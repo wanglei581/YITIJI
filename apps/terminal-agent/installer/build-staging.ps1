@@ -115,6 +115,39 @@ if (Test-Path -LiteralPath $deployedNodeWindows) {
 Copy-Item -LiteralPath (Join-Path $deployRoot "node_modules") -Destination $appRoot -Recurse
 Copy-Item -LiteralPath (Join-Path $agentRoot "dist") -Destination $appRoot -Recurse
 
+$vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+  Fail "Visual Studio Build Tools discovery is required for secure-scan-reader.exe"
+}
+$vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+$vsDevCmd = Join-Path $vsInstall "Common7\Tools\VsDevCmd.bat"
+if ([string]::IsNullOrWhiteSpace($vsInstall) -or -not (Test-Path -LiteralPath $vsDevCmd -PathType Leaf)) {
+  Fail "Visual Studio C++ x64 build tools are required for secure-scan-reader.exe"
+}
+$nativeRoot = Join-Path $appRoot "native"
+$nativeSources = @(
+  (Join-Path $agentRoot "native\secure-scan-reader.c"),
+  (Join-Path $agentRoot "native\secure-scan-path.c"),
+  (Join-Path $agentRoot "native\secure-scan-mutation.c")
+)
+$nativeExecutable = Join-Path $nativeRoot "secure-scan-reader.exe"
+New-Item -ItemType Directory -Path $nativeRoot -Force | Out-Null
+$compileScript = Join-Path $cacheRoot "compile-secure-scan-reader.cmd"
+$quotedNativeSources = ($nativeSources | ForEach-Object { "`"$_`"" }) -join " "
+$compileCommand = "cl.exe /nologo /TC /std:c11 /O2 /GS /guard:cf /MT /W4 /WX /Fe:`"$nativeExecutable`" $quotedNativeSources /link /Brepro /DYNAMICBASE /NXCOMPAT /guard:cf"
+$compileLines = @(
+  "@echo off",
+  "call `"$vsDevCmd`" -no_logo -arch=x64 -host_arch=x64",
+  "if errorlevel 1 exit /b %errorlevel%",
+  $compileCommand,
+  "exit /b %errorlevel%"
+)
+[System.IO.File]::WriteAllLines($compileScript, $compileLines, [System.Text.Encoding]::ASCII)
+Invoke-Checked -Executable "$env:SystemRoot\System32\cmd.exe" -Arguments @("/d", "/c", $compileScript)
+if (-not (Test-Path -LiteralPath $nativeExecutable -PathType Leaf)) {
+  Fail "secure-scan-reader.exe compilation produced no executable"
+}
+
 $runtimePackage = Get-Content -Raw -Encoding UTF8 (Join-Path $agentRoot "package.json") | ConvertFrom-Json
 $runtimePackage.PSObject.Properties.Remove("devDependencies")
 $runtimePackage.dependencies.PSObject.Properties.Remove("node-windows")
@@ -140,6 +173,7 @@ $unexpectedExecutables = @(Get-ChildItem -Recurse -File -LiteralPath $stagingRoo
   $_.FullName -notin @(
     (Join-Path $nodeRoot "node.exe"),
     (Join-Path $bootstrapRoot "aijobprintagent.exe"),
+    $nativeExecutable,
     $sumatra[0].FullName
   )
 })

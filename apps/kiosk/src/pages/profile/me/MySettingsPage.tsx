@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { useKioskSessionControl } from '../../../auth/KioskSessionControlContext'
 import { KIcon } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
@@ -233,7 +234,8 @@ const cardSurface = 'me-card px-5'
 
 export function MySettingsPage() {
   const navigate = useNavigate()
-  const { user, isLoggedIn, getToken, logout } = useAuth()
+  const { user, isLoggedIn, getToken } = useAuth()
+  const { clearSessionTo } = useKioskSessionControl()
   const [confirm, setConfirm] = useState<'logout' | 'switch' | 'revokeJobAi' | null>(null)
   const [showRebind, setShowRebind] = useState(false)
   const [jobAiGranted, setJobAiGranted] = useState<boolean | null>(null)
@@ -284,22 +286,22 @@ export function MySettingsPage() {
   // 退出登录：清空内存会话后回到「我的」（游客态）。
   const handleLogout = () => {
     setConfirm(null)
-    logout()
-    navigate('/profile')
+    clearSessionTo({ path: '/profile' })
   }
 
   // 切换账号：退出当前账号 → 直达登录页用另一手机号登录。先 logout 清空内存会话，避免数据串号。
   const handleSwitch = () => {
     setConfirm(null)
-    logout()
-    navigate('/login', { state: { from: '/profile' } })
+    clearSessionTo({ path: '/login', state: { from: '/profile' } })
   }
 
   // 换绑成功：旧会话已由后端踢出，前端清除内存会话并跳转登录页。
   const handleRebindDone = () => {
     setShowRebind(false)
-    logout()
-    navigate('/login', { state: { from: '/profile', hint: '换绑成功，请用新手机号登录' } })
+    clearSessionTo({
+      path: '/login',
+      state: { from: '/profile', hint: '换绑成功，请用新手机号登录' },
+    })
   }
 
   const handleRevokeJobAiConsent = async () => {

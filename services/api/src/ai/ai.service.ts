@@ -141,7 +141,8 @@ export class AiService {
   }
 
   /**
-   * 持久化 AI 结果（parse / optimize）。taskId+kind upsert，失败只记日志不阻塞业务。
+   * 持久化 AI 结果（parse / optimize / generate）。taskId+kind upsert；写入失败时
+   * fail-closed，调用方不得把只存在于本次进程内存中的结果报告为成功。
    *
    * accessTokenHash（Phase C-2A）：仅匿名 parse 铸造的令牌 hash，或 optimize 继承自 parse 行的 hash。
    * 显式传 string → 写入；传 null → 写 null（会员行）；传 undefined → update 时保持原值不动。
@@ -154,7 +155,7 @@ export class AiService {
     payload: ParseResumeOutput | OptimizeResumeOutput,
     endUserId?: string | null,
     accessTokenHash?: string | null,
-  ): Promise<boolean> {
+  ): Promise<void> {
     // 明文 token 只在 response 返回；落库前从 payload 防御性摘掉 accessToken，
     // 确保即便未来调整调用顺序，payloadJson 也绝不含明文 token。
     const persistablePayload: Record<string, unknown> = { ...payload }
@@ -180,18 +181,18 @@ export class AiService {
           ...(accessTokenHash !== undefined ? { accessTokenHash } : {}),
         },
       })
-      return true
     } catch (err) {
-      // 持久化失败不让用户的解析/优化动作失败（结果仍在本次响应里返回），
-      // 但**必须留痕**：此前这里是空 catch，写库失败时用户看到成功、库里却没有行，
-      // 之后「我的 AI 记录」查不到该条，且无人知晓 —— 这是一条静默丢数据路径，
-      // 会凭空制造出「已保存」的伪交付。
-      // 不打印 payload（含简历正文），只记可定位的元数据。
+      // 不打印 payload（可能含简历正文），只记可定位的非内容元数据。
       this.logger.error(
         `AI 结果持久化失败 taskId=${taskId} kind=${kind} status=${status} provider=${provider}: ` +
           (err instanceof Error ? err.message : String(err)),
       )
-      return false
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'AI_RESULT_PERSISTENCE_FAILED',
+          message: 'AI 结果保存失败，请稍后重试',
+        },
+      })
     }
   }
 

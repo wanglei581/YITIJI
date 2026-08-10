@@ -1,5 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common'
-import type { MemberPrintOrderItem } from './member-print-orders.types'
+import { Controller, Get, Header, Query, UseGuards } from '@nestjs/common'
+import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -31,5 +31,18 @@ export class MemberPrintOrdersController {
     @Query('pageSize') pageSize?: string,
   ): Promise<ApiResponse<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }>> {
     return ApiResponse.ok(await this.orders.list(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
+  }
+}
+
+@Controller('me/pending-tasks')
+@UseGuards(EndUserAuthGuard)
+export class MemberPendingTasksController {
+  constructor(private readonly orders: MemberPrintOrdersService) {}
+
+  /** 当前登录会员本人可续办的真实任务；无任务返回 []。 */
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  async list(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<MemberPendingTaskItem[]>> {
+    return ApiResponse.ok(await this.orders.listPending(user.endUserId))
   }
 }

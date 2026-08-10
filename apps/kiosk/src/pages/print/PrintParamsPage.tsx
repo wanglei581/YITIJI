@@ -10,10 +10,9 @@ import {
   PrinterIcon,
   WifiOffIcon,
 } from 'lucide-react'
-import type {
-  ColorMode,
-  DuplexMode,
-  PagesPerSheet,
+import {
+  hasUnverifiedPrintParams,
+  VERIFIED_PRINT_PARAMETER_PROFILE,
   PrintJobParams,
   PrintOrientation,
   PrintQuality,
@@ -127,6 +126,9 @@ export function PrintParamsPage() {
   const file = locationState?.file ?? restoredSession?.file ?? EMPTY_FILE
   const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
   const restoredPrintParams = restoredSession?.printParams
+  const restoredParamsWereRestricted = restoredPrintParams
+    ? hasUnverifiedPrintParams(restoredPrintParams)
+    : false
   const source = locationState?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
   // Page range passed from preview step
@@ -143,22 +145,17 @@ export function PrintParamsPage() {
     printer,
     printerLabel,
     printerReady,
-    tonerKnown,
     kind: printerKind,
     loading: printerLoading,
   } = useTerminalDeviceStatus()
 
   const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
-  const [colorMode, setColorMode] = useState<ColorMode>(restoredPrintParams?.colorMode ?? 'black_white')
-  const [duplex, setDuplex] = useState<DuplexMode>(restoredPrintParams?.duplex ?? 'simplex')
+  const colorMode = VERIFIED_PRINT_PARAMETER_PROFILE.colorMode
+  const duplex = VERIFIED_PRINT_PARAMETER_PROFILE.duplex
   const [orientation, setOrientation] = useState<PrintOrientation>(restoredPrintParams?.orientation ?? 'auto')
   const [scale, setScale] = useState<PrintScale>(restoredPrintParams?.scale ?? 'fit')
   const quality: PrintQuality = 'standard'
-  const pagesPerSheet: PagesPerSheet = 1
-
-  const colorTonerLow =
-    tonerKnown &&
-    (printer.tonerLevels.cyan < 25 || printer.tonerLevels.magenta < 25 || printer.tonerLevels.yellow < 25)
+  const pagesPerSheet = VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet
 
   const warnings = useMemo(() => {
     const w: { id: string; level: 'error' | 'warn' | 'info'; text: string }[] = []
@@ -171,12 +168,8 @@ export function PrintParamsPage() {
       w.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
     if (!printer.hasPaper)
       w.push({ id: 'empty', level: 'error', text: '打印机缺纸，请联系工作人员补纸' })
-    if (colorTonerLow && colorMode === 'color')
-      w.push({ id: 'color-toner', level: 'warn', text: '彩色墨粉不足，彩印效果可能不理想，建议改用黑白打印' })
-    if (file.pages !== null && file.pages > 8 && duplex === 'simplex')
-      w.push({ id: 'duplex-hint', level: 'info', text: `文件共 ${file.pages} 页，建议开启双面打印节省用纸` })
     return w
-  }, [printer, printerReady, printerKind, colorTonerLow, colorMode, duplex, file.pages])
+  }, [printer, printerReady, printerKind])
 
   const hasBlockingWarning = warnings.some((w) => w.level === 'error') || !printerReady
 
@@ -190,7 +183,6 @@ export function PrintParamsPage() {
   const priceCfg = usePrintPriceConfig()
   const unitCents = unitCentsFor(priceCfg.config, colorMode)
   const bwUnitCents = unitCentsFor(priceCfg.config, 'black_white')
-  const colorUnitCents = unitCentsFor(priceCfg.config, 'color')
   const estimateCents =
     billablePages === null
       ? null
@@ -218,7 +210,7 @@ export function PrintParamsPage() {
       <div data-w2-page="print-params" className="flex min-h-full flex-col">
         <PrintPrototypeHeader
           title="打印参数"
-          subtitle="设置份数、颜色、单双面等打印参数"
+          subtitle="设置份数、页面方向与页面范围"
           step={4}
           backLabel="返回预览"
           onBack={() => navigate(-1)}
@@ -243,7 +235,7 @@ export function PrintParamsPage() {
     <div data-w2-page="print-params" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="打印参数"
-        subtitle="设置份数、颜色、单双面等打印参数"
+        subtitle="设置份数、页面方向与页面范围"
         step={4}
         backLabel="返回预览"
         onBack={() => navigate(-1)}
@@ -273,16 +265,13 @@ export function PrintParamsPage() {
               <ToggleGroup
                 options={[{ label: '黑白', value: 'black_white' }, { label: '彩色', value: 'color' }]}
                 value={colorMode}
-                onChange={(v) => setColorMode(v as ColorMode)}
+                onChange={() => undefined}
+                disabled
               />
-              <p className="mt-2 text-xs text-neutral-400">
-                {bwUnitCents === null || colorUnitCents === null
-                  ? '价格以收银台显示为准'
-                  : `黑白 ${formatPriceCents(bwUnitCents)}/页 · 彩色 ${formatPriceCents(colorUnitCents)}/页`}
+              <p className="mt-2 text-xs text-neutral-500">
+                当前仅开放黑白、单面、每张 1 页
+                {restoredParamsWereRestricted ? '；检测到旧会话参数，已明确收口为当前组合' : ''}
               </p>
-              {colorMode === 'color' && (
-                <p className="mt-1 text-xs text-warning-fg">彩色效果以设备支持和当前耗材状态为准</p>
-              )}
             </ParamCard>
 
             {/* 单双面 */}
@@ -290,9 +279,10 @@ export function PrintParamsPage() {
               <ToggleGroup
                 options={[{ label: '单面', value: 'simplex' }, { label: '双面（长边）', value: 'duplex_long_edge' }, { label: '双面（短边）', value: 'duplex_short_edge' }]}
                 value={duplex}
-                onChange={(v) => setDuplex(v as DuplexMode)}
+                onChange={() => undefined}
+                disabled
               />
-              <p className="mt-2 text-xs text-neutral-400">长边翻转适合纵向文档，短边翻转适合横向文档</p>
+              <p className="mt-2 text-xs text-neutral-400">彩色、双面和多页合一将在厂家确认和 Windows 真机验收后再开放</p>
             </ParamCard>
 
             {/* 方向 */}
@@ -369,7 +359,7 @@ export function PrintParamsPage() {
             <Card className="p-5">
               <InfoRow label="文件页数" value={file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`} />
               <InfoRow label="打印份数" value={`${copies} 份`} />
-              <InfoRow label="颜色模式" value={colorMode === 'color' ? '彩色' : '黑白'} />
+              <InfoRow label="颜色模式" value="黑白" />
               <InfoRow label="纸张规格" value="A4" />
               <InfoRow label="总打印面" value={`${totalFaces} 面`} />
               <InfoRow label="预计用纸" value={`${sheetsUsed} 张`} />
@@ -391,7 +381,7 @@ export function PrintParamsPage() {
                 </div>
               ) : (
                 <>
-                  <InfoRow label="单价" value={unitCents === null ? '获取中…' : `${formatPriceCents(unitCents)} / 页（${colorMode === 'color' ? '彩色' : '黑白'}）`} />
+                  <InfoRow label="单价" value={unitCents === null ? '获取中…' : `${formatPriceCents(unitCents)} / 页（黑白）`} />
                   <InfoRow
                     label="计费页数 × 份数"
                     value={
@@ -420,7 +410,7 @@ export function PrintParamsPage() {
                   <span>打印类型</span><span>规格</span><span>黑白</span><span>彩色</span>
                 </div>
                 {[
-                  ['文档/简历', 'A4 普通纸', bwUnitCents === null ? '—' : `${formatPriceCents(bwUnitCents)}/页`, colorUnitCents === null ? '—' : `${formatPriceCents(colorUnitCents)}/页`],
+                  ['文档/简历', 'A4 普通纸', bwUnitCents === null ? '—' : `${formatPriceCents(bwUnitCents)}/页`, '待真机验证'],
                   ['证件照', '1寸/2寸标准版', '—', '待接入'],
                   ['照片打印', '6寸 光面纸', '—', '待接入'],
                   ['铜版纸简历', 'A4 铜版纸', '待接入', '待接入'],

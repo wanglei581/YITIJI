@@ -9,12 +9,15 @@ import {
   readFileSync,
   utimesSync,
   chmodSync,
+  linkSync,
+  symlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   sweepUnclaimedDir,
   processCandidate,
+  startScanWatcher,
   UNCLAIMED_MAX_AGE_MS,
   DELIVERY_RETRY_MAX_MS,
 } from '../src/agent/scan-watcher'
@@ -41,6 +44,14 @@ function verifySourceStructure(): void {
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
+  assert.match(
+    source,
+    /const trustedWindowsCandidate = readTrustedWindowsCandidate\(\s*scanWatchFolder,\s*filename,\s*stableSnapshot\s*\)/,
+    'Windows candidate reads must cross the packaged same-handle trusted-reader boundary',
+  )
+  assert.match(source, /finalizeTrustedWindowsCandidate\(/, 'Windows delivery deletion and quarantine must use the native identity token')
+  assert.match(source, /sweepTrustedWindowsUnclaimed\(/, 'Windows TTL deletion must use the native identity token')
+  assert.match(source, /if \(process\.platform === 'win32'\) \{[\s\S]*?sweepTrustedWindowsUnclaimed/, 'Windows sweep must branch into the secure native mutation path')
 
   // 以下三条是 Critical code-review 之后新增的并发安全加固，但在本脚本里没有实际
   // 可行的方式做成真实动态用例（原因分别标注在各行），因此保留成本低的静态正则
@@ -175,8 +186,13 @@ function verifyUnclaimedCleanup(): void {
     )
     assert.equal(existsSync(join(unclaimedDir, 'a-subdir')), true, 'sweepUnclaimedDir must not touch subdirectories')
 
-    // 日志必须报告文件名 + 滞留时长，绝不能把文件内容写进日志。
-    assert.match(stdout, /stale-25h\.pdf/, 'cleanup log must mention the deleted filename')
+    // 日志只报告安全化事件标识 + 滞留时长，不得记录可能含 PII 的文件名或内容。
+    assert.match(
+      stdout,
+      /event=(?:[a-f0-9]{12}|untracked)/,
+      'cleanup log must mention only a keyed event id or the safe audit-unavailable marker',
+    )
+    assert.doesNotMatch(stdout, /stale-25h\.pdf/, 'cleanup log must not include the filename')
     assert.doesNotMatch(stdout, new RegExp(staleSecret), 'cleanup log must never include file content')
 
     console.log('PASS sweepUnclaimedDir real-fs checks (age threshold boundary, subdir safety, no content in logs)')
@@ -315,6 +331,106 @@ async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
 // waitForStableFile 内部的 setTimeout 上）。这意味着"背靠背同步调用两次
 // processCandidate(同一 filePath)，不等待第一次的 Promise"可以确定性地复现
 // Critical code-review 修复的那个并发场景，不依赖人为延时或猜时序。
+// A scan-folder entry is attacker-controlled local input. It must never be
+// possible to make the Agent read and deliver a file outside the folder by
+// replacing a scanner output with a symbolic link.
+async function verifySymbolicLinkCandidateNeverReachesDelivery(): Promise<void> {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-symlink-'))
+  const scanFolder = join(temporaryRoot, 'scan')
+  mkdirSync(scanFolder)
+  try {
+    const outsideFile = join(temporaryRoot, 'outside-secret.pdf')
+    const filename = 'scanner-output.pdf'
+    const linkedPath = join(scanFolder, filename)
+    writeFileSync(outsideFile, '%PDF-1.4 outside data that must never be read or delivered')
+    symlinkSync(outsideFile, linkedPath, 'file')
+
+    let deliveryCount = 0
+    const config = makeConfig('http://127.0.0.1:1/api/v1', scanFolder)
+    await processCandidate(linkedPath, filename, config, async () => {
+      deliveryCount += 1
+    })
+
+    assert.equal(deliveryCount, 0, 'a symbolic-link candidate must be rejected before delivery')
+    assert.equal(existsSync(linkedPath), true, 'rejecting an unsafe candidate must not unlink it')
+    assert.match(readFileSync(outsideFile, 'utf8'), /outside data/, 'the outside target must remain untouched')
+    console.log('PASS processCandidate scan boundary: symbolic-link candidates never reach delivery')
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+}
+
+async function verifyAlternateOutsideFileBypassesAreRejected(): Promise<void> {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-boundary-bypass-'))
+  const scanFolder = join(temporaryRoot, 'scan')
+  mkdirSync(scanFolder)
+  try {
+    const outsideFile = join(temporaryRoot, 'outside-secret.pdf')
+    writeFileSync(outsideFile, '%PDF-1.4 outside data')
+    const hardLinkName = 'hard-linked-output.pdf'
+    const hardLinkPath = join(scanFolder, hardLinkName)
+    linkSync(outsideFile, hardLinkPath)
+
+    let deliveryCount = 0
+    const config = makeConfig('http://127.0.0.1:1/api/v1', scanFolder)
+    await processCandidate(hardLinkPath, hardLinkName, config, async () => {
+      deliveryCount += 1
+    })
+    await processCandidate(outsideFile, 'outside-secret.pdf', config, async () => {
+      deliveryCount += 1
+    })
+
+    assert.equal(deliveryCount, 0, 'hard links and direct outside paths must both be rejected before delivery')
+    assert.equal(existsSync(hardLinkPath), true, 'a rejected hard-link entry must remain for operator review')
+    assert.equal(existsSync(outsideFile), true, 'the outside target must remain untouched')
+    console.log('PASS processCandidate bypass review: hard links and direct outside paths never reach delivery')
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+}
+
+async function verifySupportedImageCandidatesStillDeliver(): Promise<void> {
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-images-'))
+  try {
+    const config = makeConfig('http://127.0.0.1:1/api/v1', scanFolder)
+    for (const filename of ['scanner-output.jpg', 'scanner-output.JPEG', 'scanner-output.png']) {
+      const filePath = join(scanFolder, filename)
+      writeFileSync(filePath, 'real scanner image bytes')
+      let deliveryCount = 0
+      await processCandidate(filePath, filename, config, async () => {
+        deliveryCount += 1
+      })
+      assert.equal(deliveryCount, 1, `${filename} must still reach the existing delivery sink`)
+      assert.equal(existsSync(filePath), false, `${filename} must still be removed after successful delivery`)
+    }
+    console.log('PASS processCandidate compatibility: JPEG/JPG/PNG scans still deliver and are removed')
+  } finally {
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+function verifyWindowsUnverifiableFolderBlocksWatcherStartup(): void {
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-windows-block-'))
+  const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+  assert.ok(platformDescriptor, 'process.platform must have a restorable descriptor')
+  try {
+    Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'win32' })
+    const config = makeConfig('http://127.0.0.1:1/api/v1', scanFolder)
+    const { stdout } = captureWarnLogs(() => {
+      assert.equal(
+        startScanWatcher(config),
+        undefined,
+        'Windows watcher startup must fail closed while reparse-point safety is unverifiable',
+      )
+    })
+    assert.match(stdout, /scan input blocked; watcher not started — reparse_point_unverifiable/)
+    console.log('PASS startScanWatcher Windows boundary: unverifiable reparse-point safety blocks startup')
+  } finally {
+    Object.defineProperty(process, 'platform', platformDescriptor)
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
 async function verifyInFlightDedupSkipsConcurrentDuplicate(): Promise<void> {
   let requestCount = 0
   const backend = await startSuccessBackendStub(() => {
@@ -617,6 +733,10 @@ async function main(): Promise<void> {
   await verifyScanTaskStateChangedQuarantinesImmediately()
   await verifyScanFileAlreadyDeliveredQuarantinesImmediately()
   await verifyGenericServerErrorStillRetriesNormally()
+  await verifySymbolicLinkCandidateNeverReachesDelivery()
+  await verifyAlternateOutsideFileBypassesAreRejected()
+  await verifySupportedImageCandidatesStillDeliver()
+  verifyWindowsUnverifiableFolderBlocksWatcherStartup()
   await verifySuccessfulDeliveryDeletesSourceFile()
   await verifyInFlightDedupSkipsConcurrentDuplicate()
   await verifyUnexpectedErrorOuterCatch()

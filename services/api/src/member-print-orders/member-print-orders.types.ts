@@ -2,7 +2,7 @@
 // 与 packages/shared/src/types/memberPrintOrders.ts 结构对齐（前后端契约 SSOT 见 shared）。
 // 只含安全元数据，绝不含 fileUrl / fileMd5 / paramsJson 原文 / 内部错误信息。
 // P0a 起补支付字段（关联 Order 才有值；历史无 Order 一律 null；无 live 网关，绝不为微信/支付宝）。
-import type { OrderPayStatus, PaymentSource } from '../payment/payment.types'
+import type { OrderPayStatus, PaymentSource, PrintPriceLine } from '../payment/payment.types'
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 
 export interface MemberPrintOrderItem {
@@ -22,4 +22,34 @@ export interface MemberPrintOrderItem {
   billingPageSource?: BillingPageSource | null
   /** 取件凭证码；仅 paid 且未退款/非终态时返回，否则 null（走 pickupCodeVisibleFor 门控）。 */
   pickupCode?: string | null
+}
+
+export type MemberPendingPrintStatus = 'pending' | 'claimed' | 'printing'
+
+export type MemberPendingTaskResume =
+  | {
+      kind: 'payment'
+      orderId: string
+      orderNo: string
+      amountCents: number
+      priceLines: PrintPriceLine[]
+      paymentSessionToken: string
+    }
+  | {
+      kind: 'print-progress'
+      orderId?: string
+      orderNo?: string
+      amountCents?: number
+      paymentSessionToken?: string
+    }
+
+/** 当前登录会员可续办的真实打印任务；不包含文件地址、哈希或任意服务端路由。 */
+export interface MemberPendingTaskItem {
+  id: string
+  type: 'print'
+  status: MemberPendingPrintStatus
+  payStatus: OrderPayStatus | null
+  fileName: string | null
+  updatedAt: string
+  resume: MemberPendingTaskResume
 }

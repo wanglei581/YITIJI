@@ -35,6 +35,7 @@ import { HeartbeatDto } from './dto/heartbeat.dto'
 import { ClaimTasksDto } from './dto/claim-tasks.dto'
 import { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import { RecordToolboxLaunchEventDto } from './dto/record-toolbox-launch-event.dto'
+import { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 
 @Controller()
 export class TerminalsController {
@@ -104,7 +105,20 @@ export class TerminalsController {
     return this.terminalsService.claimTasks(terminalId, dto, auth)
   }
 
-  // ── 4. Patch task status ─────────────────────────────────────────────────
+  // ── 4. Report expired scan deletion audit ────────────────────────────────
+  // Agent-authenticated PII-safe receipt for expired local scan deletion evidence.
+  @Post('terminals/:terminalId/scan-deletion-audits')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 120 } })
+  reportScanDeletionAudit(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: ReportScanDeletionAuditDto,
+    @Headers('authorization') auth: string | undefined,
+  ) {
+    return this.terminalsService.reportScanDeletionAudit(terminalId, dto, auth)
+  }
+
+  // ── 5. Patch task status ─────────────────────────────────────────────────
   // PATCH /api/v1/print-tasks/:taskId/status
   @Patch('print-tasks/:taskId/status')
   @HttpCode(HttpStatus.OK)
@@ -117,7 +131,7 @@ export class TerminalsController {
     return this.terminalsService.patchTaskStatus(taskId, dto, auth, terminalIdHeader)
   }
 
-  // ── 5. Printer status for Kiosk ─────────────────────────────────────────
+  // ── 6. Printer status for Kiosk ─────────────────────────────────────────
   // GET /api/v1/terminals/:terminalId/printer-status  (no auth — read-only, non-sensitive)
   @Get('terminals/:terminalId/printer-status')
   @HttpCode(HttpStatus.OK)

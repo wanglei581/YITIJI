@@ -204,7 +204,7 @@ export async function getDiskFreeGB(): Promise<number> {
  *                   and the spooler kept a copy. INDETERMINATE for Pantum CM2800ADN — the driver
  *                   uses this flag for BOTH normal completion AND waiting-for-paper. Callers must
  *                   NOT map this to 'completed' or 'paper_empty'; treat as unconfirmed.
- *   'completed'   - job no longer in queue (non-Pantum normal completion via queue removal)
+ *   'completed'   - JobStatus explicitly contains Complete/Completed/Printed
  *   'paper_empty' - JobStatus contains "PaperOut" (explicit driver report — NOT Pantum CM2800ADN)
  *   'error'       - Jammed / Error / UserIntervention / Deleting (explicit driver error flags)
  *   'not_found'   - printer exists but no job matching taskId
@@ -257,7 +257,13 @@ export async function getPrintJobStatus(
     `$job.JobStatus`
 
   const output = await runPowerShell(script, `${printerName}|${safeTaskId}`)
+  return parsePrintJobStatus(output)
+}
 
+/** Pure JobStatus parser, exported for deterministic fault-injection verification. */
+export function parsePrintJobStatus(
+  output: string | null,
+): { status: PrintJobMonitorStatus; rawStatus?: string } {
   if (!output || output === 'bad_input') return { status: 'unknown' }
   if (output === 'not_found') return { status: 'not_found' }
 
@@ -266,13 +272,18 @@ export async function getPrintJobStatus(
   // JobStatus can be a comma-separated list of flags (e.g. "Printing, PaperOut")
   const flags = raw.toLowerCase()
 
-  // Explicit error flags are checked first — they take priority over 'Retained'.
+  // Explicit failure flags are checked first. This priority prevents a combined
+  // state such as "Retained, Deleted" or "Printed, PaperOut" from being treated
+  // as completion.
   if (flags.includes('paperout')) return { status: 'paper_empty', rawStatus: raw }
   if (
     flags.includes('jammed') ||
     flags.includes('error') ||
     flags.includes('userintervention') ||
-    flags.includes('deleting')
+    flags.includes('deleting') ||
+    flags.includes('deleted') ||
+    flags.includes('cancelled') ||
+    flags.includes('canceled')
   ) {
     return { status: 'error', rawStatus: raw }
   }
@@ -286,6 +297,16 @@ export async function getPrintJobStatus(
   // Return 'retained' so callers can track this indeterminate state and decide how to handle it.
   // Do NOT map to 'completed' or 'paper_empty' here.
   if (flags.includes('retained')) return { status: 'retained', rawStatus: raw }
+
+  // Windows may report Complete/Completed or Printed before queue removal.
+  // This is spooler lifecycle evidence only; it does not prove physical delivery.
+  if (
+    flags.includes('completed') ||
+    flags.includes('complete') ||
+    flags.includes('printed')
+  ) {
+    return { status: 'completed', rawStatus: raw }
+  }
 
   // Normal / Spooling / Printing without Retained → job still rendering/spooling
   return { status: 'printing', rawStatus: raw }

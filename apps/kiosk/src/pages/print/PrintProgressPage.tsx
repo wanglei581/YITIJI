@@ -138,6 +138,59 @@ function backendStatusToStep(status: BackendJobStatus): Step {
   return 'queuing'
 }
 
+function realStatusPresentation(status: BackendJobStatus | null) {
+  switch (status) {
+    case 'pending':
+      return {
+        headerTitle: '等待终端领取',
+        headerSubtitle: '任务已进入队列，终端尚未领取，请留在机器旁',
+        stageTitle: '等待终端领取',
+        stageSubtitle: '任务正在队列中等待，尚未发送到打印机',
+        queueLabel: '等待终端领取',
+        queueDesc: '任务正在队列中，终端尚未领取',
+        activeHint: '等待终端领取…',
+        actionNote: '任务尚未被终端领取；如长时间无响应，请联系现场工作人员',
+        badge: '排队等待中',
+      }
+    case 'claimed':
+      return {
+        headerTitle: '终端已领取任务',
+        headerSubtitle: '终端正在准备打印，请留在机器旁',
+        stageTitle: '终端已领取任务',
+        stageSubtitle: '终端已领取任务，正在准备打印',
+        queueLabel: '终端已领取',
+        queueDesc: '终端已领取任务，正在准备打印',
+        activeHint: '终端准备中…',
+        actionNote: '终端正在准备打印；如遇卡纸或缺纸，请联系现场工作人员',
+        badge: '终端准备中',
+      }
+    case 'printing':
+      return {
+        headerTitle: '正在打印',
+        headerSubtitle: '打印机正在出纸，请留在机器旁及时取件',
+        stageTitle: '正在打印',
+        stageSubtitle: '打印机正在出纸，请在出纸口等候',
+        queueLabel: '终端已领取',
+        queueDesc: '终端已领取任务并进入打印阶段',
+        activeHint: '打印机正在出纸…',
+        actionNote: '打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员',
+        badge: '打印进行中',
+      }
+    default:
+      return {
+        headerTitle: '正在确认任务状态',
+        headerSubtitle: '任务已提交，正在读取终端状态，请留在机器旁',
+        stageTitle: '正在确认任务状态',
+        stageSubtitle: '尚未收到终端处理状态',
+        queueLabel: '等待状态更新',
+        queueDesc: '正在向服务端确认任务是否已被终端领取',
+        activeHint: '正在读取状态…',
+        actionNote: '正在确认任务状态；如长时间无响应，请联系现场工作人员',
+        badge: '状态确认中',
+      }
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PrintProgressPage() {
@@ -164,6 +217,7 @@ export function PrintProgressPage() {
   const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
 
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
+  const [backendStatus, setBackendStatus] = useState<BackendJobStatus | null>(null)
   const [failed, setFailed]     = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [simDone, setSimDone]   = useState(false)
@@ -280,6 +334,7 @@ export function PrintProgressPage() {
           return
         }
         // pending | claimed | printing — update step
+        setBackendStatus(result.status)
         setCurrent(backendStatusToStep(result.status))
       } catch {
         if (cancelRef.current) return
@@ -309,6 +364,7 @@ export function PrintProgressPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const currentIdx = stepIndex(current)
+  const realStatus = realStatusPresentation(backendStatus)
 
   // 任务信息展示字段
   const file   = (state?.file  as PrintFileState | undefined) ?? null
@@ -411,10 +467,10 @@ export function PrintProgressPage() {
     },
     {
       key: 'queue',
-      label: '排队等待',
+      label: isSim ? '排队等待演示' : realStatus.queueLabel,
       desc: isSim
         ? '演示：终端未接收、未校验'
-        : '终端已接收任务，文件校验通过',
+        : realStatus.queueDesc,
     },
     {
       key: 'print',
@@ -437,13 +493,13 @@ export function PrintProgressPage() {
     <PrintPageFrame>
     <div data-w2-page="print-progress" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
-        title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : '正在处理'}
+        title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : realStatus.headerTitle}
         subtitle={
           isSim
             ? (simDone
               ? '未真实打印，未创建打印任务'
               : '当前为演示模式，不会建单、支付或出纸')
-            : '任务已提交，正在等待终端处理，请留在机器旁'
+            : realStatus.headerSubtitle
         }
         step={7}
         aside={
@@ -492,7 +548,7 @@ export function PrintProgressPage() {
                   ? (isSim ? '演示失败场景已触发' : '处理出错')
                   : isSim
                     ? (simDone ? '演示流程已结束' : '流程演示中')
-                    : '正在打印'}
+                    : realStatus.stageTitle}
               </div>
               <div className="pp-stage-sub">
                 {failed
@@ -503,7 +559,7 @@ export function PrintProgressPage() {
                     ? (simDone
                       ? '未真实打印，可返回首页或重新上传'
                       : '仅演示进度步骤，未建单、未支付、未出纸')
-                    : '状态自动刷新，完成后自动进入取件页'}
+                    : realStatus.stageSubtitle}
               </div>
 
               {/* SIM 结束：停留本页，提供触控操作 */}
@@ -551,7 +607,7 @@ export function PrintProgressPage() {
                         <span>{item.desc}</span>
                         {isActive && !failed && (
                           <span className="animate-pulse" style={{ fontSize: 16, color: 'var(--print-teal-deep)', marginTop: 4, display: 'block' }}>
-                            {useRealApi ? '等待终端响应…' : '演示中…'}
+                            {useRealApi ? realStatus.activeHint : '演示中…'}
                           </span>
                         )}
                       </span>
@@ -658,11 +714,11 @@ export function PrintProgressPage() {
         <span className="pp-actionbar-note">
           {isSim
             ? (simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页')
-            : '打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员协助处理'}
+            : realStatus.actionNote}
         </span>
         <span className="pp-status-chip" role="status" aria-live="polite">
           <i aria-hidden="true" />
-          {isSim ? (simDone ? '演示已结束' : '演示进行中') : '状态自动刷新中'}
+          {isSim ? (simDone ? '演示已结束' : '演示进行中') : realStatus.badge}
         </span>
       </KioskActionBar>
 

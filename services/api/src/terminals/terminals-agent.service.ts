@@ -14,6 +14,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Logger,
 } from '@nestjs/common'
@@ -25,6 +26,7 @@ import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
+import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import {
   cleanNullable,
   normalizeMacAddress,
@@ -48,6 +50,7 @@ import {
   type TerminalBindCodeAuditContext,
   type EmergencyCredentialRevokeResult,
 } from './terminal-credential-security.service'
+import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit.service'
 
 // ── Task status type ───────────────────────────────────────────────────────────
 
@@ -177,15 +180,18 @@ function createActionToken(taskId: string, terminalId: string, expiresAt: Date):
 export class TerminalAgentService implements OnModuleInit {
   private readonly logger = new Logger(TerminalAgentService.name)
   private readonly credentialSecurity: TerminalCredentialSecurityService
+  private readonly scanDeletionAudit: TerminalScanDeletionAuditService
 
   constructor(
     private readonly prisma: PrismaService,
     audit: AuditService,
     @Optional() credentialSecurity?: TerminalCredentialSecurityService,
+    @Optional() scanDeletionAudit?: TerminalScanDeletionAuditService,
     @Optional() private readonly contractReportPrintLifecycle?: ContractReportPrintLifecycleService,
   ) {
     // Nest 运行时使用独立 provider；脚本 fixture 保留两参构造兼容。
     this.credentialSecurity = credentialSecurity ?? new TerminalCredentialSecurityService(prisma, audit)
+    this.scanDeletionAudit = scanDeletionAudit ?? new TerminalScanDeletionAuditService(prisma)
   }
 
   async onModuleInit(): Promise<void> {
@@ -498,8 +504,18 @@ export class TerminalAgentService implements OnModuleInit {
     }
 
     if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
-      await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
-      return { acknowledged: true }
+      if (preCheck.status === dto.status) {
+        await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
+        return { acknowledged: true }
+      }
+      if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+        throw new ConflictException({
+          error: {
+            code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+            message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
+          },
+        })
+      }
     }
 
     const allowed = VALID_TRANSITIONS[preCheck.status]
@@ -522,20 +538,53 @@ export class TerminalAgentService implements OnModuleInit {
           completedAt: isTerminal ? new Date() : null,
         },
       })
-      if (updated.count > 0) {
-        await tx.printTaskStatusLog.create({
-          data: {
-            taskId,
-            fromStatus: preCheck.status,
-            toStatus: dto.status,
-            errorCode: dto.errorCode ?? null,
+      if (updated.count === 0) {
+        const current = await tx.printTask.findUnique({
+          where: { id: taskId },
+          select: { status: true, terminalId: true },
+        })
+        if (!current) {
+          throw new NotFoundException({
+            error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
+          })
+        }
+        if (current.terminalId !== terminalId) {
+          throw new BadRequestException({
+            error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` },
+          })
+        }
+        if (current.status === dto.status) return
+        if (
+          TERMINAL_STATES.includes(current.status as TaskStatus) &&
+          TERMINAL_STATES.includes(dto.status as TaskStatus)
+        ) {
+          throw new ConflictException({
+            error: {
+              code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+              message: `任务已处于终态 ${current.status}，不能确认不同终态 ${dto.status}`,
+            },
+          })
+        }
+        throw new ConflictException({
+          error: {
+            code: 'PRINT_TASK_STATUS_CHANGED',
+            message: `任务状态已由 ${preCheck.status} 变更为 ${current.status}，请重新确认后上报`,
           },
         })
-        await tx.order.updateMany({
-          where: { printTaskId: taskId },
-          data: { taskStatus: dto.status, terminalId },
-        })
       }
+
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId,
+          fromStatus: preCheck.status,
+          toStatus: dto.status,
+          errorCode: dto.errorCode ?? null,
+        },
+      })
+      await tx.order.updateMany({
+        where: { printTaskId: taskId },
+        data: { taskStatus: dto.status, terminalId },
+      })
     })
 
     if (isTerminal) await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
@@ -545,6 +594,15 @@ export class TerminalAgentService implements OnModuleInit {
 
   async validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void> {
     await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
+  }
+
+  async reportScanDeletionAudit(
+    terminalId: string,
+    dto: ReportScanDeletionAuditDto,
+    authHeader: string | undefined,
+  ): Promise<{ acknowledged: true; eventId: string }> {
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
+    return this.scanDeletionAudit.persist(terminalId, dto)
   }
 
   /**

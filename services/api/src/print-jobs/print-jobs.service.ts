@@ -12,6 +12,7 @@ import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { countPagesInRange } from './page-range.util'
 import { PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
+import { assertVerifiedPrintParameters } from './verified-print-parameters'
 
 export interface PrintJobCreated {
   taskId:    string
@@ -327,6 +328,9 @@ export class PrintJobsService {
     // Task 10 服务端能力门禁：管理员把该终端 document_print 配为非 available 时
     // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
+
+    // 彩色、双面、N-up 尚无厂家/Windows 真机验证证据；在解析页数、报价与落库前统一拒绝。
+    assertVerifiedPrintParameters(dto.params)
 
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。

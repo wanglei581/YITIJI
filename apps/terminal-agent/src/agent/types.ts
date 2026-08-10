@@ -196,6 +196,25 @@ export interface PatchStatusResponse {
   acknowledged: boolean
 }
 
+// ── Scan deletion audit reporting ───────────────────────────────────────────
+
+export interface ScanDeletionAuditReportPayload {
+  eventId: string
+  reasonCode: 'UNCLAIMED_TTL_EXPIRED'
+  identifierHash: string
+  createdAt: string
+  deletedAt: string | null
+  result: 'pending_delete' | 'deleted' | 'delete_failed'
+  deleteAttempts: number
+  lastDeleteAttemptAt: string
+  lastErrorCode: string | null
+}
+
+export interface ScanDeletionAuditReportResponse {
+  acknowledged: boolean
+  eventId: string
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 export interface RegistrationRequest {

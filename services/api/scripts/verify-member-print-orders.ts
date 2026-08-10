@@ -22,16 +22,20 @@ import { closeSync, openSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { ExecutionContext } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { MemberPendingTasksController } from '../src/member-print-orders/member-print-orders.controller'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
+import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const apiRoot = path.resolve(__dirname, '..')
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-print-orders-${randomUUID().slice(0, 8)}.db`
 const fallbackDbPath = fallbackDbName ? path.join(apiRoot, 'prisma', fallbackDbName) : null
 if (fallbackDbName) {
   process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
-  prepareFallbackDb()
 }
+assertIsolatedVerificationDatabase()
+if (fallbackDbName) prepareFallbackDb()
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -78,25 +82,33 @@ async function main() {
   const userB = `eu_po_b_${suffix}`
   const userC = `eu_po_c_${suffix}` // 无任何订单 → 空列表
   const userD = `eu_po_d_${suffix}` // P0a 支付字段：unpaid / paid / refunded / 无 Order
-  const allUserIds = [userA, userB, userC, userD]
+  const userE = `eu_po_e_${suffix}` // pending-tasks：active / payment / terminal-state 过滤
+  const allUserIds = [userA, userB, userC, userD, userE]
+  const resumeTerminalId = `terminal_po_${suffix}`
 
   // 显式登记本测试创建的 PrintTask id：PrintTask→EndUser 是 onDelete:SetNull（非级联），
   // 删用户不会删任务，必须按 id 显式清理（含匿名任务）。
   const t = (k: string) => `ptask_po_${k}_${suffix}`
-  const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'), t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder')]
+  const taskIds = [
+    t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'),
+    t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder'),
+    t('e_unpaid'), t('e_paying'), t('e_paid'), t('e_claimed'), t('e_printing'),
+    t('e_completed'), t('e_failed'), t('e_cancelled'), t('e_closed'), t('e_refunded_claimed'),
+  ]
 
   async function cleanup() {
     await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: allUserIds } } })
+    await prisma.terminal.deleteMany({ where: { id: resumeTerminalId } })
   }
 
   try {
     await cleanup()
-    for (const [id, n] of [[userA, '会员A'], [userB, '会员B'], [userC, '会员C'], [userD, '会员D']] as const) {
+    for (const [id, n] of [[userA, '会员A'], [userB, '会员B'], [userC, '会员C'], [userD, '会员D'], [userE, '会员E']] as const) {
       await prisma.endUser.create({ data: { id, phoneHash: `po-${id}`, phoneEnc: `po-enc-${id}`, nickname: n } })
     }
-    pass('三个测试会员已创建')
+    pass('五个测试会员已创建')
 
     // 时间锚点：用固定偏移制造确定的 createdAt 倒序（a2 比 a1 新）。
     const base = new Date('2026-06-08T00:00:00.000Z').getTime()
@@ -272,6 +284,121 @@ async function main() {
     } else {
       fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
     }
+
+    // ── 8. /me/pending-tasks：本人 active 任务 + 支付/打印恢复语义 ──
+    process.env['PAYMENT_SESSION_SECRET'] ??= 'verify-member-pending-tasks-secret-32-bytes'
+    await prisma.terminal.create({
+      data: {
+        id: resumeTerminalId,
+        terminalCode: `KSK-PO-${suffix}`,
+        agentToken: `agent-po-${suffix}`,
+        deviceFingerprint: `fp-po-${suffix}`,
+      },
+    })
+    const resumeTaskRows = [
+      ['e_unpaid', 'pending', 60],
+      ['e_paying', 'pending', 61],
+      ['e_paid', 'pending', 62],
+      ['e_claimed', 'claimed', 63],
+      ['e_printing', 'printing', 64],
+      ['e_completed', 'completed', 65],
+      ['e_failed', 'failed', 66],
+      ['e_cancelled', 'cancelled', 67],
+      ['e_closed', 'pending', 68],
+      ['e_refunded_claimed', 'claimed', 69],
+    ] as const
+    for (const [key, status, minute] of resumeTaskRows) {
+      await prisma.printTask.create({
+        data: {
+          id: t(key),
+          endUserId: userE,
+          terminalId: resumeTerminalId,
+          fileUrl: `sig://resume-${key}`,
+          fileMd5: `sha256-resume-${key}`,
+          status,
+          createdAt: at(minute),
+          updatedAt: at(minute),
+          paramsJson: JSON.stringify({ fileName: `${key}.pdf`, copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+        },
+      })
+    }
+    const resumeOrder = async (key: string, payStatus: string, amountCents: number) => {
+      const orderNo = `ORD-${key.toUpperCase()}-${ord8}`
+      return prisma.order.create({
+        data: {
+          orderNo,
+          type: 'print',
+          printTaskId: t(key),
+          endUserId: userE,
+          terminalId: resumeTerminalId,
+          amountCents,
+          payStatus,
+          taskStatus: key.includes('claimed') ? 'claimed' : 'pending',
+          itemsJson: JSON.stringify([{ serviceKey: 'print_bw_page', unitCents: 20, quantity: 2, subtotalCents: 40 }]),
+        },
+      })
+    }
+    await resumeOrder('e_unpaid', 'unpaid', 40)
+    await resumeOrder('e_paying', 'paying', 40)
+    await resumeOrder('e_paid', 'paid', 40)
+    await resumeOrder('e_claimed', 'paid', 40)
+    await resumeOrder('e_closed', 'closed', 40)
+    await resumeOrder('e_refunded_claimed', 'refunded', 40)
+
+    const pendingController = new MemberPendingTasksController(orders)
+    const pendingEnvelope = await pendingController.list({ endUserId: userE, sessionId: 'verify-session-e' })
+    const pending = pendingEnvelope.data
+    const pendingGuards = Reflect.getMetadata('__guards__', MemberPendingTasksController) as unknown[] | undefined
+    if (
+      Reflect.getMetadata('path', MemberPendingTasksController) === 'me/pending-tasks' &&
+      pendingGuards?.includes(EndUserAuthGuard)
+    ) {
+      pass('8. GET /me/pending-tasks controller 已注册并受 EndUserAuthGuard 保护，复用 CurrentEndUser 身份')
+    } else fail('8. /me/pending-tasks controller 路径未注册')
+    const pendingIds = pending.map((item) => item.id)
+    const expectedPendingIds = [t('e_printing'), t('e_claimed'), t('e_paid'), t('e_paying'), t('e_unpaid')]
+    if (JSON.stringify(pendingIds) === JSON.stringify(expectedPendingIds)) {
+      pass('8a. pending-tasks 仅返回本人可续办 active PrintTask，按 updatedAt 倒序；任务终态与支付终态被排除')
+    } else fail(`8a. pending-tasks 过滤/排序异常：${JSON.stringify(pendingIds)}`)
+
+    const unpaidResume = pending.find((item) => item.id === t('e_unpaid'))
+    const payingResume = pending.find((item) => item.id === t('e_paying'))
+    const paidResume = pending.find((item) => item.id === t('e_paid'))
+    const claimedResume = pending.find((item) => item.id === t('e_claimed'))
+    const printingResume = pending.find((item) => item.id === t('e_printing'))
+    if (
+      unpaidResume?.resume.kind === 'payment' &&
+      payingResume?.resume.kind === 'payment' &&
+      paidResume?.resume.kind === 'print-progress' &&
+      claimedResume?.resume.kind === 'print-progress' &&
+      printingResume?.resume.kind === 'print-progress'
+    ) {
+      pass('8b. unpaid/paying 恢复到支付；paid pending 与 claimed/printing 恢复到真实打印进度')
+    } else fail(`8b. 恢复语义异常：${JSON.stringify(pending)}`)
+
+    const paymentResume = unpaidResume?.resume.kind === 'payment' ? unpaidResume.resume : null
+    const tokenCheck = paymentResume?.paymentSessionToken
+      ? verifyPaymentSessionToken(paymentResume.paymentSessionToken, {
+          orderId: paymentResume.orderId,
+          orderNo: paymentResume.orderNo,
+          terminalId: resumeTerminalId,
+          amountCents: paymentResume.amountCents,
+          printTaskId: t('e_unpaid'),
+        })
+      : null
+    if (tokenCheck?.ok === true && paymentResume?.priceLines.length === 1) {
+      pass('8c. 支付恢复只复用本人真实 Order，并签发受订单/终端/金额/task 绑定的短期 payment session')
+    } else fail(`8c. 支付恢复 token/价目明细异常：${JSON.stringify(paymentResume)}`)
+
+    const pendingForOtherUser = await orders.listPending(userB)
+    if (pendingForOtherUser.every((item) => item.id !== t('e_unpaid') && item.id !== t('e_printing'))) {
+      pass('8d. pending-tasks 按 EndUserAuthGuard 注入的 endUserId 查询，其他会员无法读取 E 的任务')
+    } else fail(`8d. pending-tasks 跨用户泄漏：${JSON.stringify(pendingForOtherUser)}`)
+
+    const pendingSerialized = JSON.stringify(pending)
+    if (!pendingSerialized.includes('sig://') && !pendingSerialized.includes('sha256-resume') && !pendingSerialized.includes('paramsJson')) {
+      pass('8e. pending-tasks 不返回 fileUrl/fileMd5/paramsJson 或任意文件内容')
+    } else fail('8e. pending-tasks 响应泄漏文件敏感字段')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

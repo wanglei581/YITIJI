@@ -16,6 +16,7 @@ export interface W6RouteCase {
   longText?: string
   expectedPath?: string
   seed?: (page: Page) => Promise<void>
+  requiresMemberSession?: boolean
 }
 
 type W6RouteDefinition = Omit<W6RouteCase, 'viewport' | 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'> & Partial<Pick<W6RouteCase, 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'>>
@@ -120,7 +121,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("输入手机上的取件码，即可从本机出纸")', featureText: '扫码取件' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("AI方案确认")', featureText: 'AI方案确认' },
-  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: '继续上次' },
+  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
   { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', marker: 'h1:text-is("线上招聘平台")', featureText: '线上招聘平台' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },

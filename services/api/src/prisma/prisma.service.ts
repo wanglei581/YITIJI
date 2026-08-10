@@ -83,6 +83,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalCapability
   }
 
+  get terminalScanDeletionAudit() {
+    return this.client.terminalScanDeletionAudit
+  }
+
   // ── Order model foundation ─────────────────────────────────────────────────
 
   get order() {

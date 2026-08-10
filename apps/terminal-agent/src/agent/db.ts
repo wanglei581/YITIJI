@@ -6,6 +6,7 @@
  * Tables:
  *   print_tasks     — records completed/failed tasks to prevent re-execution on restart
  *   pending_patches — offline PATCH queue retried by offline-queue.ts
+ *   scan_deletion_audit — durable, PII-safe audit of expired _unclaimed deletion
  *
  * Fail-closed behavior: if better-sqlite3 native module fails to load (e.g. first
  * run before npm rebuild on a new Windows machine), printing is disabled instead
@@ -19,6 +20,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { randomBytes } from 'crypto'
 import { log, warn } from '../logger'
 import type { PatchStatusPayload } from './types'
 
@@ -52,6 +54,34 @@ export interface PendingPatch {
   attempts: number
   nextRetryAt: string
   createdAt: string
+  deadLetterAt: string | null
+  deadLetterReason: string | null
+  operatorConfirmedAt: string | null
+  resolvedAt: string | null
+  resolution: string | null
+  manualReplayAttempts: number
+  lastManualReplayAt: string | null
+  manualReplayErrorCode: string | null
+}
+
+export type ScanDeletionResult = 'pending_delete' | 'deleted' | 'delete_failed'
+
+export interface ScanDeletionAudit {
+  eventId: string
+  reasonCode: string
+  identifierHash: string
+  createdAt: string
+  deletedAt: string | null
+  result: ScanDeletionResult
+  attempts: number
+  lastAttemptAt: string
+  lastErrorCode: string | null
+  pendingReport: boolean
+  reportAttempts: number
+  nextReportAt: string | null
+  reportedAt: string | null
+  reportDeadLetterAt: string | null
+  reportErrorCode: string | null
 }
 
 // ── DB path ───────────────────────────────────────────────────────────────────
@@ -81,11 +111,67 @@ CREATE TABLE IF NOT EXISTS pending_patches (
   errorMessage TEXT,
   attempts     INTEGER NOT NULL DEFAULT 0,
   nextRetryAt  TEXT    NOT NULL,
-  createdAt    TEXT    NOT NULL
+  createdAt    TEXT    NOT NULL,
+  deadLetterAt TEXT,
+  deadLetterReason TEXT,
+  operatorConfirmedAt TEXT,
+  resolvedAt TEXT,
+  resolution TEXT,
+  manualReplayAttempts INTEGER NOT NULL DEFAULT 0,
+  lastManualReplayAt TEXT,
+  manualReplayErrorCode TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dead_letter_operator_audit (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  patchId    INTEGER NOT NULL,
+  action     TEXT NOT NULL,
+  outcome    TEXT NOT NULL,
+  reasonCode TEXT,
+  createdAt  TEXT NOT NULL,
+  FOREIGN KEY (patchId) REFERENCES pending_patches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dead_letter_operator_audit_patch
+  ON dead_letter_operator_audit (patchId, createdAt);
+
+CREATE TABLE IF NOT EXISTS scan_deletion_audit (
+  eventId        TEXT PRIMARY KEY,
+  reasonCode     TEXT NOT NULL,
+  identifierHash TEXT NOT NULL,
+  createdAt      TEXT NOT NULL,
+  deletedAt      TEXT,
+  result         TEXT NOT NULL,
+  attempts       INTEGER NOT NULL DEFAULT 0,
+  lastAttemptAt  TEXT NOT NULL,
+  lastErrorCode  TEXT,
+  pendingReport  INTEGER NOT NULL DEFAULT 1,
+  reportAttempts INTEGER NOT NULL DEFAULT 0,
+  nextReportAt   TEXT,
+  reportedAt     TEXT,
+  reportDeadLetterAt TEXT,
+  reportErrorCode TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_deletion_audit_pending
+  ON scan_deletion_audit (pendingReport, createdAt);
+
+CREATE TABLE IF NOT EXISTS agent_metadata (
+  metadataKey   TEXT PRIMARY KEY,
+  metadataValue TEXT NOT NULL,
+  createdAt     TEXT NOT NULL
 );
 `
 
+function ensureColumn(db: SqliteDb, table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all()
+  if (columns.some((row) => row['name'] === column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+}
+
 // ── Open ──────────────────────────────────────────────────────────────────────
+
+let activeDatabase: AgentDatabase = null
 
 /**
  * Open (and initialise schema for) the agent SQLite database.
@@ -102,16 +188,66 @@ export function openDatabase(): AgentDatabase {
     const dbPath = getDbPath()
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     const db = new DatabaseCtor(dbPath)
+    db.exec('PRAGMA secure_delete = ON')
     db.exec(SCHEMA_SQL)
-    log(`db: opened ${dbPath}`)
+    ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'operatorConfirmedAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'resolvedAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'resolution', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'manualReplayAttempts', 'INTEGER NOT NULL DEFAULT 0')
+    ensureColumn(db, 'pending_patches', 'lastManualReplayAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'manualReplayErrorCode', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportAttempts', 'INTEGER NOT NULL DEFAULT 0')
+    ensureColumn(db, 'scan_deletion_audit', 'nextReportAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportedAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportDeadLetterAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportErrorCode', 'TEXT')
+    activeDatabase = db
+    log('db: opened local task database')
     return db
-  } catch (e) {
+  } catch {
+    activeDatabase = null
     warn(
       `db: local task database unavailable; printing disabled — ` +
-        `better-sqlite3 加载失败，任务状态持久化不可用 — ${e instanceof Error ? e.message : String(e)}`,
+        'LOCAL_DB_OPEN_FAILED: better-sqlite3 加载或任务状态持久化不可用',
     )
     return null
   }
+}
+
+/** Returns the process-wide DB opened during Agent startup, without opening a second connection. */
+export function getActiveDatabase(): AgentDatabase {
+  return activeDatabase
+}
+
+/**
+ * Per-install 256-bit HMAC key for scan audit identifiers. The key stays in local
+ * metadata and is never copied into the deletion audit ledger or logs.
+ */
+export function getOrCreateScanAuditHmacKey(db: AgentDatabase): string {
+  if (!db) throw new Error('SCAN_AUDIT_DB_UNAVAILABLE')
+  const metadataKey = 'scan_deletion_audit_hmac_key_v1'
+  const existing = db
+    .prepare('SELECT metadataValue FROM agent_metadata WHERE metadataKey = ?')
+    .get(metadataKey)
+  if (existing) {
+    const value = String(existing['metadataValue'])
+    if (!/^[a-f0-9]{64}$/.test(value)) throw new Error('SCAN_AUDIT_HMAC_KEY_INVALID')
+    return value
+  }
+
+  const generated = randomBytes(32).toString('hex')
+  db.prepare(
+    `INSERT OR IGNORE INTO agent_metadata (metadataKey, metadataValue, createdAt)
+     VALUES (?, ?, ?)`,
+  ).run(metadataKey, generated, new Date().toISOString())
+  const stored = db
+    .prepare('SELECT metadataValue FROM agent_metadata WHERE metadataKey = ?')
+    .get(metadataKey)
+  const value = String(stored?.['metadataValue'] ?? '')
+  if (!/^[a-f0-9]{64}$/.test(value)) throw new Error('SCAN_AUDIT_HMAC_KEY_PERSIST_FAILED')
+  return value
 }
 
 export function isDatabaseAvailable(db: AgentDatabase): db is SqliteDb {
@@ -155,6 +291,188 @@ export function markTaskDone(db: AgentDatabase, taskId: string, status: string):
     .run(taskId, status, now, now)
 }
 
+// ── Expired scan deletion audit ───────────────────────────────────────────────
+
+/**
+ * Durably record delete intent before touching an expired high-sensitivity scan.
+ * eventId and identifierHash are caller-generated hashes; no path, filename,
+ * file content, or other plaintext PII is accepted by this schema/API.
+ */
+export function beginScanDeletionAudit(
+  db: AgentDatabase,
+  event: Pick<ScanDeletionAudit, 'eventId' | 'reasonCode' | 'identifierHash'>,
+  attemptedAt: string,
+): void {
+  if (!db) return
+  db.prepare(
+    `INSERT INTO scan_deletion_audit
+       (eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+        attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+        nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode)
+     VALUES (?, ?, ?, ?, NULL, 'pending_delete', 1, ?, NULL, 1, 0, ?, NULL, NULL, NULL)
+     ON CONFLICT(eventId) DO UPDATE SET
+       result = 'pending_delete',
+       deletedAt = NULL,
+       attempts = scan_deletion_audit.attempts + 1,
+       lastAttemptAt = excluded.lastAttemptAt,
+       lastErrorCode = NULL,
+       pendingReport = 1,
+       reportAttempts = 0,
+       nextReportAt = excluded.nextReportAt,
+       reportedAt = NULL,
+       reportDeadLetterAt = NULL,
+       reportErrorCode = NULL`,
+  ).run(
+    event.eventId,
+    event.reasonCode,
+    event.identifierHash,
+    attemptedAt,
+    attemptedAt,
+    attemptedAt,
+  )
+}
+
+export function finishScanDeletionAudit(
+  db: AgentDatabase,
+  eventId: string,
+  outcome: { result: 'deleted'; deletedAt: string } | { result: 'delete_failed'; errorCode: string },
+): void {
+  if (!db) return
+  if (outcome.result === 'deleted') {
+    db.prepare(
+      `UPDATE scan_deletion_audit
+       SET result = 'deleted', deletedAt = ?, lastErrorCode = NULL, pendingReport = 1,
+           reportAttempts = 0, nextReportAt = ?, reportedAt = NULL,
+           reportDeadLetterAt = NULL, reportErrorCode = NULL
+       WHERE eventId = ?`,
+    ).run(outcome.deletedAt, outcome.deletedAt, eventId)
+    return
+  }
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET result = 'delete_failed', deletedAt = NULL, lastErrorCode = ?, pendingReport = 1,
+         reportAttempts = 0, nextReportAt = ?, reportedAt = NULL,
+         reportDeadLetterAt = NULL, reportErrorCode = NULL
+     WHERE eventId = ?`,
+  ).run(outcome.errorCode, new Date().toISOString(), eventId)
+}
+
+/** Local operator/diagnostic read model. */
+export function getScanDeletionAudits(db: AgentDatabase): ScanDeletionAudit[] {
+  if (!db) return []
+  const rows = db.prepare(
+    `SELECT eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+            attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+            nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode
+     FROM scan_deletion_audit ORDER BY createdAt ASC`,
+  ).all()
+  return rows.map((row) => ({
+    eventId: String(row['eventId']),
+    reasonCode: String(row['reasonCode']),
+    identifierHash: String(row['identifierHash']),
+    createdAt: String(row['createdAt']),
+    deletedAt: row['deletedAt'] === null ? null : String(row['deletedAt']),
+    result: row['result'] as ScanDeletionResult,
+    attempts: Number(row['attempts']),
+    lastAttemptAt: String(row['lastAttemptAt']),
+    lastErrorCode: row['lastErrorCode'] === null ? null : String(row['lastErrorCode']),
+    pendingReport: Number(row['pendingReport']) === 1,
+    reportAttempts: Number(row['reportAttempts']),
+    nextReportAt: row['nextReportAt'] === null ? null : String(row['nextReportAt']),
+    reportedAt: row['reportedAt'] === null ? null : String(row['reportedAt']),
+    reportDeadLetterAt:
+      row['reportDeadLetterAt'] === null ? null : String(row['reportDeadLetterAt']),
+    reportErrorCode: row['reportErrorCode'] === null ? null : String(row['reportErrorCode']),
+  }))
+}
+
+export function getPendingScanDeletionAuditReports(
+  db: AgentDatabase,
+  limit = 50,
+): ScanDeletionAudit[] {
+  if (!db) return []
+  const now = new Date().toISOString()
+  const rows = db.prepare(
+    `SELECT eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+            attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+            nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode
+     FROM scan_deletion_audit
+     WHERE pendingReport = 1 AND reportDeadLetterAt IS NULL
+       AND COALESCE(nextReportAt, createdAt) <= ?
+     ORDER BY createdAt ASC
+     LIMIT ?`,
+  ).all(now, limit)
+  return rows.map((row) => ({
+    eventId: String(row['eventId']),
+    reasonCode: String(row['reasonCode']),
+    identifierHash: String(row['identifierHash']),
+    createdAt: String(row['createdAt']),
+    deletedAt: row['deletedAt'] === null ? null : String(row['deletedAt']),
+    result: row['result'] as ScanDeletionResult,
+    attempts: Number(row['attempts']),
+    lastAttemptAt: String(row['lastAttemptAt']),
+    lastErrorCode: row['lastErrorCode'] === null ? null : String(row['lastErrorCode']),
+    pendingReport: Number(row['pendingReport']) === 1,
+    reportAttempts: Number(row['reportAttempts']),
+    nextReportAt: row['nextReportAt'] === null ? null : String(row['nextReportAt']),
+    reportedAt: row['reportedAt'] === null ? null : String(row['reportedAt']),
+    reportDeadLetterAt:
+      row['reportDeadLetterAt'] === null ? null : String(row['reportDeadLetterAt']),
+    reportErrorCode: row['reportErrorCode'] === null ? null : String(row['reportErrorCode']),
+  }))
+}
+
+export function acknowledgeScanDeletionAuditReport(
+  db: AgentDatabase,
+  eventId: string,
+  reportedAt = new Date().toISOString(),
+): void {
+  if (!db) return
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET pendingReport = 0, reportedAt = ?, nextReportAt = NULL,
+         reportDeadLetterAt = NULL, reportErrorCode = NULL
+     WHERE eventId = ? AND pendingReport = 1`,
+  ).run(reportedAt, eventId)
+}
+
+export function markScanDeletionAuditReportRetry(
+  db: AgentDatabase,
+  eventId: string,
+  errorCode: string,
+  nextReportAt: string,
+): void {
+  if (!db) return
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET reportAttempts = reportAttempts + 1, nextReportAt = ?, reportErrorCode = ?
+     WHERE eventId = ? AND pendingReport = 1 AND reportDeadLetterAt IS NULL`,
+  ).run(nextReportAt, errorCode, eventId)
+}
+
+export function deadLetterScanDeletionAuditReport(
+  db: AgentDatabase,
+  eventId: string,
+  errorCode: string,
+): void {
+  if (!db) return
+  const now = new Date().toISOString()
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET reportAttempts = reportAttempts + 1, nextReportAt = NULL,
+         reportDeadLetterAt = ?, reportErrorCode = ?
+     WHERE eventId = ? AND pendingReport = 1 AND reportDeadLetterAt IS NULL`,
+  ).run(now, errorCode, eventId)
+}
+
+export function getScanDeletionAuditReportDeadLetterCount(db: AgentDatabase): number {
+  if (!db) return 0
+  const row = db.prepare(
+    'SELECT COUNT(*) AS count FROM scan_deletion_audit WHERE reportDeadLetterAt IS NOT NULL',
+  ).get()
+  return Number(row?.['count'] ?? 0)
+}
+
 // ── Offline PATCH queue ───────────────────────────────────────────────────────
 
 /**
@@ -167,6 +485,18 @@ export function enqueuePatch(
   payload: PatchStatusPayload,
 ): void {
   if (!db) return
+  const existing = db
+    .prepare(
+      `SELECT id, deadLetterAt FROM pending_patches
+       WHERE taskId = ? AND status = ? AND resolvedAt IS NULL
+       ORDER BY id DESC LIMIT 1`,
+    )
+    .get(taskId, payload.status)
+  if (existing) {
+    const disposition = existing['deadLetterAt'] ? 'dead-lettered; operator action required' : 'already queued'
+    warn(`db: PATCH status=${payload.status} for task ${taskId} not duplicated — ${disposition}`)
+    return
+  }
   const now = new Date().toISOString()
   // First retry after 30s
   const nextRetryAt = new Date(Date.now() + 30_000).toISOString()
@@ -196,28 +526,73 @@ export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
   const now = new Date().toISOString()
   return db
     .prepare(
-      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt
-       FROM pending_patches WHERE nextRetryAt <= ?`,
+      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
+              deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+       FROM pending_patches WHERE deadLetterAt IS NULL AND nextRetryAt <= ?`,
     )
     .all(now) as unknown as PendingPatch[]
+}
+
+/** Return durable, operator-actionable terminal status failures. */
+export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
+  if (!db) return []
+  return db
+    .prepare(
+      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
+              deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+       FROM pending_patches
+       WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL
+       ORDER BY deadLetterAt ASC`,
+    )
+    .all() as unknown as PendingPatch[]
+}
+
+export function getDeadLetterPatchCount(db: AgentDatabase): number {
+  if (!db) return 0
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_patches
+       WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL`,
+    )
+    .get()
+  return Number(row?.['count'] ?? 0)
+}
+
+/** Move a patch to durable dead-letter state without deleting its evidence. */
+export function deadLetterPatch(
+  db: AgentDatabase,
+  id: number,
+  reason: string,
+  incrementAttempt = false,
+): void {
+  if (!db) return
+  const now = new Date().toISOString()
+  db
+    .prepare(
+      `UPDATE pending_patches
+       SET deadLetterAt = ?, deadLetterReason = ?, nextRetryAt = ?,
+           attempts = attempts + ?
+       WHERE id = ? AND deadLetterAt IS NULL`,
+    )
+    .run(now, reason, now, incrementAttempt ? 1 : 0, id)
 }
 
 /**
  * Record the outcome of a retry attempt.
  *
  * @param success    true  → delete the record (done)
- * @param nextRetryAt ISO string for the next retry (only used when success=false, abandon=false)
- * @param abandon    true  → delete the record without retrying (4xx or max attempts reached)
+ * @param nextRetryAt ISO string for the next retry (only used when success=false)
  */
 export function markPatchAttempt(
   db: AgentDatabase,
   id: number,
   success: boolean,
   nextRetryAt?: string,
-  abandon?: boolean,
 ): void {
   if (!db) return
-  if (success || abandon) {
+  if (success) {
     db.prepare('DELETE FROM pending_patches WHERE id = ?').run(id)
   } else {
     db
