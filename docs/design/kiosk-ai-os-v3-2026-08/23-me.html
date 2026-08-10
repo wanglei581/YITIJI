@@ -112,9 +112,9 @@
 
 /* ---------- 顶部横向信息框：左账号 ｜ 右 AI 盘点 ---------- */
 .userbox {
-  position: relative; flex: 0 0 auto;
+  position: relative; flex: 0 0 auto; min-height: 556px; overflow: hidden;
   display: flex; align-items: stretch; gap: var(--s-6);
-  border-radius: var(--r-lg); padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-lg); padding: var(--s-6) var(--s-7);
   background: var(--glass-2-bg); border: 1px solid var(--jade-a20);
   box-shadow: var(--sh-2), var(--glass-hi);
   backdrop-filter: blur(var(--glass-blur)) saturate(135%);
@@ -137,7 +137,7 @@
 .ub-wb { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ub-name { font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); }
 .ub-sub { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.5; }
-.ub-chips { display: flex; align-items: center; gap: var(--s-3); }
+.ub-chips { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); }
 .ub-chips .ub-out { margin-left: auto; }
 
 .ub-div { flex: 0 0 1px; background: linear-gradient(180deg, transparent, var(--brd-2) 18%, var(--brd-2) 82%, transparent); }
@@ -146,6 +146,107 @@
 .ub-ai .ai-kick { flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
 .ub-ai .ai-kick .t { font-size: var(--fz-4); }
 .ub-ai .ainext .tx { font-size: var(--fz-3); }
+
+
+/* ---------- 顶部面板科技层：点阵底纹 / 雷达扫掠 / HUD 角标 / 扫描线 ----------
+     全部是装饰层（aria-hidden + pointer-events:none），不承载信息，
+     只用 transform/opacity 动画；ai-down 停摆、lowgpu 与 reduced-motion 全退化。 */
+.ub-fx { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; overflow: hidden; }
+.ub-fx i { position: absolute; display: block; }
+/* 点阵 */
+.ub-dots {
+  inset: 0;
+  background-image: radial-gradient(currentColor 1px, transparent 1.2px);
+  background-size: 26px 26px; color: var(--jade-500); opacity: .085;
+  -webkit-mask: radial-gradient(150% 110% at 18% 12%, #000 12%, transparent 72%);
+  mask: radial-gradient(150% 110% at 18% 12%, #000 12%, transparent 72%);
+}
+/* 雷达光楔：以左栏头像为圆心缓慢扫掠 */
+/* 尺寸必须整体落在 1080 舞台内：审计按元素外接矩形判横向溢出，
+   即便面板 overflow:hidden 也会被计到。 */
+.ub-radar {
+  width: 540px; height: 540px; left: 8px; top: 8px;
+  border-radius: 50%; opacity: .5;
+  background: conic-gradient(from 0deg, var(--jade-a20) 0deg, transparent 46deg, transparent 360deg);
+  -webkit-mask: radial-gradient(closest-side, #000 12%, transparent 74%);
+  mask: radial-gradient(closest-side, #000 12%, transparent 74%);
+}
+/* 横向扫描线 */
+.ub-scan {
+  left: 0; right: 0; height: 2px; top: -2px;
+  background: linear-gradient(90deg, transparent, var(--jade-a32), transparent);
+  opacity: .55;
+}
+/* 四角 HUD 括号 */
+.ub-hud i {
+  width: 26px; height: 26px; border: 1.5px solid var(--jade-a32); opacity: .55;
+}
+.ub-hud i:nth-child(1) { left: 12px; top: 12px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.ub-hud i:nth-child(2) { right: 12px; top: 12px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+.ub-hud i:nth-child(3) { left: 12px; bottom: 12px; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
+.ub-hud i:nth-child(4) { right: 12px; bottom: 12px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+
+@keyframes ubsweep { to { transform: rotate(360deg); } }
+@keyframes ubscan { 0% { transform: translateY(0); opacity: 0; }
+                    12% { opacity: .55; } 88% { opacity: .55; }
+                    100% { transform: translateY(556px); opacity: 0; } }
+@keyframes ubspine { 0% { transform: translateY(-10%); opacity: 0; }
+                     18% { opacity: 1; } 82% { opacity: 1; }
+                     100% { transform: translateY(560%); opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .ub-radar { animation: ubsweep 22s linear infinite; }
+  .ub-scan  { animation: ubscan 7.5s var(--ease-in-out) infinite; }
+  .ub-spine { animation: ubspine 5.2s var(--ease-in-out) infinite; }
+}
+html.lowgpu .ub-radar, html.lowgpu .ub-scan, html.lowgpu .ub-spine { animation: none; }
+.screen[data-state="ai-down"] .ub-radar,
+.screen[data-state="ai-down"] .ub-scan,
+.screen[data-state="ai-down"] .ub-spine { animation: none; opacity: .12; }
+
+/* 中缝数据脊：分隔线上有一颗上下流动的光点 */
+.ub-div { position: relative; }
+.ub-spine {
+  position: absolute; left: -2px; top: 0; width: 5px; height: 46px; border-radius: 3px;
+  background: linear-gradient(180deg, transparent, var(--jade-400), transparent);
+  opacity: .9;
+}
+
+/* 放大后的左栏 */
+.ub-id { justify-content: center; gap: var(--s-5); padding: var(--s-2) 0; }
+.ub-av { width: 118px; height: 118px; }
+.ub-av .ic { width: 50px; height: 50px; }
+.ub-av .fc-plate { inset: 15px; }
+.ub-name { font-size: var(--fz-6); }
+.ub-meta { display: flex; flex-direction: column; gap: 10px; }
+.ub-mrow {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 8px var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  font-size: var(--fz-2); color: var(--fog-700); line-height: 1.45;
+}
+.ub-mrow .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+.ub-mrow b { color: var(--fog-900); font-weight: 600; }
+
+/* 求职动作序列：来自你的记录，不依赖 AI，故 ai-down 仍在 */
+.ubrail { display: flex; align-items: stretch; gap: 0; }
+.ubnode { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; position: relative; padding-right: var(--s-3); }
+.ubnode::after {
+  content: ''; position: absolute; left: 9px; right: 6px; top: 9px; height: 2px;
+  background: var(--brd-2);
+}
+.ubnode:last-child::after { display: none; }
+.ubdot {
+  width: 18px; height: 18px; border-radius: 50%; position: relative; z-index: 1;
+  border: 2px solid var(--jade-500); background: var(--surf-0, #fff);
+}
+.ubnode--done .ubdot { background: var(--jade-500); }
+.ubnode--now .ubdot { box-shadow: 0 0 0 5px var(--jade-a12); }
+.ubnode--todo .ubdot { border-color: var(--brd-2); }
+.ubn-t { font-size: var(--fz-2); color: var(--fog-900); font-weight: 600; }
+.ubn-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.4; }
+
+/* 未登录预览列表 */
+.ubprev { display: flex; flex-direction: column; gap: 8px; }
 
 /* ---------- 8 张功能大卡：2 列 4 行，占满剩余高度 ---------- */
 .fgrid {
@@ -352,6 +453,10 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
          框下面才是功能卡布局。因此把原「登录窄条 + AI 横幅」两条合并成
          一个面板：左栏账号身份，右栏 AI 盘点，中间一条分隔线。 -->
     <section class="userbox rise">
+      <span class="ub-fx" aria-hidden="true">
+        <i class="ub-dots"></i><i class="ub-radar"></i><i class="ub-scan"></i>
+        <span class="ub-hud"><i></i><i></i><i></i><i></i></span>
+      </span>
 
       <!-- 左栏 · 已登录 -->
       <div class="ub-id" data-when="default ai-down device-off">
@@ -362,11 +467,15 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           </span>
           <span class="ub-wb">
             <span class="ub-name">已登录 · 尾号 8000</span>
-            <span class="ub-sub">本机登录 15:02 · 无操作 5 分钟自动退出<br>本页只你可见 · 退出即离屏</span>
+            <span class="ub-sub">手机号登录 · 本次为本机会话</span>
           </span>
         </div>
+        <div class="ub-meta">
+          <div class="ub-mrow"><svg class="ic"><use href="#i-ticket"/></svg><span>会员 · <b>2 项权益</b>可用 · 8 月 31 日到期</span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>本页只你可见 · <b>退出即离屏</b> · 不留在本机</span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>本机登录 <b>15:02</b> · 无操作 5 分钟自动退出</span></div>
+        </div>
         <div class="ub-chips">
-          <span class="chip chip--jade is-static"><svg class="ic"><use href="#i-ticket"/></svg>会员 · 2 项权益可用</span>
           <button class="btn btn--ghost ub-out" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
         </div>
       </div>
@@ -380,13 +489,16 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
             <span class="ub-sub">登录后简历、文档和打印记录跟着账号走</span>
           </span>
         </div>
+        <div class="ub-meta">
+          <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>不登录也能用<b>全部功能</b> · 只是记录留不下来</span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>离场或无操作 <b>5 分钟</b>后本机会话自动清空</span></div>
+        </div>
         <div class="ub-chips">
           <span class="chip chip--info">未登录 · 离场自动清空</span>
-          <span class="chip is-static">不登录也能用全部功能</span>
         </div>
       </div>
 
-      <span class="ub-div" aria-hidden="true"></span>
+      <span class="ub-div" aria-hidden="true"><i class="ub-spine"></i></span>
 
       <!-- 右栏 · AI 求职进度盘点 -->
       <div class="ub-ai">
@@ -403,6 +515,17 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>本周打印 <b>2 单</b> · 已全部出纸</span></div>
           <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏岗位 <b>3 条</b> · 1 条已下线</span></div>
         </div>
+        <div class="ubrail" data-when="default ai-down device-off">
+          <div class="ubnode ubnode--done"><span class="ubdot"></span>
+            <span class="ubn-t">材料就绪</span><span class="ubn-s">简历 2 份 · 文档 7 份</span></div>
+          <div class="ubnode ubnode--done"><span class="ubdot"></span>
+            <span class="ubn-t">已诊断</span><span class="ubn-s">最新版 v3 · 8 月 9 日</span></div>
+          <div class="ubnode ubnode--now"><span class="ubdot"></span>
+            <span class="ubn-t">待比对</span><span class="ubn-s">收藏 3 条还没逐条比</span></div>
+          <div class="ubnode ubnode--todo"><span class="ubdot"></span>
+            <span class="ubn-t">去来源平台</span><span class="ubn-s">投递在来源平台完成</span></div>
+        </div>
+
         <div class="ainext" data-when="default device-off">
           <span class="tx">下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
           <a class="btn btn--ghost" href="11-jobfit-compare.html">去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -412,6 +535,12 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <svg class="ic"><use href="#i-offline"/></svg>
           <span><b>AI 盘点暂不可用。</b>你的记录都在下面各卡里，不受影响；
                 故障已自动上报，不需要你操作。</span>
+        </div>
+
+        <div class="ubprev" data-when="first">
+          <div class="ub-mrow"><svg class="ic"><use href="#i-resume"/></svg><span>登录后这里会有：简历的<b>历次版本与诊断结论</b></span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-printer"/></svg><span>打印与扫描的<b>单据与花费</b></span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏的<b>岗位与招聘会场次</b></span></div>
         </div>
 
         <div class="aidown" data-when="first">
