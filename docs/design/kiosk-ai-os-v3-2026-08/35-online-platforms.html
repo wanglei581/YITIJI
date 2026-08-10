@@ -56,9 +56,13 @@
 
 /* ── 平台行 ── */
 .plist { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+/* 左栏净宽只有 ~580px，按钮文案「去来源平台 · 扫码投递」本身就要 250px 上下（这串字
+   是合规白名单短语，不能为了排版缩写）。所以按钮不跟文字抢同一行，改成第二行右对齐 ——
+   文字块拿到全宽，平台名与类型标签才能并排、取向说明才不会一行只剩两个字。 */
 .prow {
   flex: 1 1 0; min-height: 112px;
-  display: flex; align-items: center; gap: var(--s-4);
+  display: grid; grid-template-columns: 62px 1fr; align-content: center;
+  column-gap: var(--s-4); row-gap: var(--s-3);
   padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
   background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
   border-left: 3px solid var(--azure-400);
@@ -66,17 +70,18 @@
 }
 .prow.is-on { border-color: var(--jade-a32); border-left-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a12); }
 .pmark {
-  width: 62px; height: 62px; border-radius: var(--r-sm); flex: 0 0 auto;
+  grid-row: 1 / span 2; align-self: center;
+  width: 62px; height: 62px; border-radius: var(--r-sm);
   display: grid; place-items: center;
   background: var(--azure-a12); border: 1px solid var(--azure-a20);
   font-family: var(--ff-display); font-size: 26px; color: var(--azure-200); letter-spacing: 0;
 }
-.pbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.pbody { grid-column: 2; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .ptop { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
 .pnm { font-family: var(--ff-display); font-size: var(--fz-6); font-weight: 600; color: var(--fog-900); letter-spacing: .02em; }
 .pds { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
 .plean { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fz-1); color: var(--amber-200); line-height: 1.5; }
-.pbtn { flex: 0 0 auto; min-height: 56px; white-space: nowrap; }
+.pbtn { grid-column: 2; justify-self: end; min-height: 56px; white-space: nowrap; }
 
 /* ── 右栏：二维码卡（同版面切换：未选 / 已选 高度一致，码位不动） ── */
 .qslot { width: 176px; height: 176px; flex: 0 0 auto; }
@@ -121,16 +126,16 @@
     <a class="backbtn" href="34-jobs-hub.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 岗位信息</span></a>
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
-      <div style="min-width:0">
+      <div>
         <div class="brand-name">线上招聘平台</div>
-        <div class="brand-sub">职易达 · 01 号机 · 扫码到你手机</div>
+        <div class="brand-sub">职易达 · 01 号机</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default"><span class="dot dot--live"></span>4 个来源平台入口 · 本机不代投</div>
-    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能扫码 · 记录只留本次会话</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>取向说明不可用 · 4 个入口照常</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本页不依赖打印机</div>
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>4 个平台入口 · 本机不代投</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>未登录 · 记录只留本次会话</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>取向说明不可用 · 入口照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本页不受影响</div>
     <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
   </header>
 
@@ -254,14 +259,14 @@
     <!-- ══════════════════ 右：出码与边界 ══════════════════ -->
     <div class="wside">
 
-      <!-- 二维码卡：金额/码位不动，只换字（同版面切换） -->
-      <div class="pane">
+      <!-- 二维码卡：码位不动，只换字（同版面切换）。撑到有余量的位置，让码面居中 -->
+      <div class="pane pane--fill pane--grow">
         <div class="pane-hd"><span class="t">扫码到手机</span><span class="s" id="qrTag">还没选平台</span></div>
-        <div class="qr" style="padding:var(--s-5)">
+        <div class="qr" style="padding:var(--s-5);flex:1 1 auto;justify-content:center">
           <div class="qslot">
             <div class="qempty">
               <svg class="ic"><use href="#i-qr"/></svg>
-              点左边任一平台的按钮<br>这里出对应的码
+              点左边的平台<br>这里出码
             </div>
             <div class="qr-box">
               <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
