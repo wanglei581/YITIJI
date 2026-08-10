@@ -84,6 +84,23 @@
   background:var(--fog-a08); color:var(--fog-700);
   font-family:var(--ff-num); font-size:var(--fz-1); letter-spacing:.02em; }
 
+/* ── 「这一步不用 AI」常驻说明（2026-08-10 补）────────────────────────────
+   全站 AI 落实度审计的唯一一条：本页是**没有 AI、也没说自己没有 AI** 的那一页。
+   用户在别的页面刚被 AI 读过材料、给过结论，走到这道门时会默认「它又在算什么」——
+   在公共场所要手机号的这一步，这份默认最伤人。所以这句必须：
+     · **常驻**，不挂 data-when="ai-down"。挂上去就只有 AI 挂掉时才说，
+       等于「平时确实在用 AI，只是没告诉你」—— 那比不写还糟；
+     · 说清**不用 AI 做什么**（不判断、不打分、不留材料），
+       而不是只写「本页无 AI」这种自说自话；
+     · 顺带把出口再说一遍：验完回到你刚才那一步。 */
+.noai { flex:0 0 auto; margin:0 var(--s-6) var(--s-5);
+  display:flex; align-items:flex-start; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--fog-a04); border:1px dashed var(--brd-2); }
+.noai > .ic { width:20px; height:20px; flex:0 0 auto; color:var(--fog-600); margin-top:3px; }
+.noai-b { min-width:0; font-size:var(--fz-2); color:var(--fog-700); line-height:1.65; }
+.noai-b b { color:var(--fog-900); }
+
 /* 三个选项：同样大小、同样醒目 */
 .ways { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-4); }
 .way { text-align:left; padding:var(--s-5); border-radius:var(--r-md); cursor:pointer;
@@ -168,6 +185,40 @@
           选「先不登录」也回到同一步，只是这次的文件留不到账号里。<br>
           <span class="retcode">returnTo = 17-fair-desk.html?stage=s4</span>
         </span>
+      </span>
+    </div>
+
+    <!-- ═══ 这一步不用 AI（常驻，三个阶段、四种态都在）═══════════════════
+         ⚠ 位置刻意放在 .gate-hd / .retbar 之后、.gate-body 之前：
+         身份门的三个阶段各有各的 body，说明句跟着任一 body 走都会在别的阶段消失。
+         挂在弹层骨架上才是「常驻」。同理它**没有** data-when ——
+         四态共用一句，AI 挂没挂掉都不改变「这一步本来就不用 AI」这个事实。
+
+         ── 接线契约（交 Codex）·「不用 AI」不是一句文案，是一条要守住的实现约束 ──
+         · 需要的输入：phone（手机号，仅 S2 输入）、code（6 位验证码）、
+                       returnTo（被打断的页与阶段，来自 URL ?returnTo=）。
+         · 输出结构：{ ok: boolean, sessionToken?: string, maskedPhone: string,
+                       returnTo: string }。**不返回任何模型字段**
+                       （无 score / tier / suggestion / risk），前端也不许给它留位置。
+         · 调用的服务：只有短信验证码下发与校验两个端点；
+                       **不得**在本页调用任何 /ai/* 端点，也不得把手机号、
+                       returnTo 或本次会话里的简历内容送进任何模型上下文。
+         · 失败 / 不可用怎么降级：
+             － 验证码下发失败 / 校验不通过 → 停在 S2 并给出具体原因；
+               「先不登录，继续办理」这条出口**在任何失败下都必须仍然可点**；
+             － 短信通道整体不可用 → 本页降级为「扫码登录 + 不登录」两条路，
+               不弹「稍后重试」把用户堵在门里；
+             － AI 服务不可用（四态里的 ai-down）→ **本页不降级、不提示**：
+               它本来就不依赖 AI，为它加一句「AI 不可用」反而是在暗示平时会用。
+         · 幂等与留存：同一 returnTo 重复进门只产生一次登录；
+           手机号只作账号标识，不进任何模型训练或推荐链路。 -->
+    <div class="noai">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="noai-b">
+        <b>这一步不用 AI。</b>只做手机号验证与回跳 ——
+        <b>不判断你适不适合什么岗位、不给你打分、不读你的简历</b>，
+        也不会把你在别的页面做过的东西送进任何模型。<br>
+        验完就回到你刚才那一步；选「先不登录」也一样回去。
       </span>
     </div>
 

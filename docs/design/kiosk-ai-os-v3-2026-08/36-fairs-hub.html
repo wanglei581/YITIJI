@@ -115,6 +115,20 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .pick--empty { border-color: var(--amber-a20); background: var(--amber-a12); }
 .pick--empty .v { color: var(--amber-200); }
 .dcard--pick .dcard-go { min-height: 48px; text-decoration: none; }
+/* 半栏 pick 卡的「选择行 + 主动作」并成一行（2026-08-10 第二轮全量回归）──────
+   #c-material 是唯一一张**半栏**的 pick 卡：卡头 52 + 标题 30 + 说明 23 + 选择行 48
+   + 两条提示 19/38 + 主动作 48 ＋ 六道 12 间距 ＋ 上下 19 内边距 = 实测 361px，
+   但 .dgrid 是定高栅格、这一行只分到 287px，.dcard 又是 overflow:hidden ——
+   多出来的 74px 正好把主动作「先选方向 / 生成材料清单」整条吃掉：
+   卡面留着两个待选项，却没有任何可点的出口（v3AuditPlus「内部裁切 · 严重 · 可交互被裁」
+   default / first / device-off 三态各 1 次；ai-down 因为不显示选择行反而没事）。
+   c-plan 靠 .dcard--wide 横排躲开了同一个问题，半栏卡没有那条路。
+   改法沿用 .dcard--row 的思路：主动作挪到选择行右端（本来也就是「选完再走」），
+   两条提示并成一条（一个字没删）。实测内容 361→270、栏高 274，四态不再有裁切；
+   顺带把原先被挤掉 3px 的 c-plan 那一行也还了回去（257→270）。 */
+.pickrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.pickrow .picks { flex: 0 1 auto; }
+.pickrow .dcard-go { margin-top: 0; margin-left: auto; }
 
 /* 时间：真实日期标签（Codex :297 整改）──────────────────────────────
    原来时间是 .pick 轮换「本周 / 本月 / 指定日期」，选中「指定日期」却没有任何
@@ -246,7 +260,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibar-t">你想做哪件事</span>
-          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原为 `E3 AI 判断 · 仅供参考`。
+               点哪个按钮 → 亮哪张卡是 data-spot 写死的映射（scripts/linkage.js），
+               背后没有模型。E3 是给模型判断用的标签，贴在确定性导航上会稀释它在
+               合规上的意义 —— 改标「选哪件不依赖 AI」；两张 AI 卡各自仍标 AI · 仅供参考。 -->
+          <span class="chip chip--info">选哪件不依赖 AI</span>
         </div>
         <div class="aiuse">
           <button class="aibtn" type="button" data-spot="c-social c-campus" aria-pressed="false">我要挑一场去<em>先看有哪些场次</em></button>
@@ -312,6 +330,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
+        <!-- ══ AI 接线契约 · P36-A「参会规划：排出去哪几场、几点到、先逛哪几个展位」══
+             输入（三项都在卡上当场选，不猜、不默认方向）：
+               · city  string  本机配置的服务城市，可改；取 .pick[data-key="city"]
+               · from/to  YYYY-MM-DD  取 .dtag[data-from][data-to]，四个真实起止范围
+               · dir   string  岗位方向，**必选**，未选不给主动作（data-need="dir"）
+               · fairs  服务端侧：city+日期窗内已审核通过（reviewStatus=approved）的场次
+             输出：
+               · { order: [{ fairId, startAt, booths:[{ boothNo, orgName, reason }] }],
+                   note: string }
+               · 证据级别 E3（模型判断 · 仅供参考）；只排顺序，**不替用户报名或预约**
+                 （合规红线：CLAUDE.md §2，招聘会只做第三方/官方来源信息入口）
+             降级：
+               · AI 不可用 → 主动作换成「只看展位图与名录」→ 45-fair-onsite.html?stage=map，
+                 顺序由用户自己定；卡面副文同步换成 data-when="ai-down" 那一句
+             当前阻塞：17-fair-desk.html 全文 0 处 URLSearchParams，city/from/to/dir 会被
+                 静默丢弃 —— 参数已按契约传出，目标页接上即生效（卡面已如实标「待接线」）。
+             ════════════════════════════════════════════════════════════════ -->
         <!-- 4 AI 参会规划（AI · 先选三样再排 · 整行横排）
              2026-08-10 Codex :297/:306 整改：
              ① 时间原来是「本周 / 本月 / 指定日期」轮换，选中「指定日期」却没有日期控件 ——
@@ -340,11 +375,18 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                 <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-15" data-to="2026-08-15">8/15<i>周六</i></button>
               </span>
             </span>
-            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选</span>
-            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜</span>
+            <!-- 2026-08-10 AI 落实度审查整改：卡面承诺「按这三项排顺序」，但已核实
+                 17-fair-desk.html 全文 0 处 URLSearchParams —— city / from / to / dir
+                 会被目标页**静默丢弃**，进去看到的仍是全量场次。同类情况 34/38 都写了
+                 「接线后自动生效」，这张卡漏了。保留参数（接线契约），补如实提示。
+                 提示并进原有那一条、不另起一行：这张整行卡的可用高度只有 274px，
+                 多一行 .dcard-hint 会把主动作顶进 overflow:hidden（同 c-material 的教训）。 -->
+            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
+            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
             <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
             <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="按这三项排顺序" href="17-fair-desk.html?stage=s1">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
             <!-- 2026-08-10 Codex 错配整改：同上，view=booth-map 不被消费，17 的 s3 是路线顺序页。
@@ -353,26 +395,49 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
         </div>
 
+        <!-- ══ AI 接线契约 · P36-B「求职材料准备：带几份简历、带哪些证明材料」══
+             输入：
+               · session string  场次（三选一，含"还没定"）；取 .pick[data-key="session"]
+               · dir     string  方向，**必选**，未选不给主动作（data-need="dir"）
+               · 账户侧：该用户已有的简历版本数与证件类文档（只读份数，不读内容）
+             输出：
+               · { resumeCopies: number, items: [{ name, why, optional:boolean }] }
+               · 证据级别 E3（模型判断 · 仅供参考）；**带几份最后由用户定**，页面不代按
+             降级：
+               · AI 不可用 → 主动作换成 12-material-factory.html?stage=t4&view=templates，
+                 用现成模板自己填；清单不生成，模板照常可用
+             当前阻塞：12-material-factory.html 只读 ?from=（用于改返回键父级），
+                 **不读 session / dir** —— 参数已按契约传出，接上即生效（卡面已如实标「待接线」）。
+             ════════════════════════════════════════════════════════════════ -->
         <!-- 5 求职材料准备（AI · 先选场次与方向） -->
         <div class="dcard dcard--ai dcard--pick" id="c-material">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
             <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
           </span>
           <span class="dcard-nm">求职材料准备</span>
           <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
           <span class="dcard-ds" data-when="ai-down">求职信、自我介绍、清单模板都是现成的</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-key="session" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
-              <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
-            <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
+          <!-- 2026-08-10 第二轮回归：选择行与主动作并成一行 .pickrow（原因见样式表 .pickrow 注释：
+               半栏卡装不下「选择行 + 主动作 + 两条提示」，主动作原先被 overflow:hidden 整条吃掉）。
+               12-material-factory 的阶段轴是 t1 求职信 / t2 自我介绍 / t3 材料清单 / t4 简历模板，
+               不是 s1–s4；本卡去的是「材料清单」，所以传 stage=t3，ai-down 走 t4 模板。 -->
+          <div class="pickrow" data-when="default first device-off">
+            <div class="picks">
+              <button class="pick" type="button" data-key="session" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
+                <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
+              <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
+                <span class="k">方向</span><span class="v">未选</span></button>
+            </div>
+            <a class="dcard-go" data-base="12-material-factory.html?stage=t3&amp;from=P36" data-pick-scope="c-material" data-need="dir" data-need-label="先选方向" data-go-label="生成材料清单" href="12-material-factory.html?stage=t3&amp;from=P36">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </div>
-          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定</span>
-          <!-- 12-material-factory 的阶段轴是 t1 求职信 / t2 自我介绍 / t3 材料清单 / t4 简历模板，
-               不是 s1–s4；本卡去的是「材料清单」，所以传 stage=t3，ai-down 走 t4 模板 -->
-          <a class="dcard-go" data-when="default first device-off" data-base="12-material-factory.html?stage=t3&amp;from=P36" data-pick-scope="c-material" data-need="dir" data-need-label="先选方向" data-go-label="生成材料清单" href="12-material-factory.html?stage=t3&amp;from=P36">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          <!-- 2026-08-10 AI 落实度审查整改：同 c-plan。已核实 12-material-factory.html
+               只读 ?from=（用来改返回键的父级），**不读 session / dir** —— 这两项同样被
+               静默丢弃。保留参数（接线契约），补如实提示，不再让卡面独自承诺「按这一场列清单」。
+               第二轮回归把原来的两条提示并成这一条，字面内容一字未删。 -->
+          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定；这两项<b>按 ?session / dir 带过去</b>，材料工坊目前只读 ?from=，<b>接线后自动生效</b></span>
           <a class="dcard-go" data-when="ai-down" href="12-material-factory.html?stage=t4&amp;from=P36&amp;view=templates">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
         </div>
 

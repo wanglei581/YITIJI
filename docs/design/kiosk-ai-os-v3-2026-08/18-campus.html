@@ -426,7 +426,12 @@
       </div>
 
       <!-- ─────────── S3 带走计划表 ─────────── -->
-      <div class="paper-bar" data-at="s3">
+      <!-- 2026-08-10 ai-down 泄漏整改：纸面此前**没有 data-when**。AI 挂掉时屏上第 1 步
+           已经写明「本机现在读不了你的简历，给不了针对你的意见」，纸面页脚却照印
+           「根据公开的校招公告**和你本人的简历**生成」，第一块还印着按简历得出的
+           「压到一页 / 项目经历补上结果」。屏纸打架，而纸是带出门的那一份。
+           现在按态分两份，名字与页脚都不一样。 -->
+      <div class="paper-bar" data-at="s3" data-when="default first device-off">
         <span class="nm">我的校招计划表 · 8月9日 – 8月22日</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
@@ -435,9 +440,18 @@
           <button class="pgbtn" aria-label="下一页">›</button>
         </span>
       </div>
+      <div class="paper-bar" data-at="s3" data-when="ai-down">
+        <span class="nm">校招活动清单 · 8月9日 – 8月22日</span>
+        <span class="mt">A4 · 1 页 · 黑白 · 未结合简历</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
 
       <div class="paper-stage" data-at="s3">
-        <div class="sheet-a4">
+        <div class="sheet-a4" data-when="default first device-off">
           <div class="plan">
             <h1>我的校招计划表</h1>
             <div class="pl-sub">
@@ -459,6 +473,35 @@
               本表由职易达一体机根据公开的校招公告和你本人的简历生成，仅供你自己参考。<br>
               本机不代为报名，也不预测录用结果。<br>
               活动时间、地点、资格要求以主办方最新公告为准。本表不作为入场或报名凭证。
+            </div>
+          </div>
+        </div>
+
+        <!-- ai-down 版纸面：改名「校招活动清单」。日期块照旧（那是你勾的公告，不经过 AI），
+             第一块换成**明确标注为通用**的三条提醒（与第 1 步 ai-down 屏上给的通用建议
+             一字对应），页脚写清没结合简历。 -->
+        <div class="sheet-a4" data-when="ai-down">
+          <div class="plan">
+            <h1>校招活动清单</h1>
+            <div class="pl-sub">
+              2027 届 · 8月9日 – 8月22日 · 由职易达一体机打印<br>
+              活动信息来自学校就业网与主办方公告，同步于 8月9日 07:30
+            </div>
+            <div class="pl-hr"></div>
+
+            <div class="pl-w">通用提醒（不结合你的简历）</div>
+            <div class="pl-i"><i></i><span>校招简历<b>压到一页</b>，项目经历要写出结果</span></div>
+            <div class="pl-i"><i></i><span>备齐成绩单、在读证明、四六级、获奖证明（本机可扫可打）</span></div>
+            <div class="pl-i"><i></i><span>网申到<b>企业官网或学校就业网</b>投，认准官方域名</span></div>
+
+            <div data-f="pl-items"></div>
+
+            <div class="pl-foot">
+              <b>本清单未结合你的简历。</b>生成时本机的 AI 服务不可用，
+              所以上面三条是校招通用提醒，<b>不是看过你的简历之后给的意见</b>。<br>
+              本清单由职易达一体机根据公开的校招公告生成，仅供你自己参考。<br>
+              本机不代为报名，也不预测录用结果。<br>
+              活动时间、地点、资格要求以主办方最新公告为准。本清单不作为入场或报名凭证。
             </div>
           </div>
         </div>
@@ -646,7 +689,8 @@
                真要能去掉，下面的页数与费用就得跟着变，而这一步没有那个开关。 -->
           <ul class="li-list">
             <li class="li"><span class="li-dot"></span>
-              <span class="li-b"><span class="li-t">校招计划表</span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">校招计划表</span>
+                <span class="li-t" data-when="ai-down">校招活动清单</span>
                 <span class="li-s">A4 黑白 · 1 页 × 1 份</span></span>
               <span class="li-st">在这批里</span></li>
             <li class="li"><span class="li-dot"></span>
@@ -666,7 +710,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            计划表同时存进「我的文档」。
+            这张表同时存进「我的文档」。
           </div>
         </div>
       </div>
@@ -677,9 +721,9 @@
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">出纸口取走 <span data-f="pg">7</span> 页</span>
-                <span class="tl-s">计划表在最上面一页</span></span></div>
+                <span class="tl-s">这张表在最上面一页</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">计划表存进「我的文档」</span>
+              <span class="tl-b"><span class="tl-t">这张表存进「我的文档」</span>
                 <span class="tl-s">今天之内可以再打一次，不重复收费</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">日期变了就回来重打</span>
@@ -864,6 +908,11 @@
     var ns = scr.querySelectorAll('[data-f="' + k + '"]')
     for (var i = 0; i < ns.length; i++) ns[i].innerHTML = html
   }
+  /* 2026-08-10 ai-down 泄漏整改：交接给打印工作台的**标题**随态变。
+     AI 挂掉时出的不是「计划表」——它没有结合简历，只是你勾的公告清单。
+     打印台顶部的来源回执就靠这个 title 说话，这里给错那边就骗人。 */
+  function isAiDown () { return (scr.getAttribute('data-state') || 'default') === 'ai-down' }
+  function sheetNm () { return isAiDown() ? '校招活动清单' : '校园招聘计划表' }
   function on (r) { return r.getAttribute('aria-pressed') === 'true' }
   function picked () { return rows.filter(on) }   // 行的排列已经是日期顺序，不再另排
 
@@ -898,7 +947,7 @@
     var go = scr.querySelector('[data-f="gobtn"]')
     if (go) {
       go.setAttribute('href', '06-print-workbench.html?stage=s3&from=P18&kind=fair-plan&title=' +
-        encodeURIComponent('校园招聘计划表 + 简历 ' + copies + ' 份') +
+        encodeURIComponent(sheetNm() + ' + 简历 ' + copies + ' 份') +
         '&pages=' + pages + '&copies=1&back=s3')
     }
     if (window.v3Audit) requestAnimationFrame(window.v3Audit)
@@ -912,6 +961,18 @@
   })
 
   render()
+
+  /* 四态切换后重算交接标题。两条路都要接：走查与 stages.js 调
+     window.v3ApplyVisibility()；外壳四态按钮走 stage.js 的局部函数，另挂点击兜底。 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>

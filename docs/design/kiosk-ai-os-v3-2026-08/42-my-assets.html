@@ -262,7 +262,25 @@
     <!-- ═════════════════ 左：条目列表 ═════════════════ -->
     <div class="wmain">
 
-      <!-- ───────── 我的简历 · AI 顶栏（省掉逐份打开对比） ───────── -->
+      <!-- ───────── 我的简历 · AI 顶栏（省掉逐份打开对比） ─────────
+           ══ AI 接线契约 · P42-A「历次简历版本比对」═══════════════════════════
+           输入：
+             · resumeVersions [{ id, ver, createdAt, sections:[{ name, text }] }]
+               —— 账户数据，本人历次简历版本；**只读本人的，不跨账号**
+             · 无需用户当场输入：有 ≥2 版就能比，没有就走 first 态那句"不猜也不举例"
+           输出：
+             · { diffs: [{ ver, added:[section], removed:[section], unchanged:[section] }],
+                 fitHint: { ver, direction, why } }
+             · 差异条目（补了哪两段、哪栏没改过）= E1 你的材料（文本事实，不是判断）
+             · 「哪一版更适合投哪类岗位」= E3 建议 · 仅供参考，且**不预测录用结果**
+           动作（省步骤，不止多一段话）：
+             · 结论后接「带 v3 去和岗位逐条比」→ 11-jobfit-compare.html?stage=s1&resumeVer=<ver>
+             · 刻意不传 need=job：11 的 carry-in 横幅写死了「从招聘会现场带来」，
+               从本页传 need 会让对面谎报来源。resumeVer 是接线契约，11 接上即生效。
+           降级：
+             · AI 不可用 → 顶栏换成 data-when="ai-down" 那句「本机这次不做版本比对，
+               简历都在下面」；查看、打印、删除三项照常，整页仍可用
+           ═══════════════════════════════════════════════════════════════════ -->
       <div class="checks" data-at="resume">
         <div class="checks-hd">
           <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
@@ -282,7 +300,14 @@
           <div class="fold-b">v3 的运营类经历写得更满，偏运营方向；v1 保留了完整实习段落，偏应届岗。
             <span class="ev ev--e3">E3 建议 · 仅供参考</span>
             这只是两版文字的对照，不预测录用结果，投哪一版由你定。
-            <a class="inlink" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>拿去和岗位逐条比</a></div>
+            <a class="inlink" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42"><svg class="ic"><use href="#i-target"/></svg>带 v3 去和岗位逐条比</a>
+            <!-- 2026-08-10 交接不带货整改：原为裸链 11-jobfit-compare.html。上面刚说完
+                 「v3 偏运营方向」，出口却什么都不带，用户到了对面还得从头选。
+                 现按 11 的落点补 ?stage=s1（选岗位那一步）+ resumeVer=v3 + from=P42。
+                 刻意**不传 need=job**：11 的 carry-in 横幅写死了「从招聘会现场带来」，
+                 从「我的资产」传 need 会让对面谎报来源；不传则 11 早返回，逐像素不变。
+                 resumeVer 是接线契约，11 目前只读 need/jobId/jobTitle，所以下面写明。 -->
+            <span class="ev ev--e1">E1 你的材料</span> 带去：<b>简历 v3</b>（版本号接线后自动生效，对面暂只认岗位）</div>
         </details>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有账号就没有历次版本，这里不猜也不举例</span>
@@ -415,7 +440,8 @@
               <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
-              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>岗位匹配</a>
+              <!-- 2026-08-10 交接不带货整改：这一行说的就是 v3，出口带上它（同上，不传 need=job） -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42"><svg class="ic"><use href="#i-target"/></svg>拿 v3 去岗位匹配</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -946,10 +972,11 @@
               <span class="xlane-ds">上传新简历 · 重新诊断与优化</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="11-jobfit-compare.html">
+          <!-- 2026-08-10 交接不带货整改：出口带上最新那一版（v3）；不传 need=job 的理由见上 -->
+          <a class="xlane-go" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42">
             <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
-              <span class="xlane-ds">拿简历和收藏的岗位逐条比</span></span>
+              <span class="xlane-ds">带去：简历 v3&nbsp;· 到对面挑岗位</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
           <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=resume-report&amp;title=简历诊断报告&amp;pages=3&amp;copies=1">

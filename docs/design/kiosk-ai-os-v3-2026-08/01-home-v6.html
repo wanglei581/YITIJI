@@ -236,6 +236,34 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
 .vivid .vgrid-b .card { min-height: 92px; }
 .vivid .vfoot { padding-top: 4px; }
 .vivid .vfoot .btn { min-height: 52px; }
+
+/* ── 版头文案落回可视区(2026-08-10 第二轮全量回归)────────────────────
+   上面那条 .vhero 限高只解决了「页面总高」，没管版头**里面**装不装得下：
+   .vhero 是 height:226/186 + overflow:hidden，而 .vhero-inner 的行高由
+   .vfigure(300px、刻意出血站在版头底边上)决定，.vhero-copy 又 align-items:end
+   贴在这 300px 行的底部 —— 实测 copy 底 452 > vhero 底 354：
+     · <h1> 第二行「序我来排」被从中间切掉(裁 19px，截图可见半截字压在输入条下)
+     · <p class="vhero-sub"> 371–434 整条落在裁切线以下，**四态全部 0% 可见** ——
+       连 ai-down「AI 排序暂时不可用…」、device-off「这台机器打印机离线…」
+       这两条状态说明也一起没了(§9 不伪造能力：状态说明不可见等于没说)
+   改法：版头文案改顶对齐、标题收成单行。76px 单行需要 912px，版头左栏只有 614px，
+   所以按宽度反推最大单行字号 —— 实测 50px 单行 / 52px 起换两行，取 48px 留余量。
+   实测 copy 底：default/first/device-off 311(余 43px)、ai-down 297(余 17px)，四态全可见。
+   只动版头，未碰 .vbody 的既有试算结果。 */
+.vivid .vhero-inner { align-items: start; }
+.vivid .vhero-copy { padding-bottom: 0; }
+.vivid .vhero-title { font-size: 48px; line-height: 1.06; margin-top: 12px; max-width: none; }
+.vivid .vhero-sub { margin-top: 12px; }
+/* ai-down 版头矮 40px，标题、上留白与行距再收一档。
+   注意可视下边界不是 .vhero 的 354/314 —— .vcommand 是「跨在版头底边上的玻璃胶囊」
+   (vivid.css: margin-top:-26px, z-index:6)，会盖住版头最后 26px。
+   所以文案的真实底线 = vhero 底 - 26：default 328、ai-down 288。
+   实测 ai-down 未收之前 sub 底 296 > 288，第二行「都正常，顺序需要你自己选。」
+   被指令条压住(elementFromPoint 命中 DIV.vcommand)——检测器量不到这种"被别的层盖住"，
+   只有对着 288 这条线量才看得见。收完实测 279，留 9px。 */
+.screen[data-state="ai-down"] .vivid .vhero { padding-top: 12px; }
+.screen[data-state="ai-down"] .vivid .vhero-title { font-size: 40px; margin-top: 6px; }
+.screen[data-state="ai-down"] .vivid .vhero-sub { margin-top: 6px; }
 </style>
 </head>
 <body>

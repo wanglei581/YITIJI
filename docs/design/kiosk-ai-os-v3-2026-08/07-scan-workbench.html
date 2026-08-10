@@ -31,9 +31,23 @@
      .pgbtn 没有 flex-shrink:0，于是被压扁 —— 实测 default/first/ai-down 36px、device-off 32.1px，
      且 device-off 下页码块还越出预览区 16.8px（「下一页」只剩 15.3px 可见），都低于 §9 的 ≥48px。
      栏内没有空档，只能让可截断的文件名让位：文件名单行省略号，页码单行不折。
-     参数（A4 · 页数 · 灰度 · 体积）与页码文字都完整保留，不改 work.css（共享文件）。 */
+     参数（A4 · 页数 · 灰度 · 体积）与页码文字都完整保留，不改 work.css（共享文件）。
+
+     2026-08-10 第二轮回归修正：上面那版「文件名单行省略号」把触控缺陷换成了文字裁切
+     —— 实测 .nm 需要 201px，一行里只分到 114px（device-off 更只有 64px，等于只剩「扫描_2…」），
+     v3Audit「文字裁切」四态各中 1 次。省略号不是解法，是把问题挪了个地方。
+     真正的解法是别再挤在一行：预览条本来就有 62px 高，两行 21px 完全放得下。
+     改成两行栅格 —— 左列上行文件名、下行参数，右列页码跨两行竖排居中。
+     实测：.nm 分到 347px（需要 201px，全名不再截断）、条高仍 62px、参数与页码一字未删，
+     四态 文字裁切 / 内部裁切 / 卡内溢出 / 触控不足 全 0。仍然不改 work.css。 */
   .paper-bar .pgbtn { flex: 0 0 48px; }
-  .paper-bar .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paper-bar {
+    display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+    align-items: center; column-gap: var(--s-4); row-gap: 2px;
+  }
+  .paper-bar .nm { grid-column: 1; grid-row: 1; min-width: 0; white-space: nowrap; }
+  .paper-bar .mt { grid-column: 1; grid-row: 2; }
+  .paper-bar .pg { grid-column: 2; grid-row: 1 / span 2; margin-left: 0; }
   .paper-bar .pg span { white-space: nowrap; }
   /* 输出格式 / 扫什么 选中态：复用 seg 的选中语义，卡面描边表达 */
   .src[data-fmt][aria-pressed="true"],

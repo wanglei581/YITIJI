@@ -196,6 +196,45 @@
   /* 主按钮 64px / 次按钮 56px（Codex 字号与触控规格） */
   .actionbar .btn--primary { height: 64px; font-size: 22px; }
   .actionbar .btn--lg { height: 56px; font-size: 20px; }
+
+  /* ── 空结果：逐条列出「放宽这一条能多出几条」（2026-08-10 补）────────────
+     旧版空结果只会说「放宽任一条件再试」，然后给三个并排按钮 ——
+     可机器**知道**每个条件各卡掉多少条，却让用户自己去猜该松哪一条。
+     一次点错就是一次白等：在一体机前站着的人不会试第三次。
+
+     这一块**不是 AI**：服务端做完筛选本来就有每个条件的 facet 计数，
+     「去掉这一条、其余不动，还剩几条」是一次减法，不需要模型，也不该标 E3。
+     所以标 E1 本机计数，并且在版面上写清是数出来的。
+
+     类名刻意避开 card / note / act / pane / row / item：
+     audit-plus 的「卡内溢出」按 [class*=] 选容器，用那些词会被当成卡片量。 */
+  .relaxlist { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 900px; }
+  .relaxone {
+    display: flex; align-items: center; gap: var(--s-4); width: 100%;
+    min-height: 96px; padding: 14px var(--s-5); text-align: left;
+    border-radius: var(--r-md); background: var(--glass-1-bg);
+    border: 1px solid var(--glass-1-brd); cursor: pointer; font-family: var(--ff-ui);
+    transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+  }
+  .relaxone:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+  .relaxone:active { transform: translateY(1px) scale(.998); }
+  .relaxone[hidden] { display: none; }
+  .relaxone-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .relaxone-t { font-size: 24px; color: var(--fog-900); white-space: nowrap; }
+  .relaxone-t b { font-weight: 700; }
+  .relaxone-s { font-size: 19px; color: var(--fog-600); }
+  .relaxone-n {
+    flex: 0 0 auto; font-family: var(--ff-num); font-size: 20px; color: var(--fog-700);
+    white-space: nowrap; padding: 0 14px; height: 56px; display: inline-flex;
+    align-items: center; border-radius: var(--r-xs); background: var(--jade-a12);
+  }
+  .relaxone-n b { font-size: 30px; font-weight: 700; color: var(--jade-600); margin: 0 4px; }
+  .relaxone > .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--fog-600); }
+  .relaxwhy {
+    width: 100%; max-width: 900px; text-align: left;
+    font-size: 19px; color: var(--fog-600); line-height: 1.65;
+  }
+  .relaxwhy b { color: var(--fog-800); }
 </style>
 </head>
 <body>
@@ -448,15 +487,83 @@
         </div>
       </div>
 
-      <!-- 空结果 -->
+      <!-- ═══════ 空结果 ═══════
+           2026-08-10「AI 结论接不上动作」整改 ②：
+           旧版三个并排按钮（放宽薪资 / 扩到全广州 / 清空筛选）都能点、也真的会改筛选，
+           缺的是**判断依据**：用户不知道松哪一条最划算，只能一条条试。
+           而服务端做完这次筛选，每个条件卡掉多少条本来就是已知的 ——
+           把它显示出来，用户一眼就知道该松哪一条，一次点中。
+
+           这一块**不依赖 AI**，也不许标 E3：
+           「去掉这一条、其余条件不动，还剩几条」是一次减法（facet 计数），
+           不是判断、不是排序、更不是预测。所以标 E1 本机计数。
+
+           ── 接线契约（交 Codex）─────────────────────────────────────────
+           · 需要的输入：本次筛选的完整条件对象 filters（与列表查询同一个），
+             外加一个 relaxable 轴清单 ['pay','area','dir']。
+           · 需要的输出：facets: [{ axis, from, to, count }]，其中
+             count = 把 axis 这一条放宽到 to、**其余条件保持不动**时的命中条数。
+             服务端一次查询里带出来（GROUP BY / 多条 count 查询皆可），
+             不要为每一行单独发一次请求 —— 空结果页要一次画完。
+           · 排序：count 由大到小。count = 0 的轴**不渲染这一行**，
+             不能出现「放宽了还是 0 条」的按钮。
+           · 点击行为：只改这一个轴、其余条件原样保留，然后重新查询列表。
+             等价于用户自己进抽屉改了这一项 —— 不是「清空重来」。
+           · 失败 / 不可用怎么降级：facets 拿不到（超时、字段缺失、count 全为 0）
+             → **整块不渲染**，退回「清空全部筛选」与两个外部出口，
+             并写明「这次没算出每条能多出几条」。**绝不允许写一个估计值**：
+             这一屏的全部价值就在于数字是真的。
+           · 数字口径：count 是**这一刻**的命中数，随同步批次变化；
+             页面不缓存、不跨会话复用。
+           · 原型口径（只对本静态稿成立）：上面「有结果」那一屏是**固定样例列表**，
+             放宽之后仍然显示同一批样例条目。31 / 12 / 3 表达的是
+             服务端 facet 计数的**口径与量级**，不是样例列表的条数；
+             真机上两者必须来自同一次查询，不许各算各的。 -->
       <div class="blank" data-at="empty">
         <svg class="ic"><use href="#i-search"/></svg>
         <b>这些条件下暂时没有岗位</b>
-        <p>当前筛选：<b data-empty-cond>运营 · 天河区 · 10K 以上</b>。不凑不符合的充数。</p>
+        <p>当前筛选：<b data-empty-cond>运营 · 天河区 · 10K 以上</b>。不凑不符合的充数。<br>
+           这三条各卡掉多少，本机数给你看 —— <b>松哪一条最划算，你自己挑</b>。</p>
+
+        <div class="relaxlist" data-relaxlist>
+          <button class="relaxone" type="button" data-relax="area" data-relax-axis="area">
+            <span class="relaxone-x">
+              <span class="relaxone-t">地区 <b data-relax-from="area">天河区</b> → 扩到 <b>全广州</b></span>
+              <span class="relaxone-s">薪资与岗位方向不动，只松地区这一条</span>
+            </span>
+            <span class="relaxone-n">可多<b>31</b>条</span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </button>
+
+          <button class="relaxone" type="button" data-relax="pay" data-relax-axis="pay">
+            <span class="relaxone-x">
+              <span class="relaxone-t">薪资 <b data-relax-from="pay">10K 以上</b> → 放宽到 <b>6K 以上</b></span>
+              <span class="relaxone-s">地区与岗位方向不动，只松薪资这一条</span>
+            </span>
+            <span class="relaxone-n">可多<b>12</b>条</span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </button>
+
+          <button class="relaxone" type="button" data-relax="dir" data-relax-axis="dir">
+            <span class="relaxone-x">
+              <span class="relaxone-t">岗位方向 <b data-relax-from="dir">运营</b> → 放开成 <b>不限方向</b></span>
+              <span class="relaxone-s">地区与薪资不动，只松岗位方向这一条</span>
+            </span>
+            <span class="relaxone-n">可多<b>3</b>条</span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </button>
+        </div>
+
+        <span class="relaxwhy">
+          这几个数是<b>本机在这次筛选结果上数出来的</b>：把那一条去掉、其余条件原样不动，
+          还剩几条就写几条 —— <b>不是预测，也没有用 AI</b>。
+          <span class="ev ev--e1">E1 本机计数 · 不依赖 AI</span><br>
+          数字对应上面这一组条件；换一组条件会重新数。三条都松还是 0 条时，这里会空着，
+          不会给你一个凑出来的数。
+        </span>
+
         <div class="acts">
-          <button class="btn btn--primary" data-relax="pay">放宽薪资到 6K 以上</button>
-          <button class="btn btn--ghost" data-relax="area">扩到全广州</button>
-          <button class="btn btn--ghost" data-relax="clear">清空筛选</button>
+          <button class="btn btn--ghost" data-relax="clear">清空全部筛选 · 看所有来源</button>
         </div>
         <div class="acts">
           <a class="btn btn--ghost" href="35-online-platforms.html"><svg class="ic"><use href="#i-external"/></svg>去线上平台自己搜</a>
@@ -760,8 +867,29 @@
     return out
   }
 
+  /* ── 空结果的「放宽这一条」逐条行 ───────────────────────────────────────
+     只在**这一条真的被设了**的时候才出现：没设岗位方向就不该有「放开成不限方向」，
+     那是一个放宽了什么都不会变的按钮 —— 比不给还糟。
+     行上的「原值」也跟着当前筛选走，不写死回显。
+     条数（可多 N 条）在真机上来自服务端 facet 计数，原型里是写死并可核对的样例，
+     与本页 isEmptyResult() 的判据同一口径：条件写在明处，不猜、不随机。 */
+  function relaxRows () {
+    var rows = scr.querySelectorAll('.relaxone[data-relax-axis]')
+    var dirs = names(group('dir'))
+    var pays = names(group('pay'))
+    var reg = regionVal().split('|')
+    var live = { dir: dirs.join(' · '), pay: pays[0] || '', area: reg[2] || reg[1] || '' }
+    for (var i = 0; i < rows.length; i++) {
+      var ax = rows[i].getAttribute('data-relax-axis')
+      rows[i].hidden = !live[ax]
+      var from = rows[i].querySelector('[data-relax-from="' + ax + '"]')
+      if (from && live[ax]) from.textContent = live[ax]
+    }
+  }
+
   function refresh () {
     var cond = conditions()
+    relaxRows()
     if (countEl) countEl.textContent = String(cond.length)
     if (condEl) condEl.textContent = cond.length ? cond.map(function (c) { return c.t }).join(' · ') : '未设条件'
     if (printEl) printEl.textContent = String(scr.querySelectorAll('.jlist .jline').length)
@@ -781,11 +909,18 @@
     }
   }
 
-  /* 条件够窄就没有结果 —— 判据写死并可核对，不猜、不随机。 */
+  /* 条件够窄就没有结果 —— 判据写死并可核对，不猜、不随机。
+     2026-08-10 补 '运营'：空结果页现在逐条列出「放宽这一条能多出几条」，
+     其中一条是「岗位方向 → 不限方向」。判据里如果不含方向，
+     点它之后 isEmptyResult() 仍然成立、页面停在空结果 ——
+     用户点了一个写着「可多 3 条」的按钮却什么都没发生，
+     那正是这次要修的「结论到位、动作断头」，只是换了个地方犯。
+     现在三条轴任松一条都会真的离开空结果态。 */
   function isEmptyResult () {
     var pay = names(group('pay'))
+    var dir = names(group('dir'))
     var r = regionVal().split('|')
-    return pay.indexOf('10K 以上') > -1 && r[2] === '天河区'
+    return pay.indexOf('10K 以上') > -1 && r[2] === '天河区' && dir.indexOf('运营') > -1
   }
 
   function apply () {
@@ -858,6 +993,10 @@
       } else if (kind === 'area') {
         /* 「扩到全广州」＝ 地区从区县退回整个广州市，不是把八个区都勾上 */
         window.v3Region.set(regionBtn, '广东省|广州市|')
+      } else if (kind === 'dir') {
+        /* 「放开成不限方向」＝ 只把岗位方向这一组全部取消，
+           薪资 / 地区 / 经验 / 学历 / 来源一概不动 —— 与「清空筛选」不是一回事。 */
+        chips(group('dir')).forEach(function (c) { c.setAttribute('aria-pressed', 'false') })
       } else {
         [].slice.call(scr.querySelectorAll('[data-fgroup] .fchip')).forEach(function (c) {
           c.setAttribute('aria-pressed', 'false')

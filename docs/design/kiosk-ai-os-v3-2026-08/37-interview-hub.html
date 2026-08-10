@@ -213,7 +213,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <span class="dot dot--down"></span>
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
-          <span class="rdy-s">停掉的是出题、点评与解读；题库、技巧、往期报告照常</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原写「题库、技巧、往期报告照常」，
+               可同屏「面试技巧」与「往期训练报告」都是 `建设中 · 暂不可用` ——
+               把还没建的东西说成"照常"，比不说更糟。只留真能办的。 -->
+          <span class="rdy-s">停掉的是出题、点评与解读；<b>题目照常看</b>，技巧与往期报告页还没建</span>
         </span>
       </div>
       <div class="rdy rdy--warn" data-when="device-off">
@@ -229,7 +232,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibar-t">你现在想做哪件事</span>
-          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原为 `E3 AI 判断 · 仅供参考`。
+               点哪个按钮 → 亮哪张卡是 data-spot 写死的映射，背后没有模型；
+               E3 贴在确定性导航上会稀释这个标签在合规上的意义。
+               真正标 E3 的是练完那份逐题点评，它在 20-interview-pod 里自己标。 -->
+          <span class="chip chip--info">选哪件不依赖 AI</span>
         </div>
         <div class="aiuse">
           <button class="aibtn" type="button" data-spot="c-mock" aria-pressed="false">按岗位给我出题<em>先选岗位与难度</em></button>
@@ -246,19 +253,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="aibar-t">下面这些照常能办</span>
           <span class="chip chip--info">已自动上报</span>
         </div>
+        <!-- 2026-08-10 AI 落实度审查整改：这一组的标题是「下面这些照常能办」，
+             原来却把两张 `建设中 · 暂不可用` 的灰卡也列进来 —— 自相矛盾：
+             一边说照常能办，一边点不动。降级出路只能给**现在真点得开**的去处，
+             所以换成同样不依赖 AI 的两条：评估往期记录（28 的 s4）与自我评估题目（28 的 s1，
+             28 只出解读要模型，答题本身不要）。面试技巧 / 往期训练报告仍在下面的卡里
+             如实标建设中，不在这里冒充可办。 -->
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="20-interview-pod.html?stage=s2&amp;view=questions">只看题目<em>自己写答案、自己掐时间</em></a>
-          <button class="aibtn aibtn--soon" type="button" disabled aria-disabled="true">面试技巧&nbsp;· 建设中<em>技巧要点页还没建，面试页里没有这段内容</em></button>
-          <!-- Codex :236 整改：往期报告原来跳 28-self-assessment（自我评估页），
-               那里放的是评估报告不是面试报告，改指过面试页 s4。
-               2026-08-10 复核：20-interview-pod 的 s4 是**本场**练完的复盘，
-               全文 0 处往期报告列表，也不读 ?view=reports —— 承诺兑现不了，改建设中。 -->
-          <button class="aibtn aibtn--soon" type="button" disabled aria-disabled="true">往期报告&nbsp;· 建设中<em>只能在练习结束后看本次复盘</em></button>
+          <a class="aibtn" href="28-self-assessment.html?stage=s4">评估往期记录<em>历次自我评估，只列你本人的</em></a>
+          <a class="aibtn" href="28-self-assessment.html?stage=s1">自我评估题目<em>照常答题，解读等 AI 恢复再出</em></a>
           <!-- Codex :237 同 :314：薪资原来跳 11-jobfit-compare，可那页的「方向与薪资参考」
                挂在 data-when="default device-off"，ai-down 下根本不显示。改指岗位情报台，
                那里每条岗位的公示薪资四态都在，且不需要先传简历。 -->
           <a class="aibtn" href="13-jobs-desk.html?stage=ok">薪资区间<em>岗位公示原文转录</em></a>
         </div>
+        <!-- 建设中的两项在这里点名，免得用户以为是"降级藏起来了" -->
+        <div class="aibar-note"><b>面试技巧</b>与<b>往期训练报告</b>两个页面还没建，<b>和 AI 好不好没关系</b> —— 不在上面这一组里。</div>
       </div>
 
       <!-- ── 六张子能力卡 ── -->

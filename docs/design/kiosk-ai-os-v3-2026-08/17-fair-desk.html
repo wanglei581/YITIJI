@@ -300,7 +300,11 @@
     <div class="wmain">
 
       <!-- ─────────── S1 哪一场 ─────────── -->
-      <div class="pane" data-at="s1">
+      <!-- 2026-08-10 ai-down 泄漏整改：这一整块此前**没有 data-when** —— AI 挂掉时
+           它照样说「读了你 8月9日 传的那份简历」并给出三档裁定，而同屏第 2 步已经
+           承认「AI 暂时不可用」。两句话在同一页互相打脸，用户只会信前面那句。
+           三档裁定是模型判断，AI 不可用就没有它；下面另给一份只按主办方公告排的版本。 -->
+      <div class="pane" data-at="s1" data-when="default first device-off">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <b>这三场，你该去哪一场</b>
@@ -339,6 +343,58 @@
                   <div class="fold-b">入场要过学信网核验，按这条规则你可能进不去。<b>去之前先在来源平台确认</b>——本机不代为核验，也定不了你能不能进。</div></details>
               </span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ai-down：同一位置换成「只按主办方公告」的三场对照。
+           没有值得去 / 看你时间 / 先确认资格这三档 —— 那是模型比对简历之后才有的判断。
+           这里只转述公告里写死的东西：时间、企业数、要不要预约、入场怎么核验。 -->
+      <div class="pane" data-at="s1" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <b>AI 不可用 · 这三场按公告时间列出</b>
+          <span class="mt">未结合你的简历</span>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>本机现在读不了你的简历</b>，给不出「你该去哪一场」。
+                  下面三条全部来自主办方公告原文，<b>没有做任何排序和推荐</b>。</span>
+          </div>
+
+          <div class="tri" style="margin-top:var(--s-4)">
+            <div class="tri-row">
+              <span class="tri-vd">8月12日</span>
+              <span>
+                <span class="tri-t">秋季综合人才交流会 · 09:00–16:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 80 家 · 综合类 ·
+                  <b>免预约</b>，凭身份证入场</span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd">8月15日</span>
+              <span>
+                <span class="tri-t">制造业专场招聘会 · 09:30–15:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 32 家 · 全制造类 ·
+                  <b>需在来源平台先预约</b></span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd">8月20日</span>
+              <span>
+                <span class="tri-t">2026 届毕业生双选会（秋季首场）· 13:00–17:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 46 家 · <b>限应届</b>，
+                  入场需学信网核验 —— 能不能进以来源平台为准，本机不代为核验</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            三场的来源机构、同步时间与外部 ID 见下面的场次列表。
+            AI 恢复后回到这一步，才会有结合你简历的比较。
           </div>
         </div>
       </div>
@@ -689,7 +745,11 @@
       </div>
 
       <!-- ─────────── S4 带走作战单 ─────────── -->
-      <div class="paper-bar" data-at="s4">
+      <!-- 2026-08-10 ai-down 泄漏整改：纸面此前**没有 data-when** —— AI 挂掉时照样
+           印出「可以问：夹具设计岗现在缺几个人」这种模型生成的问句，页脚还写着
+           「根据……和你本人的简历生成」。纸带出门就没法撤回，屏上说不可用、纸上照印，
+           是这一页最贵的一处不诚实。现在按态分两份交付物，名字都不一样。 -->
+      <div class="paper-bar" data-at="s4" data-when="default first device-off">
         <span class="nm">赶场作战单 · 2026 秋季综合人才交流会</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
@@ -698,9 +758,18 @@
           <button class="pgbtn" aria-label="下一页">›</button>
         </span>
       </div>
+      <div class="paper-bar" data-at="s4" data-when="ai-down">
+        <span class="nm">场次与展位单 · 2026 秋季综合人才交流会</span>
+        <span class="mt">A4 · 1 页 · 黑白 · 未结合简历</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
 
       <div class="paper-stage" data-at="s4">
-        <div class="sheet-a4">
+        <div class="sheet-a4" data-when="default first device-off">
           <div class="combat">
             <h1>赶场作战单</h1>
             <div class="cb-sub">
@@ -721,6 +790,36 @@
 
             <div class="cb-foot">
               本单由职易达一体机根据公开岗位信息和你本人的简历生成，仅供你自己参考。<br>
+              本机不代收简历、不代为投递、不预测录用结果；是否录用由用人单位决定。<br>
+              岗位与展位信息以主办方现场公布为准。本单不作为入场凭证。
+            </div>
+          </div>
+        </div>
+
+        <!-- ai-down 版纸面：改名「场次与展位单」，站点只留公司名 / 展位号 / 岗位名
+             （这三样来自主办方同步的展位数据，不经过 AI），**去掉全部「可以问……」问句**，
+             页脚明确写「未结合你的简历」。 -->
+        <div class="sheet-a4" data-when="ai-down">
+          <div class="combat">
+            <h1>场次与展位单</h1>
+            <div class="cb-sub">
+              2026 年秋季综合人才交流会 · 8月12日 周三 09:00–16:00 · 市人力资源市场 A 馆<br>
+              主办：市人力资源和社会保障局 · 外部ID RC-2026-0812-A · 数据同步于 8月9日 07:30
+            </div>
+            <div class="cb-hr"></div>
+
+            <div data-f="cb-stops-plain"></div>
+
+            <div class="cb-hr"></div>
+            <div class="cb-sub" data-f="cb-route-plain">
+              走法：入口 → A-12 → A-27 → B-05 → 出口，按展位号顺序走。<br>
+              建议带 <b>6 份</b>纸质简历（3 家 × 2 份），已加入本次打印清单，将同时打印。
+            </div>
+
+            <div class="cb-foot">
+              <b>本单未结合你的简历。</b>生成时本机的 AI 服务不可用，
+              所以单上只有主办方同步的场次、展位与岗位名称，<b>没有针对你的建议，也没有要问的话</b>。<br>
+              本单由职易达一体机根据公开的展位信息生成，仅供你自己参考。<br>
               本机不代收简历、不代为投递、不预测录用结果；是否录用由用人单位决定。<br>
               岗位与展位信息以主办方现场公布为准。本单不作为入场凭证。
             </div>
@@ -962,10 +1061,14 @@
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-pin"/></svg><b>到了现场</b></div>
         <div class="sec">
+          <!-- 2026-08-10 伪造精度整改：这里原有「全程 约 240 米 / 预计用时 1 小时 20 分」。
+               主区（617 行）和动作条（1146 行）两处早就把同样两个数字删掉了，理由写在那两条注释里 ——
+               本机没有场馆实际尺寸，也不知道用户走多快，两个数都是编的。右栏漏删，成了全页
+               唯一还在报假精度的地方。现在这里只写做得到的那件事，并把做不到的如实说出来。 -->
           <div class="kv">
-            <div class="kv-row"><span class="k">全程</span><span class="v">约 240 米</span></div>
-            <div class="kv-row"><span class="k">预计用时</span><span class="v">1 小时 20 分</span></div>
-            <div class="kv-row"><span class="k">每家停留</span><span class="v">约 20 分钟</span></div>
+            <div class="kv-row"><span class="k">走法</span><span class="v">按展位号顺序 · 图上为示意路线</span></div>
+            <div class="kv-row"><span class="k">全程距离 / 耗时</span><span class="v v--fog">本机没有场馆尺寸，算不出</span></div>
+            <div class="kv-row"><span class="k">每家停留</span><span class="v">约 20 分钟（经验值）</span></div>
             <div class="kv-row"><span class="k">建议时段</span><span class="v">上午 10 点前</span></div>
           </div>
 
@@ -975,8 +1078,12 @@
           </div>
           <details class="fold">
             <summary>下一步那张纸上有什么</summary>
-            <div class="fold-b"><span data-f="n-firm">3</span> 站、每站要问的话、展位号，打成一页纸带着走。
+            <div class="fold-b" data-when="default first device-off"><span data-f="n-firm">3</span> 站、每站要问的话、展位号，打成一页纸带着走。
               纸上<b>不会有你的手机号和身份证号</b>。</div>
+            <!-- ai-down：纸上没有「要问的话」——那是模型读完岗位正文才写得出来的 -->
+            <div class="fold-b" data-when="ai-down"><span data-f="n-firm">3</span> 站的公司名、展位号、岗位名称，打成一页纸带着走。
+              AI 不可用，<b>纸上没有「要问的话」，也没有结合你简历的任何内容</b>；
+              纸上同样<b>不会有你的手机号和身份证号</b>。</div>
           </details>
 
           <!-- 2026-08-10 孤儿页接线：真正的场馆平面图与服务点在 P45 的 map 阶段，此前没有入口。
@@ -1008,7 +1115,8 @@
         <div class="sec">
           <ul class="li-list">
             <li class="li"><span class="li-dot"></span>
-              <span class="li-b"><span class="li-t">赶场作战单</span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">赶场作战单</span>
+                <span class="li-t" data-when="ai-down">场次与展位单</span>
                 <span class="li-s">A4 黑白 · 1 页 × 1 份</span></span>
               <span class="li-st">在这批里</span></li>
             <li class="li"><span class="li-dot"></span>
@@ -1028,7 +1136,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            作战单同时存进「我的文档」。
+            这张单同时存进「我的文档」。
           </div>
         </div>
       </div>
@@ -1068,11 +1176,13 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
         <div class="sec">
           <div class="tline">
+            <!-- 名字不写死：ai-down 出的是「场次与展位单」，不是「作战单」。
+                 这两行本来就不需要点名，用「这张单」两态都成立。 -->
             <div class="tl tl--now"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">出纸口取走 <span data-f="pg">13</span> 页</span>
-                <span class="mt">作战单在最上面一页</span></span></div>
+                <span class="mt">这张单在最上面一页</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">作战单存进「我的文档」</span>
+              <span class="tl-b"><span class="tl-t">这张单存进「我的文档」</span>
                 <span class="mt">今天之内可以再打一次，不重复收费</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">这次记进「打印订单」</span>
@@ -1236,6 +1346,12 @@
     var ns = scr.querySelectorAll('[data-f="' + k + '"]')
     for (var i = 0; i < ns.length; i++) ns[i].innerHTML = html
   }
+  /* 2026-08-10 ai-down 泄漏整改：交付物的**名字**随态变。
+     AI 挂掉时出的那张纸不是「作战单」—— 它没有要问的话、没有结合简历，
+     只是场次与展位的清单。名字一样会让用户以为拿到的是同一样东西。
+     主按钮、交接卡、动作条提示三处都从这里取名，不各写一份。 */
+  function isAiDown () { return (scr.getAttribute('data-state') || 'default') === 'ai-down' }
+  function sheetNm () { return isAiDown() ? '场次与展位单' : '赶场作战单' }
   function on (r) { return r.getAttribute('aria-pressed') === 'true' }
   /* 走法按展位号排（A-12 → A-27 → B-05）：本机能做到的就是这个，
      不声称「最短路线」—— 那要有真实通道图才算得出来。 */
@@ -1336,6 +1452,16 @@
         '<span class="cb-ask">' + (r.getAttribute('data-ask') || '') + '</span></span></div>'
     }).join('') || '<div class="cb-ask">还没勾企业 —— 回第 2 步勾上要去的几家，这张单才有内容。</div>')
 
+    /* ai-down 版纸面的站点：同一批企业、同样的展位号与岗位名，
+       **不带 data-ask** —— 那一行「可以问：夹具设计岗现在缺几个人」是模型
+       读完岗位正文写出来的，AI 不可用时它不存在，不能照印。 */
+    set('cb-stops-plain', sel.map(function (r, i) {
+      return '<div class="cb-stop"><span class="cb-no">' + (i + 1) + '</span><span>' +
+        '<span class="cb-nm">' + esc(r.getAttribute('data-co')) + ' &nbsp;·&nbsp; ' +
+        esc(r.getAttribute('data-booth')) + ' 号展位</span>' +
+        '<span class="cb-mt">' + esc(r.getAttribute('data-pos')) + '</span></span></div>'
+    }).join('') || '<div class="cb-ask">还没勾企业 —— 回第 2 步勾上要去的几家，这张单才有内容。</div>')
+
     // 打印算术：作战单 1 页 + 每家 2 份简历 × 每份 2 页
     var copies = n * COPIES
     var pages = (n ? 1 : 0) + copies * CV_PAGES
@@ -1344,13 +1470,17 @@
     set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
     set('ap-s', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份 = ' + copies * CV_PAGES + ' 页 · 本单大头')
     set('ap-by', '已按 ' + n + ' 家 × ' + COPIES + ' 份算')
+    var route = sel.map(function (r) { return esc(r.getAttribute('data-booth')) }).join(' → ')
+    var carry = '<br>建议带 <b>' + copies + ' 份</b>纸质简历（' + n + ' 家 × ' + COPIES +
+                ' 份），已加入本次打印清单，将同时打印。'
     set('cb-route', n
-      ? '建议路线：入口 → ' + sel.map(function (r) { return esc(r.getAttribute('data-booth')) }).join(' → ') +
-        ' → 出口，按展位号顺序走。<br>建议带 <b>' + copies + ' 份</b>纸质简历（' + n + ' 家 × ' + COPIES +
-        ' 份），已加入本次打印清单，将同时打印。'
+      ? '建议路线：入口 → ' + route + ' → 出口，按展位号顺序走。' + carry
+      : '还没勾企业，这张单暂时是空的。')
+    set('cb-route-plain', n
+      ? '走法：入口 → ' + route + ' → 出口，按展位号顺序走。' + carry
       : '还没勾企业，这张单暂时是空的。')
 
-    var what = '作战单 1 份 + 简历 ' + copies + ' 份'
+    var what = sheetNm() + ' 1 份 + 简历 ' + copies + ' 份'
     set('handoff-s', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页（预估 · 以打印工作台核价为准）')
     set('gobtn-t', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页')
     set('hint4', '共 ' + pages + ' 页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
@@ -1386,6 +1516,21 @@
   })
 
   render()
+
+  /* 四态切换后必须重算：交付物的名字随态变（赶场作战单 / 场次与展位单），
+     而 stage.js 的 applyState 只管可见性，不知道本页还有派生文案。
+     两条路都要接上，缺一个就会出现「屏上切到 ai-down，主按钮还写着作战单」：
+       · 走查与自检直接调 window.v3ApplyVisibility() —— 包一层是主路径
+       · 外壳上的四态按钮走 stage.js 自己的局部函数 —— 另挂一个捕获期点击兜底 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
 })()
 </script>
 <script src="scripts/linkage.js?v=4"></script>

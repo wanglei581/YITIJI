@@ -212,15 +212,26 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibar-t">你要办哪件事</span>
-          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原为 `E3 AI 判断 · 仅供参考`。
+               点哪个按钮 → 亮哪张卡是 data-spot 写死的映射，背后没有模型；
+               E3 贴在确定性导航上会稀释这个标签在合规上的意义。
+               真做推理的是下面那张 AI政策助手卡，它自己标 AI · 仅供参考。 -->
+          <span class="chip chip--info">选哪件不依赖 AI</span>
         </div>
         <div class="aiuse">
           <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>筛出可能相关的政策</em></button>
-          <button class="aibtn" type="button" data-spot="c-ai c-subsidy" aria-pressed="false">这一项要带什么材料<em>核对材料缺口</em></button>
+          <!-- 2026-08-10 AI 落实度审查整改：这一项原写「这一项要带什么材料 · 核对材料缺口」，
+               但整页没有任何卡片或下游能做"材料缺口核对"（政策页的 s3 是按事项列的办事清单，
+               不比对你缺哪几样）。承诺兑现不了就不写承诺，改成如实的去处：
+               直接进政策页第 3 步看这一项要带的材料清单（?stage=s3 已核实是「打印清单」那一步）。
+               "缺口核对"作为待接线能力仍留在下面的 AI政策助手卡上，并标明未接线。 -->
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;from=P38">看这一项要带的材料清单<em>政策页按事项列，不按人 · 不依赖 AI</em></a>
           <a class="aibtn" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">我要打印政策要点<em>去打印工作台核价</em></a>
           <a class="aibtn aibtn--off" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
         </div>
-        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只做政策预筛与材料缺口核对。</div>
+        <!-- 2026-08-10 整改：原写「AI 只做政策预筛与材料缺口核对」，缺口核对没有实现，
+             写在这里等于承诺一件办不成的事。改成如实分工。 -->
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 这一屏<b>只做政策预筛</b>，材料清单按事项列、不依赖 AI。</div>
       </div>
 
       <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
@@ -239,10 +250,14 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       </div>
 
       <!-- ── 六张子能力卡 ──
-           2026-08-10 说谎文案整改：下面四张分类卡原来写「进入后已按「X」分类筛好，只列这一类」，
-           但 21-policy.html 目前并不读 ?cat= 参数，进去看到的仍是全量列表 —— 这是明确说谎。
-           处置：**保留 ?cat= 参数**（接线契约，目标页接上即生效），
-           把副文改成如实的「按 X 分类筛选（接线后自动生效）」，不再宣称「已筛好、只列这一类」。 -->
+           2026-08-10 说谎文案整改（第一轮）：四张分类卡原来写「进入后已按「X」分类筛好，只列这一类」，
+           当时 21-policy.html 还不读 ?cat=，进去看到的仍是全量列表 —— 明确说谎。
+           当时的处置：保留 ?cat= 参数，副文改成「按 X 分类筛选（接线后自动生效）」。
+
+           2026-08-10 AI 落实度审查整改（第二轮）：21-policy.html 已经真的消费 cat 了
+           （:892 `new URLSearchParams(location.search)`、:913 `carry.cat = inList(qval('cat'), CAT_KEYS)`），
+           「接线后自动生效」这句已经过时 —— 它是 under-claim，反而让用户以为参数没生效、
+           进去还得自己再筛一遍。四处注脚一并删掉，副文回到如实的「按 X 分类筛选」。 -->
       <div class="dgrid">
 
         <!-- 1 就业政策（首张大卡 · 非 AI · 带 cat=employment 进政策页） -->
@@ -251,7 +266,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-bd">
             <span class="dcard-nm">就业政策</span>
             <span class="dcard-ds">就业补贴、灵活就业等官方口径原文</span>
-            <span class="dcard-hint">进入政策页后按「就业」分类筛选（接线后自动生效）</span>
+            <span class="dcard-hint">进入政策页后按「就业」分类筛选</span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--info">不依赖 AI</span>
@@ -267,7 +282,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">社保指南</span>
           <span class="dcard-ds">参保流程与办事材料清单</span>
-          <span class="dcard-hint">进入政策页后按「社保」分类筛选（接线后自动生效）</span>
+          <span class="dcard-hint">进入政策页后按「社保」分类筛选</span>
           <span class="dcard-go">看社保指南<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -279,7 +294,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">档案与登记</span>
           <span class="dcard-ds">档案托管、就业登记与证明开具</span>
-          <span class="dcard-hint">进入政策页后按「档案」分类筛选（接线后自动生效）</span>
+          <span class="dcard-hint">进入政策页后按「档案」分类筛选</span>
           <span class="dcard-go">看办理指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -291,7 +306,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">补贴指引</span>
           <span class="dcard-ds">失业保险、创业扶持与官方办理入口</span>
-          <span class="dcard-hint">进入政策页后按「补贴」分类筛选（接线后自动生效）</span>
+          <span class="dcard-hint">进入政策页后按「补贴」分类筛选</span>
           <span class="dcard-go">看补贴指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -311,6 +326,22 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-go">看我的收藏<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
+        <!-- ══ AI 接线契约 · P38-A「政策预筛 + （待接线）材料缺口核对」══
+             输入（三项当场选，其余六项由 21-policy 继续补问）：
+               · identity string  现在状态；白名单 = 21-policy QS 里 k='status' 的选项表
+               · insured  string  连续缴费；白名单 = 21-policy QS 里 k='soc' 的选项表
+               · city     string  本机配置的服务城市，可改；白名单 = scripts/region.js 字典
+               · （材料缺口核对额外需要）ownedDocs string[] —— 用户声明或账户里已有的材料，
+                 **本稿没有采集入口**，这是这一项还没接线的真正原因
+             输出：
+               · 预筛：{ candidates: [{ policyId, why }] } —— 已接线，由 21-policy 消费上述三参
+                 （21-policy :913 起 readCarry() 白名单校验 + 顶部回执，非法值当没传）
+               · 缺口：{ gaps: [{ policyId, missing: [docName], have: [docName] }] } —— **待接线**
+               · 证据级别一律 E3；资格结论只走页脚那条「以经办窗口审核为准」，本卡不另下结论
+             降级：
+               · AI 不可用 → 主动作换成「只看政策原文」→ 21-policy.html?stage=s2&view=doc；
+                 政策原文、办事清单、官方入口三条照常，条件由用户自己对
+             ════════════════════════════════════════════════════════════════ -->
         <!-- 6 AI 政策助手（AI · 三项只做预筛，选完带进 21-policy 继续补问 · 整行横排）
              2026-08-10 Codex :311/:314 整改：
              ① 原文案「对照能办哪些 / 我能办哪些」是资格判断承诺 —— 改成「筛出可能相关的政策 ·
@@ -322,7 +353,12 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
           <span class="dcard-bd">
             <span class="dcard-nm">AI政策助手</span>
-            <span class="dcard-ds" data-when="default first device-off">筛出可能相关的政策 · 核对材料缺口</span>
+            <!-- 2026-08-10 AI 落实度审查整改：副文原写「筛出可能相关的政策 · 核对材料缺口」，
+                 但缺口核对没有任何实现，主动作也只把三项预筛值带进政策页。
+                 按产品口径不删这项能力（设计成立、只是没接后端），改为如实分栏：
+                 已能办的写在前，待接线的明确标出来。 -->
+            <span class="dcard-ds" data-when="default first device-off">筛出可能相关的政策</span>
+            <span class="dcard-hint" data-when="default first device-off"><b>材料缺口核对：待接线</b> —— 本稿只把下面三项带进政策页预筛，<b>不出"你缺哪几样"的结论</b></span>
             <span class="dcard-ds" data-when="ai-down">政策原文与办事清单照常看，条件自己对</span>
             <span class="picks" data-when="default first device-off">
               <button class="pick" type="button" data-key="identity" data-opts="离职找工作中|在职想换工作|应届毕业生|想创业 / 已创业">

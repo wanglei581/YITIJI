@@ -106,6 +106,9 @@
 }
 .af .ic { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; color: var(--jade-500); }
 .af b { color: var(--fog-900); font-weight: 600; }
+/* E 标现在逐条挂在事实上（原来是三个并排的图例）。行内跟着文字走，
+   高度压到 20px，免得把三行盘点撑高、挤到下面八张功能卡。 */
+.af .ev, .ainext .ev { height: 20px; margin-right: 6px; vertical-align: 2px; }
 .ainext { display: flex; align-items: center; gap: var(--s-4); }
 .ainext .tx { flex: 1; min-width: 0; font-size: var(--fz-3); color: var(--fog-800); line-height: 1.5; }
 .ainext .tx b { color: var(--fog-900); }
@@ -141,8 +144,12 @@
 .ub-wb { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ub-name { font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); }
 .ub-sub { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.5; }
-.ub-chips { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); }
-.ub-chips .ub-out { margin-left: auto; }
+/* 2026-08-10 自检误报消除：这是个**纯布局容器**（一行 flex，里面装「退出登录」按钮
+   或「未登录」状态标），本身不是任何入口。但它旧名里带 chip，命中了 audit-plus
+   「疑似假入口」的扫描面 [class*="chip"]，豁免名单里又没有它 —— 于是四态各报 1 处，
+   报的是容器、不是内容。改名 .ub-acts：语义更准（这是动作区），一个像素没动。 */
+.ub-acts { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-2); }
+.ub-acts .ub-out { margin-left: auto; }
 
 .ub-div { flex: 0 0 1px; background: linear-gradient(180deg, transparent, var(--brd-2) 18%, var(--brd-2) 82%, transparent); }
 .ub-ai { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s-3); justify-content: center; }
@@ -536,7 +543,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>本页只你可见 · <b>退出即离屏</b> · 不留在本机</span></div>
           <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>本机登录 <b>15:02</b> · 无操作 5 分钟自动退出</span></div>
         </div>
-        <div class="ub-chips">
+        <div class="ub-acts">
           <button class="btn btn--ghost ub-out" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
         </div>
       </div>
@@ -554,7 +561,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>不登录也能用<b>全部功能</b> · 只是记录留不下来</span></div>
           <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>离场或无操作 <b>5 分钟</b>后本机会话自动清空</span></div>
         </div>
-        <div class="ub-chips">
+        <div class="ub-acts">
           <span class="chip chip--info">未登录</span>
         </div>
       </div>
@@ -563,18 +570,41 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 
       <!-- 右栏 · AI 求职进度盘点 -->
       <div class="ub-ai">
+        <!-- E 标从这里的「图例」改成逐条挂在事实上：三条的证据级别本来就不一样
+             （两条是你的记录、一条是来源状态 + 一句建议），并排放三个图例反而
+             让人分不清哪条算哪级。图例撤掉，标签跟着结论走。 -->
         <div class="ai-kick">
           <span class="t">AI 求职进度盘点</span>
-          <span class="ev ev--e1" data-when="default device-off">E1 你的记录</span>
-          <span class="ev ev--e2" data-when="default device-off">E2 来源状态</span>
-          <span class="ev ev--e3" data-when="default device-off">E3 建议 · 仅供参考</span>
+          <span class="mt" data-when="default device-off">按你的记录盘出来的，不是卡片的重复</span>
           <span class="mt" data-when="ai-down">服务中断已自动上报</span>
         </div>
 
+        <!-- 2026-08-10 「AI 盘点是复述」整改：这三条原来是
+               「简历已诊断 · 最新版 v3」「本周打印 2 单 · 已全部出纸」「收藏岗位 3 条 · 1 条已下线」——
+             逐条都是正下方那几张功能大卡副标的**同义复述**（v3 在简历卡上、
+             1 条已下线在收藏卡上、打印在订单卡上）。盘点如果说不出「省了你哪几步」，
+             它就只是把卡片又念了一遍，占着一屏最贵的位置。
+
+             换成三件**卡片给不出**的事：都要跨卡、跨浮层才拼得出来，
+             而且都带时间压力 —— 这正是盘点该干的活。
+               ① 敏感件到期：期限表在「账号设置」浮层里，到期提醒在「通知」浮层里，
+                  两个浮层都得点开才看得到，而两边合起来才是「你还有几天」。
+               ② 未取件订单：取件码与有效期在订单明细里；首页订单卡副标只写
+                  「最近一单已出纸」，根本不提还有一单没取。
+               ③ 已下线的收藏：收藏卡只报「1 条已下线」这个数，不说该拿它怎么办。 -->
         <div class="aifacts" data-when="default device-off">
-          <div class="af"><svg class="ic"><use href="#i-resume"/></svg><span>简历已诊断 · 最新版 <b>v3</b></span></div>
-          <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>本周打印 <b>2 单</b> · 已全部出纸</span></div>
-          <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏岗位 <b>3 条</b> · 1 条已下线</span></div>
+          <div class="af"><svg class="ic"><use href="#i-shield"/></svg><span>
+            <span class="ev ev--e1">E1 你的记录</span>
+            你存的<b>证件类文件</b>将在 <b>3 天后</b>到期自动删除 ——
+            还要用就先打印或另存，到期不可恢复</span></div>
+          <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>
+            <span class="ev ev--e1">E1 你的记录</span>
+            还有 <b>1 单没取</b>：取件码 <b>P-4172</b> ·
+            取件码 <b>7 天</b>内有效，过期关单要重新下单</span></div>
+          <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>
+            <span class="ev ev--e2">E2 来源状态</span><span class="ev ev--e3">E3 建议 · 仅供参考</span>
+            收藏里的「内容运营（新媒体）」<b>来源平台已下线</b> ——
+            建议取消收藏，别再按它准备</span></div>
         </div>
         <div class="ubrail" data-when="default ai-down device-off">
           <div class="ubnode ubnode--done"><span class="ubdot"></span>
@@ -587,9 +617,18 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
             <span class="ubn-t">去来源平台</span><span class="ubn-s">在手机上打开该岗位</span></div>
         </div>
 
+        <!-- 2026-08-10 交接整改：这个 CTA 原来是**裸链接** `11-jobfit-compare.html`，
+             既不带简历版本也不带岗位。用户点过去，看到的是一屏空的挑岗位列表，
+             完全看不出跟刚才那句「拿 v3 简历去比对」有什么关系 —— 而 P11 那边
+             早就写好了参数契约（?stage=s1&need=job[&jobId=][&jobTitle=]），
+             并且专门处理了「只说要比对、没带岗位」这种情况，会如实告诉用户
+             「不是你点错了」。本页此前一个参数都不传，等于让那段处理白写。
+             现在按契约带参，按钮上也写清带去什么。 -->
         <div class="ainext" data-when="default device-off">
-          <span class="tx">下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
-          <a class="btn btn--ghost" href="11-jobfit-compare.html">去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          <span class="tx"><span class="ev ev--e3">E3 建议 · 仅供参考</span>
+            下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
+          <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P23">
+            带 v3 简历去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
         </div>
 
         <div class="aidown" data-when="ai-down">

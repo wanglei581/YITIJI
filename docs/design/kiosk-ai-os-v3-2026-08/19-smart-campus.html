@@ -114,6 +114,13 @@
 .previewwrap[data-at="s4"] .alt { padding:10px var(--s-5); }
 .previewwrap[data-at="s4"] .alt-s { font-size:var(--fz-1); }
 
+/* 「待接线」标：不是证据级别。E1/E2/E3 说的是「这条结论有多硬」，
+   而这里**还没有结论** —— 是一个已经想清楚该长什么样、但数据还没接上的 AI 位。
+   所以刻意不借 E3 的琥珀色（那会让人以为已经有模型判断了），
+   改用虚线中性色，和本页 .wh「接入后会有什么」是同一套语言。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
+
 /* ai-down 静态对照表：六项 ↔ 现有替代路径。没有替代的就写没有，不硬凑 */
 .xmap { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-2) var(--s-5); }
 .xm { display:flex; align-items:baseline; gap:var(--s-2); font-size:var(--fz-1); line-height:1.5; }
@@ -422,42 +429,38 @@
       </div>
 
       <!-- ─────────── S4 开通后 · 六项服务（预览） ─────────── -->
-      <!-- AI 引导带：默认 / 首次 / 设备离线。链接指的都是本机自己的能力，不是学校系统 -->
+      <!-- 2026-08-10 E 标签错挂整改（口径已按产品所有者意见调整）：
+           上一版这块挂 `E3 提示 · 仅供参考`，但它的内容是**零输入的固定文案** ——
+           不读用户任何东西，四态下逐字相同，标 E3 等于给一段静态文字盖了个"模型判断"的章。
+           更露馅的是：它的 ai-down 替代品（下面那张六行对照表）信息更全、覆盖六项，
+           反而只在 AI 挂掉时才看得到。
+
+           整改口径**不是删掉这个 AI 位** —— 这块的位置是对的，只是还没接线。
+           现在分成两块，各自说清自己是什么：
+             · 上面 = AI 位，标「待接线」，写明接线后按你要办的事给路径；不再冒充 E3 结论。
+             · 下面 = 六行对照表，**四态常驻**（原来只在 ai-down 出现），三个跳转按钮
+               也挪到这里 —— 它们指的是本机自己的能力，不依赖 AI，凭什么 AI 挂了就没了。 -->
       <div class="aiguide" data-at="s4" data-when="default first device-off">
         <svg class="ic"><use href="#i-orbit"/></svg>
         <span class="ag-b">
           <span class="ag-hd"><span class="ag-t">你要办的事，现在这台机器能怎么办</span>
-            <span class="ev ev--e3">E3 提示 · 仅供参考</span></span>
-          <span class="ag-s">六项里，只有「迎新系统」沾到的那部分本机能替一点：
-                <b>要交的纸能打、要传的扫描件能出、入学后的求职准备能做</b>。
-                行李帮运、VR校园、校园卡、一卡通、校园网这五项<b>本机替不了</b>，
-                得走学校窗口或学校自己的系统 —— 这一条不会因为 AI 说得好听就变。</span>
-          <span class="ag-row">
-            <!-- 2026-08-10：本机手上并没有「报到材料」这份文件，不能按交接契约直落 s3 参数页
-                 （那等于替用户认领一份不存在的材料）。改落 s1，让他先把电子版传进来。 -->
-            <a class="asug" href="06-print-workbench.html?stage=s1&amp;from=P19">
-              <svg class="ic"><use href="#i-printer"/></svg>
-              <span class="asug-b"><span class="asug-k">报到材料要打印</span>
-                <span class="asug-t">打印扫描台</span></span></a>
-            <a class="asug" href="07-scan-workbench.html?from=P19">
-              <svg class="ic"><use href="#i-scan"/></svg>
-              <span class="asug-b"><span class="asug-k">证件、成绩单要电子版</span>
-                <span class="asug-t">扫描工作台</span></span></a>
-            <a class="asug" href="09-resume-workbench.html">
-              <svg class="ic"><use href="#i-resume"/></svg>
-              <span class="asug-b"><span class="asug-k">入学后的求职准备</span>
-                <span class="asug-t">简历工作台</span></span></a>
-          </span>
+            <span class="ev ev--wire">待接线 · 尚未按你的情况计算</span></span>
+          <span class="ag-s"><b>这块还没接上。</b>接线后它按你在迎新流程里卡住的那一步，
+                只给当下这一步能走的路径；现在给不出那个结论，所以不装作给了 ——
+                下面那张六项对照表是写死的，<b>现在就能照着用</b>。</span>
         </span>
       </div>
 
-      <!-- ai-down：同一位置换成静态对照表，六项逐条写清有没有替代。不依赖 AI 也能用 -->
-      <div class="aiguide aiguide--off" data-at="s4" data-when="ai-down">
+      <!-- 六项 ↔ 现在就能用的替代路径。四态常驻：这张表和三个入口都不经过 AI。 -->
+      <div class="aiguide aiguide--off" data-at="s4">
         <svg class="ic"><use href="#i-info"/></svg>
         <span class="ag-b">
-          <span class="ag-hd"><span class="ag-t">AI 顾问暂时不可用 · 六项 ↔ 现在的替代路径</span></span>
+          <span class="ag-hd"><span class="ag-t">六项 ↔ 现在就能用的替代路径</span>
+            <span class="ev ev--e2">E2 本机能力</span></span>
           <span class="ag-s">下面这张表是写死的，不经过 AI。
                 <b>没有替代的就写没有</b> —— 编一条听着能办的路径，只会让你白跑一趟。</span>
+          <span class="ag-s" data-when="ai-down"><b>AI 顾问暂时不可用</b>，上面那块给不出按你情况算的路径；
+                这张表与下面三个入口<b>不受影响</b>。</span>
           <span class="xmap">
             <span class="xm"><span class="xm-a">迎新系统</span>
               <span class="xm-b">材料自带电子版 → 打印扫描台能打</span></span>
@@ -471,6 +474,22 @@
               <span class="xm-b">本机没有替代 → 学校窗口办</span></span>
             <span class="xm"><span class="xm-a">校园网开通</span>
               <span class="xm-b">本机没有替代 → 学校网络中心办</span></span>
+          </span>
+          <span class="ag-row">
+            <!-- 2026-08-10：本机手上并没有「报到材料」这份文件，不能按交接契约直落 s3 参数页
+                 （那等于替用户认领一份不存在的材料）。改落 s1，让他先把电子版传进来。 -->
+            <a class="asug" href="06-print-workbench.html?stage=s1&amp;from=P19">
+              <svg class="ic"><use href="#i-printer"/></svg>
+              <span class="asug-b"><span class="asug-k">报到材料要打印</span>
+                <span class="asug-t">打印扫描台</span></span></a>
+            <a class="asug" href="07-scan-workbench.html?from=P19">
+              <svg class="ic"><use href="#i-scan"/></svg>
+              <span class="asug-b"><span class="asug-k">证件、成绩单要电子版</span>
+                <span class="asug-t">扫描工作台</span></span></a>
+            <a class="asug" href="09-resume-workbench.html?from=P19">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="asug-b"><span class="asug-k">入学后的求职准备</span>
+                <span class="asug-t">简历工作台</span></span></a>
           </span>
         </span>
       </div>

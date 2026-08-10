@@ -302,11 +302,37 @@
 
       <!-- ───────── 浏览与跳转 · 方向画像 + 本页唯一合规声明 ─────────
            声明贴在画像正下方：用户看到"机器归纳了我在看什么"的同一屏，
-           就该看到这份归纳的边界。其余三个标签的声明在右栏，任一屏只一条。 -->
+           就该看到这份归纳的边界。其余三个标签的声明在右栏，任一屏只一条。
+
+           ══ AI 接线契约 · P43-A「浏览足迹方向画像」════════════════════════════
+           输入：
+             · browseLogs   [{ id, kind:'job|fair|policy', title, dir, region, at }]
+             · jumpLogs     [{ id, targetOrg, at }] —— 只记「打开过来源平台」，
+               **不记投没投、投没投成**（合规红线：CLAUDE.md §10 / 本页页脚声明）
+             · 窗口：最近 14 天，仅本人；未登录时只有本次会话，走 first 态
+           输出：
+             · { summary: string, topDir: string, topRegion: string, counts:{...} }
+             · summary（"最近两周你主要在看运营方向，集中在天河区"）= **E3 · AI 判断**
+               —— 这是模型对行为的概括，2026-08-10 之前漏标，本轮补上
+             · counts（9 条里 5 条运营岗 / 打开过 4 次来源平台）= E1 你的记录（纯统计）
+           动作（省步骤，不止多一段话）：
+             · topDir / topRegion 直接做成「按这个方向接着找」→
+               13-jobs-desk.html?stage=ok&dir=<topDir>&region=<topRegion>
+               参数名对齐 13 自己的筛选组键（data-fgroup）；13 目前 0 处 URLSearchParams，
+               接线后即生效，按钮上已写明带去什么
+           降级：
+             · AI 不可用 → 标题换成「本机这次不做归纳，记录都在下面」，
+               summary 与动作一并隐藏；两个 Tab 与全部明细照常，页面完全可用
+             · 未登录（first）→ 不出画像也不举例，只说明"登录后这里会归纳"
+           ═══════════════════════════════════════════════════════════════════ -->
       <div class="checks" data-at="trace">
         <div class="checks-hd">
           <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
-          <span class="t" data-when="default device-off">最近两周你主要在看运营方向，集中在天河区</span>
+          <!-- 2026-08-10 AI 落实度审查整改：这一句是**模型对你行为的概括**，
+               原来一个 E 标都没有，反倒是下面那两条计数（纯统计）标了 E1 —— 标反了。
+               概括必须标 E3：它是归纳，不是记录本身。 -->
+          <span class="t" data-when="default device-off">最近两周你主要在看运营方向，集中在天河区
+            <span class="ev ev--e3">E3 · AI 判断 · 仅供参考</span></span>
           <span class="t" data-when="first">登录后这里会归纳你最近在看哪个方向</span>
           <span class="t" data-when="ai-down">本机这次不做归纳，记录都在下面</span>
           <span class="s" data-when="default device-off">9 条足迹</span>
@@ -317,6 +343,10 @@
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>9 条里 5 条是运营岗、2 条招聘会、1 条政策 <span class="ev ev--e1">E1 你的记录</span></span>
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>打开过 4 次来源平台，最近一次今天 10:20 <span class="ev ev--e1">E1 你的记录</span></span>
         </div>
+        <!-- 2026-08-10 「只多一段话 → 能省步骤」整改：上面那句归纳原来读完就完了，
+             用户还得自己走到岗位台、自己把方向和区再筛一遍。归纳出的两项直接做成动作，
+             按 13 自己的筛选组键（dir / region）带过去。 -->
+        <a class="inlink" data-when="default device-off" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>按这个方向接着找：运营&nbsp;· 天河区</a>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录只留本次会话的足迹，离场即清</span>
         </div>
@@ -456,7 +486,11 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-eye"/></svg>查看对比</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看对比（带这条岗位）</a>
               <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看这个岗位</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="岗位匹配记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -579,7 +613,11 @@
             </button>
             <div class="rrow-ops">
               <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
-              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>和简历比一比</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-target"/></svg>和简历比一比（带这条）</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
             <div class="rrow-det">
@@ -602,7 +640,13 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="已下线的收藏"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
             <div class="rrow-det">
@@ -761,7 +805,11 @@
             </button>
             <div class="rrow-ops">
               <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
-              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>和简历比一比</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-target"/></svg>和简历比一比（带这条）</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -783,7 +831,13 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -916,7 +970,13 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -1167,10 +1227,11 @@
       <div class="xlane" data-at="ai">
         <span class="xlane-hd">盘点之外，这三处能接着做</span>
         <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
-          <a class="xlane-go" href="11-jobfit-compare.html">
+          <!-- 2026-08-10 交接不带货整改：带上收藏里那条在招的岗位（JX-88214），到对面不用再挑 -->
+          <a class="xlane-go" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43">
             <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
-              <span class="xlane-ds">拿简历和收藏岗位逐条比</span></span>
+              <span class="xlane-ds">带去：用户运营专员&nbsp;· 直接进逐条比对</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
           <a class="xlane-go" href="20-interview-pod.html">
@@ -1191,10 +1252,11 @@
       <div class="xlane" data-at="fav">
         <span class="xlane-hd">收藏之外，这三处也能往下走</span>
         <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
-          <a class="xlane-go" href="13-jobs-desk.html">
+          <!-- 2026-08-10 交接不带货整改：收藏那条在招岗位的方向与区就在行上（运营 · 天河区），带过去 -->
+          <a class="xlane-go" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">
             <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
-              <span class="xlane-ds">再找几条要求相近的</span></span>
+              <span class="xlane-ds">带去：运营&nbsp;· 天河区（接线后自动生效）</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
           <a class="xlane-go" href="17-fair-desk.html">
@@ -1222,10 +1284,12 @@
       <div class="xlane" data-at="trace">
         <span class="xlane-hd">看过的之外，这三处也能往下走</span>
         <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
-          <a class="xlane-go" href="13-jobs-desk.html">
+          <!-- 2026-08-10 交接不带货整改：这一栏顶上的画像归纳的就是「运营方向 · 集中在天河区」，
+               出口带上这两项，用户不用到对面再筛一遍（13 接线后生效） -->
+          <a class="xlane-go" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">
             <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
-              <span class="xlane-ds">按同一方向接着找</span></span>
+              <span class="xlane-ds">带去：运营&nbsp;· 天河区（接线后自动生效）</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
           <a class="xlane-go" href="35-online-platforms.html">
@@ -1512,9 +1576,9 @@
     <a class="btn btn--lg btn--ghost" data-at="trace" href="23-me.html"><svg class="ic"><use href="#i-shield"/></svg>隐私与删除</a>
     <a class="btn btn--lg btn--ghost" data-at="notice" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>查看本机状态</a>
 
-    <a class="btn btn--primary" data-at="ai" href="11-jobfit-compare.html">去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="fav" href="13-jobs-desk.html">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="trace" href="13-jobs-desk.html">接着找运营岗<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="ai" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43">去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="fav" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="trace" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">接着找运营岗<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="notice" type="button" data-submit>提交这条反馈<svg class="ic"><use href="#i-arrowRight"/></svg></button>
   </div>
 

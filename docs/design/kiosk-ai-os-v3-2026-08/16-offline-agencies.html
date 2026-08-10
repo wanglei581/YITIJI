@@ -774,6 +774,13 @@
       </div>
     </div>
   </div>
+  <!-- 2026-08-10 第二轮全量回归：这里原来少一个 </div>，.work--ag 一直开到页尾，
+       于是 .actionbar 与 .navbar 变成 .work 的子元素、继承了它 56px 的左右内边距
+       和 16px 的下内边距 —— 全站 44 张有外壳的页里只有本页：返回键在 112px（其余 56px）、
+       两条栏宽 968（其余 1080）、底部导航离屏底 16px（其余贴边 0）。
+       `.stage` 因此也没闭合，靠浏览器在 </body> 处兜底。补回这一个闭合标签，
+       .actionbar / .navbar 回到 .screen 直接子级，与其余 43 页一致。 -->
+  </div>
 
   <div class="actionbar">
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>

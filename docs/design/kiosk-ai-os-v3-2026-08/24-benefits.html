@@ -68,6 +68,14 @@
 .py--org { background:var(--fog-a08); color:var(--fog-700); }
 .py--own { background:var(--amber-a12); color:var(--amber-200); }
 
+/* 「待接线」标：不是证据级别。E1/E2/E3 说的是「这条结论有多硬」，
+   这里**还没有结论** —— 是一个位置对、但输入只到一半的提示位。
+   刻意不借 E3 的琥珀色：那会让人以为已经算过了，而这正是上一版犯的错。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
+/* 逐条挂在 tl 说明里的 E 标：跟着文字走，不把时间线撑高 */
+.tl-s .ev { height:20px; margin-right:6px; vertical-align:2px; }
+
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
@@ -172,7 +180,7 @@
               8月9日 15:04 已使用。<br>
               <b>顺带说清</b>：政策核对、岗位浏览这类查询本来就不收费；
               AI 诊断、优化、面试练习按次计入当月用量，<b>会员期内不限次</b> ——
-              你本月的用量在右侧「AI 权益提示」里。
+              你本月的用量在右侧「你的账户」里。
             </div>
           </div>
 
@@ -278,16 +286,24 @@
         </div>
       </div>
 
+      <!-- 2026-08-10 E 标签错挂整改（反向）：这一块**真的在做推理** ——
+           它跨页读了用户在政策服务页（P21）选的答案，拿去逐条核对这项权益的门槛，
+           还给出「第 2 条本机判不了、所以不给结论」这样的判断。全页最该标 E 的就是它，
+           而上一版它一个 E 标都没有；反倒是隔壁一条纯付费状态挂着 E3。
+           标反了比不标更糟：用户会以为标了 E3 的那条才是算出来的。
+           现在按实际证据来源标：用户的作答标 E1，本机做出的判断标 E3。 -->
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
           <b>怎么用 · 你现在卡在哪</b>
+          <span class="mt"><span class="ev ev--e3">E3 判断 · 仅供参考</span></span>
         </div>
         <div class="sec">
           <div class="tline">
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
               <span class="tl-b"><span class="tl-t">本市户籍或本市缴社保</span>
-                <span class="tl-s">你在政策服务页选了本市户籍 —— 这条通了</span></span></div>
+                <span class="tl-s"><span class="ev ev--e1">E1 你的作答</span>
+                  你在政策服务页选了本市户籍 —— 这条通了</span></span></div>
             <div class="tl tl--now"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">已做失业登记</span>
                 <span class="tl-s"><b>本机查不到你的登记状态</b> ——
@@ -329,7 +345,7 @@
             <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
             不能预支、不能攒到下月。<br>
             用完<b>不影响任何功能</b> —— 这份额度只管纸张；
-            AI 服务的次数是另一套口径，见「AI 权益提示」。
+            AI 服务的次数是另一套口径，见右侧「你的账户」。
           </div>
         </div>
       </div>
@@ -432,23 +448,36 @@
         </div>
       </div>
 
-      <!-- 本轮新增：AI 权益提示 —— 只对本人显示的两条账户事实（E2）+ 一条提示（E3），
-           事实与提示分开标注、分开看。只陈述事实和一个查看入口：
-           不倒计时、不弹窗、不催费——和下面「不做的事」是同一条纪律。
-           first（无上下文）没有本人数据，整卡隐藏。 -->
+      <!-- 2026-08-10 E 标签错挂整改（口径已按产品所有者意见调整）：
+           上一版这张卡叫「AI 权益提示」，那条 E3 挂在**会员到期与续费**上 ——
+           而它说的是「续不续看你的求职节奏，本机不催」，纯粹是一句立场声明，
+           没有读任何东西、没有推出任何结论。把 E3 盖在一条付费状态上，
+           等于让「模型判断」这个标去给一句运营话术背书。实证：ai-down 把它撤掉，
+           页面一条信息都没少。
+
+           整改口径**不是删掉这个提示位** —— 位置该有，只是挂错了地方，也还没接线。
+           两件事分开做：
+             ① 卡改名「你的账户」，两条 E2 账户事实原样保留（它们本来就没问题）。
+             ② 提示位保留，但从「会员/续费」挪到它真能帮上忙的地方 ——
+                你这个月剩的免费额度，够不够把待打印的材料打完。这是本机
+                唯一能替用户算、而用户自己算起来最烦的一件事。
+                现在缺一半输入（额度有、待打印页数没有），所以标「待接线」，
+                并写清缺什么 —— 不拿 E3 冒充已经算过。 -->
       <div class="pane" data-at="s1" data-when="default ai-down device-off">
-        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>AI 权益提示</b><span class="mt">只有你这一屏可见</span></div>
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>你的账户</b><span class="mt">只有你这一屏可见</span></div>
         <div class="sec">
           <div class="kv">
             <div class="kv-row"><span class="k">打印会员</span><span class="v">剩 <b>23</b> 天 · 到期后打印恢复单价 <span class="ev ev--e2">E2 账户事实</span></span></div>
             <div class="kv-row"><span class="k">本月 AI 服务</span><span class="v">已用 <b>4</b> 次 · 会员期内不限次 <span class="ev ev--e2">E2 账户事实</span></span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)" data-when="default device-off">
-            <span class="ev ev--e3">E3 提示 · 仅供参考</span>
-            续不续、什么时候续，看你的求职节奏；到期只恢复原价，不影响任何功能。本机不催、不倒计时。
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            <span class="ev ev--wire">待接线</span>
+            这里要回答的是一个具体问题：<b>你这个月剩的免费额度，够不够把待打印的材料打完</b>。
+            本机现在只有一半输入 —— 额度知道（本月剩 <b>7</b> 页），
+            但<b>还没接上「我的文档」里待打印材料的页数</b>，所以给不出结论，也不假装给了。
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)" data-when="ai-down">
-            AI 提示不可用。上面两条是账户事实，读的是你的账户，不受影响。
+            上面两条是账户事实，读的是你的账户，<b>AI 是否可用都不受影响</b>。
           </div>
           <button class="btn btn--ghost" style="width:100%;margin-top:var(--s-3)">查看续费方式</button>
         </div>

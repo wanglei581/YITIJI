@@ -1116,7 +1116,26 @@
         </div>
       </div>
 
-      <!-- AI 不可用：如实说明与本页无关 -->
+      <!-- 这八态不依赖 AI —— 常驻，四态都看得见。
+           2026-08-10 AI 落实度审查整改：这句话原来**只**写在下面 data-when="ai-down"
+           的面板里，而页面默认是 default 态，stage.js 会把它 hidden ——
+           真实用户根本看不到「付款到履约这八种状态不依赖 AI」。钱和纸的判定依据是
+           支付回执与出纸计数，这是**任何时候都成立**的事实，所以提到常驻区；
+           ai-down 面板保留，作为降级当场的复述。 -->
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这八态不依赖 AI</b>
+          <span class="chip chip--info" style="margin-left:auto">四态都成立</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁在判定</span><span class="v">支付回执与出纸计数</span></div>
+            <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
+            <div class="kv-row"><span class="k">AI 挂了会怎样</span><span class="v">八态照常判定</span></div>
+          </div>
+          <div class="panel-note">付没付、出了几页、退多少 —— 依据是<b>支付渠道回执与打印机出纸计数</b>，没有一步经过模型，也<b>不由模型决定退款金额</b>。<span class="ev ev--e2">E2 来自支付回执与出纸计数</span></div>
+        </div>
+      </div>
+
+      <!-- AI 不可用：降级当场再复述一次（内容与上面那条常驻面板一致） -->
       <div class="pane" data-when="ai-down">
         <div class="pane-hd"><svg class="ic"><use href="#i-brain"/></svg><b>AI 不可用时</b></div>
         <div class="sec">

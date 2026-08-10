@@ -548,15 +548,38 @@
         </div>
       </div>
 
-      <div class="pane" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b></div>
+      <!-- 2026-08-10 不同源整改：这块此前是**写死的两条**，不随核对结果变。
+           默认答案里「失业登记：已办」，左边逐条核对已经把这条标成通过，
+           右边却还在让用户去办失业登记 —— 同一屏，同一件事，两个结论。
+           一页里最不该打架的就是「你卡在哪」和「所以你先去办什么」。
+
+           两个可选做法里选了**按核对结果派生**（另一个是标成「通用提醒」）：
+           本页的判定函数 cReg / cSoc3 / cAlways 已经在跑，`ans` 也在，
+           派生只是把已有结果换个说法，不需要任何新数据；标成通用提醒等于
+           承认这一栏永远帮不上忙，那还不如不放。
+
+           但 ai-down 例外：那一态本来就不做条件核对（右上角写着「条件核对 · 未做」），
+           派生无从谈起，所以那一态另给一份并**明写「通用提醒 · 不随你的作答变化」**。 -->
+      <div class="pane" data-at="s2" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先办的</b>
+          <span class="mt" id="todoMt">按你的作答派生</span></div>
+        <div class="sec" id="todoBox"></div>
+      </div>
+
+      <div class="pane" data-at="s2" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b>
+          <span class="mt">通用提醒 · 不随你的作答变化</span></div>
         <div class="sec">
-          <button class="ckrow" data-todo="reg" aria-pressed="false">
+          <div class="panel-note" style="margin-bottom:var(--s-3)">
+            这一态<b>没做条件核对</b>，所以下面两条是通用提醒，
+            <b>不是按你的情况算出来的</b> —— 已经办过的请自行跳过。
+          </div>
+          <button class="ckrow" data-todo="reg-generic" aria-pressed="false">
             <span class="ck-box"></span>
             <span class="ckrow-b"><span class="ckrow-t">办失业登记</span>
               <span class="ckrow-s">政务网或户籍地街道办</span></span>
           </button>
-          <button class="ckrow" data-todo="soc" aria-pressed="false">
+          <button class="ckrow" data-todo="soc-generic" aria-pressed="false">
             <span class="ck-box"></span>
             <span class="ckrow-b"><span class="ckrow-t">查失业保险缴了多久</span>
               <span class="ckrow-s">社保 App 可查</span></span>
@@ -1147,6 +1170,80 @@
     return nPick
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     「去之前先办的」· 2026-08-10 不同源整改
+     ----------------------------------------------------------------------
+     这一栏原来是写死的两条，和左边逐条核对的结果毫无关系：默认答案里
+     「失业登记：已办」已经被核对判成通过，右栏照样让人去办登记。
+
+     现在每条待办声明它**解决的是哪个条件判定函数**，然后只在两个前提都成立时出现：
+       ① 当前分类里**真有政策用到这个条件**（换到「社保指南」就不该再提创业相关的事）
+       ② 这个条件现在**还没通过**（'no' 卡住 / 'dunno' 判不了）
+     已经通过的条件不生成待办 —— 这正是原来那条 bug。
+
+     待办后面必须写清**为什么是你**：是你答了「没办」，还是你没答，还是本机查不到。
+     不写原因的待办等于命令，用户没法判断该不该照做。
+     ══════════════════════════════════════════════════════════════════════ */
+  var todoDone = {}          // 用户在屏幕上打勾的那几条（render 重建时不能丢）
+
+  var TODO = [
+    { k: 'reg',  t: '办失业登记',
+      s: '政务网或户籍地街道办',        f: cReg,    q: 'reg' },
+    { k: 'soc3', t: '查灵活就业社保连续缴了几个月',
+      s: '社保 App 可查',              f: cSoc3,   q: 'soc' },
+    { k: 'ins1', t: '查失业保险累计缴了多久',
+      s: '社保 App 可查 · 本机查不到，只能你自己去查', f: cAlways, q: '' }
+  ]
+
+  /* 当前分类里是否有政策用到这个判定；用到了，它现在是什么结果 */
+  function condState (fn) {
+    var list = polsIn(), i, j
+    for (i = 0; i < list.length; i++) {
+      for (j = 0; j < list[i].c.length; j++) {
+        if (list[i].c[j].f !== fn) continue
+        return cityOK() ? fn() : 'dunno'
+      }
+    }
+    return ''                 // 这一分类下没有政策要这个条件 → 不生成待办
+  }
+
+  function todoWhy (it, r) {
+    /* 顺序要紧：本机压根查不到的那一项（没有对应问项），
+       理由永远是「查不到」—— 城市定没定都改变不了这件事。
+       先判城市会把它错写成「先定城市」，等于暗示定完城市本机就能替你查。 */
+    if (!it.q) return '本机查不到这项，谁都替你查不了'
+    if (!cityOK()) return '本机还没定到城市，判不了这条 —— 先在第 1 步定城市'
+    if (r === 'no') return '你答：' + esc(ans[it.q]) + ' —— 这条现在卡住了'
+    if (ans[it.q]) return '你答：' + esc(ans[it.q]) + ' —— 本机据此判不了'
+    return '这一项你还没答，所以本机没算它'
+  }
+
+  function renderTodo () {
+    var box = $('todoBox')
+    if (!box) return
+    var html = '', n = 0, i, r
+    for (i = 0; i < TODO.length; i++) {
+      r = condState(TODO[i].f)
+      if (r === '' || r === 'ok') continue          // 用不上 / 已经通了
+      n++
+      html += '<button class="ckrow" data-todo="' + TODO[i].k + '" aria-pressed="' +
+              (todoDone[TODO[i].k] ? 'true' : 'false') + '">' +
+              '<span class="ck-box"></span><span class="ckrow-b">' +
+              '<span class="ckrow-t">' + TODO[i].t + '</span>' +
+              '<span class="ckrow-s">' + TODO[i].s + '</span>' +
+              '<span class="ckrow-s">' + todoWhy(TODO[i], r) + '</span>' +
+              '</span></button>'
+    }
+    if (!n) {
+      html = '<div class="panel-note" style="margin-left:0">' +
+             '按你现在的作答，<b>没有需要先去办的事</b> —— 上面几条政策卡在哪，' +
+             '左边逐条列着。改了作答，这里会跟着变。</div>'
+    }
+    box.innerHTML = html
+    var mt = $('todoMt')
+    if (mt) mt.textContent = n ? ('按你的作答派生 · ' + n + ' 条') : '按你的作答派生 · 暂无'
+  }
+
   /* ---------- 打印交接链接 ----------
      全站契约：06-print-workbench.html?stage=s3&from=&kind=&title=&pages=&copies=&back=
      · pages 用本页自己算出来的合计（清单 1 页 + 已勾原文页数），不是写死的 5；
@@ -1312,6 +1409,7 @@
     renderCarry()
     renderCity()
     renderQs()
+    renderTodo()
     renderPaper(renderPols())
   }
   window.p21Render = render
@@ -1343,7 +1441,13 @@
       render(); return
     }
     if ((t = e.target.closest('[data-todo]'))) {
-      t.setAttribute('aria-pressed', t.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); return
+      var tk = t.getAttribute('data-todo')
+      var nowOn = t.getAttribute('aria-pressed') !== 'true'
+      t.setAttribute('aria-pressed', nowOn ? 'true' : 'false')
+      /* 打过的勾要记住：这一栏现在是 render() 重建的，
+         用户改一个答案就会重画，不记就会把他刚打的勾抹掉。 */
+      if (nowOn) todoDone[tk] = 1; else delete todoDone[tk]
+      return
     }
     if ((t = e.target.closest('[data-fold]'))) {
       var fb = scr.querySelector('[data-foldbox="' + t.getAttribute('data-fold') + '"]')

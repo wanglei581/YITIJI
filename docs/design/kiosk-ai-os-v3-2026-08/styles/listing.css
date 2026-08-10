@@ -65,7 +65,13 @@
   font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .03em;
 }
 .srcline .org { color: var(--azure-400); }
-.srcline .sep { opacity: .45; }
+/* 分隔点：原来 <span class="sep">·</span> 是独立的 flex item，于是它自己就是一个
+   换行点 —— 栏一窄就换到下一行行首（中文排版禁则，v3Audit 的「标点在行首」判缺陷）。
+   实测 2026-08-10 第二轮回归：18-campus s2 两条来源条各中一次（「…07:30」「…06:50」后的「·」起行）。
+   改成挂在**前一段**的 ::after 上，`·` 就和前一段绑成同一个 flex item，只能跟着它一起走。
+   来源条九页共 53 处结构完全一致（[.org][.sep][同步][.sep][外部 ID]），故在共享样式里一次改掉。 */
+.srcline .sep { display: none; }
+.srcline > span:not(.sep):not(:last-child)::after { content: '·'; margin-left: var(--s-3); opacity: .45; }
 .srcline--detail { padding-top: var(--s-3); border-top: 1px solid var(--brd-1); }
 
 /* 线上 / 线下双轨标记 */

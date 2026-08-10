@@ -1240,6 +1240,9 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
+  /* 来源措辞按 ?from= 决定,避免谎报来源(P43 是「我的记录」不是「招聘会现场」) */
+  var FROM_SRC={P43:'从我的记录带来:',P45:'从招聘会现场带来:',P42:'从我的资产带来:',P15:'从企业详情带来:'};
+
 /* 点岗位要求 → 简历原文定位并高亮所有对应证据（一条要求可命中多处） */
 ;(function () {
   var scr = document.querySelector('.screen')
@@ -1458,8 +1461,8 @@
     box.className = 'carryin'
     box.setAttribute('data-at', 's1 s2')
     var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
-            '<b>' + (hit ? ('从招聘会现场带来：' + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
-            '<span class="carryin-src">来自招聘会现场 · 可改</span></div>'
+            '<b>' + (hit ? ((FROM_SRC[q.get('from')]||'从招聘会现场带来：') + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
+            '<span class="carryin-src">来自上一屏 · 可改</span></div>'
     if (items) h += '<div class="carryin-items">' + items + '</div>'
     for (i = 0; i < notes.length; i++) h += '<div class="carryin-note">' + notes[i] + '</div>'
     /* data-at 写成静态属性：本条只建一次、不重排，切阶段交给 v3ApplyVisibility 管 */
