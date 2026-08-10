@@ -612,6 +612,12 @@ function auditCardVoid (win) {
       var nr = n.getBoundingClientRect()
       if (nr.height > 0 && nr.bottom > maxBottom) maxBottom = nr.bottom
     }
+    /* 一个内容叶子都没有的元素**不是「卡里空了」，是背景层**。
+       第一版没这条，于是 03 的全屏遮罩 .scrim 被报成「高 1920 空 1920」，
+       .behind-row--tall 同理 —— 遮罩本来就该是空的，报它纯属噪声。
+       判据：找不到任何可见叶子（maxBottom 还停在容器顶边）。 */
+    if (maxBottom <= r.top + 1) continue
+
     var pad = parseFloat(cs.paddingBottom) || 0
     var gap = Math.round(r.bottom - pad - maxBottom)
     if (gap > 200) {
