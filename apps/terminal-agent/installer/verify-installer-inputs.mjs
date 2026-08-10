@@ -6,14 +6,24 @@ import { fileURLToPath } from 'node:url'
 const root = path.dirname(fileURLToPath(import.meta.url))
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8')
 const workspace = fs.readFileSync(path.join(root, '../../../pnpm-workspace.yaml'), 'utf8')
+const agentPackage = JSON.parse(fs.readFileSync(path.join(root, '../package.json'), 'utf8'))
 const inputs = JSON.parse(read('inputs.json'))
 const wix = read('Agent.wxs')
 const project = read('AIJobPrintAgent.wixproj')
 const bundle = read('Bundle.wxs')
 const bundleProject = read('AIJobPrintTerminalSetup.wixproj')
+const buildMsi = read('build-msi.ps1')
 const buildExe = read('build-exe.ps1')
 const staging = read('build-staging.ps1')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
+const agentCli = fs.readFileSync(path.join(root, '../src/index.ts'), 'utf8')
+const agentConfigExample = JSON.parse(
+  fs.readFileSync(path.join(root, '../agent-config.example.json'), 'utf8'),
+)
+const productionInstaller = fs.readFileSync(
+  path.join(root, '../scripts/install-production-agent.ps1'),
+  'utf8',
+)
 const workflow = fs.readFileSync(
   path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
   'utf8',
@@ -31,6 +41,15 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
+assert.equal(inputs.productVersion, '0.3.9')
+assert.equal(
+  inputs.productVersion,
+  agentPackage.version,
+  'installer and Agent package versions must advance together',
+)
+assert.ok(agentCli.includes(`.version('${inputs.productVersion}')`))
+assert.equal(agentConfigExample.agentVersion, inputs.productVersion)
+assert.ok(productionInstaller.includes(`AgentVersion = "${inputs.productVersion}-production"`))
 assert.equal(inputs.node.version, '22.23.1')
 assert.match(inputs.node.url, /^https:\/\/nodejs\.org\//)
 assert.match(inputs.serviceWrapper.url, /^https:\/\/github\.com\/winsw\/winsw\/releases\//)
@@ -65,6 +84,13 @@ assert.match(bundle, /SuppressOptionsUI="yes"/)
 assert.match(bundle, /<MsiPackage[\s\S]*SourceFile="\$\(var\.MsiPath\)"[\s\S]*Compressed="yes"/)
 assert.doesNotMatch(bundle, /<(?:Variable|MsiProperty|ExePackage)\b/)
 assert.doesNotMatch(bundle, /(?:BindCode|AgentToken|BridgeToken|adminSecret)/i)
+for (const buildScript of [buildMsi, buildExe]) {
+  assert.match(buildScript, /\[string\]\$ProductVersion/)
+  assert.match(buildScript, /three-part numeric/)
+  assert.match(buildScript, /Windows Installer bounds/)
+  assert.match(buildScript, /-p:ProductVersion=\$ProductVersion/)
+  assert.match(buildScript, /\$resolvedOutputDirectory = \(Resolve-Path -LiteralPath \$OutputDirectory\)\.Path/)
+}
 assert.match(buildExe, /Expected exactly one MSI input/)
 assert.match(buildExe, /AIJobPrintTerminalSetup\.exe/)
 assert.match(buildExe, /unsigned CI candidate/)
@@ -114,6 +140,7 @@ assert.match(staging, /manifest\.json/)
 
 const lifecycle = read('test-msi-lifecycle.ps1')
 const exeLifecycle = read('test-exe-lifecycle.ps1')
+const upgradeLifecycle = read('test-exe-upgrade-lifecycle.ps1')
 assert.match(lifecycle, /Start-Service -Name \$serviceName/)
 assert.match(lifecycle, /Remove-Item -LiteralPath \$diagnosticPath -Force/)
 assert.match(lifecycle, /\$startServiceError = \$null/)
@@ -149,6 +176,10 @@ assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
 assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
+assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.3\.8"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.3\.9"/)
+assert.match(upgradeLifecycle, /ProgramData sentinel was not preserved through upgrade/)
+assert.match(upgradeLifecycle, /EXE_UPGRADE_LIFECYCLE_PASS/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
 assert.match(workflow, /Verify staged secure scan reader boundary/)
 assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
@@ -164,7 +195,15 @@ assert.match(secureScanReaderVerify, /replace\(\/\^\\uFEFF\//, 'Windows PowerShe
 assert.match(secureScanReaderVerify, /FileAttributes\]::ReparsePoint/, 'cleanup must never treat an ordinary non-empty scan directory as a link')
 assert.match(lifecycle, /Installed secure scan reader boundary verification failed/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
+assert.match(
+  workflow,
+  /actions\/checkout@v4[\s\S]*?ref:\s*\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/,
+  'installer artifacts must record the exact PR head instead of an ephemeral pull-request merge ref',
+)
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
+assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
+assert.match(workflow, /-ProductVersion 0\.3\.8/)
+assert.match(workflow, /artifacts\/upgrade\/predecessor\/exe/)
 assert.ok(
   workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
   'EXE lifecycle must run first on a clean ProgramData root',
