@@ -236,7 +236,7 @@ const ISSUE_SQL: Record<string, string> = {
                 AND d."occurredAt"<=$1 ORDER BY d."occurredAt" DESC,d.id DESC LIMIT 1) IS TRUE
               AND EXISTS (SELECT 1 FROM "FileObject" f WHERE f.id=q."evidenceFileId"
                 AND f.purpose='qualification_evidence' AND f.visibility='private' AND f.status='active'
-                AND f."deletedAt" IS NULL AND (f."expiresAt" IS NULL OR f."expiresAt">=$1))))))`,
+                AND f."deletedAt" IS NULL AND (f."expiresAt" IS NULL OR f."expiresAt">=$1)))))))`,
   offline_job_duplicate_external_id: `SELECT DISTINCT j.id FROM "OfflineJob" j JOIN (SELECT "agencyId","externalId"
     FROM "OfflineJob" WHERE "externalId" IS NOT NULL AND BTRIM("externalId")<>'' GROUP BY 1,2 HAVING COUNT(*)>1) d
     USING("agencyId","externalId")`,

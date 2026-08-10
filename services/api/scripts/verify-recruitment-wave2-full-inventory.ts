@@ -271,6 +271,15 @@ async function verifySqlAllowlist(): Promise<void> {
     source,
     /audit_negative_action_reason_missing_candidate:[\s\S]{0,700}offline_agency%/u
   )
+  const qualificationSql = source.match(
+    /agency_qualification_chain_unproven: `([\s\S]*?)`,\n {2}offline_job_duplicate_external_id:/u
+  )?.[1]
+  assert(qualificationSql)
+  assert.equal(
+    qualificationSql.split('(').length,
+    qualificationSql.split(')').length,
+    'qualification inventory SQL parentheses must stay balanced'
+  )
 }
 
 async function verifyReaderContracts(): Promise<void> {
