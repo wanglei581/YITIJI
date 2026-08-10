@@ -410,6 +410,44 @@
   }
   window.v3Audit = audit
 
+  // ── 返回键：先退阶段，退无可退才离开本页 ─────────────────────────
+  // 一体机没有浏览器后退键；用户口径是「回到上一级，不是回首页」。
+  function stageList () {
+    var set = new Set()
+    document.querySelectorAll('[data-at]').forEach(function (el) {
+      String(el.getAttribute('data-at') || '').split(/\s+/).forEach(function (v) { if (v) set.add(v) })
+    })
+    var order = []
+    var rail = document.querySelector('.rail, [data-rail], .spine-rail') || document
+    if (rail) {
+      rail.querySelectorAll('[data-go]').forEach(function (el) {
+        var v = el.getAttribute('data-go'); if (v && set.has(v) && order.indexOf(v) < 0) order.push(v)
+      })
+    }
+    if (!order.length) order = Array.from(set)
+    return order
+  }
+  function syncBack () {
+    var b = document.querySelector('.actionbar > .backbtn'); if (!b) return
+    var cur = screen.getAttribute('data-stage') || screen.getAttribute('data-at') || ''
+    var list = stageList(); var i = list.indexOf(cur)
+    var t = b.querySelector('.backbtn-t'); var sub = b.querySelector('.backbtn-sub')
+    if (i > 0) { if (t) t.firstChild ? (t.firstChild.nodeValue = '上一步') : (t.textContent = '上一步'); if (sub) sub.textContent = '第 ' + i + ' 步' }
+    else { if (t) t.firstChild ? (t.firstChild.nodeValue = '返回') : (t.textContent = '返回'); if (sub) sub.textContent = b.getAttribute('data-parent-label') || '' }
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.actionbar > .backbtn'); if (!b) return
+    var cur = screen.getAttribute('data-stage') || screen.getAttribute('data-at') || ''
+    var list = stageList(); var i = list.indexOf(cur)
+    if (i > 0) {
+      e.preventDefault()
+      if (typeof window.v3Stage === 'function') window.v3Stage(list[i - 1])
+      else { screen.setAttribute('data-stage', list[i - 1]); applyVisibility() }
+      syncBack()
+    }
+  }, true)
+  window.v3SyncBack = syncBack
+
   tick(); fit()
   applyState(q.get('state') || 'default')
   addEventListener('load', function () { fit(); requestAnimationFrame(audit) })

@@ -137,6 +137,15 @@ body.capture .stage { border-radius: 0; box-shadow: none; }
 .backbtn:active { transform: translateX(-2px) scale(.98); }
 .backbtn-t { line-height: 1; }
 .backbtn-t { font-size: var(--fz-2); }
+/* 操作栏版：一体机竖屏立式安装时顶部约 1.9m 高，左上角要抬手够；
+   底部两角才在手自然抬起的高度。左角返回 / 右角主操作。 */
+.actionbar > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
 .brand { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
 .brand-mark {
   width: 52px; height: 52px; border-radius: 15px; flex: 0 0 auto;

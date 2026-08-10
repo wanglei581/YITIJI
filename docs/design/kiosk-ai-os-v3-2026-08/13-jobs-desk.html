@@ -17,6 +17,33 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <style>
   .work--list { grid-template-columns: 1fr 372px; }
+
+  /* 2026-08-10 Codex 走查整改（列表点不动 / 筛选点不动）——本页只补交互模型，不改公共层。 */
+
+  /* ① 岗位卡整卡可点：原来是没有去向的 <button>，看着能点、点了没反应。
+     改成 <a href="14-job-detail.html">，并补按压反馈 —— 27 寸触控屏上没有
+     按下去的形变，用户会以为没点中，于是反复点。 */
+  .rcard:active { transform: translateY(1px) scale(.997); border-color: var(--jade-500); }
+  .rcard:focus-visible { outline: 3px solid var(--jade-400); outline-offset: 2px; }
+
+  /* ② 筛选标签：选中态由 aria-pressed 表达（公共层已有配色），
+     这里只补「展开更多」按钮自己的开合态，让它也看得出被按过。 */
+  .fmore[aria-expanded="true"] { border-style: solid; color: var(--jade-600); border-color: var(--jade-500); }
+  .fgroup-more[hidden] { display: none; }
+
+  /* ③ 折叠块：长说明压成一行摘要，展开才给全文。
+     合规原文一字不删，只是默认不占屏 —— 用户「操作不下去」多半是被墙一样的字挡住的。 */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+    display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+    font-size: var(--fz-2); color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2);
+    color: var(--fog-700); line-height: 1.65; }
+  .fold-b a { color: var(--jade-600); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -34,7 +61,9 @@
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">岗位信息</div>
-        <div class="brand-sub">01 号机 · 第三方与官方来源 · 不代收简历</div>
+        <!-- 合规声明去重（2026-08-10）：本页原有 4 处「不代收简历」。
+             按硬指标只保留右栏「数据是哪来的」那一处，其余压成中性描述，不删任何合规义务。 -->
+        <div class="brand-sub">01 号机 · 第三方与官方来源信息入口</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
