@@ -152,8 +152,8 @@
     <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">职易达</div>
-        <div class="brand-sub">01 号机 · 市人力资源市场 A 馆</div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo">01 号机</span> · <span data-site="venue">市人力资源市场 A 馆</span></div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -212,8 +212,13 @@
               <span class="help-no">2</span>
               <span class="help-b">
                 <span class="help-t">找现场工作人员</span>
+                <!-- 2026-08-11 站点值收口：原来写死「A 馆服务台在正门左手第一个窗口，
+                     工作日 09:00–17:00」。那是某一台机器的现场事实，换个场地就是把人指去
+                     一个不存在的窗口 —— 比不指路更糟。改读站点配置；配置里没有就落到
+                     诚实兜底（「本机未配置 · 可问现场工作人员」），不编一个像真的。 -->
                 <span class="help-s">
-                  A 馆<b>服务台在正门左手第一个窗口</b>，工作日 09:00–17:00 有人。<br>
+                  <span data-site="serviceDesk"></span><br>
+                  <span data-site="serviceHours"></span><br>
                   卡纸、机器没反应、打印出来是白纸这类，<b>找人比在这儿点快</b>。
                 </span>
               </span>
@@ -301,9 +306,14 @@
         <div class="bighead bh--warn">
           <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
           <span class="bh-t">还在吗？</span>
+          <!-- 2026-08-11 会话钟收口：这一屏是**提示态**，不是清空时刻。
+               提示阈值读 SITE.session.hintSec（3 分钟），提示后的宽限读 graceSec（60 秒），
+               两者相加才是「无操作满 4 分钟自动清空」。原来这里写「4 分钟」，
+               把清空时刻当成了提示时刻，用户据此估算就会晚一步。 -->
           <span class="bh-p">
-            你有 <b>4 分钟</b>没动屏幕了。这台机器在公共场所，
-            免得下一个人看到你的东西。
+            你有 <b><span data-site-time="hint">3 分钟</span></b>没碰过屏幕了，
+            再过 <b><span data-site-time="grace">60 秒</span></b>这台机器会清空你的东西。
+            它摆在公共场所，免得下一个人看到。
           </span>
         </div>
       </div>
@@ -311,7 +321,7 @@
       <div class="pane pane--grow" data-at="s3">
         <div class="sec">
           <div class="tick">
-            <span class="tick-n">58</span>
+            <span class="tick-n">60</span>
             <span class="tick-b">
               <span class="tick-t">秒后自动清空并回到待机</span>
               <span class="tick-s">碰一下屏幕就能继续，不用重新开始</span>
@@ -576,7 +586,7 @@
           </div>
           <div class="nb-sec">
             <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 超时清空 · 会话恢复</div>
-            <p class="nb-p">这台机器摆在大厅里，你走开之后屏幕还亮着；<b>简历上有你的姓名、电话，有时还有住址，下一个人过来时不该看到这些</b>——所以无操作会提示并清空。碰一下就能续，没有次数限制。</p>
+            <p class="nb-p">这台机器摆在大厅里，你走开之后屏幕还亮着；<b>简历上有你的姓名、电话，有时还有住址，下一个人过来时不该看到这些</b>——所以<b>无操作满 <span data-site-time="hint">3 分钟</span></b>会出提示条，<b>再 <span data-site-time="grace">60 秒</span>没人碰</b>（无操作满 <b><span data-site-time="clear">4 分钟</span></b>）就自动清空。碰一下就能续，没有次数限制。</p>
             <p class="nb-p">会话恢复也是同一个道理：<b>万一站在这里的不是你本人，直接展示上次的内容就是把你的东西给了别人</b>，所以要先确认身份。选「重新开始」<b>不会删掉上次的记录</b>，只是这次不接着它做，上次的进度仍在你的 AI 服务记录里。</p>
             <p class="nb-p"><b>管理员看不到你的文件内容</b>，只看得到打印流水与设备日志；因故障需要打开文件时<b>每次都留访问日志，日志删不掉</b>。</p>
           </div>
@@ -586,7 +596,7 @@
           </div>
           <div class="nb-sec">
             <div class="nb-h"><svg class="ic"><use href="#i-info"/></svg>这一区为什么存在</div>
-            <p class="nb-p">这些页是<b>出了事才出现</b>的：卡纸或机器没反应走帮助，条款更新走法务，无操作 4 分钟走会话超时，网络中断走断网，同账号有没做完的事走会话恢复。<b>正在办事的用户不需要这一区</b>——真出事时，对应那一页会自己弹出来，不用在这儿找。这里列的是异常长什么样，不是本机现在的状态。</p>
+            <p class="nb-p">这些页是<b>出了事才出现</b>的：卡纸或机器没反应走帮助，条款更新走法务，无操作满 <span data-site-time="hint">3 分钟</span>走会话超时提示，网络中断走断网，同账号有没做完的事走会话恢复。<b>正在办事的用户不需要这一区</b>——真出事时，对应那一页会自己弹出来，不用在这儿找。这里列的是异常长什么样，不是本机现在的状态。</p>
           </div>
         </div>
       </div>
@@ -605,7 +615,7 @@
         <div class="sec">
           <div class="panel-note" style="line-height:1.75">
             五种形态都由<b>系统事件触发</b>：卡纸或机器没反应 → 帮助；条款更新 → 法务；
-            无操作 4 分钟 → 会话超时；网络中断 → 断网；同账号有没做完的事 → 会话恢复。<br>
+            无操作满 <span data-site-time="hint">3 分钟</span> → 会话超时提示；网络中断 → 断网；同账号有没做完的事 → 会话恢复。<br>
             所以<b>首页里没有指向这一页的入口</b>，正常办事不会走到这儿。
             想主动看当前状态，从<b>「我的」操作栏上的「查看本机状态」</b>进来。<br>
             <!-- 2026-08-10 补：说明第 6 站是什么，免得被当成第六种系统态。 -->
@@ -661,14 +671,19 @@
       <div class="pane" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这台机器</b></div>
         <div class="sec">
+          <!-- 服务台与有人时段搬出 kv 行：.kv-row 是不换行的 flex，
+               缺配置兜底文案（一句话）塞进 348px 的值格会横向溢出。
+               它们本来也是句子不是值，放在下面的说明块里更合适。 -->
           <div class="kv">
-            <div class="kv-row"><span class="k">编号</span><span class="v">01 号机</span></div>
-            <div class="kv-row"><span class="k">位置</span><span class="v">A 馆 · 正门右手</span></div>
-            <div class="kv-row"><span class="k">服务台</span><span class="v">正门左手第一窗</span></div>
-            <div class="kv-row"><span class="k">有人时段</span><span class="v">工作日 09:00–17:00</span></div>
+            <div class="kv-row"><span class="k">编号</span><span class="v" data-site="terminalNo">01 号机</span></div>
+            <div class="kv-row"><span class="k">位置</span><span class="v" data-site="venue">市人力资源市场 A 馆</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.7">
+            服务台：<span data-site="serviceDesk"></span><br>
+            有人时段：<span data-site="serviceHours"></span>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
-            报修时报上<b>「01 号机」</b>，运维能直接定位到这一台。
+            报修时报上<b>「<span data-site="terminalNo">01 号机</span>」</b>，运维能直接定位到这一台。
           </div>
         </div>
       </div>
@@ -723,8 +738,9 @@
             这台机器摆在大厅里，<b>你走开之后屏幕还亮着</b>。
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v">4 分钟</span></div>
-            <div class="kv-row"><span class="k">提示后还有</span><span class="v">60 秒</span></div>
+            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v" data-site-time="hint">3 分钟</span></div>
+            <div class="kv-row"><span class="k">提示后还有</span><span class="v" data-site-time="grace">60 秒</span></div>
+            <div class="kv-row"><span class="k">无操作满多久清空</span><span class="v" data-site-time="clear">4 分钟</span></div>
             <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 无次数限制</span></div>
             <div class="kv-row"><span class="k">正在打印时</span><span class="v v--fog">不会打断</span></div>
           </div>
@@ -841,6 +857,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

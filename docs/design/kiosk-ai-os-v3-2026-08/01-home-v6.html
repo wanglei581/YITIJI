@@ -150,8 +150,6 @@
   88% { opacity: .95; }
   100% { transform: translateX(252px); opacity: 0; }
 }
-.screen[data-state="first"] .vx-part,
-.screen[data-state="ai-down"] .vx-part { display: none; }
 /* 当前步：fx2 的旋转环改为呼吸环（同一伪元素，覆盖为纯描边） */
 .vstep--now .vstep-dot::before {
   background: none; mask: none; -webkit-mask: none;
@@ -159,6 +157,62 @@
   animation: vx-stepring 2.4s var(--ease-in-out) infinite;
 }
 @keyframes vx-stepring { 0%, 100% { transform: scale(.86); opacity: .35; } 50% { transform: scale(1.06); opacity: .9; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   AI 任务状态绑定：data-aitask —— 接线契约（生产必须照此实现）
+   ------------------------------------------------------------------
+   为什么有这一节：这一屏原来用 setTimeout / setInterval 直接"演"进度，
+   屏幕上转着圈说在算、实际没有任何任务在跑。接线后照抄那种写法，就会
+   出现「AI 已经挂了、进度条还在转」。所以进度类动效一律不许自己起跳，
+   必须绑定到一个明确的任务状态上。
+
+   ▸ 数据源（唯一）：.screen[data-aitask]，取值只有四个
+       idle    当前没有任务（无上下文 / 未提交）
+       running 后端已受理、任务未结束
+       done    任务结束且结果已渲染
+       failed  任务失败，或 AI 服务不可用
+
+   ▸ 生产接线要求
+       1. data-aitask 只能由**后端任务状态**驱动（轮询 / SSE / WebSocket
+          推送 AI 排序任务的真实生命周期），前端不得用计时器自行推进。
+       2. 没有任务时（idle）不许自转：进度日志、扫光、路径粒子、当前步
+          呼吸环全部静止。"看起来在算"必须等于"真的在算"。
+       3. running 的存续时间由后端决定。前端不得设"到点就变 done"的兜底
+          计时器；超时应由后端判定并下发 failed。
+       4. data-state="ai-down" 时 data-aitask 恒为 failed，任何用户输入都
+          不得把它推回 running（见页内脚本 taskFromState / setAiTask）。
+       5. failed 必须停在明确的不可用表现，并保留不依赖 AI 的路径
+          （打印扫描 / 岗位 / 招聘会 / 我的文档）—— 那几个入口不受本节影响。
+
+   ▸ 设计稿里唯一的例外：startAiTask() 末尾把 running 收回 taskFromState()
+     的那段是**原型占位**（标了 PROTOTYPE-ONLY）。接线时删掉它，改成订阅
+     后端状态。除那一处外，本页不再有任何"假装在算"的计时器。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 没有任务 / 任务失败 → 路径粒子如实消失（原来按 data-state 判，等价迁移：
+   first→idle、ai-down→failed，视觉结果与旧版逐像素一致） */
+.screen[data-aitask="idle"] .vx-part,
+.screen[data-aitask="failed"] .vx-part { display: none; }
+
+/* 没有任务 / 任务失败 → 当前步呼吸环停下。转圈=在算，不许空转 */
+.screen[data-aitask="idle"] .vstep--now .vstep-dot::before,
+.screen[data-aitask="failed"] .vstep--now .vstep-dot::before { animation: none; opacity: .32; }
+
+/* 进度日志与扫光只在 running 播放；failed 一律冻结（含 reduced-motion 之外的兜底） */
+.screen[data-aitask="failed"] .proclog,
+.screen[data-aitask="failed"] .sweep { display: none; }
+
+/* failed（= AI 不可用）：场景快捷停在"点了也不会算"的明确表现，不给假可点感 */
+.screen[data-aitask="failed"] .vscene { opacity: .45; cursor: not-allowed; }
+.screen[data-aitask="failed"] .vscene:hover { transform: none; box-shadow: none; color: var(--fog-800); }
+.screen[data-aitask="failed"] .vscene--key:hover { color: #fff; }
+
+/* ── 示例数据标记 ──────────────────────────────────────────────
+   default 态是"完整走查示例"，里面的材料结论不属于当前使用者。
+   用 text-decoration 做视觉标记（零布局影响）—— .verrand-kick 是
+   nowrap 且实测子项总宽 546px = 容器 546px，**一点富余都没有**，
+   任何带 padding/border 的徽章都会把这一行挤出横向溢出。 */
+.vx-demo { color: #9a5f0d; text-decoration: underline dashed; text-underline-offset: 3px; }
 
 /* ── 八卡 300ms 交错上浮 ── */
 .vgrid-a .card, .vgrid-b .card {
@@ -271,7 +325,10 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-theme="warm">
+<!-- data-aitask 与 data-state 同源：初始 data-state="default"（示例走查态，
+     排序任务已完成）→ data-aitask="done"。四态映射与接线契约见页内 <style>
+     的「AI 任务状态绑定」一节；同步逻辑在页内脚本 taskFromState()。 -->
+<div class="screen" data-state="default" data-theme="warm" data-aitask="done">
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
@@ -369,7 +426,10 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
       <section class="verrand rise" data-fx="think-target">
         <div class="verrand-main">
           <div class="verrand-kick">
-            <span data-when="default">本次办理单 · 小青 09:41 排的</span>
+            <!-- default = 完整走查「示例」：这一态里的材料结论不属于当前使用者。
+                 「示例」与「本次」同为 2 个汉字，宽度不变 —— 这一行 nowrap 且
+                 子项总宽实测等于容器宽，不能再加任何东西。 -->
+            <span class="vx-demo" data-when="default">示例办理单 · 小青 09:41 排的</span>
             <span data-when="first">本次办理单 · 还没有目标</span>
             <span data-when="ai-down">本次办理单 · 排序不可用</span>
             <span data-when="device-off">本次办理单 · 已按设备状况改过</span>
@@ -383,10 +443,20 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
           <h2 class="verrand-h" data-when="ai-down">打印扫描照常，顺序你来定</h2>
           <h2 class="verrand-h" data-when="device-off">先把材料转存到「我的文档」</h2>
 
-          <p class="verrand-p" data-when="default">你上传的《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周五这场招聘会 <b>128 家企业参展、现场普遍收纸质简历</b>。</p>
-          <p class="verrand-p" data-when="first">在上面说一句处境，或直接选下面的服务。<b>拿到你的材料或目标之后我才会给建议</b>，现在不做任何猜测。</p>
+          <!-- 个人数据口径（2026-08-11 整改）：
+               · default = 唯一允许出现"某人材料结论"的态，且必须自称示例（见上方 .vx-demo
+                 徽标 + 这里的「示例：」前缀）。公共机器上，路过的人看到的第一屏不能写
+                 得像认识他。
+               · first = 无上下文态，**一个属于"你"的数字都不许出现**；只说明规则并给出
+                 可执行的下一步（下方 AI 简历服务卡 first 态胶囊「上传后逐条体检」，
+                 同卡「诊断优化」即 48px 真入口）。
+               · ai-down / device-off = 设备与 AI 状态演示，不声称任何本人材料数量。
+               · 「128 家企业参展」是来源方（主办方）公布的事实，不是本机统计，所以写
+                 「主办方公布」并在页脚现场卡带齐来源三字段。 -->
+          <p class="verrand-p" data-when="default">示例：一份《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周五这场招聘会 <b>主办方公布 128 家企业参展</b>、现场普遍收纸质简历。</p>
+          <p class="verrand-p" data-when="first">在上面说一句处境，或直接选下面的服务。<b>上传简历后，这里给你逐条体检</b>；在拿到你的材料之前，不显示任何属于你的结论。</p>
           <p class="verrand-p" data-when="ai-down">对话与排序服务中断，<b>已自动上报，不需要你操作</b>；打印、扫描、上传与浏览都不受影响。</p>
-          <p class="verrand-p" data-when="device-off">打印机离线已上报运维；你上传的 <b>2 份材料</b>可以先存起来，<b>凭手机号在任一台空闲机器取回打印</b>。</p>
+          <p class="verrand-p" data-when="device-off">打印机离线已上报运维；<b>已上传的材料</b>可以先存起来，<b>凭手机号在任一台空闲机器取回打印</b>。</p>
 
           <div class="verrand-foot">
             <span class="verrand-cost" data-when="default"><span>约 40 秒</span><span>免费</span><span>结果进「我的简历」</span></span>
@@ -465,7 +535,20 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="22-career-plan.html">职业规划</span>
-            <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
+            <!-- 2026-08-11 个人数据整改：「已有 1 份待优化」原来挂在 default first device-off 三态，
+                 first 是**无上下文态** —— 一位刚走过来、什么都没传过的人，第一屏就被告知
+                 "已有 1 份待优化"，既是假数据也让人以为上一位用户的东西还在。现在只留 default
+                 （示例走查态），first 换成不声称任何本人资产的空态 + 可执行的下一步：
+                 同一张卡第一行的「诊断优化」就是 48px 真入口，这颗胶囊只负责说清它会做什么。
+                 宽度实测（.card-foot 内宽 300px，第三行 = 职业规划104 + 本胶囊 + card-go34 + 2×12 间距）：
+                 「上传后逐条体检」129px → 291px 恰好放得下（原「已有 1 份待优化」130px）；
+                 device-off 若写「诊断优化可用 · 出纸需换机」195px 会挤到第四行、把卡撑破（卡内余量为 0），
+                 所以收成「出纸需换机」102px。 -->
+            <!-- default 这颗必须自称示例，但只能等宽替换：「示例」与「已有」同为 2 字 → 仍是 130px。
+                 加「（示例）」后缀实测会涨到 ~190px，第三行放不下、卡片余量为 0，直接撑破。 -->
+            <span class="card-pill card-pill--info" data-when="default">示例 1 份待优化</span>
+            <span class="card-pill card-pill--info" data-when="first">上传后逐条体检</span>
+            <span class="card-pill card-pill--info" data-when="device-off">出纸需换机</span>
             <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
@@ -531,9 +614,12 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
         <div class="vsite">
           <img src="assets/fair-today.jpg" alt="招聘会现场">
           <div class="vsite-in">
+            <!-- 来源方事实（不是个人数据、也不是本机统计）：CLAUDE.md §10 要求来源机构 /
+                 同步时间 / 外部 ID 三样齐全。整改前只有前两样，且「128 家企业参展」写得像
+                 本机统计出来的 —— 已改成「主办方公布」，把数字的归属说清楚。 -->
             <b>2026 夏季综合招聘会</b>
-            <span>广州国际会展中心 · 8 月 14 日（周五）09:00–16:00 · 128 家企业参展</span>
-            <span class="src">来源 广州市人才服务中心 · 8 月 8 日 08:52 同步</span>
+            <span>广州国际会展中心 · 8 月 14 日（周五）09:00–16:00 · 主办方公布 128 家企业参展</span>
+            <span class="src">来源 广州市人才服务中心 · 外部 ID GZFAIR-2026-0814 · 8 月 8 日 08:52 同步</span>
             <a class="btn" href="17-fair-desk.html">查看招聘会</a>
           </div>
         </div>
@@ -631,8 +717,9 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
         rAF 只写 transform / opacity / z-index，前后穿越人像
      2) 轨道环 / 雷达 / 胶囊→中枢连线：量真实坐标后摆位与连线
      3) 打字机 placeholder / 计数点阵 / 卡片 pill 快捷入口
-     4) 生成序列（沿用 fx2.css 的 sweep / proclog / is-working 样式）
-     5) 状态即动效：ai-down 冻结轨道角度；resize / 换态重量坐标
+     4) AI 任务状态机 data-aitask（idle/running/done/failed）—— 进度类动效
+        只在 running 播放，没有任务不许自转；契约见页内 <style> 同名小节
+     5) 状态即动效：ai-down 冻结轨道角度 + 任务态恒为 failed；resize / 换态重量坐标
      ============================================================ -->
 <script>
 ;(function () {
@@ -792,16 +879,71 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     }
   }
 
-  /* ---------- 6. 生成序列（sweep / proclog / is-working 样式来自 fx2.css） ---------- */
+  /* ---------- 6. AI 任务状态机（取代原来的"定时器演进度"） ----------
+     契约全文见页内 <style> 的「AI 任务状态绑定」一节。这里只实现三件事：
+       taskFromState()  四态 → 任务态的**派生默认值**（页面初次进入某一态时的真值）
+       syncTaskFromState() 把派生值写回 DOM，供 CSS 选择器与审计读取
+       startAiTask()    用户真的提交了 → 进 running；ai-down 一律拒绝进 running
+
+     为什么要包一层 v3ApplyVisibility：审计驱动是
+         screen.setAttribute('data-state', st); window.v3ApplyVisibility(); …
+     只改 data-state 不会同步 data-aitask，而 MutationObserver 的回调是微任务，
+     跑在整段同步代码之后 —— 审计当场读到的会是上一态的任务值。包一层就能保证
+     任何走标准驱动的调用都拿到同步、正确的 data-aitask。 */
+  var TASK_BY_STATE = {
+    'default':    'done',    /* 示例走查：排序任务已完成，路径是算出来的 */
+    'first':      'idle',    /* 无上下文：没有任务，一切进度动效必须静止 */
+    'ai-down':    'failed',  /* AI 不可用：冻结在失败态，不许被推回 running */
+    'device-off': 'done'     /* 打印机离线不影响 AI 排序任务本身 */
+  }
+  function taskFromState () {
+    return TASK_BY_STATE[screen.getAttribute('data-state') || 'default'] || 'idle'
+  }
+  function setAiTask (v) {
+    /* ai-down 是硬约束：任何输入都不得把 AI 推回"正在算" */
+    if (screen.getAttribute('data-state') === 'ai-down') v = 'failed'
+    screen.setAttribute('data-aitask', v)
+    /* 失败态下场景快捷如实标记不可用（CSS 已置灰，这里补可访问性语义） */
+    var scenes = screen.querySelectorAll('.vscene')
+    for (var i = 0; i < scenes.length; i++) {
+      if (v === 'failed') scenes[i].setAttribute('aria-disabled', 'true')
+      else scenes[i].removeAttribute('aria-disabled')
+    }
+    return v
+  }
+  /* lastState 记住"上一次按哪个四态同步过"。没有它，下面那个兜底 MutationObserver
+     会在同步代码跑完后的微任务里再同步一次，把用户刚点出来的 running 打回派生值
+     —— 实测症状：点场景快捷后 proclog 已经在写，data-aitask 却已经是 done。 */
+  var lastState = screen.getAttribute('data-state')
+  function syncTaskFromState () {
+    lastState = screen.getAttribute('data-state')
+    setAiTask(taskFromState())
+  }
+
+  var _applyVis = window.v3ApplyVisibility
+  window.v3ApplyVisibility = function () {
+    syncTaskFromState()
+    return typeof _applyVis === 'function' ? _applyVis.apply(this, arguments) : undefined
+  }
+  /* 供接线方 / 评审驱动直接推任务态：生产由后端状态调用这个，不要再调 startAiTask 的占位收尾 */
+  window.v3SetAiTask = setAiTask
+
+  /* 进度日志文案：只描述**这一步在做什么**，不预先编造结果。
+     整改前这里写的是「读取 个人简历.pdf · 3 页」「核对 …128 家企业」——
+     任务还没跑就把文件名、页数、家数说死了，等于在假装已经算完。 */
   var STEPS_TEXT = [
-    '读取 个人简历.pdf · 3 页',
-    '核对 周五 夏季综合招聘会 · 128 家企业',
-    '排出办理顺序 · 3 步'
+    '读取你上传的材料',
+    '核对来源方的招聘会信息',
+    '排出办理顺序'
   ]
   var busy = false
-  function runSequence () {
+  function startAiTask () {
+    /* ai-down：AI 不可用。不播任何"正在算"的动效，停在明确的失败表现。
+       这就是「AI 已经挂了、进度条还在转」的防线。 */
+    if (screen.getAttribute('data-state') === 'ai-down') { setAiTask('failed'); return }
     if (busy) return
     busy = true
+    setAiTask('running')
     var cap = screen.querySelector('.vcommand')
     var errand = screen.querySelector('.verrand')
     var main = errand && errand.querySelector('.verrand-main')
@@ -827,6 +969,9 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
       if (kick) kick.textContent = '本次办理单 · 正在盘点'
       STEPS_TEXT.forEach(function (t, i) {
         setTimeout(function () {
+          /* 每一帧都复查任务是否还在跑：任务已结束 / 已失败 / AI 中途掉线时，
+             进度日志必须当场停笔，不能靠计时器把剩下几行补完。 */
+          if (screen.getAttribute('data-aitask') !== 'running') return
           var prev = log.lastElementChild
           if (prev) prev.classList.add('done')
           var row = document.createElement('div')
@@ -853,17 +998,27 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
         setTimeout(function () { primary.classList.remove('is-next') }, 8400)
       }
       busy = false
+      /* ⚠️ PROTOTYPE-ONLY —— 接线时删掉这一行连同外层 setTimeout。
+         设计稿没有后端，只能让 running 自己收尾；生产必须改成订阅后端任务状态，
+         由后端下发 done / failed。留着这段计时器上线 = 又变回"演一个不存在的任务"。
+         收回派生值而不是硬写 done：first 态本来就没有算出任何东西，回 idle 才诚实。 */
+      setAiTask(taskFromState())
       drawFlow()
     }, REDUCED ? 200 : 2250)
   }
   screen.addEventListener('click', function (e) {
     var scene = e.target.closest('[data-fx="scene"]')
     var submit = e.target.closest('[data-fx="submit"]')
+    if (!scene && !submit) return
+    /* AI 不可用时场景快捷不启动任务（CSS 已置灰 + aria-disabled）：
+       点了也不会有进度动效，页面停在 ai-down 的"排序暂不可用"表述上。
+       不依赖 AI 的路径照常可用 —— 打印扫描卡、岗位、招聘会、底部主按钮都没被拦。 */
+    if (screen.getAttribute('data-state') === 'ai-down') { setAiTask('failed'); return }
     if (scene) {
       var input = screen.querySelector('[data-typewriter]')
       if (input) input.value = scene.textContent.trim()
     }
-    if (scene || submit) runSequence()
+    startAiTask()
   })
 
   /* ---------- 启动 / 重量坐标 ---------- */
@@ -876,9 +1031,17 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
   })
   if (img && !img.complete) img.addEventListener('load', refresh)
   addEventListener('resize', refresh)
-  new MutationObserver(function () { setTimeout(refresh, 80) })
-    .observe(screen, { attributes: true, attributeFilter: ['data-state'] })
+  /* 兜底：有人直接改 data-state 而没走 v3ApplyVisibility（外壳按钮、控制台）时也要同步任务态。
+     注意这条是**兜底**不是主路径 —— MutationObserver 回调是微任务，跑在同步审计之后，
+     所以主路径必须是上面那层 v3ApplyVisibility 包装。 */
+  new MutationObserver(function () {
+    /* 只有"四态真的变了、而且没走 v3ApplyVisibility"时才补同步。
+       无条件同步会把进行中的 running 打回派生值（见 lastState 注释）。 */
+    if (screen.getAttribute('data-state') !== lastState) syncTaskFromState()
+    setTimeout(refresh, 80)
+  }).observe(screen, { attributes: true, attributeFilter: ['data-state'] })
   bindPills()
+  syncTaskFromState()
   refresh()
 })()
 </script>

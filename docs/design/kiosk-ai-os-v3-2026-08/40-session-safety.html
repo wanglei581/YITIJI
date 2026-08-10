@@ -195,8 +195,8 @@
     <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">职易达</div>
-        <div class="brand-sub">01 号机 · 市人力资源市场 A 馆</div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo">01 号机</span> · <span data-site="venue">市人力资源市场 A 馆</span></div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -225,19 +225,26 @@
       <div class="pane" data-at="idle-warn">
         <div class="bighead bh--warn">
           <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <!-- 2026-08-11 会话钟收口：本页六态的时限一律读 site-config.js 的 SITE.session。
+               原来这里写「4 分钟」，但这一屏是**提示态**——4 分钟是清空时刻，提示阈值是
+               3 分钟。差一分钟，用户对"还剩多久"的判断就整个错位，而错位的代价是
+               简历和身份证复印件被清掉。所以每处都必须说清是哪一步。 -->
           <span class="bh-t">还在吗？</span>
-          <span class="bh-p">你有 <b>4 分钟</b>没碰过屏幕了</span>
+          <span class="bh-p">你有 <b><span data-site-time="hint">3 分钟</span></b>没碰过屏幕了，再过
+            <b><span data-site-time="grace">60 秒</span></b>这台机器会清空你的东西</span>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="idle-warn">
         <div class="sec">
           <div class="tick">
-            <span class="tick-n">30</span>
+            <span class="tick-n">60</span>
             <span class="tick-b">
               <span class="tick-t">秒后自动结束并清空</span>
               <span class="tick-s">碰一下屏幕就回到刚才那一步，不用重来</span>
-              <span class="tick-bar"><i></i></span>
+              <!-- 进度条随倒计时走：刚出提示条时是满格（.tick-bar i 默认 50% 是旧的
+                   30 秒口径留下的，与 60 秒对不上，这里就地写死满格）。 -->
+              <span class="tick-bar"><i style="width:100%"></i></span>
             </span>
           </div>
 
@@ -254,11 +261,11 @@
 
           <div class="tri">
             <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
-              <span class="tb-v">屏幕连续 <b>4 分钟</b>没有任何触摸</span></div>
+              <span class="tb-v">屏幕连续 <b><span data-site-time="hint">3 分钟</span></b>没有任何触摸</span></div>
             <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
               <span class="tb-v">继续用，或者现在就结束并清空</span></div>
             <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
-              <span class="tb-v">30 秒后自动清空，回到待机屏</span></div>
+              <span class="tb-v"><span data-site-time="grace">60 秒</span>后自动清空，回到待机屏</span></div>
             <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
               <span class="tb-v">清掉未保存的，正在出纸的不打断</span></div>
             <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
@@ -315,11 +322,11 @@
 
           <div class="tri">
             <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
-              <span class="tb-v">倒计时走完了，屏幕已经锁上</span></div>
+              <span class="tb-v">无操作满 <b><span data-site-time="hint">3 分钟</span></b>，登录中的会话先锁屏</span></div>
             <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
               <span class="tb-v">输尾号或扫码，二选一都算复验</span></div>
             <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
-              <span class="tb-v">再等 60 秒就自动清空并退出</span></div>
+              <span class="tb-v">再等 <span data-site-time="grace">60 秒</span>（无操作满 <span data-site-time="clear">4 分钟</span>）就自动清空并退出</span></div>
             <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
               <span class="tb-v">验过才解锁；连错 3 次只留结束</span></div>
             <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
@@ -327,7 +334,7 @@
           </div>
 
           <div class="dl">
-            <div class="d"><span class="d-k">锁屏于</span><span class="d-v">17:50</span><span class="d-s">超时后自动锁</span></div>
+            <div class="d"><span class="d-k">锁屏于</span><span class="d-v">17:50</span><span class="d-s">无操作满 <span data-site-time="hint">3 分钟</span>自动锁</span></div>
             <div class="d"><span class="d-k">还可以试</span><span class="d-v">3 <em>次</em></span></div>
             <div class="d"><span class="d-k">锁屏时未保存</span><span class="d-v">3 <em>份</em></span></div>
           </div>
@@ -352,8 +359,10 @@
         <div class="sec">
           <div class="mach">
             <div class="mc mc--here">
-              <span class="mc-h"><svg class="ic"><use href="#i-pin"/></svg><span class="mc-t">本机 · 01 号机</span></span>
-              <span class="mc-r"><em>位置</em><b>A 馆 · 正门右手</b></span>
+              <!-- 「本机」这一栏是站点身份，读配置；右边「另一台」是会话服务在运行时
+                   下发的另一场会话所在机器，属于运行时数据，不是本机配置，保持示例值。 -->
+              <span class="mc-h"><svg class="ic"><use href="#i-pin"/></svg><span class="mc-t">本机 · <span data-site="terminalNo">01 号机</span></span></span>
+              <span class="mc-r"><em>位置</em><b data-site="venue">市人力资源市场 A 馆</b></span>
               <span class="mc-r"><em>开始于</em><b>17:46</b></span>
               <span class="mc-r"><em>进行到</em><b>刚登录，还没办事</b></span>
               <span class="mc-r"><em>未保存</em><b>0 份</b></span>
@@ -610,11 +619,15 @@
 
       <!-- 1 右 -->
       <div class="pane" data-at="idle-warn">
-        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>会话计时口径</b></div>
+        <!-- 清空时刻放在标题右槽而不是再加一行 kv：这一列下面那块 .pane--grow 本来就
+             排不下（.sec 自己滚，见本文件 66 行），多一行 kv 就从它身上再拿走 48px。
+             实测：加一行后可滚内容从 269px 涨到 317px。标题右槽不占额外高度。 -->
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>会话计时口径</b>
+          <span class="s">满 <span data-site-time="clear">4 分钟</span>清空</span></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v">4 分钟</span></div>
-            <div class="kv-row"><span class="k">提示后还有</span><span class="v">60 秒</span></div>
+            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v" data-site-time="hint">3 分钟</span></div>
+            <div class="kv-row"><span class="k">提示后还有</span><span class="v" data-site-time="grace">60 秒</span></div>
             <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 不限次</span></div>
             <div class="kv-row"><span class="k">正在出纸时</span><span class="v v--fog">不打断</span></div>
             <div class="kv-row"><span class="k">清空可撤销</span><span class="v v--fog">否</span></div>
@@ -626,16 +639,20 @@
       <div class="pane pane--grow" data-at="idle-warn">
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>接下来会发生什么</b></div>
         <div class="sec">
+          <!-- 2026-08-11 会话钟收口：原时间线是「倒计时 30 秒 → 锁屏 → 再 60 秒 → 清空」，
+               加上 4 分钟的提示阈值，总时长 5 分半 —— 和页面别处写的「4 分钟自动清空」
+               互相矛盾。现在按 SITE.session 一条钟走完：3 分钟出提示 → 60 秒宽限 →
+               满 4 分钟清空。锁屏不是额外一段时间，是宽限期内对**登录会话**的额外遮挡。 -->
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">现在 · 倒计时 30 秒</span>
-                <span class="tl-s">碰屏幕即清零</span></span></div>
+              <span class="tl-b"><span class="tl-t">现在 · 倒计时 <span data-site-time="grace">60 秒</span></span>
+                <span class="tl-s">已经 <span data-site-time="hint">3 分钟</span>没碰 · 碰屏幕即清零</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">归零 · 进锁屏</span>
-                <span class="tl-s">内容隐藏，需本人复验</span></span></div>
+              <span class="tl-b"><span class="tl-t">同一刻 · 登录会话先锁屏</span>
+                <span class="tl-s">内容隐藏，本人复验能拿回</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">锁屏后再 60 秒</span>
-                <span class="tl-s">没人复验就往下走</span></span></div>
+              <span class="tl-b"><span class="tl-t">无操作满 <span data-site-time="clear">4 分钟</span></span>
+                <span class="tl-s">倒计时归零，没人碰就往下走</span></span></div>
             <div class="tl"><span class="tl-dot">4</span>
               <span class="tl-b"><span class="tl-t">自动清空</span>
                 <span class="tl-s">未保存文件全部删除</span></span></div>
@@ -854,7 +871,7 @@
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">工作人员过来收</span>
-                <span class="tl-s">工作日 09:00–17:00</span></span></div>
+                <span class="tl-s" data-site="serviceHours"></span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">登记并封存</span>
                 <span class="tl-s">不翻看内容</span></span></div>
@@ -980,6 +997,7 @@
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

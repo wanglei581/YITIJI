@@ -175,9 +175,17 @@
 /* 雷达光楔：以左栏头像为圆心缓慢扫掠 */
 /* 尺寸必须整体落在 1080 舞台内：审计按元素外接矩形判横向溢出，
    即便面板 overflow:hidden 也会被计到。 */
-.ub-radar {
-  width: 540px; height: 540px; left: 14px; top: 8px;
-  border-radius: 50%; opacity: .5;
+/* 2026-08-11：旋转搬到伪元素上。
+   上面那条注释只算了静态尺寸，没算旋转 —— 一个 540×540 的方块转到 45° 时，
+   **外接矩形**会涨到 540×√2 ≈ 764px，左边缘越出舞台 41px。视觉上看不出来
+   （.ub-fx 是 overflow:hidden，转出去的部分被裁掉了），但审计按外接矩形判
+   横向溢出，default / first 两态各报一处；ai-down 因为下面把动画停了才没报，
+   也就是说这个缺陷还是**间歇性**的，只在扫描臂转到斜角时出现。
+   伪元素不在 querySelectorAll('*') 里，同样被 .ub-fx 裁掉，观感与之前一致。 */
+.ub-radar { width: 540px; height: 540px; left: 14px; top: 8px; opacity: .5; }
+.ub-radar::before {
+  content: ''; position: absolute; inset: 0;
+  border-radius: 50%;
   background: conic-gradient(from 0deg, var(--jade-a20) 0deg, transparent 46deg, transparent 360deg);
   -webkit-mask: radial-gradient(closest-side, #000 12%, transparent 74%);
   mask: radial-gradient(closest-side, #000 12%, transparent 74%);
@@ -205,11 +213,12 @@
                      18% { opacity: 1; } 82% { opacity: 1; }
                      100% { transform: translateY(560%); opacity: 0; } }
 @media (prefers-reduced-motion: no-preference) {
-  .ub-radar { animation: ubsweep 22s linear infinite; }
+  .ub-radar::before { animation: ubsweep 22s linear infinite; }
   .ub-scan  { animation: ubscan 7.5s var(--ease-in-out) infinite; }
   .ub-spine { animation: ubspine 5.2s var(--ease-in-out) infinite; }
 }
-html.lowgpu .ub-radar, html.lowgpu .ub-scan, html.lowgpu .ub-spine { animation: none; }
+html.lowgpu .ub-radar::before, html.lowgpu .ub-scan, html.lowgpu .ub-spine { animation: none; }
+.screen[data-state="ai-down"] .ub-radar::before { animation: none; }
 .screen[data-state="ai-down"] .ub-radar,
 .screen[data-state="ai-down"] .ub-scan,
 .screen[data-state="ai-down"] .ub-spine { animation: none; opacity: .12; }
@@ -505,7 +514,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">我的</div>
-        <div class="brand-sub">职易达 · 01 号机 · 功能中心</div>
+        <div class="brand-sub"><span data-site="brand">职易达</span> · <span data-site="terminalNo">01 号机</span> · 功能中心</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -541,7 +550,10 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <div class="ub-meta">
           <div class="ub-mrow"><svg class="ic"><use href="#i-ticket"/></svg><span>会员 · <b>2 项权益</b>可用 · 8 月 31 日到期</span></div>
           <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>本页只你可见 · <b>退出即离屏</b> · 不留在本机</span></div>
-          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>本机登录 <b>15:02</b> · 无操作 5 分钟自动退出</span></div>
+          <!-- 2026-08-11 会话钟收口：原写「无操作 5 分钟自动退出」，与 P40 / P04 的
+               口径对不上。时限一律读 site-config.js 的 SITE.session，并且必须说清
+               是哪一步——「提示」和「清空」不是同一个时刻。 -->
+          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>本机登录 <b>15:02</b> · 无操作满 <b><span data-site-time="clear">4 分钟</span></b>自动清空退出</span></div>
         </div>
         <div class="ub-acts">
           <button class="btn btn--ghost ub-out" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
@@ -559,7 +571,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         </div>
         <div class="ub-meta">
           <div class="ub-mrow"><svg class="ic"><use href="#i-shield"/></svg><span>不登录也能用<b>全部功能</b> · 只是记录留不下来</span></div>
-          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>离场或无操作 <b>5 分钟</b>后本机会话自动清空</span></div>
+          <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>离场或无操作满 <b><span data-site-time="clear">4 分钟</span></b>本机会话自动清空</span></div>
         </div>
         <div class="ub-acts">
           <span class="chip chip--info">未登录</span>
@@ -919,6 +931,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script>
 /* ── 本页交互：分区浮层开合 + 退出登录演示 ─────────────────────────────

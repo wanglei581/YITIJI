@@ -135,8 +135,8 @@
     <div class="sb-top">
       <span class="sb-mark">职</span>
       <span class="sb-id">
-        <span class="sb-nm">职易达</span>
-        <span class="sb-sub">AI 求职打印服务终端 · 01 号机 · 市人力资源市场 A 馆</span>
+        <span class="sb-nm" data-site="brand">职易达</span>
+        <span class="sb-sub">AI 求职打印服务终端 · <span data-site="terminalNo">01 号机</span> · <span data-site="venue">市人力资源市场 A 馆</span></span>
       </span>
       <span class="sb-clock">
         <span class="sb-time" data-clock>17:24</span>
@@ -242,15 +242,21 @@
       <div class="slide" data-when="device-off">
         <span class="slide-kicker">当前状态</span>
         <span class="slide-h">打印机暂时坏了，<br>但别的还能用。</span>
+        <!-- 替代路径的写法（2026-08-11 站点值收口）：
+             原来写死「去 B 馆 03 号机」—— 那是某一台机器的现场事实，换个场地就是错的，
+             而按错的指路跑一趟比不指路更糟。改成站点配置 peerTerminal，缺配置时落到
+             诚实兜底。要点：**行动不能只剩一句「未配置」** —— 所以先给不依赖配置的那条路
+             （扫码存手机、修好了再来打），就近终端只是附加项。 -->
         <span class="slide-p">
           扫描、改简历、练面试、查政策<b>都不受影响</b>。<br>
           要打印的话，<b>可以先把文件在这里准备好</b>，
-          扫码存进手机，修好了再来打；或者去 B 馆 03 号机。
+          扫码存进手机，修好了再来打；也可以换就近另一台机器 ——
+          <span data-site="peerTerminal"></span>。
         </span>
         <span class="slide-meta">
           <span>故障已自动上报运维</span>
           <span>预计 18:30 前恢复</span>
-          <span>03 号机在 B 馆入口右手</span>
+          <span>扫码存进手机不收费</span>
         </span>
       </div>
 
@@ -296,7 +302,7 @@
         </div>
         <div class="nb-sec">
           <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私：待机屏上没有任何个人信息</div>
-          <p class="nb-p">这一屏<b>不含任何个人信息</b>，也不做个性化：上一位用户的材料、记录与结果不会出现在这里。碰屏进首页后，未登录时办的事只留在本次会话，离场或超时自动清空。</p>
+          <p class="nb-p">这一屏<b>不含任何个人信息</b>，也不做个性化：上一位用户的材料、记录与结果不会出现在这里。碰屏进首页后，未登录时办的事只留在本次会话：<b>无操作满 <span data-site-time="hint">3 分钟</span></b>屏幕上会出提示条，<b>再 <span data-site-time="grace">60 秒</span>没人碰</b>（也就是无操作满 <b><span data-site-time="clear">4 分钟</span></b>）就自动清空回到本屏。</p>
         </div>
         <div class="nb-sec">
           <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>费用口径</div>
@@ -304,7 +310,7 @@
         </div>
         <div class="nb-sec">
           <div class="nb-h"><svg class="ic"><use href="#i-clock"/></svg>这一屏为什么会出现</div>
-          <p class="nb-p">本屏由<b>无操作超时</b>自动进入（系统触发），首页里没有指向它的入口，<b>碰屏即回首页</b>。设备与 AI 的当前状态就在上面那三条，不收进这里。</p>
+          <p class="nb-p">本屏由<b>无操作满 <span data-site-time="clear">4 分钟</span>自动清空</b>后进入（系统触发），首页里没有指向它的入口，<b>碰屏即回首页</b>。设备与 AI 的当前状态就在上面那三条，不收进这里。</p>
         </div>
       </div>
     </div>
@@ -322,6 +328,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

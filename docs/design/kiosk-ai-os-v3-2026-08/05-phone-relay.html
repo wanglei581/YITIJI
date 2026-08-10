@@ -133,8 +133,8 @@
   <div class="ph-top">
     <span class="ph-mark">职</span>
     <span class="ph-b">
-      <span class="ph-t">正在为 01 号机服务</span>
-      <span class="ph-s">市人力资源市场 A 馆 · 办理单 #F-2318</span>
+      <span class="ph-t">正在为 <span data-site="terminalNo">01 号机</span> 服务</span>
+      <span class="ph-s"><span data-site="venue">市人力资源市场 A 馆</span> · 办理单 #F-2318</span>
     </span>
     <!-- 手机页的四态不照抄一体机，而是「机器那边现在什么情况」：
          已连上 / 刚扫进来 / 机器的识别不可用（仍能传） / 机器离线（传了也出不来）。
@@ -204,7 +204,7 @@
 
   <!-- ─────────── S2 正在传 ─────────── -->
   <div class="ph-body" data-at="s2">
-    <div class="ph-h">正在传到 01 号机</div>
+    <div class="ph-h">正在传到 <span data-site="terminalNo">01 号机</span></div>
     <div class="ph-p">
       别关这一页，也<b>别锁屏</b>。传完机器那边会自动出现。
     </div>
@@ -239,7 +239,7 @@
   <div class="ph-body" data-at="s3">
     <div class="ph-h">这次办理结束了</div>
     <div class="ph-p">
-      01 号机那边已经<b>结束并清空</b>。这一页也跟着失效了 ——
+      <span data-site="terminalNo">01 号机</span>那边已经<b>结束并清空</b>。这一页也跟着失效了 ——
       它本来就只为那一次办理服务。
     </div>
 
@@ -326,6 +326,7 @@
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

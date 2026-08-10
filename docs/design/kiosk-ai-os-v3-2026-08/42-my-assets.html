@@ -81,6 +81,13 @@
   border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
   font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
 }
+.sidebtn {
+  flex:0 0 auto; margin-left:var(--s-4); min-height:56px; padding:0 var(--s-5);
+  border-radius:var(--r-full); border:1px solid var(--brd-2); background:var(--surf-1);
+  color:var(--fog-800); font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.sidebtn .ic { width:18px; height:18px; }
 .sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
 /* 常驻合规声明：从右栏移到正文底部，一行装下 */
 .compline {
@@ -290,6 +297,9 @@ body.capture .proto-only { display:none !important; }
       <button class="stbtn" data-go="orders"><svg class="ic" style="width:17px;height:17px"><use href="#i-printer"/></svg>打印订单</button>
     </div>
     <span class="rail-count">三类都是你自己的东西：简历版本 / 存下的文件 / 打过的单</span>
+    <!-- 抽屉开关放标签条右端：三类都在，且不跟底部动作条抢宽度
+         （放动作条里会把「我的文档」那一态的提示挤出 8px，自检 卡内溢出）。 -->
+    <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p42side"><svg class="ic"><use href="#i-layers"/></svg>统计与口径</button>
   </div>
 
   <div class="work work--list">
@@ -1250,9 +1260,6 @@ body.capture .proto-only { display:none !important; }
         <div data-when="device-off"><div class="t">打印机离线 · 排队单等恢复</div><div class="s">已支付的单在取件码有效期内可复打</div></div>
       </div>
     </div>
-
-    <!-- 抽屉开关：统计、保存期限、删除与日志制度都在里面（2026-08-11 从常驻右栏改过来） -->
-    <button class="btn btn--lg btn--ghost sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p42side"><svg class="ic"><use href="#i-layers"/></svg>统计与口径</button>
 
     <a class="btn btn--lg btn--ghost" data-at="resume" href="09-resume-workbench.html?stage=s1"><svg class="ic"><use href="#i-upload"/></svg>上传新简历</a>
     <a class="btn btn--lg btn--ghost" data-at="docs" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>扫描原件存档</a>

@@ -167,6 +167,10 @@
   .cline-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
   .cline-t b { color: var(--fog-900); }
   .cline .fold { flex: 0 0 auto; width: 260px; border: 0; background: transparent; }
+  /* 2026-08-11：页脚这处折叠展开后会把上面的入口顶出主栏（自检「内部裁切 · 可交互被裁」）。
+     去掉阶段轨腾出的 92px 把超出量从 133px 压到 41px，但没有清零 ——
+     口径正文限高自滚，展开多长都不再挤到别人。 */
+  .cline .fold[open] .fold-b { max-height: 300px; overflow-y: auto; }
   /* 合规句必须一行放下：折行时「·」会被甩到行首（中文排版禁则，自检会判缺陷） */
   .cline-t > span { white-space: nowrap; }
 

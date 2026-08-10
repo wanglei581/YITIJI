@@ -371,6 +371,10 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 }
 .pfold-b b, .stfold-b b { color: var(--fog-800); font-weight: 600; }
 .pfold:not([open]) .pfold-b, .stfold:not([open]) .stfold-b { display: none; }
+/* 卡片是 overflow:hidden 的固定格子：折叠展开得自己限高滚动，
+   否则会把卡尾那句「用上面的『重新检测』再试一次」顶出格子（自检 内部裁切）。 */
+.stfold[open] .stfold-b { max-height: 168px; overflow-y: auto; }
+.pfold[open] .pfold-b { max-height: 200px; overflow-y: auto; }
 
 /* ══ 原型外壳条 · 评审开关（不属于产品界面）═══════════════════════════
    2026-08-11：能力探测态切换按钮与「原型稿：重新检测会直接成功」这句
@@ -549,7 +553,8 @@ body.capture .proto-rail { display: none !important; }
           <summary>技术档案（运维用）</summary>
           <div class="pfold-b">
             未取得本机打印扫描能力配置 —— 这和「一体机离线」不是一回事：那次知道坏在哪，这次连能力都读不到。
-            读不到能力配置，本机就<b>无权声称任何一项正常</b>，连上传、格式转换、签名盖章也不敢开 ——
+            <!-- 「，」放进 <b> 里：跨元素边界时浏览器会在 </b> 后断行，把逗号甩到行首（中文排版禁则，自检会判） -->
+            读不到能力配置，本机就<b>无权声称任何一项正常，</b>连上传、格式转换、签名盖章也不敢开 ——
             传上来接不接得住、合成完存不存得下，现在都答不上来。重新检测一次不花钱。
           </div>
         </details>
@@ -796,7 +801,10 @@ body.capture .proto-rail { display: none !important; }
 
         <span class="hc-st" data-when="default first ai-down" data-probe-when="ok">纸张、耗材、双面与输稿器<b>在提交任务前确认</b></span>
         <span class="hc-st" data-when="device-off" data-probe-when="ok">这一台打印扫描一体机离线&nbsp;· <b>上传、转换、签章不受影响</b></span>
-        <span class="hc-st" data-probe-when="unknown">本机现在读不到设备与耗材状态&nbsp;· <b>不会创建正式任务</b></span>
+        <!-- 2026-08-11：原来这一态是「一行结论 + 折叠 + 卡尾 chip（用上面的重新检测再试一次）」，
+             三层叠起来超出卡格 26px（自检 内部裁切）。把 chip 那句并进结论行 ——
+             字一个没少，卡也不再被顶出血。 -->
+        <span class="hc-st" data-probe-when="unknown">本机现在读不到设备与耗材状态&nbsp;· <b>不会创建正式任务</b>&nbsp;· 用上面的「重新检测」再试一次</span>
 
         <details class="stfold">
         <summary>设备与耗材明细（运维信息）</summary>
@@ -825,7 +833,6 @@ body.capture .proto-rail { display: none !important; }
         </div>
         </details>
 
-        <span class="hc-ft" data-probe-when="unknown"><span class="chip chip--info">用上面的「重新检测」再试一次</span></span>
       </div>
 
     </div>

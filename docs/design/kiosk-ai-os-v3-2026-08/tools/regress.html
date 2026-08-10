@@ -317,6 +317,62 @@ function comboLabel (c) {
   return s
 }
 
+/* ── 跨页链接校验 ────────────────────────────────────────────
+   用户最不能接受的一类错就是「点进去跳转的不是这个连接的页面，
+   或者这个页面根本不存在」。此前全靠人眼，没有任何自动检查。
+
+   这里查三件事：
+     ① 目标文件在不在（不在 = 死链）
+     ② 目标页存不存在这个 ?stage=（stage 不认识 = 到了页面也是空的/白屏）
+     ③ 链接文字承诺的和目标页是不是一回事 —— 这条**机器判不了**，
+        只把「文字 → 目标」的对照表导出来，留给人核。不假装机器能判。
+
+   注意：只能查静态 href。JS 运行时算出来的跳转（如 06 的交接契约）
+   查不到 —— 这是本检查的已知边界，不要当成"链接都验过了"。 */
+function collectLinks (win) {
+  var doc = win.document
+  var out = []
+  doc.querySelectorAll('a[href]').forEach(function (a) {
+    var h = a.getAttribute('href') || ''
+    if (!h || h.charAt(0) === '#' || /^(https?:|mailto:|tel:|javascript:)/i.test(h)) return
+    var file = h.split('?')[0].split('#')[0]
+    if (!file || !/\.html$/i.test(file)) return
+    var st = ''
+    var m = h.match(/[?&]stage=([^&#]+)/)
+    if (m) st = decodeURIComponent(m[1])
+    out.push({
+      href: h, file: file, stage: st,
+      text: (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+    })
+  })
+  return out
+}
+
+/* 两趟：先把每页的阶段清单都收齐，再回头验链接。
+   一趟做不到 —— 验 A 页的链接需要 B 页的阶段清单，而 B 页可能还没装载。 */
+function validateLinks (pages) {
+  var stagesOf = {}, exists = {}
+  pages.forEach(function (p) {
+    exists[p.page] = true
+    if (p.stages) stagesOf[p.page] = p.stages
+  })
+  var bad = []
+  pages.forEach(function (p) {
+    ;(p.links || []).forEach(function (l) {
+      if (!exists[l.file]) {
+        bad.push({ from: p.page, href: l.href, text: l.text, why: '目标页不存在' })
+        return
+      }
+      if (l.stage && stagesOf[l.file] && stagesOf[l.file].length &&
+          stagesOf[l.file].indexOf(l.stage) < 0) {
+        bad.push({ from: p.page, href: l.href, text: l.text,
+                   why: '目标页没有这个阶段（它有：' + stagesOf[l.file].join('/') + '）' })
+      }
+    })
+  })
+  return bad
+}
+
 /* ── 主流程 ──────────────────────────────────────────────── */
 async function runAll (only) {
   if (!checkEnv()) {
@@ -374,6 +430,8 @@ async function runAll (only) {
         }
       }
       rec.consoleErrors = errs.slice(0, 20)
+      rec.stages = disc.stages
+      rec.links = collectLinks(win)
 
       totalCombos += rec.combos
       totalDefects += rec.defects.length
@@ -395,6 +453,22 @@ async function runAll (only) {
   }
 
   RESULT.finishedAt = new Date().toISOString()
+
+  var badLinks = validateLinks(RESULT.pages)
+  RESULT.badLinks = badLinks
+  var linkCount = RESULT.pages.reduce(function (n, p) { return n + ((p.links || []).length) }, 0)
+  log('\n跨页链接：查了 ' + linkCount + ' 条静态 href（JS 运行时算出来的跳转查不到，见台子头部的已知盲区）')
+  if (badLinks.length) {
+    log('✗ ' + badLinks.length + ' 条对不上：', 'bad')
+    badLinks.slice(0, 40).forEach(function (b) {
+      log('   ' + b.from + ' 的「' + b.text + '」→ ' + b.href + '　' + b.why, 'bad')
+    })
+    if (badLinks.length > 40) log('   …还有 ' + (badLinks.length - 40) + ' 条，见 JSON', 'bad')
+  } else {
+    log('✓ 目标页都存在，?stage= 都是目标页真有的阶段', 'ok')
+  }
+  log('（链接文字承诺的和目标页是不是一回事，机器判不了 —— JSON 里有「文字 → 目标」对照表，留给人核）')
+
   log('\n────────────────────────────────')
   log('页数 ' + PAGES.length + '　组合 ' + totalCombos
     + '　有问题的页 ' + pagesWithDefects

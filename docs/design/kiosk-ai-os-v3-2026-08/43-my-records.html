@@ -1482,10 +1482,7 @@ body.capture .proto-only { display:none !important; }
           <div class="kv-row"><span class="k">状态多久更新</span><span class="v">跟着来源同步 · 每天一次</span></div>
           <div class="kv-row"><span class="k">收藏上限</span><span class="v">没有上限 · 多了用上面的筛选</span></div>
         </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>岗位与招聘会只做<b>第三方与官方来源信息入口</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
-        </div>
+        <!-- 2026-08-11：合规声明已移到正文常驻（.compline），不在抽屉里重复。 -->
       </div>
 
       <!-- ---------- 浏览与跳转（合规声明在左栏画像下，这里不重复） ---------- -->
@@ -1569,11 +1566,7 @@ body.capture .proto-only { display:none !important; }
           <button class="btn btn--primary" type="button" data-submit><svg class="ic"><use href="#i-check"/></svg>提交反馈</button>
           <div class="panel-note" style="margin-left:0">原型稿 · 提交后由运营受理，结果会进上面的通知。</div>
         </div>
-        <!-- notice 标签的那一条合规声明（每屏恰好一条） -->
-        <div class="notice" style="margin-top:var(--s-3)">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>通知与反馈只关联<b>你自己的服务记录</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
-        </div>
+        <!-- 2026-08-11：notice 标签的合规声明已移到正文常驻（.compline），这里不重复。 -->
       </div>
     </div>
   </div>
@@ -1596,7 +1589,9 @@ body.capture .proto-only { display:none !important; }
       <div class="ovl-act">
         <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
         <button class="btn btn--commit" type="button" data-close>确认删除</button>
-        <span class="panel-note" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
+        <!-- 2026-08-11：「原型稿 · …」是给评审看的实现备注，不是给站在机器前的人看的。
+             产品视图（?capture=1）里不渲染，评审视图仍在。 -->
+        <span class="panel-note proto-only" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
       </div>
     </div>
   </div>
@@ -1625,6 +1620,13 @@ body.capture .proto-only { display:none !important; }
         <div data-when="ai-down"><div class="t">起草暂不可用 · 反馈照常提交</div><div class="s">输入框可写，消息与工单都在</div></div>
       </div>
     </div>
+
+    <!-- 抽屉开关：统计口径、工单与「写一条反馈」都在里面（2026-08-11 从常驻右栏改过来）。
+         按标签换文案，notice 标签直接写「写一条反馈」，用户不用猜里面是什么。 -->
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="ai" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>统计与口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="fav" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>收藏口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="trace" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>足迹口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="notice" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-pen"/></svg>写一条反馈</button>
 
     <a class="btn btn--lg btn--ghost" data-at="ai" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的资产</a>
     <a class="btn btn--lg btn--ghost" data-at="fav" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>按企业看</a>
@@ -1836,6 +1838,32 @@ body.capture .proto-only { display:none !important; }
     if (e.key !== 'Escape') return
     var os = document.querySelectorAll('.ovl')
     for (var i = 0; i < os.length; i++) os[i].hidden = true
+  })
+})()
+
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var bs = document.querySelectorAll('[data-side-open]')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  /* 「提交这条反馈」的输入框在抽屉里。抽屉关着就按提交，等于让人提交一段
+     自己看不见的文字 —— 先把抽屉打开，让他看清再按。捕获阶段拦截，
+     所以要早于下面那个真正的提交处理器。 */
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-submit]') && !sc.classList.contains('is-side')) {
+      e.stopPropagation(); e.preventDefault(); set(true)
+    }
+  }, true)
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
   })
 })()
 </script>

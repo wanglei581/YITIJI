@@ -184,6 +184,18 @@
   .receipt .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
   .receipt-t { font-size: var(--fz-3); color: var(--fog-900); }
   .receipt-a { margin-left: auto; flex: 0 0 auto; }
+  /* 回执附注（2026-08-11 加）：
+     · .receipt-n       —— 「本机还没体检这份文件」。交接回执只能声明「收到了一条交接」，
+                           声明不了「文件已经在本机、已经量过页数」，那两件事没发生过。
+     · .receipt-n--warn —— 链接里的份数/页数被夹到本机上限时，用户必须看见系统改了什么。
+                           所以给到和正文同号的字（fz-3）+ 加粗，不能压成脚注。 */
+  .receipt-n { display: block; margin-top: 5px; font-size: var(--fz-2);
+    color: var(--fog-700); line-height: 1.5; }
+  .receipt-n--warn { font-size: var(--fz-3); color: var(--amber-600); font-weight: 700; }
+  /* 链接不可识别 / 参数被夹：整条转琥珀并换警示图标。
+     青底打勾等于替这条 URL 背书 —— 恰恰是这次要修的那件事。 */
+  .receipt--warn { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .receipt--warn .ic { color: var(--amber-600); }
 
   /* 折叠块：长说明压成一行摘要，展开才给全文。合规原文一字不删。 */
   .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
@@ -505,10 +517,13 @@
       <!-- 2026-08-10 材料交接：别的台面（简历工作台 / 招聘会作战台 / 岗位清单）把材料送过来时，
            参数阶段顶上先出一张来源回执 —— 让用户确认「是不是这份」，而不是直接开始调份数。
            2026-08-10 修：这一行以前是写死的，政策页送办事清单过来也显示成「简历诊断报告」。
-           现在由页尾的交接契约脚本按 URL 参数改写；参数一个都没有时保留下面这行默认文案。 -->
+           现在由页尾的交接契约脚本按 URL 参数改写；参数一个都没有时保留下面这行默认文案。
+           2026-08-11 再修：默认这行原本写「09:43 送达」。「送达」是结论 —— 它同时声称
+           文件已经在本机、并且本机已经量过 3 页。走 ?stage=s3 直达时这两件事都没发生过，
+           所以默认文案也改成只说真实发生的事（收到交接）＋ 一句「还没体检」。 -->
       <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off" id="handoff">
-        <svg class="ic"><use href="#i-check"/></svg>
-        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · <b>3 页</b> · 09:43 送达</span>
+        <svg class="ic"><use href="#i-check" id="handoff-ic"/></svg>
+        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · 来源页标注 <b>3 页</b> · 09:43 收到交接<span class="receipt-n">本机还没体检这份文件，页数与费用以体检为准。</span></span>
         <span class="receipt-a"><a class="btn btn--quiet" id="handoff-back" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
       </div>
 
@@ -1866,6 +1881,52 @@
    份数与页数同时参与核价卡的用量口径（仍是预估，金额一律等服务端核价）。
    预览纸张与体检结论是原型的样例渲染，不跟着参数变 —— 那是「这台机器读到的文件」，
    不是「来源页说了什么」，交接参数无权改写本机体检结果。
+
+   ──────────────────────────────────────────────────────────────────────────
+   2026-08-11 收紧（走查抓到三条，都是「一条 URL 就能在公共机器上造假」）：
+
+   ① title 不受白名单约束。上一版只给 from 建了登记表，title 只清控制字符与尖括号，
+      于是 `06-print-workbench.html?title=你的身份证复印件&pages=1` 会渲染出
+      「本次来自：上一步 · 你的身份证复印件 · 1 页 · 17:32 送达」。
+      没有任何来源页送过东西，回执却把一份不存在的材料说成已经到了本机 ——
+      在候机厅那种公共机器上，前一个人留一条链接就能骗到下一个人。
+      现在：**title / pages / copies 只在 from 命中登记表时才采纳**。
+      from 缺失或不认识 → 整条回执正文作废，只说「这条链接没有可识别的来源页」，
+      主按钮指回 ?stage=s1。不认识来源就什么都不认领。
+
+   ② 份数与页数没有上限。`?copies=9999` 会让核价卡显示九千份、九千张纸。
+      现在 copies ≤ 99、pages ≤ 200。**关键是超限不许静默截断**：
+      悄悄改成 99，用户要么以为自己真排了 9999 份、要么以为只排了 99 份而其实不是。
+      两种都是系统偷偷改了数还不告诉人。所以夹到上限的同时必须在回执上写明
+      「链接里写的份数（9999 份）超出本机上限，已按 99 份处理，请核对后再付款」。
+
+   ③ 回执写「17:32 送达」。「送达」是结论，它同时声称：文件已经在本机、本机已经量过
+      页数。这两件事在 s2 体检之前都没发生过。改成描述真实发生的事 ——「17:32 收到交接」，
+      页数一律写成「来源页标注 N 页」（谁说的就署谁的名），并常驻一句
+      「本机还没体检这份文件，页数与费用以体检为准」。体检完成后才允许出真实页数与金额。
+
+   ══════════════════════════════════════════════════════════════════════════
+   给 Codex 的接线契约 —— 上面这套白名单只是**设计侧止血，不是根治**
+   --------------------------------------------------------------------------
+   为什么不是根治：白名单管的是「来源页号」，管不住 `title`。
+   `?from=P22&title=你的身份证复印件&pages=1` 里 from 是合法的 P22，title 仍然是
+   URL 里的一句话。设计稿能做到的上限只有两件事 —— 不认识的来源一律不认领；
+   认识的来源，也把它说的话署上它的名（「来源页标注」「还没体检」），不冒充本机读数。
+   **只要回执的内容来自 URL，它就永远是可伪造的**：真正的判据必须是服务端有没有这份文件。
+
+   根治办法是 `interface-handoff.md §2A` 的 artifactId 资产链（blockers.md B1）：
+     1. 产物先落地再开放出口：诊断报告 / 办事清单 / 复盘单 / 参会作战单 / 证件照排版，
+        必须先生成并保存成 artifact、拿到服务端签发的 `artifactId`，
+        来源页才点亮「去打印」。没有 ID 就没有出口，也就没有可拼的链接。
+     2. 打印台只收 `?artifactId=`，**按 ID 向服务端查真实文件**（文件名、页数、sha256、
+        ownerId）。回执上的每个字都来自这次查询的结果，不来自 URL。
+     3. 查不到 / 过期 / ownerId 不是本人 → 回到第 1 步选文件，不显示任何来源回执。
+        这一条就是本次 ① 那段兜底逻辑在生产里的正确形态：现在判的是「from 认不认识」，
+        接线后判的是「服务端认不认这份资产」。
+     4. 上限也要挪到服务端：copies / pages 的合法区间由服务端核价接口判并回报，
+        前端这两个常量只是本机的最后一道兜底，不作为定价依据。
+     5. 页数与金额一律以服务端体检 / 核价结果为准；在结果回来之前，界面只能写
+        「还没体检」，不得先把 URL 里的数字当成事实展示。
    ══════════════════════════════════════════════════════════════════════════ */
 ;(function () {
   var scr = document.querySelector('.screen')
@@ -1922,72 +1983,156 @@
     'interview-sheet':  '面试复盘单'
   }
 
+  /* 本机上限。超出即视为异常链接：夹到上限，**并且把夹这件事写在脸上**。 */
+  var MAX_COPIES = 99
+  var MAX_PAGES = 200
+
   var q
   try { q = new URLSearchParams(location.search) } catch (e) { return }
 
-  function int (v) {
-    if (!v || !/^[0-9]{1,4}$/.test(v)) return 0
-    var n = parseInt(v, 10)
-    return (n > 0 && n <= 9999) ? n : 0
+  /* 数字解析。返回 { n: 本机采用值, over: 链接里的原值（只有超限时非 0） }。
+     上一版是「不合法就当 0」：9999 因为超四位被直接吞成「没传过」，
+     用户既看不到 9999 也看不到本机做了什么 —— 系统改了数却一声不吭。
+     现在把「链接写了多少」和「本机按多少算」两件事分开留住，交给回执去说。 */
+  function num (v, max) {
+    var raw = (v == null ? '' : String(v)).replace(/[^0-9]/g, '').slice(0, 9)
+    var n = raw ? parseInt(raw, 10) : 0
+    if (!n) return { n: 0, over: 0 }
+    return n > max ? { n: max, over: n } : { n: n, over: 0 }
   }
   function clean (v, re, max) {
     v = (v == null ? '' : String(v)).replace(re, '')
     return v.length > max ? v.slice(0, max) : v
   }
-
-  var from   = clean((q.get('from') || '').toUpperCase(), /[^A-Z0-9]/g, 6)
-  var kind   = clean((q.get('kind') || '').toLowerCase(), /[^a-z-]/g, 24)
-  /* title 只清掉控制字符与尖括号；正文一律走 textContent，不存在注入面 */
-  var title  = clean(q.get('title'), new RegExp('[\\u0000-\\u001f<>]', 'g'), 40).trim()
-  var pages  = int(q.get('pages'))
-  var copies = int(q.get('copies'))
-  var src    = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : null
-  var name   = title || (Object.prototype.hasOwnProperty.call(KIND, kind) ? KIND[kind] : '')
-
-  /* 一个交接参数都没有 → 什么都不改，保留 HTML 里的默认文案 */
-  if (!src && !name && !pages && !copies) return
-
   function b (t) { var e = document.createElement('b'); e.textContent = t; return e }
   function txt (t) { return document.createTextNode(t) }
+  /* 附注行：正文之下另起一行。warn 版说的是「系统改了你给的参数」，
+     必须和正文同号加粗 —— 压成脚注就等于没说。 */
+  function note (t, warn) {
+    var e = document.createElement('span')
+    e.className = 'receipt-n' + (warn ? ' receipt-n--warn' : '')
+    e.textContent = t
+    return e
+  }
   function hhmm () {
     var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n }
     return p(d.getHours()) + ':' + p(d.getMinutes())
   }
+  /* 「预估 · 以打印工作台核价为准」里的间隔号用 nbsp 夹住：
+     断行落在它前面会让「·」起行，中文排版禁则，走查会报「标点在行首」 */
+  var GUARD = '预估\u00a0·\u00a0以打印工作台核价为准'
 
-  /* ① 回执正文 —— 全部用 textContent 拼，URL 里带标签也只会当字面文字显示 */
   var line = document.getElementById('handoff-t')
+  var back = document.getElementById('handoff-back')
+  var icon = document.getElementById('handoff-ic')
+  function warnSkin () {
+    bar.classList.add('receipt--warn')
+    if (icon) icon.setAttribute('href', '#i-alert')
+  }
+  function wipe () { while (line.firstChild) line.removeChild(line.firstChild) }
+  /* 用量说明只在 s3（参数核价）出现：s4 右栏在 device-off 下已经没有多余高度 */
+  function qnote (t) {
+    var host = document.querySelector('.quote')
+    if (!host) return
+    var p = document.createElement('p')
+    p.className = 'qnote'
+    p.id = 'q-handoff'
+    p.setAttribute('data-at', 's3')
+    p.textContent = t
+    host.appendChild(p)
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  /* 先看有没有人递过交接参数。一个都没有 → 什么都不改，保留 HTML 里的默认文案
+     （真正的「直接点开打印台」由页尾脚本②处理：落 s1 并把整条回执摘掉）。 */
+  var rawFrom = q.get('from')
+  var rawKind = q.get('kind')
+  var rawTitle = q.get('title')
+  var rawPages = q.get('pages')
+  var rawCopies = q.get('copies')
+  if (!rawFrom && !rawKind && !rawTitle && !rawPages && !rawCopies) return
+
+  var from = clean((rawFrom || '').toUpperCase(), /[^A-Z0-9]/g, 6)
+  var src = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : null
+
+  /* ══ ① from 不在登记表（含 from 干脆没给）→ 整条回执作废 ══
+     本次修的主症就在这里：title / pages / copies 一个都不采纳，核价与文件信息也不动。
+     不认识来源就什么都不认领 —— 页面宁可承认「这条链接我读不懂」，
+     也不能凭 URL 里的一句话，替一份没人送过的材料出一张「已经到了本机」的回执。 */
+  if (!src) {
+    if (line) {
+      wipe()
+      line.appendChild(b('这条链接没有可识别的来源页'))
+      line.appendChild(txt('，本机没有认领任何材料'))
+      line.appendChild(note('链接里写的材料名、页数、份数一律不采纳。请回第 1 步自己选文件。', true))
+    }
+    warnSkin()
+    if (back) {
+      back.setAttribute('href', '06-print-workbench.html?stage=s1')
+      back.textContent = '回第 1 步选文件'
+    }
+    /* 核价卡也得说清楚：下面那两行用量不是「你的文件」，是本页的样例数字 */
+    qnote('这条链接没有可识别的来源页，本机没有认领任何材料；下面的用量不是你的文件。' +
+          '请回第 1 步选文件后再核价。')
+    return
+  }
+
+  /* ══ ② from 认识 —— 到这一步才允许采纳来源页说的话 ══ */
+  var kind = clean((rawKind || '').toLowerCase(), /[^a-z-]/g, 24)
+  /* title 只清掉控制字符与尖括号；正文一律走 textContent，不存在注入面 */
+  var title = clean(rawTitle, new RegExp('[\\u0000-\\u001f<>]', 'g'), 40).trim()
+  var name = title || (Object.prototype.hasOwnProperty.call(KIND, kind) ? KIND[kind] : '')
+  var P = num(rawPages, MAX_PAGES)
+  var C = num(rawCopies, MAX_COPIES)
+  var pages = P.n
+  var copies = C.n
+  var overs = []
+  if (C.over) {
+    overs.push('链接里写的份数（' + C.over + ' 份）超出本机上限，已按 ' +
+               MAX_COPIES + ' 份处理，请核对后再付款。')
+  }
+  if (P.over) {
+    overs.push('链接里写的页数（' + P.over + ' 页）超出本机上限，已按 ' +
+               MAX_PAGES + ' 页处理，请核对后再付款。')
+  }
+
+  /* ①′ 回执正文 —— 全部用 textContent 拼，URL 里带标签也只会当字面文字显示 */
   if (line) {
-    while (line.firstChild) line.removeChild(line.firstChild)
+    wipe()
     line.appendChild(txt('本次来自：'))
-    line.appendChild(b(src ? src.n : '上一步'))
+    line.appendChild(b(src.n))
     line.appendChild(txt(' · '))
     if (!name) {
-      /* 来源页没说送的是什么 —— 那就不许写「送达」，那等于替它认领一份不存在的材料 */
+      /* 来源页没说送的是什么 —— 那就不许写「收到交接」，那等于替它认领一份不存在的材料 */
       line.appendChild(b('未指定材料'))
       line.appendChild(txt(' · 请回第 1 步选文件'))
     } else {
       line.appendChild(b(name))
       line.appendChild(txt(' · '))
-      if (pages) line.appendChild(b(pages + ' 页' + (copies ? ' × ' + copies + ' 份' : '')))
-      else line.appendChild(txt('页数以本机体检为准'))
-      line.appendChild(txt(' · ' + hhmm() + ' 送达'))
+      if (pages) {
+        /* 「来源页标注」四个字是署名：这个数字是来源页说的，不是本机量出来的 */
+        line.appendChild(txt('来源页标注 '))
+        line.appendChild(b(pages + ' 页' + (copies ? ' × ' + copies + ' 份' : '')))
+      } else {
+        line.appendChild(txt('页数以本机体检为准'))
+      }
+      /* 上一版写「送达」。那是结论：它同时声称文件已经在本机、本机已经量过页数。
+         这台机器此刻只做过一件事 —— 收到一条交接。就只写这一件。 */
+      line.appendChild(txt(' · ' + hhmm() + ' 收到交接'))
+      line.appendChild(note('本机还没体检这份文件，页数与费用以体检为准。'))
     }
+    for (var oi = 0; oi < overs.length; oi++) line.appendChild(note(overs[oi], true))
   }
+  if (overs.length) warnSkin()
 
-  /* ② 回去换：认识来源页就回那一页，不认识就退回本页第 1 步，不瞎猜 */
-  var back = document.getElementById('handoff-back')
+  /* ②′ 回去换：认识来源页就回那一页 */
   if (back) {
-    if (src) {
-      var st = clean(q.get('back') || src.s, /[^a-z0-9]/g, 8)
-      back.setAttribute('href', src.f + (st ? '?stage=' + st : ''))
-      back.textContent = '不是这份？回去换'
-    } else {
-      back.setAttribute('href', '06-print-workbench.html?stage=s1')
-      back.textContent = '回第 1 步换一份'
-    }
+    var st = clean(q.get('back') || src.s, /[^a-z0-9]/g, 8)
+    back.setAttribute('href', src.f + (st ? '?stage=' + st : ''))
+    back.textContent = '不是这份？回去换'
   }
 
-  /* ③ 用量口径：来源页给了页数才改核价那两行，没给就一个字不动 */
+  /* ③′ 用量口径：来源页给了页数才改核价那两行，没给就一个字不动 */
   var cp = copies || 1
   if (pages) {
     var sheets = Math.ceil(pages / 2)
@@ -1996,35 +2141,25 @@
     if (qc) qc.textContent = pages + ' 页 × ' + cp + ' 份 = ' + (pages * cp) + ' 个印刷面'
     if (qp) qp.textContent = (sheets * cp) + ' 张（每份 ' + sheets + ' 张）'
   }
-  /* 用量说明只在 s3（参数核价）出现，且只在真有交接时才建这个节点 */
-  var host = document.querySelector('.quote')
-  if (host) {
-    var qn = document.createElement('p')
-    qn.className = 'qnote'
-    qn.id = 'q-handoff'
-    qn.setAttribute('data-at', 's3')
-    /* 「预估 · 以打印工作台核价为准」里的间隔号用 nbsp 夹住：
-       断行落在它前面会让「·」起行，中文排版禁则，走查会报「标点在行首」 */
-    var GUARD = '预估\u00a0·\u00a0以打印工作台核价为准'
-    var who = src ? src.n : '来源页'
-    qn.textContent = !name
+  qnote(
+    (overs.length ? overs.join('') : '') +
+    (!name
       ? ('本次没有指定材料，先回第 1 步选文件；金额为' + GUARD + '。')
       : (pages
-          ? ('「' + pages + ' 页 × ' + cp + ' 份」是' + who + '送来的用量，属' + GUARD + '。')
-          : (who + '没给页数，本机不替它写一个 —— ' + GUARD + '。'))
-    host.appendChild(qn)
-    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
-  }
+          ? ('「' + pages + ' 页 × ' + cp + ' 份」是' + src.n + '标注的用量，本机还没体检这份文件；属' + GUARD + '。')
+          : (src.n + '没给页数，本机不替它写一个 —— ' + GUARD + '。')))
+  )
 
-  /* ④ 第 2 步「文件信息」跟着交接走，免得回头看时又变回样例文件。
+  /* ④′ 第 2 步「文件信息」跟着交接走，免得回头看时又变回样例文件。
+        页数同样要署名（「来源页标注 N 页」），别让它看起来像本机读出来的数。
         来源页连材料名都没给（纯导航跳过来）时，这三行一个字都不动 —— 没交接就没有「本次文件」。 */
   if (name) {
     var fn = document.getElementById('fi-name')
     var fp = document.getElementById('fi-pages')
     var fs = document.getElementById('fi-src')
     if (fn) fn.textContent = name
-    if (fp) fp.textContent = pages ? (pages + ' 页') : '以本机体检为准'
-    if (fs && src) fs.textContent = src.n + ' 送来'
+    if (fp) fp.textContent = pages ? ('来源页标注 ' + pages + ' 页') : '以本机体检为准'
+    if (fs) fs.textContent = src.n + ' 送来'
   }
 })()
 </script>

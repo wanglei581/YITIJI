@@ -284,6 +284,64 @@
   background:var(--surf-1); border:1px dashed var(--brd-2);
   font-size:var(--fz-2); color:var(--fog-700); line-height:1.65; }
 .polempty b { color:var(--fog-900); }
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右副列常驻抢走约三分之一宽度，装的是政策来源统计、注意事项、首次使用说明、
+   官方热线与二维码、「打完之后」——问了才想知道的东西，不是当下这一步要做的。
+   Codex 明确说本页「需要收窄，不需要推倒重做」，所以只动出现方式：
+     · 与当前流程直接相关的（核对进度 / 按作答派生的待办 / 打印勾选与页数费用）
+       整块移到左主区常驻；
+     · 其余口径与旁路动作收进上下文抽屉，点阶段轨右端的按钮才展开。
+   内容一条未删。 */
+.work { grid-template-columns: 1fr; }
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--gutter); bottom:auto; width:404px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; margin-left:var(--s-4); min-height:56px; padding:0 var(--s-5);
+  border-radius:var(--r-full); border:1px solid var(--brd-2); background:var(--surf-1);
+  color:var(--fog-800); font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.sidebtn .ic { width:18px; height:18px; }
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+
+/* 移进正文的三块横过来，别把主列表挤出血 */
+.wmain .pane--ans, .wmain .pane--todo, .wmain .pane--pick { flex:0 0 auto; }
+.wmain .pane--ans .kv { display:grid; grid-template-columns:1fr 1fr 1fr; column-gap:var(--s-6); }
+.wmain .pane--ans .kv-row { padding-top:var(--s-1); padding-bottom:var(--s-1); }
+.wmain .pane--ans .kv-row .k { flex:0 0 auto; white-space:nowrap; }
+.wmain .pane--ans .kv-row .v { text-align:right; }
+.wmain .pane--todo > .sec { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); align-items:start; }
+.wmain .pane--todo > .sec > .panel-note { grid-column:1 / -1; margin-bottom:0 !important; }
+.wmain .pane--pick > .sec {
+  display:grid; grid-template-columns:280px 1fr 340px; grid-template-rows:auto 1fr;
+  gap:var(--s-3) var(--s-5); align-items:start;
+}
+.wmain .pane--pick > .sec > .ckrow--fix { grid-column:1; grid-row:1 / span 2; }
+.wmain .pane--pick > .sec > .field-lb { grid-column:2; grid-row:1; }
+.wmain .pane--pick > .sec > #docPick { grid-column:2; grid-row:2; }
+.wmain .pane--pick > .sec > .push { grid-column:3; grid-row:1 / span 2; }
+.wmain .pane--pick .field-lb { margin-top:0 !important; }
+.wmain .pane--pick .push { margin-top:0; }
+/* device-off 的取回码要留着 —— 那是打印机离线时唯一能走的替代路径，不许藏 */
+.wmain .pane--pick .qr { flex-direction:row; align-items:center; gap:var(--s-4); text-align:left; }
+.wmain .pane--pick .qr-box { width:104px; height:104px; flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -320,6 +378,8 @@
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">打印清单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+    <!-- 抽屉开关放阶段轨右端：三步都在，且不跟底部动作条抢宽度 -->
+    <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p21side"><svg class="ic"><use href="#i-agency"/></svg>来源与提醒</button>
   </div>
 
   <!-- 全页唯一的合规边界声明。删字不许删它 -->
@@ -437,6 +497,85 @@
            下面 .sheet-a4 里的 .gd-foot 是**要印在纸上的字**，纸会离开本机、脱离屏幕语境，
            所以必须自带「以经办机构当日认定为准、本机不代办」这一句。
            复核合规文案条数时，这两处不能都算成屏幕文案：屏幕 1 条 + 纸面 1 条，各归各的载体。 -->
+      <!-- 2026-08-11：以下三块从右副列移到左主区常驻 —— 核对进度、按作答派生的待办、
+           打印勾选与页数费用，都是「当前这一步正在做的事」，不能跟着右栏收进抽屉。 -->
+      <div class="pane pane--ans" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>你答了什么</b>
+          <span class="mt" id="sideN">已答 7 / 9</span></div>
+        <div class="sec">
+          <div class="kv" id="sideKv"></div>
+        </div>
+      </div>
+
+      <div class="pane pane--todo" data-at="s2" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先办的</b>
+          <span class="mt" id="todoMt">按你的作答派生</span></div>
+        <div class="sec" id="todoBox"></div>
+      </div>
+
+      <div class="pane pane--todo" data-at="s2" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b>
+          <span class="mt">通用提醒 · 不随你的作答变化</span></div>
+        <div class="sec">
+          <div class="panel-note" style="margin-bottom:var(--s-3)">
+            这一态<b>没做条件核对</b>，所以下面两条是通用提醒，
+            <b>不是按你的情况算出来的</b> —— 已经办过的请自行跳过。
+          </div>
+          <button class="ckrow" data-todo="reg-generic" aria-pressed="false">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">办失业登记</span>
+              <span class="ckrow-s">政务网或户籍地街道办</span></span>
+          </button>
+          <button class="ckrow" data-todo="soc-generic" aria-pressed="false">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">查失业保险缴了多久</span>
+              <span class="ckrow-s">社保 App 可查</span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="pane pane--pick" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>这次打什么</b>
+          <span class="mt">勾选即改页数</span></div>
+        <div class="sec sec--col">
+          <button class="ckrow ckrow--fix" aria-pressed="true" aria-disabled="true">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">办事清单</span>
+              <span class="ckrow-s">A4 黑白 · 1 页</span></span>
+          </button>
+          <div class="field-lb" style="margin-top:var(--s-4)">政策原文（按需勾选）</div>
+          <div id="docPick"></div>
+
+          <div class="push">
+            <div class="kv">
+              <div class="kv-row"><span class="k">合计</span><span class="v"><b id="sumPg">5</b> 页</span></div>
+              <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b id="sumFee">1.00</b> 元</span></div>
+            </div>
+            <div class="panel-note" style="margin-top:var(--s-3)" data-when="default first ai-down">
+              清单同时存进「我的文档」
+            </div>
+            <div class="qr" data-when="device-off">
+              <div class="qr-box">
+                <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+                  <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+                  <rect x="40" y="8" width="6" height="6"/><rect x="52" y="14" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/>
+                  <rect x="58" y="20" width="6" height="6"/><rect x="8" y="40" width="6" height="6"/><rect x="20" y="46" width="6" height="6"/>
+                  <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/><rect x="64" y="46" width="6" height="6"/>
+                  <rect x="76" y="40" width="6" height="6"/><rect x="88" y="46" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/>
+                  <rect x="58" y="70" width="6" height="6"/><rect x="70" y="58" width="6" height="6"/><rect x="82" y="76" width="6" height="6"/>
+                  <rect x="40" y="82" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/><rect x="64" y="76" width="6" height="6"/>
+                  <rect x="8" y="58" width="6" height="6"/><rect x="20" y="70" width="6" height="6"/><rect x="88" y="82" width="6" height="6"/>
+                </svg>
+              </div>
+              <span class="qr-cap">取回码 <b>P-3155</b> · 示意码<br>存我的文档后扫码带走</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="paper-stage" data-at="s3" id="paperStage">
         <div class="sheet-a4">
           <div class="gd">
@@ -478,16 +617,14 @@
 
     </div>
 
-    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
-
-      <!-- S1 右：你答了什么（实时） -->
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>你答了什么</b>
-          <span class="mt" id="sideN">已答 7 / 9</span></div>
-        <div class="sec">
-          <div class="kv" id="sideKv"></div>
-        </div>
+    <!-- ══ 右副列 → 按需抽屉（2026-08-11）══════════════════════════════
+         政策来源统计、注意事项、首次使用说明、官方热线与二维码、「打完之后」
+         都在这里，点阶段轨右端的「来源与提醒」才展开。
+         核对进度 / 待办 / 打印勾选已移到左主区常驻，不在这里。 -->
+    <div class="wside" id="p21side">
+      <div class="sidehd">
+        <span class="t">来源与提醒</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
       </div>
 
       <div class="pane" data-at="s1">
@@ -560,32 +697,6 @@
 
            但 ai-down 例外：那一态本来就不做条件核对（右上角写着「条件核对 · 未做」），
            派生无从谈起，所以那一态另给一份并**明写「通用提醒 · 不随你的作答变化」**。 -->
-      <div class="pane" data-at="s2" data-when="default first device-off">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先办的</b>
-          <span class="mt" id="todoMt">按你的作答派生</span></div>
-        <div class="sec" id="todoBox"></div>
-      </div>
-
-      <div class="pane" data-at="s2" data-when="ai-down">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b>
-          <span class="mt">通用提醒 · 不随你的作答变化</span></div>
-        <div class="sec">
-          <div class="panel-note" style="margin-bottom:var(--s-3)">
-            这一态<b>没做条件核对</b>，所以下面两条是通用提醒，
-            <b>不是按你的情况算出来的</b> —— 已经办过的请自行跳过。
-          </div>
-          <button class="ckrow" data-todo="reg-generic" aria-pressed="false">
-            <span class="ck-box"></span>
-            <span class="ckrow-b"><span class="ckrow-t">办失业登记</span>
-              <span class="ckrow-s">政务网或户籍地街道办</span></span>
-          </button>
-          <button class="ckrow" data-todo="soc-generic" aria-pressed="false">
-            <span class="ck-box"></span>
-            <span class="ckrow-b"><span class="ckrow-t">查失业保险缴了多久</span>
-              <span class="ckrow-s">社保 App 可查</span></span>
-          </button>
-        </div>
-      </div>
 
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-phone"/></svg><b>出发前问官方</b></div>
@@ -645,47 +756,6 @@
       </div>
 
       <!-- S3 右 -->
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>这次打什么</b>
-          <span class="mt">勾选即改页数</span></div>
-        <div class="sec sec--col">
-          <button class="ckrow ckrow--fix" aria-pressed="true" aria-disabled="true">
-            <span class="ck-box"></span>
-            <span class="ckrow-b"><span class="ckrow-t">办事清单</span>
-              <span class="ckrow-s">A4 黑白 · 1 页</span></span>
-          </button>
-          <div class="field-lb" style="margin-top:var(--s-4)">政策原文（按需勾选）</div>
-          <div id="docPick"></div>
-
-          <div class="push">
-            <div class="kv">
-              <div class="kv-row"><span class="k">合计</span><span class="v"><b id="sumPg">5</b> 页</span></div>
-              <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b id="sumFee">1.00</b> 元</span></div>
-            </div>
-            <div class="panel-note" style="margin-top:var(--s-3)" data-when="default first ai-down">
-              清单同时存进「我的文档」
-            </div>
-            <div class="qr" data-when="device-off">
-              <div class="qr-box">
-                <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
-                  <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                  <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                  <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                  <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
-                  <rect x="40" y="8" width="6" height="6"/><rect x="52" y="14" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/>
-                  <rect x="58" y="20" width="6" height="6"/><rect x="8" y="40" width="6" height="6"/><rect x="20" y="46" width="6" height="6"/>
-                  <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/><rect x="64" y="46" width="6" height="6"/>
-                  <rect x="76" y="40" width="6" height="6"/><rect x="88" y="46" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/>
-                  <rect x="58" y="70" width="6" height="6"/><rect x="70" y="58" width="6" height="6"/><rect x="82" y="76" width="6" height="6"/>
-                  <rect x="40" y="82" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/><rect x="64" y="76" width="6" height="6"/>
-                  <rect x="8" y="58" width="6" height="6"/><rect x="20" y="70" width="6" height="6"/><rect x="88" y="82" width="6" height="6"/>
-                </svg>
-              </div>
-              <span class="qr-cap">取回码 <b>P-3155</b> · 示意码<br>存我的文档后扫码带走</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
@@ -750,6 +820,24 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var bs = document.querySelectorAll('[data-side-open]')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/keypad.js?v=1"></script>
 <script src="scripts/region.js?v=1"></script>
