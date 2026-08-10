@@ -1,8 +1,10 @@
 # 招聘信息内容域 Wave 2 生产只读盘点与恢复库规划 Runbook
 
-状态：完整盘点实现候选，未执行生产盘点、未恢复生产备份、未写任何数据库、未部署。
+状态：完整生产只读盘点已于 2026-08-10 执行，结果为稳定快照下存在业务 blocker（`exit 2`）；未恢复生产备份、未写任何业务数据、未切换 reader/writer、未部署。
 
 本执行包包含三件严格分离的只读能力：廉价的 production legacy backfill 子集 probe、冻结方案第 6 节完整 production inventory + 公开 API ID 差集，以及受控恢复库上的 manifest-aware dry-run。子集 probe 仍不能产生 GO；完整盘点同时区分现网 `currentReader` 与冻结目标 `targetSafe`，不会把尚未切换的 Profile/Directory 接口伪装成空集合。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write` 或 `--fix`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧、reader 切换或发布。
+
+当前按 `single-owner` 执行：同一位业主可兼任业务、数据和运维责任人，不需虚构多个员工；但只读授权、证据形成、manifest 确认、写入授权和发布授权必须保留为不同时点的可追溯动作。Codex 可执行技术检查和自动化，不能把一次普通“继续”自动扩张为生产写入或部署授权。
 
 ## 1. 固定边界
 
@@ -121,5 +123,7 @@ pnpm plan:recruitment-wave2 --manifest /approved/secure/manifest.json --batch-si
 - 需要修改 schema、恢复库数据、生产数据、Redis、密钥、API reader/writer 或页面才能“让结果通过”。
 
 ## 6. 后续批次
+
+当前生产完整盘点为 `exit 2`：可以按受限内部 ID 整理 Organization/JobSource/域策略/ReviewDecision、无源 Job、JobFair、legacy 机构/岗位和负向审计候选的治理证据包，但它不是现有 `agencies[]/jobs[]` planner manifest。在恢复库依赖事实仍为空时，现有 dry-run 应继续 `exit 2`；要验证拟议治理事实，必须另开代码批次扩展零写入纯内存 planner，或为隔离恢复库 fixture/applier 另立专项授权和清理门禁。
 
 只有冻结方案第 6 节完整 production inventory 与公开 API ID 差集通过、恢复库 dry-run 全绿、人工映射清单获批后，才可另开独立 PR 设计真正的 shadow backfill writer：每条 Job、legacy 映射、migration checksum 和追加写 AuditLog 同事务/CAS，失败不删 legacy，所有新 Job 仍不可见。任何生产执行还必须再次取得具名写授权；重复组归零后，`(sourceId, externalId)` unique 仍须作为 SQLite/PostgreSQL 独立 additive migration 验证，不能夹带在 writer 或 dual-write 中。
