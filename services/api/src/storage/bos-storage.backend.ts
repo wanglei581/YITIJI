@@ -21,6 +21,8 @@ export interface BosBackendConfig {
   endpoint: string
 }
 
+export const BOS_SDK_PATH_STYLE_ENABLED = false as const
+
 type BosResponse = {
   body?: Buffer
   http_headers?: Record<string, string | undefined>
@@ -57,7 +59,9 @@ export class BosStorageBackend implements ObjectStorageBackend {
     this.client = client ?? new BaiduBCE.BosClient({
       endpoint: this.endpoint,
       credentials: { ak: cfg.accessKeyId, sk: cfg.secretAccessKey },
-      pathStyleEnable: true,
+      // 百度 BOS IAM 对对象级 READ/WRITE 使用虚拟主机寻址；路径式请求会在
+      // PUT 成功后对 HEAD/GET/DELETE 返回 AccessDenied，破坏读删闭环。
+      pathStyleEnable: BOS_SDK_PATH_STYLE_ENABLED,
     })
   }
 

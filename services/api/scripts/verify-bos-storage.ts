@@ -1,6 +1,7 @@
 import assert from 'assert/strict'
 import { createHash } from 'crypto'
 import {
+  BOS_SDK_PATH_STYLE_ENABLED,
   BosStorageBackend,
   type BosClientLike,
 } from '../src/storage/bos-storage.backend'
@@ -168,6 +169,11 @@ function verifyLiveGateConfig(): void {
 }
 
 async function main(): Promise<void> {
+  assert.equal(
+    BOS_SDK_PATH_STYLE_ENABLED,
+    false,
+    '百度 BOS 必须使用虚拟主机寻址，路径式请求会令对象 HEAD/GET/DELETE 返回 403',
+  )
   const fake = new FakeBosClient()
   const backend = new BosStorageBackend(
     {
