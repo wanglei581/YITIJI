@@ -647,6 +647,59 @@ jobs:
             PY
             )"
 
+            if ! (
+              cd "$SRC_ROOT/services/api"
+              node -r @swc-node/register -e \
+                "require('./src/recruitment-content/recruitment-content-readiness');require('./src/recruitment-content/recruitment-wave2-target');require('./scripts/support/recruitment-wave2-readonly-db');require('./scripts/support/recruitment-wave2-full-inventory')" \
+                >/dev/null 2>&1
+            ); then
+              echo "INVENTORY_RESULT=execution_failed"
+              echo "INVENTORY_ERROR_CODE=MODULE_GRAPH_INVALID"
+              exit 1
+            fi
+            echo "INVENTORY_MODULE_GRAPH=ok"
+
+            set +e
+            (
+              cd "$SRC_ROOT/services/api"
+              RW2_URL="$RW2_URL" RW2_DATABASE="$RW2_DATABASE" AUTHORIZED_UNTIL="$AUTHORIZED_UNTIL" \
+                node -r @swc-node/register <<'JS'
+            const { withRecruitmentWave2Readonly } = require('./scripts/support/recruitment-wave2-readonly-db')
+            const { collectFullInventory } = require('./scripts/support/recruitment-wave2-full-inventory')
+            const config = {
+              target: 'authorized-readonly',
+              databaseUrl: process.env.RW2_URL,
+              expectedDatabase: process.env.RW2_DATABASE,
+              authorizationRef: 'AUTH/recruitment-wave2/prod-readonly-20260810-user-approved-002',
+              authorizedUntil: new Date(process.env.AUTHORIZED_UNTIL),
+              restoreNonce: null,
+              snapshotSha256: null,
+            }
+            const codes = {
+              '42P01': 'DATABASE_TABLE_MISSING',
+              '42703': 'DATABASE_COLUMN_MISSING',
+              '42501': 'DATABASE_SELECT_DENIED',
+              '57014': 'DATABASE_QUERY_TIMEOUT',
+              '22P02': 'DATABASE_VALUE_INVALID',
+            }
+            withRecruitmentWave2Readonly(config, (query, identity) =>
+              collectFullInventory(query, identity, false)
+            ).then(() => {
+              console.log('INVENTORY_DB_SNAPSHOT_PREFLIGHT=ok')
+            }).catch((error) => {
+              const code = error && typeof error.code === 'string' ? codes[error.code] : null
+              console.log('INVENTORY_DB_SNAPSHOT_PREFLIGHT=failed')
+              console.log('INVENTORY_DB_SNAPSHOT_ERROR=' + (code || 'DATABASE_SNAPSHOT_FAILED'))
+              process.exitCode = 1
+            })
+            JS
+            )
+            DB_PREFLIGHT_STATUS=$?
+            set -e
+            if [ "$DB_PREFLIGHT_STATUS" -ne 0 ]; then
+              exit 1
+            fi
+
             install -d -m 700 "$EVIDENCE_ROOT"
             REPORT_TMP="$TMP_ROOT/report.json"
             ERROR_TMP="$TMP_ROOT/error.json"
