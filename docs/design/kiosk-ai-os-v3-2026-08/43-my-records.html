@@ -107,6 +107,22 @@
 /* 来源条在条目里稍收一点，不抢标题 */
 .rrow-b .srcline { margin-top: 1px; }
 
+/* ---------- 深链高亮：?stage=trace&activityId=xxx 落到哪一条要看得出来 ----------
+   足迹一屏 9 条，只把标签切过去等于让用户自己找。命中那条直接展开 + 描边，
+   顶部给一条「按记录号定位」的说明；参数缺失或写错就当没传，列表照常全量显示。 */
+.rrow.is-target { border-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a20), var(--sh-1); }
+.deep {
+  flex: 0 0 auto; display: none; align-items: center; gap: var(--s-3);
+  min-height: 52px; margin-bottom: var(--s-3); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  font-size: var(--fz-2); color: var(--fog-800);
+}
+.deep.is-on { display: flex; }
+.deep .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--jade-400); }
+.deep-b { flex: 1 1 auto; min-width: 0; }
+.deep-id { font-family: var(--ff-num); color: var(--fog-900); font-weight: 600; }
+.deep .btn { flex: 0 0 auto; min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+
 .fbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .fbar-n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
 
@@ -414,7 +430,10 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s6"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <!-- 2026-08-10 Codex 空白链接整改：原指 09-resume-workbench.html?stage=s6。
+                   简历工作台只有 s1–s5，s6 不存在 → 没有任何 data-at 命中 → **整页空白**。
+                   优化后的版本落在第 5 步「版本与导出」，改指 s5。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="简历优化记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -606,7 +625,10 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <!-- 2026-08-10 Codex 错配整改：这一条是**线下机构**岗位（到店咨询、不接受线上投递），
+                   原来点开却是线上岗位详情 14-job-detail.html —— 那一页写的是外部投递链接与扫码投递，
+                   和这条岗位的办事方式对不上。线下岗位详情页 44 已存在，改指 44。 -->
+              <a class="btn btn--ghost" href="44-job-detail-offline.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
               <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>看这家机构</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -717,15 +739,22 @@
 
       <!-- ═══════════ 浏览与跳转 · 列表（两个 Tab 共用一个列表容器） ═══════════ -->
       <div class="lwrap" id="lw-trace" data-at="trace">
+        <!-- 深链定位条：?stage=trace&activityId=xxx 命中时才出现（.is-on 由页内脚本加）。
+             参数缺失或写错就不显示，足迹列表照常全量展示。 -->
+        <div class="deep" id="deep-trace" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <span class="deep-b">已按记录号 <span class="deep-id" data-deep-id>—</span> 定位到这一条，已展开在下面</span>
+          <button class="btn btn--ghost" type="button" data-deep-clear>看全部足迹</button>
+        </div>
         <div class="rlist" data-when="default ai-down device-off">
 
-          <div class="rrow" data-g="browse">
+          <div class="rrow" data-g="browse" data-aid="A-20260810-1018">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">用户运营专员 · 广州××科技</span>
                   <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
-                <span class="rrow-m">今天 10:18 · 停在详情页</span>
+                <span class="rrow-m">今天 10:18 · 停在详情页 · 记录号 A-20260810-1018</span>
                 <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -742,13 +771,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="browse">
+          <div class="rrow" data-g="browse" data-aid="A-20260810-1012">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">内容运营（新媒体）· 广州××文化</span>
                   <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
-                <span class="rrow-m">今天 10:12 · 该条现已下线</span>
+                <span class="rrow-m">今天 10:12 · 该条现已下线 · 记录号 A-20260810-1012</span>
                 <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -764,13 +793,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="browse">
+          <div class="rrow" data-g="browse" data-aid="A-20260810-0956">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">2026 年夏季综合招聘会</span>
                   <span class="chip chip--amber is-static">浏览 · 招聘会</span></span>
-                <span class="rrow-m">今天 09:56 · 看了展位导览</span>
+                <span class="rrow-m">今天 09:56 · 看了展位导览 · 记录号 A-20260810-0956</span>
                 <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -786,13 +815,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="browse">
+          <div class="rrow" data-g="browse" data-aid="A-20260810-0948">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-company"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">广州××科技有限公司</span>
                   <span class="chip is-static">浏览 · 企业</span></span>
-                <span class="rrow-m">今天 09:48 · 看了在招岗位</span>
+                <span class="rrow-m">今天 09:48 · 看了在招岗位 · 记录号 A-20260810-0948</span>
                 <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID CO-7781</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -808,13 +837,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="browse">
+          <div class="rrow" data-g="browse" data-aid="A-20260808-2032">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">高校毕业生一次性求职补贴</span>
                   <span class="chip is-static">浏览 · 政策</span></span>
-                <span class="rrow-m">8 月 8 日 20:32 · 对过申领条件</span>
+                <span class="rrow-m">8 月 8 日 20:32 · 对过申领条件 · 记录号 A-20260808-2032</span>
                 <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -830,13 +859,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="jump">
+          <div class="rrow" data-g="jump" data-aid="A-20260810-1020">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">打开了前程无忧的岗位页</span>
                   <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
-                <span class="rrow-m">今天 10:20 · 扫码在手机上打开</span>
+                <span class="rrow-m">今天 10:20 · 扫码在手机上打开 · 记录号 A-20260810-1020</span>
                 <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -853,13 +882,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="jump">
+          <div class="rrow" data-g="jump" data-aid="A-20260810-0958">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-external"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">打开了招聘会官方预约入口</span>
                   <span class="chip chip--amber is-static">跳转 · 招聘会</span></span>
-                <span class="rrow-m">今天 09:58 · 扫码在手机上打开</span>
+                <span class="rrow-m">今天 09:58 · 扫码在手机上打开 · 记录号 A-20260810-0958</span>
                 <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -875,13 +904,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="jump">
+          <div class="rrow" data-g="jump" data-aid="A-20260808-1530">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">打开了人才服务中心岗位页</span>
                   <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
-                <span class="rrow-m">8 月 8 日 15:30 · 扫码在手机上打开</span>
+                <span class="rrow-m">8 月 8 日 15:30 · 扫码在手机上打开 · 记录号 A-20260808-1530</span>
                 <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -897,13 +926,13 @@
             </div>
           </div>
 
-          <div class="rrow" data-g="jump">
+          <div class="rrow" data-g="jump" data-aid="A-20260808-2040">
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-external"/></svg></span>
               <span class="rrow-b">
                 <span class="rrow-tl"><span class="rrow-t">打开了补贴申领官方渠道</span>
                   <span class="chip is-static">跳转 · 政策</span></span>
-                <span class="rrow-m">8 月 8 日 20:40 · 扫码在手机上打开</span>
+                <span class="rrow-m">8 月 8 日 20:40 · 扫码在手机上打开 · 记录号 A-20260808-2040</span>
                 <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
@@ -1094,11 +1123,15 @@
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders"><svg class="ic"><use href="#i-printer"/></svg>看这一单</a>
+              <!-- 2026-08-10：「看这一单」原来只打开订单列表，用户还得在 6 条里自己找。
+                   这条通知对应的就是取件码 P-4172 那一单（8 月 9 日 10:20 · 活动资料_夏季招聘会.pdf），
+                   带上 orderId 直接定位；P42 那边找不到这个单号时会照常显示整张列表。 -->
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1020"><svg class="ic"><use href="#i-printer"/></svg>看这一单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
             <div class="rrow-det">
               <div class="kv">
+                <div class="kv-row"><span class="k">对应订单</span><span class="v">O-20260809-1020 · 活动资料_夏季招聘会.pdf</span></div>
                 <div class="kv-row"><span class="k">怎么用</span><span class="v">向现场工作人员出示这串码</span></div>
                 <div class="kv-row"><span class="k">失效</span><span class="v">出纸完成或 7 天后自动失效</span></div>
               </div>
@@ -1574,6 +1607,44 @@
     if (cur) applyFilter(b, cur.getAttribute('data-sel'))
   })
 
+  /* ── 足迹深链：?stage=trace&activityId=xxx ───────────────────────────────
+     足迹一屏 9 条、还分「浏览 / 跳转」两个 Tab，只把标签切过去等于让用户自己找。
+     命中就展开那一条 + 描边；如果它在另一个 Tab 里，**先把 Tab 切过去**，
+     否则筛选会把它藏起来，深链看着像失效。
+     参数缺失、写错、或那条不在本机就什么都不做，列表照常全量显示 ——
+     不为一个查询参数把列表清空，也不编一条不存在的记录。 */
+  var deepBar = document.getElementById('deep-trace')
+
+  function clearDeep () {
+    var i, rs = scr.querySelectorAll('.rrow.is-target')
+    for (i = 0; i < rs.length; i++) rs[i].classList.remove('is-target')
+    if (deepBar) deepBar.classList.remove('is-on')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  function applyDeepActivity () {
+    var q, aid, row, hd, bar, g
+    try { q = new URLSearchParams(location.search) } catch (err) { return }
+    aid = (q.get('activityId') || '').trim()
+    if (!aid) return
+    row = scr.querySelector('.rrow[data-aid="' + aid.replace(/"/g, '') + '"]')
+    if (!row) return                        // 找不到就当没传
+    g = String(row.getAttribute('data-g') || '').split(/\s+/)[0]
+    bar = scr.querySelector('.fbar[data-for="lw-trace"]')
+    if (bar && g && bar.querySelector('.fchip[data-sel="' + g + '"]')) applyFilter(bar, g)
+    row.classList.add('is-open', 'is-target')
+    hd = row.querySelector('.rrow-hd')
+    if (hd) hd.setAttribute('aria-expanded', 'true')
+    if (deepBar) {
+      var lab = deepBar.querySelector('[data-deep-id]')
+      if (lab) lab.textContent = aid
+      deepBar.classList.add('is-on')
+    }
+    if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' })
+  }
+
+  applyDeepActivity()
+
   scr.addEventListener('click', function (e) {
     var hd = e.target.closest('.rrow-hd')
     if (hd) {
@@ -1600,6 +1671,9 @@
       if (bar2) applyFilter(bar2, bar2.getAttribute('data-for') === 'lw-trace' ? 'browse' : 'all')
       return
     }
+    /* 深链定位条上的「看全部足迹」：撤掉高亮，回到普通列表 */
+    var dc = e.target.closest('[data-deep-clear]')
+    if (dc) { clearDeep(); return }
     /* 标为已读：只改这一条的状态，不代你处理别的 */
     var rd = e.target.closest('[data-read]')
     if (rd) {

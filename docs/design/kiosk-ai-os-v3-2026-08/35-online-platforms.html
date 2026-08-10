@@ -18,130 +18,102 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
-/* ══ P35 专用 ══ 线上招聘平台
+/* ══ P35 线上招聘平台 ══
    需求真值 = 生产代码 apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx：
    PLATFORMS 常量四条（Boss直聘 / 前程无忧 / 智联招聘 / 猎聘），
-   每条含 name / tagline / category / url；按钮点开二维码面板，
-   面板文案「请用手机扫描下方二维码访问来源平台」+「投递请前往来源平台，
-   本终端不参与投递流程」；页脚合规声明一条。**不得增删捏造平台。**
+   每条含 name / tagline / category / url。**不得增删捏造平台。**
 
-   四条必须守住的口径：
+   2026-08-10 版面重排（Codex 评审）：
+     · 这是**平台目录**，不是岗位记录：不显示岗位数、不放来源三字段
+       —— 来源三字段是岗位条目的字段，进入具体岗位后才展示，硬套是伪造。
+     · 二维码**复用生产的全屏遮罩交互**，删掉常驻二维码右栏；
+       右栏一去，四张平台卡拿回整个 968px 正文宽。
+     · 删掉平台长科普（「这四家分别偏向什么」整段 + 每卡的类型点评）、
+       后台维护说明、扫码流程说明 —— 前两者收进页脚折叠，后者进弹层。
+     · 卡片为主、说明为辅：每卡正文 ≤1 行。
+
+   仍必须守住的口径：
    ① 按钮文案是「扫码打开来源平台」。**不写「扫码投递」**——
-      2026-08-10 Codex：这四个码指向的是平台**首页**（PLATFORMS[].url），
-      不是某个岗位的投递页；写「扫码投递」等于承诺了一件本机做不到的事。
-      只有当手上真的握着岗位级来源 URL 时（岗位详情页 P14 那种），才允许用「扫码投递」。
-      顺带：任何写法都不能连写成 '平台投递' —— 那是 stage.js 的违禁词。
-   ② 本机**不打开**这些平台的页面。屏上出码，操作全在用户自己手机上完成 ——
-      公共终端上不该让人登录自己的求职账号，这比「离站确认」更进一步。
-   ③ 这一页**不展示任何岗位条目**。平台名单由管理后台维护，本机不同步
-      这四家的岗位数据，所以这里没有来源机构 / 同步时间 / 外部 ID 那一套 ——
-      那是岗位条目的字段，不是平台入口的字段，硬套反而是伪造。
-   ④ 每个平台**各自出码**。原来四家共用一张示意码、且没有编码各自 URL ——
-      看着像四个入口，实际是同一张图。现在按各自域名生成互不相同的图案，
-      并把域名写在码下面；同时明说这是原型示意图案、真机才是可扫的真码。
-
-   本页现在**没有任何 AI**：原来那条「AI 取向建议」既不采集岗位/经验/地区、
-   也没有触发动作，只是四家平台定位的固定归纳 —— 那不是模型判断，是公开事实（E2）。
-   于是去掉 AI 标签，改成「平台类型说明」，四态常驻。
-   结果是这一页四个入口 + 一段说明**全部不依赖 AI**：ai-down 与 device-off 都不影响本页。
+      这四个码指向平台**首页**（PLATFORMS[].url），不是某个岗位的投递页。
+      任何写法都不能连写成 '平台投递' —— 那是 stage.js 的违禁词。
+   ② 本机**不打开**这些平台的页面。屏上出码，操作全在用户自己手机上完成。
+   ③ 本页没有任何 AI：四个入口全部不依赖 AI，ai-down / device-off 不影响本页。
    ══════════════════════════════════════════════════════════ */
 
-.work--plat { grid-template-columns: 1fr 372px; }
+/* 全宽单栏：原 372px 常驻二维码右栏取消 */
+.work--plat { grid-template-columns: 1fr; }
+.work { padding: var(--s-4) var(--gutter); }
+.wmain { gap: var(--s-4); }
 
-/* ── AI 取向带（E3） ── */
-.lean {
-  flex: 0 0 auto; padding: var(--s-4) var(--s-5);
-  border-radius: var(--r-md);
-  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-  display: flex; flex-direction: column; gap: var(--s-3);
-}
-.lean-hd { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
-.lean-hd .ic { width: 21px; height: 21px; color: var(--cat-job); flex: 0 0 auto; }
-.lean-t { font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); }
-.lean-s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); }
-.lean-p { margin: 0; font-size: var(--fz-2); color: var(--fog-700); line-height: 1.62; }
-.lean-p b { color: var(--fog-900); }
-
-/* ── 平台行 ── */
-.plist { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); }
-/* 左栏净宽只有 ~580px，按钮文案「扫码打开来源平台」本身就要 230px 上下（这串字
-   是对本机真实行为的描述，不能为了排版缩写）。所以按钮不跟文字抢同一行，改成第二行右对齐 ——
-   文字块拿到全宽，平台名与类型标签才能并排、取向说明才不会一行只剩两个字。 */
+/* ── 平台卡：卡片为主，每卡正文 ≤1 行 ── */
+.plist { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .prow {
-  flex: 1 1 0; min-height: 112px;
-  display: grid; grid-template-columns: 62px 1fr; align-content: center;
-  column-gap: var(--s-4); row-gap: var(--s-3);
-  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  flex: 1 1 0; min-height: 216px;
+  display: flex; align-items: center; gap: var(--s-6);
+  padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
   background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-  border-left: 3px solid var(--azure-400);
+  border-left: 4px solid var(--azure-400);
   transition: border-color var(--dur-2) var(--ease-out);
 }
 .prow.is-on { border-color: var(--jade-a32); border-left-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a12); }
 .pmark {
-  grid-row: 1 / span 2; align-self: center;
-  width: 62px; height: 62px; border-radius: var(--r-sm);
+  width: 88px; height: 88px; flex: 0 0 auto; border-radius: var(--r-sm);
   display: grid; place-items: center;
   background: var(--azure-a12); border: 1px solid var(--azure-a20);
-  font-family: var(--ff-display); font-size: 26px; color: var(--azure-200); letter-spacing: 0;
+  font-family: var(--ff-display); font-size: 38px; color: var(--azure-200); letter-spacing: 0;
 }
-.pbody { grid-column: 2; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.ptop { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
-.pnm { font-family: var(--ff-display); font-size: var(--fz-6); font-weight: 600; color: var(--fog-900); letter-spacing: .02em; }
-.pds { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
-.plean { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fz-1); color: var(--amber-200); line-height: 1.5; }
-.pbtn { grid-column: 2; justify-self: end; min-height: 56px; white-space: nowrap; }
+.pbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ptop { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.pnm { font-family: var(--ff-display); font-size: 34px; font-weight: 600; color: var(--fog-900); letter-spacing: .02em; }
+/* 每卡正文一行 —— 生产 PLATFORMS[].tagline 原文，不加评点 */
+.pds { font-size: 22px; color: var(--fog-700); line-height: 1.4; }
+.pbtn { flex: 0 0 auto; height: 64px; font-size: 22px; white-space: nowrap; }
 
-/* ── 右栏：二维码卡（同版面切换：未选 / 已选 高度一致，码位不动） ── */
-.qslot { width: 176px; height: 176px; flex: 0 0 auto; }
-.qempty {
-  width: 100%; height: 100%; border-radius: var(--r-sm);
-  border: 1px dashed var(--fog-a20, rgba(139,164,169,.34));
-  background: var(--surf-1);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  text-align: center; padding: 0 var(--s-4);
-  font-size: var(--fz-2); color: var(--fog-600); line-height: 1.5;
+/* ── 页脚：全页唯一一条合规声明 + 唯一一处折叠 ── */
+.cline {
+  flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: 0 var(--s-4); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
 }
-.qempty .ic { width: 26px; height: 26px; color: var(--fog-600); }
-.qslot .qr-box { width: 176px; height: 176px; }
-.qmeta {
-  width: 100%; display: flex; flex-direction: column; gap: 4px;
-  padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
-  border: 1px dashed var(--brd-2); background: var(--surf-1);
-  font-size: var(--fz-1); color: var(--fog-700); line-height: 1.5; text-align: center;
-}
-.qmeta .u { font-family: var(--ff-num); font-size: var(--fz-3); color: var(--azure-200); word-break: break-all; }
-.qmeta .warn { color: var(--amber-200); }
-/* 三行操作口径：本机做什么 / 不做什么 / 记录什么。右栏不再抄一遍合规声明 */
-.steps { display: flex; flex-direction: column; gap: var(--s-2); }
-.step3 { display: flex; align-items: flex-start; gap: var(--s-3); min-height: var(--touch-min);
-         padding: var(--s-2) var(--s-3); border-radius: var(--r-xs);
-         background: var(--surf-1); border: 1px solid var(--brd-1);
-         font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5; }
-.step3 .ic { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 2px; color: var(--fog-600); }
-.step3 b { color: var(--fog-900); }
-.step3--no .ic { color: var(--coral-400); }
+.cline-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: 56px; font-size: 20px; color: var(--fog-700); }
+.cline-t > span { white-space: nowrap; }
+.cline-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+.cline-t b { color: var(--fog-900); }
+.cline .fold { flex: 0 0 auto; width: 300px; border: 0; background: transparent; }
+
 .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
-.fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
-  display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
-  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary { list-style: none; cursor: pointer; min-height: 56px;
+  display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
+  font-size: 20px; color: var(--fog-700); }
 .fold > summary::-webkit-details-marker { display: none; }
 .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
-  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+  font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
 .fold[open] > summary::after { content: '收起'; }
-.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-1);
-  color: var(--fog-700); line-height: 1.6; display: flex; flex-direction: column; gap: var(--s-3); }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px;
+  color: var(--fog-700); line-height: 1.7; }
 .fold:not([open]) .fold-b { display: none; }
-/* 未选/已选：用 class 控制，不用 hidden —— hidden 是四态机制的地盘 */
-.screen:not(.is-picked) .qslot .qr-box,
-.screen:not(.is-picked) .qmeta,
-.screen:not(.is-picked) .qcap-on { display: none; }
-.screen.is-picked .qempty,
-.screen.is-picked .qcap-off { display: none; }
+.fold-b b { color: var(--fog-900); }
+
+/* ── 二维码全屏遮罩：不再常驻右栏 ── */
+.screen:not(.is-qr) #qr-sheet { display: none; }
+#qr-sheet .sheet { max-width: 620px; }
+.qmeta {
+  width: 100%; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--s-4); border-radius: var(--r-xs);
+  border: 1px dashed var(--brd-2); background: var(--surf-1);
+  font-size: 18px; color: var(--fog-700); line-height: 1.5; text-align: center;
+}
+.qmeta .u { font-family: var(--ff-num); font-size: 22px; color: var(--azure-200); word-break: break-all; }
+.qmeta .warn { color: var(--amber-200); }
+#qr-sheet .qr-box { width: 300px; height: 300px; }
 
 /* 状态标签不是入口（先例见 P14 / P17 / P27 / P32） */
 .chip--static { cursor: inherit; }
-/* 全站统一标签口径：非 AI 卡固定「不依赖 AI」。本页四个平台卡与那段说明都属于这一类 */
 .chip--label { cursor: inherit; }
+
+.actionbar .btn--primary { height: 64px; font-size: 22px; }
+.actionbar .btn--lg { height: 56px; font-size: 20px; }
 </style>
 </head>
 <body>
@@ -171,38 +143,12 @@
   </header>
 
   <div class="work work--plat">
-
-    <!-- ══════════════════ 左：平台清单 ══════════════════ -->
     <div class="wmain">
 
-      <!-- 平台类型说明：四家平台**公开定位**的归纳，不是模型判断。
-           2026-08-10 Codex：原来这里挂着「E3 AI 判断」，却既不采集岗位/经验/地区、
-           也没有任何触发按钮，给的是一段写死的结论 —— 那不是 AI，是伪造 AI。
-           既然内容本身是公开事实，就按事实标 E2、去掉 AI 标签，并且四态都留着。 -->
-      <div class="lean">
-        <div class="lean-hd">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span class="lean-t">这四家分别偏向什么</span>
-          <span class="chip chip--azure chip--label">不依赖 AI</span>
-          <span class="ev ev--e2">E2 平台公开定位</span>
-          <span class="lean-s">只说类型，不排名次</span>
-        </div>
-        <p class="lean-p">
-          四家都是公开的招聘平台，<b>各自岗位池不一样</b>。按类型分：想直接和招聘负责人对话，看<b>直聘型</b>；
-          想一次覆盖更多行业和地区，看<b>综合型</b>；工作年限较长、找管理或专业方向，看<b>中高端型</b>。
-        </p>
-        <p class="lean-p" style="color:var(--fog-600)">
-          这是各家<b>公开定位的归纳，不是针对你的建议</b>，本机也不比较哪家更好。
-          四家都能扫，挑不定就都扫一遍，在手机上比较。
-        </p>
-      </div>
-
       <div class="plist">
+        <!-- 四张卡：平台名 + 类型 + 一行 tagline（生产 PLATFORMS 原文）+ 扫码按钮。
+             按钮一律「扫码打开来源平台」—— 码指向平台首页，不是某个岗位的投递页。 -->
 
-        <!-- 四张卡统一挂「不依赖 AI」；按钮一律「扫码打开来源平台」——
-             码指向平台首页，不是某个岗位的投递页，不能写成「扫码投递」。 -->
-
-        <!-- ① Boss直聘 -->
         <div class="prow" data-plat="boss">
           <span class="pmark">B</span>
           <span class="pbody">
@@ -212,15 +158,10 @@
               <span class="chip chip--jade chip--label">不依赖 AI</span>
             </span>
             <span class="pds">直连招聘，直接与招聘负责人沟通</span>
-            <span class="plean">
-              <svg class="ic" style="width:14px;height:14px"><use href="#i-info"/></svg>
-              类型：想省掉中间环节、直接对话的，可以先看这家
-            </span>
           </span>
           <button type="button" class="btn pbtn" data-go-plat="boss"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
         </div>
 
-        <!-- ② 前程无忧 -->
         <div class="prow" data-plat="51job">
           <span class="pmark">前</span>
           <span class="pbody">
@@ -230,15 +171,10 @@
               <span class="chip chip--jade chip--label">不依赖 AI</span>
             </span>
             <span class="pds">综合招聘求职一站式服务平台</span>
-            <span class="plean">
-              <svg class="ic" style="width:14px;height:14px"><use href="#i-info"/></svg>
-              类型：行业跨度大、还没锁定方向时，综合型的池子更宽
-            </span>
           </span>
           <button type="button" class="btn pbtn" data-go-plat="51job"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
         </div>
 
-        <!-- ③ 智联招聘 -->
         <div class="prow" data-plat="zhilian">
           <span class="pmark">智</span>
           <span class="pbody">
@@ -248,15 +184,10 @@
               <span class="chip chip--jade chip--label">不依赖 AI</span>
             </span>
             <span class="pds">职业发展综合服务，岗位丰富</span>
-            <span class="plean">
-              <svg class="ic" style="width:14px;height:14px"><use href="#i-info"/></svg>
-              类型：同为综合型，和上一家一起看，同岗位常两边都有
-            </span>
           </span>
           <button type="button" class="btn pbtn" data-go-plat="zhilian"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
         </div>
 
-        <!-- ④ 猎聘 -->
         <div class="prow" data-plat="liepin">
           <span class="pmark">猎</span>
           <span class="pbody">
@@ -266,100 +197,66 @@
               <span class="chip chip--jade chip--label">不依赖 AI</span>
             </span>
             <span class="pds">中高端人才招聘，精准匹配职位</span>
-            <span class="plean">
-              <svg class="ic" style="width:14px;height:14px"><use href="#i-info"/></svg>
-              类型：定位偏中高端岗位；刚毕业或转行起步，这家可看的会少一些
-            </span>
           </span>
           <button type="button" class="btn pbtn" data-go-plat="liepin"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
         </div>
-
       </div>
 
-      <div class="notice">
-        <svg class="ic"><use href="#i-info"/></svg>
-        <span>这份名单<b>由管理后台维护</b>，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。
-          本机<b>不同步这四家的岗位数据</b> —— 你在本机岗位台看到的岗位，来自另一批已审核来源，两边条目不是一回事。</span>
-      </div>
-
-      <!-- 底部合规声明：全页**唯一一条**，常驻贴底，四态都在。
-           右栏原来还有两处同义的边界表述（qr-cap 里一条、kv 里三行），已经删掉。 -->
-      <div class="notice" style="margin-top:auto">
-        <svg class="ic"><use href="#i-shield"/></svg>
-        <span>投递请前往来源平台，本终端不参与投递流程，<b>不收取求职者简历，不参与企业筛选</b>。
-          岗位信息与招聘结果均由来源平台负责；本机只提供入口与扫码，不代办、不代填、不代收费用。</span>
-      </div>
-    </div>
-
-    <!-- ══════════════════ 右：出码与边界 ══════════════════ -->
-    <div class="wside">
-
-      <!-- 二维码卡：码位不动，只换字（同版面切换）。撑到有余量的位置，让码面居中 -->
-      <div class="pane pane--fill pane--grow">
-        <div class="pane-hd"><span class="t">扫码到手机</span><span class="s" id="qrTag">还没选平台</span></div>
-        <div class="qr" style="padding:var(--s-5);flex:1 1 auto;justify-content:center">
-          <div class="qslot">
-            <div class="qempty">
-              <svg class="ic"><use href="#i-qr"/></svg>
-              点左边的平台<br>这里出码
-            </div>
-            <!-- 图案由 JS 按该平台域名生成（见页尾脚本）：四家四个样子，不再共用一张。
-                 这里预留三个定位角，模块格由 #qrMods 填充。 -->
-            <div class="qr-box">
-              <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
-                <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
-                <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
-                <g id="qrMods"></g>
-              </svg>
-            </div>
-          </div>
-          <div class="qmeta">
-            <span id="qrName">—</span>
-            <span class="u" id="qrUrl">—</span>
-            <span class="warn"><b>本稿这张是示意图案，扫不出东西</b>；真机此处是上面这个域名的可扫码二维码</span>
-          </div>
-          <span class="qr-cap qcap-off">
-            选一个平台，这里出<b>那一家自己的码</b><br>
-            <span style="color:var(--fog-600)">四家各出各的码，本机屏幕不打开对方页面</span>
-          </span>
-          <span class="qr-cap qcap-on">
-            真机上：用手机扫这个码，在<b>你自己手机上</b>打开该平台<br>
-            <span style="color:var(--fog-600)">本稿扫不了 —— 手机上搜平台名，或按上面的域名打开</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- 三行说清这一步：本机做什么 / 不做什么 / 记录什么。
-           2026-08-10 Codex：原来「点了会发生什么」+「这一步会被记下什么」两大块 kv 占满右栏，
-           而且把左下角那条合规声明又同义抄了两遍。现在压成三行，细节收进折叠，
-           合规声明**整页只留左栏底部那一条**。 -->
-      <div class="pane pane--fill pane--grow">
-        <div class="pane-hd"><span class="t">这一步会发生什么</span><span class="s">三行说完</span></div>
-        <div class="steps">
-          <span class="step3"><svg class="ic"><use href="#i-qr"/></svg><span><b>本机做什么</b>：在这块屏上出选中那一家的码，仅此而已。</span></span>
-          <span class="step3 step3--no"><svg class="ic"><use href="#i-close"/></svg><span><b>不做什么</b>：不在本机打开对方页面、不替你登录、不代填表单。</span></span>
-          <span class="step3"><svg class="ic"><use href="#i-eye"/></svg><span><b>记录什么</b>：只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。</span></span>
-        </div>
-
-        <details class="fold" style="margin-top:var(--s-3)">
-          <summary>展开看：登录与否有什么区别、为什么不建议在这台机器上登录</summary>
+      <!-- 页脚：全页唯一一条合规声明 + 唯一一处折叠（名单口径 / 登录提醒 / 记录范围） -->
+      <div class="cline">
+        <span class="cline-t">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>投递请前往来源平台 · <b>本机不代收简历</b>、不参与企业筛选</span>
+        </span>
+        <details class="fold">
+          <summary>名单口径与登录提醒</summary>
           <div class="fold-b">
-            <span data-when="default ai-down device-off"><b>登录后</b>：这次打开记在岗位台的外部跳转记录里，你自己能回看。</span>
-            <span data-when="first"><b>现在未登录</b>：只留本次会话，离场即清，不进任何账号。</span>
-            <span>公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。</span>
+            <b>名单怎么来。</b>这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。
+            本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事；
+            所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段。
+            四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。
+            <b>记录范围。</b>只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。
+            <span data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</span>
+            <span data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</span>
+            公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。
+            想把岗位信息打出来带走？回岗位台选中那一条，从详情页走打印，<b>不在这一页出纸</b>。
           </div>
         </details>
+      </div>
+    </div>
+  </div>
 
-        <div class="notice" style="margin-top:auto" data-when="default first ai-down">
-          <svg class="ic"><use href="#i-printer"/></svg>
-          <span>想把岗位信息打出来带走？回岗位台选中那一条，从详情页走打印，<b>不在这一页出纸</b>。</span>
+  <!-- ══════════ 二维码全屏遮罩：点平台卡的按钮才出现 ══════════ -->
+  <div class="sheet-mask" id="qr-sheet">
+    <div class="sheet">
+      <div class="sheet-hd">
+        <svg class="ic"><use href="#i-qr"/></svg>
+        <h2 class="sheet-t" id="qrTitle">扫码打开来源平台</h2>
+      </div>
+      <div class="qr" style="padding:var(--s-5)">
+        <!-- 图案由 JS 按该平台域名生成（见页尾脚本）：四家四个样子，不共用一张。
+             预留三个定位角，模块格由 #qrMods 填充。 -->
+        <div class="qr-box">
+          <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+            <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+            <g id="qrMods"></g>
+          </svg>
         </div>
-        <div class="notice notice--amber" style="margin-top:auto" data-when="device-off">
-          <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机离线<b>不影响这一页</b>；只有回岗位台打印岗位信息才会受影响。</span>
+        <div class="qmeta">
+          <span id="qrName">—</span>
+          <span class="u" id="qrUrl">—</span>
+          <span class="warn"><b>本稿这张是示意图案，扫不出东西</b>；真机此处是上面这个域名的可扫码二维码</span>
         </div>
+        <span class="qr-cap">
+          用手机扫这个码，在<b>你自己手机上</b>打开该平台<br>
+          <span style="color:var(--fog-600)">本机屏幕不打开对方页面、不替你登录、不代填表单</span>
+        </span>
+      </div>
+      <div class="sheet-acts">
+        <button class="btn btn--lg btn--ghost" id="qr-close">关闭</button>
       </div>
     </div>
   </div>
@@ -367,10 +264,6 @@
   <div class="actionbar">
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <!-- 原来这一条里「看本机岗位台」是 ghost、主按钮却写「回岗位信息」——
-         和左边 backbtn 去的是同一页（34-jobs-hub），重复入口；五个按钮还把
-         .actionbar-hint 挤成 0 宽（提示折行后溢出操作条 120px+，自检按"卡内溢出"报硬缺陷）。
-         现在：返回走 backbtn，主按钮改成本页真正的下一步——去本机岗位台。 -->
     <a class="btn btn--lg btn--ghost" href="16-offline-agencies.html?stage=list"><svg class="ic"><use href="#i-agency"/></svg>线下机构</a>
 
     <!-- 提示句写短，且不用带空格的「 · 」分隔：空格给了换行机会，下一行就以「·」开头 -->
@@ -400,15 +293,13 @@
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script>
-/* 选平台 → 右栏出**那一家自己的**码。四条数据抄自生产 OnlinePlatformsPage.tsx 的
+/* 选平台 → **全屏遮罩**出那一家自己的码。四条数据抄自生产 OnlinePlatformsPage.tsx 的
    PLATFORMS 常量，一条不增、一条不减。刻意不做的两件事：不在本机打开对方页面、
    不把码做成一次性凭证（它就是平台首页链接，没有会话绑定，不该假装有）。
 
-   2026-08-10 Codex：原来四家共用同一张写死的示意码，图案也没有编码任何 URL ——
-   四个入口看着一样，等于告诉用户"扫哪个都一样"。现在按域名生成互不相同的图案：
-   同一个域名永远得到同一张图（伪随机是**确定性**的，不是每次刷新乱跳），
-   四个域名彼此不同。它仍然是**示意图案，扫不出内容** —— 这一点在码下面写死了，
-   不靠"看起来像二维码"蒙混过去。真机上这里换成该域名的真码即可，接口不变。 */
+   码图案按域名生成，互不相同：同一个域名永远得到同一张图（伪随机是**确定性**的，
+   不是每次刷新乱跳）。它仍然是**示意图案，扫不出内容** —— 这一点在码下面写死了。
+   真机上这里换成该域名的真码即可，接口不变。 */
 ;(function () {
   var P = {
     boss:    { name: 'Boss直聘',   cat: '直聘平台',   url: 'https://www.zhipin.com' },
@@ -418,11 +309,11 @@
   }
   var NS = 'http://www.w3.org/2000/svg'
   var screen = document.querySelector('.screen')
-  var tag = document.getElementById('qrTag')
+  var title = document.getElementById('qrTitle')
   var nm = document.getElementById('qrName')
   var url = document.getElementById('qrUrl')
   var mods = document.getElementById('qrMods')
-  if (!screen || !tag) return
+  if (!screen || !nm) return
 
   /* 域名 → 32 位种子（djb2）。确定性：同域名同图案。 */
   function seedOf (s) {
@@ -460,6 +351,13 @@
     mods.appendChild(hole)
   }
 
+  /* 遮罩一律用 class 控制，不用 hidden —— hidden 是四态机制的地盘 */
+  function close () { screen.classList.remove('is-qr') }
+  var closeBtn = document.getElementById('qr-close')
+  if (closeBtn) closeBtn.addEventListener('click', close)
+  var mask = document.getElementById('qr-sheet')
+  if (mask) mask.addEventListener('click', function (e) { if (e.target === mask) close() })
+
   screen.addEventListener('click', function (e) {
     var b = e.target.closest('[data-go-plat]')
     if (!b) return
@@ -471,8 +369,8 @@
     for (var i = 0; i < rows.length; i++) {
       rows[i].classList.toggle('is-on', rows[i].getAttribute('data-plat') === k)
     }
-    screen.classList.add('is-picked')
-    tag.textContent = d.name
+    screen.classList.add('is-qr')
+    if (title) title.textContent = '扫码打开 ' + d.name
     nm.textContent = d.name + ' · ' + d.cat
     url.textContent = d.url
     paint(d.url)

@@ -105,6 +105,11 @@
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
 
+/* 2026-08-10：校园服务三个入口放进右栏后被挤到 47.3px（自检线 47.5px，差 0.2px）。
+   右栏是弹性分配的，靠文案长度撑高度不可靠 —— 直接钉住 56px，按 CLAUDE.md §9 的
+   主操作尺寸走。 */
+.campus-svc .alt { min-height: 56px; }
+
 /* 计划表纸面 */
 .plan { padding: 30px 34px; color:#17222b; }
 .plan h1 { font-size:21px; font-weight:800; }
@@ -500,6 +505,31 @@
           <div class="panel-note" style="margin-top:var(--s-3)">
             这些只在本次办理里用，离场自动清空，不留存。
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 孤儿页接线：P46 校园服务（迎新报到 / 校园卡办理 / 校园大数据）
+           此前**全站零入口**，只能手敲网址进。本页是校招页，来的多半是在校生与应届生，
+           三块各自直达自己的阶段。这三块是**校方信息与办事指引**，本机只做展示，不代办。 -->
+      <div class="pane campus-svc" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-campus"/></svg><b>校园服务</b>
+          <span class="mt">校方信息 · 本机不代办</span></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <a class="alt" href="46-campus-service.html?stage=welcome">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <span class="alt-b"><span class="alt-t">迎新报到</span>
+              <span class="alt-s">报到四步、办事窗口，入学要打的表本机能打</span></span>
+          </a>
+          <a class="alt" href="46-campus-service.html?stage=card">
+            <svg class="ic"><use href="#i-idcard"/></svg>
+            <span class="alt-b"><span class="alt-t">校园卡办理</span>
+              <span class="alt-s">办卡指引与所需材料 · 全程不接 AI，办理在学校窗口</span></span>
+          </a>
+          <a class="alt" href="46-campus-service.html?stage=bigdata">
+            <svg class="ic"><use href="#i-layers"/></svg>
+            <span class="alt-b"><span class="alt-t">校园大数据</span>
+              <span class="alt-s">面向学校管理端 · 学校没开通就是没开通，不摆假数字</span></span>
+          </a>
         </div>
       </div>
 

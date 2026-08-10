@@ -124,6 +124,17 @@
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+
+/* 2026-08-10：「不用等接入，现在就能做的」这一栏原来正好 4 条填满 496px，
+   补进 P46 校园服务的三个入口后溢出 363px，三条全被裁掉。
+   右栏的 pane--grow 早就是「外层收边、内层滚动」（上面两行），
+   左栏这一块照同一套处理，不为了塞下去而删掉已有的四条真入口。 */
+.wmain .pane--grow.svc-list { overflow:hidden; }
+.wmain .pane--grow.svc-list > .sec { min-height:0; flex:1 1 auto; overflow-y:auto; }
+/* .alt 默认 flex-shrink:1，在滚动容器里会被压扁（实测 51px 高、内容 91px，
+   overflow:visible 让说明文字直接压到下一条上，自检查不出来但眼睛看得见）。
+   滚动容器里的条目一律不许压缩，让容器去滚。 */
+.wmain .pane--grow.svc-list > .sec > .alt { flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -220,11 +231,11 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
+      <div class="pane pane--grow svc-list" data-at="s1">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
           <b>不用等接入，现在就能做的</b>
-          <span class="mt">这些不依赖学校系统</span>
+          <span class="mt">这些不依赖学校系统 · 共 7 条，可上下滑动</span>
         </div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
@@ -261,6 +272,35 @@
             <span class="alt-b">
               <span class="alt-t">改简历并打印</span>
               <span class="alt-s">校招简历压到一页、项目经历补结果，本机能改能打。</span>
+            </span>
+          </a>
+
+          <!-- 2026-08-10 孤儿页接线：P46 校园服务此前**全站零入口**，只能手敲网址进。
+               放在这一栏（不是放进下面那六张卡）是有意的：那六张卡是「学校开通后才出现的服务」，
+               本机开关关着，点不动是对的；而 P46 给的是**公开办事指引与展示**，
+               不读学校系统、不显示任何学生个人数据，所以现在就能看。
+               校园大数据那一块本机未接入，点进去是「未开放」说明页，不是数字 —— 卡面如实写。 -->
+          <a class="alt" href="46-campus-service.html?stage=welcome">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">看迎新报到指引</span>
+              <span class="alt-s">报到四步与办事窗口是公开流程，不用接入就能看。窗口的具体位置与时间本机未配置，以现场服务台为准。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="46-campus-service.html?stage=card">
+            <svg class="ic"><use href="#i-idcard"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">看校园卡办理指引</span>
+              <span class="alt-s">办卡四步与所需材料，全程不接 AI。办理本身在学校一卡通中心，本机不代办、不经手你的证件。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="46-campus-service.html?stage=bigdata">
+            <svg class="ic"><use href="#i-layers"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">校园大数据 · 未开放说明</span>
+              <span class="alt-s">面向学校管理端，本机未接入。点进去是「为什么没有数据、开通要满足什么」，<b>不摆任何假数字</b>。</span>
             </span>
           </a>
 
@@ -663,8 +703,13 @@
             <a class="alt" href="18-campus.html?from=P19"><svg class="ic"><use href="#i-campus"/></svg>
               <span class="alt-b"><span class="alt-t">看校招活动</span>
                 <span class="alt-s">学校就业网与主办方的公开公告</span></span></a>
+            <!-- 2026-08-10 孤儿页接线：P46 校园服务的入口。它给的是公开办事指引，
+                 不读学校系统，所以和上面四条一样，开关关着也能点。 -->
+            <a class="alt" href="46-campus-service.html?stage=welcome"><svg class="ic"><use href="#i-users"/></svg>
+              <span class="alt-b"><span class="alt-t">看迎新与校园卡办事指引</span>
+                <span class="alt-s">公开流程与所需材料 · 办理仍在学校窗口</span></span></a>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">这四条链接现在就能点。</div>
+          <div class="panel-note" style="margin-top:var(--s-4)">这五条链接现在就能点。</div>
         </div>
       </div>
 

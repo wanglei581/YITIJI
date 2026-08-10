@@ -18,20 +18,172 @@
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/region.css?v=1">
 <style>
-  .work--ag { grid-template-columns: 1fr 396px; }
+  /* ══════════════════════════════════════════════════════════════
+     2026-08-10 版面重排 — 按 Codex 版面评审的数值规格执行
+     实测起点：机构卡占屏 11.1%、首屏 2 家、可见非可点说明字 765、长说明块 9。
 
-  /* 2026-08-10 筛选补全：本页「区域」原来是两个广州区名 + 一个点不动的「选区县」，
-     没有省、没有市、没有机构名搜索。现在区域走统一下钻组件，另补机构名搜索。
-     服务类型与机构性质**不编枚举**：后端没有这两个字典，标注「以管理端配置为准」。
-     筛选组变多后让筛选区自己滚——滚得到的内容不算被裁。 */
-  /* 高度分配：筛选卡按内容高，但**优先被压缩**（shrink 20 vs 默认 1）——
-     右栏放不下时该让内部能滚的筛选区退让，而不是把末卡的合规 notice 压掉一截。
-     内容不满时它也不抢空间（grow 0），免得卡片里留一大块空白。 */
-  .pane--filter { flex: 0 20 auto; min-height: 260px; overflow: hidden; }
-  .pane--filter .filters {
-    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-    padding-right: 4px;
+     骨架：全宽业务主体（968px）+ 按需抽屉；筛选条关闭态 76px、占屏 ≤7%；
+       机构卡 216px、间距 12px、首屏 5 家；机构卡占整屏 50–56%。
+     Codex 点名要折叠的段落全部收进单一折叠区：
+       「到店带什么」「两类机构差异」「动作记录」「本机做什么」「到店后流程」。
+
+     生产数据约束（Codex 点名，必须遵守）：
+       · **列表页不显示许可证号**，也**不显示「18 个岗位」** ——
+         生产机构列表 DTO 没有许可证号，列表端也不返回岗位数
+         （offlineAgencies.ts:78）。要展示得等 API 新增。
+         许可证号仍留在**详情页**（详情 DTO 有），并注明本机未核验。
+     ══════════════════════════════════════════════════════════════ */
+  /* 全宽单栏：原 396px 常驻右栏取消 */
+  .work--ag { grid-template-columns: 1fr; }
+  .work { padding: var(--s-4) var(--gutter); }
+  .wmain { gap: var(--s-4); }
+
+  /* ── 防诈骗警示条：这一页最值钱的信息，排最前，不缩进页脚小字 ── */
+  .warnband {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
+    min-height: 80px; padding: var(--s-3) var(--s-5); border-radius: var(--r-sm);
+    background: var(--amber-a12); border: 1px solid var(--amber-a20);
+    font-size: 22px; line-height: 1.4; color: var(--fog-800);
   }
+  .warnband .ic { width: 26px; height: 26px; flex: 0 0 auto; color: var(--amber-600); }
+  .warnband b { color: var(--fog-900); }
+
+  /* ── 筛选条：关闭态一行 76px ── */
+  .fbar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3);
+    height: 76px; padding: 0 var(--s-4); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .fbar-lb { flex: 0 0 auto; font-size: 20px; color: var(--fog-600); }
+  .fbar-sel { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s-2); }
+  .fbar-sel .fsel { min-height: 56px; font-size: 20px; }
+  .fbar-n {
+    flex: 0 0 auto; display: inline-flex; align-items: center; height: 56px; padding: 0 14px;
+    border-radius: var(--r-xs); border: 1px dashed var(--brd-2);
+    font-size: 20px; color: var(--fog-600);
+  }
+  .fbar-go { flex: 0 0 auto; white-space: nowrap; height: 56px; font-size: 20px; }
+
+  /* ── 机构卡：216px、间距 12px ── */
+  .alist {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  /* 类名不含 card/note/act/pane/row/item：audit-plus 的「卡内溢出」按 [class*=] 选容器 */
+  .agline {
+    flex: 0 0 auto; display: flex; align-items: stretch; min-height: 216px;
+    border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    transition: border-color var(--dur-2) var(--ease-out);
+  }
+  .agline[hidden] { display: none; }
+  .agline:hover { border-color: var(--jade-a32); }
+  .agline-a {
+    flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s-5);
+    padding: 14px var(--s-5) 14px var(--s-6);
+    text-decoration: none; color: inherit; font-family: var(--ff-ui);
+    border: 0; background: transparent; text-align: left; cursor: pointer;
+    border-radius: var(--r-md) 0 0 var(--r-md);
+  }
+  .agline-a:active { transform: translateY(1px) scale(.998); }
+  .agline-a:focus-visible { outline: 3px solid var(--jade-400); outline-offset: -3px; }
+  .agline-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .agline-h { display: flex; align-items: center; gap: var(--s-5); }
+  .agline-nm { font-size: 30px; font-weight: 600; color: var(--fog-900); line-height: 1.2; }
+  .agline-h .open { margin-left: auto; flex: 0 0 auto; }
+  /* nowrap 是中文禁则要求：这些行用「·」分隔，折行会把「·」甩到行首（自检判缺陷） */
+  .agline-o, .agline-m {
+    display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; white-space: nowrap;
+  }
+  .agline-o { font-size: 22px; color: var(--fog-800); }
+  .agline-m { font-size: 20px; color: var(--fog-700); }
+  .agline-o .ic, .agline-m .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--fog-600); }
+  .agline-o .sep, .agline-m .sep { opacity: .4; }
+  .agline .srcline { flex-wrap: nowrap; white-space: nowrap; font-size: 18px; }
+  .agline-arw { width: 26px; height: 26px; flex: 0 0 auto; color: var(--fog-600); }
+  .agline-fav {
+    flex: 0 0 auto; width: 96px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    border: 0; border-left: 1px solid var(--brd-1); background: transparent;
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+    color: var(--fog-600); font-family: var(--ff-ui); font-size: 18px; cursor: pointer;
+  }
+  .agline-fav .ic { width: 26px; height: 26px; }
+  .agline-fav:active { background: var(--fog-a04); }
+  .agline-fav[aria-pressed="true"] { color: var(--jade-600); }
+
+  /* ── 折叠信息条 ── */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: 56px;
+    display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
+    font-size: 20px; color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px; color: var(--fog-700); line-height: 1.7; }
+  .fold:not([open]) .fold-b { display: none; }
+  .fold-b .kv { margin: 8px 0; }
+  .fold-b b { color: var(--fog-900); }
+
+  /* ── 页脚口径条 ── */
+  .cfoot {
+    flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
+    padding: 0 var(--s-4); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .cfoot-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+    min-height: 56px; font-size: 20px; color: var(--fog-700); }
+  .cfoot-t > span { white-space: nowrap; }
+  .cfoot-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .cfoot-t b { color: var(--fog-900); }
+  .cfoot .fold { flex: 0 0 auto; width: 320px; border: 0; background: transparent; }
+
+  /* ── 出口行 ── */
+  .exits { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .exit {
+    display: flex; align-items: center; gap: 12px; height: 76px; padding: 0 var(--s-4);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: var(--fog-800); font-size: 20px;
+  }
+  .exit > .ic:first-child { width: 22px; height: 22px; flex: 0 0 auto; color: var(--jade-500); }
+  .exit-t { flex: 1 1 auto; min-width: 0; }
+  .exit > .ic:last-child { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+
+  /* ── 详情第二屏入口 ── */
+  .entries { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-4); }
+  .entry {
+    display: flex; align-items: center; gap: 12px; height: 88px; padding: 0 var(--s-5);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: var(--fog-800); font-size: 22px; font-family: var(--ff-ui);
+    cursor: pointer; text-align: left; width: 100%;
+  }
+  .entry > .ic:first-child { width: 24px; height: 24px; flex: 0 0 auto; color: var(--jade-500); }
+  .entry-t { flex: 1 1 auto; min-width: 0; }
+  .entry > .ic:last-child { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+
+  /* ── 筛选抽屉 ── */
+  .screen:not(.is-filtering) #filter-sheet { display: none; }
+  #filter-sheet { align-items: end; padding: 0; }
+  #filter-sheet .sheet {
+    max-width: none; width: 100%; height: 760px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .fsheet-b { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: var(--s-5); padding-right: 6px; }
+  #filter-sheet .btn { height: 64px; font-size: 22px; }
+  #filter-sheet .btn--ghost { height: 56px; }
+
+  .actionbar .btn--primary { height: 64px; font-size: 22px; }
+  .actionbar .btn--lg { height: 56px; font-size: 20px; }
+  /* detail / joboffline 态操作条按钮更多，提示句被挤窄后 .s 折成两行、
+     整块溢出 124px 高的操作条（audit-plus 按「卡内溢出」判硬缺陷）。
+     给提示留最小宽度，让它保持单行；文案本身已压到一行的长度。 */
+  .actionbar-hint { min-width: 250px; }
+  /* 提示句拿到最小宽度后，操作条的按钮不能再被压缩去补差额 ——
+     实测「需要帮助」被挤到 94px，四个字被裁（自检「文字裁切」）。 */
+  .actionbar .btn { flex: 0 0 auto; white-space: nowrap; }
+
   .fsearch {
     width: 100%; min-height: 64px; padding: 0 var(--s-4);
     border-radius: var(--r-sm); border: 1px solid var(--brd-2);
@@ -100,130 +252,193 @@
     <!-- ================= 左 ================= -->
     <div class="wmain">
 
-      <!-- 三条红线：放在最前面，不放在页脚小字里 -->
-      <div class="checks" data-at="list detail joboffline">
-        <div class="checks-hd">
-          <svg class="ic" style="width:19px;height:19px;color:var(--coral-400)"><use href="#i-shield"/></svg>
-          <span class="t">本机在这里只做三件事，其余一概不做</span>
-          <span class="s">合规边界，非免责声明</span>
-        </div>
-        <div class="checks-list">
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>展示机构与岗位信息</span>
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>告诉你怎么到店、带什么</span>
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>把信息打出来给你带走</span>
-          <span class="chk chk--warn"><svg class="ic"><use href="#i-close"/></svg><span><b>不代收简历、不代收费用、不做预约登记</b></span></span>
-        </div>
+      <!-- ① 防诈骗警示条 = 全页唯一一条合规声明，list / detail / joboffline / error 都在 -->
+      <div class="warnband">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span><b>本机不代收简历、不代收任何费用</b>，也不做预约登记。收费以门店依法公示为准，<b>请勿支付押金或未公示费用。</b></span>
       </div>
 
-      <!-- 机构列表 -->
-      <div class="rlist" data-at="list">
-        <button class="rcard" data-go="detail" data-ag
-                data-ag-region="广东省|广州市|天河区" data-ag-nature="经营性机构"
-                data-ag-open="现在营业中 今天还开门" data-ag-svc="岗位推荐"
-                data-ag-kw="广州人力资源服务 天河客运站">
-          <span class="rcard-top">
-            <span style="flex:1;min-width:0">
-              <span class="rcard-t">广州××人力资源服务有限公司</span>
-              <span class="rcard-org">天河客运站店 · 人力资源服务许可证 A2019xxxx</span>
-            </span>
-            <span class="open open--on"><span class="dot dot--live"></span>营业中</span>
-          </span>
-          <span class="rcard-meta">
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-pin"/></svg>天河区 燕岭路 ×× 号 2 楼</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-clock"/></svg>09:00–18:00 · 周日休</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-briefcase"/></svg>在招 18 个岗位</span>
-          </span>
-          <span class="rcard-foot">
-            <span class="chip chip--amber">仅信息展示 · 到店咨询</span>
-            <span class="chip">只做信息展示</span>
-          </span>
-          <span class="srcline">
-            <span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span>
-            <span>同步 8 月 8 日 07:40</span><span class="sep">·</span>
-            <span>外部 ID OA-3312</span>
-          </span>
+      <!-- ② 筛选：关闭态 76px 一行，完整筛选走抽屉 -->
+      <div class="fbar" data-at="list">
+        <span class="fbar-lb">已选</span>
+        <span class="fbar-sel" data-fbar></span>
+        <button class="btn btn--ghost fbar-go" data-fopen>
+          <svg class="ic"><use href="#i-search"/></svg>筛选 · <b data-fcount>0</b> 项
         </button>
+      </div>
 
-        <button class="rcard" data-go="detail" data-ag
-                data-ag-region="广东省|广州市|海珠区" data-ag-nature="官方公共服务机构"
-                data-ag-open="" data-ag-svc="失业登记 补贴咨询"
-                data-ag-kw="广州就业服务中心 海珠 江南大道">
-          <span class="rcard-top">
-            <span style="flex:1;min-width:0">
-              <span class="rcard-t">广州市××区就业服务中心</span>
-              <span class="rcard-org">官方公共就业服务机构</span>
+      <!-- ③ 机构列表：卡片 216px、首屏 5 家。
+           按 Codex 生产数据约束：列表卡**不显示许可证号、不显示岗位数** ——
+           生产列表 DTO 两者都没有（offlineAgencies.ts:78）。 -->
+      <div class="alist" data-at="list">
+        <div class="agline" data-ag
+             data-ag-region="广东省|广州市|天河区" data-ag-nature="经营性机构"
+             data-ag-open="现在营业中 今天还开门" data-ag-svc="岗位推荐"
+             data-ag-kw="广州人力资源服务 天河客运站">
+          <button class="agline-a" type="button" data-go="detail">
+            <span class="agline-x">
+              <span class="agline-h"><span class="agline-nm">广州××人力资源服务有限公司</span><span class="open open--on"><span class="dot dot--live"></span>营业中</span></span>
+              <span class="agline-o">经营性机构<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>天河区 燕岭路 ×× 号 2 楼</span>
+              <span class="agline-m"><svg class="ic"><use href="#i-clock"/></svg>09:00–18:00 · 周日休
+                <span class="chip chip--label">岗位推荐</span><span class="chip chip--amber chip--label">仅信息展示</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span><span>同步 08-08 07:40</span><span class="sep">·</span><span>外部 ID OA-3312</span>
+              </span>
             </span>
-            <span class="open open--off"><span class="dot"></span>今日已打烊</span>
-          </span>
-          <span class="rcard-meta">
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-pin"/></svg>海珠区 江南大道 ×× 号</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-clock"/></svg>周一至周五 09:00–17:00</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-policy"/></svg>可办失业登记、补贴咨询</span>
-          </span>
-          <span class="rcard-foot">
-            <span class="chip chip--jade">官方 · 公共服务</span>
-            <span class="chip">明天 09:00 开门</span>
-          </span>
-          <span class="srcline">
-            <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span>
-            <span>同步 8 月 8 日 08:52</span><span class="sep">·</span>
-            <span>外部 ID GOV-0208</span>
-          </span>
-        </button>
+            <svg class="ic agline-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="agline-fav" type="button" aria-pressed="false" aria-label="收藏：广州××人力资源服务有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="agline" data-ag
+             data-ag-region="广东省|广州市|海珠区" data-ag-nature="官方公共服务机构"
+             data-ag-open="" data-ag-svc="失业登记 补贴咨询"
+             data-ag-kw="广州就业服务中心 海珠 江南大道">
+          <button class="agline-a" type="button" data-go="detail">
+            <span class="agline-x">
+              <span class="agline-h"><span class="agline-nm">广州市××区就业服务中心</span><span class="open open--off"><span class="dot"></span>今日已打烊</span></span>
+              <span class="agline-o">官方公共就业服务机构<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>海珠区 江南大道 ×× 号</span>
+              <span class="agline-m"><svg class="ic"><use href="#i-clock"/></svg>周一至周五 09:00–17:00
+                <span class="chip chip--jade chip--label">失业登记</span><span class="chip chip--label">补贴咨询</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:52</span><span class="sep">·</span><span>外部 ID GOV-0208</span>
+              </span>
+            </span>
+            <svg class="ic agline-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="agline-fav" type="button" aria-pressed="false" aria-label="收藏：广州市××区就业服务中心">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="agline" data-ag
+             data-ag-region="广东省|广州市|天河区" data-ag-nature="官方公共服务机构"
+             data-ag-open="现在营业中 今天还开门" data-ag-svc="失业登记 补贴咨询 岗位推荐"
+             data-ag-kw="天河区就业服务中心 天河 龙口">
+          <button class="agline-a" type="button" data-go="detail">
+            <span class="agline-x">
+              <span class="agline-h"><span class="agline-nm">广州市天河区就业服务中心</span><span class="open open--on"><span class="dot dot--live"></span>营业中</span></span>
+              <span class="agline-o">官方公共就业服务机构<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>天河区 龙口西路 ×× 号</span>
+              <span class="agline-m"><svg class="ic"><use href="#i-clock"/></svg>周一至周五 09:00–17:00
+                <span class="chip chip--jade chip--label">失业登记</span><span class="chip chip--label">岗位推荐</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:40</span><span class="sep">·</span><span>外部 ID GOV-0311</span>
+              </span>
+            </span>
+            <svg class="ic agline-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="agline-fav" type="button" aria-pressed="false" aria-label="收藏：广州市天河区就业服务中心">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="agline" data-ag
+             data-ag-region="广东省|广州市|白云区" data-ag-nature="经营性机构"
+             data-ag-open="现在营业中" data-ag-svc="岗位推荐"
+             data-ag-kw="广州××人力 白云 三元里 劳务">
+          <button class="agline-a" type="button" data-go="detail">
+            <span class="agline-x">
+              <span class="agline-h"><span class="agline-nm">广州××人力资源（白云门店）</span><span class="open open--on"><span class="dot dot--live"></span>营业中</span></span>
+              <span class="agline-o">经营性机构<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>白云区 三元里大道 ×× 号</span>
+              <span class="agline-m"><svg class="ic"><use href="#i-clock"/></svg>08:30–17:30 · 全周无休
+                <span class="chip chip--label">岗位推荐</span><span class="chip chip--amber chip--label">仅信息展示</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span><span>同步 08-08 07:55</span><span class="sep">·</span><span>外部 ID OA-4108</span>
+              </span>
+            </span>
+            <svg class="ic agline-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="agline-fav" type="button" aria-pressed="false" aria-label="收藏：广州××人力资源白云门店">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="agline" data-ag
+             data-ag-region="广东省|广州市|番禺区" data-ag-nature="官方公共服务机构"
+             data-ag-open="" data-ag-svc="补贴咨询 失业登记"
+             data-ag-kw="番禺区人力资源中心 番禺 市桥">
+          <button class="agline-a" type="button" data-go="detail">
+            <span class="agline-x">
+              <span class="agline-h"><span class="agline-nm">广州市番禺区人力资源中心</span><span class="open open--off"><span class="dot"></span>今日已打烊</span></span>
+              <span class="agline-o">官方公共就业服务机构<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>番禺区 市桥街 ×× 号</span>
+              <span class="agline-m"><svg class="ic"><use href="#i-clock"/></svg>周一至周五 09:00–17:00
+                <span class="chip chip--jade chip--label">补贴咨询</span><span class="chip chip--label">失业登记</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:20</span><span class="sep">·</span><span>外部 ID GOV-0455</span>
+              </span>
+            </span>
+            <svg class="ic agline-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="agline-fav" type="button" aria-pressed="false" aria-label="收藏：广州市番禺区人力资源中心">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
 
         <!-- 0 命中就地表达：本页状态轨是 列表/详情/线下岗位/失败，没有独立空结果位 -->
         <div class="notice notice--amber agnone" data-agnone hidden>
-          <span><b>这些条件同时满足的机构，这一刻一家也没有。</b>不会凑几家不符合的充数。
-            当前条件：<b data-agcond>未设条件</b>。</span>
+          <span><b>这些条件同时满足的机构，这一刻一家也没有。</b>当前条件：<b data-agcond>未设条件</b>。</span>
           <span style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn--ghost" data-agrelax="region">区域放宽到整个广东省</button>
             <button class="btn btn--primary" data-agrelax="all">清空全部条件</button>
           </span>
         </div>
-
-        <div class="notice">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>共 7 家已审核机构，当前条件下显示 <b data-agcount>2</b> 家。
-            <b>营业状态来自机构填报的营业时间</b>，不是实时探测——
-            出门前建议先打电话确认 <span class="ev ev--e3">E3 这条建议属 AI 判断</span>。本机<b>不显示"当前空闲/排队人数"这类它拿不到的信息</b>。</span>
-        </div>
       </div>
 
-      <!-- 2026-08-09 留白复核补实：list 态列表下方原有 ~720px 无容器空洞。
-           补到店准备清单（通用求职常识，与详情页「带上」行同口径）+ 同域互通入口（真 <a>）。 -->
-      <div class="pane" data-at="list">
-        <div class="pane-hd"><span class="t">到店咨询，带什么</span><span class="s">通用清单</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">身份证等证件</span><span class="v">带不带、用在哪一步，以机构现场公示与主管部门规定为准</span></div>
-          <div class="kv-row"><span class="k">纸质简历 2–3 份</span><span class="v">可在本机打印；现场直接交给面谈的人</span></div>
-          <div class="kv-row"><span class="k">笔</span><span class="v">现场填表用</span></div>
-          <div class="kv-row"><span class="k">费用</span><span class="v">机构是否收费，以现场公示与主管部门规定为准</span></div>
-        </div>
-        <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-          门店可能在楼上、手机没信号——地址与路线建议先打出来拿在手上，进详情页就能打印。
-        </p>
+      <!-- ④ 出口 -->
+      <div class="exits" data-at="list">
+        <a class="exit" href="13-jobs-desk.html">
+          <svg class="ic"><use href="#i-briefcase"/></svg>
+          <span class="exit-t">看线上岗位</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <a class="exit" href="15-companies.html">
+          <svg class="ic"><use href="#i-company"/></svg>
+          <span class="exit-t">找企业 · 先摸底再跑腿</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <a class="exit" href="21-policy.html">
+          <svg class="ic"><use href="#i-policy"/></svg>
+          <span class="exit-t">政策服务 · 失业登记与补贴</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
       </div>
 
-      <div class="xlane" data-at="list">
-        <span class="xlane-hd">线下跑之前，这两处也值得先看一眼</span>
-        <div class="xlane-row">
-          <a class="xlane-go" href="15-companies.html">
-            <span class="src-ic"><svg class="ic"><use href="#i-company"/></svg></span>
-            <span class="xlane-tx">
-              <span class="xlane-nm">找企业</span>
-              <span class="xlane-ds">46 家已审核企业与在招岗位导览，先摸底再跑腿</span>
-            </span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-          <a class="xlane-go" href="21-policy.html">
-            <span class="src-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
-            <span class="xlane-tx">
-              <span class="xlane-nm">政策服务</span>
-              <span class="xlane-ds">失业登记、补贴条件先看清，去官方机构少跑一趟</span>
-            </span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-        </div>
+      <!-- ⑤ 页脚：Codex 点名的五段口径全部收进这一个折叠区，原文一字不删 -->
+      <div class="cfoot" data-at="list">
+        <span class="cfoot-t">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>营业状态来自机构填报，<b>不是实时探测</b> · 出门前建议先电话确认</span>
+          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
+        </span>
+        <details class="fold">
+          <!-- 标题不写带空格的「 · 」：空格给了换行机会，下一行就以「·」开头（中文禁则，自检判缺陷） -->
+          <summary>到店准备与机构口径</summary>
+          <div class="fold-b">
+            <b>到店带什么。</b>
+            <div class="kv">
+              <div class="kv-row"><span class="k">纸质简历 2–3 份</span><span class="v">可在本机打印；现场直接交给面谈的人</span></div>
+              <div class="kv-row"><span class="k">身份证等证件</span><span class="v">带不带、用在哪一步，以机构现场公示与主管部门规定为准</span></div>
+              <div class="kv-row"><span class="k">笔</span><span class="v">现场填表用</span></div>
+              <div class="kv-row"><span class="k">费用</span><span class="v">机构是否收费，以现场公示与主管部门规定为准</span></div>
+            </div>
+            门店可能在楼上、手机没信号——地址与路线建议先打出来拿在手上，进详情页就能打印。
+            <b>两类机构差在哪。</b>官方公共机构办失业登记、补贴咨询等公共服务；经营性机构可代招荐岗，
+            是否收费以现场公示与主管部门规定为准。共同前提：许可证信息为机构填报，经管理员审核后展示，<b>本机未做核验</b>。
+            要办失业登记、补贴这类公共服务，先看官方公共就业服务机构。
+            <b>记录范围。</b>只记<b>浏览</b>与<b>收藏</b>。登录后记在本机构页的浏览记录里；未登录只留本次会话，离场即清。
+            机构那边不会收到「你看过它」的通知；你到不到店、和谁面谈，本机不知道也不记录。
+            展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。
+            本机也<b>不显示「当前空闲 / 排队人数」</b>这类它拿不到的信息。
+            共 7 家已审核机构，当前条件下显示 <b data-agcount>5</b> 家。
+          </div>
+        </details>
       </div>
 
       <!-- 机构详情 -->
@@ -419,25 +634,88 @@
         </div>
       </div>
 
-      <!-- 2026-08-09 留白复核补实：error 态底部原为无容器空洞。
-           把 blank 页脚一行小字的故障事实挪成结构化档案卡，不新造数据。 -->
-      <div class="pane" data-at="error">
-        <div class="pane-hd"><span class="t">故障档案</span><span class="s">给你看，也给运维看</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 07:40</span></div>
-          <div class="kv-row"><span class="k">失败发生</span><span class="v">10:54</span></div>
-          <div class="kv-row"><span class="k">自动重试</span><span class="v">已试 2 次，仍失败</span></div>
-          <div class="kv-row"><span class="k">上报</span><span class="v">已自动上报运维，无需你操作</span></div>
-        </div>
+      <!-- 故障档案：折叠，不占一整块 -->
+      <div data-at="error" style="flex:0 0 auto">
+        <details class="fold">
+          <summary>故障档案 · 影响范围 · 为什么不显示缓存</summary>
+          <div class="fold-b">
+            <b>不显示上次缓存的机构与营业状态</b>——按过期的营业时间跑一趟，门可能是锁着的。
+            <div class="kv">
+              <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 07:40</span></div>
+              <div class="kv-row"><span class="k">失败发生</span><span class="v">10:54 · 已自动重试 2 次</span></div>
+              <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
+              <div class="kv-row"><span class="k">已打印的路线</span><span class="v">拿在手上的纸不受任何故障影响</span></div>
+              <div class="kv-row"><span class="k">线上岗位与政策服务</span><span class="v">独立入口 · 照常可看</span></div>
+              <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+            </div>
+            恢复后名单自动回来。要出门的话别按过期营业时间跑——<b>先电话确认</b>这条建议在故障时更要紧。
+          </div>
+        </details>
       </div>
-    </div>
 
-    <!-- ================= 右 ================= -->
-    <div class="wside">
+      <!-- ══ 详情 / 线下岗位态的第二屏：三个入口 + 一个口径折叠 ══
+           原来这四块常驻右栏（带走这些信息 / 本机做什么 / 到店之后流程），
+           右栏取消后按 Codex 口径收成「入口 + 折叠」，一字不删。 -->
+      <div class="entries" data-at="detail joboffline">
+        <a class="entry" href="06-print-workbench.html?stage=s3&amp;from=P16&amp;kind=material&amp;title=机构与路线&amp;back=detail" data-when="default first ai-down">
+          <svg class="ic"><use href="#i-printer"/></svg>
+          <span class="entry-t">打印机构与路线</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <button class="entry" type="button" aria-disabled="true" data-when="device-off">
+          <svg class="ic"><use href="#i-printer"/></svg>
+          <span class="entry-t">打印机离线 · 可发到手机</span>
+        </button>
+        <button class="entry" type="button">
+          <svg class="ic"><use href="#i-phone"/></svg>
+          <span class="entry-t">路线发到我手机</span>
+        </button>
+        <button class="entry" type="button">
+          <svg class="ic"><use href="#i-bookmark"/></svg>
+          <span class="entry-t">收藏这家机构</span>
+        </button>
+      </div>
 
-      <div class="pane pane--fill pane--filter" data-at="list">
-        <div class="pane-hd"><span class="t">筛选</span><span class="s" data-fcount>已选 0 项</span></div>
-        <div class="filters">
+      <div class="cfoot" data-at="detail joboffline">
+        <span class="cfoot-t">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机与列表内机构<b>无代理、无分成、无导流返佣关系</b></span>
+        </span>
+        <details class="fold">
+          <!-- 标题不写带空格的「 · 」：空格给了换行机会，下一行就以「·」开头（中文禁则） -->
+          <summary>本机边界与到店流程</summary>
+          <div class="fold-b">
+            <b>本机在这一步会做什么。</b>
+            <div class="kv">
+              <div class="kv-row"><span class="k">简历代收 / 费用代收 / 预约登记</span><span class="v" style="color:var(--coral-400)">都不做</span></div>
+              <div class="kv-row"><span class="k">把你信息给机构</span><span class="v" style="color:var(--coral-400)">不做</span></div>
+              <div class="kv-row"><span class="k">记录你看过</span><span class="v">会记 · 登录后在本页浏览记录，未登录只留本次会话</span></div>
+              <div class="kv-row"><span class="k">打印带走</span><span class="v" data-when="default first ai-down">可以</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+            </div>
+            展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。
+            <b>到店之后，大致会经历什么。</b>
+            <div class="kv">
+              <div class="kv-row"><span class="k">到店</span><span class="v">前台说明来意；是否需要证件登记，按机构现场指引</span></div>
+              <div class="kv-row"><span class="k">面谈</span><span class="v">机构介绍岗位与用人单位，你交纸质简历</span></div>
+              <div class="kv-row"><span class="k">决定</span><span class="v">去不去面试由你定；遇到收费要求，先对照现场公示与主管部门规定</span></div>
+              <div class="kv-row"><span class="k">后续</span><span class="v">与机构 / 用人单位直接联系，本机不参与</span></div>
+            </div>
+            本机的服务到「把信息给你、把材料打出来」为止；其余都发生在你和机构、用人单位之间。
+            门店可能在楼上、手机没信号，<b>建议把地址与岗位打出来带着</b>。
+          </div>
+        </details>
+      </div>
+
+  </div>
+
+  <!-- ══════════ 筛选抽屉：五组条件收在这里，不铺在页面上 ══════════ -->
+  <div class="sheet-mask" id="filter-sheet">
+    <div class="sheet">
+      <div class="sheet-hd">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <h2 class="sheet-t">筛选机构</h2>
+      </div>
+      <div class="fsheet-b">
 
           <div class="fgroup" data-fgroup="kw">
             <div class="fgroup-lb">机构名称<span class="n">屏幕键盘输入</span></div>
@@ -488,115 +766,10 @@
               同样暂无后端字典，取自机构填报内容；<b>以管理端配置为准</b>。
             </p>
           </div>
-        </div>
-        <div style="margin-top:var(--s-4);display:flex;gap:10px;flex:0 0 auto">
-          <button class="btn btn--ghost" style="flex:1" data-agrelax="all">清空</button>
-          <button class="btn btn--primary" style="flex:1" data-agapply>用这些条件找</button>
-        </div>
       </div>
-
-      <!-- 2026-08-09 留白复核补实：list 态右栏筛选卡之下原有 ~950px 无容器空洞。
-           补两类机构的口径区别（与筛选「机构性质」同口径）+ 浏览记录去向；末卡撑底。 -->
-      <div class="pane" data-at="list">
-        <div class="pane-hd"><span class="t">两类机构，差在哪</span><span class="s">收费与职能</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">官方公共机构</span><span class="v">办失业登记、补贴咨询等公共服务；收费口径以现场公示为准</span></div>
-          <div class="kv-row"><span class="k">经营性机构</span><span class="v">可代招荐岗；是否收费以现场公示与主管部门规定为准</span></div>
-          <div class="kv-row"><span class="k">共同前提</span><span class="v">许可证信息为机构填报，经管理员审核后展示，本机未做核验</span></div>
-        </div>
-        <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-          要办<b>失业登记、补贴</b>这类公共服务，先看官方公共就业服务机构；是否收费以机构现场公示为准。
-        </p>
-      </div>
-
-      <div class="pane pane--fill pane--grow" data-at="list">
-        <div class="pane-hd"><span class="t">你在这里的动作会被记下</span></div>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
-          只记<b>浏览</b>与<b>收藏</b>。登录后记录在<b>本机构页的浏览记录</b>里；未登录只留本次会话，离场即清。<br>
-          <span style="color:var(--fog-600)">机构那边不会收到「你看过它」的通知；你到不到店、和谁面谈，本机不知道也不记录。</span>
-        </p>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>展示顺序不接受机构付费。</span>
-        </div>
-      </div>
-
-      <div class="pane" data-at="detail joboffline">
-        <div class="pane-hd"><span class="t">带走这些信息</span></div>
-        <p style="margin:0 0 14px;font-size:var(--fz-3);color:var(--fog-800);line-height:1.7">
-          门店在楼上、手机可能没信号，<b>建议把地址与岗位打出来带着</b>。
-        </p>
-        <div class="outs">
-          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P16&amp;kind=material&amp;title=机构与路线&amp;back=detail" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印机构与路线</a>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P16&amp;kind=job-list&amp;title=岗位清单&amp;back=detail" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印岗位清单</a>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>路线发到我手机</button>
-          <button class="out"><svg class="ic"><use href="#i-bookmark"/></svg>收藏这家机构</button>
-        </div>
-        <div class="notice notice--amber" style="margin-top:14px" data-when="device-off">
-          <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机离线。可以「路线发到我手机」，或先收藏这家机构，换机再打。</span>
-        </div>
-      </div>
-
-      <div class="pane pane--fill" data-at="detail joboffline">
-        <div class="pane-hd"><span class="t">本机在这一步会做什么</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">简历代收</span><span class="v" style="color:var(--coral-400)">不做</span></div>
-          <div class="kv-row"><span class="k">费用代收</span><span class="v" style="color:var(--coral-400)">不做</span></div>
-          <div class="kv-row"><span class="k">预约登记</span><span class="v" style="color:var(--coral-400)">不做</span></div>
-          <div class="kv-row"><span class="k">把你信息给机构</span><span class="v" style="color:var(--coral-400)">不做</span></div>
-          <div class="kv-row"><span class="k">记录你看过</span><span class="v">会记 · 登录后在本页浏览记录，未登录只留本次会话</span></div>
-          <div class="kv-row"><span class="k">打印带走</span><span class="v" data-when="default first ai-down">可以</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
-        </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机与列表内机构<b>无代理、无分成、无导流返佣关系</b>。
-            展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。</span>
-        </div>
-      </div>
-
-      <!-- 2026-08-09 留白复核补实：detail / joboffline 态右栏底部原有 ~580–670px 无容器空洞。
-           补到店之后的流程口径：与栏首「全流程只到到店咨询为止」同一边界；末卡撑底。 -->
-      <div class="pane pane--fill pane--grow" data-at="detail joboffline">
-        <div class="pane-hd"><span class="t">到店之后，大致会经历什么</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">到店</span><span class="v">前台说明来意；是否需要证件登记，按机构现场指引</span></div>
-          <div class="kv-row"><span class="k">面谈</span><span class="v">机构介绍岗位与用人单位，你交纸质简历</span></div>
-          <div class="kv-row"><span class="k">决定</span><span class="v">去不去面试由你定；遇到收费要求，先对照现场公示与主管部门规定</span></div>
-          <div class="kv-row"><span class="k">后续</span><span class="v">与机构 / 用人单位直接联系，本机不参与</span></div>
-        </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>本机的服务到「把信息给你、把材料打出来」为止；
-            都发生在你和机构、用人单位之间。</span>
-        </div>
-      </div>
-
-      <div class="pane" data-at="error">
-        <div class="pane-hd"><span class="t">现在能做的</span></div>
-        <div class="outs">
-          <button class="out"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
-          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>看线上岗位</a>
-        </div>
-      </div>
-
-      <!-- 2026-08-09 留白复核补实：error 态右栏原只剩一张小卡，底部 ~1306px 无容器空洞。
-           补故障影响边界卡并撑底：影响 / 不影响是真实边界，不是装饰填充。 -->
-      <div class="pane pane--fill pane--grow" data-at="error">
-        <div class="pane-hd"><span class="t">这次故障影响什么</span><span class="s">边界说清楚</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">机构名单与营业状态</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
-          <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
-          <div class="kv-row"><span class="k">已打印的路线</span><span class="v">拿在手上的纸不受任何故障影响</span></div>
-          <div class="kv-row"><span class="k">线上岗位与政策服务</span><span class="v">独立入口 · 照常可看</span></div>
-          <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
-        </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>恢复后名单自动回来。要出门的话别按过期营业时间跑——<b>先电话确认</b>这条建议在故障时更要紧。</span>
-        </div>
+      <div class="sheet-acts">
+        <button class="btn btn--lg btn--ghost" data-agrelax="all">清空</button>
+        <button class="btn btn--primary" data-agapply>用这些条件找<svg class="ic"><use href="#i-arrowRight"/></svg></button>
       </div>
     </div>
   </div>
@@ -605,9 +778,9 @@
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-at="list"><div class="t">7 家已审核机构，当前条件下显示 <b data-agcount>2</b> 家</div><div class="s">营业状态来自机构填报，不是实时探测 · 出门前建议先电话确认</div></div>
-      <div data-at="detail"><div class="t">本机不代收任何费用</div><div class="s">带什么材料、是否收费，以机构现场公示与主管部门规定为准</div></div>
-      <div data-at="joboffline"><div class="t">代招岗位，只能到店面谈</div><div class="s">本机不代投递、不代预约、不把你简历给机构</div></div>
+      <div data-at="list"><div class="t">7 家已审核机构，当前条件下显示 <b data-agcount>5</b> 家</div><div class="s">营业状态为机构填报，非实时探测</div></div>
+      <div data-at="detail"><div class="t">本机不代收任何费用</div><div class="s">带什么、是否收费，以现场公示为准</div></div>
+      <div data-at="joboffline"><div class="t">代招岗位，只能到店面谈</div><div class="s">本机不代投递、不代预约</div></div>
       <div data-at="error"><div class="t">机构数据没取到，已自动上报</div><div class="s">不显示过期营业状态——门可能是锁着的</div></div>
     </div>
 
@@ -674,6 +847,9 @@
   var noneEl = scr.querySelector('[data-agnone]')
   var condEl = scr.querySelector('[data-agcond]')
   var countEls = [].slice.call(scr.querySelectorAll('[data-agcount]'))
+  var barEl = scr.querySelector('[data-fbar]')
+  var MAXCHIP = 4
+  function esc (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') }
   var kwEl = scr.querySelector('[data-fkw]')
   var regionBtn = scr.querySelector('[data-region]')
 
@@ -714,19 +890,75 @@
     for (i = 0; i < countEls.length; i++) countEls[i].textContent = String(n)
     if (noneEl) noneEl.hidden = n > 0
 
-    var cnt = (region ? 1 : 0) + (kw ? 1 : 0) + nature.length + open.length + svc.length
+    /* 2026-08-10 重排：条件从常驻右栏挪进抽屉，页面只留一行
+       「已选 chip + 筛选 · N 项」。chip 点 ✕ 就地去掉并重新筛。 */
+    var cond = []
+    if (kw) cond.push({ t: '「' + kw + '」', k: 'kw' })
+    if (region) {
+      /* region.js 挂在本脚本之后，首帧 window.v3Region 还不存在 ——
+         不能因此把真实已选条件漏掉，回落到直接读 value。 */
+      cond.push({
+        t: window.v3Region ? window.v3Region.get(regionBtn).text
+                           : region.split('|').filter(Boolean).join(' · '),
+        k: 'region'
+      })
+    }
+    nature.forEach(function (v) { cond.push({ t: v, k: 'chip', g: 'nature' }) })
+    open.forEach(function (v) { cond.push({ t: v, k: 'chip', g: 'open' }) })
+    svc.forEach(function (v) { cond.push({ t: v, k: 'chip', g: 'svc' }) })
+
     var fc = scr.querySelector('[data-fcount]')
-    if (fc) fc.textContent = '已选 ' + cnt + ' 项'
+    if (fc) fc.textContent = String(cond.length)
     if (condEl) {
-      if (kw) parts.push('「' + kw + '」')
-      if (region && window.v3Region) parts.push(window.v3Region.get(regionBtn).text)
-      parts = parts.concat(nature, open, svc)
+      parts = cond.map(function (x) { return x.t })
       condEl.textContent = parts.length ? parts.join(' · ') : '未设条件'
+    }
+    if (barEl) {
+      if (!cond.length) {
+        barEl.innerHTML = '<span class="fbar-n">未设条件 · 显示全部已审核机构</span>'
+      } else {
+        var h = ''
+        cond.slice(0, MAXCHIP).forEach(function (x) {
+          h += '<button class="fsel" type="button" data-fkill="' + esc(x.k) + '|' + esc(x.g || '') + '|' + esc(x.t) + '"' +
+               ' aria-label="去掉筛选条件：' + esc(x.t) + '">' + esc(x.t) +
+               '<span class="fsel-x" aria-hidden="true">✕</span></button>'
+        })
+        if (cond.length > MAXCHIP) h += '<span class="fbar-n">+' + (cond.length - MAXCHIP) + ' 项</span>'
+        barEl.innerHTML = h
+      }
     }
     if (window.v3Audit) requestAnimationFrame(window.v3Audit)
   }
 
+  function openSheet (v) { scr.classList[v ? 'add' : 'remove']('is-filtering') }
+
   scr.addEventListener('click', function (e) {
+    if (e.target.closest('[data-fopen]')) { openSheet(true); return }
+    if (e.target.closest('[data-agapply]')) { openSheet(false); apply(); return }
+    if (e.target.id === 'filter-sheet') { openSheet(false); return }
+
+    var fav = e.target.closest('.agline-fav')
+    if (fav) {
+      fav.setAttribute('aria-pressed', fav.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+      return
+    }
+
+    /* 一行筛选条上的 ✕：真的去掉这个条件并重新筛 */
+    var kill = e.target.closest('[data-fkill]')
+    if (kill) {
+      var p = kill.getAttribute('data-fkill').split('|')
+      if (p[0] === 'kw') { if (kwEl) kwEl.value = '' }
+      else if (p[0] === 'region') { window.v3Region.set(regionBtn, '') }
+      else {
+        var g0 = scr.querySelector('[data-fgroup="' + p[1] + '"]')
+        if (g0) [].slice.call(g0.querySelectorAll('.fchip')).forEach(function (c) {
+          if (c.getAttribute('data-v') === p[2]) c.setAttribute('aria-pressed', 'false')
+        })
+      }
+      apply()
+      return
+    }
+
     var chip = e.target.closest('.fchip')
     if (chip && chip.closest('[data-fgroup]')) {
       chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
@@ -743,12 +975,12 @@
       }
       apply(); return
     }
-    if (e.target.closest('[data-agapply]')) apply()
   })
 
   scr.addEventListener('v3region:change', apply)
   if (kwEl) { kwEl.addEventListener('input', apply); kwEl.addEventListener('change', apply) }
   apply()
+  window.addEventListener('load', apply)
 })()
 </script>
 </body>

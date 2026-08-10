@@ -165,6 +165,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dmore-hd b { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
 .dmore-hd > span { font-size: var(--fz-1); color: var(--fog-600); }
 .dmore-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+/* 2026-08-10：4 列变体。本页主栏高度已用满（实测多 40px 就裁 AI 卡里的控件），
+   所以新增的现场入口只能横着摊，不能竖着加行。 */
+.dmore-row--4 { grid-template-columns: repeat(4, 1fr); gap: var(--s-3); }
+.dmore-row--4 .dmore-go { gap: var(--s-3); padding-left: var(--s-4); padding-right: var(--s-4); }
 .dmore-go { display: flex; align-items: center; gap: var(--s-4);
   min-height: 88px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
   background: var(--surf-1); border: 1px solid var(--brd-1);
@@ -262,7 +266,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="17-fair-desk.html?stage=s1">看场次<em>时间、地点、企业名录</em></a>
           <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>到场扫主办方的码</em></a>
-          <a class="aibtn" href="17-fair-desk.html?stage=s3&amp;view=booth-map">看展位图<em>顺序自己定</em></a>
+          <!-- 2026-08-10 Codex 错配整改：原指 17-fair-desk.html?stage=s3&view=booth-map。
+               17 不消费 view 参数，s3 是「排今天走哪几家的顺序」，根本没有展位图；
+               真正的场馆平面图在 P45 的 map 阶段（此前全站零入口）。改指 45。 -->
+          <a class="aibtn" href="45-fair-onsite.html?stage=map">看展位图<em>场馆导览 · 顺序自己定</em></a>
           <a class="aibtn" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=简历与活动资料">打印材料<em>简历与活动资料</em></a>
         </div>
       </div>
@@ -340,7 +347,9 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
             <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
             <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="按这三项排顺序" href="17-fair-desk.html?stage=s1">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-            <a class="dcard-go" data-when="ai-down" href="17-fair-desk.html?stage=s3&amp;view=booth-map">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <!-- 2026-08-10 Codex 错配整改：同上，view=booth-map 不被消费，17 的 s3 是路线顺序页。
+                 AI 降级时要给的正是「不靠 AI 也能看的图和名录」= P45 map（图 + 服务点 + 展位企业）。 -->
+            <a class="dcard-go" data-when="ai-down" href="45-fair-onsite.html?stage=map">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
         </div>
 
@@ -393,36 +402,56 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </a>
       </div>
 
-      <!-- ── 次卡：记录类 ──
-           2026-08-10 改：原指 17-fair-desk.html?view=browse / view=jumps，
+      <!-- ── 次卡：快捷入口 ──
+           2026-08-10 改：记录类原指 17-fair-desk.html?view=browse / view=jumps，
            但招聘会台里没有任何浏览/跳转记录 UI，view 参数也不被消费 —— 送错门。
-           浏览与外部跳转记录统一落在「我的记录 · 足迹」标签。 -->
+           浏览与外部跳转记录统一落在「我的记录 · 足迹」标签。
+
+           2026-08-10 孤儿页接线：P45 招聘会现场（活动资料 / 现场数据）此前**全站零入口**。
+           为什么塞进这一排而不是新起一块：本页主栏高度已经用满，实测在 .dgrid 下方多插
+           **40px 就会把 AI 卡里的选择控件裁掉**（「先选方向」超出 39px）。所以改成
+           把这一排从 2 列扩成 4 列 —— 行数不变、总高不变，多出两个真入口。
+           展位企业与场馆导览已经由上面的「看展位图」与 AI 降级链接指向 P45，不再重复。 -->
       <div class="dmore">
         <div class="dmore-hd">
           <b>快捷入口</b>
-          <span data-when="default ai-down device-off">登录后可查看历史记录</span>
-          <span data-when="first">未登录，记录留不下</span>
+          <span data-when="default ai-down device-off">现场信息随时能看；历史记录登录后可查</span>
+          <span data-when="first">现场信息随时能看；未登录，记录留不下</span>
         </div>
-        <div class="dmore-row">
+        <div class="dmore-row dmore-row--4">
+          <a class="dmore-go" href="45-fair-onsite.html?stage=materials">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">活动资料</span>
+              <span class="dmore-s">主办方会刊与名录</span>
+              <span class="dmore-n">勾选后免费出纸</span>
+            </span>
+          </a>
+          <a class="dmore-go" href="45-fair-onsite.html?stage=stats">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">现场数据</span>
+              <span class="dmore-s">规模与签到进度</span>
+              <span class="dmore-n">主办方同步</span>
+            </span>
+          </a>
           <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
-              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
+              <span class="dmore-s">在「我的 · 足迹」看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
-            <span class="chip chip--info">不依赖 AI</span>
           </a>
           <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
             <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">外部跳转记录</span>
-              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
+              <span class="dmore-s">在「我的 · 足迹」看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 次</span>
               <span class="dmore-n" data-when="first">未登录 · 0 次</span>
             </span>
-            <span class="chip chip--info">不依赖 AI</span>
           </a>
         </div>
       </div>

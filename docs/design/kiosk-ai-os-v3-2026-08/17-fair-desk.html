@@ -195,6 +195,19 @@
 .checkin-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
 .checkin-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
 
+/* 2026-08-10 孤儿页接线：招聘会现场页（P45）此前**全站零入口** ——
+   展位企业、场馆导览、活动资料、现场数据四块只能靠手敲网址进。
+   本页是它唯一的自然上游（这一页是「去之前怎么准备」，P45 是「到了现场怎么用」），
+   所以在这里给四个直达链接，各自落到对应阶段，不再统统指回本页。 */
+.onsite { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.onsite-hd { display:flex; align-items:center; gap:8px; font-size:var(--fz-3);
+  color:var(--fog-900); font-weight:600; }
+.onsite-hd .ic { width:19px; height:19px; color:var(--jade-500); }
+.onsite-hd .mt { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600); font-weight:400; }
+.onsite .outs { grid-template-columns:1fr 1fr; }
+
 /* ════════ 2026-08-10 Codex 走查整改 ════════ */
 
 /* ① 场次卡原来是 data-go="s2"：一点就跳走。可右栏又写着「点左边任一场可以换成看它的」——
@@ -410,6 +423,22 @@
           <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
             <svg class="ic"><use href="#i-qr"/></svg>入场签到
           </button>
+        </div>
+
+        <!-- 2026-08-10 孤儿页接线：P45 招聘会现场（展位企业 / 场馆导览 / 活动资料 / 现场数据）
+             此前全站没有任何入口。这一页管的是「去之前怎么准备」，P45 管的是「到了现场怎么用」，
+             四个链接各自直达对应阶段，不再统一丢到本页第 3 步。 -->
+        <div class="onsite">
+          <div class="onsite-hd">
+            <svg class="ic"><use href="#i-pin"/></svg>已经在现场？这四块直接看
+            <span class="mt">主办方同步 · 不是投递入口</span>
+          </div>
+          <div class="outs">
+            <a class="out" href="45-fair-onsite.html?stage=booth"><svg class="ic"><use href="#i-building"/></svg>展位企业</a>
+            <a class="out" href="45-fair-onsite.html?stage=map"><svg class="ic"><use href="#i-map"/></svg>场馆导览</a>
+            <a class="out" href="45-fair-onsite.html?stage=materials"><svg class="ic"><use href="#i-file"/></svg>活动资料</a>
+            <a class="out" href="45-fair-onsite.html?stage=stats"><svg class="ic"><use href="#i-layers"/></svg>现场数据</a>
+          </div>
         </div>
       </div>
 
@@ -868,6 +897,11 @@
             那 18 家我看不到里面招什么，所以不参与排序 ——
             <b>这不等于它们不好</b>。
           </div>
+          <!-- 2026-08-10 孤儿页接线：展位企业档案在 P45 的 booth 阶段（主办方同步的企业档案 +
+               现场签到状态 + 展位岗位清单），此前没有入口。这一步正在挑企业，是它的自然去处。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=booth">
+            <svg class="ic"><use href="#i-building"/></svg>看展位企业档案
+          </a>
         </div>
       </div>
 
@@ -945,6 +979,12 @@
               纸上<b>不会有你的手机号和身份证号</b>。</div>
           </details>
 
+          <!-- 2026-08-10 孤儿页接线：真正的场馆平面图与服务点在 P45 的 map 阶段，此前没有入口。
+               本页第 3 步排的是「先去哪几家」的顺序，看图得去 P45 —— 直达 map，不落在本页。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=map">
+            <svg class="ic"><use href="#i-map"/></svg>看场馆导览图
+          </a>
+
           <!-- 2026-08-10：右栏原来只到这里，下面空 574px。补的是这一趟真正要带的纸。 -->
           <div class="sec-foot">
             <a class="handoff" data-f="handoff" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=fair-plan&amp;title=作战单%201%20份%20%2B%20简历%206%20份&amp;pages=13&amp;copies=1&amp;back=s4">
@@ -1011,6 +1051,16 @@
             <summary>开场当天这里会变成什么</summary>
             <div class="fold-b">换成主办方同步的实时数据并标同步时间；<b>主办方没提供的场次不显示</b>，不拿别处的数字凑。</div>
           </details>
+          <!-- 2026-08-10 孤儿页接线：完整现场数据（规模、企业签到进度、行业分布）在 P45 的
+               stats 阶段，此前没有入口。本页这三行是摘要，看全的去 P45。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=stats">
+            <svg class="ic"><use href="#i-layers"/></svg>看完整现场数据
+          </a>
+          <!-- 活动资料（主办方提供的会刊 / 企业名录 / 展位图，免费出纸）在 P45 的 materials 阶段。
+               本页这一栏打的是「你自己的作战单 + 简历」，两批纸不是一回事，所以分开给入口。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)" href="45-fair-onsite.html?stage=materials">
+            <svg class="ic"><use href="#i-file"/></svg>拿主办方的活动资料
+          </a>
         </div>
       </div>
 

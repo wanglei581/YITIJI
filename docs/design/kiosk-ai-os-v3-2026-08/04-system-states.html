@@ -106,6 +106,33 @@
 .sp--ok .sp-i i { background:var(--jade-500); }
 .sp-i b { color:var(--fog-900); }
 
+/* ── 2026-08-10 补：本机状态与异常处置（s6） ─────────────────────────────
+   P40 会话与安全（6 态）、P41 履约异常（8 态）和本页一样，都是**系统事件**推过来的：
+   没人会在首页点「我要支付失败」。所以它们没有产品入口是对的，
+   但「没有产品入口」不等于「不可达」—— 运维要复核话术、演示要按顺序过一遍，
+   现在只能靠手敲网址，这两页在全站的入链数是 0。
+   这一区把两页的 14 个状态逐条列出来并直达对应阶段，位置就放在本页（它本身
+   就是「本机状态」的落脚点，且已经是「我的 · 查看本机状态」的去处）。
+   ────────────────────────────────────────────────────────────────────── */
+.stgrp { display:flex; flex-direction:column; gap:var(--s-3); }
+.stgrp + .stgrp { margin-top:var(--s-5); }
+.stgrp-hd { display:flex; align-items:baseline; gap:var(--s-3); }
+.stgrp-hd b { font-size:var(--fz-4); color:var(--fog-900); font-weight:700; }
+.stgrp-hd span { font-size:var(--fz-1); color:var(--fog-600); }
+.stgrid { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
+.stlink { display:flex; align-items:center; gap:var(--s-4); min-height:var(--touch-min);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r-sm); text-decoration:none;
+  background:var(--surf-1); border:1px solid var(--brd-1);
+  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.stlink:hover { border-color:var(--jade-a32); transform:translateY(-1px); }
+.stlink-no { width:28px; height:28px; flex:0 0 auto; border-radius:50%; display:grid;
+  place-items:center; background:var(--surf-3); color:var(--fog-700);
+  font-family:var(--ff-num); font-size:var(--fz-1); }
+.stlink-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.stlink-t { font-size:var(--fz-3); color:var(--fog-900); }
+.stlink-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.45; }
+.stlink > .ic { width:17px; height:17px; flex:0 0 auto; color:var(--fog-600); }
+
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
@@ -129,7 +156,7 @@
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-at="s1 s2 s3 s5"><span class="dot dot--live"></span>设备正常</div>
+    <div class="devpill" data-at="s1 s2 s3 s5 s6"><span class="dot dot--live"></span>设备正常</div>
     <div class="devpill" data-at="s4"><span class="dot dot--down"></span>网络中断 · 已自动重连中</div>
     <div class="clock" data-clock>2026年8月9日 <b>17:52</b></div>
   </header>
@@ -141,6 +168,9 @@
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">会话超时</span></button>
       <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">断网</span></button>
       <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">会话恢复</span></button>
+      <!-- 2026-08-10 补：第 6 站不是第六种系统态，是**这些系统态的总目录**。
+           P40 / P41 两页共 14 个状态此前全站零入链，从这里逐条直达。 -->
+      <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">异常处置</span></button>
     </div>
     <span class="rail-count" data-rail-count>五种系统态</span>
   </div>
@@ -412,6 +442,120 @@
         </div>
       </div>
 
+      <!-- ─────────── S6 本机状态与异常处置 ───────────
+           2026-08-10 补。这一区解决的是一个具体问题：P40 会话与安全、P41 履约异常
+           这两页在全站的入链数是 **0** —— 它们由系统事件触发，首页不该有产品入口，
+           这一点是对的；但「不该有产品入口」被落实成了「完全不可达」，
+           运维复核话术、现场演示按顺序过一遍，都只能靠手敲网址。
+           这里把两页 14 个状态逐条列出并直达，位置放在本页是因为它本身就是
+           「本机状态」的落脚点，也是「我的 · 查看本机状态」现有的去处。 -->
+      <div class="pane" data-at="s6">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
+          <span class="bh-t">本机状态与异常处置</span>
+          <span class="bh-p">
+            下面 14 个状态<b>都由系统事件触发</b>，正常办事碰不到，首页也不设入口。<br>
+            这份清单<b>供运维复核与现场演示用</b> —— 点进去看的是那个状态长什么样、话术怎么写，
+            <b>不会真的触发它</b>，也不会改变这台机器现在的状态。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s6">
+        <div class="sec">
+          <div class="stgrp">
+            <div class="stgrp-hd"><b>会话与安全 · 6 个状态</b>
+              <span>P40 · 触发源：无操作计时、断电、下一位用户</span></div>
+            <div class="stgrid">
+              <a class="stlink" href="40-session-safety.html?stage=idle-warn">
+                <span class="stlink-no">1</span>
+                <span class="stlink-b"><span class="stlink-t">无操作预警</span>
+                  <span class="stlink-s">离场前先提醒，不直接清</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="40-session-safety.html?stage=locked">
+                <span class="stlink-no">2</span>
+                <span class="stlink-b"><span class="stlink-t">超时锁屏</span>
+                  <span class="stlink-s">内容盖住，标题与进度仍可见</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="40-session-safety.html?stage=handover">
+                <span class="stlink-no">3</span>
+                <span class="stlink-b"><span class="stlink-t">会话接管</span>
+                  <span class="stlink-s">换人时先问，不把上一位的东西铺开</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="40-session-safety.html?stage=endclear">
+                <span class="stlink-no">4</span>
+                <span class="stlink-b"><span class="stlink-t">结束并清空</span>
+                  <span class="stlink-s">清掉什么、留下什么，逐条写明</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="40-session-safety.html?stage=recover">
+                <span class="stlink-no">5</span>
+                <span class="stlink-b"><span class="stlink-t">断电恢复</span>
+                  <span class="stlink-s">来电后能拿回什么、拿不回什么</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="40-session-safety.html?stage=leftover">
+                <span class="stlink-no">6</span>
+                <span class="stlink-b"><span class="stlink-t">遗留物</span>
+                  <span class="stlink-s">上一位落下的纸怎么处理</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            </div>
+          </div>
+
+          <div class="stgrp">
+            <div class="stgrp-hd"><b>履约异常 · 8 个状态</b>
+              <span>P41 · 触发源：支付、退款、耗材、取件</span></div>
+            <div class="stgrid">
+              <a class="stlink" href="41-fulfillment-states.html?stage=pay-fail">
+                <span class="stlink-no">1</span>
+                <span class="stlink-b"><span class="stlink-t">支付失败</span>
+                  <span class="stlink-s">钱没扣，文件还在，可重试</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=pay-pending">
+                <span class="stlink-no">2</span>
+                <span class="stlink-b"><span class="stlink-t">付后待确认</span>
+                  <span class="stlink-s">扣了但没到账，先等再说</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=refund-doing">
+                <span class="stlink-no">3</span>
+                <span class="stlink-b"><span class="stlink-t">退款处理中</span>
+                  <span class="stlink-s">进度与预计到账时间</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=refund-done">
+                <span class="stlink-no">4</span>
+                <span class="stlink-b"><span class="stlink-t">退款已提交</span>
+                  <span class="stlink-s">提交不等于到账，写清楚差别</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=refund-fail">
+                <span class="stlink-no">5</span>
+                <span class="stlink-b"><span class="stlink-t">退款失败</span>
+                  <span class="stlink-s">走人工，给凭据与联系路径</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=supply">
+                <span class="stlink-no">6</span>
+                <span class="stlink-b"><span class="stlink-t">耗材异常</span>
+                  <span class="stlink-s">缺纸、缺粉、卡纸时这一单怎么算</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=claim">
+                <span class="stlink-no">7</span>
+                <span class="stlink-b"><span class="stlink-t">安全取件</span>
+                  <span class="stlink-s">取件码核验与超时未取</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+              <a class="stlink" href="41-fulfillment-states.html?stage=wrongdoc">
+                <span class="stlink-no">8</span>
+                <span class="stlink-b"><span class="stlink-t">错件事故</span>
+                  <span class="stlink-s">拿到别人的纸，怎么处置与补救</span></span>
+                <svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            </div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>这一区不是给正在办事的用户看的。</b>
+                  它列的是异常长什么样，不是本机现在的状态 ——
+                  真出了事，对应那一页会自己弹出来，不用在这儿找。</span>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -429,7 +573,52 @@
             五种形态都由<b>系统事件触发</b>：卡纸或机器没反应 → 帮助；条款更新 → 法务；
             无操作 4 分钟 → 会话超时；网络中断 → 断网；同账号有没做完的事 → 会话恢复。<br>
             所以<b>首页里没有指向这一页的入口</b>，正常办事不会走到这儿。
-            想主动看当前状态，从<b>「我的」操作栏上的「查看本机状态」</b>进来。
+            想主动看当前状态，从<b>「我的」操作栏上的「查看本机状态」</b>进来。<br>
+            <!-- 2026-08-10 补：说明第 6 站是什么，免得被当成第六种系统态。 -->
+            第 6 站<b>「异常处置」不是第六种形态</b>，是会话与安全（P40）、履约异常（P41）
+            这两组系统态的<b>总目录</b>：那两页同样没有产品入口，链接放在这里供运维与演示用。
+          </div>
+        </div>
+      </div>
+
+      <!-- S6 右：这一区的边界，写在清单旁边而不是埋进说明页 -->
+      <div class="pane" data-at="s6">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这份清单的边界</b>
+          <span class="mt">运维 / 演示用</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">这 14 条是</span><span class="v">状态样板 · 不是本机当前状态</span></div>
+            <div class="kv-row"><span class="k">点进去会</span><span class="v">看到那个状态的页面</span></div>
+            <div class="kv-row"><span class="k">点进去不会</span><span class="v v--fog">触发它 · 不改机器状态</span></div>
+            <div class="kv-row"><span class="k">首页入口</span><span class="v v--fog">没有 · 两页都由事件推过来</span></div>
+            <div class="kv-row"><span class="k">谁会用到</span><span class="v">运维复核话术 · 现场演示走查</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            正在办事的用户不需要这一区 —— 真出事时，对应那一页会自己出现。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s6">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么它们不该有首页入口</b></div>
+        <div class="sec">
+          <div style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+            没有人会在首页点<b>「我要支付失败」</b>。这两页的每一个状态都是
+            <b>事情已经发生之后</b>才出现的 —— 把它们做成首页里的功能格子，
+            等于让用户在一堆正常功能里挑一个异常，既没用也吓人。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">会话与安全</span><span class="v">计时器 / 断电 / 换人 触发</span></div>
+            <div class="kv-row"><span class="k">履约异常</span><span class="v">支付 / 退款 / 耗材 / 取件 触发</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>零入口是<b>设计结论</b>，零可达是<b>缺陷</b>。这一区补的是后者：
+                  运维要复核话术、演示要按顺序过一遍，总得有一条正经路径进去，
+                  不能只靠手敲网址。</span>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这两页自身的返回键仍指首页，从这里点进去后可以直接返回。
           </div>
         </div>
       </div>
@@ -592,18 +781,21 @@
     <button class="btn btn--lg btn--ghost" data-at="s3">结束并清空</button>
     <a class="btn btn--lg btn--ghost" data-at="s4" href="06-print-workbench.html">先去打印</a>
     <button class="btn btn--lg btn--ghost" data-at="s5">重新开始</button>
+    <a class="btn btn--lg btn--ghost" data-at="s6" href="01-home-v6.html">回首页</a>
 
     <span class="actionbar-hint" data-at="s1">卡纸和机器没反应，找工作人员比在这儿点快</span>
     <span class="actionbar-hint" data-at="s2">不点同意也能继续用</span>
     <span class="actionbar-hint" data-at="s3">碰一下屏幕就能继续</span>
     <span class="actionbar-hint" data-at="s4">正在自动重连</span>
     <span class="actionbar-hint" data-at="s5">只显示标题和进度，内容要你点了才出来</span>
+    <span class="actionbar-hint" data-at="s6">这 14 条是状态样板，点开只是看，不会触发它</span>
 
     <a class="btn btn--primary" data-at="s1" href="25-advisor.html">问问小青<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s2"><svg class="ic"><use href="#i-qr"/></svg>扫码存全文</button>
     <button class="btn btn--primary" data-at="s3">我还在，继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4"><svg class="ic"><use href="#i-refresh"/></svg>立即重试</button>
     <button class="btn btn--primary" data-at="s5">接着上次做<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s6" href="40-session-safety.html?stage=idle-warn">从第一条开始看<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
