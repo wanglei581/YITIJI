@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* 2026-08-09 留白复核（页内样式，不动 styles/*.css）：
    1) .qa —— 一问一答的短条目，转 PDF 常见问题用；
@@ -55,7 +56,23 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="t1" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     这一页的 t1/t2/t3 是三个并列的工具，不是流程步骤，所以按「这个台面上现在摆着什么」判，
+     不存在「第一步不拦」的问题。
+     t3 证件照未开放，整块是锁着的，用户手里一样东西都没有 —— 拦它纯属打扰，不列入。
+     t1 / t2 丢的东西完全不同，所以分开写：t1 是送进来的那叠图和你排的顺序，
+     t2 是你在屏上一笔一笔写的那个签名。
+     （已知取舍：「首次使用」那一态 t1 还没有图、t2 还没落笔，此时台面其实是空的，
+       这一版仍会拦 —— leaveguard 只按阶段判，读不到四态。真正在用的人绝大多数
+       停在默认态，漏拦一次丢的是真东西，多拦一次只是多按一下，所以按前者取。
+       这一条与 09 试点同源：阶段轴判不了「这一态里到底有没有东西」。）
+     不写 data-guard-keep：本页的「存进「我的·文档」」出现在**合成之后**的结果层里，
+     而这里要救的恰恰是**还没合成**的半成品 —— 图片队列和签名笔迹都没有落点可存。
+     给一个存不了的按钮就是伪造能力，宁可只留「留下 / 直接离开」两个选择。 -->
+<div class="screen" data-state="default" data-stage="t1" data-theme="warm"
+     data-guard-at="t1 t2"
+     data-guard-lose-t1="刚送进来的 5 张证件照片和你排好的装订顺序（U 盘和手机里的原图不受影响，还在你手里）"
+     data-guard-lose-t2="你刚在屏幕上写的这个签名 —— 它只用于本次合成，离开就随会话一起删掉">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -636,6 +653,7 @@
 })()
 </script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P29 专用（需求真值 = p29-p31-design-spec.md P29 节） ─────────────────
    本页主状态是「还没有」：后端零实现是主因，硬件只挡拍摄与相纸。
@@ -218,6 +219,14 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：本页**一个阶段都不拦**。
+     sA 是「证件照排版尚未开放」的当前状态页；s1–s5 是页面自己反复声明的
+     「开放后的流程示意，不是本机当前状态 —— 现在一步都做不了，也没有真实照片」。
+     既然一张照片都传不进来、一版排版也生成不了，用户手里就不存在任何会丢的东西。
+     在示意流程上弹「离开就没了：你的证件照」，等于反过来假装这条链路已经在跑，
+     和本页从头到尾守的「没有的能力不装有」（CLAUDE.md §9）正好相反。
+     公共件先引进来：等硬件到位、这条链路真开放，再按那时的真实产物补
+     data-guard-at / data-guard-lose-*，以及只有那时才存在的 data-guard-keep。 -->
 <div class="screen" data-state="default" data-stage="sA" data-theme="warm">
 
   <div class="grain"></div>
@@ -1072,6 +1081,7 @@
 })()
 </script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

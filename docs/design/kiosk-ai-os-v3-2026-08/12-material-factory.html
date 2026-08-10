@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。
 
@@ -145,7 +146,21 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="t1" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     t1–t4 是四个并列的工具，不是流程步骤，所以按「这个台面上有没有你的东西」判。
+     只拦 t1 / t2 —— 这两样是对着你的简历和目标岗位写出来的稿子，一走就没了。
+     t3 不拦：材料清单取自主办方公告原文，回来还是那一份；勾选是按本机已有材料算的，
+     不是你输进去的东西，重进一次原样就回来了。
+     t4 不拦：那一步只是在版式里点一个，还没生成任何东西（要按「应用到我的简历」才生成 v3），
+     选错了重点一下就是，拦它纯属打扰。
+     data-guard-keep 只挂 t2：t2 的「这两版拿去做什么」里有一个四态常驻、真接了线的
+     「存进我的文档」按钮。t1 的同名按钮只在打印机离线那一态出现，默认态下这个落点并不存在，
+     所以不给 t1 写 keep —— 平时没有的按钮不该由弹层凭空补出来。 -->
+<div class="screen" data-state="default" data-stage="t1" data-theme="warm"
+     data-guard-at="t1 t2"
+     data-guard-lose-t1="刚写好的这封求职信（写给「用户运营专员」的那一版，含你核对过的三处槽位）"
+     data-guard-lose-t2="刚写好的自我介绍口述稿（30 秒版和 60 秒版两版）"
+     data-guard-keep-t2="存进「我的文档」">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -925,6 +940,7 @@
   }
 })()
 </script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

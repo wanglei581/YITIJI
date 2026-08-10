@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P20 专用 ───────────────────────────────────────────────────────────
    这一页有个别的页没有的约束：**机器在公共场所**。所以默认答题方式是打字，
@@ -435,7 +436,20 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 不拦：那一步只是在选行业、目标岗位、难度，一道题都还没答。
+     s2 / s3 / s4 拦，因为这一页最贵的东西是**你自己写的那几段答案**，
+     而页面自己写明「你答的内容从不保存」「内容离场即清」—— 走了就是真没了，一句都捞不回。
+     但这三步不能一律拦：这一页开局是空的（一道题都没答），
+     此时 s3 的点评来自题库示例、s4 的单子也只有题目，都不是用户的东西，拦了就是无中生有。
+     所以 data-guard-lose-* 不写死在这里，交给本页 render 按**真实作答题数**填：
+     一题没答就把它清成空串，leaveguard 读到空串即视为「没有东西可丢」，自然不拦
+     （见 syncGuard()，与「没写 lose 就不拦截」是同一条规矩）。
+     不写 data-guard-keep：本页没有常规的存档落点 —— 右栏白纸黑字写着
+     「离线时才存「我的文档」」，那是打印机离线时的兜底，不是随时能用的动作；
+     何况要救的答案本身「从不保存」，给一个「存下来再走」的按钮就是伪造能力。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2 s3 s4">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -1540,6 +1554,10 @@
 
   function renderS3 () {
     var list = qs(), c = counts(), html = ''
+    /* 挂在这儿而不是 renderAll()：答题框的 input 只调 renderS3 / renderS4，
+       不走 renderAll —— 挂错地方就会「打了一半的答案不算数」，白拦。
+       renderS3 是所有会改动答案的路径（打字、跳过、翻题、切卷）唯一都经过的那道口。 */
+    syncGuard(c)
     for (var i = 0; i < list.length; i++) {
       var q = list[i], n = i + 1
       var mine = hasAns(n) ? A()[n] : ''
@@ -1932,6 +1950,25 @@
     setPageNums(sheets.length)
   }
 
+  /* ── 离场确认要丢的是什么（scripts/leaveguard.js）─────────────────────
+     写死在 HTML 里不行：这一页开局一道题都没答，那时候 s3 的点评是题库示例、
+     s4 的单子上只有题目，都不是用户的东西 —— 拦下来说「你的答案要没了」是无中生有。
+     所以按**真实作答题数**填：答过才写，一题没答就清成空串。
+     leaveguard 读到空串就当「没东西可丢」，自然不拦（它自己的规矩就是宁可不拦、
+     也不弹一句空话）。数只能来自 counts()，不另算一份，免得跟纸面和右栏对不上。 */
+  function syncGuard (c) {
+    var n = (c || counts()).done
+    scr.setAttribute('data-guard-lose-s2', n
+      ? '刚答完的 ' + n + ' 道题 —— 你答的内容本机从不保存，离开就是真没了，一句都捞不回'
+      : '')
+    scr.setAttribute('data-guard-lose-s3', n
+      ? '刚答完的 ' + n + ' 道题和还没看完的这次点评'
+      : '')
+    scr.setAttribute('data-guard-lose-s4', n
+      ? '刚答完的 ' + n + ' 道题，和照着它们排出来的这份复盘单'
+      : '')
+  }
+
   /* renderAll 不碰可见性：它会被 v3ApplyVisibility 的 hook 调用，
      在里面再调一次 v3ApplyVisibility 就成了自己套自己。
      对外的 render() 才负责补算可见性。 */
@@ -2271,6 +2308,7 @@
   }
 })()
 </script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

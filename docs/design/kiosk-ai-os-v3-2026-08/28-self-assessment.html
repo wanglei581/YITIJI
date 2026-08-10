@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P28 专用 ───────────────────────────────────────────────────────────
    自我探索（线上 /resume/self-assessment：25 题 5 组、必勾+可选双同意、
@@ -149,7 +150,25 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：这一页是全站最该拦的一处 ——
+     25 道题答到一半按返回，答案在本机内存里，一走就全没，重做要 5 分钟。
+     **只拦 s2**，另外三步逐条说明为什么不拦：
+       · s1 只是勾两个同意项，还一道题都没答，拦了纯粹是打扰。
+       · s3 不拦：那一步结果**已经交上去了** —— 页面自己写「库里只落摘要和陈述」
+         「结果只保留 24 小时」，是真存下来的终态。而且 s3 的主操作是「去打印工作台核价」，
+         那本来就是把这份结果带走的正路，在它头上弹一句「离开就没了」是假的。
+       · s4 往期记录同理：只是回看，没有任何未存的东西。
+     data-guard-lose-s2 的题数由本页 render 填（见 syncGuard），不写死：
+     勾不勾可选同意项，总题量在 25 / 20 之间变，答到第几题更是随时在动。
+     文案必须和 s3 那句「答案原文不留存，恢复后也补不回这一次，要解读得重新作答（约 5 分钟）」
+     一个口径 —— 同一件事全页只能有一种说法，不能这里说「还能找回」那里说「补不回」。
+     **不写 data-guard-keep**：这一页压根没有「存进我的文档」这个动作。
+     结果只在 24 小时窗口内可回看，s3 那个「存我的文档 · 扫码带走」只在打印机离线那一态出现，
+     是离线兜底、不是常规落点；何况要救的是**还没提交的作答**，那个东西本来就没有落点可存。
+     给它一个「存下来再走」的按钮就是伪造能力（CLAUDE.md §9）。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2"
+     data-guard-lose-s2="已经答完的 7 道题 —— 答案原文不留存，补不回这一次，要解读得重新作答（约 5 分钟）">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -874,6 +893,12 @@
       opts[k].classList.toggle('opt--on', S.ans[S.cur] === opts[k].getAttribute('data-opt'))
     }
     html('kvDone', '<b>' + answered() + '</b> / ' + T + ' 题')
+    /* 离场确认要丢的是什么（scripts/leaveguard.js）。题数不能写死在 HTML 里：
+       总题量随可选同意项在 25 / 20 之间变，答到第几题更是随时在动。
+       用户要看到的是「已经答完的 18 道题」，不是「未保存的更改」。
+       口径与 s3 那句「答案原文不留存…要解读得重新作答（约 5 分钟）」保持一致。 */
+    scr.setAttribute('data-guard-lose-s2',
+      '已经答完的 ' + answered() + ' 道题 —— 答案原文不留存，补不回这一次，要解读得重新作答（约 5 分钟）')
     set('kvCur', B.g + ' · 第 ' + (S.cur + 1) + ' 题')
     set('hint2', '第 ' + no + ' 题 / 共 ' + T + ' 题 · 闲置 60 秒自动清空')
     /* 五组进度 */
@@ -937,6 +962,7 @@
 })()
 </script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

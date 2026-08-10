@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* 访谈阶段：对话是当前操作，占主体；预览收在右栏。
      到了预览阶段再把 A4 换到主体——操作对象变了，主次就该换。 */
@@ -90,7 +91,25 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s2" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 只是在六个方向里点一个，一句话都还没答 —— 不拦，拦了只会烦人。
+     s2 起用户是在一句一句说自己的经历，这是本页最贵的东西：口述内容**只存在本次会话**
+     （页脚「隐私 · 保留期限」写明未登录时离场即清），走了就得从第 1 个话题重新聊。
+     s3 虽然已经成了 1 页 A4，但那也只是本次会话里的草稿，没存进「我的简历」照样清掉，
+     所以照拦；两步丢的不是一回事，分开写。
+     data-guard-keep 只挂 s3：本页真实落点是 s3「接下来」里那个「存进我的简历」按钮，
+     页面自己也写「要留下来需要在最后一步存进「我的简历」」。s2 还在聊，没有这个动作，
+     所以不给 s2 keep —— 没有落点却给「存下来」的按钮就是伪造能力。 -->
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s2"（逐题回答）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「逐题回答」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2 s3"
+     data-guard-lose-s2="已经答完的 2 个话题（求职方向、上一份工作），这些回答只在本次会话里，走了要从第 1 个话题重新聊"
+     data-guard-lose-s3="刚聊出来的这一版访谈简历（1 页 A4，10 个话题里答了 7 个），还没存进「我的简历」"
+     data-guard-keep-s3="存进「我的简历」">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -520,6 +539,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

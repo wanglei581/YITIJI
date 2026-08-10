@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P22 专用 ───────────────────────────────────────────────────────────
    职业规划最容易做成算命：「这个方向前景好」「三年后你能到 XX 岗」
@@ -173,6 +174,17 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：本页**一个阶段都不拦**，理由逐条写在这里，
+     免得后来的人以为是漏接了。公共件已引入，将来这一页真长出用户输入再补 data-guard-at。
+       · 用户在这一页从头到尾没有任何输入。三步全是本机对着**已经存在的**简历
+         和 214 条读过正文的岗位算出来的读数；唯一的控件是 s3 那个「缺口表打不打」开关，
+         点错重点一下就是。
+       · s1 / s2 因此不算「丢东西」：退出去再进来，读的还是同一份简历、同一批岗位，
+         重算一遍就回来了，中间只隔两次点按。为这个弹窗只会烦人。
+       · s3 更不该拦：那一步页面自己写明「清单同时存进「我的文档」与「AI服务记录」」——
+         已经落到账号里了，是真存下来的终态，再问一句「离开就没了」是假的。
+     同理不写 data-guard-keep：既然没有拦截，也就没有「存下来再走」这一说；
+     何况 s3 的清单本来就已经存过了，再给一个存的按钮是重复承诺。 -->
 <div class="screen" data-state="default" data-stage="s1" data-theme="warm">
 
   <div class="grain"></div>
@@ -760,6 +772,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

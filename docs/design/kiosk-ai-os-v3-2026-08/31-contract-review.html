@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P31 专用 ── 签约风险提示（用户可见名不含「审查」）。
    真实底盘：三步流程 + 状态机 + consent 快照 + PII 脱敏 + 安全门已实现，
@@ -199,6 +200,14 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：本页**一个阶段都不拦**。
+     s0 是「签约风险提示暂未开放 · 当前不接收合同」的当前状态页，faq 是静态参考资料；
+     s1–s4 顶着常驻横幅「这是开放后的流程示意，不是本机当前状态」——
+     合同根本传不进来，也就没有提取结果、没有风险报告，用户手里不存在任何会丢的东西。
+     在示意流程上弹「离开就没了：你上传的合同」，等于假装本机已经在收合同了，
+     与本页从 s0 到页脚一路守的「未开放就说未开放」正好相反。
+     公共件先引进来：等这条链路真开放（页面里「报告端点」还标着未开放），
+     再按那时真实存在的产物补 data-guard-at / data-guard-lose-*，以及真实落点的 keep。 -->
 <div class="screen" data-state="default" data-stage="s0" data-theme="warm">
 
   <div class="grain"></div>
@@ -923,6 +932,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script>
 /* s1 范围 chips 随所选类型切换：专项 = 14 类条款 / 通用 = 八维度。

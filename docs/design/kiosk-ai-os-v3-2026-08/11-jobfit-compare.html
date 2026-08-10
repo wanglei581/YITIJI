@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* ── 2026-08-10 P11 升格为「P30 岗位大师 · 决策台」──────────────────────
      唯一需求真值 = p29-p31-design-spec.md P30 节。文件名不变（IA 裁决：
@@ -291,7 +292,28 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s2" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 不拦：那一步只是在列表里挑岗位、或往 JD 框里贴原文，本机还没算出任何比对结果。
+     （这条有个已知的取舍：JD 框真被手打了一长段再误触返回，这一版拦不住 ——
+       leaveguard 只按阶段判，判不了「框里有没有字」。相比之下，让每个刚进第 1 步、
+       什么都没填的人都吃一次弹层更糟，所以这里选择不拦。）
+     s2 / s3 / s4 都拦，且丢的东西一步一个样，分开写：
+       s2 是这一个岗位的逐条对照（未登录时页面写明「只留在本次会话，离场即清」）；
+       s3 是你先后比过的那几个岗位、和本机就着它们数出来的共同要求；
+       s4 是已经排好的那份带走报告。
+     不写 data-guard-keep：本页没有一个真能把结果存下来的按钮 ——
+     s4 右栏「我的文档」那几行是说明文字，device-off 那个「存我的文档 · 扫码带走」
+     是个没有接线的按钮（点了什么都不发生）。照它写 keep 等于给一个按不动的承诺。 -->
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s2"（逐条比对）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「逐条比对」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2 s3 s4"
+     data-guard-lose-s2="这个岗位的逐条比对结果 —— 8 条要求的对照、三张差距卡和面试追问清单"
+     data-guard-lose-s3="你先后比过的这 3 个岗位，和本机数出来的 3 条共同要求"
+     data-guard-lose-s4="刚排好的这份决策报告（A4 3 页：封面、正文、面试追问清单）">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -1579,6 +1601,7 @@
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

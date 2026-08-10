@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
   .chip--info { cursor: inherit; }
@@ -91,7 +92,29 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s3" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 只是在挑「扫的是什么」并跟着定参数，s2 只是放纸图示 —— 正常走下来到这两步，
+     纸都还没走，本机手里一张图像都没有，拦一次只会烦人，所以都不在 data-guard-at 里。
+     （已知取舍：从 s4 按「重扫某一页」退回 s2 时，手里其实已经有扫好的页了，
+       这一版拦不住 —— leaveguard 只按阶段判，分不出「第一次到 s2」和「回头补扫」。
+       两害相权：让每个刚放好纸、还没扫的人都吃一次弹层更糟，所以这里选择不拦。）
+     s3 起本机手里才真有东西，且两步丢的不是一回事：
+       s3 丢的是送稿器刚走完、还在这台机器里的那几页图像；
+       s4 丢的是已经拼成的那份 PDF —— 它没存进「我的文档」就只活到本次会话结束。
+     s3 那句必须把「有效期一到就销毁」说出来：用户以为纸扫过了东西就一直在，
+     实际是任务作废就连图像一起销毁（页面「任务有效期与图像销毁」写的就是这条）。
+     data-guard-keep 只挂在 s4：本页真实的落点只有 s4 右栏那个「存进「我的文档」」，
+     s3 还在扫，没有任何可存的成品，所以不给它 keep —— 没落点却给存的按钮就是伪造能力。 -->
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s3"（正在扫描）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「正在扫描」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s3 s4"
+     data-guard-lose-s3="刚扫进来的 3 页原件 —— 离开就是放弃这次扫描任务，任务有效期 15 分钟一到，已采集的图像会被销毁"
+     data-guard-lose-s4="扫好的这份扫描件 PDF —— 还没存进「我的文档」，没存进去的只留到本次会话结束"
+     data-guard-keep-s4="存进「我的文档」">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -1000,6 +1023,7 @@
 })()
 </script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
