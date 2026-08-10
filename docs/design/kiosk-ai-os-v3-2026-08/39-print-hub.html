@@ -669,15 +669,23 @@ body.capture .proto-rail { display: none !important; }
         <span class="hc-st">未取得本机扫描能力配置，本机不会创建正式扫描任务。</span>
       </div>
 
-      <!-- ④ 照片打印（要 MFP） -->
-      <a class="hcard" data-cap="photo" data-when="default first ai-down" data-probe-when="ok" href="06-print-workbench.html?stage=s3&amp;from=P39&amp;kind=material&amp;title=照片">
+      <!-- ④ 照片打印（要 MFP）
+           2026-08-11 链接落地整改（Codex (b)-8 / #570）：原指 ?stage=s3&kind=material&title=照片。
+           这一屏没有上传过、也没有生成过任何照片文件，却跳过 P06 第 1 步直接进「参数核价」，
+           还用 title=照片 让打印台开出一张「本次来自：打印扫描服务域首屏 · 照片 · 收到交接」的回执 ——
+           标题不是文件，本机手上根本没有这份材料。改为进 P06 第 1 步（选来源）。
+           Codex (c) 写的是「照片打印 → P06 s1 并预选照片来源」，但已核实 P06 只消费
+           from/kind/title/pages/copies/back，**不读任何来源参数**（06:2225 KEYS 白名单），
+           传 source= 只会是一句目标页听不懂的承诺 —— 按「目标必须真实消费该参数，否则不要传」
+           的口径，这里不传，改成在卡面如实写清「照片和文档走同一条流程、进去自己选图片」。 -->
+      <a class="hcard" data-cap="photo" data-when="default first ai-down" data-probe-when="ok" href="06-print-workbench.html">
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-image"/></svg></span>
           <span class="hc-nm">照片打印</span>
           <span class="chip chip--amber chip--info" data-when="default first">AI&nbsp;· 仅供参考</span>
           <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
         </span>
-        <span class="hc-ds">上传 JPG / PNG 打印，走文档打印同一条流程</span>
+        <span class="hc-ds">和文档打印同一条流程：进去<b>第 1 步选图片</b>（本机上传 / 手机扫码传 / U 盘），再设参数</span>
         <span class="hc-st" data-when="default first">可用&nbsp;· 彩色与纸张给取舍理由，<b>最终由你按</b></span>
         <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次没有体检结论，彩色与纸张你自己定</span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
@@ -760,8 +768,14 @@ body.capture .proto-rail { display: none !important; }
         <span class="hc-st">合完存不存得下现在答不上来，合并任务先不创建。</span>
       </div>
 
-      <!-- ⑦ 签名盖章（服务端合成，不经过 MFP） -->
-      <a class="hcard" data-cap="sign" data-when="default first ai-down device-off" data-probe-when="ok" href="08-file-tools.html">
+      <!-- ⑦ 签名盖章（服务端合成，不经过 MFP）
+           2026-08-11 链接落地整改（Codex (c) 分流表：格式转换 / 签名盖章 → P08「对应首步」）：
+           原指裸 08-file-tools.html，而 P08 默认落 t1「图片转 PDF」—— 点「签名盖章」
+           进去看到的是另一个工具，属于「跳转的不是这个链接承诺的页面」。
+           P08 是三个页签（t1 图片转 PDF / t2 签名盖章 / t3 证件照·未开放），不是线性流程，
+           所以「签名盖章的第一个可操作步骤」就是 t2 本身 → 显式 ?stage=t2。
+           上面第 ⑥ 张「格式转换」对应的正是默认的 t1，保持裸链接不动。 -->
+      <a class="hcard" data-cap="sign" data-when="default first ai-down device-off" data-probe-when="ok" href="08-file-tools.html?stage=t2">
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
           <span class="hc-nm">签名盖章</span>

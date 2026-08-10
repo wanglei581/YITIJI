@@ -283,12 +283,20 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="17-fair-desk.html?stage=s1">看场次<em>时间、地点、企业名录</em></a>
-          <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>到场扫主办方的码</em></a>
+          <!-- 2026-08-11 复核（Codex (b)-11 / #501）：?view=checkin 至今不被 17-fair-desk 消费
+               （该页全文 0 处 URLSearchParams）。已核实签到入口**确实在** s1 这一屏内
+               （17-fair-desk.html:533 .checkin「已经在现场？先签到再逛」），所以落点没错，
+               只是不会自动定位过去。参数按接线契约保留，副文如实写「入口在场次页内」，
+               不写"直接进签到"。 -->
+          <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>签到入口在场次页内 · 到场扫主办方的码</em></a>
           <!-- 2026-08-10 Codex 错配整改：原指 17-fair-desk.html?stage=s3&view=booth-map。
                17 不消费 view 参数，s3 是「排今天走哪几家的顺序」，根本没有展位图；
                真正的场馆平面图在 P45 的 map 阶段（此前全站零入口）。改指 45。 -->
           <a class="aibtn" href="45-fair-onsite.html?stage=map">看展位图<em>场馆导览 · 顺序自己定</em></a>
-          <a class="aibtn" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=简历与活动资料">打印材料<em>简历与活动资料</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #503）：原指 ?stage=s3&title=简历与活动资料。
+               这一屏没上传也没扫描过任何材料，跳过 P06 第 1 步直接进核价，还让打印台
+               替一份不存在的「简历与活动资料」开交接回执。改为进 P06 第 1 步（选来源）。 -->
+          <a class="aibtn" href="06-print-workbench.html">打印材料<em>第 1 步先选文件：上传 / 扫描原件 / U 盘</em></a>
         </div>
       </div>
 
@@ -319,14 +327,18 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-go">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 3 扫码签到（非 AI） -->
+        <!-- 3 扫码签到（非 AI）
+             2026-08-11 复核（Codex (b)-11 / #506）：同 #501。落点 17-fair-desk s1「哪一场」
+             这一屏内就有入场签到块（17-fair-desk.html:533），所以这条不是"送错门"；
+             ?view=checkin 目前不被消费，进去不会自动滚到签到，副文按这个事实写。
+             不新增 .dcard-hint 行：这张卡与 c-campus 同一栅格行，多一行会顶高整行。 -->
         <a class="dcard" id="c-checkin" href="17-fair-desk.html?stage=s1&amp;view=checkin">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">扫码签到</span>
-          <span class="dcard-ds">现场签到二维码展示与识别引导</span>
+          <span class="dcard-ds">签到二维码在招聘会台的场次页内出示</span>
           <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -445,15 +457,19 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
              2026-08-10 Codex :335 整改：device-off 卡面写「先存我的文档」，整张卡却仍链接
              打印工作台 —— 用打印链接冒充保存。出纸链路断了，动作就得真的是「存进我的文档」，
              所以这里按态拆成两张卡，各自挂各自真实的去向。 -->
-        <a class="dcard dcard--print" id="c-print" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=活动资料">
+        <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #511）：原指 ?stage=s3&title=活动资料。
+             卡面自己写的就是「上传或扫描材料」—— 那两件事都还没发生，却直接落在
+             第 3 步核价，并让打印台开出一张「活动资料 · 收到交接」的回执。
+             材料是在 P06 第 1 步选的，所以落点改成第 1 步，主动作文案同步改掉「核价」。 -->
+        <a class="dcard dcard--print" id="c-print" data-when="default first ai-down" href="06-print-workbench.html">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">活动资料打印</span>
           <span class="dcard-ds">上传或扫描材料，本机直接打印</span>
-          <span class="dcard-hint">本页不出价，以打印台核价为准</span>
-          <span class="dcard-go">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-hint">第 1 步先选文件；本页不出价，以打印台核价为准</span>
+          <span class="dcard-go">去打印工作台选材料<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
         <a class="dcard dcard--print" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P36&amp;kind=material&amp;title=活动资料">
           <span class="dcard-hd">
@@ -539,7 +555,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
     </div>
 
-    <a class="btn btn--lg btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
+    <!-- 2026-08-11 链接落地整改（Codex (b)-12 / #518）：原指 13-jobs-desk.html。
+         按钮写的是域名「岗位信息」（跨域泛入口），落点应是岗位信息域首屏 P34；
+         P13 只是那个域里的一个子工作台（全部岗位台），不该替整个域收口。 -->
+    <a class="btn btn--lg btn--ghost" href="34-jobs-hub.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
     <a class="btn btn--primary" href="17-fair-desk.html?stage=s1">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 

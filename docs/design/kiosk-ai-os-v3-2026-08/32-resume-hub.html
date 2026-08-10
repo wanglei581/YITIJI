@@ -420,11 +420,17 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         </span>
       </div>
 
-      <!-- ⑦ 简历打印（非 AI，依赖打印机） -->
-      <a class="hcard hcard--local" data-cap="print" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P32&amp;kind=material&amp;title=简历">
+      <!-- ⑦ 简历打印（非 AI，依赖打印机）
+           2026-08-11 链接落地整改（Codex (b)-8 / #449）：原指 ?stage=s3&kind=material&title=简历。
+           域首屏这一格上没有任何已上传 / 已生成的简历文件，只有一个中文标题，却跳过
+           P06 第 1 步直接落「参数核价」，并让打印台开出「本次来自：AI简历服务域首屏 · 简历」
+           的交接回执 —— 那份简历本机并没有收到过。标题不能代替产物。
+           按判断表「缺少文件、对象 ID 或必要选择 → 不得跳过首步」改为进 P06 第 1 步（选来源）；
+           接线后若确有 artifactId（interface-handoff.md §2A），再由那条真实产物链直达 s3。 -->
+      <a class="hcard hcard--local" data-cap="print" data-when="default first ai-down" href="06-print-workbench.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span><span class="hc-nm">简历打印</span></span>
-        <span class="hc-ds">定稿后在本机打印，走标准文档流程</span>
+        <span class="hc-ds">定稿后在本机打印：进去<b>第 1 步选文件</b>（上传 / 扫描原件 / U 盘），再核价出纸</span>
         <span class="hc-ft">
           <span class="chip chip--jade chip--label">不依赖 AI</span>
           <span class="chip chip--info chip--label">依赖打印机</span>

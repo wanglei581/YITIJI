@@ -541,10 +541,20 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
           <span class="card-name">打印扫描</span>
           <span class="card-foot">
             <!-- 这三个是真快捷入口（页内脚本绑 data-href 并阻止冒泡到外层卡片链接）。
-                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
+                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。
+                 2026-08-11 链接落地整改：三条原来带 ?stage=s1。带 stage 参数进 P06，
+                 会绕过它页尾脚本②「无交接参数 → 落 s1 并把写死的回执整条摘掉」那一支
+                 （06-print-workbench.html:2228 的判据是 !handed && !stage），
+                 于是首页点「本机上传」进去、走到第 3 步，屏幕上挂着一张
+                 「本次来自：简历工作台 · 诊断报告 · 来源页标注 3 页 · 09:43 收到交接」——
+                 那是模板里的样例回执，用户根本没去过简历工作台，也没交接过任何材料（已实测复现）。
+                 去掉 stage 后落点仍是第 1 步（P06 默认 data-stage 就是 s1），假回执被摘掉。
+                 ?source= 保留为接线契约：P06 目前只认 from/kind/title/pages/copies/back
+                 （:2225 KEYS 白名单），**不读 source**，所以这三条只当"进去自己选来源"，
+                 卡面也没有写"已经替你选好"。接线时由 P06 消费 source 预选第 1 步的来源卡。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=local">本机上传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=qr">手机扫码传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=usb">U 盘</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
             <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
@@ -725,7 +735,10 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     <button class="btn btn--lg btn--ghost" data-when="default">跳过</button>
     <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 2026-08-11 链接落地整改（Codex (b)-12 / #10）：原指 06-print-workbench.html。
+         按钮只写域名「打印扫描」，属于泛域入口 —— 该进域首屏 P39（七件事都在那一屏），
+         不该越过它直接落在「文档打印」这一个子工作台。同页主功能卡早就指 P39，两处口径现在一致。 -->
+    <a class="btn btn--primary" href="39-print-hub.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 

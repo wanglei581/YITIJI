@@ -226,7 +226,16 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                直接进政策页第 3 步看这一项要带的材料清单（?stage=s3 已核实是「打印清单」那一步）。
                "缺口核对"作为待接线能力仍留在下面的 AI政策助手卡上，并标明未接线。 -->
           <a class="aibtn" href="21-policy.html?stage=s3&amp;from=P38">看这一项要带的材料清单<em>政策页按事项列，不按人 · 不依赖 AI</em></a>
-          <a class="aibtn" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">我要打印政策要点<em>去打印工作台核价</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #543）：原指
+               06-print-workbench.html?stage=s3&kind=policy-checklist&title=政策要点。
+               本屏没有任何已生成的政策要点文件，只有一个中文标题，却跳过 P06 第 1 步直接落核价，
+               并让打印台开出「本次来自：政策服务域首屏 · 政策要点 · 收到交接」的回执 ——
+               那份清单还没生成过。「政策要点」这件产物本来就是在政策页勾选后才成形的
+               （21-policy s3「带走办事清单」：勾选清单 / 原文 → 合计页数与预估 → 去打印，
+               21-policy.html:805 那条 href 才带得出真实的 pages/copies），
+               所以按「先生成产物，再谈打印」改指那一步，而不是核价页。
+               与上一条同为 s3 是刻意的：看清单和打清单是同一步的两件事，文案已各自写明。 -->
+          <a class="aibtn" data-when="default first" href="21-policy.html?stage=s3&amp;from=P38">我要打印政策要点<em>去政策页第 3 步勾选要打的内容，再核价出纸</em></a>
           <a class="aibtn aibtn--off" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
         </div>
         <!-- 2026-08-10 整改：原写「AI 只做政策预筛与材料缺口核对」，缺口核对没有实现，
@@ -245,7 +254,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <a class="aibtn" href="21-policy.html?stage=s2&amp;view=doc">政策原文<em>官方发布口径</em></a>
           <a class="aibtn" href="21-policy.html?stage=s3&amp;view=checklist">办事材料清单<em>按事项列，不按人</em></a>
           <a class="aibtn" href="21-policy.html?stage=s2&amp;view=official">官方办理入口<em>热线与官网二维码</em></a>
-          <a class="aibtn" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">打印政策要点<em>本机直接打印</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #548）：同 #543，原来跳过 P06 第 1 步、
+               用一个标题冒充已交接的材料。要点清单在政策页第 3 步勾选生成后才存在，
+               那一步在 AI 降级态照常可用（21-policy.html:805 的去打印按钮含 ai-down）。 -->
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;from=P38">打印政策要点<em>第 3 步勾选要打的内容，再核价出纸</em></a>
         </div>
       </div>
 
@@ -435,7 +447,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div data-when="device-off"><div class="t">打印机离线，查政策不受影响</div><div class="s">要点可先存我的文档，换机取回再打</div></div>
     </div>
 
-    <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-printer"/></svg>打印政策要点</a>
+    <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #559）：同 #543 / #548。
+         落点改成政策页第 3 步「带走办事清单」—— 要点是在那一步勾选生成并算页数的，
+         打印台的核价页只有拿到真实产物（接线后的 artifactId）才谈得上。
+         按钮加「去」字：它是去办这件事的入口，不是本页当场出纸。 -->
+    <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="21-policy.html?stage=s3&amp;from=P38"><svg class="ic"><use href="#i-printer"/></svg>去打印政策要点</a>
     <!-- device-off：这里不能挂打印链接冒充保存 —— 出纸链路断了，动作就得真的是「存进我的文档」 -->
     <a class="btn btn--lg btn--ghost" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</a>
     <a class="btn btn--primary" href="21-policy.html?stage=s1">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>

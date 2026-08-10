@@ -227,13 +227,25 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     <!-- ══════════ 三张预设类型卡：一行标题说清它们是同一个台 ══════════ -->
     <div class="glabel">
       <b>直接按类型进</b>
-      <span>下面三张进的是同一个岗位台，只是预设了类型，台内还能改</span>
+      <!-- 2026-08-11 文案整改（Codex (b)-11 / #476、477、478）：原写「只是预设了类型，台内还能改」，
+           那是**现在时**的承诺，而实测点进去是未筛的全量列表（stage=ok&jobType=intern 进去，
+           顶部仍是「已选 运营 / 广州 / 10K 以上」那套样例筛选，类型一项都没落）。
+           改成如实的「参数已经带过去、目标页接上才生效」，与三张卡上的注脚同一口径。 -->
+      <span>下面三张进的是同一个岗位台，类型<b>按 ?jobType= 带过去</b>，岗位台目前还不读，<b>接线后自动生效</b>；台内可自己筛</span>
     </div>
     <div class="hgrid hgrid--3">
-      <!-- 口径备注：生产 JobsServiceHubPage.tsx 用的是 /jobs?category=fulltime|intern|parttime。
-           本稿按本轮验收口径统一写 jobType，接线时映射到 category 即可，不要两套都发。
-           已核实 13-jobs-desk 目前**不读** jobType，所以卡面写「接线后自动生效」，
-           不宣称"已经筛好"—— 那是说谎。 -->
+      <!-- ══ 参数契约（本页发出，13-jobs-desk 消费）══
+           参数名：jobType，取值白名单 all | fulltime | intern | parttime（本页四处发出，仅此四值）。
+           口径备注：生产 JobsServiceHubPage.tsx 用的是 /jobs?category=fulltime|intern|parttime。
+           本稿按本轮验收口径统一写 jobType，接线时由目标页映射到 category，**不要两套都发**。
+           2026-08-11 复核（Codex (b)-11 / #476、477、478）：13-jobs-desk.html 里已经出现
+           `new URLSearchParams` 与 `qval(Q,'jobType')` 的读取代码（那一路正在补消费），
+           但复核当时该页脚本抛 `renderFrom is not defined`，实测进去仍是未筛的全量列表。
+           所以本轮**不动参数、不改口径**：三张卡面继续写「接线后自动生效」，不许提前写
+           「已按 X 筛好」。等对方那一路自测通过、真能按类型收敛之后，再把这四处
+           「（接线后自动生效）」注脚一起删掉（先例见 38-policy-hub 的 ?cat= 二轮整改）。 -->
+      <!-- 2026-08-11 修：原来只有「全职」这张写了「（接线后自动生效）」，实习与兼职两张没写，
+           口径不齐会让人以为那两张是真的筛过的。三张统一补齐。 -->
       <a class="hcard hcard--desk" data-cap="fulltime" href="13-jobs-desk.html?stage=ok&amp;jobType=fulltime">
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span><span class="hc-nm">全职岗位</span></span>
         <span class="hc-ds">按「全职」筛选（接线后自动生效）</span>
@@ -244,7 +256,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       </a>
       <a class="hcard hcard--desk" data-cap="intern" href="13-jobs-desk.html?stage=ok&amp;jobType=intern">
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-campus"/></svg></span><span class="hc-nm">实习岗位</span></span>
-        <span class="hc-ds">在校生与应届生的实习机会</span>
+        <span class="hc-ds">在校生与应届生的实习机会（接线后自动生效）</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -252,7 +264,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       </a>
       <a class="hcard hcard--desk" data-cap="parttime" href="13-jobs-desk.html?stage=ok&amp;jobType=parttime">
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-clock"/></svg></span><span class="hc-nm">兼职信息</span></span>
-        <span class="hc-ds">灵活就业与兼职，本机不经手费用</span>
+        <span class="hc-ds">灵活就业与兼职，本机不经手费用（接线后自动生效）</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
