@@ -609,6 +609,22 @@
           </a>
         </div>
 
+        <!-- 两卡之间真正该做的决策阅读：交集与差集，一次改动能惠及几个岗位 -->
+        <div class="pane" style="flex:1 1 auto">
+          <div class="pane-hd"><span class="t">把两个岗位放在一起看</span><span class="s">交集先补，回报最大</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">两边都要的</span><span class="v">社群维护 · 活动策划——你的原文都有证据</span></div>
+            <div class="kv-row"><span class="k">只有用户运营要</span><span class="v">SQL 独立取数——差的是证据，不是新技能</span></div>
+            <div class="kv-row"><span class="k">只有内容运营要</span><span class="v">短视频脚本——完全没写到，缺口更大</span></div>
+            <div class="kv-row"><span class="k">改一处顶两处</span><span class="v">「参与增长项目」写清你负责的环节，两边都加分</span></div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.65">
+            交集与差集来自两份 JD 原文 <span class="ev ev--e2">E2 来源信息</span> 对你的简历
+            <span class="ev ev--e1">E1 你的材料</span>；「先补哪个」是 AI 的排序
+            <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>。
+          </p>
+        </div>
+
         <div class="pane" style="margin-top:auto;flex:0 0 auto">
           <div class="pane-hd"><span class="t">对比怎么读</span></div>
           <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
@@ -626,7 +642,7 @@
           <svg class="ic"><use href="#i-offline"/></svg>
           <span><b>对比服务中断，不给三档、不给计数、不给差距。</b>你已选的 2 个岗位还在，原文照常可看；故障已自动上报。</span>
         </div>
-        <div class="cmpgrid" style="grid-template-columns:1fr 1fr">
+        <div class="cmpgrid" style="grid-template-columns:1fr 1fr;flex:1 1 auto;min-height:0">
           <div class="cmp">
             <span class="cmp-t">用户运营专员</span>
             <span class="cmp-m">广州 · 天河区 · 6–9K</span>
@@ -655,7 +671,7 @@
           <svg class="ic"><use href="#i-info"/></svg>
           <span>多岗对比拿的是<b>同一份简历</b>对多个岗位——还没有简历，比不起来。</span>
         </div>
-        <div class="pane" style="flex:0 0 auto">
+        <div class="pane" style="flex:1 1 auto">
           <div class="pane-hd"><span class="t">三步就能用上这里</span></div>
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
@@ -772,7 +788,7 @@
             报告只从<b>真实做过的比对</b>里来——没有简历、没有比对，就没有报告，本机不会拿模板凑一份给你。
           </p>
         </div>
-        <div class="pane" style="flex:0 0 auto">
+        <div class="pane" style="flex:1 1 auto">
           <div class="pane-hd"><span class="t">怎么拿到这份报告</span></div>
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
@@ -802,7 +818,7 @@
           <svg class="ic"><use href="#i-offline"/></svg>
           <span><b>AI 服务中断，本次生成不了报告。</b>结论造不出来就不出——不会拿旧模板或缓存凑一份。故障已自动上报。</span>
         </div>
-        <div class="pane" style="flex:0 0 auto">
+        <div class="pane" style="flex:1 1 auto">
           <div class="pane-hd"><span class="t">现在还能做的</span></div>
           <div class="outs" style="grid-template-columns:1fr 1fr">
             <a class="out" href="23-me.html"><svg class="ic"><use href="#i-history"/></svg>看之前生成过的报告 · 我的</a>
@@ -826,7 +842,7 @@
     <div class="wside">
 
       <!-- S1 说明 -->
-      <div class="pane pane--fill" data-at="s1">
+      <div class="pane pane--grow" data-at="s1">
         <div class="pane-hd"><span class="t">这个台子做什么</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-3);line-height:1.7;color:var(--fog-800)">
           拿你的简历原文和<b>具体岗位</b>的要求逐条对照：哪条对上了、哪条差一点、哪条没写到；
@@ -861,7 +877,7 @@
       </div>
 
       <!-- S2 右 · 方向缺口 + 站内薪资合并卡 -->
-      <div class="pane" data-at="s2" data-when="default device-off">
+      <div class="pane pane--grow" data-at="s2" data-when="default device-off">
         <div class="pane-hd"><span class="t">方向与薪资参考</span><span class="s">只描述见过的文本</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">来源方写的</span><span class="v">6–9K · 原样转录</span></div>
@@ -881,7 +897,7 @@
       </div>
 
       <!-- S2 右 · ai-down / first：七块全收后的替代出口 -->
-      <div class="pane" data-at="s2" data-when="ai-down first">
+      <div class="pane pane--grow" data-at="s2" data-when="ai-down first">
         <div class="pane-hd"><span class="t">现在还能做什么</span></div>
         <div class="outs" style="grid-template-columns:1fr">
           <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
@@ -898,7 +914,7 @@
       </div>
 
       <!-- S3 右 · 谁能看 + 岗位从哪来 -->
-      <div class="pane" data-at="s3">
+      <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><span class="t">对比结果谁能看</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">你本人</span><span class="v">仅本机与「我的」可见</span></div>
@@ -934,15 +950,18 @@
         </p>
       </div>
 
-      <!-- S4 右 · first / ai-down：报告里有什么（机制说明，不给结论） -->
-      <div class="pane" data-at="s4" data-when="first ai-down">
-        <div class="pane-hd"><span class="t">报告里会有什么</span></div>
+      <!-- S4 右 · 报告的三页构成（机制说明，四态通用；仅结语按态区分） -->
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><span class="t">报告里有什么</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">封面页</span><span class="v">AIGC 标识 · 免责 · 来源三字段</span></div>
           <div class="kv-row"><span class="k">正文页</span><span class="v">三档结论 · 差距第一步 · 风险薪资</span></div>
           <div class="kv-row"><span class="k">清单页</span><span class="v">面试前的追问清单</span></div>
         </div>
-        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="default device-off">
+          左边就是全文预览，打印出来和预览一致；每页页脚固定标注 AI 生成内容。
+        </p>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="first ai-down">
           全部内容来自真实比对——所以现在这里给不出预览。
         </p>
       </div>
