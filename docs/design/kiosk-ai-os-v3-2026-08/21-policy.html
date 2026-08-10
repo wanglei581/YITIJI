@@ -1016,12 +1016,34 @@
     return ''
   }
 
-  var carry = { cat: '', identity: '', insured: '', city: '', prov: '' }
+  /* ── ?view= 直达点（2026-08-11 补消费）────────────────────────────────────
+     38 政策服务首屏那三张卡各自承诺直达一块内容，此前本页**一个都不读**：
+       ?view=official   「官方办理入口 · 热线与官网二维码」  → 第 2 步 · 右侧抽屉
+       ?view=doc        「政策原文 · 官方发布口径」          → 第 2 步 · 逐条原文
+       ?view=checklist  「办事材料清单 · 按事项列」          → 第 3 步 · 打印清单
+     认下 view 之后顺手把阶段对齐到目标块所在的那一步 —— 把人送到一个
+     根本看不见目标块的阶段，和不读参数是同一种走错。
+     official 尤其要注意：那一块默认**收在抽屉里**，抽屉里的热线与二维码
+     两个大按钮也默认是收起的。链接文案写的就是「热线与官网二维码」，
+     只把抽屉拉开还不算直达，得让这两样直接露出来并滚到眼前。
+     白名单之外的值一律不认，并在回执里明写忽略了什么（同 identity / city 口径）。 */
+  var VIEW_KEYS = ['official', 'doc', 'checklist']
+  var VIEW_NM = { official: '官方办理入口', doc: '政策原文', checklist: '办事材料清单' }
+  var VIEW_AT = { official: 's2', doc: 's2', checklist: 's3' }
+  var VIEW_TIP = {
+    official: '：第 2 步右侧「出发前问官方」已展开，<b>热线与官网二维码都已打开</b>，不用再自己去翻抽屉。',
+    doc: '：第 2 步每条政策的<b>原文已逐条展开</b>，原文照官方公开文件转录，本机不改写、不加条件。',
+    checklist: '：已落在第 3 步<b>打印清单</b>，勾哪几条清单就按哪几条生成。'
+  }
+
+  var carry = { cat: '', identity: '', insured: '', city: '', prov: '', view: '', badView: '' }
   var catSel = ''          // 当前生效的分类（'' = 全部）
   var catBar = false       // URL 真带过分类，才出分类切换条
 
   function readCarry () {
     carry.cat = inList(qval('cat'), CAT_KEYS)
+    carry.view = inList(qval('view'), VIEW_KEYS)
+    if (qval('view') && !carry.view) carry.badView = qval('view')
     carry.identity = inList(qval('identity'), optsOf('status'))
     carry.insured = inList(qval('insured'), optsOf('soc'))
     var c = qval('city')
@@ -1431,7 +1453,7 @@
      只在真的带了合法参数时才插进 DOM。不带参数 → 这一块整个不存在，
      版面与整改前逐像素相同（自检基线不受影响）。 */
   function buildCarry () {
-    if (!catBar && !carryItems().length) return
+    if (!catBar && !carryItems().length && !carry.view && !carry.badView) return
     var box = document.createElement('div')
     box.className = 'carryin'
     box.id = 'carryBox'
@@ -1449,11 +1471,26 @@
        的包装钩子在算完可见性**之后**调用，新塞进来的 [data-at] 节点
        这一帧不会被算到，会在第 1 步也露出来。 */
     var atS2 = (scr.getAttribute('data-stage') || 's1') === 's2'
-    var ttl = items.length ? ('已带入你在上一屏选的 ' + items.length + ' 项') : '已按上一屏点的分类筛选'
+    var ttl
     if (items.length && catBar) ttl = '已带入上一屏的选择：' + items.length + ' 项条件 + 1 个分类'
+    else if (items.length) ttl = '已带入你在上一屏选的 ' + items.length + ' 项'
+    else if (catBar) ttl = '已按上一屏点的分类筛选'
+    else if (carry.view) ttl = '已按上一屏点的入口直达'
+    else ttl = '上一屏带来的参数本机没认出来'
 
     h += '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg><b>' + ttl + '</b>' +
          '<span class="carryin-src">来自政策服务首屏 · 可改</span></div>'
+
+    /* 直达点回执：写清「直达了哪一块、那一块现在是什么状态」。
+       不写「已为你办好」之类 —— 本页只是把内容摊开，办事还在窗口。 */
+    if (carry.view) {
+      h += '<div class="carryin-note">已直达<b>' + VIEW_NM[carry.view] + '</b>' + VIEW_TIP[carry.view] + '</div>'
+    }
+    if (carry.badView) {
+      h += '<div class="carryin-note">链接里的 <b>view=' + esc(carry.badView) + '</b> 本机不认识，<b>已忽略</b>：' +
+           '本页只有「官方办理入口 / 政策原文 / 办事材料清单」三个直达点。' +
+           '这一屏<b>没有替你跳到任何地方</b>，按正常流程从第 1 步开始。</div>'
+    }
 
     if (items.length) {
       h += '<div class="carryin-items">'
@@ -1569,7 +1606,12 @@
      再配合 screen.setAttribute('data-state'|'data-stage') + v3ApplyVisibility() + v3AuditPlus() */
   /* 参数消费的走查把手：看本页到底认下了 URL 里的哪几个值 */
   window.p21Carry = function () {
-    return { carry: carry, catSel: catSel, catBar: catBar, status: ans.status, soc: ans.soc, city: city.city }
+    return { carry: carry, catSel: catSel, catBar: catBar, status: ans.status, soc: ans.soc, city: city.city,
+             view: carry.view, badView: carry.badView,
+             sideOpen: scr.classList.contains('is-side'),
+             telOpen: !!($('telBox') && !$('telBox').hidden),
+             qrOpen: !!($('qrWrap') && !$('qrWrap').hidden),
+             docsOpen: Object.keys(open).length }
   }
 
   window.p21Set = function (o) {
@@ -1590,6 +1632,36 @@
     render()
   })
 
+  /* ?view= 的落实：阶段对齐 + 把目标块摊开。
+     只在 DOM 建好、render() 跑过一轮之后做 —— 抽屉与原文块都要先存在。 */
+  function applyView () {
+    if (!carry.view) return
+    var want = VIEW_AT[carry.view]
+    if (want && (scr.getAttribute('data-stage') || '') !== want && window.v3Stage) window.v3Stage(want)
+
+    if (carry.view === 'official') {
+      /* 抽屉开关只切 .screen 上的一个 class（同页内那段 data-side-open 的实现），
+         这里走同一条路，不另起一套。 */
+      scr.classList.add('is-side')
+      var bs = document.querySelectorAll('[data-side-open]')
+      for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', 'true')
+      /* 热线提示与二维码：默认 hidden，直达就得直接可见 */
+      if ($('telBox')) { $('telBox').hidden = false; $('telBtn').setAttribute('aria-pressed', 'true') }
+      if ($('qrWrap')) { $('qrWrap').hidden = false; $('qrBtn').setAttribute('aria-pressed', 'true') }
+      /* 抽屉里「出发前问官方」排在政策来源、核对结果后面，不滚过去用户看不到 */
+      var pane = $('telBtn') && $('telBtn').closest('.pane')
+      if (pane && pane.scrollIntoView) { try { pane.scrollIntoView({ block: 'start' }) } catch (e) {} }
+    }
+
+    if (carry.view === 'doc') {
+      /* 「只看政策原文」：当前分类下的每一条都展开原文。
+         原文一字不改，只是不用再逐条点「看原文」。 */
+      var list = polsIn()
+      for (var j = 0; j < list.length; j++) open[list[j].id] = 1
+      render()
+    }
+  }
+
   /* 先读参数再建 DOM：分类决定列表建哪几条，预填决定问项的初始选中态 */
   readCarry()
   trimPick()
@@ -1597,6 +1669,7 @@
   buildQs()
   buildPols()
   render()
+  applyView()
   if (window.v3ApplyVisibility) window.v3ApplyVisibility()
 
   /* 四态 / 阶段切换后重算：

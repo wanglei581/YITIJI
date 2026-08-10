@@ -222,9 +222,14 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 
       <!-- 这一行只讲本页行为。合规声明整页只留左栏底部 .foot 那一条 ——
            原来这里和右栏各写一遍，同义重复（Codex 2026-08-10）。 -->
+      <!-- 2026-08-11 Codex 链接复核 #465 / #469 / #466 / #470：
+           这一句原来写「选中的版式会作为参数带进优化与打印那两步」。参数确实带了，
+           但**两个目标页都不读**（P09 只消费 from/src，P06 只消费 from/kind/title/
+           pages/copies/back）。「带进去」听起来像已经生效，实际到那边什么都没发生。
+           改成如实写：带的是参数，接线后才生效。 -->
       <div class="notice">
         <svg class="ic"><use href="#i-book"/></svg>
-        <span><b>选择只代表版式参考，本页不生成、不套用、不保存。</b>选中的版式会作为参数带进优化与打印那两步。</span>
+        <span><b>选择只代表版式参考，本页不生成、不套用、不保存。</b>选中的版式<b>只作为参数</b>随链接带进优化与打印那两步；那两页目前还没读它，<b>接线后自动生效</b>。</span>
       </div>
 
       <div class="flt" role="group" aria-label="简历素材分类">
@@ -370,32 +375,55 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
         <div class="pane-hd"><svg class="ic"><use href="#i-arrowRight"/></svg><b>拿它去做什么</b><span class="s">三个出口</span></div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
-          <!-- ① 套用到简历优化：AI 出口。原来深链 ?stage=s4（逐条优化结果态），
-               现在落到工作台第一步 s1，让用户先选自己的简历；templateId 由 JS 按选中态挂上。
-               ai-down 时这一项**按不动**（换成下面那张 exit--off），浏览 / 预览 / 打印照常。 -->
+          <!-- ══ 出口接线契约（2026-08-11 · Codex 链接复核 #465 #469 #466 #470）══════
+               本页选中的版式只有一个可交接的东西：templateId（取值抄自生产
+               packages/shared/src/types/jobMaterials.ts 的 JOB_MATERIAL_TEMPLATES[0].id）。
+               参数一直在传，两个目标页却都不读：
+                 · P09 简历工作台 —— 只消费 from / src，intent 与 templateId 静默丢弃
+                 · P06 打印工作台 —— 只消费 from / kind / title / pages / copies / back，
+                   templateId 静默丢弃
+               两页都不归本页改，所以这一轮做的是**把话说回真实**，而不是假装接上了：
+                 ① 参数照传（接线契约不断），但文案一律不写「已套用 / 已带着改」，
+                    只写「接线后自动套用」；
+                 ② 打印那条**改落点**：从 ?stage=s3（参数核价）退回 ?stage=s1（选来源）。
+                    理由是硬的 —— 本页**根本没有生成任何样张文件**，
+                    s3 是「已经选好材料、只差核价」那一步，带着一个不存在的产物进去，
+                    屏幕上会摆出另一份写死的文件（实测显示的是「个人简历.pdf · 3 页」，
+                    还带身份证号提示）。用户点「打印带走版式样张」，看到的是别人的简历 ——
+                    这正是所有者说的「点进去不是这个链接的那个页面」。
+                    Codex (c) 的判据也一样：缺少文件 / 产物 ID 时不得跳过首步。
+               接线时该怎么做（交 P09 / P06）：
+                 · P09 收到 intent=optimize&templateId=<id> → s1 顶部回显「按这个版式方向优化」，
+                   用户选完简历后把版式方向带进 s4 逐条优化；读不到该 id 就当没传，
+                   照常走默认版式，**不要**报错也不要静默换一个版式。
+                 · P06 收到 kind=template&templateId=<id> → 第 1 步回显「你要打的是：简历版式样张」，
+                   并从素材库取该模板的样张 PDF 落成产物后再进 s3；取不到就停在第 1 步，
+                   让用户自己选文件，**不要**拿别的文件顶上。
+                 · 真正接上产物之后，本页这条出口才可以改回 ?stage=s3 并带 artifactId。
+               ═══════════════════════════════════════════════════════════════════════ -->
           <a class="exit" data-when="default first device-off" data-tpl-link data-goal-link
              data-href0="09-resume-workbench.html?stage=s1&amp;intent=optimize"
              href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-pen"/></svg>
-            <span class="exit-b"><span class="exit-t">套用到简历优化</span>
-              <span class="exit-s">进去<b>先选你的简历</b>，再带这个版式方向逐条改；原件只新增版本不覆盖。</span></span>
+            <span class="exit-b"><span class="exit-t">带这个版式去简历优化</span>
+              <span class="exit-s">进去<b>先选你的简历</b>；版式方向按 <b>?templateId</b> 带过去，简历工作台<b>目前还没读这个参数</b>，接线后自动套用。原件只新增版本不覆盖。</span></span>
           </a>
           <div class="exit exit--off" data-when="ai-down">
             <svg class="ic"><use href="#i-offline"/></svg>
-            <span class="exit-b"><span class="exit-t">套用到简历优化：现在按不动</span>
+            <span class="exit-b"><span class="exit-t">带这个版式去简历优化：现在按不动</span>
               <span class="exit-s">改写要模型生成，中断期间做不了。<b>浏览、选版式、打印照常</b>。</span></span>
           </div>
 
           <a class="exit" data-when="default first ai-down" data-tpl-link
-             data-href0="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
-             href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">
+             data-href0="06-print-workbench.html?stage=s1&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
+             href="06-print-workbench.html?stage=s1&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-printer"/></svg>
-            <span class="exit-b"><span class="exit-t">打印带走</span>
-              <span class="exit-s">送进打印工作台；<b>金额以核价与现场公示价为准</b>，本页不出价。</span></span>
+            <span class="exit-b"><span class="exit-t">拿这个版式去打印台</span>
+              <span class="exit-s">本页<b>只有版式预览、没有可打印的样张文件</b>，所以落在打印台<b>第 1 步选来源</b>，不跳到核价。<b>金额以核价与现场公示价为准</b>，本页不出价。</span></span>
           </a>
           <div class="exit exit--off" data-when="device-off">
             <svg class="ic"><use href="#i-offline"/></svg>
-            <span class="exit-b"><span class="exit-t">打印带走：本机现在打不了</span>
+            <span class="exit-b"><span class="exit-t">拿这个版式去打印台：本机现在打不了</span>
               <span class="exit-s">打印机离线，已上报运维。这台机器<b>出不了纸</b>，可以换台机器再打。</span></span>
           </div>
 
@@ -444,13 +472,17 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
     <span class="actionbar-hint" data-when="ai-down">套用暂不可用，浏览与打印照常</span>
     <span class="actionbar-hint" data-when="device-off">打印机离线，出纸要换台机器</span>
 
+    <!-- 2026-08-11：主按钮原来写「套用到简历优化」/「打印带走」，两句都在承诺
+         按下去之后会发生的事 —— 而目标页一个参数都不读、本页也没有样张文件。
+         按钮上只写这一按**真正会发生**的事：把版式带过去 / 去打印台。
+         落点与右栏两个出口保持同一个 href（同一件事不能两个说法）。 -->
     <a class="btn btn--primary" data-when="default first device-off" data-tpl-link data-goal-link
        data-href0="09-resume-workbench.html?stage=s1&amp;intent=optimize"
-       href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">套用到简历优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+       href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">带版式去简历优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <!-- ai-down：主按钮不能还写「套用到简历优化」—— 那一步现在按不动。换成本态真能做完的事。 -->
     <a class="btn btn--primary" data-when="ai-down" data-tpl-link
-       data-href0="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
-       href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">打印带走<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+       data-href0="06-print-workbench.html?stage=s1&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
+       href="06-print-workbench.html?stage=s1&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">拿版式去打印台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">

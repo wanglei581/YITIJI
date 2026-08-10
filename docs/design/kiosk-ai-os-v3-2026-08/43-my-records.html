@@ -256,6 +256,61 @@ body.capture .proto-only { display:none !important; }
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
+<!-- ══════════════════════════════════════════════════════════════════════════
+     2026-08-11 · 链接落地整改（Codex 复核 reviews-codex-2026-08-11.md (b) P0）
+     本页发出的 URL 参数契约 —— 谁该消费、消费不到时目标页该怎么办
+     --------------------------------------------------------------------------
+     总原则同 42：**记录页只负责把「哪一条」的身份传全；目标页解析不出来时必须停在
+     自己的第一步并说明原因，绝不许拿默认样例冒充用户点的那一条。**
+     记录页尤其吃这一条 —— 这一页每一行都是"具体某一条"，落到列表首屏就等于没落。
+
+     ① returnTo / returnStage / from（→ 03 身份门）**03 已接线，按它落地的格式发**
+        03-identity-gate.html?returnTo=<站内页面文件名>&returnStage=<阶段 slug>&from=P43
+        returnTo 只放**文件名**，阶段单独走 returnStage（03 的白名单 RET 按裸文件名建键，
+        整串带 ?stage= 会比不中白名单被丢掉）。43 在 RET 里登记的阶段名是
+        ai / fav / trace / notice，与本页四个标签一一对应。
+        03 已消费：命中白名单就改写门上的说明与跳过 / 登录两个出口；不认识就回首页
+        并说明原因（不回显原值），from=P43 是 returnTo 丢失时的兜底。
+
+     ② orderId（→ 42 我的资产 · 打印订单）
+        42-my-assets.html?stage=orders&orderId=O-xxxxxxxx-xxxx
+        42 已经在消费（applyDeepOrder：命中就展开 + 描边 + 顶部定位条；查不到照常全量列表）。
+
+     ③ fairId（→ 17 招聘会作战台）
+        17-fair-desk.html?stage=s1&fairId=<外部ID>&from=P43   打开这一场
+        17-fair-desk.html?stage=s4&fairId=<外部ID>&from=P43   打开这一场生成的作战单
+        17 应消费：按外部 ID 选中那一场。**本机场次库里没有这一场时停在 s1 并写明
+        「这一场不在本机场次库里」，不得默认选中第一场。**
+        已知数据缺口（不是链接错，是样例数据没对齐，见交回说明）：本页记录里的
+        FA-2026-08 / FA-2026-07 在 17 的场次库里不存在（17 只有 RC-2026-0812-A /
+        RC-2026-0815-M / XZ-2026-0820）。改 17 的场次数据不在本轮可改文件内。
+
+     ④ companyId（→ 15 企业导览）
+        15-companies.html?stage=detail&companyId=<外部ID>&from=P43
+        契约来源：15 文件内 AI 接线注释已写明输入含 companyId。
+        15 应消费：按 ID 打开该企业详情；查不到就停在 list 并说明。
+
+     ⑤ policyId（→ 21 政策服务）
+        21-policy.html?stage=s2&policyId=<政策ID>&from=P43
+        s2 是「看缺口 / 政策与原文」，是"打开某一条政策看原文"的落点；
+        s1 是「选情况」，那是重新填一遍条件，不是打开这一条。
+        21 应消费：按 ID 展开那一条的原文；查不到就停在 s2 并说明本机政策库里没有它。
+        已知数据缺口：本页收藏的「高校毕业生一次性求职补贴（穗人社规〔2026〕3 号）」
+        不在 21 的政策库（21 只有 p1–p6）。同上，改 21 不在本轮范围内。
+
+     ⑥ jobId（→ 14 线上岗位详情 / 44 线下岗位详情）
+        沿用 11 岗位匹配已在用的 jobId 命名，值取本页每一行「外部 ID」那一栏显示的号。
+
+     ⑦ artifactId（→ 09 / 20 / 22 查看产物）
+        产物 ID 口径见 interface-handoff.md §2A；本页写可读占位 ID（art-…），
+        与 42 同一份，接线时一起换成 art_… 真 ID。
+
+     ⑧ view（→ 23 我的）：23-me.html?view=settings，23 已在消费。
+
+     本页自己消费的 activityId（?stage=trace&activityId=A-…）是**本页足迹记录号**，
+     和上面那些业务对象 ID 不是一回事，不要混用。
+     ══════════════════════════════════════════════════════════════════════════ -->
+
 <div class="stage">
 <div class="screen" data-state="default" data-stage="ai" data-theme="warm">
 
@@ -472,7 +527,10 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
+              <!-- 2026-08-11 Codex 错配整改：原指 09?stage=s5 =「版本与导出」，那是简历版本
+                   导出页，不是诊断报告。报告在第 3 步「诊断结论」，改指 s3 并带产物 ID
+                   （09 应按 ID 取这一份，取不到回 s1，不得显示示例结论）。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s3&amp;from=P43&amp;artifactId=art-rpt-v3"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
               <a class="btn btn--ghost" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的简历</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="简历诊断记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -499,7 +557,7 @@ body.capture .proto-only { display:none !important; }
               <!-- 2026-08-10 Codex 空白链接整改：原指 09-resume-workbench.html?stage=s6。
                    简历工作台只有 s1–s5，s6 不存在 → 没有任何 data-at 命中 → **整页空白**。
                    优化后的版本落在第 5 步「版本与导出」，改指 s5。 -->
-              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5&amp;from=P43&amp;artifactId=art-resume-v3"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="简历优化记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -527,7 +585,9 @@ body.capture .proto-only { display:none !important; }
                    对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
                    jobTitle 做 URL 编码，避免中文裸字符。 -->
               <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看对比（带这条岗位）</a>
-              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看这个岗位</a>
+              <!-- 2026-08-11：「看这个岗位」是具体某一条，必须带外部 ID（契约 ⑥）。
+                   14 目前只有 JX-88214 这一条，裸链看着也对，但那是巧合不是接线。 -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-briefcase"/></svg>看这个岗位</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="岗位匹配记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
             <div class="rrow-det">
@@ -549,7 +609,7 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="20-interview-pod.html?stage=s3"><svg class="ic"><use href="#i-eye"/></svg>查看点评</a>
+              <a class="btn btn--ghost" href="20-interview-pod.html?stage=s3&amp;from=P43&amp;artifactId=art-interview-0728"><svg class="ic"><use href="#i-eye"/></svg>查看点评</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印复盘单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="面试练习记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -572,7 +632,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="22-career-plan.html"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，默认落 22 s1「你现在会什么」——
+                   那是重做一遍规划的第一步。产物（行动清单）在第 3 步，改指 s3。 -->
+              <a class="btn btn--ghost" href="22-career-plan.html?stage=s3&amp;from=P43&amp;artifactId=art-plan-0805"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=职业规划建议&amp;pages=4&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="职业规划记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -595,7 +657,10 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，默认落 17 s1「哪一场」——
+                   那是重新挑一场的第一步。这一条记录是**已经生成好的作战单**，
+                   落点是第 4 步「带走作战单」，并按契约 ③ 带上是哪一场。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s4&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="参会作战单记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -625,7 +690,9 @@ body.capture .proto-only { display:none !important; }
           <b>未登录 · 记录留不下来</b>
           <p>不登录也能用<b>全部 AI 功能</b>，只是这一栏的记录离场就清空。</p>
           <div class="acts">
-            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <!-- 2026-08-11 Codex 错配整改：原为裸链 —— 03 的门上说明与两个出口都写死
+                 招聘会上下文，从这里进门登录完会被送去招聘会作战台。补 returnTo（契约 ①）。 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=ai&amp;from=P43">扫码登录</a>
             <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">先做简历诊断</a>
             <a class="btn btn--ghost" href="25-advisor.html">问问 AI 顾问</a>
           </div>
@@ -648,7 +715,8 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
               <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
                    正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
                    对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
@@ -708,7 +776,11 @@ body.capture .proto-only { display:none !important; }
               <!-- 2026-08-10 Codex 错配整改：这一条是**线下机构**岗位（到店咨询、不接受线上投递），
                    原来点开却是线上岗位详情 14-job-detail.html —— 那一页写的是外部投递链接与扫码投递，
                    和这条岗位的办事方式对不上。线下岗位详情页 44 已存在，改指 44。 -->
-              <a class="btn btn--ghost" href="44-job-detail-offline.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID（用本行显示的 OA-3312，
+                   与 13 岗位情报台、16 线下机构页一致）。
+                   已知不一致：44 岗位详情页自己写的是 OA-3312-07，改 44 不在本轮范围内，
+                   已在交回说明里单列。 -->
+              <a class="btn btn--ghost" href="44-job-detail-offline.html?jobId=OA-3312&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
               <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>看这家机构</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -732,7 +804,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <!-- 2026-08-11 Codex 错配整改：收藏的是**这一场**（外部 ID FA-2026-08），
+                   原为裸链，落到作战台的默认场次 = 打开的是别人那一场。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印作战单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -756,7 +830,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <!-- 2026-08-11 Codex 错配整改：这一条是**毕业生专场（FA-2026-07）**，
+                   和上一条夏季综合不是同一场，原来两条裸链落到的却是同一屏。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-07&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
               <a class="btn btn--ghost" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -780,7 +856,10 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」—— 那是重新填一遍
+                   条件的第一步，不是打开这一条政策。打开某一条看原文的落点是 s2
+                   「看缺口 / 政策与原文」，并按契约 ⑤ 带政策 ID。 -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的政策"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -810,7 +889,8 @@ body.capture .proto-only { display:none !important; }
           <b>未登录 · 收藏离场即清</b>
           <p>没登录也能收藏，只是<b>只留本次会话</b>；要留着，先登录或把清单打印带走。</p>
           <div class="acts">
-            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「我的收藏」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=fav&amp;from=P43">扫码登录</a>
             <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
             <a class="btn btn--ghost" href="17-fair-desk.html">去招聘会作战台</a>
           </div>
@@ -840,7 +920,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11 Codex 错配整改：「回到这一条」是对某一条足迹的承诺，
+                   必须带外部 ID（契约 ⑥），不能靠"目标页碰巧只有这一条"。 -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
               <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
                    正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
                    对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
@@ -895,7 +977,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11 Codex 错配整改：这一条足迹是**夏季综合（FA-2026-08）**，
+                   裸链落到作战台的默认场次，等于打开了另一场。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -912,12 +996,18 @@ body.capture .proto-only { display:none !important; }
                 <span class="rrow-tl"><span class="rrow-t">广州××科技有限公司</span>
                   <span class="chip is-static">浏览 · 企业</span></span>
                 <span class="rrow-m">今天 09:48 · 看了在招岗位 · 记录号 A-20260810-0948</span>
-                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID CO-7781</span></span>
+                <!-- 2026-08-11 Codex 错配整改：这一行原来写「外部 ID CO-7781」，可 15 企业导览
+                     里同名企业「广州××科技有限公司」的外部 ID 是 CO-4471（列表行与详情页
+                     两处都是），全站只有本页在用 CO-7781 —— 是本页这条记录写错了号，
+                     写错的号让「回到这一条」永远查不到。按 15 的号改正。 -->
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID CO-4471</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="15-companies.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 原为裸链 15-companies.html，落 list 默认态 = 一张企业列表，
+                   不是用户点的那一家。15 有 detail 阶段，按契约 ④ 带 companyId 直达。 -->
+              <a class="btn btn--ghost" href="15-companies.html?stage=detail&amp;companyId=CO-4471&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -939,7 +1029,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」——
+                   那是重新填条件，不是回到这一条政策。打开某一条看原文在 s2，按契约 ⑤ 带 policyId。 -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -961,7 +1053,8 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
               <a class="btn btn--ghost" href="35-online-platforms.html"><svg class="ic"><use href="#i-external"/></svg>线上平台入口</a>
             </div>
             <div class="rrow-det">
@@ -984,7 +1077,8 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11：这条跳转记录对应的也是夏季综合（FA-2026-08），按契约 ③ 带 fairId -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -1034,7 +1128,8 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11：同上，打开某一条政策看原文在 21 s2，按契约 ⑤ 带 policyId -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
             </div>
             <div class="rrow-det">
@@ -1054,7 +1149,9 @@ body.capture .proto-only { display:none !important; }
           <div class="acts">
             <button class="btn btn--primary" data-reset>回到浏览记录</button>
             <a class="btn btn--ghost" href="35-online-platforms.html">去线上平台自己查</a>
-            <a class="btn btn--ghost" href="23-me.html">看隐私与删除设置</a>
+            <!-- 2026-08-11：文案承诺的是「隐私与删除设置」，23 已在消费 ?view=，
+                 带 settings 才会落到账号设置那张卡；裸链只到「我的」首屏。 -->
+            <a class="btn btn--ghost" href="23-me.html?view=settings">看隐私与删除设置</a>
           </div>
         </div>
 
@@ -1063,9 +1160,12 @@ body.capture .proto-only { display:none !important; }
           <b>未登录 · 足迹离场即清</b>
           <p>没登录时的浏览与跳转<b>只留本次会话</b>，结束或超时就没了。</p>
           <div class="acts">
-            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「浏览与跳转」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=trace&amp;from=P43">扫码登录</a>
             <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
-            <a class="btn btn--ghost" href="21-policy.html">去政策服务</a>
+            <!-- 2026-08-11 Codex (b) P2 第 12 条：「去政策服务」是**泛域入口**，不是某一条政策，
+                 按正式 IA（closed-loop-map）泛入口先落域首屏 P38，不直接进 21 的核对流程。 -->
+            <a class="btn btn--ghost" href="38-policy-hub.html">去政策服务</a>
           </div>
         </div>
       </div>
@@ -1085,7 +1185,14 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
+              <!-- 2026-08-11 Codex 错配整改：原来只到 orders 列表，用户还得在 6 条里自己找 ——
+                   同一栏下面「取件码 P-4172」那条早就带了 orderId，这一条漏了。
+                   这条通知对应的是今天 10:23 完成的那一单：本页右栏 AI 反馈草稿写的就是
+                   「8 月 9 日 10:23，在打印工作台打『王同学_行政专员_简历.pdf』」，
+                   42 的订单里同一时刻同一文件的是 O-20260809-1023。按契约 ② 带上。
+                   （已知：本条标题写「13 页」，而 42 那一单计费 4 页 —— 这是 23/43 与 42 之间
+                     的样例数据不一致，改 23-me.html 不在本轮可改文件内，已在交回说明里单列。） -->
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1023"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
               <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -1131,7 +1238,17 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>看本机状态</a>
+              <!-- ══ 2026-08-11 「看本机状态」整改（Codex (b) P0 第 1 条）══════════════
+                   核过一遍：**全站没有一页在显示本机实时的纸量、粉量与队列**。最接近的
+                   实时读数在 06 打印工作台右栏那块「本机状态」面板（打印机在线/碳粉、
+                   A4 纸张 78%、扫描仪就绪），但它是打印流程里的侧栏、不是能被链过去的
+                   状态页 —— 把人送进 06 等于逼他为了看纸量开一笔新打印。
+                   04 的实际内容：s1 帮助（编号、位置、现场服务台、服务时间、**报修**、
+                   三个最常见卡点）；s6「本机状态与异常处置」是给运维复核与现场演示看的
+                   14 条状态样板，04 自己写明「不会改变这台机器现在的状态」。
+                   所以按第三种处置办：目标钉到 04 s1（求助与报修真在那儿），
+                   文案不再承诺纸、墨、队列。这一条工单说的就是出纸偏慢，落到求助页对得上。 -->
+              <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
             <div class="rrow-det">
@@ -1175,7 +1292,9 @@ body.capture .proto-only { display:none !important; }
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <a class="btn btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>看本机状态</a>
+              <!-- 2026-08-11 「看本机状态」整改，理由同上一条。维护预告要的是"到时候找谁"，
+                   04 s1 的现场服务台与服务时间正好答这个。 -->
+              <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
             <div class="rrow-det">
@@ -1242,7 +1361,8 @@ body.capture .proto-only { display:none !important; }
           <p>缺纸、卡纸、离线这类告警只在真的发生时才发，本机不发营销消息。</p>
           <div class="acts">
             <button class="btn btn--primary" data-reset>看全部 7 条</button>
-            <a class="btn btn--ghost" href="04-system-states.html">主动看本机状态</a>
+            <!-- 2026-08-11 「本机状态」整改，理由见上面工单行的长注释 -->
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43">求助与报修</a>
             <a class="btn btn--ghost" href="42-my-assets.html?stage=orders">看打印订单</a>
           </div>
         </div>
@@ -1252,8 +1372,9 @@ body.capture .proto-only { display:none !important; }
           <b>未登录 · 通知跟着账号走</b>
           <p>不登录也能提反馈，<b>留个手机号才收得到回复</b>；通知要登录后才收得到。</p>
           <div class="acts">
-            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
-            <a class="btn btn--ghost" href="04-system-states.html">看本机状态</a>
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「通知与反馈」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=notice&amp;from=P43">扫码登录</a>
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43">求助与报修</a>
             <a class="btn btn--ghost" href="25-advisor.html">找 AI 顾问问问</a>
           </div>
         </div>
@@ -1307,8 +1428,9 @@ body.capture .proto-only { display:none !important; }
               <span class="xlane-ds">带去：收藏 6 条&nbsp;· 预估价</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <!-- 未登录时收藏只在本次会话里，条数不属于账号，出口退回从选文件开始 -->
-          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s3&amp;from=P43">
+          <!-- 未登录时收藏只在本次会话里，条数不属于账号，出口退回从选文件开始。
+               2026-08-11：文案写「从选文件开始」，href 却是 s3 参数核价，自相矛盾；改指 s1。 -->
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s1&amp;from=P43">
             <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
               <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
@@ -1334,7 +1456,9 @@ body.capture .proto-only { display:none !important; }
               <span class="xlane-ds">本机收不到的自己搜</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="23-me.html">
+          <!-- 2026-08-11：卡面写「账号设置里可整段清」，就该落到账号设置那张卡；
+               23 已在消费 ?view=，带 settings。 -->
+          <a class="xlane-go" href="23-me.html?view=settings">
             <span class="src-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">隐私与删除</span>
               <span class="xlane-ds">账号设置里可整段清</span></span>
@@ -1358,10 +1482,15 @@ body.capture .proto-only { display:none !important; }
               <span class="xlane-ds">到期的先打印带走</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="04-system-states.html">
-            <span class="src-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
-            <span class="xlane-tx"><span class="xlane-nm">本机状态</span>
-              <span class="xlane-ds">纸墨队列与故障上报</span></span>
+          <!-- 2026-08-11 「本机状态」整改（Codex (b) P0 第 1 条）：
+               这张卡原来承诺「纸墨队列与故障上报」，可 04 打开是求助页，04 自己也写明
+               它列的是异常长什么样、不是这台机器现在的状态。全站没有实时纸/粉/队列的
+               落地页（最接近的是 06 打印台右栏的本机状态面板，不是独立页）。
+               卡面改成 04 s1 真正给得出的东西：现场服务台、服务时间、报修、常见卡点。 -->
+          <a class="xlane-go" href="04-system-states.html?stage=s1&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">求助与报修</span>
+              <span class="xlane-ds">现场服务台 · 报修方式 · 三个最常见卡点</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
         </div>
@@ -1630,8 +1759,10 @@ body.capture .proto-only { display:none !important; }
 
     <a class="btn btn--lg btn--ghost" data-at="ai" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的资产</a>
     <a class="btn btn--lg btn--ghost" data-at="fav" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>按企业看</a>
-    <a class="btn btn--lg btn--ghost" data-at="trace" href="23-me.html"><svg class="ic"><use href="#i-shield"/></svg>隐私与删除</a>
-    <a class="btn btn--lg btn--ghost" data-at="notice" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>查看本机状态</a>
+    <!-- 2026-08-11：带 view=settings 才落到账号设置那张卡（23 已在消费 ?view=） -->
+    <a class="btn btn--lg btn--ghost" data-at="trace" href="23-me.html?view=settings"><svg class="ic"><use href="#i-shield"/></svg>隐私与删除</a>
+    <!-- 2026-08-11 「查看本机状态」整改，理由见 notice 出口卡上的长注释 -->
+    <a class="btn btn--lg btn--ghost" data-at="notice" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
 
     <a class="btn btn--primary" data-at="ai" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43">去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="fav" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
