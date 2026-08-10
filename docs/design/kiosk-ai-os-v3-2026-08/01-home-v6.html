@@ -829,6 +829,11 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     if (LOWGPU || !fig || !img) return
     var brain = screen.querySelector('.vcommand > .ic')
     if (!brain) return
+    /* AI 不可用时不画这条线 —— 一条从指令条流向 AI 枢纽的动线，等于告诉用户
+       它还在工作。此前这一态是靠几何"恰好"不满足守卫（该态版头收到 186px，
+       指令条被拉近枢纽，落差只剩 21px）才没画出来；靠巧合成立的行为迟早会变，
+       所以写成明确的判断。 */
+    if (screen.getAttribute('data-state') === 'ai-down') return
     var sc = scale()
     var host = vivid.getBoundingClientRect()
     var br = brain.getBoundingClientRect()
@@ -837,7 +842,13 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     var y1 = (br.top - host.top) / sc - 6
     var x2 = (fr.left - host.left) / sc + hub.cx - RX - 10   /* 落到轨道左缘 */
     var y2 = (fr.top - host.top) / sc + hub.cy
-    if (x2 - x1 < 200 || y1 - y2 < 60) return
+    /* 守卫的用意是别画出一条退化的平线，不是把线关掉。
+       2026-08-11 实测：版头压到 226px 之后落差只有 49px，卡在 60 这条线上，
+       于是这组「指令→枢纽流向线」四态**一次都没渲染过** —— 而文件与交付说明里
+       一直写着「九组动效」。手工按同一套控制点画出来看过：629×49 的缓升连接线，
+       正是这组动效该有的样子，并不退化。所以把门槛下调到 40。
+       横向 200 那一条保持不变（左右距离不够时才是真的没法画）。 */
+    if (x2 - x1 < 200 || y1 - y2 < 40) return
     var path = 'M' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
                ' C' + (x1 + 150).toFixed(1) + ' ' + (y1 - 90).toFixed(1) + ', ' +
                (x2 - 220).toFixed(1) + ' ' + (y2 + 30).toFixed(1) + ', ' +
