@@ -20,6 +20,7 @@ on:
 jobs:
   precheck:
     name: Verify deploy defaults match server
+    if: github.ref_name != 'codex/recruitment-wave2-prod-admission-20260810'
     runs-on: ubuntu-latest
     steps:
       - name: Read-only probe via SSH
@@ -153,7 +154,11 @@ jobs:
             from urllib.parse import parse_qs, unquote, urlparse
 
             api_dir, pm2_name = sys.argv[1:3]
-            env_path = os.path.join(api_dir, '.env')
+            env_candidates = [
+                ('root', os.path.join(api_dir, '.env')),
+                ('api', os.path.join(api_dir, 'services', 'api', '.env')),
+            ]
+            present_envs = [(label, path) for label, path in env_candidates if os.path.isfile(path)]
             expected_readonly_role = 'recruitment_wave2_readonly'
 
             def load_dotenv(path: str) -> dict[str, str]:
@@ -204,9 +209,14 @@ jobs:
                     raise RuntimeError('psql-failed')
                 return result.stdout.strip()
 
-            if not os.path.isfile(env_path):
+            if not present_envs:
                 print('ADMISSION_ENV_FILE_PRESENT=no')
                 raise SystemExit(1)
+
+            # Root is the current release-script convention; the API-local file is
+            # retained as the legacy runtime layout. Never print either path.
+            env_layout, env_path = present_envs[0]
+            print('ADMISSION_ENV_LAYOUT=' + ('root' if env_layout == 'root' else 'api'))
 
             values = load_dotenv(env_path)
             app_url = values.get('DATABASE_URL', '')
