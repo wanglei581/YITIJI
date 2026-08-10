@@ -109,6 +109,44 @@
 .aidown .ic { width: 26px; height: 26px; flex: 0 0 auto; color: var(--fog-600); }
 .aidown b { color: var(--fog-900); }
 
+
+/* ---------- 顶部横向信息框：左账号 ｜ 右 AI 盘点 ---------- */
+.userbox {
+  position: relative; flex: 0 0 auto;
+  display: flex; align-items: stretch; gap: var(--s-6);
+  border-radius: var(--r-lg); padding: var(--s-5) var(--s-6);
+  background: var(--glass-2-bg); border: 1px solid var(--jade-a20);
+  box-shadow: var(--sh-2), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+}
+/* 4s 微呼吸描边：AI「在」的唯一常驻信号；ai-down / 未登录不呼吸 */
+.userbox::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit;
+  border: 1px solid var(--jade-a32); pointer-events: none; opacity: .2;
+  animation: aibreathe 4s var(--ease-in-out) infinite;
+}
+.screen[data-state="ai-down"] .userbox { border-color: var(--brd-2); }
+.screen[data-state="ai-down"] .userbox::after,
+.screen[data-state="first"] .userbox::after { animation: none; opacity: 0; }
+
+.ub-id { flex: 0 0 396px; display: flex; flex-direction: column; gap: var(--s-3); justify-content: center; }
+.ub-who { display: flex; align-items: center; gap: var(--s-4); }
+.ub-av { width: 66px; height: 66px; color: var(--jade-600); }
+.ub-av .ic { width: 30px; height: 30px; }
+.ub-av .fc-plate { inset: 9px; }
+.ub-wb { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ub-name { font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); }
+.ub-sub { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.5; }
+.ub-chips { display: flex; align-items: center; gap: var(--s-3); }
+.ub-chips .ub-out { margin-left: auto; }
+
+.ub-div { flex: 0 0 1px; background: linear-gradient(180deg, transparent, var(--brd-2) 18%, var(--brd-2) 82%, transparent); }
+.ub-ai { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s-3); justify-content: center; }
+.ub-ai .aifacts { grid-template-columns: 1fr; gap: 8px; }
+.ub-ai .ai-kick { flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
+.ub-ai .ai-kick .t { font-size: var(--fz-4); }
+.ub-ai .ainext .tx { font-size: var(--fz-3); }
+
 /* ---------- 8 张功能大卡：2 列 4 行，占满剩余高度 ---------- */
 .fgrid {
   flex: 1 1 auto; min-height: 0;
@@ -309,60 +347,78 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 
   <div class="fc">
 
-    <!-- ══════════ 顶部窄条 ══════════ -->
-    <div class="idbar rise" data-when="default ai-down device-off">
-      <span class="chip chip--jade is-static"><svg class="ic"><use href="#i-user"/></svg>已登录 · 尾号 8000</span>
-      <span class="chip is-static"><svg class="ic"><use href="#i-ticket"/></svg>会员 · 2 项权益可用</span>
-      <span class="idbar-note">本机登录 15:02 · 无操作 5 分钟自动退出</span>
-      <button class="btn btn--ghost" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
-    </div>
-    <div class="idbar rise" data-when="first">
-      <div class="loginqr">
-        <span class="loginqr-box"><svg class="ic"><use href="#i-qr"/></svg></span>
-        <span class="loginqr-b">
-          <span class="loginqr-t">手机扫码登录</span>
-          <span class="loginqr-s">登录后简历、文档和打印记录跟着账号走 · 未登录也能用全部功能</span>
-        </span>
-        <span class="chip chip--info">未登录 · 离场自动清空</span>
-      </div>
-    </div>
+    <!-- ══════════ 顶部横向信息框：账号信息 ｜ AI 求职进度盘点 ══════════
+         用户口径（2026-08-10）：顶部要一个横向的方框，装登录信息等内容，
+         框下面才是功能卡布局。因此把原「登录窄条 + AI 横幅」两条合并成
+         一个面板：左栏账号身份，右栏 AI 盘点，中间一条分隔线。 -->
+    <section class="userbox rise">
 
-    <!-- ══════════ AI 求职进度盘点横幅 ══════════ -->
-    <section class="aihero rise">
-      <div class="ai-kick">
-        <span class="t">AI 求职进度盘点</span>
-        <span class="ev ev--e1" data-when="default device-off">E1 你的记录</span>
-        <span class="ev ev--e2" data-when="default device-off">E2 来源状态</span>
-        <span class="mt" data-when="default device-off">只你可见 · 退出即离屏</span>
-        <span class="mt" data-when="ai-down">服务中断已自动上报</span>
+      <!-- 左栏 · 已登录 -->
+      <div class="ub-id" data-when="default ai-down device-off">
+        <div class="ub-who">
+          <span class="fc-ic ub-av">
+            <i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i>
+            <svg class="ic"><use href="#i-user"/></svg>
+          </span>
+          <span class="ub-wb">
+            <span class="ub-name">已登录 · 尾号 8000</span>
+            <span class="ub-sub">本机登录 15:02 · 无操作 5 分钟自动退出<br>本页只你可见 · 退出即离屏</span>
+          </span>
+        </div>
+        <div class="ub-chips">
+          <span class="chip chip--jade is-static"><svg class="ic"><use href="#i-ticket"/></svg>会员 · 2 项权益可用</span>
+          <button class="btn btn--ghost ub-out" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
+        </div>
       </div>
 
-      <!-- 登录 + AI 可用：三条事实 -->
-      <div class="aifacts" data-when="default device-off">
-        <div class="af"><svg class="ic"><use href="#i-resume"/></svg><span>简历已诊断 · 最新版 <b>v3</b></span></div>
-        <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>本周打印 <b>2 单</b> · 已全部出纸</span></div>
-        <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏岗位 <b>3 条</b> · 1 条已下线</span></div>
-      </div>
-      <!-- 尾接一条 E3 建议，真链 P11 -->
-      <div class="ainext" data-when="default device-off">
-        <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
-        <span class="tx">下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
-        <a class="btn btn--ghost" href="11-jobfit-compare.html">去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-      </div>
-
-      <!-- ai-down：整卡换兜底说明 -->
-      <div class="aidown" data-when="ai-down">
-        <svg class="ic"><use href="#i-offline"/></svg>
-        <span><b>AI 盘点暂不可用。</b>你的记录都在下面各卡里，不受影响；
-              故障已自动上报，不需要你操作。</span>
+      <!-- 左栏 · 未登录 -->
+      <div class="ub-id" data-when="first">
+        <div class="ub-who">
+          <span class="loginqr-box"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="ub-wb">
+            <span class="ub-name">手机扫码登录</span>
+            <span class="ub-sub">登录后简历、文档和打印记录跟着账号走</span>
+          </span>
+        </div>
+        <div class="ub-chips">
+          <span class="chip chip--info">未登录 · 离场自动清空</span>
+          <span class="chip is-static">不登录也能用全部功能</span>
+        </div>
       </div>
 
-      <!-- first：横幅换扫码登录引导（不出现任何个性化数字） -->
-      <div class="aidown" data-when="first">
-        <svg class="ic"><use href="#i-brain"/></svg>
-        <span><b>登录后，这里会用你的记录盘出进度和下一步。</b>
-              用上方二维码扫码登录即可；不登录也能用本机全部功能，
-              离场后本机会话自动清空。</span>
+      <span class="ub-div" aria-hidden="true"></span>
+
+      <!-- 右栏 · AI 求职进度盘点 -->
+      <div class="ub-ai">
+        <div class="ai-kick">
+          <span class="t">AI 求职进度盘点</span>
+          <span class="ev ev--e1" data-when="default device-off">E1 你的记录</span>
+          <span class="ev ev--e2" data-when="default device-off">E2 来源状态</span>
+          <span class="ev ev--e3" data-when="default device-off">E3 建议 · 仅供参考</span>
+          <span class="mt" data-when="ai-down">服务中断已自动上报</span>
+        </div>
+
+        <div class="aifacts" data-when="default device-off">
+          <div class="af"><svg class="ic"><use href="#i-resume"/></svg><span>简历已诊断 · 最新版 <b>v3</b></span></div>
+          <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>本周打印 <b>2 单</b> · 已全部出纸</span></div>
+          <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏岗位 <b>3 条</b> · 1 条已下线</span></div>
+        </div>
+        <div class="ainext" data-when="default device-off">
+          <span class="tx">下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
+          <a class="btn btn--ghost" href="11-jobfit-compare.html">去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+        </div>
+
+        <div class="aidown" data-when="ai-down">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span><b>AI 盘点暂不可用。</b>你的记录都在下面各卡里，不受影响；
+                故障已自动上报，不需要你操作。</span>
+        </div>
+
+        <div class="aidown" data-when="first">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span><b>登录后，这里会用你的记录盘出进度和下一步。</b>
+                扫左边二维码即可；不登录也能用本机全部功能，离场后本机会话自动清空。</span>
+        </div>
       </div>
     </section>
 
