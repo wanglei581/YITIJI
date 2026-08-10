@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P19 专用 ───────────────────────────────────────────────────────────
    这一页的设计任务和别的页不一样：**它的主状态是「还没有」**。
@@ -310,10 +311,7 @@
         <div class="stophere" data-at="s2">
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
-            接入后这一步下面还会有<b>具体的楼栋、窗口、时间、缴费状态</b> ——
-            但那些数据在学校手里，<b>本机不替学校编</b>。<br>
-            所以这块是空的，不是没做完，是<b>不该由本机填</b>。
-            学校开通后，这里会换成真实内容。
+            <b>这块是空的：楼栋、窗口、时间、缴费状态都在学校手里</b>，学校开通后换成真实内容。
           </div>
         </div>
       </div>
@@ -374,10 +372,7 @@
         <div class="stophere" data-at="s3">
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
-            接入后每一项下面还会有<b>办理条件、所需材料、是否需要审批、出多少份</b> ——
-            这些由学校设定，<b>本机不替学校编</b>。<br>
-            所以这块是空的。空着比编一套看起来合理的规则更诚实 ——
-            后者会让你按错的规则去准备。
+            <b>这块是空的：办理条件与材料由学校设定</b>，本机不编一套会让你按错规则去准备的。
           </div>
         </div>
       </div>
@@ -447,37 +442,31 @@
               <svg class="ic"><use href="#i-users"/></svg>
               <span class="alt-b"><span class="alt-t">迎新系统</span>
                 <span class="alt-s">报到流程、办事窗口、入学与求职准备</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-package"/></svg>
               <span class="alt-b"><span class="alt-t">行李帮运</span>
                 <span class="alt-s">合作物流服务入口与服务点说明</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-eye"/></svg>
               <span class="alt-b"><span class="alt-t">VR校园</span>
                 <span class="alt-s">360° 云游校园与重点场馆介绍</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-card"/></svg>
               <span class="alt-b"><span class="alt-t">校园卡办理</span>
                 <span class="alt-s">新生办卡、补卡、挂失后快速办理</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-idcard"/></svg>
               <span class="alt-b"><span class="alt-t">一卡通开通</span>
                 <span class="alt-s">开通食堂、门禁、图书馆等校园通行权限</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-route"/></svg>
               <span class="alt-b"><span class="alt-t">校园网开通</span>
                 <span class="alt-s">激活校园 Wi-Fi、宿舍网络与上网账号</span></span>
-              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
             </div>
 
             <div class="notice" style="margin-top:var(--s-3)">
@@ -493,7 +482,7 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-gear"/></svg>
           <b>谁能开、开关关着时会怎样</b>
-          <span class="mt">这几行是线上规则，不是示意</span>
+          <span class="mt">取自线上配置</span>
         </div>
         <div class="sec">
           <div class="kv">
@@ -503,9 +492,7 @@
             <div class="kv-row"><span class="k">关着时首页</span><span class="v">不出现「智慧校园」入口</span></div>
             <div class="kv-row"><span class="k">关着时直达网址</span><span class="v v--fog">只有「本机暂未开启」一句话</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            开关关着时入口不是灰掉，是压根不渲染 —— 本页由评审直达入口打开。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">开关关着时入口不渲染，不是灰掉。</div>
         </div>
       </div>
 
@@ -524,9 +511,6 @@
             <div class="kv-row"><span class="k">已接入学校</span><span class="v v--fog">无</span></div>
             <div class="kv-row"><span class="k">可读学籍数据</span><span class="v v--fog">无</span></div>
             <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未接入</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几行是本机的真实状态，不是示意。
           </div>
         </div>
       </div>
@@ -614,9 +598,6 @@
             <span class="alt-b"><span class="alt-t">看校招活动</span>
               <span class="alt-s">不需要接入学校系统</span></span>
           </a>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几件都不依赖学校系统，今天就能用。
-          </div>
         </div>
       </div>
 
@@ -648,10 +629,7 @@
             <div class="kv-row"><span class="k">卡上的说明</span><span class="v">由学校与运营方配置</span></div>
             <div class="kv-row"><span class="k">这六项本身</span><span class="v v--fog">线上已定好 · 本机不增不减</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.7">
-            开哪几项由学校定：学校只开一部分时，没开的那几张同样不渲染，
-            本机不会替学校把它们摆在这儿。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">开哪几项由学校定，没开的不会摆在这儿。</div>
         </div>
       </div>
 
@@ -659,8 +637,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这六张卡为什么点不动</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            因为本机的校园开关是关的。开关关着的时候，六项服务在线上<b>连渲染都不渲染</b> ——
-            这里把名字列出来，只是让你知道开通后会有什么，<b>不是给你一排点不开的按钮</b>。
+            本机的校园开关是关的；这里列名字只是让你知道<b>开通后会有什么</b>。
           </div>
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
@@ -680,9 +657,7 @@
               <span class="alt-b"><span class="alt-t">看校招活动</span>
                 <span class="alt-s">学校就业网与主办方的公开公告</span></span></a>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4);line-height:1.7">
-            这四条链接现在就有效 —— 和上面六张点不动的卡，区别就在这儿。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">这四条链接现在就能点。</div>
         </div>
       </div>
 
@@ -735,5 +710,7 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

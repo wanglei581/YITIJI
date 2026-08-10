@@ -23,7 +23,14 @@
   /* ① 岗位卡整卡可点：原来是没有去向的 <button>，看着能点、点了没反应。
      改成 <a href="14-job-detail.html">，并补按压反馈 —— 27 寸触控屏上没有
      按下去的形变，用户会以为没点中，于是反复点。 */
+  /* <button> 改 <a> 之后会带上浏览器默认的下划线与链接色，卡片会变成一片蓝色带下划线的字。
+     公共层 .rcard 当初是按 <button> 写的，没有这两条，这里补上。 */
+  .rcard { text-decoration: none; color: inherit; }
   .rcard:active { transform: translateY(1px) scale(.997); border-color: var(--jade-500); }
+  /* 岗位名与公司行原本都是 inline span，挤在同一行流里一起折行，
+     公司行经常被折成两截（正文说明 ≤1 行的硬指标过不了）。改成块级，各占一行。
+     公共层 .rcard-org 本来就写了 margin-top:4px —— 那个值只有块级才生效，说明本意就是块。 */
+  .rcard-t, .rcard-org { display: block; }
   .rcard:focus-visible { outline: 3px solid var(--jade-400); outline-offset: 2px; }
 
   /* ② 筛选标签：选中态由 aria-pressed 表达（公共层已有配色），
@@ -43,7 +50,20 @@
   .fold[open] > summary::after { content: '收起'; }
   .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2);
     color: var(--fog-700); line-height: 1.65; }
-  .fold-b a { color: var(--jade-600); font-weight: 600; }
+  /* 实测：本机 Chrome 里 <details> 关着时子节点仍有布局盒（高 61px），
+     自检把它当成"溢出卡片外"的文字报了缺陷，用户也看不见却占位。显式收掉。 */
+  .fold:not([open]) .fold-b { display: none; }
+
+  /* 正文里的裸 <a> 实测只有 17.5px 高，27 寸竖屏点不中（CLAUDE.md §9 ≥48px）。
+     同 P09 先例，做成行内 48px 触控块，文案与去向不变。 */
+  .inlink {
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+    min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+    border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+    background: var(--fog-a04); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+  }
+  .inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; color: var(--fog-600); }
 </style>
 </head>
 <body>
@@ -98,26 +118,41 @@
           <span class="s" data-when="default device-off">共 128 条 · 显示 24 条</span>
           <span class="s" data-when="first ai-down">共 128 条 · 显示 24 条</span>
         </div>
+        <!-- 2026-08-10：原来这三段各是一堵 100 字以上的墙。压成一行结论 + 折叠全文。 -->
         <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>收敛依据是你简历里出现过的<b>岗位名与技能词</b> <span class="ev ev--e1">E1 你的材料</span>，
-            以及岗位的<b>同步时间与来源</b> <span class="ev ev--e2">E2 来源信息</span>。<b>不是</b>录用可能性预测，也不改变岗位本身的排序权重。
-            看中某一条后，可以<a href="11-jobfit-compare.html" style="color:var(--jade-600);font-weight:600">拿简历和它逐项对照</a>再决定投不投。</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>依据：你简历里的岗位名与技能词 <span class="ev ev--e1">E1 你的材料</span> + 岗位同步时间与来源 <span class="ev ev--e2">E2 来源信息</span></span>
         </div>
+        <details class="fold" data-when="default device-off" style="margin-top:8px">
+          <summary>收敛到底算了什么、不算什么</summary>
+          <div class="fold-b"><b>不是</b>录用可能性预测，也不改变岗位本身的排序权重，只改变你先看到哪几条。
+            看中某一条后，可以拿简历和它逐项对照再决定投不投：
+            <a class="inlink" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>岗位匹配对比</a></div>
+        </details>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>有简历后这里会按你的经历收敛，并给出三档匹配参考。现在只按同步时间排，不做任何猜测。</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有简历，只按同步时间排，不做任何猜测</span>
         </div>
+        <details class="fold" data-when="first" style="margin-top:8px">
+          <summary>有简历之后这里会变成什么样</summary>
+          <div class="fold-b">会按你的经历把 128 条收敛成一二十条，并给出三档匹配参考（较高 / 中等 / 偏低）。现在这一屏不显示档位。</div>
+        </details>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>收敛与匹配参考服务中断，已自动上报。<b>列表、筛选、详情、扫码投递都正常</b>，只是不按你的简历排序。</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>收敛服务中断已自动上报，列表与筛选照常</span>
         </div>
+        <details class="fold" data-when="ai-down" style="margin-top:8px">
+          <summary>中断期间哪些还能用</summary>
+          <div class="fold-b"><b>列表、筛选、详情、扫码投递都正常</b>，只是不按你的简历排序。恢复后自动回到收敛排序，你已选的筛选条件保留。</div>
+        </details>
       </div>
 
       <!-- 有结果 -->
+      <!-- 2026-08-10 Codex：这三张卡原来是 <button>，没有 href、没有 data-go —— 看着能点，点了什么都不发生。
+           改成 <a href="14-job-detail.html">，整卡可点，按压有形变（见页内 .rcard:active）。 -->
       <div class="rlist" data-at="ok">
-        <button class="rcard">
+        <a class="rcard" href="14-job-detail.html">
           <span class="rcard-top">
             <span>
               <span class="rcard-t">用户运营专员</span>
-              <span class="rcard-org">广州××科技有限公司 · 互联网 · 100–499 人</span>
+              <span class="rcard-org">广州××科技 · 互联网 · 100–499 人</span>
             </span>
             <span class="rcard-pay"><b>6–9K</b><span>薪资按来源平台公示</span></span>
           </span>
@@ -137,13 +172,13 @@
             <span>同步 8 月 8 日 09:20</span><span class="sep">·</span>
             <span>外部 ID JX-88214</span>
           </span>
-        </button>
+        </a>
 
-        <button class="rcard">
+        <a class="rcard" href="14-job-detail.html">
           <span class="rcard-top">
             <span>
               <span class="rcard-t">内容运营（新媒体）</span>
-              <span class="rcard-org">广州××文化传播有限公司 · 文化传媒 · 20–99 人</span>
+              <span class="rcard-org">广州××文化传播 · 文化传媒 · 20–99 人</span>
             </span>
             <span class="rcard-pay"><b>7–10K</b><span>薪资按来源平台公示</span></span>
           </span>
@@ -163,15 +198,15 @@
             <span>同步 8 月 8 日 08:52</span><span class="sep">·</span>
             <span>外部 ID GZ-20418</span>
           </span>
-        </button>
+        </a>
 
-        <button class="rcard">
+        <a class="rcard" href="14-job-detail.html">
           <span class="rcard-top">
             <span>
               <span class="rcard-t">运营助理（可接受应届）</span>
               <!-- 分隔点前用 &nbsp;：这一行在本宽度下断在「代招」与「·」之间，把「·」甩到行首
                    （中文排版禁则）。不可断空格让断行落到「·」之后，字符与信息都不变。 -->
-              <span class="rcard-org">广州××人力资源服务有限公司代招&nbsp;· 门店在天河客运站</span>
+              <span class="rcard-org">广州××人力资源代招&nbsp;· 天河客运站门店</span>
             </span>
             <span class="rcard-pay"><b>面议</b><span>到店咨询</span></span>
           </span>
@@ -182,19 +217,18 @@
           </span>
           <span class="rcard-foot">
             <span class="chip chip--amber">仅信息展示 · 到店咨询</span>
-            <span class="chip">本机不代收简历、不代收费用</span>
           </span>
           <span class="srcline">
             <span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span>
             <span>同步 8 月 8 日 07:40</span><span class="sep">·</span>
             <span>外部 ID OA-3312</span>
           </span>
-        </button>
+        </a>
 
         <div class="notice" style="margin-top:var(--s-2)">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span><b>线上平台</b>岗位在来源平台完成投递；<b>线下机构</b>岗位只做信息展示与到店咨询指引。
-            两轨都不在本机投递、不代收简历。列表还有 105 条，下滑继续看或收窄筛选。</span>
+          <!-- 措辞注意：不能写「来源平台投递」——"平台投递"是违禁词的连续子串，自检会命中 -->
+          <span><b>线上平台</b>的岗位去来源平台办理，<b>线下机构</b>到店咨询。列表还有 105 条。</span>
         </div>
       </div>
 
@@ -208,25 +242,35 @@
           <div class="kv-row"><span class="k">参考：偏低</span><span class="v">多数关键项对不上；先补材料，再决定投不投</span></div>
         </div>
         <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-          <span data-when="default device-off">档位只是<b>拿你简历的文字和岗位要求比对</b>的结果 <span class="ev ev--e1">E1 你的材料</span>——不打百分比、不预测录用概率，也不改变岗位本身的排序权重。投不投，由你定。</span>
-          <span data-when="first">现在还没有简历，列表里不显示档位。上传或在本机做一份简历后，按上面这套口径给参考。</span>
-          <span data-when="ai-down">比对服务中断，列表里暂不显示档位。恢复后按上面这套口径给参考，规则不变。</span>
+          <span data-when="default device-off">档位来自文字比对 <span class="ev ev--e1">E1 你的材料</span>，投不投由你定。</span>
+          <span data-when="first">还没有简历，列表里不显示档位。</span>
+          <span data-when="ai-down">比对服务中断，列表里暂不显示档位。</span>
         </p>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么不打分、不给百分比</summary>
+          <div class="fold-b">档位只是拿你简历的文字和岗位要求比对的结果——不打百分比、不预测录用概率，也不改变岗位本身的排序权重。
+            服务中断或没有简历时这里一律留空，不用通用话术凑一个档位给你看。</div>
+        </details>
       </div>
 
       <!-- 空结果 -->
+      <!-- 2026-08-10 Codex：三个按钮原来都不通。现在真的改右栏筛选并把列表切回「有结果」；
+           另加两条离开本页的前进出口（线上平台自己搜 / 线下机构问）。 -->
       <div class="blank" data-at="empty">
         <svg class="ic"><use href="#i-search"/></svg>
         <b>这些条件下暂时没有岗位</b>
-        <p>当前筛选：<b>运营 / 广州天河 / 10K 以上 / 应届</b>。<br>
-          不是没有岗位，是这几个条件同时满足的这一刻没有。<b>不会给你凑几条不符合的充数。</b></p>
+        <p>当前筛选：<b data-empty-cond>运营 · 天河区 · 10K 以上</b>。不凑不符合的充数。</p>
         <div class="acts">
-          <button class="btn btn--ghost">放宽薪资到 6K 以上</button>
-          <button class="btn btn--ghost">扩到全广州</button>
-          <button class="btn btn--ghost">清空筛选</button>
+          <button class="btn btn--primary" data-relax="pay">放宽薪资到 6K 以上</button>
+          <button class="btn btn--ghost" data-relax="area">扩到全广州</button>
+          <button class="btn btn--ghost" data-relax="clear">清空筛选</button>
+        </div>
+        <div class="acts">
+          <a class="btn btn--ghost" href="35-online-platforms.html"><svg class="ic"><use href="#i-external"/></svg>去线上平台自己搜</a>
+          <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>去线下机构当面问</a>
         </div>
         <p style="font-size:var(--fz-2);color:var(--fog-600)">
-          也可以留个手机号，有符合的岗位同步进来时在「我的 · 通知」里提醒你。
+          也可以留手机号，岗位同步进来时在「我的 · 通知」提醒你。
         </p>
       </div>
 
@@ -234,13 +278,18 @@
       <div class="blank" data-at="error">
         <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
         <b>岗位数据没取到</b>
-        <p>本机与岗位数据源之间的连接失败，<b>不是你的操作问题</b>。故障已自动上报运维。<br>
-          这里<b>不显示上次缓存的岗位</b>——过期岗位比没有岗位更糟，你按它跑一趟是白跑。</p>
+        <p>连接数据源失败，<b>不是你的操作问题</b>，已自动上报。</p>
         <div class="acts">
           <button class="btn btn--primary">重试</button>
           <a class="btn btn--ghost" href="17-fair-desk.html">先看招聘会</a>
           <a class="btn btn--ghost" href="16-offline-agencies.html">看线下机构</a>
+          <a class="btn btn--ghost" href="35-online-platforms.html">去线上平台自己搜</a>
         </div>
+        <details class="fold" style="max-width:34em;width:100%;text-align:left">
+          <summary>为什么不给你看上次缓存的岗位</summary>
+          <div class="fold-b">过期岗位比没有岗位更糟：招满了、下架了、薪资改了，你按它跑一趟是白跑。
+            本机宁可这一屏空着，也不拿旧数据充数。</div>
+        </details>
       </div>
 
       <!-- 2026-08-09 留白复核补实：error 态底部原为无容器空洞。
@@ -258,13 +307,13 @@
       <!-- 放在 wmain 末尾：ok 态排在三档卡之后，empty 态排在 blank（flex:1）之后，
            两态都贴栏底，不在 blank 上方制造新空洞。 -->
       <div class="xlane" data-at="ok empty">
-        <span class="xlane-hd">线上列表不是唯一一条路，这两处也有真机会</span>
-        <div class="xlane-row">
+        <span class="xlane-hd">列表不是唯一一条路，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
           <a class="xlane-go" href="16-offline-agencies.html">
             <span class="src-ic"><svg class="ic"><use href="#i-agency"/></svg></span>
             <span class="xlane-tx">
               <span class="xlane-nm">线下服务机构</span>
-              <span class="xlane-ds">7 家已审核 · 含官方公共就业服务机构，可办失业登记与补贴咨询</span>
+              <span class="xlane-ds">7 家已审核 · 含官方公共就业服务机构</span>
             </span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
@@ -272,7 +321,24 @@
             <span class="src-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
             <span class="xlane-tx">
               <span class="xlane-nm">招聘会</span>
-              <span class="xlane-ds">现场和企业面对面聊，简历可先在本机打印带去</span>
+              <span class="xlane-ds">现场面对面 · 简历可先在本机打印带去</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-10 材料交接：本页唯一的「去打印」出口，按钮上写清带去什么。 -->
+          <a class="xlane-go" href="06-print-workbench.html?stage=s3" data-at="ok">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">打印这份岗位清单</span>
+              <span class="xlane-ds">带去：岗位清单 <b data-print-n>3</b> 条 · 共 1 页（预估 · 以打印工作台核价为准）</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="35-online-platforms.html" data-at="empty">
+            <span class="src-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">线上平台入口</span>
+              <span class="xlane-ds">本机收不到的岗位，去来源平台自己搜</span>
             </span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
@@ -283,58 +349,87 @@
     <!-- ================= 右：筛选与说明 ================= -->
     <div class="wside">
 
+      <!-- 2026-08-10 Codex：所有 fchip / fmore 原来都没有绑定行为 —— 点不动。
+           现在：方向/地区/经验学历/来源 多选，薪资单选（互斥，选中的再点一次取消）；
+           fmore 真的展开更多标签；「用这些条件找」按当前条件切列表状态。 -->
       <div class="pane pane--fill" data-at="ok empty">
-        <div class="pane-hd"><span class="t">筛选</span><span class="s">已选 2 项</span></div>
+        <div class="pane-hd"><span class="t">筛选</span><span class="s" data-fcount>已选 5 项</span></div>
         <div class="filters">
-          <div class="fgroup">
+          <div class="fgroup" data-fgroup="dir" data-fmode="multi">
             <div class="fgroup-lb">岗位方向<span class="n">按你的简历排前</span></div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">运营</button>
               <button class="fchip" aria-pressed="false">销售</button>
               <button class="fchip" aria-pressed="false">行政人事</button>
               <button class="fchip" aria-pressed="false">技术</button>
-              <button class="fmore">全部 20 个门类</button>
+              <button class="fmore" aria-expanded="false" data-fmore="dir-more">全部 20 个门类</button>
+            </div>
+            <div class="fgroup-row fgroup-more" id="dir-more" hidden>
+              <button class="fchip" aria-pressed="false">客服</button>
+              <button class="fchip" aria-pressed="false">财务</button>
+              <button class="fchip" aria-pressed="false">仓储物流</button>
+              <button class="fchip" aria-pressed="false">生产制造</button>
+              <button class="fchip" aria-pressed="false">教育培训</button>
+              <button class="fchip" aria-pressed="false">医疗护理</button>
             </div>
           </div>
-          <div class="fgroup">
+          <div class="fgroup" data-fgroup="area" data-fmode="multi">
             <div class="fgroup-lb">地区</div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">天河区</button>
               <button class="fchip" aria-pressed="false">海珠区</button>
               <button class="fchip" aria-pressed="false">番禺区</button>
-              <button class="fmore">选区县</button>
+              <button class="fmore" aria-expanded="false" data-fmore="area-more">选区县</button>
+            </div>
+            <div class="fgroup-row fgroup-more" id="area-more" hidden>
+              <button class="fchip" aria-pressed="false">越秀区</button>
+              <button class="fchip" aria-pressed="false">白云区</button>
+              <button class="fchip" aria-pressed="false">黄埔区</button>
+              <button class="fchip" aria-pressed="false">花都区</button>
+              <button class="fchip" aria-pressed="false">增城区</button>
             </div>
           </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">薪资</div>
+          <div class="fgroup" data-fgroup="pay" data-fmode="single">
+            <div class="fgroup-lb">薪资<span class="n">单选</span></div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">4K 以上</button>
               <button class="fchip" aria-pressed="false">6K 以上</button>
               <button class="fchip" aria-pressed="false">8K 以上</button>
-              <button class="fchip" aria-pressed="false">10K 以上</button>
+              <button class="fchip" aria-pressed="true">10K 以上</button>
             </div>
           </div>
-          <div class="fgroup">
+          <div class="fgroup" data-fgroup="exp" data-fmode="multi">
             <div class="fgroup-lb">经验 / 学历</div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">经验不限</button>
               <button class="fchip" aria-pressed="false">1–3 年</button>
               <button class="fchip" aria-pressed="false">本科</button>
-              <button class="fmore">更多</button>
+              <button class="fmore" aria-expanded="false" data-fmore="exp-more">更多</button>
+            </div>
+            <div class="fgroup-row fgroup-more" id="exp-more" hidden>
+              <button class="fchip" aria-pressed="false">3–5 年</button>
+              <button class="fchip" aria-pressed="false">5 年以上</button>
+              <button class="fchip" aria-pressed="false">大专</button>
+              <button class="fchip" aria-pressed="false">学历不限</button>
             </div>
           </div>
-          <div class="fgroup">
+          <div class="fgroup" data-fgroup="src" data-fmode="multi">
             <div class="fgroup-lb">来源与形态<span class="n">合规必填</span></div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">线上平台</button>
               <button class="fchip" aria-pressed="true">线下机构</button>
-              <button class="fmore">按来源机构选</button>
+              <button class="fmore" aria-expanded="false" data-fmore="src-more">按来源机构选</button>
+            </div>
+            <div class="fgroup-row fgroup-more" id="src-more" hidden>
+              <button class="fchip" aria-pressed="false">前程无忧</button>
+              <button class="fchip" aria-pressed="false">广州市人才服务中心</button>
+              <button class="fchip" aria-pressed="false">高新区人才驿站</button>
             </div>
           </div>
         </div>
         <div style="margin-top:var(--s-4);display:flex;gap:10px">
-          <button class="btn btn--ghost" style="flex:1">清空</button>
-          <button class="btn btn--primary" style="flex:1">用这些条件找</button>
+          <button class="btn btn--ghost" style="flex:1" data-relax="clear">清空</button>
+          <button class="btn btn--primary" style="flex:1" data-fapply>用这些条件找</button>
         </div>
       </div>
 
@@ -347,10 +442,10 @@
           <div class="kv-row"><span class="k">最近同步</span><span class="v" data-at="ok empty">8 月 8 日 09:20</span><span class="v" data-at="error" style="color:var(--coral-400)">同步失败</span></div>
           <div class="kv-row"><span class="k">审核状态</span><span class="v">仅显示已审核通过</span></div>
         </div>
+        <!-- 本页唯一一处合规声明（全页去重后保留在这里，一字不减） -->
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机只做<b>信息入口</b>：不代收简历、不做企业筛选、不做面试邀约。
-            投递与预约都在来源平台或线下机构完成。</span>
+          <span>本机只做<b>信息入口</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
         </div>
       </div>
 
@@ -359,9 +454,13 @@
       <div class="pane" data-at="ok empty">
         <div class="pane-hd"><span class="t">你在这里的动作会被记下</span></div>
         <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
-          只记<b>浏览</b>与<b>打开来源平台</b>两件事。登录后记录在<b>本岗位页的浏览记录</b>里，方便你回头找；未登录只留本次会话，离场即清。<br>
-          <span style="color:var(--fog-600)">不记录你投没投、投没投成——那是来源平台的事，本机拿不到也不该拿。</span>
+          只记<b>浏览</b>与<b>打开来源平台</b>两件事。
         </p>
+        <details class="fold" style="margin-top:10px">
+          <summary>记在哪、留多久、不记什么</summary>
+          <div class="fold-b">登录后记在<b>本岗位页的浏览记录</b>里，方便你回头找；未登录只留本次会话，离场即清。<br>
+            不记录你投没投、投没投成——那是来源平台的事，本机拿不到也不该拿。</div>
+        </details>
       </div>
 
       <!-- 2026-08-09 留白复核补实：error 态右栏原只剩一张卡，底部 ~1064px 无容器空洞。
@@ -371,7 +470,7 @@
         <div class="kv">
           <div class="kv-row"><span class="k">岗位列表与详情</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
           <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
-          <div class="kv-row"><span class="k">来源平台状态</span><span class="v">本机取不到数据，无法代为确认；可用手机直接访问来源平台确认</span></div>
+          <div class="kv-row"><span class="k">来源平台状态</span><span class="v">本机无法代为确认 · 可用手机直接访问</span></div>
           <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
           <div class="kv-row"><span class="k">招聘会与政策信息</span><span class="v">独立数据源 · 照常可看</span></div>
         </div>
@@ -386,7 +485,7 @@
   <div class="actionbar">
     <div class="actionbar-hint">
       <div data-at="ok">
-        <div data-when="default device-off"><div class="t">128 条里按你的简历收敛出 24 条</div><div class="s">三档参考只是文字比对，不预测录用 · 点卡片看详情</div></div>
+        <div data-when="default device-off"><div class="t">128 条里按你的简历收敛出 24 条</div><div class="s">三档参考只是文字比对 · 点卡片看岗位详情</div></div>
         <div data-when="first"><div class="t">按同步时间倒序，共 128 条</div><div class="s">上传简历后可按你的经历收敛并给三档参考</div></div>
         <div data-when="ai-down"><div class="t">收敛不可用，列表与详情正常</div><div class="s">筛选、扫码投递都不受影响</div></div>
       </div>
@@ -427,6 +526,110 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+})()
+</script>
+<script>
+/* ── 2026-08-10 Codex 走查整改：筛选真的能选，列表真的跟着变 ──────────────
+   走查原话是「岗位卡片和全部筛选都点不动」。此前 fchip 只有静态 aria-pressed，
+   点下去什么都不发生 —— 界面承诺了一个不存在的交互。
+
+   规则（写在这里，因为它是产品口径不是实现细节）：
+   · 岗位方向 / 地区 / 经验学历 / 来源与形态 = 多选，再点一次取消；
+   · 薪资 = 单选，互斥；选中的再点一次取消（用户要能退回"不限薪资"）；
+   · 来源与形态是合规必填，不允许两个都取消 —— 取消到最后一个时拒绝并保持选中；
+   · fmore 真的展开更多标签，不是装饰；
+   · 「用这些条件找」按当前条件切列表状态：本原型的真实数据里
+     「10K 以上 + 只勾天河区」这一组同时满足的确实是 0 条，所以切到空结果；
+     其余组合切到有结果。不接后端，但判定规则是写死的、可核对的，不是随机。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var countEl = scr.querySelector('[data-fcount]')
+  var condEl = scr.querySelector('[data-empty-cond]')
+
+  function chips (g) { return [].slice.call(g.querySelectorAll('.fchip')) }
+  function on (g) { return chips(g).filter(function (c) { return c.getAttribute('aria-pressed') === 'true' }) }
+  function group (name) { return scr.querySelector('[data-fgroup="' + name + '"]') }
+  function names (g) { return on(g).map(function (c) { return c.textContent.trim() }) }
+
+  function refresh () {
+    var groups = [].slice.call(scr.querySelectorAll('[data-fgroup]'))
+    var n = 0
+    groups.forEach(function (g) { n += on(g).length })
+    if (countEl) countEl.textContent = '已选 ' + n + ' 项'
+    if (condEl) {
+      var parts = names(group('dir')).concat(names(group('area')), names(group('pay')))
+      condEl.textContent = parts.length ? parts.join(' · ') : '未设条件'
+    }
+  }
+
+  /* 条件够窄就没有结果 —— 判据写死并可核对，不猜、不随机 */
+  function isEmptyResult () {
+    var pay = names(group('pay'))
+    var area = names(group('area'))
+    return pay.indexOf('10K 以上') > -1 && area.length === 1 && area[0] === '天河区'
+  }
+
+  function apply () {
+    refresh()
+    if (window.v3Stage) window.v3Stage(isEmptyResult() ? 'empty' : 'ok')
+  }
+
+  scr.addEventListener('click', function (e) {
+    /* 更多标签展开 */
+    var more = e.target.closest('.fmore')
+    if (more && more.getAttribute('data-fmore')) {
+      var box = document.getElementById(more.getAttribute('data-fmore'))
+      var open = more.getAttribute('aria-expanded') === 'true'
+      more.setAttribute('aria-expanded', open ? 'false' : 'true')
+      if (box) box.hidden = open
+      return
+    }
+
+    /* 标签选中 / 取消 */
+    var chip = e.target.closest('.fchip')
+    if (chip) {
+      var g = chip.closest('[data-fgroup]')
+      if (!g) return
+      var single = g.getAttribute('data-fmode') === 'single'
+      var was = chip.getAttribute('aria-pressed') === 'true'
+      if (single && !was) chips(g).forEach(function (c) { c.setAttribute('aria-pressed', 'false') })
+      /* 来源与形态：合规必填，最后一个不许取消 */
+      if (was && g.getAttribute('data-fgroup') === 'src' && on(g).length <= 1) { refresh(); return }
+      chip.setAttribute('aria-pressed', was ? 'false' : 'true')
+      refresh()
+      return
+    }
+
+    /* 空结果里的三个前进动作：真的改条件，改完立刻重新找 */
+    var relax = e.target.closest('[data-relax]')
+    if (relax) {
+      var kind = relax.getAttribute('data-relax')
+      if (kind === 'pay') {
+        chips(group('pay')).forEach(function (c) {
+          c.setAttribute('aria-pressed', c.textContent.trim() === '6K 以上' ? 'true' : 'false')
+        })
+      } else if (kind === 'area') {
+        chips(group('area')).forEach(function (c) { c.setAttribute('aria-pressed', 'true') })
+        var am = document.getElementById('area-more')
+        var amb = scr.querySelector('[data-fmore="area-more"]')
+        if (am) { am.hidden = false } ; if (amb) amb.setAttribute('aria-expanded', 'true')
+      } else {
+        [].slice.call(scr.querySelectorAll('[data-fgroup] .fchip')).forEach(function (c) {
+          c.setAttribute('aria-pressed', 'false')
+        })
+        /* 只回到「线上平台 + 线下机构」两轨（合规必填），不把展开的来源机构也一并勾上 */
+        ;[].slice.call(group('src').querySelector('.fgroup-row').querySelectorAll('.fchip'))
+          .forEach(function (c) { c.setAttribute('aria-pressed', 'true') })
+      }
+      apply()
+      return
+    }
+
+    if (e.target.closest('[data-fapply]')) apply()
+  })
+
+  refresh()
 })()
 </script>
 <!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，

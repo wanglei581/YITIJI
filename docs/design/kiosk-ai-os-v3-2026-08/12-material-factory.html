@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。 */
   .letter { font-size: 12px; line-height: 1.95; color: var(--paper-ink); }
@@ -74,6 +75,25 @@
     position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 0; text-align: center;
     font-size: 11px; color: var(--paper-fog); background: rgba(255,255,255,.9);
   }
+  /* 本次要用的那一版：场合一改，两张稿子的主次跟着换 */
+  .speak-card[aria-current="true"] { border-color: var(--jade-a32); box-shadow: 0 0 0 1px var(--jade-a20) inset; }
+  .speak-now { font-size: var(--fz-1); color: var(--jade-600); background: var(--jade-a12);
+    border: 1px solid var(--jade-a20); border-radius: 4px; padding: 2px 7px; }
+  /* 结果反馈层：点了要有交代。无 data-when/data-at，applyVisibility 不碰它 */
+  .fb { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center;
+        background: rgba(4,8,10,.62); padding: var(--s-6); }
+  .fb-box { width: min(640px, 100%); max-height: 76%; overflow-y: auto;
+        border-radius: var(--r-lg); padding: var(--s-6);
+        background: var(--ink-100); border: 1px solid var(--glass-1-brd);
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: var(--s-4); }
+  .fb-ic { width: 56px; height: 56px; border-radius: var(--r-md); display: grid; place-items: center;
+        background: var(--jade-a12); border: 1px solid var(--jade-a20); }
+  .fb-ic .ic { width: 27px; height: 27px; color: var(--jade-500); }
+  .fb-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); line-height: var(--lh-snug); }
+  .fb-p { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.66; }
+  .fb-p b { color: var(--fog-900); }
+  .fb-go { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  .fb-go .btn { flex: 1 1 200px; min-height: 56px; }
 </style>
 </head>
 <body>
@@ -117,8 +137,8 @@
       <!-- T1 求职信 -->
       <div class="paper" data-at="t1">
         <div class="paper-bar">
-          <span class="nm">求职信_用户运营专员.pdf</span>
-          <span class="mt" data-when="default device-off">A4 · 1 页 · 约 320 字</span>
+          <span class="nm" data-out="fname">求职信_用户运营专员.pdf</span>
+          <span class="mt" data-when="default device-off" data-out="fmeta">A4 · 1 页 · 约 320 字</span>
           <span class="mt" data-when="ai-down">未生成</span>
           <span class="mt" data-when="first">还没有简历</span>
           <span class="pg" data-when="default device-off">
@@ -130,21 +150,9 @@
         <div class="paper-stage">
           <div class="sheet-a4" data-when="default device-off">
             <h4 style="font-size:19px">求职信</h4>
-            <div class="meta">应聘岗位：用户运营专员 · <span class="slot-mark">某科技有限公司</span></div>
+            <div class="meta" data-out="lmeta">应聘岗位：用户运营专员 · <span class="slot-mark">某科技有限公司</span></div>
             <div class="hr"></div>
-            <div class="letter">
-              <p>尊敬的招聘负责人：</p>
-              <p>您好。我在<span class="slot-mark">前程无忧</span>看到贵公司招聘用户运营专员，特此应聘。</p>
-              <p>我有 2 年 3 个月运营经验。在上一家公司独立运营公众号，半年内粉丝从 3000 增至 12000；
-                 策划并执行 8 场线上活动，单场最高带来 340 个新增关注。这些数字都可以在面试时提供后台截图核对。</p>
-              <p>贵公司这个岗位要求熟练使用 SQL 独立取数，这一项我目前只做到能写基础查询，
-                 还没有独立支撑过完整的数据复盘。我会在入职前继续补，也希望能有机会在实际工作中练。</p>
-              <p>随信附上简历，期待有机会与您详谈。</p>
-              <div class="sign">
-                <span class="slot-mark">王 ×</span><br>
-                <span style="font-size:11px;color:var(--paper-fog)">联系电话 138****2046 · 2026 年 8 月 8 日</span>
-              </div>
-            </div>
+            <div class="letter" data-out="letter"></div>
             <span class="pgno">1 / 1</span>
           </div>
           <div class="paper-empty" data-when="ai-down">
@@ -156,7 +164,7 @@
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
             <b>先得有简历</b>
-            <p>求职信里的经历和数字都来自你的简历，<br>不会另外问你一遍，也不会凭空编。</p>
+            <p>求职信里的经历和数字都来自你的简历。</p>
             <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
           </div>
         </div>
@@ -164,40 +172,27 @@
 
       <!-- T2 自我介绍 -->
       <div class="speak" data-at="t2" style="flex:1 1 auto;min-height:0;overflow-y:auto">
-        <div class="speak-card" data-when="default device-off">
-          <div class="speak-hd"><span class="t">30 秒版 · 现场递简历时用</span><span class="s">约 95 字</span></div>
-          <div class="speak-txt">
-            您好，我叫<b>王 ×</b>，做运营两年多。上一份工作在一家科技公司，
-            <b>独立运营公众号，半年从 3000 粉做到 12000</b>；也策划过 8 场线上活动。
-            我今天投的是用户运营专员，简历在这儿，您方便的话我可以补充说一下增长那部分是怎么做的。
-          </div>
+        <div class="speak-card" data-when="default device-off" data-card="s30">
+          <div class="speak-hd"><span class="t">30 秒版 · 现场递简历时用</span><span class="speak-now" data-out="now30" hidden>本次要用的</span><span class="s" data-out="len30">约 95 字</span></div>
+          <div class="speak-txt" data-out="txt30"></div>
         </div>
-        <div class="speak-card" data-when="default device-off">
-          <div class="speak-hd"><span class="t">1 分钟版 · 面试开场用</span><span class="s">约 210 字</span></div>
-          <div class="speak-txt">
-            您好，我叫王 ×，2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，主要负责两块：
-            <b>公众号从 0 到 1 的日常运营</b>，半年粉丝从 3000 到 12000；以及<b>线上活动</b>，
-            做过 8 场，单场最高带来 340 个新增关注。<br>
-            另外我在学校带过一个校园推广项目，带 5 个人在 3 所高校做地推。<br>
-            我看到这个岗位要求 SQL 取数，说实话我目前只能写基础查询，还没独立做过完整的数据复盘，
-            这块是我接下来想补的。其他要求我基本都做过。
-          </div>
+        <div class="speak-card" data-when="default device-off" data-card="s60">
+          <div class="speak-hd"><span class="t">1 分钟版 · 面试开场用</span><span class="speak-now" data-out="now60" hidden>本次要用的</span><span class="s" data-out="len60">约 210 字</span></div>
+          <div class="speak-txt" data-out="txt60"></div>
         </div>
         <!-- 2026-08-09 留白复核补实：代写边界卡——两版稿子里每个事实的出处，
              与 t1「没有新增任何事实」同口径。 -->
         <div class="speak-card" data-when="default device-off">
           <div class="speak-hd"><span class="t">这两版是怎么写出来的</span><span class="s">代写边界</span></div>
           <div class="speak-txt" style="font-size:var(--fz-3)">
-            里面每一个事实——2 年 3 个月、3000 到 12000、8 场活动、带 5 人地推——都取自你的简历 v2
-            <span class="ev ev--e1">E1 你的材料</span>，SQL 那句短板来自你诊断里的缺口。
-            AI 只把它们组织成口语稿 <span class="ev ev--e3">E3 表达属 AI 判断</span>，<b>没有替你新增任何经历</b>；
-            你没给过的内容，这里一个字也不会出现。
+            每个事实都取自简历 v2 <span class="ev ev--e1">E1 你的材料</span>，AI 只负责组织成口语稿
+            <span class="ev ev--e3">E3</span>，<b>没有替你新增任何经历</b>。
           </div>
         </div>
         <div class="notice notice--amber" style="margin-top:auto" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>照着念会很假。</b>这是给你熟悉逻辑用的稿子——记住三个数字和一句短板，
-            现场用自己的话说。缺点那句建议保留，主动说短板比被问出来好。<span class="ev ev--e3">E3 表达属 AI 判断</span></span>
+            现场用自己的话说。缺点那句建议保留，主动说短板比被问出来好。<span class="ev ev--e3">E3</span></span>
         </div>
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
@@ -208,7 +203,7 @@
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
           <b>先得有简历</b>
-          <p>自我介绍里的经历与数字来自你的简历，不会凭空编。</p>
+          <p>自我介绍的内容来自你的简历。</p>
           <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
         </div>
       </div>
@@ -219,34 +214,16 @@
         <div class="checks" style="margin-bottom:var(--s-4)">
           <div class="checks-hd">
             <svg class="ic" style="width:19px;height:19px;color:var(--azure-400)"><use href="#i-policy"/></svg>
-            <span class="t">周五招聘会 · 建议带的材料</span>
-            <span class="s" data-when="default device-off">来源：主办方公告 · 同步 08:52</span>
-            <span class="s" data-when="ai-down">来源：主办方公告 · 同步 08:52</span>
+            <span class="t" data-out="ckTitle">周五招聘会 · 建议带的材料</span>
+            <span class="s" data-when="default device-off" data-out="ckSrc">来源：主办方公告 · 同步 08:52</span>
+            <span class="s" data-when="ai-down" data-out="ckSrc">来源：主办方公告 · 同步 08:52</span>
           </div>
           <div class="checks-list" style="grid-template-columns:1fr">
-            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>清单来自<b>主办方公告原文</b>与你已收藏的 3 家企业要求 <span class="ev ev--e2">E2 来源信息</span>，不是模型凭经验列的。勾选状态按你在本机的材料自动判断 <span class="ev ev--e1">E1 你的材料</span>。</span>
+            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>清单取自<b data-out="ckOrigin">主办方公告原文</b> <span class="ev ev--e2">E2 来源信息</span>；勾选按本机已有材料判断 <span class="ev ev--e1">E1 你的材料</span>。</span>
           </div>
         </div>
-        <div class="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
-          <div class="ck ck--have"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历 5 份</span><span class="ck-s">现场普遍收纸质件；128 家参展，5 份偏保守</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已在打印队列</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">身份证原件</span><span class="ck-s">入场登记需要，主办方公告第 3 条</span></span>
-            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
-          <div class="ck ck--have"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">学位证 / 毕业证复印件 2 份</span><span class="ck-s">3 家收藏企业中 2 家在 JD 里要求</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已扫描存档</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">证件照 2 张</span><span class="ck-s">部分企业现场填表要贴</span></span>
-            <span class="ck-tag-status"><span class="chip chip--info">本机暂不能拍</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">笔</span><span class="ck-s">现场填表用，主办方不一定提供</span></span>
-            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
-          <!-- 2026-08-09：求职信状态跟 AI 走——t1 的 ai-down 态明说「未生成」，这里不能仍标已生成 -->
-          <div class="ck ck--have ck--gen"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">求职信 1 份（可选）</span><span class="ck-s">投递明确目标企业时递上去更显诚意</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default device-off">已生成</span><span class="chip chip--info" data-when="ai-down">未生成 · 可手写</span></span></div>
+        <!-- 清单由「给哪件事准备」驱动：三件事各有各的清单，选择必须换内容，不能只换标题 -->
+        <div class="cklist" data-out="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
         </div>
         <!-- 2026-08-09 留白复核补实：清单是给周五招聘会用的，就近给作战台与打印通道。
              first 态不显示——locked 卡里已有「去准备材料」，避免重复入口。 -->
@@ -282,12 +259,12 @@
 
       <!-- T4 简历模板 -->
       <div class="tplgrid" data-at="t4">
-        <div class="tpl" aria-current="true"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i></i><i></i><i class="s"></i><span>单栏 · 稳妥</span></div>
-        <div class="tpl"><i class="t"></i><i class="bar"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>单栏 · 紧凑</span></div>
-        <div class="tpl"><i class="t"></i><i></i><i class="bar"></i><i class="s"></i><i></i><span>带侧栏 · 技能突出</span></div>
-        <div class="tpl"><i class="t"></i><i class="s"></i><i></i><i class="bar"></i><i></i><i></i><span>时间线式</span></div>
-        <div class="tpl"><i class="t"></i><i></i><i></i><i class="s"></i><i class="bar"></i><span>校招 · 一页版</span></div>
-        <div class="tpl"><i class="t"></i><i class="bar"></i><i class="s"></i><i></i><i></i><i class="s"></i><span>项目优先</span></div>
+        <div class="tpl" aria-current="true" data-tpl="0"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i></i><i></i><i class="s"></i><span>单栏 · 稳妥</span></div>
+        <div class="tpl" data-tpl="1"><i class="t"></i><i class="bar"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>单栏 · 紧凑</span></div>
+        <div class="tpl" data-tpl="2"><i class="t"></i><i></i><i class="bar"></i><i class="s"></i><i></i><span>带侧栏 · 技能突出</span></div>
+        <div class="tpl" data-tpl="3"><i class="t"></i><i class="s"></i><i></i><i class="bar"></i><i></i><i></i><span>时间线式</span></div>
+        <div class="tpl" data-tpl="4"><i class="t"></i><i></i><i></i><i class="s"></i><i class="bar"></i><span>校招 · 一页版</span></div>
+        <div class="tpl" data-tpl="5"><i class="t"></i><i class="bar"></i><i class="s"></i><i></i><i></i><i class="s"></i><span>项目优先</span></div>
       </div>
     </div>
 
@@ -298,41 +275,38 @@
       <div class="pane" data-at="t1">
         <div class="pane-hd"><span class="t">写给哪个岗位</span><span class="s">来自真实岗位</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">岗位</span><span class="v">用户运营专员</span></div>
-          <div class="kv-row"><span class="k">来源机构</span><span class="v" style="color:var(--azure-400)">前程无忧</span></div>
-          <div class="kv-row"><span class="k">同步时间</span><span class="v">8 月 8 日 09:20</span></div>
-          <div class="kv-row"><span class="k">外部 ID</span><span class="v">JX-88214</span></div>
+          <div class="kv-row"><span class="k">岗位</span><span class="v" data-out="jNm">用户运营专员</span></div>
+          <div class="kv-row"><span class="k">来源机构</span><span class="v" style="color:var(--azure-400)" data-out="jOrg">前程无忧</span></div>
+          <div class="kv-row"><span class="k">同步时间</span><span class="v" data-out="jSync">8 月 8 日 09:20</span></div>
+          <div class="kv-row"><span class="k">外部 ID</span><span class="v" data-out="jId">JX-88214</span></div>
         </div>
-        <button class="btn btn--ghost" style="width:100%;margin-top:12px">换一个岗位</button>
+        <button class="btn btn--ghost" style="width:100%;margin-top:12px" data-act="job">换一个岗位</button>
       </div>
       <div class="pane" data-at="t1">
         <div class="pane-hd"><span class="t">怎么写</span><span class="s" data-when="default device-off">已预设</span><span class="s" data-when="ai-down first">需你设置</span></div>
         <div class="field">
-          <div class="field-lb">语气<span class="prefill" data-when="default device-off">按岗位类型预设 · 可改</span></div>
-          <div class="seg"><button aria-pressed="true">务实</button><button aria-pressed="false">热情</button><button aria-pressed="false">正式</button></div>
+          <div class="field-lb">语气<span class="prefill" data-when="default device-off" data-out="pfTone">按岗位类型预设 · 可改</span></div>
+          <div class="seg" data-param="tone"><button aria-pressed="true" data-v="务实">务实</button><button aria-pressed="false" data-v="热情">热情</button><button aria-pressed="false" data-v="正式">正式</button></div>
         </div>
         <div class="field">
-          <div class="field-lb">长度</div>
-          <div class="seg"><button aria-pressed="false">200 字</button><button aria-pressed="true">300 字</button><button aria-pressed="false">500 字</button></div>
+          <div class="field-lb">长度<span class="prefill" data-when="default device-off" data-out="pfLen">约 320 字</span></div>
+          <div class="seg" data-param="len"><button aria-pressed="false" data-v="200">200 字</button><button aria-pressed="true" data-v="300">300 字</button><button aria-pressed="false" data-v="500">500 字</button></div>
         </div>
         <div class="field">
           <div class="field-lb">要不要主动写短板</div>
-          <div class="seg"><button aria-pressed="true">写</button><button aria-pressed="false">不写</button></div>
+          <div class="seg" data-param="weak"><button aria-pressed="true" data-v="写">写</button><button aria-pressed="false" data-v="不写">不写</button></div>
         </div>
       </div>
       <div class="pane pane--fill" data-at="t1" style="margin-top:auto">
         <div class="pane-hd"><span class="t">两处要你自己核</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>黄底标出来的三处是<b>槽位</b>：公司全称、来源平台、你的署名。公司全称请照招聘公告写全，
-            别用简称——正式信里写错公司名是硬伤。</span>
+          <span>黄底标出来的三处是<b>槽位</b>：公司全称、来源平台、你的署名。照公告写全，别用简称。</span>
         </div>
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>信里的经历与数字全部取自你的简历 v2，<b>没有新增任何事实</b>。短板那段是按你在诊断里的缺口写的，
-            你可以改措辞，但建议保留——主动说比被问出来好。<span class="ev ev--e3">E3 表达属 AI 判断</span><br>
-            <b>求职信、自我介绍、材料清单都只给你本人看，不向任何企业提供、不进入任何库；</b>
-            未登录时只留到本次会话结束。</span>
+          <span>经历与数字全部取自简历 v2，<b>没有新增任何事实</b> <span class="ev ev--e3">E3</span>。<br>
+            <b>只给你本人看，不向任何企业提供、不进入任何库</b>；未登录只留到本次会话结束。</span>
         </div>
       </div>
 
@@ -340,16 +314,16 @@
       <div class="pane" data-at="t2">
         <div class="pane-hd"><span class="t">用在什么场合</span></div>
         <div class="field">
-          <div class="field-lb">场合<span class="prefill" data-when="default device-off">按周五招聘会预设 · 可改</span></div>
-          <div class="seg"><button aria-pressed="true">招聘会递简历</button><button aria-pressed="false">面试开场</button></div>
+          <div class="field-lb">场合<span class="prefill" data-when="default device-off" data-out="pfScene">按周五招聘会预设 · 可改</span></div>
+          <div class="seg" data-param="scene"><button aria-pressed="true" data-v="招聘会递简历">招聘会递简历</button><button aria-pressed="false" data-v="面试开场">面试开场</button></div>
         </div>
         <div class="field">
           <div class="field-lb">要不要提短板</div>
-          <div class="seg"><button aria-pressed="true">提</button><button aria-pressed="false">不提</button></div>
+          <div class="seg" data-param="weak2"><button aria-pressed="true" data-v="提">提</button><button aria-pressed="false" data-v="不提">不提</button></div>
         </div>
         <div class="field" style="border-bottom:0">
           <div class="field-lb">突出哪一段</div>
-          <div class="seg"><button aria-pressed="true">公众号增长</button><button aria-pressed="false">校园地推</button></div>
+          <div class="seg" data-param="focus"><button aria-pressed="true" data-v="公众号增长">公众号增长</button><button aria-pressed="false" data-v="校园地推">校园地推</button></div>
         </div>
       </div>
       <div class="pane pane--fill" data-at="t2" style="margin-top:auto">
@@ -360,8 +334,8 @@
           <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-printer"/></svg>小卡片未生成</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
-          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
+          <button class="out" data-fb="phone"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
+          <button class="out" data-fb="save"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -373,15 +347,15 @@
       <div class="pane" data-at="t3">
         <div class="pane-hd"><span class="t">给哪件事准备</span></div>
         <div class="field">
-          <div class="field-lb">事项<span class="prefill" data-when="default device-off">按你收藏的场次预设 · 可改</span></div>
-          <div class="seg" style="flex-wrap:wrap"><button aria-pressed="true">周五招聘会</button><button aria-pressed="false">补贴申领</button><button aria-pressed="false">入职报到</button></div>
+          <div class="field-lb">事项<span class="prefill" data-when="default device-off" data-out="pfItem">按你收藏的场次预设 · 可改</span></div>
+          <div class="seg" style="flex-wrap:wrap" data-param="item"><button aria-pressed="true" data-v="fair">周五招聘会</button><button aria-pressed="false" data-v="subsidy">补贴申领</button><button aria-pressed="false" data-v="onboard">入职报到</button></div>
         </div>
         <div class="field" style="border-bottom:0">
-          <div class="field-lb">份数按几家企业算</div>
-          <div class="stepper">
-            <button aria-label="减少"><svg class="ic"><use href="#i-minus"/></svg></button>
-            <span class="val">5<span class="unit"> 家</span></span>
-            <button aria-label="增加"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <div class="field-lb" data-out="stepLb">份数按几家企业算</div>
+          <div class="stepper" data-param="copies">
+            <button aria-label="减少" data-step="-1"><svg class="ic"><use href="#i-minus"/></svg></button>
+            <span class="val"><span data-out="copies">5</span><span class="unit" data-out="copiesUnit"> 家</span></span>
+            <button aria-label="增加" data-step="1"><svg class="ic"><use href="#i-plus"/></svg></button>
           </div>
         </div>
       </div>
@@ -389,10 +363,10 @@
            ai-down 态求职信未生成、结论也变了，不能沿用同一句。 -->
       <div class="pane pane--fill" data-at="t3" style="margin-top:auto">
         <div class="pane-hd">
-          <span class="t" data-when="default device-off">还差两样</span>
+          <span class="t" data-when="default device-off" data-out="ckLack">还差两样</span>
           <span class="t" data-when="ai-down">清单不受影响</span>
           <span class="t" data-when="first">先看该带什么</span>
-          <span class="s" data-when="default device-off">3 / 6 已有</span>
+          <span class="s" data-when="default device-off" data-out="ckCount">3 / 6 已有</span>
         </div>
         <div class="notice" data-when="first">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -415,16 +389,16 @@
 
       <!-- T4 模板 -->
       <div class="pane" data-at="t4">
-        <div class="pane-hd"><span class="t">选中：单栏 · 稳妥</span></div>
+        <div class="pane-hd"><span class="t" data-out="tplNm">选中：单栏 · 稳妥</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">适合</span><span class="v">大部分岗位</span></div>
-          <div class="kv-row"><span class="k">页数</span><span class="v">你的内容约 1 页</span></div>
-          <div class="kv-row"><span class="k">字号</span><span class="v">正文 10.5pt</span></div>
-          <div class="kv-row"><span class="k">机读友好</span><span class="v" style="color:var(--jade-600)">是</span></div>
+          <div class="kv-row"><span class="k">适合</span><span class="v" data-out="tplFor">大部分岗位</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" data-out="tplPg">你的内容约 1 页</span></div>
+          <div class="kv-row"><span class="k">字号</span><span class="v" data-out="tplFz">正文 10.5pt</span></div>
+          <div class="kv-row"><span class="k">机读友好</span><span class="v" data-out="tplAts" style="color:var(--jade-600)">是</span></div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>带侧栏和双栏模板在部分企业的简历筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
+          <span data-out="tplNote">带侧栏和双栏模板在部分企业的筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
         </div>
       </div>
       <div class="pane pane--fill" data-at="t4" style="margin-top:auto">
@@ -445,39 +419,40 @@
 
   <div class="actionbar">
       <a class="backbtn" href="09-resume-workbench.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="t1">
-        <div data-when="default device-off"><div class="t">经历与数字全部取自简历 v2，没有新增事实</div><div class="s">黄底三处是槽位：公司全称、来源平台、署名，要你自己核</div></div>
+        <div data-when="default device-off"><div class="t" data-out="hint1">写给：用户运营专员 · 约 320 字 · 务实</div><div class="s">黄底三处是槽位：公司全称、来源平台、署名，要你自己核</div></div>
         <div data-when="ai-down"><div class="t">求职信生成不可用</div><div class="s">可打印空白格式纸手写</div></div>
-        <div data-when="first"><div class="t">先得有简历</div><div class="s">求职信不会另外问你一遍，也不凭空编</div></div>
+        <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写求职信</div></div>
       </div>
       <div data-at="t2">
-        <div data-when="default device-off"><div class="t">两个版本：30 秒递简历用，1 分钟面试开场用</div><div class="s">照着念会很假 · 记住三个数字和一句短板就够</div></div>
+        <div data-when="default device-off"><div class="t" data-out="hint2">本次用 30 秒版 · 招聘会递简历</div><div class="s">照着念会很假 · 记住三个数字和一句短板就够</div></div>
         <div data-when="ai-down"><div class="t">生成不可用，可打印结构卡自己填</div><div class="s">结构卡只给顺序，不含内容</div></div>
-        <div data-when="first"><div class="t">先得有简历</div><div class="s">内容来自你的简历，不凭空编</div></div>
+        <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写口述稿</div></div>
       </div>
       <div data-at="t3">
-        <div data-when="default device-off"><div class="t">6 样里已有 3 样，还差证件照和身份证原件</div><div class="s">清单来自主办方公告原文，不是模型凭经验列的</div></div>
+        <div data-when="default device-off"><div class="t" data-out="hint3">6 样里已有 3 样，还差 3 样</div><div class="s">清单来自主办方公告原文，不是模型凭经验列的</div></div>
         <div data-when="ai-down"><div class="t">清单照常显示，不依赖 AI</div><div class="s">只有「哪些你已经有了」需要读你的材料</div></div>
         <div data-when="first"><div class="t">清单可以看，勾选状态需要你的材料</div><div class="s">没有材料时只显示该带什么</div></div>
       </div>
       <div data-at="t4"><div class="t">换模板只改排版，不改一个字</div><div class="s">生成 v3，v1 与 v2 都保留，可随时切回</div></div>
     </div>
 
-    <button class="btn btn--lg btn--ghost" data-at="t1" data-when="default device-off">换一版措辞</button>
+    <button class="btn btn--lg btn--ghost" data-at="t1" data-when="default device-off" data-act="rephrase">换一版措辞</button>
     <button class="btn btn--lg btn--ghost" data-at="t1" data-when="ai-down first" data-go="t3">看材料清单</button>
-    <button class="btn btn--lg btn--ghost" data-at="t2">切换场合</button>
-    <button class="btn btn--lg btn--ghost" data-at="t3">加一样自定义</button>
+    <button class="btn btn--lg btn--ghost" data-at="t2" data-act="scene">切换场合</button>
+    <button class="btn btn--lg btn--ghost" data-at="t3" data-act="addck">加一样自定义</button>
     <button class="btn btn--lg btn--ghost" data-at="t4" data-go="t1">回求职信</button>
 
     <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
     <a class="btn btn--primary" data-at="t1" data-when="first" href="09-resume-workbench.html">先去做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <button class="btn btn--primary" data-at="t1" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="t1" data-when="device-off" data-fb="save">存进我的文档 · 扫码带走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="t2" data-when="default device-off" href="20-interview-pod.html">对着练一遍<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html?stage=s3">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="t3" data-when="device-off">发到我手机<svg class="ic"><use href="#i-phone"/></svg></button>
+    <button class="btn btn--primary" data-at="t3" data-when="device-off" data-fb="phone">发到我手机 · 扫码带走<svg class="ic"><use href="#i-phone"/></svg></button>
     <a class="btn btn--primary" data-at="t4" href="09-resume-workbench.html?stage=s5">应用到我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
@@ -486,6 +461,16 @@
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
+
+  <!-- 结果反馈层：发手机 / 存文档点完必须有交代，并给返回入口 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
 
 </div>
 </div>
@@ -505,14 +490,286 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
-  // 模板选中
+})()
+</script>
+<script>
+/* ============================================================================
+   四个台面的参数模型。为什么必须有：原来 7 组 seg、份数步进、换岗位、换措辞、
+   切场合、加自定义全部点了没反应，产出物（求职信正文 / 两版口述稿 / 材料清单 /
+   模板说明）是写死的 —— 参数与结论之间没有任何因果，等于把设定摆着好看。
+   现在信由「语气 × 长度 × 写不写短板 × 措辞版本」拼出来，口述稿由
+   「场合 × 提不提短板 × 突出哪段」拼出来，清单由「给哪件事准备 × 份数」决定。
+   事实池是固定的（简历 v2 里那几条），任何组合都不新增经历。
+   ========================================================================== */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* ── 事实池：全部取自简历 v2，任何参数组合都只是重新组织，不新增 ── */
+  var F = {
+    yrs: '2 年 3 个月', wx: '半年内粉丝从 3000 增至 12000', act: '策划并执行 8 场线上活动，单场最高带来 340 个新增关注',
+    campus: '带 5 个人在 3 所高校做校园地推', weak: 'SQL 只能写基础查询，还没独立支撑过完整的数据复盘'
+  }
+  var JOBS = [
+    { nm: '用户运营专员', org: '前程无忧', sync: '8 月 8 日 09:20', id: 'JX-88214' },
+    { nm: '新媒体运营',   org: '智联招聘', sync: '8 月 8 日 08:40', id: 'ZL-52307' },
+    { nm: '内容运营助理', org: '市人力资源市场官网', sync: '8 月 7 日 17:05', id: 'SH-20260807-19' }
+  ]
+  var TPL = [
+    { nm: '单栏 · 稳妥', to: '大部分岗位', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '最保守的一版，投大公司不会出错。' },
+    { nm: '单栏 · 紧凑', to: '经历较多时', pg: '你的内容约 1 页', fz: '正文 10pt',   ats: '是', note: '行距压紧，同样一页能多放两段。' },
+    { nm: '带侧栏 · 技能突出', to: '技能型岗位', pg: '你的内容约 1 页', fz: '正文 10pt', ats: '否 · 可能乱序', note: '侧栏在部分筛选系统里会<b>乱序</b>，投大公司慎用。' },
+    { nm: '时间线式', to: '经历连贯的人', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '时间轴清楚，空窗期也会一并显出来。' },
+    { nm: '校招 · 一页版', to: '应届与实习', pg: '强制 1 页', fz: '正文 10pt', ats: '是', note: '强制一页，超出的内容会被压缩。' },
+    { nm: '项目优先', to: '项目经历强的人', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '项目排在工作经历前面，适合作品说话。' }
+  ]
+  /* 三件事各有各的清单。来源都是外部公开信息，本机只做展示与勾选。 */
+  var LISTS = {
+    fair: {
+      title: '周五招聘会 · 建议带的材料', src: '来源：主办方公告 · 同步 08:52', origin: '主办方公告原文',
+      stepLb: '份数按几家企业算', unit: ' 家', pf: '按你收藏的场次预设 · 可改',
+      items: [
+        { t: '纸质简历 {n} 份', s: '现场普遍收纸质件', have: 1, tag: '已在打印队列', tone: 'jade', ai: 1 },
+        { t: '身份证原件', s: '入场登记需要', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '学位证 / 毕业证复印件 2 份', s: '3 家收藏企业中 2 家要求', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '证件照 2 张', s: '部分企业现场填表要贴', have: 0, tag: '本机暂不能拍', tone: '' },
+        { t: '笔', s: '现场填表用', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '求职信 1 份（可选）', s: '投明确目标企业时更显诚意', have: 1, tag: '已生成', tone: 'jade', gen: 1 }
+      ]
+    },
+    subsidy: {
+      title: '补贴申领 · 窗口要收的材料', src: '来源：人社局办事指南 · 同步 08:52', origin: '人社局办事指南',
+      stepLb: '复印件按几份准备', unit: ' 份', pf: '按办事指南默认 2 份 · 可改',
+      items: [
+        { t: '身份证复印件 {n} 份', s: '正反面复印在同一页', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '失业登记证明', s: '在就业服务窗口开具', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '本人一类银行卡', s: '补贴只打本人账户', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '解除劳动合同证明', s: '原单位出具', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '社保缴纳记录', s: '可在本机打印电子版', have: 1, tag: '可本机打印', tone: 'jade' },
+        { t: '申领表', s: '窗口现场领取填写', have: 0, tag: '现场领', tone: '' }
+      ]
+    },
+    onboard: {
+      title: '入职报到 · 单位要收的材料', src: '来源：用人单位入职通知 · 同步 08:52', origin: '入职通知原文',
+      stepLb: '复印件按几份准备', unit: ' 份', pf: '按入职通知默认 2 份 · 可改',
+      items: [
+        { t: '身份证复印件 {n} 份', s: '人事建档用', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '学位证 / 毕业证原件', s: '现场核验后退还', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '离职证明', s: '原单位出具，入职前必须有', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '体检报告', s: '指定医院一个月内有效', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '一寸证件照 2 张', s: '工牌与档案用', have: 0, tag: '本机暂不能拍', tone: '' },
+        { t: '银行卡复印件', s: '发薪账户', have: 1, tag: '可本机打印', tone: 'jade' }
+      ]
+    }
+  }
+  var EXTRA = ['成绩单复印件', '获奖证书复印件', '实习证明']
+
+  var P = { tone: '务实', len: '300', weak: '写', variant: 0, job: 0,
+            scene: '招聘会递简历', weak2: '提', focus: '公众号增长',
+            item: 'fair', copies: 5, tpl: 0, custom: [] }
+
+  function q (n) { return scr.querySelectorAll('[data-out="' + n + '"]') }
+  function set (n, v) {
+    var els = q(n)
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]
+      if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = v
+      else el.textContent = v
+    }
+  }
+  function html (n, v) { var els = q(n); for (var i = 0; i < els.length; i++) els[i].innerHTML = v }
+  function setSeg (p, v) {
+    var g = scr.querySelector('.seg[data-param="' + p + '"]'); if (!g) return
+    var bs = g.querySelectorAll('button')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === v ? 'true' : 'false')
+  }
+
+  /* ── T1 求职信：按语气 / 长度 / 短板 / 措辞版本拼 ── */
+  function letter () {
+    var j = JOBS[P.job], v = P.variant % 2
+    var slotOrg = '<span class="slot-mark">' + j.org + '</span>'
+    var HI = { '务实': '尊敬的招聘负责人：', '热情': '您好，招聘负责人：', '正式': '尊敬的贵公司人力资源部：' }
+    var OPEN = {
+      '务实': ['我在' + slotOrg + '看到贵公司招聘' + j.nm + '，特此应聘。这个岗位写的职责方向，和我这两年实际在做的事基本一致。',
+               '贵公司' + j.nm + '一岗的招聘信息，我是在' + slotOrg + '看到的，现来应聘。岗位说明里的几项要求，我先在下面逐条对一遍。'],
+      '热情': ['在' + slotOrg + '看到贵公司在招' + j.nm + '，这正是我一直想做的方向，所以第一时间投了过来。',
+               '我在' + slotOrg + '看到' + j.nm + '在招，越看越觉得对得上，就先把信写过来了。'],
+      '正式': ['本人现应聘贵公司' + j.nm + '一职，招聘信息来源为' + slotOrg + '。现将本人与该岗位相关的经历陈述如下。',
+               '兹应聘贵公司' + j.nm + '一职，信息见' + slotOrg + '所载公告。以下就岗位要求逐项说明本人情况。']
+    }
+    var END = { '务实': '随信附上简历，期待有机会与您详谈。', '热情': '简历随信附上，很期待能当面聊聊。', '正式': '现将本人简历随信呈上，恭候回音。' }
+    var CORE = '我有' + F.yrs + '运营经验。在上一家公司独立运营公众号，' + F.wx + '；' + F.act + '。这些数字都可以在面试时提供后台截图核对，简历里也写了对应的时间与口径。'
+    var SHORT = '我有' + F.yrs + '运营经验，独立运营公众号' + F.wx.replace('半年内', '，半年') + '，另' + F.act.split('，')[0] + '。详细时间与口径都写在简历里，可随时核对。'
+    var TAIL = '岗位要求里我做过的都写在上面，细节可以在面试时逐条说明。'
+    /* 写短板 / 不写短板两段长度接近，否则「300 字」这个档位会随开关忽长忽短 */
+    var WEAK = '贵公司这个岗位要求熟练使用 SQL 独立取数，这一项我' + F.weak + '。这一条我先说明白，免得入职之后才发现对不上；我会在入职前继续补，也希望能有机会在实际工作中练。'
+    var NOWEAK = '以上经历与数字都取自我的简历，没有另外加工；岗位说明里列的要求，能对上的我写在上面，对不上的我也不会绕过去。如需核对，我可以在面试时提供后台截图与时间口径。'
+    var MORE = '在校期间我带过一个校园推广项目，' + F.campus + '，从排期、物料到现场执行都跟过一遍。这段经历让我习惯把一个目标拆成可执行的动作，也是我后来做活动运营的底子。'
+    var WHY = '我看过贵公司在' + j.org + '上的岗位说明，其中提到的日常运营与活动执行两块，正是我这两年主要在做的事。'
+    var LONG = '如果贵公司希望我先补齐取数那一项再入职，我可以在面试时说明补课的安排；岗位上还有我没提到的要求，也请您直接问，我不会含糊过去。简历、活动记录和后台截图我都带着，随时可以提供核对。'
+
+    var ps = [HI[P.tone], OPEN[P.tone][v]]
+    if (P.len === '200') { ps.push(SHORT); ps.push(TAIL) }
+    else {
+      ps.push(CORE)
+      ps.push(P.weak === '写' ? WEAK : NOWEAK)
+      if (P.len === '500') { ps.push(MORE); ps.push(WHY); ps.push(LONG) }
+    }
+    ps.push(END[P.tone])
+    var body = ps.map(function (t) { return '<p>' + t + '</p>' }).join('')
+    body += '<div class="sign"><span class="slot-mark">王 ×</span><br>' +
+            '<span style="font-size:11px;color:var(--paper-fog)">联系电话 138****2046 · 2026 年 8 月 8 日</span></div>'
+    var chars = ps.join('').replace(/<[^>]+>/g, '').replace(/\s/g, '').length
+    return { body: body, chars: Math.round(chars / 10) * 10 }
+  }
+
+  /* ── T2 口述稿：按场合 / 提不提短板 / 突出哪段拼 ── */
+  function speak () {
+    var j = JOBS[P.job], f = P.focus === '公众号增长'
+    var hi = '您好，我叫<b>王 ×</b>，做运营两年多。'
+    var main30 = f
+      ? '上一份工作在一家科技公司，<b>独立运营公众号，半年从 3000 粉做到 12000</b>；也策划过 8 场线上活动。'
+      : '上一份工作在一家科技公司做运营；在校时我<b>带 5 个人在 3 所高校做地推</b>，从 0 组队到落地都跑过一遍。'
+    var end30 = P.scene === '招聘会递简历'
+      ? '我今天投的是' + j.nm + '，简历在这儿，您方便的话我可以补充说一下增长那部分是怎么做的。'
+      : '我应聘的是' + j.nm + '，想先从我最有把握的一段讲起。'
+    var w30 = P.weak2 === '提' ? 'SQL 取数我目前只能写基础查询，这块我在补。' : ''
+    var s30 = hi + main30 + w30 + end30
+
+    var main60 = f
+      ? '2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，主要负责两块：<b>公众号从 0 到 1 的日常运营</b>，半年粉丝从 3000 到 12000；以及<b>线上活动</b>，做过 8 场，单场最高带来 340 个新增关注。<br>另外我在学校带过一个校园推广项目，带 5 个人在 3 所高校做地推。'
+      : '在学校我带过一个校园推广项目，<b>带 5 个人在 3 所高校做地推</b>，从排期到现场执行都我来盯。<br>之后 2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，独立运营公众号，半年粉丝从 3000 到 12000，也做过 8 场线上活动。'
+    var w60 = P.weak2 === '提'
+      ? '<br>我看到这个岗位要求 SQL 取数，说实话我目前只能写基础查询，还没独立做过完整的数据复盘，这块是我接下来想补的。其他要求我基本都做过。'
+      : '<br>岗位上写的要求，我基本都做过。'
+    var s60 = '您好，我叫王 ×，' + main60 + w60
+    return { s30: s30, s60: s60,
+             n30: Math.round(s30.replace(/<[^>]+>/g, '').replace(/\s/g, '').length / 5) * 5,
+             n60: Math.round(s60.replace(/<[^>]+>/g, '').replace(/\s/g, '').length / 5) * 5 }
+  }
+
+  /* ── T3 清单：三件事各一套，份数随步进器走 ── */
+  function renderList () {
+    var L = LISTS[P.item]
+    var items = L.items.map(function (it) { return it }).concat(P.custom.map(function (nm) {
+      return { t: nm, s: '你自己加的一项', have: 0, tag: '你自己带', tone: 'amber' }
+    }))
+    var box = q('cklist')[0]; if (!box) return
+    box.innerHTML = items.map(function (it) {
+      var t = it.t.replace('{n}', P.copies)
+      var tone = it.tone === 'jade' ? ' chip--jade' : it.tone === 'amber' ? ' chip--amber' : ''
+      var when = it.gen ? ' data-when="default device-off"' : it.have ? ' data-when="default ai-down device-off"' : ''
+      var tag = '<span class="chip' + tone + ' chip--info"' + when + '>' + it.tag + '</span>' +
+        (it.gen ? '<span class="chip chip--info" data-when="ai-down">未生成 · 可手写</span>' : '')
+      return '<div class="ck' + (it.have ? ' ck--have' : '') + (it.gen ? ' ck--gen' : '') + '"><span class="ck-box"></span>' +
+        '<span class="ck-b"><span class="ck-t">' + t + '</span><span class="ck-s">' + it.s + '</span></span>' +
+        '<span class="ck-tag-status">' + tag + '</span></div>'
+    }).join('')
+    var have = items.filter(function (i) { return i.have }).length
+    set('ckTitle', L.title); set('ckSrc', L.src); set('ckOrigin', L.origin)
+    set('stepLb', L.stepLb); set('copiesUnit', L.unit); set('copies', P.copies); set('pfItem', L.pf)
+    set('ckCount', have + ' / ' + items.length + ' 已有')
+    set('ckLack', '还差 ' + (items.length - have) + ' 样')
+    set('hint3', items.length + ' 样里已有 ' + have + ' 样，还差 ' + (items.length - have) + ' 样')
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  function render () {
+    var j = JOBS[P.job], L = letter(), S = speak(), T = TPL[P.tpl]
+    /* T1 */
+    set('jNm', j.nm); set('jOrg', j.org); set('jSync', j.sync); set('jId', j.id)
+    html('letter', L.body)
+    html('lmeta', '应聘岗位：' + j.nm + ' · <span class="slot-mark">某科技有限公司</span>')
+    set('fname', '求职信_' + j.nm + '.pdf')
+    set('fmeta', 'A4 · 1 页 · 约 ' + L.chars + ' 字')
+    set('pfLen', '实际约 ' + L.chars + ' 字')
+    set('pfTone', P.tone + '语气 · 第 ' + (P.variant % 2 + 1) + ' 版措辞')
+    set('hint1', '写给：' + j.nm + ' · 约 ' + L.chars + ' 字 · ' + P.tone)
+    setSeg('tone', P.tone); setSeg('len', P.len); setSeg('weak', P.weak)
+    /* T2 */
+    html('txt30', S.s30); html('txt60', S.s60)
+    set('len30', '约 ' + S.n30 + ' 字'); set('len60', '约 ' + S.n60 + ' 字')
+    var use30 = P.scene === '招聘会递简历'
+    var n30 = q('now30')[0], n60 = q('now60')[0]
+    if (n30) n30.hidden = !use30
+    if (n60) n60.hidden = use30
+    var c30 = scr.querySelector('[data-card="s30"]'), c60 = scr.querySelector('[data-card="s60"]')
+    if (c30) c30.setAttribute('aria-current', use30 ? 'true' : 'false')
+    if (c60) c60.setAttribute('aria-current', use30 ? 'false' : 'true')
+    set('pfScene', P.scene + ' · 突出' + P.focus)
+    set('hint2', '本次用' + (use30 ? ' 30 秒版' : ' 1 分钟版') + ' · ' + P.scene)
+    setSeg('scene', P.scene); setSeg('weak2', P.weak2); setSeg('focus', P.focus)
+    /* T3 */
+    setSeg('item', P.item); renderList()
+    /* T4 */
+    set('tplNm', '选中：' + T.nm); set('tplFor', T.to); set('tplPg', T.pg); set('tplFz', T.fz); set('tplAts', T.ats)
+    html('tplNote', T.note)
+    var ts = scr.querySelectorAll('.tpl')
+    for (var i = 0; i < ts.length; i++) ts[i].setAttribute('aria-current', +ts[i].getAttribute('data-tpl') === P.tpl ? 'true' : 'false')
+  }
+
+  /* ── 结果反馈层 ── */
+  var fb = document.getElementById('fb')
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    var go = document.getElementById('fb-go'); go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', function () { fb.hidden = true })
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+  function what () {
+    var st = scr.getAttribute('data-stage')
+    if (st === 't1') return '求职信_' + JOBS[P.job].nm + '.pdf'
+    if (st === 't2') return '自我介绍稿（30 秒版 + 1 分钟版）'
+    if (st === 't3') return LISTS[P.item].title
+    return '简历模板：' + TPL[P.tpl].nm
+  }
+  var FB = {
+    phone: function () {
+      return { t: '已生成取件二维码',
+        p: '<b>' + what() + '</b> 已打包，手机扫屏幕上的码就能取走。<br>链接 <b>30 分钟后失效</b>，过期回本页重新生成；本机不留副本。',
+        go: [{ t: '去手机接力页看码', href: '05-phone-relay.html', primary: true }, { t: '留在这一页' }] }
+    },
+    save: function () {
+      return { t: '已存进「我的文档」',
+        p: '<b>' + what() + '</b> 已存好。凭手机号在任一台机器登录都能取回，<b>文件跟人走，不跟机器走</b>。<br>只给你本人看，不向任何企业提供。',
+        go: [{ t: '去「我的」查看', href: '23-me.html', primary: true }, { t: '留在这一页' }] }
+    }
+  }
+
   scr.addEventListener('click', function (e) {
-    var t = e.target.closest('.tpl')
-    if (!t) return
-    scr.querySelectorAll('.tpl').forEach(function (x) { x.setAttribute('aria-current', x === t ? 'true' : 'false') })
+    var seg = e.target.closest('.seg[data-param] button[data-v]')
+    if (seg) { P[seg.closest('.seg').getAttribute('data-param')] = seg.getAttribute('data-v'); render(); return }
+    var st = e.target.closest('.stepper[data-param] button[data-step]')
+    if (st) { P.copies = Math.max(1, Math.min(20, P.copies + (+st.getAttribute('data-step')))); render(); return }
+    var tp = e.target.closest('.tpl')
+    if (tp) { P.tpl = +tp.getAttribute('data-tpl'); render(); return }
+    var act = e.target.closest('[data-act]')
+    if (act) {
+      var a = act.getAttribute('data-act')
+      if (a === 'job') P.job = (P.job + 1) % JOBS.length
+      if (a === 'rephrase') P.variant += 1
+      if (a === 'scene') P.scene = P.scene === '招聘会递简历' ? '面试开场' : '招聘会递简历'
+      if (a === 'addck' && P.custom.length < EXTRA.length) P.custom.push(EXTRA[P.custom.length])
+      render(); return
+    }
+    var f = e.target.closest('[data-fb]')
+    if (f) { openFb(FB[f.getAttribute('data-fb')]()); return }
   })
+  fb.addEventListener('click', function (e) { if (e.target === fb) fb.hidden = true })
+
+  render()
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

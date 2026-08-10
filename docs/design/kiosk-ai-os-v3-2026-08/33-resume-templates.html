@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ══ P33 专用 ══ 简历素材库（线上 /resume/templates）
    需求真值 = 生产代码，本页所有数量与文案都能对上：
@@ -213,8 +214,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
       <div class="stock">
         <div class="stock-t">线上库现在就这些 —— 数量按后台实际配置，本机不替它凑数</div>
         <div class="stock-p">
-          <b>简历版式：1 个</b>（就是上面这个）。三个分类都是<b>同一批素材的筛选条件</b>，不是三类模板 ——
-          这一个版式同时带「简历模板」「通用」两个标签，所以三个分类下都看得到它。
+          <b>简历版式：1 个</b>（就是上面这个）。三个分类都是<b>同一批素材的筛选条件</b>，不是三类模板 —— 同一个版式带两个标签，三个分类下都看得到。
         </div>
         <div class="stock-p">
           另外还有 <b>5 个求职材料文档模板</b>，它们不在本页，在<b>材料工厂</b>那一页：
@@ -333,6 +333,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" href="32-resume-hub.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回 AI简历服务</a>
     <a class="btn btn--lg btn--ghost" href="12-material-factory.html"><svg class="ic"><use href="#i-package"/></svg>去材料工厂</a>
 
@@ -385,5 +386,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

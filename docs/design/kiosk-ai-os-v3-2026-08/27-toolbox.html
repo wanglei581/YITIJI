@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P27 专用 ── 百宝箱区 = 后台配置驱动的扩展服务启动区（线上 /toolbox：
    管理后台审核上架 · launchMode 三种 = 站内页面/扫码到手机/外部 H5 · 启动有
@@ -115,7 +116,10 @@
 .tbg-items { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-3); }
 .tbi { display:flex; flex-direction:column; gap:6px; padding:var(--s-3) var(--s-4);
   border-radius:var(--r-xs); background:var(--surf-1); border:1px dashed var(--fog-a20);
-  min-height:96px; cursor:default; }
+  /* 去重后每卡少一行说明；卡高由 min-height 兜住，chip 压到卡底，
+     避免删文案顺带把左栏底部留白撑大（不改 styles/，只改本页样式块） */
+  min-height:156px; cursor:default; }
+.tbi > .chip { margin-top:auto; }
 .tbi-hd { display:flex; align-items:center; gap:var(--s-2); }
 .tbi-hd .ic { width:18px; height:18px; color:var(--fog-600); flex:0 0 auto; }
 .tbi-t { font-size:var(--fz-3); color:var(--fog-800); font-weight:600; min-width:0; }
@@ -185,8 +189,7 @@
       </div>
       <div class="notice" data-at="s1" data-when="device-off">
         <svg class="ic"><use href="#i-info"/></svg>
-        <span>打印机离线 —— 扩展服务<b>不依赖打印机</b>，这一页照常；
-              下面「现在就能做的」里涉及打印的那条此刻打不了，可先转存「我的文档」。</span>
+        <span>打印机离线 —— 扩展服务<b>不依赖打印机</b>，这一页照常；涉及打印的那条此刻打不了，可先转存「我的文档」。</span>
       </div>
 
       <div class="pane" data-at="s1">
@@ -297,9 +300,7 @@
         <div class="stophere">
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
-            真上架后每张卡还会有<b>服务方名称、审核时间、能不能用的实时状态</b> ——
-            那些来自管理后台的真实配置，<b>本机不替后台编</b>。<br>
-            所以这块是空的，不是没做完：空着比编一排看起来能点的假服务更诚实。
+            <b>这块是空的：本机一个扩展服务都没上架</b>，空着也不编一排点不动的假服务。
           </div>
         </div>
       </div>
@@ -307,8 +308,7 @@
       <!-- ─────────── S3 会有哪些条目 · 按启动方式分三组 ─────────── -->
       <div class="previewbar" data-at="s3">
         <svg class="ic"><use href="#i-alert"/></svg>
-        <span><b>下面按「启动方式」分三组 —— 这是配置里唯一真实存在的分类维度。</b>
-              条目叫什么、有几条、上不上，全由管理后台下发；
+        <span><b>下面按「启动方式」分三组</b>，条目由管理后台下发；
               <b>本机现在一条都没有，示例卡一张都点不动</b>。</span>
       </div>
 
@@ -380,17 +380,14 @@
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-idcard"/></svg><span class="tbi-t">证件照预约</span></span>
                   <span class="tbi-s">选时段，拍摄在合作点</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-book"/></svg><span class="tbi-t">办事指南速查</span></span>
                   <span class="tbi-s">流程与所需材料清单</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-users"/></svg><span class="tbi-t">培训课程信息</span></span>
                   <span class="tbi-s">开课时间与报名方式</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
               </div>
             </div>
@@ -398,23 +395,20 @@
             <div class="tbgroup tbgroup--h5">
               <div class="tbg-hd"><span class="tbg-n">② 外部 H5</span>
                 <span class="tbg-go">按钮写「打开(离场提示)」</span></div>
-              <div class="tbg-rule">共同规矩：<b>会离开本页</b>，跳出去之前先弹「要离开吗」，你点确认才走；
+              <div class="tbg-rule">共同规矩：<b>会离开本页</b>，跳出去前先弹「要离开吗」；
                     打开的是第三方页面，内容与办理结果都不归本机管。</div>
               <div class="tbg-items">
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-campus"/></svg><span class="tbi-t">校园门户</span></span>
                   <span class="tbi-s">学校官网的公开页</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-building"/></svg><span class="tbi-t">政务网厅指南页</span></span>
                   <span class="tbi-s">官方网厅公开说明</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-agency"/></svg><span class="tbi-t">合作机构介绍页</span></span>
                   <span class="tbi-s">机构自己的页面</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
               </div>
             </div>
@@ -422,32 +416,27 @@
             <div class="tbgroup tbgroup--qr">
               <div class="tbg-hd"><span class="tbg-n">③ 二维码</span>
                 <span class="tbg-go">按钮写「扫码获取」</span></div>
-              <div class="tbg-rule">共同规矩：<b>在你自己手机上办</b>，屏上只出码、不出你的信息；
+              <div class="tbg-rule">共同规矩：<b>在你自己手机上办</b>，屏上只出码；
                     码有有效期，过期作废。要登录、要看个人账户的事项都归这一类。</div>
               <div class="tbg-items">
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-qr"/></svg><span class="tbi-t">社保查询</span></span>
                   <span class="tbi-s">结果只出现在你手机</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-phone"/></svg><span class="tbi-t">公积金查询</span></span>
                   <span class="tbi-s">要登录，一律走手机</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
                 <div class="tbi" aria-disabled="true">
                   <span class="tbi-hd"><svg class="ic"><use href="#i-card"/></svg><span class="tbi-t">小程序办事入口</span></span>
                   <span class="tbi-s">扫码进小程序里办</span>
-                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
                   <span class="chip chip--info">未配置</span></div>
               </div>
             </div>
 
             <div class="notice">
               <svg class="ic"><use href="#i-shield"/></svg>
-              <span>上面这些卡是<b>用来说明三种启动方式长什么样</b>，不是本机的服务清单。
-                    上一页那句仍然成立：空着比编一排看起来能点的假服务更诚实 ——
-                    <b>本机现在一个扩展服务都没有</b>。</span>
+              <span>上面这些卡只演示三种启动方式的样子，<b>不是本机的服务清单</b>。</span>
             </div>
           </div>
         </div>
@@ -468,9 +457,6 @@
             <div class="kv-row"><span class="k">已上架服务</span><span class="v v--fog">0 个</span></div>
             <div class="kv-row"><span class="k">配置来源</span><span class="v v--fog">管理后台</span></div>
             <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未配置</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几行是本机的真实状态，不是示意。
           </div>
         </div>
       </div>
@@ -501,8 +487,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
-            想接入服务的机构请咨询现场工作人员或机器背面的运维标签。
-            本页不展示未经核实的联系方式。
+            想接入服务的机构请咨询现场工作人员。本页不展示未经核实的联系方式。
           </div>
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
@@ -523,9 +508,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么给你看这个</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            让你知道<b>配置后这里能长出什么</b>。<br><br>
-            但示例卡现在<b>一张都启动不了</b> —— 所以它们不带链接、不出真码、
-            不写具体的服务方名称。
+            让你知道<b>配置后这里能长出什么</b>；示例卡<b>一张都启动不了</b>。
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">站内页面</span><span class="v">本机直接打开</span></div>
@@ -545,9 +528,6 @@
             <span class="alt-b"><span class="alt-t">打印扫描</span> <span class="alt-s">本机的主业，不依赖百宝箱</span></span></a>
           <a class="alt" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>
             <span class="alt-b"><span class="alt-t">政策服务</span> <span class="alt-s">官方政策与办事清单在这里看</span></span></a>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几件都是本机自己的能力，不用等任何服务上架。
-          </div>
         </div>
       </div>
 
@@ -565,9 +545,6 @@
             <div class="kv-row"><span class="k">三组共同点</span><span class="v">都经后台审核后配置</span></div>
             <div class="kv-row"><span class="k">本机现有条目</span><span class="v v--fog">0 条</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            最后一行是本机真实状态，上面几行是配置规则，两者都不是示意。
-          </div>
         </div>
       </div>
 
@@ -575,14 +552,11 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这些卡为什么点不动</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            因为它们不是入口，是<b>启动方式的样子</b>。真条目的名称、图标、说明、
-            能不能用，全部来自管理后台下发的配置 ——
-            <b>本机不替后台编条目，也不替后台编条数。</b>
+            它们不是入口，只是<b>启动方式的样子</b>；真条目全部来自管理后台配置。
           </div>
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>配置下发之后，卡片上才会出现真名字，那时按钮才是真能按的。
-                  在那之前，做成能按的样子就是骗你走一趟。</span>
+            <span>后台下发配置后，卡片才会出现真服务名，按钮那时才能按。</span>
           </div>
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
@@ -602,10 +576,7 @@
               <span class="alt-b"><span class="alt-t">求职材料四件套</span>
                 <span class="alt-s">求职信、自我介绍、材料清单、简历模板</span></span></a>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4);line-height:1.7">
-            这四个是本机自己的能力，链接现在就有效 ——
-            和上面那些点不动的示例卡，区别就在这儿。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">这四个链接现在就能点。</div>
         </div>
       </div>
 
@@ -657,5 +628,7 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P04 系统态 ─────────────────────────────────────────────────────────
    一页五形态：帮助 / 法务 / 会话超时 / 断网异常 / 会话恢复。
@@ -273,7 +274,7 @@
           <span class="bh-t">还在吗？</span>
           <span class="bh-p">
             你有 <b>4 分钟</b>没动屏幕了。这台机器在公共场所，
-            <b>无人操作会自动清空</b>，免得下一个人看到你的东西。
+            免得下一个人看到你的东西。
           </span>
         </div>
       </div>
@@ -455,7 +456,7 @@
             <div class="kv-row"><span class="k">服务条款</span><span class="v">v2.3 · 2026-07-01</span></div>
             <div class="kv-row"><span class="k">隐私政策</span><span class="v">v2.1 · 2026-06-15</span></div>
             <div class="kv-row"><span class="k">合计</span><span class="v">6 页</span></div>
-            <div class="kv-row"><span class="k">打印</span><span class="v">预估 1.20 元 · 以核价为准</span></div>
+            <div class="kv-row"><span class="k">打印</span><span class="v">预估 1.20 元</span></div>
             <div class="kv-row"><span class="k">扫码存手机</span><span class="v v--fog">不收费</span></div>
           </div>
 
@@ -564,6 +565,7 @@
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" data-at="s1 s2" href="01-home-v5.html">回首页</a>
     <button class="btn btn--lg btn--ghost" data-at="s3">结束并清空</button>
     <a class="btn btn--lg btn--ghost" data-at="s4" href="06-print-workbench.html">先去打印</a>
@@ -571,8 +573,8 @@
 
     <span class="actionbar-hint" data-at="s1">卡纸和机器没反应，找工作人员比在这儿点快</span>
     <span class="actionbar-hint" data-at="s2">不点同意也能继续用</span>
-    <span class="actionbar-hint" data-at="s3">碰一下屏幕就能继续，不用重新开始</span>
-    <span class="actionbar-hint" data-at="s4">打印和扫描不受影响</span>
+    <span class="actionbar-hint" data-at="s3">碰一下屏幕就能继续</span>
+    <span class="actionbar-hint" data-at="s4">正在自动重连</span>
     <span class="actionbar-hint" data-at="s5">只显示标题和进度，内容要你点了才出来</span>
 
     <a class="btn btn--primary" data-at="s1" href="25-advisor.html">问问小青<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -596,5 +598,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

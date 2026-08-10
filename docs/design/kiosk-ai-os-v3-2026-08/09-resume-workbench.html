@@ -35,10 +35,108 @@
     font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
   }
   .inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 0; color: var(--fog-600); }
+
+  /* ════════ 2026-08-10 Codex 走查整改：上传门 + 材料交接 ════════
+     走查第一名：「上传入口根本不收文件」—— 六卡点下去直接跳到"正在解析"，
+     中间没有任何选取动作，用户不知道解析的是哪一份。
+     这里补第三条轴 data-src（选了哪种来源）与第四条轴 data-file（有没有真的选中一份）。
+
+     为什么不用 hidden：stage.js 的 applyVisibility() 独占 hidden 属性，
+     四态/阶段一重算就会把门控状态盖掉（P06 核价门控早前踩过这个坑）。
+     所以门控一律走 CSS display:none。 */
+  .screen[data-src="none"]  [data-src]:not([data-src~="none"]),
+  .screen[data-src="local"] [data-src]:not([data-src~="local"]),
+  .screen[data-src="phone"] [data-src]:not([data-src~="phone"]),
+  .screen[data-src="phone-got"] [data-src]:not([data-src~="phone-got"]),
+  .screen[data-src="usb"]   [data-src]:not([data-src~="usb"]),
+  .screen[data-src="usb-in"][data-src]:not([data-src~="usb-in"]),
+  .screen[data-file="none"] [data-file]:not([data-file~="none"]),
+  .screen[data-file="on"]   [data-file]:not([data-file~="on"]) { display: none !important; }
+
+  /* 取件层：选来源之后占满左栏，一次只让用户做一件事 */
+  .pickwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+  .pickbar { display: flex; align-items: center; gap: var(--s-4); flex: 0 0 auto; }
+  .pickbar-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
+    font-weight: 600; display: inline-flex; align-items: center; gap: 10px; }
+  .pickbar-t .ic { width: 24px; height: 24px; color: var(--jade-500); }
+  .pickbar-s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+
+  .filelist { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: var(--s-3); }
+  .filerow { text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui);
+    min-height: 92px; padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    display: flex; align-items: center; gap: var(--s-5);
+    transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+  .filerow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+  .filerow:active { transform: translateY(1px) scale(.997); }
+  .filerow[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .fr-ic { width: 46px; height: 46px; flex: 0 0 auto; border-radius: var(--r-xs);
+    background: var(--fog-a08); display: grid; place-items: center; }
+  .fr-ic .ic { width: 23px; height: 23px; color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-ic { background: var(--jade-a20); }
+  .filerow[aria-pressed="true"] .fr-ic .ic { color: var(--jade-500); }
+  .fr-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .fr-nm { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .fr-mt { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .03em; }
+  .fr-pick { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-2); color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-pick { color: var(--jade-600); font-weight: 700; }
+
+  /* 已选态：文件名 / 页数 / 大小 / 格式 + 换一份 */
+  .picked { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-5);
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .picked-ic { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%;
+    background: var(--jade-a20); display: grid; place-items: center; }
+  .picked-ic .ic { width: 22px; height: 22px; color: var(--jade-500); }
+  .picked-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .picked-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .picked-m { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; }
+
+  /* 手机接力 / U 盘：示意码与插口状态 */
+  .relay { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--s-6); align-items: stretch;
+    padding: var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd); }
+  .miniqr { flex: 0 0 auto; width: 208px; display: flex; flex-direction: column;
+    align-items: center; gap: 10px; }
+  .miniqr-box { width: 190px; height: 190px; border-radius: var(--r-sm); background: #fff;
+    display: grid; place-items: center; padding: 12px; box-shadow: var(--sh-2); }
+  .miniqr-box svg { width: 100%; height: 100%; }
+  .miniqr-cap { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .1em; }
+  .relay-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column;
+    gap: var(--s-4); justify-content: space-between; }
+  .relay-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); font-weight: 600; }
+
+  /* 折叠块：长说明压成一行摘要，展开才给全文 */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+    display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+    font-size: var(--fz-2); color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2);
+    color: var(--fog-700); line-height: 1.65; }
+  /* 本机 Chrome 里 <details> 关着时子节点仍有布局盒，自检会报卡内溢出。显式收掉。 */
+  .fold:not([open]) .fold-b { display: none; }
+
+  /* s3「可改点」：4 条比右栏高时，让列表自己滚，别把最后一条画到卡片外面
+     （实测溢出 34px —— 不裁不滚，两段字叠着，主检测器看不见）。 */
+  .wside .pane--fill > .issues { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
+<!-- 原型示意码：不是可扫的真码，只表达「这里会出一个二维码」。真实系统由服务端一次性会话签发。 -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="i-qrdemo" viewBox="0 0 25 25" shape-rendering="crispEdges">
+    <path d="M.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M18.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="20" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M.5 18.5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="20" width="3" height="3" fill="#101613"/>
+    <path fill="#101613" d="M9 0h1v1h-1z M10 0h1v1h-1z M11 0h1v1h-1z M12 0h1v1h-1z M15 0h1v1h-1z M16 0h1v1h-1z M11 1h1v1h-1z M15 1h1v1h-1z M9 2h1v1h-1z M10 2h1v1h-1z M15 2h1v1h-1z M16 2h1v1h-1z M11 3h1v1h-1z M14 3h1v1h-1z M15 3h1v1h-1z M9 4h1v1h-1z M11 4h1v1h-1z M14 4h1v1h-1z M15 4h1v1h-1z M9 5h1v1h-1z M10 5h1v1h-1z M13 5h1v1h-1z M14 5h1v1h-1z M15 5h1v1h-1z M16 5h1v1h-1z M10 6h1v1h-1z M12 6h1v1h-1z M14 6h1v1h-1z M16 6h1v1h-1z M10 7h1v1h-1z M11 7h1v1h-1z M12 7h1v1h-1z M14 7h1v1h-1z M9 8h1v1h-1z M12 8h1v1h-1z M15 8h1v1h-1z M16 8h1v1h-1z M3 9h1v1h-1z M4 9h1v1h-1z M5 9h1v1h-1z M7 9h1v1h-1z M8 9h1v1h-1z M10 9h1v1h-1z M11 9h1v1h-1z M12 9h1v1h-1z M14 9h1v1h-1z M15 9h1v1h-1z M16 9h1v1h-1z M17 9h1v1h-1z M19 9h1v1h-1z M20 9h1v1h-1z M22 9h1v1h-1z M24 9h1v1h-1z M0 10h1v1h-1z M3 10h1v1h-1z M4 10h1v1h-1z M6 10h1v1h-1z M7 10h1v1h-1z M9 10h1v1h-1z M10 10h1v1h-1z M12 10h1v1h-1z M14 10h1v1h-1z M15 10h1v1h-1z M16 10h1v1h-1z M21 10h1v1h-1z M22 10h1v1h-1z M0 11h1v1h-1z M3 11h1v1h-1z M4 11h1v1h-1z M8 11h1v1h-1z M9 11h1v1h-1z M10 11h1v1h-1z M13 11h1v1h-1z M14 11h1v1h-1z M15 11h1v1h-1z M18 11h1v1h-1z M20 11h1v1h-1z M22 11h1v1h-1z M0 12h1v1h-1z M3 12h1v1h-1z M6 12h1v1h-1z M8 12h1v1h-1z M20 12h1v1h-1z M22 12h1v1h-1z M24 12h1v1h-1z M0 13h1v1h-1z M2 13h1v1h-1z M3 13h1v1h-1z M4 13h1v1h-1z M5 13h1v1h-1z M10 13h1v1h-1z M12 13h1v1h-1z M13 13h1v1h-1z M15 13h1v1h-1z M17 13h1v1h-1z M20 13h1v1h-1z M21 13h1v1h-1z M22 13h1v1h-1z M23 13h1v1h-1z M24 13h1v1h-1z M6 14h1v1h-1z M7 14h1v1h-1z M9 14h1v1h-1z M11 14h1v1h-1z M18 14h1v1h-1z M20 14h1v1h-1z M23 14h1v1h-1z M0 15h1v1h-1z M2 15h1v1h-1z M7 15h1v1h-1z M11 15h1v1h-1z M12 15h1v1h-1z M15 15h1v1h-1z M17 15h1v1h-1z M18 15h1v1h-1z M22 15h1v1h-1z M24 15h1v1h-1z M2 16h1v1h-1z M3 16h1v1h-1z M4 16h1v1h-1z M5 16h1v1h-1z M6 16h1v1h-1z M7 16h1v1h-1z M8 16h1v1h-1z M11 16h1v1h-1z M12 16h1v1h-1z M13 16h1v1h-1z M16 16h1v1h-1z M18 16h1v1h-1z M21 16h1v1h-1z M14 17h1v1h-1z M15 17h1v1h-1z M18 17h1v1h-1z M19 17h1v1h-1z M22 17h1v1h-1z M24 17h1v1h-1z M9 18h1v1h-1z M10 18h1v1h-1z M12 18h1v1h-1z M13 18h1v1h-1z M17 18h1v1h-1z M18 18h1v1h-1z M19 18h1v1h-1z M20 18h1v1h-1z M23 18h1v1h-1z M11 19h1v1h-1z M12 19h1v1h-1z M14 19h1v1h-1z M15 19h1v1h-1z M17 19h1v1h-1z M20 19h1v1h-1z M21 19h1v1h-1z M22 19h1v1h-1z M24 19h1v1h-1z M10 20h1v1h-1z M13 20h1v1h-1z M15 20h1v1h-1z M22 20h1v1h-1z M23 20h1v1h-1z M24 20h1v1h-1z M10 21h1v1h-1z M11 21h1v1h-1z M12 21h1v1h-1z M13 21h1v1h-1z M14 21h1v1h-1z M16 21h1v1h-1z M17 21h1v1h-1z M18 21h1v1h-1z M20 21h1v1h-1z M22 21h1v1h-1z M23 21h1v1h-1z M24 21h1v1h-1z M9 22h1v1h-1z M14 22h1v1h-1z M18 22h1v1h-1z M19 22h1v1h-1z M20 22h1v1h-1z M22 22h1v1h-1z M23 22h1v1h-1z M11 23h1v1h-1z M12 23h1v1h-1z M13 23h1v1h-1z M16 23h1v1h-1z M19 23h1v1h-1z M20 23h1v1h-1z M22 23h1v1h-1z M23 23h1v1h-1z M24 23h1v1h-1z M9 24h1v1h-1z M10 24h1v1h-1z M13 24h1v1h-1z M15 24h1v1h-1z M16 24h1v1h-1z M17 24h1v1h-1z M18 24h1v1h-1z M19 24h1v1h-1z M20 24h1v1h-1z M21 24h1v1h-1z M22 24h1v1h-1z M23 24h1v1h-1z M24 24h1v1h-1z"/>
+  </symbol>
+</svg>
 
 <div class="stage">
 <div class="screen" data-state="default" data-stage="s1" data-job="ok" data-theme="warm">
@@ -78,50 +176,143 @@
     <div class="wmain">
 
       <!-- S1 怎么开始做简历：六卡选择器（2026-08-10 W2 口径，取代旧四卡）。
-           前两卡页内续 s2；扫描 / 访谈 / 简历库走真链；「继续上次」first 态隐藏。 -->
-      <div class="xlane-hd" data-at="s1">怎么开始做简历 · 六选一</div>
-      <div class="sources" data-at="s1">
-        <button class="src" data-go="s2">
+           2026-08-10 Codex 整改：前两卡原来直接 data-go="s2" 跳「正在解析」——
+           中间没有任何选取动作，用户根本不知道解析的是哪一份。
+           改成：选来源 → 真的选中一份（有已选态与「换一份」）→ 才允许进解析。 -->
+      <div class="xlane-hd" data-at="s1" data-src="none">怎么开始做简历 · 六选一</div>
+      <div class="sources" data-at="s1" data-src="none">
+        <button class="src" data-src-go="local">
           <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
           <span class="src-nm">上传简历文件</span>
-          <span class="src-ds">PDF / Word 导出的 PDF / 图片，本机上传或 U 盘导入。</span>
+          <span class="src-ds">本机选文件 · PDF / 图片</span>
           <span class="src-tag"><span class="chip chip--jade">最快</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-src-go="phone">
           <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="src-nm">手机扫码传</span>
-          <span class="src-ds">简历在手机或微信里，扫码传过来，不用插东西。</span>
+          <span class="src-ds">简历在手机里，扫码传过来</span>
           <span class="src-tag"><span class="chip">一次性会话</span></span>
         </button>
         <a class="src" href="07-scan-workbench.html">
           <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
           <span class="src-nm">扫描纸质简历</span>
-          <span class="src-ds">只有纸质件时用，扫成 PDF 自动识别文字。</span>
+          <span class="src-ds">只有纸质件时用，扫成 PDF</span>
           <span class="src-tag"><span class="chip chip--amber">需识别</span></span>
         </a>
         <a class="src" href="10-resume-interview.html">
           <span class="src-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
           <span class="src-nm">AI 访谈新建</span>
-          <span class="src-ds">还没有简历：小青问、你答，边聊边生成。</span>
+          <span class="src-ds">还没有简历：小青问、你答</span>
           <span class="src-tag"><span class="chip chip--jade" data-when="default first">约 6 分钟</span><span class="chip" data-when="ai-down">AI 不可用</span></span>
         </a>
         <!-- 「继续上次」只在本次会话里已有简历时出现，first 态隐藏 -->
         <button class="src" data-go="s3" data-when="default ai-down device-off">
           <span class="src-ic"><svg class="ic"><use href="#i-history"/></svg></span>
           <span class="src-nm">继续上次</span>
-          <span class="src-ds">《个人简历.pdf》还在本次会话里，接着看诊断。</span>
+          <span class="src-ds">《个人简历.pdf》还在本次会话里</span>
           <span class="src-tag"><span class="chip chip--jade">09:43 上传</span></span>
         </button>
         <a class="src" href="23-me.html">
           <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
           <span class="src-nm">我的简历库</span>
-          <span class="src-ds">登录后取出以前存过的版本，改完再存回去。</span>
+          <span class="src-ds">登录后取出以前存过的版本</span>
           <span class="src-tag"><span class="chip">需登录</span></span>
         </a>
       </div>
 
+      <!-- ── S1-b 本机上传：真的列出可选文件，选中才算数 ── -->
+      <div class="pickwrap" data-at="s1" data-src="local">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-upload"/></svg>选一份简历</span>
+          <span class="pickbar-s">只列 PDF / JPG / PNG</span>
+        </div>
+        <div class="filelist">
+          <button class="filerow" data-file-go="f1" aria-pressed="false"
+                  data-nm="个人简历.pdf" data-mt="PDF · A4 · 3 页 · 1.2 MB">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">个人简历.pdf</span>
+              <span class="fr-mt">PDF · A4 · 3 页 · 1.2 MB · 今天 09:43</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f2" aria-pressed="false"
+                  data-nm="简历_运营_2026版.pdf" data-mt="PDF · A4 · 2 页 · 0.8 MB">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">简历_运营_2026版.pdf</span>
+              <span class="fr-mt">PDF · A4 · 2 页 · 0.8 MB · 8 月 6 日</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f3" aria-pressed="false"
+                  data-nm="简历照片.jpg" data-mt="JPG · 1 页 · 2.4 MB · 需先识别文字">
+            <span class="fr-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">简历照片.jpg</span>
+              <span class="fr-mt">JPG · 1 页 · 2.4 MB · 需先识别文字</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+        </div>
+        <div class="picked" data-file="on">
+          <span class="picked-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="picked-b">
+            <span class="picked-t">已选中：<b data-picked-nm>个人简历.pdf</b></span>
+            <span class="picked-m" data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span>
+          </span>
+          <button class="btn btn--ghost" style="margin-left:auto" data-file-go="none">换一份</button>
+        </div>
+        <div class="notice" data-file="none">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>还没选文件。点上面任意一行，选中后才会进解析。</span>
+        </div>
+      </div>
+
+      <!-- ── S1-b 手机扫码传：出码 → 等待 → 已收到 1 份，三态各有各的前进动作 ── -->
+      <div class="pickwrap" data-at="s1" data-src="phone phone-got">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-qr"/></svg>手机扫码传</span>
+          <span class="pickbar-s">一次性会话 · 5 分钟内有效</span>
+        </div>
+        <div class="relay">
+          <span class="miniqr">
+            <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码 · 不是可扫的真码</span>
+          </span>
+          <span class="relay-b">
+            <span class="relay-t" data-src="phone">等你在手机上选文件</span>
+            <span class="relay-t" data-src="phone-got">已收到 1 份</span>
+            <div class="kv" data-src="phone">
+              <div class="kv-row"><span class="k">第 1 步</span><span class="v">用微信或相机扫这个码</span></div>
+              <div class="kv-row"><span class="k">第 2 步</span><span class="v">在手机上选简历文件</span></div>
+              <div class="kv-row"><span class="k">第 3 步</span><span class="v">传输页保持常亮到提示完成</span></div>
+              <div class="kv-row"><span class="k">状态</span><span class="v" style="color:var(--amber-600)">等待中 · 还没收到文件</span></div>
+            </div>
+            <div class="kv" data-src="phone-got">
+              <div class="kv-row"><span class="k">文件名</span><span class="v">王磊_简历.pdf</span></div>
+              <div class="kv-row"><span class="k">格式与页数</span><span class="v">PDF · A4 · 2 页</span></div>
+              <div class="kv-row"><span class="k">大小</span><span class="v">0.9 MB · 完整</span></div>
+              <div class="kv-row"><span class="k">来源</span><span class="v">手机扫码传 · 09:44</span></div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap" data-src="phone-got">
+              <button class="btn btn--primary" data-file-go="f4" data-go="s2">用这份，进解析</button>
+              <button class="btn btn--ghost" data-src-go="phone">重新出码换一份</button>
+            </div>
+            <!-- 到没到是服务端推的，不是用户按的；给评审一个可切开关，标 data-review -->
+            <div class="cash-demo" data-review style="position:static;justify-content:flex-start">
+              <span style="width:100%;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 · 切接力处境（真实系统由服务端推送）</span>
+              <button data-src-go="phone">等待中</button>
+              <button data-src-go="phone-got">已收到</button>
+            </div>
+          </span>
+        </div>
+      </div>
+
       <!-- S1 域内横向通道：简历材料域 = P09 + P10 + P11 + P12 + P22（closed-loop-map §二） -->
-      <div class="xlane" data-at="s1">
+      <div class="xlane" data-at="s1" data-src="none">
         <span class="xlane-hd">简历已经是现成的？这几件事也在这个台面做</span>
         <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
           <a class="xlane-go" href="11-jobfit-compare.html">
@@ -191,10 +382,9 @@
         <div class="locked" data-when="ai-down" data-job="ok" style="flex:1 1 auto">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>解析服务中断</b>
-          <p>你上传的文件<b>完好保存</b>在本次会话里，没有丢。故障已<b>自动上报</b>运维，不需要你操作。<br>
-             现在可以直接打印这份简历，或存进「我的文档」稍后再诊断。</p>
+          <p>你的文件<b>完好保存</b>在本次会话里，已<b>自动上报</b>运维。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">直接拿去打印</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">带去：你上传的原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
           </div>
         </div>
@@ -229,7 +419,7 @@
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost" data-job-go="ocrlow">按图片识别再试（OCR）</button>
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">直接拿去打印</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">带去：你上传的原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
           </div>
         </div>
@@ -313,8 +503,12 @@
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
             <b>还没有简历</b>
-            <p>回到第 1 步：上传简历文件、手机扫码传、扫描纸质件，<br>或者让小青问你几个问题从零做一份。</p>
-            <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
+            <p>从零做一份，或回第 1 步把已有的传进来。</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+              <a class="btn btn--primary" href="10-resume-interview.html"><svg class="ic"><use href="#i-brain"/></svg>让小青问你几个问题</a>
+              <a class="btn btn--ghost" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>扫描纸质简历</a>
+              <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
+            </div>
           </div>
         </div>
       </div>
@@ -330,7 +524,7 @@
             <div class="pair-box">负责公众号日常运营与活动策划，配合完成各项运营工作</div>
             <div class="pair-box pair-box--new">
               <span>独立运营公众号（<ins>粉丝 1.2 万</ins>），策划 <ins>8 场</ins>活动，<ins>单场最高带来 340 个新增关注</ins></span>
-              <span class="pair-why">改动理由：原句没有可核对的数字，招聘方无法判断规模。<b>数字需要你自己填真实值</b>，这里的示例来自你在访谈里说过的内容。</span>
+              <span class="pair-why">原句没有可核对的数字。<b>数字要你自己填真实值。</b></span>
               <span class="taken-flag" style="color:var(--amber-600)"><svg class="ic"><use href="#i-alert"/></svg>已采纳 · <b>3 个数字待你核实</b>，核实后才进 v2</span>
               <span class="pair-act"><button class="btn btn--ghost">逐个核实数字</button><button class="btn btn--quiet">改回原文</button></span>
             </div>
@@ -363,7 +557,7 @@
             <div class="pair-box" style="border-style:dashed;color:var(--fog-600)">（技能栏只列了 SQL，正文里没有任何一句用到它）</div>
             <div class="pair-box pair-box--new">
               <span>建议在工作经历里补一句：用 SQL <ins>做过什么查询 / 出过什么报表 / 支撑了什么决策</ins></span>
-              <span class="pair-why">改动理由：目标岗位明确要求熟练取数，招聘方看不到证据就当没有。<b>这句需要你自己写，AI 不替你编经历。</b></span>
+              <span class="pair-why">岗位要求熟练取数，看不到证据就当没有。<b>这句要你自己写。</b></span>
               <span class="pair-act">
                 <button class="btn btn--ghost">我来补写</button>
                 <button class="btn btn--quiet">先跳过</button>
@@ -375,9 +569,16 @@
           <svg class="ic"><use href="#i-offline"/></svg>
           <b data-when="ai-down">改写服务中断</b>
           <b data-when="first">还没有简历</b>
-          <p data-when="ai-down">诊断与改写都不可用，<b>你的原件完好</b>。可以直接打印，或存进「我的文档」，稍后再来优化。</p>
-          <p data-when="first">先回第 1 步给一份简历，再来这里逐条优化。</p>
-          <button class="btn btn--ghost" data-go="s1" data-when="first">回第 1 步</button>
+          <p data-when="ai-down">改写不可用，<b>你的原件完好</b>。</p>
+          <p data-when="first">先给一份简历，再来这里逐条优化。</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="ai-down">
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>带去打印：原件 1 份 · 共 3 页</a>
+            <button class="btn btn--ghost">存进「我的文档」</button>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="first">
+            <a class="btn btn--primary" href="10-resume-interview.html"><svg class="ic"><use href="#i-brain"/></svg>让小青问你几个问题</a>
+            <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
+          </div>
         </div>
       </div>
 
@@ -438,7 +639,7 @@
     <div class="wside">
 
       <!-- S1 说明 -->
-      <div class="pane pane--fill" data-at="s1">
+      <div class="pane pane--fill pane--grow" data-at="s1">
         <div class="pane-hd"><span class="t">这一步会发生什么</span></div>
         <div class="tline">
           <div class="tl tl--now"><span class="tl-dot"><svg class="ic"><use href="#i-file"/></svg></span>
@@ -452,18 +653,24 @@
           <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="tl-b"><span class="tl-t">导出或打印</span><span class="tl-s">原件不被覆盖，可随时回退</span></span></div>
         </div>
+        <!-- 2026-08-10：原来这里是五条长说明，和右栏常驻「你的简历，规矩在先」大面积重复。
+             支付/提交前只留三句关键事实，完整规则折叠，一字不删。 -->
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>AI 只生成新版本，永不覆盖你的原件。</b><br>
+          <span><b>AI 只生成新版本，永不覆盖原件。</b></span>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>去向 / 保留 / 外部服务 / 谁能看</summary>
+          <div class="fold-b">
             · <b>去向</b>：解析、诊断、改写结果<b>只进你本人的简历与记录</b>；<b>不发送给任何企业，不沉淀到任何简历库</b>。<br>
             · <b>保留</b>：未登录时只留到本次会话结束；要长期保存需你本人选「存进我的简历」。<br>
             · <b>外部服务</b>：诊断与改写由 AI 服务处理简历文本；扫描件走识别时会经第三方 OCR。<br>
-            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。</span>
-        </div>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。</div>
+        </details>
       </div>
 
       <!-- S2 解析进度 -->
-      <div class="pane pane--fill" data-at="s2">
+      <div class="pane pane--fill pane--grow" data-at="s2">
         <div class="pane-hd"><span class="t">正在做什么</span><span class="s">#RS-0958-12</span></div>
         <!-- 2026-08-09 门控修正：解析不依赖打印机,device-off 一并显示 -->
         <div class="tline" data-when="default first device-off" data-job="ok">
@@ -478,9 +685,13 @@
         </div>
         <div class="notice" data-when="default first device-off" data-job="ok" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>不显示百分比：可改点的数量要看完全文才知道，这里只报已完成的步骤。约 40 秒 · 本次权益内 0 元。<br>
-            解析只为给你出诊断，<b>不发送企业、不沉淀简历库</b>；失败可重试或换来源重新上传。</span>
+          <span>约 40 秒 · 本次权益内 0 元 · 不显示百分比</span>
         </div>
+        <details class="fold" data-when="default first device-off" data-job="ok" style="margin-top:10px">
+          <summary>为什么不给进度百分比</summary>
+          <div class="fold-b">可改点的数量要看完全文才知道，先编一个 62% 再跳到 100% 是假的。这里只报已完成的步骤。
+            失败可重试或换来源重新上传。</div>
+        </details>
         <div class="notice notice--coral" data-when="ai-down" data-job="ok" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span>解析中断。已自动上报，不需要你操作。你的文件没有丢，仍可打印或存文档。</span>
@@ -516,13 +727,14 @@
           <div class="dim dim--mid"><span class="dim-nm">真实性自查</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">待核</span></div>
         </div>
         <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
-          用三档不用分数：简历好坏没有可核对的分母，打个「72 分」是假精确。
-          <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
+          用三档不用分数 <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
         </p>
-        <p style="margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
-          <b>ATS 机读友好</b>看版式能否被招聘系统正确读取：单栏、无表格嵌套、字体可提取<span class="ev ev--e1">E1 你的材料</span>；
-          <b>真实性自查</b>只列出待你核对的表述（本份有 3 处数字待核实），不下真假结论<span class="ev ev--e3">E3 AI 判断</span>
-        </p>
+        <details class="fold" data-when="default device-off" style="margin-top:8px">
+          <summary>这六档分别在看什么</summary>
+          <div class="fold-b">简历好坏没有可核对的分母，打个「72 分」是假精确，所以只给三档。<br>
+            <b>ATS 机读友好</b>看版式能否被招聘系统正确读取：单栏、无表格嵌套、字体可提取<span class="ev ev--e1">E1 你的材料</span>；
+            <b>真实性自查</b>只列出待你核对的表述（本份有 3 处数字待核实），不下真假结论<span class="ev ev--e3">E3 AI 判断</span></div>
+        </details>
         <!-- 2026-08-10 补验：原来「去证件照工作台」是正文里的裸 <a>，实测 17px 高，
              触控点不中。整条 notice 改成可点的行（同 P31 .fprev 先例），
              触控高度 ≈ 100px，且不占额外高度、不挤压下方「可改点」列表。 -->
@@ -544,19 +756,19 @@
         <div class="issues" data-when="default device-off">
           <button class="issue issue--high" data-ev="i2" aria-current="true">
             <span class="issue-hd"><span class="issue-sev">重要</span><span class="issue-t">经历没有成果数字</span><span class="issue-loc">第 1 页</span></span>
-            <span class="issue-p"><b>6 段经历里 5 段没有任何数字</b>：粉丝数、活动场数、增长量、团队人数都没写。招聘方无法判断你做到什么程度。<span class="ev ev--e1">E1 你的材料</span></span>
+            <span class="issue-p"><b>6 段里 5 段没有数字</b>，招聘方看不出你做到什么程度。<span class="ev ev--e1">E1 你的材料</span></span>
           </button>
           <button class="issue issue--high" data-ev="i3">
             <span class="issue-hd"><span class="issue-sev">重要</span><span class="issue-t">用了自我评价代替事实</span><span class="issue-loc">第 1 页</span></span>
-            <span class="issue-p">「效果良好」「表现优秀」这类话共 <b>3 处</b>。它们不是事实，招聘方会直接忽略。<span class="ev ev--e1">E1 你的材料</span></span>
+            <span class="issue-p">「效果良好」这类自评共 <b>3 处</b>，不是事实。<span class="ev ev--e1">E1 你的材料</span></span>
           </button>
           <button class="issue issue--mid" data-ev="i4">
             <span class="issue-hd"><span class="issue-sev">建议</span><span class="issue-t">技能列了但正文没证据</span><span class="issue-loc">第 1 页</span></span>
-            <span class="issue-p">技能栏有 <b>SQL</b>，但整份简历没有一句说明用它做过什么。目标岗位明确要求熟练取数。<span class="ev ev--e1">E1 你的材料</span><span class="ev ev--e2">E2 岗位要求</span></span>
+            <span class="issue-p">技能栏有 <b>SQL</b>，正文没有一句用它做过什么。<span class="ev ev--e1">E1 你的材料</span><span class="ev ev--e2">E2 岗位要求</span></span>
           </button>
           <button class="issue issue--low" data-ev="i1">
             <span class="issue-hd"><span class="issue-sev">可选</span><span class="issue-t">求职意向偏笼统</span><span class="issue-loc">第 1 页</span></span>
-            <span class="issue-p">只写「运营」，没说清是内容运营、用户运营还是活动运营。<span class="ev ev--e1">E1 你的材料</span></span>
+            <span class="issue-p">只写「运营」，没说清是哪一类运营。<span class="ev ev--e1">E1 你的材料</span></span>
           </button>
         </div>
         <div class="notice" data-when="ai-down first" style="margin-top:0">
@@ -579,16 +791,17 @@
           采纳且<b>数字核实过</b>的内容才进入 v2，<b>v1 原件不动</b>。任何时候都能在第 5 步回退。
         </p>
       </div>
-      <div class="pane pane--fill" data-at="s4">
+      <div class="pane pane--fill pane--grow" data-at="s4">
         <div class="pane-hd"><span class="t">两条底线</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是按你说过的内容填的示例，不是 AI 编的事实——发出去之前请确认每一个数都是真的。</span>
+          <span><b>数字要你自己核对</b>；<b>AI 不替你编经历</b>。</span>
         </div>
-        <div class="notice" style="margin-top:10px">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，不会凭空生成一段。</span>
-        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>这两条具体是什么意思</summary>
+          <div class="fold-b"><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是按你说过的内容填的示例，不是 AI 编的事实——发出去之前请确认每一个数都是真的。<br><br>
+            <b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，不会凭空生成一段。</div>
+        </details>
       </div>
 
       <!-- S5 版本与导出 -->
@@ -608,15 +821,16 @@
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>优化<b>覆盖不了</b>原件：切换版本只改「当前用哪一版」，不销毁任何一版。未登录随本次会话清空；登录保存后想删除由你自己删，删除留日志。</span>
+          <span>切换版本只改「当前用哪一版」，<b>不销毁任何一版</b>。</span>
         </div>
       </div>
 
-      <div class="pane pane--fill" data-at="s5">
+      <div class="pane pane--fill pane--grow" data-at="s5">
         <div class="pane-hd"><span class="t">拿去做什么</span></div>
         <div class="outs">
-          <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印工作台核价</a>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <!-- 2026-08-10 材料交接：出口按钮上写清本次带去什么，并保留预估核价口径 -->
+          <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>带去：简历 v2 · 3 页</a>
+          <button class="out" data-when="device-off"><svg class="ic"><use href="#i-folder"/></svg>存我的文档 · 扫码带走</button>
           <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
           <button class="out"><svg class="ic"><use href="#i-download"/></svg>导出 PDF</button>
           <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
@@ -624,29 +838,44 @@
           <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-target"/></svg>比对不可用</button>
           <a class="out" href="11-jobfit-compare.html" data-when="device-off"><svg class="ic"><use href="#i-target"/></svg>按岗位比对</a>
         </div>
+        <!-- device-off：打印这条路断了，就画出真正能用的那条 —— 扫码带走 -->
+        <div class="relay" data-when="device-off" style="margin-top:12px;flex:0 0 auto;padding:var(--s-4)">
+          <span class="miniqr" style="width:150px">
+            <span class="miniqr-box" style="width:132px;height:132px;padding:9px"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码</span>
+          </span>
+          <span class="relay-b" style="gap:var(--s-3)">
+            <span class="relay-t" style="font-size:var(--fz-4)">扫码把 v2 带走</span>
+            <div class="kv">
+              <div class="kv-row"><span class="k">带走的是</span><span class="v">简历 v2 · PDF · 3 页</span></div>
+              <div class="kv-row"><span class="k">同时</span><span class="v">存进「我的文档」保留 7 天</span></div>
+              <div class="kv-row"><span class="k">之后</span><span class="v">凭手机号在任一台空闲机器打印</span></div>
+            </div>
+          </span>
+        </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span data-when="default first">下一步建议：周五那场招聘会现场普遍收纸质简历，这一版可以先打 5 份。<span class="ev ev--e2">E2 来源信息</span></span>
+          <span data-when="default first">周五那场招聘会现场收纸质简历，这一版可以先打 5 份。<span class="ev ev--e2">E2 来源信息</span></span>
           <span data-when="ai-down">AI 服务中断，不给下一步建议。导出与存档都正常。</span>
-          <span data-when="device-off">打印机离线，可先存进「我的简历」，凭手机号在任一台空闲机器取回打印。</span>
+          <span data-when="device-off">打印机离线 · 上面的码可把 v2 带到手机。</span>
         </div>
       </div>
 
       <!-- 右栏常驻两卡：权限红线与费用去向都是真规则 -->
+      <!-- 2026-08-10：这张卡在 s1–s5 常驻，是全页最容易与别处重复的一块，压成一句。
+           不加折叠 —— 折叠头本身也占 48px，s3 右栏放不下（实测把「可改点」挤出 28px）。 -->
       <div class="pane" data-at="s1 s2 s3 s4 s5">
         <div class="pane-hd"><span class="t">你的简历，规矩在先</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>· 原件<b>不被覆盖</b>，优化只产生新版本，采不采纳由你定；登录保存后可自行删除，删除留日志；<br>
-            · AI 只改表达，<b>不编造经历</b>，没写过的不会替你写；<br>
-            · 会话结束自动清空；登录后可长期存进「我的简历」。</span>
+          <span>原件<b>不被覆盖</b>；AI <b>不编造经历</b>；会话结束自动清空，删除留日志。</span>
         </div>
       </div>
       <div class="pane" data-at="s1 s2 s3 s4 s5">
         <div class="pane-hd"><span class="t">费用与去向</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">本次权益内 0 元</span></div>
-          <div class="kv-row"><span class="k">打印</span><span class="v">按现场公示价</span></div>
+          <div class="kv-row"><span class="k">打印</span><span class="v">预估 · 以打印工作台核价为准</span></div>
           <div class="kv-row"><span class="k">诊断报告</span><span class="v">进「AI 服务记录」</span></div>
           <div class="kv-row"><span class="k">新版本</span><span class="v">进「我的简历」</span></div>
         </div>
@@ -666,7 +895,12 @@
 
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-at="s1"><div class="t">怎么开始做简历，六种开局任选</div><div class="s">不需要登录 · 原件不会被优化覆盖</div></div>
+      <div data-at="s1">
+        <div data-src="none"><div class="t">怎么开始做简历，六种开局任选</div><div class="s">不需要登录 · 原件不会被优化覆盖</div></div>
+        <div data-src="local phone-got" data-file="none"><div class="t">先选中一份，再进解析</div><div class="s">没选文件时不会开始解析 —— 不让你等一个不知道是哪份的结果</div></div>
+        <div data-src="phone"><div class="t">等你在手机上选文件</div><div class="s">码 5 分钟内有效 · 传不过来可以改用本机上传</div></div>
+        <div data-src="local phone-got" data-file="on"><div class="t">已选中 <b data-picked-nm>个人简历.pdf</b></div><div class="s"><span data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span> · 按右下角开始解析</div></div>
+      </div>
       <div data-at="s2">
         <div data-when="default first device-off" data-job="ok"><div class="t">正在解析，约 40 秒</div><div class="s">免费 · 可改点的数量要看完全文才知道</div></div>
         <div data-when="ai-down" data-job="ok"><div class="t">解析中断，你的文件没有丢</div><div class="s">可直接打印或存进「我的文档」</div></div>
@@ -689,7 +923,8 @@
       </div>
     </div>
 
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="none"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="local phone phone-got" data-src-go="none">换一种方式</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-job="ok">取消解析</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-job="upfail parsefail" data-go="s1">回第 1 步</button>
     <a class="btn btn--lg btn--ghost" data-at="s2" data-job="ocrlow" href="07-scan-workbench.html">重新扫描</a>
@@ -697,19 +932,23 @@
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看诊断</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-go="s4">继续优化</button>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2">上传简历文件<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <!-- 2026-08-10：原来这里直接 data-go="s2"，不选文件也能进解析。现在按 data-file 门控。 -->
+    <button class="btn btn--primary" data-at="s1" data-src="none" data-src-go="local">上传简历文件<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="phone" data-src-go="local">传不过来？改用本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="none" aria-disabled="true">先选文件</button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="on" data-go="s2">解析这份 · <span data-picked-pg>3 页</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" aria-disabled="true" data-when="default first device-off" data-job="ok">解析中…</button>
-    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3">直接拿去打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s2" data-job="upfail" data-go="s1">重新上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="parsefail" data-job-go="ocrlow">按图片识别再试<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="ocrlow" data-job-go="ok" data-go="s3">核对完了，进诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default device-off">逐条优化<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html?stage=s3">拿去打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html?stage=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="first" data-go="s1">回第 1 步<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-go="s5" data-when="default device-off">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="ai-down first" aria-disabled="true">改写不可用</button>
-    <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">拿去打印 5 份<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s5" data-when="device-off">存进我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">带去：简历 v2 5 份 · 共 15 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s5" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
   </div>
 
   <nav class="navbar">
@@ -746,6 +985,57 @@
     })
     if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' })
   })
+})()
+</script>
+<script>
+/* ── 2026-08-10 Codex 走查整改：上传门（选来源 → 选中文件 → 才进解析）─────────
+   走查第一名：「上传入口根本不收文件」。原来六卡里前两张直接 data-go="s2"，
+   一按就跳到「正在解析」——用户既没做选取动作，也不知道机器在解析哪一份。
+
+   两条新轴：
+     data-src  = none | local | phone | phone-got   选了哪种来源、接力到哪一步
+     data-file = none | on                          有没有真的选中一份
+
+   为什么不用 hidden：stage.js 的 applyVisibility() 独占 hidden，
+   一切四态/阶段就把门控盖掉（P06 核价门控踩过这个坑）。门控一律走 CSS display:none。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var FILES = {
+    f1: { nm: '个人简历.pdf',        mt: 'PDF · A4 · 3 页 · 1.2 MB', pg: '3 页' },
+    f2: { nm: '简历_运营_2026版.pdf', mt: 'PDF · A4 · 2 页 · 0.8 MB', pg: '2 页' },
+    f3: { nm: '简历照片.jpg',        mt: 'JPG · 1 页 · 2.4 MB',      pg: '1 页' },
+    f4: { nm: '王磊_简历.pdf',        mt: 'PDF · A4 · 2 页 · 0.9 MB', pg: '2 页' }
+  }
+  function setAll (sel, v) {
+    [].slice.call(scr.querySelectorAll(sel)).forEach(function (n) { n.textContent = v })
+  }
+  function file (k) {
+    if (!k || k === 'none') {
+      scr.setAttribute('data-file', 'none')
+    } else {
+      scr.setAttribute('data-file', 'on')
+      var f = FILES[k]
+      if (f) { setAll('[data-picked-nm]', f.nm); setAll('[data-picked-mt]', f.mt); setAll('[data-picked-pg]', f.pg) }
+    }
+    ;[].slice.call(scr.querySelectorAll('.filerow')).forEach(function (r) {
+      r.setAttribute('aria-pressed', r.getAttribute('data-file-go') === k ? 'true' : 'false')
+    })
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+  function src (k) {
+    scr.setAttribute('data-src', k)
+    /* 换来源就等于放弃上一次的选中 —— 不能让「已选中」跟着新来源假装还在 */
+    if (k === 'none' || k === 'local' || k === 'phone') file('none')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+  scr.addEventListener('click', function (e) {
+    var s = e.target.closest('[data-src-go]')
+    if (s) { src(s.getAttribute('data-src-go')); return }
+    var f = e.target.closest('[data-file-go]')
+    if (f) file(f.getAttribute('data-file-go'))
+  })
+  src('none')
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>

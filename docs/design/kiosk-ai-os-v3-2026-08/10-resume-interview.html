@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   /* 访谈阶段：对话是当前操作，占主体；预览收在右栏。
      到了预览阶段再把 A4 换到主体——操作对象变了，主次就该换。 */
@@ -192,7 +193,7 @@
             <span class="qa-hint">说清<b>做了什么 + 结果是多少</b>就够，不用文采。比如「运营公众号，半年从 3 千涨到 1 万 2」。
               <b>数字你自己报，我不替你估。</b></span>
             <!-- 多段经历支持：这条不是装饰——答完本段，话题 4 就是追加第 2 段 -->
-            <span><span class="chip chip--info">第 2 段经历 · 可继续追加</span><span class="chip chip--info" style="margin-left:8px">聊完这段就问你要不要加</span></span>
+            <span><span class="chip chip--info">聊完这段就问你要不要加第 2 段</span></span>
           </span>
         </div>
         <div class="qa-free" data-when="default first device-off">
@@ -258,7 +259,7 @@
           </div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span><b>跳过的话题不会被编造进简历。</b>哪块跳过，第 3 步的成品就把那一块明确标成空着，不拿模板话术垫。
+            <span><b>跳过的话题不会被编造进简历。</b>跳过的那块，成品里明确标成空着。
               想提前走，「提前结束，生成草稿」只写你已答的。</span>
           </div>
         </div>
@@ -302,7 +303,7 @@
             </div>
             <div class="sec">技能</div>
             <div style="font-size:11px;line-height:1.8;color:var(--paper-ink)">Excel · SQL · Photoshop · 英语六级</div>
-            <div class="gapline" style="margin-top:10px">这两块你跳过了，所以没写：<b>教育背景</b>、<b>证书 / 语言</b>。空着比编上去好——要补随时回第 2 步。</div>
+            <div class="gapline" style="margin-top:10px">这两块你跳过了，所以没写：<b>教育背景</b>、<b>证书 / 语言</b>——要补随时回第 2 步。</div>
             <span class="pgno">1 / 1</span>
           </div>
           <div class="paper-empty" data-when="ai-down">
@@ -345,7 +346,7 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>跳过的部分不会被编出来。</b>简历上宁可空一块，也不写你没说过的事。联系方式不填就不出现在文件上。</span>
+          <span><b>跳过的部分不会被编出来</b>；联系方式不填就不出现在文件上。</span>
         </div>
       </div>
 
@@ -360,7 +361,7 @@
           <div class="kv-row"><span class="k">教育 / 技能 / 联系</span><span class="v v--fog">未聊到</span></div>
         </div>
         <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default first device-off">
-          不显示百分比：10 个话题里你可能跳过好几个，「完成 XX%」对你没有意义。这里只报哪几块已经写上了。
+          不显示百分比：只报哪几块已经写上了。
         </p>
       </div>
       <!-- 两条底线从 s2 扩到 s1 s2 —— 开聊前正是该看承诺的时候 -->
@@ -368,7 +369,7 @@
         <div class="pane-hd"><span class="t">两条底线</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>数字你自己报，我不替你估。</b>你说「涨了不少」我不会写成「涨了 XX%」——我会再问一句具体多少，你说不清就不写数字。</span>
+          <span><b>数字你自己报，我不替你估。</b>你说「涨了不少」，我会再问一句具体多少，说不清就不写数字。</span>
         </div>
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -472,5 +473,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

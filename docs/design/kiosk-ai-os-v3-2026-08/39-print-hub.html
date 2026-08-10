@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>P39 打印扫描服务 · 域首屏 — AI 求职操作系统 V3</title>
+<title>P39 打印扫描服务&nbsp;· 域首屏 — AI 求职操作系统 V3</title>
 <meta name="screen-name" content="P39 打印扫描服务域首屏">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ══ P39 专用 ══ 打印扫描服务「域首屏」
    需求真值 = 生产代码 apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx：
@@ -195,25 +196,25 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">打印扫描服务</div>
-        <div class="brand-sub">职易达 · 01 号机 · 市人力资源市场 A 馆</div>
+        <div class="brand-sub">职易达&nbsp;· 01 号机&nbsp;· 市人力资源市场 A 馆</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default"><span class="dot dot--live"></span>本机服务配置已读取</div>
-    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能打 · 记录留不下</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 打印照常</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能打&nbsp;· 记录留不下</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用&nbsp;· 打印照常</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>服务状态无法确认</div>
     <div class="clock" data-clock>2026年8月10日 <b>14:30</b></div>
   </header>
 
   <div class="hub">
 
-    <!-- ══════════ AI 带 · default / first ══════════ -->
+    <!-- ══════════ AI 带&nbsp;· default / first ══════════ -->
     <div class="tband" data-when="default first">
       <div class="tband-hd">
         <svg class="ic"><use href="#i-brain"/></svg>
         <span class="tband-t">这一屏的 AI 只做三件事，点一件我给你下一步</span>
-        <span class="tband-x"><span class="ev ev--e3">E3 AI 判断，仅供参考</span></span>
+        <span class="tband-x"><span class="ev ev--e3">E3 AI 判断</span></span>
       </div>
 
       <div class="tpick" role="group" aria-label="AI 能帮你做的三件事">
@@ -233,28 +234,28 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
       <div class="tadv">
         <div class="tadv-act" id="useAct">点上面任一件，下面对应的卡会亮起来 —— 不会替你跳走，也不会替你按下出纸</div>
-        <div class="tadv-ln" id="useWhy"><span class="k">理由</span>这三件是 AI 在打印这条链上真正干的活：推荐入口、材料体检、打印前隐私检查。<b>三件都只出结论，不动你的文件</b>。<span class="ev ev--e3">E3 AI 判断，仅供参考</span></div>
-        <div class="tadv-ln" id="useCost"><span class="k">代价</span>三件都不需要登录；体检与隐私检查要读一遍你送进来的文件内容，扫描件与图片可能经第三方 OCR 识别文字。</div>
-        <div class="tadv-ln" id="useAlt"><span class="k">备选</span>不想让机器分诊，直接看下面七张卡自己挑；七张卡任何时候都全在，没有被藏起来的功能。</div>
+        <div class="tadv-ln" id="useWhy"><span class="k">理由</span>这三件是 AI 在打印这条链上真正干的活：推荐入口、材料体检、打印前隐私检查。<b>三件都只出结论，不动你的文件</b>。</div>
+        <div class="tadv-ln" id="useCost"><span class="k">代价</span>三件都不需要登录；体检与隐私检查要读一遍文件内容。</div>
+        <div class="tadv-ln" id="useAlt"><span class="k">备选</span>不想让机器分诊，直接看下面七张卡自己挑。</div>
       </div>
     </div>
 
-    <!-- ══════════ AI 带 · ai-down：整块换话，机械能力照常 ══════════ -->
+    <!-- ══════════ AI 带&nbsp;· ai-down：整块换话，机械能力照常 ══════════ -->
     <div class="tband" data-when="ai-down">
       <div class="tband-hd">
         <svg class="ic"><use href="#i-offline"/></svg>
-        <span class="tband-t">AI 暂不可用，下面这些照常能办</span>
+        <span class="tband-t">下面这些照常能办</span>
         <span class="tband-x"><span class="chip chip--info">出纸不受影响</span></span>
       </div>
       <div class="tadv" style="border-top:0;padding-top:0">
         <div class="tadv-act">推荐入口、材料体检、打印前隐私检查这三件现在给不了 —— 但打印没有被关掉</div>
         <div class="tadv-ln"><span class="k">还能做什么</span>文档打印、手机扫码上传、材料扫描、照片打印、格式转换、签名盖章<b>七张卡一张没少，全都照常可办</b>：页数、纸张、份数、双面这些由本机自己算，不经过 AI。</div>
         <div class="tadv-ln"><span class="k">代价</span>这一趟不会有体检结论，也不会有隐私提醒 —— 文件里有没有身份证号<b>要你自己看一眼</b>；扫描件这次不会自动出文字识别结果，纸张照样扫成 PDF。</div>
-        <div class="tadv-ln"><span class="k">备选</span>非要 AI 结论：先把文件存进「我的文档」，等恢复再来体检。本机已自动上报运维，恢复时间以现场公告为准，<b>本机不替系统承诺时间</b>。</div>
+        <div class="tadv-ln"><span class="k">备选</span>要 AI 结论：先存「我的文档」，等恢复再来体检。已自动上报运维，<b>本机不替系统承诺时间</b>。</div>
       </div>
     </div>
 
-    <!-- ══════════ AI 带 · device-off：还原线上「能力未确认」 ══════════ -->
+    <!-- ══════════ AI 带&nbsp;· device-off：还原线上「能力未确认」 ══════════ -->
     <div class="tband tband--off" data-when="device-off">
       <div class="tband-hd">
         <svg class="ic"><use href="#i-alert"/></svg>
@@ -281,9 +282,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
     <div class="glabel">
       <b>这个台面能做的七件事</b>
-      <span data-when="default first">每张卡右上角标了是不是 AI · 标 AI 的结论只作参考</span>
-      <span data-when="ai-down">标 AI 的那几项这次只降建议 · 打印扫描本身照常</span>
-      <span data-when="device-off">七项现在都开不了 · 状态确认后自动恢复</span>
+      <span data-when="default first">每张卡右上角标了是不是 AI</span>
+      <span data-when="ai-down">标 AI 的那几项这次只降建议&nbsp;· 打印扫描本身照常</span>
+      <span data-when="device-off">七项现在都开不了&nbsp;· 状态确认后自动恢复</span>
     </div>
 
     <!-- ══════════ 七张能力卡 + 第 8 格状态卡 ══════════ -->
@@ -294,12 +295,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
           <span class="hc-nm">文档打印</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">PDF、图片上传后先做材料检查，再设置参数打印</span>
-        <span class="hc-ai" data-when="default first"><b>AI：材料体检与参数建议</b> · 页数、清晰度、边距，以及黑白还是彩色，预设可改</span>
-        <span class="hc-ai" data-when="ai-down"><b>这次没有体检结论</b> · 页数、纸张、份数、双面由本机自己算，打印照常</span>
+        <span class="hc-ai" data-when="default first"><b>AI：材料体检与参数建议</b>&nbsp;· 页数、清晰度、边距，以及黑白还是彩色，预设可改</span>
+        <span class="hc-ai" data-when="ai-down"><b>这次没有体检结论</b>&nbsp;· 页数、纸张、份数、双面由本机自己算，打印照常</span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
@@ -308,9 +308,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">文档打印</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">未取得本机打印能力配置，本机不会创建正式打印任务。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ② 手机扫码上传（非 AI） -->
@@ -330,9 +328,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">手机扫码上传</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">传上来也没有地方接，所以这一步先关着，免得白传一趟。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ③ 材料扫描 -->
@@ -340,12 +336,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
           <span class="hc-nm">材料扫描</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">纸质材料扫描成 PDF，可打印、做简历识别；登录后可在「我的文档」管理</span>
-        <span class="hc-ai" data-when="default first"><b>AI：OCR 识别与置信度</b> · 置信度低会标「需人工复核」，<b>不拿低置信文本往下出结论</b></span>
-        <span class="hc-ai" data-when="ai-down"><b>这次不出文字识别结果</b> · 纸张照样扫成 PDF，存得下也打得出</span>
+        <span class="hc-ai" data-when="default first"><b>AI：OCR 识别与置信度</b>&nbsp;· 置信度低会标「需人工复核」，<b>不拿低置信文本往下出结论</b></span>
+        <span class="hc-ai" data-when="ai-down"><b>这次不出文字识别结果</b>&nbsp;· 纸张照样扫成 PDF，存得下也打得出</span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
@@ -354,9 +349,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">材料扫描</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">未取得本机扫描能力配置，本机不会创建正式扫描任务。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ④ 照片打印 -->
@@ -364,12 +357,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-image"/></svg></span>
           <span class="hc-nm">照片打印</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">上传 JPG / PNG 照片打印，走文档打印同一检查流程</span>
-        <span class="hc-ai" data-when="default first"><b>AI：材料体检与参数建议</b> · 和文档打印同一套体检，另给彩色与纸张的取舍理由</span>
-        <span class="hc-ai" data-when="ai-down"><b>这次没有体检结论</b> · 彩色、纸张、份数你自己定，照片照常打</span>
+        <span class="hc-ai" data-when="default first"><b>AI：材料体检与参数建议</b>&nbsp;· 和文档打印同一套体检，另给彩色与纸张的取舍理由</span>
+        <span class="hc-ai" data-when="ai-down"><b>这次没有体检结论</b>&nbsp;· 彩色、纸张、份数你自己定，照片照常打</span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
@@ -378,9 +370,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">照片打印</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">照片走文档打印同一条门禁，那条关着，这条也开不了。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ⑤ 证件照（线上未开放，可先了解） -->
@@ -388,13 +378,12 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
           <span class="hc-nm">证件照</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">常见规格证件照排版打印，当前可先用「照片打印」</span>
-        <span class="hc-ai" data-when="default first"><b>AI：规格体检与换底</b> · 尺寸、人脸位置、底色是否合规；<b>换底是重绘背景，不修改你的脸</b></span>
-        <span class="hc-ai" data-when="ai-down"><b>规格体检与换底都要模型</b> · 这两项现在给不了，功能本身也还没开放</span>
-        <span class="hc-ft"><span class="chip chip--info">尚未开放 · 可先了解</span><span class="hc-go">了解详情<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+        <span class="hc-ai" data-when="default first"><b>AI：规格体检与换底</b>&nbsp;· 尺寸、人脸位置、底色是否合规；<b>换底是重绘背景，不修改你的脸</b></span>
+        <span class="hc-ai" data-when="ai-down"><b>规格体检与换底都要模型</b>&nbsp;· 这两项现在给不了，功能本身也还没开放</span>
+        <span class="hc-ft"><span class="chip chip--info">尚未开放&nbsp;· 可先了解</span><span class="hc-go">了解详情<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
         <span class="hc-hd">
@@ -402,9 +391,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">证件照</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">本来就还没开放；现在连本机能力也读不到，说明页同样先关着。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ⑥ 格式转换 -->
@@ -412,12 +399,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
           <span class="hc-nm">格式转换</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">多张图片（最多 20 张）合并为一份 PDF，便于打印和存档</span>
-        <span class="hc-ai" data-when="default first"><b>AI：页序与方向识别建议</b> · 提示哪张像是倒的、顺序像是错的；<b>调不调由你按</b></span>
-        <span class="hc-ai" data-when="ai-down"><b>这次没有页序建议</b> · 顺序你自己排，<b>合并成 PDF 照常能办</b></span>
+        <span class="hc-ai" data-when="default first"><b>AI：页序与方向识别建议</b>&nbsp;· 提示哪张像是倒的、顺序像是错的；<b>调不调由你按</b></span>
+        <span class="hc-ai" data-when="ai-down"><b>这次没有页序建议</b>&nbsp;· 顺序你自己排，<b>合并成 PDF 照常能办</b></span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
@@ -426,9 +412,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">格式转换</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">未取得本机材料处理能力配置，合并任务先不创建。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ⑦ 签名盖章 -->
@@ -436,12 +420,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
           <span class="hc-nm">签名盖章</span>
-          <span class="chip chip--amber" data-when="default first">AI · 仅供参考</span>
-          <span class="chip chip--info" data-when="ai-down">AI 建议暂停</span>
+          <span class="chip chip--amber" data-when="default first">AI</span>
         </span>
         <span class="hc-ds">在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）</span>
-        <span class="hc-ai" data-when="default first"><b>AI：落款位建议</b> · 建议放第几页、哪个方位、多大；<b>位置与大小最终由你按</b></span>
-        <span class="hc-ai" data-when="ai-down"><b>这次没有落款位建议</b> · 页码、九宫格方位、大小档你自己选，合成照常</span>
+        <span class="hc-ai" data-when="default first"><b>AI：落款位建议</b>&nbsp;· 建议放第几页、哪个方位、多大；<b>位置与大小最终由你按</b></span>
+        <span class="hc-ai" data-when="ai-down"><b>这次没有落款位建议</b>&nbsp;· 页码、九宫格方位、大小档你自己选，合成照常</span>
         <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
       </a>
       <div class="hcard hcard--off" data-when="device-off">
@@ -450,9 +433,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="hc-nm">签名盖章</span>
           <span class="chip chip--info">状态未确认</span>
         </span>
-        <span class="hc-no">服务状态无法确认，请重新检测</span>
         <span class="hc-ai">未取得本机材料处理能力配置，合成任务先不创建。</span>
-        <span class="hc-ft"><span class="chip chip--info">暂不可用</span></span>
       </div>
 
       <!-- ⑧ 本机服务配置（状态卡，不是入口） -->
@@ -473,9 +454,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span><i>输稿器</i>配置支持</span>
           <span><i>费用</i>预估核价</span>
         </span>
-        <span class="stnote" data-when="default first ai-down">打印、扫描与材料处理入口按本机配置开放；纸张、耗材、双面与输稿器状态在提交任务前确认。<b>未确认能力不会创建正式打印或扫描任务</b>。</span>
+        <span class="stnote" data-when="default first ai-down">纸张、耗材、双面与输稿器状态在提交任务前确认。<b>未确认能力不会创建正式打印或扫描任务</b>。</span>
 
-        <span class="stnote" data-when="device-off">未取得本机打印扫描能力配置 —— 打印机、纸张、耗材、双面与输稿器的状态<b>本机现在都读不到</b>，所以一项也不敢说正常。<b>未确认能力不会创建正式打印或扫描任务</b>；费用一律预估，以打印工作台核价为准。</span>
+        <span class="stnote" data-when="device-off">未取得本机打印扫描能力配置 —— 打印机、纸张、耗材、双面与输稿器的状态<b>本机现在都读不到</b>，所以一项也不敢说正常。<b>未确认能力不会创建正式打印或扫描任务</b>；费用一律预估。</span>
         <span class="hc-ft" data-when="device-off"><span class="chip chip--info">用上面的「重新检测」再试一次</span></span>
       </div>
 
@@ -518,7 +499,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     </div>
     <div class="foot">
       <svg class="ic"><use href="#i-card"/></svg>
-      <span>本页<b>不核价、不结算</b>：所有打印价格均为<b>预估 · 以打印工作台核价为准</b>，最终以现场公示价为准。</span>
+      <span>本页<b>不核价、不结算</b>：所有打印价格均为<b>预估&nbsp;· 以打印工作台核价为准</b>，最终以现场公示价为准。</span>
     </div>
 
   </div>
@@ -526,13 +507,14 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>问问小青</a>
     <a class="btn btn--lg btn--ghost" href="05-phone-relay.html"><svg class="ic"><use href="#i-phone"/></svg>用手机传文件</a>
 
-    <span class="actionbar-hint" data-when="default">七件事全在这一屏 · 每张卡标了是不是 AI，标 AI 的结论仅供参考</span>
-    <span class="actionbar-hint" data-when="first">不登录也能打 · 记录留不下，要留在保存那一步再登录</span>
-    <span class="actionbar-hint" data-when="ai-down">AI 建议暂停 · 打印、扫描、上传、合并照常，出纸不受影响</span>
-    <span class="actionbar-hint" data-when="device-off">服务状态无法确认 · 七项暂不开放任务，记录仍可查</span>
+    <span class="actionbar-hint" data-when="default">七件事全在这一屏&nbsp;· 每张卡标了是不是 AI，标 AI 的结论仅供参考</span>
+    <span class="actionbar-hint" data-when="first">不登录也能打&nbsp;· 记录留不下，要留在保存那一步再登录</span>
+    <span class="actionbar-hint" data-when="ai-down">AI 建议暂停&nbsp;· 打印、扫描、上传、合并照常，出纸不受影响</span>
+    <span class="actionbar-hint" data-when="device-off">服务状态无法确认&nbsp;· 七项暂不开放任务，记录仍可查</span>
 
     <a class="btn btn--primary" data-when="default first ai-down" href="06-print-workbench.html">去文档打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-when="device-off" href="23-me.html">去我的打印记录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -561,21 +543,21 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     route: {
       caps: ['doc'],
       act: '你选了「不知道该用哪个」 → 多数人要办的是「文档打印」',
-      why: '<span class="k">理由</span>手里已经有 PDF 或图片、想拿到纸，这条链最短：上传 → 体检 → 设参数 → 出纸。<b>要办的事不是这个，说一句给小青，它换一条。</b><span class="ev ev--e3">E3 AI 判断，仅供参考</span>',
+      why: '<span class="k">理由</span>手里已经有 PDF 或图片、想拿到纸，这条链最短：上传 → 体检 → 设参数 → 出纸。<b>要办的事不是这个，说一句给小青，它换一条。</b>',
       cost: '<span class="k">代价</span>不需要登录；纸和耗材要钱，金额在打印工作台核价，<b>本页只给预估口径，不结算</b>。',
       alt: '<span class="k">备选</span>文件在手机里 → 「手机扫码上传」；手上是纸 → 「材料扫描」；一堆图片要拼一份 → 「格式转换」。'
     },
     check: {
       caps: ['doc', 'photo'],
       act: '你选了「检查这份文件能不能打」 → 材料体检在「文档打印」第 2 步',
-      why: '<span class="k">理由</span>页数、清晰度、边距、该黑白还是彩色，在设参数之前一次看完，<b>比出到第 7 页才发现糊了省一趟</b>。照片打印走的是同一套体检。<span class="ev ev--e3">E3 AI 判断，仅供参考</span>',
+      why: '<span class="k">理由</span>页数、清晰度、边距、该黑白还是彩色，在设参数之前一次看完，<b>比出到第 7 页才发现糊了省一趟</b>。照片打印走的是同一套体检。',
       cost: '<span class="k">代价</span>要读一遍文件内容才能体检；结论是参考，<b>参数最终由你按</b>，不满意可以全部改回去。',
       alt: '<span class="k">备选</span>不想让机器读：跳过体检直接设参数照样能打；先自己在预览里翻一遍也行。'
     },
     privacy: {
       caps: ['doc', 'scan', 'idphoto'],
       act: '你选了「打印前隐私检查」 → 提示文件里可能有身份证号等敏感信息',
-      why: '<span class="k">理由</span>公共机器旁边有人，身份证、银行卡、社保号被打出来落在出纸口是真会发生的事。检查只做<b>提示</b>，不替你删、不替你打码。<span class="ev ev--e3">E3 AI 判断，仅供参考</span>',
+      why: '<span class="k">理由</span>公共机器旁边有人，身份证、银行卡、社保号被打出来落在出纸口是真会发生的事。检查只做<b>提示</b>，不替你删、不替你打码。',
       cost: '<span class="k">代价</span>扫描件与图片可能通过第三方 OCR 服务识别文字；敏感文件按隐私策略自动清理，不长期留存。',
       alt: '<span class="k">备选</span>不想经 OCR：跳过隐私检查直接打，自己看一眼更稳；证件类材料也可以只扫描存文档，先不打印。'
     }
@@ -637,5 +619,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

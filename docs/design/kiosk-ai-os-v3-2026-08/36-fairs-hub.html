@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
    骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
@@ -234,7 +235,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div class="aibar aibar--down" data-when="ai-down">
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span class="aibar-t">AI 暂不可用，下面这些照常能办</span>
+          <span class="aibar-t">下面这些照常能办</span>
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
@@ -287,8 +288,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="dcard dcard--ai dcard--pick" id="c-plan">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
           </span>
           <span class="dcard-nm">AI参会规划</span>
           <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
@@ -313,8 +313,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="dcard dcard--ai dcard--pick" id="c-material">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
           </span>
           <span class="dcard-nm">求职材料准备</span>
           <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
@@ -388,10 +387,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">预约报名在来源平台完成</div></div>
+      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">带什么去，卡里有清单</div></div>
       <div data-when="first"><div class="t">不登录也能用，六张卡一张都不锁</div><div class="s">这一趟的记录留不下，离场即清</div></div>
-      <div data-when="ai-down"><div class="t">AI 暂不可用，场次、签到、打印照常</div><div class="s">停掉的只有排顺序与生成清单</div></div>
+      <div data-when="ai-down"><div class="t">场次、签到、打印照常</div></div>
       <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
     </div>
 
@@ -449,5 +449,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P29 专用（需求真值 = p29-p31-design-spec.md P29 节） ─────────────────
    本页主状态是「还没有」：后端零实现是主因，硬件只挡拍摄与相纸。
@@ -169,6 +170,25 @@
 .redline .ic { width:20px; height:20px; flex:0 0 auto; margin-top:1px; color:var(--coral-400); }
 .redline b { color:var(--fog-900); }
 .tl-s2 { font-size:var(--fz-1); color:var(--fog-600); }
+
+/* 来源卡 / 简历卡选中态：选择必须看得见（现场拍摄那张是 div，不参与选择） */
+.way[aria-pressed="true"] { border-color:var(--jade-500); background:var(--jade-a12); }
+.way[aria-pressed="true"] .way-t { color:var(--fog-900); }
+/* 结果反馈层：无 data-when/data-at，applyVisibility 不碰它 */
+.fb { position:absolute; inset:0; z-index:80; display:grid; place-items:center;
+      background:rgba(4,8,10,.62); padding:var(--s-6); }
+.fb-box { width:min(640px,100%); max-height:76%; overflow-y:auto;
+      border-radius:var(--r-lg); padding:var(--s-6);
+      background:var(--ink-100); border:1px solid var(--glass-1-brd);
+      box-shadow:0 30px 80px -20px rgba(0,0,0,.7); display:flex; flex-direction:column; gap:var(--s-4); }
+.fb-ic { width:56px; height:56px; border-radius:var(--r-md); display:grid; place-items:center;
+      background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.fb-ic .ic { width:27px; height:27px; color:var(--amber-400); }
+.fb-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.fb-p { font-size:var(--fz-3); color:var(--fog-700); line-height:1.66; }
+.fb-p b { color:var(--fog-900); }
+.fb-go { display:flex; gap:var(--s-3); flex-wrap:wrap; }
+.fb-go .btn { flex:1 1 200px; min-height:56px; }
 </style>
 </head>
 <body>
@@ -278,8 +298,7 @@
       <!-- ─────────── s1–s5 预览横幅（常驻，不可关闭） ─────────── -->
       <div class="previewbar" data-at="s1 s2 s3 s4 s4b s5">
         <svg class="ic"><use href="#i-alert"/></svg>
-        <span><b>这是开放后的流程示意，不是本机当前状态。</b>
-              后端服务还没建成，现在这条流程<b>一步都做不了</b> —— 页面里也没有任何真实照片。</span>
+        <span><b>开放后的流程示意，不是本机当前状态</b>：现在一步都做不了，也没有真实照片。</span>
       </div>
 
       <!-- ─────────── s1 选来源（示意） ─────────── -->
@@ -291,14 +310,14 @@
         </div>
         <div class="sec">
           <div class="ways absorb">
-            <button class="way">
+            <button class="way" data-src="qr" aria-pressed="true">
               <span class="way-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
               <span class="way-b">
                 <span class="way-t">手机扫码传照</span>
                 <span class="way-s">手机相册里挑一张正面免冠照，扫码直传本机 —— 最常用的一条路。</span>
               </span>
             </button>
-            <button class="way">
+            <button class="way" data-src="usb" aria-pressed="false">
               <span class="way-ic"><svg class="ic"><use href="#i-usb"/></svg></span>
               <span class="way-b">
                 <span class="way-t">本机上传 / U 盘导入</span>
@@ -318,7 +337,7 @@
             <svg class="ic"><use href="#i-alert"/></svg>
             <span>AI 不可用：传完可以先做 A4 排版（机械路径），规格体检和换底等恢复后再补。</span>
           </div>
-          <div class="note-end">传上来先进「规格体检」，不合格会退回并写明原因，<b>不会静默通过</b>。</div>
+          <div class="note-end" data-out="srcNote">本次来源：<b>手机扫码传照</b>。传上来先进规格体检，不合格会退回写明原因。</div>
         </div>
       </div>
 
@@ -342,7 +361,7 @@
             <div class="chk2">
               <svg class="ic"><use href="#i-check"/></svg>
               <span class="chk2-b">
-                <span class="chk2-t">居中度 <span class="ev ev--e1">E1 你的照片</span></span>
+                <span class="chk2-t">居中度</span>
                 <span class="chk2-s">人脸中线相对画面中线的偏移，标准 ±5% 以内。</span>
               </span>
               <span class="chk2-v">偏 1.8% · 合格</span>
@@ -350,7 +369,7 @@
             <div class="chk2">
               <svg class="ic"><use href="#i-check"/></svg>
               <span class="chk2-b">
-                <span class="chk2-t">分辨率 <span class="ev ev--e1">E1 你的照片</span></span>
+                <span class="chk2-t">分辨率</span>
                 <span class="chk2-s">按 300dpi 出片要求折算，一寸至少 295 × 413 像素。</span>
               </span>
               <span class="chk2-v">1180 × 1652 · 合格</span>
@@ -358,7 +377,7 @@
             <div class="chk2 chk2--warn">
               <svg class="ic"><use href="#i-alert"/></svg>
               <span class="chk2-b">
-                <span class="chk2-t">背景色差 <span class="ev ev--e1">E1 你的照片</span></span>
+                <span class="chk2-t">背景色差</span>
                 <span class="chk2-s"><b>不合格，原因：</b>背景色彩波动 12%，超过 ≤8% 的标准 ——
                       多半是背景不纯或有阴影。两条出路：下一步用 AI 换底
                       <span class="ev ev--e3">E3 AI 处理</span>，或回上一步重传一张纯色背景照。</span>
@@ -400,29 +419,29 @@
         </div>
         <div class="sec">
           <div class="swgrid">
-            <button class="sw" aria-pressed="true"><span class="idsil idsil--w"></span><em>一寸 · 白底</em></button>
-            <button class="sw"><span class="idsil idsil--w"></span><em>小一寸 · 白底</em></button>
-            <button class="sw"><span class="idsil idsil--w"></span><em>二寸 · 白底</em></button>
-            <button class="sw"><span class="idsil idsil--w"></span><em>小二寸 · 白底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--b"></span><em>一寸 · 蓝底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--b"></span><em>小一寸 · 蓝底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--b"></span><em>二寸 · 蓝底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--b"></span><em>小二寸 · 蓝底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--r"></span><em>一寸 · 红底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--r"></span><em>小一寸 · 红底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--r"></span><em>二寸 · 红底</em></button>
-            <button class="sw sw--tint"><span class="idsil idsil--r"></span><em>小二寸 · 红底</em></button>
+            <button class="sw" aria-pressed="true" data-spec="one" data-bg="w"><span class="idsil idsil--w"></span><em>一寸 · 白底</em></button>
+            <button class="sw" data-spec="one-s" data-bg="w"><span class="idsil idsil--w"></span><em>小一寸 · 白底</em></button>
+            <button class="sw" data-spec="two" data-bg="w"><span class="idsil idsil--w"></span><em>二寸 · 白底</em></button>
+            <button class="sw" data-spec="two-s" data-bg="w"><span class="idsil idsil--w"></span><em>小二寸 · 白底</em></button>
+            <button class="sw sw--tint" data-spec="one" data-bg="b"><span class="idsil idsil--b"></span><em>一寸 · 蓝底</em></button>
+            <button class="sw sw--tint" data-spec="one-s" data-bg="b"><span class="idsil idsil--b"></span><em>小一寸 · 蓝底</em></button>
+            <button class="sw sw--tint" data-spec="two" data-bg="b"><span class="idsil idsil--b"></span><em>二寸 · 蓝底</em></button>
+            <button class="sw sw--tint" data-spec="two-s" data-bg="b"><span class="idsil idsil--b"></span><em>小二寸 · 蓝底</em></button>
+            <button class="sw sw--tint" data-spec="one" data-bg="r"><span class="idsil idsil--r"></span><em>一寸 · 红底</em></button>
+            <button class="sw sw--tint" data-spec="one-s" data-bg="r"><span class="idsil idsil--r"></span><em>小一寸 · 红底</em></button>
+            <button class="sw sw--tint" data-spec="two" data-bg="r"><span class="idsil idsil--r"></span><em>二寸 · 红底</em></button>
+            <button class="sw sw--tint" data-spec="two-s" data-bg="r"><span class="idsil idsil--r"></span><em>小二寸 · 红底</em></button>
           </div>
           <div class="notice notice--amber" data-when="default first device-off" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>换底是 AI 处理 <span class="ev ev--e3">E3 AI 处理</span>，发丝边缘可能有瑕疵 ——
+            <span>换底是 AI 处理 <span class="ev ev--e3">E3</span>，发丝边缘可能有瑕疵 ——
                   <b>打印前请在预览里确认</b>，不满意就换回原底色或重传。</span>
           </div>
           <div class="notice notice--amber" data-when="ai-down" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
             <span>AI 不可用：蓝底、红底都换不了（已置灰）。白底一列是<b>不换底、用原图</b>，可以继续。</span>
           </div>
-          <div class="note-end">样片是剪影示意，不是任何真实照片。选好规格与底色，下一步看 A4 排版。</div>
+          <div class="note-end" data-out="specNote">已选<b>一寸 · 白底</b>，A4 排 8 张。样片为剪影示意。</div>
         </div>
       </div>
 
@@ -430,23 +449,14 @@
       <div class="pane pane--grow" data-at="s4">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-file"/></svg>
-          <b>A4 排版预览 · 一寸 8 张</b>
-          <span class="mt">4 × 2 排布 · 裁切框随纸印出</span>
+          <b data-out="a4hd">A4 排版预览 · 一寸 8 张</b>
+          <span class="mt" data-out="a4sub">4 × 2 排布 · 裁切框随纸印出</span>
         </div>
         <div class="sec">
           <div class="sheet-a4 a4id">
-            <div class="meta">A4 210 × 297mm · 一寸 25 × 35mm × 8 · 虚线为裁切框</div>
+            <div class="meta" data-out="a4meta">A4 210 × 297mm · 一寸 25 × 35mm × 8 · 虚线为裁切框</div>
             <div class="hr"></div>
-            <div class="grid8">
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-            </div>
+            <div class="grid8" data-out="a4grid"></div>
             <span class="pgno">A4 · 1 / 1</span>
           </div>
           <div class="notice" style="margin-top:var(--s-3)">
@@ -454,7 +464,7 @@
             <span>出的是 <b>A4 普通纸</b>，裁切框跟着印出来，照线裁开就能用；
                   相纸未配置 —— 用不用相纸以本机配置为准，配好后单独开放。</span>
           </div>
-          <div class="note-end">二寸排 4 张（2 × 2），小样在右栏。选「二寸」后这里会换成对应排版。</div>
+          <div class="note-end" data-out="a4note">选二寸后换成 4 张（2 × 2）排布，右栏小样同步跟着换。</div>
         </div>
       </div>
 
@@ -467,13 +477,13 @@
         </div>
         <div class="sec">
           <div style="display:flex;gap:var(--s-3)">
-            <button class="way" style="max-height:none;min-height:72px;flex:1">
+            <button class="way" style="max-height:none;min-height:72px;flex:1" data-cv="张三_简历_2026.pdf" aria-pressed="true">
               <span class="way-b">
                 <span class="way-t" style="font-size:var(--fz-3)">我的简历 · 张三_简历_2026.pdf</span>
                 <span class="way-s">上次保存于本机「我的简历」</span>
               </span>
             </button>
-            <button class="way" style="max-height:none;min-height:72px;flex:1">
+            <button class="way" style="max-height:none;min-height:72px;flex:1" data-cv="resume_final.docx" aria-pressed="false">
               <span class="way-b">
                 <span class="way-t" style="font-size:var(--fz-3)">本次会话已传 · resume_final.docx</span>
                 <span class="way-s">刚在选来源那一步传的文件</span>
@@ -485,7 +495,7 @@
           <div data-when="default first device-off" style="display:flex;flex-direction:column;gap:var(--s-3)">
             <div class="notice">
               <svg class="ic"><use href="#i-search"/></svg>
-              <span>AI 读了这份简历的版面 <span class="ev ev--e1">E1 你的简历</span>：
+              <span>AI 读了 <b data-out="cvName">张三_简历_2026.pdf</b> 的版面 <span class="ev ev--e1">E1 你的简历</span>：
                     <b>第 1 页右上角检测到旧照片 3.2 × 4.5cm</b>，新照片会缩放到同一位置、同一尺寸。
                     简历里没有照片时，给右上 / 左上 / 自定义三个预设插入位让你挑。</span>
             </div>
@@ -517,9 +527,9 @@
                     直接挑一个插入位，新照片按固定尺寸放进去，旧照片（如有）保持原样。</span>
             </div>
             <div class="pos3">
-              <button class="btn"><svg class="ic"><use href="#i-image"/></svg>右上角<span>最常见的位置</span></button>
-              <button class="btn"><svg class="ic"><use href="#i-image"/></svg>左上角<span>竖排版式常用</span></button>
-              <button class="btn"><svg class="ic"><use href="#i-pen"/></svg>自定义位置<span>在预览里拖到想要的位置</span></button>
+              <button class="btn" data-pos="右上角" aria-pressed="true"><svg class="ic"><use href="#i-image"/></svg>右上角<span>最常见的位置</span></button>
+              <button class="btn" data-pos="左上角" aria-pressed="false"><svg class="ic"><use href="#i-image"/></svg>左上角<span>竖排版式常用</span></button>
+              <button class="btn" data-pos="自定义位置" aria-pressed="false"><svg class="ic"><use href="#i-pen"/></svg>自定义位置<span>在预览里拖到想要的位置</span></button>
             </div>
           </div>
 
@@ -528,7 +538,7 @@
             <span><b>只生成简历新版本 · 原件永不覆盖 · 是否采纳由你确认。</b>
                   确认采纳才进「我的简历」，不采纳的新版本可以直接删掉。</span>
           </div>
-          <div class="note-end">简历诊断（P09）发现「没有照片 / 照片不规范」时，会把你指到这一步；换好照片也能带回简历工作台继续改。</div>
+          <div class="note-end">换好照片可带回简历工作台继续改。</div>
         </div>
       </div>
 
@@ -541,16 +551,15 @@
         </div>
         <div class="sec">
           <div class="kv absorb">
-            <div class="kv-row"><span class="k">证件照排版</span><span class="v">一寸 × 8 · A4 × 1 张</span></div>
-            <div class="kv-row"><span class="k">也可带上</span><span class="v">换照后的简历新版本（上一步生成才有）</span></div>
+            <div class="kv-row"><span class="k">证件照排版</span><span class="v" data-out="s5spec">一寸 × 8 · A4 × 1 张</span></div>
+            <div class="kv-row"><span class="k">也可带上</span><span class="v" data-out="s5cv">换照后的简历新版本（上一步生成才有）</span></div>
             <div class="kv-row"><span class="k">纸张</span><span class="v">A4 普通纸 · 相纸未配置</span></div>
             <div class="kv-row"><span class="k">色彩 / 份数</span><span class="v">彩色 · 1 份（工作台里可改）</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v v--fog">预估 · 以打印工作台核价为准</span></div>
           </div>
           <div class="notice" data-when="default first ai-down" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>点右下角会把这一单带去<b>打印工作台第 3 步「参数核价」</b>，
-                  金额以那里的核价为准，本页不报价。</span>
+            <span>点右下角会把这一单带去<b>打印工作台第 3 步「参数核价」</b>，本页不报价。</span>
           </div>
           <div class="notice notice--coral" data-when="device-off" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
@@ -588,7 +597,6 @@
             <div class="kv-row"><span class="k">能力开关</span><span class="v">id_photo · 默认关闭</span></div>
             <div class="kv-row"><span class="k">线上页面</span><span class="v v--fog">「即将上线」说明页</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">这几行是真实状态，不是示意。</div>
         </div>
       </div>
 
@@ -619,7 +627,7 @@
             <div class="kv-row"><span class="k">删除</span><span class="v">留删除日志</span></div>
             <div class="kv-row"><span class="k">前端存储</span><span class="v v--fog">公共终端不落本地</span></div>
           </div>
-          <div class="note-end">「采集 → 使用 → 删除 → 审计」全链留痕，管理员访问文件也要记日志。这几条开放后原样生效。</div>
+          <div class="note-end">这几条开放后原样生效。</div>
         </div>
       </div>
 
@@ -702,7 +710,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>换底为什么要你确认</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-2)">
-            换底是 AI 把人像从原背景里抠出来再铺新色 <span class="ev ev--e3">E3 AI 处理</span>，
+            换底是 AI 把人像从原背景里抠出来再铺新色 <span class="ev ev--e3">E3</span>，
             发丝、眼镜边缘可能出瑕疵。机器判断不了「这瑕疵要不要紧」——
             所以打印前必须由<b>你自己看过预览</b>，这一步不代劳。
           </div>
@@ -725,23 +733,18 @@
           <div class="kv">
             <div class="kv-row"><span class="k">纸张</span><span class="v">A4 普通纸</span></div>
             <div class="kv-row"><span class="k">相纸</span><span class="v v--fog">未配置 · 以本机为准</span></div>
-            <div class="kv-row"><span class="k">一寸</span><span class="v">8 张 / A4（4 × 2）</span></div>
-            <div class="kv-row"><span class="k">二寸</span><span class="v">4 张 / A4（2 × 2）</span></div>
+            <div class="kv-row"><span class="k">本次规格</span><span class="v" data-out="kvSpec">一寸 25 × 35mm · 白底</span></div>
+            <div class="kv-row"><span class="k">本次排布</span><span class="v" data-out="kvGrid">8 张 / A4（4 × 2）</span></div>
           </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s4">
-        <div class="pane-hd"><svg class="ic"><use href="#i-image"/></svg><b>二寸排版小样</b></div>
+        <div class="pane-hd"><svg class="ic"><use href="#i-image"/></svg><b data-out="miniHd">二寸排版小样</b></div>
         <div class="sec">
           <div class="sheet-a4 a4mini">
-            <div class="meta">二寸 35 × 49mm × 4</div>
-            <div class="grid4">
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-              <span class="crop"><span class="idsil idsil--w"></span></span>
-            </div>
+            <div class="meta" data-out="miniMeta">二寸 35 × 49mm × 4</div>
+            <div class="grid4" data-out="miniGrid"></div>
             <span class="pgno">A4 · 1 / 1</span>
           </div>
           <div class="note-end">小样只示意排布数量与裁切框，人像为剪影，不是真实照片。</div>
@@ -754,7 +757,7 @@
         <div class="sec">
           <div class="kv">
             <div class="kv-row"><span class="k">你的原件</span><span class="v">只读 · 永不覆盖</span></div>
-            <div class="kv-row"><span class="k">新版本</span><span class="v">另存「简历（换照版）」</span></div>
+            <div class="kv-row"><span class="k">新版本</span><span class="v" data-out="cvNew">张三_简历_2026（换照版）</span></div>
             <div class="kv-row"><span class="k">采纳</span><span class="v">你确认后进「我的简历」</span></div>
             <div class="kv-row"><span class="k">不采纳</span><span class="v v--fog">新版本可直接删除</span></div>
           </div>
@@ -765,8 +768,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>和简历工作台怎么接</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-2)">
-            简历诊断（P09）里有一项「简历没有照片 / 照片不规范」——
-            命中时它会把你指到本页；在这里换好照片后，也可以带着新版本回去逐条改内容。
+            简历诊断命中「没有照片 / 照片不规范」时会指到本页。
           </div>
           <a class="alt" href="09-resume-workbench.html" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-resume"/></svg>
@@ -819,7 +821,7 @@
 
     <span class="actionbar-hint" data-at="sA">证件照排版尚未开放 · 后面几步是开放后示意</span>
     <span class="actionbar-hint" data-at="s1 s2 s3 s4 s4b">以上为开放后示意 · 现在一步都做不了</span>
-    <span class="actionbar-hint" data-at="s5" data-when="default first ai-down">示意 · 费用以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s5" data-when="default first ai-down">示意 · 费用在打印工作台确认</span>
     <span class="actionbar-hint" data-at="s5" data-when="device-off">打印机离线 · 排版产物可存「我的文档」换机打</span>
 
     <button class="btn btn--lg" data-at="sA" data-go="s1">看开放后的流程</button>
@@ -841,6 +843,16 @@
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
+  <!-- 结果反馈层：示意阶段点了"传照片 / 选简历"要说清现在做不了什么、能做什么 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -849,6 +861,139 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* ============================================================================
+   P29 的三组「画了没接」：12 张规格底色卡、2 张来源卡、2 张简历卡，
+   点了全都只是静态图。现在做成真单选，并且往下游传：
+     规格 → A4 排版的张数、排布、裁切框数量、meta 尺寸、右栏小样、s5 单据
+     底色 → 排版预览与简历换照预览里剪影的底色
+     来源 → s1 收尾说明写明本次走哪条路
+     简历 → s4B 的文件名、右栏「新版本」命名、s5「也可带上」
+   本页仍是「未开放」的示意页：previewbar 常驻不动，选择只改示意内容，
+   不冒充任何真实能力（CLAUDE.md §9 不伪造能力）。
+   ========================================================================== */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var SPEC = {
+    'one':   { nm: '一寸',   mm: '25 × 35mm', n: 8, grid: '4 × 2', ratio: '5/7' },
+    'one-s': { nm: '小一寸', mm: '22 × 32mm', n: 8, grid: '4 × 2', ratio: '11/16' },
+    'two':   { nm: '二寸',   mm: '35 × 49mm', n: 4, grid: '2 × 2', ratio: '5/7' },
+    'two-s': { nm: '小二寸', mm: '35 × 45mm', n: 4, grid: '2 × 2', ratio: '7/9' }
+  }
+  var BG = { w: { nm: '白底', cls: 'idsil--w' }, b: { nm: '蓝底', cls: 'idsil--b' }, r: { nm: '红底', cls: 'idsil--r' } }
+  var P = { spec: 'one', bg: 'w', src: 'qr', cv: '张三_简历_2026.pdf', pos: '右上角' }
+
+  function q (n) { return scr.querySelectorAll('[data-out="' + n + '"]') }
+  function set (n, v) {
+    var e = q(n)
+    for (var i = 0; i < e.length; i++) {
+      if (e[i].firstChild && e[i].firstChild.nodeType === 3) e[i].firstChild.nodeValue = v
+      else e[i].textContent = v
+    }
+  }
+  function html (n, v) { var e = q(n); for (var i = 0; i < e.length; i++) e[i].innerHTML = v }
+  function crops (n, cls, ratio) {
+    var out = ''
+    for (var i = 0; i < n; i++) out += '<span class="crop"><span class="idsil ' + cls + '" style="aspect-ratio:' + ratio + '"></span></span>'
+    return out
+  }
+
+  function render () {
+    var S = SPEC[P.spec], B = BG[P.bg]
+    /* s3 十二张卡的选中态 */
+    var sw = scr.querySelectorAll('.sw[data-spec]')
+    for (var i = 0; i < sw.length; i++) {
+      var on = sw[i].getAttribute('data-spec') === P.spec && sw[i].getAttribute('data-bg') === P.bg
+      sw[i].setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
+    html('specNote', '已选<b>' + S.nm + ' · ' + B.nm + '</b>，A4 排 ' + S.n + ' 张（' + S.grid + '）。样片为剪影示意。')
+    /* s4 排版预览：张数、排布、裁切框、尺寸全部跟着换 */
+    set('a4hd', 'A4 排版预览 · ' + S.nm + ' ' + S.n + ' 张')
+    set('a4sub', S.grid + ' 排布 · 裁切框随纸印出')
+    set('a4meta', 'A4 210 × 297mm · ' + S.nm + ' ' + S.mm + ' × ' + S.n + ' · 虚线为裁切框')
+    var g = q('a4grid')[0]
+    if (g) {
+      g.innerHTML = crops(S.n, B.cls, S.ratio)
+      g.style.gridTemplateColumns = 'repeat(' + (S.n === 8 ? 4 : 2) + ',1fr)'
+    }
+    set('a4note', S.n === 8
+      ? '选二寸后换成 4 张（2 × 2）排布，右栏小样同步跟着换。'
+      : '选一寸后换成 8 张（4 × 2）排布，右栏小样同步跟着换。')
+    set('kvSpec', S.nm + ' ' + S.mm + ' · ' + B.nm)
+    set('kvGrid', S.n + ' 张 / A4（' + S.grid + '）')
+    /* 右栏小样：给出与主预览不同的那一档，方便对照 */
+    var alt = S.n === 8 ? SPEC['two'] : SPEC['one']
+    set('miniHd', alt.nm + '排版小样')
+    set('miniMeta', alt.nm + ' ' + alt.mm + ' × ' + alt.n)
+    var mg = q('miniGrid')[0]
+    /* 小样也要按张数换列数：8 张仍用 2 列会排成 4 行，把小样纸底戳穿（实测被裁掉一行） */
+    if (mg) { mg.innerHTML = crops(alt.n, B.cls, alt.ratio); mg.style.gridTemplateColumns = 'repeat(' + (alt.n === 8 ? 4 : 2) + ',1fr)' }
+    /* s4B 换照预览里的新照片也用当前底色 */
+    var np = scr.querySelector('.cmp-photo--new .idsil')
+    if (np) np.className = 'idsil ' + B.cls
+    /* s1 来源 */
+    var ws = scr.querySelectorAll('.way[data-src]')
+    for (var j = 0; j < ws.length; j++) ws[j].setAttribute('aria-pressed', ws[j].getAttribute('data-src') === P.src ? 'true' : 'false')
+    html('srcNote', '本次来源：<b>' + (P.src === 'qr' ? '手机扫码传照' : '本机上传 / U 盘导入') +
+      '</b>。传上来先进规格体检，不合格会退回写明原因。')
+    /* s4B 简历 */
+    var cvs = scr.querySelectorAll('.way[data-cv]')
+    for (var k = 0; k < cvs.length; k++) cvs[k].setAttribute('aria-pressed', cvs[k].getAttribute('data-cv') === P.cv ? 'true' : 'false')
+    set('cvName', P.cv)
+    set('cvNew', P.cv.replace(/\.[a-z]+$/i, '') + '（换照版）')
+    var ps = scr.querySelectorAll('[data-pos]')
+    for (var m = 0; m < ps.length; m++) ps[m].setAttribute('aria-pressed', ps[m].getAttribute('data-pos') === P.pos ? 'true' : 'false')
+    /* s5 单据 */
+    set('s5spec', S.nm + ' × ' + S.n + ' · A4 × 1 张 · ' + B.nm)
+    set('s5cv', P.cv.replace(/\.[a-z]+$/i, '') + '（换照版）· 上一步生成才有')
+  }
+
+  /* ── 结果反馈层：示意页点「传照片」要说清现在做不了什么 ── */
+  var fb = document.getElementById('fb')
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    var go = document.getElementById('fb-go'); go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', function () { fb.hidden = true })
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+
+  scr.addEventListener('click', function (e) {
+    var sw = e.target.closest('.sw[data-spec]')
+    if (sw) { P.spec = sw.getAttribute('data-spec'); P.bg = sw.getAttribute('data-bg'); render(); return }
+    var src = e.target.closest('.way[data-src]')
+    if (src) {
+      P.src = src.getAttribute('data-src'); render()
+      openFb({ t: '这条路现在还走不了',
+        p: '来源已记为<b>' + (P.src === 'qr' ? '手机扫码传照' : '本机上传 / U 盘导入') + '</b>，但证件照排版的后端服务<b>一项都还没建</b>，本次不会真的收到照片。<br>现在真能用的两条路在第 1 步：<b>打印已有电子证件照</b>、<b>扫描纸质证件照留存</b>。',
+        go: [{ t: '回到当前状态', go: 'sA', primary: true }, { t: '继续看示意' }] })
+      return
+    }
+    var cv = e.target.closest('.way[data-cv]')
+    if (cv) { P.cv = cv.getAttribute('data-cv'); render(); return }
+    var pos = e.target.closest('[data-pos]')
+    if (pos) { P.pos = pos.getAttribute('data-pos'); render(); return }
+  })
+  fb.addEventListener('click', function (e) { if (e.target === fb) fb.hidden = true })
+  document.getElementById('fb-go').addEventListener('click', function (e) {
+    var b = e.target.closest('.btn')
+    if (b && b.textContent.indexOf('回到当前状态') === 0 && window.v3Stage) { fb.hidden = true; window.v3Stage('sA') }
+  })
+
+  render()
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

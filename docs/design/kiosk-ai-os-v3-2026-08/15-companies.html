@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   .work--co { grid-template-columns: 1fr 372px; }
   .cologo {
@@ -220,8 +221,8 @@
           <div class="dsec-t">经营与资质信息</div>
           <div class="metrics" data-at="detail">
             <div class="metric"><b>2016</b><span>成立年份</span></div>
-            <div class="metric"><b>100–499</b><span>人员规模<br>来源机构填报</span></div>
-            <div class="metric"><b>正常</b><span>登记状态<br>来源机构填报</span></div>
+            <div class="metric"><b>100–499</b><span>人员规模</span></div>
+            <div class="metric"><b>正常</b><span>登记状态</span></div>
           </div>
           <div class="metrics" data-at="metricsoff">
             <div class="metric metric-off"><b>未开启</b><span>成立年份</span></div>
@@ -247,8 +248,8 @@
           <div data-when="default first device-off">
             <div class="kv">
               <div class="kv-row"><span class="k">规模与行业定位</span><span class="v">按填报口径，是互联网行业百人规模的中型公司，主营企业服务软件 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
-              <div class="kv-row"><span class="k">在招岗位分布</span><span class="v">6 个岗位覆盖运营、技术、销售三类，不集中在单一职能 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
-              <div class="kv-row"><span class="k">你可能想核实的点</span><span class="v">社保公积金缴纳口径、试用期约定——可在来源平台或面谈时确认 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
+              <div class="kv-row"><span class="k">在招岗位分布</span><span class="v">6 个岗位覆盖运营、技术、销售三类，不集中在单一职能 <span class="ev ev--e3">E3</span></span></div>
+              <div class="kv-row"><span class="k">你可能想核实的点</span><span class="v">社保公积金缴纳口径、试用期约定——可在来源平台或面谈时确认 <span class="ev ev--e3">E3</span></span></div>
             </div>
             <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
               以上只是把本页已展示的信息<b>重新组织</b>了一遍，不是风评，也不构成该不该投、该不该入职的判断——那由你自己定。
@@ -281,7 +282,7 @@
             </a>
             <div class="notice" style="margin-top:2px">
               <svg class="ic"><use href="#i-info"/></svg>
-              <span>还有 4 个岗位。点任一岗位看详情，投递在来源平台自己完成。</span>
+              <span>还有 4 个岗位，点任一岗位看详情。</span>
             </div>
           </div>
         </div>
@@ -408,7 +409,7 @@
         </p>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机不代收简历、不做候选人筛选、不安排面试。想联系企业，走岗位详情或招聘会展位。</span>
+          <span>本机不做候选人筛选、不安排面试。想联系企业，走岗位详情或招聘会展位。</span>
         </div>
       </div>
 
@@ -449,7 +450,7 @@
         </p>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>本机只记「你看过这家企业」和「你打开过来源平台」，登录后记录在企业业务页的浏览记录里；未登录只留本次会话。</span>
+          <span>本机只记「看过这家企业」和「打开过来源平台」；未登录只留本次会话。</span>
         </div>
       </div>
 
@@ -465,7 +466,7 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>做求职决定前，建议在「国家企业信用信息公示系统」自行核对企业登记信息——那是官方核验，本机替代不了。</span>
+          <span>做决定前建议在「国家企业信用信息公示系统」自行核对，本机替代不了官方核验。</span>
         </div>
       </div>
 
@@ -498,6 +499,7 @@
 
   <div class="actionbar">
       <a class="backbtn" href="13-jobs-desk.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="list"><div class="t">46 家已审核企业，显示 12 家</div><div class="s">来源企业与岗位导览 · 本机不代收简历、不做筛选与邀约</div></div>
       <div data-at="detail"><div class="t">6 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
@@ -543,5 +545,7 @@
 <!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
      于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

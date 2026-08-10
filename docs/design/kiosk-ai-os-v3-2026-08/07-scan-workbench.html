@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
   .chip--info { cursor: inherit; }
@@ -25,8 +26,31 @@
   /* s4 去向三卡在右栏里用紧凑高度：栏宽 348px 放 88px 高卡会把栏顶爆（实测溢出 40px）。
      64px 仍满足 ≥48 触控。 */
   .wside .xlane-go { min-height: 60px; padding: 6px var(--s-4); }
-  /* 输出格式选中态：复用 seg 的选中语义，卡面描边表达 */
-  .src[data-fmt][aria-pressed="true"] { border-color: var(--jade-500); box-shadow: var(--sh-2), 0 0 0 1px var(--jade-500) inset; }
+  /* 输出格式 / 扫什么 选中态：复用 seg 的选中语义，卡面描边表达 */
+  .src[data-fmt][aria-pressed="true"],
+  .src[data-kind][aria-pressed="true"] { border-color: var(--jade-500); box-shadow: var(--sh-2), 0 0 0 1px var(--jade-500) inset; }
+  /* 页数减半（仅正面）时，第 4–6 页的缩略图与预览页不再成立，按类隐藏。
+     不能用 hidden —— 那是 applyVisibility 的专属通道，会被四态覆盖掉。 */
+  .screen.is-half .pv--x, .screen.is-half .thumb--x { display: none; }
+  /* 结果反馈层：点了要有交代。默认 hidden（无 data-when/data-at，applyVisibility 不碰） */
+  .fb { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center;
+        background: rgba(4,8,10,.62); padding: var(--s-6); }
+  .fb-box { width: min(640px, 100%); max-height: 76%; overflow-y: auto;
+        border-radius: var(--r-lg); padding: var(--s-6);
+        background: var(--ink-100); border: 1px solid var(--glass-1-brd);
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: var(--s-4); }
+  .fb-ic { width: 56px; height: 56px; border-radius: var(--r-md); display: grid; place-items: center;
+        background: var(--jade-a12); border: 1px solid var(--jade-a20); }
+  .fb-ic .ic { width: 27px; height: 27px; color: var(--jade-500); }
+  .fb--warn .fb-ic { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .fb--warn .fb-ic .ic { color: var(--amber-400); }
+  .fb-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); line-height: var(--lh-snug); }
+  .fb-p { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.66; }
+  .fb-p b { color: var(--fog-900); }
+  .fb-go { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  .fb-go .btn { flex: 1 1 200px; min-height: 56px; }
+  /* 当前选中的「扫什么」在右栏对照表里点亮，选择要看得见 */
+  .kv-row[aria-current="true"] .k { color: var(--jade-500); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -68,19 +92,19 @@
 
       <!-- S1 扫什么 -->
       <div class="sources" data-at="s1" style="grid-template-columns:1fr 1fr 1fr">
-        <button class="src" data-go="s2">
+        <button class="src" data-go="s2" data-kind="resume" aria-pressed="true">
           <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
           <span class="src-nm">纸质简历</span>
           <span class="src-ds">扫成 PDF，并可送去 AI 识别做诊断与优化。<br>300dpi 灰度，识别效果最好。</span>
           <span class="src-tag"><span class="chip chip--jade">可接 AI 诊断</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-go="s2" data-kind="id" aria-pressed="false">
           <span class="src-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
           <span class="src-nm">证件</span>
           <span class="src-ds">身份证、学位证、资格证。<br>正反面自动合成一页，不放大不裁切。</span>
           <span class="src-tag"><span class="chip chip--amber">含敏感信息</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-go="s2" data-kind="doc" aria-pressed="false">
           <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
           <span class="src-nm">普通文档</span>
           <span class="src-ds">多页材料、表格、合同页。<br>送稿器一次最多 50 页。</span>
@@ -170,11 +194,8 @@
              用户会以为机器坏了。这一条必须写在指引里，不能藏在帮助页。 -->
         <div class="notice notice--amber" style="margin-top:var(--s-4)">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>面板上按「开始扫描」之前，先把目标选成「扫描到 PC」。</b>
-            如果选成<b>扫描到 U 盘 / 邮箱 / FTP</b>，纸会照走完，但文件进的是那个目标，
-            <b>本机一张也收不到</b>，这一屏会一直停在等待。<br>
-            已经扫错目标了：纸不用重放，回面板改目标再按一次「开始扫描」就行 ——
-            本机按<b>本次扫描任务号</b>接收，重扫会覆盖上一次，不会两份混在一起。</span>
+          <span><b>按「开始扫描」前，先把目标选成「扫描到 PC」。</b>选成 U 盘 / 邮箱 / FTP，纸会走完但<b>本机收不到</b>。<br>
+            扫错了：纸不用重放，改目标再按一次即可，按任务号覆盖，不会两份混在一起。</span>
         </div>
 
         <!-- 三方职责：谁能做什么、谁不能做什么。
@@ -182,13 +203,10 @@
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-info"/></svg>
           <span><b>这一步谁做什么：</b><br>
-            · <b>你</b>：放好原件、在面板上选「扫描到 PC」、按下实体键。<br>
-            · <b>打印机面板</b>：走纸、成像、按任务号把文件送到本机接收目录。
-              走纸只能由面板上的实体键启动。<br>
-            · <b>本屏</b>：只负责<b>接收和显示</b>结果，<b>不能替你启动走纸</b> ——
-              这是硬件安全设计，防止没人在机器旁时被远程启动。<br>
-            · <b>接收目录</b>由运维在终端上配好，你不需要知道路径；本机收到文件会自己认领，
-              认领后原始文件从接收目录移走，<b>不会留在公共目录里被下一位看到</b>。</span>
+            · <b>你</b>：放好原件、选「扫描到 PC」、按实体键。<br>
+            · <b>打印机</b>：走纸成像，按任务号送到本机。<br>
+            · <b>本屏</b>：只接收和显示，<b>不能替你启动走纸</b>（硬件安全设计）。<br>
+            · <b>接收目录</b>：收到即认领并移走，不留在公共目录。</span>
         </div>
       </div>
 
@@ -207,11 +225,10 @@
         <div class="locked" data-when="device-off" style="margin-top:var(--s-4)">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>扫描仪离线，本次扫描已中断</b>
-          <p>已扫好的 <b>3 页</b>不会丢，已存进本次会话。故障已自动上报运维，不需要你操作。<br>
-             你可以改用手机拍照上传，或去任一台空闲机器继续扫剩下的页——
-             凭手机号登录即可取回，文件跟人走，不跟机器走。</p>
+          <p>已扫的 <b>3 页</b>不会丢，故障已自动上报。<br>
+             可改用手机拍照上传，或换一台机器接着扫 —— 凭手机号登录取回。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-            <button class="btn btn--ghost">手机拍照上传</button>
+            <a class="btn btn--ghost" href="05-phone-relay.html">手机拍照上传</a>
             <button class="btn btn--ghost" data-go="s4">先看已扫的 3 页</button>
           </div>
         </div>
@@ -236,7 +253,8 @@
           <span class="t" data-when="device-off">已扫的 3 页现在就能</span>
         </div>
         <div class="kv">
-          <div class="kv-row"><span class="k">文件</span><span class="v" data-when="default first ai-down">PDF · 灰度 300dpi（可选 JPEG）</span><span class="v" data-when="device-off">PDF · 已扫 3 页 · 存本次会话</span></div>
+          <div class="kv-row"><span class="k">文件</span><span class="v" data-when="default first ai-down" data-out="file">PDF · 灰度 300dpi · 6 页 · 4.8 MB</span><span class="v" data-when="device-off">PDF · 已扫 3 页 · 存本次会话</span></div>
+          <div class="kv-row" data-when="default first ai-down"><span class="k">成品说明</span><span class="v" data-out="note">灰度 300dpi 最适合识别</span></div>
           <div class="kv-row"><span class="k">去向</span><span class="v" data-when="default first">送 AI 诊断 / 拿去打印 / 存我的文档</span><span class="v" data-when="ai-down">拿去打印 / 存我的文档（AI 诊断不可用）</span><span class="v" data-when="device-off">存我的文档（打印暂不可用）</span></div>
           <div class="kv-row"><span class="k">某页没扫好</span><span class="v" data-when="default first ai-down">结果页可只重扫那一页</span><span class="v" data-when="device-off">换一台空闲机器继续扫</span></div>
         </div>
@@ -246,11 +264,11 @@
       <div class="paper" data-at="s4">
         <div class="paper-bar">
           <span class="nm">扫描_20260808_0947.pdf</span>
-          <span class="mt" data-when="default first ai-down">A4 · 6 页 · 灰度 300dpi · 4.8 MB</span>
+          <span class="mt" data-when="default first ai-down" data-out="meta" style="white-space:nowrap">A4 · 6 页 · 灰度 300dpi · 4.8 MB</span>
           <span class="mt" data-when="device-off" style="white-space:nowrap">A4 · 3 页（中断）· 灰度 300dpi · 2.4 MB</span>
           <span class="pg">
             <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
-            <span data-when="default first ai-down">第 1 / 共 6 页</span>
+            <span data-when="default first ai-down" data-out="pgtotal">第 1 / 共 6 页</span>
             <span data-when="device-off">第 1 / 共 3 页</span>
             <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
           </span>
@@ -265,13 +283,33 @@
             <div class="sec">工作经历</div>
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
             <div class="ln"></div><div class="ln ln--m"></div>
-            <span class="pgno">1 / 6</span>
+            <span class="pgno" data-pg="1">1 / 6</span>
           </div>
           <div class="sheet-a4">
             <div class="sec">项目经历</div>
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
             <div class="ln"></div><div class="ln ln--m"></div>
-            <span class="pgno">2 / 6</span>
+            <span class="pgno" data-pg="2">2 / 6</span>
+          </div>
+          <div class="sheet-a4 pv--x" data-when="default first ai-down">
+            <div class="sec">技能与证书</div>
+            <div class="ln"></div><div class="ln ln--s"></div><div class="ln ln--m"></div>
+            <span class="pgno" data-pg="3">3 / 6</span>
+          </div>
+          <div class="sheet-a4 pv--x" data-when="default first ai-down">
+            <div class="sec">自我评价</div>
+            <div class="ln"></div><div class="ln ln--m"></div>
+            <span class="pgno" data-pg="4">4 / 6</span>
+          </div>
+          <div class="sheet-a4 pv--x" data-when="default first ai-down">
+            <div class="sec">获奖与培训</div>
+            <div class="ln ln--m"></div><div class="ln"></div><div class="ln ln--s"></div>
+            <span class="pgno" data-pg="5">5 / 6</span>
+          </div>
+          <div class="sheet-a4 pv--x" data-when="default first ai-down">
+            <div class="sec">联系方式</div>
+            <div class="ln ln--s"></div><div class="ln ln--m"></div>
+            <span class="pgno" data-pg="6">6 / 6</span>
           </div>
         </div>
       </div>
@@ -280,9 +318,9 @@
         <div class="thumb" aria-current="true"><i class="t"></i><i></i><i class="s"></i><span>1</span></div>
         <div class="thumb"><i class="t"></i><i></i><span>2</span></div>
         <div class="thumb thumb--flag"><i class="t"></i><i class="s"></i><span>3</span></div>
-        <div class="thumb" data-when="default first ai-down"><i class="t"></i><i></i><span>4</span></div>
-        <div class="thumb" data-when="default first ai-down"><i class="t"></i><i class="s"></i><span>5</span></div>
-        <div class="thumb" data-when="default first ai-down"><i class="t"></i><i></i><span>6</span></div>
+        <div class="thumb thumb--x" data-when="default first ai-down"><i class="t"></i><i></i><span>4</span></div>
+        <div class="thumb thumb--x" data-when="default first ai-down"><i class="t"></i><i class="s"></i><span>5</span></div>
+        <div class="thumb thumb--x" data-when="default first ai-down"><i class="t"></i><i></i><span>6</span></div>
       </div>
       <!-- 2026-08-09 留白复核顺手修：注释原挤在 6 张缩略图右侧约 20px 宽的缝里，
            逐字竖排且溢出条带（148px 定高）。挪出条带单独一行，四态都完整可读。 -->
@@ -297,11 +335,11 @@
       <div class="pane pane--fill" data-at="s1">
         <div class="pane-hd"><span class="t">三种有什么不一样</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">简历</span><span class="v">灰度 300dpi · 可接 AI</span></div>
-          <div class="kv-row"><span class="k">证件</span><span class="v">彩色 300dpi · 正反合一</span></div>
-          <div class="kv-row"><span class="k">普通文档</span><span class="v">灰度 200dpi · 可双面</span></div>
-          <div class="kv-row"><span class="k">输出</span><span class="v">PDF（可选 JPEG）</span></div>
-          <div class="kv-row"><span class="k">单次上限</span><span class="v">送稿器 50 页</span></div>
+          <div class="kv-row" data-kindrow="resume"><span class="k">简历</span><span class="v">灰度 300dpi · 可接 AI</span></div>
+          <div class="kv-row" data-kindrow="id"><span class="k">证件</span><span class="v">彩色 300dpi · 正反合一</span></div>
+          <div class="kv-row" data-kindrow="doc"><span class="k">普通文档</span><span class="v">灰度 200dpi · 可双面</span></div>
+          <div class="kv-row"><span class="k">本次输出</span><span class="v" data-out="kvout">PDF · 灰度 300dpi · 6 页</span></div>
+          <div class="kv-row"><span class="k">单次上限</span><span class="v" data-out="kvlimit">送稿器 50 页</span></div>
         </div>
         <!-- 2026-08-09 留白复核：原挂在这里的隐私 notice 挪进下方常驻卡
              「你的材料，规矩在先」（data-at="s1 s2 s3"）——同一段规则 s2/s3 也该看到，
@@ -310,36 +348,36 @@
 
       <!-- S2 参数 + 设备 -->
       <div class="pane" data-at="s2">
-        <div class="pane-hd"><span class="t">扫描参数</span><span class="s" data-when="default device-off">已按类型预设</span><span class="s" data-when="ai-down first">需你确认</span></div>
-        <div class="field">
-          <div class="field-lb">分辨率<span class="prefill" data-when="default device-off">已按「纸质简历」预设 · 可改</span></div>
+        <div class="pane-hd"><span class="t">扫描参数</span><span class="s" data-when="default device-off" data-out="hd">预设 · 灰度 300dpi · 6 页</span><span class="s" data-when="ai-down first" data-out="hd">需确认 · 灰度 300dpi · 6 页</span></div>
+        <div class="field" data-param="dpi">
+          <div class="field-lb">分辨率<span class="prefill" data-when="default device-off" data-out="pf-dpi">按「纸质简历」预设 · 可改</span></div>
           <div class="seg">
-            <button aria-pressed="false">200dpi</button>
-            <button aria-pressed="true">300dpi</button>
-            <button aria-pressed="false">600dpi</button>
+            <button aria-pressed="false" data-v="200">200dpi</button>
+            <button aria-pressed="true" data-v="300">300dpi</button>
+            <button aria-pressed="false" data-v="600">600dpi</button>
           </div>
         </div>
-        <div class="field">
-          <div class="field-lb">色彩<span class="prefill" data-when="default device-off">识别效果最好 · 可改</span></div>
+        <div class="field" data-param="color">
+          <div class="field-lb">色彩<span class="prefill" data-when="default device-off" data-out="pf-color">识别效果最好 · 可改</span></div>
           <div class="seg">
-            <button aria-pressed="false">黑白</button>
-            <button aria-pressed="true">灰度</button>
-            <button aria-pressed="false">彩色</button>
+            <button aria-pressed="false" data-v="黑白">黑白</button>
+            <button aria-pressed="true" data-v="灰度">灰度</button>
+            <button aria-pressed="false" data-v="彩色">彩色</button>
           </div>
         </div>
-        <div class="field">
-          <div class="field-lb">来源</div>
+        <div class="field" data-param="src">
+          <div class="field-lb">来源<span class="prefill" data-when="default device-off" data-out="pf-src">送稿器 · 一次最多 50 页</span></div>
           <div class="seg">
-            <button aria-pressed="true">送稿器</button>
-            <button aria-pressed="false">玻璃板</button>
+            <button aria-pressed="true" data-v="adf">送稿器</button>
+            <button aria-pressed="false" data-v="flat">玻璃板</button>
           </div>
         </div>
-        <div class="field">
-          <div class="field-lb">双面</div>
+        <div class="field" data-param="duplex">
+          <div class="field-lb">双面<span class="prefill" data-when="default device-off" data-out="pf-duplex">两面都扫 · 6 页</span></div>
           <div class="seg">
-            <button aria-pressed="true" data-when="default first ai-down">自动双面</button>
+            <button aria-pressed="true" data-v="both" data-when="default first ai-down">自动双面</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">不可用</button>
-            <button aria-pressed="false">仅正面</button>
+            <button aria-pressed="false" data-v="one">仅正面</button>
           </div>
         </div>
       </div>
@@ -354,7 +392,7 @@
 
       <!-- S3 任务 -->
       <div class="pane pane--fill" data-at="s3">
-        <div class="pane-hd"><span class="t">进行到哪一步</span><span class="s">#SC-0947-31</span></div>
+        <div class="pane-hd"><span class="t">进行到哪一步</span></div>
         <div class="tline">
           <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="tl-b"><span class="tl-t">进纸与走纸</span><span class="tl-s">09:47:12 完成</span></span></div>
@@ -371,9 +409,9 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>不显示总进度百分比：页数由送稿器实际走纸决定，扫完才知道总数。这里只报已完成的步骤。<br>
+          <span>不报总进度百分比：总页数由送稿器实际走纸决定，扫完才知道；这里只报已完成的步骤。<br>
             <b>任务有效期 15 分钟</b>，超时自动作废并销毁已采集图像，需重新发起；
-            你点「取消」后若机器已回传新页，<b>以取消为准</b>，回传的页不会进结果。</span>
+            点「取消」后机器再回传的页<b>不会进结果</b>。</span>
         </div>
       </div>
 
@@ -396,12 +434,12 @@
         </div>
         <div class="notice notice--amber" data-when="default first device-off" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>第 3 页置信 62%，低于 80% 阈值 <span class="ev ev--e1">E1 本机识别数据</span>，<b>不会送 AI 生成结论</b>。建议重扫这一页，或人工确认后再继续。</span>
+          <span>第 3 页置信 62%，低于 80% 阈值 <span class="ev ev--e1">E1</span>，<b>不会送 AI 生成结论</b>。建议重扫这一页。</span>
         </div>
         <div class="notice" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>识别服务中断，本次不做置信度检查、也不接 AI 诊断。扫描件本身完整，可以直接打印或存进「我的文档」。<br>
-            对某页效果不放心，下方「重扫某一页」现在就能用，不必等识别恢复。</span>
+          <span>识别中断：不做置信度检查、不接 AI 诊断；扫描件完整，可直接打印或存档。<br>
+            对某页不放心，「重扫某一页」现在就能用。</span>
         </div>
       </div>
 
@@ -418,7 +456,7 @@
           扫描仪离线，<b>打印去向暂不可用</b>。可以先存进「我的文档」，凭手机号在任一台空闲机器取回。
         </p>
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto">
-          <button class="btn btn--ghost" style="width:100%" data-when="default first">送 AI 简历诊断</button>
+          <button class="btn btn--ghost" style="width:100%" data-when="default first" data-fb="ai">送 AI 简历诊断</button>
           <button class="btn btn--ghost" style="width:100%" data-when="ai-down device-off" aria-disabled="true">AI 诊断不可用</button>
           <!-- 完成去向三卡：打印 / 存档 / 带走。全部真链接；打印随 device-off 如实置灰 -->
           <a class="xlane-go" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">
@@ -526,7 +564,10 @@
       <a class="backbtn" href="06-print-workbench.html" data-parent-label="打印扫描"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印扫描</span></span></a>
     <div class="actionbar-hint">
       <div data-at="s1"><div class="t">先说清扫的是什么，参数会跟着变</div><div class="s">选错也没关系，第 2 步还能改</div></div>
-      <div data-at="s2"><div class="t">按图示放好原件，再按机器面板上的实体键</div><div class="s">软件端不能替你启动走纸——这是硬件安全设计</div></div>
+      <div data-at="s2">
+        <div data-when="default first ai-down"><div class="t">按图示放好原件，再按机器面板上的实体键</div><div class="s">软件端不能替你启动走纸——这是硬件安全设计</div></div>
+        <div data-when="device-off"><div class="t">扫描仪离线，这台机器现在扫不了</div><div class="s">改用手机拍照上传，同样能存进「我的文档」</div></div>
+      </div>
       <div data-at="s3">
         <div data-when="default first ai-down"><div class="t">正在扫描，请不要抽走原件</div><div class="s">已采集 3 页 · 总页数要扫完才知道</div></div>
         <div data-when="device-off"><div class="t">扫描仪离线，已扫的 3 页已保留</div><div class="s">故障已上报，不需要你操作</div></div>
@@ -540,17 +581,17 @@
 
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3">取消本次扫描</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-fb="cancel">取消本次扫描</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s2">重扫某一页</button>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2">扫纸质简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-out="cta">扫纸质简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first ai-down">我已放好，开始扫<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-when="device-off" aria-disabled="true">扫描仪离线</button>
-    <button class="btn btn--primary" data-at="s3" aria-disabled="true" data-when="default first ai-down">扫描中…</button>
+    <a class="btn btn--primary" data-at="s2" data-when="device-off" href="05-phone-relay.html">改用手机拍照上传<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">不再加页 · 生成 PDF<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="device-off">看已扫的 3 页<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="default first">送 AI 诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="default first" data-fb="ai">送 AI 诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="06-print-workbench.html?stage=s3">拿去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off" data-fb="save">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
   </div>
 
   <nav class="navbar">
@@ -558,6 +599,16 @@
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
+
+  <!-- 结果反馈层：送诊断 / 取消扫描 / 存文档 点完必须有交代，并给返回入口 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-check" id="fb-use"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
 
 </div>
 </div>
@@ -567,18 +618,231 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
-/* s1「扫描成什么」：单选组。只改本次输出格式，不换阶段；
-   aria-pressed 由这里维护，置灰卡（ai-down 的 OCR）没有 data-fmt 参与不了选择 */
+/* ============================================================================
+   本次扫描的参数模型 —— 单一真值，所有显示都从它算出来。
+   为什么要有模型：早前四组参数（分辨率/色彩/来源/双面）与输出格式点了都只是
+   高亮，s3「扫完会得到什么」和 s4 的页数、大小、文件名是写死的 ——
+   结论与输入无因果，等于界面在演戏。现在页数由「张数 × 双面」算，
+   体积由「dpi × 色彩 × 页数」算，成品说明按色彩与 dpi 给，改哪一项都跟着变。
+   ========================================================================== */
 ;(function () {
-  var cards = [].slice.call(document.querySelectorAll('[data-fmt]'))
-  if (!cards.length) return
-  cards.forEach(function (c) {
-    c.addEventListener('click', function () {
-      cards.forEach(function (x) { x.setAttribute('aria-pressed', x === c ? 'true' : 'false') })
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var SHEETS = 3                       /* 已走纸的原件张数（s3 网格里那 3 张） */
+  var P = { kind: 'resume', dpi: '300', color: '灰度', src: 'adf', duplex: 'both', fmt: 'pdf' }
+
+  /* 三类原件的出厂预设：选「扫什么」会把四组参数一次带过去 */
+  var PRESET = {
+    resume: { dpi: '300', color: '灰度', src: 'adf',  duplex: 'both', nm: '纸质简历', cta: '扫纸质简历' },
+    id:     { dpi: '300', color: '彩色', src: 'flat', duplex: 'one',  nm: '证件',     cta: '扫证件' },
+    doc:    { dpi: '200', color: '灰度', src: 'adf',  duplex: 'both', nm: '普通文档', cta: '扫普通文档' }
+  }
+  /* 每页体积（MB）。数量级取自 A4 扫描常见值，只用于预估，页面已写明"预估" */
+  var MB = {
+    '200': { '黑白': 0.15, '灰度': 0.35, '彩色': 0.9 },
+    '300': { '黑白': 0.30, '灰度': 0.80, '彩色': 2.1 },
+    '600': { '黑白': 1.00, '灰度': 2.60, '彩色': 6.8 }
+  }
+  var FMT = { pdf: 'PDF', jpg: 'JPG 每页一张', ocr: '可检索 PDF' }
+
+  function pages () { return SHEETS * (P.duplex === 'both' ? 2 : 1) }
+  function size () {
+    var s = pages() * MB[P.dpi][P.color] * (P.fmt === 'jpg' ? 1.25 : P.fmt === 'ocr' ? 1.06 : 1)
+    return (s < 10 ? s.toFixed(1) : Math.round(s)) + ' MB'
+  }
+  function note () {
+    if (P.fmt === 'jpg') return '每页一张图，不合并成一份'
+    if (P.fmt === 'ocr') return '文字可搜索 · 图像送第三方识别'
+    if (P.color === '彩色') return '彩色件最大，发邮件前建议压缩'
+    if (P.color === '黑白') return '黑白最省空间，印章会失真'
+    if (P.dpi === '600') return '600dpi 存档级，文件明显变大'
+    if (P.dpi === '200') return '200dpi 够看清正文，识别率略降'
+    return '灰度 300dpi 最适合识别'
+  }
+  /* 只改第一个文本节点：主按钮里还挂着箭头 <svg>，用 textContent 会把图标抹掉 */
+  function set (name, v) {
+    var els = scr.querySelectorAll('[data-out="' + name + '"]')
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]
+      if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = v
+      else el.textContent = v
+    }
+  }
+  function setSeg (param, v) {
+    var f = scr.querySelector('.field[data-param="' + param + '"]')
+    if (!f) return
+    var bs = f.querySelectorAll('.seg button')
+    for (var i = 0; i < bs.length; i++) {
+      if (!bs[i].hasAttribute('data-v')) continue
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === v ? 'true' : 'false')
+    }
+  }
+
+  function render () {
+    var n = pages(), col = P.color + ' ' + P.dpi + 'dpi'
+    /* 参数卡头部：同屏就能看见这次会得到什么，不用等到下一步 */
+    var hd = scr.querySelectorAll('[data-out="hd"]')
+    if (hd[0]) hd[0].textContent = '预设 · ' + col + ' · ' + n + ' 页'
+    if (hd[1]) hd[1].textContent = '需确认 · ' + col + ' · ' + n + ' 页'
+    set('file', FMT[P.fmt] + ' · ' + col + ' · ' + n + ' 页 · ' + size())
+    set('note', note())
+    set('meta', 'A4 · ' + n + ' 页 · ' + col + ' · ' + size())
+    set('kvout', FMT[P.fmt] + ' · ' + col + ' · ' + n + ' 页')
+    set('kvlimit', P.src === 'adf' ? '送稿器 50 页' : '玻璃板 逐页扫')
+    set('cta', PRESET[P.kind].cta)
+    set('pf-dpi', P.dpi === '600' ? '600dpi · 存档级 · 文件大' : P.dpi === '200' ? '200dpi · 省空间 · 够看正文' : '300dpi · 识别效果最好')
+    set('pf-color', P.color === '彩色' ? '彩色 · 证件与印章保真' : P.color === '黑白' ? '黑白 · 文件最小' : '灰度 · 识别效果最好')
+    set('pf-src', P.src === 'adf' ? '送稿器 · 一次最多 50 页' : '玻璃板 · 不能自动双面')
+    set('pf-duplex', P.duplex === 'both' ? '两面都扫 · ' + n + ' 页' : '只扫正面 · ' + n + ' 页')
+
+    /* 玻璃板没有自动双面 —— 这是硬件事实，选了就得把双面锁掉并落回仅正面 */
+    var au = scr.querySelector('.field[data-param="duplex"] button[data-v="both"]')
+    if (au) {
+      if (P.src === 'flat') au.setAttribute('aria-disabled', 'true')
+      else au.removeAttribute('aria-disabled')
+    }
+    setSeg('dpi', P.dpi); setSeg('color', P.color); setSeg('src', P.src); setSeg('duplex', P.duplex)
+
+    /* 页数减半时，第 4–6 页的缩略图与预览页不再存在，不能继续摆在那儿 */
+    scr.classList.toggle('is-half', n <= 3)
+    var pg = scr.querySelectorAll('.pgno[data-pg]')
+    for (var i = 0; i < pg.length; i++) pg[i].textContent = pg[i].getAttribute('data-pg') + ' / ' + n
+    syncPage()
+
+    var kr = scr.querySelectorAll('[data-kindrow]')
+    for (var j = 0; j < kr.length; j++) kr[j].setAttribute('aria-current', kr[j].getAttribute('data-kindrow') === P.kind ? 'true' : 'false')
+    var kc = scr.querySelectorAll('[data-kind]')
+    for (var k = 0; k < kc.length; k++) kc[k].setAttribute('aria-pressed', kc[k].getAttribute('data-kind') === P.kind ? 'true' : 'false')
+  }
+
+  /* ── s4 预览翻页：缩略图与翻页键驱动同一个滚动容器（P06 同款） ── */
+  var stg = scr.querySelector('.paper-stage')
+  function sheets () {
+    return [].slice.call(scr.querySelectorAll('.paper-stage .sheet-a4')).filter(function (s) {
+      return !s.hidden && s.offsetParent !== null
     })
+  }
+  function curPage () {
+    var ss = sheets(), best = 0, min = 1e9
+    for (var i = 0; i < ss.length; i++) {
+      var d = Math.abs(ss[i].offsetTop - stg.offsetTop - stg.scrollTop)
+      if (d < min) { min = d; best = i }
+    }
+    return best
+  }
+  /* 翻页反馈必须当场发生：等平滑滚动结束再改页码，点下去那一刻界面是死的 */
+  function markPage (i) {
+    set('pgtotal', '第 ' + (i + 1) + ' / 共 ' + pages() + ' 页')
+    var th = [].slice.call(scr.querySelectorAll('.thumb'))
+    for (var k = 0; k < th.length; k++) th[k].setAttribute('aria-current', k === i ? 'true' : 'false')
+  }
+  function syncPage () {
+    if (!stg) return
+    markPage(Math.min(curPage(), Math.max(0, sheets().length - 1)))
+  }
+  function goPage (i) {
+    var ss = sheets(); if (!ss[i] || !stg) return
+    markPage(i)
+    stg.scrollTo({ top: ss[i].offsetTop - stg.offsetTop - 12, behavior: 'smooth' })
+  }
+  if (stg) stg.addEventListener('scroll', syncPage, { passive: true })
+
+  /* ── 结果反馈层 ── */
+  var fb = document.getElementById('fb')
+  function closeFb () { fb.hidden = true }
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    fb.className = 'fb' + (o.warn ? ' fb--warn' : '')
+    document.getElementById('fb-use').setAttribute('href', o.warn ? '#i-alert' : '#i-check')
+    var go = document.getElementById('fb-go')
+    go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', function () { closeFb(); if (b.go && window.v3Stage) window.v3Stage(b.go) })
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+  var FB = {
+    ai: function () {
+      return {
+        t: '已送去 AI 简历诊断',
+        p: '任务 <b>#SC-0947-31</b> 的 ' + pages() + ' 页扫描件已提交，<b>第 3 页置信 62% 已自动排除</b>。<br>约 40 秒出结果，免费，结果进「我的简历」。诊断只读你的材料，不外发。',
+        go: [
+          { t: '去简历工作台看诊断', href: '09-resume-workbench.html', primary: true },
+          { t: '留在扫描结果页' }
+        ]
+      }
+    },
+    cancel: function () {
+      return {
+        warn: true,
+        t: '取消后，已扫的 3 页会被销毁',
+        p: '本次任务 <b>#SC-0947-31</b> 作废，<b>已采集的 3 页图像即刻销毁</b>，不会留在本机也不会进「我的文档」。<br>取消后回到放置指引，原件不用取出，可以重新开始扫。',
+        go: [
+          { t: '确认取消 · 回上一步', go: 's2', primary: true },
+          { t: '继续扫描' }
+        ]
+      }
+    },
+    save: function () {
+      return {
+        t: '已存进「我的文档」',
+        p: '扫描件 <b>扫描_20260808_0947.pdf</b>（' + pages() + ' 页）已存好。凭手机号在任一台空闲机器登录就能取回，<b>文件跟人走，不跟机器走</b>。<br>证件类扫描件默认 7 天到期清理。',
+        go: [
+          { t: '去「我的」查看', href: '23-me.html', primary: true },
+          { t: '留在这一页' }
+        ]
+      }
+    }
+  }
+
+  /* ── 事件 ── */
+  scr.addEventListener('click', function (e) {
+    var seg = e.target.closest('.field[data-param] .seg button[data-v]')
+    if (seg) {
+      var p = seg.closest('.field').getAttribute('data-param')
+      P[p] = seg.getAttribute('data-v')
+      if (p === 'src' && P.src === 'flat') P.duplex = 'one'   /* 玻璃板不能自动双面 */
+      render(); return
+    }
+    var kind = e.target.closest('[data-kind]')
+    if (kind) {
+      var k = kind.getAttribute('data-kind'), pre = PRESET[k]
+      P.kind = k; P.dpi = pre.dpi; P.color = pre.color; P.src = pre.src; P.duplex = pre.duplex
+      render(); return
+    }
+    var fmt = e.target.closest('[data-fmt]')
+    if (fmt) {
+      P.fmt = fmt.getAttribute('data-fmt')
+      var cs = scr.querySelectorAll('[data-fmt]')
+      for (var i = 0; i < cs.length; i++) cs[i].setAttribute('aria-pressed', cs[i] === fmt ? 'true' : 'false')
+      render(); return
+    }
+    var th = e.target.closest('.thumb')
+    if (th) { goPage([].slice.call(scr.querySelectorAll('.thumb')).indexOf(th)); return }
+    var pb = e.target.closest('.paper-bar .pgbtn')
+    if (pb) {
+      var bs = [].slice.call(scr.querySelectorAll('.paper-bar .pgbtn'))
+      goPage(Math.max(0, Math.min(sheets().length - 1, curPage() + (bs.indexOf(pb) === 0 ? -1 : 1))))
+      return
+    }
+    var f = e.target.closest('[data-fb]')
+    if (f) { openFb(FB[f.getAttribute('data-fb')]()); return }
   })
+  fb.addEventListener('click', function (e) { if (e.target === fb) closeFb() })
+
+  render()
+  addEventListener('load', render)
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

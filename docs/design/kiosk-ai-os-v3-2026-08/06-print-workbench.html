@@ -24,10 +24,135 @@
   .chip--info { cursor: inherit; }
   /* s1 六卡里被设备离线拦下的卡：置灰 + 不可点，原因写在卡面 chip 上 */
   .src[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+
+  /* ════════ 2026-08-10 Codex 走查整改 ════════
+     走查第一名：「上传入口根本不收文件」—— 六卡里前三张一按就跳到「材料体检」，
+     中间没有任何选取动作，用户不知道体检的是哪一份。补两条门控轴：
+       data-src  = none | local | phone | phone-got | usb | usb-in
+       data-file = none | on
+     不能用 hidden：stage.js 的 applyVisibility() 独占 hidden，一切四态就把门控盖掉
+     （本页核价门控早前踩过这个坑，所以那里也是 data-gate + class）。 */
+  .screen[data-src="none"]      [data-src]:not([data-src~="none"]),
+  .screen[data-src="local"]     [data-src]:not([data-src~="local"]),
+  .screen[data-src="phone"]     [data-src]:not([data-src~="phone"]),
+  .screen[data-src="phone-got"] [data-src]:not([data-src~="phone-got"]),
+  .screen[data-src="usb"]       [data-src]:not([data-src~="usb"]),
+  .screen[data-src="usb-in"]    [data-src]:not([data-src~="usb-in"]),
+  .screen[data-file="none"]     [data-file]:not([data-file~="none"]),
+  .screen[data-file="on"]       [data-file]:not([data-file~="on"]),
+  .screen[data-off="ask"]       [data-off]:not([data-off~="ask"]),
+  .screen[data-off="keep"]      [data-off]:not([data-off~="keep"]),
+  .screen[data-off="refund"]    [data-off]:not([data-off~="refund"]),
+  .screen[data-off="fixed"]     [data-off]:not([data-off~="fixed"]),
+  .screen[data-done="none"]     [data-done]:not([data-done~="none"]),
+  .screen[data-done="save"]     [data-done]:not([data-done~="save"]),
+  .screen[data-done="phone"]    [data-done]:not([data-done~="phone"]),
+  .screen[data-done="again"]    [data-done]:not([data-done~="again"]),
+  .screen[data-done="issue"]    [data-done]:not([data-done~="issue"]),
+  .screen[data-done="issue-sent"] [data-done]:not([data-done~="issue-sent"]),
+  .screen[data-done="rated"]    [data-done]:not([data-done~="rated"]) { display: none !important; }
+
+  .pickwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+  .pickbar { display: flex; align-items: center; gap: var(--s-4); flex: 0 0 auto; }
+  .pickbar-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
+    font-weight: 600; display: inline-flex; align-items: center; gap: 10px; }
+  .pickbar-t .ic { width: 24px; height: 24px; color: var(--jade-500); }
+  .pickbar-s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+
+  .filelist { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: var(--s-3); }
+  .filerow { text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui);
+    min-height: 92px; padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    display: flex; align-items: center; gap: var(--s-5);
+    transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+  .filerow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+  .filerow:active { transform: translateY(1px) scale(.997); }
+  .filerow[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .fr-ic { width: 46px; height: 46px; flex: 0 0 auto; border-radius: var(--r-xs);
+    background: var(--fog-a08); display: grid; place-items: center; }
+  .fr-ic .ic { width: 23px; height: 23px; color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-ic { background: var(--jade-a20); }
+  .filerow[aria-pressed="true"] .fr-ic .ic { color: var(--jade-500); }
+  .fr-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .fr-nm { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .fr-mt { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .03em; }
+  .fr-pick { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-2); color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-pick { color: var(--jade-600); font-weight: 700; }
+
+  .picked { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-5);
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .picked-ic { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%;
+    background: var(--jade-a20); display: grid; place-items: center; }
+  .picked-ic .ic { width: 22px; height: 22px; color: var(--jade-500); }
+  .picked-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .picked-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .picked-m { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; }
+
+  .relay { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--s-6); align-items: stretch;
+    padding: var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd); }
+  .miniqr { flex: 0 0 auto; width: 208px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .miniqr-box { width: 190px; height: 190px; border-radius: var(--r-sm); background: #fff;
+    display: grid; place-items: center; padding: 12px; box-shadow: var(--sh-2); }
+  .miniqr-box svg { width: 100%; height: 100%; }
+  .miniqr-cap { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .1em; }
+  .relay-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column;
+    gap: var(--s-4); justify-content: space-between; }
+  .relay-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); font-weight: 600; }
+
+  /* 来源回执：参数阶段顶部，让用户先确认「是不是这份」 */
+  .receipt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .receipt .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .receipt-t { font-size: var(--fz-3); color: var(--fog-900); }
+  .receipt-a { margin-left: auto; flex: 0 0 auto; }
+
+  /* 折叠块：长说明压成一行摘要，展开才给全文。合规原文一字不删。 */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+    display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+    font-size: var(--fz-2); color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+  /* 本机 Chrome 里 <details> 关着时子节点仍有布局盒，自检会报卡内溢出。显式收掉。 */
+  .fold:not([open]) .fold-b { display: none; }
+
+  /* 右栏最后一张卡撑到栏底：把「卡片外的背景空洞」变成「卡片内的呼吸感」。
+     只动布局，不塞任何填充物 —— 哪张卡是最后一张随阶段变，靠页尾脚本打标。 */
+  .wside > .pane--tailgrow { flex: 1 1 auto; min-height: 0; }
+
+  /* U 盘「未插入」原来整块垂直居中，卡底空 432px。改成内容靠上、演示开关贴底。 */
+  .pickwrap > .locked { justify-content: flex-start; }
+  .pickwrap > .locked > .cash-demo { margin-top: auto; }
+
+  /* 取件页：每个动作点完必须给出结果，不能点了就没下文 */
+  .doneline { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32);
+    font-size: var(--fz-3); color: var(--fog-900); }
+  .doneline .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .doneline--amber { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .doneline--amber .ic { color: var(--amber-500); }
+  .doneline .btn { margin-left: auto; }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
+<!-- 原型示意码：不是可扫的真码，只表达「这里会出一个二维码」。真实系统由服务端一次性会话签发。 -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="i-qrdemo" viewBox="0 0 25 25" shape-rendering="crispEdges">
+    <path d="M.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M18.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="20" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M.5 18.5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="20" width="3" height="3" fill="#101613"/>
+    <path fill="#101613" d="M9 0h1v1h-1z M10 0h1v1h-1z M11 0h1v1h-1z M12 0h1v1h-1z M15 0h1v1h-1z M16 0h1v1h-1z M11 1h1v1h-1z M15 1h1v1h-1z M9 2h1v1h-1z M10 2h1v1h-1z M15 2h1v1h-1z M16 2h1v1h-1z M11 3h1v1h-1z M14 3h1v1h-1z M15 3h1v1h-1z M9 4h1v1h-1z M11 4h1v1h-1z M14 4h1v1h-1z M15 4h1v1h-1z M9 5h1v1h-1z M10 5h1v1h-1z M13 5h1v1h-1z M14 5h1v1h-1z M15 5h1v1h-1z M16 5h1v1h-1z M10 6h1v1h-1z M12 6h1v1h-1z M14 6h1v1h-1z M16 6h1v1h-1z M10 7h1v1h-1z M11 7h1v1h-1z M12 7h1v1h-1z M14 7h1v1h-1z M9 8h1v1h-1z M12 8h1v1h-1z M15 8h1v1h-1z M16 8h1v1h-1z M3 9h1v1h-1z M4 9h1v1h-1z M5 9h1v1h-1z M7 9h1v1h-1z M8 9h1v1h-1z M10 9h1v1h-1z M11 9h1v1h-1z M12 9h1v1h-1z M14 9h1v1h-1z M15 9h1v1h-1z M16 9h1v1h-1z M17 9h1v1h-1z M19 9h1v1h-1z M20 9h1v1h-1z M22 9h1v1h-1z M24 9h1v1h-1z M0 10h1v1h-1z M3 10h1v1h-1z M4 10h1v1h-1z M6 10h1v1h-1z M7 10h1v1h-1z M9 10h1v1h-1z M10 10h1v1h-1z M12 10h1v1h-1z M14 10h1v1h-1z M15 10h1v1h-1z M16 10h1v1h-1z M21 10h1v1h-1z M22 10h1v1h-1z M0 11h1v1h-1z M3 11h1v1h-1z M4 11h1v1h-1z M8 11h1v1h-1z M9 11h1v1h-1z M10 11h1v1h-1z M13 11h1v1h-1z M14 11h1v1h-1z M15 11h1v1h-1z M18 11h1v1h-1z M20 11h1v1h-1z M22 11h1v1h-1z M0 12h1v1h-1z M3 12h1v1h-1z M6 12h1v1h-1z M8 12h1v1h-1z M20 12h1v1h-1z M22 12h1v1h-1z M24 12h1v1h-1z M0 13h1v1h-1z M2 13h1v1h-1z M3 13h1v1h-1z M4 13h1v1h-1z M5 13h1v1h-1z M10 13h1v1h-1z M12 13h1v1h-1z M13 13h1v1h-1z M15 13h1v1h-1z M17 13h1v1h-1z M20 13h1v1h-1z M21 13h1v1h-1z M22 13h1v1h-1z M23 13h1v1h-1z M24 13h1v1h-1z M6 14h1v1h-1z M7 14h1v1h-1z M9 14h1v1h-1z M11 14h1v1h-1z M18 14h1v1h-1z M20 14h1v1h-1z M23 14h1v1h-1z M0 15h1v1h-1z M2 15h1v1h-1z M7 15h1v1h-1z M11 15h1v1h-1z M12 15h1v1h-1z M15 15h1v1h-1z M17 15h1v1h-1z M18 15h1v1h-1z M22 15h1v1h-1z M24 15h1v1h-1z M2 16h1v1h-1z M3 16h1v1h-1z M4 16h1v1h-1z M5 16h1v1h-1z M6 16h1v1h-1z M7 16h1v1h-1z M8 16h1v1h-1z M11 16h1v1h-1z M12 16h1v1h-1z M13 16h1v1h-1z M16 16h1v1h-1z M18 16h1v1h-1z M21 16h1v1h-1z M14 17h1v1h-1z M15 17h1v1h-1z M18 17h1v1h-1z M19 17h1v1h-1z M22 17h1v1h-1z M24 17h1v1h-1z M9 18h1v1h-1z M10 18h1v1h-1z M12 18h1v1h-1z M13 18h1v1h-1z M17 18h1v1h-1z M18 18h1v1h-1z M19 18h1v1h-1z M20 18h1v1h-1z M23 18h1v1h-1z M11 19h1v1h-1z M12 19h1v1h-1z M14 19h1v1h-1z M15 19h1v1h-1z M17 19h1v1h-1z M20 19h1v1h-1z M21 19h1v1h-1z M22 19h1v1h-1z M24 19h1v1h-1z M10 20h1v1h-1z M13 20h1v1h-1z M15 20h1v1h-1z M22 20h1v1h-1z M23 20h1v1h-1z M24 20h1v1h-1z M10 21h1v1h-1z M11 21h1v1h-1z M12 21h1v1h-1z M13 21h1v1h-1z M14 21h1v1h-1z M16 21h1v1h-1z M17 21h1v1h-1z M18 21h1v1h-1z M20 21h1v1h-1z M22 21h1v1h-1z M23 21h1v1h-1z M24 21h1v1h-1z M9 22h1v1h-1z M14 22h1v1h-1z M18 22h1v1h-1z M19 22h1v1h-1z M20 22h1v1h-1z M22 22h1v1h-1z M23 22h1v1h-1z M11 23h1v1h-1z M12 23h1v1h-1z M13 23h1v1h-1z M16 23h1v1h-1z M19 23h1v1h-1z M20 23h1v1h-1z M22 23h1v1h-1z M23 23h1v1h-1z M24 23h1v1h-1z M9 24h1v1h-1z M10 24h1v1h-1z M13 24h1v1h-1z M15 24h1v1h-1z M16 24h1v1h-1z M17 24h1v1h-1z M18 24h1v1h-1z M19 24h1v1h-1z M20 24h1v1h-1z M21 24h1v1h-1z M22 24h1v1h-1z M23 24h1v1h-1z M24 24h1v1h-1z"/>
+  </symbol>
+</svg>
 
 <div class="stage">
 <div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm">
@@ -75,50 +200,52 @@
       <!-- S1 六卡选择器：怎么把文件带进来（2 列 3 行，每卡 ≥150px）。
            前三卡在本页继续第 2 步；后三卡是去对应台面的真链接（a 标签，非装饰）。
            device-off 时扫描原件 / 复印置灰 —— 扫描与打印同一台机，离线一起停。 -->
-      <div class="sources" data-at="s1" style="grid-auto-rows:minmax(150px,1fr)">
-        <button class="src" data-go="s2">
+      <!-- 2026-08-10 Codex 整改：前三张原来是 data-go="s2"，一按就跳「材料体检」——
+           中间没有任何选取动作，用户不知道体检的是哪一份。改成先开取件层，选中一份才能往下走。 -->
+      <div class="sources" data-at="s1" data-src="none" style="grid-auto-rows:minmax(150px,1fr)">
+        <button class="src" data-src-go="local">
           <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
           <span class="src-nm">本机上传</span>
-          <span class="src-ds">用本机键盘选择文件。支持 PDF / JPG / PNG。</span>
+          <span class="src-ds">本机选文件 · PDF / JPG / PNG</span>
           <span class="src-tag"><span class="chip chip--jade">最常用</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-src-go="phone">
           <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="src-nm">手机扫码传</span>
-          <span class="src-ds">扫屏幕上的码，从手机把文件传过来，不用插任何东西。</span>
+          <span class="src-ds">扫屏上的码，从手机传过来</span>
           <span class="src-tag"><span class="chip">一次性会话</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-src-go="usb">
           <span class="src-ic"><svg class="ic"><use href="#i-usb"/></svg></span>
           <span class="src-nm">U 盘导入</span>
-          <span class="src-ds">插入右侧 USB 口，选择要打印的文件。</span>
+          <span class="src-ds">插右侧 USB 口，选要打的文件</span>
           <span class="src-tag"><span class="chip" data-when="default first ai-down">已识别 1 个设备</span><span class="chip" data-when="device-off">未检测到设备</span></span>
         </button>
-        <a class="src" href="07-scan-workbench.html" data-when="default first ai-down">
+        <a class="src" href="07-scan-workbench.html" data-when="default first ai-down" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
           <span class="src-nm">扫描原件</span>
           <span class="src-ds">纸质原件放玻璃板或送稿器，扫成 PDF 再回来打印。</span>
           <span class="src-tag"><span class="chip chip--jade">去扫描工作台</span></span>
         </a>
-        <button class="src" aria-disabled="true" data-when="device-off">
+        <button class="src" aria-disabled="true" data-when="device-off" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
           <span class="src-nm">扫描原件</span>
           <span class="src-ds">扫描与打印是同一台机，离线一起停，已上报运维。</span>
           <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
         </button>
-        <a class="src" href="07-scan-workbench.html?stage=s2" data-when="default first ai-down">
+        <a class="src" href="07-scan-workbench.html?stage=s2" data-when="default first ai-down" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
           <span class="src-nm">复印</span>
           <span class="src-ds">纸质原件复一份：先扫描后打印，一台机上完成。</span>
           <span class="src-tag"><span class="chip">先扫后打</span></span>
         </a>
-        <button class="src" aria-disabled="true" data-when="device-off">
+        <button class="src" aria-disabled="true" data-when="device-off" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
           <span class="src-nm">复印</span>
           <span class="src-ds">复印要出纸，打印机离线时做不了，已上报运维。</span>
           <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
         </button>
-        <a class="src" href="29-id-photo.html">
+        <a class="src" href="29-id-photo.html" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
           <span class="src-nm">证件照排版</span>
           <span class="src-ds">证件照排成 A4 版面，打印后按裁切线剪开。</span>
@@ -127,7 +254,7 @@
       </div>
 
       <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
-      <div class="xlane" data-at="s1">
+      <div class="xlane" data-at="s1" data-src="none">
         <span class="xlane-hd">不打印，只处理文件？这两个台面也在这里</span>
         <div class="xlane-row">
           <a class="xlane-go" href="07-scan-workbench.html">
@@ -149,6 +276,166 @@
         </div>
       </div>
 
+      <!-- ── S1-b 本机上传：真的列出可选文件，选中才算数 ── -->
+      <div class="pickwrap" data-at="s1" data-src="local">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-upload"/></svg>选一个文件</span>
+          <span class="pickbar-s">只列 PDF / JPG / PNG</span>
+        </div>
+        <div class="filelist">
+          <button class="filerow" data-file-go="f1" aria-pressed="false"
+                  data-nm="个人简历.pdf" data-mt="PDF · A4 · 3 页 · 1.2 MB" data-pg="3 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">个人简历.pdf</span>
+              <span class="fr-mt">PDF · A4 · 3 页 · 1.2 MB · 今天 09:43</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f2" aria-pressed="false"
+                  data-nm="毕业证明扫描件.pdf" data-mt="PDF · A4 · 2 页 · 3.4 MB" data-pg="2 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">毕业证明扫描件.pdf</span>
+              <span class="fr-mt">PDF · A4 · 2 页 · 3.4 MB · 8 月 6 日</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f3" aria-pressed="false"
+                  data-nm="证件照.jpg" data-mt="JPG · 1 页 · 2.1 MB" data-pg="1 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">证件照.jpg</span>
+              <span class="fr-mt">JPG · 1 页 · 2.1 MB · 今天 09:12</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+        </div>
+        <div class="picked" data-file="on">
+          <span class="picked-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="picked-b">
+            <span class="picked-t">已选中：<b data-picked-nm>个人简历.pdf</b></span>
+            <span class="picked-m" data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span>
+          </span>
+          <button class="btn btn--ghost" style="margin-left:auto" data-file-go="none">换一份</button>
+        </div>
+        <div class="notice" data-file="none">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>还没选文件。点上面任意一行，选中后才会进材料体检。</span>
+        </div>
+      </div>
+
+      <!-- ── S1-b 手机扫码传：出码 → 等待 → 已收到 1 份 ── -->
+      <div class="pickwrap" data-at="s1" data-src="phone phone-got">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-qr"/></svg>手机扫码传</span>
+          <span class="pickbar-s">一次性会话 · 5 分钟内有效</span>
+        </div>
+        <div class="relay">
+          <span class="miniqr">
+            <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码 · 不是可扫的真码</span>
+          </span>
+          <span class="relay-b">
+            <span class="relay-t" data-src="phone">等你在手机上选文件</span>
+            <span class="relay-t" data-src="phone-got">已收到 1 份</span>
+            <div class="kv" data-src="phone">
+              <div class="kv-row"><span class="k">第 1 步</span><span class="v">用微信或相机扫这个码</span></div>
+              <div class="kv-row"><span class="k">第 2 步</span><span class="v">在手机上选要打的文件</span></div>
+              <div class="kv-row"><span class="k">第 3 步</span><span class="v">传输页保持常亮到提示完成</span></div>
+              <div class="kv-row"><span class="k">状态</span><span class="v" style="color:var(--amber-600)">等待中 · 还没收到文件</span></div>
+            </div>
+            <div class="kv" data-src="phone-got">
+              <div class="kv-row"><span class="k">文件名</span><span class="v">个人简历.pdf</span></div>
+              <div class="kv-row"><span class="k">格式与页数</span><span class="v">PDF · A4 · 3 页</span></div>
+              <div class="kv-row"><span class="k">大小</span><span class="v">1.2 MB · 完整</span></div>
+              <div class="kv-row"><span class="k">来源</span><span class="v">手机扫码传 · 09:43</span></div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap" data-src="phone-got">
+              <button class="btn btn--primary" data-file-go="f1" data-go="s2">用这份，去体检</button>
+              <button class="btn btn--ghost" data-src-go="phone">重新出码换一份</button>
+            </div>
+            <!-- 到没到是服务端推的，不是用户按的；给评审一个可切开关，标 data-review -->
+            <div class="cash-demo" data-review style="position:static;justify-content:flex-start">
+              <span style="width:100%;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 · 切接力处境（真实系统由服务端推送）</span>
+              <button data-src-go="phone">等待中</button>
+              <button data-src-go="phone-got">已收到</button>
+            </div>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── S1-b U 盘导入：未插入 / 已插入两态 ── -->
+      <div class="pickwrap" data-at="s1" data-src="usb usb-in">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-usb"/></svg>U 盘导入</span>
+          <span class="pickbar-s">USB 口在屏幕右下侧</span>
+        </div>
+        <div class="locked" data-src="usb" style="flex:1 1 auto">
+          <svg class="ic"><use href="#i-usb"/></svg>
+          <b>还没检测到 U 盘</b>
+          <p>把 U 盘插进屏幕右下侧的 USB 口，插好后这里自动列出文件。</p>
+          <div class="kv" style="width:min(360px,100%);text-align:left">
+            <div class="kv-row"><span class="k">接口</span><span class="v">USB-A · 屏幕右下侧</span></div>
+            <div class="kv-row"><span class="k">支持格式</span><span class="v">PDF / JPG / PNG</span></div>
+            <div class="kv-row"><span class="k">读取范围</span><span class="v">只读你选中的那一个文件</span></div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn--ghost" data-src-go="phone">没带 U 盘？用手机扫码传</button>
+            <button class="btn btn--ghost" data-src-go="local">用本机上传</button>
+          </div>
+          <!-- 插没插是硬件事件，不是用户在界面上按的 -->
+          <div class="cash-demo" data-review style="position:static;justify-content:center">
+            <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 · 切 U 盘处境（真实系统由终端硬件事件驱动）</span>
+            <button data-src-go="usb">未插入</button>
+            <button data-src-go="usb-in">已插入</button>
+          </div>
+        </div>
+        <div class="filelist" data-src="usb-in">
+          <button class="filerow" data-file-go="u1" aria-pressed="false"
+                  data-nm="简历_最终版.pdf" data-mt="PDF · A4 · 2 页 · 0.9 MB" data-pg="2 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">简历_最终版.pdf</span>
+              <span class="fr-mt">PDF · A4 · 2 页 · 0.9 MB · U 盘根目录</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="u2" aria-pressed="false"
+                  data-nm="在校证明.jpg" data-mt="JPG · 1 页 · 1.6 MB" data-pg="1 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">在校证明.jpg</span>
+              <span class="fr-mt">JPG · 1 页 · 1.6 MB · /材料 目录</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+        </div>
+        <div class="picked" data-src="usb-in" data-file="on">
+          <span class="picked-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="picked-b">
+            <span class="picked-t">已选中：<b data-picked-nm>简历_最终版.pdf</b></span>
+            <span class="picked-m" data-picked-mt>PDF · A4 · 2 页 · 0.9 MB</span>
+          </span>
+          <button class="btn btn--ghost" style="margin-left:auto" data-file-go="none">换一份</button>
+        </div>
+        <div class="notice" data-src="usb-in" data-file="none">
+          <svg class="ic"><use href="#i-usb"/></svg>
+          <span>已识别 U 盘「Kingston 32G」，共 2 个可打印文件。选中一个才会读取。</span>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 材料交接：别的台面（简历工作台 / 招聘会作战台 / 岗位清单）把材料送过来时，
+           参数阶段顶上先出一张来源回执 —— 让用户确认「是不是这份」，而不是直接开始调份数。 -->
+      <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <span class="receipt-t">本次来自：<b>简历工作台 · 诊断报告</b> · <b>3 页</b> · 09:43 送达</span>
+        <span class="receipt-a"><a class="btn btn--quiet" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
+      </div>
+
       <!-- S2–S4 体检结论 -->
       <div class="checks" data-at="s2 s3 s4">
         <div class="checks-hd">
@@ -168,7 +455,7 @@
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>字体已嵌入，不会缺字</span>
         </div>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>体检与参数预填服务中断。文件预览、参数设置、核价与出纸都不受影响，参数需要你自己确认。</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>体检与预填中断 · 预览、参数、核价、出纸都不受影响</span>
         </div>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>先回第 1 步把文件送进来，体检结果会显示在这里。</span>
@@ -253,7 +540,7 @@
           <span class="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
         </div>
 
-        <div class="cash-mode" data-pay="wait expired query">
+        <div class="cash-mode" data-pay="wait scan expired query">
           <button data-pay-btn="wait" aria-pressed="true"><svg class="ic"><use href="#i-qr"/></svg>屏上出码，你扫</button>
           <button data-pay-btn="scan"><svg class="ic"><use href="#i-scan"/></svg>你出码，本机扫</button>
         </div>
@@ -307,22 +594,26 @@
 
         <div class="notice" data-pay="confirm" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>渠道回传通常几秒内到。<b>如果你手机已显示付款成功但这里没动</b>，
-            按「我已付款，帮我查」——本机会按订单号主动查一次，不需要你再付一遍。
-            同一笔订单本机只接受一次收款；重复到账会自动退回原路。</span>
+          <span>手机已付但这里没动？按「我已付款，帮我查」<b>，不要再付一遍</b>。</span>
         </div>
+        <details class="fold" data-pay="confirm" style="max-width:40em">
+          <summary>会不会被收两次</summary>
+          <div class="fold-b">同一笔订单本机只接受一次收款；重复到账会自动退回原路。渠道回传通常几秒内到。</div>
+        </details>
 
         <div class="notice notice--amber" data-pay="query" style="max-width:40em">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>查单有三种结果：<b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
-            <b>渠道说处理中</b>→ 本机不会替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。
-            <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
+          <span>查单有三种结果 <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
         </div>
+        <details class="fold" data-pay="query" style="max-width:40em">
+          <summary>三种结果分别怎么处理</summary>
+          <div class="fold-b"><b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
+            <b>渠道说处理中</b>→ 本机不替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。</div>
+        </details>
 
         <div class="notice" data-pay="closed" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>关单时二维码已同步作废，之后扫它不会成功。文件还在本次会话里，
-            可以回上一步重新下单；离场或会话结束会自动清空。</span>
+          <span>二维码已同步作废 · <b>文件还在本次会话里</b>，可以重新下单。</span>
         </div>
 
         <div class="cash-demo" data-review>
@@ -358,31 +649,42 @@
 
         <div class="notice notice--amber" data-job="queued" style="max-width:40em">
           <svg class="ic"><use href="#i-clock"/></svg>
-          <span>前面还有 <b>2 单</b>，约 3 分钟。<b>钱已经收了，不会重复收</b>；
-            排队期间你可以离开，凭取件码回来打，也可以在这里等。
-            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</span>
+          <span>前面 <b>2 单</b>，约 3 分钟 · <b>钱已收，不会重复收</b>。</span>
         </div>
+        <details class="fold" data-job="queued" style="max-width:40em">
+          <summary>排队期间能离开吗</summary>
+          <div class="fold-b">可以，凭取件码回来打，也可以在这里等。
+            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</div>
+        </details>
 
         <div class="notice" data-job="checking" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>正在检查这份文件能不能真的打出来：页数、字体是否内嵌、有没有加密、幅面是否 A4。
-            <b>这一步在出纸之前</b> —— 宁可现在拦住，也不要出到第 7 页才发现字体丢了。</span>
+          <span>正在检查页数、字体内嵌、加密、幅面 —— <b>都在出纸之前</b>。</span>
         </div>
+        <details class="fold" data-job="checking" style="max-width:40em">
+          <summary>为什么要多这一步</summary>
+          <div class="fold-b">宁可现在拦住，也不要出到第 7 页才发现字体丢了 —— 那时纸和钱都已经花掉。</div>
+        </details>
 
         <div class="notice notice--coral" data-job="checkfail" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>校验没通过：第 2 页有一处字体没内嵌，打出来会变成方框。</b>没有出任何纸，也没有扣这一单的钱
-            （已收的 3.00 元会<b>原路退回</b>，1–3 个工作日到账，退款记录进「我的 · 打印订单」）。<br>
-            两条路：<b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；
-            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。</span>
+          <span><b>第 2 页字体没内嵌，打出来会是方框。</b>没出纸，已原路退款 3.00 元。</span>
         </div>
+        <details class="fold" data-job="checkfail" style="max-width:40em">
+          <summary>两条路怎么选</summary>
+          <div class="fold-b"><b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；
+            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。<br>
+            退款 1–3 个工作日到账，记录进「我的 · 打印订单」。</div>
+        </details>
 
         <div class="notice notice--coral" data-job="timeout" style="max-width:40em">
           <svg class="ic"><use href="#i-clock"/></svg>
-          <span><b>超过 10 分钟没能开始出纸，已自动转成待打印订单。</b>钱不退也不重复收 ——
-            凭取件码 <b>7742 106 358</b> 在任一台空闲机器直接打，7 天内有效。<br>
-            如果你不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</span>
+          <span><b>超 10 分钟未开始，已转待打印订单。</b>凭取件码 <b>7742 106 358</b> 打，7 天内有效。</span>
         </div>
+        <details class="fold" data-job="timeout" style="max-width:40em">
+          <summary>不想打了怎么退</summary>
+          <div class="fold-b">钱不退也不重复收。不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</div>
+        </details>
 
         <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
           <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
@@ -402,46 +704,134 @@
           </svg>
           <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 面</span></div></div>
         </div>
+        <!-- 2026-08-10 Codex :414：卡纸态原来只有一句「等你取出卡纸」和一个禁用主按钮，
+             用户处理完了没有地方告诉机器。补一个「已处理 · 继续」。 -->
+        <div data-when="default first ai-down" data-job="jam" data-off="ask keep"
+             style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
+          <button class="btn btn--primary" data-off-go="fixed"><svg class="ic"><use href="#i-check"/></svg>已处理 · 继续打剩余 12 面</button>
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，按未出页数退款</button>
+        </div>
+        <div class="doneline" data-when="default first ai-down" data-job="jam" data-off="fixed" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已收到「卡纸已处理」· 正在重新送纸，从第 4 面继续 · <b>不重复收费</b></span>
+          <button class="btn btn--quiet" data-off-go="ask">还是没好</button>
+        </div>
+        <div class="doneline doneline--amber" data-when="default first ai-down" data-job="jam" data-off="refund" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已提交退款 <b>2.40 元</b>（未出 12 面）· 已出 3 面不退 · 原渠道 1–3 个工作日到账</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成继续打</button>
+        </div>
+        <div class="notice" data-when="default first ai-down" data-job="jam" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>卡纸已暂停在第 4 面。<b>剩余份数已保留</b>，处理完按上面的按钮告诉本机。</span>
+        </div>
         <div class="notice" data-when="default first ai-down" data-job="printing" style="max-width:40em">
           <svg class="ic"><use href="#i-printer"/></svg>
-          <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
-            凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
+          <span>请在取纸口等待 · <b>已开始的这一份不可取消</b>。</span>
         </div>
+        <details class="fold" data-when="default first ai-down" data-job="printing" style="max-width:40em">
+          <summary>中途卡纸或超时会怎样</summary>
+          <div class="fold-b">卡纸会自动暂停并保留剩余份数，凭取件码可在任一台空闲机器续打。
+            任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</div>
+        </details>
         <!-- 2026-08-09 Codex 整改：中途离线文案只在真的出过纸的处境(printing/jam)出现,
              排队/校验/超时各有自己的 0 面与退款事实,不能被这段"已出 3 面"覆盖。 -->
+        <!-- 2026-08-10 Codex :414：原文让用户在「继续打 / 退款」里选，页面却没有这两个按钮。
+             把两条路做成真按钮；决定之后给结果条，不是点了就没下文。 -->
         <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>打印机中途离线，已暂停。你已经付过的钱不会再扣一次。</b>剩余 12 面有两条路，你选：<br>
-            · <b>继续打</b>：剩余份数保留为待打印订单，凭取件码在任一台空闲机器续打，不再收费。<br>
-            · <b>不打了</b>：按<b>未出的 12 面</b>退 2.40 元，已出的 3 面不退；退款走原渠道，1–3 个工作日到账。<br>
-            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</span>
+          <span><b>打印机中途离线，已暂停。已付的钱不会再扣一次。</b>剩余 12 面，两条路你选一条。</span>
         </div>
-        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机<b>不会自己替你决定退还是续打</b>。你离场未选择时，订单默认转为待打印保留 7 天，
-            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。</span>
+        <div data-when="device-off" data-job="printing jam" data-off="ask fixed"
+             style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
+          <button class="btn btn--primary" data-off-go="keep"><svg class="ic"><use href="#i-ticket"/></svg>保留待打印（凭取件码续打，不再收费）</button>
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>按未出页数退款（退 12 面 · 2.40 元）</button>
         </div>
+        <div class="doneline" data-when="device-off" data-job="printing jam" data-off="keep" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已保留为待打印订单 · 取件码 <b>7742 106 358</b> · 7 天内任一台空闲机器续打，不再收费</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成退款</button>
+        </div>
+        <div class="doneline doneline--amber" data-when="device-off" data-job="printing jam" data-off="refund" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已提交退款 <b>2.40 元</b>（未出 12 面）· 已出 3 面不退 · 原渠道 1–3 个工作日到账</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成续打</button>
+        </div>
+        <details class="fold" data-when="device-off" data-job="printing jam" style="max-width:40em">
+          <summary>不选会怎样</summary>
+          <div class="fold-b">本机<b>不会自己替你决定</b>。离场未选择时，订单默认转为待打印保留 7 天，
+            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。
+            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</div>
+        </details>
       </div>
 
       <!-- S6 取件 -->
+      <!-- 2026-08-10 Codex :433：四个动作（存文档 / 发手机 / 再打一份 / 打印有问题）与评价
+           原来点了都没有任何结果。现在每个动作点完给明确完成态或表单层，并各带返回入口。 -->
       <div class="progress-wrap" data-at="s7">
         <div class="pickup">
           <span class="chip chip--jade chip--info"><span class="dot dot--live"></span>本次办理完成</span>
           <div class="pickup-code">7742 106 358</div>
-          <p class="pickup-hint">这是你的取件码。<b>7 天内</b>凭码可在任一台空闲机器复打同一份文件；文件到期自动清理，清理会留删除日志。</p>
+          <p class="pickup-hint">取件码 · <b>7 天内</b>可在任一台空闲机器复打同一份文件。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-            <button class="btn btn--ghost">存进「我的文档」</button>
-            <button class="btn btn--ghost">发到我手机</button>
+            <button class="btn btn--ghost" data-done-go="save"><svg class="ic"><use href="#i-folder"/></svg>存进「我的文档」</button>
+            <button class="btn btn--ghost" data-done-go="phone"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
           </div>
         </div>
-        <div class="notice" style="max-width:40em">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。</span>
+
+        <div class="doneline" data-done="save" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已存进「我的文档」· <b>个人简历.pdf</b> · 保留 7 天，到期清理留删除日志</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
         </div>
+        <div class="doneline" data-done="phone" style="max-width:40em">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <span>扫下面的示意码把 <b>个人简历.pdf</b> 带到手机 · 链接 10 分钟内有效</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+        <div data-done="phone" style="display:flex;justify-content:center">
+          <span class="miniqr">
+            <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码 · 不是可扫的真码</span>
+          </span>
+        </div>
+        <div class="doneline" data-done="again" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已按同参数新建一单：<b>黑白 · 双面 · 5 份 · 15 面</b> · 需重新核价与支付</span>
+          <button class="btn btn--primary" data-go="s4" data-done-go="none">去核价</button>
+          <button class="btn btn--quiet" data-done-go="none">算了</button>
+        </div>
+        <div class="doneline doneline--amber" data-done="issue" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>这次哪里不对？选一项，本机会连同订单号 #PT-20260808-0431 一起报给运维</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+        <div data-done="issue" style="display:flex;gap:10px;flex-wrap:wrap;max-width:40em">
+          <button class="btn btn--ghost" data-done-go="issue-sent">页数不对 / 少了几页</button>
+          <button class="btn btn--ghost" data-done-go="issue-sent">打印发黑 / 发花</button>
+          <button class="btn btn--ghost" data-done-go="issue-sent">纸卡住了 / 没出完</button>
+          <button class="btn btn--ghost" data-done-go="issue-sent">其他问题</button>
+        </div>
+        <div class="doneline" data-done="issue-sent" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已受理 · 工单 <b>#FB-0431</b> · 结果会写进「我的 · 打印订单」，需要退款会走原渠道</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+        <div class="doneline" data-done="rated" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已记下你的评价 · 只用于改进现场服务，<b>不影响你的订单</b></span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+
         <div class="notice" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板 / 送稿器上取走；<b>U 盘</b>拔下带好。</span>
+          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板取走；<b>U 盘</b>拔下带好。</span>
         </div>
+        <details class="fold" style="max-width:40em">
+          <summary>取件码与本次会话怎么清</summary>
+          <div class="fold-b">离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。
+            文件到期自动清理，清理会留删除日志。</div>
+        </details>
       </div>
     </div>
 
@@ -460,9 +850,10 @@
       </div>
       <div class="pane" data-at="s1">
         <div class="pane-hd"><span class="t">Word 与其他格式</span></div>
+        <!-- 2026-08-10 Codex :463：删掉「这里不提供看起来能点但其实不通的入口」——
+             那是设计自评，不是用户要的信息。只留用户真正要做的动作。 -->
         <p style="margin:0;font-size:var(--fz-2);line-height:1.6;color:var(--fog-700)">
-          Word / Excel 转换尚未开放。先在手机上导出成 PDF 再传过来，或用纸质扫描。<br>
-          <span style="color:var(--fog-600)">这里不提供"看起来能点但其实不通"的入口。</span>
+          Word / Excel 请先导出 PDF 再传过来，或用纸质扫描。
         </p>
       </div>
 
@@ -479,8 +870,8 @@
       <div class="pane pane--fill" data-at="s2">
         <div class="pane-hd"><span class="t">建议</span></div>
         <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off">
-          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断</span>，再进入参数。<br>
-          <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：本机在第 2 页识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
+          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断</span><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
         </p>
         <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="ai-down">
           体检不可用时不给建议。<br>
@@ -570,10 +961,13 @@
             <button aria-pressed="true">按原尺寸（100%）</button>
             <button aria-pressed="false">缩放到 A4</button>
           </div>
-          <p class="fnote">
-            本机<b>只有 A4，不支持 A3</b>。这份文件检出为 A4，按原尺寸出即可。<br>
-            如果换成 A3 或 Letter，这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
-          </p>
+          <!-- 2026-08-10 Codex :573：整段压成一句，细节折叠。口径一字不改。 -->
+          <p class="fnote">仅支持 A4；非 A4 文件须确认缩放。</p>
+          <details class="fold" style="margin-top:8px">
+            <summary>换成 A3 或 Letter 会怎样</summary>
+            <div class="fold-b">这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
+              这份文件检出为 A4，按原尺寸出即可。</div>
+          </details>
         </div>
 
         <div class="field">
@@ -606,10 +1000,31 @@
             <span class="v" data-when="device-off" style="color:var(--coral-400)">暂不可下单</span>
           </div>
           <p class="qnote" data-pay="free" data-when="default first ai-down">
-            本单金额为 <b>0 元</b>（只扫描 / 用了减免），<b>不进收银台、不出收款码</b>，第 5 站直接跳过。
-            不收钱也就没有退款问题；出纸完成一样有取件码和订单记录。</p>
-          <p class="qnote" data-when="default first ai-down">金额由服务端按现场公示价计算。<b>核价结果显示出来之后，才会出现「确认并支付」</b>——不让你确认一个还没看见的金额。</p>
-          <p class="qnote" data-when="device-off">打印机离线期间不接受支付。可先把文件存进「我的文档」，凭手机号在任一台空闲机器取回打印。</p>
+            本单 <b>0 元</b>，<b>不进收银台、不出收款码</b>，出纸完成一样有取件码。</p>
+          <p class="qnote" data-when="default first ai-down"><b>核价结果显示出来之后，才会出现「确认并支付」。</b></p>
+          <p class="qnote" data-when="device-off">打印机离线期间不接受支付。</p>
+        </div>
+        <!-- 2026-08-10：device-off 统一成「存我的文档 · 扫码带走」，并把码画出来 -->
+        <div data-when="device-off" style="display:flex;gap:var(--s-5);align-items:center;margin-top:var(--s-4)">
+          <span class="miniqr" style="width:150px">
+            <span class="miniqr-box" style="width:132px;height:132px;padding:9px"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码</span>
+          </span>
+          <span class="picked-b">
+            <span class="picked-t">存我的文档 · 扫码带走</span>
+            <span class="picked-m">带走：个人简历.pdf · 3 页</span>
+            <span class="picked-m">保留 7 天 · 凭手机号在任一台空闲机器打印</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 2026-08-10：核对金额这一步要对得上单价，但整张公示价表放不下，只给要用的两行。 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><span class="t">单价对照</span><span class="s">以屏上公示为准</span></div>
+        <div class="price">
+          <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
+          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
         </div>
       </div>
 
@@ -635,18 +1050,24 @@
         </div>
         <div class="notice notice--amber" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>你选择了保持原样打印。<b>本机不会自动遮盖</b>——遮盖版未生成，出纸内容就是你上传的原文件。
-            含身份证号的纸质材料请自行妥善保管，不要留在取纸口。</span>
+          <span>保持原样打印 · <b>本机不会自动遮盖</b>，出的就是原文件。</span>
         </div>
+        <!-- 2026-08-10 Codex :643：五条长说明与后文重复。支付前只留三句，完整规则折叠，一字不删。 -->
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>你的材料去哪、留多久、谁能看：</b><br>
+          <span>· 文件只用于本次打印，<b>不发给任何企业</b>；<br>
+            · 已支付订单的文件保留 <b>7 天</b>供复打；<br>
+            · 未支付的随离场清空。</span>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>完整的去向 / 保留 / 谁能看 / 出纸规则</summary>
+          <div class="fold-b">
             · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
             · <b>保留</b>：未支付的临时文件随本次会话结束清空；已支付订单的文件保留 7 天供复打；登录后主动存入「我的文档」的按其保留期。到期清理都留删除日志。<br>
             · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
             · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<br>
-            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span>
-        </div>
+            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</div>
+        </details>
       </div>
 
 
@@ -654,6 +1075,8 @@
       <!-- 2026-08-09 留白复核：公示价从 s4 挪到 s1 —— s4 已有服务端核价明细(冗余致右栏超高、
            把「支付前请核对」挤出 14–39px)；s1 进门正需要价格预期。s5 保留(退款语境要对照价目)。
            s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
+      <!-- 2026-08-10 复核：完整公示价表在 s4 仍放不下（免费单与 device-off 会把「支付前请核对」
+           挤出 32–96px）。维持 2026-08-09 的结论：s4 不放整表，只在核价卡下面放两行单价对照。 -->
       <div class="pane" data-at="s1 s5">
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
@@ -664,10 +1087,11 @@
           <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
           <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
         </div>
-        <p class="price-note">
-          <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
-          本机不接受现金，不找零；不支持刷卡。
-        </p>
+        <p class="price-note">本机不接受现金，不找零；不支持刷卡。</p>
+        <details class="fold" style="margin-top:8px">
+          <summary>0 元的单怎么走</summary>
+          <div class="fold-b"><b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。</div>
+        </details>
       </div>
 
       <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 本机事实(E2)与隐私规则。
@@ -691,17 +1115,20 @@
         <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>· 文件默认只保留到<b>本次会话结束</b>；<br>
-            · 支付、出纸、删除都要<b>你本人确认</b>，系统不代按；<br>
-            · 离场或超时自动清空，下一位用户看不到任何痕迹；<br>
-            · 要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。</span>
+          <span>只留到<b>本次会话结束</b>；支付与出纸都要<b>你本人确认</b>。</span>
         </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>离场后怎么清、想长期保存怎么办</summary>
+          <div class="fold-b">离场或超时自动清空，下一位用户看不到任何痕迹。
+            要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。
+            删除也要你本人确认，系统不代按。</div>
+        </details>
       </div>
       <div class="pane" data-at="s6">
         <div class="pane-hd"><span class="t">出纸完成后</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-ticket"/></svg>
-          <span>取件码会放大显示在屏幕上；已登录用户同步进「我的 · 打印订单」。<b>出纸完成前请不要离开本机。</b></span>
+          <span><b>出纸完成前请不要离开本机。</b>取件码会放大显示。</span>
         </div>
       </div>
 
@@ -717,9 +1144,12 @@
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>退款由服务端按<b>实际出纸面数</b>算，不看你按了几次按钮。
-            所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</span>
+          <span>按<b>实际出纸面数</b>退，不看你按了几次按钮。</span>
         </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>退款记录去哪查</summary>
+          <div class="fold-b">所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</div>
+        </details>
       </div>
 
       <!-- S6 任务信息 -->
@@ -762,25 +1192,25 @@
           <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
         </div>
         <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn--ghost" style="width:100%">
+          <button class="btn btn--ghost" style="width:100%" data-done-go="issue">
             <svg class="ic"><use href="#i-alert"/></svg>这次打印有问题
           </button>
           <div>
             <div style="font-size:var(--fz-2);color:var(--fog-700);margin-bottom:8px">这次办理还顺手吗？</div>
-            <div class="seg">
-              <button aria-pressed="false">满意</button>
-              <button aria-pressed="false">一般</button>
-              <button aria-pressed="false">不满意</button>
+            <div class="seg" data-rate>
+              <button aria-pressed="false" data-done-go="rated">满意</button>
+              <button aria-pressed="false" data-done-go="rated">一般</button>
+              <button aria-pressed="false" data-done-go="rated">不满意</button>
             </div>
             <p style="margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
-              评价只用于改进现场服务，不影响你的订单，也可以不评。
+              评价只用于改进现场服务，也可以不评。
             </p>
           </div>
         </div>
-        <div class="notice" style="margin-top:12px">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>下一步建议：这份简历还没做过按岗位优化。周五招聘会前可以先优化再多打几份。</span>
-        </div>
+        <a class="notice" href="09-resume-workbench.html?stage=s3" style="margin-top:auto;text-decoration:none;color:inherit">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span>这份简历还没做过按岗位优化 · <b>去简历工作台</b><svg class="ic" style="width:15px;height:15px;vertical-align:-2px;margin-left:4px"><use href="#i-chevron"/></svg></span>
+        </a>
       </div>
     </div>
   </div>
@@ -788,7 +1218,13 @@
   <!-- ============ ActionBar：主按钮恒定右下 ============ -->
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-at="s1"><div class="t">怎么把文件带进来？点一张大卡</div><div class="s">前三种在本页继续；扫描、复印、证件照会去对应台面 · 文件默认只保留到本次会话结束</div></div>
+      <div data-at="s1">
+        <div data-src="none"><div class="t">怎么把文件带进来？点一张大卡</div><div class="s">前三种在本页继续；扫描、复印、证件照会去对应台面</div></div>
+        <div data-src="local usb-in phone-got" data-file="none"><div class="t">先选中一份，再进体检</div><div class="s">没选文件时不会开始 —— 不让你为一份不知道是哪个的文件付钱</div></div>
+        <div data-src="local usb-in phone-got" data-file="on"><div class="t">已选中 <b data-picked-nm>个人简历.pdf</b></div><div class="s"><span data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span> · 按右下角进材料体检</div></div>
+        <div data-src="phone"><div class="t">等你在手机上选文件</div><div class="s">码 5 分钟内有效 · 传不过来可以改用本机上传</div></div>
+        <div data-src="usb"><div class="t">把 U 盘插进屏幕右下侧的 USB 口</div><div class="s">插好后自动列出可打印的文件</div></div>
+      </div>
       <div data-at="s2">
         <div data-when="default device-off"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印 · 也可以保持原样继续</div></div>
         <div data-when="ai-down"><div class="t">体检不可用，其余流程正常</div><div class="s">参数需要你自己确认</div></div>
@@ -826,29 +1262,35 @@
     </div>
 
     <!-- 左侧：返回 / 备选 -->
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="none"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="local phone phone-got usb usb-in" data-src-go="none">换一种方式</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">返回改参数</button>
     <button class="btn btn--lg btn--ghost" data-at="s6" data-job="printing queued checking jam timeout">异常求助</button>
     <a class="btn btn--lg btn--ghost" data-at="s6" data-job="checkfail" href="08-file-tools.html?tool=t1">让本机转成可打印 PDF</a>
-    <button class="btn btn--lg btn--ghost" data-at="s7">再打一份</button>
+    <button class="btn btn--lg btn--ghost" data-at="s7" data-done-go="again">再打一份</button>
 
     <!-- 右侧：唯一主动作。不可逆动作用朱砂 -->
-    <button class="btn btn--primary" data-at="s1" data-go="s2">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <!-- 2026-08-10：原来这里直接 data-go="s2"，不选文件也能进体检。现在按 data-file 门控。 -->
+    <button class="btn btn--primary" data-at="s1" data-src="none" data-src-go="local">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="phone" data-src-go="local">传不过来？改用本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="usb" data-src-go="local">没带 U 盘？改用本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got usb-in" data-file="none" aria-disabled="true">先选文件</button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got usb-in" data-file="on" data-go="s2">去材料体检 · <span data-picked-pg>3 页</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default ai-down device-off">去设参数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-when="first" data-go="s1">先选来源<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">去确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first ai-down" id="btn-quote" data-gate="unquoted">获取核价<svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
     <button class="btn btn--commit" data-at="s4" data-go="s6" data-when="default first ai-down" data-pay="free" data-gate="quoted">本单免费，直接出纸<svg class="ic"><use href="#i-printer"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
 
     <!-- 收银台：左侧退出路径 -->
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="wait scan expired query" data-go="s4">取消支付，返回</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="confirm" data-pay-go="query">我已付款，帮我查</button>
-    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed" data-go="s4">重新下单</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed">文件还在，存我的文档</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="paid" data-go="s4">先不打，转存我的文档</button>
     <!-- 收银台：右侧主动作 -->
     <button class="btn btn--primary" data-at="s5" data-pay="wait" data-pay-go="query">我已付款，帮我查<svg class="ic"><use href="#i-search"/></svg></button>
@@ -856,6 +1298,8 @@
     <button class="btn btn--primary" data-at="s5" data-pay="confirm" aria-disabled="true">等渠道回传到账…</button>
     <button class="btn btn--primary" data-at="s5" data-pay="query" aria-disabled="true">查询中…</button>
     <button class="btn btn--primary" data-at="s5" data-pay="expired" data-pay-go="wait">重新出码<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <!-- 2026-08-10：已关单原来右下角空着，用户看完「本单已关闭」不知道往哪走。 -->
+    <button class="btn btn--primary" data-at="s5" data-pay="closed" data-go="s4">重新下单<svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--commit" data-at="s5" data-pay="paid" data-go="s6">开始出纸<svg class="ic"><use href="#i-printer"/></svg></button>
     <button class="btn btn--primary" data-at="s6" data-job="printing" aria-disabled="true">出纸中…</button>
     <button class="btn btn--primary" data-at="s6" data-job="queued" aria-disabled="true">排队中…</button>
@@ -946,6 +1390,105 @@
   if (btns[0]) btns[0].addEventListener('click', function () { goto(Math.max(0, current() - 1)) })
   if (btns[1]) btns[1].addEventListener('click', function () { goto(Math.min(pages().length - 1, current() + 1)) })
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
+})()
+</script>
+<script>
+/* ── 2026-08-10 Codex 走查整改：上传门 + 断头路 + 取件页结果 ───────────────
+   走查第一名：「上传入口根本不收文件」。原来六卡里前三张直接 data-go="s2"，
+   一按就跳「材料体检」——用户没做过任何选取动作，也不知道体检的是哪一份。
+
+   四条页内轴（都走 CSS display 门控，不碰 hidden —— applyVisibility 独占 hidden）：
+     data-src   选了哪种来源、接力/U 盘到哪一步
+     data-file  有没有真的选中一份
+     data-off   离线/卡纸时用户选了「续打」还是「退款」（:414 的两个缺失按钮）
+     data-done  取件页四个动作各自的结果层（:433 的没有反馈） */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function setAll (sel, v) {
+    [].slice.call(scr.querySelectorAll(sel)).forEach(function (n) { n.textContent = v })
+  }
+  function refresh () { if (window.v3Audit) requestAnimationFrame(window.v3Audit) }
+
+  /* ① 文件选中：名称 / 页数 / 大小 / 格式同步到已选态、hint 与主按钮 */
+  function file (k, row) {
+    if (!k || k === 'none') {
+      scr.setAttribute('data-file', 'none')
+    } else {
+      scr.setAttribute('data-file', 'on')
+      if (row) {
+        setAll('[data-picked-nm]', row.getAttribute('data-nm') || '')
+        setAll('[data-picked-mt]', row.getAttribute('data-mt') || '')
+        setAll('[data-picked-pg]', row.getAttribute('data-pg') || '')
+      }
+    }
+    ;[].slice.call(scr.querySelectorAll('.filerow')).forEach(function (r) {
+      r.setAttribute('aria-pressed', r.getAttribute('data-file-go') === k ? 'true' : 'false')
+    })
+    refresh()
+  }
+
+  /* ② 换来源就等于放弃上一次的选中 —— 不能让「已选中」跟着新来源假装还在 */
+  function src (k) {
+    scr.setAttribute('data-src', k)
+    if (k !== 'phone-got' && k !== 'usb-in') file('none')
+    refresh()
+  }
+
+  function axis (name, k) { scr.setAttribute(name, k); refresh() }
+
+  scr.addEventListener('click', function (e) {
+    var s1 = e.target.closest('[data-src-go]')
+    if (s1) { src(s1.getAttribute('data-src-go')); return }
+    var f1 = e.target.closest('[data-file-go]')
+    if (f1) { file(f1.getAttribute('data-file-go'), f1.classList.contains('filerow') ? f1 : null); return }
+    var o1 = e.target.closest('[data-off-go]')
+    if (o1) { axis('data-off', o1.getAttribute('data-off-go')); return }
+    var d1 = e.target.closest('[data-done-go]')
+    if (d1) {
+      /* 评价三档：先记下按了哪一档，再出结果条 */
+      var seg = d1.closest('[data-rate]')
+      if (seg) {
+        [].slice.call(seg.querySelectorAll('button')).forEach(function (b) {
+          b.setAttribute('aria-pressed', b === d1 ? 'true' : 'false')
+        })
+      }
+      axis('data-done', d1.getAttribute('data-done-go'))
+    }
+  })
+
+  /* 手机扫码传的「用这份」既选文件又推进阶段，data-go 由 stages.js 接管，这里不重复处理 */
+  src('none')
+  axis('data-off', 'ask')
+  axis('data-done', 'none')
+
+  /* 右栏最后一张可见的卡撑到栏底。哪张是最后一张随阶段变，所以只能在运行时打标。
+     两处都要挂：window.v3ApplyVisibility 是同步入口（阶段/子状态切换走这条），
+     MutationObserver 兜底（stage.js 内部的 applyState 不经过 window 上那份）。 */
+  var side = scr.querySelector('.wside')
+  function tailgrow () {
+    if (!side) return
+    var last = null
+    var kids = [].slice.call(side.children)
+    kids.forEach(function (p) {
+      p.classList.remove('pane--tailgrow')
+      if (p.hidden) return
+      var cs
+      try { cs = window.getComputedStyle(p) } catch (e) { return }
+      if (cs.display === 'none') return
+      last = p
+    })
+    if (last) last.classList.add('pane--tailgrow')
+  }
+  var origAV = window.v3ApplyVisibility
+  if (typeof origAV === 'function') {
+    window.v3ApplyVisibility = function () { var r = origAV.apply(this, arguments); tailgrow(); return r }
+  }
+  new MutationObserver(tailgrow).observe(scr, { attributes: true,
+    attributeFilter: ['data-state', 'data-stage', 'data-pay', 'data-job', 'data-src', 'data-file', 'data-off', 'data-done'] })
+  window.addEventListener('load', tailgrow)
+  tailgrow()
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>

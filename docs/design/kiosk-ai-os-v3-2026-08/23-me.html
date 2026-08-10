@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P23 我的 · 功能中心（2026-08-10 重做） ──────────────────────────────
    为什么推翻上一版「三段路牌 + 大段文字」：用户原话是「像一本书全是文字」。
@@ -494,7 +495,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <div class="ub-mrow"><svg class="ic"><use href="#i-clock"/></svg><span>离场或无操作 <b>5 分钟</b>后本机会话自动清空</span></div>
         </div>
         <div class="ub-chips">
-          <span class="chip chip--info">未登录 · 离场自动清空</span>
+          <span class="chip chip--info">未登录</span>
         </div>
       </div>
 
@@ -523,7 +524,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <div class="ubnode ubnode--now"><span class="ubdot"></span>
             <span class="ubn-t">待比对</span><span class="ubn-s">收藏 3 条还没逐条比</span></div>
           <div class="ubnode ubnode--todo"><span class="ubdot"></span>
-            <span class="ubn-t">去来源平台</span><span class="ubn-s">投递在来源平台完成</span></div>
+            <span class="ubn-t">去来源平台</span><span class="ubn-s">在手机上打开该岗位</span></div>
         </div>
 
         <div class="ainext" data-when="default device-off">
@@ -533,8 +534,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 
         <div class="aidown" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
-          <span><b>AI 盘点暂不可用。</b>你的记录都在下面各卡里，不受影响；
-                故障已自动上报，不需要你操作。</span>
+          <span><b>你的记录都在下面各卡里，不受影响</b>；故障已自动上报。</span>
         </div>
 
         <div class="ubprev" data-when="first">
@@ -546,7 +546,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <div class="aidown" data-when="first">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span><b>登录后，这里会用你的记录盘出进度和下一步。</b>
-                扫左边二维码即可；不登录也能用本机全部功能，离场后本机会话自动清空。</span>
+                扫左边二维码即可；不登录也能用本机全部功能。</span>
         </div>
       </div>
     </section>
@@ -747,7 +747,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
     <button class="btn btn--lg btn--ghost"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">明细在各自的业务页里</div><div class="s">本页只做入口 · 浏览与跳转记录去岗位 / 招聘会 / 政策页看</div></div>
-      <div data-when="first"><div class="t">未登录 · 东西留不下来</div><div class="s">离场或无操作 5 分钟后自动清空 · 功能不受影响</div></div>
+      <div data-when="first"><div class="t">未登录 · 东西留不下来</div><div class="s">功能不受影响</div></div>
       <div data-when="ai-down"><div class="t">AI 盘点暂不可用</div><div class="s">各卡里的记录不受影响 · 故障已自动上报</div></div>
       <div data-when="device-off"><div class="t">打印机离线 · 本页可正常查看</div><div class="s">出纸恢复后打印订单可续打</div></div>
     </div>
@@ -807,5 +807,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
   });
 })();
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

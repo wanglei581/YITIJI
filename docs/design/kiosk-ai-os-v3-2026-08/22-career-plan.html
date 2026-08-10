@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P22 专用 ───────────────────────────────────────────────────────────
    职业规划最容易做成算命：「这个方向前景好」「三年后你能到 XX 岗」
@@ -159,9 +160,8 @@
           </div>
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>这一页只用一种依据：<b>本机真读过的岗位正文</b>。<br>
-                  说的不是「这个方向好」，而是「<b>本机在这批岗位里见到多少条要求这个</b>」——
-                  数量是可核对的事实，前景是预测。只说前者。</span>
+            <span>这一页只用一种依据：<b>本机真读过的岗位正文</b> ——
+                  说的是见到多少条要求，不是「这个方向好」。</span>
           </div>
         </div>
       </div>
@@ -264,10 +264,8 @@
         <div class="sec">
           <div class="notice" data-when="default first">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>下面每个方向后面的数字，是<b>本机读过正文的岗位里出现的条数</b> ——
-                  不是"市场需求"，也不是"前景排名"。<br>
-                  本机只见过这一批（来自 3 家来源机构，同步于 8月9日），
-                  <b>见得多不等于岗位多，只等于本机见得多</b>。</span>
+            <span>方向后面的数字是<b>本机读过的岗位里出现的条数</b>，
+                  <b>见得多不等于岗位多</b>。</span>
           </div>
           <div class="notice notice--amber" data-when="ai-down">
             <svg class="ic"><use href="#i-alert"/></svg>
@@ -357,8 +355,7 @@
         </div>
 
         <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
-          以上只覆盖<b>本机读过正文的 214 条岗位</b>（来自 3 家来源机构，同步 8月9日 07:30）。
-          本机没见过的岗位不在里面 —— <b>这不是市场全貌</b>。
+          以上只覆盖<b>本机读过正文的 214 条岗位</b> —— <b>这不是市场全貌</b>。
         </div>
       </div>
 
@@ -533,8 +530,7 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>你会看到本页多次写「<b>如果你其实做过，这是简历漏写，不是你缺</b>」——
-                  这两种要分开：一种要花几个月，一种今天下午就能补。</span>
+            <span><b>「简历漏写」和「真的没做过」要分开看</b>：一种要花几个月，一种今天下午就能补。</span>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
@@ -581,7 +577,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。<span data-when="default first device-off">清单同时存进「我的文档」与「AI服务记录」。</span><span data-when="ai-down">这张计数表同时存进「我的文档」。</span>
+            费用为预估。<span data-when="default first device-off">清单同时存进「我的文档」与「AI服务记录」。</span><span data-when="ai-down">这张计数表同时存进「我的文档」。</span>
           </div>
         </div>
       </div>
@@ -675,5 +671,7 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

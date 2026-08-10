@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P31 专用 ── 签约风险提示（用户可见名不含「审查」）。
    真实底盘：三步流程 + 状态机 + consent 快照 + PII 脱敏 + 安全门已实现，
@@ -385,7 +386,7 @@
               <span class="tl-s">过滤越界表述，过了这道门结果才上屏</span></span></div>
         </div>
         <div class="panel-note" style="margin-top:var(--s-3)">
-          不显示百分比 —— 合同长短、扫描质量差别很大，「完成 XX%」对你没有参考意义，报到哪个阶段就是哪个阶段。
+          不显示百分比 —— 报到哪个阶段就是哪个阶段。
         </div>
       </div>
 
@@ -411,8 +412,7 @@
           </div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-trash"/></svg>
-            <span><b>随时可以取消。</b>点右下角「取消并删除」，文件和已产生的中间结果立即删除、留删除日志，
-                  对你没有任何影响。</span>
+            <span><b>随时可以取消。</b>点右下角「取消并删除」，文件与中间结果立即删除、留删除日志。</span>
           </div>
         </div>
       </div>
@@ -421,7 +421,6 @@
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd">
           <span class="t">这份合同值得核对的地方</span>
-          <span class="chip chip--info" style="height:26px;font-size:11px">AI 生成内容</span>
           <span class="s">共 5 条 · 优先核查 2 · 建议关注 2 · 信息不足 1</span>
         </div>
         <div class="sec">
@@ -505,14 +504,13 @@
       <div class="pane" data-at="s4">
         <div class="pane-hd">
           <span class="t">带走的报告 · A4 三页</span>
-          <span class="chip chip--info" style="height:26px;font-size:11px">AI 生成内容</span>
           <span class="s">黑白即可 · 版式示意</span>
         </div>
         <div class="minis">
           <div class="mini">
             <div class="sheet-a4">
               <h4>签约风险提示</h4>
-              <div class="meta">AI 生成内容 · 仅作风险提示，不构成法律意见</div>
+              <div class="meta">AI 生成内容</div>
               <div class="hr"></div>
               <div class="sec">版本信息</div>
               <div class="meta">规则包 v1.3 · 境内备案模型 · 2026-08-10 11:20</div>
@@ -522,7 +520,7 @@
               <div class="ln ln--s"></div>
               <span class="pgno">1 / 3</span>
             </div>
-            <div class="mini-cap">封面 · AIGC 标识 + 免责 + 版本三元组</div>
+            <div class="mini-cap">封面 · 免责与版本</div>
           </div>
           <div class="mini">
             <div class="sheet-a4">
@@ -575,7 +573,7 @@
           </div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>费用是<b>预估口径</b>：A4 · 3 页 · 黑白。最终以打印工作台的核价为准，这里不代收任何费用。</span>
+            <span>费用是<b>预估口径</b>：A4 · 3 页 · 黑白；本页不代收任何费用。</span>
           </div>
         </div>
       </div>
@@ -585,52 +583,52 @@
         <div class="pane-hd">
           <span class="t">常见签约问题 · 8 条</span>
           <span class="chip chip--jade chip-static" style="height:26px;font-size:11px">现在就能用</span>
-          <span class="s">静态参考 · 非 AI 生成 · 更新 2026-06</span>
+          <span class="s">E2 法规依据 · 静态参考 · 非 AI 生成 · 更新 2026-06</span>
         </div>
         <div class="sec">
 
           <div class="faqcard">
             <div class="faq-q">1 · 试用期最长能约定多久？</div>
             <div class="faq-a">按合同期限分档：三个月以上不满一年的，试用期不超过 <b>1 个月</b>；一年以上不满三年的，不超过 <b>2 个月</b>；三年以上或无固定期限的，不超过 <b>6 个月</b>。同一单位与同一劳动者只能约定一次试用期。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动合同法》第十九条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动合同法》第十九条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">2 · 试用期工资有下限吗？</div>
             <div class="faq-a">有。不得低于本单位相同岗位最低档工资或约定工资的 <b>80%</b>，并且不得低于用人单位所在地的最低工资标准。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动合同法》第二十条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动合同法》第二十条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">3 · 公司说试用期不缴社保，合法吗？</div>
             <div class="faq-a">不合法。用人单位应当自用工之日起 <b>30 日内</b>为职工办理社会保险登记 —— 试用期也算用工期间，不存在「转正再缴」的说法。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《社会保险法》第五十八条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《社会保险法》第五十八条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">4 · 什么情况下才能让我付违约金？</div>
             <div class="faq-a">只有两种：单位出钱做了<b>专项培训并约定服务期</b>、或者约定了<b>竞业限制</b>。除此之外，以任何名目要求劳动者承担违约金的约定都是无效的。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动合同法》第二十二、二十三、二十五条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动合同法》第二十二、二十三、二十五条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">5 · 竞业限制有补偿吗？最长多久？</div>
             <div class="faq-a">竞业限制期限<b>不得超过二年</b>，并且在限制期内单位要<b>按月</b>给予经济补偿。只限制、不补偿的条款，效力在实践中存在争议。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动合同法》第二十三、二十四条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动合同法》第二十三、二十四条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">6 · 入职收押金、扣身份证，可以拒绝吗？</div>
             <div class="faq-a">可以，而且应该拒绝。用人单位<b>不得扣押</b>劳动者的居民身份证等证件，<b>不得要求提供担保</b>或者以其他名义向劳动者收取财物。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动合同法》第九条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动合同法》第九条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">7 · 加班费怎么算？</div>
             <div class="faq-a">平日延长工作时间不低于工资的 <b>150%</b>；休息日安排工作又不能补休的不低于 <b>200%</b>；法定节假日不低于 <b>300%</b>。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《劳动法》第四十四条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《劳动法》第四十四条</span></div>
           </div>
           <div class="faqcard">
             <div class="faq-q">8 · 收到录用通知后被撤回，怎么办？</div>
             <div class="faq-a">录用通知送达后单位反悔的，可能承担<b>缔约过失责任</b>。保留好通知原文和沟通记录，可以就辞职损失、路费等合理损失主张赔偿。</div>
-            <div class="faq-m"><span class="ev ev--e2">E2 法规依据</span><span>《民法典》第五百条</span><span>更新 2026-06</span></div>
+            <div class="faq-m"><span>《民法典》第五百条</span></div>
           </div>
 
-          <div class="panel-note">这 8 条是<b>静态参考内容</b>，由人工整理并标注出处，不是 AI 生成，也不针对你的具体合同 —— 你的情形和这里写的不一样时，以现行法规和专业意见为准。</div>
+          <div class="panel-note">这 8 条不针对你的具体合同；情形不同时以现行法规和专业意见为准。</div>
         </div>
       </div>
 
@@ -648,7 +646,6 @@
           <div class="kv-row"><span class="k">报告端点</span><span class="v v--fog">未开放</span></div>
           <div class="kv-row"><span class="k">入口位置</span><span class="v">AI简历服务 → 签约与权益</span></div>
         </div>
-        <div class="panel-note" style="margin-top:var(--s-3)">这几行是本机真实状态，不是示意。</div>
       </div>
 
       <div class="pane pane--grow" data-at="s0">
@@ -662,7 +659,7 @@
             <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-card"/></svg>
               <span class="fprev-t">什么情况下才能让我付违约金？</span><svg class="ic"><use href="#i-chevron"/></svg></button>
           </div>
-          <div class="panel-note">一共 8 条，每条都标了法规出处 —— 静态参考、非 AI 生成，不受上面门禁影响。</div>
+          <div class="panel-note">一共 8 条，不受上面门禁影响。</div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span>开放之后这页也只做<b>风险提示</b>：不代替律师，不出具法律意见，重要合同请咨询专业律师或劳动保障部门。</span>
@@ -742,15 +739,14 @@
             <span>第 5 页没读全，那一页的问题<b>不会出现在这里</b> —— 缺口已在上方标明。</span></div>
           <div class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg>
             <span>「信息不足」不等于没有问题，「没提示」也<b>不等于合同没毛病</b>。</span></div>
-          <div class="panel-note">哪怕一条提示都没有，这里也只会写「本次未发现可提示项」——
-            不会替这份合同下「安全」的结论。</div>
+          <div class="panel-note">没有提示时只写「本次未发现可提示项」，不下「安全」结论。</div>
           <div class="notice" data-when="ai-down">
             <svg class="ic"><use href="#i-offline"/></svg>
             <span>AI 暂不可用：<b>发不起新的分析</b>，但这份已生成的结果照常可看、可打印。</span>
           </div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>本页所有条目均为 <b>AI 生成内容</b>，已按规定标识。它是帮你准备问题的清单，不是结论。</span>
+            <span>这是帮你准备问题的<b>清单</b>，不是结论。</span>
           </div>
         </div>
       </div>
@@ -790,7 +786,7 @@
         <div class="kv">
           <div class="kv-row"><span class="k">条目</span><span class="v">8 条</span></div>
           <div class="kv-row"><span class="k">更新时间</span><span class="v">2026-06</span></div>
-          <div class="kv-row"><span class="k">内容属性</span><span class="v v--fog">静态参考 · 非 AI 生成</span></div>
+          <div class="kv-row"><span class="k">内容属性</span><span class="v v--fog">人工整理</span></div>
           <div class="kv-row"><span class="k">法规出处</span><span class="v">每条标注</span></div>
         </div>
         <div class="panel-note" style="margin-top:var(--s-3)">法规会修订 —— 以发布机关的现行有效版本为准。</div>
@@ -839,6 +835,7 @@
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
       <a class="backbtn" href="09-resume-workbench.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s0" data-go="faq">常见签约问题</button>
     <button class="btn btn--lg btn--ghost" data-at="s1 s2 s3 s4" data-go="s0">回本机状态</button>
     <button class="btn btn--lg btn--ghost" data-at="s2 s3">取消并删除</button>
@@ -848,10 +845,10 @@
     <span class="actionbar-hint" data-at="s1" data-when="default first device-off">示意 · 开放后需五项知情同意全部勾选才能继续</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 暂不可用 · 不能发起新的合同分析</span>
     <span class="actionbar-hint" data-at="s2">示意 · 你确认页数与类型之后，分析才继续往下走</span>
-    <span class="actionbar-hint" data-at="s3">AI 生成内容 · 仅作风险提示 · 缺口与局限已逐条标明</span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">预估 A4 · 3 页 · 黑白 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3">缺口与局限已逐条标明</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">A4 · 3 页 · 黑白</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线 · 先存「我的文档」，换机或恢复后再打</span>
-    <span class="actionbar-hint" data-at="faq">静态参考 · 非 AI 生成 · 更新至 2026-06</span>
+    <span class="actionbar-hint" data-at="faq">静态参考 · 更新至 2026-06</span>
 
     <button class="btn btn--primary" data-at="s0" data-go="s1">看开放后的流程示意<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-when="default first device-off" data-go="s2">下一步 · 提取与确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -901,5 +898,7 @@
   pick('labor')
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

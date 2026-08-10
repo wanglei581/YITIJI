@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P25 专用 · 单屏驾驶舱（codex 复审终态） ─────────────────────────────
    上一版是三段轨（问小青 / 她能帮你做的 / 带走要点）。复审结论：
@@ -284,12 +285,12 @@
       <!-- 对话流：唯一主滚动区 -->
       <div class="pane pane--grow">
         <div class="chat" data-when="default first device-off">
-          <div class="daymark">今天 16:48 · 对话不保存</div>
+          <div class="daymark">今天 16:48</div>
 
           <div class="msg msg--ai">
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
-              <span class="msg-evrow"><span class="ev ev--e3">E3 · AI 生成</span></span>
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
               我是小青。简历、岗位、政策、面试，直接问 ——
               有用的回答点下面的<b>「钉到托盘」</b>，聚到右边，走前打成一张纸带走。
             </span>
@@ -298,10 +299,9 @@
           <div class="msg msg--ai" data-when="first">
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
-              <span class="msg-evrow"><span class="ev ev--e3">E3 · AI 生成</span></span>
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
               第一次用？可以先按下面的快捷问题试一句。
-              我答的每条尽量带依据 —— <b>没有依据的，你就当参考</b>；
-              涉及钱和资格的，一律以经办窗口为准。
+              我答的每条尽量带依据，<b>没有依据的你就当参考</b>。
             </span>
           </div>
 
@@ -313,7 +313,7 @@
           <div class="msg msg--ai" data-when="default device-off">
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
-              <span class="msg-evrow"><span class="ev ev--e3">E3 · AI 生成</span></span>
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
               有，刚同步进来一批：
               <span class="fact">
                 <span class="fact-v">今日新增岗位 <b>12</b> 条</span>
@@ -336,7 +336,7 @@
           <div class="msg msg--ai" data-when="default device-off">
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
-              <span class="msg-evrow"><span class="ev ev--e3">E3 · AI 生成</span></span>
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
               关键看<b>参保时长</b>和<b>离职原因</b>这两条。
               我能按官方政策文件帮你逐条比对 —— 到政策测算台把情况填了，
               符合哪条、卡在哪条，会一条条列出来，不笼统说「你可以领」。
@@ -344,7 +344,7 @@
                 <a class="msg-go" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>去政策测算逐条核对</a>
                 <button class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉到托盘</button>
               </span>
-              <span class="msg-tail">结果仅供参考 —— 能不能领、领多少，以窗口审核为准。</span>
+              <span class="msg-tail">能不能领、领多少，以经办窗口审核为准。</span>
             </span>
           </div>
         </div>
@@ -432,7 +432,6 @@
             <span class="gauge-k">AI 引擎</span>
             <span class="gauge-v" data-when="default first device-off"><span class="dot dot--live"></span>在线</span>
             <span class="gauge-v" data-when="ai-down"><span class="dot dot--down"></span>休息中</span>
-            <span class="gauge-s" data-when="default first device-off">回答由 AI 生成</span>
             <span class="gauge-s" data-when="ai-down">恢复后自动上线</span>
           </div>
         </div>
@@ -452,13 +451,13 @@
             <a class="cap cap--ai" href="09-resume-workbench.html">
               <svg class="ic"><use href="#i-resume"/></svg>
               <span class="cap-b"><span class="cap-t">简历诊断</span>
-                <span class="cap-w">简历哪里不行，逐条指出 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">简历哪里不行，逐条指出</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
             <a class="cap cap--ai" href="10-resume-interview.html">
               <svg class="ic"><use href="#i-pen"/></svg>
               <span class="cap-b"><span class="cap-t">访谈生成</span>
-                <span class="cap-w">不会写？她问你答，拼出简历 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">不会写？她问你答，拼出简历</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
             <a class="cap" href="29-id-photo.html">
@@ -476,7 +475,7 @@
             <a class="cap cap--ai" href="11-jobfit-compare.html">
               <svg class="ic"><use href="#i-target"/></svg>
               <span class="cap-b"><span class="cap-t">岗位大师</span>
-                <span class="cap-w">这个岗值不值得投，摆开了比 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">这个岗值不值得投，摆开了比</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
             <a class="cap" href="21-policy.html">
@@ -488,7 +487,7 @@
             <a class="cap cap--ai" href="31-contract-review.html">
               <svg class="ic"><use href="#i-shield"/></svg>
               <span class="cap-b"><span class="cap-t">签约风险</span>
-                <span class="cap-w">签字前把风险点标出来 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">签字前把风险点标出来</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
           </div>
@@ -500,13 +499,13 @@
             <a class="cap cap--ai" href="20-interview-pod.html">
               <svg class="ic"><use href="#i-interview"/></svg>
               <span class="cap-b"><span class="cap-t">面试陪练</span>
-                <span class="cap-w">一问一答练，练完有复盘 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">一问一答练，练完有复盘</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
             <a class="cap cap--ai" href="28-self-assessment.html">
               <svg class="ic"><use href="#i-orbit"/></svg>
               <span class="cap-b"><span class="cap-t">自我评估</span>
-                <span class="cap-w">25 题陈述式，不打分不贴标签 <span class="cap-off">· AI 恢复后可用</span></span></span>
+                <span class="cap-w">25 题陈述式，不打分不贴标签</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
           </div>
@@ -534,14 +533,13 @@
         </div>
 
         <div class="tray-how">
-          对话<b>不保存、离场即清</b>；看到有用的回答就点<b>「钉到托盘」</b>，
-          聚到这里，走之前一次打成纸。每条都带依据来源一起打。
+          有用的回答点<b>「钉到托盘」</b>，聚到这里，走之前一次打成纸。
         </div>
 
         <!-- 隐私账本：这次聊了什么、留下什么，当面说清 -->
         <div class="kv" data-when="default ai-down device-off" style="margin-top:var(--s-3)">
           <div class="kv-row"><span class="k">本次对话</span><span class="v">4 轮</span></div>
-          <div class="kv-row"><span class="k">对话保存</span><span class="v v--fog">不保存 · 离场即清</span></div>
+          <div class="kv-row"><span class="k">对话保存</span><span class="v v--fog">不保存</span></div>
           <div class="kv-row"><span class="k">进 AI 服务记录</span><span class="v">只记「用过一次」，不记内容</span></div>
         </div>
 
@@ -589,5 +587,7 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

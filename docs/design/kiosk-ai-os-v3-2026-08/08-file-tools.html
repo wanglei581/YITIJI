@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* 2026-08-09 留白复核（页内样式，不动 styles/*.css）：
    1) .qa —— 一问一答的短条目，转 PDF 常见问题用；
@@ -81,7 +82,7 @@
         <div class="checks-list" data-when="default device-off">
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>5 张图，均为竖向，无需旋转</span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 张倾斜 <b>2.1°</b>，已机械校正 <span class="ev ev--e1">E1 读自图片</span></span></span>
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>清晰度 良 · 最小分辨率 1440×1920 <span class="ev ev--e1">E1 读自图片</span></span></span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>清晰度 良 · 最小分辨率 1440×1920</span></span>
           <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>4</b> 张偏暗，建议重拍或调亮</span></span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>合成后 5 页 A4，约 2.6 MB</span>
         </div>
@@ -182,7 +183,7 @@
           <p><b>顺序不对？</b>拖动卡片调整，左上角序号就是装订顺序。</p>
           <p><b>能把两份 PDF 合成一份吗？</b>这里只收图片；PDF 合并本机未提供。</p>
           <p><b>合成后还能改吗？</b>合成生成的是新文件，原图一直都在；不满意删掉重排就行。</p>
-          <p><b>传上来的照片去哪了？</b>只在本机用于合成，只有你本人可见；不向任何企业提供。</p>
+          <p><b>传上来的照片去哪了？</b>只在本机用于合成，只有你本人可见。</p>
         </div>
       </div>
 
@@ -191,7 +192,6 @@
         <div class="checks-hd">
           <svg class="ic" style="width:19px;height:19px;color:var(--amber-400)"><use href="#i-alert"/></svg>
           <span class="t">这不是电子签名认证</span>
-          <span class="s">非 CA 数字签名</span>
         </div>
         <div class="checks-list" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>本功能只是把你手写的签名或印章图像<b>合成到文件上</b>，方便你打印带走。它<b>不具备</b>《电子签名法》意义上的可靠电子签名效力，也不做时间戳与身份核验。需要法律效力请走线下签署或有资质的第三方 CA。</span>
@@ -227,7 +227,7 @@
           <div class="kv-row"><span class="k">日期写法</span><span class="v">建议写全「2026年8月8日」，不用 8/8 这类简写</span></div>
         </div>
         <div class="panel-note" style="margin-top:12px">
-          类型判断可能出错——如果这不是求职信，忽略本卡即可；落款放哪、日期怎么写，最终以你拖动和输入的为准。
+          类型判断可能出错；不是求职信忽略本卡即可。
         </div>
       </div>
       <div class="pane" data-at="t2" data-when="ai-down">
@@ -242,8 +242,8 @@
       <div class="locked" data-at="t3">
         <svg class="ic"><use href="#i-idcard"/></svg>
         <b>证件照拍摄与排版尚未开放</b>
-        <p>这台机器没有配置符合规格的补光与背景板，拍出来的照片不符合各类证件照标准，
-          做出来大概率白花钱、还得重拍。所以这里<b>不提供一个看起来能点、实际不通的入口</b>。</p>
+        <p>本机没有配置符合规格的补光与背景板，拍出来<b>不符合证件照标准</b>，
+          大概率白花钱还得重拍。</p>
         <p style="color:var(--fog-600);font-size:var(--fz-2)">
           现在能做的替代路径：把已有的证件照电子文件用「图片转 PDF」整理后打印；
           或用「打印扫描」把纸质证件照扫成电子件留存。</p>
@@ -336,7 +336,7 @@
         </label>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>签名图像只用于本次合成，<b>会话结束即删除</b>，不会留在机器上、也不会用于其他文件。合成结果是新文件，原件不变。
+          <span>签名图像只用于本次合成，<b>会话结束即删除</b>，不会留在机器上。合成结果是新文件，原件不变。
             签名图片与待签 PDF 都有大小上限，超限会明确报错而不是静默失败。</span>
         </div>
       </div>
@@ -414,6 +414,7 @@
 
   <div class="actionbar">
       <a class="backbtn" href="06-print-workbench.html" data-parent-label="打印扫描"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印扫描</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="t1">
         <div data-when="default device-off"><div class="t">5 张已排好序，第 4 张偏暗</div><div class="s">合成会生成新文件，原图保留不动</div></div>
@@ -422,7 +423,7 @@
       </div>
       <div data-at="t2">
         <div data-when="first"><div class="t">在左边写下签名</div><div class="s">这不是具有法律效力的电子签名</div></div>
-        <div data-when="default ai-down device-off"><div class="t">勾选授权后才会合成，且只生成新文件</div><div class="s">签名图像会话结束即删除</div></div>
+        <div data-when="default ai-down device-off"><div class="t">勾选授权后才会合成，且只生成新文件</div><div class="s">原件不变</div></div>
       </div>
       <div data-at="t3"><div class="t">证件照尚未开放，已给出替代路径</div><div class="s">硬件到位并通过规格校验后才会开放</div></div>
     </div>
@@ -466,5 +467,7 @@
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

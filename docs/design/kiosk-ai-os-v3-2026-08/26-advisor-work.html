@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P26 专用 ───────────────────────────────────────────────────────────
    九个能力共用一个作业面，只有三种作业型：
@@ -269,8 +270,7 @@
             <div class="slot slot--now">
               <span class="slot-q">3 · 你为什么想投这个岗？</span>
               <span class="slot-why">
-                自我介绍最后一句要落到「所以我想做什么」，否则听完不知道你要什么 ——
-                这是你上次面试练习里被标出的同一个缺口。
+                自我介绍最后一句要落到「所以我想做什么」，否则听完不知道你要什么。
               </span>
               <span class="slot-a">
                 想做<span class="blank">　　　　</span>方向，因为<span class="blank">　　　　　　</span>。
@@ -300,8 +300,7 @@
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span><b>空着的地方她不会替你编。</b>
-                  数字、公司名、时间、离职原因这类只有你知道的事，一律留空 ——
-                  编出来你面试时答不上，比空着更糟。</span>
+                  数字、公司名、时间、离职原因一律留空 —— 编出来你面试时答不上。</span>
           </div>
         </div>
       </div>
@@ -365,8 +364,7 @@
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
             <b>型由你的问题决定，不用你选。</b><br><br>
-            你不知道"填槽型"是什么意思，也不该知道 ——
-            那是我们内部怎么实现的，不是你要操心的事。
+            比对型摆开逐条对，填槽型一问一答替你补齐，问答型直接给结论和依据。
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">「够不够格」</span><span class="v">比对型</span></div>
@@ -491,8 +489,7 @@
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
             小青干活的地方。<b>怎么干由你的问题决定</b> ——
-            要比就摆一起比，不会写就一问一答，拿不准就直接答。<br>
-            判错了顶部能一键换。
+            要比就摆一起比，不会写就一问一答，拿不准就直接答。
           </div>
         </div>
       </div>
@@ -503,6 +500,7 @@
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
       <a class="backbtn" href="25-advisor.html" data-parent-label="AI 顾问"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 顾问</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" data-at="sC sB sA" href="25-advisor.html">回去问别的</a>
 
     <span class="actionbar-hint" data-at="sC" data-when="default first">7 条要求 · 你写到 3 条 · 2 条可能是漏写</span>
@@ -533,5 +531,7 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
    骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
@@ -226,7 +227,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div class="aibar aibar--down" data-when="ai-down">
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span class="aibar-t">AI 暂不可用，下面这些照常能办</span>
+          <span class="aibar-t">下面这些照常能办</span>
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
@@ -264,8 +265,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
             <span class="dcard-hint" data-when="default first device-off">没选岗位就先问你，不给你默认一个</span>
           </span>
           <span class="dcard-rt">
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
             <a class="dcard-go" data-when="default first device-off" href="20-interview-pod.html">开始这一场<svg class="ic"><use href="#i-arrowRight"/></svg></a>
             <a class="dcard-go" data-when="ai-down" href="20-interview-pod.html">只看题目<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
@@ -275,8 +275,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <a class="dcard dcard--ai" id="c-assess" href="28-self-assessment.html">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-target"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
           </span>
           <span class="dcard-nm">职业自我评估</span>
           <span class="dcard-ds" data-when="default first device-off">答问卷，得优势、薄弱项与方向参考</span>
@@ -341,8 +340,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
             <span class="dcard-hint" data-when="default first device-off">没有目标方向就先问你，不承诺结果</span>
           </span>
           <span class="dcard-rt">
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
             <a class="dcard-go" data-when="default first device-off" href="22-career-plan.html">看方向与行动项<svg class="ic"><use href="#i-arrowRight"/></svg></a>
             <a class="dcard-go" data-when="ai-down" href="22-career-plan.html">只看计数表<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
@@ -392,10 +390,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">练一场，或者先弄清自己适合什么</div><div class="s">点评标 E3，只给你本人看</div></div>
       <div data-when="first"><div class="t">不登录也能练，六张卡一张都不锁</div><div class="s">这一趟的报告与评估记录留不下</div></div>
-      <div data-when="ai-down"><div class="t">AI 暂不可用，题目、技巧、往期报告照常</div><div class="s">停掉的是出题、点评与解读</div></div>
+      <div data-when="ai-down"><div class="t">题目、技巧、往期报告照常</div></div>
       <div data-when="device-off"><div class="t">打印机离线，练习与看报告不受影响</div><div class="s">只有打复盘单要换机取回</div></div>
     </div>
 
@@ -454,5 +453,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

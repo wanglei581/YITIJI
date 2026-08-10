@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ══ P35 专用 ══ 线上招聘平台
    需求真值 = 生产代码 apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx：
@@ -152,12 +153,12 @@
           <span class="lean-s">只说取向，不排名次</span>
         </div>
         <p class="lean-p">
-          四家都是公开的招聘平台，<b>各自岗位池不一样</b>，同一个岗位也可能同时挂在几家。
+          四家都是公开的招聘平台，<b>各自岗位池不一样</b>。
           按下面这条粗略取向挑一个先看：想直接和招聘负责人对话，看<b>直聘型</b>；
           想一次覆盖更多行业和地区，看<b>综合型</b>；工作年限较长、找管理或专业方向，看<b>中高端型</b>。
         </p>
         <p class="lean-p" style="color:var(--fog-600)">
-          这只是平台定位的归纳，<b>不代表你在哪家更容易找到工作</b>，本机也不预测录用概率、不给平台打分排名。
+          这只是平台定位的归纳，<b>不代表你在哪家更容易找到工作</b>。
           四家都能扫，挑不定就都扫一遍，在手机上比较。
         </p>
       </div>
@@ -290,7 +291,7 @@
           </div>
           <span class="qr-cap qcap-off">
             扫码<b>在你自己手机上</b>打开来源平台<br>
-            <span style="color:var(--fog-600)">本机屏幕不打开对方页面，也不代填、不代投</span>
+            <span style="color:var(--fog-600)">本机屏幕不打开对方页面</span>
           </span>
           <span class="qr-cap qcap-on">
             请用手机扫描上方二维码访问来源平台<br>
@@ -307,7 +308,7 @@
           <div class="kv-row"><span class="k">你做的</span><span class="v">用手机扫码打开该平台</span></div>
           <div class="kv-row"><span class="k">本机不做</span><span class="v v--fog">不打开对方页面 · 不代填</span></div>
           <div class="kv-row"><span class="k">你的简历</span><span class="v v--fog">不上传 · 不代收</span></div>
-          <div class="kv-row"><span class="k">费用</span><span class="v v--fog">本机不代收任何费用</span></div>
+          <div class="kv-row"><span class="k">费用</span><span class="v v--fog">不代收</span></div>
         </div>
       </div>
 
@@ -332,7 +333,7 @@
         </div>
         <div class="notice notice--amber" style="margin-top:auto" data-when="device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机离线<b>不影响这一页</b> —— 这里只出码、不出纸。只有回岗位台打印岗位信息时才会受影响。</span>
+          <span>打印机离线<b>不影响这一页</b>；只有回岗位台打印岗位信息才会受影响。</span>
         </div>
       </div>
     </div>
@@ -340,12 +341,13 @@
 
   <div class="actionbar">
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" href="13-jobs-desk.html?stage=ok"><svg class="ic"><use href="#i-briefcase"/></svg>看本机岗位台</a>
     <a class="btn btn--lg btn--ghost" href="16-offline-agencies.html?stage=list"><svg class="ic"><use href="#i-agency"/></svg>线下机构</a>
 
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">四个来源平台入口，扫码在你手机上完成</div><div class="s">本机不代投、不收简历、不参与筛选</div></div>
-      <div data-when="first"><div class="t">不登录也能扫码，四个入口都能用</div><div class="s">打开记录只留本次会话，离场即清</div></div>
+      <div data-when="default"><div class="t">四个来源平台入口，扫码在你手机上完成</div><div class="s">扫码在你手机上打开</div></div>
+      <div data-when="first"><div class="t">不登录也能扫码，四个入口都能用</div><div class="s">打开记录不进账号</div></div>
       <div data-when="ai-down"><div class="t">取向说明不可用，四个入口照常</div><div class="s">扫码不依赖 AI；类型标签与说明仍可自己判断</div></div>
       <div data-when="device-off"><div class="t">打印机离线不影响本页</div><div class="s">这里只出码不出纸；打印岗位信息回岗位台</div></div>
     </div>
@@ -404,5 +406,7 @@
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

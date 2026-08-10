@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ══ P32 专用 ══ AI 简历服务「域首屏」
    需求真值 = 生产代码 apps/kiosk/src/pages/resume/ResumeServiceHubPage.tsx：
@@ -238,8 +239,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <div class="tadv">
         <div class="tadv-act" id="triAct">选一种情况，我给你一条带理由的下一步</div>
         <div class="tadv-ln" id="triWhy"><span class="k">怎么用</span>点上面任一种情况，下面八张卡里对应的那张会亮起来；<b>不会替你跳走</b>，也不会替你按下任何一步。<span class="ev ev--e1">E1 你自己选的</span></div>
-        <div class="tadv-ln" id="triCost"><span class="k">代价</span>三种情况都不需要登录；用到 AI 的那几项会记一次 AI 服务，结果留不留由你在下一页决定。</div>
-        <div class="tadv-ln" id="triAlt"><span class="k">备选</span>不想让机器分诊，直接看下面八张卡自己挑；八张卡任何时候都全在，没有被藏起来的功能。</div>
+        <div class="tadv-ln" id="triCost"><span class="k">代价</span>三种情况都不需要登录；用到 AI 的会记一次 AI 服务。</div>
+        <div class="tadv-ln" id="triAlt"><span class="k">备选</span>不想让机器分诊，直接看下面八张卡自己挑。</div>
       </div>
     </div>
 
@@ -272,7 +273,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     <!-- ══════════ 同版面通知行：四态换话不换位 ══════════ -->
     <div class="notice" data-when="default">
       <svg class="ic"><use href="#i-shield"/></svg>
-      <span>AI 出的诊断、改写、规划一律<b>仅供参考</b>；原简历只新增版本、<b>永不覆盖</b>。本机不代收简历，岗位申请仍在来源平台或官方渠道完成。</span>
+      <span>原简历只新增版本、<b>永不覆盖</b>；岗位申请在来源平台或官方渠道完成。</span>
     </div>
     <div class="notice" data-when="first">
       <svg class="ic"><use href="#i-info"/></svg>
@@ -289,7 +290,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
     <div class="glabel">
       <b>这个台面能做的八件事</b>
-      <span>每张卡都标了是不是 AI 功能 · 标 AI 的结论只作参考 · 下方三张是我的记录路牌</span>
+      <span>卡上标「AI / 非 AI」· 下方三张是我的记录路牌</span>
     </div>
 
     <!-- ══════════ 八张能力卡 ══════════ -->
@@ -299,9 +300,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="diagnose" data-when="default first device-off" href="09-resume-workbench.html?stage=s3">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-search"/></svg></span><span class="hc-nm">AI简历诊断</span></span>
-        <span class="hc-ds">上传 PDF 或图片简历，AI 解析结构、指出问题，给出针对性改进建议。</span>
+        <span class="hc-ds">上传简历，AI 解析结构、指出问题</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -309,7 +310,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-search"/></svg></span><span class="hc-nm">AI简历诊断</span></span>
         <span class="hc-ds">要模型读你的简历才出结论，现在做不了。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>改成对着素材库自己核对</a>
         </span>
       </div>
@@ -318,9 +318,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="optimize" data-when="default first device-off" href="09-resume-workbench.html?stage=s4">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span><span class="hc-nm">AI简历优化</span></span>
-        <span class="hc-ds">说清目标岗位，AI 逐条重写表达；改写按条采纳，原件只新增版本不覆盖。</span>
+        <span class="hc-ds">说清目标岗位，AI 逐条重写表达</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -328,7 +328,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span><span class="hc-nm">AI简历优化</span></span>
         <span class="hc-ds">改写要模型生成，这一项现在做不了。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>去素材库自己动手改</a>
         </span>
       </div>
@@ -337,9 +336,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="generate" data-when="default first device-off" href="10-resume-interview.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-brain"/></svg></span><span class="hc-nm">简历生成</span></span>
-        <span class="hc-ds">还没有简历：小青逐题问、你答，边答边成形；跳过的项不编造，完成后可打印。</span>
+        <span class="hc-ds">没有简历时：小青逐题问，边答边成形</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -347,7 +346,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-brain"/></svg></span><span class="hc-nm">简历生成</span></span>
         <span class="hc-ds">访谈式生成整条链都靠模型，现在做不了。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>先去素材库看版式</a>
         </span>
       </div>
@@ -356,7 +354,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--local" data-cap="templates" href="33-resume-templates.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-book"/></svg></span><span class="hc-nm">简历素材库</span></span>
-        <span class="hc-ds">看版式方向与求职材料模板，照着自己编辑；不登录能看，AI 不可用也照常。</span>
+        <span class="hc-ds">看版式与材料模板，照着自己编辑</span>
         <span class="hc-ft">
           <span class="chip chip--jade">不依赖 AI · 一直可用</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -367,9 +365,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="career" data-when="default first device-off" href="22-career-plan.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-route"/></svg></span><span class="hc-nm">职业规划</span></span>
-        <span class="hc-ds">结合你填的经历与目标，给发展方向与可执行的行动项，可打印带走。</span>
+        <span class="hc-ds">按你的经历与目标给方向和行动项</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -377,7 +375,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-route"/></svg></span><span class="hc-nm">职业规划</span></span>
         <span class="hc-ds">方向与行动项由模型生成，现在做不了。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="28-self-assessment.html"><svg class="ic"><use href="#i-check"/></svg>先做自我评估的题目</a>
         </span>
       </div>
@@ -386,9 +383,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="materials" data-when="default first device-off" href="12-material-factory.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-package"/></svg></span><span class="hc-nm">求职材料</span></span>
-        <span class="hc-ds">求职信、自我介绍、材料清单、作品集封面；线上库现有 5 个文档模板，生成完可打印。</span>
+        <span class="hc-ds">求职信、自我介绍、材料清单、封面</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -396,7 +393,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-package"/></svg></span><span class="hc-nm">求职材料</span></span>
         <span class="hc-ds">正文由模型按模板生成，现在做不了。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>去看模板要填哪几项</a>
         </span>
       </div>
@@ -405,7 +401,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--local" data-cap="print" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span><span class="hc-nm">简历打印</span></span>
-        <span class="hc-ds">简历定稿后在本机打印，走标准文档流程；金额以打印工作台核价与现场公示价为准。</span>
+        <span class="hc-ds">定稿后在本机打印，走标准文档流程</span>
         <span class="hc-ft">
           <span class="chip chip--jade">不依赖 AI · 依赖打印机</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -424,17 +420,16 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard" data-cap="jobfit" data-when="default first device-off" href="11-jobfit-compare.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位匹配参考</span></span>
-        <span class="hc-ds">拿简历对照具体岗位，给较高 / 中等 / 偏低三档参考并逐项列证据，不预测录用概率。</span>
+        <span class="hc-ds">简历对照岗位，给三档参考并列证据</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI 生成 · 仅供参考</span>
+          <span class="chip chip--amber">AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
       <div class="hcard hcard--off" data-when="ai-down">
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位匹配参考</span></span>
-        <span class="hc-ds">对照与三档参考都要模型判断，现在做不了。替代：岗位详情页的任职要求可以自己逐条对。</span>
+        <span class="hc-ds">对照要模型判断，这次做不了</span>
         <span class="hc-ft">
-          <span class="chip chip--info">AI 暂不可用</span>
           <a class="inlink" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>去看岗位要求</a>
         </span>
       </div>
@@ -478,10 +473,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>问问小青</a>
     <a class="btn btn--lg btn--ghost" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>只有纸质简历</a>
 
-    <span class="actionbar-hint" data-when="default">八项功能全在这一屏 · 标 AI 的结论仅供参考，是否采用你定</span>
+    <span class="actionbar-hint" data-when="default">八项功能全在这一屏 · 是否采用你定</span>
     <span class="actionbar-hint" data-when="first">不登录也能用 · 记录留不下，保存那一步再登录</span>
     <span class="actionbar-hint" data-when="ai-down">六项 AI 功能暂不可用 · 素材库与打印照常</span>
     <span class="actionbar-hint" data-when="device-off">打印机离线 · 其余七项不受影响，做完先存我的文档</span>
@@ -515,7 +511,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       cap: 'diagnose',
       act: '你选了「手里已经有简历」 → 先做 AI简历诊断',
       why: '<span class="k">理由</span>先看清问题在哪再动手改，比直接改省一遍返工；诊断只读你的简历，<b>不动原件</b>。<span class="ev ev--e1">E1 你自己选的</span>',
-      cost: '<span class="k">代价</span>约 2 分钟；记一次 AI 服务；结论仅供参考，采不采用你定。',
+      cost: '<span class="k">代价</span>约 2 分钟；记一次 AI 服务；采不采用你定。',
       alt: '<span class="k">备选</span>已经知道要改哪几处 → 直接进「AI简历优化」；只想把现有的打出来 → 「简历打印」。'
     },
     none: {
@@ -564,5 +560,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   })
 })()
 </script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

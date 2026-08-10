@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   .work--detail { grid-template-columns: 1fr 396px; }
   /* 离站确认层默认不存在，点了外链动作才出现 */
@@ -41,7 +42,7 @@
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">岗位详情</div>
-        <div class="brand-sub">01 号机 · 来源第三方 · 投递在来源平台</div>
+        <div class="brand-sub">01 号机 · 来源第三方</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -240,13 +241,13 @@
           </div>
           <div style="font-size:var(--fz-2);line-height:1.55;color:var(--fog-800)">
             <span style="display:flex;align-items:center;gap:8px">
-              <b style="color:var(--fog-900)">想核实什么</b><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+              <b style="color:var(--fog-900)">想核实什么</b><span class="ev ev--e3">E3</span>
             </span>
             「独立完成活动」的边界：预算与投放资源，当面问清。
           </div>
           <div style="font-size:var(--fz-2);line-height:1.55;color:var(--fog-800)">
             <span style="display:flex;align-items:center;gap:8px">
-              <b style="color:var(--fog-900)">建议准备什么</b><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+              <b style="color:var(--fog-900)">建议准备什么</b><span class="ev ev--e3">E3</span>
             </span>
             一两个带数据的活动案例，一段讲得清的取数经历。
           </div>
@@ -348,12 +349,12 @@
         <div class="pane-hd"><span class="t">下架岗位，多防一手</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>之后若有人以「用户运营专员 · 广州××科技」名义联系你，先在来源平台核对岗位是否真的在招。
-            <b>凡要你先交费或先交证件原件的，务必警惕；可向来源平台与人力资源社会保障部门核实、反映。</b></span>
+          <span>有人以这个岗位名义联系你，先在来源平台核对是否真的在招。
+            <b>要你先交费或交证件原件的，务必警惕，可向主管部门反映。</b></span>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>本机不代收任何费用；招聘方是否收费、是否合规，以主管部门规定为准。这条口径在本机所有岗位页一致，与岗位是否下架无关。</span>
+          <span>本机不代收任何费用；招聘方是否收费、是否合规，以主管部门规定为准。</span>
         </div>
       </div>
 
@@ -425,11 +426,12 @@
 
   <div class="actionbar">
       <a class="backbtn" href="13-jobs-desk.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="ok">
         <div data-when="default device-off"><div class="t">和你的简历比：参考较高（5 对上 / 2 差一点 / 1 没写到）</div><div class="s">投递在来源平台自己完成 · 本机不代收简历</div></div>
         <div data-when="first"><div class="t">扫码可在手机上打开来源平台的岗位页</div><div class="s">上传简历后可看三档匹配参考</div></div>
-        <div data-when="ai-down"><div class="t">匹配参考不可用，岗位与投递入口正常</div><div class="s">投递在来源平台自己完成 · 本机不代收简历</div></div>
+        <div data-when="ai-down"><div class="t">匹配参考不可用，岗位与投递入口正常</div></div>
       </div>
       <div data-at="expired"><div class="t">来源平台已下架，不建议再投</div><div class="s">投递入口已关闭 · 要求仍可用于比对</div></div>
       <div data-at="error"><div class="t">详情没取到，已自动上报</div><div class="s">不用列表摘要凑详情——缺职责与要求你判断不了</div></div>
@@ -482,5 +484,7 @@
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>
