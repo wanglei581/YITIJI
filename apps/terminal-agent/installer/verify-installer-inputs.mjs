@@ -89,6 +89,7 @@ for (const buildScript of [buildMsi, buildExe]) {
   assert.match(buildScript, /three-part numeric/)
   assert.match(buildScript, /Windows Installer bounds/)
   assert.match(buildScript, /-p:ProductVersion=\$ProductVersion/)
+  assert.match(buildScript, /\$resolvedOutputDirectory = \(Resolve-Path -LiteralPath \$OutputDirectory\)\.Path/)
 }
 assert.match(buildExe, /Expected exactly one MSI input/)
 assert.match(buildExe, /AIJobPrintTerminalSetup\.exe/)

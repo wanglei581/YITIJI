@@ -56,11 +56,11 @@ jobs:
       - name: Build predecessor 0.3.0 upgrade fixture
         shell: powershell
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1 `
+          & apps/terminal-agent/installer/build-msi.ps1 `
             -ProductVersion 0.3.0 `
             -OutputDirectory apps/terminal-agent/installer/artifacts/upgrade/predecessor/msi
           $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/upgrade/predecessor/msi -Filter *.msi | Select-Object -First 1
-          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1 `
+          & apps/terminal-agent/installer/build-exe.ps1 `
             -MsiPath $msi.FullName `
             -ProductVersion 0.3.0 `
             -OutputDirectory apps/terminal-agent/installer/artifacts/upgrade/predecessor/exe
