@@ -136,6 +136,31 @@
   /* 主按钮 64px / 次按钮 56px */
   .actionbar .btn--primary { height: 64px; font-size: 22px; }
   .actionbar .btn--lg { height: 56px; font-size: 20px; }
+
+  /* ══ 原型外壳条 · 评审开关（不属于产品界面）═══════════════════════════
+     与 .shell 同级浮在舞台外，平时隐身、碰到才现身；?capture=1 下不渲染。 */
+  .proto-rail {
+    position: fixed; left: 16px; top: 62px; z-index: var(--z-shell);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    max-width: calc(100vw - 32px);
+    padding: 7px 10px; border-radius: var(--r-lg);
+    background: rgba(8, 16, 18, .86); border: 1px solid rgba(232, 241, 241, .12);
+    backdrop-filter: blur(14px);
+    font-family: var(--ff-ui); font-size: 12px;
+    opacity: .1; transition: opacity .18s ease-out;
+  }
+  .proto-rail:hover, .proto-rail:focus-within { opacity: 1; }
+  .proto-rail-id { color: var(--fog-600); letter-spacing: .08em; padding: 0 6px 0 2px; }
+  .proto-rail .states { display: flex; gap: 6px; }
+  .proto-rail .stbtn {
+    min-height: 28px; height: 28px; padding: 0 11px; font-size: 12px;
+    color: var(--fog-700); border-color: rgba(232, 241, 241, .12);
+  }
+  .proto-rail .rail-count {
+    margin-left: 4px; padding-left: 8px; border-left: 1px solid rgba(232, 241, 241, .16);
+    font-size: 12px; color: var(--fog-600);
+  }
+  body.capture .proto-rail { display: none !important; }
 </style>
 </head>
 <body>
@@ -161,14 +186,10 @@
     <div class="clock" data-clock>2026年8月8日 <b>10:38</b></div>
   </header>
 
-  <div class="rail">
-    <div class="states">
-      <button class="stbtn" data-go="ok"><svg class="ic" style="width:17px;height:17px"><use href="#i-briefcase"/></svg>正常</button>
-      <button class="stbtn" data-go="expired"><svg class="ic" style="width:17px;height:17px"><use href="#i-clock"/></svg>岗位已过期</button>
-      <button class="stbtn" data-go="error"><svg class="ic" style="width:17px;height:17px"><use href="#i-offline"/></svg>加载失败</button>
-    </div>
-    <span class="rail-count">过期与失败都要接线</span>
-  </div>
+  <!-- 2026-08-11：岗位状态切换器（正常/已过期/加载失败）是**评审用的原型开关**，
+       不是用户界面控件 —— 用户看到的是他点进来的那条岗位的真实状态，不该有得选。
+       已整体移到 .stage 之外的原型外壳条（见文件末尾 .proto-rail），
+       评审视图照常可切三态，?capture=1 的产品视图里不渲染。切换能力没有删。 -->
 
   <div class="work work--detail">
     <div class="wmain">
@@ -466,6 +487,18 @@
 </div>
 </div>
 
+<!-- ══ 原型外壳条（.shell 同级）· 评审开关，产品视图不渲染 ══════════════
+     data-rail 让 scripts/stage.js 的 stageList() 仍按这里的顺序识别状态序列。 -->
+<div class="proto-rail" data-rail aria-label="评审用：岗位状态切换">
+  <span class="proto-rail-id">评审 · 岗位状态</span>
+  <div class="states">
+    <button class="stbtn" data-go="ok">正常</button>
+    <button class="stbtn" data-go="expired">岗位已过期</button>
+    <button class="stbtn" data-go="error">加载失败</button>
+  </div>
+  <span class="rail-count">过期与失败都要接线</span>
+</div>
+
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
@@ -481,6 +514,13 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+
+  /* 原型外壳条已移出 .screen，stages.js 的委托监听挂在 .screen 上够不着，
+     这里补一条同样调用 v3Stage 的转发 —— 切换能力与原来完全一致。 */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.proto-rail [data-go]')
+    if (b && window.v3Stage) window.v3Stage(b.getAttribute('data-go'))
+  })
 
   /* 弹层一律用 class 控制，不用 hidden——hidden 是四态/阶段机制的地盘（本轮踩过） */
   function on (id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn) }

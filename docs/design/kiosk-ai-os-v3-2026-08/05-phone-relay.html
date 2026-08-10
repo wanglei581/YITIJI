@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P05 手机接力 ───────────────────────────────────────────────────────
    **390×844，不是 1080×1920。**这是全套里唯一的手机端页面。
@@ -114,6 +115,10 @@
   color:var(--fog-600); }
 .up-bar { height:6px; border-radius:3px; background:var(--fog-a12); overflow:hidden; }
 .up-bar i { display:block; height:100%; background:var(--jade-500); border-radius:3px; }
+
+/* 折叠条：手机版式（390×844）。面板上限比一体机小一档；
+   JS 还会按「.ph-top 下沿 → 横条上沿」的实际可用空间再收紧一次。 */
+.nb-bar--phone { --nb-max: 420px; }
 </style>
 </head>
 <body>
@@ -195,11 +200,6 @@
             要出纸就回到机器前面点「开始打印」。</span>
     </div>
 
-    <div class="ph-note ph-note--calm">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <span>传过去的文件<b>只进入这一次办理</b>，跟着机器那边的规则走：
-            没登录就离场即清，登录了才存进账号。</span>
-    </div>
   </div>
 
   <!-- ─────────── S2 正在传 ─────────── -->
@@ -227,18 +227,7 @@
       <div class="up-bar"><i style="width:62%"></i></div>
     </div>
 
-    <div class="ph-note ph-note--calm">
-      <svg class="ic"><use href="#i-info"/></svg>
-      <span>用<b>手机流量</b>比连大厅公共 WiFi 稳 —— 公共 WiFi 常有认证页拦着，
-            传到一半会断。</span>
-    </div>
 
-    <div class="ph-note ph-note--warn">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <!-- 2026-08-10 口径统一：原来一句 7 天盖住所有类型；基准表按类型分档，这里照抄 -->
-      <span>证件类文件传过去后，机器上默认<b>办完即清</b>。
-            如果你选了存进账号，按文件类型算：证件类等敏感件 <b>7 天</b>，一般文档 <b>90 天</b>。</span>
-    </div>
 
     <div class="ph-note ph-note--calm">
       <svg class="ic"><use href="#i-alert"/></svg>
@@ -267,14 +256,45 @@
 
     <div class="ph-note ph-note--calm">
       <svg class="ic"><use href="#i-info"/></svg>
-      <span><b>本机没有 App，也不需要你装。</b>
-            下次要用，还是走到机器前扫一次码 —— 那样最省事，
-            也不用在手机上多留一个东西。</span>
+      <span><b>本机没有 App，也不需要你装。</b></span>
     </div>
+  </div>
 
-    <div class="ph-note ph-note--calm">
+
+  <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条（手机版式） ══════════
+       收进来的：这一页是什么 / 合规边界 / 隐私与保留期限 / 传输口径 /
+                 产物去向（为什么这一页不能打印）/ AI 与设备离线的降级说明。
+       **没有**收进来（必须常驻）：顶部「正在为 01 号机服务」、「这一页不能打印」
+       这条当前能力状态、每一态的一句话状态提示与传输进度。 -->
+  <div class="nb-bar nb-bar--phone" data-notebar>
+    <button type="button" class="nb-sum">
       <svg class="ic"><use href="#i-shield"/></svg>
-      <span>这一页<b>不会给你发通知</b>，也不占后台 —— 关掉就行。</span>
+      <span class="nb-sum-t">信息与边界 · <b>只承接这一次办理</b> · 隐私与保留</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>这一页是什么 · 边界在哪</div>
+        <p class="nb-p">这不是第二个 App：<b>没有首页、没有「我的」、没有消息中心</b>，也不需要你装任何东西。它<b>只承接当前这台一体机的这一次办理</b>——机器那边办完，这一页立即失效。它<b>不会给你发通知</b>，也不占后台，关掉就行；下次要用，走到机器前再扫一次码。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>为什么这一页不能打印</div>
+        <p class="nb-p">出纸是机器上的动作，<b>必须在机器前面按</b>——这一页只负责把文件递过去、把做完的接回来。费用与核价都在机器上的打印工作台完成，手机这边不收款。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+        <p class="nb-p">传过去的文件<b>只进入这一次办理</b>，跟着机器那边的规则走：<b>没登录就离场即清</b>，登录了才存进账号。证件类文件在机器上默认<b>办完即清</b>；选了存进账号的按类型算：证件类等敏感件 <b>7 天</b>，一般文档 <b>90 天</b>。</p>
+        <p class="nb-p">在自己手机上输手机号，<b>号码不会出现在大厅那块屏幕上</b>——把敏感输入挪离公共屏幕是有意的设计。办理结束后没存、没打印的东西<b>已经清掉了</b>，机器那边不留，这一页也拿不回来；你存进手机的文件不受影响。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-upload"/></svg>传输口径</div>
+        <p class="nb-p">传的时候别关这一页、也别锁屏，传完机器那边会自动出现，不用手动刷新。用<b>手机流量比连大厅公共 WiFi 稳</b>——公共 WiFi 常有认证页拦着，传到一半会断。传失败会明确告诉你是哪一个、为什么，<b>不会悄悄少传一份</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 或机器离线时会怎样</div>
+        <p class="nb-p"><b>AI 不可用：</b>文件照样能传，机器那边暂时不做识别与建议。<b>机器离线：</b>传过去也打不出来，可以先存进「我的文档」，等机器好了或换一台在线的机器再打，别白跑一趟。当前是哪种情况，以底部那行状态提示为准。</p>
+      </div>
     </div>
   </div>
 
@@ -305,6 +325,7 @@
 
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

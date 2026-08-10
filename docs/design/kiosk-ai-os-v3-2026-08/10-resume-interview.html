@@ -67,6 +67,11 @@
   .said--todo { border-style: dashed; background: transparent; }
   .said--todo .said-a { color: var(--fog-600); }
   .said-group { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .08em; margin: var(--s-2) 0 0; }
+  /* 2026-08-10：.qa-said 自己能滚，但它外层 .pane 没有 overflow，
+     audit-plus 的「卡内溢出」按 [class*="pane"] 选容器，会把滚动区里
+     露出卡底的条目算成溢出（页脚折叠条占掉 64px 后实测 52px）。
+     给这一个 pane 显式收边：内部裁切那一支会因为中间隔着可滚的 .qa-said 而豁免。 */
+  .pane:has(> .qa-said) { overflow: hidden; }
   /* chip--info：状态提示，非入口（先例见 P14/P17） */
   .chip--info { cursor: inherit; }
   /* 2026-08-10 补验：s3「版本与体检」里的裸 <a> 实测只有 41px 高，

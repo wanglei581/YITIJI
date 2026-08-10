@@ -235,6 +235,33 @@
     font-size: 19px; color: var(--fog-600); line-height: 1.65;
   }
   .relaxwhy b { color: var(--fog-800); }
+
+  /* ══ 原型外壳条 · 评审开关（不属于产品界面）═══════════════════════════
+     2026-08-11：结果状态切换器原先摆在正文顶部占 92px 一整条，用户会当成
+     可点的业务筛选。现在与 .shell 同级浮在舞台外，平时隐身、碰到才现身；
+     ?capture=1 的产品视图里整条不渲染。评审仍可切三态。 */
+  .proto-rail {
+    position: fixed; left: 16px; top: 62px; z-index: var(--z-shell);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    max-width: calc(100vw - 32px);
+    padding: 7px 10px; border-radius: var(--r-lg);
+    background: rgba(8, 16, 18, .86); border: 1px solid rgba(232, 241, 241, .12);
+    backdrop-filter: blur(14px);
+    font-family: var(--ff-ui); font-size: 12px;
+    opacity: .1; transition: opacity .18s ease-out;
+  }
+  .proto-rail:hover, .proto-rail:focus-within { opacity: 1; }
+  .proto-rail-id { color: var(--fog-600); letter-spacing: .08em; padding: 0 6px 0 2px; }
+  .proto-rail .states { display: flex; gap: 6px; }
+  .proto-rail .stbtn {
+    min-height: 28px; height: 28px; padding: 0 11px; font-size: 12px;
+    color: var(--fog-700); border-color: rgba(232, 241, 241, .12);
+  }
+  .proto-rail .rail-count {
+    margin-left: 4px; padding-left: 8px; border-left: 1px solid rgba(232, 241, 241, .16);
+    font-size: 12px; color: var(--fog-600);
+  }
+  body.capture .proto-rail { display: none !important; }
 </style>
 </head>
 <body>
@@ -261,14 +288,9 @@
     <div class="clock" data-clock>2026年8月8日 <b>10:32</b></div>
   </header>
 
-  <div class="rail">
-    <div class="states">
-      <button class="stbtn" data-go="ok"><svg class="ic" style="width:17px;height:17px"><use href="#i-briefcase"/></svg>有结果</button>
-      <button class="stbtn" data-go="empty"><svg class="ic" style="width:17px;height:17px"><use href="#i-search"/></svg>空结果</button>
-      <button class="stbtn" data-go="error"><svg class="ic" style="width:17px;height:17px"><use href="#i-offline"/></svg>加载失败</button>
-    </div>
-    <span class="rail-count">三种状态都要接线</span>
-  </div>
+  <!-- 2026-08-11：结果状态切换器（有结果/空结果/加载失败）是**评审用的原型开关**，
+       不是用户界面控件。已整体移到 .stage 之外的原型外壳条（见文件末尾 .proto-rail），
+       评审视图照常可切，?capture=1 的产品视图里不渲染。切换能力没有删。 -->
 
   <div class="work work--list">
     <div class="wmain">
@@ -574,8 +596,10 @@
       <!-- 加载失败 -->
       <div class="blank" data-at="error">
         <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
-        <b>岗位数据没取到</b>
-        <p>连接数据源失败，<b>不是你的操作问题</b>，已自动上报。</p>
+        <b>岗位数据暂不可用</b>
+        <!-- 2026-08-11：失败态只留「暂不可用 · 已上报 · 重试」三件事。
+             运维口径（连接数据源失败 / 为什么不拿缓存充数）收进下面的技术档案折叠。 -->
+        <p><b>不是你的操作问题</b>，已自动上报，可以重试。</p>
         <div class="acts">
           <button class="btn btn--primary">重试</button>
           <a class="btn btn--ghost" href="17-fair-desk.html">先看招聘会</a>
@@ -583,9 +607,9 @@
           <a class="btn btn--ghost" href="35-online-platforms.html">去线上平台自己搜</a>
         </div>
         <details class="fold" style="max-width:34em;width:100%;text-align:left">
-          <summary>故障档案与「为什么不给你看缓存」</summary>
+          <summary>技术档案（运维用）</summary>
           <div class="fold-b">
-            过期岗位比没有岗位更糟：招满了、下架了、薪资改了，你按它跑一趟是白跑。本机宁可这一屏空着，也不拿旧数据充数。
+            连接数据源失败。为什么不拿缓存充数：过期岗位比没有岗位更糟 —— 招满了、下架了、薪资改了，你按它跑一趟是白跑。本机宁可这一屏空着，也不拿旧数据充数。
             <div class="kv">
               <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 09:20</span></div>
               <div class="kv-row"><span class="k">失败发生</span><span class="v">10:32 · 已自动重试 2 次</span></div>
@@ -765,7 +789,9 @@
         <div data-when="first"><div class="t">按同步时间倒序</div><div class="s">上传简历后可按你的经历收敛并给三档参考</div></div>
         <div data-when="ai-down"><div class="t">收敛不可用，列表与详情正常</div><div class="s">筛选、扫码、去来源平台都不受影响</div></div>
       </div>
-      <div data-at="empty"><div class="t">这些条件同时满足的岗位这一刻没有</div><div class="s">不会凑几条不符合的充数 · 上面逐条写了放宽哪一条能多出几条</div></div>
+      <!-- 这一行也得短：「不凑不符合的充数」主区那段已经写过，操作栏不重复，
+           只留这一屏新增的那件事 —— 放宽哪一条能多出几条，上面逐条写了。 -->
+      <div data-at="empty"><div class="t">这些条件同时满足的岗位这一刻没有</div><div class="s">上面逐条写了放宽哪一条能多出几条</div></div>
       <div data-at="error"><div class="t">岗位数据没取到，已自动上报</div><div class="s">不显示过期缓存——按过期岗位跑一趟是白跑</div></div>
     </div>
 
@@ -791,6 +817,18 @@
 </div>
 </div>
 
+<!-- ══ 原型外壳条（.shell 同级）· 评审开关，产品视图不渲染 ══════════════
+     data-rail 让 scripts/stage.js 的 stageList() 仍按这里的顺序识别状态序列。 -->
+<div class="proto-rail" data-rail aria-label="评审用：结果状态切换">
+  <span class="proto-rail-id">评审 · 结果状态</span>
+  <div class="states">
+    <button class="stbtn" data-go="ok">有结果</button>
+    <button class="stbtn" data-go="empty">空结果</button>
+    <button class="stbtn" data-go="error">加载失败</button>
+  </div>
+  <span class="rail-count">三种状态都要接线</span>
+</div>
+
 <!-- 两份取值表。行业**不是字典**：后端 job.industry 是来源平台原文（自由文本），
      这里只列本机已收到的 8 种取值，弹层里也这么标注，不冒充全集。
      来源机构 12 家＝线上平台 8 + 官方机构 2 + 线下机构 2，与页脚统计同一份。 -->
@@ -812,6 +850,12 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+  /* 原型外壳条已移出 .screen，stages.js 的委托监听挂在 .screen 上够不着，
+     这里补一条同样调用 v3Stage 的转发 —— 切换能力与原来完全一致。 */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.proto-rail [data-go]')
+    if (b && window.v3Stage) window.v3Stage(b.getAttribute('data-go'))
+  })
 })()
 </script>
 <script>
@@ -883,11 +927,37 @@
     var pays = names(group('pay'))
     var reg = regionVal().split('|')
     var live = { dir: dirs.join(' · '), pay: pays[0] || '', area: reg[2] || reg[1] || '' }
+    var best = null
     for (var i = 0; i < rows.length; i++) {
       var ax = rows[i].getAttribute('data-relax-axis')
       rows[i].hidden = !live[ax]
       var from = rows[i].querySelector('[data-relax-from="' + ax + '"]')
       if (from && live[ax]) from.textContent = live[ax]
+      /* 行本身按「可多几条」从多到少排好了，第一条可见的就是最划算的那条 */
+      if (!best && !rows[i].hidden) best = rows[i]
+    }
+    /* 右下角主按钮 = 最划算的那一条。文案跟着写实，没有可放宽的条件就不出这个键。 */
+    var go = scr.querySelector('[data-relax-best]')
+    if (go) {
+      var t = go.querySelector('[data-relax-best-t]')
+      if (best) {
+        go.setAttribute('data-relax', best.getAttribute('data-relax-axis'))
+        go.style.display = ''
+        if (t) {
+          var n = best.querySelector('.relaxone-n b')
+          var to = best.querySelectorAll('.relaxone-t b')
+          /* 文案必须短。操作栏是定高一行：返回键 + 提示区 + 次要键 + 这个主键并排，
+             主键写长了会把中间的提示区挤成一条 95px 的窄柱，两行小字直接溢出条外
+             （实测溢出 40px，四态都溢）。所以只写「放宽到<新值> · 多 N 条」：
+             轴名不重复（上面那一行已经写了「地区 天河区 →」），
+             理由也不重复（上面三行本身就是理由）。 */
+          t.textContent = '放宽到 ' + (to[1] ? to[1].textContent : '更宽的条件') +
+                          (n ? ' · 多 ' + n.textContent + ' 条' : '')
+        }
+      } else {
+        go.removeAttribute('data-relax')
+        go.style.display = 'none'
+      }
     }
   }
 

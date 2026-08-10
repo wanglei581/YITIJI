@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P29 专用（需求真值 = p29-p31-design-spec.md P29 节） ─────────────────
    本页主状态是「还没有」：后端零实现是主因，硬件只挡拍摄与相纸。
@@ -260,12 +261,7 @@
           <span class="lock-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
           <div class="lock-t">证件照排版尚未开放</div>
           <div class="lock-p">
-            主因是<b>后端一项服务都还没建</b>：规格校验、AI 换底、A4 排版 PDF 都是零实现，
-            能力开关 <b>id_photo</b> 也保持默认关闭。硬件只挡两件事：
-            本机没有补光灯和背景板，所以<b>不做现场拍摄</b>；只装了 A4 普通纸，<b>相纸未配置</b>。<br><br>
-            上传照片再由 AI 规格化是<b>纯软件路径，不依赖拍摄硬件</b> ——
-            后端服务建成，上传这条路就能先开，不用等硬件。
-            这一页不是坏了，是还没建成；后面几步是开放后的示意。
+            这一页<b>不是坏了，是还没建成</b>；后面几步是开放后的示意。
           </div>
         </div>
       </div>
@@ -310,10 +306,9 @@
           </div>
           <div class="notice" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>各家受理方（用人单位、报名系统、发证机关）要求不一，
-                  <b>以受理方公布的规格为准</b>，本表只是常见值。</span>
+            <span><b>以受理方公布的规格为准</b>，本表只是常见值。</span>
           </div>
-          <div class="note-end">开放后这四种规格都走同一条流程：传照片 → 体检 → 选底色 → A4 排版。</div>
+
         </div>
       </div>
 
@@ -417,10 +412,7 @@
           <span class="lock-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
           <div class="lock-t">AI 体检不可用 · 这一步不出结论</div>
           <div class="lock-p">
-            头部占比、居中度、背景色差都要 AI 来量。现在量不了，
-            本页就<b>不给「大概合格」这类含糊话</b> —— 结论造不出来就不出。<br><br>
-            照片本身合格的话，可以跳过体检直接去 A4 排版：排版是机械动作，不依赖 AI。
-            换底也是 AI 做的，这一态同样做不了。
+            本页<b>不给「大概合格」这类含糊话</b> —— 结论造不出来就不出。
           </div>
         </div>
         <div class="sec" style="flex:1 1 auto;display:flex;flex-direction:column;gap:var(--s-3)">
@@ -466,8 +458,7 @@
           </div>
           <div class="notice notice--amber" data-when="ai-down" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>AI 不可用：底色一组里的蓝底、红底都换不了（已置灰），已自动退回白底。
-                  白底是<b>不换底、用原图</b>，规格照常可选，可以继续。</span>
+            <span>AI 不可用：蓝底、红底换不了（已置灰），<b>已自动退回白底</b>，可以继续。</span>
           </div>
           <div class="note-end" data-out="specNote">已选<b>一寸 · 白底</b>，A4 排 8 张。样片为剪影示意。</div>
         </div>
@@ -598,6 +589,43 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：未开放的真实原因与开放顺序 / 规格口径与受理方口径 /
+                     敏感文件的隐私与保留期限 / 产物去向与费用 / AI 离线降级的详细说明。
+           **没有**收进来（必须常驻）：「证件照排版尚未开放」「AI 体检不可用 · 这一步不出结论」
+           这类当前状态、常驻的「开放后示意」预览横幅、体检结论旁的证据徽章与数值。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>未开放的真实原因</b> · 规格口径 · 隐私与费用</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>为什么还没开放 · 会按什么顺序开</div>
+            <p class="nb-p">主因是<b>后端一项服务都还没建</b>：规格校验、AI 换底、A4 排版 PDF 都是零实现，能力开关 <b>id_photo</b> 也保持默认关闭。硬件只挡两件事：本机没有补光灯和背景板，所以<b>不做现场拍摄</b>；只装了 A4 普通纸，<b>相纸未配置</b>。</p>
+            <p class="nb-p">上传照片再由 AI 规格化是<b>纯软件路径，不依赖拍摄硬件</b>——后端服务建成，上传这条路就能先开，不用等硬件。按项目口径不做占位流程：<b>没有真实能力就显示为未开放</b>，并给出替代路径。现在真能用的是：打印已有的证件照电子版、把纸质照片扫成电子件留存。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>规格口径以谁为准</div>
+            <p class="nb-p">各家受理方（用人单位、报名系统、发证机关）要求不一，<b>以受理方公布的规格为准</b>，本页的常见规格表只是参考值。开放后四种规格都走同一条流程：传照片 → 体检 → 选底色 → A4 排版。换底是 AI 做的，发丝、眼镜边缘可能出瑕疵，<b>机器判断不了「这瑕疵要不要紧」，所以打印前必须由你本人确认</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+            <p class="nb-p">证件照属<b>敏感文件</b>：存进「我的文档」后按敏感件 <b>7 天</b> 计，到期自动清理并保留删除日志；没存进去的只留到本次会话结束，未登录一律离场即清。只有你本人可见，管理员访问写审计日志，<b>不向任何企业提供</b>。换照后的简历新版本走「我的简历」的保存规则，和证件照的短期清理互不影响。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">这一页<b>只到「送去打印工作台」为止</b>——核价、支付、出纸、取件都在那边完成并计入订单，本页不收款。A4 排版会把裁切框一起印出来，照线裁开就能用；<b>相纸未配置</b>，用不用相纸以本机配置为准，配好后单独开放。排版产物可以存进「我的文档」，换一台在线的机器登录后接着打，已做的步骤不作废。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">头部占比、居中度、背景色差<b>都要 AI 来量</b>。量不了的时候本页<b>不给「大概合格」这类含糊话</b>——结论造不出来就不出。仍然能做：上传照片、按原底色做 <b>A4 排版</b>（排版是机械动作，不依赖 AI）、送打印；蓝底红底换不了会置灰并自动退回白底，白底就是不换底、用原图。恢复后可以回来补一次体检。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -829,7 +857,7 @@
             <svg class="ic"><use href="#i-folder"/></svg>
             <span>换照后的简历新版本走「我的简历」的保存规则，和证件照的短期清理互不影响。</span>
           </div>
-          <div class="note-end">这一页只到「送去打印工作台」为止 —— 核价、支付、出纸、取件都在那边完成并计入订单。</div>
+          <div class="note-end">核价、支付、出纸、取件都在打印工作台完成并计入订单。</div>
         </div>
       </div>
 
@@ -1043,6 +1071,7 @@
   render()
 })()
 </script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

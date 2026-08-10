@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P26 专用 ───────────────────────────────────────────────────────────
    九个能力共用一个作业面，只有三种作业型：
@@ -353,6 +354,48 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界与「她不会替你编什么」的口径 / 三种作业型的解释 /
+                     证据分级与出处口径 / 隐私（对话不保存）/ 产物去向与费用 / AI 离线降级说明。
+           **没有**收进来（必须常驻）：逐条结论旁的证据徽章与出处标注（AIGC 标识）、
+           「数字、公司名、时间、离职原因一律留空」这张事实表、当前状态提示。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>不替你编内容</b> · 三种作业型 · 出处与隐私</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：她不会替你编什么</div>
+            <p class="nb-p">数字、公司名、时间、离职原因、证书资质<b>一律留空</b>——这些只有你知道，<b>编出来你面试时答不上，比空着更糟</b>，面试官追问细节的第一句就会露。她做的是<b>把你说的话顺成书面表达</b>，不是替你想内容：你随口说的口语，她会帮你改成能念出口的句子。</p>
+            <p class="nb-p">本机<b>不代收简历、不做平台内投递</b>，也不预测录用结果、不承诺薪资。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-layers"/></svg>三种作业型是怎么定的</div>
+            <p class="nb-p"><b>型由你的问题决定，不用你选。</b>比对型摆开逐条对（「够不够格」），填槽型一问一答替你补齐（「我不会写」），问答型直接给结论和依据（拿不准就直接问）。方案里每一步到了对应工作台<b>还要你自己确认</b>；不按这个顺序办，也不影响已完成的部分。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-check"/></svg>比对口径与证据分级</div>
+            <p class="nb-p">比的是<b>有没有写到</b>，不是<b>写得好不好</b>——后者要懂这一行的人才看得出来，<b>本机没有依据，所以不比</b>。「没写到」的那几条如果你其实做过，那是<b>简历漏写</b>，补上再重跑，结果会变。</p>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你说过的话与你的材料。<span class="nb-e nb-e--2">E2</span> 本机读到的岗位正文等来源事实。<span class="nb-e nb-e--3">E3</span> AI 的判断与建议，仅供参考。答案的出处不一样、可信度就不一样，所以页面上每条都带出处，<b>打印时也会带上，让你自己能分辨哪条更可信</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 对话保存口径</div>
+            <p class="nb-p">对话<b>不保存</b>；只有你主动钉住的条目会带进后续步骤。你的材料与回答只用于生成你自己的东西，<b>不发送企业、不沉淀到任何库</b>；未登录时离场即清。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">这里产出的方案、改写与清单会进「我的简历 / 我的文档」，可以拿去打印。顾问服务<b>不收费</b>，<b>只有出纸收费</b>，核价、支付与取件都在打印工作台完成。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">顾问作业依赖 AI：AI 不可用时这一页不给新结论，已钉住与已生成的内容不受影响，可以照常打印或存档。打印机离线时不出纸，可先存进「我的文档」，换一台在线的机器再打。当前状态以顶栏为准。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -363,8 +406,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>型是怎么定的</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            <b>型由你的问题决定，不用你选。</b><br><br>
-            比对型摆开逐条对，填槽型一问一答替你补齐，问答型直接给结论和依据。
+            <b>型由你的问题决定，不用你选。</b>
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">「够不够格」</span><span class="v">比对型</span></div>
@@ -404,9 +446,7 @@
           <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="09-resume-workbench.html">
             <svg class="ic"><use href="#i-check"/></svg>按这个方案办 · 先去第 1 步
           </a>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            每一步到了对应工作台还要你自己确认；不按这个顺序办，也不影响已完成的部分。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">每一步到了对应工作台还要你自己确认。</div>
         </div>
       </div>
 
@@ -424,8 +464,7 @@
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>比的是<b>有没有写到</b>，不是<b>写得好不好</b>。<br>
-                  后者要懂这一行的人才看得出来，本机没有依据，所以不比。</span>
+            <span>比的是<b>有没有写到</b>，不是<b>写得好不好</b>。</span>
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
@@ -455,7 +494,6 @@
 
           <div class="panel-note" style="margin-top:var(--s-4)">
             她做的是<b>把你说的话顺成书面表达</b>，不是替你想内容。
-            你随口说的口语，她会帮你改成能念出口的句子。
           </div>
 
           <div class="notice" style="margin-top:var(--s-4)">
@@ -495,8 +533,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
-            小青干活的地方。<b>怎么干由你的问题决定</b> ——
-            要比就摆一起比，不会写就一问一答，拿不准就直接答。
+            小青干活的地方。<b>怎么干由你的问题决定</b>。
           </div>
         </div>
       </div>
@@ -537,6 +574,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
