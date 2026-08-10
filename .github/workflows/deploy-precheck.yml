@@ -584,16 +584,28 @@ jobs:
                 raise SystemExit('AUTHORIZATION_WINDOW_INVALID')
             PY
 
-            ARCHIVE="$TMP_ROOT/source.tar.gz"
-            curl --proto '=https' --tlsv1.2 -fsSL --max-redirs 3 \
-              --connect-timeout 10 --max-time 120 \
-              "https://github.com/wanglei581/YITIJI/archive/${SOURCE_COMMIT}.tar.gz" \
-              -o "$ARCHIVE"
-            tar -xzf "$ARCHIVE" -C "$TMP_ROOT"
-            SRC_ROOT="$(find "$TMP_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'YITIJI-*' -print -quit)"
-            test -n "$SRC_ROOT"
+            SRC_ROOT="$TMP_ROOT/source"
+            SOURCE_FILES=(
+              tsconfig.base.json
+              services/api/tsconfig.json
+              services/api/scripts/recruitment-wave2-full-inventory.ts
+              services/api/scripts/support/recruitment-wave2-full-inventory.ts
+              services/api/scripts/support/recruitment-wave2-public-snapshot.ts
+              services/api/scripts/support/recruitment-wave2-readonly-db.ts
+              services/api/src/recruitment-content/recruitment-wave2-target.ts
+              services/api/src/recruitment-content/recruitment-content-readiness.ts
+            )
+            for SOURCE_FILE in "${SOURCE_FILES[@]}"; do
+              mkdir -p "$SRC_ROOT/$(dirname "$SOURCE_FILE")"
+              curl --proto '=https' --tlsv1.2 -fsSL --max-redirs 0 \
+                --connect-timeout 10 --max-time 60 \
+                "https://raw.githubusercontent.com/wanglei581/YITIJI/${SOURCE_COMMIT}/${SOURCE_FILE}" \
+                -o "$SRC_ROOT/$SOURCE_FILE"
+            done
 
             CALCULATED_DIGEST="$(cd "$SRC_ROOT" && sha256sum \
+              tsconfig.base.json \
+              services/api/tsconfig.json \
               services/api/scripts/recruitment-wave2-full-inventory.ts \
               services/api/scripts/support/recruitment-wave2-full-inventory.ts \
               services/api/scripts/support/recruitment-wave2-public-snapshot.ts \
@@ -722,5 +734,5 @@ jobs:
           EVIDENCE_ROOT: /srv/ai-job-print-backups/recruitment-wave2-evidence
           RUN_ID: ${{ github.run_id }}
           SOURCE_COMMIT: b8369021177f95a9d76ca1d9130ad1afb249a720
-          SOURCE_DIGEST: ed80f77c97aeb83f93023b77add08b5cd802d6dba5cef60a555ec0e2bf51ceb0
+          SOURCE_DIGEST: beed48b347a0f0ee18e0d07e757a2b328c343026eba63822560ac9deada60dae
           AUTHORIZED_UNTIL: '2026-08-10T15:25:10Z'
