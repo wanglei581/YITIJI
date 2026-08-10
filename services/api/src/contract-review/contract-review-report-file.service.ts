@@ -73,11 +73,13 @@ export class ContractReviewReportFileService {
     })
     const bucket = this.storage.defaultBucket
     const region = this.storage.defaultRegion
+    const storageProvider = this.storage.driver
     const digest = sha256(args.buffer)
     const record = await this.prisma.fileObject.create({
       data: {
         id,
         storageKey: objectKey,
+        storageProvider,
         bucket,
         region,
         filename: REPORT_FILENAME,
@@ -104,7 +106,7 @@ export class ContractReviewReportFileService {
       },
     })
     try {
-      const put = await this.storage.putObject(objectKey, args.buffer, REPORT_MIME, bucket)
+      const put = await this.storage.putObject(objectKey, args.buffer, REPORT_MIME, bucket, storageProvider)
       if (put.sizeBytes !== args.buffer.length || put.sha256 !== digest) {
         throw new Error('CONTRACT_REVIEW_REPORT_STORAGE_MISMATCH')
       }
@@ -120,7 +122,7 @@ export class ContractReviewReportFileService {
         expiresAt: args.expiresAt,
       }, actualPages)
     } catch (error) {
-      await this.compensateFailedWrite(record.id, objectKey, bucket)
+      await this.compensateFailedWrite(record.id, objectKey, bucket, storageProvider)
       this.storageUnavailable('put', error)
     }
   }
@@ -155,11 +157,11 @@ export class ContractReviewReportFileService {
     let head
     let buffer: Buffer
     try {
-      head = await this.storage.headObject(record.storageKey, record.bucket)
+      head = await this.storage.headObject(record.storageKey, record.bucket, record.storageProvider)
       if (!head || head.sizeBytes !== record.sizeBytes) return null
       const contentType = head.contentType?.split(';', 1)[0]?.trim().toLowerCase() ?? null
       if (contentType !== null && contentType !== REPORT_MIME) return null
-      buffer = await this.storage.getObject(record.storageKey, record.bucket)
+      buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
     } catch (error) {
       this.storageUnavailable('read', error)
     }
@@ -220,9 +222,10 @@ export class ContractReviewReportFileService {
     fileId: string,
     objectKey: string,
     bucket: string,
+    storageProvider: string,
   ): Promise<void> {
     try {
-      await this.storage.deleteObject(objectKey, bucket)
+      await this.storage.deleteObject(objectKey, bucket, storageProvider)
     } catch (error) {
       this.logStorageFailure('delete_compensation', error)
       return

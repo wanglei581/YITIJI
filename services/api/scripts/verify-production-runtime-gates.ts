@@ -7,6 +7,11 @@ const PROD_OK: Env = {
   NODE_ENV: 'production',
   JWT_SECRET: 'a-strong-production-secret-0123456789',
   FILE_STORAGE_DRIVER: 'cos',
+  FILE_STORAGE_LEGACY_DRIVER: 'cos',
+  TENCENT_COS_SECRET_ID: 'cos-secret-id',
+  TENCENT_COS_SECRET_KEY: 'cos-secret-key',
+  TENCENT_COS_BUCKET: 'verify-cos-private',
+  TENCENT_COS_REGION: 'ap-guangzhou',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/ai_job_print',
   REDIS_URL: 'redis://127.0.0.1:6379/0',
   SMS_PROVIDER: 'tencent',
@@ -126,13 +131,97 @@ function main(): void {
   // 生产环境：FILE_STORAGE_DRIVER 门禁
   expectRejected(
     { ...PROD_OK, FILE_STORAGE_DRIVER: 'local' },
-    'PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS',
+    'PRODUCTION_FILE_STORAGE_DRIVER_UNSUPPORTED',
     '生产环境拒绝 FILE_STORAGE_DRIVER=local',
   )
   expectRejected(
     { ...PROD_OK, FILE_STORAGE_DRIVER: undefined },
-    'PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS',
+    'PRODUCTION_FILE_STORAGE_DRIVER_UNSUPPORTED',
     '生产环境拒绝未设置 FILE_STORAGE_DRIVER',
+  )
+  expectRejected(
+    { ...PROD_OK, TENCENT_COS_SECRET_KEY: undefined },
+    'PRODUCTION_FILE_STORAGE_CONFIG_MISSING',
+    '生产环境拒绝 COS 配置不完整',
+  )
+  expectAllowed(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'bos-secret-access-key',
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://bj.bcebos.com',
+    },
+    '生产环境允许百度 BOS 私有对象存储',
+  )
+  expectRejected(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: undefined,
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://bj.bcebos.com',
+    },
+    'PRODUCTION_FILE_STORAGE_CONFIG_MISSING',
+    '生产环境拒绝 BOS 配置不完整',
+  )
+  expectRejected(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      FILE_STORAGE_LEGACY_DRIVER: undefined,
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'bos-secret-access-key',
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://bj.bcebos.com',
+    },
+    'PRODUCTION_FILE_STORAGE_LEGACY_DRIVER_INVALID',
+    '生产环境切 BOS 时拒绝缺失历史 COS 路由声明',
+  )
+  expectRejected(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      TENCENT_COS_SECRET_KEY: undefined,
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'bos-secret-access-key',
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://bj.bcebos.com',
+    },
+    'PRODUCTION_LEGACY_COS_CONFIG_MISSING',
+    '生产环境切 BOS 时拒绝移除历史 COS 凭证',
+  )
+  expectRejected(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'bos-secret-access-key',
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'http://bj.bcebos.com',
+    },
+    'PRODUCTION_BAIDU_BOS_ENDPOINT_INVALID',
+    '生产环境拒绝非 HTTPS BOS endpoint',
+  )
+  expectRejected(
+    {
+      ...PROD_OK,
+      FILE_STORAGE_DRIVER: 'bos',
+      BAIDU_BOS_ACCESS_KEY_ID: 'bos-access-key-id',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'bos-secret-access-key',
+      BAIDU_BOS_BUCKET: 'verify-bos-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://object-storage.example.com',
+    },
+    'PRODUCTION_BAIDU_BOS_ENDPOINT_INVALID',
+    '生产环境拒绝非百度官方 BOS endpoint，防止密钥误发往第三方主机',
   )
 
   // 生产环境：DATABASE_URL 门禁（委托 assertRuntimeDatabaseAllowed）

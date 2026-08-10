@@ -78,7 +78,7 @@ export class PrintSignService {
   async inspect(args: { terminalId: string; document: SignStampSource; endUserId: string | null }): Promise<SignInspectResponse> {
     await this.capabilities.assertUserTaskAllowed(args.terminalId, 'signature_stamp')
     const record = await this.verifyDocumentSource(args.document, args.endUserId)
-    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+    const buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
     // inspect 同样解析 ≤15MB 完整 PDF，与 doCompose 共用并发信号量（解析型 DoS 防线）
     await this.acquireComposeSlot()
     try {
@@ -287,11 +287,11 @@ export class PrintSignService {
     const stampRecord = await this.verifyStampSource(args.stamp, endUserId)
 
     // 顺序读取（禁止 Promise.all，同 print-conversion）
-    const docBuffer = await this.storage.getObject(docRecord.storageKey, docRecord.bucket)
+    const docBuffer = await this.storage.getObject(docRecord.storageKey, docRecord.bucket, docRecord.storageProvider)
     if (!sniffDeclaredMimeMismatch(docBuffer, 'application/pdf').ok) {
       throw new BadRequestException({ error: { code: 'SIGN_DOC_UNSUPPORTED', message: '文档内容与 PDF 格式不符' } })
     }
-    const stampBuffer = await this.storage.getObject(stampRecord.storageKey, stampRecord.bucket)
+    const stampBuffer = await this.storage.getObject(stampRecord.storageKey, stampRecord.bucket, stampRecord.storageProvider)
     if (!sniffDeclaredMimeMismatch(stampBuffer, stampRecord.mimeType).ok) {
       throw new BadRequestException({ error: { code: 'SIGN_STAMP_UNSUPPORTED', message: '图片内容与声明格式不符' } })
     }

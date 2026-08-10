@@ -144,13 +144,13 @@ export interface UploadIntentResponse {
   bucket: string
   region: string
   objectKey: string
-  /** 直传 URL(COS 预签名 PUT;本地为 API 代理 PUT)。 */
+  /** 直传 URL(COS/BOS 预签名 PUT;本地为 API 代理 PUT)。 */
   uploadUrl: string
   uploadMethod: 'PUT'
   /** 直传时应带的请求头(如 Content-Type)。 */
   uploadHeaders: Record<string, string>
   uploadUrlExpiresAt: string
-  /** true=直传 COS;false=回 API 代理写入(本地后端)。 */
+  /** true=直传云对象存储;false=回 API 代理写入。 */
   direct: boolean
 }
 

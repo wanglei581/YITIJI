@@ -59,6 +59,7 @@ type FindingRecord = {
 type SourceFileRecord = {
   id: string
   storageKey: string
+  storageProvider: string
   bucket: string
   filename: string
   mimeType: string
@@ -158,7 +159,7 @@ export class MaterialsService {
       // pii_scan 现在对任意 purpose / mimeType / contentCategory 一律尝试真实抽取，不再有任何
       // 跳过路径。'skipped_non_document' 这个 mode 值仍保留在类型/前端展示逻辑里，只是为了兼容
       // TASK_TTL_HOURS 内、修复上线前用旧代码路径创建、此刻仍可能被读取到的存量任务。
-      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket, sourceFile.storageProvider).catch(() => null)
       const extraction = buffer
         ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
         : { pages: [], outcome: 'degraded' as const, truncated: false as const }
@@ -336,7 +337,7 @@ export class MaterialsService {
       }
     }
     try {
-      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket, sourceFile.storageProvider)
       const pageCount = countPdfPages(buffer)
       const warnings = pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : []
       const messages: InspectionMessage[] = pageCount === null
@@ -376,7 +377,7 @@ export class MaterialsService {
       text: '图片将按 1 页参与打印设置',
     }
     try {
-      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket, sourceFile.storageProvider)
       const dimensions = readImageDimensions(buffer, sourceFile.mimeType)
       if (!dimensions) {
         return {

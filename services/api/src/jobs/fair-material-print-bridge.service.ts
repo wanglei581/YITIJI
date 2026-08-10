@@ -26,6 +26,8 @@ interface EligibleMaterial {
   id: string
   name: string
   storageKey: string
+  storageProvider: string
+  storageBucket: string | null
   mimeType: string
   sizeBytes: number
   sha256: string
@@ -62,7 +64,7 @@ export class FairMaterialPrintBridgeService {
 
     let uploadedFileId: string | null = null
     try {
-      const buffer = await this.storage.getObject(material.storageKey)
+      const buffer = await this.storage.getObject(material.storageKey, material.storageBucket, material.storageProvider)
       this.assertSourceIntegrity(material, buffer)
       const expiresAt = new Date(Date.now() + BRIDGE_FILE_TTL_MS)
       const uploaded = await this.files.upload({
@@ -222,6 +224,8 @@ export class FairMaterialPrintBridgeService {
         id: true,
         name: true,
         storageKey: true,
+        storageProvider: true,
+        storageBucket: true,
         mimeType: true,
         sizeBytes: true,
         sha256: true,

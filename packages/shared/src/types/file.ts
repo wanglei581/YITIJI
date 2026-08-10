@@ -1,5 +1,5 @@
 /**
- * 文件元数据 + 签名 URL 契约(BE-1 / COS 接入)。
+ * 文件元数据 + 签名 URL 契约(BE-1 / COS/BOS 接入)。
  *
  * 服务端落地于 services/api/src/files,数据库表 FileObject。
  * 三端前端只从这里 import 类型,严禁自造结构。
@@ -8,10 +8,10 @@
  * 必须与此同步(任何字段变更同时改两处)。
  *
  * 合规约束(CLAUDE.md §11):
- *   - 文件 URL 必须为短期签名 URL(本地 HMAC 代理 / COS 预签名,TTL ≤ 30 分钟)
+ *   - 文件 URL 必须为短期签名 URL(本地 HMAC 代理 / COS/BOS 预签名,TTL ≤ 30 分钟)
  *   - 敏感文件设有效期,过期由 cron 自动清理
  *   - 管理员访问 / 清理动作必须落 AuditLog
- *   - 前端绝不出现 COS SecretId / SecretKey
+ *   - 前端绝不出现 COS/BOS 服务端访问密钥
  */
 
 /** 文件用途。决定默认 sensitiveLevel + 默认 TTL + objectKey 前缀。 */

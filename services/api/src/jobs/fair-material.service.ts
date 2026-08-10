@@ -142,6 +142,9 @@ export class FairMaterialService {
         type: args.type ?? 'other',
         description: args.description ?? null,
         storageKey: `pending:${args.fairId}:${Date.now()}`,
+        storageProvider: this.storage.driver,
+        storageBucket: this.storage.defaultBucket,
+        storageRegion: this.storage.defaultRegion,
         mimeType: sniffed,
         sizeBytes: args.buffer.length,
         sha256: '',
@@ -215,7 +218,7 @@ export class FairMaterialService {
     const material = await this.assertMaterialInFair(fairId, materialId)
     await this.printBridges.revokeForMaterial(materialId, 'material_deleted')
     if (!material.storageKey.startsWith('pending:')) {
-      await this.storage.deleteObject(material.storageKey).catch((e: unknown) => {
+      await this.storage.deleteObject(material.storageKey, material.storageBucket, material.storageProvider).catch((e: unknown) => {
         // 对象缺失不阻断删除(可能已被清理);其余错误记日志后继续软删
         this.logger.warn(`deleteMaterial storage delete failed: ${material.id} ${(e as Error).message}`)
       })
@@ -274,7 +277,7 @@ export class FairMaterialService {
     if (!material || material.storageKey.startsWith('pending:')) {
       throw new NotFoundException({ error: { code: 'MATERIAL_NOT_FOUND', message: '资料不存在' } })
     }
-    const buffer = await this.storage.getObject(material.storageKey)
+    const buffer = await this.storage.getObject(material.storageKey, material.storageBucket, material.storageProvider)
     return { buffer, mimeType: material.mimeType }
   }
 

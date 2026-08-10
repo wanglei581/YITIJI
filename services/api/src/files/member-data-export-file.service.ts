@@ -97,12 +97,14 @@ export class MemberDataExportFileService {
     })
     const bucket = this.storage.defaultBucket
     const region = this.storage.defaultRegion
+    const storageProvider = this.storage.driver
     // 元数据必须先于对象写入。这样即使 putObject 已落盘后抛错、且补偿删除也失败，
     // reconciler 仍能通过 FileObject 扫描并回收高敏对象，不会产生无账本孤儿。
     const record = await this.prisma.fileObject.create({
       data: {
         id,
         storageKey: objectKey,
+        storageProvider,
         bucket,
         region,
         filename: EXPORT_FILENAME,
@@ -129,9 +131,9 @@ export class MemberDataExportFileService {
       },
     })
     try {
-      await this.storage.putObject(objectKey, args.buffer, EXPORT_MIME)
+      await this.storage.putObject(objectKey, args.buffer, EXPORT_MIME, bucket, storageProvider)
     } catch (error) {
-      await this.compensateFailedWrite(record.id, objectKey, bucket)
+      await this.compensateFailedWrite(record.id, objectKey, bucket, storageProvider)
       this.storageUnavailable('put', error)
     }
     return {
@@ -167,7 +169,7 @@ export class MemberDataExportFileService {
 
     let head
     try {
-      head = await this.storage.headObject(record!.storageKey, record!.bucket)
+      head = await this.storage.headObject(record!.storageKey, record!.bucket, record!.storageProvider)
     } catch (error) {
       this.storageUnavailable('head', error)
     }
@@ -209,7 +211,7 @@ export class MemberDataExportFileService {
 
     let head
     try {
-      head = await this.storage.headObject(record.storageKey, record.bucket)
+      head = await this.storage.headObject(record.storageKey, record.bucket, record.storageProvider)
     } catch (error) {
       this.storageUnavailable('head', error)
     }
@@ -224,7 +226,7 @@ export class MemberDataExportFileService {
 
     let buffer: Buffer
     try {
-      buffer = await this.storage.getObject(record.storageKey, record.bucket)
+      buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
     } catch (error) {
       this.storageUnavailable('get', error)
     }
@@ -246,9 +248,10 @@ export class MemberDataExportFileService {
     fileId: string,
     objectKey: string,
     bucket: string,
+    storageProvider: string,
   ): Promise<void> {
     try {
-      await this.storage.deleteObject(objectKey, bucket)
+      await this.storage.deleteObject(objectKey, bucket, storageProvider)
     } catch (error) {
       this.logStorageFailure('delete_compensation', error)
       return

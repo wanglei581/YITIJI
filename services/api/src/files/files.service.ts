@@ -171,12 +171,14 @@ export class FilesService {
 
     const bucket = this.storage.defaultBucket
     const region = this.storage.defaultRegion
+    const storageProvider = this.storage.driver
     let record
     try {
       record = await this.prisma.fileObject.create({
         data: {
           id,
           storageKey: objectKey,
+          storageProvider,
           bucket,
           region,
           filename: args.filename,
@@ -205,7 +207,7 @@ export class FilesService {
       })
     } catch (createError) {
       try {
-        await this.storage.deleteObject(objectKey, bucket)
+        await this.storage.deleteObject(objectKey, bucket, storageProvider)
       } catch {
         // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
         this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
@@ -224,7 +226,8 @@ export class FilesService {
         ttlSeconds,
         disposition: 'inline',
       },
-      record.bucket
+      record.bucket,
+      record.storageProvider
     )
     return {
       fileId: record.id,
@@ -315,6 +318,7 @@ export class FilesService {
       data: {
         id,
         storageKey: objectKey,
+        storageProvider: this.storage.driver,
         bucket: this.storage.defaultBucket,
         region: this.storage.defaultRegion,
         filename: body.filename,
@@ -347,7 +351,8 @@ export class FilesService {
         contentType: record.mimeType,
         ttlSeconds: this.storage.signTtlSeconds,
       },
-      record.bucket
+      record.bucket,
+      record.storageProvider
     )
 
     return {
@@ -375,7 +380,7 @@ export class FilesService {
       })
     }
 
-    const head = await this.storage.headObject(record.storageKey, record.bucket)
+    const head = await this.storage.headObject(record.storageKey, record.bucket, record.storageProvider)
     if (!head) {
       throw new BadRequestException({
         error: { code: 'FILE_NOT_UPLOADED', message: '对象未上传或上传未完成' },
@@ -396,7 +401,7 @@ export class FilesService {
     // 故嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
     // 本轮明确豁免(属已披露残留;待存储接口支持 Range 读取后收口)。
     if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
-      const bytes = await this.storage.getObject(record.storageKey, record.bucket)
+      const bytes = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
       const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
       if (!sniff.ok) {
         // 与上方超限分支同款处理：先 quarantined，再物理删除。
@@ -458,7 +463,8 @@ export class FilesService {
       record.storageKey,
       buffer,
       record.mimeType,
-      record.bucket
+      record.bucket,
+      record.storageProvider
     )
     await this.prisma.fileObject.update({
       where: { id: fileId },
@@ -499,7 +505,8 @@ export class FilesService {
         ttlSeconds,
         disposition,
       },
-      record.bucket
+      record.bucket,
+      record.storageProvider
     )
 
     const isUserFile = record.ownerType === 'user' || Boolean(record.endUserId)
@@ -547,7 +554,8 @@ export class FilesService {
         ttlSeconds,
         disposition: 'inline',
       },
-      record.bucket
+      record.bucket,
+      record.storageProvider
     )
     return {
       fileId: record.id,
@@ -578,7 +586,7 @@ export class FilesService {
     ) {
       this.throwFileNotFound()
     }
-    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+    const buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
     return {
       buffer,
       mimeType: record.mimeType,
@@ -609,7 +617,7 @@ export class FilesService {
         error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
       })
     }
-    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+    const buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
     return {
       buffer,
       mimeType: record.mimeType,
@@ -790,7 +798,7 @@ export class FilesService {
     try {
       // COS 与本地后端均把对象不存在视为成功；首次失败后，同一授权主体可用
       // 上方 tombstone 记录的 storageKey/bucket 幂等重试，不恢复 active 状态。
-      await this.storage.deleteObject(tombstone.storageKey, tombstone.bucket)
+      await this.storage.deleteObject(tombstone.storageKey, tombstone.bucket, tombstone.storageProvider)
     } catch (error) {
       const errorType = error instanceof Error ? error.constructor.name : typeof error
       this.logger.warn(
@@ -823,7 +831,14 @@ export class FilesService {
           { purpose: 'contract_upload', expiresAt: null },
         ],
       },
-      select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
+      select: {
+        id: true,
+        storageKey: true,
+        storageProvider: true,
+        bucket: true,
+        purpose: true,
+        sensitiveLevel: true,
+      },
     })
 
     const deletedIds: string[] = []
@@ -847,7 +862,7 @@ export class FilesService {
         })
         if (quarantined.count === 0) continue
 
-        await this.storage.deleteObject(f.storageKey, f.bucket)
+        await this.storage.deleteObject(f.storageKey, f.bucket, f.storageProvider)
         const finalized = await this.prisma.fileObject.updateMany({
           where: { id: f.id, deletedAt: null, status: 'quarantined' },
           data: {
@@ -1001,6 +1016,7 @@ export class FilesService {
   private async quarantineAndDeleteObject(record: {
     id: string
     storageKey: string
+    storageProvider: string
     bucket: string
   }): Promise<void> {
     const quarantined = await this.prisma.fileObject.updateMany({
@@ -1010,7 +1026,7 @@ export class FilesService {
     if (quarantined.count !== 1) this.throwFileNotFound()
 
     try {
-      await this.storage.deleteObject(record.storageKey, record.bucket)
+      await this.storage.deleteObject(record.storageKey, record.bucket, record.storageProvider)
     } catch (error) {
       const errorType = error instanceof Error ? error.constructor.name : typeof error
       this.logger.warn(

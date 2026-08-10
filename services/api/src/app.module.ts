@@ -83,7 +83,7 @@ const redisUrl = process.env['REDIS_URL']
       ? [BullModule.forRoot({ connection: parseRedisConnection(redisUrl) })]
       : []),
     PrismaModule,
-    // StorageModule(@Global): COS / 本地对象存储,files / content / print 共用。
+    // StorageModule(@Global): BOS / COS / 本地对象存储,files / content / print 共用。
     StorageModule,
     // RedisModule(@Global): member-auth 会话/验证码/频控强依赖。
     RedisModule,

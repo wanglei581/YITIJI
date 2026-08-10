@@ -74,6 +74,7 @@ git status --short --branch
 
 pnpm --filter @ai-job-print/shared typecheck
 pnpm --filter @ai-job-print/api typecheck
+pnpm --filter @ai-job-print/api verify:bos
 pnpm --filter @ai-job-print/api verify:contract-review:gate0
 pnpm --filter @ai-job-print/api verify:contract-review:preprod-readiness
 pnpm --filter @ai-job-print/api verify:contract-review:contract
@@ -102,7 +103,10 @@ git diff --check
 NODE_ENV=production
 DATABASE_URL=set scheme=postgresql
 REDIS_URL=set
-FILE_STORAGE_DRIVER=cos
+FILE_STORAGE_DRIVER=bos
+FILE_STORAGE_LEGACY_DRIVER=cos
+BAIDU_BOS_ENDPOINT=set official_bcebos_host=true
+TENCENT_COS_BUCKET=set historical_compatibility=true
 CONTRACT_REVIEW_PROVIDER=<approved-id>
 CONTRACT_REVIEW_BASE_URL=<approved-origin-only>
 CONTRACT_REVIEW_MODEL=<approved-model-id>
@@ -113,6 +117,7 @@ CONTRACT_REVIEW_REPORT_PRINT_ENABLED=false
 检查项：
 
 - API health 返回 PostgreSQL，部署来源 SHA 与冻结候选一致。
+- BOS 主存储与 COS 历史兼容配置同时存在；缺少 legacy 路由或 COS 凭证时生产启动必须 fail-closed。
 - `docs/compliance/contract-review-release-gate.md` 的机器可读状态仍为 `approved`，批准未撤销、未过期且证据可复核。
 - provider 三元组严格等于批准白名单之一，不允许自定义代理、通用 fallback 或境外 endpoint。
 - Redis、PostgreSQL 与对象存储不暴露公网管理端口。
@@ -172,6 +177,8 @@ CONTRACT_REVIEW_REPORT_PRINT_ENABLED=false
 5. 建单后 `PrintTask.fileId` 保护报告；打印终态立即清理，reconciler 与 TTL 兜底。
 6. 通用 `/print/jobs` 对 `contract_upload` 返回拒绝；客户端提供的 hash 不能覆盖数据库 SHA-256。
 7. 验收结束后 canary 原件、报告、签名 URL 和临时本地文件均不可再访问，删除日志仍可审计。
+8. 新 canary 的 `storageProvider=bos` 且 bucket/region 正确；读取一份批准的合成 COS 历史 canary 时仍按 `storageProvider=cos` 路由，任一路径均不得静默回退本地。
+9. BOS 预览和服务端读回通过后，单独核对浏览器下载文件名/附件行为；官方 BOS 域名不能用动态 `responseContentDisposition` 作为已通过证据，若业务必须强制附件下载则停止切换并先增加受控 API 下载代理。
 
 ## 十、CR-G6 公共终端会员/匿名隐私
 

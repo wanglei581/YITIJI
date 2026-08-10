@@ -1,22 +1,24 @@
 /**
  * 对象存储后端抽象。
  *
- * 两个实现:
+ * 三个实现:
  *   - LocalStorageBackend:本地文件系统(dev / 默认),内容经 API 代理签名 URL 提供。
  *   - CosStorageBackend:腾讯云 COS(生产),内容经 COS 预签名 URL 直连。
+ *   - BosStorageBackend:百度智能云 BOS(生产),内容经 BOS 预签名 URL 直连。
  *
- * StorageService 按 FILE_STORAGE_DRIVER 选默认后端,并按文件记录的 bucket
- * 路由读/删,从而兼容"先本地后切 COS"的混合环境。
+ * StorageService 按 FILE_STORAGE_DRIVER 选默认后端,并按文件记录的 provider + bucket
+ * 路由读/删,从而兼容本地、COS 历史对象与 BOS 新对象并存的迁移环境。
  */
 
 /** 后端类型标识,落库到 FileObject.bucket 区分(本地用哨兵值)。 */
 export const LOCAL_BUCKET_SENTINEL = 'local-fs'
 export const LOCAL_REGION_SENTINEL = 'local'
 
-export type StorageDriver = 'local' | 'cos'
+export type StorageDriver = 'local' | 'cos' | 'bos'
+export type StorageProvider = StorageDriver | 'legacy'
 
 export interface PutResult {
-  /** 上传内容的 sha256(hex)。COS / 本地均由服务端就 buffer 计算。 */
+  /** 上传内容的 sha256(hex)。云端 / 本地均由服务端就 buffer 计算。 */
   sha256: string
   sizeBytes: number
 }
@@ -57,7 +59,7 @@ export interface UploadUrlResult {
   /** 客户端 PUT 时应带的请求头(如 Content-Type)。 */
   headers: Record<string, string>
   expiresAt: Date
-  /** 直传是否落到 COS(true)还是回 API 代理写入(false,本地)。 */
+  /** true=浏览器直传对象存储;false=回 API 代理写入。 */
   direct: boolean
 }
 
