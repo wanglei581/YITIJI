@@ -44,13 +44,13 @@
      每卡只留 图标 + 大标题 + 至多 1 条 chip--info 事实徽记；
      go-pill 子入口全部撤销（子功能入口已移到各域首屏）。
      撤掉后卡体高度不缩水：图标放大 + 留白吸收，四态高度预算保持 0 溢出。 */
-  .vgrid-a .card { padding: var(--s-6) var(--s-7); gap: var(--s-3); }
-  .vgrid-a .card-ic { width: 76px; height: 76px; border-radius: var(--r-md); margin-bottom: var(--s-3); }
+  .vgrid-a .card { padding: var(--s-5) var(--s-7); gap: var(--s-3); }
+  .vgrid-a .card-ic { width: 76px; height: 76px; border-radius: var(--r-md); margin-bottom: var(--s-2); }
   .vgrid-a .card-ic .ic { width: 40px; height: 40px; }
   .vgrid-a .card-name { font-size: var(--fz-8); }
-  .card--sm { padding: var(--s-5) var(--s-6); gap: var(--s-2); }
-  .card--sm .card-ic { width: 60px; height: 60px; border-radius: var(--r-sm); margin-bottom: var(--s-2); }
-  .card--sm .card-ic .ic { width: 31px; height: 31px; }
+  .card--sm { padding: 18px var(--s-6); gap: var(--s-2); }
+  .card--sm .card-ic { width: 56px; height: 56px; border-radius: var(--r-sm); margin-bottom: var(--s-2); }
+  .card--sm .card-ic .ic { width: 29px; height: 29px; }
   .card--sm .card-name { font-size: var(--fz-6); }
 </style>
 </head>
@@ -216,7 +216,7 @@
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
         </a>
-        <a class="card card--resume" href="09-resume-studio.html">
+        <a class="card card--resume" href="09-resume-workbench.html">
           <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
           <span class="card-name">AI 简历服务</span>
           <span class="card-foot">
@@ -304,7 +304,7 @@
     </div>
     <button class="btn btn--lg btn--ghost" data-when="default">跳过</button>
     <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <a class="btn btn--primary" href="09-resume-studio.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>

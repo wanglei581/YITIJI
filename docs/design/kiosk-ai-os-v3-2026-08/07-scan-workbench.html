@@ -22,6 +22,9 @@
   .src[aria-disabled="true"], .xlane-go[aria-disabled="true"] { opacity: .45; pointer-events: none; }
   /* button.xlane-go：与 a.xlane-go 同构（UA 按钮样式清掉，文字左对齐） */
   button.xlane-go { font: inherit; text-align: left; }
+  /* s4 去向三卡在右栏里用紧凑高度：栏宽 348px 放 88px 高卡会把栏顶爆（实测溢出 40px）。
+     64px 仍满足 ≥48 触控。 */
+  .wside .xlane-go { min-height: 60px; padding: 6px var(--s-4); }
   /* 输出格式选中态：复用 seg 的选中语义，卡面描边表达 */
   .src[data-fmt][aria-pressed="true"] { border-color: var(--jade-500); box-shadow: var(--sh-2), 0 0 0 1px var(--jade-500) inset; }
 </style>
@@ -105,7 +108,7 @@
           <span class="src-ic"><svg class="ic"><use href="#i-search"/></svg></span>
           <span class="src-nm">可检索 PDF · OCR</span>
           <span class="src-ds">文字可复制、可搜索；图像会送第三方 OCR 识别。</span>
-          <span class="src-tag"><span class="chip chip--amber chip--info">文字外送识别 · 多等约 1 分钟</span></span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">文字送第三方识别</span></span>
         </button>
         <button class="src" aria-disabled="true" data-when="ai-down">
           <span class="src-ic"><svg class="ic"><use href="#i-search"/></svg></span>
@@ -244,7 +247,7 @@
         <div class="paper-bar">
           <span class="nm">扫描_20260808_0947.pdf</span>
           <span class="mt" data-when="default first ai-down">A4 · 6 页 · 灰度 300dpi · 4.8 MB</span>
-          <span class="mt" data-when="device-off">A4 · 3 页（中断）· 灰度 300dpi · 2.4 MB</span>
+          <span class="mt" data-when="device-off" style="white-space:nowrap">A4 · 3 页（中断）· 灰度 300dpi · 2.4 MB</span>
           <span class="pg">
             <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
             <span data-when="default first ai-down">第 1 / 共 6 页</span>
@@ -386,10 +389,9 @@
           <div class="kv-row" data-when="device-off"><span class="k">中断时间</span><span class="v">8 月 8 日 09:49</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">可识别页</span><span class="v" data-when="default first">5 / 6 页</span><span class="v" data-when="device-off">2 / 3 页</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">整页平均置信</span><span class="v">91% <span class="ev ev--e1">E1 本机识别数据</span></span></div>
-          <div class="kv-row" data-when="default first"><span class="k">逐页置信</span><span class="v">①96 ②95 ③<b style="color:var(--amber-400)">62</b> ④94 ⑤93 ⑥95</span></div>
-          <div class="kv-row" data-when="device-off"><span class="k">逐页置信</span><span class="v">①95 ②93 ③<b style="color:var(--amber-400)">62</b></span></div>
-          <div class="kv-row" data-when="default first device-off"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页 · 62%，低于 80% 阈值</span></div>
-          <div class="kv-row" data-when="default first device-off"><span class="k">原因</span><span class="v">原件折痕导致断行</span></div>
+          <div class="kv-row" data-when="default first"><span class="k">逐页置信</span><span class="v">①96 ②95 ③<b style="color:var(--amber-400)">62 · 低于 80% 阈值</b> ④94 ⑤93 ⑥95</span></div>
+          <div class="kv-row" data-when="device-off"><span class="k">逐页置信</span><span class="v">①95 ②93 ③<b style="color:var(--amber-400)">62 · 低于 80% 阈值</b></span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">原因</span><span class="v">第 3 页原件折痕导致断行</span></div>
           <div class="kv-row" data-when="ai-down"><span class="k">置信度终检</span><span class="v v--fog">已跳过 · 识别服务中断</span></div>
         </div>
         <div class="notice notice--amber" data-when="default first device-off" style="margin-top:12px">
@@ -403,7 +405,7 @@
         </div>
       </div>
 
-      <div class="pane pane--fill" data-at="s4">
+      <div class="pane pane--fill pane--grow" data-at="s4">
         <div class="pane-hd"><span class="t">接下来放到哪</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="default first">
           <b>建议先送 AI 简历诊断</b> <span class="ev ev--e3">E3 这条建议属 AI 判断</span>。<br>
@@ -424,10 +426,7 @@
             <span class="xlane-tx"><span class="xlane-nm">拿去打印</span><span class="xlane-ds">去打印工作台核价出纸</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <button class="xlane-go" aria-disabled="true" data-when="device-off" style="width:100%">
-            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
-            <span class="xlane-tx"><span class="xlane-nm">拿去打印</span><span class="xlane-ds">打印机同机离线，换一台空闲机器打</span></span>
-          </button>
+          <button class="btn btn--ghost" style="width:100%" aria-disabled="true" data-when="device-off">拿去打印 · 同机离线暂不可用</button>
           <a class="xlane-go" href="23-me.html">
             <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">存进「我的文档」</span><span class="xlane-ds">登录后长期保存，换一台机也能取</span></span>
@@ -486,8 +485,10 @@
         </div>
       </div>
 
-      <!-- 常驻：本机事实（E2）。s2 已有「设备」卡报扫描仪细节，不重复挂 -->
-      <div class="pane" data-at="s1 s3 s4">
+      <!-- 常驻：本机事实（E2）。s2 已有「设备」卡报扫描仪细节，不重复挂。
+           2026-08-10：s4 也摘掉 —— 该栏补上完成去向三卡后版面已满（实测溢出 9–26px），
+           与当年"s2 已满不挂"同一判据；s4 的设备事实由去向卡的置灰与文案承担。 -->
+      <div class="pane" data-at="s1 s3">
         <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:47</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">扫描仪</span>
@@ -495,7 +496,6 @@
             <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
           <div class="kv-row" data-at="s1"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">空 · 单次可放 50 页</span><span class="v v--fog" data-when="device-off">未知</span></div>
           <div class="kv-row" data-at="s3"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">走纸中 · 可继续加页</span><span class="v v--fog" data-when="device-off">未知</span></div>
-          <div class="kv-row" data-at="s4"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">已走完 · 空</span><span class="v v--fog" data-when="device-off">未知</span></div>
           <div class="kv-row"><span class="k">打印机</span>
             <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
             <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>暂不可用 · 同机上报</span></div>

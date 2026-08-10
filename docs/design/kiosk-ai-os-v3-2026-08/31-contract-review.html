@@ -159,7 +159,7 @@
 .legalbar span { font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.02em; }
 .legalbar b { color:var(--fog-700); font-weight:600; }
 
-.chip--info { cursor:inherit; }
+.chip--info, .chip-static { cursor:inherit; }
 </style>
 </head>
 <body>
@@ -396,7 +396,7 @@
             <div class="confirm-t">读到的是这样一份文件 —— 对吗？</div>
             <div class="confirm-facts">
               <span class="chip chip--info">共 6 页</span>
-              <span class="chip chip--amber">识别质量 · 中</span>
+              <span class="chip chip--amber chip-static">识别质量 · 中</span>
               <span class="chip chip--info">类型 · 劳动合同</span>
             </div>
             <div class="confirm-row">
@@ -584,7 +584,7 @@
       <div class="pane pane--grow" data-at="faq">
         <div class="pane-hd">
           <span class="t">常见签约问题 · 8 条</span>
-          <span class="chip chip--jade" style="height:26px;font-size:11px">现在就能用</span>
+          <span class="chip chip--jade chip-static" style="height:26px;font-size:11px">现在就能用</span>
           <span class="s">静态参考 · 非 AI 生成 · 更新 2026-06</span>
         </div>
         <div class="sec">
@@ -652,7 +652,7 @@
       </div>
 
       <div class="pane pane--grow" data-at="s0">
-        <div class="pane-hd"><span class="t">常见签约问题</span><span class="chip chip--jade" style="height:26px;font-size:11px">现在就能用</span></div>
+        <div class="pane-hd"><span class="t">常见签约问题</span><span class="chip chip--jade chip-static" style="height:26px;font-size:11px">现在就能用</span></div>
         <div class="sec">
           <div style="display:flex;flex-direction:column">
             <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-clock"/></svg>
