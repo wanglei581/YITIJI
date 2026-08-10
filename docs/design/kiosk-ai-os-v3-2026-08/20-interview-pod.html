@@ -95,6 +95,21 @@
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+/* 本轮新增：s1 加了垂直题库一行后，左栏「怎么答」大卡可能被压缩——
+   与右栏同款处理：卡内滚动，不让内容画到下一张卡上（IMPLEMENTATION-NOTES §3.2） */
+.wmain .pane--grow > .sec { min-height:0; overflow-y:auto; }
+
+/* 本轮新增：垂直题库 —— 四类岗位组卷的大按钮（≥56px 触控） */
+.bankrow { display:grid; grid-template-columns:repeat(2,1fr); gap:var(--s-3); margin-top:var(--s-3); }
+.bank { min-height:56px; padding:var(--s-3) var(--s-4); border-radius:var(--r-sm); cursor:pointer;
+        display:flex; align-items:center; gap:var(--s-3); text-align:left;
+        background:var(--surf-1); border:1px solid var(--brd-1); font-family:var(--ff-ui);
+        font-size:var(--fz-3); color:var(--fog-800);
+        transition:border-color var(--dur-2) var(--ease-out); }
+.bank:hover { border-color:var(--jade-a32); }
+.bank[aria-pressed="true"] { border-color:var(--jade-400); background:var(--jade-a12); color:var(--fog-900); }
+/* ai-down 整行禁用：组卷靠 AI，不可用就不装可用 */
+.screen[data-state="ai-down"] .bankrow .bank { opacity:.45; pointer-events:none; }
 
 /* 单页文件：纸面居中。
    work.css 的 .paper-stage 注释解释了为什么默认顶对齐 ——
@@ -185,6 +200,21 @@
               <span class="way-s">6 道题 · 约 10 分钟 · 不限岗位</span>
             </button>
           </div>
+
+          <!-- 本轮新增：垂直题库 —— 四类岗位组卷。选中后第 2 步的示例题随之更换（每类 1 道）；
+               再点一次取消选择，回到上面按简历推荐的卷。ai-down 整行禁用（见页顶样式）。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-layers"/></svg><b>或者按行业选垂直题库</b>
+            <span class="chip chip--info" style="margin-left:8px">题库持续扩充</span>
+            <span class="mt" data-when="default first">选一类，第 2 步的题就按这类出</span>
+            <span class="mt" data-when="ai-down">AI 不可用 · 暂不能按题库组卷</span>
+          </div>
+          <div class="bankrow">
+            <button class="bank" data-bank="tech">技术开发</button>
+            <button class="bank" data-bank="mkt">市场运营</button>
+            <button class="bank" data-bank="adm">行政文员</button>
+            <button class="bank" data-bank="mfg">生产制造</button>
+          </div>
         </div>
       </div>
 
@@ -257,11 +287,11 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-interview"/></svg>
-          <b>第 3 题 / 共 8 题</b>
+          <b><span data-bankq="default">第 3 题 / 共 8 题</span><span data-bankq="tech mkt adm mfg" hidden>垂直题库 · 示例题预览</span></b>
           <span class="mt">打字作答 · 想好再写，没有倒计时</span>
         </div>
         <div class="sec qbox">
-          <div>
+          <div data-bankq="default">
             <div class="q-no">追问题 · 上一题你提到了工装改造</div>
             <div class="q-t">你说把卡料率从 12% 降到 3%，这个 3% 是怎么测出来的？</div>
             <div class="q-why" data-when="default first">
@@ -274,10 +304,34 @@
             </div>
           </div>
 
+          <!-- 本轮新增：垂直题库示例题（每类 1 道）。在第 1 步选中题库后由页脚脚本切换；
+               这只是各题库的风格示例，不是完整卷 —— 题库持续扩充。 -->
+          <div data-bankq="tech" hidden>
+            <div class="q-no">垂直题库 · 技术开发 · 示例题</div>
+            <div class="q-t">线上服务突然变慢，你会按什么顺序排查？</div>
+            <div class="q-why">这道看的是排查思路，不是背名词。选中题库后整卷按这个方向出，这里先给 1 道示例。</div>
+          </div>
+          <div data-bankq="mkt" hidden>
+            <div class="q-no">垂直题库 · 市场运营 · 示例题</div>
+            <div class="q-t">一场活动结束后，你会用哪些数据判断它办得值不值？</div>
+            <div class="q-why">这道看的是你会不会自己定衡量口径。选中题库后整卷按这个方向出，这里先给 1 道示例。</div>
+          </div>
+          <div data-bankq="adm" hidden>
+            <div class="q-no">垂直题库 · 行政文员 · 示例题</div>
+            <div class="q-t">两位负责人同时给你派了急事，你怎么排优先级？</div>
+            <div class="q-why">这道看的是沟通和取舍，不是谁官大听谁的。选中题库后整卷按这个方向出，这里先给 1 道示例。</div>
+          </div>
+          <div data-bankq="mfg" hidden>
+            <div class="q-no">垂直题库 · 生产制造 · 示例题</div>
+            <div class="q-t">交接班时发现上一班的记录和实物数量对不上，你会怎么处理？</div>
+            <div class="q-why">这道看的是先核实再上报的习惯。选中题库后整卷按这个方向出，这里先给 1 道示例。</div>
+          </div>
+
           <div class="ansbox">
-            我们改完第二版之后，连续跑了三天的量产单来统计。
+            <span data-bankq="default">我们改完第二版之后，连续跑了三天的量产单来统计。
             每天记录进料总数和卡住停机的次数，卡料率就是停机次数除以进料总数。
-            改造前那一版我也有同样的记录，是 12% 左右。三天下来第二版平均是 3.1%<span class="cursor"></span>
+            改造前那一版我也有同样的记录，是 12% 左右。三天下来第二版平均是 3.1%<span class="cursor"></span></span>
+            <span data-bankq="tech mkt adm mfg" hidden style="color:var(--fog-600)">示例题预览 · 从第 1 步「开始作答」进入后，在这里输入你的回答</span>
           </div>
         </div>
       </div>
@@ -676,6 +730,35 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* 本轮新增：垂直题库切换。选中一类，s2 的示例题随之更换（每类 1 道）；
+   再点同一类取消，回到默认卷。ai-down 时按钮已被 CSS 禁点，这里再兜一道；
+   切到 ai-down 态时自动回默认卷，不让「AI 不可用」和题库示例同屏矛盾。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var cur = 'default'
+  function show (k) {
+    cur = k
+    document.querySelectorAll('[data-bankq]').forEach(function (n) {
+      n.hidden = n.getAttribute('data-bankq').split(/\s+/).indexOf(k) === -1
+    })
+    document.querySelectorAll('.bank').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-bank') === k ? 'true' : 'false')
+    })
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.bank')
+    if (!b) return
+    if (scr.getAttribute('data-state') === 'ai-down') return
+    var k = b.getAttribute('data-bank')
+    show(k === cur ? 'default' : k)
+  })
+  new MutationObserver(function () {
+    if (scr.getAttribute('data-state') === 'ai-down' && cur !== 'default') show('default')
+  }).observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  show('default')
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

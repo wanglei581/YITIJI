@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>首页三版构图对比 — AI 求职操作系统</title>
+<title>首页四版构图对比 — AI 求职操作系统</title>
 <style>
-  :root { --scale: .305; --card: calc(1080px * var(--scale)); }
+  :root { --scale: .26; --card: calc(1080px * var(--scale)); }
   body {
     margin: 0; padding: 24px 28px 40px;
     background: radial-gradient(1300px 800px at 20% -14%, #12191b, #070a0b 62%, #040606);
@@ -13,7 +13,7 @@
   }
   h1 { font-family: "Songti SC", "SimSun", serif; font-size: 25px; font-weight: 600; margin: 0 0 6px; letter-spacing: .04em; }
   p.sub { margin: 0 0 20px; font-size: 13px; color: #8ba4a9; line-height: 1.7; max-width: 92ch; }
-  .grid { display: grid; grid-template-columns: repeat(3, var(--card)); gap: 22px; }
+  .grid { display: grid; grid-template-columns: repeat(4, var(--card)); gap: 22px; }
   figure { margin: 0; }
   .frame {
     width: var(--card); height: calc(1920px * var(--scale));
@@ -31,9 +31,9 @@
 </style>
 </head>
 <body>
-  <h1>首页 · 三版构图对比</h1>
+  <h1>首页 · 四版构图对比</h1>
   <p class="sub">
-    同一套内容、同一套合规口径、同一套暖色令牌，三种完全不同的构图逻辑。三版都通过四态自查（纵向溢出 0 / 横向溢出 0 / 触控目标全部 ≥48px / 违禁文案 0 命中）。
+    同一套内容、同一套合规口径、同一套暖色令牌，四种完全不同的构图逻辑。四版都通过四态自查（纵向溢出 0 / 横向溢出 0 / 触控目标全部 ≥48px / 违禁文案 0 命中）。
     点「单独打开」可看动效与四态切换。
   </p>
   <div class="grid" id="g"></div>
@@ -41,11 +41,12 @@
   var V = [
     ['01-home.html', '甲 · 玻璃卡片版', '构图：大标题 + 顾问卡 + 办理单面板 + 不等宽入口矩阵。最接近常见 App，最稳，但视觉冲击最弱。'],
     ['01-home-v4.html', '乙 · 印务台版', '构图：左侧任务脊（竖排步骤）+ 巨型宋体版头 + 行式服务目录 + 套准标记 / 半调网点 / 等宽读数。最专业、最像精密仪器，但偏素。'],
-    ['01-home-v5.html', '丙 · 鲜彩玻璃版', '构图：大色域版头 + 出血肖像 + 跨边玻璃指令胶囊 + 横向办理路径 + 六张身份色服务卡 + 现场大图。色彩与纵深最强，最像消费级商业产品。']
+    ['01-home-v5.html', '丙 · 鲜彩玻璃版', '构图：大色域版头 + 出血肖像 + 跨边玻璃指令胶囊 + 横向办理路径 + 六张身份色服务卡 + 现场大图。色彩与纵深最强，最像消费级商业产品。'],
+    ['01-home-v6.html', '丁 · v6 AI 神经中枢', '构图：信息结构 100% 沿用丙版；顾问升级为「神经中枢」—— 八大功能玻璃圆片沿椭圆轨道绕小青运转（前后穿越人像），胶囊指令流入中枢，点阵层雷达扫掠，办理路径三粒子 + 当前步呼吸环，八卡交错上浮与图标语义微动。动效即状态：ai-down 整环灰化停转。']
   ]
   document.getElementById('g').innerHTML = V.map(function (v, i) {
     return '<figure><div class="frame"><iframe src="' + v[0] + '?capture=1&theme=warm" title="' + v[1] + '"></iframe></div>' +
-      '<figcaption><b>' + v[1] + (i === 2 ? '<span class="tag">最新</span>' : '') + '</b>' +
+      '<figcaption><b>' + v[1] + (i === 3 ? '<span class="tag">最新</span>' : '') + '</b>' +
       '<span class="k">' + v[2] + '</span>' +
       '<a href="' + v[0] + '?theme=warm" target="_blank">单独打开 →</a></figcaption></figure>'
   }).join('')

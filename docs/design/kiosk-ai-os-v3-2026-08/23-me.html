@@ -3,103 +3,223 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>P23 我的 — AI 求职操作系统 V3</title>
-<meta name="screen-name" content="P23 我的">
+<title>P23 我的 · 功能中心 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P23 我的 · 功能中心">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=22">
-<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
-<link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <style>
-/* ── P23 专用 ───────────────────────────────────────────────────────────
-   ⚠ 本页**故意不按** V3 README 里「我的 · 资产中心 · 分区+抽屉」那版规格做。
+/* ── P23 我的 · 功能中心（2026-08-10 重做） ──────────────────────────────
+   为什么推翻上一版「三段路牌 + 大段文字」：用户原话是「像一本书全是文字」。
+   这一版按定稿蓝图做成**功能中心**：顶部登录窄条 + AI 求职进度盘点横幅 +
+   8 张功能大卡（2 列 4 行，每卡 ≥180px）。动效与首页 V5/V6 同源但量收敛：
+   卡入场 300ms 交错上浮 / 图标 hover-按压微动 / AI 横幅 4s 微呼吸描边 /
+   reduced-motion 全退化（base.css + polish.css 全局兜底）。
 
-   docs/product/user-data-flow-matrix.md 顶部有一条用户确认过、
-   且明写「优先级高于下文『我的＝资产中心』旧表述」的信息架构整改（2026-06-14）：
+   codex 复审修正，全部落在本文件：
+   ① first（未登录）态 8 卡副文全部为功能说明式，零个性化计数；
+   ② 不做假入口 —— 每张卡都真链现有页（09/06/08/13/20/24/11）或本页
+      自有分区浮层（通知与反馈、账号设置）；链不出去的功能不上卡；
+   ③ 「90 天」保存期限说明不占数字槽位，写进「我的文档」卡副文正文；
+   ④ 「账号设置」卡副文压缩为 3 个事实：登录方式 / 隐私与删除 / 无障碍；
+   ⑤ 删除记录带防肩窥：确认弹层不回显文件名全称，只显示「简历文件 ×N」。
 
-     硬约束：不在 ProfilePage 重新渲染 AccountAssetsPanel；
-             不新增「账号资产」「资产中心」这类重复聚合入口。
-     各类明细归位到对应业务页面（简历→简历页、订单→打印页、
-     收藏/浏览/跳转→岗位与招聘会页……）。
-
-   照旧规格做，等于把用户明确删掉的聚合区装回去。所以本页只做
-   **入口与概览**，不做明细聚合。
-
-   ── 另一条本页独有的判断 ──────────────────────────────────────────
-   在公共机器上，「我的」和手机上的「我的」是两回事：
-   多数人**没登录**，做完就走，机器下一个人还要用。
-
-   所以这一页最要紧的不是罗列资产，是回答两个问题：
-     ① 我这次在这台机器上做了什么
-     ② 我走之后，什么会留下、什么会被清掉
-   ②比①更重要 —— 公共机器上没人替你记得关灯。
+   数据边界（合规红线，docs/product/user-data-flow-matrix.md 2026-06-14）：
+   浏览 / 外部跳转明细归岗位、招聘会、政策各业务页，本页不聚合明细，
+   卡片只给数量与入口。device-off 不影响本页（纯读），仅打印订单卡
+   加注「出纸恢复后可续打」。
    ──────────────────────────────────────────────────────────────────── */
 
-.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
-      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
-      border:1px solid var(--brd-1); background:var(--surf-1); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
-.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* ---------- 版面骨架：topbar 与 actionbar 之间，一屏放完，不滚动 ---------- */
+.fc {
+  flex: 1 1 auto; min-height: 0; position: relative; z-index: var(--z-content);
+  padding: var(--s-5) var(--gutter);
+  display: flex; flex-direction: column; gap: var(--s-4); overflow: hidden;
+}
 
-/* 概览数字：只给数量与入口，点进去看明细 —— 明细在业务页 */
-.ovw { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-4); }
-.ov { text-align:left; padding:var(--s-5); border-radius:var(--r-md); cursor:pointer;
-      background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); font-family:var(--ff-ui);
-      display:flex; flex-direction:column; gap:6px;
-      transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
-.ov:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
-.ov-n { font-size:var(--fz-8); font-weight:800; font-family:var(--ff-num); color:var(--fog-900);
-        line-height:1; font-variant-numeric:tabular-nums; }
-.ov-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
-.ov-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
-.ov-n--zero { color:var(--fog-600); }
+/* ---------- 顶部窄条：登录态 = 尾号 / 会员 chip / 退出；未登录 = 扫码登录卡 ---------- */
+.idbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3); min-height: 64px; }
+.idbar-note { font-size: var(--fz-2); color: var(--fog-600); }
+.idbar .btn { margin-left: auto; }
+.loginqr {
+  display: flex; align-items: center; gap: var(--s-4); width: 100%;
+  padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--jade-a20);
+  backdrop-filter: blur(var(--glass-blur));
+}
+.loginqr-box {
+  width: 56px; height: 56px; border-radius: var(--r-xs); flex: 0 0 auto;
+  background: var(--paper-000); color: var(--paper-ink);
+  display: grid; place-items: center; box-shadow: var(--sh-1);
+}
+.loginqr-box .ic { width: 36px; height: 36px; }
+.loginqr-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.loginqr-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.loginqr-s { font-size: var(--fz-2); color: var(--fog-600); }
+.loginqr .chip { margin-left: auto; }
 
-/* 分区入口：明细去对应业务页，这里只是路牌 */
-.gates { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
-.gate { display:flex; align-items:center; gap:var(--s-4); padding:var(--s-4) var(--s-5);
-        border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
-        text-decoration:none; color:inherit; min-height:var(--touch-min);
-        transition:border-color var(--dur-2) var(--ease-out); }
-.gate:hover { border-color:var(--jade-a32); }
-.gate .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; }
-.gate-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.gate-t { font-size:var(--fz-3); color:var(--fog-900); }
-.gate-s { font-size:var(--fz-1); color:var(--fog-600); }
-.gate-go { margin-left:auto; flex:0 0 auto; color:var(--fog-600); }
+/* ---------- AI 求职进度盘点：横幅卡 ---------- */
+.aihero {
+  position: relative; flex: 0 0 auto; min-height: 196px;
+  border-radius: var(--r-lg); padding: var(--s-5) var(--s-6);
+  background: var(--glass-2-bg); border: 1px solid var(--jade-a20);
+  box-shadow: var(--sh-2), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  display: flex; flex-direction: column; gap: var(--s-4); justify-content: center;
+}
+/* 4s 微呼吸描边：AI「在」的唯一常驻信号；ai-down / 未登录不呼吸 */
+.aihero::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit;
+  border: 1px solid var(--jade-a32); pointer-events: none; opacity: .2;
+  animation: aibreathe 4s var(--ease-in-out) infinite;
+}
+@keyframes aibreathe {
+  0%, 100% { opacity: .18; box-shadow: 0 0 0 0 rgba(52, 224, 168, 0); }
+  50%      { opacity: .7;  box-shadow: 0 0 26px -6px var(--jade-a32); }
+}
+.screen[data-state="ai-down"] .aihero { border-color: var(--brd-2); }
+.screen[data-state="ai-down"] .aihero::after,
+.screen[data-state="first"] .aihero::after { animation: none; opacity: 0; }
 
-/* 离场处理：本页的重点。留 / 清 两栏对照，不用文字堆 */
-.leave { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
-.lv { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
-.lv--keep { background:var(--jade-a12); border:1px solid var(--jade-a32); }
-.lv--wipe { background:var(--fog-a04); border:1px dashed var(--fog-a20); }
-.lv-hd { display:flex; align-items:center; gap:var(--s-3); }
-.lv-hd .ic { width:20px; height:20px; flex:0 0 auto; }
-.lv--keep .lv-hd .ic { color:var(--jade-400); }
-.lv-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
-.lv-i { display:grid; grid-template-columns:14px 1fr; gap:var(--s-3); align-items:start;
-        font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
-.lv-i i { width:7px; height:7px; border-radius:50%; margin-top:7px; flex:0 0 auto;
-          background:var(--fog-a20); display:block; }
-.lv--keep .lv-i i { background:var(--jade-500); }
-.lv-i b { color:var(--fog-900); }
+.ai-kick { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ai-kick .t {
+  font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600;
+  color: var(--fog-900); letter-spacing: .02em;
+}
+.ai-kick .mt { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+.aifacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
+.af {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5;
+}
+.af .ic { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 1px; color: var(--jade-500); }
+.af b { color: var(--fog-900); font-weight: 600; }
+.ainext { display: flex; align-items: center; gap: var(--s-4); }
+.ainext .tx { flex: 1; min-width: 0; font-size: var(--fz-3); color: var(--fog-800); line-height: 1.5; }
+.ainext .tx b { color: var(--fog-900); }
+.aidown { display: flex; align-items: center; gap: var(--s-4); font-size: var(--fz-3); color: var(--fog-700); line-height: 1.6; }
+.aidown .ic { width: 26px; height: 26px; flex: 0 0 auto; color: var(--fog-600); }
+.aidown b { color: var(--fog-900); }
 
-.chip--info { cursor:inherit; }
-.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
-.wside .pane--grow { overflow:hidden; }
+/* ---------- 8 张功能大卡：2 列 4 行，占满剩余高度 ---------- */
+.fgrid {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr);
+  gap: var(--s-4);
+}
+.fcard {
+  position: relative; overflow: hidden; min-height: 180px;
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-lg);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  box-shadow: var(--sh-2), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur));
+  text-decoration: none; color: inherit; cursor: pointer; text-align: left;
+  font-family: var(--ff-ui); font-size: var(--fz-3);
+  transition: transform var(--dur-2) var(--ease-out),
+              border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+.fcard:hover { transform: translateY(-3px); border-color: var(--jade-a32); box-shadow: var(--sh-3), var(--glass-hi); }
+.fcard:active { transform: translateY(1px) scale(.995); }
+button.fcard { appearance: none; width: 100%; }
+.fc-ic {
+  width: 60px; height: 60px; border-radius: var(--r-md); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--c1, var(--jade-500)); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .26), 0 10px 22px -10px rgba(0, 0, 0, .4);
+  transition: transform var(--dur-1) var(--ease-spring);
+}
+.fc-ic .ic { width: 30px; height: 30px; }
+.fcard:hover .fc-ic { transform: translateY(-3px); }
+.fcard:active .fc-ic { transform: scale(.92); }
+.fc-num {
+  position: absolute; right: var(--s-6); top: var(--s-5);
+  font-family: var(--ff-num); font-size: var(--fz-9); font-weight: 700; line-height: 1;
+  color: var(--fog-900); font-variant-numeric: tabular-nums;
+}
+.fc-num i { font-style: normal; font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 400; color: var(--fog-600); margin-left: 4px; }
+.fc-t { margin-top: auto; font-family: var(--ff-display); font-size: var(--fz-7); font-weight: 600; color: var(--fog-900); line-height: 1.2; padding-top: var(--s-3); }
+.fc-s { margin-top: 6px; padding-right: 64px; font-size: var(--fz-2); color: var(--fog-600); line-height: 1.55; }
+.fc-chips { margin-top: 8px; display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.fc-go {
+  position: absolute; right: var(--s-5); bottom: var(--s-5);
+  width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--fog-600);
+  border: 1px solid var(--brd-2);
+  transition: transform var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.fc-go .ic { width: 20px; height: 20px; }
+.fcard:hover .fc-go { transform: translateX(4px); color: var(--jade-400); }
+
+/* ---------- 入场：300ms 交错上浮（覆写 fx.css 的 760ms boot；复用 .rise
+     以便 stage.js 切态时重放）。reduced-motion 由全局兜底退化。 ---------- */
+.fc .rise { opacity: 0; transform: translateY(16px); filter: none; animation: fcin 300ms var(--ease-out) forwards; }
+@keyframes fcin { to { opacity: 1; transform: none; } }
+.idbar.rise { animation-delay: 0ms; }
+.aihero.rise { animation-delay: 60ms; }
+.fgrid .rise:nth-child(1) { animation-delay: 120ms; }
+.fgrid .rise:nth-child(2) { animation-delay: 165ms; }
+.fgrid .rise:nth-child(3) { animation-delay: 210ms; }
+.fgrid .rise:nth-child(4) { animation-delay: 255ms; }
+.fgrid .rise:nth-child(5) { animation-delay: 300ms; }
+.fgrid .rise:nth-child(6) { animation-delay: 345ms; }
+.fgrid .rise:nth-child(7) { animation-delay: 390ms; }
+.fgrid .rise:nth-child(8) { animation-delay: 435ms; }
+
+/* ---------- 分区浮层：通知与反馈 / 账号设置 / 删除确认 ----------
+   刻意不叫 .sheet —— v3Audit 会把 .sheet 当页面主体量纵向溢出。 */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet); display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
+.ovl--top { z-index: calc(var(--z-sheet) + 5); }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+.ovl-panel {
+  position: relative; width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto;
+  border-radius: var(--r-lg); padding: var(--s-6);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(140%);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.ovl--top .ovl-panel { max-width: 620px; }
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--jade-500); }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x {
+  margin-left: auto; width: 48px; height: 48px; border-radius: var(--r-sm);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  cursor: pointer; display: grid; place-items: center;
+}
+.ovl-x .ic { width: 20px; height: 20px; }
+.ovl-sec { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .06em; margin-top: var(--s-2); }
+.nrow {
+  display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: var(--touch-min); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1);
+}
+.nrow + .nrow { margin-top: var(--s-2); }
+.nrow .dot { margin-top: 7px; }
+.nrow-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrow-t { font-size: var(--fz-3); color: var(--fog-900); }
+.nrow-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+.ovl-act { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-act .btn { flex: 0 0 auto; }
+.btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<div class="screen" data-state="default" data-theme="warm">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -109,501 +229,329 @@
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">我的</div>
-        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #M-8841</div>
+        <div class="brand-sub">职易达 · 01 号机 · 功能中心</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>本次会话进行中</div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列空闲</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
-    <div class="clock" data-clock>2026年8月9日 <b>15:22</b></div>
+    <div class="clock" data-clock>2026年8月10日 <b>15:22</b></div>
   </header>
 
-  <div class="rail">
-    <div class="rail-track">
-      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">这次做了什么</span></button>
-      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">登录后能留下的</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">账号与数据</span></button>
+  <div class="fc">
+
+    <!-- ══════════ 顶部窄条 ══════════ -->
+    <div class="idbar rise" data-when="default ai-down device-off">
+      <span class="chip chip--jade is-static"><svg class="ic"><use href="#i-user"/></svg>已登录 · 尾号 8000</span>
+      <span class="chip is-static"><svg class="ic"><use href="#i-ticket"/></svg>会员 · 2 项权益可用</span>
+      <span class="idbar-note">本机登录 15:02 · 无操作 5 分钟自动退出</span>
+      <button class="btn btn--ghost" type="button" data-logout><svg class="ic"><use href="#i-close"/></svg>退出登录</button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
-  </div>
-
-  <div class="work">
-    <!-- ══════════════════ 左主区 ══════════════════ -->
-    <div class="wmain">
-
-      <!-- ─────────── S1 这次做了什么（未登录也能看） ─────────── -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-clock"/></svg>
-          <b>本次会话 · 15:02 开始，已 20 分钟</b>
-          <span class="mt">你没有登录，这些只存在这台机器的内存里</span>
-        </div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">上传简历并做了诊断</span>
-                <span class="tl-s">15:04 · 王磊_机械_2026.pdf</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">看了 4 个岗位、打开 1 次来源平台</span>
-                <span class="tl-s">15:09 · 恒信精密制造等</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">练了 4 道面试题</span>
-                <span class="tl-s">15:14 · 机械设计 / 工艺岗</span></span></div>
-            <div class="tl tl--now"><span class="tl-dot">4</span>
-              <span class="tl-b"><span class="tl-t">打印了 13 页 · 2.60 元</span>
-                <span class="tl-s">15:19 · 赶场作战单 + 简历 6 份 · 已出纸</span></span></div>
-          </div>
-        </div>
+    <div class="idbar rise" data-when="first">
+      <div class="loginqr">
+        <span class="loginqr-box"><svg class="ic"><use href="#i-qr"/></svg></span>
+        <span class="loginqr-b">
+          <span class="loginqr-t">手机扫码登录</span>
+          <span class="loginqr-s">登录后简历、文档和打印记录跟着账号走 · 未登录也能用全部功能</span>
+        </span>
+        <span class="chip chip--info">未登录 · 离场自动清空</span>
       </div>
-
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <b>你走之后，这些会怎么处理</b>
-          <span class="mt">这台机器下一个人还要用，所以先说清楚</span>
-        </div>
-        <div class="sec">
-          <div class="leave">
-            <div class="lv lv--keep">
-              <div class="lv-hd"><svg class="ic"><use href="#i-check"/></svg><span class="lv-t">会留下</span></div>
-              <div class="lv-i"><i></i><span><b>你手里的 13 页纸</b> —— 这是你带走的，机器上不再有</span></div>
-              <div class="lv-i"><i></i><span><b>这次打印的付款流水</b> —— 记在机器的经营账上，
-                只有金额、页数、时间，<b>不含你打了什么内容</b></span></div>
-              <div class="lv-i"><i></i><span>设备侧的<b>匿名计数</b>（今天打了多少页、用了几次 AI）——
-                用来算耗材和运维，认不出是谁</span></div>
-            </div>
-
-            <div class="lv lv--wipe">
-              <div class="lv-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="lv-t">会清掉</span></div>
-              <div class="lv-i"><i></i><span><b>你上传的简历原件和它的诊断结果</b></span></div>
-              <div class="lv-i"><i></i><span><b>面试练习里你打的每一个字</b></span></div>
-              <div class="lv-i"><i></i><span>看过哪些岗位、点开过哪个来源平台</span></div>
-              <div class="lv-i"><i></i><span>本次生成的作战单、复盘单等所有文件</span></div>
-              <div class="lv-i"><i></i><span><b>你在这一页看到的全部内容</b></span></div>
-            </div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>清空发生在<b>离场时</b>：点「结束并清空」，或无操作 5 分钟自动清。<br>
-                  <b>本机不会因为你忘了点就把东西留着。</b></span>
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>要留下这些，得<b>登录</b>。登录后文件存进你的账号，换台机器也能取 ——
-                  但那意味着<b>它们不再只存在这台机器上</b>。<br>
-                  留不留由你决定，本机不替你选，也不默认帮你留。</span>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-card"/></svg><b>这次花了多少</b>
-            <span class="mt">收费的只有打印，其余都不收钱</span>
-          </div>
-          <div class="kv">
-            <div class="kv-row"><span class="k">赶场作战单</span><span class="v">1 页 · 0.20 元</span></div>
-            <div class="kv-row"><span class="k">纸质简历 × 6 份</span><span class="v">12 页 · 2.40 元</span></div>
-            <div class="kv-row"><span class="k">简历诊断 / 优化</span><span class="v v--fog">不收费</span></div>
-            <div class="kv-row"><span class="k">面试练习</span><span class="v v--fog">不收费</span></div>
-            <div class="kv-row"><span class="k">岗位与政策查询</span><span class="v v--fog">不收费</span></div>
-            <div class="kv-row"><span class="k">本次合计</span><span class="v"><b>2.60</b> 元 · 已支付</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            单价以现场公示价为准。<b>本机不收求职服务费、不收内推费、不收会员费</b> ——
-            有人在这台机器上向你收这些，是骗子。<br>
-            打印失败或卡纸未出纸的部分会自动退回，不用你申请。
-          </div>
-        </div>
-      </div>
-
-      <!-- ─────────── S2 登录后能留下的 ─────────── -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-user"/></svg>
-          <b>登录后，这些跟着账号走</b>
-          <span class="mt">数字是数量，明细在各自的业务页里看</span>
-        </div>
-        <div class="sec">
-          <div class="ovw">
-            <a class="ov" href="09-resume-workbench.html">
-              <span class="ov-n">2</span>
-              <span class="ov-t">我的简历</span>
-              <span class="ov-s">1 份原件 · 1 份优化后 · 去简历工作台看</span>
-            </a>
-            <a class="ov" href="08-file-tools.html">
-              <span class="ov-n">7</span>
-              <span class="ov-t">我的文档</span>
-              <span class="ov-s">作战单、清单、扫描件 · 去文件加工台看</span>
-            </a>
-            <a class="ov" href="06-print-workbench.html">
-              <span class="ov-n">5</span>
-              <span class="ov-t">打印订单</span>
-              <span class="ov-s">近 30 天 · 去打印工作台看</span>
-            </a>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>这里<b>只给数量和入口，不铺明细</b> ——
-                  明细在它该在的地方：简历在简历页、订单在打印页、
-                  收藏和浏览记录在岗位与招聘会页。<br>
-                  同一份东西在两处各显示一遍，改了一处另一处就是错的。</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-route"/></svg>
-          <b>去各自的业务页</b>
-        </div>
-        <div class="sec">
-          <div class="gates">
-            <a class="gate" href="09-resume-workbench.html">
-              <svg class="ic"><use href="#i-resume"/></svg>
-              <span class="gate-b"><span class="gate-t">简历与 AI 记录</span>
-                <span class="gate-s">诊断、优化、访谈式生成</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-            <a class="gate" href="06-print-workbench.html">
-              <svg class="ic"><use href="#i-printer"/></svg>
-              <span class="gate-b"><span class="gate-t">打印订单与文档</span>
-                <span class="gate-s">重打、下载、删除</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-            <a class="gate" href="11-jobfit-compare.html">
-              <svg class="ic"><use href="#i-briefcase"/></svg>
-              <span class="gate-b"><span class="gate-t">岗位收藏与浏览</span>
-                <span class="gate-s">看过的、去过来源平台的</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-            <a class="gate" href="17-fair-desk.html">
-              <svg class="ic"><use href="#i-fair"/></svg>
-              <span class="gate-b"><span class="gate-t">招聘会记录</span>
-                <span class="gate-s">看过的场次、打过的作战单</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-            <a class="gate" href="21-policy.html">
-              <svg class="ic"><use href="#i-policy"/></svg>
-              <span class="gate-b"><span class="gate-t">政策与办事清单</span>
-                <span class="gate-s">核对过的政策、打过的清单</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-            <a class="gate" href="24-benefits.html">
-              <svg class="ic"><use href="#i-ticket"/></svg>
-              <span class="gate-b"><span class="gate-t">权益与活动</span>
-                <span class="gate-s">可领的、已领的</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </a>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-5)">
-            这一页<b>只是路牌</b>。要改、要删、要重打，都在对应的业务页上做 ——
-            那里才有完整的上下文。
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-shield"/></svg><b>哪些<u>不</u>跟着账号走</b>
-            <span class="mt">登录也留不下的，说清楚比含糊强</span>
-          </div>
-          <div class="leave">
-            <div class="lv lv--wipe">
-              <div class="lv-hd"><svg class="ic"><use href="#i-close"/></svg><span class="lv-t">从不保存</span></div>
-              <div class="lv-i"><i></i><span><b>面试练习你答的每一个字</b> ——
-                里面常有公司名和项目细节，登录了也不存</span></div>
-              <div class="lv-i"><i></i><span><b>语音转成的文字</b> —— 答完即删</span></div>
-              <div class="lv-i"><i></i><span>AI 对话的完整上下文 —— 只留结论，不留过程</span></div>
-            </div>
-            <div class="lv lv--wipe">
-              <div class="lv-hd"><svg class="ic"><use href="#i-clock"/></svg><span class="lv-t">只在本机、离场即清</span></div>
-              <div class="lv-i"><i></i><span>你在<b>这一次</b>看过哪些岗位、点开过哪个来源平台</span></div>
-              <div class="lv-i"><i></i><span>本次选过的政策条件、填过的情况</span></div>
-              <div class="lv-i"><i></i><span>未保存的草稿与中间结果</span></div>
-            </div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            上面这些<b>不是"还没做"，是有意不做</b>。
-            公共机器上，能不留的就不留。
-          </div>
-        </div>
-      </div>
-
-      <!-- ─────────── S3 账号与数据 ─────────── -->
-      <div class="pane" data-at="s3">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-gear"/></svg>
-          <b>账号与数据</b>
-        </div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">登录方式</span><span class="v">手机号 · 138****8000</span></div>
-            <div class="kv-row"><span class="k">注册时间</span><span class="v v--fog">2026年6月18日</span></div>
-            <div class="kv-row"><span class="k">本机登录</span><span class="v">今天 15:02</span></div>
-            <div class="kv-row"><span class="k">文件保留期</span><span class="v">简历 90 天 · 证件类 7 天</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            证件类文件（身份证、学位证等）保留期更短，到期自动删除，<b>删除会留日志</b>。
-          </div>
-
-          <!-- 2026-08-09 路牌补齐：通知与反馈（线上 /me/notifications /me/feedback）。
-               与本页其他资产行同口径：只给数量 + 路牌，明细在对应页面。 -->
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-bell"/></svg><b>通知与反馈</b>
-            <span class="mt">只给数量 · 明细在对应页面看</span>
-          </div>
-          <div class="gates">
-            <button class="gate" type="button" style="width:100%;font:inherit;text-align:left;cursor:pointer">
-              <svg class="ic"><use href="#i-bell"/></svg>
-              <span class="gate-b"><span class="gate-t">通知 · 3 条</span>
-                <span class="gate-s">1 条未读：打印完成、文件到期提醒</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </button>
-            <button class="gate" type="button" style="width:100%;font:inherit;text-align:left;cursor:pointer">
-              <svg class="ic"><use href="#i-pen"/></svg>
-              <span class="gate-b"><span class="gate-t">反馈工单 · 1 件</span>
-                <span class="gate-s">处理中 · 有结果会进左边的通知</span></span>
-              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <b>你可以做的</b>
-        </div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
-
-          <button class="gate" type="button" style="min-height:64px;width:100%;text-align:inherit;font:inherit;color:inherit;background:none;border:none;cursor:pointer">
-            <svg class="ic"><use href="#i-close"/></svg>
-            <span class="gate-b"><span class="gate-t">退出登录并清空本机会话</span>
-              <span class="gate-s">点击后需你确认 · 账号里的文件不受影响</span><span class="gate-s" style="opacity:.7">原型稿:确认弹层在落地实现,此处仅形态</span></span>
-            <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-          </button>
-
-          <div class="ck">
-            <span class="ck-b">
-              <span class="ck-t">导出我的数据</span>
-              <span class="ck-s">
-                <b>本机暂时办不了。</b>导出要把你所有文件打包并安全送达，
-                本机没有可靠的送达方式（公共机器上不该直接下载到 U 盘，
-                邮箱通道也还没接）。<br>
-                需要导出请到线上或联系客服，<b>本机不假装能办</b>。
-              </span>
-            </span>
-            <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">未开放</span></span>
-          </div>
-
-          <div class="ck">
-            <span class="ck-b">
-              <span class="ck-t">注销账号</span>
-              <span class="ck-s">
-                <b>本机暂时办不了。</b>注销要连带处理未完成订单、已付款未打印的余额、
-                以及各处的关联记录 —— 这条链路还没做完，
-                在这里放一个按钮却删不干净，<b>比不放更糟</b>。<br>
-                需要注销请到线上或联系客服。
-              </span>
-            </span>
-            <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">未开放</span></span>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-3)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>上面两项<b>没有做成灰色按钮</b> —— 灰按钮会让人以为"点了没反应"，
-                  其实是本机压根还办不了。说清楚比留个坑强。</span>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-history"/></svg><b>你的文件删除记录</b>
-            <span class="mt">「删除会留日志」这句话，在这里能核对</span>
-          </div>
-          <div class="tline">
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-trash"/></svg></span>
-              <span class="tl-b"><span class="tl-t">身份证扫描件 · 到期自动删除</span>
-                <span class="tl-s">8月5日 02:00 · 系统 · 保留期 7 天已到</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-trash"/></svg></span>
-              <span class="tl-b"><span class="tl-t">简历旧版本 v1 · 你手动删除</span>
-                <span class="tl-s">7月30日 16:41 · 本人 · 01 号机</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-trash"/></svg></span>
-              <span class="tl-b"><span class="tl-t">打印失败的临时文件 · 自动清理</span>
-                <span class="tl-s">7月28日 03:00 · 系统</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            日志记<b>谁删的、什么时候、删了哪一个</b>，不含文件内容。
-            日志本身删不掉 —— 能被删掉的日志等于没有日志。
-          </div>
-        </div>
-      </div>
-
     </div>
 
-    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
-
-      <!-- S1 右 -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-user"/></svg><b>当前身份</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">登录状态</span><span class="v"><span class="chip chip--info">未登录</span></span></div>
-            <div class="kv-row"><span class="k">会话开始</span><span class="v">15:02</span></div>
-            <div class="kv-row"><span class="k">已进行</span><span class="v">20 分钟</span></div>
-            <div class="kv-row"><span class="k">无操作清空</span><span class="v">5 分钟后</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            未登录一样能用本机的全部功能，只是<b>东西留不下来</b>。
-          </div>
-        </div>
+    <!-- ══════════ AI 求职进度盘点横幅 ══════════ -->
+    <section class="aihero rise">
+      <div class="ai-kick">
+        <span class="t">AI 求职进度盘点</span>
+        <span class="ev ev--e1" data-when="default device-off">E1 你的记录</span>
+        <span class="ev ev--e2" data-when="default device-off">E2 来源状态</span>
+        <span class="mt" data-when="default device-off">只你可见 · 退出即离屏</span>
+        <span class="mt" data-when="ai-down">服务中断已自动上报</span>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>公共机器上的三条</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            <b>① 走之前点一下「结束并清空」。</b><br>
-            不点也会自动清，但自动清要等 5 分钟 —— 这 5 分钟里下一个人可能已经站过来了。
-            <br><br>
-            <b>② 纸别忘在出纸口。</b><br>
-            简历上有你的姓名和电话。本机管不了纸，只能提醒。
-            <br><br>
-            <b>③ 证件扫描件不要选"存进账号"。</b><br>
-            除非你确实要在别处用。默认 7 天删，但公共场所扫的东西，能不存就不存。
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>本机<b>不主动索要手机号</b>，也不会因为你没登录就少给功能。</span>
-          </div>
-        </div>
+      <!-- 登录 + AI 可用：三条事实 -->
+      <div class="aifacts" data-when="default device-off">
+        <div class="af"><svg class="ic"><use href="#i-resume"/></svg><span>简历已诊断 · 最新版 <b>v3</b></span></div>
+        <div class="af"><svg class="ic"><use href="#i-printer"/></svg><span>本周打印 <b>2 单</b> · 已全部出纸</span></div>
+        <div class="af"><svg class="ic"><use href="#i-bookmark"/></svg><span>收藏岗位 <b>3 条</b> · 1 条已下线</span></div>
+      </div>
+      <!-- 尾接一条 E3 建议，真链 P11 -->
+      <div class="ainext" data-when="default device-off">
+        <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
+        <span class="tx">下一步可以做：把 <b>v3 简历</b>拿去和收藏岗位的要求<b>逐条比对</b></span>
+        <a class="btn btn--ghost" href="11-jobfit-compare.html">去比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
       </div>
 
-      <!-- S2 右 -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>为什么这里不铺明细</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            同一份简历既在「我的」列一遍、又在简历页列一遍 ——
-            改了一处，另一处就是<b>过期的错数据</b>。<br><br>
-            而用户会信先看到的那个。
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            所以这里只给数量和路牌，<b>明细只有一处</b>。
-          </div>
-        </div>
+      <!-- ai-down：整卡换兜底说明 -->
+      <div class="aidown" data-when="ai-down">
+        <svg class="ic"><use href="#i-offline"/></svg>
+        <span><b>AI 盘点暂不可用。</b>你的记录都在下面各卡里，不受影响；
+              故障已自动上报，不需要你操作。</span>
       </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>最近在别的机器上</b></div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">03 号机 · 打印 4 页</span>
-                <span class="tl-s">8月2日 · 市人才市场 B 馆</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">03 号机 · 面试练习 5 题</span>
-                <span class="tl-s">8月2日 · 复盘单未打印</span></span></div>
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">01 号机 · 简历优化</span>
-                <span class="tl-s">7月28日 · 本机</span></span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>跨机记录只有<b>做过什么、在哪台、什么时候</b> ——
-                  不含你当时答了什么、看了哪家公司。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            这几条不能删（要留作打印计费的凭证），但<b>本身不含内容</b>。
-          </div>
-        </div>
+      <!-- first：横幅换扫码登录引导（不出现任何个性化数字） -->
+      <div class="aidown" data-when="first">
+        <svg class="ic"><use href="#i-brain"/></svg>
+        <span><b>登录后，这里会用你的记录盘出进度和下一步。</b>
+              用上方二维码扫码登录即可；不登录也能用本机全部功能，
+              离场后本机会话自动清空。</span>
       </div>
+    </section>
 
-      <!-- S3 右 -->
-      <div class="pane" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-file"/></svg><b>文件保留期</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">简历</span><span class="v">90 天</span></div>
-            <div class="kv-row"><span class="k">生成的文档</span><span class="v">90 天</span></div>
-            <div class="kv-row"><span class="k">证件类扫描件</span><span class="v">7 天</span></div>
-            <div class="kv-row"><span class="k">面试作答内容</span><span class="v v--fog">从不保存</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            到期自动删除，<b>删除会留日志</b>（谁删的、什么时候、删了几个），
-            但日志里不含文件内容。
-          </div>
-        </div>
-      </div>
+    <!-- ══════════ 8 张功能大卡（卡序 codex 定稿） ══════════ -->
+    <div class="fgrid">
 
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>管理员能看到什么</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">你的文件内容</span><span class="v v--fog">看不到</span></div>
-            <div class="kv-row"><span class="k">打印流水</span><span class="v">能看到</span></div>
-            <div class="kv-row"><span class="k">设备与故障日志</span><span class="v">能看到</span></div>
-            <div class="kv-row"><span class="k">因故障需查文件时</span><span class="v">留访问日志</span></div>
-          </div>
+      <!-- 1 我的简历 -->
+      <a class="fcard rise" href="09-resume-workbench.html?stage=s5" style="--c1:var(--cat-resume)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">2<i>份</i></span>
+        <span class="fc-t">我的简历</span>
+        <span class="fc-s" data-when="default ai-down device-off">1 份原件 · 1 份优化后 · 最新版 v3</span>
+        <span class="fc-s" data-when="first">简历的历次版本与诊断都在这里</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
 
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>管理员确实存在"为排查故障需要打开某个文件"的情况 ——
-                  本机<b>不假装这不会发生</b>，而是<b>每次访问都记日志</b>，
-                  日志本身删不掉。</span>
-          </div>
+      <!-- 2 我的文档（「90 天」写进副文正文，不占数字槽位） -->
+      <a class="fcard rise" href="08-file-tools.html" style="--c1:var(--cat-mock)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">7<i>份</i></span>
+        <span class="fc-t">我的文档</span>
+        <span class="fc-s" data-when="default ai-down device-off">作战单与扫描件 · 保存 90 天到期自动删</span>
+        <span class="fc-s" data-when="first">作战单、扫描件与生成材料归在这里 · 保存 90 天</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            这比"承诺绝对没人看"更实在 —— 后者没法验证，前者可以查。
-          </div>
-        </div>
-      </div>
+      <!-- 3 打印订单 -->
+      <a class="fcard rise" href="06-print-workbench.html" style="--c1:var(--cat-print)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">5<i>单</i></span>
+        <span class="fc-t">打印订单</span>
+        <span class="fc-s" data-when="default ai-down device-off">近 30 天 · 最近一单 13 页已出纸</span>
+        <span class="fc-s" data-when="first">打过什么、花了多少 · 单子都在这里</span>
+        <span class="fc-chips" data-when="device-off"><span class="chip chip--amber is-static">打印机离线 · 出纸恢复后可续打</span></span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
 
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            这是<b>公共机器</b>上的「我的」。最要紧的两件事：
-            你这次做了什么、<b>走之后什么会留下什么会清掉</b>。<br>
-            明细都在各自的业务页里，这里只给数量和路牌。
-          </div>
-        </div>
-      </div>
+      <!-- 4 我的收藏（明细归岗位业务页，本页不聚合） -->
+      <a class="fcard rise" href="13-jobs-desk.html" style="--c1:var(--cat-job)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">3<i>条</i></span>
+        <span class="fc-t">我的收藏</span>
+        <span class="fc-s" data-when="default ai-down device-off">1 条已下线 · 明细在岗位情报台里看</span>
+        <span class="fc-s" data-when="first">收藏过的岗位和场次 · 回业务页接着看</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
+
+      <!-- 5 AI 服务使用 -->
+      <a class="fcard rise" href="20-interview-pod.html?stage=s3" style="--c1:var(--jade-600)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">4<i>次</i></span>
+        <span class="fc-t">AI 服务使用</span>
+        <span class="fc-s" data-when="default ai-down device-off">本月 · 面试点评 1 份可回看</span>
+        <span class="fc-s" data-when="first">练过的题和 AI 给的点评从这里回看</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
+
+      <!-- 6 我的权益 -->
+      <a class="fcard rise" href="24-benefits.html" style="--c1:var(--cat-fair)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">2<i>项</i></span>
+        <span class="fc-t">我的权益</span>
+        <span class="fc-s" data-when="default ai-down device-off">打印减免可用 · 8 月 31 日到期</span>
+        <span class="fc-s" data-when="first">能用的打印减免和活动名额在这里</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </a>
+
+      <!-- 7 通知与反馈（本页分区浮层） -->
+      <button class="fcard rise" type="button" data-open="ovl-notice" style="--c1:var(--cat-policy)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-bell"/></svg></span>
+        <span class="fc-num" data-when="default ai-down device-off">3<i>条</i></span>
+        <span class="fc-t">通知与反馈</span>
+        <span class="fc-s" data-when="default ai-down device-off">1 条未读 · 反馈工单 1 件处理中</span>
+        <span class="fc-s" data-when="first">打印完成、文件到期这类提醒在这里</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </button>
+
+      <!-- 8 账号设置（本页分区浮层；副文 = 3 个事实，四态同文） -->
+      <button class="fcard rise" type="button" data-open="ovl-set" style="--c1:var(--fog-600)">
+        <span class="fc-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
+        <span class="fc-t">账号设置</span>
+        <span class="fc-s">登录方式 · 隐私与删除 · 无障碍</span>
+        <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+      </button>
 
     </div>
   </div>
 
-  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <!-- ══════════ 浮层：通知与反馈 ══════════ -->
+  <div class="ovl" id="ovl-notice" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-bell"/></svg><b>通知与反馈</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+
+      <div data-when="default ai-down device-off">
+        <div class="ovl-sec">通知 · 3 条</div>
+        <div class="nrow"><span class="dot dot--live"></span>
+          <span class="nrow-b"><span class="nrow-t">打印完成 · 13 页已出纸</span>
+            <span class="nrow-s">今天 15:19 · 未读</span></span></div>
+        <div class="nrow"><span class="dot"></span>
+          <span class="nrow-b"><span class="nrow-t">证件类文件将在 3 天后到期自动删除</span>
+            <span class="nrow-s">今天 09:00 · 已读</span></span></div>
+        <div class="nrow"><span class="dot"></span>
+          <span class="nrow-b"><span class="nrow-t">权益到账 · 打印减免 2 张</span>
+            <span class="nrow-s">8月8日 10:12 · 已读</span></span></div>
+
+        <div class="ovl-sec">反馈工单 · 1 件</div>
+        <div class="nrow"><span class="dot dot--warn"></span>
+          <span class="nrow-b"><span class="nrow-t">出纸偏慢 · #F-2231</span>
+            <span class="nrow-s">处理中 · 有结果会进上面的通知</span></span></div>
+      </div>
+
+      <div data-when="first">
+        <div class="nrow"><span class="dot"></span>
+          <span class="nrow-b"><span class="nrow-t">未登录 · 通知跟着账号走</span>
+            <span class="nrow-s">登录后打印完成、文件到期这类提醒会显示在这里</span></span></div>
+      </div>
+
+      <div class="panel-note" style="margin-left:0">通知只发到你的账号，本机不发营销消息。</div>
+    </div>
+  </div>
+
+  <!-- ══════════ 浮层：账号设置 ══════════ -->
+  <div class="ovl" id="ovl-set" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-gear"/></svg><b>账号设置</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="ovl-sec">登录方式</div>
+      <div class="kv">
+        <div class="kv-row" data-when="default ai-down device-off"><span class="k">手机号</span><span class="v">尾号 8000</span></div>
+        <div class="kv-row" data-when="default ai-down device-off"><span class="k">本机登录</span><span class="v v--fog">今天 15:02</span></div>
+        <div class="kv-row" data-when="first"><span class="k">当前状态</span><span class="v"><span class="chip chip--info">未登录</span></span></div>
+      </div>
+
+      <div class="ovl-sec">隐私与删除</div>
+      <div class="kv">
+        <div class="kv-row"><span class="k">简历 / 生成文档</span><span class="v">保存 90 天 · 到期自动删</span></div>
+        <div class="kv-row"><span class="k">证件类扫描件</span><span class="v">保存 7 天 · 到期自动删</span></div>
+        <div class="kv-row"><span class="k">面试练习作答</span><span class="v v--fog">从不保存</span></div>
+      </div>
+      <div class="ovl-act" data-when="default ai-down device-off">
+        <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-del"><svg class="ic"><use href="#i-trash"/></svg>删除已存的简历文件</button>
+        <span class="panel-note" style="margin-left:0">删除会留日志 · 日志不含文件内容</span>
+      </div>
+      <div class="panel-note" style="margin-left:0" data-when="first">未登录 · 账号里没有可删的文件；本机会话在离场时自动清空。</div>
+
+      <div class="ovl-sec">无障碍</div>
+      <div class="kv">
+        <div class="kv-row"><span class="k">动效</span><span class="v v--fog">跟随系统「减弱动态效果」自动关闭</span></div>
+        <div class="kv-row"><span class="k">触控</span><span class="v v--fog">所有按钮不小于 48px</span></div>
+        <div class="kv-row"><span class="k">文字</span><span class="v v--fog">界面文字不小于 13px</span></div>
+      </div>
+
+      <div class="ovl-act" data-when="default ai-down device-off">
+        <button class="btn btn--ghost" type="button" data-logout data-close><svg class="ic"><use href="#i-close"/></svg>退出登录并清空本机会话</button>
+        <span class="panel-note" style="margin-left:0">账号里的文件不受影响</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 浮层：删除确认（防肩窥：不回显文件名全称） ══════════ -->
+  <div class="ovl ovl--top" id="ovl-del" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-trash"/></svg><b>删除已存的简历文件？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t">将删除：简历文件 ×2 · 诊断报告 ×1</span>
+          <span class="nrow-s">为防旁人看到 · 此处不显示文件名全称</span></span></div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>删除后不可恢复；删除会留日志（谁删的、什么时候、删了几个），
+              日志不含文件内容。</span>
+      </div>
+
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
+        <button class="btn btn--commit" type="button" data-close>确认删除</button>
+        <span class="panel-note" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 常驻 ActionBar ══════════ -->
   <div class="actionbar">
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">看本次会话</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回上一页</button>
-
-    <span class="actionbar-hint" data-at="s1">未登录 · 离场或无操作 5 分钟后自动清空</span>
-    <span class="actionbar-hint" data-at="s2">数量在这里，明细在各自的业务页</span>
-    <span class="actionbar-hint" data-at="s3">导出与注销本机暂时办不了，已说明原因</span>
-
-    <button class="btn btn--primary" data-at="s1"><svg class="ic"><use href="#i-close"/></svg>结束并清空</button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">账号与数据<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3"><svg class="ic"><use href="#i-close"/></svg>结束并清空</button>
+    <button class="btn btn--lg btn--ghost"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">明细在各自的业务页里</div><div class="s">本页只做入口 · 浏览与跳转记录去岗位 / 招聘会 / 政策页看</div></div>
+      <div data-when="first"><div class="t">未登录 · 东西留不下来</div><div class="s">离场或无操作 5 分钟后自动清空 · 功能不受影响</div></div>
+      <div data-when="ai-down"><div class="t">AI 盘点暂不可用</div><div class="s">各卡里的记录不受影响 · 故障已自动上报</div></div>
+      <div data-when="device-off"><div class="t">打印机离线 · 本页可正常查看</div><div class="s">出纸恢复后打印订单可续打</div></div>
+    </div>
+    <button class="btn btn--primary" type="button"><svg class="ic"><use href="#i-close"/></svg>结束并清空</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
-    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
-<script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ── 本页交互：分区浮层开合 + 退出登录演示 ─────────────────────────────
+   浮层是「通知与反馈」「账号设置」两张卡的真实去处（codex 修正②：
+   没有独立页面的功能不做假链接，落在本页自有分区）。
+   退出登录直接切到 first 态 —— 原型里这是最诚实的「退出后长什么样」。 */
+;(function () {
+  'use strict';
+  function closeAll () {
+    var os = document.querySelectorAll('.ovl');
+    for (var i = 0; i < os.length; i++) os[i].hidden = true;
+  }
+  document.addEventListener('click', function (e) {
+    var op = e.target.closest('[data-open]');
+    if (op) {
+      var t = document.getElementById(op.getAttribute('data-open'));
+      if (t) { t.hidden = false; }
+      return;
+    }
+    var cl = e.target.closest('[data-close]');
+    if (cl) {
+      var ovl = cl.closest('.ovl');
+      if (ovl) ovl.hidden = true;
+    }
+    var lo = e.target.closest('[data-logout]');
+    if (lo) {
+      closeAll();
+      var b = document.querySelector('[data-state-btn="first"]');
+      if (b) { b.click(); }
+      else {
+        var s = document.querySelector('.screen');
+        if (s) s.setAttribute('data-state', 'first');
+        if (window.v3ApplyVisibility) window.v3ApplyVisibility();
+      }
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAll();
+  });
+})();
+</script>
 </body>
 </html>

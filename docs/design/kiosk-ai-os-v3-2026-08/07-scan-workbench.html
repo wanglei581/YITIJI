@@ -15,6 +15,16 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+  /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
+  .chip--info { cursor: inherit; }
+  /* s1「扫描成什么」/ s4 去向卡：被服务中断或设备离线拦下的卡置灰 + 不可点，原因写在卡面上 */
+  .src[aria-disabled="true"], .xlane-go[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  /* button.xlane-go：与 a.xlane-go 同构（UA 按钮样式清掉，文字左对齐） */
+  button.xlane-go { font: inherit; text-align: left; }
+  /* 输出格式选中态：复用 seg 的选中语义，卡面描边表达 */
+  .src[data-fmt][aria-pressed="true"] { border-color: var(--jade-500); box-shadow: var(--sh-2), 0 0 0 1px var(--jade-500) inset; }
+</style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
@@ -72,6 +82,36 @@
           <span class="src-nm">普通文档</span>
           <span class="src-ds">多页材料、表格、合同页。<br>送稿器一次最多 50 页。</span>
           <span class="src-tag"><span class="chip">支持双面</span></span>
+        </button>
+      </div>
+
+      <!-- S1 扫描成什么：三大卡（输出格式）。选择不换阶段，只改本次输出；
+           OCR 需要把图像送第三方识别服务，ai-down 时该卡如实置灰。 -->
+      <span class="xlane-hd" data-at="s1">扫描成什么 · 点卡切换，差别写在卡面上</span>
+      <div class="sources" data-at="s1" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="src" data-fmt="pdf" aria-pressed="true">
+          <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+          <span class="src-nm">PDF 文档</span>
+          <span class="src-ds">多页合成一份 PDF。打印、存档、发招聘方都认。</span>
+          <span class="src-tag"><span class="chip chip--jade">默认 · 最通用</span></span>
+        </button>
+        <button class="src" data-fmt="jpg" aria-pressed="false">
+          <span class="src-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+          <span class="src-nm">图片 JPG</span>
+          <span class="src-ds">每页出一张图片，发微信、插进别的文档方便。</span>
+          <span class="src-tag"><span class="chip">每页一张 · 不合并</span></span>
+        </button>
+        <button class="src" data-fmt="ocr" aria-pressed="false" data-when="default first device-off">
+          <span class="src-ic"><svg class="ic"><use href="#i-search"/></svg></span>
+          <span class="src-nm">可检索 PDF · OCR</span>
+          <span class="src-ds">文字可复制、可搜索；图像会送第三方 OCR 识别。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">文字外送识别 · 多等约 1 分钟</span></span>
+        </button>
+        <button class="src" aria-disabled="true" data-when="ai-down">
+          <span class="src-ic"><svg class="ic"><use href="#i-search"/></svg></span>
+          <span class="src-nm">可检索 PDF · OCR</span>
+          <span class="src-ds">识别服务中断，本次选不了；普通 PDF 与 JPG 不受影响。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">识别中断 · 暂不可选</span></span>
         </button>
       </div>
 
@@ -345,13 +385,16 @@
           <div class="kv-row" data-when="default first ai-down"><span class="k">完成时间</span><span class="v">8 月 8 日 09:49</span></div>
           <div class="kv-row" data-when="device-off"><span class="k">中断时间</span><span class="v">8 月 8 日 09:49</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">可识别页</span><span class="v" data-when="default first">5 / 6 页</span><span class="v" data-when="device-off">2 / 3 页</span></div>
-          <div class="kv-row" data-when="default first device-off"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页</span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">整页平均置信</span><span class="v">91% <span class="ev ev--e1">E1 本机识别数据</span></span></div>
+          <div class="kv-row" data-when="default first"><span class="k">逐页置信</span><span class="v">①96 ②95 ③<b style="color:var(--amber-400)">62</b> ④94 ⑤93 ⑥95</span></div>
+          <div class="kv-row" data-when="device-off"><span class="k">逐页置信</span><span class="v">①95 ②93 ③<b style="color:var(--amber-400)">62</b></span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页 · 62%，低于 80% 阈值</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">原因</span><span class="v">原件折痕导致断行</span></div>
           <div class="kv-row" data-when="ai-down"><span class="k">置信度终检</span><span class="v v--fog">已跳过 · 识别服务中断</span></div>
         </div>
         <div class="notice notice--amber" data-when="default first device-off" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>第 3 页置信度偏低，<b>不会送 AI 生成结论</b>。建议重扫这一页，或人工确认后再继续。</span>
+          <span>第 3 页置信 62%，低于 80% 阈值 <span class="ev ev--e1">E1 本机识别数据</span>，<b>不会送 AI 生成结论</b>。建议重扫这一页，或人工确认后再继续。</span>
         </div>
         <div class="notice" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -375,9 +418,26 @@
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto">
           <button class="btn btn--ghost" style="width:100%" data-when="default first">送 AI 简历诊断</button>
           <button class="btn btn--ghost" style="width:100%" data-when="ai-down device-off" aria-disabled="true">AI 诊断不可用</button>
-          <a class="btn btn--ghost" style="width:100%" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">拿去打印工作台核价</a>
-          <button class="btn btn--ghost" style="width:100%" data-when="device-off" aria-disabled="true">打印不可用</button>
-          <button class="btn btn--ghost" style="width:100%">存进「我的文档」</button>
+          <!-- 完成去向三卡：打印 / 存档 / 带走。全部真链接；打印随 device-off 如实置灰 -->
+          <a class="xlane-go" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">拿去打印</span><span class="xlane-ds">去打印工作台核价出纸</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <button class="xlane-go" aria-disabled="true" data-when="device-off" style="width:100%">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">拿去打印</span><span class="xlane-ds">打印机同机离线，换一台空闲机器打</span></span>
+          </button>
+          <a class="xlane-go" href="23-me.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">存进「我的文档」</span><span class="xlane-ds">登录后长期保存，换一台机也能取</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="05-phone-relay.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">带走 · 扫码传手机</span><span class="xlane-ds">手机扫码把文件带走，不留在本机</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
         </div>
       </div>
 
@@ -505,6 +565,19 @@
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script>
+/* s1「扫描成什么」：单选组。只改本次输出格式，不换阶段；
+   aria-pressed 由这里维护，置灰卡（ai-down 的 OCR）没有 data-fmt 参与不了选择 */
+;(function () {
+  var cards = [].slice.call(document.querySelectorAll('[data-fmt]'))
+  if (!cards.length) return
+  cards.forEach(function (c) {
+    c.addEventListener('click', function () {
+      cards.forEach(function (x) { x.setAttribute('aria-pressed', x === c ? 'true' : 'false') })
+    })
+  })
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

@@ -20,6 +20,10 @@
   /* 核价门控：金额没显示出来之前，朱砂支付键不存在 */
   .screen:not(.is-quoted) [data-gate="quoted"],
   .screen.is-quoted [data-gate="unquoted"] { display: none !important; }
+  /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
+  .chip--info { cursor: inherit; }
+  /* s1 六卡里被设备离线拦下的卡：置灰 + 不可点，原因写在卡面 chip 上 */
+  .src[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -67,12 +71,14 @@
     <!-- ---------- 左：文件为主 ---------- -->
     <div class="wmain">
 
-      <!-- S1 来源四选 -->
-      <div class="sources" data-at="s1">
+      <!-- S1 六卡选择器：怎么把文件带进来（2 列 3 行，每卡 ≥150px）。
+           前三卡在本页继续第 2 步；后三卡是去对应台面的真链接（a 标签，非装饰）。
+           device-off 时扫描原件 / 复印置灰 —— 扫描与打印同一台机，离线一起停。 -->
+      <div class="sources" data-at="s1" style="grid-auto-rows:minmax(150px,1fr)">
         <button class="src" data-go="s2">
           <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
           <span class="src-nm">本机上传</span>
-          <span class="src-ds">插入 U 盘或用本机键盘选择文件。支持 PDF / JPG / PNG。</span>
+          <span class="src-ds">用本机键盘选择文件。支持 PDF / JPG / PNG。</span>
           <span class="src-tag"><span class="chip chip--jade">最常用</span></span>
         </button>
         <button class="src" data-go="s2">
@@ -87,12 +93,36 @@
           <span class="src-ds">插入右侧 USB 口，选择要打印的文件。</span>
           <span class="src-tag"><span class="chip" data-when="default first ai-down">已识别 1 个设备</span><span class="chip" data-when="device-off">未检测到设备</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <a class="src" href="07-scan-workbench.html" data-when="default first ai-down">
           <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
-          <span class="src-nm">纸质扫描</span>
-          <span class="src-ds">把纸质原件放上玻璃板或送稿器，扫成 PDF 再打印。</span>
-          <span class="src-tag"><span class="chip chip--jade">扫描仪就绪</span></span>
+          <span class="src-nm">扫描原件</span>
+          <span class="src-ds">纸质原件放玻璃板或送稿器，扫成 PDF 再回来打印。</span>
+          <span class="src-tag"><span class="chip chip--jade">去扫描工作台</span></span>
+        </a>
+        <button class="src" aria-disabled="true" data-when="device-off">
+          <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="src-nm">扫描原件</span>
+          <span class="src-ds">扫描与打印是同一台机，离线一起停，已上报运维。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
         </button>
+        <a class="src" href="07-scan-workbench.html?stage=s2" data-when="default first ai-down">
+          <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="src-nm">复印</span>
+          <span class="src-ds">纸质原件复一份：先扫描后打印，一台机上完成。</span>
+          <span class="src-tag"><span class="chip">先扫后打</span></span>
+        </a>
+        <button class="src" aria-disabled="true" data-when="device-off">
+          <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="src-nm">复印</span>
+          <span class="src-ds">复印要出纸，打印机离线时做不了，已上报运维。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
+        </button>
+        <a class="src" href="29-id-photo.html">
+          <span class="src-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
+          <span class="src-nm">证件照排版</span>
+          <span class="src-ds">证件照排成 A4 版面，打印后按裁切线剪开。</span>
+          <span class="src-tag"><span class="chip chip--info">尚未开放 · 可先了解</span></span>
+        </a>
       </div>
 
       <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
@@ -648,7 +678,9 @@
             <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
             <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
           <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
-          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>就绪</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 同机一起停</span></div>
           <div class="kv-row"><span class="k">AI 服务</span>
             <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
             <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 打印不受影响</span></div>
@@ -755,7 +787,7 @@
   <!-- ============ ActionBar：主按钮恒定右下 ============ -->
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-at="s1"><div class="t">选一种方式，把要打印的文件送进来</div><div class="s">不需要登录也可以打印；文件默认只保留到本次会话结束</div></div>
+      <div data-at="s1"><div class="t">怎么把文件带进来？点一张大卡</div><div class="s">前三种在本页继续；扫描、复印、证件照会去对应台面 · 文件默认只保留到本次会话结束</div></div>
       <div data-at="s2">
         <div data-when="default device-off"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印 · 也可以保持原样继续</div></div>
         <div data-when="ai-down"><div class="t">体检不可用，其余流程正常</div><div class="s">参数需要你自己确认</div></div>

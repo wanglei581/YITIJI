@@ -169,8 +169,9 @@
             </div>
             <div class="bf-p">
               8月9日 15:04 已使用。<br>
-              <b>顺带说清：AI 诊断、优化、面试练习、政策核对本来就都不收费</b> ——
-              这一项只是历史遗留的标注，不是"用完就要付费"。
+              <b>顺带说清</b>：政策核对、岗位浏览这类查询本来就不收费；
+              AI 诊断、优化、面试练习按次计入当月用量，<b>会员期内不限次</b> ——
+              你本月的用量在右侧「AI 权益提示」里。
             </div>
           </div>
 
@@ -326,8 +327,8 @@
           <div class="panel-note" style="margin-top:var(--s-5)">
             <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
             不能预支、不能攒到下月。<br>
-            用完<b>不影响任何功能</b> —— AI 诊断、优化、面试练习、政策核对本来就不收费，
-            额度只管纸张。
+            用完<b>不影响任何功能</b> —— 这份额度只管纸张；
+            AI 服务的次数是另一套口径，见「AI 权益提示」。
           </div>
         </div>
       </div>
@@ -430,6 +431,28 @@
         </div>
       </div>
 
+      <!-- 本轮新增：AI 权益提示 —— 只对本人显示的两条账户事实（E2）+ 一条提示（E3），
+           事实与提示分开标注、分开看。只陈述事实和一个查看入口：
+           不倒计时、不弹窗、不催费——和下面「不做的事」是同一条纪律。
+           first（无上下文）没有本人数据，整卡隐藏。 -->
+      <div class="pane" data-at="s1" data-when="default ai-down device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>AI 权益提示</b><span class="mt">只有你这一屏可见</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">打印会员</span><span class="v">剩 <b>23</b> 天 · 到期后打印恢复单价 <span class="ev ev--e2">E2 账户事实</span></span></div>
+            <div class="kv-row"><span class="k">本月 AI 服务</span><span class="v">已用 <b>4</b> 次 · 会员期内不限次 <span class="ev ev--e2">E2 账户事实</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)" data-when="default device-off">
+            <span class="ev ev--e3">E3 提示 · 仅供参考</span>
+            续不续、什么时候续，看你的求职节奏——到期只是恢复原价，不影响任何功能。本机不催、不倒计时。
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)" data-when="ai-down">
+            AI 提示不可用。上面两条是账户事实，读的是你的账户，不受影响。
+          </div>
+          <button class="btn btn--ghost" style="width:100%;margin-top:var(--s-3)">查看续费方式</button>
+        </div>
+      </div>
+
       <div class="pane pane--grow" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机在权益上不做的事</b></div>
         <div class="sec">
@@ -450,8 +473,9 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
-            本机也<b>不向你收求职服务费、内推费、会员费</b>。
-            只收打印纸张的钱，价格现场公示。
+            本机也<b>不向你收求职服务费、内推费</b>。
+            收钱的只有打印纸张和可选的打印会员，价格现场公示——
+            不买会员，找工作要用的功能一样不少。
           </div>
         </div>
       </div>

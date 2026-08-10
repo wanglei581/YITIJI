@@ -15,6 +15,44 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+  /* ── 2026-08-10 品牌锁定升级（本页局部样式，不动共享 CSS）────────────
+     topbar 左侧三段式：主名「职易达」+ 副名「AI 求职操作系统」+「NATIVE-OS」徽章。
+     brand-sub（机位/地点行）按用户要求删除，topbar 高度不变，垂直居中吸收。 */
+  .brand-line { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+  .brand-os {
+    font-size: var(--fz-2); color: var(--fog-700);
+    letter-spacing: .12em; white-space: nowrap;
+  }
+  .brand-ver {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 26px; padding: 0 11px; border-radius: var(--r-full);
+    border: 1px solid var(--jade-a32); color: var(--jade-600);
+    font-family: var(--ff-num); font-size: 11px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; white-space: nowrap;
+  }
+  .brand-ver i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--jade-500);
+    animation: brand-breathe 2.2s var(--ease-in-out) infinite;
+  }
+  @keyframes brand-breathe {
+    0%, 100% { opacity: .35; transform: scale(.78); }
+    50%      { opacity: 1;   transform: scale(1); box-shadow: 0 0 8px var(--jade-a32); }
+  }
+
+  /* ── 八卡清爽化（用户 2026-08-10：首页不要太多小字）───────────────
+     每卡只留 图标 + 大标题 + 至多 1 条 chip--info 事实徽记；
+     go-pill 子入口全部撤销（子功能入口已移到各域首屏）。
+     撤掉后卡体高度不缩水：图标放大 + 留白吸收，四态高度预算保持 0 溢出。 */
+  .vgrid-a .card { padding: var(--s-6) var(--s-7); gap: var(--s-3); }
+  .vgrid-a .card-ic { width: 76px; height: 76px; border-radius: var(--r-md); margin-bottom: var(--s-3); }
+  .vgrid-a .card-ic .ic { width: 40px; height: 40px; }
+  .vgrid-a .card-name { font-size: var(--fz-8); }
+  .card--sm { padding: var(--s-5) var(--s-6); gap: var(--s-2); }
+  .card--sm .card-ic { width: 60px; height: 60px; border-radius: var(--r-sm); margin-bottom: var(--s-2); }
+  .card--sm .card-ic .ic { width: 31px; height: 31px; }
+  .card--sm .card-name { font-size: var(--fz-6); }
+</style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
@@ -27,11 +65,14 @@
 
   <!-- ============ 顶栏 ============ -->
   <header class="topbar">
+    <!-- 2026-08-10 品牌锁定升级：三段式=主名 + 副名（基线对齐）+ NATIVE-OS 徽章（呼吸点）。
+         原 brand-sub「就业服务终端 · 01 号机 · 广州人才市场南门」按用户要求删除。 -->
     <div class="brand">
       <div class="brand-mark">职</div>
-      <div>
+      <div class="brand-line">
         <div class="brand-name">职易达</div>
-        <div class="brand-sub">就业服务终端 · 01 号机 · 广州人才市场南门</div>
+        <span class="brand-os">AI 求职操作系统</span>
+        <span class="brand-ver"><i></i>NATIVE-OS</span>
       </div>
     </div>
     <div class="topbar-spacer"></div>
@@ -164,35 +205,23 @@
 
       <!-- ============ 服务入口：身份色卡 ============ -->
       <section class="vgrid-a rise">
+        <!-- 2026-08-10 八卡清爽化：go-pill 子入口全部撤销（子功能入口在各域首屏，
+             如 P09 六卡选择器）；每卡只留 图标 + 大标题 + 至多 1 条事实徽记。 -->
         <a class="card card--print" href="06-print-workbench.html">
           <span class="card-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
           <span class="card-name">打印扫描</span>
           <span class="card-foot">
-            <!-- 这三个是真快捷入口（linkage.js 绑 data-href 并阻止冒泡到外层卡片链接）。
-                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
-            <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
+            <span class="card-pill card-pill--info" data-when="default first ai-down">A4 · 彩色</span>
             <span class="card-pill card-pill--info" data-when="device-off">打印离线 · 扫描可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
         </a>
-        <a class="card card--resume" href="09-resume-workbench.html">
+        <a class="card card--resume" href="09-resume-studio.html">
           <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
           <span class="card-name">AI 简历服务</span>
           <span class="card-foot">
-            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(linkage.js 绑 data-href)。
-                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="22-career-plan.html">职业规划</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
-            <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">AI 暂不可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
         </a>
@@ -202,41 +231,31 @@
         <a class="card card--sm card--job" href="13-jobs-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
           <span class="card-name">岗位信息</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
-            <span class="card-pill" data-dots="12">12 家来源</span>
-          </span>
+          <span class="card-foot"><span class="card-pill card-pill--info">12 家来源</span></span>
         </a>
         <a class="card card--sm card--fair" href="17-fair-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="card-name">招聘会</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="17-fair-desk.html?stage=s3">展位导览</span>
-            <span class="card-pill" data-dots="3">本周 3 场</span>
-          </span>
+          <span class="card-foot"><span class="card-pill card-pill--info">本周 3 场</span></span>
         </a>
         <a class="card card--sm card--mock" href="20-interview-pod.html">
           <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
           <span class="card-name">AI 面试训练</span>
           <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="20-interview-pod.html?stage=s3">往期点评</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
-            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用</span>
           </span>
         </a>
         <a class="card card--sm card--policy" href="21-policy.html">
           <span class="card-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
           <span class="card-name">政策服务</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="21-policy.html?stage=s3">办事清单</span><span class="card-pill card-pill--info">官方来源</span></span>
+          <span class="card-foot"><span class="card-pill card-pill--info">官方来源</span></span>
         </a>
         <!-- 2026-08-09 用户定:百宝箱/智慧校园升为正式成员,与六服务同级同大(原角落迷你卡撤销) -->
         <a class="card card--sm card--tool" href="27-toolbox.html">
           <span class="card-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
           <span class="card-name">百宝箱</span>
-          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务 · 后台上架控制</span></span>
+          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务</span></span>
         </a>
         <a class="card card--sm card--camp" href="19-smart-campus.html">
           <span class="card-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
@@ -285,7 +304,7 @@
     </div>
     <button class="btn btn--lg btn--ghost" data-when="default">跳过</button>
     <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="09-resume-studio.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>

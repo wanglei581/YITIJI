@@ -337,6 +337,35 @@
         </div>
       </div>
 
+      <!-- 本轮新增：到店问题清单（AI 拟）—— 去这家机构前可以带着问的 4 个问题，整卡 E3。
+           法务口径：只用「如何核实 / 是否提供 / 能否写进书面约定」这类中性问句，
+           不替机构背书、不出现任何绝对化表述（「机构说的都可信」这类措辞被上一轮审查点名过）。
+           joboffline 态照常显示——问题清单问的是机构，不依赖某个岗位。
+           ai-down 时清单隐藏，换成「什么不可用、该核实的仍然成立」。可打印带走（真链接 → P06 s3）。 -->
+      <div class="pane" data-at="detail joboffline">
+        <div class="pane-hd"><span class="t">到店问题清单</span><span class="s">AI 拟的 4 个问题</span></div>
+        <div data-when="default first device-off">
+          <div class="kv">
+            <div class="kv-row"><span class="k">问资质</span><span class="v">「人力资源服务许可证与营业执照，是否可以现场查看原件？」</span></div>
+            <div class="kv-row"><span class="k">问收费</span><span class="v">「服务是否收费？收费项目与标准在哪里公示，如何核实？」</span></div>
+            <div class="kv-row"><span class="k">问岗位</span><span class="v">「岗位的用人单位全称能否当面告知？薪资、社保能否写进书面约定？」</span></div>
+            <div class="kv-row"><span class="k">问后续</span><span class="v">「面谈之后流程怎么走？是否提供答复的大致时间？」</span></div>
+          </div>
+          <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
+            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+            清单只帮你把要问的想在前面，不替任何机构作保证；对方的回答以现场公示与书面约定为准。
+          </p>
+          <div style="display:flex;gap:10px;margin-top:12px">
+            <a class="btn btn--ghost" style="flex:1" href="06-print-workbench.html?stage=s3" data-when="default first">打印带走</a>
+            <button class="btn btn--ghost" style="flex:1" aria-disabled="true" data-when="device-off">打印机离线 · 可发到手机</button>
+          </div>
+        </div>
+        <div class="notice" data-when="ai-down">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>AI 暂时拟不了问题清单。到店该核实的事仍然成立：是否收费、用人单位全称、能否写进书面约定——以现场公示与主管部门规定为准。</span>
+        </div>
+      </div>
+
       <!-- 加载失败 -->
       <div class="blank" data-at="error">
         <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>

@@ -220,6 +220,37 @@
         </p>
       </div>
 
+      <!-- A 级 · AI 帮你读这条岗位：三条 E3 解读，读的是岗位文本本身，不需要你的简历。
+           expired / error 态整卡如实隐藏（data-at="ok"）；ai-down 不装内容，换成不可用说明。 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd">
+          <span class="t">AI 帮你读这条岗位</span>
+          <span class="s" data-when="default first device-off">三条解读</span>
+          <span class="s" data-when="ai-down">不可用</span>
+        </div>
+        <div data-when="default first device-off" style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
+            <b style="color:var(--fog-900)">这条岗位重点看什么</b><br>
+            「独立使用 SQL 取数」在职责和要求里各出现一次——数据能力是硬门槛，不是加分项。
+            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          </div>
+          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
+            <b style="color:var(--fog-900)">你可能想核实什么</b><br>
+            「独立完成活动」的边界：预算多少、有没有设计和投放资源，面试时值得当面问清。
+            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          </div>
+          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
+            <b style="color:var(--fog-900)">建议准备什么</b><br>
+            一两个有数据结果的活动案例，和一段能当场讲清楚的 SQL 取数经历。
+            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          </div>
+          <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s2" style="width:100%" data-when="default device-off">拿这条岗位去比对</a>
+        </div>
+        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="ai-down">
+          解读服务中断，本卡不可用。岗位正文、扫码、打开来源平台都正常。
+        </p>
+      </div>
+
       <!-- 扫码投递 -->
       <div class="pane" data-at="ok">
         <div class="pane-hd"><span class="t">扫码投递</span><span class="s">在你手机上完成</span></div>

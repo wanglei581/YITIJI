@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P28 自我探索 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P28 自我探索">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P28 专用 ───────────────────────────────────────────────────────────
+   自我探索（线上 /resume/self-assessment：25 题 5 组、必勾+可选双同意、
+   答案原文不入库只留 SHA-256 摘要、结果 24 小时、撤回=物理删除、
+   闲置 60 秒退出、游客可用）。
+
+   这一页最容易犯的错是把它做成"性格测试"：打个分、贴个标签、
+   说你适合什么岗。生产代码的合规口径写得很死 —— 非临床、非诊断、
+   不用 MBTI/大五/DISC/霍兰德标签、不打分排名、不说适合不适合。
+   所以 s3 的 5 张维度卡全是**陈述式**：只转述你的选择，每张挂
+   「AI 生成 · 陈述」和题号依据行，头部 amber 披露挂 E3。
+
+   另一条纪律照搬机制本身：原文不入库、24h 自动清理、撤回物理删除 ——
+   所以 s4 往期只有**次数**，铺不出明细。空着不是没做完，是隐私设计
+   的代价，页面把代价直说。
+
+   组件备忘：.tl 本身是一步（容器 .tline）；复选框是 .ck-box；
+   .ck / .alt 只在别页页内定义过，本页自带。选项按钮 ≥64px。
+   ──────────────────────────────────────────────────────────────────── */
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 机制卡：4 条硬规则，写机制不写空话 */
+.mech { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); }
+.mh { display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-4);
+      border-radius:var(--r-xs); background:var(--fog-a04); border:1px dashed var(--fog-a12); }
+.mh .ic { width:19px; height:19px; color:var(--jade-500); flex:0 0 auto; margin-top:1px; }
+.mh-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.mh-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.mh-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 题目区（照 P20 的口径：想好再选，没有倒计时） */
+.q-no { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.06em; }
+.q-t  { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.q-why{ font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+
+/* 选项：主操作，≥64px */
+.opt { display:flex; align-items:center; gap:var(--s-4); min-height:64px; width:100%;
+       padding:var(--s-4) var(--s-5); border-radius:var(--r-md); text-align:left;
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); cursor:pointer;
+       font-family:var(--ff-ui); font-size:var(--fz-4); color:var(--fog-900);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.opt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.opt--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.opt-key { width:34px; height:34px; border-radius:var(--r-xs); flex:0 0 auto;
+           display:grid; place-items:center; background:var(--fog-a08);
+           font-family:var(--ff-num); font-size:var(--fz-2); color:var(--fog-700); }
+.opt--on .opt-key { background:var(--jade-a20); color:var(--jade-300); }
+
+/* 五组进度：状态展示，不可点 */
+.grp { display:grid; grid-template-columns:repeat(5,1fr); gap:var(--s-3); }
+.gr { padding:var(--s-3) var(--s-3); border-radius:var(--r-xs); text-align:center;
+      background:var(--fog-a04); border:1px solid var(--fog-a12);
+      display:flex; flex-direction:column; gap:2px; }
+.gr--done { border-color:var(--jade-a32); }
+.gr--now { border-color:var(--jade-400); background:var(--jade-a12); }
+.gr-t { font-size:var(--fz-1); color:var(--fog-700); }
+.gr-n { font-size:var(--fz-3); font-family:var(--ff-num); color:var(--fog-900); font-weight:600; }
+.gr--done .gr-n { color:var(--jade-500); }
+
+/* 维度卡：陈述式，不打分 */
+.dim { padding:var(--s-5); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.dim-hd { display:flex; align-items:center; gap:var(--s-3); }
+.dim-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.dim-p { font-size:var(--fz-3); color:var(--fog-800); line-height:1.65; }
+.dim-p b { color:var(--fog-900); }
+.dim-src { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5;
+           padding-left:var(--s-4); border-left:2px solid var(--fog-a12); }
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-3); padding-bottom:var(--s-4); }
+
+/* 路牌 / 互链：≥64px */
+.alt { display:flex; align-items:center; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+       border-radius:var(--r-md); background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:64px;
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; }
+.alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">自我探索</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-2207</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 可作答，解读暂缺</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>15:12</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">这是什么·同意</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐题作答</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">看结果</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">往期记录</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 这是什么 · 同意 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-orbit"/></svg>
+          <b>25 道选择题，把「你怎么倾向」说成明白话</b>
+          <span class="mt">约 5 分钟 · 不需登录，游客直接做</span>
+        </div>
+        <div class="sec">
+          <div class="advice-act">
+            5 组各 5 题 —— <b>兴趣偏好、工作风格、团队偏好、价值取向、求职动机</b>。
+            全是选择题，不用打字。做完得到 5 段陈述式解读，
+            「做过这件事」会记进你的「AI 服务记录」。
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>先说清楚：这<b>不是临床、心理或人格测评</b>，不用 MBTI、大五、DISC、
+                  霍兰德那套标签；不打分、不排名、不说你适合或不适合哪类岗位 ——
+                  结果<b>不构成能力证明</b>，只是你自己的参考。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="notice" data-at="s1" data-when="ai-down">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>AI 暂时不可用 —— 题目和记分<b>不靠 AI，作答照常</b>。
+              只有结果页的 5 段陈述这次生成不了，会如实空着；
+              且答案原文不留存，恢复后也补不回这一次 —— 想要解读，等恢复后再来做。</span>
+      </div>
+      <div class="notice" data-at="s1" data-when="device-off">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>打印机离线 —— 作答和看结果<b>都不受影响</b>；
+              只有最后把结果打出来那一步此刻打不了，可以扫码带走。</span>
+      </div>
+
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>四条硬规则</b>
+          <span class="mt">写的是机制，每条都真的这么运行</span>
+        </div>
+        <div class="sec">
+          <div class="mech">
+            <div class="mh"><svg class="ic"><use href="#i-file"/></svg>
+              <span class="mh-b"><span class="mh-t">答案原文不入库</span>
+                <span class="mh-s">每个选择只当场用一次，库里只留一段校验摘要，不留你选了什么</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-clock"/></svg>
+              <span class="mh-b"><span class="mh-t">结果只保留 24 小时</span>
+                <span class="mh-s">到点自动清理，不用你记得回来删</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-trash"/></svg>
+              <span class="mh-b"><span class="mh-t">撤回 = 物理删除</span>
+                <span class="mh-s">结果页有撤回键，删的是数据本身，不是「隐藏起来」</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-eye"/></svg>
+              <span class="mh-b"><span class="mh-t">不向任何人推送</span>
+                <span class="mh-s">企业、合作机构、管理后台都看不到你的结果，也不参与岗位排序</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-route"/></svg>
+          <b>接下来会发生什么</b>
+          <span class="mt">四步，全在这一页里走完</span>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">勾选同意</span>
+                <span class="tl-s">一条必勾、一条可选，就在下面，不用翻协议</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">逐题作答 25 题</span>
+                <span class="tl-s">可回退改答；离开超过 60 秒本机自动退出并清空</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">生成结果</span>
+                <span class="tl-s">库里只落摘要和 5 段陈述，答案原文当场丢弃</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">24 小时内由你处置</span>
+                <span class="tl-s">打印带走、撤回删掉，或什么都不做等它自动清理</span></span></div>
+          </div>
+
+          <div class="field-lb" style="margin-top:var(--s-5)">开始前要勾的</div>
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">我已了解上述说明，同意开始作答</span>
+              <span class="ck-s">必勾 —— 不勾开始不了</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">同意作答涉及偏好 / 风格的题目</span>
+              <span class="ck-s">可选 —— 不勾也能作答，相关题会跳过</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 逐题作答 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-pen"/></svg>
+          <b>第 8 题 / 共 25 题</b>
+          <span class="mt">选择题 · 没有倒计时 · 可回退改答</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-4)">
+          <div>
+            <div class="q-no">工作风格 · 这一组的第 3 题</div>
+            <div class="q-t">你更喜欢哪种工作方式？</div>
+            <div class="q-why" data-when="default first device-off">
+              这一组问的是<b>你怎么推进一件事</b>，不是你能不能推成 ——
+              所以选哪个都不算错，凭第一反应选就行。
+            </div>
+            <div class="q-why" data-when="ai-down">
+              AI 不可用 —— 照常答，记分不靠 AI；只是答完之后的 5 段陈述这次出不来。
+            </div>
+          </div>
+          <button class="opt"><span class="opt-key">A</span><span>结构清晰、目标明确</span></button>
+          <button class="opt opt--on"><span class="opt-key">B</span><span>保持开放、允许调整</span></button>
+          <button class="opt"><span class="opt-key">C</span><span>先讨论、再行动</span></button>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-layers"/></svg>
+          <b>五组进度</b>
+          <span class="mt">组间顺序固定，答完自动进下一组</span>
+        </div>
+        <div class="sec">
+          <div class="grp">
+            <div class="gr gr--done"><span class="gr-t">兴趣偏好</span><span class="gr-n">5/5</span></div>
+            <div class="gr gr--now"><span class="gr-t">工作风格</span><span class="gr-n">2/5</span></div>
+            <div class="gr"><span class="gr-t">团队偏好</span><span class="gr-n">0/5</span></div>
+            <div class="gr"><span class="gr-t">价值取向</span><span class="gr-n">0/5</span></div>
+            <div class="gr"><span class="gr-t">求职动机</span><span class="gr-n">0/5</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-clock"/></svg>
+            <span><b>离开超过 60 秒，本机自动退出并清空这页作答。</b>
+                  公共机器，这条是替你兜底 —— 你走开了，答到一半的内容不会留在屏上给下一个人看。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span><b>没有倒计时是故意的。</b>这是自我探索不是考试 ——
+                  逼你抢时间，答出来的就不是你的倾向，是你的手速。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            提交前，你的选择不出这台机器；提交后，库里只留摘要，不留原文。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 看结果 ─────────── -->
+      <div class="pane" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>先说清楚这 5 段话是什么</b>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>下面 5 段是 AI 把你本次作答整理成的<b>陈述</b>
+                  <span class="ev ev--e3">E3 解读属 AI 判断</span>，
+                  依据只有你的选择本身 <span class="ev ev--e1">E1 你的作答</span>。
+                  它<b>不打分、不排名、不说你适合或不适合哪类岗位</b>，
+                  也不构成能力证明 —— 把它当「换个说法的你」，不是「权威结论」。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+        <div class="joblist">
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">兴趣偏好</span>
+              <span class="chip chip--info" style="margin-left:auto">AI 生成 · 陈述</span></div>
+            <div class="dim-p">这一组里你三次选了「把东西做出来」一类的选项 ——
+              比起看行业趋势、写对外讲解，你更愿意把时间花在<b>能跑起来的产出</b>上。</div>
+            <div class="dim-src">依据：这一组第 1、2、5 题的选择（只记题号，不含选项内容）</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">工作风格</span>
+              <span class="chip chip--info" style="margin-left:auto">AI 生成 · 陈述</span></div>
+            <div class="dim-p">模糊任务你选了<b>先拆成可执行步骤</b>，长周期任务你更看重每个阶段的稳定质量 ——
+              「按部就班」在你这里不是贬义词，是你选的推进方式。</div>
+            <div class="dim-src">依据：这一组第 1、3、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">团队偏好</span>
+              <span class="chip chip--info" style="margin-left:auto">AI 生成 · 陈述</span></div>
+            <div class="dim-p">分歧出现时你选了<b>先收集信息再判断</b>；协作方式上你挑了分工明确、按时交付 ——
+              你对「节奏一致」的在意，超过「随时同步」。</div>
+            <div class="dim-src">依据：这一组第 2、3、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">价值取向</span>
+              <span class="chip chip--info" style="margin-left:auto">AI 生成 · 陈述</span></div>
+            <div class="dim-p">选工作时你把<b>成长路径</b>排在前面，两道题都选了「能积累、可迁移」——
+              短期可见的成果，在你的选择里让位给了长期能带走的东西。</div>
+            <div class="dim-src">依据：这一组第 1、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">求职动机</span>
+              <span class="chip chip--info" style="margin-left:auto">AI 生成 · 陈述</span></div>
+            <div class="dim-p">五道题里有三道，你都选了<b>岗位和能力对不对得上</b>一类的选项 ——
+              此刻你在意的是「这活我能不能干好」，排在薪酬和城市节奏前面。</div>
+            <div class="dim-src">依据：这一组第 1、4、5 题的选择</div>
+          </div>
+
+        </div>
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          5 段都只描述<b>本次作答</b>。同一个人隔一周再做，答不一样，话就不一样 ——
+          这不是矛盾，它本来就只是当下的倾向。
+        </div>
+      </div>
+
+      <!-- s3 · ai-down：解读如实空缺 -->
+      <div class="pane" data-at="s3" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <b>这次没有解读</b>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>AI 不可用，<b>5 段陈述这次生成不了</b>。你的作答已按规则只记了摘要，
+                  但答案原文不留存 —— 所以 AI 恢复后也<b>补不回这一次</b>，
+                  想要解读得重新作答一遍（约 5 分钟）。<br>
+                  这里空着比编 5 段像样的话诚实。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>不等 AI，现在就能走的三条路</b>
+          <span class="mt">这几件都不依赖解读</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <a class="alt" href="22-career-plan.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">去职业规划 · 看岗位原文计数</span>
+              <span class="alt-s">那页的「哪类要求出现多少条」是本机数出来的，不靠 AI。</span></span>
+          </a>
+          <a class="alt" href="13-jobs-desk.html">
+            <svg class="ic"><use href="#i-briefcase"/></svg>
+            <span class="alt-b"><span class="alt-t">直接翻岗位</span>
+              <span class="alt-s">本机同步的岗位照常能看、能收藏，投递走各岗位的来源平台入口。</span></span>
+          </a>
+          <a class="alt" href="06-print-workbench.html">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="alt-b"><span class="alt-t">打印、扫描照常</span>
+              <span class="alt-s">本机的主业不依赖 AI，要打的材料现在就能打。</span></span>
+          </a>
+          <div class="panel-note">你的这次记录还在，右边可以撤回；AI 恢复后再来重做一次就有解读。</div>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 往期记录 ─────────── -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-history"/></svg>
+          <b>本机记过的</b>
+          <span class="mt">只有次数和日期，往下看为什么</span>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">7月26日 · 作答 25 题</span>
+                <span class="tl-s">结果已过 24 小时，自动清理</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">8月2日 · 作答 25 题</span>
+                <span class="tl-s">你在结果页撤回，已物理删除</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">今天 · 本次</span>
+                <span class="tl-s">结果还在 24 小时窗口内，可回上一步看</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">往期一共 <b>2</b> 次，加上今天这次。</div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>为什么这里只有次数、没有明细</b>
+        </div>
+        <div class="sec">
+          <div class="notice">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>不是没做完，是<b>机制不允许铺</b>：答案原文从不入库；5 段陈述只保留 24 小时；
+                  撤回是物理删除。往期那两次，本机手里真正剩下的只有「做过」这件事本身 ——
+                  想铺明细也铺不出来。</span>
+          </div>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">记下的</span><span class="v">次数 · 日期 · 题数</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">从未入库</span></div>
+            <div class="kv-row"><span class="k">过期的陈述</span><span class="v v--fog">已自动清理</span></div>
+            <div class="kv-row"><span class="k">撤回的那次</span><span class="v v--fog">已物理删除</span></div>
+          </div>
+
+          <div class="field-lb" style="margin-top:var(--s-5)">要看更多，去这两处</div>
+          <a class="alt" href="23-me.html">
+            <svg class="ic"><use href="#i-user"/></svg>
+            <span class="alt-b"><span class="alt-t">我的 → AI 服务记录</span>
+              <span class="alt-s">你在本机用过的各项 AI 服务都记在那里，含这一项的次数。</span></span>
+          </a>
+          <a class="alt" href="22-career-plan.html" style="margin-top:var(--s-3)">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">职业规划 · 拿着倾向去对照岗位</span>
+              <span class="alt-s">那页依据本机读过的岗位正文，说的是「见到多少条」，和这页正好互补。</span></span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-pen"/></svg><b>本次作答</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">题目</span><span class="v"><b>25</b> 题 · 5 组</span></div>
+            <div class="kv-row"><span class="k">用时</span><span class="v">约 5 分钟</span></div>
+            <div class="kv-row"><span class="k">登录</span><span class="v v--fog">不需要</span></div>
+            <div class="kv-row"><span class="k">结果保留</span><span class="v">24 小时</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            游客也能做；会员做完会在「AI 服务记录」里记一条「做过」，同样不含答案原文。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>五个组各问什么</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">兴趣偏好 · 5 题</span>
+                <span class="tl-s">你愿意把时间花在哪类事上</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">工作风格 · 5 题</span>
+                <span class="tl-s">一件事你怎么推进</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">团队偏好 · 5 题</span>
+                <span class="tl-s">协作里你怎么站位</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">价值取向 · 5 题</span>
+                <span class="tl-s">选工作你看重什么</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">求职动机 · 5 题</span>
+                <span class="tl-s">此刻找工作你最在意什么</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>题目都是「你更愿意 / 更倾向哪个」——
+                  <b>没有对错，也没有陷阱题</b>；不用揣摩「哪个答案更好看」。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            结果和岗位、招聘会互不挂钩：它不参与任何排序，也不会推给任何企业。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>进度</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已答</span><span class="v"><b>7</b> / 25 题</span></div>
+            <div class="kv-row"><span class="k">当前</span><span class="v">工作风格 · 第 3 题</span></div>
+            <div class="kv-row"><span class="k">倒计时</span><span class="v v--fog">无</span></div>
+            <div class="kv-row"><span class="k">闲置退出</span><span class="v">60 秒</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            随时可以回退改答，以最后一次选择为准。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>作答期间，数据在哪</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">屏上的选择</span><span class="v">只在本机本次</span></div>
+            <div class="kv-row"><span class="k">提交时</span><span class="v">一次性上传记分</span></div>
+            <div class="kv-row"><span class="k">入库的</span><span class="v v--fog">摘要 + 5 段陈述</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">当场丢弃</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>记分是<b>按你选项的固定权重累加</b>的机械过程，不是 AI 猜的 ——
+                  所以 AI 不可用时作答照常，缺的只是最后那 5 段话。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            中途走开超过 60 秒，本机退出并清空；已提交的结果不受影响。
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 · 正常/离线：打印与处置 -->
+      <div class="pane" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">倾向参考单</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把参考单存进手机。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用为预估 · 以打印工作台核价为准。纸上只有 5 段陈述和题号依据，
+            不含你每题选了什么，脚注印着「不构成能力证明」。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-trash"/></svg><b>这份结果由你处置</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">打印带走</span>
+                <span class="tl-s">走打印工作台核价出纸</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">撤回 = 物理删除</span>
+                <span class="tl-s">删的是数据本身，删完不可恢复</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">什么都不做</span>
+                <span class="tl-s">24 小时后自动清理，效果同上</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>无论选哪个，企业、合作机构和管理后台<b>都看不到这份结果</b>。</span>
+          </div>
+
+          <div class="field-lb" style="margin-top:var(--s-5)">拿着结果能去哪</div>
+          <a class="alt" href="22-career-plan.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">去职业规划对照岗位</span>
+              <span class="alt-s">那页用本机读过的岗位正文说话，和这 5 段正好一内一外。</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- S3 右 · ai-down：实际发生了什么 -->
+      <div class="pane" data-at="s3" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这次实际发生了什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">作答 25 题</span><span class="v">已完成</span></div>
+            <div class="kv-row"><span class="k">记分</span><span class="v">已完成 · 不靠 AI</span></div>
+            <div class="kv-row"><span class="k">5 段陈述</span><span class="v v--fog">未生成</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">未留存</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几行是本机的真实状态，不是示意。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>接下来</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">不想留这次记录，可以撤回</span>
+                <span class="tl-s">摘要也一并物理删除</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">AI 恢复后重新作答</span>
+                <span class="tl-s">约 5 分钟，重做才有 5 段陈述</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">先去职业规划对照岗位</span>
+                <span class="tl-s">岗位计数不靠 AI，现在就能看</span></span></div>
+          </div>
+
+          <a class="alt" href="22-career-plan.html" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">去职业规划</span>
+              <span class="alt-s">看本机这批岗位里各类要求出现了多少条。</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- S4 右 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>记录规则</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">保存位置</span><span class="v">服务端 · 仅本人</span></div>
+            <div class="kv-row"><span class="k">陈述保留</span><span class="v">24 小时</span></div>
+            <div class="kv-row"><span class="k">对企业可见</span><span class="v v--fog">不可见</span></div>
+            <div class="kv-row"><span class="k">参与岗位排序</span><span class="v v--fog">不参与</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            游客的记录只在本次会话里，离场即清，连次数也不留。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>下次再做会怎样</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">每次都从头做 25 题</span>
+                <span class="tl-s">原文不留存，没有「接着上次」</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">新结果重新算 24 小时</span>
+                <span class="tl-s">旧的到点照常清理</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">两次想比较，得靠你自己记</span>
+                <span class="tl-s">本机比不了 —— 原文都删了</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>「比不了」是隐私设计的代价：要能比，就得留原文 ——
+                  本机选了不留。这个取舍页面直说，不藏。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            25 道选择题、约 5 分钟，把你的倾向整理成 <b>5 段明白话</b>，能打印带走。<br>
+            不打分、不诊断、不构成能力证明 —— 只是帮你把话说清楚。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2">上一题</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s4">看往期记录</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看这次结果</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first">25 题 · 5 组 · 约 5 分钟 · 不需登录</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 可作答，5 段陈述这次出不来</span>
+    <span class="actionbar-hint" data-at="s1" data-when="device-off">打印机离线 · 作答与结果不受影响</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first device-off">第 8 题 / 共 25 题 · 没有倒计时 · 闲置 60 秒自动清空</span>
+    <span class="actionbar-hint" data-at="s2" data-when="ai-down">照常作答 · 答完这次不会有解读</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="ai-down">解读空缺 · 摘要已记 · 随时可撤回</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+    <span class="actionbar-hint" data-at="s4">本机只记次数 · 完整记录在「我的 → AI 服务记录」</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off">同意并开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">照常开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">答完了，看结果<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="22-career-plan.html">先去职业规划对照岗位<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+    <a class="btn btn--primary" data-at="s4" href="22-career-plan.html">拿着倾向去职业规划<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

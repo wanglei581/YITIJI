@@ -76,14 +76,18 @@
           <span class="s" data-when="default device-off">本机读取 EXIF · 可拖动改</span>
           <span class="s" data-when="ai-down">读取服务中断</span>
         </div>
+        <!-- 本轮补强：纠偏与清晰度两行给 E1 证据（读自你的图片文件，可核对）。
+             纠偏是本机图像处理（机械纠偏），不依赖 AI，所以 ai-down 时仍保留。 -->
         <div class="checks-list" data-when="default device-off">
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>5 张图，均为竖向，无需旋转</span>
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>最小分辨率 1440×1920，打印清晰</span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 张倾斜 <b>2.1°</b>，已机械校正 <span class="ev ev--e1">E1 读自图片</span></span></span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>清晰度 良 · 最小分辨率 1440×1920 <span class="ev ev--e1">E1 读自图片</span></span></span>
           <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>4</b> 张偏暗，建议重拍或调亮</span></span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>合成后 5 页 A4，约 2.6 MB</span>
         </div>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>自动排序与画质检查不可用。合成本身正常，顺序请你自己核对——下面卡片左上角的序号就是装订顺序。</span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 张倾斜 <b>2.1°</b>，已机械校正——纠偏是本机图像处理，不依赖 AI <span class="ev ev--e1">E1 读自图片</span></span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>自动排序与清晰度检查不可用。合成本身正常，顺序请你自己核对——下面卡片左上角的序号就是装订顺序。</span>
         </div>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>点右下角「添加图片」，或用手机扫码把照片传过来。</span>
@@ -212,6 +216,28 @@
         <div class="st4"><b>04</b><span>勾选授权后合成新文件（不覆盖原件）</span></div>
       </div>
 
+      <!-- 本轮新增：AI 落款位建议 —— 检测文书类型后，对落款位置与日期写法给规范建议。
+           类型判断与建议全部是模型判断（E3 仅供参考），签名放哪最终由你在第 03 步拖动决定；
+           ai-down 时建议卡整卡隐藏，换成「什么不可用、还能做什么」，不留 AI 壳子。 -->
+      <div class="pane" data-at="t2" data-when="default first device-off">
+        <div class="pane-hd"><span class="t">AI 落款位建议</span><span class="s">可不采纳</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文书类型</span><span class="v">求职信 <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span></span></div>
+          <div class="kv-row"><span class="k">落款位置</span><span class="v">正文结束后右下：先署名，日期另起一行</span></div>
+          <div class="kv-row"><span class="k">日期写法</span><span class="v">建议写全「2026年8月8日」，不用 8/8 这类简写</span></div>
+        </div>
+        <div class="panel-note" style="margin-top:12px">
+          类型判断可能出错——如果这不是求职信，忽略本卡即可；落款放哪、日期怎么写，最终以你拖动和输入的为准。
+        </div>
+      </div>
+      <div class="pane" data-at="t2" data-when="ai-down">
+        <div class="pane-hd"><span class="t">AI 落款位建议</span><span class="s">不可用</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>AI 建议服务中断，这次给不了文书类型与落款建议。手写签名、拖动定位与合成<b>不受影响</b>——落款位置由你在上面第 03 步自己拖到合适处。</span>
+        </div>
+      </div>
+
       <!-- T3 证件照：未开放 -->
       <div class="locked" data-at="t3">
         <svg class="ic"><use href="#i-idcard"/></svg>
@@ -282,10 +308,11 @@
       <!-- T2 授权与定位 -->
       <div class="pane" data-at="t2">
         <div class="pane-hd"><span class="t">要签的文件</span><span class="s">本次会话</span></div>
+        <!-- 本轮同步：示例文件改为求职信，与左侧「AI 落款位建议」的类型检测口径一致 -->
         <div class="kv">
-          <div class="kv-row"><span class="k">文件</span><span class="v">就业协议书.pdf</span></div>
-          <div class="kv-row"><span class="k">页数</span><span class="v">4 页</span></div>
-          <div class="kv-row"><span class="k">落款位置</span><span class="v">第 4 页右下</span></div>
+          <div class="kv-row"><span class="k">文件</span><span class="v">求职信_运营助理.pdf</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
+          <div class="kv-row"><span class="k">落款位置</span><span class="v">第 1 页右下</span></div>
         </div>
       </div>
       <div class="pane" data-at="t2">

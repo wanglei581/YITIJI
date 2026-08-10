@@ -191,8 +191,27 @@
     <!-- ═══ 轮播 ═══ -->
     <div class="sb-stage">
 
-      <!-- 幻灯 1：本机能做什么（default / first / ai-down） -->
-      <div class="slide" data-when="default first ai-down">
+      <!-- 幻灯 1（本轮新增）：AI 精选 · 今日信息 ——
+           只用站内真实汇总数据说话：岗位 / 招聘会 / 政策三条事实，标 E2 系统事实。
+           待机屏没有用户，所以这一帧**没有任何个性化**，只有汇总口径；
+           ai-down 时整帧隐藏（AI 精选服务断了就不播，不播壳子），改播「能做什么」帧。 -->
+      <div class="slide" data-when="default">
+        <span class="slide-kicker">AI 精选 · 今日信息 <span class="ev ev--e2">E2 站内数据 · 每日更新</span></span>
+        <span class="slide-h">今天新到 12 条岗位，<br>本周有 2 场招聘会。</span>
+        <span class="slide-p">
+          · 今日新增岗位 <b>12 条</b>，来自 <b>3 家</b>来源机构<br>
+          · 本周招聘会 <b>2 场</b>，最近一场在<b>周六</b><br>
+          · 政策更新 <b>1 条</b>，可在政策服务里查看
+        </span>
+        <span class="slide-meta">
+          <span>站内数据 · 每日更新</span>
+          <span>同步 8月9日 07:30</span>
+          <span>汇总口径 · 待机屏不含任何个人信息</span>
+        </span>
+      </div>
+
+      <!-- 幻灯 2：本机能做什么（first / ai-down；default 态由上一帧「AI 精选」占位演示） -->
+      <div class="slide" data-when="first ai-down">
         <span class="slide-kicker">这台机器能做什么</span>
         <span class="slide-h">改简历、打材料、<br>算好招聘会先去哪几家。</span>
         <span class="slide-p">

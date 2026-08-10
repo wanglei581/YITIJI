@@ -80,6 +80,19 @@
 .wside .pane--grow { overflow:hidden; }
 .paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
 
+/* 互链 P28：主入口级触控（≥64px）。本页说「岗位那边要什么」，
+   P28 说「你自己倾向什么」—— 一外一内，互为补充，不互相替代 */
+.xlink { display:flex; align-items:center; gap:var(--s-4); min-height:64px;
+         padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+         background:var(--surf-1); border:1px solid var(--brd-1);
+         text-decoration:none; color:inherit;
+         transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.xlink:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.xlink .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; }
+.xlink-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.xlink-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.xlink-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
 /* 行动清单纸面 */
 .pl { padding:30px 34px; color:#17222b; }
 .pl h1 { font-size:21px; font-weight:800; }
@@ -441,6 +454,13 @@
             本机能做的只有一件：把<b>它真读过的岗位正文</b>和你的简历放在一起，
             指出哪些对得上、哪些差一个可验证的条件。
           </div>
+
+          <div class="field-lb" style="margin-top:var(--s-5)">先看看自己这一头</div>
+          <a class="xlink" href="28-self-assessment.html">
+            <svg class="ic"><use href="#i-orbit"/></svg>
+            <span class="xlink-b"><span class="xlink-t">还说不清自己想要什么？先做一次自我探索</span>
+              <span class="xlink-s">25 道选择题 · 约 5 分钟 · 得 5 段倾向陈述，拿回这页对照方向。</span></span>
+          </a>
         </div>
       </div>
 

@@ -236,6 +236,28 @@
           </div>
         </div>
 
+        <!-- 本轮新增：AI 帮你读这家企业 —— 三条「信息组织式」解读，每条 E3。
+             只把本页已展示的信息重新组织：不做风评、不下该不该入职的判断（合规红线）；
+             指标未开启（metricsoff）时随经营指标一起隐藏——指标都不展示，解读更不该有；
+             ai-down 时换成「什么不可用」，不留 AI 壳子。下方来源三字段不动。 -->
+        <div class="dsec" data-at="detail">
+          <div class="dsec-t">AI 帮你读这家企业</div>
+          <div data-when="default first device-off">
+            <div class="kv">
+              <div class="kv-row"><span class="k">规模与行业定位</span><span class="v">按填报口径，是互联网行业百人规模的中型公司，主营企业服务软件 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
+              <div class="kv-row"><span class="k">在招岗位分布</span><span class="v">6 个岗位覆盖运营、技术、销售三类，不集中在单一职能 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
+              <div class="kv-row"><span class="k">你可能想核实的点</span><span class="v">社保公积金缴纳口径、试用期约定——可在来源平台或面谈时确认 <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></span></div>
+            </div>
+            <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
+              以上只是把本页已展示的信息<b>重新组织</b>了一遍，不是风评，也不构成该不该投、该不该入职的判断——那由你自己定。
+            </p>
+          </div>
+          <div class="notice" data-when="ai-down">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>AI 解读服务中断，这里不放缓存的解读。企业简介、经营信息与在招岗位照常可看。</span>
+          </div>
+        </div>
+
         <div class="dsec">
           <div class="dsec-t">在招岗位 · 6 个</div>
           <div class="rlist" style="overflow:visible">
