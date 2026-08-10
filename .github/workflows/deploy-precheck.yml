@@ -125,3 +125,185 @@ jobs:
           EXPECT_DIR: /srv/ai-job-print
           EXPECT_PM2: ai-job-print-api
           EXPECT_BACKUP: /srv/ai-job-print-backups
+
+  recruitment-wave2-admission:
+    name: Recruitment Wave2 production read-only admission
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect production read-only prerequisites
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 3m
+          envs: EXPECT_DIR,EXPECT_PM2
+          script: |
+            set -euo pipefail
+
+            # Public repository: never print URLs, credentials, database/role names,
+            # PM2 environment JSON, or dotenv contents. This probe performs no writes.
+            python3 - "$EXPECT_DIR" "$EXPECT_PM2" <<'PY'
+            import hashlib
+            import json
+            import os
+            import subprocess
+            import sys
+            from urllib.parse import parse_qs, unquote, urlparse
+
+            api_dir, pm2_name = sys.argv[1:3]
+            env_path = os.path.join(api_dir, '.env')
+            expected_readonly_role = 'recruitment_wave2_readonly'
+
+            def load_dotenv(path: str) -> dict[str, str]:
+                values: dict[str, str] = {}
+                with open(path, encoding='utf-8') as handle:
+                    for raw_line in handle:
+                        line = raw_line.strip()
+                        if not line or line.startswith('#') or '=' not in line:
+                            continue
+                        key, value = line.split('=', 1)
+                        key = key.strip()
+                        value = value.strip()
+                        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                            value = value[1:-1]
+                        values[key] = value
+                return values
+
+            def parse_postgres_url(value: str):
+                parsed = urlparse(value)
+                if parsed.scheme not in ('postgres', 'postgresql') or not parsed.hostname:
+                    raise ValueError('not-postgres')
+                database = unquote(parsed.path.lstrip('/'))
+                if not database or '/' in database:
+                    raise ValueError('bad-database')
+                return parsed, database
+
+            def run_psql(parsed, database: str, sql: str) -> str:
+                pg_env = os.environ.copy()
+                pg_env.update({
+                    'PGHOST': parsed.hostname or '',
+                    'PGPORT': str(parsed.port or 5432),
+                    'PGUSER': unquote(parsed.username or ''),
+                    'PGDATABASE': database,
+                    'PGPASSWORD': unquote(parsed.password or ''),
+                })
+                sslmode = parse_qs(parsed.query).get('sslmode', [None])[0]
+                if sslmode:
+                    pg_env['PGSSLMODE'] = sslmode
+                result = subprocess.run(
+                    ['psql', '-X', '-A', '-t', '-F', '\t', '-v', 'ON_ERROR_STOP=1', '-c', sql],
+                    env=pg_env,
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError('psql-failed')
+                return result.stdout.strip()
+
+            if not os.path.isfile(env_path):
+                print('ADMISSION_ENV_FILE_PRESENT=no')
+                raise SystemExit(1)
+
+            values = load_dotenv(env_path)
+            app_url = values.get('DATABASE_URL', '')
+            try:
+                _, app_database = parse_postgres_url(app_url)
+            except ValueError:
+                print('ADMISSION_APP_DATABASE=invalid')
+                raise SystemExit(1)
+
+            print('ADMISSION_APP_DATABASE=postgres')
+            print('ADMISSION_DATABASE_ID_SHA256=' + hashlib.sha256(app_database.encode()).hexdigest())
+
+            runtime_demo = None
+            try:
+                pm2 = subprocess.run(
+                    ['pm2', 'jlist'], text=True, capture_output=True, timeout=15, check=False,
+                )
+                if pm2.returncode == 0:
+                    for process in json.loads(pm2.stdout):
+                        if process.get('name') == pm2_name:
+                            runtime_demo = process.get('pm2_env', {}).get('EXCLUDE_DEMO_PUBLIC_DATA')
+                            break
+            except (FileNotFoundError, subprocess.SubprocessError, json.JSONDecodeError):
+                runtime_demo = None
+            raw_demo = runtime_demo if runtime_demo is not None else values.get('EXCLUDE_DEMO_PUBLIC_DATA')
+            normalized_demo = 'false' if raw_demo is None else str(raw_demo).strip().lower()
+            if normalized_demo not in ('true', 'false'):
+                print('ADMISSION_DEMO_POLICY=invalid')
+                raise SystemExit(1)
+            print('ADMISSION_DEMO_POLICY=' + normalized_demo)
+
+            readonly_url = values.get('RECRUITMENT_WAVE2_PRODUCTION_READONLY_URL', '')
+            print('ADMISSION_READONLY_URL_CONFIGURED=' + ('yes' if readonly_url else 'no'))
+
+            # A role may already exist even when its credential URL has not been provisioned.
+            role_exists = 'unknown'
+            try:
+                result = subprocess.run(
+                    [
+                        'sudo', '-n', '-u', 'postgres', 'psql', '-X', '-A', '-t',
+                        '-d', app_database, '-v', 'ON_ERROR_STOP=1', '-v',
+                        f'candidate={expected_readonly_role}', '-c',
+                        "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=:'candidate');",
+                    ],
+                    text=True,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    role_exists = 'yes' if result.stdout.strip() == 't' else 'no'
+            except (FileNotFoundError, subprocess.SubprocessError):
+                role_exists = 'unknown'
+            print('ADMISSION_EXPECTED_ROLE_EXISTS=' + role_exists)
+
+            if not readonly_url:
+                print('ADMISSION_READY=no')
+                print('ADMISSION_BLOCKER=readonly_url_missing')
+                raise SystemExit(0)
+
+            try:
+                readonly_parsed, readonly_database = parse_postgres_url(readonly_url)
+                if readonly_database != app_database:
+                    raise ValueError('database-mismatch')
+                required_tables = [
+                    '_prisma_migrations', 'Organization', 'JobSource', 'Job', 'JobFair',
+                    'PolicyPost', 'OfflineAgency', 'OfflineJob', 'OnlinePlatformDirectory',
+                    'OfflineAgencyProfile', 'OfflineAgencyBranch', 'QualificationRecord',
+                    'ReviewDecision', 'AuditLog', 'FileObject',
+                ]
+                quoted_tables = ','.join("'" + table.replace("'", "''") + "'" for table in required_tables)
+                sql = f"""
+                SELECT current_database(),
+                  NOT r.rolsuper AND NOT r.rolcreatedb AND NOT r.rolcreaterole
+                    AND NOT r.rolreplication AND NOT r.rolbypassrls,
+                  NOT has_schema_privilege(current_user,'public','CREATE'),
+                  NOT has_database_privilege(current_user,current_database(),'CREATE'),
+                  NOT EXISTS (
+                    SELECT 1 FROM pg_tables t WHERE t.schemaname='public'
+                    AND (has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'INSERT')
+                      OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'UPDATE')
+                      OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'DELETE')
+                      OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'TRUNCATE'))),
+                  NOT EXISTS (
+                    SELECT 1 FROM unnest(ARRAY[{quoted_tables}]) AS required(name)
+                    WHERE NOT has_table_privilege(current_user,format('%I.%I','public',required.name),'SELECT'))
+                FROM pg_roles r WHERE r.rolname=current_user;
+                """
+                fields = run_psql(readonly_parsed, readonly_database, sql).split('\t')
+                ready = len(fields) == 6 and fields[0] == app_database and all(value == 't' for value in fields[1:])
+            except (ValueError, RuntimeError, subprocess.SubprocessError):
+                ready = False
+
+            print('ADMISSION_READY=' + ('yes' if ready else 'no'))
+            if not ready:
+                print('ADMISSION_BLOCKER=readonly_role_or_grants_invalid')
+            PY
+        env:
+          EXPECT_DIR: /srv/ai-job-print
+          EXPECT_PM2: ai-job-print-api
