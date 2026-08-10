@@ -17,6 +17,11 @@ const buildExe = read('build-exe.ps1')
 const staging = read('build-staging.ps1')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
 const agentCli = fs.readFileSync(path.join(root, '../src/index.ts'), 'utf8')
+const runtimeVersion = fs.readFileSync(path.join(root, '../src/runtime-version.ts'), 'utf8')
+const heartbeat = fs.readFileSync(path.join(root, '../src/agent/heartbeat.ts'), 'utf8')
+const localApi = fs.readFileSync(path.join(root, '../src/local-api/qr-login-server.ts'), 'utf8')
+const statusPanel = fs.readFileSync(path.join(root, '../src/local-api/status-panel.ts'), 'utf8')
+const panelShortcut = read('assets/AI Job Print Terminal.url')
 const agentConfigExample = JSON.parse(
   fs.readFileSync(path.join(root, '../agent-config.example.json'), 'utf8'),
 )
@@ -41,13 +46,16 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.3.9')
+assert.equal(inputs.productVersion, '0.4.0')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
   'installer and Agent package versions must advance together',
 )
-assert.ok(agentCli.includes(`.version('${inputs.productVersion}')`))
+assert.match(runtimeVersion, /AGENT_RUNTIME_VERSION\s*=\s*agentPackage\.version/)
+assert.match(agentCli, /\.version\(AGENT_RUNTIME_VERSION\)/)
+assert.match(heartbeat, /agentVersion:\s*AGENT_RUNTIME_VERSION/)
+assert.doesNotMatch(heartbeat, /agentVersion:\s*config\.agentVersion/)
 assert.equal(agentConfigExample.agentVersion, inputs.productVersion)
 assert.ok(productionInstaller.includes(`AgentVersion = "${inputs.productVersion}-production"`))
 assert.equal(inputs.node.version, '22.23.1')
@@ -72,6 +80,26 @@ assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
 assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
+assert.match(project, /InstallerSourceRoot=\$\(MSBuildProjectDirectory\)/)
+assert.match(wix, /StandardDirectory Id="CommonAppDataFolder"/)
+assert.match(wix, /Name="Microsoft"[\s\S]*Name="Windows"[\s\S]*Name="Start Menu"[\s\S]*Name="Programs"/)
+assert.match(wix, /Id="AgentPanelInternetShortcut"/)
+assert.match(wix, /Source="\$\(var\.InstallerSourceRoot\)\\assets\\AI Job Print Terminal\.url" KeyPath="yes"/)
+assert.match(wix, /RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall"/)
+assert.match(wix, /ComponentRef Id="AgentPanelShortcutComponent"/)
+assert.equal(
+  panelShortcut.replace(/\r\n/g, '\n').trim(),
+  '[InternetShortcut]\nURL=http://127.0.0.1:9527/local/panel',
+)
+assert.match(localApi, /url\.pathname === '\/local\/panel'/)
+assert.ok(
+  localApi.indexOf("url.pathname === '/local/panel'") < localApi.indexOf('if (!isOriginAllowed(origin, origins))'),
+  'top-level panel navigation must be handled before browser Origin enforcement',
+)
+assert.match(statusPanel, /Cache-Control': 'no-store'/)
+assert.match(statusPanel, /Content-Security-Policy/)
+assert.match(statusPanel, /frame-ancestors 'none'/)
+assert.doesNotMatch(statusPanel, /agentToken|terminalId|apiBaseUrl|printerName|scanWatchFolder/)
 
 assert.match(bundleProject, /<OutputType>Bundle<\/OutputType>/)
 assert.match(bundleProject, /<InstallerPlatform>x64<\/InstallerPlatform>/)
@@ -166,6 +194,9 @@ assert.match(lifecycle, /VersionInfo\.FileVersion/)
 assert.match(lifecycle, /& \$nodePath --version/)
 assert.match(lifecycle, /Join-Path \$stateRoot "logs"/)
 assert.match(lifecycle, /Copy-Item -LiteralPath \$item\.FullName -Destination \$copiedLogRoot -Recurse -Force/)
+assert.match(lifecycle, /Assert-PanelShortcut/)
+assert.ok(lifecycle.includes('URL=http://127\\.0\\.0\\.1:9527/local/panel'))
+assert.match(lifecycle, /Start Menu shortcut remains after uninstall/)
 assert.match(workflow, /artifacts\/msi\/lifecycle-logs\//)
 assert.doesNotMatch(workflow, /lifecycle-logs\/\*\.log/)
 assert.match(exeLifecycle, /Invoke-Bundle -Action "\/install"/)
@@ -176,8 +207,10 @@ assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
 assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
-assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.3\.8"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.3\.9"/)
+assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.3\.9"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.0"/)
+assert.match(upgradeLifecycle, /Assert-PanelShortcut/)
+assert.match(upgradeLifecycle, /0\.3\.9 no-panel-shortcut predecessor fixture/)
 assert.match(upgradeLifecycle, /ProgramData sentinel was not preserved through upgrade/)
 assert.match(upgradeLifecycle, /EXE_UPGRADE_LIFECYCLE_PASS/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
@@ -202,7 +235,7 @@ assert.match(
 )
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
-assert.match(workflow, /-ProductVersion 0\.3\.8/)
+assert.match(workflow, /-ProductVersion 0\.3\.9/)
 assert.match(workflow, /artifacts\/upgrade\/predecessor\/exe/)
 assert.ok(
   workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),

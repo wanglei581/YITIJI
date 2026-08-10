@@ -7,6 +7,7 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
 $serviceName = "aijobprintagent.exe"
+$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.url"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -21,6 +22,16 @@ function Invoke-Msi([string[]]$Arguments, [string]$LogName) {
 
 function Write-Utf8File([string]$Path, [string]$Content) {
   [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Assert-PanelShortcut {
+  if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
+    throw "Local status panel Start Menu shortcut is missing"
+  }
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $panelShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
+    throw "Local status panel shortcut does not contain the fixed loopback URL"
+  }
 }
 
 function Add-EvidenceError([string]$Phase, [string]$Message) {
@@ -193,6 +204,7 @@ if (Test-Path -LiteralPath $installRoot) {
 }
 
 Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
+Assert-PanelShortcut
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
@@ -263,6 +275,9 @@ if (Test-Path -LiteralPath $installRoot) {
 }
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory must be retained after uninstall"
+}
+if (Test-Path -LiteralPath $panelShortcutPath) {
+  throw "Local status panel Start Menu shortcut remains after uninstall"
 }
 
 Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"

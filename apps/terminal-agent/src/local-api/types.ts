@@ -1,4 +1,5 @@
 import type { MemberUser } from './wire'
+import type { PrinterStatus, ScanInputHealthReason, ScanInputHealthStatus } from '../agent/types'
 
 export interface LocalQrCreateRequest {
   deviceId?: string
@@ -36,6 +37,20 @@ export interface LocalTerminalIdentityResponse {
 export interface LocalPrintWakeResponse {
   accepted: true
   coalesced: boolean
+}
+
+/** PII-safe snapshot rendered by the read-only loopback status panel. */
+export interface LocalAgentPanelStatus {
+  runtimeVersion: string
+  terminalCode: string
+  serviceState: 'running'
+  cloudConnected: boolean
+  lastHeartbeatAt: string | null
+  printerStatus: PrinterStatus
+  localTaskDatabaseAvailable: boolean
+  scanInputStatus: ScanInputHealthStatus
+  scanInputReason: ScanInputHealthReason
+  credentialStatus: 'ready' | 'unauthorized'
 }
 
 // ── U 盘导入（Task 9） ──────────────────────────────────────────────────────
