@@ -47,7 +47,10 @@
 </style>
 </head>
 <body>
-  <h1>Kiosk AI 操作系统 V3 · 38 页总览</h1>
+  <!-- 页数由 G 算出来，不写死。写死的那个版本停在「38 页总览」，
+       而目录里已经有 45 页 —— P40–P46 七页从来没被挂上来，
+       打开总览的人（评审、客户、接手的模型）根本看不到它们存在。 -->
+  <h1>Kiosk AI 操作系统 V3 · <span id="cnt">…</span> 页总览</h1>
   <p class="sub">
     78 个原型编号（<b>kiosk-proto-2026-07</b>「75 屏」定稿）融合为 <b>26 页</b>，能力零丢失；另有 <b>P27–P29 / P31–P35</b> 承接线上真实存在、但不在 78 号原型内的页面（/toolbox、自我评估、证件照、签约风险、<b>/resume-service 域首屏</b>、<b>/resume/templates 素材库</b>、/jobs-service、线上招聘平台）。每页承接的原型编号写在卡片下方。<br>
     视觉与构图基线 = <b>P01 首页 · 鲜彩玻璃</b>。每页交付前必须过：四态同版面 / 纵向溢出 0 / 横向溢出 0 / 触控 ≥48px / 违禁文案 0。
@@ -80,6 +83,8 @@ var G = [
     ['P28', '自我评估', '引导同意→逐题作答→陈述式结果(E3·无分数无排名)→往期数量与路牌', '线上 /resume/self-assessment', '28-self-assessment.html?theme=warm'],
     ['P29', '证件照工作台', '双态:锁定+开放后示意(上传→规格体检→换底→A4排版→放进简历→打印)', '线上 /print-scan/feature/id-photo', '29-id-photo.html?theme=warm'],
     ['P31', '签约风险提示', '锁定态=Gate0可视化;开放后:上传知情(五类型含通用)→提取确认→三档风险→报告打印;附常见签约问题', '线上 /contract-review(默认关)', '31-contract-review.html?theme=warm'],
+    ['P40', '会话安全', '无操作提示→倒计时→清空 / 锁屏 / 跨机接管 / 异常退出，六态同页；这一区不接 AI —— 超时与清场是安全判定，交给模型判断有害', '新增', '40-session-safety.html?theme=warm'],
+    ['P41', '支付履约', '待付 / 已付 / 出纸中 / 卡纸部分退款 / 收款码超时转单 / 退款处理与完成，八态同页；金额只由支付回执与出纸计数决定，不接 AI', '新增', '41-fulfillment-states.html?theme=warm'],
   ]],
   ['打印扫描', [
     ['P06', '打印工作台', '选来源→材料体检→参数核价→核对金额→收银→出纸→取件，七阶段一页', '02, 03, 04, 31, 32, 33, 64, 65, 77', '06-print-workbench.html?theme=warm&stage=s3'],
@@ -105,11 +110,14 @@ var G = [
     ['P37', '面试训练 · 域首屏', '模拟面试/自我评估/职业规划/面试技巧/评估历史/薪资参考,卡内可选岗位与难度', '线上 /interview-service', '37-interview-hub.html?theme=warm'],
     ['P38', '政策服务 · 域首屏', '就业政策/社保/档案/补贴/AI政策助手/收藏,卡内可选身份与参保', '线上 /policy-service', '38-policy-hub.html?theme=warm'],
     ['P39', '打印扫描 · 域首屏', '文档/扫码上传/材料扫描/照片/证件照/格式转换/签名盖章 + 本机能力状态', '线上 /print-scan', '39-print-hub.html?theme=warm'],
+    ['P44', '岗位详情 · 线下机构版', '线下机构发布的岗位详情：机构资质与许可证口径、到店准备、中性核实问句清单；不代投不收简历', '新增', '44-job-detail-offline.html?theme=warm'],
   ]],
   ['招聘会与校园', [
     ['P17', '招聘会作战台', '场次→企业→导览→AI 准备单→资料打印→签到→现场数据', '10, 11, 43–49', '17-fair-desk.html?theme=warm&stage=s2'],
     ['P18', '校园招聘专区', '校招季节条 + 逐场活动来源可核 + 计划表打印', '50', '18-campus.html?theme=warm&stage=s2'],
-    ['P19', '智慧校园', '未接入锁定态 + 接入后示意（明确标注非当前状态）', '51, 52, 69, 70', '19-smart-campus.html?theme=warm&stage=s1']
+    ['P19', '智慧校园', '未接入锁定态 + 接入后示意（明确标注非当前状态）', '51, 52, 69, 70', '19-smart-campus.html?theme=warm&stage=s1'],
+    ['P45', '招聘会现场', '到场后四阶段：展位顺序 → 场馆导览 → 材料准备 → 扫码去来源平台；现场数据只读事实，无数据时诚实空态不编分布', '新增', '45-fair-onsite.html?theme=warm'],
+    ['P46', '校园服务 · 报到', '报到材料差分（勾已带 → 列还缺 → 点出本机能补的项）三阶段；不给校方清单之外的猜测', '新增', '46-campus-service.html?theme=warm']
   ]],
   ['面试 · 政策 · 规划', [
     ['P20', '面试训练舱', '设置→逐题→报告→历史→技巧', '38–42', '20-interview-pod.html?theme=warm&stage=s2'],
@@ -120,7 +128,9 @@ var G = [
     ['P23', '我的 · 资产中心', '简历 / 文档 / 订单 / AI 记录 / 收藏 / 权益 / 通知 / 设置', '14, 16–23, 71', '23-me.html?theme=warm&stage=s1'],
     ['P24', '权益活动', '活动列表 + 详情领取', '24, 72', '24-benefits.html?theme=warm&stage=s1'],
     ['P25', '顾问驾驶舱', '小青 + 文字对话 + 语音咨询态 + 九能力入口', '13, 73', '25-advisor.html?theme=warm&stage=s1'],
-    ['P26', '顾问作业面', 'A 问答型 / B 填槽型 / C 比对型，三态同页；含 76 方案确认落点', '九能力, 76', '26-advisor-work.html?theme=warm&stage=sA']
+    ['P26', '顾问作业面', 'A 问答型 / B 填槽型 / C 比对型，三态同页；含 76 方案确认落点', '九能力, 76', '26-advisor-work.html?theme=warm&stage=sA'],
+    ['P42', '我的 · 资产', '简历 / 文档 / 打印订单三栏；版本差异摘要 + 到期件点名可直接送打印。订单栏的金额、页数、支付状态、取件码是订单原文，不做 AI 加工', '线上 /me/* 资产层', '42-my-assets.html?theme=warm'],
+    ['P43', '我的 · 记录', 'AI 服务记录 / 浏览 / 外部跳转 / 收藏四栏；只记录本人浏览与打开来源平台的行为，不记录投递或预约结果', '线上 /me/* 记录层', '43-my-records.html?theme=warm']
   ]]
 ]
 document.getElementById('out').innerHTML = G.map(function (g) {
@@ -133,6 +143,47 @@ document.getElementById('out').innerHTML = G.map(function (g) {
       '<p class="src">承接原型 ' + p[3] + '</p></a>'
   }).join('') + '</div>'
 }).join('')
+
+/* 页数算出来，不写死 */
+var listed = []
+G.forEach(function (g) { g[1].forEach(function (p) { if (p[4]) listed.push(p[4].split('?')[0]) }) })
+document.getElementById('cnt').textContent = listed.length
+document.title = 'Kiosk AI 操作系统 V3 · ' + listed.length + ' 页总览'
+
+/* ── 总览页自检 ────────────────────────────────────────────
+   这一页曾经停在「38 页总览」，而目录里已经有 45 页 —— P40–P46 七页
+   从来没被挂上来。打开总览的人（评审、客户、接手的模型）会以为那七页
+   不存在。补一次只是补这一次；下次新增页照样会漏。所以让它自己对账：
+   和 pages.json 比，缺了或多了都当场喊出来。
+   走 file:// 时 fetch 会失败 —— 那就什么都不显示，不要拿一个假的「一致」骗人。 */
+;(function () {
+  /* 挂到 window 上是为了能被单独调用来验这个检查器本身。
+     检测器不被检测，就会出现「审计全绿但其实什么都没检」—— 这个坑踩过两次。 */
+  window.v3IndexCheck = function (j) {
+    var have = j.pages || []
+    var missing = have.filter(function (f) { return listed.indexOf(f) < 0 })
+    var ghost = listed.filter(function (f) { return have.indexOf(f) < 0 })
+    var old = document.getElementById('idx-warn')
+    if (old) old.parentNode.removeChild(old)
+    if (!missing.length && !ghost.length) return { missing: [], ghost: [] }
+    var box = document.createElement('div')
+    box.id = 'idx-warn'
+    box.style.cssText = 'margin:18px 0;padding:14px 16px;border:1px solid #7a5320;' +
+      'background:#241a0c;color:#ffc46b;border-radius:10px;font-size:13px;line-height:1.7'
+    var html = '<b>总览页与 pages.json 对不上</b>（pages.json 由 <code>sh tools/make-pages.sh</code> 生成）<br>'
+    if (missing.length) html += '目录里有、这一页没挂：<b>' + missing.join('、') + '</b><br>'
+    if (ghost.length) html += '这一页挂了、目录里没有：<b>' + ghost.join('、') + '</b><br>'
+    if (j.retired && j.retired.length) html += '<span style="color:#9a8a70">退役页（不计入）：' + j.retired.join('、') + '</span>'
+    box.innerHTML = html
+    document.getElementById('out').parentNode.insertBefore(box, document.getElementById('out'))
+    return { missing: missing, ghost: ghost }
+  }
+
+  fetch('pages.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { if (!r.ok) throw new Error('no manifest'); return r.json() })
+    .then(window.v3IndexCheck)
+    .catch(function () { /* file:// 或没生成清单：不显示，也不假装一致 */ })
+})()
 </script>
 </body>
 </html>
