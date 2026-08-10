@@ -65,6 +65,24 @@
 .chip--info { cursor:inherit; }
 
 /* 四规格参考表（sA·仅供了解） */
+/* ── 2026-08-11 卡内空洞整改（sA 锁定态）────────────────────────────────
+   实测「四种常用规格」那张卡高 805px、表只占 373px，卡里空 432px。
+   缺数据是对的（本机确实排不了证件照），但**空版式不是**：这一屏唯一的真话
+   ——「还没开放 / 现在能走哪两条路 / 规格长什么样」——被排得又小又挤，
+   底下却空着一大片。按 08 的 t3 锁定态先例处理：把真话放大到主视觉尺寸，
+   表格行距抬到站着能读，余量由这三块吃掉，而不是留一块空盒。 */
+.screen[data-stage="sA"] .lockcard { gap:var(--s-5); padding:var(--s-7) var(--s-6); }
+.screen[data-stage="sA"] .lock-ic { width:88px; height:88px; }
+.screen[data-stage="sA"] .lock-ic .ic { width:42px; height:42px; }
+.screen[data-stage="sA"] .lock-t { font-size:var(--fz-8); }
+.screen[data-stage="sA"] .lock-p { font-size:var(--fz-5); line-height:1.7; }
+.screen[data-stage="sA"] .alt { padding:var(--s-5); }
+.screen[data-stage="sA"] .alt .ic { width:26px; height:26px; }
+.screen[data-stage="sA"] .alt-t { font-size:var(--fz-5); }
+.screen[data-stage="sA"] .alt-s { font-size:var(--fz-3); line-height:1.6; }
+.screen[data-stage="sA"] .spect span { padding:22px 16px; font-size:var(--fz-4); }
+.screen[data-stage="sA"] .spect .h { font-size:var(--fz-2); }
+
 .spect { display:grid; grid-template-columns:1fr .9fr 1.05fr 1.5fr;
   border:1px solid var(--brd-1); border-radius:var(--r-xs); overflow:hidden; }
 .spect span { padding:13px 14px; font-size:var(--fz-2); color:var(--fog-700);
@@ -174,6 +192,11 @@
 .cmp-page .tt { height:12px; width:56%; border-radius:3px; background:#c6ccd3; }
 .cmp-page .ln { height:6px; border-radius:2px; background:var(--paper-200); }
 .cmp-page .ln.s { width:60%; }
+/* 2026-08-11：这两张是 A4 缩略图（aspect-ratio 1/1.414），原来只画了页面上部
+   六条，下面 252px 是白的 —— 缩略图本身没画完，不是「页面留白」。
+   补上小节标题与正文条，把一页简历画到底；两张画的内容完全一致，
+   唯一的差别仍然只有右上角那张照片，这才是这组对照要给人看的东西。 */
+.cmp-page .sec-t { height:8px; width:34%; border-radius:2px; background:#b9c0c8; margin-top:6px; }
 .cmp-photo { position:absolute; right:16px; top:18px; width:25%; }
 .cmp-photo .idsil { aspect-ratio:5/7; width:100%; }
 .cmp-photo--old .idsil { filter:grayscale(1) brightness(.86); outline:1.5px dashed #949ba4; }
@@ -532,6 +555,12 @@
                 <div class="cmp-page">
                   <span class="tt"></span><span class="ln"></span><span class="ln s"></span>
                   <span class="ln"></span><span class="ln s"></span><span class="ln"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln"></span><span class="ln s"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln"></span><span class="ln"></span><span class="ln s"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln s"></span>
                   <span class="cmp-photo cmp-photo--old"><span class="idsil idsil--w"></span></span>
                 </div>
                 <span class="cmp-cap">现在的第 1 页 · <b>旧照灰显</b>（3.2 × 4.5cm）</span>
@@ -540,6 +569,12 @@
                 <div class="cmp-page">
                   <span class="tt"></span><span class="ln"></span><span class="ln s"></span>
                   <span class="ln"></span><span class="ln s"></span><span class="ln"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln"></span><span class="ln s"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln"></span><span class="ln"></span><span class="ln s"></span>
+                  <span class="sec-t"></span>
+                  <span class="ln"></span><span class="ln s"></span>
                   <span class="cmp-photo cmp-photo--new"><span class="idsil idsil--b"></span></span>
                 </div>
                 <span class="cmp-cap">换照后的第 1 页 · <b>新版本</b>（尺寸自适配到原照片位）</span>

@@ -90,15 +90,41 @@
   .shop-l .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--jade-500); }
   .shop-n { font-size: 18px; color: var(--fog-600); line-height: 1.5; }
 
-  /* ⑤ 职责 / 要求：双列各 468px */
-  .duo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); }
-  .duo .dsec { padding: var(--s-5); border-radius: var(--r-sm);
+  /* ⑤ 正文栅格：2 列 × 2 行
+     ── 2026-08-11 卡内空洞整改 ─────────────────────────────────────
+     原来只有「职责 / 要求」两张（各 2–3 条短句）挂 flex:1 吃余量：
+     实测单张 539px 高、内容 168px，卡里空 371px。
+     本页的落点是最下面那个主按钮「打印到店问题清单」，而那份清单
+     （到店先问清这四件）当时压在折叠条里 —— 主按钮要打的东西，屏幕上看不见。
+     所以把「四问清单」从折叠移回常驻，占满第二行整宽；折叠里留「带什么」与「怎么到 · 三步」。
+     只移这一块而不是整屉：本页 .detail 只有 1360px，四张卡放不下（试过，
+     栅格被压到每张 281px，内容溢出 245px），移多了就是把空洞换成裁切。
+     行高用 `auto 1fr`：第一行按内容收高，余量全给四问那张 —— 它有内容接得住。
+     职责 / 要求正文 22px → 26px。 */
+  .duo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 468px 468px;
+         grid-template-rows: auto 1fr; gap: var(--s-5); }
+  .duo .dsec { min-height: 0; padding: var(--s-5); border-radius: var(--r-sm);
     background: var(--surf-1); border: 1px solid var(--brd-1); }
   .dsec-t { font-size: 20px; color: var(--fog-600); letter-spacing: .14em; }
-  .duo .dsec-body { font-size: 22px; line-height: 1.55; }
-  .duo .dsec-body ul { margin: 0; padding-left: 1.2em; }
-  .duo .dsec-body li { margin-bottom: 10px; }
+  .duo .dsec-body { font-size: 26px; line-height: 1.6; }
+  .duo .dsec-body ul { margin: 0; padding-left: 1.15em; }
+  .duo .dsec-body li { margin-bottom: 14px; }
+  .duo .dsec-body li:last-child { margin-bottom: 0; }
   .duo .dsec-body .none { display: block; margin-top: 10px; font-size: 18px; color: var(--fog-600); }
+  /* 栅格里的 kv：值是整句，改成定宽键 + 左对齐值，别让「第 1 步」折成两行 */
+  .duo .dsec .kv { margin: 0; }
+  .duo .dsec .kv-row { align-items: flex-start; font-size: 21px; line-height: 1.5; padding: 9px 0; min-height: 0; }
+  .duo .dsec .kv-row .k { flex: 0 0 5.6em; font-size: 20px; white-space: nowrap; padding-top: 1px; }
+  .duo .dsec .kv-row .v { margin-left: 0; flex: 1 1 auto; min-width: 0; display: block; }
+  .duo .dsec .asks { margin-top: 12px; gap: 8px; }
+  .duo .dsec .ask { min-height: 52px; }
+  .duo .dsec .ask-t { font-size: 21px; }
+  .duo .dsec .cav { display: block; margin-top: 12px; font-size: 19px; color: var(--fog-600); line-height: 1.55; }
+  /* 第二行整宽：四问是一份清单，横过来占满 968px 比挤在 468px 里好读。
+     四条排成 2×2 而不是竖着一列：竖排时这张卡要 406px，而第二行只有 318px，
+     内容会溢出 88px（实测）。两列各 464px，最长一条 19 字也放得下。 */
+  .duo .dsec--wide { grid-column: 1 / -1; }
+  .duo .dsec--wide .asks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
   /* 折叠区 */
   .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
@@ -252,27 +278,12 @@
               </ul>
             </div>
           </div>
-        </div>
-        <!-- 两列共用一条免责，不在每列各写一遍：各写一遍会让两列都变成 ≥40 字的说明块 -->
-        <div class="shop-n" style="flex:0 0 auto">机构填报，<b>本机未核实</b>；以书面约定为准</div>
 
-        <!-- ════ 第二屏 ════ -->
-
-        <!-- 到店准备：要带什么 / 怎么走 / 四问清单，三段合并成一个折叠区 -->
-        <details class="fold fold--prep" data-at="ok">
-          <summary>到店准备：带什么 · 怎么走 · 到店先问清这四件
-            <span class="ev ev--e3" data-when="default first device-off">E3 仅供参考</span>
-          </summary>
-          <div class="fold-b">
-            <b>带什么。</b>机构<b>没有填报</b>所需材料清单，本机不替它编一份。通用建议：纸质简历 2–3 份（本机可打印）、
-            本人身份证件、与岗位相关的证书复印件。<b>到店前请向机构确认实际所需材料</b>，并以门店现场公示为准。
-            身份证等原件当面核验后应<b>当场带回</b>，不要留在任何机构。
-            <div class="kv">
-              <div class="kv-row"><span class="k">怎么到</span><span class="v">地铁 3 号线 天河客运站 B 口，步行约 5 分钟</span></div>
-              <div class="kv-row"><span class="k">第 1 步</span><span class="v">打印这份到店问题清单，带着去</span></div>
-              <div class="kv-row"><span class="k">第 2 步</span><span class="v">备好简历与证件，按营业时间到店</span></div>
-              <div class="kv-row"><span class="k">第 3 步</span><span class="v">与机构面谈，逐条问清并记下答复</span></div>
-              <div class="kv-row"><span class="k">本机到哪为止</span><span class="v">到「打印带走」为止；面谈与结果都在门店</span></div>
+          <!-- 从「到店准备」折叠移回常驻：这份清单就是最下面主按钮要打印的东西，
+               藏在折叠里等于让用户先展开才知道自己要打什么。E3 标识随内容一起搬。 -->
+          <div class="dsec dsec--wide">
+            <div class="dsec-t">到店先问清这四件
+              <span class="ev ev--e3" data-when="default first device-off">E3 仅供参考</span>
             </div>
             <div class="asks" data-when="default first device-off">
               <div class="ask"><span class="ask-no">1</span><span class="ask-t">薪资写「面议」，区间是多少？</span></div>
@@ -286,8 +297,28 @@
               <div class="ask"><span class="ask-no">3</span><span class="ask-t">试用期与转正条件？</span></div>
               <div class="ask"><span class="ask-no">4</span><span class="ask-t">合同由谁签、什么时候签？</span></div>
             </div>
-            <span data-when="default first device-off">四问按这条岗位与机构的公开文本生成，<b>不读你的简历</b>。</span>
-            <span data-when="ai-down">生成服务中断，这里改用固定清单，<b>照样能打印带走</b>。</span>
+            <span class="cav" data-when="default first device-off">四问按这条岗位与机构的公开文本生成，<b>不读你的简历</b>。上面的职责、要求与门店信息均为<b>机构填报，本机未核实</b>；以书面约定为准。</span>
+            <span class="cav" data-when="ai-down">生成服务中断，这里改用固定清单，<b>照样能打印带走</b>。上面的职责、要求与门店信息均为<b>机构填报，本机未核实</b>；以书面约定为准。</span>
+          </div>
+
+        </div>
+
+        <!-- ════ 第二屏 ════ -->
+
+        <!-- 到店准备：四问清单已移到上方常驻，这里留「带什么」与「怎么到 · 三步」 -->
+        <details class="fold fold--prep" data-at="ok">
+          <summary>到店准备：带什么 · 怎么到 · 到店三步</summary>
+          <div class="fold-b">
+            <b>带什么。</b>机构<b>没有填报</b>所需材料清单，本机不替它编一份。通用建议：纸质简历 2–3 份（本机可打印）、
+            本人身份证件、与岗位相关的证书复印件。<b>到店前请向机构确认实际所需材料</b>，并以门店现场公示为准。
+            身份证等原件当面核验后应<b>当场带回</b>，不要留在任何机构。
+            <div class="kv">
+              <div class="kv-row"><span class="k">怎么到</span><span class="v">地铁 3 号线 天河客运站 B 口，步行约 5 分钟</span></div>
+              <div class="kv-row"><span class="k">第 1 步</span><span class="v">打印这份到店问题清单，带着去</span></div>
+              <div class="kv-row"><span class="k">第 2 步</span><span class="v">备好简历与证件，按营业时间到店</span></div>
+              <div class="kv-row"><span class="k">第 3 步</span><span class="v">与机构面谈，逐条问清并记下答复</span></div>
+              <div class="kv-row"><span class="k">本机到哪为止</span><span class="v">到「打印带走」为止；面谈与结果都在门店</span></div>
+            </div>
           </div>
         </details>
 

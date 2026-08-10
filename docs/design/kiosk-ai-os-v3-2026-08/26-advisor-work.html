@@ -66,6 +66,19 @@
 /* A 问答型 */
 .chat { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
         gap:var(--s-4); padding-bottom:var(--s-4); }
+/* ── 2026-08-11 卡内空洞整改 ─────────────────────────────────────────
+   sA 的对话卡实测高 1256px、最后一条消息之后空 536px（四态皆然）。
+   成因不是缺内容 —— 是对话贴着卡顶往下排，短对话就把一大片空留在下方，
+   而下方正是眼睛落点（紧挨着操作栏的「打印钉住的 2 条」）。
+   改成从底部往上堆：这是聊天界面的通行排法（消息少时贴底，多了自然向上滚）。
+   用首条 margin-top:auto 而不是 justify-content:flex-end —— 后者在
+   overflow:auto 的容器里会让溢出的顶部滚不到，是已知的 flexbox 坑。 */
+.chat > .msg:first-child { margin-top:auto; }
+
+/* B 填槽型：四问 + 成稿 + 提醒，末尾空 232px。这里不是对话，贴底反而怪；
+   改成四个问题按余量摊开 —— 站着填表时行距大一点本来就该。 */
+.slots { flex:1 1 auto; }
+.slots > .slot { flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; }
 .msg { display:flex; gap:var(--s-4); align-items:flex-start; }
 .msg-av { width:32px; height:32px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
           background:var(--fog-a08); }
@@ -259,7 +272,7 @@
           <span class="mt" data-when="ai-down">AI 不可用 · 停在第 3 问，已答的还在</span>
         </div>
 
-        <div class="sec" style="overflow-y:auto">
+        <div class="sec" style="overflow-y:auto;display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
           <div class="slots">
             <div class="slot">
               <span class="slot-q">1 · 你现在做什么，做了多久？</span>

@@ -33,8 +33,14 @@
 .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-4); }
 .fee { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.6; margin: 8px 0 0; }
 
-/* ── 报到流程 / 办卡指引：编号步骤条（两处同一套样式，不各造一套） ── */
+/* ── 报到流程 / 办卡指引：编号步骤条（两处同一套样式，不各造一套） ──
+   2026-08-11 卡内空洞整改：welcome 那张卡实测高 1132px，四步 + 四个窗口 +
+   两个出口 + 来源三字段只占 904px，卡底空 228px（四态皆命中）。
+   报到就是这四步、窗口就是这四个，编第五条是假的校方信息；
+   所以让这两组行按余量摊开（每行 +28px 左右），来源三字段落到卡底。 */
 .flow { display: flex; flex-direction: column; gap: var(--s-3); }
+.screen[data-stage="welcome"] .pane--grow .flow > .frow { flex: 1 1 auto; }
+.screen[data-stage="welcome"] .pane--grow .scroll > .kv > .kv-row { flex: 1 1 auto; }
 .frow {
   display: flex; align-items: center; gap: var(--s-4); min-height: 56px;
   padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
@@ -145,7 +151,7 @@
       <div class="pane pane--grow" data-at="welcome">
         <div class="pane-hd"><span class="t">报到流程</span><span class="s">四步 · 校方提供</span></div>
         <div class="scroll">
-          <div class="flow" style="flex:0 0 auto">
+          <div class="flow" style="flex:1 1 auto">
             <div class="frow"><span class="fno">1</span><span class="fb"><span class="ft">线上预报到</span><span class="fs">在学校迎新官网或公众号完成信息确认</span></span><span class="fwhere">校方系统</span></div>
             <div class="frow"><span class="fno">2</span><span class="fb"><span class="ft">学院报到</span><span class="fs">到所在学院迎新点核验、领取材料</span></span><span class="fwhere">各学院</span></div>
             <div class="frow"><span class="fno">3</span><span class="fb"><span class="ft">宿舍入住</span><span class="fs">领钥匙与校园卡，办理水电网</span></span><span class="fwhere">后勤服务</span></div>
@@ -155,7 +161,7 @@
           <div class="dsec-t" style="margin-top:var(--s-2)">办事窗口</div>
           <!-- 原来四行各写一遍「位置与时间按站点配置下发」，同一句话四遍；
                口径合到下面那条 fee 里，窗口名单照留。 -->
-          <div class="kv" style="flex:0 0 auto">
+          <div class="kv" style="flex:1 1 auto">
             <div class="kv-row"><span class="k">学生处</span><span class="v v--fog">—</span></div>
             <div class="kv-row"><span class="k">财务处</span><span class="v v--fog">—</span></div>
             <div class="kv-row"><span class="k">后勤服务</span><span class="v v--fog">—</span></div>

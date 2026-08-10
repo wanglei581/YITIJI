@@ -152,6 +152,16 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 .exit--off { border-style: dashed; opacity: .72; }
 .exit--off .ic { color: var(--fog-600); }
 .exit--off .exit-t { color: var(--fog-700); }
+/* ── 2026-08-11 卡内空洞整改 ──────────────────────────────────────────
+   右栏「拿它去做什么」实测卡高 813px、三个出口只占 430px，卡里空 347–383px
+   （四态皆命中，ai-down 最严重）。这一栏没有更多真话可写 —— 出口就是三个，
+   编第四个才是错的。所以按余量把三个出口摊开：说明文字跟着放大，
+   触控区从 ~140px 长到 ~250px，站着点更稳。 */
+.pane--grow > .sec { flex: 1 1 auto; min-height: 0; }
+.pane--grow > .sec > .exit { flex: 1 1 auto; align-items: center; }
+.pane--grow > .sec > .exit .exit-t { font-size: var(--fz-4); }
+.pane--grow > .sec > .exit .exit-s { font-size: var(--fz-2); line-height: 1.6; }
+.pane--grow > .sec > .exit .ic { width: 24px; height: 24px; margin-top: 0; }
 
 /* 目标岗位输入 + 生成推荐：AI 卡不能只有一段话没有输入也没有按钮 —— 那是空承诺。
    输入框点了会弹屏幕软键盘（scripts/keypad.js）；按钮在没填岗位前是 aria-disabled，

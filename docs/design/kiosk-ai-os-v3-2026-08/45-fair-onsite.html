@@ -112,7 +112,12 @@
 .jrow-pay { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-4); color: var(--jade-200); }
 .jrow-m { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
 
-/* ── 活动资料：整行大复选按钮（P17 .jobrow 先例，点整行、≥56px） ── */
+/* ── 活动资料：整行大复选按钮（P17 .jobrow 先例，点整行、≥56px） ──
+   2026-08-11 卡内空洞整改：这张卡实测高 1155px，六行资料 + 来源行只占 847px，
+   卡底空 308px（四态皆命中）。资料就这 6 份，编第 7 份是假数据；
+   所以让六行按余量摊开 —— 行从 ~74px 长到 ~125px，勾选区更好按，
+   卡底那两行来源与说明自然落到底。 */
+.materials .scroll > .matrow { flex: 1 1 auto; }
 .matrow {
   text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui); min-height: 56px;
   padding: var(--s-4); border-radius: var(--r-sm);
@@ -376,7 +381,7 @@
       </div>
 
       <!-- ─────────── 活动资料（原型 47） ─────────── -->
-      <div class="pane pane--grow" data-at="materials">
+      <div class="pane pane--grow materials" data-at="materials">
         <div class="pane-hd">
           <span class="t">活动资料 · 勾选后一次打印</span>
           <span class="s">共 6 份 · 5 份可打印</span>

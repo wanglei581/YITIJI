@@ -73,19 +73,48 @@
   .cband .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
   .cband b { color: var(--fog-900); }
 
-  /* ④ 职责 / 要求：双列各 468px，正文 22–24px，每条最多 2 行。
-     flex:1 让这一段吃掉第一屏之后的余量 —— 否则栏底会空出 400px 以上，
-     audit-plus 的「版面留白」会判缺陷，观感上也是「没写完」。
-     余量给正文而不是给说明块，正是这次重排的取向。 */
-  .duo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); }
+  /* ④ 正文栅格：2 列 × 2 行，四张都是**这一步真正要看的事实**。
+     ── 2026-08-11 卡内空洞整改 ───────────────────────────────────────
+     上一版这里只有「职责 / 要求」两张，各 3 条短句，却挂着 flex:1 去吃
+     第一屏之后的全部余量：实测 expired 态单张 903px 高、内容只有 212px，
+     卡里空 691px（全站第二严重）。当时的注释写着「余量给正文而不是给说明块」——
+     取向是对的，做法错在**把主栏的留白搬进了卡里**：主栏读数 0，屏幕上是两根空槽。
+
+     真正的成因是内容量不足：一条岗位的「这一步该看什么」被拆成
+     两张 3 条的小卡 + 两条折叠。改法按三条口径来，没有第四条：
+       ① 放大：正文 22px → 28px（82 PPI 屏、60cm 站距，22px 只有 6.8mm 字高）
+       ② 移回：把折叠里**当前这一步的决策依据**改成常驻 ——
+          「福利与工作时间」（判断投不投要看）与「投递怎么走」（本页的终点动作）。
+          只移这两块，「数据来源 / 记录什么 / 公共终端提醒」仍留在折叠里，
+          不是整屉复制回来。
+       ③ 版式：grid-auto-rows:1fr 两行等高，四张卡各自吃四分之一，
+          不再由一张卡独吞余量。
+     ────────────────────────────────────────────────────────────── */
+  .duo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 468px 468px;
+         grid-auto-rows: 1fr; gap: var(--s-6); }
   .duo .dsec {
-    padding: var(--s-5); border-radius: var(--r-sm);
+    min-height: 0; padding: var(--s-5); border-radius: var(--r-sm);
     background: var(--surf-1); border: 1px solid var(--brd-1);
   }
-  .dsec-t { font-size: 20px; color: var(--fog-600); letter-spacing: .14em; }
-  .duo .dsec-body { font-size: 22px; line-height: 1.55; }
-  .duo .dsec-body ul { margin: 0; padding-left: 1.2em; }
-  .duo .dsec-body li { margin-bottom: 10px; }
+  .dsec-t { font-size: 22px; color: var(--fog-600); letter-spacing: .14em; }
+  .duo .dsec-body { font-size: 28px; line-height: 1.7; }
+  .duo .dsec-body ul { margin: 0; padding-left: 1.15em; }
+  .duo .dsec-body li { margin-bottom: 16px; }
+  .duo .dsec-body li:last-child { margin-bottom: 0; }
+  /* 福利这张是整段句子，字号与职责 / 要求同一档（28px）：它同样是「投不投」的依据，
+     没有理由排得更小。免责句降一档（22px），保持主次。 */
+  .duo .dsec--prose .dsec-body { font-size: 28px; line-height: 1.7; }
+  .duo .dsec--prose .dsec-body .cav { display: block; margin-top: 14px; font-size: 22px; line-height: 1.65; color: var(--fog-700); }
+  /* 栅格里的 kv：值是整句而不是一个词，默认的「键左值右、值 margin-left:auto」
+     会把「第 1 步」挤成两行、把整句推成右对齐的碎块。这里改成定宽键 + 左对齐值。 */
+  .duo .dsec .kv { margin: 0; }
+  .duo .dsec .kv-row { align-items: flex-start; font-size: 22px; line-height: 1.5; padding: 11px 0; }
+  .duo .dsec .kv-row .k { flex: 0 0 4.9em; font-size: 21px; white-space: nowrap; padding-top: 1px; }
+  .duo .dsec .kv-row .v { margin-left: 0; flex: 1 1 auto; min-width: 0; display: block; }
+  /* 福利那张是「一个词对一个词」，保留右对齐读法 */
+  .duo .dsec--prose .kv-row { align-items: center; }
+  .duo .dsec--prose .kv-row .k { flex: 0 0 auto; }
+  .duo .dsec--prose .kv-row .v { margin-left: auto; flex: 0 0 auto; }
 
   /* ⑤ 第二屏：福利摘要 + 三个入口 + 边界折叠 */
   .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
@@ -102,8 +131,10 @@
   .fold-b b { color: var(--fog-900); }
   .fold-sub { margin-left: auto; margin-right: 12px; flex: 0 0 auto; }
 
-  /* 三个入口：一行，64px 主动作尺寸 */
-  .entries { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-4); }
+  /* 入口行：2026-08-10 删掉「查看企业」之后实际只剩两个入口（匹配参考 + 打印），
+     栅格却还是三列 —— 第三列 312px 一直空着，匹配参考的标题和「展开」被挤到换行。
+     改成两列：既补掉那块空，也让两个入口的文字一行放得下。 */
+  .entries { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
   .entry {
     display: flex; align-items: center; gap: 12px; height: 88px; padding: 0 var(--s-5);
     border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
@@ -236,7 +267,7 @@
           <span>投递在来源平台完成 · <b>本机不代收简历</b>、不做企业筛选与面试邀约</span>
         </div>
 
-        <!-- ④ 职责 / 要求：双列各 3 条 -->
+        <!-- ④ 正文栅格：2×2，四张都是这一步要看的事实（见上方 CSS 注释） -->
         <div class="duo">
           <div class="dsec">
             <div class="dsec-t">岗位职责</div>
@@ -258,18 +289,51 @@
               </ul>
             </div>
           </div>
+
+          <!-- 原「福利与工作时间」折叠条，原文一字未改，改为常驻：
+               判断投不投要看的就是它，藏在折叠里等于没写。 -->
+          <div class="dsec dsec--prose">
+            <div class="dsec-t">福利与工作时间</div>
+            <!-- 折叠里原来是一串「五险一金 · 带薪年假 · 周末双休 · 09:30–18:30 · 节日福利。」，
+                 一行点号连写在 27 寸屏上要逐字扫。事实一条没增没减，只是拆成逐项 ——
+                 与同排的另外三张同一种读法。 -->
+            <div class="kv">
+              <div class="kv-row"><span class="k">保险公积金</span><span class="v">五险一金</span></div>
+              <div class="kv-row"><span class="k">假期</span><span class="v">带薪年假 · 周末双休</span></div>
+              <div class="kv-row"><span class="k">工作时间</span><span class="v">09:30–18:30</span></div>
+              <div class="kv-row"><span class="k">其他</span><span class="v">节日福利</span></div>
+            </div>
+            <div class="dsec-body">
+              <span class="cav">以上为来源平台展示内容，本机<b>未做核实</b>；具体以你与用人单位签订的书面约定为准。</span>
+            </div>
+          </div>
+
+          <!-- 原「本机的边界」折叠里的投递三步，移回常驻：本页的终点动作就是它。
+               折叠里剩下的数据来源 / 记录什么 / 公共终端提醒仍留在折叠中，不整屉搬。 -->
+          <div class="dsec" data-at="ok">
+            <div class="dsec-t">投递怎么走</div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">第 1 步</span><span class="v">扫码用手机打开来源平台的这条岗位页</span></div>
+              <div class="kv-row"><span class="k">第 2 步</span><span class="v">在来源平台登录你自己的账号，按它的流程办理</span></div>
+              <div class="kv-row"><span class="k">第 3 步</span><span class="v">结果与面试邀约都在来源平台查——<b>本机不知道结果，也不该知道</b></span></div>
+              <div class="kv-row"><span class="k">想暂缓</span><span class="v">先收藏或打印带走；岗位若被下架，本机会如实标注</span></div>
+            </div>
+          </div>
+
+          <!-- expired 态换成「这条记录怎么处理」：已下架就没有投递这一步，
+               此时用户真正要知道的是这条记录会怎样、收藏还在不在。 -->
+          <div class="dsec" data-at="expired">
+            <div class="dsec-t">下架后这条记录怎么处理</div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">判定依据</span><span class="v">最近一次与来源核对时，该岗位状态已变为「下架」</span></div>
+              <div class="kv-row"><span class="k">下架原因</span><span class="v">来源平台不提供——招满、撤销还是改招，本机不猜</span></div>
+              <div class="kv-row"><span class="k">你若收藏过</span><span class="v">收藏保留，并标注「已下架」</span></div>
+              <div class="kv-row"><span class="k">这页快照</span><span class="v">本次会话结束即清，不再展示</span></div>
+            </div>
+          </div>
         </div>
 
         <!-- ════ 第二屏 ════ -->
-
-        <!-- 福利与工作时间：两行摘要，完整可展开 -->
-        <details class="fold" data-at="ok expired">
-          <summary>福利与工作时间<span class="fold-sub">五险一金 · 双休 · 09:30–18:30</span></summary>
-          <div class="fold-b">
-            五险一金 · 带薪年假 · 周末双休 · 09:30–18:30 · 节日福利。
-            以上为来源平台展示内容，本机<b>未做核实</b>；具体以你与用人单位签订的书面约定为准。
-          </div>
-        </details>
 
         <!-- 三个入口：岗位匹配参考（原位展开）/ 打印 / 查看企业 -->
         <div class="entries" data-at="ok">
@@ -325,16 +389,12 @@
 
         <!-- 边界口径：四段合并成一个折叠区，原文一字不删，只是默认不占屏 -->
         <details class="fold" data-at="ok">
-          <summary>本机的边界：数据来源 · 投递怎么走 · 记录什么 · 哪些没核实</summary>
+          <summary>本机的边界：数据来源 · 记录什么 · 哪些没核实</summary>
           <div class="fold-b">
             <b>数据来源。</b>本机<b>不是</b>该岗位的发布方，也不代该企业收取简历。岗位内容由来源机构提供并经管理员审核后展示；
             如内容与来源平台不一致，以来源平台为准。
-            <div class="kv">
-              <div class="kv-row"><span class="k">第 1 步</span><span class="v">扫码用手机打开来源平台的这条岗位页</span></div>
-              <div class="kv-row"><span class="k">第 2 步</span><span class="v">在来源平台登录你自己的账号，按它的流程办理</span></div>
-              <div class="kv-row"><span class="k">第 3 步</span><span class="v">结果与面试邀约都在来源平台查——<b>本机不知道结果，也不该知道</b></span></div>
-              <div class="kv-row"><span class="k">想暂缓</span><span class="v">先收藏或打印带走；岗位若被下架，本机会如实标注</span></div>
-            </div>
+            <!-- 2026-08-11：原来放在这里的投递三步已移到上方「投递怎么走」常驻卡，
+                 折叠里不再重复一遍。 -->
             <b>记录什么。</b>只记两件事：你看过这个岗位、你打开过来源平台；<b>不记录你投没投、投没投成</b>。
             这一步本机<b>不上传、不转交你的简历</b>；匹配参考只在你本人的服务里处理，不给企业。
             想带一份纸质版去面试可以在本机打印——那是打印服务，不是投递。
@@ -344,14 +404,12 @@
         </details>
 
         <details class="fold" data-at="expired">
-          <summary>下架怎么判定的 · 这条记录怎么处理 · 多防一手</summary>
+          <summary>浏览记录怎么留 · 多防一手</summary>
           <div class="fold-b">
+            <!-- 2026-08-11：判定依据 / 下架原因 / 你若收藏过 / 这页快照 已移到上方
+                 「下架后这条记录怎么处理」常驻卡，这里只留浏览记录与防骗提醒。 -->
             <div class="kv">
-              <div class="kv-row"><span class="k">判定依据</span><span class="v">最近一次与来源核对时，该岗位状态已变为「下架」</span></div>
-              <div class="kv-row"><span class="k">下架原因</span><span class="v">来源平台不提供——招满、撤销还是改招，本机不猜</span></div>
               <div class="kv-row"><span class="k">你的浏览记录</span><span class="v">登录后保留在岗位页；未登录只留本次会话</span></div>
-              <div class="kv-row"><span class="k">你若收藏过</span><span class="v">收藏保留，并标注「已下架」</span></div>
-              <div class="kv-row"><span class="k">这页快照</span><span class="v">本次会话结束即清，不再展示</span></div>
             </div>
             扫码与来源平台入口<b>已关闭</b>——留着按钮让你白跑一趟，不如直接说没了。
             有人以这个岗位名义联系你，先在来源平台核对是否真的在招。

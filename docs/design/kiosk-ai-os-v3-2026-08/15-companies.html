@@ -130,11 +130,21 @@
   }
   .cband .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
   .cband b { color: var(--fog-900); }
-  .duo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); }
+  /* ── 2026-08-11 卡内空洞整改 ─────────────────────────────────────────
+     原来 .duo 挂 flex:1 去吃余量：企业简介只有一句话、经营资质只有三个格子，
+     两张卡各被撑到 539px，卡里空 380px（metricsoff 态最坏）。
+     余量给错了人 —— 本页的主内容不是这两张说明卡，是「在招岗位」：
+     动作条的主按钮就写着「看在招岗位」，而那张卡当时只列 2 条，
+     自己还挂着一句「完整 6 条在下面…里逐条列出」的静默截断说明。
+     （页面另一处 AI 文案已经在说「上面 6 个在招岗位照常可看」，与事实不符。）
+     改法：.duo 改为按内容收高，余量全部转给在招岗位那张卡，六条全列。
+     六条的岗位名 / 薪资 / 外部 ID 都来自本页已有数据（下方比对块逐条列着），
+     没有新编任何一条。 */
+  .duo { flex: 0 0 auto; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); align-items: start; }
   .duo .dsec { padding: var(--s-5); border-radius: var(--r-sm);
     background: var(--surf-1); border: 1px solid var(--brd-1); }
   .dsec-t { font-size: 20px; color: var(--fog-600); letter-spacing: .14em; }
-  .duo .dsec-body { font-size: 22px; line-height: 1.55; }
+  .duo .dsec-body { font-size: 24px; line-height: 1.6; }
 
   .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
   .metric {
@@ -147,10 +157,16 @@
   .metric-off { border-style: dashed; opacity: .72; }
   .metric-off b { color: var(--fog-600); font-size: 22px; }
 
-  /* 在招岗位：紧凑行 */
+  /* 在招岗位：本页主内容，承接 .duo 让出来的余量 */
+  .dsec--jobs { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .dsec--jobs .jmini { flex: 1 1 auto; min-height: 0; }
   .jmini { display: flex; flex-direction: column; gap: 10px; }
+  /* 六行平分 .jmini 的高度：min-height 取 56（>48 触控下限，且 detail 态
+     .duo 更高、留给列表的只有 410px 时六行仍放得下），行再按余量长高 ——
+     既填满，也不会把末尾那行来源说明顶到行上面去。 */
   .jm {
-    display: flex; align-items: center; gap: var(--s-4); min-height: 96px; padding: 0 var(--s-5);
+    flex: 1 1 auto; display: flex; align-items: center; gap: var(--s-4);
+    min-height: 56px; padding: 0 var(--s-5);
     border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
     text-decoration: none; color: inherit;
   }
@@ -568,24 +584,44 @@
           </div>
         </div>
 
-        <div class="dsec">
+        <!-- 2026-08-11：这张卡改为承接余量的主卡，六条全列（原来只列 2 条 +
+             一句「完整 6 条在下面…」的截断说明）。六条的岗位名 / 薪资 / 外部 ID
+             与下方比对块逐字一致，同来源同同步时间，统一写在列表末尾一行。 -->
+        <div class="dsec dsec--jobs">
           <div class="dsec-t">在招岗位 · 6 个</div>
           <div class="jmini">
             <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">用户运营专员</span><span class="jm-m">天河区 · 1–3 年 · 本科 · 来源 前程无忧 · 外部 ID JX-88214 · 同步 09:20</span></span>
+              <span class="jm-x"><span class="jm-t">用户运营专员</span><span class="jm-m">天河区 · 1–3 年 · 本科 · 外部 ID JX-88214</span></span>
               <span class="jm-p">6–9K</span>
               <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
             </a>
             <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">前端开发工程师</span><span class="jm-m">天河区 · 3–5 年 · 本科 · 来源 前程无忧 · 外部 ID JX-88301 · 同步 09:20</span></span>
+              <span class="jm-x"><span class="jm-t">社群运营专员</span><span class="jm-m">外部 ID JX-88266</span></span>
+              <span class="jm-p">5–8K</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">客户成功运营</span><span class="jm-m">外部 ID JX-88240</span></span>
+              <span class="jm-p">8–12K</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">企业服务销售</span><span class="jm-m">外部 ID JX-88352</span></span>
+              <span class="jm-p">6–10K + 提成</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">前端开发工程师</span><span class="jm-m">天河区 · 3–5 年 · 本科 · 外部 ID JX-88301</span></span>
               <span class="jm-p">12–18K</span>
               <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
             </a>
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">测试工程师</span><span class="jm-m">外部 ID JX-88318</span></span>
+              <span class="jm-p">9–14K</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
           </div>
-          <!-- 标题写「6 个」却只列 2 条，是本页原有的静默截断。下面那块
-               「哪几个对得上我的简历」正好逐条列全了 6 条，把两处接上，
-               别让用户以为另外 4 条不存在。 -->
-          <p class="jfitnote">这里先列 2 条；<b>完整 6 条</b>在下面「这 6 个在招岗位，哪几个对得上我的简历」里逐条列出。</p>
+          <p class="jfitnote">六条同来源：<b>来源机构 前程无忧 · 同步时间 2026-08-08 09:20</b>，外部 ID 见各行。经验与学历只显示来源方给了的那几条，<b>没给的不替它补</b>。</p>
         </div>
 
         <!-- 第二屏入口：岗位对得上吗（AI · 原位展开）/ 信息导读（静态）/ 打印 / 招聘会展位 -->
