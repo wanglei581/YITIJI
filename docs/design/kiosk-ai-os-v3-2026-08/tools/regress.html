@@ -298,8 +298,24 @@ function discoverAxes (win) {
     }
   })
 
+  /* 默认阶段必须是第 1 步。
+     实测栽过：07 扫描台的 .screen 上写死 data-stage="s3"，s3 是「正在扫描」——
+     用户从打印扫描首屏点「材料扫描」进来，屏幕上直接是扫描中途。
+     全站 34 个多阶段页里有 5 页是这样，全都停在设计时最后调试的那一步。
+     阶段轨的第一个 [data-go] 就是第 1 步（与 stage.js 的 stageList() 同口径）。 */
+  var rail = doc.querySelector('.rail, .spine-rail, [data-rail]')
+  var railOrder = []
+  ;(rail || doc).querySelectorAll('[data-go]').forEach(function (el) {
+    var v = el.getAttribute('data-go')
+    if (v && stages.indexOf(v) > -1 && railOrder.indexOf(v) < 0) railOrder.push(v)
+  })
+  var declared = screen.getAttribute('data-stage') || ''
+  var defaultNotFirst = (rail && railOrder.length && declared && declared !== railOrder[0])
+    ? { declared: declared, shouldBe: railOrder[0] } : null
+
   return { stages: stages, axes: axes, suspicious: suspicious,
-           hasStage: screen.hasAttribute('data-stage') }
+           hasStage: screen.hasAttribute('data-stage'),
+           defaultNotFirst: defaultNotFirst }
 }
 
 /* ── 组合枚举 ──────────────────────────────────────────────
@@ -417,6 +433,36 @@ function auditOcclusion (win) {
   return out
 }
 
+/* ── 从审计返回值里收集缺陷 ────────────────────────────────────────
+   一开始我只数了**顶层的数字键**。而 v3AuditPlus() 的返回里
+   「版面留白 / 内部裁切 / 联动接线 / 假入口 / 主区空壳 / 卡内溢出」是嵌套对象，
+   「违禁文案 / 量化红线 / 来源三字段缺」是数组 —— 全被跳过了。
+   于是全站报「0 缺陷」，而 04 那一屏其实写着「右栏底部空 676px」。
+
+   这是今天第二次栽在同一件事上（上一次是 stage.js 的 audit() 忘了 return）：
+   **检测器自己必须被检测。** 现在改成递归走完整棵树，
+   数字 > 0、非空数组，一律算缺陷。 */
+function collectDefects (node, path, out, combo) {
+  if (node === null || node === undefined) return
+  if (typeof node === 'number') {
+    if (node > 0) out.push({ combo: combo, check: path, value: node })
+    return
+  }
+  if (Array.isArray(node)) {
+    if (node.length) out.push({ combo: combo, check: path, value: node.length,
+      detail: JSON.stringify(node).slice(0, 200) })
+    return
+  }
+  if (typeof node === 'object') {
+    Object.keys(node).forEach(function (k) {
+      /* 「明细」是上面那个计数的证据，不重复计一次 */
+      if (k === '明细') return
+      if (k === 'screen') return
+      collectDefects(node[k], path ? path + '·' + k : k, out, combo)
+    })
+  }
+}
+
 function comboLabel (c) {
   var s = c.state + (c.stage ? '/' + c.stage : '')
   for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
@@ -520,6 +566,11 @@ async function runAll (only) {
       var disc = discoverAxes(win)
       if (disc.error) { rec.error = disc.error; log(name + '  ✗ ' + disc.error, 'bad'); RESULT.pages.push(rec); continue }
       rec.suspicious = disc.suspicious
+      if (disc.defaultNotFirst) {
+        rec.defects.push({ combo: '（页面默认）', check: '打开就落在流程中途', value: 1,
+          detail: '.screen 写死 data-stage="' + disc.defaultNotFirst.declared
+                + '"，而第 1 步是 "' + disc.defaultNotFirst.shouldBe + '"' })
+      }
 
       var cb = buildCombos(disc, win)
       rec.combos = cb.ran; rec.fullCombos = cb.full; rec.sampled = cb.sampled
@@ -530,10 +581,7 @@ async function runAll (only) {
         if (j && j % 20 === 0) await new Promise(function (r) { setTimeout(r, 0) })
         var out = runCombo(win, cb.list[j])
         if (out && typeof out === 'object') {
-          Object.keys(out).forEach(function (k) {
-            var v = out[k]
-            if (typeof v === 'number' && v > 0) rec.defects.push({ combo: comboLabel(cb.list[j]), check: k, value: v })
-          })
+          collectDefects(out, '', rec.defects, comboLabel(cb.list[j]))
         } else if (out === undefined || out === null) {
           rec.defects.push({ combo: comboLabel(cb.list[j]), check: '审计没有返回值', value: 1 })
         }

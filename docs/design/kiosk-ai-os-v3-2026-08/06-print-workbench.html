@@ -256,7 +256,12 @@
 
      没写 data-guard-keep：本页的「存我的文档」只在 device-off 态出现，
      默认态没有这个落点。给一个不一定存在的「存下来再走」按钮就是伪造能力。 -->
-<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm"
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s3"（参数核价）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「参数核价」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-pay="wait" data-job="printing" data-theme="warm"
      data-guard-at="s2 s3 s4"
      data-guard-lose-s2="已经带进来的文件、材料体检结果，以及你刚做的遮盖"
      data-guard-lose-s3="已经带进来的文件、体检结果和你调好的打印参数"
