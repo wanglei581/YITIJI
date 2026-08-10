@@ -165,7 +165,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 .qcard:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
 .qc-ic { width: 40px; height: 40px; border-radius: var(--r-xs); flex: 0 0 auto; display: grid; place-items: center; background: var(--surf-2); }
 .qc-ic .ic { width: 20px; height: 20px; color: var(--fog-700); }
-.qc-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.qc-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.qc-h { display: flex; align-items: center; gap: var(--s-3); }
 .qc-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
 .qc-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
 .qc-x { margin-left: auto; flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: var(--fz-1); letter-spacing: .02em; }
@@ -199,10 +200,10 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default"><span class="dot dot--live"></span>本机服务配置已读取 · 硬件状态提交前再确认</div>
-    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能打印 · 记录留不下</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 打印扫描照常出纸</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>服务状态无法确认 · 暂不开放任务</div>
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>本机服务配置已读取</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能打 · 记录留不下</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 打印照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>服务状态无法确认</div>
     <div class="clock" data-clock>2026年8月10日 <b>14:30</b></div>
   </header>
 
@@ -466,14 +467,14 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-ds" data-when="device-off">当前无法确认设备能力</span>
 
         <span class="stg" data-when="default first ai-down">
-          <span><i>打印机</i>按后台 printerName 配置</span>
-          <span><i>纸张</i>A4 · 提交任务前确认</span>
-          <span><i>耗材</i>提交任务前确认</span>
-          <span><i>双面</i>配置声明支持 · 出纸前确认</span>
-          <span><i>输稿器</i>配置声明支持 · 扫描前确认</span>
-          <span><i>打印费用</i>预估 · 以打印工作台核价为准</span>
+          <span><i>打印机</i>后台配置</span>
+          <span><i>纸张</i>A4</span>
+          <span><i>耗材</i>提交前确认</span>
+          <span><i>双面</i>配置支持</span>
+          <span><i>输稿器</i>配置支持</span>
+          <span><i>费用</i>预估核价</span>
         </span>
-        <span class="stnote" data-when="default first ai-down">打印、扫描与材料处理入口按本机配置开放。<b>未确认能力不会创建正式打印或扫描任务</b>。</span>
+        <span class="stnote" data-when="default first ai-down">打印、扫描与材料处理入口按本机配置开放；纸张、耗材、双面与输稿器状态在提交任务前确认。<b>未确认能力不会创建正式打印或扫描任务</b>。</span>
 
         <span class="stnote" data-when="device-off">未取得本机打印扫描能力配置 —— 打印机、纸张、耗材、双面与输稿器的状态<b>本机现在都读不到</b>，所以一项也不敢说正常。<b>未确认能力不会创建正式打印或扫描任务</b>；费用一律预估，以打印工作台核价为准。</span>
         <span class="hc-ft" data-when="device-off"><span class="chip chip--info">用上面的「重新检测」再试一次</span></span>
@@ -490,18 +491,24 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     <div class="qrow">
       <a class="qcard" href="23-me.html">
         <span class="qc-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
-        <span class="qc-b"><span class="qc-t">我的文档</span><span class="qc-s">查看已上传 / 生成的文件</span></span>
-        <span class="chip chip--info qc-x">不依赖 AI</span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">我的文档</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">查看已上传 / 生成的文件</span>
+        </span>
       </a>
       <a class="qcard" href="23-me.html">
         <span class="qc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
-        <span class="qc-b"><span class="qc-t">打印订单</span><span class="qc-s">查看任务状态与取件凭证码</span></span>
-        <span class="chip chip--info qc-x">不依赖 AI</span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">打印订单</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">查看任务状态与取件凭证码</span>
+        </span>
       </a>
       <a class="qcard" href="23-me.html">
         <span class="qc-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
-        <span class="qc-b"><span class="qc-t">异常反馈</span><span class="qc-s">打印 / 扫描遇到问题在此反馈</span></span>
-        <span class="chip chip--info qc-x">不依赖 AI</span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">异常反馈</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">打印 / 扫描遇到问题在此反馈</span>
+        </span>
       </a>
     </div>
 
