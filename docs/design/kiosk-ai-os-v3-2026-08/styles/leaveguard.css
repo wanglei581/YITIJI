@@ -1,0 +1,86 @@
+/* ============================================================
+   V3 · 离场确认（LeaveGuard）
+   ------------------------------------------------------------
+   触控尺寸按 CLAUDE.md §9：主要按钮 ≥56px，可点区域 ≥48px。
+   关闭态只用 hidden（base.css 里是 display:none !important），
+   一切矩形为 0，审计的溢出与触控检查都会跳过。
+
+   配色刻意不用红：这不是错误，是一次确认。
+   把它做成红色警告，用户会以为自己弄坏了什么。
+   ============================================================ */
+
+.lg-mask {
+  position: fixed; inset: 0; z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  background: rgba(6, 10, 14, .62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.lg-box {
+  width: min(760px, 100%);
+  padding: 34px 34px 28px;
+  border-radius: 22px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line, rgba(0, 0, 0, .1));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .34);
+}
+
+.lg-hd { display: flex; align-items: center; gap: 12px; margin: 0 0 14px }
+.lg-hd b { font-size: 30px; line-height: 1.35; font-weight: 700; color: var(--ink-900, #10171d) }
+
+.lg-ic {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 12px;
+  background: var(--amber-100, #fdf0d5);
+  border: 1px solid var(--amber-300, #f0d29a);
+  position: relative;
+}
+.lg-ic::after {
+  content: ''; position: absolute; left: 50%; top: 10px;
+  width: 3px; height: 13px; margin-left: -1.5px; border-radius: 2px;
+  background: var(--amber-700, #a2701d);
+  box-shadow: 0 17px 0 0 var(--amber-700, #a2701d);
+}
+
+/* 「丢的是什么」是这个弹层存在的理由，字号要压得住 */
+.lg-lose {
+  margin: 0 0 24px; font-size: 22px; line-height: 1.6;
+  color: var(--ink-600, #46545f);
+}
+.lg-lose b { color: var(--ink-900, #10171d); font-weight: 700 }
+
+.lg-acts { display: flex; flex-direction: column; gap: 12px }
+
+.lg-btn {
+  min-height: 60px; padding: 0 22px;
+  border-radius: 14px; font-size: 21px; font-weight: 600;
+  border: 1px solid var(--line, rgba(0, 0, 0, .12));
+  background: var(--surface-2, #f4f6f8);
+  color: var(--ink-900, #10171d);
+  cursor: pointer;
+}
+.lg-btn:active { transform: translateY(1px) }
+
+/* 默认动作是「留下」—— 误触时最不容易造成损失，所以它最显眼 */
+.lg-stay {
+  background: var(--brand-600, #12776a);
+  border-color: transparent;
+  color: #fff;
+}
+.lg-keep { background: var(--surface-2, #f4f6f8) }
+
+/* 「直接离开」不做成红色按钮，但也不能和其它两个一样重 —— 降到文字级 */
+.lg-go {
+  background: transparent; border-color: transparent;
+  color: var(--ink-500, #64727d); font-weight: 500;
+  text-decoration: underline; text-underline-offset: 4px;
+}
+
+@media (max-width: 480px) {          /* 05 手机接力页 */
+  .lg-mask { padding: 20px }
+  .lg-box { padding: 24px 20px 20px; border-radius: 18px }
+  .lg-hd b { font-size: 22px }
+  .lg-lose { font-size: 16px; margin-bottom: 18px }
+  .lg-btn { min-height: 52px; font-size: 16px }
+}
