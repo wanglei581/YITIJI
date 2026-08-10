@@ -20,9 +20,9 @@
 <link rel="stylesheet" href="styles/notebar.css?v=2">
 <style>
 /* ── P04 系统态 ─────────────────────────────────────────────────────────
-   一页五形态：帮助 / 法务 / 会话超时 / 断网异常 / 会话恢复。
-   共同点是它们都在**用户没打算来这里的时候**出现 ——
-   要么他卡住了，要么系统出事了。所以五形态共用一条纪律：
+   一页六站：帮助 / 法务 / 会话超时 / 断网 / 会话恢复 / 异常处置总目录。
+   前五站的共同点是它们都在**用户没打算来这里的时候**出现 ——
+   要么他卡住了，要么系统出事了。所以它们共用一条纪律：
 
      **先说现在能做什么，再说发生了什么。**
 
@@ -40,103 +40,232 @@
      不说清会让人以为整台机器废了。
    · 会话恢复 —— 恢复是好意，但**必须先问**。
      公共机器上，上一个人的东西不该直接出现在下一个人眼前。
+   · 异常处置 —— 不是第六种形态，是 P40 / P41 两组系统态的**总目录**。
 
-   ── 结构 ────────────────────────────────────────────────────────
-   本页用标准两栏骨架，audit-plus 五项全部适用。
+   ── 2026-08-11 版式改动：两栏 → 单栏 ──────────────────────────────
+   不是"想换个样子"。work.css 在文件头就写明两栏骨架（1fr + 348px）是给
+   「有文件的页」用的：左栏放文件预览、右栏收参数。**本页一个文件都没有**，
+   左栏是说明文字、右栏是几行 kv —— 模板从一开始就不对。
+   后果是实测数据：24 个「态 × 阶段」组合里 15 个命中「主栏留白过大」，
+   全部在右栏，底部裸露 395 / 527 / 623 / 626 / 676px。左栏其实同样空，
+   只是页脚折叠条把栏底占住了，检测器量不到 —— 肉眼一看就知道更严重。
+
+   为什么不是"把右栏塞满"：348px 宽的栏要吃掉 600px 的说明文字，只能靠
+   小字 + 密行。用户是**站在 27 寸竖屏前**看这一页的，那样做比留白更糟。
+
+   所以改单栏：主内容拉到 968px 宽，图标 112px、标题 42px、正文 19–21px；
+   原右栏的卡片降级成主区下方的 2 列信息格；页脚抽屉里**当前这一站真正
+   需要**的那几段（为什么会清空 / 恢复为什么要先问 / 不点同意也能用 /
+   断网时 AI 为什么停）搬回常驻，抽屉只留全页通用的那几条。
+   没有新增任何设备数据、状态数字或装饰块 —— 填满靠的是放大和搬回，
+   不是填充物。
+
+   ── 边界（这一条不许动）─────────────────────────────────────────
+   这一页列的是这些情况**长什么样**，不是本机现在的状态。
+   放大之后这句话更要说在前面：版面越大越像仪表盘，越容易被当成实时状态。
+   所以它从页脚抽屉里搬到了**顶部常驻条**，六站全程可见，
+   s6 那条 amber 提示同时保留 —— 合规边界重复写不算冗余。
    ──────────────────────────────────────────────────────────────── */
 
-.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
-           gap:var(--s-4); padding-bottom:var(--s-6); }
+/* ══════════ 版式骨架：单栏 ══════════ */
+.work { grid-template-columns: 1fr; }
 
-/* 大状态头：出事时第一眼看到的东西 */
-.bighead { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
-.bh-ic { width:66px; height:66px; border-radius:var(--r-md); display:grid; place-items:center; }
-.bh-ic .ic { width:32px; height:32px; }
-.bh--warn .bh-ic { background:var(--amber-a12); border:1px solid var(--amber-a20); }
-.bh--warn .bh-ic .ic { color:var(--amber-400); }
-.bh--calm .bh-ic { background:var(--jade-a12); border:1px solid var(--jade-a32); }
-.bh--calm .bh-ic .ic { color:var(--jade-400); }
-.bh-t { font-size:38px; font-weight:800; color:var(--fog-900); line-height:1.18; }
-.bh-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.62; max-width:32em; }
-.bh-p b { color:var(--fog-900); }
+/* 常驻边界条：这一页怎么出现的 + 它不是什么。
+   高度必须压在 160px 上下 —— 它每一站都在，多占 40px 就是六站各少 40px。 */
+.bound {
+  flex: 0 0 auto;
+  display: grid; grid-template-columns: 1fr 300px; gap: var(--s-5);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+}
+.bound-hd { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); }
+.bound-hd .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+.bound-hd b { font-size: var(--fz-4); color: var(--fog-900); font-weight: 700; }
+.bound-hd span { margin-left: auto; font-size: var(--fz-2); color: var(--fog-600); }
+.bound-p { font-size: var(--fz-4); color: var(--fog-700); line-height: 1.65; }
+.bound-p b { color: var(--fog-900); }
+.bound-x {
+  display: flex; gap: var(--s-3); align-items: flex-start;
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+  background: var(--amber-a12); border: 1px solid var(--amber-a20);
+  font-size: var(--fz-3); line-height: 1.66; color: var(--amber-200);
+}
+.bound-x .ic { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 2px; color: var(--amber-400); }
+.bound-x b { color: var(--fog-900); }
+
+/* 一站 = 大状态头 + 主内容 + 信息格 */
+.stagebox { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+
+/* 大状态头：出事时第一眼看到的东西。横排，图标 96 / 标题 38 / 正文 20。
+   三个数都落在复核意见给的区间里（图标 96–120 / 标题 36–44 / 正文 20–22），
+   取下限是因为下面还有真内容要放 —— 头再大就要靠滚动才能看全，那是另一种"看不到"。 */
+.hero {
+  flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-6);
+  padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+}
+.hero-ic { width: 96px; height: 96px; flex: 0 0 auto; border-radius: var(--r-lg);
+  display: grid; place-items: center; }
+.hero-ic .ic { width: 46px; height: 46px; }
+.hero--warn .hero-ic { background: var(--amber-a12); border: 1px solid var(--amber-a20); }
+.hero--warn .hero-ic .ic { color: var(--amber-400); }
+.hero--calm .hero-ic { background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+.hero--calm .hero-ic .ic { color: var(--jade-400); }
+.hero-b { min-width: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.hero-t { font-size: 38px; font-weight: 800; color: var(--fog-900); line-height: 1.2; }
+.hero-p { font-size: 20px; color: var(--fog-700); line-height: 1.66; }
+.hero-p b { color: var(--fog-900); }
+
+/* 主内容区。overflow-y:auto 是安全阀不是设计：六站内容量差一倍多，
+   任何一站超了都必须能滚到，绝不允许被 .wmain 的 overflow:hidden 吃掉。
+   调版时的目标是每一站 scrollHeight === clientHeight（实测已达成）。 */
+.body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--s-5);
+  /* 各站内容量差着一截（s3 比 s1 少约 120px）。space-between 让这点差额
+     摊到块与块之间变成行距，而不是全堆在卡片底部变成一条空带。
+     内容溢出时它自动失效，不会掩盖真溢出。 */
+  justify-content: space-between;
+  padding: var(--s-6) var(--s-7); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+}
+.body::-webkit-scrollbar { width: 8px; }
+.body::-webkit-scrollbar-thumb { background: var(--surf-3); border-radius: 4px; }
+
+/* 信息格：原右侧栏的卡片，改成主区下方 2–3 列。
+   这一层刻意**不跟主内容一起放大到 20px**：整页可用面积是 968×1456，
+   把主内容 + 说明卡全部放大 30%，总量会超出一屏 300–450px（实测），
+   只能靠滚动补 —— 那等于把"看不到"从留白换成了折叠。
+   所以分两级：英雄区与主内容放大（20–38px），说明卡守在 16–18px。 */
+.igrid { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.igrid--3 { grid-template-columns: repeat(3, 1fr); }
+.icard {
+  display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+}
+.icard--wide { grid-column: 1 / -1; }
+.icard-hd { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.icard-hd .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+.icard-hd b { font-size: var(--fz-4); color: var(--fog-900); font-weight: 700; }
+.icard-hd span { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); }
+.icard-p { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.68; }
+.icard-p b { color: var(--fog-900); }
+.icard .kv-row { font-size: var(--fz-3); min-height: 48px; }
+.icard .notice { font-size: var(--fz-3); line-height: 1.6; padding: var(--s-3) var(--s-4); }
+.icard .notice .ic { width: 20px; height: 20px; }
+
+/* ══════════ 各站主内容（全部按 968px 宽重新定尺）══════════ */
 
 /* 求助路径：三条，每条给可执行动作 */
-.helps { display:flex; flex-direction:column; gap:var(--s-3); }
-.help { display:flex; align-items:flex-start; gap:var(--s-5); padding:var(--s-5);
-  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); }
-.help-no { width:38px; height:38px; border-radius:50%; flex:0 0 auto; display:grid;
-  place-items:center; background:var(--jade-a20); color:var(--jade-200);
-  font-size:var(--fz-4); font-weight:800; font-family:var(--ff-num); }
-.help-b { min-width:0; display:flex; flex-direction:column; gap:4px; }
-.help-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
-.help-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
-.help-s b { color:var(--fog-900); }
+/* helps 是 s1 主区里唯一的块：不让它跟着长，body 的 space-between 就没东西可摊，
+   富余会全部堆到卡片底部变成一条空带 —— 那正是这次要修的毛病。 */
+.helps { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--s-4);
+  justify-content: space-between; }
+.help { display: flex; align-items: flex-start; gap: var(--s-5); padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-md); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.help-no { width: 52px; height: 52px; border-radius: 50%; flex: 0 0 auto; display: grid;
+  place-items: center; background: var(--jade-a20); color: var(--jade-200);
+  font-size: var(--fz-6); font-weight: 800; font-family: var(--ff-num); }
+.help-b { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.help-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); }
+.help-s { font-size: 19px; color: var(--fog-700); line-height: 1.7; }
+.help-s b { color: var(--fog-900); }
 
 /* 法务：五条最要紧的，先于全文 */
-.legal { display:flex; flex-direction:column; gap:var(--s-3); }
-.lg { display:grid; grid-template-columns:26px 1fr; gap:var(--s-4); align-items:start;
-  padding:var(--s-4) var(--s-5); border-radius:var(--r-xs);
-  background:var(--surf-1); border:1px solid var(--brd-1); }
-.lg i { width:9px; height:9px; border-radius:50%; background:var(--jade-500);
-  margin-top:9px; display:block; }
-.lg-t { font-size:var(--fz-3); color:var(--fog-800); line-height:1.6; }
-.lg-t b { color:var(--fog-900); }
+/* 同 .helps：五条法务要点是 s2 的主体，让它跟着长，
+   富余变成条与条之间的行距，而不是压在末尾那句注脚上面的一条空带。 */
+.legal { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--s-2);
+  justify-content: space-between; }
+.lg { display: grid; grid-template-columns: 30px 1fr; gap: var(--s-4); align-items: start;
+  padding: var(--s-3) var(--s-5); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.lg i { width: 11px; height: 11px; border-radius: 50%; background: var(--jade-500);
+  margin-top: 10px; display: block; }
+.lg-t { font-size: 19px; color: var(--fog-800); line-height: 1.62; }
+.lg-t b { color: var(--fog-900); }
 
 /* 倒计时 */
-.tick { display:flex; align-items:center; gap:var(--s-5); padding:var(--s-6) var(--s-5);
-  border-radius:var(--r-md); background:var(--amber-a12); border:1px solid var(--amber-a20); }
-.tick-n { font-size:76px; font-weight:800; font-family:var(--ff-num); color:var(--fog-900);
-  line-height:1; font-variant-numeric:tabular-nums; }
-.tick-b { min-width:0; display:flex; flex-direction:column; gap:4px; }
-.tick-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
-.tick-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+/* 倒计时是这一站唯一的主体，数字给到 120px：用户要在两三米外一眼读到还剩多久 */
+.tick { display: flex; align-items: center; gap: var(--s-8); padding: var(--s-7);
+  border-radius: var(--r-md); background: var(--amber-a12); border: 1px solid var(--amber-a20); }
+.tick-n { font-size: 120px; font-weight: 800; font-family: var(--ff-num); color: var(--fog-900);
+  line-height: 1; font-variant-numeric: tabular-nums; }
+.tick-b { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.tick-t { font-size: var(--fz-7); font-weight: 700; color: var(--fog-900); }
+.tick-s { font-size: 19px; color: var(--fog-700); line-height: 1.6; }
 
 /* 还能用 / 用不了 两栏 */
-.split { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
-.sp { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
-.sp--ok { background:var(--jade-a12); border:1px solid var(--jade-a32); }
-.sp--no { background:var(--fog-a04); border:1px dashed var(--fog-a20); }
-.sp-hd { display:flex; align-items:center; gap:var(--s-3); }
-.sp-hd .ic { width:19px; height:19px; flex:0 0 auto; }
-.sp--ok .sp-hd .ic { color:var(--jade-400); }
-.sp-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
-.sp-i { display:grid; grid-template-columns:13px 1fr; gap:var(--s-3); align-items:start;
-  font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
-.sp-i i { width:6px; height:6px; border-radius:50%; margin-top:7px; flex:0 0 auto;
-  background:var(--fog-a20); display:block; }
-.sp--ok .sp-i i { background:var(--jade-500); }
-.sp-i b { color:var(--fog-900); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.sp { padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+  display: flex; flex-direction: column; gap: var(--s-4); }
+.sp--ok { background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+/* 2026-08-11 修：原来写的是 var(--fog-a04) / var(--fog-a20)，tokens.css 里**没有这两个变量**
+   （全站只有 pay.css 也误用了 --fog-a04）。未定义变量会让整条 background / border 声明
+   在计算时作废，于是「清空会没掉的」「现在用不了」两块既没有底也没有边，
+   连列表圆点都是透明的 —— 看上去就是一段悬空的字，正好被当成"这里空着"。
+   改用已定义令牌，语义不变：弱底 + 虚线描边表示"不可用/会失去"。 */
+.sp--no { background: var(--surf-1); border: 1px dashed var(--brd-2); }
+.sp-hd { display: flex; align-items: center; gap: var(--s-3); }
+.sp-hd .ic { width: 24px; height: 24px; flex: 0 0 auto; }
+.sp--ok .sp-hd .ic { color: var(--jade-400); }
+.sp-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); }
+.sp-i { display: grid; grid-template-columns: 15px 1fr; gap: var(--s-4); align-items: start;
+  font-size: 19px; color: var(--fog-700); line-height: 1.62; }
+.sp-i i { width: 8px; height: 8px; border-radius: 50%; margin-top: 9px; flex: 0 0 auto;
+  background: var(--fog-600); display: block; }   /* 同上：--fog-a20 未定义，圆点是透明的 */
+.sp--ok .sp-i i { background: var(--jade-500); }
+.sp-i b { color: var(--fog-900); }
 
-/* ── 2026-08-10 补：本机状态与异常处置（s6） ─────────────────────────────
-   P40 会话与安全（6 态）、P41 履约异常（8 态）和本页一样，都是**系统事件**推过来的：
-   没人会在首页点「我要支付失败」。所以它们没有产品入口是对的，
-   但「没有产品入口」不等于「不可达」—— 运维要复核话术、演示要按顺序过一遍，
-   现在只能靠手敲网址，这两页在全站的入链数是 0。
-   这一区把两页的 14 个状态逐条列出来并直达对应阶段，位置就放在本页（它本身
-   就是「本机状态」的落脚点，且已经是「我的 · 查看本机状态」的去处）。
-   ────────────────────────────────────────────────────────────────────── */
-.stgrp { display:flex; flex-direction:column; gap:var(--s-3); }
-.stgrp + .stgrp { margin-top:var(--s-5); }
-.stgrp-hd { display:flex; align-items:baseline; gap:var(--s-3); }
-.stgrp-hd b { font-size:var(--fz-4); color:var(--fog-900); font-weight:700; }
-.stgrp-hd span { font-size:var(--fz-1); color:var(--fog-600); }
-.stgrid { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
-.stlink { display:flex; align-items:center; gap:var(--s-4); min-height:var(--touch-min);
-  padding:var(--s-3) var(--s-4); border-radius:var(--r-sm); text-decoration:none;
-  background:var(--surf-1); border:1px solid var(--brd-1);
-  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
-.stlink:hover { border-color:var(--jade-a32); transform:translateY(-1px); }
-.stlink-no { width:28px; height:28px; flex:0 0 auto; border-radius:50%; display:grid;
-  place-items:center; background:var(--surf-3); color:var(--fog-700);
-  font-family:var(--ff-num); font-size:var(--fz-1); }
-.stlink-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
-.stlink-t { font-size:var(--fz-3); color:var(--fog-900); }
-.stlink-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.45; }
-.stlink > .ic { width:17px; height:17px; flex:0 0 auto; color:var(--fog-600); }
+/* 会话恢复：未完成的那件事 */
+.rsm { padding: var(--s-7); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; flex-direction: column; gap: var(--s-5); }
+.rsm-t { font-size: var(--fz-7); font-weight: 700; color: var(--fog-900); }
+.rsm-m { font-size: var(--fz-4); color: var(--fog-600); font-family: var(--ff-num); }
+/* 进度点：把「答完 5 / 8 题」这句已有的话画出来，不是新数据 */
+.rsm-bar { display: flex; align-items: center; gap: var(--s-4); }
+.rsm-dots { display: flex; gap: 10px; }
+.rsm-dots i { width: 34px; height: 12px; border-radius: 999px; background: var(--surf-3); display: block; }
+.rsm-dots i.on { background: var(--jade-500); }
+.rsm-c { font-size: var(--fz-4); color: var(--fog-700); font-family: var(--ff-num); }
+.rsm-c b { color: var(--fog-900); }
+.rsm-p { font-size: 19px; color: var(--fog-700); line-height: 1.7; }
+.rsm-p b { color: var(--fog-900); }
 
-.chip--info { cursor:inherit; }
-.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
-.wside .pane--grow { overflow:hidden; }
+/* 异常处置总目录：P40 / P41 十四个状态 */
+.stgrp { display: flex; flex-direction: column; gap: var(--s-3); }
+/* 两组之间的距离由 .body 的 flex gap 给，这里不再叠 margin —— 叠起来是 40px，
+   等于白吃掉两行链接的高度。 */
+.stgrp-hd { display: flex; align-items: baseline; gap: var(--s-4); }
+.stgrp-hd b { font-size: var(--fz-5); color: var(--fog-900); font-weight: 700; }
+.stgrp-hd span { font-size: var(--fz-2); color: var(--fog-600); }
+/* 列数按条目数选，不图统一 —— 目标是**每一行都排满，不留空格子**：
+   6 条 → 3 列正好 2 行；8 条 → 2 列正好 4 行。
+   反过来（6 条两列 / 8 条三列）都会剩一个空格子，那就是所有者说的
+   「留出空白的地方什么也没有」。
+   14 条全用两列则要 7 行、比现在高 170px，会把下面的信息格挤出屏幕。 */
+.stgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
+.stgrid--2 { grid-template-columns: repeat(2, 1fr); }
+/* 68px 高、整格可点：远高于 CLAUDE.md §9 的 48px 触控下限，
+   两列时单格宽 476px、三列时 312px，都比一根手指宽得多。 */
+.stlink { display: flex; align-items: center; gap: var(--s-4); min-height: 68px;
+  padding: var(--s-2) var(--s-4); border-radius: var(--r-sm); text-decoration: none;
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.stlink:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
+.stlink-no { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid;
+  place-items: center; background: var(--surf-3); color: var(--fog-700);
+  font-family: var(--ff-num); font-size: var(--fz-2); }
+.stlink-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.stlink-t { font-size: var(--fz-4); color: var(--fog-900); }
+.stlink-s { font-size: 14px; color: var(--fog-600); line-height: 1.42; }
+.stlink > .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* 本页的提示条统一放大：站着看 15px 太小 */
+.body .notice { font-size: 19px; line-height: 1.62; padding: var(--s-5) var(--s-6); }
+.body .notice .ic { width: 24px; height: 24px; margin-top: 2px; }
+.body .panel-note { margin-left: 0; font-size: var(--fz-4); line-height: 1.65; }
 </style>
 </head>
 <body>
@@ -182,31 +311,54 @@
   </div>
 
   <div class="work">
-    <!-- ══════════════════ 左主区 ══════════════════ -->
     <div class="wmain">
 
-      <!-- ─────────── S1 帮助 ─────────── -->
-      <div class="pane" data-at="s1">
-        <div class="bighead bh--calm">
-          <span class="bh-ic"><svg class="ic"><use href="#i-help"/></svg></span>
-          <span class="bh-t">卡住了？这里只有三条路</span>
-          <span class="bh-p">
-            现场求助的真实路径就这三条。<b>不列二十条 FAQ</b> ——
-            你现在卡着，没心思翻目录。
-          </span>
+      <!-- ══════════════════ 常驻边界条（六站全程可见）══════════════════
+           左半：这一页怎么出现的 —— 原来在右侧栏第一张卡（无 data-at，本来就全程可见）。
+           右半：它不是什么 —— 原来埋在页脚抽屉「这一区为什么存在」的最后一句。
+           搬到顶部是因为改单栏之后主体被放大了：版面越像仪表盘，越要先说清
+           **这不是本机现在的状态**。这条不许改字。 -->
+      <div class="bound">
+        <div>
+          <div class="bound-hd"><svg class="ic"><use href="#i-alert"/></svg>
+            <b>这一页怎么出现的</b>
+            <!-- 四态只改这一行：首次使用时把本页的写法讲一句，其余三态说清它没有产品入口。
+                 做成同一行的互斥文案而不是多一张卡 —— 多一张卡就要多占 90px 高，
+                 六站每站都得为它让位。 -->
+            <span data-when="default ai-down device-off">系统事件触发 · 首页没有入口</span>
+            <span data-when="first">首次使用 · 先说现在能做什么，再说发生了什么</span></div>
+          <div class="bound-p">
+            五种形态都由<b>系统事件触发</b>：卡纸走帮助、条款更新走法务、无操作满
+            <span data-site-time="hint">3 分钟</span>走会话超时、网络中断走断网、同账号有没做完的事走会话恢复。
+            <b>首页里没有入口</b>；唯一的主动入口是<b>「我的 · 查看本机状态」</b>。
+          </div>
+        </div>
+        <div class="bound-x">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>这一页列的是这些情况<b>长什么样，不是本机现在的状态</b>。真出事时，对应那一页会自己出现，不用在这儿找。</span>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="sec">
+      <!-- ═══════════════════════ S1 帮助 ═══════════════════════ -->
+      <div class="stagebox" data-at="s1">
+        <div class="hero hero--calm">
+          <span class="hero-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">卡住了？这里只有三条路</span>
+            <span class="hero-p">
+              现场求助的真实路径就这三条。<b>不列二十条 FAQ</b> —— 你现在卡着，没心思翻目录。
+            </span>
+          </span>
+        </div>
+
+        <div class="body">
           <div class="helps">
             <div class="help">
               <span class="help-no">1</span>
               <span class="help-b">
                 <span class="help-t">按当前这一页上的提示走</span>
                 <span class="help-s">
-                  每一页底部那条横杠上，<b>右边永远是"下一步该点的"</b>，
-                  左边是退路。<br>
+                  每一页底部那条横杠上，<b>右边永远是"下一步该点的"</b>，左边是退路。<br>
                   不确定点哪个，就点右边那个大的 —— <b>本机没有点了会扣钱或删东西的按钮</b>，
                   收费动作一律会先问你一次。
                 </span>
@@ -242,30 +394,72 @@
             </div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span><b>任何人以本机名义向你收钱，都是骗子。</b>本机只在打印时收纸张钱。</span>
+        </div>
+
+        <!-- 三列：帮助这一站的说明性内容有三块（这台机器 / 费用与防诈骗 / 常见卡点），
+             两列会排成两行、把三条求助路径挤到要滚动。三列后每格 ~312px，
+             说明卡本来就守在 16px，读得下来。 -->
+        <div class="igrid igrid--3">
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这台机器</b></div>
+            <!-- 服务台与有人时段不进 kv 行：.kv-row 是不换行的 flex，
+                 缺配置兜底文案（一句话）塞进值格会横向溢出。
+                 它们本来也是句子不是值，放在下面的说明块里更合适。 -->
+            <div class="kv">
+              <div class="kv-row"><span class="k">编号</span><span class="v" data-site="terminalNo">01 号机</span></div>
+              <div class="kv-row"><span class="k">位置</span><span class="v" data-site="venue">市人力资源市场 A 馆</span></div>
+            </div>
+            <!-- 不给这两行加「服务台：」「有人时段：」前缀：缺配置兜底文案自己就以
+                 「服务台位置…」「服务时间…」开头，加了会变成「服务台：服务台位置…」。 -->
+            <div class="icard-p">
+              <span data-site="serviceDesk"></span><br>
+              <span data-site="serviceHours"></span><br>
+              报修时报上<b>「<span data-site="terminalNo">01 号机</span>」</b>，运维能直接定位到这一台。
+            </div>
           </div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>纸卡在里面<b>不要自己拆机器</b> —— 找工作人员。
-                  已经付过钱但没出纸的部分会自动退，不用你申请。</span>
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机只收纸张钱</b></div>
+            <!-- 2026-08-11：「没有会员费 / 加急费 / 服务费」这一句原来只在页脚抽屉里。
+                 帮助这一站正是被人当场蒙钱的时候会点开的，把它折起来是错的。 -->
+            <div class="icard-p">
+              本机<b>只在打印时收纸张钱</b>，金额显示在屏幕上、可在打印订单里核对。
+              <b>没有会员费、没有加急费、没有「帮你办」的服务费</b>；
+              扫码把文件存进手机<b>不收费</b>。
+            </div>
+            <div class="notice">
+              <svg class="ic"><use href="#i-alert"/></svg>
+              <span><b>任何人以本机名义向你收钱，都是骗子。</b></span>
+            </div>
+          </div>
+
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-alert"/></svg><b>最常见的三个卡点</b></div>
+            <div class="icard-p">
+              <b>扫码传文件传不上去</b> —— 多半是手机没连网，用手机流量试一次。<br>
+              <b>打印出来是白纸</b> —— 硒鼓可能到寿命了，找工作人员，这一单会退。<br>
+              <b>扫描件很花</b> —— 原件放歪了或压不平，重放一次比调参数管用。
+            </div>
+            <div class="notice notice--amber">
+              <svg class="ic"><use href="#i-alert"/></svg>
+              <span>纸卡在里面<b>不要自己拆机器</b> —— 找工作人员。
+                    已经付过钱但没出纸的部分会自动退，不用你申请。</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ─────────── S2 法务 ─────────── -->
-      <div class="pane" data-at="s2">
-        <div class="bighead bh--calm">
-          <span class="bh-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
-          <span class="bh-t">先给你五条，全文在下面</span>
-          <span class="bh-p"><b>本机不做"点同意才能用"的墙。</b>全文能打印带走。</span>
+      <!-- ═══════════════════════ S2 法务 ═══════════════════════ -->
+      <div class="stagebox" data-at="s2">
+        <div class="hero hero--calm">
+          <span class="hero-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">先给你五条，全文在下面</span>
+            <span class="hero-p"><b>本机不做"点同意才能用"的墙。</b>全文能打印带走，什么都不点也能继续用。</span>
+          </span>
         </div>
-      </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="sec">
+        <div class="body">
           <div class="legal">
             <div class="lg"><i></i><span class="lg-t">
               <b>本机不是招聘平台。</b>岗位与招聘会只做第三方或官方来源的信息展示，
@@ -294,37 +488,65 @@
             </span></div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-printer"/></svg>
-            <span>《服务条款》与《隐私政策》全文共 6 页，<b>可以打印带走</b>（A4 黑白预估 1.20 元 · 以打印工作台核价为准），
-                  也可以扫码存进手机<b>不收费</b>。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
+          <div class="panel-note">
             上面五条不是全文的替代，<b>不一致时以全文为准</b>。
           </div>
         </div>
-      </div>
 
-      <!-- ─────────── S3 会话超时 ─────────── -->
-      <div class="pane" data-at="s3">
-        <div class="bighead bh--warn">
-          <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
-          <span class="bh-t">还在吗？</span>
-          <!-- 2026-08-11 会话钟收口：这一屏是**提示态**，不是清空时刻。
-               提示阈值读 SITE.session.hintSec（3 分钟），提示后的宽限读 graceSec（60 秒），
-               两者相加才是「无操作满 4 分钟自动清空」。原来这里写「4 分钟」，
-               把清空时刻当成了提示时刻，用户据此估算就会晚一步。 -->
-          <span class="bh-p">
-            你有 <b><span data-site-time="hint">3 分钟</span></b>没碰过屏幕了，
-            再过 <b><span data-site-time="grace">60 秒</span></b>这台机器会清空你的东西。
-            它摆在公共场所，免得下一个人看到。
-          </span>
+        <div class="igrid">
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-file"/></svg><b>全文与版本</b></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">服务条款</span><span class="v">v2.3 · 2026-07-01</span></div>
+              <div class="kv-row"><span class="k">隐私政策</span><span class="v">v2.1 · 2026-06-15</span></div>
+              <div class="kv-row"><span class="k">合计</span><span class="v">6 页</span></div>
+              <div class="kv-row"><span class="k">打印</span><span class="v">A4 黑白预估 1.20 元</span></div>
+              <div class="kv-row"><span class="k">扫码存手机</span><span class="v v--fog">不收费</span></div>
+            </div>
+          </div>
+
+          <div class="icard">
+            <!-- 2026-08-11：这一段原来在页脚抽屉「合规边界与知情权」里。
+                 法务这一站的核心决策就是"我要不要点同意"，把答案埋进折叠条是错的。 -->
+            <div class="icard-hd"><svg class="ic"><use href="#i-eye"/></svg><b>不点同意也能用</b>
+              <span>原在页脚抽屉，已搬回常驻</span></div>
+            <div class="icard-p">
+              本机<b>不做「点同意才能用」的墙</b>，也不弹「同意即视为接受」的遮罩 ——
+              功能不该以你放弃知情权为前提。你可以先用，也可以先读，
+              <b>全文能打印带走</b>，什么都不点也能继续用。
+            </div>
+            <div class="icard-p">
+              屏上摘出的五条是<b>对你影响最大的五条</b>，不是全文的替代；
+              两者不一致时<b>以全文为准</b>，本机会尽力保证不出现不一致。
+            </div>
+            <div class="notice">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>条款有变更时，<b>会在这一页顶部标出改了哪几条</b>，不是只把版本号加一。
+                    打印价格以打印工作台核价为准。</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s3">
-        <div class="sec">
+      <!-- ═══════════════════════ S3 会话超时 ═══════════════════════ -->
+      <div class="stagebox" data-at="s3">
+        <div class="hero hero--warn">
+          <span class="hero-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">还在吗？</span>
+            <!-- 2026-08-11 会话钟收口：这一屏是**提示态**，不是清空时刻。
+                 提示阈值读 SITE.session.hintSec（3 分钟），提示后的宽限读 graceSec（60 秒），
+                 两者相加才是「无操作满 4 分钟自动清空」。原来这里写「4 分钟」，
+                 把清空时刻当成了提示时刻，用户据此估算就会晚一步。 -->
+            <span class="hero-p">
+              你有 <b><span data-site-time="hint">3 分钟</span></b>没碰过屏幕了，
+              再过 <b><span data-site-time="grace">60 秒</span></b>这台机器会清空你的东西。
+              它摆在公共场所，免得下一个人看到。
+            </span>
+          </span>
+        </div>
+
+        <div class="body">
           <div class="tick">
             <span class="tick-n">60</span>
             <span class="tick-b">
@@ -333,7 +555,7 @@
             </span>
           </div>
 
-          <div class="split" style="margin-top:var(--s-5)">
+          <div class="split">
             <div class="sp sp--ok">
               <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">已经带走的</span></div>
               <div class="sp-i"><i></i><span>你已打印的 <b>13 页纸</b> —— 在你手上，不受影响</span></div>
@@ -347,33 +569,60 @@
             </div>
           </div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+          <div class="notice notice--amber">
             <svg class="ic"><use href="#i-alert"/></svg>
             <span>右边那些<b>要打印或登录才留得下来</b>。
                   如果还想要，现在碰一下屏幕，先把它们打出来。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            倒计时不是催你走 —— <b>是替你把东西收好</b>。
-            这台机器下一个人还要用。
+          <div class="panel-note">
+            倒计时不是催你走 —— <b>是替你把东西收好</b>。这台机器下一个人还要用。
+          </div>
+        </div>
+
+        <div class="igrid">
+          <div class="icard">
+            <!-- 2026-08-11：这一段原来在页脚抽屉「隐私 · 超时清空 · 会话恢复」的第一段。
+                 用户在这一站要判断的是"值不值得续"，理由必须常驻，不能折起来。 -->
+            <div class="icard-hd"><svg class="ic"><use href="#i-eye"/></svg><b>为什么非清不可</b>
+              <span>原在页脚抽屉，已搬回常驻</span></div>
+            <div class="icard-p">
+              这台机器摆在大厅里，你走开之后屏幕还亮着；
+              <b>简历上有你的姓名、电话，有时还有住址，下一个人过来时不该看到这些</b> ——
+              所以无操作满 <b><span data-site-time="hint">3 分钟</span></b>会出提示条，
+              再 <b><span data-site-time="grace">60 秒</span></b>没人碰就自动清空。
+              碰一下就能续，<b>没有次数限制</b>。
+            </div>
+            <div class="icard-p">
+              打印进行中<b>不会因超时中断</b> —— 纸出完才算完。
+            </div>
+          </div>
+
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-clock"/></svg><b>超时的这几个数</b></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">无操作多久提示</span><span class="v" data-site-time="hint">3 分钟</span></div>
+              <div class="kv-row"><span class="k">提示后还有</span><span class="v" data-site-time="grace">60 秒</span></div>
+              <div class="kv-row"><span class="k">无操作满多久清空</span><span class="v" data-site-time="clear">4 分钟</span></div>
+              <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 无次数限制</span></div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ─────────── S4 断网 ─────────── -->
-      <div class="pane" data-at="s4">
-        <div class="bighead bh--warn">
-          <span class="bh-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
-          <span class="bh-t">网断了，但机器没坏</span>
-          <span class="bh-p">
-            正在自动重连。<b>打印和扫描不受影响</b> ——
-            这两件本来就在本机上完成，不走网络。
+      <!-- ═══════════════════════ S4 断网 ═══════════════════════ -->
+      <div class="stagebox" data-at="s4">
+        <div class="hero hero--warn">
+          <span class="hero-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">网断了，但机器没坏</span>
+            <span class="hero-p">
+              正在自动重连。<b>打印和扫描不受影响</b> —— 这两件本来就在本机上完成，不走网络。
+            </span>
           </span>
         </div>
-      </div>
 
-      <div class="pane pane--grow" data-at="s4">
-        <div class="sec">
+        <div class="body">
           <div class="split">
             <div class="sp sp--ok">
               <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">现在照常能用</span></div>
@@ -391,87 +640,154 @@
             </div>
           </div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+          <!-- 2026-08-11：这条原来在右侧栏「重连情况」卡里。它是这一站唯一的可执行建议，
+               而且和左边「打印照常能用」是同一句话的两半，放进主区、跟在清单后面。 -->
+          <div class="notice notice--amber">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>你现在看到的岗位与招聘会是<b>断网前缓存的，同步于 8月9日 07:30</b>。<br>
+            <span>如果十分钟还没恢复，<b>建议先把要打的打了</b> —— 打印走本机驱动，
+                  <b>不依赖网络</b>，别干等。
+                  <span class="ev ev--e2">E2 设备能力事实，不是模型猜的</span></span>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>你现在看到的岗位与招聘会是<b>断网前缓存的，同步于 8月9日 07:30</b>。
                   <b>可能已经变了</b> —— 出发前建议在来源平台再确认一次。</span>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
+          <div class="notice">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span>断网期间<b>不会先收你钱再说打不了</b> ——
                   打印是本机完成的，收费按实际出纸计算。</span>
           </div>
         </div>
-      </div>
 
-      <!-- ─────────── S5 会话恢复 ─────────── -->
-      <div class="pane" data-at="s5">
-        <div class="bighead bh--calm">
-          <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
-          <span class="bh-t">上次没做完，要接着来吗？</span>
-          <span class="bh-p">
-            检测到<b>同一个账号</b>在 <b>8月2日 10:41</b> 于 03 号机有一件没做完的事。<br>
-            <b>要不要恢复由你决定</b> —— 本机不直接把它铺开。
-          </span>
+        <div class="igrid">
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>重连情况</b></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">断开于</span><span class="v">17:49</span></div>
+              <div class="kv-row"><span class="k">已尝试</span><span class="v">6 次</span></div>
+              <div class="kv-row"><span class="k">下次重试</span><span class="v">30 秒后</span></div>
+              <div class="kv-row"><span class="k">已自动上报</span><span class="v">是</span></div>
+            </div>
+          </div>
+
+          <div class="icard">
+            <!-- 2026-08-11：这一段原来在页脚抽屉「AI 生成内容的免责口径」里。
+                 断网这一站左边刚写完"AI 相关现在用不了"，为什么停、停了以后
+                 那些结论算不算数，就该写在旁边，不该折起来。 -->
+            <div class="icard-hd"><svg class="ic"><use href="#i-orbit"/></svg><b>AI 停掉的这段时间</b>
+              <span>原在页脚抽屉，已搬回常驻</span></div>
+            <div class="icard-p">
+              断网时 AI 相关能力停掉，<b>打印、扫描与已加载出来的信息照常</b>。
+              你<b>不用做任何事</b> —— 恢复后会自动接上，正在做的事不会因此丢掉。
+            </div>
+            <div class="icard-p">
+              <b>AI 生成的内容可能出错</b>，且<b>不预测录用结果、不承诺薪资</b>；
+              涉及钱和资格的事，一律<b>以经办机构认定为准</b>。
+              断网期间的操作会<b>暂存在本机</b>，恢复后再同步；
+              同步失败会明确告诉你，不会悄悄丢掉。
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s5">
-        <div class="sec">
-          <div class="jobrow-like" style="padding:var(--s-5);border-radius:var(--r-md);
-               background:var(--glass-1-bg);border:1px solid var(--glass-1-brd)">
-            <div style="font-size:var(--fz-5);font-weight:600;color:var(--fog-900)">
-              机械设计岗 · 面试练习</div>
-            <div style="font-size:var(--fz-2);color:var(--fog-600);margin-top:5px">
-              8月2日 10:41 · 03 号机 · 答完 5 / 8 题 · 复盘单未打印</div>
-            <div style="font-size:var(--fz-2);color:var(--fog-700);margin-top:var(--s-3);line-height:1.6">
+      <!-- ═══════════════════════ S5 会话恢复 ═══════════════════════ -->
+      <div class="stagebox" data-at="s5">
+        <div class="hero hero--calm">
+          <span class="hero-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">上次没做完，要接着来吗？</span>
+            <span class="hero-p">
+              检测到<b>同一个账号</b>在 <b>8月2日 10:41</b> 于 03 号机有一件没做完的事。
+              <b>要不要恢复由你决定</b> —— 本机不直接把它铺开。
+            </span>
+          </span>
+        </div>
+
+        <div class="body">
+          <div class="rsm">
+            <div class="rsm-t">机械设计岗 · 面试练习</div>
+            <div class="rsm-m">8月2日 10:41 · 03 号机 · 复盘单未打印</div>
+            <!-- 进度点画的就是「答完 5 / 8 题」这句已有的话，没有新数据 -->
+            <div class="rsm-bar">
+              <span class="rsm-dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span>
+              <span class="rsm-c">答完 <b>5 / 8</b> 题</span>
+            </div>
+            <div class="rsm-p">
               可以恢复的是：<b>练到第几题、哪几道有缺口</b>。<br>
               <b>你当时答的内容恢复不了</b> —— 面试作答从不保存，这是有意的。
             </div>
           </div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+          <div class="notice notice--amber">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span><b>恢复要先问，不能直接铺开。</b>
                   这台机器在公共场所 —— 万一站在这里的不是你本人，
-                  直接展示上次的内容就是把你的东西给了别人。<br>
+                  直接展示上次的内容就是把你的东西给了别人。
                   所以本机<b>只显示标题和进度，不显示内容，并且要你点一下才继续</b>。</span>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
+          <div class="notice">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>选「重新开始」不会删掉上次的记录 ——
-                  只是这次不接着它做。上次的进度仍在你的 AI 服务记录里。</span>
+            <span>选「重新开始」不会删掉上次的记录 —— 只是这次不接着它做。
+                  上次的进度仍在你的 AI 服务记录里。</span>
+          </div>
+        </div>
+
+        <div class="igrid">
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-shield"/></svg><b>恢复能拿回什么</b></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">进度（第几题）</span><span class="v">能</span></div>
+              <div class="kv-row"><span class="k">缺口类型</span><span class="v">能</span></div>
+              <div class="kv-row"><span class="k">你答的内容</span><span class="v v--fog">不能 · 从不保存</span></div>
+              <div class="kv-row"><span class="k">上传的文件</span><span class="v">能 · 若已登录</span></div>
+            </div>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            超过 <b>30 天</b>的未完成会话不再提示恢复，自动归档。
+          <div class="icard">
+            <!-- 2026-08-11：这一段原来在页脚抽屉「隐私 · 超时清空 · 会话恢复」的第二段。
+                 这一站要用户当场做"接着做 / 重新开始"的选择，凭据不该折起来。 -->
+            <div class="icard-hd"><svg class="ic"><use href="#i-eye"/></svg><b>为什么恢复要先确认</b>
+              <span>原在页脚抽屉，已搬回常驻</span></div>
+            <div class="icard-p">
+              <b>万一站在这里的不是你本人，直接展示上次的内容就是把你的东西给了别人</b>，
+              所以要先确认身份。如果站在这里的不是本人，
+              <b>点「重新开始」就什么都不会显示</b>。
+            </div>
+            <div class="icard-p">
+              超过 <b>30 天</b>的未完成会话不再提示恢复，自动归档。
+            </div>
+            <div class="notice">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>「你答的内容恢复不了」不是缺陷，是<b>面试作答从不保存</b>这条设计的必然结果 ——
+                    两者不能同时要。</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ─────────── S6 本机状态与异常处置 ───────────
+      <!-- ═══════════════════════ S6 异常处置总目录 ═══════════════════════
            2026-08-10 补。这一区解决的是一个具体问题：P40 会话与安全、P41 履约异常
            这两页在全站的入链数是 **0** —— 它们由系统事件触发，首页不该有产品入口，
            这一点是对的；但「不该有产品入口」被落实成了「完全不可达」，
-           运维复核话术、现场演示按顺序过一遍，都只能靠手敲网址。
-           这里把两页 14 个状态逐条列出并直达，位置放在本页是因为它本身就是
-           「本机状态」的落脚点，也是「我的 · 查看本机状态」现有的去处。 -->
-      <div class="pane" data-at="s6">
-        <div class="bighead bh--calm">
-          <span class="bh-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
-          <span class="bh-t">本机状态与异常处置</span>
-          <span class="bh-p">
-            下面 14 个状态<b>都由系统事件触发</b>，正常办事碰不到，首页也不设入口。<br>
-            这份清单<b>供运维复核与现场演示用</b> —— 点进去看的是那个状态长什么样、话术怎么写，
-            <b>不会真的触发它</b>，也不会改变这台机器现在的状态。
+           运维复核话术、现场演示按顺序过一遍，都只能靠手敲网址。 -->
+      <div class="stagebox" data-at="s6">
+        <div class="hero hero--calm">
+          <span class="hero-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
+          <span class="hero-b">
+            <span class="hero-t">本机状态与异常处置</span>
+            <span class="hero-p">
+              下面 14 个状态<b>都由系统事件触发</b>，正常办事碰不到，首页也不设入口。
+              这份清单<b>供运维复核与现场演示用</b> —— 点进去只是看那个状态长什么样，
+              <b>不会真的触发它</b>。
+            </span>
           </span>
         </div>
-      </div>
 
-      <div class="pane pane--grow" data-at="s6">
-        <div class="sec">
+        <div class="body">
           <div class="stgrp">
             <div class="stgrp-hd"><b>会话与安全 · 6 个状态</b>
               <span>P40 · 触发源：无操作计时、断电、下一位用户</span></div>
@@ -489,7 +805,7 @@
               <a class="stlink" href="40-session-safety.html?stage=handover">
                 <span class="stlink-no">3</span>
                 <span class="stlink-b"><span class="stlink-t">会话接管</span>
-                  <span class="stlink-s">换人时先问，不把上一位的东西铺开</span></span>
+                  <span class="stlink-s">换人时先问，不铺开上一位的东西</span></span>
                 <svg class="ic"><use href="#i-arrowRight"/></svg></a>
               <a class="stlink" href="40-session-safety.html?stage=endclear">
                 <span class="stlink-no">4</span>
@@ -512,7 +828,7 @@
           <div class="stgrp">
             <div class="stgrp-hd"><b>履约异常 · 8 个状态</b>
               <span>P41 · 触发源：支付、退款、耗材、取件</span></div>
-            <div class="stgrid">
+            <div class="stgrid stgrid--2">
               <a class="stlink" href="41-fulfillment-states.html?stage=pay-fail">
                 <span class="stlink-no">1</span>
                 <span class="stlink-b"><span class="stlink-t">支付失败</span>
@@ -555,26 +871,56 @@
                 <svg class="ic"><use href="#i-arrowRight"/></svg></a>
             </div>
           </div>
+        </div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span><b>这一区不是给正在办事的用户看的。</b>
-                  它列的是异常长什么样，不是本机现在的状态 ——
-                  真出了事，对应那一页会自己弹出来，不用在这儿找。</span>
+        <div class="igrid">
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这份清单的边界</b>
+              <span>运维 / 演示用</span></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">这 14 条是</span><span class="v">状态样板 · 不是本机当前状态</span></div>
+              <div class="kv-row"><span class="k">点进去会 / 不会</span><span class="v">看到那个状态 · <span class="v--fog">不触发它</span></span></div>
+              <div class="kv-row"><span class="k">谁会用到</span><span class="v">运维复核话术 · 现场演示走查</span></div>
+            </div>
+            <div class="notice notice--amber">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span><b>这一区不是给正在办事的用户看的。</b>
+                    它列的是异常长什么样，不是本机现在的状态 ——
+                    真出了事，对应那一页会自己弹出来，不用在这儿找。</span>
+            </div>
+          </div>
+
+          <div class="icard">
+            <div class="icard-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么它们不该有首页入口</b></div>
+            <div class="icard-p">
+              没有人会在首页点<b>「我要支付失败」</b>。这两页的每一个状态都是
+              <b>事情已经发生之后</b>才出现的 —— 把它们做成首页里的功能格子，
+              等于让用户在一堆正常功能里挑一个异常，既没用也吓人。
+            </div>
+            <div class="icard-p">
+              <b>零入口是设计结论，零可达是缺陷。</b>这一区补的是后者：
+              运维要复核话术、演示要按顺序过一遍，总得有一条正经路径进去。
+              这两页自身的返回键仍指首页，从这里点进去后可以直接返回。
+            </div>
           </div>
         </div>
       </div>
 
-
       <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
-           收进来的：合规边界与防诈骗说明 / 隐私与超时清空口径 / 五条要点与全文的关系 /
-                     产物去向与费用口径 / AI 生成内容的免责口径 / 本区为什么存在。
-           **没有**收进来（必须常驻）：「任何人以本机名义向你收钱都是骗子」这条防诈骗提示、
-           每一态的当前状态说明、卡纸时「不要自己拆机器」这条安全提示、各类倒计时与参数。 -->
+           2026-08-11 改版后这里只留**全页通用**的三段：防诈骗与费用口径、
+           管理员能看到什么、条款全文的去向。
+           已经搬回常驻、不再放在这里的：
+             · 「不点同意也能用」（合规边界与知情权）→ s2 信息格
+             · 「为什么非清不可」（隐私与超时清空第一段）→ s3 信息格
+             · 「为什么恢复要先确认」（会话恢复第二段）→ s5 信息格
+             · 「AI 停掉的这段时间」（AI 免责口径）→ s4 信息格
+             · 「这一区为什么存在 / 不是本机现在的状态」→ 顶部常驻边界条
+           **仍然常驻、任何时候都不许收进这里**：防诈骗提示、每一态的当前状态说明、
+           卡纸时「不要自己拆机器」、各类倒计时与参数。 -->
       <div class="nb-bar" data-notebar>
         <button type="button" class="nb-sum">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span class="nb-sum-t">信息与边界&nbsp;· <b>只收纸张钱</b>&nbsp;· 隐私与超时</span>
+          <span class="nb-sum-t">信息与边界&nbsp;· <b>只收纸张钱</b>&nbsp;· 管理员能看到什么</span>
           <span class="nb-x">展开</span>
           <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
         </button>
@@ -585,246 +931,16 @@
             <p class="nb-p">卡纸时<b>不要自己拆机器</b>，找工作人员。已经付过钱但没出纸的部分会<b>自动退</b>，不用你申请。扫码把文件存进手机<b>不收费</b>。</p>
           </div>
           <div class="nb-sec">
-            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界与知情权</div>
-            <p class="nb-p">本机<b>不做「点同意才能用」的墙</b>，也不弹「同意即视为接受」的遮罩——功能不该以你放弃知情权为前提。你可以先用，也可以先读，<b>全文能打印带走</b>，什么都不点也能继续用。</p>
-            <p class="nb-p">屏上摘出的五条是<b>对你影响最大的五条</b>，不是全文的替代；两者不一致时<b>以全文为准</b>，本机会尽力保证不出现不一致。</p>
-          </div>
-          <div class="nb-sec">
-            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 超时清空 · 会话恢复</div>
-            <p class="nb-p">这台机器摆在大厅里，你走开之后屏幕还亮着；<b>简历上有你的姓名、电话，有时还有住址，下一个人过来时不该看到这些</b>——所以<b>无操作满 <span data-site-time="hint">3 分钟</span></b>会出提示条，<b>再 <span data-site-time="grace">60 秒</span>没人碰</b>（无操作满 <b><span data-site-time="clear">4 分钟</span></b>）就自动清空。碰一下就能续，没有次数限制。</p>
-            <p class="nb-p">会话恢复也是同一个道理：<b>万一站在这里的不是你本人，直接展示上次的内容就是把你的东西给了别人</b>，所以要先确认身份。选「重新开始」<b>不会删掉上次的记录</b>，只是这次不接着它做，上次的进度仍在你的 AI 服务记录里。</p>
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>管理员能看到什么</div>
             <p class="nb-p"><b>管理员看不到你的文件内容</b>，只看得到打印流水与设备日志；因故障需要打开文件时<b>每次都留访问日志，日志删不掉</b>。</p>
+            <p class="nb-p">文件保留期<b>按文件类型定，不是所有文件都 90 天</b>：一般文档 90 天，敏感文件 7 天，未登录时本次会话的文件离场即清，面试作答从不保存。到期自动删除，<b>删除会留日志</b>。</p>
           </div>
           <div class="nb-sec">
-            <div class="nb-h"><svg class="ic"><use href="#i-orbit"/></svg>AI 生成内容的免责口径</div>
-            <p class="nb-p"><b>AI 生成的内容可能出错</b>，且<b>不预测录用结果、不承诺薪资</b>。涉及钱和资格的事，一律<b>以经办机构认定为准</b>。断网时 AI 相关能力停掉，打印、扫描与已加载出来的信息照常。</p>
-          </div>
-          <div class="nb-sec">
-            <div class="nb-h"><svg class="ic"><use href="#i-info"/></svg>这一区为什么存在</div>
-            <p class="nb-p">这些页是<b>出了事才出现</b>的：卡纸或机器没反应走帮助，条款更新走法务，无操作满 <span data-site-time="hint">3 分钟</span>走会话超时提示，网络中断走断网，同账号有没做完的事走会话恢复。<b>正在办事的用户不需要这一区</b>——真出事时，对应那一页会自己弹出来，不用在这儿找。这里列的是异常长什么样，不是本机现在的状态。</p>
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-file"/></svg>条款全文去哪儿拿</div>
+            <p class="nb-p">《服务条款》与《隐私政策》全文共 6 页，<b>可以打印带走</b>（A4 黑白预估 1.20 元 · 以打印工作台核价为准），也可以扫码存进手机<b>不收费</b>。条款有变更时<b>会在法务那一站顶部标出改了哪几条</b>，不是只把版本号加一。</p>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
-
-      <!-- 入链说明（2026-08-10 补）：本页有返回、却零入链。
-           零入链在这里是对的 —— 它不是首页里的一个功能，是**异常事件把人推过来**。
-           但页面必须自己把这件事说清楚，否则只会被当成没接线的孤页。
-           唯一的主动入口在「我的 · 查看本机状态」（23-me 操作栏）。 -->
-      <div class="pane">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>这一页怎么出现的</b>
-          <span class="mt">系统触发</span></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.75">
-            五种形态都由<b>系统事件触发</b>：卡纸或机器没反应 → 帮助；条款更新 → 法务；
-            无操作满 <span data-site-time="hint">3 分钟</span> → 会话超时提示；网络中断 → 断网；同账号有没做完的事 → 会话恢复。<br>
-            所以<b>首页里没有指向这一页的入口</b>，正常办事不会走到这儿。
-            想主动看当前状态，从<b>「我的」操作栏上的「查看本机状态」</b>进来。<br>
-            <!-- 2026-08-10 补：说明第 6 站是什么，免得被当成第六种系统态。 -->
-            第 6 站<b>「异常处置」不是第六种形态</b>，是会话与安全（P40）、履约异常（P41）
-            这两组系统态的<b>总目录</b>：那两页同样没有产品入口，链接放在这里供运维与演示用。
-          </div>
-        </div>
-      </div>
-
-      <!-- S6 右：这一区的边界，写在清单旁边而不是埋进说明页 -->
-      <div class="pane" data-at="s6">
-        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这份清单的边界</b>
-          <span class="mt">运维 / 演示用</span></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">这 14 条是</span><span class="v">状态样板 · 不是本机当前状态</span></div>
-            <div class="kv-row"><span class="k">点进去会</span><span class="v">看到那个状态的页面</span></div>
-            <div class="kv-row"><span class="k">点进去不会</span><span class="v v--fog">触发它 · 不改机器状态</span></div>
-            <div class="kv-row"><span class="k">首页入口</span><span class="v v--fog">没有 · 两页都由事件推过来</span></div>
-            <div class="kv-row"><span class="k">谁会用到</span><span class="v">运维复核话术 · 现场演示走查</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            正在办事的用户不需要这一区 —— 真出事时，对应那一页会自己出现。
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s6">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么它们不该有首页入口</b></div>
-        <div class="sec">
-          <div style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            没有人会在首页点<b>「我要支付失败」</b>。这两页的每一个状态都是
-            <b>事情已经发生之后</b>才出现的 —— 把它们做成首页里的功能格子，
-            等于让用户在一堆正常功能里挑一个异常，既没用也吓人。
-          </div>
-          <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">会话与安全</span><span class="v">计时器 / 断电 / 换人 触发</span></div>
-            <div class="kv-row"><span class="k">履约异常</span><span class="v">支付 / 退款 / 耗材 / 取件 触发</span></div>
-          </div>
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>零入口是<b>设计结论</b>，零可达是<b>缺陷</b>。这一区补的是后者：
-                  运维要复核话术、演示要按顺序过一遍，总得有一条正经路径进去，
-                  不能只靠手敲网址。</span>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            这两页自身的返回键仍指首页，从这里点进去后可以直接返回。
-          </div>
-        </div>
-      </div>
-
-      <!-- S1 右 -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这台机器</b></div>
-        <div class="sec">
-          <!-- 服务台与有人时段搬出 kv 行：.kv-row 是不换行的 flex，
-               缺配置兜底文案（一句话）塞进 348px 的值格会横向溢出。
-               它们本来也是句子不是值，放在下面的说明块里更合适。 -->
-          <div class="kv">
-            <div class="kv-row"><span class="k">编号</span><span class="v" data-site="terminalNo">01 号机</span></div>
-            <div class="kv-row"><span class="k">位置</span><span class="v" data-site="venue">市人力资源市场 A 馆</span></div>
-          </div>
-          <!-- 不给这两行加「服务台：」「有人时段：」前缀：缺配置兜底文案自己就以
-               「服务台位置…」「服务时间…」开头，加了会变成「服务台：服务台位置…」。
-               统一用一个小标题带住，配置下发后（例：A 馆正门左手第一窗 / 工作日 09:00–17:00）
-               同样读得通。 -->
-          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.7">
-            现场服务<br>
-            <span data-site="serviceDesk"></span><br>
-            <span data-site="serviceHours"></span>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            报修时报上<b>「<span data-site="terminalNo">01 号机</span>」</b>，运维能直接定位到这一台。
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>最常见的三个卡点</b></div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">扫码传文件传不上去</span>
-                <span class="tl-s">多半是手机没连网。用手机流量试一次，别连大厅的公共 WiFi</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">打印出来是白纸</span>
-                <span class="tl-s">硒鼓可能到寿命了 —— 找工作人员，这一单会退</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">扫描件很花、字看不清</span>
-                <span class="tl-s">原件放歪了或压不平。掀开盖子重放一次，比调参数管用</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            这三条是<b>本机实际报障里最多的三类</b>，不是编出来凑数的。
-          </div>
-        </div>
-      </div>
-
-      <!-- S2 右 -->
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-file"/></svg><b>全文与版本</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">服务条款</span><span class="v">v2.3 · 2026-07-01</span></div>
-            <div class="kv-row"><span class="k">隐私政策</span><span class="v">v2.1 · 2026-06-15</span></div>
-            <div class="kv-row"><span class="k">合计</span><span class="v">6 页</span></div>
-            <div class="kv-row"><span class="k">打印</span><span class="v">预估 1.20 元</span></div>
-            <div class="kv-row"><span class="k">扫码存手机</span><span class="v v--fog">不收费</span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>条款有变更时，<b>会在这一页顶部标出改了哪几条</b>，
-                  不是只把版本号加一。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)"><b>你什么都不点也能继续用</b>。</div>
-        </div>
-      </div>
-
-      <!-- S3 右 -->
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>为什么会超时</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            这台机器摆在大厅里，<b>你走开之后屏幕还亮着</b>。
-          </div>
-          <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v" data-site-time="hint">3 分钟</span></div>
-            <div class="kv-row"><span class="k">提示后还有</span><span class="v" data-site-time="grace">60 秒</span></div>
-            <div class="kv-row"><span class="k">无操作满多久清空</span><span class="v" data-site-time="clear">4 分钟</span></div>
-            <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 无次数限制</span></div>
-            <div class="kv-row"><span class="k">正在打印时</span><span class="v v--fog">不会打断</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            打印进行中<b>不会因超时中断</b> —— 纸出完才算完。
-          </div>
-        </div>
-      </div>
-
-      <!-- S4 右 -->
-      <div class="pane pane--grow" data-at="s4">
-        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>重连情况</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">断开于</span><span class="v">17:49</span></div>
-            <div class="kv-row"><span class="k">已尝试</span><span class="v">6 次</span></div>
-            <div class="kv-row"><span class="k">下次重试</span><span class="v">30 秒后</span></div>
-            <div class="kv-row"><span class="k">已自动上报</span><span class="v">是</span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>你<b>不用做任何事</b> —— 恢复后会自动接上，
-                  正在做的事不会因此丢掉。</span>
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>如果十分钟还没恢复，<b>建议先把要打的打了</b> ——
-                  打印走本机驱动，<b>不依赖网络</b>，别干等。
-                  <span class="ev ev--e2">E2 设备能力事实，不是模型猜的</span></span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            断网期间的操作会<b>暂存在本机</b>，恢复后再同步；
-            同步失败会明确告诉你，不会悄悄丢掉。
-          </div>
-        </div>
-      </div>
-
-      <!-- S5 右 -->
-      <div class="pane pane--grow" data-at="s5">
-        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>恢复能拿回什么</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">进度（第几题）</span><span class="v">能</span></div>
-            <div class="kv-row"><span class="k">缺口类型</span><span class="v">能</span></div>
-            <div class="kv-row"><span class="k">你答的内容</span><span class="v v--fog">不能 · 从不保存</span></div>
-            <div class="kv-row"><span class="k">上传的文件</span><span class="v">能 · 若已登录</span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>「你答的内容恢复不了」不是缺陷，是<b>面试作答从不保存</b>这条设计的必然结果 ——
-                  两者不能同时要。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            如果站在这里的不是本人，<b>点「重新开始」就什么都不会显示</b>。
-          </div>
-        </div>
-      </div>
-
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            系统提示都在这里：帮助、法务、超时、断网、恢复。<br>
-            共同的写法是：<b>先说现在能做什么，再说发生了什么</b>。
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
