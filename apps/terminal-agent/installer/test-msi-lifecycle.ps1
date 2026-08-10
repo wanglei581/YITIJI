@@ -7,7 +7,7 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
 $serviceName = "aijobprintagent.exe"
-$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.lnk"
+$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.url"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -28,13 +28,9 @@ function Assert-PanelShortcut {
   if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
     throw "Local status panel Start Menu shortcut is missing"
   }
-  $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($panelShortcutPath)
-  if ([System.IO.Path]::GetFileName([string]$shortcut.TargetPath) -ne "rundll32.exe") {
-    throw "Local status panel shortcut target is not rundll32.exe"
-  }
-  if ([string]$shortcut.Arguments -ne "url.dll,FileProtocolHandler http://127.0.0.1:9527/local/panel") {
-    throw "Local status panel shortcut arguments are not the fixed loopback URL"
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $panelShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
+    throw "Local status panel shortcut does not contain the fixed loopback URL"
   }
 }
 

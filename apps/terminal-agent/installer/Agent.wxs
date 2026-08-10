@@ -41,20 +41,19 @@
           <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="StateDirectoryCreated" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>
-    </StandardDirectory>
-
-    <StandardDirectory Id="CommonProgramsFolder">
-      <Directory Id="AgentProgramMenuFolder" Name="AI Job Print Terminal">
-        <Component Id="AgentPanelShortcutComponent" Guid="E565227D-70C5-4C17-A63E-2322DA18C0E4" Bitness="always64">
-          <Shortcut
-            Id="AgentPanelShortcut"
-            Name="AI Job Print Terminal"
-            Description="Open the local AI Job Print Terminal status panel"
-            Target="[SystemFolder]rundll32.exe"
-            Arguments="url.dll,FileProtocolHandler http://127.0.0.1:9527/local/panel" />
-          <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
-          <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="PanelShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
-        </Component>
+      <Directory Id="CommonMicrosoftFolder" Name="Microsoft">
+        <Directory Id="CommonWindowsFolder" Name="Windows">
+          <Directory Id="CommonStartMenuFolder" Name="Start Menu">
+            <Directory Id="CommonStartMenuProgramsFolder" Name="Programs">
+              <Directory Id="AgentProgramMenuFolder" Name="AI Job Print Terminal">
+                <Component Id="AgentPanelShortcutComponent" Guid="E565227D-70C5-4C17-A63E-2322DA18C0E4" Bitness="always64">
+                  <File Id="AgentPanelInternetShortcut" Source="$(var.InstallerSourceRoot)\assets\AI Job Print Terminal.url" KeyPath="yes" />
+                  <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
+                </Component>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
       </Directory>
     </StandardDirectory>
 

@@ -13,7 +13,7 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $nodePath = Join-Path $installRoot "node\node.exe"
 $serviceName = "aijobprintagent.exe"
-$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.lnk"
+$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.url"
 $sentinelPath = Join-Path $stateRoot "installer-upgrade-state-sentinel.json"
 $logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -59,9 +59,8 @@ function Assert-PanelShortcut {
   if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
     throw "0.4.0 upgrade did not install the local status panel Start Menu shortcut"
   }
-  $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($panelShortcutPath)
-  if ([string]$shortcut.Arguments -ne "url.dll,FileProtocolHandler http://127.0.0.1:9527/local/panel") {
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $panelShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
     throw "Upgraded local status panel shortcut does not use the fixed loopback URL"
   }
 }

@@ -21,6 +21,7 @@ const runtimeVersion = fs.readFileSync(path.join(root, '../src/runtime-version.t
 const heartbeat = fs.readFileSync(path.join(root, '../src/agent/heartbeat.ts'), 'utf8')
 const localApi = fs.readFileSync(path.join(root, '../src/local-api/qr-login-server.ts'), 'utf8')
 const statusPanel = fs.readFileSync(path.join(root, '../src/local-api/status-panel.ts'), 'utf8')
+const panelShortcut = read('assets/AI Job Print Terminal.url')
 const agentConfigExample = JSON.parse(
   fs.readFileSync(path.join(root, '../agent-config.example.json'), 'utf8'),
 )
@@ -79,12 +80,17 @@ assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
 assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
-assert.match(wix, /Id="AgentPanelShortcut"/)
-assert.match(wix, /StandardDirectory Id="CommonProgramsFolder"/)
-assert.doesNotMatch(wix, /StandardDirectory Id="ProgramMenuFolder"/)
-assert.match(wix, /Target="\[SystemFolder\]rundll32\.exe"/)
-assert.match(wix, /Arguments="url\.dll,FileProtocolHandler http:\/\/127\.0\.0\.1:9527\/local\/panel"/)
+assert.match(project, /InstallerSourceRoot=\$\(MSBuildProjectDirectory\)/)
+assert.match(wix, /StandardDirectory Id="CommonAppDataFolder"/)
+assert.match(wix, /Name="Microsoft"[\s\S]*Name="Windows"[\s\S]*Name="Start Menu"[\s\S]*Name="Programs"/)
+assert.match(wix, /Id="AgentPanelInternetShortcut"/)
+assert.match(wix, /Source="\$\(var\.InstallerSourceRoot\)\\assets\\AI Job Print Terminal\.url" KeyPath="yes"/)
 assert.match(wix, /RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall"/)
+assert.match(wix, /ComponentRef Id="AgentPanelShortcutComponent"/)
+assert.equal(
+  panelShortcut.replace(/\r\n/g, '\n').trim(),
+  '[InternetShortcut]\nURL=http://127.0.0.1:9527/local/panel',
+)
 assert.match(localApi, /url\.pathname === '\/local\/panel'/)
 assert.ok(
   localApi.indexOf("url.pathname === '/local/panel'") < localApi.indexOf('if (!isOriginAllowed(origin, origins))'),
@@ -189,7 +195,7 @@ assert.match(lifecycle, /& \$nodePath --version/)
 assert.match(lifecycle, /Join-Path \$stateRoot "logs"/)
 assert.match(lifecycle, /Copy-Item -LiteralPath \$item\.FullName -Destination \$copiedLogRoot -Recurse -Force/)
 assert.match(lifecycle, /Assert-PanelShortcut/)
-assert.match(lifecycle, /http:\/\/127\.0\.0\.1:9527\/local\/panel/)
+assert.ok(lifecycle.includes('URL=http://127\\.0\\.0\\.1:9527/local/panel'))
 assert.match(lifecycle, /Start Menu shortcut remains after uninstall/)
 assert.match(workflow, /artifacts\/msi\/lifecycle-logs\//)
 assert.doesNotMatch(workflow, /lifecycle-logs\/\*\.log/)
