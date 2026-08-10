@@ -178,6 +178,21 @@
 .nrow-s { font-size: var(--fz-1); color: var(--fog-600); }
 .ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+
+/* ---------- 返回键：永远回「我的」，不在标签之间倒退 ----------
+   stage.js 对 `.actionbar > .backbtn` 有一套「先退阶段、退无可退才离开本页」的
+   逻辑 —— 那是给打印 / 扫描这类**多步工作台**的。本页三/四个标签是**并列分类**，
+   不是流程步骤：用户从 P23 直达「我的文档」后按返回，应当回「我的」，
+   而不是被送到「我的简历」再按两次。把返回键包一层，公共选择器不再命中，
+   返回就老老实实按 href 走。不改公共脚本，只在本页失效那条规则。 */
+.backwrap { flex: 0 0 auto; display: flex; }
+.actionbar .backwrap > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar .backwrap > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar .backwrap > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar .backwrap > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -304,7 +319,7 @@
         <button class="fchip" data-sel="gen" aria-pressed="false">生成 2</button>
         <button class="fchip" data-sel="raw" aria-pressed="false">原件 1</button>
         <button class="fchip" data-sel="run" aria-pressed="false">处理中 0</button>
-        <span class="fbar-n" data-count>显示 6 条</span>
+        <span class="fbar-n" data-shown>显示 6 条</span>
       </div>
 
       <div class="fbar" data-at="docs" data-when="default ai-down device-off" data-for="lw-docs">
@@ -312,7 +327,7 @@
         <button class="fchip" data-sel="normal" aria-pressed="false">一般文档 4</button>
         <button class="fchip" data-sel="sens" aria-pressed="false">敏感件 2</button>
         <button class="fchip" data-sel="expired" aria-pressed="false">已到期 0</button>
-        <span class="fbar-n" data-count>显示 6 条</span>
+        <span class="fbar-n" data-shown>显示 6 条</span>
       </div>
 
       <div class="fbar" data-at="orders" data-when="default ai-down device-off" data-for="lw-orders">
@@ -321,7 +336,7 @@
         <button class="fchip" data-sel="run" aria-pressed="false">进行中 2</button>
         <button class="fchip" data-sel="cancel" aria-pressed="false">已取消 1</button>
         <button class="fchip" data-sel="fail" aria-pressed="false">失败 0</button>
-        <span class="fbar-n" data-count>显示 6 条</span>
+        <span class="fbar-n" data-shown>显示 6 条</span>
       </div>
 
       <!-- ═══════════ 我的简历 · 列表 ═══════════ -->
@@ -853,13 +868,20 @@
           <a class="xlane-go" href="11-jobfit-compare.html">
             <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
-              <span class="xlane-ds">拿 v3 和收藏的岗位逐条比</span></span>
+              <span class="xlane-ds">拿简历和收藏的岗位逐条比</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=resume-report&amp;title=简历诊断报告&amp;pages=3&amp;copies=1">
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=resume-report&amp;title=简历诊断报告&amp;pages=3&amp;copies=1">
             <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">打印诊断报告</span>
-              <span class="xlane-ds">带去：诊断报告 3 页 · 预估价</span></span>
+              <span class="xlane-ds">带去：诊断报告 3 页&nbsp;· 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 未登录时没有"你的诊断报告"可带，出口退回从选文件开始，不报个不存在的页数 -->
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s3&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
         </div>
@@ -880,10 +902,16 @@
               <span class="xlane-ds">纸质原件扫成 PDF 存进这一栏</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=我的文档&amp;pages=2&amp;copies=1">
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=我的文档&amp;pages=2&amp;copies=1">
             <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">打印所选文件</span>
-              <span class="xlane-ds">带去：所选文件 2 页 · 预估价</span></span>
+              <span class="xlane-ds">带去：所选文件 2 页&nbsp;· 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s3&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
         </div>
@@ -1016,8 +1044,11 @@
           <div class="kv-row"><span class="k">删除</span><span class="v">要点两次 · 第二次才真删</span></div>
           <div class="kv-row"><span class="k">确认层</span><span class="v">不显示文件名全称 · 防旁人看到</span></div>
           <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
-          <div class="kv-row"><span class="k">日志里有什么</span><span class="v">谁删的、什么时候、删了几个</span></div>
-          <div class="kv-row"><span class="k">日志里没有</span><span class="v">文件内容与文件名全称</span></div>
+          <div class="kv-row"><span class="k">日志内容</span><span class="v">谁删的、什么时候、删了几个</span></div>
+          <div class="kv-row"><span class="k">日志不含</span><span class="v">文件内容与文件名全称</span></div>
+          <div class="kv-row"><span class="k">到期自动删</span><span class="v">同样留日志 · 不需要你操作</span></div>
+          <div class="kv-row"><span class="k">删了能再打</span><span class="v">不能 · 要先重新上传或扫描</span></div>
+          <div class="kv-row"><span class="k">管理员看文件</span><span class="v">必须留访问日志</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -1051,7 +1082,7 @@
   </div>
 
   <div class="actionbar">
-    <a class="backbtn" href="23-me.html" data-parent-label="我的"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a>
+    <div class="backwrap"><a class="backbtn" href="23-me.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a></div>
     <div class="actionbar-hint">
       <div data-at="resume">
         <div data-when="default device-off"><div class="t">6 条简历记录 · 最新 v3</div><div class="s">版本差异在顶上一屏看完 · 点条目展开任务与派生记录</div></div>
@@ -1099,12 +1130,21 @@
 ;(function () {
   var scr = document.querySelector('.screen')
   if (!scr) return
+  /* 不认识的 ?stage= 兜底：stages.js 会照单全收地把 data-stage 设成任意字符串，
+     于是 42-my-assets.html?stage=typo 会渲染成**一片空白**（没有任何 data-at 命中）。
+     外部链接写错一个字母就白屏，代价太大。这里把取值收敛到白名单，
+     不认识就落回第一个标签。 */
+  var VALID = ['resume', 'docs', 'orders']
+  if (VALID.indexOf(scr.getAttribute('data-stage')) < 0) {
+    if (window.v3Stage) window.v3Stage(VALID[0])
+    else { scr.setAttribute('data-stage', VALID[0]); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
   function sync () {
     var cur = scr.getAttribute('data-stage')
     document.querySelectorAll('.stbtn').forEach(function (b) {
       b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
     })
-    if (window.v3SyncBack) window.v3SyncBack()
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
@@ -1146,7 +1186,7 @@
       if (ok) n++
     }
     wrap.classList.toggle('is-empty', n === 0)
-    var cnt = bar.querySelector('[data-count]')
+    var cnt = bar.querySelector('[data-shown]')
     if (cnt) cnt.textContent = n ? ('显示 ' + n + ' 条') : '这一类现在没有记录'
     var lb = wrap.querySelector('[data-empty-lb]')
     var cur = bar.querySelector('.fchip[aria-pressed="true"]')

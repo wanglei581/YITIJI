@@ -184,6 +184,21 @@
 .nrow-s { font-size: var(--fz-1); color: var(--fog-600); }
 .ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+
+/* ---------- 返回键：永远回「我的」，不在标签之间倒退 ----------
+   stage.js 对 `.actionbar > .backbtn` 有一套「先退阶段、退无可退才离开本页」的
+   逻辑 —— 那是给打印 / 扫描这类**多步工作台**的。本页三/四个标签是**并列分类**，
+   不是流程步骤：用户从 P23 直达「我的文档」后按返回，应当回「我的」，
+   而不是被送到「我的简历」再按两次。把返回键包一层，公共选择器不再命中，
+   返回就老老实实按 href 走。不改公共脚本，只在本页失效那条规则。 */
+.backwrap { flex: 0 0 auto; display: flex; }
+.actionbar .backwrap > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar .backwrap > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar .backwrap > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar .backwrap > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -306,9 +321,9 @@
           <span class="t" data-when="default device-off">2 条未读：1 条打印完成、1 条文件到期提醒</span>
           <span class="t" data-when="first">登录后打印完成、文件到期这类提醒会进这里</span>
           <span class="t" data-when="ai-down">本机这次不做整理，消息和工单都在下面</span>
-          <span class="s" data-when="default device-off">5 条 · 未读 2</span>
+          <span class="s" data-when="default device-off">7 条 · 未读 2</span>
           <span class="s" data-when="first">功能说明</span>
-          <span class="s" data-when="ai-down">5 条</span>
+          <span class="s" data-when="ai-down">7 条</span>
         </div>
         <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>要提问题时，右栏已经替你起好一段工单摘要 <span class="ev ev--e3">E3 草稿 · 你可以改</span></span>
@@ -330,7 +345,7 @@
         <button class="fchip" data-sel="mock" aria-pressed="false">面试类 1</button>
         <button class="fchip" data-sel="plan" aria-pressed="false">规划与参会 2</button>
         <button class="fchip" data-sel="run" aria-pressed="false">处理中 0</button>
-        <span class="fbar-n" data-count>显示 6 条</span>
+        <span class="fbar-n" data-shown>显示 6 条</span>
       </div>
 
       <div class="fbar" data-at="fav" data-when="default ai-down device-off" data-for="lw-fav">
@@ -340,7 +355,7 @@
         <button class="fchip" data-sel="policy" aria-pressed="false">政策 1</button>
         <button class="fchip" data-sel="off" aria-pressed="false">已下线 1</button>
         <button class="fchip" data-sel="company" aria-pressed="false">企业 0</button>
-        <span class="fbar-n" data-count>显示 6 条</span>
+        <span class="fbar-n" data-shown>显示 6 条</span>
       </div>
 
       <!-- 两个 Tab，与原型 71 一致：浏览记录 / 外部跳转记录 -->
@@ -348,16 +363,16 @@
         <button class="fchip" data-sel="browse" aria-pressed="true">浏览记录 5</button>
         <button class="fchip" data-sel="jump" aria-pressed="false">外部跳转记录 4</button>
         <button class="fchip" data-sel="none" aria-pressed="false">投递结果 0</button>
-        <span class="fbar-n" data-count>显示 5 条</span>
+        <span class="fbar-n" data-shown>显示 7 条</span>
       </div>
 
       <div class="fbar" data-at="notice" data-when="default ai-down device-off" data-for="lw-notice">
-        <button class="fchip" data-sel="all" aria-pressed="true">全部 5</button>
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 7</button>
         <button class="fchip" data-sel="unread" aria-pressed="false">未读 2</button>
-        <button class="fchip" data-sel="print" aria-pressed="false">打印 1</button>
-        <button class="fchip" data-sel="file" aria-pressed="false">文件到期 1</button>
+        <button class="fchip" data-sel="print" aria-pressed="false">打印 2</button>
+        <button class="fchip" data-sel="file" aria-pressed="false">文件 2</button>
         <button class="fchip" data-sel="warn" aria-pressed="false">设备告警 0</button>
-        <span class="fbar-n" data-count>显示 5 条</span>
+        <span class="fbar-n" data-shown>显示 5 条</span>
       </div>
 
       <!-- ═══════════ AI 服务记录 · 列表 ═══════════ -->
@@ -1046,6 +1061,50 @@
             </div>
           </div>
 
+          <div class="rrow" data-g="file">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">扫描完成 · 3 页已存进我的文档</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 9 日 09:52 · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-folder"/></svg>去我的文档</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件</span><span class="v">纸质简历扫描_0809.pdf</span></div>
+                <div class="kv-row"><span class="k">期限</span><span class="v">一般文档 90 天</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="print">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-package"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">取件码 P-4172 已生成</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 9 日 10:20 · 7 天内凭码取件或复打</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders"><svg class="ic"><use href="#i-printer"/></svg>看这一单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">怎么用</span><span class="v">向现场工作人员出示这串码</span></div>
+                <div class="kv-row"><span class="k">失效</span><span class="v">出纸完成或 7 天后自动失效</span></div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <div class="blank blank--filter" data-when="default ai-down device-off">
@@ -1053,7 +1112,7 @@
           <b>近期没有「<span data-empty-lb>设备告警</span>」发给你</b>
           <p>缺纸、卡纸、离线这类告警只在真的发生时才发，本机不发营销消息。</p>
           <div class="acts">
-            <button class="btn btn--primary" data-reset>看全部 5 条</button>
+            <button class="btn btn--primary" data-reset>看全部 7 条</button>
             <a class="btn btn--ghost" href="04-system-states.html">主动看本机状态</a>
             <a class="btn btn--ghost" href="42-my-assets.html?stage=orders">看打印订单</a>
           </div>
@@ -1111,10 +1170,17 @@
               <span class="xlane-ds">现场面对面 · 可先打简历</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
-          <a class="xlane-go" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=job-list&amp;title=收藏清单&amp;pages=1&amp;copies=1">
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=job-list&amp;title=收藏清单&amp;pages=1&amp;copies=1">
             <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">打印收藏清单</span>
-              <span class="xlane-ds">带去：收藏 6 条 · 预估价</span></span>
+              <span class="xlane-ds">带去：收藏 6 条&nbsp;· 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 未登录时收藏只在本次会话里，条数不属于账号，出口退回从选文件开始 -->
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s3&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
         </div>
@@ -1211,7 +1277,7 @@
           <div class="kv-row"><span class="k">删诊断记录</span><span class="v">同任务的优化记录一并删</span></div>
           <div class="kv-row"><span class="k">删除要</span><span class="v">点两次 · 第二次才真删</span></div>
           <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
-          <div class="kv-row"><span class="k">日志里没有</span><span class="v">记录内容与文件名全称</span></div>
+          <div class="kv-row"><span class="k">日志不含</span><span class="v">记录内容与文件名全称</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -1260,6 +1326,9 @@
           <div class="kv-row"><span class="k">不记</span><span class="v">你投没投、约没约</span></div>
           <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方看不到</span></div>
           <div class="kv-row"><span class="k">取消收藏</span><span class="v">点两次 · 只删书签不删岗位</span></div>
+          <div class="kv-row"><span class="k">失效标记</span><span class="v">来源撤下就标灰 · 不动你的书签</span></div>
+          <div class="kv-row"><span class="k">状态多久更新</span><span class="v">跟着来源同步 · 每天一次</span></div>
+          <div class="kv-row"><span class="k">收藏上限</span><span class="v">没有上限 · 多了用上面的筛选</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -1301,6 +1370,9 @@
           <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方与企业看不到</span></div>
           <div class="kv-row"><span class="k">怎么清</span><span class="v">账号设置里整段删</span></div>
           <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+          <div class="kv-row"><span class="k">什么时候写</span><span class="v">打开详情、打开来源入口各一条</span></div>
+          <div class="kv-row"><span class="k">不参与</span><span class="v">排序与推荐都不用这份记录</span></div>
+          <div class="kv-row"><span class="k">导出</span><span class="v">本机不做导出 · 可逐条打印带走</span></div>
         </div>
         <details class="fold" style="margin-top:10px">
           <summary>为什么还要留这份记录</summary>
@@ -1378,7 +1450,7 @@
   </div>
 
   <div class="actionbar">
-    <a class="backbtn" href="23-me.html" data-parent-label="我的"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a>
+    <div class="backwrap"><a class="backbtn" href="23-me.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a></div>
     <div class="actionbar-hint">
       <div data-at="ai">
         <div data-when="default device-off"><div class="t">本月 6 次 AI 服务 · 下一步是逐条比对</div><div class="s">只存元数据，不存简历原文与模型输出</div></div>
@@ -1431,12 +1503,21 @@
 ;(function () {
   var scr = document.querySelector('.screen')
   if (!scr) return
+  /* 不认识的 ?stage= 兜底：stages.js 会照单全收地把 data-stage 设成任意字符串，
+     于是 42-my-assets.html?stage=typo 会渲染成**一片空白**（没有任何 data-at 命中）。
+     外部链接写错一个字母就白屏，代价太大。这里把取值收敛到白名单，
+     不认识就落回第一个标签。 */
+  var VALID = ['ai', 'fav', 'trace', 'notice']
+  if (VALID.indexOf(scr.getAttribute('data-stage')) < 0) {
+    if (window.v3Stage) window.v3Stage(VALID[0])
+    else { scr.setAttribute('data-stage', VALID[0]); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
   function sync () {
     var cur = scr.getAttribute('data-stage')
     document.querySelectorAll('.stbtn').forEach(function (b) {
       b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
     })
-    if (window.v3SyncBack) window.v3SyncBack()
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
@@ -1478,7 +1559,7 @@
       if (ok) n++
     }
     wrap.classList.toggle('is-empty', n === 0)
-    var cnt = bar.querySelector('[data-count]')
+    var cnt = bar.querySelector('[data-shown]')
     if (cnt) cnt.textContent = n ? ('显示 ' + n + ' 条') : '这一类没有记录'
     var lb = wrap.querySelector('[data-empty-lb]')
     var cur = bar.querySelector('.fchip[aria-pressed="true"]')
