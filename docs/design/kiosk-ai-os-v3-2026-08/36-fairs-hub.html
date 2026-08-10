@@ -116,6 +116,27 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .pick--empty .v { color: var(--amber-200); }
 .dcard--pick .dcard-go { min-height: 48px; text-decoration: none; }
 
+/* 时间：真实日期标签（Codex :297 整改）──────────────────────────────
+   原来时间是 .pick 轮换「本周 / 本月 / 指定日期」，选中「指定日期」却没有任何
+   日期控件，等于让用户选了一个选不出来的东西。一体机不弹系统日期选择器
+   （原生控件会挡住流程、也不适合触控），所以改成**可点的真实日期标签**：
+   每个标签把对应的起止日期写在脸上，点中即写进 from / to，直接带进 17-fair-desk。 */
+.dates { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.dtag { min-height: 48px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; line-height: 1.3;
+  transition: border-color var(--dur-2) var(--ease-out); }
+.dtag i { font-style: normal; font-size: var(--fz-1); font-weight: 400; color: var(--fog-600);
+  font-family: var(--ff-num); letter-spacing: .02em; }
+.dtag:hover { border-color: var(--jade-a32); }
+.dtag[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
+.dtag[aria-pressed="true"] i { color: var(--fog-700); }
+.dates-k { align-self: center; font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+
+/* 方向未选时主动作不可用：链接去掉 href，不留一个点了没反应的假入口 */
+.dcard-go[aria-disabled="true"] { color: var(--fog-600); cursor: not-allowed; }
+
 /* ai-down：AI 卡置灰（主动作仍是真链接，去向那一页的非 AI 部分照常） */
 .screen[data-state="ai-down"] .dcard--ai { opacity: .72; border-color: var(--brd-1);
   border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
@@ -221,11 +242,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibar-t">你想做哪件事</span>
-          <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
+          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
         </div>
         <div class="aiuse">
           <button class="aibtn" type="button" data-spot="c-social c-campus" aria-pressed="false">我要挑一场去<em>先看有哪些场次</em></button>
-          <button class="aibtn" type="button" data-spot="c-plan" aria-pressed="false">帮我排逛展顺序<em>先选城市、时间、方向</em></button>
+          <button class="aibtn" type="button" data-spot="c-plan" aria-pressed="false">帮我排逛展顺序<em>先选城市、日期、方向</em></button>
           <button class="aibtn" type="button" data-spot="c-material" aria-pressed="false">去之前带什么材料<em>按这一场列清单</em></button>
         </div>
         <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只排顺序和列清单，<b>不替你报名或预约</b>。</div>
@@ -239,9 +260,9 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
-          <a class="aibtn" href="17-fair-desk.html">看场次<em>时间、地点、企业名录</em></a>
-          <a class="aibtn" href="17-fair-desk.html">扫码签到<em>到场扫主办方的码</em></a>
-          <a class="aibtn" href="17-fair-desk.html">看展位图<em>顺序自己定</em></a>
+          <a class="aibtn" href="17-fair-desk.html?stage=s1">看场次<em>时间、地点、企业名录</em></a>
+          <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>到场扫主办方的码</em></a>
+          <a class="aibtn" href="17-fair-desk.html?stage=s3&amp;view=booth-map">看展位图<em>顺序自己定</em></a>
           <a class="aibtn" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=简历与活动资料">打印材料<em>简历与活动资料</em></a>
         </div>
       </div>
@@ -250,7 +271,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div class="dgrid">
 
         <!-- 1 社会招聘会（首张大卡 · 非 AI） -->
-        <a class="dcard dcard--hero dcard--row" id="c-social" href="17-fair-desk.html">
+        <a class="dcard dcard--hero dcard--row" id="c-social" href="17-fair-desk.html?stage=s1&amp;kind=social">
           <span class="dcard-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="dcard-bd">
             <span class="dcard-nm">社会招聘会</span>
@@ -263,7 +284,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </a>
 
         <!-- 2 校园招聘会（非 AI） -->
-        <a class="dcard" id="c-campus" href="18-campus.html">
+        <a class="dcard" id="c-campus" href="18-campus.html?stage=s1&amp;kind=campus">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
@@ -274,7 +295,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </a>
 
         <!-- 3 扫码签到（非 AI） -->
-        <a class="dcard" id="c-checkin" href="17-fair-desk.html">
+        <a class="dcard" id="c-checkin" href="17-fair-desk.html?stage=s1&amp;view=checkin">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
@@ -284,65 +305,91 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 4 AI 参会规划（AI · 先选三样再排） -->
-        <div class="dcard dcard--ai dcard--pick" id="c-plan">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
+        <!-- 4 AI 参会规划（AI · 先选三样再排 · 整行横排）
+             2026-08-10 Codex :297/:306 整改：
+             ① 时间原来是「本周 / 本月 / 指定日期」轮换，选中「指定日期」却没有日期控件 ——
+                换成写明起止日期的真实标签，点中即落进 from / to。
+             ② 三项原来只改卡面文字，17-fair-desk 什么都收不到 —— 现在按
+                ?stage=s1&city=&from=&to=&dir= 带过去。
+             ③ 「城市默认本机所在地」没说明来源、「方向取自你的简历」既没说来源也没让用户确认 ——
+                城市改写成「本机配置的服务城市」并注明可改；方向默认「未选」，必须显式选，
+                没选就不给主动作（不替用户猜一个方向再排顺序）。 -->
+        <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-plan">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">AI参会规划</span>
+            <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
+            <span class="dcard-ds" data-when="ai-down">展位图与企业名录照常看，顺序自己定</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-key="city" data-opts="广州市|深圳市|佛山市|东莞市">
+                <span class="k">城市</span><span class="v">广州市</span></button>
+              <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
+                <span class="k">方向</span><span class="v">未选</span></button>
+              <span class="dates" role="group" aria-label="选时间范围">
+                <span class="dates-k">时间</span>
+                <button class="dtag" type="button" aria-pressed="true" data-from="2026-08-10" data-to="2026-08-16">本周<i>8/10–8/16</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-01" data-to="2026-08-31">本月<i>8/1–8/31</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-12" data-to="2026-08-12">8/12<i>周三</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-15" data-to="2026-08-15">8/15<i>周六</i></button>
+              </span>
+            </span>
+            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选</span>
+            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜</span>
           </span>
-          <span class="dcard-nm">AI参会规划</span>
-          <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
-          <span class="dcard-ds" data-when="ai-down">展位图与企业名录照常看，顺序自己定</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="广州 · 天河区|广州 · 越秀区|广州 · 海珠区|全广州">
-              <span class="k">城市</span><span class="v">广州 · 天河区</span></button>
-            <button class="pick" type="button" data-opts="本周|本月|指定日期">
-              <span class="k">时间</span><span class="v">本周</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
-          </div>
-          <span class="dcard-hint" data-when="default device-off">城市默认本机所在地，点一下可改；方向取自你的简历</span>
-          <span class="dcard-hint" data-when="first">城市默认本机所在地；没登录就手选方向，缺哪项先问你，不猜</span>
-          <a class="dcard-go" data-when="default first device-off" href="17-fair-desk.html">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="17-fair-desk.html">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          <span class="dcard-rt">
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
+            <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="按这三项排顺序" href="17-fair-desk.html?stage=s1">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="17-fair-desk.html?stage=s3&amp;view=booth-map">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          </span>
         </div>
 
         <!-- 5 求职材料准备（AI · 先选场次与方向） -->
         <div class="dcard dcard--ai dcard--pick" id="c-material">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
           </span>
           <span class="dcard-nm">求职材料准备</span>
           <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
           <span class="dcard-ds" data-when="ai-down">求职信、自我介绍、清单模板都是现成的</span>
           <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
+            <button class="pick" type="button" data-key="session" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
               <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
+            <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
               <span class="k">方向</span><span class="v">未选</span></button>
           </div>
-          <span class="dcard-hint" data-when="default first device-off">没选场次就先让你选，带几份由你最后定</span>
-          <a class="dcard-go" data-when="default first device-off" href="12-material-factory.html">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="12-material-factory.html">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定</span>
+          <!-- 12-material-factory 的阶段轴是 t1 求职信 / t2 自我介绍 / t3 材料清单 / t4 简历模板，
+               不是 s1–s4；本卡去的是「材料清单」，所以传 stage=t3，ai-down 走 t4 模板 -->
+          <a class="dcard-go" data-when="default first device-off" data-base="12-material-factory.html?stage=t3&amp;from=P36" data-pick-scope="c-material" data-need="dir" data-need-label="先选方向" data-go-label="生成材料清单" href="12-material-factory.html?stage=t3&amp;from=P36">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          <a class="dcard-go" data-when="ai-down" href="12-material-factory.html?stage=t4&amp;from=P36&amp;view=templates">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
         </div>
 
-        <!-- 6 活动资料打印（非 AI） -->
-        <a class="dcard dcard--wide dcard--print" id="c-print" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=活动资料">
+        <!-- 6 活动资料打印（非 AI）
+             2026-08-10 Codex :335 整改：device-off 卡面写「先存我的文档」，整张卡却仍链接
+             打印工作台 —— 用打印链接冒充保存。出纸链路断了，动作就得真的是「存进我的文档」，
+             所以这里按态拆成两张卡，各自挂各自真实的去向。 -->
+        <a class="dcard dcard--print" id="c-print" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P36&amp;kind=material&amp;title=活动资料">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">活动资料打印</span>
-          <span class="dcard-ds" data-when="default first ai-down">上传或扫描材料，本机直接打印</span>
-          <span class="dcard-ds" data-when="device-off">打印机离线，材料可先存进我的文档，换机取回</span>
-          <span class="dcard-hint" data-when="default first ai-down">本页不出价，以打印工作台核价为准</span>
-          <span class="dcard-go" data-when="default first ai-down">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-          <span class="dcard-go" data-when="device-off">先存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-ds">上传或扫描材料，本机直接打印</span>
+          <span class="dcard-hint">本页不出价，以打印台核价为准</span>
+          <span class="dcard-go">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+        <a class="dcard dcard--print" data-when="device-off" href="23-me.html?view=docs&amp;from=P36&amp;kind=material&amp;title=活动资料">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">活动资料打印</span>
+          <span class="dcard-ds">打印机离线，材料存进我的文档</span>
+          <span class="dcard-hint">只做保存，不进打印队列、不产生费用</span>
+          <span class="dcard-go">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
       </div>
 
@@ -354,7 +401,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span data-when="first">未登录，记录留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="17-fair-desk.html">
+          <a class="dmore-go" href="17-fair-desk.html?stage=s1&amp;view=browse">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
@@ -364,7 +411,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="17-fair-desk.html">
+          <a class="dmore-go" href="17-fair-desk.html?stage=s1&amp;view=jumps">
             <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">外部跳转记录</span>
@@ -389,14 +436,14 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">带什么去，卡里有清单</div></div>
+      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">城市、日期、方向选完才排顺序</div></div>
       <div data-when="first"><div class="t">不登录也能用，六张卡一张都不锁</div><div class="s">这一趟的记录留不下，离场即清</div></div>
       <div data-when="ai-down"><div class="t">场次、签到、打印照常</div></div>
       <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
     </div>
 
     <a class="btn btn--lg btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
-    <a class="btn btn--primary" href="17-fair-desk.html">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="17-fair-desk.html?stage=s1">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
@@ -416,8 +463,73 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 ;(function () {
   var scr = document.querySelector('.screen')
   if (!scr) return
+
+  function shown (el) {
+    return el && !el.hidden && (el.offsetParent !== null || el.getClientRects().length > 0)
+  }
+
+  /* ── 选择项 → 下一页参数 ────────────────────────────────────────────
+     2026-08-10 Codex :297 整改：三项选择原来点完就停在本页，17-fair-desk 收不到。
+     现在城市 / 方向走 .pick[data-key]，日期走 .dtag[data-from][data-to]，
+     点完立刻把当前取值拼回主动作的 href：
+       17-fair-desk.html?stage=s1&city=…&dir=…&from=…&to=…
+     方向未选（data-need）时**不给 href**，按钮文字改成「先选方向」——
+     宁可点不动，也不能替用户猜一个方向就去排顺序。 */
+  function syncPickLinks () {
+    var links = scr.querySelectorAll('[data-pick-scope][data-base]')
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i]
+      var host = document.getElementById(a.getAttribute('data-pick-scope'))
+      if (!host) continue
+      var qs = '', missing = false
+      var picks = host.querySelectorAll('.pick[data-key]')
+      for (var j = 0; j < picks.length; j++) {
+        var pk = picks[j]
+        if (!shown(pk)) continue
+        var vEl = pk.querySelector('.v')
+        var raw = vEl ? (vEl.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+        if (raw === '未选') raw = ''
+        if (!raw && pk.getAttribute('data-key') === a.getAttribute('data-need')) missing = true
+        qs += '&' + pk.getAttribute('data-key') + '=' + encodeURIComponent(raw)
+      }
+      var on = host.querySelector('.dtag[aria-pressed="true"]')
+      if (on && shown(on)) {
+        qs += '&from=' + encodeURIComponent(on.getAttribute('data-from')) +
+              '&to=' + encodeURIComponent(on.getAttribute('data-to'))
+      }
+      var label = missing ? a.getAttribute('data-need-label') : a.getAttribute('data-go-label')
+      a.innerHTML = label + '<svg class="ic"><use href="#i-arrowRight"/></svg>'
+      if (missing) {
+        a.removeAttribute('href')
+        a.setAttribute('aria-disabled', 'true')
+      } else {
+        a.setAttribute('href', a.getAttribute('data-base') + qs)
+        a.removeAttribute('aria-disabled')
+      }
+    }
+  }
+  window.v3SyncPickLinks = syncPickLinks
+  syncPickLinks()
+  if (typeof window.v3ApplyVisibility === 'function') {
+    var origApply = window.v3ApplyVisibility
+    window.v3ApplyVisibility = function () { origApply.apply(this, arguments); syncPickLinks() }
+  }
+  if (window.MutationObserver) {
+    new window.MutationObserver(syncPickLinks)
+      .observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  }
+
   scr.addEventListener('click', function (e) {
     if (!e.target.closest) return
+
+    /* ⓪ 日期标签：直接选中，起止日期写在标签脸上，不做"指定日期"这种选不出来的选项 */
+    var d = e.target.closest('.dtag')
+    if (d) {
+      var grp = d.parentNode.querySelectorAll('.dtag')
+      for (var n = 0; n < grp.length; n++) grp[n].setAttribute('aria-pressed', grp[n] === d ? 'true' : 'false')
+      syncPickLinks()
+      return
+    }
 
     /* ① 卡上的输入项：点一下换一个值。缺输入时先变成真实取值，再进下一页 */
     var p = e.target.closest('.pick')
@@ -429,6 +541,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         v.textContent = opts[(i + 1) % opts.length]
         p.classList.remove('pick--empty')
       }
+      syncPickLinks()
       return
     }
 

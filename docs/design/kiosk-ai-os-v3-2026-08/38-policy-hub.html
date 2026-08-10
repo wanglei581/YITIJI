@@ -212,15 +212,15 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibar-t">你要办哪件事</span>
-          <span class="ev ev--e3">E3 AI 判断</span>
+          <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
         </div>
         <div class="aiuse">
-          <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>对照能办哪些</em></button>
-          <button class="aibtn" type="button" data-spot="c-ai c-subsidy" aria-pressed="false">这一项要带什么材料<em>生成办事清单</em></button>
+          <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>筛出可能相关的政策</em></button>
+          <button class="aibtn" type="button" data-spot="c-ai c-subsidy" aria-pressed="false">这一项要带什么材料<em>核对材料缺口</em></button>
           <a class="aibtn" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">我要打印政策要点<em>去打印工作台核价</em></a>
-          <a class="aibtn aibtn--off" data-when="device-off" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">我要打印政策要点<em>打印机离线 · 先存我的文档</em></a>
+          <a class="aibtn aibtn--off" data-when="device-off" href="23-me.html?view=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
         </div>
-        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只做条件对照与材料清单。</div>
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只做政策预筛与材料缺口核对。</div>
       </div>
 
       <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
@@ -231,9 +231,9 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
-          <a class="aibtn" href="21-policy.html">政策原文<em>官方发布口径</em></a>
-          <a class="aibtn" href="21-policy.html">办事材料清单<em>按事项列，不按人</em></a>
-          <a class="aibtn" href="21-policy.html">官方办理入口<em>去官方渠道办</em></a>
+          <a class="aibtn" href="21-policy.html?stage=s2&amp;view=doc">政策原文<em>官方发布口径</em></a>
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;view=checklist">办事材料清单<em>按事项列，不按人</em></a>
+          <a class="aibtn" href="21-policy.html?stage=s2&amp;view=official">官方办理入口<em>热线与官网二维码</em></a>
           <a class="aibtn" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">打印政策要点<em>本机直接打印</em></a>
         </div>
       </div>
@@ -241,12 +241,13 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <!-- ── 六张子能力卡 ── -->
       <div class="dgrid">
 
-        <!-- 1 就业政策（首张大卡 · 非 AI） -->
-        <a class="dcard dcard--hero dcard--row" id="c-employ" href="21-policy.html">
+        <!-- 1 就业政策（首张大卡 · 非 AI · 带 cat=employment 进政策页） -->
+        <a class="dcard dcard--hero dcard--row" id="c-employ" href="21-policy.html?stage=s1&amp;cat=employment">
           <span class="dcard-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
           <span class="dcard-bd">
             <span class="dcard-nm">就业政策</span>
             <span class="dcard-ds">就业补贴、灵活就业等官方口径原文</span>
+            <span class="dcard-hint">进入后已按「就业」分类筛好，只列这一类</span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--info">不依赖 AI</span>
@@ -254,79 +255,86 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
         </a>
 
-        <!-- 2 社保指南（非 AI） -->
-        <a class="dcard" id="c-social" href="21-policy.html">
+        <!-- 2 社保指南（非 AI · 带 cat=social） -->
+        <a class="dcard" id="c-social" href="21-policy.html?stage=s1&amp;cat=social">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">社保指南</span>
           <span class="dcard-ds">参保流程与办事材料清单</span>
-          <span class="dcard-hint">城镇职工与灵活就业两类险种说明</span>
+          <span class="dcard-hint">进入后已按「社保」分类筛好，只列这一类</span>
           <span class="dcard-go">看社保指南<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 3 档案与登记（非 AI） -->
-        <a class="dcard" id="c-archive" href="21-policy.html">
+        <!-- 3 档案与登记（非 AI · 带 cat=archive） -->
+        <a class="dcard" id="c-archive" href="21-policy.html?stage=s1&amp;cat=archive">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">档案与登记</span>
           <span class="dcard-ds">档案托管、就业登记与证明开具</span>
-          <span class="dcard-hint">按事项列材料，去哪办也写在里面</span>
+          <span class="dcard-hint">进入后已按「档案」分类筛好，只列这一类</span>
           <span class="dcard-go">看办理指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 4 补贴指引（非 AI） -->
-        <a class="dcard" id="c-subsidy" href="21-policy.html">
+        <!-- 4 补贴指引（非 AI · 带 cat=subsidy） -->
+        <a class="dcard" id="c-subsidy" href="21-policy.html?stage=s1&amp;cat=subsidy">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">补贴指引</span>
           <span class="dcard-ds">失业保险、创业扶持与官方办理入口</span>
-          <span class="dcard-hint">只做说明与指引，不代办、不承诺到账</span>
+          <span class="dcard-hint">进入后已按「补贴」分类筛好，只列这一类</span>
           <span class="dcard-go">看补贴指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 5 政策收藏（非 AI） -->
-        <a class="dcard" id="c-fav" href="21-policy.html">
+        <!-- 5 政策收藏（非 AI · 收藏是个人清单不是政策分类，所以传 view=favorites） -->
+        <a class="dcard" id="c-fav" href="21-policy.html?stage=s1&amp;view=favorites">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-bookmark"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">政策收藏</span>
           <span class="dcard-ds">收藏过的政策条目，方便回头再看</span>
-          <span class="dcard-hint" data-when="default ai-down device-off">本次会话 0 条</span>
+          <span class="dcard-hint" data-when="default ai-down device-off">进入后只列你收藏的 · 本次会话 0 条</span>
           <span class="dcard-hint" data-when="first">未登录，0 条，这一趟收藏的也留不下</span>
           <span class="dcard-go">看我的收藏<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 6 AI 政策助手（AI · 先给三样再对照 · 整行横排） -->
+        <!-- 6 AI 政策助手（AI · 三项只做预筛，选完带进 21-policy 继续补问 · 整行横排）
+             2026-08-10 Codex :311/:314 整改：
+             ① 原文案「对照能办哪些 / 我能办哪些」是资格判断承诺 —— 改成「筛出可能相关的政策 ·
+                核对材料缺口」；资格结论一律走页脚那条（经办窗口审核为准），本卡不再另说一遍。
+             ② 这三项**替代不了** 21-policy 的「地区 + 九项条件」问答，所以只当预筛：
+                选项取值直接对齐政策页的 status / soc / city 三个问项，点完通过 URL 带过去，
+                剩下六项由政策页继续补问。未选就传空值，让政策页知道这项还得问。 -->
         <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-ai">
           <span class="dcard-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
           <span class="dcard-bd">
             <span class="dcard-nm">AI政策助手</span>
-            <span class="dcard-ds" data-when="default first device-off">按你的情况对照能办哪些，再列要带的材料</span>
+            <span class="dcard-ds" data-when="default first device-off">筛出可能相关的政策 · 核对材料缺口</span>
             <span class="dcard-ds" data-when="ai-down">政策原文与办事清单照常看，条件自己对</span>
             <span class="picks" data-when="default first device-off">
-              <button class="pick" type="button" data-opts="应届毕业生|失业登记|灵活就业|在职">
-                <span class="k">身份</span><span class="v">应届毕业生</span></button>
-              <button class="pick" type="button" data-when="default device-off" data-opts="灵活就业参保|城镇职工参保|暂未参保">
-                <span class="k">参保</span><span class="v">灵活就业参保</span></button>
-              <button class="pick pick--empty" type="button" data-when="first" data-opts="灵活就业参保|城镇职工参保|暂未参保">
-                <span class="k">参保</span><span class="v">未选</span></button>
-              <button class="pick" type="button" data-opts="广州 · 天河区|广州 · 越秀区|广州 · 海珠区|全广州">
-                <span class="k">城市</span><span class="v">广州 · 天河区</span></button>
+              <button class="pick" type="button" data-key="identity" data-opts="离职找工作中|在职想换工作|应届毕业生|想创业 / 已创业">
+                <span class="k">现在状态</span><span class="v">离职找工作中</span></button>
+              <button class="pick" type="button" data-key="insured" data-when="default device-off" data-opts="未缴|不满 3 个月|满 3 个月以上">
+                <span class="k">连续缴费</span><span class="v">未缴</span></button>
+              <button class="pick pick--empty" type="button" data-key="insured" data-when="first" data-opts="未缴|不满 3 个月|满 3 个月以上">
+                <span class="k">连续缴费</span><span class="v">未选</span></button>
+              <button class="pick" type="button" data-key="city" data-opts="广州市|深圳市|佛山市|东莞市">
+                <span class="k">城市</span><span class="v">广州市</span></button>
             </span>
-            <span class="dcard-hint" data-when="default device-off">城市默认本机所在地，点一下可改；缺哪项先问你，不替你填</span>
-            <span class="dcard-hint" data-when="first">城市默认本机所在地；没登录就手选，缺哪项先问你</span>
+            <span class="dcard-hint" data-when="default device-off">这三项只做预筛；城市取本机配置的服务城市（可改），其余条件进政策页继续问</span>
+            <span class="dcard-hint" data-when="first">这三项只做预筛；没登录就手选，未选的项带空值进去，由政策页继续问</span>
           </span>
           <span class="dcard-rt">
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI</span>
-            <a class="dcard-go" data-when="default first device-off" href="21-policy.html">对照我能办哪些<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-            <a class="dcard-go" data-when="ai-down" href="21-policy.html">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
+            <a class="dcard-go" data-when="default first device-off" data-base="21-policy.html?stage=s1" data-pick-scope="c-ai" href="21-policy.html?stage=s1">筛出可能相关的政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="21-policy.html?stage=s2&amp;view=doc">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
         </div>
       </div>
@@ -339,7 +347,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span data-when="first">未登录，记录留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="21-policy.html">
+          <a class="dmore-go" href="21-policy.html?stage=s1&amp;view=browse">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
@@ -349,11 +357,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="21-policy.html">
+          <a class="dmore-go" href="21-policy.html?stage=s1&amp;view=qa-history">
             <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">AI政策问答记录</span>
-              <span class="dmore-s">查看历次条件对照与问答</span>
+              <span class="dmore-s">查看历次条件核对与问答</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
@@ -365,8 +373,8 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <!-- ── 页脚：整页只此一条合规声明 ── -->
       <div class="notice">
         <svg class="ic"><use href="#i-shield"/></svg>
-        <span>政策信息来自官方发布，仅供参考；本终端只做政策说明与材料指引，<b>不代办、不承诺办理结果</b>，
-          能不能办、能不能领一律<b>以经办窗口审核为准</b>。</span>
+        <span>政策信息来自官方发布，仅供参考；本终端只做政策说明与材料指引，<b>不做资格判定、不代办、不承诺办理结果</b>，
+          够不够条件、能不能办、能不能领一律<b>以经办窗口审核为准</b>。</span>
       </div>
     </div>
   </div>
@@ -375,15 +383,16 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">先说你的情况，再看能办哪些</div><div class="s">本机不代办</div></div>
+      <div data-when="default"><div class="t">先说你的情况，再筛出可能相关的政策</div><div class="s">条件由政策页逐项核对</div></div>
       <div data-when="first"><div class="t">不登录也能查，六张卡一张都不锁</div><div class="s">这一趟的浏览与收藏留不下，离场即清</div></div>
       <div data-when="ai-down"><div class="t">政策原文与清单照常</div></div>
       <div data-when="device-off"><div class="t">打印机离线，查政策不受影响</div><div class="s">要点可先存我的文档，换机取回再打</div></div>
     </div>
 
     <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-printer"/></svg>打印政策要点</a>
-    <a class="btn btn--lg btn--ghost" data-when="device-off" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-printer"/></svg>先存我的文档</a>
-    <a class="btn btn--primary" href="21-policy.html">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- device-off：这里不能挂打印链接冒充保存 —— 出纸链路断了，动作就得真的是「存进我的文档」 -->
+    <a class="btn btn--lg btn--ghost" data-when="device-off" href="23-me.html?view=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</a>
+    <a class="btn btn--primary" href="21-policy.html?stage=s1">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
@@ -403,6 +412,46 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 ;(function () {
   var scr = document.querySelector('.screen')
   if (!scr) return
+
+  /* ── 选择项 → 下一页参数 ────────────────────────────────────────────
+     2026-08-10 Codex :314 整改：三项选择原来点完就停在本页，下一页收不到。
+     现在每个 .pick 带 data-key，主动作链接带 data-base + data-pick-scope，
+     点完立刻把当前取值拼回 href。**未选的项也要出现在 query 里、值留空** ——
+     空值是给政策页的信号：这一项还没问到，请继续补问，别当成用户答过了。
+     只有当前可见（未被 data-when 隐藏）的 pick 参与拼接，否则同一个 key
+     会被 first 态那份「未选」按钮覆盖成空。 */
+  function syncPickLinks () {
+    var links = scr.querySelectorAll('[data-pick-scope][data-base]')
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i]
+      var host = document.getElementById(a.getAttribute('data-pick-scope'))
+      if (!host) continue
+      var picks = host.querySelectorAll('.pick[data-key]')
+      var qs = ''
+      for (var j = 0; j < picks.length; j++) {
+        var pk = picks[j]
+        if (pk.hidden || (pk.offsetParent === null && pk.getClientRects().length === 0)) continue
+        var vEl = pk.querySelector('.v')
+        var raw = vEl ? (vEl.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+        if (raw === '未选') raw = ''
+        qs += '&' + pk.getAttribute('data-key') + '=' + encodeURIComponent(raw)
+      }
+      a.setAttribute('href', a.getAttribute('data-base') + qs)
+    }
+  }
+  window.v3SyncPickLinks = syncPickLinks
+  syncPickLinks()
+  /* 四态切换会换掉哪些 pick 可见，所以每次切态之后要重拼一次。
+     包一层 v3ApplyVisibility 覆盖脚本调用；再挂一个 observer 覆盖 stage.js 自己的态切换。 */
+  if (typeof window.v3ApplyVisibility === 'function') {
+    var origApply = window.v3ApplyVisibility
+    window.v3ApplyVisibility = function () { origApply.apply(this, arguments); syncPickLinks() }
+  }
+  if (window.MutationObserver) {
+    new window.MutationObserver(syncPickLinks)
+      .observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  }
+
   scr.addEventListener('click', function (e) {
     if (!e.target.closest) return
 
@@ -416,6 +465,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         v.textContent = opts[(i + 1) % opts.length]
         p.classList.remove('pick--empty')
       }
+      syncPickLinks()
       return
     }
 
