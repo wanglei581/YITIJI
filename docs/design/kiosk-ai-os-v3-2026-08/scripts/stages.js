@@ -70,9 +70,17 @@
      把用户放在流程开头才是对的，放在半路等于换了一种走错。 */
   function firstStage () {
     var rail = document.querySelector('.rail, .spine-rail, [data-rail]')
+    /* **没有阶段轨就不要猜。**
+       第一版写的是 (rail || document)，在没有轨的页面上退化成
+       「扫全文档第一个 [data-go]」—— 而那通常是正文里的某个跳转按钮，
+       不是流程的第一步。实测后果：裸开 03 身份门落在 s2「输入手机号」，
+       三选一那一屏根本没出现；裸开 05 手机接力落在 s2 一屏正在上传的进度条，
+       还带着两个不属于用户的文件名 —— 既是错方向，又是伪造的进行态。
+       没有轨时返回 null，交回页面自己在 HTML 里声明的 data-stage。 */
+    if (!rail) return null
     var ok = validStages()
     var found = null
-    ;(rail || document).querySelectorAll('[data-go]').forEach(function (el) {
+    rail.querySelectorAll('[data-go]').forEach(function (el) {
       if (found) return
       var v = el.getAttribute('data-go')
       if (v && ok[v]) found = v

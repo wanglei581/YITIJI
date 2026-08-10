@@ -693,6 +693,24 @@ async function runAll (only) {
 
   RESULT.finishedAt = new Date().toISOString()
 
+  /* 跨页链接校验只在**跑了全站**时才有意义。
+     单页模式下 exists 表只有这一页，于是所有跨页链接都被报成「目标页不存在」——
+     一屏假红条会把真问题淹掉，也会让人开始不信这份报告。
+     （这一条是整改代理跑单页时发现的，用未改动的 02-standby 复现确认过。） */
+  var partial = PAGES.length < (RESULT.manifest && RESULT.manifest.count || PAGES.length)
+  if (partial) {
+    log('\n跨页链接：本次只跑了 ' + PAGES.length + ' 页，**跳过链接校验**'
+      + '（单页模式下无法判断其它页存不存在，报出来全是假的）。', 'warn')
+    RESULT.badLinks = null
+    RESULT.finishedAt = new Date().toISOString()
+    log('\n────────────────────────────────')
+    log('页数 ' + PAGES.length + '　组合 ' + totalCombos
+      + '　有问题的页 ' + pagesWithDefects + '　缺陷 ' + totalDefects + '　console 错 ' + totalErrors,
+      (totalDefects || totalErrors) ? 'bad' : 'ok')
+    window.V3_REGRESS_RESULT = RESULT
+    return
+  }
+
   var badLinks = validateLinks(RESULT.pages)
   RESULT.badLinks = badLinks
   var linkCount = RESULT.pages.reduce(function (n, p) { return n + ((p.links || []).length) }, 0)
