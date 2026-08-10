@@ -344,7 +344,30 @@ function buildCombos (disc, win) {
     base[n] = (v && disc.axes[n].indexOf(v) > -1) ? v : disc.axes[n][0]
   })
 
-  /* 每条轴要单独跑的取值 = 全部取值去掉默认值（默认值已经在基线组合里跑过） */
+  /* 每条轴只在**它真正起作用的阶段**上变化。
+     06 一开始是 868 组，其中大量组合毫无意义 —— 在「选来源」那一步去改
+     「收银状态」，那一步根本没有收银元素，跑一遍什么也验不到，
+     还把一台子拖到跑不完。
+     判据：带这条轴的元素自己（或其祖先）用 data-at 声明了哪些阶段。
+     没有任何 data-at 约束的，视为所有阶段都相关。 */
+  var axisStages = {}
+  axisNames.forEach(function (n) {
+    var set = null
+    win.document.querySelectorAll('[' + n + ']').forEach(function (el) {
+      if (el === screen) return
+      var at = null
+      for (var a = el; a && a !== screen; a = a.parentElement) {
+        if (a.hasAttribute && a.hasAttribute('data-at')) { at = a.getAttribute('data-at'); break }
+      }
+      if (!at) { set = 'all'; return }
+      if (set === 'all') return
+      if (!set) set = {}
+      at.split(/\s+/).forEach(function (s) { if (s) set[s] = 1 })
+    })
+    axisStages[n] = (set === 'all' || !set) ? null : Object.keys(set)
+  })
+
+  /* 每条轴要单独跑的取值 = 全部取值去掉默认值（默认值已在基线组合里跑过） */
   var variants = [[]]                                    // [] = 全部用默认值
   axisNames.forEach(function (n) {
     disc.axes[n].forEach(function (v) {
@@ -356,6 +379,9 @@ function buildCombos (disc, win) {
   for (var s = 0; s < STATES.length; s++)
     for (var g = 0; g < stages.length; g++)
       for (var e = 0; e < variants.length; e++) {
+        var vary = variants[e][0]
+        if (vary && axisStages[vary[0]] && stages[g] &&
+            axisStages[vary[0]].indexOf(stages[g]) < 0) continue   // 这一步用不到这条轴
         /* 每个组合都带上全套默认值，避免上一轮改过的轴留在 .screen 上污染下一轮 */
         var extra = axisNames.map(function (n) { return [n, base[n]] })
         variants[e].forEach(function (kv) {
@@ -624,7 +650,13 @@ async function runAll (only) {
         } else if (out === undefined || out === null) {
           rec.defects.push({ combo: comboLabel(cb.list[j]), check: '审计没有返回值', value: 1 })
         }
-        var occ = auditOcclusion(win)
+        /* 遮挡检测只在每个「态 × 阶段」的基线组合上跑一次。
+           它对每个按钮的每一层祖先调 getComputedStyle，会强制样式重算，
+           在 06 / 09 这种大页上按 868 组合逐一跑会把整台子拖死（实测 09 卡住数分钟）。
+           附加轴（data-pay / data-job / data-redact…）改的是卡片内容，
+           不改栏与页脚的几何，对遮挡没有影响 —— 所以按基线跑一次就够，
+           而这一点是**判断**，写在这里以便日后有人推翻它。 */
+        var occ = cb.list[j].varied ? [] : auditOcclusion(win)
         for (var oi = 0; oi < occ.length; oi++) {
           var cut = occ[oi].kind === '被裁掉'
           rec.defects.push({ combo: comboLabel(cb.list[j]),
