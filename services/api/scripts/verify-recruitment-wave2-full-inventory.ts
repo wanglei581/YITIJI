@@ -198,6 +198,24 @@ async function verifyPaginationAndDiff(): Promise<void> {
   }
   const snapshot = await collectPublicSnapshot(config, target, fakeRequester(fixture))
   assert.deepEqual(snapshot.ids, fixture)
+  const legacyPolicyFixture = { ...fixture, policies: makeIds('policy', 199) }
+  const legacyPolicySnapshot = await collectPublicSnapshot(
+    config,
+    target,
+    fakeRequester(legacyPolicyFixture, { legacyPolicies: true })
+  )
+  assert.deepEqual(legacyPolicySnapshot.ids, legacyPolicyFixture)
+  await assert.rejects(
+    collectPublicSnapshot(
+      config,
+      target,
+      fakeRequester(
+        { ...fixture, policies: makeIds('policy', 200) },
+        { legacyPolicies: true }
+      )
+    ),
+    /PUBLIC_API_NOT_PAGEABLE/u
+  )
   const diff = diffIdSets(fixture, { ...fixture, jobs: fixture.jobs.slice(1) })
   assert.deepEqual(diff.jobs.missingFromApi, [fixture.jobs[0]])
   assert.deepEqual(diff.jobs.unexpectedInApi, [])
@@ -318,7 +336,7 @@ async function verifyOperationalContracts(): Promise<void> {
   }
 }
 
-function fakeRequester(fixture: PublicIdSets) {
+function fakeRequester(fixture: PublicIdSets, options: { legacyPolicies?: boolean } = {}) {
   return async (path: string): Promise<unknown> => {
     const url = new URL(path, 'http://127.0.0.1')
     if (url.pathname === '/health') return { success: true, data: { status: 'ok', db: 'postgres' } }
@@ -343,7 +361,9 @@ function fakeRequester(fixture: PublicIdSets) {
       total: ids.length,
       totalPages: Math.max(1, Math.ceil(ids.length / pageSize)),
     }
-    return legacy ? { data, ...meta } : { data, pagination: meta }
+    return legacy || (url.pathname === '/policies' && options.legacyPolicies)
+      ? { data, ...meta }
+      : { data, pagination: meta }
   }
 }
 
