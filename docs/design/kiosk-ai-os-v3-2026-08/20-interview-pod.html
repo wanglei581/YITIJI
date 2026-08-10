@@ -217,6 +217,11 @@
            gap:var(--s-3); padding-bottom:var(--s-3); }
 .rev { border-radius:var(--r-md); background:var(--glass-1-bg);
        border:1px solid var(--glass-1-brd); overflow:hidden; }
+/* .joblist 是 flex 列 + overflow-y:auto，子项默认 flex-shrink:1 ——
+   八题全答完再把点评行全部展开，卡片会被压扁，而 .rev 自己带 overflow:hidden，
+   压掉的那几行**直接被切掉**（audit-plus 里 P05 记的就是这一类：
+   文字不是溢出，是被吃掉了，肉眼很难发现）。列表该滚动，卡片不许缩。 */
+.joblist > .rev { flex:0 0 auto; }
 .rev-hd { display:flex; align-items:center; gap:var(--s-3); width:100%; min-height:64px;
           padding:var(--s-3) var(--s-4); background:transparent; border:0; cursor:pointer;
           font-family:var(--ff-ui); text-align:left; }
@@ -259,10 +264,13 @@
    行内间距（页面里到处是这个写法），行内样式优先级压过类，不加就沉不下去。 */
 .tail { margin-top:auto !important; }
 
-/* 纸下面的交接条：一行放得下，不许折成三段。
+/* 纸上下两条信息带：各自一行放得下，不许折成三段。
    刻意不用 overflow:hidden + ellipsis —— 自检的「文字裁切」量的是文本自身矩形，
-   省略号那一套会让它判成字被切掉（误报）。文案压短才是正解。 */
-.paper-bar--go .nm, .paper-bar--go .mt, .paper-bar--go .pg { white-space:nowrap; }
+   省略号那一套会让它判成字被切掉（误报）。文案压短才是正解。
+   nowrap 两条带都要加：只加下面那条时，上面那条会**默默折行**，
+   62px 固定高的带子里折成两行 = 上下都被切掉半个字，而 scrollWidth 检测
+   照样报 0（折行不产生横向溢出）—— 比溢出更难发现。 */
+.paper-bar .nm, .paper-bar .mt, .paper-bar .pg { white-space:nowrap; }
 
 /* ── S4：纸面 ─────────────────────────────────────────────────────── */
 /* 单页文件纸面居中（work.css 的顶对齐是为多页连续滚动设计的，只有一张纸时留死白） */
@@ -301,12 +309,66 @@
 .ck-t { font-size:var(--fz-3); color:var(--fog-900); }
 .ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
 
-/* 离线出口：屏幕上要真的画出码，不能只写「可以扫码」 */
+/* 离线出口：屏幕上要真的画出码，不能只写「可以扫码」。
+   码本身只在**存好之后**才出现 —— 没存就没有取件链接，先画一个码等于骗人。 */
 .qrcard { display:flex; flex-direction:column; align-items:center; gap:var(--s-3); }
 .qr-box { width:168px; height:168px; border-radius:var(--r-sm); background:#fff;
           display:grid; place-items:center; padding:12px; box-shadow:var(--sh-2); }
 .qr-box svg { width:100%; height:100%; }
+.qr-hold { width:168px; height:168px; border-radius:var(--r-sm);
+           border:1px dashed var(--brd-2); background:var(--surf-1);
+           display:grid; place-items:center; padding:var(--s-4); text-align:center;
+           font-size:var(--fz-1); color:var(--fog-600); line-height:1.6; }
 .qr-cap { font-size:var(--fz-1); color:var(--fog-600); text-align:center; line-height:1.6; }
+.qr-code { font-family:var(--ff-num); font-size:var(--fz-6); letter-spacing:.12em;
+           color:var(--jade-200); }
+
+/* ── 2026-08-10 第三轮（Codex 复审）新增构件 ──────────────────────────
+   全部为了同一件事：**页面不许在用户看不见的地方作弊**。
+   门控被绕过、旧答案串到新卷、超长回答被纸面裁掉、零勾选还能收费，
+   这四类都是「屏幕上写着一套、实际另一套」，比缺功能更糟。 */
+
+/* ① 阶段轨门控：设置没做完，2/3/4 步进不去。
+   刻意**不用** pointer-events:none —— 那会变成点了没反应的死键。
+   保持可点：点下去把缺的那一项高亮出来，并把人拦回第 1 步。 */
+.rstep[data-locked="true"] { opacity:.5; }
+.rstep[data-locked="true"] .rstep-name::after { content:' · 待设置'; color:var(--amber-200); }
+.gate-note { display:none; align-items:center; gap:var(--s-3);
+             margin-top:var(--s-4); padding:var(--s-3) var(--s-4);
+             border-radius:var(--r-xs); background:var(--amber-a12);
+             border:1px solid var(--amber-a20); color:var(--amber-200);
+             font-size:var(--fz-2); line-height:1.5; }
+.gate-note.is-on { display:flex; }
+.gate-note .ic { width:18px; height:18px; flex:0 0 auto; color:var(--amber-400); }
+
+/* ② ai-down 只有通用卷：岗位卷靠 AI 读岗位正文组卷，AI 不可用就不装可用。
+   和下面的 .bankrow 同一条规矩。 */
+.screen[data-state="ai-down"] .way[data-v="job"] { opacity:.45; pointer-events:none; }
+
+/* ③ 零勾选：不生成纸、不给链接、按钮真的按不动。
+   aria-disabled + pointer-events 一起用，读屏和手指看到的是同一件事。 */
+.btn[aria-disabled="true"], .pgbtn[aria-disabled="true"] { opacity:.42; pointer-events:none; }
+/* 空单占位刻意用**纸的配色**而不是半透明白：paper-stage 的底色是 --ink-400，
+   在 warm / ink 这些浅色主题里它本身就是浅的，白字压上去几乎读不出来
+   （第一版就是这样，截图里那两行字基本看不见）。用纸色卡片就跟主题无关了，
+   顺便也站在了「纸本来该在的位置」。 */
+.rp-none { width:100%; max-width:520px; margin:auto; padding:var(--s-6);
+           border-radius:var(--r-md); border:1px dashed #b9c6cf;
+           background:var(--paper-000); color:var(--paper-ink); text-align:center;
+           display:flex; flex-direction:column; gap:var(--s-3); box-shadow:var(--sh-2); }
+.rp-none b { font-size:var(--fz-5); }
+.rp-none span { font-size:var(--fz-2); line-height:1.6; color:var(--paper-fog); }
+
+/* ④ 离线存档：按钮必须真的改变什么。存之前 / 存之后两套内容同版面切换。
+   用 class 不用 hidden —— hidden 是四态机制的地盘（见本文件顶部注释）。 */
+.screen:not(.is-saved) .only-saved { display:none; }
+.screen.is-saved .only-idle { display:none; }
+
+/* ⑤ 纸面上的 AIGC 标识：全页只出现这一次，就印在纸头上。
+   「由职易达一体机生成」说的是设备，说明不了点评是 AI 写的。 */
+.rp-aigc { display:inline-block; margin-top:4px; padding:1px 7px;
+           border:1px solid #b9c6cf; border-radius:3px;
+           font-size:11px; color:#3f5361; letter-spacing:.04em; }
 </style>
 </head>
 <body>
@@ -389,9 +451,11 @@
                 <button class="opt" data-opt="target" data-v="any">
                   <span class="opt-t">不指定</span><span class="opt-s">走通用行为面</span></button>
               </div>
+              <!-- 选中「手输方向」只是选了个入口，**框里没字就等于没选** ——
+                   上一版选中即算完成，空着也能开始，出的题跟手输毫无关系。 -->
               <div class="manual">
                 <input class="tin" type="text" id="mtarget" placeholder="输入你想练的岗位方向，例如：机械设计 / 工艺">
-                <span class="chip chip--info">按方向出题</span>
+                <span class="chip chip--info" data-f="manualst">填了才算选完</span>
               </div>
             </div>
 
@@ -407,6 +471,9 @@
                   <span class="opt-t">深挖</span><span class="opt-s">每题多问一层</span></button>
               </div>
             </div>
+
+            <!-- 门控被挡下来时说清挡在哪。空着不占位，不是常驻的劝说文字。 -->
+            <div class="gate-note" data-f="gatenote"></div>
           </div>
 
           <!-- 回访 / 离线 / AI 不可用：本机已经认识你，直接给推荐 -->
@@ -418,9 +485,13 @@
             AI 不可用：能看题、能自己答、能打印题目，这次没有点评。
           </div>
 
+          <!-- 卷名 / 题数 / 时长上一版在四个地方各写一遍（这里、折叠区、右栏两处、
+               动作条），四处各自渲染就一定会有对不上的时候。现在只留右栏
+               「开始前确认」一处完整口径，别处不再复述数字。 -->
           <div class="pane-hd" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-layers"/></svg><b>选一份卷</b>
-            <span class="mt" data-f="paperline">岗位卷 · 8 题 · 约 15 分钟</span>
+            <span class="mt" data-when="default first device-off">选完在右边「开始前确认」核对</span>
+            <span class="mt" data-when="ai-down">AI 不可用 · 只能用通用卷</span>
           </div>
           <div class="ways">
             <button class="way" data-opt="paper" data-v="job" aria-pressed="true">
@@ -455,7 +526,7 @@
             </span>
             <span class="sp" style="flex:1 1 auto"></span>
             <button class="btn btn--primary" data-go="s2" data-act="start">
-              用此题库开始 · <span data-f="banktotal">6</span> 题<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+              用此题库开始<svg class="ic"><use href="#i-arrowRight"/></svg></button>
           </div>
         </div>
       </div>
@@ -505,7 +576,7 @@
           <div class="fold" style="margin-top:var(--s-3)">
             <button class="fold-t" data-fold="struct" aria-expanded="false">
               <svg class="ic"><use href="#i-interview"/></svg>查看本卷题目构成
-              <span class="fold-mt" data-f="structmt">8 题 · 约 15 分钟</span></button>
+              <span class="fold-mt">按题型分</span></button>
             <div class="fold-b" data-fold-b="struct">
               <div class="tline" data-f="structlist"></div>
             </div>
@@ -589,6 +660,11 @@
       <!-- ─────────── S3 看点评 ─────────── -->
       <!-- ai-down 的诚实降级（上一轮修好的，本轮保留）：点评正文隐藏，
            用户自己答的原文照留，纸面改叫「题目与答案单」。 -->
+      <!-- 降级说明**全页只讲一次**，就讲在这里。
+           上一版 ai-down 的 s3 把「没有点评 / AI 不可用 / 判断不了」讲了五遍：
+           这块两遍、列表每行一遍、右栏两块各一遍。重复的坏处不是啰嗦，
+           是用户读到第三遍会开始怀疑「是不是还有别的地方也坏了」。
+           这里留一条完整的，别处只标「无点评」。 -->
       <div class="pane" data-at="s3" data-when="ai-down">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-alert"/></svg><b>这次没有点评</b>
@@ -596,10 +672,8 @@
         <div class="sec">
           <div class="notice notice--amber">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span><b>AI 不可用，做不出点评。</b>下面留着的是原文，本机这次判断不了。</span>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            题目和答案可以照常打印带走；AI 恢复后回来重跑就有点评。
+            <span><b>AI 不可用，做不出点评。</b>下面留着的是题目和你自己答的原文，
+              可以照常打印带走；AI 恢复后回来重跑就有点评。</span>
           </div>
         </div>
       </div>
@@ -627,9 +701,9 @@
         <span class="nm" data-when="ai-down">题目与答案单 · <span data-f="p-paper2">机械设计 / 工艺岗</span></span>
         <span class="mt">A4 · <span data-f="p-pages">1</span> 页 · 黑白</span>
         <span class="pg">
-          <button class="pgbtn" aria-label="上一页">‹</button>
-          <span>第 1 / <span data-f="p-pages2">1</span> 页</span>
-          <button class="pgbtn" aria-label="下一页">›</button>
+          <button class="pgbtn" aria-label="上一页" aria-disabled="true">‹</button>
+          <span data-f="p-pgtext">第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页" aria-disabled="true">›</button>
         </span>
       </div>
 
@@ -644,13 +718,15 @@
       <div class="paper-bar paper-bar--go" data-at="s4">
         <span class="nm" data-when="default first device-off">带去：复盘单</span>
         <span class="nm" data-when="ai-down">带去：答案单</span>
+        <!-- 这一行的三个数字和纸面上真正印出来的块一一对应（同一次生成里数出来的），
+             不是另算一遍。上一版按钮只算「本人 + 示例」，把也会印的未答题漏掉了。 -->
         <span class="mt" data-f="f-what">示例 4 题 · 未答 8 道</span>
         <!-- 这条深色带上不放 chip：warm 主题里 --amber-200 / --jade-200 解析成深色
              （那是给浅底用的），压在深带上几乎读不出来。直接用带子自己的字色。 -->
         <span class="pg">
           <span>共 <span data-f="f-pages">1</span> 页 · 预估 <span data-f="f-fee">0.20</span> 元</span>
-          <span class="mt" data-when="default first ai-down">· 打印台核价</span>
-          <span class="mt" data-when="device-off">· 离线，改存我的文档</span>
+          <span class="mt" data-when="default first ai-down">· 待核价</span>
+          <span class="mt" data-when="device-off">· 离线，改存文档</span>
         </span>
       </div>
 
@@ -663,21 +739,22 @@
       <div class="pane" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>题目从哪来</b></div>
         <div class="sec">
+          <!-- 「来源」这一行每态只准出现一次。上一版 ai-down 下自己的块写「通用题库」，
+               下面那个不分态的块又写一遍「通用题库 + 岗位正文」—— 同一栏里两种来源，
+               而页面同时还在说「只能用通用题库」。三句话互相打架。
+               题数也不在这里重复：唯一完整口径在下面的「开始前确认」。 -->
           <div class="kv" data-when="default device-off">
             <div class="kv-row"><span class="k">你的简历</span><span class="v">王磊_机械_2026.pdf</span></div>
             <div class="kv-row"><span class="k">看过的岗位</span><span class="v">恒信精密制造</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog" data-f="k-src">通用题库 + 岗位正文</span></div>
           </div>
           <div class="kv" data-when="first">
             <div class="kv-row"><span class="k">你的简历</span><span class="v v--fog" data-f="k-resume">还没选</span></div>
             <div class="kv-row"><span class="k">目标岗位</span><span class="v v--fog" data-f="k-target">还没选</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog" data-f="k-src">通用题库 + 岗位正文</span></div>
           </div>
           <div class="kv" data-when="ai-down">
-            <div class="kv-row"><span class="k">来源</span><span class="v">通用题库</span></div>
-            <div class="kv-row"><span class="k">岗位正文组卷</span><span class="v v--fog">AI 不可用 · 无</span></div>
-          </div>
-          <div class="kv">
-            <div class="kv-row"><span class="k">题目数</span><span class="v"><b data-f="k-total">8</b> 题</span></div>
-            <div class="kv-row"><span class="k">来源</span><span class="v v--fog" data-f="k-src">通用题库 + 岗位正文</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">通用题库</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
             题目按公开岗位正文和常见面试题生成，不是那家公司给的。
@@ -779,41 +856,39 @@
         </div>
       </div>
 
-      <!-- ai-down：只留本机数得出来的（答了几题），缺口分类属 AI 判断，不显示 -->
+      <!-- ai-down：只留本机数得出来的（答了几题）。
+           缺口分类要 AI 判断，这一栏索性不摆那一行 —— 摆一行「AI 不可用 · 无」
+           只是把左边那条降级说明又抄了一遍。 -->
       <div class="pane" data-at="s3" data-when="ai-down">
         <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次答了多少</b></div>
         <div class="sec">
           <div class="kv">
             <div class="kv-row"><span class="k">已答</span><span class="v"><b data-f="g-done2">0</b> 题</span></div>
             <div class="kv-row"><span class="k">还没答</span><span class="v"><b data-f="g-todo2">0</b> 题</span></div>
-            <div class="kv-row"><span class="k">缺口分类</span><span class="v v--fog">AI 不可用 · 无</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
-            题数是数出来的；缺口分类要 AI 判断，空着比先给一个实诚。
+            题数是数出来的，不用 AI 也准。
           </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s3">
-        <!-- 「反复出现的一条」是跨次对比的结论，前提是**你这次真答了题**。
-             一题没答就摆出「你讲结论不讲过程」，和 first 态摆假历史是同一类漏洞。
-             没答题时标题和正文都改口，说清这条来自示例。 -->
+        <!-- 上一版这里最狠的一处假：只要答过任意一题，就固定弹出
+             「讲结论，不讲过程。」—— 一个字都没读你的答案。
+             静态稿读不了内容，那就**别装读过**：答了题就说「等 AI 分析」，
+             并把本机会对照的三条结构说清楚；没答题就老实说这条来自示例。
+             （示例的点评是人写死在题库里的，那个可以照说。） -->
         <div class="pane-hd" data-when="default first device-off">
           <svg class="ic"><use href="#i-alert"/></svg><b data-f="gaphd">这一卷常见的缺口</b></div>
-        <div class="pane-hd" data-when="ai-down"><svg class="ic"><use href="#i-alert"/></svg><b>跨次对比做不了</b></div>
+        <div class="pane-hd" data-when="ai-down"><svg class="ic"><use href="#i-interview"/></svg><b>这一卷剩下的题</b></div>
         <div class="sec">
-          <div class="notice notice--amber" data-when="ai-down">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>跨次对比要先判断出缺口类型，这次判断不了，所以是空的。</span>
-          </div>
-
-          <div class="advice-act" style="font-size:var(--fz-6)" data-when="default first device-off">
-            讲结论，不讲过程。
+          <div class="advice-act" data-when="default first device-off" data-f="gapmain">
+            这一卷常见的缺口来自示例作答。
           </div>
 
           <div class="fold" style="margin-top:var(--s-4)" data-when="default first device-off">
             <button class="fold-t" data-fold="why" aria-expanded="false">
-              <svg class="ic"><use href="#i-chevron"/></svg>为什么这么说
+              <svg class="ic"><use href="#i-chevron"/></svg>这条是怎么来的
               <span class="fold-mt" data-f="gapmt">来自示例作答</span></button>
             <div class="fold-b" data-fold-b="why" data-f="gapwhy"></div>
           </div>
@@ -833,7 +908,7 @@
             没答的题目也会印在复盘单上，可以带回去自己想。
           </div>
           <div class="panel-note tail" style="margin-top:var(--s-4)" data-when="ai-down">
-            没答的题目也会印在带走单上；这次全单都没有点评。
+            没答的题目也会印在带走单上，可以带回去自己想。
           </div>
         </div>
       </div>
@@ -871,11 +946,15 @@
         </div>
       </div>
 
-      <!-- 离线：屏幕上把码画出来，不能只写「可以扫码」 -->
+      <!-- 离线：屏幕上把码画出来，不能只写「可以扫码」。
+           但**没存之前不画码** —— 取件链接是存完才有的东西，先画一个等于假装存过了。
+           上一版的「存我的文档 · 扫码带走」按钮点了什么都不发生：码一直在那儿，
+           取件码没有，也没有「没存上怎么办」。这一版做成两态：未存 / 已存。 -->
       <div class="pane pane--grow" data-at="s4" data-when="device-off">
         <div class="pane-hd"><svg class="ic"><use href="#i-qr"/></svg><b>打印机离线 · 扫码带走</b></div>
         <div class="sec qrcard">
-          <div class="qr-box">
+          <div class="qr-hold only-idle">还没存 · 存进「我的文档」后<br>这里出现取件码</div>
+          <div class="qr-box only-saved">
             <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
               <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
               <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
@@ -890,8 +969,24 @@
               <rect x="8" y="52" width="6" height="6"/><rect x="20" y="64" width="6" height="6"/><rect x="88" y="88" width="6" height="6"/>
             </svg>
           </div>
-          <span class="chip chip--amber chip--info">示意码</span>
-          <span class="qr-cap">原型示意码；真机这里是本单的一次性取件链接。</span>
+          <span class="chip chip--amber chip--info only-saved">示意码</span>
+          <span class="qr-cap only-saved">原型示意码；真机这里是本单的一次性取件链接。</span>
+
+          <div class="only-saved" style="width:100%">
+            <div class="kv">
+              <div class="kv-row"><span class="k">取件码</span><span class="v"><b class="qr-code" data-f="pickcode">—</b></span></div>
+              <div class="kv-row"><span class="k">内容</span><span class="v" data-f="savedwhat">—</span></div>
+              <div class="kv-row"><span class="k">存入时间</span><span class="v" data-f="savedat">—</span></div>
+            </div>
+            <div class="notice" style="margin-top:var(--s-3)">
+              <svg class="ic"><use href="#i-check"/></svg>
+              <span>已存进「我的文档 · 离线取件」，用上面的码或扫码取。</span>
+            </div>
+            <!-- 失败重试入口：存不上、码扫不出来、存完又改了勾选，都从这里重来。 -->
+            <button class="rev-go" data-act="save" style="margin-top:var(--s-3)">
+              <svg class="ic"><use href="#i-refresh"/></svg>没存上 / 要重存 · 换一个取件码</button>
+          </div>
+
           <div class="notice tail" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span>离线时才存「我的文档」，<b>24 小时后自动清理</b>。</span>
@@ -943,15 +1038,15 @@
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3" data-when="default first device-off">回看点评</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3" data-when="ai-down">回看答案</button>
 
-    <span class="actionbar-hint" data-at="s1" data-when="default device-off"><span data-f="h-s1">8 题 · 约 15 分钟 · 没有倒计时</span></span>
+    <span class="actionbar-hint" data-at="s1" data-when="default device-off"><span data-f="h-s1">没有倒计时，答不上来可以跳过</span></span>
     <span class="actionbar-hint" data-at="s1" data-when="first"><span data-f="h-first">先选完上面三项</span></span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 本次只能看题，不会有点评</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first device-off">第 <span data-f="h-qi">1</span> 题 / 共 <span data-f="h-qm">8</span> 题 · 想好再答</span>
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">第 <span data-f="h-qi2">1</span> 题 / 共 <span data-f="h-qm2">8</span> 题 · 答完不会有点评</span>
     <span class="actionbar-hint" data-at="s3" data-when="default first device-off"><span data-f="h-s3">还没作答</span></span>
     <span class="actionbar-hint" data-at="s3" data-when="ai-down"><span data-f="h-s3b">已答 0 题 · 本次无点评</span></span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">预估 <span data-f="h-fee">0.20</span> 元 · 以打印工作台核价为准</span>
-    <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线 · 先存文档再扫码带走</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down"><span data-f="h-s4">预估 0.20 元 · 以打印工作台核价为准</span></span>
+    <span class="actionbar-hint" data-at="s4" data-when="device-off"><span data-f="h-s4b">打印机离线 · 先存文档再扫码带走</span></span>
 
     <button class="btn btn--primary" data-at="s1" data-when="default device-off" data-go="s2" data-act="start">开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-when="first" data-act="start-first">开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -960,9 +1055,14 @@
     <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">答完了，看这次的答案<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first device-off">生成复盘单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="ai-down">生成题目与答案单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s4" data-when="default first" href="06-print-workbench.html?stage=s3">带去：面试复盘单 · <span data-f="b-items">4</span> 题 · 共 <span data-f="b-pages">1</span> 页<svg class="ic"><use href="#i-printer"/></svg></a>
-    <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="06-print-workbench.html?stage=s3">带去：题目与答案单 · <span data-f="b-items2">4</span> 题 · 共 <span data-f="b-pages2">1</span> 页<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走</button>
+    <!-- 交接契约（2026-08-10 定）：打印出口一律带全参数，页数必须等于纸面真实张数。
+         上一版只写 ?stage=s3，打印台收到的是一个不知道从哪来、印什么、印几页的空单。
+         零勾选时 href 会被摘掉（见 setHandoff）—— 不生成链接，也就收不了费。 -->
+    <a class="btn btn--primary" data-at="s4" data-when="default first" data-print-link data-title="面试复盘单"
+       href="06-print-workbench.html?stage=s3&amp;from=P20&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=1&amp;copies=1"><span data-f="b-lab">带去：复盘单</span><svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" data-when="ai-down" data-print-link data-title="题目与答案单"
+       href="06-print-workbench.html?stage=s3&amp;from=P20&amp;kind=interview-sheet&amp;title=题目与答案单&amp;pages=1&amp;copies=1"><span data-f="b-lab2">带去：答案单</span><svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off" data-act="save" data-save-btn><svg class="ic"><use href="#i-qr"/></svg><span data-f="savebtn">存我的文档 · 扫码带走</span></button>
   </div>
 
   <nav class="navbar">
@@ -1110,14 +1210,32 @@
   var LEVEL_NM = { easy: '入门', std: '标准', deep: '深挖' }
 
   /* ── 页内状态 ──────────────────────────────────────────────────────
-     ans 只装用户**自己写的**。示例作答不进 ans —— 那是示例，不是他的答案。 */
+     ans 只装用户**自己写的**。示例作答不进 ans —— 那是示例，不是他的答案。
+
+     2026-08-10 改：答案**按卷 ID 隔离**（BOOK）。
+     上一版所有卷共用一个 S.ans：在岗位卷答了「先介绍一下你自己」，
+     切到「生产制造」卷，第 1 题变成「交接班记录对不上怎么处理」，
+     可那段自我介绍还挂在第 1 题上 —— 答非所问，还会照原样印到纸上。
+     当时的补救是切卷就清空，但那又把用户答过的东西直接扔掉（切错一下就白答）。
+     按卷存各自一份，切回去还在，两个毛病一起没了。 */
   var S = {
     resume: '', target: '', level: '',       // first 态三选，空 = 还没选
-    paper: 'job', way: 'type', qi: 1,
-    ans: {}, skip: {},
+    paper: 'job', paperPrev: '', way: 'type',
     print: { mine: true, sample: true, todo: true },
-    open: {}                                  // 折叠区开合
+    gate: '',                                 // 门控拦下来时给用户看的那句话
+    saved: false, savedKey: '', saveN: 0, code: ''   // 离线存档
   }
+  var BOOK = {}
+  function bk () {
+    var k = S.paper
+    return BOOK[k] || (BOOK[k] = { ans: {}, skip: {}, open: {}, qi: 1 })
+  }
+  function A () { return bk().ans }
+  function SKP () { return bk().skip }
+  function OPEN () { return bk().open }
+  function QI () { return bk().qi }
+  function setQI (n) { bk().qi = n }
+  function hasAns (n) { return !!(A()[n] || '').replace(/\s/g, '') }
 
   function P () { return PAPERS[S.paper] }
   function lv () { return S.level || 'std' }
@@ -1132,21 +1250,45 @@
   function qs () { return P().qs.slice(0, total()) }
   function isBank () { return ['tech', 'mkt', 'adm', 'mfg'].indexOf(S.paper) > -1 }
   function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+  function state () { return scr.getAttribute('data-state') || 'default' }
+  function stage () { return scr.getAttribute('data-stage') || 's1' }
 
   function counts () {
     var list = qs(), c = { done: 0, skip: 0, todo: 0, ok: 0, gap: 0, sample: 0 }
     for (var i = 0; i < list.length; i++) {
       var n = i + 1
-      if (S.ans[n] && S.ans[n].replace(/\s/g, '')) { c.done++ } else if (S.skip[n]) { c.skip++ } else { c.todo++ }
+      if (hasAns(n)) { c.done++ } else if (SKP()[n]) { c.skip++ } else { c.todo++ }
       if (list[i].s) { c.sample++; if (list[i].tag === 'ok') c.ok++; else if (list[i].tag === 'gap') c.gap++ }
     }
     return c
   }
 
-  // 页数不再按公式猜，由 buildSheets() 量出来（见下）
-  function printItems () {
-    var c = counts()
-    return (S.print.mine ? c.done : 0) + (S.print.sample ? c.sample : 0)
+  /* ── first 态三项门控 ───────────────────────────────────────────────
+     上一版只有动作条那个「开始作答」按钮校验，阶段轨的 2/3/4 步、
+     题库卡里的「用此题库开始」全都直接跳 —— 门控形同虚设。
+     现在**所有**带 data-go 的入口走同一个判定（见页尾的捕获阶段监听）。
+
+     「手输方向」尤其要小心：选中只是选了个入口，框里没字就是没选完。 */
+  function mtext () {
+    var el = document.getElementById('mtarget')
+    return (el ? el.value : '').replace(/^\s+|\s+$/g, '')
+  }
+  function targetDone () {
+    if (!S.target) return false
+    return S.target !== 'manual' || !!mtext()
+  }
+  function missingKey () {
+    if (state() !== 'first') return ''        // 三项只在 first 态问，别的态本机已经认识你
+    if (!S.resume) return 'resume'
+    if (!targetDone()) return 'target'
+    if (!S.level) return 'level'
+    return ''
+  }
+  function missName (k) {
+    if (k === 'resume') return '用哪份简历'
+    if (k === 'target') return S.target === 'manual' ? '目标岗位（方向还没填）' : '目标岗位'
+    if (k === 'level') return '难度'
+    return ''
   }
 
   /* ── 小工具：按 data-f 填值 ── */
@@ -1165,21 +1307,20 @@
   function renderS1 () {
     var t = total(), m = minutes(), pn = P().nm
     var lab = S.paper === 'job' ? '岗位卷' : S.paper === 'general' ? '通用行为面' : pn
-    set('paperline', esc(lab) + ' · ' + t + ' 题 · 约 ' + m + ' 分钟')
     set('n-job', PAPERS.job.qs.length)
     set('n-general', PAPERS.general.qs.length)
+    // 卷名 / 题数 / 时长的**唯一完整口径**：右栏「开始前确认」。别处不再复述。
     set('c-paper', esc(lab)); set('c-total', t); set('c-min', '约 ' + m + ' 分钟')
     set('c-way', S.way === 'voice' ? '语音' : '打字')
     set('c-level', LEVEL_NM[lv()] + (S.level ? '' : '（默认）'))
-    set('structmt', t + ' 题 · 约 ' + m + ' 分钟')
     set('peek-t', esc(P().qs[0].t)); set('peek-w', esc(P().qs[0].w))
     set('rec', S.paper === 'job'
       ? '你看过<b>恒信精密制造</b>的机械设计岗，先练这个方向。'
       : '你手选了<b>' + esc(lab) + '</b>，按这一类出题。')
-    set('k-total', t); set('k-src', esc(P().src))
-    set('h-s1', t + ' 题 · 约 ' + m + ' 分钟 · 没有倒计时')
+    set('k-src', esc(P().src))
+    set('h-s1', '没有倒计时，答不上来可以跳过')
 
-    // 题目构成：折叠区里才铺开，默认只看到题数和时长
+    // 题目构成：折叠区里才铺开
     var kinds = [], seen = {}
     qs().forEach(function (q) { if (!seen[q.k]) { seen[q.k] = 0; kinds.push(q.k) } seen[q.k]++ })
     set('structlist', kinds.map(function (k, i) {
@@ -1189,10 +1330,7 @@
 
     // 垂直题库：选中就给示例题 + 进卷按钮
     scr.classList.toggle('is-bank', isBank())
-    if (isBank()) {
-      set('banksample', esc(P().qs[0].t))
-      set('banktotal', t)
-    }
+    if (isBank()) set('banksample', esc(P().qs[0].t))
 
     // first 态三选的完成度
     press('[data-opt="resume"]', 'data-v', S.resume)
@@ -1202,43 +1340,65 @@
     press('[data-opt="way"]', 'data-v', S.way)
     var RN = { mine: '我的简历', session: '本次会话已传', none: '不用简历' }
     var TN = { fav: '从收藏带入', manual: '手输方向', any: '不指定' }
+    var tv = S.target === 'manual' ? (mtext() ? '手输：' + mtext() : '手输方向 · 还没填') : TN[S.target]
     set('st-resume', S.resume ? RN[S.resume] : '还没选')
-    set('st-target', S.target ? TN[S.target] : '还没选')
+    set('st-target', S.target ? esc(tv) : '还没选')
     set('st-level', S.level ? LEVEL_NM[S.level] : '还没选')
     set('k-resume', S.resume ? RN[S.resume] : '还没选')
-    set('k-target', S.target ? TN[S.target] : '还没选')
-    var miss = !S.resume ? '简历' : !S.target ? '目标岗位' : !S.level ? '难度' : ''
-    set('h-first', miss ? '还差：' + miss + '，选完就能开始' : t + ' 题 · 约 ' + m + ' 分钟 · 可以开始了')
+    set('k-target', S.target ? esc(tv) : '还没选')
+    set('manualst', mtext() ? '按「' + esc(mtext()) + '」出题' : '填了才算选完')
+
+    var need = missingKey()
+    set('h-first', need ? '还差「' + missName(need) + '」，选完就能开始' : '三项都选好了，可以开始')
     ;['resume', 'target', 'level'].forEach(function (k) {
       var g = scr.querySelector('[data-pick="' + k + '"]')
-      if (g) g.classList.toggle('is-done', !!S[k])
+      if (!g) return
+      // 「手输方向」框里没字就不算 done —— 选中态是选中态，完成度是完成度
+      g.classList.toggle('is-done', k === 'target' ? targetDone() : !!S[k])
+      if (!need || need !== k) g.classList.remove('is-miss')
     })
+    if (!need) S.gate = ''
+    var gn = scr.querySelector('[data-f="gatenote"]')
+    if (gn) {
+      gn.innerHTML = S.gate
+        ? '<svg class="ic"><use href="#i-alert"/></svg><span>' + esc(S.gate) + '</span>'
+        : ''
+      gn.classList.toggle('is-on', !!S.gate)
+    }
+    // 阶段轨：没设置完就把 2/3/4 步标成待设置（仍可点，点了拦回缺项）
+    var rs = scr.querySelectorAll('.rstep[data-go]')
+    for (var i = 0; i < rs.length; i++) {
+      rs[i].setAttribute('data-locked',
+        (need && rs[i].getAttribute('data-go') !== 's1') ? 'true' : 'false')
+    }
+
     scr.classList.toggle('is-manual', S.target === 'manual')
     scr.classList.toggle('is-nores', S.resume === 'none' || S.target === 'any')
   }
 
   function renderS2 () {
     var list = qs(), t = list.length
-    if (S.qi > t) S.qi = t
-    if (S.qi < 1) S.qi = 1
-    var q = list[S.qi - 1]
-    set('qi', S.qi); set('qm', t); set('h-qi', S.qi); set('h-qm', t)
-    set('h-qi2', S.qi); set('h-qm2', t)
-    set('q-no', esc(q.k) + ' · 第 ' + S.qi + ' 题')
+    if (QI() > t) setQI(t)
+    if (QI() < 1) setQI(1)
+    var i0 = QI()
+    var q = list[i0 - 1]
+    set('qi', i0); set('qm', t); set('h-qi', i0); set('h-qm', t)
+    set('h-qi2', i0); set('h-qm2', t)
+    set('q-no', esc(q.k) + ' · 第 ' + i0 + ' 题')
     set('q-t', esc(q.t)); set('q-why', esc(q.w))
     set('waymt', S.way === 'voice' ? '语音作答' : '打字作答')
 
     var box = scr.querySelector('[data-f="ansin"]')
-    if (box && box.value !== (S.ans[S.qi] || '')) box.value = S.ans[S.qi] || ''
+    if (box && box.value !== (A()[i0] || '')) box.value = A()[i0] || ''
     if (box) {
       box.placeholder = S.way === 'voice'
         ? '按住上面的按钮说话，转成的文字会出现在这里，也可以直接打字。'
         : '在这里写你的回答。想好再写，没有倒计时。'
     }
-    set('q-len', (S.ans[S.qi] || '').replace(/\s/g, '').length)
+    set('q-len', (A()[i0] || '').replace(/\s/g, '').length)
 
     var sk = scr.querySelector('[data-f="q-skipbar"]')
-    if (sk) sk.hidden = !S.skip[S.qi]
+    if (sk) sk.hidden = !SKP()[i0]
 
     // 示例作答：只有本题真有示例才给入口，没有就不装（点了没反应是断头路）
     var fold = scr.querySelector('[data-fold="sample"]')
@@ -1246,20 +1406,10 @@
     if (foldw) foldw.style.display = q.s ? '' : 'none'
     set('q-sample', esc(q.s || ''))
 
-    scr.querySelector('[data-act="prev"]').setAttribute('aria-disabled', S.qi === 1 ? 'true' : 'false')
-    scr.querySelector('[data-act="next"]').setAttribute('aria-disabled', S.qi === t ? 'true' : 'false')
+    scr.querySelector('[data-act="prev"]').setAttribute('aria-disabled', i0 === 1 ? 'true' : 'false')
+    scr.querySelector('[data-act="next"]').setAttribute('aria-disabled', i0 === t ? 'true' : 'false')
 
-    // 题号进度条：已答 / 已跳过（可返回） / 未答
-    var bar = ''
-    for (var i = 1; i <= t; i++) {
-      var st = (S.ans[i] && S.ans[i].replace(/\s/g, '')) ? 'done' : (S.skip[i] ? 'skip' : 'todo')
-      var lb = st === 'done' ? '已答' : st === 'skip' ? '已跳过 · 可返回' : '未答'
-      bar += '<button class="qdot" data-q="' + i + '" data-st="' + st + '"' +
-             (i === S.qi ? ' aria-current="true"' : '') +
-             ' aria-label="第 ' + i + ' 题 · ' + lb + '">' + i +
-             '<span class="s">' + (st === 'done' ? '已答' : st === 'skip' ? '跳过' : '未答') + '</span></button>'
-    }
-    set('qbar', bar)
+    set('qbar', qbarHtml())
 
     var tips = (q.tip || TB)
     set('tipkv', tips.map(function (r) {
@@ -1267,29 +1417,46 @@
     }).join(''))
 
     var c = counts()
-    set('s-done', c.done); set('s-skip', c.skip); set('s-total', t); set('s-cur', S.qi)
+    set('s-done', c.done); set('s-skip', c.skip); set('s-total', t); set('s-cur', i0)
+  }
+
+  // 题号进度条：已答 / 已跳过（可返回） / 未答。
+  // 抽出来是因为输入框那边也要重画一遍，上一版两处各抄一份，改一处忘一处。
+  function qbarHtml () {
+    var t = total(), bar = '', i
+    for (i = 1; i <= t; i++) {
+      var st = hasAns(i) ? 'done' : (SKP()[i] ? 'skip' : 'todo')
+      var lb = st === 'done' ? '已答' : st === 'skip' ? '已跳过 · 可返回' : '未答'
+      bar += '<button class="qdot" data-q="' + i + '" data-st="' + st + '"' +
+             (i === QI() ? ' aria-current="true"' : '') +
+             ' aria-label="第 ' + i + ' 题 · ' + lb + '">' + i +
+             '<span class="s">' + (st === 'done' ? '已答' : st === 'skip' ? '跳过' : '未答') + '</span></button>'
+    }
+    return bar
   }
 
   function renderS3 () {
     var list = qs(), c = counts(), html = ''
     for (var i = 0; i < list.length; i++) {
       var q = list[i], n = i + 1
-      var mine = (S.ans[n] || '').replace(/\s/g, '') ? S.ans[n] : ''
-      var open = S.open['rev' + n] ? ' is-open' : ''
-      var exp = S.open['rev' + n] ? 'true' : 'false'
+      var mine = hasAns(n) ? A()[n] : ''
+      var open = OPEN()['rev' + n] ? ' is-open' : ''
+      var exp = OPEN()['rev' + n] ? 'true' : 'false'
       var tag, sum, sumHtml = '', body = ''
 
       if (mine) {
-        tag = '<span class="rev-tag-status" data-when="default first device-off">你答的 · 已记录</span>' +
-              '<span class="rev-tag-status" data-when="ai-down">你答的 · 待点评</span>'
+        // 「待 AI 点评」不是托词：本机确实还没读过这段文字。
+        // 写成「已记录」会让人以为下面那句结构提示就是针对这一题的点评。
+        tag = '<span class="rev-tag-status" data-when="default first device-off">你答的 · 待 AI 点评</span>' +
+              '<span class="rev-tag-status" data-when="ai-down">无点评</span>'
         sum = '你自己写的回答'
         body += '<div class="rev-said"><span class="lb">你答的</span>' + esc(mine) + '</div>'
         body += '<div class="rev-p" data-when="default first device-off">' +
-                '本机对照的是：讲了背景吗、讲了做法吗、讲了结果吗。</div>'
+                '本机会对照这三条：讲了背景吗、讲了做法吗、讲了结果吗。逐条点评由 AI 生成。</div>'
       } else if (q.s) {
         tag = '<span class="rev-tag-status rev-tag-status--' + q.tag + '" data-when="default first device-off">' +
               (q.tag === 'ok' ? '说清楚了' : '有缺口') + '</span>' +
-              '<span class="rev-tag-status" data-when="ai-down">示例 · 无点评</span>'
+              '<span class="rev-tag-status" data-when="ai-down">无点评</span>'
         // 摘要里那半句（「缺：没说为什么投这个岗」）本身就是 AI 的判断，
         // ai-down 下必须一起隐掉 —— 只把标签换成「无点评」、摘要照写，等于换个地方泄题。
         sumHtml = '<span class="rev-sum" data-when="default first device-off">示例作答 · ' + esc(q.sum) + '</span>' +
@@ -1297,8 +1464,8 @@
         body += '<div class="rev-said"><span class="lb">示例作答（不是你写的）</span>' + esc(q.s) + '</div>'
         body += '<div class="rev-p" data-when="default first device-off">' + q.r + '</div>'
       } else {
-        tag = '<span class="rev-tag-status">' + (S.skip[n] ? '已跳过' : '还没答') + '</span>'
-        sum = S.skip[n] ? '跳过了，可以回去补' : '这题还没答'
+        tag = '<span class="rev-tag-status">' + (SKP()[n] ? '已跳过' : '还没答') + '</span>'
+        sum = SKP()[n] ? '跳过了，可以回去补' : '这题还没答'
         body += '<div class="rev-p">' + esc(q.t) + '</div>'
       }
       if (!mine) {
@@ -1320,24 +1487,32 @@
     set('g-todo', c.todo + c.skip)
     set('g-done2', c.done); set('g-todo2', c.todo + c.skip)
 
-    // 结论的口径随「你这次到底答没答」变，不随四态变 —— 所以放在这里渲染
+    /* 结论的口径随「你这次到底答没答」变，不随四态变 —— 所以放在这里渲染。
+
+       上一版这里是本页最严重的一处伪造：只要 c.done 大于 0，就固定输出
+       「讲结论，不讲过程」「8月2日那次和今天都是这个问题」——
+       用户答的是什么、有没有讲过程，页面一个字都没看。
+       静态稿没有能力分析文本，那就只说**能证实的**：答了几题（数出来的）、
+       本机会按哪三条对照（写死的判定口径）、点评什么时候来（待 AI）。
+       示例那条不同：示例的点评是人写在题库里的，可以照说，但必须标明来自示例。 */
     if (c.done) {
-      set('gaphd', '<span data-when="default device-off">反复出现的一条</span>' +
-                   '<span data-when="first">这次的一条</span>')
-      set('gapmt', '来自你这次的作答')
+      set('gaphd', '你这次的作答')
+      set('gapmain', '你答了 <b>' + c.done + '</b> 题，逐条点评待 AI 分析。')
+      set('gapmt', '待 AI 分析')
       set('gapwhy',
-        '<div class="advice-why" data-when="default device-off">' +
-        '8月2日 那次和今天都是这个问题：只说换了什么方案，没说中间怎么查的。</div>' +
-        '<div class="advice-why" data-when="first">你这次讲了结论，没讲过程。</div>' +
-        '<div class="advice-why">试着按<b>先怀疑什么 → 怎么排除 → 怎么确认</b>说一遍。</div>' +
-        '<div class="panel-note" data-when="default device-off">本机只比缺口类型，不保存你说过的内容。</div>' +
-        '<div class="panel-note" data-when="first">再练一次才有跨次对比，这次没有上一次可比。</div>')
+        '<div class="advice-why">本机会按<b>讲了背景吗 → 讲了做法吗 → 讲了结果吗</b>三条对照你写的原文，' +
+        '逐条点评由 AI 生成。</div>' +
+        '<div class="panel-note">这一版原型不分析你答的内容，所以这里不给针对你的结论 ——' +
+        '给一个凭空编的结论比不给更糟。</div>' +
+        '<div class="panel-note">本机只比缺口类型，不保存你说过的内容。</div>')
     } else {
       set('gaphd', '这一卷常见的缺口')
+      set('gapmain', '你这次还没答题，下面这条来自本卷<b>示例作答</b>。')
       set('gapmt', '来自示例作答')
       set('gapwhy',
-        '<div class="advice-why">这条来自本卷<b>示例作答</b>，不是你的作答 —— 你这次还没答题。</div>' +
-        '<div class="advice-why">答几题之后，这里会换成你自己的缺口。</div>' +
+        '<div class="advice-why">示例里那位把「查了很久」一句带过 —— 讲了结论，没讲过程。' +
+        '这条点评是写在题库里的，针对的是示例，不是你。</div>' +
+        '<div class="advice-why">你自己答几题之后，这里换成对你那几题的处理。</div>' +
         '<div class="panel-note">本机只比缺口类型，不保存你说过的内容。</div>')
     }
     set('t-todo', c.todo + c.skip); set('a-todo', c.todo + c.skip)
@@ -1347,7 +1522,7 @@
     var todo = ''
     for (var j = 0; j < list.length; j++) {
       var k = j + 1
-      if ((S.ans[k] || '').replace(/\s/g, '')) continue
+      if (hasAns(k)) continue
       todo += '<div class="tl"><span class="tl-dot">' + k + '</span><span class="tl-b">' +
         '<span class="tl-t">' + esc(list[j].t) + '</span>' +
         '<span class="tl-s">' + esc(list[j].w) + '</span></span></div>'
@@ -1356,17 +1531,83 @@
       '<span class="tl-t">全答完了</span></span></div>')
   }
 
-  function renderS4 () {
+  /* ── 纸面内容生成：**一次生成，同一份计数** ──────────────────────────
+     上一版打印按钮上的题数是另算的（printItems = 本人 + 示例），
+     漏掉了实际也会印上去的未答题目 —— 按钮说 4 题，纸上其实是 12 题。
+     现在计数只能来自这里：块生成到哪一类，哪一类的计数就加一，
+     别处（按钮、交接条、勾选行）全部读这一份结果。 */
+  function buildPrint () {
     var list = qs(), c = counts()
+    var out = { blocks: [], mine: 0, sample: 0, todo: 0, total: 0 }
+    var i, n, a, q, head
+
+    if (S.print.mine && c.done) {
+      head = out.blocks.length; out.blocks.push('')      // 组标题占位，数完再填
+      for (i = 0; i < list.length; i++) {
+        n = i + 1
+        if (!hasAns(n)) continue
+        a = A()[n]
+        out.mine++
+        out.blocks.push('<div class="rp-q">' + n + '. ' + esc(list[i].t) + '</div>')
+        // data-split：这一块允许被分页器按字切开（回答可以很长，见 buildSheets）
+        out.blocks.push('<div class="rp-a" data-split="1">你答的：' + esc(a) + '</div>')
+      }
+      out.blocks[head] = '<div class="rp-gp">你的作答（' + out.mine + ' 题）</div>'
+    }
+
+    if (S.print.sample && c.sample) {
+      head = out.blocks.length; out.blocks.push('')
+      for (i = 0; i < list.length; i++) {
+        q = list[i]
+        if (!q.s) continue
+        out.sample++
+        out.blocks.push('<div class="rp-q"><span data-when="default first device-off">' + (i + 1) + '. ' + esc(q.t) +
+          ' —— ' + (q.tag === 'ok' ? '说清楚了' : '有缺口') + '</span>' +
+          '<span data-when="ai-down">' + (i + 1) + '. ' + esc(q.t) + '</span></div>')
+        out.blocks.push('<div class="rp-a" data-split="1">示例作答：' + esc(q.rp) + '</div>')
+        if (q.fix) out.blocks.push('<div class="rp-fix" data-when="default first device-off">' + q.fix + '</div>')
+      }
+      out.blocks[head] = '<div class="rp-gp rp-gp--ex">' +
+        '<span data-when="default first device-off">示例作答与点评（' + out.sample + ' 题，示例，不是你写的）</span>' +
+        '<span data-when="ai-down">示例作答（' + out.sample + ' 题，示例，不是你写的）</span></div>'
+    }
+
+    if (S.print.todo && (c.todo + c.skip)) {
+      head = out.blocks.length; out.blocks.push('')
+      var arr = []
+      for (i = 0; i < list.length; i++) {
+        if (hasAns(i + 1)) continue
+        out.todo++
+        arr.push((i + 1) + '. ' + esc(list[i].t))
+      }
+      // 每行两道：印成一整段会变成纸上唯一一块长文字，读起来也不像清单
+      for (i = 0; i < arr.length; i += 2) {
+        out.blocks.push('<div class="rp-a">' + arr.slice(i, i + 2).join('&nbsp;&nbsp; ') + '</div>')
+      }
+      out.blocks[head] = '<div class="rp-gp">还没答的 ' + out.todo + ' 道（可以自己想）</div>'
+    }
+
+    out.total = out.mine + out.sample + out.todo
+    return out
+  }
+
+  function partsLabel (pc) {
+    return '本人 ' + pc.mine + ' · 示例 ' + pc.sample + ' · 未答 ' + pc.todo
+  }
+
+  // 内容哈希：上一版拿 html.length 当缓存键，等长改写（改一个字不改字数）
+  // 分页器会认为没变，纸面停在旧文本上 —— 屏幕改了、纸没改。
+  function hashStr (s) {
+    var h = 5381, i
+    for (i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+    return (h >>> 0).toString(36)
+  }
+
+  function renderS4 () {
+    var c = counts()
     var lab = P().nm
     set('p-paper', esc(lab)); set('p-paper2', esc(lab))
     set('ck-mine', c.done); set('ck-sample', c.sample); set('ck-todo', c.todo + c.skip)
-    set('b-items', printItems()); set('b-items2', printItems())
-    var what = []
-    if (S.print.mine && c.done) what.push('你的作答 ' + c.done + ' 题')
-    if (S.print.sample && c.sample) what.push('示例 ' + c.sample + ' 题')
-    if (S.print.todo && (c.todo + c.skip)) what.push('未答 ' + (c.todo + c.skip) + ' 道')
-    set('f-what', what.length ? what.join(' · ') : '什么都没勾，这一单是空的')
 
     var ckm = scr.querySelector('[data-ck="mine"]')
     if (ckm) {
@@ -1384,50 +1625,20 @@
       ckt.setAttribute('aria-disabled', (c.todo + c.skip) ? 'false' : 'true')
     }
 
-    var html = ''
-    if (S.print.mine && c.done) {
-      html += '<div class="rp-gp">你的作答（' + c.done + ' 题）</div>'
-      for (var i = 0; i < list.length; i++) {
-        var n = i + 1, a = (S.ans[n] || '').replace(/\s/g, '') ? S.ans[n] : ''
-        if (!a) continue
-        html += '<div class="rp-q">' + n + '. ' + esc(list[i].t) + '</div>' +
-          '<div class="rp-a">你答的：' + esc(a) + '</div>'
-      }
-    }
-    if (S.print.sample && c.sample) {
-      html += '<div class="rp-gp rp-gp--ex">' +
-        '<span data-when="default first device-off">示例作答与点评（示例，不是你写的）</span>' +
-        '<span data-when="ai-down">示例作答（示例，不是你写的；本单无点评）</span></div>'
-      for (var j = 0; j < list.length; j++) {
-        var q = list[j]
-        if (!q.s) continue
-        html += '<div class="rp-q"><span data-when="default first device-off">' + (j + 1) + '. ' + esc(q.t) +
-          ' —— ' + (q.tag === 'ok' ? '说清楚了' : '有缺口') + '</span>' +
-          '<span data-when="ai-down">' + (j + 1) + '. ' + esc(q.t) + '</span></div>' +
-          '<div class="rp-a">示例作答：' + esc(q.rp) + '</div>' +
-          (q.fix ? '<div class="rp-fix" data-when="default first device-off">' + q.fix + '</div>' : '')
-      }
-    }
-    if (S.print.todo && (c.todo + c.skip)) {
-      html += '<div class="rp-gp">还没答的 ' + (c.todo + c.skip) + ' 道（可以自己想）</div>'
-      var arr = []
-      for (var k = 0; k < list.length; k++) {
-        if ((S.ans[k + 1] || '').replace(/\s/g, '')) continue
-        arr.push((k + 1) + '. ' + esc(list[k].t))
-      }
-      // 每行两道：印成一整段会变成纸上唯一一块长文字，读起来也不像清单
-      for (var g = 0; g < arr.length; g += 2) {
-        html += '<div class="rp-a">' + arr.slice(g, g + 2).join('&nbsp;&nbsp; ') + '</div>'
-      }
-    }
-    if (!html) html = '<div class="rp-a">三项都取消了，这一单是空的。至少勾一项才能打印。</div>'
+    PC = buildPrint()
+    // 这条深色带只有一行 604px，文案压短才放得下（顶部注释里那条老规矩）：
+    // 三个数字用和按钮同一套写法，别在这里另起一种更长的说法。
+    set('f-what', PC.total ? partsLabel(PC) : '三项都没勾 · 不生成')
 
     RP.head =
       '<h1 data-when="default first device-off">面试复盘单</h1>' +
       '<h1 data-when="ai-down">题目与答案单</h1>' +
       '<div class="rp-sub">' + esc(lab) + ' · ' + (S.way === 'voice' ? '语音作答' : '打字作答') +
-        ' · 你的作答 ' + c.done + ' 题 · 示例 ' + (S.print.sample ? c.sample : 0) + ' 题</div>' +
-      '<div class="rp-sub" data-when="default first device-off">由职易达一体机生成，仅供你自己参考</div>' +
+        ' · ' + partsLabel(PC) + '</div>' +
+      // AIGC 标识：全页只此一处。「由职易达一体机生成」讲的是哪台设备打的，
+      // 讲不出点评是谁写的 —— 点评是 AI 生成内容，必须自己标出来。
+      '<div class="rp-sub" data-when="default first device-off">' +
+        '<span class="rp-aigc">AIGC · AI 生成内容</span> 点评由 AI 生成，仅供你自己参考</div>' +
       '<div class="rp-sub" data-when="ai-down"><b>本单不含点评</b>：生成时 AI 不可用</div>' +
       '<div class="rp-hr"></div>'
     // 页脚压成两行（上一版四行，和屏幕上的边界说明重复）。
@@ -1435,8 +1646,16 @@
     RP.foot =
       '<div>只判断说清楚了没有；对不对、行业里合不合理，本机判断不了。</div>' +
       '<div>不代表用人单位判断，不预测录用结果，仅供练习参考；内容离场即清。</div>'
-    RP.body = html
-    RP.key = String(html.length) + ':' + RP.head.length
+    RP.body = PC.blocks.join('')
+    RP.key = hashStr(RP.head + '' + RP.body + '' + RP.foot) + ':' + RP.body.length
+
+    // 勾选一改，之前那个取件码就对不上了：存的是旧内容，不能还显示「已存」
+    if (S.saved && S.savedKey !== RP.key) { S.saved = false; S.code = '' }
+    scr.classList.toggle('is-saved', S.saved)
+    set('pickcode', esc(S.code || '—'))
+    set('savedwhat', PC.total ? esc(lab) + ' · ' + partsLabel(PC) : '—')
+    set('savebtn', S.saved ? '重新存一次 · 换取件码' : '存我的文档 · 扫码带走')
+
     buildSheets()
   }
 
@@ -1449,91 +1668,246 @@
      纸面高度跟着变，页数也跟着变。而四态是外部脚本切的，本文件的 render()
      不会被调用。这两个函数是四态切换后必经的入口，挂在这里最稳。 */
   var RP = { head: '', body: '', foot: '', key: '' }
+  var PC = { blocks: [], mine: 0, sample: 0, todo: 0, total: 0 }
+  var PAGES = 0
 
-  function whenOK (el, state) {
+  function whenOK (el, st) {
     var w = el.getAttribute && el.getAttribute('data-when')
-    return !w || w.split(/\s+/).indexOf(state) > -1
+    return !w || w.split(/\s+/).indexOf(st) > -1
   }
-  function applyWhenDeep (root, state) {
+  function applyWhenDeep (root, st) {
     if (!root || root.nodeType !== 1) return
-    root.hidden = !whenOK(root, state)
+    root.hidden = !whenOK(root, st)
     if (root.hidden) return
     var ns = root.querySelectorAll('[data-when]')
-    for (var i = 0; i < ns.length; i++) ns[i].hidden = !whenOK(ns[i], state)
+    for (var i = 0; i < ns.length; i++) ns[i].hidden = !whenOK(ns[i], st)
+  }
+
+  /* ── 交接契约 ──────────────────────────────────────────────────────
+     打印出口统一写成：
+       06-print-workbench.html?stage=s3&from=P20&kind=interview-sheet
+         &title=<单据名>&pages=<真实页数>&copies=1
+     pages 必须等于 buildSheets() 量出来的张数 —— 不是估的，不是写死的。
+     零勾选（pages=0）时**不生成链接**：href 直接摘掉，按钮按不动，
+     也就不存在「一单空纸照收 0.20 元」。 */
+  function setHandoff (n) {
+    var links = scr.querySelectorAll('[data-print-link]')
+    var i, a, title
+    for (i = 0; i < links.length; i++) {
+      a = links[i]
+      title = a.getAttribute('data-title') || '面试复盘单'
+      if (n > 0) {
+        a.setAttribute('href', '06-print-workbench.html?stage=s3&from=P20&kind=interview-sheet' +
+          '&title=' + encodeURIComponent(title) + '&pages=' + n + '&copies=1')
+        a.setAttribute('aria-disabled', 'false')
+      } else {
+        a.removeAttribute('href')
+        a.setAttribute('aria-disabled', 'true')
+      }
+    }
+    var sv = scr.querySelector('[data-save-btn]')
+    if (sv) sv.setAttribute('aria-disabled', n > 0 ? 'false' : 'true')
+
+    var lab = n > 0
+      ? '带去：复盘单 · ' + partsLabel(PC) + ' · 共 ' + n + ' 页'
+      : '先在右边勾一项才能打印'
+    var lab2 = n > 0
+      ? '带去：答案单 · ' + partsLabel(PC) + ' · 共 ' + n + ' 页'
+      : '先在右边勾一项才能打印'
+    set('b-lab', lab); set('b-lab2', lab2)
+
+    var pg = scr.querySelectorAll('.paper-bar .pgbtn')
+    for (i = 0; i < pg.length; i++) pg[i].setAttribute('aria-disabled', n > 1 ? 'false' : 'true')
+    set('p-pgtext', n > 0 ? '第 1 / ' + n + ' 页' : '不出纸')
   }
 
   function setPageNums (n) {
+    PAGES = n
     var fee = (n * 0.2).toFixed(2)
-    set('p-pages', n); set('p-pages2', n); set('t-pages', n)
-    set('c-pages', n); set('c-fee', fee); set('h-fee', fee)
-    set('b-pages', n); set('b-pages2', n)
+    set('p-pages', n); set('t-pages', n)
+    set('c-pages', n); set('c-fee', fee)
     set('f-pages', n); set('f-fee', fee)
+    set('h-s4', n > 0 ? '预估 ' + fee + ' 元 · 以打印工作台核价为准'
+                      : '三项都没勾 · 这一单不会打印，也不计费')
+    set('h-s4b', n > 0 ? '打印机离线 · 先存文档再扫码带走'
+                       : '三项都没勾 · 没有可存的内容')
+    setHandoff(n)
   }
 
   function buildSheets () {
-    var stage = scr.querySelector('.paper-stage')
-    if (!stage || !RP.body) return
+    var host = scr.querySelector('.paper-stage')
+    if (!host) return
     // 纸面不可见时量不出高度（全是 0），这时不排；切回 s4 会再调一次
-    if (stage.hidden || !stage.offsetParent) return
-    var state = scr.getAttribute('data-state') || 'default'
-    var key = state + '|' + RP.key
-    if (stage.getAttribute('data-built') === key) return
+    if (host.hidden || !host.offsetParent) return
+    var st = state()
+    var key = st + '|' + RP.key
+    if (host.getAttribute('data-built') === key) return
 
-    stage.innerHTML = ''
+    host.innerHTML = ''
+
+    // 零勾选：不出纸。上一版还是排出 1 页空纸，右栏照收 0.20 元 ——
+    // 纸上什么都没有、账照记，这是最不能出的一种错。
+    if (!RP.body) {
+      var none = document.createElement('div')
+      none.className = 'rp-none'
+      none.innerHTML = '<b>这一单没有内容</b>' +
+        '<span>右边三项一个都没勾，现在不会生成纸，也不会计费。至少勾一项。</span>'
+      host.appendChild(none)
+      host.setAttribute('data-built', key)
+      setPageNums(0)
+      return
+    }
+
     function newSheet () {
       var sh = document.createElement('div'); sh.className = 'sheet-a4'
-      var rp = document.createElement('div'); rp.className = 'rp'
-      sh.appendChild(rp); stage.appendChild(sh); return rp
+      var el = document.createElement('div'); el.className = 'rp'
+      sh.appendChild(el); host.appendChild(sh); return el
     }
-    function over (rp) {
+    function over (el) {
       // .sheet-a4 padding 40px 上下 → 可用高度 = clientHeight - 80
-      return rp.offsetHeight > rp.parentNode.clientHeight - 80 + 1
+      return el.offsetHeight > el.parentNode.clientHeight - 80 + 1
     }
     var rp = newSheet()
     rp.innerHTML = RP.head
-    applyWhenDeep(rp, state)
+    applyWhenDeep(rp, st)
+
+    /* 放一块：先试本页，放不下整块搬下一页；
+       **整块独占一页还是放不下**（一段 800 字的回答就会这样），
+       只能按字切开 —— 上一版到这里就放弃了，多出来的字被 overflow:hidden
+       直接吃掉，纸上少半段，页数还显示 1 页。 */
+    var guard = 0
+    function place (b) {
+      rp.appendChild(b); applyWhenDeep(b, st)
+      if (!over(rp)) return
+      if (rp.children.length > 1) {
+        rp.removeChild(b)
+        rp = newSheet()
+        rp.appendChild(b); applyWhenDeep(b, st)
+        if (!over(rp)) return
+      }
+      if (b.getAttribute && b.getAttribute('data-split') === '1') {
+        var txt = b.textContent
+        var cls = b.className
+        rp.removeChild(b)
+        var lead = ''
+        while (txt && guard++ < 400) {
+          var el = document.createElement('div')
+          el.className = cls
+          rp.appendChild(el)
+          el.textContent = lead + txt
+          if (!over(rp)) return                      // 剩下的正好放得下，收工
+          var lo = 1, hi = txt.length, best = 0, mid
+          while (lo <= hi) {
+            mid = (lo + hi) >> 1
+            el.textContent = lead + txt.slice(0, mid) + '（转下页）'
+            if (over(rp)) hi = mid - 1; else { best = mid; lo = mid + 1 }
+          }
+          if (best <= 0) {
+            rp.removeChild(el)
+            if (!rp.children.length) {               // 空页都放不下：兜底，别死循环
+              rp.appendChild(el); el.textContent = lead + txt; return
+            }
+            rp = newSheet(); continue
+          }
+          el.textContent = lead + txt.slice(0, best) + '（转下页）'
+          txt = txt.slice(best)
+          rp = newSheet(); lead = '（接上页）'
+        }
+      }
+    }
 
     var tmp = document.createElement('div')
     tmp.innerHTML = RP.body
     var blocks = [].slice.call(tmp.children)
-    for (var i = 0; i < blocks.length; i++) {
-      var b = blocks[i]
-      rp.appendChild(b); applyWhenDeep(b, state)
-      if (over(rp) && rp.children.length > 1) {
-        rp.removeChild(b); rp = newSheet(); rp.appendChild(b); applyWhenDeep(b, state)
-      }
-    }
+    for (var i = 0; i < blocks.length; i++) place(blocks[i])
+
     var foot = document.createElement('div')
     foot.className = 'rp-foot'; foot.innerHTML = RP.foot
-    rp.appendChild(foot); applyWhenDeep(foot, state)
+    rp.appendChild(foot); applyWhenDeep(foot, st)
     if (over(rp) && rp.children.length > 1) {
-      rp.removeChild(foot); rp = newSheet(); rp.appendChild(foot); applyWhenDeep(foot, state)
+      rp.removeChild(foot); rp = newSheet(); rp.appendChild(foot); applyWhenDeep(foot, st)
     }
 
-    var sheets = stage.querySelectorAll('.sheet-a4')
+    var sheets = host.querySelectorAll('.sheet-a4')
     for (var k = 0; k < sheets.length; k++) {
       var pg = document.createElement('div')
       pg.className = 'pgno'; pg.textContent = (k + 1) + ' / ' + sheets.length
       sheets[k].appendChild(pg)
     }
-    stage.setAttribute('data-built', key)
+    host.setAttribute('data-built', key)
     setPageNums(sheets.length)
   }
 
-  function render () {
+  /* renderAll 不碰可见性：它会被 v3ApplyVisibility 的 hook 调用，
+     在里面再调一次 v3ApplyVisibility 就成了自己套自己。
+     对外的 render() 才负责补算可见性。 */
+  function renderAll () {
     renderS1(); renderS2(); renderS3(); renderS4()
     scr.classList.toggle('is-voice', S.way === 'voice')
+  }
+  function render () {
+    renderAll()
     // 生成的节点里带 data-when，必须补算一次可见性（本文件不自己管 hidden）
     if (window.v3ApplyVisibility) window.v3ApplyVisibility()
     if (window.v3Audit) requestAnimationFrame(window.v3Audit)
   }
 
+  /* ── 四态跟随 ───────────────────────────────────────────────────────
+     ai-down 下组卷要读岗位正文，那是 AI 干的活 —— AI 不可用就只剩通用卷。
+     上一版页头写着「只能用通用题库」，可 S.paper 还是 'job'，右栏一边显示
+     「来源：通用题库」一边显示「通用题库 + 岗位正文」。说的和用的不是一回事。
+     这里把卷真的换掉；离开 ai-down 再换回来（用户之前选的不该被吃掉）。 */
+  function syncState () {
+    var st = state(), changed = false
+    if (st === 'ai-down') {
+      if (S.paper !== 'general') { S.paperPrev = S.paper; S.paper = 'general'; changed = true }
+    } else if (S.paperPrev) {
+      S.paper = S.paperPrev; S.paperPrev = ''; changed = true
+    }
+    if (changed) renderAll()
+    return changed
+  }
+
   /* ── 交互 ──────────────────────────────────────────────────────────── */
   function gotoQ (n) {
     var t = total()
-    S.qi = Math.min(t, Math.max(1, n))
+    setQI(Math.min(t, Math.max(1, n)))
     render()
   }
+
+  // 门控拦截：把人拦回第 1 步的缺项上，并说清缺什么。
+  // 不是"点了没反应"—— 那种沉默比放行还糟。
+  function blockTo (k) {
+    if (stage() !== 's1' && window.v3Stage) window.v3Stage('s1')
+    S.gate = '还差「' + missName(k) + '」，选完这一项才能进下一步。'
+    render()
+    var g = scr.querySelector('[data-pick="' + k + '"]')
+    if (g) {
+      g.classList.add('is-miss')
+      if (g.scrollIntoView) g.scrollIntoView({ block: 'nearest' })
+    }
+    if (k === 'target' && S.target === 'manual') {
+      var el = document.getElementById('mtarget')
+      if (el && el.focus) el.focus()
+    }
+  }
+
+  /* 捕获阶段：必须抢在 stages.js 前面。
+     stages.js 的 [data-go] 监听挂在同一个 .screen 上、冒泡阶段，
+     而且比本文件先注册 —— 冒泡阶段拦不住它。捕获阶段 stopPropagation
+     会连同一节点上的冒泡监听一起挡掉（DOM 规范：invoke 前先查停止标志）。
+     覆盖的入口：阶段轨 1/2/3/4、题库卡「用此题库开始」、动作条各按钮、
+     点评里的「去答第 N 题」—— 凡是带 data-go 的都走这一处判定。 */
+  scr.addEventListener('click', function (e) {
+    var g = e.target.closest && e.target.closest('[data-go]')
+    if (!g) return
+    var to = g.getAttribute('data-go')
+    if (!to || to === 's1') return
+    var need = missingKey()
+    if (!need) return
+    e.preventDefault(); e.stopPropagation()
+    blockTo(need)
+  }, true)
 
   scr.addEventListener('click', function (e) {
     var el
@@ -1552,21 +1926,22 @@
     // 点评行展开
     if ((el = e.target.closest('[data-rev]'))) {
       var rn = el.getAttribute('data-rev')
-      S.open['rev' + rn] = el.getAttribute('aria-expanded') !== 'true'
-      el.setAttribute('aria-expanded', S.open['rev' + rn] ? 'true' : 'false')
+      OPEN()['rev' + rn] = el.getAttribute('aria-expanded') !== 'true'
+      el.setAttribute('aria-expanded', OPEN()['rev' + rn] ? 'true' : 'false')
       var rb = scr.querySelector('[data-revb="' + rn + '"]')
-      if (rb) rb.classList.toggle('is-open', S.open['rev' + rn])
+      if (rb) rb.classList.toggle('is-open', OPEN()['rev' + rn])
       if (window.v3Audit) requestAnimationFrame(window.v3Audit)
       return
     }
 
     // 三选 / 选卷 / 选答法
     if ((el = e.target.closest('[data-opt]'))) {
-      if (scr.getAttribute('data-state') === 'ai-down' &&
-          el.classList.contains('bank')) return
       var kk = el.getAttribute('data-opt')
+      // ai-down 只有通用卷（组卷靠 AI）。岗位卷和四个垂直题库整排不可选，
+      // 点了直接不理 —— CSS 也压着 pointer-events，这里是第二道。
+      if (kk === 'paper' && state() === 'ai-down' && el.getAttribute('data-v') !== 'general') return
       S[kk] = el.getAttribute('data-v')
-      if (kk === 'paper') { S.qi = 1; S.ans = {}; S.skip = {}; S.open = {} }
+      // 换卷不再清空答案：答案按卷 ID 各存各的（BOOK），换回来还在，也串不了线
       if (kk === 'target' && S.target === 'any' && S.paper === 'job') S.paper = 'general'
       if (kk === 'target' && S.target !== 'any' && S.paper === 'general') S.paper = 'job'
       var grp = el.closest('.pick'); if (grp) grp.classList.remove('is-miss')
@@ -1589,31 +1964,43 @@
     // 上一题 / 下一题 / 跳过
     if ((el = e.target.closest('[data-act]'))) {
       var act = el.getAttribute('data-act')
-      if (act === 'prev') { gotoQ(S.qi - 1); return }
-      if (act === 'next') { gotoQ(S.qi + 1); return }
+      if (act === 'prev') { gotoQ(QI() - 1); return }
+      if (act === 'next') { gotoQ(QI() + 1); return }
       if (act === 'skip') {
-        if (!(S.ans[S.qi] || '').replace(/\s/g, '')) S.skip[S.qi] = true
-        gotoQ(S.qi + 1)                       // 跳过就是往下走，不是原地不动
+        var cur = QI(), last = total()
+        if (!hasAns(cur)) SKP()[cur] = true
+        // 最后一题跳过后没有"下一题"可去。上一版 gotoQ 被 clamp 回原题，
+        // 用户连点两下都停在同一屏，以为按钮坏了。这里明确收尾：进复核页。
+        if (cur >= last) { render(); if (window.v3Stage) window.v3Stage('s3'); return }
+        gotoQ(cur + 1)
         return
       }
-      if (act === 'start') { S.qi = 1; render(); return }
+      if (act === 'start') { setQI(1); render(); return }
       if (act === 'firsttodo') {
         var list = qs()
         for (var i = 0; i < list.length; i++) {
-          if (!(S.ans[i + 1] || '').replace(/\s/g, '')) { S.qi = i + 1; break }
+          if (!hasAns(i + 1)) { setQI(i + 1); break }
         }
         render(); return
       }
       if (act === 'start-first') {
-        // first 态：三项没选完不进作答，但也不做"点了没反应"——高亮缺的那一项
-        var need = !S.resume ? 'resume' : !S.target ? 'target' : !S.level ? 'level' : ''
-        if (need) {
-          var g = scr.querySelector('[data-pick="' + need + '"]')
-          if (g) { g.classList.add('is-miss'); g.scrollIntoView({ block: 'nearest' }) }
-          render(); return
-        }
-        S.qi = 1; render()
+        // 和阶段轨走同一套判定（missingKey），不再各写一份
+        var need = missingKey()
+        if (need) { blockTo(need); return }
+        setQI(1); render()
         if (window.v3Stage) window.v3Stage('s2')
+        return
+      }
+      // 离线存档：真的改变状态 —— 存进「我的文档」、发一个取件码、给重存入口
+      if (act === 'save') {
+        if (!PAGES) return                      // 零勾选没有可存的东西（按钮也已置灰）
+        S.saveN++
+        S.saved = true
+        S.code = 'QJ-' + (4406 + S.saveN * 17)
+        S.savedKey = RP.key
+        var d = new Date()
+        set('savedat', '今天 ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2))
+        render()
         return
       }
       if (act === 'rec') return
@@ -1635,49 +2022,42 @@
   var ta = scr.querySelector('[data-f="ansin"]')
   if (ta) {
     ta.addEventListener('input', function () {
-      S.ans[S.qi] = ta.value
-      if (ta.value.replace(/\s/g, '')) delete S.skip[S.qi]
+      A()[QI()] = ta.value
+      if (ta.value.replace(/\s/g, '')) delete SKP()[QI()]
       set('q-len', ta.value.replace(/\s/g, '').length)
       renderS3(); renderS4()
       var sk = scr.querySelector('[data-f="q-skipbar"]')
-      if (sk) sk.hidden = !S.skip[S.qi]
-      var bar = ''
-      var t = total()
-      for (var i = 1; i <= t; i++) {
-        var st = (S.ans[i] && S.ans[i].replace(/\s/g, '')) ? 'done' : (S.skip[i] ? 'skip' : 'todo')
-        var lb = st === 'done' ? '已答' : st === 'skip' ? '已跳过 · 可返回' : '未答'
-        bar += '<button class="qdot" data-q="' + i + '" data-st="' + st + '"' +
-               (i === S.qi ? ' aria-current="true"' : '') +
-               ' aria-label="第 ' + i + ' 题 · ' + lb + '">' + i +
-               '<span class="s">' + (st === 'done' ? '已答' : st === 'skip' ? '跳过' : '未答') + '</span></button>'
-      }
-      set('qbar', bar)
+      if (sk) sk.hidden = !SKP()[QI()]
+      set('qbar', qbarHtml())
       var c = counts()
       set('s-done', c.done); set('s-skip', c.skip)
       if (window.v3ApplyVisibility) window.v3ApplyVisibility()
     })
   }
 
+  // 手输方向：框里的字直接决定「目标岗位」这一项算不算选完，所以要重算门控
   var mt = document.getElementById('mtarget')
-  if (mt) mt.addEventListener('input', function () { set('k-target', esc(mt.value) || '手输方向') })
+  if (mt) mt.addEventListener('input', function () { renderS1() })
 
   /* 四态由外部脚本切换，本文件的 render() 不会被调用；
      这两个函数是切态后必经的入口，挂上去让纸面跟着重排。
      顺序：先算可见性再排版，排完再算一次（生成的节点里带 data-when）。 */
   var baseApply = window.v3ApplyVisibility
   if (baseApply) {
-    window.v3ApplyVisibility = function () { baseApply(); buildSheets(); baseApply() }
+    window.v3ApplyVisibility = function () {
+      syncState(); baseApply(); buildSheets(); baseApply()
+    }
   }
   var baseAudit = window.v3Audit
   if (baseAudit) {
     window.v3Audit = function () {
-      buildSheets(); if (baseApply) baseApply()
+      syncState(); buildSheets(); if (baseApply) baseApply()
       return baseAudit.apply(this, arguments)
     }
   }
   // shell 的四态按钮走 stage.js 内部的局部函数，上面两个 hook 都碰不到，补一道观察者
   new MutationObserver(function () {
-    buildSheets(); if (baseApply) baseApply()
+    syncState(); buildSheets(); if (baseApply) baseApply()
   }).observe(scr, { attributes: true, attributeFilter: ['data-state', 'data-stage'] })
 
   // 纸面翻页：‹ › 滚到上一张 / 下一张，不做成点了没反应的装饰
@@ -1694,8 +2074,16 @@
     stage.scrollTop = sheets[nx].offsetTop - sheets[0].offsetTop
   })
 
+  syncState()
   render()
+  // 自检 / 走查用的把手：S 是选择，BOOK 是各卷的答案，PC/PAGES 是纸面真实计数
   window.v3P20 = S
+  window.v3P20X = {
+    S: S, BOOK: BOOK, render: render,
+    pc: function () { return PC },
+    pages: function () { return PAGES },
+    missing: missingKey
+  }
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
