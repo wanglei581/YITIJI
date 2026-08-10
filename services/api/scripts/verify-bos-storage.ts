@@ -5,6 +5,7 @@ import {
   type BosClientLike,
 } from '../src/storage/bos-storage.backend'
 import { StorageService } from '../src/storage/storage.service'
+import { requireBosLiveConfig } from './verify-bos-live'
 
 class FakeBosClient implements BosClientLike {
   readonly objects = new Map<string, { body: Buffer; contentType: string }>()
@@ -114,6 +115,58 @@ function verifyProviderRouting(): void {
   }
 }
 
+function verifyLiveGateConfig(): void {
+  assert.throws(
+    () => requireBosLiveConfig({}),
+    /BOS_LIVE_VERIFY_NOT_AUTHORIZED/,
+  )
+  assert.throws(
+    () => requireBosLiveConfig({ BOS_LIVE_VERIFY_ENABLED: 'true' }),
+    /BOS_LIVE_VERIFY_TARGET_INVALID/,
+  )
+  assert.throws(
+    () => requireBosLiveConfig({
+      BOS_LIVE_VERIFY_ENABLED: 'true',
+      BOS_LIVE_VERIFY_TARGET: 'preprod',
+    }),
+    /BOS_LIVE_CONFIG_MISSING/,
+  )
+  assert.throws(
+    () => requireBosLiveConfig({
+      BOS_LIVE_VERIFY_ENABLED: 'true',
+      BOS_LIVE_VERIFY_TARGET: 'preprod',
+      BAIDU_BOS_ACCESS_KEY_ID: 'verify-ak',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'verify-sk',
+      BAIDU_BOS_BUCKET: 'verify-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'http://bj.bcebos.com',
+    }),
+    /BOS_LIVE_ENDPOINT_INVALID/,
+  )
+
+  assert.deepEqual(
+    requireBosLiveConfig({
+      BOS_LIVE_VERIFY_ENABLED: 'true',
+      BOS_LIVE_VERIFY_TARGET: 'preprod',
+      BAIDU_BOS_ACCESS_KEY_ID: 'verify-ak',
+      BAIDU_BOS_SECRET_ACCESS_KEY: 'verify-sk',
+      BAIDU_BOS_BUCKET: 'verify-private',
+      BAIDU_BOS_REGION: 'bj',
+      BAIDU_BOS_ENDPOINT: 'https://bj.bcebos.com',
+    }),
+    {
+      target: 'preprod',
+      config: {
+        accessKeyId: 'verify-ak',
+        secretAccessKey: 'verify-sk',
+        bucket: 'verify-private',
+        region: 'bj',
+        endpoint: 'https://bj.bcebos.com',
+      },
+    },
+  )
+}
+
 async function main(): Promise<void> {
   const fake = new FakeBosClient()
   const backend = new BosStorageBackend(
@@ -171,8 +224,9 @@ async function main(): Promise<void> {
   assert.equal(await backend.headObject(key), null)
   await backend.deleteObject(key)
   verifyProviderRouting()
+  verifyLiveGateConfig()
 
-  console.log('PASS: 百度 BOS 后端与 BOS/COS/legacy 显式路由离线验证通过')
+  console.log('PASS: 百度 BOS 后端、live fail-closed 配置与 BOS/COS/legacy 显式路由离线验证通过')
 }
 
 main().catch((error) => {

@@ -50,8 +50,12 @@ TENCENT_COS_REGION=<historical-region>
 ```bash
 pnpm --filter @ai-job-print/api run verify:bos
 pnpm --filter @ai-job-print/api run verify:production-runtime-gates
-pnpm --filter @ai-job-print/api run verify:bos:live
+BOS_LIVE_VERIFY_ENABLED=true \
+  BOS_LIVE_VERIFY_TARGET=preprod \
+  pnpm --filter @ai-job-print/api run verify:bos:live
 ```
+
+`verify:bos:live` 是会在目标 Bucket 创建并删除随机临时对象的外部写验证，缺少显式启用标记、目标环境或任一 `BAIDU_BOS_*` 配置时必须失败，不能 `SKIP` 后按通过处理。预生产通过不授权生产执行；生产切换窗口须另行授权，并把 `BOS_LIVE_VERIFY_TARGET` 明确改为 `production`。脚本成功前会复核临时对象已经删除；失败时必须按输出检查 `tmp/verify-bos/` 是否存在残留。
 
 然后重启 API 并完成以下 canary：
 
