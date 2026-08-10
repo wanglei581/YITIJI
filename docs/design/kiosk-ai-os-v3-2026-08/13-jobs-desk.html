@@ -765,7 +765,7 @@
         <div data-when="first"><div class="t">按同步时间倒序</div><div class="s">上传简历后可按你的经历收敛并给三档参考</div></div>
         <div data-when="ai-down"><div class="t">收敛不可用，列表与详情正常</div><div class="s">筛选、扫码、去来源平台都不受影响</div></div>
       </div>
-      <div data-at="empty"><div class="t">这些条件同时满足的岗位这一刻没有</div><div class="s">不会凑几条不符合的充数 · 放宽任一条件再试</div></div>
+      <div data-at="empty"><div class="t">这些条件同时满足的岗位这一刻没有</div><div class="s">不会凑几条不符合的充数 · 上面逐条写了放宽哪一条能多出几条</div></div>
       <div data-at="error"><div class="t">岗位数据没取到，已自动上报</div><div class="s">不显示过期缓存——按过期岗位跑一趟是白跑</div></div>
     </div>
 
@@ -774,7 +774,11 @@
     <button class="btn btn--lg btn--ghost" data-at="error">查看设备与网络状态</button>
 
     <a class="btn btn--primary" data-at="ok" href="14-job-detail.html">查看岗位<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <button class="btn btn--primary" data-at="empty">放宽条件再找<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <!-- 2026-08-10：这个主按钮原来写「放宽条件再找」但**没有绑任何东西** ——
+         页面刚逐条告诉你放宽哪条能多出几条，右下角最大的那个键却点了没反应。
+         现在它就是「多出条数最多的那一条」，文案由脚本按当前筛选写实；
+         没有可放宽的条件时整个键不出现，不留一个点了没用的键。 -->
+    <button class="btn btn--primary" type="button" data-at="empty" data-relax-best><span data-relax-best-t>放宽条件再找</span><svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--primary" data-at="error">重试<svg class="ic"><use href="#i-refresh"/></svg></button>
   </div>
 

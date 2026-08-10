@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
   /* 诊断与对比阶段：原文占主体，结论在侧栏 */
   .work--diag { grid-template-columns: 1fr 396px; }
@@ -428,8 +429,7 @@
         <div class="locked" data-job="upfail" style="flex:1 1 auto">
           <svg class="ic" style="color:var(--coral-400)"><use href="#i-alert"/></svg>
           <b>文件没传上来</b>
-          <p>传输中断，本机<b>没有收到完整文件</b>，半份文件已丢弃，<b>没有产生任何费用</b>。<br>
-             常见原因：手机中途离开了传输页、U 盘提前拔出、文件本身损坏。</p>
+          <p>传输中断，本机<b>没有收到完整文件</b>，半份文件已丢弃，<b>没有产生任何费用</b>。</p>
           <div class="kv" style="width:min(360px,100%);text-align:left">
             <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
             <div class="kv-row"><span class="k">已收到</span><span class="v">0.4 MB / 1.1 MB · 不完整</span></div>
@@ -668,6 +668,48 @@
           </div>
         </div>
       </div>
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：原来四个 <details class="fold">（进度百分比口径 / 去向·保留·外部服务·谁能看 /
+                     六档体检在看什么 / 数字与经历的两条口径）+ 失败态的成因说明。
+           **没有**收进来（必须常驻）：「AI 只生成新版本，永不覆盖原件」「数字要你自己核对；
+           AI 不替你编经历」这两条结论、逐条结论旁的 E1 / E3 徽章（AIGC 标识）、
+           当前解析 / 失败 / 低置信的状态提示与其参数。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>不发送给任何企业</b> · 保留期限 · 体检口径</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>去向 · 保留 · 外部服务 · 谁能看</div>
+            <p class="nb-p"><b>去向：</b>解析、诊断、改写结果<b>只进你本人的简历与记录</b>；<b>不发送给任何企业，不沉淀到任何简历库</b>。<b>保留：</b>未登录时只留到本次会话结束；要长期保存需你本人选「存进我的简历」。</p>
+            <p class="nb-p"><b>外部服务：</b>诊断与改写由 AI 服务处理简历文本；扫描件走识别时会经<b>第三方 OCR</b>，低置信页会先提示你复核，不想识别也可以直接打印或存档。<b>谁能看：</b>只有你本人，管理员如需访问会写入审计日志。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-orbit"/></svg>AI 生成内容的两条口径</div>
+            <p class="nb-p"><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是<b>按你说过的内容填的示例，不是 AI 编的事实</b>——发出去之前请确认每一个数都是真的。</p>
+            <p class="nb-p"><b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，不会凭空生成一段。AI 只生成新版本，<b>永不覆盖原件</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-check"/></svg>体检为什么用三档不用分数</div>
+            <p class="nb-p">简历好坏<b>没有可核对的分母</b>，打个「72 分」是假精确，所以只给三档。<b>ATS 机读友好</b>看版式能否被招聘系统正确读取：单栏、无表格嵌套、字体可提取。<b>真实性自查</b>只列出待你核对的表述，<b>不下真假结论</b>。</p>
+            <p class="nb-p">证据分级：<span class="nb-e nb-e--1">E1</span> 你的材料本身；<span class="nb-e nb-e--2">E2</span> 系统与来源给的事实；<span class="nb-e nb-e--3">E3</span> AI 判断，仅供参考。页面上挂在结论旁的小徽章就是这三档。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-clock"/></svg>为什么不给进度百分比</div>
+            <p class="nb-p"><b>可改点的数量要看完全文才知道</b>，先编一个 62% 再跳到 100% 是假的，所以这里只报已完成的步骤。失败可重试或换来源重新上传。</p>
+            <p class="nb-p">传输失败的常见原因：手机中途离开了传输页、U 盘提前拔出、文件本身损坏。<b>没收到完整文件 = 什么都没开始</b>，不收费、不保留半份文件，重新上传后从头解析；手机扫码传建议保持传输页常亮到提示完成。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线与打印机离线时会怎样</div>
+            <p class="nb-p"><b>AI 不可用：</b>诊断与改写停掉，<b>不给结论</b>；已上报，不需要你操作。左边的原文可以正常翻看、<b>打印、存档</b>，文件没有丢。</p>
+            <p class="nb-p"><b>打印机离线：</b>不出纸，成品可先存进「我的简历 / 我的文档」，凭手机号在任一台空闲机器取回打印。AI 服务本身不收费，<b>只有出纸收费</b>，以打印工作台核价为准。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ================= 右：结论与操作 ================= -->
@@ -694,14 +736,6 @@
           <svg class="ic"><use href="#i-shield"/></svg>
           <span><b>AI 只生成新版本，永不覆盖原件。</b></span>
         </div>
-        <details class="fold" style="margin-top:10px">
-          <summary>去向 / 保留 / 外部服务 / 谁能看</summary>
-          <div class="fold-b">
-            · <b>去向</b>：解析、诊断、改写结果<b>只进你本人的简历与记录</b>；<b>不发送给任何企业，不沉淀到任何简历库</b>。<br>
-            · <b>保留</b>：未登录时只留到本次会话结束；要长期保存需你本人选「存进我的简历」。<br>
-            · <b>外部服务</b>：诊断与改写由 AI 服务处理简历文本；扫描件走识别时会经第三方 OCR。<br>
-            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。</div>
-        </details>
       </div>
 
       <!-- S2 解析进度 -->
@@ -722,11 +756,6 @@
           <svg class="ic"><use href="#i-info"/></svg>
           <span>约 40 秒 · 本次权益内 0 元 · 不显示百分比</span>
         </div>
-        <details class="fold" data-when="default first device-off" data-job="ok" style="margin-top:10px">
-          <summary>为什么不给进度百分比</summary>
-          <div class="fold-b">可改点的数量要看完全文才知道，先编一个 62% 再跳到 100% 是假的。这里只报已完成的步骤。
-            失败可重试或换来源重新上传。</div>
-        </details>
         <div class="notice notice--coral" data-when="ai-down" data-job="ok" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span>解析中断。已自动上报，不需要你操作。你的文件没有丢，仍可打印或存文档。</span>
@@ -734,11 +763,11 @@
         <!-- job 轴右栏说明：与主区失败卡同一处境，各说各的事实 -->
         <div class="notice notice--coral" data-job="upfail" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>没收到完整文件，什么都还没开始。</b>不收费、不保留半份文件；重新上传后从头解析。手机扫码传建议保持传输页常亮到提示完成。</span>
+          <span><b>没收到完整文件，什么都还没开始。</b>不收费、不保留半份文件。</span>
         </div>
         <div class="notice notice--coral" data-job="parsefail" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>文件完好，只是读不出文字。</b>按图片识别（OCR）会经第三方识别服务，低置信页会先提示你复核；不想识别也可以直接打印或存档。</span>
+          <span><b>文件完好，只是读不出文字。</b>可以直接打印或存档。</span>
         </div>
         <div class="notice notice--amber" data-job="ocrlow" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -764,12 +793,6 @@
         <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
           用三档不用分数 <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
         </p>
-        <details class="fold" data-when="default device-off" style="margin-top:8px">
-          <summary>这六档分别在看什么</summary>
-          <div class="fold-b">简历好坏没有可核对的分母，打个「72 分」是假精确，所以只给三档。<br>
-            <b>ATS 机读友好</b>看版式能否被招聘系统正确读取：单栏、无表格嵌套、字体可提取<span class="ev ev--e1">E1 你的材料</span>；
-            <b>真实性自查</b>只列出待你核对的表述（本份有 3 处数字待核实），不下真假结论<span class="ev ev--e3">E3 AI 判断</span></div>
-        </details>
         <!-- 2026-08-10 补验：原来「去证件照工作台」是正文里的裸 <a>，实测 17px 高，
              触控点不中。整条 notice 改成可点的行（同 P31 .fprev 先例），
              触控高度 ≈ 100px，且不占额外高度、不挤压下方「可改点」列表。 -->
@@ -832,11 +855,6 @@
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>数字要你自己核对</b>；<b>AI 不替你编经历</b>。</span>
         </div>
-        <details class="fold" style="margin-top:10px">
-          <summary>这两条具体是什么意思</summary>
-          <div class="fold-b"><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是按你说过的内容填的示例，不是 AI 编的事实——发出去之前请确认每一个数都是真的。<br><br>
-            <b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，不会凭空生成一段。</div>
-        </details>
       </div>
 
       <!-- S5 版本与导出 -->
@@ -1208,6 +1226,7 @@
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>
