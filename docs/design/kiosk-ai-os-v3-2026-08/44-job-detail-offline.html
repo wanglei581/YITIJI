@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P44 线下机构岗位详情 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P44 线下机构岗位详情">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+  /* 与 P14 岗位详情同一骨架：左正文 + 右动作。线下岗位的动作不是"去平台"，
+     而是"到店"，所以右栏第一张卡换成到店前要问清的清单。 */
+  .work--detail { grid-template-columns: 1fr 396px; }
+
+  /* chip--info：状态标签，非入口（与 P14/P17/P20 同一先例） */
+  .chip--info { cursor: inherit; }
+
+  /* 右栏四卡同屏：.out 默认 72px 起，页内收紧到 64px，仍远高于 48px 触控下限。
+     只作用于本页，不动共享 components.css。 */
+  .work--detail .out { min-height: 64px; padding: var(--s-3); }
+
+  /* 到店问题清单：只读条目。刻意不用 pill/chip/tag/btn 命名 ——
+     那几个词是自检"疑似假入口"的扫描面，而这就是一句要问的话，不接受点击。 */
+  .asks { display: flex; flex-direction: column; gap: var(--s-3); }
+  .ask {
+    display: flex; align-items: center; gap: var(--s-3); min-height: 48px;
+    padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
+    border: 1px solid var(--brd-1); background: var(--surf-1);
+  }
+  .ask-no {
+    width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--jade-a12); color: var(--jade-200);
+    font-family: var(--ff-num); font-size: 12px;
+  }
+  .ask-t { font-size: var(--fz-2); color: var(--fog-900); line-height: 1.45; }
+
+  /* 门店与材料行：单行 key-value，比 .kv 更紧，给左栏省高度 */
+  .fee { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.6; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="ok" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="16-offline-agencies.html?stage=detail" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">线下机构岗位</div>
+        <div class="brand-sub">01 号机 · 机构代招 · 到店办理</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>本机在线</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 浏览正常</div>
+    <div class="clock" data-clock>2026年8月10日 <b>10:38</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="ok"><svg class="ic" style="width:17px;height:17px"><use href="#i-agency"/></svg>在招</button>
+      <button class="stbtn" data-go="error"><svg class="ic" style="width:17px;height:17px"><use href="#i-offline"/></svg>加载失败</button>
+    </div>
+    <span class="rail-count">线下机构岗位没有线上投递入口，只能到店面谈</span>
+  </div>
+
+  <div class="work work--detail">
+    <!-- ================= 左：岗位与门店正文 ================= -->
+    <div class="wmain">
+
+      <!-- 本页唯一一条合规声明。刻意不挂 data-at：正常态与故障态都要看得见，
+           否则详情取不到时这条边界就消失了，而那恰恰是最容易被冒名找上门的时候。 -->
+      <div class="notice notice--amber" style="flex:0 0 auto">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span><b>本机不代收简历、不代收任何费用。</b>机构服务项目与收费以门店依法公示为准，<b>请勿支付押金或未公示费用。</b></span>
+      </div>
+
+      <div class="detail" data-at="ok">
+
+        <div class="dhead">
+          <div class="dhead-row">
+            <span class="track track--offline"><svg class="ic" style="width:14px;height:14px"><use href="#i-agency"/></svg>线下机构岗位</span>
+            <span class="chip chip--amber chip--info">机构代招 · 到店咨询</span>
+          </div>
+          <h1 class="dhead-t" style="font-size:var(--fz-8)">运营助理（可接受应届）</h1>
+          <span class="dhead-org">由 广州××人力资源服务有限公司 代招 · 用人单位面谈时告知</span>
+          <div class="dhead-row">
+            <span class="rcard-pay" style="text-align:left"><b style="font-size:var(--fz-7)">面议</b><span>机构未公示薪资区间</span></span>
+            <span class="rcard-meta">
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-pin"/></svg>广州 · 天河区</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-clock"/></svg>经验不限</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-campus"/></svg>大专及以上</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-users"/></svg>招 3 人</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">岗位信息（机构填报）</div>
+          <div class="dsec-body">
+            <ul>
+              <li>协助日常运营事务与客户对接</li>
+              <li>整理运营数据，输出周报</li>
+              <li>大专及以上，专业不限，应届可</li>
+              <li>周末双休，缴纳五险</li>
+            </ul>
+            <span style="font-size:var(--fz-2);color:var(--fog-600)">
+              以上由机构填报，本机<b>未做核实。</b>具体以你与用人单位签订的书面约定为准。
+            </span>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">机构服务门店</div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">门店</span><span class="v">广州××人力资源 · 天河门店</span></div>
+            <div class="kv-row"><span class="k">地址</span><span class="v">天河区 燕岭路 ×× 号 2 楼 201–205</span></div>
+            <div class="kv-row"><span class="k">怎么到</span><span class="v">地铁 3 号线 天河客运站 B 口，步行约 5 分钟</span></div>
+            <div class="kv-row"><span class="k">营业时间</span><span class="v">09:00–18:00，周日休（机构填报）</span></div>
+            <div class="kv-row"><span class="k">公开电话</span><span class="v v--fog">以门店公示为准 · 本机不接听、不转接</span></div>
+            <div class="kv-row"><span class="k">机构服务</span><span class="v">岗位推荐 · 用工咨询 · 入职登记指引</span></div>
+          </div>
+          <p class="fee">营业时间为机构填报，<b>不是本机实时探测；</b>出门前先电话确认更稳妥 <span class="ev ev--e3">E3 这条属 AI 判断</span></p>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">到店要带什么</div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">纸质简历</span><span class="v">2–3 份 · 本机可打印</span></div>
+            <div class="kv-row"><span class="k">身份证</span><span class="v">本人原件，现场核验后带回</span></div>
+            <div class="kv-row"><span class="k">学历与资格证</span><span class="v">有就带，机构未标为必需</span></div>
+            <div class="kv-row"><span class="k">笔</span><span class="v">现场要填登记表</span></div>
+          </div>
+          <p class="fee">这四项由机构填报；<b>实际所需材料以门店现场公示为准。</b></p>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">到店咨询怎么走</div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">第 1 步</span><span class="v">打印这页的到店问题清单，带着去</span></div>
+            <div class="kv-row"><span class="k">第 2 步</span><span class="v">备好简历与身份证，按营业时间到店</span></div>
+            <div class="kv-row"><span class="k">第 3 步</span><span class="v">与机构面谈，逐条问清并记下答复</span></div>
+            <div class="kv-row"><span class="k">本机到哪为止</span><span class="v">到"打印带走"为止；面谈与结果都在门店</span></div>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">数据来源</div>
+          <div class="srcline srcline--detail">
+            <span class="org">来源机构：广州××人力资源服务有限公司</span><span class="sep">·</span>
+            <span>同步时间：2026-08-10 07:40</span><span class="sep">·</span>
+            <span>外部 ID：OA-3312-07</span>
+          </div>
+          <p class="fee">
+            岗位由该机构填报并经管理员审核后展示。机构许可证与执照编号为机构填报，本机<b>未做工商与许可核验；</b>
+            可在国家企业信用信息公示系统与当地人社部门官网自行核对。
+          </p>
+        </div>
+      </div>
+
+      <!-- 加载失败 -->
+      <div class="blank" data-at="error">
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
+        <b>这条线下岗位的详情没取到</b>
+        <p>本机与机构同步数据之间连接失败，<b>不是你的操作问题。</b>故障已自动上报。<br>
+          这里<b>不用列表摘要凑一个详情页</b>——摘要没有门店地址与营业时间，你照着跑可能扑空。</p>
+        <div class="acts">
+          <button class="btn btn--primary">重试</button>
+          <a class="btn btn--ghost" href="16-offline-agencies.html?stage=detail">回机构详情</a>
+        </div>
+      </div>
+
+      <div class="pane" data-at="error">
+        <div class="pane-hd"><span class="t">故障档案</span><span class="s">给你看，也给运维看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">要看的岗位</span><span class="v">外部 ID OA-3312-07</span></div>
+          <div class="kv-row"><span class="k">失败发生</span><span class="v">10:38</span></div>
+          <div class="kv-row"><span class="k">自动重试</span><span class="v">已试 2 次，仍失败</span></div>
+          <div class="kv-row"><span class="k">上报</span><span class="v">已自动上报运维，无需你操作</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="error">
+        <div class="pane-hd"><span class="t">机构那边还能怎么核对</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">机构名单</span><span class="v">机构列表页照常可打开</span></div>
+          <div class="kv-row"><span class="k">门店地址</span><span class="v">恢复后自动回来，本机不猜地址</span></div>
+          <div class="kv-row"><span class="k">营业状态</span><span class="v v--fog">取不到就不显示——门可能是锁着的</span></div>
+          <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>机构列表能打开，说明只是这一条详情取失败——<b>回列表换一条看，不受影响。</b></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 右：到店前的准备 ================= -->
+    <div class="wside">
+
+      <!-- A 级 AI 落点：读的是这条岗位与机构的文本本身，不需要你的简历，所以 first 态照常给。 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd">
+          <span class="t">到店前先问清这几件</span>
+          <span class="s" data-when="default first device-off">四条 · 可打印</span>
+          <span class="s" data-when="ai-down">固定清单</span>
+        </div>
+
+        <div data-when="default first device-off">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          </div>
+          <div class="asks">
+            <div class="ask"><span class="ask-no">1</span><span class="ask-t">薪资写"面议"，区间是多少？</span></div>
+            <div class="ask"><span class="ask-no">2</span><span class="ask-t">这岗位是直招还是代招？</span></div>
+            <div class="ask"><span class="ask-no">3</span><span class="ask-t">试用期多长、工资怎么算？</span></div>
+            <div class="ask"><span class="ask-no">4</span><span class="ask-t">到岗前是否需要交任何费用？</span></div>
+          </div>
+        </div>
+
+        <div data-when="ai-down">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span class="ev ev--e2">不依赖 AI · 内容固定</span>
+          </div>
+          <div class="asks">
+            <div class="ask"><span class="ask-no">1</span><span class="ask-t">用人单位名称是哪一家？</span></div>
+            <div class="ask"><span class="ask-no">2</span><span class="ask-t">是否收取任何费用？</span></div>
+            <div class="ask"><span class="ask-no">3</span><span class="ask-t">试用期与转正条件？</span></div>
+            <div class="ask"><span class="ask-no">4</span><span class="ask-t">合同由谁签、什么时候签？</span></div>
+          </div>
+        </div>
+
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default first device-off">
+          按这条岗位与机构的公开文本生成，<b>不读你的简历。</b>
+        </p>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="ai-down">
+          生成服务中断，这里改用固定清单，<b>照样能打印带走。</b>
+        </p>
+      </div>
+
+      <div class="pane pane--fill" data-at="ok">
+        <div class="pane-hd"><span class="t">还能做什么</span></div>
+        <div class="outs">
+          <a class="out" href="16-offline-agencies.html?stage=detail"><svg class="ic"><use href="#i-building"/></svg>查看机构详情</a>
+          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找线上同类岗位</a>
+          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P44&amp;kind=job-list&amp;title=到店问题清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印问题清单</a>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>按这岗位练面谈</a>
+          <button class="out" aria-disabled="true" data-when="first ai-down"><svg class="ic"><use href="#i-interview"/></svg>练面谈不可用</button>
+        </div>
+      </div>
+
+      <!-- 机构合不合规，本机没核；与其含糊带过，不如把自查渠道写清楚 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd"><span class="t">这家机构自己怎么核</span><span class="s">本机没核</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">营业执照</span><span class="v">企业信用信息公示系统</span></div>
+          <div class="kv-row"><span class="k">人力资源许可</span><span class="v">当地人社部门官网</span></div>
+          <div class="kv-row"><span class="k">收费有争议</span><span class="v">向人社部门反映</span></div>
+          <div class="kv-row"><span class="k">本机做了什么</span><span class="v v--fog">只展示，未核验</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="ok">
+        <div class="pane-hd"><span class="t">到店之后，去哪看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">面谈与结果</span><span class="v">由机构与用人单位当面告知</span></div>
+          <div class="kv-row"><span class="k">书面约定</span><span class="v">薪资、地点、试用期要写进合同</span></div>
+          <div class="kv-row"><span class="k">身份证</span><span class="v">当面核验后当场带回</span></div>
+          <div class="kv-row"><span class="k">觉得不对劲</span><span class="v">先停下，别交钱、别押证件</span></div>
+          <div class="kv-row"><span class="k">本机能查</span><span class="v" data-when="default ai-down device-off">岗位页浏览记录里有这一条</span><span class="v v--fog" data-when="first">未登录 · 只留本次会话</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>本机<b>只记两件事：</b>你看过这个岗位、你打印过什么。<b>不记你去没去、谈没谈成。</b></span>
+        </div>
+      </div>
+
+      <div class="pane" data-at="error">
+        <div class="pane-hd"><span class="t">现在能做的</span></div>
+        <div class="outs">
+          <button class="out"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
+          <a class="out" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>回机构列表</a>
+        </div>
+      </div>
+
+      <div class="pane" data-at="error">
+        <div class="pane-hd"><span class="t">机构信息还能从哪确认</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">机构列表页</span><span class="v">照常可开，含门店地址</span></div>
+          <div class="kv-row"><span class="k">到了门店</span><span class="v">以现场公示为准</span></div>
+          <div class="kv-row"><span class="k">资质核对</span><span class="v">企业信用信息公示系统</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="error">
+        <div class="pane-hd"><span class="t">这次故障影响什么</span><span class="s">边界说清楚</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">这条岗位详情</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
+          <div class="kv-row"><span class="k">到店问题清单</span><span class="v" style="color:var(--coral-400)">暂不可用 · 要等岗位文本</span></div>
+          <div class="kv-row"><span class="k">你的浏览记录</span><span class="v">不受影响 · 登录后在岗位页</span></div>
+          <div class="kv-row"><span class="k">机构电话核对</span><span class="v">本机取不到，无法代为确认</span></div>
+          <div class="kv-row"><span class="k">机构列表</span><span class="v">照常可开，可换一条看</span></div>
+          <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>有人以这个岗位名义联系你，<b>先到门店当面核对；</b>要你先交费的务必警惕。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="16-offline-agencies.html?stage=detail" data-parent-label="线下机构"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">线下机构</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <div class="actionbar-hint">
+      <div data-at="ok">
+        <div data-when="default"><div class="t">到店问题清单已备好 · 4 条，1 页</div><div class="s">应聘与咨询在门店完成 · 本机不代收简历</div></div>
+        <div data-when="first"><div class="t">不用登录也能把问题清单打印带走</div><div class="s">登录后才会留下这次浏览记录</div></div>
+        <div data-when="ai-down"><div class="t">改用固定问题清单，一样可打印</div><div class="s">岗位正文、门店信息、打印都正常</div></div>
+        <div data-when="device-off"><div class="t">打印机离线，清单可扫码带到手机</div><div class="s">门店地址与营业时间照常可看</div></div>
+      </div>
+      <div data-at="error"><div class="t">详情没取到，已自动上报</div><div class="s">不用列表摘要凑详情——照着跑可能扑空</div></div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="ok"><svg class="ic"><use href="#i-bookmark"/></svg>收藏</button>
+    <button class="btn btn--lg btn--ghost" data-at="error">查看网络状态</button>
+
+    <a class="btn btn--primary" data-at="ok" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P44&amp;kind=job-list&amp;title=到店问题清单&amp;pages=1&amp;copies=1">打印到店问题清单 · 1 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="ok" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
+    <button class="btn btn--primary" data-at="error">重试<svg class="ic"><use href="#i-refresh"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+</body>
+</html>

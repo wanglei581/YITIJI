@@ -201,7 +201,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div style="min-width:0">
         <div class="brand-name">岗位信息</div>
@@ -300,6 +300,10 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
            参数上完全一样，等于四张卡承诺了一件没发生的事。现在各自带 jobType，
            并在卡面写明"进去后已按此类型筛好"。岗位台读不读这个参数属下游实现，
            本轮只保证**参数正确传出、卡面如实说明**。
+           2026-08-10 说谎文案整改：已核实 13-jobs-desk.html 目前**不读** jobType（全站只有
+           scripts/stage.js 读 capture / state 两个参数），进去看到的仍是全量列表 ——
+           「进去后已按 X 筛好」是明确说谎。处置：**保留 jobType 参数**（接线契约不变），
+           把卡面副文改成如实的「按 X 筛选（接线后自动生效）」，不再宣称已经筛好。
            口径备注：生产 apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx 用的是
            `/jobs?category=fulltime|intern|parttime`（全部岗位为不带参数的 /jobs）。
            本稿按本轮验收口径统一写 jobType，接线时映射到 category 即可，不要两套都发。 -->
@@ -308,7 +312,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--desk" data-cap="fulltime" href="13-jobs-desk.html?stage=ok&amp;jobType=fulltime">
         <span class="hc-rec">研判推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span><span class="hc-nm">全职岗位</span></span>
-        <span class="hc-ds">第三方同步的全职岗位，<b>进去后已按「全职」筛好</b>，台内可再改</span>
+        <span class="hc-ds">第三方同步的全职岗位，进入岗位台后<b>按「全职」筛选</b>（接线后自动生效），台内可再改</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -319,7 +323,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--desk" data-cap="intern" href="13-jobs-desk.html?stage=ok&amp;jobType=intern">
         <span class="hc-rec">研判推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-campus"/></svg></span><span class="hc-nm">实习岗位</span></span>
-        <span class="hc-ds">在校生与应届生的实习机会，<b>进去后已按「实习」筛好</b></span>
+        <span class="hc-ds">在校生与应届生的实习机会，进入岗位台后<b>按「实习」筛选</b>（接线后自动生效）</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -330,7 +334,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--desk" data-cap="parttime" href="13-jobs-desk.html?stage=ok&amp;jobType=parttime">
         <span class="hc-rec">研判推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-clock"/></svg></span><span class="hc-nm">兼职信息</span></span>
-        <span class="hc-ds">灵活就业与兼职，<b>进去后已按「兼职」筛好</b>；本机不经手费用</span>
+        <span class="hc-ds">灵活就业与兼职，进入岗位台后<b>按「兼职」筛选</b>（接线后自动生效）；本机不经手费用</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -341,7 +345,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <a class="hcard hcard--desk" data-cap="all" href="13-jobs-desk.html?stage=ok&amp;jobType=all">
         <span class="hc-rec">研判推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-layers"/></svg></span><span class="hc-nm">全部岗位</span></span>
-        <span class="hc-ds"><b>进去后不预设类型</b>，看全部<b>已审核</b>来源岗位，台内自己收窄</span>
+        <span class="hc-ds"><b>不预设类型</b>，看全部<b>已审核</b>来源岗位，台内自己收窄</span>
         <span class="hc-ft">
           <span class="chip chip--azure chip--label">不依赖 AI</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -402,20 +406,23 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
     </div>
 
-    <!-- ══════════ 两张次卡：明细归业务页，不归「我的」 ══════════ -->
+    <!-- ══════════ 两张次卡：记录类 ══════════
+         2026-08-10 改：两张卡原来都指 13-jobs-desk.html?stage=ok，并写明「明细在岗位台内」——
+         但岗位台里 0 处浏览记录 / 外部跳转记录 UI，进去只会看到岗位列表，承诺兑现不了。
+         记录统一落「我的记录 · 足迹」标签，卡面同步注明记录在哪里看。 -->
     <div class="glabel">
       <b>你在岗位域留下的记录</b>
-      <span data-when="default ai-down device-off">明细在岗位台内，「我的」页只给数量和路牌，不铺第二份</span>
+      <span data-when="default ai-down device-off">浏览与跳转明细统一在「我的 · 足迹」里看，业务页不铺第二份</span>
       <span data-when="first">现在没登录，进去只会看到本次会话的几条</span>
     </div>
     <div class="qrow">
-      <a class="qcard" href="13-jobs-desk.html?stage=ok">
+      <a class="qcard" href="43-my-records.html?stage=trace&amp;from=P34">
         <span class="qc-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
-        <span class="qc-b"><span class="qc-t">浏览记录</span><span class="qc-s">你看过哪些岗位&nbsp;· 明细在岗位台内，不在「我的」页聚合</span></span>
+        <span class="qc-b"><span class="qc-t">浏览记录</span><span class="qc-s">你看过哪些岗位&nbsp;· 记录在「我的 · 足迹」里看</span></span>
       </a>
-      <a class="qcard" href="13-jobs-desk.html?stage=ok">
+      <a class="qcard" href="43-my-records.html?stage=trace&amp;from=P34">
         <span class="qc-ic"><svg class="ic"><use href="#i-external"/></svg></span>
-        <span class="qc-b"><span class="qc-t">外部跳转记录</span><span class="qc-s">你打开过哪些来源平台入口&nbsp;· 明细同样在岗位台内</span></span>
+        <span class="qc-b"><span class="qc-t">外部跳转记录</span><span class="qc-s">你打开过哪些来源平台入口&nbsp;· 记录同样在「我的 · 足迹」</span></span>
       </a>
     </div>
 
@@ -428,7 +435,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
-      <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <!-- 原来这里还有一个「问问小青」，和底部导航的「AI顾问」去的是同一页（25-advisor）——
          重复入口，并且五个按钮把 .actionbar-hint 挤到 9px 宽：提示文字折行后溢出操作条 140px，
@@ -445,7 +452,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>

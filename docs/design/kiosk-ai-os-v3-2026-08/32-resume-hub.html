@@ -213,7 +213,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">AI 简历服务</div>
@@ -444,7 +444,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-ft">
           <span class="chip chip--jade chip--label">不依赖 AI</span>
           <span class="chip chip--info chip--label">打印机离线</span>
-          <a class="inlink" href="23-me.html"><svg class="ic"><use href="#i-folder"/></svg>去我的文档，换机取回</a>
+          <a class="inlink" href="42-my-assets.html?stage=docs&amp;from=P32"><svg class="ic"><use href="#i-folder"/></svg>去我的文档，换机取回</a>
         </span>
       </div>
 
@@ -474,11 +474,14 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
     <!-- ══════════ 三张次卡 ══════════ -->
     <div class="qrow">
-      <a class="qcard" href="23-me.html">
+      <!-- 2026-08-10 改：这两张原来都指 23-me.html（「我」的域首屏）—— 点进去只看到 8 张卡，
+           还得再点一次才到明细，且「我的简历」那张卡当时又指回 09，形成 32→23→09 绕圈。
+           现在直落资产/记录页的对应标签，一步到承诺的那一屏。 -->
+      <a class="qcard" href="42-my-assets.html?stage=resume&amp;from=P32">
         <span class="qc-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
         <span class="qc-b"><span class="qc-t">我的简历</span><span class="qc-s">存过的简历版本 · 不依赖 AI</span></span>
       </a>
-      <a class="qcard" href="23-me.html">
+      <a class="qcard" href="43-my-records.html?stage=ai&amp;from=P32">
         <span class="qc-ic"><svg class="ic"><use href="#i-history"/></svg></span>
         <span class="qc-b"><span class="qc-t">AI服务记录</span><span class="qc-s">历次诊断与优化 · 只读记录</span></span>
       </a>
@@ -509,7 +512,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
-      <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <!-- 原来这里还有一个「问问小青」，和底部导航的「AI顾问」去的是同一页（25-advisor）——
          重复入口，并且五个按钮把 .actionbar-hint 挤成 0 宽：提示文字折成十几行、
@@ -528,7 +531,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>

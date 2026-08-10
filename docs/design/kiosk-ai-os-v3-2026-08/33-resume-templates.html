@@ -398,8 +398,10 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           </div>
 
           <!-- ③ 原来写「存我的文档」，点了只是打开 23-me.html —— 什么都没保存。
-               保存这件事本页做不到（本页不写库），所以按实际行为改名为「查看我的文档」。 -->
-          <a class="exit" href="23-me.html">
+               保存这件事本页做不到（本页不写库），所以按实际行为改名为「查看我的文档」。
+               2026-08-10 再改：23-me 只是「我」的域首屏，没有文档明细，
+               「打开我的文档」还是兑现不了 → 直落 42-my-assets.html?stage=docs。 -->
+          <a class="exit" href="42-my-assets.html?stage=docs&amp;from=P33">
             <svg class="ic"><use href="#i-folder"/></svg>
             <span class="exit-b"><span class="exit-t">查看我的文档</span>
               <span class="exit-s" data-when="default ai-down device-off">打开「我的文档」看已有的简历与材料。<b>本页不保存任何东西</b>，保存发生在优化或打印那一步。</span>
@@ -453,7 +455,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>

@@ -20,7 +20,7 @@
 <!-- ============================================================
      V6 「AI 神经中枢」页内样式（自包含，不改任何共享文件）
      ------------------------------------------------------------
-     信息结构与文案 100% 沿用 01-home-v5.html，三处同步差异：
+     信息结构与文案 100% 沿用 01-home-v6.html，三处同步差异：
        ① topbar 品牌三段式：职易达 + 「AI 求职操作系统」副名(小号 fog-700)
           + NATIVE-OS 徽章（等宽大写 jade 胶囊 + 2.2s 呼吸点）
        ② 不再有 brand-sub 行（用户已删）
@@ -222,6 +222,20 @@ html.lowgpu .vx-ring ellipse, html.lowgpu .vsite img,
 html.lowgpu .card-ic .ic, html.lowgpu .vx-mic .ic,
 html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
 /* reduced-motion：base.css 全局把动画压到 .001ms 单次即静态终态，无需另写 */
+
+/* ── 高度收口(2026-08-10 浏览器内试算后落定)────────────────────────
+   实测:.vbody 可用高度装不下 verrand+两栅格+vfoot,ai-down 态最坏溢出 95px,
+   「查看招聘会」四态全部落在裁切线下、elementFromPoint 命中不到 → 点不动。
+   前两版靠猜改反而更糟(76→99→122),这版是在浏览器里逐个候选试算出来的:
+   四态溢出 -15/-42/-15/-5(均为负=有余量),按钮四态可点,按钮高 50px≥48。
+   ai-down 额外压缩中枢区,因为该态 vgrid-a 会多出一条降级说明(+44px)。 */
+.vivid .vhero { height: 226px; }
+.screen[data-state="ai-down"] .vivid .vhero { height: 186px; }
+.vivid .verrand { padding-top: 6px; padding-bottom: 6px; }
+.vivid .vgrid-a .card { min-height: 108px; }
+.vivid .vgrid-b .card { min-height: 92px; }
+.vivid .vfoot { padding-top: 4px; }
+.vivid .vfoot .btn { min-height: 52px; }
 </style>
 </head>
 <body>

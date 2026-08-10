@@ -153,6 +153,20 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 /* 数量单独一行：真实环境常年是 0，不许编一个数 */
 .dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
 .dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
+
+/* ── 建设中（2026-08-10 逐屏对照整改）──────────────────────────────────
+   已核实 20-interview-pod.html 全文 0 处「面试技巧 / 谈薪要点 / 往期报告 /
+   历次训练记录」内容，它只有 s1–s4 四步的练习流程本身，且不读 ?view= 参数。
+   原来这几个入口链过去，用户只会落到练习第一步，看不到承诺的东西。
+   处置口径（IMPLEMENTATION-NOTES：宁可灰掉并写清原因，也不链到一个语义不同的页）：
+   改成 aria-disabled 的建设中卡 —— 不可点、不进 Tab 序、当场说明为什么还不能用。 */
+.dcard--soon, .aibtn--soon, .dmore-go--soon {
+  opacity: .62; cursor: not-allowed; pointer-events: none;
+  background: var(--surf-1); border-color: var(--brd-1); box-shadow: none; }
+.dcard--soon { border-top-color: var(--ink-500); }
+.dcard--soon .dcard-nm, .dcard--soon .dcard-ic, .dcard--soon .dcard-go { color: var(--fog-600); }
+.aibtn--soon, .aibtn--soon em { color: var(--fog-600); }
+.dmore-go--soon .dmore-t, .dmore-go--soon .dmore-ic { color: var(--fog-600); }
 </style>
 </head>
 <body>
@@ -165,7 +179,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">AI 面试训练</div>
@@ -234,14 +248,16 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="20-interview-pod.html?stage=s2&amp;view=questions">只看题目<em>自己写答案、自己掐时间</em></a>
-          <a class="aibtn" href="20-interview-pod.html?stage=s1&amp;view=tips">面试技巧<em>常见问题与谈薪要点</em></a>
+          <button class="aibtn aibtn--soon" type="button" disabled aria-disabled="true">面试技巧&nbsp;· 建设中<em>技巧要点页还没建，面试页里没有这段内容</em></button>
           <!-- Codex :236 整改：往期报告原来跳 28-self-assessment（自我评估页），
-               那里放的是评估报告不是面试报告。改指面试页自己的报告态 s4。 -->
-          <a class="aibtn" href="20-interview-pod.html?stage=s4&amp;view=reports">往期报告<em>面试训练报告都还在</em></a>
+               那里放的是评估报告不是面试报告，改指过面试页 s4。
+               2026-08-10 复核：20-interview-pod 的 s4 是**本场**练完的复盘，
+               全文 0 处往期报告列表，也不读 ?view=reports —— 承诺兑现不了，改建设中。 -->
+          <button class="aibtn aibtn--soon" type="button" disabled aria-disabled="true">往期报告&nbsp;· 建设中<em>只能在练习结束后看本次复盘</em></button>
           <!-- Codex :237 同 :314：薪资原来跳 11-jobfit-compare，可那页的「方向与薪资参考」
                挂在 data-when="default device-off"，ai-down 下根本不显示。改指岗位情报台，
                那里每条岗位的公示薪资四态都在，且不需要先传简历。 -->
-          <a class="aibtn" href="13-jobs-desk.html?view=salary&amp;sort=pay">薪资区间<em>岗位公示原文转录</em></a>
+          <a class="aibtn" href="13-jobs-desk.html?stage=ok">薪资区间<em>岗位公示原文转录</em></a>
         </div>
       </div>
 
@@ -297,17 +313,21 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-go" data-when="ai-down">先答题，解读稍后<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 3 面试技巧（非 AI） -->
-        <a class="dcard" id="c-tips" href="20-interview-pod.html?stage=s1&amp;view=tips">
+        <!-- 3 面试技巧（非 AI）
+             2026-08-10 逐屏对照整改：原指 20-interview-pod.html?stage=s1&view=tips。
+             已核实那一页全文 0 处「常见问题 / 自我介绍模板 / 谈薪要点」，
+             s1 是「练什么·怎么答」的开场设置，?view= 也没人读 ——
+             点进去看不到技巧要点。灰掉并写明原因，比链到一个语义不同的页诚实。 -->
+        <div class="dcard dcard--soon" id="c-tips" aria-disabled="true">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-book"/></svg></span>
-            <span class="chip chip--info">不依赖 AI</span>
+            <span class="chip chip--info">建设中</span>
           </span>
           <span class="dcard-nm">面试技巧</span>
           <span class="dcard-ds">常见问题、自我介绍模板、谈薪要点</span>
-          <span class="dcard-hint">人工整理的静态要点，内容不随人变</span>
-          <span class="dcard-go">看技巧要点<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-        </a>
+          <span class="dcard-hint"><b>面试技巧页还没建</b>，面试练习页里没有这段内容；<br>现在只能在练习结束后看本次复盘里的逐题点评。</span>
+          <span class="dcard-go">暂不可用</span>
+        </div>
 
         <!-- 4 评估历史（非 AI） -->
         <a class="dcard" id="c-history" href="28-self-assessment.html?stage=s4&amp;view=history">
@@ -329,7 +349,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
              从本域首屏点进去拿不到薪资。改指岗位情报台：每条岗位的公示薪资是来源平台原文，
              四态都在、也不需要先传简历。「谈薪要点」不在那页，从本卡文案里去掉，
              它本来就归隔壁「面试技巧」卡。 -->
-        <a class="dcard" id="c-salary" href="13-jobs-desk.html?view=salary&amp;sort=pay">
+        <!-- 2026-08-10 复核：本卡**保留真链接**。13-jobs-desk 每条岗位都印着「薪资按来源平台公示」，
+             筛选区也有「薪资 · 单选 · 按最低薪资」，入口承诺兑现得了。
+             但它没有「按薪资排序」控件，?view=salary&sort=pay 也没人读 ——
+             去掉这两个参数，去向文案从「按薪资看」（暗示排序）改成如实的「按薪资筛选」。 -->
+        <a class="dcard" id="c-salary" href="13-jobs-desk.html?stage=ok">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-card"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
@@ -337,7 +361,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-nm">行业薪资参考</span>
           <span class="dcard-ds">同方向岗位按来源平台公示的薪资区间</span>
           <span class="dcard-hint">来源方原文转录，不预测你个人能拿多少</span>
-          <span class="dcard-go">去岗位情报台按薪资看<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-go">去岗位情报台按薪资筛选<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
         <!-- 6 职业规划建议（AI · 先选方向与跨度 · 整行横排） -->
@@ -373,29 +397,27 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
         <div class="dmore-row">
           <!-- 2026-08-10 Codex :358 整改：这里原来是「AI服务记录」→ 23-me.html，
-               把明细甩回通用「我的」，跟「记录明细留在业务域」的口径相反。
-               改成面试域自己的训练记录，去向也留在 20-interview-pod。 -->
-          <a class="dmore-go" href="20-interview-pod.html?stage=s4&amp;view=history">
+               把明细甩回通用「我的」，跟「记录明细留在业务域」的口径相反，
+               当时改成面试域自己的训练记录、去向留在 20-interview-pod。
+               2026-08-10 逐屏对照复核：20-interview-pod 的 s4 只有**本场**复盘，
+               全文 0 处历次训练列表 / 往期报告列表，?view=history、?view=reports 也没人读 ——
+               两条都是承诺了一件没发生的事。按 IMPLEMENTATION-NOTES 的口径灰掉并写清原因。 -->
+          <div class="dmore-go dmore-go--soon" aria-disabled="true">
             <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">面试训练记录</span>
-              <span class="dmore-s">历次练过的岗位、难度与题量</span>
-              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
-              <span class="dmore-n" data-when="first">未登录 · 0 条</span>
+              <span class="dmore-t">面试训练记录&nbsp;· 建设中</span>
+              <span class="dmore-s">历次记录页还没建，面试页只保留本场</span>
             </span>
-            <span class="chip chip--info">不依赖 AI</span>
-          </a>
-          <a class="dmore-go dmore-go--print" id="c-report" href="20-interview-pod.html?stage=s4&amp;view=reports">
+            <span class="chip chip--info">暂不可用</span>
+          </div>
+          <div class="dmore-go dmore-go--soon" id="c-report" aria-disabled="true">
             <span class="dmore-ic"><svg class="ic"><use href="#i-file"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">训练报告</span>
-              <span class="dmore-s" data-when="default first ai-down">逐题点评与复盘单</span>
-              <span class="dmore-s" data-when="device-off">可看可存，打印机离线暂时打不出来</span>
-              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 份</span>
-              <span class="dmore-n" data-when="first">未登录 · 0 份</span>
+              <span class="dmore-t">往期训练报告&nbsp;· 建设中</span>
+              <span class="dmore-s">往期报告页还没建，现在只能在练习结束后看本次复盘</span>
             </span>
-            <span class="chip chip--info">不依赖 AI</span>
-          </a>
+            <span class="chip chip--info">暂不可用</span>
+          </div>
         </div>
       </div>
 
@@ -409,16 +431,17 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   </div>
 
   <div class="actionbar">
-      <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">练一场，或者先弄清自己适合什么</div><div class="s">点评标 E3，只给你本人看</div></div>
       <div data-when="first"><div class="t">不登录也能练，六张卡一张都不锁</div><div class="s">这一趟的报告与评估记录留不下</div></div>
-      <div data-when="ai-down"><div class="t">题目、技巧、往期报告照常</div></div>
+      <div data-when="ai-down"><div class="t">题目照常，技巧与往期报告页还没建</div></div>
       <div data-when="device-off"><div class="t">打印机离线，练习与看报告不受影响</div><div class="s">只有打复盘单要换机取回</div></div>
     </div>
 
-    <a class="btn btn--lg btn--ghost" href="20-interview-pod.html?stage=s1&amp;view=tips"><svg class="ic"><use href="#i-book"/></svg>看面试技巧</a>
+    <!-- 2026-08-10：同 c-tips，面试技巧页未建，20 页里没有这段内容 → 置灰不可点 -->
+    <button class="btn btn--lg btn--ghost" type="button" disabled aria-disabled="true"><svg class="ic"><use href="#i-book"/></svg>面试技巧&nbsp;· 建设中</button>
     <!-- 底栏这个主按钮进的是面试页第 1 步「练什么·怎么答」，岗位在那一步选，
          所以它不受本页卡上的岗位门控 —— 但也不带 target，免得看着像已经替你选好了 -->
     <a class="btn btn--primary" data-when="default first device-off" href="20-interview-pod.html?stage=s1">开始模拟面试<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -426,7 +449,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>

@@ -82,7 +82,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="06-print-workbench.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">纸质扫描</div>
@@ -484,7 +484,7 @@
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
           <button class="btn btn--ghost" style="width:100%" aria-disabled="true" data-when="device-off">拿去打印 · 同机离线暂不可用</button>
-          <a class="xlane-go" href="23-me.html?view=docs&amp;from=P07">
+          <a class="xlane-go" href="42-my-assets.html?stage=docs&amp;from=P07">
             <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
             <!-- 2026-08-10 口径统一：原写「长期保存」，全站基准表里没有「长期」这一档。
                  按类型分档：一般扫描件 90 天，含身份证号的按敏感文件 7 天。 -->
@@ -618,7 +618,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -820,13 +820,15 @@
     },
     /* 2026-08-10 Codex 闭环整改：这条原来写「已存进「我的文档」」，
        可按钮只进 23 的通用入口，落在哪个分区、有没有这份文件都不确定。
-       改成动作文案 + 传 ?view=docs&from=P07 直落文档分区，并把判定权交回文档列表。 */
+       改成动作文案 + 直落文档分区，并把判定权交回文档列表。
+       2026-08-10 二次整改：23-me 只是「我」的域首屏、并无文档明细列表，
+       ?view=docs 不被消费 → 改指 42-my-assets.html?stage=docs（文档标签）。 */
     save: function () {
       return {
         t: '存进「我的文档」',
         p: '扫描件 <b>扫描_20260808_0947.pdf</b>（' + pages() + ' 页）正在存入「我的 · 文档」。凭手机号在任一台空闲机器登录就能取回，<b>文件跟人走，不跟机器走</b>。<br><b>保存结果以文档列表为准</b>：过去没看到这一份，回本页重新存。保存期限按类型算：一般扫描件 90 天，含身份证号的按敏感文件 7 天。',
         go: [
-          { t: '去「我的 · 文档」核对', href: '23-me.html?view=docs&from=P07', primary: true },
+          { t: '去「我的 · 文档」核对', href: '42-my-assets.html?stage=docs&from=P07', primary: true },
           { t: '留在这一页' }
         ]
       }
@@ -892,7 +894,7 @@
   try { q = new URLSearchParams(location.search) } catch (e) { return }
   var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
   var D = {
-    P01: ['首页', '01-home-v5.html'],
+    P01: ['首页', '01-home-v6.html'],
     P06: ['打印扫描', '39-print-hub.html'],
     P07: ['打印扫描', '39-print-hub.html'],
     P08: ['打印扫描', '39-print-hub.html'],

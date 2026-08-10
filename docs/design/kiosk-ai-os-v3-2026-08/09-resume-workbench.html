@@ -169,7 +169,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">AI 简历服务</div>
@@ -235,7 +235,10 @@
           <span class="src-ds">《个人简历.pdf》还在本次会话里</span>
           <span class="src-tag"><span class="chip chip--jade">09:43 上传</span></span>
         </button>
-        <a class="src" href="23-me.html">
+        <!-- 2026-08-10 修死循环：原指 23-me.html，而 23 的「我的简历」卡当时又指回本页 s5，
+             用户点「我的简历库」→ 23 → 09，绕一圈回到起点、始终看不到版本列表。
+             改为直落 42-my-assets.html?stage=resume（简历标签）。 -->
+        <a class="src" href="42-my-assets.html?stage=resume&amp;from=P09">
           <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
           <span class="src-nm">我的简历库</span>
           <span class="src-ds">登录后取出以前存过的版本</span>
@@ -992,7 +995,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -1143,7 +1146,7 @@
   var back = document.querySelector('.actionbar > .backbtn')
   if (!back) return
   var D = {
-    P01: ['首页', '01-home-v5.html'],
+    P01: ['首页', '01-home-v6.html'],
     P06: ['打印扫描', '39-print-hub.html'],
     P07: ['打印扫描', '39-print-hub.html'],
     P08: ['打印扫描', '39-print-hub.html'],

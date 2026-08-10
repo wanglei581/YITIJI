@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P43 我的记录 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P43 我的记录">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   P43 我的记录（2026-08-10 新建）
+   --------------------------------------------------------------------------
+   与 P42 同一批补建：V3 把原型里的资产/记录列表整层丢了，「我的收藏」于是
+   链到了岗位大全。这一页把原型的四页合并成四个标签：
+     19-me-ai-records.html   → data-stage="ai"      AI 服务记录
+     20-me-favorites.html    → data-stage="fav"     我的收藏
+     71-me-activity.html     → data-stage="trace"   浏览与跳转记录
+     22-me-notifications.html→ data-stage="notice"  通知与反馈
+
+   **四个标签都能被 URL 直达**（stages.js 消费 ?stage=）：
+     43-my-records.html?stage=ai
+     43-my-records.html?stage=fav
+     43-my-records.html?stage=trace
+     43-my-records.html?stage=notice
+   P23 的对应卡请直接指到这四个地址 —— 合并的收益是「少点一次」，
+   落在首个标签再让用户找第二下，就白合并了。
+
+   操作方式与原型一致：收藏列表点条目回对应详情页、通知有「已读 / 删除」、
+   反馈是「选分类 + 写描述 + 提交」，浏览与跳转仍是两个 Tab。手势不变。
+
+   合规红线（本页最硬的一条，来自 CLAUDE.md §10 与 user-data-flow-matrix）：
+   浏览与跳转记录**只记动作，不记结果** —— 记「打开了来源平台」，
+   不记「投没投、投没投成」。那是来源平台的事，本机拿不到也不该拿。
+   所以 trace 标签的合规声明**贴在画像正下方**（用户看画像时就该看到边界），
+   其余三个标签的声明在右栏；任何一屏都只出现一条。
+
+   AI 落点只保留能省步骤的四处：
+     ① AI 服务记录：这段时间用 AI 做了什么 + 下一步可以做什么（E3）
+        —— 省掉自己回忆做过哪些、还差哪一步。
+     ② 我的收藏：要求相近的聚成一簇 + 有几条已下线
+        —— 省掉逐条点开才发现岗位已经没了。
+     ③ 浏览记录：最近在看哪个方向的画像
+        —— 省掉自己翻二十条记录做归纳。
+     ④ 通知与反馈：把你的问题描述整理成工单摘要（可改，**不自动提交**）
+        —— 省掉从头组织语言。
+   ai-down 时上述 AI 块整块换成「本机这次不做盘点，记录都在下面」，
+   列表、筛选、Tab、已读、删除、提交反馈全都照常。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.work--list { grid-template-columns: 1fr 332px; }
+
+/* ---------- 条目行（与 P42 同一套构件，保证两页手势一致） ---------- */
+.lwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.lwrap .blank--filter { display: none; }
+.lwrap.is-empty .blank--filter { display: flex; }
+.lwrap.is-empty .rlist { display: none; }
+
+.rrow {
+  flex: 0 0 auto;
+  border-radius: var(--r-md); background: var(--glass-1-bg);
+  border: 1px solid var(--glass-1-brd); box-shadow: var(--sh-1);
+  display: flex; flex-direction: column;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.rrow.is-open { border-color: var(--jade-a32); }
+.rrow--off { opacity: .74; }
+.rrow-hd {
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; min-height: 74px; padding: var(--s-4) var(--s-5) 10px;
+  background: transparent; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--ff-ui); color: inherit;
+}
+.rrow-hd:active { transform: translateY(1px) scale(.998); }
+.rrow-hd:focus-visible { outline: 3px solid var(--jade-400); outline-offset: -3px; border-radius: var(--r-md); }
+.rrow-ic {
+  width: 44px; height: 44px; flex: 0 0 auto; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-1); color: var(--jade-400);
+}
+.rrow-ic .ic { width: 22px; height: 22px; }
+.rrow-ic--azure { color: var(--azure-400); }
+.rrow-ic--amber { color: var(--amber-400); }
+.rrow-ic--fog { color: var(--fog-700); }
+.rrow-b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.rrow-tl { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.rrow-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; line-height: 1.25; }
+.rrow-m { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); line-height: 1.5; }
+.rrow-x { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600);
+  transition: transform var(--dur-2) var(--ease-out); }
+.rrow.is-open .rrow-x { transform: rotate(90deg); }
+.rrow-ops { display: flex; gap: var(--s-2); flex-wrap: wrap; padding: 0 var(--s-5) var(--s-4); }
+.rrow-ops .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+.rrow-det { display: none; margin: 0 var(--s-5) var(--s-4); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rrow.is-open .rrow-det { display: block; }
+.rrow-det .kv-row { min-height: var(--touch-min); }
+/* 来源条在条目里稍收一点，不抢标题 */
+.rrow-b .srcline { margin-top: 1px; }
+
+.fbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.fbar-n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+
+.fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+.fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fold[open] > summary::after { content: '收起'; }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+.fold:not([open]) .fold-b { display: none; }
+
+.inlink {
+  display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+  border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+  background: var(--surf-1); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+}
+.inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* ---------- 反馈工单：AI 只出草稿，提交仍要你自己按 ---------- */
+/* 撑满剩余高度：不撑的话「写一条反馈」这张卡底下会空 640px，
+   卡片里的空洞比页面留白更像"没加载完"（audit-plus 版面留白那条注释说的就是这个）。
+   撑开后多出来的高度全给输入框 —— 一体机上站着打字，写字区越大越好。 */
+.draft {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.draft textarea {
+  width: 100%; flex: 1 1 auto; min-height: 128px; resize: none;
+  border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+  background: var(--field-bg); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); line-height: 1.6;
+  padding: var(--s-3) var(--s-4);
+}
+.draft textarea:focus { outline: 2px solid var(--jade-a32); outline-offset: 1px; }
+.draft-act { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.draft-act .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+.tkt { display: flex; align-items: center; gap: var(--s-3);
+  min-height: var(--touch-min); padding: 10px var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.tkt-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tkt-t { font-size: var(--fz-2); color: var(--fog-900); }
+.tkt-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+.tkt + .tkt { margin-top: var(--s-2); }
+
+/* ---------- 删除 / 取消收藏 确认层（防肩窥：不回显名称全称） ---------- */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet);
+  display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+.ovl-panel {
+  position: relative; width: 100%; max-width: 620px; max-height: 100%; overflow-y: auto;
+  border-radius: var(--r-lg); padding: var(--s-6);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(140%);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--coral-400); }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x { margin-left: auto; width: 48px; height: 48px; border-radius: var(--r-sm);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  cursor: pointer; display: grid; place-items: center; }
+.ovl-x .ic { width: 20px; height: 20px; color: var(--fog-800); }
+.nrow { display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: var(--touch-min); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.nrow .dot { margin-top: 7px; }
+.nrow-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrow-t { font-size: var(--fz-3); color: var(--fog-900); }
+.nrow-s { font-size: var(--fz-1); color: var(--fog-600); }
+.ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="ai" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="23-me.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">记</div>
+      <div>
+        <div class="brand-name">我的记录</div>
+        <div class="brand-sub">职易达 · 01 号机 · 只你自己看得到</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first device-off"><span class="dot dot--live"></span>记录服务正常</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 盘点不可用 · 记录正常</div>
+    <div class="clock" data-clock>2026年8月10日 <b>15:22</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="ai"><svg class="ic" style="width:17px;height:17px"><use href="#i-brain"/></svg>AI 服务记录</button>
+      <button class="stbtn" data-go="fav"><svg class="ic" style="width:17px;height:17px"><use href="#i-bookmark"/></svg>我的收藏</button>
+      <button class="stbtn" data-go="trace"><svg class="ic" style="width:17px;height:17px"><use href="#i-history"/></svg>浏览与跳转</button>
+      <button class="stbtn" data-go="notice"><svg class="ic" style="width:17px;height:17px"><use href="#i-bell"/></svg>通知与反馈</button>
+    </div>
+    <span class="rail-count">四类都是你留下的痕迹</span>
+  </div>
+
+  <div class="work work--list">
+    <!-- ═════════════════ 左：记录列表 ═════════════════ -->
+    <div class="wmain">
+
+      <!-- ───────── AI 服务记录 · 盘点（省掉自己回忆做过什么） ───────── -->
+      <div class="checks" data-at="ai">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">这个月你做完了诊断和优化，还差一次逐条比对</span>
+          <span class="t" data-when="first">登录后这里会盘点你用 AI 做过什么</span>
+          <span class="t" data-when="ai-down">本机这次不做盘点，记录都在下面</span>
+          <span class="s" data-when="default device-off">本月 6 次</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 次</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-check"/></svg>已做：简历诊断、优化、职业规划、参会作战单 <span class="ev ev--e1">E1 你的记录</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>下一步：拿 v3 和收藏的 3 个岗位逐条比 <span class="ev ev--e3">E3 建议 · 仅供参考</span></span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有账号就没有历史记录，这里不猜也不举例</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>盘点服务中断已自动上报；查看、打印、删除照常</span>
+        </div>
+      </div>
+
+      <!-- ───────── 我的收藏 · 聚类与失效提示（省掉逐条点开才发现没了） ───────── -->
+      <div class="checks" data-at="fav">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">你收的 3 个岗位要求相近，其中 1 条已下线</span>
+          <span class="t" data-when="first">登录后这里会替你归拢收藏并盯着失效</span>
+          <span class="t" data-when="ai-down">本机这次不做归拢，收藏都在下面</span>
+          <span class="s" data-when="default device-off">6 条 · 下线 1</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 条</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-alert"/></svg>「内容运营（新媒体）」<b>来源平台已下线</b>，别再按它准备 <span class="ev ev--e2">E2 来源状态</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>三条都要「运营 + 内容 + 社群」，一份简历够用 <span class="ev ev--e3">E3 建议 · 仅供参考</span></span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录时的收藏只留本次会话，离场即清</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>下线标记来自来源平台状态，不依赖 AI，照常显示</span>
+        </div>
+      </div>
+
+      <!-- ───────── 浏览与跳转 · 方向画像 + 本页唯一合规声明 ─────────
+           声明贴在画像正下方：用户看到"机器归纳了我在看什么"的同一屏，
+           就该看到这份归纳的边界。其余三个标签的声明在右栏，任一屏只一条。 -->
+      <div class="checks" data-at="trace">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">最近两周你主要在看运营方向，集中在天河区</span>
+          <span class="t" data-when="first">登录后这里会归纳你最近在看哪个方向</span>
+          <span class="t" data-when="ai-down">本机这次不做归纳，记录都在下面</span>
+          <span class="s" data-when="default device-off">9 条足迹</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">9 条足迹</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>9 条里 5 条是运营岗、2 条招聘会、1 条政策 <span class="ev ev--e1">E1 你的记录</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>打开过 4 次来源平台，最近一次今天 10:20 <span class="ev ev--e1">E1 你的记录</span></span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录只留本次会话的足迹，离场即清</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>归纳服务中断已自动上报；两个 Tab 与明细照常</span>
+        </div>
+        <!-- 本页唯一一处合规声明（trace 标签版） -->
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>这份画像<b>仅本人可见</b>，不外传、不用于推荐给企业；本机只记你<b>打开过来源平台</b>，投没投、投没投成一律不记。</span>
+        </div>
+      </div>
+
+      <!-- ───────── 通知与反馈 · AI 只出工单草稿（省掉从头组织语言） ───────── -->
+      <div class="checks" data-at="notice">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-bell"/></svg>
+          <span class="t" data-when="default device-off">2 条未读：1 条打印完成、1 条文件到期提醒</span>
+          <span class="t" data-when="first">登录后打印完成、文件到期这类提醒会进这里</span>
+          <span class="t" data-when="ai-down">本机这次不做整理，消息和工单都在下面</span>
+          <span class="s" data-when="default device-off">5 条 · 未读 2</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">5 条</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>要提问题时，右栏已经替你起好一段工单摘要 <span class="ev ev--e3">E3 草稿 · 你可以改</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-shield"/></svg>草稿<b>不会自动提交</b>，按了「提交反馈」才发出去</span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>不登录也能提反馈，留个手机号才收得到回复</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>右栏的输入框照常可写，你直接描述就行</span>
+        </div>
+      </div>
+
+      <!-- ───────── 筛选条 / Tab ───────── -->
+      <div class="fbar" data-at="ai" data-when="default ai-down device-off" data-for="lw-ai">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="resume" aria-pressed="false">简历类 2</button>
+        <button class="fchip" data-sel="job" aria-pressed="false">岗位类 1</button>
+        <button class="fchip" data-sel="mock" aria-pressed="false">面试类 1</button>
+        <button class="fchip" data-sel="plan" aria-pressed="false">规划与参会 2</button>
+        <button class="fchip" data-sel="run" aria-pressed="false">处理中 0</button>
+        <span class="fbar-n" data-count>显示 6 条</span>
+      </div>
+
+      <div class="fbar" data-at="fav" data-when="default ai-down device-off" data-for="lw-fav">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="job" aria-pressed="false">岗位 3</button>
+        <button class="fchip" data-sel="fair" aria-pressed="false">招聘会 2</button>
+        <button class="fchip" data-sel="policy" aria-pressed="false">政策 1</button>
+        <button class="fchip" data-sel="off" aria-pressed="false">已下线 1</button>
+        <button class="fchip" data-sel="company" aria-pressed="false">企业 0</button>
+        <span class="fbar-n" data-count>显示 6 条</span>
+      </div>
+
+      <!-- 两个 Tab，与原型 71 一致：浏览记录 / 外部跳转记录 -->
+      <div class="fbar" data-at="trace" data-when="default ai-down device-off" data-for="lw-trace">
+        <button class="fchip" data-sel="browse" aria-pressed="true">浏览记录 5</button>
+        <button class="fchip" data-sel="jump" aria-pressed="false">外部跳转记录 4</button>
+        <button class="fchip" data-sel="none" aria-pressed="false">投递结果 0</button>
+        <span class="fbar-n" data-count>显示 5 条</span>
+      </div>
+
+      <div class="fbar" data-at="notice" data-when="default ai-down device-off" data-for="lw-notice">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 5</button>
+        <button class="fchip" data-sel="unread" aria-pressed="false">未读 2</button>
+        <button class="fchip" data-sel="print" aria-pressed="false">打印 1</button>
+        <button class="fchip" data-sel="file" aria-pressed="false">文件到期 1</button>
+        <button class="fchip" data-sel="warn" aria-pressed="false">设备告警 0</button>
+        <span class="fbar-n" data-count>显示 5 条</span>
+      </div>
+
+      <!-- ═══════════ AI 服务记录 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-ai" data-at="ai">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="resume">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断 · 行政专员版</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 9 日 10:05 · 任务 rt7f2a…c41d · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的简历</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历诊断记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是什么</span><span class="v">时间 · 类型 · 任务号</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">简历原文 · 提示词 · 模型原始输出</span></div>
+                <div class="kv-row"><span class="k">删除会连带</span><span class="v">同任务的优化记录一并删</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="resume">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历优化 · 基于上一条诊断</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 9 日 10:18 · 同任务 rt7f2a…c41d · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s6"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历优化记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">产物在哪</span><span class="v">我的资产 · 我的简历 v3</span></div>
+                <div class="kv-row"><span class="k">AI 生成标识</span><span class="v">文件内已标 · 打印件每页一次</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">岗位匹配参考 · 用户运营专员</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 8 日 15:02 · 任务 jf20de…58b3 · 存至 11 月 6 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-eye"/></svg>查看对比</a>
+              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看这个岗位</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="岗位匹配记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">给的是什么</span><span class="v">三档参考 · 较高 / 中等 / 偏低</span></div>
+                <div class="kv-row"><span class="k">不给什么</span><span class="v">分数 · 百分比 · 录取预测</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="mock">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">模拟面试点评 · 运营岗中档</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 7 日 19:40 · 练了 8 题 · 作答原文从不保存</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="20-interview-pod.html?stage=s3"><svg class="ic"><use href="#i-eye"/></svg>查看点评</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印复盘单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="面试练习记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是什么</span><span class="v">只记「练过一次」与点评结论</span></div>
+                <div class="kv-row"><span class="k">你答的内容</span><span class="v">从不保存 · 练完即弃</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="plan">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">职业规划建议 · 阶段行动</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 5 日 09:20 · 任务 cp11f8…6a90 · 存至 11 月 3 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="22-career-plan.html"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=职业规划建议&amp;pages=4&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="职业规划记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">性质</span><span class="v">建议 · 仅供参考，不是承诺</span></div>
+                <div class="kv-row"><span class="k">产物在哪</span><span class="v">我的资产 · 我的文档</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="plan">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">招聘会参会作战单 · 夏季综合</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 3 日 14:30 · 任务 fv08ab…12c4 · 存至 11 月 1 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="参会作战单记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">依据</span><span class="v">招聘会公开信息 + 你的简历</span></div>
+                <div class="kv-row"><span class="k">预约</span><span class="v">要预约请去官方入口办理</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <b>「<span data-empty-lb>处理中</span>」这一类现在没有记录</b>
+          <p>AI 任务一般几十秒就出结果，没有卡在处理中的。换一个筛选，或者去做一次新的。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 条</button>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">去做简历诊断</a>
+            <a class="btn btn--ghost" href="20-interview-pod.html">去练一次面试</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 记录留不下来</b>
+          <p>不登录也能用<b>全部 AI 功能</b>，只是这一栏的记录离场就清空。</p>
+          <div class="acts">
+            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">先做简历诊断</a>
+            <a class="btn btn--ghost" href="25-advisor.html">问问 AI 顾问</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 我的收藏 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-fav" data-at="fav">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">用户运营专员 · 广州××科技</span>
+                  <span class="chip chip--azure is-static">岗位</span></span>
+                <span class="rrow-m">收藏于 8 月 8 日 21:40 · 6–9K · 天河区</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>和简历比一比</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">收藏记的是</span><span class="v">你标记过这一条，仅此而已</span></div>
+                <div class="kv-row"><span class="k">要办理</span><span class="v">去来源平台办理 · 详情页有扫码</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow rrow--off" data-g="job off">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">内容运营（新媒体）· 广州××文化</span>
+                  <span class="chip chip--coral is-static">已下线</span></span>
+                <span class="rrow-m">收藏于 8 月 7 日 16:22 · 来源平台已撤下</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="已下线的收藏"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">为什么点不开</span><span class="v">来源平台 8 月 9 日撤下了这条</span></div>
+                <div class="kv-row"><span class="k">本机能做的</span><span class="v">只如实标出来，不替它续命</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-agency"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">运营助理（可接受应届）</span>
+                  <span class="chip chip--amber is-static">线下机构</span></span>
+                <span class="rrow-m">收藏于 8 月 6 日 10:08 · 面议 · 到店咨询</span>
+                <span class="srcline"><span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span><span>同步 8 月 8 日 07:40</span><span class="sep">·</span><span>外部 ID OA-3312</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>看这家机构</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">这条怎么办</span><span class="v">仅信息展示 · 到店当面咨询</span></div>
+                <div class="kv-row"><span class="k">带什么去</span><span class="v">简历打两份，本机可先打印</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fair">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2026 年夏季综合招聘会</span>
+                  <span class="chip chip--amber is-static">招聘会</span></span>
+                <span class="rrow-m">收藏于 8 月 6 日 20:12 · 8 月 16 日 · 广交会 C 区</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印作战单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">要预约</span><span class="v">去官方入口办理 · 详情页有扫码</span></div>
+                <div class="kv-row"><span class="k">本机记的</span><span class="v">你打开过入口，不记你约没约</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fair">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-campus"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">高校毕业生专场招聘会</span>
+                  <span class="chip chip--amber is-static">招聘会</span></span>
+                <span class="rrow-m">收藏于 8 月 4 日 09:36 · 8 月 22 日 · 大学城</span>
+                <span class="srcline"><span class="org">来源 广州市大学生就业指导中心</span><span class="sep">·</span><span>同步 8 月 6 日 09:30</span><span class="sep">·</span><span>外部 ID FA-2026-07</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <a class="btn btn--ghost" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">入场</span><span class="v">凭学生证 · 以官方公告为准</span></div>
+                <div class="kv-row"><span class="k">展位导览</span><span class="v">招聘会作战台里可看</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="policy">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">高校毕业生一次性求职补贴</span>
+                  <span class="chip chip--jade is-static">政策</span></span>
+                <span class="rrow-m">收藏于 8 月 2 日 11:05 · 申领指引</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的政策"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">办理</span><span class="v">去官方渠道 · 本机只做信息入口</span></div>
+                <div class="kv-row"><span class="k">条件核对</span><span class="v">政策服务页可逐条对一遍</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-company"/></svg>
+          <b>还没有收藏过「<span data-empty-lb>企业</span>」</b>
+          <p>在企业导览里点收藏，这里就会出现。企业页只做<b>来源企业与岗位导览</b>。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 条</button>
+            <a class="btn btn--ghost" href="15-companies.html">去企业导览</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 收藏离场即清</b>
+          <p>没登录也能收藏，只是<b>只留本次会话</b>；要留着，先登录或把清单打印带走。</p>
+          <div class="acts">
+            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+            <a class="btn btn--ghost" href="17-fair-desk.html">去招聘会作战台</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 浏览与跳转 · 列表（两个 Tab 共用一个列表容器） ═══════════ -->
+      <div class="lwrap" id="lw-trace" data-at="trace">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="browse">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">用户运营专员 · 广州××科技</span>
+                  <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
+                <span class="rrow-m">今天 10:18 · 停在详情页</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="11-jobfit-compare.html"><svg class="ic"><use href="#i-target"/></svg>和简历比一比</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记了什么</span><span class="v">打开过哪一条 · 什么时候</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">投递结果 · 本机拿不到也不该拿</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">内容运营（新媒体）· 广州××文化</span>
+                  <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
+                <span class="rrow-m">今天 10:12 · 该条现已下线</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">状态</span><span class="v">来源平台 8 月 9 日撤下</span></div>
+                <div class="kv-row"><span class="k">记录保留</span><span class="v">保留 · 但不假装它还在</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2026 年夏季综合招聘会</span>
+                  <span class="chip chip--amber is-static">浏览 · 招聘会</span></span>
+                <span class="rrow-m">今天 09:56 · 看了展位导览</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记了什么</span><span class="v">打开过这场招聘会 · 什么时候</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">预约结果 · 以官方入口为准</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-company"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">广州××科技有限公司</span>
+                  <span class="chip is-static">浏览 · 企业</span></span>
+                <span class="rrow-m">今天 09:48 · 看了在招岗位</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID CO-7781</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="15-companies.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">企业页是什么</span><span class="v">来源企业与岗位导览</span></div>
+                <div class="kv-row"><span class="k">企业看得到吗</span><span class="v">看不到 · 记录只在你账号里</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">高校毕业生一次性求职补贴</span>
+                  <span class="chip is-static">浏览 · 政策</span></span>
+                <span class="rrow-m">8 月 8 日 20:32 · 对过申领条件</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">条件核对</span><span class="v">你答的选项没有留在本机</span></div>
+                <div class="kv-row"><span class="k">办理</span><span class="v">去官方渠道 · 结果本机不跟踪</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了前程无忧的岗位页</span>
+                  <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
+                <span class="rrow-m">今天 10:20 · 扫码在手机上打开</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="14-job-detail.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="35-online-platforms.html"><svg class="ic"><use href="#i-external"/></svg>线上平台入口</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你在本机打开了来源入口</span></div>
+                <div class="kv-row"><span class="k">之后发生什么</span><span class="v">在来源平台上，本机看不到</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了招聘会官方预约入口</span>
+                  <span class="chip chip--amber is-static">跳转 · 招聘会</span></span>
+                <span class="rrow-m">今天 09:58 · 扫码在手机上打开</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你打开了官方预约入口</span></div>
+                <div class="kv-row"><span class="k">约没约成</span><span class="v">以官方入口为准 · 本机不记</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了人才服务中心岗位页</span>
+                  <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
+                <span class="rrow-m">8 月 8 日 15:30 · 扫码在手机上打开</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找相似岗位</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">这条现状</span><span class="v">来源平台已撤下</span></div>
+                <div class="kv-row"><span class="k">记录</span><span class="v">如实保留 · 只记打开过</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了补贴申领官方渠道</span>
+                  <span class="chip is-static">跳转 · 政策</span></span>
+                <span class="rrow-m">8 月 8 日 20:40 · 扫码在手机上打开</span>
+                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="21-policy.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你打开了官方办理渠道</span></div>
+                <div class="kv-row"><span class="k">办没办成</span><span class="v">以官方渠道为准 · 本机不记</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>「<span data-empty-lb>投递结果</span>」本机永远是 0 条</b>
+          <p>这不是还没同步，是<b>设计上就不采集</b>：投没投、投没投成在来源平台那边，本机拿不到也不该拿。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>回到浏览记录</button>
+            <a class="btn btn--ghost" href="35-online-platforms.html">去线上平台自己查</a>
+            <a class="btn btn--ghost" href="23-me.html">看隐私与删除设置</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 足迹离场即清</b>
+          <p>没登录时的浏览与跳转<b>只留本次会话</b>，结束或超时就没了。</p>
+          <div class="acts">
+            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+            <a class="btn btn--ghost" href="21-policy.html">去政策服务</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 通知与反馈 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-notice" data-at="notice">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="unread print">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打印完成 · 13 页已出纸</span>
+                  <span class="chip chip--jade is-static">未读</span></span>
+                <span class="rrow-m">今天 10:23 · 请到出纸口取走并核对页数</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
+              <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">来自</span><span class="v">本机打印任务 · 非营销消息</span></div>
+                <div class="kv-row"><span class="k">通知去处</span><span class="v">只发到你的账号</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="unread file">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-alert"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2 份敏感件将在 6 天后自动删除</span>
+                  <span class="chip chip--amber is-static">未读</span></span>
+                <span class="rrow-m">今天 09:00 · 要留就先打印带走</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-folder"/></svg>去我的文档</a>
+              <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">哪两份</span><span class="v">身份证复印件 · 证件照排版</span></div>
+                <div class="kv-row"><span class="k">为什么 7 天</span><span class="v">含身份证号 · 按敏感件算</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fb">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">你的反馈已回复 · #F-2231</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 8 日 14:20 · 出纸偏慢 · 已排查</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>看本机状态</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">处理说明</span><span class="v">已清理走纸通道 · 观察中</span></div>
+                <div class="kv-row"><span class="k">还能补充</span><span class="v">右栏写一条，会并进这个工单</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="benefit">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">权益到账 · 打印减免 2 张</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 8 日 10:12 · 8 月 31 日到期</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="24-benefits.html"><svg class="ic"><use href="#i-ticket"/></svg>去我的权益</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">怎么用</span><span class="v">打印结算时自动抵扣</span></div>
+                <div class="kv-row"><span class="k">过期</span><span class="v">到期作废 · 不折现</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="sys">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-gear"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">终端维护预告 · 8 月 20 日凌晨</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 7 日 09:00 · 02:00–04:00 暂停服务</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>看本机状态</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">影响</span><span class="v">这两小时不能打印扫描</span></div>
+                <div class="kv-row"><span class="k">建议</span><span class="v">要打的提前打 <span class="ev ev--e2">E2 设备事实</span></span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>近期没有「<span data-empty-lb>设备告警</span>」发给你</b>
+          <p>缺纸、卡纸、离线这类告警只在真的发生时才发，本机不发营销消息。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 5 条</button>
+            <a class="btn btn--ghost" href="04-system-states.html">主动看本机状态</a>
+            <a class="btn btn--ghost" href="42-my-assets.html?stage=orders">看打印订单</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 通知跟着账号走</b>
+          <p>不登录也能提反馈，<b>留个手机号才收得到回复</b>；通知要登录后才收得到。</p>
+          <div class="acts">
+            <a class="btn btn--primary" href="03-identity-gate.html">扫码登录</a>
+            <a class="btn btn--ghost" href="04-system-states.html">看本机状态</a>
+            <a class="btn btn--ghost" href="25-advisor.html">找 AI 顾问问问</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────── 各标签出口 ───────── -->
+      <div class="xlane" data-at="ai">
+        <span class="xlane-hd">盘点之外，这三处能接着做</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="11-jobfit-compare.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
+              <span class="xlane-ds">拿简历和收藏岗位逐条比</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="20-interview-pod.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">面试训练舱</span>
+              <span class="xlane-ds">按岗位方向再练一轮</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="42-my-assets.html?stage=resume">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">我的简历</span>
+              <span class="xlane-ds">产物都在资产那一页</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="fav">
+        <span class="xlane-hd">收藏之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="13-jobs-desk.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
+              <span class="xlane-ds">再找几条要求相近的</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="17-fair-desk.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">招聘会作战台</span>
+              <span class="xlane-ds">现场面对面 · 可先打简历</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=job-list&amp;title=收藏清单&amp;pages=1&amp;copies=1">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印收藏清单</span>
+              <span class="xlane-ds">带去：收藏 6 条 · 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="trace">
+        <span class="xlane-hd">看过的之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="13-jobs-desk.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
+              <span class="xlane-ds">按同一方向接着找</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="35-online-platforms.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">线上平台入口</span>
+              <span class="xlane-ds">本机收不到的自己搜</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="23-me.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">隐私与删除</span>
+              <span class="xlane-ds">账号设置里可整段清</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="notice">
+        <span class="xlane-hd">消息之外，这三处能直接处理</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="42-my-assets.html?stage=orders">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印订单</span>
+              <span class="xlane-ds">取件码与复打都在这</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="42-my-assets.html?stage=docs">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">我的文档</span>
+              <span class="xlane-ds">到期的先打印带走</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="04-system-states.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">本机状态</span>
+              <span class="xlane-ds">纸墨队列与故障上报</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════════ 右：口径 / 工单 ═════════════════ -->
+    <div class="wside">
+
+      <!-- ---------- AI 服务记录 ---------- -->
+      <div class="pane" data-at="ai">
+        <div class="pane-hd"><span class="t">本月 AI 使用</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">简历类</span>
+            <span class="v" data-when="default ai-down device-off">2 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">岗位类</span>
+            <span class="v" data-when="default ai-down device-off">1 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">面试类</span>
+            <span class="v" data-when="default ai-down device-off">1 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">规划与参会</span>
+            <span class="v" data-when="default ai-down device-off">2 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="ai">
+        <div class="pane-hd"><span class="t">记录里存什么</span><span class="s">元数据而已</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">存</span><span class="v">时间 · 类型 · 任务号 · 状态</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">简历原文与诊断正文</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">提示词与模型原始输出</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">面试作答原文</span></div>
+          <div class="kv-row"><span class="k">留存</span><span class="v">90 天 · 到期自动清理</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="ai">
+        <div class="pane-hd"><span class="t">删除会连带什么</span><span class="s">删了就没了</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">删诊断记录</span><span class="v">同任务的优化记录一并删</span></div>
+          <div class="kv-row"><span class="k">删除要</span><span class="v">点两次 · 第二次才真删</span></div>
+          <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+          <div class="kv-row"><span class="k">日志里没有</span><span class="v">记录内容与文件名全称</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机只做<b>信息入口与材料服务</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+        </div>
+      </div>
+
+      <!-- ---------- 我的收藏 ---------- -->
+      <div class="pane" data-at="fav">
+        <div class="pane-hd"><span class="t">收藏分布</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">岗位</span>
+            <span class="v" data-when="default ai-down device-off">3 条 · 1 条已下线</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">招聘会</span>
+            <span class="v" data-when="default ai-down device-off">2 场</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">政策</span>
+            <span class="v" data-when="default ai-down device-off">1 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">来源</span><span class="v v--fog">来源与外部 ID 在每条上</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="fav">
+        <div class="pane-hd"><span class="t">已下线怎么办</span><span class="s">如实标出来</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">本机做的</span><span class="v">标灰 · 写明撤下时间</span></div>
+          <div class="kv-row"><span class="k">本机不做的</span><span class="v">不替它续命、不推荐替代岗</span></div>
+          <div class="kv-row"><span class="k">你能做的</span><span class="v">找相似岗位或取消收藏</span></div>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么收藏会失效</summary>
+          <div class="fold-b">岗位与招聘会都是<b>第三方与官方来源</b>的信息，招满、下架、改期都由来源方决定。
+            本机每天同步，同步到撤下就立刻标出来，不留着假装还能投。</div>
+        </details>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="fav">
+        <div class="pane-hd"><span class="t">收藏记的是什么</span><span class="s">一个书签</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">记</span><span class="v">你标记过这一条 · 什么时候</span></div>
+          <div class="kv-row"><span class="k">不记</span><span class="v">你投没投、约没约</span></div>
+          <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方看不到</span></div>
+          <div class="kv-row"><span class="k">取消收藏</span><span class="v">点两次 · 只删书签不删岗位</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>岗位与招聘会只做<b>第三方与官方来源信息入口</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+        </div>
+      </div>
+
+      <!-- ---------- 浏览与跳转（合规声明在左栏画像下，这里不重复） ---------- -->
+      <div class="pane" data-at="trace">
+        <div class="pane-hd"><span class="t">足迹统计</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">浏览</span>
+            <span class="v" data-when="default ai-down device-off">5 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">打开来源入口</span>
+            <span class="v" data-when="default ai-down device-off">4 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">最近一次</span>
+            <span class="v" data-when="default ai-down device-off">今天 10:20</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">留存</span><span class="v">90 天 · 到期自动清理</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="trace">
+        <div class="pane-hd"><span class="t">这条记录里有什么</span><span class="s">逐项列出来</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">有</span><span class="v">打开了哪一条 · 什么时候</span></div>
+          <div class="kv-row"><span class="k">有</span><span class="v">从本机哪个入口打开的</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">投递结果 · 来源平台那边的事</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">预约结果 · 以官方入口为准</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">停留时长与鼠标轨迹</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="trace">
+        <div class="pane-hd"><span class="t">这些记录归你</span><span class="s">随时能清</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方与企业看不到</span></div>
+          <div class="kv-row"><span class="k">怎么清</span><span class="v">账号设置里整段删</span></div>
+          <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么还要留这份记录</summary>
+          <div class="fold-b">为了你自己回头找得到 —— 一体机上看过就走，第二天想不起是哪一条。
+            这份记录只给你自己用，不参与任何排序或推荐。</div>
+        </details>
+        <div class="panel-note" style="margin:auto 0 0">在账号设置里可以一次清空浏览与跳转记录。</div>
+      </div>
+
+      <!-- ---------- 通知与反馈 ---------- -->
+      <div class="pane" data-at="notice">
+        <div class="pane-hd"><span class="t">反馈工单</span><span class="s">2 件</span></div>
+        <!-- 工单行可点：点了把「补充 #F-xxxx：」填进右下输入框（原型 22 的
+             「可补充描述」同一件事，只是不再单开一页）。不做假的工单详情页。 -->
+        <button class="tkt" type="button" data-tkt="#F-2231"><svg class="ic" style="width:20px;height:20px;color:var(--amber-400)"><use href="#i-alert"/></svg>
+          <span class="tkt-b"><span class="tkt-t">出纸偏慢 · #F-2231</span>
+            <span class="tkt-s">打印服务 · 8 月 8 日 · 已回复 · 点这里补充</span></span></button>
+        <button class="tkt" type="button" data-tkt="#F-2244"><svg class="ic" style="width:20px;height:20px;color:var(--fog-600)"><use href="#i-clock"/></svg>
+          <span class="tkt-b"><span class="tkt-t">扫描预览显示建议 · #F-2244</span>
+            <span class="tkt-s">文件处理 · 8 月 6 日 · 处理中 · 点这里补充</span></span></button>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="notice">
+        <div class="pane-hd"><span class="t">写一条反馈</span><span class="s" data-when="default device-off">AI 起草 · 你可改</span><span class="s" data-when="first ai-down">你自己写</span></div>
+        <div class="fbar" style="margin-bottom:10px">
+          <button class="fchip" data-cat aria-pressed="false">设备使用</button>
+          <button class="fchip" data-cat aria-pressed="true">打印服务</button>
+          <button class="fchip" data-cat aria-pressed="false">文件处理</button>
+          <button class="fchip" data-cat aria-pressed="false">一般建议</button>
+        </div>
+        <div class="draft">
+          <textarea id="fb-box" aria-label="反馈描述">8 月 9 日 10:23，在打印工作台打「王同学_行政专员_简历.pdf」，2 份黑白 A4，出纸比平时慢约 1 分钟，页数与内容都对。</textarea>
+          <div class="draft-act">
+            <button class="btn btn--ghost" type="button" data-draft="fill"><svg class="ic"><use href="#i-brain"/></svg>用 AI 起草的这段</button>
+            <button class="btn btn--ghost" type="button" data-draft="clear"><svg class="ic"><use href="#i-close"/></svg>清空自己写</button>
+          </div>
+          <div class="panel-note" style="margin-left:0" data-when="default device-off">
+            这段是 AI 按你今天的打印单起的草稿 <span class="ev ev--e3">E3 草稿 · 你可以改</span>，<b>不会自动提交</b>。
+          </div>
+          <div class="panel-note" style="margin-left:0" data-when="ai-down">起草服务中断，输入框照常可写，直接描述就行。</div>
+          <div class="panel-note" style="margin-left:0" data-when="first">未登录也能提交，留手机号才收得到回复。</div>
+          <button class="btn btn--primary" type="button" data-submit><svg class="ic"><use href="#i-check"/></svg>提交反馈</button>
+          <div class="panel-note" style="margin-left:0">原型稿 · 提交后由运营受理，结果会进上面的通知。</div>
+        </div>
+        <!-- notice 标签的那一条合规声明（每屏恰好一条） -->
+        <div class="notice" style="margin-top:var(--s-3)">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>通知与反馈只关联<b>你自己的服务记录</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 删除 / 取消收藏 确认层 ══════════ -->
+  <div class="ovl" id="ovl-del" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-trash"/></svg><b>确认删除？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t" id="del-what">将删除：一条记录 ×1</span>
+          <span class="nrow-s">为防旁人看到 · 此处不显示名称全称</span></span></div>
+      <div class="notice">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>删除后不可恢复；会留一条删除日志（谁删的、什么时候、删了几个），<b>日志不含记录内容</b>。</span>
+      </div>
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
+        <button class="btn btn--commit" type="button" data-close>确认删除</button>
+        <span class="panel-note" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <a class="backbtn" href="23-me.html" data-parent-label="我的"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a>
+    <div class="actionbar-hint">
+      <div data-at="ai">
+        <div data-when="default device-off"><div class="t">本月 6 次 AI 服务 · 下一步是逐条比对</div><div class="s">只存元数据，不存简历原文与模型输出</div></div>
+        <div data-when="first"><div class="t">未登录 · 记录留不下来</div><div class="s">AI 功能不受影响</div></div>
+        <div data-when="ai-down"><div class="t">盘点暂不可用 · 记录照常</div><div class="s">查看、打印、删除都不受影响</div></div>
+      </div>
+      <div data-at="fav">
+        <div data-when="default device-off"><div class="t">6 条收藏 · 1 条来源平台已下线</div><div class="s">收藏只是书签 · 办理去来源平台或官方入口</div></div>
+        <div data-when="first"><div class="t">未登录 · 收藏离场即清</div><div class="s">要留着先登录，或把清单打印带走</div></div>
+        <div data-when="ai-down"><div class="t">归拢暂不可用 · 收藏照常</div><div class="s">下线标记来自来源状态，不依赖 AI</div></div>
+      </div>
+      <div data-at="trace">
+        <div data-when="default device-off"><div class="t">9 条足迹 · 只记动作不记结果</div><div class="s">仅本人可见 · 不外传、不用于推荐给企业</div></div>
+        <div data-when="first"><div class="t">未登录 · 足迹离场即清</div><div class="s">浏览与跳转都不跟着账号走</div></div>
+        <div data-when="ai-down"><div class="t">方向归纳暂不可用 · 明细照常</div><div class="s">两个 Tab 与每条来源信息都在</div></div>
+      </div>
+      <div data-at="notice">
+        <div data-when="default device-off"><div class="t">2 条未读 · 反馈工单 1 件处理中</div><div class="s">草稿不会自动提交 · 按了提交才发出去</div></div>
+        <div data-when="first"><div class="t">未登录 · 收不到通知</div><div class="s">反馈仍可提交，留手机号才收得到回复</div></div>
+        <div data-when="ai-down"><div class="t">起草暂不可用 · 反馈照常提交</div><div class="s">输入框可写，消息与工单都在</div></div>
+      </div>
+    </div>
+
+    <a class="btn btn--lg btn--ghost" data-at="ai" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的资产</a>
+    <a class="btn btn--lg btn--ghost" data-at="fav" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>按企业看</a>
+    <a class="btn btn--lg btn--ghost" data-at="trace" href="23-me.html"><svg class="ic"><use href="#i-shield"/></svg>隐私与删除</a>
+    <a class="btn btn--lg btn--ghost" data-at="notice" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>查看本机状态</a>
+
+    <a class="btn btn--primary" data-at="ai" href="11-jobfit-compare.html">去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="fav" href="13-jobs-desk.html">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="trace" href="13-jobs-desk.html">接着找运营岗<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="notice" type="button" data-submit>提交这条反馈<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* 标签选中态同步（?stage=fav 直达进来也是选中的，用户不用再点一次） */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+    if (window.v3SyncBack) window.v3SyncBack()
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P43 本页交互：条目展开 / 筛选与 Tab / 标为已读 / 删除二次确认 / 反馈草稿
+   --------------------------------------------------------------------------
+   与原型手势一致：Tab 就是原型 71 的两个 f-chip；通知的「已读 / 删除」还在
+   条目行内；反馈仍是「选分类 + 写描述 + 按提交」三步。
+   两条不能松的口径：
+     · 「投递结果 0」这一档不是"暂时没有"，是**设计上就不采集**，
+       所以它的空态写的是原因，不是"稍后再试"。
+     · AI 草稿只填进输入框，**绝不代你提交**；提交必须你自己按。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var DRAFT = '8 月 9 日 10:23，在打印工作台打「王同学_行政专员_简历.pdf」，' +
+              '2 份黑白 A4，出纸比平时慢约 1 分钟，页数与内容都对。'
+
+  function applyFilter (bar, sel) {
+    var wrap = document.getElementById(bar.getAttribute('data-for'))
+    if (!wrap) return
+    var chips = bar.querySelectorAll('.fchip[data-sel]')
+    var i
+    for (i = 0; i < chips.length; i++) {
+      chips[i].setAttribute('aria-pressed', chips[i].getAttribute('data-sel') === sel ? 'true' : 'false')
+    }
+    var rows = wrap.querySelectorAll('.rrow')
+    var n = 0
+    for (i = 0; i < rows.length; i++) {
+      var g = String(rows[i].getAttribute('data-g') || '').split(/\s+/)
+      var ok = (sel === 'all') || g.indexOf(sel) > -1
+      rows[i].style.display = ok ? '' : 'none'
+      if (ok) n++
+    }
+    wrap.classList.toggle('is-empty', n === 0)
+    var cnt = bar.querySelector('[data-count]')
+    if (cnt) cnt.textContent = n ? ('显示 ' + n + ' 条') : '这一类没有记录'
+    var lb = wrap.querySelector('[data-empty-lb]')
+    var cur = bar.querySelector('.fchip[aria-pressed="true"]')
+    if (!n && lb && cur) lb.textContent = cur.textContent.replace(/\s*\d+\s*$/, '').replace(/记录$/, '').trim()
+  }
+
+  /* 初始化：按每条筛选条上已选中的那一档先过滤一次。
+     trace 的两个 Tab 默认停在「浏览记录」—— 不初始化的话，
+     跳转记录会和浏览记录混在一张列表里，Tab 就成了摆设。 */
+  ;[].forEach.call(scr.querySelectorAll('.fbar[data-for]'), function (b) {
+    var cur = b.querySelector('.fchip[aria-pressed="true"]')
+    if (cur) applyFilter(b, cur.getAttribute('data-sel'))
+  })
+
+  scr.addEventListener('click', function (e) {
+    var hd = e.target.closest('.rrow-hd')
+    if (hd) {
+      var row = hd.closest('.rrow')
+      var open = row.classList.toggle('is-open')
+      hd.setAttribute('aria-expanded', open ? 'true' : 'false')
+      return
+    }
+    var chip = e.target.closest('.fchip[data-sel]')
+    if (chip) { applyFilter(chip.closest('.fbar'), chip.getAttribute('data-sel')); return }
+    /* 反馈分类：单选，与原型 22 的 opt-group 同一手势 */
+    var cat = e.target.closest('.fchip[data-cat]')
+    if (cat) {
+      var sibs = cat.closest('.fbar').querySelectorAll('.fchip[data-cat]')
+      for (var s = 0; s < sibs.length; s++) sibs[s].setAttribute('aria-pressed', 'false')
+      cat.setAttribute('aria-pressed', 'true')
+      return
+    }
+    var rst = e.target.closest('[data-reset]')
+    if (rst) {
+      var wrap2 = rst.closest('.lwrap')
+      var bar2 = scr.querySelector('.fbar[data-for="' + (wrap2 && wrap2.id) + '"]')
+      /* trace 没有「全部」，回到默认 Tab「浏览记录」 */
+      if (bar2) applyFilter(bar2, bar2.getAttribute('data-for') === 'lw-trace' ? 'browse' : 'all')
+      return
+    }
+    /* 标为已读：只改这一条的状态，不代你处理别的 */
+    var rd = e.target.closest('[data-read]')
+    if (rd) {
+      var r2 = rd.closest('.rrow')
+      var tag = r2 && r2.querySelector('.chip')
+      if (tag) { tag.textContent = '已读'; tag.className = 'chip is-static' }
+      if (r2) r2.setAttribute('data-g', String(r2.getAttribute('data-g') || '').replace(/\bunread\b/, '').trim())
+      rd.setAttribute('aria-disabled', 'true')
+      return
+    }
+    /* AI 草稿：只填进输入框，绝不代你提交 */
+    var df = e.target.closest('[data-draft]')
+    if (df) {
+      var box = document.getElementById('fb-box')
+      if (box) { box.value = df.getAttribute('data-draft') === 'fill' ? DRAFT : ''; box.focus() }
+      return
+    }
+    /* 补充已有工单：把工单号填进同一个输入框，仍然要你自己按提交 */
+    var tk = e.target.closest('[data-tkt]')
+    if (tk) {
+      var box2 = document.getElementById('fb-box')
+      if (box2) { box2.value = '补充 ' + tk.getAttribute('data-tkt') + '：'; box2.focus() }
+      return
+    }
+    var del = e.target.closest('[data-del]')
+    if (del) {
+      var o = document.getElementById('ovl-del')
+      var what = document.getElementById('del-what')
+      if (what) what.textContent = '将删除：' + del.getAttribute('data-del') + ' ×1'
+      if (o) o.hidden = false
+      return
+    }
+    var cl = e.target.closest('[data-close]')
+    if (cl) {
+      var ov = cl.closest('.ovl')
+      if (ov) ov.hidden = true
+    }
+  })
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return
+    var os = document.querySelectorAll('.ovl')
+    for (var i = 0; i < os.length; i++) os[i].hidden = true
+  })
+})()
+</script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

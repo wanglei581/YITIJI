@@ -162,7 +162,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">政策服务</div>
@@ -218,7 +218,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>筛出可能相关的政策</em></button>
           <button class="aibtn" type="button" data-spot="c-ai c-subsidy" aria-pressed="false">这一项要带什么材料<em>核对材料缺口</em></button>
           <a class="aibtn" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">我要打印政策要点<em>去打印工作台核价</em></a>
-          <a class="aibtn aibtn--off" data-when="device-off" href="23-me.html?view=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
+          <a class="aibtn aibtn--off" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
         </div>
         <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只做政策预筛与材料缺口核对。</div>
       </div>
@@ -238,7 +238,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
       </div>
 
-      <!-- ── 六张子能力卡 ── -->
+      <!-- ── 六张子能力卡 ──
+           2026-08-10 说谎文案整改：下面四张分类卡原来写「进入后已按「X」分类筛好，只列这一类」，
+           但 21-policy.html 目前并不读 ?cat= 参数，进去看到的仍是全量列表 —— 这是明确说谎。
+           处置：**保留 ?cat= 参数**（接线契约，目标页接上即生效），
+           把副文改成如实的「按 X 分类筛选（接线后自动生效）」，不再宣称「已筛好、只列这一类」。 -->
       <div class="dgrid">
 
         <!-- 1 就业政策（首张大卡 · 非 AI · 带 cat=employment 进政策页） -->
@@ -247,7 +251,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-bd">
             <span class="dcard-nm">就业政策</span>
             <span class="dcard-ds">就业补贴、灵活就业等官方口径原文</span>
-            <span class="dcard-hint">进入后已按「就业」分类筛好，只列这一类</span>
+            <span class="dcard-hint">进入政策页后按「就业」分类筛选（接线后自动生效）</span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--info">不依赖 AI</span>
@@ -263,7 +267,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">社保指南</span>
           <span class="dcard-ds">参保流程与办事材料清单</span>
-          <span class="dcard-hint">进入后已按「社保」分类筛好，只列这一类</span>
+          <span class="dcard-hint">进入政策页后按「社保」分类筛选（接线后自动生效）</span>
           <span class="dcard-go">看社保指南<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -275,7 +279,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">档案与登记</span>
           <span class="dcard-ds">档案托管、就业登记与证明开具</span>
-          <span class="dcard-hint">进入后已按「档案」分类筛好，只列这一类</span>
+          <span class="dcard-hint">进入政策页后按「档案」分类筛选（接线后自动生效）</span>
           <span class="dcard-go">看办理指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
@@ -287,12 +291,15 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
           <span class="dcard-nm">补贴指引</span>
           <span class="dcard-ds">失业保险、创业扶持与官方办理入口</span>
-          <span class="dcard-hint">进入后已按「补贴」分类筛好，只列这一类</span>
+          <span class="dcard-hint">进入政策页后按「补贴」分类筛选（接线后自动生效）</span>
           <span class="dcard-go">看补贴指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 5 政策收藏（非 AI · 收藏是个人清单不是政策分类，所以传 view=favorites） -->
-        <a class="dcard" id="c-fav" href="21-policy.html?stage=s1&amp;view=favorites">
+        <!-- 5 政策收藏（非 AI）
+             2026-08-10 改：原指 21-policy.html?view=favorites —— favorites 是「我的」域的落区值，
+             政策页既不读这个参数、也没有个人收藏清单，等于把人送错门。
+             收藏是个人清单不是政策分类 → 归「我的记录 · 收藏」标签。 -->
+        <a class="dcard" id="c-fav" href="43-my-records.html?stage=fav&amp;from=P38">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-bookmark"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
@@ -339,7 +346,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
       </div>
 
-      <!-- ── 次卡：记录类，明细归政策业务页 ── -->
+      <!-- ── 次卡：记录类 ──
+           2026-08-10 改：原指 21-policy.html?view=browse / view=qa-history，
+           但政策页没有浏览记录与问答历史 UI，view 参数也不被消费 —— 送错门。
+           浏览足迹归「我的记录 · 足迹」，AI 问答历史归「我的记录 · AI」。 -->
       <div class="dmore">
         <div class="dmore-hd">
           <b>快捷入口</b>
@@ -347,21 +357,21 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span data-when="first">未登录，记录留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="21-policy.html?stage=s1&amp;view=browse">
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P38">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
-              <span class="dmore-s">查看最近浏览的政策条目</span>
+              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="21-policy.html?stage=s1&amp;view=qa-history">
+          <a class="dmore-go" href="43-my-records.html?stage=ai&amp;from=P38">
             <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">AI政策问答记录</span>
-              <span class="dmore-s">查看历次条件核对与问答</span>
+              <span class="dmore-s">记录在「我的 · AI 服务」里看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
@@ -380,7 +390,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   </div>
 
   <div class="actionbar">
-      <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">先说你的情况，再筛出可能相关的政策</div><div class="s">条件由政策页逐项核对</div></div>
@@ -391,12 +401,12 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 
     <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-printer"/></svg>打印政策要点</a>
     <!-- device-off：这里不能挂打印链接冒充保存 —— 出纸链路断了，动作就得真的是「存进我的文档」 -->
-    <a class="btn btn--lg btn--ghost" data-when="device-off" href="23-me.html?view=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</a>
+    <a class="btn btn--lg btn--ghost" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</a>
     <a class="btn btn--primary" href="21-policy.html?stage=s1">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P46 校园服务 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P46 校园服务">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════════
+   P46 校园服务 = 原型 69 迎新系统 + 52 校园卡办理 + 70 校园大数据
+   三屏合成一页三阶段。合并只为省步数，不改办事方式：
+     · 报到流程、办事窗口、求职准备 —— 照原型 69
+     · 校园卡四步指引、所需材料、常见问题 —— 照原型 52，全程不接 AI
+     · 校园大数据 —— 照原型 70 的诚实口径：学校没开通就是没开通，不填假数据
+   入口直达：?stage=welcome|card|bigdata（stages.js 读 ?stage=），
+   从智慧校园点「校园卡办理」应直接落在 ?stage=card。
+   ══════════════════════════════════════════════════════════════════════ */
+
+.chip--info { cursor: inherit; }
+.wside .out { min-height: 64px; padding: var(--s-3); }
+
+.scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-4); }
+.fee { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.6; margin: 8px 0 0; }
+
+/* ── 报到流程 / 办卡指引：编号步骤条（两处同一套样式，不各造一套） ── */
+.flow { display: flex; flex-direction: column; gap: var(--s-3); }
+.frow {
+  display: flex; align-items: center; gap: var(--s-4); min-height: 56px;
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  border: 1px solid var(--brd-1); background: var(--surf-1);
+}
+.fno {
+  width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center;
+  background: var(--jade-a20); color: var(--jade-200); font-family: var(--ff-num); font-size: var(--fz-2); font-weight: 700;
+}
+.fb { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.ft { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.fs { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.fwhere { flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+
+/* ── 材料清单：只读条目，圆点 + 一行正文 + 右侧状态词（P17 .li 先例） ── */
+.li-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.li {
+  display: flex; align-items: center; gap: var(--s-4); min-height: 52px;
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
+  border: 1px solid var(--brd-1); background: var(--surf-1);
+}
+.li-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fog-a20); flex: 0 0 auto; }
+.li-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.li-t { font-size: var(--fz-3); color: var(--fog-900); }
+.li-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.li-st { flex: 0 0 auto; font-size: var(--fz-1); white-space: nowrap; color: var(--jade-600); }
+.li-st--miss { color: var(--amber-200); }
+.li-st--own { color: var(--fog-600); }
+
+/* ── 未开放锁定态（照原型 70） ── */
+.lock { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-4); padding: var(--s-8) var(--s-6) var(--s-6); }
+.lock-ic {
+  width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-600);
+}
+.lock-ic .ic { width: 42px; height: 42px; }
+.lock-t { font-family: var(--ff-display); font-size: var(--fz-8); color: var(--fog-900); margin: 0; }
+.lock-p { margin: 0; max-width: 30em; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.75; }
+.cond { display: flex; align-items: center; gap: var(--s-4); min-height: 56px; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); border: 1px solid var(--brd-1); background: var(--surf-1); }
+.cond-no { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center;
+  background: var(--surf-3); color: var(--fog-700); font-family: var(--ff-num); font-size: var(--fz-2); }
+.cond-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.cond-t { font-size: var(--fz-3); color: var(--fog-900); }
+.cond-s { font-size: var(--fz-1); color: var(--fog-600); }
+.cond-st { flex: 0 0 auto; font-size: var(--fz-1); color: var(--amber-200); white-space: nowrap; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="welcome" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="19-smart-campus.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">校园服务</div>
+        <div class="brand-sub">××职业技术学院 · 校方官方信息入口</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机就绪 · A4</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月10日 <b>10:12</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="welcome"><svg class="ic" style="width:17px;height:17px"><use href="#i-campus"/></svg>迎新报到</button>
+      <button class="stbtn" data-go="card"><svg class="ic" style="width:17px;height:17px"><use href="#i-idcard"/></svg>校园卡办理</button>
+      <button class="stbtn" data-go="bigdata"><svg class="ic" style="width:17px;height:17px"><use href="#i-layers"/></svg>校园大数据</button>
+    </div>
+    <span class="rail-count">哪几块开、开到什么程度，由学校与终端后台决定</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- 本页唯一一条合规声明，也是整页常驻的开关归属说明。三个阶段都看得见。 -->
+      <div class="notice notice--amber" style="flex:0 0 auto">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>智慧校园各块由<b>学校与终端后台开关控制，</b>你在本机开不了；本机只做展示与指引，<b>不采集你的任何个人信息。</b></span>
+      </div>
+
+      <!-- ─────────── 迎新报到（原型 69） ─────────── -->
+      <div class="pane pane--grow" data-at="welcome">
+        <div class="pane-hd"><span class="t">报到流程</span><span class="s">四步 · 校方提供</span></div>
+        <div class="scroll">
+          <div class="flow" style="flex:0 0 auto">
+            <div class="frow"><span class="fno">1</span><span class="fb"><span class="ft">线上预报到</span><span class="fs">在学校迎新官网或公众号完成信息确认</span></span><span class="fwhere">校方系统</span></div>
+            <div class="frow"><span class="fno">2</span><span class="fb"><span class="ft">学院报到</span><span class="fs">到所在学院迎新点核验、领取材料</span></span><span class="fwhere">各学院</span></div>
+            <div class="frow"><span class="fno">3</span><span class="fb"><span class="ft">宿舍入住</span><span class="fs">领钥匙与校园卡，办理水电网</span></span><span class="fwhere">后勤服务</span></div>
+            <div class="frow"><span class="fno">4</span><span class="fb"><span class="ft">校园卡激活</span><span class="fs">食堂、门禁、图书馆通用</span></span><span class="fwhere">一卡通中心</span></div>
+          </div>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">办事窗口</div>
+          <div class="kv" style="flex:0 0 auto">
+            <div class="kv-row"><span class="k">学生处</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
+            <div class="kv-row"><span class="k">财务处</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
+            <div class="kv-row"><span class="k">后勤服务</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
+            <div class="kv-row"><span class="k">校医院</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
+          </div>
+          <p class="fee" style="flex:0 0 auto">
+            本机<b>未配置本校窗口位置与时间，</b>请到现场服务台咨询——写一个示例楼层会让你白跑。
+          </p>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">求职准备 · 本机现在就能办</div>
+          <div class="outs" style="flex:0 0 auto">
+            <a class="out" href="06-print-workbench.html?stage=s1&amp;from=P46" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印入学表格</a>
+            <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+            <a class="out" href="29-id-photo.html" data-when="default first device-off"><svg class="ic"><use href="#i-image"/></svg>证件照排版</a>
+            <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-image"/></svg>证件照不可用</button>
+            <a class="out" href="09-resume-workbench.html" data-when="default device-off"><svg class="ic"><use href="#i-resume"/></svg>做第一份简历</a>
+            <button class="out" aria-disabled="true" data-when="first ai-down"><svg class="ic"><use href="#i-resume"/></svg>简历诊断不可用</button>
+            <a class="out" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
+          </div>
+
+          <div class="srcline srcline--detail" style="flex:0 0 auto;margin-top:var(--s-3)">
+            <span class="org">来源机构：××职业技术学院学生处</span><span class="sep">·</span>
+            <span>同步时间：2026-08-10 08:10</span><span class="sep">·</span>
+            <span>外部 ID：XY-XS-2026-09</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="welcome" style="flex:0 0 auto">
+        <div class="pane-hd"><span class="t">这页到哪为止</span><span class="s">边界写在前面</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">报到登记</span><span class="v">在学校官方系统办，本机不代办</span></div>
+          <div class="kv-row"><span class="k">缴费</span><span class="v">按学校通知渠道交，本机不收款</span></div>
+          <div class="kv-row"><span class="k">本机能办</span><span class="v">打印、证件照、简历这三件</span></div>
+        </div>
+      </div>
+
+      <!-- ─────────── 校园卡办理（原型 52）· 全程不接 AI ─────────── -->
+      <div class="pane pane--grow" data-at="card">
+        <div class="pane-hd"><span class="t">校园卡办理指引</span><span class="s">四步 · 一卡通中心受理</span></div>
+        <div class="scroll">
+          <div style="flex:0 0 auto"><span class="ev ev--e2">不依赖 AI · 校方指引原文</span></div>
+          <div class="flow" style="flex:0 0 auto">
+            <div class="frow"><span class="fno">1</span><span class="fb"><span class="ft">确认办哪一项</span><span class="fs">首次办卡 / 遗失补办 / 挂失解挂 / 信息变更</span></span><span class="fwhere">四选一</span></div>
+            <div class="frow"><span class="fno">2</span><span class="fb"><span class="ft">备齐材料</span><span class="fs">按下面清单准备，缺一项当场办不下来</span></span><span class="fwhere">本机可打印</span></div>
+            <div class="frow"><span class="fno">3</span><span class="fb"><span class="ft">到一卡通中心</span><span class="fs">现场提交材料并核验本人身份</span></span><span class="fwhere">行政楼一层</span></div>
+            <div class="frow"><span class="fno">4</span><span class="fb"><span class="ft">领卡并激活</span><span class="fs">食堂、门禁、图书馆通用</span></span><span class="fwhere">当场或次日</span></div>
+          </div>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">需要带的材料</div>
+          <ul class="li-list" style="flex:0 0 auto">
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">录取通知书或学生证</span><span class="li-s">证明在校身份，二选一</span></span><span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">本人身份证原件</span><span class="li-s">现场核验后带回，本机不留存</span></span><span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">近期一寸免冠照片</span><span class="li-s">没有可以在本机拍并排版打印</span></span><span class="li-st">本机可办</span></li>
+          </ul>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">常见问题</div>
+          <div class="kv" style="flex:0 0 auto">
+            <div class="kv-row"><span class="k">能线上办吗</span><span class="v">校方未开通，只能到窗口办</span></div>
+            <div class="kv-row"><span class="k">卡丢了怎么办</span><span class="v">先挂失，再带材料补办</span></div>
+            <div class="kv-row"><span class="k">受理时间</span><span class="v v--fog">按站点配置下发 · 以现场公示为准</span></div>
+            <div class="kv-row"><span class="k">本机代办吗</span><span class="v">不代办、不采集你的任何信息</span></div>
+          </div>
+
+          <div class="srcline srcline--detail" style="flex:0 0 auto;margin-top:var(--s-3)">
+            <span class="org">来源机构：××职业技术学院一卡通中心</span><span class="sep">·</span>
+            <span>同步时间：2026-08-10 08:10</span><span class="sep">·</span>
+            <span>外部 ID：XY-CARD-2026-03</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="card" style="flex:0 0 auto">
+        <div class="pane-hd"><span class="t">照片没有？本机能出</span><span class="s">办卡就差这一样</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">一寸免冠</span><span class="v">本机拍照并排版，A4 一张出 8 张</span></div>
+          <div class="kv-row"><span class="k">底色</span><span class="v">白 / 蓝 / 红可选，按学校要求挑</span></div>
+          <div class="kv-row"><span class="k">照片保留</span><span class="v">敏感文件按 7 天到期删除</span></div>
+        </div>
+      </div>
+
+      <!-- ─────────── 校园大数据（原型 70）· 未开放锁定态 ─────────── -->
+      <div class="pane pane--grow" data-at="bigdata">
+        <div class="scroll">
+          <div class="lock" style="flex:0 0 auto">
+            <span class="lock-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <h1 class="lock-t">校园大数据没有开通</h1>
+            <p class="lock-p">
+              这块要的是学校的迎新与学籍数据，<b>数据在学校手里，不在本机。</b>
+              学校没开通，本机<b>不展示任何统计，也不放示例图表凑数。</b>
+            </p>
+          </div>
+
+          <div class="dsec-t">开通要满足三项</div>
+          <div class="flow" style="flex:0 0 auto">
+            <div class="cond"><span class="cond-no">1</span><span class="cond-b"><span class="cond-t">学校书面授权</span><span class="cond-s">明确数据范围与用途</span></span><span class="cond-st">未完成</span></div>
+            <div class="cond"><span class="cond-no">2</span><span class="cond-b"><span class="cond-t">签署数据处理协议</span><span class="cond-s">约定安全与保存要求</span></span><span class="cond-st">未完成</span></div>
+            <div class="cond"><span class="cond-no">3</span><span class="cond-b"><span class="cond-t">只接聚合脱敏统计</span><span class="cond-s">不含任何个人身份信息</span></span><span class="cond-st">未完成</span></div>
+          </div>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">具体查不到哪些</div>
+          <div class="kv" style="flex:0 0 auto">
+            <div class="kv-row"><span class="k">报到人数与进度</span><span class="v v--fog">未接入</span></div>
+            <div class="kv-row"><span class="k">生源与专业分布</span><span class="v v--fog">未接入</span></div>
+            <div class="kv-row"><span class="k">宿舍分配情况</span><span class="v v--fog">未接入</span></div>
+            <div class="kv-row"><span class="k">缴费与手续进度</span><span class="v v--fog">未接入</span></div>
+          </div>
+
+          <div class="dsec-t" style="margin-top:var(--s-2)">现在想知道的，去这些地方</div>
+          <div class="kv" style="flex:0 0 auto">
+            <div class="kv-row"><span class="k">报到进度</span><span class="v">学校迎新官网与公众号</span></div>
+            <div class="kv-row"><span class="k">同届去向</span><span class="v">学校就业指导中心的报告</span></div>
+            <div class="kv-row"><span class="k">本地就业面</span><span class="v">政策服务页有官方公开数据</span></div>
+            <div class="kv-row"><span class="k">本机能做</span><span class="v">看校园招聘、练面试、打材料</span></div>
+          </div>
+          <p class="fee" style="flex:0 0 auto">
+            这几条是真能走通的路；<b>本机不拿"即将上线"当答复。</b>
+          </p>
+        </div>
+      </div>
+
+      <!-- 常驻底卡：为什么不放示例图表。锁定态最容易被塞假数据，这里把理由写明。 -->
+      <div class="pane" data-at="bigdata" style="flex:0 0 auto">
+        <div class="pane-hd"><span class="t">为什么不先放个示例图表</span><span class="s">这是取舍，不是没做</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">示例图表</span><span class="v">看着像真的，会被当成本校数据</span></div>
+          <div class="kv-row"><span class="k">行业均值</span><span class="v">不是你学校的，参考不了</span></div>
+          <div class="kv-row"><span class="k">本机口径</span><span class="v">没有就写没有，空着不填</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ 右动作区 ══════════════════ -->
+    <div class="wside">
+
+      <!-- ── welcome ── AI 落点：把"逐条对照清单"压成"还差什么" -->
+      <div class="pane pane--fill" data-at="welcome">
+        <div class="pane-hd">
+          <span class="t">报到还差什么</span>
+          <span class="s" data-when="default device-off">按你的情况</span>
+          <span class="s" data-when="first">需要先说情况</span>
+          <span class="s" data-when="ai-down">全量清单</span>
+        </div>
+
+        <div data-when="default device-off">
+          <div style="margin-bottom:10px"><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span></div>
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">录取通知书</span></span><span class="li-st li-st--own">你说已带</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">一寸免冠照片</span></span><span class="li-st li-st--miss">还缺</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">户口迁移证</span></span><span class="li-st li-st--miss">还缺</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">体检表</span></span><span class="li-st li-st--own">你说已带</span></li>
+          </ul>
+          <p style="margin:10px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55">
+            按你在本机勾过的情况算，<b>照片这一样本机就能补。</b>
+          </p>
+        </div>
+
+        <div data-when="first">
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
+            还没说过你的情况，<b>不给"还差什么"。</b>下面是校方全量清单，自己对着看更稳。
+          </p>
+          <ul class="li-list" style="margin-top:12px">
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">录取通知书</span></span><span class="li-st li-st--own">校方要求</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">身份证与复印件</span></span><span class="li-st li-st--own">校方要求</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">一寸免冠照片</span></span><span class="li-st li-st--own">校方要求</span></li>
+          </ul>
+        </div>
+
+        <div data-when="ai-down">
+          <div style="margin-bottom:10px"><span class="ev ev--e2">不依赖 AI · 校方全量清单</span></div>
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">录取通知书</span></span><span class="li-st li-st--own">校方要求</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">身份证与复印件</span></span><span class="li-st li-st--own">校方要求</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">一寸免冠照片</span></span><span class="li-st li-st--own">校方要求</span></li>
+            <li class="li"><span class="li-dot"></span><span class="li-b"><span class="li-t">户口迁移证与体检表</span></span><span class="li-st li-st--own">校方要求</span></li>
+          </ul>
+          <p style="margin:10px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55">
+            核对服务中断，<b>这里给全量，不给"还差什么"。</b>
+          </p>
+        </div>
+      </div>
+
+      <div class="pane" data-at="welcome">
+        <div class="pane-hd"><span class="t">报到当天怎么排</span><span class="s">校方建议顺序</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">先做</span><span class="v">线上预报到，省现场排队</span></div>
+          <div class="kv-row"><span class="k">到校后</span><span class="v">先学院报到，再宿舍</span></div>
+          <div class="kv-row"><span class="k">最后办</span><span class="v">校园卡激活</span></div>
+          <div class="kv-row"><span class="k">高峰时段</span><span class="v v--fog">按站点配置下发</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="welcome">
+        <div class="pane-hd"><span class="t">带走这份清单</span></div>
+        <div class="kv" style="margin-bottom:var(--s-3)">
+          <div class="kv-row"><span class="k">打什么</span>
+            <span class="v" data-when="default device-off">还缺的 2 样 + 全量清单</span>
+            <span class="v" data-when="first ai-down">校方全量清单</span>
+          </div>
+          <div class="kv-row"><span class="k">几页</span><span class="v">1 页 · A4 黑白</span></div>
+        </div>
+        <div class="outs">
+          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=迎新报到清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印报到清单</a>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <button class="out" data-go="card"><svg class="ic"><use href="#i-idcard"/></svg>看校园卡办理</button>
+          <a class="out" href="19-smart-campus.html"><svg class="ic"><use href="#i-layers"/></svg>看智慧校园</a>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>窗口位置与时间<b>按站点配置下发；</b>本机没配就不写，免得你白跑。</span>
+        </div>
+      </div>
+
+      <!-- ── card ── 非 AI -->
+      <div class="pane pane--fill" data-at="card">
+        <div class="pane-hd"><span class="t">这页怎么来的</span></div>
+        <div style="margin-bottom:10px"><span class="ev ev--e2">不依赖 AI · 只读指引</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">内容</span><span class="v">校方提供并经管理员审核</span></div>
+          <div class="kv-row"><span class="k">线上办理</span><span class="v v--fog">校方未开通</span></div>
+          <div class="kv-row"><span class="k">受理地点</span><span class="v">一卡通中心 · 行政楼一层</span></div>
+          <div class="kv-row"><span class="k">本机角色</span><span class="v">只展示与指引，不代办</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="card">
+        <div class="pane-hd"><span class="t">最常见的卡点</span><span class="s">白跑一趟多因这三样</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">照片规格不对</span><span class="v">要一寸免冠、近期</span></div>
+          <div class="kv-row"><span class="k">只带了复印件</span><span class="v">身份证要原件</span></div>
+          <div class="kv-row"><span class="k">没先挂失</span><span class="v">补办前要先挂失</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="card">
+        <div class="pane-hd"><span class="t">证件照本机能出</span><span class="s">现拍现印</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">规格</span><span class="v">一寸 25×35mm</span></div>
+          <div class="kv-row"><span class="k">一张 A4</span><span class="v">排 8 张，够办卡用</span></div>
+          <div class="kv-row"><span class="k">照片保留</span><span class="v">敏感文件 · 7 天删除</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="card">
+        <div class="pane-hd"><span class="t">现在能做的</span></div>
+        <div class="outs">
+          <a class="out" href="29-id-photo.html" data-when="default first device-off"><svg class="ic"><use href="#i-image"/></svg>拍证件照</a>
+          <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-image"/></svg>证件照不可用</button>
+          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=校园卡办理清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印办卡清单</a>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <button class="out" data-go="welcome"><svg class="ic"><use href="#i-campus"/></svg>回迎新报到</button>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>身份证只在窗口当面核验，<b>本机不扫描、不留存证件。</b></span>
+        </div>
+      </div>
+
+      <!-- ── bigdata ── 锁定态也要有真出路 -->
+      <div class="pane pane--fill" data-at="bigdata">
+        <div class="pane-hd"><span class="t">谁能开通</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">开关在</span><span class="v">学校 + 终端后台</span></div>
+          <div class="kv-row"><span class="k">你能开吗</span><span class="v v--fog">不能，本机没有这个入口</span></div>
+          <div class="kv-row"><span class="k">开通后展示</span><span class="v">只有聚合统计</span></div>
+          <div class="kv-row"><span class="k">永远不展示</span><span class="v">任何个人身份信息</span></div>
+          <div class="kv-row"><span class="k">开通时间</span><span class="v v--fog">没有时间表，不给倒计时</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="bigdata">
+        <div class="pane-hd"><span class="t">开通了会长什么样</span><span class="s">先说清楚</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">会有</span><span class="v">按院系的报到进度条</span></div>
+          <div class="kv-row"><span class="k">会有</span><span class="v">同届去向的聚合比例</span></div>
+          <div class="kv-row"><span class="k">不会有</span><span class="v">任何一个人的记录</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="bigdata">
+        <div class="pane-hd"><span class="t">换条路走</span></div>
+        <div class="outs">
+          <a class="out" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
+          <a class="out" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>看官方公开数据</a>
+          <button class="out" data-go="welcome"><svg class="ic"><use href="#i-users"/></svg>回迎新报到</button>
+          <a class="out" href="19-smart-campus.html"><svg class="ic"><use href="#i-layers"/></svg>看还锁着哪些</a>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>锁着的功能<b>不给倒计时、不写"即将上线"，</b>开了自然就能用。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="19-smart-campus.html" data-parent-label="智慧校园"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">智慧校园</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <div class="actionbar-hint">
+      <div data-at="welcome">
+        <div data-when="default"><div class="t">报到还缺 2 样 · 照片本机能补</div><div class="s">报到登记在学校官方系统办</div></div>
+        <div data-when="first"><div class="t">给的是校方全量清单，自己对着看</div><div class="s">说了情况才给"还差什么"</div></div>
+        <div data-when="ai-down"><div class="t">核对不可用，改给校方全量清单</div><div class="s">流程、窗口、打印都正常</div></div>
+        <div data-when="device-off"><div class="t">打印机离线，清单可扫码带到手机</div><div class="s">流程与窗口信息照常可看</div></div>
+      </div>
+      <div data-at="card">
+        <div data-when="default first ai-down"><div class="t">校园卡只能到一卡通中心窗口办</div><div class="s">材料带齐一次办结 · 本机不代办</div></div>
+        <div data-when="device-off"><div class="t">打印机离线，办卡清单可扫码带走</div><div class="s">指引与材料清单照常可看</div></div>
+      </div>
+      <div data-at="bigdata"><div class="t">学校没开通，这块本机不该填</div><div class="s">开通前不展示任何统计，含示例数据</div></div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="welcome" data-go="card">校园卡办理</button>
+    <button class="btn btn--lg btn--ghost" data-at="card" data-go="welcome">回迎新报到</button>
+    <button class="btn btn--lg btn--ghost" data-at="bigdata" data-go="card">校园卡办理</button>
+
+    <a class="btn btn--primary" data-at="welcome" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=迎新报到清单&amp;pages=1&amp;copies=1">打印报到清单 · 1 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="welcome" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
+
+    <a class="btn btn--primary" data-at="card" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=校园卡办理清单&amp;pages=1&amp;copies=1">打印办卡清单 · 1 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="card" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
+
+    <a class="btn btn--primary" data-at="bigdata" href="18-campus.html">去校园招聘<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+</body>
+</html>

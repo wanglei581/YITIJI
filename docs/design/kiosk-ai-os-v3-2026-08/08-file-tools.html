@@ -60,7 +60,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="06-print-workbench.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">文件加工</div>
@@ -462,7 +462,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -508,7 +508,7 @@
      ① 成功态：合成出的是哪一份、几页、原件动没动，当场讲清；
      ② 三条真实出口（全是真链接，按交接契约带载荷）：
         · 去打印   06-print-workbench.html?stage=s3&from=P08&kind=material&title=…&pages=…
-        · 存文档   23-me.html?view=docs&from=P08&…
+        · 存文档   42-my-assets.html?stage=docs&from=P08&…（2026-08-10 改：23-me 无文档明细列表）
         · 发手机   05-phone-relay.html?from=P08&…（原型上是示意码）
      ③ device-off 降级：打印机离线时**不摆出纸出口**，改「存文档 / 发手机，换机再打」，
         并写明为什么（interface-handoff §0：ai-down ≠ device-off，出纸类动作才禁用）。
@@ -551,7 +551,7 @@
         primary: true
       })
     }
-    out.push({ t: '存进「我的 · 文档」', href: '23-me.html?view=docs&' + pay, primary: off })
+    out.push({ t: '存进「我的 · 文档」', href: '42-my-assets.html?stage=docs&' + pay, primary: off })
     out.push({ t: '发到手机 · 看示意码', href: '05-phone-relay.html?' + pay })
     out.push({ t: '留在加工台' })
     return out

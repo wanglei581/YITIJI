@@ -479,7 +479,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -765,7 +765,9 @@
     save: function () {
       return { t: '已存进「我的文档」',
         p: '<b>' + what() + '</b> 已存好。凭手机号在任一台机器登录都能取回，<b>文件跟人走，不跟机器走</b>。<br>只给你本人看，不向任何企业提供。',
-        go: [{ t: '去「我的」查看', href: '23-me.html', primary: true }, { t: '留在这一页' }] }
+        /* 2026-08-10 改：原指 23-me.html（「我」的域首屏，无文档明细），承诺「查看」兑现不了
+           → 直落 42-my-assets.html?stage=docs 的文档标签 */
+        go: [{ t: '去「我的 · 文档」查看', href: '42-my-assets.html?stage=docs&from=P12', primary: true }, { t: '留在这一页' }] }
     }
   }
 
@@ -812,7 +814,7 @@
   try { q = new URLSearchParams(location.search) } catch (e) { return }
   var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
   var D = {
-    P01: ['首页', '01-home-v5.html'],
+    P01: ['首页', '01-home-v6.html'],
     P06: ['打印扫描', '39-print-hub.html'],
     P07: ['打印扫描', '39-print-hub.html'],
     P08: ['打印扫描', '39-print-hub.html'],

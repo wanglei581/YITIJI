@@ -192,7 +192,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">招聘会信息</div>
@@ -381,7 +381,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-hint">本页不出价，以打印台核价为准</span>
           <span class="dcard-go">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
-        <a class="dcard dcard--print" data-when="device-off" href="23-me.html?view=docs&amp;from=P36&amp;kind=material&amp;title=活动资料">
+        <a class="dcard dcard--print" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P36&amp;kind=material&amp;title=活动资料">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
@@ -393,7 +393,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </a>
       </div>
 
-      <!-- ── 次卡：记录类，明细归招聘会业务页 ── -->
+      <!-- ── 次卡：记录类 ──
+           2026-08-10 改：原指 17-fair-desk.html?view=browse / view=jumps，
+           但招聘会台里没有任何浏览/跳转记录 UI，view 参数也不被消费 —— 送错门。
+           浏览与外部跳转记录统一落在「我的记录 · 足迹」标签。 -->
       <div class="dmore">
         <div class="dmore-hd">
           <b>快捷入口</b>
@@ -401,21 +404,21 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span data-when="first">未登录，记录留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="17-fair-desk.html?stage=s1&amp;view=browse">
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
-              <span class="dmore-s">查看最近浏览的招聘会</span>
+              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="17-fair-desk.html?stage=s1&amp;view=jumps">
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
             <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">外部跳转记录</span>
-              <span class="dmore-s">查看已前往来源平台的记录</span>
+              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 次</span>
               <span class="dmore-n" data-when="first">未登录 · 0 次</span>
             </span>
@@ -433,7 +436,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   </div>
 
   <div class="actionbar">
-      <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">城市、日期、方向选完才排顺序</div></div>
@@ -447,7 +450,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
