@@ -186,6 +186,21 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
 /* 状态标签不是入口（先例见 P14 / P17 / P27） */
 .chip--info { cursor: inherit; }
+/* 全站统一标签口径：AI 卡「AI · 仅供参考」/ 非 AI 卡「不依赖 AI」/
+   ai-down 时 AI 卡改「AI · 已降级」而不是让标签消失 —— 这三种都是**状态标签，不是入口**。 */
+.chip--label { cursor: inherit; }
+
+/* 一句话输入：本稿不解析它，所以必须当场说清楚，不能让它看着像能改变结果的入口。
+   真机由 scripts/keypad.js 的屏幕软键盘接管（一体机没有物理键盘）—— 这一条是真的，
+   点这个框现在就会弹出软键盘；不真的只有「这句话会被谁读」。
+   说明**贴在输入框右边、不另起一行**：分诊带每多一行，下面八张卡就少一行的余量。 */
+.goalnote {
+  flex: 0 0 340px; min-width: 0; align-self: stretch;
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: 0 var(--s-4); border-radius: var(--r-sm);
+  border: 1px dashed var(--brd-2); background: var(--surf-1);
+  font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45;
+}
 </style>
 </head>
 <body>
@@ -226,8 +241,12 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <div class="goalbar">
         <label class="goalfield">
           <svg class="ic"><use href="#i-pen"/></svg>
-          <input type="text" placeholder="例：明天有场招聘会，简历还是去年的，想改一改再打两份" aria-label="用一句话说说你的情况">
+          <input type="text" data-keypad="text" placeholder="例：明天有场招聘会，简历还是去年的，想改一改再打两份" aria-label="用一句话说说你的情况">
         </label>
+        <div class="goalnote">
+          <span class="chip chip--info chip--label">示意</span>
+          <span>点框弹出屏幕软键盘。<b>本稿不解析这句话</b>，分诊只认下面三种情况。</span>
+        </div>
       </div>
 
       <div class="tpick" role="group" aria-label="你是哪种情况">
@@ -271,9 +290,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     </div>
 
     <!-- ══════════ 同版面通知行：四态换话不换位 ══════════ -->
+    <!-- 这一行只讲本机行为，不重复合规声明 ——
+         合规声明全页只留底部 .foot 那一条（同义的也算重复）。 -->
     <div class="notice" data-when="default">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <span>原简历只新增版本、<b>永不覆盖</b>；岗位申请在来源平台或官方渠道完成。</span>
+      <svg class="ic"><use href="#i-info"/></svg>
+      <span>诊断 / 优化 / 岗位匹配都<b>从第一步开始</b>：先选简历（或岗位），再出结论 —— 没有材料时不会凭空给你一页结果。原简历只新增版本、<b>永不覆盖</b>。</span>
     </div>
     <div class="notice" data-when="first">
       <svg class="ic"><use href="#i-info"/></svg>
@@ -290,19 +311,22 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
     <div class="glabel">
       <b>这个台面能做的八件事</b>
-      <span>卡上标「AI / 非 AI」· 下方三张是我的记录路牌</span>
+      <span>每张卡都标了「AI · 仅供参考」或「不依赖 AI」；AI 中断时改标「AI · 已降级」，标签不会消失</span>
     </div>
 
     <!-- ══════════ 八张能力卡 ══════════ -->
     <div class="hgrid">
 
-      <!-- ① AI简历诊断 -->
-      <a class="hcard" data-cap="diagnose" data-when="default first device-off" href="09-resume-workbench.html?stage=s3">
+      <!-- ① AI简历诊断
+           2026-08-10 Codex：原来直接深链 ?stage=s3（诊断结论）—— 没选简历就能看到一页结论，
+           那页结论凭空存在。改为落到工作台第一步 s1「简历来源」，并把「要什么材料」
+           作为参数带下去（need=resume），由目标页门控。intent 只说明进来要干什么。 -->
+      <a class="hcard" data-cap="diagnose" data-when="default first device-off" href="09-resume-workbench.html?stage=s1&amp;intent=diagnose&amp;need=resume">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-search"/></svg></span><span class="hc-nm">AI简历诊断</span></span>
-        <span class="hc-ds">上传简历，AI 解析结构、指出问题</span>
+        <span class="hc-ds">进去<b>先选简历来源</b>（上传 / 扫描 / 我的简历），再出诊断结论</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -310,17 +334,18 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-search"/></svg></span><span class="hc-nm">AI简历诊断</span></span>
         <span class="hc-ds">要模型读你的简历才出结论，现在做不了。</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>改成对着素材库自己核对</a>
         </span>
       </div>
 
-      <!-- ② AI简历优化 -->
-      <a class="hcard" data-cap="optimize" data-when="default first device-off" href="09-resume-workbench.html?stage=s4">
+      <!-- ② AI简历优化：同上，原来深链 ?stage=s4（逐条优化）也是结果态 -->
+      <a class="hcard" data-cap="optimize" data-when="default first device-off" href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;need=resume">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span><span class="hc-nm">AI简历优化</span></span>
-        <span class="hc-ds">说清目标岗位，AI 逐条重写表达</span>
+        <span class="hc-ds">进去<b>先选简历再说目标岗位</b>，然后逐条给改写建议</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -328,17 +353,18 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span><span class="hc-nm">AI简历优化</span></span>
         <span class="hc-ds">改写要模型生成，这一项现在做不了。</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>去素材库自己动手改</a>
         </span>
       </div>
 
-      <!-- ③ 简历生成 -->
+      <!-- ③ 简历生成：本来就落在访谈第一题，没有结果态可跳 -->
       <a class="hcard" data-cap="generate" data-when="default first device-off" href="10-resume-interview.html">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-brain"/></svg></span><span class="hc-nm">简历生成</span></span>
         <span class="hc-ds">没有简历时：小青逐题问，边答边成形</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -346,6 +372,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-brain"/></svg></span><span class="hc-nm">简历生成</span></span>
         <span class="hc-ds">访谈式生成整条链都靠模型，现在做不了。</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>先去素材库看版式</a>
         </span>
       </div>
@@ -356,7 +383,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-book"/></svg></span><span class="hc-nm">简历素材库</span></span>
         <span class="hc-ds">看版式与材料模板，照着自己编辑</span>
         <span class="hc-ft">
-          <span class="chip chip--jade">不依赖 AI · 一直可用</span>
+          <span class="chip chip--jade chip--label">不依赖 AI</span>
+          <span class="chip chip--info chip--label">四态都能进</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -367,7 +395,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-route"/></svg></span><span class="hc-nm">职业规划</span></span>
         <span class="hc-ds">按你的经历与目标给方向和行动项</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -375,6 +403,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-route"/></svg></span><span class="hc-nm">职业规划</span></span>
         <span class="hc-ds">方向与行动项由模型生成，现在做不了。</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="28-self-assessment.html"><svg class="ic"><use href="#i-check"/></svg>先做自我评估的题目</a>
         </span>
       </div>
@@ -385,7 +414,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-package"/></svg></span><span class="hc-nm">求职材料</span></span>
         <span class="hc-ds">求职信、自我介绍、材料清单、封面</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -393,6 +422,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-package"/></svg></span><span class="hc-nm">求职材料</span></span>
         <span class="hc-ds">正文由模型按模板生成，现在做不了。</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="33-resume-templates.html"><svg class="ic"><use href="#i-book"/></svg>去看模板要填哪几项</a>
         </span>
       </div>
@@ -403,7 +433,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span><span class="hc-nm">简历打印</span></span>
         <span class="hc-ds">定稿后在本机打印，走标准文档流程</span>
         <span class="hc-ft">
-          <span class="chip chip--jade">不依赖 AI · 依赖打印机</span>
+          <span class="chip chip--jade chip--label">不依赖 AI</span>
+          <span class="chip chip--info chip--label">依赖打印机</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -411,18 +442,22 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span><span class="hc-nm">简历打印</span></span>
         <span class="hc-ds">本机打印机离线，现在出不了纸，已上报运维。</span>
         <span class="hc-ft">
-          <span class="chip chip--info">打印机离线</span>
-          <a class="inlink" href="23-me.html"><svg class="ic"><use href="#i-folder"/></svg>存我的文档，换机取回</a>
+          <span class="chip chip--jade chip--label">不依赖 AI</span>
+          <span class="chip chip--info chip--label">打印机离线</span>
+          <a class="inlink" href="23-me.html"><svg class="ic"><use href="#i-folder"/></svg>去我的文档，换机取回</a>
         </span>
       </div>
 
-      <!-- ⑧ 岗位匹配参考 -->
-      <a class="hcard" data-cap="jobfit" data-when="default first device-off" href="11-jobfit-compare.html">
+      <!-- ⑧ 岗位匹配参考
+           原来写 11-jobfit-compare.html 不带参数 —— 那一页默认 data-stage="s2"（逐条比对），
+           等于没挑岗位就直接看到比对结果。改为显式 ?stage=s1「挑一个岗位」，
+           并带 need=job 让目标页知道：这一趟必须先有岗位才谈得上比对。 -->
+      <a class="hcard" data-cap="jobfit" data-when="default first device-off" href="11-jobfit-compare.html?stage=s1&amp;need=job">
         <span class="hc-rec">分诊推荐</span>
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位匹配参考</span></span>
-        <span class="hc-ds">简历对照岗位，给三档参考并列证据</span>
+        <span class="hc-ds">进去<b>先挑一个岗位</b>，再拿简历逐项对照，给三档参考并列证据</span>
         <span class="hc-ft">
-          <span class="chip chip--amber">AI</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
           <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </span>
       </a>
@@ -430,6 +465,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位匹配参考</span></span>
         <span class="hc-ds">对照要模型判断，这次做不了</span>
         <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
           <a class="inlink" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>去看岗位要求</a>
         </span>
       </div>
@@ -475,15 +511,19 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <a class="btn btn--lg btn--ghost" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>问问小青</a>
+    <!-- 原来这里还有一个「问问小青」，和底部导航的「AI顾问」去的是同一页（25-advisor）——
+         重复入口，并且五个按钮把 .actionbar-hint 挤成 0 宽：提示文字折成十几行、
+         溢出操作条 86–136px，自检按"卡内溢出"报硬缺陷，「·」还被挤到行首（中文排版禁则）。
+         删掉重复的那个，问小青仍走底部导航。 -->
     <a class="btn btn--lg btn--ghost" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>只有纸质简历</a>
 
-    <span class="actionbar-hint" data-when="default">八项功能全在这一屏 · 是否采用你定</span>
-    <span class="actionbar-hint" data-when="first">不登录也能用 · 记录留不下，保存那一步再登录</span>
-    <span class="actionbar-hint" data-when="ai-down">六项 AI 功能暂不可用 · 素材库与打印照常</span>
-    <span class="actionbar-hint" data-when="device-off">打印机离线 · 其余七项不受影响，做完先存我的文档</span>
+    <!-- 提示句写短，且不用带空格的「 · 」分隔：空格给了换行机会，下一行就以「·」开头 -->
+    <span class="actionbar-hint" data-when="default">八项功能全在这一屏，是否采用你定</span>
+    <span class="actionbar-hint" data-when="first">不登录也能用，记录留不下</span>
+    <span class="actionbar-hint" data-when="ai-down">六项 AI 暂不可用，素材库与打印照常</span>
+    <span class="actionbar-hint" data-when="device-off">打印机离线，其余七项不受影响</span>
 
-    <a class="btn btn--primary" data-when="default first device-off" href="09-resume-workbench.html?stage=s3">先做简历诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-when="default first device-off" href="09-resume-workbench.html?stage=s1&amp;intent=diagnose&amp;need=resume">先做简历诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-when="ai-down" href="33-resume-templates.html">去简历素材库<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 

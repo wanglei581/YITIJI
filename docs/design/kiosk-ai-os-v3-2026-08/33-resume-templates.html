@@ -46,14 +46,38 @@
 .flt-ct { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); }
 .flt-ct b { color: var(--fog-900); }
 
-/* 版式卡：左缩略图 + 右说明。缩略图画的是真实 sectionOrder 的七段顺序 */
-.tpl { flex: 0 0 auto; display: grid; grid-template-columns: 190px 1fr; gap: var(--s-5);
+/* 版式卡：左缩略图 + 右说明。缩略图画的是真实 sectionOrder 的七段顺序。
+   2026-08-10 Codex：这张卡原来是个普通 div —— 页面写着「当前选择」，却既不能选，
+   也没有任何 templateId 往下游传。现在它是**真的单选卡**：
+   <button aria-pressed> 切换选中 / 取消，选中态把 templateId 挂到右栏三个出口的 href 上。
+   语义与生产一致（ResumeTemplateLibraryPage.tsx 的模板卡也是 aria-pressed 单选）。 */
+/* 库存说明折叠之后左栏内容变短，多出的高度**均摊到块与块之间**（.wmain 用 space-between），
+   不塞进任何一张卡里 —— 试过让模板卡独吞：缩略图被拉成 190×950 的长条像"没画完的纸"，
+   改成卡内居中又让内容浮在半空。两版都比"块间多留点气"难看。
+   注意底部那条合规声明仍然 margin-top:auto 贴底，所以自检的"主栏留白"照样是 0。 */
+.wmain { justify-content: space-between; }
+.tpl { flex: 0 0 auto; min-height: 0; width: 100%; text-align: left; cursor: pointer;
+       appearance: none; font: inherit; color: inherit;
+       display: grid; grid-template-columns: 190px 1fr; align-items: start; gap: var(--s-5);
        padding: var(--s-5); border-radius: var(--r-md);
        background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-       border-left: 3px solid var(--cat-resume); }
+       border-left: 3px solid var(--cat-resume);
+       transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out); }
+.tpl:hover { border-color: var(--jade-a32); }
+.tpl:focus-visible { outline: 3px solid var(--jade-400); outline-offset: 2px; }
 .tpl.is-on { border-color: var(--jade-a32); border-left-color: var(--jade-500); box-shadow: 0 0 0 2px var(--jade-a12); }
+/* 未选中：不置灰、不禁用 —— 未选只是"没带版式方向往下走"，浏览与打印照旧 */
+.tpl-pick { display: inline-flex; align-items: center; gap: 7px; min-height: var(--touch-min);
+            padding: 0 var(--s-4); border-radius: var(--r-sm);
+            border: 1px solid var(--brd-2); background: var(--surf-2);
+            font-size: var(--fz-2); font-weight: 600; color: var(--fog-700); }
+.tpl.is-on .tpl-pick { border-color: var(--jade-a32); background: var(--jade-a12); color: var(--jade-200); }
+.tpl-pick .ic { width: 17px; height: 17px; flex: 0 0 auto; }
+.tpl.is-on .tpl-pick .i-off, .tpl:not(.is-on) .tpl-pick .i-on { display: none; }
 .tsheet { background: var(--paper-000); border: 1px solid var(--paper-200); border-radius: var(--r-xs);
-          padding: 14px 15px; display: flex; flex-direction: column; gap: 7px; }
+          padding: 14px 15px; display: flex; flex-direction: column; gap: 7px;
+          /* 190 × 268 ≈ A4（1:1.41）。不写死高度：内容多了自己长，但不会被拉成长条。 */
+          min-height: 268px; }
 .ts-h { height: 12px; width: 58%; border-radius: 2px; background: #b9c3c0; }
 .ts-m { height: 6px; width: 40%; border-radius: 2px; background: var(--paper-200); }
 .ts-sec { display: flex; flex-direction: column; gap: 4px; }
@@ -72,10 +96,27 @@
 /* 「当前选择」是状态不是入口，同 .chip--info 语义 */
 .chip--label { cursor: inherit; }
 
-/* 「线上库现在就这些」：空白用诚实填，不用编造填（同 P19 / P27 口径） */
-.stock { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3);
-         padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
-         border: 1px dashed var(--brd-2); background: var(--surf-1); }
+/* 「线上库现在就这些」：空白用诚实填，不用编造填（同 P19 / P27 口径）。
+   2026-08-10 Codex：这一整块原来常驻首屏，读起来像后台说明书，把当前模板和主操作挤没了。
+   现在整块收进 <details class="fold"> —— 一个字没删，只是默认不占屏。 */
+.fold { flex: 0 0 auto; border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+.fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fold[open] > summary::after { content: '收起'; }
+/* 实测（P13 同坑）：<details> 关着时子节点仍有布局盒，自检会当成溢出报缺陷。显式收掉。 */
+.fold:not([open]) .stock { display: none; }
+/* 展开后这块很长：如果让它把左栏顶穿，底部那条合规声明会被 .wmain 的 overflow:hidden
+   切掉 29px（实测）。所以展开时由**折叠块自己吃掉剩余高度并内部滚动**，
+   合规声明永远留在屏内。内部可滚的内容不算缺陷（audit-plus 的 isReachableByScroll）。 */
+.fold[open] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.fold[open] > summary { flex: 0 0 auto; }
+.stock { display: flex; flex-direction: column; gap: var(--s-3);
+         padding: 0 var(--s-4) var(--s-4); }
+.fold[open] .stock { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .stock-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-800); }
 .stock-p { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.7; }
 .stock-p b { color: var(--fog-800); }
@@ -86,7 +127,7 @@
 .mrow i { font-style: normal; color: var(--fog-600); }
 
 /* AI 建议位：ai-down 时整块换成「什么不可用、还能做什么」，位置与高度不动 */
-.aibox { flex: 0 0 auto; display: flex; flex-direction: column; gap: 7px;
+.aibox { flex: 0 0 auto; display: flex; flex-direction: column; gap: 9px;
          padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
          background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd); }
 .aibox-hd { display: flex; align-items: center; gap: var(--s-3); }
@@ -112,8 +153,25 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 .exit--off .ic { color: var(--fog-600); }
 .exit--off .exit-t { color: var(--fog-700); }
 
+/* 目标岗位输入 + 生成推荐：AI 卡不能只有一段话没有输入也没有按钮 —— 那是空承诺。
+   输入框点了会弹屏幕软键盘（scripts/keypad.js）；按钮在没填岗位前是 aria-disabled，
+   按不动，也不会假装算过。 */
+.goalrow { display: flex; gap: var(--s-3); align-items: stretch; }
+.goalrow .goalfield { flex: 1 1 auto; min-width: 0; }
+.goalrow .btn { flex: 0 0 auto; }
+.aiout { display: flex; flex-direction: column; gap: 6px; }
+
+/* 底部单条合规声明：全页只此一处（同义的也算重复）。
+   刻意**不写 margin-top:auto** —— auto 外边距会把富余高度一口吃光，
+   space-between 就分不到东西了，结果又是"上面挤、下面一个大洞"。 */
+.foot { flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-3);
+        font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
+.foot .ic { width: 17px; height: 17px; color: var(--fog-600); flex: 0 0 auto; margin-top: 1px; }
+
 /* 状态标签不是入口（先例见 P14 / P17 / P27） */
 .chip--info { cursor: inherit; }
+/* 全站统一标签口径：AI 卡「AI · 仅供参考」/ 非 AI 卡「不依赖 AI」/ ai-down 时改「AI · 已降级」 */
+.chip--label { cursor: inherit; }
 .wside .pane--grow > .sec { min-height: 0; overflow-y: auto; }
 </style>
 </head>
@@ -147,9 +205,11 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
     <!-- ══════════════════ 左主区：分类 + 版式 + 库存实况 ══════════════════ -->
     <div class="wmain">
 
+      <!-- 这一行只讲本页行为。合规声明整页只留左栏底部 .foot 那一条 ——
+           原来这里和右栏各写一遍，同义重复（Codex 2026-08-10）。 -->
       <div class="notice">
         <svg class="ic"><use href="#i-book"/></svg>
-        <span><b>选择只代表版式参考，本页不会替你生成或套用简历。</b>正式内容要在后面的流程里结合你自己的经历生成；岗位申请仍在来源平台或官方渠道完成。</span>
+        <span><b>选择只代表版式参考，本页不会替你生成或套用简历。</b>正式内容要在后面的流程里结合你自己的经历生成；你在这里选中的版式，会作为参数带进优化与打印那两步。</span>
       </div>
 
       <div class="flt" role="group" aria-label="简历素材分类">
@@ -160,8 +220,8 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
         <span class="flt-ct">当前分类 <b id="fltCount">1</b> 个版式</span>
       </div>
 
-      <div class="tpl is-on" id="tplCard">
-        <div class="tsheet" aria-hidden="true">
+      <button type="button" class="tpl is-on" id="tplCard" data-tpl="resume-template-clean" aria-pressed="true">
+        <span class="tsheet" aria-hidden="true">
           <span class="ts-h"></span>
           <span class="ts-m"></span>
           <span class="ts-rule"></span>
@@ -170,47 +230,64 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           <span class="ts-sec"><span class="ts-k">工作经历</span><span class="ts-l"></span><span class="ts-l ts-l--m"></span></span>
           <span class="ts-sec"><span class="ts-k">项目经历</span><span class="ts-l ts-l--m"></span></span>
           <span class="ts-sec"><span class="ts-k">技能 · 证书</span><span class="ts-l ts-l--s"></span></span>
-        </div>
-        <div class="tpl-b">
+        </span>
+        <span class="tpl-b">
           <span class="tpl-nm">清爽通用简历模板</span>
           <span class="tpl-ds">用于选择简历版式方向，进入简历诊断或优化后生成正式简历。</span>
           <span class="tpl-for">适合<b>简历诊断、AI 简历优化、现场打印前的版式参考</b>；单栏、无表格嵌套，招聘系统好读。</span>
           <span class="tpl-labels">
-            <span class="chip chip--info">简历模板</span>
-            <span class="chip chip--info">通用</span>
-            <span class="chip chip--info">单栏 · 标准字号行距</span>
+            <span class="chip chip--info chip--label">简历模板</span>
+            <span class="chip chip--info chip--label">通用</span>
+            <span class="chip chip--info chip--label">单栏 · 标准字号行距</span>
+            <span class="chip chip--jade chip--label">不依赖 AI</span>
           </span>
           <span class="tpl-ft">
-            <span class="chip chip--jade chip--label">当前选择</span>
+            <span class="tpl-pick">
+              <svg class="ic i-on"><use href="#i-check"/></svg><svg class="ic i-off"><use href="#i-plus"/></svg>
+              <span id="tplPickTx">已选中 · 再按一次取消</span>
+            </span>
             <span class="exit-s">线上库这一类目前只有它，不是没加载出来。</span>
           </span>
-        </div>
-      </div>
+        </span>
+      </button>
 
+      <!-- AI 卡：有输入、有触发按钮，按之前不出任何结论。
+           2026-08-10 Codex：原来这张卡只有四行说明 —— 没有岗位输入，也没有可按的东西，
+           「按你的岗位方向推荐素材」是一句没有落点的承诺。 -->
       <div class="aibox" data-when="default first device-off">
         <div class="aibox-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <span class="aibox-t">按你的岗位方向推荐素材</span>
-          <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
+          <span class="ev ev--e3">E3 AI 判断</span>
         </div>
-        <div class="aibox-ln"><span class="k">动作</span>把目标岗位说给下一页，让它按方向挑该突出哪几段 —— <b>本页不替你套用</b>，推荐只影响后面怎么改，不影响你现在能看什么。</div>
-        <div class="aibox-ln"><span class="k">理由</span>同一份经历，投技术岗和投运营岗要突出的段落顺序不一样；这属于模型判断，<b>不是规则</b>，所以标 E3。</div>
-        <div class="aibox-ln"><span class="k">代价</span>约 1 分钟；记一次 AI 服务；推荐可以完全不采纳，分类浏览不受任何影响。</div>
-        <div class="aibox-ln"><span class="k">备选</span>不想让模型插手 → 直接按上面的分类自己挑；只想拿纸质版参考 → 打印带走再慢慢改。</div>
+        <div class="goalrow">
+          <label class="goalfield">
+            <svg class="ic"><use href="#i-target"/></svg>
+            <input type="text" id="goalIn" data-keypad="text" placeholder="填你的目标岗位，例：新媒体运营 / 机械设计" aria-label="目标岗位">
+          </label>
+          <button type="button" class="btn" id="goalGo" aria-disabled="true"><svg class="ic"><use href="#i-brain"/></svg>生成推荐</button>
+        </div>
+        <div class="aiout" id="aiOut">
+          <div class="aibox-ln"><span class="k">还没生成</span>先填目标岗位再按「生成推荐」。<b>没填岗位就不给结论</b> —— 没有方向的"推荐"只是套话。</div>
+          <div class="aibox-ln"><span class="k">代价</span>约 1 分钟；记一次 AI 服务；推荐可以完全不采纳，分类浏览与打印不受任何影响。</div>
+        </div>
       </div>
 
       <div class="aibox" data-when="ai-down">
         <div class="aibox-hd">
           <svg class="ic"><use href="#i-offline"/></svg>
           <span class="aibox-t">按岗位方向推荐素材：现在给不了</span>
-          <span class="chip chip--info">AI 暂不可用</span>
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
         </div>
         <div class="aibox-ln"><span class="k">不可用的</span>只有「按岗位方向挑素材」这一条，它要模型判断。本机已自动上报运维，<b>恢复时间以现场公告为准</b>。</div>
-        <div class="aibox-ln"><span class="k">照常的</span>上面的<b>分类浏览、版式预览、打印带走</b>都不依赖 AI，现在全都能用。</div>
+        <div class="aibox-ln"><span class="k">照常的</span>上面的<b>分类浏览、选中版式、版式预览、打印带走</b>都不依赖 AI，现在全都能用。</div>
         <div class="aibox-ln"><span class="k">自己挑的话</span>单栏版式适合大多数岗位，也最容易被招聘系统正确读取，先按它准备内容不会错。</div>
-        <div class="aibox-ln"><span class="k">要留档的话</span>先把版式打印带走或存进「我的文档」，等 AI 恢复再回来做优化，材料不用重做。</div>
+        <div class="aibox-ln"><span class="k">要留档的话</span>先把版式打印带走，等 AI 恢复再回来做优化，材料不用重做。</div>
       </div>
 
+      <details class="fold">
+      <summary>线上库现在有几个、这批素材要填哪五项（点开看，不占首屏）</summary>
       <div class="stock">
         <div class="stock-t">线上库现在就这些 —— 数量按后台实际配置，本机不替它凑数</div>
         <div class="stock-p">
@@ -245,6 +322,14 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           <span class="mrow"><svg class="ic"><use href="#i-shield"/></svg><i>不问身份证号、不问联系人</i></span>
         </div>
       </div>
+      </details>
+
+      <!-- ══ 全页唯一一条合规声明（四态常驻）══
+           原来这条在左栏顶部与右栏出口区各写一遍，同义重复。现在只留这一处。 -->
+      <div class="foot">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>素材只供你本人求职准备、查看和打印。<b>本机不代收简历给企业</b>，也不做平台内筛选、邀约或 Offer 管理；岗位申请在来源平台或官方渠道完成。</span>
+      </div>
 
     </div>
 
@@ -252,13 +337,14 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
     <div class="wside">
 
       <div class="pane">
-        <div class="pane-hd"><svg class="ic"><use href="#i-book"/></svg><b>当前版式参考</b><span class="s">清爽通用</span></div>
+        <div class="pane-hd"><svg class="ic"><use href="#i-book"/></svg><b>当前版式参考</b><span class="s" id="sideTag">清爽通用</span></div>
         <div class="sec">
           <div class="kv">
+            <div class="kv-row"><span class="k">选中状态</span><span class="v" id="sideOn">已选中</span></div>
+            <div class="kv-row"><span class="k">模板标识</span><span class="v" id="sideId">resume-template-clean</span></div>
             <div class="kv-row"><span class="k">版式风格</span><span class="v">清爽 clean</span></div>
             <div class="kv-row"><span class="k">栏数</span><span class="v">单栏</span></div>
             <div class="kv-row"><span class="k">字号 / 行距</span><span class="v">标准 / 标准</span></div>
-            <div class="kv-row"><span class="k">页边距</span><span class="v">常规</span></div>
             <div class="kv-row"><span class="k">段落顺序</span><span class="v">共 7 段</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
@@ -273,7 +359,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
             进入 AI 简历优化后，系统会<b>基于你自己的内容</b>生成正式简历，版式在优化页里<b>重新确认一次</b>。<br>
-            本页<b>不保存、也不套用</b>任何模板 —— 你在这里点「选择」，只是告诉自己想要哪个方向。
+            本页<b>不保存、也不套用</b>任何模板 —— 选中只是把 <b>templateId</b> 挂在下面几个出口上带过去，本页自己什么都不写库。
           </div>
         </div>
       </div>
@@ -282,13 +368,25 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
         <div class="pane-hd"><svg class="ic"><use href="#i-arrowRight"/></svg><b>拿它去做什么</b><span class="s">三个出口</span></div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
-          <a class="exit" href="09-resume-workbench.html?stage=s4">
+          <!-- ① 套用到简历优化：AI 出口。原来深链 ?stage=s4（逐条优化结果态），
+               现在落到工作台第一步 s1，让用户先选自己的简历；templateId 由 JS 按选中态挂上。
+               ai-down 时这一项**按不动**（换成下面那张 exit--off），浏览 / 预览 / 打印照常。 -->
+          <a class="exit" data-when="default first device-off" data-tpl-link data-goal-link
+             data-href0="09-resume-workbench.html?stage=s1&amp;intent=optimize"
+             href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-pen"/></svg>
             <span class="exit-b"><span class="exit-t">套用到简历优化</span>
-              <span class="exit-s">带着这个版式方向去改简历；改写按条采纳，原件只新增版本不覆盖。</span></span>
+              <span class="exit-s">进去<b>先选你的简历</b>，再带着这个版式方向逐条改；改写按条采纳，原件只新增版本不覆盖。</span></span>
           </a>
+          <div class="exit exit--off" data-when="ai-down">
+            <svg class="ic"><use href="#i-offline"/></svg>
+            <span class="exit-b"><span class="exit-t">套用到简历优化：现在按不动</span>
+              <span class="exit-s">改写要模型生成，AI 中断期间这一步做不了。<b>浏览、选中版式、预览、打印照常</b> —— 先打印带走，等恢复了再回来改。</span></span>
+          </div>
 
-          <a class="exit" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张">
+          <a class="exit" data-when="default first ai-down" data-tpl-link
+             data-href0="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
+             href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-printer"/></svg>
             <span class="exit-b"><span class="exit-t">打印带走</span>
               <span class="exit-s">按标准文档流程送进打印工作台；<b>金额以打印工作台核价与现场公示价为准</b>，本页不出价。</span></span>
@@ -296,20 +394,17 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           <div class="exit exit--off" data-when="device-off">
             <svg class="ic"><use href="#i-offline"/></svg>
             <span class="exit-b"><span class="exit-t">打印带走：本机现在打不了</span>
-              <span class="exit-s">打印机离线，已上报运维。可先存进「我的文档」，换台机器取回来打。</span></span>
+              <span class="exit-s">打印机离线，已上报运维。这台机器<b>出不了纸</b>，可以换台机器再打。</span></span>
           </div>
 
+          <!-- ③ 原来写「存我的文档」，点了只是打开 23-me.html —— 什么都没保存。
+               保存这件事本页做不到（本页不写库），所以按实际行为改名为「查看我的文档」。 -->
           <a class="exit" href="23-me.html">
             <svg class="ic"><use href="#i-folder"/></svg>
-            <span class="exit-b"><span class="exit-t">存我的文档</span>
-              <span class="exit-s" data-when="default ai-down device-off">留一份到本人文档里，之后在别的机器上也能取。</span>
-              <span class="exit-s" data-when="first">这一项<b>需要登录</b>；不登录可以照常浏览和打印，只是留不下来。</span></span>
+            <span class="exit-b"><span class="exit-t">查看我的文档</span>
+              <span class="exit-s" data-when="default ai-down device-off">打开「我的文档」看已有的简历与材料。<b>本页不保存任何东西</b>，保存发生在优化或打印那一步。</span>
+              <span class="exit-s" data-when="first">打开「我的文档」<b>需要登录</b>；不登录可以照常浏览、选版式和打印，只是没有本人文档可看。</span></span>
           </a>
-
-          <div class="notice" style="margin-top:var(--s-2)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>素材只供你本人求职准备、查看和打印。<b>本机不代收简历给企业</b>，也不做平台内筛选、邀约或 Offer 管理。</span>
-          </div>
         </div>
       </div>
 
@@ -318,9 +413,9 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
         <div class="sec">
           <div class="kv">
             <div class="kv-row"><span class="k">浏览素材</span><span class="v">不需要登录</span></div>
-            <div class="kv-row"><span class="k">你点的「选择」</span><span class="v v--fog">不落库</span></div>
-            <div class="kv-row"><span class="k">这一页的选择</span><span class="v v--fog">离场即清</span></div>
-            <div class="kv-row"><span class="k">存我的文档</span><span class="v">需登录</span></div>
+            <div class="kv-row"><span class="k">你选中的版式</span><span class="v v--fog">不落库 · 只随链接带走</span></div>
+            <div class="kv-row"><span class="k">你填的目标岗位</span><span class="v v--fog">离场即清</span></div>
+            <div class="kv-row"><span class="k">查看我的文档</span><span class="v">需登录</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
             这四条现在就成立，和有没有登录无关。
@@ -335,15 +430,26 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
   <div class="actionbar">
       <a class="backbtn" href="32-resume-hub.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <a class="btn btn--lg btn--ghost" href="32-resume-hub.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回 AI简历服务</a>
+    <!-- 原来这里还有一个「回 AI简历服务」的 ghost 按钮，和左边 backbtn 去的是同一页 ——
+         重复入口，还把 .actionbar-hint 挤到 0 宽（提示文字折成十来行、溢出操作条 160px+，
+         自检按"卡内溢出"报硬缺陷）。删掉重复的那个，返回仍走 backbtn。 -->
     <a class="btn btn--lg btn--ghost" href="12-material-factory.html"><svg class="ic"><use href="#i-package"/></svg>去材料工厂</a>
 
-    <span class="actionbar-hint" data-when="default">选择只代表版式方向 · 本页不生成、不套用、不保存</span>
-    <span class="actionbar-hint" data-when="first">不登录也能浏览和打印 · 「存我的文档」那一步才需要登录</span>
-    <span class="actionbar-hint" data-when="ai-down">AI 推荐暂不可用 · 分类浏览、版式预览与打印照常</span>
-    <span class="actionbar-hint" data-when="device-off">打印机离线 · 浏览与套用不受影响，打印改为换机取回</span>
+    <!-- 这一栏净宽只剩约 140px（左边四个按钮 + 右边主按钮之后的余量），
+         提示句必须短，且**不要用带空格的「 · 」分隔**：空格给了换行机会，
+         下一行就以「·」开头，命中中文排版禁则（stage.js 的"标点在行首"）。 -->
+    <span class="actionbar-hint" data-when="default">选中版式只带走标识，本页不生成、不套用、不保存</span>
+    <span class="actionbar-hint" data-when="first">不登录也能浏览、选版式和打印</span>
+    <span class="actionbar-hint" data-when="ai-down">套用暂不可用，浏览与打印照常</span>
+    <span class="actionbar-hint" data-when="device-off">打印机离线，出纸要换台机器</span>
 
-    <a class="btn btn--primary" href="09-resume-workbench.html?stage=s4">套用到简历优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-when="default first device-off" data-tpl-link data-goal-link
+       data-href0="09-resume-workbench.html?stage=s1&amp;intent=optimize"
+       href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">套用到简历优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- ai-down：主按钮不能还写「套用到简历优化」—— 那一步现在按不动。换成本态真能做完的事。 -->
+    <a class="btn btn--primary" data-when="ai-down" data-tpl-link
+       data-href0="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张"
+       href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">打印带走<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
@@ -364,27 +470,118 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 <script>
 /* 分类筛选：按线上 FILTERS = ['全部','简历模板','通用'] 真判。
    这一个版式同时带「简历模板」「通用」两个标签，所以三个分类都能命中 ——
-   这就是线上库现在的真实情况，不是筛选没生效。 */
+   这就是线上库现在的真实情况，不是筛选没生效。
+
+   模板单选 + templateId 下传（2026-08-10 Codex）：
+     · 卡是 <button aria-pressed>，按一次选中、再按一次取消；
+     · 选中态把 templateId=resume-template-clean 挂到所有 [data-tpl-link] 的 href 上，
+       取消就摘掉 —— 链接里有没有这个参数，和屏幕上写的选中状态永远一致；
+     · templateId 取值抄自生产 packages/shared/src/types/jobMaterials.ts 的
+       JOB_MATERIAL_TEMPLATES[0].id，不自己编。
+   目标岗位推荐：填了岗位才允许按「生成推荐」，按下后结论里带上这个岗位，
+   并把 goal 一起挂到优化出口上；没填不给任何结论。 */
 ;(function () {
+  var TPL_ID = 'resume-template-clean'
   var TAGS = ['简历模板', '通用']
   var screen = document.querySelector('.screen')
   var card = document.getElementById('tplCard')
   var count = document.getElementById('fltCount')
   if (!screen || !card || !count) return
 
-  screen.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-flt]')
-    if (!b) return
-    var f = b.getAttribute('data-flt')
-    var btns = screen.querySelectorAll('[data-flt]')
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].setAttribute('aria-pressed', btns[i] === b ? 'true' : 'false')
+  var pickTx = document.getElementById('tplPickTx')
+  var sideOn = document.getElementById('sideOn')
+  var sideId = document.getElementById('sideId')
+  var sideTag = document.getElementById('sideTag')
+  var goalIn = document.getElementById('goalIn')
+  var goalGo = document.getElementById('goalGo')
+  var aiOut = document.getElementById('aiOut')
+  var goal = ''
+
+  function esc (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
+
+  /* 把当前选择写进每一个出口的 href。基址存在 data-href0 上，每次从基址重算，
+     不做字符串拼接式的"追加再追加"—— 那样反复切换会拼出脏 URL。 */
+  function syncLinks () {
+    var on = card.getAttribute('aria-pressed') === 'true'
+    var links = screen.querySelectorAll('[data-tpl-link]')
+    for (var i = 0; i < links.length; i++) {
+      var base = links[i].getAttribute('data-href0')
+      if (!base) continue
+      var q = []
+      if (on) q.push('templateId=' + encodeURIComponent(TPL_ID))
+      /* 目标岗位只对"改简历"那一步有意义，所以只挂在标了 data-goal-link 的出口上。
+         往打印任务上挂一个用不到的 goal，是另一种形式的假接线。 */
+      if (goal && links[i].hasAttribute('data-goal-link')) q.push('goal=' + encodeURIComponent(goal))
+      links[i].setAttribute('href', q.length
+        ? base + (base.indexOf('?') > -1 ? '&' : '?') + q.join('&')
+        : base)
     }
-    var hit = f === '全部' || TAGS.indexOf(f) > -1
-    card.hidden = !hit
-    count.textContent = hit ? '1' : '0'
-    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+    if (pickTx) pickTx.textContent = on ? '已选中 · 再按一次取消' : '未选中 · 按一下选它'
+    if (sideOn) sideOn.textContent = on ? '已选中' : '未选中'
+    if (sideId) sideId.textContent = on ? TPL_ID : '未选 · 不带 templateId'
+    if (sideTag) sideTag.textContent = on ? '清爽通用' : '未选版式'
+  }
+
+  screen.addEventListener('click', function (e) {
+    /* ① 分类筛选 */
+    var b = e.target.closest('[data-flt]')
+    if (b) {
+      var f = b.getAttribute('data-flt')
+      var btns = screen.querySelectorAll('[data-flt]')
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute('aria-pressed', btns[i] === b ? 'true' : 'false')
+      }
+      var hit = f === '全部' || TAGS.indexOf(f) > -1
+      card.hidden = !hit
+      count.textContent = hit ? '1' : '0'
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+      return
+    }
+
+    /* ② 模板单选 */
+    if (e.target.closest('#tplCard')) {
+      var on = card.getAttribute('aria-pressed') === 'true'
+      card.setAttribute('aria-pressed', on ? 'false' : 'true')
+      card.classList.toggle('is-on', !on)
+      syncLinks()
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+      return
+    }
+
+    /* ③ 生成推荐：没填岗位按不动（aria-disabled 已经 pointer-events:none，这里再兜一层） */
+    if (goalGo && e.target.closest('#goalGo')) {
+      var v = goalIn ? String(goalIn.value || '').replace(/^\s+|\s+$/g, '') : ''
+      if (!v) return
+      goal = v
+      syncLinks()
+      if (aiOut) {
+        aiOut.innerHTML =
+          '<div class="aibox-ln"><span class="k">动作</span>按「<b>' + esc(v) + '</b>」这个方向，' +
+          '进优化页时<b>先确认这三段</b>：个人概述、与该方向最近的一段经历、技能与证书；' +
+          '其余段落顺序保持版式默认。<span class="ev ev--e1">E1 岗位是你自己填的</span></div>' +
+          '<div class="aibox-ln"><span class="k">理由</span>同一份经历投不同方向，要先看到的段落不一样；' +
+          '哪几段该往前是<b>模型判断，不是硬规则</b>，所以标 E3。<span class="ev ev--e3">E3 AI 判断</span></div>' +
+          '<div class="aibox-ln"><span class="k">代价</span>约 1 分钟；记一次 AI 服务；' +
+          '<b>本页不替你套用</b> —— 这条推荐只跟着「套用到简历优化」带过去，采不采纳在那一页由你按。</div>' +
+          '<div class="aibox-ln"><span class="k">备选</span>不想让模型插手 → 直接按上面的分类自己挑；' +
+          '只想拿纸质版参考 → 打印带走再慢慢改。</div>'
+      }
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+    }
   })
+
+  /* 输入框有字才允许按「生成推荐」。按钮用 aria-disabled（项目既有约定：
+     opacity .42 + pointer-events:none），不用 disabled 属性 —— 那会让它从可及性树里消失。 */
+  if (goalIn && goalGo) {
+    goalIn.addEventListener('input', function () {
+      var has = String(goalIn.value || '').replace(/^\s+|\s+$/g, '').length > 0
+      goalGo.setAttribute('aria-disabled', has ? 'false' : 'true')
+    }, false)
+  }
+
+  syncLinks()
 })()
 </script>
 <script src="scripts/help.js?v=1"></script>
