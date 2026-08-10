@@ -16,6 +16,11 @@ fi
 : "${CI_RUN:?CI_RUN is required}"
 : "${DEPLOY_PATH:?DEPLOY_PATH is required}"
 
+if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then
+  echo "::error::PRINT_REQUIRE_PII_SCAN must be explicitly true before production release" >&2
+  exit 1
+fi
+
 RUNTIME_ROOT="${DEPLOY_API_DIR:-/srv/ai-job-print}"
 PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}"
 BACKUP_ROOT="${DEPLOY_BACKUP_ROOT:-/srv/ai-job-print-backups}"
@@ -124,6 +129,32 @@ pg_restore -l "$BACKUP_PREFIX.dump" >/dev/null
 echo "=== 3. 备份当前运行目录（回滚锚点）==="
 cp -a "$RUNTIME_ROOT" "$BACKUP_PREFIX.runtime"
 
+echo "=== 3b. 持久化强制 PII 扫描门禁（不打印 .env）==="
+ENV_FILE="$API_DIR/.env"
+ENV_TMP="$(mktemp "$API_DIR/.env.runtime.XXXXXX")"
+cleanup_env_tmp() {
+  rm -f -- "$ENV_TMP"
+}
+trap cleanup_env_tmp EXIT
+awk '
+  BEGIN { written = 0 }
+  /^[[:space:]]*(export[[:space:]]+)?PRINT_REQUIRE_PII_SCAN[[:space:]]*=/ {
+    if (!written) {
+      print "PRINT_REQUIRE_PII_SCAN=true"
+      written = 1
+    }
+    next
+  }
+  { print }
+  END {
+    if (!written) print "PRINT_REQUIRE_PII_SCAN=true"
+  }
+' "$ENV_FILE" > "$ENV_TMP"
+chmod --reference="$ENV_FILE" "$ENV_TMP"
+chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
+mv -f -- "$ENV_TMP" "$ENV_FILE"
+trap - EXIT
+
 echo "=== 4. 在目标提交内构建 API ==="
 cd "$DEPLOY_PATH"
 pnpm --filter @ai-job-print/api db:pg:generate
@@ -169,6 +200,7 @@ EOF
 
 echo "=== 8. 重启 PM2 并健康检查 ==="
 export COMMIT="$TARGET_SHA"
+export PRINT_REQUIRE_PII_SCAN=true
 pm2 restart "$PM2_NAME" --update-env
 for _ in $(seq 1 30); do
   if curl -fsS "$HEALTH_URL" 2>/dev/null | grep -q '"status":"ok"'; then

@@ -23,10 +23,15 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 30m
-          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
+
+            if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then
+              echo "::error::PRINT_REQUIRE_PII_SCAN 必须通过仓库变量显式设置为 true，禁止进入生产发布" >&2
+              exit 1
+            fi
 
             echo "=== 拉取并检出 CI 已验证提交 ==="
             EXPECTED_SHA='${{ github.event.workflow_run.head_sha }}'
@@ -132,3 +137,4 @@ jobs:
           DEPLOY_ADMIN_WEB_ROOT: ${{ secrets.DEPLOY_ADMIN_WEB_ROOT }}
           DEPLOY_PARTNER_WEB_ROOT: ${{ secrets.DEPLOY_PARTNER_WEB_ROOT }}
           KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN: ${{ secrets.KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN }}
+          PRINT_REQUIRE_PII_SCAN: ${{ vars.PRINT_REQUIRE_PII_SCAN }}
