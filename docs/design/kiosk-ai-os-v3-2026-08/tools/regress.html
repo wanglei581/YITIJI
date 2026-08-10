@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>V3 全站回归台</title>
+<!--
+  ============================================================
+  V3 · 全站回归台（可复现版）
+  ------------------------------------------------------------
+  为什么要有这个文件：
+
+  上一轮回归用的是「跑完就删」的临时驱动台。结果是 Codex 终审时给出
+  「候选稿在终审过程中仍在变化，当前不存在可复现的最终版」——
+  没有留下驱动台，就没有人能重跑出同一份结论，报告也就不能当作定版依据。
+  所以驱动台必须进仓库、必须版本化、必须能被别人原样跑出同样的数。
+
+  ── 测量环境（不照做会量出不同结果，这是实打实踩过的坑）──────
+  1) 必须走 HTTP，不能走 file://
+     file:// 下 iframe 跨文档访问被 Chrome 挡住，驱动台读不到子页 DOM。
+     在设计稿目录起：  python3 -m http.server 8899
+     然后开：          http://localhost:8899/tools/regress.html
+
+  2) 窗口必须 1120×2010
+     舞台是 1080×1920。窗口更小时 stage.js 的 fit() 会整体缩放，
+     一切像素测量（溢出、留白、可见比例）都跟着失真。
+
+  3) 每页每轮都要清 localStorage
+     themes.html 会把主题写进 localStorage。不清的话，同一份代码
+     在不同轮次会量出 0 / 44 / 68 三种不同的溢出值——这个坑吃过一次。
+     驱动台在每次装载前清一遍，并在 URL 上钉死 ?theme=warm。
+
+  4) 关 HTTP 缓存（DevTools → Network → Disable cache）
+     否则改完代码重跑，量的还是旧文件。
+
+  ── 审计驱动顺序（少一步就漏检）──────────────────────────
+     screen.setAttribute('data-state', st)
+     screen.setAttribute('data-stage', sg)
+     window.v3ApplyVisibility()
+     void document.body.offsetHeight      // 强制回流，否则量到的是旧版面
+     window.v3AuditPlus()
+
+  ── 轴发现（这一段是本文件最要紧的地方）────────────────────
+  V3 的页面状态由挂在 .screen 上的 data-* 轴决定。麻烦在于
+  data-src / data-file / data-redact 这类轴是**运行时才加到 .screen 上**的，
+  静态扫 HTML 根本看不见。上一轮就是这么漏检的：审计报全绿，
+  而那几条轴上的组合从头到尾没有被跑过。
+
+  所以这里的做法是：
+    · 轴的**取值**从后代元素的门控列表里取并集（那是写死在 HTML 里的，看得见）
+    · 轴的**名字**用白名单，因为轴是一个小的封闭集合
+    · 遇到白名单之外、但长得像轴的 data-* 属性，**报警**而不是跳过
+      —— 检测器自己也必须被检测。
+  ============================================================
+-->
+<style>
+  html, body { margin: 0; background: #0e1116; color: #dfe6f2;
+    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif }
+  #bar { position: sticky; top: 0; z-index: 9; display: flex; gap: 10px; align-items: center;
+    padding: 12px 16px; background: #151a22; border-bottom: 1px solid #263041; flex-wrap: wrap }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #33415a;
+    background: #1d2530; color: #dfe6f2; cursor: pointer }
+  button:hover { background: #263041 }
+  #env { font-size: 12px; color: #8fa1bd }
+  #env b.bad { color: #ff8f8f }
+  #env b.ok { color: #8fe0a8 }
+  #log { padding: 12px 16px; white-space: pre-wrap; font: 12px/1.55 ui-monospace, Menlo, monospace }
+  .warn { color: #ffc46b }
+  .bad { color: #ff8f8f }
+  .ok { color: #8fe0a8 }
+  /* 舞台 iframe 必须是真实 1080×1920，不能缩放，否则测量失真 */
+  #frame { width: 1080px; height: 1920px; border: 0; position: fixed; left: -4000px; top: 0 }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <button id="run">开始全量回归</button>
+  <button id="runone">只跑一页…</button>
+  <button id="copy">复制 JSON 结果</button>
+  <span id="env"></span>
+</div>
+<div id="log">按「开始全量回归」。先看上面的环境自检，红的先修再跑。</div>
+<iframe id="frame" src="about:blank"></iframe>
+
+<script>
+/* ── 轴白名单 ────────────────────────────────────────────────
+   已知的轴。data-when 是四态、data-at 是阶段，两者单独处理。 */
+var AXIS_ALLOW = ['data-pay', 'data-job', 'data-src', 'data-file',
+                  'data-off', 'data-done', 'data-probe', 'data-redact', 'data-tab']
+
+/* 明确不是轴的 data-*（用于「长得像轴但没在白名单里」的报警去噪）。
+   这些要么是行为钩子，要么是数据槽，不参与可见性判定。 */
+var AXIS_DENY = ['data-go', 'data-ev', 'data-out', 'data-f', 'data-f22', 'data-when',
+  'data-at', 'data-stage', 'data-state', 'data-theme', 'data-notebar', 'data-site',
+  'data-site-price', 'data-site-mode', 'data-site-unit', 'data-site-time', 'data-site-missing',
+  'data-rail-count', 'data-parent-label', 'data-empty-cond', 'data-relax-from',
+  'data-jobpick', 'data-kw', 'data-region', 'data-region-value', 'data-region-text',
+  'data-opts', 'data-vals', 'data-key', 'data-count', 'data-pay-btn', 'data-help',
+  'data-keypad', 'data-nb-ceiling', 'data-capture',
+  /* 以下经 07-scan-workbench 实测确认不是轴：全部挂在按钮 / 数据行上，
+     既没写到 .screen，页面里也没有任何 setAttribute('data-…')。
+     它们是选择器的取值槽，不参与可见性判定。 */
+  'data-kind', 'data-kindrow', 'data-fmt', 'data-param', 'data-v', 'data-pg', 'data-fb']
+
+/* ── 本台子的已知盲区（写在这里，不写在报告的漂亮话里）──────────
+   1) **交互驱动的文本态没有覆盖。** 像 07 的扫描格式（PDF/JPG/可检索 PDF）、
+      分辨率、彩色/黑白，是页面局部脚本改**文字**而不是改可见性的。
+      本台子靠枚举 data-* 轴来驱动，够不到这一类。这些组合会改变文字长度，
+      因而可能造成溢出 —— 没跑过就是没跑过，不要把它算进"全覆盖"。
+      高风险页需要另写点击脚本，或人工过一遍。
+   2) **跨页链接的落地内容没有验。** 只验了本页；链接指向哪一页对不对，
+      要靠 closed-loop-map.md 的映射表另行核。
+   3) **动效与时序没有验。** 审计取的是某一帧的静态版面。
+   4) 抽样页（组合数超上限）按等距抽，不是全量；报告里逐页标了 sampled。 */
+
+var STATES = ['default', 'first', 'ai-down', 'device-off']
+
+/* 每页组合数上限。超过就按轴优先级抽样，并在报告里**明写抽了多少**——
+   静默截断会让报告读起来像"全覆盖"，那是最坏的一种假绿。 */
+var COMBO_CAP = 260
+
+var PAGES = []          // 运行时从目录清单拉
+var RESULT = { env: {}, pages: [], startedAt: '', finishedAt: '' }
+
+var logEl = document.getElementById('log')
+var frame = document.getElementById('frame')
+function log (s, cls) {
+  var span = document.createElement('span')
+  if (cls) span.className = cls
+  span.textContent = s + '\n'
+  logEl.appendChild(span)
+  logEl.scrollTop = logEl.scrollHeight
+}
+
+/* ── 环境自检 ──────────────────────────────────────────────
+   注意这里检的是**真正决定测量是否可信的东西**，不是它的代理指标。
+
+   一开始我检的是外层 Chrome 窗口尺寸，那是错的：舞台 iframe 有显式的
+   1080×1920 CSS 尺寸，它的内部视口就等于这个盒子，跟外层窗口多大无关。
+   真正要保证的是两条 ——
+     ① iframe 内部视口正好 1080×1920
+     ② ?capture=1 生效，stage.js 的 fit() 把 transform 设成 none（完全不缩放）
+   这两条都在**子页里**验，见 verifyStage()。外层只剩一条：必须走 http。 */
+function checkEnv () {
+  var e = document.getElementById('env')
+  var proto = location.protocol === 'http:' || location.protocol === 'https:'
+  RESULT.env = { protocol: location.protocol, protocolOk: proto, ua: navigator.userAgent }
+  e.innerHTML =
+    '协议 <b class="' + (proto ? 'ok' : 'bad') + '">' + location.protocol + '</b>（须 http，file:// 下读不到子页 DOM）　' +
+    '<span style="color:#8fa1bd">舞台 1:1 与缩放在每页装载后逐页验　·　缓存请在 DevTools 里手动关</span>'
+  return proto
+}
+
+/* 逐页验舞台：视口须 1080×1920，且 capture 模式下不得有任何缩放。
+   任何一条不成立，这一页量出来的像素数都不可信，必须当作装载失败。 */
+function verifyStage (win) {
+  var vw = win.innerWidth, vh = win.innerHeight
+  var stage = win.document.querySelector('.stage')
+  var tf = stage ? win.getComputedStyle(stage).transform : 'none'
+  var scaled = tf && tf !== 'none' && tf !== 'matrix(1, 0, 0, 1, 0, 0)'
+  var ok = vw === 1080 && vh === 1920 && !scaled
+  return { ok: ok, viewport: vw + '×' + vh, transform: tf || 'none' }
+}
+checkEnv()
+window.addEventListener('resize', checkEnv)
+
+/* ── 页面清单 ──────────────────────────────────────────────
+   从 manifest.json 读；没有就退回目录列表解析。
+   不硬编码页名——硬编码就会在新增页时静默漏测。 */
+async function loadPages () {
+  var r = await fetch('../pages.json?t=' + Date.now(), { cache: 'no-store' })
+  if (!r.ok) throw new Error('读不到 pages.json —— 先在设计稿目录跑 sh tools/make-pages.sh')
+  var j = await r.json()
+  RESULT.manifest = { generatedAt: j.generatedAt, retired: j.retired || [], count: j.pages.length }
+
+  /* 清单陈旧是最隐蔽的漏检：报告看起来"全站都跑了"，实际少跑了新增页。
+     这里用清单生成时间与最新一页的 Last-Modified 对比，陈旧就明着报出来。 */
+  try {
+    var newest = 0
+    for (var i = 0; i < j.pages.length; i++) {
+      var h = await fetch('../' + j.pages[i], { method: 'HEAD', cache: 'no-store' })
+      var lm = Date.parse(h.headers.get('last-modified') || '')
+      if (lm > newest) newest = lm
+    }
+    var gen = Date.parse(j.generatedAt)
+    RESULT.manifest.stale = newest > gen
+    RESULT.manifest.newestPageAt = new Date(newest).toISOString()
+    if (newest > gen) log('⚠ pages.json 比最新改动的页面还旧（清单 ' + j.generatedAt
+      + '，最新页 ' + new Date(newest).toISOString() + '）。先跑 sh tools/make-pages.sh 再回归。', 'warn')
+  } catch (e) {}
+
+  if (j.retired && j.retired.length)
+    log('退役页（保留文件，不进交付集、不回归）：' + j.retired.join('、'), 'warn')
+  return j.pages
+}
+
+/* ── 装载一页 ──────────────────────────────────────────────
+   清 localStorage → 钉主题 → 等 load → 再等一帧让 stage.js 跑完初始化。 */
+function loadPage (name) {
+  return new Promise(function (resolve, reject) {
+    var to = setTimeout(function () { reject(new Error('装载超时 8s')) }, 8000)
+    frame.onload = function () {
+      clearTimeout(to)
+      var win = frame.contentWindow
+      try { win.localStorage.clear() } catch (e) {}
+      /* 两帧：一帧给 DOMContentLoaded 后的脚本，一帧给它们触发的布局 */
+      win.requestAnimationFrame(function () {
+        win.requestAnimationFrame(function () { resolve(win) })
+      })
+    }
+    try { frame.contentWindow.localStorage.clear() } catch (e) {}
+    frame.src = '../' + name + '?theme=warm&capture=1&t=' + Date.now()
+  })
+}
+
+/* ── 轴发现 ────────────────────────────────────────────────
+   取值从后代门控列表取并集；名字走白名单；白名单外的可疑项报警。 */
+function discoverAxes (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return { error: '没有 .screen' }
+
+  var stages = []
+  doc.querySelectorAll('[data-at]').forEach(function (el) {
+    String(el.getAttribute('data-at') || '').split(/\s+/).forEach(function (v) {
+      if (v && stages.indexOf(v) < 0) stages.push(v)
+    })
+  })
+
+  var axes = {}, suspicious = []
+  var seen = {}
+  doc.querySelectorAll('*').forEach(function (el) {
+    for (var i = 0; i < el.attributes.length; i++) {
+      var n = el.attributes[i].name
+      if (n.indexOf('data-') !== 0) continue
+      seen[n] = (seen[n] || 0) + 1
+    }
+  })
+  Object.keys(seen).forEach(function (n) {
+    if (AXIS_ALLOW.indexOf(n) > -1) {
+      var vals = []
+      doc.querySelectorAll('[' + n + ']').forEach(function (el) {
+        if (el === screen) return
+        String(el.getAttribute(n) || '').split(/\s+/).forEach(function (v) {
+          if (v && vals.indexOf(v) < 0) vals.push(v)
+        })
+      })
+      if (vals.length > 1) axes[n] = vals
+      return
+    }
+    if (AXIS_DENY.indexOf(n) > -1) return
+    /* 白名单外、出现在多个元素上、且取值像是枚举 —— 可能是新轴。
+       报出来，别静默跳过。上一轮的教训就是漏轴等于漏检。 */
+    if (seen[n] >= 3) {
+      var vs = {}
+      doc.querySelectorAll('[' + n + ']').forEach(function (el) {
+        String(el.getAttribute(n) || '').split(/\s+/).forEach(function (v) { if (v) vs[v] = 1 })
+      })
+      var k = Object.keys(vs)
+      if (k.length > 1 && k.length <= 12 && k.every(function (x) { return x.length <= 16 })) {
+        suspicious.push({ attr: n, count: seen[n], values: k })
+      }
+    }
+  })
+
+  return { stages: stages, axes: axes, suspicious: suspicious,
+           hasStage: screen.hasAttribute('data-stage') }
+}
+
+/* ── 组合枚举 ──────────────────────────────────────────────
+   四态 × 阶段 × 各附加轴的笛卡尔积。超上限就抽样，并记下抽了多少。 */
+function buildCombos (disc) {
+  var stages = disc.hasStage && disc.stages.length ? disc.stages : ['']
+  var axisNames = Object.keys(disc.axes)
+  var combos = []
+  function rec (i, acc) {
+    if (i === axisNames.length) { combos.push(acc.slice()); return }
+    var vals = disc.axes[axisNames[i]]
+    for (var j = 0; j < vals.length; j++) rec(i + 1, acc.concat([[axisNames[i], vals[j]]]))
+  }
+  var extra = []
+  rec(0, [])
+  extra = combos
+  var out = []
+  for (var s = 0; s < STATES.length; s++)
+    for (var g = 0; g < stages.length; g++)
+      for (var e = 0; e < extra.length; e++)
+        out.push({ state: STATES[s], stage: stages[g], extra: extra[e] })
+
+  var full = out.length, sampled = false
+  if (full > COMBO_CAP) {
+    /* 抽样规则要可复现：等距抽，不用随机。随机会让两次跑不出同一份报告。 */
+    var step = full / COMBO_CAP, picked = []
+    for (var k = 0; k < COMBO_CAP; k++) picked.push(out[Math.floor(k * step)])
+    out = picked; sampled = true
+  }
+  return { list: out, full: full, ran: out.length, sampled: sampled }
+}
+
+/* ── 跑一个组合 ──────────────────────────────────────────── */
+function runCombo (win, c) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  screen.setAttribute('data-state', c.state)
+  if (c.stage) screen.setAttribute('data-stage', c.stage)
+  for (var i = 0; i < c.extra.length; i++) screen.setAttribute(c.extra[i][0], c.extra[i][1])
+  if (typeof win.v3ApplyVisibility === 'function') win.v3ApplyVisibility()
+  void doc.body.offsetHeight                      // 强制回流：不做就量到旧版面
+  var r = (typeof win.v3AuditPlus === 'function') ? win.v3AuditPlus()
+        : (typeof win.v3Audit === 'function') ? win.v3Audit() : null
+  return r
+}
+
+function comboLabel (c) {
+  var s = c.state + (c.stage ? '/' + c.stage : '')
+  for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
+  return s
+}
+
+/* ── 主流程 ──────────────────────────────────────────────── */
+async function runAll (only) {
+  if (!checkEnv()) {
+    log('环境自检没过。协议必须是 http、窗口必须 ~1120×2010，否则量出来的数不可复现。', 'bad')
+    return
+  }
+  logEl.textContent = ''
+  RESULT = { env: RESULT.env, pages: [], startedAt: new Date().toISOString(), finishedAt: '' }
+
+  PAGES = await loadPages()
+  if (only) PAGES = PAGES.filter(function (p) { return p.indexOf(only) > -1 })
+  log('共 ' + PAGES.length + ' 页。开始。\n')
+
+  var totalCombos = 0, totalDefects = 0, totalErrors = 0, pagesWithDefects = 0
+
+  for (var i = 0; i < PAGES.length; i++) {
+    var name = PAGES[i]
+    var rec = { page: name, combos: 0, fullCombos: 0, sampled: false,
+                defects: [], consoleErrors: [], suspicious: [], error: '' }
+    try {
+      var win = await loadPage(name)
+
+      /* 舞台不是 1:1 就没有测量意义 —— 直接判失败，不要拿失真的数去凑一份"跑过了"的报告 */
+      var vs = verifyStage(win)
+      rec.stage = vs
+      if (!vs.ok) {
+        rec.error = '舞台不是 1:1（视口 ' + vs.viewport + '，transform ' + vs.transform + '）'
+        log(name + '  ✗ ' + rec.error, 'bad')
+        RESULT.pages.push(rec); continue
+      }
+
+      /* 接管子页 console.error：脚本挂了但静态审计还报绿，是最危险的一种假绿。
+         P21 就发生过整段脚本被 URL 编码坏掉、静态审计照样全绿的事。 */
+      var errs = []
+      var oe = win.console.error
+      win.console.error = function () { errs.push([].slice.call(arguments).join(' ')); oe.apply(win.console, arguments) }
+      win.addEventListener('error', function (ev) { errs.push('window.onerror: ' + ev.message) })
+
+      var disc = discoverAxes(win)
+      if (disc.error) { rec.error = disc.error; log(name + '  ✗ ' + disc.error, 'bad'); RESULT.pages.push(rec); continue }
+      rec.suspicious = disc.suspicious
+
+      var cb = buildCombos(disc)
+      rec.combos = cb.ran; rec.fullCombos = cb.full; rec.sampled = cb.sampled
+
+      for (var j = 0; j < cb.list.length; j++) {
+        var out = runCombo(win, cb.list[j])
+        if (out && typeof out === 'object') {
+          Object.keys(out).forEach(function (k) {
+            var v = out[k]
+            if (typeof v === 'number' && v > 0) rec.defects.push({ combo: comboLabel(cb.list[j]), check: k, value: v })
+          })
+        } else if (out === undefined || out === null) {
+          rec.defects.push({ combo: comboLabel(cb.list[j]), check: '审计没有返回值', value: 1 })
+        }
+      }
+      rec.consoleErrors = errs.slice(0, 20)
+
+      totalCombos += rec.combos
+      totalDefects += rec.defects.length
+      totalErrors += errs.length
+      if (rec.defects.length || errs.length) pagesWithDefects++
+
+      var line = name.padEnd(34) + String(rec.combos).padStart(4) + ' 组合'
+        + (cb.sampled ? '（全量 ' + cb.full + '，等距抽样）' : '')
+        + '  缺陷 ' + rec.defects.length + '  console 错 ' + errs.length
+      log(line, (rec.defects.length || errs.length) ? 'warn' : 'ok')
+      if (rec.suspicious.length)
+        log('    ⚠ 疑似未登记的轴：' + rec.suspicious.map(function (s) {
+          return s.attr + '(' + s.values.join('|') + ')' }).join('，') + ' —— 确认后加进 AXIS_ALLOW 或 AXIS_DENY', 'warn')
+    } catch (e) {
+      rec.error = String(e && e.message || e)
+      log(name + '  ✗ ' + rec.error, 'bad')
+    }
+    RESULT.pages.push(rec)
+  }
+
+  RESULT.finishedAt = new Date().toISOString()
+  log('\n────────────────────────────────')
+  log('页数 ' + PAGES.length + '　组合 ' + totalCombos
+    + '　有问题的页 ' + pagesWithDefects
+    + '　缺陷 ' + totalDefects + '　console 错 ' + totalErrors,
+    (totalDefects || totalErrors) ? 'bad' : 'ok')
+  log('点「复制 JSON 结果」把完整结果取走。')
+  window.V3_REGRESS_RESULT = RESULT
+}
+
+document.getElementById('run').onclick = function () { runAll('') }
+document.getElementById('runone').onclick = function () {
+  var p = prompt('页名片段，例如 06 或 print-workbench')
+  if (p) runAll(p)
+}
+document.getElementById('copy').onclick = function () {
+  navigator.clipboard.writeText(JSON.stringify(RESULT, null, 2))
+  log('已复制。', 'ok')
+}
+window.v3RunAll = runAll
+</script>
+</body>
+</html>
