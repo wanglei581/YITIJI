@@ -29,10 +29,8 @@ async function main(): Promise<void> {
     throw new Error('RECRUITMENT_WAVE2_MANIFEST_TARGET_SNAPSHOT_MISMATCH')
   }
   const result = await withRecruitmentWave2Readonly(config, async (query, identity) => {
-    const [inventory, snapshot] = await Promise.all([
-      collectRecruitmentWave2Inventory(query, identity),
-      loadRecruitmentWave2Snapshot(query, batchSize),
-    ])
+    const inventory = await collectRecruitmentWave2Inventory(query, identity)
+    const snapshot = await loadRecruitmentWave2Snapshot(query, batchSize)
     if (!identity.snapshotAsOf) throw new Error('RECRUITMENT_WAVE2_RESTORE_MARKER_TIME_INVALID')
     return {
       inventory,

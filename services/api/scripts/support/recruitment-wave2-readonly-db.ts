@@ -214,10 +214,11 @@ export async function collectRecruitmentWave2Inventory(
 ): Promise<RecruitmentWave2Inventory> {
   const inventory = await countQueries(query, INVENTORY_SQL)
   const blockers = await countQueries(query, BLOCKER_SQL)
-  const grouped = Object.fromEntries(await Promise.all(Object.entries(GROUPED_SQL).map(async ([key, sql]) => {
+  const grouped: RecruitmentWave2Inventory['grouped'] = {}
+  for (const [key, sql] of Object.entries(GROUPED_SQL)) {
     const rows = await query<{ key: string; count: number }>(sql)
-    return [key, rows.map((row) => ({ key: row.key, count: Number(row.count) }))]
-  })))
+    grouped[key] = rows.map((row) => ({ key: row.key, count: Number(row.count) }))
+  }
   return {
     identity,
     queryPlanSha256: sha256(JSON.stringify({ INVENTORY_SQL, GROUPED_SQL, BLOCKER_SQL })),
@@ -234,18 +235,19 @@ export async function loadRecruitmentWave2Snapshot(
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) {
     throw new Error('RECRUITMENT_WAVE2_BATCH_SIZE_INVALID')
   }
-  const [organizations, sources, profiles, branches, qualificationRows, decisions, legacyAgencies, legacyJobs, jobs] =
-    await Promise.all([
-      query<RecruitmentWave2Snapshot['organizations'][number]>(SNAPSHOT_SQL.organizations),
-      query<RecruitmentWave2Snapshot['sources'][number]>(SNAPSHOT_SQL.sources),
-      query<RecruitmentWave2Snapshot['profiles'][number]>(SNAPSHOT_SQL.profiles),
-      query<RecruitmentWave2Snapshot['branches'][number]>(SNAPSHOT_SQL.branches),
-      query<Record<string, unknown>>(SNAPSHOT_SQL.qualifications),
-      query<RecruitmentWave2Snapshot['decisions'][number]>(SNAPSHOT_SQL.decisions),
-      loadBatched<RecruitmentWave2Snapshot['legacyAgencies'][number]>(query, SNAPSHOT_SQL.legacyAgencies, batchSize),
-      loadBatched<RecruitmentWave2Snapshot['legacyJobs'][number]>(query, SNAPSHOT_SQL.legacyJobs, batchSize),
-      loadBatched<RecruitmentWave2Snapshot['jobs'][number]>(query, SNAPSHOT_SQL.jobs, batchSize),
-    ])
+  const organizations = await query<RecruitmentWave2Snapshot['organizations'][number]>(SNAPSHOT_SQL.organizations)
+  const sources = await query<RecruitmentWave2Snapshot['sources'][number]>(SNAPSHOT_SQL.sources)
+  const profiles = await query<RecruitmentWave2Snapshot['profiles'][number]>(SNAPSHOT_SQL.profiles)
+  const branches = await query<RecruitmentWave2Snapshot['branches'][number]>(SNAPSHOT_SQL.branches)
+  const qualificationRows = await query<Record<string, unknown>>(SNAPSHOT_SQL.qualifications)
+  const decisions = await query<RecruitmentWave2Snapshot['decisions'][number]>(SNAPSHOT_SQL.decisions)
+  const legacyAgencies = await loadBatched<RecruitmentWave2Snapshot['legacyAgencies'][number]>(
+    query, SNAPSHOT_SQL.legacyAgencies, batchSize,
+  )
+  const legacyJobs = await loadBatched<RecruitmentWave2Snapshot['legacyJobs'][number]>(
+    query, SNAPSHOT_SQL.legacyJobs, batchSize,
+  )
+  const jobs = await loadBatched<RecruitmentWave2Snapshot['jobs'][number]>(query, SNAPSHOT_SQL.jobs, batchSize)
   const qualifications = qualificationRows.map((row) => ({
     id: String(row['id']),
     organizationId: String(row['organizationId']),
@@ -288,7 +290,10 @@ async function loadBatched<T extends { id: string }>(query: QueryRows, sql: stri
 }
 
 function nullableString(value: unknown): string | null { return value === null || value === undefined ? null : String(value) }
-function nullableDate(value: unknown): Date | null { return value === null || value === undefined ? null : new Date(String(value)) }
+function nullableDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null
+  return value instanceof Date ? new Date(value.getTime()) : new Date(String(value))
+}
 
 async function verifyIdentity(query: QueryRows, config: RecruitmentWave2TargetConfig): Promise<RecruitmentWave2DatabaseIdentity> {
   const rows = await query<Record<string, unknown>>(`SELECT current_database() AS database,current_schema() AS schema,
@@ -341,18 +346,20 @@ async function verifyRestoreMarker(
     FROM "_RecruitmentWave2RestoreMarker" WHERE restore_nonce=$1`, [config.restoreNonce])
   const row = rows[0]
   if (!row || row['snapshot_sha256'] !== config.snapshotSha256) throw new Error('RECRUITMENT_WAVE2_RESTORE_MARKER_MISMATCH')
-  const expiresAt = new Date(String(row['expires_at']))
+  const expiresAt = nullableDate(row['expires_at']) ?? new Date(Number.NaN)
   assertRecruitmentWave2ExecutionWindow(config, new Date(), expiresAt)
-  const snapshotAsOf = new Date(String(row['snapshot_as_of']))
+  const snapshotAsOf = nullableDate(row['snapshot_as_of']) ?? new Date(Number.NaN)
   if (!Number.isFinite(snapshotAsOf.getTime())) throw new Error('RECRUITMENT_WAVE2_RESTORE_MARKER_TIME_INVALID')
   return { snapshotAsOf: snapshotAsOf.toISOString(), expiresAt: expiresAt.toISOString() }
 }
 
 async function countQueries(query: QueryRows, sqlMap: Record<string, string>): Promise<Record<string, number>> {
-  return Object.fromEntries(await Promise.all(Object.entries(sqlMap).map(async ([key, sql]) => {
+  const counts: Record<string, number> = {}
+  for (const [key, sql] of Object.entries(sqlMap)) {
     const rows = await query<{ count: number }>(sql)
-    return [key, Number(rows[0]?.count ?? 0)]
-  })))
+    counts[key] = Number(rows[0]?.count ?? 0)
+  }
+  return counts
 }
 
 function sha256(value: string): string { return createHash('sha256').update(value, 'utf8').digest('hex') }
