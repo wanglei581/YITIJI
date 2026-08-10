@@ -245,7 +245,9 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     </div>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列空闲</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 扫描可用</div>
+    <!-- device-off = 打印扫描一体机（同一台 MFP）离线：扫描仪就长在这台机器上，
+         不能再写「扫描可用」。全站口径见 39-print-hub.html 文件头。 -->
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印扫描离线 · 其余功能可用</div>
     <div class="clock" data-clock>2026年8月8日 <b>09:41</b></div>
   </header>
 
@@ -403,7 +405,7 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
             <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
-            <span class="card-pill card-pill--info" data-when="device-off">打印离线 · 扫描可用</span>
+            <span class="card-pill card-pill--info" data-when="device-off">打印扫描离线 · 上传可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
           <i class="vx-sheen" aria-hidden="true"></i>
@@ -498,11 +500,11 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
           <div class="vrow"><span class="k">A4 纸张</span><span class="v" data-when="default first ai-down">78%</span><span class="v" data-when="device-off">—</span></div>
           <div class="vbar" data-when="default first ai-down"><i style="width:78%"></i></div>
           <div class="vrow"><span class="k">碳粉</span><span class="v" data-when="default first ai-down">62%</span><span class="v" data-when="device-off">—</span></div>
-          <div class="vrow"><span class="k">扫描仪</span><span class="v">就绪</span></div>
+          <div class="vrow"><span class="k">扫描仪</span><span class="v" data-when="default first ai-down">就绪</span><span class="v" data-when="device-off" style="color:var(--coral-400)">离线</span></div>
           <div class="vcalib">
             <span class="s"><i style="background:#1c1c1c"></i><i style="background:#00a0c6"></i><i style="background:#d6338c"></i><i style="background:#f2c200"></i></span>
             <span class="t" data-when="default first ai-down">黑白 / 彩色均可 · 费用以现场公示价为准</span>
-            <span class="t" data-when="device-off">打印能力暂不可用 · 扫描与转存正常</span>
+            <span class="t" data-when="device-off">打印与扫描暂不可用 · 上传与转存正常</span>
           </div>
         </div>
 
