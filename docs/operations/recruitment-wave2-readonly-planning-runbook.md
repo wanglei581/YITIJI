@@ -150,6 +150,6 @@ node -r @swc-node/register scripts/recruitment-wave2-proposed-governance-dry-run
 
 ## 6. 后续批次
 
-当前生产完整盘点为 `exit 2`：可以按受限内部 ID 整理 Organization/JobSource/域策略/拟议决定、无源 Job、JobFair、legacy 机构/岗位和负向审计候选的治理证据包，但它不是现有 `agencies[]/jobs[]` planner manifest。零写入 proposed-governance 校验器已形成代码候选；它只验证 draft evidence pack 与恢复基线的一致性。在恢复库依赖事实仍为空时，现有 dry-run 应继续 `exit 2`，模拟 `exit 0` 也只允许形成后续独立批准记录，不能解释为治理事实已存在。
+当前生产完整盘点为 `exit 2`：可以按受限内部 ID 整理 Organization/JobSource/域策略/拟议决定、无源 Job、JobFair、legacy 机构/岗位和负向审计候选的治理证据包，但它不是现有 `agencies[]/jobs[]` planner manifest。零写入 proposed-governance 校验器已通过 [PR #590](https://github.com/wanglei581/YITIJI/pull/590) 合入 `main`；同一 HEAD 的 GitHub Actions run [31405483030](https://github.com/wanglei581/YITIJI/actions/runs/31405483030) 已完成 Node 22、PostgreSQL 与浏览器三项验证，三组专家终审均 **APPROVE**。它仍只验证 draft evidence pack 与恢复基线的一致性；尚未填写或执行生产 evidence pack。在恢复库依赖事实仍为空时，现有 dry-run 应继续 `exit 2`，模拟 `exit 0` 也只允许形成后续独立批准记录，不能解释为治理事实已存在，更不授权 writer、生产写入、reader 切换、发布或部署。
 
 只有冻结方案第 6 节完整 production inventory 与公开 API ID 差集通过、恢复库 dry-run 全绿、人工映射清单获批后，才可另开独立 PR 设计真正的 shadow backfill writer：每条 Job、legacy 映射、migration checksum 和追加写 AuditLog 同事务/CAS，失败不删 legacy，所有新 Job 仍不可见。任何生产执行还必须再次取得具名写授权；重复组归零后，`(sourceId, externalId)` unique 仍须作为 SQLite/PostgreSQL 独立 additive migration 验证，不能夹带在 writer 或 dual-write 中。
