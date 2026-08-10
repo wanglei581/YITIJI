@@ -600,7 +600,7 @@ jobs:
             for SOURCE_FILE in "${SOURCE_FILES[@]}"; do
               mkdir -p "$SRC_ROOT/$(dirname "$SOURCE_FILE")"
               curl --proto '=https' --tlsv1.2 -fsSL --max-redirs 0 \
-                --connect-timeout 10 --max-time 60 \
+                --connect-timeout 10 --max-time 45 --retry 2 --retry-all-errors --retry-delay 1 \
                 "https://raw.githubusercontent.com/wanglei581/YITIJI/${SOURCE_COMMIT}/${SOURCE_FILE}" \
                 -o "$SRC_ROOT/$SOURCE_FILE"
             done
