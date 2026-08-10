@@ -1,0 +1,190 @@
+name: Deploy BOS candidate to isolated preprod
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact 40-character commit SHA to deploy
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful CI run ID whose head SHA equals target_sha
+        required: true
+        type: string
+      confirmation:
+        description: Type DEPLOY PREPROD BOS
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-bos-preprod
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Bind authorization to an exact successful CI run
+    runs-on: ubuntu-latest
+    outputs:
+      target_sha: ${{ steps.guard.outputs.target_sha }}
+      ci_run_id: ${{ steps.guard.outputs.ci_run_id }}
+    steps:
+      - name: Validate explicit preprod authorization and CI identity
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TARGET_SHA: ${{ inputs.target_sha }}
+          INPUT_CI_RUN_ID: ${{ inputs.ci_run_id }}
+          INPUT_CONFIRMATION: ${{ inputs.confirmation }}
+          PREPROD_DEPLOY_ENABLED: ${{ vars.PREPROD_DEPLOY_ENABLED }}
+        run: |
+          set -euo pipefail
+          if [ "$PREPROD_DEPLOY_ENABLED" != "true" ]; then
+            echo "::error::PREPROD_DEPLOY_ENABLED must be explicitly true"
+            exit 1
+          fi
+          if [ "$INPUT_CONFIRMATION" != "DEPLOY PREPROD BOS" ]; then
+            echo "::error::confirmation text does not match"
+            exit 1
+          fi
+          if ! [[ "$INPUT_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::target_sha must be a lowercase 40-character commit SHA"
+            exit 1
+          fi
+          if ! [[ "$INPUT_CI_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::ci_run_id must be numeric"
+            exit 1
+          fi
+
+          RUN_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${INPUT_CI_RUN_ID}")"
+          test "$(jq -r '.name' <<<"$RUN_JSON")" = "CI"
+          test "$(jq -r '.status' <<<"$RUN_JSON")" = "completed"
+          test "$(jq -r '.conclusion' <<<"$RUN_JSON")" = "success"
+          test "$(jq -r '.head_sha' <<<"$RUN_JSON")" = "$INPUT_TARGET_SHA"
+
+          echo "target_sha=$INPUT_TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "ci_run_id=$INPUT_CI_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "PASS: exact SHA is bound to a successful CI run"
+
+  deploy:
+    name: Deploy API and web assets to isolated preprod
+    needs: authorize
+    runs-on: ubuntu-latest
+    environment: preprod
+    steps:
+      - name: Deploy through preprod-only SSH boundary
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PREPROD_DEPLOY_HOST }}
+          username: ${{ secrets.PREPROD_DEPLOY_USER }}
+          key: ${{ secrets.PREPROD_DEPLOY_KEY }}
+          port: 22
+          command_timeout: 35m
+          envs: TARGET_SHA,CI_RUN,PREPROD_DEPLOY_ENABLED,PREPROD_DEPLOY_PATH,PREPROD_DEPLOY_API_DIR,PREPROD_DEPLOY_BACKUP_ROOT,PREPROD_DEPLOY_PM2_NAME,PREPROD_DEPLOY_HEALTH_URL,PREPROD_KIOSK_WEB_ROOT,PREPROD_ADMIN_WEB_ROOT,PREPROD_PARTNER_WEB_ROOT,PREPROD_PUBLIC_ORIGIN,PREPROD_KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN,BAIDU_BOS_ACCESS_KEY_ID,BAIDU_BOS_SECRET_ACCESS_KEY,BAIDU_BOS_BUCKET,BAIDU_BOS_REGION,BAIDU_BOS_ENDPOINT
+          script: |
+            set -euo pipefail
+
+            if [ "$PREPROD_DEPLOY_ENABLED" != "true" ]; then
+              echo "::error::preprod deploy authorization was revoked" >&2
+              exit 1
+            fi
+            if [ "$PRINT_REQUIRE_PII_SCAN" != "true" ]; then
+              echo "::error::PREPROD_PRINT_REQUIRE_PII_SCAN must be explicitly true" >&2
+              exit 1
+            fi
+            for name in PREPROD_DEPLOY_PATH PREPROD_DEPLOY_API_DIR PREPROD_DEPLOY_BACKUP_ROOT PREPROD_DEPLOY_PM2_NAME PREPROD_DEPLOY_HEALTH_URL PREPROD_KIOSK_WEB_ROOT PREPROD_ADMIN_WEB_ROOT PREPROD_PARTNER_WEB_ROOT PREPROD_PUBLIC_ORIGIN PREPROD_KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN BAIDU_BOS_ACCESS_KEY_ID BAIDU_BOS_SECRET_ACCESS_KEY BAIDU_BOS_BUCKET BAIDU_BOS_REGION BAIDU_BOS_ENDPOINT; do
+              if [ -z "${!name:-}" ]; then
+                echo "::error::missing required preprod setting: $name" >&2
+                exit 1
+              fi
+            done
+            for root in "$PREPROD_DEPLOY_PATH" "$PREPROD_DEPLOY_API_DIR" "$PREPROD_DEPLOY_BACKUP_ROOT" "$PREPROD_KIOSK_WEB_ROOT" "$PREPROD_ADMIN_WEB_ROOT" "$PREPROD_PARTNER_WEB_ROOT"; do
+              case "$root" in
+                /*preprod*) ;;
+                *) echo "::error::every preprod path must be absolute and contain preprod" >&2; exit 1 ;;
+              esac
+            done
+            if [ "$PREPROD_DEPLOY_PATH" = "$PREPROD_DEPLOY_API_DIR" ] || [ "$PREPROD_DEPLOY_API_DIR" = "$PREPROD_DEPLOY_BACKUP_ROOT" ]; then
+              echo "::error::checkout, runtime and backup roots must be distinct" >&2
+              exit 1
+            fi
+            if [ "$PREPROD_KIOSK_WEB_ROOT" = "$PREPROD_ADMIN_WEB_ROOT" ] || [ "$PREPROD_KIOSK_WEB_ROOT" = "$PREPROD_PARTNER_WEB_ROOT" ] || [ "$PREPROD_ADMIN_WEB_ROOT" = "$PREPROD_PARTNER_WEB_ROOT" ]; then
+              echo "::error::Kiosk, Admin and Partner web roots must be distinct" >&2
+              exit 1
+            fi
+
+            cd "$PREPROD_DEPLOY_PATH"
+            FETCH_OK=0
+            for ATTEMPT in 1 2 3 4; do
+              if timeout --foreground --kill-after=10s 180s git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$TARGET_SHA"; then
+                FETCH_OK=1
+                break
+              fi
+              sleep "$((ATTEMPT * 5))"
+            done
+            test "$FETCH_OK" = "1"
+            git cat-file -e "$TARGET_SHA^{commit}"
+            git checkout --detach "$TARGET_SHA"
+            test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+            pnpm install --frozen-lockfile
+            VITE_API_MODE=http \
+            VITE_API_BASE_URL=/api/v1 \
+            VITE_USE_TRTC_CALL=true \
+            VITE_ENABLE_CONTRACT_REVIEW=false \
+            VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT=false \
+            VITE_TERMINAL_AGENT_BRIDGE_TOKEN="$PREPROD_KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN" \
+            pnpm build:kiosk:production
+            VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build
+            VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/partner build
+
+            DEPLOY_TARGET_ENV=preprod \
+            DEPLOY_API_DIR="$PREPROD_DEPLOY_API_DIR" \
+            DEPLOY_PM2_NAME="$PREPROD_DEPLOY_PM2_NAME" \
+            DEPLOY_HEALTH_URL="$PREPROD_DEPLOY_HEALTH_URL" \
+            PREPROD_PUBLIC_ORIGIN="$PREPROD_PUBLIC_ORIGIN" \
+            bash .github/scripts/configure-preprod-bos-env.sh check
+
+            BOS_LIVE_VERIFY_ENABLED=true \
+            BOS_LIVE_VERIFY_TARGET=preprod \
+            pnpm --filter @ai-job-print/api verify:bos:live
+
+            DEPLOY_TARGET_ENV=preprod \
+            DEPLOY_SOURCE_LABEL=preprod-candidate \
+            DEPLOY_PATH="$PREPROD_DEPLOY_PATH" \
+            DEPLOY_API_DIR="$PREPROD_DEPLOY_API_DIR" \
+            DEPLOY_BACKUP_ROOT="$PREPROD_DEPLOY_BACKUP_ROOT" \
+            DEPLOY_PM2_NAME="$PREPROD_DEPLOY_PM2_NAME" \
+            DEPLOY_HEALTH_URL="$PREPROD_DEPLOY_HEALTH_URL" \
+            PREPROD_PUBLIC_ORIGIN="$PREPROD_PUBLIC_ORIGIN" \
+            API_RELEASE_ENABLED=true \
+            bash .github/scripts/deploy-api-release.sh
+
+            rsync -a --delete apps/kiosk/dist/ "$PREPROD_KIOSK_WEB_ROOT"/
+            rsync -a --delete apps/admin/dist/ "$PREPROD_ADMIN_WEB_ROOT"/
+            rsync -a --delete apps/partner/dist/ "$PREPROD_PARTNER_WEB_ROOT"/
+            nginx -s reload || systemctl reload nginx
+            echo "PASS: isolated preprod deployment completed"
+        env:
+          TARGET_SHA: ${{ needs.authorize.outputs.target_sha }}
+          CI_RUN: ${{ needs.authorize.outputs.ci_run_id }}
+          PREPROD_DEPLOY_ENABLED: ${{ vars.PREPROD_DEPLOY_ENABLED }}
+          PREPROD_DEPLOY_PATH: ${{ secrets.PREPROD_DEPLOY_PATH }}
+          PREPROD_DEPLOY_API_DIR: ${{ secrets.PREPROD_DEPLOY_API_DIR }}
+          PREPROD_DEPLOY_BACKUP_ROOT: ${{ secrets.PREPROD_DEPLOY_BACKUP_ROOT }}
+          PREPROD_DEPLOY_PM2_NAME: ${{ secrets.PREPROD_DEPLOY_PM2_NAME }}
+          PREPROD_DEPLOY_HEALTH_URL: ${{ secrets.PREPROD_DEPLOY_HEALTH_URL }}
+          PREPROD_KIOSK_WEB_ROOT: ${{ secrets.PREPROD_KIOSK_WEB_ROOT }}
+          PREPROD_ADMIN_WEB_ROOT: ${{ secrets.PREPROD_ADMIN_WEB_ROOT }}
+          PREPROD_PARTNER_WEB_ROOT: ${{ secrets.PREPROD_PARTNER_WEB_ROOT }}
+          PREPROD_PUBLIC_ORIGIN: ${{ vars.PREPROD_PUBLIC_ORIGIN }}
+          PREPROD_KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN: ${{ secrets.PREPROD_KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN }}
+          PRINT_REQUIRE_PII_SCAN: ${{ vars.PREPROD_PRINT_REQUIRE_PII_SCAN }}
+          BAIDU_BOS_ACCESS_KEY_ID: ${{ secrets.PREPROD_BAIDU_BOS_ACCESS_KEY_ID }}
+          BAIDU_BOS_SECRET_ACCESS_KEY: ${{ secrets.PREPROD_BAIDU_BOS_SECRET_ACCESS_KEY }}
+          BAIDU_BOS_BUCKET: ${{ vars.PREPROD_BAIDU_BOS_BUCKET }}
+          BAIDU_BOS_REGION: ${{ vars.PREPROD_BAIDU_BOS_REGION }}
+          BAIDU_BOS_ENDPOINT: ${{ vars.PREPROD_BAIDU_BOS_ENDPOINT }}

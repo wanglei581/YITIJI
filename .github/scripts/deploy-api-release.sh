@@ -155,6 +155,14 @@ chown --reference="$ENV_FILE" "$ENV_TMP" 2>/dev/null || true
 mv -f -- "$ENV_TMP" "$ENV_FILE"
 trap - EXIT
 
+if [ "${DEPLOY_TARGET_ENV:-production}" = "preprod" ]; then
+  echo "=== 3c. 应用已隔离校验的预生产 BOS 配置（不打印 .env）==="
+  bash "$DEPLOY_PATH/.github/scripts/configure-preprod-bos-env.sh" apply
+elif [ "${DEPLOY_TARGET_ENV:-production}" != "production" ]; then
+  echo "::error::DEPLOY_TARGET_ENV must be production or preprod" >&2
+  exit 1
+fi
+
 echo "=== 4. 在目标提交内构建 API ==="
 cd "$DEPLOY_PATH"
 pnpm --filter @ai-job-print/api db:pg:generate
@@ -189,7 +197,7 @@ pnpm db:pg:deploy
 
 echo "=== 7. 写 DEPLOY_SOURCE（不含秘密）==="
 cat > "$RUNTIME_ROOT/DEPLOY_SOURCE.txt" <<EOF
-source=origin/main@$TARGET_SHA
+source=${DEPLOY_SOURCE_LABEL:-origin/main}@$TARGET_SHA
 deployed_at=$(date -Is)
 ci_run=$CI_RUN
 backup=$BACKUP_PREFIX.dump

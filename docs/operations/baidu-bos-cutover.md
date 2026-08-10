@@ -43,6 +43,19 @@ TENCENT_COS_REGION=<historical-region>
 
 不要把真实值写进仓库、命令输出、截图或验收文档。
 
+### 3.1 隔离预生产发布入口
+
+仓库中的 `.github/workflows/deploy-preprod-bos.yml` 是唯一的 BOS 预生产发布入口；它不会由 `push`、PR 或生产 CI 自动触发。执行前必须同时满足：
+
+1. 手动输入精确 40 位候选 SHA、该 SHA 对应的成功 `CI` run ID，以及确认词 `DEPLOY PREPROD BOS`；工作流会从 GitHub Actions API 复核 run 名称、状态、结论和 `head_sha`。
+2. 仓库变量 `PREPROD_DEPLOY_ENABLED=true`，GitHub Environment `preprod` 已配置审批保护；执行结束后恢复为 `false`。
+3. 只配置 `PREPROD_DEPLOY_*`、`PREPROD_KIOSK_*` 和 `PREPROD_BAIDU_BOS_*` Secrets/Variables，禁止把生产 `DEPLOY_*` 凭据复用到本工作流。
+4. 服务器已预置彼此独立且路径名包含 `preprod` 的 checkout、runtime、backup、Kiosk/Admin/Partner web root；PM2 名称包含 `preprod`，health 使用非生产回环端口。
+5. 预生产 API `.env` 权限不宽于 `0600`，包含 `DEPLOYMENT_ENV=preprod`、独立 PostgreSQL URL（数据库名含 `preprod` 或 `staging`）及完整历史腾讯 COS 配置。BOS 凭据由工作流在运行目录备份之后原子写入，不进入仓库。
+6. `PREPROD_PRINT_REQUIRE_PII_SCAN=true`；Kiosk 构建固定 `VITE_ENABLE_CONTRACT_REVIEW=false`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT=false`，API 固定 `CONTRACT_REVIEW_REPORT_PRINT_ENABLED=false`。BOS 验收不授权顺带开放合同审查。
+
+首次执行前建议先保持 `PREPROD_DEPLOY_ENABLED=false`，补齐上述服务器和 GitHub Environment 配置后做只读核对。工作流会在迁移前完成 BOS live 临时对象创建/删除验证；任一隔离项不成立都会在备份、迁移或 web root 覆盖前失败。
+
 ## 四、切换门禁
 
 按顺序执行：
