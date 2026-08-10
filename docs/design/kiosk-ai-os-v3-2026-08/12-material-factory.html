@@ -89,6 +89,11 @@
   .tplgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); overflow-y: auto; }
   .speak > .locked { flex: 1 1 auto; }
   .paper-stage .paper-empty { flex: 1 1 auto; }
+  /* 2026-08-11 卡内空洞复核（t1）：纸台高 1154，纸只有 973（A4 按 688px 栏宽算死的高度），
+     纸原来贴着纸台上沿，下面 165px 露的是纸台底色 —— 那是版面没接住纸。
+     与 20 / 22 同一处置：单张纸在纸台里居中，上下各 82px 对称。
+     ai-down / first 两态换成 .paper-empty（flex:1 1 auto 自己撑满），这条规则不起作用。 */
+  [data-at="t1"] .paper-stage { justify-content: center; }
   /* 2026-08-11 卡内空洞整改（口径与 08 的 t3 证件照同一套）：
      上一版把 .locked 撑满 .speak 就算完了 —— 主栏尾部读数确实归零，但空洞只是从
      栏背景搬进了卡里：实测 t2 的 .locked 高 1256px，里面只有 220px（first）/
@@ -135,6 +140,27 @@
     position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 0; text-align: center;
     font-size: 11px; color: var(--paper-fog); background: rgba(255,255,255,.9);
   }
+  /* ── 2026-08-11 卡内空洞整改 · t4 六张模板缩略图 ────────────────────────
+     回归台报这六张各空 378–400px（卡高 498，正文只画到 60–100px）。判为 B：
+     **模板缩略图的全部内容就是「整页版面长什么样」**，只画顶上四五根条，
+     六张看起来几乎一模一样，「单栏 / 带侧栏 / 时间线 / 一页版」根本分不出来 ——
+     这不是留白，是预览没画完。
+     处置：沿用 .tpl i 自己那套记号（同色 --paper-200、4px 行高），把版面画到页脚，
+     并让六张按各自名字呈现真实结构差异。.fill 是**正文其余部分**的整块记号，
+     一个元素代替堆几十根空条；不含任何文字，也不代表任何人的简历内容。
+     .tpl 的 padding-bottom 由 16 抬到 26，让正文停在底部说明条之上。 */
+  .tpl { padding-bottom: 26px; }
+  .tpl .fill {
+    flex: 1 1 auto; min-height: 0; height: auto; border-radius: 0;
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 12px);
+  }
+  .tpl .fill--tight { background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 9px); }
+  .tpl .fill--loose { background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 17px); }
+  .tpl .cols { display: flex; gap: 9px; flex: 1 1 auto; min-height: 0; }
+  .tpl .cols > .side { width: 34%; flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .cols > .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .tlrail { position: relative; padding-left: 14px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .tlrail::before { content: ""; position: absolute; left: 4px; top: 3px; bottom: 3px; width: 1.5px; background: var(--paper-200); }
   /* 本次要用的那一版：场合一改，两张稿子的主次跟着换 */
   .speak-card[aria-current="true"] { border-color: var(--jade-a32); box-shadow: 0 0 0 1px var(--jade-a20) inset; }
   .speak-now { font-size: var(--fz-1); color: var(--jade-600); background: var(--jade-a12);
@@ -264,7 +290,18 @@
           </span>
         </div>
         <div class="paper-stage">
-          <div class="sheet-a4" data-when="default device-off">
+          <!-- data-void-ok（2026-08-11 卡内空洞复核）：回归台报这张纸底部空 500px。判 A。
+               ① 内容确实写完了：这是一封完整的求职信 —— 称呼 → 开头（写明岗位来源）→
+                  正文 → 结语 → 落款「王 ×」+ 联系电话 + 日期，页脚就是落款，不是断在半截。
+                  长度由用户在右栏「篇幅」自己选，纸面跟着实时重排（实测同一张纸：
+                  200 字档 → 空 547px、300 字档 → 空 500px、500 字档 → 空 350px），
+                  不是写死的短样张。一封 300 字的中文求职信在 A4 上本来就占大半页不到，
+                  往下面补字等于替用户多写他没让本机写的话。
+               ② 纸在栏里的位置对：纸宽 688px 铺满 720px 主栏（左右各 16px 纸台内边距），
+                  纸台已按上面那条 CSS 居中，上下各 82px 对称，不是纸贴上沿、下面露底色。
+               另：纸下方紧接着「三处要你自己核」槽位条，它属于这份产出物本身，不是旁注。 -->
+          <div class="sheet-a4" data-when="default device-off"
+               data-void-ok="A4 纸样：一封完整的求职信（称呼→开头→正文→结语→落款与日期），篇幅由用户在右栏自选并实时重排（实测 200/300/500 字档纸面依次变长）；300 字的中文求职信在 A4 上本来就占不满一页，补字等于替用户多写他没让本机写的话">
             <h4 style="font-size:19px">求职信</h4>
             <div class="meta" data-out="lmeta">应聘岗位：用户运营专员 · <span class="slot-mark">某科技有限公司</span></div>
             <div class="hr"></div>
@@ -469,12 +506,20 @@
 
       <!-- T4 简历模板 -->
       <div class="tplgrid" data-at="t4">
-        <div class="tpl" aria-current="true" data-tpl="0"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i></i><i></i><i class="s"></i><span>单栏 · 稳妥</span></div>
-        <div class="tpl" data-tpl="1"><i class="t"></i><i class="bar"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>单栏 · 紧凑</span></div>
-        <div class="tpl" data-tpl="2"><i class="t"></i><i></i><i class="bar"></i><i class="s"></i><i></i><span>带侧栏 · 技能突出</span></div>
-        <div class="tpl" data-tpl="3"><i class="t"></i><i class="s"></i><i></i><i class="bar"></i><i></i><i></i><span>时间线式</span></div>
-        <div class="tpl" data-tpl="4"><i class="t"></i><i></i><i></i><i class="s"></i><i class="bar"></i><span>校招 · 一页版</span></div>
-        <div class="tpl" data-tpl="5"><i class="t"></i><i class="bar"></i><i class="s"></i><i></i><i></i><i class="s"></i><span>项目优先</span></div>
+        <!-- 六张缩略图画的是**版面**，不是内容：条纹只表示「这里有一行字」，
+             不承载任何文字，也不代表任何人的简历。差别按各自名字来：
+             单栏行距宽 / 单栏行距紧 / 左侧栏 / 左时间轴 / 一页两大块 / 项目块提到最前。 -->
+        <div class="tpl" aria-current="true" data-tpl="0"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i class="fill fill--loose"></i><span>单栏 · 稳妥</span></div>
+        <div class="tpl" data-tpl="1"><i class="t"></i><i class="s"></i><i class="bar"></i><i class="fill fill--tight"></i><i class="bar"></i><i class="fill fill--tight"></i><span>单栏 · 紧凑</span></div>
+        <div class="tpl" data-tpl="2"><i class="t"></i><i class="s"></i>
+          <div class="cols">
+            <div class="side"><i class="bar"></i><i></i><i class="s"></i><i class="bar"></i><i class="fill"></i></div>
+            <div class="main"><i class="bar"></i><i class="fill"></i></div>
+          </div><span>带侧栏 · 技能突出</span></div>
+        <div class="tpl" data-tpl="3"><i class="t"></i><i class="s"></i>
+          <div class="tlrail"><i class="bar"></i><i class="fill"></i><i class="bar"></i><i class="fill"></i></div><span>时间线式</span></div>
+        <div class="tpl" data-tpl="4"><i class="bar"></i><i class="t"></i><i class="s"></i><i class="fill fill--loose"></i><i class="bar"></i><i class="fill fill--loose"></i><span>校招 · 一页版</span></div>
+        <div class="tpl" data-tpl="5"><i class="t"></i><i class="bar"></i><i class="fill"></i><i class="s"></i><i class="bar"></i><i class="fill fill--tight"></i><span>项目优先</span></div>
       </div>
     </div>
 

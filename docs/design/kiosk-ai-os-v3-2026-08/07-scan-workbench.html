@@ -86,6 +86,36 @@
     font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
   }
   .actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
+
+  /* ── 2026-08-11 卡内空洞整改 · 扫描件预览（s3 缩略页 / s4 结果页）────────────
+     回归台报 s4 六张 .sheet-a4 各空 442–657px、s3 三张 .scanpage 各空 298–320px。判 B。
+     判据：这几张不是「本机生成的一页短文档」（那种见 17 / 18 / 21 的纸样豁免），
+     而是**用户刚扫进去的那份文件的页面预览**，而本页自己已经把这份文件断言清楚了 ——
+     顶上写着「扫描_20260808_0947.pdf · A4 · 6 页 · 灰度 300dpi · 4.8 MB」。
+     一份 6 页 300dpi 的扫描件，每页却只画三五根字条、下面四分之三是白的，
+     那不是「原件短」，是**预览没画完**；真机上用户看到这个只会以为自己的内容没扫上。
+     处置：沿用本设计稿 .ln 自己那套记号（同色 --paper-200、7px 字条、12px 行距），
+     用一个 .lnrest 把正文画到页脚上边距，替代堆几十根空 div。
+     .lnrest **不含任何文字**，它只表示「这里有正文」—— 与 .ln 一模一样的语义，
+     不新增任何可读内容，也不替用户往他的扫描件里加东西。
+     第 3 页（预检偏低那张）按本页已经写明的成因画：「原件折痕导致断行」，
+     所以那一页的字条是断开的、参差的，不是整齐一片。 */
+  .sheet-a4 .lnrest, .scanpage .lnrest {
+    flex: 1 1 auto; min-height: 0; align-self: stretch; border-radius: 0;
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 7px, transparent 7px 19px);
+  }
+  /* 末页不排满：一份文件的最后一页本来就会提前结束。停在离页脚 130px 处 ——
+     这是「末页收尾」的真实样子，不是为了压读数（130px 在屏幕上是看得见的一段留白）。 */
+  .sheet-a4 .lnrest--last { margin-bottom: 130px; }
+  /* 缩略页比例更小：字条 6px / 行距 11px，与 .scanpage i 同一档 */
+  .scanpage .lnrest { background: repeating-linear-gradient(to bottom, var(--paper-200) 0 6px, transparent 6px 11px); }
+  /* 折痕断行：字条短一截、中间空一条带 —— 本页自己写着「原件折痕导致断行」 */
+  .scanpage--low .lnrest {
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 6px, transparent 6px 11px);
+    background-size: 76% 100%; background-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0 44%, transparent 44% 53%, #000 53% 100%);
+    mask-image: linear-gradient(to bottom, #000 0 44%, transparent 44% 53%, #000 53% 100%);
+  }
 </style>
 </head>
 <body>
@@ -267,10 +297,12 @@
            已扫的 3 页在中断后依然真实存在（locked 文案自己说"不会丢"），
            所以四态都展示页面网格；只有「可继续加页」占位随离线换成「已中断」。 -->
       <div class="scanpages" data-at="s3">
+        <!-- 缩略页画的是**这一页扫进来长什么样**：.lnrest 与 .ln / .scanpage i 同一套记号，
+             只表示「这里有正文」，不含任何文字。第 3 页按本页写明的成因画成断行。 -->
         <div class="scangrid">
-          <div class="scanpage"><i class="t"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>1</span></div>
-          <div class="scanpage"><i class="t"></i><i></i><i></i><i class="s"></i><span>2</span></div>
-          <div class="scanpage scanpage--low"><i class="t"></i><i class="s"></i><i></i><span>3</span></div>
+          <div class="scanpage"><i class="t"></i><i></i><i class="s"></i><i></i><i class="s"></i><i class="lnrest"></i><span>1</span></div>
+          <div class="scanpage"><i class="t"></i><i></i><i></i><i class="s"></i><i class="lnrest"></i><span>2</span></div>
+          <div class="scanpage scanpage--low"><i class="t"></i><i class="s"></i><i></i><i class="lnrest"></i><span>3</span></div>
           <div class="scanpage scanpage--pending" data-when="default first ai-down"><em>可继续加页<br><span style="font-size:var(--fz-1)">总页数由实际走纸决定</span></em></div>
           <div class="scanpage scanpage--pending" data-when="device-off"><em>扫描已中断<br><span style="font-size:var(--fz-1)">剩下的页还没有扫</span></em></div>
         </div>
@@ -325,6 +357,8 @@
             <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
           </span>
         </div>
+        <!-- 六张预览页 = 顶上 paper-bar 声明的那份「A4 · 6 页 · 灰度 300dpi · 4.8 MB」
+             扫描件的每一页。.lnrest 把每页正文画到页脚上边距（见页内 CSS 的整改说明）。 -->
         <div class="paper-stage">
           <div class="sheet-a4">
             <h4>王 · 个人简历</h4>
@@ -335,32 +369,39 @@
             <div class="sec">工作经历</div>
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
             <div class="ln"></div><div class="ln ln--m"></div>
+            <div class="lnrest"></div>
             <span class="pgno" data-pg="1">1 / 6</span>
           </div>
           <div class="sheet-a4">
             <div class="sec">项目经历</div>
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
             <div class="ln"></div><div class="ln ln--m"></div>
+            <div class="lnrest"></div>
             <span class="pgno" data-pg="2">2 / 6</span>
           </div>
           <div class="sheet-a4 pv--x" data-when="default first ai-down">
             <div class="sec">技能与证书</div>
             <div class="ln"></div><div class="ln ln--s"></div><div class="ln ln--m"></div>
+            <div class="lnrest"></div>
             <span class="pgno" data-pg="3">3 / 6</span>
           </div>
           <div class="sheet-a4 pv--x" data-when="default first ai-down">
             <div class="sec">自我评价</div>
             <div class="ln"></div><div class="ln ln--m"></div>
+            <div class="lnrest"></div>
             <span class="pgno" data-pg="4">4 / 6</span>
           </div>
           <div class="sheet-a4 pv--x" data-when="default first ai-down">
             <div class="sec">获奖与培训</div>
             <div class="ln ln--m"></div><div class="ln"></div><div class="ln ln--s"></div>
+            <div class="lnrest"></div>
             <span class="pgno" data-pg="5">5 / 6</span>
           </div>
           <div class="sheet-a4 pv--x" data-when="default first ai-down">
             <div class="sec">联系方式</div>
             <div class="ln ln--s"></div><div class="ln ln--m"></div>
+            <!-- 最后一页：正文停在离页脚 130px 的地方 —— 一份文件的末页本来就不会排满 -->
+            <div class="lnrest lnrest--last"></div>
             <span class="pgno" data-pg="6">6 / 6</span>
           </div>
         </div>

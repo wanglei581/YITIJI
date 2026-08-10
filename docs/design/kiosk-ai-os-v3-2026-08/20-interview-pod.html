@@ -1870,8 +1870,26 @@
       return
     }
 
+    /* data-void-ok（2026-08-11 卡内空洞复核）：回归台报这张纸底部空 609–614px（四态都报，
+       不只 ai-down）。判 A —— 纸样类豁免，理由必须挂在纸上，所以在这里设，
+       不是在 HTML 里（这些纸是分页器按真实作答量当场排出来的，HTML 里没有它们）。
+       ① 内容确实写完了：纸面 = RP.head（抬头 + 卷名 + 本人/示例/未答题数 + AIGC 标识）
+          → 逐题正文 → RP.foot 那两句免责收尾（「不代表用人单位判断，不预测录用结果，
+          仅供练习参考；内容离场即清」），是完整一份，不是断在半截。
+          正文由 buildPrint() 按**你真答了什么**当场生成，不是写死的短样张 ——
+          实测同一张纸：0 题作答 → 空 609px；答 3 题 → 空 375px；
+          答满 8 题且每题长文 → 分成 2 页，第 1 页只空 92px，纸台 scrollHeight 1971 / clientH 1300
+          （这时它确实是连续滚动阅读器且溢出）。
+          ai-down 更空是**故意的**：点评块（.rp-fix 与「说清楚了/有缺口」判语）挂 data-when
+          在这一态整体撤下，抬头改印「题目与答案单 · 本单不含点评：生成时 AI 不可用」，
+          答案原文照留。把它填满就等于在 AI 不可用时照样印出 AI 写的点评。
+       ② 纸在栏里的位置对：纸宽 688px 铺满 720px 主栏（左右各 16px 纸台内边距）；
+          只有一页时 .paper-stage 的 justify-content:center 让它居中，上下各 163px 对称，
+          不是纸贴上沿、下半截露纸台底色。 */
+    var VOID_OK = 'A4 纸样：面试复盘单是一份完整短文档（抬头→逐题正文→「不代表用人单位判断，不预测录用结果，仅供练习参考」免责收尾），正文由分页器按你真实作答量当场排（实测 0 题空 609px / 答 3 题空 375px / 答满 8 题长文分成 2 页且第 1 页只空 92px）；ai-down 版撤掉全部点评、改名「题目与答案单」，纸面更空是故意的'
     function newSheet () {
       var sh = document.createElement('div'); sh.className = 'sheet-a4'
+      sh.setAttribute('data-void-ok', VOID_OK)
       var el = document.createElement('div'); el.className = 'rp'
       sh.appendChild(el); host.appendChild(sh); return el
     }

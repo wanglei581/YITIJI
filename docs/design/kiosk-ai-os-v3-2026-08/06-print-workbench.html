@@ -364,6 +364,25 @@
     display: flex !important;
   }
 
+  /* ── 2026-08-11 卡内空洞整改 · 三页文件预览 ─────────────────────────────
+     回归台报 s3 的 .sheet-a4 空 363 / 527px、s2 遮盖层里那张空 543px。判 B。
+     判据：这几张不是「本机生成的一页短文档」（那种见 17 / 18 / 21 的纸样豁免），
+     而是**用户上传的那份文件的页面预览**，而 paper-bar 上自己写着
+     「个人简历.pdf · A4 · 3 页 · 1.2 MB · 上传 09:43」。
+     一份 3 页的简历，每页却只画七八根字条、下面三分之二是白的 ——
+     那不是「原件短」，是预览没画完；而这一步用户正要**照着预览核对再付钱**，
+     核对对象画成半空的纸，核不出任何东西。
+     处置：沿用本设计稿 .ln 自己那套记号（同色 --paper-200、7px 字条、12px 行距），
+     用一个 .lnrest 把正文画到页脚上边距。它**不含任何文字**，只表示「这里有正文」，
+     不新增任何可读内容，也不动纸上任何一处隐私标记的位置
+     （.redact / .candbox 是绝对定位，锚点是 top 像素值，不受流内容影响）。
+     第 3 页是末页，正文停在离页脚 130px 处 —— 末页本来就不会排满。 */
+  .sheet-a4 .lnrest {
+    flex: 1 1 auto; min-height: 0; align-self: stretch; border-radius: 0;
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 7px, transparent 7px 19px);
+  }
+  .sheet-a4 .lnrest--last { margin-bottom: 130px; }
+
   /* first 态的预览位：把「没有文件」做成居中的完整空态，而不是顶在框子上沿的一小坨。
      图标 46→104、标题 20→36、正文 15→18。剩下的空当由 data-void-ok 声明，理由写在 HTML 上。 */
   .paper-empty { flex: 1 1 auto; width: 100%; justify-content: center; gap: var(--s-6); }
@@ -878,6 +897,7 @@
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln"></div>
             <div class="sec">项目</div>
             <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <div class="lnrest"></div>
             <span class="pgno">1 / 3</span>
           </div>
           <div class="sheet-a4" id="pg2" data-when="default ai-down device-off" data-redact="none ask done skip">
@@ -889,6 +909,7 @@
             <div class="ln ln--s"></div>
             <div class="sec">在校证明</div>
             <div class="ln ln--m"></div><div class="ln"></div>
+            <div class="lnrest"></div>
             <span class="pgno">2 / 3</span>
             <!-- 三种处置结果落在同一位置：未处置=虚线框，已遮盖=实心黑条，保持原样=琥珀框。
                  top 由页尾脚本按用户选中的那一处改写，不写死。 -->
@@ -903,6 +924,7 @@
             <div class="ln"></div><div class="ln ln--s"></div>
             <div class="sec">自我评价</div>
             <div class="ln ln--m"></div><div class="ln"></div><div class="ln ln--s"></div>
+            <div class="lnrest lnrest--last"></div>
             <span class="pgno">3 / 3</span>
           </div>
           <!-- ═══ 遮盖层：原地展开在预览位（2026-08-10 补）═══════════════════
@@ -958,6 +980,9 @@
                 <div class="ln ln--s"></div>
                 <div class="sec">在校证明</div>
                 <div class="ln ln--m"></div><div class="ln"></div>
+                <!-- 与滚动区里的第 2 页同一张纸，正文也画到页脚 —— 遮盖是对着这一页做的判断，
+                     参照物半空就没法判断框圈的是不是那一处。 -->
+                <div class="lnrest"></div>
                 <span class="pgno">2 / 3</span>
 
                 <!-- 系统框出来的候选区。体检把第 ① 处算进了结论；
