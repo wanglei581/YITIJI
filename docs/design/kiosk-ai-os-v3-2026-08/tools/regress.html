@@ -421,11 +421,39 @@ function auditOcclusion (win) {
     var cx = Math.round(r.left + r.width / 2)
     var cy = Math.round(r.top + r.height / 2)
     if (cx < 0 || cy < 0 || cx >= win.innerWidth || cy >= win.innerHeight) continue
+
+    /* 第一版漏了这一步，于是报了一堆假的「被 .kw 压住」「被 .pane 压住」：
+       按钮在可滚动面板里被滚出可视区时，它的矩形仍在视口内，
+       中心点却落在别的内容上 —— 那不是遮挡，是「需要滚一下才看得到」。
+
+       但**不能一律跳过**。第二版我一律跳过，结果把首页那个真缺陷也放过了：
+       「查看招聘会」当初正是被 overflow:hidden 的祖先裁掉的。所以要分两种：
+         · 祖先是 auto / scroll  → 滚一下就能看到，不算缺陷（沿用 audit-plus 的既有口径）
+         · 祖先是 hidden / clip  → **永远看不到、永远按不着**，比被盖住更严重 */
+    var clippedBy = null, scrollable = false
+    for (var a = el.parentElement; a && a !== doc.body; a = a.parentElement) {
+      var as = win.getComputedStyle(a)
+      var ox = as.overflowX, oy = as.overflowY
+      if (ox === 'visible' && oy === 'visible') continue
+      var ar = a.getBoundingClientRect()
+      if (cx < ar.left || cx > ar.right || cy < ar.top || cy > ar.bottom) {
+        clippedBy = a
+        scrollable = (ox === 'auto' || ox === 'scroll' || oy === 'auto' || oy === 'scroll')
+        break
+      }
+    }
+    if (clippedBy) {
+      if (scrollable) continue                       // 滚得到，放过
+      out.push({ label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || el.className,
+                 blockedBy: (String(clippedBy.className).split(' ')[0] || clippedBy.tagName),
+                 kind: '被裁掉' })
+      continue
+    }
+
     var hit = doc.elementFromPoint(cx, cy)
     if (!hit) continue
     if (hit === el || el.contains(hit) || hit.contains(el)) continue
 
-    /* 命中的是别人 —— 再确认一下它确实压在上面，而不是我们自己算错了中心点 */
     var label = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24)
     var by = (hit.className && String(hit.className).split(' ')[0]) || hit.tagName
     out.push({ label: label || el.className, blockedBy: by })
@@ -442,10 +470,13 @@ function auditOcclusion (win) {
    这是今天第二次栽在同一件事上（上一次是 stage.js 的 audit() 忘了 return）：
    **检测器自己必须被检测。** 现在改成递归走完整棵树，
    数字 > 0、非空数组，一律算缺陷。 */
-function collectDefects (node, path, out, combo) {
+function collectDefects (node, path, out, combo, evidence) {
   if (node === null || node === undefined) return
   if (typeof node === 'number') {
-    if (node > 0) out.push({ combo: combo, check: path, value: node })
+    if (node > 0) out.push({ combo: combo, check: path, value: node,
+      /* 把同级的「明细」当证据带上 —— 只报「主栏留白过大 = 1」没法定位，
+         带上「右栏 底部空 676px」才知道去哪一栏看。 */
+      detail: evidence ? JSON.stringify(evidence).slice(0, 240) : undefined })
     return
   }
   if (Array.isArray(node)) {
@@ -458,10 +489,18 @@ function collectDefects (node, path, out, combo) {
       /* 「明细」是上面那个计数的证据，不重复计一次 */
       if (k === '明细') return
       if (k === 'screen') return
-      collectDefects(node[k], path ? path + '·' + k : k, out, combo)
+      /* 信息量，不是缺陷。递归收集第一版把它当缺陷报了 192 条 ——
+         「这一页声明了 N 条联动」是好事，报成缺陷就是喊狼来了。
+         检测器宁可漏一类，也不能把正常值染成红的：一旦人开始怀疑报告，
+         真缺陷也会被一起忽略。 */
+      if (INFO_KEYS.indexOf(k) > -1) return
+      collectDefects(node[k], path ? path + '·' + k : k, out, combo, node['明细'])
     })
   }
 }
+
+/* v3AuditPlus() 返回里属于「统计」而非「缺陷」的键 */
+var INFO_KEYS = ['声明条数']
 
 function comboLabel (c) {
   var s = c.state + (c.stage ? '/' + c.stage : '')
@@ -587,9 +626,11 @@ async function runAll (only) {
         }
         var occ = auditOcclusion(win)
         for (var oi = 0; oi < occ.length; oi++) {
+          var cut = occ[oi].kind === '被裁掉'
           rec.defects.push({ combo: comboLabel(cb.list[j]),
-            check: '按钮被遮挡按不动', value: 1,
-            detail: '「' + occ[oi].label + '」被 .' + occ[oi].blockedBy + ' 压住' })
+            check: cut ? '按钮被裁掉看不见' : '按钮被遮挡按不动', value: 1,
+            detail: '「' + occ[oi].label + '」' + (cut ? '被 .' + occ[oi].blockedBy + ' 裁掉（overflow:hidden，滚也看不到）'
+                                                      : '被 .' + occ[oi].blockedBy + ' 压住') })
         }
       }
       rec.consoleErrors = errs.slice(0, 20)
