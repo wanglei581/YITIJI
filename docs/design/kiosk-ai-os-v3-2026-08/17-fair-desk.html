@@ -290,7 +290,8 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">哪一场</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">去哪几家</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">怎么走</span></button>
-      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走作战单</span></button>
+      <!-- 步骤名也随态变：ai-down 那一步交付的不是作战单 -->
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name" data-when="default first device-off">带走作战单</span><span class="rstep-name" data-when="ai-down">带走展位单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
   </div>
@@ -1010,7 +1011,9 @@
           <div class="kv">
             <div class="kv-row"><span class="k">已选</span><span class="v"><b data-f="n-firm">3</b> 家</span></div>
             <div class="kv-row"><span class="k">建议带简历</span><span class="v"><b data-f="n-cv">6</b> 份（每家 2 份）</span></div>
-            <div class="kv-row"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
+            <!-- ai-down 那张单里没有「要问的话」，这里不能照写 -->
+            <div class="kv-row" data-when="default first device-off"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
+            <div class="kv-row" data-when="ai-down"><span class="k">场次与展位单</span><span class="v">1 页 · 含展位号与岗位名</span></div>
             <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 页 · <b data-f="fee">2.60</b> 元（预估）</span></div>
           </div>
 
@@ -1261,7 +1264,8 @@
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">去挑企业：<span data-sess-nm>制造业专场</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3">排今天的路线<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-go="s4">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first device-off">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="ai-down">生成场次与展位单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" data-f="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=fair-plan&amp;title=作战单%201%20份%20%2B%20简历%206%20份&amp;pages=13&amp;copies=1&amp;back=s4"><span data-f="gobtn-t">带去：作战单 1 份 + 简历 6 份&nbsp;· 共 13 页</span><svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
   </div>

@@ -161,7 +161,8 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">现在该做什么</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">这两周的活动</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走计划表</span></button>
+      <!-- 步骤名随态变：ai-down 那一步交付的是活动清单，不是结合简历的计划表 -->
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name" data-when="default first device-off">带走计划表</span><span class="rstep-name" data-when="ai-down">带走活动清单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
   </div>
@@ -788,7 +789,8 @@
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成活动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" data-f="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P18&amp;kind=fair-plan&amp;title=校园招聘计划表&amp;pages=7&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
@@ -921,7 +923,8 @@
 
     rows.forEach(function (r) {
       var t = r.querySelector('.jobrow-pick')
-      if (t) t.textContent = on(r) ? '已加进计划表' : '选这场'
+      // 名字随态：ai-down 加进去的是活动清单，不是结合简历的计划表
+      if (t) t.textContent = on(r) ? ('已加进' + (isAiDown() ? '活动清单' : '计划表')) : '选这场'
     })
 
     // 最近的那一场：取选中项里的第一条日期，没有就不编

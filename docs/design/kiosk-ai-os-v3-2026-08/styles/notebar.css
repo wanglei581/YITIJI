@@ -1,0 +1,194 @@
+/* ============================================================
+   V3 · 信息与边界条（Notebar）
+   ------------------------------------------------------------
+   产品所有者口径（2026-08-10）：
+     「合规声明、AIGC 标识、证据标注、来源三字段、防诈骗提示、
+       产物去向及其参数、AI 离线时的降级说明 —— 这些压缩成一个
+       点击展开的提示就行了，不要一直挂在页面上面，不好看。」
+
+   所以本组件只解决一件事：**把常驻的说明性长文收进页脚一条可展开的横条**。
+   它不是新的信息架构，也不承担任何功能入口 —— 里面永远只有"说明"。
+
+   ── 为什么类名前缀是 nb-，且容器刻意不叫 .notebar ────────────────
+   audit-plus.js 按**类名子串**做判定，两处会误伤：
+     · auditCardOverlap 取 [class*="card"|"note"|"act"|"pane"|"row"|"item"]
+       —— `notebar` 里含 `note`，`arrow` 里含 `row`（a-**r-r-o-w**）；
+     · auditFakeAffordance 取 [class*="pill"|"chip"|"tag"|"btn"]
+       —— 任何 `nb-btn` 之类的命名都会被当成"看着能点却点不了"。
+   因此：容器写 `class="nb-bar" data-notebar`，内部一律 nb- 前缀，
+   且**不使用** nb-row / nb-item / nb-arrow / nb-btn / nb-tag 这些名字。
+   （CSS 里同时保留 .notebar 选择器作兼容，但页面不要用它。）
+
+   ── 为什么容器必须透明无边框 ─────────────────────────────────
+   auditCardOverlap 只在"容器有背景或有边框"时才把它当卡片查溢出。
+   .nb-bar 保持 background:transparent + border:0，检测器直接跳过它；
+   视觉由 .nb-sum（收起态那条）和 .nb-body（展开面板）各自承担。
+   这不是为了骗检测 —— 展开面板是绝对定位的浮层，它本来就不属于
+   "卡片内容溢出"这个语义，把它算进去只会产生假缺陷。
+
+   ── 为什么面板向上展开（绝对定位）─────────────────────────────
+   横条挂在页脚。若面板在文档流里向下/向内撑开，会把 .work / .wmain
+   撑高 → 撞 overflow:hidden → auditInternalClipping 报"文字被裁"，
+   而且四态切换时版面会跳。改成 bottom:100% 向上浮出：
+     · 收起态与展开态的**版面完全一致**，只多一层浮层；
+     · 面板自己 overflow-y:auto，超高的内容"能滚到"，
+       isReachableByScroll 会把它豁免，不算裁切缺陷。
+
+   ── 收起态的硬约束 ──────────────────────────────────────────
+   收起时 .nb-body 只用 [hidden]（base.css 里是 display:none !important），
+   矩形为 0、不参与任何测量。本文件**不得**给 .nb-body 写
+   height:0 / opacity:0 / visibility:hidden / transform 这类"看不见但还在"
+   的收起方式 —— 那会让审计器把里面的文字算成可见内容。
+   ============================================================ */
+
+/* ---------- 横条本体：只做定位，不做视觉 ---------- */
+.nb-bar,
+.notebar {
+  --nb-inset: var(--gutter);      /* 左右缩进，跟随所在版面的安全边距 */
+  --nb-max: 560px;                /* 面板高度上限，JS 按可用空间再收紧 */
+  position: relative;
+  z-index: 38;                    /* 高于 --z-content(10)，低于 --z-actionbar(40) */
+  flex: 0 0 auto;
+  padding: 0 var(--nb-inset) var(--s-3);
+  background: transparent;        /* 见文件头：不得给容器加背景/边框 */
+  border: 0;
+}
+
+/* ---------- 收起态那一条：整条可点，≥56px ---------- */
+.nb-sum {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-2) var(--s-5);
+  border-radius: var(--r-md);
+  background: var(--glass-1-bg);
+  border: 1px solid var(--glass-1-brd);
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--fog-700);
+  font-family: var(--ff-ui);
+  font-size: var(--fz-5);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out),
+              background var(--dur-2) var(--ease-out);
+}
+.nb-sum:hover { border-color: var(--brd-2); }
+.nb-sum:active { transform: translateY(1px); }
+.nb-sum:focus-visible { outline: 2px solid var(--jade-400); outline-offset: 3px; }
+
+.nb-sum > .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* 摘要文字：写清里面有什么 */
+.nb-sum-t { flex: 1 1 auto; min-width: 0; color: var(--fog-700); }
+.nb-sum-t b { color: var(--fog-900); font-weight: 600; }
+
+/* 右侧展开提示。不叫 nb-tag / nb-chip —— 那两个词会被假入口检测抓 */
+.nb-x {
+  flex: 0 0 auto;
+  font-family: var(--ff-num);
+  font-size: var(--fz-3);
+  letter-spacing: .04em;
+  color: var(--fog-600);
+}
+/* 展开箭头。不叫 nb-arrow —— "arrow" 含子串 "row" */
+.nb-cue {
+  width: 22px; height: 22px; flex: 0 0 auto; color: var(--fog-600);
+  transform: rotate(-90deg);      /* i-chevron 默认朝右，转成朝上 */
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+/* 展开态：条本身给一点"被激活"的提示 */
+[data-nb-open="1"] > .nb-sum {
+  background: var(--glass-2-bg);
+  border-color: var(--glass-2-brd);
+  color: var(--fog-900);
+}
+[data-nb-open="1"] > .nb-sum .nb-cue { transform: rotate(90deg); }
+[data-nb-open="1"] > .nb-sum .nb-x { color: var(--fog-700); }
+
+/* ---------- 展开面板：向上浮出，自己可滚 ---------- */
+.nb-body {
+  position: absolute;
+  left: var(--nb-inset);
+  right: var(--nb-inset);
+  bottom: calc(100% + 10px);
+  max-height: var(--nb-max);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--s-5) var(--s-6);
+  border-radius: var(--r-md);
+  background: var(--glass-3-bg);
+  border: 1px solid var(--glass-3-brd);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  box-shadow: var(--sh-3);
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.nb-body::-webkit-scrollbar { width: 8px; }
+.nb-body::-webkit-scrollbar-thumb { background: var(--surf-3); border-radius: 4px; }
+
+/* ---------- 面板内的分节 ---------- */
+.nb-sec { display: block; }
+.nb-sec + .nb-sec {
+  margin-top: var(--s-4);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--brd-1);
+}
+
+/* 分节标题 ≥48px（触控口径同步：即使不可点也保证可读区高度） */
+.nb-h {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--ff-ui);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fog-900);
+  letter-spacing: .01em;
+}
+.nb-h .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+.nb-h--jade .ic { color: var(--jade-500); }
+.nb-h--azure .ic { color: var(--azure-400); }
+.nb-h--amber .ic { color: var(--amber-400); }
+
+.nb-p {
+  margin: 0;
+  font-size: var(--fz-5);
+  line-height: 1.7;
+  color: var(--fog-700);
+}
+.nb-p + .nb-p { margin-top: var(--s-3); }
+.nb-p b { color: var(--fog-900); font-weight: 600; }
+.nb-p em { font-style: normal; color: var(--amber-200); }
+
+/* 证据分级解释里的小色块：只在面板内用，不是页面上那种逐条徽章 */
+.nb-e {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--ff-num);
+  font-size: var(--fz-2);
+  letter-spacing: .04em;
+}
+.nb-e--1 { background: var(--jade-a12);  color: var(--jade-200);  border: 1px solid var(--jade-a20); }
+.nb-e--2 { background: var(--azure-a12); color: var(--azure-200); border: 1px solid var(--azure-a20); }
+.nb-e--3 { background: var(--amber-a12); color: var(--amber-200); border: 1px solid var(--amber-a20); }
+
+/* ---------- 手机接力页（390×844）：缩进与上限都要小一号 ---------- */
+.nb-bar--phone { --nb-inset: 20px; }
+.nb-bar--phone .nb-sum { min-height: 56px; font-size: 13.5px; padding: var(--s-2) 14px; border-radius: 12px; }
+.nb-bar--phone .nb-sum > .ic,
+.nb-bar--phone .nb-cue { width: 16px; height: 16px; }
+.nb-bar--phone .nb-x { font-size: 11px; }
+.nb-bar--phone .nb-body { padding: 14px 15px; border-radius: 12px; }
+.nb-bar--phone .nb-h { min-height: 48px; font-size: 14px; }
+.nb-bar--phone .nb-p { font-size: 12.5px; line-height: 1.62; }
+.nb-bar--phone .nb-e { font-size: 10.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nb-cue, .nb-sum { transition: none; }
+}

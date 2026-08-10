@@ -110,6 +110,40 @@
   .planned-p b { color: var(--fog-900); }
   /* 规划区里的示意卡：整体压淡，和上面「现在能用」的部分拉开 */
   .is-planned { opacity: .72; }
+
+  /* ── 共同要求：把「一份简历够用」这句结论接上动作（2026-08-10 补）────────
+     上一版 s3 的结论落在「两边都要的：社群维护 · 活动策划」——
+     读完用户知道该改简历了，可这一屏没有任何通往简历的门：
+     主按钮是「生成带走报告」，次按钮是「回逐条比对」。**结论到位，动作断头。**
+
+     关键在于：这块**不是多岗对比**，所以不受「一次只比一个」的限制。
+     「哪些词在你比过的几条岗位正文里都出现」是词频统计 ——
+     一次比一个、比三次，三份 JD 原文都在你自己的 AI 服务记录里，
+     把它们放一起数交集，不需要多岗接口，也不需要模型。
+     因此它**不压淡、不进 .is-planned**，也不标 E3：它现在就能用。
+
+     故意做得矮：s3 左栏实测只剩约 176px 余量（再多，「对比怎么读」那张卡会被裁），
+     所以三个词与主按钮压在同一行，长说明并进上面的规划横幅。 */
+  .common { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px;
+    padding: 12px var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a08); border: 1px solid var(--jade-a20); }
+  .common-hd { display: flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
+  .common-hd > .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .common-t { font-size: var(--fz-3); font-weight: 700; color: var(--fog-900); }
+  .common-s { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); }
+  .common-b { display: flex; align-items: center; gap: var(--s-4); }
+  .cwgrid { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .cw { display: flex; flex-direction: column; gap: 1px; justify-content: center;
+    min-height: 56px; padding: 5px var(--s-4); border-radius: var(--r-xs);
+    background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .cw b { font-size: var(--fz-2); color: var(--fog-900); }
+  .cw i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600);
+    font-family: var(--ff-num); letter-spacing: .02em; white-space: nowrap; }
+  .cw--miss { border-color: var(--amber-a20); background: var(--amber-a12); }
+  .cw--miss i { color: var(--amber-600); }
+  /* 主按钮压到 56px：这一栏余量只有约 176px，64px 的 btn--primary 会把
+     「对比怎么读」那张卡挤出栏底（实测超出 18.5px）。56px 仍在触控下限之上。 */
+  .common-b > .btn { flex: 0 0 auto; height: 56px; font-size: var(--fz-2); }
   /* 追加位原来是 <a href="13-jobs-desk.html">：点了跳走、没有回传、也没有多岗接口。
      不是入口就不许长成入口 —— 换成静态占位说明。 */
   .cmp-slot {
@@ -715,10 +749,68 @@
         <span class="planned-b">
           <span class="planned-t">规划能力 · 多岗对比还没有做出来</span>
           <span class="planned-p">
-            <b>现在只能一次比一个岗位</b>：比完一个，回第 1 步换一个再比，两次结果都在「我的 · AI 服务记录」里，可以自己对着看。
+            <!-- 「我的 · AI 服务记录」整块 nowrap：断行恰好落在「·」前时，
+                 中点会被甩到行首（中文排版禁则，自检判缺陷）。实测本页 s3 四态都在报这一条。 -->
+            <b>现在只能一次比一个岗位</b>：比完一个，回第 1 步换一个再比，两次结果都在<span style="white-space:nowrap">「我的 · AI 服务记录」</span>里，可以自己对着看。
             下面这一屏是<b>规划稿</b>，用来说清做出来之后长什么样 —— <b>不是现在可用的功能</b>，卡上的数字也都是示例。
+            <b>但紧接着那一条不是规划稿</b>：它是数出来的，现在就能用。
           </span>
         </span>
+      </div>
+
+      <!-- ═══ 共同要求 · 结论接动作（2026-08-10 补）═══════════════════════
+           ⚠ 位置在 .planned 之后、.cmpwrap 之前，且**不进 .is-planned**：
+           规划稿是压淡的示意，这一块是现在真能用的能力，两者不能长成一个样子。
+
+           为什么它不受「一次只比一个」限制：多岗对比要的是同时把 N 个 JD 送进模型；
+           这里要的只是把用户**已经先后比过**的 N 份 JD 原文取回来做词频交集。
+           前者缺接口，后者缺的只是一次 GROUP BY。
+
+           ── 接线契约（交 Codex）─────────────────────────────────────────
+           · 需要的输入：
+               resumeId（当前简历，E1）
+               + jobFitRecordIds[]（本人最近 N 次 job-fit 记录，N ≤ 5，
+                 每条带 jobId / manualJobText 与当时的 JD 原文快照，E2）。
+               **只取本人记录**；未登录时只取本次会话内的比对。
+           · 需要的输出：
+               commonTerms: [{ term, hitJobCount, totalJobCount, resumeHitCount }]
+               term 取 JD 原文里的技能 / 职责词；
+               hitJobCount === totalJobCount 才算「共同要求」（全命中，不是多数）；
+               resumeHitCount = 该词在简历原文里出现的次数（0 也要返回，0 正是要改的那一条）。
+               **禁止返回任何分数、档位、百分比或排序理由** —— 这是计数接口，不是模型接口。
+           · 排序：resumeHitCount 升序（简历里最缺的排最前），并列时按 term 在 JD 里的出现次数降序。
+           · 数量：最多取 3 条。超过 3 条时只显示前 3，并在说明里写清「还有 N 条」。
+           · 动作：跳 09-resume-workbench.html?stage=s4&from=P11，
+               把 commonTerms 放在**会话态**里带过去（sessionStorage / 服务端会话皆可），
+               不要塞进 URL —— 词条属于用户材料，不该出现在地址栏和访问日志里。
+               P09 s4 收到后：在改写建议里把这几条列成「必须体现的要求」，
+               不得替用户编造经历，只标位置与提示。
+           · 失败 / 不可用怎么降级：
+               － 记录不足 2 条（只比过 1 个岗位）→ **整块不渲染**，
+                 什么都不显示，也不写「暂无共同要求」这种像结论的话；
+               － 交集为空（几份 JD 没有共同词）→ 整块不渲染，同上；
+               － AI 服务不可用（ai-down）→ **本块照常渲染**：它是词频统计，
+                 不经过模型。这一点必须在版面上说出来，否则用户会以为它也挂了；
+               － 简历不存在（first）→ 整块不渲染，s3 的 first 分支已经在引导做简历。
+           · 记录：本块不产生新的 AI 服务记录，只读既有记录；点按钮跳转算一次页面跳转，
+             不算一次 AI 调用。 -->
+      <div class="common" data-at="s3" data-when="default ai-down device-off">
+        <div class="common-hd">
+          <svg class="ic"><use href="#i-layers"/></svg>
+          <span class="common-t">你先后比过的 3 个岗位，正文里都出现的 3 个词</span>
+          <span class="ev ev--e1">E1 你的材料</span>
+          <span class="ev ev--e2">E2 岗位正文</span>
+          <span class="common-s" data-when="default device-off">本机数出来的 · 不依赖 AI</span>
+          <span class="common-s" data-when="ai-down">对比服务中断也照常能数 · 这是词频不是判断</span>
+        </div>
+        <div class="common-b">
+          <div class="cwgrid">
+            <span class="cw"><b>社群维护</b><i>3/3 条正文出现 · 简历里 2 次</i></span>
+            <span class="cw"><b>活动策划</b><i>3/3 条正文出现 · 简历里 1 次</i></span>
+            <span class="cw cw--miss"><b>数据复盘</b><i>3/3 条正文出现 · 简历里 0 次</i></span>
+          </div>
+          <a class="btn btn--primary" href="09-resume-workbench.html?stage=s4&amp;from=P11">按这三条共同要求改一版简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+        </div>
       </div>
 
       <div class="cmpwrap is-planned" data-at="s3" data-when="default device-off">
@@ -780,7 +872,10 @@
         <div class="pane" style="flex:1 1 auto">
           <div class="pane-hd"><span class="t">把两个岗位放在一起看</span><span class="s">交集先补，回报最大</span></div>
           <div class="kv">
-            <div class="kv-row"><span class="k">两边都要的</span><span class="v">社群维护 · 活动策划——你的原文都有证据</span></div>
+            <!-- 2026-08-10：补上「数据复盘」。上面那块「共同要求」说这三个词在**三条**
+                 岗位正文里都出现——按集合关系，凡三条都有的，这两条必然也有。
+                 只写两个就和上面对不上了。整句是单个文本节点，中点不会被甩到行首。 -->
+            <div class="kv-row"><span class="k">两边都要的</span><span class="v">社群维护 · 活动策划 · 数据复盘——前两项你的原文有证据，数据复盘一次都没写到</span></div>
             <div class="kv-row"><span class="k">只有用户运营要</span><span class="v">SQL 独立取数——差的是证据，不是新技能</span></div>
             <div class="kv-row"><span class="k">只有内容运营要</span><span class="v">短视频脚本——完全没写到，缺口更大</span></div>
             <div class="kv-row"><span class="k">改一处顶两处</span><span class="v">「参与增长项目」写清你负责的环节，两边都加分</span></div>

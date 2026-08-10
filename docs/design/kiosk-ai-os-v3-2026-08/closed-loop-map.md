@@ -13,7 +13,7 @@
 | 目录 / 文件 | 身份 | 用途 |
 | --- | --- | --- |
 | `kiosk-ai-os-v3-2026-08/`(本目录 26 页) | **唯一交付基线** | 所有后续修改、评审、落地都对它做 |
-| `01-home-v5.html`(theme=warm) | **P01 正典首页** | 首页以它为准(README 顶部与 index P01 卡均已指向它);`01-home.html`、`01-home-v4.html` 是构图历史,留档不删、不再维护 |
+| `01-home-v6.html`(theme=warm) | **P01 正典首页** | 首页以它为准(README 顶部与 index P01 卡均已指向它);`01-home.html`、`01-home-v4.html`、`01-home-v5.html` 是构图历史,留档不删、不再维护,三页均带页面水印 |
 | `kiosk-proto-2026-07/`(78 个 html,即「75 屏」定稿) | 功能完整性真值 | 26 页承接了它全部 78 个编号(见 README §七),能力已零丢失并入;只用于回查,不再演进 |
 | `kiosk-ai-orchestration-2026-08/` | 机制来源 | 办理单/四要素/证据分级/权限红线的出处(README §零) |
 | `kiosk-ai-os-fusion-2026-08/`、`kiosk-ai-os-prototype-2026-08/`、`kiosk-ai-os-style-study-2026-08/`、`kiosk-visual-directions-2026-08/` | 历史候选 | 仅存档,不再作为输入(README §零 原判) |

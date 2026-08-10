@@ -294,34 +294,13 @@
             <svg class="ic"><use href="#i-printer"/></svg>
             <span class="entry-t">打印机离线</span>
           </button>
-          <a class="entry" href="15-companies.html">
-            <svg class="ic"><use href="#i-company"/></svg>
-            <span class="entry-t">查看企业</span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
         </div>
 
-        <div class="entries" data-at="expired">
-          <a class="entry" href="11-jobfit-compare.html" data-when="default device-off">
-            <svg class="ic"><use href="#i-target"/></svg>
-            <span class="entry-t">按这份要求比对</span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-          <button class="entry" type="button" aria-disabled="true" data-when="ai-down first">
-            <svg class="ic"><use href="#i-target"/></svg>
-            <span class="entry-t">比对不可用</span>
-          </button>
-          <a class="entry" href="13-jobs-desk.html">
-            <svg class="ic"><use href="#i-search"/></svg>
-            <span class="entry-t">找同类在招</span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-          <a class="entry" href="15-companies.html">
-            <svg class="ic"><use href="#i-company"/></svg>
-            <span class="entry-t">查看企业</span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-        </div>
+        <!-- 2026-08-10 重心整改：这里原来还有「查看企业」（ok 态）和一整排 expired 态入口
+             （按这份要求比对 / 找同类在招 / 查看企业）。本页主角是**这一条岗位**，
+             那些是"你可能还想去"的横向入口 —— 而且 expired 那三个与操作栏
+             （找同类在招 + 按这份要求比对）逐个重复。企业页 15 有 5 处别的入口，
+             岗位列表 13 有 7 处，都不是唯一路径，已删；要去别处按左下角返回键。 -->
 
         <!-- 边界口径：四段合并成一个折叠区，原文一字不删，只是默认不占屏 -->
         <details class="fold" data-at="ok">
@@ -366,10 +345,11 @@
         <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
         <b>这个岗位的详情没取到</b>
         <p>与来源数据连接失败，<b>不是你的操作问题</b>，已自动上报。</p>
+        <!-- 原来这里有两个按钮都指 13-jobs-desk（「回岗位列表」「回岗位页找浏览记录」），
+             同一个去处写两遍，只留一个。 -->
         <div class="acts">
           <button class="btn btn--primary">重试</button>
           <a class="btn btn--ghost" href="13-jobs-desk.html">回岗位列表</a>
-          <a class="btn btn--ghost" href="13-jobs-desk.html">回岗位页找浏览记录</a>
         </div>
       </div>
 

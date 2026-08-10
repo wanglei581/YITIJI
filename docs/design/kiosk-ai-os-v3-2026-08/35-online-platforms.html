@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ══ P35 线上招聘平台 ══
    需求真值 = 生产代码 apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx：
@@ -69,31 +70,10 @@
 .pds { font-size: 22px; color: var(--fog-700); line-height: 1.4; }
 .pbtn { flex: 0 0 auto; height: 64px; font-size: 22px; white-space: nowrap; }
 
-/* ── 页脚：全页唯一一条合规声明 + 唯一一处折叠 ── */
-.cline {
-  flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
-  padding: 0 var(--s-4); border-radius: var(--r-md);
-  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-}
-.cline-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
-  min-height: 56px; font-size: 20px; color: var(--fog-700); }
-.cline-t > span { white-space: nowrap; }
-.cline-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
-.cline-t b { color: var(--fog-900); }
-.cline .fold { flex: 0 0 auto; width: 300px; border: 0; background: transparent; }
-
-.fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
-.fold > summary { list-style: none; cursor: pointer; min-height: 56px;
-  display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
-  font-size: 20px; color: var(--fog-700); }
-.fold > summary::-webkit-details-marker { display: none; }
-.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
-  font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
-.fold[open] > summary::after { content: '收起'; }
-.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px;
-  color: var(--fog-700); line-height: 1.7; }
-.fold:not([open]) .fold-b { display: none; }
-.fold-b b { color: var(--fog-900); }
+/* ── 页脚：全页唯一一条折叠说明（原 .cline 常驻声明 + .fold 长文合并进去）──
+   2026-08-10：合规声明、名单口径、记录范围、产物去向全部收进 styles/notebar.css
+   的统一折叠条，页面本体不再挂常驻说明段落。本页无 AI 产出、无岗位条目，
+   因此没有必须常驻的 AIGC 标识与来源三字段；状态提示仍在顶栏 devpill。 */
 
 /* ── 二维码全屏遮罩：不再常驻右栏 ── */
 .screen:not(.is-qr) #qr-sheet { display: none; }
@@ -202,27 +182,6 @@
         </div>
       </div>
 
-      <!-- 页脚：全页唯一一条合规声明 + 唯一一处折叠（名单口径 / 登录提醒 / 记录范围） -->
-      <div class="cline">
-        <span class="cline-t">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>投递请前往来源平台 · <b>本机不代收简历</b>、不参与企业筛选</span>
-        </span>
-        <details class="fold">
-          <summary>名单口径与登录提醒</summary>
-          <div class="fold-b">
-            <b>名单怎么来。</b>这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。
-            本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事；
-            所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段。
-            四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。
-            <b>记录范围。</b>只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。
-            <span data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</span>
-            <span data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</span>
-            公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。
-            想把岗位信息打出来带走？回岗位台选中那一条，从详情页走打印，<b>不在这一页出纸</b>。
-          </div>
-        </details>
-      </div>
     </div>
   </div>
 
@@ -261,6 +220,42 @@
     </div>
   </div>
 
+  <!-- ══════════ 页脚：信息与边界（全页唯一折叠条） ══════════ -->
+  <div class="nb-bar" data-notebar>
+    <button type="button" class="nb-sum">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="nb-sum-t">信息与边界 · <b>本机不代收简历</b> · 名单口径 · 记录范围 · 打印去向</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+        <p class="nb-p">投递请前往来源平台。本机<b>不代收简历</b>、不参与企业筛选、不替你投递、也不打开对方页面。屏上只出码，扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。</p>
+        <p class="nb-p">公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>名单口径与排序口径</div>
+        <p class="nb-p">这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。</p>
+        <p class="nb-p">本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事。所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段，进具体岗位后才展示。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围与保留期限</div>
+        <p class="nb-p">只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。</p>
+        <p class="nb-p" data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</p>
+        <p class="nb-p" data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+        <p class="nb-p">这一页<b>不出纸、不收款</b>。想把岗位信息打出来带走，回岗位台选中那一条，从详情页走打印；核价、支付与取件都在打印工作台完成。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+        <p class="nb-p">本页四个入口<b>全部不依赖 AI</b>：AI 不可用或打印扫描离线时，出码、跳转与本页说明照常。</p>
+      </div>
+    </div>
+  </div>
+
   <div class="actionbar">
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
@@ -291,6 +286,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script>
 /* 选平台 → **全屏遮罩**出那一家自己的码。四条数据抄自生产 OnlinePlatformsPage.tsx 的

@@ -40,8 +40,12 @@
    （首次还没聊，不许摆一张「今天的建议清单」装闭环）。
    ──────────────────────────────────────────────────────────────────── */
 
-/* 布局：左主列（约 620px）对话，右副列 380px 仪表。无 rail、无 actionbar。 */
-.work { grid-template-columns: 1fr 380px; padding: var(--s-5) var(--s-7); }
+/* 布局：对话是本页唯一主体，右副列只留「仪表 + 作业面 + 托盘」。
+   2026-08-10 重心整改：副列 380 → 300，页边 32 → 24，把宽度还给对话区
+   （主功能区占屏 50.0% → 56.5%）。右列原本还挂着「能帮你做的」9 个入口 ——
+   那是"你可能还想去"的横向导航，跟"和小青对话"这件事无关，已删；
+   用户要去别的功能按返回键即可，不需要每页都摆一排入口。 */
+.work { grid-template-columns: 1fr 300px; padding: var(--s-5) var(--s-6); }
 
 /* ── 头卡：compact 人像 + 常驻披露 ── */
 .advhead { display:flex; align-items:center; gap:var(--s-5); }
@@ -177,12 +181,7 @@
 .screen[data-state="ai-down"] .gauge--ai { filter:grayscale(1); opacity:.55; }
 .screen[data-state="device-off"] .gauge--dev .gauge-v { color:var(--coral-200); }
 
-/* ── 右列②：能力三组（每条都是真链大按钮 ≥56px） ── */
-.cgrp { margin-top:var(--s-4); }
-.cgrp:first-of-type { margin-top:0; }
-.cgrp-t { display:flex; align-items:center; gap:9px; margin-bottom:var(--s-2);
-  font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.08em; }
-.cgrp-t::after { content:''; flex:1; height:1px; background:var(--brd-1); }
+/* ── 右列②：作业面入口（真链大按钮 ≥56px） ── */
 .caps { display:flex; flex-direction:column; gap:var(--s-2); }
 .cap { display:flex; align-items:center; gap:var(--s-4); min-height:60px;
   padding:var(--s-2) var(--s-4); border-radius:var(--r-xs);
@@ -291,8 +290,7 @@
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
               <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
-              我是小青。简历、岗位、政策、面试，直接问 ——
-              有用的回答点下面的<b>「钉到托盘」</b>，聚到右边，走前打成一张纸带走。
+              我是小青。简历、岗位、政策、面试，直接问。
             </span>
           </div>
 
@@ -300,8 +298,7 @@
             <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
             <span class="msg-b">
               <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
-              第一次用？可以先按下面的快捷问题试一句。
-              我答的每条尽量带依据，<b>没有依据的你就当参考</b>。
+              第一次用？先按下面的快捷问题试一句。<b>没带依据的就当参考。</b>
             </span>
           </div>
 
@@ -357,22 +354,13 @@
             <span>AI 暂时不可用，<b>小青现在答不了话</b> ——
                   页面不会用编出来的回答顶上，恢复后这里自动回来。</span>
           </div>
-          <div class="tline" style="margin-top:var(--s-2)">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">打印、扫描照常</span>
-                <span class="tl-s">出纸链路不依赖 AI，托盘里已钉的照样能打</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">招聘会展位图与路线照常</span>
-                <span class="tl-s">路线是本机算的，不是 AI 猜的</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">政策条件核对照常</span>
-                <span class="tl-s">规则判断，逐条比对，不用 AI</span></span></div>
-          </div>
+          <!-- 2026-08-10 重心整改：这里原来还有一条三格 tline（打印扫描 / 展位图 / 政策核对
+               照常），和下面 aidown-lock 里那三个真链说的是同一件事，重复一遍。
+               只留下面可点的那组，说明合一条。 -->
           <div class="notice">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>受影响的是<b>要读你简历、要理解岗位正文</b>的那几件：
-                  简历诊断、访谈生成、岗位大师 · 决策台、面试陪练、自我评估、签约风险。
-                  它们现在<b>会如实报错，不会给编出来的结果</b>。</span>
+            <span>受影响的是<b>要读你材料</b>的那几件（简历诊断、面试陪练等），
+                  它们现在<b>会如实报错，不给编出来的结果</b>。</span>
           </div>
         </div>
 
@@ -437,98 +425,26 @@
         </div>
       </div>
 
-      <!-- ② 能力三组：真链，不是同义卡片 -->
+      <!-- ② 让她直接开工：本页只留这一个入口
+           2026-08-10 重心整改：这里原来是「能帮你做的」9 个入口（简历诊断 / 访谈生成 /
+           证件照 / 岗位大师 / 政策测算 / 签约风险 / 面试陪练 / 自我评估 / 作业面）。
+           它们跟"和小青对话"这件主功能无关，是横向导航 —— 按返回键回首页各板块一样到得了，
+           那 8 个在别处都还有 4 个以上入口，已删。
+           只留 26-advisor-work：它是「她动手替你办」的作业面，是本次对话的直接产物去向，
+           而且**全站 38 页里只有这一处指向它**（唯一路径，不能删）。 -->
       <div class="pane">
         <div class="pane-hd">
-          <span class="t">能帮你做的</span>
-          <span class="s" data-when="default first device-off">9 个真入口 · 点了直达</span>
-          <span class="s" data-when="ai-down">灰色的等 AI 恢复</span>
+          <span class="t">让她直接开工</span>
+          <span class="s" data-when="default first device-off">聊出方向后，去作业面动手</span>
+          <span class="s" data-when="ai-down">等 AI 恢复</span>
         </div>
-
-        <!-- P26 顾问作业面的唯一产品入口（2026-08-10 补）：
-             此前 38 页里没有任何一处指向 26-advisor-work.html —— 它是真正的业务孤页。
-             作业面是「她动手替你办」的地方，和下面三组「去某个工作台」不是一类，
-             所以单起一组放在最前，且写清它是什么，不让人以为又是一个同义入口。 -->
-        <div class="cgrp">
-          <div class="cgrp-t">让她直接开工</div>
-          <div class="caps">
-            <a class="cap cap--ai" href="26-advisor-work.html">
-              <svg class="ic"><use href="#i-route"/></svg>
-              <span class="cap-b"><span class="cap-t">顾问作业面</span>
-                <span class="cap-w">小青帮你做事的作业面：摆开比 / 一问一答替你写 / 直接答</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-          </div>
-        </div>
-
-        <div class="cgrp">
-          <div class="cgrp-t">帮你做材料</div>
-          <div class="caps">
-            <a class="cap cap--ai" href="09-resume-workbench.html">
-              <svg class="ic"><use href="#i-resume"/></svg>
-              <span class="cap-b"><span class="cap-t">简历诊断</span>
-                <span class="cap-w">简历哪里不行，逐条指出</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-            <a class="cap cap--ai" href="10-resume-interview.html">
-              <svg class="ic"><use href="#i-pen"/></svg>
-              <span class="cap-b"><span class="cap-t">访谈生成</span>
-                <span class="cap-w">不会写？她问你答，拼出简历</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-            <a class="cap" href="29-id-photo.html">
-              <svg class="ic"><use href="#i-idcard"/></svg>
-              <span class="cap-b"><span class="cap-t">证件照</span>
-                <span class="cap-w">规格排版，确认后打印</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-          </div>
-        </div>
-
-        <div class="cgrp">
-          <div class="cgrp-t">帮你做决策</div>
-          <div class="caps">
-            <!-- 命名对齐（2026-08-10）：P11/P30 的正式名是「岗位大师 · 决策台」，
-                 一句话说明全站统一为「拿简历和岗位逐条比对，给三档参考与差距」。
-                 上一版写「这个岗值不值得投」—— 那是替用户做投递决策的承诺，
-                 与三档参考口径冲突（投不投只能用户自己定），已删。 -->
-            <a class="cap cap--ai" href="11-jobfit-compare.html">
-              <svg class="ic"><use href="#i-target"/></svg>
-              <span class="cap-b"><span class="cap-t">岗位大师 · 决策台</span>
-                <span class="cap-w">拿简历和岗位逐条比对，给三档参考与差距</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-            <a class="cap" href="21-policy.html">
-              <svg class="ic"><use href="#i-policy"/></svg>
-              <span class="cap-b"><span class="cap-t">政策测算</span>
-                <span class="cap-w">条件逐条核对，规则判断不猜</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-            <a class="cap cap--ai" href="31-contract-review.html">
-              <svg class="ic"><use href="#i-shield"/></svg>
-              <span class="cap-b"><span class="cap-t">签约风险</span>
-                <span class="cap-w">签字前把风险点标出来</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-          </div>
-        </div>
-
-        <div class="cgrp">
-          <div class="cgrp-t">帮你练</div>
-          <div class="caps">
-            <a class="cap cap--ai" href="20-interview-pod.html">
-              <svg class="ic"><use href="#i-interview"/></svg>
-              <span class="cap-b"><span class="cap-t">面试陪练</span>
-                <span class="cap-w">一问一答练，练完有复盘</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-            <a class="cap cap--ai" href="28-self-assessment.html">
-              <svg class="ic"><use href="#i-orbit"/></svg>
-              <span class="cap-b"><span class="cap-t">自我评估</span>
-                <span class="cap-w">25 题陈述式，不打分不贴标签</span></span>
-              <svg class="ic"><use href="#i-chevron"/></svg>
-            </a>
-          </div>
+        <div class="caps">
+          <a class="cap cap--ai" href="26-advisor-work.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="cap-b"><span class="cap-t">顾问作业面</span>
+              <span class="cap-w">摆开比 / 一问一答替你写 / 直接答<span class="cap-off"> · AI 恢复后可用</span></span></span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </a>
         </div>
       </div>
 
@@ -567,9 +483,8 @@
 
         <div class="notice notice--amber" data-when="device-off" style="margin-top:var(--s-3)">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>出纸暂停 · 先存我的文档</b> —— 打印机离线，
-                钉住的内容可以先存起来，换机或改天再打。<br>
-                存下来的和打出来的是同一份：<b>只有钉住的要点，不含姓名电话</b>。</span>
+          <span><b>出纸暂停 · 先存我的文档</b> —— 钉住的内容先存起来，换机或改天再打。
+                存的和打的是同一份：<b>只有要点，不含姓名电话</b>。</span>
         </div>
 
         <div class="tray-bottom">
@@ -579,9 +494,6 @@
             <div class="kv-row"><span class="k">页数</span><span class="v">1 页 · 黑白</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元 · 以打印工作台核价为准</span></div>
             <div class="kv-row"><span class="k">纸上含</span><span class="v v--fog">只有钉住的要点，不含姓名电话</span></div>
-          </div>
-          <div class="in-note" data-when="first">
-            钉住之后从这里走：按「去打印」，到打印工作台核价出纸。
           </div>
           <a class="btn btn--primary btn--lg" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
             去打印<svg class="ic"><use href="#i-printer"/></svg>

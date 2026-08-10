@@ -726,14 +726,19 @@
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="default first device-off">回看方向与缺口</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="ai-down">回看岗位计数</button>
 
-    <span class="actionbar-hint" data-at="s1" data-when="default first">4 条有事例 · 2 条没事例撑着</span>
+    <!-- 2026-08-10 第二轮全量回归：s1 的提示与主动作原来只写了 default / first / ai-down，
+         device-off 一态两样都不显示 —— 该态操作栏只剩「返回 / 需要帮助」，用户在第 1 步就走不下去
+         （四态 × 全阶段扫描里全站仅剩这一处真实的「无前进主操作」）。
+         打印机离线只影响第 3 步出纸（s3 已有自己的 device-off 分支），s1→s2 不碰打印，
+         所以按 s2「生成行动清单」的既有写法，把 device-off 并进 default 分支。 -->
+    <span class="actionbar-hint" data-at="s1" data-when="default first device-off">4 条有事例 · 2 条没事例撑着</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 读不出简历，只能看岗位计数</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first">依据 214 条读过正文的岗位 · 不是市场全貌</span>
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 只有原始计数，无方向建议</span>
     <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f22="hint3">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看岗位计数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成岗位要求计数表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
