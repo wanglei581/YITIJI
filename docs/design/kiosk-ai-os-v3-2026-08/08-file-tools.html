@@ -27,6 +27,40 @@
 .qa p { margin: 0; font-size: var(--fz-2); line-height: 1.55; color: var(--fog-700); }
 .qa b { color: var(--fog-900); }
 .wmain > .locked { flex: 1 1 auto; }
+
+/* ══════════ 2026-08-11 版面留白批次 ══════════════════════════════════════
+   实测基线（1080×1920，capture=1，四态 × 三工具）：只有 t3 命中 ——
+     右栏底部空 420px（四态一致）、左栏 `.locked` 卡内上下各空约 500px。
+   t1 / t2 全绿，不动。
+   （first·t2 的 `.signpad` 有 379px 空 —— 那是等你落笔的手写板本身，
+     空白就是它的功能，本批不当缺陷处理。）
+
+   上一版这里写着「这里的余白属于诚实空态的呼吸感，不往里编内容」。
+   「不往里编内容」这一条继续成立、一个字都不改；但**两栏版式**本身是错的：
+   t3 右栏那四张卡装的是「为什么关着 / 现在真实可行的路径 / 本机状态 / 文件规矩」——
+   全是这一屏的主叙事，不是参数。它们被挤在 348px 里，主区那句真话又浮在
+   1390px 高的框里上下各空 500px。所以 t3 单独改单栏：
+   锁定语放大居中，右栏四张卡并进主区做 2×2 卡阵。内容一条没新增、一条没编。 */
+.screen[data-stage="t3"] .work { grid-template-columns: 1fr; }
+.screen[data-stage="t3"] .wside { display: none; }
+
+/* t3 锁定态主视觉：这一屏唯一的真话是「没有这个能力」，做成主视觉 */
+.screen[data-stage="t3"] .locked { gap: var(--s-5); padding: var(--s-7); }
+.screen[data-stage="t3"] .locked .ic { width: 88px; height: 88px; }
+/* 只放大标题那一个 b（.locked 的直接子元素）。work.css 的 `.locked b` 是
+   给标题用的，正文里的 <b> 跟着变成 30px 本来就偏大，这里一并纠正为随正文。 */
+.screen[data-stage="t3"] .locked > b { font-size: var(--fz-9); }
+.screen[data-stage="t3"] .locked p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+.screen[data-stage="t3"] .locked p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+.screen[data-stage="t3"] .locked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-7); }
+
+/* t3 卡阵：2×2，四张卡整块来自原右栏 */
+.t3grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); flex: 0 0 auto; }
+.t3grid .pane { display: flex; flex-direction: column; }
+.t3grid .kv-row { min-height: 58px; font-size: var(--fz-4); }
+.t3grid .pane-hd .t { font-size: var(--fz-5); }
+.t3grid .notice { font-size: var(--fz-3); line-height: 1.66; padding: var(--s-5); }
+.t3grid .notice .ic { width: 22px; height: 22px; }
 /* 托盘不再抢占整列（work.css 默认 flex:1）：砖块是固定比例的，托盘撑高只会在
    网格和下一张卡之间留一条无容器空带；改为按内容收高，信息卡紧随其后。 */
 .wmain > .tray { flex: 0 0 auto; }
@@ -276,16 +310,85 @@
         </div>
       </div>
 
-      <!-- T3 证件照：未开放 -->
+      <!-- T3 证件照：未开放 · 单栏（2026-08-11 版面批次） -->
       <div class="locked" data-at="t3">
         <svg class="ic"><use href="#i-idcard"/></svg>
         <b>证件照拍摄与排版尚未开放</b>
         <p>本机没有配置符合规格的补光与背景板，拍出来<b>不符合证件照标准</b>，
-          大概率白花钱还得重拍。</p>
-        <p style="color:var(--fog-600);font-size:var(--fz-2)">替代路径见下面两个按钮。</p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+          大概率白花钱还得重拍。<b>没有的能力不装有</b>，所以这里是关着的，
+          不做一套走完也拿不到东西的占位流程。</p>
+        <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center">
           <button class="btn btn--ghost" data-go="t1">去图片转 PDF</button>
           <a class="btn btn--ghost" href="07-scan-workbench.html">去纸质扫描</a>
+        </div>
+      </div>
+
+      <!-- 原右栏四张卡整块并进主区（t3 改单栏后右栏 display:none）。
+           内容一条没新增：为什么关着 / 现在真实可行的路径 / 本机状态 / 文件规矩，
+           全是原样搬过来，只是排到了主区并按主内容尺寸放大。 -->
+      <div class="t3grid" data-at="t3">
+        <div class="pane">
+          <div class="pane-hd"><span class="t">为什么这里是关着的</span><span class="s">硬件事实</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">补光与背景板</span><span class="v v--fog">未配置</span></div>
+            <div class="kv-row"><span class="k">规格校验</span><span class="v v--fog">未实现</span></div>
+            <div class="kv-row"><span class="k">相纸与裁切</span><span class="v v--fog">未配置</span></div>
+            <div class="kv-row"><span class="k">开放条件</span><span class="v">硬件到位 + 规格校验通过</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>没有真实硬件与校验能力的功能一律显示为<b>未开放</b>，不做占位流程。</span>
+          </div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-hd"><span class="t">现在真实可行的路径</span><span class="s">本机今天能办的</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">已有电子证件照</span><span class="v">用「图片转 PDF」排进 A4 打印</span></div>
+            <div class="kv-row"><span class="k">纸质证件照</span><span class="v">去「纸质扫描」存成电子件</span></div>
+            <div class="kv-row"><span class="k">现场拍摄</span><span class="v v--fog">本机未提供</span></div>
+            <div class="kv-row"><span class="k">打印载体</span><span class="v v--fog">仅 A4 普通纸 · 未配相纸与裁切</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>要正规证件照，仍需去有资质的照相点拍；本机只能帮你把<b>已经有的那张</b>整理成能打的文件。</span>
+          </div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:52</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">打印机</span>
+              <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+              <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+            <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+            <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+            <div class="kv-row"><span class="k">AI 服务</span>
+              <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+              <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 合成本身不受影响</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，替代路径里「排进 A4 打印」这一步此刻出不了纸；扫描与合成照常。</span>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)" data-when="default first ai-down">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>证件照未开放与设备状态<b>无关</b>：机器一切正常，只是缺补光、背景板与规格校验。</span>
+          </div>
+        </div>
+
+        <div class="pane">
+          <div class="pane-hd"><span class="t">你的文件，规矩在先</span><span class="s">对两条替代路径同样成立</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你本人</span></div>
+            <div class="kv-row"><span class="k">给企业</span><span class="v v--fog">不向任何企业提供</span></div>
+            <div class="kv-row"><span class="k">管理员访问</span><span class="v">写审计日志，可查可追</span></div>
+            <!-- 2026-08-11：以下两行从页脚抽屉「隐私 · 保留期限 · 删除口径」移回常驻。
+                 t3 把人往「图片转 PDF」「纸质扫描」引，去之前就该知道存多久。 -->
+            <div class="kv-row"><span class="k">存进「我的 · 文档」</span><span class="v">一般文档 90 天</span></div>
+            <div class="kv-row"><span class="k">含身份证号的</span><span class="v">按敏感文件 7 天</span></div>
+            <div class="kv-row"><span class="k">没存进去的</span><span class="v v--fog">只留到本次会话结束</span></div>
+          </div>
         </div>
       </div>
 
@@ -417,20 +520,9 @@
         </div>
       </div>
 
-      <!-- T3 为什么未开放 -->
-      <div class="pane pane--fill" data-at="t3">
-        <div class="pane-hd"><span class="t">为什么这里是关着的</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">补光与背景板</span><span class="v v--fog">未配置</span></div>
-          <div class="kv-row"><span class="k">规格校验</span><span class="v v--fog">未实现</span></div>
-          <div class="kv-row"><span class="k">相纸与裁切</span><span class="v v--fog">未配置</span></div>
-          <div class="kv-row"><span class="k">开放条件</span><span class="v">硬件到位 + 规格校验通过</span></div>
-        </div>
-        <div class="notice" style="margin-top:14px">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>没有真实硬件与校验能力的功能一律显示为<b>未开放</b>，不做占位流程。</span>
-        </div>
-      </div>
+      <!-- T3 右栏已整体撤销（2026-08-11 版面批次）：t3 改单栏，
+           「为什么这里是关着的」「现在真实可行的路径」「你的文件，规矩在先」
+           三张卡连同 t3 的「本机状态」都已并进主区 2×2 卡阵，这里不留重复副本。 -->
 
       <!-- ============ 2026-08-09 留白复核补实：右栏 t1/t2/t3 底部原空 411–1089px。
            以下按阶段垫底，只写已确认事实（P06 先例同款）。 ============ -->
@@ -447,19 +539,9 @@
         </div>
       </div>
 
-      <!-- t3 专属：想要证件照的人，现在真实可行的路径 -->
-      <div class="pane" data-at="t3">
-        <div class="pane-hd"><span class="t">现在真实可行的路径</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">已有电子证件照</span><span class="v">用「图片转 PDF」排进 A4 打印</span></div>
-          <div class="kv-row"><span class="k">纸质证件照</span><span class="v">去「纸质扫描」存成电子件</span></div>
-          <div class="kv-row"><span class="k">现场拍摄</span><span class="v v--fog">本机未提供</span></div>
-          <div class="kv-row"><span class="k">打印载体</span><span class="v v--fog">仅 A4 普通纸 · 未配相纸与裁切</span></div>
-        </div>
-      </div>
-
-      <!-- 常驻：本机事实（E2），三个工具页脚同一份 -->
-      <div class="pane" data-at="t1 t2 t3">
+      <!-- 常驻：本机事实（E2）。原为 t1/t2/t3 同一份；t3 改单栏后在主区卡阵里
+           另有一份带 t3 专属说明的，所以这里只挂 t1/t2。 -->
+      <div class="pane" data-at="t1 t2">
         <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:52</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">打印机</span>
@@ -473,14 +555,6 @@
         </div>
       </div>
 
-      <!-- t3 专属：文件规矩（t1/t2 的隐私规则各在自己卡里，t3 原来一条都看不到） -->
-      <div class="pane" data-at="t3">
-        <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
-        <div class="notice">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>只有你本人可见，<b>不向任何企业提供</b>。保留期限与删除口径见页脚折叠条。</span>
-        </div>
-      </div>
     </div>
   </div>
 

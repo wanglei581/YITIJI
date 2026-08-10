@@ -130,6 +130,100 @@
 
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; } .wside .pane--grow { overflow:hidden; }
+
+/* ══════════ 2026-08-11 版面留白批次 ══════════════════════════════════════
+   实测基线（1080×1920，capture=1，四态 × 三阶段）：
+     右栏底部空  s1 340 / s2 760 / s3 281
+     左栏卡内空  s1 grow 卡 256、s2 `.stophere` 被 flex:1 撑高后空 610
+   注意 first 态右栏读数为 0 —— 那是末尾多一张短卡把栏底顶住了，
+   grow 卡内的 567px 洞照样在。所以本批按「卡内空洞」一起改。
+
+   三种手段，一律不塞填充物、不编服务名：
+   A 放大 —— 站姿看 27 寸竖屏，348px 右栏里 15px 正文偏小；s1 的锁定态主视觉
+     （图标 64px、标题 30px）明显不够分量，这一屏的主内容就是这句「还没有」。
+   B 抽屉内容移回常驻 —— 只移当前这一步真正要用的：s2 移「三种启动方式的口径」
+     （示意卡演示的正是这三种）、s3 移「记录范围与隐私」。来源全文仍留抽屉。
+   C s1 改单栏 —— 这一步是真实的「0 个已批准扩展」空态。右侧那根 348px 参数栏
+     装的其实是「为什么是空的 / 记录范围」，那是主叙事，不是参数；
+     放回主区之后，锁定态主视觉才排得开。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* A · 右栏与主区放大（只改既有内容的字号行高，不新增条目） */
+.wside .kv-row { min-height:58px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.wside .kv-row .k { line-height:1.5; } .wside .kv-row .v { line-height:1.5; text-align:right; }
+.wside .notice, .wmain .notice { font-size:var(--fz-3); line-height:1.66; padding:var(--s-5); }
+.wside .notice .ic, .wmain .notice .ic { width:22px; height:22px; }
+.wside .tl { padding:var(--s-4) 0; }
+.wside .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wside .tl-s { font-size:var(--fz-2); line-height:1.55; margin-top:5px; }
+.wside .panel-note { font-size:var(--fz-2); line-height:1.62; }
+.wside .pane-hd b { font-size:var(--fz-5); }
+.wside .alt { min-height:84px; }
+.wside .lock-p { line-height:1.7; }
+
+/* C · s1 单栏 */
+.screen[data-stage="s1"] .work { grid-template-columns:1fr; }
+.screen[data-stage="s1"] .wside { display:none; }
+
+/* s1 锁定态主视觉：这一屏唯一的真话是「还没有」，就把它做成主视觉 */
+.lockcard { align-items:center; text-align:center; padding:var(--s-6); gap:var(--s-4); }
+.lock-ic { width:96px; height:96px; border-radius:var(--r-lg); }
+.lock-ic .ic { width:46px; height:46px; }
+.lock-t { font-size:var(--fz-9); }
+.lock-p { font-size:var(--fz-5); max-width:40em; }
+/* 单栏卡里 kv 行也一起放大（右栏那条规则在 s1 用不上，右栏已 display:none） */
+.wmain .kv-row { min-height:58px; font-size:var(--fz-4); }
+
+/* 本机事实横排：原右栏「本机配置状态」那张 kv 卡，单栏里改成一条事实带 */
+.factstrip { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s-3);
+             width:100%; margin-top:var(--s-3); }
+.fs { padding:var(--s-4); border-radius:var(--r-xs); background:var(--fog-a04);
+      border:1px solid var(--fog-a12); display:flex; flex-direction:column; gap:4px; text-align:left; }
+.fs-k { font-size:var(--fz-2); color:var(--fog-600); }
+.fs-v { font-size:var(--fz-5); color:var(--fog-900); font-weight:600; }
+.fs-v--fog { color:var(--fog-600); }
+
+/* 上架四步：单栏里横排，比竖排 tline 省一半高度，读起来也更像流程 */
+.flow4 { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s-3); }
+.f4 { padding:var(--s-5) var(--s-4); border-radius:var(--r-xs);
+      background:var(--fog-a04); border:1px solid var(--fog-a12);
+      display:flex; flex-direction:column; gap:var(--s-2); }
+.f4-n { width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
+        background:var(--ink-200); border:2px solid var(--brd-2);
+        font-family:var(--ff-num); font-size:var(--fz-3); color:var(--fog-700); }
+.f4-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; line-height:1.4; }
+.f4-s { font-size:var(--fz-2); color:var(--fog-600); line-height:1.5; }
+
+/* 单栏两列排：把「上架后会怎样」和「记录范围」并排 */
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); align-items:stretch; }
+.duo > .pane { display:flex; flex-direction:column; }
+
+/* s1 替代入口：单栏里做成 2×2 大瓷砖，自己长高去占剩余高度 */
+.screen[data-stage="s1"] .wmain .pane--grow > .sec { flex:1 1 auto; min-height:0; }
+.altgrid { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4);
+           grid-auto-rows:minmax(96px,1fr); }
+.altgrid .alt { align-items:center; padding:var(--s-6); gap:var(--s-5); }
+.altgrid .alt .ic { width:32px; height:32px; margin-top:0; }
+.altgrid .alt-t { font-size:var(--fz-6); }
+.altgrid .alt-s { font-size:var(--fz-3); line-height:1.65; }
+
+/* s2 示意区。原来是「示意卡那张 pane 被 flex 撑到栏底、内容只到一半（卡内空 350px），
+   而 `.stophere` 又被 flex:1 撑高 610px、字全挤在顶上」—— 两处都是空壳撑高。
+
+   这里**不能**用「把示意卡放大占位」来解决：那三张是**未上架的示例服务**，
+   给假服务加视觉分量，正好违反本页自己写的「空着也不编一排点不动的假服务」。
+   正确解法是让**那句真话**占住这块高度：示意卡按内容收高，
+   「这里到此为止」放大并居中，撑满剩余空间 —— 空白本来就是这一屏要表达的内容。 */
+.previewwrap > .pane { flex:0 0 auto; }
+.svc { min-height:112px; align-items:center; }
+.svc-t { font-size:var(--fz-5); }
+.svc-m { font-size:var(--fz-2); }
+.svc-s { font-size:var(--fz-3); line-height:1.6; }
+.stophere { flex:1 1 auto; min-height:0; align-items:center; justify-content:center;
+            text-align:center; gap:var(--s-4); padding:var(--s-8) var(--s-6); }
+.stophere .ic { width:56px; height:56px; color:var(--fog-600); }
+.sh-t { font-size:var(--fz-7); }
+.sh-p { font-size:var(--fz-4); line-height:1.72; max-width:32em; }
 </style>
 </head>
 <body>
@@ -169,7 +263,14 @@
     <!-- ══════════════════ 左主区 ══════════════════ -->
     <div class="wmain">
 
-      <!-- ─────────── S1 本机当前状态（真实） ─────────── -->
+      <!-- ─────────── S1 本机当前状态（真实）· 单栏 ───────────
+           2026-08-11 版面批次：这一步原为两栏，右栏底部实测空 340px、
+           左栏 grow 卡内空 256px。改单栏的理由不是为了凑读数：
+           原右栏两张卡装的是「服务是怎么上架的」「本机对使用记录做什么」——
+           那是「为什么现在是空的」的主叙事，不是参数，本来就该在主区。
+           腾出整幅宽度后，锁定态主视觉（图标 64→104、标题 30→44）才排得开。
+           红线：不编服务名、不摆假服务卡。这一屏的全部内容仍然只有
+           「本机 0 个已上架」这一条真状态 + 机制 + 现在真能用的四条替代路径。 -->
       <div class="pane" data-at="s1">
         <div class="lockcard">
           <span class="lock-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
@@ -178,10 +279,23 @@
                「百宝箱是什么 / 谁决定上架 / 配置后会怎样」这三段长说明收进页脚折叠条。 -->
           <div class="lock-p">
             这一页现在<b>没有任何服务可以启动</b>——不是坏了，是还没配置。
+            上不上、上哪些，由<b>管理后台审核后决定</b>，本机不自己加。
+          </div>
+          <!-- 原右栏「本机配置状态」kv 卡：单栏里改横排事实带，同样四条事实 -->
+          <div class="factstrip">
+            <span class="fs"><span class="fs-k">机器编号</span><span class="fs-v">01 号机</span></span>
+            <span class="fs"><span class="fs-k">所在地点</span><span class="fs-v">市人力资源市场 A 馆</span></span>
+            <span class="fs"><span class="fs-k">已上架服务</span><span class="fs-v fs-v--fog">0 个</span></span>
+            <span class="fs"><span class="fs-k">配置来源</span><span class="fs-v fs-v--fog">管理后台 · 未配置</span></span>
           </div>
         </div>
       </div>
 
+      <div class="notice" data-at="s1" data-when="first">
+        <svg class="ic"><use href="#i-help"/></svg>
+        <span>第一次来的话：百宝箱是<b>求职打印之外的扩展服务位</b>。
+              本机现在一个都没上架，但下面四件今天就能用。</span>
+      </div>
       <div class="notice" data-at="s1" data-when="ai-down">
         <svg class="ic"><use href="#i-info"/></svg>
         <span>AI 暂时不可用 —— 扩展服务<b>不依赖 AI</b>，这一页的内容和入口都照常。</span>
@@ -191,27 +305,53 @@
         <span>打印机离线 —— 扩展服务<b>不依赖打印机</b>，这一页照常；涉及打印的那条此刻打不了，可先转存「我的文档」。</span>
       </div>
 
-      <div class="pane" data-at="s1">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <b>管理后台上架服务后，这一页会怎样</b>
-          <span class="mt">列的是机制，不是服务 —— 没上架就没有服务名</span>
-        </div>
-        <div class="sec">
-          <div class="willhave">
-            <div class="wh"><svg class="ic"><use href="#i-check"/></svg>
-              <span class="wh-b"><span class="wh-t">审核后才上架</span> <span class="wh-s">每个服务都经管理后台审核，来路不明的进不来</span></span></div>
-            <div class="wh"><svg class="ic"><use href="#i-layers"/></svg>
-              <span class="wh-b"><span class="wh-t">三种启动方式</span> <span class="wh-s">站内页面 / 扫码到手机 / 外部 H5，卡片上写明是哪种</span></span></div>
-            <div class="wh"><svg class="ic"><use href="#i-external"/></svg>
-              <span class="wh-b"><span class="wh-t">离开本页先确认</span> <span class="wh-s">要跳第三方页面时，先问你「要离开吗」，不静默跳走</span></span></div>
-            <div class="wh"><svg class="ic"><use href="#i-shield"/></svg>
-              <span class="wh-b"><span class="wh-t">只记匿名次数</span> <span class="wh-s">上报的只有「某服务被打开一次」，不含你的身份与办理内容</span></span></div>
+      <!-- 原右栏两张卡并排。
+           说明：原主区那张「上架之后这一页会怎样」（willhave 四条）整卡去掉了 ——
+           它四条里有三条与这里重复：「审核后才上架」＝上架流程第 2 步、
+           「三种启动方式」＝第 3 步、「只记匿名次数」＝右卡第 1 行。
+           唯一不重复的「离开本页先确认」已并成右卡的一行。这是去重，不是删内容。 -->
+      <div class="duo" data-at="s1">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-agency"/></svg>
+            <b>服务是怎么上架的</b>
+            <span class="mt">每一步都过管理后台</span>
           </div>
+          <div class="sec">
+            <div class="flow4" style="grid-template-columns:1fr 1fr">
+              <div class="f4"><span class="f4-n">1</span>
+                <span class="f4-t">服务方或运营方提出</span><span class="f4-s">说明服务内容与启动方式</span></div>
+              <div class="f4"><span class="f4-n">2</span>
+                <span class="f4-t">管理后台审核</span><span class="f4-s">内容、资质、合规边界逐项过</span></div>
+              <div class="f4"><span class="f4-n">3</span>
+                <span class="f4-t">配置启动方式</span><span class="f4-s">站内页面 / 扫码到手机 / 外部 H5 三选一</span></div>
+              <div class="f4"><span class="f4-n">4</span>
+                <span class="f4-t">在指定终端上架</span><span class="f4-s">上架后这一页才会出现服务卡</span></div>
+            </div>
+            <div class="panel-note" style="margin-top:var(--s-3)">
+              不存在谁塞个链接进来就能上屏。
+            </div>
+          </div>
+        </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
+        <!-- 原右栏「本机对使用记录做什么」整块并进来 -->
+        <div class="pane">
+          <div class="pane-hd">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>你在第三方服务页面里办了什么，<b>本机不记录、也看不到</b>。</span>
+            <b>本机对使用记录做什么</b>
+            <span class="mt">这几条现在就成立，不等上架</span>
+          </div>
+          <div class="sec">
+            <div class="kv">
+              <div class="kv-row"><span class="k">启动了哪个服务</span><span class="v">匿名计数</span></div>
+              <div class="kv-row"><span class="k">你的身份</span><span class="v v--fog">不关联</span></div>
+              <div class="kv-row"><span class="k">第三方页面里的操作</span><span class="v v--fog">不记录，也看不到</span></div>
+              <div class="kv-row"><span class="k">跳第三方页面前</span><span class="v">先弹离场确认</span></div>
+              <div class="kv-row"><span class="k">屏上出过的二维码</span><span class="v">失效即作废</span></div>
+            </div>
+            <div class="panel-note" style="margin-top:var(--s-3)">
+              百宝箱不代收简历、不做平台内投递。
+            </div>
           </div>
         </div>
       </div>
@@ -220,9 +360,9 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
           <b>不用等上架，现在就能做的</b>
-          <span class="mt">这些是本机自己的能力，不走百宝箱</span>
+          <span class="mt">这些是本机自己的能力，不走百宝箱 —— 扩展服务上没上架都不影响</span>
         </div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+        <div class="sec altgrid">
 
           <a class="alt" href="08-file-tools.html">
             <svg class="ic"><use href="#i-file"/></svg>
@@ -244,7 +384,6 @@
             <span class="alt-b"><span class="alt-t">求职材料四件套</span>
               <span class="alt-s">求职信、自我介绍、材料清单、简历模板，生成完可以打印。</span></span>
           </a>
-          <div class="panel-note">这几件都不走百宝箱，今天就能用；扩展服务上没上架都不影响。</div>
         </div>
       </div>
 
@@ -294,10 +433,15 @@
             </div>
           </div>
         </div>
+        <!-- 2026-08-11 版面批次：这块从「顶部两行字 + 底下 610px 空」改成
+             居中放大的收尾块。占住剩余高度的是这句真话本身，不是示意卡 ——
+             把未上架的示例服务卡放大，等于给假服务加分量。 -->
         <div class="stophere">
-          <div class="sh-t">这里到此为止</div>
+          <svg class="ic"><use href="#i-toolbox"/></svg>
+          <div class="sh-t">示意到此为止</div>
           <div class="sh-p">
-            <b>这块是空的：本机一个扩展服务都没上架</b>，空着也不编一排点不动的假服务。
+            <b>再往下是空的：本机一个扩展服务都没上架。</b>
+            空着也不编一排点不动的假服务 —— 上面那三张已经是示意能给到的全部。
           </div>
         </div>
       </div>
@@ -487,56 +631,10 @@
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
     <div class="wside">
 
-      <!-- S1 右 -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>本机配置状态</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">机器编号</span><span class="v">01 号机</span></div>
-            <div class="kv-row"><span class="k">所在地点</span><span class="v">市人力资源市场 A 馆</span></div>
-            <div class="kv-row"><span class="k">已上架服务</span><span class="v v--fog">0 个</span></div>
-            <div class="kv-row"><span class="k">配置来源</span><span class="v v--fog">管理后台</span></div>
-            <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未配置</span></span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>服务是怎么上架的</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3)">
-            每一步都过管理后台。
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>百宝箱<b>不代收简历、不做平台内投递</b>。</span>
-          </div>
-
-          <div class="tline" style="margin-top:var(--s-4)">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">服务方或运营方提出</span> <span class="tl-s">说明服务内容与启动方式</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">管理后台审核</span> <span class="tl-s">内容、资质、合规边界逐项过</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">配置启动方式</span> <span class="tl-s">站内页面 / 扫码到手机 / 外部 H5 三选一</span></span></div>
-            <div class="tl"><span class="tl-dot">4</span>
-              <span class="tl-b"><span class="tl-t">在指定终端上架</span> <span class="tl-s">上架后这一页才会出现服务卡</span></span></div>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-shield"/></svg><b>本机对使用记录做什么</b>
-          </div>
-          <div class="kv">
-            <div class="kv-row"><span class="k">启动了哪个服务</span><span class="v">匿名计数</span></div>
-            <div class="kv-row"><span class="k">你的身份</span><span class="v v--fog">不关联</span></div>
-            <div class="kv-row"><span class="k">第三方页面里的操作</span><span class="v v--fog">不记录</span></div>
-            <div class="kv-row"><span class="k">屏上出过的二维码</span><span class="v">失效即作废</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">这几条现在就成立，不等上架。</div>
-          <div class="panel-note" style="margin-top:var(--s-3)">接入咨询请找现场工作人员。</div>
-        </div>
-      </div>
+      <!-- S1 右栏已整体撤销（2026-08-11 版面批次）：s1 改单栏，
+           原「本机配置状态」改成主区锁定卡下的横排事实带，
+           「服务是怎么上架的」改成主区横排四步，
+           「本机对使用记录做什么」整块并入主区右侧那张卡。 -->
 
       <!-- S2 右 -->
       <div class="pane" data-at="s2">
@@ -554,6 +652,29 @@
         </div>
       </div>
 
+      <!-- 2026-08-11 版面批次：从页脚抽屉「三种启动方式的口径」移回常驻，只在 s2 出现。
+           左边三张示意卡演示的正是这三种启动方式 —— 解释它们的那三句话
+           放在折叠条里，等于让人对着示意卡猜。抽屉里仍保留完整条款。 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>三种启动方式各是什么意思</b></div>
+        <div class="sec">
+          <div class="willhave" style="grid-template-columns:1fr">
+            <div class="wh"><svg class="ic"><use href="#i-toolbox"/></svg>
+              <span class="wh-b"><span class="wh-t">站内页面</span>
+                <span class="wh-s">在这块屏上办完就回到百宝箱，不离开本机。</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-external"/></svg>
+              <span class="wh-b"><span class="wh-t">外部 H5</span>
+                <span class="wh-s">跳出去前先弹「要离开吗」；打开的是第三方页面，内容与办理结果都不归本机管。</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-qr"/></svg>
+              <span class="wh-b"><span class="wh-t">扫码到手机</span>
+                <span class="wh-s">屏上只出码，码有有效期、过期作废；要登录、要看个人账户的事项都归这一类。</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            卡片上的服务名与说明，由管理后台在上架时填写。
+          </div>
+        </div>
+      </div>
+
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
@@ -563,6 +684,14 @@
             <span class="alt-b"><span class="alt-t">打印扫描</span> <span class="alt-s">本机的主业，不依赖百宝箱</span></span></a>
           <a class="alt" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>
             <span class="alt-b"><span class="alt-t">政策服务</span> <span class="alt-s">官方政策与办事清单在这里看</span></span></a>
+
+          <!-- 从抽屉「百宝箱是什么 · 谁决定上架」移回：示意屏最容易让人误会
+               「那我等多久能用」，谁说了算这件事必须当面写清楚。 -->
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-agency"/></svg>
+            <span>上架什么、下架什么<b>由管理后台决定</b>，页面随配置实时变化；
+                  本机不自己加。接入咨询请找现场工作人员。</span>
+          </div>
         </div>
       </div>
 
@@ -570,14 +699,17 @@
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>三组的区别只有一件事</b></div>
         <div class="sec">
+          <!-- 2026-08-11：原句后半「站内不动、外部 H5 会离场、二维码换到手机上」
+               与紧接着的三行 kv 逐字重复，删去，只留判据本身。 -->
           <div class="lock-p" style="font-size:var(--fz-3)">
-            <b>办这件事的时候，你人在哪。</b>站内不动、外部 H5 会离场、二维码换到手机上。
+            <b>办这件事的时候，你人在哪。</b>
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">① 站内服务</span><span class="v">不离开本机</span></div>
             <div class="kv-row"><span class="k">② 外部 H5</span><span class="v">先弹离场确认</span></div>
             <div class="kv-row"><span class="k">③ 二维码</span><span class="v">屏上出码 · 手机继续</span></div>
-            <div class="kv-row"><span class="k">三组共同点</span><span class="v">都经后台审核后配置</span></div>
+            <!-- 2026-08-11：「三组共同点 · 都经后台审核后配置」一行删去 ——
+                 同一句话本屏顶部的示意横幅和上架流程已各说过一次，留三份是重复占位。 -->
             <div class="kv-row"><span class="k">本机现有条目</span><span class="v v--fog">0 条</span></div>
           </div>
         </div>
@@ -611,20 +743,29 @@
               <span class="alt-b"><span class="alt-t">求职材料四件套</span>
                 <span class="alt-s">求职信、自我介绍、材料清单、简历模板</span></span></a>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">这四个链接现在就能点。</div>
-        </div>
-      </div>
-
-      <!-- 首次使用：一句话 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            扩展服务还没上架，<b>这一页没有可启动的服务</b>。<br>
-            但文件加工、打印扫描、政策查询，今天就能用。
+          <!-- 2026-08-11 版面批次：从页脚抽屉「记录范围与隐私」移回常驻，只在 s3 出现。
+               这一屏在讲「上架后会有哪些条目」，紧接着的问题就是
+               「那我点了之后本机记我什么」，答案不该藏在折叠条里。
+               同批删去原「这四个链接现在就能点。」一句：上面已写明示例卡点不动，
+               能点的四张就在下面，这句是重复。 -->
+          <div class="pane-hd" style="margin-top:var(--s-6)">
+            <svg class="ic"><use href="#i-eye"/></svg><b>真上架之后，本机记你什么</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">启动了哪个服务</span><span class="v">匿名计数</span></div>
+            <div class="kv-row"><span class="k">你的身份</span><span class="v v--fog">不关联</span></div>
+            <div class="kv-row"><span class="k">第三方页面里的操作</span><span class="v v--fog">不记录</span></div>
+            <div class="kv-row"><span class="k">屏上出过的二维码</span><span class="v">失效即作废</span></div>
           </div>
         </div>
       </div>
+
+      <!-- 首次使用提示已移到 s1 主区那条 notice（2026-08-11 版面批次）。
+           原来这张卡挂在右栏、三个阶段都出；现在 s1 是单栏（右栏 display:none），
+           而 s2 / s3 上它说的两句话本屏各已有出处：
+             「没有可启动的服务」＝ 顶部示意横幅 + ActionBar 提示；
+             「文件加工 / 打印扫描 / 政策查询今天就能用」＝ 右栏「现在能用的」/「现在就能去的地方」。
+           留着只是把右栏顶出 127–209px 的滚动裁切，所以按去重删掉，不是丢内容。 -->
 
     </div>
   </div>

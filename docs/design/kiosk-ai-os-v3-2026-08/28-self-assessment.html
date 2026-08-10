@@ -126,9 +126,139 @@
 /* 正文压短之后，s1 的勾选区不该再悬在卡片中间：时间线在上、要勾的钉卡底。
    这是把留白重新分配，不是塞填充物。 */
 .wmain .pane--grow[data-at="s1"] > .sec { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
-/* 右栏 grow 卡的底部留白是接线前就有的版面结构问题（各态实测 521–785px），
-   不属本批「接线 + 文字瘦身」范围：改法要动 .wside .pane--grow 的滚动契约，
-   风险大于收益，留给版面批次处理，这里只记不改。 */
+
+/* ══════════ 2026-08-11 版面留白批次 ══════════════════════════════════════
+   上一版这里写着「右栏 grow 卡底部各态实测 521–785px，留给版面批次处理」。
+   这就是那个批次。实测基线（1080×1920，capture=1，四态×四阶段）：
+     右栏底部空 s1 746 / s2 836 / s3 685(默认) 805(ai-down) 588(离线) / s4 925
+     左栏卡内空洞 s2 667 / s4 484 / ai-down·s3 833
+   （first 态右栏读数为 0，是因为末尾多一张短卡把栏底顶住了 ——
+     grow 卡内部那个 604px 的洞照样在，检测器量的是栏尾不是卡内。所以
+     本批按「卡内空洞」一起改，不只对付读数。）
+
+   只用三种手段，一律不塞填充物：
+   A 放大真正的主内容 —— 站姿看 27 寸竖屏，348px 右栏里 15px 正文本来就偏小；
+     s2 的题干和选项是这一步唯一的主内容，理应做成主视觉。
+   B 把页脚抽屉里**当前这一步真正要用**的那几段移回常驻（来源全文与低频条款仍留抽屉）。
+   C 侧栏无话可说的那一步改单栏 —— 只有 s4：它按隐私规则本来就只有次数，
+     硬凑一根 348px 参数栏就是为了两栏而两栏。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* A · 主区提示条放大：站姿看 27 寸竖屏，15px 正文偏小。这一条同时压缩了
+   s2 题卡的上下呼吸带（规矩卡长高，题卡就相应变矮）。 */
+.wmain .notice { font-size:var(--fz-3); line-height:1.68; padding:var(--s-5); }
+.wmain .notice .ic { width:22px; height:22px; }
+
+/* A · s1 主区：时间线与两个同意项一起放大。
+   这张卡原来是「时间线在上、勾选区 margin-top:auto 钉卡底」，中间空 250px。
+   勾选框是这一步唯一的主操作，本来就该做大（48→72px，勾选框 22→28px）；
+   放大之后中间那段空自然收掉，不是靠塞东西补的。 */
+.wmain .tl { padding:var(--s-4) 0; }
+.wmain .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wmain .tl-s { font-size:var(--fz-2); line-height:1.55; margin-top:4px; }
+.ck { min-height:72px; padding:var(--s-4) var(--s-5); align-items:center; }
+.ck-box { width:28px; height:28px; border-radius:7px; margin-top:0; }
+.ck--have .ck-box::after { left:9px; top:4px; width:6px; height:13px; border-width:0 3px 3px 0; }
+.ck-t { font-size:var(--fz-4); }
+.ck-s { font-size:var(--fz-2); }
+.wmain .field-lb { font-size:var(--fz-3); }
+/* 「四条硬规则」是这一步用户真正在同意的东西，按主内容的字号排 */
+.mh { padding:var(--s-5); }
+.mh .ic { width:22px; height:22px; }
+.mh-t { font-size:var(--fz-4); }
+.mh-s { font-size:var(--fz-2); line-height:1.6; }
+
+/* A · 右栏整体放大（改的是既有内容的字号行高，不新增条目） */
+.wside .kv-row { min-height:56px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.wside .kv-row .k { line-height:1.5; }
+.wside .kv-row .v { line-height:1.5; text-align:right; }
+.wside .notice { font-size:var(--fz-3); line-height:1.66; padding:var(--s-5); }
+.wside .notice .ic { width:22px; height:22px; }
+.wside .tl { padding:var(--s-4) 0; }
+.wside .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wside .tl-s { font-size:var(--fz-2); line-height:1.55; margin-top:5px; }
+.wside .panel-note { font-size:var(--fz-2); line-height:1.62; }
+.wside .field-lb { font-size:var(--fz-3); }
+.wside .alt { min-height:80px; }
+.wside .pane-hd b { font-size:var(--fz-5); }
+
+/* A · s2 题干是这一步唯一的主内容：做成主视觉。题号 16→18、题干 30→44、
+   解释 16→20，选项按钮 64→110（触控上限 130，再高就成了「一行字浮在大空盒里」）。 */
+.q-no { font-size:var(--fz-4); }
+.q-t  { font-size:var(--fz-9); }
+.q-why{ font-size:var(--fz-5); line-height:1.7; }
+.opt { min-height:110px; font-size:var(--fz-6); padding:var(--s-5) var(--s-6); }
+.opt-key { width:52px; height:52px; font-size:var(--fz-5); }
+/* 这一步主区确实只有「一道题」这一件真东西 —— 25 题里没有第二块内容可摆，
+   抽屉里也没有第二段属于这一步的话（隐私与记分口径已经移到右栏了）。
+   所以不硬凑第二张卡，而是让题组**居中**：上下等量呼吸带围着放大的主体，
+   这是构图，不是单侧裸露的空洞。按钮长到 130 就封顶，避免空盒效应。 */
+.wmain .pane--grow[data-at="s2"] > .sec { flex:1 1 auto; min-height:0; justify-content:center; }
+.wmain .pane--grow[data-at="s2"] .opt { flex:1 1 auto; max-height:160px; }
+.grp { gap:var(--s-2); }
+.gr { padding:var(--s-4) var(--s-2); }
+.gr-t { font-size:var(--fz-2); }
+.gr-n { font-size:var(--fz-4); }
+/* 五组进度挪进右栏后改竖排：348px 里五列会把「兴趣偏好」挤成两行 */
+.wside .grp { grid-template-columns:1fr; gap:var(--s-2); }
+.wside .gr { flex-direction:row; align-items:center; justify-content:space-between;
+             text-align:left; min-height:64px; padding:var(--s-3) var(--s-4); }
+.wside .gr-t { font-size:var(--fz-3); }
+.wside .gr-n { font-size:var(--fz-5); }
+
+/* A · s3 五段陈述是主内容：字号行高一起提 */
+.dim { padding:var(--s-6) var(--s-5); gap:var(--s-4); }
+.dim-t { font-size:var(--fz-6); }
+.dim-p { font-size:var(--fz-4); line-height:1.75; }
+.dim-src { font-size:var(--fz-2); line-height:1.62; padding-left:var(--s-5); }
+/* ai-down·s3：主区那张 grow 卡原本 833px 见底。三条替代路是这一态**唯一的真出口**，
+   让它们自己长大占住高度（有上限），再把「记分为什么不靠 AI」从抽屉移回常驻。 */
+.wmain .alt { min-height:96px; }
+.wmain .alt-t { font-size:var(--fz-5); }
+.wmain .alt-s { font-size:var(--fz-3); line-height:1.6; }
+.wmain .pane--grow[data-at="s3"] > .sec,
+.wmain .pane--grow[data-at="s4"] > .sec { flex:1 1 auto; min-height:0; }
+
+/* C · 两处改单栏。共同判据：这一步的右栏没有**合法内容**可放，不是没写完。
+     · s4 往期：按隐私规则本机手里只有次数，348px 参数栏无话可说（原空 925px）。
+     · ai-down · s3：这一步的真话就是「解读没有」，需要的是原因 + 出口，
+       不是「主区讲原因 + 右栏再讲一遍」。两栏合起来要 2900px 内容才填得满，
+       为了两栏而两栏必然编东西 —— 改单栏只要一屏，全部说真话也够。 */
+.screen[data-stage="s4"] .work,
+.screen[data-state="ai-down"][data-stage="s3"] .work { grid-template-columns:1fr; }
+.screen[data-stage="s4"] .wside,
+.screen[data-state="ai-down"][data-stage="s3"] .wside { display:none; }
+
+/* 单栏专用：两列卡片阵。写的都是页面已有的机制与状态，不新造数据 */
+.solo-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.solo-c { padding:var(--s-6); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.solo-c--warn { background:var(--fog-a04); border-style:dashed; border-color:var(--fog-a20); }
+.solo-c-hd { display:flex; align-items:center; gap:var(--s-3); }
+.solo-c-hd .ic { width:26px; height:26px; color:var(--jade-500); flex:0 0 auto; }
+.solo-c--warn .solo-c-hd .ic { color:var(--fog-600); }
+.solo-c-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.solo-c-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.72; } .solo-c-p b { color:var(--fog-900); }
+.solo-c .kv-row { min-height:56px; font-size:var(--fz-4); }
+/* 单栏出口区：两列大瓷砖。这里不是「把小卡拉高留空」——
+   瓷砖长高之后图标与标题跟着放大、内容整体居中，长成的是一块可按的主操作。 */
+.solo-alts { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4);
+             grid-auto-rows:minmax(96px,1fr); align-content:stretch; }
+.solo-alts .alt { align-items:center; padding:var(--s-6); gap:var(--s-5); }
+.solo-alts .alt .ic { width:32px; height:32px; }
+.solo-alts .alt-t { font-size:var(--fz-6); }
+.solo-alts .alt-s { font-size:var(--fz-3); line-height:1.65; }
+
+.screen[data-stage="s4"] .tl,
+.screen[data-state="ai-down"][data-stage="s3"] .tl { padding:var(--s-4) 0; }
+.screen[data-stage="s4"] .tl-t,
+.screen[data-state="ai-down"][data-stage="s3"] .tl-t { font-size:var(--fz-5); line-height:1.4; }
+.screen[data-stage="s4"] .tl-s,
+.screen[data-state="ai-down"][data-stage="s3"] .tl-s { font-size:var(--fz-3); line-height:1.55; margin-top:5px; }
+.screen[data-stage="s4"] .alt { min-height:96px; }
+.screen[data-stage="s4"] .alt-t { font-size:var(--fz-5); }
+.screen[data-stage="s4"] .alt-s { font-size:var(--fz-3); line-height:1.6; }
 /* 结果反馈层：点了要有交代。无 data-when/data-at，applyVisibility 不碰它 */
 .fb { position:absolute; inset:0; z-index:80; display:grid; place-items:center;
       background:rgba(4,8,10,.62); padding:var(--s-6); }
@@ -218,6 +348,11 @@
         </div>
       </div>
 
+      <div class="notice" data-at="s1" data-when="first">
+        <svg class="ic"><use href="#i-help"/></svg>
+        <span>第一次来的话：这一页做完会得到<b>几段把你的倾向说成明白话的陈述</b>，
+              可以打印带走 —— <span data-out="firstNote">25 道选择题、约 5 分钟</span>，不需登录。</span>
+      </div>
       <div class="notice" data-at="s1" data-when="ai-down">
         <svg class="ic"><use href="#i-info"/></svg>
         <span>AI 不可用：<b>作答照常，本次解读出不来</b>；原文不留存，事后补不回。</span>
@@ -289,13 +424,18 @@
       </div>
 
       <!-- ─────────── S2 逐题作答 ─────────── -->
-      <div class="pane" data-at="s2">
+      <!-- 2026-08-11 版面批次：这一步的主内容只有一样东西 —— 当前这道题。
+           原版把它塞在一张 408px 的小卡里，下面跟一张 952px 的「五组进度」卡，
+           而进度卡内容只有 285px，卡底见空 667px。
+           改法：题卡吃满剩余高度并居中（一屏一题），选项 64→96px；
+           「五组进度」本来就是进度指标不是主内容，整块挪到右栏竖排。 -->
+      <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-pen"/></svg>
           <b data-out="qHd">第 8 题 / 共 25 题</b>
           <span class="mt">选择题 · 可回退改答</span>
         </div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-4)">
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-5)">
           <div>
             <div class="q-no" data-out="qNo">工作风格 · 这一组的第 3 题</div>
             <div class="q-t" data-out="qT">你更喜欢哪种工作方式？</div>
@@ -306,19 +446,24 @@
           <button class="opt" data-opt="A"><span class="opt-key">A</span><span data-out="optA">结构清晰、目标明确</span></button>
           <button class="opt" data-opt="B"><span class="opt-key">B</span><span data-out="optB">保持开放、允许调整</span></button>
           <button class="opt" data-opt="C"><span class="opt-key">C</span><span data-out="optC">先讨论、再行动</span></button>
+          <!-- 2026-08-11：从页脚抽屉「合规边界」段移回常驻，并且就摆在选项底下 ——
+               「该怎么选」这句话的用处只在人正对着 A/B/C 犹豫的这一刻。 -->
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>题目问的都是「你更愿意哪个」，<b>没有对错，也没有陷阱题</b>；
+                  不用揣摩哪个答案更好看 —— 这一页不打分、不排名。</span>
+          </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2">
+      <div class="pane" data-at="s2">
         <div class="pane-hd">
-          <svg class="ic"><use href="#i-layers"/></svg>
-          <b>五组进度</b>
-          <span class="mt">组间顺序固定，答完自动进下一组</span>
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <b>作答期间的两条规矩</b>
+          <span class="mt">这一步全程生效</span>
         </div>
         <div class="sec">
-          <div class="grp" data-out="grp"></div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+          <div class="notice notice--amber">
             <svg class="ic"><use href="#i-clock"/></svg>
             <span><b>离开超过 60 秒，本机自动退出并清空这页作答。</b>
                   公共机器，这条是替你兜底 —— 你走开了，答到一半的内容不会留在屏上给下一个人看。</span>
@@ -328,7 +473,6 @@
             <svg class="ic"><use href="#i-info"/></svg>
             <span><b>想好再选，这里不计时。</b>抢时间答出来的是手速，不是你的倾向。</span>
           </div>
-
         </div>
       </div>
 
@@ -351,7 +495,9 @@
       </div>
 
       <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
-        <div class="pane-hd"><span class="t">五段陈述</span>
+        <!-- 2026-08-11：标题原来写死「五段陈述」，跳过「工作风格」那一组时实际只有 4 段，
+             和同屏的「先说清楚这 4 段话」「纸上印的 4 段陈述」对不上。改成同一个 segN 数据源。 -->
+        <div class="pane-hd"><span class="t"><span data-out="segN">5</span> 段陈述</span>
           <span class="chip chip--info">AI 生成 · 陈述</span></div>
         <div class="joblist">
 
@@ -397,6 +543,7 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-alert"/></svg>
           <b>这次没有解读</b>
+          <span class="mt">缺的只是最后那几段文字，前面都做完了</span>
         </div>
         <div class="sec">
           <div class="notice notice--amber">
@@ -404,16 +551,51 @@
             <span>AI 不可用，<b>陈述这次生成不了</b>；答案原文不留存，
                   恢复后也<b>补不回这一次</b>，要解读得重新作答（约 5 分钟）。</span>
           </div>
+
+          <!-- 2026-08-11 版面批次：从页脚抽屉「AI 离线时会怎样」移回常驻。
+               这一态的用户第一个问题就是「那我刚才白答了吗」——
+               答案（记分是机械过程、已经算完了）不该藏在折叠条里。 -->
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">记分（固定权重累加，机械过程）</span><span class="v">已完成 · 不经过 AI</span></div>
+            <div class="kv-row"><span class="k">题号依据与分组结果</span><span class="v">已拿到</span></div>
+            <div class="kv-row"><span class="k">那几段陈述文字（要 AI 写）</span><span class="v v--fog">这次没有</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面批次：以下两卡整块从右栏并进主区（ai-down·s3 改单栏）。
+           原来是「主区讲一遍原因、右栏再讲一遍处境」，两栏各留 344 / 801px 空尾。 -->
+      <div class="solo-grid" data-at="s3" data-when="ai-down">
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-gear"/></svg><span class="solo-c-t">这次实际发生了什么</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k" data-out="kvAns">作答 25 题</span><span class="v">已完成</span></div>
+            <div class="kv-row"><span class="k">记分</span><span class="v">已完成 · 不靠 AI</span></div>
+            <div class="kv-row"><span class="k" data-out="kvSeg">5 段陈述</span><span class="v v--fog">未生成</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">未留存</span></div>
+          </div>
+          <div class="solo-c-p">前面三步都走完了，<b>断在最后一步</b>。</div>
+        </div>
+
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-shield"/></svg><span class="solo-c-t">这次落下的那条记录</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">已入库</span><span class="v">校验摘要一段</span></div>
+            <div class="kv-row"><span class="k">陈述</span><span class="v v--fog">未生成，也不会补</span></div>
+            <div class="kv-row"><span class="k">保留</span><span class="v">24 小时后自动清理</span></div>
+            <div class="kv-row"><span class="k">你点撤回</span><span class="v">物理删除，不可恢复</span></div>
+          </div>
+          <div class="solo-c-p">企业、合作机构和管理后台<b>都看不到</b>。</div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s3" data-when="ai-down">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
-          <b>不等 AI，现在就能走的三条路</b>
+          <b>不等 AI，现在就能走的路</b>
           <span class="mt">这几件都不依赖解读</span>
         </div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+        <div class="sec solo-alts">
           <a class="alt" href="22-career-plan.html">
             <svg class="ic"><use href="#i-route"/></svg>
             <span class="alt-b"><span class="alt-t">去职业规划 · 看岗位原文计数</span>
@@ -429,11 +611,24 @@
             <span class="alt-b"><span class="alt-t">打印、扫描照常</span>
               <span class="alt-s">本机的主业不依赖 AI，要打的材料现在就能打。</span></span>
           </a>
-          <div class="panel-note">你的这次记录还在，右边可以撤回；AI 恢复后再来重做一次就有解读。</div>
+          <!-- 不是为了填版面新加的入口：s4「往期记录」本来就指向同一处，
+               这一态用户最可能问的「那我这次算不算做过」也只有那里能答。 -->
+          <a class="alt" href="43-my-records.html?stage=ai&amp;from=P28">
+            <svg class="ic"><use href="#i-user"/></svg>
+            <span class="alt-b"><span class="alt-t">我的 → AI 服务记录</span>
+              <span class="alt-s">这次的「做过」记在那里。AI 恢复后重做一次（约 5 分钟）才会有解读。</span></span>
+          </a>
         </div>
       </div>
 
-      <!-- ─────────── S4 往期记录 ─────────── -->
+      <!-- ─────────── S4 往期记录 · 单栏 ───────────
+           2026-08-11 版面批次：这一步原来是两栏，右栏底部实测空 925px —— 全站最严重。
+           成因不是「没写完」：按本页的隐私规则，往期本来就**只有次数**，
+           右侧那根 348px 的参数栏在这一步没有任何合法内容可放。
+           所以整步改单栏，把原右栏两张卡（记录规则 / 下次再做会怎样）的事实
+           并进主区做两列卡阵，按主内容的尺寸排。
+           红线：不因为版面空就编「两次结果对比」——本页比不了，这一点在
+           「为什么比不了」那张卡里直说，是解释，不是数据。 -->
       <div class="pane" data-at="s4">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-history"/></svg>
@@ -456,25 +651,66 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s4">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <b>为什么这里只有次数、没有明细</b>
-        </div>
-        <div class="sec">
-          <div class="notice">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>本机手里剩下的<b>只有「做过」这件事</b>。</span>
-          </div>
+      <div class="notice" data-at="s4" data-when="first">
+        <svg class="ic"><use href="#i-help"/></svg>
+        <span>第一次来的话：这一页是<b><span data-out="firstNote">25 道选择题、约 5 分钟</span></b>的倾向整理，
+              做完能打印带走。这一屏是往期，回上一步才是这次的结果。</span>
+      </div>
 
-          <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">记下的</span><span class="v">次数 · 日期 · 题数</span></div>
+      <div class="solo-grid" data-at="s4">
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-check"/></svg><span class="solo-c-t">这里记下了什么</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">次数</span><span class="v">3 次（含今天）</span></div>
+            <div class="kv-row"><span class="k">日期</span><span class="v">每次的日子</span></div>
+            <div class="kv-row"><span class="k">题数</span><span class="v">那次答了几题</span></div>
+          </div>
+          <div class="solo-c-p">就这三样。它们合起来只能说明<b>「你做过」</b>。</div>
+        </div>
+
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="solo-c-t">这里没有什么</span></div>
+          <div class="kv">
             <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">从未入库</span></div>
             <div class="kv-row"><span class="k">过期的陈述</span><span class="v v--fog">已自动清理</span></div>
             <div class="kv-row"><span class="k">撤回的那次</span><span class="v v--fog">已物理删除</span></div>
           </div>
+          <div class="solo-c-p">不是没加载出来，是<b>本来就不存</b>。</div>
+        </div>
 
-          <div class="field-lb" style="margin-top:var(--s-5)">要看更多，去这两处</div>
+        <!-- 从页脚抽屉「隐私 · 保留期限 · 删除口径」最后一段移回常驻：
+             这一屏用户最想干的事就是「跟上次比一比」，页面必须当面回答做不到，
+             而不是让他先展开折叠条才发现。 -->
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-refresh"/></svg><span class="solo-c-t">为什么比不了两次</span></div>
+          <div class="solo-c-p">要能比，就得把两次的<b>作答原文都留着</b>。本机选了不留 —— 这是
+            取舍，不是漏做。所以每次都从头答，没有「接着上次」。</div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">重做一次</span><span class="v">从头 25 题 · 约 5 分钟</span></div>
+            <div class="kv-row"><span class="k">新结果</span><span class="v">重新算 24 小时</span></div>
+            <div class="kv-row"><span class="k">旧的</span><span class="v v--fog">到点照常清理</span></div>
+          </div>
+        </div>
+
+        <!-- 原右栏「记录规则」整块并进来 -->
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-shield"/></svg><span class="solo-c-t">这条记录谁看得见</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">保存位置</span><span class="v">服务端 · 仅本人</span></div>
+            <div class="kv-row"><span class="k">企业 / 合作机构</span><span class="v v--fog">不可见</span></div>
+            <div class="kv-row"><span class="k">管理后台</span><span class="v v--fog">不可见</span></div>
+            <div class="kv-row"><span class="k">岗位排序</span><span class="v v--fog">不参与</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-route"/></svg>
+          <b>要看更多，去这两处</b>
+          <span class="mt">这一页只有次数，明细在别处</span>
+        </div>
+        <div class="sec solo-alts">
           <!-- 2026-08-10 改：原指 23-me.html（「我」的域首屏，无 AI 记录明细），
                「去这两处看更多」兑现不了 → 直落 43-my-records.html?stage=ai -->
           <a class="alt" href="43-my-records.html?stage=ai&amp;from=P28">
@@ -482,7 +718,7 @@
             <span class="alt-b"><span class="alt-t">我的 → AI 服务记录</span>
               <span class="alt-s">你在本机用过的各项 AI 服务都记在那里，含这一项的次数。</span></span>
           </a>
-          <a class="alt" href="22-career-plan.html" style="margin-top:var(--s-3)">
+          <a class="alt" href="22-career-plan.html">
             <svg class="ic"><use href="#i-route"/></svg>
             <span class="alt-b"><span class="alt-t">职业规划 · 拿着倾向去对照岗位</span>
               <span class="alt-s">那页依据本机读过的岗位正文，说的是「见到多少条」，和这页正好互补。</span></span>
@@ -577,6 +813,26 @@
         </div>
       </div>
 
+      <!-- 2026-08-11 版面批次：从页脚抽屉「隐私 · 保留期限 · 删除口径」移回常驻。
+           这一步用户正要按下「同意并开始作答」——「机器到底存什么、存多久」
+           是这一步的决策依据，不该藏在折叠条里。抽屉里仍保留完整条款原文。 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-eye"/></svg><b>同意之后，机器保存什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">从不入库</span></div>
+            <div class="kv-row"><span class="k">真正入库的</span><span class="v">摘要 + 陈述</span></div>
+            <div class="kv-row"><span class="k">陈述保留</span><span class="v">24 小时后自动清理</span></div>
+            <div class="kv-row"><span class="k">你点撤回</span><span class="v">物理删除，不可恢复</span></div>
+            <div class="kv-row"><span class="k">企业 / 后台</span><span class="v v--fog">看不到，也不参与排序</span></div>
+            <div class="kv-row"><span class="k">游客做的</span><span class="v v--fog">连次数都不留</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            提交前，你的选择不出这台机器。
+          </div>
+        </div>
+      </div>
+
       <!-- S2 右 -->
       <div class="pane" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>进度</b></div>
@@ -593,6 +849,18 @@
         </div>
       </div>
 
+      <!-- 2026-08-11 版面批次：整块从主区挪来。进度是「参数 / 指标」，本来就属右栏；
+           主区腾出来给题干做主视觉。竖排是因为 348px 里五列会把组名挤成两行。 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>五组进度</b></div>
+        <div class="sec">
+          <div class="grp" data-out="grp"></div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            组间顺序固定，答完自动进下一组。
+          </div>
+        </div>
+      </div>
+
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>作答期间，数据在哪</b></div>
         <div class="sec">
@@ -601,11 +869,16 @@
             <div class="kv-row"><span class="k">提交时</span><span class="v">一次性上传记分</span></div>
             <div class="kv-row"><span class="k">入库的</span><span class="v v--fog">摘要 + 陈述</span></div>
             <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">当场丢弃</span></div>
+            <!-- 2026-08-11：以下两行从页脚抽屉「隐私」段移回常驻。
+                 人正在答题，「我这次到底会不会被记一笔」是当下的疑问。 -->
+            <div class="kv-row"><span class="k">游客作答</span><span class="v v--fog">连次数都不留</span></div>
+            <div class="kv-row"><span class="k">会员作答</span><span class="v">只记一条「做过」</span></div>
           </div>
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>记分是<b>固定权重累加</b>，不是 AI 猜的。</span>
+            <span>记分是<b>按你选项的固定权重累加</b>，不是 AI 猜的 ——
+                  所以 AI 不可用时作答与记分照常，缺的只是最后那几段解读文字。</span>
           </div>
         </div>
       </div>
@@ -623,6 +896,11 @@
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">合计</span><span class="v" data-out="pgTotal">1 页</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v" data-out="pgFee">预估 <b>0.20</b> 元</span></div>
+            <!-- 2026-08-11：以下三行从页脚抽屉「产物去向与费用」移回常驻。
+                 「这 0.20 元买到的纸上到底印什么」正是这一步要做的决定。 -->
+            <div class="kv-row"><span class="k">纸上印的</span><span class="v"><b data-out="segN">5</b> 段陈述 + 题号依据</span></div>
+            <div class="kv-row"><span class="k">脚注固定印着</span><span class="v">不构成能力证明</span></div>
+            <div class="kv-row"><span class="k">你的作答原文</span><span class="v v--fog">不印，也没留</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -633,7 +911,7 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+      <div class="pane" data-at="s3" data-when="default first device-off">
         <div class="pane-hd"><svg class="ic"><use href="#i-trash"/></svg><b>这份结果由你处置</b></div>
         <div class="sec">
           <div class="tline">
@@ -662,82 +940,33 @@
         </div>
       </div>
 
-      <!-- S3 右 · ai-down：实际发生了什么 -->
-      <div class="pane" data-at="s3" data-when="ai-down">
-        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这次实际发生了什么</b></div>
+      <!-- 2026-08-11 版面批次：从页脚抽屉「证据分级怎么读」移回常驻，只在 s3 出现。
+           屏幕上此刻正挂着 E1 / E3 两枚徽章，解释徽章含义的那一段
+           放在折叠条里等于没解释。抽屉里仍保留完整条款。 -->
+      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>那两枚徽章怎么读</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k" data-out="kvAns">作答 25 题</span><span class="v">已完成</span></div>
-            <div class="kv-row"><span class="k">记分</span><span class="v">已完成 · 不靠 AI</span></div>
-            <div class="kv-row"><span class="k" data-out="kvSeg">5 段陈述</span><span class="v v--fog">未生成</span></div>
-            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">未留存</span></div>
+            <div class="kv-row"><span class="k"><span class="ev ev--e1">E1</span></span><span class="v">你自己的选择与材料</span></div>
+            <div class="kv-row"><span class="k"><span class="ev ev--e2">E2</span></span><span class="v">系统按固定权重算出的事实</span></div>
+            <div class="kv-row"><span class="k"><span class="ev ev--e3">E3</span></span><span class="v">AI 写的解读 · 仅供参考</span></div>
           </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s3" data-when="ai-down">
-        <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>接下来</b></div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">不想留这次记录，可以撤回</span>
-                <span class="tl-s">摘要也一并物理删除</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">AI 恢复后重新作答</span>
-                <span class="tl-s">约 5 分钟，重做才有陈述</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">先去职业规划对照岗位</span>
-                <span class="tl-s">岗位计数不靠 AI，现在就能看</span></span></div>
-          </div>
+      <!-- S3 · ai-down 右栏已整体撤销（2026-08-11 版面批次）：这一态改单栏，
+           「实际发生了什么」「这次落下的那条记录」两块已并入主区卡阵。
+           原「接下来」三条：撤回写进卡里；重做与去职业规划写进主区四条出口。 -->
 
-          <a class="alt" href="22-career-plan.html" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-route"/></svg>
-            <span class="alt-b"><span class="alt-t">去职业规划</span>
-              <span class="alt-s">看本机这批岗位里各类要求出现了多少条。</span></span>
-          </a>
-        </div>
-      </div>
+      <!-- S4 右栏已整体撤销（2026-08-11 版面批次）：s4 改单栏，
+           原「记录规则」「下次再做会怎样」两卡的事实已并入主区卡阵，
+           这里不再保留重复副本。 -->
 
-      <!-- S4 右 -->
-      <div class="pane" data-at="s4">
-        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>记录规则</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">保存位置</span><span class="v">服务端 · 仅本人</span></div>
-            <div class="kv-row"><span class="k">陈述保留</span><span class="v">24 小时</span></div>
-            <div class="kv-row"><span class="k">对企业可见</span><span class="v v--fog">不可见</span></div>
-            <div class="kv-row"><span class="k">参与岗位排序</span><span class="v v--fog">不参与</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s4">
-        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>下次再做会怎样</b></div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">每次都从头做 25 题</span>
-                <span class="tl-s">原文不留存，没有「接着上次」</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">新结果重新算 24 小时</span>
-                <span class="tl-s">旧的到点照常清理</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">两次想比较，得靠你自己记</span>
-                <span class="tl-s">本机比不了 —— 原文都删了</span></span></div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            <span data-out="firstNote">25 道选择题、约 5 分钟</span>，把倾向整理成明白话，能打印带走。
-          </div>
-        </div>
-      </div>
+      <!-- 首次使用提示已改到主区（2026-08-11 版面批次）：s1 一条 notice、s4 一条 notice。
+           原来这张卡挂在右栏、四个阶段都出，说的是「N 道选择题、约 5 分钟，
+           把倾向整理成明白话，能打印带走」—— 这三件事页头标题、intro 和四步时间线
+           各已写过一遍，四个阶段重复四次，只把右栏顶出 61–140px 的滚动裁切。
+           按去重删掉，不是丢内容。 -->
 
     </div>
   </div>
