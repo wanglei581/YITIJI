@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* 核价门控：金额没显示出来之前，朱砂支付键不存在 */
   .screen:not(.is-quoted) [data-gate="quoted"],
@@ -242,7 +243,24 @@
 </svg>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）
+     只拦 s2–s4。三个阶段的边界是想清楚的，不是图省事：
+
+     · s1 还在挑来源，没有东西可丢，拦截只会烦人。
+     · s5 收银、s6 出纸、s7 取件 **一律不拦**。那时钱已经收了、有取件码，
+       离开不叫「丢东西」——套同一套「离开就没了」的话术会把用户吓回来，
+       甚至让他以为不守在屏幕前就拿不到打印件。这三步的正确出路是取件码，
+       页面里本来就有。
+     · s4 的文案要点明「还没收你钱」，否则用户在核对金额这一步看到
+       「离开就没了」，第一反应是钱要不回来。
+
+     没写 data-guard-keep：本页的「存我的文档」只在 device-off 态出现，
+     默认态没有这个落点。给一个不一定存在的「存下来再走」按钮就是伪造能力。 -->
+<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm"
+     data-guard-at="s2 s3 s4"
+     data-guard-lose-s2="已经带进来的文件、材料体检结果，以及你刚做的遮盖"
+     data-guard-lose-s3="已经带进来的文件、体检结果和你调好的打印参数"
+     data-guard-lose-s4="已经带进来的文件和这一单的打印设置（还没收你钱）">
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
@@ -2267,6 +2285,7 @@
   back.parentNode.insertBefore(alt, back.nextSibling)
 })()
 </script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>
