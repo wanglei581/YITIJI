@@ -22,9 +22,20 @@ cleanup() {
     /tmp/recruitment-wave2-plan-100.json \
     /tmp/recruitment-wave2-plan-1000.json \
     /tmp/recruitment-wave2-full-inventory.json \
+    /tmp/recruitment-wave2-proposed-pack.json \
+    /tmp/recruitment-wave2-proposed-manifest.json \
+    /tmp/recruitment-wave2-proposed-plan.json \
+    /tmp/recruitment-wave2-proposed-ready-report.json \
+    /tmp/recruitment-wave2-proposed-ready-pack.json \
+    /tmp/recruitment-wave2-proposed-ready-manifest.json \
+    /tmp/recruitment-wave2-proposed-ready-plan.json \
+    /tmp/recruitment-wave2-proposed-guard-out.json \
+    /tmp/recruitment-wave2-proposed-guard-err.json \
+    /tmp/recruitment-wave2-proposed-pack-link.json \
+    /tmp/recruitment-wave2-proposed-oversize.json \
     /tmp/rw2-api.log
   do
-    if [ -e "$path" ] && ! rm -f -- "$path"; then cleanup_failed=1; fi
+    if { [ -e "$path" ] || [ -L "$path" ]; } && ! rm -f -- "$path"; then cleanup_failed=1; fi
   done
   return "$cleanup_failed"
 }
@@ -295,4 +306,150 @@ for (const key of ['job_published_dependency_decision_unproven','agency_service_
   if (!report.issues[key] || report.issues[key].count < 1) throw new Error(`missing blocker fixture: ${key}`)
 }
 console.log('Recruitment Wave 2 full PostgreSQL + HTTP inventory: PASS')
+NODE
+node - <<'NODE'
+const crypto = require('node:crypto')
+const fs = require('node:fs')
+const reportPath = '/tmp/recruitment-wave2-full-inventory.json'
+const reportBytes = fs.readFileSync(reportPath)
+const report = JSON.parse(reportBytes)
+const markerAsOf = require('/tmp/recruitment-wave2-ci-manifest.json').asOf
+const ids = (prefix, count) => Array.from({ length: count }, (_, i) => `${prefix}${String(i + 1).padStart(3, '0')}`)
+const expected = (values) => ({ count: values.length,
+  idsSha256: crypto.createHash('sha256').update(JSON.stringify([...values].sort())).digest('hex') })
+const legacyJobs = ['rw2-legacy-job', ...ids('rw2-offline-job-', 100)]
+const pack = {
+  schemaVersion: 1, ruleVersion: 'recruitment-wave2-proposed-governance-v1',
+  sourceInventoryReportSha256: crypto.createHash('sha256').update(reportBytes).digest('hex'),
+  sourceDatabaseSnapshotDigest: report.snapshots.databaseB,
+  restoreSnapshotSha256: 'a'.repeat(64), asOf: markerAsOf,
+  preparedAt: new Date().toISOString(), preparedByRef: 'ci-fixture/owner-001',
+  expectedCoverage: {
+    sources: expected(['rw2-source']), sourceBoundJobs: expected(ids('rw2-job-', 101)),
+    orphanJobs: expected([]), fairs: expected(ids('rw2-fair-', 101)),
+    legacyAgencies: expected(['rw2-legacy-agency']), legacyJobs: expected(legacyJobs),
+    auditCandidates: expected([]),
+  },
+  organizations: [], sources: [], jobLinkEvidence: [], orphanJobs: [], fairs: [], profiles: [], branches: [],
+  qualifications: [], proposedActions: [], auditCandidates: [],
+}
+const manifest = {
+  schemaVersion: 1, ruleVersion: 'recruitment-wave2-plan-v1', snapshotSha256: 'a'.repeat(64),
+  asOf: markerAsOf, approvalRef: 'AUTH/recruitment-wave2/ci-proposed-manifest',
+  approvedAt: pack.preparedAt,
+  agencies: [{ disposition: 'blocker', legacyAgencyId: 'rw2-legacy-agency', reasonCodes: ['ci_fact_missing'] }],
+  jobs: legacyJobs.map((legacyJobId) => ({ disposition: 'blocker', legacyJobId, reasonCodes: ['ci_fact_missing'] })),
+}
+for (const [path, value] of [['/tmp/recruitment-wave2-proposed-pack.json', pack],
+  ['/tmp/recruitment-wave2-proposed-manifest.json', manifest]]) {
+  fs.writeFileSync(path, `${JSON.stringify(value)}\n`, { mode: 0o600 })
+}
+fs.chmodSync(reportPath, 0o600)
+NODE
+assert_proposed_guard_failure() {
+  local evidence_path="$1"
+  local expected_code="$2"
+  set +e
+  node -r @swc-node/register scripts/recruitment-wave2-proposed-governance-dry-run.ts \
+    --inventory-report /tmp/recruitment-wave2-full-inventory.json \
+    --evidence-pack "$evidence_path" \
+    --legacy-manifest /tmp/recruitment-wave2-proposed-manifest.json \
+    >/tmp/recruitment-wave2-proposed-guard-out.json \
+    2>/tmp/recruitment-wave2-proposed-guard-err.json
+  local status=$?
+  set -e
+  if [ "$status" -ne 1 ] || [ -s /tmp/recruitment-wave2-proposed-guard-out.json ] \
+    || ! grep -q "\"errorCode\":\"$expected_code\"" /tmp/recruitment-wave2-proposed-guard-err.json; then
+    echo "expected proposed input guard failure: $expected_code" >&2
+    exit 1
+  fi
+  if grep -Eq 'postgresql://|ci-readonly-password|ci-secret-path' \
+    /tmp/recruitment-wave2-proposed-guard-err.json; then
+    echo 'proposed input guard leaked restricted content' >&2
+    exit 1
+  fi
+}
+chmod 0644 /tmp/recruitment-wave2-proposed-pack.json
+assert_proposed_guard_failure /tmp/recruitment-wave2-proposed-pack.json \
+  RECRUITMENT_WAVE2_PROPOSED_EVIDENCE_PACK_FILE_MODE_INVALID
+chmod 0600 /tmp/recruitment-wave2-proposed-pack.json
+ln -s /tmp/recruitment-wave2-proposed-pack.json /tmp/recruitment-wave2-proposed-pack-link.json
+assert_proposed_guard_failure /tmp/recruitment-wave2-proposed-pack-link.json \
+  RECRUITMENT_WAVE2_PROPOSED_EVIDENCE_PACK_FILE_INVALID
+dd if=/dev/zero of=/tmp/recruitment-wave2-proposed-oversize.json bs=1048576 count=3 status=none
+chmod 0600 /tmp/recruitment-wave2-proposed-oversize.json
+assert_proposed_guard_failure /tmp/recruitment-wave2-proposed-oversize.json \
+  RECRUITMENT_WAVE2_PROPOSED_EVIDENCE_PACK_FILE_SIZE_INVALID
+set +e
+node -r @swc-node/register scripts/recruitment-wave2-proposed-governance-dry-run.ts \
+  --inventory-report /tmp/recruitment-wave2-full-inventory.json \
+  --evidence-pack /tmp/recruitment-wave2-proposed-pack.json \
+  --legacy-manifest /tmp/recruitment-wave2-proposed-manifest.json \
+  >/tmp/recruitment-wave2-proposed-plan.json
+proposed_status=$?
+set -e
+if [ "$proposed_status" -ne 2 ]; then echo "expected proposed governance blockers, got $proposed_status" >&2; exit 1; fi
+node - <<'NODE'
+const report = require('/tmp/recruitment-wave2-proposed-plan.json')
+if (!report.simulatedOnly || report.databaseWrites !== 0 || report.plan.readyForOwnerApproval
+  || report.plan.recommendedExitCode !== 2 || report.plan.fairTargetSafe !== 'unsupported') {
+  throw new Error('proposed governance dry-run lost zero-write or fail-closed semantics')
+}
+console.log('Recruitment Wave 2 PostgreSQL proposed governance zero-write dry-run: PASS')
+NODE
+psql -h localhost -U ci -d ai_job_print_recruitment_wave2_ci -v ON_ERROR_STOP=1 <<'SQL'
+DELETE FROM "QualificationRecord";
+DELETE FROM "OfflineAgencyBranch";
+DELETE FROM "OfflineAgencyProfile";
+UPDATE "JobFair" SET "checkinUrl"='https://jobs.example.test/checkin/1'
+  WHERE id='rw2-fair-001';
+SQL
+set +e
+node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+  >/tmp/recruitment-wave2-proposed-ready-report.json
+ready_report_status=$?
+set -e
+if [ "$ready_report_status" -ne 2 ]; then
+  echo "expected governed-data blockers for ready proposal baseline, got $ready_report_status" >&2
+  exit 1
+fi
+chmod 0600 /tmp/recruitment-wave2-proposed-ready-report.json
+node -r @swc-node/register <<'NODE'
+const crypto = require('node:crypto')
+const fs = require('node:fs')
+const { buildRecruitmentWave2ProposedGovernanceCiFixture, loadRecruitmentWave2GovernanceExtras } =
+  require('./scripts/support/recruitment-wave2-governance-readonly')
+const { loadRecruitmentWave2Snapshot, withRecruitmentWave2Readonly } = require('./scripts/support/recruitment-wave2-readonly-db')
+const { resolveRecruitmentWave2Target } = require('./src/recruitment-content/recruitment-wave2-target')
+;(async () => {
+const reportPath = '/tmp/recruitment-wave2-proposed-ready-report.json'
+const reportBytes = fs.readFileSync(reportPath)
+const report = JSON.parse(reportBytes)
+const config = resolveRecruitmentWave2Target()
+const loaded = await withRecruitmentWave2Readonly(config, async (query, identity) => ({
+  identity, snapshot: await loadRecruitmentWave2Snapshot(query, 100),
+  extras: await loadRecruitmentWave2GovernanceExtras(query, 100, [], ['rw2-evidence']),
+}))
+const fixture = buildRecruitmentWave2ProposedGovernanceCiFixture(loaded.snapshot, loaded.extras,
+  crypto.createHash('sha256').update(reportBytes).digest('hex'), report.snapshots.databaseB,
+  loaded.identity.snapshotAsOf)
+for (const [path, value] of [['/tmp/recruitment-wave2-proposed-ready-pack.json', fixture.governance],
+  ['/tmp/recruitment-wave2-proposed-ready-manifest.json', fixture.manifest]]) {
+  fs.writeFileSync(path, `${JSON.stringify(value)}\n`, { mode: 0o600 })
+}
+})().catch((error) => { console.error(error instanceof Error ? error.message : 'CI fixture failed'); process.exit(1) })
+NODE
+node -r @swc-node/register scripts/recruitment-wave2-proposed-governance-dry-run.ts \
+  --inventory-report /tmp/recruitment-wave2-proposed-ready-report.json \
+  --evidence-pack /tmp/recruitment-wave2-proposed-ready-pack.json \
+  --legacy-manifest /tmp/recruitment-wave2-proposed-ready-manifest.json \
+  >/tmp/recruitment-wave2-proposed-ready-plan.json
+node - <<'NODE'
+const report = require('/tmp/recruitment-wave2-proposed-ready-plan.json')
+if (!report.simulatedOnly || report.databaseWrites !== 0 || !report.plan.readyForOwnerApproval
+  || report.plan.recommendedExitCode !== 0 || report.plan.blockers.total !== 0
+  || report.plan.fairTargetSafe !== 'unsupported' || report.plan.writerEligible) {
+  throw new Error('proposed governance ready dry-run lost zero-write or exit-0 semantics')
+}
+console.log('Recruitment Wave 2 PostgreSQL proposed governance 0/1/2 gates: PASS')
 NODE
