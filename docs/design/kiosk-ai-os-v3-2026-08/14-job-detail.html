@@ -21,6 +21,10 @@
   .screen:not(.is-leaving) .sheet-mask { display: none; }
   /* chip--info：状态标签，非入口（与 P17/P18/P20 同一先例） */
   .chip--info { cursor: inherit; }
+  /* 右栏五张卡同屏（匹配参考 / AI 解读 / 扫码 / 还能做什么 / 投完去哪看）：
+     .out 默认 72px 起、单行标签实际 84px，四个按钮占两行。这里页内收紧到 64px，
+     仍远高于 48px 触控下限，换来右栏不挤爆。只作用于本页，不动共享 components.css。 */
+  .work--detail .out { min-height: 64px; padding: var(--s-3); }
 </style>
 </head>
 <body>
@@ -33,11 +37,12 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="13-jobs-desk.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 岗位信息</span></a>
     <a class="brand" href="13-jobs-desk.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">岗位详情</div>
-        <div class="brand-sub">职易达 · 01 号机 · 信息来自第三方来源，投递在来源平台完成</div>
+        <div class="brand-sub">01 号机 · 来源第三方 · 投递在来源平台</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -207,9 +212,8 @@
             <span class="cnt cnt--miss"><b>1</b><span>没写到</span></span>
           </div>
           <p style="margin:0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55">
-            只有三档：较高 / 中等 / 偏低。<b>不给百分比，也不预测录用概率。</b>
+            只有三档，<b>不给百分比、不预测录用概率</b>。逐条比对见下卡。
           </p>
-          <a class="btn btn--ghost" href="11-jobfit-compare.html" style="width:100%;margin-top:12px">看逐条比对</a>
         </div>
         <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="first">
           还没有简历，不给匹配参考——没有你的材料就无从比对，猜一个档位对你没用。
@@ -229,20 +233,23 @@
           <span class="s" data-when="ai-down">不可用</span>
         </div>
         <div data-when="default first device-off" style="display:flex;flex-direction:column;gap:10px">
-          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
-            <b style="color:var(--fog-900)">这条岗位重点看什么</b><br>
-            「独立使用 SQL 取数」在职责和要求里各出现一次——数据能力是硬门槛，不是加分项。
-            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          <div style="font-size:var(--fz-2);line-height:1.55;color:var(--fog-800)">
+            <span style="display:flex;align-items:center;gap:8px">
+              <b style="color:var(--fog-900)">重点看什么</b><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+            </span>
+            「独立使用 SQL 取数」在要求里写了两次，是硬门槛。
           </div>
-          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
-            <b style="color:var(--fog-900)">你可能想核实什么</b><br>
-            「独立完成活动」的边界：预算多少、有没有设计和投放资源，面试时值得当面问清。
-            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          <div style="font-size:var(--fz-2);line-height:1.55;color:var(--fog-800)">
+            <span style="display:flex;align-items:center;gap:8px">
+              <b style="color:var(--fog-900)">想核实什么</b><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+            </span>
+            「独立完成活动」的边界：预算与投放资源，当面问清。
           </div>
-          <div style="font-size:var(--fz-2);line-height:1.6;color:var(--fog-800)">
-            <b style="color:var(--fog-900)">建议准备什么</b><br>
-            一两个有数据结果的活动案例，和一段能当场讲清楚的 SQL 取数经历。
-            <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+          <div style="font-size:var(--fz-2);line-height:1.55;color:var(--fog-800)">
+            <span style="display:flex;align-items:center;gap:8px">
+              <b style="color:var(--fog-900)">建议准备什么</b><span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
+            </span>
+            一两个带数据的活动案例，一段讲得清的取数经历。
           </div>
           <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s2" style="width:100%" data-when="default device-off">拿这条岗位去比对</a>
         </div>
@@ -254,8 +261,9 @@
       <!-- 扫码投递 -->
       <div class="pane" data-at="ok">
         <div class="pane-hd"><span class="t">扫码投递</span><span class="s">在你手机上完成</span></div>
-        <div class="qr">
-          <div class="qr-box">
+        <div class="qr" style="padding:var(--s-5)">
+          <!-- 码面 152px：右栏五卡同屏，码只要能扫得动就够，不必占满一屏高度 -->
+          <div class="qr-box" style="width:152px;height:152px">
             <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
               <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
               <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
@@ -271,8 +279,8 @@
             </svg>
           </div>
           <span class="qr-cap">
-            用手机扫这个码，会打开<b>来源平台的该岗位页面</b>，在手机上登录并投递。<br>
-            <span style="color:var(--fog-600)">码只在本次会话有效，离场即失效。投递这一步，本机不上传、不转交你的简历。</span>
+            扫码用手机打开<b>来源平台的岗位页</b><br>
+            <span style="color:var(--fog-600)">码本次会话有效；本机不上传你的简历</span>
           </span>
         </div>
       </div>
@@ -290,8 +298,7 @@
         </div>
         <div class="notice" style="margin-top:14px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机<b>只记两件事</b>：你看过这个岗位、你打开过来源平台。
-            登录后记录在岗位业务页的浏览记录里；未登录只留本次会话。<b>不记录你投没投、投没投成。</b></span>
+          <span>本机<b>只记两件事</b>：你看过这个岗位、你打开过来源平台。<b>不记录你投没投、投没投成。</b></span>
         </div>
       </div>
 
@@ -300,13 +307,12 @@
       <div class="pane pane--fill pane--grow" data-at="ok">
         <div class="pane-hd"><span class="t">投完之后，去哪看</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">投递结果</span><span class="v">来源平台你自己的账号里</span></div>
-          <div class="kv-row"><span class="k">面试邀约</span><span class="v">来源平台站内信，或企业直接联系你</span></div>
-          <div class="kv-row"><span class="k">本机能查的</span><span class="v">只有你的浏览与跳转记录 · 登录后在岗位页</span></div>
+          <div class="kv-row"><span class="k">投递结果与邀约</span><span class="v">来源平台你自己的账号里</span></div>
+          <div class="kv-row"><span class="k">本机能查</span><span class="v">登录后在岗位页看浏览与跳转记录</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>公共终端提醒：投递在你手机上完成即可，<b>不需要在本机登录来源平台</b>。</span>
+          <span>公共终端提醒：<b>不需要在本机登录来源平台</b>，手机上完成即可。</span>
         </div>
       </div>
 

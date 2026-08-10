@@ -172,6 +172,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="01-home-v5.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 首页</span></a>
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
@@ -685,7 +686,9 @@
           <label class="ck ck--have">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">纸质简历 6–10 份</span>
-              <span class="ck-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估 · 以打印工作台核价为准）</span></span>
+              <!-- 括号内原用「·」分隔，实测在此宽度下断行恰好把「·」甩到行首（中文排版禁则）。
+                   改成逗号：信息一字不减，且浏览器不会让「，」起行。 -->
+              <span class="ck-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估，以打印工作台核价为准）</span></span>
           </label>
           <label class="ck" style="margin-top:var(--s-3)">
             <span class="ck-box"></span>

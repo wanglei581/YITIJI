@@ -128,6 +128,7 @@
   background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd);
   font-size: var(--fz-2); color: var(--fog-800); letter-spacing: .04em;
   backdrop-filter: blur(12px);
+  white-space: nowrap;
 }
 
 /* ---------------- 来源卡：合规要求（来源机构 + 同步时间 [+ 外部ID]） ---------------- */

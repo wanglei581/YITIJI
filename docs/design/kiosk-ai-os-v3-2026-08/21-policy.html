@@ -114,6 +114,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="01-home-v5.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 首页</span></a>
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
@@ -243,9 +244,10 @@
                 <span class="pol-t">一次性求职创业补贴</span>
                 <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕14 号</span>
               </span>
-              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
+              <span class="pol-verdict-status pv--maybe" style="margin-left:auto" data-when="default first device-off">像是符合</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--ok"><i></i><span>本市户籍 —— <b>你选了本市户籍</b></span></div>
               <div class="cd cd--ok"><i></i><span>处于失业状态并已做失业登记 —— 你选了离职找工作中</span></div>
               <div class="cd cd--dunno"><i></i><span><b>你做过失业登记吗？</b>本机不知道。
@@ -260,16 +262,17 @@
                 <span class="pol-t">灵活就业人员社保补贴</span>
                 <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕09 号</span>
               </span>
-              <span class="pol-verdict-status pv--gap" style="margin-left:auto">卡一条</span>
+              <span class="pol-verdict-status pv--gap" style="margin-left:auto" data-when="default first device-off">卡一条</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--ok"><i></i><span>本市户籍 —— 满足</span></div>
               <div class="cd cd--no"><i></i><span><b>要求以灵活就业身份连续缴纳社保满 3 个月</b> ——
                 你选的是「离职 1–6 个月」，如果这期间<b>没有自己交社保</b>，这条不成立。<br>
                 这是你目前卡住的那一条。</span></div>
               <div class="cd cd--dunno"><i></i><span>年龄需在法定退休年龄前 —— 本机不知道你的年龄，也不问。</span></div>
             </div>
-            <div class="panel-note">
+            <div class="panel-note" data-when="default first device-off">
               如果你确实在自己交社保，把缴费记录带上再去 —— 这条可能就通了。
             </div>
           </div>
@@ -280,9 +283,10 @@
                 <span class="pol-t">职业技能培训补贴</span>
                 <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕21 号</span>
               </span>
-              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
+              <span class="pol-verdict-status pv--maybe" style="margin-left:auto" data-when="default first device-off">像是符合</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--ok"><i></i><span>本市户籍或本市缴社保 —— 满足</span></div>
               <div class="cd cd--ok"><i></i><span>法定劳动年龄内有就业需求 —— 满足</span></div>
               <div class="cd cd--dunno"><i></i><span>需参加<b>目录内</b>的培训并取得证书才能申领 ——
@@ -296,9 +300,10 @@
                 <span class="pol-t">就业见习补贴</span>
                 <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕11 号</span>
               </span>
-              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
+              <span class="pol-verdict-status pv--no" style="margin-left:auto" data-when="default first device-off">按你填的看不符合</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--no"><i></i><span>面向<b>毕业 2 年内未就业的高校毕业生</b>或 16–24 岁失业青年 ——
                 你选的是「离职找工作中」，不是应届。<br>
                 如果你其实是毕业两年内，<b>回上一步改一下</b>，这条会重新判。</span></div>
@@ -311,9 +316,10 @@
                 <span class="pol-t">创业担保贷款贴息</span>
                 <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社财〔2026〕05 号</span>
               </span>
-              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
+              <span class="pol-verdict-status pv--no" style="margin-left:auto" data-when="default first device-off">按你填的看不符合</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--no"><i></i><span>需已办理营业执照并正常经营 —— 你没选「想创业 / 已创业」。</span></div>
             </div>
           </div>
@@ -324,15 +330,16 @@
                 <span class="pol-t">失业保险金申领</span>
                 <span class="pol-m">来源：市社会保险基金管理中心 · 同步 8月9日 07:30 · 文号 穗社保〔2026〕02 号</span>
               </span>
-              <span class="pol-verdict-status pv--gap" style="margin-left:auto">要你自己确认两条</span>
+              <span class="pol-verdict-status pv--gap" style="margin-left:auto" data-when="default first device-off">要你自己确认两条</span>
             </div>
-            <div class="cond">
+            <div class="panel-note" data-when="ai-down">本机这次<b>没有核对条件</b> —— 上面一行是来源与文号，条件请看原文。</div>
+            <div class="cond" data-when="default first device-off">
               <div class="cd cd--dunno"><i></i><span><b>累计缴纳失业保险满 1 年</b> —— 本机查不到你的参保记录，
                 这条只能你自己查（社保 App 或社保窗口）。</span></div>
               <div class="cd cd--dunno"><i></i><span><b>非因本人意愿中断就业</b> ——
                 主动辞职通常不算。这条以经办机构对你离职原因的认定为准。</span></div>
             </div>
-            <div class="panel-note">
+            <div class="panel-note" data-when="default first device-off">
               这两条本机都判不了，所以不给结论 —— <b>不猜比猜错强</b>。
             </div>
           </div>
@@ -347,7 +354,8 @@
 
       <!-- ─────────── S3 带走办事清单 ─────────── -->
       <div class="paper-bar" data-at="s3">
-        <span class="nm">办事清单 · 一次性求职创业补贴等 3 项</span>
+        <span class="nm" data-when="default first device-off">办事清单 · 一次性求职创业补贴等 3 项</span>
+        <span class="nm" data-when="ai-down">办事清单（未核对条件）· 等 3 项</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
           <button class="pgbtn" aria-label="上一页">‹</button>
@@ -360,9 +368,13 @@
         <div class="sheet-a4">
           <div class="gd">
             <h1>办事清单</h1>
-            <div class="gd-sub">
+            <div class="gd-sub" data-when="default first device-off">
               2026年8月9日 13:18 由职易达一体机打印 · 政策同步于 8月9日 07:30<br>
               按你在本机选的「离职找工作中 / 本市户籍 / 离职 1–6 个月」生成
+            </div>
+            <div class="gd-sub" data-when="ai-down">
+              2026年8月9日 13:18 由职易达一体机打印 · 政策同步于 8月9日 07:30<br>
+              按你选的类别列出相关政策的原文要点 · <b>本单未做条件核对</b>（打印时 AI 不可用）
             </div>
             <div class="gd-hr"></div>
 
@@ -384,9 +396,13 @@
             <div class="gd-i"><i></i><span>带：身份证原件、离职证明、本人银行卡</span></div>
             <div class="gd-i"><i></i><span>办理：社保经办机构窗口</span></div>
 
-            <div class="gd-w">你目前卡住的一条</div>
-            <div class="gd-i"><i></i><span>灵活就业社保补贴要求<b>以灵活就业身份连续缴社保满 3 个月</b>。
+            <div class="gd-w" data-when="default first device-off">你目前卡住的一条</div>
+            <div class="gd-i" data-when="default first device-off"><i></i><span>灵活就业社保补贴要求<b>以灵活就业身份连续缴社保满 3 个月</b>。
               如果你这期间自己交了社保，<b>带上缴费记录</b>再去问，这条可能就通了。</span></div>
+
+            <div class="gd-w" data-when="ai-down">本单没有「你卡在哪一条」</div>
+            <div class="gd-i" data-when="ai-down"><i></i><span>打印时 AI 不可用，本机<b>没有核对你的条件</b>。
+              上面每条的条件请照原文自己核 —— 本单没标不等于你都满足。</span></div>
 
             <div class="gd-foot">
               本单由职易达一体机根据公开政策文件生成，<b>不是资格认定</b>，仅供你自己参考。<br>
@@ -466,7 +482,7 @@
       </div>
 
       <!-- S2 右 -->
-      <div class="pane" data-at="s2">
+      <div class="pane" data-at="s2" data-when="default first device-off">
         <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这 6 条的结果</b></div>
         <div class="sec">
           <div class="kv">
@@ -481,13 +497,30 @@
         </div>
       </div>
 
+      <!-- ai-down：分类结果来自条件核对，这一态没核对，就不给分类，只报条数 -->
+      <div class="pane" data-at="s2" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次只列到这</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">相关政策</span><span class="v"><b>6</b> 条</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v">8月9日 07:30</span></div>
+            <div class="kv-row"><span class="k">条件核对</span><span class="v v--fog">AI 不可用 · 未做</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            条数是本机数出来的；<b>符合 / 不符合的分类这次没有</b> ——
+            没标不等于你都满足，条件请照原文自己核。
+          </div>
+        </div>
+      </div>
+
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b></div>
         <div class="sec">
           <label class="ck">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">办失业登记</span>
-              <span class="ck-s">政务网或户籍地街道办 · 没登记，第 ① 条不成立</span></span>
+              <span class="ck-s" data-when="default first device-off">政务网或户籍地街道办 · 没登记，第 ① 条不成立</span>
+              <span class="ck-s" data-when="ai-down">政务网或户籍地街道办 · 多数求职类补贴的通用前置</span></span>
           </label>
           <label class="ck" style="margin-top:var(--s-3)">
             <span class="ck-box"></span>
@@ -502,8 +535,12 @@
                   先办完再跑窗口，能少跑一趟。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="default first device-off">
             办完回来可以再来本机重新核对一遍，重打清单不额外收费（只算纸张）。
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="ai-down">
+            办完回来可以再来本机核对一遍 —— <b>要等 AI 恢复才核得了</b>；
+            重打清单不额外收费（只算纸张）。
           </div>
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
@@ -607,7 +644,8 @@
   <div class="actionbar">
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">改一下情况</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看核对结果</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="default first device-off">回看核对结果</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="ai-down">回看政策原文</button>
 
     <span class="actionbar-hint" data-at="s1">只用这三项判定 · 不问身份证号</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first">2 条像是符合 · 2 条待确认 · 2 条不符合</span>
@@ -617,7 +655,8 @@
 
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看我卡在哪<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成办事清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成办事清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成办事清单（未核对条件）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>

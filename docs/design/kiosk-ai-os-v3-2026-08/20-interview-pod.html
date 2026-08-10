@@ -142,6 +142,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="01-home-v5.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 首页</span></a>
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
@@ -160,8 +161,12 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">练什么·怎么答</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐题作答</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">看点评</span></button>
-      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走复盘单</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span>
+        <span class="rstep-name" data-when="default first device-off">看点评</span>
+        <span class="rstep-name" data-when="ai-down">看这次答案</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span>
+        <span class="rstep-name" data-when="default first device-off">带走复盘单</span>
+        <span class="rstep-name" data-when="ai-down">带走答案单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
   </div>
@@ -337,7 +342,28 @@
       </div>
 
       <!-- ─────────── S3 看点评 ─────────── -->
-      <div class="pane" data-at="s3">
+      <!-- 2026-08-10 复审：s3/s4 原先没有 ai-down 分支，AI 中断时照样铺满点评结论，
+           与顶栏「AI 不可用 · 只能看题不能点评」和 s1「本次只会看题，不会有点评」自相矛盾。
+           按 CLAUDE.md §9「不伪造能力」：AI 判断部分按态门控，你自己答的原文（E1）保留。 -->
+      <div class="pane" data-at="s3" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <b>这次没有点评</b>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>AI 不可用，这一步做不出点评。</b>下面留着的是<b>你自己答的原文</b> ——
+                  哪几题说清楚了、缺什么，本机这次判断不了，也不会先写一个占着位置。<br>
+                  题目和你的答案可以照常打印带走，AI 恢复后回来重跑一次就有点评。</span>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            答过的内容仍然离场即清，不因为这次没点评而多留。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s3" data-when="default first device-off">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-shield"/></svg>
           <b>先说清楚本机能判断什么</b>
@@ -363,13 +389,14 @@
           <div class="rev">
             <div class="rev-hd">
               <span class="rev-q">第 3 题 · 3% 是怎么测出来的</span>
-              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto">说清楚了</span>
+              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto" data-when="default first device-off">说清楚了</span>
+              <span class="rev-tag-status" style="margin-left:auto" data-when="ai-down">待点评</span>
             </div>
             <div class="rev-said">
               你说：连续跑三天量产单，记录进料总数和停机次数，卡料率＝停机次数／进料总数，
               改造前同样口径是 12%，第二版平均 3.1%。
             </div>
-            <div class="rev-p">
+            <div class="rev-p" data-when="default first device-off">
               <b>好在</b>：说了测法、说了周期、说了改造前用的是同一口径 ——
               最后这点最关键，两个数字口径一致，比较才成立。
             </div>
@@ -378,12 +405,13 @@
           <div class="rev">
             <div class="rev-hd">
               <span class="rev-q">第 1 题 · 自我介绍</span>
-              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto">有缺口</span>
+              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto" data-when="default first device-off">有缺口</span>
+              <span class="rev-tag-status" style="margin-left:auto" data-when="ai-down">待点评</span>
             </div>
             <div class="rev-said">
               你说：我叫王磊，做机械设计六年，主要做非标自动化夹具，用 SolidWorks 和 CAD。
             </div>
-            <div class="rev-p">
+            <div class="rev-p" data-when="default first device-off">
               <b>缺的是</b>：没说<b>为什么来应聘这个岗</b>。
               自我介绍最后一句通常要落到"所以我想做什么"，否则听完不知道你要什么。<br>
               另外六年经验只说了工具，<b>没说做成过什么</b> —— 你后面第 3 题讲的那个卡料率，
@@ -394,12 +422,13 @@
           <div class="rev">
             <div class="rev-hd">
               <span class="rev-q">第 2 题 · 遇到过最难的技术问题</span>
-              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto">有缺口</span>
+              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto" data-when="default first device-off">有缺口</span>
+              <span class="rev-tag-status" style="margin-left:auto" data-when="ai-down">待点评</span>
             </div>
             <div class="rev-said">
               你说：有一次产线夹具老是定位不准，查了很久，后来换了个定位销的方案就好了。
             </div>
-            <div class="rev-p">
+            <div class="rev-p" data-when="default first device-off">
               <b>缺的是</b>：「查了很久」中间发生了什么。这类题问的就是<b>你怎么排查</b>，
               不是最后换了什么。<br>
               试着补：先怀疑什么、怎么排除的、怎么确定是定位销。
@@ -410,12 +439,13 @@
           <div class="rev">
             <div class="rev-hd">
               <span class="rev-q">第 4 题 · 期望薪资</span>
-              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto">说清楚了</span>
+              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto" data-when="default first device-off">说清楚了</span>
+              <span class="rev-tag-status" style="margin-left:auto" data-when="ai-down">待点评</span>
             </div>
             <div class="rev-said">
               你说：参考同行水平，也看岗位具体职责，可以谈。
             </div>
-            <div class="rev-p">
+            <div class="rev-p" data-when="default first device-off">
               这样答没问题。<b>本机不给你建议报多少</b> ——
               薪资跟地区、行业、公司规模都相关，本机没有可靠依据，编一个数字反而害你。
             </div>
@@ -423,14 +453,19 @@
 
         </div>
 
-        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)" data-when="default first device-off">
           8 道题里，<b>4 道</b>本机给了点评，另外 4 道你还没答。没答的不算"不会答"。
+        </div>
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)" data-when="ai-down">
+          8 道题里你答了 <b>4 道</b>，另外 4 道没答。<b>这 4 道一条点评都没有</b> ——
+          不是都合格，是这次判断不了。没答的也不算"不会答"。
         </div>
       </div>
 
       <!-- ─────────── S4 带走复盘单 ─────────── -->
       <div class="paper-bar" data-at="s4">
-        <span class="nm">面试复盘单 · 机械设计 / 工艺岗</span>
+        <span class="nm" data-when="default first device-off">面试复盘单 · 机械设计 / 工艺岗</span>
+        <span class="nm" data-when="ai-down">题目与答案单 · 机械设计 / 工艺岗</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
           <button class="pgbtn" aria-label="上一页">‹</button>
@@ -442,25 +477,35 @@
       <div class="paper-stage" data-at="s4">
         <div class="sheet-a4">
           <div class="rp">
-            <h1>面试复盘单</h1>
-            <div class="rp-sub">
+            <h1 data-when="default first device-off">面试复盘单</h1>
+            <h1 data-when="ai-down">题目与答案单</h1>
+            <div class="rp-sub" data-when="default first device-off">
               机械设计 / 工艺岗 · 2026年8月9日 11:32 · 打字作答 · 已答 4 / 8 题<br>
               由职易达一体机生成，仅供你自己参考
             </div>
+            <div class="rp-sub" data-when="ai-down">
+              机械设计 / 工艺岗 · 2026年8月9日 11:32 · 打字作答 · 已答 4 / 8 题<br>
+              由职易达一体机生成 · <b>本单不含点评</b>：生成时 AI 不可用
+            </div>
             <div class="rp-hr"></div>
 
-            <div class="rp-q">1. 自我介绍 —— 有缺口</div>
+            <div class="rp-q" data-when="default first device-off">1. 自我介绍 —— 有缺口</div>
+            <div class="rp-q" data-when="ai-down">1. 自我介绍</div>
             <div class="rp-a">你说：做机械设计六年，非标自动化夹具，SolidWorks / CAD。</div>
-            <div class="rp-fix">补：最后落到<b>为什么来应聘这个岗</b>；把卡料率 12%→3% 这件事挪到这里。</div>
+            <div class="rp-fix" data-when="default first device-off">补：最后落到<b>为什么来应聘这个岗</b>；把卡料率 12%→3% 这件事挪到这里。</div>
 
-            <div class="rp-q">2. 最难的技术问题 —— 有缺口</div>
+            <div class="rp-q" data-when="default first device-off">2. 最难的技术问题 —— 有缺口</div>
+            <div class="rp-q" data-when="ai-down">2. 最难的技术问题</div>
             <div class="rp-a">你说：夹具定位不准，查了很久，换了定位销方案。</div>
-            <div class="rp-fix">补：<b>怎么排查的</b> —— 先怀疑什么、怎么排除、怎么确定是定位销。过程比结论值钱。</div>
+            <div class="rp-fix" data-when="default first device-off">补：<b>怎么排查的</b> —— 先怀疑什么、怎么排除、怎么确定是定位销。过程比结论值钱。</div>
 
-            <div class="rp-q">3. 3% 怎么测出来的 —— 说清楚了</div>
-            <div class="rp-a">三天量产单，停机次数／进料总数，改造前同口径 12%。<b>两个数字口径一致，这点做得好。</b></div>
+            <div class="rp-q" data-when="default first device-off">3. 3% 怎么测出来的 —— 说清楚了</div>
+            <div class="rp-q" data-when="ai-down">3. 3% 怎么测出来的</div>
+            <div class="rp-a" data-when="default first device-off">三天量产单，停机次数／进料总数，改造前同口径 12%。<b>两个数字口径一致，这点做得好。</b></div>
+            <div class="rp-a" data-when="ai-down">你说：三天量产单，停机次数／进料总数，改造前同口径 12%。</div>
 
-            <div class="rp-q">4. 期望薪资 —— 说清楚了</div>
+            <div class="rp-q" data-when="default first device-off">4. 期望薪资 —— 说清楚了</div>
+            <div class="rp-q" data-when="ai-down">4. 期望薪资</div>
             <div class="rp-a">参考同行水平，看岗位职责，可以谈。</div>
 
             <div class="rp-q">还没答的 4 道（可以自己想）</div>
@@ -469,9 +514,15 @@
               7. 这个岗位你觉得最难的地方是什么？&nbsp; 8. 你有什么想问我们的？
             </div>
 
-            <div class="rp-foot">
+            <div class="rp-foot" data-when="default first device-off">
               本单只判断你<b>说清楚了没有</b>（有没有讲背景、做法、结果，有没有答到点上）。<br>
               本机<b>判断不了</b>你说的是否属实、数字是否准确、做法在你们行业里是否合理。<br>
+              本机<b>不预测录用结果</b>，本单不代表任何用人单位的评价，也不作为任何凭证。<br>
+              作答内容不留存，离场即清；本单不含你的手机号与身份证号。
+            </div>
+            <div class="rp-foot" data-when="ai-down">
+              打印这一单时 AI 不可用，<b>全单没有点评</b> —— 上面每一题只有题目和你自己写的答案。
+              没写「有缺口」不代表答得好，是这次没判断。<br>
               本机<b>不预测录用结果</b>，本单不代表任何用人单位的评价，也不作为任何凭证。<br>
               作答内容不留存，离场即清；本单不含你的手机号与身份证号。
             </div>
@@ -571,7 +622,7 @@
       </div>
 
       <!-- S3 右 -->
-      <div class="pane" data-at="s3">
+      <div class="pane" data-at="s3" data-when="default first device-off">
         <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次的主要缺口</b></div>
         <div class="sec">
           <div class="kv">
@@ -585,17 +636,39 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>反复出现的一条</b></div>
+      <!-- ai-down：只留本机数得出来的（答了几题），缺口分类属 AI 判断，不显示 -->
+      <div class="pane" data-at="s3" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次答了多少</b></div>
         <div class="sec">
-          <div class="advice-act" style="font-size:var(--fz-4)">你讲结论，不讲过程。</div>
-          <div class="advice-why" style="margin-top:var(--s-3)">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已答</span><span class="v"><b>4</b> 题</span></div>
+            <div class="kv-row"><span class="k">还没答</span><span class="v"><b>4</b> 题</span></div>
+            <div class="kv-row"><span class="k">缺口分类</span><span class="v v--fog">AI 不可用 · 无</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            题数是本机数出来的；「说清楚了 / 有缺口」要 AI 判断，这次没有 ——
+            空着比先给个分类实诚。这里本来也不打分、不排名。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd" data-when="default first device-off"><svg class="ic"><use href="#i-alert"/></svg><b>反复出现的一条</b></div>
+        <div class="pane-hd" data-when="ai-down"><svg class="ic"><use href="#i-alert"/></svg><b>跨次对比这次做不了</b></div>
+        <div class="sec">
+          <div class="notice notice--amber" data-when="ai-down">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>「反复出现的一条」是把今天和上一次的<b>缺口类型</b>比出来的，
+                  要 AI 先判断出缺口类型才比得了 —— 这次比不了，所以这里是空的。</span>
+          </div>
+          <div class="advice-act" style="font-size:var(--fz-4)" data-when="default first device-off">你讲结论，不讲过程。</div>
+          <div class="advice-why" style="margin-top:var(--s-3)" data-when="default first device-off">
             8月2日那次第 2 题、今天第 2 题，<b>都是这个问题</b>：
             「查了很久，后来换了方案就好了」——中间那段才是对方想听的。<br><br>
             下次答这类题，试着按<b>先怀疑什么 → 怎么排除 → 怎么确认</b>说一遍，
             哪怕说得慢一点。
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="default first device-off">
             这条是把今天和 8月2日 两次比出来的 ——
             本机只比"缺口类型"，<b>不保存你两次说过的内容</b>。
           </div>
@@ -619,9 +692,13 @@
                 <span class="tl-s">答"没有"最吃亏，准备两个问题带过去</span></span></div>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="default first device-off">
             这 4 道的<b>题目</b>会印在复盘单上，你可以带回去自己想 ——
             但只有在本机答过的题才有点评。
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="ai-down">
+            这 4 道的<b>题目</b>会印在带走单上，你可以带回去自己想。
+            这次全单都没有点评 —— 答过的那 4 道也一样。
           </div>
         </div>
       </div>
@@ -632,13 +709,15 @@
         <div class="sec">
           <label class="ck ck--have">
             <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">面试复盘单</span>
+            <span class="ck-b"><span class="ck-t" data-when="default first device-off">面试复盘单</span>
+              <span class="ck-t" data-when="ai-down">题目与答案单（无点评）</span>
               <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
           </label>
           <label class="ck" style="margin-top:var(--s-3)">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">还没答的 4 道题</span>
-              <span class="ck-s">已含在复盘单里，不用单独打</span></span>
+              <span class="ck-s" data-when="default first device-off">已含在复盘单里，不用单独打</span>
+              <span class="ck-s" data-when="ai-down">已含在这一单里，不用单独打</span></span>
           </label>
 
           <div class="kv" style="margin-top:var(--s-4)">
@@ -669,7 +748,8 @@
                 <span class="tl-s">只记练了哪个岗、答了几题</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">你答的内容离场即清</span>
-                <span class="tl-s">复盘单也不存进「我的文档」，只有纸</span></span></div>
+                <span class="tl-s" data-when="default first device-off">复盘单也不存进「我的文档」，只有纸</span>
+                <span class="tl-s" data-when="ai-down">这一单也不存进「我的文档」，只有纸</span></span></div>
           </div>
 
           <div class="notice" style="margin-top:var(--s-4)">
@@ -699,19 +779,24 @@
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2">跳过这题</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">继续答剩下 4 题</button>
-    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看点评</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3" data-when="default first device-off">回看点评</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3" data-when="ai-down">回看答案</button>
 
     <span class="actionbar-hint" data-at="s1" data-when="default first">8 道题 · 约 15 分钟 · 没有倒计时</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 本次只能看题，不会有点评</span>
-    <span class="actionbar-hint" data-at="s2">第 3 题 / 共 8 题 · 想好再写</span>
-    <span class="actionbar-hint" data-at="s3">2 题说清楚了 · 2 题有缺口 · 4 题没答</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first device-off">第 3 题 / 共 8 题 · 想好再写</span>
+    <span class="actionbar-hint" data-at="s2" data-when="ai-down">第 3 题 / 共 8 题 · 答完不会有点评</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first device-off">2 题说清楚了 · 2 题有缺口 · 4 题没答</span>
+    <span class="actionbar-hint" data-at="s3" data-when="ai-down">已答 4 题 · 4 题没答 · 本次无点评</span>
     <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看题目<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">答完了，看点评<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-go="s4">生成复盘单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">答完了，看点评<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">答完了，看这次的答案<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first device-off">生成复盘单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="ai-down">生成题目与答案单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>

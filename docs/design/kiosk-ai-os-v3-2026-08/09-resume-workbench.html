@@ -24,6 +24,17 @@
   .work--diag .dim-nm { width: 7em; }
   /* chip--info：状态提示，非入口（先例见 P14/P17） */
   .chip--info { cursor: inherit; }
+  /* 2026-08-10 补验：正文里的裸 <a> 实测只有 17px 高，27 寸竖屏触控点不中，
+     违反 CLAUDE.md §9「可点击区域不小于 48px」。改成行内 48px 触控块，
+     文案与去向不变，只把它做成真的能按的东西。 */
+  .inlink {
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+    min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+    border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+    background: var(--fog-a04); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+  }
+  .inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 0; color: var(--fog-600); }
 </style>
 </head>
 <body>
@@ -36,6 +47,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="01-home-v5.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 首页</span></a>
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
@@ -511,10 +523,14 @@
           <b>ATS 机读友好</b>看版式能否被招聘系统正确读取：单栏、无表格嵌套、字体可提取<span class="ev ev--e1">E1 你的材料</span>；
           <b>真实性自查</b>只列出待你核对的表述（本份有 3 处数字待核实），不下真假结论<span class="ev ev--e3">E3 AI 判断</span>
         </p>
-        <div class="notice" data-when="default device-off" style="margin-top:12px">
+        <!-- 2026-08-10 补验：原来「去证件照工作台」是正文里的裸 <a>，实测 17px 高，
+             触控点不中。整条 notice 改成可点的行（同 P31 .fprev 先例），
+             触控高度 ≈ 100px，且不占额外高度、不挤压下方「可改点」列表。 -->
+        <a class="notice" href="29-id-photo.html" data-when="default device-off"
+           style="margin-top:12px;text-decoration:none;color:inherit">
           <svg class="ic"><use href="#i-idcard"/></svg>
-          <span><span class="chip chip--info">照片提示</span> 这份简历<b>没有照片</b>。简历没有照片 / 照片不规范 → <a href="29-id-photo.html">去证件照工作台</a>处理，只生成新版本，原件不动。</span>
-        </div>
+          <span><span class="chip chip--info">照片提示</span> 这份简历<b>没有照片</b>。简历没有照片 / 照片不规范 → <b>去证件照工作台</b>处理，只生成新版本，原件不动。<svg class="ic" style="width:15px;height:15px;vertical-align:-2px;margin:0 0 0 4px"><use href="#i-chevron"/></svg></span>
+        </a>
         <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="ai-down">
           诊断服务中断，不给结论。左边的原文可以正常翻看、打印、存档。
         </p>
@@ -640,9 +656,9 @@
         <div class="notice">
           <svg class="ic"><use href="#i-check"/></svg>
           <span>打印、扫描、存档、岗位与招聘会浏览<b>都不受影响</b>：
-            <a href="06-print-workbench.html?stage=s3">去打印</a> ·
-            <a href="13-jobs-desk.html">看岗位</a> ·
-            <a href="17-fair-desk.html">看招聘会</a></span>
+            <a class="inlink" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印</a>
+            <a class="inlink" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位</a>
+            <a class="inlink" href="17-fair-desk.html"><svg class="ic"><use href="#i-fair"/></svg>看招聘会</a></span>
         </div>
       </div>
     </div>

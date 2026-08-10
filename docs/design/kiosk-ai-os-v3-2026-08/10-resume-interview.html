@@ -63,6 +63,16 @@
   .said-group { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .08em; margin: var(--s-2) 0 0; }
   /* chip--info：状态提示，非入口（先例见 P14/P17） */
   .chip--info { cursor: inherit; }
+  /* 2026-08-10 补验：s3「版本与体检」里的裸 <a> 实测只有 41px 高，
+     不到 CLAUDE.md §9 的 48px 触控下限。改成行内 48px 触控块，去向不变。 */
+  .inlink {
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+    min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+    border-radius: var(--r-sm); border: 1px solid var(--amber-a20);
+    background: var(--amber-a12); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+  }
+  .inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 0; color: var(--amber-400); }
 </style>
 </head>
 <body>
@@ -75,6 +85,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
+    <a class="backbtn" href="09-resume-workbench.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · AI 简历服务</span></a>
     <a class="brand" href="09-resume-workbench.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
@@ -382,7 +393,7 @@
         </div>
         <div class="notice notice--amber" style="margin-top:12px" data-when="default first device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>联系方式你没留，文件上这一行是空的。<b>投出去之前一定要补</b>，否则招聘方联系不到你。</span>
+          <span>联系方式你没留，文件上这一行是空的。<b>投出去之前一定要补</b>，否则招聘方联系不到你。<span class="ev ev--e1">E1 这次访谈记录</span></span>
         </div>
       </div>
 
@@ -391,8 +402,8 @@
         <div class="pane-hd"><span class="t">版本与体检</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-refresh"/></svg>
-          <span><b>生成新版本后，旧的诊断结论就失效了。</b>诊断是对着某一版做的：这份访谈版是新文件，之前任何版本的体检结论都不适用于它——
-            <a href="09-resume-workbench.html?stage=s3">去简历工作台重新体检</a>，再决定要不要逐条优化。</span>
+          <span><b>生成新版本后，旧的诊断结论就失效了。</b>诊断是对着某一版做的：这份访谈版是新文件，之前任何版本的体检结论都不适用于它——重新体检后再决定要不要逐条优化。
+            <a class="inlink" href="09-resume-workbench.html?stage=s3"><svg class="ic"><use href="#i-target"/></svg>去简历工作台重新体检</a></span>
         </div>
       </div>
 
@@ -410,7 +421,7 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span data-when="default first device-off">建议先补联系方式和教育背景，再做一次诊断——新版本要重新体检，旧结论不算数。</span>
+          <span data-when="default first device-off">建议先补联系方式和教育背景，再做一次诊断——新版本要重新体检，旧结论不算数。<span class="ev ev--e1">E1 你这次跳过了教育、证书，也没留联系方式</span></span>
           <span data-when="ai-down">AI 不可用，只能导出草稿或打印空白表格。不给下一步建议。</span>
         </div>
       </div>
