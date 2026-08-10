@@ -325,7 +325,7 @@ export class MemberDataExportReconcilerService {
   private async isFilePhysicallyGone(fileId: string): Promise<boolean> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file?.deletedAt || file.purpose !== 'member_data_export') return false
-    return (await this.storage.headObject(file.storageKey, file.bucket)) === null
+    return (await this.storage.headObject(file.storageKey, file.bucket, file.storageProvider)) === null
   }
 
   private async finalize(

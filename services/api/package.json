@@ -104,6 +104,8 @@
     "verify:llm-connectivity": "node -r @swc-node/register scripts/verify-llm-connectivity.ts",
     "verify:cos": "tsx scripts/verify-cos-storage.ts",
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",
+    "verify:bos": "tsx scripts/verify-bos-storage.ts",
+    "verify:bos:live": "tsx scripts/verify-bos-live.ts",
     "verify:cos-lifecycle-policy": "node -r @swc-node/register scripts/verify-cos-lifecycle-policy.ts",
     "verify:file-retention": "node -r @swc-node/register scripts/verify-file-retention.ts",
     "verify:file-delete-consistency": "node -r @swc-node/register scripts/verify-file-delete-consistency.ts",
@@ -239,6 +241,7 @@
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts"
   },
   "dependencies": {
+    "@baiducloud/sdk": "1.0.7",
     "@libsql/client": "^0.17.3",
     "@napi-rs/canvas": "^1.0.0",
     "@nestjs/bullmq": "^11.0.4",

@@ -100,6 +100,9 @@ export class ContentService {
         type: v.kind,
         title,
         storageKey,
+        storageProvider: this.storage.driver,
+        storageBucket: this.storage.defaultBucket,
+        storageRegion: this.storage.defaultRegion,
         mimeType: args.mimeType,
         sizeBytes: args.buffer.length,
         sha256,
@@ -187,7 +190,7 @@ export class ContentService {
     // 物理删除文件 + 软删元数据(保留删除痕迹,审计可追溯)。
     // 外链素材无物理文件,跳过对象存储删除(storageKey 为合成键 external:<id>)。
     if (record.source !== 'external_url') {
-      await this.storage.deleteObject(record.storageKey)
+      await this.storage.deleteObject(record.storageKey, record.storageBucket, record.storageProvider)
     }
     const updated = await this.prisma.adAsset.update({
       where: { id },
@@ -204,7 +207,7 @@ export class ContentService {
     if (record.source === 'external_url') {
       throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
     }
-    const buffer = await this.storage.getObject(record.storageKey)
+    const buffer = await this.storage.getObject(record.storageKey, record.storageBucket, record.storageProvider)
     return { buffer, mimeType: record.mimeType }
   }
 

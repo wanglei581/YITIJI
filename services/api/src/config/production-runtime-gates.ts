@@ -3,7 +3,9 @@
  *
  * 集中校验 NODE_ENV=production 时的安全底线，启动期一次性断言，缺一即拒启动：
  *   - JWT_SECRET 必须存在且长度 >= 16（杜绝不安全回退签密钥）
- *   - FILE_STORAGE_DRIVER 必须为 cos（生产不得回退本地磁盘存储，合规要求落 COS）
+ *   - FILE_STORAGE_DRIVER 必须为 cos 或 bos（生产不得回退本地磁盘存储）
+ *   - 所选对象存储的服务端凭证、私有桶和区域配置必须齐全
+ *   - BOS 迁移期必须显式保留 COS 作为 legacy provider，避免历史运营素材误读本地
  *   - DATABASE_URL 不得为 file: SQLite（委托 assertRuntimeDatabaseAllowed，与现有
  *     verify:production-db-guard 共用同一判定，避免双份口径漂移）
  *   - REDIS_URL 必须存在（会员会话、队列、幂等和防重放依赖 Redis）
@@ -36,6 +38,16 @@ export interface ProductionRuntimeEnv {
   NODE_ENV?: string
   JWT_SECRET?: string
   FILE_STORAGE_DRIVER?: string
+  FILE_STORAGE_LEGACY_DRIVER?: string
+  TENCENT_COS_SECRET_ID?: string
+  TENCENT_COS_SECRET_KEY?: string
+  TENCENT_COS_BUCKET?: string
+  TENCENT_COS_REGION?: string
+  BAIDU_BOS_ACCESS_KEY_ID?: string
+  BAIDU_BOS_SECRET_ACCESS_KEY?: string
+  BAIDU_BOS_BUCKET?: string
+  BAIDU_BOS_REGION?: string
+  BAIDU_BOS_ENDPOINT?: string
   DATABASE_URL?: string
   REDIS_URL?: string
   SMS_PROVIDER?: string
@@ -69,6 +81,19 @@ const REQUIRED_TENCENT_SMS_KEYS = [
   'TENCENT_SMS_SIGN_NAME',
   'TENCENT_SMS_TEMPLATE_ID',
 ] as const
+const REQUIRED_COS_KEYS = [
+  'TENCENT_COS_SECRET_ID',
+  'TENCENT_COS_SECRET_KEY',
+  'TENCENT_COS_BUCKET',
+  'TENCENT_COS_REGION',
+] as const
+const REQUIRED_BOS_KEYS = [
+  'BAIDU_BOS_ACCESS_KEY_ID',
+  'BAIDU_BOS_SECRET_ACCESS_KEY',
+  'BAIDU_BOS_BUCKET',
+  'BAIDU_BOS_REGION',
+  'BAIDU_BOS_ENDPOINT',
+] as const
 
 function hasValue(value: string | undefined): boolean {
   return Boolean(value?.trim())
@@ -88,10 +113,48 @@ export function assertProductionRuntimeGates(
   }
 
   const driver = env.FILE_STORAGE_DRIVER?.trim()
-  if (driver !== 'cos') {
+  if (driver !== 'cos' && driver !== 'bos') {
     throw new Error(
-      `PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS: NODE_ENV=production 时 FILE_STORAGE_DRIVER 必须为 cos（当前: ${driver || '未设置'}）`,
+      `PRODUCTION_FILE_STORAGE_DRIVER_UNSUPPORTED: NODE_ENV=production 时 FILE_STORAGE_DRIVER 必须为 cos 或 bos（当前: ${driver || '未设置'}）`,
     )
+  }
+  const requiredStorageKeys = driver === 'cos' ? REQUIRED_COS_KEYS : REQUIRED_BOS_KEYS
+  const missingStorageKeys = requiredStorageKeys.filter((key) => !hasValue(env[key]))
+  if (missingStorageKeys.length > 0) {
+    throw new Error(
+      `PRODUCTION_FILE_STORAGE_CONFIG_MISSING: FILE_STORAGE_DRIVER=${driver} 时必须配置 ${missingStorageKeys.join(', ')}`,
+    )
+  }
+  if (driver === 'bos') {
+    if (env.FILE_STORAGE_LEGACY_DRIVER?.trim() !== 'cos') {
+      throw new Error(
+        'PRODUCTION_FILE_STORAGE_LEGACY_DRIVER_INVALID: FILE_STORAGE_DRIVER=bos 迁移期必须显式配置 FILE_STORAGE_LEGACY_DRIVER=cos',
+      )
+    }
+    const missingLegacyCosKeys = REQUIRED_COS_KEYS.filter((key) => !hasValue(env[key]))
+    if (missingLegacyCosKeys.length > 0) {
+      throw new Error(
+        `PRODUCTION_LEGACY_COS_CONFIG_MISSING: BOS 迁移期读取历史文件必须配置 ${missingLegacyCosKeys.join(', ')}`,
+      )
+    }
+    let endpoint: URL
+    try {
+      endpoint = new URL(env.BAIDU_BOS_ENDPOINT!)
+    } catch {
+      throw new Error('PRODUCTION_BAIDU_BOS_ENDPOINT_INVALID: BAIDU_BOS_ENDPOINT 必须为 HTTPS regional endpoint')
+    }
+    if (
+      endpoint.protocol !== 'https:' ||
+      endpoint.username ||
+      endpoint.password ||
+      !/(^|\.)bcebos\.com$/i.test(endpoint.hostname) ||
+      endpoint.port ||
+      (endpoint.pathname !== '/' && endpoint.pathname !== '') ||
+      endpoint.search ||
+      endpoint.hash
+    ) {
+      throw new Error('PRODUCTION_BAIDU_BOS_ENDPOINT_INVALID: BAIDU_BOS_ENDPOINT 必须为 HTTPS regional endpoint')
+    }
   }
 
   const databaseUrl = env.DATABASE_URL

@@ -226,7 +226,7 @@ export class PrintConversionService {
         throw new BadRequestException({ error: { code: 'CONVERT_TOTAL_LIMIT_EXCEEDED', message: '图片总大小超出限制（40MB）' } })
       }
 
-      const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+      const buffer = await this.storage.getObject(record.storageKey, record.bucket, record.storageProvider)
 
       const dims = readImageDimensions(buffer, record.mimeType)
       if (!dims) {

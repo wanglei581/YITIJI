@@ -824,13 +824,15 @@ model CompanyProfile {
 
 model FileObject {
   id          String  @id @default(cuid())
-  // storageKey 即对象存储 objectKey(COS:users/.../{id}.{ext};本地:同键落 FS)。
+  // storageKey 即对象存储 objectKey(COS/BOS:users/.../{id}.{ext};本地:同键落 FS)。
   storageKey  String  @unique
 
-  // ── COS 接入:落库存储位置(provenance + 跨后端路由)─────────────────
-  //   bucket:COS 私有桶名;本地后端用哨兵 'local-fs'。
-  //   region:如 'ap-guangzhou';本地用 'local'。
-  //   读 / 删 / 签名按此 bucket 路由后端,兼容"先本地后切 COS"的历史数据。
+  // ── 对象存储位置(provenance + 跨后端路由)─────────────────────────
+  //   storageProvider:'local' | 'cos' | 'bos'。
+  //   bucket:云端私有桶名;本地后端用哨兵 'local-fs'。
+  //   region:云区域;本地用 'local'。
+  //   读 / 删 / 签名按 provider + bucket 路由,兼容跨云历史数据。
+  storageProvider String @default("local")
   bucket      String  @default("local-fs")
   region      String  @default("local")
 
@@ -1208,6 +1210,10 @@ model FairMaterial {
   description String?
 
   storageKey String @unique
+  // legacy 表示本字段加入前的存量对象；运行时按 FILE_STORAGE_LEGACY_DRIVER 读取。
+  storageProvider String @default("legacy")
+  storageBucket   String?
+  storageRegion   String?
   mimeType   String
   sizeBytes  Int
   sha256     String
@@ -1822,6 +1828,10 @@ model AdAsset {
   type           String   // 'image' | 'video'
   title          String
   storageKey     String   @unique
+  // legacy 表示本字段加入前的存量对象；运行时按 FILE_STORAGE_LEGACY_DRIVER 读取。
+  storageProvider String  @default("legacy")
+  storageBucket   String?
+  storageRegion   String?
   mimeType       String
   sizeBytes      Int
   sha256         String

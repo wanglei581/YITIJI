@@ -44,7 +44,7 @@ export class PrintPageCountService {
     }
 
     if (file.mimeType === 'application/pdf') {
-      const buffer = await this.readOrFail(file.storageKey, file.bucket)
+      const buffer = await this.readOrFail(file.storageKey, file.bucket, file.storageProvider)
       const pages = countPdfPages(buffer)
       if (pages === null || pages <= 0) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
       return { billablePages: pages, billingPageSource: 'pdf_lightweight_scan' }
@@ -58,9 +58,9 @@ export class PrintPageCountService {
     throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
   }
 
-  private async readOrFail(storageKey: string, bucket: string | null): Promise<Buffer> {
+  private async readOrFail(storageKey: string, bucket: string | null, storageProvider: string): Promise<Buffer> {
     try {
-      return await this.storage.getObject(storageKey, bucket)
+      return await this.storage.getObject(storageKey, bucket, storageProvider)
     } catch {
       throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
     }

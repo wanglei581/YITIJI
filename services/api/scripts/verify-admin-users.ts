@@ -421,6 +421,7 @@ async function initFallbackDb(): Promise<void> {
       `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE "FileObject" (
         "id" TEXT NOT NULL PRIMARY KEY, "storageKey" TEXT NOT NULL,
+        "storageProvider" TEXT NOT NULL DEFAULT 'local',
         "bucket" TEXT NOT NULL DEFAULT 'local-fs', "region" TEXT NOT NULL DEFAULT 'local',
         "filename" TEXT NOT NULL, "mimeType" TEXT NOT NULL, "sizeBytes" INTEGER NOT NULL, "sha256" TEXT NOT NULL,
         "uploaderId" TEXT, "endUserId" TEXT, "ownerType" TEXT, "ownerId" TEXT, "purpose" TEXT NOT NULL,
