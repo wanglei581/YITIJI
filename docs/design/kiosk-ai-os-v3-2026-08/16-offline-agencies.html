@@ -36,7 +36,9 @@
   /* 全宽单栏：原 396px 常驻右栏取消 */
   .work--ag { grid-template-columns: 1fr; }
   .work { padding: var(--s-4) var(--gutter); }
-  .wmain { gap: var(--s-4); }
+  /* 本页比其他列表页多一条 80px 防诈骗警示条（不可省），
+     所以栏间距收到 12px、出口行收到 64px，把高度还给机构卡。 */
+  .wmain { gap: 12px; }
 
   /* ── 防诈骗警示条：这一页最值钱的信息，排最前，不缩进页脚小字 ── */
   .warnband {
@@ -137,12 +139,12 @@
   .cfoot-t > span { white-space: nowrap; }
   .cfoot-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
   .cfoot-t b { color: var(--fog-900); }
-  .cfoot .fold { flex: 0 0 auto; width: 320px; border: 0; background: transparent; }
+  .cfoot .fold { flex: 0 0 auto; width: 260px; border: 0; background: transparent; }
 
   /* ── 出口行 ── */
   .exits { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
   .exit {
-    display: flex; align-items: center; gap: 12px; height: 76px; padding: 0 var(--s-4);
+    display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 var(--s-4);
     border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
     text-decoration: none; color: var(--fog-800); font-size: 20px;
   }
@@ -176,13 +178,11 @@
 
   .actionbar .btn--primary { height: 64px; font-size: 22px; }
   .actionbar .btn--lg { height: 56px; font-size: 20px; }
-  /* detail / joboffline 态操作条按钮更多，提示句被挤窄后 .s 折成两行、
+  /* detail / joboffline 态操作条按钮更多，提示句被挤窄后 .s 会折成两行、
      整块溢出 124px 高的操作条（audit-plus 按「卡内溢出」判硬缺陷）。
-     给提示留最小宽度，让它保持单行；文案本身已压到一行的长度。 */
-  .actionbar-hint { min-width: 250px; }
-  /* 提示句拿到最小宽度后，操作条的按钮不能再被压缩去补差额 ——
-     实测「需要帮助」被挤到 94px，四个字被裁（自检「文字裁切」）。 */
-  .actionbar .btn { flex: 0 0 auto; white-space: nowrap; }
+     试过给提示 min-width：那会反过来把「需要帮助」压到 94px 裁字，
+     再加 flex:0 0 auto 又把整条撑出屏宽。最终处置是**去掉那两态的副行**
+     —— 副行的内容本来就在页脚折叠区里，不必在操作条再说一遍。 */
 
   .fsearch {
     width: 100%; min-height: 64px; padding: 0 var(--s-4);
@@ -414,13 +414,14 @@
       <div class="cfoot" data-at="list">
         <span class="cfoot-t">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>营业状态来自机构填报，<b>不是实时探测</b> · 出门前建议先电话确认</span>
+          <span>营业状态为机构填报，<b>非实时探测</b></span>
           <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>
         </span>
         <details class="fold">
           <!-- 标题不写带空格的「 · 」：空格给了换行机会，下一行就以「·」开头（中文禁则，自检判缺陷） -->
           <summary>到店准备与机构口径</summary>
           <div class="fold-b">
+            营业时间是机构填报的，不是本机实时探测——<b>出门前建议先打电话确认</b>，免得白跑一趟。
             <b>到店带什么。</b>
             <div class="kv">
               <div class="kv-row"><span class="k">纸质简历 2–3 份</span><span class="v">可在本机打印；现场直接交给面谈的人</span></div>
@@ -778,10 +779,10 @@
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-at="list"><div class="t">7 家已审核机构，当前条件下显示 <b data-agcount>5</b> 家</div><div class="s">营业状态为机构填报，非实时探测</div></div>
-      <div data-at="detail"><div class="t">本机不代收任何费用</div><div class="s">带什么、是否收费，以现场公示为准</div></div>
-      <div data-at="joboffline"><div class="t">代招岗位，只能到店面谈</div><div class="s">本机不代投递、不代预约</div></div>
-      <div data-at="error"><div class="t">机构数据没取到，已自动上报</div><div class="s">不显示过期营业状态——门可能是锁着的</div></div>
+      <div data-at="list"><div class="t">7 家已审核，当前显示 <b data-agcount>5</b> 家</div><div class="s">营业状态为机构填报</div></div>
+      <div data-at="detail"><div class="t">本机不代收任何费用</div></div>
+      <div data-at="joboffline"><div class="t">代招岗位，只能到店面谈</div></div>
+      <div data-at="error"><div class="t">机构数据没取到，已自动上报</div></div>
     </div>
 
     <a class="btn btn--lg btn--ghost" data-at="list" href="13-jobs-desk.html">看线上岗位</a>
