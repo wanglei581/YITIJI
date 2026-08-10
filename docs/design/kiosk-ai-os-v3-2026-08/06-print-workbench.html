@@ -523,7 +523,7 @@
            所以默认文案也改成只说真实发生的事（收到交接）＋ 一句「还没体检」。 -->
       <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off" id="handoff">
         <svg class="ic"><use href="#i-check" id="handoff-ic"/></svg>
-        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · 来源页标注 <b>3 页</b> · 09:43 收到交接<span class="receipt-n">本机还没体检这份文件，页数与费用以体检为准。</span></span>
+        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · 来源页标注&#160;<b>3&#160;页</b> · 09:43 收到交接<span class="receipt-n">本机还没体检这份文件，页数与费用以体检为准。</span></span>
         <span class="receipt-a"><a class="btn btn--quiet" id="handoff-back" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
       </div>
 
@@ -1933,6 +1933,12 @@
         前端这两个常量只是本机的最后一道兜底，不作为定价依据。
      5. 页数与金额一律以服务端体检 / 核价结果为准；在结果回来之前，界面只能写
         「还没体检」，不得先把 URL 里的数字当成事实展示。
+     6. 已知残留（本轮改不掉，只能靠接线收口）：带交接参数进来时，回执写「本机还没体检
+        这份文件」，而同屏的体检卡与预览区仍是原型样例（「材料体检已完成」「个人简历.pdf」
+        「3 页，无空白页」）。设计稿里没有任何状态能表示「这份交接来的材料已经体检过了」，
+        交接参数按既有约定又无权改写本机体检结论，两句话只能并排摆着。
+        接线后：按 artifactId 查到真实文件 → 体检卡、预览、文件信息、核价一起换成这一份的
+        真实读数，那句「还没体检」也才有对应的「已体检」终态可切。
    ══════════════════════════════════════════════════════════════════════════ */
 ;(function () {
   var scr = document.querySelector('.screen')
@@ -2116,9 +2122,10 @@
       line.appendChild(b(name))
       line.appendChild(txt(' · '))
       if (pages) {
-        /* 「来源页标注」四个字是署名：这个数字是来源页说的，不是本机量出来的 */
+        /* 「来源页标注」四个字是署名：这个数字是来源页说的，不是本机量出来的。
+           数字与单位之间用 nbsp 绑住：不绑的话「来源页标注 3 / 页 × 2 份」会把数和单位拆到两行。 */
         line.appendChild(txt('来源页标注 '))
-        line.appendChild(b(pages + ' 页' + (copies ? ' × ' + copies + ' 份' : '')))
+        line.appendChild(b(pages + '\u00a0页' + (copies ? '\u00a0×\u00a0' + copies + '\u00a0份' : '')))
       } else {
         line.appendChild(txt('页数以本机体检为准'))
       }
@@ -2164,7 +2171,7 @@
     var fp = document.getElementById('fi-pages')
     var fs = document.getElementById('fi-src')
     if (fn) fn.textContent = name
-    if (fp) fp.textContent = pages ? ('来源页标注 ' + pages + ' 页') : '以本机体检为准'
+    if (fp) fp.textContent = pages ? ('来源页标注\u00a0' + pages + '\u00a0页') : '以本机体检为准'
     if (fs) fs.textContent = src.n + ' 送来'
   }
 })()
