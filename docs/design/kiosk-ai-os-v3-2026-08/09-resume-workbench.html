@@ -20,6 +20,50 @@
 <link rel="stylesheet" href="styles/notebar.css?v=2">
 <link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
+  /* 2026-08-11 卡内空洞整改（口径同 08 的 t3 证件照、10、12）：
+     s2 的四张处境卡（解析中断 / 上传失败 / 解析失败 / 识别置信低）都挂着
+     inline flex:1 1 auto 撑满 .scanpages，实测卡高 1288px，里面内容只有
+     329px（ai-down）/ 457px（upfail）/ 586px（ocrlow）/ 631px（parsefail），
+     居中后上下各空 284–443px。
+     居中是对的，卡也确实撑住了栏（主栏尾部读数 0，右栏四张卡是满的），
+     缺的是**放大**：这四张卡是那一刻屏幕上唯一的真话，却还用着默认字号，
+     在 556px 宽、1288px 高的框里像一张便签。按 08 t3 的做法放大到主内容尺寸。
+     kv 明细块跟着放大（它承载的是文件名 / 已收到多少 / 费用这些要看清的事实）。
+     注意只放大 s2 这四张：s3 的 .locked 尺寸另有其位，不连坐。 */
+  .screen[data-stage="s2"] .scanpages > .locked { gap: var(--s-6); padding: var(--s-8); }
+  .screen[data-stage="s2"] .scanpages > .locked > .ic { width: 88px; height: 88px; }
+  .screen[data-stage="s2"] .scanpages > .locked > b { font-size: var(--fz-9); }
+  .screen[data-stage="s2"] .scanpages > .locked p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+  /* work.css 里 .locked b / .paper-empty b 是**后代**选择器（给标题那个 <b> 用的
+     展示体 + fz-7 / fz-5）。正文、notice、kv 里只要出现 <b>，就会被它放大成标题字号 ——
+     实测 notice 里「不会替换你的原件」直接跳成大字，一段话三种字号。
+     这里把非标题位置的 <b> 拉回正文字号（先例：08 t3 的同名规则）。 */
+  .screen[data-stage="s2"] .scanpages > .locked p b,
+  .screen[data-stage="s2"] .scanpages > .locked .notice b,
+  .screen[data-stage="s2"] .scanpages > .locked .kv b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+  .screen[data-stage="s2"] .scanpages > .locked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-6); }
+  .screen[data-stage="s2"] .scanpages > .locked .kv { width: min(460px, 100%) !important; }
+  .screen[data-stage="s2"] .scanpages > .locked .kv-row { min-height: 58px; font-size: var(--fz-3); }
+  .screen[data-stage="s2"] .scanpages > .locked .kv-row .k { white-space: nowrap; }
+  .screen[data-stage="s2"] .scanpages > .locked .notice { font-size: var(--fz-3); line-height: 1.66; padding: var(--s-6); text-align: left; }
+  .screen[data-stage="s2"] .scanpages > .locked .notice .ic { width: 22px; height: 22px; }
+  /* s3 的 first 态同一个毛病：纸台上没有文件，只有一块 368px 的空态浮在
+     1314px 高的深色纸台中间，.paper 因此被报底部空 465px。同样按主内容尺寸放大，
+     并在纸台下面补一张「回第 1 步能传什么进来」——那四条是 s1 自己的来源标签
+     （本机选文件 PDF/图片、只列 PDF/JPG/PNG、纸质件扫成 PDF、图片需先识别文字）
+     原样搬过来。这一态本机正是要把用户送回第 1 步，送之前先告诉他能带什么来。 */
+  .screen[data-stage="s3"] .paper-stage .paper-empty { gap: var(--s-5); padding: var(--s-7); }
+  .screen[data-stage="s3"] .paper-stage .paper-empty .ic { width: 88px; height: 88px; }
+  /* 只放大标题那一个 <b>（直接子元素）。写成后代选择器会把正文里的 <b> 一起拉成
+     fz-9 —— .paper-empty b 在 work.css 里本来就是后代选择器，这里必须收窄。 */
+  .screen[data-stage="s3"] .paper-stage .paper-empty > b { font-size: var(--fz-9); }
+  .screen[data-stage="s3"] .paper-stage .paper-empty p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+  .screen[data-stage="s3"] .paper-stage .paper-empty p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+  .screen[data-stage="s3"] .paper-stage .paper-empty .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-6); }
+  .p09sup { flex: 0 0 auto; }
+  .p09sup .pane-hd .t { font-size: var(--fz-5); }
+  .p09sup .kv-row { min-height: 58px; font-size: var(--fz-3); }
+  .p09sup .kv-row .k { white-space: nowrap; }
   /* 诊断与对比阶段：原文占主体，结论在侧栏 */
   .work--diag { grid-template-columns: 1fr 396px; }
   /* 2026-08-10 六维度诊断：「ATS 机读友好」6 字超出共享样式 5.2em 名宽，本页放宽 */
@@ -480,10 +524,27 @@
             </div>
           </div>
         </div>
+        <!-- 2026-08-11：这一张原来只有一句话 + 两个按钮（实测内容 329px，是四张里最薄的一张），
+             另外三张失败态都带 kv 明细。补齐成同一副骨架 —— 事实没有新增：
+             页数来自上面 paper-bar 的「A4 · 3 页」，「完好保存 / 已自动上报」是原文那句话拆开，
+             「费用未产生」与另三张同一口径，保留期限是页脚折叠条里已经写着的规矩。 -->
         <div class="locked" data-when="ai-down" data-job="ok" style="flex:1 1 auto">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>解析服务中断</b>
-          <p>你的文件<b>完好保存</b>在本次会话里，已<b>自动上报</b>运维。</p>
+          <p>你的文件<b>完好保存</b>在本次会话里，已<b>自动上报</b>运维。
+            中断的只是「读懂这份简历」这一步，<b>文件本身没有任何损坏，也没有被改动</b>。<br>
+            现在就想要东西带走的话，<b>原件可以照原样打印</b>——原样打印不需要 AI。</p>
+          <div class="kv" style="width:min(460px,100%);text-align:left">
+            <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf · 3 页 · 完整</span></div>
+            <div class="kv-row"><span class="k">文件状态</span><span class="v">完好 · 未改动</span></div>
+            <div class="kv-row"><span class="k">解析</span><span class="v v--fog">已中断 · 未产生任何结论</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">未产生</span></div>
+          </div>
+          <div class="notice">
+            <svg class="ic"><use href="#i-eye"/></svg>
+            <span>未登录时文件<b>只留到本次会话结束</b>，离场或超时自动清空 ——
+              要留着请先存进「我的文档」，或者现在把原件打出来带走。</span>
+          </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去：你上传的原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
@@ -499,6 +560,15 @@
             <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
             <div class="kv-row"><span class="k">已收到</span><span class="v">0.4 MB / 1.1 MB · 不完整</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v">未产生</span></div>
+          </div>
+          <!-- 2026-08-11：补这一条不是为了占位 —— 传失败时用户最想知道的是
+               「重传要不要再花一次钱」「是不是接着上次传」，两条本页原来都没答。
+               换来源那句对应的是右边那个「换个来源试试」按钮，说清它为什么值得试。 -->
+          <div class="notice">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>那半份文件<b>不会留在机器上</b>，也不会进「我的文档」。重传是<b>从头开始</b>，
+              不接着上次传，<b>也不会重复收费</b>。换个来源常常更稳：手机扫码传不受 U 盘接触影响，
+              纸质件可以直接走扫描。</span>
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost" data-go="s1">回第 1 步重新上传</button>
@@ -517,6 +587,13 @@
             <div class="kv-row"><span class="k">失败原因</span><span class="v">无文字层，非加密</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v">未产生</span></div>
           </div>
+          <!-- 2026-08-11：补这一条对应「按图片识别再试」那个按钮 —— 用户按之前会想
+               「这会不会把我的原件改了」「要不要再收一次钱」，本页原来两条都没答。 -->
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>走识别<b>不会改动你的原件</b>：识别出来的是<b>另一份结果</b>，原件照旧保留。
+              识别会经<b>第三方 OCR</b>，识别本身<b>不额外收费</b>，只有出纸按页收。</span>
+          </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost" data-job-go="ocrlow">按图片识别再试（OCR）</button>
             <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去：你上传的原件 1 份 · 共 3 页</a>
@@ -534,6 +611,14 @@
             <div class="kv-row"><span class="k">识别方式</span><span class="v">第三方 OCR · 已提示</span></div>
             <div class="kv-row"><span class="k">第 1、3 页</span><span class="v">正常</span></div>
             <div class="kv-row"><span class="k">第 2 页</span><span class="v" style="color:var(--amber-600)">置信偏低 · 需复核</span></div>
+          </div>
+          <!-- 2026-08-11：补这一条对应右边那两个按钮 —— 用户要在「逐句核对」和
+               「重新扫描」之间选，本页原来没说清各自代价，也没说识别结果会不会动原件。 -->
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>识别结果<b>不会替换你的原件</b>，原件始终保留。第 2 页确认之前，
+              诊断<b>不会拿低置信内容下任何结论</b>，也不会把它算进体检分档。
+              手写较多的页，<b>重新扫描一次</b>往往比逐字改快。</span>
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost" data-job-go="ok" data-go="s3">核对完了，进诊断</button>
@@ -603,13 +688,34 @@
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
             <b>还没有简历</b>
-            <p>从零做一份，或回第 1 步把已有的传进来。</p>
+            <p>体检要<b>对着一份具体的简历</b>做。现在没有文件，就没有可诊断的对象 ——
+              本机<b>不会拿模板生成一份假简历</b>来演示给你看。<br>
+              手里有现成的，<b>传进来最快</b>；一份都没有，可以让顾问问你几个问题，边聊边成形。</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
               <a class="btn btn--primary" href="10-resume-interview.html"><svg class="ic"><use href="#i-brain"/></svg>让小青问你几个问题</a>
               <a class="btn btn--ghost" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>扫描纸质简历</a>
               <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 卡内空洞整改：first 态纸台上没有文件，.paper 底部被报空 465px。
+           这一张把它接住。四条不是新写的，是第 1 步来源卡自己的标签
+           （「本机选文件 · PDF / 图片」「只列 PDF / JPG / PNG」「只有纸质件时用，扫成 PDF」
+           「JPG · 需先识别文字」）搬到这里 —— 这一态本机正要把用户送回第 1 步，
+           送之前就该告诉他能带什么来，而不是让他到了那边再猜。 -->
+      <div class="pane p09sup" data-at="s3" data-when="first">
+        <div class="pane-hd"><span class="t">回第 1 步能传什么进来</span><span class="s">四条来源</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">本机选文件</span><span class="v">只认 PDF / JPG / PNG</span></div>
+          <div class="kv-row"><span class="k">手机里的</span><span class="v">扫码传过来，不用装 App</span></div>
+          <div class="kv-row"><span class="k">纸质件</span><span class="v">走扫描，先扫成 PDF 再进来</span></div>
+          <div class="kv-row"><span class="k">图片简历</span><span class="v v--fog">要先识别文字（OCR）才能诊断</span></div>
+        </div>
+        <div class="notice" style="margin-top:var(--s-4)">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>体检一次只对着<b>你选中的那一份</b>做。传进来之后还想换，在第 1 步的已选条上点「换一份」。</span>
         </div>
       </div>
 

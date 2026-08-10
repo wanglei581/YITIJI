@@ -576,8 +576,16 @@
         </div>
       </div>
 
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏两张 .sheet-a4 都判**纸样类豁免**。
+           共同依据（实测 default/s3）：.sheet-a4 是 aspect-ratio 1/1.414 的真 A4 纸样，
+           纸宽 928px 已铺满 968px 主栏，不是浮在栏上半截、下半截露栏背景；.paper-stage 是
+           overflow:auto 的连续滚动阅读器（clientH 886 / scrollHeight 2672），纸溢出栏底靠滚动看。
+           所以空的不是版面，是**纸**。纸会从出纸口带去经办窗口，往空白处填东西 =
+           在用户拿去办事的纸上印本机没有依据的内容。
+           两张纸的正文都随勾选实时变长（清单跟着办事项数、目录跟着勾中的原文份数），不是写死的短样张。 -->
       <div class="paper-stage" data-at="s3" id="paperStage">
-        <div class="sheet-a4">
+        <div class="sheet-a4"
+             data-void-ok="A4 纸样：办事清单是一页短文档，3 项办事项各自的「带什么 / 去哪办」写完就到「本单仅供参考…本机不代办」收尾；项数由左侧勾选实时决定，勾更多纸面自然变长">
           <div class="gd">
             <h1>办事清单</h1>
             <div class="gd-sub"><b id="gdCity">广州市</b> · 2026年8月9日 13:18 打印 · 同步 07:30</div>
@@ -592,7 +600,10 @@
           </div>
         </div>
 
-        <div class="sheet-a4" id="docSheet">
+        <!-- 这张实测 top=2017 已在 1920 视口之外，审计器按「不在视口内」跳过、当前不报数；
+             但它跟上面那张是同一类东西（而且更短），一并声明，免得将来版面一动就冒出来。 -->
+        <div class="sheet-a4" id="docSheet"
+             data-void-ok="A4 纸样：这张是附页目录（告诉用户后面跟着哪几份原文、共几页），本身就只有目录那几行；真正的政策原文按官方公开文件另页转录，不在这张上">
           <div class="gd">
             <h1>政策原文 · 附页目录</h1>
             <div class="gd-sub" id="dsSub">2 份 · 共 4 页 · 跟在清单后面打印</div>

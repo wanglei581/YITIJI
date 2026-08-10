@@ -65,6 +65,38 @@
      s1/s2 主栏空洞用真实信息补；locked 卡撑满访谈区——空态居中是意图，背景空洞不是。 */
   .qa > .locked { flex: 1 1 auto; }
   .paper-stage .paper-empty { flex: 1 1 auto; }
+  /* 2026-08-11 卡内空洞整改（口径同 08 的 t3 证件照、12 的 t2）：
+     上一条「locked 卡撑满访谈区」把主栏尾部读数做成了 0，但空洞只是从栏背景搬进了卡里 ——
+     实测 s2/ai-down 的 .locked 高 1376px 里只有 242px 内容居中，上下各空 520px；
+     s1/ai-down 高 1175px 里 348px，上下各空 370px；s3 的 .paper 高 1376px，而 A4 只有
+     797px 高（栏宽 604px × 1.414 就这么高），纸下方 511px 是**裸露的深色纸台背景** ——
+     那不是纸空，是版面没接住纸。
+     三处按同一套改：① 空态构图按主内容尺寸放大（图标 88px / 标题 fz-9 / 正文 fz-5 /
+     按钮 64px，27 寸竖屏触控见 CLAUDE.md §9）；② 下面补真实信息块把栏接满，
+     .locked 与 .paper 保留 flex:1 1 auto，吸收的是补块之后的剩余，自身余白落到 200px 以内。
+     补块内容全部来自本页已经说过的话：s2 是 .qa-said 里用户自己答过的两条原话，
+     s1 是 qa-hint「这一整套是纯 AI 能力」的展开，s3 是页脚折叠条「产物去向与费用」
+     「隐私 · 保留期限」两节移回常驻 —— 到了要把文件拿走这一步，收不收费、存多久、
+     离场会不会清，是当场就得知道的事，不该还收在折叠条里。 */
+  .screen[data-stage="s1"] .qa > .locked,
+  .screen[data-stage="s2"] .qa > .locked { gap: var(--s-5); padding: var(--s-7); }
+  .screen[data-stage="s1"] .qa > .locked > .ic,
+  .screen[data-stage="s2"] .qa > .locked > .ic { width: 88px; height: 88px; }
+  .screen[data-stage="s1"] .qa > .locked > b,
+  .screen[data-stage="s2"] .qa > .locked > b { font-size: var(--fz-9); }
+  .screen[data-stage="s1"] .qa > .locked p,
+  .screen[data-stage="s2"] .qa > .locked p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+  .screen[data-stage="s1"] .qa > .locked p b,
+  .screen[data-stage="s2"] .qa > .locked p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+  .screen[data-stage="s1"] .qa > .locked .btn,
+  .screen[data-stage="s2"] .qa > .locked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-6); }
+  /* 补块：604px 栏宽放不下两列 kv（实测标签会逐字断行），所以竖排单列。 */
+  .p10stack { display: flex; flex-direction: column; gap: var(--s-4); flex: 0 0 auto; }
+  .p10stack .pane-hd .t { font-size: var(--fz-5); }
+  .p10stack .kv-row { min-height: 58px; font-size: var(--fz-3); }
+  .p10stack .kv-row .k { white-space: nowrap; }
+  .p10stack .notice { font-size: var(--fz-3); line-height: 1.66; padding: var(--s-5); }
+  .p10stack .notice .ic { width: 22px; height: 22px; }
   .said--todo { border-style: dashed; background: transparent; }
   .said--todo .said-a { color: var(--fog-600); }
   .said-group { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .08em; margin: var(--s-2) 0 0; }
@@ -202,12 +234,36 @@
 
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
-          <b>两条不依赖 AI 的路</b>
-          <p><b>一、打印一份空白简历表格</b>，用笔手写填好，再回来扫描进系统。<br>
-             <b>二、如果你手机里已经有简历</b>，扫码传过来直接做诊断（诊断也要 AI，但可以先存着）。</p>
+          <b>访谈现在开不了，但有两条不依赖 AI 的路</b>
+          <p>访谈是<b>纯 AI 能力</b>：按你上一句话决定下一个问题，再把你说的口语理成书面表达。
+            现在这两件都做不了，所以<b>我不能替你提问</b>，也不会拿一套通用模板假装聊过。<br>
+            <b>一、打印一份空白简历表格</b>，用笔手写填好，再回来扫描进系统。<br>
+            <b>二、如果你手机里已经有简历</b>，扫码传过来先存着（诊断也要 AI，恢复后再做）。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <a class="btn btn--ghost" href="06-print-workbench.html">打印空白表格</a>
             <a class="btn btn--ghost" href="09-resume-workbench.html">我有简历，扫码传</a>
+          </div>
+        </div>
+
+        <!-- 2026-08-11 卡内空洞整改：这张卡没有新增任何能力说明 —— 它是 qa-hint
+             「这一整套是纯 AI 能力」逐条摊开：哪一步要 AI、哪一步不要。中断态最容易被
+             误解成「整台机器坏了」，说清边界比再放一个入口有用。
+             只放一张：实测再加一张，主栏会溢出 112px 被 .wmain 的 overflow:hidden 切掉，
+             那是拿一个缺陷换另一个缺陷。替代出口在上面 locked 卡的两个按钮里已经给全。 -->
+        <div class="p10stack" data-when="ai-down">
+          <div class="pane">
+            <div class="pane-hd"><span class="t">哪一步要 AI，哪一步不要</span><span class="s">中断影响到哪为止</span></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">逐题追问</span><span class="v v--fog">按你上一句定下一题 · 要 AI · 现在不可用</span></div>
+              <div class="kv-row"><span class="k">口语理成书面</span><span class="v v--fog">把你说的整理成简历句 · 要 AI · 现在不可用</span></div>
+              <div class="kv-row"><span class="k">打印与扫描</span><span class="v">不受影响 · 空白表格现在就能打</span></div>
+              <div class="kv-row"><span class="k">文件存取</span><span class="v">不受影响 · 传进来的简历可以先存着</span></div>
+              <div class="kv-row"><span class="k">诊断与优化</span><span class="v v--fog">同样要 AI · 恢复后再做</span></div>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>服务恢复后回这一页，<b>从第 1 个话题开始</b>；本机不会把中断前的空白当成你答过。</span>
+            </div>
           </div>
         </div>
       </div>
@@ -295,10 +351,33 @@
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>访谈中断，你说过的都留着</b>
-          <p>前 2 个话题的回答<b>已经存在本次会话里</b>，没有丢。</p>
+          <p>前 2 个话题的回答<b>已经存在本次会话里，没有丢</b> —— 下面就是你说过的原话，
+            你可以自己核对。<b>没答的那 8 个话题，本机不会替你编出来</b>。<br>
+            现在可以把已答的部分<b>导出成草稿带走</b>，或者打印一份空白表格用笔把剩下的补齐；
+            服务恢复后回这一页，<b>从中断的那一题接着答</b>。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost">导出草稿</button>
             <a class="btn btn--ghost" href="06-print-workbench.html">打印空白表格手写</a>
+          </div>
+        </div>
+
+        <!-- 2026-08-11 卡内空洞整改：这张卡不是新内容 —— 它就是上面 .qa-said 里
+             用户自己答过的那两条，原话搬过来。中断态最贵的一句话是「你说过的没丢」，
+             光写一句让人信不过；把原话摆出来，用户能自己核对，这句话才成立。 -->
+        <div class="p10stack" data-when="ai-down">
+          <div class="pane">
+            <div class="pane-hd"><span class="t">你说过的原话</span><span class="s">2 / 10 个话题 · 本次会话内</span></div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">话题 01</span><span class="v">你想找哪个方向？ —— 运营 / 新媒体</span></div>
+              <div class="kv-row"><span class="k">话题 02</span><span class="v">做过多久？在什么单位？ —— 2 年 3 个月，某科技公司，运营专员</span></div>
+              <div class="kv-row"><span class="k">中断在</span><span class="v v--fog">话题 03「这段经历里最有成果的一件事」· 未作答</span></div>
+              <div class="kv-row"><span class="k">其余 7 个</span><span class="v v--fog">还没聊到 · 留空，不替你编</span></div>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-eye"/></svg>
+              <span>这两条是<b>你自己说的，本机一个字没改</b>。未登录时它们<b>只留到本次会话结束</b>，
+                离场或超时自动清空 —— 要带走请先导出草稿。</span>
+            </div>
           </div>
         </div>
       </div>
@@ -338,6 +417,47 @@
             <b>成文需要 AI，现在不可用</b>
             <p>你答过的 2 个话题原文可以导出成草稿带走，<br>服务恢复后回来一键成文。</p>
             <button class="btn btn--ghost">导出草稿</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 卡内空洞整改：A4 按栏宽算只有 797px 高，栏却有 1376px，
+           纸下方 511px 是裸露的深色纸台背景 —— 版面没接住纸，不是纸空。
+           这块接住它。内容是页脚折叠条里「产物去向与费用」「隐私 · 保留期限」两节
+           **移回常驻**，不是新写的：到了要把文件拿走这一步，收不收费、离场会不会清、
+           存进去留多久，是当场就得知道的事，收在折叠条里等于没说。
+           右栏「接下来」给的是**去哪**（三个按钮），这里给的是**代价**（钱、期限、版本），
+           两者不重复。 -->
+      <div class="p10stack" data-at="s3">
+        <div class="pane">
+          <div class="pane-hd"><span class="t">拿走之前，先知道这几件</span><span class="s">费用 · 期限 · 版本</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">费用</span>
+              <span class="v">AI 访谈<b>不收费</b> · 只有出纸按页收，核价在打印工作台，本页不收款</span></div>
+            <div class="kv-row"><span class="k">不做任何操作</span>
+              <span class="v v--fog">未登录时这一版<b>只存在本次会话</b> · 离场或超时自动清空</span></div>
+            <div class="kv-row"><span class="k">存进「我的简历」</span>
+              <span class="v">登录后保存 · 按一般文档 <b>90 天</b> · 只有你本人可见</span></div>
+            <div class="kv-row"><span class="k">版本</span>
+              <span class="v">只<b>新增</b>版本，不覆盖任何旧版本；换算法也不会动你的原件</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)" data-when="ai-down">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>这一态还没有成文文件，上面几条<b>对导出的草稿同样成立</b>：草稿不收费，未登录时离场即清。</span>
+          </div>
+        </div>
+
+        <!-- ai-down 独有：这一态纸台上没有 A4，只有一块「成文需要 AI」的空态，
+             .paper 因此还剩 331px 空洞（default 态被 A4 占住，只剩 189px）。
+             补这一张把它接住。内容不是新的：草稿的范围来自 s2 已答的两个话题，
+             「成文要 AI」是空态自己那句话，「空白表格」是 s1 已经给过的同一条替代路径。 -->
+        <div class="pane" data-when="ai-down">
+          <div class="pane-hd"><span class="t">这一态能带走什么</span><span class="s">草稿 ≠ 成文简历</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">草稿里有</span><span class="v">你答过的 2 个话题原话 · 未整理成简历句</span></div>
+            <div class="kv-row"><span class="k">草稿里没有</span><span class="v v--fog">没答的 8 个话题 · 留空，不替你编</span></div>
+            <div class="kv-row"><span class="k">成文</span><span class="v v--fog">要 AI · 恢复后回来一键成文</span></div>
+            <div class="kv-row"><span class="k">现在就想要纸</span><span class="v">打印空白表格，用笔把剩下的补齐</span></div>
           </div>
         </div>
       </div>

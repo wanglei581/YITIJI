@@ -544,8 +544,15 @@
         </span>
       </div>
 
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏三张 .sheet-a4 都判**纸样类豁免**。
+           共同依据（实测 default/s3）：纸宽 564px 已铺满 604px 主栏（左右各 20px 栏内边距），
+           两张纸各 797px 上下叠满整栏（stage clientH 1378 / scrollHeight 1663），右边 348px
+           副栏也是满的 —— 纸不是浮在栏上半截、下半截露栏背景，空的是**纸**不是版面。
+           这几张纸会从出纸口带去宣讲会和网申现场，往空白处填东西 = 在学生带走的纸上
+           印本机没有依据的内容。 -->
       <div class="paper-stage" data-at="s3">
-        <div class="sheet-a4" data-when="default first device-off">
+        <div class="sheet-a4" data-when="default first device-off"
+             data-void-ok="A4 纸样：校招计划表是一页短文档，三件待办＋勾中的活动日期块写完就到页脚免责收尾；日期块由第 2 步勾选实时生成，勾满 6 场会自然变长">
           <div class="plan">
             <h1>我的校招计划表</h1>
             <div class="pl-sub">
@@ -574,7 +581,8 @@
         <!-- ai-down 版纸面：改名「校招活动清单」。日期块照旧（那是你勾的公告，不经过 AI），
              第一块换成**明确标注为通用**的三条提醒（与第 1 步 ai-down 屏上给的通用建议
              一字对应），页脚写清没结合简历。 -->
-        <div class="sheet-a4" data-when="ai-down">
+        <div class="sheet-a4" data-when="ai-down"
+             data-void-ok="A4 纸样：ai-down 版三条提醒明写「不结合你的简历」，纸面比默认版更空是**故意的**；把它填满就等于在 AI 不可用时照样印出看过简历才能给的意见">
           <div class="plan">
             <h1>校招活动清单</h1>
             <div class="pl-sub">
@@ -600,7 +608,8 @@
           </div>
         </div>
 
-        <div class="sheet-a4" style="margin-top:var(--s-5)">
+        <div class="sheet-a4" style="margin-top:var(--s-5)"
+             data-void-ok="A4 纸样：这张是 2027 届在校生压到一页的简历（页脚写明「这是你在本机改过的版本：已压到一页」）。校招简历本来就该短，一个课程设计＋技能就是他真有的东西；补内容等于替学生编在校经历">
           <div class="plan" style="padding:26px 30px">
             <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
               同批第 2 份 · 共 <span data-f="cv-n">6</span> 份 · 每份 1 页

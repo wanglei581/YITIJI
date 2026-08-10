@@ -89,6 +89,35 @@
   .tplgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); overflow-y: auto; }
   .speak > .locked { flex: 1 1 auto; }
   .paper-stage .paper-empty { flex: 1 1 auto; }
+  /* 2026-08-11 卡内空洞整改（口径与 08 的 t3 证件照同一套）：
+     上一版把 .locked 撑满 .speak 就算完了 —— 主栏尾部读数确实归零，但空洞只是从
+     栏背景搬进了卡里：实测 t2 的 .locked 高 1256px，里面只有 220px（first）/
+     297px（ai-down）内容居中，上下各空 470px 左右。
+     「没有内容可给」是真的，「所以这里可以空 470px」不是。按 08 的做法改三件事：
+       1) 按主内容尺寸放大：图标 88px、标题 fz-9、正文 fz-5、按钮 64px
+          （27 寸竖屏触控，CLAUDE.md §9 主按钮 ≥56px）；
+       2) 把真实原因和真实出口讲满，而不是一句话带过；
+       3) 下面补 .t2grid —— 两张卡的内容**一条没新增**：左边那张是本页
+          .actionbar-hint 里逐个工具、逐个态已经写好的状态（t1/t3/t4 三行原样搬过来），
+          右边那张是 .rail 那句「四件都基于你已有的简历」与 t3 pane 里
+          「清单来自主办方公告原文，不依赖 AI」的展开。
+     .locked 保留 flex:1 1 auto：它现在吸收的是 .t2grid / .slots 之后的剩余，
+     内容放大后自身余白落到 200px 以内，不再是空盒。 */
+  .screen[data-stage="t2"] .speak > .locked { gap: var(--s-5); padding: var(--s-7); }
+  .screen[data-stage="t2"] .speak > .locked > .ic { width: 88px; height: 88px; }
+  .screen[data-stage="t2"] .speak > .locked > b { font-size: var(--fz-9); }
+  .screen[data-stage="t2"] .speak > .locked p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+  .screen[data-stage="t2"] .speak > .locked p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+  .screen[data-stage="t2"] .speak > .locked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-7); }
+  .t2grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); flex: 0 0 auto; }
+  .t2grid .pane { display: flex; flex-direction: column; }
+  .t2grid .kv-row { min-height: 58px; font-size: var(--fz-3); }
+  /* 左列标签不许从词中间断开（实测「AI 的角色」被断成「AI 的角 / 色」、
+     「结构卡」断成「结构 / 卡」）——中文排版禁则，也影响扫读。 */
+  .t2grid .kv-row .k { white-space: nowrap; }
+  .t2grid .pane-hd .t { font-size: var(--fz-5); }
+  .t2grid .notice { font-size: var(--fz-3); line-height: 1.66; padding: var(--s-5); }
+  .t2grid .notice .ic { width: 22px; height: 22px; }
   .screen[data-state="first"] .ck--have .ck-box,
   .screen[data-state="ai-down"] .ck--gen .ck-box { background: transparent; border-color: var(--brd-2); }
   .tpl {
@@ -306,15 +335,80 @@
         </div>
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
-          <b>生成中断</b>
-          <p>可以先打印一张<b>自我介绍结构卡</b>：说什么、按什么顺序、哪三处该放数字。<br>不含具体内容，需要你自己填。</p>
-          <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍结构卡&amp;pages=1&amp;copies=1&amp;back=t2">打印结构卡</a>
+          <b>自我介绍稿现在生成不了</b>
+          <p>口述稿是<b>纯 AI 生成能力</b>——它把你简历里已有的事实组织成能说出口的话。
+            现在 AI 服务中断，<b>没有稿子可以给你</b>，本机也不会拿一份通用模板套上你的名字充数。<br>
+            <b>打印不受影响</b>：可以先打一张自我介绍结构卡，说什么、按什么顺序、哪三处该放数字都印在纸上，
+            <b>不含具体内容</b>，你自己填；服务恢复后回这一页重新生成。</p>
+          <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍结构卡&amp;pages=1&amp;copies=1&amp;back=t2">打印结构卡</a>
+            <button class="btn btn--ghost" type="button" data-go="t3">去材料清单 · 不依赖 AI</button>
+          </div>
         </div>
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
-          <b>先得有简历</b>
-          <p>自我介绍的内容来自你的简历。</p>
-          <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
+          <b>先得有简历，才能写自我介绍</b>
+          <p>这一页四件事<b>都基于你已有的简历</b>，不重复问你一遍：口述稿里的经历和数字
+            全部取自简历里已经写着的内容，<b>本机不替你编</b>。现在没有简历，就没有可组织的事实。<br>
+            做简历有两条路：把现成的<b>传进来或扫进来</b>，或者让顾问<b>问你几个问题边聊边成形</b>。</p>
+          <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="09-resume-workbench.html">去简历工作台 · 上传或扫描</a>
+            <a class="btn btn--ghost" href="10-resume-interview.html">让小青问你几个问题</a>
+          </div>
+        </div>
+
+        <!-- 2026-08-11 卡内空洞整改：两张卡的内容一条没新增 ——
+             左卡是 .actionbar-hint 里 t1 / t3 / t4 各自那一态已经写好的状态，原样搬过来
+             并排成一屏能看全的四行；右卡是 .rail「四件都基于你已有的简历」与
+             t3 pane「清单来自主办方公告原文，不依赖 AI」「AI 只组织表达」的展开。
+             为什么要搬：用户此刻卡住了，最需要知道的就是「那另外三件还能不能做」——
+             这个答案本来散在操作栏和右栏里，得切到那个工具才看得到。 -->
+        <div class="t2grid" data-when="ai-down first">
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">这四件现在能做哪几件</span>
+              <span class="s" data-when="ai-down">AI 中断时</span>
+              <span class="s" data-when="first">还没有简历时</span>
+            </div>
+            <div class="kv" data-when="ai-down">
+              <div class="kv-row"><span class="k">求职信</span><span class="v v--fog">生成不可用 · 可打印空白格式纸手写</span></div>
+              <div class="kv-row"><span class="k">自我介绍</span><span class="v v--fog">就是这一件 · 生成不可用</span></div>
+              <div class="kv-row"><span class="k">材料清单</span><span class="v">照常显示 · 不依赖 AI</span></div>
+              <div class="kv-row"><span class="k">简历模板</span><span class="v">只改排版 · 不依赖 AI</span></div>
+            </div>
+            <div class="kv" data-when="first">
+              <div class="kv-row"><span class="k">求职信</span><span class="v v--fog">先得有简历</span></div>
+              <div class="kv-row"><span class="k">自我介绍</span><span class="v v--fog">就是这一件 · 先得有简历</span></div>
+              <div class="kv-row"><span class="k">材料清单</span><span class="v">可以看该带什么 · 勾选状态要你的材料</span></div>
+              <div class="kv-row"><span class="k">简历模板</span><span class="v v--fog">先去做简历</span></div>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)" data-when="ai-down">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>中断只影响<b>要 AI 写字</b>的两件。清单来自主办方公告原文，模板只动排版，都照常。</span>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)" data-when="first">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>清单是<b>唯一不需要简历</b>的一件：它能告诉你该带什么，只是标不出哪些你已经有了。</span>
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">这一件的规矩</span>
+              <span class="s">开着关着都一样</span>
+            </div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">稿子里的事实</span><span class="v">全取自你的简历 · 无新增</span></div>
+              <div class="kv-row"><span class="k">AI 的角色</span><span class="v">只把事实组织成口语 · 不替你编经历</span></div>
+              <div class="kv-row"><span class="k">结构卡</span><span class="v v--fog">只有顺序与该放数字的位置 · 不含内容</span></div>
+              <div class="kv-row"><span class="k">给谁看</span><span class="v">只给你本人 · 不进任何库</span></div>
+            </div>
+            <div class="notice notice--amber" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-alert"/></svg>
+              <span><b>照着念会很假。</b>稿子是给你熟悉逻辑用的——现场用自己的话说，
+                三个数字和一句短板记住就够。</span>
+            </div>
+          </div>
         </div>
         <!-- 空态是居中块，栏底会空出一大截（自检「主栏留白过大」）。
              这一条顶在栏底：说清没生成时纸上会是什么，不是装饰。 -->

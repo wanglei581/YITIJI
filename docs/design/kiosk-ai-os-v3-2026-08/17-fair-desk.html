@@ -895,8 +895,17 @@
         </span>
       </div>
 
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏里三张 .sheet-a4 都会被报
+           「底部空 780–910px」。三张都判为**纸样类豁免**，理由分别写在各自属性里。
+           共同的依据：.sheet-a4 是 aspect-ratio 1/1.414 的**真 A4 纸样**，宽度已铺满
+           整个 968px 主栏（实测纸宽 928px），纸本身不是浮在栏上半截、下半截露栏背景
+           ——.paper-stage 是 overflow:auto 的多页连续滚动阅读器（实测 scrollHeight 2692
+           / clientH 1138），纸溢出栏底靠滚动看。所以空的不是版面，是**纸**。
+           而纸下半截空着，正是这几份短文档打出来的真实样子：这些纸会从出纸口离开本机
+           被用户带进招聘会现场，往空白处填任何东西 = 在用户带走的纸上印它本来没有的内容。 -->
       <div class="paper-stage" data-at="s4">
-        <div class="sheet-a4" data-when="default first device-off">
+        <div class="sheet-a4" data-when="default first device-off"
+             data-void-ok="A4 纸样：赶场作战单是一页短文档（抬头＋3 站＋路线＋免责声明就写完了），纸下半截空白是这份纸真实的打印效果；站点数随第 2 步勾选实时增减，勾满会自然变长">
           <div class="combat">
             <h1>赶场作战单</h1>
             <div class="cb-sub">
@@ -926,7 +935,8 @@
         <!-- ai-down 版纸面：改名「场次与展位单」，站点只留公司名 / 展位号 / 岗位名
              （这三样来自主办方同步的展位数据，不经过 AI），**去掉全部「可以问……」问句**，
              页脚明确写「未结合你的简历」。 -->
-        <div class="sheet-a4" data-when="ai-down">
+        <div class="sheet-a4" data-when="ai-down"
+             data-void-ok="A4 纸样：ai-down 版比默认版更短是**故意的**——去掉了全部「可以问……」问句，只留主办方同步的场次/展位/岗位名，纸面因此更空；把它填满就等于在 AI 不可用时照样印出 AI 生成的内容">
           <div class="combat">
             <h1>场次与展位单</h1>
             <div class="cb-sub">
@@ -953,7 +963,8 @@
           </div>
         </div>
 
-        <div class="sheet-a4" style="margin-top:var(--s-5)">
+        <div class="sheet-a4" style="margin-top:var(--s-5)"
+             data-void-ok="A4 纸样：这张是用户自己上传的原件（页脚写明「本机原样打印，没有改动其中任何内容」）。原件短，纸就空——本机无权替用户往他的简历上加经历">
           <div class="combat" style="padding:26px 30px">
             <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
               同批第 2 份 · 共 <span data-f="cv-n">6</span> 份 · 每份 2 页
