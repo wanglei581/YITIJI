@@ -105,7 +105,26 @@ var AXIS_DENY = ['data-go', 'data-ev', 'data-out', 'data-f', 'data-f22', 'data-w
   /* 以下经 07-scan-workbench 实测确认不是轴：全部挂在按钮 / 数据行上，
      既没写到 .screen，页面里也没有任何 setAttribute('data-…')。
      它们是选择器的取值槽，不参与可见性判定。 */
-  'data-kind', 'data-kindrow', 'data-fmt', 'data-param', 'data-v', 'data-pg', 'data-fb']
+  'data-kind', 'data-kindrow', 'data-fmt', 'data-param', 'data-v', 'data-pg', 'data-fb',
+  /* 以下逐页看过，确认是**选择器与数据槽**，不参与可见性判定（2026-08-11）：
+     13 的筛选组结构 data-fgroup / data-fmode / data-jobtype / data-relax*；
+     16 同类 data-agrelax；21 的逐条政策槽 data-pol / data-pick / data-verdict /
+     data-cond / data-doc / data-doclb / data-hint / data-docbox / data-todo /
+     data-docpick / data-qrow / data-q；42/43 的 data-for / data-sel / data-g；
+     28 的选项按钮 data-opt；23 的 data-view（是定位器，被 ?view= 消费后加
+     is-located，不改可见性）与弹层开关 data-open；01 的 data-fx。
+     登记在这里而不是让它每页刷屏：**告警的价值在于「有没见过的轴」，
+     判过的就该记下来，否则噪声一多，真正该看的那条会被埋掉。** */
+  'data-fgroup', 'data-fmode', 'data-jobtype', 'data-relax', 'data-relax-axis',
+  'data-agrelax', 'data-pol', 'data-pick', 'data-verdict', 'data-cond', 'data-doc',
+  'data-doclb', 'data-hint', 'data-docbox', 'data-todo', 'data-docpick',
+  'data-qrow', 'data-q', 'data-for', 'data-sel', 'data-g', 'data-opt',
+  'data-view', 'data-open', 'data-fx',
+  /* data-gate(unquoted|quoted)：06 上只挂在 3 个按钮上，从没写到 .screen，
+     源码里 0 处 setAttribute，切换它可见元素数 216→216 一点不变 ——
+     是个没接线的遗留标记（当初大概打算做成轴，后来用 data-at/data-when 实现了）。
+     实测确认惰性后登记，不是猜的。 */
+  'data-gate']
 
 /* ── 本台子的已知盲区（写在这里，不写在报告的漂亮话里）──────────
    1) **交互驱动的文本态没有覆盖。** 像 07 的扫描格式（PDF/JPG/可检索 PDF）、
@@ -292,7 +311,20 @@ function discoverAxes (win) {
         String(el.getAttribute(n) || '').split(/\s+/).forEach(function (v) { if (v) vs[v] = 1 })
       })
       var k = Object.keys(vs)
-      if (k.length > 1 && k.length <= 12 && k.every(function (x) { return x.length <= 16 })) {
+      /* 取值长什么样，基本就能判出它是轴还是数据。
+         轴用短的 ASCII 标识（default / first / s1 / pay-fail / booth / resume）；
+         而「个人简历.pdf」「广州××科技」「2026-08-12」「穗人社规〔2026〕3 号」
+         这些是内容。第一版没做这个区分，于是每页都刷一屏
+         「疑似未登记的轴：data-nm(个人简历.pdf|毕业证明扫描件.pdf|…)」——
+         噪声一多，真正该看的那条就被埋了，跟假红条一样有害。 */
+      var looksLikeSlug = k.every(function (x) {
+        return x.length <= 16 &&
+               /^[A-Za-z0-9_-]+$/.test(x) &&      // 纯 ASCII 标识
+               !/^\d{4}-\d{2}/.test(x) &&          // 不是日期
+               !/^\d+$/.test(x) &&                 // 不是纯数字（页码、份数）
+               !/^[A-Z]{1,3}-?\d{4,}/.test(x)      // 不是业务 ID（O-20260809-1023 / CO-4471）
+      })
+      if (k.length > 1 && k.length <= 12 && looksLikeSlug) {
         suspicious.push({ attr: n, count: seen[n], values: k })
       }
     }
