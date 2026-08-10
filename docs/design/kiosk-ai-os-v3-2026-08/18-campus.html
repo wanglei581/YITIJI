@@ -107,7 +107,23 @@
 
 /* 2026-08-10：校园服务三个入口放进右栏后被挤到 47.3px（自检线 47.5px，差 0.2px）。
    右栏是弹性分配的，靠文案长度撑高度不可靠 —— 直接钉住 56px，按 CLAUDE.md §9 的
-   主操作尺寸走。 */
+   主操作尺寸走。
+
+   2026-08-11 补：上面这行 min-height 一直没生效 —— `.alt` 这套类**全站没有定义**。
+   它是 P19 页内自带的样式，本页照抄了结构却没抄样式，于是三个入口一直以
+   裸 <a> 下划线蓝链的样子渲染：既不是卡片，也没有 56px 触控高度
+   （min-height 对 inline 元素不起作用）。补上定义，取 P19 的原样，
+   不另造一套观感。 */
+.alt { display:flex; align-items:flex-start; gap:var(--s-4);
+       padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+       background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:var(--touch-min);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt > .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; }
+.alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
 .campus-svc .alt { min-height: 56px; }
 
 /* 计划表纸面 */
@@ -132,6 +148,77 @@
   font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
 }
 .actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：s1 左 349（device-off 554）、s2 右 476、s3 右 300。
+   左栏 s2（活动列表）和 s3（纸面）本来就满，不动。
+
+   成因两条，分开处理：
+
+   ① **状态漏配** —— 只命中 device-off 的那 205px。第 1 步的「按你的毕业年份算的」
+      和 ① 号建议的正文都只写了 `default first` / `ai-down`，离线态两块都不显示。
+      打印机在不在线跟能不能读简历没关系。已按 default 口径补 device-off（见上方三处注释）。
+
+   ② **内容量不足 + flex 分配** —— 其余三处。pane--grow 撑到栏底，
+      s1 左卡里只有 726/1075，s2 右 739/1215，s3 右 767/1068。
+      处理：放大真正的主内容（27 寸竖屏 ≈ 82 PPI，13–16px 副文在 60cm 距离下偏小），
+      s2 右另补一块**来源与同步汇总** —— 那是把左边 6 场各自 srcline 里已经标着的
+      来源机构、同步时间、外部 ID 前缀按来源聚合，不是新数据；
+      而「场次 / 时间 / 来源三字段保持真实来源标注」正是这一页的硬要求。
+
+   放大的范围是按栏、按阶段量出来的，不是全页一刀切：
+     · 左栏 s1 差 227–258px → 放大三件事的正文与季节条。
+     · 右栏 s2 差 476px、s3 差 300px → 放大 + 补来源汇总。
+     · 右栏 s1 本来就只差 126px（近乎装满），一放大就把「校招常见的三个坑」
+       顶出可视区 —— 这一栏保持原尺寸，不跟着放。
+   另外：首次使用态会在右栏多插一张 ~160px 的卡，三个阶段的右栏都必须留出这一份，
+   否则默认态好看、first 态末行被滚动条吃掉（baseline 上 s1 右就已经这样）。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+/* 左栏：s1 的主内容 */
+.wmain .kv-row { min-height:56px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.wmain .notice { font-size:var(--fz-3); line-height:1.72; padding:var(--s-5); }
+.wmain .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.wmain .advice-why { font-size:var(--fz-4); line-height:1.78; }
+.wmain .advice { gap:var(--s-4); }
+.sn { padding:var(--s-5) var(--s-4); }
+.sn-t { font-size:var(--fz-3); }
+.sn-d { font-size:var(--fz-2); }
+.sn-s { font-size:var(--fz-2); line-height:1.6; margin-top:8px; }
+/* 右栏：只放大 s2 / s3 两步；s1 保持原尺寸 */
+.wside [data-at="s2"] .kv-row,
+.wside [data-at="s3"] .kv-row { min-height:50px; font-size:var(--fz-4); }
+.wside [data-at="s2"] .notice,
+.wside [data-at="s3"] .notice { font-size:var(--fz-2); line-height:1.66; }
+.wside [data-at="s2"] .panel-note,
+.wside [data-at="s3"] .panel-note { font-size:var(--fz-2); line-height:1.66; }
+.wside [data-at="s3"] .tl { padding:var(--s-3) 0; }
+.wside [data-at="s3"] .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wside [data-at="s3"] .tl-s { font-size:var(--fz-2); line-height:1.6; margin-top:5px; }
+/* s2 右：材料清单条目 */
+.wside [data-at="s2"] .li { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s2"] .li-t { font-size:var(--fz-4); }
+.wside [data-at="s2"] .li-s { font-size:var(--fz-2); line-height:1.5; }
+.wside [data-at="s2"] .li-st { font-size:var(--fz-2); }
+.wside [data-at="s2"] .li-dot { margin-top:11px; }
+/* 首次使用态在 s1 右栏多插一张 154px 的卡，而那一栏默认只剩 126px 富余 ——
+   差的 66px 在 baseline 上就已经把「校招常见的三个坑」末行推出可视区。
+   顺手一起修掉：卡按两行字的体量给高度，s1 右栏的 kv 行与三个校园服务入口收紧一档。
+   收紧后默认态富余 ≈ 170px，仍在 200px 判据以内。 */
+.wside [data-when="first"] { padding:var(--s-3) var(--s-5); }
+.wside [data-when="first"] .pane-hd { margin-bottom:var(--s-2); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-2); line-height:1.55; }
+.wside [data-when="first"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-1); }
+/* 校园服务三张卡补上样式后，s1 右栏由「差 170px」变成「差 36px」—— 这一栏现在是真满了。
+   首次使用态那张卡的 138px 只能从这一栏自己腾：11 行 kv、3 张卡的副文、3 段脚注各收一档。
+   收完默认态仍差约 160px，在 200px 判据以内。 */
+.wside [data-at="s1"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-at="s1"] .kv-row { min-height:40px; }
+.wside [data-at="s1"] .panel-note { font-size:var(--fz-2); line-height:1.55; }
+.wside [data-at="s1"] .notice { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s1"] .alt-s { font-size:var(--fz-1); line-height:1.45; }
+.campus-svc .sec { gap:var(--s-2) !important; }
 </style>
 </head>
 <body>
@@ -176,11 +263,15 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-clock"/></svg>
           <b>今天是 8月9日，秋招刚开始</b>
-          <span class="mt" data-when="default first">按你的毕业年份算的</span>
+          <!-- 2026-08-11 状态漏配修正：这四处原来只写 `default first` / `ai-down`，
+               device-off 态两块都不显示 —— 打印机离线跟能不能读你的简历、能不能算校招节奏
+               没有任何关系，结果离线态下第 1 步整块空白（实测左栏裸露 554px，比另外三态多 205px）。
+               同一类错误 P22 页内注释里已经记过一次。按 default 的口径补上 device-off。 -->
+          <span class="mt" data-when="default first device-off">按你的毕业年份算的</span>
           <span class="mt" data-when="ai-down">按公开日历，未结合你的情况</span>
         </div>
         <div class="sec">
-          <div class="advice-act" data-when="default first">
+          <div class="advice-act" data-when="default first device-off">
             你写的是 <b>2027 年 6 月毕业</b>，现在是<b>提前批和秋招网申的开头</b>。
             这个月最要紧的不是投得多，是<b>把简历改到能投</b>。
           </div>
@@ -220,7 +311,7 @@
 
           <div class="advice">
             <div class="advice-act">① 先把简历改到能投（本机能做）</div>
-            <div class="advice-why" data-when="default first">
+            <div class="advice-why" data-when="default first device-off">
               <span class="ev ev--e1">读过你上传的简历</span>
               你的简历现在有 <b>2 页</b>，第 2 页只有半页内容 ——
               校招简历<b>压到一页</b>更容易被看完。
@@ -285,7 +376,9 @@
           <span class="mt">共 6 场 · 来自学校就业网与主办方公告</span>
         </div>
         <div class="sec">
-          <div class="notice" data-when="default first">
+          <!-- 2026-08-11 状态漏配修正：同第 1 步，device-off 原来两块都不显示。
+               活动列表来自公告同步，跟打印机在不在线无关。 -->
+          <div class="notice" data-when="default first device-off">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span>下面按<b>截止或开场时间</b>排，不按"好不好"排 ——
                   哪场值得去要你自己判断。本机只转述公告，不代为报名。</span>
@@ -679,6 +772,24 @@
             <span>11日那个网申<b>要传成绩单</b> —— 今天顺手在本机扫好，
                   比截止当天临时找强。</span>
           </div>
+
+          <!-- 2026-08-11 版面整改：这一块不是新数据 —— 左边 6 场每一场的 srcline 里
+               都已经标着来源机构、同步时间和外部 ID，这里只是按来源聚合成一张表，
+               让「这 6 场从哪来、什么时候同步的」一眼看得全。
+               本页的硬要求就是场次 / 时间 / 来源三字段必须保持真实来源标注。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-agency"/></svg><b>这 6 场从哪来</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">学校就业网</span><span class="v"><b>2</b> 场</span></div>
+            <div class="kv-row"><span class="k">学校就业指导中心</span><span class="v"><b>2</b> 场</span></div>
+            <div class="kv-row"><span class="k">主办方公告</span><span class="v"><b>2</b> 场</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            同步时间 <b>8月9日 07:30</b>，最旧一条 8月8日 21:10；
+            每一场的外部 ID 印在列表里那一条的来源行上。
+            <b>报名、资格、是否如期举行以来源方为准</b>，本机不代办、不代收简历。
+          </div>
         </div>
       </div>
 
@@ -761,8 +872,12 @@
         </div>
       </div>
 
-      <!-- 首次使用：一句话 -->
-      <div class="pane" data-when="first">
+      <!-- 首次使用：一句话。
+           2026-08-11：限定在 s1，并按两行字的体量给高度。
+           它说的是「这一页帮你做什么」—— 那是进门那一步的话。到了第 2 步（选活动）
+           和第 3 步（看纸面），步骤条和动作条提示已经在说同一件事，这张卡是第三遍，
+           还会把右栏顶出 161px（末行被滚动条吃掉）。不是删内容，是不在同一屏说三遍。 -->
+      <div class="pane" data-when="first" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">

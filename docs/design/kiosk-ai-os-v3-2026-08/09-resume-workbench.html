@@ -132,6 +132,58 @@
      （实测溢出 34px —— 不裁不滚，两段字叠着，主检测器看不见）。 */
   .wside .pane--fill > .issues { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
+  /* ── 2026-08-11 版面留白整改（只动 s3 的 first / ai-down 两态）────────────
+     实测 s3 右栏：默认 / device-off 富余 64px（正常），
+     first 裸露 787px、ai-down 裸露 539px。
+     成因是 Codex 说的那一组：固定两栏 + 各阶段右栏 fill/grow，
+     再叠上 data-when 把「六个维度」和「可改点」两块结果整块藏掉 ——
+     **藏了之后没有重新分配**，两张卡缩到 93 / 149px，底下一大片空。
+
+     处置严格按 (f)：这两态没有诊断结论是对的，一个格子都不许填。
+     补上去的三块全是**口径**不是结论：
+       · 六项维度的名字 + 六个「未评」——「都没评」和「都合格」不是一回事，明写出来
+       · 三档可改点的含义 + 「每条会指到原文第几页」的格式说明
+       · E1 / E2 / E3 三档证据与「不替你编经历、不替你填数字」的边界
+     默认态一处不加（那一栏只剩 64px 富余，加了反而要滚）。
+     ──────────────────────────────────────────────────────────────────── */
+  /* 六格全空的维度条：不借用 good / mid / weak 任何一档的颜色，
+     那会让人以为已经评过了。 */
+  .dims--none .dim-nm { color: var(--fog-600); }
+  .dims--none .dim-bar i { background: var(--surf-3); opacity: .55; }
+  .dims--none .dim-tag { color: var(--fog-600); }
+  /* 三档可改点的图例 */
+  /* first 态 s3 的「还没有简历」模块：原来是一个 388px 的小块，顶在 1376px 的
+     文档区最上面，下面空 988px（回归台「卡内空洞」抓到）。
+     Codex 对本页 first/ai-down 的处置口径是「完整居中的状态模块 + 真实出口」——
+     这里按那个尺寸做：图标 104px、标题 36px、正文 21px，三个出口按主操作尺寸给，
+     并在文档区里垂直居中。三个出口本来就在，一个没加。 */
+  .paper-stage > .paper-empty { flex: 1 1 auto; width: 100%; justify-content: center;
+    gap: var(--s-5); padding: var(--s-8) var(--s-6); }
+  /* 直接子选择器：不加 > 的话按钮里的图标也会被放到 104px（实测「让小青问你几个问题」
+     的脑图标涨到跟按钮一样高，整个盖住文字）。放大的只有状态图标本身。 */
+  .paper-stage > .paper-empty > .ic { width: 104px; height: 104px; }
+  /* work.css 的 .paper-empty .ic 是 46px，按钮里的图标也照单全收 —— 在 64px 的按钮里
+     46px 的图标顶着上下边。按钮图标回到正常尺寸。 */
+  .paper-stage > .paper-empty .btn .ic { width: 22px; height: 22px; }
+  .paper-stage > .paper-empty b { font-size: 36px; line-height: 1.25; }
+  .paper-stage > .paper-empty p { font-size: 21px; line-height: 1.65; max-width: 26em; }
+  .paper-stage > .paper-empty .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-6); }
+
+  /* .pane--fill 默认 flex:0 1 auto 会被压扁 —— 三档图例没有滚动容器，
+     压扁就直接画到卡片外面（实测溢出 6–14px）。带图例时这张卡不许压缩。 */
+  .wside .pane--fill:has(.sevmap) { flex: 0 0 auto; }
+  /* 行高按「整栏 1456px 装得下」量出来的：ai-down 那一态同栏还有
+     「现在还能做什么」三个按钮，松一档就会把「看岗位 / 看招聘会」裁掉 20px。 */
+  .sevmap { display: flex; flex-direction: column; gap: var(--s-2); margin-top: 10px; }
+  .sv { display: grid; grid-template-columns: 3.6em 1fr; gap: var(--s-3);
+        align-items: baseline; padding: 8px var(--s-4);
+        border-radius: var(--r-xs); border: 1px solid var(--brd-1); background: var(--surf-1); }
+  .sv-k { font-size: var(--fz-2); font-weight: 700; }
+  .sv--high .sv-k { color: var(--coral-400); }
+  .sv--mid  .sv-k { color: var(--amber-600); }
+  .sv--low  .sv-k { color: var(--fog-600); }
+  .sv-p { font-size: var(--fz-1); color: var(--fog-700); line-height: 1.55; }
+
   /* 来源回执（2026-08-10 补）：解析阶段顶上先说清「这份是谁送来的」。
      样式抄 P06 的 .receipt —— 同一个语义在全站长一个样，用户不用重新认。 */
   .receipt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
@@ -820,6 +872,26 @@
         <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="first">
           还没有简历，暂无诊断。
         </p>
+
+        <!-- 2026-08-11 版面留白整改（first / ai-down）：
+             这两态下本卡原来只剩上面那一行字，「可改点」也只剩一条 notice，
+             右栏 511 / 713px 内容之下裸露 787 / 539px。
+             按 (f) 的口径，「没有结论」是对的，「底下空 787px」不是。
+             这里补的**不是结论，是口径**：诊断会看哪六件事。六行名字、六个「未评」，
+             一个格子都不填 —— 默认态那六项是有值的（好 / 需改 / 一般 / 待核），
+             这里没有值就明写没有值。用户由此知道给一份简历之后会拿到什么。 -->
+        <div class="dims dims--none" data-when="ai-down first" style="margin-top:12px">
+          <div class="dim"><span class="dim-nm">结构完整</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+          <div class="dim"><span class="dim-nm">成果量化</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+          <div class="dim"><span class="dim-nm">用词具体</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+          <div class="dim"><span class="dim-nm">岗位相关</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+          <div class="dim"><span class="dim-nm">ATS 机读友好</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+          <div class="dim"><span class="dim-nm">真实性自查</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">未评</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="ai-down first">
+          六格全空 = <b>这六项本机这次一项都没评</b>，不是「都合格」。
+          有结论时这里会是三档：好 / 一般 / 需改，并逐条指到原文位置。
+        </p>
       </div>
 
       <div class="pane pane--fill" data-at="s3">
@@ -846,6 +918,54 @@
           <svg class="ic"><use href="#i-info"/></svg>
           <span data-when="ai-down">诊断不可用时这里不显示任何结论——不猜、不给通用建议。</span>
           <span data-when="first">给一份简历后，可改点会逐条列在这里，每条都能点回原文位置。</span>
+        </div>
+
+        <!-- 2026-08-11：同上，补的是**格式口径**不是结论 ——
+             有可改点时它们会按这三档列出来，每条带一个位置和一个证据标。
+             三档的名字和默认态列表里用的是同一套（重要 / 建议 / 可选）。 -->
+        <div class="sevmap" data-when="ai-down">
+          <div class="sv sv--high"><span class="sv-k">重要</span>
+            <span class="sv-p">看不出你做到什么程度，先改这些</span></div>
+          <div class="sv sv--mid"><span class="sv-k">建议</span>
+            <span class="sv-p">改了更好，不改也能投</span></div>
+          <div class="sv sv--low"><span class="sv-k">可选</span>
+            <span class="sv-p">措辞层面，看你有没有时间</span></div>
+        </div>
+        <p style="margin:10px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5" data-when="ai-down">
+          每条都写清在原文第几句，点一条左边就定位过去。这次一条都没有 ——
+          <b>不是你的简历没问题</b>。
+        </p>
+      </div>
+
+      <!-- 2026-08-11 版面整改 · 证据与 AI 边界（Codex 对 P09 s3 的处置项）。
+           只挂 first，不是四态常驻 —— 这一栏装得下多少是量出来的：
+             · 默认 / device-off：实测只剩 64px 富余，再插一张卡会把「可改点」挤到要滚。
+               而那两态里 E1/E2/E3 标签就长在每一条可改点上、「用三档不用分数」
+               也写在维度卡里，口径本来就在场。
+             · ai-down：那一态多一张「现在还能做什么」，加上维度与三档说明已经到 1364px，
+               再加这张会把「去打印 / 看岗位 / 看招聘会」三个按钮裁掉（实测超出 33–87px）。
+               该态的边界话由「诊断不可用时这里不显示任何结论——不猜、不给通用建议」承担。
+             · first：那一态没有「现在还能做什么」，正好空出这张卡的位置，
+               而没有简历的人最需要先知道「本机凭什么下结论、以及它绝不会替我做什么」。 -->
+      <div class="pane" data-at="s3" data-when="first">
+        <div class="pane-hd"><span class="t">证据与 AI 边界</span><span class="s">三档证据</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k"><span class="ev ev--e1">E1 你的材料</span></span>
+            <span class="v">你上传的原文</span></div>
+          <div class="kv-row"><span class="k"><span class="ev ev--e2">E2 岗位要求</span></span>
+            <span class="v">本机读过的岗位正文</span></div>
+          <div class="kv-row"><span class="k"><span class="ev ev--e3">E3 AI 判断</span></span>
+            <span class="v">仅供参考</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6">
+          有结论时，每一条可改点都会挂上它是靠哪一档得出来的。<b>没有依据就不写</b> ——
+          这也是现在这一栏空着的原因。
+        </p>
+        <div class="notice notice--amber" style="margin-top:12px">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>本机不会替你编经历，也不会替你填数字。</b>
+                AI 只提候选改写，采纳与否你逐条决定，数字要你自己核对过才进新版本；
+                <b>原件任何时候都不被覆盖</b>。</span>
         </div>
       </div>
 

@@ -101,6 +101,81 @@
 .wside .pane--grow { overflow:hidden; }
 .paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
 
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：
+     s1 左 631（ai-down 702）/ 右 480 · s2 右 483 · s3 左 376（ai-down 478）/ 右 566
+   只有 s2 左（四张方向卡的滚动列表）是满的。
+
+   成因按栏分三种：
+
+   ① 右栏三步都是「内容量不足 + flex 分配」——
+      s1 639/1119、s2 615/1098、s3 461/1027，pane--grow 撑到栏底、卡里只有上半截。
+      Codex 的处置口径是「右栏常驻：214 条岗位、来源数、同步时间、纳入 / 排除数量、
+      缺口口径和重跑条件」。这些**全都已经在本页上**，只是被锁在某一步里：
+      「这些数字是什么」只在 s2，「什么时候该重跑」只在 s3。改成常驻即可，
+      一个数都不用编。
+
+   ② s1 左是「内容量不足」——「从你的简历里读出来的」只有 6 张能力卡（560/1191）。
+      处置：把能力卡按主区尺寸放大（原文出处 13px，在 82 PPI 的竖屏上读不清），
+      并把页面自己写着的那句「可以去简历工作台补上」做成真入口 ——
+      现在它只是一句白字，用户得自己退出去找。
+
+   ③ s3 左是**版式不匹配**，不是内容不够：主栏 604×1378 ≈ 1:2.28，
+      而 A4 竖版是 1:1.414，单张纸最大只能到 572×809，上下必然各空 285px。
+      P18 同一版式下有两张纸所以填得满，本页的交付物只有一页 —— 不能为了填满
+      再编一张纸出来。处置：纸按自然高度摆，下面补一块**屏读版的纸面索引**：
+      这张纸写了什么、以及明确没写什么。纸上的页脚是 11px，站在机器前根本读不了，
+      而「本机不预测薪资 / 不预测录用结果」恰恰是打印前必须看清的一句。
+      两栏都是把纸上已有的原话搬到可读字号，不是新内容。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+.wmain .notice { font-size:var(--fz-4); line-height:1.78; padding:var(--s-5); }
+.wmain .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.wmain .xlink-t { font-size:var(--fz-4); }
+.wmain .xlink-s { font-size:var(--fz-3); line-height:1.62; }
+/* s1 左：能力卡是这一步的主内容 */
+.skills { gap:var(--s-4); }
+.sk { padding:var(--s-5); gap:8px; }
+.sk-t { font-size:var(--fz-5); }
+.sk-src { font-size:var(--fz-3); line-height:1.75; }
+.field-lb { font-size:var(--fz-4); }
+/* ai-down 那一支的主内容是「不靠 AI 也能自己看的三件事」三步时间线 —— 原来 16/13px */
+.wmain .tl { padding:var(--s-5) 0; }
+.wmain .tl::before { top:38px; }
+.wmain .tl-dot { width:30px; height:30px; }
+.wmain .tl-t { font-size:var(--fz-5); line-height:1.5; }
+.wmain .tl-s { font-size:var(--fz-3); line-height:1.72; margin-top:7px; font-family:var(--ff-ui); }
+/* s3 左：纸台仍占剩余高度（A4 竖版在 604px 宽的栏里最大只有 572×809，
+   上下必然留白 —— 那是**围绕放大主体的均衡留白**，是对的）；
+   屏读索引按自然高度钉在栏底，栏底不再裸露。 */
+/* align-items:start —— 两列条数不一样（ai-down 那一态左列只有 2 条、右列 6 条）。
+   默认 stretch 会把矮的那张卡拉到和高的一样高，卡里空 234px。卡各自按内容收高。 */
+.sheetmap { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr;
+            gap:var(--s-4); align-content:start; align-items:start; }
+.smcol { padding:var(--s-5); border-radius:var(--r-md);
+         background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+         display:flex; flex-direction:column; gap:var(--s-3); }
+.smcol--not { background:var(--fog-a04); border-style:dashed; border-color:var(--fog-a20); }
+.sm-hd { font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.sm-i { display:grid; grid-template-columns:16px 1fr; gap:var(--s-3);
+        font-size:var(--fz-3); color:var(--fog-700); line-height:1.62; }
+.sm-i i { width:9px; height:9px; border-radius:2px; background:var(--jade-500);
+          margin-top:7px; display:block; }
+.smcol--not .sm-i i { background:var(--fog-a20); }
+.sm-i b { color:var(--fog-900); }
+/* 右栏：常驻依据面板。四张卡同栏，行高按能装得下四张的上限给 */
+.wside .kv-row { min-height:42px; font-size:var(--fz-3); }
+.wside .notice { font-size:var(--fz-2); line-height:1.6; padding:var(--s-3) var(--s-4); }
+.wside .panel-note { font-size:var(--fz-2); line-height:1.6; }
+.wside .pane-hd { margin-bottom:var(--s-3); }
+/* 方向分布计数条：数字取 s2 四张方向卡的原值，不另算 */
+.dist { display:flex; flex-direction:column; gap:var(--s-3); }
+.ds { display:flex; align-items:center; gap:var(--s-3); font-size:var(--fz-2); color:var(--fog-700); }
+.ds-n { flex:0 0 auto; min-width:0; }
+.ds-bar { flex:1 1 auto; height:8px; border-radius:999px; background:var(--surf-3); overflow:hidden; }
+.ds-bar i { display:block; height:100%; background:var(--jade-500); border-radius:999px; }
+.ds-v { flex:0 0 auto; font-family:var(--ff-num); font-weight:700; color:var(--fog-900); }
+
 /* 互链 P28：主入口级触控（≥64px）。本页说「岗位那边要什么」，
    P28 说「你自己倾向什么」—— 一外一内，互为补充，不互相替代 */
 .xlink { display:flex; align-items:center; gap:var(--s-4); min-height:64px;
@@ -289,6 +364,21 @@
                     如果有你会但简历里没写的，本机就读不到 ——
                     <b>那不是你不会，是简历没写</b>，可以去简历工作台补上。</span>
             </div>
+
+            <!-- 2026-08-11：上面那句「可以去简历工作台补上」原来只是一句白字，
+                 用户得自己退出去、回首页、再找简历工作台。第 2 步右栏早就有一条
+                 同样目的的真链接（?stage=s4&from=P22），这里按同一份交接契约补上 ——
+                 少写的能力在第 1 步就该能去补，不用先看完方向再回头。 -->
+            <a class="xlink" style="margin-top:var(--s-4)"
+               href="09-resume-workbench.html?stage=s4&amp;from=P22">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="xlink-b">
+                <span class="xlink-t">有会做但简历里没写的？现在就去补</span>
+                <span class="xlink-s">去简历工作台第 4 步「补内容」· 带去：从本页来，补完可以回来重跑</span>
+              </span>
+              <svg class="ic" style="margin-left:auto"><use href="#i-arrowRight"/></svg>
+            </a>
+
           </div>
 
           <div data-when="ai-down">
@@ -322,6 +412,20 @@
                     AI 恢复后再来，能给出按你原文逐条对应的版本。</span>
             </div>
           </div>
+
+          <!-- 2026-08-11：自右栏移入，并**四态常驻**。
+               原来它锁在 default/first/device-off 那一支里，AI 挂掉时连这条也没了 ——
+               可 P28 的记分是固定权重累加、明写「不经过 AI」，AI 不可用时照样能答，
+               只是没有陈述解读（P28 自己的 devpill 就是这么写的）。
+               降级态更需要一条真能走的出口，所以按 P28 的真实能力常驻，
+               并在 ai-down 下如实说明这次拿不到解读。 -->
+          <div class="field-lb" style="margin-top:var(--s-5)">先看看自己这一头</div>
+          <a class="xlink" href="28-self-assessment.html">
+            <svg class="ic"><use href="#i-orbit"/></svg>
+            <span class="xlink-b"><span class="xlink-t">还说不清自己想要什么？先做一次自我探索</span>
+              <span class="xlink-s" data-when="default first device-off">25 道选择题 · 约 5 分钟 · 得 5 段倾向陈述，拿回这页对照方向。</span>
+              <span class="xlink-s" data-when="ai-down">25 道选择题 · 约 5 分钟 · 记分是固定权重累加，不经过 AI，现在照常能答；<b>这次不会有陈述解读</b>。</span></span>
+          </a>
 
         </div>
       </div>
@@ -514,6 +618,42 @@
         </div>
       </div>
 
+      <!-- 2026-08-11 版面整改：纸面索引（屏读版）。
+           主栏 604×1378 ≈ 1:2.28，A4 竖版 1:1.414 —— 单张纸最大 572×809，
+           上下必然各空 285px。这一页的交付物只有一张纸，不能为了填满再编一张。
+           所以补的是纸上已有内容的**可读字号索引**：左边是纸上四个小节的标题，
+           右边是纸面页脚那四条边界。纸上页脚是 11px，站在机器前读不了，
+           而「不预测薪资、不预测录用结果」正是按下打印前必须看清的一句。 -->
+      <div class="sheetmap" data-at="s3">
+        <div class="smcol">
+          <span class="sm-hd" data-when="default first device-off">这张纸上写了什么</span>
+          <span class="sm-hd" data-when="ai-down">这张表上写了什么</span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>这周能做完的</b> —— 三条，都是改简历，不用等任何条件</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>现在就能投的方向</b> —— 机械设计，你的事例已经对得上</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>要花时间才能通的一条</b> —— 设备调试，27 条里 19 条要电工证</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>缺口较大、只是让你知道有这条路</b> —— 质量工程师</span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            <b>四类方向在这 214 条里各有多少</b> —— 38 / 27 / 21 / 18 条</span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            <b>本单没有的东西</b> —— 没有「你缺什么」，也没有先做哪三件</span></span>
+        </div>
+        <div class="smcol smcol--not">
+          <span class="sm-hd">这张纸上<b>没有</b>写什么</span>
+          <span class="sm-i"><i></i><span>不预测<b>薪资</b></span></span>
+          <span class="sm-i"><i></i><span>不预测<b>录用结果</b></span></span>
+          <span class="sm-i"><i></i><span>不排<b>前景好坏</b>，条数不是市场需求</span></span>
+          <span class="sm-i"><i></i><span>不替你决定<b>转不转方向、要不要考证</b></span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            本单<b>没有读你的简历</b>：打印时 AI 不可用，没有缺口对照</span></span>
+          <span class="sm-i"><i></i><span>
+            只覆盖<b>本机读过正文的那 214 条</b>，本机没见过的岗位不在里面</span></span>
+        </div>
+      </div>
+
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -558,17 +698,17 @@
             指出哪些对得上、哪些差一个可验证的条件。
           </div>
 
-          <div class="field-lb" style="margin-top:var(--s-5)">先看看自己这一头</div>
-          <a class="xlink" href="28-self-assessment.html">
-            <svg class="ic"><use href="#i-orbit"/></svg>
-            <span class="xlink-b"><span class="xlink-t">还说不清自己想要什么？先做一次自我探索</span>
-              <span class="xlink-s">25 道选择题 · 约 5 分钟 · 得 5 段倾向陈述，拿回这页对照方向。</span></span>
-          </a>
+          <!-- 2026-08-11 版面整改：P28 自我探索入口移到左栏第 1 步的正文下面。
+               它回答的是「你自己想要什么」，正好接在「从你的简历里读出来的」之后；
+               留在右栏这张「本机不做的四件事」里，语义上也挂不上。链接与文案未改。 -->
         </div>
       </div>
 
-      <!-- S2 右 -->
-      <div class="pane" data-at="s2">
+      <!-- 依据面板：三步常驻（2026-08-11）。
+           原来只挂在 s2，于是 s1 和 s3 的右栏各空了 480 / 566px，而用户在 s1 就该知道
+           「下一步的建议会拿哪批岗位来比」，在 s3 更该知道「手上这张纸是按什么算的」。
+           四行数字与下面那段口径和原来一字不差，只是不再锁在第 2 步。 -->
+      <div class="pane" data-at="s1 s2 s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这些数字是什么</b></div>
         <div class="sec">
           <div class="kv">
@@ -577,9 +717,50 @@
             <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
             <div class="kv-row"><span class="k">只有标题的</span><span class="v"><b>61</b> 条 · 不计入</span></div>
           </div>
+          <!-- 方向分布：四个数取自第 2 步那四张方向卡（38 / 27 / 21 / 18），不另算。
+               条形长度按 38 条为满格换算，只是同一组数的另一种读法。 -->
+          <!-- 四态常驻：条数是本机数出来的事实，不经过 AI（页面自己在 ai-down 那一支
+               写着「计数不依赖 AI，是本机数出来的事实」，ai-down 版纸面印的也正是这四个数）。
+               早先误加了 data-when，导致 ai-down 的 s2 右栏又空出 209px。 -->
+          <div class="dist" style="margin-top:var(--s-4)" data-at="s2 s3">
+            <div class="ds"><span class="ds-n">机械设计</span>
+              <span class="ds-bar"><i style="width:100%"></i></span><span class="ds-v">38</span></div>
+            <div class="ds"><span class="ds-n">设备调试</span>
+              <span class="ds-bar"><i style="width:71%"></i></span><span class="ds-v">27</span></div>
+            <div class="ds"><span class="ds-n">工艺工程师</span>
+              <span class="ds-bar"><i style="width:55%"></i></span><span class="ds-v">21</span></div>
+            <div class="ds"><span class="ds-n">质量工程师</span>
+              <span class="ds-bar"><i style="width:47%"></i></span><span class="ds-v">18</span></div>
+          </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
             条数 = 本机见到的数量。<b>不是市场需求，不是前景排名。</b>
             另有 61 条来源平台只给了标题，本机读不到内容，一律不参与计数。
+            四类合计 104 条，其余 110 条不属于这四类。
+          </div>
+          <!-- 首次使用说明（2026-08-11）：原来是右栏末尾**单独一张 176px 的卡**，
+               三个阶段都插一张，把「本机不做的四件事 / 接下来」挤到只剩 34–370px，
+               实测最多藏掉 417px。它说的是这一页的依据与边界，和这张卡同题 ——
+               并进来即可，措辞未改。 -->
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="first">
+            <b>这一页帮你做什么</b>：把上面这些岗位正文和你的简历放一起，指出哪些对得上、
+            哪些差一个<b>可验证的</b>条件。不预测薪资、不预测前景。
+          </div>
+
+          <!-- 重跑条件：s1 / s2 常驻（2026-08-11）。原来只写在 s3 的「接下来」里，
+               但「这些数字什么时候会变」是看到数字的那一刻就该知道的事。原话未改。
+               并进本卡而不是另起一张：348px 的栏里已经有四张卡，多一张卡头就要多 90px，
+               而这三行本来就是上面那四行数字的注脚 —— 同题，合在一起读更顺。
+               s3 不放：那一步的「接下来」卡里已经逐字写着同一件事。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)" data-at="s1 s2">
+            <svg class="ic"><use href="#i-refresh"/></svg><b>什么时候该重跑</b>
+          </div>
+          <div class="kv" data-at="s1 s2">
+            <div class="kv-row"><span class="k">改了简历</span><span class="v">方向会变</span></div>
+            <div class="kv-row"><span class="k">岗位数据</span><span class="v">每天同步</span></div>
+            <div class="kv-row"><span class="k">补上漏写的经历</span><span class="v">缺口会少</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)" data-at="s1 s2">
+            这一页给的<b>不是一次性的结论</b>。过一阵再来，条数和缺口都会变。
           </div>
         </div>
       </div>
@@ -715,17 +896,8 @@
         </div>
       </div>
 
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            把<b>本机真读过的岗位正文</b>和你的简历放一起，
-            指出哪些对得上、哪些差一个<b>可验证的</b>条件。<br>
-            不预测薪资、不预测前景 —— 那些本机没有依据。
-          </div>
-        </div>
-      </div>
+      <!-- 首次使用说明已并入上面「这些数字是什么」卡内（2026-08-11，见该处注释）：
+           它原来是每个阶段都额外插一张 176px 的卡，把同栏的主卡挤到藏掉 417px。 -->
 
     </div>
   </div>

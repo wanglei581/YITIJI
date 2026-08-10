@@ -79,6 +79,61 @@
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（1080×1920，两根主栏各 1456px 高）：
+     s2 右栏 pane--grow 外壳 1098px、里面只有 306px 内容 → 底部裸露 792px
+     s3 右栏 892px、左栏 342px；s1 四态全 0
+   成因是**内容量不足 + flex 分配**这一组，不是 min-height，也不是状态漏配 ——
+   s1 同样的模板同样的四态一处不报，说明模板本身能填满，是 s2/s3 内容不够。
+   pane--grow 把卡片撑到栏底、卡里只有顶部一小块，正是 work.css:221 自己写明
+   「空白落在页面底色上是留白，落在卡片里就是缺陷」的那一种。
+
+   两条处理，都不加填充物：
+
+   ① 放大真正的主内容。这台机器是 27 寸竖屏，1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI；
+      人站在机器前约 60cm 读，15–16px 正文的字高只有 4.6mm，本来就偏小，
+      348px 宽的右栏折行多更吃亏。正文提到 19px、行高 1.72，kv 行提到 64px
+      （顺带把触控目标从 48px 抬到 64px）。这是该做的事，不是为了填数字。
+
+   ② 把内容放回它该在的栏。s2 左栏原来同时讲「你卡在哪」和「剩的 7 页怎么用不浪费」，
+      而右栏那张卡的标题正好就叫「用之前想清楚的」—— 后半段本来就属于右栏。
+      s3 同理：对账口径与记录边界属于「一共省了多少」那一侧，明细留在左栏。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+.work .kv-row { min-height:58px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.work .notice { font-size:var(--fz-3); line-height:1.7; padding:var(--s-5); }
+.work .panel-note { font-size:var(--fz-3); line-height:1.7; }
+.work .lock-p { font-size:var(--fz-4) !important; line-height:1.78 !important; }
+.work .tl { padding:var(--s-4) 0; }
+.work .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.work .tl-s { font-size:var(--fz-2); line-height:1.62; margin-top:5px; }
+/* 左栏是主阅读区（604px 宽）。s2 的「你卡在哪」和 s3 的「核销明细」整页就靠这几条
+   时间线承载，原来标题 16px、副文 13px —— 在 82 PPI 的竖屏上偏小。
+   连接线起点跟着行距一起下移，否则会插进圆点里。 */
+.wmain .tl { padding:var(--s-5) 0; }
+.wmain .tl::before { top:38px; }
+.wmain .tl-dot { width:30px; height:30px; }
+.wmain .tl-dot .ic { width:16px; height:16px; }
+.wmain .tl-t { font-size:var(--fz-5); line-height:1.5; }
+.wmain .tl-s { font-size:var(--fz-3); line-height:1.72; margin-top:7px; }
+.wmain .notice { font-size:var(--fz-4); line-height:1.78; }
+.wmain .panel-note { font-size:var(--fz-4); line-height:1.78; }
+.wside .btn { min-height:56px; font-size:var(--fz-4); }
+.bf-p { font-size:var(--fz-3); line-height:1.72; }
+
+/* 关键数字放大：s2 / s3 开头那两张卡里，用户真正来看的就是「还剩几页」「省了多少」。
+   原来它们是 8 行 / 4 行 kv 里的一行，在 27 寸屏上和「能否转让」一样大。
+   数字一个没变、没有新增任何一项 —— 只是按它们的重要程度给了尺寸。 */
+.figs { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-4); }
+.fig { padding:var(--s-5) var(--s-4); border-radius:var(--r-md);
+       background:var(--fog-a04); border:1px solid var(--brd-1);
+       display:flex; flex-direction:column; gap:6px; }
+.fig--now { background:var(--jade-a12); border-color:var(--jade-a20); }
+.fig-k { font-size:var(--fz-2); color:var(--fog-600); line-height:1.4; }
+.fig-v { font-family:var(--ff-num); font-size:44px; font-weight:700; color:var(--fog-900); line-height:1; }
+.fig--now .fig-v { color:var(--jade-200); }
+.fig-u { font-size:var(--fz-2); color:var(--fog-600); }
 </style>
 </head>
 <body>
@@ -273,9 +328,27 @@
           </span>
         </div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">本月剩余</span><span class="v"><b>7</b> 页</span></div>
-            <div class="kv-row"><span class="k">本月已用</span><span class="v">13 页</span></div>
+          <!-- 2026-08-11 版面整改：「本月剩余 / 已用 / 总额」原来混在 8 行 kv 里，
+               和「能否转让」一样大。用户来这一步就是看这三个数。数值一个没改，
+               只是按重要程度给了尺寸。剩下的条款仍在下面按原样列全。 -->
+          <div class="figs">
+            <div class="fig fig--now">
+              <span class="fig-k">本月剩余</span>
+              <span class="fig-v">7</span>
+              <span class="fig-u">页 · 9月1日 00:00 重置</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">本月已用</span>
+              <span class="fig-v">13</span>
+              <span class="fig-u">页 · 省 2.60 元</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">每月额度</span>
+              <span class="fig-v">20</span>
+              <span class="fig-u">页 · 按月清零不累积</span>
+            </div>
+          </div>
+          <div class="kv" style="margin-top:var(--s-5)">
             <div class="kv-row"><span class="k">重置时间</span><span class="v">每月 1 日 00:00</span></div>
             <div class="kv-row"><span class="k">可用范围</span><span class="v">简历与求职材料</span></div>
             <div class="kv-row"><span class="k">能否兑现</span><span class="v v--fog">不能</span></div>
@@ -326,27 +399,10 @@
                   也拿不到你的其他社保信息。</span>
           </div>
 
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-target"/></svg><b>剩的 7 页，怎么用不浪费</b>
-          </div>
-          <div class="tline">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">先把简历改到能投，再打</span>
-                <span class="tl-s">打完才发现要改，那几页就白扔了 —— 这是最常见的浪费</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">按实际要去的场次算份数</span>
-                <span class="tl-s">招聘会作战台会按你选的企业数算「每家 2 份」，不用凭感觉多打</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">证件、成绩单这类先扫成 PDF，别急着打</span>
-                <span class="tl-s">网申上传用电子版就够，到要交纸质件时再打</span></span></div>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-5)">
-            <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
-            不能预支、不能攒到下月。<br>
-            用完<b>不影响任何功能</b> —— 这份额度只管纸张；
-            AI 服务的次数是另一套口径，见右侧「你的账户」。
-          </div>
+          <!-- 2026-08-11 版面整改：这里原来还接着「剩的 7 页，怎么用不浪费」三条和
+               「用完之后」一段。那两块讲的是**用之前该想清楚的事**，和右栏那张卡的
+               标题一字不差；左栏这一步要回答的是「你现在卡在哪」。已整块移到右栏，
+               不是删除，措辞一字未改。 -->
         </div>
       </div>
 
@@ -358,11 +414,28 @@
           <span class="mt">只记核销，不记你打了什么内容</span>
         </div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">本月免费额度</span><span class="v">已用 13 / 20 页</span></div>
-            <div class="kv-row"><span class="k">本月省下</span><span class="v"><b>2.60</b> 元</span></div>
-            <div class="kv-row"><span class="k">累计使用</span><span class="v">3 项权益</span></div>
-            <div class="kv-row"><span class="k">已过期未用</span><span class="v">1 项</span></div>
+          <!-- 2026-08-11 版面整改：同 s2，四个数原样，只是按重要程度给了尺寸。 -->
+          <div class="figs" style="grid-template-columns:repeat(4,1fr)">
+            <div class="fig fig--now">
+              <span class="fig-k">本月省下</span>
+              <span class="fig-v">2.60</span>
+              <span class="fig-u">元 · 自付 0.00 元</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">本月已用额度</span>
+              <span class="fig-v">13</span>
+              <span class="fig-u">/ 20 页</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">累计使用</span>
+              <span class="fig-v">3</span>
+              <span class="fig-u">项权益</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">已过期未用</span>
+              <span class="fig-v">1</span>
+              <span class="fig-u">项 · 本机没提醒你</span>
+            </div>
           </div>
         </div>
       </div>
@@ -395,10 +468,9 @@
                   代价是这类限时权益可能会过期。<b>这是我们选的取舍，如实告诉你</b>。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            记录只有<b>用了哪一项、什么时候、在哪台机器、省了多少钱</b>，
-            不含你打印的内容。
-          </div>
+          <!-- 2026-08-11 版面整改：记录边界那一段移到右栏「一共省了多少」下面 ——
+               它说的是这些数字**记了什么、没记什么**，属于账目口径，
+               和右栏那张金额卡是同一件事；左栏这里只留明细本身。 -->
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-history"/></svg><b>再往前</b>
@@ -416,12 +488,6 @@
                 <span class="tl-s">6月30日 失效 · 同样没提醒你</span></span></div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-check"/></svg>
-            <span><b>这些数字可以自己对账</b>：每一条核销都对应「打印订单」里的一单，
-                  页数、时间、机器编号能一一对上。<br>
-                  对不上就是我们错了 —— 拿着订单号找现场工作人员。</span>
-          </div>
         </div>
       </div>
 
@@ -529,13 +595,38 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>用之前想清楚的</b></div>
         <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+          <div class="lock-p" style="color:var(--fog-700)">
             <b>额度按月清零，不累积。</b><br>
             剩的 7 页这个月不用就没了，<b>但也没必要为了用完而多打</b> ——
             打出来用不上的纸是浪费，不是省钱。
             <br><br>
             <b>先想清楚要投哪几家，再决定打几份。</b><br>
             招聘会作战台可以帮你算该带几份。
+          </div>
+
+          <!-- 2026-08-11 版面整改：以下三条与「用完之后」一段自左栏移入。
+               左栏第 2 步答的是「你卡在哪」，这几条答的是「怎么用不浪费」，
+               和本卡标题同义。原文一字未改。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-target"/></svg><b>剩的 7 页，怎么用不浪费</b>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先把简历改到能投，再打</span>
+                <span class="tl-s">打完才发现要改，那几页就白扔了 —— 这是最常见的浪费</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">按实际要去的场次算份数</span>
+                <span class="tl-s">招聘会作战台会按你选的企业数算「每家 2 份」，不用凭感觉多打</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">证件、成绩单这类先扫成 PDF，别急着打</span>
+                <span class="tl-s">网申上传用电子版就够，到要交纸质件时再打</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-5)">
+            <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
+            不能预支、不能攒到下月。<br>
+            用完<b>不影响任何功能</b> —— 这份额度只管纸张；
+            AI 服务的次数是另一套口径，见上面「你的账户」。
           </div>
 
           <div class="notice" style="margin-top:var(--s-5)">
@@ -559,13 +650,28 @@
             金额不大，但这是<b>真实发生的核销</b>，不是虚拟积分。
             每一笔都能在打印订单里对上。
           </div>
+
+          <!-- 2026-08-11 版面整改：以下两段自左栏移入。它们讲的是这些金额
+               **记了什么、怎么对账**，属于账目口径，和这张金额卡是同一件事。
+               原文一字未改。 -->
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span><b>这些数字可以自己对账</b>：每一条核销都对应「打印订单」里的一单，
+                  页数、时间、机器编号能一一对上。<br>
+                  对不上就是我们错了 —— 拿着订单号找现场工作人员。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            记录只有<b>用了哪一项、什么时候、在哪台机器、省了多少钱</b>，
+            不含你打印的内容。
+          </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>过期那一条</b></div>
         <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+          <div class="lock-p" style="color:var(--fog-700)">
             7 月那张招聘会折扣券，<b>本机没提醒你就让它过期了</b>。<br><br>
             本机不收手机号，所以<b>发不了到期提醒</b>；限时权益要你自己留意有效期。
           </div>
@@ -574,6 +680,23 @@
             <svg class="ic"><use href="#i-check"/></svg>
             <span>能做的是：<b>限时权益尽量做成"到时候自动生效"</b>，
                   不需要你记得领 —— 8月12日 那个 5 折就是这样。</span>
+          </div>
+
+          <!-- 2026-08-11：这一步右栏原来只有上面两块（实测内容 306px、外壳 1098px）。
+               补的是本页**已经成立、但从没在这一步说清**的两件事：
+               这些记录留多久、以及"已过期未用 1 项"那一条现在还能不能补救。
+               都不是新数据，是把 s1/s2 已写明的口径在结账这一步复述到位。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg><b>这些记录留多久</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">核销流水</span><span class="v">跟打印订单同期</span></div>
+            <div class="kv-row"><span class="k">打印内容</span><span class="v v--fog">不记录</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">没有</span></div>
+            <div class="kv-row"><span class="k">导出给出资方</span><span class="v">只报页数与金额</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            向人社结算时报的是<b>页数和金额</b>，不报你打了什么。
           </div>
         </div>
       </div>

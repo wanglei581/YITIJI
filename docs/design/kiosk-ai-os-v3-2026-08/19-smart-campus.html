@@ -142,6 +142,117 @@
    overflow:visible 让说明文字直接压到下一条上，自检查不出来但眼睛看得见）。
    滚动容器里的条目一律不许压缩，让容器去滚。 */
 .wmain .pane--grow.svc-list > .sec > .alt { flex:0 0 auto; }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：s2 左 745 / 右 768，s3 左 611 / 右 768，s1 右 233；s4 两栏都是 0。
+
+   成因分两类，不是同一件事：
+
+   ① s2 / s3 —— **内容量真的不够 + flex 分配**。
+      左栏 .previewwrap 外壳 1356px，里面只有 611px；.stophere 写着 flex:1 1 auto，
+      于是一个只有两行字的虚线框被拉到栏底。右栏 pane--grow 外壳 1089px、内容 321px。
+      这两步是「学校接入后长什么样」的预览，本来就没有数据可放 —— 但按 (f) 的判据，
+      「数据缺失是正确的」不等于「底下空 768px 是正确版式」。
+      处理：不编任何学校数据。改为
+        · 把该说的说到位：.stophere 由「两行字 + 撑满的空壳」改成逐项列清
+          **哪一项没有、谁提供** —— 屏上那 5 步 / 4 项各缺什么，本来就写在页面上，
+          这里只是把同一句话拆到它对应的那一项上，每一行的值都是「未接入」。
+        · 把真实出口做大：这一屏唯一能点的三条（打印 / 扫描 / 看校招活动）
+          原来是 90px 的小卡，现在按 §9 主操作尺寸做成 ≥140px 的大卡。
+        · 把「本机对你的数据做什么」从 s1 扩到 s2/s3 常驻 —— 页面自己写着
+          「这几条现在就成立，不等接入」，而用户正是在这两步判断值不值得推动学校开通。
+
+   ② s1 右 233 —— 纯粹是字太小。27 寸竖屏 1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI，
+      60cm 距离下 13–16px 正文只有 4–4.6mm 字高。放大即可，不动结构。
+
+   s4 两栏本来就是 0，且左栏 .previewwrap 实测已经溢出 112px（六项服务那张卡），
+   靠 .alt 压行距硬塞。放大之前先给它内层滚动，既不会因为放大而挤破，
+   也顺手修掉那 112px 的静默溢出。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 通用放大：两栏同步，不按阶段切字号 */
+.work .pane-hd b { font-size:var(--fz-5); }
+.work .kv-row { min-height:58px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.work .notice { font-size:var(--fz-3); line-height:1.72; padding:var(--s-5); }
+.work .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.work .lock-p { font-size:var(--fz-4) !important; line-height:1.78; }
+.work .tl { padding:var(--s-4) 0; }
+.work .tl-t { font-size:var(--fz-4); line-height:1.5; }
+.work .tl-s2 { font-size:var(--fz-3); line-height:1.68; display:block; margin-top:5px; }
+.work .alt-t { font-size:var(--fz-5); }
+.work .alt-s { font-size:var(--fz-3); line-height:1.68; }
+.work .alt { padding:var(--s-5); }
+.wh-t { font-size:var(--fz-4); }
+.wh-s { font-size:var(--fz-2); line-height:1.6; }
+.previewbar span { font-size:var(--fz-4); line-height:1.68; }
+
+/* 预览两步的主区：时间线是这两步的主内容，行距按主区尺寸给 */
+.previewwrap .tl { padding:var(--s-5) 0; }
+.previewwrap .tl::before { top:38px; }
+.previewwrap .tl-dot { width:30px; height:30px; }
+.previewwrap .tl-t { font-size:var(--fz-5); }
+
+/* 「到此为止」：不再 flex 撑满，改成按内容收高的实体块 */
+.stophere { flex:0 0 auto; }
+.sh-t { font-size:var(--fz-5); }
+.sh-p { font-size:var(--fz-3); line-height:1.75; max-width:none; }
+/* 逐项列清「哪一项没有、谁提供」。值一律是「未接入」—— 这是本页的主张本身，
+   不是数据。two-column 网格，行高按触控尺寸给。 */
+.miss { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); margin-top:var(--s-4); }
+.ms { display:flex; flex-direction:column; gap:4px; min-height:var(--touch-min);
+      padding:var(--s-4); border-radius:var(--r-xs);
+      background:var(--fog-a04); border:1px dashed var(--fog-a20); }
+.ms-t { font-size:var(--fz-3); color:var(--fog-800); font-weight:600; }
+.ms-w { font-size:var(--fz-2); color:var(--fog-600); line-height:1.55; }
+.ms-v { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+
+/* s4 右栏那 5 条「不用等开通现在能做的」是次要出口清单（同样的入口在 s1 左栏已经大卡列过），
+   跟着通用放大会把整栏顶出 190px，末两条被推到可视区外。这一处保持紧凑行高，
+   触控高度仍由 .alt 的 min-height:var(--touch-min) 兜住。 */
+.wside [data-at="s4"] .alt { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s4"] .alt-t { font-size:var(--fz-4); }
+.wside [data-at="s4"] .alt-s { font-size:var(--fz-2); line-height:1.5; }
+.wside [data-at="s4"] .kv-row { min-height:52px; }
+.wside [data-at="s4"] .lock-p { font-size:var(--fz-3) !important; line-height:1.7; }
+/* s2/s3 右栏三块加起来自然高 1503px、可用 1424px：不让它滚（滚会把
+   「具体开放哪些由学校方决定」最后一行推出可视区，实测被切 24px）。
+   压的是行距和 kv 行高，一个字都没删。 */
+.wside [data-at="s2 s3"] .kv-row { min-height:48px; }
+.wside [data-at="s2 s3"] .lock-p { line-height:1.7; }
+.wside [data-at="s2 s3"] .alt { padding:var(--s-4); }
+
+/* s4 六项服务卡：原来 6 条竖着排，previewwrap 只分到 419px，实测**溢出 112px 压在
+   下面那张卡上**（自检查不出来，眼睛看得见；页内注释里也承认过一次 53px）。
+   主区有 604px 宽，这六张卡只有图标 + 标题 + 一行说明，本来就不需要整行 ——
+   改成 2×3 网格，高度砍掉一半，六条全部露出来，不用滚也不压任何东西。
+   说明栏 notice 跨两列。滚动兜底仍保留，防止字号或文案变长时又悄悄压上去。 */
+.previewwrap[data-at="s4"] { overflow:hidden; }
+.previewwrap[data-at="s4"] > .pane { min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.previewwrap[data-at="s4"] > .pane > .svc6 {
+  min-height:0; flex:1 1 auto; overflow-y:auto;
+  display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); align-content:start; }
+.previewwrap[data-at="s4"] > .pane > .svc6 > .alt { flex:0 0 auto; }
+.previewwrap[data-at="s4"] > .pane > .svc6 > .notice { grid-column:1 / -1; margin-top:var(--s-2) !important; }
+.previewwrap[data-at="s4"] .alt-t { font-size:var(--fz-4); }
+
+/* s1 右栏「如果你是学校老师」一块就有 4 步时间线 + 两组说明 + 第二组 kv —— 本来就满，
+   跟着通用放大会顶出 213px 被滚动条吃掉（首次使用态还要再加一张卡）。
+   这一栏压回接近原尺寸：它不是留白问题栏，只需要 233px 的富余被填掉即可。内容一字不动。 */
+.wside [data-at="s1"] .kv-row { min-height:44px; font-size:var(--fz-3); }
+.wside [data-at="s1"] .tl { padding:var(--s-3) 0; }
+.wside [data-at="s1"] .tl-t { font-size:var(--fz-3); }
+.wside [data-at="s1"] .tl-s2 { font-size:var(--fz-1); line-height:1.5; }
+.wside [data-at="s1"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-at="s1"] .notice { font-size:var(--fz-2); line-height:1.6; padding:var(--s-3) var(--s-4); }
+.wside [data-at="s1"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
+.wside [data-at="s1"] .lock-p { font-size:var(--fz-3) !important; line-height:1.66; }
+/* 首次使用那张卡在 s1 是**多出来的第三张** —— 右栏放不下就会把「如果你是学校老师」
+   那一栏顶出 130px。它只有两行字，按两行字的体量给，不占一张常规卡的高度。 */
+.wside [data-when="first"] .pane-hd { margin-bottom:var(--s-3); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
+/* s4 右栏第三块（5 条替代入口）差 29px 才装得下，压条目间距即可 */
+.wside [data-at="s4"] .sec > div[style*="column"] { gap:var(--s-2) !important; }
+.wside [data-at="s4"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
 </style>
 </head>
 <body>
@@ -363,6 +474,28 @@
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
             <b>这块是空的：楼栋、窗口、时间、缴费状态都在学校手里</b>，学校开通后换成真实内容。
+            下面把上面那 5 步各缺什么、由谁提供逐条列开 —— <b>每一项现在都是「未接入」，
+            本机不替学校填一个看起来像真的值</b>。
+          </div>
+          <!-- 2026-08-11 版面整改：这不是新数据，是把上面那句「楼栋、窗口、时间、
+               缴费状态都在学校手里」按上面 5 步拆到对应的那一项上。值一律「未接入」。 -->
+          <div class="miss">
+            <div class="ms"><span class="ms-t">院系报到处楼栋与窗口</span>
+              <span class="ms-w">由学校教务 / 学工处按院系下发</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">缴费与保险状态</span>
+              <span class="ms-w">由学校财务系统给，缺哪一项也由它判定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">宿舍楼号房号与领钥匙地点</span>
+              <span class="ms-w">由学校后勤宿管分配</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">校园卡办理窗口与所需材料</span>
+              <span class="ms-w">由学校一卡通中心设定</span>
+              <span class="ms-v">未接入</span></div>
+          </div>
+          <div class="sh-p" style="margin-top:var(--s-4)">
+            第 5 步「打印报到确认单」<b>不在这张表里</b> —— 那一步不依赖学校系统，
+            材料自带电子版，现在就能在本机打。
           </div>
         </div>
       </div>
@@ -424,6 +557,27 @@
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
             <b>这块是空的：办理条件与材料由学校设定</b>，本机不编一套会让你按错规则去准备的。
+            上面 4 项各自还差什么，逐条列在下面 —— <b>四项现在全是「未接入」</b>。
+          </div>
+          <!-- 2026-08-11 版面整改：同 s2，把「实际开放哪些由学校决定」按上面 4 项拆开。
+               每一项写的是**决定权在谁**，值一律「未接入」，不写任何办理条件。 -->
+          <div class="miss">
+            <div class="ms"><span class="ms-t">在读 / 学籍证明</span>
+              <span class="ms-w">是否带电子章、要不要学校审批，由学校设定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">成绩单</span>
+              <span class="ms-w">中英文、是否含绩点，由学校教务设定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">活动与讲座报名凭证</span>
+              <span class="ms-w">报名本身在学校自己的系统里完成</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">校内导览图</span>
+              <span class="ms-w">按院系高亮要学校给楼栋与窗口坐标</span>
+              <span class="ms-v">未接入</span></div>
+          </div>
+          <div class="sh-p" style="margin-top:var(--s-4)">
+            这四项<b>现在一项都办不了</b>。手上已经有纸质件的，扫描成 PDF 这条路今天就通 ——
+            右边第二个入口。
           </div>
         </div>
       </div>
@@ -501,7 +655,8 @@
             <b>开通后会有这些</b>
             <span class="mt">六项名称与说明取自线上已定好的配置</span>
           </div>
-          <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <!-- 2026-08-11：由竖排 6 行改 2×3 网格（见上方 .svc6）。名称与说明一字未改。 -->
+          <div class="sec svc6">
 
             <div class="alt" style="cursor:default" aria-disabled="true">
               <svg class="ic"><use href="#i-users"/></svg>
@@ -645,9 +800,12 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2 s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+      <!-- 2026-08-11 版面整改：这三条是这两步**唯一真能点**的东西，原来是 90px 的小卡，
+           摆在一个 1089px 的空壳里。按 §9 主操作尺寸做大，说明写全。 -->
+      <div class="pane" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b>
+          <span class="mt">不依赖学校系统</span></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-4)">
           <!-- 2026-08-10：同上，打印入口由 P12 改指打印工作台第 1 步（上传打印） -->
           <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19">
             <svg class="ic"><use href="#i-printer"/></svg>
@@ -664,6 +822,27 @@
             <span class="alt-b"><span class="alt-t">看校招活动</span>
               <span class="alt-s">不需要接入学校系统</span></span>
           </a>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面整改：这一块原来只挂在 s1（`data-at="s1"` 那张卡的后半段），
+           但页面自己写着「这几条现在就成立，不等接入」。s2/s3 正是用户在判断
+           「值不值得推动学校开通」的两步 —— 要判断，就得知道接入后本机会怎么对待这些数据。
+           所以扩到 s2/s3 常驻。四行文字与 s1 一字不差，不是新结论。 -->
+      <div class="pane pane--grow" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机对你的数据做什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">学籍信息</span><span class="v">不落库</span></div>
+            <div class="kv-row"><span class="k">证件扫描件</span><span class="v">办完即清</span></div>
+            <div class="kv-row"><span class="k">管理员可见</span><span class="v">只见打印流水</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">不收集</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>即使接入，本机也只读学校授权范围内的数据，<b>不留存学籍信息</b>，
+                  办理结束即清。<b>具体开放哪些由学校方决定，不由本机决定。</b></span>
+          </div>
         </div>
       </div>
 
@@ -732,8 +911,12 @@
         </div>
       </div>
 
-      <!-- 首次使用：一句话 -->
-      <div class="pane" data-when="first">
+      <!-- 首次使用：一句话。
+           2026-08-11：限定在 s1。s2 / s3 / s4 的顶部常驻横幅已经写明「这是接入后 / 开通后的样子，
+           不是本机当前状态」，右栏紧接着又把三条（s4 是五条）真出口列了一遍 ——
+           这张卡在那三步是逐字重复，还把右栏顶出 93–203px（末行被滚动条吃掉）。
+           不是删内容，是不在同一屏说第三遍；s1 是本机真实状态那一步，它留在那里。 -->
+      <div class="pane" data-when="first" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
