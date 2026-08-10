@@ -561,18 +561,6 @@ jobs:
         with:
           ref: b8369021177f95a9d76ca1d9130ad1afb249a720
           path: inventory-source
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            tsconfig.base.json
-            services/api/tsconfig.json
-            services/api/scripts/recruitment-wave2-full-inventory.ts
-            services/api/scripts/support/recruitment-wave2-full-inventory.ts
-            services/api/scripts/support/recruitment-wave2-public-snapshot.ts
-            services/api/scripts/support/recruitment-wave2-readonly-db.ts
-            services/api/src/recruitment-content/recruitment-wave2-target.ts
-            services/api/src/recruitment-content/recruitment-content-readiness.ts
-            services/api/src/recruitment-content/recruitment-content.types.ts
-            services/api/src/recruitment-content/recruitment-wave2-plan.ts
 
       - name: Verify pinned inventory source digest
         run: |
@@ -591,14 +579,39 @@ jobs:
             | sha256sum | awk '{print $1}')"
           test "$CALCULATED_DIGEST" = '91b957fca1c2415fead68c050454076ec13a14a106e3bb22513fe143bb038502'
 
-      - name: Upload minimal verified source bundle
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compile minimal inventory bundle
+        working-directory: inventory-source
+        run: |
+          set -euo pipefail
+          corepack enable
+          pnpm install --frozen-lockfile --filter . --filter @ai-job-print/api...
+          pnpm exec tsc \
+            --target ES2022 \
+            --module CommonJS \
+            --moduleResolution Node \
+            --esModuleInterop \
+            --skipLibCheck \
+            --rootDir services/api \
+            --outDir ../inventory-dist \
+            services/api/scripts/recruitment-wave2-full-inventory.ts
+          cd ../inventory-dist
+          find . -type f -name '*.js' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          test -s SHA256SUMS
+          sha256sum -c SHA256SUMS >/dev/null
+
+      - name: Upload minimal verified CommonJS bundle
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          source: inventory-source/tsconfig.base.json,inventory-source/services/api/tsconfig.json,inventory-source/services/api/scripts/recruitment-wave2-full-inventory.ts,inventory-source/services/api/scripts/support/recruitment-wave2-full-inventory.ts,inventory-source/services/api/scripts/support/recruitment-wave2-public-snapshot.ts,inventory-source/services/api/scripts/support/recruitment-wave2-readonly-db.ts,inventory-source/services/api/src/recruitment-content/recruitment-wave2-target.ts,inventory-source/services/api/src/recruitment-content/recruitment-content-readiness.ts,inventory-source/services/api/src/recruitment-content/recruitment-content.types.ts,inventory-source/services/api/src/recruitment-content/recruitment-wave2-plan.ts
+          source: inventory-dist
           target: /tmp/rw2-upload-${{ github.run_id }}
           overwrite: true
 
@@ -610,13 +623,13 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 15m
-          envs: EXPECT_DIR,EVIDENCE_ROOT,RUN_ID,SOURCE_COMMIT,SOURCE_DIGEST,AUTHORIZED_UNTIL
+          envs: EXPECT_DIR,EVIDENCE_ROOT,RUN_ID,AUTHORIZED_UNTIL
           script: |
             set -euo pipefail
             umask 077
 
             UPLOAD_ROOT="/tmp/rw2-upload-${RUN_ID}"
-            SRC_ROOT="$UPLOAD_ROOT/inventory-source"
+            SRC_ROOT="$UPLOAD_ROOT/inventory-dist"
             TMP_ROOT="$(mktemp -d "/tmp/rw2-full-${RUN_ID}-XXXXXX")"
             cleanup() {
               rm -rf -- "$TMP_ROOT" "$UPLOAD_ROOT"
@@ -632,24 +645,8 @@ jobs:
                 raise SystemExit('AUTHORIZATION_WINDOW_INVALID')
             PY
 
-            test -f "$SRC_ROOT/services/api/scripts/recruitment-wave2-full-inventory.ts"
-
-            CALCULATED_DIGEST="$(cd "$SRC_ROOT" && sha256sum \
-              tsconfig.base.json \
-              services/api/tsconfig.json \
-              services/api/scripts/recruitment-wave2-full-inventory.ts \
-              services/api/scripts/support/recruitment-wave2-full-inventory.ts \
-              services/api/scripts/support/recruitment-wave2-public-snapshot.ts \
-              services/api/scripts/support/recruitment-wave2-readonly-db.ts \
-              services/api/src/recruitment-content/recruitment-wave2-target.ts \
-              services/api/src/recruitment-content/recruitment-content-readiness.ts \
-              services/api/src/recruitment-content/recruitment-content.types.ts \
-              services/api/src/recruitment-content/recruitment-wave2-plan.ts \
-              | sha256sum | awk '{print $1}')"
-            if [ "$CALCULATED_DIGEST" != "$SOURCE_DIGEST" ]; then
-              echo "INVENTORY_ERROR=SOURCE_DIGEST_MISMATCH"
-              exit 1
-            fi
+            test -f "$SRC_ROOT/scripts/recruitment-wave2-full-inventory.js"
+            (cd "$SRC_ROOT" && sha256sum -c SHA256SUMS >/dev/null)
             test -d "$EXPECT_DIR/node_modules"
             ln -s "$EXPECT_DIR/node_modules" "$SRC_ROOT/node_modules"
             node -e "if (Number(process.versions.node.split('.')[0]) !== 22) process.exit(1)"
@@ -682,16 +679,16 @@ jobs:
 
             MODULE_LABELS=(READINESS TARGET READONLY_DB FULL_INVENTORY)
             MODULE_PATHS=(
-              ./src/recruitment-content/recruitment-content-readiness
-              ./src/recruitment-content/recruitment-wave2-target
-              ./scripts/support/recruitment-wave2-readonly-db
-              ./scripts/support/recruitment-wave2-full-inventory
+              ./src/recruitment-content/recruitment-content-readiness.js
+              ./src/recruitment-content/recruitment-wave2-target.js
+              ./scripts/support/recruitment-wave2-readonly-db.js
+              ./scripts/support/recruitment-wave2-full-inventory.js
             )
             for INDEX in "${!MODULE_PATHS[@]}"; do
               MODULE_ERROR="$TMP_ROOT/module-${MODULE_LABELS[$INDEX]}.error"
               if ! (
-                cd "$SRC_ROOT/services/api"
-                node --experimental-strip-types -e "require('${MODULE_PATHS[$INDEX]}')" \
+                cd "$SRC_ROOT"
+                node -e "require('${MODULE_PATHS[$INDEX]}')" \
                   >/dev/null 2>"$MODULE_ERROR"
               ); then
                 echo "INVENTORY_RESULT=execution_failed"
@@ -720,9 +717,9 @@ jobs:
 
             set +e
             (
-              cd "$SRC_ROOT/services/api"
+              cd "$SRC_ROOT"
               RW2_URL="$RW2_URL" RW2_DATABASE="$RW2_DATABASE" AUTHORIZED_UNTIL="$AUTHORIZED_UNTIL" \
-                node --experimental-strip-types <<'JS'
+                node <<'JS'
             const { withRecruitmentWave2Readonly } = require('./scripts/support/recruitment-wave2-readonly-db')
             const { collectFullInventory } = require('./scripts/support/recruitment-wave2-full-inventory')
             const config = {
@@ -765,7 +762,7 @@ jobs:
             unset DATABASE_URL DIRECT_URL POSTGRES_URL
             set +e
             (
-              cd "$SRC_ROOT/services/api"
+              cd "$SRC_ROOT"
               RECRUITMENT_WAVE2_TARGET=authorized-readonly \
               RECRUITMENT_WAVE2_AUTHORIZATION_REF=AUTH/recruitment-wave2/prod-readonly-20260810-user-approved-002 \
               RECRUITMENT_WAVE2_AUTHORIZED_UNTIL="$AUTHORIZED_UNTIL" \
@@ -774,7 +771,7 @@ jobs:
               RECRUITMENT_WAVE2_PUBLIC_API_BASE_URL=https://zyidai.cn/api/v1 \
               RECRUITMENT_WAVE2_EXPECTED_PUBLIC_API_ORIGIN=https://zyidai.cn \
               RECRUITMENT_WAVE2_EXPECTED_EXCLUDE_DEMO_PUBLIC_DATA=false \
-              node --experimental-strip-types scripts/recruitment-wave2-full-inventory.ts \
+              node scripts/recruitment-wave2-full-inventory.js \
               >"$REPORT_TMP" 2>"$ERROR_TMP"
             )
             CLI_STATUS=$?
@@ -845,8 +842,6 @@ jobs:
           EXPECT_DIR: /srv/ai-job-print
           EVIDENCE_ROOT: /srv/ai-job-print-backups/recruitment-wave2-evidence
           RUN_ID: ${{ github.run_id }}
-          SOURCE_COMMIT: b8369021177f95a9d76ca1d9130ad1afb249a720
-          SOURCE_DIGEST: 91b957fca1c2415fead68c050454076ec13a14a106e3bb22513fe143bb038502
           AUTHORIZED_UNTIL: '2026-08-10T15:25:10Z'
 
       - name: Remove exact temporary upload path
