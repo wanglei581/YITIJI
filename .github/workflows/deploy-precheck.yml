@@ -221,7 +221,7 @@ jobs:
             values = load_dotenv(env_path)
             app_url = values.get('DATABASE_URL', '')
             try:
-                _, app_database = parse_postgres_url(app_url)
+                app_parsed, app_database = parse_postgres_url(app_url)
             except ValueError:
                 print('ADMISSION_APP_DATABASE=invalid')
                 raise SystemExit(1)
@@ -254,21 +254,14 @@ jobs:
             # A role may already exist even when its credential URL has not been provisioned.
             role_exists = 'unknown'
             try:
-                result = subprocess.run(
-                    [
-                        'sudo', '-n', '-u', 'postgres', 'psql', '-X', '-A', '-t',
-                        '-d', app_database, '-v', 'ON_ERROR_STOP=1', '-v',
-                        f'candidate={expected_readonly_role}', '-c',
-                        "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=:'candidate');",
-                    ],
-                    text=True,
-                    capture_output=True,
-                    timeout=30,
-                    check=False,
+                role_exists_result = run_psql(
+                    app_parsed,
+                    app_database,
+                    "SELECT EXISTS(SELECT 1 FROM pg_roles "
+                    f"WHERE rolname='{expected_readonly_role}');",
                 )
-                if result.returncode == 0:
-                    role_exists = 'yes' if result.stdout.strip() == 't' else 'no'
-            except (FileNotFoundError, subprocess.SubprocessError):
+                role_exists = 'yes' if role_exists_result == 't' else 'no'
+            except (RuntimeError, subprocess.SubprocessError):
                 role_exists = 'unknown'
             print('ADMISSION_EXPECTED_ROLE_EXISTS=' + role_exists)
 
