@@ -459,7 +459,7 @@
           <button class="btn btn--ghost" style="width:100%" data-when="default first" data-fb="ai">送 AI 简历诊断</button>
           <button class="btn btn--ghost" style="width:100%" data-when="ai-down device-off" aria-disabled="true">AI 诊断不可用</button>
           <!-- 完成去向三卡：打印 / 存档 / 带走。全部真链接；打印随 device-off 如实置灰 -->
-          <a class="xlane-go" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">
+          <a class="xlane-go" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P07&amp;kind=material&amp;title=扫描件%20PDF&amp;back=s4">
             <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
             <span class="xlane-tx"><span class="xlane-nm">拿去打印</span><span class="xlane-ds">去打印工作台核价出纸</span></span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
@@ -590,7 +590,7 @@
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">不再加页 · 生成 PDF<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="device-off">看已扫的 3 页<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first" data-fb="ai">送 AI 诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="06-print-workbench.html?stage=s3">拿去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="06-print-workbench.html?stage=s3&amp;from=P07&amp;kind=material&amp;title=扫描件%20PDF&amp;back=s4">拿去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off" data-fb="save">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
   </div>
 

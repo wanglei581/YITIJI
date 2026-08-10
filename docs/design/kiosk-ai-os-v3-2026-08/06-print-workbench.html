@@ -429,11 +429,13 @@
       </div>
 
       <!-- 2026-08-10 材料交接：别的台面（简历工作台 / 招聘会作战台 / 岗位清单）把材料送过来时，
-           参数阶段顶上先出一张来源回执 —— 让用户确认「是不是这份」，而不是直接开始调份数。 -->
-      <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off">
+           参数阶段顶上先出一张来源回执 —— 让用户确认「是不是这份」，而不是直接开始调份数。
+           2026-08-10 修：这一行以前是写死的，政策页送办事清单过来也显示成「简历诊断报告」。
+           现在由页尾的交接契约脚本按 URL 参数改写；参数一个都没有时保留下面这行默认文案。 -->
+      <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off" id="handoff">
         <svg class="ic"><use href="#i-check"/></svg>
-        <span class="receipt-t">本次来自：<b>简历工作台 · 诊断报告</b> · <b>3 页</b> · 09:43 送达</span>
-        <span class="receipt-a"><a class="btn btn--quiet" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
+        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · <b>3 页</b> · 09:43 送达</span>
+        <span class="receipt-a"><a class="btn btn--quiet" id="handoff-back" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
       </div>
 
       <!-- S2–S4 体检结论 -->
@@ -861,9 +863,9 @@
       <div class="pane" data-at="s2">
         <div class="pane-hd"><span class="t">文件信息</span><span class="s" data-when="default ai-down device-off">已上传</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">文件名</span><span class="v" data-when="default ai-down device-off">个人简历.pdf</span><span class="v v--fog" data-when="first">—</span></div>
-          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off">3 页</span><span class="v v--fog" data-when="first">—</span></div>
-          <div class="kv-row"><span class="k">来源</span><span class="v" data-when="default ai-down device-off">手机扫码传</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">文件名</span><span class="v" id="fi-name" data-when="default ai-down device-off">个人简历.pdf</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" id="fi-pages" data-when="default ai-down device-off">3 页</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">来源</span><span class="v" id="fi-src" data-when="default ai-down device-off">手机扫码传</span><span class="v v--fog" data-when="first">—</span></div>
           <div class="kv-row"><span class="k">保留期限</span><span class="v">本次会话</span></div>
         </div>
       </div>
@@ -990,8 +992,8 @@
       <div class="pane" data-at="s3 s4">
         <div class="pane-hd"><span class="t">核价</span><span class="s">服务端计算</span></div>
         <div class="quote">
-          <div class="qrow"><span class="k">内容</span><span class="v">3 页 × 5 份 = 15 个印刷面</span></div>
-          <div class="qrow"><span class="k">双面用纸</span><span class="v">10 张（每份 2 张）</span></div>
+          <div class="qrow"><span class="k">内容</span><span class="v" id="q-content">3 页 × 5 份 = 15 个印刷面</span></div>
+          <div class="qrow"><span class="k">双面用纸</span><span class="v" id="q-paper">10 张（每份 2 张）</span></div>
           <div class="qrow"><span class="k">单价</span><span class="v">以现场公示价为准</span></div>
           <div class="qtotal">
             <span class="k">应付</span>
@@ -1001,6 +1003,9 @@
           </div>
           <p class="qnote" data-pay="free" data-when="default first ai-down">
             本单 <b>0 元</b>，<b>不进收银台、不出收款码</b>，出纸完成一样有取件码。</p>
+          <!-- 交接来的用量口径那一行由页尾契约脚本在**带参数时**动态插到这里（data-at="s3"）。
+               不预留空 <p>：没有交接就一行都不占；也不挂到 s4，s4 右栏在 device-off 下已经没有
+               多余 29px，多一段就把最后一张卡的正文顶出去（走查抓到过）。 -->
           <p class="qnote" data-when="default first ai-down"><b>核价结果显示出来之后，才会出现「确认并支付」。</b></p>
           <p class="qnote" data-when="device-off">打印机离线期间不接受支付。</p>
         </div>
@@ -1489,6 +1494,193 @@
     attributeFilter: ['data-state', 'data-stage', 'data-pay', 'data-job', 'data-src', 'data-file', 'data-off', 'data-done'] })
   window.addEventListener('load', tailgrow)
   tailgrow()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   全站「打印材料交接契约」· P06 收件端（2026-08-10）
+   --------------------------------------------------------------------------
+   走查发现的硬伤：参数阶段顶上的来源回执是写死的，不论谁把材料送过来，
+   都显示「本次来自：简历工作台 · 诊断报告 · 3 页」。政策页送办事清单过来
+   也这么显示 —— 那是骗人。这里把那一行改成按 URL 参数渲染。
+
+   链接格式（各来源页出口统一按这个拼）：
+     06-print-workbench.html?stage=s3
+       &from=<页号>      P09 / P21 / P30 …，决定「本次来自」的页名与「回去换」的回链
+       &kind=<类型slug>  十种白名单之一；title 缺失时用它的中文名兜底
+       &title=<中文名>   产物真名，来源页界面上叫什么就传什么
+       &pages=<页数>     **只传来源页自己已显示的数字**；页面没显示就不传，本机绝不替它编
+       &copies=<份数>    同上
+       &back=<阶段>      可选。回链要落回来源页的哪一步（默认用登记表里的那一步）
+
+   参数缺失的回退（都不报错、不空白）：
+     · 全缺           → 保留 HTML 里那行默认文案（原型默认场景本来就是简历诊断报告送过来）
+     · 缺 pages       → 写「页数以本机体检为准」，不写数字，也不动核价那两行
+     · 缺 title/kind  → 写「未指定材料 · 请回第 1 步选文件」
+     · from 不认识    → 回链退到本页第 1 步，不瞎猜来源页
+   份数与页数同时参与核价卡的用量口径（仍是预估，金额一律等服务端核价）。
+   预览纸张与体检结论是原型的样例渲染，不跟着参数变 —— 那是「这台机器读到的文件」，
+   不是「来源页说了什么」，交接参数无权改写本机体检结果。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var bar = document.getElementById('handoff')
+  if (!scr || !bar) return
+
+  /* 来源页登记表：页号 → 页名 + 回链文件 + 回链默认落点 */
+  var SRC = {
+    P01: { n: '首页',           f: '01-home-v5.html',        s: '' },
+    P07: { n: '扫描工作台',     f: '07-scan-workbench.html', s: 's4' },
+    P08: { n: '文件加工台',     f: '08-file-tools.html',     s: '' },
+    P09: { n: '简历工作台',     f: '09-resume-workbench.html', s: 's5' },
+    P10: { n: '访谈式生成',     f: '10-resume-interview.html', s: 's3' },
+    P12: { n: '材料工厂',       f: '12-material-factory.html', s: 't1' },
+    P13: { n: '岗位情报台',     f: '13-jobs-desk.html',      s: '' },
+    P14: { n: '岗位详情',       f: '14-job-detail.html',     s: '' },
+    P15: { n: '企业导览',       f: '15-companies.html',      s: '' },
+    P16: { n: '线下机构',       f: '16-offline-agencies.html', s: 'detail' },
+    P17: { n: '招聘会作战台',   f: '17-fair-desk.html',      s: 's4' },
+    P18: { n: '校园招聘专区',   f: '18-campus.html',         s: 's3' },
+    P19: { n: '智慧校园',       f: '19-smart-campus.html',   s: '' },
+    P20: { n: '面试训练舱',     f: '20-interview-pod.html',  s: 's4' },
+    P21: { n: '政策服务',       f: '21-policy.html',         s: 's3' },
+    P22: { n: '职业规划',       f: '22-career-plan.html',    s: 's3' },
+    P24: { n: '权益活动',       f: '24-benefits.html',       s: 's3' },
+    P25: { n: '顾问驾驶舱',     f: '25-advisor.html',        s: '' },
+    P26: { n: '顾问作业面',     f: '26-advisor-work.html',   s: '' },
+    P27: { n: '百宝箱区',       f: '27-toolbox.html',        s: '' },
+    P28: { n: '自我探索',       f: '28-self-assessment.html', s: 's3' },
+    P29: { n: '证件照工作台',   f: '29-id-photo.html',       s: 's5' },
+    P30: { n: '岗位大师决策台', f: '11-jobfit-compare.html', s: 's4' },
+    P31: { n: '签约风险提示',   f: '31-contract-review.html', s: 's4' },
+    P32: { n: 'AI简历服务域首屏', f: '32-resume-hub.html',   s: '' },
+    P33: { n: '简历素材库',     f: '33-resume-templates.html', s: '' },
+    P34: { n: '岗位信息域首屏', f: '34-jobs-hub.html',       s: '' },
+    P36: { n: '招聘会域首屏',   f: '36-fairs-hub.html',      s: '' },
+    P38: { n: '政策服务域首屏', f: '38-policy-hub.html',     s: '' },
+    P39: { n: '打印扫描服务域首屏', f: '39-print-hub.html',  s: '' }
+  }
+
+  /* 产物类型白名单：只认这十种，别的一律当没传 */
+  var KIND = {
+    'resume-report':    '简历诊断报告',
+    'jobfit-report':    '岗位匹配报告',
+    'material':         '求职材料',
+    'job-list':         '岗位清单',
+    'fair-plan':        '参会作战单',
+    'policy-checklist': '办事清单',
+    'assessment-sheet': '自评参考单',
+    'id-photo-sheet':   '证件照排版',
+    'contract-report':  '合同风险报告',
+    'template':         '简历版式',
+    /* P20 面试训练舱按同一契约发过来的类型（复盘单 / 题目与答案单），登记在册免得回退成空 */
+    'interview-sheet':  '面试复盘单'
+  }
+
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  function int (v) {
+    if (!v || !/^[0-9]{1,4}$/.test(v)) return 0
+    var n = parseInt(v, 10)
+    return (n > 0 && n <= 9999) ? n : 0
+  }
+  function clean (v, re, max) {
+    v = (v == null ? '' : String(v)).replace(re, '')
+    return v.length > max ? v.slice(0, max) : v
+  }
+
+  var from   = clean((q.get('from') || '').toUpperCase(), /[^A-Z0-9]/g, 6)
+  var kind   = clean((q.get('kind') || '').toLowerCase(), /[^a-z-]/g, 24)
+  /* title 只清掉控制字符与尖括号；正文一律走 textContent，不存在注入面 */
+  var title  = clean(q.get('title'), new RegExp('[\\u0000-\\u001f<>]', 'g'), 40).trim()
+  var pages  = int(q.get('pages'))
+  var copies = int(q.get('copies'))
+  var src    = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : null
+  var name   = title || (Object.prototype.hasOwnProperty.call(KIND, kind) ? KIND[kind] : '')
+
+  /* 一个交接参数都没有 → 什么都不改，保留 HTML 里的默认文案 */
+  if (!src && !name && !pages && !copies) return
+
+  function b (t) { var e = document.createElement('b'); e.textContent = t; return e }
+  function txt (t) { return document.createTextNode(t) }
+  function hhmm () {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n }
+    return p(d.getHours()) + ':' + p(d.getMinutes())
+  }
+
+  /* ① 回执正文 —— 全部用 textContent 拼，URL 里带标签也只会当字面文字显示 */
+  var line = document.getElementById('handoff-t')
+  if (line) {
+    while (line.firstChild) line.removeChild(line.firstChild)
+    line.appendChild(txt('本次来自：'))
+    line.appendChild(b(src ? src.n : '上一步'))
+    line.appendChild(txt(' · '))
+    if (!name) {
+      /* 来源页没说送的是什么 —— 那就不许写「送达」，那等于替它认领一份不存在的材料 */
+      line.appendChild(b('未指定材料'))
+      line.appendChild(txt(' · 请回第 1 步选文件'))
+    } else {
+      line.appendChild(b(name))
+      line.appendChild(txt(' · '))
+      if (pages) line.appendChild(b(pages + ' 页' + (copies ? ' × ' + copies + ' 份' : '')))
+      else line.appendChild(txt('页数以本机体检为准'))
+      line.appendChild(txt(' · ' + hhmm() + ' 送达'))
+    }
+  }
+
+  /* ② 回去换：认识来源页就回那一页，不认识就退回本页第 1 步，不瞎猜 */
+  var back = document.getElementById('handoff-back')
+  if (back) {
+    if (src) {
+      var st = clean(q.get('back') || src.s, /[^a-z0-9]/g, 8)
+      back.setAttribute('href', src.f + (st ? '?stage=' + st : ''))
+      back.textContent = '不是这份？回去换'
+    } else {
+      back.setAttribute('href', '06-print-workbench.html?stage=s1')
+      back.textContent = '回第 1 步换一份'
+    }
+  }
+
+  /* ③ 用量口径：来源页给了页数才改核价那两行，没给就一个字不动 */
+  var cp = copies || 1
+  if (pages) {
+    var sheets = Math.ceil(pages / 2)
+    var qc = document.getElementById('q-content')
+    var qp = document.getElementById('q-paper')
+    if (qc) qc.textContent = pages + ' 页 × ' + cp + ' 份 = ' + (pages * cp) + ' 个印刷面'
+    if (qp) qp.textContent = (sheets * cp) + ' 张（每份 ' + sheets + ' 张）'
+  }
+  /* 用量说明只在 s3（参数核价）出现，且只在真有交接时才建这个节点 */
+  var host = document.querySelector('.quote')
+  if (host) {
+    var qn = document.createElement('p')
+    qn.className = 'qnote'
+    qn.id = 'q-handoff'
+    qn.setAttribute('data-at', 's3')
+    /* 「预估 · 以打印工作台核价为准」里的间隔号用 nbsp 夹住：
+       断行落在它前面会让「·」起行，中文排版禁则，走查会报「标点在行首」 */
+    var GUARD = '预估\u00a0·\u00a0以打印工作台核价为准'
+    var who = src ? src.n : '来源页'
+    qn.textContent = !name
+      ? ('本次没有指定材料，先回第 1 步选文件；金额为' + GUARD + '。')
+      : (pages
+          ? ('「' + pages + ' 页 × ' + cp + ' 份」是' + who + '送来的用量，属' + GUARD + '。')
+          : (who + '没给页数，本机不替它写一个 —— ' + GUARD + '。'))
+    host.appendChild(qn)
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  /* ④ 第 2 步「文件信息」跟着交接走，免得回头看时又变回样例文件。
+        来源页连材料名都没给（纯导航跳过来）时，这三行一个字都不动 —— 没交接就没有「本次文件」。 */
+  if (name) {
+    var fn = document.getElementById('fi-name')
+    var fp = document.getElementById('fi-pages')
+    var fs = document.getElementById('fi-src')
+    if (fn) fn.textContent = name
+    if (fp) fp.textContent = pages ? (pages + ' 页') : '以本机体检为准'
+    if (fs && src) fs.textContent = src.n + ' 送来'
+  }
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>

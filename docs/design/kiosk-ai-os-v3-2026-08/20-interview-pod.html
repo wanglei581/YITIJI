@@ -1647,7 +1647,7 @@
       '<div>只判断说清楚了没有；对不对、行业里合不合理，本机判断不了。</div>' +
       '<div>不代表用人单位判断，不预测录用结果，仅供练习参考；内容离场即清。</div>'
     RP.body = PC.blocks.join('')
-    RP.key = hashStr(RP.head + '' + RP.body + '' + RP.foot) + ':' + RP.body.length
+    RP.key = hashStr(RP.head + '|' + RP.body + '|' + RP.foot) + ':' + RP.body.length
 
     // 勾选一改，之前那个取件码就对不上了：存的是旧内容，不能还显示「已存」
     if (S.saved && S.savedKey !== RP.key) { S.saved = false; S.code = '' }

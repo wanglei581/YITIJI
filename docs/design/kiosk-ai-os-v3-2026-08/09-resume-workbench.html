@@ -384,7 +384,7 @@
           <b>解析服务中断</b>
           <p>你的文件<b>完好保存</b>在本次会话里，已<b>自动上报</b>运维。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">带去：你上传的原件 1 份 · 共 3 页</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去：你上传的原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
           </div>
         </div>
@@ -419,7 +419,7 @@
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost" data-job-go="ocrlow">按图片识别再试（OCR）</button>
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">带去：你上传的原件 1 份 · 共 3 页</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去：你上传的原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
           </div>
         </div>
@@ -572,7 +572,7 @@
           <p data-when="ai-down">改写不可用，<b>你的原件完好</b>。</p>
           <p data-when="first">先给一份简历，再来这里逐条优化。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="ai-down">
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>带去打印：原件 1 份 · 共 3 页</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s4"><svg class="ic"><use href="#i-printer"/></svg>带去打印：原件 1 份 · 共 3 页</a>
             <button class="btn btn--ghost">存进「我的文档」</button>
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="first">
@@ -829,7 +829,7 @@
         <div class="pane-hd"><span class="t">拿去做什么</span></div>
         <div class="outs">
           <!-- 2026-08-10 材料交接：出口按钮上写清本次带去什么，并保留预估核价口径 -->
-          <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>带去：简历 v2 · 3 页</a>
+          <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;pages=3&amp;copies=1&amp;back=s5"><svg class="ic"><use href="#i-printer"/></svg>带去：简历 v2 · 3 页</a>
           <button class="out" data-when="device-off"><svg class="ic"><use href="#i-folder"/></svg>存我的文档 · 扫码带走</button>
           <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
           <button class="out"><svg class="ic"><use href="#i-download"/></svg>导出 PDF</button>
@@ -885,7 +885,7 @@
         <div class="notice">
           <svg class="ic"><use href="#i-check"/></svg>
           <span>打印、扫描、存档、岗位与招聘会浏览<b>都不受影响</b>：
-            <a class="inlink" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印</a>
+            <a class="inlink" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;back=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印</a>
             <a class="inlink" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位</a>
             <a class="inlink" href="17-fair-desk.html"><svg class="ic"><use href="#i-fair"/></svg>看招聘会</a></span>
         </div>
@@ -938,16 +938,16 @@
     <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="none" aria-disabled="true">先选文件</button>
     <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="on" data-go="s2">解析这份 · <span data-picked-pg>3 页</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" aria-disabled="true" data-when="default first device-off" data-job="ok">解析中…</button>
-    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s2" data-job="upfail" data-go="s1">重新上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="parsefail" data-job-go="ocrlow">按图片识别再试<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="ocrlow" data-job-go="ok" data-go="s3">核对完了，进诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default device-off">逐条优化<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html?stage=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="first" data-go="s1">回第 1 步<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-go="s5" data-when="default device-off">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="ai-down first" aria-disabled="true">改写不可用</button>
-    <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">带去：简历 v2 5 份 · 共 15 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;pages=3&amp;copies=5&amp;back=s5">带去：简历 v2 5 份 · 共 15 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s5" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
   </div>
 
