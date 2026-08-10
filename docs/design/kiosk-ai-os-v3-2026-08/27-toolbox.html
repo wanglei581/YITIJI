@@ -74,6 +74,55 @@
 .alt .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; } .alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; } .alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
+/* ── 补：子功能入口层（s3）────────────────────────────────────────────
+   分类维度只取生产代码里真实存在的那一个 —— ToolboxZonePage.tsx 的 launchMode：
+   站内(进入服务) / 外部 H5(打开·离场提示) / 二维码(扫码获取)。
+   业务分类是编不出来的：条目来自后端 config，本机不知道会下发什么。
+   所以示例条目卡一律 aria-disabled + chip--info「未配置」，不做成能点的入口。 */
+
+/* AI 引导带：唯一真链接区，ai-down 时整条换成静态分类说明（同结构、去掉 AI 判断） */
+.aiguide { flex:0 0 auto; display:flex; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.aiguide > .ic { width:22px; height:22px; color:var(--jade-400); flex:0 0 auto; margin-top:2px; }
+.aiguide--off { background:var(--fog-a04); border-color:var(--fog-a12); }
+.aiguide--off > .ic { color:var(--fog-600); }
+.aiguide--off .asug .ic { color:var(--fog-600); }
+.ag-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.ag-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.ag-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.ag-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; } .ag-s b { color:var(--fog-900); }
+.ag-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-3); }
+.asug { display:flex; align-items:center; gap:var(--s-3); min-height:var(--touch-min);
+  padding:9px var(--s-4); border-radius:var(--r-xs); background:var(--surf-1);
+  border:1px solid var(--brd-2); text-decoration:none; color:inherit;
+  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.asug:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.asug .ic { width:19px; height:19px; color:var(--jade-500); flex:0 0 auto; }
+.asug-b { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.asug-k { font-size:var(--fz-1); color:var(--fog-600); line-height:1.35; }
+.asug-t { font-size:var(--fz-2); color:var(--fog-900); font-weight:600; line-height:1.35; }
+
+/* 三组：组头写共同规矩，组内是示例条目卡 */
+.tbgroup { display:flex; flex-direction:column; gap:var(--s-3);
+  padding-left:var(--s-4); border-left:3px solid var(--fog-a12); }
+.tbgroup--in { border-left-color:var(--jade-a32); } .tbgroup--in .tbg-go { color:var(--jade-600); }
+.tbgroup--h5 { border-left-color:var(--azure-a20); } .tbgroup--h5 .tbg-go { color:var(--azure-200); }
+.tbgroup--qr { border-left-color:var(--amber-a20); } .tbgroup--qr .tbg-go { color:var(--amber-200); }
+.tbg-hd { display:flex; align-items:baseline; gap:var(--s-3); flex-wrap:wrap; }
+.tbg-n { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.tbg-go { font-size:var(--fz-2); font-family:var(--ff-num); letter-spacing:.03em; }
+.tbg-rule { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; } .tbg-rule b { color:var(--fog-900); }
+.tbg-items { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-3); }
+.tbi { display:flex; flex-direction:column; gap:6px; padding:var(--s-3) var(--s-4);
+  border-radius:var(--r-xs); background:var(--surf-1); border:1px dashed var(--fog-a20);
+  min-height:96px; cursor:default; }
+.tbi-hd { display:flex; align-items:center; gap:var(--s-2); }
+.tbi-hd .ic { width:18px; height:18px; color:var(--fog-600); flex:0 0 auto; }
+.tbi-t { font-size:var(--fz-3); color:var(--fog-800); font-weight:600; min-width:0; }
+.tbi-s { font-size:var(--fz-1); color:var(--fog-700); line-height:1.45; }
+.tbi-m { font-size:var(--fz-1); color:var(--fog-600); line-height:1.45; }
+.tbi .chip { align-self:flex-start; margin-top:auto; }
+
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; } .wside .pane--grow { overflow:hidden; }
 </style>
@@ -107,8 +156,9 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">配置后 · 示意</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">会有哪些条目</span></button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>1</b> / 2 步</span>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
   </div>
 
   <div class="work">
@@ -255,6 +305,155 @@
         </div>
       </div>
 
+      <!-- ─────────── S3 会有哪些条目 · 按启动方式分三组 ─────────── -->
+      <div class="previewbar" data-at="s3">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span><b>下面按「启动方式」分三组 —— 这是配置里唯一真实存在的分类维度。</b>
+              条目叫什么、有几条、上不上，全由管理后台下发；
+              <b>本机现在一条都没有，示例卡一张都点不动</b>。</span>
+      </div>
+
+      <!-- AI 引导带：这一屏唯一能点的东西，指的都是本机已有的功能域 -->
+      <div class="aiguide" data-at="s3" data-when="default first device-off">
+        <svg class="ic"><use href="#i-orbit"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">不知道该用哪个？</span>
+            <span class="ev ev--e3">E3 提示 · 仅供参考</span></span>
+          <span class="ag-s">说你要办的事，不必先猜它属于哪一类。
+                <b>你要办的大部分事本机自己就能办</b>，不用等百宝箱上架 ——
+                下面三个是最常被问到的去处，也可以直接问 AI 顾问。</span>
+          <span class="ag-row">
+            <a class="asug" href="06-print-workbench.html?stage=s3">
+              <svg class="ic"><use href="#i-printer"/></svg>
+              <span class="asug-b"><span class="asug-k">要打印、要出纸</span>
+                <span class="asug-t">打印扫描台</span></span></a>
+            <a class="asug" href="09-resume-workbench.html">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="asug-b"><span class="asug-k">要准备求职材料</span>
+                <span class="asug-t">简历工作台</span></span></a>
+            <a class="asug" href="21-policy.html">
+              <svg class="ic"><use href="#i-policy"/></svg>
+              <span class="asug-b"><span class="asug-k">要查补贴、办事</span>
+                <span class="asug-t">政策服务</span></span></a>
+          </span>
+        </span>
+      </div>
+
+      <!-- ai-down：同一个位置换成静态分类说明。分类维度写在配置字段里，不依赖 AI -->
+      <div class="aiguide aiguide--off" data-at="s3" data-when="ai-down">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">AI 顾问暂时不可用 · 按下面这张固定对照走</span></span>
+          <span class="ag-s"><b>下面三个去处是写死的，不经过 AI，也不会变。</b>
+                三组条目分类同样来自配置里的启动方式字段 ——
+                <b>AI 停了，分类区照常可读、照常准确</b>，只是没人替你挑而已。</span>
+          <span class="ag-row">
+            <a class="asug" href="06-print-workbench.html?stage=s3">
+              <svg class="ic"><use href="#i-printer"/></svg>
+              <span class="asug-b"><span class="asug-k">要打印、要出纸</span>
+                <span class="asug-t">打印扫描台</span></span></a>
+            <a class="asug" href="09-resume-workbench.html">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="asug-b"><span class="asug-k">要准备求职材料</span>
+                <span class="asug-t">简历工作台</span></span></a>
+            <a class="asug" href="21-policy.html">
+              <svg class="ic"><use href="#i-policy"/></svg>
+              <span class="asug-b"><span class="asug-k">要查补贴、办事</span>
+                <span class="asug-t">政策服务</span></span></a>
+          </span>
+        </span>
+      </div>
+
+      <div class="previewwrap" data-at="s3">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-layers"/></svg>
+            <b>这个箱子里会有什么</b>
+          </div>
+          <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-5)">
+
+            <div class="tbgroup tbgroup--in">
+              <div class="tbg-hd"><span class="tbg-n">① 站内服务</span>
+                <span class="tbg-go">按钮写「进入服务」</span></div>
+              <div class="tbg-rule">共同规矩：<b>不离开本机</b>，在这块屏上办完就回到百宝箱；
+                    本机只记「这个服务被打开过一次」，不记你办了什么。</div>
+              <div class="tbg-items">
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-idcard"/></svg><span class="tbi-t">证件照预约</span></span>
+                  <span class="tbi-s">选时段，拍摄在合作点</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-book"/></svg><span class="tbi-t">办事指南速查</span></span>
+                  <span class="tbi-s">流程与所需材料清单</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-users"/></svg><span class="tbi-t">培训课程信息</span></span>
+                  <span class="tbi-s">开课时间与报名方式</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+              </div>
+            </div>
+
+            <div class="tbgroup tbgroup--h5">
+              <div class="tbg-hd"><span class="tbg-n">② 外部 H5</span>
+                <span class="tbg-go">按钮写「打开(离场提示)」</span></div>
+              <div class="tbg-rule">共同规矩：<b>会离开本页</b>，跳出去之前先弹「要离开吗」，你点确认才走；
+                    打开的是第三方页面，内容与办理结果都不归本机管。</div>
+              <div class="tbg-items">
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-campus"/></svg><span class="tbi-t">校园门户</span></span>
+                  <span class="tbi-s">学校官网的公开页</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-building"/></svg><span class="tbi-t">政务网厅指南页</span></span>
+                  <span class="tbi-s">官方网厅公开说明</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-agency"/></svg><span class="tbi-t">合作机构介绍页</span></span>
+                  <span class="tbi-s">机构自己的页面</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+              </div>
+            </div>
+
+            <div class="tbgroup tbgroup--qr">
+              <div class="tbg-hd"><span class="tbg-n">③ 二维码</span>
+                <span class="tbg-go">按钮写「扫码获取」</span></div>
+              <div class="tbg-rule">共同规矩：<b>在你自己手机上办</b>，屏上只出码、不出你的信息；
+                    码有有效期，过期作废。要登录、要看个人账户的事项都归这一类。</div>
+              <div class="tbg-items">
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-qr"/></svg><span class="tbi-t">社保查询</span></span>
+                  <span class="tbi-s">结果只出现在你手机</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-phone"/></svg><span class="tbi-t">公积金查询</span></span>
+                  <span class="tbi-s">要登录，一律走手机</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+                <div class="tbi" aria-disabled="true">
+                  <span class="tbi-hd"><svg class="ic"><use href="#i-card"/></svg><span class="tbi-t">小程序办事入口</span></span>
+                  <span class="tbi-s">扫码进小程序里办</span>
+                  <span class="tbi-m">示例 · 实际条目由后台配置下发</span>
+                  <span class="chip chip--info">未配置</span></div>
+              </div>
+            </div>
+
+            <div class="notice">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span>上面这些卡是<b>用来说明三种启动方式长什么样</b>，不是本机的服务清单。
+                    上一页那句仍然成立：空着比编一排看起来能点的假服务更诚实 ——
+                    <b>本机现在一个扩展服务都没有</b>。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -353,6 +552,64 @@
         </div>
       </div>
 
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>三组的区别只有一件事</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            <b>办这件事的时候，你人在哪。</b>站内不动、外部 H5 会离场、二维码换到手机上。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">① 站内服务</span><span class="v">不离开本机</span></div>
+            <div class="kv-row"><span class="k">② 外部 H5</span><span class="v">先弹离场确认</span></div>
+            <div class="kv-row"><span class="k">③ 二维码</span><span class="v">屏上出码 · 手机继续</span></div>
+            <div class="kv-row"><span class="k">三组共同点</span><span class="v">都经后台审核后配置</span></div>
+            <div class="kv-row"><span class="k">本机现有条目</span><span class="v v--fog">0 条</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            最后一行是本机真实状态，上面几行是配置规则，两者都不是示意。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这些卡为什么点不动</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            因为它们不是入口，是<b>启动方式的样子</b>。真条目的名称、图标、说明、
+            能不能用，全部来自管理后台下发的配置 ——
+            <b>本机不替后台编条目，也不替后台编条数。</b>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>配置下发之后，卡片上才会出现真名字，那时按钮才是真能按的。
+                  在那之前，做成能按的样子就是骗你走一趟。</span>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg><b>现在就能去的地方</b>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <a class="alt" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>
+              <span class="alt-b"><span class="alt-t">问 AI 顾问</span>
+                <span class="alt-s">说不清要办什么，直接问，它按事分流</span></span></a>
+            <a class="alt" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>
+              <span class="alt-b"><span class="alt-t">回首页看功能域</span>
+                <span class="alt-s">本机全部能力都在首页入口里，百宝箱只是扩展位</span></span></a>
+            <a class="alt" href="08-file-tools.html"><svg class="ic"><use href="#i-file"/></svg>
+              <span class="alt-b"><span class="alt-t">文件加工台</span>
+                <span class="alt-s">图片转 PDF、加签名，今天就能办</span></span></a>
+            <a class="alt" href="12-material-factory.html"><svg class="ic"><use href="#i-package"/></svg>
+              <span class="alt-b"><span class="alt-t">求职材料四件套</span>
+                <span class="alt-s">求职信、自我介绍、材料清单、简历模板</span></span></a>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4);line-height:1.7">
+            这四个是本机自己的能力，链接现在就有效 ——
+            和上面那些点不动的示例卡，区别就在这儿。
+          </div>
+        </div>
+      </div>
+
       <!-- 首次使用：一句话 -->
       <div class="pane" data-when="first">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
@@ -372,13 +629,17 @@
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s1" data-go="s2">看配置后的示意</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到当前状态</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s3">看会有哪些条目</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">回到当前状态</button>
 
     <span class="actionbar-hint" data-at="s1" data-when="default first ai-down">本机未上架任何扩展服务 · 由管理后台配置</span>
     <span class="actionbar-hint" data-at="s1" data-when="device-off">扩展服务不依赖打印机 · 本页照常，打印相关除外</span>
     <span class="actionbar-hint" data-at="s2">以上为配置后示意 · 现在一项都启动不了</span>
+    <span class="actionbar-hint" data-at="s3">以上为示例条目 · 实际条目由管理后台配置下发，本机现有 0 条</span>
 
     <a class="btn btn--primary" data-at="s1" href="08-file-tools.html">去文件加工台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s2" href="08-file-tools.html">去文件加工台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="25-advisor.html">问 AI 顾问该去哪<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">

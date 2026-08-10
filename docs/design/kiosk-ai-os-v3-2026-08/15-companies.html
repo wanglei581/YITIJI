@@ -87,7 +87,7 @@
             <span class="cologo">科</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××科技有限公司</span>
-              <span class="rcard-org">互联网 · 100–499 人 · 民营 · 天河区</span>
+              <span class="rcard-org">互联网&nbsp;· 100–499 人&nbsp;· 民营&nbsp;· 天河区</span>
             </span>
             <span class="rcard-pay"><b>6</b><span>个在招岗位</span></span>
           </span>
@@ -108,7 +108,9 @@
             <span class="cologo">文</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××文化传播有限公司</span>
-              <span class="rcard-org">文化传媒 · 20–99 人 · 民营 · 海珠区</span>
+              <!-- 分隔点前用 &nbsp;：这一行在本宽度下断在「民营」与「·」之间，把「·」甩到行首
+                   （中文排版禁则）。不可断空格让断行落到「·」之后，字符与信息都不变。 -->
+              <span class="rcard-org">文化传媒&nbsp;· 20–99 人&nbsp;· 民营&nbsp;· 海珠区</span>
             </span>
             <span class="rcard-pay"><b>2</b><span>个在招岗位</span></span>
           </span>
@@ -129,7 +131,7 @@
             <span class="cologo">制</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××智能制造股份有限公司</span>
-              <span class="rcard-org">先进制造 · 500–999 人 · 上市 · 番禺区</span>
+              <span class="rcard-org">先进制造&nbsp;· 500–999 人&nbsp;· 上市&nbsp;· 番禺区</span>
             </span>
             <span class="rcard-pay"><b>11</b><span>个在招岗位</span></span>
           </span>
@@ -538,5 +540,8 @@
   sync()
 })()
 </script>
+<!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
+     于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
+<script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

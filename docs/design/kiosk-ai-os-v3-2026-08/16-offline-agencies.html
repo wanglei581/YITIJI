@@ -586,5 +586,8 @@
   sync()
 })()
 </script>
+<!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
+     于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
+<script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>
