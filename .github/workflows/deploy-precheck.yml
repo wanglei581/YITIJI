@@ -127,8 +127,248 @@ jobs:
           EXPECT_PM2: ai-job-print-api
           EXPECT_BACKUP: /srv/ai-job-print-backups
 
+  recruitment-wave2-provision:
+    name: Provision dedicated recruitment Wave2 read-only role
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create least-scope role and protected connection config
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 3m
+          envs: EXPECT_DIR,AUTHORIZED_UNTIL
+          script: |
+            set -euo pipefail
+
+            # One-time, user-authorized production mutation. Credentials and dotenv
+            # contents stay in server memory/files and are never printed.
+            python3 - "$EXPECT_DIR" "$AUTHORIZED_UNTIL" <<'PY'
+            import datetime
+            import os
+            import secrets
+            import stat
+            import subprocess
+            import sys
+            import tempfile
+            from urllib.parse import parse_qs, quote, unquote, urlparse
+
+            api_dir, authorized_until_raw = sys.argv[1:3]
+            role = 'recruitment_wave2_readonly'
+            config_key = 'RECRUITMENT_WAVE2_PRODUCTION_READONLY_URL'
+            allowed_tables = [
+                '_prisma_migrations', 'Organization', 'JobSource', 'Job', 'JobFair',
+                'PolicyPost', 'OfflineAgency', 'OfflineJob', 'OnlinePlatformDirectory',
+                'OfflineAgencyProfile', 'OfflineAgencyBranch', 'QualificationRecord',
+                'ReviewDecision', 'AuditLog', 'FileObject',
+            ]
+
+            def fail(code: str):
+                print('PROVISION_STATUS=failed')
+                print('PROVISION_ERROR=' + code)
+                raise SystemExit(1)
+
+            def load_dotenv(path: str) -> tuple[dict[str, str], list[str]]:
+                values: dict[str, str] = {}
+                lines = open(path, encoding='utf-8').read().splitlines()
+                for raw_line in lines:
+                    line = raw_line.strip()
+                    if not line or line.startswith('#') or '=' not in line:
+                        continue
+                    key, value = line.split('=', 1)
+                    value = value.strip()
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                        value = value[1:-1]
+                    values[key.strip()] = value
+                return values, lines
+
+            def parse_postgres_url(value: str):
+                parsed = urlparse(value)
+                database = unquote(parsed.path.lstrip('/'))
+                if parsed.scheme not in ('postgres', 'postgresql') or not parsed.hostname or not database or '/' in database:
+                    fail('app_database_invalid')
+                return parsed, database
+
+            def identifier(value: str) -> str:
+                return '"' + value.replace('"', '""') + '"'
+
+            def literal(value: str) -> str:
+                return "'" + value.replace("'", "''") + "'"
+
+            def admin_psql(database: str, sql: str) -> str:
+                result = subprocess.run(
+                    ['sudo', '-n', '-u', 'postgres', 'psql', '-X', '-A', '-t',
+                     '-v', 'ON_ERROR_STOP=1', '-d', database],
+                    input=sql, text=True, capture_output=True, timeout=45, check=False,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError('admin_psql_failed')
+                return result.stdout.strip()
+
+            def readonly_psql(parsed, database: str, sql: str) -> str:
+                pg_env = os.environ.copy()
+                pg_env.update({
+                    'PGHOST': parsed.hostname or '',
+                    'PGPORT': str(parsed.port or 5432),
+                    'PGUSER': unquote(parsed.username or ''),
+                    'PGDATABASE': database,
+                    'PGPASSWORD': unquote(parsed.password or ''),
+                })
+                sslmode = parse_qs(parsed.query).get('sslmode', [None])[0]
+                if sslmode:
+                    pg_env['PGSSLMODE'] = sslmode
+                result = subprocess.run(
+                    ['psql', '-X', '-A', '-t', '-F', '\t', '-v', 'ON_ERROR_STOP=1', '-c', sql],
+                    env=pg_env, text=True, capture_output=True, timeout=45, check=False,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError('readonly_psql_failed')
+                return result.stdout.strip()
+
+            try:
+                deadline = datetime.datetime.fromisoformat(authorized_until_raw.replace('Z', '+00:00'))
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if deadline.tzinfo is None or now >= deadline or deadline - now > datetime.timedelta(hours=4):
+                    fail('authorization_window_invalid')
+            except ValueError:
+                fail('authorization_window_invalid')
+
+            candidates = [
+                os.path.join(api_dir, '.env'),
+                os.path.join(api_dir, 'services', 'api', '.env'),
+            ]
+            env_path = next((path for path in candidates if os.path.isfile(path)), None)
+            if not env_path:
+                fail('env_file_missing')
+            env_stat = os.stat(env_path)
+            if env_stat.st_uid != os.geteuid():
+                fail('env_file_owner_mismatch')
+            values, original_lines = load_dotenv(env_path)
+            if values.get(config_key):
+                fail('readonly_url_already_configured')
+            app_parsed, database = parse_postgres_url(values.get('DATABASE_URL', ''))
+
+            try:
+                if admin_psql(database, f"SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname={literal(role)});") == 't':
+                    fail('readonly_role_already_exists')
+            except RuntimeError:
+                fail('postgres_admin_access_unavailable')
+
+            password = secrets.token_urlsafe(48)
+            host = app_parsed.hostname or ''
+            host_text = f'[{host}]' if ':' in host else host
+            port_text = f':{app_parsed.port}' if app_parsed.port else ''
+            query_text = f'?{app_parsed.query}' if app_parsed.query else ''
+            readonly_url = (
+                f'postgresql://{quote(role, safe="")}:{quote(password, safe="")}@'
+                f'{host_text}{port_text}/{quote(database, safe="")}{query_text}'
+            )
+            replacement = f'{config_key}="{readonly_url}"'
+            updated_lines = [line for line in original_lines if not line.lstrip().startswith(config_key + '=')]
+            updated_lines.append(replacement)
+            temp_path = None
+            role_created = False
+            try:
+                fd, temp_path = tempfile.mkstemp(prefix='.env.rw2-', dir=os.path.dirname(env_path), text=True)
+                with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+                    handle.write('\n'.join(updated_lines) + '\n')
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.chmod(temp_path, stat.S_IMODE(env_stat.st_mode) & 0o600 or 0o600)
+
+                table_literals = ','.join(literal(table) for table in allowed_tables)
+                table_identifiers = ','.join('public.' + identifier(table) for table in allowed_tables)
+                sql = f"""
+                BEGIN;
+                CREATE ROLE {identifier(role)} LOGIN PASSWORD {literal(password)}
+                  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+                ALTER ROLE {identifier(role)} SET default_transaction_read_only = on;
+                ALTER ROLE {identifier(role)} SET statement_timeout = '15s';
+                ALTER ROLE {identifier(role)} SET lock_timeout = '2s';
+                ALTER ROLE {identifier(role)} SET idle_in_transaction_session_timeout = '5s';
+                GRANT CONNECT ON DATABASE {identifier(database)} TO {identifier(role)};
+                GRANT USAGE ON SCHEMA public TO {identifier(role)};
+                GRANT SELECT ON TABLE {table_identifiers} TO {identifier(role)};
+                DO $guard$
+                BEGIN
+                  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname={literal(role)} AND
+                    (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls))
+                    OR has_database_privilege({literal(role)},current_database(),'CREATE')
+                    OR has_schema_privilege({literal(role)},'public','CREATE')
+                    OR EXISTS (SELECT 1 FROM pg_tables t WHERE t.schemaname='public' AND
+                      (has_table_privilege({literal(role)},format('%I.%I',t.schemaname,t.tablename),'INSERT')
+                       OR has_table_privilege({literal(role)},format('%I.%I',t.schemaname,t.tablename),'UPDATE')
+                       OR has_table_privilege({literal(role)},format('%I.%I',t.schemaname,t.tablename),'DELETE')
+                       OR has_table_privilege({literal(role)},format('%I.%I',t.schemaname,t.tablename),'TRUNCATE')))
+                    OR EXISTS (SELECT 1 FROM pg_tables t WHERE t.schemaname='public'
+                      AND t.tablename NOT IN ({table_literals})
+                      AND has_any_column_privilege({literal(role)},format('%I.%I',t.schemaname,t.tablename),'SELECT'))
+                    OR EXISTS (SELECT 1 FROM unnest(ARRAY[{table_literals}]) required(name)
+                      WHERE NOT has_table_privilege({literal(role)},format('%I.%I','public',required.name),'SELECT'))
+                  THEN RAISE EXCEPTION 'readonly_role_guard_failed'; END IF;
+                END $guard$;
+                COMMIT;
+                """
+                admin_psql(database, sql)
+                role_created = True
+
+                readonly_parsed, readonly_database = parse_postgres_url(readonly_url)
+                verification = readonly_psql(readonly_parsed, readonly_database, """
+                  SELECT current_database(),current_setting('default_transaction_read_only'),
+                    NOT r.rolsuper AND NOT r.rolcreatedb AND NOT r.rolcreaterole
+                      AND NOT r.rolreplication AND NOT r.rolbypassrls,
+                    NOT has_database_privilege(current_user,current_database(),'CREATE'),
+                    NOT has_schema_privilege(current_user,'public','CREATE'),
+                    NOT EXISTS (SELECT 1 FROM pg_tables t WHERE t.schemaname='public' AND
+                      (has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'INSERT')
+                       OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'UPDATE')
+                       OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'DELETE')
+                       OR has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),'TRUNCATE')))
+                  FROM pg_roles r WHERE r.rolname=current_user;
+                """).split('\t')
+                if len(verification) != 6 or verification[0] != database or verification[1] != 'on' \
+                    or any(value != 't' for value in verification[2:]):
+                    raise RuntimeError('readonly_verification_failed')
+
+                os.replace(temp_path, env_path)
+                temp_path = None
+                try:
+                    directory_fd = os.open(os.path.dirname(env_path), os.O_DIRECTORY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+                except OSError:
+                    # Rename already succeeded and the role is valid. Do not create a
+                    # dangling config by compensating after this durability-only hint.
+                    pass
+            except Exception:
+                if role_created:
+                    try:
+                        admin_psql(database, f'DROP OWNED BY {identifier(role)}; DROP ROLE {identifier(role)};')
+                    except Exception:
+                        fail('provision_failed_cleanup_required')
+                fail('provision_transaction_failed')
+            finally:
+                if temp_path:
+                    try:
+                        os.unlink(temp_path)
+                    except FileNotFoundError:
+                        pass
+
+            print('PROVISION_STATUS=created')
+            print('PROVISION_ROLE_SCOPE=explicit_15_table_select_only')
+            print('PROVISION_CONFIG_MODE=protected_atomic')
+            PY
+        env:
+          EXPECT_DIR: /srv/ai-job-print
+          AUTHORIZED_UNTIL: '2026-08-10T15:25:10Z'
+
   recruitment-wave2-admission:
     name: Recruitment Wave2 production read-only admission
+    needs: recruitment-wave2-provision
     runs-on: ubuntu-latest
     steps:
       - name: Inspect production read-only prerequisites
