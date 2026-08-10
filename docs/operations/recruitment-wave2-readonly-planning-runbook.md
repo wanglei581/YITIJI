@@ -65,8 +65,11 @@ pnpm probe:recruitment-wave2
 ```bash
 cd services/api
 umask 077
-pnpm inventory:recruitment-wave2:full > /approved/restricted/recruitment-wave2-full-inventory.json
+node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+  > /approved/restricted/recruitment-wave2-full-inventory.json
 ```
+
+机器证据必须直接调用 Node 入口；禁止用 `pnpm <script> > report.json` 包裹，因为业务阻塞按约定返回 `exit 2`，包管理器的生命周期提示可能污染 JSON stdout。交互式本地探查仍可使用 package script，但不得把其重定向结果当作证据。
 
 工具执行 `DB(A) → API pass A → API pass B → DB(B)`：两次数据库报告摘要或两次 API ID 摘要任一漂移均以 `exit 1` 停止，不输出可被误解的差集。Job、JobFair、PolicyPost、legacy OfflineAgency/OfflineJob 均按当前公开 reader 的真实谓词计算 `currentReader`，再与无认证公开 API 全分页 ID 集合做双向差集；Job 的冻结目标安全证据单列，JobFair/PolicyPost 尚未冻结版本化 target-safe 模型，Directory/Profile 尚无公开 endpoint，均明确标为 unsupported/endpoint absent，不伪造结论。
 

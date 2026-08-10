@@ -33,6 +33,7 @@ async function main(): Promise<void> {
   await verifyDriftAndDuplicate()
   await verifySqlAllowlist()
   await verifyReaderContracts()
+  await verifyOperationalContracts()
   console.log('Recruitment Wave 2 full inventory contract: PASS')
 }
 
@@ -296,6 +297,25 @@ async function verifyReaderContracts(): Promise<void> {
   assert.match(policies, /\{ publishedDate: 'desc' \}, \{ createdAt: 'desc' \}, \{ id: 'asc' \}/u)
   assert.match(policies, /policyPost\.count\(\{ where \}\)/u)
   assert.match(policies, /pagination: \{ page, pageSize, total, totalPages:/u)
+}
+
+async function verifyOperationalContracts(): Promise<void> {
+  const root = join(__dirname, '..', '..', '..')
+  const ciScript = await readFile(
+    join(__dirname, 'verify-recruitment-wave2-postgres-ci.sh'),
+    'utf8'
+  )
+  const runbook = await readFile(
+    join(root, 'docs/operations/recruitment-wave2-readonly-planning-runbook.md'),
+    'utf8'
+  )
+  for (const source of [ciScript, runbook]) {
+    assert.match(
+      source,
+      /node -r @swc-node\/register scripts\/recruitment-wave2-full-inventory\.ts/u
+    )
+    assert.doesNotMatch(source, /pnpm inventory:recruitment-wave2:full\s*>/u)
+  }
 }
 
 function fakeRequester(fixture: PublicIdSets) {

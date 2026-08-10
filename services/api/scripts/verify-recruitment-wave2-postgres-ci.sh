@@ -276,7 +276,8 @@ export RECRUITMENT_WAVE2_PUBLIC_API_BASE_URL=http://127.0.0.1:3102/api/v1
 export RECRUITMENT_WAVE2_EXPECTED_PUBLIC_API_ORIGIN=http://127.0.0.1:3102
 export RECRUITMENT_WAVE2_EXPECTED_EXCLUDE_DEMO_PUBLIC_DATA=false
 set +e
-pnpm inventory:recruitment-wave2:full >/tmp/recruitment-wave2-full-inventory.json
+node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+  >/tmp/recruitment-wave2-full-inventory.json
 full_status=$?
 set -e
 if [ "$full_status" -ne 2 ]; then echo "expected governed-data blockers, got $full_status" >&2; exit 1; fi
