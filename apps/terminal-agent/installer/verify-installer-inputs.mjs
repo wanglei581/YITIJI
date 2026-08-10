@@ -195,6 +195,11 @@ assert.match(secureScanReaderVerify, /replace\(\/\^\\uFEFF\//, 'Windows PowerShe
 assert.match(secureScanReaderVerify, /FileAttributes\]::ReparsePoint/, 'cleanup must never treat an ordinary non-empty scan directory as a link')
 assert.match(lifecycle, /Installed secure scan reader boundary verification failed/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
+assert.match(
+  workflow,
+  /actions\/checkout@v4[\s\S]*?ref:\s*\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/,
+  'installer artifacts must record the exact PR head instead of an ephemeral pull-request merge ref',
+)
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
 assert.match(workflow, /-ProductVersion 0\.3\.0/)
