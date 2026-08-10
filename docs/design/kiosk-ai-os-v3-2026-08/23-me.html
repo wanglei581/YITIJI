@@ -906,10 +906,16 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
   <div class="actionbar">
       <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
     <button class="btn btn--lg btn--ghost"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <!-- P04 系统态页由异常事件触发，全站没有别的入口指向它。
-         主动想看本机现在什么状况的，从这里进 —— 「我的」是查自己东西的地方，
-         "这台机器现在能不能用"属于同一类问题。 -->
-    <a class="btn btn--lg btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>查看本机状态</a>
+    <!-- 2026-08-11 改名：原来叫「查看本机状态」，指向 P04。
+         但 P04 自己写着「这里列的是异常长什么样，**不是本机现在的状态**」——
+         全站翻遍也没有任何一页在显示本机实时的纸量、粉量、队列。
+         按这个名字点进去的人拿不到他要的东西，这正是所有者说的
+         「点进去了跳转的不是这个连接的页面」。
+
+         P04 的第 1 步**真有**东西给：服务台位置、服务时间、报修要报的机号、
+         三个最常见卡点。所以改叫它真给得出的那件事。
+         42/43 上同类的 15 个入口已同批改成同一叫法，站内不留两种说法。 -->
+    <a class="btn btn--lg btn--ghost" href="04-system-states.html?stage=s1&amp;from=P23"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">明细在各自的业务页里</div><div class="s">本页只做入口 · 浏览与跳转记录去岗位 / 招聘会 / 政策页看</div></div>
       <div data-when="first"><div class="t">未登录 · 东西留不下来</div><div class="s">功能不受影响</div></div>
