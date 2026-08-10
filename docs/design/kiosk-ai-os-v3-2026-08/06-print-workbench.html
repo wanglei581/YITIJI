@@ -1487,50 +1487,56 @@
   <!-- ============ ActionBar：主按钮恒定右下 ============ -->
   <div class="actionbar">
       <a class="backbtn" href="39-print-hub.html" data-parent-label="打印扫描"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印扫描</span></span></a>
+    <!-- 2026-08-11：本块所有间隔号一律写成 &#160;·&#160;（nbsp 夹住）。
+         原因：带 ?from=<页号> 进来时，脚本②会在返回键右边插一个「打印扫描首页」次要入口，
+         提示区被挤窄，几条 .s 恰好断在「·」前面 —— 中文排版禁则，走查报「标点在行首」。
+         实测命中三条（s5/pay=closed、s6/device-off、s1/src=phone），而且换个来源域、
+         返回键副标签一变长短，命中的又换成另一条：这是宽度敏感的，逐条改文案治不住。
+         与页尾契约脚本里 GUARD 常量同一手法。 -->
     <div class="actionbar-hint">
       <div data-at="s1">
         <div data-src="none"><div class="t">怎么把文件带进来？点一张大卡</div><div class="s">前三种在本页继续；扫描、复印、证件照会去对应台面</div></div>
         <div data-src="local usb-in phone-got" data-file="none"><div class="t">先选中一份，再进体检</div><div class="s">没选文件时不会开始 —— 不让你为一份不知道是哪个的文件付钱</div></div>
-        <div data-src="local usb-in phone-got" data-file="on"><div class="t">已选中 <b data-picked-nm>个人简历.pdf</b></div><div class="s"><span data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span> · 按右下角进材料体检</div></div>
-        <div data-src="phone"><div class="t">等你在手机上选文件</div><div class="s">码 5 分钟内有效 · 传不过来可以改用本机上传</div></div>
+        <div data-src="local usb-in phone-got" data-file="on"><div class="t">已选中 <b data-picked-nm>个人简历.pdf</b></div><div class="s"><span data-picked-mt>PDF&#160;·&#160;A4&#160;·&#160;3 页&#160;·&#160;1.2 MB</span>&#160;·&#160;按右下角进材料体检</div></div>
+        <div data-src="phone"><div class="t">等你在手机上选文件</div><div class="s">码 5 分钟内有效&#160;·&#160;传不过来可以改用本机上传</div></div>
         <div data-src="usb"><div class="t">把 U 盘插进屏幕右下侧的 USB 口</div><div class="s">插好后自动列出可打印的文件</div></div>
       </div>
       <div data-at="s2">
-        <div data-when="default device-off" data-redact="none"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印 · 也可以保持原样继续</div></div>
-        <div data-when="default device-off" data-redact="ask"><div class="t">确认一下：真的保持原样打印？</div><div class="s">打出来的每一份都带完整身份证号 · 右边两条路都还开着</div></div>
+        <div data-when="default device-off" data-redact="none"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印&#160;·&#160;也可以保持原样继续</div></div>
+        <div data-when="default device-off" data-redact="ask"><div class="t">确认一下：真的保持原样打印？</div><div class="s">打出来的每一份都带完整身份证号&#160;·&#160;右边两条路都还开着</div></div>
         <div data-when="default device-off" data-redact="pick"><div class="t">正在遮盖第 2 页</div><div class="s">三个动作在左边遮盖层里 —— 遮哪一处要对着页面看，按钮离框太远容易点错</div></div>
-        <div data-when="default device-off" data-redact="done"><div class="t">已遮盖 1 处 · 打印件不含身份证号</div><div class="s">遮的是打印用的新版本，你的原件没被改动</div></div>
-        <div data-when="default device-off" data-redact="skip"><div class="t">保持原样打印（你已确认）</div><div class="s">打印件会含完整身份证号 · 出纸前都还能改主意</div></div>
+        <div data-when="default device-off" data-redact="done"><div class="t">已遮盖 1 处&#160;·&#160;打印件不含身份证号</div><div class="s">遮的是打印用的新版本，你的原件没被改动</div></div>
+        <div data-when="default device-off" data-redact="skip"><div class="t">保持原样打印（你已确认）</div><div class="s">打印件会含完整身份证号&#160;·&#160;出纸前都还能改主意</div></div>
         <div data-when="ai-down"><div class="t">体检不可用，其余流程正常</div><div class="s">参数需要你自己确认</div></div>
         <div data-when="first"><div class="t">还没有文件</div><div class="s">回第 1 步把材料送进来</div></div>
       </div>
       <div data-at="s3">
-        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s">黑白 · 自动双面 · 5 份 · 全部 3 页</div></div>
+        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s">黑白&#160;·&#160;自动双面&#160;·&#160;5 份&#160;·&#160;全部 3 页</div></div>
         <div data-when="ai-down first"><div class="t">请确认打印参数</div><div class="s">预填不可用，四项都需要你自己设</div></div>
       </div>
       <div data-at="s4">
         <div data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="hint-quote"><div class="t">先获取核价，金额显示出来再决定要不要付</div><div class="s">本机不预先计算金额，也不承诺价格</div></div>
-        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银 · 按「直接出纸」开始</div></div>
+        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银&#160;·&#160;按「直接出纸」开始</div></div>
         <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
       </div>
       <div data-at="s5">
-        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效 · 失效会自动作废，不会重复收款</div></div>
+        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效&#160;·&#160;失效会自动作废，不会重复收款</div></div>
         <div data-pay="scan"><div class="t">把手机付款码对准取景框</div><div class="s">本机只读取一次，不保存你的付款码</div></div>
-        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付 · 手机已成功但这里没动，按「帮我查」</div></div>
+        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付&#160;·&#160;手机已成功但这里没动，按「帮我查」</div></div>
         <div data-pay="paid"><div class="t">已到账 3.00 元</div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
-        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码 · 这笔钱没有扣</div></div>
+        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码&#160;·&#160;这笔钱没有扣</div></div>
         <div data-pay="query"><div class="t">正在按订单号向渠道查这笔钱</div><div class="s">查询结果来自支付渠道，本机不替渠道下结论</div></div>
-        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印 · 文件还在本次会话</div></div>
+        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印&#160;·&#160;文件还在本次会话</div></div>
       </div>
       <div data-at="s6">
-        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
-        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单 · 约 3 分钟</div><div class="s">钱已收，不会重复收 · 可以离开，凭取件码回来打</div></div>
-        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前 · 宁可现在拦住</div></div>
-        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
-        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
-        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面&#160;·&#160;用纸 10 张</div></div>
+        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单&#160;·&#160;约 3 分钟</div><div class="s">钱已收，不会重复收&#160;·&#160;可以离开，凭取件码回来打</div></div>
+        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前&#160;·&#160;宁可现在拦住</div></div>
+        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款&#160;·&#160;换文件或让本机转一次</div></div>
+        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打&#160;·&#160;7 天内有效</div></div>
+        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续&#160;·&#160;剩余份数已保留</div></div>
         <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
-        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出 · 按各处境规则处理，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出&#160;·&#160;按各处境规则处理，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
     </div>

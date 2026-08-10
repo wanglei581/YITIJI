@@ -678,9 +678,14 @@
             <div class="kv-row"><span class="k">编号</span><span class="v" data-site="terminalNo">01 号机</span></div>
             <div class="kv-row"><span class="k">位置</span><span class="v" data-site="venue">市人力资源市场 A 馆</span></div>
           </div>
+          <!-- 不给这两行加「服务台：」「有人时段：」前缀：缺配置兜底文案自己就以
+               「服务台位置…」「服务时间…」开头，加了会变成「服务台：服务台位置…」。
+               统一用一个小标题带住，配置下发后（例：A 馆正门左手第一窗 / 工作日 09:00–17:00）
+               同样读得通。 -->
           <div class="panel-note" style="margin-top:var(--s-3);line-height:1.7">
-            服务台：<span data-site="serviceDesk"></span><br>
-            有人时段：<span data-site="serviceHours"></span>
+            现场服务<br>
+            <span data-site="serviceDesk"></span><br>
+            <span data-site="serviceHours"></span>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
             报修时报上<b>「<span data-site="terminalNo">01 号机</span>」</b>，运维能直接定位到这一台。

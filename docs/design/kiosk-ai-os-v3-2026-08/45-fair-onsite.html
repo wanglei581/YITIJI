@@ -509,8 +509,14 @@
               <rect x="8" y="52" width="6" height="6"/><rect x="20" y="64" width="6" height="6"/><rect x="88" y="88" width="6" height="6"/>
             </svg>
           </div>
-          <span class="qr-cap">扫码打开<b>来源平台的这家企业页</b><br>
-            <span style="color:var(--fog-600)">码本次会话有效 · 本机不上传简历</span></span>
+          <!-- 2026-08-11 改：这里原来写「码本次会话有效 · 本机不上传简历」。
+               上面那个方块是 CSS/SVG 画的装饰图案，**扫不出任何东西** ——
+               「本次会话有效」等于给一个假码背书。招聘会现场用户举着手机扫不出来，
+               只会以为自己手机坏了或这台机器坏了，然后来找服务台。
+               所以标注改成如实的设计稿口径；「本机不上传简历」是真的合规口径，保留。 -->
+          <span class="qr-cap"><b>示意码 · 设计稿占位，扫不出东西</b><br>
+            <span style="color:var(--fog-600)">本机不上传简历</span><br>
+            <span style="color:var(--fog-600);font-size:var(--fz-1)">生产要求：真实二维码由服务端下发，短时效、一次一码，指向来源平台的这家企业页。</span></span>
         </div>
       </div>
 

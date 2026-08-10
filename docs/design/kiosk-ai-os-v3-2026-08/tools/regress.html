@@ -68,7 +68,12 @@
   .bad { color: #ff8f8f }
   .ok { color: #8fe0a8 }
   /* 舞台 iframe 必须是真实 1080×1920，不能缩放，否则测量失真 */
-  #frame { width: 1080px; height: 1920px; border: 0; position: fixed; left: -4000px; top: 0 }
+  /* 舞台 iframe 必须是真实 1080×1920 且**留在视口里**。
+     一开始我把它丢到 left:-4000px，结果 Chrome 把屏外 iframe 的 rAF 节流到不触发，
+     装载握手永远不 resolve，整台子无声挂死 —— 台子自己会骗人，这也是一种假绿。
+     现在留在视口内、用 opacity 压掉、pointer-events 关掉。 */
+  #frame { width: 1080px; height: 1920px; border: 0;
+    position: fixed; right: 0; top: 0; opacity: .02; pointer-events: none; z-index: -1 }
 </style>
 </head>
 <body>
@@ -198,19 +203,41 @@ async function loadPages () {
    清 localStorage → 钉主题 → 等 load → 再等一帧让 stage.js 跑完初始化。 */
 function loadPage (name) {
   return new Promise(function (resolve, reject) {
-    var to = setTimeout(function () { reject(new Error('装载超时 8s')) }, 8000)
+    /* 超时**贯穿整个握手**，不在 onload 时清掉。
+       之前的写法是 onload 里 clearTimeout 再等 rAF —— rAF 一旦被节流，
+       超时已经没了，于是无声挂死。凡是等待，都必须有一个自己管不掉的兜底。 */
+    var settled = false
+    var to = setTimeout(function () {
+      if (settled) return
+      settled = true
+      reject(new Error('装载握手超时 12s'))
+    }, 12000)
+
     frame.onload = function () {
-      clearTimeout(to)
       var win = frame.contentWindow
       try { win.localStorage.clear() } catch (e) {}
-      /* 两帧：一帧给 DOMContentLoaded 后的脚本，一帧给它们触发的布局 */
-      win.requestAnimationFrame(function () {
-        win.requestAnimationFrame(function () { resolve(win) })
-      })
+      /* 用 setTimeout 而不是 rAF：rAF 在被节流的 iframe 里可能永远不触发。
+         两拍：一拍给 DOMContentLoaded 之后的脚本，一拍给它们触发的布局。 */
+      setTimeout(function () {
+        setTimeout(function () {
+          if (settled) return
+          settled = true
+          clearTimeout(to)
+          resolve(win)
+        }, 80)
+      }, 80)
     }
     try { frame.contentWindow.localStorage.clear() } catch (e) {}
     frame.src = '../' + name + '?theme=warm&capture=1&t=' + Date.now()
   })
+}
+
+/* 任何一步都不许无限等：整页处理套一个硬超时，超了就记成失败继续跑下一页。
+   一台会挂死的回归台，比没有回归台更糟 —— 它会让人以为「还在跑」。 */
+function withTimeout (p, ms, what) {
+  return Promise.race([p, new Promise(function (_, rej) {
+    setTimeout(function () { rej(new Error(what + ' 超时 ' + ms + 'ms')) }, ms)
+  })])
 }
 
 /* ── 轴发现 ────────────────────────────────────────────────
@@ -249,6 +276,10 @@ function discoverAxes (win) {
       return
     }
     if (AXIS_DENY.indexOf(n) > -1) return
+    /* `data-xxx-go` / `data-xxx-btn` 是**设置轴的按钮**，不是轴本身。
+       06 一页就有 data-src-go / data-file-go / data-redact-go / data-job-btn /
+       data-pay-go / data-off-go / data-done-go 七个，全报一遍纯属噪声。 */
+    if (/-(go|btn)$/.test(n)) return
     /* 白名单外、出现在多个元素上、且取值像是枚举 —— 可能是新轴。
        报出来，别静默跳过。上一轮的教训就是漏轴等于漏检。 */
     if (seen[n] >= 3) {
@@ -268,24 +299,50 @@ function discoverAxes (win) {
 }
 
 /* ── 组合枚举 ──────────────────────────────────────────────
-   四态 × 阶段 × 各附加轴的笛卡尔积。超上限就抽样，并记下抽了多少。 */
-function buildCombos (disc) {
+   一开始我做的是各轴笛卡尔积。跑起来才看清那是错的：
+   06 打印工作台有 7 条附加轴，全量组合 **193 万**，抽 260 个只覆盖 0.013%,
+   而且其中绝大多数现实里根本不可能同时成立（免费单 × 卡纸 × 正在选遮盖区）。
+   一个覆盖率 0.013% 的报告写成"跑过了"，比不跑更误导。
+
+   改成**逐轴遍历**：其余轴保持页面自己的默认值，一次只动一条轴。
+   规模从 prod(k_i) 降到 sum(k_i)，而且可以诚实地说清覆盖了什么：
+
+     ✓ 每条轴的每个取值，都在四态 × 全阶段下跑过
+     ✗ 轴与轴的交叉只跑了默认组合
+
+   后一条是本台子的**已知边界**，不是"全覆盖"。真要验特定交叉（例如
+   ai-down × 卡纸 × 已遮盖），得由页面所有者点名，另列用例。 */
+function buildCombos (disc, win) {
   var stages = disc.hasStage && disc.stages.length ? disc.stages : ['']
   var axisNames = Object.keys(disc.axes)
-  var combos = []
-  function rec (i, acc) {
-    if (i === axisNames.length) { combos.push(acc.slice()); return }
-    var vals = disc.axes[axisNames[i]]
-    for (var j = 0; j < vals.length; j++) rec(i + 1, acc.concat([[axisNames[i], vals[j]]]))
-  }
-  var extra = []
-  rec(0, [])
-  extra = combos
+  var screen = win.document.querySelector('.screen')
+
+  /* 各轴的默认值：优先取页面自己在 .screen 上写的，没有就取第一个取值 */
+  var base = {}
+  axisNames.forEach(function (n) {
+    var v = screen.getAttribute(n)
+    base[n] = (v && disc.axes[n].indexOf(v) > -1) ? v : disc.axes[n][0]
+  })
+
+  /* 每条轴要单独跑的取值 = 全部取值去掉默认值（默认值已经在基线组合里跑过） */
+  var variants = [[]]                                    // [] = 全部用默认值
+  axisNames.forEach(function (n) {
+    disc.axes[n].forEach(function (v) {
+      if (v !== base[n]) variants.push([[n, v]])
+    })
+  })
+
   var out = []
   for (var s = 0; s < STATES.length; s++)
     for (var g = 0; g < stages.length; g++)
-      for (var e = 0; e < extra.length; e++)
-        out.push({ state: STATES[s], stage: stages[g], extra: extra[e] })
+      for (var e = 0; e < variants.length; e++) {
+        /* 每个组合都带上全套默认值，避免上一轮改过的轴留在 .screen 上污染下一轮 */
+        var extra = axisNames.map(function (n) { return [n, base[n]] })
+        variants[e].forEach(function (kv) {
+          for (var i = 0; i < extra.length; i++) if (extra[i][0] === kv[0]) extra[i][1] = kv[1]
+        })
+        out.push({ state: STATES[s], stage: stages[g], extra: extra, varied: variants[e][0] || null })
+      }
 
   var full = out.length, sampled = false
   if (full > COMBO_CAP) {
@@ -294,7 +351,10 @@ function buildCombos (disc) {
     for (var k = 0; k < COMBO_CAP; k++) picked.push(out[Math.floor(k * step)])
     out = picked; sampled = true
   }
-  return { list: out, full: full, ran: out.length, sampled: sampled }
+  return { list: out, full: full, ran: out.length, sampled: sampled,
+           axisCount: axisNames.length,
+           crossFull: axisNames.reduce(function (n, a) { return n * disc.axes[a].length }, 1) *
+                      STATES.length * stages.length }
 }
 
 /* ── 跑一个组合 ──────────────────────────────────────────── */
@@ -393,7 +453,7 @@ async function runAll (only) {
     var rec = { page: name, combos: 0, fullCombos: 0, sampled: false,
                 defects: [], consoleErrors: [], suspicious: [], error: '' }
     try {
-      var win = await loadPage(name)
+      var win = await withTimeout(loadPage(name), 15000, name + ' 装载')
 
       /* 舞台不是 1:1 就没有测量意义 —— 直接判失败，不要拿失真的数去凑一份"跑过了"的报告 */
       var vs = verifyStage(win)
@@ -415,10 +475,13 @@ async function runAll (only) {
       if (disc.error) { rec.error = disc.error; log(name + '  ✗ ' + disc.error, 'bad'); RESULT.pages.push(rec); continue }
       rec.suspicious = disc.suspicious
 
-      var cb = buildCombos(disc)
+      var cb = buildCombos(disc, win)
       rec.combos = cb.ran; rec.fullCombos = cb.full; rec.sampled = cb.sampled
 
       for (var j = 0; j < cb.list.length; j++) {
+        /* 每 20 组让出一次事件循环：组合循环是同步的，一页几百组会把主线程
+           占满，日志不刷新、页面像死了一样，分不清「在跑」还是「挂了」。 */
+        if (j && j % 20 === 0) await new Promise(function (r) { setTimeout(r, 0) })
         var out = runCombo(win, cb.list[j])
         if (out && typeof out === 'object') {
           Object.keys(out).forEach(function (k) {
@@ -438,8 +501,11 @@ async function runAll (only) {
       totalErrors += errs.length
       if (rec.defects.length || errs.length) pagesWithDefects++
 
+      rec.axisCount = cb.axisCount
+      rec.crossFull = cb.crossFull
       var line = name.padEnd(34) + String(rec.combos).padStart(4) + ' 组合'
-        + (cb.sampled ? '（全量 ' + cb.full + '，等距抽样）' : '')
+        + (cb.sampled ? '（逐轴全量 ' + cb.full + '，等距抽样）' : '')
+        + (cb.axisCount > 1 ? '　[' + cb.axisCount + ' 条附加轴，轴间交叉未跑，全交叉需 ' + cb.crossFull + ']' : '')
         + '  缺陷 ' + rec.defects.length + '  console 错 ' + errs.length
       log(line, (rec.defects.length || errs.length) ? 'warn' : 'ok')
       if (rec.suspicious.length)
