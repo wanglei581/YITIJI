@@ -237,6 +237,55 @@
 .tray-how b { color:var(--fog-800); }
 .tray-bottom { margin-top:auto; display:flex; flex-direction:column; gap:var(--s-3); }
 .tray-bottom .btn { width:100%; }
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右副列常驻，抢走约三分之一宽度，装的是本机仪表（统计口径）和作业面入口
+   （旁路动作）—— 跟"和小青对话"这件当下要做的事无关。
+   处置：对话区改全宽；仪表与作业面入口收进上下文抽屉，点按钮才展开。
+   **产物去向不许收起**：托盘的页数、黑白、费用与「去打印 / 先存我的文档」
+   留在对话下方常驻（CLAUDE.md §9 不伪造能力 + 本轮不许动清单）。
+   内容一条未删，只换了出现方式。 */
+.work { grid-template-columns: 1fr; }
+/* 高度跟着内容走、不撑满：抽屉撑满会在底部留一大片空，
+   自检的「版面留白」会照实报出来（它量的是内容底边，不是容器底边）。 */
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--s-7); bottom:auto; width:396px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; min-height:56px; padding:0 var(--s-5); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:var(--surf-1); color:var(--fog-800);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px;
+}
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+
+/* 产物去向常驻条：托盘明细进抽屉，但"打成几页、多少钱、去哪打"留在正文 */
+.traybar {
+  flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+}
+.traybar > .ic { width:22px; height:22px; flex:0 0 auto; color:var(--jade-500); }
+.traybar-b { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.traybar-t { font-size:var(--fz-3); font-weight:600; color:var(--fog-900); }
+.traybar-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.traybar-s b { color:var(--fog-800); font-family:var(--ff-num); }
+.traybar .btn { flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -405,10 +454,49 @@
         </div>
       </div>
 
+      <!-- ── 产物去向常驻条（2026-08-11 从右副列移过来）──────────────────
+           托盘明细、隐私账本与本机仪表都收进抽屉了，但「这次会打成什么纸、
+           几页、黑白还是彩色、多少钱、按哪个键」必须留在用户看得见的地方。 -->
+      <div class="traybar">
+        <svg class="ic"><use href="#i-file"/></svg>
+        <span class="traybar-b" data-when="default ai-down">
+          <span class="traybar-t">纸质带走 · 今天的建议清单</span>
+          <span class="traybar-s">2 条要点 · 来自本次对话 · 1 页黑白 · 预估 <b>0.20</b> 元 · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
+        </span>
+        <span class="traybar-b" data-when="device-off">
+          <span class="traybar-t">纸质带走 · 出纸暂停</span>
+          <span class="traybar-s">钉住的内容先存起来，换机或改天再打 · 存的和打的是同一份，只有要点，不含姓名电话</span>
+        </span>
+        <span class="traybar-b" data-when="first">
+          <span class="traybar-t">纸质带走 · 托盘还是空的</span>
+          <span class="traybar-s">聊出有用的回答后，点气泡下的「钉到托盘」，走之前一次打成纸</span>
+        </span>
+        <a class="btn btn--primary btn--lg" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
+          去打印<svg class="ic"><use href="#i-printer"/></svg>
+        </a>
+        <button class="btn btn--primary btn--lg" data-when="device-off">
+          <svg class="ic"><use href="#i-folder"/></svg>先存我的文档
+        </button>
+        <a class="btn btn--ghost btn--lg" data-when="first" href="06-print-workbench.html">
+          先去打印别的文件<svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p25side">
+          <svg class="ic"><use href="#i-layers"/></svg>托盘明细 · 本机仪表
+        </button>
+      </div>
+
     </div>
 
-    <!-- ══════════════════ 右副列：驾驶舱仪表 ══════════════════ -->
-    <div class="wside">
+    <!-- ══════════════════ 右副列 → 按需抽屉（2026-08-11）══════════════════
+         仪表（统计口径）、作业面入口（旁路动作）与托盘明细都在这里，
+         点正文里的「托盘明细 · 本机仪表」才展开。内容一条未删。 -->
+    <div class="wside" id="p25side">
+
+      <div class="sidehd">
+        <span class="t">托盘明细 · 本机仪表</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
+      </div>
+
 
       <!-- ① 仪表组 -->
       <div class="pane">
@@ -497,24 +585,8 @@
                 存的和打的是同一份：<b>只有要点，不含姓名电话</b>。</span>
         </div>
 
-        <div class="tray-bottom">
-          <!-- device-off 不显示页数与费用：这一态的动作是「先存我的文档」，不出纸也不收钱，
-               摆一行「预估 0.20 元」是给一个不会发生的动作报价。 -->
-          <div class="kv" data-when="default ai-down">
-            <div class="kv-row"><span class="k">页数</span><span class="v">1 页 · 黑白</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元 · 以打印工作台核价为准</span></div>
-            <div class="kv-row"><span class="k">纸上含</span><span class="v v--fog">只有钉住的要点，不含姓名电话</span></div>
-          </div>
-          <a class="btn btn--primary btn--lg" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
-            去打印<svg class="ic"><use href="#i-printer"/></svg>
-          </a>
-          <button class="btn btn--primary btn--lg" data-when="device-off">
-            <svg class="ic"><use href="#i-folder"/></svg>先存我的文档
-          </button>
-          <a class="btn btn--ghost btn--lg" data-when="first" href="06-print-workbench.html">
-            先去打印别的文件<svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-        </div>
+        <!-- 2026-08-11：原来的 .tray-bottom（页数 / 费用 / 纸上含 + 去打印 / 先存我的文档）
+             已移到对话下方的产物去向常驻条，不在抽屉里重复摆一遍入口。 -->
       </div>
 
     </div>
@@ -533,6 +605,24 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var b = document.querySelector('[data-side-open]')
+    if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

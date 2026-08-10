@@ -182,6 +182,15 @@
 .nb-e--2 { background: var(--azure-a12); color: var(--azure-200); border: 1px solid var(--azure-a20); }
 .nb-e--3 { background: var(--amber-a12); color: var(--amber-200); border: 1px solid var(--amber-a20); }
 
+/* ---------- 挂在 .work 主栏里时不要再缩一次 gutter ----------
+   横条默认按「.screen 直接子级的页脚」设计，左右各让出 56px 安全边距。
+   但 .work 已经有 var(--gutter) 的内边距，横条再让一次就等于 112px，
+   摘要行的可用宽度会被压到 325px（约 16 个中文字）→ 收起态折成两行。
+   所以挂进主栏时缩进归零，摘要能有 ~440px、一行放得下 20 字左右。 */
+.wmain > .nb-bar,
+.wside > .nb-bar,
+.main > .nb-bar { --nb-inset: 0; }
+
 /* ---------- 手机接力页（390×844）：缩进与上限都要小一号 ---------- */
 .nb-bar--phone { --nb-inset: 20px; }
 .nb-bar--phone .nb-sum { min-height: 56px; font-size: 13.5px; padding: var(--s-2) 14px; border-radius: 12px; }

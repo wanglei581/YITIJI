@@ -349,6 +349,56 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 .fb-done .t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
 .fb-done .s { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
 .fb-done .s b { color: var(--fog-900); font-weight: 600; }
+
+/* ── 卡内 / 带内折叠：把运维口径收起来，点开才展开 ─────────────────── */
+.pfold, .stfold { margin-top: var(--s-2); }
+.pfold > summary, .stfold > summary {
+  list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--ff-ui); font-size: var(--fz-1); color: var(--fog-600);
+}
+.pfold > summary::-webkit-details-marker, .stfold > summary::-webkit-details-marker { display: none; }
+.pfold > summary::after, .stfold > summary::after {
+  content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-size: var(--fz-1); color: var(--fog-600);
+  border: 1px solid var(--brd-2); border-radius: var(--r-full); padding: 3px 11px;
+}
+.pfold[open] > summary::after, .stfold[open] > summary::after { content: '收起'; }
+.pfold-b, .stfold-b {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding-bottom: var(--s-2);
+  font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6;
+}
+.pfold-b b, .stfold-b b { color: var(--fog-800); font-weight: 600; }
+.pfold:not([open]) .pfold-b, .stfold:not([open]) .stfold-b { display: none; }
+
+/* ══ 原型外壳条 · 评审开关（不属于产品界面）═══════════════════════════
+   2026-08-11：能力探测态切换按钮与「原型稿：重新检测会直接成功」这句
+   原先摆在用户可见区，产品化时会让用户困惑。整体移到与 .shell 同级、
+   浮在舞台之外；平时隐身、碰到才现身；?capture=1 的产品视图里不渲染。
+   切换能力没有删，评审照常能进探测失败态。 */
+.proto-rail {
+  position: fixed; left: 16px; top: 62px; z-index: var(--z-shell);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  padding: 7px 10px; border-radius: var(--r-lg);
+  background: rgba(8, 16, 18, .86); border: 1px solid rgba(232, 241, 241, .12);
+  backdrop-filter: blur(14px);
+  font-family: var(--ff-ui); font-size: 12px;
+  opacity: .1; transition: opacity .18s ease-out;
+}
+.proto-rail:hover, .proto-rail:focus-within { opacity: 1; }
+.proto-rail-id { color: var(--fog-600); letter-spacing: .08em; padding: 0 6px 0 2px; }
+.proto-rail .rvbtn {
+  margin-left: 0; min-height: 28px; height: 28px; padding: 0 11px;
+  font-size: 12px; color: var(--fog-700); border-color: rgba(232, 241, 241, .16);
+}
+.proto-rail .rvbtn[aria-pressed="true"] { background: var(--jade-a20); color: var(--jade-200); }
+.proto-rail-n {
+  margin-left: 4px; padding-left: 8px; border-left: 1px solid rgba(232, 241, 241, .16);
+  font-size: 12px; color: var(--fog-600);
+}
+body.capture .proto-rail { display: none !important; }
 </style>
 </head>
 <body>
@@ -440,7 +490,10 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       </div>
 
       <div class="tadv">
-        <div class="tadv-act" id="useAct">点上面任一件，下面对应的卡会亮起来 —— 不会替你跳走，也不会替你按下出纸</div>
+        <!-- 2026-08-11：删掉「不会替你跳走、不会替你按下出纸」这类解释交互规则的话。
+             按钮自己会说话，不跳走这件事用户按一下就知道。红线本身在 README §四红线，
+             不需要在屏幕上向用户复述。 -->
+        <div class="tadv-act" id="useAct">点上面任一件，下面对应的卡会亮起来</div>
         <div class="tadv-ln" id="useWhy"><span class="k">理由</span>这三件是 AI 在打印这条链上真正干的活：推荐入口、材料体检、打印前隐私检查。<b>三件都只出结论，不动你的文件</b>；其中<b>推荐入口尚未接线</b>，选它会先让你说一句话。</div>
         <div class="tadv-ln" id="useCost"><span class="k">代价</span>三件都不需要登录；体检与隐私检查要读一遍文件内容。</div>
         <div class="tadv-ln" id="useAlt"><span class="k">备选</span>不想让机器分诊，直接看下面七张卡自己挑。</div>
@@ -485,15 +538,23 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="tband-t" id="probeTitle">服务状态无法确认</span>
         <span class="tband-x"><span class="chip chip--info" id="probeChip">暂不开放任务</span></span>
       </div>
+      <!-- 2026-08-11 整改：探测失败态原来向用户讲「能力配置」「为什么七项全停」，
+           那是运维口径，站在机器前的人只需要知道：这次办不了、可以重试、可以换机。
+           用户可见区压成一句 + 替代路径；技术档案整段收进折叠，内容一字未删。 -->
       <div class="tadv" style="border-top:0;padding-top:0">
-        <div class="tadv-act">未取得本机打印扫描能力配置 —— 这和「一体机离线」不是一回事：那次知道坏在哪，这次连能力都读不到</div>
-        <div class="tadv-ln"><span class="k">为什么七项全停</span>读不到能力配置，本机就<b>无权声称任何一项正常</b>，连上传、格式转换、签名盖章也不敢开 —— 传上来接不接得住、合成完存不存得下，现在都答不上来。<span class="ev ev--e2">E2 来自本机能力探测</span></div>
-        <div class="tadv-ln"><span class="k">还能做什么</span>「我的打印记录」三个入口<b>不受影响：</b>历史文件、订单与凭证码在你账号里，不靠本机能力。重新检测一次也不花钱。</div>
-        <div class="tadv-ln"><span class="k">备选</span>本机确实不行就换一台，或找现场工作人员；已存进「我的文档」的文件<b>换机也能取回来打</b>。</div>
+        <div class="tadv-act">这次打印扫描都开不了 —— <b>请重新检测，或换一台机器</b><span class="ev ev--e2">E2 来自本机能力探测</span></div>
+        <div class="tadv-ln"><span class="k">还能做什么</span>「我的打印记录」三个入口<b>不受影响；</b>已存进「我的文档」的文件<b>换机也能取回来打</b>，或找现场工作人员。</div>
         <div class="tadv-ln" data-when="ai-down"><span class="k">另外</span>这一趟 AI 也不可用 —— 就算探测成功，体检与隐私检查<b>这次仍然给不了</b>。</div>
+        <details class="pfold">
+          <summary>技术档案（运维用）</summary>
+          <div class="pfold-b">
+            未取得本机打印扫描能力配置 —— 这和「一体机离线」不是一回事：那次知道坏在哪，这次连能力都读不到。
+            读不到能力配置，本机就<b>无权声称任何一项正常</b>，连上传、格式转换、签名盖章也不敢开 ——
+            传上来接不接得住、合成完存不存得下，现在都答不上来。重新检测一次不花钱。
+          </div>
+        </details>
       </div>
       <div class="tband-act">
-        <span class="tadv-ln" style="flex:1;min-width:0">原型稿：这里点「重新检测」会直接探测成功，真机以后端返回为准。</span>
         <button type="button" class="rebtn" id="probeBtn">重新检测</button>
       </div>
     </div>
@@ -505,7 +566,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <span data-when="device-off" data-probe-when="ok">要出纸的四项停了&nbsp;· 上传、转换、签章照常</span>
       <span data-probe-when="unknown">七项现在都开不了&nbsp;· 状态确认后自动恢复</span>
       <button class="gbtn" type="button" data-open="ovl-ai"><svg class="ic"><use href="#i-brain"/></svg>AI 怎么帮&nbsp;· 降级后怎么做</button>
-      <button class="rvbtn" type="button" data-probe-btn="unknown" data-probe-when="ok" data-review>评审：模拟能力探测失败</button>
+      <!-- 2026-08-11：「评审：模拟能力探测失败」是原型开关，已移到 .stage 之外的
+           原型外壳条（见文件末尾 .proto-rail）。切换能力没有删，产品视图里看不到。 -->
     </div>
 
     <!-- ══════════ 七张能力卡 + 第 8 格状态卡 ══════════
@@ -718,7 +780,13 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="hc-st">合成完存不存得下现在答不上来，合成任务先不创建。</span>
       </div>
 
-      <!-- ⑧ 本机服务配置（状态卡，不是入口） -->
+      <!-- ⑧ 本机服务配置（状态卡，不是入口）
+           2026-08-11 整改：这是设备运维卡，不是用户能力，原来六格参数 + 两段说明
+           常驻第 8 格，和七张「我能办什么」的卡等重。现在卡面只留一行结论，
+           六格参数与运维说明收进折叠（默认收起，点开才展开）。
+           栅格仍是 8 格，四态 × 探测态的组合都不会错位；内容一条未删。
+           更彻底的做法是整块移到系统状态页 P04，那要改 04-system-states.html，
+           本轮不在允许改动范围内，先按「收折叠」处理。 -->
       <div class="hcard hcard--stat">
         <span class="hc-hd">
           <span class="hc-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
@@ -726,6 +794,13 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
           <span class="chip chip--info">不依赖 AI</span>
         </span>
 
+        <span class="hc-st" data-when="default first ai-down" data-probe-when="ok">纸张、耗材、双面与输稿器<b>在提交任务前确认</b></span>
+        <span class="hc-st" data-when="device-off" data-probe-when="ok">这一台打印扫描一体机离线&nbsp;· <b>上传、转换、签章不受影响</b></span>
+        <span class="hc-st" data-probe-when="unknown">本机现在读不到设备与耗材状态&nbsp;· <b>不会创建正式任务</b></span>
+
+        <details class="stfold">
+        <summary>设备与耗材明细（运维信息）</summary>
+        <div class="stfold-b">
         <span class="stg" data-when="default first ai-down" data-probe-when="ok">
           <span><i>打印机</i>后台配置</span>
           <span><i>扫描</i>后台配置</span>
@@ -747,6 +822,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="stnote" data-when="device-off" data-probe-when="ok">离线的是<b>这一台打印扫描一体机</b>，纸张与耗材跟着读不到；上传、格式转换、签名盖章在服务端做，<b>不受这台机器影响</b>。</span>
 
         <span class="stnote" data-probe-when="unknown">未取得本机打印扫描能力配置 —— 打印机、扫描、纸张、耗材、双面与输稿器<b>本机现在都读不到</b>，所以一项也不敢说正常。<b>未确认能力不会创建正式任务</b>；费用一律预估。</span>
+        </div>
+        </details>
+
         <span class="hc-ft" data-probe-when="unknown"><span class="chip chip--info">用上面的「重新检测」再试一次</span></span>
       </div>
 
@@ -933,6 +1011,14 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 </div>
 </div>
 
+<!-- ══ 原型外壳条（.shell 同级）· 评审开关，产品视图不渲染 ══════════════ -->
+<div class="proto-rail" data-review aria-label="评审用：能力探测态切换">
+  <span class="proto-rail-id">评审 · 能力探测</span>
+  <button class="rvbtn" type="button" data-probe-btn="ok">配置已读取</button>
+  <button class="rvbtn" type="button" data-probe-btn="unknown">模拟探测失败</button>
+  <span class="proto-rail-n">原型稿：点页内「重新检测」会直接探测成功，真机以后端返回为准</span>
+</div>
+
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
@@ -1022,7 +1108,9 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 
   function setProbe (k) {
     screen.setAttribute('data-probe', k === 'unknown' ? 'unknown' : 'ok')
-    var bs = screen.querySelectorAll('[data-probe-btn]')
+    /* 2026-08-11：探测态切换按钮已移到 .screen 之外的原型外壳条，
+       这里改成 document 级查询，否则按钮的选中态点不亮。 */
+    var bs = document.querySelectorAll('[data-probe-btn]')
     for (var i = 0; i < bs.length; i++) {
       bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-probe-btn') === k ? 'true' : 'false')
     }
@@ -1030,10 +1118,12 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
   }
   window.v3Probe = setProbe
 
-  screen.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-probe-btn]')
+  /* 委托挂 document：原型外壳条在 .screen 之外，挂 screen 上够不着。 */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-probe-btn]')
     if (b) setProbe(b.getAttribute('data-probe-btn'))
   })
+  setProbe(screen.getAttribute('data-probe') || 'ok')
 
   /* 「重新检测」：还原线上能力探测的第三种处境 —— 加载中。
      线上三种：检查中(正在确认本机服务配置) / 配置已读取 / 服务状态无法确认。

@@ -39,6 +39,24 @@
 .wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
 
 
+/* ── 内部治理信息折叠（2026-08-11）───────────────────────────────
+   门禁清单与 fail-closed / 报告端点这类工程状态不进用户可见区，
+   收进默认收起的折叠；评审要看，点开就在，内容一条未删。 */
+.gfold > summary {
+  list-style:none; cursor:pointer; min-height:var(--touch-min);
+  display:flex; align-items:center; gap:var(--s-3);
+}
+.gfold > summary::-webkit-details-marker { display:none; }
+.gfold > summary .t { font-size:var(--fz-3); font-weight:600; color:var(--fog-700); }
+.gfold > summary .s { font-family:var(--ff-num); font-size:var(--fz-1); color:var(--fog-600); }
+.gfold > summary::after {
+  content:'展开'; margin-left:auto; flex:0 0 auto;
+  font-size:var(--fz-1); color:var(--fog-600);
+  border:1px solid var(--brd-2); border-radius:var(--r-full); padding:4px 12px;
+}
+.gfold[open] > summary::after { content:'收起'; }
+.gfold:not([open]) .gfold-b { display:none; }
+
 /* 通用小节容器（本页自定，共享样式里没有 .sec 通用定义） */
 .sec { display:flex; flex-direction:column; gap:var(--s-3); }
 .pane--grow > .sec { flex:1 1 auto; min-height:0; overflow-y:auto; }
@@ -195,7 +213,8 @@
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default first"><span class="dot"></span>功能未开放 · 门禁 0 / 6 项完成</div>
+    <!-- 2026-08-11：「门禁 0 / 6 项完成」是内部验收进度，用户看不懂也用不上。 -->
+    <div class="devpill" data-when="default first"><span class="dot"></span>功能暂未开放 · 当前不接收合同</div>
     <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 不能发起新分析</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 报告可先存文档</div>
     <div class="clock" data-clock>2026年8月10日 <b>11:20</b></div>
@@ -221,17 +240,24 @@
       <div class="pane" data-at="s0">
         <div class="lockcard">
           <span class="lock-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
-          <div class="lock-t">签约风险提示还没开放</div>
+          <div class="lock-t">签约风险提示暂未开放</div>
+          <!-- 2026-08-11 整改（产品所有者口径：说明太多把页面真正要做的事挤小了）：
+               用户可见区压成一句 —— 是什么、现在能不能用、现在能干什么。
+               「六道发布门禁」是内部验收清单，收进下面的折叠区。 -->
           <div class="lock-p">
             这项服务能把你的合同<b>逐条对照法律规定</b>，把值得核对的条款标出来。
-            它要过完下面<b>六道发布门禁</b>才允许对外服务 —— 现在一项都没过完，
-            开关保持关闭。<b>不是坏了，是还不能用。</b>
+            <b>现在还不接收合同</b> —— 可以先看常见签约问题。
           </div>
         </div>
       </div>
 
+      <!-- 内部发布门禁清单：产品化时不该出现在用户界面（allowlist、算法备案、
+           安全评估、AIGC 标识、法务黄金集都是内部验收项）。内容一条未删，
+           收进默认收起的折叠区，标明「内部发布门禁（评审用）」。 -->
       <div class="pane" data-at="s0">
-        <div class="pane-hd"><span class="t">六道发布门禁 · 完成一项亮一项</span><span class="s">0 / 6</span></div>
+        <details class="gfold">
+        <summary><span class="t">内部发布门禁（评审用）</span><span class="s">0 / 6</span></summary>
+        <div class="gfold-b">
         <div class="gates">
           <div class="gate"><span class="gate-no">1</span>
             <span class="gate-b"><span class="gate-t">境内模型 allowlist</span>
@@ -258,6 +284,8 @@
               <span class="gate-s">法务准备的验收题集未跑通，跑通才算合格</span></span>
             <span class="chip chip--info">待完成</span></div>
         </div>
+        </div>
+        </details>
       </div>
 
       <!-- 原来这一块叫「为什么还不能用」，写的是"这台机器不拿你的合同当测试品"——
@@ -266,8 +294,10 @@
       <div class="pane pane--grow" data-at="s0">
         <div class="pane-hd"><span class="t">现在这里能做什么</span></div>
         <div class="sec">
+          <!-- 2026-08-11：原文再讲一遍「门禁没过完」，与上面那句重复；
+               保留「不假装给结果」这条不伪造能力的承诺，去掉门禁口径。 -->
           <div class="lock-p" style="font-size:var(--fz-3)">
-            门禁没过完，这里<b>收不进合同、发不起分析</b>，
+            这里<b>收不进合同、发不起分析</b>，
             也不会假装分析给你一份看起来像样的结果。
           </div>
           <div class="notice" style="margin-top:auto">
@@ -280,8 +310,10 @@
       <!-- ─────────── 示意横幅：s1–s4 常驻 ─────────── -->
       <div class="previewbar" data-at="s1 s2 s3 s4">
         <svg class="ic"><use href="#i-alert"/></svg>
+        <!-- 2026-08-11：去掉「六项门禁」这个内部口径，保留「不是当前状态、现在收不进合同」
+             这两条不伪造能力的事实，以及现在真能走的那条路。 -->
         <span><b>这是开放后的流程示意，不是本机当前状态。</b>
-              六项门禁一项都没过完，现在<b>收不进合同、发不起分析</b>；第 6 步的常见签约问题现在就能看。</span>
+              现在<b>收不进合同、发不起分析</b>；第 6 步的常见签约问题现在就能看。</span>
       </div>
 
       <!-- ─────────── S1 上传与知情（示意） ─────────── -->
@@ -649,15 +681,21 @@
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
     <div class="wside">
 
-      <!-- S0 右 -->
+      <!-- S0 右
+           2026-08-11 整改：fail-closed、报告端点这些是工程状态，不是用户信息。
+           整块收进折叠并标「内部状态（评审用）」，内容一条未删。 -->
       <div class="pane" data-at="s0">
-        <div class="pane-hd"><span class="t">本机真实状态</span></div>
+        <details class="gfold">
+        <summary><span class="t">内部状态（评审用）</span></summary>
+        <div class="gfold-b">
         <div class="kv">
           <div class="kv-row"><span class="k">功能开关</span><span class="v"><span class="chip chip--info">关闭 · fail-closed</span></span></div>
           <div class="kv-row"><span class="k">已收合同</span><span class="v v--fog">0 份</span></div>
           <div class="kv-row"><span class="k">报告端点</span><span class="v v--fog">未开放</span></div>
           <div class="kv-row"><span class="k">入口位置</span><span class="v">AI简历服务 → 签约与权益</span></div>
         </div>
+        </div>
+        </details>
       </div>
 
       <div class="pane pane--grow" data-at="s0">
@@ -674,7 +712,7 @@
           <!-- 原来这里的免责与页脚 .legalbar 逐字同义（全页第二遍），删。 -->
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>一共 <b>8 条</b>，不受上面门禁影响，现在就能看。</span>
+            <span>一共 <b>8 条</b>，现在就能看。</span>
           </div>
         </div>
       </div>
@@ -849,7 +887,7 @@
     <button class="btn btn--lg btn--ghost" data-at="s2 s3">取消并删除</button>
     <button class="btn btn--lg btn--ghost" data-at="faq" data-go="s0">回本机状态</button>
 
-    <span class="actionbar-hint" data-at="s0">功能未开放 · 六项门禁完成后才会开放，不提前、不例外</span>
+    <span class="actionbar-hint" data-at="s0">功能暂未开放 · 当前不接收合同，可以先看常见签约问题</span>
     <span class="actionbar-hint" data-at="s1" data-when="default first device-off">示意 · 开放后需五项知情同意全部勾选才能继续</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 暂不可用 · 不能发起新的合同分析</span>
     <!-- 同上：压到腾出来的宽度放得下的长度。「这是示意不是真分析」由 s1–s4 常驻
