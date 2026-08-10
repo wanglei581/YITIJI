@@ -1,8 +1,8 @@
-# 招聘信息内容域 Wave 2 生产预盘点 Probe 与恢复库规划 Runbook
+# 招聘信息内容域 Wave 2 生产只读盘点与恢复库规划 Runbook
 
-状态：本地候选，未执行生产盘点、未恢复生产备份、未写任何数据库、未部署。
+状态：完整盘点实现候选，未执行生产盘点、未恢复生产备份、未写任何数据库、未部署。
 
-本执行包只覆盖 Wave 2 的第一批：生产 PostgreSQL legacy backfill 子集聚合 probe，以及受控恢复库上的 manifest-aware dry-run。生产 probe 不是冻结方案第 6 节的完整 production inventory，更不是 Wave 2 GO 门禁；它尚不覆盖 JobFair/PolicyPost、完整 URL/过期治理、机构重复与结构化地区、AuditLog/ReviewDecision 或数据库理论可见 ID 与公开 API ID 差集，不能单独作为制作/批准 manifest 或启动 backfill 的依据。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write` 或 `--fix`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧或发布。
+本执行包包含三件严格分离的只读能力：廉价的 production legacy backfill 子集 probe、冻结方案第 6 节完整 production inventory + 公开 API ID 差集，以及受控恢复库上的 manifest-aware dry-run。子集 probe 仍不能产生 GO；完整盘点同时区分现网 `currentReader` 与冻结目标 `targetSafe`，不会把尚未切换的 Profile/Directory 接口伪装成空集合。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write` 或 `--fix`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧、reader 切换或发布。
 
 ## 1. 固定边界
 
@@ -29,6 +29,14 @@
 | `RECRUITMENT_WAVE2_RESTORE_NONCE` | 不设置 | 恢复任务 nonce |
 | `RECRUITMENT_WAVE2_SNAPSHOT_SHA256` | 不设置 | 加密快照 SHA-256 |
 
+完整 production inventory 另要求：
+
+- `RECRUITMENT_WAVE2_PUBLIC_API_BASE_URL=https://<已批准主机>/api/v1`
+- `RECRUITMENT_WAVE2_EXPECTED_PUBLIC_API_ORIGIN=https://<同一已批准主机>`
+- `RECRUITMENT_WAVE2_EXPECTED_EXCLUDE_DEMO_PUBLIC_DATA=true|false`，必须与被盘点部署的真实运行策略一致，禁止猜测。
+
+生产公开 API 仅允许 HTTPS 443、固定 `/api/v1`、无认证头、无 Cookie、无重定向；DNS 所有地址先通过公网地址校验，实际 TLS 连接固定到已核验地址且仍按原 hostname 校验证书。CI 只在 `target=ci-fixture` 时允许 loopback HTTP。
+
 数据库内还会二次核验：目标库名、`public` schema、`REPEATABLE READ READ ONLY`、角色非 superuser/createdb/createrole/replication/bypassrls、无 database/schema CREATE 权限、对 `public` 所有现有表均无 INSERT/UPDATE/DELETE/TRUNCATE 权限。恢复库另须存在 `_RecruitmentWave2RestoreMarker`，至少包含 `restore_nonce / snapshot_sha256 / snapshot_as_of / expires_at`；nonce、快照摘要和有效期必须与执行环境一致。规划事务提交后及最终输出序列化完成后，工具都会用新的只读事务重新读取 marker 并复核授权/marker 有效期，旧 `REPEATABLE READ` 快照不能替代撤销检查。
 
 任何目标/权限守卫失败均在查询或规划前停止；运行中授权或 marker 失效则在输出前停止。错误输出只返回稳定错误码，不回显连接串或数据库异常正文。
@@ -49,6 +57,29 @@ pnpm probe:recruitment-wave2
 - `1`：目标、权限、事务、超时、schema 或执行失败；不得据此推断数据状态。
 
 生产输出必须作为受限证据保存。不得把本 probe、旧 `verify:recruitment-p1-preflight` 的 `readyForWave2Backfill` 或历史文档计数当作本批退出门禁；在冻结方案第 6 节完整 production inventory 和公开 API 差集另行落地并通过前，不得仅凭本 probe 推进生产 manifest。
+
+## 3.1 完整 production inventory 与公开 API 差集
+
+前置条件除专用只读数据库授权外，还必须有精确生产 API origin、对应部署提交/主机侧运行配置证据，并用 `umask 077` 把输出重定向到受限证据目录；不得在普通 CI、聊天或公开日志中展开生产报告。
+
+```bash
+cd services/api
+umask 077
+node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+  > /approved/restricted/recruitment-wave2-full-inventory.json
+```
+
+机器证据必须直接调用 Node 入口；禁止用 `pnpm <script> > report.json` 包裹，因为业务阻塞按约定返回 `exit 2`，包管理器的生命周期提示可能污染 JSON stdout。交互式本地探查仍可使用 package script，但不得把其重定向结果当作证据。
+
+工具执行 `DB(A) → API pass A → API pass B → DB(B)`：两次数据库报告摘要或两次 API ID 摘要任一漂移均以 `exit 1` 停止，不输出可被误解的差集。Job、JobFair、PolicyPost、legacy OfflineAgency/OfflineJob 均按当前公开 reader 的真实谓词计算 `currentReader`，再与无认证公开 API 全分页 ID 集合做双向差集；Job 的冻结目标安全证据单列，JobFair/PolicyPost 尚未冻结版本化 target-safe 模型，Directory/Profile 尚无公开 endpoint，均明确标为 unsupported/endpoint absent，不伪造结论。
+
+退出码：
+
+- `0`：稳定、可完整枚举、已定义 blocker 为 0、current-reader 双向差集为 0，且已支持的 target-safe 泄漏为 0；这仍不是 writer、发布或部署授权。
+- `2`：稳定快照下存在数据治理 blocker、current-reader/API 差集或可证明的 target-safe 泄漏。
+- `1`：授权、只读角色、API origin/DNS/TLS/health、分页、响应上限、快照漂移或执行失败。
+
+输出只保留状态聚合、招聘内容内部 ID（每类最多 100 条样例并附全量集合摘要）、规则/查询摘要和 API origin 摘要；不输出完整 URL、标题、公司、正文、地址、电话、邮箱、证照号/证据文件、Audit payload、数据库连接串、用户或行为数据。
 
 ## 4. 恢复库与 manifest
 

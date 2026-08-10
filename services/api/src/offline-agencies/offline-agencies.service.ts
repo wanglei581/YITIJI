@@ -96,7 +96,7 @@ export class OfflineAgenciesService {
         where: where as never,
         skip,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         select: {
           id: true, name: true, orgType: true, address: true, district: true,
           lat: true, lng: true, openHours: true, phone: true, contactEmail: true,
@@ -128,7 +128,7 @@ export class OfflineAgenciesService {
       include: {
         jobs: {
           where: { status: 'active' },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         },
       },
     })
@@ -192,7 +192,7 @@ export class OfflineAgenciesService {
         where: where as never,
         skip,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.offlineJob.count({ where: where as never }),
     ])

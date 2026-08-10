@@ -92,19 +92,33 @@ export class PoliciesService {
 
   // ── Kiosk 公开读(只放出 approved+published)──────────────────────────────
 
-  async getPublishedPolicies(params?: { kind?: string; audience?: string; category?: string }): Promise<{ data: PolicyPostDto[] }> {
-    const rows = await this.prisma.policyPost.findMany({
-      where: {
+  async getPublishedPolicies(params?: {
+    kind?: string; audience?: string; category?: string; page?: number | string; pageSize?: number | string
+  }): Promise<{ data: PolicyPostDto[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+    const parsedPage = Number.parseInt(String(params?.page ?? 1), 10)
+    const page = Math.min(10_000, Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1)
+    const parsedPageSize = Number.parseInt(String(params?.pageSize ?? 200), 10)
+    const pageSize = Math.min(200, Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : 200)
+    const where = {
         reviewStatus: 'approved',
         publishStatus: 'published',
         ...(params?.kind ? { kind: params.kind } : {}),
         ...(params?.audience ? { audience: params.audience } : {}),
         ...(params?.category ? { category: params.category } : {}),
-      },
-      orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }],
-      take: 200,
-    })
-    return { data: rows.map(mapPolicy) }
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.policyPost.findMany({
+        where,
+        orderBy: [{ publishedDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.policyPost.count({ where }),
+    ])
+    return {
+      data: rows.map(mapPolicy),
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    }
   }
 
   // ── Partner:本机构 CRUD(编辑回 pending 重审)─────────────────────────────
