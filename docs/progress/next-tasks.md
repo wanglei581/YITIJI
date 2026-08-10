@@ -22,6 +22,7 @@
 
 ## 当前执行：后台招聘数据 P0/P1 收口
 
+- [x] **真实来源到位前的通用接入契约与无写入预检候选**：复用既有四轨导入和审核发布链，补 Partner-only 机器可读 contract 与岗位/招聘会 DTO preflight；预检按机构类型 fail-closed，只返回聚合摘要并明确不落库，未来数据方可先对接字段、HMAC 和目标状态。未部署、未连接生产、未写演示数据；真实来源到位后仍须创建/审批数据源、执行导入、逐条审核发布和线上验收。
 - [x] **P0 后台招聘数据两波升级与生产发布**：Admin 线下机构真实 HTTP 契约、内容变更回待审、父机构深链门禁、Webhook/Excel 计数与审核、5 类 Organization capability、API/Webhook Admin 启用、停源不级联、影响预览、批量下架及审计已由 PR #572–#574 收口，并以 `37025dc9` 完成生产发布；SQLite/PG/浏览器 CI 与公网 health、三端 bundle、公开空态均已复验。部署授权已恢复为 `false`。
 - [x] **P1 Wave 0 统一模型与迁移方案冻结**：完成当前模型/双库/公开生产状态只读盘点，冻结 Organization、JobSource、OnlinePlatformDirectory、OfflineAgencyProfile/Branch、QualificationRecord 与 canonical Job 的职责、有效可见性、存量 blocker、生产只读盘点、expand/backfill/switch/contract 和回滚门禁；本波不改 schema、不写生产、不新增页面、不部署。正式方案见 `docs/product/recruitment-content-domain-model-2026-08.md`。
 - [x] **P1 Wave 1A 迁移安全与 additive expand（PR #578）**：旧 37 模型全库搬数脚本/命令已退役删除；SQLite SSOT、PG 机械镜像、双 additive migration、旧 schema 只读 preflight、schema verifier 与独立 fresh/upgrade CI 已落地。PR CI run `31325581514` 的 build-and-verify、真实 PostgreSQL 16 fresh/upgrade/read-only preflight 和 Kiosk 浏览器冒烟全部通过。未改页面、未切 reader/writer、未迁生产数据、未部署。
