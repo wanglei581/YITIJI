@@ -82,6 +82,43 @@
 .alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
 .alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
+/* ── 补：子功能入口层（s4）─ 生产 SmartCampusHomePage.tsx 的六项服务预览 ──
+   六项名称与说明取生产代码原文（ENTRIES + SERVICE_ENTRIES 的 title/description）。
+   整页由终端开关 config.enabled 控制：关着时首页连入口都不渲染，直达 URL 只有空态。
+   所以这六张卡一律 aria-disabled + chip--info「学校开通后可用」，不做成能点的入口。 */
+
+/* AI 引导带：这一屏唯一能点的东西，指向本机自己已有的能力；ai-down 换静态对照表 */
+.aiguide { flex:0 0 auto; display:flex; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.aiguide > .ic { width:22px; height:22px; color:var(--jade-400); flex:0 0 auto; margin-top:2px; }
+.aiguide--off { background:var(--fog-a04); border-color:var(--fog-a12); }
+.aiguide--off > .ic { color:var(--fog-600); }
+.ag-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.ag-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.ag-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.ag-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; } .ag-s b { color:var(--fog-900); }
+.ag-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-3); }
+.asug { display:flex; align-items:center; gap:var(--s-3); min-height:var(--touch-min);
+  padding:9px var(--s-4); border-radius:var(--r-xs); background:var(--surf-1);
+  border:1px solid var(--brd-2); text-decoration:none; color:inherit;
+  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.asug:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.asug .ic { width:19px; height:19px; color:var(--jade-500); flex:0 0 auto; }
+.asug-b { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.asug-k { font-size:var(--fz-1); color:var(--fog-600); line-height:1.35; }
+.asug-t { font-size:var(--fz-2); color:var(--fog-900); font-weight:600; line-height:1.35; }
+
+/* 六项服务行：沿用 s3 已有的 .alt 视觉，只把行距压紧一点，
+   否则 6 行 + 说明会把 previewwrap 撑破、压到下面那张卡上（实测溢出 53px）。 */
+.previewwrap[data-at="s4"] .alt { padding:10px var(--s-5); }
+.previewwrap[data-at="s4"] .alt-s { font-size:var(--fz-1); }
+
+/* ai-down 静态对照表：六项 ↔ 现有替代路径。没有替代的就写没有，不硬凑 */
+.xmap { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-2) var(--s-5); }
+.xm { display:flex; align-items:baseline; gap:var(--s-2); font-size:var(--fz-1); line-height:1.5; }
+.xm-a { color:var(--fog-900); font-weight:600; flex:0 0 auto; }
+.xm-b { color:var(--fog-700); min-width:0; }
+
 .tl-s2 { font-size:var(--fz-1); color:var(--fog-600); }
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
@@ -117,8 +154,9 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">接入后 · 迎新</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">接入后 · 自助服务</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">开通后 · 六项服务</span></button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
   </div>
 
   <div class="work">
@@ -226,13 +264,15 @@
       </div>
 
       <!-- ─────────── S2 接入后 · 迎新（预览） ─────────── -->
-      <div class="previewbar" data-at="s2 s3">
+      <div class="previewbar" data-at="s2 s3 s4">
         <svg class="ic"><use href="#i-alert"/></svg>
         <span data-at="s2"><b>这是学校接入后的样子，不是本机当前状态。</b>
               下面所有内容都是示意，<b>不是任何真实学生的数据</b> ——
               本机现在读不到任何学校系统。</span>
         <span data-at="s3"><b>这是学校接入后的样子，不是本机当前状态。</b>
               下面的办理项是示意，<b>现在一项都办不了</b>。</span>
+        <span data-at="s4"><b>下面六项是学校开通后才会出现的服务，不是本机当前状态。</b>
+              <b>本机校园开关现在是关的，六项一项都进不去。</b></span>
       </div>
 
       <div class="previewwrap" data-at="s2">
@@ -339,6 +379,133 @@
             这些由学校设定，<b>本机不替学校编</b>。<br>
             所以这块是空的。空着比编一套看起来合理的规则更诚实 ——
             后者会让你按错的规则去准备。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 开通后 · 六项服务（预览） ─────────── -->
+      <!-- AI 引导带：默认 / 首次 / 设备离线。链接指的都是本机自己的能力，不是学校系统 -->
+      <div class="aiguide" data-at="s4" data-when="default first device-off">
+        <svg class="ic"><use href="#i-orbit"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">你要办的事，现在这台机器能怎么办</span>
+            <span class="ev ev--e3">E3 提示 · 仅供参考</span></span>
+          <span class="ag-s">六项里，只有「迎新系统」沾到的那部分本机能替一点：
+                <b>要交的纸能打、要传的扫描件能出、入学后的求职准备能做</b>。
+                行李帮运、VR校园、校园卡、一卡通、校园网这五项<b>本机替不了</b>，
+                得走学校窗口或学校自己的系统 —— 这一条不会因为 AI 说得好听就变。</span>
+          <span class="ag-row">
+            <a class="asug" href="06-print-workbench.html?stage=s3">
+              <svg class="ic"><use href="#i-printer"/></svg>
+              <span class="asug-b"><span class="asug-k">报到材料要打印</span>
+                <span class="asug-t">打印扫描台</span></span></a>
+            <a class="asug" href="07-scan-workbench.html">
+              <svg class="ic"><use href="#i-scan"/></svg>
+              <span class="asug-b"><span class="asug-k">证件、成绩单要电子版</span>
+                <span class="asug-t">扫描工作台</span></span></a>
+            <a class="asug" href="09-resume-workbench.html">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="asug-b"><span class="asug-k">入学后的求职准备</span>
+                <span class="asug-t">简历工作台</span></span></a>
+          </span>
+        </span>
+      </div>
+
+      <!-- ai-down：同一位置换成静态对照表，六项逐条写清有没有替代。不依赖 AI 也能用 -->
+      <div class="aiguide aiguide--off" data-at="s4" data-when="ai-down">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">AI 顾问暂时不可用 · 六项 ↔ 现在的替代路径</span></span>
+          <span class="ag-s">下面这张表是写死的，不经过 AI。
+                <b>没有替代的就写没有</b> —— 编一条听着能办的路径，只会让你白跑一趟。</span>
+          <span class="xmap">
+            <span class="xm"><span class="xm-a">迎新系统</span>
+              <span class="xm-b">材料自带电子版 → 打印扫描台能打</span></span>
+            <span class="xm"><span class="xm-a">行李帮运</span>
+              <span class="xm-b">本机没有替代 → 问现场工作人员</span></span>
+            <span class="xm"><span class="xm-a">VR校园</span>
+              <span class="xm-b">本机没有替代 → 学校官网自己看</span></span>
+            <span class="xm"><span class="xm-a">校园卡办理</span>
+              <span class="xm-b">本机没有替代 → 学校窗口办</span></span>
+            <span class="xm"><span class="xm-a">一卡通开通</span>
+              <span class="xm-b">本机没有替代 → 学校窗口办</span></span>
+            <span class="xm"><span class="xm-a">校园网开通</span>
+              <span class="xm-b">本机没有替代 → 学校网络中心办</span></span>
+          </span>
+        </span>
+      </div>
+
+      <div class="previewwrap" data-at="s4">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-campus"/></svg>
+            <b>开通后会有这些</b>
+            <span class="mt">六项名称与说明取自线上已定好的配置</span>
+          </div>
+          <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-users"/></svg>
+              <span class="alt-b"><span class="alt-t">迎新系统</span>
+                <span class="alt-s">报到流程、办事窗口、入学与求职准备</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-package"/></svg>
+              <span class="alt-b"><span class="alt-t">行李帮运</span>
+                <span class="alt-s">合作物流服务入口与服务点说明</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-eye"/></svg>
+              <span class="alt-b"><span class="alt-t">VR校园</span>
+                <span class="alt-s">360° 云游校园与重点场馆介绍</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-card"/></svg>
+              <span class="alt-b"><span class="alt-t">校园卡办理</span>
+                <span class="alt-s">新生办卡、补卡、挂失后快速办理</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-idcard"/></svg>
+              <span class="alt-b"><span class="alt-t">一卡通开通</span>
+                <span class="alt-s">开通食堂、门禁、图书馆等校园通行权限</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-route"/></svg>
+              <span class="alt-b"><span class="alt-t">校园网开通</span>
+                <span class="alt-s">激活校园 Wi-Fi、宿舍网络与上网账号</span></span>
+              <span style="margin-left:auto"><span class="chip chip--info">学校开通后可用</span></span>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-3)">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span>这六项本机只做<b>入口与办理指引</b>，办理本身在学校窗口或学校自己的系统里完成；
+                    本机不在这几项里采集你的个人信息，也不保存办理结果。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-gear"/></svg>
+          <b>谁能开、开关关着时会怎样</b>
+          <span class="mt">这几行是线上规则，不是示意</span>
+        </div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁提出</span><span class="v">学校（就业处 / 学工处）提出并授权</span></div>
+            <div class="kv-row"><span class="k">谁打开开关</span><span class="v">运营方在管理后台<b>按终端</b>打开校园模式</span></div>
+            <div class="kv-row"><span class="k">你能自己开吗</span><span class="v v--fog">不能 · 本机上没有这个开关</span></div>
+            <div class="kv-row"><span class="k">关着时首页</span><span class="v">不出现「智慧校园」入口</span></div>
+            <div class="kv-row"><span class="k">关着时直达网址</span><span class="v v--fog">只有「本机暂未开启」一句话</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            开关关着时入口不是灰掉，是压根不渲染 —— 本页由评审直达入口打开。
           </div>
         </div>
       </div>
@@ -454,6 +621,72 @@
         </div>
       </div>
 
+      <!-- S4 右 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这六项里本机做什么</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            本机在这六项里的角色只有一个：<b>入口和指引</b>。
+            办卡、开网、运行李都不是本机在办，本机也不经手你的证件和账号。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">服务提供方</span><span class="v">学校 / 学校指定的服务商</span></div>
+            <div class="kv-row"><span class="k">本机角色</span><span class="v">入口与办理指引</span></div>
+            <div class="kv-row"><span class="k">个人信息</span><span class="v v--fog">不采集</span></div>
+            <div class="kv-row"><span class="k">办理结果</span><span class="v v--fog">不保存</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这四行开通前后都成立，不随开关变。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>开通后这六张卡会变成什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">卡片状态</span><span class="v">由「学校开通后可用」变成可进入</span></div>
+            <div class="kv-row"><span class="k">卡上的说明</span><span class="v">由学校与运营方配置</span></div>
+            <div class="kv-row"><span class="k">这六项本身</span><span class="v v--fog">线上已定好 · 本机不增不减</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.7">
+            开哪几项由学校定：学校只开一部分时，没开的那几张同样不渲染，
+            本机不会替学校把它们摆在这儿。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这六张卡为什么点不动</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            因为本机的校园开关是关的。开关关着的时候，六项服务在线上<b>连渲染都不渲染</b> ——
+            这里把名字列出来，只是让你知道开通后会有什么，<b>不是给你一排点不开的按钮</b>。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg><b>不用等开通，现在能做的</b>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <a class="alt" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>
+              <span class="alt-b"><span class="alt-t">打印报到材料</span>
+                <span class="alt-s">选纸张、看价格，确认后出纸</span></span></a>
+            <a class="alt" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>
+              <span class="alt-b"><span class="alt-t">扫描证件与成绩单</span>
+                <span class="alt-s">扫成 PDF，网申上传直接用</span></span></a>
+            <a class="alt" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>
+              <span class="alt-b"><span class="alt-t">改简历</span>
+                <span class="alt-s">入学后的求职准备，本机能改能打</span></span></a>
+            <a class="alt" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>
+              <span class="alt-b"><span class="alt-t">看校招活动</span>
+                <span class="alt-s">学校就业网与主办方的公开公告</span></span></a>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4);line-height:1.7">
+            这四条链接现在就有效 —— 和上面六张点不动的卡，区别就在这儿。
+          </div>
+        </div>
+      </div>
+
       <!-- 首次使用：一句话 -->
       <div class="pane" data-when="first">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
@@ -473,14 +706,18 @@
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到当前状态</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一页</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s4">看开通后的六项</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s1">回到当前状态</button>
 
     <span class="actionbar-hint" data-at="s1">本机未接入任何学校系统 · 这一页现在没有数据</span>
     <span class="actionbar-hint" data-at="s2 s3">以上为接入后示意 · 现在一项都办不了</span>
+    <span class="actionbar-hint" data-at="s4">以上六项为学校开通后才有 · 本机校园开关现在是关的</span>
 
     <a class="btn btn--primary" data-at="s1" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s1" data-go="s2" style="display:none"></button>
     <a class="btn btn--primary" data-at="s2" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" href="06-print-workbench.html?stage=s3">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
