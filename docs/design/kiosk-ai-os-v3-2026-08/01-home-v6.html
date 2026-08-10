@@ -278,19 +278,48 @@ html.lowgpu .card-ic .ic, html.lowgpu .vx-mic .ic,
 html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
 /* reduced-motion：base.css 全局把动画压到 .001ms 单次即静态终态，无需另写 */
 
-/* ── 高度收口(2026-08-10 浏览器内试算后落定)────────────────────────
-   实测:.vbody 可用高度装不下 verrand+两栅格+vfoot,ai-down 态最坏溢出 95px,
-   「查看招聘会」四态全部落在裁切线下、elementFromPoint 命中不到 → 点不动。
-   前两版靠猜改反而更糟(76→99→122),这版是在浏览器里逐个候选试算出来的:
-   四态溢出 -15/-42/-15/-5(均为负=有余量),按钮四态可点,按钮高 50px≥48。
-   ai-down 额外压缩中枢区,因为该态 vgrid-a 会多出一条降级说明(+44px)。 */
+/* ── 高度收口 ──────────────────────────────────────────────────────
+   2026-08-10 第一轮:.vbody 装不下 verrand+两栅格+vfoot,ai-down 最坏溢出 95px,
+   「查看招聘会」四态落在裁切线下、点不动。前两版靠猜改反而更糟(76→99→122),
+   靠在浏览器里逐个候选试算才收住。
+
+   2026-08-11 复发,原因是我自己:页脚加了 64px 的「信息与边界」折叠条,
+   .vivid 从 100→1688 缩到 100→1624,而 .vfoot 的 min-height:240px 不肯让步,
+   于是底部 71px 又被 overflow:hidden 裁掉 ——
+   「查看招聘会」再次点不动(elementFromPoint 命中 .nb-sum),
+   连设备状态面板的最后两行(扫描仪、费用口径)也一起没了。
+   上面那句「按钮四态可点」当时是真的,加了折叠条之后就不再成立 ——
+   **注释会过期,所以这类结论必须由自检守着**:回归台已加「按钮被遮挡按不动」
+   一项(取按钮中心点做 elementFromPoint),四态复现该缺陷后才动手改。
+
+   这一轮把 71px 从哪里省出来,也是逐项试算的(每步都量了四态):
+     ① 计数胶囊(「12 家来源」「本周 3 场」这类**不可点**的标签)本来在
+        .card-foot 里换行独占一行,每行卡多吃 42px。移到卡片右上角与图标同行,
+        既省高度,语义上也更该跟标题在一起。          →  71 → 32
+     ② .vbody 行间距 8→6                            →  32 → 26
+     ③ .verrand 上下内距 6→2                        →  26 → 19
+     ④ .vfoot min-height 240→212(实测面板内容 196px,仍装得下) → 19 → 4
+     ⑤ .card-foot 换行后的行间距 12→6              →   4 → 全部为负
+   四态最终余量:default -20 / first -68 / ai-down -5 / device-off -20。
+   ai-down 余量最小,因为该态 vgrid-a 与面试卡各多一条降级说明并换行。
+   可点胶囊高度全部仍 ≥48px(实测 0 个低于 48),按钮、耗材行、费用口径行均未被裁。 */
 .vivid .vhero { height: 226px; }
 .screen[data-state="ai-down"] .vivid .vhero { height: 186px; }
-.vivid .verrand { padding-top: 6px; padding-bottom: 6px; }
+.vivid .verrand { padding-top: 2px; padding-bottom: 2px; }
+.vivid .vbody { gap: 6px; }
 .vivid .vgrid-a .card { min-height: 108px; }
-.vivid .vgrid-b .card { min-height: 92px; }
-.vivid .vfoot { padding-top: 4px; }
+.vivid .vgrid-b .card { min-height: 92px; position: relative; }
+.vivid .vfoot { padding-top: 4px; min-height: 212px; flex-basis: 212px; }
 .vivid .vfoot .btn { min-height: 52px; }
+.vivid .vpanel { padding: 16px; }
+.vivid .vpanel .vrow { min-height: 0; }
+.vivid .vcalib { margin-top: 2px; }
+/* 换行后那一行贴紧一点：只影响被挤到第二行的信息胶囊，不动可点胶囊的 48px */
+.vivid .card-foot { row-gap: 6px; }
+/* 计数标签(不可点)移到卡片右上角，别再独占一行 */
+.vivid .vgrid-b .card-foot > .card-pill:not(.card-pill--go):not(.card-pill--info) {
+  position: absolute; top: 14px; right: 16px; margin: 0;
+}
 
 /* ── 版头文案落回可视区(2026-08-10 第二轮全量回归)────────────────────
    上面那条 .vhero 限高只解决了「页面总高」，没管版头**里面**装不装得下：

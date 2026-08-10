@@ -371,6 +371,48 @@ function runCombo (win, c) {
   return r
 }
 
+/* ── 遮挡检测 ────────────────────────────────────────────────
+   为什么单独加这一项：首页的「查看招聘会」在 default / device-off 两态
+   被页脚折叠条盖住、按不动，而全套审计报的是 0 缺陷 —— 因为它既没有溢出，
+   也在 1920 视口之内，只是**被另一个元素压在上面**。
+   一个按不动的按钮，比一个丑的按钮严重得多，却正好是既有检查的盲区。
+
+   做法：取按钮中心点做 elementFromPoint，命中的若不是它自己或它的后代，
+   就是被挡住了。有弹层打开时整页跳过（那时候盖住是对的）。 */
+function auditOcclusion (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  /* 弹层/遮罩打开时不查：那时候盖住下面的东西是设计意图 */
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden]), .modal:not([hidden])')) return []
+
+  var out = []
+  var els = screen.querySelectorAll('button, a.btn, .btn, .pick, [role="button"], a.card, .fc-card')
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i]
+    if (el.hidden || el.closest('[hidden]')) continue
+    var st = win.getComputedStyle(el)
+    if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < .1) continue
+    if (st.pointerEvents === 'none') continue
+    var r = el.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) continue
+    if (r.bottom <= 0 || r.top >= win.innerHeight || r.right <= 0 || r.left >= win.innerWidth) continue
+
+    var cx = Math.round(r.left + r.width / 2)
+    var cy = Math.round(r.top + r.height / 2)
+    if (cx < 0 || cy < 0 || cx >= win.innerWidth || cy >= win.innerHeight) continue
+    var hit = doc.elementFromPoint(cx, cy)
+    if (!hit) continue
+    if (hit === el || el.contains(hit) || hit.contains(el)) continue
+
+    /* 命中的是别人 —— 再确认一下它确实压在上面，而不是我们自己算错了中心点 */
+    var label = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24)
+    var by = (hit.className && String(hit.className).split(' ')[0]) || hit.tagName
+    out.push({ label: label || el.className, blockedBy: by })
+  }
+  return out
+}
+
 function comboLabel (c) {
   var s = c.state + (c.stage ? '/' + c.stage : '')
   for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
@@ -490,6 +532,12 @@ async function runAll (only) {
           })
         } else if (out === undefined || out === null) {
           rec.defects.push({ combo: comboLabel(cb.list[j]), check: '审计没有返回值', value: 1 })
+        }
+        var occ = auditOcclusion(win)
+        for (var oi = 0; oi < occ.length; oi++) {
+          rec.defects.push({ combo: comboLabel(cb.list[j]),
+            check: '按钮被遮挡按不动', value: 1,
+            detail: '「' + occ[oi].label + '」被 .' + occ[oi].blockedBy + ' 压住' })
         }
       }
       rec.consoleErrors = errs.slice(0, 20)
