@@ -559,7 +559,7 @@ jobs:
       - name: Checkout pinned inventory source
         uses: actions/checkout@v4
         with:
-          ref: b8369021177f95a9d76ca1d9130ad1afb249a720
+          ref: 1a5b1f78df0a8667d11898b729711eccbe26130f
           path: inventory-source
 
       - name: Verify pinned inventory source digest
@@ -577,7 +577,7 @@ jobs:
             services/api/src/recruitment-content/recruitment-content.types.ts \
             services/api/src/recruitment-content/recruitment-wave2-plan.ts \
             | sha256sum | awk '{print $1}')"
-          test "$CALCULATED_DIGEST" = '91b957fca1c2415fead68c050454076ec13a14a106e3bb22513fe143bb038502'
+          test "$CALCULATED_DIGEST" = '51ce6400ffc79156d396d5505b2d26e42fa403922f6963553d8db908feb6672c'
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
