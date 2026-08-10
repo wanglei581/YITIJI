@@ -404,6 +404,9 @@
     if (over.length) console.log('溢出元素：', over)
     if (small.length) console.log('触控不足元素：', small)
     window.__V3_AUDIT__ = out
+    // 必须返回：audit-plus.js 用 base = originalAudit.call(window) 合并九项基础检查，
+    // 少了 return 会让 v3AuditPlus() 的返回值里永远看不到触控/违禁词/裁字等项。
+    return out
   }
   window.v3Audit = audit
 
