@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-10T19:17:36Z",
+  "generatedAt": "2026-08-10T19:40:56Z",
   "note": "由 tools/make-pages.sh 生成。全量回归前必须重跑，否则新增页会被静默漏测。",
   "retiredNote": "retired 里的页保留文件但不进交付集：已定全站统一 V6 首页。",
   "retired": ["01-home.html","01-home-v4.html","01-home-v5.html"],
