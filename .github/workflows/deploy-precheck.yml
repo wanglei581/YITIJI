@@ -647,16 +647,23 @@ jobs:
             PY
             )"
 
-            if ! (
-              cd "$SRC_ROOT/services/api"
-              node -r @swc-node/register -e \
-                "require('./src/recruitment-content/recruitment-content-readiness');require('./src/recruitment-content/recruitment-wave2-target');require('./scripts/support/recruitment-wave2-readonly-db');require('./scripts/support/recruitment-wave2-full-inventory')" \
-                >/dev/null 2>&1
-            ); then
-              echo "INVENTORY_RESULT=execution_failed"
-              echo "INVENTORY_ERROR_CODE=MODULE_GRAPH_INVALID"
-              exit 1
-            fi
+            MODULE_LABELS=(READINESS TARGET READONLY_DB FULL_INVENTORY)
+            MODULE_PATHS=(
+              ./src/recruitment-content/recruitment-content-readiness
+              ./src/recruitment-content/recruitment-wave2-target
+              ./scripts/support/recruitment-wave2-readonly-db
+              ./scripts/support/recruitment-wave2-full-inventory
+            )
+            for INDEX in "${!MODULE_PATHS[@]}"; do
+              if ! (
+                cd "$SRC_ROOT/services/api"
+                node -r @swc-node/register -e "require('${MODULE_PATHS[$INDEX]}')" >/dev/null 2>&1
+              ); then
+                echo "INVENTORY_RESULT=execution_failed"
+                echo "INVENTORY_ERROR_CODE=MODULE_${MODULE_LABELS[$INDEX]}_INVALID"
+                exit 1
+              fi
+            done
             echo "INVENTORY_MODULE_GRAPH=ok"
 
             set +e
