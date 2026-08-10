@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>30 页总览 — Kiosk AI 操作系统 V3</title>
+<title>34 页总览 — Kiosk AI 操作系统 V3</title>
 <style>
   body {
     margin: 0; padding: 30px 34px 60px;
@@ -47,9 +47,9 @@
 </style>
 </head>
 <body>
-  <h1>Kiosk AI 操作系统 V3 · 30 页总览</h1>
+  <h1>Kiosk AI 操作系统 V3 · 34 页总览</h1>
   <p class="sub">
-    78 个原型编号（<b>kiosk-proto-2026-07</b>「75 屏」定稿）融合为 <b>26 页</b>，能力零丢失；另有 <b>P27 百宝箱区</b>承接线上 /toolbox（不在 78 号原型内）。每页承接的原型编号写在卡片下方。<br>
+    78 个原型编号（<b>kiosk-proto-2026-07</b>「75 屏」定稿）融合为 <b>26 页</b>，能力零丢失；另有 <b>P27–P29 / P31–P35</b> 承接线上真实存在、但不在 78 号原型内的页面（/toolbox、自我评估、证件照、签约风险、<b>/resume-service 域首屏</b>、<b>/resume/templates 素材库</b>、/jobs-service、线上招聘平台）。每页承接的原型编号写在卡片下方。<br>
     视觉与构图基线 = <b>P01 首页 · 鲜彩玻璃</b>。每页交付前必须过：四态同版面 / 纵向溢出 0 / 横向溢出 0 / 触控 ≥48px / 违禁文案 0。
   </p>
   <div class="links">
@@ -87,16 +87,20 @@ var G = [
     ['P08', '文件加工台', '图片转 PDF / 签章 / 证件照未开放', '66, 67, 68', '08-file-tools.html?theme=warm&stage=t1']
   ]],
   ['简历与材料', [
+    ['P32', 'AI简历服务 · 域首屏', 'AI 分诊带(三选一→页内高亮对应卡)+8 张能力卡+3 张记录路牌;每卡标明是不是 AI，AI 不可用时纯 AI 卡置灰给替代路径、素材库与打印照常', '线上 /resume-service', '32-resume-hub.html?theme=warm'],
     ['P09', '简历工作台', '来源→解析→诊断→优化对比→版本→导出打印', '05, 06, 07, 26, 27, 28', '09-resume-workbench.html?theme=warm&stage=s3'],
     ['P10', '访谈式生成', '小青逐题问，边答边成形；跳过的不编造', '25, 26', '10-resume-interview.html?theme=warm&stage=s2'],
     ['P11·P30', '岗位大师 · 决策台', '七块决策底盘+多岗对比+方向缺口/站内薪资+带走报告(三档,禁百分比)', '55, 线上 /resume/job-fit', '11-jobfit-compare.html?theme=warm&stage=s2'],
-    ['P12', '材料工厂', '求职信 / 自我介绍 / 材料清单 / 简历模板 四件套', '29, 30', '12-material-factory.html?theme=warm&stage=t1']
+    ['P12', '材料工厂', '求职信 / 自我介绍 / 材料清单 / 简历模板 四件套', '29, 30', '12-material-factory.html?theme=warm&stage=t1'],
+    ['P33', '简历素材库', '三分类(全部/简历模板/通用)+线上库现有 1 个简历版式(另 5 个文档模板归 P12)+要填的五项;套用/打印/存文档三出口,不写「已保存」', '线上 /resume/templates', '33-resume-templates.html?theme=warm']
   ]],
   ['岗位与企业', [
     ['P13', '岗位情报台', '列表 + 筛选 + 线上线下双轨 + AI 收敛', '08, 78', '13-jobs-desk.html?theme=warm&stage=ok'],
     ['P14', '岗位详情', '来源机构 / 同步时间 / 外部 ID / 扫码投递', '09', '14-job-detail.html?theme=warm&stage=ok'],
     ['P15', '企业导览', '找企业 + 企业详情（指标受后台开关控制）', '53, 54', '15-companies.html?theme=warm&stage=list'],
-    ['P16', '线下机构', '机构列表 + 线下岗位；仅信息展示与到店指引', '74, 75', '16-offline-agencies.html?theme=warm&stage=list']
+    ['P16', '线下机构', '机构列表 + 线下岗位；仅信息展示与到店指引', '74, 75', '16-offline-agencies.html?theme=warm&stage=list'],
+    ['P34', '岗位信息 · 域首屏', '八张能力卡(全职/实习/兼职/全部/找企业/岗位大师/线上平台/线下机构)+浏览与跳转记录路牌+AI研判带;前四张进同一个岗位台,只是预设筛选不同', '线上 /jobs-service', '34-jobs-hub.html?theme=warm'],
+    ['P35', '线上招聘平台', '四家来源平台(Boss直聘/前程无忧/智联招聘/猎聘)扫码入口;屏上出码、手机上打开,本机不代投不收简历', '线上 /jobs/online-platforms', '35-online-platforms.html?theme=warm']
   ]],
   ['招聘会与校园', [
     ['P17', '招聘会作战台', '场次→企业→导览→AI 准备单→资料打印→签到→现场数据', '10, 11, 43–49', '17-fair-desk.html?theme=warm&stage=s2'],

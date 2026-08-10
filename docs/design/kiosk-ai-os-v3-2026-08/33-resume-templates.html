@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P33 简历素材库 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P33 简历素材库">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/resume.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ══ P33 专用 ══ 简历素材库（线上 /resume/templates）
+   需求真值 = 生产代码，本页所有数量与文案都能对上：
+   · apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx
+       FILTERS = ['全部','简历模板','通用']（三个分类，不是三类模板）
+       列表 = getResumeTemplates() → 只保留 type==='resume_template' 的项
+       选中语义 = 「选择仅代表版式参考，不会自动生成或应用简历」
+       唯一出口 = handleUseResumeTemplate → /resume/source?intent=optimize
+   · packages/shared/src/types/jobMaterials.ts · JOB_MATERIAL_TEMPLATES
+     与 services/api/src/job-materials/job-material-templates.ts 完全一致：
+       已发布 6 个，其中 resume_template 只有 1 个 = 清爽通用简历模板；
+       另外 5 个是求职材料文档模板，归材料工厂 /resume/materials（P12）。
+   所以本页刻意**不编造模板数量**：线上库有几个就写几个，并标明以线上库为准。
+   ══════════════════════════════════════════════════════════ */
+
+/* 分类筛选：真三类，来自 FILTERS 常量 */
+.flt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.flt-lb { font-size: var(--fz-2); color: var(--fog-600); }
+.flt button {
+  min-height: var(--touch-min); padding: 0 var(--s-5); border-radius: var(--r-full); cursor: pointer;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 600;
+  transition: border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
+}
+.flt button:hover { border-color: var(--jade-a32); }
+.flt button[aria-pressed="true"] { background: var(--jade-a12); border-color: var(--jade-a32); color: var(--fog-900); }
+.flt-ct { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); }
+.flt-ct b { color: var(--fog-900); }
+
+/* 版式卡：左缩略图 + 右说明。缩略图画的是真实 sectionOrder 的七段顺序 */
+.tpl { flex: 0 0 auto; display: grid; grid-template-columns: 190px 1fr; gap: var(--s-5);
+       padding: var(--s-5); border-radius: var(--r-md);
+       background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+       border-left: 3px solid var(--cat-resume); }
+.tpl.is-on { border-color: var(--jade-a32); border-left-color: var(--jade-500); box-shadow: 0 0 0 2px var(--jade-a12); }
+.tsheet { background: var(--paper-000); border: 1px solid var(--paper-200); border-radius: var(--r-xs);
+          padding: 14px 15px; display: flex; flex-direction: column; gap: 7px; }
+.ts-h { height: 12px; width: 58%; border-radius: 2px; background: #b9c3c0; }
+.ts-m { height: 6px; width: 40%; border-radius: 2px; background: var(--paper-200); }
+.ts-sec { display: flex; flex-direction: column; gap: 4px; }
+.ts-k { font-size: 8px; letter-spacing: .14em; color: var(--paper-fog); }
+.ts-l { height: 5px; border-radius: 2px; background: var(--paper-200); }
+.ts-l--s { width: 56%; } .ts-l--m { width: 78%; }
+.ts-rule { height: 1px; background: var(--paper-200); }
+
+.tpl-b { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.tpl-nm { font-family: var(--ff-display); font-size: var(--fz-6); font-weight: 600; color: var(--fog-900); }
+.tpl-ds { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.6; }
+.tpl-for { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.55; }
+.tpl-for b { color: var(--fog-800); }
+.tpl-labels { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: 2px; }
+.tpl-ft { margin-top: auto; display: flex; align-items: center; gap: var(--s-3); }
+/* 「当前选择」是状态不是入口，同 .chip--info 语义 */
+.chip--label { cursor: inherit; }
+
+/* 「线上库现在就这些」：空白用诚实填，不用编造填（同 P19 / P27 口径） */
+.stock { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3);
+         padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+         border: 1px dashed var(--brd-2); background: var(--surf-1); }
+.stock-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-800); }
+.stock-p { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.7; }
+.stock-p b { color: var(--fog-800); }
+.mlist { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2) var(--s-4); }
+.mrow { display: flex; align-items: center; gap: var(--s-3); min-height: 34px;
+        font-size: var(--fz-2); color: var(--fog-700); }
+.mrow .ic { width: 16px; height: 16px; color: var(--fog-600); flex: 0 0 auto; }
+.mrow i { font-style: normal; color: var(--fog-600); }
+
+/* AI 建议位：ai-down 时整块换成「什么不可用、还能做什么」，位置与高度不动 */
+.aibox { flex: 0 0 auto; display: flex; flex-direction: column; gap: 7px;
+         padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+         background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd); }
+.aibox-hd { display: flex; align-items: center; gap: var(--s-3); }
+.aibox-hd .ic { width: 20px; height: 20px; color: var(--cat-resume); flex: 0 0 auto; }
+.aibox-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.aibox-t + .ev { margin-left: auto; }
+.aibox-ln { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+.aibox-ln b { color: var(--fog-900); }
+.aibox-ln .k { color: var(--fog-600); margin-right: 6px; }
+
+/* 右栏出口行 */
+.exit { display: flex; align-items: flex-start; gap: var(--s-4); min-height: var(--touch-min);
+        padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
+        text-decoration: none; color: inherit;
+        background: var(--surf-1); border: 1px solid var(--brd-1);
+        transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
+.exit .ic { width: 20px; height: 20px; color: var(--jade-500); flex: 0 0 auto; margin-top: 2px; }
+.exit-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.exit-t { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+.exit-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.exit--off { border-style: dashed; opacity: .72; }
+.exit--off .ic { color: var(--fog-600); }
+.exit--off .exit-t { color: var(--fog-700); }
+
+/* 状态标签不是入口（先例见 P14 / P17 / P27） */
+.chip--info { cursor: inherit; }
+.wside .pane--grow > .sec { min-height: 0; overflow-y: auto; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="32-resume-hub.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">简历素材库</div>
+        <div class="brand-sub">AI 简历服务 · 版式参考 · 01 号机</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>素材库在线 · 打印机在线</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>未登录也能浏览与打印</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 中断 · 浏览与打印照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 浏览照常</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:31</b></div>
+  </header>
+
+  <div class="work">
+
+    <!-- ══════════════════ 左主区：分类 + 版式 + 库存实况 ══════════════════ -->
+    <div class="wmain">
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-book"/></svg>
+        <span><b>选择只代表版式参考，本页不会替你生成或套用简历。</b>正式内容要在后面的流程里结合你自己的经历生成；岗位申请仍在来源平台或官方渠道完成。</span>
+      </div>
+
+      <div class="flt" role="group" aria-label="简历素材分类">
+        <span class="flt-lb">分类</span>
+        <button type="button" data-flt="全部" aria-pressed="true">全部</button>
+        <button type="button" data-flt="简历模板" aria-pressed="false">简历模板</button>
+        <button type="button" data-flt="通用" aria-pressed="false">通用</button>
+        <span class="flt-ct">当前分类 <b id="fltCount">1</b> 个版式</span>
+      </div>
+
+      <div class="tpl is-on" id="tplCard">
+        <div class="tsheet" aria-hidden="true">
+          <span class="ts-h"></span>
+          <span class="ts-m"></span>
+          <span class="ts-rule"></span>
+          <span class="ts-sec"><span class="ts-k">个人概述</span><span class="ts-l ts-l--m"></span><span class="ts-l ts-l--s"></span></span>
+          <span class="ts-sec"><span class="ts-k">教育经历</span><span class="ts-l ts-l--m"></span></span>
+          <span class="ts-sec"><span class="ts-k">工作经历</span><span class="ts-l"></span><span class="ts-l ts-l--m"></span></span>
+          <span class="ts-sec"><span class="ts-k">项目经历</span><span class="ts-l ts-l--m"></span></span>
+          <span class="ts-sec"><span class="ts-k">技能 · 证书</span><span class="ts-l ts-l--s"></span></span>
+        </div>
+        <div class="tpl-b">
+          <span class="tpl-nm">清爽通用简历模板</span>
+          <span class="tpl-ds">用于选择简历版式方向，进入简历诊断或优化后生成正式简历。</span>
+          <span class="tpl-for">适合<b>简历诊断、AI 简历优化、现场打印前的版式参考</b>；单栏、无表格嵌套，招聘系统好读。</span>
+          <span class="tpl-labels">
+            <span class="chip chip--info">简历模板</span>
+            <span class="chip chip--info">通用</span>
+            <span class="chip chip--info">单栏 · 标准字号行距</span>
+          </span>
+          <span class="tpl-ft">
+            <span class="chip chip--jade chip--label">当前选择</span>
+            <span class="exit-s">线上库这一类目前只有它，不是没加载出来。</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="aibox" data-when="default first device-off">
+        <div class="aibox-hd">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span class="aibox-t">按你的岗位方向推荐素材</span>
+          <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
+        </div>
+        <div class="aibox-ln"><span class="k">动作</span>把目标岗位说给下一页，让它按方向挑该突出哪几段 —— <b>本页不替你套用</b>，推荐只影响后面怎么改，不影响你现在能看什么。</div>
+        <div class="aibox-ln"><span class="k">理由</span>同一份经历，投技术岗和投运营岗要突出的段落顺序不一样；这属于模型判断，<b>不是规则</b>，所以标 E3。</div>
+        <div class="aibox-ln"><span class="k">代价</span>约 1 分钟；记一次 AI 服务；推荐可以完全不采纳，分类浏览不受任何影响。</div>
+        <div class="aibox-ln"><span class="k">备选</span>不想让模型插手 → 直接按上面的分类自己挑；只想拿纸质版参考 → 打印带走再慢慢改。</div>
+      </div>
+
+      <div class="aibox" data-when="ai-down">
+        <div class="aibox-hd">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span class="aibox-t">按岗位方向推荐素材：现在给不了</span>
+          <span class="chip chip--info">AI 暂不可用</span>
+        </div>
+        <div class="aibox-ln"><span class="k">不可用的</span>只有「按岗位方向挑素材」这一条，它要模型判断。本机已自动上报运维，<b>恢复时间以现场公告为准</b>。</div>
+        <div class="aibox-ln"><span class="k">照常的</span>上面的<b>分类浏览、版式预览、打印带走</b>都不依赖 AI，现在全都能用。</div>
+        <div class="aibox-ln"><span class="k">自己挑的话</span>单栏版式适合大多数岗位，也最容易被招聘系统正确读取，先按它准备内容不会错。</div>
+        <div class="aibox-ln"><span class="k">要留档的话</span>先把版式打印带走或存进「我的文档」，等 AI 恢复再回来做优化，材料不用重做。</div>
+      </div>
+
+      <div class="stock">
+        <div class="stock-t">线上库现在就这些 —— 数量按后台实际配置，本机不替它凑数</div>
+        <div class="stock-p">
+          <b>简历版式：1 个</b>（就是上面这个）。三个分类都是<b>同一批素材的筛选条件</b>，不是三类模板 ——
+          这一个版式同时带「简历模板」「通用」两个标签，所以三个分类下都看得到它。
+        </div>
+        <div class="stock-p">
+          另外还有 <b>5 个求职材料文档模板</b>，它们不在本页，在<b>材料工厂</b>那一页：
+        </div>
+        <div class="mlist">
+          <span class="mrow"><svg class="ic"><use href="#i-file"/></svg>校招自荐信 <i>· 应届 / 校园招聘会</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-file"/></svg>社招求职信 <i>· 社招 / 岗位咨询</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-file"/></svg>面试感谢信 <i>· 面试后跟进</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-file"/></svg>作品集封面 <i>· 设计 / 运营岗</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-file"/></svg>招聘会材料清单 <i>· 现场准备</i></span>
+          <a class="mrow" href="12-material-factory.html" style="text-decoration:none;min-height:var(--touch-min);color:var(--jade-600);font-weight:600"><svg class="ic" style="color:var(--jade-500)"><use href="#i-arrowRight"/></svg>去材料工厂看这 5 个</a>
+        </div>
+        <div class="stock-p">
+          示例与数量<b>以线上库为准</b>：管理后台上架、下架或改标签，这一页会跟着变；本机不缓存一份旧清单来撑场面。
+        </div>
+
+        <div class="stock-t" style="margin-top:var(--s-2)">这批素材要你填的，就这五项</div>
+        <div class="stock-p">
+          上面的版式和材料工厂那 5 个模板<b>共用同一组填写项</b>，字数上限也是线上库定的 ——
+          现在心里有数，到了生成那一步不用现想。
+        </div>
+        <div class="mlist">
+          <span class="mrow"><svg class="ic"><use href="#i-check"/></svg>姓名 <i>· 必填 · 40 字内</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-check"/></svg>目标岗位 <i>· 必填 · 60 字内</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-minus"/></svg>目标单位 <i>· 选填 · 80 字内</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-minus"/></svg>核心亮点 <i>· 选填 · 280 字内</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-minus"/></svg>补充说明 <i>· 选填 · 220 字内</i></span>
+          <span class="mrow"><svg class="ic"><use href="#i-shield"/></svg><i>不问身份证号、不问联系人</i></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px：当前版式 + 出口 ══════════════════ -->
+    <div class="wside">
+
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-book"/></svg><b>当前版式参考</b><span class="s">清爽通用</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">版式风格</span><span class="v">清爽 clean</span></div>
+            <div class="kv-row"><span class="k">栏数</span><span class="v">单栏</span></div>
+            <div class="kv-row"><span class="k">字号 / 行距</span><span class="v">标准 / 标准</span></div>
+            <div class="kv-row"><span class="k">页边距</span><span class="v">常规</span></div>
+            <div class="kv-row"><span class="k">段落顺序</span><span class="v">共 7 段</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
+            抬头 → 个人概述 → 教育经历 → 工作经历 → 项目经历 → 技能 → 证书。
+            这七段的顺序来自线上库的版式配置，不是本页排的。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>下一步会发生什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            进入 AI 简历优化后，系统会<b>基于你自己的内容</b>生成正式简历，版式在优化页里<b>重新确认一次</b>。<br>
+            本页<b>不保存、也不套用</b>任何模板 —— 你在这里点「选择」，只是告诉自己想要哪个方向。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow">
+        <div class="pane-hd"><svg class="ic"><use href="#i-arrowRight"/></svg><b>拿它去做什么</b><span class="s">三个出口</span></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+          <a class="exit" href="09-resume-workbench.html?stage=s4">
+            <svg class="ic"><use href="#i-pen"/></svg>
+            <span class="exit-b"><span class="exit-t">套用到简历优化</span>
+              <span class="exit-s">带着这个版式方向去改简历；改写按条采纳，原件只新增版本不覆盖。</span></span>
+          </a>
+
+          <a class="exit" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="exit-b"><span class="exit-t">打印带走</span>
+              <span class="exit-s">按标准文档流程送进打印工作台；<b>金额以打印工作台核价与现场公示价为准</b>，本页不出价。</span></span>
+          </a>
+          <div class="exit exit--off" data-when="device-off">
+            <svg class="ic"><use href="#i-offline"/></svg>
+            <span class="exit-b"><span class="exit-t">打印带走：本机现在打不了</span>
+              <span class="exit-s">打印机离线，已上报运维。可先存进「我的文档」，换台机器取回来打。</span></span>
+          </div>
+
+          <a class="exit" href="23-me.html">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <span class="exit-b"><span class="exit-t">存我的文档</span>
+              <span class="exit-s" data-when="default ai-down device-off">留一份到本人文档里，之后在别的机器上也能取。</span>
+              <span class="exit-s" data-when="first">这一项<b>需要登录</b>；不登录可以照常浏览和打印，只是留不下来。</span></span>
+          </a>
+
+          <div class="notice" style="margin-top:var(--s-2)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>素材只供你本人求职准备、查看和打印。<b>本机不代收简历给企业</b>，也不做平台内筛选、邀约或 Offer 管理。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本页对你做了什么记录</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">浏览素材</span><span class="v">不需要登录</span></div>
+            <div class="kv-row"><span class="k">你点的「选择」</span><span class="v v--fog">不落库</span></div>
+            <div class="kv-row"><span class="k">这一页的选择</span><span class="v v--fog">离场即清</span></div>
+            <div class="kv-row"><span class="k">存我的文档</span><span class="v">需登录</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
+            这四条现在就成立，和有没有登录无关。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="btn btn--lg btn--ghost" href="32-resume-hub.html"><svg class="ic"><use href="#i-arrowRight"/></svg>回 AI简历服务</a>
+    <a class="btn btn--lg btn--ghost" href="12-material-factory.html"><svg class="ic"><use href="#i-package"/></svg>去材料工厂</a>
+
+    <span class="actionbar-hint" data-when="default">选择只代表版式方向 · 本页不生成、不套用、不保存</span>
+    <span class="actionbar-hint" data-when="first">不登录也能浏览和打印 · 「存我的文档」那一步才需要登录</span>
+    <span class="actionbar-hint" data-when="ai-down">AI 推荐暂不可用 · 分类浏览、版式预览与打印照常</span>
+    <span class="actionbar-hint" data-when="device-off">打印机离线 · 浏览与套用不受影响，打印改为换机取回</span>
+
+    <a class="btn btn--primary" href="09-resume-workbench.html?stage=s4">套用到简历优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* 分类筛选：按线上 FILTERS = ['全部','简历模板','通用'] 真判。
+   这一个版式同时带「简历模板」「通用」两个标签，所以三个分类都能命中 ——
+   这就是线上库现在的真实情况，不是筛选没生效。 */
+;(function () {
+  var TAGS = ['简历模板', '通用']
+  var screen = document.querySelector('.screen')
+  var card = document.getElementById('tplCard')
+  var count = document.getElementById('fltCount')
+  if (!screen || !card || !count) return
+
+  screen.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-flt]')
+    if (!b) return
+    var f = b.getAttribute('data-flt')
+    var btns = screen.querySelectorAll('[data-flt]')
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-pressed', btns[i] === b ? 'true' : 'false')
+    }
+    var hit = f === '全部' || TAGS.indexOf(f) > -1
+    card.hidden = !hit
+    count.textContent = hit ? '1' : '0'
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  })
+})()
+</script>
+</body>
+</html>
