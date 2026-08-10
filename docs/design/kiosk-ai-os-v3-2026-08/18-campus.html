@@ -57,18 +57,49 @@
 .jw-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
 .jw--soon .jw-d { color: var(--coral-400); }
 
-/* 勾选行 */
-.ck { display:flex; align-items:flex-start; gap:var(--s-4);
-      min-height:var(--touch-min); padding:var(--s-3) var(--s-4);
-      border-radius:var(--r-xs); border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
-.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
-          flex:0 0 auto; margin-top:2px; position:relative; }
-.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
-.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
-          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
-.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* ════════ 2026-08-10 Codex 走查整改 ① · 别再造假控件 ════════
+   上一版这一页两处长得像控件、其实不是：
+     · 活动行是 <label class="jobrow ck--have">，右边还挂着「已加进计划表」——
+       可 ck--have 在这里连方框都没有（.ck-box 根本没写进行里），
+       整行没有 input、没有状态、没有事件。用户点了什么也不会发生，
+       而动作条偏偏写着「已选 2 场」，第 3 步还有「改选活动」按钮。
+     · 右栏「这几场要用到的材料」是 <label class="ck"> + 22px 方框，同样点不动。
+   现在分家：活动行做成整行大复选按钮（真选中、真影响计划表与页数），
+   材料清单降级为圆点条目（只读，不伪装成控件）。.ck 整套删除。 */
+
+/* 活动行：整行大复选按钮 */
+/* .joblist 是 flex 列 + overflow-y:auto，行默认 flex-shrink:1 会被压扁：
+   加进 26px 复选框、右侧再让出一列之后，正文更窄、折行更多，
+   行高被压到 181px 而内容有 231px —— 来源行直接被切掉（自检：卡内溢出 ×6）。
+   行不许压缩，长了让列表自己滚。 */
+.jobrow { min-height:56px; flex:0 0 auto; }
+.jobrow[aria-pressed="true"] { border-color:var(--jade-a32); background:var(--jade-a12); }
+.jobrow:focus-visible { outline:3px solid var(--jade-400); outline-offset:2px; }
+.jobrow-b { flex:1 1 auto; }
+.ck-box { width:26px; height:26px; border-radius:6px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:3px; position:relative; }
+.jobrow[aria-pressed="true"] .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.jobrow[aria-pressed="true"] .ck-box::after { content:''; position:absolute; left:8px; top:3px;
+          width:6px; height:12px; border:solid #fff; border-width:0 3px 3px 0; transform:rotate(42deg); }
+.jobrow-side { flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end;
+          gap:6px; align-self:center; }
+.jobrow-pick { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.jobrow[aria-pressed="true"] .jobrow-pick { color:var(--jade-600); font-weight:700; }
+
+/* 只读清单条目：圆点 + 正文 + 右侧状态词。状态词是结论不是开关，
+   所以不给 cursor:pointer、不给 hover，看得出来它不接受点击。
+   类名避开 pill / chip / tag / btn —— 那几个词是自检「疑似假入口」的扫描面。 */
+.li-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s-3); }
+.li { display:flex; align-items:flex-start; gap:var(--s-4);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); }
+.li-dot { width:9px; height:9px; border-radius:50%; background:var(--fog-a20);
+          flex:0 0 auto; margin-top:9px; }
+.li-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.li-t { font-size:var(--fz-3); color:var(--fog-900); }
+.li-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.li-st { flex:0 0 auto; align-self:center; font-size:var(--fz-1); white-space:nowrap; color:var(--jade-600); }
+.li-st--own { color:var(--fog-600); }
 
 .chip--info { cursor: inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
@@ -263,7 +294,8 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="joblist">
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-camp="a" data-date="8月11日 周一 · 还有 2 天" data-plan="某通信设备公司 提前批<b>网申截止</b> · 要交成绩单扫描件">
+            <span class="ck-box"></span>
             <span class="jobrow-when jw--soon"><span class="jw-d">11</span><span class="jw-m">8月 周一</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某通信设备公司 · 2027 届提前批网申截止</span>
@@ -279,10 +311,11 @@
                 <span>外部 ID XJ-2027-1188</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
-          </label>
+            <span class="jobrow-side"><span class="jobrow-pick">已加进计划表</span></span>
+          </button>
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-camp="b" data-date="8月14日 周四 14:00" data-plan="某汽车零部件集团 <b>校内宣讲</b> · 第二报告厅 · 现场收纸质简历，宣讲后有初面">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">14</span><span class="jw-m">8月 周四</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">校内宣讲会 · 某汽车零部件集团</span>
@@ -298,10 +331,11 @@
                 <span>外部 ID XJ-XJH-0814</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
-          </label>
+            <span class="jobrow-side"><span class="jobrow-pick">已加进计划表</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="c" data-date="8月16日 周六 09:00" data-plan="2027 届秋季双选会（第一场）· 学校体育馆 · 参会 46 家<br><b>参会企业名单主办方还没公布</b>，公布后可以再来本机排走法">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">16</span><span class="jw-m">8月 周六</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">2027 届毕业生秋季双选会（第一场）</span>
@@ -317,10 +351,11 @@
                 <span>外部 ID XJ-SXH-0816</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">名单未公布</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">名单未公布</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="d" data-date="8月18日 周一" data-plan="某电子制造 网申开启（截止 9月30日）· <b>要求本科及以上，先看清楚学历门槛</b>">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">18</span><span class="jw-m">8月 周一</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某电子制造 · 2027 届校招网申开启</span>
@@ -336,10 +371,11 @@
                 <span>外部 ID XJ-2027-1206</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">学历要求需留意</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">学历要求需留意</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="e" data-date="8月20日 周三 19:00" data-plan="某新能源 <b>线上宣讲</b>（需提前在来源平台报名）">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">20</span><span class="jw-m">8月 周三</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">线上宣讲 · 某新能源企业</span>
@@ -354,10 +390,11 @@
                 <span>外部 ID ZB-LIVE-0820</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">需自行报名</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">需自行报名</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="f" data-date="8月22日 周五 09:00" data-plan="某机械集团 <b>校园开放日</b>（需提前预约）">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">22</span><span class="jw-m">8月 周五</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某机械集团 · 校园开放日</span>
@@ -372,8 +409,8 @@
                 <span>外部 ID ZB-OPEN-0822</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">信息不全</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">信息不全</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
         </div>
 
@@ -409,22 +446,9 @@
             <div class="pl-i"><i></i><span>备齐成绩单、在读证明、四六级、获奖证明（本机可扫可打）</span></div>
             <div class="pl-i"><i></i><span>网申到<b>企业官网或学校就业网</b>投，认准官方域名</span></div>
 
-            <div class="pl-w">8月11日 周一 · 还有 2 天</div>
-            <div class="pl-i"><i></i><span>某通信设备公司 提前批<b>网申截止</b> · 要交成绩单扫描件</span></div>
-
-            <div class="pl-w">8月14日 周四 14:00</div>
-            <div class="pl-i"><i></i><span>某汽车零部件集团 <b>校内宣讲</b> · 第二报告厅 · 现场收纸质简历，宣讲后有初面</span></div>
-
-            <div class="pl-w">8月16日 周六 09:00</div>
-            <div class="pl-i"><i></i><span>2027 届秋季双选会（第一场）· 学校体育馆 · 参会 46 家<br>
-              <b>参会企业名单主办方还没公布</b>，公布后可以再来本机排走法</span></div>
-
-            <div class="pl-w">8月18日 周一</div>
-            <div class="pl-i"><i></i><span>某电子制造 网申开启（截止 9月30日）·
-              <b>要求本科及以上，先看清楚学历门槛</b></span></div>
-
-            <div class="pl-w">8月20日 周三 19:00 · 8月22日 周五 09:00</div>
-            <div class="pl-i"><i></i><span>某新能源 线上宣讲（需提前报名）／某机械集团 校园开放日（需预约）</span></div>
+            <!-- 日期块按第 2 步勾中的活动实时生成：勾选一变，纸面跟着变。
+                 上一版这五段是写死的 —— 只勾了 2 场，纸上照样印满 6 场。 -->
+            <div data-f="pl-items"></div>
 
             <div class="pl-foot">
               本表由职易达一体机根据公开的校招公告和你本人的简历生成，仅供你自己参考。<br>
@@ -437,7 +461,7 @@
         <div class="sheet-a4" style="margin-top:var(--s-5)">
           <div class="plan" style="padding:26px 30px">
             <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
-              同批第 2 份 · 共 6 份 · 每份 1 页
+              同批第 2 份 · 共 <span data-f="cv-n">6</span> 份 · 每份 1 页
             </div>
             <h1 style="font-size:19px">王 磊</h1>
             <div class="pl-sub">2027 届 · 机械设计与制造（专科）· 求职意向：机械设计 / 工艺</div>
@@ -541,26 +565,27 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>这几场要用到的材料</b></div>
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历 4–6 份</span>
-              <span class="ck-s">14日宣讲会现场收</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">成绩单扫描件</span>
-              <span class="ck-s">11日网申要传 · 本机可扫成 PDF</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">在读证明</span>
-              <span class="ck-s">双选会入场可能要查</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">学生证</span>
-              <span class="ck-s">校内活动进场用</span></span>
-          </label>
+          <!-- 2026-08-10 Codex ①：这四条是本机告诉你「要带什么」，不是你要勾的东西。
+               上一版长成 <label> + 22px 方框，看着能勾，点了什么也不发生。
+               右边那个词是**状态**（这一项本机能不能帮你解决），不是勾选。 -->
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历 4–6 份</span>
+                <span class="li-s">14日宣讲会现场收</span></span>
+              <span class="li-st">本机可打</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">成绩单扫描件</span>
+                <span class="li-s">11日网申要传</span></span>
+              <span class="li-st">本机可扫</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">在读证明</span>
+                <span class="li-s">双选会入场可能要查</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">学生证</span>
+                <span class="li-s">校内活动进场用</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+          </ul>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
             证件类扫描件本机默认<b>不长期保存</b>，办理结束即清。
@@ -587,20 +612,22 @@
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>一起打印</b></div>
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">校招计划表</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
-          </label>
-          <label class="ck ck--have" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 6 份</span></span>
-          </label>
+          <!-- 同上：这两条是「这一批里有什么」的陈述，不是可勾可去的选项 ——
+               真要能去掉，下面的页数与费用就得跟着变，而这一步没有那个开关。 -->
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">校招计划表</span>
+                <span class="li-s">A4 黑白 · 1 页 × 1 份</span></span>
+              <span class="li-st">在这批里</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历</span>
+                <span class="li-s" data-f="cv-line">A4 黑白 · 1 页 × 6 份</span></span>
+              <span class="li-st">在这批里</span></li>
+          </ul>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v">7 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>1.40</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">7</b> 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">1.40</b> 元</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -619,7 +646,7 @@
         <div class="sec">
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">出纸口取走 7 页</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走 <span data-f="pg">7</span> 页</span>
                 <span class="tl-s">计划表在最上面一页</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">计划表存进「我的文档」</span>
@@ -682,13 +709,13 @@
 
     <span class="actionbar-hint" data-at="s1" data-when="default first">按 2027 届算 · 现在是提前批和秋招网申</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 只显示公开校招日历</span>
-    <span class="actionbar-hint" data-at="s2">已选 2 场 · 最近一个截止在 2 天后</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 7 页 · 预估 1.40 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s2" data-f="hint2">已选 2 场 · 最近一个截止在 2 天后</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f="hint3">共 7 页 · 预估 1.40 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P18&amp;kind=fair-plan&amp;title=校园招聘计划表&amp;pages=7&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" data-f="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P18&amp;kind=fair-plan&amp;title=校园招聘计划表&amp;pages=7&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
@@ -776,6 +803,85 @@
   alt.setAttribute('href', own.f)
   alt.textContent = own.n + '首页'
   back.parentNode.insertBefore(alt, back.nextSibling)
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P18 · 2026-08-10 Codex 走查整改 ① ·「这两周去哪几场」真的能勾
+   --------------------------------------------------------------------------
+   上一版六条活动行是 <label class="jobrow ck--have">：ck--have 在这一页连方框
+   都没有（.ck-box 根本没写进行里），整行没有 input、没有状态、没有事件；
+   右边还挂着「已加进计划表」这种**看着是结果、其实改不了**的标签。
+   而动作条写着「已选 2 场」，第 3 步还有「改选活动」按钮 —— 承诺了不存在的控件。
+
+   现在整行是 <button aria-pressed>，勾选真的往下游走：
+     选中数 → 动作条「已选 N 场」
+     选中项 → 计划表纸面的日期块逐条重建（原来勾没勾都印满 6 场）
+     场数   → 简历份数 = N × 2、页数 = 1 + N × 2、费用 = 页数 × 0.2 元，
+              以及出口链接里的 ?pages=
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var rows = [].slice.call(scr.querySelectorAll('.jobrow[data-camp]'))
+  if (!rows.length) return
+
+  var COPIES = 2          // 每场带 2 份简历
+  var CV_PAGES = 1        // 校招简历压到一页（本页反复讲的那件事）
+  var UNIT = 0.2
+
+  function set (k, html) {
+    var ns = scr.querySelectorAll('[data-f="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].innerHTML = html
+  }
+  function on (r) { return r.getAttribute('aria-pressed') === 'true' }
+  function picked () { return rows.filter(on) }   // 行的排列已经是日期顺序，不再另排
+
+  function render () {
+    var sel = picked(), n = sel.length
+
+    rows.forEach(function (r) {
+      var t = r.querySelector('.jobrow-pick')
+      if (t) t.textContent = on(r) ? '已加进计划表' : '选这场'
+    })
+
+    // 最近的那一场：取选中项里的第一条日期，没有就不编
+    set('hint2', n
+      ? '已选 <b>' + n + '</b> 场 · 最近一场 ' +
+        String(sel[0].getAttribute('data-date')).split(' ')[0]
+      : '一场都没选 · 先勾上要去的活动')
+
+    // 计划表纸面
+    set('pl-items', sel.map(function (r) {
+      return '<div class="pl-w">' + r.getAttribute('data-date') + '</div>' +
+        '<div class="pl-i"><i></i><span>' + r.getAttribute('data-plan') + '</span></div>'
+    }).join('') || '<div class="pl-i"><i></i><span>还没勾活动 —— 回第 2 步勾上要去的几场，这张表才有内容。</span></div>')
+
+    // 打印算术：计划表 1 页 + 每场 2 份简历 × 每份 1 页
+    var copies = n * COPIES
+    var pages = (n ? 1 : 0) + copies * CV_PAGES
+    var fee = (pages * UNIT).toFixed(2)
+    set('pg', pages); set('fee', fee); set('cv-n', copies)
+    set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
+    set('hint3', '共 ' + pages + ' 页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+
+    var go = scr.querySelector('[data-f="gobtn"]')
+    if (go) {
+      go.setAttribute('href', '06-print-workbench.html?stage=s3&from=P18&kind=fair-plan&title=' +
+        encodeURIComponent('校园招聘计划表 + 简历 ' + copies + ' 份') +
+        '&pages=' + pages + '&copies=1&back=s3')
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var r = e.target.closest && e.target.closest('.jobrow[data-camp]')
+    if (!r) return
+    r.setAttribute('aria-pressed', on(r) ? 'false' : 'true')
+    render()
+  })
+
+  render()
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>

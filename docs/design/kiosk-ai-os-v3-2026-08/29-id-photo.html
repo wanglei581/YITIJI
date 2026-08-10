@@ -120,15 +120,37 @@
 .idsil--b { background:#2f6bd8; }
 .idsil--r { background:#c8433c; }
 
-/* s3 规格 × 底色样片（真按钮；ai-down 时蓝红底不可点） */
+/* s3 规格组 + 底色组（真按钮；ai-down 时蓝红底不可点）
+   ── 2026-08-10 Codex 走查整改 ⑨ ────────────────────────────────────────
+   上一版是「规格 × 底色」的**笛卡尔积**：4 规格 × 3 底色铺成 12 张卡。
+   12 张卡里「一寸」出现 3 次、「白底」出现 4 次 —— 同一个信息被重复印了
+   三四遍，还占掉整块面板；用户想「把一寸换成二寸」得在 12 张里重新找那一张。
+   两个维度本来就是正交的，拆成两组：规格 4 选 1 + 底色 3 选 1，
+   选项 12 → 7，两组都在「2–6 项平铺」区间，直接铺开不用弹层。
+   合成结果（一寸 · 白底）不再由卡片自己写，而是落到下面的结论行与 s4 预览里。 */
+.swset { display:flex; flex-direction:column; gap:var(--s-2); }
+.swset + .swset { margin-top:var(--s-4); }
+.swset-lb { display:flex; align-items:baseline; gap:var(--s-3);
+  font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.05em; }
+.swset-lb b { font-size:var(--fz-2); color:var(--fog-900); letter-spacing:0; }
 .swgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s-3); }
+.bggrid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-3); }
 .sw { display:flex; flex-direction:column; gap:7px; padding:9px; cursor:pointer;
   background:var(--surf-1); border:1.5px solid var(--brd-2); border-radius:var(--r-xs);
   font-family:var(--ff-ui); }
-.sw .idsil { aspect-ratio:5/7; width:100%; }
+/* 规格卡的样片按各自比例画，但**统一高度、宽度自适应**：
+   四张卡的文字才对得齐（比例不同时若固定宽度，小二寸最矮、标题掉一行），
+   而横向宽窄差异本身就把「哪个更方」这件事说清楚了。 */
+.sw .idsil { aspect-ratio:5/7; height:150px; width:auto; margin:0 auto; }
 .sw em { font-style:normal; font-size:var(--fz-1); color:var(--fog-700); text-align:center; }
+.sw i { font-style:normal; font-size:11px; color:var(--fog-600); font-family:var(--ff-num);
+  text-align:center; letter-spacing:.03em; }
 .sw[aria-pressed="true"] { border-color:var(--jade-500); background:var(--jade-a12); }
 .sw[aria-pressed="true"] em { color:var(--fog-900); font-weight:600; }
+/* 底色行：3 项平铺，整块可点，高度 ≥64px（触控下限 48px 之上留余量） */
+.sw--bg { flex-direction:row; align-items:center; gap:var(--s-4); min-height:64px; padding:9px var(--s-4); }
+.sw--bg .idsil { width:34px; height:auto; aspect-ratio:5/7; flex:0 0 auto; margin:0; }
+.sw--bg em { text-align:left; font-size:var(--fz-2); }
 .screen[data-state="ai-down"] .sw--tint { opacity:.38; pointer-events:none; }
 
 /* s4 A4 排版：白纸上画真实裁切框 */
@@ -415,22 +437,27 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-layers"/></svg>
           <b>选规格与底色</b>
-          <span class="mt">四规格 × 白 / 蓝 / 红底 · 简历常用一寸或小二寸</span>
+          <span class="mt">两组分开选：先定规格，再定底色</span>
         </div>
         <div class="sec">
-          <div class="swgrid">
-            <button class="sw" aria-pressed="true" data-spec="one" data-bg="w"><span class="idsil idsil--w"></span><em>一寸 · 白底</em></button>
-            <button class="sw" data-spec="one-s" data-bg="w"><span class="idsil idsil--w"></span><em>小一寸 · 白底</em></button>
-            <button class="sw" data-spec="two" data-bg="w"><span class="idsil idsil--w"></span><em>二寸 · 白底</em></button>
-            <button class="sw" data-spec="two-s" data-bg="w"><span class="idsil idsil--w"></span><em>小二寸 · 白底</em></button>
-            <button class="sw sw--tint" data-spec="one" data-bg="b"><span class="idsil idsil--b"></span><em>一寸 · 蓝底</em></button>
-            <button class="sw sw--tint" data-spec="one-s" data-bg="b"><span class="idsil idsil--b"></span><em>小一寸 · 蓝底</em></button>
-            <button class="sw sw--tint" data-spec="two" data-bg="b"><span class="idsil idsil--b"></span><em>二寸 · 蓝底</em></button>
-            <button class="sw sw--tint" data-spec="two-s" data-bg="b"><span class="idsil idsil--b"></span><em>小二寸 · 蓝底</em></button>
-            <button class="sw sw--tint" data-spec="one" data-bg="r"><span class="idsil idsil--r"></span><em>一寸 · 红底</em></button>
-            <button class="sw sw--tint" data-spec="one-s" data-bg="r"><span class="idsil idsil--r"></span><em>小一寸 · 红底</em></button>
-            <button class="sw sw--tint" data-spec="two" data-bg="r"><span class="idsil idsil--r"></span><em>二寸 · 红底</em></button>
-            <button class="sw sw--tint" data-spec="two-s" data-bg="r"><span class="idsil idsil--r"></span><em>小二寸 · 红底</em></button>
+          <!-- 两组正交单选，不是 12 张笛卡尔积卡：规格换规格、底色换底色，
+               互不牵连。样片剪影跟着当前底色走，所以规格卡上看到的就是最终配色。 -->
+          <div class="swset">
+            <div class="swset-lb"><b>规格</b><span>4 选 1 · 简历常用一寸或小二寸</span></div>
+            <div class="swgrid">
+              <button class="sw" aria-pressed="true" data-spec="one"><span class="idsil idsil--w"></span><em>一寸</em><i>25 × 35mm</i></button>
+              <button class="sw" data-spec="one-s"><span class="idsil idsil--w"></span><em>小一寸</em><i>22 × 32mm</i></button>
+              <button class="sw" data-spec="two"><span class="idsil idsil--w"></span><em>二寸</em><i>35 × 49mm</i></button>
+              <button class="sw" data-spec="two-s"><span class="idsil idsil--w"></span><em>小二寸</em><i>35 × 45mm</i></button>
+            </div>
+          </div>
+          <div class="swset">
+            <div class="swset-lb"><b>底色</b><span>3 选 1 · 白底＝不换底、用原图</span></div>
+            <div class="bggrid">
+              <button class="sw sw--bg" aria-pressed="true" data-bg="w"><span class="idsil idsil--w"></span><em>白底</em></button>
+              <button class="sw sw--bg sw--tint" data-bg="b"><span class="idsil idsil--b"></span><em>蓝底</em></button>
+              <button class="sw sw--bg sw--tint" data-bg="r"><span class="idsil idsil--r"></span><em>红底</em></button>
+            </div>
           </div>
           <div class="notice notice--amber" data-when="default first device-off" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
@@ -439,7 +466,8 @@
           </div>
           <div class="notice notice--amber" data-when="ai-down" style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>AI 不可用：蓝底、红底都换不了（已置灰）。白底一列是<b>不换底、用原图</b>，可以继续。</span>
+            <span>AI 不可用：底色一组里的蓝底、红底都换不了（已置灰），已自动退回白底。
+                  白底是<b>不换底、用原图</b>，规格照常可选，可以继续。</span>
           </div>
           <div class="note-end" data-out="specNote">已选<b>一寸 · 白底</b>，A4 排 8 张。样片为剪影示意。</div>
         </div>
@@ -864,10 +892,11 @@
 <script src="scripts/linkage.js?v=4"></script>
 <script>
 /* ============================================================================
-   P29 的三组「画了没接」：12 张规格底色卡、2 张来源卡、2 张简历卡，
+   P29 的三组「画了没接」：规格底色卡、2 张来源卡、2 张简历卡，
    点了全都只是静态图。现在做成真单选，并且往下游传：
      规格 → A4 排版的张数、排布、裁切框数量、meta 尺寸、右栏小样、s5 单据
-     底色 → 排版预览与简历换照预览里剪影的底色
+     底色 → 规格卡样片、排版预览与简历换照预览里剪影的底色
+   2026-08-10 Codex ⑨：规格与底色由 12 张笛卡尔积卡拆成两组正交单选（4 + 3）。
      来源 → s1 收尾说明写明本次走哪条路
      简历 → s4B 的文件名、右栏「新版本」命名、s5「也可带上」
    本页仍是「未开放」的示意页：previewbar 常驻不动，选择只改示意内容，
@@ -903,13 +932,20 @@
 
   function render () {
     var S = SPEC[P.spec], B = BG[P.bg]
-    /* s3 十二张卡的选中态 */
+    /* s3 两组正交单选的选中态：规格组 4 个、底色组 3 个，各自独立 */
     var sw = scr.querySelectorAll('.sw[data-spec]')
     for (var i = 0; i < sw.length; i++) {
-      var on = sw[i].getAttribute('data-spec') === P.spec && sw[i].getAttribute('data-bg') === P.bg
-      sw[i].setAttribute('aria-pressed', on ? 'true' : 'false')
+      sw[i].setAttribute('aria-pressed', sw[i].getAttribute('data-spec') === P.spec ? 'true' : 'false')
+      /* 规格卡里的样片跟着当前底色走：卡上看到的就是最终配色，
+         不必再靠「一寸 · 蓝底」这种合成卡名去脑补。 */
+      var sil = sw[i].querySelector('.idsil')
+      if (sil) { sil.className = 'idsil ' + B.cls; sil.style.aspectRatio = SPEC[sw[i].getAttribute('data-spec')].ratio }
     }
-    html('specNote', '已选<b>' + S.nm + ' · ' + B.nm + '</b>，A4 排 ' + S.n + ' 张（' + S.grid + '）。样片为剪影示意。')
+    var bw = scr.querySelectorAll('.sw[data-bg]')
+    for (var b2 = 0; b2 < bw.length; b2++) {
+      bw[b2].setAttribute('aria-pressed', bw[b2].getAttribute('data-bg') === P.bg ? 'true' : 'false')
+    }
+    html('specNote', '已选<b>' + S.nm + ' ' + S.mm + ' · ' + B.nm + '</b>，A4 排 ' + S.n + ' 张（' + S.grid + '）。样片为剪影示意。')
     /* s4 排版预览：张数、排布、裁切框、尺寸全部跟着换 */
     set('a4hd', 'A4 排版预览 · ' + S.nm + ' ' + S.n + ' 张')
     set('a4sub', S.grid + ' 排布 · 裁切框随纸印出')
@@ -970,7 +1006,9 @@
 
   scr.addEventListener('click', function (e) {
     var sw = e.target.closest('.sw[data-spec]')
-    if (sw) { P.spec = sw.getAttribute('data-spec'); P.bg = sw.getAttribute('data-bg'); render(); return }
+    if (sw) { P.spec = sw.getAttribute('data-spec'); render(); return }
+    var bgb = e.target.closest('.sw[data-bg]')
+    if (bgb) { P.bg = bgb.getAttribute('data-bg'); render(); return }
     var src = e.target.closest('.way[data-src]')
     if (src) {
       P.src = src.getAttribute('data-src'); render()
@@ -989,6 +1027,18 @@
     var b = e.target.closest('.btn')
     if (b && b.textContent.indexOf('回到当前状态') === 0 && window.v3Stage) { fb.hidden = true; window.v3Stage('sA') }
   })
+
+  /* ai-down 下换底做不了。CSS 已经把蓝红底压成 pointer-events:none，
+     但「切到 ai-down 之前已经选了蓝底」这一路 CSS 拦不住 —— 选中态还在蓝底上，
+     旁边却写着「换不了」。四态是外部脚本切的，本文件的 render() 不会被调到，
+     所以挂在四态切换的必经入口 v3ApplyVisibility 上，把底色退回白底。 */
+  var applyVis = window.v3ApplyVisibility
+  if (typeof applyVis === 'function') {
+    window.v3ApplyVisibility = function () {
+      applyVis.apply(this, arguments)
+      if (scr.getAttribute('data-state') === 'ai-down' && P.bg !== 'w') { P.bg = 'w'; render() }
+    }
+  }
 
   render()
 })()

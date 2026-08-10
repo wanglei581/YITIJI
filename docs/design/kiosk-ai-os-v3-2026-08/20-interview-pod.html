@@ -122,25 +122,28 @@
           transform:rotate(42deg); }
 .way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
 
-/* 垂直题库：四类岗位组卷。选中后**不再是死路** —— 旁边给示例题和「用此题库开始」。 */
-.bankrow { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s-3); }
-.bank { min-height:80px; padding:var(--s-3); border-radius:var(--r-sm); cursor:pointer;
-        display:flex; align-items:center; justify-content:center; text-align:center;
-        background:var(--surf-1); border:1px solid var(--brd-1); font-family:var(--ff-ui);
-        font-size:var(--fz-3); color:var(--fog-800);
-        transition:border-color var(--dur-2) var(--ease-out); }
-.bank:hover { border-color:var(--jade-a32); }
-.bank[aria-pressed="true"] { border-color:var(--jade-400); background:var(--jade-a12); color:var(--fog-900); }
-/* ai-down 整行禁用：组卷靠 AI，不可用就不装可用 */
-.screen[data-state="ai-down"] .bankrow .bank { opacity:.45; pointer-events:none; }
-.bankpick { display:none; align-items:center; gap:var(--s-4); margin-top:var(--s-3);
-            padding:var(--s-4); border-radius:var(--r-md);
-            background:var(--jade-a12); border:1px solid var(--jade-a20); }
-.screen.is-bank:not([data-state="ai-down"]) .bankpick { display:flex; }
-.bankpick-tx { min-width:0; display:flex; flex-direction:column; gap:3px; }
-.bankpick-t { font-size:var(--fz-1); color:var(--fog-600); }
-.bankpick-q { font-size:var(--fz-4); color:var(--fog-900); }
-.bankpick .btn { flex:0 0 auto; }
+/* 2026-08-10 Codex ②：.bankrow / .bank / .bankpick 整套删除。
+   那是「手选题库」的样式，而题库现在由行业 + 目标岗位派生，不再是用户直接选的东西。
+   留着空样式只会诱导下一个人把这组控件加回来。
+
+   行业一行 5 项：仍在「2–6 项平铺」区间，直接铺开不用弹层。
+   1080 宽的左栏摊 5 列后每格 ≈118px、高 60px，触控面积远超 48px 下限。 */
+.pick-row--5 { grid-template-columns:repeat(5,1fr); }
+.pick-mt { font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; }
+.pick-lb .ic { flex:0 0 auto; }
+/* ai-down 下行业整组失效：组卷要读岗位正文，那是 AI 干的活。
+   旁边的 .pick-mt 已经写明「这一项本次不起作用」，控件就该跟着灰掉 ——
+   一个点得动、却什么也不改变的按钮，正是这轮要清掉的东西。 */
+.screen[data-state="ai-down"] [data-pick="industry"] .pick-row { opacity:.45; pointer-events:none; }
+
+/* 派生结果条：说清「你这几项选完，出的是哪一份题」。
+   是结论不是控件 —— 不给 cursor:pointer、不给 hover、不给选中态。 */
+.derive { margin-top:var(--s-4); padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+          background:var(--jade-a12); border:1px solid var(--jade-a20);
+          display:flex; flex-direction:column; gap:5px; }
+.derive-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.derive-p { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+.derive-p b { color:var(--fog-900); }
 
 /* 开始前的第 1 题预览：撑满卡片剩余高度，随选卷实时变 */
 .qpeek { flex:0 0 auto; margin-top:var(--s-4);
@@ -292,6 +295,18 @@
            padding-top:8px; margin-top:14px; }
 
 /* 打印勾选：真开关，勾掉会改页数、改费用、改纸面 */
+/* 2026-08-10 Codex ③：这一批原本是三个真复选框（.ck），现在降级为只读条目 .li。
+   .ck 家族保留给别处已在用的地方；.li 是「陈述」的样式，不长成控件。 */
+.li-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s-3); }
+.li { display:flex; align-items:flex-start; gap:var(--s-4);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); }
+.li-dot { width:9px; height:9px; border-radius:50%; background:var(--fog-a20);
+          flex:0 0 auto; margin-top:9px; }
+.li-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.li-t { font-size:var(--fz-3); color:var(--fog-900); }
+.li-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
 .ck { display:flex; align-items:center; gap:var(--s-4); width:100%; min-height:56px;
       padding:var(--s-3) var(--s-4); border-radius:var(--r-xs); text-align:left;
       border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer;
@@ -458,21 +473,6 @@
               </div>
             </div>
 
-            <div class="pick" data-pick="level">
-              <div class="pick-lb"><span class="n">3</span>难度
-                <span class="st" data-f="st-level">还没选</span></div>
-              <div class="pick-row">
-                <button class="opt" data-opt="level" data-v="easy">
-                  <span class="opt-t">入门</span><span class="opt-s">只问主干题</span></button>
-                <button class="opt" data-opt="level" data-v="std">
-                  <span class="opt-t">标准</span><span class="opt-s">主干 + 常见追问</span></button>
-                <button class="opt" data-opt="level" data-v="deep">
-                  <span class="opt-t">深挖</span><span class="opt-s">每题多问一层</span></button>
-              </div>
-            </div>
-
-            <!-- 门控被挡下来时说清挡在哪。空着不占位，不是常驻的劝说文字。 -->
-            <div class="gate-note" data-f="gatenote"></div>
           </div>
 
           <!-- 回访 / 离线 / AI 不可用：本机已经认识你，直接给推荐 -->
@@ -484,49 +484,75 @@
             AI 不可用：能看题、能自己答、能打印题目，这次没有点评。
           </div>
 
-          <!-- 卷名 / 题数 / 时长上一版在四个地方各写一遍（这里、折叠区、右栏两处、
-               动作条），四处各自渲染就一定会有对不上的时候。现在只留右栏
-               「开始前确认」一处完整口径，别处不再复述数字。 -->
-          <div class="pane-hd" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-layers"/></svg><b>选一份卷</b>
-            <span class="mt" data-when="default first device-off">选完在右边「开始前确认」核对</span>
-            <span class="mt" data-when="ai-down">AI 不可用 · 只能用通用卷</span>
-          </div>
-          <div class="ways">
-            <button class="way" data-opt="paper" data-v="job" aria-pressed="true">
-              <span class="way-hd"><span class="way-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
-                <span class="way-t">岗位卷</span><span class="way-ck"></span></span>
-              <span class="way-s">按岗位正文出题 · <span data-f="n-job">8</span> 题</span>
-            </button>
-            <button class="way" data-opt="paper" data-v="general">
-              <span class="way-hd"><span class="way-ic"><svg class="ic"><use href="#i-users"/></svg></span>
-                <span class="way-t">通用行为面</span><span class="way-ck"></span></span>
-              <span class="way-s">不限岗位 · <span data-f="n-general">6</span> 题</span>
-            </button>
+          <!-- ══════ 2026-08-10 Codex 走查整改 ②⑤⑥ · 参数与生产建单对齐 ══════
+               生产 InterviewSetupPage 建单只有六个参数：
+                 岗位 position · 行业 industry · 面试官 interviewerType ·
+                 经验 experience · 难度 difficulty · 时长 duration
+               **没有 paper 字段**。上一版这里却让用户直接「选一份卷」
+               （岗位卷 / 通用行为面 / 4 个垂直题库），选出来的东西服务端接不住。
+
+               ② 的两个选项里选了「删掉独立试卷选择，改由岗位 + 行业派生」。
+                  理由：标为「规划中 · 待服务端支持」等于把这一屏最主要的一组
+                  控件整片置灰，用户既选不了也不知道该选什么；而这六份题库本来
+                  就能从**已经存在的生产参数**推出来 —— 行业选垂直行业就用该行业
+                  题库，行业不限时看有没有目标岗位（有＝按岗位正文出题，无＝通用
+                  行为面）。控件全部落在真实参数上，题库一份没丢。派生结果写在
+                  下面「本次出题」里，让用户看得见推理，不是黑箱。
+               ⑤ 补时长 3 / 5 / 8 分钟（生产 DURATIONS），题数由时长派生。
+               ⑥ 难度直接用生产文案：轻松练习 / 标准面试 / 压力面试
+                  （值也用生产的 easy / standard / pressure，不留一层映射给人对错）。
+               这三组都不是 first 态专属 —— 每次练都要定，所以四态都在。 ══════ -->
+          <div class="pick" data-pick="industry" style="margin-top:var(--s-4)">
+            <div class="pick-lb"><svg class="ic" style="width:20px;height:20px;color:var(--fog-600)"><use href="#i-toolbox"/></svg>行业
+              <span class="st" data-f="st-industry">不限行业</span></div>
+            <div class="pick-row pick-row--5">
+              <button class="opt" data-opt="industry" data-v="any" aria-pressed="true">
+                <span class="opt-t">不限行业</span><span class="opt-s">按岗位出题</span></button>
+              <button class="opt" data-opt="industry" data-v="tech">
+                <span class="opt-t">技术开发</span></button>
+              <button class="opt" data-opt="industry" data-v="mkt">
+                <span class="opt-t">市场运营</span></button>
+              <button class="opt" data-opt="industry" data-v="adm">
+                <span class="opt-t">行政文员</span></button>
+              <button class="opt" data-opt="industry" data-v="mfg">
+                <span class="opt-t">生产制造</span></button>
+            </div>
+            <div class="pick-mt only-nores">没有简历、也不指定岗位时，就靠这一项决定出什么题。</div>
+            <div class="pick-mt" data-when="ai-down">AI 不可用：组卷要读岗位正文，这一项本次不起作用，只能走通用行为面。</div>
           </div>
 
-          <div class="pane-hd" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-toolbox"/></svg><b>或按行业手选题库</b>
-            <span class="chip chip--info" style="margin-left:8px">题库持续扩充</span>
-            <span class="mt only-nores">没有简历也能练</span>
-            <span class="mt" data-when="ai-down">AI 不可用 · 暂不能按题库组卷</span>
+          <div class="pick" data-pick="level">
+            <div class="pick-lb"><svg class="ic" style="width:20px;height:20px;color:var(--fog-600)"><use href="#i-target"/></svg>难度
+              <span class="st" data-f="st-level">还没选</span></div>
+            <div class="pick-row">
+              <button class="opt" data-opt="level" data-v="easy">
+                <span class="opt-t">轻松练习</span><span class="opt-s">适合第一次练，问题更基础</span></button>
+              <button class="opt" data-opt="level" data-v="standard">
+                <span class="opt-t">标准面试</span><span class="opt-s">接近真实面试节奏</span></button>
+              <button class="opt" data-opt="level" data-v="pressure">
+                <span class="opt-t">压力面试</span><span class="opt-s">更多追问与细节验证</span></button>
+            </div>
           </div>
-          <div class="bankrow">
-            <button class="bank" data-opt="paper" data-v="tech">技术开发</button>
-            <button class="bank" data-opt="paper" data-v="mkt">市场运营</button>
-            <button class="bank" data-opt="paper" data-v="adm">行政文员</button>
-            <button class="bank" data-opt="paper" data-v="mfg">生产制造</button>
+
+          <div class="pick" data-pick="dur">
+            <div class="pick-lb"><svg class="ic" style="width:20px;height:20px;color:var(--fog-600)"><use href="#i-clock"/></svg>时长
+              <span class="st" data-f="st-dur">5 分钟</span></div>
+            <div class="pick-row">
+              <button class="opt" data-opt="dur" data-v="3">
+                <span class="opt-t">3 分钟</span><span class="opt-s">快速练习 · 约 3–4 题</span></button>
+              <button class="opt" data-opt="dur" data-v="5" aria-pressed="true">
+                <span class="opt-t">5 分钟</span><span class="opt-s">标准练习 · 约 4–6 题</span></button>
+              <button class="opt" data-opt="dur" data-v="8">
+                <span class="opt-t">8 分钟</span><span class="opt-s">深度练习 · 约 6–8 题</span></button>
+            </div>
           </div>
-          <!-- 选了题库不能只给一道示例题就没下文：示例旁边就是进卷的按钮 -->
-          <div class="bankpick">
-            <span class="bankpick-tx">
-              <span class="bankpick-t">这一类长这样（示例题）</span>
-              <span class="bankpick-q" data-f="banksample">—</span>
-            </span>
-            <span class="sp" style="flex:1 1 auto"></span>
-            <button class="btn btn--primary" data-go="s2" data-act="start">
-              用此题库开始<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-          </div>
+
+          <!-- 派生结果：用户没直接选卷，就得看得见「你这几项选完出的是什么题」。
+               这一块是**结论**不是控件 —— 没有 cursor:pointer，也没有选中态。 -->
+          <div class="derive" data-f="derive"></div>
+
+          <!-- 门控被挡下来时说清挡在哪。空着不占位，不是常驻的劝说文字。 -->
+          <div class="gate-note" data-f="gatenote"></div>
         </div>
       </div>
 
@@ -916,23 +942,29 @@
       <div class="pane" data-at="s4">
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>这一单印什么</b></div>
         <div class="sec">
-          <button class="ck" data-ck="mine" aria-pressed="true">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t" data-when="default first device-off">你的作答与点评</span>
-              <span class="ck-t" data-when="ai-down">你的作答（无点评）</span>
-              <span class="ck-s"><span data-f="ck-mine">0</span> 题 · 你自己写的</span></span>
-          </button>
-          <button class="ck" data-ck="sample" aria-pressed="true">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t" data-when="default first device-off">示例作答与点评</span>
-              <span class="ck-t" data-when="ai-down">示例作答（无点评）</span>
-              <span class="ck-s"><span data-f="ck-sample">4</span> 题 · 示例，不是你写的</span></span>
-          </button>
-          <button class="ck" data-ck="todo" aria-pressed="true">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">还没答的题目</span>
-              <span class="ck-s"><span data-f="ck-todo">8</span> 道 · 只印题目</span></span>
-          </button>
+          <!-- ══════ 2026-08-10 Codex 走查整改 ③ ══════
+               上一版这里是三个可勾的复选框（本人作答 / 示例作答 / 未答题），
+               勾选真的会改页数和费用 —— 屏幕上做得很像回事。
+               可生产侧只生成**一份固定的完整报告**，没有分章节出单的接口：
+               用户在这里勾掉「示例作答」，服务端照样把它印出来，
+               页数和费用就都对不上了。服务端支持分章节之前，不摆这三个开关。
+               改成如实说明这一单里有什么 —— 是陈述，不是选项。 -->
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">你的作答与点评</span>
+                <span class="li-t" data-when="ai-down">你的作答（无点评）</span>
+                <span class="li-s"><span data-f="ck-mine">0</span> 题 · 你自己写的</span></span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">示例作答与点评</span>
+                <span class="li-t" data-when="ai-down">示例作答（无点评）</span>
+                <span class="li-s"><span data-f="ck-sample">4</span> 题 · 示例，不是你写的</span></span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">还没答的题目</span>
+                <span class="li-s"><span data-f="ck-todo">8</span> 道 · 只印题目</span></span></li>
+          </ul>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            报告是<b>完整版</b>：上面三部分都会印，不能只印其中一部分。
+          </div>
 
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="c-pages">1</b> 页</span></div>
@@ -1210,7 +1242,20 @@
     }
   }
 
-  var LEVEL_NM = { easy: '入门', std: '标准', deep: '深挖' }
+  /* 2026-08-10 Codex ⑥：难度枚举直接用生产的键和文案
+     （services 侧 InterviewDifficulty = easy | standard | pressure），
+     不在原型里另起一套「入门 / 标准 / 深挖」再留一层映射给人对错。 */
+  var LEVEL_NM = { easy: '轻松练习', standard: '标准面试', pressure: '压力面试' }
+
+  /* Codex ⑤：时长是生产参数（InterviewDuration = 3 | 5 | 8），题数由它派生。
+     取值照抄生产 DURATIONS 的说明：3→约 3-4 题、5→约 4-6 题、8→约 6-8 题。
+     上一版反过来：题数由卷子定死，时长是算出来给用户看的，用户根本选不了。 */
+  var DUR_QS = { 3: 4, 5: 6, 8: 8 }
+
+  /* Codex ②：卷子不再是用户直接选的，由「行业 + 目标岗位」派生。
+     行业选了垂直行业 → 用该行业题库；行业不限 → 有目标岗位走岗位卷，没有走通用行为面。
+     这样每个控件都落在生产真有的参数上（industry / position），六份题库一份没丢。 */
+  var IND_NM = { any: '不限行业', tech: '技术开发', mkt: '市场运营', adm: '行政文员', mfg: '生产制造' }
 
   /* ── 页内状态 ──────────────────────────────────────────────────────
      ans 只装用户**自己写的**。示例作答不进 ans —— 那是示例，不是他的答案。
@@ -1222,15 +1267,32 @@
      当时的补救是切卷就清空，但那又把用户答过的东西直接扔掉（切错一下就白答）。
      按卷存各自一份，切回去还在，两个毛病一起没了。 */
   var S = {
-    resume: '', target: '', level: '',       // first 态三选，空 = 还没选
-    paper: 'job', paperPrev: '', way: 'type',
-    print: { mine: true, sample: true, todo: true },
+    resume: '', target: '', level: '',       // first 态门控：简历 / 目标岗位 / 难度
+    industry: 'any', dur: 5, way: 'type',    // 生产参数：industry / duration
+    print: { mine: true, sample: true, todo: true },  // Codex ③：生产只出完整报告，三项恒 true
     gate: '',                                 // 门控拦下来时给用户看的那句话
     saved: false, savedKey: '', saveN: 0, code: ''   // 离线存档
   }
+
+  /* 卷子是**派生值**，不是状态：由行业 + 目标岗位算出来（Codex ②）。
+     ai-down 下组卷要读岗位正文，那是 AI 干的活 —— 不可用就只剩通用卷。
+     写成函数而不是 S.paper 字段，是为了不再出现「页头说通用卷、S.paper 还是 job」
+     那种两处各存一份、迟早对不上的老毛病。 */
+  function paper () {
+    if (state() === 'ai-down') return 'general'
+    if (S.industry !== 'any') return S.industry
+    return (S.target && S.target !== 'any') ? 'job' : 'general'
+  }
+  function paperWhy () {
+    if (state() === 'ai-down') return 'AI 不可用，组卷读不了岗位正文，只能走通用行为面。'
+    if (S.industry !== 'any') return '你选了行业<b>' + esc(IND_NM[S.industry]) + '</b>，按这一类的题库出题。'
+    if (S.target && S.target !== 'any') return '行业不限、但你给了目标岗位，<b>按岗位正文出题</b>。'
+    return '行业不限、也没指定岗位，<b>走通用行为面</b>。'
+  }
+
   var BOOK = {}
   function bk () {
-    var k = S.paper
+    var k = paper()
     return BOOK[k] || (BOOK[k] = { ans: {}, skip: {}, open: {}, qi: 1 })
   }
   function A () { return bk().ans }
@@ -1240,18 +1302,13 @@
   function setQI (n) { bk().qi = n }
   function hasAns (n) { return !!(A()[n] || '').replace(/\s/g, '') }
 
-  function P () { return PAPERS[S.paper] }
-  function lv () { return S.level || 'std' }
-  function total () {
-    var n = P().qs.length
-    return lv() === 'easy' ? Math.max(3, n - 2) : n
-  }
-  function minutes () {
-    var b = Math.round(P().min * total() / P().qs.length)
-    return lv() === 'deep' ? Math.round(b * 1.4) : b
-  }
+  function P () { return PAPERS[paper()] }
+  function lv () { return S.level || 'standard' }   // 生产默认 standard
+  /* Codex ⑤：题数由**时长**派生（生产口径），再被这份卷实际有多少题兜住。
+     难度不再改题数 —— 难度管的是追问深不深，那是出题内容的事，不是长度。 */
+  function total () { return Math.min(P().qs.length, DUR_QS[S.dur] || 6) }
+  function minutes () { return S.dur }
   function qs () { return P().qs.slice(0, total()) }
-  function isBank () { return ['tech', 'mkt', 'adm', 'mfg'].indexOf(S.paper) > -1 }
   function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
   function state () { return scr.getAttribute('data-state') || 'default' }
   function stage () { return scr.getAttribute('data-stage') || 's1' }
@@ -1308,20 +1365,28 @@
 
   /* ── 渲染 ──────────────────────────────────────────────────────────── */
   function renderS1 () {
-    var t = total(), m = minutes(), pn = P().nm
-    var lab = S.paper === 'job' ? '岗位卷' : S.paper === 'general' ? '通用行为面' : pn
-    set('n-job', PAPERS.job.qs.length)
-    set('n-general', PAPERS.general.qs.length)
+    var t = total(), m = minutes(), pk = paper(), pn = P().nm
+    var lab = pk === 'job' ? '岗位卷' : pk === 'general' ? '通用行为面' : pn
     // 卷名 / 题数 / 时长的**唯一完整口径**：右栏「开始前确认」。别处不再复述。
     set('c-paper', esc(lab)); set('c-total', t); set('c-min', '约 ' + m + ' 分钟')
     set('c-way', S.way === 'voice' ? '语音' : '打字')
     set('c-level', LEVEL_NM[lv()] + (S.level ? '' : '（默认）'))
     set('peek-t', esc(P().qs[0].t)); set('peek-w', esc(P().qs[0].w))
-    set('rec', S.paper === 'job'
+    set('rec', pk === 'job'
       ? '你看过<b>恒信精密制造</b>的机械设计岗，先练这个方向。'
-      : '你手选了<b>' + esc(lab) + '</b>，按这一类出题。')
+      : '按<b>' + esc(lab) + '</b>出题。')
     set('k-src', esc(P().src))
     set('h-s1', '没有倒计时，答不上来可以跳过')
+
+    // 派生结果条：把「你这几项选完出的是什么题」摆出来，别让派生变黑箱
+    set('derive',
+      '<span class="derive-t">本次出题：' + esc(lab) + ' · ' + t + ' 题 · 约 ' + m + ' 分钟</span>' +
+      '<span class="derive-p">' + paperWhy() + '</span>' +
+      '<span class="derive-p">题数按<b>时长</b>定（' + m + ' 分钟 → ' + t + ' 题' +
+      // 时长要的题数比这份卷实际有的还多时，说清是被卷子卡住了，别让用户以为选错
+      (DUR_QS[S.dur] > P().qs.length ? '，这份卷一共就 ' + P().qs.length + ' 题' : '') + '）；' +
+      '难度<b>' + LEVEL_NM[lv()] + '</b>决定追问深不深，不改题数。第 1 题：' +
+      esc(P().qs[0].t) + '</span>')
 
     // 题目构成：折叠区里才铺开
     var kinds = [], seen = {}
@@ -1331,16 +1396,15 @@
         '<span class="tl-b"><span class="tl-t">' + esc(k) + ' · ' + seen[k] + ' 道</span></span></div>'
     }).join(''))
 
-    // 垂直题库：选中就给示例题 + 进卷按钮
-    scr.classList.toggle('is-bank', isBank())
-    if (isBank()) set('banksample', esc(P().qs[0].t))
-
-    // first 态三选的完成度
+    // 选中态
     press('[data-opt="resume"]', 'data-v', S.resume)
     press('[data-opt="target"]', 'data-v', S.target)
     press('[data-opt="level"]', 'data-v', S.level)
-    press('[data-opt="paper"]', 'data-v', S.paper)
+    press('[data-opt="industry"]', 'data-v', S.industry)
+    press('[data-opt="dur"]', 'data-v', String(S.dur))
     press('[data-opt="way"]', 'data-v', S.way)
+    set('st-industry', esc(IND_NM[S.industry]))
+    set('st-dur', S.dur + ' 分钟 · ' + t + ' 题')
     var RN = { mine: '我的简历', session: '本次会话已传', none: '不用简历' }
     var TN = { fav: '从收藏带入', manual: '手输方向', any: '不指定' }
     var tv = S.target === 'manual' ? (mtext() ? '手输：' + mtext() : '手输方向 · 还没填') : TN[S.target]
@@ -1352,7 +1416,7 @@
     set('manualst', mtext() ? '按「' + esc(mtext()) + '」出题' : '填了才算选完')
 
     var need = missingKey()
-    set('h-first', need ? '还差「' + missName(need) + '」，选完就能开始' : '三项都选好了，可以开始')
+    set('h-first', need ? '还差「' + missName(need) + '」，选完就能开始' : '该选的都选好了，可以开始')
     ;['resume', 'target', 'level'].forEach(function (k) {
       var g = scr.querySelector('[data-pick="' + k + '"]')
       if (!g) return
@@ -1612,26 +1676,13 @@
     set('p-paper', esc(lab)); set('p-paper2', esc(lab))
     set('ck-mine', c.done); set('ck-sample', c.sample); set('ck-todo', c.todo + c.skip)
 
-    var ckm = scr.querySelector('[data-ck="mine"]')
-    if (ckm) {
-      ckm.setAttribute('aria-pressed', S.print.mine && c.done ? 'true' : 'false')
-      ckm.setAttribute('aria-disabled', c.done ? 'false' : 'true')
-    }
-    var cks = scr.querySelector('[data-ck="sample"]')
-    if (cks) {
-      cks.setAttribute('aria-pressed', S.print.sample && c.sample ? 'true' : 'false')
-      cks.setAttribute('aria-disabled', c.sample ? 'false' : 'true')
-    }
-    var ckt = scr.querySelector('[data-ck="todo"]')
-    if (ckt) {
-      ckt.setAttribute('aria-pressed', S.print.todo && (c.todo + c.skip) ? 'true' : 'false')
-      ckt.setAttribute('aria-disabled', (c.todo + c.skip) ? 'false' : 'true')
-    }
+    // Codex ③：三个复选框已改成只读条目，S.print 三项恒 true（生产只出完整报告），
+    // 所以这里不再有「勾没勾」的状态要写回 DOM。
 
     PC = buildPrint()
     // 这条深色带只有一行 604px，文案压短才放得下（顶部注释里那条老规矩）：
     // 三个数字用和按钮同一套写法，别在这里另起一种更长的说法。
-    set('f-what', PC.total ? partsLabel(PC) : '三项都没勾 · 不生成')
+    set('f-what', PC.total ? partsLabel(PC) : '本次没有可印的内容')
 
     RP.head =
       '<h1 data-when="default first device-off">面试复盘单</h1>' +
@@ -1860,19 +1911,23 @@
   }
 
   /* ── 四态跟随 ───────────────────────────────────────────────────────
-     ai-down 下组卷要读岗位正文，那是 AI 干的活 —— AI 不可用就只剩通用卷。
-     上一版页头写着「只能用通用题库」，可 S.paper 还是 'job'，右栏一边显示
-     「来源：通用题库」一边显示「通用题库 + 岗位正文」。说的和用的不是一回事。
-     这里把卷真的换掉；离开 ai-down 再换回来（用户之前选的不该被吃掉）。 */
+     2026-08-10 Codex ②：卷子改成派生值 paper() 之后，这里不需要再存一份
+     S.paperPrev 来「切走再切回」—— ai-down 的分支写在 paper() 里，
+     离开 ai-down 自然就回到用户选的行业上，一行状态都不用备份。
+     保留这个函数只为让四态切换后重算一次（题数、纸面、右栏都跟着卷走）。
+     **必须保留「变了才重算」这道闸**：本函数挂在 v3ApplyVisibility 上，
+     而 render() 又会回调 v3ApplyVisibility —— 无条件 renderAll 会直接递归炸栈。
+     闸的键必须**同时**含四态：不少页面文案只随态变、不随卷变。
+     只记 paper() 时，default → first 卷子都是 general，闸判定「没变」，
+     于是 first 态的动作条还挂着 default 那句「该选的都选好了，可以开始」，
+     而三项其实一项都没选（实测复现）。 */
+  var lastKey = ''
   function syncState () {
-    var st = state(), changed = false
-    if (st === 'ai-down') {
-      if (S.paper !== 'general') { S.paperPrev = S.paper; S.paper = 'general'; changed = true }
-    } else if (S.paperPrev) {
-      S.paper = S.paperPrev; S.paperPrev = ''; changed = true
-    }
-    if (changed) renderAll()
-    return changed
+    var k = state() + '|' + paper()
+    if (k === lastKey) return false
+    lastKey = k
+    renderAll()
+    return true
   }
 
   /* ── 交互 ──────────────────────────────────────────────────────────── */
@@ -1941,25 +1996,15 @@
       return
     }
 
-    // 三选 / 选卷 / 选答法
+    // 简历 / 目标岗位 / 行业 / 难度 / 时长 / 答法，六组都是真单选
     if ((el = e.target.closest('[data-opt]'))) {
       var kk = el.getAttribute('data-opt')
-      // ai-down 只有通用卷（组卷靠 AI）。岗位卷和四个垂直题库整排不可选，
-      // 点了直接不理 —— CSS 也压着 pointer-events，这里是第二道。
-      if (kk === 'paper' && state() === 'ai-down' && el.getAttribute('data-v') !== 'general') return
-      S[kk] = el.getAttribute('data-v')
-      // 换卷不再清空答案：答案按卷 ID 各存各的（BOOK），换回来还在，也串不了线
-      if (kk === 'target' && S.target === 'any' && S.paper === 'job') S.paper = 'general'
-      if (kk === 'target' && S.target !== 'any' && S.paper === 'general') S.paper = 'job'
+      var vv = el.getAttribute('data-v')
+      // 时长是数字（生产 InterviewDuration = 3 | 5 | 8），别把 "5" 当字符串存进去
+      S[kk] = (kk === 'dur') ? +vv : vv
+      // 换卷不再清空答案：答案按卷 ID 各存各的（BOOK），换回来还在，也串不了线。
+      // 卷子由 paper() 从 industry / target 现算，这里不再手工同步 S.paper。
       var grp = el.closest('.pick'); if (grp) grp.classList.remove('is-miss')
-      render()
-      return
-    }
-
-    // 打印勾选：真的会改页数和费用
-    if ((el = e.target.closest('[data-ck]'))) {
-      var ck = el.getAttribute('data-ck')
-      S.print[ck] = !S.print[ck]
       render()
       return
     }

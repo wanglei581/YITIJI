@@ -45,6 +45,81 @@
   .jobrow-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .04em; }
   .jobrow-go { margin-left: auto; flex: 0 0 auto; color: var(--fog-600); }
 
+  /* ════════ 2026-08-10 Codex 走查整改 ⑦⑧ · 选岗方式与生产对齐 ════════
+     生产 JobFitPage.tsx 的选岗只有两条路，都是真控件：
+       tab=pick   → 关键词搜索（getJobs { keyword, page:1, pageSize:8 }）+ 结果单选
+       tab=manual → manualTitle(maxLength 50) + manualReq(maxLength 2000)
+     上一版本页两条都没有：只有三张写死的推荐行，动作条却写着「自己搜岗位」。
+     现在把两条路都画成真控件，输入框走 scripts/keypad.js 软键盘（一体机无实体键盘）。 */
+  .pick2 { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
+  .pick2-tabs { display: flex; gap: var(--s-3); }
+  .pick2-tab {
+    flex: 1; min-height: 56px; padding: 0 var(--s-4);
+    border-radius: var(--r-xs); border: 1px solid var(--brd-2);
+    background: transparent; color: var(--fog-700); cursor: pointer;
+    font-family: var(--ff-ui); font-size: var(--fz-3);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all var(--dur-2) var(--ease-out);
+  }
+  .pick2-tab .ic { width: 17px; height: 17px; }
+  .pick2-tab[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); color: var(--fog-900); font-weight: 600; }
+  .pick2-body { display: flex; flex-direction: column; gap: var(--s-3); }
+  .pick2-body[hidden] { display: none; }
+  .srch { display: flex; align-items: center; gap: var(--s-3); }
+  .srch > .ic { flex: 0 0 auto; width: 19px; height: 19px; color: var(--fog-600); }
+  .tin {
+    flex: 1 1 auto; min-height: 56px; padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-xs); background: var(--field-bg);
+    border: 1px solid var(--brd-2); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-3); width: 100%;
+  }
+  .tin::placeholder { color: var(--fog-600); }
+  .tin:focus { outline: none; border-color: var(--jade-a32); }
+  .tin--ta { resize: none; line-height: 1.6; font-size: var(--fz-2); }
+  .srch-x { flex: 0 0 auto; min-height: 56px; min-width: 72px; padding: 0 var(--s-4);
+    border-radius: var(--r-xs); border: 1px solid var(--brd-2); background: transparent;
+    color: var(--fog-700); cursor: pointer; font-family: var(--ff-ui); font-size: var(--fz-2); }
+  .srch-x[hidden] { display: none; }
+  .srch-mt { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6; }
+  .srch-mt b { color: var(--fog-900); }
+  /* 选中的岗位行：本页原来点行就跳走，选和推进混在一起。改成先选中、再由
+     主按钮推进（与 P17 场次卡同一口径），选中的岗位名回填到动作条主按钮上。 */
+  /* 注意：这里刻意用 data-jobpick 而不是 data-job —— stage.js 的可见性判定把
+     [data-job] 当作第四条轴（出纸阶段处境）在扫，用 data-job 会被整行 hidden 掉。 */
+  .jobrow[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .jobrow[hidden] { display: none; }
+  .jobrow-pick { margin-left: var(--s-4); flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+  .jobrow[aria-pressed="true"] .jobrow-pick { color: var(--jade-600); font-weight: 700; }
+  .nohit { padding: var(--s-5); border-radius: var(--r-md); border: 1.5px dashed var(--brd-2);
+    color: var(--fog-600); font-size: var(--fz-2); line-height: 1.7; }
+  .nohit[hidden] { display: none; }
+  /* 「还没选好」的主按钮：压淡但**保持可点**（点了会说清还差什么）。
+     不要用 aria-disabled —— 公共层给它配了 pointer-events:none。 */
+  .btn[data-ready="0"] { filter: saturate(.55); opacity: .78; }
+
+  /* ════════ 2026-08-10 Codex 走查整改 ④ · 多岗对比标为规划能力 ════════
+     生产一次只分析一个岗位（JobFitRequest 只接受一个 jobId 或一个 manualJob），
+     没有多岗接口。这一整个 s3 是规划稿，必须在版面上说死，不能当已可用的选择摆着。 */
+  .planned { flex: 0 0 auto; border: 1.5px dashed var(--amber-600); background: var(--amber-a12);
+    border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+    display: flex; align-items: flex-start; gap: var(--s-4); }
+  .planned > .ic { flex: 0 0 auto; width: 22px; height: 22px; color: var(--amber-600); margin-top: 2px; }
+  .planned-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .planned-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 700; }
+  .planned-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+  .planned-p b { color: var(--fog-900); }
+  /* 规划区里的示意卡：整体压淡，和上面「现在能用」的部分拉开 */
+  .is-planned { opacity: .72; }
+  /* 追加位原来是 <a href="13-jobs-desk.html">：点了跳走、没有回传、也没有多岗接口。
+     不是入口就不许长成入口 —— 换成静态占位说明。 */
+  .cmp-slot {
+    border: 1.5px dashed var(--brd-2); border-radius: var(--r-md);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--s-3); color: var(--fog-600); padding: var(--s-5); text-align: center;
+    font-size: var(--fz-2); line-height: 1.6;
+  }
+  .cmp-slot .ic { width: 26px; height: 26px; opacity: .5; }
+
   /* s2 纵向结果流：七块底盘从上往下走，整栏滚动；逐条比对区自身限高内滚 */
   .fitstream { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-4); }
   .fitstream > * { flex: 0 0 auto; }
@@ -208,33 +283,77 @@
           </div>
         </div>
 
-        <button class="jobrow" data-go="s2">
+        <!-- ── 2026-08-10 Codex ⑦⑧：选岗两条路，与生产 JobFitPage 一一对应 ──
+             上一版这里只有三张写死的推荐行，而动作条挂着「自己搜岗位」——
+             按钮承诺的能力界面上根本没有。现在两条路都是真控件。 -->
+        <div class="pick2" data-when="default device-off ai-down">
+          <div class="pick2-tabs">
+            <button class="pick2-tab" data-tab="list" aria-pressed="true">
+              <svg class="ic"><use href="#i-briefcase"/></svg>从岗位信息选择</button>
+            <button class="pick2-tab" data-tab="manual">
+              <svg class="ic"><use href="#i-target"/></svg>手填目标岗位</button>
+          </div>
+
+          <div class="pick2-body" data-tabb="list">
+            <div class="srch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" type="search" id="jobkw" autocomplete="off"
+                     placeholder="搜索岗位名称 / 公司，点这里弹出软键盘"
+                     aria-label="搜索岗位名称或公司">
+              <button class="srch-x" data-kwclear hidden>清空</button>
+            </div>
+            <!-- 生产接线备忘（写给接线的人，不是给用户看的空话）：
+                 getJobs({ keyword, page:1, pageSize:8 })，**服务端只回 8 条且没有分页器**。
+                 关键词命中超过 8 条时，第 9 条起用户在这一屏根本选不到 ——
+                 这是生产侧的缺口，接线时要么补分页/加载更多，要么把「没找到就手填」写进空态。
+                 本页按 8 条上限如实标注，不假装列表能翻页。 -->
+            <div class="srch-mt" data-f="kwmt">显示<b>本机已同步</b>的岗位，一次最多 <b>8 条</b>（来源接口不分页）。<b>超过 8 条的部分这一屏选不到</b> —— 换更准的词，或改用「手填目标岗位」。</div>
+          </div>
+
+          <div class="pick2-body" data-tabb="manual" hidden>
+            <input class="tin" id="mjtitle" maxlength="50" autocomplete="off"
+                   placeholder="目标岗位名称，如：行政专员（必填，≤50 字）"
+                   aria-label="目标岗位名称">
+            <textarea class="tin tin--ta" id="mjjd" maxlength="2000" rows="4"
+                      placeholder="粘贴或手打岗位 JD / 任职要求（选填，给了比对更有针对性）"
+                      aria-label="岗位 JD 或任职要求"></textarea>
+            <div class="srch-mt">JD <b data-f="jdlen">0</b> / 2000 字 ·
+              手填的岗位<b>只当参考文本，不进岗位库</b>，也不回传任何来源平台。
+              岗位名称填了才能开始比对。</div>
+          </div>
+        </div>
+
+        <button class="jobrow" data-jobpick="用户运营专员" data-kw="用户运营专员 前程无忧 运营">
           <span class="jobrow-b">
             <span class="jobrow-t">用户运营专员</span>
             <span class="jobrow-m">广州 · 天河区 · 6–9K · 1–3 年 · 本科</span>
             <span class="jobrow-s">来源 前程无忧 · 同步 09:20 · 外部 ID JX-88214</span>
           </span>
           <span class="tier tier--high"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：较高</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
-        <button class="jobrow" data-go="s2">
+        <button class="jobrow" data-jobpick="内容运营（新媒体）" data-kw="内容运营 新媒体 广州市人才服务中心 运营">
           <span class="jobrow-b">
             <span class="jobrow-t">内容运营（新媒体）</span>
             <span class="jobrow-m">广州 · 海珠区 · 7–10K · 1–3 年 · 本科</span>
             <span class="jobrow-s">来源 广州市人才服务中心 · 同步 08:52 · 外部 ID GZ-20418</span>
           </span>
           <span class="tier tier--mid"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：中等</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
-        <button class="jobrow" data-go="s2">
+        <button class="jobrow" data-jobpick="数据运营助理" data-kw="数据运营助理 boss直聘 运营 数据">
           <span class="jobrow-b">
             <span class="jobrow-t">数据运营助理</span>
             <span class="jobrow-m">广州 · 番禺区 · 6–8K · 经验不限 · 本科</span>
             <span class="jobrow-s">来源 boss直聘 · 同步 09:05 · 外部 ID BS-51907</span>
           </span>
           <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
+        <div class="nohit" data-f="nohit" hidden>
+          这三条是本机已同步岗位里和你简历最对得上的，<b>没有一条命中「<span data-f="nohitkw"></span>」</b>。
+          换个词再搜，或者切到「手填目标岗位」直接把 JD 粘进来。
+        </div>
 
         <!-- 三档口径卡：行上就挂着三档标签，挑选时就该解释三档是什么 -->
         <div class="pane" style="flex:0 0 auto">
@@ -553,16 +672,32 @@
         </div>
       </div>
 
-      <!-- ─────────── S3 多岗对比（≤3，独立阶段） ─────────── -->
-      <div class="cmpwrap" data-at="s3" data-when="default device-off">
+      <!-- ─────────── S3 多岗对比 · 规划能力（≤3） ───────────
+           2026-08-10 Codex 走查整改 ④：
+           生产 /resume/job-fit 一次只接受**一个**岗位（JobFitRequest 里要么一个 jobId，
+           要么一个 manualJob），没有多岗接口；上一版那个「加一个」只是跳去岗位情报台，
+           挑完既没有回传也没有第二个岗位的位置 —— 是个走不通的入口。
+           整页保留这块作为规划稿，但必须在版面上标死：现在只能单岗。 -->
+      <div class="planned" data-at="s3">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span class="planned-b">
+          <span class="planned-t">规划能力 · 多岗对比还没有做出来</span>
+          <span class="planned-p">
+            <b>现在只能一次比一个岗位</b>：比完一个，回第 1 步换一个再比，两次结果都在「我的 · AI 服务记录」里，可以自己对着看。
+            下面这一屏是<b>规划稿</b>，用来说清做出来之后长什么样 —— <b>不是现在可用的功能</b>，卡上的数字也都是示例。
+          </span>
+        </span>
+      </div>
+
+      <div class="cmpwrap is-planned" data-at="s3" data-when="default device-off">
         <div class="checks" style="flex:0 0 auto">
           <div class="checks-hd">
-            <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-layers"/></svg>
-            <span class="t">并排最多 3 个</span>
+            <svg class="ic" style="width:19px;height:19px;color:var(--fog-600)"><use href="#i-layers"/></svg>
+            <span class="t">做出来之后：并排最多 3 个</span>
             <span class="s">多了就不是决策，是列表</span>
           </div>
           <div class="checks-list" style="grid-template-columns:1fr">
-            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>岗位来自情报台收藏，或手输 JD 文本；外部链接只当参考文本，<b>不进岗位库</b>。对比结果只给你自己看。</span>
+            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>岗位来自情报台收藏，或第 1 步手填的 JD 文本；外部链接只当参考文本，<b>不进岗位库</b>。对比结果只给你自己看。</span>
           </div>
         </div>
 
@@ -601,10 +736,12 @@
             </span>
           </div>
 
-          <a class="cmp-add" href="13-jobs-desk.html">
+          <!-- 原来这里是 <a href="13-jobs-desk.html">「还可加 1 个」：点了跳去情报台，
+               挑完没有回传、也没有第二个岗位的接口 —— 不是入口就不长成入口。 -->
+          <div class="cmp-slot">
             <svg class="ic"><use href="#i-plus"/></svg>
-            <span><b>还可加 1 个</b><br>去岗位情报台挑，或在详情页收藏后回来</span>
-          </a>
+            <span><b>第 3 个位置</b><br>多岗接口做出来之后，这里放第三个岗位</span>
+          </div>
         </div>
 
         <!-- 两卡之间真正该做的决策阅读：交集与差集，一次改动能惠及几个岗位 -->
@@ -926,11 +1063,12 @@
         </p>
       </div>
       <div class="pane" data-at="s3">
-        <div class="pane-hd"><span class="t">对比的岗位从哪来</span></div>
+        <div class="pane-hd"><span class="t">对比的岗位从哪来</span><span class="s">现在只能进一个</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">情报台收藏</span><span class="v">挑好收藏，回来直接加</span></div>
-          <div class="kv-row"><span class="k">手输 JD 文本</span><span class="v">粘贴 / 手打岗位要求原文</span></div>
+          <div class="kv-row"><span class="k">岗位列表选中</span><span class="v">第 1 步搜索后选一个</span></div>
+          <div class="kv-row"><span class="k">手填目标岗位</span><span class="v">第 1 步粘贴 / 手打 JD 原文</span></div>
           <div class="kv-row"><span class="k">外部链接</span><span class="v v--fog">只当参考文本 · 不入库</span></div>
+          <div class="kv-row"><span class="k">一次几个</span><span class="v v--fog">1 个 · 多岗为规划能力</span></div>
         </div>
       </div>
 
@@ -995,7 +1133,7 @@
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="s1">
-        <div data-when="default device-off"><div class="t">挑一个具体岗位来比，不做泛泛的"适合什么工作"</div><div class="s">三档参考只是文字比对，不预测录用</div></div>
+        <div data-when="default device-off"><div class="t" data-f="s1hint">搜岗位或手填 JD，选一个再开始比</div><div class="s">一次比一个 · 三档参考只是文字比对，不预测录用</div></div>
         <div data-when="ai-down"><div class="t">推荐排序不可用，列表可正常浏览</div><div class="s">选中后也不会给比对结论</div></div>
         <div data-when="first"><div class="t">还没有简历，无法逐条比对</div><div class="s">先去「AI 简历服务」给一份，或先做兴趣快测</div></div>
       </div>
@@ -1005,7 +1143,7 @@
         <div data-when="first"><div class="t">没有简历，只能看岗位原文</div></div>
       </div>
       <div data-at="s3">
-        <div data-when="default device-off"><div class="t">已并排 2 个，还可加 1 个</div><div class="s">档位不是排名 · 对比只给你自己看，不回传企业</div></div>
+        <div data-when="default device-off"><div class="t">多岗对比是规划能力 · 现在只能一次比一个</div><div class="s">下面是规划稿与示例数字 · 档位不是排名，对比只给你自己看，不回传企业</div></div>
         <div data-when="ai-down"><div class="t">对比不可用，已选岗位原文照常可看</div><div class="s">不给三档、不给计数</div></div>
         <div data-when="first"><div class="t">没有简历，比不起来</div><div class="s">先做简历，再挑 2–3 个岗位回来</div></div>
       </div>
@@ -1019,12 +1157,14 @@
       </div>
     </div>
 
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-search"/></svg>自己搜岗位</button>
+    <!-- 「自己搜岗位」原来点了什么都不发生 —— 页面上根本没有搜索框。
+         现在搜索框就在第 1 步，这个按钮把焦点送过去并弹出软键盘。 -->
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-focus-kw><svg class="ic"><use href="#i-search"/></svg>自己搜岗位</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">换个岗位比</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回逐条比对</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回多岗对比</button>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default device-off">比第一个<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default device-off" data-gate-pick><span data-f="s1go">先选一个岗位</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s1" data-when="ai-down" href="13-jobs-desk.html">去岗位列表<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s1" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
 
@@ -1079,6 +1219,123 @@
     })
     if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' })
   })
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P11 · 2026-08-10 Codex 走查整改 ⑦⑧ · 选岗两条路真的能用
+   --------------------------------------------------------------------------
+   对齐生产 apps/kiosk/src/pages/resume/JobFitPage.tsx：
+     tab=pick   → keyword 搜索 + 结果单选（getJobs pageSize:8，服务端不分页）
+     tab=manual → manualTitle(≤50) + manualReq(≤2000)
+   选中 / 填写会回填到动作条主按钮上；没选没填时主按钮拦住，不放行到第 2 步。
+   输入框不绑任何自定义键盘：scripts/keypad.js 是纯事件委托，
+   聚焦 input/textarea 自动弹软键盘（一体机没有实体键盘）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var kw = document.getElementById('jobkw')
+  var mjTitle = document.getElementById('mjtitle')
+  var mjJd = document.getElementById('mjjd')
+  var rows = [].slice.call(scr.querySelectorAll('.jobrow[data-jobpick]'))
+  /* gate 存进 state：拦下来那句话必须活过后面的 render()。
+     初版直接 set() 到 DOM 上，聚焦输入框弹出软键盘时带出一次 change → render()，
+     那句「还没选」当场被默认提示盖掉 —— 用户只看到按钮没反应。 */
+  var S = { tab: 'list', job: '', kw: '', gate: '' }
+
+  function set (k, txt) {
+    var ns = scr.querySelectorAll('[data-f="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].textContent = txt
+  }
+  function val (el) { return ((el && el.value) || '').replace(/^\s+|\s+$/g, '') }
+
+  /* 当前这一步到底选没选好 —— 主按钮文案和门控都读这一个判定 */
+  function picked () {
+    return S.tab === 'manual' ? val(mjTitle) : S.job
+  }
+
+  function render () {
+    // 标签页
+    var tabs = scr.querySelectorAll('.pick2-tab')
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].setAttribute('aria-pressed', tabs[i].getAttribute('data-tab') === S.tab ? 'true' : 'false')
+    }
+    var bodies = scr.querySelectorAll('.pick2-body')
+    for (var b = 0; b < bodies.length; b++) {
+      bodies[b].hidden = bodies[b].getAttribute('data-tabb') !== S.tab
+    }
+    // 岗位列表只在「从岗位信息选择」下出现；手填时整列表收起，免得两条路同时亮
+    var hit = 0
+    for (var r = 0; r < rows.length; r++) {
+      var hay = (rows[r].getAttribute('data-kw') || '') + ' ' + (rows[r].textContent || '')
+      var on = S.tab === 'list' && (!S.kw || hay.toLowerCase().indexOf(S.kw.toLowerCase()) > -1)
+      rows[r].hidden = !on
+      if (on) hit++
+      rows[r].setAttribute('aria-pressed', rows[r].getAttribute('data-jobpick') === S.job ? 'true' : 'false')
+      var t = rows[r].querySelector('.jobrow-pick')
+      if (t) t.textContent = rows[r].getAttribute('data-jobpick') === S.job ? '已选' : '选这个'
+    }
+    var nh = scr.querySelector('[data-f="nohit"]')
+    if (nh) nh.hidden = !(S.tab === 'list' && S.kw && hit === 0)
+    set('nohitkw', S.kw)
+    var x = scr.querySelector('[data-kwclear]')
+    if (x) x.hidden = !S.kw
+
+    set('jdlen', val(mjJd).length)
+
+    // 主按钮回填 + 动作条提示
+    var p = picked()
+    if (p) S.gate = ''
+    set('s1go', p ? '比这个岗位：' + p : (S.tab === 'manual' ? '先填岗位名称' : '先选一个岗位'))
+    set('s1hint', S.gate ? S.gate : (p
+      ? (S.tab === 'manual' ? '手填岗位「' + p + '」· 只当参考文本，不进岗位库' : '已选「' + p + '」· 一次比一个')
+      : '搜岗位或手填 JD，选一个再开始比'))
+    /* 没选好时**不能**用 aria-disabled：公共层给它配了 pointer-events:none，
+       按钮会变成点不动的死物，用户既过不去也不知道为什么 ——「点了没反应」比放行还糟。
+       改成 data-ready="0"：外观压淡表示还没准备好，但照常可点，
+       点下去由上面的捕获门控说清还差什么。 */
+    var go = scr.querySelector('[data-gate-pick]')
+    if (go) go.setAttribute('data-ready', p ? '1' : '0')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  /* 门控走捕获阶段：stages.js 的 [data-go] 监听挂在同一个 .screen 上、冒泡阶段，
+     且比这里先注册 —— 冒泡拦不住它（与 P20 同一处理）。 */
+  scr.addEventListener('click', function (e) {
+    var g = e.target.closest && e.target.closest('[data-gate-pick]')
+    if (!g || picked()) return
+    e.preventDefault(); e.stopPropagation()
+    S.gate = S.tab === 'manual' ? '还没填岗位名称，填了才能开始比' : '还没选岗位，点一行选中再开始'
+    var f = S.tab === 'manual' ? mjTitle : rows.filter(function (r) { return !r.hidden })[0]
+    if (f && f.scrollIntoView) f.scrollIntoView({ block: 'nearest' })
+    if (f && f.focus) f.focus()
+    render()
+  }, true)
+
+  scr.addEventListener('click', function (e) {
+    var el
+    if ((el = e.target.closest('.pick2-tab'))) { S.tab = el.getAttribute('data-tab'); render(); return }
+    if ((el = e.target.closest('[data-kwclear]'))) { if (kw) kw.value = ''; S.kw = ''; render(); return }
+    if ((el = e.target.closest('.jobrow[data-jobpick]'))) {
+      var v = el.getAttribute('data-jobpick')
+      S.job = (S.job === v ? '' : v)     // 再点一次＝取消，不做只进不退的选择
+      render(); return
+    }
+    if ((el = e.target.closest('[data-focus-kw]'))) {
+      S.tab = 'list'; render()
+      if (kw) { kw.focus(); if (window.v3Keypad) window.v3Keypad.open(kw) }
+    }
+  })
+
+  ;['input', 'change'].forEach(function (ev) {
+    if (kw) kw.addEventListener(ev, function () { S.kw = val(kw); render() })
+    if (mjTitle) mjTitle.addEventListener(ev, render)
+    if (mjJd) mjJd.addEventListener(ev, render)
+  })
+
+  render()
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>
