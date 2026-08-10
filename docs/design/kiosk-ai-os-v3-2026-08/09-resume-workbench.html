@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* 诊断与对比阶段：原文占主体，结论在侧栏 */
   .work--diag { grid-template-columns: 1fr 396px; }
@@ -164,7 +165,19 @@
 </svg>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-job="ok" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 只是在挑来源，还没有东西可丢，所以不在 data-guard-at 里 —— 那一步拦截只会烦人。
+     s2 起每一步丢的东西都不一样，所以逐阶段写清楚：用户要看到的是
+     「刚扫进来的 6 页原件」，不是「未保存的更改」这种给程序员看的话。
+     data-guard-keep 指向本页真实存在的落点（第 5 步的「存进我的文档」），
+     没有真实落点时不写 —— 没有落点却给一个「存下来」的按钮就是伪造能力。 -->
+<div class="screen" data-state="default" data-stage="s1" data-job="ok" data-theme="warm"
+     data-guard-at="s2 s3 s4 s5"
+     data-guard-lose-s2="刚上传的简历原件和正在解析的结果"
+     data-guard-lose-s3="这份简历的六维诊断结论"
+     data-guard-lose-s4="诊断结论和你已经选定的逐条改写"
+     data-guard-lose-s5="改好的这一版简历（原件不受影响，还在你手里）"
+     data-guard-keep="存进「我的文档」">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -1227,6 +1240,7 @@
 </script>
 <script src="scripts/linkage.js?v=6"></script>
 <script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>
