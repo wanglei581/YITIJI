@@ -236,7 +236,7 @@
        s2 右栏 284–592px ｜ s3 右栏 205–245px ｜ s4 右栏 215px
        s6 左栏 312–568px ｜ s7 左栏 303–443px
      只走三条路：① 放大真正的主内容 ② 把当前这一步真正需要的抽屉内容移回常驻
-     ③ 版式不匹配就改版式。**不塞填充物、不编数据**；金额、面数、份数一个不动。
+     ③ 版式不匹配就改版式。**不塞填充物、不编数据**；金额、计费页数、份数一个不动。
 
      放大的依据不是"为了把数字压到 0"：1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI，
      站立 60cm 时 15px 正文只有 4.6mm 字高 —— 本来就偏小。s6 的进度盘 232px、
@@ -472,6 +472,55 @@
   .doneline--amber { background: var(--amber-a12); border-color: var(--amber-a20); }
   .doneline--amber .ic { color: var(--amber-500); }
   .doneline .btn { margin-left: auto; }
+
+  /* ── 权益抵扣（2026-08-11 新增）────────────────────────────────────────
+     为什么放在左栏而不是核价卡里：实测右栏在 s3 是 1160(参数) + 281(核价) = 1456，
+     一像素余量都没有；核价卡是 tailgrow，往里塞东西只会让它内部起滚动条，
+     内容被藏在滚动里比放不下更糟。左栏的 .paper 是 flex:1/1 的预览，
+     让它从 908px 让出 ~200px，A4 预览仍然可读（本来就是可滚动的 .paper-stage）。
+
+     「本机可担保的那一档」在这张卡上分三层，措辞必须分开：
+       · 余额与券面     → 账户事实（E2），服务端下发，本机照抄
+       · 屏上单价       → 后台配置快照（GET /print/price-config），本机拉到什么显示什么
+       · 「这一单最终减了多少」→ **今天还没有**。订单级抵扣是 C5-4，
+         PrintPriceQuote 的返回里根本没有 discount / benefit 字段。
+         所以本卡只做「试算」，并且把待接线写在脸上，不冒充已经能减。
+     ──────────────────────────────────────────────────────────────────── */
+  .benefit { flex: 0 0 auto; border-radius: var(--r-md); padding: var(--s-3) var(--s-5) var(--s-4);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    backdrop-filter: blur(var(--glass-blur));
+    display: flex; flex-direction: column; gap: var(--s-3); }
+  .benefit-hd { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .benefit-hd .t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+  .benefit-hd .s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600);
+    font-family: var(--ff-num); }
+  .benopts { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  /* 触控：一体机主操作 ≥56px，这里给到 88px（两行文字 + 省多少） */
+  .benopt { flex: 1 1 0; min-width: 0; min-height: 88px; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: center; gap: 3px; padding: 11px 13px;
+    border-radius: var(--r-sm); border: 1px solid var(--brd-1); background: var(--surf-1);
+    color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .benopt[aria-pressed="true"] { border-color: var(--jade-a32); background: var(--jade-a12); }
+  .benopt-t { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+  .benopt-m { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+  .benopt-v { font-size: var(--fz-2); font-family: var(--ff-num); color: var(--jade-200); }
+  .bensum { display: flex; flex-direction: column; gap: 6px; }
+  .bensum-r { display: flex; align-items: baseline; font-size: var(--fz-2); color: var(--fog-700); }
+  .bensum-r .v { margin-left: auto; font-family: var(--ff-num); color: var(--fog-900); }
+  .bensum-r--cut .v { color: var(--jade-200); }
+  .bensum-r--due { padding-top: 8px; border-top: 1px solid var(--brd-1); }
+  .bensum-r--due .k { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+  .bensum-r--due .v { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); }
+  .ben-p { margin: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.62; }
+  .ben-p b { color: var(--fog-900); }
+  .ben-p + .ben-p { margin-top: 6px; }
+  .ben-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+  /* 一体机主操作 ≥56px（§9）。这条出口是真要按的，不按 48px 的下限凑合。 */
+  .ben-acts .btn { min-height: 56px; font-size: var(--fz-3); }
+  /* 「待接线」不借 E3 的琥珀色（与 24 同一条口径）：E1/E2/E3 说的是「结论有多硬」，
+     这里**还没有结论** —— 是一个位置对、输入只到一半的提示位。 */
+  .ev--wire { color: var(--fog-600); background: var(--fog-a04);
+    border-style: dashed; border-color: var(--fog-a20); }
 </style>
 </head>
 <body>
@@ -812,6 +861,65 @@
         <button class="btn btn--quiet" type="button" data-redact-go="pick" data-go="s2">去遮盖</button>
       </div>
 
+      <!-- ══════════════ S3/S4 权益抵扣（2026-08-11 新增）══════════════
+           走查提出的问题：整条打印流程从核价到收银，**一处都没提过权益** ——
+           而 P24 里免费打印额度、打印折扣券这些是真的、成体系的，
+           用户在 24 看到「本月还剩 7 计费页」，走到这里却只有一个 3.00 元。
+
+           这一卡把它接上，同时受三条硬事实约束（都是后端的既有实现，不是猜的）：
+
+           ① **一单一权益，不能叠加。** RedemptionRecord 上有 DB 级唯一约束
+              @@unique([serviceType, serviceRefId]) —— 同一服务产物只能被核销一次，
+              换不同权益、换 idempotencyKey 都不行。所以下面是**单选**，
+              而且必须在屏上说清「为什么选了 A 就不能再选 B」，
+              否则用户会以为是本机小气。
+
+           ② **订单级抵扣今天不存在。** PrintPriceQuote 的返回是
+              { amountCents, billablePages, billingPageSource, lines } ——
+              没有 discount / benefit / deduction 任何一个字段；
+              RedemptionRecord 本批 orderId 恒 null、amountCents 恒 0
+              （券=平台 credit，非资金、非收款）。订单抵扣是 C5-4。
+              所以这里只做**试算**，并把「待接线」写在脸上。
+              这跟本页已有的「本机还没体检这份文件，页数与费用以体检为准」是同一种写法。
+
+           ③ **单价不是产品常量，是后台配置。** 屏上的 0.20 / 1.50 来自
+              GET /api/v1/print/price-config（匿名可读，Kiosk 展示价唯一来源），
+              改价只有 PUT /admin/billing/price-config/:serviceKey 一条合法路径且必审计。
+              设计稿里 scripts/site-config.js 的 price 段要按「**本机开机时拉到的快照**」
+              理解，不是「我们的定价」。拉不到就是 PRICE_CONFIG_UNAVAILABLE ——
+              后端真实会抛的错，对应下面那一屏：不显示金额、不收款、不拿旧价当现价。
+
+           默认**不选权益**：C5-4 没上线之前，本机不能替你真扣掉，
+           那就不该默认摆出一个本机还兑现不了的减免。要不要试算，你自己按一下。
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="benefit" data-at="s4" data-when="default first ai-down" id="benefit">
+        <div class="benefit-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-ticket"/></svg>
+          <span class="t">权益与本单价格</span>
+          <span class="s" id="ben-snap">价目与权益均来自后台配置</span>
+        </div>
+
+        <!-- 单选：一单一权益。选项由服务端下发的权益列表渲染，不是写死的卡片。 -->
+        <div class="benopts" id="ben-opts"></div>
+
+        <!-- 试算：原价 / 抵扣 / 试算应付。数值全部由页尾同一份算式产出。 -->
+        <div class="bensum" id="ben-sum"></div>
+
+        <div id="ben-notes"></div>
+        <div class="ben-acts" id="ben-acts"></div>
+
+        <div class="cash-demo" data-review style="position:static;justify-content:flex-start;margin-top:2px">
+          <span style="font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 ·
+            处境由服务端返回，不由用户点：</span>
+          <button data-ben-btn="have" aria-pressed="true">有可用</button>
+          <button data-ben-btn="ordinary">普通打印不适用</button>
+          <button data-ben-btn="none">已用完/过期</button>
+          <button data-ben-btn="guest">未认领身份</button>
+          <button data-ben-btn="unavailable">价目拉不到</button>
+          <button data-ben-btn="repriced">后台刚调价</button>
+        </div>
+      </div>
+
       <!-- S2–S4 体检结论 -->
       <div class="checks" data-at="s2 s3 s4">
         <div class="checks-hd">
@@ -963,7 +1071,7 @@
                      做完可存「我的文档」或换机再打。
                · 记录：遮盖动作写入文件操作日志（谁、哪个版本、遮了哪几处、什么时候）；
                  遮盖后的版本与原版本都按 §11 的敏感件期限清理，删除留日志。 -->
-          <div class="redactl" data-when="default device-off" data-redact="pick">
+          <div class="redactl" data-at="s2" data-when="default device-off" data-redact="pick">
             <div class="redactl-hd">
               <svg class="ic"><use href="#i-shield"/></svg>
               <span class="redactl-t">遮盖第 2 页</span>
@@ -1037,7 +1145,7 @@
         <div class="cash-amt">
           <span class="lb">应付</span>
           <span class="num"><span data-out="amtNum">3.00</span><i>元</i></span>
-          <span class="brk" data-out="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
+          <span class="brk" data-out="brk">15 个计费页 × 0.20 元 · 黑白双面 · 5 份</span>
         </div>
 
         <div class="cash-mode" data-pay="wait scan expired query">
@@ -1140,7 +1248,7 @@
           <span class="jobsum-ic"><svg class="ic"><use href="#i-file"/></svg></span>
           <span class="jobsum-b">
             <span class="jobsum-t">正在处理：个人简历.pdf</span>
-            <span class="jobsum-m" data-out="jobsum">黑白 · 自动双面 · 5 份 · 15 个印刷面 · 用纸 10 张</span>
+            <span class="jobsum-m" data-out="jobsum">黑白 · 自动双面 · 5 份 · 15 个计费页 · 用纸 10 张</span>
           </span>
         </div>
 
@@ -1156,7 +1264,7 @@
           <span class="jnode jn--done" data-job="printing jam timeout"><i></i><b>服务端校验</b><em>通过</em></span>
           <span class="jnode jn--now"  data-job="checking"><i></i><b>服务端校验</b><em>正在检查文件能不能打</em></span>
           <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>服务端校验</b><em>没通过</em></span>
-          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 面</em></span>
+          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 页</em></span>
           <span class="jnode"          data-job="queued checking"><i></i><b>出纸</b><em>还没开始</em></span>
           <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>出纸</b><em>不会开始</em></span>
           <span class="jnode jn--bad"  data-job="jam"><i></i><b>出纸</b><em>卡纸暂停</em></span>
@@ -1201,7 +1309,7 @@
         </div>
         <div class="restnote" data-job="timeout" style="max-width:40em">
           <div class="restnote-t">不想打了怎么退</div>
-          <div class="restnote-b">钱不退也不重复收。不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</div>
+          <div class="restnote-b">钱不退也不重复收。不想打了，在「我的 · 打印订单」里申请退款，按<b>未出的计费页</b>全额退。</div>
         </div>
 
         <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
@@ -1217,36 +1325,36 @@
 
         <!-- 2026-08-11：进度盘改成只在打印机在线时出现。
              device-off 下这台机已经停了，而青色进度环看起来像还在走 —— 那一屏真正要用户做的是
-             「续打还是退款」，一个像在动的环既误导又抢焦点。它携带的「已出 3 / 共 15 面」
-             在同屏的离线提示条（剩余 12 面）和右栏「任务 · 已完成 3 / 15 面」里都在，不会丢。
+             「续打还是退款」，一个像在动的环既误导又抢焦点。它携带的「已出 3 / 共 15 页」
+             在同屏的离线提示条（剩余 12 页）和右栏「任务 · 已完成 3 / 15 页」里都在，不会丢。
              顺带解决 device-off 那两屏内容超栏被裁的问题（实测 -3 / -61px）。 -->
         <div class="dial" data-job="printing jam" data-when="default first ai-down">
           <svg viewBox="0 0 100 100">
             <circle class="tk" cx="50" cy="50" r="43"/>
             <circle class="vl" cx="50" cy="50" r="43" stroke-dasharray="270" stroke-dashoffset="216"/>
           </svg>
-          <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 面</span></div></div>
+          <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 页</span></div></div>
         </div>
         <!-- 2026-08-10 Codex :414：卡纸态原来只有一句「等你取出卡纸」和一个禁用主按钮，
              用户处理完了没有地方告诉机器。补一个「已处理 · 继续」。 -->
         <div data-when="default first ai-down" data-job="jam" data-off="ask keep"
              style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
-          <button class="btn btn--primary" data-off-go="fixed"><svg class="ic"><use href="#i-check"/></svg>已处理 · 继续打剩余 12 面</button>
+          <button class="btn btn--primary" data-off-go="fixed"><svg class="ic"><use href="#i-check"/></svg>已处理 · 继续打剩余 12 页</button>
           <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，按未出页数退款</button>
         </div>
         <div class="doneline" data-when="default first ai-down" data-job="jam" data-off="fixed" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>已收到「卡纸已处理」· 正在重新送纸，从第 4 面继续 · <b>不重复收费</b></span>
+          <span>已收到「卡纸已处理」· 正在重新送纸，从第 4 页继续 · <b>不重复收费</b></span>
           <button class="btn btn--quiet" data-off-go="ask">还是没好</button>
         </div>
         <div class="doneline doneline--amber" data-when="default first ai-down" data-job="jam" data-off="refund" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>已提交退款 <b>2.40 元</b>（未出 12 面）· 已出 3 面不退 · 原渠道 1–3 个工作日到账</span>
+          <span>已提交退款 <b>2.40 元</b>（未出 12 页）· 已出 3 页不退 · 原渠道 1–3 个工作日到账</span>
           <button class="btn btn--quiet" data-off-go="ask">改成继续打</button>
         </div>
         <div class="notice" data-when="default first ai-down" data-job="jam" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>卡纸已暂停在第 4 面。<b>剩余份数已保留</b>，处理完按上面的按钮告诉本机。</span>
+          <span>卡纸已暂停在第 4 页。<b>剩余份数已保留</b>，处理完按上面的按钮告诉本机。</span>
         </div>
         <div class="notice" data-when="default first ai-down" data-job="printing" style="max-width:40em">
           <svg class="ic"><use href="#i-printer"/></svg>
@@ -1259,19 +1367,19 @@
             任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</div>
         </div>
         <!-- 2026-08-09 Codex 整改：中途离线文案只在真的出过纸的处境(printing/jam)出现,
-             排队/校验/超时各有自己的 0 面与退款事实,不能被这段"已出 3 面"覆盖。 -->
+             排队/校验/超时各有自己的 0 页与退款事实,不能被这段"已出 3 页"覆盖。 -->
         <!-- 2026-08-10 Codex :414：原文让用户在「继续打 / 退款」里选，页面却没有这两个按钮。
              把两条路做成真按钮；决定之后给结果条，不是点了就没下文。 -->
         <!-- 2026-08-11：离线态下进度盘不再出现，这句话就是这一屏的主体，按 jstate 放大。
              与排队 / 校验中 / 校验失败 / 超时四屏同一处理，文案一字未改。 -->
         <div class="notice notice--coral jstate" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>打印机中途离线，已暂停。已付的钱不会再扣一次。</b>剩余 12 面，两条路你选一条。</span>
+          <span><b>打印机中途离线，已暂停。已付的钱不会再扣一次。</b>剩余 12 页，两条路你选一条。</span>
         </div>
         <div data-when="device-off" data-job="printing jam" data-off="ask fixed"
              style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
           <button class="btn btn--primary" data-off-go="keep"><svg class="ic"><use href="#i-ticket"/></svg>保留待打印（凭取件码续打，不再收费）</button>
-          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>按未出页数退款（退 12 面 · 2.40 元）</button>
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>按未出页数退款（退 12 页 · 2.40 元）</button>
         </div>
         <div class="doneline" data-when="device-off" data-job="printing jam" data-off="keep" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
@@ -1280,15 +1388,15 @@
         </div>
         <div class="doneline doneline--amber" data-when="device-off" data-job="printing jam" data-off="refund" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>已提交退款 <b>2.40 元</b>（未出 12 面）· 已出 3 面不退 · 原渠道 1–3 个工作日到账</span>
+          <span>已提交退款 <b>2.40 元</b>（未出 12 页）· 已出 3 页不退 · 原渠道 1–3 个工作日到账</span>
           <button class="btn btn--quiet" data-off-go="ask">改成续打</button>
         </div>
         <!-- 2026-08-11：这一屏是在问用户「续打还是退款」，「不选会怎样」正是做这个决定的依据。 -->
         <div class="restnote" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <div class="restnote-t">不选会怎样</div>
           <div class="restnote-b">本机<b>不会自己替你决定</b>。离场未选择时，订单默认转为待打印保留 7 天，
-            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。
-            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</div>
+            到期未打自动按未出的计费页退款并留退款日志 —— 钱不会不声不响留在系统里。
+            两种处理都会写进「我的 · 打印订单」，含计费页数、金额和原因。</div>
         </div>
       </div>
 
@@ -1342,7 +1450,7 @@
         </div>
         <div class="doneline" data-done="again" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>已按同参数新建一单：<b data-out="againsum">黑白 · 双面 · 5 份 · 15 面</b> · 需重新核价与支付</span>
+          <span>已按同参数新建一单：<b data-out="againsum">黑白 · 双面 · 5 份 · 15 页</b> · 需重新核价与支付</span>
           <button class="btn btn--primary" data-go="s4" data-done-go="none">去核价</button>
           <button class="btn btn--quiet" data-done-go="none">算了</button>
         </div>
@@ -1554,7 +1662,7 @@
             <button aria-pressed="true" data-v="duplex" data-when="default first ai-down">自动双面</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">双面不可用</button>
           </div>
-          <p class="fnote" data-out="duplexNote">自动双面：3 页 5 份用纸 10 张。印刷面仍是 15 面 —— 一张纸两面按 2 面计，所以钱不变，省的是纸。</p>
+          <p class="fnote" data-out="duplexNote">自动双面：3 页 5 份用纸 10 张。计费页仍是 15 页 —— 按所选文档页计费，双面只减少用纸、不减少计费页数，所以钱不变，省的是纸。</p>
         </div>
 
         <!-- 翻页边只在自动双面下才有意义，所以挂在双面之后、且写清后果。
@@ -1623,7 +1731,7 @@
       <div class="pane" data-at="s3 s4">
         <div class="pane-hd"><span class="t">核价</span><span class="s">服务端计算</span></div>
         <div class="quote">
-          <div class="qrow"><span class="k">内容</span><span class="v" id="q-content">3 页 × 5 份 = 15 个印刷面</span></div>
+          <div class="qrow"><span class="k">内容</span><span class="v" id="q-content">3 页 × 5 份 = 15 个计费页</span></div>
           <div class="qrow"><span class="k">双面用纸</span><span class="v" id="q-paper">10 张（每份 2 张）</span></div>
           <div class="qrow"><span class="k">单价</span><span class="v">以现场公示价为准</span></div>
           <div class="qtotal">
@@ -1637,6 +1745,10 @@
           <!-- 交接来的用量口径那一行由页尾契约脚本在**带参数时**动态插到这里（data-at="s3"）。
                不预留空 <p>：没有交接就一行都不占；也不挂到 s4，s4 右栏在 device-off 下已经没有
                多余 29px，多一段就把最后一张卡的正文顶出去（走查抓到过）。 -->
+          <!-- 0 元的**成因**必须写在金额旁边：同一屏上「0.00 元 · 本单本来就不收费」
+               和「0.00 元 · 你的免费次数付的」并排出现过，含义完全不同。
+               由左栏权益卡的脚本按处境填，没成因就一行都不占。 -->
+          <p class="qnote" id="q-benefit" style="display:none"></p>
           <p class="qnote" data-when="default first ai-down"><b>核价结果显示出来之后，才会出现「确认并支付」。</b></p>
           <p class="qnote" data-when="device-off">打印机离线期间不接受支付。</p>
         </div>
@@ -1659,8 +1771,8 @@
         <div class="pane-hd"><span class="t">单价对照</span><span class="s">以屏上公示为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
-          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v" data-site-unit="bw">0.20 元</span></div>
-          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个计费页</span><span class="v" data-site-unit="bw">0.20 元</span></div>
+          <div class="price-row"><span>双面打印</span><span class="v">只减用纸，不减计费页</span></div>
         </div>
       </div>
 
@@ -1669,8 +1781,13 @@
       <div class="pane" data-at="s4" data-review style="border-style:dashed">
         <div class="pane-hd"><span class="t" style="color:var(--fog-600)">核价结果（服务端决定，此处可切换查看）</span></div>
         <div class="cash-demo" style="position:static;justify-content:flex-start">
+          <!-- 2026-08-11：这两个按钮的文案原来是「应付 3.00 元 · 走收银」「应付 0.00 元 · 跳过收银」。
+               左栏权益卡接上之后，「额度抵完 → 0.00 元」也会出现在同一屏上，
+               两个 0.00 元并排而原因完全不同，用户会以为是白拿。
+               所以把**各自的成因**写进按钮里：这一支是服务端核价本来就是 0（只扫描、纯查询），
+               权益抵完那一支的说明由左栏权益卡自己承担。 -->
           <button data-pay-btn="wait" aria-pressed="true">应付 <span data-out="amt">3.00 元</span> · 走收银</button>
-          <button data-pay-btn="free">应付 0.00 元 · 跳过收银</button>
+          <button data-pay-btn="free">应付 0.00 元 · 本单本来就不收费 · 跳过收银</button>
         </div>
       </div>
 
@@ -1680,8 +1797,14 @@
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf · 3 页</span></div>
           <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 自动双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">印刷面数</span><span class="v" data-out="faces">15 面</span></div>
+          <div class="kv-row"><span class="k">计费页数</span><span class="v" data-out="faces">15 页</span></div>
           <div class="kv-row"><span class="k">用纸</span><span class="v" data-out="sheets">10 张</span></div>
+          <!-- 抵扣必须在**付钱前这一屏**看得见：只在真选了权益时才出现这一行，
+               没选就一行都不占（付款前的清单不放"本可以但你没用"的推销）。
+               显隐用 style.display —— hidden 归 applyVisibility() 独占，
+               本页 data-redact 与翻页边整块都踩过那个坑。 -->
+          <div class="kv-row" id="ben-kv" style="display:none">
+            <span class="k">权益抵扣</span><span class="v" id="ben-kv-v"></span></div>
           <!-- 付钱前最后一次说清打印件到底含不含身份证号。整改前这里恒定写「未遮盖」，
                即使用户刚遮过也一样 —— 那会让人以为刚才那一下白做了。 -->
           <div class="kv-row"><span class="k">隐私命中</span>
@@ -1739,9 +1862,9 @@
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
-          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v" data-site-unit="bw">0.20 元</span></div>
-          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v" data-site-unit="color">1.50 元</span></div>
-          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个计费页</span><span class="v" data-site-unit="bw">0.20 元</span></div>
+          <div class="price-row"><span>彩色 · A4 · 每个计费页</span><span class="v" data-site-unit="color">1.50 元</span></div>
+          <div class="price-row"><span>双面打印</span><span class="v">只减用纸，不减计费页</span></div>
           <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
           <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
         </div>
@@ -1795,14 +1918,14 @@
         <div class="pane-hd"><span class="t">退款怎么算</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">未出纸就取消</span><span class="v">全额退</span></div>
-          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出面数退</span></div>
+          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出的计费页退</span></div>
           <div class="kv-row"><span class="k">已出纸但你不满意</span><span class="v" style="color:var(--amber-400)">不退，可折价复打</span></div>
           <div class="kv-row"><span class="k">重复到账</span><span class="v">自动退回原路</span></div>
           <div class="kv-row"><span class="k">退款到账</span><span class="v">原渠道 1–3 个工作日</span></div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>按<b>实际出纸面数</b>退，不看你按了几次按钮。</span>
+          <span>按<b>实际出纸的计费页</b>退，不看你按了几次按钮。</span>
         </div>
         <details class="fold" style="margin-top:10px">
           <summary>退款记录去哪查</summary>
@@ -1823,10 +1946,10 @@
             <span class="v" data-when="default first ai-down" data-job="jam" style="color:var(--coral-400)"><span class="dot dot--down"></span>卡纸暂停</span>
             <span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
           <div class="kv-row"><span class="k">已完成</span>
-            <span class="v" data-job="printing">3 / <span data-out="facesN">15</span> 面</span>
-            <span class="v" data-job="jam">3 / <span data-out="facesN">15</span> 面（暂停在第 4 面）</span>
-            <span class="v" data-job="queued checking timeout">0 / <span data-out="facesN">15</span> 面 · 还没开始出纸</span>
-            <span class="v" data-job="checkfail">0 面 · 一张纸都没出</span></div>
+            <span class="v" data-job="printing">3 / <span data-out="facesN">15</span> 页</span>
+            <span class="v" data-job="jam">3 / <span data-out="facesN">15</span> 页（暂停在第 4 页）</span>
+            <span class="v" data-job="queued checking timeout">0 / <span data-out="facesN">15</span> 页 · 还没开始出纸</span>
+            <span class="v" data-job="checkfail">0 页 · 一张纸都没出</span></div>
           <div class="kv-row"><span class="k">支付</span>
             <span class="v" data-job="printing queued checking jam">已支付 <span data-out="amt">3.00 元</span></span>
             <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 <span data-out="amt">3.00 元</span></span>
@@ -1844,7 +1967,7 @@
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
           <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">面数</span><span class="v" data-out="facesSheets">15 面 · 用纸 10 张</span></div>
+          <div class="kv-row"><span class="k">计费页数</span><span class="v" data-out="facesSheets">15 页 · 用纸 10 张</span></div>
           <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
           <div class="kv-row"><span class="k">去向</span><span class="v">已进「我的 · 打印订单」</span></div>
           <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
@@ -1918,13 +2041,13 @@
         <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印&#160;·&#160;文件还在本次会话</div></div>
       </div>
       <div data-at="s6">
-        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 <span data-out="facesN">15</span> 面&#160;·&#160;用纸 <span data-out="sheetsN">10</span> 张</div></div>
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 <span data-out="facesN">15</span> 页&#160;·&#160;用纸 <span data-out="sheetsN">10</span> 张</div></div>
         <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单&#160;·&#160;约 3 分钟</div><div class="s">钱已收，不会重复收&#160;·&#160;可以离开，凭取件码回来打</div></div>
         <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前&#160;·&#160;宁可现在拦住</div></div>
         <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款&#160;·&#160;换文件或让本机转一次</div></div>
         <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打&#160;·&#160;7 天内有效</div></div>
         <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续&#160;·&#160;剩余份数已保留</div></div>
-        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 页已转为待打印订单，不会重复扣款</div></div>
         <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出&#160;·&#160;按各处境规则处理，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
@@ -2547,7 +2670,7 @@
     var sheets = Math.ceil(pages / 2)
     var qc = document.getElementById('q-content')
     var qp = document.getElementById('q-paper')
-    if (qc) qc.textContent = pages + ' 页 × ' + cp + ' 份 = ' + (pages * cp) + ' 个印刷面'
+    if (qc) qc.textContent = pages + ' 页 × ' + cp + ' 份 = ' + (pages * cp) + ' 个计费页'
     if (qp) qp.textContent = (sheets * cp) + ' 张（每份 ' + sheets + ' 张）'
   }
   qnote(
@@ -2683,21 +2806,24 @@
         幅面与缩放 按原尺寸／缩放到 A4
         页码范围 全部 3 页（这一个是**已经选中**，本来就该没反应）
 
-      其中份数最要命：它直接乘进金额。屏幕上写着「3 页 × 5 份 = 15 个印刷面 ·
+      其中份数最要命：它直接乘进金额。屏幕上写着「3 页 × 5 份 = 15 个计费页 ·
       应付 3.00 元」，而那个 5 用户一下也改不动 —— 只想打 1 份的人，
       要么照着 5 份付 3.00 元，要么走人。这不是少个交互，是收错钱。
 
    ── 接线之后金额怎么算（口径与 site-config.js 一致，全站唯一一套）：
-        印刷面 faces = 有效页数 × 份数
+        计费页 faces = 有效页数 × 份数
         用纸  sheets = ceil(有效页数 ÷ (双面?2:1)) × 份数
         应付        = v3Price(faces, 黑白?undefined:'color')
-      默认值代回去：3 页 × 5 份 = 15 面，双面用纸 ceil(3/2)×5 = 10 张，
+      默认值代回去：3 页 × 5 份 = 15 计费页，双面用纸 ceil(3/2)×5 = 10 张，
       15 × 0.20 = 3.00 元 —— 与改动前页面上写死的那三个数**逐字相同**，
       所以这次接线没有偷偷改价，只是把它们从字面量变成算出来的。
 
    ── 一条必须说清楚的取舍：**单／双面不改变金额**。
-      本机按「印刷面」计价，一张纸正反两面算 2 面（单价对照表里写着「双面按 2 面计」）。
-      3 页无论单面双面都是 3 个印刷面，变的只有纸：双面 10 张、单面 15 张。
+      本机按**所选文档页**计费：双面与「一面排 N 页」都**不减少**计费数量，只减少用纸。
+      3 页无论单面双面都是 3 个计费页，变的只有纸：双面 10 张、单面 15 张。
+      （2026-08-11 口径收口：此前屏上写「印刷面 / 一张纸两面按 2 面计」，那是从
+       双面不变价倒推出来的解释；一旦出现「一面排两页」，印刷面就比计费数量少，
+       账立刻对不上。服务端的算式是 quantity = billablePages × copies，与此一致。）
       所以这一项的下游是**用纸张数 + 翻页边整块的显隐**，不是钱。
       让它去改金额才是编数 —— 那等于按纸收费，与屏上公示的单位自相矛盾，
       账立刻加不拢。这一点在 duplexNote 里对用户明写，不藏在代码注释里。
@@ -2710,7 +2836,7 @@
       不会把链接里的数字偷渡进核价。超限夹取与「系统改了什么」的告知也仍归护栏。
 
    ── 不伪造能力：s3 的「应付」一格保持「未核价」不动（服务端才有权定价），
-      本段只动**用量**（面数 / 用纸）与 s4 之后那些本来就写着金额的位置；
+      本段只动**用量**（计费页数 / 用纸）与 s4 之后那些本来就写着金额的位置；
       交接来的那句「本机还没体检这份文件，页数与费用以体检为准」由护栏挂着，
       本段一个字都不碰。
    ══════════════════════════════════════════════════════════════════════════ */
@@ -2786,6 +2912,10 @@
 
     var R = parseRange(elIn ? elIn.value : '', TOTAL)
     var pages = (P.range === 'all') ? TOTAL : R.list.length
+    /* faces = 计费页数 = 所选文档页 × 份数。
+       ⚠ 变量名沿用 faces（全页十几处 data-out 都叫它），但**口径是「计费页」**：
+       双面与「一面排 N 页」都不减少计费数量，它们只影响用纸张数。
+       服务端 quotePrint 的算法与此一致：quantity = billablePages × copies。 */
     var faces = pages * P.copies
     var perCopy = Math.ceil(pages / (duplex === 'duplex' ? 2 : 1))
     var sheets = perCopy * P.copies
@@ -2798,6 +2928,396 @@
     var S = window.V3_SITE
     if (!S) return ''
     return (mode === 'color' ? S.price.colorPerFace : S.price.bwPerFace).toFixed(2)
+  }
+  /* ══════════════════════════════════════════════════════════════════════
+     权益 · 免单券模型（2026-08-11 复核后端源码后定版）
+     ----------------------------------------------------------------------
+     字段名照抄生产模型，不自创：
+       PriceConfig  · serviceKey('print_bw_page' / 'print_color_page')
+                    · unitCents / unit / active
+       BenefitGrant · id / benefitType / title / quantityTotal / quantityRemaining
+                    · status / sourceType / sourceRef / validUntil
+       BenefitType  · coupon | free_quota | package_entitlement | subsidy_eligibility_hint
+       BenefitStatus· active | used_up | expired | revoked
+
+     ── 为什么是「N 次免单」而不是「每月 20 页额度」 ──────────────────────
+     服务端核销的语义是「**一次免掉一整单，权益扣 1**」：
+         discountCents = order.amountCents
+         quantityRemaining: { decrement: 1 }
+     这正好就是**免单券**。上一版设计稿把它写成「20 页额度」，那需要按页拆分抵扣，
+     后端不支持 —— 硬接会出现「一张券免掉 3.00 元、额度只扣 1」的账务事故
+     （一个月 20 页的额度能白打 105 页）。改成「N 次免单」之后，
+     现有后端语义立刻是对的，一行都不用改。
+
+     ── 会赔钱的缺口：四道闸，一道都不能少 ────────────────────────────────
+     discountCents = order.amountCents **没有上限** —— 一张券打 200 页，平台全赔。
+     所以这里设计了四道闸，每一道的值**全部由后台配置**，页面一个都不写死：
+
+       ① applicableScopes  只在简历 / 求职材料 / 招聘会资料 / 政策材料 / 证件照生效
+                           —— 拦「拿补贴打自带的任意文件」
+       ② maxBillableUnits  单次计费总量上限，**按「页 × 份」算，不是文档页数**
+                           —— 只限文档页数拦不住：10 页 × 20 份 = 200 页照样白拿
+       ③ colorScope        只覆盖黑白。黑白 0.20 / 彩色 1.50，同一个「免 10 页」
+                           上限彩色值 15 元、黑白只值 2 元（7.5 倍）
+       ④ quantityTotal     每月 N 次 —— 拦反复使用
+
+     **这三个字段（①②③）后端目前都没有**，已列进契约文档的必补项。
+
+     超出任何一道闸时，正确做法是**整单走正常价格，并给一句可执行的话**
+     （「减到 10 个计费页以内即可」），绝不是「抵 10 页、剩下的自付」——
+     那是部分抵扣，后端只有整单核销，做了就是伪造能力。
+
+     ── 下面这个 SCN 不是「页面数据」，是**一次服务端响应的样例** ──────────
+     价目来自 GET /api/v1/print/price-config（匿名可读，Kiosk 展示价唯一来源）；
+     N 次、封顶金额、券的名称与有效期，全部由后台配置下发。页面一个都不写死。
+     ══════════════════════════════════════════════════════════════════════ */
+  var SCN = {
+    have: {
+      lb: '有 2 项可用', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41' },
+      grants: [
+        { id: 'BG-2026-0007', benefitType: 'free_quota', status: 'active',
+          title: '免费打印 · 每月 3 次', sourceType: 'gov',
+          sourceRef: '市人社局「就业服务进社区」专项',
+          quantityTotal: 3, quantityRemaining: 1, unitLabel: '次',
+          maxBillableUnits: 10, colorScope: 'bw_only', validUntil: '8月31日 23:59' },
+        { id: 'BG-2026-0031', benefitType: 'coupon', status: 'active',
+          title: '秋季招聘会 · 打印免单券', sourceType: 'fair',
+          sourceRef: '市人社局秋季招聘会 · 现场发放',
+          quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+          maxBillableUnits: 20, colorScope: 'bw_only', validUntil: '8月31日 23:59' }
+      ]
+    },
+    /* 普通打印单：用户自己带文件来单纯打印。服务端返回的可用权益列表为空，
+       理由是 out_of_scope —— 补贴是**特定场景特定功能**，不是所有打印都能免。
+       屏上**不出现按不动的券**：显示一个灰按钮比不显示更糟。 */
+    ordinary: { lb: '普通打印单', identity: 'claimed', kind: 'ordinary',
+      price: { ok: true, snapAt: '09:41' }, grants: [],
+      emptyReason: 'out_of_scope' },
+    /* 求职材料单，但两项都不能用 —— 理由各不相同，屏上必须分开说。
+       合并成一句「不可用」等于没说。 */
+    none: { lb: '已用完 / 已过期', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41' }, grants: [],
+      blocked: [
+        { title: '免费打印 · 每月 3 次', reason: 'used_up',
+          detail: '本月 3 次已用完 · 9月1日 00:00 重置' },
+        { title: '秋季招聘会 · 打印免单券', reason: 'expired',
+          detail: '8月10日 已过期 · 招聘会结束后失效' }
+      ] },
+    guest: { lb: '未认领身份', identity: 'guest', kind: 'job',
+      price: { ok: true, snapAt: '09:41' }, grants: null, emptyReason: 'needs_identity' },
+    unavailable: { lb: '价目拉不到', identity: 'claimed', kind: 'job',
+      price: { ok: false, error: 'PRICE_CONFIG_UNAVAILABLE', lastSync: '09:41' }, grants: null },
+    /* 「后台刚改过价」不是假想：Admin 改价是**立即改** unitCents / active，
+       计价服务不读 effectiveFrom（serviceKey 唯一，也存不下"现价 + 未来价"两份），
+       而且报价没有 quoteId / expiresAt —— **本机不锁价**。 */
+    repriced: { lb: '后台刚调过价', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41', changed: { bwPerFace: 0.25, at: '09:58' } },
+      grants: [
+        { id: 'BG-2026-0007', benefitType: 'free_quota', status: 'active',
+          title: '免费打印 · 每月 3 次', sourceType: 'gov',
+          sourceRef: '市人社局「就业服务进社区」专项',
+          quantityTotal: 3, quantityRemaining: 1, unitLabel: '次',
+          maxBillableUnits: 10, colorScope: 'bw_only', validUntil: '8月31日 23:59' }
+      ] }
+  }
+  /* sourceType 说的是**这一项是谁发的**，不是"这一单的钱谁付了"。
+     模型能证明的只有发放来源分类，证明不了本次打印已纳入哪一笔结算 ——
+     所以屏上只写发放来源，不写"政府买单"。 */
+  var PAYER = { gov: '政府补贴', platform: '本机自营', partner: '机构赞助',
+                campus: '校方提供', fair: '招聘会主办方' }
+  /* 适用范围**由后台配置**，不是本机写死的产品规则。
+     06 的来源登记表（本文件上面那段交接契约里的 SRC）是判断"这一单是什么"的
+     现成抓手，但 from 来自 URL、**可以伪造，不是安全边界** ——
+     所以最终"这一单能用哪些权益"必须由**服务端在报价时返回**，
+     前端只负责把服务端给的理由讲成人话。 */
+  var SCOPE_TEXT = '简历 / 求职材料 / 招聘会资料 / 政策申请材料 / 证件照'
+  var SCOPE_OUT = '自带文件的普通打印'
+  var BEN = { scene: 'have', pick: 'none' }
+
+  function r2 (x) { return Math.round(x * 100) / 100 }
+  function bwUnit () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
+  /* 可用权益 = 状态 active、且是**可核销**的三种品类之一。
+     subsidy_eligibility_hint 被这一行挡在外面，不是靠人记得别写：
+     它是 info-only（政策说明 / 材料清单 / 官方入口），不可核销，
+     也不许出现余额、金额、抵扣或"已发放"。 */
+  function usable (sc) {
+    if (!sc.grants) return []
+    return sc.grants.filter(function (g) {
+      return g.status === 'active' &&
+        ['coupon', 'free_quota', 'package_entitlement'].indexOf(g.benefitType) > -1
+    })
+  }
+  /* 这张券在**这一单**上能不能用。只有两种结果：整单免、或者用不了。
+     刻意不给第三种「抵一部分」—— 后端只有全额核销，做部分抵扣就是伪造能力。
+
+     ⚠ 前端这段判定是**演示**，不是资格判定的权威。生产里「本单可用哪些权益、
+     每一张为什么不可用」必须由服务端在报价时返回结构化原因码，前端只负责
+     把原因码讲成人话 —— from 来自 URL、可以伪造，不是安全边界。 */
+  function fitOf (g, C, gross) {
+    if (!g) return { ok: false, why: '' }
+    if (gross <= 0) return { ok: false, why: 'zero' }
+    if (g.colorScope === 'bw_only' && C.color === 'color') return { ok: false, why: 'color' }
+    if (g.maxBillableUnits != null && C.faces > g.maxBillableUnits) {
+      return { ok: false, why: 'over_units' }
+    }
+    return { ok: true, why: '' }
+  }
+  function benCalc (C) {
+    var sc = SCN[BEN.scene]
+    var out = { sc: sc, gross: C.money, due: C.money, item: null, fit: { ok: false, why: '' },
+                list: usable(sc) }
+    /* 价目取不到 → 一个数都不给。旧快照只用来说明"上次是什么时候拉的"，
+       绝不拿它当现价。 */
+    if (!sc.price.ok) { out.gross = null; out.due = null; return out }
+    if (C.st === 'device-off') return out
+    for (var i = 0; i < out.list.length; i++) {
+      if (out.list[i].id === BEN.pick) out.item = out.list[i]
+    }
+    if (out.item) {
+      out.fit = fitOf(out.item, C, out.gross)
+      if (out.fit.ok) out.due = 0
+    }
+    return out
+  }
+
+  /* ── 权益卡渲染 ───────────────────────────────────────────────────────
+     整卡由服务端返回的列表驱动。刻意不写「如果是那两张券就……」这种分支：
+     0 项、N 项、拿不到、未认领、超封顶，走的是同一段代码的不同分支，
+     后台加一项、下线一项、改封顶，页面不用改。
+
+     显隐一律用 style.display / 重建节点，**不用 hidden** ——
+     hidden 归 stage.js 的 applyVisibility() 独占，一切四态就会被它整片覆盖。 */
+  var elSnap = document.getElementById('ben-snap')
+  var elOpts = document.getElementById('ben-opts')
+  var elSum = document.getElementById('ben-sum')
+  var elNotes = document.getElementById('ben-notes')
+  var elActs = document.getElementById('ben-acts')
+  var elKv = document.getElementById('ben-kv')
+  var elKvV = document.getElementById('ben-kv-v')
+  var elQBen = document.getElementById('q-benefit')
+
+  function yuan (n) { return n.toFixed(2) + ' 元' }
+  /* 中文排版禁则：间隔号不能起行。券名、来源、有效期串里到处是「 · 」，
+     而这张卡的文案由后台数据拼出来 —— 逐条手改文案改不干净（后台还会下发新的）。
+     渲染完统一走一遍文本节点，把「 · 」两侧换成 nbsp 绑住。
+     只碰文本节点，不动标签，不存在破坏 HTML 的可能。 */
+  function bindDots (root) {
+    if (!root) return
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), t
+    while ((t = w.nextNode())) {
+      if (t.nodeValue.indexOf(' · ') > -1) t.nodeValue = t.nodeValue.replace(/ · /g, '\u00a0·\u00a0')
+    }
+  }
+  function benRender (C, B) {
+    if (!elOpts) return
+    var sc = B.sc, P0 = sc.price, notes = [], more = [], acts = []
+
+    /* ① 顶栏：这一屏的价目什么时候拉的。价格来自哪里，用户有权知道。 */
+    if (elSnap) {
+      var kindTx = sc.kind === 'ordinary' ? '本单类型 · 普通打印' : '本单类型 · 求职材料'
+      elSnap.textContent = kindTx + '　|　' + (!P0.ok
+        ? ('价目未取到 · ' + P0.error)
+        : (P0.changed ? ('价目快照 ' + P0.snapAt + ' · 后台已改价') : ('价目快照 ' + P0.snapAt)))
+    }
+
+    /* ② 选项：一单一权益（核销账本对同一件产物只允许核销一次），所以是单选。
+       超封顶的那一项**照样能按** —— 与 P24 同一条口径「领不了就直说领不了，
+       不用灰按糊弄」：按下去它会告诉你为什么这一单用不了，而不是按不动。 */
+    var opts = ''
+    if (P0.ok && C.st !== 'device-off' && B.list.length) {
+      opts += '<button class="benopt" type="button" data-benuse-btn="none" aria-pressed="' +
+        (BEN.pick === 'none' ? 'true' : 'false') + '">' +
+        '<span class="benopt-t">本单不用权益</span>' +
+        '<span class="benopt-m">按现场公示价自付，留着下次用</span>' +
+        '<span class="benopt-v">应付 ' + yuan(B.gross) + '</span></button>'
+      for (var i = 0; i < B.list.length; i++) {
+        var g = B.list[i]
+        var f = fitOf(g, C, B.gross)
+        var vtx = f.ok ? '本单可用 → 0.00 元'
+          : (f.why === 'color' ? '本单是彩色，用不了'
+            : (f.why === 'over_units' ? ('超出 ' + g.maxBillableUnits + ' 个计费页上限') : '本单用不了'))
+        opts += '<button class="benopt" type="button" data-benuse-btn="' + g.id + '" aria-pressed="' +
+          (BEN.pick === g.id ? 'true' : 'false') + '">' +
+          '<span class="benopt-t">' + g.title + '</span>' +
+          '<span class="benopt-m">余 ' + g.quantityRemaining + ' / ' + g.quantityTotal + ' ' +
+          g.unitLabel + ' · 上限 ' + g.maxBillableUnits + ' 计费页' +
+          '</span><span class="benopt-v">' + vtx + '</span></button>'
+      }
+    }
+    elOpts.innerHTML = opts
+    elOpts.style.display = opts ? '' : 'none'
+
+    /* ③ 金额。用券就是**整单免**，没有第三种结果。 */
+    var sum = ''
+    if (P0.ok && C.st !== 'device-off') {
+      sum += '<div class="bensum-r"><span class="k">本单用量 ' + C.faces +
+        ' 计费页 × ' + unit(C.color) + ' 元（' + (C.color === 'color' ? '彩色' : '黑白') +
+        '）</span><span class="v">' + yuan(B.gross) + '</span></div>'
+      if (B.item && B.fit.ok) {
+        sum += '<div class="bensum-r bensum-r--cut"><span class="k">' + B.item.title +
+          ' · 整单免</span><span class="v">− ' + yuan(B.gross) + '</span></div>'
+      }
+      sum += '<div class="bensum-r bensum-r--due"><span class="k">应付</span>' +
+        '<span class="v">' + yuan(B.due) + '</span></div>'
+    }
+    elSum.innerHTML = sum
+    elSum.style.display = sum ? '' : 'none'
+
+    /* ④ 说明：每一种处境都要说清「为什么是这样、卡在哪、下一步能做什么」。 */
+    if (!P0.ok) {
+      notes.push('<b>本机没能从后台取到现行价目。</b>错误码 <b>' + P0.error + '。</b>' +
+        '屏上<b>不显示金额，</b>本机<b>也不收款、不下单。</b>')
+      notes.push('上一次拉到价目是 ' + P0.lastSync + '。<b>本机不拿旧价当现价</b> —— ' +
+        '现在能做的：把文件存进「我的文档」下次再打，或找现场工作人员。')
+      more.push('价目的唯一来源是 <b>GET /api/v1/print/price-config</b>（匿名可读）；' +
+        '改价只有一条合法后台路径且必审计。所以这一屏宁可不显示金额，' +
+        '也不拿一份过期快照报价 —— 用旧值报价就是报错价。')
+    } else if (C.st === 'device-off') {
+      notes.push('打印机离线期间本页不接受支付，<b>权益也不会被核销。</b>' +
+        '你的免费次数和券原样留在账户里。')
+    } else if (sc.emptyReason === 'out_of_scope') {
+      /* 「不在适用范围」这一支**一个券都不列** —— 显示一个按不动的券比不显示更糟。
+         只用一句话说清：本单是什么、按什么价、免费次数用在哪。 */
+      notes.push('本单是<b>普通打印</b>（你自己带来的文件），按现场公示价计费 <b>' +
+        yuan(B.gross) + '。</b>')
+      notes.push('免费打印次数与打印免单券<b>只适用于' + SCOPE_TEXT + '</b>这类求职产出，' +
+        '<b>' + SCOPE_OUT + '不在适用范围内</b> —— 所以这里不列可用权益，' +
+        '也不摆一个按不动的券。')
+      more.push('<b>适用范围由后台配置，</b>不是本机写死的产品规则；' +
+        '这一单能用哪些权益，也<b>由服务端在报价时判定</b> —— ' +
+        '本机只把服务端给的结果讲成人话，不自己按链接参数决定谁能免。')
+      acts.push(['24-benefits.html', '去权益页看适用范围'])
+    } else if (sc.identity === 'guest') {
+      notes.push('权益记在<b>你的账户</b>上。你还没认领身份，' +
+        '<b>本机现在不知道你有几次免费打印、有没有券</b> —— 这里不显示任何数字，也不替你猜。')
+      notes.push('价格不受影响：现场公示价<b>不认领身份也看得到，</b>' +
+        '本单按公示价 <b>' + yuan(B.gross) + '。</b>')
+      more.push('价目接口是匿名可读的，所以本机<b>不会为了让你看见价格而先要你登录。</b>' +
+        '认领身份只有一个用途：让本机读得到<b>你账户里的</b>次数与券。')
+      acts.push(['03-identity-gate.html', '去认领身份'])
+    } else if (!B.list.length) {
+      /* 「不可用」要分开说：已用完 / 已过期 / 不在适用范围 / 超封顶 / 需登录，
+         在屏上是五种完全不同的话。合并成一句「不可用」等于没说。 */
+      var RSN = { used_up: '已用完', expired: '已过期', out_of_scope: '不在适用范围',
+                  over_cap: '超出封顶', needs_identity: '需要先认领身份', revoked: '已被下线' }
+      var rows = (sc.blocked || []).map(function (x) {
+        return '<b>' + x.title + '</b> —— <b>' + (RSN[x.reason] || x.reason) + '</b>：' + x.detail
+      })
+      notes.push('本单在适用范围内，但你账户里<b>现在没有能用的。</b>' +
+        (rows.length ? ('<br>' + rows.join('<br>')) : ''))
+      notes.push('本单按现场公示价自付 <b>' + yuan(B.gross) + '。</b>' +
+        '<b>没有可用的就直说没有</b> —— 不摆一个灰按钮让你按不动。')
+      acts.push(['24-benefits.html?stage=s3', '去权益页看这个月的核销明细'])
+    } else {
+      if (B.item && B.fit.ok) {
+        notes.push('本单由<b>你账户里的「' + B.item.title + '」支付，</b>应付 <b>0.00 元。</b>' +
+          '用掉后这一项从 <b>' + B.item.quantityRemaining + '</b> ' + B.item.unitLabel +
+          '变成 <b>' + (B.item.quantityRemaining - 1) + '</b> ' + B.item.unitLabel +
+          '（本单 ' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页，' +
+          '在 ' + B.item.maxBillableUnits + ' 个以内；黑白，在覆盖范围内）。')
+        notes.push('这 0.00 元<b>不是本机免收，也不是本机收银坏了</b> —— ' +
+          '是你自己账户里的权益付的。0 元单<b>不进收银台、不出收款码，</b>' +
+          '出纸完成一样有取件码。')
+        notes.push('列表里写着「可用」<b>不等于一定能用：</b>有效期是发放时写下的，' +
+          '<b>本机不替服务端重新判过期</b> —— 核销那一刻仍可能被判过期或不适用。' +
+          '真被判掉，本单按公示价收，<b>不会先扣了你的次数再告诉你不行。</b>')
+      } else if (B.item && B.fit.why === 'over_units') {
+        notes.push('本单 <b>' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces +
+          ' 个计费页，</b>超出「' + B.item.title + '」的 <b>' + B.item.maxBillableUnits +
+          ' 个计费页</b>上限。本单按公示价 <b>' + yuan(B.gross) + '</b>计费。')
+        notes.push('<b>如需使用免费次数，把计费总量减到 ' + B.item.maxBillableUnits +
+          ' 个以内即可</b> —— 少打几份，或在上一步用页码范围只打要用的那几页。' +
+          '（上限按<b>页 × 份</b>算，不是文档页数。）')
+        notes.push('<b>本机不做补差价</b> —— 不会「先免 ' + B.item.maxBillableUnits +
+          ' 页、超出的你自付」。要么整单免，要么整单按公示价，' +
+          '<b>这张券不会被扣掉。</b>')
+      } else if (B.item && B.fit.why === 'color') {
+        notes.push('<b>免费打印次数覆盖黑白；本单是彩色，</b>按公示价 <b>' + yuan(B.gross) +
+          '</b>计费。')
+        notes.push('黑白 ' + bwUnit().toFixed(2) + ' 元、彩色 ' + unit('color') +
+          ' 元，差 <b>' + (Number(unit('color')) / bwUnit()).toFixed(1) + ' 倍</b> —— ' +
+          '同一个「免 ' + B.item.maxBillableUnits + ' 个计费页」的上限，彩色值的钱是黑白的几倍，' +
+          '所以免费次数只覆盖黑白。<b>要用免费次数，在上一步把色彩改回黑白即可。</b>')
+      } else if (B.item) {
+        notes.push('本单没有可打印的页，金额 0 元，<b>权益用不上，也不会被扣掉。</b>')
+      } else {
+        notes.push('本单<b>没有选任何权益，</b>按现场公示价自付 <b>' + yuan(B.gross) + '。</b>' +
+          '上面列的是你账户里现在有的东西 —— <b>用不用在这一单由你决定。</b>')
+        more.push('免费次数按月清零、不累积，但<b>没必要为了用掉而多打</b> —— ' +
+          '一次免单免的是整单，<b>攒到要打得多的那一单再用更划算。</b>')
+      }
+      if (B.item) {
+        more.push('这一项的<b>发放来源</b>登记为「' + (PAYER[B.item.sourceType] || B.item.sourceType) +
+          ' · ' + B.item.sourceRef + '」。这说的是<b>谁发的这项权益，</b>' +
+          '不代表本次打印已经纳入哪一笔结算，本机也不替出资方承诺任何款项。')
+      }
+      if (P0.changed) {
+        notes.push('<b>后台在你停留期间改过价</b>（' + P0.changed.at + ' 起黑白改为 <b>' +
+          P0.changed.bwPerFace.toFixed(2) + ' 元 / 计费页</b>）。<b>后台改价立即生效，' +
+          '本机也不锁价</b> —— 上面按 ' + P0.snapAt + ' 的快照显示；' +
+          '<b>确认下单时服务端会重新算一次，以那一次的结论为准。</b>' +
+          '若按新价，本单 ' + C.faces + ' 计费页是 <b>' +
+          yuan(r2(C.faces * P0.changed.bwPerFace)) + '，</b>' +
+          '会不会因此超出券的封顶，也要到那一刻才算得准。')
+      }
+      more.push('<b>按所选文档页计费；打印双面只减少用纸，不减少计费页数</b>' +
+        '（这一条只说打印；扫描台的「双面」是扫两面，页数与费用<b>会</b>跟着变）。' +
+        '本单 ' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页，' +
+        '用纸 ' + C.sheets + ' 张。')
+      more.push('<b>券只覆盖黑白</b>：黑白与彩色单价差 ' +
+        (Number(unit('color')) / bwUnit()).toFixed(1) + ' 倍，同一个上限彩色值的钱高得多，' +
+        '所以免费次数与免单券都只覆盖黑白，彩色一律走公示价。')
+      more.push('<b>单次上限、色彩范围、适用场景这三项后端目前还没有字段</b>，' +
+        '已列进给后端的字段契约；本页先按设计口径演示。')
+      more.push('<b>一单只能用一项。</b>核销账本对同一件产物只允许核销一次' +
+        '（换另一张券、换另一个请求都不行），所以上面是单选 —— 不是本机小气。')
+      more.push('<b>次数、上限、色彩范围、适用场景、券名与有效期，全部由后台配置，</b>' +
+        '本机开机时从 <b>GET /api/v1/print/price-config</b> 与账户权益接口各拉一份快照 —— ' +
+        '页面一个数都不写死。后台改了，本机要等下一次同步才知道。')
+      for (var mi = 0; mi < B.list.length; mi++) {
+        more.push('「' + B.list[mi].title + '」有效期至 <b>' + B.list[mi].validUntil +
+          '</b> · 发放来源 ' + (PAYER[B.list[mi].sourceType] || B.list[mi].sourceType) +
+          ' · ' + B.list[mi].sourceRef + '。')
+      }
+      acts.push(['24-benefits.html', '去权益页看这几项的规则'])
+    }
+    elNotes.innerHTML = notes.map(function (t) { return '<p class="ben-p">' + t + '</p>' }).join('') +
+      (more.length
+        ? ('<details class="fold" style="margin-top:8px"><summary>用券规则与发放来源</summary>' +
+           '<div class="fold-b">' + more.join('<br>') + '</div></details>')
+        : '')
+    elActs.innerHTML = acts.map(function (a) {
+      return '<a class="btn btn--ghost" href="' + a[0] + '">' + a[1] + '</a>'
+    }).join('')
+    elActs.style.display = acts.length ? '' : 'none'
+    bindDots(elOpts); bindDots(elSum); bindDots(elNotes)
+
+    /* ⑤ 核价卡里也要把 0 元的**成因**写出来。
+       同一屏上「0.00 元 · 本单本来就不收费」和「0.00 元 · 你的免费次数付的」
+       并排出现过，两者含义完全不同 —— 不写清成因，用户会以为白拿。 */
+    if (elQBen) {
+      if (P0.ok && B.item && B.fit.ok && C.st !== 'device-off') {
+        elQBen.textContent = '本单 0 元的原因是：由你账户里的「' + B.item.title +
+          '」整单支付，不是本机免收，也不是收银不可用。'
+        elQBen.style.display = ''
+      } else { elQBen.style.display = 'none' }
+    }
+
+    /* ⑥ 付钱前那一屏也要看得见"你选了什么、扣的是哪一次"。 */
+    if (elKv && elKvV) {
+      if (P0.ok && B.item && C.st !== 'device-off') {
+        elKvV.textContent = B.fit.ok
+          ? (B.item.title + ' · 整单免 ' + yuan(B.gross) + ' · 核销后余 ' +
+             (B.item.quantityRemaining - 1) + ' ' + B.item.unitLabel)
+          : (B.item.title + ' · 本单' +
+             (B.fit.why === 'color' ? '为彩色，不在覆盖范围'
+              : (B.fit.why === 'over_units'
+                 ? ('超出 ' + B.item.maxBillableUnits + ' 个计费页上限')
+                 : '用不了')) + '，未使用')
+        elKv.style.display = ''
+      } else { elKv.style.display = 'none' }
+    }
   }
 
   function render () {
@@ -2817,25 +3337,51 @@
     /* ── 核价那两行（s3 常驻）。这两处早就有 id，沿用，不再另挂 data-out ── */
     var qc = document.getElementById('q-content')
     var qp = document.getElementById('q-paper')
-    if (qc) qc.textContent = C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个印刷面'
+    if (qc) qc.textContent = C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页'
     if (qp) qp.textContent = C.sheets + ' 张（每份 ' + C.perCopy + ' 张）'
 
-    /* ── 金额与用量（s4 之后各处，全部同一份算式）── */
-    set('amt', money + ' 元')
-    set('amtNum', money)
-    set('brk', C.faces + ' 个印刷面 × ' + unit(C.color) + ' 元 · ' + cName + dShort + ' · ' + P.copies + ' 份')
+    /* ── 金额与用量（s4 之后各处，全部同一份算式）──
+       2026-08-11：金额这一支多走一步权益试算。三种结果：
+         · 价目拿不到（PRICE_CONFIG_UNAVAILABLE，后端真实错误码）→ 一个数都不给
+         · 没选权益 → 与接权益之前**逐字相同**（不偷偷改价）
+         · 选了权益 → 原价 − 抵扣；明细挂在左栏权益卡与 s4 的「权益抵扣」行上 */
+    var B = benCalc(C)
+    if (B.due === null) {
+      set('amt', '—（本机暂无价目）')
+      set('amtNum', '—')
+      set('brk', '本机暂无价目 · 不列单价明细，也不下单')
+    } else {
+      money = B.due.toFixed(2)
+      set('amt', money + ' 元')
+      set('amtNum', money)
+      set('brk', (B.item && B.fit.ok)
+        ? (C.faces + ' 个计费页 × ' + unit(C.color) + ' 元 = ' + yuan(B.gross) +
+           ' · 由「' + B.item.title + '」整单免')
+        : (C.faces + ' 个计费页 × ' + unit(C.color) + ' 元 · ' + cName + dShort + ' · ' + P.copies + ' 份'))
+    }
+    benRender(C, B)
+
+    /* 0 元的单不进收银台（本页「0 元的单怎么走」那条折叠里写着的规则）。
+       金额是被权益免掉、还是被份数/页码改成 0，处理方式一样。
+       只在 wait ↔ free 之间切，不碰 scan / confirm / paid 这些渠道态 ——
+       那几种由支付渠道回传驱动，不该被参数改动带走。 */
+    if (B.due !== null && window.v3Pay) {
+      var payNow = scr.getAttribute('data-pay')
+      if (B.due === 0 && payNow !== 'free') window.v3Pay('free')
+      else if (B.due > 0 && payNow === 'free') window.v3Pay('wait')
+    }
     set('params', cName + ' · ' + dName + ' · ' + P.copies + ' 份')
-    set('faces', C.faces + ' 面')
+    set('faces', C.faces + ' 页')
     set('facesN', String(C.faces))
     set('sheets', C.sheets + ' 张')
     set('sheetsN', String(C.sheets))
-    set('facesSheets', C.faces + ' 面 · 用纸 ' + C.sheets + ' 张')
-    set('jobsum', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + C.faces + ' 个印刷面 · 用纸 ' + C.sheets + ' 张')
-    set('againsum', cName + ' · ' + dShort + ' · ' + P.copies + ' 份 · ' + C.faces + ' 面')
+    set('facesSheets', C.faces + ' 页 · 用纸 ' + C.sheets + ' 张')
+    set('jobsum', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + C.faces + ' 个计费页 · 用纸 ' + C.sheets + ' 张')
+    set('againsum', cName + ' · ' + dShort + ' · ' + P.copies + ' 份 · ' + C.faces + ' 页')
     set('hintParams', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + rName)
 
     /* ── 各项 prefill 与脚注：说清「选了这个会怎样」，不是复述按钮文字 ── */
-    set('pfColor', cName + ' · 每印刷面 ' + unit(C.color) + ' 元')
+    set('pfColor', cName + ' · 每计费页 ' + unit(C.color) + ' 元')
     set('pfDuplex', dName + ' · 用纸 ' + C.sheets + ' 张')
     set('pfOrient', P.orient === 'land' ? '强制横向 · 全部转 90°' : '按文件里的方向 · 可改')
     set('pfScale', P.scale === 'fit' ? '缩放到 A4' : '已检出 A4 · 无需缩放')
@@ -2846,9 +3392,9 @@
     var other = Math.ceil(C.pages / (C.duplex === 'duplex' ? 1 : 2)) * P.copies
     set('duplexNote', C.duplex === 'duplex'
       ? ('自动双面：' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比单面省 ' + (other - C.sheets) + ' 张纸。'
-         + '印刷面仍是 ' + C.faces + ' 面 —— 本机按印刷面计价，一张纸两面算 2 面，所以钱不变，省的是纸。')
+         + '计费页仍是 ' + C.faces + ' 页 —— 本机按所选文档页计费，双面只减少用纸、不减少计费页数 —— 所以钱不变，省的是纸。')
       : ('单面：每页各占一张纸，' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比双面多 ' + (C.sheets - other) + ' 张。'
-         + '印刷面仍是 ' + C.faces + ' 面，应付不变 —— 本机按印刷面计价，不按纸张。'))
+         + '计费页仍是 ' + C.faces + ' 页，应付不变 —— 本机按所选文档页计费，不按纸张。'))
 
     set('flipNote', P.flip === 'long'
       ? '选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。'
@@ -2913,6 +3459,26 @@
     /* 页码范围两个键的显隐由本页更早那段小脚本管，这里只跟着重算 */
     if (e.target.closest('#rng-all')) { P.range = 'all'; render(); return }
     if (e.target.closest('#rng-custom')) { P.range = 'custom'; render(); return }
+    /* 权益：单选（一单一权益）。换处境时把选中项复位 —— 上一种处境里选的那张券
+       在新的列表里可能根本不存在，留着它会让金额按一张不在册的券算。 */
+    var ub = e.target.closest('[data-benuse-btn]')
+    if (ub) {
+      BEN.pick = ub.getAttribute('data-benuse-btn'); render()
+      /* 0 元单不进收银台（本页「0 元的单怎么走」那条折叠里写着的规则）。
+         只在 wait ↔ free 之间切，不碰 scan / confirm / paid 那些渠道态 ——
+         那几种由支付渠道回传驱动，不该被参数改动带走。 */
+      return
+    }
+    var bb = e.target.closest('[data-ben-btn]')
+    if (bb) {
+      BEN.scene = bb.getAttribute('data-ben-btn'); BEN.pick = 'none'
+      var all = scr.querySelectorAll('[data-ben-btn]')
+      for (var k = 0; k < all.length; k++) {
+        all[k].setAttribute('aria-pressed',
+          all[k].getAttribute('data-ben-btn') === BEN.scene ? 'true' : 'false')
+      }
+      render(); return
+    }
   })
   if (elIn) elIn.addEventListener('input', function () { if (P.range === 'custom') render() })
 
