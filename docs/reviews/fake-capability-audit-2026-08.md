@@ -178,3 +178,173 @@ B 线查清了为什么还做不到、以及要补什么。
 
 `viewCount`（已修）与 `printCount`（F11）都是这么找到的。
 建议后续对 `printCount`、`lastSeenAt`（F16）、告警聚合（F17）按同法收口。
+
+---
+
+## 五、交给 Codex 的开发任务（剩余 9 处 + 配套能力）
+
+> **分工（产品所有者 2026-08-11 明确）**：Claude 负责审查、方案与规格；**真实功能开发由 Codex 执行**。
+> 本节把剩余问题整理为可直接开工的任务，每条给出：改哪里 / 做什么 / 验收 / 依赖。
+> 已修的 14 处见 §一、§二，不在此列。
+
+### 任务优先级总览
+
+| 任务 | 问题 | 严重度 | 依赖 | 建议批次 |
+| --- | --- | :---: | --- | :---: |
+| **T1** | F1 后端域名白名单（政策 + 线上平台 + 百宝箱三合一） | 🔴 | 无 | **第一批** |
+| **T2** | F3 线上平台目录治理（Admin 页 + Kiosk 改读目录） | 🔴 | T1 | **第一批** |
+| **T3** | F4 岗位来源可信度分级 | 🔴 | T1 | 第二批 |
+| **T4** | F5 招聘会主办方归因去伪 | 🔴 | 无 | 第二批 |
+| **T5** | F2 校方审核角色或文案收敛 | 🔴 | 产品决策 | 第二批 |
+| **T6** | F9 数据源「已连接」语义收紧 | 🟠 | 无 | 第三批 |
+| **T7** | F7 续办列表空态语义 | 🟠 | 无 | 第三批 |
+| **T8** | F13 AI 记录聚合（政策收藏 / 问答记录） | 🟠 | 会话持久化 | 第三批 |
+| **T9** | F8 离线写队列 | 🟠 | 独立立项 | 择期 |
+
+---
+
+### T1 · 官方域名白名单三合一 🔴
+
+**问题**：政策 `externalUrl` 无任何核验即被展示为可扫码办理入口（前端文案已于 `366bf1fb` 撤回「官方」字样，但**链接本身仍不校验**）。
+
+**改哪里**（Codex 已给出具体位置）：
+
+| 位置 | 做什么 |
+| --- | --- |
+| `services/api/src/policies/dto/policy.dto.ts:41-42,67-68` | 加 `@IsUrl({protocols:['https'], require_protocol:true, require_tld:true, disallow_auth:true})` + `@MaxLength(500)`，类型放开为 `string \| null`（`null` 用于清除旧链接） |
+| `apps/partner/src/routes/policy/index.tsx:151` | 编辑时空值必须传 `null` 而非 `undefined`，否则无法真正删除旧链接 |
+| `services/api/src/policies/policies.service.ts:138` | 创建入库前校验非空 `externalUrl` |
+| `services/api/src/policies/policies.service.ts:172` | 更新时只校验本次明确提交的非空新链接；`null` 允许清除 |
+| **`services/api/src/policies/policies.service.ts:291-297`** | **`publish` 前再次校验——这是不可绕过的最终门禁** |
+| `services/api/src/policies/policies.service.ts:119` | 公开列表批量核验后才返回 `externalUrl`；**未核验时只隐藏链接、不隐藏政策正文** |
+| `services/api/src/policies/policies.module.ts:9` | 导入 `TerminalsModule`，注入已导出的 `ToolboxGovernanceService` |
+
+**复用 ToolboxAllowedHost 的哪部分**：
+
+- ✅ `toolbox-governance.ts:98-113` 状态 / 暂停 / 过期 / 有效期判定
+- ✅ `toolbox-governance.service.ts:397-447` 提交进 pending_review、异人审核、责任人、原因、到期
+- ✅ `toolbox-governance.ts:176-212` URL/host 解析——**需抽成公共函数**，并补禁止账号密码、HTTP、localhost、私网 IP
+- ❌ **不要**整个复用 `evaluateToolboxPublishGate`（`:115-160`）——其中混有微应用状态、权限、免责声明等无关规则
+
+**统一接口**（三处共用一张物理表，不需改表名）：
+
+```ts
+type ExternalHostPurpose =
+  | 'web_app' | 'qr_target' | 'asset'
+  | 'policy_external'            // 新增
+  | 'online_platform_official'   // 新增
+
+async assertApprovedExternalTarget(input: {
+  target: { kind: 'url' | 'host'; value: string }
+  purpose: ExternalHostPurpose
+  expectedOwner?: string
+  requireEvidence?: boolean
+  evidenceFileId?: string | null
+  now?: Date
+}): Promise<{ approvalId: string; host: string; reviewedAt: Date; expiresAt: Date | null }>
+```
+
+**校验顺序固定**：HTTPS / 无认证信息 → 非本机私网 → 精确 host 命中 → `active` → 未到期 → `expectedOwner` 与审批记录一致 → 官方用途具备证据。
+
+**同步扩展字面量**：`toolbox-governance.ts:16`、`toolbox-governance.helpers.ts:24`、`dto/toolbox-governance.dto.ts:14`、`packages/shared/src/types/toolboxMicroApp.ts:74`。
+
+**存量处理**：已发布政策若链接不合规，**只隐藏链接、不下架正文**——避免一次性清空生产内容。
+
+**验收**：
+- 非 HTTPS / 带账号密码 / 私网 IP / 未审批 host 的 `externalUrl` 在 create、update、publish 三处均被拒
+- 已发布政策链接失效后，Kiosk 仍展示正文但不展示扫码入口
+- 百宝箱原有环境变量双白名单**保留**，不因共表而删除
+
+---
+
+### T2 · 线上平台目录治理 🔴
+
+**问题**：`OnlinePlatformsPage.tsx:16,146` **硬编码四个平台主页**并提供「去来源平台投递」，完全绕过后端已设计的 `OnlinePlatformDirectory`（含官方域名、证据、审核、链接检查）；**且平台主页不是具体岗位投递地址**。
+
+**做什么**：
+1. 建 Admin 治理页 —— 原型已出：`docs/design/console-ai-os-2026-08/admin/online-platforms.html`
+2. `OnlinePlatformsPage` 改为**读目录**，删除硬编码列表
+3. Partner 侧只给「申请收录 / 提交更新」，**不给发布、不给 `displayOrder`** —— 原型见 `partner/profile.html` 的「线上平台收录」Tab
+4. `recruitment-content-read.service.ts:281-292` 目前只验证自填 JSON 与自填 landingUrl 一致，**须加入 `online_platform_official` 审批表 blocker**
+5. `officialDomainsJson` 每个域、`landingUrl` host、**重定向最终 host** 都必须过 T1 的同一函数
+
+**依赖**：T1（域名校验函数）
+
+**验收**：目录为空时 Kiosk 该入口**不显示**（不显示空列表）；机构无法自助发布；`displayOrder` 只能由 Admin 改；驳回必须回传原因。
+
+**设计约束**：`neutralDescription` 字段名说明设计上要求平台中立——**开放机构自助发布，目录立刻变成竞价位**。
+
+---
+
+### T3 · 岗位来源可信度分级 🔴
+
+**问题**：`JobsServiceHubPage.tsx:68`、`JobDetailSections.tsx:172,179` 把岗位统称「权威来源 / 来源可信」并**硬写来源类型为「线上招聘平台」**，但后端只检查审核发布状态，来源可能是 Excel、手工或学校录入。
+
+**做什么**：投影真实 `SourceKind`（6 种），取不到显示「未标注」；「权威 / 可信」措辞需有依据才用——建议与 T1 的审批状态挂钩。
+
+**注**：这与总账 A1/A2/A3（来源语义）是同一组，建议合并处理。
+
+---
+
+### T4 · 招聘会主办方归因 🔴
+
+**问题**：`CampusTabs.tsx:141`、`FairMapPage.tsx:265`、`FairStatsPage.tsx:117` 将信息/导览/统计归因于主办方，但展区实际由**管理员接口**写入（`fair-company-zone.service.ts:109`），且 `jobs-kiosk.service.ts:326` **直接硬编码「主办方录入数据」**。
+
+**做什么**：后端去掉硬编码归因，改为返回真实录入方；前端按真实值展示，无法确定时不归因。
+
+---
+
+### T5 · 「校方审核后上架」🔴（需产品先决策）
+
+**问题**：`SmartCampusHomePage.tsx:228` 称扩展应用经「校方审核后上架」，但审核接口是**仅限管理员**的 `admin-toolbox.controller.ts:28,149`，**没有校方审批角色或记录**。
+
+**两条路，二选一**：
+- **A**：建校方审批角色与记录（较大，涉及 RBAC——注意 §2.5 N-1：现无子角色载体）
+- **B**：文案收敛为「经平台审核后上架」（最小，立即可做）
+
+**建议 B**，除非产品确实要给学校审批权。
+
+---
+
+### T6 · 数据源「已连接」语义 🟠
+
+**问题**：`jobs-shared.ts:366` 只要「已启用且最后状态非失败」即判 connected——**新建且从未同步的 Excel/手工源也显示已连接**。
+
+**做什么**：区分 `never_synced` / `connected` / `failed` 三态；从未同步的显示「待首次同步」。
+
+---
+
+### T7 · 续办列表空态 🟠
+
+**问题**：`SessionResumePage.tsx:139` 列表为空即显示「所有任务已完成」，但后端同时排除了失败、关闭、退款等状态（`member-print-orders.service.ts:169`）——**空列表不等于全部完成**。
+
+**做什么**：空态改为「无可续办任务」，并提示可在「打印订单」查看全部状态。
+
+---
+
+### T8 · AI 记录聚合 🟠
+
+**问题**：`PolicyServiceHubPage.tsx:105,137` 的「政策收藏」「AI 政策问答记录」都跳 `/me/ai-records`，但目标页只加载简历与岗位记录；**助手会话只存进程内存**（`llm-chat.service.ts:233`），重启即失。
+
+**做什么**：要么让 `/me/ai-records` 真正聚合政策类记录（需先持久化助手会话），要么改跳转目标并说明当前不保存问答记录。
+
+---
+
+### T9 · 离线写队列 🟠（建议独立立项）
+
+**问题**：`ErrorOfflinePage.tsx:76` 声称上传/订单/状态上报「排队等待、恢复后自动继续」，但该页**只轮询健康接口**，没有离线写队列或持久化重放。
+
+**做什么**：要么实现离线队列（较大），要么改文案为「网络恢复后请重新提交」。**建议先改文案，队列独立立项**。
+
+---
+
+### 配套能力任务（非伪造，但同源）
+
+| 任务 | 出处 | 说明 |
+| --- | --- | --- |
+| **定价 W0-1~W0-10** | [pricing 方案](../product/pricing-benefit-campaign-plan-2026-08.md) §七 | 收窄核销规则、接通用券闭环、双面价目、退款冲正等 |
+| **补贴 S-1~S-6** | 同上 §4.5 + §七 | 服务端可信 `scenarioKey`、`FundingProgram`、预算预占、对账改造 |
+| **双后台 AI 化** | [开发任务书](../api/console-ai-dev-spec-2026-08.md) | §4 S0 五项 + §5 设计难题（账本并发、多实例迁移） |
+
+> ⚠️ **T1 是多个任务的公共前置**：政策链接、线上平台域名、岗位来源可信度都依赖它。
+> **建议第一批只做 T1 + T2**，做完再评估其余。
