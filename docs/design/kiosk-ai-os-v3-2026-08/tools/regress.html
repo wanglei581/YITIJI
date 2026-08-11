@@ -677,7 +677,7 @@ function auditCardVoid (win) {
    最后一条机器判不了（脚本可以用任意选择器委托），所以这里采取的办法是：
    **真的按一下**，看有没有任何可观察的变化（阶段、URL、DOM、弹层、aria）。
    有变化就算接线了，没有就报出来。按完立刻把现场复原。 */
-function auditDeadButtons (win) {
+function auditDeadButtons (win, only) {
   var doc = win.document
   var screen = doc.querySelector('.screen')
   if (!screen) return []
@@ -711,6 +711,22 @@ function auditDeadButtons (win) {
        submit / reset 只有在 <form> 里才真的有行为，所以两条要一起判。 */
     if (b.hasAttribute('data-go') || b.hasAttribute('onclick')) continue
     if (b.closest('form') && (b.type === 'submit' || b.type === 'reset')) continue
+
+    /* 复验模式：只按指定的那一个。
+       不加这一条，复验时仍会把同组的 7 个「删除」依次按一遍 ——
+       第 1 个弹出确认层，第 2 个之后弹的是同一层同样文案，快照不变 → 又判死。
+       同类控件必然误报 N−1 个，这个成因在复验里会原样重演。 */
+    if (only && !(b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24)
+                  .startsWith(only.label.slice(0, 12))) continue
+
+    /* **已经处于选中态的选项，点了不变是对的。**
+       单选组里当前选中的那一个、当前所在的标签页、已激活的筛选片 ——
+       它们本来就该毫无反应。把这类报成缺陷，等于要求「按已选项要有变化」，
+       那反而是错的交互。 */
+    var st = (b.className || '') + ' ' + (b.getAttribute('aria-pressed') === 'true' ? 'aria-on' : '') +
+             ' ' + (b.getAttribute('aria-selected') === 'true' ? 'aria-sel' : '') +
+             ' ' + (b.getAttribute('aria-current') ? 'aria-cur' : '')
+    if (/(^|[\s-])(on|is-on|active|is-active|current|is-current|selected|is-selected|now|is-now)([\s-]|$)|aria-on|aria-sel|aria-cur/.test(st)) continue
 
     /* 按一下，看有没有任何可观察的变化。
        ── 观察面必须够宽，否则全是假阳性（第一版实测报了 215 条，大半是假的）──
@@ -901,21 +917,63 @@ async function runAll (only, theme) {
       /* 死按钮检查放在**所有组合跑完之后**：它要真的按一下按钮，会改变现场。
          放在组合循环里会污染后面的测量。这一页已经量完了，可以随便按。
          逐阶段各按一遍 —— 不同阶段露出来的按钮不一样。 */
-      var dead = {}
+      /* ── 死按钮：扫一遍，再逐个**在干净页面上复验** ────────────────────
+         第一版只扫一遍就报，结果是**同一份代码连跑四次得到 0 / 72 / 67 / 99**。
+         一个不可复现的检测器比没有更糟：它报出来的东西没人敢信，
+         真缺陷也会跟着被一起忽略。
+
+         成因实测两条，都来自「探测本身会改变现场，而改动留到了下一次探测」：
+           ① **同类控件必然误报 N−1 个**。43 有 7 个「删除」，点第 1 个弹出确认层
+              （HTML 变了 −11 字符），点第 2/3/4 个弹的是**同一层、同样文案** →
+              前后快照一模一样 → 判死。
+           ② **单选组里已经选中的那一个**：按已经选中的东西本就不该有变化。
+
+         所以改成两段：
+           扫描段（快，允许多报）→ 候选
+           复验段（慢，只对候选）：**每个候选单独在一张新装载的页面上按一次**。
+         干净页面上按下去仍然毫无变化的，才算数。
+         代价是候选多时慢，但换来的是「报出来的每一条都可复现」。 */
       var stagesForDead = disc.hasStage && disc.stages.length ? disc.stages : ['']
+      var cand = []
       for (var ds = 0; ds < stagesForDead.length; ds++) {
         if (stagesForDead[ds]) win.document.querySelector('.screen')
           .setAttribute('data-stage', stagesForDead[ds])
         if (typeof win.v3ApplyVisibility === 'function') win.v3ApplyVisibility()
         void win.document.body.offsetHeight
         auditDeadButtons(win).forEach(function (b) {
-          dead[b.label + '|' + b.cls] = (stagesForDead[ds] || '默认')
+          if (b.cls === 'PROBE-ABORTED') return
+          cand.push({ stage: stagesForDead[ds] || '', label: b.label, cls: b.cls })
         })
       }
-      Object.keys(dead).forEach(function (k) {
-        rec.defects.push({ combo: dead[k], check: '按钮按下去什么都不发生', value: 1,
-          detail: '「' + k.split('|')[0] + '」（.' + k.split('|')[1] + '）' })
+      /* 去重：同一个（阶段 + 文字 + 类名）只复验一次 */
+      var seenCand = {}
+      cand = cand.filter(function (c) {
+        var k = c.stage + '|' + c.label + '|' + c.cls
+        if (seenCand[k]) return false
+        seenCand[k] = 1; return true
       })
+      if (cand.length > 24) {
+        log('    ⚠ ' + name + ' 死按钮候选 ' + cand.length + ' 个，只复验前 24 个'
+          + '（其余未覆盖，不是「没问题」）', 'warn')
+        cand = cand.slice(0, 24)
+      }
+      for (var ci = 0; ci < cand.length; ci++) {
+        var c = cand[ci]
+        var fresh
+        try { fresh = await withTimeout(loadPage(name), 15000, name + ' 复验装载') }
+        catch (e) { break }
+        var fs = fresh.document.querySelector('.screen')
+        if (c.stage && fs) fs.setAttribute('data-stage', c.stage)
+        if (typeof fresh.v3ApplyVisibility === 'function') fresh.v3ApplyVisibility()
+        void fresh.document.body.offsetHeight
+        var still = auditDeadButtons(fresh, c).some(function (b) {
+          return b.label === c.label && b.cls === c.cls
+        })
+        if (still) {
+          rec.defects.push({ combo: c.stage || '默认', check: '按钮按下去什么都不发生', value: 1,
+            detail: '「' + c.label + '」（.' + c.cls + '）· 已在干净页面上复验' })
+        }
+      }
 
       rec.consoleErrors = errs.slice(0, 20)
       rec.stages = disc.stages
