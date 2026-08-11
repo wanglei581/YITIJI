@@ -28,7 +28,7 @@
 以下两处必须按源码与安全状态机纠正，不能照抄文档：
 
 1. P39「手机扫码上传」不能直接打开 P05。Kiosk 应先进入 P06 创建上传会话并展示 QR；只有扫码后的手机打开 P05/生产 `/upload/phone`。
-2. P41 不能新增匿名 `claim-pickup` 并把 `PrintTask` 写成 `claimed`。`claimed` 是 Terminal Agent 的租约状态；匿名 Kiosk 抢写会让 Agent 永远取不到任务。若需要跨机取件，必须新增独立的 pickup authorization / fulfillment request，最终 `claimed` 仍只允许 Agent 写入。
+2. P41 的到机码只能授权/绑定订单，不能直接把 `PrintTask` 写成 `claimed`；该状态是 Terminal Agent 的租约状态。最新 `main` 已新增 order-only `/print/jobs/claim-pickup`：终端核验订单并在付款后幂等创建 `pending` PrintTask，最终 `PrintTask.claimed` 仍只允许 Agent 写入。后续 UI 与测试必须持续区分 `Order.pickupStatus=claimed` 和 Agent 任务租约，禁止把两套状态机混用。
 
 ## 3. 所有控件的生产合同
 
@@ -156,7 +156,7 @@ Kiosk 页面按 1080×1920 逐页验收；P05 单独按 390×844。每个页面�
 
 不采用“先把所有后端做完、最后统一换皮”，也不采用“先把 45 个静态页搬进 React”。采用垂直业务切片：每一片同时完成 V6 UI、真实数据、API、状态机、错误态、自动化与真机验收。
 
-1. **公共底座**：typed route context、capability guard、站点配置、action manifest、统一 loading/error/empty、帮助、无障碍与 1080×1920 门禁。
+1. **公共底座**：typed route context、capability guard、站点配置、action manifest、统一 loading/error/empty、帮助、无障碍与 1080×1920 门禁。RouteContext 只含受控 `routeId/actionId` 与非敏感 locator，query/state/hash 全部按攻击者输入解析；静态 action manifest 只映射已知动作，新 V6 action 的能力未知/未配置/请求失败均 fail-closed。前端 guard 不替代后端授权，token/secret/signed URL/手机号/内容不得进入 URL、history 或新 context。
 2. **身份/会话/文件**：P03/P04/P05/P40，完成 QR/SMS、session lifecycle、upload/takeaway、文件 provenance；W1-D4 durable staging cap 未关闭前不得宣称手机上传商用 GO。
 3. **打印/扫描交易履约**：P06/P07/P08/P39/P41，完成核价锁价、权益预占、订单支付、Agent attempt/outcome、退款补偿、真机扫描/出纸。
 4. **简历与 AI 资产**：P09–P12、P20、P22、P25/P26、P28、P32/P33；所有输出先落真实 artifact，再开放打印/保存/带走。
