@@ -129,3 +129,32 @@ export function buildPhoneUploadUrl(uploadUrl: string, sessionId: string, upload
   url.hash = fragment.toString()
   return url.toString()
 }
+
+/**
+ * 上传会话接口面对公共终端和手机浏览器；不要把服务端原始错误（可能含内部状态）
+ * 直接显示给用户。这里保留用户可执行的恢复路径，不改变错误码给调用方作逻辑判断。
+ */
+export function uploadSessionUserMessage(error: unknown, fallback = '上传暂时不可用，请稍后重试。'): string {
+  const code = error instanceof ApiHttpError ? error.code : undefined
+  switch (code) {
+    case 'NETWORK_ERROR':
+      return '网络连接失败，请检查网络后重试。'
+    case 'UPLOAD_SESSION_EXPIRED':
+    case 'UPLOAD_SESSION_NOT_PENDING':
+    case 'UPLOAD_SESSION_NOT_FOUND':
+    case 'UPLOAD_TOKEN_INVALID':
+      return '二维码已失效或已使用，请回到一体机刷新二维码。'
+    case 'UPLOAD_SESSION_UPLOAD_IN_PROGRESS':
+      return '文件正在上传，请稍候。'
+    case 'FILE_REQUIRED':
+      return '请选择要上传的文件。'
+    case 'FILE_TOO_LARGE':
+      return '文件超过 10MB，请压缩后重新上传。'
+    case 'UPLOAD_SESSION_NOT_READY':
+      return '手机端尚未完成上传，请先在手机上选择文件。'
+    case 'MEMBER_AUTH_REQUIRED':
+      return '登录状态已失效，请回到一体机重新登录或使用临时上传。'
+    default:
+      return fallback
+  }
+}
