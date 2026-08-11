@@ -172,7 +172,10 @@ function mustNotContainOutsideComments(rel, markers, label) {
 // 说明：本组断言针对「前端声称、后端无来源」的伪造能力（CLAUDE.md §9）。
 // 编造的楼栋位置一旦重新出现，说明有人又把设计稿里的占位文案当真实数据落地了。
 const FABRICATED_CAMPUS_LOCATIONS = ['行政楼 1F', '行政楼 2F', '综合楼 1F', '东门内 50m', '行政楼一层', '宿舍楼一层']
-const FAKE_SCHOOL_ENDORSEMENT = ['校方官方指引', '校方官方信息入口', '校方授权', '校方合作', '校方已开启']
+// 2026-08-11 追加「校方审核」「校方配置」：扩展应用审核接口仅限平台管理员
+//（admin-toolbox.controller.ts:28,149），系统无校方审批角色与记录；
+// 智慧校园开关与扩展投放平台 Admin 同样可设置，均不能单独归因给校方。
+const FAKE_SCHOOL_ENDORSEMENT = ['校方官方指引', '校方官方信息入口', '校方授权', '校方合作', '校方已开启', '校方审核', '校方配置']
 
 // 注：注释中保留原文用于说明修正原因，因此统一只检查「用户可见文案」。
 mustNotContainOutsideComments(
