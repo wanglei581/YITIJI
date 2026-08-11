@@ -18,7 +18,7 @@
 
 ## 2026-08-11 上线前安全稳定化（优先于新增功能）
 
-- [~] **S0 第一批低耦合修复候选**：混合鉴权文件路由已改为复用内部当前状态解析器，匿名/内部代理 multipart 已在第一个超出 15MB 业务上限的字节处由 Multer 拒绝；RED→GREEN 专项、API typecheck、目标 lint、既有 Kiosk 上传→打印契约已通过，专项已接 CI。下一步先审查最终 diff，提交并推送独立分支，创建 Draft PR，等待 Node 22 主 CI / PostgreSQL / browser 三项全绿；未合入前不得记作 main 已修，未获得新的精确 SHA 部署授权前不得发布。
+- [~] **S0 第一批低耦合修复候选**：混合鉴权文件路由已改为复用内部当前状态解析器，匿名/内部代理 multipart 已在第一个超出 15MB 业务上限的字节处由 Multer 拒绝；RED→GREEN 专项、API typecheck、目标 lint、既有 Kiosk 上传→打印契约已通过并接 CI。修复提交 `734a891d` 已推送至 Draft PR [#595](https://github.com/wanglei581/YITIJI/pull/595)，同一提交的 GitHub Actions run [`31477414579`](https://github.com/wanglei581/YITIJI/actions/runs/31477414579) 三项全绿。下一步只做 PR 审查与合入决策；未合入前不得记作 main 已修，未获得新的精确 SHA 部署授权前不得发布。
 - [ ] **S1 文件不可变性与打印哈希**：将直传 staging key 与 active final key 分离，完成时做唯一 `uploading → active` CAS 和后端 SHA-256，所有普通打印任务必须携带服务端哈希，Agent 下载必须有字节上限。实施前先确认 BOS 原子 copy/checksum/content-length 能力；这是跨存储/打印协议改造，禁止与 S0 混在同一提交。
 - [ ] **S2 TRTC 终端信任链**：在 loopback Agent broker 与短期 terminal-bound attestation 中选定一种，不再把 `X-Terminal-Id` 当认证；补终端存在/enabled/lifecycle/capability、服务端生成 userId、每终端配额和审计。不得把长期 Agent token放进浏览器 bundle。
 - [ ] **S3 匿名 DOCX 资源预算**：把合同审查已有的实际解压字节/entry/path/CRC 守卫抽成公共 document-security 边界，在 resume parse 和 materials pii_scan 两条独立 Mammoth 路径前强制执行，并增加 worker 内存/时间限制与压缩炸弹回归。
