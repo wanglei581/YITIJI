@@ -157,9 +157,13 @@ mustContain(
 function mustNotContainOutsideComments(rel, markers, label) {
   const src = read(rel)
   if (src === null) { fail(`${label} — 文件缺失: ${rel}`); return }
+  // 整块剥离 JSX 注释 {/* ... */} 与块注释，再剥离行注释——
+  // 注释中保留原文用于说明修正原因与恢复条件，不应因此 FAIL。
   const visible = src
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
-    .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
     .join('\n')
   const hits = markers.filter((m) => visible.includes(m))
   if (hits.length > 0) fail(`${label} — ${rel} 用户可见文案出现违规标记: ${hits.join(' | ')}`)

@@ -146,9 +146,10 @@ export function MaterialsTab({
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{m.pageCount > 0 ? `${m.pageCount} 页` : '未填写'}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{formatSize(m.fileSizeKB)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="flex items-center gap-1 text-xs text-neutral-600">
-                        <PrinterIcon className="h-3.5 w-3.5 text-neutral-400" />
-                        {m.printCount}
+                      {/* 2026-08-11：printCount 无递增写入（见 StatsTab 注释），恒为 0，改为明示未接入 */}
+                      <span className="flex items-center gap-1 text-xs text-neutral-400">
+                        <PrinterIcon className="h-3.5 w-3.5 text-neutral-300" />
+                        未接入
                       </span>
                     </td>
                     <td className="px-4 py-3">

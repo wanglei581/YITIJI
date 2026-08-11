@@ -163,10 +163,13 @@ export function FairMaterialsPage() {
                         <FileTextIcon aria-hidden="true" />
                         {mat.pageCount} 页 · {formatSize(mat.fileSizeKB)}
                       </span>
-                      <span>
-                        <PrinterIcon aria-hidden="true" />
-                        已打印 {mat.printCount} 次
-                      </span>
+                      {/*
+                        2026-08-11（CLAUDE.md §9）：原为「已打印 {mat.printCount} 次」。
+                        FairMaterial.printCount 全后端**没有出纸完成后递增的写路径**
+                        （资料转打印文件时只更新桥接记录 fair-material-print-bridge.service.ts:82），
+                        故恒为 0——对求职者显示「已打印 0 次」既不实也无决策价值，直接移除。
+                        恢复条件：打印完成回调中递增该字段后，方可重新展示。
+                      */}
                     </div>
                   </div>
                   {mat.allowPrint ? (

@@ -159,13 +159,27 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
 function visibleTextOf(rel) {
   const src = read(rel)
   if (src === null) return null
+  // 先整块剥离 JSX 注释 {/* ... */} 与块注释 /* ... */（可跨行），
+  // 再按行剥离 // 与 * 开头的行注释。
+  // 注释中常保留被修正的原文用于说明理由与恢复条件，属有价值上下文，不应触发 FAIL。
   return src
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
-    .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
     .join('\n')
 }
 
 const FREE_CLAIMS = ['免费打印', '免费出纸', '可免费打印', '免费复印', '免费扫描']
+
+// 6c：printCount 全后端无递增写路径（恒为 0），不得展示为真实打印次数
+{
+  const visible = visibleTextOf('src/pages/job-fairs/FairMaterialsPage.tsx')
+  if (visible === null) fail('6c 活动资料页 — 文件缺失')
+  else if (/已打印\s*\{?\s*mat\.printCount/.test(visible) || visible.includes('已打印 {mat.printCount}'))
+    fail('6c 活动资料页不得展示 printCount — 该字段无递增写路径，恒为 0')
+  else pass('6c 活动资料页不展示无写入方的 printCount')
+}
 
 for (const [rel, label] of [
   ['src/pages/job-fairs/FairMaterialsPage.tsx', '6a 活动资料页'],
