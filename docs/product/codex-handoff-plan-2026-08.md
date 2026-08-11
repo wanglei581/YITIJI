@@ -49,7 +49,7 @@ FileProvenance → OrderQuote → BenefitReservation
 |---|---|---|---|
 | **① 计价权益主链** | 后端建模型与接口 + **同窗口顺手接 `apps/kiosk` 的核价 / 结算 / 权益** | 无 | **先开**，其余等它 |
 | **② 两个后台配置面** | Admin 配四道闸规则、Partner 数据面 | 需要 ① 的 schema | ① 的 schema 落地后 |
-| **③ 履约与硬件** | Agent 未确认出纸却报完成、取件页调不存在的端点 | 无 | **现在就能开**（已开两张任务卡） |
+| **③ 履约与硬件** | 履约结果/补偿链、取件页调不存在的端点 | 无 | **现在就能开**（已开两张任务卡） |
 
 **① 之所以跨前后端放一个窗口**，正是因为它是一条链：契约在同一个上下文里定，不会漂。
 **② ③ 与它没有数据依赖**，可以并行。
@@ -106,7 +106,7 @@ docs/design/kiosk-ai-os-v3-2026-08/api-inventory-snapshot.md   后端 415 个端
   报价锁价在改价场景下不串价；权益预占在并发下只有一台成功；
   券已核销而打印失败时走冲正而**不是删核销记录**。
 - **②**：Admin 保存一条规则后，Kiosk 报价返回的可用权益随之改变（端到端可见）。
-- **③**：未确认出纸不再上报 completed，且有 verify 脚本覆盖那三条路径。
+- **③**：不确定出纸结果必须保持 fail-closed，并有 regression verify；补齐履约状态、异常补偿和真实取件认领闭环。
 
 ---
 
@@ -201,12 +201,32 @@ docs/design/console-ai-os-2026-08/                   双后台原型 24 页
 「**做不到的能力**」与「**恒为 0 的数字**」不在此列 ——
 前者要在用户动手前就挡住，后者只会制造噪音。
 
-#### 认领 ③ 号窗口的发现
+#### 认领 ③ 号窗口的发现（已由 W0 源码再基线更正）
 
-`monitorPrintJob()` 三条 conservative completed 路径已独立复核确认
-（`apps/terminal-agent/src/agent/task-runner.ts` doc comment 原文即写 conservative completed）：
-job 从未出现、超时、**非 Windows 直接跳过监控立即返回 completed**。
+早期审查曾认为 `monitorPrintJob()` 在任务从未出现、监控超时、非 Windows 三条路径会保守报 `completed`。
+**该结论不适用于 `main@6ad3be9f`**：
+`apps/terminal-agent/src/agent/task-runner.ts:445-448,582-586,662-668,679-704` 已把上述不确定结果统一收敛为
+`PRINT_JOB_UNCONFIRMED`，崩溃后 `spooled/dispatching` 恢复同样报 failed（`:286-299`）。
 
-**同意判为上线阻塞，且严重度高于本线找到的 23 处伪造**：
-那些是「展示不实信息」，这一条是**资金已收、纸可能未出、系统标记为已完成**。
-③ 号窗口验收「未确认出纸不再上报 completed 且有 verify 覆盖那三条路径」的口径，本线认可。
+③ 号窗口不再重复修复该旧问题；其仍需完成的是 `PrintTask` 履约证据/attempt 建模、异常补偿、
+`POST /print/jobs/claim-pickup` 真端点，以及 Windows 真机对这条 fail-closed 行为的验收。
+
+### 2026-08-11 · W0 源码再基线（`main@6ad3be9f`）
+
+**目的**：在任何 V3 或计价权益代码开工前，逐条以当前源码核对计划文档；文档是施工说明，不替代代码事实。
+
+- **已经存在，禁止重造**：`GET /me/pending-tasks` 已由 `MemberPendingTasksController` 提供、受
+  `EndUserAuthGuard` 保护；当前仅覆盖会员本人的可续办打印任务，不等同通用 Errand 模型。
+- **已经修正，保持并做真机回归**：Agent 对非 Windows、队列未出现、监控超时与崩溃恢复均 fail-closed；
+  不能再把它作为“待修 conservative completed”开发。
+- **仍是真缺陷/阻塞**：取件认领页调用不存在的 `POST /print/jobs/claim-pickup`；付款码明文进入公共屏 React state；
+  `/orders/:id/redeem` 可按订单全额抵扣；PII 遮盖不能产出新文件；计价权益不可变链仍未建成。
+- **V3 施工顺序不变**：先完成真实能力 A（现有 `apps/kiosk` 对接），再把 V3 视觉 B 独立立项；
+  不把静态 HTML 当成已上线能力，也不删除真实但尚待开发的功能意图。
+- **视觉真源已由产品负责人指定**：以 `design/v3-entry-remodel` 工作树
+  `docs/design/kiosk-ai-os-v3-2026-08/` 的当前页面为准（本地预览为 `http://127.0.0.1:8961/`，
+  基线首页为 `01-home-v6.html`）。它不是旧 Kiosk 页面；后续任何 React 迁移不得退回历史原型或
+  以目录同名的其他副本替代。当前该工作树有未提交设计修改，视觉实施 W5 开工前必须由设计线固定可追溯 commit；
+  W0/W1 不得修改该工作树。
+
+W0 仅维护事实表与门禁，不修改产品代码、数据库、CI、生产配置或硬件协议。W1 每个闭环必须从本节复核后再写文件预算。

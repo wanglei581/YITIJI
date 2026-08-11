@@ -8,6 +8,14 @@
 > `reviews-codex-2026-08-11.md`（链接错配复核）、`hardware-camera-scanner-plan.md`（新硬件规划）、
 > `dead-buttons-2026-08-11.md`（死按钮实测清单）。驱动台：`tools/regress.html`（可重跑）。
 
+> **W0 源码再基线补充**：本文件描述的是静态设计稿状态，不是 `apps/kiosk` 发布状态。
+> 当前交付集以 `pages.json` 的 **45 页** 为准（目录另保留 3 份 retired 首页比稿）。
+> `main@6ad3be9f` 已有会员打印恢复 `GET /me/pending-tasks`，Agent 对不确定出纸结果也已 fail-closed；
+> 它们不能再被本设计状态页或对接表标为“端点不存在/误报 completed”。V3 仍须等真实交易与履约闭环后独立实施。
+> 产品负责人指定的视觉真源是 `design/v3-entry-remodel` 工作树的当前页面（本地预览 `127.0.0.1:8961`，
+> 基线 `01-home-v6.html`）；不要以历史 Kiosk 原型或其他同名目录替代。该工作树若仍有未提交设计改动，
+> React 实施前必须先由设计线冻结可追溯 commit，本状态页不自行提交或覆盖它。
+
 ## 一、已经做到的（可复现，不是印象）
 
 45 页 / 944 组合 / **9 套主题各跑一遍** / 823–865 条站内链接：

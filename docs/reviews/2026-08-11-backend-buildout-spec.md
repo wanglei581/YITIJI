@@ -11,11 +11,9 @@
 > 免费打印 = 每月 N 次免单券；四道闸全满足则整单免 + 扣 1 次，否则整单正常价；
 > 不补差、不部分抵扣、不叠加；双面不变价；打印链计价单位「计费页」。
 >
-> **本文新发现一个原六项之外的上线阻塞**（见文末「需要纠正的几点」第 1 条）：
-> Terminal Agent 有三条路径在**未确认出纸的情况下上报 completed**，
-> 已由 Claude 读 `apps/terminal-agent/src/agent/task-runner.ts:495` 附近的
-> doc comment 复核确认（原文写着 conservative completed）。
-> 对一台收了钱的无人值守机器，这等于「用户付了钱、纸可能没出来、系统说打好了」。
+> **W0 更正（`main@6ad3be9f`）**：早期本文曾把 Terminal Agent 的三条不确定路径列为“未确认出纸却上报
+> completed”。当前源码已统一 fail-closed 为 `PRINT_JOB_UNCONFIRMED`，详情见文末「需要纠正的几点」第 1 条；
+> 保留 Windows 真机回归，但不要重复开发这项已修复行为。履约状态证据、异常补偿和用户如实呈现仍是本规格的上线工作。
 
 ---
 
@@ -933,7 +931,7 @@ PRINT_OUTCOME_V2
 
 # 需要纠正的几点
 
-1. “队列未出现或超时都会进入 `PRINT_JOB_UNCONFIRMED`”并不完全正确。当前 Agent 仍有“队列多次未出现后按完成处理”“普通监控超时按完成处理”“跳过监控按完成处理”的路径，只有部分 Pantum 保留任务超时走 unconfirmed。这是无人值守上线阻塞，见 [task-runner.ts](/Users/wanglei/AI求职打印服务终端/apps/terminal-agent/src/agent/task-runner.ts:495)。
+1. **W0 源码再基线更正**：当前 `main@6ad3be9f` 的 Agent 已在“队列未出现、普通监控超时、非 Windows、崩溃后恢复”四类不确定路径返回 `PRINT_JOB_UNCONFIRMED`，不再上报 `completed`（`apps/terminal-agent/src/agent/task-runner.ts:286-299,445-448,582-586,662-668,679-704`）。这不是可以删掉的验收项：仍需保持 regression verify 并在 Windows 真机确认。真正未完成的是 attempt/履约证据、异常补偿与前端如实呈现，不能把已有 fail-closed 行为写成待修漏洞。
 
 2. `@@unique([serviceType, serviceRefId])` 不是需要移除的障碍。它正好保证一单只核销一次；续打和恢复应通过 PrintTask attempt 与 RedemptionAdjustment 解决。
 

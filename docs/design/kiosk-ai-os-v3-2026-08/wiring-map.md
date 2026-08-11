@@ -3,7 +3,7 @@
 > 2026-08-11 落盘。**用途**：Codex 拿着这张表开工，不用再猜「这个按钮该调哪个接口」「这个功能后端到底有没有」。
 >
 > **两个输入**
-> - 设计稿：本目录 44 页（`pages.json` 交付集），页面清单见 `index.html` / `README.md` / `closed-loop-map.md`
+> - 设计稿：本目录 45 页（以 `pages.json` 交付集为准；另有 3 份 retired 首页比稿不计入交付集），页面清单见 `index.html` / `README.md` / `closed-loop-map.md`
 > - 端点清单：`api-inventory-snapshot.md`（415 个端点 / 76 个控制器，机械抽取；**有已知误渲染，见 §13**）
 >
 > **配套文件**：`docs/reviews/2026-08-11-backend-buildout-spec.md`（948 行，Codex 出的六项后端能力实施规格）。
@@ -386,7 +386,7 @@ FileProvenance
 | `04` s2 法务文本 | 隐私政策 / 服务条款 / AI 声明 | `GET /kiosk/legal/:type` | ⚠️ | 四个合法值：`privacy_policy / terms_of_service / ai_disclaimer / contract_review_disclaimer`。**非法 type 不报错，静默回 `terms_of_service`**（`legal.controller.ts:11-13`）—— 前端拿到的可能是错的文档而不是错误。返回含 `version`，**登录流程要用这个版本号**（见 §7 的 03） |
 | `04` s2「扫码存全文」 | 把法务全文带走 | **缺** | ❌ | 同「本机 → 手机下行通道」 |
 | `04` s3 会话超时 / `40` 六个会话处境 | 服务端会话钟 | `POST /kiosk/session/heartbeat` / `POST /kiosk/session/extend` | ❌ | **两个都是空壳**：整个 controller 14 行，恒返回 `{ok:true}`，`KioskSessionService` 是空类且没被注入（`kiosk-session/kiosk-session.controller.ts:1-14`）。**服务端零会话状态、零超时**。40 的六个处境（无操作预警 / 超时锁屏 / 会话接管 / 结束并清空 / 断电恢复 / 遗留物）后端一个都不支撑。要做成：`POST /kiosk/sessions` 建会话 → `POST /kiosk/sessions/:id/heartbeat` → `POST /kiosk/sessions/:id/extend` → `POST /kiosk/sessions/:id/end {reason}`；服务端持有 `hintSec/graceSec` 并在超时时**吊销该会话签发的所有一次性 token**（这才是公共终端隐私清场的真正落点，光靠前端计时不成立） |
-| `04` s5「接着上次做」会话恢复 | 恢复未完成办理单 | **缺**（`GET /me/pending-tasks` 不存在） | ❌ | ⚠️ **这条也是线上的假接真**：生产 `/session-resume` 页在调这个不存在的端点。要做成 `GET /me/pending-tasks` → `{items:[{kind:'print_order'\|'ai_task'\|'upload_session', refId, title, terminalCode, updatedAt, resumable:boolean}]}`，**只回本人、只回未完成、不自动铺开内容**（设计 P04 明写「要不要恢复由你决定，本机不直接把它铺开」） |
+| `04` s5「接着上次做」会话恢复 | 恢复未完成办理单 | `GET /me/pending-tasks` | ⚠️ | **W0 已核实端点存在**：受 `EndUserAuthGuard` 保护，只回本人的可续办打印支付/进度任务，且不返回 fileUrl。它不是通用 Errand/AI/upload-session 恢复接口；设计稿要表达后者时仍需另行建设，不能把现有打印恢复误报成完整办理单。 |
 | `40` handover 会话接管（换人） | 通知另一台机结束会话 | **缺** | ❌ | 依赖上面的会话模型：`POST /kiosk/sessions/:id/takeover {newTerminalId}` → 旧会话立即 end + 清 token |
 | `40` recover 断电恢复 | 恢复到第 3 步 | **缺** | ❌ | 同上，需要服务端记住「进行到哪一步」。可与 `OrderQuote`（buildout-spec）合并考虑：报价快照本身就是「进行到哪一步」的可信载体 |
 | `40` leftover 遗留物「呼叫服务台」 | 现场求助 | **缺** | ❌ | 要做成 `POST /kiosk/service-calls {terminalId, reason, relatedOrderId?}` → 落告警中心（`GET /admin/alerts` 已有读侧）。当前只能落 `POST /me/feedback`（需登录，不合适） |
@@ -437,11 +437,11 @@ FileProvenance
 | A4 | **权益预占** | `06` s4→s5 之间 | buildout-spec **「权益预占」**：`BenefitReservation`（`quoteId @unique`、`held/committed/released`、`version` CAS）。预占只加 `quantityReserved`，提交时才 `quantityRemaining -= 1` 并建 `RedemptionRecord`。**两台终端争最后一次额度，最多一台成功** |
 | A5 | **月度周期余额 + 有效状态** | `24` s1、`06` s4 | buildout-spec **「③ 月度周期余额」**：`BenefitPeriodBalance`（`@@unique([benefitGrantId, periodKey])`，`Asia/Shanghai` 自然月，`[startsAt, endsAt)`，不结转，月中首领发整月 N 次）。`GET /me/benefits` 增 `balance{total, remaining, reserved, available, nextResetAt}` 与 `effectiveStatus`（**读时同步计算，不靠午夜 cron**） |
 | A6 | **止血：现有 `/orders/:id/redeem` 不得再按任意 Grant 整单免** | `06` s4 | buildout-spec **「迁移与灰度 · 第一阶段」第 1 条**：对打印订单默认拒绝，最终只接受**已提交的 Reservation**。历史 Grant 无法证明规则的返回 `BENEFIT_RULE_MISSING`，暂不可核销 |
-| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**队列未出现 / 普通超时不得写 complete**（规格「需要纠正的几点」第 1 条，`apps/terminal-agent/src/agent/task-runner.ts:495`）—— 这是无人值守机器的上线阻塞 |
+| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**W0 已核实** Agent 对队列未出现/超时/非 Windows 已 fail-closed 为 `PRINT_JOB_UNCONFIRMED`；本项要补的是可审计履约语义、补偿与 Windows 真机证据，不重复修复旧误报完成结论。 |
 | A8 | **自助取件核销端点** | `41` claim「确认认领」 | `POST /print/jobs/claim-pickup {pickupCode, terminalId}` → 校验码有效 + 订单 `paid` + 未退款 + 任务未终态 → CAS 置 `claimed` → `{taskId, orderId, status}`。**幂等**（同码重提返回同一结果）、**强限流**（10 位码要防爆破）、**单次有效**（认领后作废）。⚠️ 生产 `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:44` **已经在调这个不存在的路径** |
 | A9 | **PII 遮盖产物** | `06` s2「遮住这一处再继续」 | `POST /materials/tasks {kind:'pii_redact'}` 目前 `redactedFileId` 恒 `null`（`materials.service.ts:617-634`）。要真的产出一份打了码的新 FileObject 并回 `redactedFileId + printFileUrl`，否则 s2→s3 断链 |
 | A10 | **服务端会话钟** | `04` s3、`40` 六处境 | `POST /kiosk/sessions` / `:id/heartbeat` / `:id/extend` / `:id/end`。服务端持 `hintSec/graceSec`，**超时时吊销该会话签发的全部一次性 token**（`x-resume-access-token`、`X-Upload-Session-Control`、`X-Scan-Session-Control`、`x-payment-session-token`）。公共终端的隐私清场只靠前端计时不成立 |
-| A11 | **`GET /me/pending-tasks`** | `04` s5 会话恢复 | `{items:[{kind, refId, title, terminalCode, updatedAt, resumable}]}`，只回本人未完成的。⚠️ 生产 `/session-resume` 已经在调它 |
+| A11 | **通用办理单恢复** | `04` s5 会话恢复 | ⚠️ `GET /me/pending-tasks` **已存在且已接打印恢复**；当前只返回本人的可续办打印任务。若 V3 需要跨 AI/上传/其他办理单的统一恢复，应在 Errand 模型成立后扩展，不能重复建设同名端点。 |
 | A12 | **站点配置下发面** | `01` / `02` / `04` / `21` / `39` / `41` 全站 | `GET /terminals/:id/config` 增 `site:{terminalNo, venueName, cityCode, serviceDeskLocation, serviceHours, supportPhone, peerTerminal, hotline, officialSiteUrl}`。**缺配置返回空串，不返回示例值** —— 前端已有兜底文案（`scripts/site-config.js` 的 `FALLBACK`） |
 
 ### B. 可后做（不阻塞出纸与收钱，但页面要靠它才完整）
@@ -655,10 +655,10 @@ PY
 
 诚实列出，不猜：
 
-1. **Terminal Agent 侧的出纸判定细节。** 我只读了服务端（`services/api/src`），
-   buildout-spec 引用的 `apps/terminal-agent/src/agent/task-runner.ts:495`「队列多次未出现后按完成处理」
-   我**没有亲自打开复核**。A7 那条依据的是 buildout-spec 的结论（它注明已由 Claude 读过该 doc comment），
-   不是我自己的一手证据。Codex 动手前建议自己再看一眼那一段。
+1. **Terminal Agent 侧的出纸判定细节。** **已由 W0 在 `main@6ad3be9f` 复核**：
+   `apps/terminal-agent/src/agent/task-runner.ts:445-448,582-586,662-668,679-704` 对队列未出现、超时和非 Windows 统一
+   fail-closed 为 `PRINT_JOB_UNCONFIRMED`，`:286-299` 对崩溃恢复同样 fail-closed。保留 Windows 真机回归，不再以旧
+   “conservative completed”描述开展修复。
 
 2. **`materials` 的 `pii_redact` 是否在别处真的产出了文件。**
    我确认了 `materials.service.ts:617-634` 只回计数、`redactedFileId` 恒 null（这一点来自子代理读取的行号），

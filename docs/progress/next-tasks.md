@@ -6,17 +6,18 @@
 > 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
 > 「2026-08-10 商用收口后续」及其后各节来自 main。
 >
-> ⚠️ **V3 队列的 W1–W8 写于 2026-08-09/10，已被 2026-08-11 的四份文档部分取代**，
+> ⚠️ **V3 队列的 W1–W8 写于 2026-08-09/10，已被 2026-08-11 的四份文档及 W0 源码再基线部分取代**，
 > 以后者为准：
 > - [`docs/product/codex-handoff-plan-2026-08.md`](../product/codex-handoff-plan-2026-08.md) 窗口划分（两条线共用的唯一答案）
 > - [`docs/reviews/2026-08-11-two-line-reconciliation.md`](../reviews/2026-08-11-two-line-reconciliation.md) 两线对账裁定与最小一致集
 > - [`docs/reviews/2026-08-11-backend-buildout-spec.md`](../reviews/2026-08-11-backend-buildout-spec.md) 后端六项能力实施规格
 > - [`docs/design/kiosk-ai-os-v3-2026-08/wiring-map.md`](../design/kiosk-ai-os-v3-2026-08/wiring-map.md) 功能↔接口对接表
 >
-> 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
+> 其中「视觉一律对齐 V3」这条要按新口径读：**视觉只以产品负责人指定的 `design/v3-entry-remodel` 工作树
+> （本地预览 `127.0.0.1:8961`、`01-home-v6.html` 基线）为准，先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
 
-> 最后更新：2026-08-10
+> 最后更新：2026-08-11
 
 ## V3 设计落地实施队列(分工:Claude=视觉与设计;Codex=以下全部实施,2026-08-09 用户定,2026-08-10 重建)
 
