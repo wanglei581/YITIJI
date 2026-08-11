@@ -84,6 +84,36 @@
 .fb-p b { color: var(--fog-900); }
 .fb-go { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 .fb-go .btn { flex: 1 1 200px; min-height: 56px; }
+
+/* ══════════ 2026-08-11 版面预览（配合「每页放几张 / 留白」接线）══════════
+   为什么要画这张小纸：这两项原来按下去什么都不发生（实测：整个 body 的
+   outerHTML 一个字节都没变），用户等于在盲选。只把按钮点亮还不够 ——
+   「每页 4 张、宽边距」到底长什么样，光看两个字是想不出来的，
+   而它决定的是打出来那张纸。所以给一张按真实比例画的 A4：
+     · 纸面比例锁 210:297，不是随手画的方框；
+     · 内边距 = 所选边距按纸宽等比换算，看到的留白就是纸上的留白；
+     · 格子数 = 所选「每页放几张」，格子里的序号就是装订顺序。
+   这张图不读任何图片内容，纯粹是两个参数的几何投影 —— 不编数据。 */
+/* 纸宽 64px 是量出来的，不是随手定的：右栏「合成后去哪」那张卡在 default /
+   ai-down / device-off 三态下余量只有十几像素，84px 的纸会把「预览合成结果」
+   顶出卡外 17px（v3AuditPlus 的「卡内溢出」当场报出来）。64px 高 90px，
+   比 84px 省 28px，三态都留得下，格子里的序号仍然看得清。 */
+.lay { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
+.lay-pg { flex: 0 0 auto; width: 64px; aspect-ratio: 210 / 297; background: var(--paper-000);
+          border: 1.5px solid var(--paper-200); border-radius: 3px; display: grid; gap: 3px; }
+.lay-pg i { background: var(--jade-a20); border: 1px solid var(--jade-500); border-radius: 2px;
+            display: grid; place-items: center; font-style: normal; font-size: 9px;
+            font-weight: 700; color: var(--jade-600); min-height: 0; min-width: 0; }
+.lay-b { display: flex; flex-direction: column; gap: 4px; font-size: var(--fz-1);
+         color: var(--fog-600); line-height: 1.5; padding-top: 2px; }
+.lay-b b { color: var(--fog-900); font-size: var(--fz-2); }
+
+/* 签名大小：手写板上的墨迹跟着「小 / 中 / 大」等比缩放。
+   缩的是墨迹本身，不是整块板 —— 板是屏上的书写区，纸上那一笔才是参数控制的东西。 */
+.signpad .ink { transform-origin: left center; }
+.screen[data-sig="s"] .signpad .ink { transform: rotate(-3deg) scale(.62); }
+.screen[data-sig="m"] .signpad .ink { transform: rotate(-3deg) scale(1); }
+.screen[data-sig="l"] .signpad .ink { transform: rotate(-3deg) scale(1.5); }
 </style>
 </head>
 <body>
@@ -156,7 +186,7 @@
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 张倾斜 <b>2.1°</b>，已机械校正 <span class="ev ev--e1">E1 读自图片</span></span></span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>清晰度 良 · 最小分辨率 1440×1920</span></span>
           <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>4</b> 张偏暗，建议重拍或调亮</span></span>
-          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>合成后 5 页 A4，约 2.6 MB</span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span data-out="chkOut">合成后 5 页 A4，约 2.6 MB</span></span>
         </div>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 张倾斜 <b>2.1°</b>，已机械校正——纠偏是本机图像处理，不依赖 AI <span class="ev ev--e1">E1 读自图片</span></span></span>
@@ -446,13 +476,31 @@
           <div class="field-lb">页面尺寸<span class="prefill" data-when="default device-off">本机仅支持 A4</span></div>
           <div class="seg"><button aria-pressed="true">A4</button><button aria-pressed="false" aria-disabled="true">A3 不支持</button></div>
         </div>
-        <div class="field">
-          <div class="field-lb">每页放几张<span class="prefill" data-when="default device-off">已按图片方向预设 · 可改</span></div>
-          <div class="seg"><button aria-pressed="true">1 张</button><button aria-pressed="false">2 张</button><button aria-pressed="false">4 张</button></div>
+        <div class="field" data-param="per">
+          <div class="field-lb">每页放几张<span class="prefill" data-when="default device-off" data-out="pf-per">已按图片方向预设 · 可改</span></div>
+          <div class="seg"><button aria-pressed="true" data-v="1">1 张</button><button aria-pressed="false" data-v="2">2 张</button><button aria-pressed="false" data-v="4">4 张</button></div>
         </div>
-        <div class="field">
-          <div class="field-lb">留白</div>
-          <div class="seg"><button aria-pressed="false">无边距</button><button aria-pressed="true">窄边距</button><button aria-pressed="false">宽边距</button></div>
+        <div class="field" data-param="margin">
+          <div class="field-lb">留白<span class="prefill" data-out="pf-margin">窄边距 10mm</span></div>
+          <div class="seg"><button aria-pressed="false" data-v="0">无边距</button><button aria-pressed="true" data-v="10">窄边距</button><button aria-pressed="false" data-v="20">宽边距</button></div>
+          <!-- 版面预览：上面两项直接决定这张纸长什么样，所以预览就贴在它们下面。
+               格子里的数字是装订顺序，与左栏图片卡左上角那个序号是同一套。
+
+               为什么 device-off 那一态不放（data-when 少一个 device-off）：
+               实测右栏最后那张卡在离线态只剩 17px 余量（它比其他三态多一条
+               「打印机离线」的 amber 提示），预览无论缩到多小都会把卡里的内容
+               顶出去 61–80px。缩图不是办法，只能不放。
+               不放不等于不告知：离线态下「每页几张 / 边距」仍在上面两行 prefill 里，
+               页数在右栏「页数」和左栏「合成后 N 页 A4」里，一个事实都没少，
+               少的只是这张示意图。 -->
+          <div class="lay" data-when="default first ai-down">
+            <div class="lay-pg" data-out-lay aria-hidden="true"></div>
+            <span class="lay-b">
+              <b data-out="layPages">5 页 A4</b>
+              <span data-out="layArea">每张图约 190 × 277 mm</span>
+              <span data-out="layNote">5 张图 · 每页 1 张</span>
+            </span>
+          </div>
         </div>
         <div class="field">
           <div class="field-lb">文件名</div>
@@ -465,7 +513,7 @@
       <div class="pane pane--fill" data-at="t1">
         <div class="pane-hd"><span class="t">合成后去哪</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off">5 页</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off" data-out="kvPages">5 页</span><span class="v v--fog" data-when="first">—</span></div>
           <div class="kv-row"><span class="k">预计大小</span><span class="v" data-when="default device-off">约 2.6 MB</span><span class="v v--fog" data-when="ai-down first">合成后可知</span></div>
           <div class="kv-row"><span class="k">原图</span><span class="v">保留，不修改</span></div>
         </div>
@@ -497,6 +545,7 @@
           <div class="kv-row"><span class="k">文件</span><span class="v">求职信_运营助理.pdf</span></div>
           <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
           <div class="kv-row"><span class="k">落款位置</span><span class="v">第 1 页右下</span></div>
+          <div class="kv-row"><span class="k">签名尺寸</span><span class="v" data-out="kvSig">中 · 约 40 × 16 mm</span></div>
         </div>
       </div>
       <div class="pane" data-at="t2">
@@ -505,9 +554,9 @@
           <button class="btn btn--ghost" style="width:100%">清除重写</button>
           <button class="btn btn--ghost" style="width:100%">用已保存的印章</button>
         </div>
-        <div class="field" style="border-bottom:0;padding-bottom:0">
-          <div class="field-lb">大小</div>
-          <div class="seg"><button aria-pressed="false">小</button><button aria-pressed="true">中</button><button aria-pressed="false">大</button></div>
+        <div class="field" data-param="sig" style="border-bottom:0;padding-bottom:0">
+          <div class="field-lb">大小<span class="prefill" data-out="pf-sig">中 · 纸上约 40 × 16 mm</span></div>
+          <div class="seg"><button aria-pressed="false" data-v="s">小</button><button aria-pressed="true" data-v="m">中</button><button aria-pressed="false" data-v="l">大</button></div>
         </div>
       </div>
       <div class="pane pane--fill" data-at="t2">
@@ -568,7 +617,7 @@
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="t1">
-        <div data-when="default device-off"><div class="t">5 张已排好序，第 4 张偏暗</div><div class="s">合成会生成新文件，原图保留不动</div></div>
+        <div data-when="default device-off"><div class="t">5 张已排好序，第 4 张偏暗</div><div class="s"><span data-out="hintLay">每页 1 张 · 窄边距 · 合成 5 页</span>&#160;·&#160;合成会生成新文件，原图保留不动</div></div>
         <div data-when="ai-down"><div class="t">自动排序不可用，请核对左上角序号</div><div class="s">序号就是装订顺序 · 合成功能正常</div></div>
         <div data-when="first"><div class="t">先把图片送进来</div><div class="s">本机选择 / 手机扫码传 / U 盘</div></div>
       </div>
@@ -625,6 +674,139 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P08 · 输出参数联动（2026-08-11 死按钮整改）
+   --------------------------------------------------------------------------
+   实测（http 干净页，逐个真按一下，比较整个 body 的 outerHTML + location +
+   data-stage）：右栏 11 个 .seg 按钮**全部**按下去零变化 ——
+     每页放几张 1/2/4、留白 无/窄/宽、签名大小 小/中/大 各三个，
+     加上页面尺寸 A4 / A3不支持。
+   回归台只报出其中 5 个，是因为「同类控件 N−1」会把当时已经选中的那一个
+   （1 张 / 窄边距 / 中）滤掉 —— 它们并不是活的，只是恰好点了也该没反应。
+
+   为什么这是要命的一类：这三组决定的是**打出来那张纸长什么样**，
+   而下一步就是拿着这份 PDF 去 06 付钱。参数改不动却照着它付钱，
+   等于让用户为一个他没选过的版面掏钱。
+
+   接线口径（三条，缺一不可）：
+     ① 选中态跟着变（同组互斥，aria-pressed 同步，读屏能报出来）；
+     ② 下游真的动：页数、每张图在纸上的尺寸、版面预览、右栏「合成后去哪」、
+        底部提示条，全部由同一份 layout() 算出来，不各写各的；
+     ③ **成品出口跟着动** —— 「去打印」那条链接带的 pages= 必须是改完之后的页数，
+        不能还是写死的 5。不然用户在这里选了「每页 4 张」，到 06 仍按 5 页核价，
+        钱就收错了。这一条是本次整改真正要堵的洞。
+
+   页面尺寸那一组不接线，是对的：A4 本来就是选中态，A3 硬件不支持（aria-disabled）。
+   按第 3 条口径，只保证状态可读，不为了消掉报警而造一个假反应。
+
+   刻意不动的：预计大小恒定「约 2.6 MB」。版面换了，图片字节数并不会变，
+   编一个跟着变的数字才是伪造。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* 图片张数读自左栏真实存在的卡片，不写死 —— 加一张删一张，这里跟着变 */
+  function imgCount () {
+    return scr.querySelectorAll('.traygrid .tile-img:not(.tile-img--add)').length
+  }
+
+  var P = { per: 1, margin: 10, sig: 'm' }
+  var SIG = { s: { nm: '小', w: 25, h: 10 }, m: { nm: '中', w: 40, h: 16 }, l: { nm: '大', w: 60, h: 24 } }
+  var MG = { 0: '无边距', 10: '窄边距', 20: '宽边距' }
+
+  function set (name, v) {
+    var els = scr.querySelectorAll('[data-out="' + name + '"]')
+    for (var i = 0; i < els.length; i++) els[i].textContent = v
+  }
+  function setSeg (param, v) {
+    var f = scr.querySelector('.field[data-param="' + param + '"]')
+    if (!f) return
+    var bs = f.querySelectorAll('.seg button[data-v]')
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === String(v) ? 'true' : 'false')
+    }
+  }
+
+  /* A4 = 210 × 297mm。可用区 = 纸面减两条边距；多格时按 4mm 装订缝分。
+     全部是这两个参数的算术，不读图片内容，也不猜 —— 所以敢把毫米数写在脸上。 */
+  var GAP = 4
+  function layout () {
+    var n = imgCount()
+    var per = P.per, m = P.margin
+    var uw = 210 - 2 * m, uh = 297 - 2 * m
+    var gap = m > 0 ? GAP : 0
+    var cols = per === 4 ? 2 : 1
+    var rows = per === 1 ? 1 : 2
+    var w = Math.round((uw - gap * (cols - 1)) / cols)
+    var h = Math.round((uh - gap * (rows - 1)) / rows)
+    return { n: n, per: per, cols: cols, rows: rows, w: w, h: h,
+             pages: n ? Math.ceil(n / per) : 0 }
+  }
+  /* 出口链接要用的页数：08 的三条出口共用它，别处不许再写死一个数 */
+  window.__p08pages = function () { return layout().pages }
+
+  function paintPage (L) {
+    var box = scr.querySelector('[data-out-lay]')
+    if (!box) return
+    var pad = P.margin * 0.4                      /* 84px 宽 ↔ 210mm，1mm = 0.4px */
+    box.style.padding = pad + 'px'
+    box.style.gap = (P.margin > 0 ? GAP * 0.4 : 0) + 'px'
+    box.style.gridTemplateColumns = 'repeat(' + L.cols + ', 1fr)'
+    box.style.gridTemplateRows = 'repeat(' + L.rows + ', 1fr)'
+    var want = L.per, have = box.children.length
+    while (have > want) { box.removeChild(box.lastChild); have-- }
+    while (have < want) { box.appendChild(document.createElement('i')); have++ }
+    for (var i = 0; i < box.children.length; i++) box.children[i].textContent = String(i + 1)
+  }
+
+  function render () {
+    var L = layout()
+    var first = scr.getAttribute('data-state') === 'first'
+    paintPage(L)
+
+    set('pf-per', '每页 ' + L.per + ' 张 · 可改')
+    set('pf-margin', MG[P.margin] + (P.margin ? ' ' + P.margin + 'mm' : ' 0mm'))
+    set('layArea', '每张图约 ' + L.w + ' × ' + L.h + ' mm')
+
+    if (first || !L.n) {
+      /* 没有图就没有页数 —— 不摆一个算出来的假页数 */
+      set('layPages', '还没有图片')
+      set('layNote', '添加图片后按每页 ' + L.per + ' 张排版')
+      set('chkOut', '还没有图片')
+      set('kvPages', '—')
+      set('hintLay', '每页 ' + L.per + ' 张 · ' + MG[P.margin])
+    } else {
+      set('layPages', L.pages + ' 页 A4')
+      set('layNote', L.n + ' 张图 · 每页 ' + L.per + ' 张')
+      set('chkOut', '合成后 ' + L.pages + ' 页 A4，约 2.6 MB')
+      set('kvPages', L.pages + ' 页')
+      set('hintLay', '每页 ' + L.per + ' 张 · ' + MG[P.margin] + ' · 合成 ' + L.pages + ' 页')
+    }
+
+    var S = SIG[P.sig]
+    scr.setAttribute('data-sig', P.sig)
+    set('pf-sig', S.nm + ' · 纸上约 ' + S.w + ' × ' + S.h + ' mm')
+    set('kvSig', S.nm + ' · 约 ' + S.w + ' × ' + S.h + ' mm')
+
+    setSeg('per', P.per); setSeg('margin', P.margin); setSeg('sig', P.sig)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var b = e.target.closest('.field[data-param] .seg button[data-v]')
+    if (!b || b.getAttribute('aria-disabled') === 'true') return
+    var p = b.closest('.field').getAttribute('data-param')
+    var v = b.getAttribute('data-v')
+    P[p] = (p === 'sig') ? v : +v
+    render()
+  })
+
+  /* 四态切换会换掉左栏的图片网格（first 态没有图），页数得跟着重算 */
+  new MutationObserver(render).observe(scr, { attributes: true, attributeFilter: ['data-state', 'data-stage'] })
+  render()
 })()
 </script>
 <script>
@@ -694,12 +876,17 @@
   var FB = {
     merge: function () {
       var nm = '合成_20260808_0952.pdf'
+      /* 2026-08-11：这三个 5 原来是写死的。右栏「每页放几张」接上线之后，
+         选「每页 4 张」实际只有 2 页 —— 再按写死的 5 页交到 06，
+         用户就要为三页不存在的纸付钱。页数一律问参数联动那一段要。 */
+      var pg = (typeof window.__p08pages === 'function') ? window.__p08pages() : 5
+      var imgs = document.querySelectorAll('.traygrid .tile-img:not(.tile-img--add)').length
       return {
-        t: '已合成 1 份 PDF · 5 页 A4',
-        p: '<b>' + nm + '</b>（5 页 A4，约 2.6 MB）已生成，<b>5 张原图保留不动</b>。' +
+        t: '已合成 1 份 PDF · ' + pg + ' 页 A4',
+        p: '<b>' + nm + '</b>（' + pg + ' 页 A4，约 2.6 MB）已生成，<b>' + imgs + ' 张原图保留不动</b>。' +
            '文件只留到本次会话结束，访问链接 30 分钟到期。' + offNote() +
            '<br>接下来把它带去哪：金额一律在打印工作台核价，本页不收款。',
-        go: exits(nm, 5)
+        go: exits(nm, pg)
       }
     },
     sign: function () {

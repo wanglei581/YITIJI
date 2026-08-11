@@ -311,10 +311,17 @@
           <span class="mt" data-when="default device-off" data-out="fmeta">A4 · 1 页 · 约 320 字</span>
           <span class="mt" data-when="ai-down">未生成</span>
           <span class="mt" data-when="first">还没有简历</span>
+          <!-- 2026-08-11 死按钮复核：回归台报这两个翻页键「按下去什么都不发生」。
+               核实结果是**本来就不该有反应** —— 求职信恒定 1 页（下面 render() 里
+               fmeta 写的就是「A4 · 1 页」，篇幅 200/300/500 字只改纸面排布，不会翻到第 2 页），
+               一共一页，没有上一页也没有下一页。
+               所以不给它接线：为了消掉一条报警而造一个假翻页，比留着这条报警更糟。
+               改成 aria-disabled，让「没得翻」这件事读屏和回归台都能读出来，
+               不再是一个看起来能按、按了没反应的键。 -->
           <span class="pg" data-when="default device-off">
-            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <button class="pgbtn" aria-label="上一页 · 本文只有 1 页" aria-disabled="true"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
             <span>第 1 / 共 1 页</span>
-            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+            <button class="pgbtn" aria-label="下一页 · 本文只有 1 页" aria-disabled="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
           </span>
         </div>
         <div class="paper-stage">
@@ -1169,6 +1176,43 @@
     if (f) { openFb(FB[f.getAttribute('data-fb')]()); return }
   })
   fb.addEventListener('click', function (e) { if (e.target === fb) fb.hidden = true })
+
+  /* ══════════════════════════════════════════════════════════════════════
+     离场确认里的「存进「我的文档」，再离开」——真正把它接上（2026-08-11）
+     ----------------------------------------------------------------------
+     本页 `.screen` 写了 data-guard-keep-t2，弹层会多出第三个按钮；可全站
+     `grep -rn "lg:keep"` 除 leaveguard.js 自己以外**零个监听**（那份文件 :158
+     的注释记着这条实测）。没人监听 → dispatchEvent 返回 true → close(true)
+     → 直接跳走。用户按的是「存下来再走」，实际发生的是「不存，直接走」。
+
+     三步同 07（两页刻意用同一套写法，免得下一个人要读两遍）：
+       ① preventDefault()：事件 `bubbles:false`，**只能挂捕获** —— 捕获阶段沿
+          window → document → body → .lg-mask 走，与 bubbles 无关；挂冒泡收不到。
+       ② 借弹层自己的「留在这一步」关掉它：不解掉 leaveguard 的 pending，
+          之后每一次会离开本页的点击都会被它 preventDefault + stopPropagation 吃掉。
+       ③ 走本页**真实存在**的存档路径 —— 就是 t2「这两版拿去做什么」里那个
+          四态常驻的「存进我的文档」（:618）所走的 FB.save()，回执一字不改地复用它。
+          刻意不为弹层另写一份回执：同一个动作在两个入口给两种说法，
+          用户没法判断哪一次才真的存了。
+          回执上补一个「继续去…」，按它才真正离开 —— 先回执后离开，顺序不能反。
+
+     只挂 t2，与 data-guard-keep-t2 的范围一致：t1 的同名按钮只在 device-off
+     那一态出现，默认态下没有落点，所以那一步本来就没有 keep 按钮可按。
+     ══════════════════════════════════════════════════════════════════════ */
+  document.addEventListener('lg:keep', function (e) {
+    e.preventDefault()
+    var href = (e.detail && e.detail.href) || ''
+    var mask = document.querySelector('.lg-mask')
+    var stay = mask && mask.querySelector('.lg-stay')
+    if (stay) stay.click()
+
+    var o = FB.save()
+    o.go = [{ t: '去「我的 · 文档」查看', href: '42-my-assets.html?stage=docs&from=P12', primary: true }]
+    if (href) o.go.push({ t: '继续去刚才那一页', href: href })
+    o.go.push({ t: '留在材料工厂' })
+    openFb(o)
+    if (window.v3Guard && window.v3Guard.off) window.v3Guard.off()
+  }, true)
 
   /* ── 带入回执：只有真带了参数才插进 DOM（同 P13 / P21 口径）────────────── */
   function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }

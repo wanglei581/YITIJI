@@ -1021,6 +1021,55 @@
   })
   fb.addEventListener('click', function (e) { if (e.target === fb) closeFb() })
 
+  /* ══════════════════════════════════════════════════════════════════════
+     离场确认里的「存进「我的文档」，再离开」——真正把它接上（2026-08-11）
+     ----------------------------------------------------------------------
+     修的是什么：本页 `.screen` 上写了 data-guard-keep-s4，弹层因此会多出
+     第三个按钮。可全站 `grep -rn "lg:keep"` 除 leaveguard.js 自己以外**零个监听**
+     （那份文件 :158 的注释就记着这条实测）。没人监听 → dispatchEvent 返回 true
+     → leaveguard 走 close(true) → 直接 location.href 跳走。
+     也就是说：用户按的是「存下来再走」，实际发生的是「不存，直接走」。
+     一个专门用来防丢东西的按钮，本身在丢东西。
+
+     契约是对的，缺的是页面这一侧的实现。这里补齐三步：
+
+       ① preventDefault() —— dispatchEvent 随即返回 false，leaveguard 不再放行。
+          事件是 `bubbles:false` 的，所以只能挂**捕获**监听：捕获阶段沿
+          window → document → body → .lg-mask 走，与 bubbles 无关；
+          挂冒泡永远收不到（实测过，不是推断）。
+
+       ② 先关弹层再存 —— 借弹层自己的「留在这一步」把 pending 解掉并 resolve(false)，
+          等于告诉 leaveguard「这一次不走」。不这么做 pending 会一直挂着，
+          之后所有会离开本页的点击都被它吃掉（leaveguard 对 pending 的处理是
+          preventDefault + stopPropagation），整页导航就死了。
+
+       ③ 走本页**真实存在**的那条存档路径，回执用它自己那一份 —— FB.save()。
+          这份回执写的是「正在存入」＋「保存结果以文档列表为准」，并给出
+          42-my-assets 的核对链接；它不替服务端宣布已经存好。
+          本轮不新造一句「已存好」：设计稿这一层没有落盘能力，
+          编一句完成态就是伪造能力（CLAUDE.md §9）。
+          回执上再补一个「继续去…」，用户按它才真正离开 —— 先回执后离开，
+          顺序不能反。
+
+     data-guard-keep 只挂 s4，而 s4 右栏那条「存进「我的·文档」」四态常驻，
+     所以这条路径在四态下都有真实落点，不存在「按了没地方存」的情形。
+     ══════════════════════════════════════════════════════════════════════ */
+  document.addEventListener('lg:keep', function (e) {
+    e.preventDefault()                                   /* ① 不许直接放行 */
+    var href = (e.detail && e.detail.href) || ''
+    var mask = document.querySelector('.lg-mask')
+    var stay = mask && mask.querySelector('.lg-stay')
+    if (stay) stay.click()                               /* ② 关弹层 + 解 pending */
+
+    var o = FB.save()                                    /* ③ 走本页真实的存档路径 */
+    o.go = [{ t: '去「我的 · 文档」核对', href: '42-my-assets.html?stage=docs&from=P07', primary: true }]
+    if (href) o.go.push({ t: '继续去刚才那一页', href: href })
+    o.go.push({ t: '留在扫描台' })
+    openFb(o)
+    /* 存档动作已经发起，再拦就是重复报警；闩一起解开（leaveguard 的 off() 语义） */
+    if (window.v3Guard && window.v3Guard.off) window.v3Guard.off()
+  }, true)
+
   render()
   addEventListener('load', render)
 })()

@@ -1036,8 +1036,8 @@
 
         <div class="cash-amt">
           <span class="lb">应付</span>
-          <span class="num">3.00<i>元</i></span>
-          <span class="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
+          <span class="num"><span data-out="amtNum">3.00</span><i>元</i></span>
+          <span class="brk" data-out="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
         </div>
 
         <div class="cash-mode" data-pay="wait scan expired query">
@@ -1076,7 +1076,7 @@
           <svg class="ic"><use href="#i-clock"/></svg>已收到扫码，正在等支付渠道回传到账结果 · <b>不要重复支付</b>
         </span>
         <span class="cash-st cash-st--ok" data-pay="paid">
-          <svg class="ic"><use href="#i-check"/></svg>已到账 3.00 元 · 按下面的按钮开始出纸
+          <svg class="ic"><use href="#i-check"/></svg>已到账 <span data-out="amt">3.00 元</span> · 按下面的按钮开始出纸
         </span>
         <span class="cash-st cash-st--bad" data-pay="expired">
           <svg class="ic"><use href="#i-alert"/></svg>本码已失效并作废 · 重新出码会同时关闭旧码，不会两个码都能付
@@ -1140,7 +1140,7 @@
           <span class="jobsum-ic"><svg class="ic"><use href="#i-file"/></svg></span>
           <span class="jobsum-b">
             <span class="jobsum-t">正在处理：个人简历.pdf</span>
-            <span class="jobsum-m">黑白 · 自动双面 · 5 份 · 15 个印刷面 · 用纸 10 张</span>
+            <span class="jobsum-m" data-out="jobsum">黑白 · 自动双面 · 5 份 · 15 个印刷面 · 用纸 10 张</span>
           </span>
         </div>
 
@@ -1185,7 +1185,7 @@
 
         <div class="notice notice--coral jstate" data-job="checkfail" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>第 2 页字体没内嵌，打出来会是方框。</b>没出纸，已原路退款 3.00 元。</span>
+          <span><b>第 2 页字体没内嵌，打出来会是方框。</b>没出纸，已原路退款 <span data-out="amt">3.00 元</span>。</span>
         </div>
         <!-- 2026-08-11：校验失败这一步用户必须当场做选择，选项说明不能藏在折叠条里。 -->
         <div class="restnote" data-job="checkfail" style="max-width:40em">
@@ -1342,7 +1342,7 @@
         </div>
         <div class="doneline" data-done="again" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>已按同参数新建一单：<b>黑白 · 双面 · 5 份 · 15 面</b> · 需重新核价与支付</span>
+          <span>已按同参数新建一单：<b data-out="againsum">黑白 · 双面 · 5 份 · 15 面</b> · 需重新核价与支付</span>
           <button class="btn btn--primary" data-go="s4" data-done-go="none">去核价</button>
           <button class="btn btn--quiet" data-done-go="none">算了</button>
         </div>
@@ -1520,75 +1520,82 @@
           <span class="s" data-when="ai-down first">需你设置</span>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="copies">
           <div class="field-lb">份数
             <span class="prefill" data-when="default device-off"><svg class="ic" style="width:11px;height:11px"><use href="#i-brain"/></svg>已按招聘会规模预设 · 可改</span>
           </div>
           <div class="stepper">
-            <button aria-label="减少"><svg class="ic"><use href="#i-minus"/></svg></button>
-            <span class="val">5<span class="unit"> 份</span></span>
-            <button aria-label="增加"><svg class="ic"><use href="#i-plus"/></svg></button>
+            <button aria-label="减少一份" data-step="-1"><svg class="ic"><use href="#i-minus"/></svg></button>
+            <span class="val" data-out="copiesVal">5<span class="unit"> 份</span></span>
+            <button aria-label="增加一份" data-step="1"><svg class="ic"><use href="#i-plus"/></svg></button>
           </div>
+          <!-- 到上限/下限时必须当场说一句。静默停住 = 用户按了没反应，
+               跟本次修的那一类死按钮是同一个病。 -->
+          <p class="fnote" data-out="copiesNote" hidden></p>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="color">
           <div class="field-lb">色彩
-            <span class="prefill" data-when="default device-off">已按文件内容预设 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfColor">已按文件内容预设 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">黑白</button>
-            <button aria-pressed="false" data-when="default first ai-down">彩色</button>
+            <button aria-pressed="true" data-v="bw">黑白</button>
+            <button aria-pressed="false" data-v="color" data-when="default first ai-down">彩色</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">彩色不可用</button>
           </div>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="duplex">
           <div class="field-lb">单双面
-            <span class="prefill" data-when="default device-off">已按页数预设 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfDuplex">已按页数预设 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="false">单面</button>
-            <button aria-pressed="true" data-when="default first ai-down">自动双面</button>
+            <button aria-pressed="false" data-v="single">单面</button>
+            <button aria-pressed="true" data-v="duplex" data-when="default first ai-down">自动双面</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">双面不可用</button>
           </div>
+          <p class="fnote" data-out="duplexNote">自动双面：3 页 5 份用纸 10 张。印刷面仍是 15 面 —— 一张纸两面按 2 面计，所以钱不变，省的是纸。</p>
         </div>
 
         <!-- 翻页边只在自动双面下才有意义，所以挂在双面之后、且写清后果。
-             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。 -->
-        <div class="field" data-when="default first ai-down">
+             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。
+             2026-08-11：选了「单面」这一整块就不该在了 —— 单面没有「翻过来的那一面」。
+             整块的显隐由参数联动脚本按 data-duplex 控制（不用 hidden，那是
+             applyVisibility() 独占的，一切四态就会被覆盖）。 -->
+        <div class="field" data-when="default first ai-down" data-only-duplex>
           <div class="field-lb">双面翻页边
             <span class="prefill">简历按长边翻 · 可改</span>
           </div>
-          <div class="seg">
-            <button aria-pressed="true">长边翻（像书）</button>
-            <button aria-pressed="false">短边翻（像记事本）</button>
+          <div class="seg" data-param="flip">
+            <button aria-pressed="true" data-v="long">长边翻（像书）</button>
+            <button aria-pressed="false" data-v="short">短边翻（像记事本）</button>
           </div>
-          <p class="fnote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
+          <p class="fnote" data-out="flipNote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="orient">
           <div class="field-lb">页面方向
-            <span class="prefill" data-when="default device-off">按文件里的方向 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfOrient">按文件里的方向 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">跟随文件（纵向）</button>
-            <button aria-pressed="false">强制横向</button>
+            <button aria-pressed="true" data-v="follow">跟随文件（纵向）</button>
+            <button aria-pressed="false" data-v="land">强制横向</button>
           </div>
-          <p class="fnote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
+          <p class="fnote" data-out="orientNote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
         </div>
 
         <!-- 幅面与缩放：硬件只有 A4，不支持 A3。
              非 A4 文件必须让用户明确选一次，不能静默缩放 —— 静默缩放会把表格压到看不清。 -->
-        <div class="field">
+        <div class="field" data-param="scale">
           <div class="field-lb">幅面与缩放
-            <span class="prefill" data-when="default device-off">已检出 A4 · 无需缩放</span>
+            <span class="prefill" data-when="default device-off" data-out="pfScale">已检出 A4 · 无需缩放</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">按原尺寸（100%）</button>
-            <button aria-pressed="false">缩放到 A4</button>
+            <button aria-pressed="true" data-v="none">按原尺寸（100%）</button>
+            <button aria-pressed="false" data-v="fit">缩放到 A4</button>
           </div>
           <!-- 2026-08-10 Codex :573：整段压成一句，细节折叠。口径一字不改。 -->
-          <p class="fnote">仅支持 A4；非 A4 文件须确认缩放。</p>
+          <p class="fnote" data-out="scaleNote">仅支持 A4；非 A4 文件须确认缩放。</p>
           <details class="fold" style="margin-top:8px">
             <summary>换成 A3 或 Letter 会怎样</summary>
             <div class="fold-b">这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
@@ -1597,9 +1604,9 @@
         </div>
 
         <div class="field">
-          <div class="field-lb">页码范围</div>
+          <div class="field-lb">页码范围<span class="prefill" data-out="pfRange">全部 3 页</span></div>
           <div class="seg">
-            <button aria-pressed="true" id="rng-all">全部 3 页</button>
+            <button aria-pressed="true" id="rng-all" data-out="rngAllLb">全部 3 页</button>
             <button aria-pressed="false" id="rng-custom">自定义</button>
           </div>
           <label class="goalfield" id="rng-input" style="height:52px;border-radius:var(--r-xs);margin-top:10px;display:none">
@@ -1652,7 +1659,7 @@
         <div class="pane-hd"><span class="t">单价对照</span><span class="s">以屏上公示为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
-          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v" data-site-unit="bw">0.20 元</span></div>
           <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
         </div>
       </div>
@@ -1662,7 +1669,7 @@
       <div class="pane" data-at="s4" data-review style="border-style:dashed">
         <div class="pane-hd"><span class="t" style="color:var(--fog-600)">核价结果（服务端决定，此处可切换查看）</span></div>
         <div class="cash-demo" style="position:static;justify-content:flex-start">
-          <button data-pay-btn="wait" aria-pressed="true">应付 3.00 元 · 走收银</button>
+          <button data-pay-btn="wait" aria-pressed="true">应付 <span data-out="amt">3.00 元</span> · 走收银</button>
           <button data-pay-btn="free">应付 0.00 元 · 跳过收银</button>
         </div>
       </div>
@@ -1672,9 +1679,9 @@
         <div class="pane-hd"><span class="t">支付前请核对</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf · 3 页</span></div>
-          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 自动双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">印刷面数</span><span class="v">15 面</span></div>
-          <div class="kv-row"><span class="k">用纸</span><span class="v">10 张</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 自动双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">印刷面数</span><span class="v" data-out="faces">15 面</span></div>
+          <div class="kv-row"><span class="k">用纸</span><span class="v" data-out="sheets">10 张</span></div>
           <!-- 付钱前最后一次说清打印件到底含不含身份证号。整改前这里恒定写「未遮盖」，
                即使用户刚遮过也一样 —— 那会让人以为刚才那一下白做了。 -->
           <div class="kv-row"><span class="k">隐私命中</span>
@@ -1732,8 +1739,8 @@
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
-          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
-          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v">1.50 元</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v" data-site-unit="bw">0.20 元</span></div>
+          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v" data-site-unit="color">1.50 元</span></div>
           <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
           <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
           <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
@@ -1816,14 +1823,14 @@
             <span class="v" data-when="default first ai-down" data-job="jam" style="color:var(--coral-400)"><span class="dot dot--down"></span>卡纸暂停</span>
             <span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
           <div class="kv-row"><span class="k">已完成</span>
-            <span class="v" data-job="printing">3 / 15 面</span>
-            <span class="v" data-job="jam">3 / 15 面（暂停在第 4 面）</span>
-            <span class="v" data-job="queued checking timeout">0 / 15 面 · 还没开始出纸</span>
+            <span class="v" data-job="printing">3 / <span data-out="facesN">15</span> 面</span>
+            <span class="v" data-job="jam">3 / <span data-out="facesN">15</span> 面（暂停在第 4 面）</span>
+            <span class="v" data-job="queued checking timeout">0 / <span data-out="facesN">15</span> 面 · 还没开始出纸</span>
             <span class="v" data-job="checkfail">0 面 · 一张纸都没出</span></div>
           <div class="kv-row"><span class="k">支付</span>
-            <span class="v" data-job="printing queued checking jam">已支付 3.00 元</span>
-            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 3.00 元</span>
-            <span class="v" data-job="timeout">已支付 3.00 元 · 未打可申请退款</span></div>
+            <span class="v" data-job="printing queued checking jam">已支付 <span data-out="amt">3.00 元</span></span>
+            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 <span data-out="amt">3.00 元</span></span>
+            <span class="v" data-job="timeout">已支付 <span data-out="amt">3.00 元</span> · 未打可申请退款</span></div>
           <div class="kv-row"><span class="k">取件码</span><span class="v">7742 106 358</span></div>
         </div>
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
@@ -1836,8 +1843,8 @@
         <div class="pane-hd"><span class="t">本次订单</span><span class="s">#PT-20260808-0431</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
-          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">面数</span><span class="v">15 面 · 用纸 10 张</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">面数</span><span class="v" data-out="facesSheets">15 面 · 用纸 10 张</span></div>
           <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
           <div class="kv-row"><span class="k">去向</span><span class="v">已进「我的 · 打印订单」</span></div>
           <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
@@ -1893,7 +1900,7 @@
         <div data-when="first"><div class="t">还没有文件</div><div class="s">回第 1 步把材料送进来</div></div>
       </div>
       <div data-at="s3">
-        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s">黑白&#160;·&#160;自动双面&#160;·&#160;5 份&#160;·&#160;全部 3 页</div></div>
+        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s" data-out="hintParams">黑白&#160;·&#160;自动双面&#160;·&#160;5 份&#160;·&#160;全部 3 页</div></div>
         <div data-when="ai-down first"><div class="t">请确认打印参数</div><div class="s">预填不可用，四项都需要你自己设</div></div>
       </div>
       <div data-at="s4">
@@ -1902,16 +1909,16 @@
         <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
       </div>
       <div data-at="s5">
-        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效&#160;·&#160;失效会自动作废，不会重复收款</div></div>
+        <div data-pay="wait"><div class="t">用手机扫屏上的码付 <span data-out="amt">3.00 元</span></div><div class="s">本码 4:32 后失效&#160;·&#160;失效会自动作废，不会重复收款</div></div>
         <div data-pay="scan"><div class="t">把手机付款码对准取景框</div><div class="s">本机只读取一次，不保存你的付款码</div></div>
         <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付&#160;·&#160;手机已成功但这里没动，按「帮我查」</div></div>
-        <div data-pay="paid"><div class="t">已到账 3.00 元</div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
+        <div data-pay="paid"><div class="t">已到账 <span data-out="amt">3.00 元</span></div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
         <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码&#160;·&#160;这笔钱没有扣</div></div>
         <div data-pay="query"><div class="t">正在按订单号向渠道查这笔钱</div><div class="s">查询结果来自支付渠道，本机不替渠道下结论</div></div>
         <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印&#160;·&#160;文件还在本次会话</div></div>
       </div>
       <div data-at="s6">
-        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面&#160;·&#160;用纸 10 张</div></div>
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 <span data-out="facesN">15</span> 面&#160;·&#160;用纸 <span data-out="sheetsN">10</span> 张</div></div>
         <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单&#160;·&#160;约 3 分钟</div><div class="s">钱已收，不会重复收&#160;·&#160;可以离开，凭取件码回来打</div></div>
         <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前&#160;·&#160;宁可现在拦住</div></div>
         <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款&#160;·&#160;换文件或让本机转一次</div></div>
@@ -2490,6 +2497,13 @@
                MAX_PAGES + ' 页处理，请核对后再付款。')
   }
 
+  /* 把**本机最终采用**的那两个数交给下面的参数联动脚本（2026-08-11）。
+     只在 from 命中登记表这一支之后才走到这里 —— 上面 ① 那一支是直接 return 的，
+     所以「不认识的来源」依然一个数都不采纳，护栏没有被绕开。
+     导出的是夹过上限之后的值：联动脚本据此起算，份数步进器也不会再显示
+     一个与核价对不上的旧数（原来交接说 1 份、步进器仍写 5 份，两处打架）。 */
+  window.V3P06 = { pages: pages || 0, copies: copies || 0, maxPages: MAX_PAGES, maxCopies: MAX_COPIES }
+
   /* ①′ 回执正文 —— 全部用 textContent 拼，URL 里带标签也只会当字面文字显示 */
   if (line) {
     wipe()
@@ -2647,6 +2661,264 @@
   alt.setAttribute('href', own.f)
   alt.textContent = own.n + '首页'
   back.parentNode.insertBefore(alt, back.nextSibling)
+})()
+</script>
+<!-- 计价单一真源。本页此前**没有**引这份文件，于是 0.20 / 1.50 / 3.00 是手抄在
+     十几处 HTML 里的字面量 —— 单价一改就要满页找，而且改漏一处账就加不拢。
+     site-config.js 只读不写：它提供 v3Price() 与 data-site-unit，不改页面结构。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P06 · 打印参数联动（2026-08-11 死按钮整改）
+   --------------------------------------------------------------------------
+   ── 实测出来的病情（http 干净页，逐个真按一下，比较整个 body 的 outerHTML
+      + location + data-stage）：s3「打印参数」整块 14 个控件里，**13 个是死的**。
+      唯一活着的是「页码范围 · 自定义」。死的包括：
+
+        份数 −／＋（回归台报的那条「(空文字)」就是它俩，按钮里只有图标没有文字）
+        色彩 黑白／彩色
+        单双面 单面／自动双面
+        双面翻页边 长边翻／短边翻
+        页面方向 跟随文件／强制横向
+        幅面与缩放 按原尺寸／缩放到 A4
+        页码范围 全部 3 页（这一个是**已经选中**，本来就该没反应）
+
+      其中份数最要命：它直接乘进金额。屏幕上写着「3 页 × 5 份 = 15 个印刷面 ·
+      应付 3.00 元」，而那个 5 用户一下也改不动 —— 只想打 1 份的人，
+      要么照着 5 份付 3.00 元，要么走人。这不是少个交互，是收错钱。
+
+   ── 接线之后金额怎么算（口径与 site-config.js 一致，全站唯一一套）：
+        印刷面 faces = 有效页数 × 份数
+        用纸  sheets = ceil(有效页数 ÷ (双面?2:1)) × 份数
+        应付        = v3Price(faces, 黑白?undefined:'color')
+      默认值代回去：3 页 × 5 份 = 15 面，双面用纸 ceil(3/2)×5 = 10 张，
+      15 × 0.20 = 3.00 元 —— 与改动前页面上写死的那三个数**逐字相同**，
+      所以这次接线没有偷偷改价，只是把它们从字面量变成算出来的。
+
+   ── 一条必须说清楚的取舍：**单／双面不改变金额**。
+      本机按「印刷面」计价，一张纸正反两面算 2 面（单价对照表里写着「双面按 2 面计」）。
+      3 页无论单面双面都是 3 个印刷面，变的只有纸：双面 10 张、单面 15 张。
+      所以这一项的下游是**用纸张数 + 翻页边整块的显隐**，不是钱。
+      让它去改金额才是编数 —— 那等于按纸收费，与屏上公示的单位自相矛盾，
+      账立刻加不拢。这一点在 duplexNote 里对用户明写，不藏在代码注释里。
+
+   ── 与交接护栏的关系（不得改坏，本次也确实没动）：
+      title / pages / copies 依旧只在 from 命中登记表时才被采纳 —— 采纳逻辑
+      整个留在上面那段契约脚本里，一行未改；本段只**读**它导出的 window.V3P06。
+      from 不认识的那一支在护栏里是直接 return 的，走不到导出那一行，
+      所以这里拿到的是 undefined，起算值落回 HTML 里的样例（3 页 / 5 份），
+      不会把链接里的数字偷渡进核价。超限夹取与「系统改了什么」的告知也仍归护栏。
+
+   ── 不伪造能力：s3 的「应付」一格保持「未核价」不动（服务端才有权定价），
+      本段只动**用量**（面数 / 用纸）与 s4 之后那些本来就写着金额的位置；
+      交接来的那句「本机还没体检这份文件，页数与费用以体检为准」由护栏挂着，
+      本段一个字都不碰。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var H = window.V3P06 || {}
+  var MAXC = H.maxCopies || 99
+  /* 起算值：交接采纳过就用采纳后的，否则用 HTML 里的样例（个人简历.pdf · 3 页 / 5 份） */
+  var TOTAL = H.pages || 3
+  var P = {
+    copies: H.copies || 5,
+    color: 'bw',
+    duplex: 'duplex',
+    flip: 'long',
+    orient: 'follow',
+    scale: 'none',
+    range: 'all'
+  }
+
+  var elAll = document.getElementById('rng-all')
+  var elCus = document.getElementById('rng-custom')
+  var elIn = document.querySelector('#rng-input input')
+  var elNote = document.getElementById('rng-note')
+
+  function set (name, v) {
+    var els = scr.querySelectorAll('[data-out="' + name + '"]')
+    for (var i = 0; i < els.length; i++) els[i].textContent = v
+  }
+  function setSeg (param, v) {
+    var f = scr.querySelector('[data-param="' + param + '"]')
+    if (!f) return
+    var bs = f.querySelectorAll('button[data-v]')
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === v ? 'true' : 'false')
+    }
+  }
+
+  /* 页码范围解析。「超出 1–N 的页码会被忽略，不会静默按全部打印」是页面
+     自己写在 #rng-note 上的承诺 —— 那就真的按它做，并把忽略了哪些当场列出来。 */
+  function parseRange (s, total) {
+    var got = {}, bad = [], i, k
+    var toks = String(s || '').split(/[,，]/)
+    for (i = 0; i < toks.length; i++) {
+      var t = toks[i].trim(); if (!t) continue
+      var m = t.match(/^(\d+)\s*[-–~]\s*(\d+)$/)
+      if (m) {
+        var a = +m[1], b = +m[2]
+        if (a > b) { var tmp = a; a = b; b = tmp }
+        var any = false
+        for (k = a; k <= b; k++) { if (k >= 1 && k <= total) { got[k] = 1; any = true } }
+        if (!any || a < 1 || b > total) bad.push(t)
+        continue
+      }
+      if (/^\d+$/.test(t)) {
+        var n = +t
+        if (n >= 1 && n <= total) got[n] = 1; else bad.push(t)
+        continue
+      }
+      bad.push(t)
+    }
+    var list = Object.keys(got).map(Number).sort(function (x, y) { return x - y })
+    return { list: list, bad: bad }
+  }
+
+  function calc () {
+    var st = scr.getAttribute('data-state') || 'default'
+    /* 离线时彩色与自动双面都不可用（右栏那两个「不可用」按钮就是这么写的）。
+       这里只在**算的时候**降级，不改 P —— 切回在线态用户原来的选择还在。 */
+    var color = (st === 'device-off') ? 'bw' : P.color
+    var duplex = (st === 'device-off') ? 'single' : P.duplex
+
+    var R = parseRange(elIn ? elIn.value : '', TOTAL)
+    var pages = (P.range === 'all') ? TOTAL : R.list.length
+    var faces = pages * P.copies
+    var perCopy = Math.ceil(pages / (duplex === 'duplex' ? 2 : 1))
+    var sheets = perCopy * P.copies
+    var money = window.v3Price ? window.v3Price(faces, color === 'color' ? 'color' : '') : 0
+    return { st: st, color: color, duplex: duplex, R: R, pages: pages,
+             faces: faces, perCopy: perCopy, sheets: sheets, money: money }
+  }
+
+  function unit (mode) {
+    var S = window.V3_SITE
+    if (!S) return ''
+    return (mode === 'color' ? S.price.colorPerFace : S.price.bwPerFace).toFixed(2)
+  }
+
+  function render () {
+    var C = calc()
+    var cName = C.color === 'color' ? '彩色' : '黑白'
+    var dName = C.duplex === 'duplex' ? '自动双面' : '单面'
+    var dShort = C.duplex === 'duplex' ? '双面' : '单面'
+    var rName = (P.range === 'all')
+      ? ('全部 ' + TOTAL + ' 页')
+      : (C.R.list.length ? ('第 ' + C.R.list.join('、') + ' 页 · 共 ' + C.pages + ' 页') : '未选中任何页')
+    var money = C.money.toFixed(2)
+
+    /* ── 份数 ── */
+    var cv = scr.querySelector('[data-out="copiesVal"]')
+    if (cv && cv.firstChild) cv.firstChild.nodeValue = String(P.copies)
+
+    /* ── 核价那两行（s3 常驻）。这两处早就有 id，沿用，不再另挂 data-out ── */
+    var qc = document.getElementById('q-content')
+    var qp = document.getElementById('q-paper')
+    if (qc) qc.textContent = C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个印刷面'
+    if (qp) qp.textContent = C.sheets + ' 张（每份 ' + C.perCopy + ' 张）'
+
+    /* ── 金额与用量（s4 之后各处，全部同一份算式）── */
+    set('amt', money + ' 元')
+    set('amtNum', money)
+    set('brk', C.faces + ' 个印刷面 × ' + unit(C.color) + ' 元 · ' + cName + dShort + ' · ' + P.copies + ' 份')
+    set('params', cName + ' · ' + dName + ' · ' + P.copies + ' 份')
+    set('faces', C.faces + ' 面')
+    set('facesN', String(C.faces))
+    set('sheets', C.sheets + ' 张')
+    set('sheetsN', String(C.sheets))
+    set('facesSheets', C.faces + ' 面 · 用纸 ' + C.sheets + ' 张')
+    set('jobsum', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + C.faces + ' 个印刷面 · 用纸 ' + C.sheets + ' 张')
+    set('againsum', cName + ' · ' + dShort + ' · ' + P.copies + ' 份 · ' + C.faces + ' 面')
+    set('hintParams', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + rName)
+
+    /* ── 各项 prefill 与脚注：说清「选了这个会怎样」，不是复述按钮文字 ── */
+    set('pfColor', cName + ' · 每印刷面 ' + unit(C.color) + ' 元')
+    set('pfDuplex', dName + ' · 用纸 ' + C.sheets + ' 张')
+    set('pfOrient', P.orient === 'land' ? '强制横向 · 全部转 90°' : '按文件里的方向 · 可改')
+    set('pfScale', P.scale === 'fit' ? '缩放到 A4' : '已检出 A4 · 无需缩放')
+    set('pfRange', rName)
+    set('rngAllLb', '全部 ' + TOTAL + ' 页')
+
+    /* 单／双面的下游是纸，不是钱 —— 把这件事对用户讲明白，别让他以为选错了亏钱 */
+    var other = Math.ceil(C.pages / (C.duplex === 'duplex' ? 1 : 2)) * P.copies
+    set('duplexNote', C.duplex === 'duplex'
+      ? ('自动双面：' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比单面省 ' + (other - C.sheets) + ' 张纸。'
+         + '印刷面仍是 ' + C.faces + ' 面 —— 本机按印刷面计价，一张纸两面算 2 面，所以钱不变，省的是纸。')
+      : ('单面：每页各占一张纸，' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比双面多 ' + (C.sheets - other) + ' 张。'
+         + '印刷面仍是 ' + C.faces + ' 面，应付不变 —— 本机按印刷面计价，不按纸张。'))
+
+    set('flipNote', P.flip === 'long'
+      ? '选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。'
+      : '短边翻：像记事本一样从下往上翻。简历、证明材料请改回长边翻，否则背面是倒的。')
+
+    set('orientNote', P.orient === 'follow'
+      ? '文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。'
+      : ('强制横向：' + C.pages + ' 页一律按横向出，原本纵向的那几页内容会被转 90°。页数与应付不变。'))
+
+    set('scaleNote', P.scale === 'none'
+      ? '仅支持 A4；非 A4 文件须确认缩放。本件已检出 A4，按原尺寸出。'
+      : '缩放到 A4：非 A4 页等比缩放并居中，四周可能留白。本件本来就是 A4，缩放后与原尺寸一致；页数与应付不变。')
+
+    /* 翻页边整块：单面时它没有意义，整块收起来。
+       用 style.display 而不是 hidden —— hidden 归 applyVisibility() 独占，
+       一切四态就会被它覆盖（本页 data-redact 那段踩过同一个坑）。
+       复原时写空串而不是 'block'：留着 hidden 那条 CSS 仍能生效。 */
+    var flipField = scr.querySelector('[data-only-duplex]')
+    if (flipField) flipField.style.display = (C.duplex === 'duplex') ? '' : 'none'
+
+    /* 页码范围：把「哪些被忽略了」当场说出来，兑现 #rng-note 上的那句承诺 */
+    if (elNote) {
+      if (P.range !== 'custom') {
+        elNote.textContent = '用逗号分隔单页、用连字符表示区间。超出 1–' + TOTAL + ' 的页码会被忽略，不会静默按全部打印。'
+      } else if (!C.R.list.length) {
+        elNote.textContent = '这个范围在 1–' + TOTAL + ' 里一页都没命中，本单没有可打印的页 —— 请改一下再核价。'
+      } else if (C.R.bad.length) {
+        elNote.textContent = '已忽略超出 1–' + TOTAL + ' 的部分：' + C.R.bad.join('、')
+          + '。本单实际打第 ' + C.R.list.join('、') + ' 页，共 ' + C.pages + ' 页。'
+      } else {
+        elNote.textContent = '本单打第 ' + C.R.list.join('、') + ' 页，共 ' + C.pages + ' 页。'
+      }
+    }
+
+    setSeg('color', C.color); setSeg('duplex', C.duplex); setSeg('flip', P.flip)
+    setSeg('orient', P.orient); setSeg('scale', P.scale)
+    if (elAll) elAll.setAttribute('aria-pressed', P.range === 'all' ? 'true' : 'false')
+    if (elCus) elCus.setAttribute('aria-pressed', P.range === 'custom' ? 'true' : 'false')
+  }
+
+  /* ── 份数步进：到上下限必须出声。静默停住 = 又一个「按了没反应」 ── */
+  function step (d) {
+    var n = P.copies + d
+    var note = scr.querySelector('[data-out="copiesNote"]')
+    var msg = ''
+    if (n < 1) { n = 1; msg = '最少 1 份 —— 已经是最少了，减不动了。' }
+    if (n > MAXC) { n = MAXC; msg = '本机单次最多 ' + MAXC + ' 份，已停在 ' + MAXC + ' 份。要更多请分几单，或找现场工作人员。' }
+    P.copies = n
+    if (note) { note.textContent = msg; note.hidden = !msg }
+    render()
+  }
+
+  scr.addEventListener('click', function (e) {
+    var sb = e.target.closest('[data-param="copies"] .stepper button[data-step]')
+    if (sb) { step(+sb.getAttribute('data-step')); return }
+    var b = e.target.closest('[data-param] button[data-v]')
+    if (b && b.getAttribute('aria-disabled') !== 'true') {
+      var host = b.closest('[data-param]')
+      P[host.getAttribute('data-param')] = b.getAttribute('data-v')
+      render(); return
+    }
+    /* 页码范围两个键的显隐由本页更早那段小脚本管，这里只跟着重算 */
+    if (e.target.closest('#rng-all')) { P.range = 'all'; render(); return }
+    if (e.target.closest('#rng-custom')) { P.range = 'custom'; render(); return }
+  })
+  if (elIn) elIn.addEventListener('input', function () { if (P.range === 'custom') render() })
+
+  /* 四态切换会改变彩色 / 双面可不可用，用量与金额得跟着重算 */
+  new MutationObserver(render).observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  render()
 })()
 </script>
 <script src="scripts/leaveguard.js?v=1"></script>
