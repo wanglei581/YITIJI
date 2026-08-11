@@ -21,6 +21,11 @@ import {
   type RecruitmentWave2PlanItem,
   type RecruitmentWave2Snapshot,
 } from './recruitment-wave2-target'
+import {
+  evaluateRecruitmentWave2LegacyJobFacts,
+  preferredRecruitmentWave2ExternalIdCounts,
+  resolveRecruitmentWave2ExternalId,
+} from './recruitment-wave2-proposed-governance-rules'
 
 export type {
   AgencyManifestEntry,
@@ -48,7 +53,7 @@ export function buildRecruitmentWave2Plan(
     .sort(byId)
     .map((legacy) => planAgency(snapshot, legacy, agencyEntries.get(legacy.id), decisionAsOf, validityAt))
   const agencyPlans = new Map(agencyItems.map((item) => [item.legacyId, item]))
-  const plannedExternalIdCounts = preferredExternalIdCounts(snapshot, manifest)
+  const plannedExternalIdCounts = preferredRecruitmentWave2ExternalIdCounts(snapshot, manifest)
   const jobItems = [...snapshot.legacyJobs]
     .sort(byId)
     .map((legacy) => planJob(
@@ -188,15 +193,9 @@ function planJob(
     targetType: 'job_source', targetId: source.id, action: 'trust_activate',
     actions: ['trust_activate', 'trust_suspend', 'trust_revoke'], toStatus: 'active', asOf: decisionAsOf,
   })) reasons.push('source_trust_decision_missing')
-  if (!entry.employer.trim()) reasons.push('employer_missing')
-  if (!entry.cityName.trim()) reasons.push('city_name_missing')
-  if (!/^\d{6}$/u.test(entry.cityCode.trim())) reasons.push('structured_city_invalid')
-  if (branch?.cityCode !== entry.cityCode.trim()) reasons.push('branch_city_mismatch')
-  const category = categoryOf(legacy.jobType)
-  if (!category) reasons.push('job_type_unknown')
-  if (legacy.salaryMin !== null && legacy.salaryMax !== null && legacy.salaryMin > legacy.salaryMax) {
-    reasons.push('salary_range_invalid')
-  }
+  const legacyFacts = evaluateRecruitmentWave2LegacyJobFacts(legacy, entry, branch?.cityCode)
+  const category = legacyFacts.category
+  reasons.push(...legacyFacts.reasons)
   const domains = source?.allowedContentDomainsJson
     ? parseDomainPolicy(source.allowedContentDomainsJson)
     : { valid: false, domains: [] }
@@ -211,11 +210,10 @@ function planJob(
     && new URL(entry.sourceUrl).hostname.toLowerCase() !== new URL(entry.finalUrl).hostname.toLowerCase()) {
     reasons.push('redirect_host_mismatch')
   }
-  if (!entry.linkCheckRef.trim()) reasons.push('link_check_ref_missing')
   if (reasons.length) return blocked(legacy.id, ...reasons)
 
   const preferredExternalId = entry.externalId?.trim() || legacy.externalId?.trim() || `offline-job:${legacy.id}`
-  const externalId = resolveExternalId(snapshot, legacy, entry, preferredExternalId, plannedExternalIdCounts)
+  const externalId = resolveRecruitmentWave2ExternalId(snapshot, legacy, entry, preferredExternalId, plannedExternalIdCounts)
   if (!externalId) return blocked(legacy.id, 'external_id_conflict')
   const targetId = legacy.canonicalJobId ?? `job-offline-${digest(legacy.id).slice(0, 24)}`
   if (!legacy.canonicalJobId && snapshot.jobs.some((job) => job.id === targetId)) {
@@ -384,50 +382,6 @@ function qualificationValid(
     })
 }
 
-function resolveExternalId(
-  snapshot: RecruitmentWave2Snapshot,
-  legacy: RecruitmentWave2Snapshot['legacyJobs'][number],
-  entry: Extract<JobManifestEntry, { disposition: 'map' }>,
-  preferred: string,
-  plannedExternalIdCounts: Map<string, number>,
-): string | null {
-  const conflicts = (value: string) => snapshot.jobs.some((job) => job.id !== legacy.canonicalJobId
-    && ((job.sourceId === entry.jobSourceId && job.externalId === value)
-      || (job.sourceOrgId === entry.organizationId && job.externalId === value)))
-  const preferredKey = `source\u0000${entry.jobSourceId}\u0000${preferred}`
-  const preferredOrgKey = `organization\u0000${entry.organizationId}\u0000${preferred}`
-  if (plannedExternalIdCounts.get(preferredKey) === 1
-    && plannedExternalIdCounts.get(preferredOrgKey) === 1
-    && !conflicts(preferred)) {
-    return preferred
-  }
-  const fallback = `offline-job:${legacy.id}`
-  const fallbackAlreadyPreferred = (plannedExternalIdCounts.get(`source\u0000${entry.jobSourceId}\u0000${fallback}`) ?? 0) > 0
-    || (plannedExternalIdCounts.get(`organization\u0000${entry.organizationId}\u0000${fallback}`) ?? 0) > 0
-  return conflicts(fallback) || fallbackAlreadyPreferred ? null : fallback
-}
-
-function preferredExternalIdCounts(
-  snapshot: RecruitmentWave2Snapshot,
-  manifest: RecruitmentWave2Manifest,
-): Map<string, number> {
-  const legacyById = new Map(snapshot.legacyJobs.map((row) => [row.id, row]))
-  const counts = new Map<string, number>()
-  for (const entry of manifest.jobs) {
-    if (entry.disposition !== 'map') continue
-    const legacy = legacyById.get(entry.legacyJobId)
-    if (!legacy) continue
-    const externalId = entry.externalId?.trim() || legacy.externalId?.trim() || `offline-job:${legacy.id}`
-    for (const key of [
-      `source\u0000${entry.jobSourceId}\u0000${externalId}`,
-      `organization\u0000${entry.organizationId}\u0000${externalId}`,
-    ]) {
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-  }
-  return counts
-}
-
 function assertNoOrphanEntries(
   snapshot: RecruitmentWave2Snapshot,
   agencyEntries: Map<string, AgencyManifestEntry>,
@@ -441,12 +395,6 @@ function assertNoOrphanEntries(
   if ([...jobEntries.keys()].some((id) => !jobIds.has(id))) {
     throw new Error('RECRUITMENT_WAVE2_MANIFEST_ORPHAN_JOB')
   }
-}
-
-function categoryOf(value: string): string | null {
-  if (value === 'fulltime' || value === 'parttime') return value
-  if (value === 'internship') return 'intern'
-  return null
 }
 
 function uniqueById<T extends AgencyManifestEntry | JobManifestEntry>(items: T[], key: 'legacyAgencyId' | 'legacyJobId'): Map<string, T> {

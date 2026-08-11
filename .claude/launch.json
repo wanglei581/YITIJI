@@ -36,6 +36,39 @@
       "autoPort": false
     },
     {
+      "name": "console-proto",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5303",
+        "--directory",
+        "/Users/wanglei/AI求职打印服务终端/.claude/worktrees/hopeful-morse-b9f44a/docs/design/console-ai-os-2026-08"
+      ],
+      "port": 5303,
+      "autoPort": false
+    },
+    {
+      "name": "admin-current",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/.claude/worktrees/hopeful-morse-b9f44a/apps/admin && ./node_modules/.bin/vite --port 5301"
+      ],
+      "port": 5301,
+      "autoPort": false
+    },
+    {
+      "name": "partner-current",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/.claude/worktrees/hopeful-morse-b9f44a/apps/partner && ./node_modules/.bin/vite --port 5302"
+      ],
+      "port": 5302,
+      "autoPort": false
+    },
+    {
       "name": "partner",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [

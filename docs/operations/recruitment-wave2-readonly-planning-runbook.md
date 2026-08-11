@@ -2,7 +2,7 @@
 
 状态：完整生产只读盘点已于 2026-08-10 执行，结果为稳定快照下存在业务 blocker（`exit 2`）；未恢复生产备份、未写任何业务数据、未切换 reader/writer、未部署。
 
-本执行包包含三件严格分离的只读能力：廉价的 production legacy backfill 子集 probe、冻结方案第 6 节完整 production inventory + 公开 API ID 差集，以及受控恢复库上的 manifest-aware dry-run。子集 probe 仍不能产生 GO；完整盘点同时区分现网 `currentReader` 与冻结目标 `targetSafe`，不会把尚未切换的 Profile/Directory 接口伪装成空集合。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write` 或 `--fix`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧、reader 切换或发布。
+本执行包包含四件严格分离的只读能力：廉价的 production legacy backfill 子集 probe、冻结方案第 6 节完整 production inventory + 公开 API ID 差集、受控恢复库上的 manifest-aware dry-run，以及五类治理证据的纯内存 proposed-governance 校验。子集 probe 仍不能产生 GO；完整盘点同时区分现网 `currentReader` 与冻结目标 `targetSafe`，不会把尚未切换的 Profile/Directory 接口伪装成空集合。执行包不包含 backfill writer，不识别 `--apply`、`--execute`、`--write`、`--fix`、`--seed` 或 `--commit`，也不授权备份下载、恢复、生产写入、数据库销毁、schema 收紧、reader 切换或发布。
 
 当前按 `single-owner` 执行：同一位业主可兼任业务、数据和运维责任人，不需虚构多个员工；但只读授权、证据形成、manifest 确认、写入授权和发布授权必须保留为不同时点的可追溯动作。Codex 可执行技术检查和自动化，不能把一次普通“继续”自动扩张为生产写入或部署授权。
 
@@ -110,6 +110,32 @@ pnpm plan:recruitment-wave2 --manifest /approved/secure/manifest.json --batch-si
 - `2`：至少一条 blocker；修订 manifest 或依赖事实后重新 dry-run。
 - `1`：守卫、manifest、数据库或执行失败。
 
+## 4.1 五类治理提案的零写入校验
+
+生产完整盘点为 `exit 2` 时，先在受限目录形成五类 draft evidence pack：Organization/JobSource 与内容域、无源 canonical Job、JobFair、legacy 机构/岗位、负向审计理由候选。提案必须绑定生产报告原始字节 SHA、数据库快照摘要、恢复快照 SHA 与全量 ID count/digest；报告中每类最多 100 个 ID 的样例不能代替恢复库重算的全量集合。
+
+三个输入文件必须是非 symlink 的普通文件、精确 `0600`、不超过 2 MiB。机器证据直接调用 Node：
+
+```bash
+cd services/api
+umask 077
+node -r @swc-node/register scripts/recruitment-wave2-proposed-governance-dry-run.ts \
+  --inventory-report /approved/restricted/recruitment-wave2-full-inventory.json \
+  --evidence-pack /approved/restricted/recruitment-wave2-proposed-governance.json \
+  --legacy-manifest /approved/secure/recruitment-wave2-legacy-manifest.json \
+  > /approved/restricted/recruitment-wave2-proposed-plan.json
+```
+
+工具只允许 `restored-isolated` 或 CI 专库，以一个 `REPEATABLE READ READ ONLY` 快照重算完整 inventory，并自动用 batch 1/100/1000 加载基线、证据文件最小状态、招聘会和受限 Audit payload 摘要。三批覆盖集合、快照摘要与计划校验和必须一致；序列化后仍须用新只读事务复核授权和 restore marker。
+
+`proposedAction` 只是拟议动作序列，不写入、不合成也不冒充 `ReviewDecision`，不能让现有 legacy planner 变绿。Profile/Branch/Qualification 使用各自固定 canonical hash；Audit payload 仅在内存计算 SHA 后丢弃；输出只保留聚合、内部 ID 最多 100 条样例和摘要，不回显 URL、企业/地址/电话、证照、证据引用、Audit payload 或连接信息。JobFair 的冻结 target-safe 仍为 `unsupported`。
+
+退出码：
+
+- `0`：五类提案与恢复基线内部一致，可进入同一业主后续的独立批准动作；这不是事实已落库、现有 dry-run 全绿、writer、发布或部署授权。
+- `2`：结构有效但仍有业务 blocker；补事实或改处置后重跑。
+- `1`：文件、摘要、守恒、目标、只读角色、marker、批次一致性或执行失败。
+
 ## 5. 必停条件
 
 出现以下任一情况立即停止，不进入 writer 设计或生产执行：
@@ -124,6 +150,6 @@ pnpm plan:recruitment-wave2 --manifest /approved/secure/manifest.json --batch-si
 
 ## 6. 后续批次
 
-当前生产完整盘点为 `exit 2`：可以按受限内部 ID 整理 Organization/JobSource/域策略/ReviewDecision、无源 Job、JobFair、legacy 机构/岗位和负向审计候选的治理证据包，但它不是现有 `agencies[]/jobs[]` planner manifest。在恢复库依赖事实仍为空时，现有 dry-run 应继续 `exit 2`；要验证拟议治理事实，必须另开代码批次扩展零写入纯内存 planner，或为隔离恢复库 fixture/applier 另立专项授权和清理门禁。
+当前生产完整盘点为 `exit 2`：可以按受限内部 ID 整理 Organization/JobSource/域策略/拟议决定、无源 Job、JobFair、legacy 机构/岗位和负向审计候选的治理证据包，但它不是现有 `agencies[]/jobs[]` planner manifest。零写入 proposed-governance 校验器已通过 [PR #590](https://github.com/wanglei581/YITIJI/pull/590) 合入 `main`；同一 HEAD 的 GitHub Actions run [31405483030](https://github.com/wanglei581/YITIJI/actions/runs/31405483030) 已完成 Node 22、PostgreSQL 与浏览器三项验证，三组专家终审均 **APPROVE**。它仍只验证 draft evidence pack 与恢复基线的一致性；尚未填写或执行生产 evidence pack。在恢复库依赖事实仍为空时，现有 dry-run 应继续 `exit 2`，模拟 `exit 0` 也只允许形成后续独立批准记录，不能解释为治理事实已存在，更不授权 writer、生产写入、reader 切换、发布或部署。
 
 只有冻结方案第 6 节完整 production inventory 与公开 API ID 差集通过、恢复库 dry-run 全绿、人工映射清单获批后，才可另开独立 PR 设计真正的 shadow backfill writer：每条 Job、legacy 映射、migration checksum 和追加写 AuditLog 同事务/CAS，失败不删 legacy，所有新 Job 仍不可见。任何生产执行还必须再次取得具名写授权；重复组归零后，`(sourceId, externalId)` unique 仍须作为 SQLite/PostgreSQL 独立 additive migration 验证，不能夹带在 writer 或 dual-write 中。

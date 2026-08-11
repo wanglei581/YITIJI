@@ -145,6 +145,13 @@ jobs:
           pnpm typecheck:recruitment-wave2-full-inventory
           pnpm verify:recruitment-wave2-full-inventory
 
+      - name: Recruitment Wave 2 proposed governance zero-write contract
+        # Pure fixtures: strict evidence packs, hypothetical-only decisions, conservation and redacted output.
+        working-directory: services/api
+        run: |
+          pnpm typecheck:recruitment-wave2-proposed-governance
+          pnpm verify:recruitment-wave2-proposed-governance
+
       - name: Lint
         run: |
           pnpm --filter @ai-job-print/api lint
