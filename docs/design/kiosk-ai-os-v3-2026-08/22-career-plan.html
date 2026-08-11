@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
 /* ── P22 专用 ───────────────────────────────────────────────────────────
    职业规划最容易做成算命：「这个方向前景好」「三年后你能到 XX 岗」
@@ -44,9 +46,28 @@
 .ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
 .ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
           border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
 .ck-t { font-size:var(--fz-3); color:var(--fog-900); }
 .ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* 2026-08-10 死控件整改配套。
+   .ck 现在有两种：真能勾的（<button aria-pressed>）和不能勾的（.ck--fix）。
+   长得一样就还是在骗人，所以固定项去掉 cursor:pointer 与 hover，
+   右侧给一个**状态词**说明它为什么不接受点击。
+   状态词类名刻意避开 pill / chip / tag / btn —— 那几个是自检「疑似假入口」的扫描面。 */
+.ck[aria-pressed] { width:100%; text-align:left; font-family:var(--ff-ui); }
+.ck[aria-pressed]:hover { border-color:var(--jade-a32); }
+.ck[aria-pressed]:focus-visible { outline:3px solid var(--jade-400); outline-offset:2px; }
+.ck[aria-pressed="true"] { border-color:var(--jade-a32); background:var(--jade-a12); }
+.ck[aria-pressed="true"] .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck[aria-pressed="true"] .ck-box::after { content:''; position:absolute; left:6px; top:2px;
+          width:5px; height:10px; border:solid #fff; border-width:0 2.5px 2.5px 0;
+          transform:rotate(42deg); }
+.ck--fix { cursor:default; }
+.ck--off { opacity:.62; }
+.ck--off .ck-box { border-style:dashed; }
+.ck-st { flex:0 0 auto; align-self:center; font-size:var(--fz-1); white-space:nowrap;
+         color:var(--fog-600); }
+.ck[aria-pressed="true"] .ck-st { color:var(--jade-600); font-weight:700; }
 
 /* 能力块：从简历原文里读出来的，每块都带原文出处 */
 .skills { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
@@ -80,6 +101,94 @@
 .wside .pane--grow { overflow:hidden; }
 .paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
 
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：
+     s1 左 631（ai-down 702）/ 右 480 · s2 右 483 · s3 左 376（ai-down 478）/ 右 566
+   只有 s2 左（四张方向卡的滚动列表）是满的。
+
+   成因按栏分三种：
+
+   ① 右栏三步都是「内容量不足 + flex 分配」——
+      s1 639/1119、s2 615/1098、s3 461/1027，pane--grow 撑到栏底、卡里只有上半截。
+      Codex 的处置口径是「右栏常驻：214 条岗位、来源数、同步时间、纳入 / 排除数量、
+      缺口口径和重跑条件」。这些**全都已经在本页上**，只是被锁在某一步里：
+      「这些数字是什么」只在 s2，「什么时候该重跑」只在 s3。改成常驻即可，
+      一个数都不用编。
+
+   ② s1 左是「内容量不足」——「从你的简历里读出来的」只有 6 张能力卡（560/1191）。
+      处置：把能力卡按主区尺寸放大（原文出处 13px，在 82 PPI 的竖屏上读不清），
+      并把页面自己写着的那句「可以去简历工作台补上」做成真入口 ——
+      现在它只是一句白字，用户得自己退出去找。
+
+   ③ s3 左是**版式不匹配**，不是内容不够：主栏 604×1378 ≈ 1:2.28，
+      而 A4 竖版是 1:1.414，单张纸最大只能到 572×809，上下必然各空 285px。
+      P18 同一版式下有两张纸所以填得满，本页的交付物只有一页 —— 不能为了填满
+      再编一张纸出来。处置：纸按自然高度摆，下面补一块**屏读版的纸面索引**：
+      这张纸写了什么、以及明确没写什么。纸上的页脚是 11px，站在机器前根本读不了，
+      而「本机不预测薪资 / 不预测录用结果」恰恰是打印前必须看清的一句。
+      两栏都是把纸上已有的原话搬到可读字号，不是新内容。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+.wmain .notice { font-size:var(--fz-4); line-height:1.78; padding:var(--s-5); }
+.wmain .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.wmain .xlink-t { font-size:var(--fz-4); }
+.wmain .xlink-s { font-size:var(--fz-3); line-height:1.62; }
+/* s1 左：能力卡是这一步的主内容 */
+.skills { gap:var(--s-4); }
+.sk { padding:var(--s-5); gap:8px; }
+.sk-t { font-size:var(--fz-5); }
+.sk-src { font-size:var(--fz-3); line-height:1.75; }
+.field-lb { font-size:var(--fz-4); }
+/* ai-down 那一支的主内容是「不靠 AI 也能自己看的三件事」三步时间线 —— 原来 16/13px */
+.wmain .tl { padding:var(--s-5) 0; }
+.wmain .tl::before { top:38px; }
+.wmain .tl-dot { width:30px; height:30px; }
+.wmain .tl-t { font-size:var(--fz-5); line-height:1.5; }
+.wmain .tl-s { font-size:var(--fz-3); line-height:1.72; margin-top:7px; font-family:var(--ff-ui); }
+/* s3 左：纸台仍占剩余高度（A4 竖版在 604px 宽的栏里最大只有 572×809，
+   上下必然留白 —— 那是**围绕放大主体的均衡留白**，是对的）；
+   屏读索引按自然高度钉在栏底，栏底不再裸露。 */
+/* align-items:start —— 两列条数不一样（ai-down 那一态左列只有 2 条、右列 6 条）。
+   默认 stretch 会把矮的那张卡拉到和高的一样高，卡里空 234px。卡各自按内容收高。 */
+.sheetmap { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr;
+            gap:var(--s-4); align-content:start; align-items:start; }
+.smcol { padding:var(--s-5); border-radius:var(--r-md);
+         background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+         display:flex; flex-direction:column; gap:var(--s-3); }
+.smcol--not { background:var(--fog-a04); border-style:dashed; border-color:var(--fog-a20); }
+.sm-hd { font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.sm-i { display:grid; grid-template-columns:16px 1fr; gap:var(--s-3);
+        font-size:var(--fz-3); color:var(--fog-700); line-height:1.62; }
+.sm-i i { width:9px; height:9px; border-radius:2px; background:var(--jade-500);
+          margin-top:7px; display:block; }
+.smcol--not .sm-i i { background:var(--fog-a20); }
+.sm-i b { color:var(--fog-900); }
+/* 右栏：常驻依据面板。四张卡同栏，行高按能装得下四张的上限给 */
+.wside .kv-row { min-height:42px; font-size:var(--fz-3); }
+.wside .notice { font-size:var(--fz-2); line-height:1.6; padding:var(--s-3) var(--s-4); }
+.wside .panel-note { font-size:var(--fz-2); line-height:1.6; }
+.wside .pane-hd { margin-bottom:var(--s-3); }
+/* 方向分布计数条：数字取 s2 四张方向卡的原值，不另算 */
+.dist { display:flex; flex-direction:column; gap:var(--s-3); }
+.ds { display:flex; align-items:center; gap:var(--s-3); font-size:var(--fz-2); color:var(--fog-700); }
+.ds-n { flex:0 0 auto; min-width:0; }
+.ds-bar { flex:1 1 auto; height:8px; border-radius:999px; background:var(--surf-3); overflow:hidden; }
+.ds-bar i { display:block; height:100%; background:var(--jade-500); border-radius:999px; }
+.ds-v { flex:0 0 auto; font-family:var(--ff-num); font-weight:700; color:var(--fog-900); }
+
+/* 互链 P28：主入口级触控（≥64px）。本页说「岗位那边要什么」，
+   P28 说「你自己倾向什么」—— 一外一内，互为补充，不互相替代 */
+.xlink { display:flex; align-items:center; gap:var(--s-4); min-height:64px;
+         padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+         background:var(--surf-1); border:1px solid var(--brd-1);
+         text-decoration:none; color:inherit;
+         transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.xlink:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.xlink .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; }
+.xlink-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.xlink-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.xlink-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
 /* 行动清单纸面 */
 .pl { padding:30px 34px; color:#17222b; }
 .pl h1 { font-size:21px; font-weight:800; }
@@ -92,19 +201,72 @@
 .pl-i b { color:#0f5a45; }
 .pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
            padding-top:9px; margin-top:14px; }
+
+/* ── 上一屏带进来的选择：回执条 ──────────────────────────────────────
+   2026-08-10 参数消费整改。上游一直在 URL 里传用户已经做过的选择，
+   本页此前一个都不读 —— 用户在上一屏选完，进来还得重选一遍。
+   现在读了就必须让用户看见：静默预填比不预填更糟，用户会以为这些
+   值是本机自己猜的。三条规矩：① 有回执；② 可改；③ 只认白名单取值，
+   非法值当没传，绝不把 URL 里的字面量渲染出来。
+   只在**真的带了合法参数**时才插进 DOM —— 不带参数时这一块整个不存在。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-note b { color:var(--fog-800); }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
+
+/* 选中的方向卡：只做「你选的是这一张」的标记，不改它的计数与缺口 */
+.dir--focus { border-color:var(--jade-500); box-shadow:var(--sh-jade); }
+.dir-focus-mark { display:inline-flex; align-items:center; margin-left:var(--s-3);
+  padding:3px 9px; border-radius:var(--r-xs); background:var(--jade-a20);
+  border:1px solid var(--jade-500); color:var(--jade-200);
+  font-size:var(--fz-1); font-weight:600; white-space:nowrap; }
+.carryin-miss { font-size:var(--fz-1); color:var(--amber-200); line-height:1.55;
+  padding:8px 10px; border-radius:var(--r-xs);
+  background:var(--amber-a12); border:1px solid var(--amber-600); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：本页**一个阶段都不拦**，理由逐条写在这里，
+     免得后来的人以为是漏接了。公共件已引入，将来这一页真长出用户输入再补 data-guard-at。
+       · 用户在这一页从头到尾没有任何输入。三步全是本机对着**已经存在的**简历
+         和 214 条读过正文的岗位算出来的读数；唯一的控件是 s3 那个「缺口表打不打」开关，
+         点错重点一下就是。
+       · s1 / s2 因此不算「丢东西」：退出去再进来，读的还是同一份简历、同一批岗位，
+         重算一遍就回来了，中间只隔两次点按。为这个弹窗只会烦人。
+       · s3 更不该拦：那一步页面自己写明「清单同时存进「我的文档」与「AI服务记录」」——
+         已经落到账号里了，是真存下来的终态，再问一句「离开就没了」是假的。
+     同理不写 data-guard-keep：既然没有拦截，也就没有「存下来再走」这一说；
+     何况 s3 的清单本来就已经存过了，再给一个存的按钮是重复承诺。 -->
 <div class="screen" data-state="default" data-stage="s1" data-theme="warm">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">职业规划</div>
@@ -122,7 +284,9 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">你现在会什么</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">能往哪走·缺什么</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走行动清单</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span>
+        <span class="rstep-name" data-when="default first device-off">带走行动清单</span>
+        <span class="rstep-name" data-when="ai-down">带走岗位计数表</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
   </div>
@@ -144,9 +308,8 @@
           </div>
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>这一页只用一种依据：<b>本机真读过的岗位正文</b>。<br>
-                  说的不是「这个方向好」，而是「<b>本机在这批岗位里见到多少条要求这个</b>」——
-                  数量是可核对的事实，前景是预测。只说前者。</span>
+            <span>这一页只用一种依据：<b>本机真读过的岗位正文</b> ——
+                  说的是见到多少条要求，不是「这个方向好」。</span>
           </div>
         </div>
       </div>
@@ -201,6 +364,21 @@
                     如果有你会但简历里没写的，本机就读不到 ——
                     <b>那不是你不会，是简历没写</b>，可以去简历工作台补上。</span>
             </div>
+
+            <!-- 2026-08-11：上面那句「可以去简历工作台补上」原来只是一句白字，
+                 用户得自己退出去、回首页、再找简历工作台。第 2 步右栏早就有一条
+                 同样目的的真链接（?stage=s4&from=P22），这里按同一份交接契约补上 ——
+                 少写的能力在第 1 步就该能去补，不用先看完方向再回头。 -->
+            <a class="xlink" style="margin-top:var(--s-4)"
+               href="09-resume-workbench.html?stage=s4&amp;from=P22">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="xlink-b">
+                <span class="xlink-t">有会做但简历里没写的？现在就去补</span>
+                <span class="xlink-s">去简历工作台第 4 步「补内容」· 带去：从本页来，补完可以回来重跑</span>
+              </span>
+              <svg class="ic" style="margin-left:auto"><use href="#i-arrowRight"/></svg>
+            </a>
+
           </div>
 
           <div data-when="ai-down">
@@ -235,6 +413,20 @@
             </div>
           </div>
 
+          <!-- 2026-08-11：自右栏移入，并**四态常驻**。
+               原来它锁在 default/first/device-off 那一支里，AI 挂掉时连这条也没了 ——
+               可 P28 的记分是固定权重累加、明写「不经过 AI」，AI 不可用时照样能答，
+               只是没有陈述解读（P28 自己的 devpill 就是这么写的）。
+               降级态更需要一条真能走的出口，所以按 P28 的真实能力常驻，
+               并在 ai-down 下如实说明这次拿不到解读。 -->
+          <div class="field-lb" style="margin-top:var(--s-5)">先看看自己这一头</div>
+          <a class="xlink" href="28-self-assessment.html">
+            <svg class="ic"><use href="#i-orbit"/></svg>
+            <span class="xlink-b"><span class="xlink-t">还说不清自己想要什么？先做一次自我探索</span>
+              <span class="xlink-s" data-when="default first device-off">25 道选择题 · 约 5 分钟 · 得 5 段倾向陈述，拿回这页对照方向。</span>
+              <span class="xlink-s" data-when="ai-down">25 道选择题 · 约 5 分钟 · 记分是固定权重累加，不经过 AI，现在照常能答；<b>这次不会有陈述解读</b>。</span></span>
+          </a>
+
         </div>
       </div>
 
@@ -249,10 +441,8 @@
         <div class="sec">
           <div class="notice" data-when="default first">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>下面每个方向后面的数字，是<b>本机读过正文的岗位里出现的条数</b> ——
-                  不是"市场需求"，也不是"前景排名"。<br>
-                  本机只见过这一批（来自 3 家来源机构，同步于 8月9日），
-                  <b>见得多不等于岗位多，只等于本机见得多</b>。</span>
+            <span>方向后面的数字是<b>本机读过的岗位里出现的条数</b>，
+                  <b>见得多不等于岗位多</b>。</span>
           </div>
           <div class="notice notice--amber" data-when="ai-down">
             <svg class="ic"><use href="#i-alert"/></svg>
@@ -342,14 +532,14 @@
         </div>
 
         <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
-          以上只覆盖<b>本机读过正文的 214 条岗位</b>（来自 3 家来源机构，同步 8月9日 07:30）。
-          本机没见过的岗位不在里面 —— <b>这不是市场全貌</b>。
+          以上只覆盖<b>本机读过正文的 214 条岗位</b> —— <b>这不是市场全貌</b>。
         </div>
       </div>
 
       <!-- ─────────── S3 带走行动清单 ─────────── -->
       <div class="paper-bar" data-at="s3">
-        <span class="nm">行动清单 · 机械设计方向</span>
+        <span class="nm" data-when="default first device-off">行动清单 · 机械设计方向</span>
+        <span class="nm" data-when="ai-down">岗位要求计数表 · 四类方向</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
           <button class="pgbtn" aria-label="上一页">‹</button>
@@ -361,40 +551,106 @@
       <div class="paper-stage" data-at="s3">
         <div class="sheet-a4">
           <div class="pl">
-            <h1>行动清单</h1>
-            <div class="pl-sub">
+            <h1 data-when="default first device-off">行动清单</h1>
+            <h1 data-when="ai-down">岗位要求计数表</h1>
+            <div class="pl-sub" data-when="default first device-off">
               2026年8月9日 14:05 由职易达一体机打印<br>
               依据：本机读过正文的 214 条岗位（3 家来源机构，同步 8月9日 07:30）+ 你上传的简历
             </div>
+            <div class="pl-sub" data-when="ai-down">
+              2026年8月9日 14:05 由职易达一体机打印<br>
+              依据：本机读过正文的 214 条岗位（3 家来源机构，同步 8月9日 07:30）<br>
+              <b>打印时 AI 不可用：本单没读你的简历，没有方向建议、没有缺口对照</b>
+            </div>
             <div class="pl-hr"></div>
 
-            <div class="pl-w">这周能做完的（不用等任何条件）</div>
-            <div class="pl-i"><i></i><span>把「团队协作」「项目管理」这两行<b>删掉或补上事例</b> ——
-              没有事例的技能词，面试一问就露</span></div>
-            <div class="pl-i"><i></i><span>简历里补上<b>你做过的具体加工工艺</b>（如果做过）——
-              工艺岗那 21 条里有 12 条要这个，漏写等于白扔</span></div>
-            <div class="pl-i"><i></i><span>补上<b>做过 SOP / 作业指导书</b>的经历（如果做过）</span></div>
+            <!-- ai-down：只印本机数得出来的条数，不印任何和简历比对出来的结论 -->
+            <div data-when="ai-down">
+              <div class="pl-w">四类方向在这 214 条里各有多少</div>
+              <div class="pl-i"><i></i><span><b>机械设计（本行往深走）</b>：38 条 ——
+                其中 14 条要 UG/NX，9 条明确写了要能量化改善效果</span></div>
+              <div class="pl-i"><i></i><span><b>设备调试 / 现场工程</b>：27 条 ——
+                其中 19 条要电工证，16 条写了需接受出差或外派</span></div>
+              <div class="pl-i"><i></i><span><b>工艺工程师</b>：21 条 ——
+                其中 12 条要熟悉某类加工工艺，7 条要做过 SOP 或作业指导书</span></div>
+              <div class="pl-i"><i></i><span><b>质量工程师</b>：18 条 ——
+                其中 13 条要 SPC / 8D / MSA，9 条要体系审核经历</span></div>
 
-            <div class="pl-w">现在就能投的方向</div>
-            <div class="pl-i"><i></i><span><b>机械设计（本行往深走）</b> —— 你的事例已经对得上，不用先补什么<br>
+              <div class="pl-w">本单没有的东西</div>
+              <div class="pl-i"><i></i><span>没有「你缺什么」：那要把这些要求和你的简历逐条比，这次比不了 ——
+                <b>本单没写你缺，不等于你不缺</b>。</span></div>
+              <div class="pl-i"><i></i><span>没有「先做哪三件」，也没有方向排序：同上，AI 恢复后回来重跑一次才有。</span></div>
+            </div>
+
+            <div class="pl-w" data-when="default first device-off">这周能做完的（不用等任何条件）</div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span>把「团队协作」「项目管理」这两行<b>删掉或补上事例</b> ——
+              没有事例的技能词，面试一问就露</span></div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span>简历里补上<b>你做过的具体加工工艺</b>（如果做过）——
+              工艺岗那 21 条里有 12 条要这个，漏写等于白扔</span></div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span>补上<b>做过 SOP / 作业指导书</b>的经历（如果做过）</span></div>
+
+            <div class="pl-w" data-when="default first device-off">现在就能投的方向</div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span><b>机械设计（本行往深走）</b> —— 你的事例已经对得上，不用先补什么<br>
               注意：本机见到的 38 条里有 14 条要 UG/NX，你会的是 SolidWorks</span></div>
 
-            <div class="pl-w">要花时间才能通的一条</div>
-            <div class="pl-i"><i></i><span><b>设备调试 / 现场工程</b>：本机见到的 27 条里 19 条要<b>电工证</b>。<br>
+            <div class="pl-w" data-when="default first device-off">要花时间才能通的一条</div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span><b>设备调试 / 现场工程</b>：本机见到的 27 条里 19 条要<b>电工证</b>。<br>
               考下来这条就通了大半。本机不评价值不值得考 —— 那要看你自己的情况。<br>
               另有 16 条写了需接受出差或外派，这是你要自己决定的条件，不是缺口。</span></div>
 
-            <div class="pl-w">缺口较大、只是让你知道有这条路</div>
-            <div class="pl-i"><i></i><span><b>质量工程师</b>：18 条里 13 条要 SPC / 8D / MSA，9 条要体系审核经历。
+            <div class="pl-w" data-when="default first device-off">缺口较大、只是让你知道有这条路</div>
+            <div class="pl-i" data-when="default first device-off"><i></i><span><b>质量工程师</b>：18 条里 13 条要 SPC / 8D / MSA，9 条要体系审核经历。
               <b>不是建议你转</b>，是列出来供你自己判断。</span></div>
 
-            <div class="pl-foot">
+            <div class="pl-foot" data-when="ai-down">
+              本单只依据<b>本机读过正文的那 214 条岗位</b>生成，<b>没有读你的简历</b>，仅供你自己参考。<br>
+              条数说的是「本机见到多少条」，<b>不是市场需求、不是前景排名</b>；本机没见过的岗位不在里面。<br>
+              本机<b>不预测薪资、不预测录用结果、不承诺任何职业发展结果</b>。<br>
+              本机不代收简历、不代为投递。是否转方向、是否考证，由你自己决定。
+            </div>
+            <div class="pl-foot" data-when="default first device-off">
               本单只依据<b>本机读过正文的那 214 条岗位</b>和你上传的简历生成，仅供你自己参考。<br>
               条数说的是「本机见到多少条」，<b>不是市场需求、不是前景排名</b>；本机没见过的岗位不在里面。<br>
               本机<b>不预测薪资、不预测录用结果、不承诺任何职业发展结果</b>。<br>
               本机不代收简历、不代为投递。是否转方向、是否考证，由你自己决定。
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面整改：纸面索引（屏读版）。
+           主栏 604×1378 ≈ 1:2.28，A4 竖版 1:1.414 —— 单张纸最大 572×809，
+           上下必然各空 285px。这一页的交付物只有一张纸，不能为了填满再编一张。
+           所以补的是纸上已有内容的**可读字号索引**：左边是纸上四个小节的标题，
+           右边是纸面页脚那四条边界。纸上页脚是 11px，站在机器前读不了，
+           而「不预测薪资、不预测录用结果」正是按下打印前必须看清的一句。 -->
+      <div class="sheetmap" data-at="s3">
+        <div class="smcol">
+          <span class="sm-hd" data-when="default first device-off">这张纸上写了什么</span>
+          <span class="sm-hd" data-when="ai-down">这张表上写了什么</span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>这周能做完的</b> —— 三条，都是改简历，不用等任何条件</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>现在就能投的方向</b> —— 机械设计，你的事例已经对得上</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>要花时间才能通的一条</b> —— 设备调试，27 条里 19 条要电工证</span></span>
+          <span class="sm-i" data-when="default first device-off"><i></i><span>
+            <b>缺口较大、只是让你知道有这条路</b> —— 质量工程师</span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            <b>四类方向在这 214 条里各有多少</b> —— 38 / 27 / 21 / 18 条</span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            <b>本单没有的东西</b> —— 没有「你缺什么」，也没有先做哪三件</span></span>
+        </div>
+        <div class="smcol smcol--not">
+          <span class="sm-hd">这张纸上<b>没有</b>写什么</span>
+          <span class="sm-i"><i></i><span>不预测<b>薪资</b></span></span>
+          <span class="sm-i"><i></i><span>不预测<b>录用结果</b></span></span>
+          <span class="sm-i"><i></i><span>不排<b>前景好坏</b>，条数不是市场需求</span></span>
+          <span class="sm-i"><i></i><span>不替你决定<b>转不转方向、要不要考证</b></span></span>
+          <span class="sm-i" data-when="ai-down"><i></i><span>
+            本单<b>没有读你的简历</b>：打印时 AI 不可用，没有缺口对照</span></span>
+          <span class="sm-i"><i></i><span>
+            只覆盖<b>本机读过正文的那 214 条</b>，本机没见过的岗位不在里面</span></span>
         </div>
       </div>
 
@@ -441,11 +697,18 @@
             本机能做的只有一件：把<b>它真读过的岗位正文</b>和你的简历放在一起，
             指出哪些对得上、哪些差一个可验证的条件。
           </div>
+
+          <!-- 2026-08-11 版面整改：P28 自我探索入口移到左栏第 1 步的正文下面。
+               它回答的是「你自己想要什么」，正好接在「从你的简历里读出来的」之后；
+               留在右栏这张「本机不做的四件事」里，语义上也挂不上。链接与文案未改。 -->
         </div>
       </div>
 
-      <!-- S2 右 -->
-      <div class="pane" data-at="s2">
+      <!-- 依据面板：三步常驻（2026-08-11）。
+           原来只挂在 s2，于是 s1 和 s3 的右栏各空了 480 / 566px，而用户在 s1 就该知道
+           「下一步的建议会拿哪批岗位来比」，在 s3 更该知道「手上这张纸是按什么算的」。
+           四行数字与下面那段口径和原来一字不差，只是不再锁在第 2 步。 -->
+      <div class="pane" data-at="s1 s2 s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这些数字是什么</b></div>
         <div class="sec">
           <div class="kv">
@@ -454,9 +717,50 @@
             <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
             <div class="kv-row"><span class="k">只有标题的</span><span class="v"><b>61</b> 条 · 不计入</span></div>
           </div>
+          <!-- 方向分布：四个数取自第 2 步那四张方向卡（38 / 27 / 21 / 18），不另算。
+               条形长度按 38 条为满格换算，只是同一组数的另一种读法。 -->
+          <!-- 四态常驻：条数是本机数出来的事实，不经过 AI（页面自己在 ai-down 那一支
+               写着「计数不依赖 AI，是本机数出来的事实」，ai-down 版纸面印的也正是这四个数）。
+               早先误加了 data-when，导致 ai-down 的 s2 右栏又空出 209px。 -->
+          <div class="dist" style="margin-top:var(--s-4)" data-at="s2 s3">
+            <div class="ds"><span class="ds-n">机械设计</span>
+              <span class="ds-bar"><i style="width:100%"></i></span><span class="ds-v">38</span></div>
+            <div class="ds"><span class="ds-n">设备调试</span>
+              <span class="ds-bar"><i style="width:71%"></i></span><span class="ds-v">27</span></div>
+            <div class="ds"><span class="ds-n">工艺工程师</span>
+              <span class="ds-bar"><i style="width:55%"></i></span><span class="ds-v">21</span></div>
+            <div class="ds"><span class="ds-n">质量工程师</span>
+              <span class="ds-bar"><i style="width:47%"></i></span><span class="ds-v">18</span></div>
+          </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
             条数 = 本机见到的数量。<b>不是市场需求，不是前景排名。</b>
             另有 61 条来源平台只给了标题，本机读不到内容，一律不参与计数。
+            四类合计 104 条，其余 110 条不属于这四类。
+          </div>
+          <!-- 首次使用说明（2026-08-11）：原来是右栏末尾**单独一张 176px 的卡**，
+               三个阶段都插一张，把「本机不做的四件事 / 接下来」挤到只剩 34–370px，
+               实测最多藏掉 417px。它说的是这一页的依据与边界，和这张卡同题 ——
+               并进来即可，措辞未改。 -->
+          <div class="panel-note" style="margin-top:var(--s-4)" data-when="first">
+            <b>这一页帮你做什么</b>：把上面这些岗位正文和你的简历放一起，指出哪些对得上、
+            哪些差一个<b>可验证的</b>条件。不预测薪资、不预测前景。
+          </div>
+
+          <!-- 重跑条件：s1 / s2 常驻（2026-08-11）。原来只写在 s3 的「接下来」里，
+               但「这些数字什么时候会变」是看到数字的那一刻就该知道的事。原话未改。
+               并进本卡而不是另起一张：348px 的栏里已经有四张卡，多一张卡头就要多 90px，
+               而这三行本来就是上面那四行数字的注脚 —— 同题，合在一起读更顺。
+               s3 不放：那一步的「接下来」卡里已经逐字写着同一件事。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)" data-at="s1 s2">
+            <svg class="ic"><use href="#i-refresh"/></svg><b>什么时候该重跑</b>
+          </div>
+          <div class="kv" data-at="s1 s2">
+            <div class="kv-row"><span class="k">改了简历</span><span class="v">方向会变</span></div>
+            <div class="kv-row"><span class="k">岗位数据</span><span class="v">每天同步</span></div>
+            <div class="kv-row"><span class="k">补上漏写的经历</span><span class="v">缺口会少</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)" data-at="s1 s2">
+            这一页给的<b>不是一次性的结论</b>。过一阵再来，条数和缺口都会变。
           </div>
         </div>
       </div>
@@ -480,8 +784,7 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>你会看到本页多次写「<b>如果你其实做过，这是简历漏写，不是你缺</b>」——
-                  这两种要分开：一种要花几个月，一种今天下午就能补。</span>
+            <span><b>「简历漏写」和「真的没做过」要分开看</b>：一种要花几个月，一种今天下午就能补。</span>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
@@ -490,30 +793,60 @@
                   没法验证，也没法行动，写了等于没写。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            属于「简历漏写」的那几条，可以直接去简历工作台补。
-          </div>
+          <!-- 2026-08-10 交接整改：这句原来是**纯文本**。整页在讲「简历漏写今天下午就能补」，
+               却没给一条能点的路 —— 用户得自己退出去、回首页、找到简历工作台。
+               现在是真链接，并按全站交接契约带参：?stage=s4 直落「补内容」那一步，
+               ?from=P22 让那边的返回键回得到这里。 -->
+          <a class="xlink" style="margin-top:var(--s-4)"
+             href="09-resume-workbench.html?stage=s4&amp;from=P22">
+            <svg class="ic"><use href="#i-resume"/></svg>
+            <span class="xlink-b">
+              <span class="xlink-t">属于「简历漏写」的那几条，现在就能补</span>
+              <span class="xlink-s">去简历工作台第 4 步「补内容」· 带去：从本页来，补完可以回来重跑</span>
+            </span>
+            <svg class="ic" style="margin-left:auto"><use href="#i-arrowRight"/></svg>
+          </a>
         </div>
       </div>
 
       <!-- S3 右 -->
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <!-- 2026-08-10 死控件整改：这两行原来都是 <label class="ck">，里面没有 input，
+             全站也没有任何 .ck 监听 —— 看着能勾，勾了页数不变、预估不变、交接链接恒为
+             pages=1。而卡头还写着「勾选即改页数」。两条里选了**做成真勾选**（另一条路是
+             删掉该项）：缺口表是这一页真做得出来的交付物，删了等于砍掉一件能给用户的东西，
+             而它「改页数」的下游本来就存在（合计 / 费用 / 主按钮 href 三处），接上即可。
+
+             同时把两类东西分开长相 —— 这正是上一版埋雷的地方：
+               · 行动清单 = 固定项，不可去 → .ck--fix，无 cursor:pointer，右侧写「必带」
+               · 缺口表   = 真选项       → <button aria-pressed>，勾选走下游
+               · ai-down 的缺口表 = 本次出不了 → .ck--fix + .ck--off，明写原因，不接受点击 -->
         <div class="sec">
-          <label class="ck ck--have">
+          <div class="ck ck--have ck--fix">
             <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">行动清单</span>
+            <span class="ck-b"><span class="ck-t" data-when="default first device-off">行动清单</span>
+              <span class="ck-t" data-when="ai-down">岗位要求计数表</span>
               <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-st">必带</span>
+          </div>
+          <button class="ck" type="button" style="margin-top:var(--s-3)"
+                  data-gapdoc aria-pressed="false" data-when="default first device-off">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">四个方向的完整缺口表</span>
               <span class="ck-s">A4 黑白 · 2 页 · 清单已含要点，按需选</span></span>
-          </label>
+            <span class="ck-st" data-f22="gapst">不打</span>
+          </button>
+          <div class="ck ck--fix ck--off" style="margin-top:var(--s-3)" data-when="ai-down">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">四个方向的完整缺口表</span>
+              <span class="ck-s">AI 不可用 · 缺口要对着你的简历算，这次出不了</span></span>
+            <span class="ck-st">本次出不了</span>
+          </div>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f22="pg">1</b> 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f22="fee">0.20</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -522,7 +855,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。清单同时存进「我的文档」与「AI服务记录」。
+            费用为预估。<span data-when="default first device-off">清单同时存进「我的文档」与「AI服务记录」。</span><span data-when="ai-down">这张计数表同时存进「我的文档」。</span>
           </div>
         </div>
       </div>
@@ -531,12 +864,18 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>接下来</b></div>
         <div class="sec">
           <div class="tline">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
+            <div class="tl tl--now" data-when="default first device-off"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">先做「这周能做完的」三条</span>
                 <span class="tl-s">都是改简历，不用等任何条件</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
+            <div class="tl tl--now" data-when="ai-down"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">AI 恢复后回来重跑一次</span>
+                <span class="tl-s">这次只有条数，没有对照你简历的缺口和先做哪几件</span></span></div>
+            <div class="tl" data-when="default first device-off"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">改完回来重跑一次</span>
                 <span class="tl-s">补上工艺和 SOP 之后，对得上的方向会变</span></span></div>
+            <div class="tl" data-when="ai-down"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">这张表可以先带走</span>
+                <span class="tl-s">条数是本机数出来的，AI 恢复与否都成立</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">岗位数据每天同步</span>
                 <span class="tl-s">过一阵再来，条数和缺口都会变</span></span></div>
@@ -544,8 +883,10 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>这份清单<b>不是一次性的结论</b>。简历改了、岗位数据更新了，
+            <span data-when="default first device-off">这份清单<b>不是一次性的结论</b>。简历改了、岗位数据更新了，
                   结果就会变 —— 值得隔一段时间重跑一次。</span>
+            <span data-when="ai-down">这张计数表<b>不是一次性的结论</b>。岗位数据每天同步，条数会变；
+                  AI 恢复后重跑才会有对照你简历的那部分。</span>
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
@@ -555,44 +896,43 @@
         </div>
       </div>
 
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            把<b>本机真读过的岗位正文</b>和你的简历放一起，
-            指出哪些对得上、哪些差一个<b>可验证的</b>条件。<br>
-            不预测薪资、不预测前景 —— 那些本机没有依据。
-          </div>
-        </div>
-      </div>
+      <!-- 首次使用说明已并入上面「这些数字是什么」卡内（2026-08-11，见该处注释）：
+           它原来是每个阶段都额外插一张 176px 的卡，把同栏的主卡挤到藏掉 417px。 -->
 
     </div>
   </div>
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="37-interview-hub.html" data-parent-label="面试训练"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">面试训练</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回看我会什么</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看方向与缺口</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="default first device-off">回看方向与缺口</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="ai-down">回看岗位计数</button>
 
-    <span class="actionbar-hint" data-at="s1" data-when="default first">4 条有事例 · 2 条没事例撑着</span>
+    <!-- 2026-08-10 第二轮全量回归：s1 的提示与主动作原来只写了 default / first / ai-down，
+         device-off 一态两样都不显示 —— 该态操作栏只剩「返回 / 需要帮助」，用户在第 1 步就走不下去
+         （四态 × 全阶段扫描里全站仅剩这一处真实的「无前进主操作」）。
+         打印机离线只影响第 3 步出纸（s3 已有自己的 device-off 分支），s1→s2 不碰打印，
+         所以按 s2「生成行动清单」的既有写法，把 device-off 并进 default 分支。 -->
+    <span class="actionbar-hint" data-at="s1" data-when="default first device-off">4 条有事例 · 2 条没事例撑着</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 读不出简历，只能看岗位计数</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first">依据 214 条读过正文的岗位 · 不是市场全貌</span>
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 只有原始计数，无方向建议</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f22="hint3">共 1 计费页 · 预估 0.20 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看岗位计数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成岗位要求计数表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" data-f22="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P22&amp;kind=material&amp;title=职业规划行动清单&amp;pages=1&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -600,10 +940,243 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P22 · 2026-08-10 死控件整改 ·「四个方向的完整缺口表」真的能勾
+   --------------------------------------------------------------------------
+   上一版这一项是 <label class="ck">：里面没有 input，全站也没有 .ck 的事件监听。
+   勾了之后 —— 合计还是 1 页、预估还是 0.20 元、主按钮的 href 还是 pages=1。
+   而这张卡的卡头写着「勾选即改页数」。界面承诺了一个不存在的控件。
+
+   现在它是 <button aria-pressed>，勾选真的往下游走：
+     勾中 → 合计页数 1 → 3、预估 0.20 → 0.60
+          → 动作条提示同步
+          → 交接链接 ?pages= 与 ?title= 同步（打印台的核价与来源回执都靠这两个）
+   ai-down 例外：那一态的缺口表本来就出不了（要对着简历算），页数恒为 1，
+   那一态的行是 .ck--fix 不接受点击 —— 不给开关就不长成开关。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var btn = scr.querySelector('[data-gapdoc]')
+  if (!btn) return
+
+  var BASE_PG = 1        // 行动清单 / 计数表恒为 1 页
+  var GAP_PG = 2         // 缺口表 2 页（卡上写的就是这个数，别在两处各写一份）
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
+
+  function set (k, txt) {
+    var ns = scr.querySelectorAll('[data-f22="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].textContent = txt
+  }
+  function isAiDown () { return (scr.getAttribute('data-state') || 'default') === 'ai-down' }
+  /* ai-down 下缺口表出不了 —— 即使按钮上一次是勾着的，也不能把它算进页数 */
+  function gapOn () { return !isAiDown() && btn.getAttribute('aria-pressed') === 'true' }
+
+  function render () {
+    var on = gapOn()
+    var pages = BASE_PG + (on ? GAP_PG : 0)
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
+    var title = isAiDown() ? '岗位要求计数表'
+              : (on ? '职业规划行动清单 + 四方向缺口表' : '职业规划行动清单')
+
+    set('gapst', on ? '已加入' : '不打')
+    set('pg', String(pages))
+    set('fee', fee)
+    set('hint3', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+
+    var go = scr.querySelector('[data-f22="gobtn"]')
+    if (go) {
+      go.setAttribute('href', '06-print-workbench.html?stage=s3&from=P22&kind=material&title=' +
+        encodeURIComponent(title) + '&pages=' + pages + '&copies=1&back=s3')
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  btn.addEventListener('click', function () {
+    btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+    render()
+  })
+
+  render()
+
+  /* 四态切换后重算：ai-down 把缺口表排除在外，页数与标题都要跟着回到 1 页。
+     两条路都接上 —— 走查调 window.v3ApplyVisibility()，外壳按钮走 stage.js 局部函数。 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P22 · 上一屏带过来的选择（37-interview-hub「职业规划建议」卡 → 本页）
+
+   契约（对方一直在传，本页此前一个都不读 —— 用户在首屏选完方向和跨度，
+   进来一点痕迹都没有，等于白选）：
+       ?target=运营|销售|行政人事|技术      ?span=3m|6m|12m
+
+   本页的处境和 P20 不同：这里没有「目标方向」控件，四张方向卡是
+   **本机读这份简历 + 214 条岗位正文数出来的结果**，不是给用户挑的菜单。
+   所以参数消费分两种情况，两种都必须如实说，不能含糊：
+
+     · 带来的方向**正好是这四类之一** → 标出那一张（只标记，不改它的计数与
+       缺口 —— 那些数是数出来的，不随用户想去哪而变），并印在行动清单上。
+     · 带来的方向**不在这四类里**（运营 / 销售 / 行政人事 / 技术 都不在）→
+       照实说「本机读出来的四类里没有这一类，没有按它重算」，
+       但仍然把用户的选择记在单子上。**不假装筛过、不硬凑一个方向。**
+
+   跨度同理：本机不知道用户每周能投入多少时间，排不出可信的时间表，
+   所以 span 只作为「你给自己定的跨度」记录并印在纸上，
+   不用来给行动项分批、更不用来判断哪条「来得及」。
+
+   白名单：target 只认上一屏那四个词 + 本页自己的四类方向；span 只认
+   3m / 6m / 12m。表以外一律当没传，不报错、不把 URL 字面量渲染出来。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var SPAN_NM = { '3m': '3 个月', '6m': '半年', '12m': '一年' }
+  var HUB_TARGET = ['运营', '销售', '行政人事', '技术']
+
+  var dirs = [].slice.call(scr.querySelectorAll('.dir'))
+  var DIR_NM = dirs.map(function (d) {
+    var t = d.querySelector('.dir-t')
+    return t ? (t.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+  })
+  /* 卡名带括号说明（「继续做机械设计（本行往深走）」），按钮上放不下也不好点，
+     所以按钮只显示括号前那截；比对用的仍是完整卡名 */
+  function shortNm (s) { return s.replace(/（.*$/, '') }
+
+  var Q = new URLSearchParams(location.search)
+  function qv (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+  function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+
+  var tRaw = qv('target'), sRaw = qv('span')
+  var target = (HUB_TARGET.indexOf(tRaw) > -1 || DIR_NM.indexOf(tRaw) > -1) ? tRaw : ''
+  var span = Object.prototype.hasOwnProperty.call(SPAN_NM, sRaw) ? sRaw : ''
+  if (!target && !span) return          // 没带合法参数 → 与整改前逐像素相同
+
+  var fromHub = !!target               // 记住第一次是从上一屏带进来的
+  function dirIndex () { return DIR_NM.indexOf(target) }
+
+  /* ---------- 顶部回执条 ---------- */
+  var box = document.createElement('div')
+  box.className = 'carryin'
+  box.setAttribute('data-at', 's1 s2 s3')
+  var wm = scr.querySelector('.wmain')
+  if (wm) wm.insertBefore(box, wm.firstChild)
+
+  /* 为什么这两项**不印到 A4 上**：实测这张 1 页的行动清单已经排满
+     （sheet-a4 clientHeight 809px，内容正好占满），再加一行就把页脚
+     「不预测薪资 / 不承诺职业发展结果」那条免责声明挤出纸外 —— 自检
+     「内部裁切」当场报出来。合规声明不能为了塞新内容让位，所以这两项
+     只留在屏幕上，并在下面如实告诉用户纸上没有它们。 */
+
+  function render () {
+    var idx = dirIndex(), i
+    var items = ''
+    if (target) items += '<span class="carryin-it"><i>目标方向</i><em>' + esc(target) + '</em></span>'
+    if (span) items += '<span class="carryin-it"><i>跨度</i><em>' + SPAN_NM[span] + '</em></span>'
+
+    var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+            '<b>已带入上一屏的选择 · 可改</b>' +
+            '<span class="carryin-src">来自面试训练首屏</span></div>' +
+            '<div class="carryin-items">' + items + '</div>'
+
+    if (target && idx > -1) {
+      h += '<div class="carryin-note">下面第 2 步里<b>「' + esc(shortNm(target)) +
+           '」那张卡已经标出来了</b>；卡上的条数与缺口是本机数出来的，' +
+           '不随你想去哪而变，所以只做标记、没有重算。</div>'
+    } else if (target) {
+      h += '<div class="carryin-miss">本机从你这份简历读出来的方向只有：' +
+           esc(DIR_NM.map(shortNm).join(' / ')) + '，<b>没有「' + esc(target) + '」这一类</b>。' +
+           '本机<b>没有按它重算</b>方向与缺口 —— 那要有对得上的岗位正文才做得出来。' +
+           '你的选择会记在行动清单上；想按本机数得出来的方向看，点下面换一个。</div>'
+    }
+    if (span) {
+      h += '<div class="carryin-note">跨度<b>' + SPAN_NM[span] + '</b>只记在这里：' +
+           '本机不知道你每周能投入多少时间，<b>不给行动项排时间表、也不判断哪条来得及</b>；' +
+           '第 3 步那张行动清单已经排满一页，<b>这两项没有印上去</b>，' +
+           '给页脚的免责声明让位。</div>'
+    }
+
+    h += '<div class="carryin-ops"><span class="carryin-lb">换一个方向</span>'
+    for (i = 0; i < DIR_NM.length; i++) {
+      h += '<button class="carryin-op" type="button" data-plandir="' + i + '" aria-pressed="' +
+           (idx === i ? 'true' : 'false') + '">' + esc(shortNm(DIR_NM[i])) + '</button>'
+    }
+    h += '</div><div class="carryin-ops"><span class="carryin-lb">换跨度</span>'
+    var keys = ['3m', '6m', '12m']
+    for (i = 0; i < keys.length; i++) {
+      h += '<button class="carryin-op" type="button" data-planspan="' + keys[i] + '" aria-pressed="' +
+           (span === keys[i] ? 'true' : 'false') + '">' + SPAN_NM[keys[i]] + '</button>'
+    }
+    h += '</div>'
+    box.innerHTML = h
+
+    /* 方向卡标记 */
+    for (i = 0; i < dirs.length; i++) {
+      dirs[i].classList.toggle('dir--focus', i === idx)
+      var old = dirs[i].querySelector('.dir-focus-mark')
+      if (i === idx && !old) {
+        var m = document.createElement('span')
+        m.className = 'dir-focus-mark'
+        m.textContent = '你选的方向'
+        var hd = dirs[i].querySelector('.dir-hd span')
+        if (hd) hd.appendChild(m)
+      } else if (i !== idx && old) {
+        old.parentNode.removeChild(old)
+      }
+    }
+
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  scr.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return
+    var el
+    if ((el = e.target.closest('[data-plandir]'))) {
+      var i = +el.getAttribute('data-plandir')
+      target = (DIR_NM[i] === target) ? (fromHub ? tRaw : '') : DIR_NM[i]
+      render(); return
+    }
+    if ((el = e.target.closest('[data-planspan]'))) {
+      var k = el.getAttribute('data-planspan')
+      span = (span === k) ? '' : k
+      render(); return
+    }
+  })
+
+  render()
+
+  /* 走查把手：本页认下了 URL 里的哪几个值 */
+  window.v3P22Carry = function () {
+    return { targetRaw: tRaw, target: target, spanRaw: sRaw, span: span, dirIndex: dirIndex(), dirs: DIR_NM }
+  }
+})()
+</script>
 </body>
 </html>

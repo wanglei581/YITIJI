@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P01 首页 · AI 神经中枢 V6 — AI 求职操作系统</title>
+<meta name="screen-name" content="P01 首页 · AI 神经中枢 V6">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=1">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
+
+<!-- ============================================================
+     V6 「AI 神经中枢」页内样式（自包含，不改任何共享文件）
+     ------------------------------------------------------------
+     信息结构与文案 100% 沿用 01-home-v6.html，三处同步差异：
+       ① topbar 品牌三段式：职易达 + 「AI 求职操作系统」副名(小号 fog-700)
+          + NATIVE-OS 徽章（等宽大写 jade 胶囊 + 2.2s 呼吸点）
+       ② 不再有 brand-sub 行（用户已删）
+       ③ 人像 assets/advisor-cut.png（840×1496 透明抠图，用户 2026-08-10 补发）
+     动效纪律：只动 transform / opacity / filter（SVG 连线沿用项目
+     既有 stroke-dashoffset 口径）；无紫蓝 / 星星 / 数字滚动；
+     reduced-motion 全静态退化；html.lowgpu 关重效果；触控 ≥48。
+     ============================================================ -->
+<style>
+/* ── ① 品牌三段式 ─────────────────────────────────────────── */
+.vx-brandrow { display: flex; align-items: baseline; gap: var(--s-3); }
+.vx-brandsub { font-size: var(--fz-2); color: var(--fog-700); letter-spacing: .08em; white-space: nowrap; }
+.vx-osbadge {
+  align-self: center; display: inline-flex; align-items: center; gap: 7px;
+  height: 26px; padding: 0 12px; border-radius: var(--r-full);
+  background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  font-family: var(--ff-num); font-size: 11px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--jade-600);
+  white-space: nowrap;
+}
+.vx-osbadge i {
+  display: block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--jade-500);
+  animation: vx-dotbreathe 2.2s var(--ease-in-out) infinite;
+}
+@keyframes vx-dotbreathe { 0%, 100% { opacity: .35; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.2); } }
+
+/* ── 神经中枢：轨道 / 圆片 / 环流光 ───────────────────────────
+   椭圆轨道 rx150 / ry94，绕小青 56s 一圈（rAF 只写 transform /
+   opacity / z-index）。圆片是功能的「神经元表征」，不是入口
+   （入口在下方八卡），因此 pointer-events:none + aria-hidden，
+   不受 48px 触控约束。 ── */
+.vfigure img { z-index: 4; }
+.vfigure-tag { z-index: 8; }
+.vx-ring { position: absolute; left: 0; top: 0; width: 316px; height: 204px; pointer-events: none; overflow: visible; }
+.vx-ring--back { z-index: 3; }    /* 上半弧：绕到人像身后 */
+.vx-ring--front { z-index: 5; }   /* 下半弧：从人像身前经过（人像 z=4） */
+.vx-ring path {
+  fill: none; stroke: var(--jade-a32); stroke-width: 1.5;
+  stroke-linecap: round; stroke-dasharray: 10 14;
+  animation: vx-ringflow 6.5s linear infinite;   /* 轨道环流光 */
+}
+@keyframes vx-ringflow { to { stroke-dashoffset: -240; } }
+.vx-orb {
+  position: absolute; left: 0; top: 0; width: 44px; height: 44px;
+  border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+  background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.9);
+  box-shadow: 0 10px 22px -10px rgba(74,50,20,.35), inset 0 1px 0 rgba(255,255,255,.9);
+  backdrop-filter: blur(8px);
+  will-change: transform, opacity;
+}
+.vx-orb .ic { width: 24px; height: 24px; }
+.vx-orb--print  .ic { color: var(--cat-print); }
+.vx-orb--resume .ic { color: var(--cat-resume); }
+.vx-orb--job    .ic { color: var(--cat-job); }
+.vx-orb--fair   .ic { color: var(--cat-fair); }
+.vx-orb--mock   .ic { color: var(--cat-mock); }
+.vx-orb--policy .ic { color: var(--cat-policy); }
+/* 与 vivid.css .card--tool / .card--camp 身份色同源（那两色未做 --cat-* 变量） */
+.vx-orb--tool   .ic { color: #8a6d3b; }
+.vx-orb--camp   .ic { color: #5f8a4e; }
+
+/* 状态即动效：ai-down 整环灰化（停转由 rAF 冻结角度实现）；
+   device-off 打印节点灰化但环照转 */
+.screen[data-state="ai-down"] .vx-orb { filter: grayscale(1) brightness(.94); }
+.screen[data-state="ai-down"] .vx-ring path { stroke: var(--surf-3); animation: none; }
+.screen[data-state="device-off"] .vx-orb--print { filter: grayscale(1) brightness(.92); }
+
+/* ── 点阵层雷达扫掠：圆心 = 中枢，18s 一圈，随同款 mask 淡出 ── */
+.vx-radarhost {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  mask-image: linear-gradient(200deg, #000 0%, transparent 62%);
+  -webkit-mask-image: linear-gradient(200deg, #000 0%, transparent 62%);
+}
+.vx-radar {
+  position: absolute; width: 1100px; height: 1100px; border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    transparent 0deg 306deg, var(--jade-a12) 330deg,
+    var(--jade-a32) 352deg, transparent 356deg 360deg);
+  animation: vx-radar 18s linear infinite;
+  will-change: transform;
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+@keyframes vx-radar { to { transform: rotate(360deg); } }
+/* AI 不可用时雷达如实熄灭：扫掠表达的是「AI 在读现场」 */
+.screen[data-state="ai-down"] .vx-radar { opacity: 0; }
+
+/* ── 胶囊 → 中枢 流动连线（量真实坐标，dash 流动） ── */
+.vx-flow { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.vx-flow .base { fill: none; stroke: var(--jade-a20); stroke-width: 1.5; }
+.vx-flow .flow {
+  fill: none; stroke: var(--cat-print); stroke-width: 2.4; stroke-linecap: round;
+  stroke-dasharray: 2 16; filter: drop-shadow(0 0 5px var(--jade-a32));
+  animation: vx-flowdash 2.6s linear infinite;
+}
+@keyframes vx-flowdash { to { stroke-dashoffset: -216; } }
+.screen[data-state="ai-down"] .vx-flow { opacity: 0; }   /* 连线流光全隐 */
+
+/* ── 胶囊聚焦呼吸光环 + 麦克风 idle 微脉冲 ── */
+.vx-halo {
+  position: absolute; inset: 2px; border-radius: var(--r-full); pointer-events: none;
+  border: 2px solid var(--jade-a32); box-shadow: inset 0 0 18px var(--jade-a12);
+  opacity: 0; z-index: 0;
+}
+.vcommand:focus-within .vx-halo { animation: vx-halo 2.2s var(--ease-in-out) infinite; }
+@keyframes vx-halo { 0%, 100% { opacity: .35; transform: scale(1); } 50% { opacity: .9; transform: scale(1.006); } }
+.vx-mic .ic { animation: vx-mic 2.6s var(--ease-in-out) infinite; }
+@keyframes vx-mic { 0%, 70%, 100% { transform: none; } 78% { transform: scale(1.16); } 86% { transform: scale(.98); } 93% { transform: scale(1.05); } }
+
+/* ── 办理路径：3 粒子沿线 + 当前步呼吸环 ──
+   fx2 的单条流光换成三粒子；first / ai-down 态路径未生成，如实隐藏
+   （呼吸环的 first/ai-down 隐藏沿用 fx2.css 既有规则） ── */
+.vtrack::after { display: none; }
+.vx-part {
+  position: absolute; left: 18px; top: 11px; width: 5px; height: 5px;
+  border-radius: 50%; background: var(--jade-400);
+  box-shadow: 0 0 8px var(--jade-a32);
+  opacity: 0; animation: vx-part 3.9s linear infinite;
+  will-change: transform, opacity;
+}
+.vx-part:nth-of-type(2) { animation-delay: 1.3s; }
+.vx-part:nth-of-type(3) { animation-delay: 2.6s; }
+@keyframes vx-part {
+  0% { transform: none; opacity: 0; }
+  10% { opacity: .95; }
+  88% { opacity: .95; }
+  100% { transform: translateX(252px); opacity: 0; }
+}
+/* 当前步：fx2 的旋转环改为呼吸环（同一伪元素，覆盖为纯描边） */
+.vstep--now .vstep-dot::before {
+  background: none; mask: none; -webkit-mask: none;
+  border: 2px solid var(--jade-400);
+  animation: vx-stepring 2.4s var(--ease-in-out) infinite;
+}
+@keyframes vx-stepring { 0%, 100% { transform: scale(.86); opacity: .35; } 50% { transform: scale(1.06); opacity: .9; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   AI 任务状态绑定：data-aitask —— 接线契约（生产必须照此实现）
+   ------------------------------------------------------------------
+   为什么有这一节：这一屏原来用 setTimeout / setInterval 直接"演"进度，
+   屏幕上转着圈说在算、实际没有任何任务在跑。接线后照抄那种写法，就会
+   出现「AI 已经挂了、进度条还在转」。所以进度类动效一律不许自己起跳，
+   必须绑定到一个明确的任务状态上。
+
+   ▸ 数据源（唯一）：.screen[data-aitask]，取值只有四个
+       idle    当前没有任务（无上下文 / 未提交）
+       running 后端已受理、任务未结束
+       done    任务结束且结果已渲染
+       failed  任务失败，或 AI 服务不可用
+
+   ▸ 生产接线要求
+       1. data-aitask 只能由**后端任务状态**驱动（轮询 / SSE / WebSocket
+          推送 AI 排序任务的真实生命周期），前端不得用计时器自行推进。
+       2. 没有任务时（idle）不许自转：进度日志、扫光、路径粒子、当前步
+          呼吸环全部静止。"看起来在算"必须等于"真的在算"。
+       3. running 的存续时间由后端决定。前端不得设"到点就变 done"的兜底
+          计时器；超时应由后端判定并下发 failed。
+       4. data-state="ai-down" 时 data-aitask 恒为 failed，任何用户输入都
+          不得把它推回 running（见页内脚本 taskFromState / setAiTask）。
+       5. failed 必须停在明确的不可用表现，并保留不依赖 AI 的路径
+          （打印扫描 / 岗位 / 招聘会 / 我的文档）—— 那几个入口不受本节影响。
+
+   ▸ 设计稿里唯一的例外：startAiTask() 末尾把 running 收回 taskFromState()
+     的那段是**原型占位**（标了 PROTOTYPE-ONLY）。接线时删掉它，改成订阅
+     后端状态。除那一处外，本页不再有任何"假装在算"的计时器。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 没有任务 / 任务失败 → 路径粒子如实消失（原来按 data-state 判，等价迁移：
+   first→idle、ai-down→failed，视觉结果与旧版逐像素一致） */
+.screen[data-aitask="idle"] .vx-part,
+.screen[data-aitask="failed"] .vx-part { display: none; }
+
+/* 没有任务 / 任务失败 → 当前步呼吸环停下。转圈=在算，不许空转 */
+.screen[data-aitask="idle"] .vstep--now .vstep-dot::before,
+.screen[data-aitask="failed"] .vstep--now .vstep-dot::before { animation: none; opacity: .32; }
+
+/* 进度日志与扫光只在 running 播放；failed 一律冻结（含 reduced-motion 之外的兜底） */
+.screen[data-aitask="failed"] .proclog,
+.screen[data-aitask="failed"] .sweep { display: none; }
+
+/* failed（= AI 不可用）：场景快捷停在"点了也不会算"的明确表现，不给假可点感 */
+.screen[data-aitask="failed"] .vscene { opacity: .45; cursor: not-allowed; }
+.screen[data-aitask="failed"] .vscene:hover { transform: none; box-shadow: none; color: var(--fog-800); }
+.screen[data-aitask="failed"] .vscene--key:hover { color: #fff; }
+
+/* ── 示例数据标记 ──────────────────────────────────────────────
+   default 态是"完整走查示例"，里面的材料结论不属于当前使用者。
+   用 text-decoration 做视觉标记（零布局影响）—— .verrand-kick 是
+   nowrap 且实测子项总宽 546px = 容器 546px，**一点富余都没有**，
+   任何带 padding/border 的徽章都会把这一行挤出横向溢出。 */
+.vx-demo { color: #9a5f0d; text-decoration: underline dashed; text-underline-offset: 3px; }
+
+/* ── 八卡 300ms 交错上浮 ── */
+.vgrid-a .card, .vgrid-b .card {
+  opacity: 0; transform: translateY(18px);
+  animation: vx-cardin 300ms var(--ease-out) forwards;
+}
+.vgrid-a .card:nth-child(1) { animation-delay: 60ms; }
+.vgrid-a .card:nth-child(2) { animation-delay: 120ms; }
+.vgrid-b .card:nth-child(1) { animation-delay: 180ms; }
+.vgrid-b .card:nth-child(2) { animation-delay: 240ms; }
+.vgrid-b .card:nth-child(3) { animation-delay: 300ms; }
+.vgrid-b .card:nth-child(4) { animation-delay: 360ms; }
+.vgrid-b .card:nth-child(5) { animation-delay: 420ms; }
+.vgrid-b .card:nth-child(6) { animation-delay: 480ms; }
+@keyframes vx-cardin { to { opacity: 1; transform: none; } }
+
+/* ── 卡面 4s 高光扫过 ──
+   扫光画在 .vx-sheen 的伪元素上：伪元素不进 DOM 扫描，idle 位
+   （translateX -130%）不会被横向溢出自检误报为出界元素。 ── */
+.card .vx-sheen { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.card .vx-sheen::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 36%, rgba(255,255,255,.28) 50%, transparent 64%);
+  transform: translateX(-130%);
+  animation: vx-sheen 4s var(--ease-in-out) infinite;
+}
+@keyframes vx-sheen { 0%, 62% { transform: translateX(-130%); } 88%, 100% { transform: translateX(130%); } }
+.vgrid-a .card:nth-child(2) .vx-sheen::before { animation-delay: .5s; }
+.vgrid-b .card:nth-child(1) .vx-sheen::before { animation-delay: 1s; }
+.vgrid-b .card:nth-child(2) .vx-sheen::before { animation-delay: 1.5s; }
+.vgrid-b .card:nth-child(3) .vx-sheen::before { animation-delay: 2s; }
+.vgrid-b .card:nth-child(4) .vx-sheen::before { animation-delay: 2.5s; }
+.vgrid-b .card:nth-child(5) .vx-sheen::before { animation-delay: 3s; }
+.vgrid-b .card:nth-child(6) .vx-sheen::before { animation-delay: 3.5s; }
+
+/* ── 图标语义微动（全部 transform-only，长间歇短动作） ── */
+.card--print .card-ic .ic  { animation: vx-ic-print 5s var(--ease-in-out) infinite; }             /* 出纸 */
+.card--resume .card-ic .ic { animation: vx-ic-resume 5.5s var(--ease-in-out) .6s infinite; }      /* 翻页 */
+.card--job .card-ic .ic    { animation: vx-ic-job 6s var(--ease-in-out) 1.1s infinite; }          /* 提箱 */
+.card--fair .card-ic .ic   { animation: vx-ic-fair 5s var(--ease-in-out) 1.7s infinite; transform-origin: 50% 22%; } /* 招展 */
+.card--mock .card-ic .ic   { animation: vx-ic-mock 4.5s var(--ease-in-out) 2.2s infinite; }       /* 拍节 */
+.card--policy .card-ic .ic { animation: vx-ic-policy 6s var(--ease-in-out) 2.8s infinite; transform-origin: 50% 88%; } /* 盖章 */
+.card--tool .card-ic .ic   { animation: vx-ic-tool 6.5s var(--ease-in-out) 3.3s infinite; transform-origin: 24% 76%; } /* 开盖 */
+.card--camp .card-ic .ic   { animation: vx-ic-camp 6s var(--ease-in-out) 3.9s infinite; }         /* 抛帽 */
+@keyframes vx-ic-print  { 0%, 64%, 88%, 100% { transform: none; } 72% { transform: translateY(-2.5px); } 80% { transform: translateY(1.5px); } }
+@keyframes vx-ic-resume { 0%, 62%, 90%, 100% { transform: none; } 72% { transform: rotateY(-34deg); } 82% { transform: rotateY(12deg); } }
+@keyframes vx-ic-job    { 0%, 62%, 88%, 100% { transform: none; } 70% { transform: translateY(-3px) rotate(-4deg); } 79% { transform: translateY(0) rotate(2deg); } }
+@keyframes vx-ic-fair   { 0%, 62%, 90%, 100% { transform: none; } 71% { transform: rotate(-5deg); } 81% { transform: rotate(4deg); } }
+@keyframes vx-ic-mock   { 0%, 64%, 90%, 100% { transform: none; } 71% { transform: scale(1.12); } 78% { transform: scale(1); } 85% { transform: scale(1.1); } }
+@keyframes vx-ic-policy { 0%, 64%, 86%, 100% { transform: none; } 72% { transform: translateY(-3px); } 78% { transform: translateY(1px) scale(.96); } }
+@keyframes vx-ic-tool   { 0%, 62%, 90%, 100% { transform: none; } 72% { transform: rotate(-9deg); } 82% { transform: rotate(3deg); } }
+@keyframes vx-ic-camp   { 0%, 62%, 88%, 100% { transform: none; } 70% { transform: translateY(-3.5px) rotate(10deg); } 80% { transform: translateY(0) rotate(0deg); } }
+
+/* ── 现场图 Ken Burns 30s（在线点呼吸 = components.css .dot--live，
+      pulseline = fx2.css，均为共享既有动效） ── */
+.vsite img { animation: vx-ken 30s var(--ease-in-out) infinite alternate; will-change: transform; }
+@keyframes vx-ken { from { transform: scale(1); } to { transform: scale(1.1) translate(-14px, -8px); } }
+
+/* ── 降级：lowgpu 关重效果（rAF 轨道由脚本改为静态摆位） ── */
+html.lowgpu .vx-radar, html.lowgpu .vx-flow, html.lowgpu .card .vx-sheen { display: none; }
+html.lowgpu .vx-ring ellipse, html.lowgpu .vsite img,
+html.lowgpu .card-ic .ic, html.lowgpu .vx-mic .ic,
+html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
+/* reduced-motion：base.css 全局把动画压到 .001ms 单次即静态终态，无需另写 */
+
+/* ── 高度收口 ──────────────────────────────────────────────────────
+   2026-08-10 第一轮:.vbody 装不下 verrand+两栅格+vfoot,ai-down 最坏溢出 95px,
+   「查看招聘会」四态落在裁切线下、点不动。前两版靠猜改反而更糟(76→99→122),
+   靠在浏览器里逐个候选试算才收住。
+
+   2026-08-11 复发,原因是我自己:页脚加了 64px 的「信息与边界」折叠条,
+   .vivid 从 100→1688 缩到 100→1624,而 .vfoot 的 min-height:240px 不肯让步,
+   于是底部 71px 又被 overflow:hidden 裁掉 ——
+   「查看招聘会」再次点不动(elementFromPoint 命中 .nb-sum),
+   连设备状态面板的最后两行(扫描仪、费用口径)也一起没了。
+   上面那句「按钮四态可点」当时是真的,加了折叠条之后就不再成立 ——
+   **注释会过期,所以这类结论必须由自检守着**:回归台已加「按钮被遮挡按不动」
+   一项(取按钮中心点做 elementFromPoint),四态复现该缺陷后才动手改。
+
+   这一轮把 71px 从哪里省出来,也是逐项试算的(每步都量了四态):
+     ① 计数胶囊(「12 家来源」「本周 3 场」这类**不可点**的标签)本来在
+        .card-foot 里换行独占一行,每行卡多吃 42px。移到卡片右上角与图标同行,
+        既省高度,语义上也更该跟标题在一起。          →  71 → 32
+     ② .vbody 行间距 8→6                            →  32 → 26
+     ③ .verrand 上下内距 6→2                        →  26 → 19
+     ④ .vfoot min-height 240→212(实测面板内容 196px,仍装得下) → 19 → 4
+     ⑤ .card-foot 换行后的行间距 12→6              →   4 → 全部为负
+   四态最终余量:default -20 / first -68 / ai-down -5 / device-off -20。
+   ai-down 余量最小,因为该态 vgrid-a 与面试卡各多一条降级说明并换行。
+   可点胶囊高度全部仍 ≥48px(实测 0 个低于 48),按钮、耗材行、费用口径行均未被裁。 */
+.vivid .vhero { height: 226px; }
+.screen[data-state="ai-down"] .vivid .vhero { height: 186px; }
+.vivid .verrand { padding-top: 2px; padding-bottom: 2px; }
+.vivid .vbody { gap: 6px; }
+.vivid .vgrid-a .card { min-height: 108px; }
+.vivid .vgrid-b .card { min-height: 92px; position: relative; }
+.vivid .vfoot { padding-top: 4px; min-height: 212px; flex-basis: 212px; }
+.vivid .vfoot .btn { min-height: 52px; }
+.vivid .vpanel { padding: 16px; }
+.vivid .vpanel .vrow { min-height: 0; }
+.vivid .vcalib { margin-top: 2px; }
+/* 换行后那一行贴紧一点：只影响被挤到第二行的信息胶囊，不动可点胶囊的 48px */
+.vivid .card-foot { row-gap: 6px; }
+/* 计数标签(不可点)移到卡片右上角，别再独占一行 */
+.vivid .vgrid-b .card-foot > .card-pill:not(.card-pill--go):not(.card-pill--info) {
+  position: absolute; top: 14px; right: 16px; margin: 0;
+}
+
+/* ── 版头文案落回可视区(2026-08-10 第二轮全量回归)────────────────────
+   上面那条 .vhero 限高只解决了「页面总高」，没管版头**里面**装不装得下：
+   .vhero 是 height:226/186 + overflow:hidden，而 .vhero-inner 的行高由
+   .vfigure(300px、刻意出血站在版头底边上)决定，.vhero-copy 又 align-items:end
+   贴在这 300px 行的底部 —— 实测 copy 底 452 > vhero 底 354：
+     · <h1> 第二行「序我来排」被从中间切掉(裁 19px，截图可见半截字压在输入条下)
+     · <p class="vhero-sub"> 371–434 整条落在裁切线以下，**四态全部 0% 可见** ——
+       连 ai-down「AI 排序暂时不可用…」、device-off「这台机器打印机离线…」
+       这两条状态说明也一起没了(§9 不伪造能力：状态说明不可见等于没说)
+   改法：版头文案改顶对齐、标题收成单行。76px 单行需要 912px，版头左栏只有 614px，
+   所以按宽度反推最大单行字号 —— 实测 50px 单行 / 52px 起换两行，取 48px 留余量。
+   实测 copy 底：default/first/device-off 311(余 43px)、ai-down 297(余 17px)，四态全可见。
+   只动版头，未碰 .vbody 的既有试算结果。 */
+.vivid .vhero-inner { align-items: start; }
+.vivid .vhero-copy { padding-bottom: 0; }
+.vivid .vhero-title { font-size: 48px; line-height: 1.06; margin-top: 12px; max-width: none; }
+.vivid .vhero-sub { margin-top: 12px; }
+/* ai-down 版头矮 40px，标题、上留白与行距再收一档。
+   注意可视下边界不是 .vhero 的 354/314 —— .vcommand 是「跨在版头底边上的玻璃胶囊」
+   (vivid.css: margin-top:-26px, z-index:6)，会盖住版头最后 26px。
+   所以文案的真实底线 = vhero 底 - 26：default 328、ai-down 288。
+   实测 ai-down 未收之前 sub 底 296 > 288，第二行「都正常，顺序需要你自己选。」
+   被指令条压住(elementFromPoint 命中 DIV.vcommand)——检测器量不到这种"被别的层盖住"，
+   只有对着 288 这条线量才看得见。收完实测 279，留 9px。 */
+.screen[data-state="ai-down"] .vivid .vhero { padding-top: 12px; }
+.screen[data-state="ai-down"] .vivid .vhero-title { font-size: 40px; margin-top: 6px; }
+.screen[data-state="ai-down"] .vivid .vhero-sub { margin-top: 6px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<!-- data-aitask 与 data-state 同源：初始 data-state="default"（示例走查态，
+     排序任务已完成）→ data-aitask="done"。四态映射与接线契约见页内 <style>
+     的「AI 任务状态绑定」一节；同步逻辑在页内脚本 taskFromState()。 -->
+<div class="screen" data-state="default" data-theme="warm" data-aitask="done">
+
+  <div class="grain"></div>
+  <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
+
+  <!-- ============ 顶栏：品牌三段式（无 brand-sub 行） ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">职</div>
+      <div class="vx-brandrow">
+        <span class="brand-name">职易达</span>
+        <span class="vx-brandsub">AI 求职操作系统</span>
+        <span class="vx-osbadge">NATIVE-OS<i aria-hidden="true"></i></span>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列空闲</div>
+    <!-- device-off = 打印扫描一体机（同一台 MFP）离线：扫描仪就长在这台机器上，
+         不能再写「扫描可用」。全站口径见 39-print-hub.html 文件头。 -->
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印扫描离线 · 其余功能可用</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:41</b></div>
+  </header>
+
+  <div class="vivid">
+
+    <!-- ============ 大色域版头 ============ -->
+    <section class="vhero">
+      <div class="vhero-field"><i></i><i></i><i></i>
+        <!-- 雷达扫掠：放在 field 层（满不透明度），套与点阵同款 mask 淡出 -->
+        <div class="vx-radarhost" aria-hidden="true"><div class="vx-radar" data-vx-radar></div></div>
+      </div>
+      <div class="vhero-dots"></div>
+
+      <div class="vhero-inner">
+        <div class="vhero-copy rise">
+          <span class="kicker">今天想办什么</span>
+          <h1 class="vhero-title">说出你的处境，<em>顺序我来排</em></h1>
+          <p class="vhero-sub" data-when="default first">一句话就够。我会盘点你手上已有的材料、排出办理顺序，每一步都等你点头才继续。</p>
+          <p class="vhero-sub" data-when="ai-down">AI 排序暂时不可用。打印、扫描、上传与岗位招聘会浏览都正常，顺序需要你自己选。</p>
+          <p class="vhero-sub" data-when="device-off">这台机器打印机离线。材料可以先存起来，凭手机号在任一台空闲机器取回打印。</p>
+        </div>
+
+        <!-- 神经中枢：小青 + 椭圆轨道 + 八功能玻璃圆片（advisor-cut.png 透明抠图） -->
+        <div class="vfigure" data-fx="figure" data-vx-hub>
+          <svg class="vx-ring vx-ring--back" viewBox="0 0 316 204" aria-hidden="true" data-vx-ring><path d="M8 102 A150 94 0 0 1 308 102"/></svg>
+          <svg class="vx-ring vx-ring--front" viewBox="0 0 316 204" aria-hidden="true" data-vx-ring><path d="M8 102 A150 94 0 0 0 308 102"/></svg>
+          <div class="vx-orb vx-orb--print"  aria-hidden="true"><svg class="ic"><use href="#i-printer"/></svg></div>
+          <div class="vx-orb vx-orb--resume" aria-hidden="true"><svg class="ic"><use href="#i-resume"/></svg></div>
+          <div class="vx-orb vx-orb--job"    aria-hidden="true"><svg class="ic"><use href="#i-briefcase"/></svg></div>
+          <div class="vx-orb vx-orb--fair"   aria-hidden="true"><svg class="ic"><use href="#i-fair"/></svg></div>
+          <div class="vx-orb vx-orb--mock"   aria-hidden="true"><svg class="ic"><use href="#i-interview"/></svg></div>
+          <div class="vx-orb vx-orb--policy" aria-hidden="true"><svg class="ic"><use href="#i-policy"/></svg></div>
+          <div class="vx-orb vx-orb--tool"   aria-hidden="true"><svg class="ic"><use href="#i-toolbox"/></svg></div>
+          <div class="vx-orb vx-orb--camp"   aria-hidden="true"><svg class="ic"><use href="#i-campus"/></svg></div>
+          <img src="assets/advisor-cut.png" alt="就业服务顾问 小青">
+          <span class="vfigure-tag" data-when="default first device-off"><span class="dot dot--live"></span>顾问 小青 · 在线</span>
+          <span class="vfigure-tag" data-when="ai-down"><span class="dot dot--down"></span>顾问 · 暂不可用</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 玻璃指令胶囊：跨在版头底边上 -->
+    <div class="vcommand">
+      <i class="vx-halo" aria-hidden="true"></i>
+      <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
+      <input type="text" data-typewriter placeholder="例如：周三要去招聘会，简历还没改" aria-label="说一句你的处境">
+      <!-- 2026-08-09 愿景补齐 + Codex 整改：语音能力真实落点是 P25 顾问的语音咨询态
+           (本机没有独立语音下单能力,README §人机分工),麦克风=去找小青语音说。
+           ai-down 态语音不可用,如实置灰。 -->
+      <a class="btn btn--lg btn--ghost vx-mic" data-when="default first device-off" href="25-advisor.html"
+         aria-label="语音找顾问小青,说出你的处境" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </a>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true"
+              aria-label="语音顾问暂不可用" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </button>
+      <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="default first"
+              style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">
+        排出办理顺序<svg class="ic" aria-hidden="true"><use href="#i-arrowRight"/></svg>
+      </button>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true">排序暂不可用</button>
+      <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="device-off"
+              style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">按离线状况重排</button>
+    </div>
+
+    <div class="vscenes">
+      <button class="vscene" data-fx="scene">周三招聘会，简历还没改</button>
+      <button class="vscene" data-fx="scene">打印两份材料</button>
+      <button class="vscene vscene--key" data-fx="scene">我不知道从哪开始</button>
+    </div>
+
+    <div class="vbody">
+
+      <!-- ============ 办理单：建议 + 横向路径 ============ -->
+      <section class="verrand rise" data-fx="think-target">
+        <div class="verrand-main">
+          <div class="verrand-kick">
+            <!-- default = 完整走查「示例」：这一态里的材料结论不属于当前使用者。
+                 「示例」与「本次」同为 2 个汉字，宽度不变 —— 这一行 nowrap 且
+                 子项总宽实测等于容器宽，不能再加任何东西。 -->
+            <span class="vx-demo" data-when="default">示例办理单 · 小青 09:41 排的</span>
+            <span data-when="first">本次办理单 · 还没有目标</span>
+            <span data-when="ai-down">本次办理单 · 排序不可用</span>
+            <span data-when="device-off">本次办理单 · 已按设备状况改过</span>
+            <span class="ev ev--e1" data-when="default device-off">E1 你的材料</span>
+            <span class="ev ev--e2" data-when="default device-off">E2 系统与来源</span>
+            <span class="ev ev--e3" data-when="default device-off">E3 排序是 AI 判断 · 仅供参考</span>
+          </div>
+
+          <h2 class="verrand-h" data-when="default">建议先做简历诊断</h2>
+          <h2 class="verrand-h" data-when="first">先告诉我一件事就够</h2>
+          <h2 class="verrand-h" data-when="ai-down">打印扫描照常，顺序你来定</h2>
+          <h2 class="verrand-h" data-when="device-off">先把材料转存到「我的文档」</h2>
+
+          <!-- 个人数据口径（2026-08-11 整改）：
+               · default = 唯一允许出现"某人材料结论"的态，且必须自称示例（见上方 .vx-demo
+                 徽标 + 这里的「示例：」前缀）。公共机器上，路过的人看到的第一屏不能写
+                 得像认识他。
+               · first = 无上下文态，**一个属于"你"的数字都不许出现**；只说明规则并给出
+                 可执行的下一步（下方 AI 简历服务卡 first 态胶囊「上传后逐条体检」，
+                 同卡「诊断优化」即 48px 真入口）。
+               · ai-down / device-off = 设备与 AI 状态演示，不声称任何本人材料数量。
+               · 「80 家企业参展」是来源方（主办方）公布的事实，不是本机统计，所以写
+                 「主办方公布」并在页脚现场卡带齐来源三字段。
+               · 2026-08-11 跨页对账：这句原写「周五这场招聘会 …… 128 家」，说的是页脚现场卡
+                 那一场。那一场（GZFAIR-2026-0814）在 17 场次库里不存在，已改引
+                 RC-2026-0812-A「8月12日 周三 · 参会企业 80 家」，所以这里同步改「周三 …… 80 家」。
+                 数字与星期都取自 17 第 471–487 行，不是本机算的。 -->
+          <p class="verrand-p" data-when="default">示例：一份《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周三这场招聘会 <b>主办方公布 80 家企业参展</b>、现场普遍收纸质简历。</p>
+          <p class="verrand-p" data-when="first">在上面说一句处境，或直接选下面的服务。<b>上传简历后，这里给你逐条体检</b>；在拿到你的材料之前，不显示任何属于你的结论。</p>
+          <p class="verrand-p" data-when="ai-down">对话与排序服务中断，<b>已自动上报，不需要你操作</b>；打印、扫描、上传与浏览都不受影响。</p>
+          <p class="verrand-p" data-when="device-off">打印机离线已上报运维；<b>已上传的材料</b>可以先存起来，<b>凭手机号在任一台空闲机器取回打印</b>。</p>
+
+          <div class="verrand-foot">
+            <span class="verrand-cost" data-when="default"><span>约 40 秒</span><span>免费</span><span>结果进「我的简历」</span></span>
+            <span class="verrand-cost" data-when="first"><span>不收费</span><span>不需要登录</span><span>离场自动清空</span></span>
+            <span class="verrand-cost" data-when="ai-down"><span>打印、扫描、上传、浏览正常</span><span>不影响已支付订单</span></span>
+            <!-- 2026-08-10 口径统一：这里存的是简历/求职材料 = 一般文档，基准表 90 天（原写 7 天串到取件码口径） -->
+            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>登录后存 90 天</span></span>
+            <button class="btn btn--quiet" data-when="default" style="text-decoration:underline;text-underline-offset:4px">跳过，直接打印</button>
+            <button class="btn btn--quiet" data-when="ai-down device-off" style="text-decoration:underline;text-underline-offset:4px">查看设备状态</button>
+          </div>
+        </div>
+
+        <div class="vsteps">
+          <div class="vsteps-hd"><span>办理路径</span><span class="n" data-when="default">第 1 / 3 步</span><span class="n" data-when="first ai-down device-off">待生成</span></div>
+          <div class="vtrack">
+            <i class="vx-part" aria-hidden="true"></i>
+            <i class="vx-part" aria-hidden="true"></i>
+            <i class="vx-part" aria-hidden="true"></i>
+            <div class="vstep vstep--now">
+              <span class="vstep-dot">01</span>
+              <span class="vstep-name" data-when="default">简历诊断</span>
+              <span class="vstep-name" data-when="first">等你说一句</span>
+              <span class="vstep-name" data-when="ai-down">顺序自己选</span>
+              <span class="vstep-name" data-when="device-off">转存文档</span>
+              <span class="vstep-tag" data-when="default device-off">下一步</span>
+              <span class="vstep-tag" data-when="first ai-down">未开始</span>
+            </div>
+            <div class="vstep">
+              <span class="vstep-dot">02</span>
+              <span class="vstep-name" data-when="default">按岗位优化</span>
+              <span class="vstep-name" data-when="first">盘点材料</span>
+              <span class="vstep-name" data-when="ai-down">打印扫描可用</span>
+              <span class="vstep-name" data-when="device-off">换机打印</span>
+              <span class="vstep-tag">待办理</span>
+            </div>
+            <div class="vstep">
+              <span class="vstep-dot">03</span>
+              <span class="vstep-name" data-when="default">打印 5 份</span>
+              <span class="vstep-name" data-when="first">排出顺序</span>
+              <span class="vstep-name" data-when="ai-down">浏览不受影响</span>
+              <span class="vstep-name" data-when="device-off">凭码取件</span>
+              <span class="vstep-tag" data-when="default">待核价</span>
+              <span class="vstep-tag" data-when="first ai-down device-off">待办理</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 服务入口：身份色卡 ============ -->
+      <section class="vgrid-a">
+        <a class="card card--print" href="39-print-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="card-name">打印扫描</span>
+          <span class="card-foot">
+            <!-- 这三个是真快捷入口（页内脚本绑 data-href 并阻止冒泡到外层卡片链接）。
+                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。
+                 2026-08-11 链接落地整改：三条原来带 ?stage=s1。带 stage 参数进 P06，
+                 会绕过它页尾脚本②「无交接参数 → 落 s1 并把写死的回执整条摘掉」那一支
+                 （06-print-workbench.html:2228 的判据是 !handed && !stage），
+                 于是首页点「本机上传」进去、走到第 3 步，屏幕上挂着一张
+                 「本次来自：简历工作台 · 诊断报告 · 来源页标注 3 页 · 09:43 收到交接」——
+                 那是模板里的样例回执，用户根本没去过简历工作台，也没交接过任何材料（已实测复现）。
+                 去掉 stage 后落点仍是第 1 步（P06 默认 data-stage 就是 s1），假回执被摘掉。
+                 ?source= 保留为接线契约：P06 目前只认 from/kind/title/pages/copies/back
+                 （:2225 KEYS 白名单），**不读 source**，所以这三条只当"进去自己选来源"，
+                 卡面也没有写"已经替你选好"。接线时由 P06 消费 source 预选第 1 步的来源卡。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=local">本机上传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=qr">手机扫码传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?source=usb">U 盘</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
+            <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
+            <span class="card-pill card-pill--info" data-when="device-off">打印扫描离线 · 上传可用</span>
+            <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <a class="card card--resume" href="32-resume-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+          <span class="card-name">AI 简历服务</span>
+          <span class="card-foot">
+            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(页内脚本绑 data-href)。
+                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="22-career-plan.html">职业规划</span>
+            <!-- 2026-08-11 个人数据整改：「已有 1 份待优化」原来挂在 default first device-off 三态，
+                 first 是**无上下文态** —— 一位刚走过来、什么都没传过的人，第一屏就被告知
+                 "已有 1 份待优化"，既是假数据也让人以为上一位用户的东西还在。现在只留 default
+                 （示例走查态），first 换成不声称任何本人资产的空态 + 可执行的下一步：
+                 同一张卡第一行的「诊断优化」就是 48px 真入口，这颗胶囊只负责说清它会做什么。
+                 宽度实测（.card-foot 内宽 300px，第三行 = 职业规划104 + 本胶囊 + card-go34 + 2×12 间距）：
+                 「上传后逐条体检」129px → 291px 恰好放得下（原「已有 1 份待优化」130px）；
+                 device-off 若写「诊断优化可用 · 出纸需换机」195px 会挤到第四行、把卡撑破（卡内余量为 0），
+                 所以收成「出纸需换机」102px。 -->
+            <!-- default 这颗必须自称示例，但只能等宽替换：「示例」与「已有」同为 2 字 → 仍是 130px。
+                 加「（示例）」后缀实测会涨到 ~190px，第三行放不下、卡片余量为 0，直接撑破。 -->
+            <span class="card-pill card-pill--info" data-when="default">示例 1 份待优化</span>
+            <span class="card-pill card-pill--info" data-when="first">上传后逐条体检</span>
+            <span class="card-pill card-pill--info" data-when="device-off">出纸需换机</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
+            <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+      </section>
+
+      <section class="vgrid-b">
+        <a class="card card--sm card--job" href="34-jobs-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+          <span class="card-name">岗位信息</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
+            <span class="card-pill" data-dots="12">12 家来源</span>
+          </span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <a class="card card--sm card--fair" href="36-fairs-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+          <span class="card-name">招聘会</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="17-fair-desk.html?stage=s3">展位导览</span>
+            <span class="card-pill" data-dots="3">本周 3 场</span>
+          </span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <a class="card card--sm card--mock" href="37-interview-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+          <span class="card-name">AI 面试训练</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="20-interview-pod.html?stage=s3">往期点评</span>
+            <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
+          </span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <a class="card card--sm card--policy" href="38-policy-hub.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+          <span class="card-name">政策服务</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="21-policy.html?stage=s3">办事清单</span><span class="card-pill card-pill--info">官方来源</span></span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <!-- 2026-08-09 用户定:百宝箱/智慧校园升为正式成员,与六服务同级同大(原角落迷你卡撤销) -->
+        <a class="card card--sm card--tool" href="27-toolbox.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
+          <span class="card-name">百宝箱</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务 · 后台上架控制</span></span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+        <a class="card card--sm card--camp" href="19-smart-campus.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+          <span class="card-name">智慧校园</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">学校接入后开放</span></span>
+          <i class="vx-sheen" aria-hidden="true"></i>
+        </a>
+      </section>
+
+      <!-- ============ 现场大图 + 本机仪表 ============ -->
+      <section class="vfoot rise">
+        <div class="vsite">
+          <img src="assets/fair-today.jpg" alt="招聘会现场">
+          <div class="vsite-in">
+            <!-- 来源方事实（不是个人数据、也不是本机统计）：CLAUDE.md §10 要求来源机构 /
+                 同步时间 / 外部 ID 三样齐全。整改前只有前两样，且企业数写得像
+                 本机统计出来的 —— 已改成「主办方公布」，把数字的归属说清楚。
+
+                 2026-08-11 跨页对账：本卡原来推的是「2026 夏季综合招聘会 · 广州国际会展中心 ·
+                 8 月 14 日（周五）· 128 家 · 来源 广州市人才服务中心 · 外部 ID GZFAIR-2026-0814」
+                 —— 这一场在 17 招聘会作战台的场次库里**根本不存在**，GZFAIR- 也是全站独一份的
+                 第五套编号。首页把一场不存在的招聘会摆在最显眼的位置，点「查看招聘会」进 17
+                 却找不到它，是最伤信任的一种矛盾。
+                 按主页面口径（招聘会＝17）改引 17 真实存在的第一场，五个字段逐个照抄
+                 17 第 471–487 行：名称 2026 年秋季综合人才交流会 / 8月12日 周三 09:00–16:00 /
+                 市人力资源市场 A 馆 / 参会企业 80 家 / 来源机构 市人力资源和社会保障局 /
+                 同步时间 8月9日 07:30 / 外部ID RC-2026-0812-A。
+                 **没有往 17 里加一场**：往主页面加条目就是凭空造数据。
+                 上方 .verrand-p 的「周五这场招聘会 …… 128 家」同步改成「周三 …… 80 家」，
+                 否则首页自己两处对不上。 -->
+            <b>2026 年秋季综合人才交流会</b>
+            <span>市人力资源市场 A 馆 · 8 月 12 日（周三）09:00–16:00 · 主办方公布 80 家企业参展</span>
+            <span class="src">来源 市人力资源和社会保障局 · 外部 ID RC-2026-0812-A · 8 月 9 日 07:30 同步</span>
+            <a class="btn" href="17-fair-desk.html">查看招聘会</a>
+          </div>
+        </div>
+
+        <div class="vpanel">
+          <div class="vpanel-hd">本机状态<span>8 月 8 日 09:41 上报</span></div>
+          <div class="vrow"><span class="k">打印机</span><span class="v" data-when="default first ai-down">在线</span><span class="v" data-when="device-off" style="color:var(--coral-400)">离线</span></div>
+          <div class="vrow"><span class="k">A4 纸张</span><span class="v" data-when="default first ai-down">78%</span><span class="v" data-when="device-off">—</span></div>
+          <div class="vbar" data-when="default first ai-down"><i style="width:78%"></i></div>
+          <div class="vrow"><span class="k">碳粉</span><span class="v" data-when="default first ai-down">62%</span><span class="v" data-when="device-off">—</span></div>
+          <div class="vrow"><span class="k">扫描仪</span><span class="v" data-when="default first ai-down">就绪</span><span class="v" data-when="device-off" style="color:var(--coral-400)">离线</span></div>
+          <div class="vcalib">
+            <span class="s"><i style="background:#1c1c1c"></i><i style="background:#00a0c6"></i><i style="background:#d6338c"></i><i style="background:#f2c200"></i></span>
+            <span class="t" data-when="default first ai-down">黑白 / 彩色均可 · 费用以现场公示价为准</span>
+            <span class="t" data-when="device-off">打印与扫描暂不可用 · 上传与转存正常</span>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ ActionBar ============ -->
+
+  <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+       收进来的：合规边界 / AIGC 生成说明 / 证据分级 E1·E2·E3 解释 /
+                 隐私与保留期限 / 产物去向与费用口径 / AI 与设备离线的降级说明。
+       **没有**收进来（必须常驻）：办理单上的 E1 / E2 / E3 逐条徽章、
+       顶栏设备状态药丸、四态各自的一句话状态提示、按钮旁的时长与费用参数。 -->
+  <div class="nb-bar" data-notebar>
+    <button type="button" class="nb-sum">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="nb-sum-t">信息与边界&nbsp;· <b>不代收简历</b>&nbsp;· 证据分级&nbsp;· 隐私与费用口径</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+        <p class="nb-p">这台机器做的是<b>简历、材料、打印扫描与信息查询</b>。岗位、招聘会、校园招聘、企业展示都只是<b>第三方或官方来源的信息入口</b>：本机<b>不代收简历、不做平台内投递、不做企业筛选、不安排面试、不管 Offer</b>。要投递或预约，请到来源平台或主办方那边办。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-orbit"/></svg>哪些内容是 AI 生成的</div>
+        <p class="nb-p">办理单里的<b>顺序、建议与理由由 AI 生成</b>，页面上会挂 <span class="nb-e nb-e--3">E3</span> 标识，<b>仅供参考</b>，不是结论也不是承诺。本机<b>不预测录用结果、不给匹配百分比、不承诺薪资</b>；涉及钱和资格的事，一律以经办机构认定为准。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+        <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 来自<b>你自己的材料</b>：你上传的简历、你说过的话。<span class="nb-e nb-e--2">E2</span> 来自<b>系统与外部来源</b>：设备状态、来源机构同步过来的岗位与招聘会事实。<span class="nb-e nb-e--3">E3</span> 是 <b>AI 的判断</b>，需要你自己核实。页面上挂在具体结论旁的小徽章就是这三档，本条只解释含义。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+        <p class="nb-p"><b>不登录也能办事</b>：未登录时，本次上传的文件与生成的结果<b>只留在本次会话，离场或超时自动清空</b>，不进任何账号。登录只决定文件存不存得下来，<b>不解锁额外能力，也不收费</b>。</p>
+        <p class="nb-p">存进「我的文档」之后按文件类型算保留期：一般文档 <b>90 天</b>，含身份证号等敏感件 <b>7 天</b>；到期清理保留删除日志。文件只有你本人可见，管理员访问写审计日志，<b>不向任何企业提供</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用口径</div>
+        <p class="nb-p">AI 简历诊断、优化、材料生成这些<b>不收费</b>；<b>只有出纸收费</b>，费用以打印工作台核价与现场公示价为准（A4 黑白与彩色分别计价，<b>按所选文档页计费</b>：计费页数 = 所选文档页数 × 份数；<b>打印双面只影响用纸张数，不减少计费页数</b>）。核价、支付、出纸、取件都在打印工作台完成，首页不收款。生成的材料会进「我的简历 / 我的文档」，打印后进「打印订单」。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 或设备离线时会怎样</div>
+        <p class="nb-p"><b>AI 不可用：</b>对话与排序停掉，页面不会替你猜顺序；打印、扫描、上传、岗位与招聘会浏览<b>都不受影响</b>，故障已自动上报，不需要你操作。</p>
+        <p class="nb-p"><b>打印机离线：</b>不出纸，但材料可以先存进「我的文档」，<b>凭手机号在任一台空闲机器取回打印</b>；已支付的订单不受影响。当前处于哪一种状态，以顶栏状态与本页的状态提示为准。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">下一步：简历诊断</div><div class="s">约 40 秒 · 免费 · 你确认后才开始</div></div>
+      <div data-when="first"><div class="t">先选一项服务，或在上面说一句你的处境</div><div class="s">不需要登录也可以办理</div></div>
+      <div data-when="ai-down"><div class="t">AI 排序不可用，打印扫描正常</div><div class="s">打印、扫描、上传、浏览都不受影响</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，材料可以先存起来</div><div class="s">凭手机号在任一空闲机器取回打印</div></div>
+    </div>
+    <button class="btn btn--lg btn--ghost" data-when="default">跳过</button>
+    <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 2026-08-11 链接落地整改（Codex (b)-12 / #10）：原指 06-print-workbench.html。
+         按钮只写域名「打印扫描」，属于泛域入口 —— 该进域首屏 P39（七件事都在那一屏），
+         不该越过它直接落在「文档打印」这一个子工作台。同页主功能卡早就指 P39，两处口径现在一致。 -->
+    <a class="btn btn--primary" href="39-print-hub.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html" aria-current="page"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+
+<!-- ============================================================
+     V6 页内行为层（自包含；不引 fx.js / fx2.js / linkage.js）
+     1) 神经中枢轨道：八圆片沿椭圆(rx150/ry94)绕小青 56s/圈，
+        rAF 只写 transform / opacity / z-index，前后穿越人像
+     2) 轨道环 / 雷达 / 胶囊→中枢连线：量真实坐标后摆位与连线
+     3) 打字机 placeholder / 计数点阵 / 卡片 pill 快捷入口
+     4) AI 任务状态机 data-aitask（idle/running/done/failed）—— 进度类动效
+        只在 running 播放，没有任务不许自转；契约见页内 <style> 同名小节
+     5) 状态即动效：ai-down 冻结轨道角度 + 任务态恒为 failed；resize / 换态重量坐标
+     ============================================================ -->
+<script>
+;(function () {
+  'use strict'
+  var REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches
+  var LOWGPU = document.documentElement.classList.contains('lowgpu')
+  var screen = document.querySelector('.screen')
+  var vivid = document.querySelector('.vivid')
+  if (!screen || !vivid) return
+
+  /* ---------- 舞台缩放系数：rect 是缩放后屏幕像素，摆位要布局像素 ---------- */
+  function scale () {
+    var st = document.querySelector('.stage')
+    var s = st && st.offsetHeight ? st.getBoundingClientRect().height / st.offsetHeight : 1
+    return (s && isFinite(s) && s > 0) ? s : 1
+  }
+
+  /* ---------- 1. 神经中枢：几何 + 轨道 ---------- */
+  var RX = 150, RY = 94, TAU = Math.PI * 2
+  var fig = screen.querySelector('[data-vx-hub]')
+  var img = fig && fig.querySelector('img')
+  var rings = fig ? [].slice.call(fig.querySelectorAll('[data-vx-ring]')) : []
+  var radar = screen.querySelector('[data-vx-radar]')
+  var orbs = fig ? [].slice.call(fig.querySelectorAll('.vx-orb')) : []
+  var hub = { cx: 189, cy: 150 }
+
+  function layout () {
+    if (!fig || !img) return
+    var sc = scale()
+    var fr = fig.getBoundingClientRect()
+    var ir = img.getBoundingClientRect()
+    if (!fr.width || !ir.width) return
+    hub.cx = (ir.left - fr.left + ir.width / 2) / sc
+    hub.cy = (fr.height / sc) * 0.5
+    for (var r = 0; r < rings.length; r++) {
+      rings[r].style.left = (hub.cx - 158) + 'px'
+      rings[r].style.top = (hub.cy - 102) + 'px'
+    }
+    if (radar) {
+      var hero = screen.querySelector('.vhero')
+      if (hero) {
+        var hr = hero.getBoundingClientRect()
+        var hx = (ir.left - hr.left + ir.width / 2) / sc
+        var hy = (fr.top - hr.top) / sc + hub.cy
+        radar.style.left = (hx - 550) + 'px'
+        radar.style.top = (hy - 550) + 'px'
+      }
+    }
+  }
+
+  var angle = -Math.PI / 2, lastTs = null
+  function placeOrbs () {
+    for (var i = 0; i < orbs.length; i++) {
+      var th = angle + i * TAU / orbs.length
+      var x = hub.cx + RX * Math.cos(th)
+      var y = hub.cy + RY * Math.sin(th)
+      var depth = (Math.sin(th) + 1) / 2          /* 0 后 → 1 前 */
+      orbs[i].style.transform = 'translate(' + (x - 22).toFixed(1) + 'px,' + (y - 22).toFixed(1) + 'px) scale(' + (0.82 + 0.18 * depth).toFixed(3) + ')'
+      orbs[i].style.opacity = (0.72 + 0.28 * depth).toFixed(3)
+      orbs[i].style.zIndex = Math.sin(th) > 0 ? 6 : 2   /* 人像 z=4：前后穿越 */
+    }
+  }
+  function tickOrbit (ts) {
+    if (lastTs == null) lastTs = ts
+    var dt = ts - lastTs
+    lastTs = ts
+    if (dt > 0 && dt < 1000 && screen.getAttribute('data-state') !== 'ai-down') {
+      angle += TAU * dt / 56000                    /* 56s 一圈；ai-down 冻结停转 */
+    }
+    placeOrbs()
+    requestAnimationFrame(tickOrbit)
+  }
+
+  /* ---------- 2. 胶囊 → 中枢 流动连线（量真实坐标） ---------- */
+  function drawFlow () {
+    var old = vivid.querySelector('.vx-flow')
+    if (old) old.remove()
+    if (LOWGPU || !fig || !img) return
+    var brain = screen.querySelector('.vcommand > .ic')
+    if (!brain) return
+    /* AI 不可用时不画这条线 —— 一条从指令条流向 AI 枢纽的动线，等于告诉用户
+       它还在工作。此前这一态是靠几何"恰好"不满足守卫（该态版头收到 186px，
+       指令条被拉近枢纽，落差只剩 21px）才没画出来；靠巧合成立的行为迟早会变，
+       所以写成明确的判断。 */
+    if (screen.getAttribute('data-state') === 'ai-down') return
+    var sc = scale()
+    var host = vivid.getBoundingClientRect()
+    var br = brain.getBoundingClientRect()
+    var fr = fig.getBoundingClientRect()
+    var x1 = (br.left - host.left + br.width / 2) / sc
+    var y1 = (br.top - host.top) / sc - 6
+    var x2 = (fr.left - host.left) / sc + hub.cx - RX - 10   /* 落到轨道左缘 */
+    var y2 = (fr.top - host.top) / sc + hub.cy
+    /* 守卫的用意是别画出一条退化的平线，不是把线关掉。
+       2026-08-11 实测：版头压到 226px 之后落差只有 49px，卡在 60 这条线上，
+       于是这组「指令→枢纽流向线」四态**一次都没渲染过** —— 而文件与交付说明里
+       一直写着「九组动效」。手工按同一套控制点画出来看过：629×49 的缓升连接线，
+       正是这组动效该有的样子，并不退化。所以把门槛下调到 40。
+       横向 200 那一条保持不变（左右距离不够时才是真的没法画）。 */
+    if (x2 - x1 < 200 || y1 - y2 < 40) return
+    var path = 'M' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
+               ' C' + (x1 + 150).toFixed(1) + ' ' + (y1 - 90).toFixed(1) + ', ' +
+               (x2 - 220).toFixed(1) + ' ' + (y2 + 30).toFixed(1) + ', ' +
+               x2.toFixed(1) + ' ' + y2.toFixed(1)
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('class', 'vx-flow')
+    svg.setAttribute('aria-hidden', 'true')
+    svg.setAttribute('viewBox', '0 0 ' + (host.width / sc).toFixed(0) + ' ' + (host.height / sc).toFixed(0))
+    svg.innerHTML = '<path class="base" d="' + path + '"/><path class="flow" d="' + path + '"/>'
+    vivid.appendChild(svg)
+  }
+
+  /* ---------- 3. 打字机 placeholder（只认 data-typewriter） ---------- */
+  var SAMPLES = [
+    '周三要去招聘会，简历还没改',
+    '帮我把这两页身份证复印成一张',
+    '我想看看广州的运营岗',
+    '我不知道从哪开始'
+  ]
+  function typewriter () {
+    var input = screen.querySelector('[data-typewriter]')
+    if (!input || REDUCED) return
+    var si = 0, ci = 0, dir = 1
+    setInterval(function () {
+      if (document.activeElement === input || input.value) return
+      var t = SAMPLES[si]
+      ci += dir
+      input.setAttribute('placeholder', t.slice(0, ci))
+      if (ci >= t.length) { dir = 0; setTimeout(function () { dir = -1 }, 1600) }
+      if (ci <= 0 && dir === -1) { dir = 1; si = (si + 1) % SAMPLES.length }
+    }, 62)
+  }
+
+  /* ---------- 4. 计数点阵：真实数量可视化（12 点 = 12 家来源） ---------- */
+  function renderDots () {
+    var list = screen.querySelectorAll('[data-dots]')
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]
+      if (el.querySelector('.dotc')) continue
+      var n = parseInt(el.getAttribute('data-dots'), 10)
+      if (!n || n > 24) continue
+      var wrap = document.createElement('span')
+      wrap.className = n > 6 ? 'dotc dotc--wrap' : 'dotc'
+      for (var j = 0; j < n; j++) {
+        var d = document.createElement('i')
+        d.style.animationDelay = (j * 34) + 'ms'
+        wrap.appendChild(d)
+      }
+      el.insertBefore(wrap, el.firstChild)
+    }
+  }
+
+  /* ---------- 5. 卡片 pill 快捷入口（span[role=button][data-href]，
+       外层整卡已是 <a>，嵌套锚点非法，所以只能这么绑；阻止冒泡） ---------- */
+  function bindPills () {
+    var pills = document.querySelectorAll('[data-href][role="button"]')
+    function go (el) {
+      var href = el.getAttribute('data-href')
+      if (href) location.href = href
+    }
+    for (var i = 0; i < pills.length; i++) {
+      (function (el) {
+        el.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); go(el) })
+        el.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); go(el) }
+        })
+      })(pills[i])
+    }
+  }
+
+  /* ---------- 6. AI 任务状态机（取代原来的"定时器演进度"） ----------
+     契约全文见页内 <style> 的「AI 任务状态绑定」一节。这里只实现三件事：
+       taskFromState()  四态 → 任务态的**派生默认值**（页面初次进入某一态时的真值）
+       syncTaskFromState() 把派生值写回 DOM，供 CSS 选择器与审计读取
+       startAiTask()    用户真的提交了 → 进 running；ai-down 一律拒绝进 running
+
+     为什么要包一层 v3ApplyVisibility：审计驱动是
+         screen.setAttribute('data-state', st); window.v3ApplyVisibility(); …
+     只改 data-state 不会同步 data-aitask，而 MutationObserver 的回调是微任务，
+     跑在整段同步代码之后 —— 审计当场读到的会是上一态的任务值。包一层就能保证
+     任何走标准驱动的调用都拿到同步、正确的 data-aitask。 */
+  var TASK_BY_STATE = {
+    'default':    'done',    /* 示例走查：排序任务已完成，路径是算出来的 */
+    'first':      'idle',    /* 无上下文：没有任务，一切进度动效必须静止 */
+    'ai-down':    'failed',  /* AI 不可用：冻结在失败态，不许被推回 running */
+    'device-off': 'done'     /* 打印机离线不影响 AI 排序任务本身 */
+  }
+  function taskFromState () {
+    return TASK_BY_STATE[screen.getAttribute('data-state') || 'default'] || 'idle'
+  }
+  function setAiTask (v) {
+    /* ai-down 是硬约束：任何输入都不得把 AI 推回"正在算" */
+    if (screen.getAttribute('data-state') === 'ai-down') v = 'failed'
+    screen.setAttribute('data-aitask', v)
+    /* 失败态下场景快捷如实标记不可用（CSS 已置灰，这里补可访问性语义） */
+    var scenes = screen.querySelectorAll('.vscene')
+    for (var i = 0; i < scenes.length; i++) {
+      if (v === 'failed') scenes[i].setAttribute('aria-disabled', 'true')
+      else scenes[i].removeAttribute('aria-disabled')
+    }
+    return v
+  }
+  /* lastState 记住"上一次按哪个四态同步过"。没有它，下面那个兜底 MutationObserver
+     会在同步代码跑完后的微任务里再同步一次，把用户刚点出来的 running 打回派生值
+     —— 实测症状：点场景快捷后 proclog 已经在写，data-aitask 却已经是 done。 */
+  var lastState = screen.getAttribute('data-state')
+  function syncTaskFromState () {
+    lastState = screen.getAttribute('data-state')
+    setAiTask(taskFromState())
+  }
+
+  var _applyVis = window.v3ApplyVisibility
+  window.v3ApplyVisibility = function () {
+    syncTaskFromState()
+    return typeof _applyVis === 'function' ? _applyVis.apply(this, arguments) : undefined
+  }
+  /* 供接线方 / 评审驱动直接推任务态：生产由后端状态调用这个，不要再调 startAiTask 的占位收尾 */
+  window.v3SetAiTask = setAiTask
+
+  /* 进度日志文案：只描述**这一步在做什么**，不预先编造结果。
+     整改前这里写的是「读取 个人简历.pdf · 3 页」「核对 …128 家企业」——
+     任务还没跑就把文件名、页数、家数说死了，等于在假装已经算完。 */
+  var STEPS_TEXT = [
+    '读取你上传的材料',
+    '核对来源方的招聘会信息',
+    '排出办理顺序'
+  ]
+  var busy = false
+  function startAiTask () {
+    /* ai-down：AI 不可用。不播任何"正在算"的动效，停在明确的失败表现。
+       这就是「AI 已经挂了、进度条还在转」的防线。 */
+    if (screen.getAttribute('data-state') === 'ai-down') { setAiTask('failed'); return }
+    if (busy) return
+    busy = true
+    setAiTask('running')
+    var cap = screen.querySelector('.vcommand')
+    var errand = screen.querySelector('.verrand')
+    var main = errand && errand.querySelector('.verrand-main')
+    var kick = errand && errand.querySelector('.verrand-kick span:not([hidden])')
+    var kickText = kick ? kick.textContent : ''
+    var hidden = []
+
+    screen.classList.add('is-working')
+    if (cap) cap.classList.add('is-working')
+    if (!REDUCED && !LOWGPU) {
+      var sw = document.createElement('div')
+      sw.className = 'sweep'
+      screen.appendChild(sw)
+      setTimeout(function () { sw.remove() }, 1200)
+    }
+    if (main) {
+      main.querySelectorAll('.verrand-h, .verrand-p, .verrand-foot').forEach(function (n) {
+        if (!n.hidden) { n.hidden = true; hidden.push(n) }
+      })
+      var log = document.createElement('div')
+      log.className = 'proclog'
+      main.appendChild(log)
+      if (kick) kick.textContent = '本次办理单 · 正在盘点'
+      STEPS_TEXT.forEach(function (t, i) {
+        setTimeout(function () {
+          /* 每一帧都复查任务是否还在跑：任务已结束 / 已失败 / AI 中途掉线时，
+             进度日志必须当场停笔，不能靠计时器把剩下几行补完。 */
+          if (screen.getAttribute('data-aitask') !== 'running') return
+          var prev = log.lastElementChild
+          if (prev) prev.classList.add('done')
+          var row = document.createElement('div')
+          row.textContent = t
+          log.appendChild(row)
+        }, REDUCED ? 0 : i * 620)
+      })
+    }
+    setTimeout(function () {
+      screen.classList.remove('is-working')
+      if (cap) cap.classList.remove('is-working')
+      var log2 = main && main.querySelector('.proclog')
+      if (log2) log2.remove()
+      hidden.forEach(function (n) { n.hidden = false })
+      if (kick) kick.textContent = kickText
+      var nodes = screen.querySelectorAll('.vstep')
+      nodes.forEach(function (n, i) {
+        n.classList.remove('is-writing')
+        setTimeout(function () { n.classList.add('is-writing') }, i * 140)
+      })
+      var primary = screen.querySelector('.actionbar .btn--primary:not([hidden])')
+      if (primary) {
+        primary.classList.add('is-next')
+        setTimeout(function () { primary.classList.remove('is-next') }, 8400)
+      }
+      busy = false
+      /* ⚠️ PROTOTYPE-ONLY —— 接线时删掉这一行连同外层 setTimeout。
+         设计稿没有后端，只能让 running 自己收尾；生产必须改成订阅后端任务状态，
+         由后端下发 done / failed。留着这段计时器上线 = 又变回"演一个不存在的任务"。
+         收回派生值而不是硬写 done：first 态本来就没有算出任何东西，回 idle 才诚实。 */
+      setAiTask(taskFromState())
+      drawFlow()
+    }, REDUCED ? 200 : 2250)
+  }
+  screen.addEventListener('click', function (e) {
+    var scene = e.target.closest('[data-fx="scene"]')
+    var submit = e.target.closest('[data-fx="submit"]')
+    if (!scene && !submit) return
+    /* AI 不可用时场景快捷不启动任务（CSS 已置灰 + aria-disabled）：
+       点了也不会有进度动效，页面停在 ai-down 的"排序暂不可用"表述上。
+       不依赖 AI 的路径照常可用 —— 打印扫描卡、岗位、招聘会、底部主按钮都没被拦。 */
+    if (screen.getAttribute('data-state') === 'ai-down') { setAiTask('failed'); return }
+    if (scene) {
+      var input = screen.querySelector('[data-typewriter]')
+      if (input) input.value = scene.textContent.trim()
+    }
+    startAiTask()
+  })
+
+  /* ---------- 启动 / 重量坐标 ---------- */
+  function refresh () { layout(); placeOrbs(); drawFlow() }
+  addEventListener('load', function () {
+    refresh()
+    renderDots()
+    typewriter()
+    if (!REDUCED && !LOWGPU) requestAnimationFrame(tickOrbit)   /* 降级：静态摆位一帧 */
+  })
+  if (img && !img.complete) img.addEventListener('load', refresh)
+  addEventListener('resize', refresh)
+  /* 兜底：有人直接改 data-state 而没走 v3ApplyVisibility（外壳按钮、控制台）时也要同步任务态。
+     注意这条是**兜底**不是主路径 —— MutationObserver 回调是微任务，跑在同步审计之后，
+     所以主路径必须是上面那层 v3ApplyVisibility 包装。 */
+  new MutationObserver(function () {
+    /* 只有"四态真的变了、而且没走 v3ApplyVisibility"时才补同步。
+       无条件同步会把进行中的 running 打回派生值（见 lastState 注释）。 */
+    if (screen.getAttribute('data-state') !== lastState) syncTaskFromState()
+    setTimeout(refresh, 80)
+  }).observe(screen, { attributes: true, attributeFilter: ['data-state'] })
+  bindPills()
+  syncTaskFromState()
+  refresh()
+})()
+</script>
+<script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

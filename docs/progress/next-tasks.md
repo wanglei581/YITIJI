@@ -1,5 +1,36 @@
 # 下一步任务
 
+> 最后更新：2026-08-11
+
+> **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，
+> 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
+> 「2026-08-10 商用收口后续」及其后各节来自 main。
+>
+> ⚠️ **V3 队列的 W1–W8 写于 2026-08-09/10，已被 2026-08-11 的四份文档部分取代**，
+> 以后者为准：
+> - [`docs/product/codex-handoff-plan-2026-08.md`](../product/codex-handoff-plan-2026-08.md) 窗口划分（两条线共用的唯一答案）
+> - [`docs/reviews/2026-08-11-two-line-reconciliation.md`](../reviews/2026-08-11-two-line-reconciliation.md) 两线对账裁定与最小一致集
+> - [`docs/reviews/2026-08-11-backend-buildout-spec.md`](../reviews/2026-08-11-backend-buildout-spec.md) 后端六项能力实施规格
+> - [`docs/design/kiosk-ai-os-v3-2026-08/wiring-map.md`](../design/kiosk-ai-os-v3-2026-08/wiring-map.md) 功能↔接口对接表
+>
+> 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
+> 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
+
+> 最后更新：2026-08-10
+
+## V3 设计落地实施队列(分工:Claude=视觉与设计;Codex=以下全部实施,2026-08-09 用户定,2026-08-10 重建)
+
+**实施三真值**:①设计基线 `docs/design/kiosk-ai-os-v3-2026-08/`(README+closed-loop-map 含六A AI 覆盖矩阵、§七映射表)②`p29-p31-design-spec.md` ③改造前截图 `~/Downloads/项目当前页面-75屏-20260809备份/`。合规以 compliance-boundary.md 为准;每项按 §8.1 立项走 verify;**视觉一律对齐 V3,不得沿用旧米色竖条卡样式(用户否决)**。
+
+- [ ] **W1 首页试点收尾**:PR #569 待用户 1080×1920 验收合并;合并后六个服务中心页视觉对齐 V3。
+- [ ] **W2 简历域对齐**:P09(六卡首屏+失败三态+ATS/真实性双维度)/P10(10 题域+多段经历+版本失效)/P12/P22/P28。
+- [ ] **W3 岗位大师七块增量**:面试预测/晋升路径/风险从 PR #117 素材分支复活;多岗对比/方向缺口/站内薪资新建;报告 PDF;`resume_optimize` key 拆分(A-5)。
+- [ ] **W4 打印域对齐**:P06 七阶段合流;P07/P08 按 A 级后设计实施。
+- [ ] **W5 证件照软件路径**:按 P29 规格(上传→体检→换底→排版→**放进简历:照片区域识别与替换,只生成新版本**→打印);`id_photo` 转 available 须真机验收。
+- [ ] **W6 签约风险补全**:报告生成打印(版式=P31 s4,即 Task 14);**新增通用合同类型 `generic` + 八维度通用规则包**(主体/期限/费用/违约/解除/争议/对等性/格式条款),finding 带维度标注;Gate 0 过签后才开 VITE_ENABLE_CONTRACT_REVIEW;常见签约问题静态区。
+- [ ] **W7 全页 AI 补强接真**:六A 矩阵 7 个🔧项(设计稿已落)。
+- [ ] **W8 发布授权**:main 积压修复未上 zyidai.cn(门禁关),按部署清单具名授权发布(需用户拍板)。
+
 ## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
 
 - [~] **Wave 8 Windows scan mutation boundary：Windows CI verified，真实现场 pending**：Windows-verified 功能代码候选 `65a3ebeb` 已包含共享功能提交 `b161a0c2`（来源独立提交 `e076c7a6`），完成 `AJPSR002`、READ root/candidate identity token、identity-bound success delete/quarantine/TTL、逐级 ancestor/root handle pin、`RootDirectory = unclaimed_handle` 相对 rename 和 audit intent → delete → result 顺序。同一 SHA 的 run `31331802378` 中 `unsigned-msi-candidate` **SUCCESS**（5m59s），覆盖 source contract、MSVC `/W4 /WX` 多源编译、动态 boundary、MSI/EXE install/repair/uninstall；run `31331802380` 的 build **SUCCESS**（7m55s）、PG **SUCCESS**（3m40s）、browser **SUCCESS**（9m17s）。下一门禁仍是在目标 Windows LocalSystem 服务账户与真实 SMB 扫描目录验证 ACL、杀毒/文件占用、服务重启、长驻 watcher、普通 PDF/JPG/PNG、失败隔离和 TTL 审计，再与 Pantum 真机完成扫描输入及打印回归；生产、法务、内容与密钥也仍未验收。Claude 未完成页面本 Wave 未触碰并继续受保护。任一现场或外部门禁未通过都不得部署或宣称商用完成，整体保持 **NO-GO**。

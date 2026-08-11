@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P28 自我探索 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P28 自我探索">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
+<style>
+/* ── P28 专用 ───────────────────────────────────────────────────────────
+   自我探索（线上 /resume/self-assessment：25 题 5 组、必勾+可选双同意、
+   答案原文不入库只留 SHA-256 摘要、结果 24 小时、撤回=物理删除、
+   闲置 60 秒退出、游客可用）。
+
+   这一页最容易犯的错是把它做成"性格测试"：打个分、贴个标签、
+   说你适合什么岗。生产代码的合规口径写得很死 —— 非临床、非诊断、
+   不用 MBTI/大五/DISC/霍兰德标签、不打分排名、不说适合不适合。
+   所以 s3 的 5 张维度卡全是**陈述式**：只转述你的选择，每张挂
+   「AI 生成 · 陈述」和题号依据行，头部 amber 披露挂 E3。
+
+   另一条纪律照搬机制本身：原文不入库、24h 自动清理、撤回物理删除 ——
+   所以 s4 往期只有**次数**，铺不出明细。空着不是没做完，是隐私设计
+   的代价，页面把代价直说。
+
+   组件备忘：.tl 本身是一步（容器 .tline）；复选框是 .ck-box；
+   .ck / .alt 只在别页页内定义过，本页自带。选项按钮 ≥64px。
+   ──────────────────────────────────────────────────────────────────── */
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 机制卡：4 条硬规则，写机制不写空话 */
+.mech { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); }
+.mh { display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-4);
+      border-radius:var(--r-xs); background:var(--fog-a04); border:1px dashed var(--fog-a12); }
+.mh .ic { width:19px; height:19px; color:var(--jade-500); flex:0 0 auto; margin-top:1px; }
+.mh-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.mh-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.mh-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 题目区（照 P20 的口径：想好再选，没有倒计时） */
+.q-no { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.06em; }
+.q-t  { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.q-why{ font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+
+/* 选项：主操作，≥64px */
+.opt { display:flex; align-items:center; gap:var(--s-4); min-height:64px; width:100%;
+       padding:var(--s-4) var(--s-5); border-radius:var(--r-md); text-align:left;
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); cursor:pointer;
+       font-family:var(--ff-ui); font-size:var(--fz-4); color:var(--fog-900);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.opt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.opt--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.opt-key { width:34px; height:34px; border-radius:var(--r-xs); flex:0 0 auto;
+           display:grid; place-items:center; background:var(--fog-a08);
+           font-family:var(--ff-num); font-size:var(--fz-2); color:var(--fog-700); }
+.opt--on .opt-key { background:var(--jade-a20); color:var(--jade-300); }
+
+/* 五组进度：状态展示，不可点 */
+.grp { display:grid; grid-template-columns:repeat(5,1fr); gap:var(--s-3); }
+.gr { padding:var(--s-3) var(--s-3); border-radius:var(--r-xs); text-align:center;
+      background:var(--fog-a04); border:1px solid var(--fog-a12);
+      display:flex; flex-direction:column; gap:2px; }
+.gr--done { border-color:var(--jade-a32); }
+.gr--now { border-color:var(--jade-400); background:var(--jade-a12); }
+.gr-t { font-size:var(--fz-1); color:var(--fog-700); }
+.gr-n { font-size:var(--fz-3); font-family:var(--ff-num); color:var(--fog-900); font-weight:600; }
+.gr--done .gr-n { color:var(--jade-500); }
+
+/* 维度卡：陈述式，不打分 */
+.dim { padding:var(--s-5); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.dim-hd { display:flex; align-items:center; gap:var(--s-3); }
+.dim-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.dim-p { font-size:var(--fz-3); color:var(--fog-800); line-height:1.65; }
+.dim-p b { color:var(--fog-900); }
+.dim-src { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5;
+           padding-left:var(--s-4); border-left:2px solid var(--fog-a12); }
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-3); padding-bottom:var(--s-4); }
+
+/* 路牌 / 互链：≥64px */
+.alt { display:flex; align-items:center; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+       border-radius:var(--r-md); background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:64px;
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; }
+.alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+
+/* 跳过的那一组：可选同意没勾时，「工作风格」5 题不问，进度条上要看得出来。
+   连带那一组的结果卡与目录项也不能留 —— 不然结果会比作答多出一段。
+   用类而不是 hidden：hidden 是 applyVisibility 的专属通道，会被四态覆盖掉。 */
+.gr--skip { opacity:.5; border-style:dashed; }
+.screen.is-skip [data-skipgrp] { display:none; }
+/* 正文压短之后，s1 的勾选区不该再悬在卡片中间：时间线在上、要勾的钉卡底。
+   这是把留白重新分配，不是塞填充物。 */
+.wmain .pane--grow[data-at="s1"] > .sec { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+
+/* ══════════ 2026-08-11 版面留白批次 ══════════════════════════════════════
+   上一版这里写着「右栏 grow 卡底部各态实测 521–785px，留给版面批次处理」。
+   这就是那个批次。实测基线（1080×1920，capture=1，四态×四阶段）：
+     右栏底部空 s1 746 / s2 836 / s3 685(默认) 805(ai-down) 588(离线) / s4 925
+     左栏卡内空洞 s2 667 / s4 484 / ai-down·s3 833
+   （first 态右栏读数为 0，是因为末尾多一张短卡把栏底顶住了 ——
+     grow 卡内部那个 604px 的洞照样在，检测器量的是栏尾不是卡内。所以
+     本批按「卡内空洞」一起改，不只对付读数。）
+
+   只用三种手段，一律不塞填充物：
+   A 放大真正的主内容 —— 站姿看 27 寸竖屏，348px 右栏里 15px 正文本来就偏小；
+     s2 的题干和选项是这一步唯一的主内容，理应做成主视觉。
+   B 把页脚抽屉里**当前这一步真正要用**的那几段移回常驻（来源全文与低频条款仍留抽屉）。
+   C 侧栏无话可说的那一步改单栏 —— 只有 s4：它按隐私规则本来就只有次数，
+     硬凑一根 348px 参数栏就是为了两栏而两栏。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* A · 主区提示条放大：站姿看 27 寸竖屏，15px 正文偏小。这一条同时压缩了
+   s2 题卡的上下呼吸带（规矩卡长高，题卡就相应变矮）。 */
+.wmain .notice { font-size:var(--fz-3); line-height:1.68; padding:var(--s-5); }
+.wmain .notice .ic { width:22px; height:22px; }
+
+/* A · s1 主区：时间线与两个同意项一起放大。
+   这张卡原来是「时间线在上、勾选区 margin-top:auto 钉卡底」，中间空 250px。
+   勾选框是这一步唯一的主操作，本来就该做大（48→72px，勾选框 22→28px）；
+   放大之后中间那段空自然收掉，不是靠塞东西补的。 */
+.wmain .tl { padding:var(--s-4) 0; }
+.wmain .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wmain .tl-s { font-size:var(--fz-2); line-height:1.55; margin-top:4px; }
+.ck { min-height:72px; padding:var(--s-4) var(--s-5); align-items:center; }
+.ck-box { width:28px; height:28px; border-radius:7px; margin-top:0; }
+.ck--have .ck-box::after { left:9px; top:4px; width:6px; height:13px; border-width:0 3px 3px 0; }
+.ck-t { font-size:var(--fz-4); }
+.ck-s { font-size:var(--fz-2); }
+.wmain .field-lb { font-size:var(--fz-3); }
+/* 「四条硬规则」是这一步用户真正在同意的东西，按主内容的字号排 */
+.mh { padding:var(--s-5); }
+.mh .ic { width:22px; height:22px; }
+.mh-t { font-size:var(--fz-4); }
+.mh-s { font-size:var(--fz-2); line-height:1.6; }
+
+/* A · 右栏整体放大（改的是既有内容的字号行高，不新增条目） */
+.wside .kv-row { min-height:56px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.wside .kv-row .k { line-height:1.5; }
+.wside .kv-row .v { line-height:1.5; text-align:right; }
+.wside .notice { font-size:var(--fz-3); line-height:1.66; padding:var(--s-5); }
+.wside .notice .ic { width:22px; height:22px; }
+.wside .tl { padding:var(--s-4) 0; }
+.wside .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wside .tl-s { font-size:var(--fz-2); line-height:1.55; margin-top:5px; }
+.wside .panel-note { font-size:var(--fz-2); line-height:1.62; }
+.wside .field-lb { font-size:var(--fz-3); }
+.wside .alt { min-height:80px; }
+.wside .pane-hd b { font-size:var(--fz-5); }
+
+/* A · s2 题干是这一步唯一的主内容：做成主视觉。题号 16→18、题干 30→44、
+   解释 16→20，选项按钮 64→110（触控上限 130，再高就成了「一行字浮在大空盒里」）。 */
+.q-no { font-size:var(--fz-4); }
+.q-t  { font-size:var(--fz-9); }
+.q-why{ font-size:var(--fz-5); line-height:1.7; }
+.opt { min-height:110px; font-size:var(--fz-6); padding:var(--s-5) var(--s-6); }
+.opt-key { width:52px; height:52px; font-size:var(--fz-5); }
+/* 这一步主区确实只有「一道题」这一件真东西 —— 25 题里没有第二块内容可摆，
+   抽屉里也没有第二段属于这一步的话（隐私与记分口径已经移到右栏了）。
+   所以不硬凑第二张卡，而是让题组**居中**：上下等量呼吸带围着放大的主体，
+   这是构图，不是单侧裸露的空洞。按钮长到 130 就封顶，避免空盒效应。 */
+.wmain .pane--grow[data-at="s2"] > .sec { flex:1 1 auto; min-height:0; justify-content:center; }
+.wmain .pane--grow[data-at="s2"] .opt { flex:1 1 auto; max-height:160px; }
+.grp { gap:var(--s-2); }
+.gr { padding:var(--s-4) var(--s-2); }
+.gr-t { font-size:var(--fz-2); }
+.gr-n { font-size:var(--fz-4); }
+/* 五组进度挪进右栏后改竖排：348px 里五列会把「兴趣偏好」挤成两行 */
+.wside .grp { grid-template-columns:1fr; gap:var(--s-2); }
+.wside .gr { flex-direction:row; align-items:center; justify-content:space-between;
+             text-align:left; min-height:64px; padding:var(--s-3) var(--s-4); }
+.wside .gr-t { font-size:var(--fz-3); }
+.wside .gr-n { font-size:var(--fz-5); }
+
+/* A · s3 五段陈述是主内容：字号行高一起提 */
+.dim { padding:var(--s-6) var(--s-5); gap:var(--s-4); }
+.dim-t { font-size:var(--fz-6); }
+.dim-p { font-size:var(--fz-4); line-height:1.75; }
+.dim-src { font-size:var(--fz-2); line-height:1.62; padding-left:var(--s-5); }
+/* ai-down·s3：主区那张 grow 卡原本 833px 见底。三条替代路是这一态**唯一的真出口**，
+   让它们自己长大占住高度（有上限），再把「记分为什么不靠 AI」从抽屉移回常驻。 */
+.wmain .alt { min-height:96px; }
+.wmain .alt-t { font-size:var(--fz-5); }
+.wmain .alt-s { font-size:var(--fz-3); line-height:1.6; }
+.wmain .pane--grow[data-at="s3"] > .sec,
+.wmain .pane--grow[data-at="s4"] > .sec { flex:1 1 auto; min-height:0; }
+
+/* C · 两处改单栏。共同判据：这一步的右栏没有**合法内容**可放，不是没写完。
+     · s4 往期：按隐私规则本机手里只有次数，348px 参数栏无话可说（原空 925px）。
+     · ai-down · s3：这一步的真话就是「解读没有」，需要的是原因 + 出口，
+       不是「主区讲原因 + 右栏再讲一遍」。两栏合起来要 2900px 内容才填得满，
+       为了两栏而两栏必然编东西 —— 改单栏只要一屏，全部说真话也够。 */
+.screen[data-stage="s4"] .work,
+.screen[data-state="ai-down"][data-stage="s3"] .work { grid-template-columns:1fr; }
+.screen[data-stage="s4"] .wside,
+.screen[data-state="ai-down"][data-stage="s3"] .wside { display:none; }
+
+/* 单栏专用：两列卡片阵。写的都是页面已有的机制与状态，不新造数据 */
+.solo-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.solo-c { padding:var(--s-6); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.solo-c--warn { background:var(--fog-a04); border-style:dashed; border-color:var(--fog-a20); }
+.solo-c-hd { display:flex; align-items:center; gap:var(--s-3); }
+.solo-c-hd .ic { width:26px; height:26px; color:var(--jade-500); flex:0 0 auto; }
+.solo-c--warn .solo-c-hd .ic { color:var(--fog-600); }
+.solo-c-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.solo-c-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.72; } .solo-c-p b { color:var(--fog-900); }
+.solo-c .kv-row { min-height:56px; font-size:var(--fz-4); }
+/* 单栏出口区：两列大瓷砖。这里不是「把小卡拉高留空」——
+   瓷砖长高之后图标与标题跟着放大、内容整体居中，长成的是一块可按的主操作。 */
+.solo-alts { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4);
+             grid-auto-rows:minmax(96px,1fr); align-content:stretch; }
+.solo-alts .alt { align-items:center; padding:var(--s-6); gap:var(--s-5); }
+.solo-alts .alt .ic { width:32px; height:32px; }
+.solo-alts .alt-t { font-size:var(--fz-6); }
+.solo-alts .alt-s { font-size:var(--fz-3); line-height:1.65; }
+
+.screen[data-stage="s4"] .tl,
+.screen[data-state="ai-down"][data-stage="s3"] .tl { padding:var(--s-4) 0; }
+.screen[data-stage="s4"] .tl-t,
+.screen[data-state="ai-down"][data-stage="s3"] .tl-t { font-size:var(--fz-5); line-height:1.4; }
+.screen[data-stage="s4"] .tl-s,
+.screen[data-state="ai-down"][data-stage="s3"] .tl-s { font-size:var(--fz-3); line-height:1.55; margin-top:5px; }
+.screen[data-stage="s4"] .alt { min-height:96px; }
+.screen[data-stage="s4"] .alt-t { font-size:var(--fz-5); }
+.screen[data-stage="s4"] .alt-s { font-size:var(--fz-3); line-height:1.6; }
+/* 结果反馈层：点了要有交代。无 data-when/data-at，applyVisibility 不碰它 */
+.fb { position:absolute; inset:0; z-index:80; display:grid; place-items:center;
+      background:rgba(4,8,10,.62); padding:var(--s-6); }
+.fb-box { width:min(640px,100%); max-height:76%; overflow-y:auto;
+      border-radius:var(--r-lg); padding:var(--s-6);
+      background:var(--ink-100); border:1px solid var(--glass-1-brd);
+      box-shadow:0 30px 80px -20px rgba(0,0,0,.7); display:flex; flex-direction:column; gap:var(--s-4); }
+.fb-ic { width:56px; height:56px; border-radius:var(--r-md); display:grid; place-items:center;
+      background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.fb-ic .ic { width:27px; height:27px; color:var(--jade-500); }
+.fb-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.fb-p { font-size:var(--fz-3); color:var(--fog-700); line-height:1.66; }
+.fb-p b { color:var(--fog-900); }
+.fb-go { display:flex; gap:var(--s-3); flex-wrap:wrap; }
+.fb-go .btn { flex:1 1 200px; min-height:56px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：这一页是全站最该拦的一处 ——
+     25 道题答到一半按返回，答案在本机内存里，一走就全没，重做要 5 分钟。
+     **只拦 s2**，另外三步逐条说明为什么不拦：
+       · s1 只是勾两个同意项，还一道题都没答，拦了纯粹是打扰。
+       · s3 不拦：那一步结果**已经交上去了** —— 页面自己写「库里只落摘要和陈述」
+         「结果只保留 24 小时」，是真存下来的终态。而且 s3 的主操作是「去打印工作台核价」，
+         那本来就是把这份结果带走的正路，在它头上弹一句「离开就没了」是假的。
+       · s4 往期记录同理：只是回看，没有任何未存的东西。
+     data-guard-lose-s2 的题数由本页 render 填（见 syncGuard），不写死：
+     勾不勾可选同意项，总题量在 25 / 20 之间变，答到第几题更是随时在动。
+     文案必须和 s3 那句「答案原文不留存，恢复后也补不回这一次，要解读得重新作答（约 5 分钟）」
+     一个口径 —— 同一件事全页只能有一种说法，不能这里说「还能找回」那里说「补不回」。
+     **不写 data-guard-keep**：这一页压根没有「存进我的文档」这个动作。
+     结果只在 24 小时窗口内可回看，s3 那个「存我的文档 · 扫码带走」只在打印机离线那一态出现，
+     是离线兜底、不是常规落点；何况要救的是**还没提交的作答**，那个东西本来就没有落点可存。
+     给它一个「存下来再走」的按钮就是伪造能力（CLAUDE.md §9）。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2"
+     data-guard-lose-s2="已经答完的 7 道题 —— 答案原文不留存，补不回这一次，要解读得重新作答（约 5 分钟）">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">自我探索</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-2207</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 可作答，解读暂缺</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>15:12</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">这是什么·同意</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐题作答</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">看结果</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">往期记录</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 这是什么 · 同意 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-orbit"/></svg>
+          <b data-out="hdTitle">25 道选择题，把「你怎么倾向」说成明白话</b>
+          <span class="mt">约 5 分钟 · 不需登录，游客直接做</span>
+        </div>
+        <div class="sec">
+          <div class="advice-act" data-out="intro"><b>5 组各 5 题</b>，全是选择题，做完得到 5 段陈述式解读。</div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这<b>不是临床、心理或人格测评</b>，不打分、不排名、不构成能力证明。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="notice" data-at="s1" data-when="first">
+        <svg class="ic"><use href="#i-help"/></svg>
+        <span>第一次来的话：这一页做完会得到<b>几段把你的倾向说成明白话的陈述</b>，
+              可以打印带走 —— <span data-out="firstNote">25 道选择题、约 5 分钟</span>，不需登录。</span>
+      </div>
+      <div class="notice" data-at="s1" data-when="ai-down">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>AI 不可用：<b>作答照常，本次解读出不来</b>；原文不留存，事后补不回。</span>
+      </div>
+      <div class="notice" data-at="s1" data-when="device-off">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>打印机离线 —— 作答和看结果<b>都不受影响</b>；
+              只有最后把结果打出来那一步此刻打不了，可以扫码带走。</span>
+      </div>
+
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>四条硬规则</b>
+          <span class="mt">写的是机制，每条都真的这么运行</span>
+        </div>
+        <div class="sec">
+          <div class="mech">
+            <div class="mh"><svg class="ic"><use href="#i-file"/></svg>
+              <span class="mh-b"><span class="mh-t">答案原文不入库</span>
+                <span class="mh-s">每个选择只当场用一次，库里只留一段校验摘要，不留你选了什么</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-clock"/></svg>
+              <span class="mh-b"><span class="mh-t">结果只保留 24 小时</span>
+                <span class="mh-s">不用你记得回来删</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-trash"/></svg>
+              <span class="mh-b"><span class="mh-t">撤回 = 物理删除</span>
+                <span class="mh-s">结果页有撤回键，删的是数据本身，不是「隐藏起来」</span></span></div>
+            <div class="mh"><svg class="ic"><use href="#i-eye"/></svg>
+              <span class="mh-b"><span class="mh-t">不向任何人推送</span>
+                <span class="mh-s">企业、合作机构、管理后台都看不到你的结果，也不参与岗位排序</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-route"/></svg>
+          <b>接下来会发生什么</b>
+          <span class="mt">四步，全在这一页里走完</span>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">勾选同意</span>
+                <span class="tl-s">一条必勾、一条可选，就在下面，不用翻协议</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t" data-out="step2">逐题作答 25 题</span>
+                <span class="tl-s">可回退改答；离开超过 60 秒自动清空</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">生成结果</span>
+                <span class="tl-s">库里只落摘要和陈述，答案原文当场丢弃</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">24 小时内由你处置</span>
+                <span class="tl-s">打印带走、撤回删掉，或什么都不做</span></span></div>
+          </div>
+
+          <div class="field-lb" style="margin-top:auto;padding-top:var(--s-5)">开始前要勾的</div>
+          <label class="ck ck--have" data-consent="must" role="checkbox" aria-checked="true" tabindex="0">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">我已了解上述说明，同意开始作答</span>
+              <span class="ck-s">必勾 —— 不勾开始不了</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)" data-consent="opt" role="checkbox" aria-checked="false" tabindex="0">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">同意作答涉及偏好 / 风格的题目</span>
+              <span class="ck-s" data-out="optNote">可选 —— 不勾会跳过「工作风格」5 题</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 逐题作答 ─────────── -->
+      <!-- 2026-08-11 版面批次：这一步的主内容只有一样东西 —— 当前这道题。
+           原版把它塞在一张 408px 的小卡里，下面跟一张 952px 的「五组进度」卡，
+           而进度卡内容只有 285px，卡底见空 667px。
+           改法：题卡吃满剩余高度并居中（一屏一题），选项 64→96px；
+           「五组进度」本来就是进度指标不是主内容，整块挪到右栏竖排。 -->
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-pen"/></svg>
+          <b data-out="qHd">第 8 题 / 共 25 题</b>
+          <span class="mt">选择题 · 可回退改答</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-5)">
+          <div>
+            <div class="q-no" data-out="qNo">工作风格 · 这一组的第 3 题</div>
+            <div class="q-t" data-out="qT">你更喜欢哪种工作方式？</div>
+            <div class="q-why" data-when="default first device-off" data-out="qWhy">这一组问的是<b>你怎么推进一件事</b>，选哪个都不算错。</div>
+            <div class="q-why" data-when="ai-down">AI 不可用 —— 照常答，只是这次没有陈述解读。</div>
+          </div>
+          <!-- 选项是真单选：选中即写进本题答案，右栏「已答 N」与五组进度同步跟着变 -->
+          <button class="opt" data-opt="A"><span class="opt-key">A</span><span data-out="optA">结构清晰、目标明确</span></button>
+          <button class="opt" data-opt="B"><span class="opt-key">B</span><span data-out="optB">保持开放、允许调整</span></button>
+          <button class="opt" data-opt="C"><span class="opt-key">C</span><span data-out="optC">先讨论、再行动</span></button>
+          <!-- 2026-08-11：从页脚抽屉「合规边界」段移回常驻，并且就摆在选项底下 ——
+               「该怎么选」这句话的用处只在人正对着 A/B/C 犹豫的这一刻。 -->
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>题目问的都是「你更愿意哪个」，<b>没有对错，也没有陷阱题</b>；
+                  不用揣摩哪个答案更好看 —— 这一页不打分、不排名。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <b>作答期间的两条规矩</b>
+          <span class="mt">这一步全程生效</span>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-clock"/></svg>
+            <span><b>离开超过 60 秒，本机自动退出并清空这页作答。</b>
+                  公共机器，这条是替你兜底 —— 你走开了，答到一半的内容不会留在屏上给下一个人看。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span><b>想好再选，这里不计时。</b>抢时间答出来的是手速，不是你的倾向。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 看结果 ─────────── -->
+      <div class="pane" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>先说清楚这 <span data-out="segN">5</span> 段话是什么</b>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>下面 <b data-out="segN">5</b> 段是 AI 把你本次作答整理成的<b>陈述</b>
+                  <span class="ev ev--e3">E3 解读属 AI 判断</span>，
+                  依据只有你的选择本身 <span class="ev ev--e1">E1 你的作答</span>。
+                  它<b>不打分、不排名、不说你适合或不适合哪类岗位</b>，
+                  也不构成能力证明 —— 把它当「换个说法的你」，不是「权威结论」。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+        <!-- 2026-08-11：标题原来写死「五段陈述」，跳过「工作风格」那一组时实际只有 4 段，
+             和同屏的「先说清楚这 4 段话」「纸上印的 4 段陈述」对不上。改成同一个 segN 数据源。 -->
+        <div class="pane-hd"><span class="t"><span data-out="segN">5</span> 段陈述</span>
+          <span class="chip chip--info">AI 生成 · 陈述</span></div>
+        <div class="joblist">
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">兴趣偏好</span></div>
+            <div class="dim-p">你三次选了「把东西做出来」一类的选项，更愿意把时间花在<b>能跑起来的产出</b>上。</div>
+            <div class="dim-src">依据：这一组第 1、2、5 题的选择（只记题号，不含选项内容）</div>
+          </div>
+
+          <div class="dim" data-skipgrp="style">
+            <div class="dim-hd"><span class="dim-t">工作风格</span></div>
+            <div class="dim-p">模糊任务你选了<b>先拆成可执行步骤</b>，长周期任务更看重每阶段的稳定质量 —— 「按部就班」是你选的推进方式。</div>
+            <div class="dim-src">依据：这一组第 1、3、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">团队偏好</span></div>
+            <div class="dim-p">分歧出现时你选了<b>先收集信息再判断</b>；协作上你挑了分工明确、按时交付，看重「节奏一致」。</div>
+            <div class="dim-src">依据：这一组第 2、3、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">价值取向</span></div>
+            <div class="dim-p">选工作时你把<b>成长路径</b>排在前面，两道题都选了「能积累、可迁移」。</div>
+            <div class="dim-src">依据：这一组第 1、5 题的选择</div>
+          </div>
+
+          <div class="dim">
+            <div class="dim-hd"><span class="dim-t">求职动机</span></div>
+            <div class="dim-p">五道题里有三道，你都选了<b>岗位和能力对不对得上</b>一类的选项 ——
+              此刻你在意的是「这活我能不能干好」，排在薪酬和城市节奏前面。</div>
+            <div class="dim-src">依据：这一组第 1、4、5 题的选择</div>
+          </div>
+
+        </div>
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          <span data-out="segN">5</span> 段都只描述<b>本次作答</b>。隔一周再做，答不一样话就不一样。
+        </div>
+      </div>
+
+      <!-- s3 · ai-down：解读如实空缺 -->
+      <div class="pane" data-at="s3" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <b>这次没有解读</b>
+          <span class="mt">缺的只是最后那几段文字，前面都做完了</span>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>AI 不可用，<b>陈述这次生成不了</b>；答案原文不留存，
+                  恢复后也<b>补不回这一次</b>，要解读得重新作答（约 5 分钟）。</span>
+          </div>
+
+          <!-- 2026-08-11 版面批次：从页脚抽屉「AI 离线时会怎样」移回常驻。
+               这一态的用户第一个问题就是「那我刚才白答了吗」——
+               答案（记分是机械过程、已经算完了）不该藏在折叠条里。 -->
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">记分（固定权重累加，机械过程）</span><span class="v">已完成 · 不经过 AI</span></div>
+            <div class="kv-row"><span class="k">题号依据与分组结果</span><span class="v">已拿到</span></div>
+            <div class="kv-row"><span class="k">那几段陈述文字（要 AI 写）</span><span class="v v--fog">这次没有</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面批次：以下两卡整块从右栏并进主区（ai-down·s3 改单栏）。
+           原来是「主区讲一遍原因、右栏再讲一遍处境」，两栏各留 344 / 801px 空尾。 -->
+      <div class="solo-grid" data-at="s3" data-when="ai-down">
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-gear"/></svg><span class="solo-c-t">这次实际发生了什么</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k" data-out="kvAns">作答 25 题</span><span class="v">已完成</span></div>
+            <div class="kv-row"><span class="k">记分</span><span class="v">已完成 · 不靠 AI</span></div>
+            <div class="kv-row"><span class="k" data-out="kvSeg">5 段陈述</span><span class="v v--fog">未生成</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">未留存</span></div>
+          </div>
+          <div class="solo-c-p">前面三步都走完了，<b>断在最后一步</b>。</div>
+        </div>
+
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-shield"/></svg><span class="solo-c-t">这次落下的那条记录</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">已入库</span><span class="v">校验摘要一段</span></div>
+            <div class="kv-row"><span class="k">陈述</span><span class="v v--fog">未生成，也不会补</span></div>
+            <div class="kv-row"><span class="k">保留</span><span class="v">24 小时后自动清理</span></div>
+            <div class="kv-row"><span class="k">你点撤回</span><span class="v">物理删除，不可恢复</span></div>
+          </div>
+          <div class="solo-c-p">企业、合作机构和管理后台<b>都看不到</b>。</div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>不等 AI，现在就能走的路</b>
+          <span class="mt">这几件都不依赖解读</span>
+        </div>
+        <div class="sec solo-alts">
+          <a class="alt" href="22-career-plan.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">去职业规划 · 看岗位原文计数</span>
+              <span class="alt-s">那页的「哪类要求出现多少条」是本机数出来的，不靠 AI。</span></span>
+          </a>
+          <a class="alt" href="13-jobs-desk.html">
+            <svg class="ic"><use href="#i-briefcase"/></svg>
+            <span class="alt-b"><span class="alt-t">直接翻岗位</span>
+              <span class="alt-s">本机同步的岗位照常能看、能收藏，投递走各岗位的来源平台入口。</span></span>
+          </a>
+          <a class="alt" href="06-print-workbench.html">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="alt-b"><span class="alt-t">打印、扫描照常</span>
+              <span class="alt-s">本机的主业不依赖 AI，要打的材料现在就能打。</span></span>
+          </a>
+          <!-- 不是为了填版面新加的入口：s4「往期记录」本来就指向同一处，
+               这一态用户最可能问的「那我这次算不算做过」也只有那里能答。 -->
+          <a class="alt" href="43-my-records.html?stage=ai&amp;from=P28">
+            <svg class="ic"><use href="#i-user"/></svg>
+            <span class="alt-b"><span class="alt-t">我的 → AI 服务记录</span>
+              <span class="alt-s">这次的「做过」记在那里。AI 恢复后重做一次（约 5 分钟）才会有解读。</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 往期记录 · 单栏 ───────────
+           2026-08-11 版面批次：这一步原来是两栏，右栏底部实测空 925px —— 全站最严重。
+           成因不是「没写完」：按本页的隐私规则，往期本来就**只有次数**，
+           右侧那根 348px 的参数栏在这一步没有任何合法内容可放。
+           所以整步改单栏，把原右栏两张卡（记录规则 / 下次再做会怎样）的事实
+           并进主区做两列卡阵，按主内容的尺寸排。
+           红线：不因为版面空就编「两次结果对比」——本页比不了，这一点在
+           「为什么比不了」那张卡里直说，是解释，不是数据。 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-history"/></svg>
+          <b>本机记过的</b>
+          <span class="mt">只有次数和日期，往下看为什么</span>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">7月26日 · 作答 25 题</span>
+                <span class="tl-s">结果已过 24 小时，自动清理</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">8月2日 · 作答 25 题</span>
+                <span class="tl-s">你在结果页撤回，已物理删除</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">今天 · 本次</span>
+                <span class="tl-s">结果还在 24 小时窗口内，可回上一步看</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">往期一共 <b>2</b> 次，加上今天这次。</div>
+        </div>
+      </div>
+
+      <div class="notice" data-at="s4" data-when="first">
+        <svg class="ic"><use href="#i-help"/></svg>
+        <span>第一次来的话：这一页是<b><span data-out="firstNote">25 道选择题、约 5 分钟</span></b>的倾向整理，
+              做完能打印带走。这一屏是往期，回上一步才是这次的结果。</span>
+      </div>
+
+      <div class="solo-grid" data-at="s4">
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-check"/></svg><span class="solo-c-t">这里记下了什么</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">次数</span><span class="v">3 次（含今天）</span></div>
+            <div class="kv-row"><span class="k">日期</span><span class="v">每次的日子</span></div>
+            <div class="kv-row"><span class="k">题数</span><span class="v">那次答了几题</span></div>
+          </div>
+          <div class="solo-c-p">就这三样。它们合起来只能说明<b>「你做过」</b>。</div>
+        </div>
+
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="solo-c-t">这里没有什么</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">从未入库</span></div>
+            <div class="kv-row"><span class="k">过期的陈述</span><span class="v v--fog">已自动清理</span></div>
+            <div class="kv-row"><span class="k">撤回的那次</span><span class="v v--fog">已物理删除</span></div>
+          </div>
+          <div class="solo-c-p">不是没加载出来，是<b>本来就不存</b>。</div>
+        </div>
+
+        <!-- 从页脚抽屉「隐私 · 保留期限 · 删除口径」最后一段移回常驻：
+             这一屏用户最想干的事就是「跟上次比一比」，页面必须当面回答做不到，
+             而不是让他先展开折叠条才发现。 -->
+        <div class="solo-c solo-c--warn">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-refresh"/></svg><span class="solo-c-t">为什么比不了两次</span></div>
+          <div class="solo-c-p">要能比，就得把两次的<b>作答原文都留着</b>。本机选了不留 —— 这是
+            取舍，不是漏做。所以每次都从头答，没有「接着上次」。</div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">重做一次</span><span class="v">从头 25 题 · 约 5 分钟</span></div>
+            <div class="kv-row"><span class="k">新结果</span><span class="v">重新算 24 小时</span></div>
+            <div class="kv-row"><span class="k">旧的</span><span class="v v--fog">到点照常清理</span></div>
+          </div>
+        </div>
+
+        <!-- 原右栏「记录规则」整块并进来 -->
+        <div class="solo-c">
+          <div class="solo-c-hd"><svg class="ic"><use href="#i-shield"/></svg><span class="solo-c-t">这条记录谁看得见</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">保存位置</span><span class="v">服务端 · 仅本人</span></div>
+            <div class="kv-row"><span class="k">企业 / 合作机构</span><span class="v v--fog">不可见</span></div>
+            <div class="kv-row"><span class="k">管理后台</span><span class="v v--fog">不可见</span></div>
+            <div class="kv-row"><span class="k">岗位排序</span><span class="v v--fog">不参与</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-route"/></svg>
+          <b>要看更多，去这两处</b>
+          <span class="mt">这一页只有次数，明细在别处</span>
+        </div>
+        <div class="sec solo-alts">
+          <!-- 2026-08-10 改：原指 23-me.html（「我」的域首屏，无 AI 记录明细），
+               「去这两处看更多」兑现不了 → 直落 43-my-records.html?stage=ai -->
+          <a class="alt" href="43-my-records.html?stage=ai&amp;from=P28">
+            <svg class="ic"><use href="#i-user"/></svg>
+            <span class="alt-b"><span class="alt-t">我的 → AI 服务记录</span>
+              <span class="alt-s">你在本机用过的各项 AI 服务都记在那里，含这一项的次数。</span></span>
+          </a>
+          <a class="alt" href="22-career-plan.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">职业规划 · 拿着倾向去对照岗位</span>
+              <span class="alt-s">那页依据本机读过的岗位正文，说的是「见到多少条」，和这页正好互补。</span></span>
+          </a>
+        </div>
+      </div>
+
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界（不是测评、不构成能力证明）/ 隐私与保留期限 /
+                     结果去向与不挂钩口径 / 产物去向与费用 / AI 离线降级说明 / 会话超时口径。
+           **没有**收进来（必须常驻）：「这不是临床、心理或人格测评」这条 amber 警示、
+           顶栏与页内的当前状态提示、AI 生成解读的 AIGC 标识、逐条结论旁的证据徽章。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界&nbsp;· <b>不构成能力证明</b>&nbsp;· 隐私与去向</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：这份东西不是什么</div>
+            <p class="nb-p">这<b>不是临床、心理或人格测评</b>：不打分、不排名、不诊断、<b>不构成能力证明</b>——只是帮你把倾向说清楚。题目都是「你更愿意 / 更倾向哪个」，没有对错，也没有陷阱题，不用揣摩哪个答案更好看。</p>
+            <p class="nb-p">结果和岗位、招聘会<b>互不挂钩</b>：它不参与任何排序，也不会推给任何企业，对企业不可见。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+            <p class="nb-p">提交前，你的选择<b>不出这台机器</b>；提交后，库里只留摘要与陈述，<b>答案原文从不入库</b>。陈述只留 24 小时，过期自动清理；撤回是<b>物理删除</b>，不是隐藏。</p>
+            <!-- 2026-08-11 整改 ③（术语跨页一致）：原写「会员做完会……」。
+                 本机**没有会员**（无订阅模型、无购买闭环，见 24 权益页「你的账户」），
+                 这里说的其实是「已登录」；03 认领身份页也写明「登录不是会员，也不收费」。 -->
+            <p class="nb-p">游客也能做，记录只在本次会话里，连次数也不留；登录后做完会在「AI 服务记录」里记一条「做过」，同样不含答案原文。中途走开超过 60 秒，本机退出并清空；已提交的结果不受影响。</p>
+            <p class="nb-p">因此本机<b>比不了两次结果的差异</b>——要能比，就得留原文，本机选了不留。这个取舍页面直说，不藏。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">打印出来的纸上<b>只有陈述与题号依据</b>，脚注印着「不构成能力证明」。核价、支付与出纸都在打印工作台完成，本页不收款。打印机离线时可以扫码把参考单存进手机，或换一台在线的机器再打。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你自己的选择与材料。<span class="nb-e nb-e--2">E2</span> 系统按固定权重算出来的事实。<span class="nb-e nb-e--3">E3</span> AI 写的解读文字，仅供参考。页面上挂在具体结论旁的小徽章就是这三档，本条只解释含义。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">记分是<b>按你选项的固定权重累加</b>的机械过程，不是 AI 猜的——所以 AI 不可用时<b>作答照常</b>，能拿到题号依据与分组结果，缺的只是最后那几段解读文字。当前是否可用以顶栏状态为准。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-pen"/></svg><b>本次作答</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">题目</span><span class="v" data-out="kvTq"><b>25</b> 题 · 5 组</span></div>
+            <div class="kv-row"><span class="k">用时</span><span class="v">约 5 分钟</span></div>
+            <div class="kv-row"><span class="k">登录</span><span class="v v--fog">不需要</span></div>
+            <div class="kv-row"><span class="k">结果保留</span><span class="v">24 小时</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>五个组各问什么</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">兴趣偏好 · 5 题</span>
+                <span class="tl-s">你愿意把时间花在哪类事上</span></span></div>
+            <div class="tl" data-skipgrp="style"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">工作风格 · 5 题</span>
+                <span class="tl-s">一件事你怎么推进</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">团队偏好 · 5 题</span>
+                <span class="tl-s">协作里你怎么站位</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">价值取向 · 5 题</span>
+                <span class="tl-s">选工作你看重什么</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">求职动机 · 5 题</span>
+                <span class="tl-s">此刻找工作你最在意什么</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>题目都是「你更愿意 / 更倾向哪个」——
+                  <b>没有对错，也没有陷阱题</b>；不用揣摩「哪个答案更好看」。</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面批次：从页脚抽屉「隐私 · 保留期限 · 删除口径」移回常驻。
+           这一步用户正要按下「同意并开始作答」——「机器到底存什么、存多久」
+           是这一步的决策依据，不该藏在折叠条里。抽屉里仍保留完整条款原文。 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-eye"/></svg><b>同意之后，机器保存什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">从不入库</span></div>
+            <div class="kv-row"><span class="k">真正入库的</span><span class="v">摘要 + 陈述</span></div>
+            <div class="kv-row"><span class="k">陈述保留</span><span class="v">24 小时后自动清理</span></div>
+            <div class="kv-row"><span class="k">你点撤回</span><span class="v">物理删除，不可恢复</span></div>
+            <div class="kv-row"><span class="k">企业 / 后台</span><span class="v v--fog">看不到，也不参与排序</span></div>
+            <div class="kv-row"><span class="k">游客做的</span><span class="v v--fog">连次数都不留</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            提交前，你的选择不出这台机器。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>进度</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已答</span><span class="v" data-out="kvDone"><b>7</b> / 25 题</span></div>
+            <div class="kv-row"><span class="k">当前</span><span class="v" data-out="kvCur">工作风格 · 第 3 题</span></div>
+            <div class="kv-row"><span class="k">倒计时</span><span class="v v--fog">无</span></div>
+            <div class="kv-row"><span class="k">闲置退出</span><span class="v">60 秒</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            随时可以回退改答，以最后一次选择为准。
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面批次：整块从主区挪来。进度是「参数 / 指标」，本来就属右栏；
+           主区腾出来给题干做主视觉。竖排是因为 348px 里五列会把组名挤成两行。 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>五组进度</b></div>
+        <div class="sec">
+          <div class="grp" data-out="grp"></div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            组间顺序固定，答完自动进下一组。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>作答期间，数据在哪</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">屏上的选择</span><span class="v">只在本机本次</span></div>
+            <div class="kv-row"><span class="k">提交时</span><span class="v">一次性上传记分</span></div>
+            <div class="kv-row"><span class="k">入库的</span><span class="v v--fog">摘要 + 陈述</span></div>
+            <div class="kv-row"><span class="k">答案原文</span><span class="v v--fog">当场丢弃</span></div>
+            <!-- 2026-08-11：以下两行从页脚抽屉「隐私」段移回常驻。
+                 人正在答题，「我这次到底会不会被记一笔」是当下的疑问。 -->
+            <!-- 2026-08-11 整改 ③（术语跨页一致）：「会员作答」→「登录后作答」，
+                 本机没有会员，这里区分的是游客 / 已登录。 -->
+            <div class="kv-row"><span class="k">游客作答</span><span class="v v--fog">连次数都不留</span></div>
+            <div class="kv-row"><span class="k">登录后作答</span><span class="v">只记一条「做过」</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>记分是<b>按你选项的固定权重累加</b>，不是 AI 猜的 ——
+                  所以 AI 不可用时作答与记分照常，缺的只是最后那几段解读文字。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 · 正常/离线：打印与处置 -->
+      <div class="pane" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have" data-print="sheet" role="checkbox" aria-checked="true" tabindex="0">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">倾向参考单</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份 = 1 计费页</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v" data-out="pgTotal">1 计费页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v" data-out="pgFee">预估 <b>0.20</b> 元</span></div>
+            <!-- 2026-08-11：以下三行从页脚抽屉「产物去向与费用」移回常驻。
+                 「这一笔钱买到的纸上到底印什么」正是这一步要做的决定。
+                 金额不写死：走 scripts/site-config.js（后台 GET /print/price-config
+                 的本机快照），后台改价这里跟着变。 -->
+            <div class="kv-row"><span class="k">纸上印的</span><span class="v"><b data-out="segN">5</b> 段陈述 + 题号依据</span></div>
+            <div class="kv-row"><span class="k">脚注固定印着</span><span class="v">不构成能力证明</span></div>
+            <div class="kv-row"><span class="k">你的作答原文</span><span class="v v--fog">不印，也没留</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把参考单存进手机。</span>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="pane" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-trash"/></svg><b>这份结果由你处置</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">打印带走</span>
+                <span class="tl-s">走打印工作台核价出纸</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">撤回 = 物理删除</span>
+                <span class="tl-s">删的是数据本身，删完不可恢复</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">什么都不做</span>
+                <span class="tl-s">24 小时后自动清理，效果同上</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>无论选哪个，企业、合作机构和管理后台<b>都看不到这份结果</b>。</span>
+          </div>
+
+          <div class="field-lb" style="margin-top:var(--s-5)">拿着结果能去哪</div>
+          <a class="alt" href="22-career-plan.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="alt-b"><span class="alt-t">去职业规划对照岗位</span>
+              <span class="alt-s">那页用本机读过的岗位正文说话，和这几段正好一内一外。</span></span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面批次：从页脚抽屉「证据分级怎么读」移回常驻，只在 s3 出现。
+           屏幕上此刻正挂着 E1 / E3 两枚徽章，解释徽章含义的那一段
+           放在折叠条里等于没解释。抽屉里仍保留完整条款。 -->
+      <div class="pane pane--grow" data-at="s3" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>那两枚徽章怎么读</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k"><span class="ev ev--e1">E1</span></span><span class="v">你自己的选择与材料</span></div>
+            <div class="kv-row"><span class="k"><span class="ev ev--e2">E2</span></span><span class="v">系统按固定权重算出的事实</span></div>
+            <div class="kv-row"><span class="k"><span class="ev ev--e3">E3</span></span><span class="v">AI 写的解读 · 仅供参考</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 · ai-down 右栏已整体撤销（2026-08-11 版面批次）：这一态改单栏，
+           「实际发生了什么」「这次落下的那条记录」两块已并入主区卡阵。
+           原「接下来」三条：撤回写进卡里；重做与去职业规划写进主区四条出口。 -->
+
+      <!-- S4 右栏已整体撤销（2026-08-11 版面批次）：s4 改单栏，
+           原「记录规则」「下次再做会怎样」两卡的事实已并入主区卡阵，
+           这里不再保留重复副本。 -->
+
+      <!-- 首次使用提示已改到主区（2026-08-11 版面批次）：s1 一条 notice、s4 一条 notice。
+           原来这张卡挂在右栏、四个阶段都出，说的是「N 道选择题、约 5 分钟，
+           把倾向整理成明白话，能打印带走」—— 这三件事页头标题、intro 和四步时间线
+           各已写过一遍，四个阶段重复四次，只把右栏顶出 61–140px 的滚动裁切。
+           按去重删掉，不是丢内容。 -->
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+      <a class="backbtn" href="37-interview-hub.html" data-parent-label="面试训练"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">面试训练</span></span></a>
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-nav="-1">上一题</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-nav="1">下一题</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s4">看往期记录</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看这次结果</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first" data-out="hint1">25 题 · 5 组 · 约 5 分钟 · 不需登录</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down" data-out="hint1">AI 不可用 · 25 题照常作答</span>
+    <span class="actionbar-hint" data-at="s1" data-when="device-off" data-out="hint1">打印机离线 · 作答与结果不受影响</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first device-off" data-out="hint2">第 8 题 / 共 25 题 · 闲置 60 秒自动清空</span>
+    <span class="actionbar-hint" data-at="s2" data-when="ai-down">照常作答 · 答完这次不会有解读</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first" data-out="hint3">共 1 计费页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="ai-down">解读空缺 · 摘要已记 · 随时可撤回</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+    <span class="actionbar-hint" data-at="s4">本机只记次数 · 完整记录在「我的 → AI 服务记录」</span>
+
+    <!-- 门控：必勾没勾时这里会被摘掉 data-go 并置灰，文案换成「先勾选必要项」 -->
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off" data-gate="1" data-label="同意并开始作答">同意并开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down" data-gate="1" data-label="照常开始作答">照常开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">答完了，看结果<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P28&amp;kind=assessment-sheet&amp;title=倾向参考单&amp;pages=1&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="22-career-plan.html">先去职业规划对照岗位<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off" data-fb="qr"><svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走</button>
+    <a class="btn btn--primary" data-at="s4" href="22-career-plan.html">拿着倾向去职业规划<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+  <!-- 结果反馈层：离线扫码带走点完必须有交代，并给返回入口 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ============================================================================
+   P28 的三处「画了没接」，这里一次接完：
+   1) 两个同意项点了不变 —— 而且文案写着「不勾开始不了」，实现却是随便进。
+      现在必勾是真门控：取消勾选，主按钮立刻摘掉 data-go 并置灰、文案换成
+      「先勾选必要项」；重新勾上才恢复。
+   2) 可选同意项没有下游 —— 现在不勾就真的跳过「工作风格」5 题：
+      总题量 25→20、组数 5→4、进度格标「跳过」、当前题换到团队偏好那一组。
+   3) A/B/C 与「上一题」是死的 —— 现在是真单选 + 真前后翻题，
+      「已答 N」「组进度」「第 M 题」跟着动。答案只存在这一次会话里，
+      与页面写的「原文不入库」不冲突：这里存的是本机内存，不落任何库。
+   ========================================================================== */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* 两组题目：勾了可选同意问「工作风格」，没勾就跳到「团队偏好」 */
+  var BANK = {
+    style: { g: '工作风格', why: '这一组问的是<b>你怎么推进一件事</b>，选哪个都不算错。', qs: [
+      { t: '接到一个说不清楚的任务，你先做什么？', o: ['先拆成能动手的小步', '先找人问清楚要什么', '先做个粗版试试水'] },
+      { t: '一件事要做三个月，你更在意什么？', o: ['每个阶段质量稳定', '尽早看到能用的东西', '中途能随时改方向'] },
+      { t: '你更喜欢哪种工作方式？', o: ['结构清晰、目标明确', '保持开放、允许调整', '先讨论、再行动'] },
+      { t: '计划和实际对不上时，你倾向？', o: ['先改计划再继续', '按原计划先做完', '停下来重新想一遍'] },
+      { t: '同时压着三件事，你怎么排？', o: ['按截止时间排', '按影响大小排', '先做能立刻完成的'] }
+    ] },
+    team: { g: '团队偏好', why: '这一组问的是<b>协作里你怎么站位</b>，没有标准答案。', qs: [
+      { t: '团队意见分歧时，你通常？', o: ['先收集信息再判断', '先表态再听反驳', '让更懂的人拍板'] },
+      { t: '你更喜欢哪种协作方式？', o: ['分工明确、按时交付', '随时同步、边做边合', '各做各的、最后合并'] },
+      { t: '别人的活出了问题，你会？', o: ['先补上再说', '先讲清楚是谁的', '等对方来找你'] },
+      { t: '你更愿意在什么样的团队里？', o: ['节奏一致、规则清楚', '氛围松、能自由发挥', '高手多、压力大'] },
+      { t: '一件事需要有人牵头，你？', o: ['愿意牵头', '愿意配合执行', '看这件事熟不熟'] }
+    ] }
+  }
+  var GROUPS = ['兴趣偏好', '工作风格', '团队偏好', '价值取向', '求职动机']
+
+  /* 起点沿用页面原有设定：兴趣偏好 5 题已答，当前组已答 2 题，正停在第 3 题 */
+  var S = { must: true, opt: false, ans: { 0: 'B', 1: 'A' }, cur: 2, print: true }
+
+  function bank () { return S.opt ? BANK.style : BANK.team }
+  function total () { return S.opt ? 25 : 20 }
+  function groups () { return S.opt ? GROUPS : GROUPS.filter(function (g) { return g !== '工作风格' }) }
+  function answered () { return 5 + Object.keys(S.ans).length }
+
+  function q (n) { return scr.querySelectorAll('[data-out="' + n + '"]') }
+  function set (n, v) {
+    var e = q(n)
+    for (var i = 0; i < e.length; i++) {
+      if (e[i].firstChild && e[i].firstChild.nodeType === 3) e[i].firstChild.nodeValue = v
+      else e[i].textContent = v
+    }
+  }
+  function html (n, v) { var e = q(n); for (var i = 0; i < e.length; i++) e[i].innerHTML = v }
+  /* A4 黑白每计费页单价（元）—— 唯一来源是 scripts/site-config.js，
+     即后台 GET /print/price-config 的本机快照。末尾字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」（后者走 PRICE_CONFIG_UNAVAILABLE，不显示数字）。 */
+  function unitBW () { var S2 = window.V3_SITE; return S2 ? S2.price.bwPerFace : 0.2 }
+
+  function render () {
+    var B = bank(), Q = B.qs[S.cur], T = total(), no = 5 + S.cur + 1
+
+    /* 同意项本身 */
+    var cks = scr.querySelectorAll('[data-consent]')
+    for (var i = 0; i < cks.length; i++) {
+      var on = cks[i].getAttribute('data-consent') === 'must' ? S.must : S.opt
+      cks[i].classList.toggle('ck--have', on)
+      cks[i].setAttribute('aria-checked', on ? 'true' : 'false')
+    }
+    /* 门控：不勾必勾项就真的进不去 */
+    var gs = scr.querySelectorAll('[data-gate]')
+    for (var g = 0; g < gs.length; g++) {
+      var b = gs[g]
+      if (S.must) { b.setAttribute('data-go', 's2'); b.removeAttribute('aria-disabled'); b.firstChild.nodeValue = b.getAttribute('data-label') }
+      else { b.removeAttribute('data-go'); b.setAttribute('aria-disabled', 'true'); b.firstChild.nodeValue = '先勾选必要项' }
+    }
+    /* 题量随可选同意变 */
+    html('intro', S.opt
+      ? '<b>5 组各 5 题</b>，全是选择题，做完得到 5 段陈述式解读。'
+      : '<b>4 组各 5 题</b>（已跳过「工作风格」），做完得到 4 段陈述式解读。')
+    set('hdTitle', T + ' 道选择题，把「你怎么倾向」说成明白话')
+    set('step2', '逐题作答 ' + T + ' 题')
+    html('kvTq', '<b>' + T + '</b> 题 · ' + groups().length + ' 组')
+    set('optNote', S.opt ? '已勾 —— 会问「工作风格」那 5 题' : '可选 —— 不勾会跳过「工作风格」5 题')
+    set('hint1', S.must
+      ? T + ' 题 · ' + groups().length + ' 组 · 约 5 分钟 · 不需登录'
+      : '先勾选必要项才能开始 · ' + T + ' 题 · 约 5 分钟')
+    /* 结果段数必须等于实际作答的组数 —— 跳过一组就少一段，不能多出一段没依据的话 */
+    set('segN', groups().length)
+    set('kvAns', '作答 ' + T + ' 题')
+    set('kvSeg', groups().length + ' 段陈述')
+    set('firstNote', T + ' 道选择题、约 5 分钟')
+    scr.classList.toggle('is-skip', !S.opt)
+    /* 当前题 */
+    set('qHd', '第 ' + no + ' 题 / 共 ' + T + ' 题')
+    set('qNo', B.g + ' · 这一组的第 ' + (S.cur + 1) + ' 题')
+    set('qT', Q.t)
+    html('qWhy', B.why)
+    set('optA', Q.o[0]); set('optB', Q.o[1]); set('optC', Q.o[2])
+    var opts = scr.querySelectorAll('.opt[data-opt]')
+    for (var k = 0; k < opts.length; k++) {
+      opts[k].classList.toggle('opt--on', S.ans[S.cur] === opts[k].getAttribute('data-opt'))
+    }
+    html('kvDone', '<b>' + answered() + '</b> / ' + T + ' 题')
+    /* 离场确认要丢的是什么（scripts/leaveguard.js）。题数不能写死在 HTML 里：
+       总题量随可选同意项在 25 / 20 之间变，答到第几题更是随时在动。
+       用户要看到的是「已经答完的 18 道题」，不是「未保存的更改」。
+       口径与 s3 那句「答案原文不留存…要解读得重新作答（约 5 分钟）」保持一致。 */
+    scr.setAttribute('data-guard-lose-s2',
+      '已经答完的 ' + answered() + ' 道题 —— 答案原文不留存，补不回这一次，要解读得重新作答（约 5 分钟）')
+    set('kvCur', B.g + ' · 第 ' + (S.cur + 1) + ' 题')
+    set('hint2', '第 ' + no + ' 题 / 共 ' + T + ' 题 · 闲置 60 秒自动清空')
+    /* 五组进度 */
+    var done = Object.keys(S.ans).length
+    html('grp', GROUPS.map(function (g) {
+      if (g === '工作风格' && !S.opt) return '<div class="gr gr--skip"><span class="gr-t">工作风格</span><span class="gr-n">跳过</span></div>'
+      if (g === '兴趣偏好') return '<div class="gr gr--done"><span class="gr-t">兴趣偏好</span><span class="gr-n">5/5</span></div>'
+      if (g === B.g) return '<div class="gr gr--now"><span class="gr-t">' + g + '</span><span class="gr-n">' + done + '/5</span></div>'
+      return '<div class="gr"><span class="gr-t">' + g + '</span><span class="gr-n">0/5</span></div>'
+    }).join(''))
+    /* 前后翻题的边界要真：到头就置灰，不给假按钮 */
+    var navs = scr.querySelectorAll('[data-nav]')
+    for (var n2 = 0; n2 < navs.length; n2++) {
+      var d = +navs[n2].getAttribute('data-nav')
+      var can = d < 0 ? S.cur > 0 : S.cur < B.qs.length - 1
+      if (can) navs[n2].removeAttribute('aria-disabled'); else navs[n2].setAttribute('aria-disabled', 'true')
+    }
+    /* s3 打印勾选 */
+    var pk = scr.querySelector('[data-print]')
+    if (pk) { pk.classList.toggle('ck--have', S.print); pk.setAttribute('aria-checked', S.print ? 'true' : 'false') }
+    set('pgTotal', S.print ? '1 计费页' : '0 计费页 · 未勾选')
+    /* 单价走 site-config（后台可改），不在页面里手抄一个 0.20。
+       本页固定 1 页 × 1 份 = 1 计费页，所以金额就等于单价本身。 */
+    html('pgFee', S.print ? '预估 <b>' + unitBW().toFixed(2) + '</b> 元' : '<span class="v--fog">不打印 · 0 元</span>')
+    set('hint3', S.print
+      ? '共 1 计费页 · 预估 ' + unitBW().toFixed(2) + ' 元 · 以打印工作台核价为准'
+      : '未勾选打印 · 不出纸不收费')
+  }
+
+  /* ── 结果反馈层 ── */
+  var fb = document.getElementById('fb')
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    var go = document.getElementById('fb-go'); go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', function () { fb.hidden = true })
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+
+  scr.addEventListener('click', function (e) {
+    var ck = e.target.closest('[data-consent]')
+    if (ck) { e.preventDefault(); S[ck.getAttribute('data-consent')] = !S[ck.getAttribute('data-consent')]; S.cur = Math.min(S.cur, bank().qs.length - 1); render(); return }
+    var op = e.target.closest('.opt[data-opt]')
+    if (op) { S.ans[S.cur] = op.getAttribute('data-opt'); render(); return }
+    var nv = e.target.closest('[data-nav]')
+    if (nv) { S.cur = Math.max(0, Math.min(bank().qs.length - 1, S.cur + (+nv.getAttribute('data-nav')))); render(); return }
+    var pk = e.target.closest('[data-print]')
+    if (pk) { e.preventDefault(); S.print = !S.print; render(); return }
+    var f = e.target.closest('[data-fb]')
+    if (f) {
+      openFb({ t: '已存进「我的文档」，二维码在下面',
+        p: '倾向参考单（1 页）已存好，手机扫屏幕上的码就能带走。<br>链接 <b>30 分钟后失效</b>；这份结果<b>24 小时后自动清理</b>，也可以在这一页随时撤回。',
+        go: [{ t: '去手机接力页看码', href: '05-phone-relay.html', primary: true }, { t: '留在结果页' }] })
+    }
+  })
+  fb.addEventListener('click', function (e) { if (e.target === fb) fb.hidden = true })
+
+  render()
+})()
+</script>
+<script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

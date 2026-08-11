@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P43 我的记录 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P43 我的记录">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   P43 我的记录（2026-08-10 新建）
+   --------------------------------------------------------------------------
+   与 P42 同一批补建：V3 把原型里的资产/记录列表整层丢了，「我的收藏」于是
+   链到了岗位大全。这一页把原型的四页合并成四个标签：
+     19-me-ai-records.html   → data-stage="ai"      AI 服务记录
+     20-me-favorites.html    → data-stage="fav"     我的收藏
+     71-me-activity.html     → data-stage="trace"   浏览与跳转记录
+     22-me-notifications.html→ data-stage="notice"  通知与反馈
+
+   **四个标签都能被 URL 直达**（stages.js 消费 ?stage=）：
+     43-my-records.html?stage=ai
+     43-my-records.html?stage=fav
+     43-my-records.html?stage=trace
+     43-my-records.html?stage=notice
+   P23 的对应卡请直接指到这四个地址 —— 合并的收益是「少点一次」，
+   落在首个标签再让用户找第二下，就白合并了。
+
+   操作方式与原型一致：收藏列表点条目回对应详情页、通知有「已读 / 删除」、
+   反馈是「选分类 + 写描述 + 提交」，浏览与跳转仍是两个 Tab。手势不变。
+
+   合规红线（本页最硬的一条，来自 CLAUDE.md §10 与 user-data-flow-matrix）：
+   浏览与跳转记录**只记动作，不记结果** —— 记「打开了来源平台」，
+   不记「投没投、投没投成」。那是来源平台的事，本机拿不到也不该拿。
+   所以 trace 标签的合规声明**贴在画像正下方**（用户看画像时就该看到边界），
+   其余三个标签的声明在右栏；任何一屏都只出现一条。
+
+   AI 落点只保留能省步骤的四处：
+     ① AI 服务记录：这段时间用 AI 做了什么 + 下一步可以做什么（E3）
+        —— 省掉自己回忆做过哪些、还差哪一步。
+     ② 我的收藏：要求相近的聚成一簇 + 有几条已下线
+        —— 省掉逐条点开才发现岗位已经没了。
+     ③ 浏览记录：最近在看哪个方向的画像
+        —— 省掉自己翻二十条记录做归纳。
+     ④ 通知与反馈：把你的问题描述整理成工单摘要（可改，**不自动提交**）
+        —— 省掉从头组织语言。
+   ai-down 时上述 AI 块整块换成「本机这次不做盘点，记录都在下面」，
+   列表、筛选、Tab、已读、删除、提交反馈全都照常。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右栏常驻抢走约三分之一宽度，装的是本月统计、「记录里存什么」「删除会连带什么」
+   这类制度口径，以及工单与反馈草稿 —— 都不是用户此刻在翻这一列记录时要读的。
+   处置：记录列表改全宽；口径 / 统计 / 工单 / 写反馈整体收进上下文抽屉，
+   点动作条上的按钮才展开（按标签换文案，notice 标签直接叫「写一条反馈」）。
+   合规声明留在正文常驻（每个标签一条，不许收起）。内容一条未删。 */
+.work--list { grid-template-columns: 1fr; }
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--gutter); bottom:auto; width:396px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+/* 常驻合规声明：从右栏移到正文底部，一行装下 */
+.compline {
+  flex:0 0 auto; display:flex; align-items:center; gap:var(--s-3);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.5;
+}
+.compline > .ic { width:20px; height:20px; flex:0 0 auto; color:var(--jade-500); }
+.compline b { color:var(--fog-900); }
+/* 评审备注：产品视图不渲染，评审视图仍在 */
+body.capture .proto-only { display:none !important; }
+
+/* ---------- 条目行（与 P42 同一套构件，保证两页手势一致） ---------- */
+.lwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.lwrap .blank--filter { display: none; }
+.lwrap.is-empty .blank--filter { display: flex; }
+.lwrap.is-empty .rlist { display: none; }
+
+.rrow {
+  flex: 0 0 auto;
+  border-radius: var(--r-md); background: var(--glass-1-bg);
+  border: 1px solid var(--glass-1-brd); box-shadow: var(--sh-1);
+  display: flex; flex-direction: column;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.rrow.is-open { border-color: var(--jade-a32); }
+.rrow--off { opacity: .74; }
+.rrow-hd {
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; min-height: 74px; padding: var(--s-4) var(--s-5) 10px;
+  background: transparent; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--ff-ui); color: inherit;
+}
+.rrow-hd:active { transform: translateY(1px) scale(.998); }
+.rrow-hd:focus-visible { outline: 3px solid var(--jade-400); outline-offset: -3px; border-radius: var(--r-md); }
+.rrow-ic {
+  width: 44px; height: 44px; flex: 0 0 auto; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-1); color: var(--jade-400);
+}
+.rrow-ic .ic { width: 22px; height: 22px; }
+.rrow-ic--azure { color: var(--azure-400); }
+.rrow-ic--amber { color: var(--amber-400); }
+.rrow-ic--fog { color: var(--fog-700); }
+.rrow-b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.rrow-tl { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.rrow-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; line-height: 1.25; }
+.rrow-m { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); line-height: 1.5; }
+.rrow-x { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600);
+  transition: transform var(--dur-2) var(--ease-out); }
+.rrow.is-open .rrow-x { transform: rotate(90deg); }
+.rrow-ops { display: flex; gap: var(--s-2); flex-wrap: wrap; padding: 0 var(--s-5) var(--s-4); }
+.rrow-ops .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+.rrow-det { display: none; margin: 0 var(--s-5) var(--s-4); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rrow.is-open .rrow-det { display: block; }
+.rrow-det .kv-row { min-height: var(--touch-min); }
+/* 来源条在条目里稍收一点，不抢标题 */
+.rrow-b .srcline { margin-top: 1px; }
+
+/* ---------- 深链高亮：?stage=trace&activityId=xxx 落到哪一条要看得出来 ----------
+   足迹一屏 9 条，只把标签切过去等于让用户自己找。命中那条直接展开 + 描边，
+   顶部给一条「按记录号定位」的说明；参数缺失或写错就当没传，列表照常全量显示。 */
+.rrow.is-target { border-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a20), var(--sh-1); }
+.deep {
+  flex: 0 0 auto; display: none; align-items: center; gap: var(--s-3);
+  min-height: 52px; margin-bottom: var(--s-3); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  font-size: var(--fz-2); color: var(--fog-800);
+}
+.deep.is-on { display: flex; }
+.deep .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--jade-400); }
+.deep-b { flex: 1 1 auto; min-width: 0; }
+.deep-id { font-family: var(--ff-num); color: var(--fog-900); font-weight: 600; }
+.deep .btn { flex: 0 0 auto; min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+
+.fbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.fbar-n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+
+.fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+.fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fold[open] > summary::after { content: '收起'; }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+.fold:not([open]) .fold-b { display: none; }
+
+.inlink {
+  display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+  border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+  background: var(--surf-1); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+}
+.inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* ---------- 反馈工单：AI 只出草稿，提交仍要你自己按 ---------- */
+/* 撑满剩余高度：不撑的话「写一条反馈」这张卡底下会空 640px，
+   卡片里的空洞比页面留白更像"没加载完"（audit-plus 版面留白那条注释说的就是这个）。
+   撑开后多出来的高度全给输入框 —— 一体机上站着打字，写字区越大越好。 */
+.draft {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.draft textarea {
+  width: 100%; flex: 1 1 auto; min-height: 128px; resize: none;
+  border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+  background: var(--field-bg); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); line-height: 1.6;
+  padding: var(--s-3) var(--s-4);
+}
+.draft textarea:focus { outline: 2px solid var(--jade-a32); outline-offset: 1px; }
+.draft-act { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.draft-act .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+/* 2026-08-11 A7：未登录提反馈时的联系方式。
+   页面三处都写着「留个手机号才收得到回复」，而表单里从来没有可以留的地方 ——
+   分类、描述、提交三件，没有第四件。选的是「补字段」而不是「删承诺」：
+   未登录用户在这台机器上**没有第二条收信路径**（通知是跟着账号走的），
+   把承诺删掉等于把匿名反馈变成只进不出，能力是真的少了一块；
+   而这个字段本身在生产侧是有落点的（blockers.md B6 反馈工单接口与状态回执）。
+   选填，且必须在旁边写清不填会怎样 —— 不写就又变成一句悬着的话。 */
+.fbph { display: flex; align-items: center; gap: var(--s-3); }
+.fbph-lb { flex: 0 0 auto; display: flex; align-items: baseline; gap: 6px;
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fbph-lb span { font-size: var(--fz-1); color: var(--fog-600); }
+.fbph-in { flex: 1 1 auto; min-width: 0; min-height: var(--touch-min);
+  border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+  background: var(--field-bg); color: var(--fog-900);
+  font-family: var(--ff-num); font-size: var(--fz-2); padding: 0 var(--s-4); }
+.fbph-in:focus { outline: 2px solid var(--jade-a32); outline-offset: 1px; }
+.tkt { display: flex; align-items: center; gap: var(--s-3);
+  min-height: var(--touch-min); padding: 10px var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.tkt-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tkt-t { font-size: var(--fz-2); color: var(--fog-900); }
+.tkt-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+.tkt + .tkt { margin-top: var(--s-2); }
+
+/* ---------- 删除 / 取消收藏 确认层（防肩窥：不回显名称全称） ---------- */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet);
+  display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+.ovl-panel {
+  position: relative; width: 100%; max-width: 620px; max-height: 100%; overflow-y: auto;
+  border-radius: var(--r-lg); padding: var(--s-6);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(140%);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--coral-400); }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x { margin-left: auto; width: 48px; height: 48px; border-radius: var(--r-sm);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  cursor: pointer; display: grid; place-items: center; }
+.ovl-x .ic { width: 20px; height: 20px; color: var(--fog-800); }
+.nrow { display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: var(--touch-min); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.nrow .dot { margin-top: 7px; }
+.nrow-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrow-t { font-size: var(--fz-3); color: var(--fog-900); }
+.nrow-s { font-size: var(--fz-1); color: var(--fog-600); }
+.ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+
+/* ---------- 返回键：永远回「我的」，不在标签之间倒退 ----------
+   stage.js 对 `.actionbar > .backbtn` 有一套「先退阶段、退无可退才离开本页」的
+   逻辑 —— 那是给打印 / 扫描这类**多步工作台**的。本页三/四个标签是**并列分类**，
+   不是流程步骤：用户从 P23 直达「我的文档」后按返回，应当回「我的」，
+   而不是被送到「我的简历」再按两次。把返回键包一层，公共选择器不再命中，
+   返回就老老实实按 href 走。不改公共脚本，只在本页失效那条规则。 */
+.backwrap { flex: 0 0 auto; display: flex; }
+.actionbar .backwrap > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar .backwrap > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar .backwrap > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar .backwrap > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     2026-08-11 · 链接落地整改（Codex 复核 reviews-codex-2026-08-11.md (b) P0）
+     本页发出的 URL 参数契约 —— 谁该消费、消费不到时目标页该怎么办
+     --------------------------------------------------------------------------
+     总原则同 42：**记录页只负责把「哪一条」的身份传全；目标页解析不出来时必须停在
+     自己的第一步并说明原因，绝不许拿默认样例冒充用户点的那一条。**
+     记录页尤其吃这一条 —— 这一页每一行都是"具体某一条"，落到列表首屏就等于没落。
+
+     ① returnTo / returnStage / from（→ 03 身份门）**03 已接线，按它落地的格式发**
+        03-identity-gate.html?returnTo=<站内页面文件名>&returnStage=<阶段 slug>&from=P43
+        returnTo 只放**文件名**，阶段单独走 returnStage（03 的白名单 RET 按裸文件名建键，
+        整串带 ?stage= 会比不中白名单被丢掉）。43 在 RET 里登记的阶段名是
+        ai / fav / trace / notice，与本页四个标签一一对应。
+        03 已消费：命中白名单就改写门上的说明与跳过 / 登录两个出口；不认识就回首页
+        并说明原因（不回显原值），from=P43 是 returnTo 丢失时的兜底。
+
+     ② orderId（→ 42 我的资产 · 打印订单）
+        42-my-assets.html?stage=orders&orderId=O-xxxxxxxx-xxxx
+        42 已经在消费（applyDeepOrder：命中就展开 + 描边 + 顶部定位条；查不到照常全量列表）。
+
+     ③ fairId（→ 17 招聘会作战台）
+        17-fair-desk.html?stage=s1&fairId=<外部ID>&from=P43   打开这一场
+        17-fair-desk.html?stage=s4&fairId=<外部ID>&from=P43   打开这一场生成的作战单
+        17 应消费：按外部 ID 选中那一场。**本机场次库里没有这一场时停在 s1 并写明
+        「这一场不在本机场次库里」，不得默认选中第一场。**
+        2026-08-11 数据缺口已消除：本页原来的 FA-2026-08 / FA-2026-07 是本页自造的号，
+        在 17 的场次库里根本不存在（17 只有 RC-2026-0812-A / RC-2026-0815-M / XZ-2026-0820）。
+        化解办法是**记录页服从主页面**，不是往 17 里加两场（往主页面加条目＝凭空造数据）：
+          · 原 FA-2026-08「2026 年夏季综合招聘会 · 8 月 16 日 · 广交会 C 区」
+            → RC-2026-0812-A「2026 年秋季综合人才交流会 · 8 月 12 日 · 市人力资源市场 A 馆」
+              来源 市人力资源和社会保障局 · 同步 8 月 9 日 07:30（17 第 471–487 行）
+          · 原 FA-2026-07「高校毕业生专场招聘会 · 8 月 22 日 · 大学城」
+            → XZ-2026-0820「2026 届毕业生双选会（秋季首场）· 8 月 20 日 · 职业技术学院体育馆」
+              来源 省教育厅学生服务中心 · 同步 8 月 9 日 07:30（17 第 507–523 行）
+        17 第三场 RC-2026-0815-M（制造业专场）本页没有记录引用它，不强凑。
+        日期写法沿用本页的「8 月 12 日」空格排版（17 内部写「8月12日」），只是排版差异，值相同。
+
+     ④ companyId（→ 15 企业导览）
+        15-companies.html?stage=detail&companyId=<外部ID>&from=P43
+        契约来源：15 文件内 AI 接线注释已写明输入含 companyId。
+        15 应消费：按 ID 打开该企业详情；查不到就停在 list 并说明。
+
+     ⑤ policyId（→ 21 政策服务）
+        21-policy.html?stage=s2&policyId=<政策ID>&from=P43
+        s2 是「看缺口 / 政策与原文」，是"打开某一条政策看原文"的落点；
+        s1 是「选情况」，那是重新填一遍条件，不是打开这一条。
+        21 应消费：按 ID 展开那一条的原文；查不到就停在 s2 并说明本机政策库里没有它。
+        2026-08-11 数据缺口已消除：本页原来收藏 / 浏览 / 跳转三条都指
+        「高校毕业生一次性求职补贴（穗人社规〔2026〕3 号）」，该文号与该名称在 21 的
+        政策库里**都不存在**（21 只有 p1–p6，文号是「人社〔2026〕09 / 11 / 14 / 21 号」
+        与「人社财〔2026〕05 号」「穗社保〔2026〕02 号」那一套），policyId=SRSG-2026-3
+        也是本页自造、21 无法解析的号。按主页面口径改引 21 真实存在的 p1：
+          「一次性求职创业补贴」· 来源 市人社局 · 文号 人社〔2026〕14 号
+          （21 第 942 行 POL 数组 { id:'p1', t:'一次性求职创业补贴', org:'市人社局',
+            no:'人社〔2026〕14 号' }；21 第 1155 行渲染成「来源 市人社局 · 同步 8/9 07:30
+            · 文号 人社〔2026〕14 号」）
+        policyId 随之改为 `p1` —— 那是 21 唯一能解析的键；沿用自造的 SRSG-2026-3
+        等于让 21 永远查不到。同步时间随主页面改成 8 月 9 日 07:30。
+
+     ⑥ jobId（→ 14 线上岗位详情 / 44 线下岗位详情）
+        沿用 11 岗位匹配已在用的 jobId 命名，值取本页每一行「外部 ID」那一栏显示的号。
+
+     ⑦ artifactId（→ 09 / 20 / 22 查看产物）
+        产物 ID 口径见 interface-handoff.md §2A；本页写可读占位 ID（art-…），
+        与 42 同一份，接线时一起换成 art_… 真 ID。
+
+     ⑧ view（→ 23 我的）：23-me.html?view=settings，23 已在消费。
+
+     本页自己消费的 activityId（?stage=trace&activityId=A-…）是**本页足迹记录号**，
+     和上面那些业务对象 ID 不是一回事，不要混用。
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="ai" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="23-me.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">记</div>
+      <div>
+        <div class="brand-name">我的记录</div>
+        <div class="brand-sub">职易达 · 01 号机 · 只你自己看得到</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first device-off"><span class="dot dot--live"></span>记录服务正常</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 盘点不可用 · 记录正常</div>
+    <div class="clock" data-clock>2026年8月10日 <b>15:22</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="ai"><svg class="ic" style="width:17px;height:17px"><use href="#i-brain"/></svg>AI 服务记录</button>
+      <button class="stbtn" data-go="fav"><svg class="ic" style="width:17px;height:17px"><use href="#i-bookmark"/></svg>我的收藏</button>
+      <button class="stbtn" data-go="trace"><svg class="ic" style="width:17px;height:17px"><use href="#i-history"/></svg>浏览与跳转</button>
+      <button class="stbtn" data-go="notice"><svg class="ic" style="width:17px;height:17px"><use href="#i-bell"/></svg>通知与反馈</button>
+    </div>
+    <span class="rail-count">四类都是你留下的痕迹</span>
+  </div>
+
+  <div class="work work--list">
+    <!-- ═════════════════ 左：记录列表 ═════════════════ -->
+    <div class="wmain">
+
+      <!-- ───────── AI 服务记录 · 盘点（省掉自己回忆做过什么） ───────── -->
+      <div class="checks" data-at="ai">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">这个月你做完了诊断和优化，还差一次逐条比对</span>
+          <span class="t" data-when="first">登录后这里会盘点你用 AI 做过什么</span>
+          <span class="t" data-when="ai-down">本机这次不做盘点，记录都在下面</span>
+          <span class="s" data-when="default device-off">本月 6 次</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 次</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-check"/></svg>已做：简历诊断、优化、职业规划、参会作战单 <span class="ev ev--e1">E1 你的记录</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>下一步：拿 v3 和收藏的 3 个岗位逐条比 <span class="ev ev--e3">E3 建议 · 仅供参考</span></span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有账号就没有历史记录，这里不猜也不举例</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>盘点服务中断已自动上报；查看、打印、删除照常</span>
+        </div>
+      </div>
+
+      <!-- ───────── 我的收藏 · 聚类与失效提示（省掉逐条点开才发现没了） ───────── -->
+      <div class="checks" data-at="fav">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">你收的 3 个岗位要求相近，其中 1 条已下线</span>
+          <span class="t" data-when="first">登录后这里会替你归拢收藏并盯着失效</span>
+          <span class="t" data-when="ai-down">本机这次不做归拢，收藏都在下面</span>
+          <span class="s" data-when="default device-off">6 条 · 下线 1</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 条</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-alert"/></svg>「内容运营（新媒体）」<b>来源平台已下线</b>，别再按它准备 <span class="ev ev--e2">E2 来源状态</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>三条都要「运营 + 内容 + 社群」，一份简历够用 <span class="ev ev--e3">E3 建议 · 仅供参考</span></span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录时的收藏只留本次会话，离场即清</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>下线标记来自来源平台状态，不依赖 AI，照常显示</span>
+        </div>
+      </div>
+
+      <!-- ───────── 浏览与跳转 · 方向画像 + 本页唯一合规声明 ─────────
+           声明贴在画像正下方：用户看到"机器归纳了我在看什么"的同一屏，
+           就该看到这份归纳的边界。其余三个标签的声明在右栏，任一屏只一条。
+
+           ══ AI 接线契约 · P43-A「浏览足迹方向画像」════════════════════════════
+           输入：
+             · browseLogs   [{ id, kind:'job|fair|policy', title, dir, region, at }]
+             · jumpLogs     [{ id, targetOrg, at }] —— 只记「打开过来源平台」，
+               **不记投没投、投没投成**（合规红线：CLAUDE.md §10 / 本页页脚声明）
+             · 窗口：最近 14 天，仅本人；未登录时只有本次会话，走 first 态
+           输出：
+             · { summary: string, topDir: string, topRegion: string, counts:{...} }
+             · summary（"最近两周你主要在看运营方向，集中在天河区"）= **E3 · AI 判断**
+               —— 这是模型对行为的概括，2026-08-10 之前漏标，本轮补上
+             · counts（9 条里 5 条运营岗 / 打开过 4 次来源平台）= E1 你的记录（纯统计）
+           动作（省步骤，不止多一段话）：
+             · topDir / topRegion 直接做成「按这个方向接着找」→
+               13-jobs-desk.html?stage=ok&dir=<topDir>&region=<topRegion>
+               参数名对齐 13 自己的筛选组键（data-fgroup）；13 目前 0 处 URLSearchParams，
+               接线后即生效，按钮上已写明带去什么
+           降级：
+             · AI 不可用 → 标题换成「本机这次不做归纳，记录都在下面」，
+               summary 与动作一并隐藏；两个 Tab 与全部明细照常，页面完全可用
+             · 未登录（first）→ 不出画像也不举例，只说明"登录后这里会归纳"
+           ═══════════════════════════════════════════════════════════════════ -->
+      <div class="checks" data-at="trace">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <!-- 2026-08-10 AI 落实度审查整改：这一句是**模型对你行为的概括**，
+               原来一个 E 标都没有，反倒是下面那两条计数（纯统计）标了 E1 —— 标反了。
+               概括必须标 E3：它是归纳，不是记录本身。 -->
+          <span class="t" data-when="default device-off">最近两周你主要在看运营方向，集中在天河区
+            <span class="ev ev--e3">E3 · AI 判断 · 仅供参考</span></span>
+          <span class="t" data-when="first">登录后这里会归纳你最近在看哪个方向</span>
+          <span class="t" data-when="ai-down">本机这次不做归纳，记录都在下面</span>
+          <span class="s" data-when="default device-off">9 条足迹</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">9 条足迹</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>9 条里 5 条是运营岗、2 条招聘会、1 条政策 <span class="ev ev--e1">E1 你的记录</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>打开过 4 次来源平台，最近一次今天 10:20 <span class="ev ev--e1">E1 你的记录</span></span>
+        </div>
+        <!-- 2026-08-10 「只多一段话 → 能省步骤」整改：上面那句归纳原来读完就完了，
+             用户还得自己走到岗位台、自己把方向和区再筛一遍。归纳出的两项直接做成动作，
+             按 13 自己的筛选组键（dir / region）带过去。 -->
+        <a class="inlink" data-when="default device-off" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>按这个方向接着找：运营&nbsp;· 天河区</a>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录只留本次会话的足迹，离场即清</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>归纳服务中断已自动上报；两个 Tab 与明细照常</span>
+        </div>
+        <!-- 本页唯一一处合规声明（trace 标签版） -->
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>这份画像<b>仅本人可见</b>，不外传、不用于推荐给企业；本机只记你<b>打开过来源平台</b>，投没投、投没投成一律不记。</span>
+        </div>
+      </div>
+
+      <!-- ───────── 通知与反馈 · AI 只出工单草稿（省掉从头组织语言） ───────── -->
+      <div class="checks" data-at="notice">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-bell"/></svg>
+          <span class="t" data-when="default device-off">2 条未读：1 条打印完成、1 条文件到期提醒</span>
+          <span class="t" data-when="first">登录后打印完成、文件到期这类提醒会进这里</span>
+          <span class="t" data-when="ai-down">本机这次不做整理，消息和工单都在下面</span>
+          <span class="s" data-when="default device-off">7 条 · 未读 2</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">7 条</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>要提问题时，右栏已经替你起好一段工单摘要 <span class="ev ev--e3">E3 草稿 · 你可以改</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-shield"/></svg>草稿<b>不会自动提交</b>，按了「提交反馈」才发出去</span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <!-- A7：原文只说「留个手机号」，不说在哪留。指到那一格上。 -->
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>不登录也能提反馈；想收到回复，在「写一条反馈」里留个手机号（选填）</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>右栏的输入框照常可写，你直接描述就行</span>
+        </div>
+      </div>
+
+      <!-- ───────── 筛选条 / Tab ───────── -->
+      <div class="fbar" data-at="ai" data-when="default ai-down device-off" data-for="lw-ai">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="resume" aria-pressed="false">简历类 2</button>
+        <button class="fchip" data-sel="job" aria-pressed="false">岗位类 1</button>
+        <button class="fchip" data-sel="mock" aria-pressed="false">面试类 1</button>
+        <button class="fchip" data-sel="plan" aria-pressed="false">规划与参会 2</button>
+        <button class="fchip" data-sel="run" aria-pressed="false">处理中 0</button>
+        <span class="fbar-n" data-shown>显示 6 条</span>
+      </div>
+
+      <div class="fbar" data-at="fav" data-when="default ai-down device-off" data-for="lw-fav">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="job" aria-pressed="false">岗位 3</button>
+        <button class="fchip" data-sel="fair" aria-pressed="false">招聘会 2</button>
+        <button class="fchip" data-sel="policy" aria-pressed="false">政策 1</button>
+        <button class="fchip" data-sel="off" aria-pressed="false">已下线 1</button>
+        <button class="fchip" data-sel="company" aria-pressed="false">企业 0</button>
+        <span class="fbar-n" data-shown>显示 6 条</span>
+      </div>
+
+      <!-- 两个 Tab，与原型 71 一致：浏览记录 / 外部跳转记录 -->
+      <div class="fbar" data-at="trace" data-when="default ai-down device-off" data-for="lw-trace">
+        <button class="fchip" data-sel="browse" aria-pressed="true">浏览记录 5</button>
+        <button class="fchip" data-sel="jump" aria-pressed="false">外部跳转记录 4</button>
+        <button class="fchip" data-sel="none" aria-pressed="false">投递结果 0</button>
+        <span class="fbar-n" data-shown>显示 7 条</span>
+      </div>
+
+      <div class="fbar" data-at="notice" data-when="default ai-down device-off" data-for="lw-notice">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 7</button>
+        <button class="fchip" data-sel="unread" aria-pressed="false">未读 2</button>
+        <button class="fchip" data-sel="print" aria-pressed="false">打印 2</button>
+        <button class="fchip" data-sel="file" aria-pressed="false">文件 2</button>
+        <button class="fchip" data-sel="warn" aria-pressed="false">设备告警 0</button>
+        <span class="fbar-n" data-shown>显示 5 条</span>
+      </div>
+
+      <!-- ═══════════ AI 服务记录 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-ai" data-at="ai">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="resume">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断 · 行政专员版</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 9 日 10:05 · 任务 rt7f2a…c41d · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原指 09?stage=s5 =「版本与导出」，那是简历版本
+                   导出页，不是诊断报告。报告在第 3 步「诊断结论」，改指 s3 并带产物 ID
+                   （09 应按 ID 取这一份，取不到回 s1，不得显示示例结论）。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s3&amp;from=P43&amp;artifactId=art-rpt-v3"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的简历</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历诊断记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是什么</span><span class="v">时间 · 类型 · 任务号</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">简历原文 · 提示词 · 模型原始输出</span></div>
+                <div class="kv-row"><span class="k">删除会连带</span><span class="v">同任务的优化记录一并删</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="resume">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历优化 · 基于上一条诊断</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 9 日 10:18 · 同任务 rt7f2a…c41d · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 Codex 空白链接整改：原指 09-resume-workbench.html?stage=s6。
+                   简历工作台只有 s1–s5，s6 不存在 → 没有任何 data-at 命中 → **整页空白**。
+                   优化后的版本落在第 5 步「版本与导出」，改指 s5。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5&amp;from=P43&amp;artifactId=art-resume-v3"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历优化记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">产物在哪</span><span class="v">我的资产 · 我的简历 v3</span></div>
+                <div class="kv-row"><span class="k">AI 生成标识</span><span class="v">文件内已标 · 打印件每页一次</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">岗位匹配参考 · 用户运营专员</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 8 日 15:02 · 任务 jf20de…58b3 · 存至 11 月 6 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看对比（带这条岗位）</a>
+              <!-- 2026-08-11：「看这个岗位」是具体某一条，必须带外部 ID（契约 ⑥）。
+                   14 目前只有 JX-88214 这一条，裸链看着也对，但那是巧合不是接线。 -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-briefcase"/></svg>看这个岗位</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="岗位匹配记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">给的是什么</span><span class="v">三档参考 · 较高 / 中等 / 偏低</span></div>
+                <div class="kv-row"><span class="k">不给什么</span><span class="v">分数 · 百分比 · 录取预测</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="mock">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">模拟面试点评 · 运营岗中档</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 7 日 19:40 · 练了 8 题 · 作答原文从不保存</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="20-interview-pod.html?stage=s3&amp;from=P43&amp;artifactId=art-interview-0728"><svg class="ic"><use href="#i-eye"/></svg>查看点评</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印复盘单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="面试练习记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是什么</span><span class="v">只记「练过一次」与点评结论</span></div>
+                <div class="kv-row"><span class="k">你答的内容</span><span class="v">从不保存 · 练完即弃</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="plan">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">职业规划建议 · 阶段行动</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 5 日 09:20 · 任务 cp11f8…6a90 · 存至 11 月 3 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，默认落 22 s1「你现在会什么」——
+                   那是重做一遍规划的第一步。产物（行动清单）在第 3 步，改指 s3。 -->
+              <a class="btn btn--ghost" href="22-career-plan.html?stage=s3&amp;from=P43&amp;artifactId=art-plan-0805"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=material&amp;title=职业规划建议&amp;pages=4&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="职业规划记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">性质</span><span class="v">建议 · 仅供参考，不是承诺</span></div>
+                <div class="kv-row"><span class="k">产物在哪</span><span class="v">我的资产 · 我的文档</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="plan">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">招聘会参会作战单 · 秋季综合</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">8 月 3 日 14:30 · 任务 fv08ab…12c4 · 存至 11 月 1 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，默认落 17 s1「哪一场」——
+                   那是重新挑一场的第一步。这一条记录是**已经生成好的作战单**，
+                   落点是第 4 步「带走作战单」，并按契约 ③ 带上是哪一场。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s4&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="参会作战单记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">依据</span><span class="v">招聘会公开信息 + 你的简历</span></div>
+                <div class="kv-row"><span class="k">预约</span><span class="v">要预约请去官方入口办理</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <b>「<span data-empty-lb>处理中</span>」这一类现在没有记录</b>
+          <p>AI 任务一般几十秒就出结果，没有卡在处理中的。换一个筛选，或者去做一次新的。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 条</button>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">去做简历诊断</a>
+            <a class="btn btn--ghost" href="20-interview-pod.html">去练一次面试</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 记录留不下来</b>
+          <p>不登录也能用<b>全部 AI 功能</b>，只是这一栏的记录离场就清空。</p>
+          <div class="acts">
+            <!-- 2026-08-11 Codex 错配整改：原为裸链 —— 03 的门上说明与两个出口都写死
+                 招聘会上下文，从这里进门登录完会被送去招聘会作战台。补 returnTo（契约 ①）。 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=ai&amp;from=P43">扫码登录</a>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">先做简历诊断</a>
+            <a class="btn btn--ghost" href="25-advisor.html">问问 AI 顾问</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 我的收藏 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-fav" data-at="fav">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">用户运营专员 · 广州××科技</span>
+                  <span class="chip chip--azure is-static">岗位</span></span>
+                <span class="rrow-m">收藏于 8 月 8 日 21:40 · 6–9K · 天河区</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-target"/></svg>和简历比一比（带这条）</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">收藏记的是</span><span class="v">你标记过这一条，仅此而已</span></div>
+                <div class="kv-row"><span class="k">要办理</span><span class="v">去来源平台办理 · 详情页有扫码</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow rrow--off" data-g="job off">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">内容运营（新媒体）· 广州××文化</span>
+                  <span class="chip chip--coral is-static">已下线</span></span>
+                <span class="rrow-m">收藏于 8 月 7 日 16:22 · 来源平台已撤下</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="已下线的收藏"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">为什么点不开</span><span class="v">来源平台 8 月 9 日撤下了这条</span></div>
+                <div class="kv-row"><span class="k">本机能做的</span><span class="v">只如实标出来，不替它续命</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="job">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-agency"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">运营助理（可接受应届）</span>
+                  <span class="chip chip--amber is-static">线下机构</span></span>
+                <span class="rrow-m">收藏于 8 月 6 日 10:08 · 面议 · 到店咨询</span>
+                <span class="srcline"><span class="org">来源 广州××人力资源服务有限公司</span><span class="sep">·</span><span>同步 8 月 8 日 07:40</span><span class="sep">·</span><span>外部 ID OA-3312</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 Codex 错配整改：这一条是**线下机构**岗位（到店咨询、不接受线上投递），
+                   原来点开却是线上岗位详情 14-job-detail.html —— 那一页写的是外部投递链接与扫码投递，
+                   和这条岗位的办事方式对不上。线下岗位详情页 44 已存在，改指 44。 -->
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID（用本行显示的 OA-3312，
+                   与 13 岗位情报台、16 线下机构页一致）。
+                   2026-08-11 更新：44 岗位详情页原写 OA-3312-07，本轮已改为 OA-3312，
+                   这条深链带的号与落地页显示的号现在对得上了，契约不再是断的。
+                   残留（读文件，本轮不可改）：16 那一页机构详情用 OA-3312 指**这家机构**，
+                   而它自己的「在招岗位」里这条岗位写 OA-3312-07 —— 机构与岗位共号，
+                   需产品定编号规则，已在交回说明里单列。 -->
+              <a class="btn btn--ghost" href="44-job-detail-offline.html?jobId=OA-3312&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
+              <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>看这家机构</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">这条怎么办</span><span class="v">仅信息展示 · 到店当面咨询</span></div>
+                <div class="kv-row"><span class="k">带什么去</span><span class="v">简历打两份，本机可先打印</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fair">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2026 年秋季综合人才交流会</span>
+                  <span class="chip chip--amber is-static">招聘会</span></span>
+                <span class="rrow-m">收藏于 8 月 6 日 20:12 · 8 月 12 日 · 市人力资源市场 A 馆</span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：收藏的是**这一场**（外部 ID RC-2026-0812-A），
+                   原为裸链，落到作战台的默认场次 = 打开的是别人那一场。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印作战单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">要预约</span><span class="v">去官方入口办理 · 详情页有扫码</span></div>
+                <div class="kv-row"><span class="k">本机记的</span><span class="v">你打开过入口，不记你约没约</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fair">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-campus"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2026 届毕业生双选会（秋季首场）</span>
+                  <span class="chip chip--amber is-static">招聘会</span></span>
+                <span class="rrow-m">收藏于 8 月 4 日 09:36 · 8 月 20 日 · 职业技术学院体育馆</span>
+                <span class="srcline"><span class="org">来源 省教育厅学生服务中心</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID XZ-2026-0820</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：这一条是**毕业生双选会（XZ-2026-0820）**，
+                   和上一条秋季综合不是同一场，原来两条裸链落到的却是同一屏。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=XZ-2026-0820&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <a class="btn btn--ghost" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">入场</span><span class="v">限应届 · 需学信网核验 · 以官方公告为准</span></div>
+                <div class="kv-row"><span class="k">展位导览</span><span class="v">招聘会作战台里可看</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="policy">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">一次性求职创业补贴</span>
+                  <span class="chip chip--jade is-static">政策</span></span>
+                <span class="rrow-m">收藏于 8 月 2 日 11:05 · 申领指引</span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」—— 那是重新填一遍
+                   条件的第一步，不是打开这一条政策。打开某一条看原文的落点是 s2
+                   「看缺口 / 政策与原文」，并按契约 ⑤ 带政策 ID。 -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的政策"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">办理</span><span class="v">去官方渠道 · 本机只做信息入口</span></div>
+                <div class="kv-row"><span class="k">条件核对</span><span class="v">政策服务页可逐条对一遍</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-company"/></svg>
+          <b>还没有收藏过「<span data-empty-lb>企业</span>」</b>
+          <p>在企业导览里点收藏，这里就会出现。企业页只做<b>来源企业与岗位导览</b>。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 条</button>
+            <a class="btn btn--ghost" href="15-companies.html">去企业导览</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 收藏离场即清</b>
+          <p>没登录也能收藏，只是<b>只留本次会话</b>；要留着，先登录或把清单打印带走。</p>
+          <div class="acts">
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「我的收藏」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=fav&amp;from=P43">扫码登录</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+            <a class="btn btn--ghost" href="17-fair-desk.html">去招聘会作战台</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 浏览与跳转 · 列表（两个 Tab 共用一个列表容器） ═══════════ -->
+      <div class="lwrap" id="lw-trace" data-at="trace">
+        <!-- 深链定位条：?stage=trace&activityId=xxx 命中时才出现（.is-on 由页内脚本加）。
+             参数缺失或写错就不显示，足迹列表照常全量展示。 -->
+        <div class="deep" id="deep-trace" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <span class="deep-b">已按记录号 <span class="deep-id" data-deep-id>—</span> 定位到这一条，已展开在下面</span>
+          <button class="btn btn--ghost" type="button" data-deep-clear>看全部足迹</button>
+        </div>
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="browse" data-aid="A-20260810-1018">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">用户运营专员 · 广州××科技</span>
+                  <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
+                <span class="rrow-m">今天 10:18 · 停在详情页 · 记录号 A-20260810-1018</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：「回到这一条」是对某一条足迹的承诺，
+                   必须带外部 ID（契约 ⑥），不能靠"目标页碰巧只有这一条"。 -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-10 交接不带货整改：原为裸链。这一行的岗位（用户运营专员 / 外部 ID JX-88214）
+                   正是 11 白名单里的那一条，按 11 的契约 ?stage=s1&need=job&jobId=&jobTitle= 带过去，
+                   对面会替用户选好并直接进第 2 步逐条比对，省掉「到了再挑一次」。
+                   jobTitle 做 URL 编码，避免中文裸字符。 -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43"><svg class="ic"><use href="#i-target"/></svg>和简历比一比（带这条）</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记了什么</span><span class="v">打开过哪一条 · 什么时候</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">投递结果 · 本机拿不到也不该拿</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse" data-aid="A-20260810-1012">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-eye"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">内容运营（新媒体）· 广州××文化</span>
+                  <span class="chip chip--azure is-static">浏览 · 岗位</span></span>
+                <span class="rrow-m">今天 10:12 · 该条现已下线 · 记录号 A-20260810-1012</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">状态</span><span class="v">来源平台 8 月 9 日撤下</span></div>
+                <div class="kv-row"><span class="k">记录保留</span><span class="v">保留 · 但不假装它还在</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse" data-aid="A-20260810-0956">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2026 年秋季综合人才交流会</span>
+                  <span class="chip chip--amber is-static">浏览 · 招聘会</span></span>
+                <span class="rrow-m">今天 09:56 · 看了展位导览 · 记录号 A-20260810-0956</span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：这一条足迹是**秋季综合（RC-2026-0812-A）**，
+                   裸链落到作战台的默认场次，等于打开了另一场。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记了什么</span><span class="v">打开过这场招聘会 · 什么时候</span></div>
+                <div class="kv-row"><span class="k">没记什么</span><span class="v">预约结果 · 以官方入口为准</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse" data-aid="A-20260810-0948">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-company"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">广州××科技有限公司</span>
+                  <span class="chip is-static">浏览 · 企业</span></span>
+                <span class="rrow-m">今天 09:48 · 看了在招岗位 · 记录号 A-20260810-0948</span>
+                <!-- 2026-08-11 Codex 错配整改：这一行原来写「外部 ID CO-7781」，可 15 企业导览
+                     里同名企业「广州××科技有限公司」的外部 ID 是 CO-4471（列表行与详情页
+                     两处都是），全站只有本页在用 CO-7781 —— 是本页这条记录写错了号，
+                     写错的号让「回到这一条」永远查不到。按 15 的号改正。 -->
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID CO-4471</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 原为裸链 15-companies.html，落 list 默认态 = 一张企业列表，
+                   不是用户点的那一家。15 有 detail 阶段，按契约 ④ 带 companyId 直达。 -->
+              <a class="btn btn--ghost" href="15-companies.html?stage=detail&amp;companyId=CO-4471&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">企业页是什么</span><span class="v">来源企业与岗位导览</span></div>
+                <div class="kv-row"><span class="k">企业看得到吗</span><span class="v">看不到 · 记录只在你账号里</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="browse" data-aid="A-20260808-2032">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">一次性求职创业补贴</span>
+                  <span class="chip is-static">浏览 · 政策</span></span>
+                <span class="rrow-m">8 月 8 日 20:32 · 对过申领条件 · 记录号 A-20260808-2032</span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」——
+                   那是重新填条件，不是回到这一条政策。打开某一条看原文在 s2，按契约 ⑤ 带 policyId。 -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">条件核对</span><span class="v">你答的选项没有留在本机</span></div>
+                <div class="kv-row"><span class="k">办理</span><span class="v">去官方渠道 · 结果本机不跟踪</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump" data-aid="A-20260810-1020">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了前程无忧的岗位页</span>
+                  <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
+                <span class="rrow-m">今天 10:20 · 扫码在手机上打开 · 记录号 A-20260810-1020</span>
+                <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 8 月 8 日 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID -->
+              <a class="btn btn--ghost" href="14-job-detail.html?jobId=JX-88214&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="35-online-platforms.html"><svg class="ic"><use href="#i-external"/></svg>线上平台入口</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你在本机打开了来源入口</span></div>
+                <div class="kv-row"><span class="k">之后发生什么</span><span class="v">在来源平台上，本机看不到</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump" data-aid="A-20260810-0958">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了招聘会官方预约入口</span>
+                  <span class="chip chip--amber is-static">跳转 · 招聘会</span></span>
+                <span class="rrow-m">今天 09:58 · 扫码在手机上打开 · 记录号 A-20260810-0958</span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11：这条跳转记录对应的也是秋季综合（RC-2026-0812-A），按契约 ③ 带 fairId -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你打开了官方预约入口</span></div>
+                <div class="kv-row"><span class="k">约没约成</span><span class="v">以官方入口为准 · 本机不记</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump" data-aid="A-20260808-1530">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--azure"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了人才服务中心岗位页</span>
+                  <span class="chip chip--azure is-static">跳转 · 岗位</span></span>
+                <span class="rrow-m">8 月 8 日 15:30 · 扫码在手机上打开 · 记录号 A-20260808-1530</span>
+                <span class="srcline"><span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 8 月 8 日 08:52</span><span class="sep">·</span><span>外部 ID GZ-20418</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 交接不带货整改：原为裸链 13-jobs-desk.html —— 这条岗位已下线，
+                   「找相似」却什么条件都不带，用户到了岗位台还得从全量里自己筛。
+                   这一行看得出来的只有方向（岗位名里的「运营」），薪资与区没写在行上，
+                   所以只带 dir，不替这条编一个地区或薪资出来。
+                   参数名对齐 13 自己的筛选组键（data-fgroup="dir"）；13 目前 0 处
+                   URLSearchParams，接线后即生效，按钮上写明带去什么。 -->
+              <a class="btn btn--ghost" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;from=P43"><svg class="ic"><use href="#i-search"/></svg>找相似岗位（带方向：运营）</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">这条现状</span><span class="v">来源平台已撤下</span></div>
+                <div class="kv-row"><span class="k">记录</span><span class="v">如实保留 · 只记打开过</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="jump" data-aid="A-20260808-2040">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打开了补贴申领官方渠道</span>
+                  <span class="chip is-static">跳转 · 政策</span></span>
+                <span class="rrow-m">8 月 8 日 20:40 · 扫码在手机上打开 · 记录号 A-20260808-2040</span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11：同上，打开某一条政策看原文在 21 s2，按契约 ⑤ 带 policyId -->
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">记的是</span><span class="v">你打开了官方办理渠道</span></div>
+                <div class="kv-row"><span class="k">办没办成</span><span class="v">以官方渠道为准 · 本机不记</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>「<span data-empty-lb>投递结果</span>」本机永远是 0 条</b>
+          <p>这不是还没同步，是<b>设计上就不采集</b>：投没投、投没投成在来源平台那边，本机拿不到也不该拿。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>回到浏览记录</button>
+            <a class="btn btn--ghost" href="35-online-platforms.html">去线上平台自己查</a>
+            <!-- 2026-08-11：文案承诺的是「隐私与删除设置」，23 已在消费 ?view=，
+                 带 settings 才会落到账号设置那张卡；裸链只到「我的」首屏。 -->
+            <a class="btn btn--ghost" href="23-me.html?view=settings">看隐私与删除设置</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 足迹离场即清</b>
+          <p>没登录时的浏览与跳转<b>只留本次会话</b>，结束或超时就没了。</p>
+          <div class="acts">
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「浏览与跳转」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=trace&amp;from=P43">扫码登录</a>
+            <a class="btn btn--ghost" href="13-jobs-desk.html">去岗位情报台</a>
+            <!-- 2026-08-11 Codex (b) P2 第 12 条：「去政策服务」是**泛域入口**，不是某一条政策，
+                 按正式 IA（closed-loop-map）泛入口先落域首屏 P38，不直接进 21 的核对流程。 -->
+            <a class="btn btn--ghost" href="38-policy-hub.html">去政策服务</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 通知与反馈 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-notice" data-at="notice">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="unread print">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">打印完成 · 4 页已出纸</span>
+                  <span class="chip chip--jade is-static">未读</span></span>
+                <span class="rrow-m">8 月 9 日 10:23 · 请到出纸口取走并核对页数</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原来只到 orders 列表，用户还得在 6 条里自己找 ——
+                   同一栏下面「取件码 P-4172」那条早就带了 orderId，这一条漏了。
+                   这条通知对应的那一单：本页右栏 AI 反馈草稿写的就是
+                   「8 月 9 日 10:23，在打印工作台打『王同学_行政专员_简历.pdf』」，
+                   42 的订单里同一时刻同一文件的是 O-20260809-1023。按契约 ② 带上。
+
+                   2026-08-11 页数与时间对齐（订单主页面＝42）：
+                     · 原写「13 页」→ 改「4 页」。42 第 976 行该单明写「计费页数 4 页（2 页 × 2 份）」，
+                       同页「再打一份」深链也带 pages=2&copies=2，两处自洽；13 页在 42 里没有任何依据。
+                     · 原写「今天 10:23」→ 改「8 月 9 日 10:23」。本页时钟是 8 月 10 日 15:22，
+                       写「今天」等于把这一单说成 8 月 10 日；42 与本页反馈草稿都写 8 月 9 日 10:23。
+                       同一栏「取件码 P-4172 已生成」本来就写「8 月 9 日 10:20」，写法一致。
+                   未修（读文件，本轮不可改）：23-me.html 第 701、787 行仍写「13 页」，
+                   且 42 该单金额 ¥1.20 按 06 公示价 0.20 元/计费页折 6 计费页、与「4 页」对不上，
+                   两项都已在交回说明里单列，等产品定。 -->
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1023"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
+              <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">来自</span><span class="v">本机打印任务 · 非营销消息</span></div>
+                <div class="kv-row"><span class="k">通知去处</span><span class="v">只发到你的账号</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="unread file">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-alert"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">2 份敏感件将在 6 天后自动删除</span>
+                  <span class="chip chip--amber is-static">未读</span></span>
+                <span class="rrow-m">今天 09:00 · 要留就先打印带走</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-folder"/></svg>去我的文档</a>
+              <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">哪两份</span><span class="v">身份证复印件 · 证件照排版</span></div>
+                <div class="kv-row"><span class="k">为什么 7 天</span><span class="v">含身份证号 · 按敏感件算</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="fb">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">你的反馈已回复 · #F-2231</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 8 日 14:20 · 出纸偏慢 · 已排查</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- ══ 2026-08-11 「看本机状态」整改（Codex (b) P0 第 1 条）══════════════
+                   核过一遍：**全站没有一页在显示本机实时的纸量、粉量与队列**。最接近的
+                   实时读数在 06 打印工作台右栏那块「本机状态」面板（打印机在线/碳粉、
+                   A4 纸张 78%、扫描仪就绪），但它是打印流程里的侧栏、不是能被链过去的
+                   状态页 —— 把人送进 06 等于逼他为了看纸量开一笔新打印。
+                   04 的实际内容：s1 帮助（编号、位置、现场服务台、服务时间、**报修**、
+                   三个最常见卡点）；s6「本机状态与异常处置」是给运维复核与现场演示看的
+                   14 条状态样板，04 自己写明「不会改变这台机器现在的状态」。
+                   所以按第三种处置办：目标钉到 04 s1（求助与报修真在那儿），
+                   文案不再承诺纸、墨、队列。这一条工单说的就是出纸偏慢，落到求助页对得上。 -->
+              <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">处理说明</span><span class="v">已清理走纸通道 · 观察中</span></div>
+                <div class="kv-row"><span class="k">还能补充</span><span class="v">右栏写一条，会并进这个工单</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="benefit">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+              <span class="rrow-b">
+                <!-- 2026-08-11 口径改：单位由「张」改「次」。后端核销语义是
+                     「一次免掉一整单，额度扣 1」，对应免单券而不是页数/张数额度；
+                     24 权益页同口径（「免费打印 · 每月 3 次」「一张券免掉一整单」）。
+                     次数、上限与适用范围全部由后台下发，页面不写死。 -->
+                <span class="rrow-tl"><span class="rrow-t">权益到账 · 免费打印 2 次</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 8 日 10:12 · 8 月 31 日到期</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="24-benefits.html"><svg class="ic"><use href="#i-ticket"/></svg>去我的权益</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">怎么用</span><span class="v">打印结算时自动抵扣 · 一次免掉一整单</span></div>
+                <div class="kv-row"><span class="k">用在哪</span><span class="v">适用范围由后台下发 · 结算页显示能不能用</span></div>
+                <div class="kv-row"><span class="k">过期</span><span class="v">到期作废 · 不折现</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="sys">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-gear"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">终端维护预告 · 8 月 20 日凌晨</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 7 日 09:00 · 02:00–04:00 暂停服务</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 「看本机状态」整改，理由同上一条。维护预告要的是"到时候找谁"，
+                   04 s1 的现场服务台与服务时间正好答这个。 -->
+              <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">影响</span><span class="v">这两小时不能打印扫描</span></div>
+                <div class="kv-row"><span class="k">建议</span><span class="v">要打的提前打 <span class="ev ev--e2">E2 设备事实</span></span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="file">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">扫描完成 · 3 页已存进我的文档</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 9 日 09:52 · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-folder"/></svg>去我的文档</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件</span><span class="v">纸质简历扫描_0809.pdf</span></div>
+                <div class="kv-row"><span class="k">期限</span><span class="v">一般文档 90 天</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="print">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-package"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">取件码 P-4172 已生成</span>
+                  <span class="chip is-static">已读</span></span>
+                <span class="rrow-m">8 月 9 日 10:20 · 7 天内凭码取件或复打</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10：「看这一单」原来只打开订单列表，用户还得在 6 条里自己找。
+                   这条通知对应的就是取件码 P-4172 那一单（8 月 9 日 10:20 · 活动资料_秋季综合.pdf），
+                   带上 orderId 直接定位；P42 那边找不到这个单号时会照常显示整张列表。 -->
+              <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1020"><svg class="ic"><use href="#i-printer"/></svg>看这一单</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">对应订单</span><span class="v">O-20260809-1020 · 活动资料_秋季综合.pdf</span></div>
+                <div class="kv-row"><span class="k">怎么用</span><span class="v">向现场工作人员出示这串码</span></div>
+                <div class="kv-row"><span class="k">失效</span><span class="v">出纸完成或 7 天后自动失效</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>近期没有「<span data-empty-lb>设备告警</span>」发给你</b>
+          <p>缺纸、卡纸、离线这类告警只在真的发生时才发，本机不发营销消息。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 7 条</button>
+            <!-- 2026-08-11 「本机状态」整改，理由见上面工单行的长注释 -->
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43">求助与报修</a>
+            <a class="btn btn--ghost" href="42-my-assets.html?stage=orders">看打印订单</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 通知跟着账号走</b>
+          <!-- A7：承诺落到实处 —— 手机号那一格就在「写一条反馈」里，选填，不填也能提交。 -->
+          <p>不登录也能提反馈：在「写一条反馈」里<b>留个手机号（选填）就收得到回复</b>，不填也能提交，只是收不到。<br>通知要登录后才收得到。</p>
+          <div class="acts">
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「通知与反馈」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=notice&amp;from=P43">扫码登录</a>
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P43">求助与报修</a>
+            <a class="btn btn--ghost" href="25-advisor.html">找 AI 顾问问问</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────── 各标签出口 ───────── -->
+      <div class="xlane" data-at="ai">
+        <span class="xlane-hd">盘点之外，这三处能接着做</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <!-- 2026-08-10 交接不带货整改：带上收藏里那条在招的岗位（JX-88214），到对面不用再挑 -->
+          <a class="xlane-go" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
+              <span class="xlane-ds">带去：用户运营专员&nbsp;· 直接进逐条比对</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="20-interview-pod.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">面试训练舱</span>
+              <span class="xlane-ds">按岗位方向再练一轮</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="42-my-assets.html?stage=resume">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">我的简历</span>
+              <span class="xlane-ds">产物都在资产那一页</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="fav">
+        <span class="xlane-hd">收藏之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <!-- 2026-08-10 交接不带货整改：收藏那条在招岗位的方向与区就在行上（运营 · 天河区），带过去 -->
+          <a class="xlane-go" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
+              <span class="xlane-ds">带去：运营&nbsp;· 天河区（接线后自动生效）</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="17-fair-desk.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">招聘会作战台</span>
+              <span class="xlane-ds">现场面对面 · 可先打简历</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=job-list&amp;title=收藏清单&amp;pages=1&amp;copies=1">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印收藏清单</span>
+              <span class="xlane-ds">带去：收藏 6 条&nbsp;· 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 未登录时收藏只在本次会话里，条数不属于账号，出口退回从选文件开始。
+               2026-08-11：文案写「从选文件开始」，href 却是 s3 参数核价，自相矛盾；改指 s1。 -->
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s1&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="trace">
+        <span class="xlane-hd">看过的之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <!-- 2026-08-10 交接不带货整改：这一栏顶上的画像归纳的就是「运营方向 · 集中在天河区」，
+               出口带上这两项，用户不用到对面再筛一遍（13 接线后生效） -->
+          <a class="xlane-go" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位情报台</span>
+              <span class="xlane-ds">带去：运营&nbsp;· 天河区（接线后自动生效）</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="35-online-platforms.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">线上平台入口</span>
+              <span class="xlane-ds">本机收不到的自己搜</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-11：卡面写「账号设置里可整段清」，就该落到账号设置那张卡；
+               23 已在消费 ?view=，带 settings。 -->
+          <a class="xlane-go" href="23-me.html?view=settings">
+            <span class="src-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">隐私与删除</span>
+              <span class="xlane-ds">账号设置里可整段清</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="notice">
+        <span class="xlane-hd">消息之外，这三处能直接处理</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="42-my-assets.html?stage=orders">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印订单</span>
+              <span class="xlane-ds">取件码与复打都在这</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="42-my-assets.html?stage=docs">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">我的文档</span>
+              <span class="xlane-ds">到期的先打印带走</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-11 「本机状态」整改（Codex (b) P0 第 1 条）：
+               这张卡原来承诺「纸墨队列与故障上报」，可 04 打开是求助页，04 自己也写明
+               它列的是异常长什么样、不是这台机器现在的状态。全站没有实时纸/粉/队列的
+               落地页（最接近的是 06 打印台右栏的本机状态面板，不是独立页）。
+               卡面改成 04 s1 真正给得出的东西：现场服务台、服务时间、报修、常见卡点。 -->
+          <a class="xlane-go" href="04-system-states.html?stage=s1&amp;from=P43">
+            <span class="src-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">求助与报修</span>
+              <span class="xlane-ds">现场服务台 · 报修方式 · 三个最常见卡点</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 常驻合规声明（每个标签一条，2026-08-11 从右栏移到正文，不随抽屉收起。
+           trace 标签的那一条本来就在左栏画像下，这里不重复。） -->
+      <div class="compline" data-at="ai">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>本机只做<b>信息入口与材料服务</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+      </div>
+      <div class="compline" data-at="fav">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>岗位与招聘会只做<b>第三方与官方来源信息入口</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+      </div>
+      <div class="compline" data-at="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>通知与反馈只关联<b>你自己的服务记录</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+      </div>
+    </div>
+
+    <!-- ═════════════════ 右：口径 / 工单 → 按需抽屉（2026-08-11）═════════════════ -->
+    <div class="wside" id="p43side">
+      <div class="sidehd">
+        <span class="t" data-at="ai">统计与口径</span>
+        <span class="t" data-at="fav">收藏口径</span>
+        <span class="t" data-at="trace">足迹口径</span>
+        <span class="t" data-at="notice">工单与写反馈</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
+      </div>
+
+      <!-- ---------- AI 服务记录 ---------- -->
+      <div class="pane" data-at="ai">
+        <div class="pane-hd"><span class="t">本月 AI 使用</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">简历类</span>
+            <span class="v" data-when="default ai-down device-off">2 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">岗位类</span>
+            <span class="v" data-when="default ai-down device-off">1 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">面试类</span>
+            <span class="v" data-when="default ai-down device-off">1 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">规划与参会</span>
+            <span class="v" data-when="default ai-down device-off">2 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="ai">
+        <div class="pane-hd"><span class="t">记录里存什么</span><span class="s">元数据而已</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">存</span><span class="v">时间 · 类型 · 任务号 · 状态</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">简历原文与诊断正文</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">提示词与模型原始输出</span></div>
+          <div class="kv-row"><span class="k">不存</span><span class="v">面试作答原文</span></div>
+          <div class="kv-row"><span class="k">留存</span><span class="v">90 天 · 到期自动清理</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="ai">
+        <div class="pane-hd"><span class="t">删除会连带什么</span><span class="s">删了就没了</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">删诊断记录</span><span class="v">同任务的优化记录一并删</span></div>
+          <div class="kv-row"><span class="k">删除要</span><span class="v">点两次 · 第二次才真删</span></div>
+          <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+          <div class="kv-row"><span class="k">日志不含</span><span class="v">记录内容与文件名全称</span></div>
+        </div>
+        <!-- 2026-08-11：合规声明已移到正文常驻（.compline），不在抽屉里重复。 -->
+      </div>
+
+      <!-- ---------- 我的收藏 ---------- -->
+      <div class="pane" data-at="fav">
+        <div class="pane-hd"><span class="t">收藏分布</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">岗位</span>
+            <span class="v" data-when="default ai-down device-off">3 条 · 1 条已下线</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">招聘会</span>
+            <span class="v" data-when="default ai-down device-off">2 场</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">政策</span>
+            <span class="v" data-when="default ai-down device-off">1 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">来源</span><span class="v v--fog">来源与外部 ID 在每条上</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="fav">
+        <div class="pane-hd"><span class="t">已下线怎么办</span><span class="s">如实标出来</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">本机做的</span><span class="v">标灰 · 写明撤下时间</span></div>
+          <div class="kv-row"><span class="k">本机不做的</span><span class="v">不替它续命、不推荐替代岗</span></div>
+          <div class="kv-row"><span class="k">你能做的</span><span class="v">找相似岗位或取消收藏</span></div>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么收藏会失效</summary>
+          <div class="fold-b">岗位与招聘会都是<b>第三方与官方来源</b>的信息，招满、下架、改期都由来源方决定。
+            本机每天同步，同步到撤下就立刻标出来，不留着假装还能投。</div>
+        </details>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="fav">
+        <div class="pane-hd"><span class="t">收藏记的是什么</span><span class="s">一个书签</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">记</span><span class="v">你标记过这一条 · 什么时候</span></div>
+          <div class="kv-row"><span class="k">不记</span><span class="v">你投没投、约没约</span></div>
+          <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方看不到</span></div>
+          <div class="kv-row"><span class="k">取消收藏</span><span class="v">点两次 · 只删书签不删岗位</span></div>
+          <div class="kv-row"><span class="k">失效标记</span><span class="v">来源撤下就标灰 · 不动你的书签</span></div>
+          <div class="kv-row"><span class="k">状态多久更新</span><span class="v">跟着来源同步 · 每天一次</span></div>
+          <div class="kv-row"><span class="k">收藏上限</span><span class="v">没有上限 · 多了用上面的筛选</span></div>
+        </div>
+        <!-- 2026-08-11：合规声明已移到正文常驻（.compline），不在抽屉里重复。 -->
+      </div>
+
+      <!-- ---------- 浏览与跳转（合规声明在左栏画像下，这里不重复） ---------- -->
+      <div class="pane" data-at="trace">
+        <div class="pane-hd"><span class="t">足迹统计</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">浏览</span>
+            <span class="v" data-when="default ai-down device-off">5 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">打开来源入口</span>
+            <span class="v" data-when="default ai-down device-off">4 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">最近一次</span>
+            <span class="v" data-when="default ai-down device-off">今天 10:20</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">留存</span><span class="v">90 天 · 到期自动清理</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="trace">
+        <div class="pane-hd"><span class="t">这条记录里有什么</span><span class="s">逐项列出来</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">有</span><span class="v">打开了哪一条 · 什么时候</span></div>
+          <div class="kv-row"><span class="k">有</span><span class="v">从本机哪个入口打开的</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">投递结果 · 来源平台那边的事</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">预约结果 · 以官方入口为准</span></div>
+          <div class="kv-row"><span class="k">没有</span><span class="v">停留时长与鼠标轨迹</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="trace">
+        <div class="pane-hd"><span class="t">这些记录归你</span><span class="s">随时能清</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">谁能看</span><span class="v">只有你 · 来源方与企业看不到</span></div>
+          <div class="kv-row"><span class="k">怎么清</span><span class="v">账号设置里整段删</span></div>
+          <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+          <div class="kv-row"><span class="k">什么时候写</span><span class="v">打开详情、打开来源入口各一条</span></div>
+          <div class="kv-row"><span class="k">不参与</span><span class="v">排序与推荐都不用这份记录</span></div>
+          <div class="kv-row"><span class="k">导出</span><span class="v">本机不做导出 · 可逐条打印带走</span></div>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么还要留这份记录</summary>
+          <div class="fold-b">为了你自己回头找得到 —— 一体机上看过就走，第二天想不起是哪一条。
+            这份记录只给你自己用，不参与任何排序或推荐。</div>
+        </details>
+        <div class="panel-note" style="margin:auto 0 0">在账号设置里可以一次清空浏览与跳转记录。</div>
+      </div>
+
+      <!-- ---------- 通知与反馈 ---------- -->
+      <div class="pane" data-at="notice">
+        <div class="pane-hd"><span class="t">反馈工单</span><span class="s">2 件</span></div>
+        <!-- 工单行可点：点了把「补充 #F-xxxx：」填进右下输入框（原型 22 的
+             「可补充描述」同一件事，只是不再单开一页）。不做假的工单详情页。 -->
+        <button class="tkt" type="button" data-tkt="#F-2231"><svg class="ic" style="width:20px;height:20px;color:var(--amber-400)"><use href="#i-alert"/></svg>
+          <span class="tkt-b"><span class="tkt-t">出纸偏慢 · #F-2231</span>
+            <span class="tkt-s">打印服务 · 8 月 8 日 · 已回复 · 点这里补充</span></span></button>
+        <button class="tkt" type="button" data-tkt="#F-2244"><svg class="ic" style="width:20px;height:20px;color:var(--fog-600)"><use href="#i-clock"/></svg>
+          <span class="tkt-b"><span class="tkt-t">扫描预览显示建议 · #F-2244</span>
+            <span class="tkt-s">文件处理 · 8 月 6 日 · 处理中 · 点这里补充</span></span></button>
+      </div>
+
+      <div class="pane pane--fill pane--grow" data-at="notice">
+        <div class="pane-hd"><span class="t">写一条反馈</span><span class="s" data-when="default device-off">AI 起草 · 你可改</span><span class="s" data-when="first ai-down">你自己写</span></div>
+        <div class="fbar" style="margin-bottom:10px">
+          <button class="fchip" data-cat aria-pressed="false">设备使用</button>
+          <button class="fchip" data-cat aria-pressed="true">打印服务</button>
+          <button class="fchip" data-cat aria-pressed="false">文件处理</button>
+          <button class="fchip" data-cat aria-pressed="false">一般建议</button>
+        </div>
+        <div class="draft">
+          <textarea id="fb-box" aria-label="反馈描述">8 月 9 日 10:23，在打印工作台打「王同学_行政专员_简历.pdf」，2 份黑白 A4，出纸比平时慢约 1 分钟，页数与内容都对。</textarea>
+          <div class="draft-act">
+            <button class="btn btn--ghost" type="button" data-draft="fill"><svg class="ic"><use href="#i-brain"/></svg>用 AI 起草的这段</button>
+            <button class="btn btn--ghost" type="button" data-draft="clear"><svg class="ic"><use href="#i-close"/></svg>清空自己写</button>
+          </div>
+          <div class="panel-note" style="margin-left:0" data-when="default device-off">
+            这段是 AI 按你今天的打印单起的草稿 <span class="ev ev--e3">E3 草稿 · 你可以改</span>，<b>不会自动提交</b>。
+          </div>
+          <div class="panel-note" style="margin-left:0" data-when="ai-down">起草服务中断，输入框照常可写，直接描述就行。</div>
+          <!-- A7：这一格就是页面三处「留个手机号」指的那个地方。只在未登录时出现 ——
+               登录状态下回复会进「通知」，再要一次手机号是多收一份个人信息。 -->
+          <div class="fbph" data-when="first">
+            <label class="fbph-lb" for="fb-phone">手机号<span>选填</span></label>
+            <input class="fbph-in" id="fb-phone" type="tel" inputmode="numeric" maxlength="11"
+                   placeholder="11 位手机号" aria-describedby="fb-phone-note">
+          </div>
+          <div class="panel-note" style="margin-left:0" id="fb-phone-note" data-when="first">
+            <b>不填也能提交</b>，工单照常受理；只是未登录时通知跟着账号走，本机没有别的路径把结果发给你。<br>
+            填了就<b>只用于回复这一条工单</b>：不做营销、不与浏览与跳转记录关联、办结后删除。
+          </div>
+          <button class="btn btn--primary" type="button" data-submit><svg class="ic"><use href="#i-check"/></svg>提交反馈</button>
+          <div class="panel-note" style="margin-left:0">原型稿 · 提交后由运营受理，结果会进上面的通知。</div>
+        </div>
+        <!-- 2026-08-11：notice 标签的合规声明已移到正文常驻（.compline），这里不重复。 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 删除 / 取消收藏 确认层 ══════════ -->
+  <div class="ovl" id="ovl-del" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-trash"/></svg><b>确认删除？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t" id="del-what">将删除：一条记录 ×1</span>
+          <span class="nrow-s">为防旁人看到 · 此处不显示名称全称</span></span></div>
+      <div class="notice">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>删除后不可恢复；会留一条删除日志（谁删的、什么时候、删了几个），<b>日志不含记录内容</b>。</span>
+      </div>
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
+        <button class="btn btn--commit" type="button" data-close>确认删除</button>
+        <!-- 2026-08-11：「原型稿 · …」是给评审看的实现备注，不是给站在机器前的人看的。
+             产品视图（?capture=1）里不渲染，评审视图仍在。 -->
+        <span class="panel-note proto-only" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="backwrap"><a class="backbtn" href="23-me.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a></div>
+    <div class="actionbar-hint">
+      <div data-at="ai">
+        <div data-when="default device-off"><div class="t">本月 6 次 AI 服务 · 下一步是逐条比对</div><div class="s">只存元数据，不存简历原文与模型输出</div></div>
+        <div data-when="first"><div class="t">未登录 · 记录留不下来</div><div class="s">AI 功能不受影响</div></div>
+        <div data-when="ai-down"><div class="t">盘点暂不可用 · 记录照常</div><div class="s">查看、打印、删除都不受影响</div></div>
+      </div>
+      <div data-at="fav">
+        <div data-when="default device-off"><div class="t">6 条收藏 · 1 条来源平台已下线</div><div class="s">收藏只是书签 · 办理去来源平台或官方入口</div></div>
+        <div data-when="first"><div class="t">未登录 · 收藏离场即清</div><div class="s">要留着先登录，或把清单打印带走</div></div>
+        <div data-when="ai-down"><div class="t">归拢暂不可用 · 收藏照常</div><div class="s">下线标记来自来源状态，不依赖 AI</div></div>
+      </div>
+      <div data-at="trace">
+        <div data-when="default device-off"><div class="t">9 条足迹 · 只记动作不记结果</div><div class="s">仅本人可见 · 不外传、不用于推荐给企业</div></div>
+        <div data-when="first"><div class="t">未登录 · 足迹离场即清</div><div class="s">浏览与跳转都不跟着账号走</div></div>
+        <div data-when="ai-down"><div class="t">方向归纳暂不可用 · 明细照常</div><div class="s">两个 Tab 与每条来源信息都在</div></div>
+      </div>
+      <div data-at="notice">
+        <!-- 2026-08-11 A6：原文「反馈工单 1 件处理中」——本页右栏那张卡写的是「2 件」，
+             两个数字并排放在同一屏上，读起来就是打架（其实 1 件说的是"处理中"的那一件，
+             但没人有义务替页面做这道推理）。改成一次把总数与在办数说清。
+             **生产由服务端下发，前端不得各写各的**：未读数与工单数只有一个来源
+             （blockers.md B6 的工单接口），23「我的」那张卡读同一份，不许各写各的。 -->
+        <div data-when="default device-off"><div class="t">2 条未读 · 反馈工单 2 件（1 件处理中）</div><div class="s">草稿不会自动提交 · 按了提交才发出去</div></div>
+        <div data-when="first"><div class="t">未登录 · 收不到通知</div><div class="s">反馈仍可提交，留手机号才收得到回复</div></div>
+        <div data-when="ai-down"><div class="t">起草暂不可用 · 反馈照常提交</div><div class="s">输入框可写，消息与工单都在</div></div>
+      </div>
+    </div>
+
+    <!-- 抽屉开关：统计口径、工单与「写一条反馈」都在里面（2026-08-11 从常驻右栏改过来）。
+         按标签换文案，notice 标签直接写「写一条反馈」，用户不用猜里面是什么。 -->
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="ai" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>统计与口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="fav" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>收藏口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="trace" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-layers"/></svg>足迹口径</button>
+    <button class="btn btn--lg btn--ghost sidebtn" data-at="notice" type="button" data-side-open aria-expanded="false" aria-controls="p43side"><svg class="ic"><use href="#i-pen"/></svg>写一条反馈</button>
+
+    <a class="btn btn--lg btn--ghost" data-at="ai" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>去我的资产</a>
+    <a class="btn btn--lg btn--ghost" data-at="fav" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>按企业看</a>
+    <!-- 2026-08-11：带 view=settings 才落到账号设置那张卡（23 已在消费 ?view=） -->
+    <a class="btn btn--lg btn--ghost" data-at="trace" href="23-me.html?view=settings"><svg class="ic"><use href="#i-shield"/></svg>隐私与删除</a>
+    <!-- 2026-08-11 「查看本机状态」整改，理由见 notice 出口卡上的长注释 -->
+    <a class="btn btn--lg btn--ghost" data-at="notice" href="04-system-states.html?stage=s1&amp;from=P43"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+
+    <a class="btn btn--primary" data-at="ai" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;jobId=JX-88214&amp;jobTitle=%E7%94%A8%E6%88%B7%E8%BF%90%E8%90%A5%E4%B8%93%E5%91%98&amp;from=P43">去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="fav" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="trace" href="13-jobs-desk.html?stage=ok&amp;dir=%E8%BF%90%E8%90%A5&amp;region=%E5%A4%A9%E6%B2%B3%E5%8C%BA&amp;from=P43">接着找运营岗<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="notice" type="button" data-submit>提交这条反馈<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* 标签选中态同步（?stage=fav 直达进来也是选中的，用户不用再点一次） */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  /* 不认识的 ?stage= 兜底：stages.js 会照单全收地把 data-stage 设成任意字符串，
+     于是 42-my-assets.html?stage=typo 会渲染成**一片空白**（没有任何 data-at 命中）。
+     外部链接写错一个字母就白屏，代价太大。这里把取值收敛到白名单，
+     不认识就落回第一个标签。 */
+  var VALID = ['ai', 'fav', 'trace', 'notice']
+  if (VALID.indexOf(scr.getAttribute('data-stage')) < 0) {
+    if (window.v3Stage) window.v3Stage(VALID[0])
+    else { scr.setAttribute('data-stage', VALID[0]); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P43 本页交互：条目展开 / 筛选与 Tab / 标为已读 / 删除二次确认 / 反馈草稿
+   --------------------------------------------------------------------------
+   与原型手势一致：Tab 就是原型 71 的两个 f-chip；通知的「已读 / 删除」还在
+   条目行内；反馈仍是「选分类 + 写描述 + 按提交」三步。
+   两条不能松的口径：
+     · 「投递结果 0」这一档不是"暂时没有"，是**设计上就不采集**，
+       所以它的空态写的是原因，不是"稍后再试"。
+     · AI 草稿只填进输入框，**绝不代你提交**；提交必须你自己按。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var DRAFT = '8 月 9 日 10:23，在打印工作台打「王同学_行政专员_简历.pdf」，' +
+              '2 份黑白 A4，出纸比平时慢约 1 分钟，页数与内容都对。'
+
+  function applyFilter (bar, sel) {
+    var wrap = document.getElementById(bar.getAttribute('data-for'))
+    if (!wrap) return
+    var chips = bar.querySelectorAll('.fchip[data-sel]')
+    var i
+    for (i = 0; i < chips.length; i++) {
+      chips[i].setAttribute('aria-pressed', chips[i].getAttribute('data-sel') === sel ? 'true' : 'false')
+    }
+    var rows = wrap.querySelectorAll('.rrow')
+    var n = 0
+    for (i = 0; i < rows.length; i++) {
+      var g = String(rows[i].getAttribute('data-g') || '').split(/\s+/)
+      var ok = (sel === 'all') || g.indexOf(sel) > -1
+      rows[i].style.display = ok ? '' : 'none'
+      if (ok) n++
+    }
+    wrap.classList.toggle('is-empty', n === 0)
+    var cnt = bar.querySelector('[data-shown]')
+    if (cnt) cnt.textContent = n ? ('显示 ' + n + ' 条') : '这一类没有记录'
+    var lb = wrap.querySelector('[data-empty-lb]')
+    var cur = bar.querySelector('.fchip[aria-pressed="true"]')
+    if (!n && lb && cur) lb.textContent = cur.textContent.replace(/\s*\d+\s*$/, '').replace(/记录$/, '').trim()
+  }
+
+  /* 初始化：按每条筛选条上已选中的那一档先过滤一次。
+     trace 的两个 Tab 默认停在「浏览记录」—— 不初始化的话，
+     跳转记录会和浏览记录混在一张列表里，Tab 就成了摆设。 */
+  ;[].forEach.call(scr.querySelectorAll('.fbar[data-for]'), function (b) {
+    var cur = b.querySelector('.fchip[aria-pressed="true"]')
+    if (cur) applyFilter(b, cur.getAttribute('data-sel'))
+  })
+
+  /* ── 足迹深链：?stage=trace&activityId=xxx ───────────────────────────────
+     足迹一屏 9 条、还分「浏览 / 跳转」两个 Tab，只把标签切过去等于让用户自己找。
+     命中就展开那一条 + 描边；如果它在另一个 Tab 里，**先把 Tab 切过去**，
+     否则筛选会把它藏起来，深链看着像失效。
+     参数缺失、写错、或那条不在本机就什么都不做，列表照常全量显示 ——
+     不为一个查询参数把列表清空，也不编一条不存在的记录。 */
+  var deepBar = document.getElementById('deep-trace')
+
+  function clearDeep () {
+    var i, rs = scr.querySelectorAll('.rrow.is-target')
+    for (i = 0; i < rs.length; i++) rs[i].classList.remove('is-target')
+    if (deepBar) deepBar.classList.remove('is-on')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  function applyDeepActivity () {
+    var q, aid, row, hd, bar, g
+    try { q = new URLSearchParams(location.search) } catch (err) { return }
+    aid = (q.get('activityId') || '').trim()
+    if (!aid) return
+    row = scr.querySelector('.rrow[data-aid="' + aid.replace(/"/g, '') + '"]')
+    if (!row) return                        // 找不到就当没传
+    g = String(row.getAttribute('data-g') || '').split(/\s+/)[0]
+    bar = scr.querySelector('.fbar[data-for="lw-trace"]')
+    if (bar && g && bar.querySelector('.fchip[data-sel="' + g + '"]')) applyFilter(bar, g)
+    row.classList.add('is-open', 'is-target')
+    hd = row.querySelector('.rrow-hd')
+    if (hd) hd.setAttribute('aria-expanded', 'true')
+    if (deepBar) {
+      var lab = deepBar.querySelector('[data-deep-id]')
+      if (lab) lab.textContent = aid
+      deepBar.classList.add('is-on')
+    }
+    if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' })
+  }
+
+  applyDeepActivity()
+
+  scr.addEventListener('click', function (e) {
+    var hd = e.target.closest('.rrow-hd')
+    if (hd) {
+      var row = hd.closest('.rrow')
+      var open = row.classList.toggle('is-open')
+      hd.setAttribute('aria-expanded', open ? 'true' : 'false')
+      return
+    }
+    var chip = e.target.closest('.fchip[data-sel]')
+    if (chip) { applyFilter(chip.closest('.fbar'), chip.getAttribute('data-sel')); return }
+    /* 反馈分类：单选，与原型 22 的 opt-group 同一手势 */
+    var cat = e.target.closest('.fchip[data-cat]')
+    if (cat) {
+      var sibs = cat.closest('.fbar').querySelectorAll('.fchip[data-cat]')
+      for (var s = 0; s < sibs.length; s++) sibs[s].setAttribute('aria-pressed', 'false')
+      cat.setAttribute('aria-pressed', 'true')
+      return
+    }
+    var rst = e.target.closest('[data-reset]')
+    if (rst) {
+      var wrap2 = rst.closest('.lwrap')
+      var bar2 = scr.querySelector('.fbar[data-for="' + (wrap2 && wrap2.id) + '"]')
+      /* trace 没有「全部」，回到默认 Tab「浏览记录」 */
+      if (bar2) applyFilter(bar2, bar2.getAttribute('data-for') === 'lw-trace' ? 'browse' : 'all')
+      return
+    }
+    /* 深链定位条上的「看全部足迹」：撤掉高亮，回到普通列表 */
+    var dc = e.target.closest('[data-deep-clear]')
+    if (dc) { clearDeep(); return }
+    /* 标为已读：只改这一条的状态，不代你处理别的 */
+    var rd = e.target.closest('[data-read]')
+    if (rd) {
+      var r2 = rd.closest('.rrow')
+      var tag = r2 && r2.querySelector('.chip')
+      if (tag) { tag.textContent = '已读'; tag.className = 'chip is-static' }
+      if (r2) r2.setAttribute('data-g', String(r2.getAttribute('data-g') || '').replace(/\bunread\b/, '').trim())
+      rd.setAttribute('aria-disabled', 'true')
+      return
+    }
+    /* AI 草稿：只填进输入框，绝不代你提交 */
+    var df = e.target.closest('[data-draft]')
+    if (df) {
+      var box = document.getElementById('fb-box')
+      if (box) { box.value = df.getAttribute('data-draft') === 'fill' ? DRAFT : ''; box.focus() }
+      return
+    }
+    /* 补充已有工单：把工单号填进同一个输入框，仍然要你自己按提交 */
+    var tk = e.target.closest('[data-tkt]')
+    if (tk) {
+      var box2 = document.getElementById('fb-box')
+      if (box2) { box2.value = '补充 ' + tk.getAttribute('data-tkt') + '：'; box2.focus() }
+      return
+    }
+    var del = e.target.closest('[data-del]')
+    if (del) {
+      var o = document.getElementById('ovl-del')
+      var what = document.getElementById('del-what')
+      if (what) what.textContent = '将删除：' + del.getAttribute('data-del') + ' ×1'
+      if (o) o.hidden = false
+      return
+    }
+    var cl = e.target.closest('[data-close]')
+    if (cl) {
+      var ov = cl.closest('.ovl')
+      if (ov) ov.hidden = true
+    }
+  })
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return
+    var os = document.querySelectorAll('.ovl')
+    for (var i = 0; i < os.length; i++) os[i].hidden = true
+  })
+})()
+
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var bs = document.querySelectorAll('[data-side-open]')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  /* 「提交这条反馈」的输入框在抽屉里。抽屉关着就按提交，等于让人提交一段
+     自己看不见的文字 —— 先把抽屉打开，让他看清再按。捕获阶段拦截，
+     所以要早于下面那个真正的提交处理器。 */
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-submit]') && !sc.classList.contains('is-side')) {
+      e.stopPropagation(); e.preventDefault(); set(true)
+    }
+  }, true)
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

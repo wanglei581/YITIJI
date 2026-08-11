@@ -64,6 +64,51 @@
 .gate-body { flex:1 1 auto; min-height:0; overflow-y:auto; padding:0 var(--s-6) var(--s-6);
   display:flex; flex-direction:column; gap:var(--s-4); }
 
+/* ── returnTo 条（2026-08-10 补 / 2026-08-11 真正接上参数）─────────────
+   身份门是**打断**，所以它必须带着「你刚才在哪一步」进来，
+   并且**每一个出口都回到那一步**。上一版三个选项按下去无处可去 ——
+   用户被拦下、给了手机号，然后被丢在原地，这是最伤人的一种断链。
+
+   2026-08-11：上一版只是把这句话写在注释里，代码根本没读 URL ——
+   本页说明与两个出口全部硬编码成「招聘会 · 第 4 步」。于是 42/43 的
+   9 条「扫码登录」点进来，用户在「我的记录」里登录，登完被扔到招聘会作战台。
+   现在真的读参数了，见页尾脚本；本条默认渲染的是**没有来源**那一态，
+   JS 认领成功才升级 —— 失败方向永远是「承认不知道」，不是「猜一个」。 */
+.retbar { flex:0 0 auto; margin:0 var(--s-6) var(--s-5);
+  display:flex; align-items:flex-start; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.retbar > .ic { width:22px; height:22px; flex:0 0 auto; color:var(--jade-500); margin-top:2px; }
+/* 没有可识别来源时的皮肤：颜色必须和「一切正常」区分开 ——
+   青色底 + 路线图标会让人以为门后面接得上，而此刻恰恰接不上。 */
+.retbar--warn { background:var(--amber-a12); border-color:var(--amber-a20); }
+.retbar--warn > .ic { color:var(--amber-400); }
+.retbar-b { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.retbar-t { font-size:var(--fz-4); color:var(--fog-900); }
+.retbar-t b { font-weight:700; }
+.retbar-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+.retbar-s b { color:var(--fog-900); }
+.retcode { display:inline-block; margin-top:4px; padding:2px 9px; border-radius:var(--r-xs);
+  background:var(--fog-a08); color:var(--fog-700);
+  font-family:var(--ff-num); font-size:var(--fz-1); letter-spacing:.02em; }
+
+/* ── 「这一步不用 AI」常驻说明（2026-08-10 补）────────────────────────────
+   全站 AI 落实度审计的唯一一条：本页是**没有 AI、也没说自己没有 AI** 的那一页。
+   用户在别的页面刚被 AI 读过材料、给过结论，走到这道门时会默认「它又在算什么」——
+   在公共场所要手机号的这一步，这份默认最伤人。所以这句必须：
+     · **常驻**，不挂 data-when="ai-down"。挂上去就只有 AI 挂掉时才说，
+       等于「平时确实在用 AI，只是没告诉你」—— 那比不写还糟；
+     · 说清**不用 AI 做什么**（不判断、不打分、不留材料），
+       而不是只写「本页无 AI」这种自说自话；
+     · 顺带把出口再说一遍：验完回到你刚才那一步。 */
+.noai { flex:0 0 auto; margin:0 var(--s-6) var(--s-5);
+  display:flex; align-items:flex-start; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--fog-a04); border:1px dashed var(--brd-2); }
+.noai > .ic { width:20px; height:20px; flex:0 0 auto; color:var(--fog-600); margin-top:3px; }
+.noai-b { min-width:0; font-size:var(--fz-2); color:var(--fog-700); line-height:1.65; }
+.noai-b b { color:var(--fog-900); }
+
 /* 三个选项：同样大小、同样醒目 */
 .ways { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-4); }
 .way { text-align:left; padding:var(--s-5); border-radius:var(--r-md); cursor:pointer;
@@ -78,6 +123,41 @@
 .way--on .way-ic { background:var(--jade-a20); }
 .way--on .way-ic .ic { color:var(--jade-400); }
 .way-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+
+/* ── SQ 扫码登录（2026-08-11 补，此前整屏不存在）───────────────────────
+   左边码、右边话。码给到 196px 是有依据的：用户站在约 60cm 外用手机扫，
+   码太小要凑近，而这是一台立式机器，凑近意味着弯腰。 */
+.qrwrap { display:grid; grid-template-columns:288px 1fr; gap:var(--s-6); align-items:start; }
+.qrpane { display:flex; flex-direction:column; gap:var(--s-3); align-items:center;
+  padding:var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.qrbox { position:relative; padding:var(--s-4); border-radius:var(--r-sm); background:var(--paper-000);
+  line-height:0; }
+/* 过期时把码压灰并盖一条明字 —— 只置灰不写字，用户会以为是自己手机的问题 */
+.screen[data-qr="expired"] .qrbox svg { opacity:.16; filter:grayscale(1); }
+.qrbox-x { position:absolute; inset:auto 0 50% 0; transform:translateY(50%);
+  text-align:center; font-size:var(--fz-5); font-weight:700; color:var(--coral-600);
+  /* .qrbox 为了贴合 svg 设了 line-height:0，这行盖字会继承成 0 高 ——
+     实测「已过期」三个字量出来高度是 0，等于没写。 */
+  line-height:1.4; padding:6px 0; background:rgba(255,255,255,.92); }
+.qrbox-cap { font-size:var(--fz-1); color:var(--fog-600); text-align:center; line-height:1.6; }
+.qrbox-cap b { color:var(--fog-700); }
+
+.qrside { display:flex; flex-direction:column; gap:var(--s-4); min-width:0; }
+.qrst { display:flex; gap:var(--s-4); align-items:flex-start;
+  padding:var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.qrst-dot { width:12px; height:12px; border-radius:50%; flex:0 0 auto; margin-top:7px;
+  background:var(--fog-600); }
+.qrst--live { background:var(--jade-a12); border-color:var(--jade-a32); }
+.qrst--live .qrst-dot { background:var(--jade-400); animation:qrpulse 1.6s var(--ease-in-out) infinite; }
+.qrst--warn { background:var(--amber-a12); border-color:var(--amber-a20); }
+.qrst--warn .qrst-dot { background:var(--amber-400); }
+@keyframes qrpulse { 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+.qrst-b { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.qrst-t { font-size:var(--fz-5); color:var(--fog-900); }
+.qrst-s { font-size:var(--fz-3); color:var(--fog-700); line-height:1.66; }
+.qrst-s b { color:var(--fog-900); }
 .way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
 /* 手机号输入：公共场所要打码 */
@@ -104,7 +184,7 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<div class="screen" data-state="default" data-stage="s1" data-qr="wait" data-theme="warm">
 
   <div class="grain"></div>
 
@@ -120,23 +200,96 @@
   <div class="gate">
 
     <div class="gate-hd">
-      <div class="gate-h" data-at="s1">要把这份文件留下来吗？</div>
+      <div class="gate-h" data-at="s1">要把这次做的东西留下来吗？</div>
+      <div class="gate-h" data-at="sq">用手机扫这个码</div>
       <div class="gate-h" data-at="s2">输入手机号</div>
+      <div class="gate-h" data-at="s3">登录好了</div>
 
+      <!-- 这一句原来写死「你刚生成的赶场作战单」—— 从「我的记录」进来的人根本没生成过
+           作战单。现在句子本身**不认领任何具体产物**：本页读不到你做了什么，也不该假装读到。
+           来源页名由页尾脚本按登记表填进 #gate-src（只填页名，不填任务名，理由见脚本注释）。 -->
       <div class="gate-p" data-at="s1">
-        你刚生成的<b>赶场作战单</b>可以直接打印带走 —— 这个<b>不用登录</b>。<br>
+        你在<b id="gate-src">刚才那一页</b>里要办的事，<b>不用登录也能办完</b>，包括打印带走。<br>
         只有想让它<b>留在账号里、换台机器还能取</b>，才需要下面三选一。
+      </div>
+      <div class="gate-p" data-at="sq">
+        手机号和验证码都在<b>你自己手机上</b>完成，<b>不出现在这块屏幕上</b>。<br>
+        扫完还要在手机上<b>点一下确认</b> —— 那一步做完才算登录。
       </div>
       <div class="gate-p" data-at="s2">
         用来给你发一条验证码，<b>只验一次</b>。<br>
         本机<b>不用它推销、不卖给第三方、不给任何合作机构</b>。
       </div>
+      <div class="gate-p" data-at="s3">
+        尾号 <b>8000</b> 已经是你的账号。<br>
+        <b>现在回到你刚才那一步接着办</b> —— 已经做好的不用重来。
+      </div>
+    </div>
+
+    <!-- returnTo：把「你刚才在哪一步」一直显示在门上，两个出口都回到那里。
+         **HTML 里写死的是「没有可识别来源」那一态**（失败态当默认）：
+         这样即使脚本没跑、参数没带、参数被拒，页面也只会承认自己不知道，
+         绝不会像上一版那样凭空说出一个「招聘会 · 第 4 步」。 -->
+    <div class="retbar retbar--warn" id="retbar">
+      <svg class="ic" id="retbar-ic"><use href="#i-alert"/></svg>
+      <span class="retbar-b">
+        <span class="retbar-t" id="retbar-t"><b>这条链接没有可识别的来源页</b></span>
+        <span class="retbar-s" id="retbar-s">
+          本机不知道你刚才在哪一步，<b>也不替这条链接猜一个</b>。
+          登录照样能完成，但两个出口都只能<b>回首页</b>。<br>
+          要回到原来那一步：请回到刚才那一页，在那里重新点「扫码登录」。
+        </span>
+      </span>
+    </div>
+
+    <!-- ═══ 这一步不用 AI（常驻，三个阶段、四种态都在）═══════════════════
+         ⚠ 位置刻意放在 .gate-hd / .retbar 之后、.gate-body 之前：
+         身份门的三个阶段各有各的 body，说明句跟着任一 body 走都会在别的阶段消失。
+         挂在弹层骨架上才是「常驻」。同理它**没有** data-when ——
+         四态共用一句，AI 挂没挂掉都不改变「这一步本来就不用 AI」这个事实。
+
+         ── 接线契约（交 Codex）·「不用 AI」不是一句文案，是一条要守住的实现约束 ──
+         · 需要的输入：phone（手机号，仅 S2 输入）、code（6 位验证码）、
+                       returnTo（被打断的页与阶段，来自 URL ?returnTo=）。
+         · 输出结构：{ ok: boolean, sessionToken?: string, maskedPhone: string,
+                       returnTo: string }。**不返回任何模型字段**
+                       （无 score / tier / suggestion / risk），前端也不许给它留位置。
+         · 调用的服务：只有短信验证码下发与校验两个端点；
+                       **不得**在本页调用任何 /ai/* 端点，也不得把手机号、
+                       returnTo 或本次会话里的简历内容送进任何模型上下文。
+         · 失败 / 不可用怎么降级：
+             － 验证码下发失败 / 校验不通过 → 停在 S2 并给出具体原因；
+               「先不登录，继续办理」这条出口**在任何失败下都必须仍然可点**；
+             － 短信通道整体不可用 → 本页降级为「扫码登录 + 不登录」两条路，
+               不弹「稍后重试」把用户堵在门里；
+             － AI 服务不可用（四态里的 ai-down）→ **本页不降级、不提示**：
+               它本来就不依赖 AI，为它加一句「AI 不可用」反而是在暗示平时会用。
+         · 幂等与留存：同一 returnTo 重复进门只产生一次登录；
+           手机号只作账号标识，不进任何模型训练或推荐链路。 -->
+    <div class="noai">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="noai-b">
+        <b>这一步不用 AI。</b>只做手机号验证与回跳 ——
+        <b>不判断你适不适合什么岗位、不给你打分、不读你的简历</b>，
+        也不会把你在别的页面做过的东西送进任何模型。<br>
+        验完就回到你刚才那一步；选「先不登录」也一样回去。
+      </span>
     </div>
 
     <!-- ─────────── S1 三选一 ─────────── -->
     <div class="gate-body" data-at="s1">
+      <!-- 2026-08-11 修：这三张卡原来**不是选择**。
+           「手机扫码」没有 data-go，点下去什么都不发生；「继续」按钮永远 data-go="s2"，
+           不管点哪张都去输手机号 —— 也就是说**扫码登录这条路从入口到页面完全不存在**。
+           实测三次点击：手机扫码 → 阶段停在 s1、无任何变化。
+
+           为什么自检没抓到：`假入口` 检查专门跳过 <button> 标签
+           （它查的是「看着像按钮的 span/div」），所以「真按钮但没接线」正好在盲区里。
+           回归台已补「死按钮」检查。
+
+           现在：三张卡是真的单选（data-way），「继续」按选中的那条走。 -->
       <div class="ways">
-        <button class="way">
+        <button class="way" data-way="qr">
           <span class="way-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="way-t">手机扫码</span>
           <span class="way-s">
@@ -145,7 +298,7 @@
           </span>
         </button>
 
-        <button class="way" data-go="s2">
+        <button class="way" data-way="phone">
           <span class="way-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
           <span class="way-t">输手机号</span>
           <span class="way-s">
@@ -154,7 +307,7 @@
           </span>
         </button>
 
-        <button class="way way--on">
+        <button class="way way--on" data-way="skip">
           <span class="way-ic"><svg class="ic"><use href="#i-user"/></svg></span>
           <span class="way-t">不登录，继续用</span>
           <span class="way-s">
@@ -179,6 +332,102 @@
     </div>
 
     <!-- ─────────── S2 输手机号 ─────────── -->
+    <!-- ═══ SQ 扫码登录 ═══════════════════════════════════════════════════
+         2026-08-11 补。此前这一屏**完全不存在** —— 三选一里的「手机扫码」是个
+         死按钮，点下去阶段停在 s1。所有者提出「扫码登录怎么没有」之后实测确认。
+
+         这一屏要解决的真实问题，s1 上已经写明：**大厅里人多的时候，
+         号码不该出现在这块屏幕上**。所以扫码登录不是「多一种方式」，
+         它是隐私更好的那一种，在人多时应当被优先选。
+
+         ── 二维码状态轴 data-qr：wait / scanned / expired ──────────────
+         三种状态屏上给的话完全不同，不能只画一个码了事：
+           wait    码已出，等你扫 —— 要给有效期，不给用户就不知道能等多久
+           scanned 手机已经扫到了，等你在手机上按确认 —— 这一步最容易卡住，
+                   用户以为扫完就完事了，屏幕必须明说「还要在手机上点一下」
+           expired 码过期了 —— 必须能一键换一个，不能让人退出去重进
+
+         ── 接线契约（交 Codex）────────────────────────────────────────
+         · 端点：`/member/qr-login create` 出码、`claim` 认领（生产已存在）。
+         · 出码请求要带 returnTo，认领成功后由服务端把会话与 returnTo 绑定，
+           **不要**把 returnTo 塞进二维码内容里 —— 二维码会被旁人拍走。
+         · 码必须**短时效、一次一码**；过期后 create 出新码，旧码立即作废。
+         · 轮询 claim 状态；**没拿到确认之前，屏幕不许显示「登录成功」**。
+         · 二维码内容不含手机号、不含会话令牌明文；它只是一个一次性凭据的取件号。
+         · 失败降级：出码失败 → 本屏明说「码出不来」并把「改用输手机号」做成主按钮，
+           不要把人堵在空屏前。整个短信通道挂掉时反过来（见 noai 注释里的降级口径）。
+         · 这一步同样**不用 AI**，不得调用任何 /ai/* 端点。 -->
+    <div class="gate-body" data-at="sq">
+      <div class="qrwrap">
+        <div class="qrpane">
+          <!-- 设计稿里这是占位图形。按 45 页已定的口径：假码必须标明扫不出东西，
+               不能标成「有效」——用户在大厅里举着手机扫半天扫不出来，
+               只会以为自己手机坏了。 -->
+          <div class="qrbox" aria-hidden="true">
+            <svg viewBox="0 0 100 100" width="196" height="196">
+              <rect x="0" y="0" width="100" height="100" fill="var(--paper-000)"/>
+              <g fill="var(--ink-100)">
+                <rect x="6" y="6" width="22" height="22"/><rect x="12" y="12" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="72" y="6" width="22" height="22"/><rect x="78" y="12" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="6" y="72" width="22" height="22"/><rect x="12" y="78" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="36" y="10" width="6" height="6"/><rect x="48" y="10" width="6" height="6"/>
+                <rect x="36" y="22" width="6" height="6"/><rect x="54" y="22" width="6" height="6"/>
+                <rect x="10" y="36" width="6" height="6"/><rect x="22" y="36" width="6" height="6"/>
+                <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/>
+                <rect x="64" y="40" width="6" height="6"/><rect x="76" y="36" width="6" height="6"/>
+                <rect x="40" y="52" width="6" height="6"/><rect x="58" y="52" width="6" height="6"/>
+                <rect x="76" y="52" width="6" height="6"/><rect x="36" y="64" width="6" height="6"/>
+                <rect x="52" y="64" width="6" height="6"/><rect x="70" y="64" width="6" height="6"/>
+                <rect x="40" y="76" width="6" height="6"/><rect x="58" y="76" width="6" height="6"/>
+                <rect x="76" y="76" width="6" height="6"/><rect x="64" y="88" width="6" height="6"/>
+              </g>
+            </svg>
+            <span class="qrbox-x" data-qr="expired">已过期</span>
+          </div>
+          <span class="qrbox-cap">示意码 · 设计稿占位，<b>扫不出东西</b><br>
+            生产由服务端下发，<b>短时效、一次一码</b></span>
+        </div>
+
+        <div class="qrside">
+          <div class="qrst" data-qr="wait">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">等你扫</b>
+              <span class="qrst-s">用手机相机或微信扫一扫对准左边的码。<br>
+                这个码 <b data-site-time="qr">5 分钟</b>内有效，过期可以换一个。</span></span>
+          </div>
+          <div class="qrst qrst--live" data-qr="scanned">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">手机已经扫到了</b>
+              <span class="qrst-s"><b>还要在你手机上点一下「确认登录」</b> ——
+                这一步最容易漏，扫完不等于登录完。<br>
+                手机上没弹出来？把手机解锁看看，或者换「输手机号」。</span></span>
+          </div>
+          <div class="qrst qrst--warn" data-qr="expired">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">这个码过期了</b>
+              <span class="qrst-s">为了安全，码只在短时间内有效。<br>
+                按下面的<b>换一个码</b>可以立刻再出一个，不用退出去重进。</span></span>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>号码不出现在这块屏幕上。</b>手机号、验证码都在你自己手机上完成，
+              旁边的人看不到。<br>
+              这块屏幕上只有这个码 —— 它<b>不含你的手机号，也不含登录凭证</b>，
+              别人拍走也用不了。</span>
+          </div>
+
+          <div class="kv">
+            <div class="kv-row"><span class="k">码有效期</span><span class="v" data-site-time="qr">5 分钟</span></div>
+            <div class="kv-row"><span class="k">过期了怎么办</span><span class="v">按「换一个码」，旧码立即作废</span></div>
+            <div class="kv-row"><span class="k">扫不出来怎么办</span><span class="v">改用「输手机号」，功能完全一样</span></div>
+            <div class="kv-row"><span class="k">手机没网怎么办</span><span class="v">改用「输手机号」，短信不走这台机器的网</span></div>
+            <div class="kv-row"><span class="k">这个码能给别人扫吗</span><span class="v v--fog">不能 · 一次一码，谁扫谁登录</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="gate-body" data-at="s2">
       <div class="phone">
         <svg class="ic" style="width:26px;height:26px;color:var(--fog-600)"><use href="#i-phone"/></svg>
@@ -209,25 +458,72 @@
       </div>
     </div>
 
+    <!-- ─────────── S3 验证通过 · 回到被打断的那一步 ─────────── -->
+    <div class="gate-body" data-at="s3">
+      <div class="kv">
+        <div class="kv-row"><span class="k">账号</span><span class="v">手机号 · 尾号 8000</span></div>
+        <div class="kv-row"><span class="k">这次做的东西</span><span class="v">能留到账号里，换台机器还能取</span></div>
+        <div class="kv-row"><span class="k">回到哪一步</span><span class="v" id="ret-kv">首页 · 这条链接没有可识别的来源页</span></div>
+        <div class="kv-row"><span class="k">要重做吗</span><span class="v v--fog">不用 · 刚才做好的还在</span></div>
+      </div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>登录只多了一件事：<b>文件能存到账号里</b>。
+              功能没有因此多解锁，也<b>不会因为你登录了就开始给你推东西</b>。</span>
+      </div>
+
+      <div class="notice notice--amber">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span><b>原型稿说明：</b>真机上到这一步之前还要输 6 位验证码，验证通过才会到这里 ——
+              本页演示的是<b>「验完之后回到哪」</b>，不是把验证跳过去。</span>
+      </div>
+    </div>
+
     <!-- 底部：合规与退路 + 操作。
          弹层的操作按钮放在弹层里，不放页面级 ActionBar ——
-         页面级那条属于背后被打断的那一页，此刻不该由它承接弹层的操作。 -->
+         页面级那条属于背后被打断的那一页，此刻不该由它承接弹层的操作。
+         2026-08-10：两个出口都写成真链，都指回 returnTo ——
+         「先不登录，继续办理」三态常驻（游客是平等选项，不是次等选项），
+         「继续办理 · 回到刚才那一步」在验证通过后出现。 -->
     <div class="gate-foot">
       <svg class="ic" style="width:22px;height:22px;color:var(--fog-600);flex:0 0 auto"><use href="#i-shield"/></svg>
       <span class="t" data-at="s1">
         无论选哪个，本机都<b>不代收简历、不代为投递</b>。
-        登录只影响文件存不存得下来。
+        登录只影响文件存不存得下来 —— <b id="foot-s1">两个出口都回首页</b>。
+      </span>
+      <span class="t" data-at="sq">
+        扫不出来、手机没网、或者不想用手机，<b>改用「输手机号」功能完全一样</b>。<br>
+        随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉。
       </span>
       <span class="t" data-at="s2">
-        随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉，
-        只是留不到账号里。
+        随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉，只是留不到账号里。
+        <b id="foot-s2">登录后回首页。</b>
+      </span>
+      <span class="t" data-at="s3">
+        账号只用来存文件。<b>「不登录」那条路一直开着</b> —— 想退出，在「我的」里一键退。
       </span>
 
       <span style="margin-left:auto;flex:0 0 auto;display:flex;gap:var(--s-3)">
-        <button class="btn btn--lg btn--ghost" data-at="s1">先不登录，继续用</button>
         <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">返回 · 改用扫码</button>
+        <!-- sq 的三个出口。「换一个码」只在过期态出现 —— 码还没过期时给这个按钮，
+             等于鼓励用户乱按，反而制造「我是不是该换一个」的犹豫。 -->
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-go="s1">返回 · 换一种方式</button>
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-qr="expired" id="qr-again">换一个码</button>
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-go="s2">改用输手机号</button>
+        <!-- 出口①：先不登录继续办理（s1/s2 常驻）。
+             href 与文案都由页尾脚本按 returnTo 改写；HTML 里写的是没有来源时的兜底。 -->
+        <a class="btn btn--lg btn--ghost" data-at="s1 sq s2" id="exit-skip"
+           href="01-home-v6.html?from=P03&amp;login=skip"><span id="exit-skip-t">先不登录 · 回首页</span></a>
+        <!-- s3 的独立退路。默认 display:none：没有返回目标时主按钮本身就是回首页，
+             两条并排等于同一件事说两遍。脚本认领到真实返回目标后才放出来。 -->
+        <a class="btn btn--lg btn--ghost" data-at="s3" id="exit-home" style="display:none"
+           href="01-home-v6.html">回首页</a>
         <button class="btn btn--primary" data-at="s1" data-go="s2">继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-        <button class="btn btn--primary" data-at="s2">发送验证码<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+        <button class="btn btn--primary" data-at="s2" data-go="s3">发送验证码<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+        <!-- 出口②：登录后继续办理，回到 returnTo 那一步（同样由脚本改写） -->
+        <a class="btn btn--primary" data-at="s3" id="exit-ok"
+           href="01-home-v6.html?from=P03&amp;login=ok"><span id="exit-ok-t">回首页接着用</span><svg class="ic"><use href="#i-arrowRight"/></svg></a>
       </span>
     </div>
 
@@ -237,9 +533,383 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   全站「登录门返回契约」· P03 收件端（2026-08-11）
+   --------------------------------------------------------------------------
+   修的是什么：Codex 复核 (b)§2 —— 42/43 等 9 条「扫码登录」进的是裸
+   03-identity-gate.html；本页从不读任何返回目标，页面说明与两个出口
+   全部硬编码 17-fair-desk?stage=s4。结果是：用户在「我的记录」里点登录，
+   登完被扔到招聘会作战台第 4 步。门把人拦下来，又把人放错地方。
+
+   ── 链接格式（42 / 43 / 17 等来源页按这个拼）─────────────────────────
+     03-identity-gate.html
+       ?returnTo=<站内页面文件名>   例：43-my-records.html
+       &returnStage=<阶段 slug>     可选，例：trace / docs / s4
+       &from=P43                    来源标识（P + 页号）
+
+   ── 谁负责编码 / 解码（和 42/43 那一路的约定，就是这一段）─────────────
+     · **发送方**（42/43/17…）：三个值一律走 encodeURIComponent 再拼进 URL。
+       这三个值的合法字符集是 [A-Za-z0-9._-]，encodeURIComponent 对它们是
+       恒等变换 —— 所以「照拼」和「编码后拼」写出来的字符串一模一样，
+       两边不会因为编码口径不同而对不上。约定成「一律编码」是为了让来源页
+       不必判断值里有没有特殊字符，少一个容易忘的分支。
+     · **接收方**（本页）：用 URLSearchParams.get() 取值（自带百分号解码），
+       解码后再做白名单比对。**白名单比对永远发生在解码之后** ——
+       先比后解会被 %34%33-my-records.html 这类写法绕过去。
+     · 来源页**不需要**把页名、步骤名、任务名写进 URL；写了本页也不采纳，
+       理由见下面「② 为什么文案不从 URL 取」。
+
+   ── ① 白名单：returnTo 只认本机登记过的页面文件名 ─────────────────────
+     照 06 打印台那套（SRC 表 + 不认识就不认领）来。判据是
+     hasOwnProperty(RET, returnTo)，不是「以 .html 结尾」也不是「不含 http」——
+     后两种都能被绕：`//evil.example/x.html` 不含 http 也不含冒号，
+     却是协议相对 URL，浏览器会当成站外地址跳出去。
+     只有登记表里那几十个键能通过，别的一律回首页并明说。
+
+   ── ② 为什么页名、步骤名不从 URL 取 ──────────────────────────────────
+     06 那边吃过的亏：title 不受白名单约束，于是一条 URL 就能在公共机器上
+     渲染出一份根本不存在的材料回执。**登录门比打印台更危险** ——
+     这一页正要用户输手机号。如果「你刚才在办：」后面的字来自 URL，
+     前一个人留一条 `?...&label=实名认证 · 请按提示输入身份证号` 的链接，
+     下一个人看到的就是一句本机署名的诈骗指令。
+     所以：**URL 只能选择「回哪一页」，不能决定「屏幕上写什么字」。**
+     页名与步骤名一律从下面的 RET 表里取，那是本机自己写死的文本。
+
+   ── ③ 被拒的值不回显 ─────────────────────────────────────────────────
+     不认识的 returnTo 只说「不认识」，不把原值打在屏幕上 ——
+     回显本身就是一块可控文本区（"400-xxxx 客服"之类照样是纯字母数字，
+     任何字符过滤都拦不住）。要排查请看地址栏，不占用户的屏幕。
+
+   ── ④ returnStage 的处理 ────────────────────────────────────────────
+     · 命中该页登记的阶段表  → 用表里的中文名，回链带 ?stage=
+     · 形如 s1…s9 但表里没有 → 收下，写「第 N 步」（这是从 slug 本身
+       推出来的事实，不是编出来的任务名）
+     · 其它                  → 丢掉，回该页第一步，并在门上写明丢了
+
+   ══════════════════════════════════════════════════════════════════════════
+   给 Codex 的接线契约 —— 白名单只是设计侧止血
+   --------------------------------------------------------------------------
+   本页能保证的只有「不会把用户送到站外、不会显示 URL 里的话」。它保证不了
+   「这个人真的是从那一页被打断的」—— returnTo 仍然是 URL 里的一个值。
+   生产上正确的判据是**服务端的会话**：打断发生时由服务端记下 interruptedAt
+   （页 + 阶段 + 会话 ID），登录成功后由服务端回传 returnTo，前端只负责跳。
+   URL 上的 returnTo 降级为「服务端没有记录时的兜底提示」，且仍走本表白名单。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var HOME = '01-home-v6.html'
+
+  /* 返回目标登记表：文件名 → { p:页号, n:页名, st:阶段名表 }
+     刻意不收 03 自己（回自己是死循环），也不收 05 手机接力
+     （那是手机端页面，一体机的门回不到那儿去）。 */
+  var RET = {
+    '01-home-v6.html':            { p: 'P01', n: '首页' },
+    '02-standby.html':            { p: 'P02', n: '待机屏' },
+    '04-system-states.html':      { p: 'P04', n: '异常状态说明' },
+    '06-print-workbench.html':    { p: 'P06', n: '打印工作台' },
+    '07-scan-workbench.html':     { p: 'P07', n: '扫描工作台' },
+    '08-file-tools.html':         { p: 'P08', n: '文件加工台' },
+    '09-resume-workbench.html':   { p: 'P09', n: '简历工作台' },
+    '10-resume-interview.html':   { p: 'P10', n: '访谈式生成' },
+    '11-jobfit-compare.html':     { p: 'P30', n: '岗位大师决策台' },
+    '12-material-factory.html':   { p: 'P12', n: '材料工厂' },
+    '13-jobs-desk.html':          { p: 'P13', n: '岗位情报台' },
+    '14-job-detail.html':         { p: 'P14', n: '岗位详情' },
+    '15-companies.html':          { p: 'P15', n: '企业导览' },
+    '16-offline-agencies.html':   { p: 'P16', n: '线下机构' },
+    '17-fair-desk.html':          { p: 'P17', n: '招聘会作战台',
+      st: { s1: '哪一场', s2: '去哪几家', s3: '怎么走', s4: '带走作战单' } },
+    '18-campus.html':             { p: 'P18', n: '校园招聘专区' },
+    '19-smart-campus.html':       { p: 'P19', n: '智慧校园' },
+    '20-interview-pod.html':      { p: 'P20', n: '面试训练舱' },
+    '21-policy.html':             { p: 'P21', n: '政策服务' },
+    '22-career-plan.html':        { p: 'P22', n: '职业规划' },
+    '23-me.html':                 { p: 'P23', n: '我的' },
+    '24-benefits.html':           { p: 'P24', n: '权益活动' },
+    '25-advisor.html':            { p: 'P25', n: '顾问驾驶舱' },
+    '26-advisor-work.html':       { p: 'P26', n: '顾问作业面' },
+    '27-toolbox.html':            { p: 'P27', n: '百宝箱区' },
+    '28-self-assessment.html':    { p: 'P28', n: '自我探索' },
+    '29-id-photo.html':           { p: 'P29', n: '证件照工作台' },
+    '31-contract-review.html':    { p: 'P31', n: '签约风险提示' },
+    '32-resume-hub.html':         { p: 'P32', n: 'AI 简历服务' },
+    '33-resume-templates.html':   { p: 'P33', n: '简历素材库' },
+    '34-jobs-hub.html':           { p: 'P34', n: '岗位信息' },
+    '35-online-platforms.html':   { p: 'P35', n: '线上求职平台' },
+    '36-fairs-hub.html':          { p: 'P36', n: '招聘会' },
+    '37-interview-hub.html':      { p: 'P37', n: '面试训练' },
+    '38-policy-hub.html':         { p: 'P38', n: '政策服务' },
+    '39-print-hub.html':          { p: 'P39', n: '打印扫描服务' },
+    '40-session-safety.html':     { p: 'P40', n: '会话与安全' },
+    '41-fulfillment-states.html': { p: 'P41', n: '取件与履约状态' },
+    '42-my-assets.html':          { p: 'P42', n: '我的资产',
+      st: { resume: '我的简历', docs: '我的文档', orders: '打印订单' } },
+    '43-my-records.html':         { p: 'P43', n: '我的记录',
+      st: { ai: 'AI 服务记录', fav: '我的收藏', trace: '浏览与跳转记录', notice: '通知与反馈' } },
+    '44-job-detail-offline.html': { p: 'P44', n: '线下岗位详情' },
+    '45-fair-onsite.html':        { p: 'P45', n: '招聘会现场' },
+    '46-campus-service.html':     { p: 'P46', n: '校园服务' }
+  }
+
+  /* from=P## → 文件名。returnTo 缺失时用它兜底：42/43 那一路只要传了来源标识，
+     哪怕忘了 returnTo，门也能把人送回正确的页（只是回不到具体那一步）。 */
+  var BY_P = {}
+  Object.keys(RET).forEach(function (f) { BY_P[RET[f].p] = f })
+
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  /* ══ 落地阶段修正（2026-08-11 走查现场抓到，和 returnTo 是同一类伤）══
+     裸 03-identity-gate.html 打开时**落在 s2「输入手机号」**，不是 s1 三选一。
+     原因在共享的 stages.js：没带 ?stage= 时它取 firstStage() ——
+     「阶段轨里第一个 [data-go]」。本页没有阶段轨（.rail/.spine-rail/[data-rail]
+     一个都没有），于是退化成「全文档第一个 [data-go]」，而那是 S1 里
+     「输手机号」那张卡的 data-go="s2"。screen 上写的 data-stage="s1" 被覆盖掉。
+
+     后果正好打在这一页的立身之本上：42/43 那 9 条「扫码登录」点进来，
+     用户直接看到「输入手机号」，**三选一那一屏根本没出现过** ——
+     「游客是平等选项」「要号码必须先说清为什么」两条全部落空，
+     等于在公共场所把人直接推到输号码那一步。
+
+     修法只在本页做，不碰 scripts/stages.js（那是共享文件，31 个页在用）：
+     stages.js 跑完之后把阶段拨回 s1。只在「URL 没指定阶段」或
+     「指定了本页没有的阶段」时拨 —— ?stage=s2 / s3 仍然照旧生效，
+     index.html 与回归台的直达链接不受影响。 */
+  var VALID = { s1: 1, s2: 1, s3: 1 }
+  var wantStage = q.get('stage')
+  if ((!wantStage || !Object.prototype.hasOwnProperty.call(VALID, wantStage)) &&
+      typeof window.v3Stage === 'function') {
+    window.v3Stage('s1')
+  }
+
+  var rawTo = q.get('returnTo')
+  var rawStage = q.get('returnStage')
+  var rawFrom = q.get('from')
+
+  /* 解码之后才比白名单。清洗只做「去掉控制字符 + 截断」，
+     不做任何「修正」—— 把 ../43-my-records.html 洗成合法值等于替攻击者补全。 */
+  function clean (v, max) {
+    return (v == null ? '' : String(v))
+      .replace(new RegExp('[\\u0000-\\u0020\\u007f]', 'g'), '')
+      .slice(0, max)
+  }
+  var to = clean(rawTo, 96)
+  var stg = clean(rawStage, 16)
+  var from = clean(rawFrom, 6).toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+  /* ── returnTo 里内嵌 ?stage= 的写法也要收 ──────────────────────────────
+     本页 2026-08-10 的注释里，示例就写成 `returnTo = 17-fair-desk.html?stage=s4`。
+     照那个示例实现的来源页会发出 returnTo=17-fair-desk.html%3Fstage%3Ds4。
+     如果只认「纯文件名」，这种链接会被白名单一律打回首页 —— 失败方向是安全的，
+     但对方按本页自己写的文档发的链接却用不了，那是本页的责任。
+     所以两种写法都收：拆出「?」左边当文件名，右边**只取 stage 这一个键**，
+     其余键一律丢掉（不转发未知参数，也就不会把 URL 里的东西带进目标页）。
+     显式的 &returnStage= 优先级更高：它是本页文档里的正式写法。 */
+  var hash = to.indexOf('#')
+  if (hash > -1) to = to.slice(0, hash)
+  var qmark = to.indexOf('?')
+  if (qmark > -1) {
+    var embedded = to.slice(qmark + 1)
+    to = to.slice(0, qmark)
+    if (!stg) {
+      var mm = embedded.match(/(?:^|&)stage=([^&]*)/)
+      if (mm) {
+        try { stg = clean(decodeURIComponent(mm[1]), 16) } catch (e) { stg = clean(mm[1], 16) }
+      }
+    }
+  }
+
+  /* ── 解析返回目标 ─────────────────────────────────────────────────── */
+  var file = null, why = ''
+  if (to) {
+    if (Object.prototype.hasOwnProperty.call(RET, to)) {
+      file = to
+    } else {
+      /* 站外 vs 站内不认识 —— 原因说清楚，原值不回显 */
+      why = /^[a-zA-Z][a-zA-Z0-9+.-]*:|^\/\/|^\.\.|^\//.test(to)
+        ? '链接里的返回目标指向本机之外，已忽略。'
+        : '链接里的返回目标不在本机登记的页面里，已忽略。'
+    }
+  }
+  if (!file && from && Object.prototype.hasOwnProperty.call(BY_P, from)) {
+    file = BY_P[from]
+    if (why) why += '已按来源标识 ' + from + ' 回到对应页面。'
+  }
+  if (!file) {
+    /* 认领失败：HTML 里写死的就是这一态，只把原因补一句，其余一个字都不改。
+       出口 href 也保持 HTML 里的首页兜底 —— 失败路径不写代码，就不会写错。 */
+    if (why) {
+      var s = document.getElementById('retbar-s')
+      if (s) {
+        var p = document.createElement('span')
+        p.style.display = 'block'
+        p.style.marginTop = '4px'
+        p.textContent = why
+        s.appendChild(p)
+      }
+    }
+    return
+  }
+
+  /* ── 解析阶段 ─────────────────────────────────────────────────────── */
+  var meta = RET[file]
+  var stMap = meta.st || {}
+  var stageKey = '', stageName = '', stageWhy = ''
+  if (stg) {
+    if (Object.prototype.hasOwnProperty.call(stMap, stg)) {
+      stageKey = stg; stageName = stMap[stg]
+    } else if (/^s[1-9]$/.test(stg)) {
+      /* 「第 N 步」是从 slug 本身推出来的，不是替来源页编一个任务名 */
+      stageKey = stg; stageName = '第 ' + stg.charAt(1) + ' 步'
+    } else {
+      stageWhy = '链接里写的步骤本机不认识，已回到该页第一步。'
+    }
+  }
+
+  var where = meta.n + (stageName ? ' · ' + stageName : '')
+  var qs = (stageKey ? 'stage=' + encodeURIComponent(stageKey) + '&' : '') + 'from=P03&login='
+  var hrefSkip = file + '?' + qs + 'skip'
+  var hrefOk = file + '?' + qs + 'ok'
+
+  /* ── 落到页面上 ───────────────────────────────────────────────────── */
+  function set (id, fn) { var el = document.getElementById(id); if (el) fn(el); return el }
+  function b (t) { var e = document.createElement('b'); e.textContent = t; return e }
+  function txt (t) { return document.createTextNode(t) }
+
+  set('gate-src', function (el) { el.textContent = meta.n })
+
+  set('retbar', function (el) { el.classList.remove('retbar--warn') })
+  set('retbar-ic', function (el) { el.setAttribute('href', '#i-route') })
+  set('retbar-t', function (el) {
+    el.textContent = ''
+    el.appendChild(txt('你刚才在办：'))
+    el.appendChild(b(where))
+  })
+  set('retbar-s', function (el) {
+    el.textContent = ''
+    el.appendChild(txt('这道门是打断，不是新任务。'))
+    el.appendChild(b('登录后回到你刚才那一步'))
+    el.appendChild(txt('；选「先不登录」也回到同一步，只是这次的东西留不到账号里。'))
+    if (stageWhy) {
+      var w = document.createElement('span')
+      w.style.display = 'block'
+      w.style.marginTop = '4px'
+      w.textContent = stageWhy
+      el.appendChild(w)
+    }
+    el.appendChild(document.createElement('br'))
+    var code = document.createElement('span')
+    code.className = 'retcode'
+    /* 这一行显示的是**本机解析后的结果**，不是 URL 原文回显 —— 值全部来自登记表 */
+    code.textContent = 'returnTo = ' + file + (stageKey ? '?stage=' + stageKey : '')
+    el.appendChild(code)
+  })
+
+  set('ret-kv', function (el) { el.textContent = where })
+  set('foot-s1', function (el) { el.textContent = '两个出口都回到你刚才那一步' })
+  set('foot-s2', function (el) { el.textContent = '登录后回到你刚才那一步。' })
+
+  set('exit-skip', function (el) { el.setAttribute('href', hrefSkip) })
+  set('exit-skip-t', function (el) { el.textContent = '先不登录，继续办理' })
+  set('exit-ok', function (el) { el.setAttribute('href', hrefOk) })
+  set('exit-ok-t', function (el) { el.textContent = '继续办理 · 回到刚才那一步' })
+  /* 有真实返回目标时，s3 的「回首页」才有存在意义（一条独立退路）；
+     没有目标时主按钮本身就是回首页，两个并排等于同一件事说两遍。 */
+  set('exit-home', function (el) { el.style.display = '' })
+})()
+</script>
+
+<script>
+/* ── 三选一是真的选择 + 扫码登录状态（2026-08-11 补）──────────────────────
+   改之前：三张卡没有任何选中逻辑，「继续」按钮永远 data-go="s2"，
+   点哪张都去输手机号；「手机扫码」连 data-go 都没有，是个死按钮。
+   也就是说扫码登录这条路从入口到页面完全不存在。
+
+   现在：卡是单选，「继续」按选中的那条走。
+   「不登录」这一条不去阶段，直接走 exit-skip 那个真实出口 ——
+   它本来就是「离开这道门」，不是门里的下一步。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var ways = [].slice.call(document.querySelectorAll('.way[data-way]'))
+  var goBtn = document.querySelector('.btn--primary[data-at="s1"]')
+  if (!scr || !ways.length) return
+
+  function pick (el) {
+    ways.forEach(function (w) {
+      var on = (w === el)
+      w.classList.toggle('way--on', on)
+      w.setAttribute('aria-pressed', on ? 'true' : 'false')
+    })
+  }
+  ways.forEach(function (w) {
+    w.setAttribute('aria-pressed', w.classList.contains('way--on') ? 'true' : 'false')
+    w.addEventListener('click', function () { pick(w) })
+  })
+
+  if (goBtn) {
+    /* 用捕获阶段抢在 stages.js 的 data-go 委托之前：
+       这个按钮上还留着 data-go="s2"（不删是为了脚本没跑时仍有个兜底去处），
+       但选中扫码时应当去 sq。 */
+    goBtn.addEventListener('click', function (e) {
+      var on = document.querySelector('.way[data-way].way--on')
+      var way = on && on.getAttribute('data-way')
+      if (way === 'phone') return                     // 交给 data-go="s2"
+      e.preventDefault(); e.stopPropagation()
+      if (way === 'qr') { if (window.v3Stage) window.v3Stage('sq'); return }
+      /* skip：离开这道门，走 exit-skip 已经算好的真实去处 */
+      var skip = document.getElementById('exit-skip')
+      if (skip && skip.getAttribute('href')) location.href = skip.getAttribute('href')
+    }, true)
+  }
+
+  /* ── data-qr 轴的可见性由本页自己接 ─────────────────────────────────
+     stage.js 的 applyVisibility() 只认 data-when / data-at / data-pay / data-job
+     四条轴（见该文件 79 行的 querySelectorAll）。data-qr 是本页新加的，
+     不在里面，所以三张状态卡会同时显示。
+
+     不去改 stage.js：它被 39 个页面共用，为一页加一条轴要全站回归；
+     而且这条轴只有本页用得上。包一层在本页做，代价最小。
+
+     包装而不是另写一个 applyQr()：回归台与页面各处都是调 v3ApplyVisibility()，
+     另写一个函数就得指望每个调用点都记得多调一次 —— 那种约定迟早会漏。 */
+  var baseApply = window.v3ApplyVisibility
+  function applyQr () {
+    var cur = scr.getAttribute('data-qr') || ''
+    var list = scr.querySelectorAll('[data-qr]')
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]
+      var want = (el.getAttribute('data-qr') || '').split(/\s+/).filter(Boolean)
+      /* 只在 sq 这一屏参与判定；别的阶段由 data-at 决定，不重复拦一次 */
+      var inSq = el.closest('[data-at]')
+      var atOk = !inSq || (inSq.getAttribute('data-at') || '').split(/\s+/).indexOf('sq') > -1
+      if (!atOk) continue
+      /* 两个方向都要写。第一版只写了「不匹配就隐藏」,没写「匹配就显示」——
+         .qrst 只有 data-qr、没有 data-when/data-at,stage.js 那一轮根本不碰它们,
+         于是一旦被隐藏就再也回不来:切回 wait 时三张卡全是空的。
+         **凡是自己接管可见性的,必须两个方向都负责**,不能指望别人帮你复位。 */
+      el.hidden = (want.indexOf(cur) < 0)
+    }
+  }
+  if (typeof baseApply === 'function') {
+    window.v3ApplyVisibility = function () { baseApply.apply(this, arguments); applyQr() }
+  }
+  applyQr()
+
+  /* 「换一个码」：本页只负责回到「等你扫」并重置倒计时的表现。
+     真正的出码由服务端做（/member/qr-login create），旧码必须立即作废 ——
+     这一条写在 sq 那一屏的接线契约注释里。 */
+  var again = document.getElementById('qr-again')
+  if (again) again.addEventListener('click', function () {
+    scr.setAttribute('data-qr', 'wait')
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  })
+})()
+</script>
+
 </body>
 </html>

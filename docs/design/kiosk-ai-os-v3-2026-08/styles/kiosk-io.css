@@ -1,0 +1,256 @@
+/* ============================================================
+   V3 · 一体机输入与兜底出口（kiosk-io）
+   ------------------------------------------------------------
+   本文件只服务两个共享组件，不改任何既有样式表：
+     · scripts/help.js   —— 共享帮助层（全站唯一兜底出口）
+     · scripts/keypad.js —— 屏幕软键盘（一体机没有物理键盘）
+
+   三条硬约束写在样式里，改动前先读：
+
+   1) 关闭态必须对自检"零污染"。
+      两个组件都用 [hidden] 收起（base.css 已有 [hidden]{display:none!important}），
+      本文件再兜一层。display:none 让 getBoundingClientRect 全为 0，
+      stage.js 的横向溢出/触控/文字裁切与 audit-plus.js 的内部裁切/卡内溢出
+      都会跳过，不会把兜底组件算进页面缺陷。
+
+   2) 类名一律 kio- 前缀，且**不得**包含
+      card / note / act / pane / row / item / pill / chip / tag / btn 这些子串。
+      audit-plus.js 的"假入口"与"卡内溢出"两项按 [class*=...] 选元素，
+      沾上这些子串会被当成业务卡片或假 chip 误报。
+      （所以是 kio-help-box 不是 -panel，是 kio-svc 不是 -contact。）
+
+   3) 任何**直接**包住文字的元素不许写 overflow:hidden。
+      stage.js 的文字裁切检查只放过 visible/auto/scroll；
+      写了 hidden 就要逐像素保证文字不越界，得不偿失。
+      需要圆角裁切的只放在不直接含文字的容器上（.kio-help-box）。
+
+   触控：帮助层按钮 ≥56px，键盘按键 ≥64×64px（CLAUDE.md §9）。
+   遮挡：两个组件的底边都停在底部导航之上（--kio-navh 由 JS 按实际导航高度写入）。
+   ============================================================ */
+
+/* 关闭态：不占位、不参与任何测量 */
+.kio-help[hidden], .kio-pad[hidden] { display: none !important; }
+/* 组件内部的折叠件（未展开的答复行）同理，不依赖 base.css 的加载顺序 */
+.kio-help [hidden], .kio-pad [hidden] { display: none !important; }
+
+/* 只淡入，不做位移/缩放 —— 位移动画会让自检在动画中途量到错误的矩形 */
+@keyframes kio-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ============================================================
+   一、帮助层
+   ============================================================ */
+.kio-help {
+  position: absolute;
+  inset: 0 0 var(--kio-navh, 0px) 0;
+  z-index: 70;
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: kio-fade var(--dur-2, 240ms) var(--ease-out, ease) both;
+}
+.kio-help-mask {
+  position: absolute; inset: 0;
+  background: rgba(2, 6, 7, .74);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.kio-help-box {
+  position: relative;
+  width: calc(100% - var(--s-11, 72px));
+  max-height: calc(100% - var(--s-8, 40px));
+  margin-bottom: var(--s-7, 32px);
+  display: flex; flex-direction: column;
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  border-radius: var(--r-xl, 34px);
+  box-shadow: var(--sh-3);
+  /* 本元素不直接含文字，可以安全裁圆角（见文件头约束 3） */
+  overflow: hidden;
+}
+
+.kio-help-hd {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-start; gap: var(--s-4, 16px);
+  padding: var(--s-7, 32px) var(--s-7, 32px) var(--s-5, 20px);
+  border-bottom: 1px solid var(--brd-1);
+}
+.kio-help-hd > .ic { width: 34px; height: 34px; color: var(--jade-400); flex: 0 0 auto; margin-top: 6px; }
+.kio-help-hgroup { flex: 1 1 auto; min-width: 0; }
+.kio-help-t {
+  margin: 0; font-family: var(--ff-display); font-size: var(--fz-8, 36px);
+  color: var(--fog-900); line-height: 1.24; letter-spacing: .03em;
+}
+.kio-help-sub {
+  margin: var(--s-2, 8px) 0 0; font-size: var(--fz-3, 16px);
+  color: var(--fog-600); line-height: 1.6;
+}
+.kio-close {
+  flex: 0 0 auto; appearance: none; cursor: pointer;
+  width: 64px; height: 64px; padding: 0;
+  display: grid; place-items: center;
+  border-radius: var(--r-full, 999px);
+  border: 1px solid var(--brd-2); background: var(--surf-2); color: var(--fog-800);
+}
+.kio-close .ic { width: 26px; height: 26px; }
+.kio-close:active { transform: scale(.96); }
+
+.kio-help-bd {
+  flex: 1 1 auto; min-height: 0;
+  /* overflow-y:auto 会让 overflow-x 计算成 auto —— 文字裁切检查因此放过本容器，
+     内部裁切检查也认它是"能滚到"的祖先，两边都不会误报 */
+  overflow-y: auto;
+  padding: var(--s-6, 24px) var(--s-7, 32px) var(--s-6, 24px);
+  display: flex; flex-direction: column; gap: var(--s-6, 24px);
+  scrollbar-width: none;
+}
+.kio-help-bd::-webkit-scrollbar { width: 0; }
+
+.kio-sec-h {
+  margin: 0 0 var(--s-3, 12px);
+  font-size: var(--fz-2, 15px); letter-spacing: .16em; color: var(--fog-600);
+}
+.kio-sec-list { display: flex; flex-direction: column; gap: var(--s-3, 12px); }
+
+/* —— 常见问题：点标题展开一句答复 —— */
+.kio-q { border: 1px solid var(--brd-2); border-radius: var(--r-md, 18px); background: var(--surf-1); }
+.kio-q-t {
+  appearance: none; cursor: pointer; width: 100%;
+  min-height: 76px; padding: var(--s-4, 16px) var(--s-5, 20px);
+  display: flex; align-items: center; gap: var(--s-4, 16px);
+  background: transparent; border: 0; border-radius: var(--r-md, 18px);
+  font-family: var(--ff-ui); font-size: var(--fz-4, 18px); font-weight: 600;
+  color: var(--fog-900); text-align: left; line-height: 1.45;
+}
+.kio-q-t .ic {
+  width: 22px; height: 22px; flex: 0 0 auto; color: var(--fog-600);
+  transition: transform var(--dur-2, 240ms) var(--ease-out, ease);
+}
+.kio-q-t[aria-expanded="true"] { color: var(--jade-400); }
+.kio-q-t[aria-expanded="true"] .ic { transform: rotate(90deg); color: var(--jade-400); }
+.kio-q-n {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: var(--r-full, 999px);
+  display: grid; place-items: center;
+  background: var(--surf-3); color: var(--fog-700);
+  font-family: var(--ff-num); font-size: var(--fz-2, 15px);
+}
+.kio-q-x { flex: 1 1 auto; min-width: 0; }
+.kio-q-a {
+  margin: 0; padding: 0 var(--s-5, 20px) var(--s-5, 20px) 74px;
+  font-size: var(--fz-3, 16px); line-height: 1.78; color: var(--fog-800);
+}
+
+/* —— 找人工 —— */
+.kio-svc { display: flex; flex-direction: column; gap: var(--s-3, 12px); }
+.kio-svc-l {
+  display: flex; align-items: center; gap: var(--s-4, 16px);
+  min-height: 76px; padding: var(--s-3, 12px) var(--s-5, 20px);
+  border: 1px dashed var(--brd-2); border-radius: var(--r-md, 18px);
+  background: var(--surf-1);
+}
+.kio-svc-l .ic { width: 26px; height: 26px; flex: 0 0 auto; color: var(--azure-400); }
+.kio-svc-k { flex: 0 0 auto; font-size: var(--fz-4, 18px); color: var(--fog-900); }
+.kio-svc-v {
+  flex: 1 1 auto; min-width: 0; text-align: right;
+  font-size: var(--fz-3, 16px); color: var(--amber-400); line-height: 1.5;
+}
+.kio-svc-tip { margin: var(--s-1, 4px) 0 0; font-size: var(--fz-2, 15px); line-height: 1.72; color: var(--fog-600); }
+
+/* —— 返回：两个大按钮 —— */
+.kio-help-ft {
+  flex: 0 0 auto;
+  display: flex; gap: var(--s-4, 16px);
+  padding: var(--s-5, 20px) var(--s-7, 32px) var(--s-6, 24px);
+  border-top: 1px solid var(--brd-1);
+}
+.kio-big {
+  appearance: none; cursor: pointer; text-decoration: none;
+  flex: 1 1 0; min-width: 0; min-height: 88px; padding: 0 var(--s-6, 24px);
+  display: flex; align-items: center; justify-content: center; gap: var(--s-3, 12px);
+  border-radius: var(--r-md, 18px); border: 1px solid var(--glass-2-brd);
+  background: var(--surf-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-5, 20px); font-weight: 600; letter-spacing: .03em;
+}
+.kio-big .ic { width: 24px; height: 24px; flex: 0 0 auto; }
+/* 图标库只有右向 chevron；「回上一步」必须指向左，否则读起来像"下一步" */
+.kio-big[data-kio-back] .ic { transform: scaleX(-1); }
+.kio-big--go { background: linear-gradient(140deg, var(--jade-400), var(--jade-600)); color: var(--on-primary); border-color: transparent; }
+.kio-big:active { transform: scale(.985); }
+
+/* ============================================================
+   二、软键盘
+   ============================================================ */
+.kio-pad {
+  position: absolute; left: 0; right: 0; bottom: var(--kio-navh, 0px);
+  z-index: 72;
+  padding: var(--s-4, 16px) var(--s-6, 24px) var(--s-5, 20px);
+  display: flex; flex-direction: column; gap: var(--s-3, 12px);
+  background: var(--glass-3-bg); border-top: 1px solid var(--glass-3-brd);
+  backdrop-filter: blur(var(--glass-blur-heavy, 34px)); -webkit-backdrop-filter: blur(34px);
+  box-shadow: 0 -24px 60px -22px rgba(1, 8, 10, .8);
+  animation: kio-fade var(--dur-1, 140ms) var(--ease-out, ease) both;
+}
+.kio-pad-hd {
+  display: flex; align-items: center; gap: var(--s-4, 16px);
+  min-height: 64px;
+}
+.kio-pad-lbl {
+  flex: 0 0 auto; font-size: var(--fz-2, 15px); letter-spacing: .12em; color: var(--fog-600);
+}
+.kio-pad-echo {
+  flex: 1 1 auto; min-width: 0;
+  font-family: var(--ff-num); font-size: var(--fz-5, 20px); color: var(--fog-900);
+  line-height: 1.4; overflow-wrap: anywhere;
+}
+.kio-pad-echo:empty::before { content: attr(data-empty); color: var(--fog-600); }
+.kio-pad-hint {
+  flex: 0 0 auto; max-width: 400px; text-align: right;
+  font-size: var(--fz-1, 13px); line-height: 1.5; color: var(--fog-600);
+}
+
+/* 键区：行间距自己管，避免继承 .kio-pad 的 12px 把键盘拉高 */
+.kio-pad-bd { display: flex; flex-direction: column; gap: 10px; }
+.kio-keys { display: flex; gap: 10px; justify-content: center; }
+.kio-key {
+  appearance: none; cursor: pointer;
+  flex: 1 1 0; min-width: 64px; min-height: 76px; padding: 0 var(--s-2, 8px);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-6, 24px); font-weight: 600;
+}
+.kio-key:active { transform: scale(.96); background: var(--surf-3); }
+.kio-key--fn { font-size: var(--fz-4, 18px); color: var(--fog-700); background: var(--surf-1); }
+.kio-key--ok {
+  background: linear-gradient(140deg, var(--jade-400), var(--jade-600));
+  color: var(--on-primary); border-color: transparent; font-size: var(--fz-5, 20px);
+}
+/* 宽键：flex-grow 权重。一行的权重和恒为 10（26 键）或 4（数字键），
+   两端 padding 与权重配合，才能让 asdf 行和 qwerty 行的键宽完全一致 */
+.kio-key--w2 { flex-grow: 2; }
+.kio-key--w3 { flex-grow: 3; }
+.kio-key--w4 { flex-grow: 4; }
+.kio-key--w5 { flex-grow: 5; }
+.kio-key--w6 { flex-grow: 6; }
+/* 26 键第三、四行两端各留半键宽，保持键盘视觉对齐 */
+.kio-keys--in2 { padding: 0 52px; }
+
+/* 数字键盘：4 列窄块居中，键宽约 150px，比铺满 1080 更好按 */
+.kio-pad--num .kio-keys { max-width: 660px; margin: 0 auto; width: 100%; }
+.kio-pad--num .kio-key { min-height: 84px; font-family: var(--ff-num); }
+
+/* ============================================================
+   三、输入框「正在输入」态
+   用 outline + box-shadow，两者都不参与布局，不会撑破任何既有版面
+   ============================================================ */
+.kio-typing {
+  outline: 3px solid var(--jade-400) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 7px var(--jade-a20) !important;
+  caret-color: var(--jade-400);
+}
+
+/* 低性能一体机：与 base.css 的降级口径一致 */
+html.lowgpu .kio-help-mask, html.lowgpu .kio-pad {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+html.lowgpu .kio-help-mask { background: rgba(2, 6, 7, .9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kio-help, .kio-pad { animation: none; }
+}

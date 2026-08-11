@@ -102,7 +102,7 @@
   width: 48px; height: 48px; border-radius: var(--r-xs); border: 1px solid rgba(255,255,255,.24);
   background: rgba(255,255,255,.10); color: #fff; cursor: pointer;
   display: grid; place-items: center;
-}
+ flex: 0 0 48px;}
 .pgbtn .ic { width: 18px; height: 18px; }
 .paper-stage {
   /* 真实阅读器行为：按宽度铺满 + 多页连续滚动。
@@ -197,6 +197,21 @@
 .xlane-nm { font-family: var(--ff-display); font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
 .xlane-ds { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
 .xlane-go > .ic:last-child { margin-left: auto; flex: 0 0 auto; width: 20px; height: 20px; color: var(--fog-600); }
+/* 三列并排时横排会把文字挤成一字一行（中文逐字竖排）：
+   图标 46 + 箭头 20 + 两处 gap 32 ≈ 100px 常量开销，三列后留给文字不足 80px。
+   ≥3 列一律改为纵向卡片：图标在上、文字占满卡宽、箭头收到右下角。 */
+.xlane-row:has(> :nth-child(3)) .xlane-go {
+  flex-direction: column; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5) var(--s-5); position: relative; min-height: 128px;
+}
+.xlane-row:has(> :nth-child(3)) .xlane-tx { width: 100%; }
+.xlane-row:has(> :nth-child(3)) .xlane-go > .ic:last-child {
+  position: absolute; right: var(--s-5); bottom: var(--s-4); margin-left: 0;
+}
+.xlane-row:has(> :nth-child(3)) .xlane-ds { padding-right: 28px; }
+/* 兜底：任何情况下标题都不逐字断行 */
+.xlane-nm { word-break: keep-all; overflow-wrap: anywhere; }
+.xlane-tx { flex: 1 1 auto; }
 
 /* 右栏「本机状态」纸量小量表 */
 .side-meter { display: inline-block; width: 72px; height: 6px; border-radius: 999px; background: var(--surf-3); overflow: hidden; vertical-align: middle; }
@@ -228,7 +243,7 @@
   background: var(--jade-a12); border: 1px solid var(--jade-a20);
   padding: 2px 7px; border-radius: 4px; margin-left: auto;
 }
-.seg { display: flex; gap: 6px; }
+.seg { display: flex; gap: 10px; }
 .seg button {
   flex: 1; min-height: var(--touch-min); padding: 0 var(--s-3);
   border-radius: var(--r-xs); border: 1px solid var(--brd-2);

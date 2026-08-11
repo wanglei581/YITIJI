@@ -16,24 +16,556 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
   /* 核价门控：金额没显示出来之前，朱砂支付键不存在 */
   .screen:not(.is-quoted) [data-gate="quoted"],
   .screen.is-quoted [data-gate="unquoted"] { display: none !important; }
+  /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
+  .chip--info { cursor: inherit; }
+  /* s1 六卡里被设备离线拦下的卡：置灰 + 不可点，原因写在卡面 chip 上 */
+  .src[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  /* 本域次要入口：主返回键按 ?from= 改去业务域之后，打印扫描域首屏不能没有门。
+     只在返回键被改走时由脚本插入；虚线边框表示它是次要出口，不抢主返回键。 */
+  .actionbar > .altbtn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 var(--s-4); margin-right: var(--s-3);
+    white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+    background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+    font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  }
+  .actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
+
+  /* ════════ 2026-08-10 Codex 走查整改 ════════
+     走查第一名：「上传入口根本不收文件」—— 六卡里前三张一按就跳到「材料体检」，
+     中间没有任何选取动作，用户不知道体检的是哪一份。补两条门控轴：
+       data-src  = none | local | phone | phone-got | usb | usb-in
+       data-file = none | on
+     不能用 hidden：stage.js 的 applyVisibility() 独占 hidden，一切四态就把门控盖掉
+     （本页核价门控早前踩过这个坑，所以那里也是 data-gate + class）。 */
+  .screen[data-src="none"]      [data-src]:not([data-src~="none"]),
+  .screen[data-src="local"]     [data-src]:not([data-src~="local"]),
+  .screen[data-src="phone"]     [data-src]:not([data-src~="phone"]),
+  .screen[data-src="phone-got"] [data-src]:not([data-src~="phone-got"]),
+  .screen[data-src="usb"]       [data-src]:not([data-src~="usb"]),
+  .screen[data-src="usb-in"]    [data-src]:not([data-src~="usb-in"]),
+  .screen[data-file="none"]     [data-file]:not([data-file~="none"]),
+  .screen[data-file="on"]       [data-file]:not([data-file~="on"]),
+  .screen[data-off="ask"]       [data-off]:not([data-off~="ask"]),
+  .screen[data-off="keep"]      [data-off]:not([data-off~="keep"]),
+  .screen[data-off="refund"]    [data-off]:not([data-off~="refund"]),
+  .screen[data-off="fixed"]     [data-off]:not([data-off~="fixed"]),
+  .screen[data-done="none"]     [data-done]:not([data-done~="none"]),
+  .screen[data-done="save"]     [data-done]:not([data-done~="save"]),
+  .screen[data-done="phone"]    [data-done]:not([data-done~="phone"]),
+  .screen[data-done="again"]    [data-done]:not([data-done~="again"]),
+  .screen[data-done="issue"]    [data-done]:not([data-done~="issue"]),
+  .screen[data-done="issue-sent"] [data-done]:not([data-done~="issue-sent"]),
+  .screen[data-done="rated"]    [data-done]:not([data-done~="rated"]),
+  /* ── 2026-08-10 新增第五条门控轴：data-redact（遮盖处置）──────────────
+     none = 还没处置（体检刚给出建议）
+     pick = 正在遮盖（左边预览位换成遮盖层）
+     ask  = 用户按了「不遮盖」，正在做二次确认
+     done = 已遮盖，打印件不含身份证号
+     skip = 已明确确认保持原样打印
+     和 data-src / data-file 同一机制：用 class/属性做 display，不用 hidden ——
+     hidden 归 stage.js 的 applyVisibility() 独占，一切四态就会被盖掉。 */
+  .screen[data-redact="none"] [data-redact]:not([data-redact~="none"]),
+  .screen[data-redact="pick"] [data-redact]:not([data-redact~="pick"]),
+  .screen[data-redact="ask"]  [data-redact]:not([data-redact~="ask"]),
+  .screen[data-redact="done"] [data-redact]:not([data-redact~="done"]),
+  .screen[data-redact="skip"] [data-redact]:not([data-redact~="skip"]) { display: none !important; }
+
+  /* ══════ 遮盖层：把「检出身份证号」接上处置手段（2026-08-10）══════════
+     整改前的断头：体检说「第 2 页含身份证号，建议遮盖后再打印」，
+     按钮写「遮盖这一处再继续」—— 但页面上没有任何涂黑 / 打码工具，
+     按下去无处可去。用户只剩两条路：保持原样，或者回去自己改文件。
+     **风险识别了，却把风险原样交还给用户**，这是本页最重的一处。
+
+     现在：按钮真的打开一个轻量遮盖层，就在预览位原地展开 ——
+     不弹窗、不换页，因为遮盖要对着那一页看，离开预览位就失去了参照。
+     三个动作贴着框放（选哪一处是就地判断），与 P03 身份门同一先例：
+     弹层 / 覆盖层的操作放在层里，不占页面级 ActionBar。 */
+  .redactl { width: 100%; flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column; gap: var(--s-4); color: #fff; }
+  .redactl-hd { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3); }
+  .redactl-hd > .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--amber-400); }
+  .redactl-t { font-size: var(--fz-4); font-weight: 700; }
+  .redactl-s { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-1); opacity: .82; }
+  .redactl-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; }
+  .redactl-acts { flex: 0 0 auto; display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; }
+  .redactl-acts .btn--ghost { color: #fff; border-color: rgba(255,255,255,.34);
+    background: rgba(255,255,255,.08); }
+  .redactl-tip { flex: 1 1 200px; min-width: 0; font-size: var(--fz-1); opacity: .82; line-height: 1.55; }
+
+  /* 候选框：系统框出来的敏感区。做成 48px 高的真按钮 ——
+     26px 的装饰框在触控屏上点不中，也过不了触控自检。 */
+  .candbox { position: absolute; left: 38px; right: 38px; height: 48px; cursor: pointer;
+    border: 1.5px dashed var(--coral-400); border-radius: 5px; background: var(--coral-a12);
+    font-family: var(--ff-ui); font-size: 13px; color: var(--paper-ink); text-align: left;
+    padding: 0 10px; display: flex; align-items: center; gap: 8px; }
+  .candbox[aria-pressed="true"] { border-style: solid; border-width: 2px; background: var(--coral-a20); }
+  .candbox-tag { margin-left: auto; flex: 0 0 auto; font-size: 10px; letter-spacing: .06em;
+    color: #fff; background: var(--fog-600); padding: 3px 8px; border-radius: 4px; }
+  .candbox[aria-pressed="true"] .candbox-tag { background: var(--coral-600); }
+
+  /* 预览位上的三种结果：未处置（虚线框，原有 .redact）/ 已遮盖（实心黑条）/ 保持原样（琥珀提示） */
+  .redact--on { border: 0; background: #14181a; }
+  .redact--on span { background: #14181a; }
+  .redact--kept { border-color: var(--amber-600); background: var(--amber-a20); }
+  .redact--kept span { background: var(--amber-600); }
+  /* 缩略条上的红点：遮过之后转成青色（已处置），不直接抹掉 ——
+     「这一页曾经命中」本身是用户该知道的事。 */
+  .screen[data-redact="done"] .thumb--flag::after { background: var(--jade-500); }
+
+  /* 处置结果条：参数步与确认步都要能一眼看到打印件到底含不含身份证号 */
+  .privline { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+    font-size: var(--fz-3); color: var(--fog-900);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .privline > .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .privline--amber { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .privline--amber > .ic { color: var(--amber-500); }
+  .privline .btn { margin-left: auto; flex: 0 0 auto; }
+
+  .pickwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+  .pickbar { display: flex; align-items: center; gap: var(--s-4); flex: 0 0 auto; }
+  .pickbar-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
+    font-weight: 600; display: inline-flex; align-items: center; gap: 10px; }
+  .pickbar-t .ic { width: 24px; height: 24px; color: var(--jade-500); }
+  .pickbar-s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+
+  .filelist { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: var(--s-3); }
+  .filerow { text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui);
+    min-height: 92px; padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    display: flex; align-items: center; gap: var(--s-5);
+    transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+  .filerow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+  .filerow:active { transform: translateY(1px) scale(.997); }
+  .filerow[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .fr-ic { width: 46px; height: 46px; flex: 0 0 auto; border-radius: var(--r-xs);
+    background: var(--fog-a08); display: grid; place-items: center; }
+  .fr-ic .ic { width: 23px; height: 23px; color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-ic { background: var(--jade-a20); }
+  .filerow[aria-pressed="true"] .fr-ic .ic { color: var(--jade-500); }
+  .fr-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .fr-nm { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .fr-mt { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .03em; }
+  .fr-pick { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-2); color: var(--fog-600); }
+  .filerow[aria-pressed="true"] .fr-pick { color: var(--jade-600); font-weight: 700; }
+
+  .picked { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-5);
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .picked-ic { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%;
+    background: var(--jade-a20); display: grid; place-items: center; }
+  .picked-ic .ic { width: 22px; height: 22px; color: var(--jade-500); }
+  .picked-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .picked-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+  .picked-m { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; }
+
+  .relay { flex: 1 1 auto; min-height: 0; display: flex; gap: var(--s-6); align-items: stretch;
+    padding: var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd); }
+  .miniqr { flex: 0 0 auto; width: 208px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .miniqr-box { width: 190px; height: 190px; border-radius: var(--r-sm); background: #fff;
+    display: grid; place-items: center; padding: 12px; box-shadow: var(--sh-2); }
+  .miniqr-box svg { width: 100%; height: 100%; }
+  .miniqr-cap { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .1em; }
+  .relay-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column;
+    gap: var(--s-4); justify-content: space-between; }
+  .relay-t { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); font-weight: 600; }
+
+  /* 来源回执：参数阶段顶部，让用户先确认「是不是这份」 */
+  .receipt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .receipt .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .receipt-t { font-size: var(--fz-3); color: var(--fog-900); }
+  .receipt-a { margin-left: auto; flex: 0 0 auto; }
+  /* 回执附注（2026-08-11 加）：
+     · .receipt-n       —— 「本机还没体检这份文件」。交接回执只能声明「收到了一条交接」，
+                           声明不了「文件已经在本机、已经量过页数」，那两件事没发生过。
+     · .receipt-n--warn —— 链接里的份数/页数被夹到本机上限时，用户必须看见系统改了什么。
+                           所以给到和正文同号的字（fz-3）+ 加粗，不能压成脚注。 */
+  .receipt-n { display: block; margin-top: 5px; font-size: var(--fz-2);
+    color: var(--fog-700); line-height: 1.5; }
+  .receipt-n--warn { font-size: var(--fz-3); color: var(--amber-600); font-weight: 700; }
+  /* 链接不可识别 / 参数被夹：整条转琥珀并换警示图标。
+     青底打勾等于替这条 URL 背书 —— 恰恰是这次要修的那件事。 */
+  .receipt--warn { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .receipt--warn .ic { color: var(--amber-600); }
+
+  /* 折叠块：长说明压成一行摘要，展开才给全文。合规原文一字不删。 */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+    display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+    font-size: var(--fz-2); color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+  /* 本机 Chrome 里 <details> 关着时子节点仍有布局盒，自检会报卡内溢出。显式收掉。 */
+  .fold:not([open]) .fold-b { display: none; }
+
+  /* 右栏最后一张卡撑到栏底：把「卡片外的背景空洞」变成「卡片内的呼吸感」。
+     只动布局，不塞任何填充物 —— 哪张卡是最后一张随阶段变，靠页尾脚本打标。
+
+     2026-08-11 补 overflow-y:auto。起因是整改时顺手验了一遍「把抽屉点开」——
+     轴遍历只切 data-* 状态，点开 <details> 这一类它根本走不到。实测：
+       s1 右栏 −118px、s4 −173px（device-off −329px）、s5 −277px
+     也就是说，用户点开「离场后怎么清」「完整的去向 / 保留 / 谁能看 / 出纸规则」
+     「退款记录去哪查」之后，抽屉正文有一大截被裁在栏外，**永远看不到也滚不到**。
+     s1 和 s5 这两栏本轮一个字都没动，可见这是本页原有的毛病，不是这次放大放出来的。
+     一张高度被钉死的卡里塞一个可展开的抽屉，正确行为是滚动而不是裁掉。
+
+     代价要写明：回归台的「卡内空洞」会跳过可滚动的卡，所以这张卡不再被那一项盯着。
+     但它是右栏最后一张，「主栏留白」量的正是它到栏底的距离 —— 同一处仍有检测覆盖。 */
+  .wside > .pane--tailgrow { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+  /* U 盘「未插入」原来整块垂直居中，卡底空 432px。改成内容靠上、演示开关贴底。 */
+  .pickwrap > .locked { justify-content: flex-start; }
+  .pickwrap > .locked > .cash-demo { margin-top: auto; }
+
+  /* ══════════ 2026-08-11 版面留白整改（台账 A20）══════════════════════
+     所有者原话：「不要留出空白的地方什么也没有」。本页是全站最后一块，
+     定版回归 348 组合里 239 处「主栏留白过大」全部出自这里，分五个桶：
+       s2 右栏 284–592px ｜ s3 右栏 205–245px ｜ s4 右栏 215px
+       s6 左栏 312–568px ｜ s7 左栏 303–443px
+     只走三条路：① 放大真正的主内容 ② 把当前这一步真正需要的抽屉内容移回常驻
+     ③ 版式不匹配就改版式。**不塞填充物、不编数据**；金额、计费页数、份数一个不动。
+
+     放大的依据不是"为了把数字压到 0"：1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI，
+     站立 60cm 时 15px 正文只有 4.6mm 字高 —— 本来就偏小。s6 的进度盘 232px、
+     s7 的取件码 52px 是笔记本尺寸，不是一两米外看的尺寸。 */
+
+  /* ── s6 / s7 左栏：出纸与取件是「隔着一两米看」的屏 ──────────────────
+     成因（实测）：.progress-wrap 是 justify-content:center 的纵向 flex，
+     栏高 1456px，而内容只有 320–850px —— 垂直居中后上下各裸露 300–570px。
+     不是 min-height 撑开，也不是状态漏配：每一态都有内容，只是内容太小。 */
+  .progress-wrap { gap: var(--s-7); }
+  /* .progress-wrap 是 align-items:center，块默认按内容收宽 —— 竖排时间线只剩 240px、
+     状态卡 530px，和满宽的其他块左右都对不齐。统一拉满，保留各自的 max-width。 */
+  [data-at="s6"] .jline, .progress-wrap > .notice, .progress-wrap > .doneline,
+  .progress-wrap > .restnote, [data-at="s7"] .pickup { width: 100%; }
+  /* 「在打的是哪一份」：公共机器上走开之前要核对的第一件事。
+     沿用 s4「支付前请核对」的同一组数值，不新编任何数字。 */
+  .jobsum { flex: 0 0 auto; width: 100%; display: flex; align-items: center; gap: var(--s-5);
+    padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd); }
+  .jobsum-ic { width: 52px; height: 52px; flex: 0 0 auto; border-radius: var(--r-xs);
+    background: var(--fog-a08); display: grid; place-items: center; }
+  .jobsum-ic .ic { width: 26px; height: 26px; color: var(--fog-600); }
+  .jobsum-b { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .jobsum-t { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; }
+  .jobsum-m { font-size: var(--fz-3); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; }
+  [data-at="s6"] .dial { width: 344px; height: 344px; }
+  [data-at="s6"] .dial-txt b { font-size: 76px; }
+  [data-at="s6"] .dial-txt span { font-size: var(--fz-4); }
+  /* 版式改动（③）：任务时间线由横排 4 格改成纵向 4 行。
+     横排在 652px 宽的栏里每格只剩 128px，「服务端校验 / 正在检查文件能不能打」
+     被压成三行小字；纵向之后每一步能给到 18px 标题 + 15px 说明，站着也读得清，
+     同时把 1456px 的栏高真正用起来。节点不增不减，文案一字未改。
+     连线改成画在**节点上方**：最后一个可见节点随处境变（出纸中时并不是 DOM 的
+     :last-child），画在下方会有一截线伸进空处；画在上方则只需要 :not(:first-child)，
+     而第 1 个节点「已提交」在所有处境下都可见。 */
+  [data-at="s6"] .jline { flex-direction: column; align-items: stretch;
+    padding: var(--s-5) var(--s-6); }
+  [data-at="s6"] .jnode { display: grid; grid-template-columns: 22px 1fr;
+    column-gap: var(--s-5); row-gap: 6px; align-items: start; text-align: left;
+    padding: var(--s-6) 0; min-width: 0; }
+  [data-at="s6"] .jnode > i { grid-column: 1; grid-row: 1 / span 2; width: 20px; height: 20px; }
+  [data-at="s6"] .jnode > b { grid-column: 2; grid-row: 1; font-size: var(--fz-5); }
+  [data-at="s6"] .jnode > em { grid-column: 2; grid-row: 2; font-size: var(--fz-3); }
+  [data-at="s6"] .jnode:not(:last-child)::after { content: none; }
+  [data-at="s6"] .jnode:not(:first-child)::before { content: ""; position: absolute;
+    left: 10px; top: -6px; width: 2px; height: 28px; background: var(--fog-a12); z-index: 1; }
+  [data-at="s6"] .jn--done:not(:first-child)::before { background: var(--jade-a32); }
+  .progress-wrap .notice { font-size: var(--fz-4); line-height: 1.65; padding: var(--s-5) var(--s-6); }
+  .progress-wrap .notice .ic { width: 26px; height: 26px; margin-top: 2px; }
+  /* 四个「没有进度盘」的处境（排队 / 校验中 / 校验失败 / 超时）：
+     这一屏唯一要说的就是这句话，却挤在一条 90px 的提示条里，下面裸露 350–420px。
+     出纸中与卡纸有 392px 的进度盘当主体，这四个什么都没有 —— 于是把这句话
+     本身放大成主体：图标 80px、正文 24px。文案一个字都没加、没改。 */
+  .progress-wrap .notice.jstate { flex-direction: column; align-items: center; text-align: center;
+    gap: var(--s-6); padding: var(--s-9) var(--s-7); font-size: var(--fz-6); line-height: 1.6; }
+  .progress-wrap .notice.jstate .ic { width: 96px; height: 96px; margin-top: 0; }
+  .progress-wrap .doneline { font-size: var(--fz-4); padding: var(--s-5) var(--s-6); }
+  .progress-wrap .doneline .ic { width: 26px; height: 26px; }
+  .progress-wrap .btn { min-height: 68px; font-size: var(--fz-4); }
+  .progress-wrap .btn--quiet { min-height: 56px; font-size: var(--fz-3); }
+  /* 取件码是这一屏唯一要被一两米外看清、并抄进手机的东西。52px 偏小，
+     但**上限由宽度定死**：栏宽 652 − 左右内边距 80 = 572px，
+     「7742 106 358」12 个字位在 .16em 字距下最多只能到约 62px；
+     再大就折行 —— 一个断成两行的取件码比一个小号的更难抄。实测 96px 折 2 行、
+     132px 折 3 行（卡高被撑到 768px），所以钉死 60px + nowrap。 */
+  [data-at="s7"] { gap: var(--s-8); }
+  [data-at="s7"] .pickup { padding: var(--s-10) var(--s-8); gap: var(--s-6); }
+  [data-at="s7"] .pickup-code { font-size: 60px; letter-spacing: .14em; white-space: nowrap; }
+  [data-at="s7"] .pickup-hint { font-size: var(--fz-5); }
+  [data-at="s7"] .restnote-b { font-size: var(--fz-4); }
+  [data-at="s7"] .miniqr { width: 196px; }
+  [data-at="s7"] .miniqr-box { width: 176px; height: 176px; }
+  [data-at="s7"] .miniqr-cap { font-size: var(--fz-2); }
+  /* 结果条：文字长时按钮原来会被挤到第二行，一条 206px 高。改成按钮固定在右、
+     文字自己折行，同一条信息少占 90px —— 省下来的高度让给取件码和离场清单。 */
+  [data-at="s7"] .doneline { flex-wrap: nowrap; align-items: center; }
+  [data-at="s7"] .doneline > span:not(.miniqr) { flex: 1 1 auto; min-width: 0; }
+  [data-at="s7"] .doneline > .btn { flex: 0 0 auto; }
+  .doneline--qr { align-items: center; gap: var(--s-6); }
+  .doneline--qr .dq-b { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3); }
+  .doneline--qr .dq-t { font-size: var(--fz-4); color: var(--fog-900); display: inline-flex;
+    align-items: center; gap: var(--s-3); }
+  .doneline--qr .dq-t .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--jade-500); }
+  .doneline--qr .dq-m { font-size: var(--fz-3); color: var(--fog-700); }
+
+  /* 离场清单：三件事，一行一件。 */
+  .leavelist { width: 100%; display: flex; flex-direction: column;
+    padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+    background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .leavelist-t { display: flex; align-items: center; gap: var(--s-3);
+    font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); padding-bottom: var(--s-4); }
+  .leavelist-t .ic { width: 26px; height: 26px; color: var(--jade-500); }
+  .leavelist-r { min-height: 92px; display: flex; align-items: center;
+    font-size: var(--fz-5); color: var(--fog-700); line-height: 1.5;
+    border-top: 1px solid var(--brd-1); }
+  .leavelist-r b { color: var(--fog-900); margin-right: 6px; }
+
+  /* 取件页两个动作：卡片化。触控目标 160px，后果写在卡面上。 */
+  .pickacts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); width: 100%; }
+  .pickact { min-height: 190px; cursor: pointer; text-align: left; font-family: var(--ff-ui);
+    padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    display: flex; flex-direction: column; gap: var(--s-3);
+    transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+  .pickact:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+  .pickact:active { transform: translateY(1px) scale(.997); }
+  .pickact-ic { width: 52px; height: 52px; border-radius: var(--r-xs);
+    background: var(--fog-a08); display: grid; place-items: center; }
+  .pickact-ic .ic { width: 26px; height: 26px; color: var(--fog-600); }
+  .pickact-t { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; }
+  .pickact-s { font-size: var(--fz-3); color: var(--fog-600); margin-top: auto; }
+
+  /* 「这次打印有问题」：问句与四个选项本来就是一道题，收进同一张卡。 */
+  .issuebox { width: 100%; display: flex; flex-direction: column; gap: var(--s-4);
+    padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+    background: var(--amber-a12); border: 1px solid var(--amber-a20); }
+  /* 四个问题类型是二级选项，不跟着 progress-wrap 的 68px 走：done=issue 是 s7 最高的一态，
+     留够离栏底的余量比再大 8px 重要。60px 仍在 48px 触控下限之上。 */
+  .issuebox .btn { min-height: 60px; }
+
+  /* ai-down × redact=pick 兜底：体检不可用 ⇒ 没有候选框 ⇒ 遮盖层不出现，
+     但三页原文不该跟着消失。比通用门控更具体的选择器 + !important 才压得住
+     `.screen[data-redact="pick"] [data-redact]:not([data-redact~="pick"])`。 */
+  .screen[data-state="ai-down"][data-redact="pick"] .paper-stage > .sheet-a4 {
+    display: flex !important;
+  }
+
+  /* ── 2026-08-11 卡内空洞整改 · 三页文件预览 ─────────────────────────────
+     回归台报 s3 的 .sheet-a4 空 363 / 527px、s2 遮盖层里那张空 543px。判 B。
+     判据：这几张不是「本机生成的一页短文档」（那种见 17 / 18 / 21 的纸样豁免），
+     而是**用户上传的那份文件的页面预览**，而 paper-bar 上自己写着
+     「个人简历.pdf · A4 · 3 页 · 1.2 MB · 上传 09:43」。
+     一份 3 页的简历，每页却只画七八根字条、下面三分之二是白的 ——
+     那不是「原件短」，是预览没画完；而这一步用户正要**照着预览核对再付钱**，
+     核对对象画成半空的纸，核不出任何东西。
+     处置：沿用本设计稿 .ln 自己那套记号（同色 --paper-200、7px 字条、12px 行距），
+     用一个 .lnrest 把正文画到页脚上边距。它**不含任何文字**，只表示「这里有正文」，
+     不新增任何可读内容，也不动纸上任何一处隐私标记的位置
+     （.redact / .candbox 是绝对定位，锚点是 top 像素值，不受流内容影响）。
+     第 3 页是末页，正文停在离页脚 130px 处 —— 末页本来就不会排满。 */
+  .sheet-a4 .lnrest {
+    flex: 1 1 auto; min-height: 0; align-self: stretch; border-radius: 0;
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 7px, transparent 7px 19px);
+  }
+  .sheet-a4 .lnrest--last { margin-bottom: 130px; }
+
+  /* first 态的预览位：把「没有文件」做成居中的完整空态，而不是顶在框子上沿的一小坨。
+     图标 46→104、标题 20→36、正文 15→18。剩下的空当由 data-void-ok 声明，理由写在 HTML 上。 */
+  .paper-empty { flex: 1 1 auto; width: 100%; justify-content: center; gap: var(--s-6); }
+  .paper-empty .ic { width: 104px; height: 104px; }
+  .paper-empty b { font-size: var(--fz-8); }
+  .paper-empty p { font-size: var(--fz-4); line-height: 1.75; max-width: 34em; }
+  .paper-empty .btn { min-height: 68px; font-size: var(--fz-4); }
+
+  /* ── s2 右栏：文件信息 + 建议就是这一步的主内容 ──────────────────────
+     成因（实测）：default 1095px / ai-down 941px / first 864px 内容装在 1456px 的栏里，
+     尾空 284–592px。四张卡里三张是键值行，行高 48px、字号 15–16px ——
+     这是笔记本尺寸；而这一步用户要在一两米外核对「打的是不是这份、含不含身份证号」。
+     first / ai-down 更空，那是**数据确实没有**，但空态本身也要有构图（见下面 .chklist）。 */
+  [data-at="s2"] .pane { padding: var(--s-5); }
+  [data-at="s2"] .pane-hd .t { font-size: var(--fz-4); }
+  [data-at="s2"] .pane-hd .s { font-size: var(--fz-2); }
+  [data-at="s2"] .kv-row { min-height: 68px; font-size: var(--fz-4); }
+  [data-at="s2"] p { font-size: var(--fz-4) !important; line-height: 1.7 !important; }
+  [data-at="s2"] p > span[style*="fz-2"] { font-size: var(--fz-3) !important; }
+  [data-at="s2"] .btn { min-height: 62px; font-size: var(--fz-3); }
+  /* 「建议」卡在五个处置态之间高度差 164px（none 298 ↔ ask 462），带来两个问题：
+     ① 短的那几态右栏见底 207–249px；② 卡底那两颗按钮跟着上下跳 —— 用户刚要按
+     「不遮盖，我知道风险」，文字一变按钮就跑了，触控屏上这是会点错的。
+     钉一个 min-height 到最高那一态：所有处置态按钮位置不动，右栏也不再见底。
+     取 380px 而不是最高那一态的 462px：按钮位置基本稳住，短态卡内只留 82px，
+     不至于在卡里挖出一个大洞 —— 右栏实测仍在阈值内。
+     flex:0 0 auto 的理由和 s3 一样：点开右栏抽屉时整栏会变满，.pane--fill 默认会被压缩，
+     实测把「建议」的正文顶出卡外 28px。不许压它，让底下那张可滚的卡去吸收。 */
+  [data-at="s2"].pane--fill { min-height: 380px; flex: 0 0 auto; }
+
+  /* 空态构图：本机会给（或这次没给）的四道关。不是装饰，是「少了哪四项检查」。 */
+  .chklist { display: flex; flex-direction: column; gap: var(--s-2); }
+  .chklist-t { margin: 0; font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+  .chklist-s { margin: 0 0 var(--s-3); font-size: var(--fz-3); color: var(--fog-600); line-height: 1.65; }
+  .chklist-r { display: flex; align-items: center; gap: var(--s-4); min-height: 64px;
+    padding: 0 var(--s-4); border-radius: var(--r-xs);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    font-size: var(--fz-3); color: var(--fog-700); line-height: 1.45; }
+  .chklist-r .ic { width: 22px; height: 22px; flex: 0 0 auto; color: var(--fog-600); }
+  .chklist-r--off { border-style: dashed; color: var(--fog-600); }
+
+  /* ── s3 右栏：打印参数就是这一步的主内容，却是全页最小的一组控件 ────────
+     成因（实测）：参数卡 971px + 核价卡内容 224px = 1211px，栏高 1456px，尾空 245px。
+     不是状态漏配（四态都有内容），也不是 min-height —— 是控件按桌面尺寸做的：
+     分段按钮 48px（正好卡在触控下限）、字段标签 15px、字段间距 12px。
+     这一步用户要连点七组参数，选错「翻页边」出来的双面简历背面是倒的。
+     所以这里放大的是**按得准**，顺带把栏填满。 */
+  [data-at="s3"] .pane-hd .t { font-size: var(--fz-4); }
+  /* 尺寸有天花板，而且是实测撞出来的：.pane--fill 是 flex:0 1 auto，会被压缩，
+     压缩之后里面的 .field 也跟着缩，最后一组分段按钮直接顶出卡外（量到 3px、13px 两次）。
+     所以字段间距止步于 s-4、分段按钮止步于 56px —— 仍比原来的 48px 大，
+     也仍在触控下限之上，但不会把参数挤到卡外面去。 */
+  /* 还要给「点开才出现的东西」留位置。轴遍历看不见这一类：页码范围点「自定义」会展开
+     一个输入框加一行说明（约 75px），实测在免费单那一态把参数卡内容顶出卡外 53px。
+     所以字段间距只回到 13px、分段按钮只到 52px，并且让参数卡 flex:0 0 auto 不被压缩 ——
+     宁可少赚几十像素，也不能让最后一组参数在用户点开自定义页码时掉到卡外面。 */
+  [data-at="s3"].pane--fill { flex: 0 0 auto; }
+  [data-at="s3"] .field { padding: var(--s-3) 0; }
+  [data-at="s3"] .field-lb { font-size: var(--fz-3); }
+  [data-at="s3"] .seg button { min-height: 52px; font-size: var(--fz-3); }
+  [data-at="s3"] .stepper button { width: 52px; height: 52px; }
+  [data-at="s3"] .stepper .val { font-size: var(--fz-7); }
+  [data-at="s3"] .fnote { font-size: var(--fz-2); line-height: 1.6; }
+  /* 核价卡是 data-at="s3 s4" 的同一张卡，所以按**阶段**限定放大，不按卡限定：
+     s4 的右栏在 device-off 下本来只剩 39px 余量（核价卡那里多一块 176px 的取件码），
+     跟着放大只剩 6px —— 那是随时会被字体差异顶出去的距离。s4 的高度另想办法（见下面
+     「支付前请核对」里那条从抽屉移回常驻的出纸规则），不从这里挤。 */
+  .screen[data-stage="s3"] .qrow { font-size: var(--fz-3); }
+  /* .qnote 不跟着放大：免费单那一态多一条「本单 0 元…」，实测放大后 s3 右栏
+     只剩 26px 余量。金额明细（.qrow）值得放大，脚注不值得拿余量去换。 */
+
+  /* 折叠条里「当前这一步真正需要的那一段」移回常驻：标题保留原问句，正文一字不改。
+     只移当前处境要用来做决定的那一条 —— 排队能不能走、校验为什么多这一步、
+     校验失败两条路怎么选、超时怎么退、卡纸不选会怎样、出纸中途出事怎么办。
+     来源全文、长隐私条款、低频说明仍留在抽屉（s7 的会话清理口径就还在抽屉里）。 */
+  .restnote { border: 1px solid var(--brd-1); border-radius: var(--r-sm);
+    background: var(--surf-1); padding: var(--s-5) var(--s-6); }
+  .restnote-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); margin-bottom: 9px; }
+  .restnote-b { font-size: var(--fz-3); line-height: 1.75; color: var(--fog-700); }
+
+  /* 取件页：每个动作点完必须给出结果，不能点了就没下文 */
+  .doneline { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32);
+    font-size: var(--fz-3); color: var(--fog-900); }
+  .doneline .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .doneline--amber { background: var(--amber-a12); border-color: var(--amber-a20); }
+  .doneline--amber .ic { color: var(--amber-500); }
+  .doneline .btn { margin-left: auto; }
+
+  /* ── 权益抵扣（2026-08-11 新增）────────────────────────────────────────
+     为什么放在左栏而不是核价卡里：实测右栏在 s3 是 1160(参数) + 281(核价) = 1456，
+     一像素余量都没有；核价卡是 tailgrow，往里塞东西只会让它内部起滚动条，
+     内容被藏在滚动里比放不下更糟。左栏的 .paper 是 flex:1/1 的预览，
+     让它从 908px 让出 ~200px，A4 预览仍然可读（本来就是可滚动的 .paper-stage）。
+
+     「本机可担保的那一档」在这张卡上分三层，措辞必须分开：
+       · 余额与券面     → 账户事实（E2），服务端下发，本机照抄
+       · 屏上单价       → 后台配置快照（GET /print/price-config），本机拉到什么显示什么
+       · 「这一单最终减了多少」→ **今天还没有**。订单级抵扣是 C5-4，
+         PrintPriceQuote 的返回里根本没有 discount / benefit 字段。
+         所以本卡只做「试算」，并且把待接线写在脸上，不冒充已经能减。
+     ──────────────────────────────────────────────────────────────────── */
+  .benefit { flex: 0 0 auto; border-radius: var(--r-md); padding: var(--s-3) var(--s-5) var(--s-4);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    backdrop-filter: blur(var(--glass-blur));
+    display: flex; flex-direction: column; gap: var(--s-3); }
+  .benefit-hd { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .benefit-hd .t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+  .benefit-hd .s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600);
+    font-family: var(--ff-num); }
+  .benopts { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  /* 触控：一体机主操作 ≥56px，这里给到 88px（两行文字 + 省多少） */
+  .benopt { flex: 1 1 0; min-width: 0; min-height: 88px; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: center; gap: 3px; padding: 11px 13px;
+    border-radius: var(--r-sm); border: 1px solid var(--brd-1); background: var(--surf-1);
+    color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .benopt[aria-pressed="true"] { border-color: var(--jade-a32); background: var(--jade-a12); }
+  .benopt-t { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+  .benopt-m { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+  .benopt-v { font-size: var(--fz-2); font-family: var(--ff-num); color: var(--jade-200); }
+  .bensum { display: flex; flex-direction: column; gap: 6px; }
+  .bensum-r { display: flex; align-items: baseline; font-size: var(--fz-2); color: var(--fog-700); }
+  .bensum-r .v { margin-left: auto; font-family: var(--ff-num); color: var(--fog-900); }
+  .bensum-r--cut .v { color: var(--jade-200); }
+  .bensum-r--due { padding-top: 8px; border-top: 1px solid var(--brd-1); }
+  .bensum-r--due .k { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+  .bensum-r--due .v { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); }
+  .ben-p { margin: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.62; }
+  .ben-p b { color: var(--fog-900); }
+  .ben-p + .ben-p { margin-top: 6px; }
+  .ben-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+  /* 一体机主操作 ≥56px（§9）。这条出口是真要按的，不按 48px 的下限凑合。 */
+  .ben-acts .btn { min-height: 56px; font-size: var(--fz-3); }
+  /* 「待接线」不借 E3 的琥珀色（与 24 同一条口径）：E1/E2/E3 说的是「结论有多硬」，
+     这里**还没有结论** —— 是一个位置对、输入只到一半的提示位。 */
+  .ev--wire { color: var(--fog-600); background: var(--fog-a04);
+    border-style: dashed; border-color: var(--fog-a20); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
+<!-- 原型示意码：不是可扫的真码，只表达「这里会出一个二维码」。真实系统由服务端一次性会话签发。 -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="i-qrdemo" viewBox="0 0 25 25" shape-rendering="crispEdges">
+    <path d="M.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M18.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="20" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M.5 18.5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="20" width="3" height="3" fill="#101613"/>
+    <path fill="#101613" d="M9 0h1v1h-1z M10 0h1v1h-1z M11 0h1v1h-1z M12 0h1v1h-1z M15 0h1v1h-1z M16 0h1v1h-1z M11 1h1v1h-1z M15 1h1v1h-1z M9 2h1v1h-1z M10 2h1v1h-1z M15 2h1v1h-1z M16 2h1v1h-1z M11 3h1v1h-1z M14 3h1v1h-1z M15 3h1v1h-1z M9 4h1v1h-1z M11 4h1v1h-1z M14 4h1v1h-1z M15 4h1v1h-1z M9 5h1v1h-1z M10 5h1v1h-1z M13 5h1v1h-1z M14 5h1v1h-1z M15 5h1v1h-1z M16 5h1v1h-1z M10 6h1v1h-1z M12 6h1v1h-1z M14 6h1v1h-1z M16 6h1v1h-1z M10 7h1v1h-1z M11 7h1v1h-1z M12 7h1v1h-1z M14 7h1v1h-1z M9 8h1v1h-1z M12 8h1v1h-1z M15 8h1v1h-1z M16 8h1v1h-1z M3 9h1v1h-1z M4 9h1v1h-1z M5 9h1v1h-1z M7 9h1v1h-1z M8 9h1v1h-1z M10 9h1v1h-1z M11 9h1v1h-1z M12 9h1v1h-1z M14 9h1v1h-1z M15 9h1v1h-1z M16 9h1v1h-1z M17 9h1v1h-1z M19 9h1v1h-1z M20 9h1v1h-1z M22 9h1v1h-1z M24 9h1v1h-1z M0 10h1v1h-1z M3 10h1v1h-1z M4 10h1v1h-1z M6 10h1v1h-1z M7 10h1v1h-1z M9 10h1v1h-1z M10 10h1v1h-1z M12 10h1v1h-1z M14 10h1v1h-1z M15 10h1v1h-1z M16 10h1v1h-1z M21 10h1v1h-1z M22 10h1v1h-1z M0 11h1v1h-1z M3 11h1v1h-1z M4 11h1v1h-1z M8 11h1v1h-1z M9 11h1v1h-1z M10 11h1v1h-1z M13 11h1v1h-1z M14 11h1v1h-1z M15 11h1v1h-1z M18 11h1v1h-1z M20 11h1v1h-1z M22 11h1v1h-1z M0 12h1v1h-1z M3 12h1v1h-1z M6 12h1v1h-1z M8 12h1v1h-1z M20 12h1v1h-1z M22 12h1v1h-1z M24 12h1v1h-1z M0 13h1v1h-1z M2 13h1v1h-1z M3 13h1v1h-1z M4 13h1v1h-1z M5 13h1v1h-1z M10 13h1v1h-1z M12 13h1v1h-1z M13 13h1v1h-1z M15 13h1v1h-1z M17 13h1v1h-1z M20 13h1v1h-1z M21 13h1v1h-1z M22 13h1v1h-1z M23 13h1v1h-1z M24 13h1v1h-1z M6 14h1v1h-1z M7 14h1v1h-1z M9 14h1v1h-1z M11 14h1v1h-1z M18 14h1v1h-1z M20 14h1v1h-1z M23 14h1v1h-1z M0 15h1v1h-1z M2 15h1v1h-1z M7 15h1v1h-1z M11 15h1v1h-1z M12 15h1v1h-1z M15 15h1v1h-1z M17 15h1v1h-1z M18 15h1v1h-1z M22 15h1v1h-1z M24 15h1v1h-1z M2 16h1v1h-1z M3 16h1v1h-1z M4 16h1v1h-1z M5 16h1v1h-1z M6 16h1v1h-1z M7 16h1v1h-1z M8 16h1v1h-1z M11 16h1v1h-1z M12 16h1v1h-1z M13 16h1v1h-1z M16 16h1v1h-1z M18 16h1v1h-1z M21 16h1v1h-1z M14 17h1v1h-1z M15 17h1v1h-1z M18 17h1v1h-1z M19 17h1v1h-1z M22 17h1v1h-1z M24 17h1v1h-1z M9 18h1v1h-1z M10 18h1v1h-1z M12 18h1v1h-1z M13 18h1v1h-1z M17 18h1v1h-1z M18 18h1v1h-1z M19 18h1v1h-1z M20 18h1v1h-1z M23 18h1v1h-1z M11 19h1v1h-1z M12 19h1v1h-1z M14 19h1v1h-1z M15 19h1v1h-1z M17 19h1v1h-1z M20 19h1v1h-1z M21 19h1v1h-1z M22 19h1v1h-1z M24 19h1v1h-1z M10 20h1v1h-1z M13 20h1v1h-1z M15 20h1v1h-1z M22 20h1v1h-1z M23 20h1v1h-1z M24 20h1v1h-1z M10 21h1v1h-1z M11 21h1v1h-1z M12 21h1v1h-1z M13 21h1v1h-1z M14 21h1v1h-1z M16 21h1v1h-1z M17 21h1v1h-1z M18 21h1v1h-1z M20 21h1v1h-1z M22 21h1v1h-1z M23 21h1v1h-1z M24 21h1v1h-1z M9 22h1v1h-1z M14 22h1v1h-1z M18 22h1v1h-1z M19 22h1v1h-1z M20 22h1v1h-1z M22 22h1v1h-1z M23 22h1v1h-1z M11 23h1v1h-1z M12 23h1v1h-1z M13 23h1v1h-1z M16 23h1v1h-1z M19 23h1v1h-1z M20 23h1v1h-1z M22 23h1v1h-1z M23 23h1v1h-1z M24 23h1v1h-1z M9 24h1v1h-1z M10 24h1v1h-1z M13 24h1v1h-1z M15 24h1v1h-1z M16 24h1v1h-1z M17 24h1v1h-1z M18 24h1v1h-1z M19 24h1v1h-1z M20 24h1v1h-1z M21 24h1v1h-1z M22 24h1v1h-1z M23 24h1v1h-1z M24 24h1v1h-1z"/>
+  </symbol>
+</svg>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）
+     只拦 s2–s4。三个阶段的边界是想清楚的，不是图省事：
+
+     · s1 还在挑来源，没有东西可丢，拦截只会烦人。
+     · s5 收银、s6 出纸、s7 取件 **一律不拦**。那时钱已经收了、有取件码，
+       离开不叫「丢东西」——套同一套「离开就没了」的话术会把用户吓回来，
+       甚至让他以为不守在屏幕前就拿不到打印件。这三步的正确出路是取件码，
+       页面里本来就有。
+     · s4 的文案要点明「还没收你钱」，否则用户在核对金额这一步看到
+       「离开就没了」，第一反应是钱要不回来。
+
+     没写 data-guard-keep：本页的「存我的文档」只在 device-off 态出现，
+     默认态没有这个落点。给一个不一定存在的「存下来再走」按钮就是伪造能力。 -->
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s3"（参数核价）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「参数核价」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-pay="wait" data-job="printing" data-theme="warm"
+     data-guard-at="s2 s3 s4"
+     data-guard-lose-s2="已经带进来的文件、材料体检结果，以及你刚做的遮盖"
+     data-guard-lose-s3="已经带进来的文件、体检结果和你调好的打印参数"
+     data-guard-lose-s4="已经带进来的文件和这一单的打印设置（还没收你钱）">
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
 
   <!-- ============ 顶栏 ============ -->
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">打印扫描</div>
@@ -67,36 +599,64 @@
     <!-- ---------- 左：文件为主 ---------- -->
     <div class="wmain">
 
-      <!-- S1 来源四选 -->
-      <div class="sources" data-at="s1">
-        <button class="src" data-go="s2">
+      <!-- S1 六卡选择器：怎么把文件带进来（2 列 3 行，每卡 ≥150px）。
+           前三卡在本页继续第 2 步；后三卡是去对应台面的真链接（a 标签，非装饰）。
+           device-off 时扫描原件 / 复印置灰 —— 扫描与打印同一台机，离线一起停。 -->
+      <!-- 2026-08-10 Codex 整改：前三张原来是 data-go="s2"，一按就跳「材料体检」——
+           中间没有任何选取动作，用户不知道体检的是哪一份。改成先开取件层，选中一份才能往下走。 -->
+      <div class="sources" data-at="s1" data-src="none" style="grid-auto-rows:minmax(150px,1fr)">
+        <button class="src" data-src-go="local">
           <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
           <span class="src-nm">本机上传</span>
-          <span class="src-ds">插入 U 盘或用本机键盘选择文件。支持 PDF / JPG / PNG。</span>
+          <span class="src-ds">本机选文件 · PDF / JPG / PNG</span>
           <span class="src-tag"><span class="chip chip--jade">最常用</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-src-go="phone">
           <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="src-nm">手机扫码传</span>
-          <span class="src-ds">扫屏幕上的码，从手机把文件传过来，不用插任何东西。</span>
+          <span class="src-ds">扫屏上的码，从手机传过来</span>
           <span class="src-tag"><span class="chip">一次性会话</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <button class="src" data-src-go="usb">
           <span class="src-ic"><svg class="ic"><use href="#i-usb"/></svg></span>
           <span class="src-nm">U 盘导入</span>
-          <span class="src-ds">插入右侧 USB 口，选择要打印的文件。</span>
+          <span class="src-ds">插右侧 USB 口，选要打的文件</span>
           <span class="src-tag"><span class="chip" data-when="default first ai-down">已识别 1 个设备</span><span class="chip" data-when="device-off">未检测到设备</span></span>
         </button>
-        <button class="src" data-go="s2">
+        <a class="src" href="07-scan-workbench.html" data-when="default first ai-down" data-src="none">
           <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
-          <span class="src-nm">纸质扫描</span>
-          <span class="src-ds">把纸质原件放上玻璃板或送稿器，扫成 PDF 再打印。</span>
-          <span class="src-tag"><span class="chip chip--jade">扫描仪就绪</span></span>
+          <span class="src-nm">扫描原件</span>
+          <span class="src-ds">纸质原件放玻璃板或送稿器，扫成 PDF 再回来打印。</span>
+          <span class="src-tag"><span class="chip chip--jade">去扫描工作台</span></span>
+        </a>
+        <button class="src" aria-disabled="true" data-when="device-off" data-src="none">
+          <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="src-nm">扫描原件</span>
+          <span class="src-ds">扫描与打印是同一台机，离线一起停，已上报运维。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
         </button>
+        <a class="src" href="07-scan-workbench.html?stage=s2" data-when="default first ai-down" data-src="none">
+          <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="src-nm">复印</span>
+          <span class="src-ds">纸质原件复一份：先扫描后打印，一台机上完成。</span>
+          <span class="src-tag"><span class="chip">先扫后打</span></span>
+        </a>
+        <button class="src" aria-disabled="true" data-when="device-off" data-src="none">
+          <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="src-nm">复印</span>
+          <span class="src-ds">复印要出纸，打印机离线时做不了，已上报运维。</span>
+          <span class="src-tag"><span class="chip chip--amber chip--info">设备离线 · 暂不可用</span></span>
+        </button>
+        <a class="src" href="29-id-photo.html" data-src="none">
+          <span class="src-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
+          <span class="src-nm">证件照排版</span>
+          <span class="src-ds">证件照排成 A4 版面，打印后按裁切线剪开。</span>
+          <span class="src-tag"><span class="chip chip--info">尚未开放 · 可先了解</span></span>
+        </a>
       </div>
 
       <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
-      <div class="xlane" data-at="s1">
+      <div class="xlane" data-at="s1" data-src="none">
         <span class="xlane-hd">不打印，只处理文件？这两个台面也在这里</span>
         <div class="xlane-row">
           <a class="xlane-go" href="07-scan-workbench.html">
@@ -118,6 +678,248 @@
         </div>
       </div>
 
+      <!-- ── S1-b 本机上传：真的列出可选文件，选中才算数 ── -->
+      <div class="pickwrap" data-at="s1" data-src="local">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-upload"/></svg>选一个文件</span>
+          <span class="pickbar-s">只列 PDF / JPG / PNG</span>
+        </div>
+        <div class="filelist">
+          <button class="filerow" data-file-go="f1" aria-pressed="false"
+                  data-nm="个人简历.pdf" data-mt="PDF · A4 · 3 页 · 1.2 MB" data-pg="3 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">个人简历.pdf</span>
+              <span class="fr-mt">PDF · A4 · 3 页 · 1.2 MB · 今天 09:43</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f2" aria-pressed="false"
+                  data-nm="毕业证明扫描件.pdf" data-mt="PDF · A4 · 2 页 · 3.4 MB" data-pg="2 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">毕业证明扫描件.pdf</span>
+              <span class="fr-mt">PDF · A4 · 2 页 · 3.4 MB · 8 月 6 日</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="f3" aria-pressed="false"
+                  data-nm="证件照.jpg" data-mt="JPG · 1 页 · 2.1 MB" data-pg="1 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">证件照.jpg</span>
+              <span class="fr-mt">JPG · 1 页 · 2.1 MB · 今天 09:12</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+        </div>
+        <div class="picked" data-file="on">
+          <span class="picked-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="picked-b">
+            <span class="picked-t">已选中：<b data-picked-nm>个人简历.pdf</b></span>
+            <span class="picked-m" data-picked-mt>PDF · A4 · 3 页 · 1.2 MB</span>
+          </span>
+          <button class="btn btn--ghost" style="margin-left:auto" data-file-go="none">换一份</button>
+        </div>
+        <div class="notice" data-file="none">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>还没选文件。点上面任意一行，选中后才会进材料体检。</span>
+        </div>
+      </div>
+
+      <!-- ── S1-b 手机扫码传：出码 → 等待 → 已收到 1 份 ── -->
+      <div class="pickwrap" data-at="s1" data-src="phone phone-got">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-qr"/></svg>手机扫码传</span>
+          <span class="pickbar-s">一次性会话 · 5 分钟内有效</span>
+        </div>
+        <div class="relay">
+          <span class="miniqr">
+            <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码 · 不是可扫的真码</span>
+          </span>
+          <span class="relay-b">
+            <span class="relay-t" data-src="phone">等你在手机上选文件</span>
+            <span class="relay-t" data-src="phone-got">已收到 1 份</span>
+            <div class="kv" data-src="phone">
+              <div class="kv-row"><span class="k">第 1 步</span><span class="v">用微信或相机扫这个码</span></div>
+              <div class="kv-row"><span class="k">第 2 步</span><span class="v">在手机上选要打的文件</span></div>
+              <div class="kv-row"><span class="k">第 3 步</span><span class="v">传输页保持常亮到提示完成</span></div>
+              <div class="kv-row"><span class="k">状态</span><span class="v" style="color:var(--amber-600)">等待中 · 还没收到文件</span></div>
+            </div>
+            <div class="kv" data-src="phone-got">
+              <div class="kv-row"><span class="k">文件名</span><span class="v">个人简历.pdf</span></div>
+              <div class="kv-row"><span class="k">格式与页数</span><span class="v">PDF · A4 · 3 页</span></div>
+              <div class="kv-row"><span class="k">大小</span><span class="v">1.2 MB · 完整</span></div>
+              <div class="kv-row"><span class="k">来源</span><span class="v">手机扫码传 · 09:43</span></div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap" data-src="phone-got">
+              <button class="btn btn--primary" data-file-go="f1" data-go="s2">用这份，去体检</button>
+              <button class="btn btn--ghost" data-src-go="phone">重新出码换一份</button>
+            </div>
+            <!-- 到没到是服务端推的，不是用户按的；给评审一个可切开关，标 data-review -->
+            <div class="cash-demo" data-review style="position:static;justify-content:flex-start">
+              <span style="width:100%;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 · 切接力处境（真实系统由服务端推送）</span>
+              <button data-src-go="phone">等待中</button>
+              <button data-src-go="phone-got">已收到</button>
+            </div>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── S1-b U 盘导入：未插入 / 已插入两态 ── -->
+      <div class="pickwrap" data-at="s1" data-src="usb usb-in">
+        <div class="pickbar">
+          <button class="btn btn--quiet" data-src-go="none"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg>换一种方式</button>
+          <span class="pickbar-t"><svg class="ic"><use href="#i-usb"/></svg>U 盘导入</span>
+          <span class="pickbar-s">USB 口在屏幕右下侧</span>
+        </div>
+        <div class="locked" data-src="usb" style="flex:1 1 auto">
+          <svg class="ic"><use href="#i-usb"/></svg>
+          <b>还没检测到 U 盘</b>
+          <p>把 U 盘插进屏幕右下侧的 USB 口，插好后这里自动列出文件。</p>
+          <div class="kv" style="width:min(360px,100%);text-align:left">
+            <div class="kv-row"><span class="k">接口</span><span class="v">USB-A · 屏幕右下侧</span></div>
+            <div class="kv-row"><span class="k">支持格式</span><span class="v">PDF / JPG / PNG</span></div>
+            <div class="kv-row"><span class="k">读取范围</span><span class="v">只读你选中的那一个文件</span></div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn--ghost" data-src-go="phone">没带 U 盘？用手机扫码传</button>
+            <button class="btn btn--ghost" data-src-go="local">用本机上传</button>
+          </div>
+          <!-- 插没插是硬件事件，不是用户在界面上按的 -->
+          <div class="cash-demo" data-review style="position:static;justify-content:center">
+            <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 · 切 U 盘处境（真实系统由终端硬件事件驱动）</span>
+            <button data-src-go="usb">未插入</button>
+            <button data-src-go="usb-in">已插入</button>
+          </div>
+        </div>
+        <div class="filelist" data-src="usb-in">
+          <button class="filerow" data-file-go="u1" aria-pressed="false"
+                  data-nm="简历_最终版.pdf" data-mt="PDF · A4 · 2 页 · 0.9 MB" data-pg="2 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">简历_最终版.pdf</span>
+              <span class="fr-mt">PDF · A4 · 2 页 · 0.9 MB · U 盘根目录</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+          <button class="filerow" data-file-go="u2" aria-pressed="false"
+                  data-nm="在校证明.jpg" data-mt="JPG · 1 页 · 1.6 MB" data-pg="1 页">
+            <span class="fr-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+            <span class="fr-b">
+              <span class="fr-nm">在校证明.jpg</span>
+              <span class="fr-mt">JPG · 1 页 · 1.6 MB · /材料 目录</span>
+            </span>
+            <span class="fr-pick">选这份</span>
+          </button>
+        </div>
+        <div class="picked" data-src="usb-in" data-file="on">
+          <span class="picked-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="picked-b">
+            <span class="picked-t">已选中：<b data-picked-nm>简历_最终版.pdf</b></span>
+            <span class="picked-m" data-picked-mt>PDF · A4 · 2 页 · 0.9 MB</span>
+          </span>
+          <button class="btn btn--ghost" style="margin-left:auto" data-file-go="none">换一份</button>
+        </div>
+        <div class="notice" data-src="usb-in" data-file="none">
+          <svg class="ic"><use href="#i-usb"/></svg>
+          <span>已识别 U 盘「Kingston 32G」，共 2 个可打印文件。选中一个才会读取。</span>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 材料交接：别的台面（简历工作台 / 招聘会作战台 / 岗位清单）把材料送过来时，
+           参数阶段顶上先出一张来源回执 —— 让用户确认「是不是这份」，而不是直接开始调份数。
+           2026-08-10 修：这一行以前是写死的，政策页送办事清单过来也显示成「简历诊断报告」。
+           现在由页尾的交接契约脚本按 URL 参数改写；参数一个都没有时保留下面这行默认文案。
+           2026-08-11 再修：默认这行原本写「09:43 送达」。「送达」是结论 —— 它同时声称
+           文件已经在本机、并且本机已经量过 3 页。走 ?stage=s3 直达时这两件事都没发生过，
+           所以默认文案也改成只说真实发生的事（收到交接）＋ 一句「还没体检」。 -->
+      <div class="receipt" data-at="s3 s4" data-when="default first ai-down device-off" id="handoff">
+        <svg class="ic"><use href="#i-check" id="handoff-ic"/></svg>
+        <span class="receipt-t" id="handoff-t">本次来自：<b>简历工作台 · 诊断报告</b> · 来源页标注&#160;<b>3&#160;页</b> · 09:43 收到交接<span class="receipt-n">本机还没体检这份文件，页数与费用以体检为准。</span></span>
+        <span class="receipt-a"><a class="btn btn--quiet" id="handoff-back" href="09-resume-workbench.html?stage=s5">不是这份？回去换</a></span>
+      </div>
+
+      <!-- 处置结果条：从遮盖层回到参数步时，第一眼就要看到「打印件到底含不含身份证号」。
+           只在体检真的命中过时出现（four-state 里只有 default / device-off 有体检结论）。 -->
+      <div class="privline" data-at="s3 s4" data-when="default device-off" data-redact="done">
+        <svg class="ic"><use href="#i-check"/></svg>
+        <span>第 2 页身份证号<b>已遮盖 1 处</b> · 打印件不含身份证号 —— 原件没被改动</span>
+        <button class="btn btn--quiet" type="button" data-redact-go="none" data-go="s2">撤销遮盖</button>
+      </div>
+      <div class="privline privline--amber" data-at="s3 s4" data-when="default device-off" data-redact="skip">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span>第 2 页身份证号<b>保持原样</b>（你已确认）· 打印件会含完整身份证号</span>
+        <button class="btn btn--quiet" type="button" data-redact-go="pick" data-go="s2">改主意，去遮盖</button>
+      </div>
+      <div class="privline privline--amber" data-at="s3 s4" data-when="default device-off" data-redact="none ask pick">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span>第 2 页含身份证号，<b>还没处置</b> · 现在打出来会带着完整号码</span>
+        <button class="btn btn--quiet" type="button" data-redact-go="pick" data-go="s2">去遮盖</button>
+      </div>
+
+      <!-- ══════════════ S3/S4 权益抵扣（2026-08-11 新增）══════════════
+           走查提出的问题：整条打印流程从核价到收银，**一处都没提过权益** ——
+           而 P24 里免费打印额度、打印折扣券这些是真的、成体系的，
+           用户在 24 看到「本月还剩 7 计费页」，走到这里却只有一个 3.00 元。
+
+           这一卡把它接上，同时受三条硬事实约束（都是后端的既有实现，不是猜的）：
+
+           ① **一单一权益，不能叠加。** RedemptionRecord 上有 DB 级唯一约束
+              @@unique([serviceType, serviceRefId]) —— 同一服务产物只能被核销一次，
+              换不同权益、换 idempotencyKey 都不行。所以下面是**单选**，
+              而且必须在屏上说清「为什么选了 A 就不能再选 B」，
+              否则用户会以为是本机小气。
+
+           ② **订单级抵扣今天不存在。** PrintPriceQuote 的返回是
+              { amountCents, billablePages, billingPageSource, lines } ——
+              没有 discount / benefit / deduction 任何一个字段；
+              RedemptionRecord 本批 orderId 恒 null、amountCents 恒 0
+              （券=平台 credit，非资金、非收款）。订单抵扣是 C5-4。
+              所以这里只做**试算**，并把「待接线」写在脸上。
+              这跟本页已有的「本机还没体检这份文件，页数与费用以体检为准」是同一种写法。
+
+           ③ **单价不是产品常量，是后台配置。** 屏上的 0.20 / 1.50 来自
+              GET /api/v1/print/price-config（匿名可读，Kiosk 展示价唯一来源），
+              改价只有 PUT /admin/billing/price-config/:serviceKey 一条合法路径且必审计。
+              设计稿里 scripts/site-config.js 的 price 段要按「**本机开机时拉到的快照**」
+              理解，不是「我们的定价」。拉不到就是 PRICE_CONFIG_UNAVAILABLE ——
+              后端真实会抛的错，对应下面那一屏：不显示金额、不收款、不拿旧价当现价。
+
+           默认**不选权益**：C5-4 没上线之前，本机不能替你真扣掉，
+           那就不该默认摆出一个本机还兑现不了的减免。要不要试算，你自己按一下。
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="benefit" data-at="s4" data-when="default first ai-down" id="benefit">
+        <div class="benefit-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-ticket"/></svg>
+          <span class="t">权益与本单价格</span>
+          <span class="s" id="ben-snap">价目与权益均来自后台配置</span>
+        </div>
+
+        <!-- 单选：一单一权益。选项由服务端下发的权益列表渲染，不是写死的卡片。 -->
+        <div class="benopts" id="ben-opts"></div>
+
+        <!-- 试算：原价 / 抵扣 / 试算应付。数值全部由页尾同一份算式产出。 -->
+        <div class="bensum" id="ben-sum"></div>
+
+        <div id="ben-notes"></div>
+        <div class="ben-acts" id="ben-acts"></div>
+
+        <div class="cash-demo" data-review style="position:static;justify-content:flex-start;margin-top:2px">
+          <span style="font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">原型演示 ·
+            处境由服务端返回，不由用户点：</span>
+          <button data-ben-btn="have" aria-pressed="true">有可用</button>
+          <button data-ben-btn="ordinary">普通打印不适用</button>
+          <button data-ben-btn="none">已用完/过期</button>
+          <button data-ben-btn="guest">未认领身份</button>
+          <button data-ben-btn="unavailable">价目拉不到</button>
+          <button data-ben-btn="repriced">后台刚调价</button>
+        </div>
+      </div>
+
       <!-- S2–S4 体检结论 -->
       <div class="checks" data-at="s2 s3 s4">
         <div class="checks-hd">
@@ -133,11 +935,15 @@
         <div class="checks-list" data-when="default device-off">
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>纸张规格 A4，无需缩放</span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>3 页，无空白页</span>
-          <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>2</b> 页含身份证号，建议遮盖后再打印</span></span>
+          <!-- 这一条随处置结果改写：体检结论不能在用户处置完之后还停在「建议遮盖」——
+               那会让人以为自己刚才那一下没生效。 -->
+          <span class="chk chk--warn" data-redact="none pick ask"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>2</b> 页含身份证号，建议遮盖后再打印</span></span>
+          <span class="chk chk--ok" data-redact="done"><svg class="ic"><use href="#i-check"/></svg><span>第 <b>2</b> 页身份证号已遮盖 · 打印件不含身份证号</span></span>
+          <span class="chk chk--warn" data-redact="skip"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>2</b> 页身份证号<b>保持原样</b>（你已确认）· 打印件会含身份证号</span></span>
           <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>字体已嵌入，不会缺字</span>
         </div>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>体检与参数预填服务中断。文件预览、参数设置、核价与出纸都不受影响，参数需要你自己确认。</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>体检与预填中断 · 预览、参数、核价、出纸都不受影响</span>
         </div>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>先回第 1 步把文件送进来，体检结果会显示在这里。</span>
@@ -145,7 +951,21 @@
       </div>
 
       <!-- S2–S4 文件预览：视觉主体 -->
-      <div class="paper" data-at="s2 s3 s4">
+      <!-- data-void-ok（2026-08-11）：回归台的「卡内空洞」会报这块在 first 态空 368px。
+           这一处的空是对的，而且**只剩这一种**情况：first = 本机手上没有任何文件，
+           框子里是居中放大的空态（104px 图标 + 36px 标题 + 18px 正文 + 回第 1 步的真实出口）。
+           要把 1124px 的框填满，只能在纸样上画一份并不存在的文稿 —— 那比留白坏得多。
+           整改前它是 826px、而且空态顶在框子上沿；现在是「围绕放大主体的均衡空间」。
+
+           另外两种会让这块空掉的情况都**已经修掉、没有靠这条豁免蒙混**：
+             · ai-down × redact=pick 曾经整块空白 1145px（原文被 data-redact 关掉、
+               遮盖层被 data-when 关掉，谁也没接住）→ 已在页内 CSS 兜底放回原文，
+               并加了「这一处没有遮住」的明示；
+             · default / device-off 各处置态读数为 43px 或负数，可以对照。
+           声明式豁免的代价要说清楚：加了它，这个框以后就不再被这项检查盯着。
+           所以谁改这块预览位，请自己确认三页原文仍然渲染得出来。 -->
+      <div class="paper" data-at="s2 s3 s4"
+           data-void-ok="first 态本机没有任何文件，框内是居中放大的空态与真实出口；填满它就等于在纸样上画一份不存在的文稿">
         <div class="paper-bar">
           <span class="nm" data-when="default ai-down device-off">个人简历.pdf</span>
           <span class="nm" data-when="first">未选择文件</span>
@@ -156,9 +976,25 @@
             <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
           </span>
         </div>
+        <!-- 2026-08-11：ai-down × redact=pick 是一个没人接住的组合 ——
+             三页原文被 data-redact="none ask done skip" 关掉，遮盖层被
+             data-when="default device-off" 关掉，预览位整块空白（实测 1145px）。
+             它是能走到的：用户在正常态按了「遮盖这一处」，随后 AI 掉线就落在这里。
+             按本页接线契约的降级口径处理 —— 体检不可用就没有候选框，遮盖打不开，
+             所以把原文放回去（见页内 CSS 的 ai-down×pick 兜底），并且**明说没遮住**。
+             契约原文：「绝不能停在『已遮盖』的界面上」。
+             这一条压在 paper-bar 下面、不进滚动区：放进 .paper-stage 实测落在三页之后
+             第 2870px，要滚到底才看得见 —— 一句「没遮住」藏在滚动区底部等于没说。 -->
+        <div class="notice notice--amber" data-when="ai-down" data-redact="pick"
+             style="flex:0 0 auto;border-radius:0;border-width:0 0 1px;font-size:var(--fz-3)">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>这一处没有遮住。</b>体检不可用时没有候选框，遮盖工具打不开 ——
+            现在打出来仍然含身份证号。等体检恢复再遮，或者确认按原样打印。</span>
+        </div>
+
         <div class="paper-stage">
           <!-- 三页连续滚动：和真实阅读器一致，用户能一路核对完再付钱 -->
-          <div class="sheet-a4" id="pg1" data-when="default ai-down device-off">
+          <div class="sheet-a4" id="pg1" data-when="default ai-down device-off" data-redact="none ask done skip">
             <h4>王 · 个人简历</h4>
             <div class="meta">求职意向：运营专员 · 广州 · 电话 138****2046</div>
             <div class="hr"></div>
@@ -169,9 +1005,10 @@
             <div class="ln"></div><div class="ln ln--m"></div><div class="ln"></div>
             <div class="sec">项目</div>
             <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <div class="lnrest"></div>
             <span class="pgno">1 / 3</span>
           </div>
-          <div class="sheet-a4" id="pg2" data-when="default ai-down device-off">
+          <div class="sheet-a4" id="pg2" data-when="default ai-down device-off" data-redact="none ask done skip">
             <div class="sec">证件与材料</div>
             <div class="ln ln--m"></div>
             <div class="ln ln--s"></div>
@@ -180,18 +1017,105 @@
             <div class="ln ln--s"></div>
             <div class="sec">在校证明</div>
             <div class="ln ln--m"></div><div class="ln"></div>
+            <div class="lnrest"></div>
             <span class="pgno">2 / 3</span>
-            <div class="redact" style="top:118px"><span>身份证号</span></div>
+            <!-- 三种处置结果落在同一位置：未处置=虚线框，已遮盖=实心黑条，保持原样=琥珀框。
+                 top 由页尾脚本按用户选中的那一处改写，不写死。 -->
+            <div class="redact" id="pg2-flag" style="top:118px" data-redact="none ask"><span>身份证号</span></div>
+            <div class="redact redact--on" id="pg2-on" style="top:118px" data-redact="done"><span>已遮盖</span></div>
+            <div class="redact redact--kept" id="pg2-kept" style="top:118px" data-redact="skip"><span>身份证号 · 保持原样</span></div>
           </div>
-          <div class="sheet-a4" id="pg3" data-when="default ai-down device-off">
+          <div class="sheet-a4" id="pg3" data-when="default ai-down device-off" data-redact="none ask done skip">
             <div class="sec">技能</div>
             <div class="ln ln--m"></div><div class="ln ln--s"></div>
             <div class="sec">证书</div>
             <div class="ln"></div><div class="ln ln--s"></div>
             <div class="sec">自我评价</div>
             <div class="ln ln--m"></div><div class="ln"></div><div class="ln ln--s"></div>
+            <div class="lnrest lnrest--last"></div>
             <span class="pgno">3 / 3</span>
           </div>
+          <!-- ═══ 遮盖层：原地展开在预览位（2026-08-10 补）═══════════════════
+               ⚠ 只在 s2 + default/device-off + data-redact="pick" 出现。
+               为什么不做成弹窗：遮盖是对着那一页做的判断，
+               弹窗会把参照物盖住，用户只能凭记忆确认框对不对。
+
+               ── 接线契约（交 Codex）· 遮盖是**产生新文件版本**的动作 ──────────
+               · 需要的输入：
+                   fileId + fileVersionId（当前版本）
+                   + page（页码，1 起）
+                   + boxes: [{ x, y, w, h }]（**页面坐标系**，单位为该页的
+                     PDF 用户空间点数，不是屏幕像素；服务端不接受屏幕坐标）
+                   + 每个 box 的 detectedType（idCard / phone / bankCard / other）。
+                   候选框由体检阶段的检测结果给出：
+                   detections: [{ page, box, type, confidence }]，
+                   前端只负责让用户选中/切换，**不自己找敏感区**。
+               · 需要的输出：
+                   { newVersionId, page, coveredBoxes, previewUrl }
+                   —— 遮盖必须**生成新版本**，不得就地覆盖原文件：
+                   用户可能还要拿原件去办别的事，把原件改掉是不可逆的破坏。
+                   打印任务此后引用 newVersionId；原版本按原有保留期限清理。
+               · 遮盖必须是**像素级销毁**，不是画一个黑色矩形盖在文字上：
+                   PDF 上层加图形，复制粘贴仍能取出身份证号。
+                   服务端要重绘该区域（删除文本对象 / 光栅化该块），
+                   并在返回前自校验：新版本该页文本层里不再存在原串。
+                   自校验不过 → 整个动作失败，按下面的失败口径处理。
+               · 幂等：同一 fileVersionId + 同一组 boxes 重复提交只产生一个新版本。
+               · 失败 / 不可用怎么降级：
+                   － 生成失败、超时或自校验不过 → **退回未遮盖状态**（data-redact=none），
+                     明说「这一处没有遮住，打印出来仍然含身份证号」，
+                     **绝不能停在「已遮盖」的界面上** —— 那会让用户带着错误结论去付钱；
+                   － 体检不可用（ai-down）→ 没有候选框，本层整块不出现，
+                     参数、核价、出纸不受影响；
+                   － 打印机离线（device-off）→ 遮盖照常可做（它是文件处理，不是出纸），
+                     做完可存「我的文档」或换机再打。
+               · 记录：遮盖动作写入文件操作日志（谁、哪个版本、遮了哪几处、什么时候）；
+                 遮盖后的版本与原版本都按 §11 的敏感件期限清理，删除留日志。 -->
+          <div class="redactl" data-at="s2" data-when="default device-off" data-redact="pick">
+            <div class="redactl-hd">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span class="redactl-t">遮盖第 2 页</span>
+              <span class="redactl-s">只改这一份打印件 · 你上传的原件不动</span>
+            </div>
+
+            <div class="redactl-body">
+              <div class="sheet-a4">
+                <div class="sec">证件与材料</div>
+                <div class="ln ln--m"></div>
+                <div class="ln ln--s"></div>
+                <div class="hr"></div>
+                <div class="ln"></div><div class="ln ln--m"></div>
+                <div class="ln ln--s"></div>
+                <div class="sec">在校证明</div>
+                <div class="ln ln--m"></div><div class="ln"></div>
+                <!-- 与滚动区里的第 2 页同一张纸，正文也画到页脚 —— 遮盖是对着这一页做的判断，
+                     参照物半空就没法判断框圈的是不是那一处。 -->
+                <div class="lnrest"></div>
+                <span class="pgno">2 / 3</span>
+
+                <!-- 系统框出来的候选区。体检把第 ① 处算进了结论；
+                     第 ② 处是格式相近但本机不确定的一串数字 ——
+                     不确定就摆出来让人自己判，不替用户下结论、也不偷偷一起遮。 -->
+                <button class="candbox" type="button" data-cand="0" aria-pressed="true" style="top:100px">
+                  18 位数字 · 格式像身份证号<span class="candbox-tag">体检命中</span>
+                </button>
+                <button class="candbox" type="button" data-cand="1" aria-pressed="false" style="top:228px">
+                  15 位数字 · 也可能是旧版身份证号<span class="candbox-tag">本机不确定</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="redactl-acts">
+              <span class="redactl-tip">
+                框错了就按「换一处」。<b data-cand-name>18 位数字 · 格式像身份证号</b>
+                会被<b>不可恢复地</b>抹掉 —— 遮的是打印用的新版本，原件仍在。
+              </span>
+              <button class="btn btn--lg btn--ghost" type="button" data-cand-next>换一处</button>
+              <button class="btn btn--lg btn--ghost" type="button" data-redact-go="none">全部取消</button>
+              <button class="btn btn--primary" type="button" data-redact-go="done" data-go="s3">遮住这一处<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+            </div>
+          </div>
+
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-file"/></svg>
             <b>还没有文件</b>
@@ -206,7 +1130,9 @@
         <div class="thumb" aria-current="false"><i class="t"></i><i></i><i class="s"></i><i></i><span>1</span></div>
         <div class="thumb thumb--flag" aria-current="true"><i class="t"></i><i></i><i></i><i class="s"></i><span>2</span></div>
         <div class="thumb" aria-current="false"><i class="t"></i><i class="s"></i><i></i><span>3</span></div>
-        <span class="thumbs-note" data-when="default device-off">第 2 页有红点：体检发现身份证号。点缩略图可翻页核对。</span>
+        <span class="thumbs-note" data-when="default device-off" data-redact="none pick ask">第 2 页有红点：体检发现身份证号。点缩略图可翻页核对。</span>
+        <span class="thumbs-note" data-when="default device-off" data-redact="done">第 2 页的点已转青：那一处已遮盖。红点不直接抹掉 —— 这一页曾经命中，你该知道。</span>
+        <span class="thumbs-note" data-when="default device-off" data-redact="skip">第 2 页红点仍在：你已确认保持原样，打印件会含身份证号。</span>
         <span class="thumbs-note" data-when="ai-down">体检不可用，红点标记不显示。缩略图仍可翻页核对。</span>
         <span class="thumbs-note" data-when="first">没有文件时不显示页面。</span>
       </div>
@@ -218,11 +1144,11 @@
 
         <div class="cash-amt">
           <span class="lb">应付</span>
-          <span class="num">3.00<i>元</i></span>
-          <span class="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
+          <span class="num"><span data-out="amtNum">3.00</span><i>元</i></span>
+          <span class="brk" data-out="brk">15 个计费页 × 0.20 元 · 黑白双面 · 5 份</span>
         </div>
 
-        <div class="cash-mode" data-pay="wait expired query">
+        <div class="cash-mode" data-pay="wait scan expired query">
           <button data-pay-btn="wait" aria-pressed="true"><svg class="ic"><use href="#i-qr"/></svg>屏上出码，你扫</button>
           <button data-pay-btn="scan"><svg class="ic"><use href="#i-scan"/></svg>你出码，本机扫</button>
         </div>
@@ -258,7 +1184,7 @@
           <svg class="ic"><use href="#i-clock"/></svg>已收到扫码，正在等支付渠道回传到账结果 · <b>不要重复支付</b>
         </span>
         <span class="cash-st cash-st--ok" data-pay="paid">
-          <svg class="ic"><use href="#i-check"/></svg>已到账 3.00 元 · 按下面的按钮开始出纸
+          <svg class="ic"><use href="#i-check"/></svg>已到账 <span data-out="amt">3.00 元</span> · 按下面的按钮开始出纸
         </span>
         <span class="cash-st cash-st--bad" data-pay="expired">
           <svg class="ic"><use href="#i-alert"/></svg>本码已失效并作废 · 重新出码会同时关闭旧码，不会两个码都能付
@@ -276,22 +1202,26 @@
 
         <div class="notice" data-pay="confirm" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>渠道回传通常几秒内到。<b>如果你手机已显示付款成功但这里没动</b>，
-            按「我已付款，帮我查」——本机会按订单号主动查一次，不需要你再付一遍。
-            同一笔订单本机只接受一次收款；重复到账会自动退回原路。</span>
+          <span>手机已付但这里没动？按「我已付款，帮我查」<b>，不要再付一遍</b>。</span>
         </div>
+        <details class="fold" data-pay="confirm" style="max-width:40em">
+          <summary>会不会被收两次</summary>
+          <div class="fold-b">同一笔订单本机只接受一次收款；重复到账会自动退回原路。渠道回传通常几秒内到。</div>
+        </details>
 
         <div class="notice notice--amber" data-pay="query" style="max-width:40em">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>查单有三种结果：<b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
-            <b>渠道说处理中</b>→ 本机不会替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。
-            <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
+          <span>查单有三种结果 <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
         </div>
+        <details class="fold" data-pay="query" style="max-width:40em">
+          <summary>三种结果分别怎么处理</summary>
+          <div class="fold-b"><b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
+            <b>渠道说处理中</b>→ 本机不替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。</div>
+        </details>
 
         <div class="notice" data-pay="closed" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>关单时二维码已同步作废，之后扫它不会成功。文件还在本次会话里，
-            可以回上一步重新下单；离场或会话结束会自动清空。</span>
+          <span>二维码已同步作废 · <b>文件还在本次会话里</b>，可以重新下单。</span>
         </div>
 
         <div class="cash-demo" data-review>
@@ -310,47 +1240,80 @@
       <!-- S6 出纸进度 -->
       <div class="progress-wrap" data-at="s6">
 
+        <!-- 2026-08-11 补漏：出纸这一屏从头到尾没说过**在打的是哪一份**。
+             右栏「任务」只有状态 / 已完成 / 支付 / 取件码，没有文件名和参数；
+             而这是一台公共机器，人要走开三分钟之前，第一件事是确认机器在印自己那份、
+             参数没设错。数值全部沿用本单已有口径（s4 支付前核对同一组），一个数都没有新编。 -->
+        <div class="jobsum" data-at="s6" style="max-width:40em">
+          <span class="jobsum-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+          <span class="jobsum-b">
+            <span class="jobsum-t">正在处理：个人简历.pdf</span>
+            <span class="jobsum-m" data-out="jobsum">黑白 · 自动双面 · 5 份 · 15 个计费页 · 用纸 10 张</span>
+          </span>
+        </div>
+
         <!-- 「已付款」到「纸出来」中间有三段，每段都可能卡住。
              原来这里是一步跳到出纸中，用户卡在排队时会以为机器死了。 -->
         <div class="jline">
           <span class="jnode jn--done"><i></i><b>已提交</b><em>13:41:02</em></span>
           <span class="jnode jn--done"><i></i><b>排队</b><em data-job="printing jam">前面 0 单</em><em data-job="queued">前面 2 单 · 约 3 分钟</em><em data-job="checking checkfail timeout">已过</em></span>
+          <!-- 2026-08-11 补漏：排队处境下这一格原来整个不出现，时间线只剩 3 段，
+               用户看到的流程比实际少一步。校验此刻确实还没开始 —— 照实写「还没开始」，
+               不是编一个进度出来。 -->
+          <span class="jnode" data-job="queued"><i></i><b>服务端校验</b><em>还没开始</em></span>
           <span class="jnode jn--done" data-job="printing jam timeout"><i></i><b>服务端校验</b><em>通过</em></span>
           <span class="jnode jn--now"  data-job="checking"><i></i><b>服务端校验</b><em>正在检查文件能不能打</em></span>
           <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>服务端校验</b><em>没通过</em></span>
-          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 面</em></span>
+          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 页</em></span>
           <span class="jnode"          data-job="queued checking"><i></i><b>出纸</b><em>还没开始</em></span>
           <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>出纸</b><em>不会开始</em></span>
           <span class="jnode jn--bad"  data-job="jam"><i></i><b>出纸</b><em>卡纸暂停</em></span>
           <span class="jnode jn--bad"  data-job="timeout"><i></i><b>出纸</b><em>超时未开始</em></span>
         </div>
 
-        <div class="notice notice--amber" data-job="queued" style="max-width:40em">
+        <div class="notice notice--amber jstate" data-job="queued" style="max-width:40em">
           <svg class="ic"><use href="#i-clock"/></svg>
-          <span>前面还有 <b>2 单</b>，约 3 分钟。<b>钱已经收了，不会重复收</b>；
-            排队期间你可以离开，凭取件码回来打，也可以在这里等。
-            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</span>
+          <span>前面 <b>2 单</b>，约 3 分钟 · <b>钱已收，不会重复收</b>。</span>
+        </div>
+        <!-- 2026-08-11：排队时用户唯一想知道的就是「我能不能走开」。移回常驻，正文一字未改。 -->
+        <div class="restnote" data-job="queued" style="max-width:40em">
+          <div class="restnote-t">排队期间能离开吗</div>
+          <div class="restnote-b">可以，凭取件码回来打，也可以在这里等。
+            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</div>
         </div>
 
-        <div class="notice" data-job="checking" style="max-width:40em">
+        <div class="notice jstate" data-job="checking" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>正在检查这份文件能不能真的打出来：页数、字体是否内嵌、有没有加密、幅面是否 A4。
-            <b>这一步在出纸之前</b> —— 宁可现在拦住，也不要出到第 7 页才发现字体丢了。</span>
+          <span>正在检查页数、字体内嵌、加密、幅面 —— <b>都在出纸之前</b>。</span>
+        </div>
+        <div class="restnote" data-job="checking" style="max-width:40em">
+          <div class="restnote-t">为什么要多这一步</div>
+          <div class="restnote-b">宁可现在拦住，也不要出到第 7 页才发现字体丢了 —— 那时纸和钱都已经花掉。</div>
         </div>
 
-        <div class="notice notice--coral" data-job="checkfail" style="max-width:40em">
+        <div class="notice notice--coral jstate" data-job="checkfail" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>校验没通过：第 2 页有一处字体没内嵌，打出来会变成方框。</b>没有出任何纸，也没有扣这一单的钱
-            （已收的 3.00 元会<b>原路退回</b>，1–3 个工作日到账，退款记录进「我的 · 打印订单」）。<br>
-            两条路：<b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；
-            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。</span>
+          <span><b>第 2 页字体没内嵌，打出来会是方框。</b>没出纸，已原路退款 <span data-out="amt">3.00 元</span>。</span>
+        </div>
+        <!-- 2026-08-11：校验失败这一步用户必须当场做选择，选项说明不能藏在折叠条里。 -->
+        <div class="restnote" data-job="checkfail" style="max-width:40em">
+          <div class="restnote-t">两条路怎么选</div>
+          <div class="restnote-b"><b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；<br>
+            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。<br>
+            退款 1–3 个工作日到账，记录进「我的 · 打印订单」。</div>
         </div>
 
-        <div class="notice notice--coral" data-job="timeout" style="max-width:40em">
+        <div class="notice notice--coral jstate" data-job="timeout" style="max-width:40em">
           <svg class="ic"><use href="#i-clock"/></svg>
-          <span><b>超过 10 分钟没能开始出纸，已自动转成待打印订单。</b>钱不退也不重复收 ——
-            凭取件码 <b>7742 106 358</b> 在任一台空闲机器直接打，7 天内有效。<br>
-            如果你不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</span>
+          <span><b>超 10 分钟未开始，已转待打印订单。</b>凭取件码 <b>7742 106 358</b> 打，7 天内有效。</span>
+        </div>
+        <!-- 2026-08-11 整改 ④：这一支是**确认未出纸**的分支（右栏任务卡写明
+             「0 / 15 页 · 还没开始出纸」），所以敢承诺全额退 —— 把这个前提写出来，
+             免得被读成「所有情形都按未出页数算」。部分出纸那一支在 s5 退款表里。 -->
+        <div class="restnote" data-job="timeout" style="max-width:40em">
+          <div class="restnote-t">不想打了怎么退</div>
+          <div class="restnote-b">钱不退也不重复收。这一单<b>一张纸都还没出</b>，
+            服务端能确认，所以不想打了在「我的 · 打印订单」里申请<b>全额退</b>。</div>
         </div>
 
         <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
@@ -364,52 +1327,196 @@
           <button data-job-btn="timeout">10 分钟超时</button>
         </div>
 
-        <div class="dial" data-job="printing jam">
+        <!-- 2026-08-11：进度盘改成只在打印机在线时出现。
+             device-off 下这台机已经停了，而青色进度环看起来像还在走 —— 那一屏真正要用户做的是
+             「续打还是退款」，一个像在动的环既误导又抢焦点。它携带的「已出 3 / 共 15 页」
+             在同屏的离线提示条（剩余 12 页）和右栏「任务 · 已完成 3 / 15 页」里都在，不会丢。
+             顺带解决 device-off 那两屏内容超栏被裁的问题（实测 -3 / -61px）。 -->
+        <div class="dial" data-job="printing jam" data-when="default first ai-down">
           <svg viewBox="0 0 100 100">
             <circle class="tk" cx="50" cy="50" r="43"/>
             <circle class="vl" cx="50" cy="50" r="43" stroke-dasharray="270" stroke-dashoffset="216"/>
           </svg>
-          <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 面</span></div></div>
+          <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 页</span></div></div>
+        </div>
+        <!-- 2026-08-10 Codex :414：卡纸态原来只有一句「等你取出卡纸」和一个禁用主按钮，
+             用户处理完了没有地方告诉机器。补一个「已处理 · 继续」。 -->
+        <div data-when="default first ai-down" data-job="jam" data-off="ask keep"
+             style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
+          <button class="btn btn--primary" data-off-go="fixed"><svg class="ic"><use href="#i-check"/></svg>已处理 · 继续打剩余 12 页</button>
+          <!-- 2026-08-11 整改 ④：原按钮写「不打了，按未出页数退款」，
+               把一个本机算不准的结果写进了按钮。卡纸是典型的「部分出纸」，
+               出了几页要服务端与工作人员核对，本机不自动按页算。 -->
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，转人工核对退款</button>
+        </div>
+        <div class="doneline" data-when="default first ai-down" data-job="jam" data-off="fixed" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已收到「卡纸已处理」· 正在重新送纸，从第 4 页继续 · <b>不重复收费</b></span>
+          <button class="btn btn--quiet" data-off-go="ask">还是没好</button>
+        </div>
+        <!-- 2026-08-11 整改 ④：原文写「已提交退款 2.40 元（未出 12 页）· 已出 3 页不退 ·
+             原渠道 1–3 个工作日到账」—— 这是把一笔本机算不准的金额宣布成已提交。
+             卡纸属于「部分出纸」，出纸页数要服务端与工作人员核对之后才定得下来。
+             改成如实的处理中状态：说清本机知道什么、不知道什么、谁来定、去哪看。
+             等出纸页数有了可信回执，再把确定金额写回来。 -->
+        <div class="doneline doneline--amber" data-when="default first ai-down" data-job="jam" data-off="refund" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>已转<b>异常处理中</b> · 本机记录到卡纸前已出 3 页、剩 12 页未出，
+            <b>退多少要工作人员核对实际出纸后才定</b> · 进度在「我的 · 打印订单」里</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成继续打</button>
+        </div>
+        <div class="notice" data-when="default first ai-down" data-job="jam" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>卡纸已暂停在第 4 页。<b>剩余份数已保留</b>，处理完按上面的按钮告诉本机。</span>
         </div>
         <div class="notice" data-when="default first ai-down" data-job="printing" style="max-width:40em">
           <svg class="ic"><use href="#i-printer"/></svg>
-          <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
-            凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
+          <span>请在取纸口等待 · <b>已开始的这一份不可取消</b>。</span>
+        </div>
+        <!-- 2026-08-11：出纸中要等好几分钟，「万一出事怎么办」是这一步的常驻疑问，不该要点开才看得到。 -->
+        <div class="restnote" data-when="default first ai-down" data-job="printing" style="max-width:40em">
+          <div class="restnote-t">中途卡纸或超时会怎样</div>
+          <div class="restnote-b">卡纸会自动暂停并保留剩余份数，凭取件码可在任一台空闲机器续打。
+            任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</div>
         </div>
         <!-- 2026-08-09 Codex 整改：中途离线文案只在真的出过纸的处境(printing/jam)出现,
-             排队/校验/超时各有自己的 0 面与退款事实,不能被这段"已出 3 面"覆盖。 -->
-        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
+             排队/校验/超时各有自己的 0 页与退款事实,不能被这段"已出 3 页"覆盖。 -->
+        <!-- 2026-08-10 Codex :414：原文让用户在「继续打 / 退款」里选，页面却没有这两个按钮。
+             把两条路做成真按钮；决定之后给结果条，不是点了就没下文。 -->
+        <!-- 2026-08-11：离线态下进度盘不再出现，这句话就是这一屏的主体，按 jstate 放大。
+             与排队 / 校验中 / 校验失败 / 超时四屏同一处理，文案一字未改。 -->
+        <div class="notice notice--coral jstate" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>打印机中途离线，已暂停。你已经付过的钱不会再扣一次。</b>剩余 12 面有两条路，你选：<br>
-            · <b>继续打</b>：剩余份数保留为待打印订单，凭取件码在任一台空闲机器续打，不再收费。<br>
-            · <b>不打了</b>：按<b>未出的 12 面</b>退 2.40 元，已出的 3 面不退；退款走原渠道，1–3 个工作日到账。<br>
-            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</span>
+          <span><b>打印机中途离线，已暂停。已付的钱不会再扣一次。</b>剩余 12 页，两条路你选一条。</span>
         </div>
-        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机<b>不会自己替你决定退还是续打</b>。你离场未选择时，订单默认转为待打印保留 7 天，
-            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。</span>
+        <div data-when="device-off" data-job="printing jam" data-off="ask fixed"
+             style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
+          <button class="btn btn--primary" data-off-go="keep"><svg class="ic"><use href="#i-ticket"/></svg>保留待打印（凭取件码续打，不再收费）</button>
+          <!-- 2026-08-11 整改 ④：原按钮写「按未出页数退款（退 12 页 · 2.40 元）」，
+               把一个未经确认的金额印在按钮上。中途离线同样属于「部分出纸」。 -->
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，转人工核对退款</button>
+        </div>
+        <div class="doneline" data-when="device-off" data-job="printing jam" data-off="keep" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已保留为待打印订单 · 取件码 <b>7742 106 358</b> · 7 天内任一台空闲机器续打，不再收费</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成退款</button>
+        </div>
+        <!-- 2026-08-11 整改 ④：同上，离线中断也是「部分出纸」，金额不能当场宣布。 -->
+        <div class="doneline doneline--amber" data-when="device-off" data-job="printing jam" data-off="refund" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>已转<b>异常处理中</b> · 本机记录到中断前已出 3 页、剩 12 页未出，
+            <b>退多少要工作人员核对实际出纸后才定</b> · 进度在「我的 · 打印订单」里</span>
+          <button class="btn btn--quiet" data-off-go="ask">改成续打</button>
+        </div>
+        <!-- 2026-08-11：这一屏是在问用户「续打还是退款」，「不选会怎样」正是做这个决定的依据。 -->
+        <!-- 2026-08-11 整改 ④：原文写「到期未打**自动按未出的计费页退款**并留退款日志」。
+             这一单已经出过 3 页，属于部分出纸，页数没有可信回执，不能自动结算。
+             改成如实的兜底：默认续打保留，到期未打转人工核对，钱不会留在系统里不管。 -->
+        <div class="restnote" data-when="device-off" data-job="printing jam" style="max-width:40em">
+          <div class="restnote-t">不选会怎样</div>
+          <div class="restnote-b">本机<b>不会自己替你决定</b>。离场未选择时，订单默认转为待打印保留 7 天，
+            <b>优先让你续打（不再收费）</b>；到期仍未打的转<b>人工核对</b>，
+            按实际出纸核定后处理并留日志 —— 钱不会不声不响留在系统里，
+            但本机<b>不会自己算一个页数就把钱退了</b>。
+            两种处理都会写进「我的 · 打印订单」，含计费页数、金额和原因。</div>
         </div>
       </div>
 
       <!-- S6 取件 -->
+      <!-- 2026-08-10 Codex :433：四个动作（存文档 / 发手机 / 再打一份 / 打印有问题）与评价
+           原来点了都没有任何结果。现在每个动作点完给明确完成态或表单层，并各带返回入口。 -->
       <div class="progress-wrap" data-at="s7">
         <div class="pickup">
           <span class="chip chip--jade chip--info"><span class="dot dot--live"></span>本次办理完成</span>
           <div class="pickup-code">7742 106 358</div>
-          <p class="pickup-hint">这是你的取件码。<b>7 天内</b>凭码可在任一台空闲机器复打同一份文件；文件到期自动清理，清理会留删除日志。</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
-            <button class="btn btn--ghost">存进「我的文档」</button>
-            <button class="btn btn--ghost">发到我手机</button>
+          <p class="pickup-hint">取件码 · <b>7 天内</b>可在任一台空闲机器复打同一份文件。</p>
+        </div>
+
+        <!-- 2026-08-11：两个动作原来是取件卡里两颗 68px 的胶囊按钮。改成两张并排的卡：
+             ① 触控目标从 68px 抬到 160px，站着按不会错；
+             ② 把「按下去之后会怎样」提到按之前 —— 保留期限和链接时效原本只在
+                按完之后的结果条里出现（data-done=save / phone），
+                等于让人先选再知道后果。两句话都是本页已有的原文，不是新编的。 -->
+        <div class="pickacts" data-done="none save phone again issue issue-sent rated" style="max-width:40em">
+          <button class="pickact" data-done-go="save">
+            <span class="pickact-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="pickact-t">存进「我的文档」</span>
+            <span class="pickact-s">一般文档保留 90 天</span>
+          </button>
+          <button class="pickact" data-done-go="phone">
+            <span class="pickact-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+            <span class="pickact-t">发到我手机</span>
+            <span class="pickact-s">链接 10 分钟内有效</span>
+          </button>
+        </div>
+
+        <div class="doneline" data-done="save" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <!-- 2026-08-10 口径统一：简历属一般文档，基准表是 90 天；原写的 7 天是取件码口径，串档了 -->
+          <span>已存进「我的文档」· <b>个人简历.pdf</b> · 一般文档保留 90 天，到期清理留删除日志</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+        <!-- 2026-08-11 版式：说明条与二维码原来是上下两块（140 + 32 + 263 = 435px），
+             码和"扫它做什么"隔着一条缝。并成一行：码在左、说明在右 ——
+             与 s1 的 .relay、s3 device-off 的取件块同一先例。文案一字未改。 -->
+        <div class="doneline doneline--qr" data-done="phone" style="max-width:40em">
+          <span class="miniqr">
+            <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码 · 不是可扫的真码</span>
+          </span>
+          <span class="dq-b">
+            <span class="dq-t"><svg class="ic"><use href="#i-qr"/></svg>扫左边的示意码把 <b>个人简历.pdf</b> 带到手机</span>
+            <span class="dq-m">链接 10 分钟内有效</span>
+            <button class="btn btn--quiet" data-done-go="none">返回</button>
+          </span>
+        </div>
+        <div class="doneline" data-done="again" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已按同参数新建一单：<b data-out="againsum">黑白 · 双面 · 5 份 · 15 页</b> · 需重新核价与支付</span>
+          <button class="btn btn--primary" data-go="s4" data-done-go="none">去核价</button>
+          <button class="btn btn--quiet" data-done-go="none">算了</button>
+        </div>
+        <!-- 2026-08-11：问句与四个选项原来是分开的两块，中间隔一条 32px 的缝，
+             读起来像两件事。并进同一张卡 —— 它本来就是一道题。文案一字未改。 -->
+        <div class="issuebox" data-done="issue" style="max-width:40em">
+          <div class="doneline doneline--amber" style="border:0;background:transparent;padding:0">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这次哪里不对？选一项，本机会连同订单号 #PT-20260808-0431 一起报给运维</span>
+            <button class="btn btn--quiet" data-done-go="none">返回</button>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn--ghost" data-done-go="issue-sent">页数不对 / 少了几页</button>
+            <button class="btn btn--ghost" data-done-go="issue-sent">打印发黑 / 发花</button>
+            <button class="btn btn--ghost" data-done-go="issue-sent">纸卡住了 / 没出完</button>
+            <button class="btn btn--ghost" data-done-go="issue-sent">其他问题</button>
           </div>
         </div>
-        <div class="notice" style="max-width:40em">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。</span>
-        </div>
-        <div class="notice" style="max-width:40em">
+        <div class="doneline" data-done="issue-sent" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
-          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板 / 送稿器上取走；<b>U 盘</b>拔下带好。</span>
+          <span>已受理 · 工单 <b>#FB-0431</b> · 结果会写进「我的 · 打印订单」，需要退款会走原渠道</span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+        <div class="doneline" data-done="rated" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>已记下你的评价 · 只用于改进现场服务，<b>不影响你的订单</b></span>
+          <button class="btn btn--quiet" data-done-go="none">返回</button>
+        </div>
+
+        <!-- 2026-08-11 版式：这是一张三项离场清单，原来压成一条 101px 的提示条、
+             用分号连成一句话 —— 站在机器前的人要照着做，做一条看一条，
+             一句话读到第三条就忘了前两条。拆成三行，一行一件事。文案一字未改。 -->
+        <div class="leavelist" style="max-width:40em">
+          <div class="leavelist-t"><svg class="ic"><use href="#i-check"/></svg>离开前</div>
+          <div class="leavelist-r"><b>打印件</b>点一下份数</div>
+          <div class="leavelist-r"><b>纸质原件</b>从玻璃板取走</div>
+          <div class="leavelist-r"><b>U 盘</b>拔下带好</div>
+        </div>
+        <!-- 2026-08-11：取件码此刻正明晃晃地印在一台公共屏上，「下一位用户看不看得到」
+             是这一刻的信任问题，不该要点开抽屉才看得到。正文一字未改。 -->
+        <div class="restnote" style="max-width:40em">
+          <div class="restnote-t">取件码与本次会话怎么清</div>
+          <div class="restnote-b">离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。
+            文件到期自动清理，清理会留删除日志。</div>
         </div>
       </div>
     </div>
@@ -429,9 +1536,10 @@
       </div>
       <div class="pane" data-at="s1">
         <div class="pane-hd"><span class="t">Word 与其他格式</span></div>
+        <!-- 2026-08-10 Codex :463：删掉「这里不提供看起来能点但其实不通的入口」——
+             那是设计自评，不是用户要的信息。只留用户真正要做的动作。 -->
         <p style="margin:0;font-size:var(--fz-2);line-height:1.6;color:var(--fog-700)">
-          Word / Excel 转换尚未开放。先在手机上导出成 PDF 再传过来，或用纸质扫描。<br>
-          <span style="color:var(--fog-600)">这里不提供"看起来能点但其实不通"的入口。</span>
+          Word / Excel 请先导出 PDF 再传过来，或用纸质扫描。
         </p>
       </div>
 
@@ -439,28 +1547,98 @@
       <div class="pane" data-at="s2">
         <div class="pane-hd"><span class="t">文件信息</span><span class="s" data-when="default ai-down device-off">已上传</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">文件名</span><span class="v" data-when="default ai-down device-off">个人简历.pdf</span><span class="v v--fog" data-when="first">—</span></div>
-          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off">3 页</span><span class="v v--fog" data-when="first">—</span></div>
-          <div class="kv-row"><span class="k">来源</span><span class="v" data-when="default ai-down device-off">手机扫码传</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">文件名</span><span class="v" id="fi-name" data-when="default ai-down device-off">个人简历.pdf</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" id="fi-pages" data-when="default ai-down device-off">3 页</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">来源</span><span class="v" id="fi-src" data-when="default ai-down device-off">手机扫码传</span><span class="v v--fog" data-when="first">—</span></div>
+          <!-- 遮盖结果必须落在「文件信息」里：用户回到这里核对的是「我要打的是什么」，
+               而遮没遮盖改变的正是打印件的内容。只写在别处等于没写。 -->
+          <div class="kv-row" data-when="default device-off"><span class="k">隐私处理</span>
+            <span class="v v--fog" data-redact="none pick">未处置 · 打印件含身份证号</span>
+            <span class="v v--fog" data-redact="ask">正在确认是否保持原样</span>
+            <span class="v" data-redact="done">已遮盖 <b>1</b> 处 · 打印件不含身份证号</span>
+            <span class="v" style="color:var(--amber-400)" data-redact="skip">保持原样（你已确认）· 打印件含身份证号</span>
+          </div>
           <div class="kv-row"><span class="k">保留期限</span><span class="v">本次会话</span></div>
         </div>
       </div>
       <div class="pane pane--fill" data-at="s2">
         <div class="pane-hd"><span class="t">建议</span></div>
-        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off">
-          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断</span>，再进入参数。<br>
-          <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：本机在第 2 页识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
+        <!-- ═══ 建议 → 动作（2026-08-10 整改）════════════════════════════════
+             整改前：这里给了结论和两个按钮，但「遮盖这一处再继续」按下去什么都不发生 ——
+             页面上没有涂黑 / 打码工具。识别出风险却把风险原样交还用户，是最难看的一种断头。
+             现在五个处置态各有各的话说，每一态都有明确的下一步：
+               none → 去遮盖 / 不遮盖（进二次确认）
+               ask  → 二次确认：说清保持原样意味着什么，再给两条路
+               pick → 正在左边选框（这里只留一句指路，不重复放按钮）
+               done → 已遮盖，并且**留一条撤销路**（有些材料就是要露身份证号）
+               skip → 已确认保持原样，并且**留一条反悔路** -->
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off" data-redact="none">
+          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断 · 仅供参考</span><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
         </p>
-        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="ai-down">
-          体检不可用时不给建议。<br>
-          <span style="font-size:var(--fz-2);color:var(--fog-600)">你可以直接进入参数设置，流程不受影响。</span>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off" data-redact="ask">
+          <b>保持原样打印，意味着什么</b><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">
+            打印出来的每一份都带着完整身份证号。招聘会现场简历会经手很多人，
+            纸落在谁手上本机管不了。<br>
+            <b>本机不会替你自动遮盖</b> —— 出的就是原文件。<br>
+            也有确实需要露出来的情况（办事窗口要看证件复印件），所以这条路一直开着。
+          </span>
         </p>
-        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="first">
-          还没有文件，暂无建议。
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off" data-redact="pick">
+          <b>正在遮盖第 2 页</b><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">
+            左边预览位已经换成遮盖层：框选那一处，按「遮住这一处」就回到参数步。
+            三个动作都在框旁边 —— 遮哪一处要对着页面看，按钮离框太远反而容易点错。
+          </span>
         </p>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off" data-redact="done">
+          <b>已遮盖 1 处 · 打印件不含身份证号</b><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">
+            遮的是<b>打印用的新版本</b>；你上传的原件没有被改，还能另作他用。
+            这一处是抹掉不是盖住 —— 打出来的纸上、文件里都取不回那串数字。
+          </span>
+        </p>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off" data-redact="skip">
+          <b>保持原样打印（你已确认）</b><br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">
+            打印件会含完整身份证号。<b>本机不会替你自动遮盖</b>，出的就是原文件。
+            随时可以改主意 —— 遮盖在出纸之前都还来得及。<br>
+            这个选择<b>只对本次打印生效</b>：文件本身没有被改，保留期限也不变，
+            未支付的随本次会话清空。
+          </span>
+        </p>
+        <!-- ══ 2026-08-11：first / ai-down 两态原来各只有一两句话（106px / 100px），
+             右栏底下裸露 592px / 515px。按 Codex 复核 (f) 的口径，「数据缺失是正确的」
+             不等于「这块版面就该空着」—— 空态也要说清**不会出现什么、现在能做什么**。
+             这里列的四项就是本机在 default 态真正会给结论的四项（见左栏体检清单），
+             不是新编的能力：first 说「送进来之后会逐项给」，ai-down 说「这次没查，你自己核对」。
+             ai-down 那一条尤其要有：体检没跑，用户至少得知道少了哪四道关。 ══ -->
+        <div class="chklist" data-when="first">
+          <p class="chklist-t">还没有文件，暂无建议。</p>
+          <p class="chklist-s">文件送进来之后，本机会在这里逐项给结论：</p>
+          <div class="chklist-r"><svg class="ic"><use href="#i-file"/></svg>纸张规格，以及要不要缩放</div>
+          <div class="chklist-r"><svg class="ic"><use href="#i-layers"/></svg>一共几页，有没有空白页</div>
+          <div class="chklist-r"><svg class="ic"><use href="#i-shield"/></svg>有没有身份证号这类建议遮盖的信息</div>
+          <div class="chklist-r"><svg class="ic"><use href="#i-check"/></svg>字体有没有内嵌，会不会打成方框</div>
+        </div>
+        <div class="chklist" data-when="ai-down">
+          <p class="chklist-t">体检不可用时不给建议。</p>
+          <p class="chklist-s">没有体检结论就没有候选区，遮盖工具也不出现；你可以直接进入参数设置，流程不受影响。
+            下面四项<b>这次没有检查</b>，出纸前请自己核对：</p>
+          <div class="chklist-r chklist-r--off"><svg class="ic"><use href="#i-file"/></svg>纸张规格，以及要不要缩放</div>
+          <div class="chklist-r chklist-r--off"><svg class="ic"><use href="#i-layers"/></svg>一共几页，有没有空白页</div>
+          <div class="chklist-r chklist-r--off"><svg class="ic"><use href="#i-shield"/></svg>有没有身份证号这类建议遮盖的信息</div>
+          <div class="chklist-r chklist-r--off"><svg class="ic"><use href="#i-check"/></svg>字体有没有内嵌，会不会打成方框</div>
+        </div>
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn--ghost" data-when="default device-off" style="width:100%">遮盖这一处再继续</button>
-          <button class="btn btn--quiet" data-when="default device-off" style="width:100%">我知道了，保持原样</button>
+          <button class="btn btn--ghost" type="button" data-when="default device-off" data-redact="none" data-redact-go="pick" style="width:100%">遮盖这一处再继续</button>
+          <button class="btn btn--quiet" type="button" data-when="default device-off" data-redact="none" data-redact-go="ask" style="width:100%">不遮盖，我知道风险</button>
+          <button class="btn btn--ghost" type="button" data-when="default device-off" data-redact="ask" data-redact-go="pick" style="width:100%">还是遮盖吧</button>
+          <button class="btn btn--quiet" type="button" data-when="default device-off" data-redact="ask" data-redact-go="skip" style="width:100%">我确认，保持原样打印</button>
+          <button class="btn btn--quiet" type="button" data-when="default device-off" data-redact="pick" data-redact-go="none" style="width:100%">退出遮盖</button>
+          <button class="btn btn--quiet" type="button" data-when="default device-off" data-redact="done" data-redact-go="none" style="width:100%">撤销遮盖，恢复原样</button>
+          <button class="btn btn--ghost" type="button" data-when="default device-off" data-redact="skip" data-redact-go="pick" style="width:100%">改主意，去遮盖</button>
         </div>
       </div>
 
@@ -472,83 +1650,93 @@
           <span class="s" data-when="ai-down first">需你设置</span>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="copies">
           <div class="field-lb">份数
             <span class="prefill" data-when="default device-off"><svg class="ic" style="width:11px;height:11px"><use href="#i-brain"/></svg>已按招聘会规模预设 · 可改</span>
           </div>
           <div class="stepper">
-            <button aria-label="减少"><svg class="ic"><use href="#i-minus"/></svg></button>
-            <span class="val">5<span class="unit"> 份</span></span>
-            <button aria-label="增加"><svg class="ic"><use href="#i-plus"/></svg></button>
+            <button aria-label="减少一份" data-step="-1"><svg class="ic"><use href="#i-minus"/></svg></button>
+            <span class="val" data-out="copiesVal">5<span class="unit"> 份</span></span>
+            <button aria-label="增加一份" data-step="1"><svg class="ic"><use href="#i-plus"/></svg></button>
           </div>
+          <!-- 到上限/下限时必须当场说一句。静默停住 = 用户按了没反应，
+               跟本次修的那一类死按钮是同一个病。 -->
+          <p class="fnote" data-out="copiesNote" hidden></p>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="color">
           <div class="field-lb">色彩
-            <span class="prefill" data-when="default device-off">已按文件内容预设 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfColor">已按文件内容预设 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">黑白</button>
-            <button aria-pressed="false" data-when="default first ai-down">彩色</button>
+            <button aria-pressed="true" data-v="bw">黑白</button>
+            <button aria-pressed="false" data-v="color" data-when="default first ai-down">彩色</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">彩色不可用</button>
           </div>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="duplex">
           <div class="field-lb">单双面
-            <span class="prefill" data-when="default device-off">已按页数预设 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfDuplex">已按页数预设 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="false">单面</button>
-            <button aria-pressed="true" data-when="default first ai-down">自动双面</button>
+            <button aria-pressed="false" data-v="single">单面</button>
+            <button aria-pressed="true" data-v="duplex" data-when="default first ai-down">自动双面</button>
             <button aria-pressed="false" aria-disabled="true" data-when="device-off">双面不可用</button>
           </div>
+          <p class="fnote" data-out="duplexNote">自动双面：3 页 5 份用纸 10 张。计费页仍是 15 页 —— 按所选文档页计费，双面只减少用纸、不减少计费页数，所以钱不变，省的是纸。</p>
         </div>
 
         <!-- 翻页边只在自动双面下才有意义，所以挂在双面之后、且写清后果。
-             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。 -->
-        <div class="field" data-when="default first ai-down">
+             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。
+             2026-08-11：选了「单面」这一整块就不该在了 —— 单面没有「翻过来的那一面」。
+             整块的显隐由参数联动脚本按 data-duplex 控制（不用 hidden，那是
+             applyVisibility() 独占的，一切四态就会被覆盖）。 -->
+        <div class="field" data-when="default first ai-down" data-only-duplex>
           <div class="field-lb">双面翻页边
             <span class="prefill">简历按长边翻 · 可改</span>
           </div>
-          <div class="seg">
-            <button aria-pressed="true">长边翻（像书）</button>
-            <button aria-pressed="false">短边翻（像记事本）</button>
+          <div class="seg" data-param="flip">
+            <button aria-pressed="true" data-v="long">长边翻（像书）</button>
+            <button aria-pressed="false" data-v="short">短边翻（像记事本）</button>
           </div>
-          <p class="fnote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
+          <p class="fnote" data-out="flipNote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
         </div>
 
-        <div class="field">
+        <div class="field" data-param="orient">
           <div class="field-lb">页面方向
-            <span class="prefill" data-when="default device-off">按文件里的方向 · 可改</span>
+            <span class="prefill" data-when="default device-off" data-out="pfOrient">按文件里的方向 · 可改</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">跟随文件（纵向）</button>
-            <button aria-pressed="false">强制横向</button>
+            <button aria-pressed="true" data-v="follow">跟随文件（纵向）</button>
+            <button aria-pressed="false" data-v="land">强制横向</button>
           </div>
-          <p class="fnote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
+          <p class="fnote" data-out="orientNote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
         </div>
 
         <!-- 幅面与缩放：硬件只有 A4，不支持 A3。
              非 A4 文件必须让用户明确选一次，不能静默缩放 —— 静默缩放会把表格压到看不清。 -->
-        <div class="field">
+        <div class="field" data-param="scale">
           <div class="field-lb">幅面与缩放
-            <span class="prefill" data-when="default device-off">已检出 A4 · 无需缩放</span>
+            <span class="prefill" data-when="default device-off" data-out="pfScale">已检出 A4 · 无需缩放</span>
           </div>
           <div class="seg">
-            <button aria-pressed="true">按原尺寸（100%）</button>
-            <button aria-pressed="false">缩放到 A4</button>
+            <button aria-pressed="true" data-v="none">按原尺寸（100%）</button>
+            <button aria-pressed="false" data-v="fit">缩放到 A4</button>
           </div>
-          <p class="fnote">
-            本机<b>只有 A4，不支持 A3</b>。这份文件检出为 A4，按原尺寸出即可。<br>
-            如果换成 A3 或 Letter，这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
-          </p>
+          <!-- 2026-08-10 Codex :573：整段压成一句，细节折叠。口径一字不改。 -->
+          <p class="fnote" data-out="scaleNote">仅支持 A4；非 A4 文件须确认缩放。</p>
+          <details class="fold" style="margin-top:8px">
+            <summary>换成 A3 或 Letter 会怎样</summary>
+            <div class="fold-b">这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
+              这份文件检出为 A4，按原尺寸出即可。</div>
+          </details>
         </div>
 
         <div class="field">
-          <div class="field-lb">页码范围</div>
+          <div class="field-lb">页码范围<span class="prefill" data-out="pfRange">全部 3 页</span></div>
           <div class="seg">
-            <button aria-pressed="true" id="rng-all">全部 3 页</button>
+            <button aria-pressed="true" id="rng-all" data-out="rngAllLb">全部 3 页</button>
             <button aria-pressed="false" id="rng-custom">自定义</button>
           </div>
           <label class="goalfield" id="rng-input" style="height:52px;border-radius:var(--r-xs);margin-top:10px;display:none">
@@ -565,8 +1753,8 @@
       <div class="pane" data-at="s3 s4">
         <div class="pane-hd"><span class="t">核价</span><span class="s">服务端计算</span></div>
         <div class="quote">
-          <div class="qrow"><span class="k">内容</span><span class="v">3 页 × 5 份 = 15 个印刷面</span></div>
-          <div class="qrow"><span class="k">双面用纸</span><span class="v">10 张（每份 2 张）</span></div>
+          <div class="qrow"><span class="k">内容</span><span class="v" id="q-content">3 页 × 5 份 = 15 个计费页</span></div>
+          <div class="qrow"><span class="k">双面用纸</span><span class="v" id="q-paper">10 张（每份 2 张）</span></div>
           <div class="qrow"><span class="k">单价</span><span class="v">以现场公示价为准</span></div>
           <div class="qtotal">
             <span class="k">应付</span>
@@ -575,10 +1763,47 @@
             <span class="v" data-when="device-off" style="color:var(--coral-400)">暂不可下单</span>
           </div>
           <p class="qnote" data-pay="free" data-when="default first ai-down">
-            本单金额为 <b>0 元</b>（只扫描 / 用了减免），<b>不进收银台、不出收款码</b>，第 5 站直接跳过。
-            不收钱也就没有退款问题；出纸完成一样有取件码和订单记录。</p>
-          <p class="qnote" data-when="default first ai-down">金额由服务端按现场公示价计算。<b>核价结果显示出来之后，才会出现「确认并支付」</b>——不让你确认一个还没看见的金额。</p>
-          <p class="qnote" data-when="device-off">打印机离线期间不接受支付。可先把文件存进「我的文档」，凭手机号在任一台空闲机器取回打印。</p>
+            本单 <b>0 元</b>，<b>不进收银台、不出收款码</b>，出纸完成一样有取件码。</p>
+          <!-- 交接来的用量口径那一行由页尾契约脚本在**带参数时**动态插到这里（data-at="s3"）。
+               不预留空 <p>：没有交接就一行都不占；也不挂到 s4，s4 右栏在 device-off 下已经没有
+               多余 29px，多一段就把最后一张卡的正文顶出去（走查抓到过）。 -->
+          <!-- 0 元的**成因**必须写在金额旁边：同一屏上「0.00 元 · 本单本来就不收费」
+               和「0.00 元 · 你的免费次数付的」并排出现过，含义完全不同。
+               由左栏权益卡的脚本按处境填，没成因就一行都不占。 -->
+          <p class="qnote" id="q-benefit" style="display:none"></p>
+          <p class="qnote" data-when="default first ai-down"><b>核价结果显示出来之后，才会出现「确认并支付」。</b></p>
+          <p class="qnote" data-when="device-off">打印机离线期间不接受支付。</p>
+        </div>
+        <!-- 2026-08-10：device-off 统一成「存我的文档 · 扫码带走」，并把码画出来 -->
+        <div data-when="device-off" style="display:flex;gap:var(--s-5);align-items:center;margin-top:var(--s-4)">
+          <span class="miniqr" style="width:150px">
+            <span class="miniqr-box" style="width:132px;height:132px;padding:9px"><svg><use href="#i-qrdemo"/></svg></span>
+            <span class="miniqr-cap">示意码</span>
+          </span>
+          <span class="picked-b">
+            <span class="picked-t">存我的文档 · 扫码带走</span>
+            <span class="picked-m">带走：个人简历.pdf · 3 页</span>
+            <span class="picked-m">保留 7 天 · 凭手机号在任一台空闲机器打印</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 2026-08-10：核对金额这一步要对得上单价，但整张公示价表放不下，只给要用的两行。 -->
+      <!-- ⚠ 2026-08-11 整改 ⑧（单价是原型样例值，不是定价）：
+           这里显示的 0.20 由 scripts/site-config.js 的 price 快照填入，
+           **那是一份原型样例值，不是已经拍板的价格**。目前三套数值并存：
+             · 开发种子   0.20 / 0.50（种子自陈「开发默认价，非正式价」）
+             · 后端方案建议 0.5 / 1.5
+             · 本设计稿快照 0.20 / 1.50
+           正式价格以**生产 PriceConfig**（GET /api/v1/print/price-config）为准。
+           数值本身这一轮不动 —— 改数会让全站几十处对账金额一起错；
+           要改就在 site-config.js 里改一处，屏上跟着变。 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><span class="t">单价对照</span><span class="s">以屏上公示为准</span></div>
+        <div class="price">
+          <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个计费页</span><span class="v" data-site-unit="bw">0.20 元</span></div>
+          <div class="price-row"><span>双面打印</span><span class="v">只减用纸，不减计费页</span></div>
         </div>
       </div>
 
@@ -587,8 +1812,13 @@
       <div class="pane" data-at="s4" data-review style="border-style:dashed">
         <div class="pane-hd"><span class="t" style="color:var(--fog-600)">核价结果（服务端决定，此处可切换查看）</span></div>
         <div class="cash-demo" style="position:static;justify-content:flex-start">
-          <button data-pay-btn="wait" aria-pressed="true">应付 3.00 元 · 走收银</button>
-          <button data-pay-btn="free">应付 0.00 元 · 跳过收银</button>
+          <!-- 2026-08-11：这两个按钮的文案原来是「应付 3.00 元 · 走收银」「应付 0.00 元 · 跳过收银」。
+               左栏权益卡接上之后，「额度抵完 → 0.00 元」也会出现在同一屏上，
+               两个 0.00 元并排而原因完全不同，用户会以为是白拿。
+               所以把**各自的成因**写进按钮里：这一支是服务端核价本来就是 0（只扫描、纯查询），
+               权益抵完那一支的说明由左栏权益卡自己承担。 -->
+          <button data-pay-btn="wait" aria-pressed="true">应付 <span data-out="amt">3.00 元</span> · 走收银</button>
+          <button data-pay-btn="free">应付 0.00 元 · 本单本来就不收费 · 跳过收银</button>
         </div>
       </div>
 
@@ -597,25 +1827,59 @@
         <div class="pane-hd"><span class="t">支付前请核对</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf · 3 页</span></div>
-          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 自动双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">印刷面数</span><span class="v">15 面</span></div>
-          <div class="kv-row"><span class="k">用纸</span><span class="v">10 张</span></div>
-          <div class="kv-row"><span class="k">隐私命中</span><span class="v" style="color:var(--amber-400)">第 2 页身份证号 · 未遮盖</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 自动双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">计费页数</span><span class="v" data-out="faces">15 页</span></div>
+          <div class="kv-row"><span class="k">用纸</span><span class="v" data-out="sheets">10 张</span></div>
+          <!-- 抵扣必须在**付钱前这一屏**看得见：只在真选了权益时才出现这一行，
+               没选就一行都不占（付款前的清单不放"本可以但你没用"的推销）。
+               显隐用 style.display —— hidden 归 applyVisibility() 独占，
+               本页 data-redact 与翻页边整块都踩过那个坑。 -->
+          <div class="kv-row" id="ben-kv" style="display:none">
+            <span class="k">权益抵扣</span><span class="v" id="ben-kv-v"></span></div>
+          <!-- 付钱前最后一次说清打印件到底含不含身份证号。整改前这里恒定写「未遮盖」，
+               即使用户刚遮过也一样 —— 那会让人以为刚才那一下白做了。 -->
+          <div class="kv-row"><span class="k">隐私命中</span>
+            <span class="v" style="color:var(--amber-400)" data-redact="none ask pick">第 2 页身份证号 · 未遮盖</span>
+            <span class="v" data-redact="done">第 2 页身份证号 · <b>已遮盖</b></span>
+            <span class="v" style="color:var(--amber-400)" data-redact="skip">第 2 页身份证号 · 保持原样（你已确认）</span>
+          </div>
         </div>
-        <div class="notice notice--amber" style="margin-top:12px">
+        <!-- ⚠ 这一条不能再长：s4 右栏在 device-off 下本来就顶到底
+             （见本文件 2026-08-09 / 08-10 两次留白复核）。
+             实测多写一句「要遮的话回第 2 步」就会把下面那个折叠标题挤出 11px。
+             去哪儿遮盖由上面主区那条 .privline 承接，这里只留结论。 -->
+        <div class="notice notice--amber" style="margin-top:12px" data-redact="none ask pick skip">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>你选择了保持原样打印。<b>本机不会自动遮盖</b>——遮盖版未生成，出纸内容就是你上传的原文件。
-            含身份证号的纸质材料请自行妥善保管，不要留在取纸口。</span>
+          <span>保持原样打印 · <b>本机不会自动遮盖</b>，出的就是原文件。</span>
         </div>
+        <div class="notice" style="margin-top:12px" data-redact="done">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本单打印的是<b>遮盖后的新版本</b>，纸上不含身份证号；你上传的原件没有被改动。</span>
+        </div>
+        <!-- 2026-08-10 Codex :643：五条长说明与后文重复。支付前只留三句，完整规则折叠，一字不删。 -->
+        <!-- 2026-08-11：第四条「出纸」规则从抽屉移回常驻，并入这条已有的须知（不另起一张卡，
+             省下一圈内边距 —— 免费单那一态右栏余量只有几十像素）。
+             下一步按的就是「确认金额，去付款」，紧接着就出纸，「按下之后不能取消」
+             正是这一按要承诺的事，不该要点开抽屉才看得见。
+             只在打印机在线时常驻：device-off 出不了纸，这条不适用，那一栏也本来就满了；
+             离线时它仍在下面抽屉里（抽屉那一条对应加了 data-when="device-off"）——
+             两种处境都看得到，任何一种处境下都不会重复出现。 -->
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>你的材料去哪、留多久、谁能看：</b><br>
-            · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
-            · <b>保留</b>：未支付的临时文件随本次会话结束清空；已支付订单的文件保留 7 天供复打；登录后主动存入「我的文档」的按其保留期。到期清理都留删除日志。<br>
-            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
-            · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<br>
-            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span>
+          <span>· 文件只用于本次打印，<b>不发给任何企业</b>；<br>
+            · 已支付订单的文件保留 <b>7 天</b>供复打；<br>
+            · 未支付的随离场清空。<span data-when="default first ai-down"><br>
+            · <b>出纸</b>：只在你按下确认后开始，<b>出纸中不可取消</b>，只能等本份完成或按急停。</span></span>
         </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>完整的去向 / 保留 / 谁能看 / 出纸规则</summary>
+          <div class="fold-b">
+            · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
+            · <b>保留</b>：未支付的临时文件随本次会话结束清空；已支付订单的文件保留 7 天供复打（取件码口径）；登录后主动存入「我的文档」的按文件类型算 —— 一般文档 90 天、敏感件 7 天。到期清理都留删除日志。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
+            · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<span data-when="device-off"><br>
+            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span></div>
+        </details>
       </div>
 
 
@@ -623,20 +1887,46 @@
       <!-- 2026-08-09 留白复核：公示价从 s4 挪到 s1 —— s4 已有服务端核价明细(冗余致右栏超高、
            把「支付前请核对」挤出 14–39px)；s1 进门正需要价格预期。s5 保留(退款语境要对照价目)。
            s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
+      <!-- 2026-08-10 复核：完整公示价表在 s4 仍放不下（免费单与 device-off 会把「支付前请核对」
+           挤出 32–96px）。维持 2026-08-09 的结论：s4 不放整表，只在核价卡下面放两行单价对照。 -->
+      <!-- ⚠ 2026-08-11 整改 ⑧（单价是原型样例值，不是定价）：
+           表里的 0.20 / 1.50 由 scripts/site-config.js 的 price 快照填入。
+           **它们是原型样例值，不是已经拍板的价格。** 目前三套数值并存：
+             · 开发种子   0.20 / 0.50（种子自陈「开发默认价，非正式价」）
+             · 后端方案建议 0.5 / 1.5
+             · 本设计稿快照 0.20 / 1.50
+           正式价格以**生产 PriceConfig**（GET /api/v1/print/price-config）为准。
+           这一轮**不改数值** —— 全站几十处对账金额都按 0.20 算过，改数会一起错；
+           真要改只在 site-config.js 改一处，屏上跟着变。
+
+           ⚠ 2026-08-11 整改 ⑥（「计费页」统一的范围）：
+           「计费页」是**打印链**的计量单位，统一的是**所有打印金额位**，
+           不强套到扫描、复印、AI 服务上：
+             · 打印   → 计费页（= 所选文档页数 × 份数；双面只省纸不减计费页）
+             · 复印（未来）→ 「计费张 / 实际出纸张数」是另一个计量对象 ——
+                             身份证复印是两面扫描合成**一张**实体纸，用「页」会算错。
+                             **当前不新增复印入口，也不展示复印价格**，这里只记口径。
+             · 扫描（未来）→ 「扫描页」；注意 07 扫描台的「双面」方向与打印相反
+                             （扫两面 → 页数翻倍 → 钱也翻倍）。 -->
       <div class="pane" data-at="s1 s5">
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
-          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
-          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v">1.50 元</span></div>
-          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个计费页</span><span class="v" data-site-unit="bw">0.20 元</span></div>
+          <div class="price-row"><span>彩色 · A4 · 每个计费页</span><span class="v" data-site-unit="color">1.50 元</span></div>
+          <div class="price-row"><span>双面打印</span><span class="v">只减用纸，不减计费页</span></div>
           <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
           <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
         </div>
-        <p class="price-note">
-          <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
-          本机不接受现金，不找零；不支持刷卡。
-        </p>
+        <p class="price-note">本机不接受现金，不找零；不支持刷卡。</p>
+        <details class="fold" style="margin-top:8px">
+          <summary>0 元的单怎么走 · 「计费页」指什么</summary>
+          <div class="fold-b"><b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
+            <b>「计费页」只用在打印的金额上</b>：计费页数 = 所选文档页数 × 份数，
+            双面与「一面排 N 页」只减少用纸张数、不减少计费页数。
+            扫描是另一套计量（本机扫描转 PDF 不收费）。<br>
+            <b>屏上这两个单价为原型样例值，正式价格以后台下发的价目配置为准。</b></div>
+        </details>
       </div>
 
       <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 本机事实(E2)与隐私规则。
@@ -648,7 +1938,9 @@
             <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
             <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
           <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
-          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>就绪</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 同机一起停</span></div>
           <div class="kv-row"><span class="k">AI 服务</span>
             <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
             <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 打印不受影响</span></div>
@@ -658,35 +1950,66 @@
         <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>· 文件默认只保留到<b>本次会话结束</b>；<br>
-            · 支付、出纸、删除都要<b>你本人确认</b>，系统不代按；<br>
-            · 离场或超时自动清空，下一位用户看不到任何痕迹；<br>
-            · 要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。</span>
+          <span>只留到<b>本次会话结束</b>；支付与出纸都要<b>你本人确认</b>。</span>
         </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>离场后怎么清、想长期保存怎么办</summary>
+          <div class="fold-b">离场或超时自动清空，下一位用户看不到任何痕迹。
+            要留久一点：登录后存入「我的文档」，按文件类型算期限 —— 一般文档 90 天、敏感件（证件照 / 身份证复印件 / 含身份证号的扫描件）7 天，到期自动清理并留删除日志。
+            删除也要你本人确认，系统不代按。</div>
+        </details>
       </div>
       <div class="pane" data-at="s6">
         <div class="pane-hd"><span class="t">出纸完成后</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-ticket"/></svg>
-          <span>取件码会放大显示在屏幕上；已登录用户同步进「我的 · 打印订单」。<b>出纸完成前请不要离开本机。</b></span>
+          <span><b>出纸完成前请不要离开本机。</b>取件码会放大显示。</span>
         </div>
       </div>
 
       <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
+      <!-- ── 2026-08-11 交叉对账整改 ④：退款改成两分支（保留退款，只是不再承诺自动按页算）──
+           原表写「机器故障没出完 → **按未出的计费页退**」，下面还有一句
+           「按**实际出纸的计费页**退，不看你按了几次按钮」。这是后端兑现不了的承诺：
+           Terminal Agent 对「部分出纸 / 无法确认」判不准 —— 它自己就有
+           PRINT_JOB_UNCONFIRMED 这个状态，文案是「打印作业已提交到打印队列，
+           但未确认完成，请工作人员检查纸张、卡纸和出纸状态」；
+           task-runner 对「队列未出现或超时」的情形还可能按 completed 回传。
+           出纸页数本身可能是不确定的，就不能写「我们会自动算好按页退给你」。
+           正式口径见 docs/reviews/2026-08-11-pricing-benefits-backend.md §四.7：
+             · **服务端确认未出纸** → 可全额补偿（这一支是确定的，敢承诺）
+             · **部分出纸 / 无法确认** → 保持「异常处理中」，同单续打或人工复核，
+               **不重复扣权益、也不自动按页退款**
+           缺什么才能把「按页退」写回来：**出纸页数的可信回执**
+           —— 打印机侧计数 + 服务端确认的履约状态机。补齐之后再改这张表。 -->
       <div class="pane pane--fill pane--grow" data-at="s5">
         <div class="pane-hd"><span class="t">退款怎么算</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">未出纸就取消</span><span class="v">全额退</span></div>
-          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出面数退</span></div>
+          <div class="kv-row"><span class="k">服务端确认没出纸</span><span class="v">全额退</span></div>
+          <div class="kv-row"><span class="k">部分出纸 / 无法确认</span><span class="v" style="color:var(--amber-400)">转异常处理，人工核对</span></div>
           <div class="kv-row"><span class="k">已出纸但你不满意</span><span class="v" style="color:var(--amber-400)">不退，可折价复打</span></div>
           <div class="kv-row"><span class="k">重复到账</span><span class="v">自动退回原路</span></div>
           <div class="kv-row"><span class="k">退款到账</span><span class="v">原渠道 1–3 个工作日</span></div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>退款由服务端按<b>实际出纸面数</b>算，不看你按了几次按钮。
-            所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</span>
+          <span><b>能确认一页都没出</b>才敢承诺全额退。<b>出了一部分、或本机确认不了出了几页</b>，
+            <b>不自动按页退</b> —— 转人工核对。</span>
         </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>为什么现在不自动按页退 · 退款记录去哪查</summary>
+          <div class="fold-b">
+            本机能确认的是「有没有开始出纸」；<b>已经出了几页，在卡纸、中途离线、
+            打印队列没回执这些情形下并不总能确认</b>。金额按一个不确定的页数自动算，
+            很可能算错，所以这类单子<b>保持「异常处理中」</b>：优先<b>同单续打</b>
+            （不再收费、不重复扣你的权益），确实不打了就由<b>工作人员核对出纸页数</b>后处理。<br>
+            <b>「按未出的计费页自动退」是规划中的能力</b>
+            <span class="ev ev--wire">待开发</span> ——
+            要先有<b>出纸页数的可信回执</b>（打印机侧计数 + 服务端确认的履约状态机）；
+            接上之后，部分出纸这一支就能自动结算，不必再等人工核对。<br>
+            所有退款与异常处理都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额、
+            页数与原因。</div>
+        </details>
       </div>
 
       <!-- S6 任务信息 -->
@@ -702,14 +2025,14 @@
             <span class="v" data-when="default first ai-down" data-job="jam" style="color:var(--coral-400)"><span class="dot dot--down"></span>卡纸暂停</span>
             <span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
           <div class="kv-row"><span class="k">已完成</span>
-            <span class="v" data-job="printing">3 / 15 面</span>
-            <span class="v" data-job="jam">3 / 15 面（暂停在第 4 面）</span>
-            <span class="v" data-job="queued checking timeout">0 / 15 面 · 还没开始出纸</span>
-            <span class="v" data-job="checkfail">0 面 · 一张纸都没出</span></div>
+            <span class="v" data-job="printing">3 / <span data-out="facesN">15</span> 页</span>
+            <span class="v" data-job="jam">3 / <span data-out="facesN">15</span> 页（暂停在第 4 页）</span>
+            <span class="v" data-job="queued checking timeout">0 / <span data-out="facesN">15</span> 页 · 还没开始出纸</span>
+            <span class="v" data-job="checkfail">0 页 · 一张纸都没出</span></div>
           <div class="kv-row"><span class="k">支付</span>
-            <span class="v" data-job="printing queued checking jam">已支付 3.00 元</span>
-            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 3.00 元</span>
-            <span class="v" data-job="timeout">已支付 3.00 元 · 未打可申请退款</span></div>
+            <span class="v" data-job="printing queued checking jam">已支付 <span data-out="amt">3.00 元</span></span>
+            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 <span data-out="amt">3.00 元</span></span>
+            <span class="v" data-job="timeout">已支付 <span data-out="amt">3.00 元</span> · 未打可申请退款</span></div>
           <div class="kv-row"><span class="k">取件码</span><span class="v">7742 106 358</span></div>
         </div>
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
@@ -722,100 +2045,127 @@
         <div class="pane-hd"><span class="t">本次订单</span><span class="s">#PT-20260808-0431</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
-          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 双面 · 5 份</span></div>
-          <div class="kv-row"><span class="k">面数</span><span class="v">15 面 · 用纸 10 张</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v" data-out="params">黑白 · 双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">计费页数</span><span class="v" data-out="facesSheets">15 页 · 用纸 10 张</span></div>
           <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
           <div class="kv-row"><span class="k">去向</span><span class="v">已进「我的 · 打印订单」</span></div>
           <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
         </div>
         <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-          <button class="btn btn--ghost" style="width:100%">
+          <button class="btn btn--ghost" style="width:100%" data-done-go="issue">
             <svg class="ic"><use href="#i-alert"/></svg>这次打印有问题
           </button>
           <div>
             <div style="font-size:var(--fz-2);color:var(--fog-700);margin-bottom:8px">这次办理还顺手吗？</div>
-            <div class="seg">
-              <button aria-pressed="false">满意</button>
-              <button aria-pressed="false">一般</button>
-              <button aria-pressed="false">不满意</button>
+            <div class="seg" data-rate>
+              <button aria-pressed="false" data-done-go="rated">满意</button>
+              <button aria-pressed="false" data-done-go="rated">一般</button>
+              <button aria-pressed="false" data-done-go="rated">不满意</button>
             </div>
             <p style="margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
-              评价只用于改进现场服务，不影响你的订单，也可以不评。
+              评价只用于改进现场服务，也可以不评。
             </p>
           </div>
         </div>
-        <div class="notice" style="margin-top:12px">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>下一步建议：这份简历还没做过按岗位优化。周五招聘会前可以先优化再多打几份。</span>
-        </div>
+        <a class="notice" href="09-resume-workbench.html?stage=s3" style="margin-top:auto;text-decoration:none;color:inherit">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span>这份简历还没做过按岗位优化 · <b>去简历工作台</b><svg class="ic" style="width:15px;height:15px;vertical-align:-2px;margin-left:4px"><use href="#i-chevron"/></svg></span>
+        </a>
       </div>
     </div>
   </div>
 
   <!-- ============ ActionBar：主按钮恒定右下 ============ -->
   <div class="actionbar">
+      <a class="backbtn" href="39-print-hub.html" data-parent-label="打印扫描"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印扫描</span></span></a>
+    <!-- 2026-08-11：本块所有间隔号一律写成 &#160;·&#160;（nbsp 夹住）。
+         原因：带 ?from=<页号> 进来时，脚本②会在返回键右边插一个「打印扫描首页」次要入口，
+         提示区被挤窄，几条 .s 恰好断在「·」前面 —— 中文排版禁则，走查报「标点在行首」。
+         实测命中三条（s5/pay=closed、s6/device-off、s1/src=phone），而且换个来源域、
+         返回键副标签一变长短，命中的又换成另一条：这是宽度敏感的，逐条改文案治不住。
+         与页尾契约脚本里 GUARD 常量同一手法。 -->
     <div class="actionbar-hint">
-      <div data-at="s1"><div class="t">选一种方式，把要打印的文件送进来</div><div class="s">不需要登录也可以打印；文件默认只保留到本次会话结束</div></div>
+      <div data-at="s1">
+        <div data-src="none"><div class="t">怎么把文件带进来？点一张大卡</div><div class="s">前三种在本页继续；扫描、复印、证件照会去对应台面</div></div>
+        <div data-src="local usb-in phone-got" data-file="none"><div class="t">先选中一份，再进体检</div><div class="s">没选文件时不会开始 —— 不让你为一份不知道是哪个的文件付钱</div></div>
+        <div data-src="local usb-in phone-got" data-file="on"><div class="t">已选中 <b data-picked-nm>个人简历.pdf</b></div><div class="s"><span data-picked-mt>PDF&#160;·&#160;A4&#160;·&#160;3 页&#160;·&#160;1.2 MB</span>&#160;·&#160;按右下角进材料体检</div></div>
+        <div data-src="phone"><div class="t">等你在手机上选文件</div><div class="s">码 5 分钟内有效&#160;·&#160;传不过来可以改用本机上传</div></div>
+        <div data-src="usb"><div class="t">把 U 盘插进屏幕右下侧的 USB 口</div><div class="s">插好后自动列出可打印的文件</div></div>
+      </div>
       <div data-at="s2">
-        <div data-when="default device-off"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印 · 也可以保持原样继续</div></div>
+        <div data-when="default device-off" data-redact="none"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印&#160;·&#160;也可以保持原样继续</div></div>
+        <div data-when="default device-off" data-redact="ask"><div class="t">确认一下：真的保持原样打印？</div><div class="s">打出来的每一份都带完整身份证号&#160;·&#160;右边两条路都还开着</div></div>
+        <div data-when="default device-off" data-redact="pick"><div class="t">正在遮盖第 2 页</div><div class="s">三个动作在左边遮盖层里 —— 遮哪一处要对着页面看，按钮离框太远容易点错</div></div>
+        <div data-when="default device-off" data-redact="done"><div class="t">已遮盖 1 处&#160;·&#160;打印件不含身份证号</div><div class="s">遮的是打印用的新版本，你的原件没被改动</div></div>
+        <div data-when="default device-off" data-redact="skip"><div class="t">保持原样打印（你已确认）</div><div class="s">打印件会含完整身份证号&#160;·&#160;出纸前都还能改主意</div></div>
         <div data-when="ai-down"><div class="t">体检不可用，其余流程正常</div><div class="s">参数需要你自己确认</div></div>
         <div data-when="first"><div class="t">还没有文件</div><div class="s">回第 1 步把材料送进来</div></div>
       </div>
       <div data-at="s3">
-        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s">黑白 · 自动双面 · 5 份 · 全部 3 页</div></div>
+        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s" data-out="hintParams">黑白&#160;·&#160;自动双面&#160;·&#160;5 份&#160;·&#160;全部 3 页</div></div>
         <div data-when="ai-down first"><div class="t">请确认打印参数</div><div class="s">预填不可用，四项都需要你自己设</div></div>
       </div>
       <div data-at="s4">
         <div data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="hint-quote"><div class="t">先获取核价，金额显示出来再决定要不要付</div><div class="s">本机不预先计算金额，也不承诺价格</div></div>
-        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银 · 按「直接出纸」开始</div></div>
+        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银&#160;·&#160;按「直接出纸」开始</div></div>
         <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
       </div>
       <div data-at="s5">
-        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效 · 失效会自动作废，不会重复收款</div></div>
+        <div data-pay="wait"><div class="t">用手机扫屏上的码付 <span data-out="amt">3.00 元</span></div><div class="s">本码 4:32 后失效&#160;·&#160;失效会自动作废，不会重复收款</div></div>
         <div data-pay="scan"><div class="t">把手机付款码对准取景框</div><div class="s">本机只读取一次，不保存你的付款码</div></div>
-        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付 · 手机已成功但这里没动，按「帮我查」</div></div>
-        <div data-pay="paid"><div class="t">已到账 3.00 元</div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
-        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码 · 这笔钱没有扣</div></div>
+        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付&#160;·&#160;手机已成功但这里没动，按「帮我查」</div></div>
+        <div data-pay="paid"><div class="t">已到账 <span data-out="amt">3.00 元</span></div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
+        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码&#160;·&#160;这笔钱没有扣</div></div>
         <div data-pay="query"><div class="t">正在按订单号向渠道查这笔钱</div><div class="s">查询结果来自支付渠道，本机不替渠道下结论</div></div>
-        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印 · 文件还在本次会话</div></div>
+        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印&#160;·&#160;文件还在本次会话</div></div>
       </div>
       <div data-at="s6">
-        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
-        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单 · 约 3 分钟</div><div class="s">钱已收，不会重复收 · 可以离开，凭取件码回来打</div></div>
-        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前 · 宁可现在拦住</div></div>
-        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
-        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
-        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
-        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
-        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出 · 按各处境规则处理，不会重复扣款</div></div>
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 <span data-out="facesN">15</span> 页&#160;·&#160;用纸 <span data-out="sheetsN">10</span> 张</div></div>
+        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单&#160;·&#160;约 3 分钟</div><div class="s">钱已收，不会重复收&#160;·&#160;可以离开，凭取件码回来打</div></div>
+        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前&#160;·&#160;宁可现在拦住</div></div>
+        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款&#160;·&#160;换文件或让本机转一次</div></div>
+        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打&#160;·&#160;7 天内有效</div></div>
+        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续&#160;·&#160;剩余份数已保留</div></div>
+        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 页已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出&#160;·&#160;按各处境规则处理，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
     </div>
 
     <!-- 左侧：返回 / 备选 -->
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
-    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="none"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-src="local phone phone-got usb usb-in" data-src-go="none">换一种方式</button>
+    <!-- 遮盖层展开时（data-redact=pick）页面级这两个按钮让位：
+         层里的三个动作才是此刻的操作集，页面级再放一个主按钮会有两个「往下走」。
+         与 P03 身份门同一先例：弹层/覆盖层的操作放在层里。 -->
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1" data-redact="none ask done skip">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">返回改参数</button>
     <button class="btn btn--lg btn--ghost" data-at="s6" data-job="printing queued checking jam timeout">异常求助</button>
     <a class="btn btn--lg btn--ghost" data-at="s6" data-job="checkfail" href="08-file-tools.html?tool=t1">让本机转成可打印 PDF</a>
-    <button class="btn btn--lg btn--ghost" data-at="s7">再打一份</button>
+    <button class="btn btn--lg btn--ghost" data-at="s7" data-done-go="again">再打一份</button>
 
     <!-- 右侧：唯一主动作。不可逆动作用朱砂 -->
-    <button class="btn btn--primary" data-at="s1" data-go="s2">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default ai-down device-off">去设参数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <!-- 2026-08-10：原来这里直接 data-go="s2"，不选文件也能进体检。现在按 data-file 门控。 -->
+    <button class="btn btn--primary" data-at="s1" data-src="none" data-src-go="local">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="phone" data-src-go="local">传不过来？改用本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="usb" data-src-go="local">没带 U 盘？改用本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got usb-in" data-file="none" aria-disabled="true">先选文件</button>
+    <button class="btn btn--primary" data-at="s1" data-src="local phone-got usb-in" data-file="on" data-go="s2">去材料体检 · <span data-picked-pg>3 页</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">去设参数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default device-off" data-redact="none ask done skip">去设参数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-when="first" data-go="s1">先选来源<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">去确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first ai-down" id="btn-quote" data-gate="unquoted">获取核价<svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
     <button class="btn btn--commit" data-at="s4" data-go="s6" data-when="default first ai-down" data-pay="free" data-gate="quoted">本单免费，直接出纸<svg class="ic"><use href="#i-printer"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
 
     <!-- 收银台：左侧退出路径 -->
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="wait scan expired query" data-go="s4">取消支付，返回</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="confirm" data-pay-go="query">我已付款，帮我查</button>
-    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed" data-go="s4">重新下单</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed">文件还在，存我的文档</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="paid" data-go="s4">先不打，转存我的文档</button>
     <!-- 收银台：右侧主动作 -->
     <button class="btn btn--primary" data-at="s5" data-pay="wait" data-pay-go="query">我已付款，帮我查<svg class="ic"><use href="#i-search"/></svg></button>
@@ -823,6 +2173,8 @@
     <button class="btn btn--primary" data-at="s5" data-pay="confirm" aria-disabled="true">等渠道回传到账…</button>
     <button class="btn btn--primary" data-at="s5" data-pay="query" aria-disabled="true">查询中…</button>
     <button class="btn btn--primary" data-at="s5" data-pay="expired" data-pay-go="wait">重新出码<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <!-- 2026-08-10：已关单原来右下角空着，用户看完「本单已关闭」不知道往哪走。 -->
+    <button class="btn btn--primary" data-at="s5" data-pay="closed" data-go="s4">重新下单<svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--commit" data-at="s5" data-pay="paid" data-go="s6">开始出纸<svg class="ic"><use href="#i-printer"/></svg></button>
     <button class="btn btn--primary" data-at="s6" data-job="printing" aria-disabled="true">出纸中…</button>
     <button class="btn btn--primary" data-at="s6" data-job="queued" aria-disabled="true">排队中…</button>
@@ -835,7 +2187,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -844,7 +2196,7 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
@@ -861,6 +2213,85 @@
   }
   all.addEventListener('click', function () { set(false) })
   cus.addEventListener('click', function () { set(true) })
+})()
+</script>
+<script>
+/* ══════ 遮盖处置（data-redact 轴）══════════════════════════════════════
+   这一段驱动 2026-08-10 补的遮盖闭环。三件事：
+
+   ① [data-redact-go="x"] 把 .screen 的 data-redact 切成 x。
+      切换用属性 + CSS，不用 hidden —— hidden 归 stage.js 的 applyVisibility()
+      独占，一切四态就会被覆盖（本页核价门控与 data-src 都踩过这个坑）。
+
+   ② 候选框：[data-cand] 是系统框出来的敏感区，点一下选中，
+      「换一处」在候选之间轮换。选中的那一处决定预览位上黑条落在哪一行 ——
+      黑条的 top 由这里改写，不写死，否则换了候选框预览还停在旧位置，
+      等于界面在骗人。
+
+   ③ 越界回收：pick 是**只属于 s2 的处境**（遮盖要对着预览做）。
+      离开 s2、或切到 ai-down / first（这两态根本没有体检结论，
+      也就没有候选区），一律把 redact 收回 none。
+      done / skip 则**必须跨阶段保留** —— 它们改变的是打印件内容，
+      用户到 s4 付钱前还要靠它判断纸上有没有身份证号。
+
+   原型边界：这里只切界面状态，不生成新文件版本。
+   真机的输入 / 输出 / 失败降级写在遮盖层那段 HTML 注释的接线契约里。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  if (!scr.getAttribute('data-redact')) scr.setAttribute('data-redact', 'none')
+
+  /* 候选区：真机由体检的 detections 给出（页码 + 页面坐标 + 类型 + 置信度）。
+     原型里写死两处并可核对，与本页别处「判据写在明处」同一口径。 */
+  var CAND = [
+    { top: 118, name: '18 位数字 · 格式像身份证号' },
+    { top: 246, name: '15 位数字 · 也可能是旧版身份证号' }
+  ]
+  var sel = 0
+
+  function paint () {
+    var boxes = scr.querySelectorAll('[data-cand]')
+    for (var i = 0; i < boxes.length; i++) {
+      boxes[i].setAttribute('aria-pressed', String(i) === String(sel) ? 'true' : 'false')
+    }
+    var nm = scr.querySelector('[data-cand-name]')
+    if (nm) nm.textContent = CAND[sel].name
+    /* 预览位上的三个结果条共用选中位置：换了候选，三条一起跟着走 */
+    var ids = ['pg2-flag', 'pg2-on', 'pg2-kept']
+    for (var j = 0; j < ids.length; j++) {
+      var el = document.getElementById(ids[j])
+      if (el) el.style.top = CAND[sel].top + 'px'
+    }
+  }
+
+  function setRedact (v) {
+    scr.setAttribute('data-redact', v)
+    paint()
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var go = e.target.closest && e.target.closest('[data-redact-go]')
+    if (go) { setRedact(go.getAttribute('data-redact-go')); return }
+
+    var next = e.target.closest && e.target.closest('[data-cand-next]')
+    if (next) { sel = (sel + 1) % CAND.length; paint(); return }
+
+    var cand = e.target.closest && e.target.closest('[data-cand]')
+    if (cand) { sel = parseInt(cand.getAttribute('data-cand'), 10) || 0; paint(); return }
+  })
+
+  /* 越界回收。只监听 stage / state 两个属性，不监听 data-redact 自己，免得自激。 */
+  new MutationObserver(function () {
+    var st = scr.getAttribute('data-state') || 'default'
+    var sg = scr.getAttribute('data-stage') || ''
+    var rd = scr.getAttribute('data-redact') || 'none'
+    if (rd === 'none') return
+    if (st === 'ai-down' || st === 'first') { setRedact('none'); return }
+    if (rd === 'pick' && sg !== 's2') setRedact('none')
+  }).observe(scr, { attributes: true, attributeFilter: ['data-stage', 'data-state'] })
+
+  paint()
 })()
 </script>
 <script>
@@ -889,7 +2320,15 @@
   var lb = document.querySelector('.paper-bar .pg span')
   var thumbs = [].slice.call(document.querySelectorAll('.thumb'))
   if (!st) return
-  function pages () { return [].slice.call(st.querySelectorAll('.sheet-a4')).filter(function (p) { return !p.hidden }) }
+  /* 2026-08-10：遮盖层里也有一张 .sheet-a4（第 2 页的缩略），它不是文档的一页。
+     不排掉的话页码会变成「共 4 页」——一个 3 页的文件突然多出一页，
+     用户第一反应是「本机把我的文件改坏了」。它靠 CSS display 门控、
+     不带 hidden 属性，所以必须显式按容器排除。 */
+  function pages () {
+    return [].slice.call(st.querySelectorAll('.sheet-a4')).filter(function (p) {
+      return !p.hidden && !p.closest('.redactl')
+    })
+  }
   function goto (i) {
     var ps = pages(); if (!ps[i]) return
     st.scrollTo({ top: ps[i].offsetTop - st.offsetTop - 16, behavior: 'smooth' })
@@ -915,6 +2354,1240 @@
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
 })()
 </script>
+<script>
+/* ── 2026-08-10 Codex 走查整改：上传门 + 断头路 + 取件页结果 ───────────────
+   走查第一名：「上传入口根本不收文件」。原来六卡里前三张直接 data-go="s2"，
+   一按就跳「材料体检」——用户没做过任何选取动作，也不知道体检的是哪一份。
+
+   四条页内轴（都走 CSS display 门控，不碰 hidden —— applyVisibility 独占 hidden）：
+     data-src   选了哪种来源、接力/U 盘到哪一步
+     data-file  有没有真的选中一份
+     data-off   离线/卡纸时用户选了「续打」还是「退款」（:414 的两个缺失按钮）
+     data-done  取件页四个动作各自的结果层（:433 的没有反馈） */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function setAll (sel, v) {
+    [].slice.call(scr.querySelectorAll(sel)).forEach(function (n) { n.textContent = v })
+  }
+  function refresh () { if (window.v3Audit) requestAnimationFrame(window.v3Audit) }
+
+  /* ① 文件选中：名称 / 页数 / 大小 / 格式同步到已选态、hint 与主按钮 */
+  function file (k, row) {
+    if (!k || k === 'none') {
+      scr.setAttribute('data-file', 'none')
+    } else {
+      scr.setAttribute('data-file', 'on')
+      if (row) {
+        setAll('[data-picked-nm]', row.getAttribute('data-nm') || '')
+        setAll('[data-picked-mt]', row.getAttribute('data-mt') || '')
+        setAll('[data-picked-pg]', row.getAttribute('data-pg') || '')
+      }
+    }
+    ;[].slice.call(scr.querySelectorAll('.filerow')).forEach(function (r) {
+      r.setAttribute('aria-pressed', r.getAttribute('data-file-go') === k ? 'true' : 'false')
+    })
+    refresh()
+  }
+
+  /* ② 换来源就等于放弃上一次的选中 —— 不能让「已选中」跟着新来源假装还在 */
+  function src (k) {
+    scr.setAttribute('data-src', k)
+    if (k !== 'phone-got' && k !== 'usb-in') file('none')
+    refresh()
+  }
+
+  function axis (name, k) { scr.setAttribute(name, k); refresh() }
+
+  scr.addEventListener('click', function (e) {
+    var s1 = e.target.closest('[data-src-go]')
+    if (s1) { src(s1.getAttribute('data-src-go')); return }
+    var f1 = e.target.closest('[data-file-go]')
+    if (f1) { file(f1.getAttribute('data-file-go'), f1.classList.contains('filerow') ? f1 : null); return }
+    var o1 = e.target.closest('[data-off-go]')
+    if (o1) { axis('data-off', o1.getAttribute('data-off-go')); return }
+    var d1 = e.target.closest('[data-done-go]')
+    if (d1) {
+      /* 评价三档：先记下按了哪一档，再出结果条 */
+      var seg = d1.closest('[data-rate]')
+      if (seg) {
+        [].slice.call(seg.querySelectorAll('button')).forEach(function (b) {
+          b.setAttribute('aria-pressed', b === d1 ? 'true' : 'false')
+        })
+      }
+      axis('data-done', d1.getAttribute('data-done-go'))
+    }
+  })
+
+  /* 手机扫码传的「用这份」既选文件又推进阶段，data-go 由 stages.js 接管，这里不重复处理 */
+  src('none')
+  axis('data-off', 'ask')
+  axis('data-done', 'none')
+
+  /* 右栏最后一张可见的卡撑到栏底。哪张是最后一张随阶段变，所以只能在运行时打标。
+     两处都要挂：window.v3ApplyVisibility 是同步入口（阶段/子状态切换走这条），
+     MutationObserver 兜底（stage.js 内部的 applyState 不经过 window 上那份）。 */
+  var side = scr.querySelector('.wside')
+  function tailgrow () {
+    if (!side) return
+    var last = null
+    var kids = [].slice.call(side.children)
+    kids.forEach(function (p) {
+      p.classList.remove('pane--tailgrow')
+      if (p.hidden) return
+      var cs
+      try { cs = window.getComputedStyle(p) } catch (e) { return }
+      if (cs.display === 'none') return
+      last = p
+    })
+    if (last) last.classList.add('pane--tailgrow')
+  }
+  var origAV = window.v3ApplyVisibility
+  if (typeof origAV === 'function') {
+    window.v3ApplyVisibility = function () { var r = origAV.apply(this, arguments); tailgrow(); return r }
+  }
+  new MutationObserver(tailgrow).observe(scr, { attributes: true,
+    attributeFilter: ['data-state', 'data-stage', 'data-pay', 'data-job', 'data-src', 'data-file', 'data-off', 'data-done'] })
+  window.addEventListener('load', tailgrow)
+  tailgrow()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   全站「打印材料交接契约」· P06 收件端（2026-08-10）
+   --------------------------------------------------------------------------
+   走查发现的硬伤：参数阶段顶上的来源回执是写死的，不论谁把材料送过来，
+   都显示「本次来自：简历工作台 · 诊断报告 · 3 页」。政策页送办事清单过来
+   也这么显示 —— 那是骗人。这里把那一行改成按 URL 参数渲染。
+
+   链接格式（各来源页出口统一按这个拼）：
+     06-print-workbench.html?stage=s3
+       &from=<页号>      P09 / P21 / P30 …，决定「本次来自」的页名与「回去换」的回链
+       &kind=<类型slug>  十种白名单之一；title 缺失时用它的中文名兜底
+       &title=<中文名>   产物真名，来源页界面上叫什么就传什么
+       &pages=<页数>     **只传来源页自己已显示的数字**；页面没显示就不传，本机绝不替它编
+       &copies=<份数>    同上
+       &back=<阶段>      可选。回链要落回来源页的哪一步（默认用登记表里的那一步）
+
+   参数缺失的回退（都不报错、不空白）：
+     · 全缺           → 保留 HTML 里那行默认文案（原型默认场景本来就是简历诊断报告送过来）
+     · 缺 pages       → 写「页数以本机体检为准」，不写数字，也不动核价那两行
+     · 缺 title/kind  → 写「未指定材料 · 请回第 1 步选文件」
+     · from 不认识    → 回链退到本页第 1 步，不瞎猜来源页
+   份数与页数同时参与核价卡的用量口径（仍是预估，金额一律等服务端核价）。
+   预览纸张与体检结论是原型的样例渲染，不跟着参数变 —— 那是「这台机器读到的文件」，
+   不是「来源页说了什么」，交接参数无权改写本机体检结果。
+
+   ──────────────────────────────────────────────────────────────────────────
+   2026-08-11 收紧（走查抓到三条，都是「一条 URL 就能在公共机器上造假」）：
+
+   ① title 不受白名单约束。上一版只给 from 建了登记表，title 只清控制字符与尖括号，
+      于是 `06-print-workbench.html?title=你的身份证复印件&pages=1` 会渲染出
+      「本次来自：上一步 · 你的身份证复印件 · 1 页 · 17:32 送达」。
+      没有任何来源页送过东西，回执却把一份不存在的材料说成已经到了本机 ——
+      在候机厅那种公共机器上，前一个人留一条链接就能骗到下一个人。
+      现在：**title / pages / copies 只在 from 命中登记表时才采纳**。
+      from 缺失或不认识 → 整条回执正文作废，只说「这条链接没有可识别的来源页」，
+      主按钮指回 ?stage=s1。不认识来源就什么都不认领。
+
+   ② 份数与页数没有上限。`?copies=9999` 会让核价卡显示九千份、九千张纸。
+      现在 copies ≤ 99、pages ≤ 200。**关键是超限不许静默截断**：
+      悄悄改成 99，用户要么以为自己真排了 9999 份、要么以为只排了 99 份而其实不是。
+      两种都是系统偷偷改了数还不告诉人。所以夹到上限的同时必须在回执上写明
+      「链接里写的份数（9999 份）超出本机上限，已按 99 份处理，请核对后再付款」。
+
+   ③ 回执写「17:32 送达」。「送达」是结论，它同时声称：文件已经在本机、本机已经量过
+      页数。这两件事在 s2 体检之前都没发生过。改成描述真实发生的事 ——「17:32 收到交接」，
+      页数一律写成「来源页标注 N 页」（谁说的就署谁的名），并常驻一句
+      「本机还没体检这份文件，页数与费用以体检为准」。体检完成后才允许出真实页数与金额。
+
+   ══════════════════════════════════════════════════════════════════════════
+   给 Codex 的接线契约 —— 上面这套白名单只是**设计侧止血，不是根治**
+   --------------------------------------------------------------------------
+   为什么不是根治：白名单管的是「来源页号」，管不住 `title`。
+   `?from=P22&title=你的身份证复印件&pages=1` 里 from 是合法的 P22，title 仍然是
+   URL 里的一句话。设计稿能做到的上限只有两件事 —— 不认识的来源一律不认领；
+   认识的来源，也把它说的话署上它的名（「来源页标注」「还没体检」），不冒充本机读数。
+   **只要回执的内容来自 URL，它就永远是可伪造的**：真正的判据必须是服务端有没有这份文件。
+
+   根治办法是 `interface-handoff.md §2A` 的 artifactId 资产链（blockers.md B1）：
+     1. 产物先落地再开放出口：诊断报告 / 办事清单 / 复盘单 / 参会作战单 / 证件照排版，
+        必须先生成并保存成 artifact、拿到服务端签发的 `artifactId`，
+        来源页才点亮「去打印」。没有 ID 就没有出口，也就没有可拼的链接。
+     2. 打印台只收 `?artifactId=`，**按 ID 向服务端查真实文件**（文件名、页数、sha256、
+        ownerId）。回执上的每个字都来自这次查询的结果，不来自 URL。
+     3. 查不到 / 过期 / ownerId 不是本人 → 回到第 1 步选文件，不显示任何来源回执。
+        这一条就是本次 ① 那段兜底逻辑在生产里的正确形态：现在判的是「from 认不认识」，
+        接线后判的是「服务端认不认这份资产」。
+     4. 上限也要挪到服务端：copies / pages 的合法区间由服务端核价接口判并回报，
+        前端这两个常量只是本机的最后一道兜底，不作为定价依据。
+     5. 页数与金额一律以服务端体检 / 核价结果为准；在结果回来之前，界面只能写
+        「还没体检」，不得先把 URL 里的数字当成事实展示。
+     6. 已知残留（本轮改不掉，只能靠接线收口）：带交接参数进来时，回执写「本机还没体检
+        这份文件」，而同屏的体检卡与预览区仍是原型样例（「材料体检已完成」「个人简历.pdf」
+        「3 页，无空白页」）。设计稿里没有任何状态能表示「这份交接来的材料已经体检过了」，
+        交接参数按既有约定又无权改写本机体检结论，两句话只能并排摆着。
+        接线后：按 artifactId 查到真实文件 → 体检卡、预览、文件信息、核价一起换成这一份的
+        真实读数，那句「还没体检」也才有对应的「已体检」终态可切。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var bar = document.getElementById('handoff')
+  if (!scr || !bar) return
+
+  /* 来源页登记表：页号 → 页名 + 回链文件 + 回链默认落点 */
+  var SRC = {
+    P01: { n: '首页',           f: '01-home-v6.html',        s: '' },
+    P07: { n: '扫描工作台',     f: '07-scan-workbench.html', s: 's4' },
+    P08: { n: '文件加工台',     f: '08-file-tools.html',     s: '' },
+    P09: { n: '简历工作台',     f: '09-resume-workbench.html', s: 's5' },
+    P10: { n: '访谈式生成',     f: '10-resume-interview.html', s: 's3' },
+    P12: { n: '材料工厂',       f: '12-material-factory.html', s: 't1' },
+    P13: { n: '岗位情报台',     f: '13-jobs-desk.html',      s: '' },
+    P14: { n: '岗位详情',       f: '14-job-detail.html',     s: '' },
+    P15: { n: '企业导览',       f: '15-companies.html',      s: '' },
+    P16: { n: '线下机构',       f: '16-offline-agencies.html', s: 'detail' },
+    P17: { n: '招聘会作战台',   f: '17-fair-desk.html',      s: 's4' },
+    P18: { n: '校园招聘专区',   f: '18-campus.html',         s: 's3' },
+    P19: { n: '智慧校园',       f: '19-smart-campus.html',   s: '' },
+    P20: { n: '面试训练舱',     f: '20-interview-pod.html',  s: 's4' },
+    P21: { n: '政策服务',       f: '21-policy.html',         s: 's3' },
+    P22: { n: '职业规划',       f: '22-career-plan.html',    s: 's3' },
+    P24: { n: '权益活动',       f: '24-benefits.html',       s: 's3' },
+    P25: { n: '顾问驾驶舱',     f: '25-advisor.html',        s: '' },
+    P26: { n: '顾问作业面',     f: '26-advisor-work.html',   s: '' },
+    P27: { n: '百宝箱区',       f: '27-toolbox.html',        s: '' },
+    P28: { n: '自我探索',       f: '28-self-assessment.html', s: 's3' },
+    P29: { n: '证件照工作台',   f: '29-id-photo.html',       s: 's5' },
+    P30: { n: '岗位大师决策台', f: '11-jobfit-compare.html', s: 's4' },
+    P31: { n: '签约风险提示',   f: '31-contract-review.html', s: 's4' },
+    P32: { n: 'AI简历服务域首屏', f: '32-resume-hub.html',   s: '' },
+    P33: { n: '简历素材库',     f: '33-resume-templates.html', s: '' },
+    P34: { n: '岗位信息域首屏', f: '34-jobs-hub.html',       s: '' },
+    P36: { n: '招聘会域首屏',   f: '36-fairs-hub.html',      s: '' },
+    P38: { n: '政策服务域首屏', f: '38-policy-hub.html',     s: '' },
+    P39: { n: '打印扫描服务域首屏', f: '39-print-hub.html',  s: '' }
+  }
+
+  /* 产物类型白名单：只认这十种，别的一律当没传 */
+  var KIND = {
+    'resume-report':    '简历诊断报告',
+    'jobfit-report':    '岗位匹配报告',
+    'material':         '求职材料',
+    'job-list':         '岗位清单',
+    'fair-plan':        '参会作战单',
+    'policy-checklist': '办事清单',
+    'assessment-sheet': '自评参考单',
+    'id-photo-sheet':   '证件照排版',
+    'contract-report':  '合同风险报告',
+    'template':         '简历版式',
+    /* P20 面试训练舱按同一契约发过来的类型（复盘单 / 题目与答案单），登记在册免得回退成空 */
+    'interview-sheet':  '面试复盘单'
+  }
+
+  /* 本机上限。超出即视为异常链接：夹到上限，**并且把夹这件事写在脸上**。 */
+  var MAX_COPIES = 99
+  var MAX_PAGES = 200
+
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  /* 数字解析。返回 { n: 本机采用值, over: 链接里的原值（只有超限时非 0） }。
+     上一版是「不合法就当 0」：9999 因为超四位被直接吞成「没传过」，
+     用户既看不到 9999 也看不到本机做了什么 —— 系统改了数却一声不吭。
+     现在把「链接写了多少」和「本机按多少算」两件事分开留住，交给回执去说。 */
+  function num (v, max) {
+    var raw = (v == null ? '' : String(v)).replace(/[^0-9]/g, '').slice(0, 9)
+    var n = raw ? parseInt(raw, 10) : 0
+    if (!n) return { n: 0, over: 0 }
+    return n > max ? { n: max, over: n } : { n: n, over: 0 }
+  }
+  function clean (v, re, max) {
+    v = (v == null ? '' : String(v)).replace(re, '')
+    return v.length > max ? v.slice(0, max) : v
+  }
+  function b (t) { var e = document.createElement('b'); e.textContent = t; return e }
+  function txt (t) { return document.createTextNode(t) }
+  /* 附注行：正文之下另起一行。warn 版说的是「系统改了你给的参数」，
+     必须和正文同号加粗 —— 压成脚注就等于没说。 */
+  function note (t, warn) {
+    var e = document.createElement('span')
+    e.className = 'receipt-n' + (warn ? ' receipt-n--warn' : '')
+    e.textContent = t
+    return e
+  }
+  function hhmm () {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n }
+    return p(d.getHours()) + ':' + p(d.getMinutes())
+  }
+  /* 「预估 · 以打印工作台核价为准」里的间隔号用 nbsp 夹住：
+     断行落在它前面会让「·」起行，中文排版禁则，走查会报「标点在行首」 */
+  var GUARD = '预估\u00a0·\u00a0以打印工作台核价为准'
+
+  var line = document.getElementById('handoff-t')
+  var back = document.getElementById('handoff-back')
+  var icon = document.getElementById('handoff-ic')
+  function warnSkin () {
+    bar.classList.add('receipt--warn')
+    if (icon) icon.setAttribute('href', '#i-alert')
+  }
+  function wipe () { while (line.firstChild) line.removeChild(line.firstChild) }
+  /* 用量说明只在 s3（参数核价）出现：s4 右栏在 device-off 下已经没有多余高度 */
+  function qnote (t) {
+    var host = document.querySelector('.quote')
+    if (!host) return
+    var p = document.createElement('p')
+    p.className = 'qnote'
+    p.id = 'q-handoff'
+    p.setAttribute('data-at', 's3')
+    p.textContent = t
+    host.appendChild(p)
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  /* 先看有没有人递过交接参数。一个都没有 → 什么都不改，保留 HTML 里的默认文案
+     （真正的「直接点开打印台」由页尾脚本②处理：落 s1 并把整条回执摘掉）。 */
+  var rawFrom = q.get('from')
+  var rawKind = q.get('kind')
+  var rawTitle = q.get('title')
+  var rawPages = q.get('pages')
+  var rawCopies = q.get('copies')
+  if (!rawFrom && !rawKind && !rawTitle && !rawPages && !rawCopies) return
+
+  var from = clean((rawFrom || '').toUpperCase(), /[^A-Z0-9]/g, 6)
+  var src = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : null
+
+  /* ══ ① from 不在登记表（含 from 干脆没给）→ 整条回执作废 ══
+     本次修的主症就在这里：title / pages / copies 一个都不采纳，核价与文件信息也不动。
+     不认识来源就什么都不认领 —— 页面宁可承认「这条链接我读不懂」，
+     也不能凭 URL 里的一句话，替一份没人送过的材料出一张「已经到了本机」的回执。 */
+  if (!src) {
+    if (line) {
+      wipe()
+      line.appendChild(b('这条链接没有可识别的来源页'))
+      line.appendChild(txt('，本机没有认领任何材料'))
+      line.appendChild(note('链接里写的材料名、页数、份数一律不采纳。请回第 1 步自己选文件。', true))
+    }
+    warnSkin()
+    if (back) {
+      back.setAttribute('href', '06-print-workbench.html?stage=s1')
+      back.textContent = '回第 1 步选文件'
+    }
+    /* 核价卡也得说清楚：下面那两行用量不是「你的文件」，是本页的样例数字 */
+    qnote('这条链接没有可识别的来源页，本机没有认领任何材料；下面的用量不是你的文件。' +
+          '请回第 1 步选文件后再核价。')
+    return
+  }
+
+  /* ══ ② from 认识 —— 到这一步才允许采纳来源页说的话 ══ */
+  var kind = clean((rawKind || '').toLowerCase(), /[^a-z-]/g, 24)
+  /* title 只清掉控制字符与尖括号；正文一律走 textContent，不存在注入面 */
+  var title = clean(rawTitle, new RegExp('[\\u0000-\\u001f<>]', 'g'), 40).trim()
+  var name = title || (Object.prototype.hasOwnProperty.call(KIND, kind) ? KIND[kind] : '')
+  var P = num(rawPages, MAX_PAGES)
+  var C = num(rawCopies, MAX_COPIES)
+  var pages = P.n
+  var copies = C.n
+  var overs = []
+  if (C.over) {
+    overs.push('链接里写的份数（' + C.over + ' 份）超出本机上限，已按 ' +
+               MAX_COPIES + ' 份处理，请核对后再付款。')
+  }
+  if (P.over) {
+    overs.push('链接里写的页数（' + P.over + ' 页）超出本机上限，已按 ' +
+               MAX_PAGES + ' 页处理，请核对后再付款。')
+  }
+
+  /* 把**本机最终采用**的那两个数交给下面的参数联动脚本（2026-08-11）。
+     只在 from 命中登记表这一支之后才走到这里 —— 上面 ① 那一支是直接 return 的，
+     所以「不认识的来源」依然一个数都不采纳，护栏没有被绕开。
+     导出的是夹过上限之后的值：联动脚本据此起算，份数步进器也不会再显示
+     一个与核价对不上的旧数（原来交接说 1 份、步进器仍写 5 份，两处打架）。 */
+  window.V3P06 = { pages: pages || 0, copies: copies || 0, maxPages: MAX_PAGES, maxCopies: MAX_COPIES }
+
+  /* ①′ 回执正文 —— 全部用 textContent 拼，URL 里带标签也只会当字面文字显示 */
+  if (line) {
+    wipe()
+    line.appendChild(txt('本次来自：'))
+    line.appendChild(b(src.n))
+    line.appendChild(txt(' · '))
+    if (!name) {
+      /* 来源页没说送的是什么 —— 那就不许写「收到交接」，那等于替它认领一份不存在的材料 */
+      line.appendChild(b('未指定材料'))
+      line.appendChild(txt(' · 请回第 1 步选文件'))
+    } else {
+      line.appendChild(b(name))
+      line.appendChild(txt(' · '))
+      if (pages) {
+        /* 「来源页标注」四个字是署名：这个数字是来源页说的，不是本机量出来的。
+           数字与单位之间用 nbsp 绑住：不绑的话「来源页标注 3 / 页 × 2 份」会把数和单位拆到两行。 */
+        line.appendChild(txt('来源页标注 '))
+        line.appendChild(b(pages + '\u00a0页' + (copies ? '\u00a0×\u00a0' + copies + '\u00a0份' : '')))
+      } else {
+        line.appendChild(txt('页数以本机体检为准'))
+      }
+      /* 上一版写「送达」。那是结论：它同时声称文件已经在本机、本机已经量过页数。
+         这台机器此刻只做过一件事 —— 收到一条交接。就只写这一件。 */
+      line.appendChild(txt(' · ' + hhmm() + ' 收到交接'))
+      line.appendChild(note('本机还没体检这份文件，页数与费用以体检为准。'))
+    }
+    for (var oi = 0; oi < overs.length; oi++) line.appendChild(note(overs[oi], true))
+  }
+  if (overs.length) warnSkin()
+
+  /* ②′ 回去换：认识来源页就回那一页 */
+  if (back) {
+    var st = clean(q.get('back') || src.s, /[^a-z0-9]/g, 8)
+    back.setAttribute('href', src.f + (st ? '?stage=' + st : ''))
+    back.textContent = '不是这份？回去换'
+  }
+
+  /* ③′ 用量口径：来源页给了页数才改核价那两行，没给就一个字不动 */
+  var cp = copies || 1
+  if (pages) {
+    var sheets = Math.ceil(pages / 2)
+    var qc = document.getElementById('q-content')
+    var qp = document.getElementById('q-paper')
+    if (qc) qc.textContent = pages + ' 页 × ' + cp + ' 份 = ' + (pages * cp) + ' 个计费页'
+    if (qp) qp.textContent = (sheets * cp) + ' 张（每份 ' + sheets + ' 张）'
+  }
+  qnote(
+    (overs.length ? overs.join('') : '') +
+    (!name
+      ? ('本次没有指定材料，先回第 1 步选文件；金额为' + GUARD + '。')
+      : (pages
+          ? ('「' + pages + ' 页 × ' + cp + ' 份」是' + src.n + '标注的用量，本机还没体检这份文件；属' + GUARD + '。')
+          : (src.n + '没给页数，本机不替它写一个 —— ' + GUARD + '。')))
+  )
+
+  /* ④′ 第 2 步「文件信息」跟着交接走，免得回头看时又变回样例文件。
+        页数同样要署名（「来源页标注 N 页」），别让它看起来像本机读出来的数。
+        来源页连材料名都没给（纯导航跳过来）时，这三行一个字都不动 —— 没交接就没有「本次文件」。 */
+  if (name) {
+    var fn = document.getElementById('fi-name')
+    var fp = document.getElementById('fi-pages')
+    var fs = document.getElementById('fi-src')
+    if (fn) fn.textContent = name
+    if (fp) fp.textContent = pages ? ('来源页标注\u00a0' + pages + '\u00a0页') : '以本机体检为准'
+    if (fs) fs.textContent = src.n + ' 送来'
+  }
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P06 · ① 无交接时的默认入口　② 来源感知返回（2026-08-10 Codex 闭环整改）
+   --------------------------------------------------------------------------
+   ① 默认入口：直接点开打印工作台（没有任何交接参数）时，页面停在 s3 参数页，
+      顶上还挂着「本次来自：简历工作台 · 诊断报告 · 3 页」。没有人送过材料，
+      那张回执是编的，参数页也无从谈起 —— 现在无交接参数时落到 s1（选文件），
+      并把回执整条摘掉。`?stage=` 直达保持原样（评审要按阶段逐屏看）。
+
+   ② 来源感知返回：打印台是共享页，简历 / 招聘会 / 政策 / 校园 / 百宝箱都会把
+      材料送进来，可左下返回键写死回「打印扫描」。从招聘会带简历过来打完一按返回，
+      落在打印扫描域首屏 —— 业务上下文没了，得回首页重新找招聘会。
+      现在按交接契约的 ?from=<页号> 查登记表：
+        · 认识且不同域 → 返回键 href 与副标签改成**真实来源域**，
+                         右边补一个「打印扫描首页」次要入口（既能回业务域也能回本域）
+        · 同域 / 不认识 / 缺失 → 一个字不改，保留 HTML 里的默认父级（现有行为）
+      登记表只登「域根」；回到具体那一页是回执里「不是这份？回去换」那条链接的活。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  /* ── ① 无交接参数 → 落 s1，并摘掉写死的来源回执 ── */
+  var KEYS = ['from', 'kind', 'title', 'pages', 'copies']
+  var handed = false
+  for (var i = 0; i < KEYS.length; i++) if (q.get(KEYS[i])) handed = true
+  if (!handed && !q.get('stage')) {
+    if (typeof window.v3Stage === 'function') window.v3Stage('s1')
+    var rc = document.getElementById('handoff')
+    if (rc && rc.parentNode) rc.parentNode.removeChild(rc)
+  }
+
+  /* ── ② 来源感知返回 ── */
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  /* 域根登记表：页号 → [域名, 域首屏文件]。与各页自己的 backbtn 去处一致。 */
+  var D = {
+    P01: ['首页', '01-home-v6.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return          /* 同域进来的，现有去处本来就对 */
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+
+  var alt = document.createElement('a')
+  alt.className = 'altbtn'
+  alt.setAttribute('href', own.f)
+  alt.textContent = own.n + '首页'
+  back.parentNode.insertBefore(alt, back.nextSibling)
+})()
+</script>
+<!-- 计价单一真源。本页此前**没有**引这份文件，于是 0.20 / 1.50 / 3.00 是手抄在
+     十几处 HTML 里的字面量 —— 单价一改就要满页找，而且改漏一处账就加不拢。
+     site-config.js 只读不写：它提供 v3Price() 与 data-site-unit，不改页面结构。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P06 · 打印参数联动（2026-08-11 死按钮整改）
+   --------------------------------------------------------------------------
+   ── 实测出来的病情（http 干净页，逐个真按一下，比较整个 body 的 outerHTML
+      + location + data-stage）：s3「打印参数」整块 14 个控件里，**13 个是死的**。
+      唯一活着的是「页码范围 · 自定义」。死的包括：
+
+        份数 −／＋（回归台报的那条「(空文字)」就是它俩，按钮里只有图标没有文字）
+        色彩 黑白／彩色
+        单双面 单面／自动双面
+        双面翻页边 长边翻／短边翻
+        页面方向 跟随文件／强制横向
+        幅面与缩放 按原尺寸／缩放到 A4
+        页码范围 全部 3 页（这一个是**已经选中**，本来就该没反应）
+
+      其中份数最要命：它直接乘进金额。屏幕上写着「3 页 × 5 份 = 15 个计费页 ·
+      应付 3.00 元」，而那个 5 用户一下也改不动 —— 只想打 1 份的人，
+      要么照着 5 份付 3.00 元，要么走人。这不是少个交互，是收错钱。
+
+   ── 接线之后金额怎么算（口径与 site-config.js 一致，全站唯一一套）：
+        计费页 faces = 有效页数 × 份数
+        用纸  sheets = ceil(有效页数 ÷ (双面?2:1)) × 份数
+        应付        = v3Price(faces, 黑白?undefined:'color')
+      默认值代回去：3 页 × 5 份 = 15 计费页，双面用纸 ceil(3/2)×5 = 10 张，
+      15 × 0.20 = 3.00 元 —— 与改动前页面上写死的那三个数**逐字相同**，
+      所以这次接线没有偷偷改价，只是把它们从字面量变成算出来的。
+
+   ── 一条必须说清楚的取舍：**单／双面不改变金额**。
+      本机按**所选文档页**计费：双面与「一面排 N 页」都**不减少**计费数量，只减少用纸。
+      3 页无论单面双面都是 3 个计费页，变的只有纸：双面 10 张、单面 15 张。
+      （2026-08-11 口径收口：此前屏上写「印刷面 / 一张纸两面按 2 面计」，那是从
+       双面不变价倒推出来的解释；一旦出现「一面排两页」，印刷面就比计费数量少，
+       账立刻对不上。服务端的算式是 quantity = billablePages × copies，与此一致。）
+      所以这一项的下游是**用纸张数 + 翻页边整块的显隐**，不是钱。
+      让它去改金额才是编数 —— 那等于按纸收费，与屏上公示的单位自相矛盾，
+      账立刻加不拢。这一点在 duplexNote 里对用户明写，不藏在代码注释里。
+
+   ── 与交接护栏的关系（不得改坏，本次也确实没动）：
+      title / pages / copies 依旧只在 from 命中登记表时才被采纳 —— 采纳逻辑
+      整个留在上面那段契约脚本里，一行未改；本段只**读**它导出的 window.V3P06。
+      from 不认识的那一支在护栏里是直接 return 的，走不到导出那一行，
+      所以这里拿到的是 undefined，起算值落回 HTML 里的样例（3 页 / 5 份），
+      不会把链接里的数字偷渡进核价。超限夹取与「系统改了什么」的告知也仍归护栏。
+
+   ── 不伪造能力：s3 的「应付」一格保持「未核价」不动（服务端才有权定价），
+      本段只动**用量**（计费页数 / 用纸）与 s4 之后那些本来就写着金额的位置；
+      交接来的那句「本机还没体检这份文件，页数与费用以体检为准」由护栏挂着，
+      本段一个字都不碰。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var H = window.V3P06 || {}
+  var MAXC = H.maxCopies || 99
+  /* 起算值：交接采纳过就用采纳后的，否则用 HTML 里的样例（个人简历.pdf · 3 页 / 5 份） */
+  var TOTAL = H.pages || 3
+  var P = {
+    copies: H.copies || 5,
+    color: 'bw',
+    duplex: 'duplex',
+    flip: 'long',
+    orient: 'follow',
+    scale: 'none',
+    range: 'all'
+  }
+
+  var elAll = document.getElementById('rng-all')
+  var elCus = document.getElementById('rng-custom')
+  var elIn = document.querySelector('#rng-input input')
+  var elNote = document.getElementById('rng-note')
+
+  function set (name, v) {
+    var els = scr.querySelectorAll('[data-out="' + name + '"]')
+    for (var i = 0; i < els.length; i++) els[i].textContent = v
+  }
+  function setSeg (param, v) {
+    var f = scr.querySelector('[data-param="' + param + '"]')
+    if (!f) return
+    var bs = f.querySelectorAll('button[data-v]')
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === v ? 'true' : 'false')
+    }
+  }
+
+  /* 页码范围解析。「超出 1–N 的页码会被忽略，不会静默按全部打印」是页面
+     自己写在 #rng-note 上的承诺 —— 那就真的按它做，并把忽略了哪些当场列出来。 */
+  function parseRange (s, total) {
+    var got = {}, bad = [], i, k
+    var toks = String(s || '').split(/[,，]/)
+    for (i = 0; i < toks.length; i++) {
+      var t = toks[i].trim(); if (!t) continue
+      var m = t.match(/^(\d+)\s*[-–~]\s*(\d+)$/)
+      if (m) {
+        var a = +m[1], b = +m[2]
+        if (a > b) { var tmp = a; a = b; b = tmp }
+        var any = false
+        for (k = a; k <= b; k++) { if (k >= 1 && k <= total) { got[k] = 1; any = true } }
+        if (!any || a < 1 || b > total) bad.push(t)
+        continue
+      }
+      if (/^\d+$/.test(t)) {
+        var n = +t
+        if (n >= 1 && n <= total) got[n] = 1; else bad.push(t)
+        continue
+      }
+      bad.push(t)
+    }
+    var list = Object.keys(got).map(Number).sort(function (x, y) { return x - y })
+    return { list: list, bad: bad }
+  }
+
+  function calc () {
+    var st = scr.getAttribute('data-state') || 'default'
+    /* 离线时彩色与自动双面都不可用（右栏那两个「不可用」按钮就是这么写的）。
+       这里只在**算的时候**降级，不改 P —— 切回在线态用户原来的选择还在。 */
+    var color = (st === 'device-off') ? 'bw' : P.color
+    var duplex = (st === 'device-off') ? 'single' : P.duplex
+
+    var R = parseRange(elIn ? elIn.value : '', TOTAL)
+    var pages = (P.range === 'all') ? TOTAL : R.list.length
+    /* faces = 计费页数 = 所选文档页 × 份数。
+       ⚠ 变量名沿用 faces（全页十几处 data-out 都叫它），但**口径是「计费页」**：
+       双面与「一面排 N 页」都不减少计费数量，它们只影响用纸张数。
+       服务端 quotePrint 的算法与此一致：quantity = billablePages × copies。
+
+       ⚠ 2026-08-11 整改 ⑥：「计费页」统一的范围是**打印链**，不是全站所有计量。
+       统一口径准确的说法是：**全站所有打印金额位一律称「计费页」**。
+       扫描、复印、AI 服务不套这个词 ——
+         · 复印（未来）用「计费张 / 实际出纸张数」：身份证复印两面扫描合成
+           **一张**实体纸，按「页」算会算错。当前不新增复印入口与复印价格展示。
+         · 扫描（未来）用「扫描页」，且 07 的「双面」与打印方向相反（页数与钱都翻倍）。 */
+    var faces = pages * P.copies
+    var perCopy = Math.ceil(pages / (duplex === 'duplex' ? 2 : 1))
+    var sheets = perCopy * P.copies
+    var money = window.v3Price ? window.v3Price(faces, color === 'color' ? 'color' : '') : 0
+    return { st: st, color: color, duplex: duplex, R: R, pages: pages,
+             faces: faces, perCopy: perCopy, sheets: sheets, money: money }
+  }
+
+  function unit (mode) {
+    var S = window.V3_SITE
+    if (!S) return ''
+    return (mode === 'color' ? S.price.colorPerFace : S.price.bwPerFace).toFixed(2)
+  }
+  /* ══════════════════════════════════════════════════════════════════════
+     权益 · 免单券模型（2026-08-11 复核后端源码后定版）
+     ----------------------------------------------------------------------
+     字段名照抄生产模型，不自创：
+       PriceConfig  · serviceKey('print_bw_page' / 'print_color_page')
+                    · unitCents / unit / active
+       BenefitGrant · id / benefitType / title / quantityTotal / quantityRemaining
+                    · status / sourceType / sourceRef / validUntil
+       BenefitType  · coupon | free_quota | package_entitlement | subsidy_eligibility_hint
+       BenefitStatus· active | used_up | expired | revoked
+
+     ── 为什么是「N 次免单」而不是「每月 20 页额度」 ──────────────────────
+     服务端核销的语义是「**一次免掉一整单，权益扣 1**」：
+         discountCents = order.amountCents
+         quantityRemaining: { decrement: 1 }
+     这正好就是**免单券**。上一版设计稿把它写成「20 页额度」，那需要按页拆分抵扣，
+     后端不支持 —— 硬接会出现「一张券免掉 3.00 元、额度只扣 1」的账务事故
+     （一个月 20 页的额度能白打 105 页）。改成「N 次免单」之后，
+     现有后端语义立刻是对的，一行都不用改。
+
+     ── 会赔钱的缺口：四道闸，一道都不能少 ────────────────────────────────
+     discountCents = order.amountCents **没有上限** —— 一张券打 200 页，平台全赔。
+     所以这里设计了四道闸，每一道的值**全部由后台配置**，页面一个都不写死：
+
+       ① applicableScopes  只在**四类**求职产出上生效：
+                           简历 / 求职材料 / 招聘会资料 / 政策申请材料
+                           —— 拦「拿补贴打自带的任意文件」
+                           （2026-08-11 整改 ①：原来这里多写了「证件照」，
+                             产品拍板的适用场景就是上面四类，已删。
+                             同步改的还有本文件 SCOPE_TEXT 与 P24 的两处。）
+       ② maxBillableUnits  单次计费总量上限，**按「页 × 份」算，不是文档页数**
+                           —— 只限文档页数拦不住：10 页 × 20 份 = 200 页照样白拿
+       ③ colorScope        只覆盖黑白。黑白 0.20 / 彩色 1.50，同一个「免 10 页」
+                           上限彩色值 15 元、黑白只值 2 元（7.5 倍）
+       ④ quantityTotal     每月 N 次 —— 拦反复使用
+
+     **这三个字段（①②③）后端目前都没有**，已列进契约文档的必补项。
+
+     超出任何一道闸时，正确做法是**整单走正常价格，并给一句可执行的话**
+     （「减到 10 个计费页以内即可」），绝不是「抵 10 页、剩下的自付」——
+     那是部分抵扣，后端只有整单核销，做了就是伪造能力。
+
+     ── 下面这个 SCN 不是「页面数据」，是**一次服务端响应的样例** ──────────
+     价目来自 GET /api/v1/print/price-config（匿名可读，Kiosk 展示价唯一来源）；
+     N 次、封顶金额、券的名称与有效期，全部由后台配置下发。页面一个都不写死。
+     ══════════════════════════════════════════════════════════════════════ */
+  var SCN = {
+    have: {
+      lb: '有 2 项可用', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41' },
+      grants: [
+        { id: 'BG-2026-0007', benefitType: 'free_quota', status: 'active',
+          title: '免费打印 · 每月 3 次', sourceType: 'gov',
+          sourceRef: '市人社局「就业服务进社区」专项',
+          quantityTotal: 3, quantityRemaining: 1, unitLabel: '次',
+          maxBillableUnits: 10, colorScope: 'bw_only', validUntil: '8月31日 23:59' },
+        { id: 'BG-2026-0031', benefitType: 'coupon', status: 'active',
+          title: '秋季招聘会 · 打印免单券', sourceType: 'fair',
+          sourceRef: '市人社局秋季招聘会 · 现场发放',
+          quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+          maxBillableUnits: 20, colorScope: 'bw_only', validUntil: '8月31日 23:59' }
+      ]
+    },
+    /* 普通打印单：用户自己带文件来单纯打印。服务端返回的可用权益列表为空，
+       理由是 out_of_scope —— 补贴是**特定场景特定功能**，不是所有打印都能免。
+       屏上**不出现按不动的券**：显示一个灰按钮比不显示更糟。 */
+    ordinary: { lb: '普通打印单', identity: 'claimed', kind: 'ordinary',
+      price: { ok: true, snapAt: '09:41' }, grants: [],
+      emptyReason: 'out_of_scope' },
+    /* 求职材料单，但两项都不能用 —— 理由各不相同，屏上必须分开说。
+       合并成一句「不可用」等于没说。 */
+    none: { lb: '已用完 / 已过期', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41' }, grants: [],
+      blocked: [
+        /* 2026-08-11 整改 ⑤：原写「9月1日 00:00 重置」。后端 BenefitGrant 只有余额与
+           validFrom / validUntil，没有重置周期字段，也没有按月续发的定时任务 ——
+           一个精确到时分的重置时刻是本机编的。改成这张权益自己的有效期
+           （服务端下发的 validUntil）。「每月 N 次」作为规则说明保留在 P24。 */
+        { title: '免费打印 · 每月 3 次', reason: 'used_up',
+          detail: '本月 3 次已用完 · 有效期至 8月31日 23:59' },
+        { title: '秋季招聘会 · 打印免单券', reason: 'expired',
+          detail: '8月10日 已过期 · 招聘会结束后失效' }
+      ] },
+    guest: { lb: '未认领身份', identity: 'guest', kind: 'job',
+      price: { ok: true, snapAt: '09:41' }, grants: null, emptyReason: 'needs_identity' },
+    unavailable: { lb: '价目拉不到', identity: 'claimed', kind: 'job',
+      price: { ok: false, error: 'PRICE_CONFIG_UNAVAILABLE', lastSync: '09:41' }, grants: null },
+    /* 「后台刚改过价」不是假想：Admin 改价是**立即改** unitCents / active，
+       计价服务不读 effectiveFrom（serviceKey 唯一，也存不下"现价 + 未来价"两份），
+       而且报价没有 quoteId / expiresAt —— **本机不锁价**。 */
+    repriced: { lb: '后台刚调过价', identity: 'claimed', kind: 'job',
+      price: { ok: true, snapAt: '09:41', changed: { bwPerFace: 0.25, at: '09:58' } },
+      grants: [
+        { id: 'BG-2026-0007', benefitType: 'free_quota', status: 'active',
+          title: '免费打印 · 每月 3 次', sourceType: 'gov',
+          sourceRef: '市人社局「就业服务进社区」专项',
+          quantityTotal: 3, quantityRemaining: 1, unitLabel: '次',
+          maxBillableUnits: 10, colorScope: 'bw_only', validUntil: '8月31日 23:59' }
+      ] }
+  }
+  /* sourceType 说的是**这一项是谁发的**，不是"这一单的钱谁付了"。
+     模型能证明的只有发放来源分类，证明不了本次打印已纳入哪一笔结算 ——
+     所以屏上只写发放来源，不写"政府买单"。 */
+  var PAYER = { gov: '政府补贴', platform: '本机自营', partner: '机构赞助',
+                campus: '校方提供', fair: '招聘会主办方' }
+  /* 适用范围**由后台配置**，不是本机写死的产品规则。
+     06 的来源登记表（本文件上面那段交接契约里的 SRC）是判断"这一单是什么"的
+     现成抓手，但 from 来自 URL、**可以伪造，不是安全边界** ——
+     所以最终"这一单能用哪些权益"必须由**服务端在报价时返回**，
+     前端只负责把服务端给的理由讲成人话。 */
+  /* 2026-08-11 整改 ①：删「证件照」。产品拍板的适用场景是四类，与 P24 一致。
+     后端 applicableScopes 字段尚未落库；补齐后这里改成读服务端下发的枚举。 */
+  var SCOPE_TEXT = '简历 / 求职材料 / 招聘会资料 / 政策申请材料'
+  var SCOPE_OUT = '自带文件的普通打印'
+  var BEN = { scene: 'have', pick: 'none' }
+
+  function r2 (x) { return Math.round(x * 100) / 100 }
+  function bwUnit () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
+  /* 可用权益 = 状态 active、且是**可核销**的三种品类之一。
+     subsidy_eligibility_hint 被这一行挡在外面，不是靠人记得别写：
+     它是 info-only（政策说明 / 材料清单 / 官方入口），不可核销，
+     也不许出现余额、金额、抵扣或"已发放"。 */
+  function usable (sc) {
+    if (!sc.grants) return []
+    return sc.grants.filter(function (g) {
+      return g.status === 'active' &&
+        ['coupon', 'free_quota', 'package_entitlement'].indexOf(g.benefitType) > -1
+    })
+  }
+  /* 这张券在**这一单**上能不能用。只有两种结果：整单免、或者用不了。
+     刻意不给第三种「抵一部分」—— 后端只有全额核销，做部分抵扣就是伪造能力。
+
+     ⚠ 前端这段判定是**演示**，不是资格判定的权威。生产里「本单可用哪些权益、
+     每一张为什么不可用」必须由服务端在报价时返回结构化原因码，前端只负责
+     把原因码讲成人话 —— from 来自 URL、可以伪造，不是安全边界。 */
+  function fitOf (g, C, gross) {
+    if (!g) return { ok: false, why: '' }
+    if (gross <= 0) return { ok: false, why: 'zero' }
+    if (g.colorScope === 'bw_only' && C.color === 'color') return { ok: false, why: 'color' }
+    if (g.maxBillableUnits != null && C.faces > g.maxBillableUnits) {
+      return { ok: false, why: 'over_units' }
+    }
+    return { ok: true, why: '' }
+  }
+  function benCalc (C) {
+    var sc = SCN[BEN.scene]
+    var out = { sc: sc, gross: C.money, due: C.money, item: null, fit: { ok: false, why: '' },
+                list: usable(sc) }
+    /* 价目取不到 → 一个数都不给。旧快照只用来说明"上次是什么时候拉的"，
+       绝不拿它当现价。 */
+    if (!sc.price.ok) { out.gross = null; out.due = null; return out }
+    if (C.st === 'device-off') return out
+    for (var i = 0; i < out.list.length; i++) {
+      if (out.list[i].id === BEN.pick) out.item = out.list[i]
+    }
+    if (out.item) {
+      out.fit = fitOf(out.item, C, out.gross)
+      if (out.fit.ok) out.due = 0
+    }
+    return out
+  }
+
+  /* ── 权益卡渲染 ───────────────────────────────────────────────────────
+     整卡由服务端返回的列表驱动。刻意不写「如果是那两张券就……」这种分支：
+     0 项、N 项、拿不到、未认领、超封顶，走的是同一段代码的不同分支，
+     后台加一项、下线一项、改封顶，页面不用改。
+
+     显隐一律用 style.display / 重建节点，**不用 hidden** ——
+     hidden 归 stage.js 的 applyVisibility() 独占，一切四态就会被它整片覆盖。 */
+  var elSnap = document.getElementById('ben-snap')
+  var elOpts = document.getElementById('ben-opts')
+  var elSum = document.getElementById('ben-sum')
+  var elNotes = document.getElementById('ben-notes')
+  var elActs = document.getElementById('ben-acts')
+  var elKv = document.getElementById('ben-kv')
+  var elKvV = document.getElementById('ben-kv-v')
+  var elQBen = document.getElementById('q-benefit')
+
+  function yuan (n) { return n.toFixed(2) + ' 元' }
+  /* 中文排版禁则：间隔号不能起行。券名、来源、有效期串里到处是「 · 」，
+     而这张卡的文案由后台数据拼出来 —— 逐条手改文案改不干净（后台还会下发新的）。
+     渲染完统一走一遍文本节点，把「 · 」两侧换成 nbsp 绑住。
+     只碰文本节点，不动标签，不存在破坏 HTML 的可能。 */
+  function bindDots (root) {
+    if (!root) return
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), t
+    while ((t = w.nextNode())) {
+      if (t.nodeValue.indexOf(' · ') > -1) t.nodeValue = t.nodeValue.replace(/ · /g, '\u00a0·\u00a0')
+    }
+  }
+  function benRender (C, B) {
+    if (!elOpts) return
+    var sc = B.sc, P0 = sc.price, notes = [], more = [], acts = []
+
+    /* ① 顶栏：这一屏的价目什么时候拉的。价格来自哪里，用户有权知道。 */
+    if (elSnap) {
+      var kindTx = sc.kind === 'ordinary' ? '本单类型 · 普通打印' : '本单类型 · 求职材料'
+      elSnap.textContent = kindTx + '　|　' + (!P0.ok
+        ? ('价目未取到 · ' + P0.error)
+        : (P0.changed ? ('价目快照 ' + P0.snapAt + ' · 后台已改价') : ('价目快照 ' + P0.snapAt)))
+    }
+
+    /* ② 选项：一单一权益（核销账本对同一件产物只允许核销一次），所以是单选。
+       超封顶的那一项**照样能按** —— 与 P24 同一条口径「领不了就直说领不了，
+       不用灰按糊弄」：按下去它会告诉你为什么这一单用不了，而不是按不动。 */
+    var opts = ''
+    if (P0.ok && C.st !== 'device-off' && B.list.length) {
+      opts += '<button class="benopt" type="button" data-benuse-btn="none" aria-pressed="' +
+        (BEN.pick === 'none' ? 'true' : 'false') + '">' +
+        '<span class="benopt-t">本单不用权益</span>' +
+        '<span class="benopt-m">按现场公示价自付，留着下次用</span>' +
+        '<span class="benopt-v">应付 ' + yuan(B.gross) + '</span></button>'
+      for (var i = 0; i < B.list.length; i++) {
+        var g = B.list[i]
+        var f = fitOf(g, C, B.gross)
+        var vtx = f.ok ? '本单可用 → 0.00 元'
+          : (f.why === 'color' ? '本单是彩色，用不了'
+            : (f.why === 'over_units' ? ('超出 ' + g.maxBillableUnits + ' 个计费页上限') : '本单用不了'))
+        opts += '<button class="benopt" type="button" data-benuse-btn="' + g.id + '" aria-pressed="' +
+          (BEN.pick === g.id ? 'true' : 'false') + '">' +
+          '<span class="benopt-t">' + g.title + '</span>' +
+          '<span class="benopt-m">余 ' + g.quantityRemaining + ' / ' + g.quantityTotal + ' ' +
+          g.unitLabel + ' · 上限 ' + g.maxBillableUnits + ' 计费页' +
+          '</span><span class="benopt-v">' + vtx + '</span></button>'
+      }
+    }
+    elOpts.innerHTML = opts
+    elOpts.style.display = opts ? '' : 'none'
+
+    /* ③ 金额。用券就是**整单免**，没有第三种结果。 */
+    var sum = ''
+    if (P0.ok && C.st !== 'device-off') {
+      sum += '<div class="bensum-r"><span class="k">本单用量 ' + C.faces +
+        ' 计费页 × ' + unit(C.color) + ' 元（' + (C.color === 'color' ? '彩色' : '黑白') +
+        '）</span><span class="v">' + yuan(B.gross) + '</span></div>'
+      if (B.item && B.fit.ok) {
+        sum += '<div class="bensum-r bensum-r--cut"><span class="k">' + B.item.title +
+          ' · 整单免</span><span class="v">− ' + yuan(B.gross) + '</span></div>'
+      }
+      sum += '<div class="bensum-r bensum-r--due"><span class="k">应付</span>' +
+        '<span class="v">' + yuan(B.due) + '</span></div>'
+    }
+    elSum.innerHTML = sum
+    elSum.style.display = sum ? '' : 'none'
+
+    /* ④ 说明：每一种处境都要说清「为什么是这样、卡在哪、下一步能做什么」。 */
+    if (!P0.ok) {
+      notes.push('<b>本机没能从后台取到现行价目。</b>错误码 <b>' + P0.error + '。</b>' +
+        '屏上<b>不显示金额，</b>本机<b>也不收款、不下单。</b>')
+      notes.push('上一次拉到价目是 ' + P0.lastSync + '。<b>本机不拿旧价当现价</b> —— ' +
+        '现在能做的：把文件存进「我的文档」下次再打，或找现场工作人员。')
+      more.push('价目的唯一来源是 <b>GET /api/v1/print/price-config</b>（匿名可读）；' +
+        '改价只有一条合法后台路径且必审计。所以这一屏宁可不显示金额，' +
+        '也不拿一份过期快照报价 —— 用旧值报价就是报错价。')
+    } else if (C.st === 'device-off') {
+      notes.push('打印机离线期间本页不接受支付，<b>权益也不会被核销。</b>' +
+        '你的免费次数和券原样留在账户里。')
+    } else if (sc.emptyReason === 'out_of_scope') {
+      /* 「不在适用范围」这一支**一个券都不列** —— 显示一个按不动的券比不显示更糟。
+         只用一句话说清：本单是什么、按什么价、免费次数用在哪。 */
+      notes.push('本单是<b>普通打印</b>（你自己带来的文件），按现场公示价计费 <b>' +
+        yuan(B.gross) + '。</b>')
+      notes.push('免费打印次数与打印免单券<b>只适用于' + SCOPE_TEXT + '</b>这类求职产出，' +
+        '<b>' + SCOPE_OUT + '不在适用范围内</b> —— 所以这里不列可用权益，' +
+        '也不摆一个按不动的券。')
+      more.push('<b>适用范围由后台配置，</b>不是本机写死的产品规则；' +
+        '这一单能用哪些权益，也<b>由服务端在报价时判定</b> —— ' +
+        '本机只把服务端给的结果讲成人话，不自己按链接参数决定谁能免。')
+      acts.push(['24-benefits.html', '去权益页看适用范围'])
+    } else if (sc.identity === 'guest') {
+      notes.push('权益记在<b>你的账户</b>上。你还没认领身份，' +
+        '<b>本机现在不知道你有几次免费打印、有没有券</b> —— 这里不显示任何数字，也不替你猜。')
+      notes.push('价格不受影响：现场公示价<b>不认领身份也看得到，</b>' +
+        '本单按公示价 <b>' + yuan(B.gross) + '。</b>')
+      more.push('价目接口是匿名可读的，所以本机<b>不会为了让你看见价格而先要你登录。</b>' +
+        '认领身份只有一个用途：让本机读得到<b>你账户里的</b>次数与券。')
+      acts.push(['03-identity-gate.html', '去认领身份'])
+    } else if (!B.list.length) {
+      /* 「不可用」要分开说：已用完 / 已过期 / 不在适用范围 / 超封顶 / 需登录，
+         在屏上是五种完全不同的话。合并成一句「不可用」等于没说。 */
+      /* 2026-08-11 整改 ⑦：revoked 原来译成「已被下线」，把两件事混成了一件。
+         活动下线只停止新领取，**不影响已发到账户里的权益**（已发权益是独立契约，
+         按领取时规则继续有效）；会让一张券不能用的是后台**单独撤销**它，
+         那才是 BenefitStatus.revoked，屏上要写「已撤销」并给出原因。 */
+      var RSN = { used_up: '已用完', expired: '已过期', out_of_scope: '不在适用范围',
+                  over_cap: '超出封顶', needs_identity: '需要先认领身份', revoked: '已撤销' }
+      var rows = (sc.blocked || []).map(function (x) {
+        return '<b>' + x.title + '</b> —— <b>' + (RSN[x.reason] || x.reason) + '</b>：' + x.detail
+      })
+      notes.push('本单在适用范围内，但你账户里<b>现在没有能用的。</b>' +
+        (rows.length ? ('<br>' + rows.join('<br>')) : ''))
+      notes.push('本单按现场公示价自付 <b>' + yuan(B.gross) + '。</b>' +
+        '<b>没有可用的就直说没有</b> —— 不摆一个灰按钮让你按不动。')
+      acts.push(['24-benefits.html?stage=s3', '去权益页看这个月的核销明细'])
+    } else {
+      if (B.item && B.fit.ok) {
+        notes.push('本单由<b>你账户里的「' + B.item.title + '」支付，</b>应付 <b>0.00 元。</b>' +
+          '用掉后这一项从 <b>' + B.item.quantityRemaining + '</b> ' + B.item.unitLabel +
+          '变成 <b>' + (B.item.quantityRemaining - 1) + '</b> ' + B.item.unitLabel +
+          '（本单 ' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页，' +
+          '在 ' + B.item.maxBillableUnits + ' 个以内；黑白，在覆盖范围内）。')
+        notes.push('这 0.00 元<b>不是本机免收，也不是本机收银坏了</b> —— ' +
+          '是你自己账户里的权益付的。0 元单<b>不进收银台、不出收款码，</b>' +
+          '出纸完成一样有取件码。')
+        notes.push('列表里写着「可用」<b>不等于一定能用：</b>有效期是发放时写下的，' +
+          '<b>本机不替服务端重新判过期</b> —— 核销那一刻仍可能被判过期或不适用。' +
+          '真被判掉，本单按公示价收，<b>不会先扣了你的次数再告诉你不行。</b>')
+      } else if (B.item && B.fit.why === 'over_units') {
+        notes.push('本单 <b>' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces +
+          ' 个计费页，</b>超出「' + B.item.title + '」的 <b>' + B.item.maxBillableUnits +
+          ' 个计费页</b>上限。本单按公示价 <b>' + yuan(B.gross) + '</b>计费。')
+        notes.push('<b>如需使用免费次数，把计费总量减到 ' + B.item.maxBillableUnits +
+          ' 个以内即可</b> —— 少打几份，或在上一步用页码范围只打要用的那几页。' +
+          '（上限按<b>页 × 份</b>算，不是文档页数。）')
+        notes.push('<b>本机不做补差价</b> —— 不会「先免 ' + B.item.maxBillableUnits +
+          ' 页、超出的你自付」。要么整单免，要么整单按公示价，' +
+          '<b>这张券不会被扣掉。</b>')
+      } else if (B.item && B.fit.why === 'color') {
+        notes.push('<b>免费打印次数覆盖黑白；本单是彩色，</b>按公示价 <b>' + yuan(B.gross) +
+          '</b>计费。')
+        notes.push('黑白 ' + bwUnit().toFixed(2) + ' 元、彩色 ' + unit('color') +
+          ' 元，差 <b>' + (Number(unit('color')) / bwUnit()).toFixed(1) + ' 倍</b> —— ' +
+          '同一个「免 ' + B.item.maxBillableUnits + ' 个计费页」的上限，彩色值的钱是黑白的几倍，' +
+          '所以免费次数只覆盖黑白。<b>要用免费次数，在上一步把色彩改回黑白即可。</b>')
+      } else if (B.item) {
+        notes.push('本单没有可打印的页，金额 0 元，<b>权益用不上，也不会被扣掉。</b>')
+      } else {
+        notes.push('本单<b>没有选任何权益，</b>按现场公示价自付 <b>' + yuan(B.gross) + '。</b>' +
+          '上面列的是你账户里现在有的东西 —— <b>用不用在这一单由你决定。</b>')
+        more.push('免费次数按月清零、不累积，但<b>没必要为了用掉而多打</b> —— ' +
+          '一次免单免的是整单，<b>攒到要打得多的那一单再用更划算。</b>')
+      }
+      if (B.item) {
+        more.push('这一项的<b>发放来源</b>登记为「' + (PAYER[B.item.sourceType] || B.item.sourceType) +
+          ' · ' + B.item.sourceRef + '」。这说的是<b>谁发的这项权益，</b>' +
+          '不代表本次打印已经纳入哪一笔结算，本机也不替出资方承诺任何款项。')
+      }
+      if (P0.changed) {
+        notes.push('<b>后台在你停留期间改过价</b>（' + P0.changed.at + ' 起黑白改为 <b>' +
+          P0.changed.bwPerFace.toFixed(2) + ' 元 / 计费页</b>）。<b>后台改价立即生效，' +
+          '本机也不锁价</b> —— 上面按 ' + P0.snapAt + ' 的快照显示；' +
+          '<b>确认下单时服务端会重新算一次，以那一次的结论为准。</b>' +
+          '若按新价，本单 ' + C.faces + ' 计费页是 <b>' +
+          yuan(r2(C.faces * P0.changed.bwPerFace)) + '，</b>' +
+          '会不会因此超出券的封顶，也要到那一刻才算得准。')
+      }
+      more.push('<b>按所选文档页计费；打印双面只减少用纸，不减少计费页数</b>' +
+        '（这一条只说打印；扫描台的「双面」是扫两面，页数与费用<b>会</b>跟着变）。' +
+        '本单 ' + C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页，' +
+        '用纸 ' + C.sheets + ' 张。')
+      more.push('<b>券只覆盖黑白</b>：黑白与彩色单价差 ' +
+        (Number(unit('color')) / bwUnit()).toFixed(1) + ' 倍，同一个上限彩色值的钱高得多，' +
+        '所以免费次数与免单券都只覆盖黑白，彩色一律走公示价。')
+      more.push('<b>单次上限、色彩范围、适用场景这三项后端目前还没有字段</b>，' +
+        '已列进给后端的字段契约；本页先按设计口径演示。')
+      more.push('<b>一单只能用一项。</b>核销账本对同一件产物只允许核销一次' +
+        '（换另一张券、换另一个请求都不行），所以上面是单选 —— 不是本机小气。')
+      more.push('<b>次数、上限、色彩范围、适用场景、券名与有效期，全部由后台配置，</b>' +
+        '本机开机时从 <b>GET /api/v1/print/price-config</b> 与账户权益接口各拉一份快照 —— ' +
+        '页面一个数都不写死。后台改了，本机要等下一次同步才知道。')
+      for (var mi = 0; mi < B.list.length; mi++) {
+        more.push('「' + B.list[mi].title + '」有效期至 <b>' + B.list[mi].validUntil +
+          '</b> · 发放来源 ' + (PAYER[B.list[mi].sourceType] || B.list[mi].sourceType) +
+          ' · ' + B.list[mi].sourceRef + '。')
+      }
+      acts.push(['24-benefits.html', '去权益页看这几项的规则'])
+    }
+    elNotes.innerHTML = notes.map(function (t) { return '<p class="ben-p">' + t + '</p>' }).join('') +
+      (more.length
+        ? ('<details class="fold" style="margin-top:8px"><summary>用券规则与发放来源</summary>' +
+           '<div class="fold-b">' + more.join('<br>') + '</div></details>')
+        : '')
+    elActs.innerHTML = acts.map(function (a) {
+      return '<a class="btn btn--ghost" href="' + a[0] + '">' + a[1] + '</a>'
+    }).join('')
+    elActs.style.display = acts.length ? '' : 'none'
+    bindDots(elOpts); bindDots(elSum); bindDots(elNotes)
+
+    /* ⑤ 核价卡里也要把 0 元的**成因**写出来。
+       同一屏上「0.00 元 · 本单本来就不收费」和「0.00 元 · 你的免费次数付的」
+       并排出现过，两者含义完全不同 —— 不写清成因，用户会以为白拿。 */
+    if (elQBen) {
+      if (P0.ok && B.item && B.fit.ok && C.st !== 'device-off') {
+        elQBen.textContent = '本单 0 元的原因是：由你账户里的「' + B.item.title +
+          '」整单支付，不是本机免收，也不是收银不可用。'
+        elQBen.style.display = ''
+      } else { elQBen.style.display = 'none' }
+    }
+
+    /* ⑥ 付钱前那一屏也要看得见"你选了什么、扣的是哪一次"。 */
+    if (elKv && elKvV) {
+      if (P0.ok && B.item && C.st !== 'device-off') {
+        elKvV.textContent = B.fit.ok
+          ? (B.item.title + ' · 整单免 ' + yuan(B.gross) + ' · 核销后余 ' +
+             (B.item.quantityRemaining - 1) + ' ' + B.item.unitLabel)
+          : (B.item.title + ' · 本单' +
+             (B.fit.why === 'color' ? '为彩色，不在覆盖范围'
+              : (B.fit.why === 'over_units'
+                 ? ('超出 ' + B.item.maxBillableUnits + ' 个计费页上限')
+                 : '用不了')) + '，未使用')
+        elKv.style.display = ''
+      } else { elKv.style.display = 'none' }
+    }
+  }
+
+  function render () {
+    var C = calc()
+    var cName = C.color === 'color' ? '彩色' : '黑白'
+    var dName = C.duplex === 'duplex' ? '自动双面' : '单面'
+    var dShort = C.duplex === 'duplex' ? '双面' : '单面'
+    var rName = (P.range === 'all')
+      ? ('全部 ' + TOTAL + ' 页')
+      : (C.R.list.length ? ('第 ' + C.R.list.join('、') + ' 页 · 共 ' + C.pages + ' 页') : '未选中任何页')
+    var money = C.money.toFixed(2)
+
+    /* ── 份数 ── */
+    var cv = scr.querySelector('[data-out="copiesVal"]')
+    if (cv && cv.firstChild) cv.firstChild.nodeValue = String(P.copies)
+
+    /* ── 核价那两行（s3 常驻）。这两处早就有 id，沿用，不再另挂 data-out ── */
+    var qc = document.getElementById('q-content')
+    var qp = document.getElementById('q-paper')
+    if (qc) qc.textContent = C.pages + ' 页 × ' + P.copies + ' 份 = ' + C.faces + ' 个计费页'
+    if (qp) qp.textContent = C.sheets + ' 张（每份 ' + C.perCopy + ' 张）'
+
+    /* ── 金额与用量（s4 之后各处，全部同一份算式）──
+       2026-08-11：金额这一支多走一步权益试算。三种结果：
+         · 价目拿不到（PRICE_CONFIG_UNAVAILABLE，后端真实错误码）→ 一个数都不给
+         · 没选权益 → 与接权益之前**逐字相同**（不偷偷改价）
+         · 选了权益 → 原价 − 抵扣；明细挂在左栏权益卡与 s4 的「权益抵扣」行上 */
+    var B = benCalc(C)
+    if (B.due === null) {
+      set('amt', '—（本机暂无价目）')
+      set('amtNum', '—')
+      set('brk', '本机暂无价目 · 不列单价明细，也不下单')
+    } else {
+      money = B.due.toFixed(2)
+      set('amt', money + ' 元')
+      set('amtNum', money)
+      set('brk', (B.item && B.fit.ok)
+        ? (C.faces + ' 个计费页 × ' + unit(C.color) + ' 元 = ' + yuan(B.gross) +
+           ' · 由「' + B.item.title + '」整单免')
+        : (C.faces + ' 个计费页 × ' + unit(C.color) + ' 元 · ' + cName + dShort + ' · ' + P.copies + ' 份'))
+    }
+    benRender(C, B)
+
+    /* 0 元的单不进收银台（本页「0 元的单怎么走」那条折叠里写着的规则）。
+       金额是被权益免掉、还是被份数/页码改成 0，处理方式一样。
+       只在 wait ↔ free 之间切，不碰 scan / confirm / paid 这些渠道态 ——
+       那几种由支付渠道回传驱动，不该被参数改动带走。 */
+    if (B.due !== null && window.v3Pay) {
+      var payNow = scr.getAttribute('data-pay')
+      if (B.due === 0 && payNow !== 'free') window.v3Pay('free')
+      else if (B.due > 0 && payNow === 'free') window.v3Pay('wait')
+    }
+    set('params', cName + ' · ' + dName + ' · ' + P.copies + ' 份')
+    set('faces', C.faces + ' 页')
+    set('facesN', String(C.faces))
+    set('sheets', C.sheets + ' 张')
+    set('sheetsN', String(C.sheets))
+    set('facesSheets', C.faces + ' 页 · 用纸 ' + C.sheets + ' 张')
+    set('jobsum', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + C.faces + ' 个计费页 · 用纸 ' + C.sheets + ' 张')
+    set('againsum', cName + ' · ' + dShort + ' · ' + P.copies + ' 份 · ' + C.faces + ' 页')
+    set('hintParams', cName + ' · ' + dName + ' · ' + P.copies + ' 份 · ' + rName)
+
+    /* ── 各项 prefill 与脚注：说清「选了这个会怎样」，不是复述按钮文字 ── */
+    set('pfColor', cName + ' · 每计费页 ' + unit(C.color) + ' 元')
+    set('pfDuplex', dName + ' · 用纸 ' + C.sheets + ' 张')
+    set('pfOrient', P.orient === 'land' ? '强制横向 · 全部转 90°' : '按文件里的方向 · 可改')
+    set('pfScale', P.scale === 'fit' ? '缩放到 A4' : '已检出 A4 · 无需缩放')
+    set('pfRange', rName)
+    set('rngAllLb', '全部 ' + TOTAL + ' 页')
+
+    /* 单／双面的下游是纸，不是钱 —— 把这件事对用户讲明白，别让他以为选错了亏钱 */
+    var other = Math.ceil(C.pages / (C.duplex === 'duplex' ? 1 : 2)) * P.copies
+    set('duplexNote', C.duplex === 'duplex'
+      ? ('自动双面：' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比单面省 ' + (other - C.sheets) + ' 张纸。'
+         + '计费页仍是 ' + C.faces + ' 页 —— 本机按所选文档页计费，双面只减少用纸、不减少计费页数 —— 所以钱不变，省的是纸。')
+      : ('单面：每页各占一张纸，' + C.pages + ' 页 × ' + P.copies + ' 份用纸 ' + C.sheets + ' 张，比双面多 ' + (C.sheets - other) + ' 张。'
+         + '计费页仍是 ' + C.faces + ' 页，应付不变 —— 本机按所选文档页计费，不按纸张。'))
+
+    set('flipNote', P.flip === 'long'
+      ? '选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。'
+      : '短边翻：像记事本一样从下往上翻。简历、证明材料请改回长边翻，否则背面是倒的。')
+
+    set('orientNote', P.orient === 'follow'
+      ? '文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。'
+      : ('强制横向：' + C.pages + ' 页一律按横向出，原本纵向的那几页内容会被转 90°。页数与应付不变。'))
+
+    set('scaleNote', P.scale === 'none'
+      ? '仅支持 A4；非 A4 文件须确认缩放。本件已检出 A4，按原尺寸出。'
+      : '缩放到 A4：非 A4 页等比缩放并居中，四周可能留白。本件本来就是 A4，缩放后与原尺寸一致；页数与应付不变。')
+
+    /* 翻页边整块：单面时它没有意义，整块收起来。
+       用 style.display 而不是 hidden —— hidden 归 applyVisibility() 独占，
+       一切四态就会被它覆盖（本页 data-redact 那段踩过同一个坑）。
+       复原时写空串而不是 'block'：留着 hidden 那条 CSS 仍能生效。 */
+    var flipField = scr.querySelector('[data-only-duplex]')
+    if (flipField) flipField.style.display = (C.duplex === 'duplex') ? '' : 'none'
+
+    /* 页码范围：把「哪些被忽略了」当场说出来，兑现 #rng-note 上的那句承诺 */
+    if (elNote) {
+      if (P.range !== 'custom') {
+        elNote.textContent = '用逗号分隔单页、用连字符表示区间。超出 1–' + TOTAL + ' 的页码会被忽略，不会静默按全部打印。'
+      } else if (!C.R.list.length) {
+        elNote.textContent = '这个范围在 1–' + TOTAL + ' 里一页都没命中，本单没有可打印的页 —— 请改一下再核价。'
+      } else if (C.R.bad.length) {
+        elNote.textContent = '已忽略超出 1–' + TOTAL + ' 的部分：' + C.R.bad.join('、')
+          + '。本单实际打第 ' + C.R.list.join('、') + ' 页，共 ' + C.pages + ' 页。'
+      } else {
+        elNote.textContent = '本单打第 ' + C.R.list.join('、') + ' 页，共 ' + C.pages + ' 页。'
+      }
+    }
+
+    setSeg('color', C.color); setSeg('duplex', C.duplex); setSeg('flip', P.flip)
+    setSeg('orient', P.orient); setSeg('scale', P.scale)
+    if (elAll) elAll.setAttribute('aria-pressed', P.range === 'all' ? 'true' : 'false')
+    if (elCus) elCus.setAttribute('aria-pressed', P.range === 'custom' ? 'true' : 'false')
+  }
+
+  /* ── 份数步进：到上下限必须出声。静默停住 = 又一个「按了没反应」 ── */
+  function step (d) {
+    var n = P.copies + d
+    var note = scr.querySelector('[data-out="copiesNote"]')
+    var msg = ''
+    if (n < 1) { n = 1; msg = '最少 1 份 —— 已经是最少了，减不动了。' }
+    if (n > MAXC) { n = MAXC; msg = '本机单次最多 ' + MAXC + ' 份，已停在 ' + MAXC + ' 份。要更多请分几单，或找现场工作人员。' }
+    P.copies = n
+    if (note) { note.textContent = msg; note.hidden = !msg }
+    render()
+  }
+
+  scr.addEventListener('click', function (e) {
+    var sb = e.target.closest('[data-param="copies"] .stepper button[data-step]')
+    if (sb) { step(+sb.getAttribute('data-step')); return }
+    var b = e.target.closest('[data-param] button[data-v]')
+    if (b && b.getAttribute('aria-disabled') !== 'true') {
+      var host = b.closest('[data-param]')
+      P[host.getAttribute('data-param')] = b.getAttribute('data-v')
+      render(); return
+    }
+    /* 页码范围两个键的显隐由本页更早那段小脚本管，这里只跟着重算 */
+    if (e.target.closest('#rng-all')) { P.range = 'all'; render(); return }
+    if (e.target.closest('#rng-custom')) { P.range = 'custom'; render(); return }
+    /* 权益：单选（一单一权益）。换处境时把选中项复位 —— 上一种处境里选的那张券
+       在新的列表里可能根本不存在，留着它会让金额按一张不在册的券算。 */
+    var ub = e.target.closest('[data-benuse-btn]')
+    if (ub) {
+      BEN.pick = ub.getAttribute('data-benuse-btn'); render()
+      /* 0 元单不进收银台（本页「0 元的单怎么走」那条折叠里写着的规则）。
+         只在 wait ↔ free 之间切，不碰 scan / confirm / paid 那些渠道态 ——
+         那几种由支付渠道回传驱动，不该被参数改动带走。 */
+      return
+    }
+    var bb = e.target.closest('[data-ben-btn]')
+    if (bb) {
+      BEN.scene = bb.getAttribute('data-ben-btn'); BEN.pick = 'none'
+      var all = scr.querySelectorAll('[data-ben-btn]')
+      for (var k = 0; k < all.length; k++) {
+        all[k].setAttribute('aria-pressed',
+          all[k].getAttribute('data-ben-btn') === BEN.scene ? 'true' : 'false')
+      }
+      render(); return
+    }
+  })
+  if (elIn) elIn.addEventListener('input', function () { if (P.range === 'custom') render() })
+
+  /* 四态切换会改变彩色 / 双面可不可用，用量与金额得跟着重算 */
+  new MutationObserver(render).observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  render()
+})()
+</script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

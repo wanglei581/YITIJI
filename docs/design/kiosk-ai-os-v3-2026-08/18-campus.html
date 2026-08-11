@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P18 专用 ───────────────────────────────────────────────────────────
    组件复用备忘（做 P17 时逐个踩过）：
@@ -56,22 +57,74 @@
 .jw-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
 .jw--soon .jw-d { color: var(--coral-400); }
 
-/* 勾选行 */
-.ck { display:flex; align-items:flex-start; gap:var(--s-4);
-      min-height:var(--touch-min); padding:var(--s-3) var(--s-4);
-      border-radius:var(--r-xs); border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
-.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
-          flex:0 0 auto; margin-top:2px; position:relative; }
-.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
-.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
-          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
-.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* ════════ 2026-08-10 Codex 走查整改 ① · 别再造假控件 ════════
+   上一版这一页两处长得像控件、其实不是：
+     · 活动行是 <label class="jobrow ck--have">，右边还挂着「已加进计划表」——
+       可 ck--have 在这里连方框都没有（.ck-box 根本没写进行里），
+       整行没有 input、没有状态、没有事件。用户点了什么也不会发生，
+       而动作条偏偏写着「已选 2 场」，第 3 步还有「改选活动」按钮。
+     · 右栏「这几场要用到的材料」是 <label class="ck"> + 22px 方框，同样点不动。
+   现在分家：活动行做成整行大复选按钮（真选中、真影响计划表与页数），
+   材料清单降级为圆点条目（只读，不伪装成控件）。.ck 整套删除。 */
+
+/* 活动行：整行大复选按钮 */
+/* .joblist 是 flex 列 + overflow-y:auto，行默认 flex-shrink:1 会被压扁：
+   加进 26px 复选框、右侧再让出一列之后，正文更窄、折行更多，
+   行高被压到 181px 而内容有 231px —— 来源行直接被切掉（自检：卡内溢出 ×6）。
+   行不许压缩，长了让列表自己滚。 */
+.jobrow { min-height:56px; flex:0 0 auto; }
+.jobrow[aria-pressed="true"] { border-color:var(--jade-a32); background:var(--jade-a12); }
+.jobrow:focus-visible { outline:3px solid var(--jade-400); outline-offset:2px; }
+.jobrow-b { flex:1 1 auto; }
+.ck-box { width:26px; height:26px; border-radius:6px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:3px; position:relative; }
+.jobrow[aria-pressed="true"] .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.jobrow[aria-pressed="true"] .ck-box::after { content:''; position:absolute; left:8px; top:3px;
+          width:6px; height:12px; border:solid #fff; border-width:0 3px 3px 0; transform:rotate(42deg); }
+.jobrow-side { flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end;
+          gap:6px; align-self:center; }
+.jobrow-pick { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.jobrow[aria-pressed="true"] .jobrow-pick { color:var(--jade-600); font-weight:700; }
+
+/* 只读清单条目：圆点 + 正文 + 右侧状态词。状态词是结论不是开关，
+   所以不给 cursor:pointer、不给 hover，看得出来它不接受点击。
+   类名避开 pill / chip / tag / btn —— 那几个词是自检「疑似假入口」的扫描面。 */
+.li-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s-3); }
+.li { display:flex; align-items:flex-start; gap:var(--s-4);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); }
+.li-dot { width:9px; height:9px; border-radius:50%; background:var(--fog-a20);
+          flex:0 0 auto; margin-top:9px; }
+.li-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.li-t { font-size:var(--fz-3); color:var(--fog-900); }
+.li-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.li-st { flex:0 0 auto; align-self:center; font-size:var(--fz-1); white-space:nowrap; color:var(--jade-600); }
+.li-st--own { color:var(--fog-600); }
 
 .chip--info { cursor: inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+
+/* 2026-08-10：校园服务三个入口放进右栏后被挤到 47.3px（自检线 47.5px，差 0.2px）。
+   右栏是弹性分配的，靠文案长度撑高度不可靠 —— 直接钉住 56px，按 CLAUDE.md §9 的
+   主操作尺寸走。
+
+   2026-08-11 补：上面这行 min-height 一直没生效 —— `.alt` 这套类**全站没有定义**。
+   它是 P19 页内自带的样式，本页照抄了结构却没抄样式，于是三个入口一直以
+   裸 <a> 下划线蓝链的样子渲染：既不是卡片，也没有 56px 触控高度
+   （min-height 对 inline 元素不起作用）。补上定义，取 P19 的原样，
+   不另造一套观感。 */
+.alt { display:flex; align-items:flex-start; gap:var(--s-4);
+       padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+       background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:var(--touch-min);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt > .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; }
+.alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.campus-svc .alt { min-height: 56px; }
 
 /* 计划表纸面 */
 .plan { padding: 30px 34px; color:#17222b; }
@@ -85,6 +138,87 @@
 .pl-i b { color:#0f5a45; }
 .pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
            padding-top:9px; margin-top:14px; }
+/* 本域次要入口：主返回键按 ?from= 改去业务域之后，本域首屏不能没有门。
+   只在返回键被改走时由脚本插入；虚线边框表示它是次要出口，不抢主返回键。 */
+.actionbar > .altbtn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 56px; padding: 0 var(--s-4); margin-right: var(--s-3);
+  white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+  background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+}
+.actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：s1 左 349（device-off 554）、s2 右 476、s3 右 300。
+   左栏 s2（活动列表）和 s3（纸面）本来就满，不动。
+
+   成因两条，分开处理：
+
+   ① **状态漏配** —— 只命中 device-off 的那 205px。第 1 步的「按你的毕业年份算的」
+      和 ① 号建议的正文都只写了 `default first` / `ai-down`，离线态两块都不显示。
+      打印机在不在线跟能不能读简历没关系。已按 default 口径补 device-off（见上方三处注释）。
+
+   ② **内容量不足 + flex 分配** —— 其余三处。pane--grow 撑到栏底，
+      s1 左卡里只有 726/1075，s2 右 739/1215，s3 右 767/1068。
+      处理：放大真正的主内容（27 寸竖屏 ≈ 82 PPI，13–16px 副文在 60cm 距离下偏小），
+      s2 右另补一块**来源与同步汇总** —— 那是把左边 6 场各自 srcline 里已经标着的
+      来源机构、同步时间、外部 ID 前缀按来源聚合，不是新数据；
+      而「场次 / 时间 / 来源三字段保持真实来源标注」正是这一页的硬要求。
+
+   放大的范围是按栏、按阶段量出来的，不是全页一刀切：
+     · 左栏 s1 差 227–258px → 放大三件事的正文与季节条。
+     · 右栏 s2 差 476px、s3 差 300px → 放大 + 补来源汇总。
+     · 右栏 s1 本来就只差 126px（近乎装满），一放大就把「校招常见的三个坑」
+       顶出可视区 —— 这一栏保持原尺寸，不跟着放。
+   另外：首次使用态会在右栏多插一张 ~160px 的卡，三个阶段的右栏都必须留出这一份，
+   否则默认态好看、first 态末行被滚动条吃掉（baseline 上 s1 右就已经这样）。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+/* 左栏：s1 的主内容 */
+.wmain .kv-row { min-height:56px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.wmain .notice { font-size:var(--fz-3); line-height:1.72; padding:var(--s-5); }
+.wmain .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.wmain .advice-why { font-size:var(--fz-4); line-height:1.78; }
+.wmain .advice { gap:var(--s-4); }
+.sn { padding:var(--s-5) var(--s-4); }
+.sn-t { font-size:var(--fz-3); }
+.sn-d { font-size:var(--fz-2); }
+.sn-s { font-size:var(--fz-2); line-height:1.6; margin-top:8px; }
+/* 右栏：只放大 s2 / s3 两步；s1 保持原尺寸 */
+.wside [data-at="s2"] .kv-row,
+.wside [data-at="s3"] .kv-row { min-height:50px; font-size:var(--fz-4); }
+.wside [data-at="s2"] .notice,
+.wside [data-at="s3"] .notice { font-size:var(--fz-2); line-height:1.66; }
+.wside [data-at="s2"] .panel-note,
+.wside [data-at="s3"] .panel-note { font-size:var(--fz-2); line-height:1.66; }
+.wside [data-at="s3"] .tl { padding:var(--s-3) 0; }
+.wside [data-at="s3"] .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.wside [data-at="s3"] .tl-s { font-size:var(--fz-2); line-height:1.6; margin-top:5px; }
+/* s2 右：材料清单条目 */
+.wside [data-at="s2"] .li { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s2"] .li-t { font-size:var(--fz-4); }
+.wside [data-at="s2"] .li-s { font-size:var(--fz-2); line-height:1.5; }
+.wside [data-at="s2"] .li-st { font-size:var(--fz-2); }
+.wside [data-at="s2"] .li-dot { margin-top:11px; }
+/* 首次使用态在 s1 右栏多插一张 154px 的卡，而那一栏默认只剩 126px 富余 ——
+   差的 66px 在 baseline 上就已经把「校招常见的三个坑」末行推出可视区。
+   顺手一起修掉：卡按两行字的体量给高度，s1 右栏的 kv 行与三个校园服务入口收紧一档。
+   收紧后默认态富余 ≈ 170px，仍在 200px 判据以内。 */
+.wside [data-when="first"] { padding:var(--s-3) var(--s-5); }
+.wside [data-when="first"] .pane-hd { margin-bottom:var(--s-2); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-2); line-height:1.55; }
+.wside [data-when="first"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-1); }
+/* 校园服务三张卡补上样式后，s1 右栏由「差 170px」变成「差 36px」—— 这一栏现在是真满了。
+   首次使用态那张卡的 138px 只能从这一栏自己腾：11 行 kv、3 张卡的副文、3 段脚注各收一档。
+   收完默认态仍差约 160px，在 200px 判据以内。 */
+.wside [data-at="s1"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-at="s1"] .kv-row { min-height:40px; }
+.wside [data-at="s1"] .panel-note { font-size:var(--fz-2); line-height:1.55; }
+.wside [data-at="s1"] .notice { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s1"] .alt-s { font-size:var(--fz-1); line-height:1.45; }
+.campus-svc .sec { gap:var(--s-2) !important; }
 </style>
 </head>
 <body>
@@ -97,7 +231,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">校园招聘</div>
@@ -114,7 +248,8 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">现在该做什么</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">这两周的活动</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走计划表</span></button>
+      <!-- 步骤名随态变：ai-down 那一步交付的是活动清单，不是结合简历的计划表 -->
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name" data-when="default first device-off">带走计划表</span><span class="rstep-name" data-when="ai-down">带走活动清单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
   </div>
@@ -128,11 +263,15 @@
         <div class="pane-hd">
           <svg class="ic"><use href="#i-clock"/></svg>
           <b>今天是 8月9日，秋招刚开始</b>
-          <span class="mt" data-when="default first">按你的毕业年份算的</span>
+          <!-- 2026-08-11 状态漏配修正：这四处原来只写 `default first` / `ai-down`，
+               device-off 态两块都不显示 —— 打印机离线跟能不能读你的简历、能不能算校招节奏
+               没有任何关系，结果离线态下第 1 步整块空白（实测左栏裸露 554px，比另外三态多 205px）。
+               同一类错误 P22 页内注释里已经记过一次。按 default 的口径补上 device-off。 -->
+          <span class="mt" data-when="default first device-off">按你的毕业年份算的</span>
           <span class="mt" data-when="ai-down">按公开日历，未结合你的情况</span>
         </div>
         <div class="sec">
-          <div class="advice-act" data-when="default first">
+          <div class="advice-act" data-when="default first device-off">
             你写的是 <b>2027 年 6 月毕业</b>，现在是<b>提前批和秋招网申的开头</b>。
             这个月最要紧的不是投得多，是<b>把简历改到能投</b>。
           </div>
@@ -172,7 +311,7 @@
 
           <div class="advice">
             <div class="advice-act">① 先把简历改到能投（本机能做）</div>
-            <div class="advice-why" data-when="default first">
+            <div class="advice-why" data-when="default first device-off">
               <span class="ev ev--e1">读过你上传的简历</span>
               你的简历现在有 <b>2 页</b>，第 2 页只有半页内容 ——
               校招简历<b>压到一页</b>更容易被看完。
@@ -197,7 +336,9 @@
               本机能打印，也能把扫描件存进「我的文档」。
             </div>
             <div class="advice-act" style="margin-top:var(--s-3)">
-              <a class="btn btn--lg btn--quiet" href="12-material-factory.html">
+              <!-- 2026-08-10：带上 ?from=P18，材料工厂那边才能把返回键指回招聘会域，
+                   不然用户从校招走过去备完材料，返回键会把他放到简历域。 -->
+              <a class="btn btn--lg btn--quiet" href="12-material-factory.html?from=P18">
                 <svg class="ic"><use href="#i-package"/></svg>去备材料
               </a>
             </div>
@@ -206,7 +347,7 @@
           <div class="advice">
             <div class="advice-act">③ 网申去官方平台投（本机不代投）</div>
             <div class="advice-why">
-              本机<b>不代收简历、不代为投递</b>，也拿不到你的投递结果。
+              本机也拿不到你的投递结果。
               这里只做两件事：帮你把材料准备好，把要投的公司和截止日期打成一张纸。
             </div>
             <div class="panel-note" style="margin-top:var(--s-3)">
@@ -235,7 +376,9 @@
           <span class="mt">共 6 场 · 来自学校就业网与主办方公告</span>
         </div>
         <div class="sec">
-          <div class="notice" data-when="default first">
+          <!-- 2026-08-11 状态漏配修正：同第 1 步，device-off 原来两块都不显示。
+               活动列表来自公告同步，跟打印机在不在线无关。 -->
+          <div class="notice" data-when="default first device-off">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span>下面按<b>截止或开场时间</b>排，不按"好不好"排 ——
                   哪场值得去要你自己判断。本机只转述公告，不代为报名。</span>
@@ -250,7 +393,8 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="joblist">
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-camp="a" data-date="8月11日 周一 · 还有 2 天" data-plan="某通信设备公司 提前批<b>网申截止</b> · 要交成绩单扫描件">
+            <span class="ck-box"></span>
             <span class="jobrow-when jw--soon"><span class="jw-d">11</span><span class="jw-m">8月 周一</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某通信设备公司 · 2027 届提前批网申截止</span>
@@ -266,10 +410,11 @@
                 <span>外部 ID XJ-2027-1188</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
-          </label>
+            <span class="jobrow-side"><span class="jobrow-pick">已加进计划表</span></span>
+          </button>
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-camp="b" data-date="8月14日 周四 14:00" data-plan="某汽车零部件集团 <b>校内宣讲</b> · 第二报告厅 · 现场收纸质简历，宣讲后有初面">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">14</span><span class="jw-m">8月 周四</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">校内宣讲会 · 某汽车零部件集团</span>
@@ -285,10 +430,11 @@
                 <span>外部 ID XJ-XJH-0814</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
-          </label>
+            <span class="jobrow-side"><span class="jobrow-pick">已加进计划表</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="c" data-date="8月16日 周六 09:00" data-plan="2027 届秋季双选会（第一场）· 学校体育馆 · 参会 46 家<br><b>参会企业名单主办方还没公布</b>，公布后可以再来本机排走法">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">16</span><span class="jw-m">8月 周六</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">2027 届毕业生秋季双选会（第一场）</span>
@@ -304,10 +450,11 @@
                 <span>外部 ID XJ-SXH-0816</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">名单未公布</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">名单未公布</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="d" data-date="8月18日 周一" data-plan="某电子制造 网申开启（截止 9月30日）· <b>要求本科及以上，先看清楚学历门槛</b>">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">18</span><span class="jw-m">8月 周一</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某电子制造 · 2027 届校招网申开启</span>
@@ -323,10 +470,11 @@
                 <span>外部 ID XJ-2027-1206</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">学历要求需留意</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">学历要求需留意</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="e" data-date="8月20日 周三 19:00" data-plan="某新能源 <b>线上宣讲</b>（需提前在来源平台报名）">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">20</span><span class="jw-m">8月 周三</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">线上宣讲 · 某新能源企业</span>
@@ -341,10 +489,11 @@
                 <span>外部 ID ZB-LIVE-0820</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">需自行报名</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">需自行报名</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-camp="f" data-date="8月22日 周五 09:00" data-plan="某机械集团 <b>校园开放日</b>（需提前预约）">
+            <span class="ck-box"></span>
             <span class="jobrow-when"><span class="jw-d">22</span><span class="jw-m">8月 周五</span></span>
             <span class="jobrow-b">
               <span class="jobrow-t">某机械集团 · 校园开放日</span>
@@ -359,8 +508,8 @@
                 <span>外部 ID ZB-OPEN-0822</span>
               </span>
             </span>
-            <span class="jobrow-when"><span class="chip chip--info">信息不全</span></span>
-          </label>
+            <span class="jobrow-side"><span class="chip chip--info">信息不全</span><span class="jobrow-pick">选这场</span></span>
+          </button>
 
         </div>
 
@@ -371,7 +520,12 @@
       </div>
 
       <!-- ─────────── S3 带走计划表 ─────────── -->
-      <div class="paper-bar" data-at="s3">
+      <!-- 2026-08-10 ai-down 泄漏整改：纸面此前**没有 data-when**。AI 挂掉时屏上第 1 步
+           已经写明「本机现在读不了你的简历，给不了针对你的意见」，纸面页脚却照印
+           「根据公开的校招公告**和你本人的简历**生成」，第一块还印着按简历得出的
+           「压到一页 / 项目经历补上结果」。屏纸打架，而纸是带出门的那一份。
+           现在按态分两份，名字与页脚都不一样。 -->
+      <div class="paper-bar" data-at="s3" data-when="default first device-off">
         <span class="nm">我的校招计划表 · 8月9日 – 8月22日</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
@@ -380,9 +534,25 @@
           <button class="pgbtn" aria-label="下一页">›</button>
         </span>
       </div>
+      <div class="paper-bar" data-at="s3" data-when="ai-down">
+        <span class="nm">校招活动清单 · 8月9日 – 8月22日</span>
+        <span class="mt">A4 · 1 页 · 黑白 · 未结合简历</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
 
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏三张 .sheet-a4 都判**纸样类豁免**。
+           共同依据（实测 default/s3）：纸宽 564px 已铺满 604px 主栏（左右各 20px 栏内边距），
+           两张纸各 797px 上下叠满整栏（stage clientH 1378 / scrollHeight 1663），右边 348px
+           副栏也是满的 —— 纸不是浮在栏上半截、下半截露栏背景，空的是**纸**不是版面。
+           这几张纸会从出纸口带去宣讲会和网申现场，往空白处填东西 = 在学生带走的纸上
+           印本机没有依据的内容。 -->
       <div class="paper-stage" data-at="s3">
-        <div class="sheet-a4">
+        <div class="sheet-a4" data-when="default first device-off"
+             data-void-ok="A4 纸样：校招计划表是一页短文档，三件待办＋勾中的活动日期块写完就到页脚免责收尾；日期块由第 2 步勾选实时生成，勾满 6 场会自然变长">
           <div class="plan">
             <h1>我的校招计划表</h1>
             <div class="pl-sub">
@@ -396,35 +566,53 @@
             <div class="pl-i"><i></i><span>备齐成绩单、在读证明、四六级、获奖证明（本机可扫可打）</span></div>
             <div class="pl-i"><i></i><span>网申到<b>企业官网或学校就业网</b>投，认准官方域名</span></div>
 
-            <div class="pl-w">8月11日 周一 · 还有 2 天</div>
-            <div class="pl-i"><i></i><span>某通信设备公司 提前批<b>网申截止</b> · 要交成绩单扫描件</span></div>
-
-            <div class="pl-w">8月14日 周四 14:00</div>
-            <div class="pl-i"><i></i><span>某汽车零部件集团 <b>校内宣讲</b> · 第二报告厅 · 现场收纸质简历，宣讲后有初面</span></div>
-
-            <div class="pl-w">8月16日 周六 09:00</div>
-            <div class="pl-i"><i></i><span>2027 届秋季双选会（第一场）· 学校体育馆 · 参会 46 家<br>
-              <b>参会企业名单主办方还没公布</b>，公布后可以再来本机排走法</span></div>
-
-            <div class="pl-w">8月18日 周一</div>
-            <div class="pl-i"><i></i><span>某电子制造 网申开启（截止 9月30日）·
-              <b>要求本科及以上，先看清楚学历门槛</b></span></div>
-
-            <div class="pl-w">8月20日 周三 19:00 · 8月22日 周五 09:00</div>
-            <div class="pl-i"><i></i><span>某新能源 线上宣讲（需提前报名）／某机械集团 校园开放日（需预约）</span></div>
+            <!-- 日期块按第 2 步勾中的活动实时生成：勾选一变，纸面跟着变。
+                 上一版这五段是写死的 —— 只勾了 2 场，纸上照样印满 6 场。 -->
+            <div data-f="pl-items"></div>
 
             <div class="pl-foot">
               本表由职易达一体机根据公开的校招公告和你本人的简历生成，仅供你自己参考。<br>
-              本机不代收简历、不代为投递、不代为报名，也不预测录用结果。<br>
+              本机不代为报名，也不预测录用结果。<br>
               活动时间、地点、资格要求以主办方最新公告为准。本表不作为入场或报名凭证。
             </div>
           </div>
         </div>
 
-        <div class="sheet-a4" style="margin-top:var(--s-5)">
+        <!-- ai-down 版纸面：改名「校招活动清单」。日期块照旧（那是你勾的公告，不经过 AI），
+             第一块换成**明确标注为通用**的三条提醒（与第 1 步 ai-down 屏上给的通用建议
+             一字对应），页脚写清没结合简历。 -->
+        <div class="sheet-a4" data-when="ai-down"
+             data-void-ok="A4 纸样：ai-down 版三条提醒明写「不结合你的简历」，纸面比默认版更空是**故意的**；把它填满就等于在 AI 不可用时照样印出看过简历才能给的意见">
+          <div class="plan">
+            <h1>校招活动清单</h1>
+            <div class="pl-sub">
+              2027 届 · 8月9日 – 8月22日 · 由职易达一体机打印<br>
+              活动信息来自学校就业网与主办方公告，同步于 8月9日 07:30
+            </div>
+            <div class="pl-hr"></div>
+
+            <div class="pl-w">通用提醒（不结合你的简历）</div>
+            <div class="pl-i"><i></i><span>校招简历<b>压到一页</b>，项目经历要写出结果</span></div>
+            <div class="pl-i"><i></i><span>备齐成绩单、在读证明、四六级、获奖证明（本机可扫可打）</span></div>
+            <div class="pl-i"><i></i><span>网申到<b>企业官网或学校就业网</b>投，认准官方域名</span></div>
+
+            <div data-f="pl-items"></div>
+
+            <div class="pl-foot">
+              <b>本清单未结合你的简历。</b>生成时本机的 AI 服务不可用，
+              所以上面三条是校招通用提醒，<b>不是看过你的简历之后给的意见</b>。<br>
+              本清单由职易达一体机根据公开的校招公告生成，仅供你自己参考。<br>
+              本机不代为报名，也不预测录用结果。<br>
+              活动时间、地点、资格要求以主办方最新公告为准。本清单不作为入场或报名凭证。
+            </div>
+          </div>
+        </div>
+
+        <div class="sheet-a4" style="margin-top:var(--s-5)"
+             data-void-ok="A4 纸样：这张是 2027 届在校生压到一页的简历（页脚写明「这是你在本机改过的版本：已压到一页」）。校招简历本来就该短，一个课程设计＋技能就是他真有的东西；补内容等于替学生编在校经历">
           <div class="plan" style="padding:26px 30px">
             <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
-              同批第 2 份 · 共 6 份 · 每份 1 页
+              同批第 2 份 · 共 <span data-f="cv-n">6</span> 份 · 每份 1 页
             </div>
             <h1 style="font-size:19px">王 磊</h1>
             <div class="pl-sub">2027 届 · 机械设计与制造（专科）· 求职意向：机械设计 / 工艺</div>
@@ -463,6 +651,31 @@
           <div class="panel-note" style="margin-top:var(--s-3)">
             这些只在本次办理里用，离场自动清空，不留存。
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 孤儿页接线：P46 校园服务（迎新报到 / 校园卡办理 / 校园大数据）
+           此前**全站零入口**，只能手敲网址进。本页是校招页，来的多半是在校生与应届生，
+           三块各自直达自己的阶段。这三块是**校方信息与办事指引**，本机只做展示，不代办。 -->
+      <div class="pane campus-svc" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-campus"/></svg><b>校园服务</b>
+          <span class="mt">校方信息 · 本机不代办</span></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <a class="alt" href="46-campus-service.html?stage=welcome">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <span class="alt-b"><span class="alt-t">迎新报到</span>
+              <span class="alt-s">报到四步、办事窗口，入学要打的表本机能打</span></span>
+          </a>
+          <a class="alt" href="46-campus-service.html?stage=card">
+            <svg class="ic"><use href="#i-idcard"/></svg>
+            <span class="alt-b"><span class="alt-t">校园卡办理</span>
+              <span class="alt-s">办卡指引与所需材料 · 全程不接 AI，办理在学校窗口</span></span>
+          </a>
+          <a class="alt" href="46-campus-service.html?stage=bigdata">
+            <svg class="ic"><use href="#i-layers"/></svg>
+            <span class="alt-b"><span class="alt-t">校园大数据</span>
+              <span class="alt-s">面向学校管理端 · 学校没开通就是没开通，不摆假数字</span></span>
+          </a>
         </div>
       </div>
 
@@ -528,26 +741,27 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>这几场要用到的材料</b></div>
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历 4–6 份</span>
-              <span class="ck-s">14日宣讲会现场收</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">成绩单扫描件</span>
-              <span class="ck-s">11日网申要传 · 本机可扫成 PDF</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">在读证明</span>
-              <span class="ck-s">双选会入场可能要查</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">学生证</span>
-              <span class="ck-s">校内活动进场用</span></span>
-          </label>
+          <!-- 2026-08-10 Codex ①：这四条是本机告诉你「要带什么」，不是你要勾的东西。
+               上一版长成 <label> + 22px 方框，看着能勾，点了什么也不发生。
+               右边那个词是**状态**（这一项本机能不能帮你解决），不是勾选。 -->
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历 4–6 份</span>
+                <span class="li-s">14日宣讲会现场收</span></span>
+              <span class="li-st">本机可打</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">成绩单扫描件</span>
+                <span class="li-s">11日网申要传</span></span>
+              <span class="li-st">本机可扫</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">在读证明</span>
+                <span class="li-s">双选会入场可能要查</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">学生证</span>
+                <span class="li-s">校内活动进场用</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+          </ul>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
             证件类扫描件本机默认<b>不长期保存</b>，办理结束即清。
@@ -567,6 +781,24 @@
             <span>11日那个网申<b>要传成绩单</b> —— 今天顺手在本机扫好，
                   比截止当天临时找强。</span>
           </div>
+
+          <!-- 2026-08-11 版面整改：这一块不是新数据 —— 左边 6 场每一场的 srcline 里
+               都已经标着来源机构、同步时间和外部 ID，这里只是按来源聚合成一张表，
+               让「这 6 场从哪来、什么时候同步的」一眼看得全。
+               本页的硬要求就是场次 / 时间 / 来源三字段必须保持真实来源标注。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-agency"/></svg><b>这 6 场从哪来</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">学校就业网</span><span class="v"><b>2</b> 场</span></div>
+            <div class="kv-row"><span class="k">学校就业指导中心</span><span class="v"><b>2</b> 场</span></div>
+            <div class="kv-row"><span class="k">主办方公告</span><span class="v"><b>2</b> 场</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            同步时间 <b>8月9日 07:30</b>，最旧一条 8月8日 21:10；
+            每一场的外部 ID 印在列表里那一条的来源行上。
+            <b>报名、资格、是否如期举行以来源方为准</b>，本机不代办、不代收简历。
+          </div>
         </div>
       </div>
 
@@ -574,20 +806,23 @@
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>一起打印</b></div>
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">校招计划表</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
-          </label>
-          <label class="ck ck--have" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 6 份</span></span>
-          </label>
+          <!-- 同上：这两条是「这一批里有什么」的陈述，不是可勾可去的选项 ——
+               真要能去掉，下面的页数与费用就得跟着变，而这一步没有那个开关。 -->
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">校招计划表</span>
+                <span class="li-t" data-when="ai-down">校招活动清单</span>
+                <span class="li-s">A4 黑白 · 1 页 × 1 份</span></span>
+              <span class="li-st">在这批里</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历</span>
+                <span class="li-s" data-f="cv-line">A4 黑白 · 1 页 × 6 份</span></span>
+              <span class="li-st">在这批里</span></li>
+          </ul>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v">7 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>1.40</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">7</b> 计费页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">1.40</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -596,7 +831,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。计划表同时存进「我的文档」。
+            这张表同时存进「我的文档」。
           </div>
         </div>
       </div>
@@ -606,10 +841,10 @@
         <div class="sec">
           <div class="tline">
             <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">出纸口取走 7 页</span>
-                <span class="tl-s">计划表在最上面一页</span></span></div>
+              <span class="tl-b"><span class="tl-t">出纸口取走 <span data-f="pg">7</span> 页</span>
+                <span class="tl-s">这张表在最上面一页</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">计划表存进「我的文档」</span>
+              <span class="tl-b"><span class="tl-t">这张表存进「我的文档」</span>
                 <span class="tl-s">今天之内可以再打一次，不重复收费</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">日期变了就回来重打</span>
@@ -646,13 +881,17 @@
         </div>
       </div>
 
-      <!-- 首次使用：一句话 -->
-      <div class="pane" data-when="first">
+      <!-- 首次使用：一句话。
+           2026-08-11：限定在 s1，并按两行字的体量给高度。
+           它说的是「这一页帮你做什么」—— 那是进门那一步的话。到了第 2 步（选活动）
+           和第 3 步（看纸面），步骤条和动作条提示已经在说同一件事，这张卡是第三遍，
+           还会把右栏顶出 161px（末行被滚动条吃掉）。不是删内容，是不在同一屏说三遍。 -->
+      <div class="pane" data-when="first" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
             按你的毕业年份定位校招节奏，把这两周的截止日期和活动<b>打成一张纸</b>。<br>
-            本机不代收、不代投、不代报名。
+            本机只做信息展示。
           </div>
         </div>
       </div>
@@ -662,25 +901,27 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="36-fairs-hub.html" data-parent-label="招聘会"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">招聘会</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">改选活动</button>
 
     <span class="actionbar-hint" data-at="s1" data-when="default first">按 2027 届算 · 现在是提前批和秋招网申</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 只显示公开校招日历</span>
-    <span class="actionbar-hint" data-at="s2">已选 2 场 · 最近一个截止在 2 天后</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 7 页 · 预估 1.40 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s2" data-f="hint2">已选 2 场 · 最近一个截止在 2 天后</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f="hint3">共 7 计费页 · 预估 1.40 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成活动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" data-f="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P18&amp;kind=fair-plan&amp;title=校园招聘计划表&amp;pages=7&amp;copies=1&amp;back=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -688,10 +929,190 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P18 · 来源感知返回（2026-08-10 Codex 闭环整改 · 06/07/12/18 同一份登记表）
+   --------------------------------------------------------------------------
+   校园招聘专区由招聘会域（36 / 17）和智慧校园（19）两条路进入，
+   可左下返回键写死跳「招聘会」。用户从智慧校园点「看校招活动」进来，看完一按返回，
+   人被放到招聘会域首屏 —— **被悄悄换了域**，回不到刚才那个智慧校园页面。
+   现在按交接契约的 ?from=<页号> 查登记表：
+     · 认识且不同域 → 返回键 href 与副标签改成**真实来源域**（?from=P19 → 智慧校园），
+                      右边补一个「招聘会首页」次要入口（既能回业务域也能回本域）
+     · 同域 / 不认识 / 缺失 → 一个字不改，保留 HTML 里的默认父级（现有行为）
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  var D = {
+    P01: ['首页', '01-home-v6.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+
+  var alt = document.createElement('a')
+  alt.className = 'altbtn'
+  alt.setAttribute('href', own.f)
+  alt.textContent = own.n + '首页'
+  back.parentNode.insertBefore(alt, back.nextSibling)
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P18 · 2026-08-10 Codex 走查整改 ① ·「这两周去哪几场」真的能勾
+   --------------------------------------------------------------------------
+   上一版六条活动行是 <label class="jobrow ck--have">：ck--have 在这一页连方框
+   都没有（.ck-box 根本没写进行里），整行没有 input、没有状态、没有事件；
+   右边还挂着「已加进计划表」这种**看着是结果、其实改不了**的标签。
+   而动作条写着「已选 2 场」，第 3 步还有「改选活动」按钮 —— 承诺了不存在的控件。
+
+   现在整行是 <button aria-pressed>，勾选真的往下游走：
+     选中数 → 动作条「已选 N 场」
+     选中项 → 计划表纸面的日期块逐条重建（原来勾没勾都印满 6 场）
+     场数   → 简历份数 = N × 2、计费页数 = 1 + N × 2、
+              费用 = 计费页数 × 现行黑白单价（取自 site-config，后台可改），
+              以及出口链接里的 ?pages=
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var rows = [].slice.call(scr.querySelectorAll('.jobrow[data-camp]'))
+  if (!rows.length) return
+
+  var COPIES = 2          // 每场带 2 份简历
+  var CV_PAGES = 1        // 校招简历压到一页（本页反复讲的那件事）
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
+
+  function set (k, html) {
+    var ns = scr.querySelectorAll('[data-f="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].innerHTML = html
+  }
+  /* 2026-08-10 ai-down 泄漏整改：交接给打印工作台的**标题**随态变。
+     AI 挂掉时出的不是「计划表」——它没有结合简历，只是你勾的公告清单。
+     打印台顶部的来源回执就靠这个 title 说话，这里给错那边就骗人。 */
+  function isAiDown () { return (scr.getAttribute('data-state') || 'default') === 'ai-down' }
+  function sheetNm () { return isAiDown() ? '校招活动清单' : '校园招聘计划表' }
+  function on (r) { return r.getAttribute('aria-pressed') === 'true' }
+  function picked () { return rows.filter(on) }   // 行的排列已经是日期顺序，不再另排
+
+  function render () {
+    var sel = picked(), n = sel.length
+
+    rows.forEach(function (r) {
+      var t = r.querySelector('.jobrow-pick')
+      // 名字随态：ai-down 加进去的是活动清单，不是结合简历的计划表
+      if (t) t.textContent = on(r) ? ('已加进' + (isAiDown() ? '活动清单' : '计划表')) : '选这场'
+    })
+
+    // 最近的那一场：取选中项里的第一条日期，没有就不编
+    set('hint2', n
+      ? '已选 <b>' + n + '</b> 场 · 最近一场 ' +
+        String(sel[0].getAttribute('data-date')).split(' ')[0]
+      : '一场都没选 · 先勾上要去的活动')
+
+    // 计划表纸面
+    set('pl-items', sel.map(function (r) {
+      return '<div class="pl-w">' + r.getAttribute('data-date') + '</div>' +
+        '<div class="pl-i"><i></i><span>' + r.getAttribute('data-plan') + '</span></div>'
+    }).join('') || '<div class="pl-i"><i></i><span>还没勾活动 —— 回第 2 步勾上要去的几场，这张表才有内容。</span></div>')
+
+    // 打印算术：计划表 1 页 + 每场 2 份简历 × 每份 1 页
+    var copies = n * COPIES
+    var pages = (n ? 1 : 0) + copies * CV_PAGES
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
+    set('pg', pages); set('fee', fee); set('cv-n', copies)
+    set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
+    set('hint3', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+
+    var go = scr.querySelector('[data-f="gobtn"]')
+    if (go) {
+      go.setAttribute('href', '06-print-workbench.html?stage=s3&from=P18&kind=fair-plan&title=' +
+        encodeURIComponent(sheetNm() + ' + 简历 ' + copies + ' 份') +
+        '&pages=' + pages + '&copies=1&back=s3')
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var r = e.target.closest && e.target.closest('.jobrow[data-camp]')
+    if (!r) return
+    r.setAttribute('aria-pressed', on(r) ? 'false' : 'true')
+    render()
+  })
+
+  render()
+
+  /* 四态切换后重算交接标题。两条路都要接：走查与 stages.js 调
+     window.v3ApplyVisibility()；外壳四态按钮走 stage.js 的局部函数，另挂点击兜底。 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

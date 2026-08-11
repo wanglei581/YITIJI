@@ -128,6 +128,7 @@
   background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd);
   font-size: var(--fz-2); color: var(--fog-800); letter-spacing: .04em;
   backdrop-filter: blur(12px);
+  white-space: nowrap;
 }
 
 /* ---------------- 来源卡：合规要求（来源机构 + 同步时间 [+ 外部ID]） ---------------- */
@@ -404,3 +405,9 @@
 .out .ic { width: 22px; height: 22px; color: var(--jade-500); }
 .out[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .out[aria-disabled="true"] .ic { color: var(--fog-600); }
+
+/* 禁用态可辨识:不能只靠 opacity(实测差异仅 0.34-0.52 且 cursor 仍是 pointer) */
+[aria-disabled="true"], .is-off, .btn:disabled, button:disabled {
+  cursor: not-allowed !important;
+  border-style: dashed !important;
+}

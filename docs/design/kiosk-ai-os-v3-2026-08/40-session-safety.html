@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P40 会话安全 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P40 会话安全">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ── P40 公共终端会话安全 ────────────────────────────────────────────────
+   Codex 最终审查列的 P0 缺屏之一：「公共终端会话安全尚未闭合」。
+   38 页里没有任何一屏回答这六个处境，而它们在商用一体机上天天发生。
+
+   六态共用一条纪律：**每一屏都必须有出路，且出路里一定包含「结束并清空」。**
+   公共机器上，"卡在这里出不去"和"下一个人看见你的东西"是同一个事故的两头。
+
+   ── 各态的判断依据 ──────────────────────────────────────────────
+   · 无操作预警 —— 倒计时要可视，两条路（继续 / 结束并清空）做成同等大，
+     不把"结束"缩成小字。人走开时，清空才是对他有利的默认。
+   · 超时锁屏 —— 锁上之后必须**复验本人**才解锁。复验不过只给结束，
+     不给"跳过"。给了跳过，锁屏就等于没锁。
+   · 会话接管 —— 同一账号两台机器同时开着，必须二选一。
+     另一台的**内容一个字不显示**，只给标题和进度：万一站这儿的不是本人。
+   · 结束并清空 —— 清空前必须列清单。"清掉什么"和"不受影响什么"要一起说，
+     否则用户会以为付过的钱也一起没，于是不敢结束、于是屏幕一直亮着。
+   · 断电恢复 —— 只恢复进度，不恢复未支付动作。
+     机器替人做的支付决定，比丢进度严重得多。
+   · 遗留物 —— 这是**隐私事故**，不是提示。当前用户要被明确告知"别碰"，
+     且必须给一键叫人的出口；上一个人的内容一个字都不显示。
+
+   ── 六态统一的五问 ──────────────────────────────────────────────
+   为什么会到这 / 你能做什么 / 如果你什么都不做 / 机器会做什么 / 机器不会做什么。
+   最后一问是刻意加的：安全屏最容易让人脑补最坏结果（"我付的钱是不是也没了"），
+   而脑补出来的恐惧会让人不敢按任何键 —— 于是屏幕一直亮着，事故照样发生。
+
+   ── 结构 ────────────────────────────────────────────────────────
+   标准两栏骨架（同 04 系统态），audit-plus 五项全部适用。
+   本页由系统事件触发，首页没有入口 —— 右栏第一块写清楚了。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 大状态头 */
+.bighead { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.bh-ic { width:66px; height:66px; border-radius:var(--r-md); display:grid; place-items:center; }
+.bh-ic .ic { width:32px; height:32px; }
+.bh--warn .bh-ic { background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.bh--warn .bh-ic .ic { color:var(--amber-400); }
+.bh--stop .bh-ic { background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.bh--stop .bh-ic .ic { color:var(--coral-400); }
+.bh--calm .bh-ic { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.bh--calm .bh-ic .ic { color:var(--jade-400); }
+.bh-t { font-size:38px; font-weight:800; color:var(--fog-900); line-height:1.18; }
+.bh-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.6; }
+.bh-p b { color:var(--fog-900); }
+
+/* 两栏的滚动归属：内容排不下时由 .sec 自己滚，不让 pane 裁掉底边 */
+.wmain .pane--grow > .sec, .wside .pane--grow > .sec {
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; gap:var(--s-4); }
+.wmain .pane--grow, .wside .pane--grow { overflow:hidden; }
+
+/* 倒计时 */
+.tick { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-5);
+  padding:var(--s-6) var(--s-5); min-height:210px;
+  border-radius:var(--r-md); background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.tick-n { font-size:96px; font-weight:800; font-family:var(--ff-num); color:var(--fog-900);
+  line-height:1; font-variant-numeric:tabular-nums; }
+.tick-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:10px; }
+.tick-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); }
+.tick-s { font-size:var(--fz-3); color:var(--fog-700); }
+.tick-bar { height:12px; border-radius:999px; background:var(--fog-a12); overflow:hidden; }
+.tick-bar i { display:block; height:100%; width:50%; border-radius:999px; background:var(--amber-400); }
+
+/* 两条出路：同等大，不把"结束"做小 */
+.picks { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.pick { min-height:146px; padding:var(--s-5) var(--s-6); border-radius:var(--r-md);
+  display:flex; flex-direction:column; justify-content:center; gap:8px; text-align:left;
+  cursor:pointer; font-family:var(--ff-ui); text-decoration:none;
+  background:var(--surf-1); border:1px solid var(--brd-2); }
+.pick-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:1.25; }
+.pick-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.pick--go { background:var(--jade-a12); border-color:var(--jade-a32); }
+.pick--stop { background:var(--coral-a12); border-color:var(--coral-a20); }
+.pick:active { transform:scale(.99); }
+
+/* ── 示意卡：这一页是「状态长什么样」的样板页，.pick 不是入口 ─────────────
+   回归台的死按钮探针（真按一下 + 干净页复验）在本页把每一态的 .pick 都报了：
+   它们是 <button>、带 cursor:pointer、带按压缩放，长得和真按钮一模一样，
+   按下去却什么都不发生 —— 27 寸竖屏前的人会反复戳。
+
+   成因不是「忘了接线」。这一态的出路本来就在**常驻动作条**里：
+   右下角那两个 .btn 的文字与这两张卡**逐字相同**。
+   主区这一组是「这一态给用户的两条出路长什么样」的样板，
+   同一个动作在一屏上摆两份都能按的拷贝，本身就是交互缺陷 ——
+   用户会问「哪个才是真的」，而两个都真反而更糟。
+
+   处置：卡片**保留 <button> 标签**，显式声明 aria-disabled="true"。
+   不换成 div —— 换标签只是让探针看不见，用户照样戳；
+   aria-disabled 是探针作者自己留的豁免口（「状态标签本来就不该可点」），
+   读屏也会念「不可用」，两边说的是同一件事。
+   同时在视觉上说死，让人不用试就知道：
+     · 光标 not-allowed + 边框改虚线 —— 这两条**不用另写**：
+       components.css 里已经有全站禁用态口径
+       `[aria-disabled="true"] { cursor:not-allowed !important; border-style:dashed !important }`
+       （它自己的注释写着「禁用态可辨识：不能只靠 opacity」）。
+       这里只声明 aria-disabled，视觉语言直接落到既有那一套上，不新造一套。
+     · 整卡压淡到 .72（沿用 11-jobfit-compare 的 .is-planned 口径）
+     · 去掉按压缩放，手指按下去没有任何反馈
+     · 每张卡顶上一枚「示意 · 不可点」角标（同 pay.css 的 .cash-code--dead::before）
+   顶部六态导航、动作条、需要帮助、底部导航照常可点，页面能力一点没少。 */
+.pick[aria-disabled="true"] { opacity:.72; }
+.pick[aria-disabled="true"]:active { transform:none; }
+.pick[aria-disabled="true"]::before {
+  content:"示意 · 不可点"; align-self:flex-start;
+  padding:3px 12px; border-radius:var(--r-full);
+  background:var(--surf-2); border:1px dashed var(--brd-2);
+  font-size:var(--fz-1); color:var(--fog-700); letter-spacing:.04em; }
+
+/* 六态统一五问 */
+.tri { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.tb { display:grid; grid-template-columns:172px 1fr; gap:var(--s-4); align-items:center;
+  min-height:82px; padding:var(--s-4) var(--s-5); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.tb-k { display:inline-flex; align-items:center; gap:9px; font-size:var(--fz-2); color:var(--fog-600); }
+.tb-k i { width:9px; height:9px; border-radius:50%; display:block; background:var(--fog-a20); }
+.tb--why i { background:var(--amber-400); }
+.tb--you i { background:var(--jade-500); }
+.tb--idle i { background:var(--fog-500); }
+.tb--sys i { background:var(--azure-400); }
+.tb--not i { background:var(--coral-400); }
+.tb-v { font-size:var(--fz-4); color:var(--fog-900); line-height:1.45; }
+.tb-v b { color:var(--fog-900); font-weight:700; }
+
+/* 三格事实条 */
+.dl { flex:0 0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-3); }
+.d { min-height:122px; padding:var(--s-4) var(--s-5); border-radius:var(--r-sm);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; justify-content:center; gap:6px; }
+.d-k { font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.05em; }
+.d-v { font-size:var(--fz-7); font-weight:800; color:var(--fog-900); font-family:var(--ff-num); line-height:1.05; }
+.d-v em { font-style:normal; font-size:var(--fz-3); font-weight:600; }
+.d-s { font-size:var(--fz-2); color:var(--fog-700); }
+
+/* 会清掉 / 不受影响 */
+.split { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.sp { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
+.sp--ok { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.sp--no { background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.sp-hd { display:flex; align-items:center; gap:var(--s-3); }
+.sp-hd .ic { width:19px; height:19px; flex:0 0 auto; }
+.sp--ok .sp-hd .ic { color:var(--jade-400); }
+.sp--no .sp-hd .ic { color:var(--coral-400); }
+.sp-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sp-i { display:grid; grid-template-columns:13px 1fr; gap:var(--s-3); align-items:start;
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.sp-i i { width:6px; height:6px; border-radius:50%; margin-top:7px; display:block; background:var(--fog-a20); }
+.sp--ok .sp-i i { background:var(--jade-500); }
+.sp--no .sp-i i { background:var(--coral-400); }
+.sp-i b { color:var(--fog-900); }
+
+/* 本人复验：尾号 + 扫码，两条都给 */
+.vf { flex:0 0 auto; display:grid; grid-template-columns:1fr 236px; gap:var(--s-4); }
+.vf-l { padding:var(--s-6) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-4); justify-content:center; }
+.vf-k { font-size:var(--fz-2); color:var(--fog-600); }
+.vf-k b { color:var(--fog-900); }
+.vf-in { width:100%; height:92px; border-radius:var(--r-sm);
+  background:var(--surf-1); border:1.5px solid var(--brd-2); color:var(--fog-900);
+  font-family:var(--ff-num); font-size:46px; letter-spacing:.42em; text-align:center;
+  padding:0 0 0 .42em; }
+.vf-in::placeholder { color:var(--fog-500); letter-spacing:.42em; }
+.vf-r { padding:var(--s-5); border-radius:var(--r-md); background:var(--surf-1);
+  border:1px solid var(--brd-1); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:var(--s-3); }
+.vf-qr { width:128px; height:128px; border-radius:var(--r-sm); background:var(--paper-100);
+  display:grid; place-items:center; }
+.vf-qr .ic { width:82px; height:82px; color:#1b2126; }
+.vf-c { font-size:var(--fz-2); color:var(--fog-700); text-align:center; }
+
+/* 两台机器对照：只给标题与进度，绝不给内容 */
+.mach { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.mc { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
+.mc--here { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.mc--there { background:var(--surf-1); border:1px dashed var(--fog-a20); }
+.mc-h { display:flex; align-items:center; gap:var(--s-3); }
+.mc-h .ic { width:20px; height:20px; color:var(--fog-600); }
+.mc-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+.mc-r { display:flex; align-items:baseline; gap:var(--s-3); font-size:var(--fz-2); color:var(--fog-700); }
+.mc-r em { font-style:normal; color:var(--fog-600); flex:0 0 70px; }
+.mc-r b { color:var(--fog-900); font-weight:600; }
+
+/* 遗留物：事故级，用 coral，不用中性灰 */
+.left { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-6);
+  padding:var(--s-6) var(--s-5); min-height:196px;
+  border-radius:var(--r-md); background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.left-ic { width:96px; height:96px; flex:0 0 auto; border-radius:var(--r-md); display:grid;
+  place-items:center; background:var(--coral-a20); }
+.left-ic .ic { width:48px; height:48px; color:var(--coral-400); }
+.left-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:9px; }
+.left-t { font-size:var(--fz-7); font-weight:800; color:var(--fog-900); }
+.left-s { font-size:var(--fz-3); color:var(--fog-700); line-height:1.55; }
+.left-s b { color:var(--fog-900); }
+
+.notice { flex:0 0 auto; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="idle-warn" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo">01 号机</span> · <span data-site="venue">市人力资源市场 A 馆</span></div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>设备正常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 会话安全照常</div>
+    <div class="clock" data-clock>2026年8月10日 <b>17:52</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="idle-warn"><span class="rstep-dot">1</span><span class="rstep-name">无操作预警</span></button>
+      <button class="rstep" data-go="locked"><span class="rstep-dot">2</span><span class="rstep-name">超时锁屏</span></button>
+      <button class="rstep" data-go="handover"><span class="rstep-dot">3</span><span class="rstep-name">会话接管</span></button>
+      <button class="rstep" data-go="endclear"><span class="rstep-dot">4</span><span class="rstep-name">结束并清空</span></button>
+      <button class="rstep" data-go="recover"><span class="rstep-dot">5</span><span class="rstep-name">断电恢复</span></button>
+      <button class="rstep" data-go="leftover"><span class="rstep-dot">6</span><span class="rstep-name">遗留物</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>六种会话安全态</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── 1 无操作预警 ─────────── -->
+      <div class="pane" data-at="idle-warn">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <!-- 2026-08-11 会话钟收口：本页六态的时限一律读 site-config.js 的 SITE.session。
+               原来这里写「4 分钟」，但这一屏是**提示态**——4 分钟是清空时刻，提示阈值是
+               3 分钟。差一分钟，用户对"还剩多久"的判断就整个错位，而错位的代价是
+               简历和身份证复印件被清掉。所以每处都必须说清是哪一步。 -->
+          <span class="bh-t">还在吗？</span>
+          <span class="bh-p">你有 <b><span data-site-time="hint">3 分钟</span></b>没碰过屏幕了，再过
+            <b><span data-site-time="grace">60 秒</span></b>这台机器会清空你的东西</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="idle-warn">
+        <div class="sec">
+          <div class="tick">
+            <span class="tick-n">60</span>
+            <span class="tick-b">
+              <span class="tick-t">秒后自动结束并清空</span>
+              <span class="tick-s">碰一下屏幕就回到刚才那一步，不用重来</span>
+              <!-- 进度条随倒计时走：刚出提示条时是满格（.tick-bar i 默认 50% 是旧的
+                   30 秒口径留下的，与 60 秒对不上，这里就地写死满格）。 -->
+              <span class="tick-bar"><i style="width:100%"></i></span>
+            </span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">我还在，继续</span>
+              <span class="pick-s">回到刚才那一步，倒计时清零</span>
+            </button>
+            <button class="pick pick--stop" type="button" aria-disabled="true">
+              <span class="pick-t">结束并清空</span>
+              <span class="pick-s">现在就走，先看清单再确认</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">屏幕连续 <b><span data-site-time="hint">3 分钟</span></b>没有任何触摸</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">继续用，或者现在就结束并清空</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v"><span data-site-time="grace">60 秒</span>后自动清空，回到待机屏</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">清掉未保存的，正在出纸的不打断</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不删已存文档，不撤已付订单</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">本次会话已用</span><span class="d-v">12 <em>分钟</em></span></div>
+            <div class="d"><span class="d-k">未保存文件</span><span class="d-v">3 <em>份</em></span></div>
+            <div class="d"><span class="d-k">正在出纸</span><span class="d-v">无</span><span class="d-s">没有打印任务在跑</span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>倒计时不是催你走，是替你把东西收好。这台机器摆在大厅里，你走开之后屏幕还亮着。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 2 超时锁屏 · 本人复验 ─────────── -->
+      <div class="pane" data-at="locked">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <span class="bh-t">屏幕已锁 · 需要本人复验</span>
+          <span class="bh-p">内容已经隐藏，<b>验过才回到刚才那一步</b></span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="locked">
+        <div class="sec">
+          <div class="vf">
+            <div class="vf-l">
+              <span class="vf-k">输入本人手机号后四位</span>
+              <input class="vf-in" type="text" data-keypad="num" inputmode="numeric" maxlength="4"
+                     placeholder="————" aria-label="手机号后四位" autocomplete="off">
+              <span class="vf-k">还可以试 <b>3</b> 次，机器不显示完整号码</span>
+            </div>
+            <div class="vf-r">
+              <span class="vf-qr"><svg class="ic"><use href="#i-qr"/></svg></span>
+              <span class="vf-c">或用登录那部手机扫码复验</span>
+            </div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">验证并继续</span>
+              <span class="pick-s">解锁后回到刚才那一步</span>
+            </button>
+            <button class="pick pick--stop" type="button" aria-disabled="true">
+              <span class="pick-t">结束并清空</span>
+              <span class="pick-s">不验证也能走这条，随时可选</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">无操作满 <b><span data-site-time="hint">3 分钟</span></b>，登录中的会话先锁屏</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">输尾号或扫码，二选一都算复验</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">再等 <span data-site-time="grace">60 秒</span>（无操作满 <span data-site-time="clear">4 分钟</span>）就自动清空并退出</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">验过才解锁；连错 3 次只留结束</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不提供跳过，也不让别人代你验</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">锁屏于</span><span class="d-v">17:50</span><span class="d-s">无操作满 <span data-site-time="hint">3 分钟</span>自动锁</span></div>
+            <div class="d"><span class="d-k">还可以试</span><span class="d-v">3 <em>次</em></span></div>
+            <div class="d"><span class="d-k">锁屏时未保存</span><span class="d-v">3 <em>份</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>验不过就只能结束会话，看不了别人的东西。本机没有跳过复验的入口，工作人员也没有。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 3 会话接管 ─────────── -->
+      <div class="pane" data-at="handover">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+          <span class="bh-t">同一个账号，另一台机器还开着</span>
+          <span class="bh-p">03 号机从 <b>10:41</b> 起有一场没结束的会话</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="handover">
+        <div class="sec">
+          <div class="mach">
+            <div class="mc mc--here">
+              <!-- 「本机」这一栏是站点身份，读配置；右边「另一台」是会话服务在运行时
+                   下发的另一场会话所在机器，属于运行时数据，不是本机配置，保持示例值。 -->
+              <span class="mc-h"><svg class="ic"><use href="#i-pin"/></svg><span class="mc-t">本机 · <span data-site="terminalNo">01 号机</span></span></span>
+              <span class="mc-r"><em>位置</em><b data-site="venue">市人力资源市场 A 馆</b></span>
+              <span class="mc-r"><em>开始于</em><b>17:46</b></span>
+              <span class="mc-r"><em>进行到</em><b>刚登录，还没办事</b></span>
+              <span class="mc-r"><em>未保存</em><b>0 份</b></span>
+            </div>
+            <div class="mc mc--there">
+              <span class="mc-h"><svg class="ic"><use href="#i-history"/></svg><span class="mc-t">另一台 · 03 号机</span></span>
+              <span class="mc-r"><em>位置</em><b>B 馆 · 东门服务台旁</b></span>
+              <span class="mc-r"><em>最近操作</em><b>10:53</b></span>
+              <span class="mc-r"><em>进行到</em><b>简历诊断 · 第 2 步</b></span>
+              <span class="mc-r"><em>未保存</em><b>2 份</b></span>
+            </div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">继续用本机</span>
+              <span class="pick-s">03 号机那边立刻结束并清空</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">放弃本机</span>
+              <span class="pick-s">回 03 号机接着做，本机现在退出</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">同一账号在两台机器上同时开着</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">二选一，两台不能一起用</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">本机 60 秒后退出，那边保留</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">你选哪台，另一台立刻结束并清空</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不显示那边的内容，只给标题与进度</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">另一台已开</span><span class="d-v">7 <em>小时</em></span></div>
+            <div class="d"><span class="d-k">那边未保存</span><span class="d-v">2 <em>份</em></span></div>
+            <div class="d"><span class="d-k">本机已开</span><span class="d-v">6 <em>分钟</em></span></div>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>上面只有标题和进度，一个字的内容都没有。万一站在这里的不是你本人，铺开内容就是把你的东西给了别人。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 4 结束并清空确认 ─────────── -->
+      <div class="pane" data-at="endclear">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-trash"/></svg></span>
+          <span class="bh-t">结束前，先看清会清掉什么</span>
+          <span class="bh-p">这是<b>第 2 次确认</b>，按下去就不可撤销</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="endclear">
+        <div class="sec">
+          <div class="split">
+            <div class="sp sp--no">
+              <div class="sp-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="sp-t">这次会清掉</span></div>
+              <div class="sp-i"><i></i><span>未保存文件 <b>3 份</b>：简历原件、扫描件、优化稿</span></div>
+              <div class="sp-i"><i></i><span>本次<b>会话记录</b>：走过哪几步、填过什么</span></div>
+              <div class="sp-i"><i></i><span>屏幕上正在显示的<b>全部内容</b></span></div>
+              <div class="sp-i"><i></i><span>剪贴板与本机临时缓存</span></div>
+            </div>
+            <div class="sp sp--ok">
+              <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">不受影响</span></div>
+              <div class="sp-i"><i></i><span>已支付订单 <b>2 笔</b>，打印订单里能查</span></div>
+              <div class="sp-i"><i></i><span>已存进账号的文档 <b>5 份</b></span></div>
+              <div class="sp-i"><i></i><span>已经打印出来、在你手上的纸</span></div>
+              <div class="sp-i"><i></i><span>已经存进你自己 U 盘的文件</span></div>
+            </div>
+          </div>
+
+          <div class="picks">
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">再想想</span>
+              <span class="pick-s">回到刚才那一步，什么都不动</span>
+            </button>
+            <button class="pick pick--stop" type="button" aria-disabled="true">
+              <span class="pick-t">确认结束并清空</span>
+              <span class="pick-s">执行后不可撤销，删除会留日志</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">你按了结束并清空，或倒计时走完了</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">确认清空，或回去先把要的打出来</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">60 秒后按「确认清空」处理</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">只清左边那栏，删除动作留日志</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不动已付订单，也不动已存文档</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">这次会清掉</span><span class="d-v">3 <em>份文件</em></span></div>
+            <div class="d"><span class="d-k">不受影响</span><span class="d-v">7 <em>项</em></span></div>
+            <div class="d"><span class="d-k">可撤销</span><span class="d-v">否</span><span class="d-s">删除动作会留日志</span></div>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>清单里没写的，本机不会动。删除会留日志，日志本身删不掉，事后能查是谁在什么时候清的。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 5 断电重启恢复 ─────────── -->
+      <div class="pane" data-at="recover">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
+          <span class="bh-t">上次没有正常结束</span>
+          <span class="bh-p">机器 <b>08:12</b> 断电重启，那场会话没收尾</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="recover">
+        <div class="sec">
+          <div class="mach">
+            <div class="mc mc--here">
+              <span class="mc-h"><svg class="ic"><use href="#i-history"/></svg><span class="mc-t">中断时的进度</span></span>
+              <span class="mc-r"><em>在做</em><b>打印工作台</b></span>
+              <span class="mc-r"><em>走到</em><b>第 3 步 · 参数确认</b></span>
+              <span class="mc-r"><em>文件</em><b>3 份，还在本机</b></span>
+              <span class="mc-r"><em>内容</em><b>不在这里显示</b></span>
+            </div>
+            <div class="mc mc--there">
+              <span class="mc-h"><svg class="ic"><use href="#i-card"/></svg><span class="mc-t">钱的部分</span></span>
+              <span class="mc-r"><em>待支付</em><b>1 笔 · 6.00 元</b></span>
+              <span class="mc-r"><em>已扣款</em><b>没有</b></span>
+              <span class="mc-r"><em>已出纸</em><b>0 页</b></span>
+              <span class="mc-r"><em>恢复后</em><b>停在付款前</b></span>
+            </div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">恢复到第 3 步</span>
+              <span class="pick-s">参数和文件都在，接着核对就行</span>
+            </button>
+            <button class="pick pick--stop" type="button" aria-disabled="true">
+              <span class="pick-t">直接结束并清空</span>
+              <span class="pick-s">这次不接着做，先看清单再确认</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">上次会话被断电打断，没有正常收尾</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">恢复到中断那一步，或者直接清空</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">60 秒后按结束并清空处理</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">恢复进度与参数，文件仍在本机</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不替你付款，也不自动提交打印</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">断电于</span><span class="d-v">08:12</span><span class="d-s">已上报运维</span></div>
+            <div class="d"><span class="d-k">可恢复文件</span><span class="d-v">3 <em>份</em></span></div>
+            <div class="d"><span class="d-k">待支付</span><span class="d-v">6.00 <em>元</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-card"/></svg>
+            <span>没付的单子不会自动往下走。要不要付、付多少，恢复之后重新由你按一次，机器不替你补这一下。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 6 遗留物：上一个人的东西还在 ─────────── -->
+      <div class="pane" data-at="leftover">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+          <span class="bh-t">出纸口有别人的东西</span>
+          <span class="bh-p"><b>请不要翻动</b>，这些不是你的材料</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="leftover">
+        <div class="sec">
+          <div class="left">
+            <span class="left-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="left-b">
+              <span class="left-t">出纸口有 7 页没被取走</span>
+              <span class="left-s">上一位用户 <b>09:41</b> 打印，人已经离开。纸面上可能有姓名和电话。</span>
+            </span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">呼叫服务台</span>
+              <span class="pick-s">工作人员过来收走并登记</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">我没有碰，开始我的会话</span>
+              <span class="pick-s">纸留在原处，等人来收</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">上一位用户的打印件没有取走</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">别动它，按一下把服务台叫来</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">纸留在原处，等工作人员来收</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">已记录时间与机位，等人来处理</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不显示内容，不让你在这里查看</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">出纸口残留</span><span class="d-v">7 <em>页</em></span></div>
+            <div class="d"><span class="d-k">打印时间</span><span class="d-v">09:41</span><span class="d-s">距今约 8 小时</span></div>
+            <div class="d"><span class="d-k">上一场会话</span><span class="d-v">已清</span><span class="d-s">超时后自动清空</span></div>
+          </div>
+
+          <div class="notice notice--coral">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>别人的材料上有姓名和电话。本机不显示内容，也不让你在这里查看，这一条对下一个人同样成立。</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- 入链说明：本页零入链是对的 —— 它不是首页里的功能，是事件把人推过来 -->
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>这一页怎么出现的</b>
+          <span class="s">系统触发</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">触发方式</span><span class="v">超时 / 冲突 / 重启</span></div>
+            <div class="kv-row"><span class="k">首页入口</span><span class="v v--fog">没有 · 办事不经过</span></div>
+            <div class="kv-row"><span class="k">主动查看</span><span class="v">我的 · 本机状态</span></div>
+            <div class="kv-row"><span class="k">这一页的卡片</span><span class="v v--fog">示意 · 不可点</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1 右 -->
+      <div class="pane" data-at="idle-warn">
+        <!-- 清空时刻放在标题右槽而不是再加一行 kv：这一列下面那块 .pane--grow 本来就
+             排不下（.sec 自己滚，见本文件 66 行），多一行 kv 就从它身上再拿走 48px。
+             实测：加一行后可滚内容从 269px 涨到 317px。标题右槽不占额外高度。 -->
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>会话计时口径</b>
+          <span class="s">满 <span data-site-time="clear">4 分钟</span>清空</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v" data-site-time="hint">3 分钟</span></div>
+            <div class="kv-row"><span class="k">提示后还有</span><span class="v" data-site-time="grace">60 秒</span></div>
+            <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 不限次</span></div>
+            <div class="kv-row"><span class="k">正在出纸时</span><span class="v v--fog">不打断</span></div>
+            <div class="kv-row"><span class="k">清空可撤销</span><span class="v v--fog">否</span></div>
+            <div class="kv-row"><span class="k">删除留日志</span><span class="v">是</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="idle-warn">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>接下来会发生什么</b></div>
+        <div class="sec">
+          <!-- 2026-08-11 会话钟收口：原时间线是「倒计时 30 秒 → 锁屏 → 再 60 秒 → 清空」，
+               加上 4 分钟的提示阈值，总时长 5 分半 —— 和页面别处写的「4 分钟自动清空」
+               互相矛盾。现在按 SITE.session 一条钟走完：3 分钟出提示 → 60 秒宽限 →
+               满 4 分钟清空。锁屏不是额外一段时间，是宽限期内对**登录会话**的额外遮挡。 -->
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">现在 · 倒计时 <span data-site-time="grace">60 秒</span></span>
+                <span class="tl-s">已经 <span data-site-time="hint">3 分钟</span>没碰 · 碰屏幕即清零</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">同一刻 · 登录会话先锁屏</span>
+                <span class="tl-s">内容隐藏，本人复验能拿回</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">无操作满 <span data-site-time="clear">4 分钟</span></span>
+                <span class="tl-s">倒计时归零，没人碰就往下走</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">自动清空</span>
+                <span class="tl-s">未保存文件全部删除</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">回待机屏</span>
+                <span class="tl-s">等下一个人</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">现在做还来得及</span></div>
+            <div class="sp-i"><i></i><span>把要的<b>打出来</b>带走</span></div>
+            <div class="sp-i"><i></i><span>登录后<b>存进账号</b></span></div>
+            <div class="sp-i"><i></i><span>扫码<b>传回手机</b></span></div>
+          </div>
+          <div class="panel-note">正在出纸的任务不受这条时间线约束。</div>
+        </div>
+      </div>
+
+      <!-- 2 右 -->
+      <div class="pane" data-at="locked">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>复验方式</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">手机尾号</span><span class="v">后四位</span></div>
+            <div class="kv-row"><span class="k">扫码复验</span><span class="v">登录那部手机</span></div>
+            <div class="kv-row"><span class="k">可试次数</span><span class="v">3 次</span></div>
+            <div class="kv-row"><span class="k">连错之后</span><span class="v v--fog">只留结束会话</span></div>
+            <div class="kv-row"><span class="k">跳过复验</span><span class="v v--fog">没有这个入口</span></div>
+            <div class="kv-row"><span class="k">工作人员代验</span><span class="v v--fog">不可以</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="locked">
+        <div class="pane-hd"><svg class="ic"><use href="#i-eye"/></svg><b>锁屏时看不到什么</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">简历正文与联系方式</span>
+                <span class="tl-s">整块隐藏，不是打码</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">待打印文件预览</span>
+                <span class="tl-s">只留份数与页数</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">扫描件与证件照</span>
+                <span class="tl-s">缩略图一并隐藏</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">已生成的优化稿</span>
+                <span class="tl-s">标题也不显示</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">面试作答</span>
+                <span class="tl-s">本来就从不保存</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-info"/></svg><span class="sp-t">锁屏不等于清空</span></div>
+            <div class="sp-i"><i></i><span>锁屏是<b>隐藏</b>，东西还在</span></div>
+            <div class="sp-i"><i></i><span>清空才是<b>删除</b></span></div>
+            <div class="sp-i"><i></i><span>验过就<b>原样回来</b></span></div>
+          </div>
+          <div class="panel-note">连错 3 次之后，这一屏只剩结束会话。</div>
+        </div>
+      </div>
+
+      <!-- 3 右 -->
+      <div class="pane" data-at="handover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-users"/></svg><b>另一台的情况</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">机器</span><span class="v">03 号机</span></div>
+            <div class="kv-row"><span class="k">位置</span><span class="v">B 馆 · 东门</span></div>
+            <div class="kv-row"><span class="k">开始</span><span class="v">10:41</span></div>
+            <div class="kv-row"><span class="k">最近操作</span><span class="v">10:53</span></div>
+            <div class="kv-row"><span class="k">那边未保存</span><span class="v">2 份</span></div>
+            <div class="kv-row"><span class="k">那边已付订单</span><span class="v v--fog">不受影响</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="handover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>接管会发生什么</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">那边立刻锁屏</span>
+                <span class="tl-s">不给缓冲时间</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">那边未保存的清掉</span>
+                <span class="tl-s">2 份文件会没</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">已付订单不动</span>
+                <span class="tl-s">打印订单里照样查</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">事件写进登录记录</span>
+                <span class="tl-s">在我的里能看到</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">本机从首页开始</span>
+                <span class="tl-s">不接那边的进度</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">哪些不受接管影响</span></div>
+            <div class="sp-i"><i></i><span>已支付订单</span></div>
+            <div class="sp-i"><i></i><span>已存进账号的文档</span></div>
+            <div class="sp-i"><i></i><span>已打印出来的纸</span></div>
+          </div>
+          <div class="panel-note">选错了可以再切回去，但那边清掉的回不来。</div>
+        </div>
+      </div>
+
+      <!-- 4 右 -->
+      <div class="pane" data-at="endclear">
+        <div class="pane-hd"><svg class="ic"><use href="#i-trash"/></svg><b>清空范围</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">未保存文件</span><span class="v">3 份 · 全删</span></div>
+            <div class="kv-row"><span class="k">会话记录</span><span class="v">本次 · 全删</span></div>
+            <div class="kv-row"><span class="k">屏幕内容</span><span class="v">立即擦除</span></div>
+            <div class="kv-row"><span class="k">已支付订单</span><span class="v v--fog">不动</span></div>
+            <div class="kv-row"><span class="k">已存文档</span><span class="v v--fog">不动</span></div>
+            <div class="kv-row"><span class="k">删除日志</span><span class="v">保留</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="endclear">
+        <div class="pane-hd"><svg class="ic"><use href="#i-file"/></svg><b>想留下来怎么办</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">打出来带走</span>
+                <span class="tl-s">纸在手上最稳</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">登录后存进账号</span>
+                <span class="tl-s">按文件类型定保留期</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">扫码传回手机</span>
+                <span class="tl-s">不经过第三方</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">存进自带 U 盘</span>
+                <span class="tl-s">拔走即与本机无关</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">再回来确认清空</span>
+                <span class="tl-s">这一屏一直在</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="sp-t">清空之后</span></div>
+            <div class="sp-i"><i></i><span>未保存文件<b>找不回</b></span></div>
+            <div class="sp-i"><i></i><span>会话记录<b>不再显示</b></span></div>
+            <div class="sp-i"><i></i><span>删除日志<b>会留下</b></span></div>
+          </div>
+          <div class="panel-note">四条都做完再清空，什么都不会丢。</div>
+        </div>
+      </div>
+
+      <!-- 5 右 -->
+      <div class="pane" data-at="recover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>恢复能拿回什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">走到第几步</span><span class="v">能</span></div>
+            <div class="kv-row"><span class="k">打印参数</span><span class="v">能</span></div>
+            <div class="kv-row"><span class="k">本机上的文件</span><span class="v">能 · 3 份</span></div>
+            <div class="kv-row"><span class="k">未支付动作</span><span class="v v--fog">不自动继续</span></div>
+            <div class="kv-row"><span class="k">面试作答</span><span class="v v--fog">不能 · 从不存</span></div>
+            <div class="kv-row"><span class="k">超过 30 天</span><span class="v v--fog">不再提示</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="recover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>这次断电发生了什么</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">08:12 断电</span>
+                <span class="tl-s">整机掉电</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">08:19 自检重启</span>
+                <span class="tl-s">硬件自检通过</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">08:20 已上报运维</span>
+                <span class="tl-s">告警中心可查</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">现在 · 等你决定</span>
+                <span class="tl-s">恢复或清空</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">超过 30 天</span>
+                <span class="tl-s">不再提示，自动归档</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">恢复能拿回</span></div>
+            <div class="sp-i"><i></i><span>走到第几步</span></div>
+            <div class="sp-i"><i></i><span>打印参数与份数</span></div>
+            <div class="sp-i"><i></i><span>本机上的 3 份文件</span></div>
+          </div>
+          <div class="panel-note">断电期间没有发生扣款，账单不会多一笔。</div>
+        </div>
+      </div>
+
+      <!-- 6 右 -->
+      <div class="pane" data-at="leftover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>遗留物登记</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">位置</span><span class="v">出纸口</span></div>
+            <div class="kv-row"><span class="k">页数</span><span class="v">7 页</span></div>
+            <div class="kv-row"><span class="k">打印时间</span><span class="v">09:41</span></div>
+            <div class="kv-row"><span class="k">归属</span><span class="v v--fog">上一位用户</span></div>
+            <div class="kv-row"><span class="k">已自动记录</span><span class="v">是</span></div>
+            <div class="kv-row"><span class="k">页面显示内容</span><span class="v v--fog">不显示</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="leftover">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>服务台会怎么处理</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">工作人员过来收</span>
+                <span class="tl-s" data-site="serviceHours"></span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">登记并封存</span>
+                <span class="tl-s">不翻看内容</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">保管 24 小时</span>
+                <span class="tl-s">放在服务台</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">本人凭尾号取</span>
+                <span class="tl-s">当面核对</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">无人认领当日碎纸</span>
+                <span class="tl-s">碎纸也留记录</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">你不要做的三件事</span></div>
+            <div class="sp-i"><i></i><span>不要翻看</span></div>
+            <div class="sp-i"><i></i><span>不要拿走</span></div>
+            <div class="sp-i"><i></i><span>不要拍照</span></div>
+          </div>
+          <div class="panel-note">不在工作时间就按机器背面贴的运维电话打。</div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页</b></div>
+        <div class="sec">
+          <div class="panel-note">六种会话安全态都在这里，每一种都留了「结束并清空」这条出路。</div>
+        </div>
+      </div>
+
+      <!-- 这六态不依赖 AI —— 常驻，四态都看得见。
+           2026-08-10 AI 落实度审查整改：这句话原来**只**写在下面 data-when="ai-down"
+           的面板里，而页面默认是 default 态，stage.js 会把它 hidden ——
+           真实用户（几乎总在 default）根本看不到「这些状态不依赖 AI」。
+           判定依据是本机与会话服务，这是**任何时候都成立**的事实，不是降级时才说的话，
+           所以提到常驻区；ai-down 面板保留，作为降级当场的复述。 -->
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这六态不依赖 AI</b>
+          <span class="chip chip--info" style="margin-left:auto">四态都成立</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁在判定</span><span class="v">本机与会话服务</span></div>
+            <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
+            <div class="kv-row"><span class="k">AI 挂了会怎样</span><span class="v">六态照常判定</span></div>
+          </div>
+          <div class="panel-note">超时、锁定、接管、结束清空、恢复、遗留物 —— 判定的是<b>计时器、会话令牌与出纸口传感</b>，没有一步经过模型。<span class="ev ev--e2">E2 来自本机与会话服务</span></div>
+        </div>
+      </div>
+
+      <!-- AI 不可用：降级当场再复述一次（内容与上面那条常驻面板一致） -->
+      <div class="pane" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-brain"/></svg><b>AI 不可用时</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">这六态</span><span class="v">照常判定</span></div>
+            <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
+            <div class="kv-row"><span class="k">谁在判定</span><span class="v">本机与会话服务</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设备离线：如实说明影响面 -->
+      <div class="pane" data-when="device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印机离线时</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">超时与清空</span><span class="v">照常执行</span></div>
+            <div class="kv-row"><span class="k">复验与接管</span><span class="v">照常执行</span></div>
+            <div class="kv-row"><span class="k">出纸口遗留物</span><span class="v v--fog">仍要服务台收</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 全页唯一一条合规声明 -->
+      <div class="pane">
+        <div class="notice notice--coral" style="padding:var(--s-4) var(--s-5)">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>公共终端不让后一个人看到前一个人的内容；复验不过只给结束会话，不给跳过。</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+    <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+
+    <button class="btn btn--lg btn--ghost" data-at="idle-warn" type="button" data-go="endclear">结束并清空</button>
+    <button class="btn btn--lg btn--ghost" data-at="locked" type="button" data-go="endclear">结束并清空</button>
+    <button class="btn btn--lg btn--ghost" data-at="handover" type="button">放弃本机</button>
+    <button class="btn btn--lg btn--ghost" data-at="endclear" type="button" data-go="idle-warn">再想想</button>
+    <button class="btn btn--lg btn--ghost" data-at="recover" type="button" data-go="endclear">结束并清空</button>
+    <button class="btn btn--lg btn--ghost" data-at="leftover" type="button" data-go="idle-warn">我没有碰</button>
+
+    <span class="actionbar-hint" data-at="idle-warn">碰一下屏幕就能继续，不用重新开始</span>
+    <span class="actionbar-hint" data-at="locked">验不过只能结束会话，没有跳过</span>
+    <span class="actionbar-hint" data-at="handover">两台不能一起用，选一台</span>
+    <span class="actionbar-hint" data-at="endclear">这是第 2 次确认，按下不可撤销</span>
+    <span class="actionbar-hint" data-at="recover">只恢复进度，没付的不自动继续</span>
+    <span class="actionbar-hint" data-at="leftover">别翻动别人的材料，叫人来收</span>
+
+    <button class="btn btn--lg btn--primary" data-at="idle-warn" type="button">我还在，继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="locked" type="button">验证并继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="handover" type="button">继续用本机<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="endclear" type="button"><svg class="ic"><use href="#i-trash"/></svg>确认结束并清空</button>
+    <button class="btn btn--lg btn--primary" data-at="recover" type="button">恢复到第 3 步<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="leftover" type="button" data-help><svg class="ic"><use href="#i-phone"/></svg>呼叫服务台</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

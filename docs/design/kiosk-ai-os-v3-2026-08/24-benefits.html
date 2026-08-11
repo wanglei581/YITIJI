@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P24 专用 ───────────────────────────────────────────────────────────
    权益页最容易做成**诱导机器**：签到、积分、抽奖、限时秒杀、
@@ -67,9 +68,100 @@
 .py--org { background:var(--fog-a08); color:var(--fog-700); }
 .py--own { background:var(--amber-a12); color:var(--amber-200); }
 
+/* 「待接线」标：不是证据级别。E1/E2/E3 说的是「这条结论有多硬」，
+   这里**还没有结论** —— 是一个位置对、但输入只到一半的提示位。
+   刻意不借 E3 的琥珀色：那会让人以为已经算过了，而这正是上一版犯的错。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
+/* 逐条挂在 tl 说明里的 E 标：跟着文字走，不把时间线撑高 */
+.tl-s .ev { height:20px; margin-right:6px; vertical-align:2px; }
+
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（1080×1920，两根主栏各 1456px 高）：
+     s2 右栏 pane--grow 外壳 1098px、里面只有 306px 内容 → 底部裸露 792px
+     s3 右栏 892px、左栏 342px；s1 四态全 0
+   成因是**内容量不足 + flex 分配**这一组，不是 min-height，也不是状态漏配 ——
+   s1 同样的模板同样的四态一处不报，说明模板本身能填满，是 s2/s3 内容不够。
+   pane--grow 把卡片撑到栏底、卡里只有顶部一小块，正是 work.css:221 自己写明
+   「空白落在页面底色上是留白，落在卡片里就是缺陷」的那一种。
+
+   两条处理，都不加填充物：
+
+   ① 放大真正的主内容。这台机器是 27 寸竖屏，1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI；
+      人站在机器前约 60cm 读，15–16px 正文的字高只有 4.6mm，本来就偏小，
+      348px 宽的右栏折行多更吃亏。正文提到 19px、行高 1.72，kv 行提到 64px
+      （顺带把触控目标从 48px 抬到 64px）。这是该做的事，不是为了填数字。
+
+   ② 把内容放回它该在的栏。s2 左栏原来同时讲「你卡在哪」和「剩的 7 页怎么用不浪费」，
+      而右栏那张卡的标题正好就叫「用之前想清楚的」—— 后半段本来就属于右栏。
+      s3 同理：对账口径与记录边界属于「一共省了多少」那一侧，明细留在左栏。
+   ──────────────────────────────────────────────────────────────────────── */
+.work .pane-hd b { font-size:var(--fz-5); }
+.work .kv-row { min-height:58px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.work .notice { font-size:var(--fz-3); line-height:1.7; padding:var(--s-5); }
+.work .panel-note { font-size:var(--fz-3); line-height:1.7; }
+.work .lock-p { font-size:var(--fz-4) !important; line-height:1.78 !important; }
+.work .tl { padding:var(--s-4) 0; }
+.work .tl-t { font-size:var(--fz-4); line-height:1.45; }
+.work .tl-s { font-size:var(--fz-2); line-height:1.62; margin-top:5px; }
+/* 左栏是主阅读区（604px 宽）。s2 的「你卡在哪」和 s3 的「核销明细」整页就靠这几条
+   时间线承载，原来标题 16px、副文 13px —— 在 82 PPI 的竖屏上偏小。
+   连接线起点跟着行距一起下移，否则会插进圆点里。 */
+.wmain .tl { padding:var(--s-5) 0; }
+.wmain .tl::before { top:38px; }
+.wmain .tl-dot { width:30px; height:30px; }
+.wmain .tl-dot .ic { width:16px; height:16px; }
+.wmain .tl-t { font-size:var(--fz-5); line-height:1.5; }
+.wmain .tl-s { font-size:var(--fz-3); line-height:1.72; margin-top:7px; }
+.wmain .notice { font-size:var(--fz-4); line-height:1.78; }
+.wmain .panel-note { font-size:var(--fz-4); line-height:1.78; }
+.wside .btn { min-height:56px; font-size:var(--fz-4); }
+.bf-p { font-size:var(--fz-3); line-height:1.72; }
+
+/* 关键数字放大：s2 / s3 开头那两张卡里，用户真正来看的就是「还剩几页」「省了多少」。
+   原来它们是 8 行 / 4 行 kv 里的一行，在 27 寸屏上和「能否转让」一样大。
+   数字一个没变、没有新增任何一项 —— 只是按它们的重要程度给了尺寸。 */
+.figs { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-4); }
+.fig { padding:var(--s-5) var(--s-4); border-radius:var(--r-md);
+       background:var(--fog-a04); border:1px solid var(--brd-1);
+       display:flex; flex-direction:column; gap:6px; }
+.fig--now { background:var(--jade-a12); border-color:var(--jade-a20); }
+.fig-k { font-size:var(--fz-2); color:var(--fog-600); line-height:1.4; }
+.fig-v { font-family:var(--ff-num); font-size:44px; font-weight:700; color:var(--fog-900); line-height:1; }
+.fig--now .fig-v { color:var(--jade-200); }
+.fig-u { font-size:var(--fz-2); color:var(--fog-600); }
+
+/* ── 2026-08-11 列表改为后台下发驱动，随之要的几个构件 ────────────────────
+   · .bf-rules  四道闸的取值一行摆开（适用范围 / 单次上限 / 色彩 / 次数）——
+                每一个都是后台配的，屏上要标出来，不能让人以为是产品常量
+   · .bf-go     每一项的出口。**已用完 / 已过期 / 领不了的不给按钮** ——
+                按 24 自己那条「领不了就直说领不了，不用灰按」的口径
+   · .bf--hint  政策资格提示单独分栏：它 info-only，不可核销，
+                不显示余额 / 金额 / 抵扣 / 绿色勾选 —— 混进券里会让人以为钱到账了
+   ─────────────────────────────────────────────────────────────────────── */
+.bf-rules { display:flex; flex-wrap:wrap; gap:6px 10px; }
+.bf-rule { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num);
+           padding:3px 9px; border-radius:var(--r-xs);
+           background:var(--fog-a04); border:1px dashed var(--fog-a20); }
+.bf-rule b { color:var(--fog-900); font-family:var(--ff-num); }
+.bf-go { display:flex; flex-wrap:wrap; gap:10px; }
+.bf-go .btn { min-height:56px; font-size:var(--fz-3); }
+.bf-why { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; }
+.bf-why b { color:var(--fog-900); }
+.bf--hint { border-style:dashed; background:var(--fog-a04); }
+.bf--unknown { border-style:dashed; }
+.ben-sechd { display:flex; align-items:center; gap:var(--s-3); margin-top:var(--s-3);
+             font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.ben-sechd .mt { font-size:var(--fz-1); font-weight:400; color:var(--fog-600); }
+.ben-empty { padding:var(--s-6) var(--s-5); border-radius:var(--r-md);
+             border:1px dashed var(--fog-a20); background:var(--fog-a04);
+             display:flex; flex-direction:column; gap:var(--s-3); }
+.ben-empty b { color:var(--fog-900); font-size:var(--fz-5); }
+.ben-empty p { margin:0; font-size:var(--fz-3); color:var(--fog-700); line-height:1.72; }
 </style>
 </head>
 <body>
@@ -82,7 +174,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">权益活动</div>
@@ -112,8 +204,8 @@
       <div class="pane" data-at="s1">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-ticket"/></svg>
-          <b>本机现在能用的 6 项</b>
-          <span class="mt">每项都标了谁出的钱</span>
+          <b id="ben-title">本机现在拿到的权益</b>
+          <span class="mt">每项都标了谁发的、用在哪</span>
         </div>
         <div class="sec">
           <div class="notice">
@@ -129,206 +221,192 @@
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
             <span>本机<b>不做签到、不做积分、不做抽奖、不做邀请解锁</b>。<br>
-                  站在这里的人多数正在找工作、时间紧。
-                  把你的时间换成我们的运营数字，那是拿你的处境换我们的指标。</span>
+                  找工作的人时间紧。
+                  不拿你的处境换运营指标。</span>
+          </div>
+          <!-- 2026-08-11：这一条是本页最要紧的免责 —— 下面每一个数字（次数、上限、
+               有效期、适用范围）都是**后台配的**，本机只是拿到一份快照。
+               后台改了、下线了、加了本机不认识的新类型，屏上都得有像样的样子。 -->
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>下面的每一项都由后台配置</b>，本机开机时拉一份快照 ——
+                  次数、单次上限、覆盖黑白还是彩色、适用范围、有效期，
+                  <b>没有一个是本机写死的</b>。<br>
+                  能不能用、能用在哪一单，<b>最终由服务端在核价那一刻判定</b>；
+                  本机只把服务端给的结果讲成人话。</span>
+          </div>
+          <div class="cash-demo" data-review style="position:static;justify-content:flex-start;margin-top:var(--s-4)">
+            <span style="width:100%;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
+              原型演示 · 这三种都是服务端真会返回的情况，不由用户点</span>
+            <button data-ben-btn="normal" aria-pressed="true">后台配了 N 项</button>
+            <button data-ben-btn="empty">后台一项都没配</button>
+            <button data-ben-btn="stale">本机还没拉到</button>
           </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s1">
-        <div class="joblist">
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">求职者免费打印额度 · 每月 20 页</span>
-                <span class="bf-src">
-                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
-                  市人社局「就业服务进社区」专项 · 同步 8月9日 07:30
-                </span>
-              </span>
-              <span class="bf-state-status bs--can" style="margin-left:auto">本机可领</span>
-            </div>
-            <div class="bf-p">
-              本月你还剩 <b>7 页</b>。用于打印简历、求职材料，<b>不能兑现、不能转让</b>。<br>
-              领取要核验：本市户籍或本市缴社保 + 已做失业登记。
-              <b>这两条和政策服务页里那条求职创业补贴是同一套核验</b>，办过一次就都通了。
-            </div>
-          </div>
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">首次上传简历 · 免费 AI 诊断一次</span>
-                <span class="bf-src">
-                  <span class="payer py--own"><svg class="ic"><use href="#i-printer"/></svg>本机自营</span>
-                  成本由本机承担
-                </span>
-              </span>
-              <span class="bf-state-status bs--had" style="margin-left:auto">你已用过</span>
-            </div>
-            <div class="bf-p">
-              8月9日 15:04 已使用。<br>
-              <b>顺带说清：AI 诊断、优化、面试练习、政策核对本来就都不收费</b> ——
-              这一项只是历史遗留的标注，不是"用完就要付费"。
-            </div>
-          </div>
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">秋季招聘会 · 现场简历打印 5 折</span>
-                <span class="bf-src">
-                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
-                  市人社局 · 限 8月12日 当天 · 限 A 馆内机器
-                </span>
-              </span>
-              <span class="bf-state-status bs--gap" style="margin-left:auto">时间未到</span>
-            </div>
-            <div class="bf-p">
-              8月12日 当天在 A 馆内的机器上自动生效，<b>不用领、不用出示任何东西</b>。<br>
-              本机就在 A 馆，那天来直接打就是半价。
-            </div>
-          </div>
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">职业技能培训 · 首课免费试听</span>
-                <span class="bf-src">
-                  <span class="payer py--org"><svg class="ic"><use href="#i-building"/></svg>机构赞助</span>
-                  某职业培训学校 · 有推广目的
-                </span>
-              </span>
-              <span class="bf-state-status bs--can" style="margin-left:auto">本机可领</span>
-            </div>
-            <div class="bf-p">
-              领了会打一张凭证，到机构报到时出示。<br>
-              <b>提醒两句</b>：① 这是机构出钱做推广，试听后大概率会被推荐付费课程，
-              <b>你没有义务报名</b>；② 如果你想申领政策里的培训补贴，
-              <b>先查当年目录再报名</b> —— 不在目录内的培训不补，顺序反了钱拿不回来。
-            </div>
-          </div>
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">应届生专项 · 简历打印 10 页免费</span>
-                <span class="bf-src">
-                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
-                  省教育厅学生服务中心 · 需学信网核验
-                </span>
-              </span>
-              <span class="bf-state-status bs--out" style="margin-left:auto">你不符合</span>
-            </div>
-            <div class="bf-p">
-              限毕业 2 年内。<b>按你在本机填的情况看你不属于这一类</b> ——
-              如果本机判错了，去核验窗口以他们的认定为准，本机不做资格认定。
-            </div>
-          </div>
-
-          <div class="bf">
-            <div class="bf-hd">
-              <span>
-                <span class="bf-t">线上简历模板包</span>
-                <span class="bf-src">
-                  <span class="payer py--org"><svg class="ic"><use href="#i-building"/></svg>机构赞助</span>
-                  某招聘平台
-                </span>
-              </span>
-              <span class="bf-state-status bs--out" style="margin-left:auto">本机领不了</span>
-            </div>
-            <div class="bf-p">
-              这一项要在对方 App 里登录才能领，<b>本机领不了，也不替你去领</b>。<br>
-              说明它存在是让你知道有这回事；要不要去对方平台注册，你自己决定。
-            </div>
-          </div>
-
-        </div>
-
-        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
-          以上 6 项来自<b>各自的出资方</b>，同步于 8月9日 07:30。
-          能否领取、发放多少，<b>以出资方规则为准</b>；本机只做展示与核销，不代办、不代领。
-        </div>
+        <!-- 2026-08-11：这一列原来是 6 张写死的卡。权益与活动是**后台配的** ——
+             后台加一项、下线一项、改次数改上限，页面都不该跟着改代码。
+             改成按服务端下发的列表渲染；渲染器在页尾。
+             「后台没配」「本机还没拉到」这两种也是真实会发生的返回，各有各的屏幕。 -->
+        <div class="joblist" id="ben-list"></div>
+        <div class="panel-note" id="ben-foot" style="flex:0 0 auto;margin-top:var(--s-4)"></div>
       </div>
 
       <!-- ─────────── S2 这一项怎么用 ─────────── -->
       <div class="pane" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-ticket"/></svg>
-          <b>求职者免费打印额度 · 每月 20 页</b>
+          <b>免费打印 · 每月 3 次</b>
           <span class="mt">
             <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
             市人社局「就业服务进社区」专项
           </span>
         </div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">本月剩余</span><span class="v"><b>7</b> 页</span></div>
-            <div class="kv-row"><span class="k">本月已用</span><span class="v">13 页</span></div>
-            <div class="kv-row"><span class="k">重置时间</span><span class="v">每月 1 日 00:00</span></div>
-            <div class="kv-row"><span class="k">可用范围</span><span class="v">简历与求职材料</span></div>
-            <div class="kv-row"><span class="k">能否兑现</span><span class="v v--fog">不能</span></div>
-            <div class="kv-row"><span class="k">能否转让</span><span class="v v--fog">不能</span></div>
-            <div class="kv-row"><span class="k">跨机器通用</span><span class="v">是 · 全市联网机器</span></div>
-            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">市人社局 · 同步 8月9日 07:30</span></div>
+          <!-- 2026-08-11 版面整改：「本月剩余 / 已用 / 总额」原来混在 8 行 kv 里，
+               和「能否转让」一样大。用户来这一步就是看这三个数。数值一个没改，
+               只是按重要程度给了尺寸。剩下的条款仍在下面按原样列全。 -->
+          <div class="figs">
+            <div class="fig fig--now">
+              <!-- 2026-08-11 整改 ⑤：原来这里写「次 · 9月1日 00:00 重置」。
+                   后端只有余额与有效期，没有重置日/续发任务 —— 精确时刻是编的。
+                   改成这张权益**自己的有效期**（validUntil，服务端下发）。 -->
+              <span class="fig-k">本月剩余</span>
+              <span class="fig-v">1</span>
+              <span class="fig-u">次 · 有效期至 8月31日 23:59</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">本月已用</span>
+              <span class="fig-v">2</span>
+              <span class="fig-u">次 · 省 2.60 元</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">每月次数</span>
+              <span class="fig-v">3</span>
+              <span class="fig-u">次 · 后台配置 · 按月清零</span>
+            </div>
+          </div>
+          <!-- 2026-08-11：「防薅的四道闸」。每一道的值都由后台配置，页面不写死。
+               ② 单次上限必须按「页 × 份」算 —— 只限文档页数拦不住：
+               10 页 × 20 份 = 200 计费页照样白拿。
+
+               2026-08-11 交叉对账整改 ①（适用场景由五类改回四类）：
+               这一行原来写「简历 / 求职材料 / 招聘会资料 / 政策材料 / 证件照」，
+               多出「证件照」一类，且「政策材料」与页尾 GRANTS 里的
+               「政策申请材料」不同名。产品拍板的适用场景是**四类**：
+               简历 / 求职材料 / 招聘会资料 / 政策申请材料。
+               证件照删除、政策口径统一为「政策申请材料」，与页尾 SCOPE 一致。
+               （后端 applicableScopes 字段尚未落库，取值以产品拍板的四类为准；
+                 字段补齐后这一行改成读服务端下发的枚举，不要再手写。） -->
+          <div class="bf-rules" style="margin-top:var(--s-5)">
+            <span class="bf-rule">单次上限 <b>10</b> 计费页（页 × 份）</span>
+            <span class="bf-rule">只覆盖<b>黑白</b>，彩色走正常价</span>
+            <span class="bf-rule">适用 <b>简历 / 求职材料 / 招聘会资料 / 政策申请材料</b></span>
+            <span class="bf-rule">不适用 <b>自带文件的普通打印</b></span>
+            <span class="bf-rule">以上取值<b>均由后台配置</b></span>
+          </div>
+          <!-- 2026-08-11 交叉对账整改 ⑤（重置时刻是伪造的，改显真实有效期）：
+               原来这里写「重置时间 · 每月 1 日 00:00」，上面 fig 里写「9月1日 00:00 重置」。
+               后端 BenefitGrant 只有 quantityRemaining / validFrom / validUntil，
+               **没有周期字段、没有重置日、也没有按月续发的定时任务** ——
+               一个精确到时分的重置时刻是本机编出来的。
+               「每月 N 次」是已拍板的产品口径，作为规则说明保留；
+               屏上给的**具体时间只能是这张权益自己的有效期**（validUntil，服务端下发）。
+               将来后端补上重置周期/续发任务后，再把精确时刻加回来。 -->
+          <div class="kv" style="margin-top:var(--s-5)">
+            <div class="kv-row"><span class="k">怎么抵</span><span class="v"><b>一次免掉一整单</b>，不按页抵</span></div>
+            <!-- 行数保持 6 行不变：原「重置时间 · 每月 1 日 00:00」换成服务端真下发的
+                 有效期，按月计次作为规则说明并到同一行 —— 多加一行会把左栏下面那张
+                 pane--grow 挤爆（实测 -118px）。 -->
+            <div class="kv-row"><span class="k">有效期</span><span class="v">至 <b>8月31日 23:59</b> · 每月 3 次不累积</span></div>
+            <div class="kv-row"><span class="k">兑现 / 转让</span><span class="v v--fog">都不能</span></div>
+            <div class="kv-row"><span class="k">跨机器 / 来源</span><span class="v">全市联网机器 · 市人社局 · 同步 8月9日 07:30</span></div>
           </div>
         </div>
       </div>
 
+      <!-- 2026-08-10 E 标签错挂整改（反向）：这一块**真的在做推理** ——
+           它跨页读了用户在政策服务页（P21）选的答案，拿去逐条核对这项权益的门槛，
+           还给出「第 2 条本机判不了、所以不给结论」这样的判断。全页最该标 E 的就是它，
+           而上一版它一个 E 标都没有；反倒是隔壁一条纯付费状态挂着 E3。
+           标反了比不标更糟：用户会以为标了 E3 的那条才是算出来的。
+           现在按实际证据来源标：用户的作答标 E1，本机做出的判断标 E3。
+
+           ─── 2026-08-11 交叉对账整改 ②（资格核验链：功能保留，改写成未来态）───────
+           **口径：没有后端 ≠ 假的，而是还没开发。这一块一个字都不删，只改时态。**
+           上一版这里有三句把「还没做」写成了「已经有了」：
+             ① 「你在政策服务页选了本市户籍 —— **这条通了**」
+                → 这是本机替官方下了资格结论，属于「声称动作已成功」，**必须改**。
+                  改成：转述你填的内容，并说明本机没核对过。E1 标保留（作答确有出处）。
+             ② 「真正的核验在核销那一刻**由人社系统做**」
+             ③ 「核验只在核销那一次**调用人社接口**」
+                → ②③ 说的是**规划中的能力**，功能保留；不能作为**既成事实**出现。
+                  改成明确的未来态：「资格核验：规划中，尚未接入」。
+           为什么②③不能写成既成事实（两层，缺一条都不够）：
+             · 工程事实：EndUser 模型**没有户籍 / 社保 / 失业登记属性**，
+               后端**没有资格核验接口**，后端方案明确「首期不做人群限定」。
+             · 合规事实：本公司当前**没有人力资源服务许可证**，
+               声称已与人社系统打通有合规风险 —— 所以改回既成事实之前，
+               **必须先过合规评审**，这不是纯工程开关。
+           E 标：本机不再给资格结论，撤掉 pane 头上的「E3 判断」；未来态用 .ev--wire「待开发」。
+           首期真正能用来判定的只有**登录用户 / 终端 / 场景 / 来源 / 色彩 / 额度**六项。 -->
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
-          <b>怎么用 · 你现在卡在哪</b>
+          <b>怎么用 · 这一项的门槛</b>
+          <span class="mt">条件照出资方公告转述 · 本机不做认定</span>
         </div>
         <div class="sec">
           <div class="tline">
-            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+            <div class="tl"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">本市户籍或本市缴社保</span>
-                <span class="tl-s">你在政策服务页选了本市户籍 —— 这条通了</span></span></div>
-            <div class="tl tl--now"><span class="tl-dot">2</span>
+                <span class="tl-s"><span class="ev ev--e1">E1 你的作答</span>
+                  你在政策服务页选了本市户籍 —— <b>这只是你自己填的</b>，本机没核对过</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">已做失业登记</span>
-                <span class="tl-s"><b>本机查不到你的登记状态</b> ——
-                  没登记的话这条不成立。政务网或街道办可以办</span></span></div>
+                <span class="tl-s"><b>本机没有你的登记状态，也不去查</b> ——
+                  没办过的话，政务网或街道办可以办</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">在本机核验后自动抵扣</span>
-                <span class="tl-s">通过后打印时自动从额度里扣，不用每次点领取</span></span></div>
+              <span class="tl-b"><span class="tl-t">在打印工作台选用这一次</span>
+                <span class="tl-s">核对金额那一步选一下就整单免，不用另点「领取」；
+                  能不能用<b>由服务端在核销那一刻定</b></span></span></div>
           </div>
 
+          <!-- 2026-08-11 整改 ②：这两条原文分别声称「由人社系统核验」「调用人社接口」。
+               既没有这个接口，公司也没有人力资源服务许可证，不能这么写。
+               换成本机**真的能负责**的两句：不做认定、不代办；核销没过不先扣次数
+               （后者是后端错误码表里已确认的行为，不是承诺出来的）。
+               二次收口：整改后这两条一度写长了，实测把这一栏的内容顶出 77–173px
+               （回归台「内部裁切」）。措辞压回原长度，该说的一句没减。 -->
           <div class="notice notice--amber" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>第 2 条<b>本机判不了</b>，所以这里不给"你已符合"的结论 ——
-                  真正的核验在核销那一刻由人社系统做，<b>本机只是转述规则</b>。<br>
-                  如果核验没过，打印会按正常价收费，<b>不会先扣额度再告诉你不行</b>。</span>
+            <span>上面是<b>出资方公告里的条件，本机只做转述</b>。是否符合
+                  <b>以官方部门审核结果为准</b> —— <b>本机不做资格认定，也不代办</b>。<br>
+                  核销那一刻没通过就按公示价收费，<b>不会先扣了你的次数</b>。</span>
           </div>
 
+          <!-- ⚠ 待开发 · 资格核验（2026-08-11 定稿口径）
+               这个能力**保留在规划里**，屏上按未来态写，不写成已经打通：
+                 缺什么：① 与人社部门的合作与相应资质（公司当前没有人力资源服务许可证）；
+                        ② EndUser 上的户籍 / 社保 / 失业登记属性；③ 服务端资格核验接口。
+                 接上之后这句改成什么：把「规划中，尚未接入」换成核验发生的时点与主体，
+                        例如「核验在核销那一刻由 XX 系统完成，本机不保存核验结果」——
+                        **改回去之前必须先过合规评审**，这不是纯工程开关。
+               在那之前，首期能用来判定的只有：登录用户 / 终端 / 场景 / 来源 / 色彩 / 额度。 -->
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>核验只在<b>核销那一次</b>调用人社接口，本机<b>不保存你的核验结果</b>，
-                  也拿不到你的其他社保信息。</span>
+            <span><b>资格核验：规划中，尚未接入</b> <span class="ev ev--wire">待开发</span>
+                  能否接入取决于与人社部门的合作与相应资质。<br>
+                  现在本机<b>不查、不存、也不对接</b>户籍、社保或失业登记 ——
+                  能不能免单只看<b>登录、材料类型、色彩、剩余次数</b>。</span>
           </div>
 
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-target"/></svg><b>剩的 7 页，怎么用不浪费</b>
-          </div>
-          <div class="tline">
-            <div class="tl"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">先把简历改到能投，再打</span>
-                <span class="tl-s">打完才发现要改，那几页就白扔了 —— 这是最常见的浪费</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">按实际要去的场次算份数</span>
-                <span class="tl-s">招聘会作战台会按你选的企业数算「每家 2 份」，不用凭感觉多打</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">证件、成绩单这类先扫成 PDF，别急着打</span>
-                <span class="tl-s">网申上传用电子版就够，到要交纸质件时再打</span></span></div>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-5)">
-            <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
-            不能预支、不能攒到下月。<br>
-            用完<b>不影响任何功能</b> —— AI 诊断、优化、面试练习、政策核对本来就不收费，
-            额度只管纸张。
-          </div>
+          <!-- 2026-08-11 版面整改：这里原来还接着「剩的 7 页，怎么用不浪费」三条和
+               「用完之后」一段。那两块讲的是**用之前该想清楚的事**，和右栏那张卡的
+               标题一字不差；左栏这一步要回答的是「你现在卡在哪」。已整块移到右栏，
+               不是删除，措辞一字未改。 -->
         </div>
       </div>
 
@@ -340,11 +418,28 @@
           <span class="mt">只记核销，不记你打了什么内容</span>
         </div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">本月免费额度</span><span class="v">已用 13 / 20 页</span></div>
-            <div class="kv-row"><span class="k">本月省下</span><span class="v"><b>2.60</b> 元</span></div>
-            <div class="kv-row"><span class="k">累计使用</span><span class="v">3 项权益</span></div>
-            <div class="kv-row"><span class="k">已过期未用</span><span class="v">1 项</span></div>
+          <!-- 2026-08-11 版面整改：同 s2，四个数原样，只是按重要程度给了尺寸。 -->
+          <div class="figs" style="grid-template-columns:repeat(4,1fr)">
+            <div class="fig fig--now">
+              <span class="fig-k">本月省下</span>
+              <span class="fig-v">2.60</span>
+              <span class="fig-u">元 · 自付 0.00 元</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">本月已用</span>
+              <span class="fig-v">2</span>
+              <span class="fig-u">/ 3 次免单</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">累计使用</span>
+              <span class="fig-v">3</span>
+              <span class="fig-u">项权益</span>
+            </div>
+            <div class="fig">
+              <span class="fig-k">已过期未用</span>
+              <span class="fig-v">1</span>
+              <span class="fig-u">项 · 本机没提醒你</span>
+            </div>
           </div>
         </div>
       </div>
@@ -357,16 +452,16 @@
         <div class="sec">
           <div class="tline">
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">免费打印额度 · 扣 6 页</span>
+              <span class="tl-b"><span class="tl-t">免费打印 · 第 2 次免单</span>
                 <span class="tl-s">8月9日 15:19 · 01 号机 · 省 1.20 元</span></span></div>
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">免费打印额度 · 扣 7 页</span>
+              <span class="tl-b"><span class="tl-t">免费打印 · 第 1 次免单</span>
                 <span class="tl-s">8月2日 10:33 · 03 号机 · 省 1.40 元</span></span></div>
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
               <span class="tl-b"><span class="tl-t">首次简历 AI 诊断 · 已用</span>
                 <span class="tl-s">8月9日 15:04 · 01 号机</span></span></div>
             <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-close"/></svg></span>
-              <span class="tl-b"><span class="tl-t">7 月招聘会打印折扣 · 未使用已过期</span>
+              <span class="tl-b"><span class="tl-t">7 月招聘会打印免单券 · 未使用已过期</span>
                 <span class="tl-s">7月31日 失效 · 本机没提醒你，这是我们的问题</span></span></div>
           </div>
 
@@ -377,10 +472,9 @@
                   代价是这类限时权益可能会过期。<b>这是我们选的取舍，如实告诉你</b>。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            记录只有<b>用了哪一项、什么时候、在哪台机器、省了多少钱</b>，
-            不含你打印的内容。
-          </div>
+          <!-- 2026-08-11 版面整改：记录边界那一段移到右栏「一共省了多少」下面 ——
+               它说的是这些数字**记了什么、没记什么**，属于账目口径，
+               和右栏那张金额卡是同一件事；左栏这里只留明细本身。 -->
 
           <div class="pane-hd" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-history"/></svg><b>再往前</b>
@@ -388,22 +482,16 @@
           </div>
           <div class="tline">
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">7 月免费额度 · 用 12 / 20 页</span>
-                <span class="tl-s">7月 · 省 2.40 元 · 剩余 8 页月底清零</span></span></div>
+              <span class="tl-b"><span class="tl-t">7 月免费打印 · 用掉的免单</span>
+                <span class="tl-s">7月 · 省 2.40 元 · 未用完的月底清零</span></span></div>
             <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="tl-b"><span class="tl-t">6 月免费额度 · 用 5 / 20 页</span>
+              <span class="tl-b"><span class="tl-t">6 月免费打印 · 用掉的免单</span>
                 <span class="tl-s">6月 · 省 1.00 元 · 那个月你只来过一次</span></span></div>
             <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-close"/></svg></span>
               <span class="tl-b"><span class="tl-t">6 月技能培训试听券 · 未使用已过期</span>
                 <span class="tl-s">6月30日 失效 · 同样没提醒你</span></span></div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-check"/></svg>
-            <span><b>这些数字可以自己对账</b>：每一条核销都对应「打印订单」里的一单，
-                  页数、时间、机器编号能一一对上。<br>
-                  对不上就是我们错了 —— 拿着订单号找现场工作人员。</span>
-          </div>
         </div>
       </div>
 
@@ -416,17 +504,93 @@
       <div class="pane" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这 6 项的状态</b></div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">本机可领</span><span class="v"><b>2</b> 项</span></div>
-            <div class="kv-row"><span class="k">条件未到</span><span class="v"><b>1</b> 项</span></div>
-            <div class="kv-row"><span class="k">你不符合</span><span class="v"><b>1</b> 项</span></div>
-            <div class="kv-row"><span class="k">本机领不了</span><span class="v"><b>1</b> 项</span></div>
-            <div class="kv-row"><span class="k">已用过</span><span class="v"><b>1</b> 项</span></div>
-          </div>
+          <div class="kv" id="ben-counts"></div>
           <div class="panel-note" style="margin-top:var(--s-3)">
+            <!-- 2026-08-11 整改 ⑦：原列举里的「活动已下线」删掉 ——
+                 活动下线只停止新领取，不影响已发到账户里的券，它不是不可用的理由。
+                 换成真正会导致不可用的「已被撤销（写明原因）」。 -->
             不符合和领不了的<b>也列出来</b> —— 藏起来你会以为本机没有，
-            反而去别处花钱。
+            反而去别处花钱。<b>不可用的理由分开写</b>：已用完、已过期、不在适用范围、
+            超出上限、已撤销，在你这里是完全不同的事，合并成一句「不可用」等于没说。
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 E 标签错挂整改（口径已按产品所有者意见调整）：
+           上一版这张卡叫「AI 权益提示」，那条 E3 挂在**会员到期与续费**上 ——
+           而它说的是「续不续看你的求职节奏，本机不催」，纯粹是一句立场声明，
+           没有读任何东西、没有推出任何结论。把 E3 盖在一条付费状态上，
+           等于让「模型判断」这个标去给一句运营话术背书。实证：ai-down 把它撤掉，
+           页面一条信息都没少。
+
+           整改口径**不是删掉这个提示位** —— 位置该有，只是挂错了地方，也还没接线。
+           两件事分开做：
+             ① 卡改名「你的账户」，两条 E2 账户事实原样保留（它们本来就没问题）。
+             ② 提示位保留，但从「会员/续费」挪到它真能帮上忙的地方 ——
+                你这个月剩的免费额度，够不够把待打印的材料打完。这是本机
+                唯一能替用户算、而用户自己算起来最烦的一件事。
+                现在缺一半输入（额度有、待打印页数没有），所以标「待接线」，
+                并写清缺什么 —— 不拿 E3 冒充已经算过。
+
+           ─── 2026-08-11 交叉对账整改 ③（会员 / 续费 / AI 用量：功能全保留，只改时态）───
+           **口径：没有后端 ≠ 假的，而是还没开发。卡、行、按钮一个都不删。**
+           上一版这两行写的是「打印会员 剩 **23** 天 · 到期后恢复单价」和
+           「本月 AI 服务 已用 **4** 次 · **会员期内不限次**」，都挂着「E2 账户事实」，
+           下面配一个「查看续费方式」按钮。要改的只有一件事：
+
+             ✗ 不能出现的：**会被当真的既成数字**。「剩 23 天」「已用 4 次」没有任何
+               模型可读（仓库里没有 Membership / Subscription 模型、没有购买闭环，
+               后端也没有 AI 定价表与用量账本），标成 E2「账户事实」尤其糟 ——
+               那个标的含义正是「这条读的是你真实账户」。**这两个数字删掉，不补别的数。**
+
+             ✓ 保留的：**功能名称、位置、交互形态**（会员行 / AI 计价行 / 续费按钮），
+               这些正是要交给实施者的设计信息。全部标 .ev--wire「待开发」，
+               并在下面那段说明里写清缺什么。
+
+           缺什么才能开（Codex 照这个做）：
+             · 打印会员与续费 → **订阅（会员）模型 + 支付闭环 + 会员期内计价规则**；
+               「查看续费方式」这个按钮届时接到购买/续费流程。
+             · 「本月 AI 用量」与「会员期内不限次」→ **AI 计价表 + 用量账本**
+               （后端方案里已提过 AI 按次计价，属于既定方向）。
+           接上之后这几句改成什么：
+             · 会员行 →「剩 N 天 · 到期后打印恢复单价」，证据标改回 E2；
+             · AI 行 →「本月已用 N 次 · 会员期内不限次」，证据标改回 E2；
+             · 按钮去掉「待开发」后缀，接真实续费流程。
+           第一行「免单额度」是现在就真读得到的（BenefitGrant.quantityRemaining /
+           validUntil），所以它才配挂 E2 —— 保持它和待开发两行的区分，别混。 -->
+      <div class="pane" data-at="s1" data-when="default ai-down device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>你的账户</b><span class="mt">只有你这一屏可见</span></div>
+        <div class="sec">
+          <!-- 版面：这一栏下面还压着「本机在权益上不做的事」整张卡，实测容不下
+               长文案（多写两段就把它顶出视口 110–204px）。所以待开发的依赖说明
+               压成一段，细节写在上面的注释里，屏上只留用户看得懂的一句。 -->
+          <div class="kv">
+            <div class="kv-row"><span class="k">免单额度</span><span class="v">余 <b>1 / 3</b> 次 · 至 8月31日 23:59 <span class="ev ev--e2">E2 账户事实</span></span></div>
+            <div class="kv-row"><span class="k">打印会员</span><span class="v v--fog">到期后恢复单价 <span class="ev ev--wire">待开发</span></span></div>
+            <div class="kv-row"><span class="k">AI 服务</span><span class="v v--fog">会员期内不限次 <span class="ev ev--wire">待开发</span></span></div>
+          </div>
+          <!-- ai-down 那一句原来是独立的 panel-note。这一栏底下还压着一整张卡，
+               一个独立块要多付 12px 外边距；改成同段内的 data-when span，
+               文字一字不改，靠段落自己流。stage.js 的 applyVisibility() 认 span 上的
+               data-when，用 hidden 控制，和页内其它 data-when 一样。 -->
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            后两项<b>还没开发</b>：缺订阅模型与支付闭环、AI 计价表与用量账本 ——
+            接上前<b>不给天数与用量数字</b>。<span data-when="ai-down"><b>AI 中断不影响</b>你账户里的权益。</span>
+          </div>
+          <!-- 这一段是原有内容，措辞压了一档（去掉三处冗语），一个意思没减：
+               把「查看续费方式」按钮按口径放回来之后，这一栏多出 56+12px，
+               实测把下面「本机在权益上不做的事」整块顶出 26–66px。
+               先从两段说明各挤一行，不动按钮、不动 kv 行、也不砍任何一条信息。 -->
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            <span class="ev ev--wire">待接线</span>
+            这里要回答的是：<b>你剩的这 1 次免单，用在「我的文档」里哪一份材料最划算</b>。
+            一次免单免的是<b>整单</b>，该用在计费页最多、又没超过 10 计费页上限的那一单。
+            本机只有一半输入 —— 次数知道（剩 <b>1</b> 次），
+            但<b>还没接上「我的文档」里待打印材料的页数</b>，所以不给结论。
+          </div>
+          <!-- 按钮保留（口径：待开发的功能保留按钮与位置，交给实施者接线）。
+               现在按下去不会声称成功 —— 文案自带「待开发」，接上购买/续费流程后去掉后缀。 -->
+          <button class="btn btn--ghost" style="width:100%;margin-top:var(--s-3)">查看续费方式（待开发）</button>
         </div>
       </div>
 
@@ -444,14 +608,18 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>这些手法本身是成熟的，但用在这台机器上不合适 ——
-                  站在这里的人多数正在找工作、手头紧。<br>
-                  <b>把他们的时间换成我们的运营数字，是拿他们的处境换我们的指标。</b></span>
+            <span>倒计时、默认勾选、拉人解锁这些手法本身是成熟的，<br>
+                  但用在这台机器上不合适 —— <b>不拿求职者的处境换运营指标。</b></span>
           </div>
 
+          <!-- 2026-08-11 整改 ③（改时态，不删）：原写「收钱的只有打印纸张和
+               **可选的打印会员**」，把还没开发的会员写成了在售项目。
+               会员这条产品线保留（见上面「你的账户」那张卡的待开发标注），
+               这里只把时态改准：现在收钱的只有纸张，会员尚未开放。 -->
           <div class="panel-note" style="margin-top:var(--s-4)">
-            本机也<b>不向你收求职服务费、内推费、会员费</b>。
-            只收打印纸张的钱，价格现场公示。
+            本机<b>不收求职服务费、内推费</b>。<br>
+            <b>现在收钱的只有打印纸张</b>，价格现场公示；<b>打印会员尚未开放</b>。<br>
+            <b>没有付费才能用的求职功能</b> —— 找工作要用的，不花钱一样不少。
           </div>
         </div>
       </div>
@@ -463,12 +631,18 @@
           <div class="kv">
             <div class="kv-row"><span class="k">出资方</span><span class="v">市人社局</span></div>
             <div class="kv-row"><span class="k">项目名</span><span class="v">就业服务进社区</span></div>
-            <div class="kv-row"><span class="k">本机角色</span><span class="v">核销点</span></div>
-            <div class="kv-row"><span class="k">本机收入</span><span class="v v--fog">按页结算</span></div>
+            <div class="kv-row"><span class="k">本机角色</span><span class="v">核销登记点</span></div>
+            <div class="kv-row"><span class="k">发放来源</span><span class="v v--fog">登记为政府补贴</span></div>
           </div>
+          <!-- 2026-08-11 删除：原文写「你免费打的这些页，本机是按页向人社结算的 ——
+               所以这不是我们送你的，是政府买单」。本机能证明的只有**这一项权益的
+               发放来源分类**是 gov，证明不了本次打印已经纳入哪一笔财政结算，
+               更不能替政府向用户承诺付款。说不出证据的话，就不该写在屏上。 -->
           <div class="panel-note" style="margin-top:var(--s-3)">
-            你免费打的这些页，<b>本机是按页向人社结算的</b> ——
-            所以这不是我们送你的，是政府买单。<b>说清楚比让你欠人情强。</b>
+            这一项的<b>发放来源登记为政府补贴</b>（市人社局专项）。
+            本机只做<b>展示与核销登记</b>，<b>不代办、不代领</b>，
+            也<b>不替出资方承诺任何款项</b>。<br>
+            <b>本机能说的只有这些</b> —— 这一单的钱最后走哪一笔账，不在本机能证明的范围内。
           </div>
         </div>
       </div>
@@ -476,18 +650,51 @@
       <div class="pane pane--grow" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>用之前想清楚的</b></div>
         <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            <b>额度按月清零，不累积。</b><br>
-            剩的 7 页这个月不用就没了，<b>但也没必要为了用完而多打</b> ——
-            打出来用不上的纸是浪费，不是省钱。
+          <div class="lock-p" style="color:var(--fog-700)">
+            <b>次数按月清零，不累积。</b><br>
+            剩的 1 次这个月不用就没了，<b>但也没必要为了用掉而多打</b> ——
+            打出来用不上的纸是浪费，不是省钱。<br>
+            一次免单免的是<b>整单</b>，所以<b>攒到要打得多的那一单再用更划算</b>；
+            但别为了凑数量硬把两份不相干的材料并成一单。
             <br><br>
             <b>先想清楚要投哪几家，再决定打几份。</b><br>
             招聘会作战台可以帮你算该带几份。
           </div>
 
+          <!-- 2026-08-11 版面整改：以下三条与「用完之后」一段自左栏移入。
+               左栏第 2 步答的是「你卡在哪」，这几条答的是「怎么用不浪费」，
+               和本卡标题同义。原文一字未改。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-target"/></svg><b>剩的 1 次，怎么用不浪费</b>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先把简历改到能投，再打</span>
+                <span class="tl-s">打完才发现要改，那几页就白扔了 —— 这是最常见的浪费</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">按实际要去的场次算份数</span>
+                <span class="tl-s">招聘会作战台会按你选的企业数算「每家 2 份」，不用凭感觉多打</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">证件、成绩单这类先扫成 PDF，别急着打</span>
+                <span class="tl-s">网申上传用电子版就够，到要交纸质件时再打</span></span></div>
+          </div>
+
+          <!-- 2026-08-11 整改 ⑤ + ③：
+               ⑤ 原写「9月1日 00:00 重置」—— 后端没有重置周期字段，也没有按月续发的
+                  定时任务，这个精确时刻是编的。改成规则说明（按月计次、不累积）
+                  加这张权益**自己的有效期**。
+               ③ 原写「AI 服务的次数是另一套口径」—— 那套口径不存在（无 AI 计价表、
+                  无用量账本）。改成当前真实状态：AI 不收费、也不计次。 -->
+          <div class="panel-note" style="margin-top:var(--s-5)">
+            <b>用完之后</b>：照常能打，按公示价自付。<b>按月计次，未用完不累积</b>，
+            也不能预支到下个月。这一项的有效期是 <b>8月31日 23:59</b>。<br>
+            用完<b>不影响任何功能</b> —— 这几次免单只管打印；
+            <b>AI 服务当前不收费，也不按次计量</b>。
+          </div>
+
           <div class="notice" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>本机<b>不会催你「额度快过期了」</b> ——
+            <span>本机<b>不会催你「次数快过期了」</b> ——
                   那种提醒是为了让你多用，不是为了帮你。</span>
           </div>
         </div>
@@ -506,24 +713,53 @@
             金额不大，但这是<b>真实发生的核销</b>，不是虚拟积分。
             每一笔都能在打印订单里对上。
           </div>
+
+          <!-- 2026-08-11 版面整改：以下两段自左栏移入。它们讲的是这些金额
+               **记了什么、怎么对账**，属于账目口径，和这张金额卡是同一件事。
+               原文一字未改。 -->
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span><b>这些数字可以自己对账</b>：每一条核销都对应「打印订单」里的一单，
+                  页数、时间、机器编号能一一对上。<br>
+                  对不上就是我们错了 —— 拿着订单号找现场工作人员。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            记录只有<b>用了哪一项、什么时候、在哪台机器、省了多少钱</b>，
+            不含你打印的内容。
+          </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>过期那一条</b></div>
         <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+          <div class="lock-p" style="color:var(--fog-700)">
             7 月那张招聘会折扣券，<b>本机没提醒你就让它过期了</b>。<br><br>
-            原因是本机没有你的手机号，也不打算要 —— 要了就得存、就得保护、
-            就多一处可能泄露的地方。<br><br>
-            <b>代价就是这类限时权益会过期。</b>这是我们选的取舍，
-            不是疏忽，也不打算靠"要个手机号"来解决。
+            本机不收手机号，所以<b>发不了到期提醒</b>；限时权益要你自己留意有效期。
           </div>
 
           <div class="notice" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-check"/></svg>
             <span>能做的是：<b>限时权益尽量做成"到时候自动生效"</b>，
                   不需要你记得领 —— 8月12日 那个 5 折就是这样。</span>
+          </div>
+
+          <!-- 2026-08-11：这一步右栏原来只有上面两块（实测内容 306px、外壳 1098px）。
+               补的是本页**已经成立、但从没在这一步说清**的两件事：
+               这些记录留多久、以及"已过期未用 1 项"那一条现在还能不能补救。
+               都不是新数据，是把 s1/s2 已写明的口径在结账这一步复述到位。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg><b>这些记录留多久</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">核销流水</span><span class="v">跟打印订单同期</span></div>
+            <div class="kv-row"><span class="k">打印内容</span><span class="v v--fog">不记录</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">没有</span></div>
+            <div class="kv-row"><span class="k">导出给出资方</span><span class="v">只报页数与金额</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            向人社结算时报的是<b>页数和金额</b>，不报你打了什么。
           </div>
         </div>
       </div>
@@ -544,22 +780,25 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="23-me.html" data-parent-label="我的"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">看全部权益</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">看全部权益</button>
 
-    <span class="actionbar-hint" data-at="s1">2 项可领 · 不符合与领不了的也列出来了</span>
-    <span class="actionbar-hint" data-at="s2">核验在核销那一刻做 · 不会先扣额度再说不行</span>
+    <span class="actionbar-hint" data-at="s1">不可用的也列出来 · 各写各的原因</span>
+    <!-- 2026-08-11 整改 ②：原写「核验在核销那一刻做」，读起来仍像本机接了资格核验。
+         改成本机真的能负责的两句：不做资格认定；核销没过不先扣次数。 -->
+    <span class="actionbar-hint" data-at="s2">本机不做资格认定 · 核销没过也不会先扣了你的次数</span>
     <span class="actionbar-hint" data-at="s3">本月已省 2.60 元 · 每笔都能在打印订单里对上</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这一项怎么用<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s2" href="21-policy.html">去看怎么办失业登记<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="s3" href="06-print-workbench.html?stage=s3">去打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="06-print-workbench.html?stage=s3&amp;from=P24&amp;back=s3">去打印<svg class="ic"><use href="#i-printer"/></svg></a>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -567,10 +806,363 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P24 · 权益列表渲染（2026-08-11）
+   --------------------------------------------------------------------------
+   为什么改成渲染：权益与活动是**后台配的**。后台加一项、下线一项、
+   改次数改上限改适用范围，页面都不该跟着改代码。上一版是 6 张写死的卡，
+   等于把某一天的后台配置刻进了 HTML。
+
+   字段名照抄生产模型，不自创：
+     BenefitGrant   · id / benefitType / title / description / quantityTotal /
+                      quantityRemaining / status / sourceType / sourceRef /
+                      validFrom / validUntil
+     BenefitType    · coupon | free_quota | package_entitlement | subsidy_eligibility_hint
+     BenefitStatus  · active | used_up | expired | revoked
+     BenefitSource  · platform | campus | gov | fair | partner
+
+   本机自加的四个字段（**后端目前没有，已列进契约文档必补项**）：
+     applicableScopes  适用场景（只在求职产出上生效）——
+                       产品拍板为**四类**：简历 / 求职材料 / 招聘会资料 / 政策申请材料。
+                       2026-08-11 整改 ①：原来多写了「证件照」，已删。
+     maxBillableUnits  单次计费总量上限，**按「页 × 份」算**
+     colorScope        色彩范围（bw_only / all）
+     revokeReason      **单独撤销**这一张权益时的原因（配合 BenefitStatus.revoked）
+
+   ⚠ 2026-08-11 整改 ⑦「活动下线」口径纠正（正式原则见
+     docs/reviews/2026-08-11-pricing-benefits-backend.md §四.2）：
+     **活动下线只停止新领取；已经发到用户账户里的权益是独立契约，
+     按领取时写下的规则继续有效。**
+     所以本机自加的 activityStatus 字段（原本用来表达「活动下线了但券还在」）
+     已删除 —— 它诱导出了一句错误的屏幕文案：「券还在但本机不知道还认不认」。
+     真正会让一张券用不了的，是后台**单独撤销**了它，那走的是
+     BenefitStatus.revoked（枚举里本来就有）+ 撤销原因，
+     屏上必须**明写「已撤销」与原因**，不能伪装成过期，也不能和「活动下线」混为一谈。
+
+   ⚠ subsidy_eligibility_hint 单独分栏「政策资格参考」：它 info-only、不可核销，
+     屏上不给余额、不给金额、不给抵扣、不给绿色勾选、不写"已发放"。
+     混进券里，用户会以为补贴已经到账。
+
+   ⚠ 三种服务端真会返回的情况各有各的屏幕：
+     normal 后台配了 N 项 / empty 后台一项都没配 / stale 本机还没拉到配置。
+     stale 那一支**绝不拿上次的值当现在的清单** —— 宁可承认没拉到。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var listEl = document.getElementById('ben-list')
+  var footEl = document.getElementById('ben-foot')
+  var cntEl = document.getElementById('ben-counts')
+  var titleEl = document.getElementById('ben-title')
+  if (!listEl) return
+
+  var SYNC = '8月9日 07:30'
+  /* 免费打印的次数、上限、适用范围全部来自后台。这里写的是**一份快照的样例值**。 */
+  var GRANTS = [
+    { id: 'BG-2026-0007', benefitType: 'free_quota', status: 'active',
+      title: '免费打印 · 每月 3 次', sourceType: 'gov',
+      sourceRef: '市人社局「就业服务进社区」专项',
+      quantityTotal: 3, quantityRemaining: 1, unitLabel: '次',
+      validUntil: '8月31日 23:59',
+      /* 2026-08-11 整改 ①：适用场景由五类改回产品拍板的四类，删「证件照」。 */
+      scope: '简历 / 求职材料 / 招聘会资料 / 政策申请材料',
+      maxBillableUnits: 10, colorScope: 'bw_only',
+      /* 2026-08-11 整改 ②（功能保留，改写成未来态）：
+         原文写「领取要核验：…… 这两条和政策服务页里那条求职创业补贴是**同一套核验**，
+         办过一次就都通了」。「同一套核验、办过一次就都通了」是**规划中的能力**，
+         不能作为既成事实写（后端没有资格核验接口，EndUser 也没有户籍/社保/失业登记属性，
+         首期不做人群限定；且公司当前没有人力资源服务许可证，不能声称已与人社系统打通）。
+         缺什么：与人社部门的合作与资质 + EndUser 资格属性 + 服务端资格核验接口。
+         接上之后改回什么：把「规划中」去掉，恢复「与政策服务页那条求职创业补贴共用
+         同一套核验，办过一次就都通了」—— 改回前须过合规评审。 */
+      desc: '一次<b>免掉一整单</b>，不是按页抵 —— 用掉一次，这一项就少一次。<br>' +
+            '不能兑现、不能转让。出资方公告的适用条件是：本市户籍或本市缴社保、' +
+            '并已做失业登记。<b>是否符合以官方部门审核结果为准</b> —— ' +
+            '<b>本机不做资格认定，也不代办、不代领</b>。<br>' +
+            '<b>规划中</b>：与政策服务页那条求职创业补贴共用同一套资格核验' +
+            '（<b>尚未接入</b>，接入取决于与人社部门的合作与相应资质）。',
+      go: ['06-print-workbench.html?stage=s1', '去打印工作台用这一次'] },
+
+    { id: 'BG-2026-0012', benefitType: 'free_quota', status: 'used_up',
+      title: '首次上传简历 · 免费 AI 诊断一次', sourceType: 'platform',
+      sourceRef: '成本由本机承担',
+      quantityTotal: 1, quantityRemaining: 0, unitLabel: '次',
+      validUntil: '—', scope: '简历诊断',
+      /* 2026-08-11 整改 ③（功能保留，改写成未来态）：
+         原文写「AI 诊断、优化、面试练习**按次计入当月用量**，**会员期内不限次** ——
+         你本月的用量在右侧「你的账户」里」，读起来像用量账本已经在跑。
+         缺什么：**AI 计价表 + 用量账本 + 订阅（会员）模型 + 支付闭环**（四样都没有）。
+         接上之后改回什么：把「规划中」去掉，恢复「按次计入当月用量，会员期内不限次 ——
+         你本月的用量在右侧『你的账户』里」。 */
+      why: '<b>8月9日 15:04 已使用</b>，这一项已经用完，所以这里不给按钮。<br>' +
+           '<b>顺带说清</b>：政策核对、岗位浏览这类查询本来就不收费；' +
+           'AI 诊断、优化、面试练习<b>当前也不收费、本机不按次计量</b>。<br>' +
+           '<b>规划中</b>：AI 服务按次计入当月用量、<b>会员期内不限次</b>' +
+           '（<b>待开发</b> —— 缺 AI 计价表与用量账本，所以现在不显示任何用量数字）。' },
+
+    { id: 'BG-2026-0031', benefitType: 'coupon', status: 'active',
+      title: '秋季招聘会 · 打印免单券', sourceType: 'fair',
+      sourceRef: '市人社局秋季招聘会 · 现场发放',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+      validUntil: '8月31日 23:59',
+      scope: '简历 / 求职材料 / 招聘会资料',
+      maxBillableUnits: 20, colorScope: 'bw_only',
+      desc: '一张券<b>免掉一整单</b>。上限比免费打印高一些，' +
+            '适合把要带去招聘会的材料一次打完。',
+      go: ['06-print-workbench.html?stage=s1', '去打印工作台用这张券'] },
+
+    { id: 'BG-2026-0044', benefitType: 'coupon', status: 'active', notYet: true,
+      title: '9月 社区招聘周 · 打印免单券', sourceType: 'gov',
+      sourceRef: '市人社局 · 9月1日–9月7日',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+      validFrom: '9月1日 00:00', validUntil: '9月7日 23:59',
+      scope: '简历 / 求职材料 / 招聘会资料',
+      maxBillableUnits: 20, colorScope: 'bw_only',
+      why: '<b>9月1日 00:00 才开始生效</b>，那几天在本机上会自动可选，' +
+           '<b>不用领、不用出示任何东西</b>。现在按不了，是因为还没到时间 —— ' +
+           '不是你少做了什么。',
+      go: ['17-fair-desk.html', '查看招聘会'] },
+
+    { id: 'BG-2026-0052', benefitType: 'coupon', status: 'active',
+      title: '职业技能培训 · 首课免费试听券', sourceType: 'partner',
+      sourceRef: '某职业培训学校 · 有推广目的',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+      validUntil: '9月30日 23:59', scope: '培训试听（不适用于打印）',
+      desc: '到机构报到时出示。<br>' +
+            '<b>提醒两句</b>：① 这是机构出钱做推广，试听后大概率会被推荐付费课程，' +
+            '<b>你没有义务报名</b>；② 如果你想申领政策里的培训补贴，' +
+            '<b>先查当年目录再报名</b> —— 不在目录内的培训不补，顺序反了钱拿不回来。',
+      go: ['16-offline-agencies.html', '去看这家机构'] },
+
+    { id: 'BG-2026-0061', benefitType: 'free_quota', status: 'active', notEligible: true,
+      title: '应届生专项 · 免费打印加 2 次', sourceType: 'gov',
+      sourceRef: '省教育厅学生服务中心 · 需学信网核验',
+      quantityTotal: 2, quantityRemaining: 2, unitLabel: '次',
+      validUntil: '12月31日 23:59', scope: '简历 / 求职材料',
+      maxBillableUnits: 10, colorScope: 'bw_only',
+      why: '限毕业 2 年内。<b>按你在本机填的情况看你不属于这一类</b>，所以不给按钮 —— ' +
+           '如果本机判错了，去核验窗口以他们的认定为准，<b>本机不做资格认定</b>。' },
+
+    { id: 'BG-2026-0070', benefitType: 'package_entitlement', status: 'active', offMachine: true,
+      title: '线上简历模板包', sourceType: 'partner',
+      sourceRef: '某招聘平台',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '份',
+      validUntil: '—', scope: '对方 App 内',
+      why: '这一项要在<b>对方 App 里登录</b>才能领，<b>本机领不了，也不替你去领</b>，' +
+           '所以这里不给按钮。<br>说明它存在是让你知道有这回事；' +
+           '要不要去对方平台注册，你自己决定。' },
+
+    /* 2026-08-11 整改 ⑦（活动下线口径纠正）：
+       原文写「这张券还在你账户里，但后台已经把发这张券的活动下线了……
+       本机**不知道它现在还认不认**」，并把状态标成「活动已下线」。
+       这与正式原则相反（docs/reviews/2026-08-11-pricing-benefits-backend.md §四.2）：
+       **活动下线只停止新领取；已发权益是独立契约，按领取时规则继续有效。**
+       所以「活动下线」根本不该让屏上出现一张不敢用的券。
+       真正会让一张券用不了的是**后台单独撤销**了它 —— 那是 BenefitStatus.revoked
+       （枚举本来就有），必须**明写「已撤销」和原因**，不能伪装成过期。
+       本条样例因此改成「已撤销 + 原因」，并在文案里把两件事划清界限。 */
+    { id: 'BG-2026-0083', benefitType: 'coupon', status: 'revoked',
+      revokeReason: '出资方核对发放名单时发现重复发放，8月10日 由后台撤销',
+      title: '社区微招聘 · 打印免单券', sourceType: 'campus',
+      sourceRef: '街道社区服务中心',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+      validUntil: '9月15日 23:59', scope: '简历 / 求职材料',
+      maxBillableUnits: 10, colorScope: 'bw_only',
+      why: '<b>这张券已被后台撤销，不能再用。</b>撤销原因：' +
+           '<b>出资方核对发放名单时发现重复发放</b>，8月10日 由后台撤销。<br>' +
+           '<b>这不是过期</b> —— 有效期本来到 9月15日，本机不拿"过期"来搪塞你。' +
+           '对撤销有疑问，凭券名和上面的编号找现场工作人员或出资方。<br>' +
+           '<b>顺带说清一件容易被搞混的事</b>：某个活动<b>下线只是停止新领取</b>，' +
+           '<b>已经发到你账户里的券不受影响</b>，按你领到时的规则继续有效 —— ' +
+           '只有像这样被<b>单独撤销</b>并写明原因的，才会不能用。' },
+
+    { id: 'BG-2026-0090', benefitType: 'training_voucher_v2', status: 'active', unknown: true,
+      title: '实训基地体验券（新类型）', sourceType: 'partner',
+      sourceRef: '市实训基地 · 8月9日 新增',
+      quantityTotal: 1, quantityRemaining: 1, unitLabel: '张',
+      validUntil: '10月31日 23:59', scope: '以券面说明为准',
+      why: '后台新增了一种<b>本机这个版本还不认识的权益类型</b>' +
+           '（<b>training_voucher_v2</b>）。名称、说明、有效期照原样显示，' +
+           '但<b>本机不知道怎么用它，也不拿它算钱</b> —— <b>本机不猜</b>。' +
+           '请按券面说明处理，或问现场工作人员。' },
+
+    { id: 'BG-2026-0101', benefitType: 'subsidy_eligibility_hint', status: 'active',
+      title: '求职创业补贴 · 资格提示', sourceType: 'gov',
+      sourceRef: '市人社局 · 政策公告',
+      validUntil: '以公告为准', scope: '政策办事参考',
+      why: '这是一条<b>政策资格提示</b>，不是券、<b>不能核销、也没有金额</b>。' +
+           '它只告诉你「按你填的情况，这条政策可能和你有关」以及要准备什么材料。<br>' +
+           '<b>能不能领、领多少、什么时候到账，全部以人社认定为准</b> —— ' +
+           '本机不代办、不代领，也不显示任何到账金额。',
+      go: ['21-policy.html', '去政策服务页看办事条件'] }
+  ]
+
+  var PAYER = { gov: ['政府补贴', 'py--gov', 'i-agency'],
+                platform: ['本机自营', 'py--own', 'i-printer'],
+                partner: ['机构赞助', 'py--org', 'i-building'],
+                campus: ['校方提供', 'py--org', 'i-building'],
+                fair: ['招聘会主办方', 'py--org', 'i-building'] }
+
+  /* 状态标签。**每一种不可用都有自己的说法** —— 合并成一句「不可用」等于没说。 */
+  function stateOf (g) {
+    if (g.benefitType === 'subsidy_eligibility_hint') return ['政策参考', 'bs--had']
+    if (g.unknown) return ['本机不认识', 'bs--out']
+    /* 2026-08-11 整改 ⑦：原来这一行是 activityStatus === 'revoked' → 「活动已下线」。
+       活动下线不该影响已发出去的券（已发权益是独立契约），所以那个状态被删掉了；
+       会导致不可用的是**单独撤销**，走 BenefitStatus.revoked，屏上明写「已撤销」。 */
+    if (g.status === 'revoked') return ['已撤销', 'bs--out']
+    if (g.status === 'used_up' || g.quantityRemaining === 0) return ['你已用过', 'bs--had']
+    if (g.status === 'expired') return ['已过期', 'bs--out']
+    if (g.notYet) return ['时间未到', 'bs--gap']
+    if (g.notEligible) return ['你不符合', 'bs--out']
+    if (g.offMachine) return ['本机领不了', 'bs--out']
+    return ['本机可用', 'bs--can']
+  }
+
+  function esc (t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+  /* 「 · 」两侧换成 nbsp：中文排版禁则不许间隔号起行，而来源串里到处是它。
+     逐条改文案改不干净（后台还会下发新的），所以在渲染时统一绑住。 */
+  function nb (t) { return esc(t).replace(/ · /g, '\u00a0·\u00a0') }
+
+  function card (g) {
+    var st = stateOf(g)
+    var py = PAYER[g.sourceType] || ['来源未标注', 'py--org', 'i-building']
+    var isHint = g.benefitType === 'subsidy_eligibility_hint'
+    var cls = 'bf' + (isHint ? ' bf--hint' : '') + (g.unknown ? ' bf--unknown' : '')
+    var h = '<div class="' + cls + '">' +
+      '<div class="bf-hd"><span>' +
+      '<span class="bf-t">' + esc(g.title) + '</span>' +
+      '<span class="bf-src"><span class="payer ' + py[1] + '">' +
+      '<svg class="ic"><use href="#' + py[2] + '"/></svg>' + py[0] + '</span> ' +
+      nb(g.sourceRef) + '\u00a0·\u00a0同步 ' + SYNC + '</span></span>' +
+      '<span class="bf-state-status ' + st[1] + '" style="margin-left:auto">' + st[0] + '</span></div>'
+
+    /* 余额只对**可核销**的品类显示。资格提示不给余额、不给金额 —— 那会让人以为钱到账了。
+       2026-08-11 整改 ⑦：已撤销的那一张同理不给余额 —— 库里 quantityRemaining 还是 1，
+       但它已经不能用了，屏上写「余 1 / 1 张」会让人以为还能按。 */
+    if (!isHint) {
+      h += '<div class="bf-rules">' +
+        (g.status === 'revoked'
+          ? '<span class="bf-rule"><b>不可核销</b> · 余额作废</span>'
+          : '<span class="bf-rule">余 <b>' + g.quantityRemaining + ' / ' + g.quantityTotal + '</b> ' +
+            g.unitLabel + '</span>') +
+        (g.maxBillableUnits != null
+          ? '<span class="bf-rule">单次上限 <b>' + g.maxBillableUnits + '</b> 计费页（页 × 份）</span>' : '') +
+        (g.colorScope === 'bw_only' ? '<span class="bf-rule">只覆盖<b>黑白</b></span>' : '') +
+        '<span class="bf-rule">适用 <b>' + nb(g.scope) + '</b></span>' +
+        '<span class="bf-rule">有效期至 <b>' + esc(g.validUntil) + '</b></span>' +
+        '</div>'
+    } else {
+      h += '<div class="bf-rules">' +
+        '<span class="bf-rule">类型 <b>政策资格提示</b></span>' +
+        '<span class="bf-rule"><b>不可核销 · 无金额</b></span>' +
+        '<span class="bf-rule">有效期 <b>' + esc(g.validUntil) + '</b></span></div>'
+    }
+
+    h += '<div class="' + (g.why ? 'bf-why' : 'bf-p') + '">' + (g.desc || g.why) + '</div>'
+    /* 出口按钮：只有真能走到某处时才给。已用完 / 已过期 / 不符合 / 领不了 / 本机不认识
+       一律**不给按钮**，并在上面那段里说清为什么 —— 不用灰按糊弄。 */
+    if (g.go) {
+      h += '<div class="bf-go"><a class="btn btn--ghost" href="' + g.go[0] + '">' +
+        esc(g.go[1]) + '</a></div>'
+    }
+    return h + '</div>'
+  }
+
+  var SCENE = 'normal'
+  function render () {
+    var redeemable = GRANTS.filter(function (g) { return g.benefitType !== 'subsidy_eligibility_hint' })
+    var hints = GRANTS.filter(function (g) { return g.benefitType === 'subsidy_eligibility_hint' })
+
+    if (SCENE === 'stale') {
+      /* 拉不到配置时**绝不拿上次的值当现在的清单**。宁可承认没拉到。 */
+      listEl.innerHTML =
+        '<div class="ben-empty"><b>本机还没拿到最新的活动配置</b>' +
+        '<p>权益与活动是后台配的，本机开机时拉一份快照。<b>这次没拉到</b>' +
+        '（上一次成功同步是 ' + SYNC + '）。</p>' +
+        '<p><b>本机不拿上一次的清单当现在的清单</b> —— 后台随时可能新增、下线或改规则，' +
+        '拿旧清单给你看，等于告诉你一个可能已经不存在的权益。</p>' +
+        '<p>你账户里的次数与券<b>没有丢，也没有被扣</b>，只是本机这一刻读不到。' +
+        '可以稍后再看，或找现场工作人员让本机重新同步。</p></div>'
+      if (titleEl) titleEl.textContent = '本机还没拿到活动配置'
+      if (cntEl) cntEl.innerHTML = '<div class="kv-row"><span class="k">本次同步</span>' +
+        '<span class="v v--fog">未拿到</span></div>' +
+        '<div class="kv-row"><span class="k">上次成功</span><span class="v">' + SYNC + '</span></div>' +
+        '<div class="kv-row"><span class="k">屏上清单</span><span class="v v--fog">不显示旧值</span></div>'
+      if (footEl) footEl.innerHTML = '拉不到配置时本机<b>什么都不列</b>，' +
+        '不是没有权益，是本机这一刻不知道有什么。'
+      return
+    }
+
+    if (SCENE === 'empty') {
+      listEl.innerHTML =
+        '<div class="ben-empty"><b>本机现在一项权益都没有</b>' +
+        '<p>后台<b>当前没有配任何面向本机的活动</b>，你的账户里也没有未用完的券。' +
+        '这就是实情 —— <b>本机不会为了让这一页看起来有内容而放点什么上去</b>。</p>' +
+        /* 2026-08-11 整改 ③（改时态，不删）：原写「不买会员，找工作要用的功能一样不少」，
+           读起来像现在就有会员可买。会员产品线保留，这里只把时态改准。 */
+        '<p>打印、扫描、AI 简历这些功能<b>照常能用</b>，出纸按现场公示价计费；' +
+        '<b>AI 服务不收费</b>，也<b>没有付费才能用的求职功能</b>' +
+        '（打印会员<b>尚未开放</b>）。</p>' +
+        '<p>有新活动时会出现在这里。<b>本机不收手机号，所以不会给你发提醒</b> —— ' +
+        '这是我们选的取舍，如实告诉你。</p></div>'
+      if (titleEl) titleEl.textContent = '本机现在没有可用权益'
+      if (cntEl) cntEl.innerHTML = '<div class="kv-row"><span class="k">后台配置</span>' +
+        '<span class="v v--fog">0 项</span></div>' +
+        '<div class="kv-row"><span class="k">你的账户</span><span class="v v--fog">0 张券</span></div>' +
+        '<div class="kv-row"><span class="k">同步时间</span><span class="v">' + SYNC + '</span></div>'
+      if (footEl) footEl.innerHTML = '没有就是没有。<b>本机不拿"敬请期待"占位</b>，' +
+        '也不做签到、积分、抽奖去凑一个。'
+      return
+    }
+
+    var html = redeemable.map(card).join('')
+    if (hints.length) {
+      html += '<div class="ben-sechd"><svg class="ic" style="width:18px;height:18px"><use href="#i-info"/></svg>' +
+        '政策资格参考<span class="mt">不是券 · 不可核销 · 无金额</span></div>' +
+        hints.map(card).join('')
+    }
+    listEl.innerHTML = html
+
+    var cnt = {}
+    redeemable.forEach(function (g) { var k = stateOf(g)[0]; cnt[k] = (cnt[k] || 0) + 1 })
+    if (titleEl) titleEl.textContent = '本机现在拿到的 ' + redeemable.length + ' 项'
+    if (cntEl) {
+      cntEl.innerHTML = Object.keys(cnt).map(function (k) {
+        return '<div class="kv-row"><span class="k">' + k + '</span><span class="v"><b>' +
+          cnt[k] + '</b> 项</span></div>'
+      }).join('') +
+      '<div class="kv-row"><span class="k">政策资格参考</span><span class="v"><b>' +
+      hints.length + '</b> 条 · 不可核销</span></div>'
+    }
+    if (footEl) {
+      footEl.innerHTML = '以上 ' + redeemable.length + ' 项来自<b>各自的出资方</b>，' +
+        '同步于 ' + SYNC + '。次数、单次上限、色彩范围、适用范围与有效期<b>全部由后台配置</b>，' +
+        '本机只拿到一份快照。<br>' +
+        '能否使用、用在哪一单，<b>以出资方规则与服务端核销结论为准</b>；' +
+        '本机只做展示与核销登记，<b>不代办、不代领</b>。'
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-ben-btn]')
+    if (!b) return
+    SCENE = b.getAttribute('data-ben-btn')
+    document.querySelectorAll('[data-ben-btn]').forEach(function (x) {
+      x.setAttribute('aria-pressed', x.getAttribute('data-ben-btn') === SCENE ? 'true' : 'false')
+    })
+    render()
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  })
+  render()
+})()
+</script>
 </body>
 </html>

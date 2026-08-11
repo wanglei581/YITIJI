@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>P11 岗位匹配对比 — AI 求职操作系统 V3</title>
-<meta name="screen-name" content="P11 岗位匹配对比">
+<title>P30 岗位大师 · 决策台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P30 岗位大师 · 决策台">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=1">
 <link rel="stylesheet" href="styles/base.css?v=3">
@@ -17,7 +17,19 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
+  /* ── 2026-08-10 P11 升格为「P30 岗位大师 · 决策台」──────────────────────
+     唯一需求真值 = p29-p31-design-spec.md P30 节。文件名不变（IA 裁决：
+     不新增第二入口，本页就是 /resume/job-fit 的完全体）。
+     七块底盘（PR #117 已验证）全部进 s2 纵向结果流；
+     四增量：s3 多岗对比（≤3）、右栏 ATS 引用卡、方向缺口+站内薪资合并卡、
+     first 态 RIASEC 冷启动链 P28（本页不重复建测评）。
+     s4 = 带走报告（A4×3：AIGC 封面 / 三档正文 / 追问清单）。
+     红线：三档禁百分比、不预测录用、不预测个人薪资、结果不回传企业；
+     投递按钮只用白名单短语「查看岗位」「去来源平台 · 扫码投递」——
+     「来源平台」与「扫码投递」之间必须有间隔符，连写会命中违禁词检测。 */
   .work--fit { grid-template-columns: 1fr 324px; }
   .joblist { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-3); }
   .jobrow {
@@ -33,17 +45,331 @@
   .jobrow-m { font-size: var(--fz-2); color: var(--fog-700); }
   .jobrow-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .04em; }
   .jobrow-go { margin-left: auto; flex: 0 0 auto; color: var(--fog-600); }
-  /* 2026-08-09 留白复核补实（先例见 06-print-workbench 同日注释）：
-     s1 三行岗位下方、s2 无结论态（ai-down/first）JD 单栏下方原为无容器空洞（约 1.0k px）。
-     只补真实信息：三档口径卡（页面本来就在用三档却没在挑选时解释过）、
-     无结论态说明「这里会看到什么」、结果去向卡。s2 default 左栏已满，不动。 */
+
+  /* ════════ 2026-08-10 Codex 走查整改 ⑦⑧ · 选岗方式与生产对齐 ════════
+     生产 JobFitPage.tsx 的选岗只有两条路，都是真控件：
+       tab=pick   → 关键词搜索（getJobs { keyword, page:1, pageSize:8 }）+ 结果单选
+       tab=manual → manualTitle(maxLength 50) + manualReq(maxLength 2000)
+     上一版本页两条都没有：只有三张写死的推荐行，动作条却写着「自己搜岗位」。
+     现在把两条路都画成真控件，输入框走 scripts/keypad.js 软键盘（一体机无实体键盘）。 */
+  .pick2 { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
+  .pick2-tabs { display: flex; gap: var(--s-3); }
+  .pick2-tab {
+    flex: 1; min-height: 56px; padding: 0 var(--s-4);
+    border-radius: var(--r-xs); border: 1px solid var(--brd-2);
+    background: transparent; color: var(--fog-700); cursor: pointer;
+    font-family: var(--ff-ui); font-size: var(--fz-3);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all var(--dur-2) var(--ease-out);
+  }
+  .pick2-tab .ic { width: 17px; height: 17px; }
+  .pick2-tab[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); color: var(--fog-900); font-weight: 600; }
+  .pick2-body { display: flex; flex-direction: column; gap: var(--s-3); }
+  .pick2-body[hidden] { display: none; }
+  .srch { display: flex; align-items: center; gap: var(--s-3); }
+  .srch > .ic { flex: 0 0 auto; width: 19px; height: 19px; color: var(--fog-600); }
+  .tin {
+    flex: 1 1 auto; min-height: 56px; padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-xs); background: var(--field-bg);
+    border: 1px solid var(--brd-2); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-3); width: 100%;
+  }
+  .tin::placeholder { color: var(--fog-600); }
+  .tin:focus { outline: none; border-color: var(--jade-a32); }
+  .tin--ta { resize: none; line-height: 1.6; font-size: var(--fz-2); }
+  .srch-x { flex: 0 0 auto; min-height: 56px; min-width: 72px; padding: 0 var(--s-4);
+    border-radius: var(--r-xs); border: 1px solid var(--brd-2); background: transparent;
+    color: var(--fog-700); cursor: pointer; font-family: var(--ff-ui); font-size: var(--fz-2); }
+  .srch-x[hidden] { display: none; }
+  .srch-mt { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6; }
+  .srch-mt b { color: var(--fog-900); }
+  /* 选中的岗位行：本页原来点行就跳走，选和推进混在一起。改成先选中、再由
+     主按钮推进（与 P17 场次卡同一口径），选中的岗位名回填到动作条主按钮上。 */
+  /* 注意：这里刻意用 data-jobpick 而不是 data-job —— stage.js 的可见性判定把
+     [data-job] 当作第四条轴（出纸阶段处境）在扫，用 data-job 会被整行 hidden 掉。 */
+  .jobrow[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .jobrow[hidden] { display: none; }
+  .jobrow-pick { margin-left: var(--s-4); flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+  .jobrow[aria-pressed="true"] .jobrow-pick { color: var(--jade-600); font-weight: 700; }
+  .nohit { padding: var(--s-5); border-radius: var(--r-md); border: 1.5px dashed var(--brd-2);
+    color: var(--fog-600); font-size: var(--fz-2); line-height: 1.7; }
+  .nohit[hidden] { display: none; }
+  /* 「还没选好」的主按钮：压淡但**保持可点**（点了会说清还差什么）。
+     不要用 aria-disabled —— 公共层给它配了 pointer-events:none。 */
+  .btn[data-ready="0"] { filter: saturate(.55); opacity: .78; }
+
+  /* ════════ 2026-08-10 Codex 走查整改 ④ · 多岗对比标为规划能力 ════════
+     生产一次只分析一个岗位（JobFitRequest 只接受一个 jobId 或一个 manualJob），
+     没有多岗接口。这一整个 s3 是规划稿，必须在版面上说死，不能当已可用的选择摆着。 */
+  .planned { flex: 0 0 auto; border: 1.5px dashed var(--amber-600); background: var(--amber-a12);
+    border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+    display: flex; align-items: flex-start; gap: var(--s-4); }
+  .planned > .ic { flex: 0 0 auto; width: 22px; height: 22px; color: var(--amber-600); margin-top: 2px; }
+  .planned-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .planned-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 700; }
+  .planned-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+  .planned-p b { color: var(--fog-900); }
+  /* 规划区里的示意卡：整体压淡，和上面「现在能用」的部分拉开 */
+  .is-planned { opacity: .72; }
+
+  /* ── 共同要求：把「一份简历够用」这句结论接上动作（2026-08-10 补）────────
+     上一版 s3 的结论落在「两边都要的：社群维护 · 活动策划」——
+     读完用户知道该改简历了，可这一屏没有任何通往简历的门：
+     主按钮是「生成带走报告」，次按钮是「回逐条比对」。**结论到位，动作断头。**
+
+     关键在于：这块**不是多岗对比**，所以不受「一次只比一个」的限制。
+     「哪些词在你比过的几条岗位正文里都出现」是词频统计 ——
+     一次比一个、比三次，三份 JD 原文都在你自己的 AI 服务记录里，
+     把它们放一起数交集，不需要多岗接口，也不需要模型。
+     因此它**不压淡、不进 .is-planned**，也不标 E3：它现在就能用。
+
+     故意做得矮：s3 左栏实测只剩约 176px 余量（再多，「对比怎么读」那张卡会被裁），
+     所以三个词与主按钮压在同一行，长说明并进上面的规划横幅。 */
+  /* 高度预算见下面 .cw i 的注释：这一块每多 1px，栏底「对比怎么读」那段就少 1px。
+     内边距与间距各收 2px，给末行留出余量（实测段落底 1670 → 1664，栏底 1668）。 */
+  .common { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px;
+    padding: 10px var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a08); border: 1px solid var(--jade-a20); }
+  .common-hd { display: flex; align-items: center; gap: var(--s-3); white-space: nowrap; }
+  .common-hd > .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .common-t { font-size: var(--fz-3); font-weight: 700; color: var(--fog-900); }
+  .common-s { margin-left: auto; flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); }
+  /* 2026-08-11 实测到的既有缺陷：三个词与主按钮压在同一行时，.cw 的
+     `white-space:nowrap` 让每个词块的最小宽度是 202px，三个 + 间距要 626px，
+     而这一栏只有 586px —— 栅格撑破自己的 255px 盒子，后两个词块被
+     x=348→663 的主按钮**盖在下面**（实测坐标）。文字压在按钮底下比留白更糟。
+     改法要省高度：这一栏没有富余（把按钮换到第二行要 +72px，实测会把
+     「把两个岗位放在一起看」压到裁字）。所以仍是一行，只让词块能收窄 ——
+     栅格用 minmax(0,1fr)、词块 min-width:0、次行说明允许折行。 */
+  .common-b { display: flex; align-items: center; gap: var(--s-3); }
+  .cwgrid { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .cw { min-width: 0; display: flex; flex-direction: column; gap: 1px; justify-content: center;
+    min-height: 56px; padding: 5px 9px; border-radius: var(--r-xs);
+    background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .cw b { font-size: var(--fz-2); color: var(--fog-900); }
+  /* 次行 12px / 折两行：这一整块的高度是有预算的 —— 实测 .common 每长 1px，
+     下面「对比怎么读」那段就往栏外顶 1px（栏底 1668，段落底 1691 时末行被切掉半行）。
+     所以词块只能折两行，不能折三行。 */
+  .cw i { font-style: normal; font-size: 12px; color: var(--fog-600);
+    font-family: var(--ff-num); letter-spacing: 0; white-space: normal; line-height: 1.3; }
+  .cw--miss { border-color: var(--amber-a20); background: var(--amber-a12); }
+  .cw--miss i { color: var(--amber-600); }
+  /* 主按钮压到 56px：这一栏余量只有约 176px，64px 的 btn--primary 会把
+     「对比怎么读」那张卡挤出栏底（实测超出 18.5px）。56px 仍在触控下限之上。 */
+  .common-b > .btn { flex: 0 0 auto; height: 56px; padding: 0 var(--s-4); font-size: var(--fz-2); }
+  /* 追加位原来是 <a href="13-jobs-desk.html">：点了跳走、没有回传、也没有多岗接口。
+     不是入口就不许长成入口 —— 换成静态占位说明。 */
+  .cmp-slot {
+    border: 1.5px dashed var(--brd-2); border-radius: var(--r-md);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--s-3); color: var(--fog-600); padding: var(--s-5); text-align: center;
+    font-size: var(--fz-2); line-height: 1.6;
+  }
+  .cmp-slot .ic { width: 26px; height: 26px; opacity: .5; }
+
+  /* s4 · ai-down 的两份原文：一体机站着看，15px 的文档字号太小（82 PPI 屏上只有
+     4.6mm 字高），这里放大到 19px；纸面本身可滚，长文档不会被截。 */
+  .resume-src--big { flex: 1 1 auto; font-size: 19px; line-height: 1.75; }
+  .resume-src--big h5 { font-size: 24px; margin-bottom: 8px; }
+  .resume-src--big .grp { font-size: 14px; margin: 16px 0 6px; }
+
+  /* s4 右栏：把余量摊到每一行上，而不是让一张卡独吞。
+     ── 2026-08-11 卡内空洞整改 ──────────────────────────────────────
+     实测 first / ai-down 两态下「打印这份报告」那张卡按 data-when 收起，
+     它让出来的高度全被 .pane--grow 的「报告里有什么」吃掉：卡高 1180、内容 265、
+     空 915px。这是典型的「某一态隐藏后没重新分配」。
+     两处改：① 补上这两态各自缺的那张卡（为什么现在没有报告 / 中断了什么），
+     ② 余下的高度由两张信息卡平分，行高随之变大 —— 27 寸屏站着看，
+     100px 上下的行距是舒服的，不是填充物：每一行都是原来就有的真实字段。 */
+  .pane--kvfill { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  .pane--kvfill .kv { flex: 1 1 auto; }
+  .pane--kvfill .kv-row { flex: 1 1 auto; align-items: center; }
+  /* 324px 的右栏里，键名折成两行（「正文 页」「三档口 径」）比值本身还难读 */
+  .pane--kvfill .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+  .pane--kvfill .kv-row .v { text-align: right; }
+  /* 垫底那张只在 s2 / s3 参与摊余量：s1 的上一张说明卡内容本来就满，
+     让它也去抢高度会把那张挤瘦。作用域用 .screen 上的 data-stage。 */
+  .screen[data-stage="s2"] .wside .pane--tail,
+  .screen[data-stage="s3"] .wside .pane--tail { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  .screen[data-stage="s2"] .wside .pane--tail .kv,
+  .screen[data-stage="s3"] .wside .pane--tail .kv { flex: 1 1 auto; }
+  .screen[data-stage="s2"] .wside .pane--tail .kv-row,
+  .screen[data-stage="s3"] .wside .pane--tail .kv-row { flex: 1 1 auto; }
+
+  /* s2 的 ai-down / first：原来是 grid「auto 1fr」两行，现在这一块有四段
+     （提示条 / 两栏原文 / 出口 / 恢复说明），改成 flex 列，由中间那段吃余量。 */
+  .fitwrap--col { display: flex; flex-direction: column; }
+  .fitwrap--col > .fitcols { flex: 1 1 auto; min-height: 0; }
+
+  /* s4 · first 的三步：按余量摊开，字号跟着放大 —— 27 寸屏上这是本态的主内容 */
+  .tline--fill { flex: 1 1 auto; min-height: 0; }
+  /* align-items:stretch 是关键：让 .tl-b 撑满整格，文字才能在格子里居中。
+     用 flex-start 时文字全贴在每格顶部，最后一步下面又剩一大截（实测卡内空 240px）。 */
+  .tline--fill .tl { flex: 1 1 auto; align-items: stretch; }
+  .tline--fill .tl-dot { align-self: flex-start; }
+  .tline--fill .tl-b { justify-content: center; }
+  .tline--fill .tl-t { font-size: var(--fz-4); }
+  .tline--fill .tl-s { font-size: var(--fz-2); line-height: 1.55; }
+
+  /* s2 纵向结果流：七块底盘从上往下走，整栏滚动；逐条比对区自身限高内滚 */
+  .fitstream { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-4); }
+  .fitstream > * { flex: 0 0 auto; }
+  .fitstream .fitcols { height: 620px; }
+  .concl-why { margin: 0; padding: var(--s-3) var(--s-5) 0; font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+  .concl-why b { color: var(--fog-900); }
+
+  /* 关键词覆盖：命中 = 简历原文里真有这个词（E1）；缺失 = JD 里有、简历没有（E2）。
+     只列词，不算覆盖率——比例数字会被拿去当录用把握。 */
+  .kwrow { display: flex; flex-wrap: wrap; gap: 10px; }
+  .kw {
+    display: inline-flex; align-items: center; gap: 7px; min-height: 40px;
+    padding: 5px 14px; border-radius: 999px; font-size: var(--fz-2); color: var(--fog-900);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  }
+  .kw .ic { width: 15px; height: 15px; color: var(--jade-600); }
+  .kw--miss { background: transparent; border: 1.5px dashed var(--brd-2); color: var(--fog-600); }
+  .kw--miss .ic { color: var(--fog-600); }
+
+  /* 差距行动卡：差距 + 学习方向 + 今天就能做的第一步 */
+  .gapc {
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .gapc-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+  .gapc-row { display: grid; grid-template-columns: 92px 1fr; gap: var(--s-3); font-size: var(--fz-2); line-height: 1.6; }
+  .gapc-k { color: var(--fog-600); }
+  .gapc-v { color: var(--fog-800); }
+  .gapc-v b { color: var(--fog-900); }
+
+  /* 面试预测：问题 + 为什么问 + 准备提示 */
+  .ivq {
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .ivq-q { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; line-height: 1.5; }
+  .ivq-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+  .ivq-p b { color: var(--fog-900); }
+
+  /* 风险标注：硬门槛·需关注 / 信息完整度·提醒（label + reason + basis） */
+  .rk {
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .rk-hd { display: flex; align-items: center; gap: var(--s-3); }
+  .rk-lb { font-size: 11px; letter-spacing: .06em; padding: 2px 8px; border-radius: 4px; border: 1px solid currentColor; flex: 0 0 auto; }
+  .rk--warn .rk-lb { color: var(--amber-600); }
+  .rk--note .rk-lb { color: var(--fog-600); }
+  .rk-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+  .rk-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+  .rk-p b { color: var(--fog-900); }
+
+  /* s3 多岗对比：并排最多 3（2 示例 + 1 追加位） */
+  .cmpwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+  .cmpgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-4); align-items: stretch; }
+  .cmp {
+    border-radius: var(--r-md); background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-3);
+  }
+  .cmp-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; line-height: 1.4; }
+  .cmp-m { font-size: var(--fz-1); color: var(--fog-700); }
+  .cmp-cnt { display: flex; gap: var(--s-4); }
+  .cmp-cnt span { font-size: var(--fz-1); color: var(--fog-600); }
+  .cmp-cnt b { font-family: var(--ff-num); }
+  .cmp-cnt .ok b { color: var(--jade-600); }
+  .cmp-cnt .near b { color: var(--amber-600); }
+  .cmp-cnt .miss b { color: var(--coral-400); }
+  .cmp-gap { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+  .cmp-gap b { color: var(--fog-900); }
+  .cmp-src { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .03em; line-height: 1.6; }
+  .cmp-act { margin-top: auto; display: flex; flex-direction: column; gap: var(--s-3); }
+  .cmp-act .btn { width: 100%; font-size: var(--fz-2); padding: var(--s-3) var(--s-4); }
+  .cmp-add {
+    border: 1.5px dashed var(--brd-2); border-radius: var(--r-md); text-decoration: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--s-3); color: var(--fog-600); padding: var(--s-5); text-align: center;
+    font-size: var(--fz-3); line-height: 1.6;
+  }
+  .cmp-add .ic { width: 28px; height: 28px; }
+  .cmp-add:hover { border-color: var(--jade-a32); color: var(--fog-800); }
+
+  /* s4 带走报告：A4 纸面排版（sheet-a4 底座在 work.css，正文样式本页自带） */
+  .rp-badge {
+    align-self: flex-start; font-size: 10.5px; letter-spacing: .08em; color: #7a6a35;
+    border: 1px solid #cdbd7f; background: #faf5e2; border-radius: 4px; padding: 3px 8px;
+  }
+  .rp-h1 { font-size: 22px; font-weight: 800; color: #17222b; margin: 8px 0 0; }
+  .rp-sub { font-size: 12px; color: #5b6b78; line-height: 1.7; }
+  .rp-hr { height: 1px; background: #d9e1e8; margin: 10px 0; }
+  .rp-w { font-size: 13px; font-weight: 800; color: #0f5a45; margin: 10px 0 4px; }
+  .rp-i { display: grid; grid-template-columns: 14px 1fr; gap: 8px; margin-bottom: 5px; font-size: 12px; color: #2c3a45; line-height: 1.55; }
+  .rp-i i { width: 9px; height: 9px; border: 1.5px solid #96a4ae; border-radius: 2px; margin-top: 3px; }
+  .rp-i b { color: #0f5a45; }
+  .rp-p { font-size: 12px; color: #2c3a45; line-height: 1.65; margin: 0; }
+  .rp-p b { color: #17222b; }
+  .rp-foot { font-size: 10.5px; color: #6b7a86; line-height: 1.65; border-top: 1px solid #d9e1e8; padding-top: 8px; margin-top: auto; }
+
+/* ── 上一屏带进来的选择：回执条 ──────────────────────────────────────
+   2026-08-10 参数消费整改。上游一直在 URL 里传用户已经做过的选择，
+   本页此前一个都不读 —— 用户在上一屏选完，进来还得重选一遍。
+   现在读了就必须让用户看见：静默预填比不预填更糟，用户会以为这些
+   值是本机自己猜的。三条规矩：① 有回执；② 可改；③ 只认白名单取值，
+   非法值当没传，绝不把 URL 里的字面量渲染出来。
+   只在**真的带了合法参数**时才插进 DOM —— 不带参数时这一块整个不存在。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-note b { color:var(--fog-800); }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s2" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     s1 不拦：那一步只是在列表里挑岗位、或往 JD 框里贴原文，本机还没算出任何比对结果。
+     （这条有个已知的取舍：JD 框真被手打了一长段再误触返回，这一版拦不住 ——
+       leaveguard 只按阶段判，判不了「框里有没有字」。相比之下，让每个刚进第 1 步、
+       什么都没填的人都吃一次弹层更糟，所以这里选择不拦。）
+     s2 / s3 / s4 都拦，且丢的东西一步一个样，分开写：
+       s2 是这一个岗位的逐条对照（未登录时页面写明「只留在本次会话，离场即清」）；
+       s3 是你先后比过的那几个岗位、和本机就着它们数出来的共同要求；
+       s4 是已经排好的那份带走报告。
+     不写 data-guard-keep：本页没有一个真能把结果存下来的按钮 ——
+     s4 右栏「我的文档」那几行是说明文字，device-off 那个「存我的文档 · 扫码带走」
+     是个没有接线的按钮（点了什么都不发生）。照它写 keep 等于给一个按不动的承诺。 -->
+
+<!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s2"（逐条比对）——
+     那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
+     不带 ?stage= 参数时，直接落在流程中途：点「逐条比对」的入口，屏幕上却是
+     半截流程。评审要看中间态，走 index.html 上的 ?stage= 链接，不靠文件默认值。 -->
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm"
+     data-guard-at="s2 s3 s4"
+     data-guard-lose-s2="这个岗位的逐条比对结果 —— 8 条要求的对照、三张差距卡和面试追问清单"
+     data-guard-lose-s3="你先后比过的这 3 个岗位，和本机数出来的 3 条共同要求"
+     data-guard-lose-s4="刚排好的这份决策报告（A4 3 页：封面、正文、面试追问清单）">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -52,30 +378,32 @@
     <a class="brand" href="09-resume-workbench.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">岗位匹配参考</div>
-        <div class="brand-sub">职易达 · 01 号机 · 拿你的简历比一个具体岗位</div>
+        <div class="brand-name">岗位大师 · 决策台</div>
+        <div class="brand-sub">01 号机 · 逐条比对 · 报告可带走</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first"><span class="dot dot--live"></span>AI 服务就绪</div>
     <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 服务中断 · 已上报</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 比对不受影响</div>
-    <div class="clock" data-clock>2026年8月8日 <b>10:06</b></div>
+    <div class="clock" data-clock>2026年8月10日 <b>10:06</b></div>
   </header>
 
   <div class="rail">
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">挑一个岗位</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐条比对</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">多岗对比</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走报告</span></button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>2</b> / 2 步</span>
+    <span class="rail-count" data-rail-count>第 <b>2</b> / 4 步</span>
   </div>
 
   <div class="work work--fit">
     <!-- ================= 左 ================= -->
     <div class="wmain">
 
-      <!-- S1 挑岗位 -->
+      <!-- ─────────── S1 挑岗位（沿用既有骨架） ─────────── -->
       <div class="joblist" data-at="s1">
         <div class="checks" data-when="default device-off">
           <div class="checks-hd">
@@ -84,7 +412,7 @@
             <span class="s">你也可以自己搜</span>
           </div>
           <div class="checks-list" style="grid-template-columns:1fr">
-            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>排序依据是你简历里出现过的岗位名与技能词 <span class="ev ev--e1">E1 你的材料</span>，<b>不是</b>录用可能性预测。</span>
+            <span class="chk"><svg class="ic"><use href="#i-info"/></svg><span>排序依据是你简历里出现过的岗位名与技能词 <span class="ev ev--e1">E1 你的材料</span>，<b>不是</b>录用可能性预测。</span></span>
           </div>
         </div>
         <div class="checks" data-when="ai-down first" style="flex:0 0 auto">
@@ -95,39 +423,83 @@
           </div>
           <div class="checks-list" style="grid-template-columns:1fr">
             <span class="chk" data-when="ai-down">岗位列表可以正常浏览和筛选，只是不按你的简历排序。</span>
-            <span class="chk" data-when="first">先去「AI 简历服务」给一份简历，才能做逐条比对。</span>
+            <span class="chk" data-when="first">先去「AI 简历服务」给一份简历，才能做逐条比对。还拿不准方向的话，下面的「兴趣快测」可以先做。</span>
           </div>
         </div>
 
-        <button class="jobrow" data-go="s2">
+        <!-- ── 2026-08-10 Codex ⑦⑧：选岗两条路，与生产 JobFitPage 一一对应 ──
+             上一版这里只有三张写死的推荐行，而动作条挂着「自己搜岗位」——
+             按钮承诺的能力界面上根本没有。现在两条路都是真控件。 -->
+        <div class="pick2" data-when="default device-off ai-down">
+          <div class="pick2-tabs">
+            <button class="pick2-tab" data-tab="list" aria-pressed="true">
+              <svg class="ic"><use href="#i-briefcase"/></svg>从岗位信息选择</button>
+            <button class="pick2-tab" data-tab="manual">
+              <svg class="ic"><use href="#i-target"/></svg>手填目标岗位</button>
+          </div>
+
+          <div class="pick2-body" data-tabb="list">
+            <div class="srch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" type="search" id="jobkw" autocomplete="off"
+                     placeholder="搜索岗位名称 / 公司，点这里弹出软键盘"
+                     aria-label="搜索岗位名称或公司">
+              <button class="srch-x" data-kwclear hidden>清空</button>
+            </div>
+            <!-- 生产接线备忘（写给接线的人，不是给用户看的空话）：
+                 getJobs({ keyword, page:1, pageSize:8 })，**服务端只回 8 条且没有分页器**。
+                 关键词命中超过 8 条时，第 9 条起用户在这一屏根本选不到 ——
+                 这是生产侧的缺口，接线时要么补分页/加载更多，要么把「没找到就手填」写进空态。
+                 本页按 8 条上限如实标注，不假装列表能翻页。 -->
+            <div class="srch-mt" data-f="kwmt">显示<b>本机已同步</b>的岗位，一次最多 <b>8 条</b>（来源接口不分页）。<b>超过 8 条的部分这一屏选不到</b> —— 换更准的词，或改用「手填目标岗位」。</div>
+          </div>
+
+          <div class="pick2-body" data-tabb="manual" hidden>
+            <input class="tin" id="mjtitle" maxlength="50" autocomplete="off"
+                   placeholder="目标岗位名称，如：行政专员（必填，≤50 字）"
+                   aria-label="目标岗位名称">
+            <textarea class="tin tin--ta" id="mjjd" maxlength="2000" rows="4"
+                      placeholder="粘贴或手打岗位 JD / 任职要求（选填，给了比对更有针对性）"
+                      aria-label="岗位 JD 或任职要求"></textarea>
+            <div class="srch-mt">JD <b data-f="jdlen">0</b> / 2000 字 ·
+              手填的岗位<b>只当参考文本，不进岗位库</b>，也不回传任何来源平台。
+              岗位名称填了才能开始比对。</div>
+          </div>
+        </div>
+
+        <button class="jobrow" data-jobpick="用户运营专员" data-kw="用户运营专员 前程无忧 运营">
           <span class="jobrow-b">
             <span class="jobrow-t">用户运营专员</span>
             <span class="jobrow-m">广州 · 天河区 · 6–9K · 1–3 年 · 本科</span>
             <span class="jobrow-s">来源 前程无忧 · 同步 09:20 · 外部 ID JX-88214</span>
           </span>
-          <span class="tier tier--high"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：较高</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span data-when="default device-off" class="tier tier--high"><span data-when="default device-off" class="tier-bars"><i></i><i></i><i></i></span><span data-when="default device-off" class="tier-text">参考：较高</span></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
-        <button class="jobrow" data-go="s2">
+        <button class="jobrow" data-jobpick="内容运营（新媒体）" data-kw="内容运营 新媒体 广州市人才服务中心 运营">
           <span class="jobrow-b">
             <span class="jobrow-t">内容运营（新媒体）</span>
             <span class="jobrow-m">广州 · 海珠区 · 7–10K · 1–3 年 · 本科</span>
             <span class="jobrow-s">来源 广州市人才服务中心 · 同步 08:52 · 外部 ID GZ-20418</span>
           </span>
-          <span class="tier tier--mid"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：中等</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span data-when="default device-off" class="tier tier--mid"><span data-when="default device-off" class="tier-bars"><i></i><i></i><i></i></span><span data-when="default device-off" class="tier-text">参考：中等</span></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
-        <button class="jobrow" data-go="s2">
+        <button class="jobrow" data-jobpick="数据运营助理" data-kw="数据运营助理 boss直聘 运营 数据">
           <span class="jobrow-b">
             <span class="jobrow-t">数据运营助理</span>
             <span class="jobrow-m">广州 · 番禺区 · 6–8K · 经验不限 · 本科</span>
             <span class="jobrow-s">来源 boss直聘 · 同步 09:05 · 外部 ID BS-51907</span>
           </span>
-          <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
-          <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span data-when="default device-off" class="tier tier--low"><span data-when="default device-off" class="tier-bars"><i></i><i></i><i></i></span><span data-when="default device-off" class="tier-text">参考：偏低</span></span>
+          <span class="jobrow-pick">选这个</span>
         </button>
+        <div class="nohit" data-f="nohit" hidden>
+          这三条是本机已同步岗位里和你简历最对得上的，<b>没有一条命中「<span data-f="nohitkw"></span>」</b>。
+          换个词再搜，或者切到「手填目标岗位」直接把 JD 粘进来。
+        </div>
 
-        <!-- 2026-08-09 留白复核补实：行上就挂着三档标签，挑选时就该解释三档是什么。 -->
+        <!-- 三档口径卡：行上就挂着三档标签，挑选时就该解释三档是什么 -->
         <div class="pane" style="flex:0 0 auto">
           <div class="pane-hd"><span class="t">行上的「参考」三档是什么意思</span><span class="s">只有三档，没有分数</span></div>
           <div class="kv">
@@ -142,9 +514,9 @@
           </p>
         </div>
 
-        <!-- 域内横向通道：简历材料域 = P09 + P10 + P11 + P12（写法同 09 的 xlane） -->
+        <!-- 域内横向通道：13 情报台 / 09 工作台 / 28 兴趣快测（RIASEC 冷启动，本页不重复建测评） -->
         <div class="xlane" style="margin-top:auto">
-          <span class="xlane-hd">想先看更多岗位，或先把简历弄好？</span>
+          <span class="xlane-hd">想先看更多岗位、先把简历弄好，或还拿不准方向？</span>
           <div class="xlane-row">
             <a class="xlane-go" href="13-jobs-desk.html">
               <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
@@ -162,37 +534,44 @@
               </span>
               <svg class="ic"><use href="#i-arrowRight"/></svg>
             </a>
+            <a class="xlane-go" href="28-self-assessment.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">兴趣快测</span>
+                <span class="xlane-ds">还拿不准方向，先花几分钟自评，回来挑岗更有谱</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
           </div>
         </div>
       </div>
 
-      <!-- S2 逐条比对 -->
-      <div class="fitwrap" data-at="s2">
+      <!-- ─────────── S2 逐条比对 · 纵向结果流（七块底盘） ─────────── -->
+      <div class="fitstream" data-at="s2" data-when="default device-off">
 
-        <div class="concl concl--high" data-when="default device-off">
-          <span class="concl-tier">
-            <span class="lb">匹配参考</span>
-            <span class="vl">较高</span>
-            <span class="concl-bars"><i></i><i></i><i></i></span>
-          </span>
-          <span class="concl-note">只有三档：较高 / 中等 / 偏低。<b>不给百分比，也不预测录用概率</b>——那不是能算出来的东西。</span>
-          <span class="concl-counts">
-            <span class="cnt cnt--ok"><b>5</b><span>对上了</span></span>
-            <span class="cnt cnt--near"><b>2</b><span>差一点</span></span>
-            <span class="cnt cnt--miss"><b>1</b><span>没写到</span></span>
-          </span>
-        </div>
-        <div class="notice" data-when="ai-down" style="flex:0 0 auto">
-          <svg class="ic"><use href="#i-offline"/></svg>
-          <span><b>比对服务中断，不给任何结论。</b>岗位原文与你的简历都可以正常翻看；故障已自动上报。想先看岗位详情可以直接去岗位页。</span>
-        </div>
-        <div class="notice" data-when="first" style="flex:0 0 auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>还没有简历，无法逐条比对。先去「AI 简历服务」上传或做一份，再回来。</span>
+        <!-- ① 三档结论 + 综合理由一句（E3） -->
+        <div class="pane" style="padding:0;overflow:hidden">
+          <div class="concl concl--high" style="border:0;border-radius:0">
+            <span class="concl-tier">
+              <span class="lb">匹配参考</span>
+              <span class="vl">较高</span>
+              <span class="concl-bars"><i></i><i></i><i></i></span>
+            </span>
+            <span class="concl-note">只有三档：较高 / 中等 / 偏低。<b>不给百分比，也不预测录用概率</b>——那不是能算出来的东西。</span>
+            <span class="concl-counts">
+              <span class="cnt cnt--ok"><b>5</b><span>对上了</span></span>
+              <span class="cnt cnt--near"><b>2</b><span>差一点</span></span>
+              <span class="cnt cnt--miss"><b>1</b><span>没写到</span></span>
+            </span>
+          </div>
+          <p class="concl-why" style="padding-bottom:var(--s-4)">
+            综合理由：8 条要求里 5 条能在你的简历原文里找到对应句子，差的 3 条<b>全集中在数据证据上</b>——
+            方向对得上，证据没写够。<span class="ev ev--e3">E3</span>
+          </p>
         </div>
 
-        <div class="fitcols" data-when="default device-off">
-          <!-- 左：岗位要求逐条 -->
+        <!-- ② 逐条证据（r1–r8 左右联动，点左边定位右边原文） -->
+        <div class="fitcols">
           <div class="fitcol">
             <div class="fitcol-hd"><svg class="ic"><use href="#i-briefcase"/></svg>岗位要求 · 8 条（来自 JD 原文）</div>
             <div class="fitcol-body">
@@ -234,7 +613,6 @@
             </div>
           </div>
 
-          <!-- 右：你的简历原文 -->
           <div class="fitcol">
             <div class="fitcol-hd"><svg class="ic"><use href="#i-resume"/></svg>你的简历原文 · v2</div>
             <div class="resume-src" id="src">
@@ -252,18 +630,161 @@
               <div class="row"><span data-ev="r7">校园推广项目　负责人　带 5 人团队在 3 所高校完成地推</span></div>
               <div class="grp">技能</div>
               <div class="row">Excel · <span data-ev="r4">SQL</span> · Photoshop · 英语六级</div>
-              <div class="gapline" data-ev="r4" style="margin-top:10px">这里缺一句：技能栏写了 SQL，但整份简历没有一句说明用它做过什么。岗位明确要求熟练取数，招聘方看不到证据就当没有。</div>
-              <div class="gapline" data-ev="r8" style="margin-top:8px">这里缺一整块：岗位要求熟悉 A/B 测试，你的简历里没有任何相关表述。做过就补上分组与指标；没做过不要硬写。</div>
+              <div class="gapline" data-ev="r4" style="margin-top:10px">技能栏写了 SQL，但没有一句说明用它做过什么 —— 招聘方看不到证据就当没有。</div>
+              <div class="gapline" data-ev="r8" style="margin-top:8px">岗位要求熟悉 A/B 测试，简历里没有相关表述。做过就补，没做过不要硬写。</div>
             </div>
           </div>
         </div>
 
-        <!-- AI 不可用 / 无简历时：不给结论，但岗位原文照看 -->
-        <div class="fitcols" data-when="ai-down first" style="grid-template-columns:1fr">
+        <!-- ③ 关键词覆盖：只列词，不算覆盖率 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">关键词覆盖</span><span class="s">命中 4 个 · 缺失 2 个 · 不算覆盖率</span></div>
+          <div class="kwrow">
+            <span class="kw"><svg class="ic"><use href="#i-check"/></svg>社群维护</span>
+            <span class="kw"><svg class="ic"><use href="#i-check"/></svg>活动策划</span>
+            <span class="kw"><svg class="ic"><use href="#i-check"/></svg>公众号运营</span>
+            <span class="kw"><svg class="ic"><use href="#i-check"/></svg>SQL</span>
+            <span class="kw kw--miss"><svg class="ic"><use href="#i-minus"/></svg>A/B 测试</span>
+            <span class="kw kw--miss"><svg class="ic"><use href="#i-minus"/></svg>数据复盘</span>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.65">
+            实心的词都在你的简历原文里出现过 <span class="ev ev--e1">E1</span>；
+            虚线的词来自岗位 JD、你的简历里没有 <span class="ev ev--e2">E2</span>。
+            <b>不给「覆盖率」这种比例数字</b>——两份文本的词对上多少，算成百分比没有意义，还容易被当成录用把握。
+          </p>
+        </div>
+
+        <!-- ④ 差距行动卡：每张都带「今天就能做的第一步」 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">差距怎么补</span><span class="s">每张卡都带今天就能做的第一步</span></div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <div class="gapc">
+              <span class="gapc-t">SQL 只有词，没有证据</span>
+              <div class="gapc-row"><span class="gapc-k">学习方向</span><span class="gapc-v">把已经做过的查询、报表整理成<b>带数字的一句经历</b>，而不是再去学新课程。</span></div>
+              <div class="gapc-row"><span class="gapc-k">今天第一步</span><span class="gapc-v">翻出最近一次用 SQL 出的表，写下「查了什么、给谁用、影响了什么」。</span></div>
+            </div>
+            <div class="gapc">
+              <span class="gapc-t">A/B 测试完全没写到</span>
+              <div class="gapc-row"><span class="gapc-k">学习方向</span><span class="gapc-v">先弄懂分组、对照、指标这三个词在运营里怎么用；<b>没做过就不要写进简历</b>。</span></div>
+              <div class="gapc-row"><span class="gapc-k">今天第一步</span><span class="gapc-v">找一篇 A/B 测试入门文章读完，能自己复述一遍流程即可。</span></div>
+            </div>
+            <div class="gapc">
+              <span class="gapc-t">「参与用户增长项目」说不清你做了哪一环</span>
+              <div class="gapc-row"><span class="gapc-k">学习方向</span><span class="gapc-v">不是学新东西，是把已发生的事还原成<b>你负责的具体环节</b>。</span></div>
+              <div class="gapc-row"><span class="gapc-k">今天第一步</span><span class="gapc-v">写下你在那个项目里每周实际做的三件事，挑最有数字的一件放进简历。</span></div>
+            </div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+            方向和第一步都是 AI 按差距推的 <span class="ev ev--e3">E3</span>——路要你自己走，第一步先帮你踩实。
+          </p>
+        </div>
+
+        <!-- ⑤ 简历改写建议（E3）+ 出口 → 09?stage=s4 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">简历改写建议 · 3 条</span><span class="s">只提醒改哪，不替你编内容</span></div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <div class="gapc"><span class="gapc-t">1 · 技能栏 SQL 后面补一句用途</span>
+              <div class="gapc-row"><span class="gapc-k">为什么</span><span class="gapc-v">岗位把「熟练取数」写在硬性要求里，光列词招聘方当没有。对应左边第 4 条证据。</span></div></div>
+            <div class="gapc"><span class="gapc-t">2 · 「参与用户增长相关项目」改成你负责的环节</span>
+              <div class="gapc-row"><span class="gapc-k">为什么</span><span class="gapc-v">同一句话换个动词，可核对程度差很远；「参与」在筛选里几乎不加分。</span></div></div>
+            <div class="gapc"><span class="gapc-t">3 · 「维护用户社群」补上规模</span>
+              <div class="gapc-row"><span class="gapc-k">为什么</span><span class="gapc-v">多少个群、多少人，一句话就能让这条从「做过」变成「做到什么程度」。</span></div></div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+            三条都是 AI 按本岗位差距给的改写方向 <span class="ev ev--e3">E3</span>，内容要你自己写，AI 不替你编经历。
+          </p>
+          <div class="outs" style="margin-top:var(--s-4);grid-template-columns:1fr">
+            <a class="out" href="09-resume-workbench.html?stage=s4"><svg class="ic"><use href="#i-pen"/></svg>带去简历工作台逐条改</a>
+          </div>
+        </div>
+
+        <!-- ⑥ 面试预测：不是考官题库 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">面试可能被问到的 · 3 条</span><span class="s">按差距推的，不是考官题库</span></div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <div class="ivq">
+              <span class="ivq-q">「你用 SQL 做过什么？」</span>
+              <span class="ivq-p"><b>为什么会问：</b>JD 把它写在硬性要求里，而你的简历只在技能栏出现过这个词。</span>
+              <span class="ivq-p"><b>准备提示：</b>提前把一次真实取数经历讲成一分钟的小故事：查什么、给谁用、结果如何。</span>
+            </div>
+            <div class="ivq">
+              <span class="ivq-q">「说一场你策划的活动，效果怎么衡量？」</span>
+              <span class="ivq-p"><b>为什么会问：</b>你写了 8 场活动和 340 新增，面试官大概率顺着数字追。</span>
+              <span class="ivq-p"><b>准备提示：</b>把 340 的口径说清楚：哪一场、多长时间、跟平时比高多少。</span>
+            </div>
+            <div class="ivq">
+              <span class="ivq-q">「没做过 A/B 测试，你怎么验证运营动作有没有用？」</span>
+              <span class="ivq-p"><b>为什么会问：</b>JD 要求而简历没有，这是最显眼的缺口。</span>
+              <span class="ivq-p"><b>准备提示：</b>如实说没做过，再给出你现有的验证办法：前后对比、控制变量的意识。</span>
+            </div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+            这三条是拿你的简历和 JD 的差距推出来的 <span class="ev ev--e3">E3</span>——
+            <b>不是考官题库</b>，真实面试问什么谁也不知道。想练就去「模拟面试」。
+          </p>
+        </div>
+
+        <!-- ⑦ 晋升路径三节点：不是承诺 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">这个方向往后怎么走</span><span class="s">整块是 AI 推的 · 不是承诺</span></div>
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">今</span>
+              <span class="tl-b"><span class="tl-t">现在 · 用户运营专员</span>
+                <span class="tl-s">理由：你的经历已对上这一档的多数要求，差的是数据证据。
+                  第一步：把上面三张差距卡的「今天第一步」做完。</span></span></div>
+            <div class="tl"><span class="tl-dot">1-3</span>
+              <span class="tl-b"><span class="tl-t">1–3 年 · 资深用户运营 / 小组负责人</span>
+                <span class="tl-s">理由：这一档普遍要求「独立背指标、带小项目」。 第一步：认领一个可量化的小指标，做出前后对比。</span></span></div>
+            <div class="tl"><span class="tl-dot">3-5</span>
+              <span class="tl-b"><span class="tl-t">3–5 年 · 用户增长 / 运营负责人</span>
+                <span class="tl-s">理由：往上走要么带人、要么带增长，都把数据复盘当硬功夫。 第一步：把 A/B 测试变成「真做过一次」。</span></span></div>
+          </div>
+          <p style="margin:10px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.65">
+            三个节点和理由都是 AI 按公开 JD 的普遍要求推的 <span class="ev ev--e3">E3</span>——
+            <b>不是承诺</b>，也不是你的既定路线；行业和公司不同，走法就不同。
+          </p>
+        </div>
+
+        <!-- ⑧ 风险标注：硬门槛 + 信息完整度 -->
+        <div class="pane">
+          <div class="pane-hd"><span class="t">风险标注</span><span class="s">两类都给出依据</span></div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <div class="rk rk--warn">
+              <span class="rk-hd"><span class="rk-lb">硬门槛 · 需关注</span><span class="rk-t">SQL 独立取数缺可核对证据</span></span>
+              <span class="rk-p">JD 第 4 条把它写成硬性要求 <span class="ev ev--e2">E2</span>，
+                你的简历里只有技能栏一个词 <span class="ev ev--e1">E1</span>。筛选阶段最可能卡在这。</span>
+            </div>
+            <div class="rk rk--note">
+              <span class="rk-hd"><span class="rk-lb">信息完整度 · 提醒</span><span class="rk-t">A/B 测试相关内容整份简历为空</span></span>
+              <span class="rk-p"><b>信息不足≠不会。</b>简历漏写今天就能补；真没做过，差距卡已给出第一步。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 · AI 不可用 / 无简历：七块全收，只留岗位原文与去处 -->
+      <div class="fitwrap fitwrap--col" data-at="s2" data-when="ai-down first">
+        <div class="notice" data-when="ai-down" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span><b>比对服务中断，七块结论一块都不给。</b>结论造不出来就不出，不拿模板凑。
+            岗位原文与你的简历都可以正常翻看；故障已自动上报。之前做过的比对在「我的」还能看。</span>
+        </div>
+        <div class="notice" data-when="first" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>还没有简历，无法逐条比对。先去「AI 简历服务」上传或做一份；还拿不准方向，可以先做「兴趣快测」。</span>
+        </div>
+
+        <div class="fitcols" style="min-height:0">
           <div class="fitcol">
             <div class="fitcol-hd"><svg class="ic"><use href="#i-briefcase"/></svg>岗位要求原文 · 来自来源平台，未做任何比对</div>
-            <div class="resume-src">
-              <h5>用户运营专员 · 岗位要求</h5>
+            <!-- 2026-08-11：纸面改为按余量长高（原来按内容收高，下面留一大片米色空地），
+                 并补上岗位基本信息 —— 这几项本页 s3 的对比卡里就在用，不是新编的。 -->
+            <div class="resume-src" style="flex:1 1 auto">
+              <h5>用户运营专员 · 岗位原文</h5>
+              <div class="grp">岗位基本信息</div>
+              <div class="row">广州××科技有限公司 · 广州 · 天河区</div>
+              <div class="row">6–9K · 1–3 年 · 本科 · 招 2 人</div>
+              <div class="grp">岗位要求 · 8 条</div>
               <div class="row">1. 1–3 年运营相关经验，本科及以上学历</div>
               <div class="row">2. 负责用户社群维护与日常反馈处理</div>
               <div class="row">3. 独立完成活动策划与执行</div>
@@ -273,23 +794,550 @@
               <div class="row">7. 熟悉 A/B 测试流程</div>
               <div class="row">8. 良好的沟通与文档能力</div>
               <div class="grp">数据来源</div>
-              <div class="row" style="font-size:11px;color:var(--paper-fog)">来源机构 前程无忧 · 同步时间 2026-08-08 09:20 · 外部 ID JX-88214</div>
-            </div>
-            <!-- 2026-08-09 留白复核补实：无结论态只说了「不给结论」，没说过这一步本来长什么样。
-                 说机制不给结果，不算伪造结论。 -->
-            <div class="pane" style="margin-top:auto">
-              <div class="pane-hd">
-                <span class="t" data-when="first">有简历之后，这里会看到什么</span>
-                <span class="t" data-when="ai-down">服务恢复后，这里会看到什么</span>
-              </div>
-              <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
-                左边把上面 8 条要求逐条摊开，每条标「对上了 / 差一点 / 没写到」；右边放你的简历原文。
-                点任何一条，右边直接跳到对应句子——结论旁边一定有出处：
-                你的原句 <span class="ev ev--e1">E1 你的材料</span> 对照岗位原文 <span class="ev ev--e2">E2 来源信息</span>，
-                档位判断是 AI 给的 <span class="ev ev--e3">E3 仅供参考</span>。
-              </p>
+              <div class="row" style="font-size:13px;color:var(--paper-fog)">来源机构 前程无忧 · 同步时间 2026-08-08 09:20 · 外部 ID JX-88214</div>
             </div>
           </div>
+
+          <!-- 2026-08-11：上面那条提示写着「岗位原文**与你的简历**都可以正常翻看」，
+               而这一屏原来只摆了岗位原文 —— 承诺的另一半从来没出现在屏幕上，
+               左栏因此从纸面底下一直空到栏底。把简历原文补成第二栏。 -->
+          <div class="fitcol" data-when="ai-down">
+            <div class="fitcol-hd"><svg class="ic"><use href="#i-resume"/></svg>你的简历原文 · v2，未做任何比对</div>
+            <div class="resume-src resume-src--big" style="flex:1 1 auto">
+              <h5>王 · 个人简历</h5>
+              <div class="grp">求职意向</div>
+              <div class="row">运营 · 广州</div>
+              <div class="grp">教育背景</div>
+              <div class="row">2020.09–2024.06　某大学　市场营销　本科</div>
+              <div class="grp">工作经历</div>
+              <div class="row">2024.03–2026.06　某科技公司　运营专员</div>
+              <div class="row">· 独立运营公众号（粉丝 1.2 万），策划 8 场活动，单场最高带来 340 个新增关注</div>
+              <div class="row">· 协助部门完成月度目标，参与用户增长相关项目</div>
+              <div class="row">· 维护用户社群，处理日常反馈</div>
+              <div class="grp">项目经历</div>
+              <div class="row">校园推广项目　负责人　带 5 人团队在 3 所高校完成地推</div>
+              <div class="grp">技能</div>
+              <div class="row">Excel · SQL · Photoshop · 英语六级</div>
+            </div>
+          </div>
+
+          <!-- first 没有简历，第二栏放「怎么补上这一半」的三步与出口 -->
+          <div class="fitcol" data-when="first">
+            <div class="fitcol-hd"><svg class="ic"><use href="#i-target"/></svg>缺的是这一半 · 三步补上</div>
+            <div class="tline tline--fill">
+              <div class="tl tl--now"><span class="tl-dot">1</span>
+                <span class="tl-b"><span class="tl-t">先有一份简历</span>
+                  <span class="tl-s">上传现成的，或在简历工作台从零做一份</span></span></div>
+              <div class="tl"><span class="tl-dot">2</span>
+                <span class="tl-b"><span class="tl-t">回到这一步逐条比对</span>
+                  <span class="tl-s">左边这八条要求，逐条对到你的原句上</span></span></div>
+              <div class="tl"><span class="tl-dot">3</span>
+                <span class="tl-b"><span class="tl-t">再看结论与差距</span>
+                  <span class="tl-s">七块结果流从上往下展开，每块都标出处</span></span></div>
+            </div>
+            <div class="outs" style="grid-template-columns:1fr;flex:0 0 auto">
+              <a class="out" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先去做一份简历</a>
+              <a class="out" href="28-self-assessment.html"><svg class="ic"><use href="#i-target"/></svg>先做兴趣快测</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="outs" data-when="ai-down" style="grid-template-columns:1fr 1fr;flex:0 0 auto">
+          <a class="out" href="23-me.html"><svg class="ic"><use href="#i-history"/></svg>看之前的比对结果 · 我的</a>
+          <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
+        </div>
+
+        <!-- 说机制不给结果，不算伪造结论 -->
+        <div class="pane" style="flex:0 0 auto">
+          <div class="pane-hd">
+            <span class="t" data-when="first">有简历之后，这里会看到什么</span>
+            <span class="t" data-when="ai-down">服务恢复后，这里会看到什么</span>
+          </div>
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+            一条从上往下的结果流，七块：三档结论与综合理由、逐条证据对照、关键词覆盖、
+            差距与今天第一步、简历改写建议、面试可能被问什么、这个方向往后怎么走，最后是风险标注。
+            每一块结论旁边都有出处：你的原句 <span class="ev ev--e1">E1 你的材料</span>、
+            岗位原文 <span class="ev ev--e2">E2 来源信息</span>、
+            AI 判断 <span class="ev ev--e3">E3</span>。
+          </p>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 多岗对比 · 规划能力（≤3） ───────────
+           2026-08-10 Codex 走查整改 ④：
+           生产 /resume/job-fit 一次只接受**一个**岗位（JobFitRequest 里要么一个 jobId，
+           要么一个 manualJob），没有多岗接口；上一版那个「加一个」只是跳去岗位情报台，
+           挑完既没有回传也没有第二个岗位的位置 —— 是个走不通的入口。
+           整页保留这块作为规划稿，但必须在版面上标死：现在只能单岗。 -->
+      <div class="planned" data-at="s3">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span class="planned-b">
+          <span class="planned-t">规划能力 · 多岗对比还没有做出来</span>
+          <span class="planned-p">
+            <!-- 「我的 · AI 服务记录」整块 nowrap：断行恰好落在「·」前时，
+                 中点会被甩到行首（中文排版禁则，自检判缺陷）。实测本页 s3 四态都在报这一条。 -->
+            <b>现在只能一次比一个岗位</b>：比完一个，回第 1 步换一个再比，两次结果都在<span style="white-space:nowrap">「我的 · AI 服务记录」</span>里，可以自己对着看。
+            下面这一屏是<b>规划稿</b>，用来说清做出来之后长什么样 —— <b>不是现在可用的功能</b>，卡上的数字也都是示例。
+            <b>但紧接着那一条不是规划稿</b>：它是数出来的，现在就能用。
+          </span>
+        </span>
+      </div>
+
+      <!-- ═══ 共同要求 · 结论接动作（2026-08-10 补）═══════════════════════
+           ⚠ 位置在 .planned 之后、.cmpwrap 之前，且**不进 .is-planned**：
+           规划稿是压淡的示意，这一块是现在真能用的能力，两者不能长成一个样子。
+
+           为什么它不受「一次只比一个」限制：多岗对比要的是同时把 N 个 JD 送进模型；
+           这里要的只是把用户**已经先后比过**的 N 份 JD 原文取回来做词频交集。
+           前者缺接口，后者缺的只是一次 GROUP BY。
+
+           ── 接线契约（交 Codex）─────────────────────────────────────────
+           · 需要的输入：
+               resumeId（当前简历，E1）
+               + jobFitRecordIds[]（本人最近 N 次 job-fit 记录，N ≤ 5，
+                 每条带 jobId / manualJobText 与当时的 JD 原文快照，E2）。
+               **只取本人记录**；未登录时只取本次会话内的比对。
+           · 需要的输出：
+               commonTerms: [{ term, hitJobCount, totalJobCount, resumeHitCount }]
+               term 取 JD 原文里的技能 / 职责词；
+               hitJobCount === totalJobCount 才算「共同要求」（全命中，不是多数）；
+               resumeHitCount = 该词在简历原文里出现的次数（0 也要返回，0 正是要改的那一条）。
+               **禁止返回任何分数、档位、百分比或排序理由** —— 这是计数接口，不是模型接口。
+           · 排序：resumeHitCount 升序（简历里最缺的排最前），并列时按 term 在 JD 里的出现次数降序。
+           · 数量：最多取 3 条。超过 3 条时只显示前 3，并在说明里写清「还有 N 条」。
+           · 动作：跳 09-resume-workbench.html?stage=s4&from=P11，
+               把 commonTerms 放在**会话态**里带过去（sessionStorage / 服务端会话皆可），
+               不要塞进 URL —— 词条属于用户材料，不该出现在地址栏和访问日志里。
+               P09 s4 收到后：在改写建议里把这几条列成「必须体现的要求」，
+               不得替用户编造经历，只标位置与提示。
+           · 失败 / 不可用怎么降级：
+               － 记录不足 2 条（只比过 1 个岗位）→ **整块不渲染**，
+                 什么都不显示，也不写「暂无共同要求」这种像结论的话；
+               － 交集为空（几份 JD 没有共同词）→ 整块不渲染，同上；
+               － AI 服务不可用（ai-down）→ **本块照常渲染**：它是词频统计，
+                 不经过模型。这一点必须在版面上说出来，否则用户会以为它也挂了；
+               － 简历不存在（first）→ 整块不渲染，s3 的 first 分支已经在引导做简历。
+           · 记录：本块不产生新的 AI 服务记录，只读既有记录；点按钮跳转算一次页面跳转，
+             不算一次 AI 调用。 -->
+      <div class="common" data-at="s3" data-when="default ai-down device-off">
+        <!-- 2026-08-11 A31：这一行原来要 719px（ai-down 态 833px），而栏宽只有 586px，
+             右端「本机数出来的 · 不依赖 AI」被 .wmain 的 overflow:hidden 切掉 133px
+             （ai-down 切 247px），只剩 31px 露在外面 —— 等于这句合规说明没说。
+             为什么不折行：实测本栏尾部真实余量 default 29px / **ai-down 只有 17px**
+             （末行文字底 1651、栏底 1668），而多一行 13px 文字至少要 18px + 行距，
+             ai-down 一折就把下面「对比怎么读」那段顶出栏外裁字。所以只能压宽度。
+             压在三处，都不丢信息：
+               ① 两个证据徽章改成裸 E1 / E2（全站已有 19 处这么写），
+                  它们指的是什么，正下方 .cw 的次行「3/3 条正文出现 · 简历里 2 次」
+                  就是逐字写着的 —— 正文＝岗位正文＝E2，简历＝你的材料＝E1；
+               ② 标题去掉「先后」「里」两处冗余；
+               ③ ai-down 那句压到「中断也能数 · 不依赖 AI」，必须说的那件事
+                  （这块是词频统计、不经过模型、AI 挂了照常出数）一个字没少。
+             实测结果：default / device-off 内容 567px（余 19px），ai-down 554px（余 32px）。 -->
+        <div class="common-hd">
+          <svg class="ic"><use href="#i-layers"/></svg>
+          <span class="common-t">你比过的 3 个岗位，正文都出现的 3 个词</span>
+          <span class="ev ev--e1">E1</span>
+          <span class="ev ev--e2">E2</span>
+          <span class="common-s" data-when="default device-off">本机数出来的 · 不依赖 AI</span>
+          <span class="common-s" data-when="ai-down">中断也能数 · 不依赖 AI</span>
+        </div>
+        <div class="common-b">
+          <div class="cwgrid">
+            <span class="cw"><b>社群维护</b><i>3/3 条正文出现 · 简历里 2 次</i></span>
+            <span class="cw"><b>活动策划</b><i>3/3 条正文出现 · 简历里 1 次</i></span>
+            <span class="cw cw--miss"><b>数据复盘</b><i>3/3 条正文出现 · 简历里 0 次</i></span>
+          </div>
+          <a class="btn btn--primary" href="09-resume-workbench.html?stage=s4&amp;from=P11">按这三条改一版简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+        </div>
+      </div>
+
+      <div class="cmpwrap is-planned" data-at="s3" data-when="default device-off">
+        <div class="checks" style="flex:0 0 auto">
+          <div class="checks-hd">
+            <svg class="ic" style="width:19px;height:19px;color:var(--fog-600)"><use href="#i-layers"/></svg>
+            <span class="t">做出来之后：并排最多 3 个</span>
+            <span class="s">多了就不是决策，是列表</span>
+          </div>
+          <div class="checks-list" style="grid-template-columns:1fr">
+            <span class="chk"><svg class="ic"><use href="#i-info"/></svg><span>岗位来自情报台收藏，或第 1 步手填的 JD 文本；外部链接只当参考文本，<b>不进岗位库</b>。对比结果只给你自己看。</span></span>
+          </div>
+        </div>
+
+        <div class="cmpgrid">
+          <div class="cmp">
+            <span class="cmp-t">用户运营专员</span>
+            <span class="cmp-m">广州 · 天河区 · 6–9K</span>
+            <span data-when="default device-off" class="tier tier--high"><span data-when="default device-off" class="tier-bars"><i></i><i></i><i></i></span><span data-when="default device-off" class="tier-text">参考：较高</span></span>
+            <span class="cmp-cnt">
+              <span class="ok"><b>5</b> 对上了</span>
+              <span class="near"><b>2</b> 差一点</span>
+              <span class="miss"><b>1</b> 没写到</span>
+            </span>
+            <span class="cmp-gap">最大差距：<b>SQL 只有词没有证据</b>——补一句真实取数经历就能补上。<span class="ev ev--e3">E3</span></span>
+            <span class="cmp-src">来源机构 前程无忧<br>同步时间 08-08 09:20<br>外部 ID JX-88214</span>
+            <span class="cmp-act">
+              <a class="btn" href="14-job-detail.html">查看岗位</a>
+              <a class="btn" href="14-job-detail.html"><svg class="ic"><use href="#i-qr"/></svg>去来源平台 · 扫码投递</a>
+            </span>
+          </div>
+
+          <div class="cmp">
+            <span class="cmp-t">内容运营（新媒体）</span>
+            <span class="cmp-m">广州 · 海珠区 · 7–10K</span>
+            <span data-when="default device-off" class="tier tier--mid"><span data-when="default device-off" class="tier-bars"><i></i><i></i><i></i></span><span data-when="default device-off" class="tier-text">参考：中等</span></span>
+            <span class="cmp-cnt">
+              <span class="ok"><b>4</b> 对上了</span>
+              <span class="near"><b>2</b> 差一点</span>
+              <span class="miss"><b>2</b> 没写到</span>
+            </span>
+            <span class="cmp-gap">最大差距：<b>短视频脚本经历完全没写到</b>——做过就补，没做过这条缺口要花时间。<span class="ev ev--e3">E3</span></span>
+            <span class="cmp-src">来源机构 广州市人才服务中心<br>同步时间 08-08 08:52<br>外部 ID GZ-20418</span>
+            <span class="cmp-act">
+              <a class="btn" href="14-job-detail.html">查看岗位</a>
+              <a class="btn" href="14-job-detail.html"><svg class="ic"><use href="#i-qr"/></svg>去来源平台 · 扫码投递</a>
+            </span>
+          </div>
+
+          <!-- 原来这里是 <a href="13-jobs-desk.html">「还可加 1 个」：点了跳去情报台，
+               挑完没有回传、也没有第二个岗位的接口 —— 不是入口就不长成入口。
+
+               data-void-ok：回归台的「卡内空洞」会报这块在 default/device-off 的 s3
+               空 247px（卡高 542、内容 295）。这一处的空是对的，理由不是「不好改」：
+                 · 它是虚线占位，本身的意思就是「位置留着，功能还没做出来」——
+                   上方规划横幅写着「多岗对比还没有做出来 / 现在只能一次比一个岗位」，
+                   这块自己也写着「多岗接口做出来之后，这里放第三个岗位」。
+                 · 往里填任何东西都得**编一个第三个岗位**，那正是本页红线禁止的：
+                   岗位只能来自来源平台的真实数据。
+                 · 高度是跟左边两张真卡对齐来的（栅格拉伸）。占位比真卡矮一截，
+                   反而像是渲染坏了。
+               所以这里声明豁免，而不是塞填充物。 -->
+          <div class="cmp-slot" data-void-ok="虚线占位：多岗接口还没做出来，空着就是它要说的话；填内容就得编一个不存在的第三个岗位">
+            <svg class="ic"><use href="#i-plus"/></svg>
+            <span><b>第 3 个位置</b><br>多岗接口做出来之后，这里放第三个岗位</span>
+          </div>
+        </div>
+
+        <!-- 两卡之间真正该做的决策阅读：交集与差集，一次改动能惠及几个岗位 -->
+        <div class="pane" style="flex:1 1 auto">
+          <div class="pane-hd"><span class="t">把两个岗位放在一起看</span><span class="s">交集先补，回报最大</span></div>
+          <div class="kv">
+            <!-- 2026-08-10：补上「数据复盘」。上面那块「共同要求」说这三个词在**三条**
+                 岗位正文里都出现——按集合关系，凡三条都有的，这两条必然也有。
+                 只写两个就和上面对不上了。整句是单个文本节点，中点不会被甩到行首。 -->
+            <div class="kv-row"><span class="k">两边都要的</span><span class="v">社群维护 · 活动策划 · 数据复盘——前两项你的原文有证据，数据复盘一次都没写到</span></div>
+            <div class="kv-row"><span class="k">只有用户运营要</span><span class="v">SQL 独立取数——差的是证据，不是新技能</span></div>
+            <div class="kv-row"><span class="k">只有内容运营要</span><span class="v">短视频脚本——完全没写到，缺口更大</span></div>
+            <div class="kv-row"><span class="k">改一处顶两处</span><span class="v">「参与增长项目」写清你负责的环节，两边都加分</span></div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.65">
+            交集与差集来自两份 JD 原文 <span class="ev ev--e2">E2 来源信息</span> 对你的简历
+            <span class="ev ev--e1">E1 你的材料</span>；「先补哪个」是 AI 的排序
+            <span class="ev ev--e3">E3 AI 判断</span>。
+          </p>
+        </div>
+
+        <div class="pane" style="margin-top:auto;flex:0 0 auto">
+          <div class="pane-hd"><span class="t">对比怎么读</span></div>
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+            三档和计数都是拿同一份简历 <span class="ev ev--e1">E1</span> 对各岗位原文
+            <span class="ev ev--e2">E2</span> 逐条比出来的文字结论
+            <span class="ev ev--e3">E3</span>。
+            <b>档位不是排名</b>——「中等但差距能今天补」可能比「较高但通勤两小时」更值得投，这个判断只能你自己做。
+          </p>
+        </div>
+      </div>
+
+      <!-- S3 · AI 不可用：只剩原文卡，不给任何结论 -->
+      <div class="cmpwrap" data-at="s3" data-when="ai-down">
+        <div class="notice" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span><b>对比服务中断，不给三档、不给计数、不给差距。</b>你已选的 2 个岗位还在，原文照常可看；故障已自动上报。</span>
+        </div>
+        <div class="cmpgrid" style="grid-template-columns:1fr 1fr;flex:1 1 auto;min-height:0">
+          <div class="cmp">
+            <span class="cmp-t">用户运营专员</span>
+            <span class="cmp-m">广州 · 天河区 · 6–9K</span>
+            <span class="cmp-src">来源机构 前程无忧<br>同步时间 08-08 09:20<br>外部 ID JX-88214</span>
+            <span class="cmp-act"><a class="btn" href="14-job-detail.html">查看岗位</a></span>
+          </div>
+          <div class="cmp">
+            <span class="cmp-t">内容运营（新媒体）</span>
+            <span class="cmp-m">广州 · 海珠区 · 7–10K</span>
+            <span class="cmp-src">来源机构 广州市人才服务中心<br>同步时间 08-08 08:52<br>外部 ID GZ-20418</span>
+            <span class="cmp-act"><a class="btn" href="14-job-detail.html">查看岗位</a></span>
+          </div>
+        </div>
+        <div class="pane" style="margin-top:auto;flex:0 0 auto">
+          <div class="pane-hd"><span class="t">恢复后这里会看到什么</span></div>
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+            每个岗位一张卡：三档参考、对上了 / 差一点 / 没写到的计数、最需要补的一条差距，
+            以及「查看岗位」和「去来源平台 · 扫码投递」两个出口。之前做过的对比记录在「我的 · AI 服务记录」。
+          </p>
+        </div>
+      </div>
+
+      <!-- S3 · 无简历：对比做不了，先引导 -->
+      <div class="cmpwrap" data-at="s3" data-when="first">
+        <div class="notice" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>多岗对比拿的是<b>同一份简历</b>对多个岗位——还没有简历，比不起来。</span>
+        </div>
+        <!-- 2026-08-11：这张卡原来是 flex:1 吃余量，三步之外空 718px（卡高 973、内容 255）。
+             三步是本态唯一的主内容，改成按余量摊开 + 字号放大，而不是挤在卡顶。 -->
+        <div class="pane pane--grow">
+          <div class="pane-hd"><span class="t">三步就能用上这里</span></div>
+          <div class="tline tline--fill">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先有一份简历</span>
+                <span class="tl-s">上传现成的，或在简历工作台从零做一份；拿不准方向先做兴趣快测</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">在情报台挑 2–3 个岗位收藏</span>
+                <span class="tl-s">也可以手输 JD 文本；外部链接只当参考文本，不进岗位库</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">回来并排比，再带走报告</span>
+                <span class="tl-s">每个岗位给三档与最大差距，最后一步可以打印带走</span></span></div>
+          </div>
+        </div>
+        <div class="outs" style="grid-template-columns:1fr 1fr;flex:0 0 auto">
+          <a class="out" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先去做一份简历</a>
+          <a class="out" href="28-self-assessment.html"><svg class="ic"><use href="#i-target"/></svg>先做兴趣快测</a>
+        </div>
+        <div class="pane" style="margin-top:auto;flex:0 0 auto">
+          <div class="pane-hd"><span class="t">这里比的是什么</span></div>
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+            同一份简历对最多 3 个岗位，各给三档参考和最需要补的一条差距——
+            全部是文字比对结论，仅你本人可见，不回传企业，也不进任何简历库。
+          </p>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 带走报告（A4 × 3） ─────────── -->
+      <div class="paper-bar" data-at="s4" data-when="default device-off">
+        <span class="nm">岗位大师 · 决策报告</span>
+        <span class="mt">A4 · 3 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 3 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s4" data-when="default device-off">
+        <!-- 页 1 · 封面：AIGC 标识 + 免责 + 来源三字段 -->
+        <div class="sheet-a4">
+          <span class="rp-badge">AI 生成内容（AIGC） · 仅供参考</span>
+          <h4 class="rp-h1" style="margin-top:14px">岗位大师 · 决策报告</h4>
+          <div class="rp-sub">
+            比对岗位：用户运营专员（广州 · 天河区）<br>
+            来源机构：前程无忧 · 同步时间：2026-08-08 09:20 · 外部 ID：JX-88214<br>
+            生成：2026年8月10日 10:06 · 职易达 01 号机
+          </div>
+          <div class="rp-hr"></div>
+          <div class="rp-w">这份报告是什么</div>
+          <p class="rp-p">
+            把你的简历和这个岗位的公开要求逐条对照后的<b>文字结论</b>：三档参考、逐条差距、
+            今天能做的第一步、面试可能被追问的点，以及风险与薪资参考。
+          </p>
+          <div class="rp-w">这份报告不是什么</div>
+          <p class="rp-p">
+            不是录用判断——本机<b>不预测录用结果</b>；不是薪资承诺——本机<b>不预测你个人能拿多少</b>；
+            也不是投递材料——报告只给你本人，<b>不提供给任何企业</b>，不进任何简历库。
+          </p>
+          <div class="rp-foot">
+            AI 生成内容（AIGC），仅供本人参考 · 职易达一体机 · 投递请前往来源平台或扫码在手机完成
+          </div>
+          <span class="pgno">1 / 3</span>
+        </div>
+
+        <!-- 页 2 · 三档正文 + 差距第一步 + 风险薪资 -->
+        <div class="sheet-a4">
+          <div class="rp-w" style="margin-top:0">比对结论 · 匹配参考：较高（三档制，无分数）</div>
+          <p class="rp-p">8 条要求：5 条对上 · 2 条差一点 · 1 条没写到，差的都在数据证据上。</p>
+          <div class="rp-hr"></div>
+          <div class="rp-w">差距与今天的第一步</div>
+          <div class="rp-i"><i></i><span><b>SQL 缺证据</b>：翻出最近一次用 SQL 出的表，把「查了什么、给谁用」写成一句放进简历。</span></div>
+          <div class="rp-i"><i></i><span><b>A/B 测试没写到</b>：读完一篇入门文章、能复述流程；没做过就不写进简历。</span></div>
+          <div class="rp-i"><i></i><span><b>「参与增长项目」太虚</b>：写下你每周实际做的三件事，挑最有数字的一件替换原句。</span></div>
+          <div class="rp-hr"></div>
+          <div class="rp-w">风险标注</div>
+          <div class="rp-i"><i></i><span><b>硬门槛 · 需关注</b>：SQL 独立取数写在 JD 硬性要求里，你的简历没有可核对证据。</span></div>
+          <div class="rp-i"><i></i><span><b>信息完整度 · 提醒</b>：A/B 测试内容为空。信息不足≠不会：做过是漏写，没做过按第一步补。</span></div>
+          <div class="rp-hr"></div>
+          <div class="rp-w">薪资参考（只描述见过的文本，不预测个人）</div>
+          <p class="rp-p">
+            来源方原文写的是 <b>6–9K</b>（原样转录，来源：前程无忧）。<br>
+            站内同方向聚合：样本 23 条，P25 6.0K · P50 7.5K · P75 9.0K。<br>
+            增长运营方向站内样本不足 5 条，不显示分位数。
+          </p>
+          <div class="rp-foot">AI 生成内容（AIGC），仅供本人参考 · 职易达一体机 · 不预测录用、不预测个人薪资</div>
+          <span class="pgno">2 / 3</span>
+        </div>
+
+        <!-- 页 3 · 追问清单 -->
+        <div class="sheet-a4">
+          <div class="rp-w" style="margin-top:0">面试前，把这几件事想清楚</div>
+          <div class="rp-i"><i></i><span>把一次真实的 SQL 取数经历讲成一分钟小故事：查什么、给谁用、结果如何。</span></div>
+          <div class="rp-i"><i></i><span>340 个新增关注的口径：哪一场活动、多长时间、跟平时比高多少。</span></div>
+          <div class="rp-i"><i></i><span>被问 A/B 测试：如实说没做过，再讲你的验证办法。</span></div>
+          <div class="rp-i"><i></i><span>社群规模补数字：多少个群、多少人、日常处理哪些反馈。</span></div>
+          <div class="rp-i"><i></i><span>你要反问的：这个岗位背什么指标？数据权限给到什么程度？</span></div>
+          <div class="rp-hr"></div>
+          <div class="rp-w">接下来</div>
+          <div class="rp-i"><i></i><span>按第 2 页的三个第一步改简历，改完可回一体机重比一次——结论会变。</span></div>
+          <div class="rp-i"><i></i><span>投递在来源平台完成：打开岗位详情页扫码，用手机进入该岗位的投递入口。</span></div>
+          <div class="rp-foot">
+            AI 生成内容（AIGC），仅供本人参考 · 职易达一体机 · 报告存入「我的文档」与「AI 服务记录」，不提供给任何企业<br>
+            本机不代收简历、不代为投递；是否投递、投哪一个，由你自己决定
+          </div>
+          <span class="pgno">3 / 3</span>
+        </div>
+      </div>
+
+      <!-- S4 · 无简历：诚实空态，报告只从真实比对里来
+           ── 2026-08-11 卡内空洞整改 ──────────────────────────────────
+           原来「怎么拿到这份报告」那张卡挂 flex:1，三步之外全是空的：
+           卡高 1121、内容 255、空 866px。空态是对的，**空卡不是**。
+           这一态屏幕上真正有东西可给的是：这条岗位的要求原文（不经过模型，
+           没有简历也照常能看），以及拿到报告的三步。所以改成两栏：
+           左边原文占主位，右边三步按余量摊开、出口贴底。 -->
+      <div class="cmpwrap" data-at="s4" data-when="first">
+        <div class="pane" style="flex:0 0 auto">
+          <div class="pane-hd"><span class="t">还没有能带走的报告</span></div>
+          <p style="margin:0;font-size:var(--fz-3);color:var(--fog-800);line-height:1.7">
+            报告只从<b>真实做过的比对</b>里来——没有简历、没有比对，就没有报告，本机不会拿模板凑一份给你。
+          </p>
+        </div>
+
+        <div class="pane pane--grow" style="min-height:0">
+          <div class="pane-hd"><span class="t">现在能看的，和怎么拿到报告</span><span class="s">岗位原文不经过 AI</span></div>
+          <div class="fitcols" style="flex:1 1 auto;min-height:0">
+            <div class="fitcol">
+              <div class="fitcol-hd"><svg class="ic"><use href="#i-briefcase"/></svg>岗位要求原文 · 来自来源平台</div>
+              <div class="resume-src resume-src--big">
+                <h5>用户运营专员 · 岗位原文</h5>
+                <div class="grp">岗位基本信息</div>
+                <div class="row">广州××科技有限公司 · 广州 · 天河区</div>
+                <div class="row">6–9K · 1–3 年 · 本科 · 招 2 人</div>
+                <div class="grp">岗位要求 · 8 条</div>
+                <div class="row">1. 1–3 年运营相关经验，本科及以上学历</div>
+                <div class="row">2. 负责用户社群维护与日常反馈处理</div>
+                <div class="row">3. 独立完成活动策划与执行</div>
+                <div class="row">4. 熟练使用 SQL 独立取数</div>
+                <div class="row">5. 具备数据复盘与增长分析能力</div>
+                <div class="row">6. 有团队协作或带人经验</div>
+                <div class="row">7. 熟悉 A/B 测试流程</div>
+                <div class="row">8. 良好的沟通与文档能力</div>
+                <div class="grp">数据来源</div>
+                <div class="row" style="font-size:13px;color:var(--paper-fog)">来源机构 前程无忧 · 同步时间 2026-08-08 09:20 · 外部 ID JX-88214</div>
+              </div>
+            </div>
+            <div class="fitcol">
+              <div class="fitcol-hd"><svg class="ic"><use href="#i-target"/></svg>怎么拿到这份报告 · 三步</div>
+              <div class="tline tline--fill">
+                <div class="tl tl--now"><span class="tl-dot">1</span>
+                  <span class="tl-b"><span class="tl-t">先有一份简历</span>
+                    <span class="tl-s">去简历工作台上传或从零做；拿不准方向先做兴趣快测</span></span></div>
+                <div class="tl"><span class="tl-dot">2</span>
+                  <span class="tl-b"><span class="tl-t">挑岗位逐条比对</span>
+                    <span class="tl-s">一个岗位摊开比，把八条要求逐条对到你的原句上</span></span></div>
+                <div class="tl"><span class="tl-dot">3</span>
+                  <span class="tl-b"><span class="tl-t">回到这一步生成报告</span>
+                    <span class="tl-s">A4 三页：结论与差距、第一步、追问清单，可打印带走</span></span></div>
+              </div>
+              <div class="outs" style="grid-template-columns:1fr;flex:0 0 auto">
+                <a class="out" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先去做一份简历</a>
+                <a class="out" href="28-self-assessment.html"><svg class="ic"><use href="#i-target"/></svg>先做兴趣快测</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="notice" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>报告生成后只存入你的「我的文档」与「AI 服务记录」——<b>不提供给任何企业</b>，本机不代收简历。</span>
+        </div>
+      </div>
+
+      <!-- S4 · AI 不可用：结论造不出来就不出 -->
+      <div class="cmpwrap" data-at="s4" data-when="ai-down">
+        <div class="notice notice--amber" style="flex:0 0 auto">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span><b>AI 服务中断，本次生成不了报告。</b>结论造不出来就不出——不会拿旧模板或缓存凑一份。故障已自动上报。</span>
+        </div>
+        <!-- ── 2026-08-11 卡内空洞整改（全站最严重的一处：卡高 1225、内容 188、空 1037）──
+             原来这一态的左栏只有一张「现在还能做的」（两个按钮 + 一句话）挂 flex:1，
+             于是一整栏 1225px 的白卡里只有顶部 188px 有东西。
+
+             成因不是「没写完」，是**放错了内容**：这一步（带走报告）里 AI 挂了，
+             报告确实给不了 —— 但这一页的红线只说「七块结论一块不给」，
+             同时明确「岗位原文照常」。而岗位要求原文与你的简历原文都不经过模型，
+             它们此刻恰恰是**用户唯一还能带走的东西**，却一个字都没出现在屏幕上。
+
+             所以把这两份原文摆上来当主内容（与 s2 的 ai-down 分支同一种做法、同一份文本），
+             卡片标题也从「现在还能做的」改成「现在能带走什么」——这一步问的就是这个。
+             没有编任何结论：两块都标着「未做任何比对」，来源三字段照旧。 -->
+        <div class="pane pane--grow" style="min-height:0">
+          <div class="pane-hd"><span class="t">现在能带走什么</span><span class="s">这两份不经过 AI · 未做任何比对</span></div>
+          <div class="fitcols" style="flex:1 1 auto;min-height:0">
+            <div class="fitcol">
+              <div class="fitcol-hd"><svg class="ic"><use href="#i-briefcase"/></svg>岗位要求原文 · 来自来源平台</div>
+              <div class="resume-src resume-src--big">
+                <h5>用户运营专员 · 岗位原文</h5>
+                <div class="grp">岗位基本信息</div>
+                <div class="row">广州××科技有限公司 · 广州 · 天河区</div>
+                <div class="row">6–9K · 1–3 年 · 本科 · 招 2 人</div>
+                <div class="grp">岗位要求 · 8 条</div>
+                <div class="row">1. 1–3 年运营相关经验，本科及以上学历</div>
+                <div class="row">2. 负责用户社群维护与日常反馈处理</div>
+                <div class="row">3. 独立完成活动策划与执行</div>
+                <div class="row">4. 熟练使用 SQL 独立取数</div>
+                <div class="row">5. 具备数据复盘与增长分析能力</div>
+                <div class="row">6. 有团队协作或带人经验</div>
+                <div class="row">7. 熟悉 A/B 测试流程</div>
+                <div class="row">8. 良好的沟通与文档能力</div>
+                <div class="grp">数据来源</div>
+                <div class="row" style="font-size:13px;color:var(--paper-fog)">来源机构 前程无忧 · 同步时间 2026-08-08 09:20 · 外部 ID JX-88214</div>
+              </div>
+            </div>
+            <div class="fitcol">
+              <div class="fitcol-hd"><svg class="ic"><use href="#i-resume"/></svg>你的简历原文 · v2</div>
+              <div class="resume-src resume-src--big">
+                <h5>王 · 个人简历</h5>
+                <div class="grp">求职意向</div>
+                <div class="row">运营 · 广州</div>
+                <div class="grp">教育背景</div>
+                <div class="row">2020.09–2024.06　某大学　市场营销　本科</div>
+                <div class="grp">工作经历</div>
+                <div class="row">2024.03–2026.06　某科技公司　运营专员</div>
+                <div class="row">· 独立运营公众号（粉丝 1.2 万），策划 8 场活动，单场最高带来 340 个新增关注</div>
+                <div class="row">· 协助部门完成月度目标，参与用户增长相关项目</div>
+                <div class="row">· 维护用户社群，处理日常反馈</div>
+                <div class="grp">项目经历</div>
+                <div class="row">校园推广项目　负责人　带 5 人团队在 3 所高校完成地推</div>
+                <div class="grp">技能</div>
+                <div class="row">Excel · SQL · Photoshop · 英语六级</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane" style="flex:0 0 auto">
+          <div class="pane-hd"><span class="t">现在还能做的</span></div>
+          <div class="outs" style="grid-template-columns:1fr 1fr">
+            <a class="out" href="23-me.html"><svg class="ic"><use href="#i-history"/></svg>看之前生成过的报告 · 我的</a>
+            <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
+            之前生成过的报告在「我的 · 我的文档」和「AI 服务记录」里，不受这次中断影响。
+          </p>
+        </div>
+        <div class="pane" style="flex:0 0 auto">
+          <div class="pane-hd"><span class="t">恢复后这里会看到什么</span></div>
+          <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+            A4 三页：封面（AIGC 标识、免责、来源三字段）、正文（三档结论、差距与第一步、风险与薪资参考）、
+            追问清单。每页页脚固定标注 AI 生成内容，打印走打印工作台核价。
+          </p>
         </div>
       </div>
     </div>
@@ -297,11 +1345,15 @@
     <!-- ================= 右 ================= -->
     <div class="wside">
 
-      <!-- S1 说明 -->
-      <div class="pane pane--fill" data-at="s1">
-        <div class="pane-hd"><span class="t">这一步做什么</span></div>
+      <!-- S1 说明。命名对齐（2026-08-10）：本页正式名「岗位大师 · 决策台」，
+           一句话说明全站统一为「拿简历和岗位逐条比对，给三档参考与差距」——
+           P25 顾问页那条能力用的是同一个名字、同一句话，不再各叫各的。 -->
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><span class="t">这个台子做什么</span><span class="s">岗位大师 · 决策台</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-3);line-height:1.7;color:var(--fog-800)">
-          拿你的简历原文，和<b>一个具体岗位</b>的要求逐条对照，指出哪条对上了、哪条差一点、哪条完全没写到。
+          <b>拿简历和岗位逐条比对，给三档参考与差距</b>：哪条对上了、哪条差一点、哪条没写到；
+          再给差距的第一步、面试预测和带得走的报告。<br>
+          <b>投不投由你定</b> —— 三档只是参考，本机不替你做这个决定，也不预测录用。
         </p>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -318,62 +1370,182 @@
         </div>
       </div>
 
-      <!-- S2 缺口行动 + 下一步 -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd"><span class="t">先补哪一条</span><span class="s" data-when="default device-off">按影响排序</span></div>
-        <div class="issues" data-when="default device-off" style="max-height:none">
-          <button class="issue issue--high" style="cursor:default">
-            <span class="issue-hd"><span class="issue-sev">最该补</span><span class="issue-t">SQL 缺证据</span></span>
-            <span class="issue-p">岗位把它写在硬性要求里，你只在技能栏列了名字。补一句用它做过什么即可。</span>
-          </button>
-          <button class="issue issue--mid" style="cursor:default">
-            <span class="issue-hd"><span class="issue-sev">值得补</span><span class="issue-t">「参与」改成你负责的环节</span></span>
-            <span class="issue-p">同一句话换个动词，可核对程度差很远。</span>
-          </button>
-          <button class="issue issue--low" style="cursor:default">
-            <span class="issue-hd"><span class="issue-sev">如实写</span><span class="issue-t">A/B 测试</span></span>
-            <span class="issue-p">没做过就别写。这条宁可空着，也不要在面试里被问穿。</span>
-          </button>
+      <!-- S2 右 · ATS 引用卡（完整诊断在 P09，本页只引用） -->
+      <div class="pane" data-at="s2" data-when="default device-off">
+        <div class="pane-hd"><span class="t">ATS 机读友好度 · 引用</span><span class="s">完整诊断在简历工作台</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">来自</span><span class="v">8月8日的简历诊断</span></div>
+          <div class="kv-row"><span class="k">通过</span><span class="v"><b>2</b> 项（版式可机读 · 联系方式位置）</span></div>
+          <div class="kv-row"><span class="k">建议调整</span><span class="v"><b>1</b> 项（标题层级）</span></div>
         </div>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="ai-down">
-          比对不可用，这里不给行动清单——不猜、不给通用建议。
-        </p>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="first">
-          有简历之后，这里会按影响排序告诉你先补哪一条。
-        </p>
+        <div class="outs" style="margin-top:var(--s-3);grid-template-columns:1fr">
+          <a class="out" href="09-resume-workbench.html?stage=s3"><svg class="ic"><use href="#i-eye"/></svg>看完整诊断与逐项依据</a>
+        </div>
       </div>
 
-      <div class="pane pane--fill" data-at="s2">
-        <div class="pane-hd"><span class="t">接下来</span></div>
-        <div class="outs">
-          <a class="out" href="09-resume-workbench.html?stage=s4" data-when="default device-off"><svg class="ic"><use href="#i-pen"/></svg>去改这两处</a>
-          <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>按这个岗位练面试</a>
-          <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
-          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印对照 · 去核价</a>
-          <a class="out" data-when="first" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先上传简历</a>
-          <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-printer"/></svg>结论不可用</button>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-pen"/></svg>改写不可用</button>
+      <!-- S2 右 · 方向缺口 + 站内薪资合并卡
+           2026-08-11：这张也从 pane--grow 换成 kvfill —— 独吞余量时卡高 741、内容 421、
+           空 320；改成四行摊开后，来源三字段那块自然落到卡底。 -->
+      <div class="pane pane--kvfill" data-at="s2" data-when="default device-off">
+        <div class="pane-hd"><span class="t">方向与薪资参考</span><span class="s">只描述见过的文本</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">来源方写的</span><span class="v">6–9K · 原样转录</span></div>
+          <div class="kv-row"><span class="k">站内同方向</span><span class="v">用户运营 · 广州 · 样本 <b>23</b> 条</span></div>
+          <div class="kv-row"><span class="k">站内分位</span><span class="v">P25 6.0K · P50 7.5K · P75 9.0K</span></div>
+          <div class="kv-row"><span class="k">增长运营方向</span><span class="v">样本不足 5 条 · 不显示分位</span></div>
         </div>
-        <div class="source" style="margin-top:14px;flex-direction:column;align-items:flex-start;gap:5px">
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.65">
+          分位数是本机站内岗位文本的聚合 <span class="ev ev--e2">E2</span>，来源方数字原样照抄。
+          <b>不预测你个人能拿多少</b>——那由面谈决定，机器算不出来。
+        </p>
+        <div class="source" style="margin-top:12px;flex-direction:column;align-items:flex-start;gap:5px">
           <span><span class="org">来源机构：前程无忧</span></span>
           <span>同步时间：2026-08-08 09:20</span>
           <span class="id">外部 ID：JX-88214</span>
         </div>
-        <div class="notice" style="margin-top:12px">
-          <svg class="ic"><use href="#i-external"/></svg>
-          <span>投递在来源平台完成。点「看岗位详情」可以扫码在手机上打开该岗位的投递页，本机不代收简历。</span>
+      </div>
+
+      <!-- S2 右 · ai-down / first：七块全收后的替代出口
+           2026-08-11：这一态右栏原本只有这一张卡（三个出口 + 一句话）挂 pane--grow，
+           1180px 的卡里只有 265px 有内容（空 879）。补一张说明这一栏平时装什么、
+           为什么现在装不了 —— 用户问的正是这个 —— 再让两张卡分摊余量。 -->
+      <div class="pane" data-at="s2" data-when="ai-down first" style="flex:0 0 auto">
+        <div class="pane-hd"><span class="t">现在还能做什么</span></div>
+        <div class="outs" style="grid-template-columns:1fr">
+          <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
+          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>去岗位情报台翻岗位</a>
+          <a class="out" data-when="ai-down" href="23-me.html"><svg class="ic"><use href="#i-history"/></svg>看历史比对 · 我的</a>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="ai-down">
+          七块结论全部收起——不给部分结果，避免你拿半份结论做决定。
+        </p>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="first">
+          有简历之后，这一栏会出现 ATS 引用卡和方向 / 薪资参考。
+        </p>
+      </div>
+
+      <!-- S2 右 · ai-down / first：这一栏平时装什么、现在为什么装不了 -->
+      <div class="pane pane--kvfill" data-at="s2" data-when="ai-down first">
+        <div class="pane-hd"><span class="t">这一栏平时有什么</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">ATS 机读友好度</span>
+            <span class="v v--fog" data-when="first">要先有简历才引用得到</span>
+            <span class="v v--fog" data-when="ai-down">不给部分结论，本次不展示</span></div>
+          <div class="kv-row"><span class="k">方向与薪资参考</span>
+            <span class="v v--fog" data-when="first">要先比对出方向</span>
+            <span class="v v--fog" data-when="ai-down">同上，等比对恢复</span></div>
+          <div class="kv-row"><span class="k">岗位来源三字段</span><span class="v">左栏原文里照常标着</span></div>
+          <div class="kv-row"><span class="k">补上之后</span>
+            <span class="v" data-when="first">这一栏自动出现引用与参考</span>
+            <span class="v" data-when="ai-down">服务恢复后自动回来</span></div>
         </div>
       </div>
 
-      <!-- 2026-08-09 留白复核补实：结果去向——与 s1「比对结果只给你看」的承诺同口径，
-           落到「我的」具体位置。s1 s2 共用，margin-top:auto 垫底。 -->
-      <div class="pane" data-at="s1 s2" style="margin-top:auto">
+      <!-- S3 右 · 谁能看 + 岗位从哪来
+           2026-08-11：原来第一张挂 pane--grow 独吞余量（卡高 904、内容 265、空 639，四态皆然）。
+           改成两张一起按余量摊开，行高随之变大 —— 行本身一条没加没减。 -->
+      <div class="pane pane--kvfill" data-at="s3">
+        <div class="pane-hd"><span class="t">对比结果谁能看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">你本人</span><span class="v">仅本机与「我的」可见</span></div>
+          <div class="kv-row"><span class="k">企业</span><span class="v v--fog">不回传 · 看不到</span></div>
+          <div class="kv-row"><span class="k">简历库 / 人才库</span><span class="v v--fog">不进入</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+          你把哪些岗位放在一起比、比出什么结果，都只是你自己的决策材料。
+        </p>
+      </div>
+      <div class="pane pane--kvfill" data-at="s3">
+        <div class="pane-hd"><span class="t">对比的岗位从哪来</span><span class="s">现在只能进一个</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">岗位列表选中</span><span class="v">第 1 步搜索后选一个</span></div>
+          <div class="kv-row"><span class="k">手填目标岗位</span><span class="v">第 1 步粘贴 / 手打 JD 原文</span></div>
+          <div class="kv-row"><span class="k">外部链接</span><span class="v v--fog">只当参考文本 · 不入库</span></div>
+          <div class="kv-row"><span class="k">一次几个</span><span class="v v--fog">1 个 · 多岗为规划能力</span></div>
+        </div>
+      </div>
+
+      <!-- S4 右 · 打印（default / device-off） -->
+      <div class="pane" data-at="s4" data-when="default device-off">
+        <div class="pane-hd"><span class="t">打印这份报告</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">页数</span><span class="v">A4 黑白 · <b>3</b> 计费页</span></div>
+          <!-- 金额不写死：3 计费页 × 现行黑白单价，单价走 scripts/site-config.js -->
+          <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-site-price="3"></b></span></div>
+        </div>
+        <!-- 2026-08-11 A24 连带整改：原文「可先存「我的文档」或扫码带走」——
+             本页没有任何一处能真的把报告存进「我的文档」（动作条那个按钮就是因此
+             成了死按钮）。文案只保留本页真做得到的那条：扫码带到手机上。 -->
+        <div class="notice notice--amber" style="margin-top:var(--s-3)" data-when="device-off">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>打印机离线，现在打不出来。可以扫码把报告带到手机上，换一台机器再打。</span>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+          费用为预估 · 以打印工作台核价为准。
+        </p>
+      </div>
+
+      <!-- S4 右 · first：没有报告的原因（补上「打印这份报告」收起后空掉的那一格） -->
+      <div class="pane" data-at="s4" data-when="first">
+        <div class="pane-hd"><span class="t">为什么现在没有报告</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">报告要什么</span><span class="v">一份简历 + 一个岗位</span></div>
+          <div class="kv-row"><span class="k">现在缺的</span><span class="v v--fog">简历还没有</span></div>
+          <div class="kv-row"><span class="k">补上之后</span><span class="v">回第 2 步逐条比对即可生成</span></div>
+          <div class="kv-row"><span class="k">不会做的</span><span class="v v--fog">不拿模板凑一份给你</span></div>
+        </div>
+      </div>
+
+      <!-- S4 右 · ai-down：中断了什么、没中断什么 -->
+      <div class="pane" data-at="s4" data-when="ai-down">
+        <div class="pane-hd"><span class="t">中断了什么，没中断什么</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">中断</span><span class="v v--fog">三档结论与差距，本次生成不了</span></div>
+          <div class="kv-row"><span class="k">照常</span><span class="v">岗位原文与你的简历原文</span></div>
+          <div class="kv-row"><span class="k">已有报告</span><span class="v">在「我的」，不受影响</span></div>
+          <div class="kv-row"><span class="k">故障</span><span class="v">已自动上报，恢复后可重来</span></div>
+        </div>
+      </div>
+
+      <!-- S4 右 · 报告的三页构成（机制说明，四态通用；仅结语按态区分） -->
+      <div class="pane pane--kvfill" data-at="s4">
+        <div class="pane-hd"><span class="t">报告里有什么</span><span class="s">A4 · 3 页 · 黑白</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">封面页</span><span class="v">AIGC 标识 · 免责 · 来源三字段</span></div>
+          <div class="kv-row"><span class="k">正文页</span><span class="v">三档结论 · 差距第一步 · 风险薪资</span></div>
+          <div class="kv-row"><span class="k">清单页</span><span class="v">面试前的追问清单</span></div>
+          <div class="kv-row"><span class="k">每页页脚</span><span class="v">固定标注 AI 生成内容</span></div>
+          <div class="kv-row"><span class="k">三档</span><span class="v v--fog">只有较高 / 中等 / 偏低 · 不打分</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="default device-off">
+          左边就是全文预览，打印出来和预览一致。
+        </p>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6" data-when="first ai-down">
+          全部内容来自真实比对——所以现在这里给不出预览。
+        </p>
+      </div>
+
+      <!-- S4 右 · 报告去向（四态通用） -->
+      <div class="pane pane--kvfill" data-at="s4">
+        <div class="pane-hd"><span class="t">报告去哪，谁能看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">我的文档</span><span class="v">存 PDF，可换机再打</span></div>
+          <div class="kv-row"><span class="k">AI 服务记录</span><span class="v">记录本次比对</span></div>
+          <div class="kv-row"><span class="k">打印订单</span><span class="v">打印后生成记录</span></div>
+          <div class="kv-row"><span class="k">未登录</span><span class="v v--fog">只留本次会话，离场即清</span></div>
+          <div class="kv-row"><span class="k">企业</span><span class="v v--fog">不去任何企业</span></div>
+        </div>
+      </div>
+
+      <!-- 结果去向：s1–s3 通用，垫底。
+           s2 / s3 这两步右栏卡少，这张也参与摊余量（见下方 stage 作用域的 CSS）；
+           s1 那步上面那张说明卡内容本来就满，这里仍按内容收高。 -->
+      <div class="pane pane--tail" data-at="s1 s2 s3" style="margin-top:auto">
         <div class="pane-hd"><span class="t">比对结果去哪，谁能看</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">登录后</span><span class="v">进「我的 · AI 服务记录」</span></div>
           <div class="kv-row"><span class="k">未登录</span><span class="v">只留在本次会话，离场即清</span></div>
-          <div class="kv-row"><span class="k">打印的对照</span><span class="v">记进「我的 · 打印订单」</span></div>
+          <div class="kv-row"><span class="k">打印的报告</span><span class="v">记进「我的 · 打印订单」</span></div>
           <div class="kv-row"><span class="k">不会留下</span><span class="v">不进任何简历库 / 人才库</span></div>
         </div>
       </div>
@@ -381,32 +1553,82 @@
   </div>
 
   <div class="actionbar">
+      <a class="backbtn" href="32-resume-hub.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="s1">
-        <div data-when="default device-off"><div class="t">挑一个具体岗位来比，不做泛泛的"适合什么工作"</div><div class="s">三档参考只是文字比对，不预测录用</div></div>
+<!-- 2026-08-10 参数消费整改时实测到的**既有**缺陷，记在这里不改文案：
+             主按钮回填岗位名后（「比这个岗位：内容运营（新媒体）」389px），
+             .actionbar-hint（flex:1 1 0%）被挤到 0 宽，这两行整条撑出操作栏 ——
+             自检报「卡内溢出 209px / 文字被裁 106px」。
+             复现与本次改动无关：不带任何参数进本页、手点任一岗位行即可复现，
+             改动前后是同一元素、同一数值。
+             试过的两条路都不能用：
+               · 给 .actionbar-hint 加 min-width → 主按钮被压到 272px，
+                 而 .btn 是 overflow:hidden，岗位名后半截被**静默截断**，比现状更糟；
+               · 只缩这两行文案 → 0 宽容器里再短也仍然溢出，治不了根。
+             真正的修法在共享层（styles/ 的 .actionbar 布局）或改「岗位名回填主按钮」
+             这条设计口径，两者都不在本轮改动范围内，故如实上报、不动文案。 -->
+        <div data-when="default device-off"><div class="t" data-f="s1hint">搜岗位或手填 JD，选一个再开始比</div><div class="s">一次比一个 · 三档参考只是文字比对，不预测录用</div></div>
         <div data-when="ai-down"><div class="t">推荐排序不可用，列表可正常浏览</div><div class="s">选中后也不会给比对结论</div></div>
-        <div data-when="first"><div class="t">还没有简历，无法逐条比对</div><div class="s">先去「AI 简历服务」给一份</div></div>
+        <div data-when="first"><div class="t">还没有简历，无法逐条比对</div><div class="s">先去「AI 简历服务」给一份，或先做兴趣快测</div></div>
       </div>
       <div data-at="s2">
-        <div data-when="default device-off"><div class="t">8 条要求：5 条对上、2 条差一点、1 条没写到</div><div class="s">点左边任一条，右边原文定位到对应证据</div></div>
-        <div data-when="ai-down"><div class="t">比对不可用，岗位原文照常可看</div><div class="s">不给结论、不给通用建议</div></div>
-        <div data-when="first"><div class="t">没有简历，只能看岗位原文</div><div class="s">先去做一份简历</div></div>
+        <div data-when="default device-off"><div class="t">8 条要求：5 条对上、2 条差一点、1 条没写到</div><div class="s">往下滚还有差距、改写、面试、晋升与风险，共七块</div></div>
+        <div data-when="ai-down"><div class="t">比对不可用，七块全部收起</div><div class="s">岗位原文照常可看，不给结论、不给通用建议</div></div>
+        <div data-when="first"><div class="t">没有简历，只能看岗位原文</div></div>
+      </div>
+      <div data-at="s3">
+        <div data-when="default device-off"><div class="t">多岗对比是规划能力 · 现在只能一次比一个</div><div class="s">下面是规划稿与示例数字 · 档位不是排名，对比只给你自己看，不回传企业</div></div>
+        <div data-when="ai-down"><div class="t">对比不可用，已选岗位原文照常可看</div><div class="s">不给三档、不给计数</div></div>
+        <div data-when="first"><div class="t">没有简历，比不起来</div><div class="s">先做简历，再挑 2–3 个岗位回来</div></div>
+      </div>
+      <div data-at="s4">
+        <div data-when="default"><div class="t">A4 · 3 计费页 · 预估 <span data-site-price="3"></span></div><div class="s">A4 黑白 · 三页一份</div></div>
+<!-- 副行原文「先存「我的文档」或扫码带走，换机再打」在本态会折成两行，
+             撑出操作栏 8px（自检：卡内溢出）—— device-off 的主按钮标题长，提示区被挤窄。缩到一行。 -->
+        <div data-when="device-off"><div class="t">打印机离线 · 现在打不出来</div><div class="s">扫码带到手机，换机再打</div></div>
+        <div data-when="ai-down"><div class="t">AI 中断，本次生成不了报告</div><div class="s">之前的报告在「我的」，不受影响</div></div>
+        <div data-when="first"><div class="t">报告只从真实比对里来，不拿模板凑</div></div>
       </div>
     </div>
 
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-search"/></svg>自己搜岗位</button>
+    <!-- 「自己搜岗位」原来点了什么都不发生 —— 页面上根本没有搜索框。
+         现在搜索框就在第 1 步，这个按钮把焦点送过去并弹出软键盘。 -->
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-focus-kw><svg class="ic"><use href="#i-search"/></svg>自己搜岗位</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">换个岗位比</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回逐条比对</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回多岗对比</button>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default device-off">比第一个<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default device-off" data-gate-pick><span data-f="s1go">先选一个岗位</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s1" data-when="ai-down" href="13-jobs-desk.html">去岗位列表<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s1" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="s2" data-when="default device-off" href="09-resume-workbench.html?stage=s4">去改这两处<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default device-off">并排多比几个<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s2" data-when="ai-down" href="14-job-detail.html">看岗位详情<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s2" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default device-off">生成带走报告<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="13-jobs-desk.html">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+
+    <a class="btn btn--primary" data-at="s4" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师 · 决策报告&amp;pages=3&amp;copies=1&amp;back=s4">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <!-- 2026-08-11 A24：这里原来是 <button>「存我的文档 · 扫码带走」，身上只有
+         class / data-at / data-when —— 没有 href、没有 data-fb、没有 data-act、
+         没有 data-go，本页三个 click 监听（.req / [data-gate-pick] / .pick2-tab
+         那组）没有一个匹配得上。实测点下去：0 次 DOM 变动、阶段不变、不跳转。
+         为什么不是「接上真实动作」：本页确实没有存档落点（同一件事在上面
+         data-guard-keep 的注释里已经写过），临时造一个「已存好」的回执就是伪造
+         能力。所以按第二种处置办 —— 改成它真做得到的事：去 05 手机接力扫码带走。
+         参数按 05 的白名单写全（from=P30 在 SRC 里、kind=jobfit-report 在 KIND 里），
+         少一个 05 就认不出这是哪一份、只能显示「没认领到文件」。 -->
+    <a class="btn btn--primary" data-at="s4" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师 · 决策报告"><svg class="ic"><use href="#i-qr"/></svg>扫码把报告带走</a>
+    <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="23-me.html">看历史报告<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -415,10 +1637,13 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
+  /* 来源措辞按 ?from= 决定,避免谎报来源(P43 是「我的记录」不是「招聘会现场」) */
+  var FROM_SRC={P43:'从我的记录带来:',P45:'从招聘会现场带来:',P42:'从我的资产带来:',P15:'从企业详情带来:'};
+
 /* 点岗位要求 → 简历原文定位并高亮所有对应证据（一条要求可命中多处） */
 ;(function () {
   var scr = document.querySelector('.screen')
@@ -444,7 +1669,227 @@
   })
 })()
 </script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P11 · 2026-08-10 Codex 走查整改 ⑦⑧ · 选岗两条路真的能用
+   --------------------------------------------------------------------------
+   对齐生产 apps/kiosk/src/pages/resume/JobFitPage.tsx：
+     tab=pick   → keyword 搜索 + 结果单选（getJobs pageSize:8，服务端不分页）
+     tab=manual → manualTitle(≤50) + manualReq(≤2000)
+   选中 / 填写会回填到动作条主按钮上；没选没填时主按钮拦住，不放行到第 2 步。
+   输入框不绑任何自定义键盘：scripts/keypad.js 是纯事件委托，
+   聚焦 input/textarea 自动弹软键盘（一体机没有实体键盘）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var kw = document.getElementById('jobkw')
+  var mjTitle = document.getElementById('mjtitle')
+  var mjJd = document.getElementById('mjjd')
+  var rows = [].slice.call(scr.querySelectorAll('.jobrow[data-jobpick]'))
+  /* gate 存进 state：拦下来那句话必须活过后面的 render()。
+     初版直接 set() 到 DOM 上，聚焦输入框弹出软键盘时带出一次 change → render()，
+     那句「还没选」当场被默认提示盖掉 —— 用户只看到按钮没反应。 */
+  var S = { tab: 'list', job: '', kw: '', gate: '' }
+
+  function set (k, txt) {
+    var ns = scr.querySelectorAll('[data-f="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].textContent = txt
+  }
+  function val (el) { return ((el && el.value) || '').replace(/^\s+|\s+$/g, '') }
+
+  /* 当前这一步到底选没选好 —— 主按钮文案和门控都读这一个判定 */
+  function picked () {
+    return S.tab === 'manual' ? val(mjTitle) : S.job
+  }
+
+  function render () {
+    // 标签页
+    var tabs = scr.querySelectorAll('.pick2-tab')
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].setAttribute('aria-pressed', tabs[i].getAttribute('data-tab') === S.tab ? 'true' : 'false')
+    }
+    var bodies = scr.querySelectorAll('.pick2-body')
+    for (var b = 0; b < bodies.length; b++) {
+      bodies[b].hidden = bodies[b].getAttribute('data-tabb') !== S.tab
+    }
+    // 岗位列表只在「从岗位信息选择」下出现；手填时整列表收起，免得两条路同时亮
+    var hit = 0
+    for (var r = 0; r < rows.length; r++) {
+      var hay = (rows[r].getAttribute('data-kw') || '') + ' ' + (rows[r].textContent || '')
+      var on = S.tab === 'list' && (!S.kw || hay.toLowerCase().indexOf(S.kw.toLowerCase()) > -1)
+      rows[r].hidden = !on
+      if (on) hit++
+      rows[r].setAttribute('aria-pressed', rows[r].getAttribute('data-jobpick') === S.job ? 'true' : 'false')
+      var t = rows[r].querySelector('.jobrow-pick')
+      if (t) t.textContent = rows[r].getAttribute('data-jobpick') === S.job ? '已选' : '选这个'
+    }
+    var nh = scr.querySelector('[data-f="nohit"]')
+    if (nh) nh.hidden = !(S.tab === 'list' && S.kw && hit === 0)
+    set('nohitkw', S.kw)
+    var x = scr.querySelector('[data-kwclear]')
+    if (x) x.hidden = !S.kw
+
+    set('jdlen', val(mjJd).length)
+
+    // 主按钮回填 + 动作条提示
+    var p = picked()
+    if (p) S.gate = ''
+    set('s1go', p ? '比这个岗位：' + p : (S.tab === 'manual' ? '先填岗位名称' : '先选一个岗位'))
+    set('s1hint', S.gate ? S.gate : (p
+      ? (S.tab === 'manual' ? '手填岗位「' + p + '」· 只当参考文本，不进岗位库' : '已选「' + p + '」· 一次比一个')
+      : '搜岗位或手填 JD，选一个再开始比'))
+    /* 没选好时**不能**用 aria-disabled：公共层给它配了 pointer-events:none，
+       按钮会变成点不动的死物，用户既过不去也不知道为什么 ——「点了没反应」比放行还糟。
+       改成 data-ready="0"：外观压淡表示还没准备好，但照常可点，
+       点下去由上面的捕获门控说清还差什么。 */
+    var go = scr.querySelector('[data-gate-pick]')
+    if (go) go.setAttribute('data-ready', p ? '1' : '0')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  /* 门控走捕获阶段：stages.js 的 [data-go] 监听挂在同一个 .screen 上、冒泡阶段，
+     且比这里先注册 —— 冒泡拦不住它（与 P20 同一处理）。 */
+  scr.addEventListener('click', function (e) {
+    var g = e.target.closest && e.target.closest('[data-gate-pick]')
+    if (!g || picked()) return
+    e.preventDefault(); e.stopPropagation()
+    S.gate = S.tab === 'manual' ? '还没填岗位名称，填了才能开始比' : '还没选岗位，点一行选中再开始'
+    var f = S.tab === 'manual' ? mjTitle : rows.filter(function (r) { return !r.hidden })[0]
+    if (f && f.scrollIntoView) f.scrollIntoView({ block: 'nearest' })
+    if (f && f.focus) f.focus()
+    render()
+  }, true)
+
+  scr.addEventListener('click', function (e) {
+    var el
+    if ((el = e.target.closest('.pick2-tab'))) { S.tab = el.getAttribute('data-tab'); render(); return }
+    if ((el = e.target.closest('[data-kwclear]'))) { if (kw) kw.value = ''; S.kw = ''; render(); return }
+    if ((el = e.target.closest('.jobrow[data-jobpick]'))) {
+      var v = el.getAttribute('data-jobpick')
+      S.job = (S.job === v ? '' : v)     // 再点一次＝取消，不做只进不退的选择
+      render(); return
+    }
+    if ((el = e.target.closest('[data-focus-kw]'))) {
+      S.tab = 'list'; render()
+      if (kw) { kw.focus(); if (window.v3Keypad) window.v3Keypad.open(kw) }
+    }
+  })
+
+  ;['input', 'change'].forEach(function (ev) {
+    if (kw) kw.addEventListener(ev, function () { S.kw = val(kw); render() })
+    if (mjTitle) mjTitle.addEventListener(ev, render)
+    if (mjJd) mjJd.addEventListener(ev, render)
+  })
+
+  render()
+
+  /* ══════════════════════════════════════════════════════════════════════
+     招聘会现场带过来的岗位（45-fair-onsite「拿这个岗位去比对」→ 本页）
+
+     契约：?stage=s1&need=job[&jobId=…][&jobTitle=…]
+     现状：上游那条链接**只传 need=job、不带岗位**，而本页此前连 need 都不读，
+     于是用户在展位上点「拿这个岗位去比对」，进来看到一屏空的挑岗位列表，
+     完全看不出跟刚才那个展位有任何关系。
+
+     本页的处理：
+     · need 只认 'job'；jobId / jobTitle 只认本机已同步的这三条 ——
+       白名单直接从列表 DOM 里取，不另抄一份，免得两边对不上。
+     · 带了岗位 → 在第 1 步替他选好；带来的正是本机做过逐条比对的那一条，
+       就直接进第 2 步；不是那一条就停在第 1 步并说清为什么。
+     · 只带 need、没带岗位 → 停在第 1 步（本来就该停这），
+       但要说清「现场没把是哪个岗位带过来」，别让用户以为是自己点错了。
+     · 参数非法 → 当作没传，不报错、不渲染字面量。
+     门控没动：picked() 为空时 [data-gate-pick] 那道拦截照旧。
+     ══════════════════════════════════════════════════════════════════════ */
+  ;(function () {
+    var Q = new URLSearchParams(location.search)
+    function qv (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+    function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+
+    var need = qv('need') === 'job' ? 'job' : ''
+    var idRaw = qv('jobId'), ttRaw = qv('jobTitle')
+    if (!need && !idRaw && !ttRaw) return        // 没带参数 → 与整改前逐像素相同
+
+    /* 白名单 = 列表里真有的这三条。外部 ID 从行上的来源行里取（「外部 ID JX-88214」） */
+    var LIST = rows.map(function (r) {
+      var s = (r.querySelector('.jobrow-s') || {}).textContent || ''
+      var m = s.match(/外部\s*ID\s*([A-Za-z0-9-]+)/)
+      return { t: r.getAttribute('data-jobpick'), id: m ? m[1] : '' }
+    })
+    /* 第 2 / 3 / 4 步的逐条比对、决策报告、纸面全是按这一条写死的静态样例。
+       带来别的岗位就不能直接跳进去 —— 那会拿这条的比对结果冒充另一条。 */
+    var ANALYZED = '用户运营专员'
+
+    var hit = null, i
+    for (i = 0; i < LIST.length; i++) {
+      if (idRaw && LIST[i].id === idRaw) { hit = LIST[i]; break }
+      if (ttRaw && LIST[i].t === ttRaw) { hit = LIST[i]; break }
+    }
+    var badRef = (!hit && !!(idRaw || ttRaw))    // 传了岗位，但本机没有这一条
+
+    var notes = [], items = ''
+    if (hit) {
+      S.job = hit.t
+      S.tab = 'list'
+      render()
+      items = '<span class="carryin-it"><i>岗位</i><em>' + esc(hit.t) + '</em></span>' +
+              '<span class="carryin-it"><i>外部 ID</i><em>' + esc(hit.id) + '</em></span>'
+      if (hit.t === ANALYZED && window.v3Stage && (!Q.get('stage') || Q.get('stage') === 's1')) {
+        window.v3Stage('s2')
+        notes.push('已替你选好这一条，<b>直接进了第 2 步逐条比对</b>；' +
+                   '想比别的，点下面「换一个岗位」回第 1 步。')
+      } else if (hit.t === ANALYZED) {
+        notes.push('已替你在第 1 步选好这一条，点动作条上的「比这个岗位」开始。')
+      } else {
+        notes.push('已替你在第 1 步<b>选好这一条</b>，但没有直接跳进比对：' +
+                   '本机这一版只对「' + ANALYZED + '」做过逐条比对，' +
+                   '拿它的结果套到这一条上就是假的。点动作条上的「比这个岗位」开始。')
+      }
+    } else if (badRef) {
+      notes.push('现场带过来的岗位<b>不在本机已同步的这几条里</b>，本机没有它的原文，' +
+                 '所以没替你选 —— 在下面挑一条，或切到「手填目标岗位」把 JD 粘进来。')
+    } else {
+      notes.push('展位那条「拿这个岗位去比对」<b>只说了要比对，没把是哪个岗位带过来</b>，' +
+                 '所以停在第 1 步：在下面挑一条，或切到「手填目标岗位」把 JD 粘进来。' +
+                 '<b>不是你点错了。</b>')
+    }
+    notes.push('比对<b>一次只比一个岗位</b>；手填的 JD 只当参考文本，不进岗位库，' +
+               '也不回传任何来源平台。')
+
+    var box = document.createElement('div')
+    box.className = 'carryin'
+    box.setAttribute('data-at', 's1 s2')
+    var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+            /* 2026-08-10：这里原写 q.get('from')，但本闭包里的实例叫 Q（:1501）——
+               带 need/jobId 进来就抛 Uncaught ReferenceError: q is not defined，
+               整条带入条不渲染。P15 新加的「拿这个岗位去逐条比对」正好走这条路，
+               实测复现后改成 Q。 */
+            '<b>' + (hit ? ((FROM_SRC[Q.get('from')]||'从招聘会现场带来：') + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
+            '<span class="carryin-src">来自上一屏 · 可改</span></div>'
+    if (items) h += '<div class="carryin-items">' + items + '</div>'
+    for (i = 0; i < notes.length; i++) h += '<div class="carryin-note">' + notes[i] + '</div>'
+    /* data-at 写成静态属性：本条只建一次、不重排，切阶段交给 v3ApplyVisibility 管 */
+    h += '<div class="carryin-ops" data-at="s2">' +
+         '<button class="carryin-op" type="button" data-go="s1">换一个岗位</button></div>'
+    box.innerHTML = h
+    var wm = scr.querySelector('.wmain')
+    if (wm) wm.insertBefore(box, wm.firstChild)
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+
+    /* 走查把手：本页认下了 URL 里的哪几个值 */
+    window.v3P11Carry = { need: need, jobIdRaw: idRaw, jobTitleRaw: ttRaw,
+                          matched: hit ? hit.t : '', picked: S.job }
+  })()
+})()
+</script>
 <script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照，页面不许手抄 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

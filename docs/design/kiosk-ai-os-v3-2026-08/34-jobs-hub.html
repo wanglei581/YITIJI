@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P34 岗位信息 · 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P34 岗位信息域首屏">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P34 岗位信息「域首屏」══
+   需求真值 = 生产代码 apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx：
+   CAPABILITIES 8 张（全职 / 实习 / 兼职 / 全部岗位 / 找企业 / 岗位大师 /
+   线上招聘平台 / 线下招聘机构），QUICK_LINKS 2 张（浏览记录 / 外部跳转记录），
+   外加合规提示一条。
+
+   2026-08-10 版面重排（Codex 评审逐页点名）：
+     · **删掉不解析的 AI 输入框** —— 原来那个一句话输入框既不被模型读、
+       也不改变任何结果，旁边还得挂一张「本稿不解析这句话」的告示牌。
+       一个需要立牌解释自己是假的入口，就不该存在。
+     · **删掉「怎么用 / 代价 / 备选」四要素大段解释**与三个找法按钮：
+       它们解释的是一个已经删掉的功能。
+     · **删掉「四张卡进同一个岗位台」的整段说明** —— 改成一行分组标题，
+       同样的意思，不占一整块。
+     · **「全部岗位」做成压倒性的主入口**：整宽 hero，其余七张卡按分组排在下面。
+   口径不变：
+     ① 全职 / 实习 / 兼职 / 全部岗位进的是**同一个岗位台**，只是预设筛选不同。
+     ② 本屏**不预告有多少条岗位**（线上真会同步不到、台内就是 0 条）。
+     ③ 岗位大师是本页唯一会调模型的能力，ai-down 时那一张降级、其余七个照常。
+   ══════════════════════════════════════════════════════════ */
+
+.hub {
+  flex: 1 1 auto; min-height: 0; position: relative; z-index: var(--z-content);
+  padding: var(--s-5) var(--gutter);
+  display: flex; flex-direction: column; gap: var(--s-4); overflow: hidden;
+}
+
+/* ── 主入口：全部岗位。这一屏的答案 90% 是它，就该长得像答案 ── */
+/* flex:1 —— 这一屏的余量全给主入口，而不是摊薄到八张卡里各留一截空白。
+   「压倒性」是字面意思：它就该是屏上最大的那一块。 */
+.hero {
+  flex: 1 1 auto; display: flex; align-items: center; gap: var(--s-6);
+  min-height: 300px; padding: var(--s-6) var(--s-7);
+  border-radius: var(--r-lg);
+  background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd);
+  border-top: 5px solid var(--cat-job);
+  box-shadow: var(--sh-2);
+  text-decoration: none; color: inherit;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.hero:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
+.hero:active { transform: translateY(1px) scale(.997); }
+.hero-ic {
+  width: 112px; height: 112px; flex: 0 0 auto; border-radius: var(--r-md);
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+}
+.hero-ic .ic { width: 56px; height: 56px; color: var(--cat-job); }
+.hero-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.hero-nm { font-family: var(--ff-display); font-size: 56px; font-weight: 600; color: var(--fog-900); line-height: 1.1; }
+.hero-ds { font-size: 24px; color: var(--fog-700); line-height: 1.45; }
+.hero-ds b { color: var(--fog-900); }
+.hero-tg { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.hero-go {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 10px;
+  height: 64px; padding: 0 var(--s-6); border-radius: var(--r-full);
+  background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  color: var(--jade-600); font-size: 24px; font-weight: 600;
+}
+.hero-go .ic { width: 24px; height: 24px; }
+
+/* ── 分组标题：一行说清分组，替掉原来那整块「四张卡进同一个岗位台」说明 ── */
+.glabel { flex: 0 0 auto; display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+.glabel b { font-family: var(--ff-display); font-size: 24px; font-weight: 600; color: var(--fog-900); }
+.glabel span { font-size: 20px; color: var(--fog-600); }
+
+/* ── 能力卡 ── */
+/* 卡片按内容定高，不跟着屏高拉伸 —— 拉伸出来的是空白，不是信息 */
+.hgrid { flex: 0 0 auto; display: grid; gap: var(--s-4); grid-auto-rows: 232px; }
+.hgrid--3 { grid-template-columns: repeat(3, 1fr); }
+.hgrid--4 { grid-template-columns: repeat(4, 1fr); }
+.hcard {
+  position: relative; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-top: 3px solid var(--cat-job);
+  text-decoration: none; color: inherit;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-shadow: var(--sh-2); }
+.hcard--desk .hc-ic .ic { color: var(--cat-job); }
+/* 本机自己的 AI 能力：顶边换铜金，和「第三方来源信息」区分开 */
+.hcard--ai { border-top-color: var(--cat-resume); }
+.hcard--ai .hc-ic .ic { color: var(--cat-resume); }
+.hc-hd { display: flex; align-items: center; gap: var(--s-3); }
+.hc-ic {
+  width: 52px; height: 52px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+}
+.hc-ic .ic { width: 26px; height: 26px; color: var(--cat-job); }
+.hc-nm { font-family: var(--ff-display); font-size: 26px; font-weight: 600; color: var(--fog-900); letter-spacing: .02em; word-break: keep-all; }
+/* 每卡正文 ≤1 行 */
+.hc-ds { font-size: 20px; color: var(--fog-700); line-height: 1.4; }
+.hc-ft { margin-top: auto; display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.hc-go { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 600; color: var(--jade-600); }
+.hc-go .ic { width: 20px; height: 20px; }
+
+/* 不可用态：置灰但把「为什么」和「那怎么办」都写清楚 */
+.hcard--off { background: var(--surf-1); border-color: var(--brd-1); border-top-color: var(--ink-500); opacity: .78; }
+.hcard--off .hc-ic .ic, .hcard--off .hc-nm { color: var(--fog-600); }
+.hcard--off .hc-ds { color: var(--fog-600); }
+.inlink {
+  display: inline-flex; align-items: center; gap: 8px; vertical-align: middle;
+  min-height: 56px; padding: 0 var(--s-4);
+  border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+  background: var(--surf-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: 20px; font-weight: 600; text-decoration: none;
+}
+.inlink .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* ── 两张次卡：记录类。明细统一落「我的 · 足迹」，业务页不铺第二份 ── */
+.qrow { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.qcard {
+  display: flex; align-items: center; gap: var(--s-4);
+  min-height: 92px; padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-sm); text-decoration: none; color: inherit;
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.qcard:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.qc-ic { width: 46px; height: 46px; border-radius: var(--r-xs); flex: 0 0 auto; display: grid; place-items: center; background: var(--surf-2); }
+.qc-ic .ic { width: 22px; height: 22px; color: var(--fog-700); }
+.qc-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.qc-t { font-size: 22px; font-weight: 600; color: var(--fog-900); }
+.qc-s { font-size: 18px; color: var(--fog-600); line-height: 1.4; }
+
+/* ── 页脚：全页唯一一条合规声明 + 唯一一处折叠 ── */
+.cline {
+  flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: 0 var(--s-4); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+}
+.cline-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: 56px; font-size: 20px; color: var(--fog-700); }
+.cline-t > span { white-space: nowrap; }
+.cline-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+.cline-t b { color: var(--fog-900); }
+.cline .fold { flex: 0 0 auto; width: 300px; border: 0; background: transparent; }
+
+.fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+.fold > summary { list-style: none; cursor: pointer; min-height: 56px;
+  display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
+  font-size: 20px; color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
+.fold[open] > summary::after { content: '收起'; }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px; color: var(--fog-700); line-height: 1.7; }
+.fold:not([open]) .fold-b { display: none; }
+.fold-b b { color: var(--fog-900); }
+
+/* 状态标签不是入口（先例见 P14 / P17 / P27 / P32） */
+.chip--info { cursor: inherit; }
+/* 全站统一标签口径：AI 卡「AI · 仅供参考」/ 非 AI 卡「不依赖 AI」/
+   ai-down 时 AI 卡改「AI · 已降级」而不是让标签消失。三种都是状态标签，不是入口。 */
+.chip--label { cursor: inherit; }
+
+.actionbar .btn--primary { height: 64px; font-size: 22px; }
+.actionbar .btn--lg { height: 56px; font-size: 20px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div style="min-width:0">
+        <div class="brand-name">岗位信息</div>
+        <div class="brand-sub">职易达&nbsp;· 01 号机</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>八个入口全可用&nbsp;· 本屏不预告条数</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>不登录也能看&nbsp;· 记录只留本次会话</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 中断&nbsp;· 七个入口照常，岗位大师暂不可用</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线&nbsp;· 岗位浏览不受影响</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
+  </header>
+
+  <div class="hub">
+
+    <!-- ══════════ 主入口：全部岗位 ══════════ -->
+    <a class="hero" href="13-jobs-desk.html?stage=ok&amp;jobType=all">
+      <span class="hero-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+      <span class="hero-x">
+        <span class="hero-nm">全部岗位</span>
+        <span class="hero-ds">第三方与官方来源的<b>已审核</b>岗位，进去用筛选按类型、地区、薪资收窄</span>
+        <span class="hero-tg">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="chip chip--info">进去看到几条就是几条</span>
+          <span class="ev ev--e2">E2 来源信息</span>
+        </span>
+      </span>
+      <span class="hero-go">进入岗位台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+    </a>
+
+    <!-- ══════════ 三张预设类型卡：一行标题说清它们是同一个台 ══════════ -->
+    <div class="glabel">
+      <b>直接按类型进</b>
+      <!-- 2026-08-11 文案整改（Codex (b)-11 / #476、477、478）：原写「只是预设了类型，台内还能改」，
+           那是**现在时**的承诺，而实测点进去是未筛的全量列表（stage=ok&jobType=intern 进去，
+           顶部仍是「已选 运营 / 广州 / 10K 以上」那套样例筛选，类型一项都没落）。
+           改成如实的「参数已经带过去、目标页接上才生效」，与三张卡上的注脚同一口径。 -->
+      <span>下面三张进的是同一个岗位台，类型<b>按 ?jobType= 带过去</b>，岗位台目前还不读，<b>接线后自动生效</b>；台内可自己筛</span>
+    </div>
+    <div class="hgrid hgrid--3">
+      <!-- ══ 参数契约（本页发出，13-jobs-desk 消费）══
+           参数名：jobType，取值白名单 all | fulltime | intern | parttime（本页四处发出，仅此四值）。
+           口径备注：生产 JobsServiceHubPage.tsx 用的是 /jobs?category=fulltime|intern|parttime。
+           本稿按本轮验收口径统一写 jobType，接线时由目标页映射到 category，**不要两套都发**。
+           2026-08-11 复核（Codex (b)-11 / #476、477、478）：13-jobs-desk.html 里已经出现
+           `new URLSearchParams` 与 `qval(Q,'jobType')` 的读取代码（那一路正在补消费），
+           但复核当时该页脚本抛 `renderFrom is not defined`，实测进去仍是未筛的全量列表。
+           所以本轮**不动参数、不改口径**：三张卡面继续写「接线后自动生效」，不许提前写
+           「已按 X 筛好」。等对方那一路自测通过、真能按类型收敛之后，再把这四处
+           「（接线后自动生效）」注脚一起删掉（先例见 38-policy-hub 的 ?cat= 二轮整改）。 -->
+      <!-- 2026-08-11 修：原来只有「全职」这张写了「（接线后自动生效）」，实习与兼职两张没写，
+           口径不齐会让人以为那两张是真的筛过的。三张统一补齐。 -->
+      <a class="hcard hcard--desk" data-cap="fulltime" href="13-jobs-desk.html?stage=ok&amp;jobType=fulltime">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span><span class="hc-nm">全职岗位</span></span>
+        <span class="hc-ds">按「全职」筛选（接线后自动生效）</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+      <a class="hcard hcard--desk" data-cap="intern" href="13-jobs-desk.html?stage=ok&amp;jobType=intern">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-campus"/></svg></span><span class="hc-nm">实习岗位</span></span>
+        <span class="hc-ds">在校生与应届生的实习机会（接线后自动生效）</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+      <a class="hcard hcard--desk" data-cap="parttime" href="13-jobs-desk.html?stage=ok&amp;jobType=parttime">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-clock"/></svg></span><span class="hc-nm">兼职信息</span></span>
+        <span class="hc-ds">灵活就业与兼职，本机不经手费用（接线后自动生效）</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+    </div>
+
+    <!-- ══════════ 另外四种找法 ══════════ -->
+    <div class="glabel">
+      <b>换一种找法</b>
+      <span>从企业进、拿简历比对、去来源平台自己搜、到线下机构当面问</span>
+    </div>
+    <div class="hgrid hgrid--4">
+      <a class="hcard" data-cap="companies" href="15-companies.html?stage=list">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-company"/></svg></span><span class="hc-nm">找企业</span></span>
+        <span class="hc-ds">先看企业再看岗位</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+
+      <!-- 岗位大师：本页唯一一处会调模型的能力 -->
+      <a class="hcard hcard--ai" data-cap="jobfit" data-when="default first device-off" href="11-jobfit-compare.html?stage=s1&amp;need=job">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位大师</span></span>
+        <span class="hc-ds">挑一个岗位逐项对照，给三档参考</span>
+        <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+      <div class="hcard hcard--off" data-when="ai-down">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-target"/></svg></span><span class="hc-nm">岗位大师</span></span>
+        <span class="hc-ds">逐项对照要模型判断，这次做不了</span>
+        <span class="hc-ft">
+          <span class="chip chip--amber chip--label">AI · 已降级</span>
+          <a class="inlink" href="14-job-detail.html?stage=ok"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位要求</a>
+        </span>
+      </div>
+
+      <a class="hcard" data-cap="online" href="35-online-platforms.html">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-phone"/></svg></span><span class="hc-nm">线上招聘平台</span></span>
+        <span class="hc-ds">四个来源平台的扫码入口</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+      <a class="hcard" data-cap="offline" href="16-offline-agencies.html?stage=list">
+        <span class="hc-hd"><span class="hc-ic"><svg class="ic"><use href="#i-agency"/></svg></span><span class="hc-nm">线下招聘机构</span></span>
+        <span class="hc-ds">已审核机构的地址与到店指引</span>
+        <span class="hc-ft">
+          <span class="chip chip--azure chip--label">不依赖 AI</span>
+          <span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </span>
+      </a>
+    </div>
+
+    <!-- ══════════ 两张次卡：记录类 ══════════ -->
+    <div class="qrow">
+      <a class="qcard" href="43-my-records.html?stage=trace&amp;from=P34">
+        <span class="qc-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
+        <span class="qc-b"><span class="qc-t">浏览记录</span><span class="qc-s">你看过哪些岗位&nbsp;· 在「我的 · 足迹」里看</span></span>
+      </a>
+      <a class="qcard" href="43-my-records.html?stage=trace&amp;from=P34">
+        <span class="qc-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+        <span class="qc-b"><span class="qc-t">外部跳转记录</span><span class="qc-s">你打开过哪些来源入口&nbsp;· 同样在「我的 · 足迹」</span></span>
+      </a>
+    </div>
+
+    <!-- ══════════ 页脚：全页唯一一条合规声明 + 唯一一处折叠 ══════════ -->
+    <div class="cline">
+      <span class="cline-t">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>投递在来源平台完成 · <b>本机不代收简历</b>、不做企业筛选与面试邀约</span>
+      </span>
+      <details class="fold">
+        <summary>本屏口径与四态说明</summary>
+        <div class="fold-b">
+          岗位信息均来自第三方 / 官方来源，本终端仅提供信息展示；投递、预约请前往来源平台完成。
+          只记录你的浏览与打开来源入口两件事，<b>不记录你投没投、投没投成</b>。
+          <span data-when="default">本屏<b>不预告有多少条</b>——岗位随来源同步实时变化，进去看到几条就是几条，<b>也可能是 0 条</b>。</span>
+          <span data-when="first"><b>不登录也能看</b>，八个入口都能进——只是记录留不下，离场或超时即清。</span>
+          <span data-when="ai-down">AI 暂不可用：<b>岗位大师</b>这一处做不了，岗位台内按你简历的收敛排序也会退成按同步时间倒序。
+            列表、筛选、详情、找企业、扫码入口全部不依赖 AI，照常。本机已自动上报运维，<b>不替系统承诺恢复时间</b>。</span>
+          <span data-when="device-off">打印机离线只影响「把岗位信息打印带走」这一件事，<b>八个入口全都还能进</b>。
+            看中的岗位可以先收藏或存进「我的文档」，换台机器取回来打。</span>
+        </div>
+      </details>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--lg btn--ghost" href="17-fair-desk.html"><svg class="ic"><use href="#i-fair"/></svg>看招聘会</a>
+
+    <!-- 提示句写短，且不用带空格的「 · 」分隔：空格给了换行机会，下一行就以「·」开头 -->
+    <span class="actionbar-hint" data-when="default">前四个入口进的是同一个岗位台</span>
+    <span class="actionbar-hint" data-when="first">不登录也能看，记录离场即清</span>
+    <span class="actionbar-hint" data-when="ai-down">岗位大师暂不可用，其余七个入口照常</span>
+    <span class="actionbar-hint" data-when="device-off">打印机离线，只影响打印带走</span>
+
+    <a class="btn btn--primary" href="13-jobs-desk.html?stage=ok&amp;jobType=all">进岗位台看全部<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>
