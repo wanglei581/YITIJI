@@ -699,6 +699,45 @@ const api = {
     return unwrapList(request('/me/print-orders', { method: 'GET', data: params, needAuth: true }));
   },
 
+  /** M2 第一片：本人文件预提交为 Order-only，付款前不会创建 PrintTask。 */
+  createCloudPrintOrder(data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印预提交'));
+    return request('/me/print-orders', { method: 'POST', data, needAuth: true });
+  },
+
+  /** Order-only 待到机订单列表。 */
+  getMyCloudPrintOrders() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印订单'));
+    return request('/me/print-orders/cloud', { method: 'GET', needAuth: true });
+  },
+
+  getCloudPrintOrder(orderId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印订单'));
+    return request(`/me/print-orders/${encodeURIComponent(orderId)}`, { method: 'GET', needAuth: true });
+  },
+
+  cancelCloudPrintOrder(orderId, reason) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('云打印订单'));
+    return request(`/me/print-orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST', data: reason ? { reason } : {}, needAuth: true,
+    });
+  },
+
+  /** 打印前隐私检查；会员 token 保证只能检查本人文件。 */
+  createPrintPiiScan(fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
+    return request('/materials/tasks', {
+      method: 'POST', data: { kind: 'pii_scan', sourceFileId: fileId }, needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  decidePrintPiiFindings(taskId, decisions) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印隐私检查'));
+    return request(`/materials/tasks/${encodeURIComponent(taskId)}/pii-findings/decisions`, {
+      method: 'POST', data: { decisions }, needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
   /**
    * C 端公开终端列表（无需登录）。
    * 后端: GET /api/v1/terminals/public

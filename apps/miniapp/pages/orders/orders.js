@@ -16,6 +16,10 @@ const STATUS_MAP = {
 
 // payStatus 门控：未付款时覆盖显示
 function resolveDisplayStatus(item) {
+  if (item.pickupStatus === 'pending') return { key: 'waiting', label: '待到机', tone: 'wheat' }
+  if (item.pickupStatus === 'claimed' && !item.printTaskId) return { key: 'waiting', label: '待现场支付', tone: 'wheat' }
+  if (item.pickupStatus === 'expired') return { key: 'done', label: '已过期', tone: 'neutral' }
+  if (item.pickupStatus === 'cancelled') return { key: 'done', label: '已取消', tone: 'neutral' }
   const pay = item.payStatus
   if (pay === 'unpaid' || pay == null) {
     return { key: 'payment', label: '待付款', tone: 'wheat' }
@@ -50,11 +54,13 @@ function fmtCode(raw) {
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
-  const action = ds.key === 'done' && item.status === 'completed' ? 'reprint'
+  const effectiveStatus = item.status || item.taskStatus || ''
+  const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
                : (item.pickupCode && ds.key === 'waiting')        ? 'pickup'
                : null
   return {
     id:          item.id,
+    orderNo:     item.orderNo || item.id,
     store:       item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端',
     title:       item.fileName || '打印文件',
     spec:        buildSpec(item),
@@ -64,14 +70,14 @@ function toUiItem(item) {
     statusTone:  ds.tone,
     pickup:      fmtCode(item.pickupCode),
     pickupRaw:   item.pickupCode || '',
-    expiresAt:   item.expiresAt || item.pickupExpiresAt || '',
-    taskStatus:  item.status || '',
+    expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
+    taskStatus:  effectiveStatus,
     // 已完成可再打一份；取件码可见时显示"查看取件码"
     action,
     actionLabel: action === 'pickup' ? '查看取件码'
                : action === 'reprint' ? '再打印一份'
                : '',
-    orderId: item.id,  // printTaskId 即 orderId（pickup 端点用）
+    orderId: item.id,
   }
 }
 
@@ -112,9 +118,18 @@ Page({
     if (!auth.isLoggedIn()) return
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
-    api.getMyPrintOrders({ pageSize: 20, ...(cursor ? { cursor } : {}) })
-      .then(items => {
-        const uiItems = (Array.isArray(items) ? items : []).map(toUiItem)
+    const legacyPromise = api.getMyPrintOrders({ pageSize: 20, ...(cursor ? { cursor } : {}) })
+    const requestPromise = append ? legacyPromise.then(items => [[], items]) : Promise.all([api.getMyCloudPrintOrders(), legacyPromise])
+    requestPromise
+      .then(([cloudItems, items]) => {
+        const combined = [...(Array.isArray(cloudItems) ? cloudItems : []), ...(Array.isArray(items) ? items : [])]
+        const seen = new Set()
+        const uiItems = combined.filter(item => {
+          const key = item.id || item.printTaskId
+          if (!key || seen.has(key)) return false
+          seen.add(key)
+          return true
+        }).map(toUiItem)
         const orders  = append ? [...this.data.orders, ...uiItems] : uiItems
         const nextCursor = items.nextCursor || null
         this.setData({
@@ -163,7 +178,8 @@ Page({
       // 当前主项目没有独立取件详情端点；只传订单列表真实返回的取件码。
       const query = [
         `pickupCode=${encodeURIComponent(item.pickupRaw)}`,
-        `orderNo=${encodeURIComponent(item.orderId)}`,
+        `orderId=${encodeURIComponent(item.orderId)}`,
+        `orderNo=${encodeURIComponent(item.orderNo)}`,
         `taskStatus=${encodeURIComponent(item.taskStatus)}`,
         `expiresAt=${encodeURIComponent(item.expiresAt)}`,
       ].join('&')

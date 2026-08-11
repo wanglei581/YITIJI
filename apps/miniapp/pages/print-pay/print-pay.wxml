@@ -48,6 +48,6 @@
 
 <view class="actionbar">
   <view class="ab-price"><text class="ab-label">预估</text><text class="ab-amt">{{fee.total === '—' ? '—' : '¥' + fee.total}}</text></view>
-  <view class="btn wx lg" bindtap="continueFlow">{{q.pickupCode ? '查看到机码' : '预提交暂未开放'}}</view>
+  <view class="btn wx lg {{submitting ? 'disabled' : ''}}" bindtap="continueFlow">{{submitting ? '正在提交…' : '提交并生成到机码'}}</view>
 </view>
 </view>

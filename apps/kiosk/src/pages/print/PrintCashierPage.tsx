@@ -27,6 +27,7 @@ import {
   fetchPaymentChannels,
   getPayStatus,
   reconcilePayment,
+  releasePickupOrder,
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
 import {
@@ -94,13 +95,23 @@ export function PrintCashierPage() {
   const codeSubmitLockRef = useRef(false)
   const lastAutoReconcileAtRef = useRef(0)
 
-  const proceedToPrint = useCallback(() => {
+  const proceedToPrint = useCallback(async () => {
     if (navigatedRef.current) return
     navigatedRef.current = true
-    cancelRef.current = true
-    // taskId 已在建单时创建（pending）；paid 后门控放行，Agent 方可 claim 出纸。
-    navigate('/print/progress', { state: { ...state } })
-  }, [navigate, state])
+    let nextState = state
+    try {
+      // 小程序 Order-only 流程在付款前没有 PrintTask；支付成功后由服务端原子释放且幂等返回同一任务。
+      if (!state.taskId && orderId && paymentSessionToken) {
+        const released = await releasePickupOrder({ orderId, paymentSessionToken })
+        nextState = { ...state, ...released, taskId: released.taskId, paymentSessionToken: released.paymentSessionToken }
+      }
+      cancelRef.current = true
+      navigate('/print/progress', { state: nextState })
+    } catch (error) {
+      navigatedRef.current = false
+      setIssueError(error instanceof Error ? error.message : '订单已付款，但创建打印任务失败，请重试')
+    }
+  }, [navigate, state, orderId, paymentSessionToken])
 
   // ── 出码（建/幂等复用支付尝试；channel 只能取服务端已启用通道）──
   const issue = useCallback(
@@ -217,7 +228,7 @@ export function PrintCashierPage() {
           },
         })
         // 服务端只有完成金额校验并幂等入账后才返回 success，直接进入打印进度，避免成功后的状态查询网络抖动阻塞用户。
-        proceedToPrint()
+        void proceedToPrint()
         return
       }
       setSnapshot({
@@ -256,7 +267,7 @@ export function PrintCashierPage() {
         const s = await getPayStatus({ orderId, paymentSessionToken })
         if (cancelRef.current) return
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
-        if (s.payStatus === 'paid') proceedToPrint()
+        if (s.payStatus === 'paid') void proceedToPrint()
         // 回调是首选路径；回调延迟/丢失时，所有真实 pending 尝试（屏上收款码和付款码）
         // 都按服务端最小间隔主动查账。sandbox 没有真实渠道账本，绝不伪造查单能力。
         const shouldAutoReconcile =

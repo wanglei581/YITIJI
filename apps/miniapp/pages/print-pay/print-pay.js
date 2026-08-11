@@ -1,9 +1,12 @@
+const api = require('../../utils/api')
+
 Page({
   data: {
     statusBarHeight: 20,
     q: {},
     files: [{ name: '未选择文件', desc: '', price: '—' }],
     fee: { total: '—' },
+    submitting: false,
   },
 
   onLoad(opts) {
@@ -25,16 +28,30 @@ Page({
 
   continueFlow() {
     const q = this.data.q
-    if (q.pickupCode) {
-      wx.navigateTo({
-        url: `/pages/print-pickup/print-pickup?pickupCode=${encodeURIComponent(q.pickupCode)}&expiresAt=${encodeURIComponent(q.expiresAt || '')}&bundleId=${encodeURIComponent(q.bundleId || '')}&store=${encodeURIComponent(q.store || '')}&name=${encodeURIComponent(this.data.files[0].name)}&total=${encodeURIComponent(this.data.fee.total)}`,
-      })
+    if (this.data.submitting) return
+    if (!q.fileId || !q.storeId) {
+      wx.showModal({ title: '参数不完整', content: '请返回重新选择文件和终端。', showCancel: false })
       return
     }
-    wx.showModal({
-      title: '预提交接口尚未开通',
-      content: '当前已完成文件、价目和终端选择界面，但 Order-only 待到机订单、到机码及机端支付状态机尚未进入主项目。本版本不会生成假订单或假取件码。',
-      showCancel: false,
+    this.setData({ submitting: true })
+    wx.showLoading({ title: '正在提交…', mask: true })
+    api.createCloudPrintOrder({
+      fileId: q.fileId,
+      terminalId: q.storeId,
+      copies: Math.max(1, Number(q.copies) || 1),
+      colorMode: 'black_white',
+      duplex: 'simplex',
+    }).then(order => {
+      wx.hideLoading()
+      this.setData({ submitting: false })
+      if (!order || !order.pickupCode) throw new Error('服务端未返回到机码')
+      wx.redirectTo({
+        url: `/pages/print-pickup/print-pickup?orderId=${encodeURIComponent(order.id)}&orderNo=${encodeURIComponent(order.orderNo || '')}&pickupCode=${encodeURIComponent(order.pickupCode)}&expiresAt=${encodeURIComponent(order.pickupCodeExpiresAt || '')}&taskStatus=${encodeURIComponent(order.taskStatus || 'pending_release')}&store=${encodeURIComponent(q.store || '')}&name=${encodeURIComponent(this.data.files[0].name)}&amountCents=${encodeURIComponent(order.amountCents || 0)}`,
+      })
+    }).catch(err => {
+      wx.hideLoading()
+      this.setData({ submitting: false })
+      wx.showModal({ title: '提交失败', content: (err && err.message) || '请稍后重试', showCancel: false })
     })
   },
 

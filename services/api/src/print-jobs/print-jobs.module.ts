@@ -11,6 +11,7 @@ import { AdminPrintJobsController } from './admin-print-jobs.controller'
 import { PrintJobsService } from './print-jobs.service'
 import { PrintPageCountService } from './print-page-count.service'
 import { AdminPrintJobsAbandonService } from './admin-print-jobs-abandon.service'
+import { PickupOrderService } from './pickup-order.service'
 
 /**
  * 打印任务 + 报价预览。
@@ -26,7 +27,7 @@ import { AdminPrintJobsAbandonService } from './admin-print-jobs-abandon.service
     AuditModule,
   ],
   controllers: [PrintJobsController, AdminPrintJobsController, OrderQuoteController],
-  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, OrderQuoteService],
+  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, OrderQuoteService, PickupOrderService],
   exports:     [PrintPageCountService, OrderQuoteService],
 })
 export class PrintJobsModule {}
