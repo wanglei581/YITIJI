@@ -1,7 +1,6 @@
 # 下一步任务
 
 > 最后更新：2026-08-12
-
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
@@ -21,6 +20,21 @@
 >
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
+
+## 2026-08-12 V6 + 双后台统一施工队列（当前优先级）
+
+> 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
+
+- [x] **A0 第一批原型确定性修正**：P03/P06 QR 居中；P05 390×844；P39 手机扫码入口先到 P06 创建会话；P06 `source` 白名单。仅设计原型，未冒充生产接线。
+- [ ] **A1 公共运行时底座**：在 `apps/kiosk` 落 V6 tokens/shell/motion/reduced-motion、typed route context、action manifest、capability guard、统一四态、帮助/弹层/焦点和 1080×1920 Playwright 门禁；不得搬运旧 75 屏视觉。
+- [ ] **A2 身份/会话/文件**：P03/P04/P05/P40 的 QR/SMS、legal version、session lifecycle、upload/takeaway 与 provenance；W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
+- [ ] **A3 打印/扫描交易履约**：P06/P07/P08/P39/P41 的 quote/reservation/order/payment/PrintTask attempt/device outcome/refund；`claimed` 只由 Agent 写，跨机取件另建 authorization/release，不接匿名 `claim-pickup`。
+- [ ] **A4–A7 业务纵切**：简历与 AI 资产 → 招聘/招聘会/政策来源 → 我的/权益 → 默认关闭能力；所有输出先生成真实 artifact，再允许打印/保存/带走；智慧校园首页可见但深链 fail-closed。
+- [ ] **C0 双后台事实冻结**：将 5303 的 `新增0页` 修为 Admin 35 + Partner 13 = 48、唯一新增 `/online-platforms`；补 V6 P01–P46/真实 React 路由映射；建立 378 个按钮与 77 个链接 action manifest，生产禁止 enabled `#`/`javascript:void(0)`。
+- [ ] **C1 Partner Stats 快速闭环**：先修现有 timezone/响应解包合同，仅展示真实同步聚合；不等待 AI 内核、不伪造曝光漏斗。
+- [ ] **C2 Online Platform 三端闭环**：复用现有目录模型，补 Admin 治理、Partner 申请、Kiosk P35 发布投影；完成 URL/域名安全、maker-checker、CAS、reason、强审计与跨租户测试。
+- [ ] **C3–C6 双后台能力**：先堵 AI Base URL/凭证风险，再建设能力/Prompt/账本/事故；随后做 Partner capability、数据源/招聘会/统计，最后做子账号与 Ticket。高危写必须二次确认、RBAC、幂等/CAS、强审计；AI 观测日志不得当计费账本。
+- [ ] **最终商用验收**：SQLite + PostgreSQL 双库、三端 typecheck/lint/build、全部动作真实浏览器链路、跨租户/权限/并发/审计负向用例，以及 Windows Agent + Pantum 真机的扫描、付款、出纸、异常、退款、清场与跨机规则。生产配置、密钥、法务、内容来源和硬件任一未通过，整体保持 NO-GO。
 
 > 最后更新：2026-08-10
 

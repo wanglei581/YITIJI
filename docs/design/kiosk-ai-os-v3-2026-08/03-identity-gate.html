@@ -125,11 +125,12 @@
 .way-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
 
 /* ── SQ 扫码登录（2026-08-11 补，此前整屏不存在）───────────────────────
-   左边码、右边话。码给到 196px 是有依据的：用户站在约 60cm 外用手机扫，
-   码太小要凑近，而这是一台立式机器，凑近意味着弯腰。 */
-.qrwrap { display:grid; grid-template-columns:288px 1fr; gap:var(--s-6); align-items:start; }
+   码给到 196px 是有依据的：用户站在约 60cm 外用手机扫，码太小要凑近，
+   而这是一台立式机器，凑近意味着弯腰。二维码是本步唯一主动作，必须落在
+   面板视觉中轴；说明与状态放到码下方，不能用左右分栏把码挤到屏幕左侧。 */
+.qrwrap { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s-6); align-items:start; }
 .qrpane { display:flex; flex-direction:column; gap:var(--s-3); align-items:center;
-  padding:var(--s-5); border-radius:var(--r-md);
+  width:min(360px,100%); justify-self:center; padding:var(--s-5); border-radius:var(--r-md);
   background:var(--surf-1); border:1px solid var(--brd-1); }
 .qrbox { position:relative; padding:var(--s-4); border-radius:var(--r-sm); background:var(--paper-000);
   line-height:0; }
