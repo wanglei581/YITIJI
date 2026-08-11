@@ -93,6 +93,39 @@
 .pick--stop { background:var(--coral-a12); border-color:var(--coral-a20); }
 .pick:active { transform:scale(.99); }
 
+/* ── 示意卡：这一页是「状态长什么样」的样板页，.pick 不是入口 ─────────────
+   回归台的死按钮探针（真按一下 + 干净页复验）在本页把每一态的 .pick 都报了：
+   它们是 <button>、带 cursor:pointer、带按压缩放，长得和真按钮一模一样，
+   按下去却什么都不发生 —— 27 寸竖屏前的人会反复戳。
+
+   成因不是「忘了接线」。这一态的出路本来就在**常驻动作条**里：
+   右下角那两个 .btn 的文字与这两张卡**逐字相同**。
+   主区这一组是「这一态给用户的两条出路长什么样」的样板，
+   同一个动作在一屏上摆两份都能按的拷贝，本身就是交互缺陷 ——
+   用户会问「哪个才是真的」，而两个都真反而更糟。
+
+   处置：卡片**保留 <button> 标签**，显式声明 aria-disabled="true"。
+   不换成 div —— 换标签只是让探针看不见，用户照样戳；
+   aria-disabled 是探针作者自己留的豁免口（「状态标签本来就不该可点」），
+   读屏也会念「不可用」，两边说的是同一件事。
+   同时在视觉上说死，让人不用试就知道：
+     · 光标 not-allowed + 边框改虚线 —— 这两条**不用另写**：
+       components.css 里已经有全站禁用态口径
+       `[aria-disabled="true"] { cursor:not-allowed !important; border-style:dashed !important }`
+       （它自己的注释写着「禁用态可辨识：不能只靠 opacity」）。
+       这里只声明 aria-disabled，视觉语言直接落到既有那一套上，不新造一套。
+     · 整卡压淡到 .72（沿用 11-jobfit-compare 的 .is-planned 口径）
+     · 去掉按压缩放，手指按下去没有任何反馈
+     · 每张卡顶上一枚「示意 · 不可点」角标（同 pay.css 的 .cash-code--dead::before）
+   顶部六态导航、动作条、需要帮助、底部导航照常可点，页面能力一点没少。 */
+.pick[aria-disabled="true"] { opacity:.72; }
+.pick[aria-disabled="true"]:active { transform:none; }
+.pick[aria-disabled="true"]::before {
+  content:"示意 · 不可点"; align-self:flex-start;
+  padding:3px 12px; border-radius:var(--r-full);
+  background:var(--surf-2); border:1px dashed var(--brd-2);
+  font-size:var(--fz-1); color:var(--fog-700); letter-spacing:.04em; }
+
 /* 六态统一五问 */
 .tri { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-3); }
 .tb { display:grid; grid-template-columns:172px 1fr; gap:var(--s-4); align-items:center;
@@ -249,11 +282,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick pick--go" type="button">
+            <button class="pick pick--go" type="button" aria-disabled="true">
               <span class="pick-t">我还在，继续</span>
               <span class="pick-s">回到刚才那一步，倒计时清零</span>
             </button>
-            <button class="pick pick--stop" type="button" data-go="endclear">
+            <button class="pick pick--stop" type="button" aria-disabled="true">
               <span class="pick-t">结束并清空</span>
               <span class="pick-s">现在就走，先看清单再确认</span>
             </button>
@@ -310,11 +343,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick pick--go" type="button">
+            <button class="pick pick--go" type="button" aria-disabled="true">
               <span class="pick-t">验证并继续</span>
               <span class="pick-s">解锁后回到刚才那一步</span>
             </button>
-            <button class="pick pick--stop" type="button" data-go="endclear">
+            <button class="pick pick--stop" type="button" aria-disabled="true">
               <span class="pick-t">结束并清空</span>
               <span class="pick-s">不验证也能走这条，随时可选</span>
             </button>
@@ -377,11 +410,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick pick--go" type="button">
+            <button class="pick pick--go" type="button" aria-disabled="true">
               <span class="pick-t">继续用本机</span>
               <span class="pick-s">03 号机那边立刻结束并清空</span>
             </button>
-            <button class="pick" type="button">
+            <button class="pick" type="button" aria-disabled="true">
               <span class="pick-t">放弃本机</span>
               <span class="pick-s">回 03 号机接着做，本机现在退出</span>
             </button>
@@ -442,11 +475,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick" type="button" data-go="idle-warn">
+            <button class="pick" type="button" aria-disabled="true">
               <span class="pick-t">再想想</span>
               <span class="pick-s">回到刚才那一步，什么都不动</span>
             </button>
-            <button class="pick pick--stop" type="button">
+            <button class="pick pick--stop" type="button" aria-disabled="true">
               <span class="pick-t">确认结束并清空</span>
               <span class="pick-s">执行后不可撤销，删除会留日志</span>
             </button>
@@ -507,11 +540,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick pick--go" type="button">
+            <button class="pick pick--go" type="button" aria-disabled="true">
               <span class="pick-t">恢复到第 3 步</span>
               <span class="pick-s">参数和文件都在，接着核对就行</span>
             </button>
-            <button class="pick pick--stop" type="button" data-go="endclear">
+            <button class="pick pick--stop" type="button" aria-disabled="true">
               <span class="pick-t">直接结束并清空</span>
               <span class="pick-s">这次不接着做，先看清单再确认</span>
             </button>
@@ -563,11 +596,11 @@
           </div>
 
           <div class="picks">
-            <button class="pick pick--go" type="button" data-help>
+            <button class="pick pick--go" type="button" aria-disabled="true">
               <span class="pick-t">呼叫服务台</span>
               <span class="pick-s">工作人员过来收走并登记</span>
             </button>
-            <button class="pick" type="button" data-go="idle-warn">
+            <button class="pick" type="button" aria-disabled="true">
               <span class="pick-t">我没有碰，开始我的会话</span>
               <span class="pick-s">纸留在原处，等人来收</span>
             </button>
@@ -613,6 +646,7 @@
             <div class="kv-row"><span class="k">触发方式</span><span class="v">超时 / 冲突 / 重启</span></div>
             <div class="kv-row"><span class="k">首页入口</span><span class="v v--fog">没有 · 办事不经过</span></div>
             <div class="kv-row"><span class="k">主动查看</span><span class="v">我的 · 本机状态</span></div>
+            <div class="kv-row"><span class="k">这一页的卡片</span><span class="v v--fog">示意 · 不可点</span></div>
           </div>
         </div>
       </div>
