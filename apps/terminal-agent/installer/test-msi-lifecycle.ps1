@@ -47,7 +47,28 @@ function Assert-ProvisioningShortcut {
   }
   $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($provisionShortcutPath)
-  if ([System.IO.Path]::GetFullPath([string]$shortcut.TargetPath) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
+  $shortcutTarget = [string]$shortcut.TargetPath
+  if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
+    $shellApplication = New-Object -ComObject Shell.Application
+    $shortcutFolder = $shellApplication.Namespace($programMenuRoot)
+    $shortcutItem = if ($null -eq $shortcutFolder) { $null } else { $shortcutFolder.ParseName((Split-Path -Leaf $provisionShortcutPath)) }
+    if ($null -ne $shortcutItem) {
+      $shortcutTarget = [string]$shortcutItem.ExtendedProperty("System.Link.TargetParsingPath")
+    }
+  }
+  if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
+    # WScript.Shell returns an empty TargetPath for some Windows Installer-created
+    # links on hosted runners. If both Shell APIs decline to resolve it, verify the
+    # persisted link payload instead of passing an empty value to GetFullPath.
+    $shortcutBytes = [System.IO.File]::ReadAllBytes($provisionShortcutPath)
+    $unicodePayload = [System.Text.Encoding]::Unicode.GetString($shortcutBytes)
+    $ansiPayload = [System.Text.Encoding]::Default.GetString($shortcutBytes)
+    if (-not $unicodePayload.Contains($provisionLauncherPath) -and -not $ansiPayload.Contains($provisionLauncherPath)) {
+      throw "Device provisioning shortcut target is unreadable or missing"
+    }
+    return
+  }
+  if ([System.IO.Path]::GetFullPath($shortcutTarget) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
     throw "Device provisioning shortcut target mismatch"
   }
 }
