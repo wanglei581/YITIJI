@@ -38,7 +38,6 @@ import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
-import { PrintPickupClaimPage } from '../pages/print/PrintPickupClaimPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
 import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
@@ -211,7 +210,6 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },
       { path: 'print/done',        element: <PrintDonePage /> },
-      { path: 'print/pickup-claim', element: <PrintPickupClaimPage /> },
       // AI简历服务（Phase 3）：服务中心中间页（ResumeHomePage）已移除，首页瓦片直达各功能。
       // /resume 与 /resume/upload 均保留为旧入口兼容，重定向到上传页 /resume/source，不再出现二次选择页。
       { path: 'resume',            element: <Navigate to="/resume/source" replace /> },

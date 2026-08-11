@@ -1,6 +1,6 @@
-# 小程序云打印 M2 第一片立项方案（预提交任务 + 到机码 + 到机核销 + 机端支付）
+# 小程序云打印 M2 第一片立项方案（预提交订单 + 到机码 + 认证释放 + 机端支付）
 
-> 状态：**方案候选，未开发 / 未部署**。用户 2026-08-07 确认范围：小程序端“预提交打印任务 → 生成到机码”，到机后用取件码核销，**支付仍走机器现有屏上二维码（Native/被扫）**，小程序端本期不做远程支付。
+> 状态：**方案候选，未开发 / 未部署**。用户 2026-08-07 确认范围：小程序端“预提交打印订单 → 生成到机码”，到机后由受认证终端校验并释放，**支付仍走机器现有屏上二维码（Native/被扫）**，小程序端本期不做远程支付。
 > 相关决策：`docs/product/miniprogram-gate0-decision-confirmation-2026-08-07.md`（M2 原延后，本次按用户指示提前第一片）；Gate 0 事实审查（`/me/print-orders/:orderId/pickup` 与 `/print/jobs/claim-pickup` 不存在、订单以 PrintTask 为主表、无小程序 JSAPI）；小程序唯一工程底座已合入 `apps/miniapp`（PR #541）。
 
 ## 1. 目标与范围
@@ -8,8 +8,8 @@
 ### 1.1 本片（第一片）范围
 
 - 小程序（`apps/miniapp` 原生四 Tab“首页 / AI百宝箱 / 求职 / 我的”）内新增“云打印”下单：从本人“我的文档/求职材料”选择文件（`print_doc`/`resume_upload`/`cover_letter`）→ 选择份数/单双面（A4、单面优先，彩色/双面未知 mode 不假设）→ 服务端按页数/份数固化报价快照 → 创建 **Order-only 待到机订单**并生成**到机码** → 小程序展示到机码、有效期与服务点信息。
-- Kiosk 端新增“到机取件/核销”：输入到机码 → 校验（哈希比对、有效期、终端匹配、未使用、防爆破/限流）→ 展示订单与价格 → 走**既有机端支付**（屏上二维码/被扫付款码）→ 支付成功后在同一事务创建 `PrintTask` → Agent 按既有链路领取并打印 → 完成/取件。
-- 服务端：Order 增加 additive 待到机履约字段/记录；`claim-pickup` 核销端点（CAS、限流、防爆破、过期/错终端/重复使用门禁）；文件 TTL 与订单生命周期联动。
+- Kiosk 端新增“到机释放”：输入到机码后由本地 Agent 使用终端凭证请求服务端校验（哈希比对、有效期、终端匹配、未使用、防爆破/限流）→ 展示订单与价格 → 走**既有机端支付**（屏上二维码/被扫付款码）→ 支付成功后在同一事务创建 `PrintTask(pending)` → Agent 按既有链路领取并打印 → 完成/取件。
+- 服务端：Order 增加 additive 待到机履约字段/记录；新建独立的终端认证 release 契约（CAS、限流、防爆破、过期/错终端/重复使用门禁）；文件 TTL 与订单生命周期联动。禁止复用匿名 `claim-pickup` 或让浏览器直接写 `claimed`。
 
 ### 1.2 本片明确不做
 
@@ -25,7 +25,7 @@
              │
              ├─ 有效期到期 → ORDER_EXPIRED（文件按 TTL 回收，审计）
              │
-             └─ 到机核销（claim-pickup 成功，CAS 置核销中）→ 机端支付
+             └─ 认证终端锁定订单（CAS 置释放处理中）→ 机端支付
                     ├─ 支付超时/取消 → 回到 ORDER_PENDING_RELEASE（到机码未使用，可重试）
                     ├─ 支付成功 → 同事务创建 PrintTask（仅一次）→ Agent 打印
                     │         → COMPLETED → 到机码标记已使用/作废
@@ -33,12 +33,12 @@
 ```
 
 - 待到机默认有效 **24 小时**（可配）；到机核销后支付窗口复用既有 **15 分钟**待支付规则。
-- 核销幂等：`claim-pickup` 成功但响应丢失时，同一到机码再次核销返回同一订单/任务（不重复创建）。
+- 释放幂等：release 成功但响应丢失时，同一终端与到机码重试返回同一订单/任务（不重复创建）。
 - 并发：同一到机码并发核销只放行一次（CAS），释放只创建一次 `PrintTask`。
 
 ## 3. 数据模型（全部 additive）
 
-- `Order` 新增字段（或等价 additive 记录）：`pickupCodeHash`（仅存哈希，不存明文）、`pickupCodeCreatedAt`、`pickupCodeExpiresAt`、`releaseTerminalId`、`pickupClaimedAt`、`pickupStatus`（`pending|claimed|used|expired|cancelled`）、`quoteSnapshotJson`（服务端固化的页数/份数/价格/参数）。
+- `Order` 新增字段（或等价 additive 记录）：`pickupCodeHash`（仅存哈希，不存明文）、`pickupCodeCreatedAt`、`pickupCodeExpiresAt`、`releaseTerminalId`、`releaseStartedAt`、`releaseStatus`（`pending|releasing|used|expired|cancelled`）、`quoteSnapshotJson`（服务端固化的页数/份数/价格/参数）。这些订单字段不得复用 `PrintTask.claimed` 语义。
 - 新增 additive 表（如 `OrderPickup`）记录到机码生命周期与核销审计（核销终端、核销时间、结果），**不含文件内容**。
 - 状态一致性：`PrintTask` 仍只在“支付成功后、到机事务内”创建；`Order` 与 `PrintTask` 通过 `orderId` 关联（既有关系复用）。
 - 文件：订单待到机期间保留；`ORDER_EXPIRED`/取消后按既有文件 TTL/清理规则回收，`FileObject` 生命周期审计不变。
@@ -51,10 +51,10 @@
 - `GET /me/print-orders`（列表，含待到机/已完成，供“我的”回看）。
 - `POST /me/print-orders/:orderId/cancel`（待到机未核销时取消；过期同理）。
 
-### 4.2 Kiosk 侧
-- `POST /print/orders/claim-pickup`：入参到机码（不落日志/审计明文）；校验哈希、有效期、终端匹配（当前 `terminalCode`）、状态未使用；限流与防爆破（按终端/IP/码计数）；成功返回订单摘要与报价（不含文件内容路径），并标记 `pickupClaimed`。
+### 4.2 Kiosk / Terminal Agent 侧
+- Kiosk 只把用户输入交给本机 Agent；Agent 使用既有终端凭证调用专用 release 契约。服务端校验到机码哈希、有效期、目标终端、支付/退款与未使用状态；按终端/IP/码限流并防爆破，日志和审计不得记录明文码。成功只返回订单摘要与报价，不含文件内容路径。
 - 机端支付复用既有 `createPayAttempt`/`code-pay` 路径；支付成功回调后由服务端在**同一事务**内：置订单履约状态 → 创建 `PrintTask`（`orderId` 关联）→ 到机码置 `used` → 返回打印任务。
-- 若主干仍无 `claim-pickup`，本片新增；已有则以本方案收口。
+- 只有现有 Agent 领取端点可以把 `PrintTask(pending)` 写成 `claimed`；release 契约不得提前改任务租约状态。
 
 ### 4.3 Admin
 - 订单管理查看待到机订单、到机码状态（不展示明文）、手动失效/取消与审计。
@@ -62,18 +62,18 @@
 ## 5. 页面（小程序 / Kiosk）
 
 - 小程序（`apps/miniapp`）：四 Tab 内入口（优先挂在“我的/材料”与 AI百宝箱既有入口，**不新增首页 Tab 或重复入口**）；下单页（选文件→参数→确认报价→展示到机码与有效期/服务点指引）。
-- Kiosk：首页“打印”链路内新增“到机取件”入口（或打印页既有入口扩展）；输入到机码 → 核销 → 支付 → 进度 → 完成。**入口稳定规则**：只接线已有入口，不新增同义卡片。
+- Kiosk：首页“打印”链路内扩展既有入口；输入到机码 → 本机 Agent 认证释放 → 支付 → 进度 → 完成。**入口稳定规则**：只接线已有入口，不新增同义卡片；release 契约和本地 Agent 桥未完成前保持隐藏。
 
 ## 6. 验证门禁
 
-- 服务端专项 verify：`claim-pickup` 的 CAS、限流、防爆破、过期、错终端、重复使用、响应丢失幂等、并发只释放一次；订单状态机（待支付超时/取消/过期）；文件 TTL 与取消回收；报价快照不可变。
+- 服务端专项 verify：认证 release 的终端凭证、CAS、限流、防爆破、过期、未支付/已退款、错终端、重复使用、响应丢失幂等、并发只释放一次；确认 release 只创建 `PrintTask(pending)` 且只有 Agent 能写 `claimed`；覆盖订单状态机、文件 TTL、取消回收与报价快照不可变。
 - 既有门禁回归：`verify:print-rollout-config`、`verify:production-runtime-gates`、打印真实性、隐私、W2 浏览器套件、API typecheck/lint/build、共享契约门禁。
 - 小程序侧：`apps/miniapp` 微信开发者工具真实编译、四 Tab/路由/合规/返回链路专项审计；不使用微信云开发。
 - Windows 真机：小程序提交 → 到机码 → Kiosk 核销 → 机端支付 → 真实出纸 → 完成取件；覆盖不提前出纸、并发只释放一次、失败不重复扣款/自动重打、断网/重启恢复；保留订单/任务/Agent 日志/脱敏截图证据。
 
 ## 7. 分期
 
-- **第一片（本方案）**：Order-only 待到机 + 到机码 + `claim-pickup` + 机端支付 + 小程序下单页 + 文档收口。支付依赖 = 现有 Native/被扫。
+- **第一片（本方案）**：Order-only 待到机 + 到机码 + 认证终端 release + 机端支付 + 小程序下单页 + 文档收口。支付依赖 = 现有 Native/被扫。
 - **第二片**：小程序 JSAPI 支付（`prepay_id`/签名/`wx.requestPayment`、AppID 商户绑定、回调/查单/退款、1 分钱 live 冒烟）；需先确认微信主体/类目/商户资质。
 - **第三片**：订阅消息与到机提醒、服务点列表与心跳展示、材料包完整形态、多机队灰度。
 

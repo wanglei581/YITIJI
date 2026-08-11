@@ -45,7 +45,6 @@
 | 31 | 31-print-material-check.html | 材料检查 | 打印扫描 | `/print/material-check` | PrintMaterialCheckPage | src/pages/print/PrintMaterialCheckPage.tsx | ApiHttpError / sessionStorage 流转 | 文件体检、A4 规范化、隐私片段检查 | loading / error | verify-print-entry-source-split |
 | 32 | 32-print-cashier.html | 收银台 | 打印扫描 | `/print/cashier` | PrintCashierPage | src/pages/print/PrintCashierPage.tsx | API_MODE / CashierPaymentPanel | 价目明细、双支付、核实兜底 | loading / error / 支付态 | verify-print-confirm-honest |
 | 33 | 33-print-done.html | 打印完成 | 打印扫描 | `/print/done` | PrintDonePage | src/pages/print/PrintDonePage.tsx | API_MODE / paymentApi.getPayStatus | 取件凭证码、任务摘要、满意度 | loading / 支付态 | verify-print-confirm-honest |
-| — | (新路由，无对应原型页) | 扫码取件认领 | 打印扫描 | `/print/pickup-claim` | PrintPickupClaimPage | src/pages/print/PrintPickupClaimPage.tsx | API_BASE_URL / POST /print/jobs/claim-pickup | 10位取件码键盘、CAS 认领、四态UI | idle / loading / success / error | (无专项) |
 | 34 | 34-scan-start.html | 扫描类型选择 | 打印扫描 | `/scan/start` | ScanStartPage | src/pages/scan/ScanStartPage.tsx | API_BASE_URL | 简历/证件/普通文档三选一 | 静态选择 | (无专项) |
 | 35 | 35-scan-settings.html | 扫描指引 | 打印扫描 | `/scan/settings` | ScanSettingsPage | src/pages/scan/ScanSettingsPage.tsx | scanTasks.createScanSession+cancelScanSession / screensaver.getTerminalId | 面板操作四步、任务会话 | loading / error | (无专项) |
 | 36 | 36-scan-progress.html | 扫描等待 | 打印扫描 | `/scan/progress` | ScanProgressPage | src/pages/scan/ScanProgressPage.tsx | scanTasks.getScanSessionStatus+cancelScanSession / ApiHttpError | 诚实等待态、处理阶段时间线 | loading / error / 轮询态 | (无专项) |
@@ -303,12 +302,12 @@
 
 `/campus`、`/campus/welcome`、`/campus/freshman-insights` 与 `/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key` 保留各自语义：前者是校园招聘专区及其直达容错页面，后者是智慧校园正式能力；它们不是互为同义重定向。
 
-### 8.2 生产路由全集（87 个 normalized patterns）
+### 8.2 生产路由全集（103 个 normalized patterns）
 
 - 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/career-plan`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
 - 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/me/privacy-requests`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
 - 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
-- 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/print/pickup-claim`、`/ai/plan`、`/session-resume`、`/jobs/online-platforms`。
+- 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`、`/ai/plan`、`/session-resume`、`/jobs/online-platforms`。历史 `/print/pickup-claim` 假页面已下线，不计入生产路由。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
 - 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/offline-agencies/:id`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
 - 自我探索 · 倾向参考（PR ③）：`/resume/self-assessment/intro`、`/resume/self-assessment/questions`、`/resume/self-assessment/result`、`/resume/self-assessment/history`。
@@ -333,9 +332,9 @@
 
 以上只证明当前分支的本地融合页面与 86 路由候选完成，不证明生产环境、Windows 一体机、奔图真实打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收或现场试运营已经通过。
 
-### 8.5 当前 87 路径收口结论（2026-07-26）
+### 8.5 87 路径历史收口结论（2026-07-26）
 
-- §8.4 的 86 条是 2026-07-24 当时的历史验收口径；最新正式清单为 **87 条 URL pattern**，由 82 个页面组件落点与 5 个兼容重定向组成。新增计入口径的是 `/me/privacy-requests`，它没有独立的 8399 原型屏。
+- §8.4 的 86 条是 2026-07-24 当时的历史验收口径；截至 2026-07-26 的正式清单为 **87 条 URL pattern**，由 82 个页面组件落点与 5 个兼容重定向组成。新增计入口径的是 `/me/privacy-requests`，它没有独立的 8399 原型屏；当前正式清单以 §8.2 的 103 条为准。
 - 本批不重做已合入的 86 路径迁移，只修复三个共享壳层缺口：权益活动详情、法务文档、百宝箱专区。三个页面继续使用真实数据与既有业务分支，不引入原型假数据或演示状态。
 - W6 production-build Playwright 当前为 **87/87 PASS**：85 条 Kiosk 路由按 `1080×1920` 验收，`/member/qr-login` 与 `/upload/phone` 两条辅助页按 `390×844` 验收；`/me/privacy-requests` 只增加验证覆盖，没有修改受保护的 `/me/*` 生产实现。
-- 常驻 Playwright 覆盖 `390×844` 与 `1080×1920`；另以一次性人工浏览器实点覆盖 `390×700`、`1024×768`、`1280×800`、`1440×1024`。人工实点不构成持续回归门禁；这些结果也不等同于 87 个页面逐一像素级复刻或生产/真机验收。
+- 常驻 Playwright 覆盖 `390×844` 与 `1080×1920`；另以一次性人工浏览器实点覆盖 `390×700`、`1024×768`、`1280×800`、`1440×1024`。人工实点不构成持续回归门禁；这些结果也不等同于 103 个路由逐一像素级复刻或生产/真机验收。

@@ -143,7 +143,7 @@ Codex 最终审查曾据旧口径判为"信息架构自相矛盾",此处正式�
 | P03 身份门 | `/login`(短信 NumPad + 扫码)、`/member/qr-login` | ✅ 可直连 |
 | P04 系统态 | `/session-timeout`、`/error-offline`、`/legal/:doc`、`/help` | ✅ 可直连(help 后端有 API 前端未接) |
 | P05 手机接力 | `/upload/phone`(upload-sessions) | ✅ 可直连 |
-| P06 打印工作台 | `/print-scan` + `/print/upload→…→done` 8 页 + `pickup-claim`(支付/PII 预检/进度全真) | 已有全真;设计 7 阶段一页(选来源→体检→参数核价→核对金额→收银→出纸→取件)↔ 现实 8 页,落地需合流 |
+| P06 打印工作台 | `/print-scan` + `/print/upload→…→done` 8 页（支付/PII 预检/进度） | 当前本机打印闭环可直连；历史 `pickup-claim` 假页面已下线。设计 7 阶段一页↔现实 8 页，落地需合流；远程到机释放另立项 |
 | P07 扫描工作台 | `/scan/start→settings→progress→result`(scan/sessions) | ✅ 可直连 |
 | P08 文件加工台 | `/print-scan/convert`(转PDF)、`/print-scan/sign`(签章);证件照=「即将上线」页 | ✅ 可直连;证件照未开放口径一致 |
 | P09 简历工作台 | `/resume/source→parse→report→optimize→export` | ✅ 可直连 |

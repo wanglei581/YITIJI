@@ -191,7 +191,7 @@ const WAVE_ROUTES = new Map([
     '/print-scan', '/print-scan/feature/:key', '/print-scan/convert', '/print-scan/sign',
     '/print/scan-convert', '/print/scan-sign', '/print/scan-feature', '/print/upload',
     '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
-    '/print/cashier', '/print/progress', '/print/done', '/print/pickup-claim', '/scan/start', '/scan/settings',
+    '/print/cashier', '/print/progress', '/print/done', '/scan/start', '/scan/settings',
     '/scan/progress', '/scan/result',
   ]],
   ['W3', [
@@ -233,12 +233,12 @@ const WAVE_ROUTES = new Map([
 const routeInventory = routerInventory()
 const manifest = manifestInventory()
 
-check('104/104 routes', () => {
+check('103/103 routes', () => {
   const actual = routeInventory.map((route) => route.path)
-  assert.equal(actual.length, 104, `router exposes ${actual.length} normalized route patterns`)
-  assert.equal(new Set(actual).size, 104, 'router route patterns must be unique')
-  assert.equal(manifest.paths.length, 104, `manifest exposes ${manifest.paths.length} route patterns`)
-  assert.equal(new Set(manifest.paths).size, 104, 'manifest route patterns must be unique')
+  assert.equal(actual.length, 103, `router exposes ${actual.length} normalized route patterns`)
+  assert.equal(new Set(actual).size, 103, 'router route patterns must be unique')
+  assert.equal(manifest.paths.length, 103, `manifest exposes ${manifest.paths.length} route patterns`)
+  assert.equal(new Set(manifest.paths).size, 103, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   assert.equal(manifest.redirects.size, 5, 'manifest must contain five compatibility redirects')
   for (const [path, target] of manifest.redirects) {
@@ -260,7 +260,7 @@ check('wave ownership', () => {
   }
   const invalid = [...owners].filter(([, waves]) => waves.length !== 1)
   assert.deepEqual(invalid, [], `missing/duplicate ownership: ${JSON.stringify(invalid)}`)
-  assert.equal([...WAVE_ROUTES.values()].flat().length, 104, 'wave inventories must total 104')
+  assert.equal([...WAVE_ROUTES.values()].flat().length, 103, 'wave inventories must total 103')
 })
 
 function jsxDescendant(source, rootName, descendantName) {
@@ -498,10 +498,10 @@ check('W6 route acceptance contract', () => {
     assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
     return { pattern, viewport }
   })
-  assert.equal(routes.length, 104, 'W6 route cases must total 104')
-  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 104, 'W6 route cases must be unique')
+  assert.equal(routes.length, 103, 'W6 route cases must total 103')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 103, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 102, 'W6 kiosk allocation')
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 101, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })
 

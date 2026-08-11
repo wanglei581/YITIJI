@@ -65,7 +65,7 @@
 
 2. 为什么更好
 
-当前生产 Kiosk 的“扫码取件”页面实际要求用户从手机记住并手输10位字母数字码；在27寸公共触屏上来回看手机、区分字符、输入十位，容易输错，也会把凭证暴露给身后的人。[PrintPickupClaimPage.tsx](/Users/wanglei/YITIJI-v3-round2/apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:161)
+历史 Kiosk “扫码取件”假页面曾要求用户从手机记住并手输 10 位字母数字码；该页面已在上线前收口下线，不能作为当前能力。未来若正式建设远程到机释放，在 27 寸公共触屏上手输长码仍会带来误输和旁观泄露风险，扫码只能作为受认证释放流程的输入方式，不能直接写 Agent 租约状态。
 
 让手机显示一次性取件二维码后直接被扫，能消除抄码和输入错误。注意：扫码器不能识别手机上显示的普通文本，手机端必须真正生成条码/二维码。
 
@@ -81,13 +81,13 @@
 
 目前不能认为后端已完成：
 
-- Kiosk 有 `/print/pickup-claim` 前端路由，并调用 `POST /print/jobs/claim-pickup`。[routes/index.tsx](/Users/wanglei/YITIJI-v3-round2/apps/kiosk/src/routes/index.tsx:203)
+- Kiosk 历史上曾有 `/print/pickup-claim` 前端路由并调用不存在的 `POST /print/jobs/claim-pickup`；该假入口已下线，当前没有可用的到机释放页面或端点。
 - 但当前 `PrintJobsController` 只有创建任务和查询状态，没有 `claim-pickup`。[print-jobs.controller.ts](/Users/wanglei/YITIJI-v3-round2/services/api/src/print-jobs/print-jobs.controller.ts:20)
 - `/me/print-orders` 只有列表端点，没有单独的 `/:orderId/pickup`。[member-print-orders.controller.ts](/Users/wanglei/YITIJI-v3-round2/services/api/src/member-print-orders/member-print-orders.controller.ts:21)
 - 会员订单列表确实可以条件性返回 `pickupCode`，但小程序没有注册打印订单/取件页面；`utils/api.js` 中的调用只是悬空封装，不等于端点和页面已存在。[app.json](/Users/wanglei/YITIJI-v3-round2/apps/miniapp/app.json:1)
 - 更关键的是，Agent当前会自动认领本机所有 `pending` 且已支付任务，没有“等待用户凭码释放”的状态。[terminals-agent.service.ts](/Users/wanglei/YITIJI-v3-round2/services/api/src/terminals/terminals-agent.service.ts:392) 数据模型也没有 `awaiting_release` 一类状态。[schema.prisma](/Users/wanglei/YITIJI-v3-round2/services/api/prisma/schema.prisma:116)
 
-所以前置至少包括：补真实手机取件页面和二维码、认领端点、一次性/限时令牌、终端绑定、幂等与限流，以及“待凭码释放”的任务状态。还要统一设计稿里4位、代码10位和部分页面 `P-4172` 三套冲突口径。硬件仍需另测手机屏幕二维码，不需要支付商户权限；HID一般不需要OS权限，COM模式需要Agent接入。
+所以前置至少包括：建立 Order-only 待释放模型、受认证终端释放端点、真实手机凭证页面和二维码、一次性/限时令牌、终端绑定、幂等与限流；释放成功后只创建 `PrintTask(pending)`，仍由 Agent 领取。还要统一设计稿里 4 位、历史代码 10 位和部分页面 `P-4172` 三套冲突口径。硬件仍需另测手机屏幕二维码，不需要支付商户权限；HID 一般不需要 OS 权限，COM 模式需要 Agent 接入。
 
 ## 3. 岗位二维码反向扫描：条件成立，只能做受控解析
 

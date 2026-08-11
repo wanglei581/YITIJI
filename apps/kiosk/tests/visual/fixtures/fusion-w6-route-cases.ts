@@ -118,7 +118,6 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
-  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("输入手机上的取件码，即可从本机出纸")', featureText: '扫码取件' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("AI方案确认")', featureText: 'AI方案确认' },
   { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
@@ -168,7 +167,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '.kpv1', featureText: '简历、岗位、打印，一趟办完' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '.kpv1', featureText: '简历、岗位、打印，一趟办完' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 104 routes (was 99)
+] as const // 103 routes
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -180,8 +179,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 104) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 103) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 102) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 101) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)

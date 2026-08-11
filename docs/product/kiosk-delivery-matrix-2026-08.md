@@ -106,7 +106,7 @@
 | 13 | 图片合成 PDF | `/print-scan/convert` | ✅ 入我的文档 |
 | 14 | 签章 PDF | `/print-scan/sign` | ✅ |
 | 15 | 证件照 | `/print-scan/feature/id-photo` | ⏸ 「即将上线」说明页 |
-| 16 | 取件码 | `/print/done`、`/print/pickup-claim` | ✅ |
+| 16 | 本机打印完成结果 | `/print/done` | ✅；远程订单到机释放尚未立项，不展示假取件入口 |
 | 17 | 二维码（去来源平台投递/预约/签到） | jobs / fairs / companies / renshi | ✅ 合规白名单文案零违规 |
 
 **要修的两条**：#8 诊断报告带不走（缺 `printResumeReport`）、#7 自我探索只下载不出纸。

@@ -44,7 +44,7 @@
 - `docs/design/mini-proto-v2-2026-07/` 保留了高保真原型，可作为视觉与流程参考，不能当作运行时代码事实。
 - 主仓库已经具备大量可复用后端底座，包括微信登录、会员资产、文件安全、AI 服务、支付退款、订单、取件码、Terminal Agent 和内容来源治理。
 - `PrintMaterialPack` 当前只有基础表，未发现真实业务服务；材料包仍需正式建模和接线。
-- 进度文档曾记录 `claim-pickup` 已完成，但当前工作区的 `services/api/src/` 在排除生成目录后没有对应 controller、service 或路由。Gate 0 必须以干净 `main`、CI 和真实端点再次核验；若仍缺失，`POST /print/jobs/claim-pickup` 及其 CAS、限流、审计和负向测试就是 M2 明确新增项，不得继续标成“待复核”或假定可用。
+- 进度文档曾记录 `claim-pickup` 已完成，但当前工作区的 `services/api/src/` 在排除生成目录后没有对应 controller、service 或路由。该历史假连接已下线，M2 必须另建 Order-only 到机释放契约：Kiosk 通过持终端凭证的本地 Agent 发起原子释放，服务端校验订单、支付/退款、有效期与终端后才创建 `PrintTask(pending)`；只有 Agent 的既有领取端点能把任务写成 `claimed`。
 
 ### 2.2 本次方案不代表
 
@@ -558,7 +558,7 @@ Partner 只能看到本机构对象和满足最小样本阈值的聚合统计，
 - §十七的产品名称、四 Tab、首发阶段、选定终端履约和微信主体五项必须由用户明确确认；未确认不能通过 Gate 0 或开始 M0 页面开发。
 - 等当前生产混合版本故障恢复完成，从干净 `main` 建 `codex/` 分支或独立 worktree。
 - 盘点旧 Taro 分支、原型、主干 API 与生产端点，只选择性提取资产。
-- 精确核验 `claim-pickup`、远程 Order-only 建单、JSAPI 支付、材料包和终端服务点数据源；把缺失项写入 M2 契约清单。
+- 精确核验远程 Order-only 建单、受认证终端到机释放、JSAPI 支付、材料包和终端服务点数据源；把缺失项写入 M2 契约清单。
 - 冻结小程序 P0 路由、共享契约、状态机和文件预算。
 - 在 `apps/miniapp/` 建唯一源码，接入 workspace、CI、lint、typecheck、test、build 和合规门禁。
 - 对 Taro CLI、构建链和新增依赖重新执行依赖树审查与 `pnpm audit`；旧分支的 lockfile、override 和审计结论不得直接继承。
@@ -589,7 +589,7 @@ Partner 只能看到本机构对象和满足最小样本阈值的聚合统计，
 - 材料包拆为四个可独立验收的子任务：本人材料包与条目快照模型；创建/编辑/删除/锁定 API；服务端页数与价格快照；与远程订单、到机 release 和文件 TTL 的事务集成。
 - JSAPI 微信支付：服务端使用本人 OpenID 获取 `prepay_id`，生成小程序 `wx.requestPayment` 所需签名参数；验证 AppID 与商户号绑定、回调验签、查单、退款和 1 分钱 live 冒烟，不复用 Native/H5 支付参数冒充小程序支付。
 - Order-only 待到机释放状态、24 小时默认有效期、到机码、Kiosk 核验页和原子 release；对应 additive migration、双 schema、共享类型和 Admin 必须同批完成。
-- 若 Gate 0 确认主干仍无 `POST /print/jobs/claim-pickup`，本阶段新增端点并覆盖限流、枚举防爆破、CAS 并发、支付/退款门控、过期、错终端、重复使用和审计。
+- 新增独立的受认证终端到机释放端点，覆盖限流、枚举防爆破、CAS 并发、支付/退款门控、过期、错终端、重复使用和审计；不得恢复匿名 `POST /print/jobs/claim-pickup`，也不得由 Kiosk 浏览器直接写 `claimed`。
 - Agent 安全 claim、真实状态回流、异常、取消和退款。
 - 一台 Windows 主机与真实奔图设备完成端到端真机验收；证据清单固定记录 Windows 版本、Agent 构建/提交、驱动与固件版本、网络拓扑、Admin 终端 ID、配置项 `printerName`、系统实际识别的打印队列名称、订单/任务 ID 和回流事件。代码仍只使用可配置 `printerName`，不得硬编码型号；彩色 mode 未经厂家确认前不得在验收脚本中假定为 `"color"`。
 

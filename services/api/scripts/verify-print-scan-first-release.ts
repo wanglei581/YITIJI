@@ -145,6 +145,8 @@ function main(): void {
     '\n' +
     read('src/terminals/terminals-admin.service.ts')
   const printJobsApi = read('../../apps/kiosk/src/services/print/printJobsApi.ts')
+  const kioskRoutes = read('../../apps/kiosk/src/routes/index.tsx')
+  const miniappApi = read('../../apps/miniapp/utils/api.js')
   const runtimeTerminalIdentity = read('../../apps/kiosk/src/services/api/screensaver.ts')
   const terminalConfigApi = read('../../apps/kiosk/src/services/api/terminalConfig.ts')
   const prismaSchema = read('prisma/schema.prisma')
@@ -177,6 +179,11 @@ function main(): void {
     printJobsApi,
     ['VITE_TERMINAL_ID'],
     'Kiosk print API must not fall back to a build-time terminal id',
+  )
+  mustNotContain(
+    `${kioskRoutes}\n${miniappApi}`,
+    ['PrintPickupClaimPage', "path: 'print/pickup-claim'", '/print/jobs/claim-pickup'],
+    'Kiosk and miniapp runtime code must not expose pickup claim until its separate remote-release fulfillment contract exists',
   )
   mustContain(
     runtimeTerminalIdentity,

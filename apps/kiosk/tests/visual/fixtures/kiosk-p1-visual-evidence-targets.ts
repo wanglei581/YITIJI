@@ -287,7 +287,6 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   productionOnly('/resume/self-assessment/questions'),
   productionOnly('/resume/self-assessment/result'),
   productionOnly('/resume/self-assessment/history'),
-  productionOnly('/print/pickup-claim'),
   productionOnly('/ai/plan'),
   productionOnly('/session-resume'),
   productionOnly('/jobs/online-platforms'),

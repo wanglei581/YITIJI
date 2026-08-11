@@ -623,16 +623,6 @@ const api = {
     return request(`/me/print-orders/${orderId}/pickup`, { method: 'GET', needAuth: true });
   },
 
-  /**
-   * Kiosk 凭取件码认领打印任务（无需 auth；Kiosk 受控设备）。
-   * 后端: POST /api/v1/print/jobs/claim-pickup  body: { code }
-   * 返回 { taskId, orderId, orderNo, terminalId, taskStatus, printTaskStatus }
-   */
-  claimPickup(code) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('认领取件'));
-    return request('/print/jobs/claim-pickup', { method: 'POST', data: { code }, needAuth: false });
-  },
-
   // ---------- 材料包 ----------
 
   /**
