@@ -149,6 +149,34 @@
      并让六张按各自名字呈现真实结构差异。.fill 是**正文其余部分**的整块记号，
      一个元素代替堆几十根空条；不含任何文字，也不代表任何人的简历内容。
      .tpl 的 padding-bottom 由 16 抬到 26，让正文停在底部说明条之上。 */
+  /* T4 右栏「六张差在哪」：一列六行，行高由剩余空间摊（flex:1 1 0），
+     内容垂直居中 —— 摊出来的余量是围绕主体的均衡空间，不是卡底的空洞。
+     一体机站着点，行高实测 100px 上下，远在 48px 触控下限之上。 */
+  .tplc-wrap { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
+  /* flex-basis 必须是 auto 不是 0：取 0 时六行强行等高，而「带侧栏 · 技能突出」
+     那行标题会折行、注文也最长，实测被自己的行框切掉最后一行（.tplc 没有 overflow，
+     所以「卡内溢出」那一项也报不出来 —— 又是一次贴边元素骗过检查）。
+     auto 是「先按内容撑开，再把余量按比例摊给每一行」，谁也不会被切。 */
+  .tplc {
+    flex: 1 1 auto; min-height: 56px; display: flex; flex-direction: column;
+    justify-content: center; gap: 3px; text-align: left;
+    padding: 8px 11px; border-radius: var(--r-xs);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    color: inherit; font: inherit; cursor: pointer;
+  }
+  /* 用 --jade-a12 不是 --jade-a08：后者**全站都没有定义**（tokens.css 里只有
+     a12 / a20 / a32），写了等于整条 background 作废、选中行连底色都没有。
+     这正是回归报告里 --fog-aNN 那次事故的同一类，自查时按九套主题逐个取过
+     computed value 才发现。已知 11 / 14 / 15 三页也在用 var(--jade-a08)，
+     同样是死声明 —— 不在本轮授权范围，只登记不动。 */
+  .tplc[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .tplc-t { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+    font-size: var(--fz-2); font-weight: 600; color: var(--fog-900); }
+  .tplc-ats { margin-left: auto; flex: 0 0 auto; white-space: nowrap;
+    font-size: var(--fz-1); font-weight: 400; color: var(--jade-600); font-family: var(--ff-num); }
+  .tplc-ats--no { color: var(--amber-600); }
+  .tplc-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+
   .tpl { padding-bottom: 26px; }
   .tpl .fill {
     flex: 1 1 auto; min-height: 0; height: auto; border-radius: 0;
@@ -651,6 +679,19 @@
           <span data-out="tplNote">带侧栏和双栏模板在部分企业的筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
         </div>
       </div>
+      <!-- ══ 2026-08-11 A30：t4 右栏这两张卡之间原来实测空 765px（y=565→1330）——
+           下面那张写着 margin-top:auto 贴在栏底，于是「主栏尾部」读数 0、
+           「卡内空洞」量的也是贴底的最后一个叶子，三项检查一个都报不出来。
+           处置按既定口径「放大主内容」：这一步用户要做的决定就是**在六张里挑一张**，
+           而右栏原来只讲选中的那一张，六张之间差在哪要靠一张张点过去试。
+           这里把决定所需的对照摆出来 —— 数据直接取自本页那份 TPL 表（见下方脚本），
+           不另写一份，改一处两处一起变，不可能对不上。点一行就切换，
+           与左栏缩略图同一个 P.tpl，不是第二套入口。 ══ -->
+      <div class="pane pane--fill pane--grow" data-at="t4">
+        <div class="pane-hd"><span class="t">六张差在哪</span><span class="s">点一行就换</span></div>
+        <div class="tplc-wrap" data-tplc></div>
+      </div>
+
       <div class="pane pane--fill" data-at="t4" style="margin-top:auto">
         <div class="pane-hd"><span class="t">换模板会怎样</span></div>
         <div class="notice">
@@ -1040,9 +1081,33 @@
     /* T4 */
     set('tplNm', '选中：' + T.nm); set('tplFor', T.to); set('tplPg', T.pg); set('tplFz', T.fz); set('tplAts', T.ats)
     html('tplNote', T.note)
-    var ts = scr.querySelectorAll('.tpl')
-    for (var i = 0; i < ts.length; i++) ts[i].setAttribute('aria-current', +ts[i].getAttribute('data-tpl') === P.tpl ? 'true' : 'false')
+    var ts = scr.querySelectorAll('.tpl, .tplc')
+    for (var i = 0; i < ts.length; i++) {
+      var on = +ts[i].getAttribute('data-tpl') === P.tpl
+      ts[i].setAttribute('aria-current', on ? 'true' : 'false')
+      /* 右栏那六行是 <button>，选中态还要挂 aria-pressed —— 与本站 .seg / .fchip /
+         .pick2-tab 同一套写法，读屏能报出「已选中」。左栏缩略图是 <div>，只用 aria-current。 */
+      if (ts[i].tagName === 'BUTTON') ts[i].setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
   }
+
+  /* 「六张差在哪」的六行由 TPL 现场生成 —— 不在 HTML 里再抄一份，
+     免得改了 TPL 而右栏还写着旧的（A29 那一类跨处对不上的病根就是抄两份）。 */
+  ;(function buildTplCompare () {
+    var host = scr.querySelector('[data-tplc]'); if (!host) return
+    for (var i = 0; i < TPL.length; i++) {
+      var t = TPL[i]
+      var b = document.createElement('button')
+      b.type = 'button'; b.className = 'tplc'; b.setAttribute('data-tpl', i)
+      b.innerHTML =
+        '<span class="tplc-t">' + t.nm +
+          '<span class="tplc-ats' + (t.ats.indexOf('否') === 0 ? ' tplc-ats--no' : '') + '">机读 ' + t.ats + '</span>' +
+        '</span>' +
+        '<span class="tplc-s">适合' + t.to + ' · ' + t.pg + ' · ' + t.fz + '</span>' +
+        '<span class="tplc-s">' + t.note + '</span>'
+      host.appendChild(b)
+    }
+  })()
 
   /* ── 结果反馈层 ── */
   var fb = document.getElementById('fb')
@@ -1087,7 +1152,9 @@
     if (seg) { P[seg.closest('.seg').getAttribute('data-param')] = seg.getAttribute('data-v'); render(); return }
     var st = e.target.closest('.stepper[data-param] button[data-step]')
     if (st) { P.copies = Math.max(1, Math.min(20, P.copies + (+st.getAttribute('data-step')))); render(); return }
-    var tp = e.target.closest('.tpl')
+    /* .tplc 是右栏「六张差在哪」的行，和左栏缩略图共用同一个 P.tpl —— 同一个选择，
+       两种看法（左边看版面长什么样，右边看事实差在哪），不是两套入口。 */
+    var tp = e.target.closest('.tpl, .tplc')
     if (tp) { P.tpl = +tp.getAttribute('data-tpl'); render(); return }
     var act = e.target.closest('[data-act]')
     if (act) {

@@ -590,6 +590,41 @@
         <p style="margin:0 0 14px;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="device-off">
           扫描仪离线，<b>打印去向暂不可用</b>。可以先存进「我的文档」，凭手机号在任一台空闲机器取回。
         </p>
+
+        <!-- ══ 2026-08-11 A30：这张卡里原来是「一段建议 + 贴在卡底的四个去向」，
+             中间实测空 213px（y=860→1073）。三项检查全都报不出来：主栏尾部读数
+             是 0（下面还有「拿去打印要花多少钱」那张卡顶着栏底）、卡内空洞量的是
+             最后一个叶子，而它被 margin-top:auto 钉在卡底 —— 空档正好落在两者之间。
+             处置按既定口径「把折叠条里当前这一步真正需要的内容移回常驻」：
+             下面四条全部出自本页页脚折叠条（§隐私·保留期限·删除口径 与
+             §产物去向与费用参数），一个新事实都没编。它们正是站在这一步要做的
+             决定所依赖的：不选会丢什么、存进去能留多久、钱在哪一步收。
+             刻意**没有**把折叠条里「任务有效期 15 分钟」搬过来 —— 那口钟说的是
+             s3 采集过程，s4 已经出图，照搬就是把一条不适用的期限写成事实。 ══ -->
+        <!-- 下边距 0：留 14px 时 default / first 实测把卡内容顶出 8px（.pane--grow 是
+             overflow:hidden，会把最后一条去向切掉一角）。去向那一组自带 margin-top:auto，
+             两者之间本来就有分隔。 -->
+        <div class="kv" style="margin:0">
+          <div class="kv-row"><span class="k" style="white-space:nowrap">不存就走</span><span class="v">只留到本次会话结束</span></div>
+          <div class="kv-row"><span class="k" style="white-space:nowrap">未登录</span><span class="v v--fog">一律离场即清</span></div>
+          <div class="kv-row"><span class="k" style="white-space:nowrap">到期之后</span><span class="v">自动删除 · 只留删除日志</span></div>
+          <div class="kv-row"><span class="k" style="white-space:nowrap">谁能看</span><span class="v">只有你本人 · 不向企业提供</span></div>
+          <!-- 「钱在哪收 / 换机再打」两行删掉了：前者下面那张「拿去打印要花多少钱」
+               已经写着「口径 · 以打印工作台核价为准」，后者上面 device-off 的正文
+               已经写着「凭手机号在任一台空闲机器取回」。留着只是把同一句话说两遍，
+               而这张卡实测只剩 6px 余量，重复的话优先让位。 -->
+          <!-- 下面几行按态补：ai-down / device-off 两态上面那张「识别质量」卡少了
+               置信度那几行，本卡分到的高度反而多出 120–180px。多出来的地方不是
+               用填充物垫，而是这两态**确实还有话要说**，出处同样是页脚折叠条
+               （§识别不可用与扫描仪离线时会怎样）。default / first 两态不加，
+               因为那两态本卡实测只剩 27px 余量，再加就把去向按钮顶出卡外。 -->
+          <div class="kv-row" data-when="ai-down"><span class="k" style="white-space:nowrap">不受识别影响</span><span class="v">走纸、出图与生成 PDF</span></div>
+          <div class="kv-row" data-when="ai-down"><span class="k" style="white-space:nowrap">这次没有的</span><span class="v v--fog">去向建议与置信度终检</span></div>
+          <div class="kv-row" data-when="ai-down"><span class="k" style="white-space:nowrap">还想要诊断</span><span class="v">先存进文档，恢复后到简历工作台再送</span></div>
+          <div class="kv-row" data-when="device-off"><span class="k" style="white-space:nowrap">已扫的页</span><span class="v">不会丢 · 故障已自动上报</span></div>
+          <div class="kv-row" data-when="device-off"><span class="k" style="white-space:nowrap">还想接着扫</span><span class="v">换一台机器，或用手机拍照上传</span></div>
+        </div>
+
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto">
           <button class="btn btn--ghost" style="width:100%" data-when="default first" data-fb="ai">送 AI 简历诊断</button>
           <button class="btn btn--ghost" style="width:100%" data-when="ai-down device-off" aria-disabled="true">AI 诊断不可用</button>

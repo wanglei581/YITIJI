@@ -200,6 +200,22 @@ body.capture .proto-only { display:none !important; }
 .draft textarea:focus { outline: 2px solid var(--jade-a32); outline-offset: 1px; }
 .draft-act { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .draft-act .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+/* 2026-08-11 A7：未登录提反馈时的联系方式。
+   页面三处都写着「留个手机号才收得到回复」，而表单里从来没有可以留的地方 ——
+   分类、描述、提交三件，没有第四件。选的是「补字段」而不是「删承诺」：
+   未登录用户在这台机器上**没有第二条收信路径**（通知是跟着账号走的），
+   把承诺删掉等于把匿名反馈变成只进不出，能力是真的少了一块；
+   而这个字段本身在生产侧是有落点的（blockers.md B6 反馈工单接口与状态回执）。
+   选填，且必须在旁边写清不填会怎样 —— 不写就又变成一句悬着的话。 */
+.fbph { display: flex; align-items: center; gap: var(--s-3); }
+.fbph-lb { flex: 0 0 auto; display: flex; align-items: baseline; gap: 6px;
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fbph-lb span { font-size: var(--fz-1); color: var(--fog-600); }
+.fbph-in { flex: 1 1 auto; min-width: 0; min-height: var(--touch-min);
+  border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+  background: var(--field-bg); color: var(--fog-900);
+  font-family: var(--ff-num); font-size: var(--fz-2); padding: 0 var(--s-4); }
+.fbph-in:focus { outline: 2px solid var(--jade-a32); outline-offset: 1px; }
 .tkt { display: flex; align-items: center; gap: var(--s-3);
   min-height: var(--touch-min); padding: 10px var(--s-4);
   border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
@@ -467,7 +483,8 @@ body.capture .proto-only { display:none !important; }
           <span class="chk"><svg class="ic"><use href="#i-shield"/></svg>草稿<b>不会自动提交</b>，按了「提交反馈」才发出去</span>
         </div>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
-          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>不登录也能提反馈，留个手机号才收得到回复</span>
+          <!-- A7：原文只说「留个手机号」，不说在哪留。指到那一格上。 -->
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>不登录也能提反馈；想收到回复，在「写一条反馈」里留个手机号（选填）</span>
         </div>
         <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>右栏的输入框照常可写，你直接描述就行</span>
@@ -1370,7 +1387,8 @@ body.capture .proto-only { display:none !important; }
         <div class="blank" data-when="first">
           <svg class="ic"><use href="#i-qr"/></svg>
           <b>未登录 · 通知跟着账号走</b>
-          <p>不登录也能提反馈，<b>留个手机号才收得到回复</b>；通知要登录后才收得到。</p>
+          <!-- A7：承诺落到实处 —— 手机号那一格就在「写一条反馈」里，选填，不填也能提交。 -->
+          <p>不登录也能提反馈：在「写一条反馈」里<b>留个手机号（选填）就收得到回复</b>，不填也能提交，只是收不到。<br>通知要登录后才收得到。</p>
           <div class="acts">
             <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「通知与反馈」这一栏 -->
             <a class="btn btn--primary" href="03-identity-gate.html?returnTo=43-my-records.html&amp;returnStage=notice&amp;from=P43">扫码登录</a>
@@ -1691,7 +1709,17 @@ body.capture .proto-only { display:none !important; }
             这段是 AI 按你今天的打印单起的草稿 <span class="ev ev--e3">E3 草稿 · 你可以改</span>，<b>不会自动提交</b>。
           </div>
           <div class="panel-note" style="margin-left:0" data-when="ai-down">起草服务中断，输入框照常可写，直接描述就行。</div>
-          <div class="panel-note" style="margin-left:0" data-when="first">未登录也能提交，留手机号才收得到回复。</div>
+          <!-- A7：这一格就是页面三处「留个手机号」指的那个地方。只在未登录时出现 ——
+               登录状态下回复会进「通知」，再要一次手机号是多收一份个人信息。 -->
+          <div class="fbph" data-when="first">
+            <label class="fbph-lb" for="fb-phone">手机号<span>选填</span></label>
+            <input class="fbph-in" id="fb-phone" type="tel" inputmode="numeric" maxlength="11"
+                   placeholder="11 位手机号" aria-describedby="fb-phone-note">
+          </div>
+          <div class="panel-note" style="margin-left:0" id="fb-phone-note" data-when="first">
+            <b>不填也能提交</b>，工单照常受理；只是未登录时通知跟着账号走，本机没有别的路径把结果发给你。<br>
+            填了就<b>只用于回复这一条工单</b>：不做营销、不与浏览与跳转记录关联、办结后删除。
+          </div>
           <button class="btn btn--primary" type="button" data-submit><svg class="ic"><use href="#i-check"/></svg>提交反馈</button>
           <div class="panel-note" style="margin-left:0">原型稿 · 提交后由运营受理，结果会进上面的通知。</div>
         </div>
@@ -1744,7 +1772,12 @@ body.capture .proto-only { display:none !important; }
         <div data-when="ai-down"><div class="t">方向归纳暂不可用 · 明细照常</div><div class="s">两个 Tab 与每条来源信息都在</div></div>
       </div>
       <div data-at="notice">
-        <div data-when="default device-off"><div class="t">2 条未读 · 反馈工单 1 件处理中</div><div class="s">草稿不会自动提交 · 按了提交才发出去</div></div>
+        <!-- 2026-08-11 A6：原文「反馈工单 1 件处理中」——本页右栏那张卡写的是「2 件」，
+             两个数字并排放在同一屏上，读起来就是打架（其实 1 件说的是"处理中"的那一件，
+             但没人有义务替页面做这道推理）。改成一次把总数与在办数说清。
+             **生产由服务端下发，前端不得各写各的**：未读数与工单数只有一个来源
+             （blockers.md B6 的工单接口），23「我的」那张卡读同一份，不许各写各的。 -->
+        <div data-when="default device-off"><div class="t">2 条未读 · 反馈工单 2 件（1 件处理中）</div><div class="s">草稿不会自动提交 · 按了提交才发出去</div></div>
         <div data-when="first"><div class="t">未登录 · 收不到通知</div><div class="s">反馈仍可提交，留手机号才收得到回复</div></div>
         <div data-when="ai-down"><div class="t">起草暂不可用 · 反馈照常提交</div><div class="s">输入框可写，消息与工单都在</div></div>
       </div>

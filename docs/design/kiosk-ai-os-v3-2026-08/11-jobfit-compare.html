@@ -920,13 +920,27 @@
            · 记录：本块不产生新的 AI 服务记录，只读既有记录；点按钮跳转算一次页面跳转，
              不算一次 AI 调用。 -->
       <div class="common" data-at="s3" data-when="default ai-down device-off">
+        <!-- 2026-08-11 A31：这一行原来要 719px（ai-down 态 833px），而栏宽只有 586px，
+             右端「本机数出来的 · 不依赖 AI」被 .wmain 的 overflow:hidden 切掉 133px
+             （ai-down 切 247px），只剩 31px 露在外面 —— 等于这句合规说明没说。
+             为什么不折行：实测本栏尾部真实余量 default 29px / **ai-down 只有 17px**
+             （末行文字底 1651、栏底 1668），而多一行 13px 文字至少要 18px + 行距，
+             ai-down 一折就把下面「对比怎么读」那段顶出栏外裁字。所以只能压宽度。
+             压在三处，都不丢信息：
+               ① 两个证据徽章改成裸 E1 / E2（全站已有 19 处这么写），
+                  它们指的是什么，正下方 .cw 的次行「3/3 条正文出现 · 简历里 2 次」
+                  就是逐字写着的 —— 正文＝岗位正文＝E2，简历＝你的材料＝E1；
+               ② 标题去掉「先后」「里」两处冗余；
+               ③ ai-down 那句压到「中断也能数 · 不依赖 AI」，必须说的那件事
+                  （这块是词频统计、不经过模型、AI 挂了照常出数）一个字没少。
+             实测结果：default / device-off 内容 567px（余 19px），ai-down 554px（余 32px）。 -->
         <div class="common-hd">
           <svg class="ic"><use href="#i-layers"/></svg>
-          <span class="common-t">你先后比过的 3 个岗位，正文里都出现的 3 个词</span>
-          <span class="ev ev--e1">E1 你的材料</span>
-          <span class="ev ev--e2">E2 岗位正文</span>
+          <span class="common-t">你比过的 3 个岗位，正文都出现的 3 个词</span>
+          <span class="ev ev--e1">E1</span>
+          <span class="ev ev--e2">E2</span>
           <span class="common-s" data-when="default device-off">本机数出来的 · 不依赖 AI</span>
-          <span class="common-s" data-when="ai-down">对比服务中断也照常能数 · 这是词频不是判断</span>
+          <span class="common-s" data-when="ai-down">中断也能数 · 不依赖 AI</span>
         </div>
         <div class="common-b">
           <div class="cwgrid">
@@ -1458,9 +1472,12 @@
           <div class="kv-row"><span class="k">页数</span><span class="v">A4 黑白 · <b>3</b> 页</span></div>
           <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.60</b> 元</span></div>
         </div>
+        <!-- 2026-08-11 A24 连带整改：原文「可先存「我的文档」或扫码带走」——
+             本页没有任何一处能真的把报告存进「我的文档」（动作条那个按钮就是因此
+             成了死按钮）。文案只保留本页真做得到的那条：扫码带到手机上。 -->
         <div class="notice notice--amber" style="margin-top:var(--s-3)" data-when="device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机离线，现在打不出来。可先存「我的文档」或扫码带走。</span>
+          <span>打印机离线，现在打不出来。可以扫码把报告带到手机上，换一台机器再打。</span>
         </div>
         <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
           费用为预估 · 以打印工作台核价为准。
@@ -1569,7 +1586,7 @@
         <div data-when="default"><div class="t">A4 · 3 页 · 预估 0.60 元</div><div class="s">A4 黑白 · 三页一份</div></div>
 <!-- 副行原文「先存「我的文档」或扫码带走，换机再打」在本态会折成两行，
              撑出操作栏 8px（自检：卡内溢出）—— device-off 的主按钮标题长，提示区被挤窄。缩到一行。 -->
-        <div data-when="device-off"><div class="t">打印机离线 · 报告可存不可打</div><div class="s">先存「我的文档」，换机再打</div></div>
+        <div data-when="device-off"><div class="t">打印机离线 · 现在打不出来</div><div class="s">扫码带到手机，换机再打</div></div>
         <div data-when="ai-down"><div class="t">AI 中断，本次生成不了报告</div><div class="s">之前的报告在「我的」，不受影响</div></div>
         <div data-when="first"><div class="t">报告只从真实比对里来，不拿模板凑</div></div>
       </div>
@@ -1595,7 +1612,16 @@
     <a class="btn btn--primary" data-at="s3" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
 
     <a class="btn btn--primary" data-at="s4" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师 · 决策报告&amp;pages=3&amp;copies=1&amp;back=s4">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走</button>
+    <!-- 2026-08-11 A24：这里原来是 <button>「存我的文档 · 扫码带走」，身上只有
+         class / data-at / data-when —— 没有 href、没有 data-fb、没有 data-act、
+         没有 data-go，本页三个 click 监听（.req / [data-gate-pick] / .pick2-tab
+         那组）没有一个匹配得上。实测点下去：0 次 DOM 变动、阶段不变、不跳转。
+         为什么不是「接上真实动作」：本页确实没有存档落点（同一件事在上面
+         data-guard-keep 的注释里已经写过），临时造一个「已存好」的回执就是伪造
+         能力。所以按第二种处置办 —— 改成它真做得到的事：去 05 手机接力扫码带走。
+         参数按 05 的白名单写全（from=P30 在 SRC 里、kind=jobfit-report 在 KIND 里），
+         少一个 05 就认不出这是哪一份、只能显示「没认领到文件」。 -->
+    <a class="btn btn--primary" data-at="s4" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师 · 决策报告"><svg class="ic"><use href="#i-qr"/></svg>扫码把报告带走</a>
     <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="23-me.html">看历史报告<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s4" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>

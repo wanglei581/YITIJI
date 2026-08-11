@@ -735,12 +735,22 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </a>
 
-      <!-- 7 通知与反馈（本页分区浮层） -->
+      <!-- 7 通知与反馈（本页分区浮层）
+           ══ 2026-08-11 A6：这张卡与下面的浮层原来自己写了一套数（3 条通知 / 1 条未读 /
+           工单 1 件），与 43「我的记录 · 通知与反馈」那一栏的 7 条 / 未读 2 / 工单 2 件
+           全部对不上，连同一张工单 #F-2231 的状态都相反（这里写"处理中"，43 写"已回复"，
+           43 还另有一条通知就叫「你的反馈已回复 · #F-2231」）。
+           核过之后按 43 为准，理由是它的数能被自己那一栏的条目数出来：
+           7 个 .rrow、其中 2 个挂「未读」、2 个 .tkt —— 而本页只显示其中几条，
+           它的 3 / 1 / 1 数不出任何东西。
+           **生产由服务端下发，前端不得各写各的**：上线后这些数字全部来自
+           未读数与工单接口（blockers.md B6），本页与 43 读同一个来源，
+           不许任何一页在 HTML 里自己写一份。下面留的是同一份样例数据的摘录。 ══ -->
       <button class="fcard rise" type="button" data-open="ovl-notice" data-view="notice" style="--c1:var(--cat-policy)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-bell"/></svg></span>
-        <span class="fc-num" data-when="default ai-down device-off">3<i>条</i></span></span>
+        <span class="fc-num" data-when="default ai-down device-off">7<i>条</i></span></span>
         <span class="fc-t">通知与反馈</span>
-        <span class="fc-s" data-when="default ai-down device-off">1 条未读 · 反馈工单 1 件处理中</span>
+        <span class="fc-s" data-when="default ai-down device-off">2 条未读 · 反馈工单 2 件（1 件处理中）</span>
         <span class="fc-s" data-when="first">打印完成、文件到期这类提醒在这里</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </button>
@@ -765,21 +775,35 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </div>
 
       <div data-when="default ai-down device-off">
-        <div class="ovl-sec">通知 · 3 条</div>
+        <!-- 三条 = 43「通知与反馈」那一栏最上面三条的原样摘录（标题、时间、已读/未读
+             逐字对齐），不是本页另写的一份。整栏 7 条在 43，本浮层不复制全量。
+             已知未修：第一条写「13 页」，而 42 里同一时刻同一文件的那一单
+             （O-20260809-1023）是「2 份 · 黑白 · A4 · ¥1.20 已付」——
+             13 页与 ¥1.20（＝6 印刷面）对不上，且 43 写「今天 10:23」、42 写「8 月 9 日 10:23」。
+             这属于 blockers.md A29 跨页样例数据基准，需要产品定一次，不单方改；
+             本轮只保证 23 与 43 说的是同一句话，不再各写各的。 -->
+        <div class="ovl-sec">通知 · 7 条 · 未读 2 <span style="font-weight:400;color:var(--fog-600)">（下面是最近 3 条）</span></div>
         <div class="nrow"><span class="dot dot--live"></span>
           <span class="nrow-b"><span class="nrow-t">打印完成 · 13 页已出纸</span>
-            <span class="nrow-s">今天 15:19 · 未读</span></span></div>
+            <span class="nrow-s">今天 10:23 · 未读</span></span></div>
+        <div class="nrow"><span class="dot dot--live"></span>
+          <span class="nrow-b"><span class="nrow-t">2 份敏感件将在 6 天后自动删除</span>
+            <span class="nrow-s">今天 09:00 · 未读</span></span></div>
         <div class="nrow"><span class="dot"></span>
-          <span class="nrow-b"><span class="nrow-t">证件类文件将在 3 天后到期自动删除</span>
-            <span class="nrow-s">今天 09:00 · 已读</span></span></div>
-        <div class="nrow"><span class="dot"></span>
-          <span class="nrow-b"><span class="nrow-t">权益到账 · 打印减免 2 张</span>
-            <span class="nrow-s">8月8日 10:12 · 已读</span></span></div>
+          <span class="nrow-b"><span class="nrow-t">你的反馈已回复 · #F-2231</span>
+            <span class="nrow-s">8月8日 14:20 · 已读</span></span></div>
 
-        <div class="ovl-sec">反馈工单 · 1 件</div>
-        <div class="nrow"><span class="dot dot--warn"></span>
+        <div class="ovl-sec">反馈工单 · 2 件</div>
+        <div class="nrow"><span class="dot"></span>
           <span class="nrow-b"><span class="nrow-t">出纸偏慢 · #F-2231</span>
-            <span class="nrow-s">处理中 · 有结果会进上面的通知</span></span></div>
+            <span class="nrow-s">打印服务 · 8月8日 · 已回复</span></span></div>
+        <div class="nrow"><span class="dot dot--warn"></span>
+          <span class="nrow-b"><span class="nrow-t">扫描预览显示建议 · #F-2244</span>
+            <span class="nrow-s">文件处理 · 8月6日 · 处理中 · 有结果会进上面的通知</span></span></div>
+
+        <div class="ovl-act">
+          <a class="btn btn--ghost" href="43-my-records.html?stage=notice"><svg class="ic"><use href="#i-bell"/></svg>看全部 7 条通知与 2 件工单</a>
+        </div>
       </div>
 
       <div data-when="first">

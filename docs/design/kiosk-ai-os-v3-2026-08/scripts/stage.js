@@ -435,16 +435,39 @@
     if (i > 0) { if (t) t.firstChild ? (t.firstChild.nodeValue = '上一步') : (t.textContent = '上一步'); if (sub) sub.textContent = '第 ' + i + ' 步' }
     else { if (t) t.firstChild ? (t.firstChild.nodeValue = '返回') : (t.textContent = '返回'); if (sub) sub.textContent = b.getAttribute('data-parent-label') || '' }
   }
+  /* 这一次按返回，会被当成「退一个阶段」，还是「离开本页」？
+     ── 为什么要把这个判断单独暴露出来（blockers.md A25）────────────────
+     离场确认（leaveguard.js）要拦的只是**离开本页**，页内退阶段不该弹窗。
+     但它必须在**任何人改动 data-stage 之前**拿到答案：
+     原来两边的捕获监听都挂在 document 上，谁先注册谁先跑，stage.js 先跑并且
+     已经把阶段退掉了，于是 leaveguard 读到的是**退完之后**的阶段。
+     后果实测（07 扫描台，data-guard-at="s3 s4"，从 s3 起按返回）：
+       第 1 次 → 退到 s2，不弹窗（此时 isDirty 已变 false）
+       第 2 次 → 退到 s1，不弹窗
+       第 3 次 → **直接跳到 39-print-hub.html，全程没有任何确认**
+     修法分两半：这里给出「会不会退阶段」的判据并导出；leaveguard 把自己的
+     捕获监听改挂到 window（捕获阶段 window 永远早于 document，与脚本加载
+     顺序无关），从而在阶段被改之前问到真答案。
+     判据与下面真正处理点击的那段**共用同一个函数**，两边不可能给出不同答案。 */
+  function backWillRetreat (el) {
+    if (!screen) return false
+    /* 只有 .actionbar 的直接子返回键才由本文件接管退阶段（43 那种包了一层
+       .backwrap 的不在此列）—— 判据必须和下面的选择器完全一致。 */
+    if (el && el.matches && !el.matches('.actionbar > .backbtn')) return false
+    var cur = screen.getAttribute('data-stage') || screen.getAttribute('data-at') || ''
+    return stageList().indexOf(cur) > 0
+  }
+  window.v3BackWillRetreat = backWillRetreat
+
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('.actionbar > .backbtn'); if (!b) return
+    if (!backWillRetreat(b)) return
     var cur = screen.getAttribute('data-stage') || screen.getAttribute('data-at') || ''
     var list = stageList(); var i = list.indexOf(cur)
-    if (i > 0) {
-      e.preventDefault()
-      if (typeof window.v3Stage === 'function') window.v3Stage(list[i - 1])
-      else { screen.setAttribute('data-stage', list[i - 1]); applyVisibility() }
-      syncBack()
-    }
+    e.preventDefault()
+    if (typeof window.v3Stage === 'function') window.v3Stage(list[i - 1])
+    else { screen.setAttribute('data-stage', list[i - 1]); applyVisibility() }
+    syncBack()
   }, true)
   window.v3SyncBack = syncBack
 
