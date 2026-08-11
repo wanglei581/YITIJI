@@ -69,8 +69,17 @@ ID_PATTERNS = [
     ('政策文号', r'[穗]?人社[规]?[〔（(]\s*2026\s*[〕）)]\s*\d+\s*号'),
 ]
 
-def strip_tags(s):
-    s = re.sub(r'<script\b.*?</script>', ' ', s, flags=re.S | re.I)
+def strip_tags(s, keep_script=False):
+    """剥标签取纯文本。
+
+       ⚠ keep_script 这个开关是补出来的：第一版无条件剥掉 <script>，
+       而 **21 的政策库是一个 JS 数组**（`{id:'p1', no:'人社〔2026〕14 号'}`），
+       于是「主页面里有没有这个文号」永远查不到 —— 43 引用了 21 里真实存在的政策，
+       却被报成孤儿引用。**判断「主页面里有没有」时必须连脚本里的数据一起看**，
+       否则工具会把已经对齐好的东西又报成矛盾。
+       （反过来，抽取「页面上显示了什么」时仍要剥掉脚本，不然会把模板字符串当正文。）"""
+    if not keep_script:
+        s = re.sub(r'<script\b.*?</script>', ' ', s, flags=re.S | re.I)
     s = re.sub(r'<style\b.*?</style>', ' ', s, flags=re.S | re.I)
     s = re.sub(r'<!--.*?-->', ' ', s, flags=re.S)      # 注释里的举例不算页面内容
     s = re.sub(r'<[^>]+>', ' ', s)
@@ -108,16 +117,22 @@ def scan():
     files = sorted(glob.glob('[0-9]*.html'))
     # kind -> id -> {page -> set(names)}
     seen = defaultdict(lambda: defaultdict(lambda: defaultdict(set)))
+    # kind -> page -> set(id)：连脚本一起看，只用于「主页面里有没有」
+    owned = defaultdict(lambda: defaultdict(set))
     for f in files:
         raw = io.open(f, encoding='utf-8').read()
         text = strip_tags(raw)
+        deep = strip_tags(raw, keep_script=True)
         for kind, pat in ID_PATTERNS:
             for m in re.finditer(pat, text):
                 tok = re.sub(r'\s+', '', m.group(0))
                 seen[kind][tok][f].add(nearby_name(text, m))
-    return seen
+            for m in re.finditer(pat, deep):
+                owned[kind][f].add(re.sub(r'\s+', '', m.group(0)))
+    return seen, owned
 
-def report(seen, as_json=False):
+def report(scanned, as_json=False):
+    seen, owned = scanned
     issues = []
 
     for kind, ids in seen.items():
@@ -143,7 +158,8 @@ def report(seen, as_json=False):
         # ② 孤儿引用：主页面里没有这个 ID，别的页却在用
         if owners:
             for tok, pages in ids.items():
-                in_owner = any(o in pages for o in owners)
+                # 用「含脚本」的集合判断：主页面的数据可能写在 JS 数组里
+                in_owner = any(tok in owned[kind].get(o, set()) for o in owners)
                 if not in_owner and pages:
                     issues.append({
                         'type': '主页面里没有这个 ID', 'kind': kind, 'id': tok,
