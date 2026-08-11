@@ -314,7 +314,7 @@ export default function PolicyPage() {
       )}
 
       <p className="mt-3 text-xs text-neutral-400">
-        政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。提交后需管理员审核通过并发布,才会在一体机「政策服务」页展示。
+        政策内容为 info-only:仅政策说明、材料清单与来源链接;不承诺补贴到账、不代申请。提交后需管理员审核通过并发布,才会在一体机「政策服务」页展示。
       </p>
 
       {/* 新增/编辑抽屉 */}
@@ -368,15 +368,15 @@ export default function PolicyPage() {
             <textarea className={`${inputCls} h-32 resize-none`} maxLength={10000} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="官方入口链接">
-              <input className={inputCls} placeholder="https://…(官方平台入口)" value={form.externalUrl} onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value }))} />
+            <Field label="政策来源 / 办理链接">
+              <input className={inputCls} placeholder="https://…(请填写发布主体或办理渠道链接)" value={form.externalUrl} onChange={(e) => setForm((f) => ({ ...f, externalUrl: e.target.value }))} />
             </Field>
             <Field label="展示日期">
               <input type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />
             </Field>
           </div>
           <p className="text-xs text-neutral-400">
-            合规提示:内容仅做政策说明与官方入口指引;请勿出现"补贴必到账""代为申请"等承诺性表述,此类内容审核将不予通过。
+            合规提示:内容仅做政策说明与来源链接指引;提交前请核对发布主体和目标域名;请勿出现"补贴必到账""代为申请"等承诺性表述,此类内容审核将不予通过。
           </p>
         </div>
       </Drawer>

@@ -85,16 +85,16 @@ export function NoticePanel({
                 {notice.externalUrl && (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
                     <ArrowUpRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                    官方入口：{notice.externalUrl}（请通过官方渠道访问办理）
+                    来源链接：{notice.externalUrl}（访问前请核对发布主体和目标域名）
                   </p>
                 )}
                 {notice.externalUrl && isValidSourceUrl(notice.externalUrl) && (
                   <button type="button" onClick={() => onOfficialEntry(notice)} className={`mt-3 ${BTN_OFFICIAL}`}>
                     <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
-                    扫码打开官方入口
+                    扫码打开来源链接
                   </button>
                 )}
-                <p className="mt-2 text-xs text-neutral-400">以上内容仅作展示说明，具体政策以官方发布为准。</p>
+                <p className="mt-2 text-xs text-neutral-400">以上内容由来源机构提交，仅作展示说明；具体要求请向发布主体或主管部门核对。</p>
               </div>
             )}
           </div>

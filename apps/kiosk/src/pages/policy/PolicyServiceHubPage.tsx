@@ -2,7 +2,13 @@
 // PolicyServiceHubPage — 政策服务中心（/policy-service）
 //
 // 能力入口：就业政策 · 社保指南 · 档案/登记 · 补贴指引 · AI政策问答
-// 合规：所有政策信息来自官方来源，仅做信息展示与材料指引，不承诺办理结果。
+// ⚠️ 2026-08-11（CLAUDE.md §9）：本链原将政策与用户自填外链称为「官方口径 / 官方入口」，
+// 但后端 policy.dto.ts:41 只把合作机构自填链接当普通字符串接收，
+// policies.service.ts 没有官方域名、发布主体或证据核验——系统无法证明其官方性。
+// 现统一改为「来源链接 / 由来源机构提交并经平台审核后展示」。
+// 「以官方发布为准」这类**让用户去核实**的免责表述是诚实的，予以保留。
+// 恢复条件：externalUrl 接入官方域名白名单核验（建议与线上平台目录、百宝箱共用一套）。
+// 合规：政策信息由来源机构提交并经平台审核后展示，仅做信息展示与材料指引，不承诺办理结果。
 // ============================================================
 
 import { useNavigate } from 'react-router-dom'
@@ -45,7 +51,7 @@ const CAPABILITIES: PolicyCapability[] = [
     iconColor: 'text-primary-700',
     goColor: 'text-primary-700',
     title: '就业政策',
-    description: '就业补贴、灵活就业政策与官方口径，来自人力资源和社会保障部门',
+    description: '就业补贴、灵活就业等政策信息，由合作机构提交并经平台审核后展示',
     to: '/renshi?tab=policy',
   },
   {
@@ -80,7 +86,7 @@ const CAPABILITIES: PolicyCapability[] = [
     iconColor: 'text-wheat',
     goColor: 'text-wheat',
     title: '补贴指引',
-    description: '就业补贴、失业保险、创业扶持政策说明与官方办理入口',
+    description: '就业补贴、失业保险、创业扶持政策说明与来源链接',
     to: '/renshi?tab=subsidy',
   },
   {
@@ -263,7 +269,7 @@ export function PolicyServiceHubPage() {
         <div className="mt-6 mb-6 flex items-start gap-3 rounded-xl border border-dashed border-neutral-200 bg-surface/70 px-5 py-4">
           <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
           <p className="text-[17px] leading-relaxed text-neutral-500">
-            政策信息来源于官方发布，仅供参考；补贴类只做政策说明和材料指引（info-only），不承诺到账，不代办申请，正式办理请前往相关政府部门或官方渠道。
+            政策内容由来源机构提交并经平台审核后展示，仅供参考；补贴类只做政策说明和材料指引（info-only），不承诺到账，不代办申请。办理前请核对来源机构与目标域名，正式办理请前往相关政府部门或官方渠道。
           </p>
         </div>
       </div>

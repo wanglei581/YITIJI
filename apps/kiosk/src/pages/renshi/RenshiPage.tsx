@@ -108,7 +108,7 @@ export function RenshiPage() {
         <div className="k8-policy-banner__text min-w-0 flex-1">
           <b>仅信息指引 · 不代办</b>
           <span>
-            只做政策说明、材料清单、官方入口与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
+            只做政策说明、材料清单、来源链接与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
           </span>
         </div>
         <button
@@ -129,7 +129,7 @@ export function RenshiPage() {
       {activeTab === 'register' && <RegisterPanel />}
 
       <p className="k8-policy-footer">
-        政策与公告内容仅作展示说明，具体以官方发布为准。如需办理具体业务，请前往对应窗口或扫码访问官方平台。
+        政策与公告内容仅作展示说明，具体要求请向发布主体或主管部门核对；如需办理，请前往对应窗口或核对目标域名后扫码访问。
       </p>
       </div>
     </KioskPageFrame>
