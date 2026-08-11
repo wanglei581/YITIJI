@@ -31,6 +31,22 @@
               Wait="yes" />
           </Component>
         </Directory>
+        <Directory Id="PROVISIONDIR" Name="provision">
+          <Component Id="ProvisioningWizardComponent" Guid="EAE4A871-94BE-4A31-BEA4-7ACFB4FA77E8" Bitness="always64">
+            <File Id="ProvisionLauncher" Source="$(var.StagingRoot)\provision\provision-terminal.cmd" KeyPath="yes" Checksum="yes" />
+            <File Id="ProvisionWizard" Source="$(var.StagingRoot)\provision\provision-installed-agent.ps1" Checksum="yes" />
+            <File Id="ProvisionProductionScript" Source="$(var.StagingRoot)\provision\install-production-agent.ps1" Checksum="yes" />
+            <File Id="ProvisionServiceIdentity" Source="$(var.StagingRoot)\provision\service-identity.ps1" Checksum="yes" />
+            <Shortcut
+              Id="ProvisioningWizardShortcut"
+              Directory="AgentProgramMenuFolder"
+              Name="设备绑定向导"
+              Description="绑定并验证 AI 求职打印服务终端"
+              Target="[#ProvisionLauncher]"
+              WorkingDirectory="PROVISIONDIR" />
+            <RemoveFolder Id="RemoveProvisioningProgramMenuFolder" Directory="AgentProgramMenuFolder" On="uninstall" />
+          </Component>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
@@ -61,6 +77,7 @@
       <ComponentRef Id="AgentServiceComponent" />
       <ComponentRef Id="AgentStateDirectoryComponent" />
       <ComponentRef Id="AgentPanelShortcutComponent" />
+      <ComponentRef Id="ProvisioningWizardComponent" />
       <ComponentGroupRef Id="AgentPayload" />
     </Feature>
   </Package>

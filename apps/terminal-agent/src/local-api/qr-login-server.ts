@@ -28,6 +28,7 @@ import type {
   BackendQrClaimResult,
   BackendQrCreateResult,
 } from './wire'
+import { createLocalBridgeSessionStore, type LocalBridgeSessionStore } from './bridge-session'
 
 const DEFAULT_LOCAL_API_PORT = 9527
 const LOCAL_HOST = '127.0.0.1'
@@ -66,15 +67,14 @@ export function startQrLoginLocalServer(
     warn('local-qr: no allowed origins configured; browser requests will be rejected')
   }
   const claims = new Map<string, StoredClaim>()
+  const bridgeSessions = createLocalBridgeSessionStore()
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
   const bridgeToken = config.localApiBridgeToken?.trim() || undefined
-  if (!bridgeToken) {
-    warn('local-qr: localApiBridgeToken not configured; protected local bridge routes will reject all requests')
-  }
+  if (!bridgeToken) log('local-qr: static bridge token not configured; using short-lived local browser sessions')
 
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin
-    void handleRequest({ req, res, origins, claims, client, bridgeToken, config, options }).catch((error) => {
+    void handleRequest({ req, res, origins, claims, client, bridgeToken, bridgeSessions, config, options }).catch((error) => {
       const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
       const isPrintRoute = (req.url ?? '').startsWith('/local/print/')
       const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
@@ -116,10 +116,11 @@ async function handleRequest(input: {
   claims: Map<string, StoredClaim>
   client: ReturnType<typeof createApiClient>
   bridgeToken: string | undefined
+  bridgeSessions: LocalBridgeSessionStore
   config: AgentConfig
   options: LocalQrServerOptions
 }): Promise<void> {
-  const { req, res, origins, claims, client, bridgeToken, config, options } = input
+  const { req, res, origins, claims, client, bridgeToken, bridgeSessions, config, options } = input
   const origin = req.headers.origin
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
@@ -171,17 +172,34 @@ async function handleRequest(input: {
     return
   }
 
+  if (url.pathname === '/local/bridge/session') {
+    if (req.method !== 'POST') {
+      sendJson(res, 405, { code: 'LOCAL_BRIDGE_METHOD_NOT_ALLOWED', message: '本机会话仅支持 POST' }, origin)
+      return
+    }
+    if (url.search.length > 0) {
+      sendJson(res, 400, { code: 'LOCAL_BRIDGE_QUERY_NOT_ALLOWED', message: '本机会话不接受查询参数' }, origin)
+      return
+    }
+    await assertEmptyBody(req)
+    sendEnvelope(res, 200, bridgeSessions.issue(origin), origin)
+    return
+  }
+
   if (url.pathname === '/local/print/wake') {
-    await handlePrintWake(req, res, origin, url, bridgeToken, options.wakePrintQueue)
+    await handlePrintWake(req, res, origin, url, bridgeToken, bridgeSessions, options.wakePrintQueue)
     return
   }
 
   if (isUsbRoute) {
-    await handleUsbRoute(req, res, origin, url, client, bridgeToken)
+    await handleUsbRoute(req, res, origin, url, client, bridgeToken, bridgeSessions)
     return
   }
 
-  if (!isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken)) {
+  if (
+    !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken) &&
+    !bridgeSessions.validate(req.headers['x-local-bridge-token'], origin)
+  ) {
     sendJson(res, 403, { code: 'LOCAL_QR_BRIDGE_TOKEN_INVALID', message: '扫码登录本地令牌校验失败' }, origin)
     return
   }
@@ -207,9 +225,13 @@ async function handlePrintWake(
   origin: string,
   url: URL,
   bridgeToken: string | undefined,
+  bridgeSessions: LocalBridgeSessionStore,
   wakePrintQueue: LocalQrServerOptions['wakePrintQueue'],
 ): Promise<void> {
-  if (!isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken)) {
+  if (
+    !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken) &&
+    !bridgeSessions.validate(req.headers['x-local-bridge-token'], origin)
+  ) {
     sendJson(res, 403, { code: 'LOCAL_PRINT_BRIDGE_TOKEN_INVALID', message: '本机打印唤醒令牌校验失败' }, origin)
     return
   }
@@ -242,8 +264,12 @@ async function handleUsbRoute(
   url: URL,
   client: ReturnType<typeof createApiClient>,
   bridgeToken: string | undefined,
+  bridgeSessions: LocalBridgeSessionStore,
 ): Promise<void> {
-  if (!isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken)) {
+  if (
+    !isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken) &&
+    !bridgeSessions.validate(req.headers['x-local-bridge-token'], origin)
+  ) {
     sendJson(res, 403, { code: 'LOCAL_USB_BRIDGE_TOKEN_INVALID', message: 'U 盘导入本地令牌校验失败' }, origin)
     return
   }

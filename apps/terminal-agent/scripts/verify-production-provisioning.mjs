@@ -15,6 +15,7 @@ for (const parameter of [
   'ReplaceLocalApiAllowedOrigins',
   'LocalApiPort',
   'PromptForLocalApiBridgeToken',
+  'InstalledAgentRoot',
 ]) {
   assert.match(installer, new RegExp(`\\$${parameter}\\b`), `installer must expose ${parameter}`)
 }
@@ -24,6 +25,10 @@ assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
 assert.match(installer, /Use either -PromptForBindCode or -BindCode, not both/)
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
+assert.match(installer, /BindCode exchange did not return a terminalId/)
+assert.match(installer, /BindCode exchange did not return a terminalCode/)
+assert.match(installer, /-UseExistingToken requires -TerminalId and -TerminalCode/)
+assert.match(installer, /MSI-installed Windows service is missing; repair the MSI before provisioning/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)

@@ -7,7 +7,11 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
 $serviceName = "aijobprintagent.exe"
-$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.url"
+$programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal"
+$panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
+$provisionShortcutName = -join ([char[]](0x8BBE, 0x5907, 0x7ED1, 0x5B9A, 0x5411, 0x5BFC))
+$provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".lnk")
+$provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -31,6 +35,20 @@ function Assert-PanelShortcut {
   $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $panelShortcutPath
   if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
     throw "Local status panel shortcut does not contain the fixed loopback URL"
+  }
+}
+
+function Assert-ProvisioningShortcut {
+  if (-not (Test-Path -LiteralPath $provisionShortcutPath -PathType Leaf)) {
+    throw "Device provisioning Start Menu shortcut is missing"
+  }
+  if (-not (Test-Path -LiteralPath $provisionLauncherPath -PathType Leaf)) {
+    throw "Device provisioning launcher is missing"
+  }
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($provisionShortcutPath)
+  if ([System.IO.Path]::GetFullPath([string]$shortcut.TargetPath) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
+    throw "Device provisioning shortcut target mismatch"
   }
 }
 
@@ -205,6 +223,7 @@ if (Test-Path -LiteralPath $installRoot) {
 
 Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
 Assert-PanelShortcut
+Assert-ProvisioningShortcut
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
@@ -214,6 +233,16 @@ if (-not (Test-Path -LiteralPath (Join-Path $installRoot "node\node.exe"))) {
 }
 if (-not (Test-Path -LiteralPath (Join-Path $installRoot "app\native\secure-scan-reader.exe"))) {
   throw "Secure scan reader is missing after install"
+}
+foreach ($relativeProvisionPath in @(
+  "provision\provision-terminal.cmd",
+  "provision\provision-installed-agent.ps1",
+  "provision\install-production-agent.ps1",
+  "provision\service-identity.ps1"
+)) {
+  if (-not (Test-Path -LiteralPath (Join-Path $installRoot $relativeProvisionPath) -PathType Leaf)) {
+    throw "Provisioning payload is missing after install: $relativeProvisionPath"
+  }
 }
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory is missing after install"
@@ -261,6 +290,8 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
 }
 
 Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
+Assert-PanelShortcut
+Assert-ProvisioningShortcut
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped") {
   throw "Repair must preserve the unprovisioned stopped service"
@@ -278,6 +309,9 @@ if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
 }
 if (Test-Path -LiteralPath $panelShortcutPath) {
   throw "Local status panel Start Menu shortcut remains after uninstall"
+}
+if (Test-Path -LiteralPath $provisionShortcutPath) {
+  throw "Device provisioning Start Menu shortcut remains after uninstall"
 }
 
 Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"

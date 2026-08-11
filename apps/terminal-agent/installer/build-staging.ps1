@@ -78,7 +78,8 @@ Assert-Sha256 -Path $nodeExecutable -Expected $inputs.node.executableSha256
 $nodeRoot = Join-Path $stagingRoot "node"
 $appRoot = Join-Path $stagingRoot "app"
 $bootstrapRoot = Join-Path $stagingRoot "bootstrap"
-New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot -Force | Out-Null
+$provisionRoot = Join-Path $stagingRoot "provision"
+New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot, $provisionRoot -Force | Out-Null
 Copy-Item -LiteralPath $nodeExecutable -Destination (Join-Path $nodeRoot "node.exe")
 Copy-Item -LiteralPath (Join-Path $extractedNodeRoot "LICENSE") -Destination (Join-Path $nodeRoot "LICENSE")
 
@@ -159,6 +160,10 @@ $runtimePackage.dependencies.PSObject.Properties.Remove("node-windows")
 
 Copy-Item -LiteralPath $wrapperDownload -Destination (Join-Path $bootstrapRoot "aijobprintagent.exe")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "bootstrap\aijobprintagent.xml") -Destination $bootstrapRoot
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\provision-installed-agent.ps1") -Destination $provisionRoot
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\provision-terminal.cmd") -Destination $provisionRoot
+Copy-Item -LiteralPath (Join-Path $agentRoot "scripts\install-production-agent.ps1") -Destination $provisionRoot
+Copy-Item -LiteralPath (Join-Path $agentRoot "scripts\service-identity.ps1") -Destination $provisionRoot
 
 Remove-Item -LiteralPath $deployRoot -Recurse -Force
 Remove-Item -LiteralPath $extractRoot -Recurse -Force

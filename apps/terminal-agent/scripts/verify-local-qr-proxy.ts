@@ -158,7 +158,7 @@ async function main(): Promise<void> {
 
   const localServerOptions: NonNullable<Parameters<typeof startQrLoginLocalServer>[1]> = {
     getPanelStatus: () => ({
-      runtimeVersion: '0.4.0',
+      runtimeVersion: '0.4.1',
       terminalCode: `${config.terminalCode}<script>alert(1)</script>`,
       serviceState: 'running',
       cloudConnected: true,
@@ -189,7 +189,7 @@ async function main(): Promise<void> {
     assert.match(panel.headers.get('content-security-policy') ?? '', /default-src 'none'/)
     for (const expected of [
       'AI Job Print Terminal',
-      '0.4.0',
+      '0.4.1',
       'T-LOCAL-QR',
       '&lt;script&gt;alert(1)&lt;/script&gt;',
       '后台服务运行中',
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
     const panelMutation = await fetch(`${localBase}/local/panel`, { method: 'POST' })
     assert.equal(panelMutation.status, 405, 'local panel must remain read-only')
 
-    assert.equal(AGENT_RUNTIME_VERSION, '0.4.0', 'runtime version must come from the deployed package')
+    assert.equal(AGENT_RUNTIME_VERSION, '0.4.1', 'runtime version must come from the deployed package')
     assert.equal(await sendHeartbeat({ config }), true, 'heartbeat fixture must be acknowledged')
     const heartbeatRecord = backend.records.find((record) => record.url.endsWith('/heartbeat'))
     assert.ok(heartbeatRecord, 'heartbeat request should be recorded')
@@ -330,9 +330,9 @@ async function main(): Promise<void> {
   }
 }
 
-// Agent 侧未配置令牌 → 整个 /local/qr-login/* 分支 fail-closed，
-// 即使客户端带上"正确"的令牌也必须 403（对齐 verify-usb-import-agent.ts Part 3）。
-async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
+// 新安装不需要在 MSI 中携带静态令牌：白名单 Origin 先领取短时本机会话，
+// 再访问受保护路由；任意客户端自带的静态令牌仍必须 fail-closed。
+async function verifyDynamicBridgeSession(): Promise<void> {
   const backend = await startBackendStub()
   const config: AgentConfig = {
     apiBaseUrl: backend.baseUrl,
@@ -372,7 +372,33 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
     assert.equal(denied.status, 403, 'unconfigured bridge token must fail closed even with a client-side token')
     assert.equal(denied.json.error.code, 'LOCAL_QR_BRIDGE_TOKEN_INVALID')
 
-    console.log('verify-local-qr-proxy: unconfigured-token instance fail-closed ok')
+    const deniedSession = await fetch(`${localBase}/local/bridge/session`, {
+      method: 'POST',
+      headers: { Origin: DENIED_ORIGIN },
+    })
+    assert.equal(deniedSession.status, 403, 'non-allowlisted Origin must not obtain a local session')
+
+    const sessionResponse = await fetch(`${localBase}/local/bridge/session`, {
+      method: 'POST',
+      headers: { Origin: ALLOWED_ORIGIN },
+    })
+    assert.equal(sessionResponse.status, 200, 'allowlisted Origin may obtain a short-lived local session')
+    const sessionEnvelope = await sessionResponse.json() as {
+      success: true
+      data: { token: string; expiresInSeconds: number }
+    }
+    assert.match(sessionEnvelope.data.token, /^[A-Za-z0-9_-]{40,}$/)
+    assert.equal(sessionEnvelope.data.expiresInSeconds, 300)
+
+    const created = await postJson<{ success: true; data: { ticketId: string } }>(
+      `${localBase}/local/qr-login/create`,
+      { returnTo: '/me' },
+      { bridgeToken: sessionEnvelope.data.token },
+    )
+    assert.equal(created.status, 200, 'dynamic local session must authorize QR ticket creation')
+    assert.equal(created.json.data.ticketId, TICKET_ID)
+
+    console.log('verify-local-qr-proxy: dynamic Origin-bound bridge session ok')
   } finally {
     await handle.close()
     await backend.close()
@@ -380,7 +406,7 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
 }
 
 main()
-  .then(() => verifyUnconfiguredTokenFailClosed())
+  .then(() => verifyDynamicBridgeSession())
   .catch((error) => {
     console.error(error)
     process.exit(1)

@@ -103,9 +103,9 @@ export interface AgentConfig {
    */
   localApiAllowedOrigins?: string[]
   /**
-   * 静态共享令牌，用于受保护的本地浏览器桥接路由。安装时随 Kiosk 构建
-   * （VITE_TERMINAL_AGENT_BRIDGE_TOKEN）与本文件一起下发，不走网络协商。
-   * 未配置时相关路由整体 403（fail-closed），不影响心跳与周期任务领取。
+   * 向后兼容的静态本地桥接令牌。新安装优先使用绑定 Origin、短时有效且
+   * 仅保存在 Agent 内存中的 /local/bridge/session 凭证；升级时保留本字段，
+   * 使旧 Kiosk 构建可以继续工作。
    */
   localApiBridgeToken?: string
 
