@@ -1307,9 +1307,13 @@
           <svg class="ic"><use href="#i-clock"/></svg>
           <span><b>超 10 分钟未开始，已转待打印订单。</b>凭取件码 <b>7742 106 358</b> 打，7 天内有效。</span>
         </div>
+        <!-- 2026-08-11 整改 ④：这一支是**确认未出纸**的分支（右栏任务卡写明
+             「0 / 15 页 · 还没开始出纸」），所以敢承诺全额退 —— 把这个前提写出来，
+             免得被读成「所有情形都按未出页数算」。部分出纸那一支在 s5 退款表里。 -->
         <div class="restnote" data-job="timeout" style="max-width:40em">
           <div class="restnote-t">不想打了怎么退</div>
-          <div class="restnote-b">钱不退也不重复收。不想打了，在「我的 · 打印订单」里申请退款，按<b>未出的计费页</b>全额退。</div>
+          <div class="restnote-b">钱不退也不重复收。这一单<b>一张纸都还没出</b>，
+            服务端能确认，所以不想打了在「我的 · 打印订单」里申请<b>全额退</b>。</div>
         </div>
 
         <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
@@ -1340,16 +1344,25 @@
         <div data-when="default first ai-down" data-job="jam" data-off="ask keep"
              style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
           <button class="btn btn--primary" data-off-go="fixed"><svg class="ic"><use href="#i-check"/></svg>已处理 · 继续打剩余 12 页</button>
-          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，按未出页数退款</button>
+          <!-- 2026-08-11 整改 ④：原按钮写「不打了，按未出页数退款」，
+               把一个本机算不准的结果写进了按钮。卡纸是典型的「部分出纸」，
+               出了几页要服务端与工作人员核对，本机不自动按页算。 -->
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，转人工核对退款</button>
         </div>
         <div class="doneline" data-when="default first ai-down" data-job="jam" data-off="fixed" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
           <span>已收到「卡纸已处理」· 正在重新送纸，从第 4 页继续 · <b>不重复收费</b></span>
           <button class="btn btn--quiet" data-off-go="ask">还是没好</button>
         </div>
+        <!-- 2026-08-11 整改 ④：原文写「已提交退款 2.40 元（未出 12 页）· 已出 3 页不退 ·
+             原渠道 1–3 个工作日到账」—— 这是把一笔本机算不准的金额宣布成已提交。
+             卡纸属于「部分出纸」，出纸页数要服务端与工作人员核对之后才定得下来。
+             改成如实的处理中状态：说清本机知道什么、不知道什么、谁来定、去哪看。
+             等出纸页数有了可信回执，再把确定金额写回来。 -->
         <div class="doneline doneline--amber" data-when="default first ai-down" data-job="jam" data-off="refund" style="max-width:40em">
-          <svg class="ic"><use href="#i-check"/></svg>
-          <span>已提交退款 <b>2.40 元</b>（未出 12 页）· 已出 3 页不退 · 原渠道 1–3 个工作日到账</span>
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>已转<b>异常处理中</b> · 本机记录到卡纸前已出 3 页、剩 12 页未出，
+            <b>退多少要工作人员核对实际出纸后才定</b> · 进度在「我的 · 打印订单」里</span>
           <button class="btn btn--quiet" data-off-go="ask">改成继续打</button>
         </div>
         <div class="notice" data-when="default first ai-down" data-job="jam" style="max-width:40em">
@@ -1379,23 +1392,32 @@
         <div data-when="device-off" data-job="printing jam" data-off="ask fixed"
              style="display:flex;gap:12px;flex-wrap:wrap;max-width:40em">
           <button class="btn btn--primary" data-off-go="keep"><svg class="ic"><use href="#i-ticket"/></svg>保留待打印（凭取件码续打，不再收费）</button>
-          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>按未出页数退款（退 12 页 · 2.40 元）</button>
+          <!-- 2026-08-11 整改 ④：原按钮写「按未出页数退款（退 12 页 · 2.40 元）」，
+               把一个未经确认的金额印在按钮上。中途离线同样属于「部分出纸」。 -->
+          <button class="btn btn--ghost" data-off-go="refund"><svg class="ic"><use href="#i-card"/></svg>不打了，转人工核对退款</button>
         </div>
         <div class="doneline" data-when="device-off" data-job="printing jam" data-off="keep" style="max-width:40em">
           <svg class="ic"><use href="#i-check"/></svg>
           <span>已保留为待打印订单 · 取件码 <b>7742 106 358</b> · 7 天内任一台空闲机器续打，不再收费</span>
           <button class="btn btn--quiet" data-off-go="ask">改成退款</button>
         </div>
+        <!-- 2026-08-11 整改 ④：同上，离线中断也是「部分出纸」，金额不能当场宣布。 -->
         <div class="doneline doneline--amber" data-when="device-off" data-job="printing jam" data-off="refund" style="max-width:40em">
-          <svg class="ic"><use href="#i-check"/></svg>
-          <span>已提交退款 <b>2.40 元</b>（未出 12 页）· 已出 3 页不退 · 原渠道 1–3 个工作日到账</span>
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>已转<b>异常处理中</b> · 本机记录到中断前已出 3 页、剩 12 页未出，
+            <b>退多少要工作人员核对实际出纸后才定</b> · 进度在「我的 · 打印订单」里</span>
           <button class="btn btn--quiet" data-off-go="ask">改成续打</button>
         </div>
         <!-- 2026-08-11：这一屏是在问用户「续打还是退款」，「不选会怎样」正是做这个决定的依据。 -->
+        <!-- 2026-08-11 整改 ④：原文写「到期未打**自动按未出的计费页退款**并留退款日志」。
+             这一单已经出过 3 页，属于部分出纸，页数没有可信回执，不能自动结算。
+             改成如实的兜底：默认续打保留，到期未打转人工核对，钱不会留在系统里不管。 -->
         <div class="restnote" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <div class="restnote-t">不选会怎样</div>
           <div class="restnote-b">本机<b>不会自己替你决定</b>。离场未选择时，订单默认转为待打印保留 7 天，
-            到期未打自动按未出的计费页退款并留退款日志 —— 钱不会不声不响留在系统里。
+            <b>优先让你续打（不再收费）</b>；到期仍未打的转<b>人工核对</b>，
+            按实际出纸核定后处理并留日志 —— 钱不会不声不响留在系统里，
+            但本机<b>不会自己算一个页数就把钱退了</b>。
             两种处理都会写进「我的 · 打印订单」，含计费页数、金额和原因。</div>
         </div>
       </div>
@@ -1767,6 +1789,15 @@
       </div>
 
       <!-- 2026-08-10：核对金额这一步要对得上单价，但整张公示价表放不下，只给要用的两行。 -->
+      <!-- ⚠ 2026-08-11 整改 ⑧（单价是原型样例值，不是定价）：
+           这里显示的 0.20 由 scripts/site-config.js 的 price 快照填入，
+           **那是一份原型样例值，不是已经拍板的价格**。目前三套数值并存：
+             · 开发种子   0.20 / 0.50（种子自陈「开发默认价，非正式价」）
+             · 后端方案建议 0.5 / 1.5
+             · 本设计稿快照 0.20 / 1.50
+           正式价格以**生产 PriceConfig**（GET /api/v1/print/price-config）为准。
+           数值本身这一轮不动 —— 改数会让全站几十处对账金额一起错；
+           要改就在 site-config.js 里改一处，屏上跟着变。 -->
       <div class="pane" data-at="s4">
         <div class="pane-hd"><span class="t">单价对照</span><span class="s">以屏上公示为准</span></div>
         <div class="price">
@@ -1858,6 +1889,25 @@
            s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
       <!-- 2026-08-10 复核：完整公示价表在 s4 仍放不下（免费单与 device-off 会把「支付前请核对」
            挤出 32–96px）。维持 2026-08-09 的结论：s4 不放整表，只在核价卡下面放两行单价对照。 -->
+      <!-- ⚠ 2026-08-11 整改 ⑧（单价是原型样例值，不是定价）：
+           表里的 0.20 / 1.50 由 scripts/site-config.js 的 price 快照填入。
+           **它们是原型样例值，不是已经拍板的价格。** 目前三套数值并存：
+             · 开发种子   0.20 / 0.50（种子自陈「开发默认价，非正式价」）
+             · 后端方案建议 0.5 / 1.5
+             · 本设计稿快照 0.20 / 1.50
+           正式价格以**生产 PriceConfig**（GET /api/v1/print/price-config）为准。
+           这一轮**不改数值** —— 全站几十处对账金额都按 0.20 算过，改数会一起错；
+           真要改只在 site-config.js 改一处，屏上跟着变。
+
+           ⚠ 2026-08-11 整改 ⑥（「计费页」统一的范围）：
+           「计费页」是**打印链**的计量单位，统一的是**所有打印金额位**，
+           不强套到扫描、复印、AI 服务上：
+             · 打印   → 计费页（= 所选文档页数 × 份数；双面只省纸不减计费页）
+             · 复印（未来）→ 「计费张 / 实际出纸张数」是另一个计量对象 ——
+                             身份证复印是两面扫描合成**一张**实体纸，用「页」会算错。
+                             **当前不新增复印入口，也不展示复印价格**，这里只记口径。
+             · 扫描（未来）→ 「扫描页」；注意 07 扫描台的「双面」方向与打印相反
+                             （扫两面 → 页数翻倍 → 钱也翻倍）。 -->
       <div class="pane" data-at="s1 s5">
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
@@ -1870,8 +1920,12 @@
         </div>
         <p class="price-note">本机不接受现金，不找零；不支持刷卡。</p>
         <details class="fold" style="margin-top:8px">
-          <summary>0 元的单怎么走</summary>
-          <div class="fold-b"><b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。</div>
+          <summary>0 元的单怎么走 · 「计费页」指什么</summary>
+          <div class="fold-b"><b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
+            <b>「计费页」只用在打印的金额上</b>：计费页数 = 所选文档页数 × 份数，
+            双面与「一面排 N 页」只减少用纸张数、不减少计费页数。
+            扫描是另一套计量（本机扫描转 PDF 不收费）。<br>
+            <b>屏上这两个单价为原型样例值，正式价格以后台下发的价目配置为准。</b></div>
         </details>
       </div>
 
@@ -1914,22 +1968,47 @@
       </div>
 
       <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
+      <!-- ── 2026-08-11 交叉对账整改 ④：退款改成两分支（保留退款，只是不再承诺自动按页算）──
+           原表写「机器故障没出完 → **按未出的计费页退**」，下面还有一句
+           「按**实际出纸的计费页**退，不看你按了几次按钮」。这是后端兑现不了的承诺：
+           Terminal Agent 对「部分出纸 / 无法确认」判不准 —— 它自己就有
+           PRINT_JOB_UNCONFIRMED 这个状态，文案是「打印作业已提交到打印队列，
+           但未确认完成，请工作人员检查纸张、卡纸和出纸状态」；
+           task-runner 对「队列未出现或超时」的情形还可能按 completed 回传。
+           出纸页数本身可能是不确定的，就不能写「我们会自动算好按页退给你」。
+           正式口径见 docs/reviews/2026-08-11-pricing-benefits-backend.md §四.7：
+             · **服务端确认未出纸** → 可全额补偿（这一支是确定的，敢承诺）
+             · **部分出纸 / 无法确认** → 保持「异常处理中」，同单续打或人工复核，
+               **不重复扣权益、也不自动按页退款**
+           缺什么才能把「按页退」写回来：**出纸页数的可信回执**
+           —— 打印机侧计数 + 服务端确认的履约状态机。补齐之后再改这张表。 -->
       <div class="pane pane--fill pane--grow" data-at="s5">
         <div class="pane-hd"><span class="t">退款怎么算</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">未出纸就取消</span><span class="v">全额退</span></div>
-          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出的计费页退</span></div>
+          <div class="kv-row"><span class="k">服务端确认没出纸</span><span class="v">全额退</span></div>
+          <div class="kv-row"><span class="k">部分出纸 / 无法确认</span><span class="v" style="color:var(--amber-400)">转异常处理，人工核对</span></div>
           <div class="kv-row"><span class="k">已出纸但你不满意</span><span class="v" style="color:var(--amber-400)">不退，可折价复打</span></div>
           <div class="kv-row"><span class="k">重复到账</span><span class="v">自动退回原路</span></div>
           <div class="kv-row"><span class="k">退款到账</span><span class="v">原渠道 1–3 个工作日</span></div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>按<b>实际出纸的计费页</b>退，不看你按了几次按钮。</span>
+          <span><b>能确认一页都没出</b>才敢承诺全额退。<b>出了一部分、或本机确认不了出了几页</b>，
+            <b>不自动按页退</b> —— 转人工核对。</span>
         </div>
         <details class="fold" style="margin-top:10px">
-          <summary>退款记录去哪查</summary>
-          <div class="fold-b">所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</div>
+          <summary>为什么现在不自动按页退 · 退款记录去哪查</summary>
+          <div class="fold-b">
+            本机能确认的是「有没有开始出纸」；<b>已经出了几页，在卡纸、中途离线、
+            打印队列没回执这些情形下并不总能确认</b>。金额按一个不确定的页数自动算，
+            很可能算错，所以这类单子<b>保持「异常处理中」</b>：优先<b>同单续打</b>
+            （不再收费、不重复扣你的权益），确实不打了就由<b>工作人员核对出纸页数</b>后处理。<br>
+            <b>「按未出的计费页自动退」是规划中的能力</b>
+            <span class="ev ev--wire">待开发</span> ——
+            要先有<b>出纸页数的可信回执</b>（打印机侧计数 + 服务端确认的履约状态机）；
+            接上之后，部分出纸这一支就能自动结算，不必再等人工核对。<br>
+            所有退款与异常处理都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额、
+            页数与原因。</div>
         </details>
       </div>
 
@@ -2915,7 +2994,14 @@
     /* faces = 计费页数 = 所选文档页 × 份数。
        ⚠ 变量名沿用 faces（全页十几处 data-out 都叫它），但**口径是「计费页」**：
        双面与「一面排 N 页」都不减少计费数量，它们只影响用纸张数。
-       服务端 quotePrint 的算法与此一致：quantity = billablePages × copies。 */
+       服务端 quotePrint 的算法与此一致：quantity = billablePages × copies。
+
+       ⚠ 2026-08-11 整改 ⑥：「计费页」统一的范围是**打印链**，不是全站所有计量。
+       统一口径准确的说法是：**全站所有打印金额位一律称「计费页」**。
+       扫描、复印、AI 服务不套这个词 ——
+         · 复印（未来）用「计费张 / 实际出纸张数」：身份证复印两面扫描合成
+           **一张**实体纸，按「页」算会算错。当前不新增复印入口与复印价格展示。
+         · 扫描（未来）用「扫描页」，且 07 的「双面」与打印方向相反（页数与钱都翻倍）。 */
     var faces = pages * P.copies
     var perCopy = Math.ceil(pages / (duplex === 'duplex' ? 2 : 1))
     var sheets = perCopy * P.copies
@@ -2953,8 +3039,12 @@
      discountCents = order.amountCents **没有上限** —— 一张券打 200 页，平台全赔。
      所以这里设计了四道闸，每一道的值**全部由后台配置**，页面一个都不写死：
 
-       ① applicableScopes  只在简历 / 求职材料 / 招聘会资料 / 政策材料 / 证件照生效
+       ① applicableScopes  只在**四类**求职产出上生效：
+                           简历 / 求职材料 / 招聘会资料 / 政策申请材料
                            —— 拦「拿补贴打自带的任意文件」
+                           （2026-08-11 整改 ①：原来这里多写了「证件照」，
+                             产品拍板的适用场景就是上面四类，已删。
+                             同步改的还有本文件 SCOPE_TEXT 与 P24 的两处。）
        ② maxBillableUnits  单次计费总量上限，**按「页 × 份」算，不是文档页数**
                            —— 只限文档页数拦不住：10 页 × 20 份 = 200 页照样白拿
        ③ colorScope        只覆盖黑白。黑白 0.20 / 彩色 1.50，同一个「免 10 页」
@@ -2999,8 +3089,12 @@
     none: { lb: '已用完 / 已过期', identity: 'claimed', kind: 'job',
       price: { ok: true, snapAt: '09:41' }, grants: [],
       blocked: [
+        /* 2026-08-11 整改 ⑤：原写「9月1日 00:00 重置」。后端 BenefitGrant 只有余额与
+           validFrom / validUntil，没有重置周期字段，也没有按月续发的定时任务 ——
+           一个精确到时分的重置时刻是本机编的。改成这张权益自己的有效期
+           （服务端下发的 validUntil）。「每月 N 次」作为规则说明保留在 P24。 */
         { title: '免费打印 · 每月 3 次', reason: 'used_up',
-          detail: '本月 3 次已用完 · 9月1日 00:00 重置' },
+          detail: '本月 3 次已用完 · 有效期至 8月31日 23:59' },
         { title: '秋季招聘会 · 打印免单券', reason: 'expired',
           detail: '8月10日 已过期 · 招聘会结束后失效' }
       ] },
@@ -3031,7 +3125,9 @@
      现成抓手，但 from 来自 URL、**可以伪造，不是安全边界** ——
      所以最终"这一单能用哪些权益"必须由**服务端在报价时返回**，
      前端只负责把服务端给的理由讲成人话。 */
-  var SCOPE_TEXT = '简历 / 求职材料 / 招聘会资料 / 政策申请材料 / 证件照'
+  /* 2026-08-11 整改 ①：删「证件照」。产品拍板的适用场景是四类，与 P24 一致。
+     后端 applicableScopes 字段尚未落库；补齐后这里改成读服务端下发的枚举。 */
+  var SCOPE_TEXT = '简历 / 求职材料 / 招聘会资料 / 政策申请材料'
   var SCOPE_OUT = '自带文件的普通打印'
   var BEN = { scene: 'have', pick: 'none' }
 
@@ -3199,8 +3295,12 @@
     } else if (!B.list.length) {
       /* 「不可用」要分开说：已用完 / 已过期 / 不在适用范围 / 超封顶 / 需登录，
          在屏上是五种完全不同的话。合并成一句「不可用」等于没说。 */
+      /* 2026-08-11 整改 ⑦：revoked 原来译成「已被下线」，把两件事混成了一件。
+         活动下线只停止新领取，**不影响已发到账户里的权益**（已发权益是独立契约，
+         按领取时规则继续有效）；会让一张券不能用的是后台**单独撤销**它，
+         那才是 BenefitStatus.revoked，屏上要写「已撤销」并给出原因。 */
       var RSN = { used_up: '已用完', expired: '已过期', out_of_scope: '不在适用范围',
-                  over_cap: '超出封顶', needs_identity: '需要先认领身份', revoked: '已被下线' }
+                  over_cap: '超出封顶', needs_identity: '需要先认领身份', revoked: '已撤销' }
       var rows = (sc.blocked || []).map(function (x) {
         return '<b>' + x.title + '</b> —— <b>' + (RSN[x.reason] || x.reason) + '</b>：' + x.detail
       })

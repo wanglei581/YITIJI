@@ -26,9 +26,13 @@
 
    1) **金额只在打印台产生，本页只做状态与出路。** 这一页一个字都不定价、
       不加价、不打折 —— 它只把「钱现在在哪一步」和「你能往哪走」说清楚。
-      计价单位一律是**计费页**，跟 06 打印台同一口径，也跟后端 PriceConfig.unit
-      的 'page' 对齐：**计费页数 = 所选文档页数 × 份数**。
+      **打印金额位**的计价单位一律是**计费页**，跟 06 打印台同一口径，
+      也跟后端 PriceConfig.unit 的 'page' 对齐：**计费页数 = 所选文档页数 × 份数**。
       双面打印与「一面排 N 页」都**只减少用纸张数，不减少计费页数**。
+      2026-08-11 整改 ⑥：把「一律」的范围写清楚 —— 统一的是**打印链的金额位**，
+      不强套扫描、复印、AI 服务。复印（未来）用「计费张 / 实际出纸张数」
+      （身份证复印两面合成一张纸），扫描（未来）用「扫描页」。
+      本页不新增复印入口，也不展示复印价格。
       单价不写死在页面里，走 scripts/site-config.js 的 data-site-unit="bw"
       —— 那是后台 GET /print/price-config 的本机快照，运营改价这一页跟着变。
       2026-08-11 修正 ①：本页原先自成一套「0.30 元/页」，且本单金额写成 6.00 元，
@@ -47,6 +51,16 @@
    · 付后待确认 —— 竞态最凶的一格：钱扣了、回执没到。这一屏的责任是
      **把重复付款这条路堵死**，并给一个"5 分钟后自动转待打印订单"的兜底。
    · 退款三态 —— 金额构成要逐项列出来（按未出的计费页数），否则用户无法判断退得对不对。
+     ⚠ 2026-08-11 整改 ④（前提必须写出来）：这三态画的是**出纸页数已由服务端确认**
+       的那一支。Terminal Agent 对「部分出纸 / 无法确认」判不准（它自己有
+       PRINT_JOB_UNCONFIRMED：「打印作业已提交到打印队列，但未确认完成，
+       请工作人员检查纸张、卡纸和出纸状态」），所以**不能承诺"自动按页算好退给你"**。
+       两分支口径（docs/reviews/2026-08-11-pricing-benefits-backend.md §四.7）：
+         · 服务端确认未出纸 → 可全额补偿；
+         · 部分出纸 / 无法确认 → 保持「异常处理中」，同单续打或人工复核，
+           不重复扣权益，也不自动按页退。
+       本页保留按页构成的展示，但屏上已写明前提；06 打印台的 s5 退款表已按两分支改。
+       缺什么才能去掉这个前提：出纸页数的可信回执（打印机侧计数 + 服务端履约状态机）。
      「处理中 / 已提交 / 失败」三态分开，是因为出路完全不同。
    · 耗材异常 —— 三种故障对用户的意义不一样：仓门未关他自己能解决，
      缺纸缺粉他不能（纸盒上锁是防盗设计）。混成一句"设备异常"等于没说。
@@ -263,6 +277,11 @@
    放进 kv 行会把键名挤成两行。键名不折行，值靠右换行 —— 兜底文案照显示，不因为排版就塞回假地址。 */
 .kv-row--site .k { white-space:nowrap; }
 .kv-row--site .v { text-align:right; }
+
+/* 「待开发」标：与 06 / 24 同一套视觉语言（不新造）。刻意不借 E1/E2/E3 的颜色 ——
+   E 标说的是「这条结论有多硬」，这里根本还没有结论，是一个还没开发的能力。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
 </style>
 </head>
 <body>
@@ -284,7 +303,9 @@
     </a>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first ai-down"><span class="dot dot--warn"></span>打印机 · 本单未完成</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 未出的计费页自动退</div>
+    <!-- 2026-08-11 整改 ④：原写「未出的计费页自动退」，那是一句本机兑现不了的承诺
+         （出纸页数在部分出纸 / 队列无回执时并不确定）。改成本机真能负责的说法。 -->
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 未出纸部分待核定</div>
     <div class="clock" data-clock>2026年8月10日 <b>17:41</b></div>
   </header>
 
@@ -437,7 +458,9 @@
         <div class="bighead bh--calm">
           <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
           <span class="bh-t">退款已提交，正在处理</span>
-          <span class="bh-p">按<b>没出的 9 计费页</b>退，已经出了的不退</span>
+          <!-- 2026-08-11 整改 ④：把前提写在标题下 —— 按页结算只在**出纸页数已确认**
+               时成立；确认不了的走「异常处理中 + 人工核对」，见下面的说明。 -->
+          <span class="bh-p"><b>出纸页数已确认</b>：按没出的 <b>9 计费页</b>退，已经出了的不退</span>
         </div>
       </div>
 
@@ -608,7 +631,9 @@
         <div class="bighead bh--warn">
           <span class="bh-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
           <span class="bh-t">打印机耗材有问题</span>
-          <span class="bh-p">已出的照常算钱，<b>没出的自动退</b></span>
+          <!-- 2026-08-11 整改 ④：全页统一 —— 「自动退」改「核对后退」。
+               逐页自动退款是规划中的能力，缺出纸页数的可信回执；见页头注释。 -->
+          <span class="bh-p">已出的照常算钱，<b>没出的核对后退</b></span>
         </div>
       </div>
 
@@ -643,7 +668,7 @@
             <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
               <span class="tb-v">10 分钟后本单结算，没出的退回</span></div>
             <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
-              <span class="tb-v">按实际出纸计费，缺的部分自动退</span></div>
+              <span class="tb-v">按实际出纸计费，缺的部分核对后退</span></div>
             <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
               <span class="tb-v">不让你自己开机器加纸或者换粉</span></div>
           </div>
@@ -656,7 +681,7 @@
 
           <div class="notice notice--amber">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>卡在里面的纸不要自己拆机器，找工作人员。这一单没出的部分会自动退。
+            <span>卡在里面的纸不要自己拆机器，找工作人员。这一单没出的部分核对后退。
               <span class="ev ev--e2">E2 设备上报</span></span>
           </div>
         </div>
@@ -823,8 +848,11 @@
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">只按实际出纸算</span>
                 <span class="tl-s">卡纸的那页不算钱</span></span></div>
+            <!-- 2026-08-11 整改 ④：原写「没出的自动退 / 不用你申请」。
+                 逐页自动退是规划中的能力（缺出纸页数可信回执），当前口径是
+                 核对后退，不用用户申请这一点不变。全页同一改法。 -->
             <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">没出的自动退</span>
+              <span class="tl-b"><span class="tl-t">没出的核对后退</span>
                 <span class="tl-s">不用你申请</span></span></div>
             <div class="tl"><span class="tl-dot">4</span>
               <span class="tl-b"><span class="tl-t">每笔进打印订单</span>
@@ -929,7 +957,13 @@
             <div class="sp-i"><i></i><span>不用提供卡号</span></div>
             <div class="sp-i"><i></i><span>不用来回跑</span></div>
           </div>
-          <div class="panel-note">退款进度在「我的 · 打印订单」里也能看。</div>
+          <!-- 2026-08-11 整改 ④：这段是新加的前提说明。上面五步只在**出纸页数确认得了**
+               的时候成立；确认不了就不能自动按页算钱。缺的是出纸页数的可信回执。 -->
+          <div class="panel-note">上面五步的前提是<b>服务端已经确认这一单出了几页</b>。
+            如果出纸页数<b>确认不了</b>（部分出纸、打印队列没回执），本单会<b>停在「异常处理中」</b>：
+            优先<b>同单续打</b>（不再收费、不重复扣权益），确实不打了由<b>工作人员核对后处理</b> ——
+            <b>本机不会自己算一个页数就把钱退了</b>。<br>
+            退款与异常处理的进度在「我的 · 打印订单」里也能看。</div>
         </div>
       </div>
 
@@ -1031,7 +1065,7 @@
             <div class="kv-row"><span class="k">已出</span><span class="v">6 计费页</span></div>
             <div class="kv-row"><span class="k">没出</span><span class="v">9 计费页</span></div>
             <div class="kv-row"><span class="k">已产生费用</span><span class="v">1.20 元</span></div>
-            <div class="kv-row"><span class="k">自动退</span><span class="v">1.80 元</span></div>
+            <div class="kv-row"><span class="k">核对后退</span><span class="v">1.80 元</span></div>
             <div class="kv-row"><span class="k">当前故障</span><span class="v">仓门未关</span></div>
             <div class="kv-row kv-row--site"><span class="k">可换机</span><span class="v" data-site="peerTerminal"></span></div>
           </div>
@@ -1056,7 +1090,7 @@
                 <span class="tl-s">不要拆机器，找人</span></span></div>
             <div class="tl"><span class="tl-dot">5</span>
               <span class="tl-b"><span class="tl-t">四种都按实际出纸算</span>
-                <span class="tl-s">没出的自动退</span></span></div>
+                <span class="tl-s">没出的核对后退</span></span></div>
           </div>
           <div class="sp sp--ok">
             <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">换机怎么换</span></div>
@@ -1064,7 +1098,12 @@
             <div class="sp-i"><i></i><span>凭取件码去<b>另一台机器</b></span></div>
             <div class="sp-i"><i></i><span>参数会<b>带过去</b></span></div>
           </div>
-          <div class="panel-note">没出的那部分先退回，再在另一台重新下单。</div>
+          <!-- 2026-08-11 整改 ④：加一句前提，全页与 06 打印台同口径。
+               「按未出计费页自动退」是**规划中**的能力，缺出纸页数的可信回执
+               （打印机侧计数 + 服务端履约状态机）；补齐后这一段可去掉「核对」二字。 -->
+          <div class="panel-note">没出的那部分核对后退回，再在另一台重新下单。<br>
+            <b>「没出的自动按页退」是规划中的能力</b> <span class="ev ev--wire">待开发</span> ——
+            缺出纸页数的可信回执，所以现在由服务端与工作人员核对后处理。</div>
         </div>
       </div>
 
@@ -1202,7 +1241,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印机离线时</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">没出的计费页</span><span class="v">自动退</span></div>
+            <div class="kv-row"><span class="k">没出的计费页</span><span class="v">核对后退</span></div>
             <div class="kv-row"><span class="k">新的打印单</span><span class="v v--fog">暂时不能付</span></div>
             <div class="kv-row"><span class="k">取件与退款</span><span class="v">照常办</span></div>
           </div>
@@ -1239,7 +1278,7 @@
     <span class="actionbar-hint" data-at="refund-doing">按没出的 9 计费页退，1.80 元</span>
     <span class="actionbar-hint" data-at="refund-done">已提交渠道，到账以银行为准</span>
     <span class="actionbar-hint" data-at="refund-fail">钱没消失，改走服务台线下</span>
-    <span class="actionbar-hint" data-at="supply">已出照常算，没出的自动退</span>
+    <span class="actionbar-hint" data-at="supply">已出照常算，没出的核对后退</span>
     <span class="actionbar-hint" data-at="claim">凭取件码认领，本机不显示内容</span>
     <span class="actionbar-hint" data-at="wrongdoc">先停手，再上报，再原样交回</span>
 
