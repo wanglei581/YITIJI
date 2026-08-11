@@ -1,5 +1,11 @@
 # 下一步任务
 
+## 2026-08-11 V3 上线前收口（以 `docs/product/codex-handoff-plan-2026-08.md` 为准）
+
+- [x] **W0：V3 源码再基线**（文档候选 PR #596）：已更正 Terminal Agent fail-closed 与会员待办端点的陈旧描述，明确用户指定的 `127.0.0.1:8961` / `design/v3-entry-remodel` 为 V3 视觉真源；其未提交设计改动须由设计线先冻结 commit，W0/W1 不触碰该工作树。
+- [x] **W1-A：公共终端付款码隐私收口**（候选分支 `codex/payment-code-privacy-20260811`，未合并/未部署）：付款码已从 React state/props 和公共屏明文输入移除，保留真实支付、扫码枪、手动输入和 18 位自动提交；专项 verify、Kiosk typecheck/lint 已通过（本机 Node 24 仅作预检，CI Node 22 仍为合并门禁）。
+- [ ] **W1-B：打印取件认领真实闭环**：先审查 `POST /print/jobs/claim-pickup` 缺失调用的状态机、终端/订单授权、取件证据与异常补偿；禁止只补一个返回成功的端点或用前端假状态代替。此任务必须独立分支、独立验收，不与 V3 页面迁移、权益核销或定价补贴混做。
+
 > 最后更新：2026-08-11
 
 > **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，

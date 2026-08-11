@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState, type RefObject } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { CheckIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
@@ -28,15 +28,15 @@ interface CashierPaymentPanelProps {
   channelsLoading: boolean
   issuing: boolean
   codeSubmitting: boolean
-  authCode: string
+  /** 受遮蔽的非受控输入框，只把 DOM 节点交给父层在提交瞬间读取。 */
+  authCodeInputRef: RefObject<HTMLInputElement>
   qrContent: string | null
   remainSec: number | null
   reconciling: boolean
   canReissue: boolean
   isDevSandbox: boolean
   canProceed: boolean
-  onAuthCodeChange: (value: string) => void
-  onSubmitCode: (authCode?: string) => void
+  onSubmitCode: () => void
   onReconcile: () => void
   onReissue: () => void
   onSimulateSandbox: (result: 'success' | 'failed') => void
@@ -52,19 +52,20 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     channelsLoading,
     issuing,
     codeSubmitting,
-    authCode,
+    authCodeInputRef,
     qrContent,
     remainSec,
     reconciling,
     canReissue,
     isDevSandbox,
     canProceed,
-    onAuthCodeChange,
     onSubmitCode,
     onReconcile,
     onReissue,
     onSimulateSandbox,
   } = props
+  // 仅保留位数以支持无障碍提示与按钮状态；付款码本身从不进入 React 状态。
+  const [authCodeLength, setAuthCodeLength] = useState(0)
 
   const showCodeInput = paymentMethod === 'code' && (!snapshot?.attempt || snapshot.attempt.status === 'failed')
   const canReconcile =
@@ -129,6 +130,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
       className="cashier-code-form"
       onSubmit={(event) => {
         event.preventDefault()
+        setAuthCodeLength(0)
         onSubmitCode()
       }}
     >
@@ -137,12 +139,17 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         <p className="cashier-code-label-hint">扫码器会自动输入并提交；也可手动输入 18 位数字。</p>
       </div>
       <input
+        ref={authCodeInputRef}
         autoFocus
-        value={authCode}
+        type="password"
         onChange={(event) => {
           const nextCode = event.target.value.replace(/\D/g, '').slice(0, 18)
-          onAuthCodeChange(nextCode)
-          if (nextCode.length === 18) onSubmitCode(nextCode)
+          event.target.value = nextCode
+          setAuthCodeLength(nextCode.length)
+          if (nextCode.length === 18) {
+            setAuthCodeLength(0)
+            onSubmitCode()
+          }
         }}
         inputMode="numeric"
         autoComplete="off"
@@ -152,7 +159,10 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         disabled={codeSubmitting}
         className="cashier-code-input"
       />
-      <button type="submit" disabled={codeSubmitting || authCode.length !== 18} className="cashier-code-submit">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        已输入 {authCodeLength} / 18 位付款码
+      </p>
+      <button type="submit" disabled={codeSubmitting || authCodeLength !== 18} className="cashier-code-submit">
         {codeSubmitting ? '正在提交…' : '确认支付'}
       </button>
     </form>

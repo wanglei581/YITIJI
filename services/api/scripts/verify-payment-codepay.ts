@@ -357,10 +357,11 @@ function verifyKioskContract(): void {
     /s\.attempt\.channel !== 'sandbox'/.test(cashier) &&
     !/!s\.attempt\.qrCodeContent/.test(cashier) &&
     /onSubmitCode\(\)/.test(panel) &&
+    /type="password"/.test(panel) &&
     /autoFocus/.test(panel) &&
     /maxLength=\{18\}/.test(panel)
   ) {
-    pass('cashier enables both screen QR and scanner payment-code modes for every real channel, while retaining automatic reconciliation')
+    pass('cashier enables both screen QR and masked scanner payment-code modes for every real channel, while retaining automatic reconciliation')
   } else {
     fail('cashier QR auto-reconciliation guard missing')
   }
@@ -371,9 +372,14 @@ function verifyKioskContract(): void {
     /isScreenQrClosureConfirmed/.test(cashierStatus) &&
     /付款码支付可能仍在渠道处理中/.test(cashierStatus) &&
     /codeSubmitLockRef/.test(cashier) &&
-    /onSubmitCode\(nextCode\)/.test(panel)
+    /authCodeInputRef/.test(cashier) &&
+    !/\[authCode, setAuthCode\]/.test(cashier) &&
+    !/authCode: string/.test(panel) &&
+    !/onAuthCodeChange/.test(panel) &&
+    !/value=\{authCode\}/.test(panel) &&
+    !/onSubmitCode\(nextCode\)/.test(panel)
   ) {
-    pass('cashier distinguishes expired screen QR from payment-code reconciliation and accepts scanner input without an Enter suffix')
+    pass('cashier distinguishes expired screen QR from payment-code reconciliation and accepts masked scanner input without an Enter suffix or React code state')
   } else {
     fail('cashier expiry and scanner state contract missing')
   }
