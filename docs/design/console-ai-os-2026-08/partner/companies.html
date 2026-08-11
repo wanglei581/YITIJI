@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>企业资料管理（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/companies</code>「企业资料管理」</b>（631 行，新增 / 编辑 / 下架已接真）。
+    加的是与岗位页同一套能力：<b>质检列 + 提交前预审 + 内容改写</b>。
+    Codex 指出我最初的映射<b>只覆盖了岗位，漏了这页和政策页</b>——已补。
+  </div>
+
+  <div class="proto proto--err">
+    <span class="proto__tag">字段级审查 · 企业信息存了三份且不同步</span>
+    <b>你在这里改的是「企业档案」，招聘会的参会企业页读的是另一张表。</b>
+    <div style="margin-top:8px;display:grid;gap:4px;font-size:12px">
+      <div><code>CompanyProfile</code>（35 字段，本页管 20 项）→ Kiosk <b>「找企业」页</b></div>
+      <div><code>FairCompany</code>（14 字段，<b>仅 Admin 能管</b>，<b>无 <code>companyProfileId</code> 外键</b>）→ Kiosk <b>「招聘会参会企业」页</b></div>
+      <div><code>FairCompanyBooth</code>（<code>companyName</code> 是<b>字符串不是外键</b>）→ 展位 / 签到</div>
+    </div>
+    <b style="display:block;margin-top:8px">后果</b>：改了企业简介，「找企业」页更新了，<b>参会企业页还是旧的</b>，而且机构不会知道。
+    展位号存两处（<code>boothNo</code> vs <code>boothNumber</code>）、荣誉标签存三处两种格式。
+    <br><b>C9「跨端一致性提示」就是为这个设计的</b>——在去重方案落地前，至少让机构看到哪几场不一致。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">CO4 · 4 个展示开关后端已就绪，前端没做</span>
+    <b>在招岗位数 / 城市 / 员工规模 / 展位号</b> 这四个指标是否在终端展示，
+    后端 Partner DTO <b>已经允许机构自己传</b>（<code>companies/dto/company.dto.ts:71-82</code>），
+    但 Partner 前端契约与表单<b>完全没有</b>（<code>partnerCompanies.ts:38-59</code>）——
+    <b>白捡的功能没接</b>。另：Admin 新增时默认 <code>showBoothNo=true</code>，模型默认 <code>false</code>，两处不一致。
+  </div>
+
+  <div class="proto">
+    <span class="proto__tag">✅ 更正：审核链路是通的</span>
+    此处曾写「平台侧没有审核入口，提交的资料从未出现在终端」——<b>那个判断是错的，已撤回</b>。
+    Admin 企业页早已完整实现审核 / 发布 / 下架 / 岗位关联
+    （<code>admin/routes/companies/components/ReviewPublishSection.tsx</code>）。
+    你提交后落 <code>pending</code>+<code>draft</code>，平台审核通过并发布即在终端可见。
+    驳回原因本页<b>也能看到</b>（<code>companies/index.tsx:439-445</code>）。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>企业资料管理</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        你在这里维护的企业信息，经平台审核发布后会出现在一体机的
+        <a href="#">「找企业」列表与企业详情页</a>。
+        企业详情里的「在招岗位」来自你在 <a href="jobs.html">岗位信息管理</a> 提交的岗位（按企业名自动关联）。
+        <b>平台不收求职者简历，求职者从岗位详情扫码去你填的来源平台。</b>
+      </p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">Excel 导入</button>
+      <button class="btn btn--sm btn--primary">新增企业</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="advice isnew" data-newtag="新增 · 提交前 AI 预审" data-when="default">
+    <div class="advice__head"><span class="tag tag--ai">AI 预审</span>
+      <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+      <b>你有 5 家企业待提交，其中 3 家资料不完整</b></div>
+    <div class="advice__action">先补齐企业简介和统一社会信用代码，再一起提交。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        3 家缺企业简介、1 家缺统一社会信用代码（<span class="ev ev--1">E1</span> 字段实测）。
+        缺简介的企业在终端详情页只有一个空壳，求职者点进去看不到任何有效信息。</span></div>
+      <div class="advice__item"><b>代价</b><span>补齐约 8 分钟。不补则审核大概率被要求补充，一来一回多等几天。</span></div>
+      <div class="advice__item"><b>备选</b><span>先提交资料完整的 2 家，其余留草稿。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">筛出这 3 家</button>
+      <button class="btn btn--sm btn--ai">AI 帮我写简介草稿</button>
+      <span class="small muted">AI 判断，仅供参考</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head">
+      <h3>本机构企业</h3><span class="sub">12 家 · 待审核 5</span>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部状态</option><option>草稿</option><option>待审核</option><option>已发布</option></select>
+      </div>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr>
+            <th style="width:30px"><input type="checkbox"></th>
+            <th style="width:24%">企业</th><th>信用代码</th><th>关联岗位</th>
+            <th>质检</th><th>审核状态</th><th>发布状态</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">XX 科技有限公司</div><div class="cellsub">互联网 · 100-499 人</div></td>
+              <td class="mono small">9111****XK</td><td class="num">6</td>
+              <td><span class="tag tag--ok">合格</span></td>
+              <td><span class="tag tag--warn">待审核 23 天</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">YY 商贸集团</div><div class="cellsub">批发零售 · 规模未填</div></td>
+              <td class="mono small">9111****YM</td><td class="num">3</td>
+              <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">缺企业简介</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">ZZ 服务有限公司</div><div class="cellsub">生活服务 · 50-99 人</div></td>
+              <td class="mono small muted">未填</td><td class="num">2</td>
+              <td><span class="ev ev--1">E1</span> <span class="tag tag--err">缺信用代码</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">AA 制造股份</div><div class="cellsub">制造业 · 500-999 人</div></td>
+              <td class="mono small">9111****AM</td><td class="num">8</td>
+              <td><span class="tag tag--ok">合格</span></td>
+              <td><span class="tag tag--ok">已通过</span></td>
+              <td><span class="tag tag--ok">已发布</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card__foot isnew" data-newtag="新增 · 批量操作">
+      <div class="row">
+        <span>已选 2 条</span>
+        <button class="btn btn--sm">批量提交审核</button>
+        <button class="btn btn--sm">批量补字段</button>
+        <div class="spacer"></div>
+        <span class="small muted">编辑已发布的企业会<b>重新回到待审核</b>，重新发布前前台仍显示旧版本</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card isnew" data-newtag="新增 · AI 内容助手" data-when="default" style="margin-top:16px">
+    <div class="card__head"><h3>AI 帮你写企业简介</h3><span class="tag tag--ai">E3</span>
+      <span class="sub">YY 商贸集团</span></div>
+    <div class="card__body">
+      <div class="grid grid--2">
+        <div class="field">
+          <label>你提供的事实（AI 只能用这些）</label>
+          <div class="locked">行业：批发零售
+成立年份：2015
+主营：区域食品供应链
+门店/网点：本市 12 家
+官网：https://example.com</div>
+          <div class="hint">AI <b>不会编造</b>规模、荣誉、融资、排名——这些没填就不出现。</div>
+        </div>
+        <div class="field">
+          <label>AI 生成的草稿</label>
+          <div class="locked" style="border-color:var(--p-300);background:var(--p-50)">YY 商贸集团成立于 2015 年，专注区域食品供应链业务，
+在本市设有 12 家门店与网点。更多信息可访问官网了解。</div>
+          <div class="hint">86 字。事实全部来自左侧，没有一句是编的。</div>
+        </div>
+      </div>
+      <div class="proto proto--warn" style="margin-top:14px">
+        <span class="proto__tag">三条硬约束</span>
+        ① 只用你填的事实，<b>不编造</b>规模 / 荣誉 / 融资 / 排名；
+        ② 不生成任何招聘承诺（与平台共用违禁词库）；
+        ③ <b>必须你点采纳才生效</b>，AI 不自动改你的内容、不自动提交审核。
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn--sm btn--primary">采纳</button>
+        <button class="btn btn--sm">重新生成</button>
+        <button class="btn btn--sm btn--ghost">放弃</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>还没有企业资料</h3>
+      <p>企业资料是岗位的展示背景——求职者在终端看到岗位后，会点进企业详情了解这家公司。
+        资料越完整，详情浏览率越高。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">新增企业</button><button class="btn">Excel 导入</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 预审与内容助手暂时不可用</div>
+      <div class="degrade__body">
+        <b>企业的增删改、提交审核、下架、Excel 导入全部照常。</b>
+        <span class="ev ev--1">E1 规则</span>档的质检也照常（缺字段、缺信用代码、重复检测——不调模型）；
+        暂停的只有 AI 简介草稿与表达质量建议。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">继续管理企业</button>
+        <button class="btn btn--sm">看规则版质检</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>企业列表加载失败</h3>
+      <p>无法读取（<code>GET /partner/companies</code> 返回 500）。已发布企业在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变、先拆组件</b>：仍是 <code>/companies</code>；631 行需先拆列表 / 表单 / 详情再加能力。</li>
+      <li><b>前置是平台侧</b>：本页做得再好，Admin 不接审核发布，内容仍到不了前台。
+        <a href="../admin/companies.html">先修那一处断点</a>。</li>
+      <li>与岗位页共用同一套：E1 规则档 + E3 模型档分开标注、AI 建议必须人工采纳、不编造事实。</li>
+      <li>同样的能力也要覆盖 <a href="policy.html">政策公告管理</a>（Codex 补充）。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'companies'})</script>
+</body>
+</html>

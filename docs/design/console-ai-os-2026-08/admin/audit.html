@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>日志审计（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/audit</code>「日志审计」</b>（已有通用 action 字典与筛选结构）。
+    加两样：<b>① AI 自然语言检索</b>（「上周谁改过打印价目」直接问出来）
+    <b>② 成为 AI 治理变更历史的统一真相源</b>——Codex 补充的一条：
+    AI 配置、Prompt 版本、预算、降级策略的变更历史<b>不要各存一份</b>，
+    统一写这里，各页的「变更历史」Tab 只做<b>过滤视图</b>。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>日志审计</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页记录后台的<b>全部关键操作</b>：内容审核发布、价目改动、AI 配置与 Prompt 变更、
+        文件访问、权益发放、隐私工单处理。<b>它不对应任何前台页面</b>——这是治理留痕，出事时用来自证。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm">导出</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="card isnew" data-newtag="新增 · AI 检索" data-when="default">
+    <div class="card__body">
+      <div class="row" style="gap:10px">
+        <input class="input" style="flex:1" value="上周谁改过打印价目？">
+        <button class="btn btn--ai">用自然语言查</button>
+      </div>
+      <div class="small muted" style="margin-top:10px">
+        AI 把这句话翻成筛选条件：<code class="mono">action=billing.price.update</code> ·
+        <code class="mono">时间=2026-08-04 ~ 2026-08-10</code>，然后走<b>普通查询接口</b>。
+        <b>AI 不读日志内容，只生成筛选条件</b>——结果由数据库返回，不经模型改写。
+      </div>
+      <div class="pill-list" style="margin-top:12px">
+        <span class="tag tag--ghost">试试：谁删过文件</span>
+        <span class="tag tag--ghost">昨天的 AI 配置改动</span>
+        <span class="tag tag--ghost">这个月被驳回的岗位</span>
+        <span class="tag tag--ghost">谁看过高敏文件</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head"><h3>审计记录</h3>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部动作</option><option>内容审核</option><option>价目变更</option><option>AI 配置</option><option>文件访问</option><option>权益发放</option></select>
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部操作人</option></select>
+      </div></div>
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th style="width:26%">对象</th><th>结果</th><th>来源 IP</th></tr></thead>
+        <tbody>
+          <tr><td class="mono small">08-11 09:14</td><td>王磊</td>
+            <td><span class="tag tag--ai">ai.prompt.publish</span></td>
+            <td class="small">resume_diagnosis v3 → v4（全量）</td>
+            <td><span class="tag tag--ok">成功</span></td><td class="mono small">10.20.0.2</td></tr>
+          <tr><td class="mono small">08-11 08:52</td><td>王磊</td>
+            <td><span class="tag tag--ai">ai.capability.budget</span></td>
+            <td class="small">resume_optimize 日预算 ¥40 → ¥60</td>
+            <td><span class="tag tag--ok">成功</span></td><td class="mono small">10.20.0.2</td></tr>
+          <tr><td class="mono small">08-10 16:40</td><td>李强</td>
+            <td><span class="tag">billing.price.update</span></td>
+            <td class="small">print_color_page 1.50 → 1.80</td>
+            <td><span class="tag tag--ok">成功</span></td><td class="mono small">10.20.0.5</td></tr>
+          <tr><td class="mono small">08-10 15:12</td><td>李强</td>
+            <td><span class="tag tag--warn">file.access</span></td>
+            <td class="small">高敏文件预览（身份证复印件）</td>
+            <td><span class="tag tag--ok">成功</span></td><td class="mono small">10.20.0.5</td></tr>
+          <tr><td class="mono small">08-10 11:30</td><td>王磊</td>
+            <td><span class="tag">job.review.reject</span></td>
+            <td class="small">JOB-8823「客服专员（限女性…）」</td>
+            <td><span class="tag tag--ok">成功</span></td><td class="mono small">10.20.0.2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      <b>AI 治理动作全部落这里</b>：<code>ai.capability.*</code>（开关/模型/预算/降级）、
+      <code>ai.prompt.*</code>（草稿/灰度/全量/回滚）、<code>ai.compliance.*</code>（词库变更）。
+      各页的「变更历史」Tab 只是本表的过滤视图，<b>不另存一份</b>。
+    </div>
+  </div>
+
+  <div class="proto proto--warn" data-when="default" style="margin-top:16px">
+    <span class="proto__tag">隐私边界</span>
+    审计只记<b>元数据</b>：谁、什么时候、对哪个对象、做了什么、结果如何。
+    <b>不记录被操作对象的正文内容</b>——不存简历原文、不存聊天记录、不存文件内容。
+    「高敏文件预览」只记录发生了这个动作，不记录看到了什么。
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>所选条件下没有审计记录</h3>
+      <p>调整时间范围或动作类型再试。审计记录只追加、不修改、不删除。</p>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>自然语言检索暂时不可用</div>
+      <div class="degrade__body">
+        <b>审计记录的查询与筛选完全照常</b>——用上面的下拉筛选器即可。
+        暂停的只是「把一句话翻成筛选条件」这一步。
+      </div>
+      <div class="degrade__alts"><button class="btn btn--sm btn--primary">用筛选器查</button></div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>审计记录加载失败</h3>
+      <p>无法读取（<code>GET /admin/audit</code> 返回 500）。<b>审计写入不受影响</b>，只是本页读不到。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/audit</code>。</li>
+      <li><b>AI 只生成筛选条件，不读日志内容、不改写结果</b>——避免模型成为审计链路的一环。</li>
+      <li>AI 治理的变更历史<b>统一写本表</b>；<code>/ai-config</code> 抽屉里的「变更历史」Tab 只做过滤视图（Codex 补充）。</li>
+      <li>审计只记元数据，<b>永不记正文</b>。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'audit'})</script>
+</body>
+</html>

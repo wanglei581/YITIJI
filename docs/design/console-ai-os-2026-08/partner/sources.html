@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数据源管理（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/sources</code>「数据源管理」</b>（545 行，列表 / 能力 / 创建 / 启停 + Excel 导入四步都已接真）。
+    补的是<b>生命周期的后半截</b>：建好之后怎么改、怎么测、怎么换凭证、怎么手动同步、怎么归档。
+    现在建完就只能启停——机构 API 换了地址或凭证过期，只能删了重建。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 三条硬前置</span>
+    <b>① 本页 545 行已超阈值</b>（<code>routes/sources/index.tsx:545</code>），且同时承载创建向导 + 列表 + 多种接入说明——
+    <b>这是全项目最明确的拆分前置项</b>，不拆不能加。
+    <b>② 连接测试曾因没有后端端点而被主动移除</b>（<code>:450</code>）——<b>不能重新放一个死按钮</b>，
+    必须先有 <code>POST /partner/data-sources/:id/test</code>。
+    <b>③ AI 字段映射建议应进入现有 Excel 字段映射流程</b>（<code>ExcelImportModal.tsx</code> 的映射步），
+    <b>不做成数据源表格的通用操作</b>。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>数据源管理</h1><p>API / Webhook / Excel 三轨接入 · 生命周期管理</p></div>
+    <div class="right"><button class="btn btn--sm btn--primary">新增数据源</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="card" data-when="default aidown">
+    <div class="card__head"><h3>本机构数据源</h3><span class="sub">3 个 · 启用中 2</span></div>
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th style="width:24%">名称</th><th>接入方式</th><th>数据类型</th><th>凭证</th>
+          <th>最近同步</th><th>状态</th><th style="width:26%">操作</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="cellmain">校招平台 API</div><div class="cellsub mono">src-8821</div></td>
+            <td><span class="tag tag--ghost">API 拉取</span></td><td>岗位</td>
+            <td><span class="tag tag--err">连续失败 3 次</span></td>
+            <td class="small">08-09 03:00<div class="cellsub">失败：401</div></td>
+            <td><span class="tag tag--ok">启用中</span></td>
+            <td class="isnew" data-newtag="新增 · 生命周期">
+              <div class="pill-list">
+                <button class="btn btn--sm">编辑</button>
+                <button class="btn btn--sm">测试连接</button>
+                <button class="btn btn--sm btn--primary">轮换凭证</button>
+                <button class="btn btn--sm">立即同步</button>
+                <button class="btn btn--sm btn--ghost">归档</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><div class="cellmain">合作企业 Webhook</div><div class="cellsub mono">src-8802</div></td>
+            <td><span class="tag tag--ghost">Webhook 推送</span></td><td>岗位</td>
+            <td><span class="tag tag--ok">已配置</span></td>
+            <td class="small">今天 11:42<div class="cellsub">新增 4 / 更新 1</div></td>
+            <td><span class="tag tag--ok">启用中</span></td>
+            <td><div class="pill-list">
+              <button class="btn btn--sm">编辑</button><button class="btn btn--sm">测试连接</button>
+              <button class="btn btn--sm">轮换密钥</button><button class="btn btn--sm btn--ghost">归档</button></div></td>
+          </tr>
+          <tr>
+            <td><div class="cellmain">秋招岗位 Excel</div><div class="cellsub mono">src-8790</div></td>
+            <td><span class="tag tag--ghost">Excel 导入</span></td><td>岗位</td>
+            <td class="muted">—</td>
+            <td class="small">08-03 14:05<div class="cellsub">导入 12 条</div></td>
+            <td><span class="tag">已停用</span></td>
+            <td><div class="pill-list">
+              <button class="btn btn--sm">编辑映射</button><button class="btn btn--sm">再次导入</button>
+              <button class="btn btn--sm btn--ghost">归档</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      <b>归档不是删除</b>——权限矩阵里「删除数据源」对所有机构类型都是 ❌，改为归档保留历史同步记录。
+      凭证轮换只能<b>写入新值 + 显示「已配置」</b>，绝不回显旧值（CLAUDE.md §18）。
+    </div>
+  </div>
+
+  <!-- 凭证轮换 -->
+  <div class="grid grid--2" data-when="default" style="margin-top:16px">
+    <div class="card isnew" data-newtag="新增 · 凭证轮换">
+      <div class="card__head"><h3>轮换凭证 · 校招平台 API</h3></div>
+      <div class="card__body">
+        <div class="proto proto--err" style="margin:0 0 14px">
+          <span class="proto__tag">安全</span>
+          <code>apiSecret</code> / <code>accessToken</code> <b>只存服务端</b>，
+          前端共享类型里只有 <code>credentialConfigured: boolean</code>。
+          这个表单<b>只能写入新值</b>，永远不显示旧值。
+        </div>
+        <div class="field" style="margin-bottom:10px"><label>当前状态</label>
+          <div><span class="tag tag--err">连续失败 3 次 · 401 未授权</span></div>
+          <div class="hint">最近成功同步：08-06 03:00</div></div>
+        <div class="field" style="margin-bottom:10px"><label>认证方式</label>
+          <select class="select"><option>Bearer Token</option><option>API Key</option><option>Basic</option><option>OAuth2</option></select></div>
+        <div class="field" style="margin-bottom:12px"><label>新凭证</label>
+          <input class="input" type="password" placeholder="粘贴新的 Token">
+          <div class="hint">保存后立即用它跑一次连接测试；测试不通过不会覆盖旧凭证。</div></div>
+        <div class="row"><button class="btn btn--sm btn--primary">测试并保存</button>
+          <button class="btn btn--sm btn--ghost">取消</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>连接测试结果</h3></div>
+      <div class="card__body">
+        <dl class="kv">
+          <dt>可达性</dt><dd><span class="tag tag--ok">200 OK</span> <span class="mono small">412 ms</span></dd>
+          <dt>认证</dt><dd><span class="tag tag--ok">通过</span></dd>
+          <dt>返回条数</dt><dd class="mono">18 条（试探性拉取，不入库）</dd>
+          <dt>字段匹配</dt><dd><span class="tag tag--warn">3 个必填字段未映射</span></dd>
+        </dl>
+        <div class="hr"></div>
+        <div class="small muted">
+          <b>测试是只读的</b>：只探测可达性与字段结构，<b>不写入任何数据、不触发审核流</b>。
+          真正入库仍要走「立即同步」并进入 pending 审核。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 字段映射（在 Excel 流程内） -->
+  <div class="sechead isnew" data-newtag="改造 · 在现有 Excel 映射步内" data-when="default" style="margin-top:24px">
+    <h2>Excel 导入 · 字段映射</h2>
+    <div class="right muted small">现有四步流程：上传 → <b>映射</b> → 预览 → 确认</div>
+  </div>
+
+  <div class="card" data-when="default">
+    <div class="card__body">
+      <div class="proto" style="margin-bottom:16px">
+        <span class="proto__tag">改造点</span>
+        现有映射步已能<b>自动回填上次的映射规则</b>（<code>FieldMappingRule</code> 模型 + <code>GET /partner/excel/mapping-rule</code>）。
+        新增的是：<b>首次导入、没有历史规则时，由 AI 给列名映射建议</b>。
+        AI 只读表头与样例行，<b>不读求职者数据</b>；<b>必须人工确认才生效</b>。
+      </div>
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr><th>Excel 列名</th><th>样例值</th><th>映射到标准字段</th><th>来源</th><th>置信度</th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">职位名称</td><td class="small muted">软件测试工程师</td>
+              <td><select class="select" style="padding:5px 9px"><option>title 岗位名称</option></select></td>
+              <td><span class="tag tag--ok">上次规则</span></td><td class="muted small">—</td></tr>
+            <tr><td class="cellmain">月薪范围</td><td class="small muted">8000-12000</td>
+              <td><select class="select" style="padding:5px 9px"><option>salaryRange 薪资区间</option></select></td>
+              <td><span class="tag tag--ai">AI 建议</span></td><td><span class="tag tag--ok">高 96%</span></td></tr>
+            <tr><td class="cellmain">工作城市</td><td class="small muted">本市 · 城南区</td>
+              <td><select class="select" style="padding:5px 9px"><option>location 工作地点</option></select></td>
+              <td><span class="tag tag--ai">AI 建议</span></td><td><span class="tag tag--ok">高 94%</span></td></tr>
+            <tr><td class="cellmain">备注</td><td class="small muted">急招，可接受应届</td>
+              <td><select class="select" style="padding:5px 9px"><option>description 岗位描述</option><option>（不导入）</option></select></td>
+              <td><span class="tag tag--ai">AI 建议</span></td><td><span class="tag tag--warn">中 68%</span></td></tr>
+            <tr><td class="cellmain">联系人电话</td><td class="small muted">138****2210</td>
+              <td><select class="select" style="padding:5px 9px"><option>（不导入）</option></select></td>
+              <td><span class="tag tag--err">建议不导入</span></td><td><span class="tag tag--ok">高</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="proto proto--warn" style="margin-top:14px">
+        <span class="proto__tag">合规</span>
+        最后一行是<b>刻意的</b>：个人联系方式类字段默认建议「不导入」。
+        岗位信息是公开展示内容，求职者通过<b>外部来源链接</b>联系用人方，平台不做中间人。
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn--sm btn--primary">采纳建议并预览</button>
+        <button class="btn btn--sm">全部手动映射</button>
+        <button class="btn btn--sm btn--ghost">保存为默认规则</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空 / AI 不可用 / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◈</div><h3>还没有配置数据源</h3>
+      <p>三种接入方式：<b>API 拉取</b>（平台定时来取）· <b>Webhook 推送</b>（你有更新就推给我们）·
+        <b>Excel 导入</b>（不懂技术也能用）。所有导入内容默认待审核。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">Excel 导入（最简单）</button><button class="btn">配置 API</button>
+      </div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 字段映射建议暂时不可用</div>
+      <div class="degrade__body">
+        <b>数据源的增删改、启停、连接测试、凭证轮换、手动同步、Excel 导入全部照常</b>——都不依赖 AI。
+        映射步会回落到<b>上次保存的映射规则</b>（如果有），没有历史规则时需要手动映射一次。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">用上次规则</button>
+        <button class="btn btn--sm">手动映射</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>数据源列表加载失败</h3>
+      <p>无法读取数据源（<code>GET /partner/data-sources</code> 返回 500）。
+        已配置的定时同步在服务端照常运行，不受本页影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变、先拆组件</b>：仍是 <code>/sources</code>；545 行必须先拆成 创建向导 / 列表 / 接入说明 三块再加能力。</li>
+      <li><b>不放死按钮</b>：连接测试必须先有 <code>POST /partner/data-sources/:id/test</code> 端点，
+        否则维持现状（现有代码就是因为没端点才主动移除的，不能走回头路）。</li>
+      <li>AI 映射建议<b>只进 Excel 映射步</b>，不做成数据源表格的通用操作（Codex 复核）。</li>
+      <li>安全：凭证只写不回显；测试只读不入库；归档代替删除。</li>
+      <li>新增端点：<code>PATCH /partner/data-sources/:id</code>、<code>POST /partner/data-sources/:id/test</code>、
+        <code>POST /partner/data-sources/:id/rotate-credential</code>、<code>POST /partner/data-sources/:id/sync</code>、
+        <code>POST /partner/ai/mapping-suggest</code>。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'sources'})</script>
+</body>
+</html>

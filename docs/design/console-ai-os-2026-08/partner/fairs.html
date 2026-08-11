@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>招聘会信息管理（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/fairs</code>「招聘会信息管理」</b>（440 行，列表 / 新增 / 编辑 / 重新提审 / 下架已接真）。
+    问题：<b>现场资料全归管理员管</b>（<code>routes/fairs/index.tsx:361-362</code>）——
+    主办方买了系统，办会当天想改展位图还得打电话找平台。
+    改法：在招聘会详情里加<b>主办方作战室</b>，把办一场会真正需要的东西放进来。
+    这是 <code>fair_organizer</code> 类机构<b>最核心的付费理由</b>。
+  </div>
+
+  <div class="proto proto--err">
+    <span class="proto__tag">Codex 字段级审查 · 招聘会是四条链里最乱的</span>
+    <b>11 个模型（主表 + 10 个子实体），Partner 只能管主表 10 个字段。</b>
+    审查查出 12 条问题，其中<b>三处「伪造」+ 两处数据损坏 + 一处合规缺口</b>——
+    是四条链里唯一三类问题都占的。下面每个 Tab 都标了对应问题编号，详见
+    <a href="../index.html">四链数据关联总账</a>。
+    <div style="margin-top:9px;display:grid;gap:4px;font-size:12px">
+      <div>🔴 <b>FA1</b>「主办方」显示的是<b>数据来源机构</b>，不是真正的主办单位（<code>jobs-shared.ts:461-463</code>）</div>
+      <div>🔴 <b>FA2</b> Excel 复导主题留空会把 <code>campus</code>/<code>industry</code> <b>降级成 general</b>（<code>jobs-excel.service.ts:444-449</code>）</div>
+      <div>🔴 <b>FA3</b> <code>FairCompanyBooth</code> <b>全局零引用</b>（死表），<code>/map</code> 页真实无展位数据</div>
+      <div>🔴 <b>FA4</b> <code>tagline</code>/<code>onsiteServices</code>/<code>admissionMethod</code> <b>无数据库来源却在校园页展示</b></div>
+      <div>🔴 <b>FA6</b> 公开详情<b>活动资料数固定为 0</b>　🔴 <b>FA7</b> <b>签到状态伪造为「未签到」</b>（系统无签到实体）</div>
+      <div>🟠 <b>FA8</b> 合规 4/5：<b>已结束场次隐藏来源预约入口</b>　🟠 <b>FA9</b> <code>viewCount</code> 无递增写入却称「终端浏览次数」</div>
+      <div>🟠 <b>FA5</b> 驳回原因不回传　🟠 <b>FA10</b> 录入路径<b>四套</b>（手工10/Excel13/批量API15/定时拉取9）</div>
+    </div>
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 两条前置</span>
+    <b>① 权限要先搬</b>：企业、展位、资料、统计、导览的接口目前<b>全是 Admin 权限</b>
+    （<code>services/api/src/jobs/admin-fairs.controller.ts:69</code>），必须先补 Partner 专属 API + 本机构范围校验。
+    <b>② 现场数据只能给聚合</b>（<code>compliance-boundary.md:336</code>）：
+    签到量、导览查看量、物料打印量都是聚合数字，<b>AI 准备助手也不得接触求职者个人数据</b>。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>招聘会信息管理</h1><p>2026 秋季校园双选会 · 09-18 09:00–16:00</p></div>
+    <div class="right">
+      <span class="tag tag--ok">已发布</span>
+      <button class="btn btn--sm">预览终端效果</button>
+      <button class="btn btn--sm btn--primary">保存</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="fair">
+    <button class="is-on" data-tab="base">基本信息</button>
+    <button data-tab="corp">参展企业<span class="newdot"></span></button>
+    <button data-tab="map">展位导览图<span class="newdot"></span></button>
+    <button data-tab="agenda">议程与指引<span class="newdot"></span></button>
+    <button data-tab="mat">活动资料<span class="newdot"></span></button>
+    <button data-tab="live">现场数据<span class="newdot"></span></button>
+  </div>
+
+  <!-- 基本信息（现有） -->
+  <div data-panel-of="fair" data-panel="base">
+    <div class="grid grid--2">
+      <div class="card"><div class="card__head"><h3>基本信息</h3><span class="tag tag--ghost">现有能力</span></div>
+        <div class="card__body stack">
+          <div class="field"><label>名称</label><input class="input" value="2026 秋季校园双选会"></div>
+          <div class="grid grid--2">
+            <div class="field"><label>开始</label><input class="input" value="2026-09-18 09:00"></div>
+            <div class="field"><label>结束</label><input class="input" value="2026-09-18 16:00"></div>
+          </div>
+          <div class="field"><label>地点</label><input class="input" value="XX 职业学院 体育馆"></div>
+          <div class="field isnew" data-newtag="新增 · 修 FA1">
+            <label>主办单位 <span class="tag tag--err">当前缺失</span></label>
+            <input class="input" placeholder="例：XX 职业学院就业指导中心">
+            <div class="hint">
+              ⚠️ <b>当前终端上的「主办方」取的是数据来源机构名，不是真正的主办单位</b>
+              （<code>jobs-shared.ts:461-463</code> 把 <code>sourceName</code> 直接映射成 <code>organizer</code>）。
+              这场会如果由你们同步进来，终端就显示你们的名字——即使主办方另有其人。
+              <b>需加独立字段修复。</b>
+            </div>
+          </div>
+          <div class="field"><label>外部预约入口</label><input class="input mono" value="https://example.edu.cn/fair/2026autumn">
+            <div class="hint">求职者<b>去来源平台预约</b>，平台不代收预约信息（CLAUDE.md §2）</div></div>
+        </div></div>
+      <div class="advice isnew" data-newtag="新增 · AI 准备助手">
+        <div class="advice__head"><span class="tag tag--ai">AI 准备助手</span>
+          <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+          <b>距开会还有 38 天，有 3 件事该做了</b></div>
+        <div class="advice__action">先补齐 6 家参展企业的展位号，导览图才能生成。</div>
+        <div class="advice__grid">
+          <div class="advice__item"><b>理由</b><span>
+            已录入 42 家企业，其中 <b>6 家没有展位号</b>（<span class="ev ev--1">E1</span>）；
+            导览图按展位号排布，缺一家就有一个空位。</span></div>
+          <div class="advice__item"><b>代价</b><span>补齐约 10 分钟。不补则终端导览图上这 6 家不可见，现场会被反复问路。</span></div>
+          <div class="advice__item"><b>备选</b><span>先按分区（A/B/C 区）粗排，开会前一周再细化到具体展位。</span></div>
+        </div>
+        <div class="advice__foot">
+          <button class="btn btn--sm btn--primary">筛出这 6 家</button>
+          <button class="btn btn--sm">生成展区分区建议</button>
+          <span class="small muted">AI 判断，仅供参考</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 参展企业 -->
+  <div data-panel-of="fair" data-panel="corp" style="display:none">
+    <div class="card">
+      <div class="card__head"><h3>参展企业</h3><span class="sub">42 家 · 6 家缺展位号</span>
+        <div class="right"><button class="btn btn--sm">Excel 批量导入</button>
+          <button class="btn btn--sm btn--primary">新增企业</button></div></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th style="width:26%">企业</th><th>展区</th><th>展位号</th><th>招聘岗位</th><th>资料完整度</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">XX 科技有限公司</td><td>A 区</td><td class="mono">A-12</td><td class="num">6</td>
+              <td><span class="tag tag--ok">完整</span></td><td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+            <tr><td class="cellmain">YY 商贸集团</td><td>A 区</td><td class="mono">A-13</td><td class="num">3</td>
+              <td><span class="tag tag--warn">缺企业简介</span></td><td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+            <tr><td class="cellmain">ZZ 服务有限公司</td><td>B 区</td><td class="mono muted">未分配</td><td class="num">2</td>
+              <td><span class="tag tag--warn">缺展位号</span></td><td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        参展企业只做<b>展示信息</b>：企业简介、招聘岗位清单、展位位置。
+        <b>不做企业端账号、不收求职者简历、不做候选人管理</b>（合规红线）。
+      </div>
+    </div>
+
+    <div class="proto proto--err" style="margin-top:16px">
+      <span class="proto__tag">FA3 + E1 · 展位与企业信息都存了多份</span>
+      <b>① 展位有两套链，互不相通</b>：<code>FairCompanyBooth</code> 表（含 <code>boothNumber</code>/<code>zone</code>/<code>checkinStatus</code>）
+      <b>除 schema 外全局零引用</b>——是死表；而 <code>/map</code> 页真实没有展位数据。
+      另一处展位号存在 <code>CompanyProfile.boothNo</code> 上。<b>两个字段谁准不知道。</b>
+      <br><b>② 企业信息存三份且不关联</b>：<code>CompanyProfile</code>（找企业页）/
+      <code>FairCompany</code>（本页，<b>无 <code>companyProfileId</code></b>）/ <code>FairCompanyBooth</code>（企业名是字符串非外键）。
+      <b>机构在企业资料页改了简介，这里不会变。</b>
+      <br>荣誉标签更是三份两种格式：<code>honorTags</code>（逗号分隔）×2 + <code>honors</code>（JSON 数组）×1。
+      <br><b>修法需产品先定</b>：参会企业的信息是<b>企业档案</b>还是<b>本场会的快照</b>？
+    </div>
+  </div>
+
+  <!-- 展位导览图 -->
+  <div data-panel-of="fair" data-panel="map" style="display:none">
+    <div class="grid grid--r">
+      <div class="card"><div class="card__head"><h3>展位平面图</h3>
+        <div class="right"><button class="btn btn--sm">上传底图</button><button class="btn btn--sm btn--primary">保存标注</button></div></div>
+        <div class="card__body">
+          <div style="border:1px dashed var(--n-300);border-radius:10px;padding:40px;text-align:center;background:var(--n-50)">
+            <div class="muted small">［平面图编辑区：上传场馆底图后，在图上标注展区与展位］</div>
+            <div class="row" style="justify-content:center;margin-top:14px">
+              <span class="tag tag--ok">A 区 · 18 展位</span><span class="tag tag--ok">B 区 · 16 展位</span>
+              <span class="tag tag--warn">C 区 · 8 展位（未标注）</span>
+            </div>
+          </div>
+          <div class="small muted" style="margin-top:12px">
+            标注结果直接进前台<b>招聘会作战台的展位导览</b>；求职者可按企业名找到展位，也可打印导览图。
+          </div>
+        </div></div>
+      <div class="card"><div class="card__head"><h3>终端预览</h3></div>
+        <div class="card__body">
+          <div class="small muted" style="margin-bottom:10px">求职者在一体机上看到的样子（27 寸竖屏）</div>
+          <div style="border:1px solid var(--n-200);border-radius:10px;aspect-ratio:9/16;background:var(--n-50);display:grid;place-items:center">
+            <span class="muted small">［竖屏导览图预览］</span>
+          </div>
+          <button class="btn btn--sm btn--block" style="margin-top:12px">在真实终端上预览</button>
+        </div></div>
+    </div>
+  </div>
+
+  <!-- 议程与指引 -->
+  <div data-panel-of="fair" data-panel="agenda" style="display:none">
+    <div class="grid grid--2">
+      <div class="card"><div class="card__head"><h3>时间表</h3>
+        <div class="right"><button class="btn btn--sm">添加环节</button></div></div>
+        <div class="card__body">
+          <div class="tl"><div class="tl__time">09:00</div><div class="tl__rail"><div class="tl__dot tl__dot--ok"></div></div>
+            <div><b>入场签到</b><div class="tl__meta">体育馆东门 · 凭学生证 / 身份证</div></div></div>
+          <div class="tl"><div class="tl__time">09:30</div><div class="tl__rail"><div class="tl__dot"></div></div>
+            <div><b>企业宣讲（主舞台）</b><div class="tl__meta">6 家重点企业，各 15 分钟</div></div></div>
+          <div class="tl"><div class="tl__time">10:30</div><div class="tl__rail"><div class="tl__dot"></div></div>
+            <div><b>自由洽谈</b><div class="tl__meta">全场展位开放</div></div></div>
+        </div></div>
+      <div class="card"><div class="card__head"><h3>入场须知与交通</h3>
+        <div class="right"><span class="tag tag--ai">AI 可代写草稿</span></div></div>
+        <div class="card__body stack">
+          <div class="field"><label>交通指引</label>
+            <textarea class="textarea" rows="3" style="font-family:var(--sans);font-size:13px">地铁 2 号线「学院路」站 B 口出，步行 400 米；校内可停车（东门入，凭邀请函免费）。</textarea></div>
+          <div class="field"><label>入场须知</label>
+            <textarea class="textarea" rows="3" style="font-family:var(--sans);font-size:13px">建议携带纸质简历 10 份以上；现场设有一体机可即时打印。着装整洁，携带有效证件。</textarea></div>
+          <div class="proto" style="margin:0">
+            <span class="proto__tag">合规</span>
+            指引里可以写「现场设有一体机可打印简历」，<b>不能写「现场投递」「代为转交简历」</b>——
+            求职者仍是把简历交给用人单位本人，平台只提供打印。
+          </div>
+        </div></div>
+    </div>
+  </div>
+
+  <!-- 活动资料 -->
+  <div data-panel-of="fair" data-panel="mat" style="display:none">
+    <div class="card">
+      <div class="card__head"><h3>可打印物料</h3>
+        <span class="sub">前台「打印企业资料 / 岗位清单」的内容来源</span>
+        <div class="right"><button class="btn btn--sm btn--primary">上传资料</button></div></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th style="width:30%">资料</th><th>类型</th><th>页数</th><th class="num">被打印</th><th>状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">参展企业名录</td><td><span class="tag tag--ghost">PDF</span></td><td>6</td>
+              <td class="num">142</td><td><span class="tag tag--ok">已发布</span></td>
+              <td><button class="btn btn--sm btn--ghost">替换</button></td></tr>
+            <tr><td class="cellmain">全场岗位清单</td><td><span class="tag tag--ghost">系统生成</span></td><td>12</td>
+              <td class="num">96</td><td><span class="tag tag--ok">已发布</span></td>
+              <td><button class="btn btn--sm btn--ghost">重新生成</button></td></tr>
+            <tr><td class="cellmain">展位导览图</td><td><span class="tag tag--ghost">系统生成</span></td><td>1</td>
+              <td class="num">58</td><td><span class="tag tag--warn">待更新</span></td>
+              <td><button class="btn btn--sm btn--ghost">重新生成</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        「被打印」次数是<b>聚合数字</b>，不含任何求职者身份信息。
+        物料打印走前台统一的收银与出纸通道，本页不做支付。
+      </div>
+    </div>
+
+    <div class="proto proto--err" style="margin-top:16px">
+      <span class="proto__tag">FA6 · 前台显示的资料数是假的</span>
+      <b>公开详情页的活动资料数当前固定为 0</b>——机构上传并发布了资料，
+      求职者在终端上看到的却是「暂无资料」。这属于 CLAUDE.md §9「不伪造能力」的反面：
+      <b>不是没做，是做了但显示成没做</b>。修法：公开 DTO 返回真实计数。
+    </div>
+  </div>
+
+  <!-- 现场数据 -->
+  <div data-panel-of="fair" data-panel="live" style="display:none">
+    <div class="grid grid--4">
+      <div class="card metric"><div class="metric__main"><div class="metric__label">签到人次</div>
+        <div class="metric__value">1,204</div><div class="metric__foot">聚合，不含个人信息</div></div><div class="metric__ico">◉</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">导览查看</div>
+        <div class="metric__value">862</div><div class="metric__foot">终端 + 手机接力</div></div><div class="metric__ico metric__ico--info">▷</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">物料打印</div>
+        <div class="metric__value">296</div><div class="metric__foot">名录 142 · 岗位清单 96 · 导览 58</div></div><div class="metric__ico">⎙</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">打开来源平台</div>
+        <div class="metric__value">318</div><div class="metric__foot">去官方预约 / 投递入口</div></div><div class="metric__ico">↗</div></div>
+    </div>
+    <div class="proto proto--err" style="margin-top:16px">
+      <span class="proto__tag">FA7 + FA9 · 这个 Tab 有两处伪造指标</span>
+      <b>① 签到状态是编的</b>：<code>FairCompanyBooth.checkinStatus</code> 默认 <code>pending</code>，
+      终端与后台显示「未签到」——<b>但系统根本没有签到实体</b>，
+      Admin 的统计页自己也写明了这一点（<code>StatsTab.tsx:45</code>）。
+      平台只提供「扫码去来源平台签到」，<b>不记录签到结果</b>（这是对的，合规）——
+      但那就不该显示任何签到状态。
+      <br><b>② `viewCount` 无递增写入</b>，后台却称「终端浏览次数」——显示的是永远不变的数字。
+      <br><b>修法</b>：签到状态不显示（或建真实签到实体）；<code>viewCount</code> 要么真实递增，要么改名并标「未接入」。
+    </div>
+
+    <div class="proto" style="margin-top:16px">
+      <span class="proto__tag">合规红线</span>
+      现场数据<b>只有聚合行为</b>：来了多少人次、看了多少次导览、打了多少份材料、点了多少次外部入口。
+      <b>没有</b>：谁来了、谁看了哪家企业、谁投了什么岗位、谁拿到了面试。
+      平台不做投递闭环，也就没有这些数据——<b>这不是「暂未开放」，是「永远不会有」</b>。
+    </div>
+  </div>
+
+  <!-- 空 / AI / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>还没有招聘会</h3>
+      <p>创建后可以管理参展企业、展位导览图、议程与可打印物料；提交审核通过后在终端展示。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">新建招聘会</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 准备助手暂时不可用</div>
+      <div class="degrade__body">招聘会的全部管理功能照常：企业、展位、议程、物料、现场数据都不依赖 AI。
+        暂时没有的只是「距开会还有几天、该做哪几件事」这条提示。</div>
+      <div class="degrade__alts"><button class="btn btn--sm btn--primary">继续管理</button>
+        <button class="btn btn--sm">手动看缺展位号的企业</button></div>
+    </div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>招聘会数据加载失败</h3>
+      <p>无法读取（<code>GET /partner/fairs</code> 返回 500）。已发布内容在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变、先拆组件</b>：仍是 <code>/fairs</code>；440 行需先拆列表与详情。</li>
+      <li><b>权限先搬后建 UI</b>：企业 / 展位 / 资料 / 统计 / 导览接口现在都是 Admin 权限，
+        必须先补 Partner 专属 API 与本机构范围校验（Codex 复核）。</li>
+      <li>可见范围：<code>fair_organizer</code> / <code>school</code> / <code>public_service</code> 可用；
+        <code>hr_agency</code> / <code>enterprise_source</code> 不可见（沿用权限矩阵 §三）。</li>
+      <li>现场数据只给聚合；AI 准备助手不接触求职者个人数据。</li>
+      <li><b>本页涉及的 12 条审查问题</b>：FA1 主办方语义 · FA2 主题降级 · FA3 展位双链 ·
+        FA4 不存在的字段 · FA5 驳回不回传 · FA6 资料数固定 0 · FA7 签到伪造 ·
+        FA8 已结束场次隐藏入口 · FA9 viewCount 假指标 · FA10 录入四套 ·
+        FA11 校园判定靠关键词 · FA12 封面图白填。逐条修法见四链总账。</li>
+      <li><b>做子实体管理前必须先修 FA1/FA2/FA6/FA7</b>——它们在持续展示错误信息，
+        且修复成本都很小。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'fairs'})</script>
+</body>
+</html>

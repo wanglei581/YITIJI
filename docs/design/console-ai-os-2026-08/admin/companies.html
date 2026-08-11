@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>企业展示管理（结论已撤回）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--err">
+    <span class="proto__tag">⚠️ 本页结论已撤回 · 保留作教训记录</span>
+    <b>这一页原本是为了「修复全项目唯一一处真断点」而做的。那个判断是错的。</b><br>
+    Admin 企业页早已完成拆分与接线：<code>routes/companies/index.tsx</code> 192 行 + 5 个组件，
+    其中 <code>components/ReviewPublishSection.tsx</code> 完整实现<b>通过审核 / 拒绝(带原因) / 发布 / 下架</b>，
+    <code>components/LinkedJobsSection.tsx</code> 实现<b>岗位关联</b>，
+    <code>services/api/companiesAdmin.ts:191-202</code> 四个方法齐全。
+    进度文档 <code>current-progress.md</code> 记录该页在 <code>codex/normalize-structure-closure</code> 已从 1116 行拆到 192 行。
+    <br><br>
+    <b>错误根因</b>：给 Codex 的审查题目里限定了「每页只看它调了哪些 service 方法，不要读全文」，
+    它读 <code>index.tsx:49</code> 只看到 <code>listCompanies</code>，<b>没有进 components/ 目录</b>，
+    因此报了「没接审核发布」；<b>我未复核一手代码即采信</b>，并据此产出了方案里的「最高优先级断点」、
+    本原型页、以及 S0 的第一条任务。
+    <br><br>
+    <b>教训</b>：受限范围审查得出的<b>否定性断言</b>（「某功能不存在 / 没接」）最容易因读取范围不足而误判，
+    写进方案前<b>必须自己复核一手代码</b>。
+    <br><br>
+    <b>本页仍成立的部分</b>：下方「批量通过并发布」确实<b>没有后端端点</b>（现有全是单条操作），
+    要做需先定批量契约（部分失败格式、幂等键）——列入 backlog，不属 S0。
+    其余区块（AI 一致性检测）作为未来增强保留。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>企业展示管理</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页<b>审核并发布</b>合作机构提交的企业资料。发布后出现在一体机的
+        <a href="#">「找企业」列表与企业详情页</a>（前台 P15）；企业指标是否展示由本页开关控制。
+        <b>机构侧提交入口</b>在 <a href="../partner/jobs.html">合作机构后台 · 企业资料管理</a>。
+      </p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">看终端效果</button>
+      <button class="btn btn--sm btn--primary">新增企业</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="proto proto--warn" data-when="default">
+    <span class="proto__tag">以下为撤回前的原始设计，仅存档</span>
+    下面的「7 家积压 23 天」是<b>撤回前编造的示意数据</b>，实际不存在积压——审核功能一直是通的。
+    「关联 API 未接」的标注同样是错的。保留原样以显示错误影响的范围，<b>不要照此开发</b>。
+  </div>
+
+  <div class="grid grid--4" data-when="default aidown">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">企业总数</div>
+      <div class="metric__value">86</div><div class="metric__foot">已发布 79</div></div><div class="metric__ico">▤</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">待审核</div>
+      <div class="metric__value">7</div><div class="metric__foot down">最久等待 23 天</div></div><div class="metric__ico metric__ico--err">!</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">资料完整度</div>
+      <div class="metric__value">73<small>%</small></div><div class="metric__foot">18 家缺企业简介</div></div><div class="metric__ico metric__ico--warn">◐</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">关联岗位</div>
+      <div class="metric__value">142</div><div class="metric__foot muted">（撤回：关联 API 已接）</div></div><div class="metric__ico">⚭</div></div>
+  </div>
+
+  <!-- AI 一致性检测 -->
+  <div class="advice isnew" data-newtag="新增 · AI 资料一致性" data-when="default" style="margin-top:16px">
+    <div class="advice__head"><span class="tag tag--ai">AI 检测</span>
+      <span class="ev ev--1">E1</span>
+      <b>3 家企业在不同来源里填了冲突的信息</b></div>
+    <div class="advice__action">先合并「XX科技有限公司」的两条重复记录，它们的行业与规模字段互相矛盾。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        同一个统一社会信用代码下有 2 条企业记录（<span class="ev ev--1">E1</span> 字段实测）：
+        一条来自「XX职业学院就业中心」填的「互联网 / 100-499人」，
+        一条来自「市人才服务中心」填的「软件服务 / 500-999人」。前台会显示两个卡片。</span></div>
+      <div class="advice__item"><b>代价</b><span>合并需人工确认保留哪一条为准，约 2 分钟/家。不合并则求职者看到重复企业。</span></div>
+      <div class="advice__item"><b>备选</b><span>保留两条但标注来源机构，让求职者自己判断（不推荐，重复卡片影响体验）。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">查看这 3 组冲突</button>
+      <span class="small muted">AI 判断，仅供参考——合并操作必须人工确认</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head">
+      <h3>企业列表</h3>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>待审核（7）</option><option>全部</option><option>已发布</option><option>已驳回</option></select>
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部来源机构</option></select>
+      </div>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr>
+            <th style="width:30px"><input type="checkbox"></th>
+            <th style="width:22%">企业</th><th>来源机构</th><th>等待</th><th>资料</th>
+            <th>审核状态</th><th>发布状态</th><th style="width:22%">操作</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">XX 科技有限公司</div><div class="cellsub">统一社会信用代码 9111****XK</div></td>
+              <td class="small">XX职业学院就业中心</td>
+              <td class="small" style="color:var(--err-fg)">23 天</td>
+              <td><span class="tag tag--err">疑似重复</span></td>
+              <td><span class="tag tag--warn">待审核</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td class="isnew" data-newtag="已存在 · 非新增">
+                <div class="pill-list">
+                  <button class="btn btn--sm btn--primary">通过</button>
+                  <button class="btn btn--sm">驳回</button>
+                  <button class="btn btn--sm btn--ghost">详情</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">YY 商贸集团</div><div class="cellsub">统一社会信用代码 9111****YM</div></td>
+              <td class="small">市人才服务中心</td>
+              <td class="small" style="color:var(--err-fg)">18 天</td>
+              <td><span class="tag tag--warn">缺企业简介</span></td>
+              <td><span class="tag tag--warn">待审核</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm">要求补充</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">ZZ 服务有限公司</div><div class="cellsub">统一社会信用代码 9111****ZF</div></td>
+              <td class="small">XX职业学院就业中心</td>
+              <td class="small">6 天</td>
+              <td><span class="tag tag--ok">完整</span></td>
+              <td><span class="tag tag--warn">待审核</span></td>
+              <td><span class="tag">草稿</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm btn--primary">通过并发布</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">AA 制造股份</div><div class="cellsub">统一社会信用代码 9111****AM</div></td>
+              <td class="small">市人才服务中心</td>
+              <td class="small muted">—</td>
+              <td><span class="tag tag--ok">完整</span></td>
+              <td><span class="tag tag--ok">已通过</span></td>
+              <td><span class="tag tag--ok">已发布</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm">下架</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card__foot">
+      <div class="row">
+        <span>已选 2 条</span>
+        <button class="btn btn--sm btn--primary">批量通过并发布</button>
+        <button class="btn btn--sm">批量要求补充</button>
+        <div class="spacer"></div>
+        <span class="small muted">审核通过 ≠ 已发布，是两个独立状态（<code>reviewStatus</code> / <code>publishStatus</code>）</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 关联岗位 -->
+  <div class="card isnew" data-newtag="新增 · 第二处漏接" data-when="default" style="margin-top:16px">
+    <div class="card__head"><h3>企业 ↔ 岗位关联</h3>
+      <span class="sub">XX 科技有限公司 · 当前关联 6 个岗位</span></div>
+    <div class="card__body">
+      <div class="proto proto--warn" style="margin:0 0 14px">
+        <span class="proto__tag">同一页的第二处漏接</span>
+        Kiosk 会读 <code>GET /companies/:id/jobs</code>（<code>kiosk/services/api/companies.ts:75-79</code>），
+        后端也有企业↔岗位<b>关联 / 解绑 API</b>（<code>companies.controller.ts:147-165</code>），
+        <b>但本页同样没接</b>。结果：企业详情页里「该企业在招岗位」这块的关联关系，后台改不了。
+      </div>
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr><th style="width:34%">岗位</th><th>审核状态</th><th>发布状态</th><th>关联方式</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain small">软件测试工程师</td>
+              <td><span class="tag tag--ok">已通过</span></td><td><span class="tag tag--ok">已发布</span></td>
+              <td class="small muted">按企业名自动匹配</td>
+              <td><button class="btn btn--sm btn--ghost">解绑</button></td></tr>
+            <tr><td class="cellmain small">行政专员</td>
+              <td><span class="tag tag--err">已驳回</span></td><td><span class="tag">草稿</span></td>
+              <td class="small muted">按企业名自动匹配</td>
+              <td><button class="btn btn--sm btn--ghost">解绑</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn--sm">手动关联岗位</button>
+        <span class="small muted">自动匹配按企业名，同名不同主体时需人工纠正</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空 / AI / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">✓</div><h3>没有待审核的企业资料</h3>
+      <p>机构提交的企业资料会出现在这里。审核通过并发布后，企业出现在一体机「找企业」页。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn">看已发布的</button><button class="btn btn--primary">新增企业</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 资料一致性检测暂时不可用</div>
+      <div class="degrade__body">
+        <b>审核、发布、下架、关联岗位全部照常</b>——这些是本页的主功能，不依赖 AI。
+        暂时没有的只是「哪几家企业信息互相冲突」的自动检测；
+        <b>基于统一社会信用代码的重复检测仍然可用</b>（那是规则，不调模型）。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">继续审核</button>
+        <button class="btn btn--sm">按信用代码查重复</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>企业列表加载失败</h3>
+      <p>无法读取（<code>GET /admin/companies</code> 返回 500）。已发布企业在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>这是本轮最高优先级的一条，且工作量最小</b>：后端 API 齐、前台页面齐，
+        只需在本页接上 <code>PATCH /admin/companies/:id/review</code> 与 <code>/publish</code>。</li>
+      <li><b>路由不变、先拆组件</b>：仍是 <code>/companies</code>；631 行需先拆列表与抽屉再加能力。</li>
+      <li>同时接上企业↔岗位关联 / 解绑 API（<code>companies.controller.ts:147-165</code>）。</li>
+      <li>接通后要<b>先清历史积压</b>——这批资料机构以为已发布，实际从未在前台出现过，
+        建议同步通知相关机构。</li>
+      <li>AI 一致性检测是锦上添花，<b>不要因为它没做就不接审核发布</b>。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'companies'})</script>
+</body>
+</html>
