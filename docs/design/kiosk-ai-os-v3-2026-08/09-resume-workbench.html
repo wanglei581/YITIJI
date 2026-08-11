@@ -999,7 +999,7 @@
         </div>
         <div class="notice" data-when="default first device-off" data-job="ok" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>约 40 秒 · 本次权益内 0 元 · 不显示百分比</span>
+          <span>约 40 秒 · 本机 AI 服务不收费 · 不显示百分比</span>
         </div>
         <!-- AI 中断：文件那两步是本机自己做的，做完了；停的是「读懂这份简历」那一步
              （主区 .locked 的原话）。所以前两步照实打勾，不把它们一起说成没做。 -->
@@ -1362,7 +1362,12 @@
       <div class="pane" data-at="s1 s2 s3 s4 s5">
         <div class="pane-hd"><span class="t">费用与去向</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">本次权益内 0 元</span></div>
+          <!-- 2026-08-11：原文写「本次权益内 0 元」，暗示正在消耗某种 AI 额度 ——
+             而后端**完全没有 AI 定价，也没有用量账本**（AiUsageLedger 仍是待建模型），
+             07 扫描台与 20 面试舱的口径也都是「AI 服务不收费」。
+             一处说"用掉了额度"、两处说"根本不收费"，是同一件事的两种说法。
+             按 §9 不伪造能力：**没有的额度不能说在消耗**。 -->
+          <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">本机 AI 服务不收费</span></div>
           <div class="kv-row"><span class="k">打印</span><span class="v">预估 · 以打印工作台核价为准</span></div>
           <div class="kv-row"><span class="k">诊断报告</span><span class="v">进「AI 服务记录」</span></div>
           <div class="kv-row"><span class="k">新版本</span><span class="v">进「我的简历」</span></div>
