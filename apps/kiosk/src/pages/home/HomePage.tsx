@@ -511,13 +511,14 @@ function SvcGrid() {
       accent: 'a-teal',
       icon: 'zone-campus',
       title: '智慧校园',
-      sub: '校园服务与信息展示',
-      aiChip: 'AI场景引导',
+      // 产品口径：一级入口常驻；真实校园能力继续由终端配置分项开放。
+      // 总开关关闭时仍允许进入专区查看诚实锁定态，不能把入口隐藏成“功能不存在”。
+      sub: campus.enabled ? '校园服务与信息展示' : '功能保留 · 当前未开启',
+      aiChip: campus.enabled ? '本机已配置' : '默认关闭',
     },
   ]
   const visibleTiles = tiles.filter((tile) => {
     if (tile.to === '/toolbox') return toolbox.enabled
-    if (tile.to === '/smart-campus') return campus.enabled
     return true
   })
   return (
@@ -528,6 +529,7 @@ function SvcGrid() {
           type="button"
           className={`svc-tile ${t.accent}`}
           onClick={() => navigate(t.to)}
+          data-feature-state={t.to === '/smart-campus' && !campus.enabled ? 'locked' : 'available'}
         >
           <span className="st-icon">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

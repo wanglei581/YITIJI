@@ -88,6 +88,11 @@ mustNotContain(
   ['freshman-insights'],
   'D HomePage 智慧校园横排不再列出校园大数据入口',
 )
+mustContain(
+  'src/pages/home/HomePage.tsx',
+  ['功能保留 · 当前未开启', "to: '/smart-campus'"],
+  'D2 智慧校园一级入口常驻，默认关闭时展示真实锁定态',
+)
 
 // ── E. smart_campus 投放的扩展应用可启动（回归守卫）────────────────────────
 // 背景：首页 prototype-v1 重写后，后台以 placement=smart_campus 投放的可启动 app

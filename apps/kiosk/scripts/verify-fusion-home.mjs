@@ -281,10 +281,13 @@ expect(
   '实际渲染的 SvcGrid 读取百宝箱与智慧校园真实配置',
 )
 expect(
-  /const\s+visibleTiles\s*=\s*tiles\.filter\([\s\S]*?toolbox\.enabled[\s\S]*?campus\.enabled[\s\S]*?\)/.test(svcGridBody) &&
+  /const\s+visibleTiles\s*=\s*tiles\.filter\([\s\S]*?toolbox\.enabled[\s\S]*?return true[\s\S]*?\)/.test(svcGridBody) &&
     /visibleTiles\.map\(/.test(svcGridBody) &&
+    /sub:\s*campus\.enabled\s*\?\s*'校园服务与信息展示'\s*:\s*'功能保留 · 当前未开启'/.test(svcGridBody) &&
+    /aiChip:\s*campus\.enabled\s*\?\s*'本机已配置'\s*:\s*'默认关闭'/.test(svcGridBody) &&
+    !/tile\.to === '\/smart-campus'\) return campus\.enabled/.test(svcGridBody) &&
     !/\{tiles\.map\(/.test(svcGridBody),
-  'SvcGrid 只渲染后台 enabled 开关允许的百宝箱/智慧校园入口',
+  'SvcGrid 智慧校园一级入口常驻，关闭时显示真实锁定态；百宝箱仍按配置显示',
 )
 
 const groupsArray = extractAssignedArray(serviceGroups, 'export const SERVICE_GROUPS')

@@ -155,7 +155,11 @@ test('smart-campus enabled 与 service 指引可达 @w4', async ({ page, api }) 
 
 test('smart-campus disabled 诚实为空 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api, { smartCampusEnabled: false })
-  await page.goto('/smart-campus')
+  await page.goto('/')
+  const campusEntry = page.getByRole('button', { name: /智慧校园.*当前未开启/ })
+  await expect(campusEntry).toBeVisible()
+  await campusEntry.click()
+  await expect(page).toHaveURL(/\/smart-campus$/)
   await expect(page.getByText('本机暂未开启智慧校园服务')).toBeVisible()
   await verifyPage(page, errors)
 })
