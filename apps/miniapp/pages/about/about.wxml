@@ -1,0 +1,48 @@
+<!--pages/about/about.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">关于我们</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <!-- Logo 区 -->
+    <view class="ab-logo">
+      <view class="ab-mark"><text class="ficon i-printer ab-ic"></text></view>
+      <view class="ab-name">AI 求职打印服务</view>
+      <view class="ab-ver">版本 1.0.2</view>
+      <view class="ab-slogan">用 AI 让求职材料更专业，让打印更简单</view>
+    </view>
+
+    <!-- 链接组1：产品说明 -->
+    <view class="ab-group">
+      <view
+        class="ab-item tap"
+        wx:for="{{links1}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        hover-class="tap-press"
+        bindtap="tapLink"
+      >
+        <view class="ab-t">{{item.title}}</view>
+        <view class="ab-go">›</view>
+      </view>
+    </view>
+
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <view>本平台为求职材料服务与第三方信息入口，不提供平台内投递或招聘服务。岗位、招聘会信息均来自第三方或官方公开来源。</view>
+    </view>
+
+    <view class="ab-foot">© 2026 AI 求职打印服务终端</view>
+
+  </view>
+</view>

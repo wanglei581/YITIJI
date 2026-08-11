@@ -11,26 +11,8 @@ Page({
     pageId: '',
     faved: false,
     job: {
-      title: '后端开发工程师（Node.js）',
-      salary: '15k–25k',
-      company: '某科技有限公司',
-      tags: ['全职', '本科', '3–5年', '深圳·南山'],
-      sourceOrg: '深圳市公共就业服务中心',
-      externalId: 'JOB-2026-087634',
-      syncTime: '2026-07-24 09:12',
-      externalUrl: 'https://example.com/job/087634',
-      duties: [
-        '负责后端业务逻辑开发与接口设计',
-        '参与系统架构设计与技术选型',
-        '编写技术文档，保障代码质量',
-        '配合前端与测试团队完成产品迭代',
-      ],
-      requirements: [
-        '3年以上 Node.js 后端开发经验',
-        '熟悉 PostgreSQL / MySQL / Redis',
-        '有 NestJS / Express 框架经验优先',
-        '本科及以上学历，计算机相关专业',
-      ],
+      title: '', salary: '', company: '', tags: [], sourceOrg: '', externalId: '',
+      syncTime: '', externalUrl: '', duties: [], requirements: [],
     },
   },
 
@@ -53,7 +35,7 @@ Page({
     this.setData({ loading: true, loadError: '' });
     api.getJobDetail(id).then((job) => {
       this.setData({ job, loading: false, faved: favorites.isFaved('job', id) });
-      // 真实拿到内容后才记录浏览(不记录 loading/错误态的默认 mock)
+      // 真实拿到内容后才记录浏览，不记录 loading/错误态的空对象。
       history.recordView('job', { id, title: job.title, source: job.sourceOrg });
     }).catch((err) => {
       const msg = err && err.statusCode === 404 ? '未找到该内容，可能已下线' : (err && err.message) || '加载失败';
@@ -92,6 +74,7 @@ Page({
     wx.showToast({ title: faved ? '已收藏' : '已取消收藏', icon: 'none', duration: 1400 });
   },
 
+  // 必须带上真实 jobId,否则 job-fit 只能退化成手填岗位,拿不到来源信息
   tapAiMatch() {
     const j = this.data.job || {};
     const id = this.data.pageId || j.id || '';
@@ -99,20 +82,20 @@ Page({
       wx.showToast({ title: '岗位信息不可用', icon: 'none' });
       return;
     }
-    // M1 接入岗位匹配前保持诚实提示
-    wx.showToast({ title: '岗位匹配将在 M1 上线', icon: 'none' });
-  },
-
-  tapScanApply() {
-    wx.showToast({ title: '请对准屏幕上的二维码扫码投递', icon: 'none', duration: 2500 });
+    const title = encodeURIComponent(j.title || '');
+    wx.navigateTo({ url: `/pages/job-fit/job-fit?jobId=${id}&jobTitle=${title}` });
   },
 
   tapExternalApply() {
     const j = this.data.job || {};
-    // 只记录「打开了来源平台」这一跳转动作,投递结果在来源平台完成,本机不记录
-    history.recordJump('job', { id: this.data.pageId, title: j.title, source: j.sourceOrg });
-    wx.showToast({ title: '将跳转至来源平台，在来源平台完成投递', icon: 'none', duration: 2500 });
-    // TODO: wx.openEmbeddedMiniProgram 或 打开 externalUrl
+    if (this.data.loading || this.data.loadError || !j.externalUrl) {
+      wx.showToast({ title: '来源链接暂不可用', icon: 'none' });
+      return;
+    }
+    wx.setClipboardData({
+      data: j.externalUrl,
+      success: () => history.recordJump('job', { id: this.data.pageId, title: j.title, source: j.sourceOrg }),
+    });
   },
 
   onShareAppMessage() {

@@ -81,8 +81,7 @@
   </view>
 
   <view class="actionbar">
-    <view class="btn ghost tap" bindtap="tapScanApply">扫码投递</view>
-    <view class="btn primary tap flex-1-6" bindtap="tapExternalApply">去来源平台投递</view>
+    <view class="btn primary block tap" bindtap="tapExternalApply">复制来源链接</view>
   </view>
 
 </view>

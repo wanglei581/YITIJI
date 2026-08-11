@@ -1,0 +1,91 @@
+<!--pages/resumes/resumes.wxml-->
+<view class="page-wrap">
+
+  <!-- 状态栏占位 -->
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+
+  <!-- 导航栏 -->
+  <view class="navbar">
+    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
+    <view class="nb-title">我的简历</view>
+    <view class="nb-right tap" hover-class="tap-press" bindtap="upload">上传</view>
+  </view>
+
+  <!-- 内容区 -->
+  <view class="content">
+
+    <!-- 头部统计 + 上传 -->
+    <view class="page-hd" wx:if="{{!loginRequired}}">
+      <view class="ph-stat">
+        <text class="ph-num">{{resumes.length}}</text>
+        <text class="ph-unit">份简历</text>
+      </view>
+      <view class="upload-btn tap" hover-class="tap-press" bindtap="upload">
+        <text>＋ 上传新简历</text>
+      </view>
+    </view>
+
+    <!-- ── 未登录空态 ── -->
+    <view class="empty-wrap" wx:if="{{loginRequired}}">
+      <view class="ev-icon">📄</view>
+      <view class="ev-title">登录后管理简历</view>
+      <view class="ev-desc">查看和管理你的全部简历版本，享受AI诊断与打印服务</view>
+      <view class="btn-primary tap" hover-class="tap-press" bindtap="goLogin">立即登录</view>
+    </view>
+
+    <!-- ── 简历列表 ── -->
+    <view class="rz-list" wx:elif="{{resumes.length}}">
+      <view
+        class="rz-card tap"
+        wx:for="{{resumes}}"
+        wx:key="id"
+        hover-class="tap-press"
+        bindtap="openResume"
+        data-id="{{item.id}}"
+        data-task-id="{{item.taskId}}"
+      >
+        <!-- 简历缩略图 -->
+        <view class="rz-thumb">
+          <view class="rz-ln ln-h"></view>
+          <view class="rz-ln"></view>
+          <view class="rz-ln"></view>
+          <view class="rz-ln ln-s"></view>
+        </view>
+
+        <!-- 简历信息 -->
+        <view class="rz-body">
+          <view class="rz-header-row">
+            <text class="rz-name">{{item.name}}</text>
+            <text class="badge-primary" wx:if="{{item.isDefault}}">主版本</text>
+          </view>
+          <text class="rz-meta">PDF · {{item.updated}}</text>
+
+          <!-- 状态标签 -->
+          <view class="rz-tags" wx:if="{{item.tag}}">
+            <text class="tag tg-green" wx:if="{{item.tag === '已优化'}}">{{item.tag}}</text>
+            <text class="tag tg-blue" wx:elif="{{item.tag === '已诊断'}}">{{item.tag}}</text>
+            <text class="tag tg-amber" wx:else>{{item.tag}}</text>
+          </view>
+
+          <!-- 操作按钮（catchtap 阻止冒泡到卡片 bindtap） -->
+          <view class="rz-acts">
+            <view class="act-btn tap" hover-class="act-press" catchtap="openResume" data-task-id="{{item.taskId}}">诊断</view>
+            <view class="act-btn tap" hover-class="act-press" catchtap="optimize" data-task-id="{{item.taskId}}">优化</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ── 无简历空态 ── -->
+    <view class="empty-wrap" wx:else>
+      <view class="ev-icon">📄</view>
+      <view class="ev-title">还没有简历</view>
+      <view class="ev-desc">上传简历开始享受 AI 诊断、优化与打印服务</view>
+      <view class="btn-primary tap" hover-class="tap-press" bindtap="upload">上传第一份简历</view>
+    </view>
+
+  </view><!-- /content -->
+
+  <!-- tabBar 安全区 -->
+  <view style="height:calc(80rpx + env(safe-area-inset-bottom))"></view>
+</view>

@@ -1,0 +1,58 @@
+<!--pages/print-preview/print-preview.wxml  P09 打印预览-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">打印预览</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="content has-bar">
+    <!-- 参数条 -->
+    <view class="preview-params rise-d1">
+      <text class="pp-chip">{{colorLabel}}</text>
+      <text class="pp-dot">·</text><text class="pp-chip">A4</text>
+      <text class="pp-dot">·</text><text class="pp-chip">{{duplexLabel}}</text>
+      <text class="pp-dot">·</text><text class="pp-chip">×{{copies}} 份</text>
+      <text class="pp-dot">·</text><text class="pp-amt">¥{{total}}</text>
+    </view>
+
+    <!-- A4 纸张近似预览 -->
+    <view class="a4-paper rise-d2">
+      <view class="p-name">{{docName}}</view>
+      <view class="p-tagline">以下为版式近似预览，实际以文件原始格式为准</view>
+      <view class="p-divider"></view>
+      <view class="p-section">第 {{page}} 页 · 共 {{pages}} 页</view>
+      <view class="p-line full"></view>
+      <view class="p-line med"></view>
+      <view class="p-line full"></view>
+      <view class="p-line short"></view>
+      <view class="p-line thin"></view>
+      <view class="p-line full"></view>
+      <view class="p-line med"></view>
+      <view class="p-line thin"></view>
+      <view class="p-line short"></view>
+    </view>
+
+    <!-- 翻页 -->
+    <view class="page-indicator rise-d3">
+      <view class="pi-nav tap {{page<=1?'off':''}}" hover-class="tap-press" bindtap="prevPage">‹</view>
+      <view class="pi-dots">
+        <view class="pi-dot {{page===idx+1?'on':''}}" wx:for="{{pageDots}}" wx:key="*this" wx:for-index="idx"></view>
+      </view>
+      <view class="pi-text">第 {{page}} / {{pages}} 页</view>
+      <view class="pi-nav tap {{page>=pages?'off':''}}" hover-class="tap-press" bindtap="nextPage">›</view>
+    </view>
+
+    <view class="notice rise-d4">
+      <text class="ficon i-info n-ic"></text>
+      <text>预览为近似效果，实际打印以文件原始格式为准。出纸在所选门店一体机完成。</text>
+    </view>
+
+  </view>
+
+  <view class="actionbar">
+    <view class="btn ghost-ink" style="flex:1" bindtap="back">返回修改</view>
+    <view class="btn primary" style="flex:1.4" bindtap="confirm">确认参数，去选门店 →</view>
+  </view>
+</view>

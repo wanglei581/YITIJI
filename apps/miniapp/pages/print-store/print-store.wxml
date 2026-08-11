@@ -1,0 +1,64 @@
+<view class="page-wrap">
+<view style="height:{{statusBarHeight}}px"></view>
+<view class="navbar">
+  <view class="nav-back tap" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+  <view class="nav-title">选择门店</view>
+  <view class="nav-right"></view>
+</view>
+
+<view class="content has-bar">
+  <view class="steps rise-d1">
+    <view class="st done"><text class="n">✓</text><text class="nl">选择文件</text></view>
+    <view class="line done"></view>
+    <view class="st on"><text class="n">2</text><text class="nl">选门店</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">4</text><text class="nl">机端支付</text></view>
+  </view>
+
+  <view class="notice info rise-d2">
+    <text class="ficon i-location n-ic"></text>
+    <text>请选择真实在线终端。到机核验后再现场支付与打印，终端状态以实时心跳为准。</text>
+  </view>
+
+  <view class="store-list rise-d3">
+    <!-- 空态：门店与机器状态需真实接口提供，未接入前不展示示例门店 -->
+    <view wx:if="{{loading}}" class="empty">
+      <view class="e-title">正在加载终端…</view>
+    </view>
+    <view wx:elif="{{loadError}}" class="empty" bindtap="reload">
+      <view class="e-title">加载失败，点此重试</view>
+      <view class="e-desc">{{loadError}}</view>
+    </view>
+    <view wx:elif="{{stores.length === 0}}" class="empty">
+      <view class="e-ic">📍</view>
+      <view class="e-title">暂无可选门店</view>
+      <view class="e-desc">仅展示已启用且有真实心跳的公开终端</view>
+    </view>
+
+    <view wx:for="{{stores}}" wx:key="id" class="store-card {{picked===item.id?'selected':''}} tap" data-id="{{item.id}}" bindtap="pick">
+      <view class="sc-top">
+        <view class="sc-name">{{item.displayName}}</view>
+        <view class="sc-radio">{{picked===item.id?'✓':''}}</view>
+      </view>
+      <view class="sc-addr">{{item.locationLabel || '暂未配置服务点说明'}}</view>
+      <view class="sc-badges">
+        <view class="badge time"><text class="ficon i-history"></text>{{item.isOnline ? '在线' : '离线'}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-t rise-d4">订单摘要</view>
+  <view class="card flat summary rise-d4">
+    <view class="summary-row"><text>文件</text><text>{{q.name || '未提供文件'}}</text></view>
+    <view class="summary-row"><text>参数</text><text>{{q.color==='color'?'彩色':'黑白'}} · A4 · {{q.duplex==='double'?'双面':'单面'}} · ×{{q.copies || 1}}份</text></view>
+    <view class="summary-row total"><text>预估</text><text class="amt">{{q.total ? '¥' + q.total : '—'}}</text></view>
+  </view>
+</view>
+
+<view class="actionbar">
+  <view class="ab-price"><text class="ab-label">预估</text><text class="ab-amt">{{q.total ? '¥' + q.total : '—'}}</text></view>
+  <view class="btn primary lg {{picked ? '' : 'disabled'}}" bindtap="toPay">确认终端 →</view>
+</view>
+</view>

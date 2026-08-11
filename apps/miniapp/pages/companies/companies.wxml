@@ -8,18 +8,6 @@
     <view class="nav-right"></view>
   </view>
 
-  <view class="search-bar">
-    <view class="search-inp tap" hover-class="tap-press" bindtap="tapSearch">
-      <text class="ficon i-search"></text>
-      <text class="si-ph">搜企业名称、行业、关键词…</text>
-    </view>
-  </view>
-
-  <view class="filter-bar">
-    <view class="f-chip {{activeFilter === index ? 'on' : ''}}"
-      wx:for="{{filters}}" wx:key="*this" data-index="{{index}}" bindtap="tapFilter">{{item}}</view>
-  </view>
-
   <view class="content has-bar">
     <view wx:if="{{loading}}" class="list-state">加载中…</view>
 

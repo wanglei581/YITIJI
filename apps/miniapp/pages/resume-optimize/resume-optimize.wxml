@@ -1,0 +1,80 @@
+<!--pages/resume-optimize/resume-optimize.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">AI 简历优化</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <!-- 无任务 -->
+  <view wx:if="{{phase === 'no-task'}}" class="no-task-state">
+    <view class="ficon i-file-text nt-ic"></view>
+    <view class="nt-title">未指定优化任务</view>
+    <view class="nt-sub">请从简历诊断页发起 AI 优化</view>
+    <view class="btn ghost tap nt-btn" bindtap="goBack">返回</view>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{phase === 'loading'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-edit rs-ic"></view>
+    </view>
+    <view class="rs-title">加载优化结果…</view>
+    <view class="rs-sub">正在读取 AI 优化建议</view>
+  </view>
+
+  <!-- 失败 -->
+  <view wx:if="{{phase === 'failed'}}" class="failed-state">
+    <view class="ficon i-info fail-ic"></view>
+    <view class="fail-msg">{{failMsg || '优化生成失败'}}</view>
+    <view wx:if="{{needReupload}}" class="fail-hint">
+      AI 已按隐私策略清理简历原文，无法重新生成。请重新上传简历后再试。
+    </view>
+    <view wx:if="{{!needReupload}}" class="fail-hint">
+      AI 生成内容未通过真实性校验。你可以手动重试，再次生成仍可能失败。
+    </view>
+    <view wx:if="{{needReupload}}" class="btn primary tap fail-btn" bindtap="tapReupload">重新上传简历</view>
+    <view wx:if="{{!needReupload}}" class="btn ghost tap fail-btn" bindtap="tapRetry">重试</view>
+    <view class="btn ghost tap fail-btn-sm" bindtap="goBack">返回</view>
+  </view>
+
+  <!-- Mock 模型提示(测试环境) -->
+  <view wx:if="{{phase === 'done' && isMock}}" class="mock-banner">
+    ⚠️ 当前使用测试模型，结果为模拟数据，不代表真实 AI 输出
+  </view>
+
+  <view wx:if="{{phase === 'done' && fromJobFit}}" class="notice info">
+    <view class="ficon i-info n-ic"></view>
+    <text>已从“{{targetPosition || '目标岗位'}}”匹配结果进入。本页优化基于原简历诊断生成，请回到匹配结果逐项核对岗位差距，不会替你补写不存在的经历。</text>
+  </view>
+
+  <!-- 对比视图 -->
+  <view wx:if="{{phase === 'done'}}" class="content">
+    <view class="compare-header">
+      <view class="ch-col">修改前</view>
+      <view class="ch-div"></view>
+      <view class="ch-col teal">修改后</view>
+    </view>
+    <view
+      class="diff-block"
+      wx:for="{{opt.modules}}"
+      wx:key="key"
+    >
+      <view class="db-section">{{item.title}}</view>
+      <view class="db-cols">
+        <view class="db-old">{{item.before}}</view>
+        <view class="db-new">{{item.after}}</view>
+      </view>
+    </view>
+    <view wx:if="{{!opt.hasModules}}" class="empty-modules">
+      AI 优化已完成，但本次未生成具体修改建议。
+    </view>
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>优化结果仅供参考，请核实内容真实性后再使用。不得添加虚假经历或虚构数据。</text>
+    </view>
+  </view>
+
+</view>

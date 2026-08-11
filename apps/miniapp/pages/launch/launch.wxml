@@ -1,0 +1,83 @@
+<!--pages/launch/launch.wxml-->
+<view class="launch-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="launch-mid">
+    <view class="launch-icon-wrap">
+      <text class="ficon i-printer launch-icon-ic"></text>
+    </view>
+    <view class="launch-brand">AI求职打印服务终端</view>
+    <view class="launch-sub">Smart Job Hunt · Print Terminal</view>
+    <view class="launch-divider"></view>
+  </view>
+
+  <view class="launch-btns">
+
+    <!-- ① 微信一键登录（默认） -->
+    <block wx:if="{{!showSms}}">
+      <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
+        open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed}}">
+        <text class="ficon i-comment" style="margin-right:8rpx;font-size:36rpx"></text>微信一键登录
+      </button>
+      <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
+        使用短信验证码登录
+      </view>
+      <button class="btn block launch-btn-guest tap" hover-class="tap-press" bindtap="tapSkip">
+        暂不登录
+      </button>
+    </block>
+
+    <!-- ② 短信验证码登录（内嵌，不跳页面） -->
+    <block wx:else>
+      <!-- 手机号 -->
+      <view class="sms-field">
+        <view class="sms-phone-wrap">
+          <view class="sms-prefix">+86</view>
+          <input class="sms-phone-input" type="number" maxlength="11"
+            placeholder="手机号码" placeholder-style="color:rgba(255,255,255,.3)"
+            value="{{phone}}" bindinput="onPhoneInput" focus="{{showSms}}" />
+          <view class="sms-send-btn {{counting || sending ? 'counting' : ''}} tap"
+            hover-class="tap-press" bindtap="sendCode">
+            {{sending ? '发送中' : (counting ? countDown + 's' : '发送验证码')}}
+          </view>
+        </view>
+        <view wx:if="{{codeHint}}" class="sms-hint">{{codeHint}}</view>
+      </view>
+
+      <!-- 验证码格子 -->
+      <view class="sms-otp-wrap" style="position:relative">
+        <block wx:for="{{otp}}" wx:key="index">
+          <view class="sms-otp-box {{item ? 'filled' : ''}} {{code.length === index ? 'active' : ''}}">
+            {{item}}
+          </view>
+        </block>
+        <input class="sms-otp-hidden" type="number" maxlength="6"
+          value="{{code}}" bindinput="onCodeInput" />
+      </view>
+
+      <!-- 确认登录 -->
+      <button class="btn block launch-btn-sms-confirm tap" hover-class="tap-press"
+        loading="{{submitting}}" disabled="{{submitting}}" bindtap="confirmSms">
+        {{submitting ? '登录中' : '确认登录'}}
+      </button>
+
+      <!-- 返回微信登录 -->
+      <view class="launch-alt tap" hover-class="tap-press" bindtap="tapBackToWx">
+        ← 返回微信一键登录
+      </view>
+    </block>
+
+    <!-- 法律条款（两种模式共用） -->
+    <view class="launch-legal">
+      <view class="launch-agree tap" hover-class="tap-press" bindtap="toggleAgree">
+        <view class="launch-check {{agreed ? 'checked' : ''}}">{{agreed ? '✓' : ''}}</view>
+        <text>我已阅读并同意</text>
+      </view>
+      <view>
+        <text class="launch-link tap" catchtap="tapTerms">《用户服务协议》</text>和
+        <text class="launch-link tap" catchtap="tapPrivacy">《隐私政策》</text>
+      </view>
+    </view>
+
+  </view>
+</view>

@@ -1,0 +1,160 @@
+<!--pages/career-plan/career-plan.wxml-->
+<!--
+  合规:全部内容来自后端 CareerPlanResponse,不做任何前端补全。
+  这里刻意没有的东西:方向匹配度(后端 directions 无该字段)、薪资预测、录用/通过率、
+  以及"学历/年限/城市/期望"输入框(后端不收 body,填了也会被丢掉)。
+-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">职业规划参考</view>
+  </view>
+
+  <!-- 无已解析简历:不伪造规划,给真实入口 -->
+  <view wx:if="{{phase === 'no-task'}}" class="running-state">
+    <view class="st-ic"><text class="ficon i-file-text"></text></view>
+    <view class="rs-title">还没有可用的简历</view>
+    <view class="rs-sub">职业规划完全基于你的简历原文生成,需要先上传并解析一份简历</view>
+    <view class="cp-cta tap" bindtap="tapUpload">去上传简历 ›</view>
+  </view>
+
+  <!-- 可生成:说清依据与代价,由用户手动触发 -->
+  <view wx:elif="{{phase === 'ready'}}" class="content">
+    <view class="card">
+      <view class="card-head"><view class="ch-title">生成依据</view></view>
+      <view class="card-inner">
+        <view class="cp-p">规划内容由 AI 依据你<text class="cp-strong">已解析简历中的文本</text>生成,包括教育、经历与技能描述。</view>
+        <view class="cp-p">如果你此前做过岗位匹配或模拟面试,系统会一并参考,并在结果里如实标注。</view>
+        <view wx:if="{{resumeName}}" class="cp-file">
+          <text class="ficon i-file-text cp-file-ic"></text>
+          <text class="cp-file-name">{{resumeName}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>只输出方向与行动建议,不预测薪资,也不提供录用或面试通过率。</text>
+    </view>
+    <view class="cp-act"><view class="btn primary block tap" bindtap="tapGenerate">生成规划建议</view></view>
+  </view>
+
+  <!-- 生成中:只显示真实已用秒数,不显示伪造进度 -->
+  <view wx:elif="{{phase === 'running'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-compass rs-ic"></view>
+    </view>
+    <view class="rs-title">AI 正在依据简历生成规划…</view>
+    <view class="rs-sub">已用 {{elapsed}} 秒,校验不通过时会自动重试一次,请勿离开页面</view>
+    <view class="rs-disclaimer">建议仅供参考,请结合自身情况与市场信息判断</view>
+  </view>
+
+  <!-- 失败:区分"重试有用"和"必须重新上传简历"两种出口 -->
+  <view wx:elif="{{phase === 'failed'}}" class="running-state">
+    <view class="st-ic warn"><text class="ficon i-info"></text></view>
+    <view class="rs-title">规划没有生成成功</view>
+    <view class="rs-sub">{{failMsg}}</view>
+    <view wx:if="{{needReupload}}" class="cp-cta tap" bindtap="tapUpload">重新上传简历 ›</view>
+    <view wx:else class="cp-cta tap" bindtap="tapGenerate">重新生成 ›</view>
+  </view>
+
+  <!-- 结果 -->
+  <view wx:elif="{{phase === 'done'}}" class="content has-bar">
+    <view class="notice plum">
+      <view class="ficon i-info n-ic"></view>
+      <text>以下建议由 AI 基于你的简历文本生成,仅供你本人参考,不构成职业指导意见,也不代表用人单位意见。</text>
+    </view>
+
+    <view wx:if="{{plan.isMockProvider}}" class="notice warn">
+      <view class="ficon i-info n-ic"></view>
+      <text>当前服务端使用占位模型,以下内容仅用于流程演示,不能作为求职依据。</text>
+    </view>
+
+    <!-- 生成依据如实展示:只有简历时不能暗示还参考了岗位匹配或面试 -->
+    <view class="cp-based">
+      <view class="cb-cap">本次生成依据</view>
+      <view class="chips">
+        <view wx:if="{{plan.basedOnResume}}" class="chip teal">简历原文</view>
+        <view wx:if="{{plan.basedOnJobFit}}" class="chip teal">岗位匹配（{{plan.jobFitName}}）</view>
+        <view wx:if="{{plan.basedOnInterview}}" class="chip teal">模拟面试（{{plan.interviewName}}）</view>
+      </view>
+      <view wx:if="{{!plan.basedOnJobFit && !plan.basedOnInterview}}" class="cb-hint">本次只参考了简历,未结合岗位匹配或面试记录。</view>
+    </view>
+
+    <view wx:if="{{plan.summary}}" class="card">
+      <view class="card-head"><view class="ch-title">总体说明</view></view>
+      <view class="card-inner"><view class="cp-summary">{{plan.summary}}</view></view>
+    </view>
+
+    <!-- 现状画像:evidence 经服务端逐字校验必须出自简历原文;校验不过的条目会被丢掉,故可能为空 -->
+    <block wx:if="{{plan.currentSnapshot.length}}">
+      <view class="section-t">现状画像</view>
+      <view class="cp-list">
+        <view class="cs-item tap" wx:for="{{plan.currentSnapshot}}" wx:key="point"
+              data-title="{{item.point}}" data-text="{{item.evidence}}" bindtap="tapText">
+          <view class="cs-mark">·</view>
+          <view class="cs-body">
+            <view class="cs-point">{{item.point}}</view>
+            <view wx:if="{{item.evidence}}" class="cs-ev">简历原文：{{item.evidence}}</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 方向:只有 title / why / firstStep,没有匹配度 -->
+    <block wx:if="{{plan.directions.length}}">
+      <view class="section-t">可考虑的方向</view>
+      <view class="dir-list">
+        <view class="dir-item" wx:for="{{plan.directions}}" wx:key="title">
+          <view class="di-head">
+            <view class="di-rank">{{index + 1}}</view>
+            <view class="di-title">{{item.title}}</view>
+          </view>
+          <view wx:if="{{item.why}}" class="di-reason">{{item.why}}</view>
+          <view wx:if="{{item.firstStep}}" class="di-step">
+            <view class="ds-cap">第一步</view>
+            <view class="ds-text">{{item.firstStep}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="cp-hint">方向按 AI 给出的顺序排列，仅供本人参考，不代表求职结果或优先级排名。</view>
+    </block>
+
+    <block wx:if="{{plan.skillPlan.length}}">
+      <view class="section-t">技能提升建议</view>
+      <view class="cp-list">
+        <view class="sk-item tap" wx:for="{{plan.skillPlan}}" wx:key="skill"
+              data-title="{{item.skill}}" data-text="{{item.action}}" bindtap="tapText">
+          <view class="sk-head">
+            <view class="sk-name">{{item.skill}}</view>
+            <view wx:if="{{item.timeframe}}" class="sk-time">{{item.timeframe}}</view>
+          </view>
+          <view wx:if="{{item.action}}" class="sk-act">{{item.action}}</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{plan.actionChecklist.length}}">
+      <view class="section-t">近期行动清单</view>
+      <view class="action-list">
+        <view class="al-item" wx:for="{{plan.actionChecklist}}" wx:key="*this">
+          <view class="al-dot"></view>
+          <view class="al-text">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>规划为参考建议,不预测薪资与录用结果。投递须前往来源平台操作。</text>
+    </view>
+  </view>
+
+  <view wx:if="{{phase === 'done'}}" class="actionbar">
+    <view class="btn ghost tap" bindtap="tapRegenerate">重新生成</view>
+    <view class="btn primary tap flex-1-4 {{printing ? 'disabled' : ''}}" bindtap="tapPrint">
+      {{printing ? '生成中…' : '生成建议单去打印'}}
+    </view>
+  </view>
+</view>

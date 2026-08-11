@@ -1,85 +1,47 @@
-<!--pages/privacy/privacy.wxml-->
 <view class="page-wrap">
-
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
       <view class="nav-back tap" hover-class="tap-press" bindtap="back">
         <text class="ficon i-right nav-back-ic"></text>
       </view>
-      <view class="nav-title">隐私设置</view>
+      <view class="nav-title">隐私与数据</view>
       <view class="nav-right"></view>
     </view>
   </view>
 
   <view class="content">
-
-    <!-- 文件安全 -->
-    <view class="grp-label">文件安全</view>
+    <view class="grp-label">隐私规则</view>
     <view class="pv-group">
-      <view class="pv-item">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toPolicy">
         <view class="pv-main">
-          <view class="pv-t">敏感文件自动清理</view>
-          <view class="pv-s">到期后系统自动删除</view>
-        </view>
-        <view class="tgl {{toggles.autoClean ? 'on' : ''}}" data-key="autoClean" catchtap="toggle"></view>
-      </view>
-      <view class="pv-item tap" hover-class="tap-press" bindtap="cyclePeriod">
-        <view class="pv-main">
-          <view class="pv-t">清理周期</view>
-        </view>
-        <view class="pv-v">打印后 7 天</view>
-        <view class="pv-go">›</view>
-      </view>
-      <view class="pv-item">
-        <view class="pv-main">
-          <view class="pv-t">打印后自动删除源文件</view>
-          <view class="pv-s">打印成功后立即删除上传的原文件</view>
-        </view>
-        <view class="tgl {{toggles.delSource ? 'on' : ''}}" data-key="delSource" catchtap="toggle"></view>
-      </view>
-    </view>
-
-    <!-- 数据授权 -->
-    <view class="grp-label">数据授权</view>
-    <view class="pv-group">
-      <view class="pv-item">
-        <view class="pv-main">
-          <view class="pv-t">允许 AI 使用简历优化建议</view>
-          <view class="pv-s">仅用于本终端 AI 服务</view>
-        </view>
-        <view class="tgl {{toggles.aiResume ? 'on' : ''}}" data-key="aiResume" catchtap="toggle"></view>
-      </view>
-      <view class="pv-item">
-        <view class="pv-main">
-          <view class="pv-t">个性化信息推荐</view>
-          <view class="pv-s">基于求职偏好推送岗位与招聘会</view>
-        </view>
-        <view class="tgl {{toggles.reco ? 'on' : ''}}" data-key="reco" catchtap="toggle"></view>
-      </view>
-    </view>
-
-    <!-- 数据管理 -->
-    <view class="grp-label">数据管理</view>
-    <view class="pv-group">
-      <view class="pv-item tap" hover-class="tap-press" bindtap="exportData">
-        <view class="pv-main">
-          <view class="pv-t">导出我的数据</view>
+          <view class="pv-t">隐私政策</view>
+          <view class="pv-s">查看当前生效版本、处理目的与保存期限</view>
         </view>
         <view class="pv-go">›</view>
       </view>
-      <view class="pv-item tap" hover-class="tap-press" bindtap="deleteAccount">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toDocuments">
         <view class="pv-main">
-          <view class="pv-t danger">注销账号</view>
-          <view class="pv-s">删除全部个人数据，不可恢复</view>
+          <view class="pv-t">我的文档与到期时间</view>
+          <view class="pv-s">查看服务端返回的真实文件期限并可主动删除</view>
         </view>
-        <view class="pv-go danger">›</view>
+        <view class="pv-go">›</view>
+      </view>
+    </view>
+
+    <view class="grp-label">高敏操作</view>
+    <view class="pv-group">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="explainSensitiveAction">
+        <view class="pv-main">
+          <view class="pv-t">数据导出与账号注销</view>
+          <view class="pv-s">需短信二次验证；本版本小程序端尚未完成安全交互</view>
+        </view>
+        <view class="pv-go">›</view>
       </view>
     </view>
 
     <view class="compliance-note">
-      我们仅收集为你提供服务所必需的信息。你的简历与文件不会提供给任何第三方或招聘方。
+      简历、文件和 AI 结果只服务本人，不提供给招聘企业或合作机构。岗位和招聘会仅提供来源信息入口。
     </view>
-
   </view>
 </view>

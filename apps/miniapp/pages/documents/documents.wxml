@@ -1,0 +1,85 @@
+<!--pages/documents/documents.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">我的文档</view>
+      <view class="nav-right tap" hover-class="tap-press" bindtap="loadDocuments">
+        <text class="nav-caps">刷新</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="content has-bar">
+
+    <view class="filter-bar">
+      <view
+        class="f-chip {{activeFilter === item.key ? 'on' : ''}}"
+        wx:for="{{filters}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="setFilter"
+      >{{item.label}}</view>
+    </view>
+
+    <view class="section-t" wx:if="{{!loading && !loadError}}">最近 · {{filtered.length}} 个文件</view>
+
+    <view class="card" wx:if="{{loading}}">
+      <view class="empty-slot"><view class="es-t">正在加载本人文档…</view></view>
+    </view>
+
+    <view class="card" wx:elif="{{loadError}}">
+      <view class="empty-slot">
+        <view class="es-t">加载失败</view>
+        <view class="es-d">{{loadError}}</view>
+        <view class="btn ghost" bindtap="loadDocuments">重试</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{filtered.length}}">
+      <view
+        class="doc-item tap"
+        wx:for="{{filtered}}"
+        wx:key="id"
+        hover-class="tap-press"
+        data-id="{{item.id}}"
+        bindtap="openDoc"
+      >
+        <view class="doc-ic ic-{{item.kind}}">{{item.ext}}</view>
+        <view class="doc-body">
+          <view class="doc-name">{{item.name}}</view>
+          <view class="doc-meta">
+            <text>{{item.size}}</text>
+            <text class="doc-dot">·</text>
+            <text>{{item.time}}</text>
+            <text class="doc-exp" wx:if="{{item.expire}}">{{item.expire}}</text>
+          </view>
+        </view>
+        <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}">⋯</view>
+      </view>
+    </view>
+
+    <view class="card" wx:else>
+      <view class="empty-slot">
+        <text class="ficon i-folder es-ic"></text>
+        <view class="es-t">暂无文件</view>
+        <view class="es-d">上传文件后可再次发起打印</view>
+      </view>
+    </view>
+
+    <view class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>身份证等敏感文件已设置有效期,到期后系统自动清理。你也可随时手动删除。</view>
+    </view>
+
+  </view>
+
+  <view class="actionbar">
+    <view class="btn primary block {{uploading ? 'disabled' : ''}}" hover-class="tap-press" bindtap="upload">{{uploading ? '上传中…' : '上传新文件'}}</view>
+  </view>
+
+</view>

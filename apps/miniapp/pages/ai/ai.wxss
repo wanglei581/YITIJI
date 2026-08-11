@@ -1,53 +1,96 @@
-/* AI 百宝箱占位页（M0.1 壳） */
-.tab-page {
-  min-height: 100vh;
-  background: #f4f1e8;
-  box-sizing: border-box;
+/* pages/ai/ai.wxss */
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 小青入口卡：纸底 + 左侧墨青细栏，去渐变 */
+.xq-card {
+  display: flex; align-items: center; gap: 14px;
+  margin: 4px 16px 12px;
+  padding: 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--plum);
+  box-shadow: 0 1px 2px rgba(16,48,43,.05), 0 4px 12px rgba(16,48,43,.05);
 }
-.tab-hd {
-  padding: 8rpx 32rpx 16rpx;
+.xq-body { flex: 1; min-width: 0; }
+.xq-name { font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: .5px; }
+.xq-desc { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.xq-go {
+  font-size: 13px; font-weight: 600; color: var(--plum-deep);
+  border: 1px solid rgba(122,90,134,.3);
+  padding: 6px 13px; border-radius: var(--r-full);
+  flex-shrink: 0;
 }
-.tab-title {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #10302b;
+
+/* AI 免责声明：安静的信息条，无发光、无 emoji 装饰 */
+.as-disc {
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: 11px; color: var(--faint);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  margin: 0 16px 16px;
+  line-height: 1.55;
 }
-.tab-body {
-  padding: 24rpx 32rpx;
+.as-disc .ficon { color: var(--plum); font-size: 13px; margin-top: 1px; flex-shrink: 0; }
+
+/* AI 工具磁贴：统一为紫调单色，去彩虹。整块「AI 区」共用一个身份色相，
+   工具之间靠图形与文案分辨，而非五种色块——更克制、更像专业工具集。 */
+.tiles .tile {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(16,48,43,.04);
 }
-.empty-card {
+.tiles .tile .t-ic {
+  background: var(--plum-wash);
+  color: var(--plum-deep);
+  border: 1px solid rgba(122,90,134,.16);
+}
+
+/* 材料和打印不冒充 AI 能力，作为百宝箱内独立目录呈现。 */
+.utility-title { padding-top: 24px; }
+.service-list {
+  margin: 0 16px;
+  padding: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.service-row {
+  min-height: 62px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 96rpx 48rpx;
-  background: #fffdf8;
-  border: 1rpx solid #e2dccb;
-  border-radius: 24rpx;
+  gap: 12px;
+  border-bottom: 1px solid var(--line-soft);
 }
-.empty-icon {
+.service-row:last-child { border-bottom: 0; }
+.service-icon {
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
-  background: #f0f7f3;
+  flex-shrink: 0;
+  border-radius: var(--r-sm);
+  color: var(--clay);
+  background: var(--clay-wash);
 }
-.empty-icon .ficon {
-  width: 52rpx;
-  height: 52rpx;
-  color: #1f9e86;
+.service-icon .ficon { width: 17px; height: 17px; }
+.service-copy { flex: 1; min-width: 0; }
+.service-name { color: var(--ink); font-size: 14px; font-weight: 600; }
+.service-desc { margin-top: 3px; color: var(--muted); font-size: 11.5px; }
+.service-arrow { flex-shrink: 0; color: var(--ghost); font-size: 18px; }
+
+/* 最近记录空态：安静引导，不伪造历史 */
+.ai-empty {
+  margin: 0 16px;
+  padding: 30px 20px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
 }
-.empty-title {
-  margin-top: 32rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #274b43;
-}
-.empty-copy {
-  margin-top: 16rpx;
-  font-size: 26rpx;
-  line-height: 1.7;
-  color: #5d6b63;
-  text-align: center;
-}
+.ai-empty .ae-ic { font-size: 26px; color: var(--ghost); margin-bottom: 10px; }
+.ae-text { font-size: 14px; font-weight: 600; color: var(--ink-soft); letter-spacing: .3px; }
+.ae-sub { font-size: 12px; color: var(--faint); margin-top: 5px; line-height: 1.5; }

@@ -1,0 +1,90 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 运行中动画（复用） */
+.running-state { display: flex; flex-direction: column; align-items: center;
+  padding: 100rpx 32rpx 0; gap: 20rpx; }
+.rs-anim { position: relative; width: 120rpx; height: 120rpx; margin-bottom: 16rpx; }
+.rs-ring { position: absolute; inset: 0; border-radius: 50%;
+  border: 4rpx solid transparent; border-top-color: var(--teal);
+  animation: spin 1s linear infinite; }
+.rs-ic { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 48rpx; color: var(--teal); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rs-title { font-size: 34rpx; font-weight: 700; color: var(--ink); }
+.rs-sub { font-size: 26rpx; color: var(--muted); text-align: center; }
+.rs-disclaimer { font-size: 22rpx; color: var(--ghost); text-align: center; line-height: 1.6; }
+
+/* 对比视图 */
+.compare-header { display: flex; align-items: center; margin-bottom: 16rpx; }
+.ch-col { flex: 1; text-align: center; font-size: 24rpx; font-weight: 600; color: var(--muted); }
+.ch-col.teal { color: var(--teal); }
+.ch-div { width: 2rpx; height: 32rpx; background: var(--line); }
+
+.diff-block { background: var(--surface); border-radius: 12rpx; margin-bottom: 16rpx;
+  overflow: hidden; }
+.db-section { font-size: 22rpx; font-weight: 700; color: var(--muted); letter-spacing: 1px;
+  padding: 14rpx 20rpx; background: var(--paper); border-bottom: 1rpx solid var(--line); }
+.db-cols { display: flex; }
+.db-old { flex: 1; padding: 20rpx; font-size: 26rpx; color: var(--muted); line-height: 1.7;
+  background: rgba(255,100,100,.04); border-right: 1rpx solid var(--line); }
+.db-new { flex: 1; padding: 20rpx; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+.db-reason { font-size: 22rpx; color: var(--teal); padding: 10rpx 20rpx 14rpx;
+  border-top: 1rpx solid var(--line); }
+
+/* 合并预览 */
+.merged-preview { background: var(--surface); border-radius: 14rpx; padding: 28rpx; }
+.mp-text { font-size: 28rpx; color: var(--ink); line-height: 1.9; white-space: pre-wrap; }
+
+/* nav toggle */
+.toggle-btn { font-size: 24rpx; color: var(--teal); padding: 8rpx 16rpx;
+  border: 1rpx solid var(--teal); border-radius: 20rpx; }
+
+/* flex */
+.flex-1-4 { flex: 1.4; }
+
+/* 无任务 */
+.no-task-state { display: flex; flex-direction: column; align-items: center;
+  padding: 120rpx 48rpx 0; gap: 20rpx; }
+.nt-ic { font-size: 80rpx; color: var(--ghost); }
+.nt-title { font-size: 34rpx; font-weight: 700; color: var(--ink); }
+.nt-sub { font-size: 26rpx; color: var(--muted); text-align: center; }
+.nt-btn { margin-top: 20rpx; padding: 0 48rpx; }
+
+/* 失败 */
+.failed-state { display: flex; flex-direction: column; align-items: center;
+  padding: 100rpx 48rpx 0; gap: 16rpx; }
+.fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.fail-msg { font-size: 30rpx; font-weight: 700; color: var(--ink); text-align: center;
+  line-height: 1.5; }
+.fail-hint { font-size: 24rpx; color: var(--muted); text-align: center; line-height: 1.7;
+  max-width: 580rpx; }
+.fail-btn { margin-top: 12rpx; padding: 0 56rpx; min-height: 80rpx; }
+.fail-btn-sm { padding: 0 40rpx; min-height: 72rpx; color: var(--muted); }
+
+/* Mock 模型横幅 */
+.mock-banner { margin: 16rpx 32rpx 0; padding: 16rpx 20rpx; background: rgba(255,170,0,.1);
+  border-left: 4rpx solid #fa0; border-radius: 8rpx;
+  font-size: 22rpx; color: var(--ink); line-height: 1.6; }
+
+/* content 包裹层 */
+.content { padding: 24rpx 24rpx 0; }
+.content.has-bar { padding-bottom: 160rpx; }
+
+/* 对比模块空状态 */
+.empty-modules { text-align: center; color: var(--muted); font-size: 26rpx;
+  padding: 60rpx 0; }
+
+/* 合并视图占位 */
+.mp-placeholder { display: flex; flex-direction: column; align-items: center;
+  padding: 60rpx 0; gap: 12rpx; }
+.mp-ic { font-size: 64rpx; color: var(--ghost); }
+.mp-tip { font-size: 30rpx; font-weight: 700; color: var(--ink); }
+.mp-sub { font-size: 24rpx; color: var(--muted); text-align: center; }
+
+/* 警告图标(app.wxss 未收录,补充在此) */
+.i-warn { display: inline-block; width: 1em; height: 1em;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896'%3E%3Cpath fill='%23000' d='M955.7 856l-416-720c-16-27.7-44.4-44-76.7-44s-60.7 16.3-76.8 44l-416 720C-46 880.4 11 960 84 960h856c73 0 130-79.6 15.7-104zM480 416c0-17.7 14.3-32 32-32s32 14.3 32 32v264c0 17.7-14.3 32-32 32s-32-14.3-32-32V416zm32 424a48 48 0 110-96 48 48 0 010 96z'/%3E%3C/svg%3E"); }

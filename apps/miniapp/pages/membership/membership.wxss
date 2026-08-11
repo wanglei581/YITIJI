@@ -1,0 +1,220 @@
+/* pages/membership/membership.wxss — 深金会员主题（页面局部，不影响全局纸感） */
+.vip-wrap {
+  min-height: 100vh;
+  background: #2a2420;
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+}
+
+/* 深色导航 */
+.vip-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #2a2420;
+}
+.vip-nav-inner {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 12rpx;
+}
+.vip-back {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vip-back-ic {
+  font-size: 40rpx;
+  color: #e7d9b8;
+  transform: rotate(180deg);
+}
+.vip-nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #f2e6c9;
+}
+.vip-nav-right { width: 72rpx; }
+
+.vip-body { padding: 8rpx 32rpx 0; }
+
+/* 会员卡 */
+.vcard {
+  border-radius: 28rpx;
+  padding: 40rpx 36rpx;
+  background: linear-gradient(135deg, #d9b671 0%, #b6893c 60%, #8a6526 100%);
+  box-shadow: 0 12rpx 32rpx rgba(0,0,0,.32);
+}
+.vc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.vc-badge {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #4a3612;
+  background: rgba(255,255,255,.55);
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+}
+.vc-exp {
+  font-size: 24rpx;
+  color: #59450f;
+}
+.vc-name {
+  margin-top: 40rpx;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #3a2a0c;
+}
+.vc-sub {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: #5a460f;
+}
+
+/* 深色小节标题 */
+.sec-t-dark {
+  margin: 44rpx 4rpx 22rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #f0e4c6;
+}
+
+/* 权益宫格 */
+.ben-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+}
+.ben-cell {
+  background: #35302a;
+  border: 1rpx solid #4a4238;
+  border-radius: 22rpx;
+  padding: 28rpx 24rpx;
+}
+.ben-ic {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  background: rgba(217,182,113,.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18rpx;
+}
+.ben-ic .ficon {
+  font-size: 40rpx;
+  color: #e0c583;
+}
+.ben-t {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #f2e9d4;
+}
+.ben-s {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #b0a68f;
+}
+
+/* 套餐 */
+.plan-scroll {
+  display: flex;
+  gap: 20rpx;
+}
+.plan-card {
+  position: relative;
+  flex: 1;
+  background: #35302a;
+  border: 2rpx solid #4a4238;
+  border-radius: 22rpx;
+  padding: 30rpx 16rpx 26rpx;
+  text-align: center;
+}
+.plan-card.on {
+  border-color: #d9b671;
+  background: #3d352a;
+  box-shadow: 0 6rpx 20rpx rgba(217,182,113,.22);
+}
+.plan-tag {
+  position: absolute;
+  top: -16rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #3a2a0c;
+  background: linear-gradient(135deg, #e6c882, #c99a44);
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+}
+.plan-name {
+  font-size: 26rpx;
+  color: #d8ccb2;
+}
+.plan-price {
+  margin-top: 12rpx;
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #f3e7c9;
+  font-family: "Songti SC", "Noto Serif SC", serif;
+}
+.pp-sym { font-size: 28rpx; }
+.pp-unit {
+  font-size: 22rpx;
+  color: #b0a68f;
+  font-weight: 400;
+}
+.plan-orig {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8f846d;
+  text-decoration: line-through;
+}
+
+/* 合规说明（深色） */
+.vip-note {
+  margin: 36rpx 4rpx 0;
+  font-size: 23rpx;
+  line-height: 1.7;
+  color: #a89e88;
+}
+
+/* 支付栏 */
+.pay-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: #211c19;
+  border-top: 1rpx solid #3a332c;
+}
+.pb-info {
+  flex: 1;
+  font-size: 28rpx;
+  color: #f0e4c6;
+  font-weight: 600;
+}
+.pb-btn {
+  height: 88rpx;
+  padding: 0 44rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #3a2a0c;
+  background: linear-gradient(135deg, #e6c882, #c99a44);
+}

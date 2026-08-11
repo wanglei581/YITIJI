@@ -1,0 +1,53 @@
+<view class="page-wrap">
+<view style="height:{{statusBarHeight}}px"></view>
+<view class="navbar">
+  <view class="nav-back tap" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+  <view class="nav-title">确认到机打印</view>
+  <view class="nav-right"></view>
+</view>
+
+<view class="content has-bar">
+  <view class="steps rise-d1">
+    <view class="st done"><text class="n">✓</text><text class="nl">选择文件</text></view>
+    <view class="line done"></view>
+    <view class="st done"><text class="n">✓</text><text class="nl">选终端</text></view>
+    <view class="line done"></view>
+    <view class="st on"><text class="n">3</text><text class="nl">到机码</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">4</text><text class="nl">机端支付</text></view>
+  </view>
+
+  <view class="section-t rise-d2">选定终端</view>
+  <view class="card flat store-mini rise-d2">
+    <view class="sm-ic a-teal"><text class="ficon i-location"></text></view>
+    <view class="sm-main">
+      <view class="sm-name">{{q.store || '未选择终端'}}</view>
+      <view class="sm-sub">到机核验后再进入现场支付与打印</view>
+    </view>
+  </view>
+
+  <view class="section-t rise-d3">打印文件</view>
+  <view class="card flat rise-d3">
+    <view wx:for="{{files}}" wx:key="name" class="order-file">
+      <view class="of-ic a-teal"><text class="ficon i-file-text"></text></view>
+      <view class="of-main"><view class="of-name">{{item.name}}</view><view class="of-desc">{{item.desc}}</view></view>
+      <view class="of-price">{{item.price === '—' ? '—' : '¥' + item.price}}</view>
+    </view>
+  </view>
+
+  <view class="section-t rise-d4">预估费用</view>
+  <view class="card flat fee rise-d4">
+    <view class="fee-row total"><text>服务端价目估算</text><text class="amt">{{fee.total === '—' ? '—' : '¥' + fee.total}}</text></view>
+  </view>
+
+  <view class="notice info rise-d6">
+    <text class="ficon i-info n-ic"></text>
+    <text>本期方案为小程序预提交、到机码核验、机端支付。到机确认前不会创建 Agent 可领取的 PrintTask，页面也不会伪造支付或打印成功。</text>
+  </view>
+</view>
+
+<view class="actionbar">
+  <view class="ab-price"><text class="ab-label">预估</text><text class="ab-amt">{{fee.total === '—' ? '—' : '¥' + fee.total}}</text></view>
+  <view class="btn wx lg" bindtap="continueFlow">{{q.pickupCode ? '查看到机码' : '预提交暂未开放'}}</view>
+</view>
+</view>

@@ -14,6 +14,7 @@
 }
 .sb-ic { font-size: 30rpx; color: #A89080; }
 .sb-ph { font-size: 28rpx; color: #C8B4A0; }
+.sb-input { flex: 1; min-width: 0; font-size: 28rpx; color: #2C1A0E; }
 
 /* 筛选条 */
 .filter-scroll { width: 100%; }
