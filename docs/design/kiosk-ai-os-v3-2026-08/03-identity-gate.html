@@ -160,17 +160,127 @@
 .qrst-s b { color:var(--fog-900); }
 .way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
-/* 手机号输入：公共场所要打码 */
-.phone { display:flex; align-items:center; gap:var(--s-4); padding:var(--s-5);
-  border-radius:var(--r-md); background:var(--surf-1); border:1px solid var(--brd-1);
-  min-height:74px; }
-.phone-n { font-size:34px; font-weight:700; font-family:var(--ff-num); color:var(--fog-900);
-  letter-spacing:.14em; font-variant-numeric:tabular-nums; }
-.phone-n .mask { color:var(--fog-600); }
-.phone-cur { display:inline-block; width:3px; height:.9em; background:var(--jade-500);
-  vertical-align:-2px; }
-@media (prefers-reduced-motion:no-preference){ .phone-cur{ animation:p03cur 1.1s steps(2) infinite } }
-@keyframes p03cur { 50%{opacity:0} }
+/* ══ S2 输手机号：固定式数字键盘 + 协议门禁 + 获取验证码（2026-08-11 补）══════
+   ── 改之前这条路走不完 ────────────────────────────────────────────────
+   s2 整屏只有一行**写死的** `138 **** 8` 假回显，没有键盘、没有协议勾选、
+   没有「获取验证码」。27 寸一体机不带物理键盘，页面画了个号码却
+   **不给任何输入手段** —— 用户在这一步是硬断的，比按钮无反应更彻底。
+   （实测 grep：keypad / 协议 / 获取验证码 三样在本页计数均为 0。）
+
+   ── 为什么是固定式，不是点输入框才弹出的浮层 ───────────────────────────
+   27 寸 9:16 竖屏约 336×598mm，1080px 铺在 336mm 上 → 1px ≈ 0.31mm。
+   1920px 高**放得下表单 + 键盘**，没有手机屏那种「必须靠弹层省地方」的约束。
+   固定式换来四件事：
+     ① 零发现成本 —— 不要求用户先知道「点输入框才出键盘」；
+     ② 不会挡住正在输的那一栏（触屏浮层键盘通病）；
+     ③ 少一层会出错的东西 —— 浮层没弹出来，用户就完全没有输入手段，当场死在这一步；
+     ④ 步数更少（CLAUDE.md 操作路径 ≤3 步）。
+   实现上键盘块是 .gate 的直接子元素、flex:0 0 auto，**排在可滚动的 .gate-body
+   之外**：body 再长，键盘也不会被滚走 —— 这才叫「固定」。
+
+   ── 键位与尺寸 ────────────────────────────────────────────────────────
+   3 列 × 300px，键高 116px（≈93×36mm），远高于 56px 触控下限；
+   4 行：1-9 / 清空-0-删除。清空与删除**不只靠颜色**和数字键区分 ——
+   虚线描边 + 图标 + 文字标签，三重区分（误删手机号在无人值守场景很难挽回）。
+
+   ── 这块键盘是按「可复用组件」写的（交给后续接线的人）─────────────────
+   全站已经有一个**就地浮层**版：scripts/keypad.js（window.v3Keypad），
+   打印份数 / 页码范围 / 取件码那类零散输入用它是对的 —— 固定键盘会白占版面。
+   本轮**只做登录页这一处固定式**，没有动 keypad.js（31 个页面共用，改它要全站回归）。
+   将来抽公共组件时，两种呈现共用同一套契约：
+     · 键元素 `.p3-key`，字符键带 `data-ch="0…9"`，功能键带 `data-fn="clear|back"`；
+     · 语义固定：clear = 清空整栏，back = 删除最后一位；
+     · 宿主只提供「当前正在输入哪一栏 + 上限位数」，键盘不关心业务；
+     · 两种呈现只换容器：固定块（本页 .p3-pad）↔ 就地浮层（keypad.js 的 .kio-pad）。
+   ⚠ 已知待统一：keypad.js 的功能键叫「退格 / 清除」，本页按登录页设计稿叫
+     「删除 / 清空」。抽组件时必须先定死一套叫法，否则同一台机器上两种说法并存。 */
+
+/* s2 比另外三屏宽：3×300 的键盘要 936px 内容宽才排得开。
+   只放宽 s2 —— s1/sq/s3 用不上这块地方，跟着变宽反而让三选一散架。 */
+.screen[data-stage="s2"] .gate { width:984px; }
+
+/* ── 输入栏：手机号 / 验证码 ────────────────────────────────────────────
+   两栏都是 <button>：一体机上「点哪栏就往哪栏输」必须是能按的东西，
+   而不是靠焦点 —— 没有物理键盘，也就没有 Tab 焦点这回事。 */
+.p3-fld { width:100%; text-align:left; cursor:pointer; font-family:var(--ff-ui);
+  display:flex; flex-direction:column; gap:var(--s-3);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1);
+  transition:border-color var(--dur-2) var(--ease-out); }
+.p3-fld--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.p3-fld-hd { display:flex; align-items:center; gap:var(--s-3); }
+.p3-fld-hd .ic { width:20px; height:20px; color:var(--fog-600); flex:0 0 auto; }
+.p3-fld--on .p3-fld-hd .ic { color:var(--jade-500); }
+.p3-fld-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.p3-fld-n { font-size:var(--fz-2); color:var(--fog-600); font-family:var(--ff-num); }
+.p3-fld-n b { color:var(--fog-900); }
+/* 「正在输入」只在选中那一栏出现：两栏都不标，用户不知道键盘往哪打 */
+.p3-fld-cue { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600);
+  padding:3px 10px; border-radius:var(--r-full); background:var(--fog-a08); }
+.p3-fld--on .p3-fld-cue { background:var(--jade-a20); color:var(--jade-500); }
+
+/* ── 逐位格：让用户看得见自己输到第几位 ─────────────────────────────────
+   不用一整串数字，用 11 个格 —— 打了码也仍然能数出还差几位。 */
+.p3-slots { display:flex; align-items:center; gap:6px; }
+.p3-s { flex:1 1 0; min-width:0; height:78px; border-radius:var(--r-xs);
+  display:grid; place-items:center;
+  font-family:var(--ff-num); font-size:34px; font-weight:700; line-height:1;
+  color:var(--fog-900); background:var(--surf-0,#f6f4ee); border:1px solid var(--brd-1);
+  font-variant-numeric:tabular-nums; }
+.p3-s--gap { margin-left:20px; }
+.p3-s--on { border-color:var(--jade-a32); }
+/* 光标位：下一个要落的格。只描边不闪，闪烁在 27 寸大屏上很吵 */
+.p3-s--cur { border-color:var(--jade-400); box-shadow:inset 0 -4px 0 var(--jade-400); }
+
+.p3-eyerow { display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; }
+.p3-eye { min-height:56px; }
+.p3-eye-s { font-size:var(--fz-2); color:var(--fog-600); line-height:1.5; flex:1 1 200px; }
+
+.p3-cols { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-5); align-items:start; }
+.p3-col { display:flex; flex-direction:column; gap:var(--s-4); min-width:0; }
+.p3-coderow { display:flex; gap:var(--s-4); align-items:stretch; }
+.p3-coderow .p3-fld { flex:1 1 auto; }
+.p3-send { flex:0 0 auto; min-height:74px; align-self:stretch; padding:0 var(--s-5);
+  white-space:nowrap; }
+
+/* ── 协议勾选：默认不勾，且**不做灰按钮式的沉默失败** ──────────────────
+   按不动却不说为什么，是这一页最不该犯的错：用户会以为机器坏了。
+   所以「获取验证码 / 验证并登录」两颗永远可按，按下去**说清为什么不能往下走**。 */
+.p3-agree { width:100%; text-align:left; cursor:pointer; font-family:var(--ff-ui);
+  display:flex; align-items:flex-start; gap:var(--s-4); min-height:88px;
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.p3-agree[aria-checked="true"] { border-color:var(--jade-400); background:var(--jade-a12); }
+.p3-box { width:38px; height:38px; flex:0 0 auto; border-radius:10px;
+  background:var(--surf-0,#f6f4ee); border:2px solid var(--brd-2);
+  display:grid; place-items:center; margin-top:2px; }
+.p3-box .ic { width:24px; height:24px; color:var(--on-primary,#fff); opacity:0; }
+.p3-agree[aria-checked="true"] .p3-box { background:var(--jade-500); border-color:var(--jade-500); }
+.p3-agree[aria-checked="true"] .p3-box .ic { opacity:1; }
+.p3-agree-t { font-size:var(--fz-3); color:var(--fog-800); line-height:1.6; }
+.p3-agree-t u { color:var(--jade-600,var(--jade-500)); text-underline-offset:4px; }
+.p3-agree-t b { color:var(--fog-900); }
+
+/* ── 固定键盘 ──────────────────────────────────────────────────────── */
+.p3-pad { flex:0 0 auto; padding:var(--s-4) var(--s-6) var(--s-5);
+  border-top:1px solid var(--brd-1); background:var(--fog-a04); }
+.p3-pad-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap;
+  font-size:var(--fz-2); color:var(--fog-600); margin-bottom:var(--s-3); }
+.p3-pad-hd b { color:var(--fog-800); }
+.p3-keys { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.p3-key { min-height:116px; border-radius:var(--r-md); cursor:pointer;
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  font-family:var(--ff-num); font-size:46px; font-weight:700; color:var(--fog-900);
+  display:grid; place-items:center;
+  transition:transform var(--dur-1,.12s) var(--ease-out), background var(--dur-1,.12s) var(--ease-out); }
+.p3-key:active { transform:scale(.985); background:var(--jade-a12); border-color:var(--jade-400); }
+/* 清空 / 删除：虚线描边 + 图标 + 文字，**三重区分，不只靠颜色** ——
+   误删 11 位手机号在无人值守的大厅里没人能替用户挽回。 */
+.p3-key--fn { font-family:var(--ff-ui); font-size:var(--fz-5); font-weight:600;
+  color:var(--fog-700); background:var(--fog-a04); border-style:dashed;
+  display:flex; align-items:center; justify-content:center; gap:var(--s-3); }
+.p3-key--fn .ic { width:26px; height:26px; color:var(--fog-600); }
+.p3-key--back .ic { transform:rotate(180deg); }
 
 .gate-foot { flex:0 0 auto; padding:var(--s-5) var(--s-6);
   border-top:1px solid var(--brd-1); display:flex; align-items:center; gap:var(--s-5);
