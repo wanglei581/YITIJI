@@ -504,7 +504,9 @@
               <div class="kv-row"><span class="k">服务条款</span><span class="v">v2.3 · 2026-07-01</span></div>
               <div class="kv-row"><span class="k">隐私政策</span><span class="v">v2.1 · 2026-06-15</span></div>
               <div class="kv-row"><span class="k">合计</span><span class="v">6 页</span></div>
-              <div class="kv-row"><span class="k">打印</span><span class="v">A4 黑白预估 1.20 元</span></div>
+              <!-- 金额不写死：6 计费页 × 现行黑白单价，单价来自 scripts/site-config.js
+                   （后台 GET /print/price-config 的本机快照），后台改价这里跟着变 -->
+              <div class="kv-row"><span class="k">打印</span><span class="v">A4 黑白预估 <span data-site-price="6"></span></span></div>
               <div class="kv-row"><span class="k">扫码存手机</span><span class="v v--fog">不收费</span></div>
             </div>
           </div>
@@ -941,7 +943,7 @@
           </div>
           <div class="nb-sec">
             <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-file"/></svg>条款全文去哪儿拿</div>
-            <p class="nb-p">《服务条款》与《隐私政策》全文共 6 页，<b>可以打印带走</b>（A4 黑白预估 1.20 元 · 以打印工作台核价为准），也可以扫码存进手机<b>不收费</b>。条款有变更时<b>会在法务那一站顶部标出改了哪几条</b>，不是只把版本号加一。</p>
+            <p class="nb-p">《服务条款》与《隐私政策》全文共 6 页，<b>可以打印带走</b>（A4 黑白预估 <span data-site-price="6"></span> · 按所选文档页计费 · 以打印工作台核价为准），也可以扫码存进手机<b>不收费</b>。条款有变更时<b>会在法务那一站顶部标出改了哪几条</b>，不是只把版本号加一。</p>
           </div>
         </div>
       </div>
@@ -987,7 +989,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/notebar.js?v=2"></script>
-<script src="scripts/site-config.js?v=1"></script>
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

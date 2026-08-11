@@ -767,7 +767,7 @@
             <!-- ai-down 那张单里没有「要问的话」，这里不能照写 -->
             <div class="kv-row" data-when="default first device-off"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
             <div class="kv-row" data-when="ai-down"><span class="k">场次与展位单</span><span class="v">1 页 · 含展位号与岗位名</span></div>
-            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 页 · <b data-f="fee">2.60</b> 元（预估）</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 计费页 · <b data-f="fee">2.60</b> 元（预估）</span></div>
           </div>
 
           <!-- 2026-08-10：右栏原来只到这里，下面空 516px。补的是「到底选了哪几家」——
@@ -1040,7 +1040,7 @@
               <span class="li-b"><span class="li-t">纸质简历 6–10 份</span>
                 <!-- 括号内原用「·」分隔，实测在此宽度下断行恰好把「·」甩到行首（中文排版禁则）。
                      改成逗号：信息一字不减，且浏览器不会让「，」起行。 -->
-                <span class="li-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估）</span></span>
+                <span class="li-s">你有 1 份可打 · A4 黑白 <span data-site-unit="bw"></span> / 计费页（预估）</span></span>
               <span class="li-st">本机可打</span></li>
             <li class="li"><span class="li-dot"></span>
               <span class="li-b"><span class="li-t">身份证原件</span>
@@ -1213,8 +1213,10 @@
           </ul>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 计费页</span></div>
+            <!-- 计费口径写在「费用」这一行的括号里，不另起一行 ——
+                 本页右栏已排满，加行会把卡撑出血（同 P07 s4 的判据）。 -->
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">2.60</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -1343,7 +1345,7 @@
     <!-- 「全程约 240 米 · 预计 1 小时 20 分」删掉：本机没有场馆尺寸也不知道你走多快，
          这两个数字是编的。换成从勾选真算得出来的东西。 -->
     <span class="actionbar-hint" data-at="s3" data-f="hint3">3 站 · 按展位号顺序</span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down" data-f="hint4">共 13 页 · 预估 2.60 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down" data-f="hint4">共 13 计费页 · 预估 2.60 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">去挑企业：<span data-sess-nm>制造业专场</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -1367,6 +1369,10 @@
 <script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就 render() 一次算费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ── 2026-08-10 Codex 走查整改：场次卡真的能选 ────────────────────────────
    原来三张场次卡都是 data-go="s2"，一点就跳到第 2 步；而右栏偏偏写着
@@ -1411,7 +1417,8 @@
      选中数     → 第 3 步「入口进 → N 家 → 出口」、动作条提示
      选中的展位 → 展位图高亮 + 按展位号排的示意路线与站点序号（原来是写死的 path）
      选中的企业 → 作战单站点逐条重建（原来勾掉了纸上照样印）
-     家数       → 简历份数 = N × 2、页数 = 1 + N × 2 × 2、费用 = 页数 × 0.2 元，
+     家数       → 简历份数 = N × 2、计费页数 = 1 + N × 2 × 2、
+                  费用 = 计费页数 × 现行黑白单价（取自 site-config，后台可改），
                   以及出口链接里的 ?pages= / ?title=
    刻意**没有**做的：全程米数与预计耗时。本机没有场馆尺寸也不知道用户走多快，
    那两个数字只能编 —— 已从版面上删掉，不拿假精度换充实感（CLAUDE.md §9）。
@@ -1426,7 +1433,11 @@
   var MAX = 8                       // 动作条上写的就是这个数，别在两处各写一份
   var COPIES = 2                    // 每家带 2 份简历
   var CV_PAGES = 2                  // 简历每份 2 页
-  var UNIT = 0.2                    // A4 黑白每页预估单价（元）
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
   var note = ''                     // 超上限时给用户看的那句话
 
   function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
@@ -1550,10 +1561,12 @@
         '<span class="cb-mt">' + esc(r.getAttribute('data-pos')) + '</span></span></div>'
     }).join('') || '<div class="cb-ask">还没勾企业 —— 回第 2 步勾上要去的几家，这张单才有内容。</div>')
 
-    // 打印算术：作战单 1 页 + 每家 2 份简历 × 每份 2 页
+    // 打印算术：作战单 1 页 + 每家 2 份简历 × 每份 2 页。
+    // pages 已经把份数乘进去了，所以它就是**计费页数**（所选文档页数 × 份数）。
+    // 单双面在这里不参与——双面只省纸，不减少计费页数。
     var copies = n * COPIES
     var pages = (n ? 1 : 0) + copies * CV_PAGES
-    var fee = (pages * UNIT).toFixed(2)
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
     set('pg', pages); set('fee', fee); set('cv-n', copies)
     set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
     set('ap-s', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份 = ' + copies * CV_PAGES + ' 页 · 本单大头')
@@ -1571,7 +1584,7 @@
     var what = sheetNm() + ' 1 份 + 简历 ' + copies + ' 份'
     set('handoff-s', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页（预估 · 以打印工作台核价为准）')
     set('gobtn-t', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页')
-    set('hint4', '共 ' + pages + ' 页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+    set('hint4', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
 
     // 出口链接里的页数与标题也要跟着走，否则打印工作台收到的还是旧的 13 页
     var links = scr.querySelectorAll('[data-f="handoff"],[data-f="gobtn"]')

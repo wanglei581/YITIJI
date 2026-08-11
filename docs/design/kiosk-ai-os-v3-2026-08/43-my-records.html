@@ -1235,7 +1235,7 @@ body.capture .proto-only { display:none !important; }
                        写「今天」等于把这一单说成 8 月 10 日；42 与本页反馈草稿都写 8 月 9 日 10:23。
                        同一栏「取件码 P-4172 已生成」本来就写「8 月 9 日 10:20」，写法一致。
                    未修（读文件，本轮不可改）：23-me.html 第 701、787 行仍写「13 页」，
-                   且 42 该单金额 ¥1.20 按 06 公示价 0.20 元/印刷面折 6 面、与「4 页」对不上，
+                   且 42 该单金额 ¥1.20 按 06 公示价 0.20 元/计费页折 6 计费页、与「4 页」对不上，
                    两项都已在交回说明里单列，等产品定。 -->
               <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1023"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
               <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
@@ -1308,7 +1308,11 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">权益到账 · 打印减免 2 张</span>
+                <!-- 2026-08-11 口径改：单位由「张」改「次」。后端核销语义是
+                     「一次免掉一整单，额度扣 1」，对应免单券而不是页数/张数额度；
+                     24 权益页同口径（「免费打印 · 每月 3 次」「一张券免掉一整单」）。
+                     次数、上限与适用范围全部由后台下发，页面不写死。 -->
+                <span class="rrow-tl"><span class="rrow-t">权益到账 · 免费打印 2 次</span>
                   <span class="chip is-static">已读</span></span>
                 <span class="rrow-m">8 月 8 日 10:12 · 8 月 31 日到期</span>
               </span>
@@ -1320,7 +1324,8 @@ body.capture .proto-only { display:none !important; }
             </div>
             <div class="rrow-det">
               <div class="kv">
-                <div class="kv-row"><span class="k">怎么用</span><span class="v">打印结算时自动抵扣</span></div>
+                <div class="kv-row"><span class="k">怎么用</span><span class="v">打印结算时自动抵扣 · 一次免掉一整单</span></div>
+                <div class="kv-row"><span class="k">用在哪</span><span class="v">适用范围由后台下发 · 结算页显示能不能用</span></div>
                 <div class="kv-row"><span class="k">过期</span><span class="v">到期作废 · 不折现</span></div>
               </div>
             </div>

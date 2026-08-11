@@ -808,7 +808,7 @@
         <!-- 这条深色带上不放 chip：warm 主题里 --amber-200 / --jade-200 解析成深色
              （那是给浅底用的），压在深带上几乎读不出来。直接用带子自己的字色。 -->
         <span class="pg">
-          <span>共 <span data-f="f-pages">1</span> 页 · 预估 <span data-f="f-fee">0.20</span> 元</span>
+          <span>共 <span data-f="f-pages">1</span> 计费页 · 预估 <span data-f="f-fee">0.20</span> 元</span>
           <span class="mt" data-when="default first ai-down">· 待核价</span>
           <span class="mt" data-when="device-off">· 离线，改存文档</span>
         </span>
@@ -1019,8 +1019,8 @@
           </div>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="c-pages">1</b> 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="c-fee">0.20</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="c-pages">1</b> 计费页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="c-fee">0.20</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
@@ -1159,6 +1159,9 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    P20 页内交互模型（静态稿，不接后端）
@@ -1829,9 +1832,16 @@
     set('p-pgtext', n > 0 ? '第 1 / ' + n + ' 页' : '不出纸')
   }
 
+  /* A4 黑白每计费页单价（元）—— 唯一来源是 scripts/site-config.js，
+     即后台 GET /print/price-config 的本机快照，后台改价这一页跟着变。
+     末尾字面量只兜「脚本没加载成功」，不兜「后端拉取失败」
+     （后者生产上走 PRICE_CONFIG_UNAVAILABLE，不显示数字）。 */
+  function unitBW () { var S2 = window.V3_SITE; return S2 ? S2.price.bwPerFace : 0.2 }
+
   function setPageNums (n) {
     PAGES = n
-    var fee = (n * 0.2).toFixed(2)
+    /* n 是复盘单排出来的**文档页数**，本页固定 1 份，所以 n 就是计费页数。 */
+    var fee = (Math.round(n * unitBW() * 100) / 100).toFixed(2)
     set('p-pages', n); set('t-pages', n)
     set('c-pages', n); set('c-fee', fee)
     set('f-pages', n); set('f-fee', fee)

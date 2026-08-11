@@ -890,14 +890,16 @@
           <label class="ck ck--have" data-print="sheet" role="checkbox" aria-checked="true" tabindex="0">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">倾向参考单</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份 = 1 计费页</span></span>
           </label>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v" data-out="pgTotal">1 页</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v" data-out="pgTotal">1 计费页</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v" data-out="pgFee">预估 <b>0.20</b> 元</span></div>
             <!-- 2026-08-11：以下三行从页脚抽屉「产物去向与费用」移回常驻。
-                 「这 0.20 元买到的纸上到底印什么」正是这一步要做的决定。 -->
+                 「这一笔钱买到的纸上到底印什么」正是这一步要做的决定。
+                 金额不写死：走 scripts/site-config.js（后台 GET /print/price-config
+                 的本机快照），后台改价这里跟着变。 -->
             <div class="kv-row"><span class="k">纸上印的</span><span class="v"><b data-out="segN">5</b> 段陈述 + 题号依据</span></div>
             <div class="kv-row"><span class="k">脚注固定印着</span><span class="v">不构成能力证明</span></div>
             <div class="kv-row"><span class="k">你的作答原文</span><span class="v v--fog">不印，也没留</span></div>
@@ -985,7 +987,7 @@
     <span class="actionbar-hint" data-at="s1" data-when="device-off" data-out="hint1">打印机离线 · 作答与结果不受影响</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first device-off" data-out="hint2">第 8 题 / 共 25 题 · 闲置 60 秒自动清空</span>
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">照常作答 · 答完这次不会有解读</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first" data-out="hint3">共 1 计费页 · 预估 0.20 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="ai-down">解读空缺 · 摘要已记 · 随时可撤回</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
     <span class="actionbar-hint" data-at="s4">本机只记次数 · 完整记录在「我的 → AI 服务记录」</span>
@@ -1024,6 +1026,9 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ============================================================================
    P28 的三处「画了没接」，这里一次接完：
@@ -1076,6 +1081,10 @@
     }
   }
   function html (n, v) { var e = q(n); for (var i = 0; i < e.length; i++) e[i].innerHTML = v }
+  /* A4 黑白每计费页单价（元）—— 唯一来源是 scripts/site-config.js，
+     即后台 GET /print/price-config 的本机快照。末尾字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」（后者走 PRICE_CONFIG_UNAVAILABLE，不显示数字）。 */
+  function unitBW () { var S2 = window.V3_SITE; return S2 ? S2.price.bwPerFace : 0.2 }
 
   function render () {
     var B = bank(), Q = B.qs[S.cur], T = total(), no = 5 + S.cur + 1
@@ -1148,8 +1157,13 @@
     /* s3 打印勾选 */
     var pk = scr.querySelector('[data-print]')
     if (pk) { pk.classList.toggle('ck--have', S.print); pk.setAttribute('aria-checked', S.print ? 'true' : 'false') }
-    set('pgTotal', S.print ? '1 页' : '0 页 · 未勾选')
-    html('pgFee', S.print ? '预估 <b>0.20</b> 元' : '<span class="v--fog">不打印 · 0 元</span>')
+    set('pgTotal', S.print ? '1 计费页' : '0 计费页 · 未勾选')
+    /* 单价走 site-config（后台可改），不在页面里手抄一个 0.20。
+       本页固定 1 页 × 1 份 = 1 计费页，所以金额就等于单价本身。 */
+    html('pgFee', S.print ? '预估 <b>' + unitBW().toFixed(2) + '</b> 元' : '<span class="v--fog">不打印 · 0 元</span>')
+    set('hint3', S.print
+      ? '共 1 计费页 · 预估 ' + unitBW().toFixed(2) + ' 元 · 以打印工作台核价为准'
+      : '未勾选打印 · 不出纸不收费')
   }
 
   /* ── 结果反馈层 ── */

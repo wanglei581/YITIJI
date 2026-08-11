@@ -821,8 +821,8 @@
           </ul>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">7</b> 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">1.40</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">7</b> 计费页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">1.40</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -909,7 +909,7 @@
     <span class="actionbar-hint" data-at="s1" data-when="default first">按 2027 届算 · 现在是提前批和秋招网申</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 只显示公开校招日历</span>
     <span class="actionbar-hint" data-at="s2" data-f="hint2">已选 2 场 · 最近一个截止在 2 天后</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f="hint3">共 7 页 · 预估 1.40 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f="hint3">共 7 计费页 · 预估 1.40 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -933,6 +933,10 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
    P18 · 来源感知返回（2026-08-10 Codex 闭环整改 · 06/07/12/18 同一份登记表）
@@ -1017,7 +1021,8 @@
    现在整行是 <button aria-pressed>，勾选真的往下游走：
      选中数 → 动作条「已选 N 场」
      选中项 → 计划表纸面的日期块逐条重建（原来勾没勾都印满 6 场）
-     场数   → 简历份数 = N × 2、页数 = 1 + N × 2、费用 = 页数 × 0.2 元，
+     场数   → 简历份数 = N × 2、计费页数 = 1 + N × 2、
+              费用 = 计费页数 × 现行黑白单价（取自 site-config，后台可改），
               以及出口链接里的 ?pages=
    ══════════════════════════════════════════════════════════════════════════ */
 ;(function () {
@@ -1028,7 +1033,11 @@
 
   var COPIES = 2          // 每场带 2 份简历
   var CV_PAGES = 1        // 校招简历压到一页（本页反复讲的那件事）
-  var UNIT = 0.2
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
 
   function set (k, html) {
     var ns = scr.querySelectorAll('[data-f="' + k + '"]')
@@ -1066,10 +1075,10 @@
     // 打印算术：计划表 1 页 + 每场 2 份简历 × 每份 1 页
     var copies = n * COPIES
     var pages = (n ? 1 : 0) + copies * CV_PAGES
-    var fee = (pages * UNIT).toFixed(2)
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
     set('pg', pages); set('fee', fee); set('cv-n', copies)
     set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
-    set('hint3', '共 ' + pages + ' 页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+    set('hint3', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
 
     var go = scr.querySelector('[data-f="gobtn"]')
     if (go) {

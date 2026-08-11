@@ -1469,8 +1469,9 @@
       <div class="pane" data-at="s4" data-when="default device-off">
         <div class="pane-hd"><span class="t">打印这份报告</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">页数</span><span class="v">A4 黑白 · <b>3</b> 页</span></div>
-          <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.60</b> 元</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v">A4 黑白 · <b>3</b> 计费页</span></div>
+          <!-- 金额不写死：3 计费页 × 现行黑白单价，单价走 scripts/site-config.js -->
+          <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-site-price="3"></b></span></div>
         </div>
         <!-- 2026-08-11 A24 连带整改：原文「可先存「我的文档」或扫码带走」——
              本页没有任何一处能真的把报告存进「我的文档」（动作条那个按钮就是因此
@@ -1583,7 +1584,7 @@
         <div data-when="first"><div class="t">没有简历，比不起来</div><div class="s">先做简历，再挑 2–3 个岗位回来</div></div>
       </div>
       <div data-at="s4">
-        <div data-when="default"><div class="t">A4 · 3 页 · 预估 0.60 元</div><div class="s">A4 黑白 · 三页一份</div></div>
+        <div data-when="default"><div class="t">A4 · 3 计费页 · 预估 <span data-site-price="3"></span></div><div class="s">A4 黑白 · 三页一份</div></div>
 <!-- 副行原文「先存「我的文档」或扫码带走，换机再打」在本态会折成两行，
              撑出操作栏 8px（自检：卡内溢出）—— device-off 的主按钮标题长，提示区被挤窄。缩到一行。 -->
         <div data-when="device-off"><div class="t">打印机离线 · 现在打不出来</div><div class="s">扫码带到手机，换机再打</div></div>
@@ -1885,6 +1886,8 @@
 </script>
 <script src="scripts/linkage.js?v=6"></script>
 <script src="scripts/leaveguard.js?v=1"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照，页面不许手抄 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

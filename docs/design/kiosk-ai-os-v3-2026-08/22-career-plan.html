@@ -846,7 +846,7 @@
 
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f22="pg">1</b> 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f22="fee">0.20</b> 元</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f22="fee">0.20</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -919,7 +919,7 @@
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 读不出简历，只能看岗位计数</span>
     <span class="actionbar-hint" data-at="s2" data-when="default first">依据 214 条读过正文的岗位 · 不是市场全貌</span>
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 只有原始计数，无方向建议</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f22="hint3">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down" data-f22="hint3">共 1 计费页 · 预估 0.20 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -948,6 +948,10 @@
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就算一次费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
    P22 · 2026-08-10 死控件整改 ·「四个方向的完整缺口表」真的能勾
@@ -971,7 +975,11 @@
 
   var BASE_PG = 1        // 行动清单 / 计数表恒为 1 页
   var GAP_PG = 2         // 缺口表 2 页（卡上写的就是这个数，别在两处各写一份）
-  var UNIT = 0.2         // A4 黑白每页预估单价（元）
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
 
   function set (k, txt) {
     var ns = scr.querySelectorAll('[data-f22="' + k + '"]')
@@ -984,14 +992,14 @@
   function render () {
     var on = gapOn()
     var pages = BASE_PG + (on ? GAP_PG : 0)
-    var fee = (pages * UNIT).toFixed(2)
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
     var title = isAiDown() ? '岗位要求计数表'
               : (on ? '职业规划行动清单 + 四方向缺口表' : '职业规划行动清单')
 
     set('gapst', on ? '已加入' : '不打')
     set('pg', String(pages))
     set('fee', fee)
-    set('hint3', '共 ' + pages + ' 页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+    set('hint3', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
 
     var go = scr.querySelector('[data-f22="gobtn"]')
     if (go) {

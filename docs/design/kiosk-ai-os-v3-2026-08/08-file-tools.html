@@ -456,7 +456,7 @@
           </div>
           <div class="nb-sec">
             <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用参数</div>
-            <p class="nb-p">加工完的文件拿去打印时，费用为<b>预估</b>：黑白约 0.20 元、彩色约 1.50 元（A4 每面），<b>以打印工作台核价为准</b>；付费也在打印工作台完成，<b>本页不收款</b>。输出统一为 A4 PDF，文件名可改。</p>
+            <p class="nb-p">加工完的文件拿去打印时，费用为<b>预估</b>：A4 黑白约 <span data-site-unit="bw"></span>、彩色约 <span data-site-unit="color"></span>，<b>按所选文档页计费</b>（计费页数 = 所选文档页数 × 份数）；<b>打印双面只影响用纸张数，不减少计费页数</b>。本页的「每页放几张」是另一回事：它<b>真的把成品合并成更少的页</b>，所以合成后页数变少，计费页数也跟着变少 —— 「去打印」带过去的就是合成后的页数。<b>以打印工作台核价为准</b>；付费也在打印工作台完成，<b>本页不收款</b>。输出统一为 A4 PDF，文件名可改。</p>
           </div>
           <div class="nb-sec">
             <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
@@ -920,6 +920,8 @@
 </script>
 <script src="scripts/notebar.js?v=2"></script>
 <script src="scripts/leaveguard.js?v=1"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照，页面不许手抄 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

@@ -504,7 +504,10 @@
         <svg class="ic"><use href="#i-file"/></svg>
         <span class="traybar-b" data-when="default ai-down" data-tray-has>
           <span class="traybar-t">纸质带走 · 今天的建议清单</span>
-          <span class="traybar-s"><b data-tray-n>2</b> 条要点 · 来自本次对话 · 1 页黑白 · 预估 <b>0.20</b> 元 · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
+          <!-- 金额不写死：1 计费页 × 现行黑白单价，data-site-price 由 scripts/site-config.js
+               填（后台 GET /print/price-config 的本机快照），后台改价这里跟着变。
+               注意 data-site-price 会把「N.NN 元」整串写进去，所以后面不能再留一个「元」。 -->
+          <span class="traybar-s"><b data-tray-n>2</b> 条要点 · 来自本次对话 · 1 计费页黑白 · 预估 <b data-site-price="1"></b> · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
         </span>
         <span class="traybar-b" data-when="device-off" data-tray-has>
           <span class="traybar-t">纸质带走 · 出纸暂停</span>
@@ -805,6 +808,8 @@
   })
 })()
 </script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照，页面不许手抄 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

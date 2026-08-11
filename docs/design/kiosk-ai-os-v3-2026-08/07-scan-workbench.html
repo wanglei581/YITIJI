@@ -448,7 +448,7 @@
           </div>
           <div class="nb-sec">
             <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用参数</div>
-            <p class="nb-p">扫完有三条去向：拿去打印、存进「我的文档」、扫码传手机带走。打印按现场公示价预估：<b>A4 黑白 0.20 元 / 面、彩色 1.50 元 / 面</b>，双面按面计价、用纸减半，<b>以打印工作台核价为准</b>；核价、支付与出纸都在打印工作台完成，本页不收款。</p>
+            <p class="nb-p">扫完有三条去向：拿去打印、存进「我的文档」、扫码传手机带走。打印按现场公示价预估：<b>A4 黑白 <span data-site-unit="bw"></span> / 计费页、彩色 <span data-site-unit="color"></span> / 计费页</b>，<b>按所选文档页计费</b>（计费页数 = 所选文档页数 × 份数）；<b>打印双面只影响用纸张数，不减少计费页数</b>——注意这和本页的<b>扫描双面</b>不是一回事：两面都扫会让扫出来的页数翻倍，计费页数也跟着翻倍。<b>以打印工作台核价为准</b>；核价、支付与出纸都在打印工作台完成，本页不收款。</p>
           </div>
           <div class="nb-sec">
             <div class="nb-h"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
@@ -664,14 +664,21 @@
         </div>
       </div>
 
-      <!-- s4 专属：下一步是打印时的费用预期。单价来自 P06 现场公示价；
+      <!-- s4 专属：下一步是打印时的费用预期。
+           单价不写死在这里 —— 走 scripts/site-config.js，那是后台
+           GET /print/price-config 的本机快照；后台改价这一卡要跟着变。
+           计费页数也不写死：跟本次扫描参数的 pages() 走（只扫正面就是一半），
+           上一版这里钉着「6 面」，用户改成单面之后这张卡就成了假账。
            device-off 打印去向不可用，这一卡换成「换机取回」。 -->
       <div class="pane" data-at="s4" data-when="default first ai-down">
-        <div class="pane-hd"><span class="t">拿去打印要花多少钱</span><span class="s">按现场公示价预估</span></div>
+        <div class="pane-hd"><span class="t">拿去打印要花多少钱</span><span class="s">按所选文档页计费 · 预估</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">黑白 · 6 面 × 0.20 元</span><span class="v">1.20 元</span></div>
-          <div class="kv-row"><span class="k">彩色 · 6 面 × 1.50 元</span><span class="v">9.00 元</span></div>
-          <div class="kv-row"><span class="k">双面</span><span class="v">按面计价 · 用纸减半</span></div>
+          <div class="kv-row"><span class="k" data-out="fee-bw-k">黑白 · 6 计费页 × 0.20 元</span><span class="v" data-out="fee-bw">1.20 元</span></div>
+          <div class="kv-row"><span class="k" data-out="fee-cl-k">彩色 · 6 计费页 × 1.50 元</span><span class="v" data-out="fee-cl">9.00 元</span></div>
+          <!-- 必须写「打印双面」而不是「双面」：本页左边那个「双面」是**扫描**双面
+               （两面都扫 → 扫出的页数翻倍 → 计费页数跟着翻倍，上面两行会当场变）。
+               两个「双面」方向相反，不点名会让用户以为翻了开关钱不该变。 -->
+          <div class="kv-row"><span class="k">打印双面</span><span class="v">只省纸，不减少计费页数</span></div>
           <div class="kv-row"><span class="k">口径</span><span class="v">以打印工作台核价为准</span></div>
         </div>
       </div>
@@ -690,7 +697,7 @@
         <div class="kv">
           <div class="kv-row"><span class="k">扫描转 PDF</span><span class="v" style="color:var(--jade-600)">免费</span></div>
           <div class="kv-row"><span class="k">AI 诊断 / 优化</span><span class="v" style="color:var(--jade-600)">免费</span></div>
-          <div class="kv-row"><span class="k">之后打印 A4 每面</span><span class="v">黑白 0.20 元 · 彩色 1.50 元</span></div>
+          <div class="kv-row"><span class="k">之后打印 A4 每计费页</span><span class="v">黑白 <span data-site-unit="bw"></span> · 彩色 <span data-site-unit="color"></span></span></div>
           <div class="kv-row"><span class="k">付款方式</span><span class="v">手机扫码 · 不收现金不刷卡</span></div>
         </div>
       </div>
@@ -791,6 +798,10 @@
 <script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面那段内联脚本**之前** —— 那段在解析时就 render() 一次，
+     晚一步 window.V3_SITE 还不存在，费用卡就会落到兜底价上。 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script>
 /* ============================================================================
    本次扫描的参数模型 —— 单一真值，所有显示都从它算出来。
@@ -821,6 +832,18 @@
   var FMT = { pdf: 'PDF', jpg: 'JPG 每页一张', ocr: '可检索 PDF' }
 
   function pages () { return SHEETS * (P.duplex === 'both' ? 2 : 1) }
+  /* 单价只有一个来源：scripts/site-config.js（后台 GET /print/price-config 的快照）。
+     末尾那个字面量只兜「脚本没加载成功」，不兜「后端拉取失败」——
+     后者生产上必须走 PRICE_CONFIG_UNAVAILABLE（不显示数字），见 site-config.js 头部。 */
+  function unitPrice (mode) {
+    var S = window.V3_SITE
+    if (S) return mode === 'color' ? S.price.colorPerFace : S.price.bwPerFace
+    return mode === 'color' ? 1.5 : 0.2
+  }
+  function feeText (n, mode) {
+    if (window.v3PriceText) return window.v3PriceText(n, mode)
+    return (Math.round(n * unitPrice(mode) * 100) / 100).toFixed(2) + ' 元'
+  }
   function size () {
     var s = pages() * MB[P.dpi][P.color] * (P.fmt === 'jpg' ? 1.25 : P.fmt === 'ocr' ? 1.06 : 1)
     return (s < 10 ? s.toFixed(1) : Math.round(s)) + ' MB'
@@ -869,6 +892,13 @@
     set('pf-color', P.color === '彩色' ? '彩色 · 证件与印章保真' : P.color === '黑白' ? '黑白 · 文件最小' : '灰度 · 识别效果最好')
     set('pf-src', P.src === 'adf' ? '送稿器 · 一次最多 50 页' : '玻璃板 · 不能自动双面')
     set('pf-duplex', P.duplex === 'both' ? '两面都扫 · ' + n + ' 页' : '只扫正面 · ' + n + ' 页')
+
+    /* 打印费预估：单价走 site-config，页数跟本次扫描参数走。
+       这里的 n 是扫出来的**文档页数**，正是计费口径要的那个数（份数为 1）。 */
+    set('fee-bw-k', '黑白 · ' + n + ' 计费页 × ' + unitPrice('bw').toFixed(2) + ' 元')
+    set('fee-bw', feeText(n, 'bw'))
+    set('fee-cl-k', '彩色 · ' + n + ' 计费页 × ' + unitPrice('color').toFixed(2) + ' 元')
+    set('fee-cl', feeText(n, 'color'))
 
     /* 玻璃板没有自动双面 —— 这是硬件事实，选了就得把双面锁掉并落回仅正面 */
     var au = scr.querySelector('.field[data-param="duplex"] button[data-v="both"]')
