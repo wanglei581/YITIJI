@@ -137,9 +137,11 @@
      动作条的主按钮就写着「看在招岗位」，而那张卡当时只列 2 条，
      自己还挂着一句「完整 6 条在下面…里逐条列出」的静默截断说明。
      （页面另一处 AI 文案已经在说「上面 6 个在招岗位照常可看」，与事实不符。）
-     改法：.duo 改为按内容收高，余量全部转给在招岗位那张卡，六条全列。
-     六条的岗位名 / 薪资 / 外部 ID 都来自本页已有数据（下方比对块逐条列着），
-     没有新编任何一条。 */
+     改法：.duo 改为按内容收高，余量全部转给在招岗位那张卡，条目全列。
+     ⚠ 2026-08-11 补记：当时写「六条全列 · 都来自本页已有数据、没有新编任何一条」——
+     **本页已有数据本身就是编的**。那六条里有五条在岗位库（13 / 16）里查无此条，
+     只是它们在本页内部自洽，所以看不出来。**页内自洽不等于真实存在**。
+     现在按主页面口径收到两条真实岗位，详见下面 .dsec--jobs 处的整改注释。 */
   .duo { flex: 0 0 auto; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); align-items: start; }
   .duo .dsec { padding: var(--s-5); border-radius: var(--r-sm);
     background: var(--surf-1); border: 1px solid var(--brd-1); }
@@ -161,9 +163,11 @@
   .dsec--jobs { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
   .dsec--jobs .jmini { flex: 1 1 auto; min-height: 0; }
   .jmini { display: flex; flex-direction: column; gap: 10px; }
-  /* 六行平分 .jmini 的高度：min-height 取 56（>48 触控下限，且 detail 态
-     .duo 更高、留给列表的只有 410px 时六行仍放得下），行再按余量长高 ——
-     既填满，也不会把末尾那行来源说明顶到行上面去。 */
+  /* 各行平分 .jmini 的高度：min-height 取 56（>48 触控下限），行再按余量长高 ——
+     既填满，也不会把末尾那行来源说明顶到行上面去。
+     2026-08-11：条目从 6 条收到真实的 2 条后，余量由这条 flex:1 自己吃掉，
+     行会长高但内容仍垂直居中（上下留白对称 → 不触发「卡内空洞」那条检查，
+     它对居中构图有豁免）。**不拿内容凑版面**：宁可行高一点，也不补造岗位。 */
   .jm {
     flex: 1 1 auto; display: flex; align-items: center; gap: var(--s-4);
     min-height: 56px; padding: 0 var(--s-5);
@@ -361,7 +365,14 @@
           <button class="cline2-a" type="button" data-go="detail">
             <span class="cologo">科</span>
             <span class="cline2-x">
-              <span class="cline2-h"><span class="cline2-nm">广州××科技有限公司</span><span class="cline2-n">6<span class="u">个在招岗位</span></span></span>
+              <!-- 2026-08-11 跨页一致性整改：这里原来写 6。详情页列的六条里有五条
+                   （JX-88240 / 88266 / 88301 / 88318 / 88352）在岗位库
+                   （13-jobs-desk / 16-offline-agencies）里根本查不到 ——
+                   用户点「查看岗位」会落到一个查无此条的东西上。
+                   按主页面口径，岗位以 13 / 16 为唯一真源；这家企业在 13 里
+                   真实存在的只有 JX-88214 与 JX-88377 两条，所以计数改 2，
+                   而不是往 13 里补五条 —— 往主页面里加条目就是凭空造数据。 -->
+              <span class="cline2-h"><span class="cline2-nm">广州××科技有限公司</span><span class="cline2-n">2<span class="u">个在招岗位</span></span></span>
               <span class="cline2-o">互联网/软件<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 天河区</span>
               <span class="cline2-m">民营企业<span class="sep">·</span>100–499 人
                 <span class="chip chip--label">运营 / 技术</span>
@@ -545,7 +556,7 @@
             </span>
           </div>
           <div class="dsum-row">
-            <span class="chip chip--azure chip--info">6 个在招岗位</span>
+            <span class="chip chip--azure chip--info">2 个在招岗位</span>
             <span class="chip chip--info" data-at="detail">参加周五招聘会 · 展位 B-12</span>
             <span class="chip chip--info">天河区天河路 ×× 号</span>
           </div>
@@ -584,44 +595,40 @@
           </div>
         </div>
 
-        <!-- 2026-08-11：这张卡改为承接余量的主卡，六条全列（原来只列 2 条 +
-             一句「完整 6 条在下面…」的截断说明）。六条的岗位名 / 薪资 / 外部 ID
-             与下方比对块逐字一致，同来源同同步时间，统一写在列表末尾一行。 -->
+        <!-- ── 2026-08-11 跨页一致性整改 ──────────────────────────────────
+             上一版这里列六条，其中五条（JX-88240 / 88266 / 88301 / 88318 / 88352）
+             **在岗位库里根本不存在** —— 13-jobs-desk 与 16-offline-agencies 一条都查不到。
+             用户在企业页看到「6 个在招岗位」，点进去落到查无此条的东西上，
+             他会开始怀疑这台机器上所有的数字。这一类矛盾最伤信任。
+
+             按主页面口径（岗位的唯一真源是 13 / 16）：这家企业在 13 里真实存在的
+             只有两条 —— JX-88214 用户运营专员、JX-88377 运营实习生。
+             所以这里**只列这两条**，字段（岗位名 / 薪资 / 区域 / 经验 / 学历 /
+             来源 / 同步时间）逐字对齐 13-jobs-desk，不往主页面里补造五条。
+
+             两条的同步时间不同（09:20 与 09:18），所以来源与同步改成**逐行写**，
+             不再用一句「六条同来源 · 同步 09:20」把两个不同的时间抹平。
+             卡里空出来的高度由 .jm 的 flex:1 自己吃掉（行会长高），
+             不需要拿内容凑版面。 -->
         <div class="dsec dsec--jobs">
-          <div class="dsec-t">在招岗位 · 6 个</div>
+          <div class="dsec-t">在招岗位 · 本机同步到 2 个</div>
           <div class="jmini">
             <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">用户运营专员</span><span class="jm-m">天河区 · 1–3 年 · 本科 · 外部 ID JX-88214</span></span>
+              <span class="jm-x"><span class="jm-t">用户运营专员</span>
+                <span class="jm-m">全职 · 广州 · 天河区 · 1–3 年 · 本科</span>
+                <span class="jm-m">来源 前程无忧 · 同步 08-08 09:20 · 外部 ID JX-88214</span></span>
               <span class="jm-p">6–9K</span>
               <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
             </a>
             <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">社群运营专员</span><span class="jm-m">外部 ID JX-88266</span></span>
-              <span class="jm-p">5–8K</span>
-              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">客户成功运营</span><span class="jm-m">外部 ID JX-88240</span></span>
-              <span class="jm-p">8–12K</span>
-              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">企业服务销售</span><span class="jm-m">外部 ID JX-88352</span></span>
-              <span class="jm-p">6–10K + 提成</span>
-              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">前端开发工程师</span><span class="jm-m">天河区 · 3–5 年 · 本科 · 外部 ID JX-88301</span></span>
-              <span class="jm-p">12–18K</span>
-              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="jm" href="14-job-detail.html">
-              <span class="jm-x"><span class="jm-t">测试工程师</span><span class="jm-m">外部 ID JX-88318</span></span>
-              <span class="jm-p">9–14K</span>
+              <span class="jm-x"><span class="jm-t">运营实习生</span>
+                <span class="jm-m">实习 · 广州 · 天河区 · 经验不限 · 大专在读及以上</span>
+                <span class="jm-m">来源 前程无忧 · 同步 08-08 09:18 · 外部 ID JX-88377</span></span>
+              <span class="jm-p">150–200 元/天</span>
               <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
             </a>
           </div>
-          <p class="jfitnote">六条同来源：<b>来源机构 前程无忧 · 同步时间 2026-08-08 09:20</b>，外部 ID 见各行。经验与学历只显示来源方给了的那几条，<b>没给的不替它补</b>。</p>
+          <p class="jfitnote">这两条是<b>本机已同步并审核通过</b>的全部。这家企业在来源平台上还有没有别的岗位，<b>本机不掌握，也不猜</b>——以来源平台公示为准。经验与学历只显示来源方给了的那几条，<b>没给的不替它补</b>。</p>
         </div>
 
         <!-- 第二屏入口：岗位对得上吗（AI · 原位展开）/ 信息导读（静态）/ 打印 / 招聘会展位 -->
@@ -629,7 +636,7 @@
 
           <!-- ═══ AI 位 · 换成它真能帮上忙的事（2026-08-10）═══════════════════
                旧版这里是「AI 帮你读这家企业」，三行 kv 全部复述同屏已有信息：
-               规模与定位 ← 上面的 dsum-org；岗位分布 ← 上面的「在招岗位 · 6 个」；
+               规模与定位 ← 上面的 dsum-org；岗位分布 ← 上面的「在招岗位」计数；
                你可能想核实 ← 一段通用提醒。读完不知道多了什么，也没有下一步 ——
                **AI 位在，但没在干活。**
 
@@ -674,7 +681,7 @@
           <details class="mfold mfold--wide" data-at="detail">
             <summary>
               <svg class="ic"><use href="#i-brain"/></svg>
-              这 6 个在招岗位，哪几个对得上我的简历
+              这 2 个在招岗位，哪个对得上我的简历
               <span class="ev ev--e3" data-when="default device-off">E3 仅供参考</span>
               <span class="ev ev--e1" data-when="first">E1 还没有你的材料</span>
             </summary>
@@ -691,46 +698,14 @@
                     <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
                   </a>
 
-                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88266&amp;jobTitle=社群运营专员">
+                  <!-- 2026-08-11 跨页一致性整改：这一块原来也是六条，与上面的
+                       在招岗位列表一一对应，同样有五条在岗位库里查不到。
+                       现在只对本机真有的两条给档位 —— 覆盖规则「每条岗位都要给一档」
+                       仍然成立，因为岗位列表本身就只有两条。 -->
+                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88377&amp;jobTitle=运营实习生">
                     <span class="jfit-x">
-                      <span class="jfit-h"><span class="jfit-t">社群运营专员</span><span class="jfit-p">5–8K</span><span class="jfit-id">外部 ID JX-88266</span></span>
-                      <span class="jfit-r">社群维护你写过；岗位正文另外要的私域转化，你的简历里一次都没出现</span>
-                    </span>
-                    <span class="tier tier--high"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：较高</span></span>
-                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-                  </a>
-
-                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88240&amp;jobTitle=客户成功运营">
-                    <span class="jfit-x">
-                      <span class="jfit-h"><span class="jfit-t">客户成功运营</span><span class="jfit-p">8–12K</span><span class="jfit-id">外部 ID JX-88240</span></span>
-                      <span class="jfit-r">运营经历对得上；岗位正文要的 SaaS 客户续约，你的简历里没有做过的痕迹</span>
-                    </span>
-                    <span class="tier tier--mid"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：中等</span></span>
-                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-                  </a>
-
-                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88352&amp;jobTitle=企业服务销售">
-                    <span class="jfit-x">
-                      <span class="jfit-h"><span class="jfit-t">企业服务销售</span><span class="jfit-p">6–10K + 提成</span><span class="jfit-id">外部 ID JX-88352</span></span>
-                      <span class="jfit-r">岗位正文要的销售业绩数字，你的简历里没有；运营经历只能算相邻，不算对上</span>
-                    </span>
-                    <span class="tier tier--mid"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：中等</span></span>
-                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-                  </a>
-
-                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88301&amp;jobTitle=前端开发工程师">
-                    <span class="jfit-x">
-                      <span class="jfit-h"><span class="jfit-t">前端开发工程师</span><span class="jfit-p">12–18K</span><span class="jfit-id">外部 ID JX-88301</span></span>
-                      <span class="jfit-r">岗位正文要的 React 工程经验，你的简历里一条都没有</span>
-                    </span>
-                    <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
-                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-                  </a>
-
-                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88318&amp;jobTitle=测试工程师">
-                    <span class="jfit-x">
-                      <span class="jfit-h"><span class="jfit-t">测试工程师</span><span class="jfit-p">9–14K</span><span class="jfit-id">外部 ID JX-88318</span></span>
-                      <span class="jfit-r">岗位正文要的自动化测试，你的简历里一条都没有</span>
+                      <span class="jfit-h"><span class="jfit-t">运营实习生</span><span class="jfit-p">150–200 元/天</span><span class="jfit-id">外部 ID JX-88377</span></span>
+                      <span class="jfit-r">运营方向和你写过的经历同一条线；但来源方给的学历要求是「大专在读及以上」，你的简历里没有在读这一条</span>
                     </span>
                     <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
                     <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -738,7 +713,8 @@
                 </div>
 
                 <p class="jfitnote">
-                  六条同来源：<b>来源机构 前程无忧 · 同步时间 2026-08-08 09:20</b>，外部 ID 见各行。<br>
+                  两条逐行标了来源与同步时间（<b>前程无忧 · 08-08 09:20 / 09:18</b>），外部 ID 见各行。
+                  这两条是本机同步到的全部，<b>不代表这家企业在来源平台上只招两个岗位</b>。<br>
                   <b>档位不是排名，也不是录用可能性。</b>它只说你的简历原文和这条岗位正文对不对得上——
                   「偏低」不等于不能投，「较高」也不等于会被约。真正的逐条依据在下一步，
                   <b>投递仍在来源平台完成，本机不代收简历</b>。
@@ -752,14 +728,14 @@
                     「哪几个对得上」要拿你的简历原文去对岗位正文——没有前一半，
                     本机<b>不会凭岗位名猜一个档位给你</b>，那样的档位没有依据。</span>
                   <a class="btn btn--primary" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先做一份简历</a>
-                  <span>企业简介、经营信息与上面 6 个在招岗位<b>照常可看</b>，也可以直接点岗位进详情、去来源平台办理。</span>
+                  <span>企业简介、经营信息与上面 2 个在招岗位<b>照常可看</b>，也可以直接点岗位进详情、去来源平台办理。</span>
                 </div>
               </div>
 
               <div data-when="ai-down">
                 <b>比对服务中断，这里不给档位，也不放缓存的旧结论。</b>
                 企业简介、经营信息与在招岗位照常可看；故障已自动上报。
-                恢复后这里会按你的简历，对这 6 条各给一档参考和一句理由。
+                恢复后这里会按你的简历，对这 2 条各给一档参考和一句理由。
               </div>
             </div>
           </details>
@@ -778,7 +754,7 @@
             <div class="mfold-b">
               <div class="kv">
                 <div class="kv-row"><span class="k">规模与定位</span><span class="v">按填报口径，互联网行业百人规模的中型公司，主营企业服务软件</span></div>
-                <div class="kv-row"><span class="k">岗位分布</span><span class="v">6 个岗位覆盖运营、技术、销售三类，不集中在单一职能</span></div>
+                <div class="kv-row"><span class="k">岗位分布</span><span class="v">本机同步到的 2 个都在运营方向，一个全职一个实习；不代表该企业只招运营</span></div>
                 <div class="kv-row"><span class="k">你可能想核实</span><span class="v">社保公积金缴纳口径、试用期约定——可在来源平台或面谈时确认</span></div>
               </div>
               以上只是把本页已展示的信息<b>重新组织</b>了一遍，不是风评，也不构成该不该投、该不该入职的判断。
@@ -984,7 +960,7 @@
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="list"><div class="t">46 家已审核企业，当前条件下显示 <b data-cocount>6</b> 家</div><div class="s">来源企业与岗位导览 · 点整行看企业详情</div></div>
-      <div data-at="detail"><div class="t">6 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
+      <div data-at="detail"><div class="t">2 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
       <div data-at="metricsoff"><div class="t">本机未开启企业指标展示</div><div class="s">不用来源数据凑数字充版面 · 岗位与展位照常可看</div></div>
       <div data-at="error"><div class="t">企业数据没取到，已自动上报</div><div class="s">不显示过期缓存——企业可能已停止招聘</div></div>
     </div>
