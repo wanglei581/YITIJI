@@ -471,6 +471,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
+          pnpm --filter @ai-job-print/api verify:files-requester-auth
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency

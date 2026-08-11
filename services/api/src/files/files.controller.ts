@@ -22,8 +22,8 @@ import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
-import type { UserRole } from '../common/decorators/roles.decorator'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { resolveOptionalInternalUser } from '../common/auth/optional-internal-user'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -36,6 +36,7 @@ import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
 import { UpdateRetentionDto } from './dto/update-retention.dto'
+import { PROXY_MAX_BYTES } from './file-validation'
 import { signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
 import type {
   FilePurpose,
@@ -103,7 +104,7 @@ export class FilesController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0, fileSize: PROXY_MAX_BYTES + 1 } as { fieldNestingDepth: number; fileSize: number } }))
   async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: UploadOptionsDto,
@@ -129,7 +130,7 @@ export class FilesController {
   /** Kiosk 一体机匿名 / 会员上传(无 User 登录态;有会员 token 则绑定 endUserId)。 */
   @Post('kiosk-upload')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0, fileSize: PROXY_MAX_BYTES + 1 } as { fieldNestingDepth: number; fileSize: number } }))
   async kioskUpload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: KioskUploadOptionsDto,
@@ -438,16 +439,9 @@ export class FilesController {
     const auth = extractAuth(req)
     const member = await resolveOptionalEndUser(auth, this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
-    if (auth && auth.toLowerCase().startsWith('bearer ')) {
-      const token = auth.slice(7).trim()
-      try {
-        const payload = this.jwt.verify<{ sub: string; role: UserRole; orgId: string | null; aud?: string }>(token)
-        if (payload.aud !== 'enduser') {
-          return { kind: 'user', userId: payload.sub, role: payload.role, orgId: payload.orgId }
-        }
-      } catch {
-        // 无效 User token → 视为未登录
-      }
+    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma)
+    if (internal) {
+      return { kind: 'user', userId: internal.userId, role: internal.role, orgId: internal.orgId }
     }
     return null
   }

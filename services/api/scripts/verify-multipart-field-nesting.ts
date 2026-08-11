@@ -88,6 +88,27 @@ function hasFieldNestingDepthLimit(call: ts.CallExpression): boolean {
   return fieldNestingDepth.length === 1 && isZero(fieldNestingDepth[0]!.initializer)
 }
 
+function hasProxyFileSizeLimit(call: ts.CallExpression): boolean {
+  const options = call.arguments[1]
+  const optionsObject = options && objectLiteral(options)
+  if (!optionsObject) return false
+
+  const limits = directPropertyAssignments(optionsObject, 'limits')
+  if (limits.length !== 1) return false
+  const limitsObject = objectLiteral(limits[0]!.initializer)
+  if (!limitsObject) return false
+
+  const fileSize = directPropertyAssignments(limitsObject, 'fileSize')
+  if (fileSize.length !== 1) return false
+  const expression = unwrapExpression(fileSize[0]!.initializer)
+  return ts.isBinaryExpression(expression)
+    && expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+    && ts.isIdentifier(expression.left)
+    && expression.left.text === 'PROXY_MAX_BYTES'
+    && ts.isNumericLiteral(expression.right)
+    && Number(expression.right.text) === 1
+}
+
 function callLocation({ file, source, call }: FileInterceptorCall): string {
   const position = source.getLineAndCharacterOfPosition(call.getStart(source))
   return `${file}:${position.line + 1}:${position.character + 1}`
@@ -135,6 +156,9 @@ async function verifyStaticGuards(): Promise<void> {
     if (!hasFieldNestingDepthLimit(call.call)) {
       failures.push(`${callLocation(call)}: FileInterceptor 必须直接声明 limits.fieldNestingDepth: 0`)
     }
+    if (call.file === 'src/files/files.controller.ts' && !hasProxyFileSizeLimit(call.call)) {
+      failures.push(`${callLocation(call)}: FilesController FileInterceptor 必须声明 limits.fileSize: PROXY_MAX_BYTES + 1`)
+    }
   }
 
   for (const expected of EXPECTED_FILE_INTERCEPTORS) {
@@ -156,6 +180,7 @@ async function verifyStaticGuards(): Promise<void> {
 
   assert.deepEqual(failures, [], `静态 multipart 防护契约失败:\n${failures.join('\n')}`)
   console.log('  PASS 静态核验：10 处 FileInterceptor 均设置 limits.fieldNestingDepth: 0')
+  console.log('  PASS 静态核验：FilesController 2 处代理上传在业务上限后 1 byte 触发 Multer 拒绝')
 }
 
 function multipartBody(fieldName: string): { body: Buffer; contentType: string } {
@@ -168,6 +193,19 @@ function multipartBody(fieldName: string): { body: Buffer; contentType: string }
     'Content-Disposition: form-data; name="file"; filename="sample.txt"\r\n',
     'Content-Type: text/plain\r\n\r\n',
     'sample\r\n',
+    `--${boundary}--\r\n`,
+  ].join(''), 'utf8')
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` }
+}
+
+function fileOnlyMultipartBody(fileBody: string): { body: Buffer; contentType: string } {
+  const boundary = `multipart-file-size-${Date.now().toString(36)}`
+  const body = Buffer.from([
+    `--${boundary}\r\n`,
+    'Content-Disposition: form-data; name="file"; filename="sample.txt"\r\n',
+    'Content-Type: text/plain\r\n\r\n',
+    fileBody,
+    '\r\n',
     `--${boundary}--\r\n`,
   ].join(''), 'utf8')
   return { body, contentType: `multipart/form-data; boundary=${boundary}` }
@@ -194,6 +232,22 @@ async function sendMultipart(url: string, fieldName: string): Promise<MultipartR
   }
 }
 
+async function sendFileMultipart(url: string, fileBody: string): Promise<MultipartResponse> {
+  const { body, contentType } = fileOnlyMultipartBody(fileBody)
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(body.length),
+    },
+    body: new Uint8Array(body),
+  })
+  return {
+    status: response.status,
+    multerErrorCode: response.headers.get('x-multer-test-error-code'),
+  }
+}
+
 async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.close((error) => (error ? reject(error) : resolve()))
@@ -203,9 +257,18 @@ async function closeServer(server: Server): Promise<void> {
 async function verifyRuntimeGuard(): Promise<void> {
   const app = express()
   const upload = multer({ limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }).single('file')
+  // Multer/Busboy 在达到 fileSize 时即报 LIMIT_FILE_SIZE。解析器上限取业务上限 + 1，
+  // 既保证业务允许的最大字节数可通过，也保证第一个超限字节在控制器前被拒绝。
+  const sizeLimitedUpload = multer({ limits: { fieldNestingDepth: 0, fileSize: 9 } as { fieldNestingDepth: number; fileSize: number } }).single('file')
 
   app.post('/upload', (req, res, next) => {
     upload(req, res, (error: unknown) => {
+      if (error) return next(error)
+      res.status(204).end()
+    })
+  })
+  app.post('/upload-size-limited', (req, res, next) => {
+    sizeLimitedUpload(req, res, (error: unknown) => {
       if (error) return next(error)
       res.status(204).end()
     })
@@ -235,6 +298,16 @@ async function verifyRuntimeGuard(): Promise<void> {
     assert.equal(nested.status, 400, '嵌套 multipart 字段必须被拒绝')
     assert.equal(nested.multerErrorCode, 'LIMIT_FIELD_NESTING', '嵌套字段必须由限深守卫拒绝')
     console.log('  PASS HTTP loopback：meta[nested] -> 400 (LIMIT_FIELD_NESTING)')
+
+    const sizeLimitedUrl = `${url}-size-limited`
+    const withinLimit = await sendFileMultipart(sizeLimitedUrl, '12345678')
+    assert.equal(withinLimit.status, 204, '文件大小等于业务上限时必须通过')
+    console.log('  PASS HTTP loopback：文件大小等于业务上限 -> 204')
+
+    const overLimit = await sendFileMultipart(sizeLimitedUrl, '123456789')
+    assert.equal(overLimit.status, 400, '文件大小超过上限时必须被 Multer 拒绝')
+    assert.equal(overLimit.multerErrorCode, 'LIMIT_FILE_SIZE', '超限文件必须由 Multer 在控制器前拒绝')
+    console.log('  PASS HTTP loopback：文件大小超过上限 -> 400 (LIMIT_FILE_SIZE)')
   } finally {
     await closeServer(server)
   }

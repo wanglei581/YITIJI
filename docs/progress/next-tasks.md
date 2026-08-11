@@ -16,6 +16,16 @@
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
 
+## 2026-08-11 上线前安全稳定化（优先于新增功能）
+
+- [~] **S0 第一批低耦合修复候选**：混合鉴权文件路由已改为复用内部当前状态解析器，匿名/内部代理 multipart 已在第一个超出 15MB 业务上限的字节处由 Multer 拒绝；RED→GREEN 专项、API typecheck、目标 lint、既有 Kiosk 上传→打印契约已通过，专项已接 CI。下一步先审查最终 diff，提交并推送独立分支，创建 Draft PR，等待 Node 22 主 CI / PostgreSQL / browser 三项全绿；未合入前不得记作 main 已修，未获得新的精确 SHA 部署授权前不得发布。
+- [ ] **S1 文件不可变性与打印哈希**：将直传 staging key 与 active final key 分离，完成时做唯一 `uploading → active` CAS 和后端 SHA-256，所有普通打印任务必须携带服务端哈希，Agent 下载必须有字节上限。实施前先确认 BOS 原子 copy/checksum/content-length 能力；这是跨存储/打印协议改造，禁止与 S0 混在同一提交。
+- [ ] **S2 TRTC 终端信任链**：在 loopback Agent broker 与短期 terminal-bound attestation 中选定一种，不再把 `X-Terminal-Id` 当认证；补终端存在/enabled/lifecycle/capability、服务端生成 userId、每终端配额和审计。不得把长期 Agent token放进浏览器 bundle。
+- [ ] **S3 匿名 DOCX 资源预算**：把合同审查已有的实际解压字节/entry/path/CRC 守卫抽成公共 document-security 边界，在 resume parse 和 materials pii_scan 两条独立 Mammoth 路径前强制执行，并增加 worker 内存/时间限制与压缩炸弹回归。
+- [ ] **S4 外部数据源出站与资源预算**：为每个 redirect hop 做 DNS 单次解析、全公网分类、连接地址 pin/peer 校验并优先强制 HTTPS；响应增加 byte/JSON/item 上限，数据库按有界批次持久化。跨 origin 重定向必须去掉 Authorization/X-API-Key。
+- [ ] **S5 LLM 配置密钥绑定**：自定义 baseURL 改为 class-validator DTO + HTTPS/批准 origin 门禁；origin 变化必须清空或要求重新输入 API key，禁止把既存加密密钥转发到新 origin。
+- [ ] **S6 复扫与 P0**：S1–S5 分批修复并各自通过专项、API package、主 CI 后重新做安全差异扫描；随后才进入生产服务器、PostgreSQL、密钥轮换、法务、Windows 双机、打印扫描/TRTC 真机 P0。安全扫描与 CI 不能替代生产/硬件验收。
+
 > 最后更新：2026-08-10
 
 ## V3 设计落地实施队列(分工:Claude=视觉与设计;Codex=以下全部实施,2026-08-09 用户定,2026-08-10 重建)
