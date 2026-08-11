@@ -70,7 +70,10 @@ const mockAdapter: SmartCampusAdminServiceInterface = {
   async saveConfig(terminalId, input) {
     const modules = {
       welcome: !!input.modules.welcome,
-      bigdata: !!input.modules.bigdata,
+      // 与真实后端保持一致：校园大数据本期冻结，任何端传 true 都强制 false
+      // （smart-campus.service.ts saveTerminalConfig）。mock 此前允许 true，
+      // 导致 mock 模式下开发者以为该模块可开，切真实后端即失效——契约漂移，2026-08-11 修正。
+      bigdata: false,
       luggage: !!input.modules.luggage,
       panorama: !!input.modules.panorama,
     }

@@ -2,10 +2,23 @@ import { useCallback, useEffect, useState } from 'react'
 import type { PartnerType, SceneTemplate } from '@ai-job-print/shared'
 import {
   MODULE_LABELS,
+  ORG_TYPE_SCENE_TEMPLATE,
   PARTNER_TYPE_LABELS,
   SCENE_DEFAULT_MODULES,
   SCENE_TEMPLATE_LABELS,
 } from '@ai-job-print/shared'
+
+// ─── 机构类型 → 场景/模块 联动 ────────────────────────────────────────────────
+// 场景模板由机构类型唯一决定（服务端 ORG_TYPE_MATRIX 硬约束），不由人选。
+// 选类型时自动带出场景与该场景的默认模块；source-only 类型（场景为 null）
+// 必须同时清空场景与模块，否则服务端抛 ORG_TYPE_MATRIX_VIOLATION。
+function sceneFieldsForType(type: string): { sceneTemplate: SceneTemplate | null; enabledModules: string[] } {
+  const scene = ORG_TYPE_SCENE_TEMPLATE[type as PartnerType] ?? null
+  return {
+    sceneTemplate: scene,
+    enabledModules: scene ? [...SCENE_DEFAULT_MODULES[scene]] : [],
+  }
+}
 import { Card, Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Building2Icon, PlusIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -123,9 +136,36 @@ function ModulesPicker({ value, onChange }: { value: string[]; onChange: (module
   )
 }
 
+/** 场景模板只读展示——由机构类型决定，不提供选择控件 */
+function SceneTemplateReadonly({ sceneTemplate }: { sceneTemplate: SceneTemplate | null }) {
+  return (
+    <Field label="场景模板">
+      <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+        {sceneTemplate ? (
+          <>
+            {SCENE_TEMPLATE_LABELS[sceneTemplate]}
+            <span className="ml-2 text-xs text-neutral-500">由机构类型决定</span>
+          </>
+        ) : (
+          <>
+            无终端场景
+            <span className="ml-2 text-xs text-neutral-500">该类型为纯内容供给方，不拥有终端</span>
+          </>
+        )}
+      </div>
+    </Field>
+  )
+}
+
 // ─── 新增机构抽屉 ─────────────────────────────────────────────────────────────
 
-const EMPTY_CREATE: CreateOrgInput = { name: '', type: 'public_employment_service' }
+const EMPTY_CREATE: CreateOrgInput = {
+  name: '',
+  type: 'public_employment_service',
+  // ⚠️ 必须带上场景与模块：服务端要求 type 与 sceneTemplate 严格配对，
+  // 此前默认为空导致「打开抽屉直接保存」必被拒（ORG_TYPE_MATRIX_VIOLATION）。
+  ...sceneFieldsForType('public_employment_service'),
+}
 
 function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState<CreateOrgInput>(EMPTY_CREATE)
@@ -143,13 +183,9 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
     }
   }, [open])
 
-  const pickScene = (scene: string) => {
-    setForm((f) => ({
-      ...f,
-      sceneTemplate: scene || undefined,
-      // 选场景模板时回填默认模块(可再手动调整)
-      enabledModules: scene ? [...SCENE_DEFAULT_MODULES[scene as SceneTemplate]] : f.enabledModules,
-    }))
+  // 机构类型变更 → 场景模板与默认模块随之切换（场景不可单独选择）
+  const pickType = (type: string) => {
+    setForm((f) => ({ ...f, type, ...sceneFieldsForType(type) }))
   }
 
   const canSave =
@@ -204,7 +240,7 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
           <input className={inputCls} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
         </Field>
         <Field label="机构类型" required>
-          <select className={inputCls} value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+          <select className={inputCls} value={form.type} onChange={(e) => pickType(e.target.value)}>
             {Object.entries(PARTNER_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </Field>
@@ -216,12 +252,7 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
             <input className={inputCls} value={form.contactPhone ?? ''} onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value }))} />
           </Field>
         </div>
-        <Field label="场景模板(选择后回填默认模块)">
-          <select className={inputCls} value={form.sceneTemplate ?? ''} onChange={(e) => pickScene(e.target.value)}>
-            <option value="">暂不设置</option>
-            {Object.entries(SCENE_TEMPLATE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </Field>
+        <SceneTemplateReadonly sceneTemplate={form.sceneTemplate ?? null} />
         <Field label="启用模块">
           <ModulesPicker value={form.enabledModules ?? []} onChange={(modules) => setForm((f) => ({ ...f, enabledModules: modules }))} />
         </Field>
@@ -291,7 +322,7 @@ function OrgDetailDrawer({
         type: d.type,
         contact: d.contact ?? '',
         contactPhone: d.contactPhone ?? '',
-        sceneTemplate: d.sceneTemplate ?? undefined,
+        sceneTemplate: d.sceneTemplate,
         enabledModules: d.enabledModules,
       })
       setState('ready')
@@ -358,27 +389,15 @@ function OrgDetailDrawer({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="机构类型">
-                <select className={inputCls} value={form.type ?? ''} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+                <select
+                  className={inputCls}
+                  value={form.type ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value, ...sceneFieldsForType(e.target.value) }))}
+                >
                   {Object.entries(PARTNER_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </Field>
-              <Field label="场景模板">
-                <select
-                  className={inputCls}
-                  value={form.sceneTemplate ?? ''}
-                  onChange={(e) => {
-                    const scene = e.target.value
-                    setForm((f) => ({
-                      ...f,
-                      sceneTemplate: scene || undefined,
-                      enabledModules: scene ? [...SCENE_DEFAULT_MODULES[scene as SceneTemplate]] : f.enabledModules,
-                    }))
-                  }}
-                >
-                  <option value="">未设置</option>
-                  {Object.entries(SCENE_TEMPLATE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </Field>
+              <SceneTemplateReadonly sceneTemplate={form.sceneTemplate ?? null} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="联系人">

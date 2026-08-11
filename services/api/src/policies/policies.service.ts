@@ -134,6 +134,7 @@ export class PoliciesService {
 
   async createPartnerPolicy(dto: CreatePolicyPostDto, user: AuthedUser): Promise<PolicyPostDto> {
     const org = await this.assertPartnerOrg(user)
+    this.assertPolicyCapableOrgType(org)
     this.assertKindFields(dto.kind, dto.audience, dto.category)
     const created = await this.prisma.policyPost.create({
       data: {
@@ -316,6 +317,36 @@ export class PoliciesService {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
     }
     return org
+  }
+
+  /**
+   * 允许发布政策内容的机构类型。
+   *
+   * ⚠️ 2026-08-11 新增。此前 createPartnerPolicy 只调 assertPartnerOrg——
+   * 只检查账号挂靠与机构启用，**不检查机构类型**，导致持证人力资源机构、
+   * 招聘会主办方、企业数据来源方同样能发布「政策公告」。
+   *
+   * 这是合规风险而非权限洁癖：政策内容是就业政策与补贴指引，属官方性质，
+   * 且 Kiosk 侧带扫码办理入口。商业机构以「政策公告」名义发布内容，
+   * 求职者会误认为是官方政策——政策涉及补贴与社保，是最敏感的内容类型。
+   * `partner-permission-matrix.md` 本就规定只有人社与高校可管政策，代码未实现。
+   */
+  private static readonly POLICY_CAPABLE_ORG_TYPES = ['public_employment_service', 'school_employment_center']
+
+  /**
+   * 仅在**创建**时校验机构类型。
+   * 更新/下架/删除不校验：存量数据若由不该发布的机构创建，仍需允许其下架与删除，
+   * 否则收紧权限反而会把违规内容锁死在已发布状态。
+   */
+  private assertPolicyCapableOrgType(org: { type: string; name: string }): void {
+    if (!PoliciesService.POLICY_CAPABLE_ORG_TYPES.includes(org.type)) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORG_TYPE_NOT_ALLOWED_FOR_POLICY',
+          message: '仅公共就业服务机构与高校就业中心可发布政策内容',
+        },
+      })
+    }
   }
 
   /** policy_guide 必须有 audience;notice 必须有 category(各自分组/标签的展示前提)。 */
