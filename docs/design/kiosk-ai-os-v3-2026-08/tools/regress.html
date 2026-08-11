@@ -661,6 +661,97 @@ function auditCardVoid (win) {
   return out.slice(0, 6)
 }
 
+/* ── 死按钮 ──────────────────────────────────────────────────────
+   所有者亲自逮到的一类：**登录页三选一里的「手机扫码」点下去什么都不发生**，
+   而扫码登录那一屏全站根本不存在。入口在、页面没有。
+
+   为什么既有检查抓不到：audit-plus 的「假入口」专门**跳过 <button> 标签**
+   （`if (tag === 'a' || tag === 'button' || tag === 'input') continue`）——
+   它查的是「看着像按钮的 span / div」。于是「真按钮但没接线」正好落在盲区里。
+   这已经是同一天里第四个「检测器自己看不见」的洞。
+
+   判据：一个可见的 <button>，既没有 data-go（页内换阶段）、
+   没有 onclick、没有 type=submit、不在 <form> 里、没有任何 data-* 行为钩子，
+   页面也没有任何脚本按它的类名或属性做委托 —— 那它按下去就是什么都不发生。
+
+   最后一条机器判不了（脚本可以用任意选择器委托），所以这里采取的办法是：
+   **真的按一下**，看有没有任何可观察的变化（阶段、URL、DOM、弹层、aria）。
+   有变化就算接线了，没有就报出来。按完立刻把现场复原。 */
+function auditDeadButtons (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden])')) return []
+
+  var out = []
+  var startHref = win.location.href
+  var btns = screen.querySelectorAll('button')
+  for (var i = 0; i < btns.length && out.length < 8; i++) {
+    var b = btns[i]
+    /* 上一次点击把页面带走了（脚本里的 location.href = …，preventDefault 拦不住）——
+       后面的元素引用全都失效了，继续探测只会在一个已经不存在的文档上瞎按。
+       停在这里，把已经查到的报回去；这一页剩下的按钮标为未覆盖。 */
+    if (win.location.href !== startHref) {
+      out.push({ label: '（页面在探测中途被带走，本页剩余按钮未覆盖）', cls: 'PROBE-ABORTED' })
+      break
+    }
+    if (b.hidden || b.closest('[hidden]')) continue
+    if (b.disabled || b.getAttribute('aria-disabled') === 'true') continue
+    var cs = win.getComputedStyle(b)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    var r = b.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) continue
+    if (r.bottom <= 0 || r.top >= win.innerHeight) continue
+    /* 明确声明了行为的，直接放过。
+       ⚠ 这里踩过一个坑：第一版写的是 `b.type === 'submit'` 就跳过 ——
+       而 HTML 里 <button> **不写 type 属性时默认就是 submit**。
+       结果它把全站几乎所有按钮都跳过了，这项检查**永远报 0**。
+       是靠「造一个死按钮，它必须报出来」的反例测出来的；
+       不做那个反例，就会交付一个瞎的检查还以为全站干净。
+       submit / reset 只有在 <form> 里才真的有行为，所以两条要一起判。 */
+    if (b.hasAttribute('data-go') || b.hasAttribute('onclick')) continue
+    if (b.closest('form') && (b.type === 'submit' || b.type === 'reset')) continue
+
+    /* 按一下，看有没有任何可观察的变化。
+       ── 观察面必须够宽，否则全是假阳性（第一版实测报了 215 条，大半是假的）──
+       · 比 **整个 body 的 outerHTML**，不是 .screen 的长度：
+         帮助层、离场确认层这些是挂到 document.body 上的，不在 .screen 里；
+         只看 .screen 就会把「需要帮助」判成死按钮。
+       · 比**内容本身**而不是**长度**：单选类按钮把选中态从一个元素挪到另一个，
+         总长度一个字符都不变（去掉一个 on、加上一个 on），只比长度必然漏判。
+       · 长按类按钮（按住说话）先补 pointerdown / pointerup —— 一次 click 触发不了它。
+       · 再等一拍：不少处理是异步的（渲染、setTimeout、fetch 之后才改 DOM）。 */
+    var snap = function () {
+      return win.location.href + '' +
+             (screen.getAttribute('data-stage') || '') + '' +
+             doc.body.outerHTML
+    }
+    var before = snap()
+    var moved = false
+    /* 探测时**拦掉默认行为，但让处理函数照常跑**。
+       不拦的话，凡是会跳转的按钮都会把 iframe 带走 —— 实测连点几百个之后
+       预览面板直接崩掉。拦在冒泡终点（document，非捕获），
+       页面自己的监听已经全部跑完，只挡最后的默认动作。 */
+    var block = function (e) { e.preventDefault() }
+    doc.addEventListener('click', block, false)
+    try {
+      try {
+        b.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true }))
+        b.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true }))
+      } catch (e) {}
+      b.click()
+      moved = snap() !== before
+    } catch (e) { moved = true }        // 抛错至少说明有代码在跑
+    doc.removeEventListener('click', block, false)
+
+    if (!moved) {
+      out.push({ label: (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || b.className,
+                 cls: String(b.className).split(' ')[0] })
+    }
+  }
+  return out
+}
+
 function comboLabel (c) {
   var s = c.state + (c.stage ? '/' + c.stage : '')
   for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
@@ -807,6 +898,25 @@ async function runAll (only, theme) {
                                                       : '被 .' + occ[oi].blockedBy + ' 压住') })
         }
       }
+      /* 死按钮检查放在**所有组合跑完之后**：它要真的按一下按钮，会改变现场。
+         放在组合循环里会污染后面的测量。这一页已经量完了，可以随便按。
+         逐阶段各按一遍 —— 不同阶段露出来的按钮不一样。 */
+      var dead = {}
+      var stagesForDead = disc.hasStage && disc.stages.length ? disc.stages : ['']
+      for (var ds = 0; ds < stagesForDead.length; ds++) {
+        if (stagesForDead[ds]) win.document.querySelector('.screen')
+          .setAttribute('data-stage', stagesForDead[ds])
+        if (typeof win.v3ApplyVisibility === 'function') win.v3ApplyVisibility()
+        void win.document.body.offsetHeight
+        auditDeadButtons(win).forEach(function (b) {
+          dead[b.label + '|' + b.cls] = (stagesForDead[ds] || '默认')
+        })
+      }
+      Object.keys(dead).forEach(function (k) {
+        rec.defects.push({ combo: dead[k], check: '按钮按下去什么都不发生', value: 1,
+          detail: '「' + k.split('|')[0] + '」（.' + k.split('|')[1] + '）' })
+      })
+
       rec.consoleErrors = errs.slice(0, 20)
       rec.stages = disc.stages
       rec.links = collectLinks(win)

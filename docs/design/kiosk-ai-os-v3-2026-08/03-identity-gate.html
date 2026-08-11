@@ -123,6 +123,41 @@
 .way--on .way-ic { background:var(--jade-a20); }
 .way--on .way-ic .ic { color:var(--jade-400); }
 .way-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+
+/* ── SQ 扫码登录（2026-08-11 补，此前整屏不存在）───────────────────────
+   左边码、右边话。码给到 196px 是有依据的：用户站在约 60cm 外用手机扫，
+   码太小要凑近，而这是一台立式机器，凑近意味着弯腰。 */
+.qrwrap { display:grid; grid-template-columns:288px 1fr; gap:var(--s-6); align-items:start; }
+.qrpane { display:flex; flex-direction:column; gap:var(--s-3); align-items:center;
+  padding:var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.qrbox { position:relative; padding:var(--s-4); border-radius:var(--r-sm); background:var(--paper-000);
+  line-height:0; }
+/* 过期时把码压灰并盖一条明字 —— 只置灰不写字，用户会以为是自己手机的问题 */
+.screen[data-qr="expired"] .qrbox svg { opacity:.16; filter:grayscale(1); }
+.qrbox-x { position:absolute; inset:auto 0 50% 0; transform:translateY(50%);
+  text-align:center; font-size:var(--fz-5); font-weight:700; color:var(--coral-600);
+  /* .qrbox 为了贴合 svg 设了 line-height:0，这行盖字会继承成 0 高 ——
+     实测「已过期」三个字量出来高度是 0，等于没写。 */
+  line-height:1.4; padding:6px 0; background:rgba(255,255,255,.92); }
+.qrbox-cap { font-size:var(--fz-1); color:var(--fog-600); text-align:center; line-height:1.6; }
+.qrbox-cap b { color:var(--fog-700); }
+
+.qrside { display:flex; flex-direction:column; gap:var(--s-4); min-width:0; }
+.qrst { display:flex; gap:var(--s-4); align-items:flex-start;
+  padding:var(--s-5); border-radius:var(--r-md);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.qrst-dot { width:12px; height:12px; border-radius:50%; flex:0 0 auto; margin-top:7px;
+  background:var(--fog-600); }
+.qrst--live { background:var(--jade-a12); border-color:var(--jade-a32); }
+.qrst--live .qrst-dot { background:var(--jade-400); animation:qrpulse 1.6s var(--ease-in-out) infinite; }
+.qrst--warn { background:var(--amber-a12); border-color:var(--amber-a20); }
+.qrst--warn .qrst-dot { background:var(--amber-400); }
+@keyframes qrpulse { 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+.qrst-b { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.qrst-t { font-size:var(--fz-5); color:var(--fog-900); }
+.qrst-s { font-size:var(--fz-3); color:var(--fog-700); line-height:1.66; }
+.qrst-s b { color:var(--fog-900); }
 .way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
 /* 手机号输入：公共场所要打码 */
@@ -149,7 +184,7 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<div class="screen" data-state="default" data-stage="s1" data-qr="wait" data-theme="warm">
 
   <div class="grain"></div>
 
@@ -166,6 +201,7 @@
 
     <div class="gate-hd">
       <div class="gate-h" data-at="s1">要把这次做的东西留下来吗？</div>
+      <div class="gate-h" data-at="sq">用手机扫这个码</div>
       <div class="gate-h" data-at="s2">输入手机号</div>
       <div class="gate-h" data-at="s3">登录好了</div>
 
@@ -175,6 +211,10 @@
       <div class="gate-p" data-at="s1">
         你在<b id="gate-src">刚才那一页</b>里要办的事，<b>不用登录也能办完</b>，包括打印带走。<br>
         只有想让它<b>留在账号里、换台机器还能取</b>，才需要下面三选一。
+      </div>
+      <div class="gate-p" data-at="sq">
+        手机号和验证码都在<b>你自己手机上</b>完成，<b>不出现在这块屏幕上</b>。<br>
+        扫完还要在手机上<b>点一下确认</b> —— 那一步做完才算登录。
       </div>
       <div class="gate-p" data-at="s2">
         用来给你发一条验证码，<b>只验一次</b>。<br>
@@ -238,8 +278,18 @@
 
     <!-- ─────────── S1 三选一 ─────────── -->
     <div class="gate-body" data-at="s1">
+      <!-- 2026-08-11 修：这三张卡原来**不是选择**。
+           「手机扫码」没有 data-go，点下去什么都不发生；「继续」按钮永远 data-go="s2"，
+           不管点哪张都去输手机号 —— 也就是说**扫码登录这条路从入口到页面完全不存在**。
+           实测三次点击：手机扫码 → 阶段停在 s1、无任何变化。
+
+           为什么自检没抓到：`假入口` 检查专门跳过 <button> 标签
+           （它查的是「看着像按钮的 span/div」），所以「真按钮但没接线」正好在盲区里。
+           回归台已补「死按钮」检查。
+
+           现在：三张卡是真的单选（data-way），「继续」按选中的那条走。 -->
       <div class="ways">
-        <button class="way">
+        <button class="way" data-way="qr">
           <span class="way-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="way-t">手机扫码</span>
           <span class="way-s">
@@ -248,7 +298,7 @@
           </span>
         </button>
 
-        <button class="way" data-go="s2">
+        <button class="way" data-way="phone">
           <span class="way-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
           <span class="way-t">输手机号</span>
           <span class="way-s">
@@ -257,7 +307,7 @@
           </span>
         </button>
 
-        <button class="way way--on">
+        <button class="way way--on" data-way="skip">
           <span class="way-ic"><svg class="ic"><use href="#i-user"/></svg></span>
           <span class="way-t">不登录，继续用</span>
           <span class="way-s">
@@ -282,6 +332,102 @@
     </div>
 
     <!-- ─────────── S2 输手机号 ─────────── -->
+    <!-- ═══ SQ 扫码登录 ═══════════════════════════════════════════════════
+         2026-08-11 补。此前这一屏**完全不存在** —— 三选一里的「手机扫码」是个
+         死按钮，点下去阶段停在 s1。所有者提出「扫码登录怎么没有」之后实测确认。
+
+         这一屏要解决的真实问题，s1 上已经写明：**大厅里人多的时候，
+         号码不该出现在这块屏幕上**。所以扫码登录不是「多一种方式」，
+         它是隐私更好的那一种，在人多时应当被优先选。
+
+         ── 二维码状态轴 data-qr：wait / scanned / expired ──────────────
+         三种状态屏上给的话完全不同，不能只画一个码了事：
+           wait    码已出，等你扫 —— 要给有效期，不给用户就不知道能等多久
+           scanned 手机已经扫到了，等你在手机上按确认 —— 这一步最容易卡住，
+                   用户以为扫完就完事了，屏幕必须明说「还要在手机上点一下」
+           expired 码过期了 —— 必须能一键换一个，不能让人退出去重进
+
+         ── 接线契约（交 Codex）────────────────────────────────────────
+         · 端点：`/member/qr-login create` 出码、`claim` 认领（生产已存在）。
+         · 出码请求要带 returnTo，认领成功后由服务端把会话与 returnTo 绑定，
+           **不要**把 returnTo 塞进二维码内容里 —— 二维码会被旁人拍走。
+         · 码必须**短时效、一次一码**；过期后 create 出新码，旧码立即作废。
+         · 轮询 claim 状态；**没拿到确认之前，屏幕不许显示「登录成功」**。
+         · 二维码内容不含手机号、不含会话令牌明文；它只是一个一次性凭据的取件号。
+         · 失败降级：出码失败 → 本屏明说「码出不来」并把「改用输手机号」做成主按钮，
+           不要把人堵在空屏前。整个短信通道挂掉时反过来（见 noai 注释里的降级口径）。
+         · 这一步同样**不用 AI**，不得调用任何 /ai/* 端点。 -->
+    <div class="gate-body" data-at="sq">
+      <div class="qrwrap">
+        <div class="qrpane">
+          <!-- 设计稿里这是占位图形。按 45 页已定的口径：假码必须标明扫不出东西，
+               不能标成「有效」——用户在大厅里举着手机扫半天扫不出来，
+               只会以为自己手机坏了。 -->
+          <div class="qrbox" aria-hidden="true">
+            <svg viewBox="0 0 100 100" width="196" height="196">
+              <rect x="0" y="0" width="100" height="100" fill="var(--paper-000)"/>
+              <g fill="var(--ink-100)">
+                <rect x="6" y="6" width="22" height="22"/><rect x="12" y="12" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="72" y="6" width="22" height="22"/><rect x="78" y="12" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="6" y="72" width="22" height="22"/><rect x="12" y="78" width="10" height="10" fill="var(--paper-000)"/>
+                <rect x="36" y="10" width="6" height="6"/><rect x="48" y="10" width="6" height="6"/>
+                <rect x="36" y="22" width="6" height="6"/><rect x="54" y="22" width="6" height="6"/>
+                <rect x="10" y="36" width="6" height="6"/><rect x="22" y="36" width="6" height="6"/>
+                <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/>
+                <rect x="64" y="40" width="6" height="6"/><rect x="76" y="36" width="6" height="6"/>
+                <rect x="40" y="52" width="6" height="6"/><rect x="58" y="52" width="6" height="6"/>
+                <rect x="76" y="52" width="6" height="6"/><rect x="36" y="64" width="6" height="6"/>
+                <rect x="52" y="64" width="6" height="6"/><rect x="70" y="64" width="6" height="6"/>
+                <rect x="40" y="76" width="6" height="6"/><rect x="58" y="76" width="6" height="6"/>
+                <rect x="76" y="76" width="6" height="6"/><rect x="64" y="88" width="6" height="6"/>
+              </g>
+            </svg>
+            <span class="qrbox-x" data-qr="expired">已过期</span>
+          </div>
+          <span class="qrbox-cap">示意码 · 设计稿占位，<b>扫不出东西</b><br>
+            生产由服务端下发，<b>短时效、一次一码</b></span>
+        </div>
+
+        <div class="qrside">
+          <div class="qrst" data-qr="wait">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">等你扫</b>
+              <span class="qrst-s">用手机相机或微信扫一扫对准左边的码。<br>
+                这个码 <b data-site-time="qr">5 分钟</b>内有效，过期可以换一个。</span></span>
+          </div>
+          <div class="qrst qrst--live" data-qr="scanned">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">手机已经扫到了</b>
+              <span class="qrst-s"><b>还要在你手机上点一下「确认登录」</b> ——
+                这一步最容易漏，扫完不等于登录完。<br>
+                手机上没弹出来？把手机解锁看看，或者换「输手机号」。</span></span>
+          </div>
+          <div class="qrst qrst--warn" data-qr="expired">
+            <span class="qrst-dot"></span>
+            <span class="qrst-b"><b class="qrst-t">这个码过期了</b>
+              <span class="qrst-s">为了安全，码只在短时间内有效。<br>
+                按下面的<b>换一个码</b>可以立刻再出一个，不用退出去重进。</span></span>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>号码不出现在这块屏幕上。</b>手机号、验证码都在你自己手机上完成，
+              旁边的人看不到。<br>
+              这块屏幕上只有这个码 —— 它<b>不含你的手机号，也不含登录凭证</b>，
+              别人拍走也用不了。</span>
+          </div>
+
+          <div class="kv">
+            <div class="kv-row"><span class="k">码有效期</span><span class="v" data-site-time="qr">5 分钟</span></div>
+            <div class="kv-row"><span class="k">过期了怎么办</span><span class="v">按「换一个码」，旧码立即作废</span></div>
+            <div class="kv-row"><span class="k">扫不出来怎么办</span><span class="v">改用「输手机号」，功能完全一样</span></div>
+            <div class="kv-row"><span class="k">手机没网怎么办</span><span class="v">改用「输手机号」，短信不走这台机器的网</span></div>
+            <div class="kv-row"><span class="k">这个码能给别人扫吗</span><span class="v v--fog">不能 · 一次一码，谁扫谁登录</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="gate-body" data-at="s2">
       <div class="phone">
         <svg class="ic" style="width:26px;height:26px;color:var(--fog-600)"><use href="#i-phone"/></svg>
@@ -346,6 +492,10 @@
         无论选哪个，本机都<b>不代收简历、不代为投递</b>。
         登录只影响文件存不存得下来 —— <b id="foot-s1">两个出口都回首页</b>。
       </span>
+      <span class="t" data-at="sq">
+        扫不出来、手机没网、或者不想用手机，<b>改用「输手机号」功能完全一样</b>。<br>
+        随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉。
+      </span>
       <span class="t" data-at="s2">
         随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉，只是留不到账号里。
         <b id="foot-s2">登录后回首页。</b>
@@ -356,9 +506,14 @@
 
       <span style="margin-left:auto;flex:0 0 auto;display:flex;gap:var(--s-3)">
         <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">返回 · 改用扫码</button>
+        <!-- sq 的三个出口。「换一个码」只在过期态出现 —— 码还没过期时给这个按钮，
+             等于鼓励用户乱按，反而制造「我是不是该换一个」的犹豫。 -->
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-go="s1">返回 · 换一种方式</button>
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-qr="expired" id="qr-again">换一个码</button>
+        <button class="btn btn--lg btn--ghost" data-at="sq" data-go="s2">改用输手机号</button>
         <!-- 出口①：先不登录继续办理（s1/s2 常驻）。
              href 与文案都由页尾脚本按 returnTo 改写；HTML 里写的是没有来源时的兜底。 -->
-        <a class="btn btn--lg btn--ghost" data-at="s1 s2" id="exit-skip"
+        <a class="btn btn--lg btn--ghost" data-at="s1 sq s2" id="exit-skip"
            href="01-home-v6.html?from=P03&amp;login=skip"><span id="exit-skip-t">先不登录 · 回首页</span></a>
         <!-- s3 的独立退路。默认 display:none：没有返回目标时主按钮本身就是回首页，
              两条并排等于同一件事说两遍。脚本认领到真实返回目标后才放出来。 -->
@@ -381,6 +536,7 @@
 <script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
@@ -667,5 +823,93 @@
   set('exit-home', function (el) { el.style.display = '' })
 })()
 </script>
+
+<script>
+/* ── 三选一是真的选择 + 扫码登录状态（2026-08-11 补）──────────────────────
+   改之前：三张卡没有任何选中逻辑，「继续」按钮永远 data-go="s2"，
+   点哪张都去输手机号；「手机扫码」连 data-go 都没有，是个死按钮。
+   也就是说扫码登录这条路从入口到页面完全不存在。
+
+   现在：卡是单选，「继续」按选中的那条走。
+   「不登录」这一条不去阶段，直接走 exit-skip 那个真实出口 ——
+   它本来就是「离开这道门」，不是门里的下一步。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var ways = [].slice.call(document.querySelectorAll('.way[data-way]'))
+  var goBtn = document.querySelector('.btn--primary[data-at="s1"]')
+  if (!scr || !ways.length) return
+
+  function pick (el) {
+    ways.forEach(function (w) {
+      var on = (w === el)
+      w.classList.toggle('way--on', on)
+      w.setAttribute('aria-pressed', on ? 'true' : 'false')
+    })
+  }
+  ways.forEach(function (w) {
+    w.setAttribute('aria-pressed', w.classList.contains('way--on') ? 'true' : 'false')
+    w.addEventListener('click', function () { pick(w) })
+  })
+
+  if (goBtn) {
+    /* 用捕获阶段抢在 stages.js 的 data-go 委托之前：
+       这个按钮上还留着 data-go="s2"（不删是为了脚本没跑时仍有个兜底去处），
+       但选中扫码时应当去 sq。 */
+    goBtn.addEventListener('click', function (e) {
+      var on = document.querySelector('.way[data-way].way--on')
+      var way = on && on.getAttribute('data-way')
+      if (way === 'phone') return                     // 交给 data-go="s2"
+      e.preventDefault(); e.stopPropagation()
+      if (way === 'qr') { if (window.v3Stage) window.v3Stage('sq'); return }
+      /* skip：离开这道门，走 exit-skip 已经算好的真实去处 */
+      var skip = document.getElementById('exit-skip')
+      if (skip && skip.getAttribute('href')) location.href = skip.getAttribute('href')
+    }, true)
+  }
+
+  /* ── data-qr 轴的可见性由本页自己接 ─────────────────────────────────
+     stage.js 的 applyVisibility() 只认 data-when / data-at / data-pay / data-job
+     四条轴（见该文件 79 行的 querySelectorAll）。data-qr 是本页新加的，
+     不在里面，所以三张状态卡会同时显示。
+
+     不去改 stage.js：它被 39 个页面共用，为一页加一条轴要全站回归；
+     而且这条轴只有本页用得上。包一层在本页做，代价最小。
+
+     包装而不是另写一个 applyQr()：回归台与页面各处都是调 v3ApplyVisibility()，
+     另写一个函数就得指望每个调用点都记得多调一次 —— 那种约定迟早会漏。 */
+  var baseApply = window.v3ApplyVisibility
+  function applyQr () {
+    var cur = scr.getAttribute('data-qr') || ''
+    var list = scr.querySelectorAll('[data-qr]')
+    for (var i = 0; i < list.length; i++) {
+      var el = list[i]
+      var want = (el.getAttribute('data-qr') || '').split(/\s+/).filter(Boolean)
+      /* 只在 sq 这一屏参与判定；别的阶段由 data-at 决定，不重复拦一次 */
+      var inSq = el.closest('[data-at]')
+      var atOk = !inSq || (inSq.getAttribute('data-at') || '').split(/\s+/).indexOf('sq') > -1
+      if (!atOk) continue
+      /* 两个方向都要写。第一版只写了「不匹配就隐藏」,没写「匹配就显示」——
+         .qrst 只有 data-qr、没有 data-when/data-at,stage.js 那一轮根本不碰它们,
+         于是一旦被隐藏就再也回不来:切回 wait 时三张卡全是空的。
+         **凡是自己接管可见性的,必须两个方向都负责**,不能指望别人帮你复位。 */
+      el.hidden = (want.indexOf(cur) < 0)
+    }
+  }
+  if (typeof baseApply === 'function') {
+    window.v3ApplyVisibility = function () { baseApply.apply(this, arguments); applyQr() }
+  }
+  applyQr()
+
+  /* 「换一个码」：本页只负责回到「等你扫」并重置倒计时的表现。
+     真正的出码由服务端做（/member/qr-login create），旧码必须立即作废 ——
+     这一条写在 sq 那一屏的接线契约注释里。 */
+  var again = document.getElementById('qr-again')
+  if (again) again.addEventListener('click', function () {
+    scr.setAttribute('data-qr', 'wait')
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  })
+})()
+</script>
+
 </body>
 </html>
