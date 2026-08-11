@@ -97,6 +97,35 @@ export class RedisService implements OnModuleDestroy {
     await this.client.set(key, value, 'EX', ttlSeconds)
   }
 
+  /** 仅当前值仍等于调用方读到的快照时推进游标，避免并发慢任务覆盖新进度。 */
+  async compareAndSetEx(
+    key: string,
+    expectedValue: string | null,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<'matched' | 'mismatched'> {
+    const result = await this.client.eval(
+      `
+      local current = redis.call('GET', KEYS[1])
+      local expectsExisting = ARGV[1] == '1'
+      if expectsExisting then
+        if current ~= ARGV[2] then return 0 end
+      else
+        if current then return 0 end
+      end
+      redis.call('SET', KEYS[1], ARGV[3], 'EX', tonumber(ARGV[4]))
+      return 1
+      `,
+      1,
+      key,
+      expectedValue === null ? '0' : '1',
+      expectedValue ?? '',
+      value,
+      ttlSeconds,
+    )
+    return result === 1 ? 'matched' : 'mismatched'
+  }
+
   async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
     const result = await this.client.eval(
       `

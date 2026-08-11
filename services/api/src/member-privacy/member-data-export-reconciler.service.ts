@@ -13,6 +13,8 @@ const MAX_BATCH_LIMIT = 100
 const REQUEST_LOCK_TTL_SECONDS = 60
 const STALE_REQUEST_MS = 15 * 60 * 1_000
 const ORPHAN_GRACE_MS = 15 * 60 * 1_000
+const ORPHAN_SWEEP_CURSOR_KEY = 'member:export:orphan-sweep-cursor:v1'
+const ORPHAN_SWEEP_CURSOR_TTL_SECONDS = 24 * 60 * 60
 
 type ReconcileOutcome = 'completed' | 'expired' | 'failed' | 'stale' | 'noop'
 
@@ -93,7 +95,22 @@ export class MemberDataExportReconcilerService {
     const page = rows.slice(0, limit)
     for (const row of page) await this.reconcileRequest(row.id, row.executionVersion)
     const expiredClaims = await this.capabilities.cleanupExpiredClaims(Math.floor(now.getTime() / 1_000), limit)
-    const orphans = await this.cleanupOrphanFiles({ limit })
+    // orphan FileObject 不具 Prisma 反向 relation，不能在候选 SQL 中直接排除
+    // UserDataRequest 引用。持久 cursor 让永久被引用的头部行不会饿死后续孤儿。
+    const savedOrphanCursor = await this.locks.get(ORPHAN_SWEEP_CURSOR_KEY)
+    const orphans = await this.cleanupOrphanFiles({
+      limit,
+      ...(savedOrphanCursor ? { cursor: savedOrphanCursor } : {}),
+    })
+    const cursorAdvanced = await this.locks.compareAndSetEx(
+      ORPHAN_SWEEP_CURSOR_KEY,
+      savedOrphanCursor,
+      orphans.nextCursor ?? '',
+      ORPHAN_SWEEP_CURSOR_TTL_SECONDS,
+    )
+    if (cursorAdvanced === 'mismatched') {
+      this.logger.warn('Member export orphan cursor race code=EXPORT_ORPHAN_CURSOR_STALE')
+    }
     return {
       processed: page.length,
       nextCursor: rows.length > limit ? page.at(-1)?.id ?? null : null,
@@ -112,8 +129,11 @@ export class MemberDataExportReconcilerService {
     const rows = await this.prisma.fileObject.findMany({
       where: {
         purpose: 'member_data_export',
-        deletedAt: null,
         createdAt: { lte: new Date(Date.now() - ORPHAN_GRACE_MS) },
+        OR: [
+          { deletedAt: null },
+          { status: { in: ['quarantined', 'deleted'] }, storageDeletedAt: null },
+        ],
       },
       select: { id: true },
       orderBy: { id: 'asc' },
@@ -312,7 +332,7 @@ export class MemberDataExportReconcilerService {
   private async deleteAndVerify(fileId: string, endUserId: string): Promise<boolean> {
     const before = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!before || before.purpose !== 'member_data_export' || before.endUserId !== endUserId) return false
-    if (!before.deletedAt) {
+    if (!before.storageDeletedAt) {
       try {
         await this.files.systemDelete(fileId, 'member_data_export_reconciled')
       } catch {
@@ -324,7 +344,14 @@ export class MemberDataExportReconcilerService {
 
   private async isFilePhysicallyGone(fileId: string): Promise<boolean> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!file?.deletedAt || file.purpose !== 'member_data_export') return false
+    if (
+      !file?.deletedAt ||
+      !file.storageDeletedAt ||
+      file.storageDeletePendingAt ||
+      file.purpose !== 'member_data_export'
+    ) {
+      return false
+    }
     return (await this.storage.headObject(file.storageKey, file.bucket)) === null
   }
 

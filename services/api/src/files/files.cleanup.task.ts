@@ -24,7 +24,7 @@ export class FilesCleanupTask {
     try {
       const result = await this.files.cleanupExpired('cron')
       if (result.deletedCount > 0) {
-        this.logger.log(`Hourly cron: cleaned up ${result.deletedCount} expired files`)
+        this.logger.log(`Hourly cron: completed ${result.deletedCount} file deletions`)
       }
     } catch {
       this.logger.error('code=FILE_CLEANUP_BATCH_FAILED')

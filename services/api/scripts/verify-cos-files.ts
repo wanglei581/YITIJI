@@ -41,7 +41,8 @@ function fail(msg: string): never {
   process.exit(1)
 }
 function ok(cond: boolean, msg: string) {
-  cond ? pass(msg) : fail(msg)
+  if (cond) pass(msg)
+  else fail(msg)
 }
 async function expectThrow(fn: () => Promise<unknown>, msg: string) {
   try {
@@ -279,7 +280,7 @@ async function main() {
       return it
     }
 
-    // G1. 直传对象字节与声明 MIME 不符 → FILE_CONTENT_MISMATCH + 物理删除 + quarantined
+    // G1. 直传对象字节与声明 MIME 不符 → FILE_CONTENT_MISMATCH + 物理删除完成凭证
     const badIntent = await mkIntent('bad-direct.pdf', 1000)
     const badRec = (await prisma.fileObject.findUnique({ where: { id: badIntent.fileId } }))!
     // 绕过 writeRawUpload,直接把伪装字节放进对象存储,模拟"客户端直传后 complete"
@@ -290,7 +291,10 @@ async function main() {
       '直传伪装 PDF completeUpload 被拒(FILE_CONTENT_MISMATCH)',
     )
     const badAfter = await prisma.fileObject.findUnique({ where: { id: badIntent.fileId } })
-    ok(badAfter?.status === 'quarantined', '伪装直传对象落库 status=quarantined')
+    ok(
+      badAfter?.status === 'deleted' && Boolean(badAfter.storageDeletedAt),
+      '伪装直传对象形成完整 tombstone + 物理删除完成凭证'
+    )
     ok((await storage.headObject(badRec.storageKey, badRec.bucket)) === null, '伪装直传对象已从存储物理删除')
 
     // G2. 超过 DIRECT_UPLOAD_SNIFF_MAX_BYTES 的直传对象 → 跳过嗅探(不读回内容),junk 字节也照常 active

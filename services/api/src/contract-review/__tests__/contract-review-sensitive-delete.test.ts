@@ -10,23 +10,19 @@ test('sensitive system deletion never logs the full file id', async () => {
   const databaseWrites: unknown[] = []
   const operationOrder: string[] = []
   const row = fileRow(fileId)
-  const deletedRow = {
-    ...row,
-    status: 'deleted',
-    deletedAt: new Date('2026-08-01T11:00:00.000Z'),
-    deletedBy: 'system',
-    deleteReason: 'contract_review_expired',
-  }
+  let current = { ...row }
   const service = new FilesService(
     {
       fileObject: {
-        updateMany: async (args: unknown) => {
-          operationOrder.push('metadata-tombstone')
+        updateMany: async (args: { data: Partial<typeof row> }) => {
+          operationOrder.push(current.deletedAt ? 'metadata-complete' : 'metadata-tombstone')
           databaseWrites.push(args)
+          current = { ...current, ...args.data }
           return { count: 1 }
         },
-        findUnique: async () => deletedRow,
+        findUnique: async () => current,
       },
+      fairMaterialPrintBridge: { findFirst: async () => null },
     } as never,
     {} as never,
     {
@@ -47,8 +43,8 @@ test('sensitive system deletion never logs the full file id', async () => {
 
   assert.equal(deleted.id, fileId)
   assert.deepEqual(storageDeletes, [{ storageKey: row.storageKey, bucket: row.bucket }])
-  assert.equal(databaseWrites.length, 1)
-  assert.deepEqual(operationOrder, ['metadata-tombstone', 'object-delete'])
+  assert.equal(databaseWrites.length, 2)
+  assert.deepEqual(operationOrder, ['metadata-tombstone', 'object-delete', 'metadata-complete'])
   assert.equal(logs.length, 1)
   assert.doesNotMatch(logs[0]!, new RegExp(fileId))
   assert.match(logs[0]!, /^Sensitive file deleted by system: [a-f0-9]{12}$/u)
@@ -58,12 +54,17 @@ test('generic system deletion keeps its existing full-id log behavior', async ()
   const fileId = 'ordinary-system-file-id'
   const logs: string[] = []
   const row = fileRow(fileId)
+  let current = { ...row }
   const service = new FilesService(
     {
       fileObject: {
-        updateMany: async () => ({ count: 1 }),
-        findUnique: async () => ({ ...row, status: 'deleted', deletedAt: new Date() }),
+        updateMany: async ({ data }: { data: Partial<typeof row> }) => {
+          current = { ...current, ...data }
+          return { count: 1 }
+        },
+        findUnique: async () => current,
       },
+      fairMaterialPrintBridge: { findFirst: async () => null },
     } as never,
     {} as never,
     { deleteObject: async () => undefined } as never
@@ -86,15 +87,18 @@ test('generic expired cleanup redacts file ids, storage errors, and cron batch e
   const service = new FilesService(
     {
       fileObject: {
-        findMany: async () => [
+        findMany: async ({ where }: { where: { deletedAt?: null } }) => where.deletedAt === null ? [
           {
             id: fileId,
             storageKey: 'contracts/member-1/private.pdf',
             bucket: 'private',
             purpose: 'contract_upload',
             sensitiveLevel: 'highly_sensitive',
+            status: 'active',
+            expiresAt: new Date('2026-08-01T12:00:00.000Z'),
+            updatedAt: new Date('2026-08-01T10:00:00.000Z'),
           },
-        ],
+        ] : [],
         updateMany: async () => ({ count: 1 }),
       },
       fairMaterialPrintBridge: { findFirst: async () => null },
@@ -138,15 +142,18 @@ test('cron audit stores irreversible digests instead of raw deleted file ids', a
   const service = new FilesService(
     {
       fileObject: {
-        findMany: async () => [
+        findMany: async ({ where }: { where: { deletedAt?: null } }) => where.deletedAt === null ? [
           {
             id: fileId,
             storageKey: row.storageKey,
             bucket: row.bucket,
             purpose: row.purpose,
             sensitiveLevel: row.sensitiveLevel,
+            status: row.status,
+            expiresAt: row.expiresAt,
+            updatedAt: row.updatedAt,
           },
-        ],
+        ] : [],
         updateMany: async () => ({ count: 1 }),
       },
       fairMaterialPrintBridge: { findFirst: async () => null },
@@ -200,6 +207,9 @@ function fileRow(id: string) {
     deletedAt: null,
     deletedBy: null,
     deleteReason: null,
+    storageDeletePendingAt: null,
+    storageDeletedAt: null,
     createdAt: new Date('2026-08-01T10:00:00.000Z'),
+    updatedAt: new Date('2026-08-01T10:00:00.000Z'),
   }
 }

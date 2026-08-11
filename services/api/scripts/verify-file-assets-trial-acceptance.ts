@@ -354,6 +354,22 @@ const allowedPendingRuntimeChange = (file: string) =>
     'services/api/src/ai/ai.controller.ts',
     'services/api/src/ai/ai.service.ts',
     'services/api/src/files/files.service.ts',
+    'services/api/src/files/files.cleanup.task.ts',
+    'services/api/src/files/member-data-export-file.service.ts',
+    'services/api/src/member-privacy/member-data-export-reconciler.service.ts',
+    'services/api/src/common/redis/redis.service.ts',
+    'services/api/src/storage/storage.service.ts',
+    'services/api/src/contract-review/contract-review-report-file.service.ts',
+    'services/api/src/contract-review/__tests__/contract-review-file-policy.test.ts',
+    'services/api/src/contract-review/__tests__/contract-review-sensitive-delete.test.ts',
+    'services/api/prisma/schema.prisma',
+    'services/api/prisma/postgres/schema.prisma',
+    'services/api/prisma/migrations/20260811143000_add_file_storage_delete_retry/migration.sql',
+    'services/api/prisma/postgres/migrations/20260811143000_add_file_storage_delete_retry/migration.sql',
+    'services/api/scripts/verify-file-delete-consistency.ts',
+    'services/api/scripts/verify-member-data-export-files.ts',
+    'services/api/scripts/verify-member-data-export-download.ts',
+    'services/api/scripts/verify-cos-files.ts',
   ].includes(file)
 const pendingRuntimeChanges = changedSinceFrozenCandidate.filter((file) => allowedPendingRuntimeChange(file))
 if (pendingRuntimeChanges.length > 0) {
@@ -371,6 +387,19 @@ if (pendingRuntimeChanges.length > 0) {
     'codex/file-assets-gate4-browser-ai-output',
     `已刷新到预生产 \`${aiOutputPreprodCandidate}\``,
     '真实 COS HEAD、短 TTL 签名 URL 过期、跨账号拒绝和审计脱敏证据',
+  ])
+}
+if (pendingRuntimeChanges.some((file) => file.includes('storage_delete_retry'))) {
+  assertIncludesAll(progress, 'current-progress storage delete retry candidate note', [
+    'W1-D2 FileObject 物理删除持久重试闭环',
+    'storageDeletePendingAt',
+    'storageDeletedAt',
+    '未合并/未部署',
+  ])
+  assertIncludesAll(nextTasks, 'next-tasks storage delete retry candidate note', [
+    'W1-D2：FileObject 物理对象删除持久重试账本',
+    '只覆盖 FileObject',
+    '未合并/未部署',
   ])
 }
 const runtimeImpactingChanges = changedSinceFrozenCandidate.filter(
@@ -638,7 +667,16 @@ assert.match(
   /where:\s*\{[\s\S]*?id: f\.id,[\s\S]*?deletedAt: null,[\s\S]*?status: f\.status,[\s\S]*?updatedAt: f\.updatedAt,[\s\S]*?\.\.\.stillExpired/,
   'cleanupExpired must re-check expiry, status and updatedAt when quarantining a stale candidate',
 )
-assert.match(filesService, /await this\.storage\.deleteObject\(f\.storageKey,\s*f\.bucket\)/, 'cleanupExpired must delete storage object before marking the row deleted')
+assert.match(
+  filesService,
+  /await this\.storage\.deleteObject\(record\.storageKey, record\.bucket\)[\s\S]*?storageDeletePendingAt: null,[\s\S]*?storageDeletedAt: completedAt/,
+  'physical deletion must succeed before pending is cleared and completion evidence is written',
+)
+assert.match(
+  filesService,
+  /purpose: \{ not: 'member_data_export' \},[\s\S]*?storageDeletedAt: null,[\s\S]*?storageDeletePendingAt: \{ not: null \}/,
+  'generic cleanup must retry incomplete FileObject deletion while excluding member exports',
+)
 assert.match(filesService, /action:\s*'file\.cleanup_expired'/, 'cleanupExpired cron path must write audit log')
 assert.match(filesController, /action:\s*'file\.retention_update'/, 'updateRetention controller path must write audit log')
 assert.match(filesController, /action:\s*'file\.delete'/, 'ownerDelete controller path must write audit log')

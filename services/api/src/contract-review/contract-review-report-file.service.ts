@@ -134,6 +134,8 @@ export class ContractReviewReportFileService {
     const valid = Boolean(
       record &&
       !record.deletedAt &&
+      !record.storageDeletePendingAt &&
+      !record.storageDeletedAt &&
       record.status === 'active' &&
       record.purpose === 'contract_review_report' &&
       record.mimeType === REPORT_MIME &&

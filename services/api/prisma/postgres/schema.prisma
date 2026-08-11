@@ -862,6 +862,10 @@ model FileObject {
   deletedAt   DateTime?
   deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
   deleteReason String?
+  // 对象删除采用 metadata-first。pending 表示仍需重试；storageDeletedAt 仅在
+  // deleteObject 明确成功（含幂等 404/ENOENT）后写入，不能用 deletedAt 代替。
+  storageDeletePendingAt DateTime?
+  storageDeletedAt DateTime?
 
   // 文件资产分类 / 派生关系 / 保存策略。
   // 取值由应用层校验,保持 SQLite / PostgreSQL schema parity。
@@ -894,6 +898,8 @@ model FileObject {
   @@index([status])
   @@index([expiresAt])
   @@index([deletedAt])
+  @@index([storageDeletePendingAt])
+  @@index([status, storageDeletedAt])
   @@index([sourceFileId])
 }
 

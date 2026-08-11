@@ -155,6 +155,8 @@ export class MemberDataExportFileService {
     )
     const metadataValid = tracked
       && !record!.deletedAt
+      && !record!.storageDeletePendingAt
+      && !record!.storageDeletedAt
       && record!.mimeType === EXPORT_MIME
       && record!.sensitiveLevel === MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel
       && record!.visibility === MEMBER_DATA_EXPORT_FILE_POLICY.visibility
@@ -193,6 +195,8 @@ export class MemberDataExportFileService {
     const valid =
       record &&
       !record.deletedAt &&
+      !record.storageDeletePendingAt &&
+      !record.storageDeletedAt &&
       record.purpose === 'member_data_export' &&
       record.mimeType === EXPORT_MIME &&
       record.sensitiveLevel === MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel &&

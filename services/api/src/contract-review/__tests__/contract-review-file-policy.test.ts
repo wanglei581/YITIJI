@@ -42,6 +42,8 @@ interface FileHarnessRecord {
   deletedAt: Date | null
   deletedBy: string | null
   deleteReason: string | null
+  storageDeletePendingAt: Date | null
+  storageDeletedAt: Date | null
   expiresAt: Date | null
   bucket: string
   region: string
@@ -52,6 +54,7 @@ interface FileHarnessRecord {
   sha256: string
   createdBy: string | null
   createdAt: Date
+  updatedAt: Date
 }
 
 function makeFileAccessHarness(
@@ -79,6 +82,8 @@ function makeFileAccessHarness(
     deletedAt: null,
     deletedBy: null,
     deleteReason: null,
+    storageDeletePendingAt: null,
+    storageDeletedAt: null,
     expiresAt: initialExpiresAt,
     bucket: 'private-files',
     region: 'local',
@@ -89,6 +94,7 @@ function makeFileAccessHarness(
     sha256: 'a'.repeat(64),
     createdBy: null,
     createdAt: FIXED_NOW,
+    updatedAt: FIXED_NOW,
     ...overrides,
   }
   let signedUrlCalls = 0
@@ -122,6 +128,7 @@ function makeFileAccessHarness(
         ? [{ fileId: record.id, fileUrl: `/api/v1/files/${record.id}/content` }]
         : [],
     },
+    fairMaterialPrintBridge: { findFirst: async () => null },
   }
   const storage = {
     signTtlSeconds: 1800,

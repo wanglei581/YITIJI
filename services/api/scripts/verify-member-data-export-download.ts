@@ -10,6 +10,7 @@ import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA, ROUTE_ARGS_METADATA } 
 import { RequestMethod } from '@nestjs/common'
 import { Redis } from 'ioredis'
 import { MemberDataExportRedisService } from '../src/common/redis/member-data-export-redis.service'
+import { RedisService } from '../src/common/redis/redis.service'
 
 interface TicketPayload {
   requestId: string
@@ -308,6 +309,25 @@ async function verifyRedisPrimitives(redis: ExportRedisApi, client: Redis, marke
   })
 }
 
+async function verifyCursorCas(redis: RedisService, markerPrefix: string): Promise<void> {
+  await check('orphan cursor CAS 拒绝慢 sweep 覆盖较新进度', async () => {
+    const key = `${markerPrefix}:orphan-cursor-cas`
+    assert.equal(await redis.get(key), null)
+    assert.equal(await redis.compareAndSetEx(key, null, 'cursor-old', 600), 'matched')
+    const sharedSnapshot = await redis.get(key)
+    assert.equal(sharedSnapshot, 'cursor-old')
+    assert.equal(
+      await redis.compareAndSetEx(key, sharedSnapshot, 'cursor-new', 600),
+      'matched'
+    )
+    assert.equal(
+      await redis.compareAndSetEx(key, sharedSnapshot, 'cursor-stale', 600),
+      'mismatched'
+    )
+    assert.equal(await redis.get(key), 'cursor-new')
+  })
+}
+
 async function verifyAuthorization(redis: ExportRedisApi): Promise<void> {
   const module = await import('../src/member-privacy/member-data-export-download.service')
   const Service = module.MemberDataExportDownloadService as new (...args: unknown[]) => {
@@ -446,8 +466,11 @@ async function verifyController(): Promise<void> {
 async function verifyReconciler(): Promise<void> {
   const module = await import('../src/member-privacy/member-data-export-reconciler.service')
   const Reconciler = module.MemberDataExportReconcilerService as new (...args: unknown[]) => {
-    reconcile(data: { requestId?: string; executionVersion?: number; reason: string }): Promise<unknown>
+    reconcile(data: { requestId?: string; executionVersion?: number; reason: string }): Promise<{
+      orphanFiles?: number
+    } | unknown>
     reconcileRequest(requestId: string, executionVersion?: number): Promise<unknown>
+    sweep(args?: { limit?: number }): Promise<{ orphanFiles: number }>
     cleanupOrphanFiles(args?: { limit?: number }): Promise<{ deleted: number }>
   }
   await check('reconciler 物理删除 + FileObject 软删后才 CAS terminal', async () => {
@@ -464,7 +487,14 @@ async function verifyReconciler(): Promise<void> {
         findUnique: async () => ({ ...row }),
         updateMany: async (args: unknown) => { updates.push(args); return { count: 1 } },
       },
-      fileObject: { findUnique: async () => ({ ...file, deletedAt: deleted ? new Date() : null }) },
+      fileObject: {
+        findUnique: async () => ({
+          ...file,
+          deletedAt: deleted ? new Date() : null,
+          storageDeletePendingAt: null,
+          storageDeletedAt: deleted ? new Date() : null,
+        }),
+      },
       $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
         userDataRequest: {
           findUnique: async () => ({ ...row }),
@@ -495,7 +525,7 @@ async function verifyReconciler(): Promise<void> {
         findUnique: async () => ({ ...row }),
         updateMany: async (args: { data?: Record<string, unknown> }) => { updates.push(args); return { count: 1 } },
       },
-      fileObject: { findUnique: async () => ({ id: row.exportFileId, endUserId: row.endUserId, storageKey: 'opaque', bucket: 'local', deletedAt: null, purpose: 'member_data_export' }) },
+      fileObject: { findUnique: async () => ({ id: row.exportFileId, endUserId: row.endUserId, storageKey: 'opaque', bucket: 'local', deletedAt: null, storageDeletePendingAt: null, storageDeletedAt: null, purpose: 'member_data_export' }) },
       $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
         userDataRequest: {
           findUnique: async () => ({ ...row }),
@@ -528,7 +558,7 @@ async function verifyReconciler(): Promise<void> {
     }
     const prisma = {
       userDataRequest: requestApi,
-      fileObject: { findUnique: async () => ({ id: row['exportFileId'], endUserId: row['endUserId'], purpose: 'member_data_export', storageKey: 'opaque', bucket: 'local', deletedAt: deleted ? new Date() : null }) },
+      fileObject: { findUnique: async () => ({ id: row['exportFileId'], endUserId: row['endUserId'], purpose: 'member_data_export', storageKey: 'opaque', bucket: 'local', deletedAt: deleted ? new Date() : null, storageDeletePendingAt: null, storageDeletedAt: deleted ? new Date() : null }) },
       $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({ userDataRequest: requestApi }),
     }
     const reconciler = new Reconciler(
@@ -566,7 +596,12 @@ async function verifyReconciler(): Promise<void> {
       fileObject: {
         findUnique: async ({ where }: { where: { id: string } }) => {
           const file = filesById[where.id]
-          return file ? { ...file, deletedAt: deleted.has(file.id) ? new Date() : file.deletedAt } : null
+          return file ? {
+            ...file,
+            deletedAt: deleted.has(file.id) ? new Date() : file.deletedAt,
+            storageDeletePendingAt: null,
+            storageDeletedAt: deleted.has(file.id) ? new Date() : null,
+          } : null
         },
         findMany: async () => [{ id: 'file-unreferenced' }],
       },
@@ -588,6 +623,62 @@ async function verifyReconciler(): Promise<void> {
     assert.equal((await reconciler.cleanupOrphanFiles({ limit: 5 })).deleted, 1)
   })
 
+  await check('periodic orphan sweep 持久游标越过永久引用头部', async () => {
+    const referencedId = 'file-head-referenced'
+    const orphanId = 'file-later-orphan'
+    let cursorValue = ''
+    let orphanDeleted = false
+    const prisma = {
+      userDataRequest: {
+        findMany: async () => [],
+        findFirst: async ({ where }: { where: { exportFileId: string } }) =>
+          where.exportFileId === referencedId ? { id: 'request-reference' } : null,
+      },
+      fileObject: {
+        findMany: async ({ cursor }: { cursor?: { id: string } }) =>
+          cursor ? [{ id: orphanId }] : [{ id: referencedId }, { id: orphanId }],
+        findUnique: async ({ where }: { where: { id: string } }) => ({
+          id: where.id,
+          purpose: 'member_data_export',
+          storageKey: where.id,
+          bucket: 'local-fs',
+          deletedAt: where.id === orphanId && orphanDeleted ? new Date() : null,
+          storageDeletePendingAt: null,
+          storageDeletedAt: where.id === orphanId && orphanDeleted ? new Date() : null,
+        }),
+      },
+    }
+    const locks = {
+      get: async () => cursorValue || null,
+      compareAndSetEx: async (
+        _key: string,
+        expectedValue: string | null,
+        value: string,
+      ) => {
+        if ((cursorValue || null) !== expectedValue) return 'mismatched'
+        cursorValue = value
+        return 'matched'
+      },
+      setNxEx: async () => true,
+      getAndDelIfEquals: async () => 'matched',
+    }
+    const reconciler = new Reconciler(
+      prisma,
+      locks,
+      { cleanupExpiredClaims: async () => 0 },
+      { systemDelete: async (id: string) => { if (id === orphanId) orphanDeleted = true } },
+      { headObject: async () => orphanDeleted ? null : { sizeBytes: 1 } },
+      { writeRequired: async () => 'unused' },
+    )
+    const first = await reconciler.sweep({ limit: 1 })
+    assert.equal(first.orphanFiles, 0)
+    assert.equal(cursorValue, referencedId)
+    const second = await reconciler.sweep({ limit: 1 })
+    assert.equal(second.orphanFiles, 1)
+    assert.equal(orphanDeleted, true)
+    assert.equal(cursorValue, '')
+  })
+
   await check('required audit 失败不释放 activeKey', async () => {
     const row = {
       id: 'request-audit-failure', endUserId: 'member-audit', requestType: 'export', status: 'handling', executionVersion: 9,
@@ -598,7 +689,7 @@ async function verifyReconciler(): Promise<void> {
     const requestApi = { findUnique: async () => ({ ...row }), updateMany: async () => { throw new Error('must not update') } }
     const prisma = {
       userDataRequest: requestApi,
-      fileObject: { findUnique: async () => ({ id: row.exportFileId, endUserId: row.endUserId, purpose: 'member_data_export', storageKey: 'opaque', bucket: 'local', deletedAt: deleted ? new Date() : null }) },
+      fileObject: { findUnique: async () => ({ id: row.exportFileId, endUserId: row.endUserId, purpose: 'member_data_export', storageKey: 'opaque', bucket: 'local', deletedAt: deleted ? new Date() : null, storageDeletePendingAt: null, storageDeletedAt: deleted ? new Date() : null }) },
       $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({ userDataRequest: requestApi }),
     }
     const reconciler = new Reconciler(
@@ -653,6 +744,7 @@ async function main(): Promise<void> {
   try {
     const redis = new MemberDataExportRedisService(runtime.client) as unknown as ExportRedisApi
     await verifyRedisPrimitives(redis, runtime.client, marker)
+    await verifyCursorCas(new RedisService(runtime.client), marker)
     await verifyAuthorization(redis)
     await verifyController()
     await verifyReconciler()

@@ -55,6 +55,8 @@ import { parseContentFileId, signFileUrl } from './signing'
  * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
  */
 export const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
+const STORAGE_DELETE_RETRY_BATCH_LIMIT = 100
+const ACTIVE_PRINT_PROTECTION_SCAN_LIMIT = 1_000
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -375,6 +377,13 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权确认此文件' },
       })
     }
+    if (
+      !['uploading', 'active'].includes(record.status) ||
+      record.storageDeletePendingAt ||
+      record.storageDeletedAt
+    ) {
+      this.throwFileNotFound()
+    }
 
     const head = await this.storage.headObject(record.storageKey, record.bucket)
     if (!head) {
@@ -414,10 +423,28 @@ export class FilesService {
       }
     }
 
-    const updated = await this.prisma.fileObject.update({
-      where: { id: fileId },
+    const completed = await this.prisma.fileObject.updateMany({
+      where: {
+        id: fileId,
+        deletedAt: null,
+        status: record.status,
+        updatedAt: record.updatedAt,
+        storageDeletePendingAt: null,
+        storageDeletedAt: null,
+      },
       data: { sizeBytes: head.sizeBytes, status: 'active' },
     })
+    if (completed.count !== 1) {
+      throw new ConflictException({
+        error: { code: 'FILE_UPLOAD_STATE_CHANGED', message: '文件状态已变化，请重新上传' },
+      })
+    }
+    const updated = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (!updated || updated.status !== 'active' || updated.deletedAt) {
+      throw new ConflictException({
+        error: { code: 'FILE_UPLOAD_STATE_CHANGED', message: '文件状态已变化，请重新上传' },
+      })
+    }
     return {
       fileId: updated.id,
       status: updated.status as FileStatus,
@@ -461,9 +488,25 @@ export class FilesService {
       record.mimeType,
       record.bucket
     )
-    await this.prisma.fileObject.update({
-      where: { id: fileId },
+    const completed = await this.prisma.fileObject.updateMany({
+      where: {
+        id: fileId,
+        deletedAt: null,
+        status: record.status,
+        updatedAt: record.updatedAt,
+        storageDeletePendingAt: null,
+        storageDeletedAt: null,
+      },
       data: { sizeBytes: put.sizeBytes, sha256: put.sha256, status: 'active' },
+    })
+    if (completed.count === 1) return
+
+    // PUT 不能与 metadata 的删除状态原子提交。若删除在 requireAlive 之后胜出，
+    // 迟到 PUT 会重新生成同 key 对象；此时旧 storageDeletedAt 已不再能证明对象
+    // 不存在。重新建立 pending 并幂等补偿删除，避免永久隐藏字节。
+    await this.compensateRawUploadAfterDeleteRace(record)
+    throw new ConflictException({
+      error: { code: 'FILE_UPLOAD_STATE_CHANGED', message: '文件状态已变化，请重新上传' },
     })
   }
 
@@ -791,31 +834,84 @@ export class FilesService {
       allowMemberDataExport,
       allowContractReviewReport: sensitiveLog,
     })
+    const deleteRequestedAt = new Date()
     if (!record.deletedAt) {
-      const deletedAt = new Date()
       // DB tombstone 必须先于对象删除：写库失败时对象仍在，绝不留下 active metadata
       // 指向已删除对象。updateMany 是 CAS，支持并发删除调用安全收敛到同一 tombstone。
       await this.prisma.fileObject.updateMany({
-        where: { id: fileId, deletedAt: null },
-        data: { deletedAt, deletedBy, deleteReason: reason, status: 'deleted' },
+        where: {
+          id: fileId,
+          deletedAt: null,
+          status: record.status,
+          updatedAt: record.updatedAt,
+          storageDeletedAt: null,
+        },
+        data: {
+          deletedAt: deleteRequestedAt,
+          deletedBy,
+          deleteReason: reason,
+          status: 'deleted',
+          storageDeletePendingAt: deleteRequestedAt,
+        },
+      })
+    } else if (!record.storageDeletedAt && !record.storageDeletePendingAt) {
+      // 滚动部署 / 历史版本可能已写 tombstone 却没有 pending；在授权主体重试时自愈。
+      await this.prisma.fileObject.updateMany({
+        where: {
+          id: fileId,
+          deletedAt: record.deletedAt,
+          status: 'deleted',
+          storageDeletePendingAt: null,
+          storageDeletedAt: null,
+        },
+        data: { storageDeletePendingAt: deleteRequestedAt },
       })
     }
 
-    const tombstone = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+    let tombstone = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!tombstone || !tombstone.deletedAt || tombstone.status !== 'deleted') {
       this.throwFileNotFound()
     }
 
-    try {
-      // COS 与本地后端均把对象不存在视为成功；首次失败后，同一授权主体可用
-      // 上方 tombstone 记录的 storageKey/bucket 幂等重试，不恢复 active 状态。
-      await this.storage.deleteObject(tombstone.storageKey, tombstone.bucket)
-    } catch (error) {
-      const errorType = error instanceof Error ? error.constructor.name : typeof error
-      this.logger.warn(
-        `code=FILE_OBJECT_DELETE_RETRY_REQUIRED file=${digestFileId(fileId)} errorType=${errorType}`
-      )
-      throw error
+    if (!tombstone.storageDeletedAt) {
+      if (!tombstone.storageDeletePendingAt) {
+        throw new ServiceUnavailableException({
+          error: {
+            code: 'FILE_STORAGE_DELETE_PENDING',
+            message: '文件已隔离，存储清理暂未完成，请稍后重试',
+          },
+        })
+      }
+      try {
+        if (tombstone.purpose !== 'member_data_export') {
+          await this.revokeFairMaterialBridgeForDeletedFile(fileId, deleteRequestedAt)
+        }
+        await this.completePendingStorageDelete(tombstone, {
+          deletedBy,
+          deleteReason: reason,
+        })
+      } catch (error) {
+        const errorType = error instanceof Error ? error.constructor.name : typeof error
+        this.logger.warn(
+          `code=FILE_OBJECT_DELETE_RETRY_REQUIRED file=${digestFileId(fileId)} errorType=${errorType}`
+        )
+        throw new ServiceUnavailableException({
+          error: {
+            code: 'FILE_STORAGE_DELETE_PENDING',
+            message: '文件已隔离，存储清理暂未完成，请稍后重试',
+            retryable: true,
+          },
+        })
+      }
+      tombstone = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+      if (!tombstone?.storageDeletedAt || tombstone.storageDeletePendingAt) {
+        throw new ServiceUnavailableException({
+          error: {
+            code: 'FILE_STORAGE_DELETE_PENDING',
+            message: '文件已隔离，存储清理暂未完成，请稍后重试',
+          },
+        })
+      }
     }
     if (sensitiveLog) {
       this.logger.log(`Sensitive file deleted by ${deletedBy}: ${digestFileId(fileId)}`)
@@ -829,12 +925,113 @@ export class FilesService {
 
   async cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
     const now = new Date()
-    const expired = await this.prisma.fileObject.findMany({
+    const deletedIds: string[] = []
+    const bySensitiveLevel: Record<string, number> = {}
+    const byPurpose: Record<string, number> = {}
+    const recordDeleted = (file: { id: string; sensitiveLevel: string; purpose: string }) => {
+      if (deletedIds.includes(file.id)) return
+      deletedIds.push(file.id)
+      bySensitiveLevel[file.sensitiveLevel] = (bySensitiveLevel[file.sensitiveLevel] ?? 0) + 1
+      byPurpose[file.purpose] = (byPurpose[file.purpose] ?? 0) + 1
+    }
+
+    // 第一批只处理已经隔离 / 逻辑删除但尚无物理删除完成凭证的行。
+    // 这也覆盖滚动部署期间旧实例写出的无 pending tombstone。会员数据导出必须
+    // 继续由 member-privacy reconciler 同步收口请求账本，通用 cron 不得越权。
+    const incompleteDeletes = await this.prisma.fileObject.findMany({
+      where: {
+        purpose: { not: 'member_data_export' },
+        storageDeletedAt: null,
+        OR: [
+          { storageDeletePendingAt: { not: null } },
+          { status: 'quarantined' },
+          { status: 'deleted', deletedAt: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        storageKey: true,
+        bucket: true,
+        purpose: true,
+        sensitiveLevel: true,
+        status: true,
+        deletedAt: true,
+        deletedBy: true,
+        deleteReason: true,
+        storageDeletePendingAt: true,
+        storageDeletedAt: true,
+        updatedAt: true,
+      },
+      orderBy: [
+        { storageDeletePendingAt: { sort: 'asc', nulls: 'first' } },
+        { createdAt: 'asc' },
+      ],
+      take: STORAGE_DELETE_RETRY_BATCH_LIMIT,
+    })
+    for (const candidate of incompleteDeletes) {
+      try {
+        // 每次尝试都刷新 pendingAt。失败项因此移动到队尾，不会让最老的
+        // 100 条持续失败记录永久饿死后续待删对象。
+        const pendingAt = new Date()
+        const claimed = await this.prisma.fileObject.updateMany({
+          where: {
+            id: candidate.id,
+            purpose: { not: 'member_data_export' },
+            status: candidate.status,
+            updatedAt: candidate.updatedAt,
+            storageDeletePendingAt: candidate.storageDeletePendingAt,
+            storageDeletedAt: null,
+          },
+          data: { storageDeletePendingAt: pendingAt },
+        })
+        if (claimed.count === 0) continue
+        const pending = { ...candidate, storageDeletePendingAt: pendingAt }
+        await this.revokeFairMaterialBridgeForDeletedFile(candidate.id, now)
+        await this.completePendingStorageDelete(pending, {
+          deletedBy: 'auto',
+          deleteReason: 'storage delete retry',
+        })
+        recordDeleted(candidate)
+      } catch {
+        this.logger.warn(
+          `code=FILE_STORAGE_DELETE_RETRY_FAILED file=${digestFileId(candidate.id)}`
+        )
+      }
+    }
+
+    const activePrintTasks = await this.prisma.printTask.findMany({
+      where: { status: { in: ['pending', 'claimed', 'printing'] } },
+      select: { fileId: true, fileUrl: true },
+      orderBy: { id: 'asc' },
+      take: ACTIVE_PRINT_PROTECTION_SCAN_LIMIT + 1,
+    })
+    const printProtectionOverflow = activePrintTasks.length > ACTIVE_PRINT_PROTECTION_SCAN_LIMIT
+    if (printProtectionOverflow) {
+      this.logger.warn('code=FILE_CLEANUP_PRINT_PROTECTION_OVERFLOW')
+    }
+    const protectedPrintFileIds = new Set<string>()
+    const legacyUrlProtectedFileIds = new Set<string>()
+    for (const task of activePrintTasks) {
+      if (task.fileId) protectedPrintFileIds.add(task.fileId)
+      const legacyFileId = parseContentFileId(task.fileUrl)
+      if (legacyFileId) {
+        protectedPrintFileIds.add(legacyFileId)
+        if (legacyFileId !== task.fileId) legacyUrlProtectedFileIds.add(legacyFileId)
+      }
+    }
+
+    const expired = printProtectionOverflow ? [] : await this.prisma.fileObject.findMany({
       // 导出文件必须由 member-privacy reconciler 同步收口请求账本，
       // 通用 cron 不得越过账本直接删除。
       where: {
         deletedAt: null,
         purpose: { not: 'member_data_export' },
+        status: { notIn: ['quarantined', 'deleted'] },
+        storageDeletePendingAt: null,
+        storageDeletedAt: null,
+        // 现代任务使用 fileId 外键，可在查询层排除，避免受保护文件占满批次。
+        // 旧任务仅有 fileUrl，下面用一次性集合兼容，不再逐文件全表查询。
+        printTasks: { none: { status: { in: ['pending', 'claimed', 'printing'] } } },
         OR: [
           { expiresAt: { lt: now } },
           // contract_upload 必须始终有系统锁定的短期寿命；null 是异常高敏行，
@@ -852,22 +1049,18 @@ export class FilesService {
         expiresAt: true,
         updatedAt: true,
       },
+      orderBy: { createdAt: 'asc' },
+      // 最多只需为仍活跃的历史 fileUrl 任务额外取一行；过滤后仍严格限删 100。
+      take: STORAGE_DELETE_RETRY_BATCH_LIMIT + legacyUrlProtectedFileIds.size,
     })
 
-    const deletedIds: string[] = []
-    const bySensitiveLevel: Record<string, number> = {}
-    const byPurpose: Record<string, number> = {}
+    let expiredDeleteAttempts = 0
     for (const f of expired) {
       try {
-        const bridge = await this.prisma.fairMaterialPrintBridge.findFirst({
-          where: { fileObjectId: f.id },
-          select: { id: true, status: true, revokedAt: true },
-        })
-        // 任意已建单且仍在履约中的文件都必须保留给 Agent 下载；合同风险提示报告
-        // 没有招聘会 bridge，不能把保护条件错误地绑在 bridge 存在上。
-        if (await this.hasActivePrintTaskForFile(f.id)) {
-          continue
-        }
+        // 任意已建单且仍在履约中的文件都必须保留给 Agent 下载；这里兼容
+        // 尚未回填 fileId、只能从历史 fileUrl 解析血缘的任务。
+        if (protectedPrintFileIds.has(f.id)) continue
+        if (expiredDeleteAttempts >= STORAGE_DELETE_RETRY_BATCH_LIMIT) break
         // 先隔离，确保后续对象删除或最终 tombstone 写入任一失败时都不会继续签发 URL/读取内容。
         // findMany 只是候选快照；隔离时必须再次 CAS 到期条件和原状态。
         // confirm / retention update 若已延长 expiresAt 或推进状态，本轮不得按旧快照删除。
@@ -875,58 +1068,42 @@ export class FilesService {
           f.purpose === 'contract_upload' && !f.expiresAt
             ? { purpose: 'contract_upload', expiresAt: null }
             : { expiresAt: { lt: now } }
+        const pendingAt = new Date()
         const quarantined = await this.prisma.fileObject.updateMany({
           where: {
             id: f.id,
             deletedAt: null,
             status: f.status,
             updatedAt: f.updatedAt,
+            storageDeletePendingAt: null,
+            storageDeletedAt: null,
             ...stillExpired,
           },
-          data: { status: 'quarantined' },
+          data: { status: 'quarantined', storageDeletePendingAt: pendingAt },
         })
         if (quarantined.count === 0) continue
+        expiredDeleteAttempts += 1
 
-        await this.storage.deleteObject(f.storageKey, f.bucket)
-        const finalized = await this.prisma.fileObject.updateMany({
-          where: { id: f.id, deletedAt: null, status: 'quarantined' },
-          data: {
-            deletedAt: now,
-            deletedBy: 'auto',
-            deleteReason:
-              triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
-            status: 'deleted',
-          },
+        await this.revokeFairMaterialBridgeForDeletedFile(f.id, now)
+        await this.completePendingStorageDelete({
+          ...f,
+          deletedAt: null,
+          deletedBy: null,
+          deleteReason: null,
+          storageDeletePendingAt: pendingAt,
+          storageDeletedAt: null,
+        }, {
+          deletedBy: 'auto',
+          deleteReason:
+            triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
         })
-        if (finalized.count === 0) {
-          const concurrent = await this.prisma.fileObject.findUnique({
-            where: { id: f.id },
-            select: { status: true, deletedAt: true },
-          })
-          if (!concurrent?.deletedAt || concurrent.status !== 'deleted') {
-            throw new Error('FILE_CLEANUP_TOMBSTONE_NOT_FINALIZED')
-          }
-        }
-        if (bridge && bridge.status === 'ready' && !bridge.revokedAt) {
-          await this.prisma.fairMaterialPrintBridge.update({
-            where: { id: bridge.id },
-            data: {
-              activeKey: null,
-              status: 'expired',
-              revokedAt: now,
-              revokeReason: 'file_expired_cleanup',
-            },
-          })
-        }
-        deletedIds.push(f.id)
-        bySensitiveLevel[f.sensitiveLevel] = (bySensitiveLevel[f.sensitiveLevel] ?? 0) + 1
-        byPurpose[f.purpose] = (byPurpose[f.purpose] ?? 0) + 1
+        recordDeleted(f)
       } catch {
         this.logger.warn(`code=FILE_CLEANUP_ITEM_FAILED file=${digestFileId(f.id)}`)
       }
     }
     if (deletedIds.length > 0) {
-      this.logger.log(`Cleanup (${triggeredBy}): deleted ${deletedIds.length} expired files`)
+      this.logger.log(`Cleanup (${triggeredBy}): completed ${deletedIds.length} file deletions`)
     }
 
     if (triggeredBy === 'cron' && deletedIds.length > 0) {
@@ -956,20 +1133,20 @@ export class FilesService {
 
   // ── 内部 ────────────────────────────────────────────────────────────────────
 
-  private resolveSensitiveLevel(
-    purpose: FilePurpose,
-    explicit?: FileSensitiveLevel
-  ): FileSensitiveLevel {
-    if (purpose === 'contract_upload') return 'highly_sensitive'
-    return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
-  }
-
   private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {
     const tasks = await this.prisma.printTask.findMany({
       where: { status: { in: ['pending', 'claimed', 'printing'] } },
       select: { fileId: true, fileUrl: true },
     })
     return tasks.some((task) => task.fileId === fileId || parseContentFileId(task.fileUrl) === fileId)
+  }
+
+  private resolveSensitiveLevel(
+    purpose: FilePurpose,
+    explicit?: FileSensitiveLevel
+  ): FileSensitiveLevel {
+    if (purpose === 'contract_upload') return 'highly_sensitive'
+    return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
   }
 
   private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
@@ -1042,15 +1219,29 @@ export class FilesService {
     id: string
     storageKey: string
     bucket: string
+    status: string
+    updatedAt: Date
   }): Promise<void> {
+    const pendingAt = new Date()
     const quarantined = await this.prisma.fileObject.updateMany({
-      where: { id: record.id, deletedAt: null },
-      data: { status: 'quarantined' },
+      where: {
+        id: record.id,
+        deletedAt: null,
+        status: record.status,
+        updatedAt: record.updatedAt,
+        storageDeletedAt: null,
+      },
+      data: { status: 'quarantined', storageDeletePendingAt: pendingAt },
     })
     if (quarantined.count !== 1) this.throwFileNotFound()
 
     try {
-      await this.storage.deleteObject(record.storageKey, record.bucket)
+      const pending = await this.prisma.fileObject.findUnique({ where: { id: record.id } })
+      if (!pending?.storageDeletePendingAt || pending.storageDeletedAt) this.throwFileNotFound()
+      await this.completePendingStorageDelete(pending, {
+        deletedBy: 'system',
+        deleteReason: 'direct_upload_rejected',
+      })
     } catch (error) {
       const errorType = error instanceof Error ? error.constructor.name : typeof error
       this.logger.warn(
@@ -1065,6 +1256,127 @@ export class FilesService {
     }
   }
 
+  /**
+   * raw PUT 完成后若 metadata CAS 失败，只在删除状态已胜出时接管清理。
+   * 先清除可能早于迟到 PUT 的完成证明，再写 pending；对象删除失败时由 cron 重试。
+   */
+  private async compensateRawUploadAfterDeleteRace(record: {
+    id: string
+    storageKey: string
+    bucket: string
+  }): Promise<void> {
+    const pendingAt = new Date()
+    // 单调删除态认领不依赖易变的 updatedAt：只要任一删除证据已出现，就原子
+    // 清除可能早于迟到 PUT 的完成证明并重建 durable pending。正常 active 行不匹配。
+    const reclaimed = await this.prisma.fileObject.updateMany({
+      where: {
+        id: record.id,
+        OR: [
+          { deletedAt: { not: null } },
+          { status: { in: ['quarantined', 'deleted'] } },
+          { storageDeletePendingAt: { not: null } },
+          { storageDeletedAt: { not: null } },
+        ],
+      },
+      data: {
+        status: 'quarantined',
+        storageDeletePendingAt: pendingAt,
+        storageDeletedAt: null,
+      },
+    })
+    if (reclaimed.count !== 1) return
+
+    const pending = await this.prisma.fileObject.findUnique({ where: { id: record.id } })
+    if (!pending?.storageDeletePendingAt || pending.storageDeletedAt) return
+    try {
+      await this.completePendingStorageDelete(pending, {
+        deletedBy: 'system',
+        deleteReason: 'raw_upload_delete_race',
+      })
+    } catch (error) {
+      const errorType = error instanceof Error ? error.constructor.name : typeof error
+      this.logger.warn(
+        `code=FILE_RAW_UPLOAD_DELETE_RETRY_REQUIRED file=${digestFileId(record.id)} errorType=${errorType}`
+      )
+    }
+  }
+
+  /**
+   * 完成已经持久化为 pending 的对象删除。
+   * COS 404 / 本地 ENOENT 已由 StorageService 后端视为成功；DB 最终写失败时
+   * pending 保留，下一轮会再次幂等 DELETE，绝不伪造 storageDeletedAt。
+   */
+  private async completePendingStorageDelete(
+    record: {
+      id: string
+      storageKey: string
+      bucket: string
+      storageDeletePendingAt: Date | null
+      storageDeletedAt: Date | null
+      deletedAt: Date | null
+      deletedBy: string | null
+      deleteReason: string | null
+    },
+    fallback: { deletedBy: string; deleteReason: string }
+  ): Promise<void> {
+    if (record.storageDeletedAt) return
+    const pendingAt = record.storageDeletePendingAt
+    if (!pendingAt) throw new Error('FILE_STORAGE_DELETE_NOT_CLAIMED')
+
+    await this.storage.deleteObject(record.storageKey, record.bucket)
+    const completedAt = new Date()
+    const finalized = await this.prisma.fileObject.updateMany({
+      where: {
+        id: record.id,
+        storageDeletePendingAt: pendingAt,
+        storageDeletedAt: null,
+      },
+      data: {
+        status: 'deleted',
+        deletedAt: record.deletedAt ?? completedAt,
+        deletedBy: record.deletedBy ?? fallback.deletedBy,
+        deleteReason: record.deleteReason ?? fallback.deleteReason,
+        storageDeletePendingAt: null,
+        storageDeletedAt: completedAt,
+      },
+    })
+    if (finalized.count === 1) return
+
+    const current = await this.prisma.fileObject.findUnique({
+      where: { id: record.id },
+      select: { status: true, deletedAt: true, storageDeletePendingAt: true, storageDeletedAt: true },
+    })
+    if (
+      current?.status === 'deleted' &&
+      current.deletedAt &&
+      !current.storageDeletePendingAt &&
+      current.storageDeletedAt
+    ) {
+      return
+    }
+    throw new Error('FILE_STORAGE_DELETE_TOMBSTONE_NOT_FINALIZED')
+  }
+
+  private async revokeFairMaterialBridgeForDeletedFile(
+    fileId: string,
+    revokedAt: Date
+  ): Promise<void> {
+    const bridge = await this.prisma.fairMaterialPrintBridge.findFirst({
+      where: { fileObjectId: fileId },
+      select: { id: true, status: true, revokedAt: true },
+    })
+    if (!bridge || bridge.status !== 'ready' || bridge.revokedAt) return
+    await this.prisma.fairMaterialPrintBridge.update({
+      where: { id: bridge.id },
+      data: {
+        activeKey: null,
+        status: 'expired',
+        revokedAt,
+        revokeReason: 'file_storage_deleted',
+      },
+    })
+  }
+
   private async requireFile(
     fileId: string,
     options: {
@@ -1077,6 +1389,8 @@ export class FilesService {
     if (
       !record ||
       record.deletedAt ||
+      record.storageDeletePendingAt ||
+      record.storageDeletedAt ||
       (!options.allowExpired && record.purpose === 'contract_upload' && !record.expiresAt) ||
       (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
       (!options.allowMemberDataExport && record.purpose === 'member_data_export') ||

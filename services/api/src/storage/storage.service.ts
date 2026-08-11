@@ -83,16 +83,14 @@ export class StorageService {
     return this.signTtl
   }
 
-  /** 按文件记录的 bucket 选后端;未知 / 未提供回退默认后端。 */
+  /** 按文件记录的 bucket 选后端；仅未提供 bucket 时使用默认后端。 */
   private backendFor(bucket?: string | null): ObjectStorageBackend {
     if (!bucket) return this.defaultBackend
     if (bucket === LOCAL_BUCKET_SENTINEL) return this.local
     if (this.cos && bucket === this.cos.bucket) return this.cos
-    // 文件记录在某 COS bucket 但当前未配置 COS → 明确报错,不静默回退本地。
-    if (bucket !== this.local.bucket && !this.cos) {
-      throw new Error(`STORAGE_BACKEND_UNAVAILABLE: bucket=${bucket} 未配置 COS,无法访问`)
-    }
-    return this.defaultBackend
+    // 非空 bucket 是持久化的 provenance，必须精确匹配已注册后端。未知 bucket
+    // 若回退默认后端，其 404/ENOENT 会被误当作原 bucket 已删除并伪造完成凭证。
+    throw new Error(`STORAGE_BACKEND_UNAVAILABLE: bucket=${bucket} 未注册,无法访问`)
   }
 
   putObject(objectKey: string, buffer: Buffer, contentType: string, bucket?: string | null): Promise<PutResult> {

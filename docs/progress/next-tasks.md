@@ -5,7 +5,7 @@
 ## 2026-08-11 文件与扫码上传生命周期收口
 
 - [x] **W1-D1：文件过期清理旧快照 CAS**（候选分支 `codex/file-cleanup-cas-20260811`，未合并/未部署）：cleanup 隔离时重验 `status + updatedAt + expiresAt`，保存期限更新使用 active/版本 CAS；查询后延寿不会被旧 cron 误删。
-- [ ] **W1-D2：物理对象删除持久重试账本**：新增 additive `storageDeletePendingAt`（或经 schema 审查确认的等价字段），统一 owner/admin 删除、直传隔离和过期清理为 quarantine/pending → 幂等删对象 → tombstone/清 pending；cron 必须重试 pending，且不重复处理已确认完成的对象。SQLite/PostgreSQL 双 schema、迁移、失败/404/连续重试与历史 tombstone 盘点同批完成。
+- [x] **W1-D2：FileObject 物理对象删除持久重试账本**（堆叠候选 `codex/storage-delete-retry-20260811`，未合并/未部署）：双库新增 `storageDeletePendingAt + storageDeletedAt`；metadata-first 删除、失败队列轮转、历史 tombstone 优先、自带活跃打印保护的有界候选、迟到 raw PUT 补偿删除与未知 bucket fail-closed 均已接入；会员导出由专用 reconciler 以 DB 完成凭证 + HEAD 不存在推进账本，并持久轮转 orphan 游标。只覆盖 FileObject，不冒充全仓库对象存储出站已收口；合并前仍须 Node 22 CI 通过，部署须先迁移并排空旧 writer。
 - [ ] **W1-D3：Upload Session 持久状态与终态锁**：在 W1-D2 后再把未确认普通上传固化为 `status=uploading + expiresAt=session.expiresAt`，confirm 通过数据库 CAS 转 active 并恢复合法 retention；upload/confirm/cancel/lazy-expire 共用 fencing lock。`contract_upload` 保持从上传起两小时的既有锁定规则，不以确认时间延长。
 
 > **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，

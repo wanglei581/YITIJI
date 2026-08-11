@@ -77,7 +77,10 @@ function makeFileRow(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     deletedBy: null,
     deleteReason: null,
+    storageDeletePendingAt: null,
+    storageDeletedAt: null,
     createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   }
 }
@@ -94,6 +97,7 @@ function createHarness(options: HarnessOptions = {}) {
   let cleanupWhere: Record<string, unknown> | null = null
 
   const prisma = {
+    printTask: { findMany: async () => [] },
     fileObject: {
       async create(input: { data: Record<string, unknown> }) {
         createdData = input.data
@@ -385,6 +389,14 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
         () => createHarness({ initialRecord: makeFileRow({ visibility: 'internal' }) }).exportFiles.read(FILE_ID, MEMBER_MARKER, 1024),
         'FILE_NOT_FOUND',
       )
+      await expectCode(
+        () => createHarness({ initialRecord: makeFileRow({ storageDeletePendingAt: new Date() }) }).exportFiles.read(FILE_ID, MEMBER_MARKER, 1024),
+        'FILE_NOT_FOUND',
+      )
+      await expectCode(
+        () => createHarness({ initialRecord: makeFileRow({ storageDeletedAt: new Date() }) }).exportFiles.read(FILE_ID, MEMBER_MARKER, 1024),
+        'FILE_NOT_FOUND',
+      )
       const storageFailure = createHarness({
         initialRecord: makeFileRow(),
         getError: new Error('storage failure at exports/member-data/private.json'),
@@ -496,6 +508,8 @@ const checks: Array<{ name: string; run: () => void | Promise<void> }> = [
       const deleted = await harness.files.systemDelete(FILE_ID, 'member export reconciliation')
       assert.equal(deleted.status, 'deleted')
       assert.equal(harness.deletedObjects.length, 1)
+      assert.equal(harness.record?.storageDeletePendingAt, null)
+      assert.ok(harness.record?.storageDeletedAt)
 
       const cleanupHarness = createHarness({ initialRecord: makeFileRow() })
       await cleanupHarness.files.cleanupExpired('manual')
