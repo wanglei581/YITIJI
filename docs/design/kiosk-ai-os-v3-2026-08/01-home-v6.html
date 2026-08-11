@@ -422,7 +422,7 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     <div class="vcommand">
       <i class="vx-halo" aria-hidden="true"></i>
       <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
-      <input type="text" data-typewriter placeholder="例如：周五要去招聘会，简历还没改" aria-label="说一句你的处境">
+      <input type="text" data-typewriter placeholder="例如：周三要去招聘会，简历还没改" aria-label="说一句你的处境">
       <!-- 2026-08-09 愿景补齐 + Codex 整改：语音能力真实落点是 P25 顾问的语音咨询态
            (本机没有独立语音下单能力,README §人机分工),麦克风=去找小青语音说。
            ai-down 态语音不可用,如实置灰。 -->
@@ -444,7 +444,7 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
     </div>
 
     <div class="vscenes">
-      <button class="vscene" data-fx="scene">周五招聘会，简历还没改</button>
+      <button class="vscene" data-fx="scene">周三招聘会，简历还没改</button>
       <button class="vscene" data-fx="scene">打印两份材料</button>
       <button class="vscene vscene--key" data-fx="scene">我不知道从哪开始</button>
     </div>
@@ -480,9 +480,13 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
                  可执行的下一步（下方 AI 简历服务卡 first 态胶囊「上传后逐条体检」，
                  同卡「诊断优化」即 48px 真入口）。
                · ai-down / device-off = 设备与 AI 状态演示，不声称任何本人材料数量。
-               · 「128 家企业参展」是来源方（主办方）公布的事实，不是本机统计，所以写
-                 「主办方公布」并在页脚现场卡带齐来源三字段。 -->
-          <p class="verrand-p" data-when="default">示例：一份《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周五这场招聘会 <b>主办方公布 128 家企业参展</b>、现场普遍收纸质简历。</p>
+               · 「80 家企业参展」是来源方（主办方）公布的事实，不是本机统计，所以写
+                 「主办方公布」并在页脚现场卡带齐来源三字段。
+               · 2026-08-11 跨页对账：这句原写「周五这场招聘会 …… 128 家」，说的是页脚现场卡
+                 那一场。那一场（GZFAIR-2026-0814）在 17 场次库里不存在，已改引
+                 RC-2026-0812-A「8月12日 周三 · 参会企业 80 家」，所以这里同步改「周三 …… 80 家」。
+                 数字与星期都取自 17 第 471–487 行，不是本机算的。 -->
+          <p class="verrand-p" data-when="default">示例：一份《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周三这场招聘会 <b>主办方公布 80 家企业参展</b>、现场普遍收纸质简历。</p>
           <p class="verrand-p" data-when="first">在上面说一句处境，或直接选下面的服务。<b>上传简历后，这里给你逐条体检</b>；在拿到你的材料之前，不显示任何属于你的结论。</p>
           <p class="verrand-p" data-when="ai-down">对话与排序服务中断，<b>已自动上报，不需要你操作</b>；打印、扫描、上传与浏览都不受影响。</p>
           <p class="verrand-p" data-when="device-off">打印机离线已上报运维；<b>已上传的材料</b>可以先存起来，<b>凭手机号在任一台空闲机器取回打印</b>。</p>
@@ -654,11 +658,24 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
           <img src="assets/fair-today.jpg" alt="招聘会现场">
           <div class="vsite-in">
             <!-- 来源方事实（不是个人数据、也不是本机统计）：CLAUDE.md §10 要求来源机构 /
-                 同步时间 / 外部 ID 三样齐全。整改前只有前两样，且「128 家企业参展」写得像
-                 本机统计出来的 —— 已改成「主办方公布」，把数字的归属说清楚。 -->
-            <b>2026 夏季综合招聘会</b>
-            <span>广州国际会展中心 · 8 月 14 日（周五）09:00–16:00 · 主办方公布 128 家企业参展</span>
-            <span class="src">来源 广州市人才服务中心 · 外部 ID GZFAIR-2026-0814 · 8 月 8 日 08:52 同步</span>
+                 同步时间 / 外部 ID 三样齐全。整改前只有前两样，且企业数写得像
+                 本机统计出来的 —— 已改成「主办方公布」，把数字的归属说清楚。
+
+                 2026-08-11 跨页对账：本卡原来推的是「2026 夏季综合招聘会 · 广州国际会展中心 ·
+                 8 月 14 日（周五）· 128 家 · 来源 广州市人才服务中心 · 外部 ID GZFAIR-2026-0814」
+                 —— 这一场在 17 招聘会作战台的场次库里**根本不存在**，GZFAIR- 也是全站独一份的
+                 第五套编号。首页把一场不存在的招聘会摆在最显眼的位置，点「查看招聘会」进 17
+                 却找不到它，是最伤信任的一种矛盾。
+                 按主页面口径（招聘会＝17）改引 17 真实存在的第一场，五个字段逐个照抄
+                 17 第 471–487 行：名称 2026 年秋季综合人才交流会 / 8月12日 周三 09:00–16:00 /
+                 市人力资源市场 A 馆 / 参会企业 80 家 / 来源机构 市人力资源和社会保障局 /
+                 同步时间 8月9日 07:30 / 外部ID RC-2026-0812-A。
+                 **没有往 17 里加一场**：往主页面加条目就是凭空造数据。
+                 上方 .verrand-p 的「周五这场招聘会 …… 128 家」同步改成「周三 …… 80 家」，
+                 否则首页自己两处对不上。 -->
+            <b>2026 年秋季综合人才交流会</b>
+            <span>市人力资源市场 A 馆 · 8 月 12 日（周三）09:00–16:00 · 主办方公布 80 家企业参展</span>
+            <span class="src">来源 市人力资源和社会保障局 · 外部 ID RC-2026-0812-A · 8 月 9 日 07:30 同步</span>
             <a class="btn" href="17-fair-desk.html">查看招聘会</a>
           </div>
         </div>
@@ -876,7 +893,7 @@ html.lowgpu .vx-part, html.lowgpu .vx-osbadge i { animation: none; }
 
   /* ---------- 3. 打字机 placeholder（只认 data-typewriter） ---------- */
   var SAMPLES = [
-    '周五要去招聘会，简历还没改',
+    '周三要去招聘会，简历还没改',
     '帮我把这两页身份证复印成一张',
     '我想看看广州的运营岗',
     '我不知道从哪开始'

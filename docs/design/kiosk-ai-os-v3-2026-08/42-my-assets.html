@@ -1013,7 +1013,7 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-package"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">活动资料_夏季招聘会.pdf</span>
+                <span class="rrow-tl"><span class="rrow-t">活动资料_秋季综合.pdf</span>
                   <span class="chip chip--amber is-static">排队中</span></span>
                 <span class="rrow-m">1 份 · 黑白 · A4 · 8 月 9 日 10:20 · 免费 · 取件码 P-4172 · 单号 O-20260809-1020</span>
               </span>
@@ -1023,9 +1023,15 @@ body.capture .proto-only { display:none !important; }
               <!-- 2026-08-10 Codex 错配整改：同上，s5 是收银，出纸进度在 s6。
                    2026-08-11 补 orderId（契约 ④）：不带单号时这一单和上一单点开一模一样。 -->
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s6&amp;from=P42&amp;orderId=O-20260809-1020"><svg class="ic"><use href="#i-eye"/></svg>看进度</a>
-              <!-- 2026-08-11：这一单打的是「活动资料_夏季招聘会.pdf」，「回招聘会」必须回到
-                   那一场，不能落到作战台的默认场次。按契约 ⑥ 补 fairId。 -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P42"><svg class="ic"><use href="#i-fair"/></svg>回招聘会</a>
+              <!-- 2026-08-11：这一单打的是「活动资料_秋季综合.pdf」，「回招聘会」必须回到
+                   那一场，不能落到作战台的默认场次。按契约 ⑥ 补 fairId。
+                   2026-08-11 跨页对账：原 fairId=FA-2026-08 是 43 自造的号，17 场次库里没有，
+                   文件名也跟着写「夏季招聘会」。按主页面口径（招聘会＝17）改引 17 真实存在的
+                   RC-2026-0812-A「2026 年秋季综合人才交流会 · 8 月 12 日 · 市人力资源市场 A 馆 ·
+                   来源 市人力资源和社会保障局 · 同步 8 月 9 日 07:30」（17 第 471–487 行），
+                   文件名同步改成「活动资料_秋季综合.pdf」，与 43 第 1359、1366 行一致。
+                   没有往 17 里新增场次 —— 往主页面加条目就是凭空造数据。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P42"><svg class="ic"><use href="#i-fair"/></svg>回招聘会</a>
             </div>
             <div class="rrow-det">
               <div class="kv">

@@ -297,9 +297,17 @@ body.capture .proto-only { display:none !important; }
         17-fair-desk.html?stage=s4&fairId=<外部ID>&from=P43   打开这一场生成的作战单
         17 应消费：按外部 ID 选中那一场。**本机场次库里没有这一场时停在 s1 并写明
         「这一场不在本机场次库里」，不得默认选中第一场。**
-        已知数据缺口（不是链接错，是样例数据没对齐，见交回说明）：本页记录里的
-        FA-2026-08 / FA-2026-07 在 17 的场次库里不存在（17 只有 RC-2026-0812-A /
-        RC-2026-0815-M / XZ-2026-0820）。改 17 的场次数据不在本轮可改文件内。
+        2026-08-11 数据缺口已消除：本页原来的 FA-2026-08 / FA-2026-07 是本页自造的号，
+        在 17 的场次库里根本不存在（17 只有 RC-2026-0812-A / RC-2026-0815-M / XZ-2026-0820）。
+        化解办法是**记录页服从主页面**，不是往 17 里加两场（往主页面加条目＝凭空造数据）：
+          · 原 FA-2026-08「2026 年夏季综合招聘会 · 8 月 16 日 · 广交会 C 区」
+            → RC-2026-0812-A「2026 年秋季综合人才交流会 · 8 月 12 日 · 市人力资源市场 A 馆」
+              来源 市人力资源和社会保障局 · 同步 8 月 9 日 07:30（17 第 471–487 行）
+          · 原 FA-2026-07「高校毕业生专场招聘会 · 8 月 22 日 · 大学城」
+            → XZ-2026-0820「2026 届毕业生双选会（秋季首场）· 8 月 20 日 · 职业技术学院体育馆」
+              来源 省教育厅学生服务中心 · 同步 8 月 9 日 07:30（17 第 507–523 行）
+        17 第三场 RC-2026-0815-M（制造业专场）本页没有记录引用它，不强凑。
+        日期写法沿用本页的「8 月 12 日」空格排版（17 内部写「8月12日」），只是排版差异，值相同。
 
      ④ companyId（→ 15 企业导览）
         15-companies.html?stage=detail&companyId=<外部ID>&from=P43
@@ -311,8 +319,17 @@ body.capture .proto-only { display:none !important; }
         s2 是「看缺口 / 政策与原文」，是"打开某一条政策看原文"的落点；
         s1 是「选情况」，那是重新填一遍条件，不是打开这一条。
         21 应消费：按 ID 展开那一条的原文；查不到就停在 s2 并说明本机政策库里没有它。
-        已知数据缺口：本页收藏的「高校毕业生一次性求职补贴（穗人社规〔2026〕3 号）」
-        不在 21 的政策库（21 只有 p1–p6）。同上，改 21 不在本轮范围内。
+        2026-08-11 数据缺口已消除：本页原来收藏 / 浏览 / 跳转三条都指
+        「高校毕业生一次性求职补贴（穗人社规〔2026〕3 号）」，该文号与该名称在 21 的
+        政策库里**都不存在**（21 只有 p1–p6，文号是「人社〔2026〕09 / 11 / 14 / 21 号」
+        与「人社财〔2026〕05 号」「穗社保〔2026〕02 号」那一套），policyId=SRSG-2026-3
+        也是本页自造、21 无法解析的号。按主页面口径改引 21 真实存在的 p1：
+          「一次性求职创业补贴」· 来源 市人社局 · 文号 人社〔2026〕14 号
+          （21 第 942 行 POL 数组 { id:'p1', t:'一次性求职创业补贴', org:'市人社局',
+            no:'人社〔2026〕14 号' }；21 第 1155 行渲染成「来源 市人社局 · 同步 8/9 07:30
+            · 文号 人社〔2026〕14 号」）
+        policyId 随之改为 `p1` —— 那是 21 唯一能解析的键；沿用自造的 SRSG-2026-3
+        等于让 21 永远查不到。同步时间随主页面改成 8 月 9 日 07:30。
 
      ⑥ jobId（→ 14 线上岗位详情 / 44 线下岗位详情）
         沿用 11 岗位匹配已在用的 jobId 命名，值取本页每一行「外部 ID」那一栏显示的号。
@@ -667,7 +684,7 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">招聘会参会作战单 · 夏季综合</span>
+                <span class="rrow-tl"><span class="rrow-t">招聘会参会作战单 · 秋季综合</span>
                   <span class="chip chip--jade is-static">已完成</span></span>
                 <span class="rrow-m">8 月 3 日 14:30 · 任务 fv08ab…12c4 · 存至 11 月 1 日</span>
               </span>
@@ -677,7 +694,7 @@ body.capture .proto-only { display:none !important; }
               <!-- 2026-08-11 Codex 错配整改：原为裸链，默认落 17 s1「哪一场」——
                    那是重新挑一场的第一步。这一条记录是**已经生成好的作战单**，
                    落点是第 4 步「带走作战单」，并按契约 ③ 带上是哪一场。 -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s4&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s4&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="参会作战单记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
@@ -795,8 +812,11 @@ body.capture .proto-only { display:none !important; }
                    和这条岗位的办事方式对不上。线下岗位详情页 44 已存在，改指 44。 -->
               <!-- 2026-08-11：具体某一条，按契约 ⑥ 带外部 ID（用本行显示的 OA-3312，
                    与 13 岗位情报台、16 线下机构页一致）。
-                   已知不一致：44 岗位详情页自己写的是 OA-3312-07，改 44 不在本轮范围内，
-                   已在交回说明里单列。 -->
+                   2026-08-11 更新：44 岗位详情页原写 OA-3312-07，本轮已改为 OA-3312，
+                   这条深链带的号与落地页显示的号现在对得上了，契约不再是断的。
+                   残留（读文件，本轮不可改）：16 那一页机构详情用 OA-3312 指**这家机构**，
+                   而它自己的「在招岗位」里这条岗位写 OA-3312-07 —— 机构与岗位共号，
+                   需产品定编号规则，已在交回说明里单列。 -->
               <a class="btn btn--ghost" href="44-job-detail-offline.html?jobId=OA-3312&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看岗位</a>
               <a class="btn btn--ghost" href="16-offline-agencies.html"><svg class="ic"><use href="#i-agency"/></svg>看这家机构</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的岗位"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
@@ -813,17 +833,17 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">2026 年夏季综合招聘会</span>
+                <span class="rrow-tl"><span class="rrow-t">2026 年秋季综合人才交流会</span>
                   <span class="chip chip--amber is-static">招聘会</span></span>
-                <span class="rrow-m">收藏于 8 月 6 日 20:12 · 8 月 16 日 · 广交会 C 区</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+                <span class="rrow-m">收藏于 8 月 6 日 20:12 · 8 月 12 日 · 市人力资源市场 A 馆</span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <!-- 2026-08-11 Codex 错配整改：收藏的是**这一场**（外部 ID FA-2026-08），
+              <!-- 2026-08-11 Codex 错配整改：收藏的是**这一场**（外部 ID RC-2026-0812-A），
                    原为裸链，落到作战台的默认场次 = 打开的是别人那一场。按契约 ③ 带 fairId。 -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=fair-plan&amp;title=参会作战单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印作战单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -839,23 +859,23 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-campus"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">高校毕业生专场招聘会</span>
+                <span class="rrow-tl"><span class="rrow-t">2026 届毕业生双选会（秋季首场）</span>
                   <span class="chip chip--amber is-static">招聘会</span></span>
-                <span class="rrow-m">收藏于 8 月 4 日 09:36 · 8 月 22 日 · 大学城</span>
-                <span class="srcline"><span class="org">来源 广州市大学生就业指导中心</span><span class="sep">·</span><span>同步 8 月 6 日 09:30</span><span class="sep">·</span><span>外部 ID FA-2026-07</span></span>
+                <span class="rrow-m">收藏于 8 月 4 日 09:36 · 8 月 20 日 · 职业技术学院体育馆</span>
+                <span class="srcline"><span class="org">来源 省教育厅学生服务中心</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID XZ-2026-0820</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <!-- 2026-08-11 Codex 错配整改：这一条是**毕业生专场（FA-2026-07）**，
-                   和上一条夏季综合不是同一场，原来两条裸链落到的却是同一屏。按契约 ③ 带 fairId。 -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-07&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
+              <!-- 2026-08-11 Codex 错配整改：这一条是**毕业生双选会（XZ-2026-0820）**，
+                   和上一条秋季综合不是同一场，原来两条裸链落到的却是同一屏。按契约 ③ 带 fairId。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=XZ-2026-0820&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看招聘会</a>
               <a class="btn btn--ghost" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的招聘会"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
             <div class="rrow-det">
               <div class="kv">
-                <div class="kv-row"><span class="k">入场</span><span class="v">凭学生证 · 以官方公告为准</span></div>
+                <div class="kv-row"><span class="k">入场</span><span class="v">限应届 · 需学信网核验 · 以官方公告为准</span></div>
                 <div class="kv-row"><span class="k">展位导览</span><span class="v">招聘会作战台里可看</span></div>
               </div>
             </div>
@@ -865,10 +885,10 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">高校毕业生一次性求职补贴</span>
+                <span class="rrow-tl"><span class="rrow-t">一次性求职创业补贴</span>
                   <span class="chip chip--jade is-static">政策</span></span>
                 <span class="rrow-m">收藏于 8 月 2 日 11:05 · 申领指引</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
@@ -876,7 +896,7 @@ body.capture .proto-only { display:none !important; }
               <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」—— 那是重新填一遍
                    条件的第一步，不是打开这一条政策。打开某一条看原文的落点是 s2
                    「看缺口 / 政策与原文」，并按契约 ⑤ 带政策 ID。 -->
-              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-eye"/></svg>查看政策</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="收藏的政策"><svg class="ic"><use href="#i-trash"/></svg>取消收藏</button>
             </div>
@@ -986,17 +1006,17 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-fair"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">2026 年夏季综合招聘会</span>
+                <span class="rrow-tl"><span class="rrow-t">2026 年秋季综合人才交流会</span>
                   <span class="chip chip--amber is-static">浏览 · 招聘会</span></span>
                 <span class="rrow-m">今天 09:56 · 看了展位导览 · 记录号 A-20260810-0956</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <!-- 2026-08-11 Codex 错配整改：这一条足迹是**夏季综合（FA-2026-08）**，
+              <!-- 2026-08-11 Codex 错配整改：这一条足迹是**秋季综合（RC-2026-0812-A）**，
                    裸链落到作战台的默认场次，等于打开了另一场。按契约 ③ 带 fairId。 -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -1038,17 +1058,17 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">高校毕业生一次性求职补贴</span>
+                <span class="rrow-tl"><span class="rrow-t">一次性求职创业补贴</span>
                   <span class="chip is-static">浏览 · 政策</span></span>
                 <span class="rrow-m">8 月 8 日 20:32 · 对过申领条件 · 记录号 A-20260808-2032</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
               <!-- 2026-08-11 Codex 错配整改：原为裸链，落 21 s1「选情况」——
                    那是重新填条件，不是回到这一条政策。打开某一条看原文在 s2，按契约 ⑤ 带 policyId。 -->
-              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -1089,13 +1109,13 @@ body.capture .proto-only { display:none !important; }
                 <span class="rrow-tl"><span class="rrow-t">打开了招聘会官方预约入口</span>
                   <span class="chip chip--amber is-static">跳转 · 招聘会</span></span>
                 <span class="rrow-m">今天 09:58 · 扫码在手机上打开 · 记录号 A-20260810-0958</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 7 日 18:00</span><span class="sep">·</span><span>外部 ID FA-2026-08</span></span>
+                <span class="srcline"><span class="org">来源 市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>外部 ID RC-2026-0812-A</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
-              <!-- 2026-08-11：这条跳转记录对应的也是夏季综合（FA-2026-08），按契约 ③ 带 fairId -->
-              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=FA-2026-08&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <!-- 2026-08-11：这条跳转记录对应的也是秋季综合（RC-2026-0812-A），按契约 ③ 带 fairId -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
             </div>
             <div class="rrow-det">
               <div class="kv">
@@ -1140,13 +1160,13 @@ body.capture .proto-only { display:none !important; }
                 <span class="rrow-tl"><span class="rrow-t">打开了补贴申领官方渠道</span>
                   <span class="chip is-static">跳转 · 政策</span></span>
                 <span class="rrow-m">8 月 8 日 20:40 · 扫码在手机上打开 · 记录号 A-20260808-2040</span>
-                <span class="srcline"><span class="org">来源 广州市人力资源和社会保障局</span><span class="sep">·</span><span>同步 8 月 4 日 10:00</span><span class="sep">·</span><span>文号 穗人社规〔2026〕3 号</span></span>
+                <span class="srcline"><span class="org">来源 市人社局</span><span class="sep">·</span><span>同步 8 月 9 日 07:30</span><span class="sep">·</span><span>文号 人社〔2026〕14 号</span></span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
               <!-- 2026-08-11：同上，打开某一条政策看原文在 21 s2，按契约 ⑤ 带 policyId -->
-              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=SRSG-2026-3&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
+              <a class="btn btn--ghost" href="21-policy.html?stage=s2&amp;policyId=p1&amp;from=P43"><svg class="ic"><use href="#i-arrowRight"/></svg>回到这一条</a>
               <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P43&amp;kind=policy-checklist&amp;title=办事清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印办事清单</a>
             </div>
             <div class="rrow-det">
@@ -1195,20 +1215,28 @@ body.capture .proto-only { display:none !important; }
             <button class="rrow-hd" type="button" aria-expanded="false">
               <span class="rrow-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
               <span class="rrow-b">
-                <span class="rrow-tl"><span class="rrow-t">打印完成 · 13 页已出纸</span>
+                <span class="rrow-tl"><span class="rrow-t">打印完成 · 4 页已出纸</span>
                   <span class="chip chip--jade is-static">未读</span></span>
-                <span class="rrow-m">今天 10:23 · 请到出纸口取走并核对页数</span>
+                <span class="rrow-m">8 月 9 日 10:23 · 请到出纸口取走并核对页数</span>
               </span>
               <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
             </button>
             <div class="rrow-ops">
               <!-- 2026-08-11 Codex 错配整改：原来只到 orders 列表，用户还得在 6 条里自己找 ——
                    同一栏下面「取件码 P-4172」那条早就带了 orderId，这一条漏了。
-                   这条通知对应的是今天 10:23 完成的那一单：本页右栏 AI 反馈草稿写的就是
+                   这条通知对应的那一单：本页右栏 AI 反馈草稿写的就是
                    「8 月 9 日 10:23，在打印工作台打『王同学_行政专员_简历.pdf』」，
                    42 的订单里同一时刻同一文件的是 O-20260809-1023。按契约 ② 带上。
-                   （已知：本条标题写「13 页」，而 42 那一单计费 4 页 —— 这是 23/43 与 42 之间
-                     的样例数据不一致，改 23-me.html 不在本轮可改文件内，已在交回说明里单列。） -->
+
+                   2026-08-11 页数与时间对齐（订单主页面＝42）：
+                     · 原写「13 页」→ 改「4 页」。42 第 976 行该单明写「计费页数 4 页（2 页 × 2 份）」，
+                       同页「再打一份」深链也带 pages=2&copies=2，两处自洽；13 页在 42 里没有任何依据。
+                     · 原写「今天 10:23」→ 改「8 月 9 日 10:23」。本页时钟是 8 月 10 日 15:22，
+                       写「今天」等于把这一单说成 8 月 10 日；42 与本页反馈草稿都写 8 月 9 日 10:23。
+                       同一栏「取件码 P-4172 已生成」本来就写「8 月 9 日 10:20」，写法一致。
+                   未修（读文件，本轮不可改）：23-me.html 第 701、787 行仍写「13 页」，
+                   且 42 该单金额 ¥1.20 按 06 公示价 0.20 元/印刷面折 6 面、与「4 页」对不上，
+                   两项都已在交回说明里单列，等产品定。 -->
               <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1023"><svg class="ic"><use href="#i-eye"/></svg>看这一单</a>
               <button class="btn btn--ghost" type="button" data-read><svg class="ic"><use href="#i-check"/></svg>标为已读</button>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
@@ -1356,14 +1384,14 @@ body.capture .proto-only { display:none !important; }
             </button>
             <div class="rrow-ops">
               <!-- 2026-08-10：「看这一单」原来只打开订单列表，用户还得在 6 条里自己找。
-                   这条通知对应的就是取件码 P-4172 那一单（8 月 9 日 10:20 · 活动资料_夏季招聘会.pdf），
+                   这条通知对应的就是取件码 P-4172 那一单（8 月 9 日 10:20 · 活动资料_秋季综合.pdf），
                    带上 orderId 直接定位；P42 那边找不到这个单号时会照常显示整张列表。 -->
               <a class="btn btn--ghost" href="42-my-assets.html?stage=orders&amp;orderId=O-20260809-1020"><svg class="ic"><use href="#i-printer"/></svg>看这一单</a>
               <button class="btn btn--ghost btn--danger" type="button" data-del="一条通知"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
             </div>
             <div class="rrow-det">
               <div class="kv">
-                <div class="kv-row"><span class="k">对应订单</span><span class="v">O-20260809-1020 · 活动资料_夏季招聘会.pdf</span></div>
+                <div class="kv-row"><span class="k">对应订单</span><span class="v">O-20260809-1020 · 活动资料_秋季综合.pdf</span></div>
                 <div class="kv-row"><span class="k">怎么用</span><span class="v">向现场工作人员出示这串码</span></div>
                 <div class="kv-row"><span class="k">失效</span><span class="v">出纸完成或 7 天后自动失效</span></div>
               </div>

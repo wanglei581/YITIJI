@@ -35,6 +35,23 @@
          「机构未填报所需材料，到店前向机构确认」。
        · 来源三字段目前生产映射丢了 headcount / externalId / syncTime，
          页面照常展示，但需 API 补齐 OfflineJobDTO 这三个字段后才是真值。
+
+     2026-08-11 跨页对账整改（外部 ID 与同步时间）
+       本页原写 `OA-3312-07` / `2026-08-10 07:40`，两项都与主页面对不上：
+         · 13-jobs-desk 这条岗位写 OA-3312 · 同步 08-08 07:40
+         · 16-offline-agencies 机构详情写 OA-3312 · 同步时间 2026-08-08 07:40
+         · 43-my-records 这条收藏写 OA-3312 · 同步 8 月 8 日 07:40
+         · 43 的「查看岗位」深链本来就带 ?jobId=OA-3312 —— 落到本页却显示
+           OA-3312-07，深链带的号和页面显示的号对不上，是**断掉的契约**。
+       且全站 OA 号只有这一处是「父-子」两段式：OA-3312 / OA-3390（13 岗位）、
+       OA-4108（16 机构）全是扁平 OA-####。两段式是孤例，不是体系。
+       故本页改为 OA-3312 / 2026-08-08 07:40，与 13 / 16 / 43 一致。
+
+       未修（读文件，本轮不可改，已在交回说明单列）：
+       16-offline-agencies 内部自己就打架 —— 机构详情页用 OA-3312 指**这家机构**
+       （第 269、468 行），而同一页「在招岗位」里这条岗位又写 OA-3312-07（第 454 行）。
+       即「机构」与「岗位」共用同一个号，需产品定：是给机构与岗位分两套号，
+       还是承认 OA-3312 就是这条岗位、机构另编号。本页只做了服从多数与深链的对齐。
      ══════════════════════════════════════════════════════════════ */
 
   /* 全宽单栏：原 396px 常驻右栏（问题清单 / 还能做什么 / 机构怎么核 / 到店后去哪看）取消 */
@@ -238,8 +255,8 @@
         <div class="srcband">
           <div class="srcline">
             <span class="org">来源机构 广州××人力资源服务有限公司</span><span class="sep">·</span>
-            <span>同步时间 2026-08-10 07:40</span><span class="sep">·</span>
-            <span>外部 ID OA-3312-07</span>
+            <span>同步时间 2026-08-08 07:40</span><span class="sep">·</span>
+            <span>外部 ID OA-3312</span>
           </div>
         </div>
 
@@ -369,7 +386,7 @@
           <div class="fold-b">
             这里<b>不用列表摘要凑一个详情页</b>——摘要没有门店地址与营业时间，你照着跑可能扑空。
             <div class="kv">
-              <div class="kv-row"><span class="k">要看的岗位</span><span class="v">外部 ID OA-3312-07</span></div>
+              <div class="kv-row"><span class="k">要看的岗位</span><span class="v">外部 ID OA-3312</span></div>
               <div class="kv-row"><span class="k">失败发生</span><span class="v">10:38 · 已自动重试 2 次</span></div>
               <div class="kv-row"><span class="k">到店问题清单</span><span class="v" style="color:var(--coral-400)">暂不可用 · 要等岗位文本</span></div>
               <div class="kv-row"><span class="k">机构列表页</span><span class="v">照常可开，含门店地址</span></div>
