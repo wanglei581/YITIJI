@@ -308,15 +308,27 @@
      s1 只是在挑来源，还没有东西可丢，所以不在 data-guard-at 里 —— 那一步拦截只会烦人。
      s2 起每一步丢的东西都不一样，所以逐阶段写清楚：用户要看到的是
      「刚扫进来的 6 页原件」，不是「未保存的更改」这种给程序员看的话。
-     data-guard-keep 指向本页真实存在的落点（第 5 步的「存进我的文档」），
-     没有真实落点时不写 —— 没有落点却给一个「存下来」的按钮就是伪造能力。 -->
+     ── 2026-08-11 · data-guard-keep 从「存进「我的文档」」改成「先扫码把这一版带走」──
+     旧写法有两个问题，都是伪造能力：
+
+     ① **全站没有任何页面监听 `lg:keep`**（`grep -rn "lg:keep"` 除 leaveguard.js
+        自己之外零命中，本文件确认过）。按下「存进「我的文档」，再离开」的实际
+        结果是 ok===true → close(true) → **直接跳走，东西一个字节都没存**。
+        这比死按钮更坏：死按钮至少不骗人，这个按钮骗完人还把你送走了。
+     ② 它挂的是**全部四个阶段**（s2 s3 s4 s5），但 s2 在传原件、s3 在出诊断、
+        s4 在挑改写 —— **那三步根本还没有成品可存**。承诺存一个不存在的东西。
+
+     改法：本稿没有账号后端，「存进我的文档」这个动作**做不到**，所以不承诺它。
+     换成本页真做得到的那一件事 —— 05 手机接力的 dir=take 带走形态是真实实现的，
+     扫码就能把这一版拿到自己手机上，这才是「离开之前先把东西弄安全」的真解。
+     并且只挂 s5：只有第 5 步手里有那一版成品。文末有对应的 lg:keep 监听。 -->
 <div class="screen" data-state="default" data-stage="s1" data-job="ok" data-theme="warm"
      data-guard-at="s2 s3 s4 s5"
      data-guard-lose-s2="刚上传的简历原件和正在解析的结果"
      data-guard-lose-s3="这份简历的六维诊断结论"
      data-guard-lose-s4="诊断结论和你已经选定的逐条改写"
      data-guard-lose-s5="改好的这一版简历（原件不受影响，还在你手里）"
-     data-guard-keep="存进「我的文档」">
+     data-guard-keep-s5="先扫码把这一版带走">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -1284,11 +1296,31 @@
         <div class="pane-hd"><span class="t">拿去做什么</span></div>
         <div class="outs">
           <!-- 2026-08-10 材料交接：出口按钮上写清本次带去什么，并保留预估核价口径 -->
+          <!-- ══ 2026-08-11：产物出口三颗死按钮的整改 ══════════════════════════
+               实测（干净页面、七种事件各打一遍、比对整个 body.outerHTML）：
+                 存进我的简历 / 导出 PDF / 发到我手机 → **全部零变化**。
+               三颗都是裸 <button>，没有 href、没有 data-go、没有任何监听 ——
+               本页把简历做完了，却一份都带不走。
+
+               为什么不是「点一下显示已保存」：本稿没有账号后端，存不进去。
+               弹一句「已保存」是伪造能力（CLAUDE.md §9），而且是最坏的一种 ——
+               用户会真的以为存好了，走人，然后东西没了。
+
+               按 11 岗位匹配 A24 那次同类整改的口径办：**接到真实去处**。
+               三个出口各自有一个真实存在的落点，互不重复：
+                 存进我的简历 → 42「我的资产 · 我的简历」（简历版本都在那儿）
+                 导出 PDF     → 42「我的资产 · 我的文档」（导出的 PDF 落这儿；
+                                 与 08 文件加工台 exits() 的写法一致）
+                 发到我手机   → 05 手机接力的 dir=take 带走形态
+               05 的参数按它页尾契约写全：from=P09 在 SRC 登记表里、
+               kind=material 在 KIND 里、artifactId 沿用 42 的 art-resume-* 命名。
+               少一个 05 就认不出这是哪一份，只会显示「没认领到文件」。 -->
           <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;pages=3&amp;copies=1&amp;back=s5"><svg class="ic"><use href="#i-printer"/></svg>带去：简历 v2 · 3 页</a>
-          <button class="out" data-when="device-off"><svg class="ic"><use href="#i-folder"/></svg>存我的文档 · 扫码带走</button>
-          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
-          <button class="out"><svg class="ic"><use href="#i-download"/></svg>导出 PDF</button>
-          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
+          <!-- device-off：打印这条路断了，画出真正能用的那条（与下面那张示意码同一个去处） -->
+          <a class="out" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;artifactId=art-resume-v2"><svg class="ic"><use href="#i-qr"/></svg>扫码把 v2 带走</a>
+          <a class="out" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</a>
+          <a class="out" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-download"/></svg>导出 PDF · 存进我的文档</a>
+          <a class="out" href="05-phone-relay.html?dir=take&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;artifactId=art-resume-v2"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</a>
           <a class="out" href="11-jobfit-compare.html" data-when="default first"><svg class="ic"><use href="#i-target"/></svg>按岗位比对</a>
           <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-target"/></svg>比对不可用</button>
           <a class="out" href="11-jobfit-compare.html" data-when="device-off"><svg class="ic"><use href="#i-target"/></svg>按岗位比对</a>
@@ -1630,6 +1662,48 @@
 <script src="scripts/linkage.js?v=6"></script>
 <script src="scripts/notebar.js?v=2"></script>
 <script src="scripts/leaveguard.js?v=1"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   离场确认的「先把东西弄安全，再离开」这一支（lg:keep）· 2026-08-11
+   --------------------------------------------------------------------------
+   背景见页首 .screen 上那段注释：leaveguard.js 一直在派 lg:keep，
+   但**全站没有任何页面监听它**，所以那颗按钮按下去 = 直接跳走 + 什么都没存。
+   leaveguard.js 自己的源码里也留了这条待办（「下一轮要么补上四页的监听，
+   要么撤掉这四处声明」）。这里补的就是 09 这一页的监听。
+
+   契约（leaveguard.js）：
+     var ev = new CustomEvent('lg:keep', {detail:{href}, cancelable:true})
+     var ok = layer.dispatchEvent(ev)
+     if (ok) close(true)          // 没人拦 → 关弹层 → 直接走人
+   所以页面必须 preventDefault()，把控制权拿回来，自己决定去哪。
+
+   本页拿回来之后做什么：**去 05 手机接力的带走形态**。
+   不是「假装存好了再放行」——本稿没有账号后端，存不了；
+   05 的 dir=take 是真实实现的收件端，扫码就能把这一版拿到自己手机上。
+   按钮文案（data-guard-keep-s5）也照这个动作写，不写「存进我的文档」。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var TAKE = '05-phone-relay.html?dir=take&from=P09&kind=material' +
+             '&title=' + encodeURIComponent('简历 v2') + '&artifactId=art-resume-v2'
+
+  /* 事件派在弹层元素上，冒泡到 document。用捕获阶段监听，保证在
+     leaveguard 自己那句 `if (ok) close(true)` 之前就把 cancel 标记打上。 */
+  document.addEventListener('lg:keep', function (e) {
+    /* 只有第 5 步手里才有成品；别的阶段本就不该出现这颗按钮
+       （data-guard-keep 只挂了 -s5），这里再兜一次底。 */
+    var scr = document.querySelector('.screen')
+    if (!scr || scr.getAttribute('data-stage') !== 's5') return
+
+    e.preventDefault()          // 拦住「直接跳走」
+
+    /* 已经把人送去带走了，本页这一份就不该再拦第二次 ——
+       否则 05 那边回来或者用户再点一次返回，还会弹一次同样的窗。 */
+    if (window.v3Guard && typeof window.v3Guard.off === 'function') window.v3Guard.off()
+    location.href = TAKE
+  }, true)
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

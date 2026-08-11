@@ -139,6 +139,53 @@
 .screen.relay-take [data-relay-send] { display:none !important; }
 .screen:not(.relay-take) [data-relay-take] { display:none !important; }
 
+/* ══ 递过去方向的三条分支：传文件 / 拍照 / 登录 ═══════════════════════════
+   2026-08-11：s1 上那三张 .act 卡（传文件到机器 / 拍照传过去 / 在手机上完成
+   登录）此前是**裸 <button>，没有 href、没有 data-go、没有任何监听** ——
+   实测七种事件（pointer/mouse/touch/click）全打一遍，整个 body 一个字节不变。
+   用户在自己手机上要点的三个动作，一个都点不动。
+
+   为什么不是弹一句「已完成」：这三条各自有对应的形态 ——
+   传文件与拍照进的是「正在传」（s2），登录进的是手机侧的号码 + 验证码表单
+   （slogin）。弹提示等于把分支入口做成了通知，用户仍然到不了那一步。
+
+   形态开关沿用本页既有口径：**落在 .screen 的 class 上，不新开 data-* 轴**
+   （见上面方向轴那段长注释）。传文件是默认，拍照加 .relay-photo；
+   登录不是同一屏的变体，它是另一步，所以走阶段（data-at="slogin"）。 */
+.screen.relay-photo [data-relay-mfile] { display:none !important; }
+.screen:not(.relay-photo) [data-relay-mphoto] { display:none !important; }
+
+/* 手机端触控下限：本页按钮一律 ≥52px（一体机是 48/56，手机这一页按 52 收）。
+   .act 原本只写了 min-height:48px —— 内容撑起来实际有 70px+，但下限写低了，
+   万一某一条文案缩到一行就会掉到 48。这里把下限提到 52 与页脚 .ph-btn 对齐。 */
+.act { min-height:52px; }
+/* 三条分支写成**无值属性**（data-relay-file / -photo / -login），
+   不是一条 data-relay-act="file|photo|login" 的枚举 —— 理由同上面方向轴那段：
+   回归台会把「白名单外、出现 ≥3 次、取值像枚举」的 data-* 报成疑似新轴，
+   而这三个只是行为钩子，不是可见性轴。实测确认过：写成枚举时
+   tools/regress.html 报 `data-relay-act(file|photo|login)`；改成无值属性后取值
+   集合为空，不再误报，也不必去动共享白名单（那是禁止修改的文件）。 */
+.act[data-relay-file], .act[data-relay-photo], .act[data-relay-login] {
+  cursor:pointer; text-align:left; font-family:var(--ff-ui); }
+.act[data-relay-file]:active, .act[data-relay-photo]:active, .act[data-relay-login]:active {
+  border-color:var(--jade-a32); background:var(--jade-a12); }
+
+/* ── slogin：在自己手机上完成登录 ──────────────────────────────────
+   这一步的存在理由写在 s1 那张卡上：号码不会出现在大厅那块屏幕上。
+   所以这里**不做任何回显打码之外的花样**，只要号码别被旁人看见。 */
+.lg-f { flex:0 0 auto; display:flex; flex-direction:column; gap:7px; }
+.lg-lb { font-size:12px; color:var(--fog-600); }
+.lg-in { min-height:52px; border-radius:12px; padding:0 14px; font-size:17px;
+  font-family:var(--ff-num); color:var(--fog-900);
+  background:var(--surf-1); border:1px solid var(--brd-1); width:100%; }
+.lg-in:focus { outline:2px solid var(--jade-500); outline-offset:1px; }
+.lg-row { display:flex; gap:9px; align-items:stretch; }
+.lg-row .lg-in { flex:1 1 auto; min-width:0; }
+.lg-code { flex:0 0 auto; min-height:52px; padding:0 15px; border-radius:12px;
+  font-size:14px; font-weight:600; font-family:var(--ff-ui); cursor:pointer;
+  background:var(--jade-a12); border:1px solid var(--jade-a32); color:var(--jade-200); }
+.lg-code[aria-disabled="true"] { opacity:.55; cursor:default; }
+
 /* 带走的是哪一份 —— 这张卡只在**真的收到文件身份**时才出现 */
 .take { flex:0 0 auto; display:flex; flex-direction:column; gap:7px;
   padding:15px 16px; border-radius:14px;
@@ -198,6 +245,11 @@
       <i style="background:var(--coral-400)"></i>机器离线 · 现在传过去也出不来</span>
     <span class="ph-live" data-at="s1 s2" data-when="device-off" data-relay-take style="color:var(--amber-600)">
       <i style="background:var(--amber-500)"></i>机器离线 · 只影响出纸，不影响带走</span>
+    <!-- 登录这一步的机器状态单列：登录只跟短信与账号有关，
+         **机器离线并不挡它** —— 沿用上面那条「后果不一样就不能共用一句」。 -->
+    <span class="ph-live" data-at="slogin" data-when="default first ai-down"><i></i>已连上 · 等你在手机上登录</span>
+    <span class="ph-live" data-at="slogin" data-when="device-off" style="color:var(--amber-600)">
+      <i style="background:var(--amber-500)"></i>机器离线 · 不影响登录</span>
     <span class="ph-live" data-at="s3" style="color:var(--fog-600)">
       <i style="background:var(--fog-600)"></i>已结束</span>
   </div>
@@ -263,7 +315,7 @@
     <div class="grp" data-relay-send>把手机上有的递过去</div>
     <div class="panel-note" data-relay-send style="margin:-4px 0 8px">原型说明:以下动作在真机手机页由上传会话执行,此稿仅呈现形态。</div>
 
-    <button class="act" type="button" data-relay-send>
+    <button class="act" type="button" data-relay-send data-relay-file>
       <svg class="ic"><use href="#i-upload"/></svg>
       <span class="act-b">
         <span class="act-t">传文件到机器</span>
@@ -271,7 +323,7 @@
       </span>
     </button>
 
-    <button class="act" type="button" data-relay-send>
+    <button class="act" type="button" data-relay-send data-relay-photo>
       <svg class="ic"><use href="#i-image"/></svg>
       <span class="act-b">
         <span class="act-t">拍照传过去</span>
@@ -279,7 +331,7 @@
       </span>
     </button>
 
-    <button class="act" type="button" data-relay-send>
+    <button class="act" type="button" data-relay-send data-relay-login>
       <svg class="ic"><use href="#i-phone"/></svg>
       <span class="act-b">
         <span class="act-t">在手机上完成登录</span>
@@ -332,7 +384,12 @@
       别关这一页，也<b>别锁屏</b>。存完在手机的「文件」或「下载」里能找到。
     </div>
 
-    <div class="up" data-relay-send>
+    <!-- 进度条是**原型示例**，不是本机读数：下面那条 panel-note 说明了这一点。
+         两条分支各摆各的 —— 从「拍照传过去」进来却看见一份 PDF 在传，
+         等于告诉用户系统传错了东西。 -->
+    <div class="panel-note" data-relay-send style="margin:-4px 0 8px">原型说明:下面的文件名与百分比是示例,不是本机读数;真机在这里显示你刚选中/刚拍的那几份的真实进度。</div>
+
+    <div class="up" data-relay-send data-relay-mfile>
       <div class="up-row">
         <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-file"/></svg>
         <span class="up-nm">王磊_机械_2026.pdf</span>
@@ -341,13 +398,28 @@
       <div class="up-bar"><i style="width:100%"></i></div>
     </div>
 
-    <div class="up" data-relay-send>
+    <div class="up" data-relay-send data-relay-mfile>
       <div class="up-row">
         <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-image"/></svg>
         <span class="up-nm">成绩单_扫描件.jpg</span>
         <span class="up-pct">62%</span>
       </div>
       <div class="up-bar"><i style="width:62%"></i></div>
+    </div>
+
+    <!-- 拍照分支：一次拍一张，所以只有一条 -->
+    <div class="up" data-relay-send data-relay-mphoto>
+      <div class="up-row">
+        <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-image"/></svg>
+        <span class="up-nm">刚拍的照片.jpg</span>
+        <span class="up-pct">48%</span>
+      </div>
+      <div class="up-bar"><i style="width:48%"></i></div>
+    </div>
+    <div class="ph-note ph-note--calm" data-relay-send data-relay-mphoto>
+      <svg class="ic"><use href="#i-image"/></svg>
+      <span>拍的是纸质材料就<b>把纸压平、光打匀</b> ——
+            机器那边要拿它出纸，糊了打出来也是糊的。</span>
     </div>
 
     <!-- 带走方向只有一份，而且必须是链接指名的那一份 —— 名字由脚本填。
@@ -370,6 +442,54 @@
       <svg class="ic"><use href="#i-alert"/></svg>
       <span>存失败会明确告诉你为什么，<b>不会显示成已存好</b>。
             存到手机<b>不等于打印</b> —— 要出纸仍然得回机器前面按。</span>
+    </div>
+  </div>
+
+  <!-- ─────────── SLOGIN 在自己手机上完成登录 ───────────
+       为什么这一步在手机上而不在一体机上：03 身份门的「扫码登录」那条路
+       承诺的就是「手机号和验证码都在你自己手机上完成，不出现在这块屏幕上」。
+       这一页是那句承诺的落地端 —— 大厅里旁边站着人，号码和验证码都不该
+       出现在 27 寸公共屏幕上。
+
+       诚实口径（CLAUDE.md §9）：原型不发短信、也不真的建会话。
+       所以这一步**不显示「已登录」**，按下去只说明真机会做什么、
+       以及现在这一稿做不到什么。 -->
+  <div class="ph-body" data-at="slogin">
+    <div class="ph-h">在这台手机上<br>完成登录</div>
+    <div class="ph-p">
+      号码和验证码都在<b>你自己手机上</b>输 ——
+      <b>不会出现在大厅那块屏幕上</b>，旁边有人也看不到。
+    </div>
+
+    <div class="panel-note" style="margin:-4px 0 4px">原型说明:此稿不发短信、不建登录会话;下面两栏可以真的输入,但按「完成登录」不会把你登进去。</div>
+
+    <div class="lg-f">
+      <label class="lg-lb" for="lg-phone">手机号</label>
+      <input class="lg-in" id="lg-phone" type="tel" inputmode="numeric"
+             autocomplete="tel" maxlength="11" placeholder="11 位手机号">
+    </div>
+
+    <div class="lg-f">
+      <label class="lg-lb" for="lg-otp">短信验证码</label>
+      <div class="lg-row">
+        <input class="lg-in" id="lg-otp" type="text" inputmode="numeric"
+               autocomplete="one-time-code" maxlength="6" placeholder="6 位数字">
+        <button class="lg-code" type="button" id="lg-send">获取验证码</button>
+      </div>
+    </div>
+
+    <div class="ph-note ph-note--calm" id="lg-say">
+      <svg class="ic"><use href="#i-info"/></svg>
+      <span id="lg-say-t"><b>先填号码，再取验证码。</b>
+            验证码只验这一次，<b>本机不保存你的号码</b> ——
+            它只用来把这次办理挂到你自己的账号下。</span>
+    </div>
+
+    <div class="ph-note ph-note--warn">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span><b>不登录也能用。</b>不登录就是「离场即清」：
+            这次传的、做的，办完就没了。登录只决定<b>东西能不能留到下次</b>，
+            不决定你能不能办。</span>
     </div>
   </div>
 
@@ -440,7 +560,10 @@
   <!-- 底部：单一动作，没有导航栏 -->
   <div class="ph-foot">
     <!-- ── 递过去方向（默认）── -->
-    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down" data-relay-send>
+    <!-- data-relay-file 不是多余的：没有它，用户先点过「拍照传过去」再退回
+         s1 按这颗主按钮，s2 会停在上一次的拍照形态，显示的是「刚拍的照片」而不是
+         他这次要传的文件。形态必须由**这一次按的是哪颗**决定。 -->
+    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down" data-relay-send data-relay-file>
       <svg class="ic"><use href="#i-upload"/></svg>选文件传过去
     </button>
     <button class="ph-btn" data-at="s1" data-when="device-off" data-relay-send style="background:var(--fog-a12);color:var(--fog-800)">
@@ -464,6 +587,17 @@
     <button class="ph-btn" data-at="s2" data-relay-take style="background:var(--fog-a12);color:var(--fog-800)">
       取消这次保存
     </button>
+    <!-- ── 登录这一步 ──
+         「完成登录」不写成 data-go：它不是换一步，它是一次要真的成/败的动作。
+         原型里它做不成，所以按下去说的是「做不成、以及真机会怎么做」，
+         **不显示已登录**。 -->
+    <button class="ph-btn" data-at="slogin" id="lg-done">
+      <svg class="ic"><use href="#i-check"/></svg>完成登录
+    </button>
+    <button class="ph-btn" data-at="slogin" data-go="s1" style="background:var(--fog-a12);color:var(--fog-800)">
+      先不登录，回上一步
+    </button>
+
     <button class="ph-btn" data-at="s3" style="background:var(--fog-a12);color:var(--fog-800)">
       关闭这一页
     </button>
@@ -475,6 +609,7 @@
     <span class="ph-hint" data-at="s1" data-when="device-off" data-relay-take>机器离线只影响出纸 · 这一份照样能存进手机，纸要等机器好了再打</span>
     <span class="ph-hint" data-at="s2" data-relay-send>传完机器那边会自动出现，不用手动刷新</span>
     <span class="ph-hint" data-at="s2" data-relay-take>存完在手机的「文件」或「下载」里能找到</span>
+    <span class="ph-hint" data-at="slogin">号码只在这台手机上输 · 不出现在大厅那块屏幕上</span>
     <span class="ph-hint" data-at="s3">没有 App 要装 · 下次到机器前扫码就行</span>
   </div>
 
@@ -667,6 +802,97 @@
   set('take-btn-save', function (el) { el.style.display = '' })
 
   if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+})()
+
+/* ══════════════════════════════════════════════════════════════════════════
+   s1 三条分支的接线（2026-08-11）
+   --------------------------------------------------------------------------
+   修的是什么：所有者亲自逮到「登录三选一里的手机扫码点下去什么都不发生」，
+   全站回归后本页 s1 的三张 .act 卡同样命中 —— 而且更严重：这三条是用户
+   **在自己手机上**要点的全部动作，一个都点不动。
+
+   实测（干净页面、七种事件各打一遍、比对整个 body.outerHTML）：
+     传文件到机器 / 拍照传过去 / 在手机上完成登录 → 全部零变化。
+     它们是裸 <button>，没有 href、没有 data-go、没有 onclick、没有任何监听。
+   同一组里第四张「存走刚生成的文件」是 <a href>，一直是好的 ——
+   所以这不是「整组没接」，是三张卡被漏掉了。
+
+   接法：**进对应形态，不弹提示。**
+     传文件 → s2（.relay-photo 关）  拍照 → s2（.relay-photo 开）
+     登录   → slogin（手机侧号码 + 验证码表单）
+   形态开关落在 .screen 的 class 上，不新开 data-* 轴（见页首方向轴注释）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function go (st) {
+    if (typeof window.v3Stage === 'function') window.v3Stage(st)
+    else { scr.setAttribute('data-stage', st); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
+  scr.addEventListener('click', function (e) {
+    var b = e.target.closest &&
+            e.target.closest('[data-relay-file],[data-relay-photo],[data-relay-login]')
+    if (!b) return
+    var act = b.hasAttribute('data-relay-file') ? 'file'
+            : b.hasAttribute('data-relay-photo') ? 'photo' : 'login'
+
+    /* 拍照与传文件是同一步的两种形态，先把形态定死再切阶段 ——
+       反过来会让 s2 先按上一次的形态闪一帧。 */
+    if (act === 'file')  { scr.classList.remove('relay-photo'); go('s2'); return }
+    if (act === 'photo') { scr.classList.add('relay-photo');    go('s2'); return }
+    if (act === 'login') { go('slogin') }
+  })
+
+  /* ── 登录这一步：能真的输入，但不假装登录成功 ──────────────────────
+     原型不发短信、不建会话。所以这两个按钮**只说真话**：
+     该拦的先拦（号码没填够就说没填够），做不到的明说做不到。
+     绝不出现「已登录」「登录成功」—— 那是本稿根本没有的落点。 */
+  var say = document.getElementById('lg-say')
+  var sayT = document.getElementById('lg-say-t')
+  function tell (html, warn) {
+    if (!sayT || !say) return
+    sayT.innerHTML = html
+    say.className = 'ph-note ' + (warn ? 'ph-note--warn' : 'ph-note--calm')
+    /* 状态变化要能被读屏播报，否则视障用户按下去也是「没反应」 */
+    say.setAttribute('role', 'status')
+    say.setAttribute('aria-live', 'polite')
+  }
+  function digits (id) {
+    var el = document.getElementById(id)
+    return el ? (el.value || '').replace(/\D/g, '') : ''
+  }
+
+  var sendBtn = document.getElementById('lg-send')
+  if (sendBtn) sendBtn.addEventListener('click', function () {
+    var p = digits('lg-phone')
+    if (p.length !== 11) {
+      tell('<b>先把 11 位手机号填完。</b>现在填了 ' + p.length + ' 位 —— ' +
+           '号码不够位数，短信没法发。', true)
+      return
+    }
+    /* 号码中段打码：这一页的存在理由就是别让旁人看见号码，
+       回显整串等于自己拆自己的台。 */
+    tell('<b>原型不发短信。</b>真机这时会向 ' +
+         p.slice(0, 3) + '****' + p.slice(7) +
+         ' 发一条验证码，60 秒内可重发；<b>本稿收不到码</b>，' +
+         '下面那栏随便填也验不过。', true)
+  })
+
+  var doneBtn = document.getElementById('lg-done')
+  if (doneBtn) doneBtn.addEventListener('click', function () {
+    var p = digits('lg-phone'), c = digits('lg-otp')
+    if (p.length !== 11) { tell('<b>手机号还没填完。</b>要 11 位，现在是 ' + p.length + ' 位。', true); return }
+    if (c.length !== 6)  { tell('<b>验证码还没填完。</b>要 6 位，现在是 ' + c.length + ' 位。', true); return }
+    /* 两栏都填齐了 —— 但本稿**没有**校验端点，所以这里不能说「登录成功」。
+       说清楚差在哪、真机会怎么走、以及现在还能干什么。 */
+    tell('<b>这一稿到此为止：没有短信校验端点，验不了，也就没法把你登进去。</b><br>' +
+         '真机在这一步校验验证码，通过后把这次办理挂到你的账号下，' +
+         '并跳回机器那边继续。<br>' +
+         '<b>现在不登录也能办</b> —— 回上一步照样能传文件、拍照传过去，' +
+         '只是东西办完即清、留不到下次。', true)
+  })
 })()
 </script>
 </body>

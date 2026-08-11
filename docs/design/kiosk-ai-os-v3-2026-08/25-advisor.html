@@ -128,6 +128,10 @@
 .msg-go .ic, .msg-pin .ic { width:16px; height:16px; }
 .msg-pin { background:var(--jade-a12); border:1px solid var(--jade-a20); color:var(--jade-200); }
 .msg-pin:hover { border-color:var(--jade-a32); }
+/* 已钉住：钉住与没钉住必须一眼分得出，否则用户会重复点、也不知道托盘里到底有什么。
+   不只靠颜色 —— 图标换成对勾、文字换成「已钉住」，色觉障碍下同样可读。 */
+.msg-pin[aria-pressed="true"] { background:var(--jade-a20); border-color:var(--jade-a32);
+  color:var(--jade-200); font-weight:600; }
 .msg-tail { margin-top:10px; padding-top:9px; border-top:1px dashed var(--brd-2);
   font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; }
 
@@ -144,6 +148,14 @@
   display:inline-flex; align-items:center; justify-content:center; gap:10px;
   box-shadow:var(--sh-jade); }
 .micbtn .ic { width:23px; height:23px; }
+/* 按住时的反馈。口径抄 20 面试舱 .recbtn.is-rec：
+   **原型不接麦克风，但按钮必须有反馈，不能按了像坏的。** */
+.micbtn.is-rec { background:linear-gradient(160deg, var(--coral-400), var(--coral-600, #b3372c));
+  box-shadow:none; }
+/* 语音状态行：本页原来没有这一行，于是「按住说话」按下去连一句话都没有。
+   20 面试舱有 rec-tx，这里补齐同一个位置。 */
+.rec-tx { font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; min-height:1.2em; }
+.rec-tx b { color:var(--fog-800); }
 .intext { flex:1; min-width:0; height:var(--touch-primary); border-radius:var(--r-sm);
   border:1px solid var(--brd-2); background:var(--field-bg); color:var(--fog-900);
   font-family:var(--ff-ui); font-size:var(--fz-3); padding:0 var(--s-5); outline:0; }
@@ -235,6 +247,17 @@
   font-size:var(--fz-2); line-height:1.6; }
 .tray-how { font-size:var(--fz-1); color:var(--fog-600); line-height:1.6; margin-top:var(--s-3); }
 .tray-how b { color:var(--fog-800); }
+
+/* ══ 托盘被取空的那一态（2026-08-11）════════════════════════════════════
+   「钉到托盘」接上之后就必然出现一个新处境：**用户把钉住的全取消了**。
+   这时托盘里没有任何东西，「去打印」「1 页黑白 · 预估 0.20 元」全都是空话 ——
+   点进打印台会发现没有可打的内容，比按钮无反应更糟。
+
+   开关落在 .screen 的 class（.tray-0）上，**不动 hidden** ——
+   hidden 是四态 / 阶段机制的地盘（本页抽屉开关那段注释已经立过这条规矩）。
+   两条规则都带 !important：要压过 .btn / .tray-item 自己的 display。 */
+.screen.tray-0 [data-tray-has] { display:none !important; }
+.screen:not(.tray-0) [data-tray-none] { display:none !important; }
 .tray-bottom { margin-top:auto; display:flex; flex-direction:column; gap:var(--s-3); }
 .tray-bottom .btn { width:100%; }
 
@@ -378,7 +401,13 @@
               你之前看过机械设计类，可以先看这 5 条的岗位正文，再决定投不投。
               <span class="msg-acts">
                 <a class="msg-go" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位情报台看这 12 条</a>
-                <button class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉到托盘</button>
+                <!-- data-pin 是**这条回答落到纸上的那一句**，不是按钮文字。
+                     初始 aria-pressed="true"：右边托盘写着「2 条要点 · 16:53 钉住」，
+                     而本页正好只有这两条 AI 回答带钉按钮 —— 那 2 条就是它们。
+                     让按钮显示成未钉住，等于页面自己跟自己对不上。 -->
+                <button class="msg-pin" type="button" aria-pressed="true"
+                        data-pin="今日新增岗位 12 条（今日 16:00 同步，含机械/制造 5 条）；先看这 5 条的岗位正文再定">
+                  <svg class="ic"><use href="#i-check"/></svg>已钉住</button>
               </span>
               <span class="msg-tail">投递请去来源平台 —— 本机只做岗位信息入口，不代办投递。</span>
             </span>
@@ -398,7 +427,9 @@
               符合哪条、卡在哪条，会一条条列出来，不笼统说「你可以领」。
               <span class="msg-acts">
                 <a class="msg-go" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>去政策测算逐条核对</a>
-                <button class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉到托盘</button>
+                <button class="msg-pin" type="button" aria-pressed="true"
+                        data-pin="能不能领补贴，关键看参保时长和离职原因两条；到政策测算台逐条比对，别听「你可以领」这种笼统说法">
+                  <svg class="ic"><use href="#i-check"/></svg>已钉住</button>
               </span>
               <span class="msg-tail">能不能领、领多少，以经办窗口审核为准。</span>
             </span>
@@ -426,13 +457,22 @@
         <!-- 输入条（default / first / device-off） -->
         <div class="inbar" data-when="default first device-off" style="margin-top:var(--s-3)">
           <div class="inrow">
-            <button class="micbtn"><svg class="ic"><use href="#i-mic"/></svg>按住说话</button>
+            <!-- aria-pressed 让「正在听」这一状态对读屏可读；
+                 原型不接麦克风的口径写在下面 .rec-tx 里，见文末脚本注释。 -->
+            <button class="micbtn" type="button" data-act="rec" aria-pressed="false">
+              <svg class="ic"><use href="#i-mic"/></svg>按住说话</button>
             <input class="intext" type="text" placeholder="想问什么，点这里打字">
           </div>
+          <!-- 语音状态行：按下去说什么、松开之后到哪一步，都写在这里。
+               本页原来没有这一行，于是「按住说话」按下去屏幕上一个字都不变。 -->
+          <div class="rec-tx" id="rec-tx" role="status" aria-live="polite"></div>
           <div class="qprow">
-            <button class="qp"><svg class="ic"><use href="#i-briefcase"/></svg>今天有新岗位吗</button>
-            <button class="qp"><svg class="ic"><use href="#i-policy"/></svg>我能领哪些补贴</button>
-            <button class="qp"><svg class="ic"><use href="#i-printer"/></svg>这台机器怎么用</button>
+            <!-- data-q = 点了要填进输入框的那句话。**只填不发** ——
+                 发出去就得有一条 AI 回答，而本稿没有真实模型，
+                 编一条顶上就是伪造能力（CLAUDE.md §9）。 -->
+            <button class="qp" type="button" data-q="今天有新岗位吗"><svg class="ic"><use href="#i-briefcase"/></svg>今天有新岗位吗</button>
+            <button class="qp" type="button" data-q="我能领哪些补贴"><svg class="ic"><use href="#i-policy"/></svg>我能领哪些补贴</button>
+            <button class="qp" type="button" data-q="这台机器怎么用"><svg class="ic"><use href="#i-printer"/></svg>这台机器怎么用</button>
           </div>
           <div class="in-note">
             大厅里语音旁人能听见，不方便就打字；录音不落盘，转成文字后即删。
@@ -462,24 +502,34 @@
            几页、黑白还是彩色、多少钱、按哪个键」必须留在用户看得见的地方。 -->
       <div class="traybar">
         <svg class="ic"><use href="#i-file"/></svg>
-        <span class="traybar-b" data-when="default ai-down">
+        <span class="traybar-b" data-when="default ai-down" data-tray-has>
           <span class="traybar-t">纸质带走 · 今天的建议清单</span>
-          <span class="traybar-s">2 条要点 · 来自本次对话 · 1 页黑白 · 预估 <b>0.20</b> 元 · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
+          <span class="traybar-s"><b data-tray-n>2</b> 条要点 · 来自本次对话 · 1 页黑白 · 预估 <b>0.20</b> 元 · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
         </span>
-        <span class="traybar-b" data-when="device-off">
+        <span class="traybar-b" data-when="device-off" data-tray-has>
           <span class="traybar-t">纸质带走 · 出纸暂停</span>
           <span class="traybar-s">钉住的内容先存起来，换机或改天再打 · 存的和打的是同一份，只有要点，不含姓名电话</span>
+        </span>
+        <!-- 用户把钉住的全取消之后的处境。和 first 的「还没钉过」不是一回事：
+             那句是「去钉」，这句是「你刚取空了，要打就再钉回来」。 -->
+        <span class="traybar-b" data-when="default ai-down device-off" data-tray-none>
+          <span class="traybar-t">纸质带走 · 托盘已被取空</span>
+          <span class="traybar-s">钉住的要点都取消了，<b>现在没有可打的内容</b> · 想打就回上面的回答里重新点「钉到托盘」</span>
         </span>
         <span class="traybar-b" data-when="first">
           <span class="traybar-t">纸质带走 · 托盘还是空的</span>
           <span class="traybar-s">聊出有用的回答后，点气泡下的「钉到托盘」，走之前一次打成纸</span>
         </span>
-        <a class="btn btn--primary btn--lg" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
+        <a class="btn btn--primary btn--lg" data-when="default ai-down" data-tray-has href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
           去打印<svg class="ic"><use href="#i-printer"/></svg>
         </a>
-        <button class="btn btn--primary btn--lg" data-when="device-off">
+        <button class="btn btn--primary btn--lg" data-when="device-off" data-tray-has>
           <svg class="ic"><use href="#i-folder"/></svg>先存我的文档
         </button>
+        <!-- 托盘空时不给「去打印」：点过去会发现没有可打的内容，
+             比按钮无反应更糟。这里换成一句说明，不是一颗按不动的按钮。 -->
+        <span class="traybar-s" data-when="default ai-down device-off" data-tray-none
+              style="flex:0 0 auto;max-width:220px">托盘空着，<b>暂时没有可打的</b></span>
         <a class="btn btn--ghost btn--lg" data-when="first" href="06-print-workbench.html">
           先去打印别的文件<svg class="ic"><use href="#i-arrowRight"/></svg>
         </a>
@@ -553,17 +603,22 @@
       <div class="pane pane--grow">
         <div class="pane-hd">
           <span class="t">纸质带走</span>
-          <span class="traybadge" data-when="default ai-down device-off">1</span>
+          <span class="traybadge" data-when="default ai-down device-off" data-tray-has>1</span>
           <span class="s">对话会清空，纸留得住</span>
         </div>
 
-        <div class="tray-item" data-when="default ai-down device-off">
+        <div class="tray-item" data-when="default ai-down device-off" data-tray-has>
           <svg class="ic"><use href="#i-file"/></svg>
           <span class="tray-item-b">
             <span class="tray-item-t">今天的建议清单</span>
-            <span class="tray-item-m">2 条要点 · 来自本次对话 · 16:53 钉住</span>
+            <span class="tray-item-m"><b data-tray-n>2</b> 条要点 · 来自本次对话 · <span data-tray-at>16:53</span> 钉住</span>
           </span>
           <span class="tray-x">×1</span>
+        </div>
+        <!-- 取空之后：这份清单已经没有内容了，不能再摆一条「今天的建议清单 ×1」，
+             那是在说一份不存在的产物。 -->
+        <div class="tray-empty" data-when="default ai-down device-off" data-tray-none>
+          托盘已被取空 ——<br>钉住的要点都取消了，现在<b>没有可打的内容</b>。
         </div>
         <div class="tray-empty" data-when="first">
           托盘还是空的 ——<br>聊出有用的回答后，点气泡下的「钉到托盘」。
@@ -623,6 +678,130 @@
     if (!e.target.closest) return
     if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
     if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P25 三组控件接线（2026-08-11）
+   --------------------------------------------------------------------------
+   实测（干净页面，pointer/mouse/touch/click 七种事件各打一遍，
+   比对整个 body.outerHTML + location + data-state/stage）：
+     .msg-pin「钉到托盘」×2   → 零变化
+     .micbtn「按住说话」      → 零变化（**pointerdown/mousedown/touchstart 也零变化**，
+                                 所以不是「探测器只发 click 够不到」，是真没接）
+     .qp 快捷问句 ×3          → 零变化
+   本页此前没有任何一行脚本处理它们；唯一的 inline script 只管右侧抽屉开合。
+
+   三组各自的处置口径不同，分开写在下面每一段的注释里。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var sc = document.querySelector('.screen')
+  if (!sc) return
+
+  /* ── ① 钉到托盘：真的钉，不是弹提示 ────────────────────────────────
+     托盘是本页真实存在的落点（右侧抽屉里的「纸质带走」+ 正文的产物去向常驻条），
+     所以这一条**有真实去处**，可以做成真动作。
+
+     初始态为什么是「已钉住」：托盘写着「2 条要点 · 16:53 钉住」，而全页正好
+     只有这两条 AI 回答带钉按钮 —— 那 2 条就是它们。按钮显示成未钉住，
+     等于页面自己跟自己对不上，用户再点一次就会变成 3 条。
+
+     取消到 0 条时切 .tray-0：托盘里没东西，「去打印」「预估 0.20 元」就都是
+     空话，那一屏必须换成「已被取空」，而不是留一个点过去没内容可打的按钮。 */
+  var pins = [].slice.call(document.querySelectorAll('.msg-pin[data-pin]'))
+
+  function pinned () {
+    /* 数的是 DOM 里所有钉住的，**不管当前四态看不看得见**。
+       ai-down 那一态聊天区换成了故障提示，两条回答连同钉按钮一起被 data-when
+       隐藏；如果只数可见的，托盘会从 2 条突然掉到 0 条 ——
+       可那两条要点是 AI 挂掉之前就钉住的，并没有消失。 */
+    return pins.filter(function (b) { return b.getAttribute('aria-pressed') === 'true' })
+  }
+
+  function two (n) { return (n < 10 ? '0' : '') + n }
+
+  function render (stamp) {
+    var n = pinned().length
+    sc.classList.toggle('tray-0', n === 0)
+    ;[].forEach.call(document.querySelectorAll('[data-tray-n]'), function (el) {
+      el.textContent = String(n)
+    })
+    if (stamp) {
+      var d = new Date()
+      ;[].forEach.call(document.querySelectorAll('[data-tray-at]'), function (el) {
+        el.textContent = d.getHours() + ':' + two(d.getMinutes())
+      })
+    }
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+
+  pins.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var on = b.getAttribute('aria-pressed') === 'true'
+      b.setAttribute('aria-pressed', on ? 'false' : 'true')
+      /* 图标 + 文字一起换：只换颜色的话，色觉障碍用户分不出钉没钉 */
+      b.innerHTML = '<svg class="ic"><use href="#i-' + (on ? 'bookmark' : 'check') + '"/></svg>' +
+                    (on ? '钉到托盘' : '已钉住')
+      /* 钉住时才更新「几点钉的」—— 取消不该把时间戳往前推 */
+      render(!on)
+    })
+  })
+  render(false)
+
+  /* ── ② 按住说话：原型不接麦克风，但不能按了像坏的 ────────────────────
+     口径与 20 面试舱 .recbtn 完全一致（那边源码里写着「原型不接麦克风，
+     但按钮必须有反馈，不能按了像坏的」）：按下去有按下去的样子和一句话，
+     松开如实说明这一稿到不了转写那一步 —— **不伪造任何转写文字**。
+     本页原来连 20 那样的状态行都没有，所以补了一个 .rec-tx。
+
+     监听 pointerdown/up 而不是 click：这是一颗「按住」按钮，
+     语义就是按下与松开两个时刻，click 表达不了。 */
+  var mic = sc.querySelector('[data-act="rec"]')
+  var recT = document.getElementById('rec-tx')
+  function say (t) { if (recT) recT.innerHTML = t }
+  if (mic) {
+    var down = function () {
+      mic.classList.add('is-rec')
+      mic.setAttribute('aria-pressed', 'true')
+      say('正在听…（松开结束）')
+    }
+    var up = function () {
+      if (!mic.classList.contains('is-rec')) return
+      mic.classList.remove('is-rec')
+      mic.setAttribute('aria-pressed', 'false')
+      say('<b>原型不接麦克风，这一稿没有转写。</b>' +
+          '真机在这里出转写文字，你确认后再发出去 —— 录音不落盘，转成文字后即删。' +
+          '现在想问，请用右边的输入框打字。')
+    }
+    mic.addEventListener('pointerdown', down)
+    mic.addEventListener('mousedown', down)      // 无 PointerEvent 的旧内核兜底
+    mic.addEventListener('touchstart', down, { passive: true })
+    /* 松开可能发生在按钮外面（手指滑出去再抬起），所以监听挂在 window 上，
+       否则按钮会一直卡在「正在听」。 */
+    window.addEventListener('pointerup', up)
+    window.addEventListener('mouseup', up)
+    window.addEventListener('touchend', up)
+    window.addEventListener('pointercancel', up)
+  }
+
+  /* ── ③ 快捷问句：填进输入框，不替用户发 ──────────────────────────────
+     为什么只填不发：发出去就得有一条 AI 回答接上，而本稿没有真实模型。
+     编一条顶上就是伪造能力（CLAUDE.md §9），也违反本页自己的口径
+     ——「AI 暂不可用时不会用编出来的回答顶上」。
+     填进输入框是用户看得见的真实结果：文字进了框、光标在框里、可以改可以发。 */
+  var box = sc.querySelector('.intext')
+  ;[].forEach.call(document.querySelectorAll('.qp[data-q]'), function (b) {
+    b.addEventListener('click', function () {
+      if (!box) return
+      box.value = b.getAttribute('data-q')
+      box.focus()
+      try { box.setSelectionRange(box.value.length, box.value.length) } catch (e) {}
+      /* input 事件要补发：软键盘（keypad.js）和任何监听输入的逻辑都靠它。 */
+      try { box.dispatchEvent(new Event('input', { bubbles: true })) } catch (e) {}
+      say('已填进输入框：<b>' + b.getAttribute('data-q') + '</b> —— 可以改，改完按回车发出去。')
+    })
   })
 })()
 </script>

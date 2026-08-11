@@ -146,6 +146,20 @@
   .entry > .ic:first-child { width: 24px; height: 24px; flex: 0 0 auto; color: var(--jade-500); }
   .entry-t { flex: 1 1 auto; min-width: 0; }
   .entry > .ic:last-child { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+  /* 已收藏：颜色之外还换图标与文字，色觉障碍下同样分得出（同 25 的 .msg-pin） */
+  .entry[aria-pressed="true"] { background: var(--jade-a12); border-color: var(--jade-a32); color: var(--jade-200); }
+  .entry[aria-pressed="true"] > .ic:first-child { color: var(--jade-500); }
+  /* 收藏回执默认不在页面上 —— 没收藏过就没有这条状态可报 */
+  #fav-say[data-fav-none] { display: none; }
+  /* 回执里那条去「我的收藏」的链接。裸 <a> 实测只有 30px 高，
+     不到 CLAUDE.md §9 的 48px 触控下限；做成行内触控块（同 P10 .inlink）。 */
+  .inlink {
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+    min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+    border-radius: var(--r-sm); border: 1px solid var(--jade-a32);
+    background: var(--jade-a12); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+  }
 
   /* ── 筛选抽屉 ── */
   .screen:not(.is-filtering) #filter-sheet { display: none; }
@@ -607,14 +621,35 @@
           <svg class="ic"><use href="#i-printer"/></svg>
           <span class="entry-t">打印机离线 · 可发到手机</span>
         </button>
-        <button class="entry" type="button">
+        <!-- ══ 2026-08-11：这两颗死按钮的整改 ══════════════════════════════════
+             实测（干净页面、七种事件各打一遍、比对整个 body.outerHTML）：
+             路线发到我手机 / 收藏这家机构 —— **都是零变化**。裸 <button>，
+             没有 href、没有 data-go、本页三个 click 监听没有一个匹配得上。
+
+             两颗的处置不一样，因为它们的真实落点不一样：
+             · 路线发到我手机 —— 05 手机接力的 dir=take 是真实实现的收件端，
+               直接接过去。参数按 05 页尾契约写全（from=P16 在 SRC 登记表里、
+               kind=material 在 KIND 里），少一个 05 就只会显示「没认领到文件」。
+               带的这一份和上面「打印机构与路线」是同一份（title=机构与路线）。
+             · 收藏这家机构 —— 口径抄 13 岗位情报台 .jline-fav：
+               「就地切换，真的记下这一条（原型内只切状态，不伪造『已同步』结论）」。
+               本稿没有账号后端，所以**不写「已存入我的收藏」**，
+               只把这一条的收藏状态切过来，并说清它只在本次会话里。 -->
+        <a class="entry" href="05-phone-relay.html?dir=take&amp;from=P16&amp;kind=material&amp;title=机构与路线&amp;artifactId=art-agency-oa3312">
           <svg class="ic"><use href="#i-phone"/></svg>
           <span class="entry-t">路线发到我手机</span>
-        </button>
-        <button class="entry" type="button">
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <button class="entry" type="button" data-fav aria-pressed="false">
           <svg class="ic"><use href="#i-bookmark"/></svg>
-          <span class="entry-t">收藏这家机构</span>
+          <span class="entry-t" data-fav-t>收藏这家机构</span>
         </button>
+        <!-- 收藏之后才出现：说清这一条现在是什么状态、去哪儿看、留多久。
+             不说「已存入账号」—— 本稿没有账号后端，那句是假的。 -->
+        <div class="notice" id="fav-say" data-fav-none style="margin-top:var(--s-3)" role="status" aria-live="polite">
+          <svg class="ic"><use href="#i-bookmark"/></svg>
+          <span id="fav-say-t"></span>
+        </div>
       </div>
 
       <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
@@ -956,6 +991,41 @@
   if (kwEl) { kwEl.addEventListener('input', apply); kwEl.addEventListener('change', apply) }
   apply()
   window.addEventListener('load', apply)
+})()
+
+/* ══════════════════════════════════════════════════════════════════════════
+   「收藏这家机构」接线（2026-08-11）
+   --------------------------------------------------------------------------
+   口径抄 13 岗位情报台 .jline-fav：**就地切换，真的记下这一条，
+   但不伪造「已同步 / 已存进账号」这类结论** —— 本稿没有账号后端。
+   所以回执只说两件真话：现在是收藏状态、这一条只在本次会话里。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var btn = scr.querySelector('[data-fav]')
+  var say = document.getElementById('fav-say')
+  var sayT = document.getElementById('fav-say-t')
+  if (!btn) return
+
+  btn.addEventListener('click', function () {
+    var on = btn.getAttribute('aria-pressed') === 'true'
+    btn.setAttribute('aria-pressed', on ? 'false' : 'true')
+    var t = btn.querySelector('[data-fav-t]')
+    if (t) t.textContent = on ? '收藏这家机构' : '已收藏 · 再点一次取消'
+    btn.querySelector('.ic use').setAttribute('href', on ? '#i-bookmark' : '#i-check')
+
+    if (!say || !sayT) return
+    if (on) { say.setAttribute('data-fav-none', ''); sayT.textContent = ''; return }
+    say.removeAttribute('data-fav-none')
+    /* 只说做得到的：本次会话内有效、去哪儿看、以及登录才留得住。
+       不写「已存入我的收藏」—— 那需要账号后端，本稿没有。 */
+    sayT.innerHTML = '已收藏 —— <b>只在本次办理里有效</b>。' +
+      '离场即清；要长期留着得先登录。' +
+      '登录后的收藏在<a class="inlink" href="43-my-records.html?stage=fav" ' +
+      'style="margin-left:6px">「我的记录 · 我的收藏」</a>里看。'
+  })
 })()
 </script>
 </body>

@@ -136,9 +136,17 @@
      （页脚「隐私 · 保留期限」写明未登录时离场即清），走了就得从第 1 个话题重新聊。
      s3 虽然已经成了 1 页 A4，但那也只是本次会话里的草稿，没存进「我的简历」照样清掉，
      所以照拦；两步丢的不是一回事，分开写。
-     data-guard-keep 只挂 s3：本页真实落点是 s3「接下来」里那个「存进我的简历」按钮，
-     页面自己也写「要留下来需要在最后一步存进「我的简历」」。s2 还在聊，没有这个动作，
-     所以不给 s2 keep —— 没有落点却给「存下来」的按钮就是伪造能力。 -->
+     data-guard-keep 只挂 s3：s2 还在聊，手里没有成品，不给 keep ——
+     没有落点却给「存下来」的按钮就是伪造能力。
+
+     ── 2026-08-11 · keep 文案从「存进「我的简历」」改成「先扫码把这一版带走」──
+     旧写法承诺的那个动作**做不到**，而且按下去比死按钮更坏：
+     `grep -rn "lg:keep"` 全站除 leaveguard.js 自己外**零监听**，所以
+     dispatchEvent 返回 true → close(true) → **直接跳走，一个字节都没存**。
+     用户以为存好了，走人，东西没了。
+     本稿没有账号后端，「存进我的简历」落不了地；05 手机接力的 dir=take
+     是真实实现的收件端，扫码就能把这一版拿到自己手机上 ——
+     换成这一条，按钮说的和做的才对得上。文末有对应的 lg:keep 监听。 -->
 
 <!-- 默认阶段必须是第 1 步。这里原来写死成 data-stage="s2"（逐题回答）——
      那是设计时最后调试的那一步，谁也没回头改。后果是用户从任何入口点进来、
@@ -148,7 +156,7 @@
      data-guard-at="s2 s3"
      data-guard-lose-s2="已经答完的 2 个话题（求职方向、上一份工作），这些回答只在本次会话里，走了要从第 1 个话题重新聊"
      data-guard-lose-s3="刚聊出来的这一版访谈简历（1 页 A4，10 个话题里答了 7 个），还没存进「我的简历」"
-     data-guard-keep-s3="存进「我的简历」">
+     data-guard-keep-s3="先扫码把这一版带走">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -280,71 +288,94 @@
         <div class="qa-ask" data-when="default first device-off">
           <span class="qa-face"><img src="assets/advisor-full.jpg" alt="顾问 小青"></span>
           <span class="qa-b">
-            <span class="qa-who">顾问 小青 · 话题 3 / 10 · 工作经历</span>
-            <h2 class="qa-q">上一份工作里，你做的哪件事最有成果？</h2>
-            <span class="qa-hint">说清<b>做了什么 + 结果是多少</b>就够，不用文采。比如「运营公众号，半年从 3 千涨到 1 万 2」。
+            <span class="qa-who" id="qa-who">顾问 小青 · 话题 3 / 10 · 工作经历</span>
+            <h2 class="qa-q" id="qa-q">上一份工作里，你做的哪件事最有成果？</h2>
+            <span class="qa-hint" id="qa-hint">说清<b>做了什么 + 结果是多少</b>就够，不用文采。
               <b>数字你自己报，我不替你估。</b></span>
             <!-- 多段经历支持：这条不是装饰——答完本段，话题 4 就是追加第 2 段 -->
-            <span><span class="chip chip--info">聊完这段就问你要不要加第 2 段</span></span>
+            <span id="qa-chip"><span class="chip chip--info">聊完这段就问你要不要加第 2 段</span></span>
           </span>
         </div>
         <div class="qa-free" data-when="default first device-off">
           <label class="goalfield" style="height:var(--touch-primary)">
             <svg class="ic" aria-hidden="true"><use href="#i-pen"/></svg>
-            <input type="text" placeholder="用大白话说，我来整理成书面表达" aria-label="回答话题 3">
+            <input type="text" id="qa-in" placeholder="用大白话说，我来整理成书面表达" aria-label="回答当前话题">
           </label>
-          <button class="btn btn--primary">说完了</button>
+          <button class="btn btn--primary" type="button" id="qa-done">说完了</button>
         </div>
+        <!-- ══ 2026-08-11：三颗答题控件的接线 ══════════════════════════════════
+             实测（干净页面、七种事件各打一遍）：这题跳过 / 上一题 / 让小青举个例子
+             **全部零变化** —— 裸 <button>，没有 href、data-go 或任何监听。
+             访谈页最核心的三颗操作键，一颗都不动。
+
+             接法见文末 P10 访谈状态机。三条硬口径：
+             ① **跳过的题标空不补。**跳过只把这一题记成「留空」，右边清单里明写
+                「跳过 · 成品里留空」，绝不替用户填一个像样的答案 —— 本页自己
+                承诺过「跳过的话题不会被编造进简历」。
+             ② **举例子只是举例子。**例句显示在单独的一块里，**不写进输入框**，
+                也不算作用户的回答；不然用户一按「说完了」就把小青的例句当成
+                自己的经历交上去了。
+             ③ **上一题回得去。**已答的题回去还看得见原答案，不清空。 -->
         <div class="qa-opts" data-when="default first device-off" style="grid-template-columns:repeat(3,1fr)">
-          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">这题跳过</button>
-          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">上一题</button>
-          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">让小青举个例子</button>
+          <button class="qa-opt" type="button" data-qa-skip style="min-height:56px;font-size:var(--fz-3)">这题跳过</button>
+          <button class="qa-opt" type="button" data-qa-prev style="min-height:56px;font-size:var(--fz-3)">上一题</button>
+          <button class="qa-opt" type="button" data-qa-eg aria-expanded="false" style="min-height:56px;font-size:var(--fz-3)">让小青举个例子</button>
+        </div>
+
+        <!-- 例句块：默认不在（不是 hidden ——hidden 是四态/阶段机制的地盘），
+             按「让小青举个例子」才出现。标成 E3 AI 判断，并写明这是例子不是你的回答。 -->
+        <div class="notice qa-eg" id="qa-eg" data-when="default first device-off"
+             style="display:none;margin-top:var(--s-3)" role="status" aria-live="polite">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span><b>这是<span style="color:var(--amber-600)">例子</span>，不是你的回答 —— 没写进上面的框，也不会进简历。</b><br>
+                <span id="qa-eg-t"></span>
+                <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span></span>
         </div>
 
         <!-- 10 题域实况清单——话题、顺序、备注与右栏「会聊这 10 个话题」逐条一致 -->
         <div class="pane" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column" data-when="default first device-off">
-          <div class="pane-hd"><span class="t">已答与还没聊的</span><span class="s">已答 2 · 正在答 1 · 共 10 个话题</span></div>
+          <div class="pane-hd"><span class="t">已答与还没聊的</span><span class="s" id="qa-count">已答 2 · 正在答 1 · 共 10 个话题</span></div>
           <div class="qa-said">
-            <div class="said">
+            <div class="said" data-topic="1">
               <span class="said-no">01</span>
               <span class="said-b"><span class="said-q">你想找哪个方向？</span><span class="said-a">运营 / 新媒体</span></span>
               <span class="said-edit"><button class="btn btn--quiet">改</button></span>
             </div>
-            <div class="said">
+            <div class="said" data-topic="2">
               <span class="said-no">02</span>
               <span class="said-b"><span class="said-q">做过多久？在什么单位？</span><span class="said-a">2 年 3 个月，某科技公司，运营专员</span></span>
               <span class="said-edit"><button class="btn btn--quiet">改</button></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="3">
               <span class="said-no">03</span>
               <span class="said-b"><span class="said-q">这段经历里最有成果的一件事</span><span class="said-a" style="color:var(--amber-600)">正在答 · 就是上面这题</span></span>
             </div>
-            <div class="said-group">还没聊到的 7 个话题 · 会挨个来</div>
-            <div class="said said--todo">
+            <div class="said-group" id="qa-group">还没聊到的 7 个话题 · 会挨个来</div>
+            <div class="said said--todo" data-topic="4">
               <span class="said-no">04</span>
               <span class="said-b"><span class="said-q">第 2 段经历（可继续追加）</span><span class="said-a">做过几份工作聊几段 · 没有就跳过</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="5">
               <span class="said-no">05</span>
               <span class="said-b"><span class="said-q">带过人 / 协作过吗</span><span class="said-a">还没聊到 · 可跳过</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="6">
               <span class="said-no">06</span>
               <span class="said-b"><span class="said-q">项目 / 校园经历</span><span class="said-a">还没聊到 · 可跳过</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="7">
               <span class="said-no">07</span>
               <span class="said-b"><span class="said-q">学历与专业</span><span class="said-a">还没聊到 · 可跳过</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="8">
               <span class="said-no">08</span>
               <span class="said-b"><span class="said-q">会用什么工具</span><span class="said-a">还没聊到 · 只列真会的</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="9">
               <span class="said-no">09</span>
               <span class="said-b"><span class="said-q">证书 / 语言</span><span class="said-a">还没聊到 · 可跳过</span></span>
             </div>
-            <div class="said said--todo">
+            <div class="said said--todo" data-topic="10">
               <span class="said-no">10</span>
               <span class="said-b"><span class="said-q">联系方式</span><span class="said-a">还没聊到 · 留了才写进简历</span></span>
             </div>
@@ -585,13 +616,15 @@
 
       <!-- S2 成形进度 -->
       <div class="pane" data-at="s2">
-        <div class="pane-hd"><span class="t">简历长出来了多少</span><span class="s" data-when="default first device-off">话题 3 / 10</span></div>
+        <div class="pane-hd"><span class="t">简历长出来了多少</span><span class="s" id="qa-prog" data-when="default first device-off">话题 3 / 10</span></div>
+        <!-- data-qa-sec = 这一行对应哪几个话题。跳过 / 回退时这几行要跟着变，
+             否则右栏会一直停在「成果数字 正在问」，而人早就答到第 7 题了。 -->
         <div class="kv" data-when="default first device-off">
-          <div class="kv-row"><span class="k">求职意向</span><span class="v" style="color:var(--jade-600)">已写</span></div>
-          <div class="kv-row"><span class="k">工作经历 · 第 1 段</span><span class="v" style="color:var(--jade-600)">已写</span></div>
-          <div class="kv-row"><span class="k">成果数字</span><span class="v" style="color:var(--amber-600)">正在问</span></div>
-          <div class="kv-row"><span class="k">第 2 段经历</span><span class="v v--fog">可追加 · 未聊到</span></div>
-          <div class="kv-row"><span class="k">教育 / 技能 / 联系</span><span class="v v--fog">未聊到</span></div>
+          <div class="kv-row"><span class="k">求职意向</span><span class="v" data-qa-sec="1">已写</span></div>
+          <div class="kv-row"><span class="k">工作经历 · 第 1 段</span><span class="v" data-qa-sec="2">已写</span></div>
+          <div class="kv-row"><span class="k">成果数字</span><span class="v" data-qa-sec="3">正在问</span></div>
+          <div class="kv-row"><span class="k">第 2 段经历</span><span class="v" data-qa-sec="4">可追加 · 未聊到</span></div>
+          <div class="kv-row"><span class="k">教育 / 技能 / 联系</span><span class="v" data-qa-sec="7 8 10">未聊到</span></div>
         </div>
         <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default first device-off">
           不显示百分比：只报哪几块已经写上了。
@@ -642,13 +675,19 @@
       <div class="pane pane--fill" data-at="s3" style="margin-top:auto">
         <div class="pane-hd"><span class="t">接下来</span></div>
         <div class="outs">
-          <button class="out" data-when="default first device-off"><svg class="ic"><use href="#i-pen"/></svg>补上跳过的</button>
+          <!-- ══ 2026-08-11：s3 产物出口整改 ══════════════════════════════════
+               实测三颗死按钮：补上跳过的 / 存进我的简历 / 发到我手机 —— 全部零变化。
+               「补上跳过的」是回访谈里补题，本来就是页内换阶段，缺的只是 data-go；
+               另外两颗是产物出口，处置口径与 09 同一套（见 09 s5 那段长注释）：
+               本稿没有账号后端，不弹「已保存」，改为接到真实去处。
+               data-qa-goto="skip1" = 回到第一个被跳过的话题，不是笼统回 s2 第一题。 -->
+          <button class="out" type="button" data-go="s2" data-qa-goto="skip1" data-when="default first device-off"><svg class="ic"><use href="#i-pen"/></svg>补上跳过的</button>
           <a class="out" href="09-resume-workbench.html?stage=s3" data-when="default first device-off"><svg class="ic"><use href="#i-target"/></svg>做一次诊断</a>
           <a class="out" data-when="default first" href="06-print-workbench.html?stage=s3&amp;from=P10&amp;kind=material&amp;title=简历%20v1%20访谈版&amp;pages=1&amp;copies=1&amp;back=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印工作台核价</a>
           <button class="out" data-when="ai-down" aria-disabled="true"><svg class="ic"><use href="#i-printer"/></svg>成文未完成 · 暂不可打印</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
-          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
+          <a class="out" href="42-my-assets.html?stage=resume"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</a>
+          <a class="out" href="05-phone-relay.html?dir=take&amp;from=P10&amp;kind=material&amp;title=简历%20v1%20访谈版&amp;artifactId=art-resume-iv1"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</a>
           <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-target"/></svg>诊断不可用</button>
         </div>
         <div class="notice" style="margin-top:auto">
@@ -706,6 +745,267 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/notebar.js?v=2"></script>
 <script src="scripts/leaveguard.js?v=1"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P10 访谈状态机（2026-08-11）
+   --------------------------------------------------------------------------
+   接的是 s2 的三颗死键：这题跳过 / 上一题 / 让小青举个例子。
+   实测三颗原来都是裸 <button>，七种事件打一遍整个 body 零变化。
+
+   ── 最要紧的一条：跳过的题标空不补 ────────────────────────────────
+   「跳过」只做一件事：把这一题记成**留空**，然后往下走。
+   右边清单里那一行明写「跳过 · 成品里留空」，
+   **绝不**替用户填一个像样的答案 —— 本页自己承诺过
+   「跳过的话题不会被编造进简历。成品里明确标成空着」，
+   这颗按钮就是那句承诺的执行者，它一旦替人编，整页的信用就没了。
+
+   ── 例句为什么不写进输入框 ──────────────────────────────────────
+   写进去用户一按「说完了」就把小青的例句当成自己的经历交上去了。
+   例句只出现在单独一块里，标 E3、标「这是例子不是你的回答」。
+
+   ── 题目文本从哪来 ──────────────────────────────────────────────
+   10 个话题的短标题本来就在右栏清单（.said-q）和 s1 时间轴（.tl-t）里，
+   两处一字不差。这里补的是**问出口的完整句子**和例句 ——
+   属于「小青要问什么」，不是「用户答了什么」，不涉及替用户编内容。
+
+   ── s3 为什么不跟着变 ───────────────────────────────────────────
+   s3 是**另一个时刻**的快照（10 题答了 7 题、跳过教育与证书、没留联系方式），
+   由作者写定，用来展示成品那一屏长什么样。s2 这台状态机只管 s2 自己那一屏。
+   把两者强行联动会得到一个半真半假的成品页；真机上这两处共用同一份会话数据，
+   接线时按 s2 的模型出 s3 即可。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* q = 问出口的完整句子；cat = 话题归类（显示在「话题 N / 10 · XX」里）；
+     eg = 例句（只展示，不入题）。短标题不写在这里 —— 直接读 DOM 里的 .said-q，
+     省得同一句话在两个地方各写一遍、改一处漏一处。 */
+  var T = [
+    { cat: '求职意向', q: '你想找哪个方向的工作？',            eg: '比如「运营 / 新媒体」「销售 / 商务」—— 说个大方向就行。' },
+    { cat: '工作经历', q: '做过多久？在什么单位？',            eg: '比如「2 年 3 个月，某科技公司，运营专员」。' },
+    { cat: '工作经历', q: '上一份工作里，你做的哪件事最有成果？', eg: '比如「运营公众号，半年从 3 千涨到 1 万 2」。' },
+    { cat: '工作经历', q: '还有第 2 段工作经历吗？',           eg: '比如「之前在一家教育机构做过 1 年课程顾问」；没有就跳过。' },
+    { cat: '协作',     q: '带过人，或者跟别的部门配合过吗？',   eg: '比如「带过 2 个实习生」「和设计、技术三方对接活动页」。' },
+    { cat: '项目经历', q: '做过什么项目，或者校园里的经历？',   eg: '比如「做过校园二手平台，负责运营，注册用户 800 多」。' },
+    { cat: '教育背景', q: '最高学历和专业是什么？',            eg: '比如「本科，某某大学，汉语言文学，2021 年毕业」。' },
+    { cat: '技能',     q: '工作里会用哪些工具或软件？',        eg: '比如「Excel、剪映、秀米、Photoshop」—— 只列真会的。' },
+    { cat: '证书语言', q: '有什么证书，或者外语到什么水平？',   eg: '比如「英语六级」「教师资格证」；没有就跳过。' },
+    { cat: '联系方式', q: '留个联系方式，怎么联系你？',        eg: '比如「手机 138xxxx1234，微信同号」—— 留了才写进简历。' }
+  ]
+
+  var rows = [].slice.call(document.querySelectorAll('.qa-said .said'))
+  if (rows.length !== T.length) return          // 结构对不上就整个不接，别改坏
+
+  /* 每一行原始的「还没聊到」提示语先存起来：从跳过态退回未聊态要还原它。 */
+  rows.forEach(function (r) {
+    var a = r.querySelector('.said-a')
+    r.setAttribute('data-todo-text', a ? a.textContent : '')
+  })
+
+  /* 初始现场照抄 HTML：前 2 题已答（答案就在 DOM 里），第 3 题正在答。
+     不硬编码答案文本 —— 从页面读，页面改了这里跟着改。 */
+  var ans = {}
+  ans[1] = rows[0].querySelector('.said-a').textContent.trim()
+  ans[2] = rows[1].querySelector('.said-a').textContent.trim()
+  var skip = {}
+  var cur = 3
+
+  var $ = function (id) { return document.getElementById(id) }
+  var who = $('qa-who'), qq = $('qa-q'), hint = $('qa-hint'), chip = $('qa-chip')
+  var input = $('qa-in'), egBox = $('qa-eg'), egTx = $('qa-eg-t'), egBtn = scr.querySelector('[data-qa-eg]')
+  var group = $('qa-group')
+
+  function nAns () { var k = 0; for (var i = 1; i <= 10; i++) if (ans[i]) k++; return k }
+  function nSkip () { var k = 0; for (var i = 1; i <= 10; i++) if (skip[i]) k++; return k }
+
+  function render () {
+    var t = T[cur - 1]
+
+    /* ① 问题区 */
+    who.textContent = '顾问 小青 · 话题 ' + cur + ' / 10 · ' + t.cat
+    qq.textContent = t.q
+    /* 通用底线那两句每题都适用，保留；题目相关的提示交给例句块。 */
+    hint.innerHTML = '说清<b>做了什么 + 结果是多少</b>就够，不用文采。' +
+                     '<b>数字你自己报，我不替你估。</b>' +
+                     (skip[cur] ? '<br><b style="color:var(--amber-600)">这题你选了跳过 —— ' +
+                                  '现在补一句就能收回来；不补就在成品里留空。</b>' : '')
+    /* 「聊完这段就问你要不要加第 2 段」只对第 3 题成立，别的题挂着就是错的 */
+    chip.style.display = (cur === 3) ? '' : 'none'
+
+    /* ② 输入框回填这一题已经答过的内容（上一题要回得去，回去还看得见） */
+    if (input) {
+      input.value = ans[cur] || ''
+      input.setAttribute('aria-label', '回答话题 ' + cur)
+    }
+
+    /* ③ 例句块每次换题先收起来：上一题的例子留在下一题下面是错的 */
+    if (egBox) { egBox.style.display = 'none'; egBtn.setAttribute('aria-expanded', 'false') }
+
+    /* ④ 右栏清单：三种状态各写各的，跳过那一条**明写留空** */
+    rows.forEach(function (r, i) {
+      var no = i + 1
+      var a = r.querySelector('.said-a')
+      var edit = r.querySelector('.said-edit')
+      r.classList.remove('said--todo')
+      r.removeAttribute('aria-current')
+      a.style.color = ''
+      if (skip[no]) {
+        r.classList.add('said--todo')
+        /* 回到一道已跳过的题时，两件事都得说：它现在是当前题，而且**还是留空的**。
+           只写「跳过」会让用户以为自己看的不是这一题。 */
+        if (no === cur) {
+          r.setAttribute('aria-current', 'step')
+          a.textContent = '正在补答 · 不补就留空'
+        } else {
+          a.textContent = '跳过 · 成品里留空'
+        }
+        a.style.color = 'var(--amber-600)'
+      } else if (ans[no]) {
+        a.textContent = ans[no]
+      } else if (no === cur) {
+        r.classList.add('said--todo')
+        r.setAttribute('aria-current', 'step')
+        a.textContent = '正在答 · 就是上面这题'
+        a.style.color = 'var(--amber-600)'
+      } else {
+        r.classList.add('said--todo')
+        a.textContent = r.getAttribute('data-todo-text')
+      }
+      /* 「改」只对答过的题有意义 */
+      if (edit) edit.style.display = ans[no] ? '' : 'none'
+    })
+
+    /* ⑤ 分组横条挪到第一条「还没碰过」的前面 —— 位置写死在第 3 条后面的话，
+          答到第 7 题时它会横在一堆已答条目中间。 */
+    if (group) {
+      var first = null
+      for (var i = 0; i < rows.length; i++) {
+        var no = i + 1
+        if (!ans[no] && !skip[no] && no !== cur) { first = rows[i]; break }
+      }
+      if (first) {
+        group.style.display = ''
+        var left = 0
+        for (var j = 0; j < rows.length; j++) {
+          var n2 = j + 1
+          if (!ans[n2] && !skip[n2] && n2 !== cur) left++
+        }
+        group.textContent = '还没聊到的 ' + left + ' 个话题 · 会挨个来'
+        first.parentNode.insertBefore(group, first)
+      } else {
+        group.style.display = 'none'
+      }
+    }
+
+    /* ⑥ 两处计数 */
+    var cnt = $('qa-count')
+    if (cnt) {
+      cnt.textContent = '已答 ' + nAns() + ' · 正在答 1' +
+        (nSkip() ? ' · 跳过 ' + nSkip() : '') + ' · 共 10 个话题'
+    }
+    var prog = $('qa-prog')
+    if (prog) prog.textContent = '话题 ' + cur + ' / 10'
+
+    /* ⑦ 右栏「简历长出来了多少」：每一行按它对应的话题算 */
+    ;[].forEach.call(document.querySelectorAll('[data-qa-sec]'), function (v) {
+      var list = v.getAttribute('data-qa-sec').split(/\s+/).map(Number)
+      var done = list.filter(function (n) { return ans[n] }).length
+      var sk = list.filter(function (n) { return skip[n] }).length
+      v.classList.remove('v--fog')
+      v.style.color = ''
+      if (list.indexOf(cur) > -1 && !ans[cur]) { v.textContent = '正在问'; v.style.color = 'var(--amber-600)' }
+      else if (done === list.length) { v.textContent = '已写'; v.style.color = 'var(--jade-600)' }
+      else if (done) { v.textContent = '写了 ' + done + ' / ' + list.length; v.style.color = 'var(--jade-600)' }
+      else if (sk) { v.textContent = '跳过 · 留空'; v.style.color = 'var(--amber-600)' }
+      else { v.textContent = '未聊到'; v.classList.add('v--fog') }
+    })
+
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+
+  /* 下一个还没答、也没跳过的题；全都处理完就停在最后一题 */
+  function nextOpen (from) {
+    for (var i = from + 1; i <= 10; i++) if (!ans[i] && !skip[i]) return i
+    return Math.min(from + 1, 10)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-qa-skip],[data-qa-prev],[data-qa-eg]')
+    if (!b) return
+    var act = b.hasAttribute('data-qa-skip') ? 'skip'
+            : b.hasAttribute('data-qa-prev') ? 'prev' : 'eg'
+
+    if (act === 'skip') {
+      /* 跳过 = 记成留空，并且**把这一题已经填的内容丢掉**（用户明说不要了）。
+         不编、不留半截。 */
+      skip[cur] = 1
+      delete ans[cur]
+      cur = nextOpen(cur)
+      render()
+      return
+    }
+    if (act === 'prev') {
+      if (cur > 1) cur--
+      render()
+      return
+    }
+    if (act === 'eg') {
+      /* 例句：只展开/收起这一块，绝不碰输入框 */
+      var open = egBox.style.display !== 'none'
+      egBox.style.display = open ? 'none' : ''
+      egBtn.setAttribute('aria-expanded', open ? 'false' : 'true')
+      if (!open) egTx.textContent = T[cur - 1].eg
+    }
+  })
+
+  /* 「说完了」：把输入框里的话记成这一题的回答，然后进下一题。
+     一个字都没填就不算答过 —— 不能把空答案记成「已答」。 */
+  var done = $('qa-done')
+  if (done) done.addEventListener('click', function () {
+    var v = (input && input.value || '').trim()
+    if (!v) {
+      hint.innerHTML = '<b style="color:var(--amber-600)">还没说话呢。</b>' +
+                       '说一句就行，实在没有这一项就按「这题跳过」——' +
+                       '<b>跳过的部分我不会替你编</b>。'
+      if (input) input.focus()
+      return
+    }
+    ans[cur] = v
+    delete skip[cur]
+    cur = nextOpen(cur)
+    render()
+  })
+
+  /* s3 的「补上跳过的」：回 s2，并且直接停在**第一个被跳过的话题**上。
+     笼统回到第 1 题，用户还得自己一题一题翻过去找。 */
+  scr.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-qa-goto="skip1"]')
+    if (!b) return
+    for (var i = 1; i <= 10; i++) { if (skip[i]) { cur = i; break } }
+    render()
+  })
+
+  render()
+})()
+</script>
+<script>
+/* 离场确认的 keep 支（lg:keep）—— 与 09 同一套口径，理由见页首 .screen 注释。
+   leaveguard.js 派的 lg:keep 全站零监听，不拦就是「直接跳走且什么都没存」。 */
+;(function () {
+  'use strict'
+  var TAKE = '05-phone-relay.html?dir=take&from=P10&kind=material' +
+             '&title=' + encodeURIComponent('简历 v1 访谈版') + '&artifactId=art-resume-iv1'
+  document.addEventListener('lg:keep', function (e) {
+    var scr = document.querySelector('.screen')
+    if (!scr || scr.getAttribute('data-stage') !== 's3') return   // keep 只挂 s3
+    e.preventDefault()
+    if (window.v3Guard && typeof window.v3Guard.off === 'function') window.v3Guard.off()
+    location.href = TAKE
+  }, true)
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
