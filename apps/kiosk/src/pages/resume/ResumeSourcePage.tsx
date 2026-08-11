@@ -108,7 +108,12 @@ const INTENT_COPY: Record<ResumeIntent, {
 /** 优化路径闭环展示(上传页直接告诉用户整条链路)。 */
 const OPTIMIZE_FLOW_STEPS = ['上传', '诊断', '优化', '新旧对比', '编辑', '导出 PDF', '打印']
 
-const SUPPORTED_FORMATS = ['PDF', 'DOC', 'DOCX', 'JPG', 'PNG', 'WEBP']
+// 2026-08-11（CLAUDE.md §9）：移除 DOC。
+// 后端 resume-extraction.service.ts:116 对旧版 .doc 固定返回 UNSUPPORTED_FILE_TYPE
+// （「暂不支持旧版 .doc 格式，请另存为 PDF 或 DOCX 后重试」），.docx 才走 docx 分支。
+// 前端此前既在格式清单里写 DOC、又让 accept 放行 .doc/application/msword，
+// 用户能选中却在上传后才被拒——白跑一趟。现让文件选择器直接不可选。
+const SUPPORTED_FORMATS = ['PDF', 'DOCX', 'JPG', 'PNG', 'WEBP']
 
 const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '上传与方向' },
@@ -117,7 +122,7 @@ const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '优化打印' },
 ]
 
-const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
+const ACCEPT = '.pdf,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 10 * 1024 * 1024
 
 interface UploadedResumeFile {

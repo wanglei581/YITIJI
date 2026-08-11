@@ -491,7 +491,13 @@ export function PrintMaterialCheckPage() {
         onBack={() => navigate(uploadPath)}
       />
 
-      <AiDriverBanner feature="AI文件预检" description="自动检查格式、边距与打印风险" />
+      {/*
+        2026-08-11（CLAUDE.md §9）：原文案为「AI文件预检 · 自动检查格式、边距与打印风险」。
+        后端 materials.service.ts:267 返回的是 mode: 'basic_inspection'——
+        只做格式、大小、页数与图片质量检查，**既没有 AI，也没有边距分析**。
+        「AI」字样与「边距」承诺均已移除。恢复条件：接入真实模型或边距分析后再改回。
+      */}
+      <AiDriverBanner feature="文件预检" description="检查格式、大小、页数与图片质量" />
 
       <MaterialCheckPresentation
         stage={stage}
