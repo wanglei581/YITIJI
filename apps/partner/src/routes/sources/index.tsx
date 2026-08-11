@@ -127,10 +127,14 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
       setCopied('secret')
       setTimeout(() => setCopied((prev) => (prev === 'secret' ? null : prev)), 2000)
     }
+    // 2026-08-11（CLAUDE.md §9）：原实现在 Clipboard API 不可用时直接 markCopied()，
+    // 复制失败也吞掉——**没有任何复制动作却标成「已复制 ✓」**。
+    // webhookSecret 是一次性明文（创建后 GET 不再回显），用户据此以为已存好，
+    // 关掉弹窗密钥就永久丢失。现在失败时明确提示手动复制。
     if (promise) {
-      promise.then(markCopied).catch(() => { /* ignore clipboard errors */ })
+      promise.then(markCopied).catch(() => setCopied('secret-failed'))
     } else {
-      markCopied()
+      setCopied('secret-failed')
     }
   }
 
@@ -283,7 +287,7 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
                 <div className="rounded-lg border border-warning/30 bg-warning-bg p-3">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-warning-fg">签名密钥（仅显示一次）</div>
-                    <button type="button" onClick={() => copySecret(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-warning-fg"><CopyIcon className="h-3 w-3" />{copied === 'secret' ? '已复制 ✓' : '复制'}</button>
+                    <button type="button" onClick={() => copySecret(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-warning-fg"><CopyIcon className="h-3 w-3" />{copied === 'secret' ? '已复制 ✓' : copied === 'secret-failed' ? '复制失败，请手动选中' : '复制'}</button>
                   </div>
                   <div className="mt-1 break-all font-mono text-xs text-warning-fg">{created.webhookSecretOnce}</div>
                 </div>

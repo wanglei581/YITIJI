@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>求职材料库（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/job-materials</code>「求职材料库」</b>。
+    它现在管 5 类内容模板：简历模板 / 求职信 / 感谢信 / 作品集封面 / <b>材料清单</b>。
+    <br><br>
+    产品所有者 2026-08-11 决定：迎新板块<b>只保留「证件与材料复印」</b>这一个功能
+    （理由：其余五个候选功能全部依赖高校先录内容，没有客户就是空壳；而复印零依赖、全年可用、换到人社大厅同样成立）。
+    该功能的后台配置面<b>应并进本页</b>——本页管的就是「用户能打印什么材料」，
+    而<b>材料清单与复印预设本就是一对</b>：清单告诉用户要带什么，复印帮他现场补齐。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>求职材料库</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页管<b>终端上用户能生成或打印的材料</b>。
+        内容模板 → 前台<a href="#">「AI简历服务」</a>与<a href="#">「我的文档」</a>；
+        复印预设 → 前台<a href="#">「打印扫描」</a>的证件复印入口。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm btn--primary">+ 新增</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="mat">
+    <button class="is-on" data-tab="tpl">内容模板</button>
+    <button data-tab="copy">证件复印预设<span class="newdot"></span></button>
+    <button data-tab="pack">材料包<span class="newdot"></span></button>
+  </div>
+
+  <!-- ═══ 内容模板（现有） ═══ -->
+  <div data-panel-of="mat" data-panel="tpl">
+    <div class="card">
+      <div class="card__head"><h3>内容模板</h3><span class="tag tag--ghost">现有能力</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>模板名称</th><th>类型</th><th>使用次数</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>应届生标准简历</td><td>简历模板</td><td>1,284</td><td><span class="tag tag--ok">已启用</span></td><td><button class="btn btn--sm">编辑</button></td></tr>
+            <tr><td>求职信 · 通用</td><td>求职信</td><td>326</td><td><span class="tag tag--ok">已启用</span></td><td><button class="btn btn--sm">编辑</button></td></tr>
+            <tr><td>新生报到材料清单</td><td>材料清单</td><td>—</td><td><span class="tag tag--warn">未启用</span></td><td><button class="btn btn--sm">编辑</button></td></tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          「材料清单」类型已存在但未启用。<b>它是迎新场景真正能落地的那一半</b>——
+          清单可以由学校提供，也可以先放通用版（身份证 / 户口本 / 录取通知书 / 照片…），
+          不依赖任何校方接口。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 证件复印预设（新增 · 对应产品决策） ═══ -->
+  <div data-panel-of="mat" data-panel="copy" style="display:none">
+    <div class="proto proto--warn">
+      <span class="proto__tag">新增 Tab · 对应 2026-08-11 产品决策</span>
+      <b>这是「证件与材料复印」的配置面。</b>
+      核心价值在<b>预设排版</b>——普通人自己排版身份证正反面，要么比例不对要么位置歪，
+      而这是所有复印场景里最高频的一个。
+      <br><br>
+      <b>⚠️ 能力边界（读一手代码确认）</b>：当前打印正式契约仅 <b>A4 / 黑白 / 单面 / 每张一页</b>
+      （<code>create-print-job.dto.ts:23-52</code>）。
+      硬件支持彩色与双面，但驱动控制仍待真机验证（<code>CLAUDE.md</code> §3）。
+      <b>因此预设里不得先行提供彩色 / 双面选项</b>，否则就是承诺做不到的能力。
+    </div>
+
+    <div class="card isnew" data-newtag="新增能力" style="margin-top:16px">
+      <div class="card__head"><h3>复印预设</h3>
+        <div class="right"><button class="btn btn--sm btn--primary">+ 新增预设</button></div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>预设名称</th><th>排版规则</th><th>纸张 / 色彩</th><th>计费</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div class="cellmain">身份证（正反面合一张）</div><div class="cellsub">最高频</div></td>
+              <td class="small">2 页合并 → 1 张 A4，上下居中，原尺寸 1:1</td>
+              <td>A4 / 黑白 / 单面</td>
+              <td>按 1 页计</td>
+              <td><span class="tag tag--ok">已启用</span></td>
+              <td><button class="btn btn--sm">编辑</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">户口本（指定页）</div></td>
+              <td class="small">逐页 1:1，不缩放</td>
+              <td>A4 / 黑白 / 单面</td>
+              <td>按实际页数</td>
+              <td><span class="tag tag--ok">已启用</span></td>
+              <td><button class="btn btn--sm">编辑</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">毕业证 / 学位证</div></td>
+              <td class="small">单页 1:1</td>
+              <td>A4 / 黑白 / 单面</td>
+              <td>按 1 页计</td>
+              <td><span class="tag tag--ok">已启用</span></td>
+              <td><button class="btn btn--sm">编辑</button></td>
+            </tr>
+            <tr class="muted">
+              <td><div class="cellmain">证件照排版打印</div><div class="cellsub">前台已挂「即将上线」</div></td>
+              <td class="small">1 寸 / 2 寸多宫格拼版</td>
+              <td>需彩色 —— <b>待真机验证</b></td>
+              <td>—</td>
+              <td><span class="tag tag--warn">未启用</span></td>
+              <td><button class="btn btn--sm" disabled>待彩色验证</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:12px">
+          <b>证件照排版为什么还不能开</b>：证件照必须彩色，而彩色打印的驱动控制尚未真机验证。
+          前台 <code>SmartCampusWelcomePage</code> 已把该入口标为 disabled +「即将上线」——
+          <b>这是诚实的做法，不要因为后台加了预设就把它点亮</b>。
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>预设编辑（示例：身份证）</h3></div>
+        <div class="card__body stack">
+          <div class="field"><label>预设名称</label><input class="input" value="身份证（正反面合一张）"></div>
+          <div class="field"><label>需要扫描的面数</label><input class="input" value="2"><div class="hint">终端会引导用户依次放置正面、反面</div></div>
+          <div class="field"><label>排版规则</label>
+            <select class="select"><option>2 合 1 · 上下居中 · 原尺寸</option><option>2 合 1 · 左右并排</option><option>逐页 1:1</option></select>
+            <div class="hint"><b>原尺寸 1:1 是关键</b>——证件复印件缩放后可能不被办事窗口接受</div>
+          </div>
+          <div class="field"><label>纸张 / 色彩 / 单双面</label>
+            <div class="locked small">A4 · 黑白 · 单面（当前正式契约唯一取值，不可选）</div>
+          </div>
+          <div class="field"><label>计费页数</label><input class="input" value="1"><div class="hint">合并后按实际出纸张数计，不按扫描面数</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L1 规则为主</span></div>
+        <div class="card__body stack">
+          <div class="advice isnew" data-newtag="AI 能力">
+            <div class="advice__head"><b>扫描质量预检</b><span class="tag">规则校验 · 不调模型</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><span>✅ 四角完整、无缺边</span></div>
+              <div class="advice__item"><span>⚠️ <b>检测到反光</b>——建议避开顶灯重扫 <span class="ev ev--1">E1</span></span></div>
+              <div class="advice__item"><span>✅ 分辨率满足 300dpi</span></div>
+            </div>
+            <div class="small muted" style="margin-top:8px">
+              自动裁边、去黑边、摆正都是<b>确定性图像处理</b>，不标「AI」。
+            </div>
+          </div>
+          <div class="advice">
+            <div class="advice__head"><b>证件类型识别</b><span class="tag tag--ai">L3 · 可选</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><b>动作</b><span>识别到「身份证正面」，建议套用「身份证（正反面合一张）」预设</span></div>
+              <div class="advice__item"><b>理由</b><span>版式与该证件模板匹配 <span class="ev ev--2">E2</span></span></div>
+              <div class="advice__item"><b>代价</b><span>识别错误时用户需手动改选，一次点击</span></div>
+              <div class="advice__item"><b>备选</b><span>让用户自己从预设列表里选</span></div>
+            </div>
+            <div class="small muted" style="margin-top:8px">
+              <b>识别结果只做「建议选中」，绝不自动执行打印</b>；
+              且<b>证件图像不得留存于识别链路之外</b>（<code>compliance-boundary.md</code> 文件安全要求）。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 材料包（新增 · 模型已有但是空壳） ═══ -->
+  <div data-panel-of="mat" data-panel="pack" style="display:none">
+    <div class="proto proto--err">
+      <span class="proto__tag">新增 Tab · 模型是空壳，需先补后端</span>
+      <code>PrintMaterialPack</code> 模型<b>已存在但只有占位字段</b>
+      （<code>name</code> / <code>description</code> / <code>items</code> JSON / <code>priceCents</code> / <code>isActive</code> / <code>sortOrder</code>），
+      <b>没有会员归属、文件条目、批次任务、订单或子任务关系</b>；
+      <code>bundle_render</code> 目前只返回 <code>skeleton / queued:false</code>，<b>没有批量渲染执行器</b>。
+      <br><br>
+      更根本的限制：<b>后端打印契约是单文件</b>——一个请求只有一个 <code>fileUrl</code>，
+      前端也只读 <code>files[0]</code>，每次确认只创建一个 <code>PrintTask</code> + 一个 <code>Order</code>。
+      <b>所以「材料包」当前只能靠逐份打印实现，不是接上界面就能用。</b>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>材料包（示例：新生报到材料包）</h3>
+        <span class="tag tag--warn">需后端先落地</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>顺序</th><th>材料</th><th>来源</th><th>份数</th><th>预设</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>身份证复印件</td><td>现场扫描</td><td>2</td><td>身份证（正反面合一张）</td></tr>
+            <tr><td>2</td><td>户口本首页 + 本人页</td><td>现场扫描</td><td>1</td><td>户口本（指定页）</td></tr>
+            <tr><td>3</td><td>录取通知书</td><td>现场扫描</td><td>1</td><td>逐页 1:1</td></tr>
+            <tr><td>4</td><td>报到材料清单</td><td>模板生成</td><td>1</td><td>—</td></tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          一包一单、总价合并、多任务进度页——设计已在
+          <code>docs/superpowers/specs/2026-07-12-material-pack-design.md</code>，
+          需新增 <code>MaterialPackTask</code> + <code>MaterialPackItem</code>，以批次包住多个现有单文件 <code>PrintTask</code>。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>尚无复印预设</h3>
+      <p>终端「证件复印」入口<b>不显示</b>，用户仍可用通用文件打印。不显示空的预设列表。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">新增第一个预设</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——复印<b>全流程照常</b>：扫描、裁边、排版、预览、出纸都是确定性处理。
+        只有「证件类型自动建议」失效，用户自己从列表选预设即可。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>材料库加载失败</h3>
+      <p>无法读取（<code>GET /admin/job-materials</code> 返回 500）。<b>终端已下发的预设不受影响</b>。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/job-materials</code>，加 2 个 Tab。<b>不新建页</b>——
+        本页管的就是「用户能打印什么材料」，复印预设是同一件事。</li>
+      <li><b>证件复印预设可先落地</b>：<code>PrintMaterialPack</code> 够不着，但「单预设」不需要它——
+        一个预设 = 一组扫描引导 + 一个排版规则 + 一次单文件打印，<b>完全在现有单文件契约内</b>。</li>
+      <li><b>不得提供彩色 / 双面选项</b>，直到真机验证通过（<code>CLAUDE.md</code> §3 明确区分「硬件能力」与「已验证的驱动控制」）。
+        证件照排版继续保持前台 disabled +「即将上线」。</li>
+      <li><b>材料包要等后端</b>：需 <code>MaterialPackTask</code> + <code>MaterialPackItem</code> 与多文件契约；
+        在那之前 Tab 显示「需后端先落地」，<b>不放可点的假按钮</b>。</li>
+      <li><b>证件图像按敏感文件处理</b>：签名 URL + TTL + 自动清理 + 访问审计（<code>compliance-boundary.md</code>），
+        识别链路之外不留存。</li>
+      <li><b>「材料清单」现有类型建议先启用</b>：它不依赖任何校方接口，通用版即可上线，
+        且与复印预设天然配套——这是迎新场景零依赖能做的另一半。</li>
+    </ul></div>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'job-materials'})</script>
+</body>
+</html>

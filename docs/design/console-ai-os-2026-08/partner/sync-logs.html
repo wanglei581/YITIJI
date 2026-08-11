@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>同步日志（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/sync-logs</code>「同步日志」</b>（206 行，日志列表与错误详情已接真）。
+    加的是 <b>AI 失败原因归因</b>：把 401 / 超时 / 字段不符翻成一句人话 + 建议动作。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 重试做不了</span>
+    我原本还想加<b>失败批次一键重试</b>。Codex 指出<b>不能基于摘要日志重放</b>：
+    <code>SyncLog</code> 只有汇总信息（新增/更新/失败条数），<b>未关联 ImportBatch 和逐行失败记录</b>
+    （<code>schema.prisma:1345</code>）；页面此前也<b>正是因为缺后端才移除了重试动作</b>
+    （<code>routes/sync-logs/index.tsx:142</code>）。
+    <b>要做重试，必须先让 SyncLog 关联到具体批次与失败行——那是后端改动。</b>
+    本页原型不放假的重试按钮。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>同步日志</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页只看<b>本机构数据同步的执行结果</b>。<b>日志本身不在一体机展示</b>；
+        同步成功的内容仍需经平台审核发布，才会出现在终端。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm">导出错误明细</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="advice isnew" data-newtag="新增 · AI 失败归因" data-when="default">
+    <div class="advice__head"><span class="tag tag--ai">AI 归因</span>
+      <span class="ev ev--2">E2</span>
+      <b>「校招平台 API」连续 3 次失败，都是同一个原因</b></div>
+    <div class="advice__action">去数据源页轮换凭证——三次返回的都是 401 未授权。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        08-07 / 08-08 / 08-09 三次定时同步均返回 <code class="mono">HTTP 401</code>
+        （<span class="ev ev--2">E2</span> 上游响应）。最近一次成功是 08-06——
+        典型的<b>访问令牌过期</b>，不是网络问题。</span></div>
+      <div class="advice__item"><b>代价</b><span>该来源已 5 天没有新岗位进来；对方平台新增的岗位在终端看不到。</span></div>
+      <div class="advice__item"><b>备选</b><span>先用 Excel 手动导入这几天的新岗位，再排查 API。</span></div>
+    </div>
+    <div class="advice__foot">
+      <a class="btn btn--sm btn--primary" href="sources.html">去轮换凭证</a>
+      <a class="btn btn--sm" href="sources.html">改用 Excel 导入</a>
+      <span class="small muted">AI 只做归因，不自动重试</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head"><h3>同步记录</h3>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部数据源</option><option>校招平台 API</option><option>合作企业 Webhook</option><option>秋招岗位 Excel</option></select>
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部结果</option><option>成功</option><option>失败</option><option>部分失败</option></select>
+      </div></div>
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th>时间</th><th style="width:20%">数据源</th><th>类型</th><th class="num">新增</th><th class="num">更新</th><th class="num">失败</th><th>结果</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="mono small">08-09 03:00</td><td class="cellmain">校招平台 API</td><td>岗位</td>
+            <td class="num">0</td><td class="num">0</td><td class="num">—</td>
+            <td><span class="tag tag--err">失败 · 401</span></td>
+            <td><button class="btn btn--sm btn--ghost">详情</button></td></tr>
+          <tr><td class="mono small">08-08 03:00</td><td class="cellmain">校招平台 API</td><td>岗位</td>
+            <td class="num">0</td><td class="num">0</td><td class="num">—</td>
+            <td><span class="tag tag--err">失败 · 401</span></td>
+            <td><button class="btn btn--sm btn--ghost">详情</button></td></tr>
+          <tr><td class="mono small">08-11 11:42</td><td class="cellmain">合作企业 Webhook</td><td>岗位</td>
+            <td class="num">4</td><td class="num">1</td><td class="num">0</td>
+            <td><span class="tag tag--ok">成功</span></td>
+            <td><button class="btn btn--sm btn--ghost">详情</button></td></tr>
+          <tr><td class="mono small">08-03 14:05</td><td class="cellmain">秋招岗位 Excel</td><td>岗位</td>
+            <td class="num">12</td><td class="num">0</td><td class="num">3</td>
+            <td><span class="tag tag--warn">部分失败</span></td>
+            <td><button class="btn btn--sm btn--ghost">详情</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      「新增 / 更新」指进入系统的记录数，<b>它们仍是待审核状态</b>——不等于已在终端展示。
+    </div>
+  </div>
+
+  <div class="card" data-when="default" style="margin-top:16px">
+    <div class="card__head"><h3>失败详情 · 秋招岗位 Excel（08-03）</h3><span class="tag tag--warn">3 行失败</span>
+      <div class="right"><button class="btn btn--sm">导出错误明细 CSV</button></div></div>
+    <div class="card__body">
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr><th>行号</th><th style="width:24%">岗位名称</th><th>错误</th><th>怎么改</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">7</td><td class="small">运营助理</td>
+              <td><span class="tag tag--err">缺必填字段 sourceUrl</span></td>
+              <td class="small muted">补上来源平台链接（岗位必须有可访问的外部入口）</td></tr>
+            <tr><td class="mono">14</td><td class="small">销售代表</td>
+              <td><span class="tag tag--err">externalId 重复</span></td>
+              <td class="small muted">同一批次里有两行用了相同外部 ID，去重后重传</td></tr>
+            <tr><td class="mono">19</td><td class="small">（空）</td>
+              <td><span class="tag tag--err">title 为空</span></td>
+              <td class="small muted">删除该空行后重传</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="proto proto--warn" style="margin-top:14px">
+        <span class="proto__tag">为什么这里没有「重试这 3 行」按钮</span>
+        <code>SyncLog</code> 只存汇总数，<b>没有关联到具体的 ImportBatch 与失败行</b>——
+        点重试系统不知道要重放什么。<b>正确做法是先补这层关联</b>，
+        在那之前只提供「导出错误明细 → 改好 → 重新导入」的可靠路径。
+      </div>
+    </div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◈</div><h3>还没有同步记录</h3>
+      <p>配置数据源并触发同步后，执行结果会记录在这里。Excel 导入也会生成同步记录。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <a class="btn btn--primary" href="sources.html">去配置数据源</a></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 失败归因暂时不可用</div>
+      <div class="degrade__body">
+        <b>日志列表与错误详情照常</b>——它们来自数据库，不依赖 AI。
+        暂时没有的只是「这几次失败是同一个原因」的聚合与建议动作，
+        错误码与原始错误信息<b>仍然完整可见</b>。
+      </div>
+      <div class="degrade__alts"><button class="btn btn--sm btn--primary">看原始错误信息</button></div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>同步日志加载失败</h3>
+      <p>无法读取（<code>GET /partner/sync-logs</code> 返回 500）。<b>定时同步在服务端照常执行</b>，只是本页看不到记录。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/sync-logs</code>。206 行体积可控。</li>
+      <li><b>本轮只做归因与错误明细导出</b>；<b>不做重试</b>——先补 <code>SyncLog</code> ↔ <code>ImportBatch</code> ↔ 失败行的关联（Codex 复核）。</li>
+      <li>不放假按钮：页面此前正是因为缺后端才移除了重试，不能走回头路。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'sync-logs'})</script>
+</body>
+</html>

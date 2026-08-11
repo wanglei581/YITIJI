@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智慧校园（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建入口</span>
+    <b>改的是现有页 <code>/smart-campus</code>「智慧校园」</b>（338 行，学校终端开关已接真）。
+    <b>Codex 复核关键提醒：迎新内容的 Tab 已经存在</b>——
+    <code>OrientationPanel</code> 已预留内容模型、审核与下发语义（<code>routes/smart-campus/index.tsx:260</code>），
+    <b>不能再建一个入口</b>，要在它里面做完。
+    另：<b>本页 338 行、多 Tab 结构，CMS 接入前应先把各 Tab 抽成独立组件</b>（<code>:338</code>）。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>智慧校园</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页管本校终端的智慧校园功能与迎新内容。内容经平台审核后显示在一体机的
+        <a href="#">「智慧校园」页</a>（前台 P19）。
+        <b>该功能默认关闭</b>，需平台为你的终端开启后学生才能看到。
+      </p>
+    </div>
+    <div class="right"><span class="tag tag--warn">本机构 2 台终端已开启</span></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="sc">
+    <button class="is-on" data-tab="switch">终端开关</button>
+    <button data-tab="orient">迎新内容<span class="newdot"></span></button>
+    <button data-tab="usage">使用统计<span class="newdot"></span></button>
+  </div>
+
+  <!-- 终端开关（现有） -->
+  <div data-panel-of="sc" data-panel="switch">
+    <div class="card"><div class="card__head"><h3>本校终端</h3><span class="tag tag--ghost">现有能力</span></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th style="width:30%">终端</th><th>位置</th><th>在线</th><th>智慧校园</th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">KSK-003</td><td class="small">就业指导中心一楼</td>
+              <td><span class="tag tag--err">离线 4h12m</span></td>
+              <td><button class="switch is-on"></button></td></tr>
+            <tr><td class="cellmain">KSK-011</td><td class="small">学生活动中心</td>
+              <td><span class="tag tag--ok">在线</span></td>
+              <td><button class="switch is-on"></button></td></tr>
+            <tr><td class="cellmain">KSK-018</td><td class="small">图书馆大厅</td>
+              <td><span class="tag tag--ok">在线</span></td>
+              <td><button class="switch"></button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        开关只控制该终端是否显示「智慧校园」磁贴。<b>不显示设备运维信息</b>——那由平台负责。
+      </div></div>
+  </div>
+
+  <!-- 迎新内容 CMS -->
+  <div data-panel-of="sc" data-panel="orient" style="display:none">
+    <div class="proto proto--warn">
+      <span class="proto__tag">在现有 OrientationPanel 里做完</span>
+      现状：这个 Tab 存在，但内容明确标注「未开放」（<code>:260-270</code>）。
+      改法是<b>把它填实</b>，不是新建页——报到流程、办事窗口、官方链接、校历四类内容全部录在这里。
+      <b>内容同样走 pending → approved 审核流</b>，不绕过平台审核。
+    </div>
+
+    <div class="grid grid--2">
+      <div class="card"><div class="card__head"><h3>报到流程</h3>
+        <div class="right"><button class="btn btn--sm">添加步骤</button></div></div>
+        <div class="card__body">
+          <div class="tl"><div class="tl__time">第 1 步</div><div class="tl__rail"><div class="tl__dot tl__dot--ok"></div></div>
+            <div><b>线上预报到</b><div class="tl__meta">迎新系统填写信息 · 8 月 20 日起开放</div></div></div>
+          <div class="tl"><div class="tl__time">第 2 步</div><div class="tl__rail"><div class="tl__dot"></div></div>
+            <div><b>现场资格审查</b><div class="tl__meta">体育馆 A 区 · 携带录取通知书、身份证、档案</div></div></div>
+          <div class="tl"><div class="tl__time">第 3 步</div><div class="tl__rail"><div class="tl__dot"></div></div>
+            <div><b>缴费与领取物资</b><div class="tl__meta">体育馆 B 区 · 支持扫码支付</div></div></div>
+          <div class="small muted" style="margin-top:12px">
+            学生在终端上按步骤查看，<b>可打印成一张办事清单带在身上</b>——这是终端的核心价值。
+          </div>
+        </div></div>
+
+      <div class="stack">
+        <div class="card"><div class="card__head"><h3>办事窗口</h3>
+          <div class="right"><button class="btn btn--sm">添加</button></div></div>
+          <div class="card__body card__body--flush">
+            <table class="table">
+              <thead><tr><th>事项</th><th>地点</th><th>时间</th><th>材料</th></tr></thead>
+              <tbody>
+                <tr><td class="small cellmain">档案接收</td><td class="small">行政楼 205</td>
+                  <td class="small">工作日 9-17</td><td><span class="tag tag--ok">3 项</span></td></tr>
+                <tr><td class="small cellmain">助学贷款</td><td class="small">行政楼 208</td>
+                  <td class="small">迎新期全天</td><td><span class="tag tag--warn">未填</span></td></tr>
+                <tr><td class="small cellmain">校园卡办理</td><td class="small">学生活动中心</td>
+                  <td class="small">8:30-20:00</td><td><span class="tag tag--ok">2 项</span></td></tr>
+              </tbody>
+            </table>
+          </div></div>
+        <div class="card"><div class="card__head"><h3>官方链接</h3><span class="tag tag--warn">需白名单</span></div>
+          <div class="card__body">
+            <div class="field" style="margin-bottom:10px">
+              <label>迎新系统</label><input class="input mono" value="https://xinsheng.example.edu.cn"></div>
+            <div class="field" style="margin-bottom:10px">
+              <label>校园地图</label><input class="input mono" value="https://map.example.edu.cn"></div>
+            <div class="hint">
+              <b>只允许本校官方域名</b>。终端上打开外部链接走离站确认页，与岗位来源平台同一套机制。
+            </div>
+          </div></div>
+      </div>
+    </div>
+
+    <div class="card isnew" data-newtag="新增 · AI 内容质检" style="margin-top:16px">
+      <div class="card__head"><h3>内容质检</h3><span class="ev ev--1">E1 规则</span></div>
+      <div class="card__body">
+        <div class="table__wrap">
+          <table class="table">
+            <thead><tr><th style="width:32%">问题</th><th>判定</th><th class="num">影响</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="cellmain">办事窗口缺所需材料<div class="cellsub">学生到了现场才发现材料没带齐</div></td>
+                <td><span class="ev ev--1">E1</span> 规则</td><td class="num">1</td>
+                <td><button class="btn btn--sm">去补</button></td></tr>
+              <tr><td class="cellmain">官方链接不可达<div class="cellsub">校园地图返回 404</div></td>
+                <td><span class="ev ev--1">E1</span> 规则</td><td class="num">1</td>
+                <td><button class="btn btn--sm">检查</button></td></tr>
+              <tr><td class="cellmain">报到流程缺时间说明<div class="cellsub">第 2 步没写具体日期</div></td>
+                <td><span class="ev ev--1">E1</span> 规则</td><td class="num">1</td>
+                <td><button class="btn btn--sm">去补</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="proto" style="margin-top:14px">
+          <span class="proto__tag">为什么这里只有规则档</span>
+          智慧校园功能<b>整体处于未接入锁定态</b>，用户量与内容量都还没起来。
+          <b>此时上生成式 AI 是过度设计</b>——先用规则把「缺字段、链接不通」这类硬问题挡住，
+          等功能真正开放、有真实使用数据后再评估要不要上模型。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用统计 -->
+  <div data-panel-of="sc" data-panel="usage" style="display:none">
+    <div class="proto">
+      <span class="proto__tag">Codex 补充的承载位</span>
+      迎新内容的<b>效果数据应该放这里</b>，不必全部挤进通用的
+      <a href="stats.html">数据统计</a>页——那页是岗位/招聘会的曝光转化，口径不同。
+    </div>
+    <div class="card"><div class="card__body">
+      <div class="empty">
+        <div class="empty__icon">▤</div>
+        <h3>智慧校园尚未开放，暂无使用数据</h3>
+        <p>该功能需平台开启后才会产生使用记录。开启后这里会显示：
+          报到流程查看次数、办事清单打印量、各办事窗口被查询的热度（<b>均为聚合数据，不含学生个人信息</b>）。</p>
+      </div>
+    </div></div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▧</div><h3>还没有配置迎新内容</h3>
+      <p>录入报到流程、办事窗口与官方链接后提交审核，通过后学生就能在终端查看并打印办事清单。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">开始录入</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="card"><div class="card__body"><div class="small muted">
+      本页只用规则档质检（不调模型），<b>AI 不可用时全部功能照常</b>。
+    </div></div></div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>智慧校园配置加载失败</h3>
+      <p>无法读取（<code>GET /partner/smart-campus</code> 返回 500）。终端上已下发的内容不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>不新建入口</b>：迎新内容 Tab 已存在（<code>OrientationPanel</code>），在它里面填实（Codex 复核）。</li>
+      <li><b>先拆组件</b>：338 行多 Tab 结构，CMS 接入前把各 Tab 抽成独立组件。</li>
+      <li>内容走 pending → approved 审核流，不绕过平台审核；官方链接只允许本校域名。</li>
+      <li><b>只做规则档质检</b>：功能未开放前不上生成式 AI（与 Admin 智慧校园「刻意无 AI」同一理由）。</li>
+      <li>迎新效果数据放本页「使用统计」Tab，不挤进通用 <code>/stats</code>（Codex 补充）。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'smart-campus'})</script>
+</body>
+</html>

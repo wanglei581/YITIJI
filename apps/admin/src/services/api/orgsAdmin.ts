@@ -8,6 +8,7 @@
 // 账号密码只在创建/重置时单向提交,任何读取接口不回显。
 // ============================================================
 
+import type { SceneTemplate } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
@@ -70,7 +71,7 @@ export interface AdminOrgListItem {
   type: string
   contact: string | null
   contactPhone: string | null
-  sceneTemplate: string | null
+  sceneTemplate: SceneTemplate | null
   enabledModules: string[]
   enabled: boolean
   createdAt: string
@@ -94,7 +95,8 @@ export interface CreateOrgInput {
   type: string
   contact?: string
   contactPhone?: string
-  sceneTemplate?: string
+  /** null = 明确清空场景（切换为 source-only 机构类型时必需）；undefined = 不修改 */
+  sceneTemplate?: SceneTemplate | null
   enabledModules?: string[]
   account?: OrgAccountInput
 }
@@ -104,7 +106,8 @@ export interface UpdateOrgInput {
   type?: string
   contact?: string
   contactPhone?: string
-  sceneTemplate?: string
+  /** null = 明确清空场景（切换为 source-only 机构类型时必需）；undefined = 不修改 */
+  sceneTemplate?: SceneTemplate | null
   enabledModules?: string[]
 }
 

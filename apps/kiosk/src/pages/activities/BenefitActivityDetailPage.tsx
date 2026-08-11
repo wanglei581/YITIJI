@@ -201,11 +201,19 @@ export function BenefitActivityDetailPage() {
                   <span>登录后点「立即领取」，计入本人权益</span>
                 </div>
               </div>
+              {/*
+                ⚠️ 2026-08-11 修正（CLAUDE.md §9 不伪造能力）：
+                本步原文为「进入对应服务，优先抵扣免费额度」，但**抵扣功能尚未接通**——
+                Kiosk 全端 0 处引用 benefitGrantId，打印报价不查权益、确认页不能选券、
+                收银页不调 /orders/:id/redeem。用户领券后仍需全价支付，与原文案承诺不符。
+                抵扣闭环接通后（需先收窄后端核销规则：面值/服务范围/最高抵扣额），
+                再把本步改回「下单时选择权益抵扣」。
+              */}
               <div className="k8-act-step">
                 <span className="k8-act-step-num" aria-hidden="true">2</span>
                 <div className="k8-act-step-body">
-                  <b>使用服务</b>
-                  <span>进入对应服务，优先抵扣免费额度</span>
+                  <b>等待抵扣开放</b>
+                  <span>权益已记入账户；<b>抵扣功能尚未开放</b>，开放后可在下单时选择使用</span>
                 </div>
               </div>
               <div className="k8-act-step">

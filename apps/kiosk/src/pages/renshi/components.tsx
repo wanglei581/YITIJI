@@ -12,7 +12,8 @@ import { AUDIENCE_CHIPS, type AudienceKey, type TabKey } from './shared'
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-// 官方入口二维码弹层：承载政策事项的真实 officialUrl；info-only。
+// 来源链接二维码弹层：承载政策事项提交的外部链接；info-only。
+// 2026-08-11：不再称「官方入口」——系统未核验该链接的官方性（见 PolicyServiceHubPage 文件头）。
 // 打开即记一条 external_open 跳转记录（仅记录打开入口动作，不记录办理结果）。
 export function OfficialEntryQrOverlay({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
   return (
@@ -25,12 +26,12 @@ export function OfficialEntryQrOverlay({ title, url, onClose }: { title: string;
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-neutral-800">扫码打开官方入口</p>
+        <p className="text-center text-base font-semibold text-neutral-800">扫码打开来源链接</p>
         <p className="mt-1 truncate text-center text-xs text-neutral-400">{title}</p>
         <div className="mt-5 flex justify-center"><SourceUrlQr value={url} size={196} /></div>
         <p className="mt-3 break-all rounded-lg bg-neutral-50 px-3 py-2 text-center text-[11px] text-neutral-500">{url}</p>
         <p className="mt-4 text-xs leading-relaxed text-neutral-500">
-          请使用手机扫码前往官方平台办理。办理结果以官方平台为准，本系统仅提供信息入口和材料服务。
+          请先核对来源机构与目标域名，再使用手机扫码访问。本系统仅提供信息入口和材料服务，不参与办理。
         </p>
       </div>
     </div>

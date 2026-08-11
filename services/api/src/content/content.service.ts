@@ -342,7 +342,12 @@ export class ContentService {
 
   async listScreensaverTerminals(): Promise<ScreensaverTerminalView[]> {
     const [terminals, configs] = await Promise.all([
-      this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' }, take: 500 }),
+      this.prisma.terminal.findMany({
+        // 取最新真实心跳用于在线判定
+        include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
+        orderBy: { registeredAt: 'desc' },
+        take: 500,
+      }),
       this.prisma.terminalScreensaverConfig.findMany({ include: { playlist: true } }),
     ])
     const configByTerminal = new Map(configs.map((c) => [c.terminalId, c]))
@@ -353,7 +358,12 @@ export class ContentService {
       return {
         terminalId: t.terminalCode,
         terminalCode: t.terminalCode,
-        isOnline: now - t.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS,
+        // ⚠️ 2026-08-11（CLAUDE.md §9）：lastSeenAt 是 @updatedAt（schema.prisma:38），
+        // 任意行更新都会刷新，断电终端也会显示「在线」。改用最新真实心跳判定。
+        isOnline: (() => {
+          const lastHeartbeatAt = t.heartbeats[0]?.createdAt
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+        })(),
         config: config ? toConfigView(config, config.playlist?.name ?? null) : null,
       }
     })

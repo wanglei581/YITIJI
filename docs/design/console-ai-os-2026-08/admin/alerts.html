@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>告警中心（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/alerts</code>「告警中心」</b>。
+    现状：告警是<b>实时派生</b>的——每次进页面重新算一遍，看完就没了。
+    加的是 <b>AI 归因与建议处置</b>：同类聚合成一条，给「可能原因 + 建议动作」。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 这条不能直接加</span>
+    我原本还想加<b>确认 / 指派 / 静默 / 升级 / SLA</b>。Codex 指出<b>加不了</b>：
+    当前告警<b>没有可确认、可指派、可留痕的持久状态</b>（<code>alerts/index.tsx:78</code>），
+    后端也只有查询、<b>没有事故状态机与操作接口</b>（<code>admin-ops.controller.ts:41</code>）。
+    <b>要做处置闭环，必须先建服务端的告警实体与状态机</b>——那是一次独立的后端改动，不是前端加按钮。
+    本页原型把这部分画成「待服务端就绪」的形态，不假装能点。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>告警中心</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页汇总终端、打印机与 AI 成本的<b>实时告警</b>。设备类告警对应一体机的
+        <a href="#">「设备离线 / 缺纸」降级态</a>（前台 P04）——用户此刻看到的正是这些告警的后果。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm">刷新</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="grid grid--4" data-when="default aidown">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">当前告警</div>
+      <div class="metric__value">6</div><div class="metric__foot down">聚合前 23 条</div></div><div class="metric__ico metric__ico--err">!</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">设备类</div>
+      <div class="metric__value">3</div><div class="metric__foot">离线 2 · 缺纸 1</div></div><div class="metric__ico metric__ico--warn">▤</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">AI 类</div>
+      <div class="metric__value">2</div><div class="metric__foot">成本突增 1 · 失败率 1</div></div><div class="metric__ico metric__ico--ai">◈</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">影响用户</div>
+      <div class="metric__value">~41</div><div class="metric__foot">近 1 小时受影响会话</div></div><div class="metric__ico">◉</div></div>
+  </div>
+
+  <div class="advice isnew" data-newtag="新增 · AI 归因聚合" data-when="default" style="margin-top:16px">
+    <div class="advice__head"><span class="tag tag--ai">AI 归因</span>
+      <span class="ev ev--2">E2</span>
+      <b>23 条原始告警聚成 6 组，其中 1 组值得马上处理</b></div>
+    <div class="advice__action">KSK-003 的 8 条告警是同一个根因：设备离线，不是 8 个独立问题。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        8 条告警（心跳超时 ×1、打印任务失败 ×5、扫描任务失败 ×2）时间戳集中在 05:48 之后，
+        与该终端最后一次心跳时间一致（<span class="ev ev--2">E2</span> 设备事实）。</span></div>
+      <div class="advice__item"><b>代价</b><span>不处理：该点位今天有招聘会，现场无法打印参会材料。</span></div>
+      <div class="advice__item"><b>备选</b><span>先把该点位的物料改派到邻近终端，再排查设备。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">看设备详情</button>
+      <button class="btn btn--sm">改派邻近终端</button>
+      <span class="small muted">AI 只做聚合与归因，不自动处置</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head"><h3>告警列表</h3><span class="sub">已按根因聚合</span>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部类型</option><option>设备</option><option>打印机</option><option>AI</option></select>
+      </div></div>
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th style="width:26%">告警</th><th>类型</th><th>首次出现</th><th class="num">聚合</th><th>可能原因</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><div class="cellmain">KSK-003 离线</div><div class="cellsub">XX职业学院就业中心</div></td>
+            <td><span class="tag tag--err">设备</span></td><td class="mono small">05:48</td><td class="num">8</td>
+            <td class="small muted">断电或网络中断（<span class="ev ev--2">E2</span>）</td>
+            <td><button class="btn btn--sm">查看</button></td></tr>
+          <tr><td><div class="cellmain">AI 简历优化成本突增</div><div class="cellsub">24h +38%，调用量仅 +12%</div></td>
+            <td><span class="tag tag--warn">AI</span></td><td class="mono small">昨日 22:10</td><td class="num">3</td>
+            <td class="small muted">Prompt v6 灰度输出变长（<span class="ev ev--1">E1</span>）</td>
+            <td><a class="btn btn--sm" href="ai-services.html">看成本</a></td></tr>
+          <tr><td><div class="cellmain">岗位 AI 推荐失败率 11.6%</div><div class="cellsub">连续超时触发熔断</div></td>
+            <td><span class="tag tag--warn">AI</span></td><td class="mono small">14:22</td><td class="num">5</td>
+            <td class="small muted">上游 45s 超时（<span class="ev ev--2">E2</span>）</td>
+            <td><a class="btn btn--sm" href="ai-config.html">调超时</a></td></tr>
+          <tr><td><div class="cellmain">KSK-001 缺纸</div><div class="cellsub">市人才市场一楼</div></td>
+            <td><span class="tag tag--warn">打印机</span></td><td class="mono small">11:02</td><td class="num">4</td>
+            <td class="small muted">纸盒余量低（<span class="ev ev--2">E2</span>）</td>
+            <td><button class="btn btn--sm">查看</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      告警为<b>实时派生</b>，刷新即重算。要做「已确认 / 已指派 / 已静默」需先建服务端告警实体（见下）。
+    </div>
+  </div>
+
+  <div class="card" data-when="default" style="margin-top:16px;border-style:dashed">
+    <div class="card__head"><h3>处置闭环</h3><span class="tag tag--warn">待服务端就绪</span></div>
+    <div class="card__body">
+      <div class="small muted" style="margin-bottom:14px">
+        商用运营需要的完整闭环：<b>确认 → 指派 → SLA 倒计时 → 处理记录 → 恢复留痕 → 未处理升级</b>。
+        这些<b>现在做不了</b>，因为告警没有持久实体。原型把它画在这里作为需求登记，
+        <b>但不放可点击的假按钮</b>——那会让运营以为点了有用。
+      </div>
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr><th style="width:22%">能力</th><th>为什么现在做不了</th><th>前置</th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain small">确认 / 认领</td><td class="small muted">告警无 id、无状态字段，刷新即重算</td>
+              <td class="small">建 <code>Alert</code> 实体 + 状态机</td></tr>
+            <tr><td class="cellmain small">指派给人</td><td class="small muted">无运维人员模型，也无通知通道</td>
+              <td class="small">同上 + 人员与通知</td></tr>
+            <tr><td class="cellmain small">静默 / 抑制</td><td class="small muted">无规则存储，重启即失效</td>
+              <td class="small">静默规则入库</td></tr>
+            <tr><td class="cellmain small">SLA 与升级</td><td class="small muted">无首次发生时间的持久记录</td>
+              <td class="small">告警生命周期落库</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">✓</div><h3>当前没有告警</h3>
+      <p>终端、打印机与 AI 成本都在正常范围。告警是实时派生的，出现异常会立即显示在这里。</p>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 归因聚合暂时不可用</div>
+      <div class="degrade__body">
+        <b>告警本身照常产生与展示</b>——它来自设备心跳与任务状态，不依赖 AI。
+        暂时没有的是同类聚合与「可能原因」，列表会回落为<b>23 条原始告警平铺</b>。
+      </div>
+      <div class="degrade__alts"><button class="btn btn--sm btn--primary">看原始告警列表</button></div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>告警数据加载失败</h3>
+      <p>无法读取（<code>GET /admin/ops/alerts</code> 超时）。设备与打印仍在正常运行，只是本页看不到状态。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>本轮只做 AI 归因聚合</b>（前端 + 一个聚合端点即可），不做处置闭环。</li>
+      <li><b>处置闭环是独立的后端立项</b>：先建 <code>Alert</code> 实体与状态机，再谈确认/指派/SLA。
+        在那之前<b>不放假按钮</b>。</li>
+      <li>AI 只做聚合与归因，<b>不自动处置</b>——重启终端、改派物料都必须人工点击。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'alerts'})</script>
+</body>
+</html>

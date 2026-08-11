@@ -169,7 +169,16 @@ export function ConvertImagesPage() {
       <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-base leading-relaxed text-info-fg">
           <InfoIcon className="h-5 w-5 shrink-0" />
-          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限；生成后直接进入确认打印。
+          {/*
+            2026-08-11（CLAUDE.md §9）：本页**不强制登录**（getToken() 可能为空），
+            匿名转换时后端以空 endUserId 落库（print-conversion.controller.ts:29），
+            而「我的文档」只查询已认证用户资产（member-assets.service.ts:15）——
+            匿名用户回头在「我的文档」里根本找不到该 PDF。
+            故按登录态给出不同说明，不再无条件承诺已保存。
+          */}
+          {getToken()
+            ? '转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限；生成后直接进入确认打印。'
+            : '未登录状态下转换的 PDF 不会进入「我的文档」，请在本次操作内直接完成打印；若需保存与延长期限，请先登录。'}
         </div>
 
         {error && <KioskStatePanel compact tone="error" title="转换暂未完成" description={error} icon={<AlertCircleIcon />} />}

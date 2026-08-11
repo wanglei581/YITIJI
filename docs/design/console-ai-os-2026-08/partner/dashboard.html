@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工作台（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/</code>「工作台」</b>（228 行，机构计数 / 待审核 / 近期同步已接真）。
+    加一块「AI 每日要点」——形态与 Admin 工作台完全一致，机构侧关心的三件事：
+    <b>内容效果、审核状态、资质与账号</b>。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 前置不足</span>
+    <b>现有数据只有内容数量与近期同步记录，不足以生成可靠的异常归因</b>
+    （<code>partner/routes/dashboard/index.tsx:228</code>）。
+    所以本页的要点<b>必须等「数据统计」的效果数据先落地</b>——
+    否则只能说「你有 4 条待审核」，那是现有卡片就能显示的，不值得叫 AI。
+    <b>顺序：先做 <a href="stats.html">/stats 效果层</a>，再做本页要点。</b>
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>工作台</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本机构数据概览。你提交的内容经平台审核发布后，会出现在一体机的
+        <b>岗位信息 / 招聘会 / 找企业 / 政策服务</b>页面；效果数据见
+        <a href="stats.html">数据统计</a>。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm">刷新</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="isnew" data-newtag="新增 · AI 每日要点" data-when="default" style="margin-bottom:18px">
+    <div class="card" style="border-color:#d6cfe8">
+      <div class="card__head"><h3>今天最该处理的 3 件事</h3><span class="tag tag--ai">AI 归因</span></div>
+      <div class="card__body stack">
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head"><span class="tag tag--err">1</span><span class="ev ev--1">E1</span>
+            <b>人力资源服务许可证 30 天后到期</b></div>
+          <div class="advice__action">现在上传新证件，避免内容被自动转为不可见。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>有效期至 2026-09-10（<span class="ev ev--1">E1</span> 资质记录）。
+              到期后本机构 33 条在架内容<b>全部自动转不可见</b>。</span></div>
+            <div class="advice__item"><b>代价</b><span>补件与平台核验通常需要 3–5 个工作日，现在办来得及。</span></div>
+            <div class="advice__item"><b>备选</b><span>若证件正在换发，可提交受理回执申请临时延期。</span></div>
+          </div>
+          <div class="advice__foot">
+            <a class="btn btn--sm btn--primary" href="profile.html">去上传</a>
+            <button class="btn btn--sm">申请临时延期</button>
+          </div>
+        </div>
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head"><span class="tag tag--warn">2</span><span class="ev ev--1">E1</span>
+            <b>3 条已过期岗位还在架上，占了本周 18% 曝光却零跳转</b></div>
+          <div class="advice__action">批量下架，把曝光让给还在招的岗位。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>截止日已过 5–12 天；本周获得 1,204 次曝光、41 次详情浏览、
+              <b>0 次打开来源平台</b>——用户点进去发现过期就退出了。</span></div>
+            <div class="advice__item"><b>代价</b><span>下架约 2 分钟。不处理会持续拉低你的详情浏览转化率。</span></div>
+            <div class="advice__item"><b>备选</b><span>岗位仍在招的话，改截止日重新提审即可。</span></div>
+          </div>
+          <div class="advice__foot">
+            <a class="btn btn--sm btn--primary" href="jobs.html">筛出这 3 条</a>
+            <button class="btn btn--sm">批量改截止日</button>
+          </div>
+        </div>
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head"><span class="tag">3</span><span class="ev ev--2">E2</span>
+            <b>数据源「校招平台 API」连续同步失败 3 次</b></div>
+          <div class="advice__action">检查凭证是否过期——三次都是 401 未授权。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>08-07 / 08-08 / 08-09 三次定时同步均返回 401
+              （<span class="ev ev--2">E2</span> 同步日志）。最近一次成功是 08-06。</span></div>
+            <div class="advice__item"><b>代价</b><span>该来源的新岗位已 5 天没进来；对方平台上新增的岗位在终端看不到。</span></div>
+            <div class="advice__item"><b>备选</b><span>先用 Excel 手动导入这几天的新岗位，再慢慢排查 API。</span></div>
+          </div>
+          <div class="advice__foot">
+            <a class="btn btn--sm btn--primary" href="sources.html">去轮换凭证</a>
+            <a class="btn btn--sm" href="sources.html">改用 Excel 导入</a>
+          </div>
+        </div>
+
+      </div>
+      <div class="card__foot">
+        每条四要素齐全（动作 / 理由 / 代价 / 备选），缺一即不显示。<b>没有要点时不硬凑</b>。
+      </div>
+    </div>
+  </div>
+
+  <div class="sechead" data-when="default aidown"><h2>数据概览</h2></div>
+  <div class="grid grid--3" data-when="default aidown">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">已上传岗位</div>
+      <div class="metric__value">28</div><div class="metric__foot">已发布 24 · 待审核 2</div></div><div class="metric__ico">▤</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">已上传招聘会</div>
+      <div class="metric__value">5</div><div class="metric__foot">已发布 4 · 待审核 1</div></div><div class="metric__ico metric__ico--info">▦</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">政策公告</div>
+      <div class="metric__value">6</div><div class="metric__foot">已发布 5 · 待审核 1</div></div><div class="metric__ico">▧</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">本周曝光</div>
+      <div class="metric__value">6,820</div><div class="metric__foot up">+12.4%</div></div><div class="metric__ico metric__ico--ai">◉</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">打开来源平台</div>
+      <div class="metric__value">312</div><div class="metric__foot down">−4.2%</div></div><div class="metric__ico">↗</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">数据源</div>
+      <div class="metric__value">3</div><div class="metric__foot down">1 个连续失败</div></div><div class="metric__ico metric__ico--warn">◈</div></div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">✓</div><h3>今天没有需要优先处理的事</h3>
+      <p>资质有效、内容正常、数据源同步顺畅。<b>没有要点时显示这句话，不硬凑三条</b>。</p>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown" style="margin-bottom:16px">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 每日要点暂时不可用</div>
+      <div class="degrade__body">
+        下面的<b>数据概览与同步记录照常</b>。你仍然可以按老办法看：待审核 4 条、数据源 1 个失败。
+      </div>
+      <div class="degrade__alts">
+        <a class="btn btn--sm btn--primary" href="jobs.html">看待审核</a>
+        <a class="btn btn--sm" href="sources.html">看数据源</a>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>工作台数据加载失败</h3>
+      <p>无法读取（<code>GET /partner/dashboard</code> 返回 500）。已发布内容在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/</code>。228 行体积可控，要点卡仍建议抽成独立组件（与 Admin 共用）。</li>
+      <li><b>必须先做效果层</b>：没有曝光/浏览/跳转数据，要点只能重复现有卡片的信息（Codex 复核）。</li>
+      <li>要点形态与 Admin 工作台完全一致——<b>全站 AI 只有「四要素建议卡」这一种面孔</b>。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'dashboard'})</script>
+</body>
+</html>

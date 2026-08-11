@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>终端数据（空壳填充）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">填充 · 现有空壳页</span>
+    <b>改的是现有页 <code>/terminals</code>「终端数据」</b>——现在整页 15 行，只有一句
+    「终端明细暂由平台统一运营」（<code>routes/terminals/index.tsx:5-12</code>）。
+    <b>那个判断对运维正确、对商业错误</b>：机构不需要知道打印机缺不缺纸，
+    但必须知道<b>自己的内容投在了哪、覆盖多少人</b>。
+    所以这页填的是<b>投放视图</b>，不是运维面板——运维仍归管理员。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>终端数据</h1><p>我的内容在哪些点位展示 · 覆盖情况</p></div>
+    <div class="right">
+      <select class="select" style="width:auto;padding:7px 12px"><option>本月</option><option>本季度</option></select>
+      <button class="btn btn--sm">申请新增投放点位</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="grid grid--4" data-when="default">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">投放点位</div>
+      <div class="metric__value">7</div><div class="metric__foot">3 个城市 · 4 类场所</div></div><div class="metric__ico">◉</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">本月曝光</div>
+      <div class="metric__value">28,410</div><div class="metric__foot up">+9.2%</div></div><div class="metric__ico metric__ico--info">▲</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">到达人次</div>
+      <div class="metric__value">4,820</div><div class="metric__foot">聚合估算，非精确人数</div></div><div class="metric__ico">◍</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">内容展示占比</div>
+      <div class="metric__value">18<small>%</small></div><div class="metric__foot">本机构内容 / 该点位全部内容</div></div><div class="metric__ico metric__ico--ai">◐</div></div>
+  </div>
+
+  <div class="proto" data-when="default">
+    <span class="proto__tag">边界</span>
+    这页<b>不展示终端运维数据</b>（在线率 / 故障 / 耗材 / IP / 序列号）——那是管理员后台的域。
+    机构看到的只有：点位在哪、我的内容在这里被看了多少次。
+  </div>
+
+  <div class="sechead" data-when="default" style="margin-top:22px"><h2>点位清单</h2></div>
+  <div class="card" data-when="default">
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th style="width:26%">点位</th><th>场所类型</th><th>城市</th><th class="num">曝光</th>
+          <th class="num">详情浏览</th><th class="num">打开来源平台</th><th class="num">资料打印</th></tr></thead>
+        <tbody>
+          <tr><td><div class="cellmain">市人才市场 · 一楼大厅</div><div class="cellsub">KSK-001</div></td>
+            <td><span class="tag tag--ghost">人才市场</span></td><td>本市</td>
+            <td class="num">11,240</td><td class="num">2,410</td><td class="num">561</td><td class="num">142</td></tr>
+          <tr><td><div class="cellmain">XX 职业学院 · 就业中心</div><div class="cellsub">KSK-003</div></td>
+            <td><span class="tag tag--ghost">高校</span></td><td>本市</td>
+            <td class="num">8,106</td><td class="num">1,980</td><td class="num">408</td><td class="num">96</td></tr>
+          <tr><td><div class="cellmain">城南街道便民中心</div><div class="cellsub">KSK-007</div></td>
+            <td><span class="tag tag--ghost">街道</span></td><td>本市</td>
+            <td class="num">5,204</td><td class="num">841</td><td class="num">147</td><td class="num">31</td></tr>
+          <tr><td><div class="cellmain">邻市人力资源市场</div><div class="cellsub">KSK-012</div></td>
+            <td><span class="tag tag--ghost">人才市场</span></td><td>邻市</td>
+            <td class="num">3,860</td><td class="num">602</td><td class="num">118</td><td class="num">22</td></tr>
+          <tr class="muted"><td><div class="cellmain">城北社区服务站</div><div class="cellsub">KSK-015</div></td>
+            <td><span class="tag tag--ghost">社区</span></td><td>本市</td>
+            <td class="num">样本不足</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      <b>最小样本阈值</b>：任一点位不足 5 条记录时显示「样本不足」而非数字。
+      「打开来源平台」统计的是外部跳转点击次数，<b>不是投递数</b>。
+    </div>
+  </div>
+
+  <div class="grid grid--2" data-when="default" style="margin-top:18px">
+    <div class="card"><div class="card__head"><h3>覆盖人群规模（估算）</h3></div>
+      <div class="card__body">
+        <dl class="kv">
+          <dt>日均到店</dt><dd>约 <b>640</b> 人次（全部 7 个点位合计）</dd>
+          <dt>主要人群</dt><dd>应届毕业生 · 本地求职者 · 转岗人员</dd>
+          <dt>高峰时段</dt><dd>工作日 09:00–12:00 / 14:00–17:00</dd>
+        </dl>
+        <div class="small muted" style="margin-top:12px">
+          <span class="ev ev--2">E2</span> 估算基于终端会话数聚合，<b>不含任何个人身份信息</b>，也不做人群画像。
+        </div>
+      </div></div>
+    <div class="card"><div class="card__head"><h3>申请新增投放</h3></div>
+      <div class="card__body">
+        <div class="small muted" style="margin-bottom:12px">
+          想让内容出现在更多点位？提交申请，平台运营会评估点位容量与内容类型匹配度。
+        </div>
+        <div class="field" style="margin-bottom:10px"><label>期望城市 / 场所</label>
+          <input class="input" placeholder="例：本市 高校"></div>
+        <div class="field" style="margin-bottom:12px"><label>说明</label>
+          <textarea class="textarea" rows="2" style="font-family:var(--sans);font-size:13px" placeholder="例：本机构秋招岗位面向应届生，希望增加高校点位"></textarea></div>
+        <button class="btn btn--sm btn--primary">提交申请（转工单）</button>
+      </div></div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◉</div><h3>你的内容还没有在任何终端展示</h3>
+      <p>内容需要先通过管理员审核并发布，才会分发到终端。当前有 4 条待审核。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">查看待审核内容</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="small muted">本页不依赖 AI，数据照常显示。</div></div></div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>点位数据加载失败</h3>
+      <p>无法读取投放点位（<code>GET /partner/coverage/points</code> 超时）。你的内容展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/terminals</code>，把空态换成投放视图。菜单位置不动。</li>
+      <li>边界：只给点位与聚合曝光，<b>不给终端运维数据</b>（在线率 / 故障 / 耗材 / IP）。</li>
+      <li>依赖与 <code>/stats</code> 同一个前置：<code>BrowseLog</code>/<code>ExternalJumpLog</code> 加 <code>sourceOrgId</code>。</li>
+      <li>新增端点：<code>GET /partner/coverage/points</code>、<code>POST /partner/coverage/request</code>（转工单）。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'terminals'})</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>政策公告管理（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/policy</code>「政策公告管理」</b>（385 行，新增 / 编辑 / 下架 / 删除已接真）。
+    加与岗位、企业页同一套：<b>合规预审 + 撰写辅助</b>。
+    Codex 指出我最初的映射<b>漏了这页</b>——已补。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>政策公告管理</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        你在这里维护的政策说明、材料清单与官方入口，经平台审核发布后会出现在一体机的
+        <a href="#">「政策服务」页</a>对应分类下（前台 P21）。
+        求职者可在终端<b>打印办事清单</b>，并扫码去你填的官方办理入口。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm btn--primary">新增公告</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="advice isnew" data-newtag="新增 · 合规预审" data-when="default">
+    <div class="advice__head"><span class="tag tag--ai">AI 预审</span>
+      <span class="ev ev--2">E2</span><span class="ev ev--3">E3</span>
+      <b>2 条已发布政策的申报期已过，还挂在终端上</b></div>
+    <div class="advice__action">先下架「2026 上半年灵活就业社保补贴」，它的申报截止日是 6 月 30 日。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        公告里写明申报期至 2026-06-30（<span class="ev ev--2">E2</span> 正文实测），今天是 8 月 11 日。
+        求职者按过期政策准备材料跑一趟，是最容易引发投诉的情况。</span></div>
+      <div class="advice__item"><b>代价</b><span>下架约 1 分钟。不处理会持续误导到终端前的求职者。</span></div>
+      <div class="advice__item"><b>备选</b><span>若下半年政策已出，直接更新内容与申报期，比下架再新建省事。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">筛出这 2 条</button>
+      <button class="btn btn--sm">更新为下半年政策</button>
+      <span class="small muted">AI 判断，仅供参考</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head"><h3>本机构政策公告</h3><span class="sub">6 条</span>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>全部分类</option><option>就业补贴</option><option>创业扶持</option><option>技能培训</option><option>社保医保</option></select>
+      </div></div>
+    <div class="card__body card__body--flush">
+      <table class="table">
+        <thead><tr><th style="width:28%">标题</th><th>分类</th><th>申报期</th><th>时效</th><th>审核</th><th>发布</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><div class="cellmain">2026 上半年灵活就业社保补贴</div><div class="cellsub">材料清单 5 项 · 有官方入口</div></td>
+            <td><span class="tag tag--ghost">社保医保</span></td><td class="small">~2026-06-30</td>
+            <td><span class="ev ev--2">E2</span> <span class="tag tag--err">已过期</span></td>
+            <td><span class="tag tag--ok">已通过</span></td><td><span class="tag tag--ok">已发布</span></td>
+            <td><button class="btn btn--sm btn--danger">下架</button></td></tr>
+          <tr><td><div class="cellmain">高校毕业生一次性求职补贴</div><div class="cellsub">材料清单 4 项 · 有官方入口</div></td>
+            <td><span class="tag tag--ghost">就业补贴</span></td><td class="small">~2026-12-31</td>
+            <td><span class="tag tag--ok">有效</span></td>
+            <td><span class="tag tag--ok">已通过</span></td><td><span class="tag tag--ok">已发布</span></td>
+            <td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+          <tr><td><div class="cellmain">校内创业孵化基地入驻指南</div><div class="cellsub">材料清单未填</div></td>
+            <td><span class="tag tag--ghost">创业扶持</span></td><td class="small muted">未填</td>
+            <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">缺材料清单</span></td>
+            <td><span class="tag tag--warn">待审核</span></td><td><span class="tag">草稿</span></td>
+            <td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card__foot">
+      <b>材料清单是必填项</b>——它是前台「打印办事清单」功能的内容来源，缺了这块用户就打印不出东西。
+    </div>
+  </div>
+
+  <div class="card isnew" data-newtag="新增 · AI 撰写辅助" data-when="default" style="margin-top:16px">
+    <div class="card__head"><h3>AI 帮你整理公告结构</h3><span class="tag tag--ai">E3</span></div>
+    <div class="card__body">
+      <div class="grid grid--2">
+        <div class="field"><label>你粘贴的原文（来自官方文件）</label>
+          <div class="locked">关于做好2026年高校毕业生一次性求职创业补贴发放工作的通知
+各有关单位：为促进高校毕业生就业……符合条件的毕业年度高校毕业生
+可申请一次性求职创业补贴，标准为每人1500元。申请人需提供身份证、
+毕业证、低保证明或残疾证明等材料，于2026年12月31日前向所在院校提交……</div></div>
+        <div class="field"><label>AI 整理成终端可读的结构</label>
+          <div class="locked" style="border-color:var(--p-300);background:var(--p-50)">【补贴标准】每人 1500 元，一次性发放
+【申请对象】毕业年度高校毕业生，且符合低保 / 残疾等条件之一
+【所需材料】① 身份证 ② 毕业证 ③ 低保证明或残疾证明
+【申报截止】2026-12-31
+【办理方式】向所在院校提交
+【官方入口】（请填写官方链接）</div></div>
+      </div>
+      <div class="proto proto--warn" style="margin-top:14px">
+        <span class="proto__tag">三条硬约束</span>
+        ① <b>只做结构化整理，不改变政策实质内容</b>——金额、条件、截止日必须与原文一致；
+        ② <b>不编造</b>原文没有的条件或材料；
+        ③ <b>必须你审校后才能提交</b>，且平台还会再审一道。政策信息错了影响的是真实的钱和时间。
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn--sm btn--primary">采纳并进入编辑</button>
+        <button class="btn btn--sm">重新整理</button>
+        <button class="btn btn--sm btn--ghost">放弃</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▧</div><h3>还没有政策公告</h3>
+      <p>政策公告会显示在一体机的「政策服务」页，求职者可以打印办事清单、扫码去官方入口办理。
+        <b>注意：本机构类型的政策发布范围受权限矩阵限制</b>（如高校仅限校内公告）。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">新增公告</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 预审与撰写辅助暂时不可用</div>
+      <div class="degrade__body">
+        <b>公告的新增、编辑、下架、删除全部照常。</b>
+        <span class="ev ev--1">E1 规则</span>档的检查也照常（缺材料清单、缺官方入口、申报期已过——都是规则判定）；
+        暂停的只有结构化整理与表达建议。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">继续管理公告</button>
+        <button class="btn btn--sm">看规则版检查</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>公告列表加载失败</h3>
+      <p>无法读取（<code>GET /partner/policies</code> 返回 500）。已发布公告在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/policy</code>。385 行体积可控。</li>
+      <li>「申报期已过」是 <span class="ev ev--2">E2</span> 判定（正文里的日期 vs 今天），不是模型猜的。</li>
+      <li>AI 撰写辅助<b>只整理结构、不改实质</b>：金额 / 条件 / 截止日必须与原文一致。政策错了影响真实的钱和时间。</li>
+      <li>发布范围受权限矩阵限制：高校仅限校内公告，hr_agency / fair_organizer / enterprise 不可发布。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'policy'})</script>
+</body>
+</html>

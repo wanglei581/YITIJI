@@ -494,7 +494,11 @@ export class TerminalToolboxService {
   async listToolboxTerminals(): Promise<ToolboxTerminalView[]> {
     const [terminals, configs] = await Promise.all([
       this.prisma.terminal.findMany({
-        include: { org: { select: { id: true, name: true } } },
+        include: {
+          org: { select: { id: true, name: true } },
+          // 取最新一条真实心跳用于在线判定（不能用 @updatedAt 的 lastSeenAt）
+          heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
+        },
         orderBy: { registeredAt: 'desc' },
         take: 500,
       }),
@@ -509,7 +513,15 @@ export class TerminalToolboxService {
         terminalCode: t.terminalCode,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
-        isOnline: now - t.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS,
+        // ⚠️ 2026-08-11（CLAUDE.md §9）：原判定用 t.lastSeenAt，但 schema.prisma:38
+        // 该字段是 @updatedAt——**任意终端行更新都会刷新**，不是真心跳。
+        // 一台已断电的终端只要有别的流程碰过它的行就会显示「在线」，误导运维。
+        // 正确实现见 terminals-admin.service.ts:255-289：查最新 TerminalHeartbeat，
+        // 无心跳必离线，最近心跳距今 < 3 分钟才在线。
+        isOnline: (() => {
+          const lastHeartbeatAt = t.heartbeats[0]?.createdAt
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+        })(),
         config: config ? toAdminConfigView(config) : null,
       }
     })
