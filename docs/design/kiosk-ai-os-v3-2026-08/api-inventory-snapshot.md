@@ -1,13 +1,20 @@
-# 后端真实端点清单(自 *.controller.ts 机械抽取)
+# 后端真实端点清单（自 `*.controller.ts` 机械抽取）
 
-> **快照说明**：本文件由脚本从 `services/api/src/**/*.controller.ts` 的
-> `@Controller` + `@Get/@Post/@Put/@Patch/@Delete` 装饰器机械抽取，**不是手写的**。
-> 取自 2026-08-11 的 `main`。它只回答「这个端点存不存在」，
-> **不回答**它有没有实现完、参数对不对、语义是否符合当前产品口径 ——
-> 那些要看 `wiring-map.md` 的逐条裁定。
-> 路径未含全局前缀 `/api/v1`。重新生成方式见 `wiring-map.md` 文末。
+> **快照说明**：由脚本从 `services/api/src/**/*.controller.ts` 的
+> `@Controller` + `@Get/@Post/@Put/@Patch/@Delete` 装饰器抽取，**不是手写的**。
+> 取自 2026-08-11 的 `main`。路径未含全局前缀 `/api/v1`。
+>
+> 它只回答「**这个端点存不存在**」，**不回答**它实现完没有、参数对不对、
+> 语义是否符合当前产品口径 —— 那些看 [`wiring-map.md`](wiring-map.md) 的逐条裁定。
+>
+> **v2 修正（同日）**：第一版脚本只取文件里**第一个** `@Controller` 前缀，
+> 同一文件中第二个控制器的路由被安上了错误前缀 —— 5 处、共 12 条路径受影响。
+> 最坑的一条让人以为存在 `DELETE /jobs/:id`（**全库没有这个路由**），
+> 真实路径是 `DELETE /me/job-ai-sessions/:id`。
+> v2 改为按每个 `@Controller` 的位置切段后再抽取；端点总数不变（415），路径已更正。
+> 重新生成方式见 `wiring-map.md` §13。
 
-共 **415** 个端点，76 个控制器。
+共 **415** 个端点，76 个控制器文件。
 
 | 方法 | 路径 | 控制器 |
 | --- | --- | --- |
@@ -27,12 +34,12 @@
 | DELETE | `/admin/ad-playlists/:id` | `content/content.controller.ts` |
 | PUT | `/admin/ad-playlists/:id` | `content/content.controller.ts` |
 | GET | `/admin/ai-config` | `ai/llm/ai-config.controller.ts` |
-| GET | `/admin/ai-config` | `ai/llm/ai-config.controller.ts` |
 | PUT | `/admin/ai-config` | `ai/llm/ai-config.controller.ts` |
-| GET | `/admin/ai-config/:featureKey` | `ai/llm/ai-config.controller.ts` |
-| PUT | `/admin/ai-config/:featureKey` | `ai/llm/ai-config.controller.ts` |
-| POST | `/admin/ai-config/:featureKey/test` | `ai/llm/ai-config.controller.ts` |
 | POST | `/admin/ai-config/test` | `ai/llm/ai-config.controller.ts` |
+| GET | `/admin/ai-configs` | `ai/llm/ai-config.controller.ts` |
+| GET | `/admin/ai-configs/:featureKey` | `ai/llm/ai-config.controller.ts` |
+| PUT | `/admin/ai-configs/:featureKey` | `ai/llm/ai-config.controller.ts` |
+| POST | `/admin/ai-configs/:featureKey/test` | `ai/llm/ai-config.controller.ts` |
 | POST | `/admin/ai-posters/generations` | `content/ai-poster.controller.ts` |
 | GET | `/admin/ai-posters/generations/:id` | `content/ai-poster.controller.ts` |
 | POST | `/admin/ai-posters/generations/:id/accept` | `content/ai-poster.controller.ts` |
@@ -85,6 +92,7 @@
 | POST | `/admin/feedback/:id/replies` | `member-feedback/admin-member-feedback.controller.ts` |
 | PATCH | `/admin/feedback/:id/status` | `member-feedback/admin-member-feedback.controller.ts` |
 | GET | `/admin/import-batches` | `jobs/jobs.controller.ts` |
+| GET | `/admin/job-materials/summary` | `job-materials/job-materials.controller.ts` |
 | GET | `/admin/job-sources` | `jobs/jobs.controller.ts` |
 | PATCH | `/admin/job-sources/:id/publish` | `jobs/jobs.controller.ts` |
 | PATCH | `/admin/job-sources/:id/review` | `jobs/jobs.controller.ts` |
@@ -249,11 +257,8 @@
 | GET | `/job-fairs/:id/zones` | `jobs/jobs.controller.ts` |
 | GET | `/job-fairs/materials/:materialId/content` | `jobs/admin-fairs.controller.ts` |
 | POST | `/job-materials/generate` | `job-materials/job-materials.controller.ts` |
-| GET | `/job-materials/summary` | `job-materials/job-materials.controller.ts` |
 | GET | `/job-materials/templates` | `job-materials/job-materials.controller.ts` |
-| GET | `/jobs` | `job-ai/job-ai.controller.ts` |
 | GET | `/jobs` | `jobs/jobs.controller.ts` |
-| DELETE | `/jobs/:id` | `job-ai/job-ai.controller.ts` |
 | GET | `/jobs/:id` | `jobs/jobs.controller.ts` |
 | POST | `/jobs/:id/ai/explain` | `job-ai/job-ai.controller.ts` |
 | POST | `/jobs/:id/ai/match` | `job-ai/job-ai.controller.ts` |
@@ -274,10 +279,7 @@
 | POST | `/materials/tasks` | `materials/materials.controller.ts` |
 | GET | `/materials/tasks/:id` | `materials/materials.controller.ts` |
 | POST | `/materials/tasks/:id/pii-findings/decisions` | `materials/materials.controller.ts` |
-| GET | `/me/ai-consents` | `member-privacy/member-privacy.controller.ts` |
 | POST | `/me/ai-consents` | `member-privacy/member-privacy.controller.ts` |
-| POST | `/me/ai-consents` | `member-privacy/member-privacy.controller.ts` |
-| POST | `/me/ai-consents/:id/download-authorizations` | `member-privacy/member-privacy.controller.ts` |
 | POST | `/me/ai-consents/:scope/revoke` | `member-privacy/member-privacy.controller.ts` |
 | GET | `/me/ai-consents/status` | `member-privacy/member-privacy.controller.ts` |
 | GET | `/me/ai-records` | `member-assets/member-assets.controller.ts` |
@@ -286,6 +288,9 @@
 | GET | `/me/benefits/redemptions` | `member-benefits/member-benefits.controller.ts` |
 | GET | `/me/browse-logs` | `activity/me-activity.controller.ts` |
 | DELETE | `/me/browse-logs/:id` | `activity/me-activity.controller.ts` |
+| GET | `/me/data-requests` | `member-privacy/member-privacy.controller.ts` |
+| POST | `/me/data-requests` | `member-privacy/member-privacy.controller.ts` |
+| POST | `/me/data-requests/:id/download-authorizations` | `member-privacy/member-privacy.controller.ts` |
 | GET | `/me/documents` | `member-assets/member-assets.controller.ts` |
 | GET | `/me/external-jump-logs` | `activity/me-activity.controller.ts` |
 | DELETE | `/me/external-jump-logs/:id` | `activity/me-activity.controller.ts` |
@@ -297,6 +302,10 @@
 | GET | `/me/feedback/:id` | `member-feedback/member-feedback.controller.ts` |
 | PATCH | `/me/feedback/:id/close` | `member-feedback/member-feedback.controller.ts` |
 | POST | `/me/feedback/:id/replies` | `member-feedback/member-feedback.controller.ts` |
+| GET | `/me/job-ai-sessions` | `job-ai/job-ai.controller.ts` |
+| DELETE | `/me/job-ai-sessions/:id` | `job-ai/job-ai.controller.ts` |
+| GET | `/me/mock-interviews` | `mock-interview/mock-interview.controller.ts` |
+| DELETE | `/me/mock-interviews/:id` | `mock-interview/mock-interview.controller.ts` |
 | GET | `/me/notifications` | `member-notifications/member-notifications.controller.ts` |
 | DELETE | `/me/notifications/:kind/:id` | `member-notifications/member-notifications.controller.ts` |
 | PATCH | `/me/notifications/:kind/:id/read` | `member-notifications/member-notifications.controller.ts` |
@@ -318,9 +327,7 @@
 | GET | `/member/data-exports/:id/content` | `member-privacy/member-data-export.controller.ts` |
 | GET | `/member/me` | `member-auth/member-auth.controller.ts` |
 | POST | `/member/phone/rebind` | `member-auth/member-auth.controller.ts` |
-| GET | `/mock-interviews` | `mock-interview/mock-interview.controller.ts` |
 | POST | `/mock-interviews` | `mock-interview/mock-interview.controller.ts` |
-| DELETE | `/mock-interviews/:id` | `mock-interview/mock-interview.controller.ts` |
 | GET | `/mock-interviews/:id` | `mock-interview/mock-interview.controller.ts` |
 | POST | `/mock-interviews/:id/answer` | `mock-interview/mock-interview.controller.ts` |
 | POST | `/mock-interviews/:id/end` | `mock-interview/mock-interview.controller.ts` |
