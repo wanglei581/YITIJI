@@ -80,8 +80,7 @@
   </view>
 
   <view class="actionbar">
-    <view class="btn ghost tap" bindtap="tapPrint">打印政策</view>
-    <view class="btn primary tap flex-1-6" bindtap="tapOfficial">查看官方原文</view>
+    <view class="btn primary block tap" bindtap="tapOfficial">复制官方原文链接</view>
   </view>
 
 </view>

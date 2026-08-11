@@ -1,0 +1,56 @@
+<!--pages/interview-qa/interview-qa.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="tapQuit"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">
+      <block wx:if="{{phase === 'running' || phase === 'submitting'}}">第 {{current}}/{{questionTarget}} 题</block>
+      <block wx:else>模拟面试</block>
+    </view>
+  </view>
+  <view class="content has-bar">
+
+    <!-- 加载中 -->
+    <view wx:if="{{phase === 'loading'}}" class="qa-state">
+      <view class="spinner"></view>
+      <text class="state-tip">正在准备第一道题…</text>
+    </view>
+
+    <!-- 不可恢复错误 -->
+    <view wx:if="{{phase === 'failed'}}" class="qa-state">
+      <view class="ficon i-info qa-fail-ic"></view>
+      <text class="state-tip">{{failMsg}}</text>
+      <view class="btn ghost tap qa-back-btn" bindtap="tapQuit">返回</view>
+    </view>
+
+    <!-- 答题区（running / submitting） -->
+    <block wx:if="{{phase === 'running' || phase === 'submitting'}}">
+      <view class="qa-progress">
+        <view class="qap-bar" style="width:{{questionTarget > 0 ? (current / questionTarget) * 100 : 0}}%"></view>
+      </view>
+      <view class="qa-card">
+        <view class="qa-q">{{question}}</view>
+      </view>
+      <view class="qa-input-area">
+        <textarea
+          class="qa-textarea"
+          placeholder="在这里输入你的回答…"
+          value="{{myAnswer}}"
+          bindinput="inputAnswer"
+          maxlength="600"
+          disabled="{{phase === 'submitting'}}"
+        />
+        <view class="word-count">{{myAnswer.length}}/600</view>
+      </view>
+    </block>
+
+  </view>
+  <view class="notice info">
+    <text class="ficon i-info n-ic"></text>
+    <view>题目由 AI 根据岗位需求生成，综合评价将在面试结束后统一呈现。</view>
+  </view>
+  <view class="actionbar">
+    <view wx:if="{{phase === 'running'}}" class="btn primary tap w-full" bindtap="tapSubmit">提交回答</view>
+    <view wx:if="{{phase === 'submitting'}}" class="btn primary w-full qa-btn-loading">提交中…</view>
+  </view>
+</view>

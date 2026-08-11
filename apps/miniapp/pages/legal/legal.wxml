@@ -1,0 +1,34 @@
+<view class="page-wrap legal-page">
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">{{title}}</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content legal-content">
+    <view wx:if="{{loading}}" class="legal-state">正在加载正式版本…</view>
+
+    <view wx:elif="{{error}}" class="card legal-state">
+      <text class="ficon i-info legal-state-icon"></text>
+      <view class="legal-state-title">暂时无法显示正式版本</view>
+      <view class="legal-state-desc">{{error}}</view>
+      <button class="btn primary block" bindtap="loadDoc">重新加载</button>
+    </view>
+
+    <view wx:else class="card legal-card">
+      <view class="legal-meta">版本 {{version}}<text wx:if="{{publishedAt}}"> · 发布于 {{publishedAt}}</text></view>
+      <block wx:for="{{blocks}}" wx:key="key">
+        <view wx:if="{{item.kind === 'heading'}}" class="legal-heading">{{item.text}}</view>
+        <view wx:elif="{{item.kind === 'bullet'}}" class="legal-paragraph legal-bullet">• {{item.text}}</view>
+        <view wx:elif="{{item.kind === 'numbered'}}" class="legal-paragraph legal-numbered">{{item.text}}</view>
+        <view wx:else class="legal-paragraph">{{item.text}}</view>
+      </block>
+      <view class="legal-end">— 全文完 —</view>
+    </view>
+  </view>
+</view>

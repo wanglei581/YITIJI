@@ -1,0 +1,100 @@
+/* pages/settings/settings.wxss */
+.grp-label {
+  margin: 28rpx 8rpx 14rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  letter-spacing: .5rpx;
+}
+.grp-label:first-of-type { margin-top: 8rpx; }
+
+.set-group {
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
+  overflow: hidden;
+}
+.set-item {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 18rpx 24rpx;
+  border-bottom: 1rpx solid var(--line-faint);
+}
+.set-item:last-child { border-bottom: none; }
+
+.set-ic {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 22rpx;
+  flex-shrink: 0;
+}
+.set-ic .ficon { font-size: 34rpx; }
+.set-ic.a-teal  { background: var(--teal-wash); }
+.set-ic.a-teal .ficon  { color: var(--teal-deep); }
+.set-ic.a-clay  { background: var(--clay-wash); }
+.set-ic.a-clay .ficon  { color: var(--clay-deep); }
+.set-ic.a-wheat { background: var(--wheat-wash); }
+.set-ic.a-wheat .ficon { color: var(--wheat-deep); }
+.set-ic.a-plum  { background: var(--plum-wash); }
+.set-ic.a-plum .ficon  { color: var(--plum-deep); }
+
+.set-t {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--ink);
+}
+.set-v {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-left: 12rpx;
+}
+.set-go {
+  margin-left: 12rpx;
+  font-size: 34rpx;
+  color: var(--faint);
+  line-height: 1;
+}
+
+/* 开关 */
+.tgl {
+  position: relative;
+  width: 88rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  background: var(--line);
+  transition: background .2s ease;
+  flex-shrink: 0;
+}
+.tgl::after {
+  content: "";
+  position: absolute;
+  top: 6rpx;
+  right: 42rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,.18);
+  transition: right .2s ease;
+}
+.tgl.on { background: var(--teal); }
+.tgl.on::after { right: 6rpx; }
+
+.logout {
+  margin: 40rpx 0 20rpx;
+  height: 100rpx;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--clay-deep);
+}

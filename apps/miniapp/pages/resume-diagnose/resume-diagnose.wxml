@@ -1,0 +1,156 @@
+<!--pages/resume-diagnose/resume-diagnose.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">AI 诊断报告</view>
+  </view>
+
+  <!-- 读取中 -->
+  <view wx:if="{{status === 'loading'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-file-text rs-ic"></view>
+    </view>
+    <view class="rs-title">正在获取诊断报告…</view>
+    <view class="rs-sub">AI 分析结果由服务端生成,请稍候</view>
+    <view class="rs-disclaimer">分析结果仅供参考,不构成招聘意见</view>
+  </view>
+
+  <!-- 无可展示任务:不伪造历史报告,给真实入口 -->
+  <view wx:elif="{{status === 'empty'}}" class="running-state">
+    <view class="st-ic"><text class="ficon i-file-text"></text></view>
+    <view class="rs-title">还没有诊断报告</view>
+    <view class="rs-sub">上传或拍摄一份简历,AI 解析完成后会在这里生成报告</view>
+    <view wx:if="{{hasSavedTask}}" class="saved-tip tap" bindtap="viewSaved">
+      查看上一次的诊断{{savedFileName ? '(' + savedFileName + ')' : ''}} ›
+    </view>
+  </view>
+
+  <!-- 明确失败:把原因说清楚,不停在转圈也不给半份结论 -->
+  <view wx:elif="{{status === 'failed'}}" class="running-state">
+    <view class="st-ic warn"><text class="ficon i-info"></text></view>
+    <view class="rs-title">未能获取诊断报告</view>
+    <view class="rs-sub">{{failMsg}}</view>
+  </view>
+
+  <!-- 真实诊断结果 -->
+  <view wx:else class="content has-bar">
+
+    <!-- 占位 provider 必须明示,否则用户会把演示结论当成真实分析 -->
+    <view wx:if="{{report.isMockProvider}}" class="notice warn">
+      <view class="ficon i-info n-ic"></view>
+      <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为简历评估结论。</text>
+    </view>
+
+    <!-- 文本抽取质量:低置信度时必须提醒人工复核 -->
+    <view wx:if="{{report.noticeConfidence !== null && report.noticeConfidence < 0.8}}" class="notice warn">
+      <view class="ficon i-info n-ic"></view>
+      <text>简历文字识别置信度较低({{report.noticeConfidence}}),部分内容可能未被正确读取,建议核对后再参考评分。</text>
+    </view>
+    <view wx:for="{{report.noticeWarnings}}" wx:for-item="w" wx:key="*this" class="notice warn">
+      <view class="ficon i-info n-ic"></view>
+      <text>{{w}}</text>
+    </view>
+
+    <!-- 概览:综合分是 6 个维度得分的折算,口径写在卡里,不伪装成后端下发的独立评分 -->
+    <view class="diag-summary">
+      <view class="ds-score">
+        <view class="ds-num">{{report.scorePct}}</view>
+        <view class="ds-label">综合评分</view>
+      </view>
+      <view class="ds-counts">
+        <view class="ds-c"><view class="ds-n high">{{report.priorities.length}}</view><view class="ds-k">优先改进</view></view>
+        <view class="ds-c"><view class="ds-n mid">{{report.suggestions.length}}</view><view class="ds-k">改进建议</view></view>
+        <view class="ds-c"><view class="ds-n low">{{report.riskNotes.length}}</view><view class="ds-k">风险提示</view></view>
+      </view>
+    </view>
+    <view class="score-note">综合评分 = 各维度得分合计 {{report.scoreSum}} / {{report.scoreMax}} 折算百分制</view>
+
+    <!-- 维度得分:后端真实返回的 label 与 score,不做任何加工 -->
+    <view class="section-t">维度得分</view>
+    <view class="card dim-card">
+      <view class="dim-row" wx:for="{{report.sections}}" wx:key="key">
+        <view class="dim-head">
+          <view class="dim-label">{{item.label}}</view>
+          <view class="dim-score">{{item.score}}<text class="dim-max">/{{item.maxScore}}</text></view>
+        </view>
+        <view class="meter"><i class="{{item.tone}}" style="width:{{item.pct}}%"></i></view>
+      </view>
+    </view>
+
+    <!-- 优先改进:后端 priorities,是真实的优先级来源 -->
+    <view wx:if="{{report.priorities.length}}" class="section-t">优先改进</view>
+    <view wx:if="{{report.priorities.length}}" class="issue-list">
+      <view
+        class="issue-item tap"
+        wx:for="{{report.priorities}}"
+        wx:key="focus"
+        bindtap="tapText"
+        data-title="{{item.focus}}"
+        data-text="{{item.reason}}"
+      >
+        <view class="ii-left"><view class="sev-dot high"></view></view>
+        <view class="ii-body">
+          <view class="ii-title">{{item.focus}}</view>
+          <view class="ii-tip">{{item.reason}}</view>
+        </view>
+        <view class="ii-arr">›</view>
+      </view>
+    </view>
+
+    <!-- 风险提示 -->
+    <view wx:if="{{report.riskNotes.length}}" class="section-t">风险提示</view>
+    <view wx:if="{{report.riskNotes.length}}" class="issue-list">
+      <view
+        class="issue-item tap"
+        wx:for="{{report.riskNotes}}"
+        wx:for-item="rk"
+        wx:key="*this"
+        bindtap="tapText"
+        data-title="风险提示"
+        data-text="{{rk}}"
+      >
+        <view class="ii-left"><view class="sev-dot mid"></view></view>
+        <view class="ii-body"><view class="ii-tip">{{rk}}</view></view>
+        <view class="ii-arr">›</view>
+      </view>
+    </view>
+
+    <!-- 改进建议 -->
+    <view wx:if="{{report.suggestions.length}}" class="section-t">改进建议</view>
+    <view wx:if="{{report.suggestions.length}}" class="issue-list">
+      <view
+        class="issue-item tap"
+        wx:for="{{report.suggestions}}"
+        wx:for-item="sg"
+        wx:key="*this"
+        bindtap="tapText"
+        data-title="改进建议"
+        data-text="{{sg}}"
+      >
+        <view class="ii-left"><view class="sev-dot low"></view></view>
+        <view class="ii-body"><view class="ii-tip">{{sg}}</view></view>
+        <view class="ii-arr">›</view>
+      </view>
+    </view>
+
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>诊断结果由 AI 生成,仅供参考。评分不代表用人单位意见,最终以招聘方要求为准。</text>
+    </view>
+
+  </view>
+
+  <!-- 操作栏 -->
+  <view wx:if="{{status === 'done'}}" class="actionbar">
+    <view class="btn primary block tap" bindtap="tapOptimize">去 AI 优化</view>
+  </view>
+  <view wx:elif="{{status === 'empty'}}" class="actionbar">
+    <view class="btn primary block tap" bindtap="toUpload">上传简历开始诊断</view>
+  </view>
+  <view wx:elif="{{status === 'failed'}}" class="actionbar">
+    <view class="btn ghost tap" bindtap="toUpload">重新上传</view>
+    <view class="btn primary tap flex-1-5" bindtap="retry">重试</view>
+  </view>
+</view>

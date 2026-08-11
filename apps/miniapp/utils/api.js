@@ -149,6 +149,21 @@ const api = {
   },
 
   // ---------- 法务协议版本 ----------
+  /** 读取当前激活的法务文档；没有正式激活版本时 fail-closed。 */
+  getLegalDocument(docType) {
+    const allowed = ['terms_of_service', 'privacy_policy'];
+    if (!allowed.includes(docType)) return Promise.reject(new Error('不支持的法律文档类型'));
+    if (config.USE_MOCK) return Promise.reject(new Error('演示数据模式不提供正式法律文档'));
+    return request(`/kiosk/legal/${docType}`, { method: 'GET', needAuth: false }).then(doc => {
+      if (!doc || !doc.version || !doc.content) {
+        const e = new Error('正式法律文档尚未发布');
+        e.code = 'LEGAL_DOC_UNAVAILABLE';
+        throw e;
+      }
+      return doc;
+    });
+  },
+
   /**
    * 取当前有效协议版本。无激活版本时回落草拟哨兵,与服务端 resolveActiveLegalVersions 口径一致。
    * 注意:线上目前两份文档均无激活版本,实际会拿到 'draft-pending-legal-review'。
@@ -316,6 +331,16 @@ const api = {
       name: 'file',
       formData: { purpose },
       needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
+    });
+  },
+
+  /** 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。 */
+  uploadPrintFile(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印文件上传'));
+    return uploadFile('/files/kiosk-upload', filePath, {
+      name: 'file',
+      formData: { purpose: 'print_doc' },
+      needAuth: true,
     });
   },
 
@@ -573,6 +598,57 @@ const api = {
     return unwrapList(request('/me/resumes', { method: 'GET', data: params, needAuth: true }));
   },
 
+  /** 本人文档元数据列表。访问文件内容时仍须通过后端短时签名端点。 */
+  getMyDocuments(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的文档'));
+    return unwrapList(request('/me/documents', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  /** 删除本人文档：服务端校验归属，物理删除对象并保留删除审计。 */
+  deleteMyDocument(fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除文档'));
+    return request(`/files/${encodeURIComponent(fileId)}?reason=${encodeURIComponent('member self delete')}`, {
+      method: 'DELETE',
+      needAuth: true,
+    });
+  },
+
+  /** 本人权益列表，只读；不在前端推断会员、折扣或可核销状态。 */
+  getMyBenefits(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的权益'));
+    return unwrapList(request('/me/benefits', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  /** 本人通知列表，返回 items 并保留 total/unreadCount 分页元数据。 */
+  getMyNotifications(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('消息通知'));
+    return request('/me/notifications', { method: 'GET', data: params, needAuth: true });
+  },
+
+  markAllNotificationsRead() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('消息通知'));
+    return request('/me/notifications/read-all', { method: 'PATCH', needAuth: true });
+  },
+
+  markNotificationRead(kind, id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('消息通知'));
+    return request(`/me/notifications/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/read`, {
+      method: 'PATCH',
+      needAuth: true,
+    });
+  },
+
+  /** 本人浏览记录；仅表示浏览或打开来源入口，不表示投递/预约结果。 */
+  getMyBrowseLogs(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('浏览记录'));
+    return unwrapList(request('/me/browse-logs', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  deleteMyBrowseLog(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除浏览记录'));
+    return request(`/me/browse-logs/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
+
   /**
    * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
    * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan
@@ -603,6 +679,17 @@ const api = {
   // ---------- 打印订单 ----------
 
   /**
+   * 公开打印价目（无需登录）。
+   * 后端运行时从 PriceConfig 读取，返回
+   * { billingEnabled, items: [{ serviceKey, unitCents, unit, description }] }。
+   * 页面不得在失败时回退硬编码价，避免展示价和最终扣费漂移。
+   */
+  getPrintPriceConfig() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    return request('/print/price-config', { method: 'GET', needAuth: false });
+  },
+
+  /**
    * 本人打印订单列表（需登录）。游标分页。
    * 后端: GET /api/v1/me/print-orders?cursor=&pageSize=
    * unwrapList 后返回 MemberPrintOrderItem[] 数组，附 .nextCursor / .total
@@ -610,50 +697,6 @@ const api = {
   getMyPrintOrders(params = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印订单'));
     return unwrapList(request('/me/print-orders', { method: 'GET', data: params, needAuth: true }));
-  },
-
-  /**
-   * 获取本人订单的取件码（需登录）。
-   * 仅 paid + 未退款 + 未终态时后端返回数据；否则 404。
-   * 后端: GET /api/v1/me/print-orders/:orderId/pickup
-   * 返回 { orderId, orderNo, pickupCode, payStatus, taskStatus, terminalId }
-   */
-  getPickup(orderId) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取件码'));
-    return request(`/me/print-orders/${orderId}/pickup`, { method: 'GET', needAuth: true });
-  },
-
-  /**
-   * Kiosk 凭取件码认领打印任务（无需 auth；Kiosk 受控设备）。
-   * 后端: POST /api/v1/print/jobs/claim-pickup  body: { code }
-   * 返回 { taskId, orderId, orderNo, terminalId, taskStatus, printTaskStatus }
-   */
-  claimPickup(code) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('认领取件'));
-    return request('/print/jobs/claim-pickup', { method: 'POST', data: { code }, needAuth: false });
-  },
-
-  // ---------- 材料包 ----------
-
-  /**
-   * 本人材料包列表（需登录）。
-   * 后端: GET /api/v1/me/bundles?cursor=&pageSize=
-   * 返回 PrintBundleItem[] 数组，附 .nextCursor / .total
-   */
-  getBundles(params = {}) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包'));
-    return unwrapList(request('/me/bundles', { method: 'GET', data: params, needAuth: true }));
-  },
-
-  /**
-   * 创建材料包（需登录）。
-   * 后端: POST /api/v1/me/bundles
-   * body: { name, files: [{fileId, fileType, copies}], printParams: {color, duplex} }
-   * 返回 { bundleId, name, pickupCode, status, createdAt, expiresAt }
-   */
-  createBundle(data) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('创建材料包'));
-    return request('/me/bundles', { method: 'POST', data, needAuth: true });
   },
 
   /**

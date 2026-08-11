@@ -1,0 +1,62 @@
+/* pages/print/print.wxss */
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 打印路径卡：扁平编辑感，发丝描边 + 极淡墨影（不再厚投影） */
+.path-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(16,48,43,.04);
+  border: 1px solid var(--line);
+  margin: 0 16px 12px;
+  padding: 18px 16px;
+}
+/* 图标统一墨色单色，去三色路径块；青色只留给下方 flow pill 作操作提示 */
+.path-card .pc-ic {
+  width: 50px; height: 50px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex-shrink: 0;
+  background: var(--surface-3);
+  color: var(--ink-soft);
+  border: 1px solid var(--line-soft);
+}
+.pc-body { flex: 1; min-width: 0; }
+.pc-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+.pc-desc  { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.pc-flow  {
+  font-size: 11px; color: var(--teal-deep);
+  background: var(--teal-wash);
+  display: inline-block;
+  padding: 3px 8px; border-radius: var(--r-full);
+  margin-top: 8px;
+}
+/* 导航箭头统一：16px + ghost 色，与 .row-item .r-arrow 一致，去粗细不一 */
+.pc-arrow { color: var(--ghost); font-size: 16px; flex-shrink: 0; }
+
+/* ── 三步流程条：上传 → 选门店 → 结算取件 ── */
+.step-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 4px 16px 20px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.step { display: flex; align-items: center; gap: 8px; }
+.step-n {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: var(--teal);
+}
+.step-label { font-size: 12.5px; color: var(--ink-soft); font-weight: 500; letter-spacing: .3px; }
+.step-sep { color: var(--ghost); font-size: 13px; margin: 0 4px; }
+
+/* ── 路径标题行 + 推荐标签 ── */
+.pc-title-row { display: flex; align-items: center; gap: 8px; }
+.pc-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .5px;
+  color: var(--teal-deep);
+  padding: 1px 7px; border-radius: var(--r-full);
+  background: var(--teal-wash); border: 1px solid rgba(31,158,134,.18);
+}

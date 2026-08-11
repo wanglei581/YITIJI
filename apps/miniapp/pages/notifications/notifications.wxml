@@ -1,0 +1,71 @@
+<!--pages/notifications/notifications.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">消息通知</view>
+      <view class="nav-right nav-caps tap" hover-class="tap-press" bindtap="markAllRead">全部已读</view>
+    </view>
+  </view>
+
+  <!-- 筛选栏：OUTSIDE content，有自带 margin -->
+  <view class="filter-bar">
+    <view
+      class="f-chip {{activeFilter === item.id ? 'on teal' : ''}} tap"
+      wx:for="{{filters}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      hover-class="tap-press"
+      bindtap="setFilter"
+    >{{item.label}}</view>
+  </view>
+
+  <view class="content">
+
+    <view class="empty-slot card" wx:if="{{loading}}">
+      <view class="es-t">正在加载本人通知…</view>
+    </view>
+
+    <view class="empty-slot card" wx:elif="{{loadError}}" bindtap="loadNotifications">
+      <view class="es-t">加载失败，点此重试</view>
+      <view class="es-d">{{loadError}}</view>
+    </view>
+
+    <block wx:elif="{{list.length > 0}}">
+      <view
+        class="nt-item {{item.unread ? 'unread' : ''}} tap"
+        wx:for="{{list}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        hover-class="tap-press"
+        bindtap="tapItem"
+      >
+        <view class="nt-ic tone-{{item.tone}}"><text class="ficon i-{{item.icon}}"></text></view>
+        <view class="nt-body">
+          <view class="nt-head">
+            <view class="nt-t">{{item.t}}</view>
+            <view class="nt-time">{{item.time}}</view>
+          </view>
+          <view class="nt-text">{{item.body}}</view>
+          <view
+            class="nt-link tap"
+            wx:if="{{item.link}}"
+            data-id="{{item.id}}"
+            catchtap="tapLink"
+          >{{item.link}} ›</view>
+        </view>
+      </view>
+    </block>
+
+    <view class="empty-slot card" wx:else>
+      <view class="es-ic"><text class="ficon i-bell"></text></view>
+      <view class="es-t">暂无通知</view>
+      <view class="es-d">打印进度、招聘会提醒等消息会出现在这里</view>
+    </view>
+
+  </view>
+</view>

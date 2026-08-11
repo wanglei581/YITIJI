@@ -1,0 +1,89 @@
+<view class="as-wrap">
+  <!-- 顶部 header（teal 渐变） -->
+  <view class="as-top">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="as-row">
+      <view class="as-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right as-back-ic"></text>
+      </view>
+      <view class="as-av">
+        <text class="ficon i-robot as-av-ic"></text>
+      </view>
+      <view style="flex:1">
+        <view class="as-name">小青</view>
+        <view class="as-role">求职服务智能助手</view>
+      </view>
+      <view class="tap" hover-class="tap-press" bindtap="tapMore" style="padding:16rpx">
+        <text style="color:rgba(255,255,255,.85);font-size:40rpx;letter-spacing:4rpx">···</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对话区（可滚动） -->
+  <scroll-view scroll-y scroll-top="{{scrollTop}}" class="chat-scroll" enhanced enable-flex>
+    <view class="chat-body">
+
+      <view class="as-disc">{{disclaimer}}</view>
+
+      <block wx:for="{{messages}}" wx:key="id">
+        <!-- AI 消息 -->
+        <view wx:if="{{item.role === 'ai'}}" class="msg msg-ai">
+          <view class="msg-av-wrap">
+            <text class="ficon i-robot msg-av-ic"></text>
+          </view>
+          <view class="b-ai">
+            <view wx:if="{{item.loading}}" class="bt msg-loading">
+              <view class="dot"></view><view class="dot"></view><view class="dot"></view>
+            </view>
+            <view wx:else class="bt">{{item.text}}</view>
+            <!-- 引导卡 -->
+            <view wx:if="{{item.cards && item.cards.length}}" class="guide-cards">
+              <view wx:for="{{item.cards}}" wx:for-item="card" wx:key="id"
+                class="gc tap" hover-class="tap-press"
+                data-url="{{card.url}}" bindtap="tapCard">
+                <view class="gc-ic tone-{{card.tone}}">
+                  <text class="ficon i-{{card.icon}}"></text>
+                </view>
+                <view style="flex:1">
+                  <view class="gc-t">{{card.title}}</view>
+                  <view class="gc-s">{{card.sub}}</view>
+                </view>
+                <text class="ficon i-right gc-go"></text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 用户消息 -->
+        <view wx:if="{{item.role === 'user'}}" class="msg msg-user">
+          <view class="b-me">
+            <view class="bt">{{item.text}}</view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 快捷问题 -->
+      <scroll-view scroll-x class="quick-scroll">
+        <view class="quick-row">
+          <view wx:for="{{quickChips}}" wx:key="index"
+            class="q-chip tap" hover-class="tap-press"
+            data-text="{{item}}" bindtap="tapChip">{{item}}</view>
+        </view>
+      </scroll-view>
+
+      <view style="height:240rpx"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部输入栏（fixed） -->
+  <view class="input-bar">
+    <input class="ib-input" placeholder="和小青说点什么…"
+      placeholder-style="color:var(--muted)"
+      value="{{inputText}}" bindinput="onInputChange"
+      confirm-type="send" bindconfirm="sendMsg"
+      disabled="{{sending}}" />
+    <view class="ib-send tap {{sending ? 'ib-disabled' : ''}}" hover-class="tap-press" bindtap="sendMsg">
+      <text class="ficon i-right" style="transform:rotate(-90deg)"></text>
+    </view>
+  </view>
+</view>

@@ -44,6 +44,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '职易达 · 就业创业政策', path: '/pages/policies/policies' }
+    return { title: '智引答 · 就业创业政策', path: '/pages/policies/policies' }
   },
 })

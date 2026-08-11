@@ -1,0 +1,237 @@
+<!--pages/job-fit/job-fit.wxml-->
+<!-- 合规：只展示后端给出的三档参考等级，不展示数字比例或招聘结果预测。 -->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">岗位匹配参考</view>
+  </view>
+
+  <!-- 无已解析简历:不伪造分析结果,给真实入口 -->
+  <view wx:if="{{phase === 'no-task'}}" class="running-state">
+    <view class="st-ic"><text class="ficon i-file-text"></text></view>
+    <view class="rs-title">还没有可用的简历</view>
+    <view class="rs-sub">岗位匹配需要先上传并解析一份简历,才能与岗位要求做对比</view>
+    <view class="jf-cta tap" bindtap="toUpload">去上传简历 ›</view>
+  </view>
+
+  <!-- 授权闸门:后端强制,未授权调用分析会被 403 -->
+  <view wx:elif="{{phase === 'consent'}}" class="content">
+    <view class="card">
+      <view class="card-head"><view class="ch-title">需要你的授权</view></view>
+      <view class="card-inner">
+        <view class="jf-p">岗位匹配需要读取你已解析简历中的文本内容(教育、经历、技能等),与目标岗位要求做对比分析。</view>
+        <view class="jf-p">分析结果只提供给你本人参考,<text class="jf-strong">不会发送给任何用人单位,也不构成投递</text>。</view>
+        <view class="jf-p">授权可以随时撤销。</view>
+        <view wx:if="{{resumeName}}" class="jf-file">
+          <text class="ficon i-file-text jf-file-ic"></text>
+          <text class="jf-file-name">{{resumeName}}</text>
+        </view>
+      </view>
+    </view>
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>本功能只输出三档参考等级与文字建议，不提供数字比例，也不预测招聘结果。</text>
+    </view>
+    <view class="jf-act"><view class="btn primary block tap" bindtap="tapGrant">我已阅读并授权</view></view>
+  </view>
+
+  <!-- 确认目标岗位 -->
+  <view wx:elif="{{phase === 'target'}}" class="content">
+    <view wx:if="{{jobId}}" class="card">
+      <view class="card-head"><view class="ch-title">目标岗位</view></view>
+      <view class="card-inner">
+        <view class="jf-target-title">{{jobTitleHint || '已选择系统内岗位'}}</view>
+        <view class="jf-hint">将按该岗位的公开要求做对比分析。</view>
+      </view>
+    </view>
+    <view wx:else class="card">
+      <view class="card-head"><view class="ch-title">填写目标岗位</view></view>
+      <view class="card-inner">
+        <view class="jf-label">岗位名称</view>
+        <input class="jf-input" placeholder="例如:前端开发工程师" value="{{manualTitle}}" bindinput="inputTitle" maxlength="60" />
+        <view class="jf-label">岗位要求(可选)</view>
+        <textarea class="jf-textarea" placeholder="粘贴岗位的职责与要求,分析会更贴近实际" value="{{manualReq}}" bindinput="inputReq" maxlength="2000" />
+        <view class="jf-hint">不填写要求时,只能按岗位名称做通用对比。</view>
+      </view>
+    </view>
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>分析由 AI 完成,实测 6~40 秒不等,请勿离开页面。</text>
+    </view>
+    <view class="jf-act"><view class="btn primary block tap" bindtap="tapAnalyze">开始分析</view></view>
+  </view>
+
+  <!-- 分析中:只显示真实已用秒数,不显示伪造进度条 -->
+  <view wx:elif="{{phase === 'running'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-link rs-ic"></view>
+    </view>
+    <view class="rs-title">AI 正在对比简历与岗位要求…</view>
+    <view class="rs-sub">已用 {{elapsed}} 秒,实测 6~40 秒不等</view>
+    <view class="rs-disclaimer">分析结果仅供参考,不代表用人单位的招聘判断</view>
+  </view>
+
+  <!-- 失败:如实说明,由用户手动重试(每次分析都是真实模型调用) -->
+  <view wx:elif="{{phase === 'failed'}}" class="running-state">
+    <view class="st-ic warn"><text class="ficon i-info"></text></view>
+    <view class="rs-title">分析没有完成</view>
+    <view class="rs-sub">{{failMsg}}</view>
+    <view class="jf-cta tap" bindtap="retry">重新分析 ›</view>
+  </view>
+
+  <!-- 结果 -->
+  <view wx:elif="{{phase === 'done'}}" class="content has-bar">
+    <view class="notice plum">
+      <view class="ficon i-info n-ic"></view>
+      <text>以下结论由 AI 基于简历文本与岗位要求生成,仅供你本人参考,不代表用人单位的实际招聘判断。</text>
+    </view>
+
+    <view wx:if="{{fit.isMockProvider}}" class="notice warn">
+      <view class="ficon i-info n-ic"></view>
+      <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为求职依据。</text>
+    </view>
+
+    <!-- 参考等级:三档文字,无百分比。等级缺失时如实说明,不兜底造词 -->
+    <view class="fit-hero">
+      <view class="fit-level {{fit.fitTone}}">
+        <view class="fl-label">{{fit.fitLabel || '等级未提供'}}</view>
+        <view class="fl-cap">{{fit.fitLabel ? 'AI 参考等级' : '本次分析未返回等级'}}</view>
+      </view>
+      <view class="fit-info">
+        <view class="fit-job">{{fit.job.title || jobTitleHint || '目标岗位'}}</view>
+        <view wx:if="{{fit.job.company}}" class="fit-org">{{fit.job.company}}</view>
+        <view class="fit-src">{{fit.job.hasSource ? '来源：' + (fit.job.sourceName || '第三方平台') : '你手动填写的目标岗位'}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{fit.summary}}" class="card">
+      <view class="card-head"><view class="ch-title">总体说明</view></view>
+      <view class="card-inner"><view class="jf-summary">{{fit.summary}}</view></view>
+    </view>
+
+    <block wx:if="{{fit.hasRequirementBreakdown}}">
+      <view class="section-t">岗位要求拆解</view>
+      <view class="jf-breakdown">
+        <view wx:if="{{fit.requirementBreakdown.responsibilities.length}}" class="jf-break-row">
+          <view class="jf-break-cap">主要职责</view>
+          <view class="jf-break-list">
+            <view class="jf-break-item" wx:for="{{fit.requirementBreakdown.responsibilities}}" wx:key="*this">{{item}}</view>
+          </view>
+        </view>
+        <view wx:if="{{fit.requirementBreakdown.mustHave.length}}" class="jf-break-row">
+          <view class="jf-break-cap strong">明确要求</view>
+          <view class="jf-break-list">
+            <view class="jf-break-item" wx:for="{{fit.requirementBreakdown.mustHave}}" wx:key="*this">{{item}}</view>
+          </view>
+        </view>
+        <view wx:if="{{fit.requirementBreakdown.preferred.length}}" class="jf-break-row">
+          <view class="jf-break-cap">优先条件</view>
+          <view class="jf-break-list">
+            <view class="jf-break-item" wx:for="{{fit.requirementBreakdown.preferred}}" wx:key="*this">{{item}}</view>
+          </view>
+        </view>
+        <view wx:if="{{fit.requirementBreakdown.attention.length}}" class="jf-break-row">
+          <view class="jf-break-cap attention">需要留意</view>
+          <view class="jf-break-list">
+            <view class="jf-break-item" wx:for="{{fit.requirementBreakdown.attention}}" wx:key="*this">{{item}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="jf-source-note">以上条目仅摘自岗位原文，不代表平台新增招聘标准。</view>
+    </block>
+
+    <block wx:if="{{fit.matchPoints.length}}">
+      <view class="section-t">岗位要求与简历证据</view>
+      <view class="fit-list">
+        <view class="fit-item plus tap" wx:for="{{fit.matchPoints}}" wx:key="point"
+              data-title="{{item.point}}" data-text="{{item.evidence}}" bindtap="tapText">
+          <view class="fi-mark">✓</view>
+          <view class="fi-body">
+            <view wx:if="{{item.requirement}}" class="fi-requirement">岗位要求 · {{item.requirement}}</view>
+            <view class="fi-text">{{item.point}}</view>
+            <view wx:if="{{item.evidence}}" class="fi-sub">简历证据 · {{item.evidence}}</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{fit.gapPoints.length}}">
+      <view class="section-t">岗位要求与补强建议</view>
+      <view class="fit-list">
+        <view class="fit-item minus tap" wx:for="{{fit.gapPoints}}" wx:key="gap"
+              data-title="{{item.gap}}" data-text="{{item.suggestion}}" bindtap="tapText">
+          <view class="fi-mark">△</view>
+          <view class="fi-body">
+            <view wx:if="{{item.requirement}}" class="fi-requirement">岗位要求 · {{item.requirement}}</view>
+            <view class="fi-text">{{item.gap}}</view>
+            <view wx:if="{{item.suggestion}}" class="fi-sub">建议 · {{item.suggestion}}</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{fit.hasKeywordCoverage}}">
+      <view class="section-t">岗位关键词</view>
+      <view class="card">
+        <view class="card-inner">
+          <view wx:if="{{fit.keywordMatched.length}}" class="jf-kw-row">
+            <view class="jf-kw-cap">简历中出现</view>
+            <view class="chips">
+              <view class="chip teal" wx:for="{{fit.keywordMatched}}" wx:key="*this">{{item}}</view>
+            </view>
+          </view>
+          <view wx:if="{{fit.keywordMissing.length}}" class="jf-kw-row">
+            <view class="jf-kw-cap">简历中未出现</view>
+            <view class="chips">
+              <view class="chip" wx:for="{{fit.keywordMissing}}" wx:key="*this">{{item}}</view>
+            </view>
+          </view>
+          <view class="jf-hint">关键词是否出现只反映文本命中情况,不代表你是否具备该能力。</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{fit.targetedSuggestions.length}}">
+      <view class="section-t">针对性建议</view>
+      <view class="fit-list">
+        <view class="fit-sug" wx:for="{{fit.targetedSuggestions}}" wx:key="*this">
+          <view class="fs-idx">{{index + 1}}</view>
+          <view class="fs-body">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <view class="section-t">继续准备</view>
+    <view class="jf-next-list">
+      <view class="jf-next tap" bindtap="tapOptimizeResume">
+        <view class="jf-next-icon"><text class="ficon i-edit"></text></view>
+        <view class="jf-next-main">
+          <view class="jf-next-title">继续优化这份简历</view>
+          <view class="jf-next-sub">生成优化稿后，对照上面的差距与建议逐项核实</view>
+        </view>
+        <view class="jf-next-go">›</view>
+      </view>
+      <view class="jf-next tap" bindtap="tapPracticeInterview">
+        <view class="jf-next-icon"><text class="ficon i-comment"></text></view>
+        <view class="jf-next-main">
+          <view class="jf-next-title">针对该岗位练习面试</view>
+          <view class="jf-next-sub">自动带入岗位名称，题目仍仅用于个人练习</view>
+        </view>
+        <view class="jf-next-go">›</view>
+      </view>
+    </view>
+
+    <view class="notice info">
+      <view class="ficon i-info n-ic"></view>
+      <text>以上分析不代表招聘方意见。投递须前往来源平台操作。</text>
+    </view>
+    <view class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>
+  </view>
+
+  <view wx:if="{{phase === 'done'}}" class="actionbar">
+    <view class="btn ghost tap {{printing ? 'disabled' : ''}}" bindtap="tapPrint">{{printing ? '生成中…' : '生成报告去打印'}}</view>
+    <view wx:if="{{fit.job.id || jobId}}" class="btn primary tap flex-1-6" bindtap="tapViewJob">查看岗位</view>
+  </view>
+</view>

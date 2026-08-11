@@ -1,0 +1,96 @@
+<!--pages/interview-result/interview-result.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">模拟面试复盘</view>
+  </view>
+  <view class="content has-bar">
+
+    <!-- 生成中 -->
+    <view wx:if="{{phase === 'loading'}}" class="ri-state">
+      <view class="spinner"></view>
+      <text class="state-tip">AI 正在生成复盘报告，约需 30 秒，请稍候…</text>
+    </view>
+
+    <!-- 失败 -->
+    <view wx:if="{{phase === 'failed'}}" class="ri-state">
+      <view class="ficon i-info ri-fail-ic"></view>
+      <text class="state-tip">{{failMsg}}</text>
+      <view class="btn ghost tap ri-retry-btn" bindtap="tapRetry">重新开始</view>
+    </view>
+
+    <!-- 报告 -->
+    <block wx:if="{{phase === 'done'}}">
+
+      <!-- 总评卡 -->
+      <view class="ri-hero">
+        <view class="rh-level" style="color:{{overallColor}}">{{overallLabel}}</view>
+        <view class="rh-pos">
+          {{position}}
+          <text wx:if="{{interviewerLabel}}" class="rh-iv"> · {{interviewerLabel}}</text>
+        </view>
+        <view class="rh-summary">{{overallSummary}}</view>
+      </view>
+
+      <!-- 能力维度点评 -->
+      <view wx:for="{{sections}}" wx:key="key" class="ri-section">
+        <view class="rs-title">{{item.title}}</view>
+        <view
+          wx:for="{{item.items}}"
+          wx:key="*this"
+          wx:for-item="point"
+          wx:for-index="pi"
+          class="rs-point"
+        >
+          <text class="rs-dot">·</text>
+          <text class="rs-text">{{point}}</text>
+        </view>
+      </view>
+
+      <!-- 高概率追问 -->
+      <view wx:if="{{predictedQuestions.length > 0}}" class="ri-section">
+        <view class="rs-title">高概率追问</view>
+        <view wx:for="{{predictedQuestions}}" wx:key="question" class="ri-pred-item">
+          <view class="rp-q">{{item.question}}</view>
+          <view class="rp-why">为什么会问：{{item.why}}</view>
+          <view class="rp-app">建议思路：{{item.approach}}</view>
+        </view>
+      </view>
+
+      <!-- STAR 法则回顾 -->
+      <view wx:if="{{starAdvice}}" class="ri-section">
+        <view class="rs-title">STAR 法则回顾</view>
+        <view class="ri-star">
+          <view class="star-row"><text class="star-k">S</text><text class="star-v">{{starAdvice.s}}</text></view>
+          <view class="star-row"><text class="star-k">T</text><text class="star-v">{{starAdvice.t}}</text></view>
+          <view class="star-row"><text class="star-k">A</text><text class="star-v">{{starAdvice.a}}</text></view>
+          <view class="star-row"><text class="star-k">R</text><text class="star-v">{{starAdvice.r}}</text></view>
+          <view wx:if="{{starAdvice.reminder}}" class="star-reminder">💡 {{starAdvice.reminder}}</view>
+        </view>
+      </view>
+
+      <!-- 面试前行动清单 -->
+      <view wx:if="{{checklist.length > 0}}" class="ri-section">
+        <view class="rs-title">面试前行动清单</view>
+        <view wx:for="{{checklist}}" wx:key="*this" wx:for-item="item" class="ri-check-item">
+          <text class="chk-box">☐</text>
+          <text class="chk-text">{{item}}</text>
+        </view>
+      </view>
+
+      <view class="notice info ri-disc">
+        <view class="ficon i-info n-ic"></view>
+        <text>以上复盘由 AI 生成，仅供个人练习参考，不代表任何招聘机构的评价标准。</text>
+      </view>
+
+    </block>
+  </view>
+
+  <view wx:if="{{phase === 'done'}}" class="actionbar">
+    <view class="btn ghost tap {{printing ? 'ri-btn-loading' : ''}}" bindtap="tapPrint">
+      {{printing ? '生成中…' : '打印报告'}}
+    </view>
+    <view class="btn primary tap flex-1-4" bindtap="tapRetry">再练一次</view>
+  </view>
+</view>

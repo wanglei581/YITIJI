@@ -1,0 +1,71 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 诊断中动画 */
+.running-state { display: flex; flex-direction: column; align-items: center;
+  padding: 100rpx 32rpx 0; gap: 20rpx; }
+.rs-anim { position: relative; width: 120rpx; height: 120rpx; margin-bottom: 16rpx; }
+.rs-ring { position: absolute; inset: 0; border-radius: 50%;
+  border: 4rpx solid transparent; border-top-color: var(--teal);
+  animation: spin 1s linear infinite; }
+.rs-ic { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 48rpx; color: var(--teal); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rs-title { font-size: 34rpx; font-weight: 700; color: var(--ink); }
+.rs-sub { font-size: 26rpx; color: var(--muted); text-align: center; }
+.rs-disclaimer { font-size: 22rpx; color: var(--ghost); text-align: center;
+  margin-top: 8rpx; line-height: 1.6; }
+
+/* 空态 / 失败态图标 */
+.st-ic { width: 128rpx; height: 128rpx; border-radius: 50%; background: var(--surface-2);
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  font-size: 52rpx; margin-bottom: 8rpx; }
+.st-ic.warn { background: var(--warn-soft); color: var(--warn); }
+.saved-tip { margin-top: 12rpx; font-size: 26rpx; color: var(--teal); }
+
+/* 概览卡 */
+.diag-summary { background: linear-gradient(135deg,#183a32 0%,#1f9e86 100%);
+  border-radius: 16rpx; padding: 32rpx 28rpx; display: flex; align-items: center;
+  gap: 32rpx; margin-top: 16rpx; }
+.ds-score { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.ds-num { font-size: 60rpx; font-weight: 800; color: #fff; line-height: 1; }
+.ds-label { font-size: 22rpx; color: rgba(255,255,255,.7); margin-top: 6rpx; }
+.ds-counts { display: flex; gap: 24rpx; flex: 1; justify-content: center; }
+.ds-c { display: flex; flex-direction: column; align-items: center; gap: 6rpx; }
+.ds-n { font-size: 36rpx; font-weight: 700; }
+.ds-n.high { color: #ff6b6b; }
+.ds-n.mid { color: var(--wheat); }
+.ds-n.low { color: var(--ghost); }
+.ds-k { font-size: 22rpx; color: rgba(255,255,255,.7); }
+
+/* 综合分口径说明:必须紧跟概览卡,让用户看到这个分数是怎么来的 */
+.score-note { font-size: 21rpx; color: var(--ghost); text-align: center;
+  margin: 10rpx 0 4rpx; line-height: 1.5; }
+
+/* 维度得分 */
+.dim-card { padding: 8rpx 28rpx 20rpx; }
+.dim-row { padding: 20rpx 0; }
+.dim-row + .dim-row { border-top: 2rpx solid var(--line-faint); }
+.dim-head { display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 12rpx; }
+.dim-label { font-size: 27rpx; color: var(--ink); font-weight: 500; }
+.dim-score { font-family: var(--font-serif); font-size: 30rpx; font-weight: 700;
+  color: var(--ink); }
+.dim-max { font-size: 21rpx; font-weight: 400; color: var(--ghost); }
+
+/* 问题列表 */
+.issue-list { background: var(--surface); border-radius: 14rpx; overflow: hidden; }
+.issue-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 24rpx;
+  border-bottom: 1rpx solid var(--line); }
+.issue-item:last-child { border-bottom: none; }
+.ii-left { padding-top: 8rpx; }
+.sev-dot { width: 16rpx; height: 16rpx; border-radius: 50%; flex-shrink: 0; }
+.sev-dot.high { background: #ff6b6b; }
+.sev-dot.mid { background: var(--wheat); }
+.sev-dot.low { background: var(--ghost); }
+.ii-body { flex: 1; }
+.ii-title { font-size: 28rpx; font-weight: 600; color: var(--ink); }
+.ii-tip { font-size: 26rpx; color: var(--ink); margin-top: 8rpx; line-height: 1.6; }
+.ii-arr { font-size: 28rpx; color: var(--ghost); flex-shrink: 0; margin-top: 4rpx; }
+
+/* flex */
+.flex-1-5 { flex: 1.5; }

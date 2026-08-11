@@ -1,0 +1,37 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 进度条 */
+.qa-progress { height: 6rpx; background: var(--line); border-radius: 3rpx; margin-bottom: 20rpx; }
+.qap-bar { height: 100%; background: var(--teal); border-radius: 3rpx; transition: width .3s ease; }
+
+/* 题目卡 */
+.qa-card { background: var(--surface); border-radius: 14rpx; padding: 32rpx 28rpx; }
+.qa-q { font-size: 32rpx; font-weight: 600; color: var(--ink); line-height: 1.6; }
+
+/* 输入区 */
+.qa-input-area { margin-top: 16rpx; }
+.qa-textarea { width: 100%; min-height: 240rpx; background: var(--surface);
+  border-radius: 14rpx; padding: 24rpx; font-size: 28rpx; color: var(--ink);
+  line-height: 1.7; border: 2rpx solid var(--line); }
+.word-count { font-size: 22rpx; color: var(--ghost); text-align: right;
+  margin-top: 8rpx; padding-right: 4rpx; }
+
+/* nav */
+.prog-text { font-size: 24rpx; color: var(--muted); }
+.w-full { width: 100%; }
+
+/* 状态：loading / failed */
+.qa-state { display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
+.state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.6; }
+.qa-fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.qa-back-btn { margin-top: 8rpx; }
+
+/* spinner（inline SVG rotate） */
+.spinner { width: 56rpx; height: 56rpx; border: 4rpx solid var(--line);
+  border-top-color: var(--teal); border-radius: 50%;
+  animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 提交中按钮禁用态 */
+.qa-btn-loading { opacity: .6; }

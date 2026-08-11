@@ -1,0 +1,75 @@
+<view class="page-wrap">
+<view style="height:{{statusBarHeight}}px"></view>
+<view class="navbar">
+  <view class="nav-back tap" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+  <view class="nav-title">打印参数</view>
+  <view class="nav-right"></view>
+</view>
+
+<view class="content has-bar">
+  <view class="steps rise-d1">
+    <view class="st on"><text class="n">1</text><text class="nl">上传文件</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">2</text><text class="nl">选门店</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
+    <view class="line"></view>
+    <view class="st"><text class="n">4</text><text class="nl">现场打印</text></view>
+  </view>
+
+  <view class="card file-card rise-d2 tap" hover-class="tap-press" bindtap="tapFile">
+    <view class="fc-ic a-teal"><text class="ficon i-file-text"></text></view>
+    <view class="fc-main">
+      <view class="fc-name">{{file.name}}</view>
+      <view class="fc-meta">{{hasFile ? (hasPageCount ? file.pages + ' 页 · ' + file.size : '服务端暂未提供页数') : '从本人文档或真实 AI 成果选择'}}</view>
+    </view>
+    <view class="fc-preview">{{hasFile ? '预览排版' : '选择文件'}} ›</view>
+  </view>
+
+  <view class="section-t rise-d3">打印颜色</view>
+  <view class="opt-list rise-d3">
+    <view class="opt {{color==='bw'?'on':''}} tap" data-v="bw" bindtap="pickColor">
+      <view class="o-radio">{{color==='bw'?'✓':''}}</view>
+      <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济,适合文字文档</view></view>
+      <view class="o-price">{{priceLabels.bw}}</view>
+    </view>
+    <view class="opt {{color==='color'?'on':''}} tap" data-v="color" bindtap="pickColor">
+      <view class="o-radio">{{color==='color'?'✓':''}}</view>
+      <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">色彩还原,适合证件照/图表</view></view>
+      <view class="o-price">{{priceLabels.color}}</view>
+    </view>
+  </view>
+
+  <view class="section-t rise-d4">纸张规格</view>
+  <view class="card flat paper-row rise-d4">
+    <view class="pr-main"><view class="o-title">A4 (210 × 297mm)</view><view class="o-sub">标准幅面</view></view>
+    <view class="paper-badge">仅支持 A4</view>
+  </view>
+
+  <view class="section-t rise-d4">打印方式</view>
+  <view class="duplex-row rise-d4">
+    <view class="duplex-opt {{duplex==='single'?'on':''}} tap" data-v="single" bindtap="pickDuplex">单面</view>
+    <view class="duplex-opt {{duplex==='double'?'on':''}} tap" data-v="double" bindtap="pickDuplex">双面 · 自动</view>
+  </view>
+
+  <view class="section-t rise-d5">打印份数</view>
+  <view class="card flat stepper-row rise-d5">
+    <view class="o-title">份数</view>
+    <view class="stepper">
+      <view class="s-btn tap {{copies<=1?'off':''}}" bindtap="minus">−</view>
+      <view class="s-val">{{copies}}</view>
+      <view class="s-btn tap" bindtap="plus">+</view>
+    </view>
+  </view>
+
+  <view class="compliance-note rise-d6">本期为小程序预提交、到机码核验和机端支付；到机确认前不会创建 Agent 可领取的打印任务。</view>
+</view>
+
+<view class="actionbar">
+  <view class="ab-price">
+    <text class="ab-label">{{priceStatus === 'loading' ? '正在读取价目' : (priceStatus === 'ready' ? '预估费用' : '价格暂不可用')}}</text>
+    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">¥{{total}}</text>
+  </view>
+  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || !hasPageCount ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (!hasPageCount ? '缺少可信页数' : '选择门店 →')}}</view>
+</view>
+</view>

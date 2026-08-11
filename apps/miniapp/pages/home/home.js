@@ -2,9 +2,7 @@
 const app = getApp()
 const auth = require('../../utils/auth')
 
-// M0.1 壳阶段：首页入口只映射到四个 Tab；未上线功能统一提示，不伪造页面。
-const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
-
+// 问候语按时段
 function greetWord() {
   const h = new Date().getHours()
   if (h < 6)  return '夜深了'
@@ -13,6 +11,7 @@ function greetWord() {
   return '晚上好'
 }
 
+// 今日日期字符串
 function todayStr() {
   const d = new Date()
   const M = d.getMonth() + 1
@@ -24,26 +23,25 @@ function todayStr() {
 Page({
   data: {
     statusBarHeight: 20,
+    isLoggedIn: false,
+    userName: '同学',
     greetWord: '你好',
     todayStr: '',
-    userName: '同学',
     preparationTools: [
-      { title: '生成简历', icon: 'edit', tab: '/pages/ai/ai' },
-      { title: '模拟面试', icon: 'comment', tab: '/pages/ai/ai' },
-      { title: '职业规划', icon: 'aim', tab: '/pages/ai/ai' },
-      { title: '岗位匹配', icon: 'solution', tab: '/pages/ai/ai' },
+      { title: '上传简历', icon: 'edit', url: '/pages/resume-upload/resume-upload' },
+      { title: '模拟面试', icon: 'comment', url: '/pages/interview-entry/interview-entry' },
+      { title: '职业规划', icon: 'aim', url: '/pages/career-plan/career-plan' },
+      { title: '岗位匹配', icon: 'solution', url: '/pages/job-fit/job-fit' },
     ],
     materialLinks: [
-      { title: '我的简历', icon: 'file-text', tab: '/pages/me/me' },
-      { title: '我的文档', icon: 'folder', tab: '/pages/me/me' },
-      { title: '打印订单', icon: 'history', tab: '/pages/me/me', wide: true },
-      { title: '扫描同步', icon: 'scan', tab: '/pages/me/me' },
-      { title: '在线打印', icon: 'printer', tab: '/pages/me/me' },
+      { title: '我的简历', icon: 'file-text', url: '/pages/resumes/resumes' },
+      { title: '打印订单', icon: 'history', url: '/pages/orders/orders', wide: true },
+      { title: '在线打印', icon: 'printer', url: '/pages/print/print' },
     ],
     discoveryLinks: [
-      { title: '招聘会', icon: 'calendar', tab: '/pages/jobs/jobs' },
-      { title: '就业政策', icon: 'form', tab: '/pages/jobs/jobs' },
-      { title: '企业信息', icon: 'bank', tab: '/pages/jobs/jobs' },
+      { title: '招聘会', icon: 'calendar', url: '/pages/fairs/fairs' },
+      { title: '就业政策', icon: 'form', url: '/pages/policies/policies' },
+      { title: '企业信息', icon: 'bank', url: '/pages/companies/companies' },
     ],
   },
 
@@ -60,27 +58,35 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
-    const user = auth.isLoggedIn() ? auth.getUser() : null
-    this.setData({ userName: (user && (user.nickname || user.name || user.phone)) || '同学' })
+    this._refresh()
   },
+
+  _refresh() {
+    const loggedIn = auth.isLoggedIn()
+    const user = loggedIn ? auth.getUser() : null
+    const name = (user && (user.nickname || user.name)) || '同学'
+    this.setData({ isLoggedIn: loggedIn, userName: name })
+  },
+
+  // ── 事件处理 ──
 
   tapService(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
-    if (TAB_PATHS.includes(url)) {
+    if (url === '/pages/jobs/jobs') {
       wx.switchTab({ url })
     } else {
-      wx.showToast({ title: '该功能在 M1 上线，敬请期待', icon: 'none' })
+      wx.navigateTo({ url })
     }
   },
 
-  tapComingSoon() {
-    wx.showToast({ title: '该功能在 M1 上线，敬请期待', icon: 'none' })
+  tapNotify() {
+    wx.navigateTo({ url: '/pages/notifications/notifications' })
   },
 
   onShareAppMessage() {
     return {
-      title: '职易达 · AI 求职与职业生活服务',
+      title: '求职通 · AI求职打印服务',
       path: '/pages/home/home',
     }
   },
