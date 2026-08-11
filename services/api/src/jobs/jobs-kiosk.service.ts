@@ -63,7 +63,7 @@ export class JobsKioskService {
     const [rows, total] = await Promise.all([
       this.prisma.job.findMany({
         where,
-        orderBy: { syncTime: 'desc' },
+        orderBy: [{ syncTime: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -144,7 +144,7 @@ export class JobsKioskService {
         const result = await Promise.all([
           this.prisma.jobFair.findMany({
             where,
-            orderBy: { startAt: 'asc' },
+            orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
             skip,
             take: pageSize,
             include: { _count: { select: { companies: true } } },
@@ -156,8 +156,8 @@ export class JobsKioskService {
       } else {
         const now = new Date()
         const result = await this.getPublishedFairRowsByGroups([
-          { where: { ...where, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
-          { where: { ...where, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
+          { where: { ...where, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
+          { where: { ...where, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
         ], skip, pageSize)
         rows = result.rows
         total = result.total
@@ -165,10 +165,10 @@ export class JobsKioskService {
     } else {
       const now = new Date()
       const result = await this.getPublishedFairRowsByGroups([
-        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
-        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
-        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
-        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
+        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
+        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
+        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
+        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
       ], skip, pageSize)
       rows = result.rows
       total = result.total

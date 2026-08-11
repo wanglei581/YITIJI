@@ -38,8 +38,10 @@ export class PoliciesController {
     @Query('kind') kind?: string,
     @Query('audience') audience?: string,
     @Query('category') category?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.policies.getPublishedPolicies({ kind, audience, category })
+    return this.policies.getPublishedPolicies({ kind, audience, category, page, pageSize })
   }
 
   // ── Partner ─────────────────────────────────────────────────────────────────
