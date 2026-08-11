@@ -176,7 +176,7 @@ export function SmartCampusHomePage() {
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>
-          校方授权的官方校园服务入口。仅信息展示与指引，不在本终端采集任何个人信息。
+          校园服务信息专区。仅信息展示与指引，不在本终端采集任何个人信息；具体办理请以学校官方通知为准。
             </p>
           </div>
 

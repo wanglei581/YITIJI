@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
@@ -105,7 +106,7 @@ export function FairMaterialsPage() {
       subtitle={fair ? `${fair.name} · ${materials.length} 份资料` : `${materials.length} 份资料`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<FusionBadge icon={FileTextIcon}>免费打印</FusionBadge>}
+      badge={<FusionBadge icon={FileTextIcon}>活动资料</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
@@ -137,7 +138,7 @@ export function FairMaterialsPage() {
                 ? '正在准备打印文件…'
                 : API_MODE !== 'http'
                   ? '暂不可打印'
-                  : `免费打印(${mat.pageCount} 页)`
+                  : `打印(${mat.pageCount} 页)`
 
               return (
                 <div
@@ -190,10 +191,10 @@ export function FairMaterialsPage() {
         )}
 
       <section className="jf-card accented">
-        <FusionSectionHead icon={PrinterIcon} title="如何打印" subtitle="三步完成，免费出纸" />
+        <FusionSectionHead icon={PrinterIcon} title="如何打印" subtitle="三步完成" />
         <FusionStepStrip
           steps={[
-            { title: '选择一份资料', desc: '点击对应资料的「免费打印」' },
+            { title: '选择一份资料', desc: '点击对应资料的「打印」' },
             { title: '确认打印参数', desc: '黑白 / 双面等参数已按推荐预设' },
             { title: '取纸', desc: '在出纸口领取，注意保管个人物品' },
           ]}
@@ -209,7 +210,7 @@ export function FairMaterialsPage() {
       )}
 
       <FusionNotice>
-        资料由主办方 / 机构上传，标记为可打印的资料均可免费打印；实际页数以文件为准。
+        资料由主办方 / 机构上传；标记为可打印的资料可在本机打印，费用以下单时报价为准，实际页数以文件为准。
       </FusionNotice>
     </KioskPageFrame>
   )

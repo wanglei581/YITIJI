@@ -36,13 +36,19 @@ export function StatsTab({ stats }: { stats: AdminFairStats | null }) {
             <p className="text-lg font-bold text-neutral-800">{stats.snapshot.jobCount}</p>
             <p className="text-xs text-neutral-500">来源标称岗位数</p>
           </div>
+          {/*
+            2026-08-11（CLAUDE.md §9 不伪造能力）：
+            JobFair.viewCount 全项目**零递增写入**（schema 默认 0），因此恒为 0。
+            此处原样展示并标注「终端浏览次数」构成伪造数据——运营会以为该场次无人浏览。
+            改为明示未接入。真实浏览数据在 BrowseLog 里，接入需单独开发。
+          */}
           <div className="rounded-lg bg-neutral-50 p-3 text-center">
-            <p className="text-lg font-bold text-neutral-800">{stats.snapshot.viewCount}</p>
+            <p className="text-lg font-bold text-neutral-400">未接入</p>
             <p className="text-xs text-neutral-500">终端浏览次数</p>
           </div>
         </div>
         <p className="mt-3 text-xs text-neutral-400">
-          系统仅统计服务行为(录入 / 浏览 / 打印),不记录求职者个人信息,不参与招聘闭环。现场签到 / 展位入驻未建数据模型,此处不展示估算数据。
+          系统仅统计服务行为(录入 / 打印),不记录求职者个人信息,不参与招聘闭环。终端浏览次数尚未接入统计管线;现场签到 / 展位入驻未建数据模型,此处均不展示估算数据。
         </p>
       </Card>
     </div>

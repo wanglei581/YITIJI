@@ -396,10 +396,11 @@ export function ZoneRow() {
             </span>
             <span className="z-text">
               <b>智慧校园</b>
-              <span className="z-sub">校园终端由校方开启后显示</span>
+              <span className="z-sub">本机已开启校园服务专区</span>
             </span>
             <span className="z-side">
-              <span className="z-tag">校方已开启</span>
+              {/* 该开关由平台 Admin 或校方 Partner 任一方设置，不能单独归因给校方 */}
+              <span className="z-tag">本机已开启</span>
               <span className="arrow">
                 <ProtoIcon name="arrow" />
               </span>

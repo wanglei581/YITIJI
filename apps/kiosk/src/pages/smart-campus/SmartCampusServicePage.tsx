@@ -56,7 +56,7 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     itemsTitle: '办理事项',
     items: ['新生首次办卡', '卡片遗失补办', '挂失与解挂', '信息变更换卡'],
     materials: ['录取通知书 / 学生证', '本人身份证原件', '近期一寸免冠照片'],
-    location: '校园卡服务中心（一卡通中心）· 行政楼一层',
+    location: '校园卡服务中心 / 一卡通中心（具体位置以学校迎新指引为准）',
     note: '校园卡线上办理后续开放，目前请携带上述材料前往校园卡服务中心办理；办理中遇到问题，可联系现场工作人员协助。',
   },
   'all-in-one': {
@@ -67,7 +67,7 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     itemsTitle: '开通权限',
     items: ['食堂与校内消费', '宿舍 / 教学楼门禁', '图书馆借阅', '自助圈存与充值'],
     materials: ['已办理的校园卡', '本人学号'],
-    location: '一卡通服务中心 · 自助圈存机（食堂、宿舍楼一层）',
+    location: '一卡通服务中心 / 校内自助圈存机（具体位置以学校迎新指引为准）',
     note: '一卡通权限开通暂未接入本终端线上办理，请前往一卡通服务中心或自助圈存机激活；如有疑问，可联系现场工作人员。',
   },
   'campus-network': {
@@ -78,29 +78,29 @@ const SERVICES: Record<ServiceKey, ServiceInfo> = {
     itemsTitle: '开通内容',
     items: ['校园 Wi-Fi 上网账号', '宿舍有线网络', '上网认证账号激活', '流量 / 套餐选择'],
     materials: ['本人学号', '初始密码（随录取材料发放）'],
-    location: '网络服务中心 · 校园网自助服务平台',
+    location: '网络服务中心 / 校园网自助服务平台（具体位置以学校迎新指引为准）',
     note: '校园网开通暂未接入本终端线上办理，请通过校园网自助服务平台或网络服务中心激活；如有疑问，可联系现场工作人员。',
   },
   luggage: {
     icon: PackageIcon,
     title: '行李帮运',
     subtitle: '服务点 · 路线 · 现场协助',
-    summary: '展示校方合作行李帮运服务信息、服务点位置与现场办理指引。',
+    summary: '行李帮运服务的通用说明与现场办理指引。',
     itemsTitle: '服务内容',
     items: ['新生行李短驳', '宿舍楼栋路线指引', '服务点排队说明', '异常件现场协助'],
     materials: ['录取通知书 / 学生证', '本人联系电话', '行李件数与目标宿舍楼栋'],
-    location: '迎新行李服务点 · 校门口 / 宿舍区入口',
-    note: '行李帮运仅作为校方合作服务信息入口，本终端不代收费用、不采集个人隐私信息；具体办理以现场服务点为准。',
+    location: '迎新行李服务点（具体位置以学校现场指引为准）',
+    note: '行李帮运为通用服务说明，本终端不代收费用、不采集个人隐私信息；是否提供该服务、服务点位置与收费均以学校现场指引为准。',
   },
   panorama: {
     icon: ScanFaceIcon,
     title: 'VR校园',
     subtitle: '全景导览 · 场馆介绍',
-    summary: '展示校园重点区域、教学楼、宿舍、图书馆等全景导览入口。',
+    summary: '校园全景导览入口；具体导览内容需学校提供后展示。',
     itemsTitle: '导览内容',
     items: ['校园主干路线', '教学楼与实验楼', '图书馆 / 食堂 / 体育馆', '宿舍区与服务中心'],
     materials: ['无需材料'],
-    location: '智慧校园服务专区 · VR校园导览',
+    location: '本终端 · 智慧校园服务专区',
     note: 'VR校园为信息展示与导览服务；如需实地咨询，请以前台志愿者或学校官方导览信息为准。',
   },
 }
@@ -144,7 +144,7 @@ export function SmartCampusServicePage() {
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
-            <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；实际办理请前往现场服务窗口或学校官方自助平台。</p>
+            <p>本页为通用办理指引，<b>不代表任何具体学校的安排</b>；所需材料、办理地点与流程请以学校官方通知为准。本终端不采集任何个人信息，实际办理请前往现场服务窗口或学校官方自助平台。</p>
           </div>
 
           <section className="kproto-card accented">
