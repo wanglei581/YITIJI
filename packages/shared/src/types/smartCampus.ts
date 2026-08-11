@@ -17,7 +17,7 @@ export type SmartCampusModuleKey = 'welcome' | 'bigdata' | 'luggage' | 'panorama
 
 /** 子模块开关位。 */
 export interface SmartCampusModules {
-  /** 迎新系统（只读信息 + 官方外链） */
+  /** 迎新指引（只读信息 + 来源链接） */
   welcome: boolean
   /** 校园大数据（本期冻结，需授权 + 合规就绪后才解冻） */
   bigdata: boolean

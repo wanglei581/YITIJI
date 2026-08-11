@@ -2,7 +2,7 @@
 // SmartCampusHomePage — 智慧校园服务中心（/smart-campus）
 //
 // 按终端开关：仅当后端返回 enabled 时，首页才出现入口卡进入本页。
-// 子模块按 config.modules 显隐。迎新系统 / 校园大数据为真实可达页面；
+// 子模块按 config.modules 显隐。迎新指引 / 校园大数据为真实可达页面；
 // 行李帮运 / 校园全景为校园服务说明页（仅信息展示与指引）。
 // 校园卡办理 / 一卡通开通 / 校园网开通为校园自助服务卡，随校园开启一并展示，点进
 // 各自说明页给出办理指引（本期前端入口/说明，未接真实办理后端）。
@@ -50,7 +50,7 @@ const ENTRIES: EntryDef[] = [
   {
     key: 'welcome',
     icon: PartyPopperIcon,
-    title: '迎新系统',
+    title: '迎新指引',
     description: '报到流程、办事窗口、入学与求职准备',
     to: '/smart-campus/welcome',
   },

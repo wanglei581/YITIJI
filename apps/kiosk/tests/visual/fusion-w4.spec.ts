@@ -147,7 +147,7 @@ test('campus 两个直达容错页诚实返回 @w4', async ({ page, api }) => {
 test('smart-campus enabled 与 service 指引可达 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api, { smartCampusEnabled: true })
   await page.goto('/smart-campus')
-  await expect(page.getByText('迎新系统')).toBeVisible()
+  await expect(page.getByText('迎新指引')).toBeVisible()
   await page.goto('/smart-campus/service/campus-card')
   await expect(page.getByText('办理指引 · 未接线上办理')).toBeVisible()
   await verifyPage(page, errors)
