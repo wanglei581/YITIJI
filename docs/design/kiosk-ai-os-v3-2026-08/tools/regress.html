@@ -147,6 +147,17 @@ var STATES = ['default', 'first', 'ai-down', 'device-off']
    报告里出现「等距抽样」四个字，就意味着那一页有没跑到的组合。 */
 var COMBO_CAP = 1200
 
+/* 跑哪一套主题。默认 warm（前几轮的基线都在这一套上）。
+   ------------------------------------------------------------
+   为什么要能换：`--fog-a04` 那次事故就是主题相关的 ——
+   26 个页面引用了三个从未定义的变量，整条 background / border 声明作废，
+   底色和边框全没了。而 themes.css 里每套主题各自覆盖 --surf-* / --brd-*，
+   **只在一套主题下跑，等于只验了九分之一。**
+   用 window.v3RunAll('', 'cobalt') 或 URL 上加 ?t=cobalt 换。 */
+var THEMES = ['warm', 'jade', 'cobalt', 'amber', 'neon', 'frost', 'honey', 'pine', 'ink']
+var THEME = (new URLSearchParams(location.search).get('t') || 'warm')
+if (THEMES.indexOf(THEME) < 0) THEME = 'warm'
+
 var PAGES = []          // 运行时从目录清单拉
 var RESULT = { env: {}, pages: [], startedAt: '', finishedAt: '' }
 
@@ -251,7 +262,7 @@ function loadPage (name) {
       }, 80)
     }
     try { frame.contentWindow.localStorage.clear() } catch (e) {}
-    frame.src = '../' + name + '?theme=warm&capture=1&t=' + Date.now()
+    frame.src = '../' + name + '?theme=' + THEME + '&capture=1&t=' + Date.now()
   })
 }
 
@@ -713,7 +724,8 @@ function validateLinks (pages) {
 }
 
 /* ── 主流程 ──────────────────────────────────────────────── */
-async function runAll (only) {
+async function runAll (only, theme) {
+  if (theme && THEMES.indexOf(theme) > -1) THEME = theme
   if (!checkEnv()) {
     log('环境自检没过。协议必须是 http、窗口必须 ~1120×2010，否则量出来的数不可复现。', 'bad')
     return
