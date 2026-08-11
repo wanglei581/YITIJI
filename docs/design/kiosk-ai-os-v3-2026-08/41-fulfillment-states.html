@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P41 支付到履约 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P41 支付到履约">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ── P41 支付到履约状态机 ────────────────────────────────────────────────
+   Codex 最终审查列的 P0 缺屏之二：「支付—退款—打印—取件没有完整、无竞态
+   的状态机」。P06 打印工作台只画了顺利那一条线；八种不顺利的处境无处安放。
+
+   八态共用两条纪律：
+
+   1) **金额只在打印台产生，本页只做状态与出路。** 这一页一个字都不定价、
+      不加价、不打折 —— 它只把「钱现在在哪一步」和「你能往哪走」说清楚。
+      **打印金额位**的计价单位一律是**计费页**，跟 06 打印台同一口径，
+      也跟后端 PriceConfig.unit 的 'page' 对齐：**计费页数 = 所选文档页数 × 份数**。
+      双面打印与「一面排 N 页」都**只减少用纸张数，不减少计费页数**。
+      2026-08-11 整改 ⑥：把「一律」的范围写清楚 —— 统一的是**打印链的金额位**，
+      不强套扫描、复印、AI 服务。复印（未来）用「计费张 / 实际出纸张数」
+      （身份证复印两面合成一张纸），扫描（未来）用「扫描页」。
+      本页不新增复印入口，也不展示复印价格。
+      单价不写死在页面里，走 scripts/site-config.js 的 data-site-unit="bw"
+      —— 那是后台 GET /print/price-config 的本机快照，运营改价这一页跟着变。
+      2026-08-11 修正 ①：本页原先自成一套「0.30 元/页」，且本单金额写成 6.00 元，
+      与退款明细（1.20 + 1.80 + 0.00 = 3.00）差一倍、加不拢。现按 06 第 722 行
+      的真实构成对齐：15 计费页 × 0.20 元 · 黑白双面 · 5 份 = 3.00 元；
+      已出 6 页 = 1.20 元，没出 9 页 = 1.80 元，卡住 0.00 元，合计 3.00 元。
+      2026-08-11 修正 ②：单位由「印刷面」改称「计费页」，**数字一个没动** ——
+      本单 3 页 × 5 份，两种口径下都是 15，所以账面完全不变，改的只是叫法。
+   2) **不做没有回执支撑的完成态断言。** 本机能确认的是「已提交到支付渠道」，
+      不能确认「钱到你账上了」。所以写「退款已提交 · 到账以银行为准」，
+      而不是「已退款」。差这一个词，用户就会停止追单，等一个不一定发生的结果。
+
+   ── 各态的判断依据 ──────────────────────────────────────────────
+   · 支付失败 —— 必须**先说钱没扣**。人在收银失败时第一反应是"我是不是被扣了"，
+     不先回答这个，后面写什么都读不进去。原因要分类，因为三类原因的出路不同。
+   · 付后待确认 —— 竞态最凶的一格：钱扣了、回执没到。这一屏的责任是
+     **把重复付款这条路堵死**，并给一个"5 分钟后自动转待打印订单"的兜底。
+   · 退款三态 —— 金额构成要逐项列出来（按未出的计费页数），否则用户无法判断退得对不对。
+     ⚠ 2026-08-11 整改 ④（前提必须写出来）：这三态画的是**出纸页数已由服务端确认**
+       的那一支。Terminal Agent 对「部分出纸 / 无法确认」判不准（它自己有
+       PRINT_JOB_UNCONFIRMED：「打印作业已提交到打印队列，但未确认完成，
+       请工作人员检查纸张、卡纸和出纸状态」），所以**不能承诺"自动按页算好退给你"**。
+       两分支口径（docs/reviews/2026-08-11-pricing-benefits-backend.md §四.7）：
+         · 服务端确认未出纸 → 可全额补偿；
+         · 部分出纸 / 无法确认 → 保持「异常处理中」，同单续打或人工复核，
+           不重复扣权益，也不自动按页退。
+       本页保留按页构成的展示，但屏上已写明前提；06 打印台的 s5 退款表已按两分支改。
+       缺什么才能去掉这个前提：出纸页数的可信回执（打印机侧计数 + 服务端履约状态机）。
+     「处理中 / 已提交 / 失败」三态分开，是因为出路完全不同。
+   · 耗材异常 —— 三种故障对用户的意义不一样：仓门未关他自己能解决，
+     缺纸缺粉他不能（纸盒上锁是防盗设计）。混成一句"设备异常"等于没说。
+   · 安全取件 —— 出纸口是公共的，凭码认领是唯一安全的放行方式。
+     已经出纸的钱不退 —— 这句必须写，否则认领流程会被当成退款入口。
+   · 错件事故 —— 拿错件是**隐私事故**，处理顺序是：先停手，再上报，再归还。
+
+   ── 结构 ────────────────────────────────────────────────────────
+   标准两栏骨架（同 04 系统态 / 40 会话安全），audit-plus 五项全部适用。
+   本页由支付回调与硬件上报触发，首页没有入口 —— 右栏第一块写清楚了。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 大状态头 */
+.bighead { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.bh-ic { width:66px; height:66px; border-radius:var(--r-md); display:grid; place-items:center; }
+.bh-ic .ic { width:32px; height:32px; }
+.bh--warn .bh-ic { background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.bh--warn .bh-ic .ic { color:var(--amber-400); }
+.bh--stop .bh-ic { background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.bh--stop .bh-ic .ic { color:var(--coral-400); }
+.bh--calm .bh-ic { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.bh--calm .bh-ic .ic { color:var(--jade-400); }
+.bh-t { font-size:38px; font-weight:800; color:var(--fog-900); line-height:1.18; }
+.bh-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.6; }
+.bh-p b { color:var(--fog-900); }
+
+/* 滚动归属：排不下时由 .sec 自己滚，不让 pane 裁掉底边 */
+.wmain .pane--grow > .sec, .wside .pane--grow > .sec {
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  display:flex; flex-direction:column; gap:var(--s-4); }
+.wmain .pane--grow, .wside .pane--grow { overflow:hidden; }
+
+/* 原因分类：三类原因的出路不同，不能混成一句"支付异常" */
+.cause { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.cs { display:grid; grid-template-columns:24px 1fr auto; gap:var(--s-4); align-items:center;
+  min-height:78px; padding:var(--s-4) var(--s-5); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.cs > i { width:10px; height:10px; border-radius:50%; background:var(--fog-a20); display:block; margin:0 auto; }
+.cs-b { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.cs-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.cs-s { font-size:var(--fz-2); color:var(--fog-700); }
+.cs-m { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.cs--hit { background:var(--coral-a12); border-color:var(--coral-a20); }
+.cs--hit > i { background:var(--coral-400); }
+.cs--hit .cs-m { color:var(--coral-200); }
+
+/* 付后待确认：横向四步，把"现在卡在哪"指出来 */
+.flow { flex:0 0 auto; display:flex; align-items:center; min-height:196px;
+  padding:var(--s-7) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); }
+.fw { flex:1; min-width:0; position:relative; display:flex; flex-direction:column;
+  align-items:center; gap:10px; text-align:center; }
+.fw::before { content:""; position:absolute; left:50%; right:-50%; top:20px; height:2px; background:var(--surf-3); }
+.fw:last-child::before { display:none; }
+.fw-d { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; z-index:2;
+  background:var(--ink-200); border:2px solid var(--brd-2); color:var(--fog-600);
+  font-family:var(--ff-num); font-size:15px; }
+.fw--done .fw-d { background:var(--jade-600); border-color:var(--jade-600); color:#fff; }
+.fw--now .fw-d { background:var(--amber-400); border-color:var(--amber-400); color:#1b2126;
+  box-shadow:0 0 0 6px var(--amber-a20); }
+.fw-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.fw-s { font-size:var(--fz-1); color:var(--fog-600); }
+
+/* 金额构成：逐项列出来，用户才判断得了退得对不对 */
+.amt { flex:0 0 auto; padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; }
+.am { display:flex; align-items:baseline; gap:var(--s-4); padding:11px 0;
+  border-bottom:1px solid var(--brd-1); font-size:var(--fz-3); color:var(--fog-700); }
+.am:last-child { border-bottom:0; }
+.am em { font-style:normal; flex:1 1 auto; min-width:0; }
+.am-x { flex:0 0 auto; font-size:var(--fz-1); color:var(--fog-600); }
+.am b { flex:0 0 auto; font-family:var(--ff-num); font-size:var(--fz-4);
+  color:var(--fog-900); font-weight:700; }
+.am--sum { border-top:1px solid var(--brd-2); border-bottom:0; margin-top:5px; padding-top:var(--s-4); }
+.am--sum em { color:var(--fog-900); font-weight:600; font-size:var(--fz-4); }
+.am--sum b { font-size:var(--fz-8); color:var(--jade-400); line-height:1; }
+
+/* 耗材三行表：三种故障对用户的意义不一样，必须分行说 */
+.sup { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-2); }
+.sr { display:grid; grid-template-columns:104px 1.05fr .85fr 1.1fr; gap:var(--s-3); align-items:center;
+  min-height:74px; padding:var(--s-3) var(--s-4); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px solid var(--brd-1);
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.4; }
+.sr--hd { min-height:0; padding:0 var(--s-4) 2px; background:transparent; border:0;
+  font-size:var(--fz-1); color:var(--fog-600); }
+.sr--hit { background:var(--amber-a12); border-color:var(--amber-a20); }
+.sr-n { font-size:var(--fz-3); color:var(--fog-900); font-weight:700; }
+
+/* 两条出路：同等大，不把"放弃"做小 */
+.picks { flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.picks--3 { grid-template-columns:repeat(3,1fr); }
+.pick { min-height:146px; padding:var(--s-5) var(--s-6); border-radius:var(--r-md);
+  display:flex; flex-direction:column; justify-content:center; gap:8px; text-align:left;
+  cursor:pointer; font-family:var(--ff-ui); text-decoration:none;
+  background:var(--surf-1); border:1px solid var(--brd-2); }
+.picks--3 .pick { padding:var(--s-5); }
+.pick-t { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); line-height:1.25; }
+.picks--3 .pick-t { font-size:var(--fz-5); }
+.pick-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.pick--go { background:var(--jade-a12); border-color:var(--jade-a32); }
+.pick--stop { background:var(--coral-a12); border-color:var(--coral-a20); }
+.pick:active { transform:scale(.99); }
+
+/* ── 示意卡：这一页是「状态长什么样」的样板页，.pick 不是入口 ─────────────
+   回归台的死按钮探针（真按一下 + 干净页复验）在本页把每一态的 .pick 都报了：
+   它们是 <button>、带 cursor:pointer、带按压缩放，长得和真按钮一模一样，
+   按下去却什么都不发生 —— 27 寸竖屏前的人会反复戳。
+
+   成因不是「忘了接线」。这一态的出路本来就在**常驻动作条**里：
+   右下角那两个 .btn 的文字与这两张卡**逐字相同**。
+   主区这一组是「这一态给用户的两条出路长什么样」的样板，
+   同一个动作在一屏上摆两份都能按的拷贝，本身就是交互缺陷 ——
+   用户会问「哪个才是真的」，而两个都真反而更糟。
+
+   处置：卡片**保留 <button> 标签**，显式声明 aria-disabled="true"。
+   不换成 div —— 换标签只是让探针看不见，用户照样戳；
+   aria-disabled 是探针作者自己留的豁免口（「状态标签本来就不该可点」），
+   读屏也会念「不可用」，两边说的是同一件事。
+   同时在视觉上说死，让人不用试就知道：
+     · 光标 not-allowed + 边框改虚线 —— 这两条**不用另写**：
+       components.css 里已经有全站禁用态口径
+       `[aria-disabled="true"] { cursor:not-allowed !important; border-style:dashed !important }`
+       （它自己的注释写着「禁用态可辨识：不能只靠 opacity」）。
+       这里只声明 aria-disabled，视觉语言直接落到既有那一套上，不新造一套。
+     · 整卡压淡到 .72（沿用 11-jobfit-compare 的 .is-planned 口径）
+     · 去掉按压缩放，手指按下去没有任何反馈
+     · 每张卡顶上一枚「示意 · 不可点」角标（同 pay.css 的 .cash-code--dead::before）
+   顶部六态导航、动作条、需要帮助、底部导航照常可点，页面能力一点没少。 */
+.pick[aria-disabled="true"] { opacity:.72; }
+.pick[aria-disabled="true"]:active { transform:none; }
+.pick[aria-disabled="true"]::before {
+  content:"示意 · 不可点"; align-self:flex-start;
+  padding:3px 12px; border-radius:var(--r-full);
+  background:var(--surf-2); border:1px dashed var(--brd-2);
+  font-size:var(--fz-1); color:var(--fog-700); letter-spacing:.04em; }
+
+/* 八态统一五问 */
+.tri { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.tb { display:grid; grid-template-columns:172px 1fr; gap:var(--s-4); align-items:center;
+  min-height:82px; padding:var(--s-4) var(--s-5); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.tb-k { display:inline-flex; align-items:center; gap:9px; font-size:var(--fz-2); color:var(--fog-600); }
+.tb-k i { width:9px; height:9px; border-radius:50%; display:block; background:var(--fog-a20); }
+.tb--why i { background:var(--amber-400); }
+.tb--you i { background:var(--jade-500); }
+.tb--idle i { background:var(--fog-500); }
+.tb--sys i { background:var(--azure-400); }
+.tb--not i { background:var(--coral-400); }
+.tb-v { font-size:var(--fz-4); color:var(--fog-900); line-height:1.45; }
+.tb-v b { color:var(--fog-900); font-weight:700; }
+
+/* 三格事实条 */
+.dl { flex:0 0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-3); }
+.d { min-height:122px; padding:var(--s-4) var(--s-5); border-radius:var(--r-sm);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; justify-content:center; gap:6px; }
+.d-k { font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.05em; }
+.d-v { font-size:var(--fz-7); font-weight:800; color:var(--fog-900); font-family:var(--ff-num); line-height:1.05; }
+.d-v em { font-style:normal; font-size:var(--fz-3); font-weight:600; }
+.d-s { font-size:var(--fz-2); color:var(--fog-700); }
+
+/* 小清单 */
+.sp { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
+.sp--ok { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.sp--no { background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.sp-hd { display:flex; align-items:center; gap:var(--s-3); }
+.sp-hd .ic { width:19px; height:19px; flex:0 0 auto; }
+.sp--ok .sp-hd .ic { color:var(--jade-400); }
+.sp--no .sp-hd .ic { color:var(--coral-400); }
+.sp-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sp-i { display:grid; grid-template-columns:13px 1fr; gap:var(--s-3); align-items:start;
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.sp-i i { width:6px; height:6px; border-radius:50%; margin-top:7px; display:block; background:var(--fog-a20); }
+.sp--ok .sp-i i { background:var(--jade-500); }
+.sp--no .sp-i i { background:var(--coral-400); }
+.sp-i b { color:var(--fog-900); }
+
+/* 取件码 */
+.vf { flex:0 0 auto; display:grid; grid-template-columns:1fr 236px; gap:var(--s-4); }
+.vf-l { padding:var(--s-6) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-4); justify-content:center; }
+.vf-k { font-size:var(--fz-2); color:var(--fog-600); }
+.vf-k b { color:var(--fog-900); }
+.vf-in { width:100%; height:92px; border-radius:var(--r-sm);
+  background:var(--surf-1); border:1.5px solid var(--brd-2); color:var(--fog-900);
+  font-family:var(--ff-num); font-size:46px; letter-spacing:.42em; text-align:center;
+  padding:0 0 0 .42em; }
+.vf-in::placeholder { color:var(--fog-500); letter-spacing:.42em; }
+.vf-r { padding:var(--s-5); border-radius:var(--r-md); background:var(--surf-1);
+  border:1px solid var(--brd-1); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:var(--s-3); }
+.vf-qr { width:128px; height:128px; border-radius:var(--r-sm); background:var(--paper-100);
+  display:grid; place-items:center; }
+.vf-qr .ic { width:82px; height:82px; color:#1b2126; }
+.vf-c { font-size:var(--fz-2); color:var(--fog-700); text-align:center; }
+
+/* 事故卡：错件是隐私事故，用 coral，不用中性灰 */
+.left { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-6);
+  padding:var(--s-6) var(--s-5); min-height:196px;
+  border-radius:var(--r-md); background:var(--coral-a12); border:1px solid var(--coral-a20); }
+.left-ic { width:96px; height:96px; flex:0 0 auto; border-radius:var(--r-md); display:grid;
+  place-items:center; background:var(--coral-a20); }
+.left-ic .ic { width:48px; height:48px; color:var(--coral-400); }
+.left-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:9px; }
+.left-t { font-size:var(--fz-7); font-weight:800; color:var(--fog-900); }
+.left-s { font-size:var(--fz-3); color:var(--fog-700); line-height:1.55; }
+.left-s b { color:var(--fog-900); }
+
+.notice { flex:0 0 auto; }
+
+/* 站点值缺配置时的兜底文案（「本机未配置就近终端 · 可问现场工作人员」）比普通取值长得多，
+   放进 kv 行会把键名挤成两行。键名不折行，值靠右换行 —— 兜底文案照显示，不因为排版就塞回假地址。 */
+.kv-row--site .k { white-space:nowrap; }
+.kv-row--site .v { text-align:right; }
+
+/* 「待开发」标：与 06 / 24 同一套视觉语言（不新造）。刻意不借 E1/E2/E3 的颜色 ——
+   E 标说的是「这条结论有多硬」，这里根本还没有结论，是一个还没开发的能力。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="pay-fail" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo"></span> · <span data-site="venue"></span></div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--warn"></span>打印机 · 本单未完成</div>
+    <!-- 2026-08-11 整改 ④：原写「未出的计费页自动退」，那是一句本机兑现不了的承诺
+         （出纸页数在部分出纸 / 队列无回执时并不确定）。改成本机真能负责的说法。 -->
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 未出纸部分待核定</div>
+    <div class="clock" data-clock>2026年8月10日 <b>17:41</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="pay-fail"><span class="rstep-dot">1</span><span class="rstep-name">支付失败</span></button>
+      <button class="rstep" data-go="pay-pending"><span class="rstep-dot">2</span><span class="rstep-name">付后待确认</span></button>
+      <button class="rstep" data-go="refund-doing"><span class="rstep-dot">3</span><span class="rstep-name">退款处理中</span></button>
+      <button class="rstep" data-go="refund-done"><span class="rstep-dot">4</span><span class="rstep-name">退款已提交</span></button>
+      <button class="rstep" data-go="refund-fail"><span class="rstep-dot">5</span><span class="rstep-name">退款失败</span></button>
+      <button class="rstep" data-go="supply"><span class="rstep-dot">6</span><span class="rstep-name">耗材异常</span></button>
+      <button class="rstep" data-go="claim"><span class="rstep-dot">7</span><span class="rstep-name">安全取件</span></button>
+      <button class="rstep" data-go="wrongdoc"><span class="rstep-dot">8</span><span class="rstep-name">错件事故</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>八种履约态</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── 1 支付失败 ─────────── -->
+      <div class="pane" data-at="pay-fail">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-card"/></svg></span>
+          <span class="bh-t">这笔没付成</span>
+          <span class="bh-p">钱<b>没有扣</b>，纸也<b>没有出</b></span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="pay-fail">
+        <div class="sec">
+          <div class="cause">
+            <div class="cs cs--hit"><i></i>
+              <span class="cs-b"><span class="cs-t">支付超时</span>
+                <span class="cs-s">二维码放了 5 分钟没被扫，本机自动关掉了这次收款</span></span>
+              <span class="cs-m">本次原因</span></div>
+            <div class="cs"><i></i>
+              <span class="cs-b"><span class="cs-t">余额或额度不足</span>
+                <span class="cs-s">付款方账户余额、日限额或免密额度不够</span></span>
+              <span class="cs-m">换个付法</span></div>
+            <div class="cs"><i></i>
+              <span class="cs-b"><span class="cs-t">网络中断</span>
+                <span class="cs-s">本机到支付服务器断开，收款请求没发出去</span></span>
+              <span class="cs-m">稍后重试</span></div>
+          </div>
+
+          <div class="picks picks--3">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">重新付一次</span>
+              <span class="pick-s">金额不变，单子还在</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">换个付法</span>
+              <span class="pick-s">微信、支付宝、服务台窗口</span>
+            </button>
+            <button class="pick pick--stop" type="button" aria-disabled="true">
+              <span class="pick-t">先放着不打</span>
+              <span class="pick-s">保留待打印单，30 分钟内回来还能付</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">收款码放了 <b>5 分钟</b>没被扫，自动关掉</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">重试、换付法，或者先放着不打</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">30 分钟后单子作废，文件还在</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">保留这张待打印单，金额不变</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不重复扣款，也不先出纸再要钱</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">本单金额</span><span class="d-v">3.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已扣款</span><span class="d-v">0.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">0 <em>页</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>没扣钱就没有退款这回事。要是手机上收到了扣款通知却停在这一屏，去看「付后待确认」那一格。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 2 付后待确认 ─────────── -->
+      <div class="pane" data-at="pay-pending">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <span class="bh-t">钱已扣，等支付平台回执</span>
+          <span class="bh-p">这一单<b>已经锁住</b>，不会再扣第二次</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="pay-pending">
+        <div class="sec">
+          <div class="flow">
+            <span class="fw fw--done"><span class="fw-d">1</span>
+              <span class="fw-t">扣款成功</span><span class="fw-s">17:40:12</span></span>
+            <span class="fw fw--now"><span class="fw-d">2</span>
+              <span class="fw-t">等回执</span><span class="fw-s">已等 47 秒</span></span>
+            <span class="fw"><span class="fw-d">3</span>
+              <span class="fw-t">回执到达</span><span class="fw-s">验签并入账</span></span>
+            <span class="fw"><span class="fw-d">4</span>
+              <span class="fw-t">开始出纸</span><span class="fw-s">约 40 秒打完</span></span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">查询支付状态</span>
+              <span class="pick-s">主动问一次支付平台，不产生新扣款</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">转为待打印订单</span>
+              <span class="pick-s">回执到了在「我的 · 打印订单」里继续</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">扣款成功了，支付平台的回执还没到</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">查一次状态，或转成待打印订单</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">满 5 分钟自动转成待打印订单</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">同一单只认一次扣款，回执按单号幂等</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不让你再付一次，也不重复计费</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">已扣款</span><span class="d-v">3.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已等待</span><span class="d-v">47 <em>秒</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">0 <em>页</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>再付一次的入口在这一屏是关掉的。哪怕你按十次，同一张单也只会有一笔扣款。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 3 退款处理中 ─────────── -->
+      <div class="pane" data-at="refund-doing">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
+          <span class="bh-t">退款已提交，正在处理</span>
+          <!-- 2026-08-11 整改 ④：把前提写在标题下 —— 按页结算只在**出纸页数已确认**
+               时成立；确认不了的走「异常处理中 + 人工核对」，见下面的说明。 -->
+          <span class="bh-p"><b>出纸页数已确认</b>：按没出的 <b>9 计费页</b>退，已经出了的不退</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-doing">
+        <div class="sec">
+          <div class="amt">
+            <span class="am"><em>本单已付</em><span class="am-x">微信支付 · 17:32</span><b>3.00 元</b></span>
+            <span class="am"><em>已出的</em><span class="am-x">6 计费页 × <span data-site-unit="bw"></span> · 不退</span><b>1.20 元</b></span>
+            <span class="am"><em>没出的</em><span class="am-x">9 计费页 × <span data-site-unit="bw"></span> · 退</span><b>1.80 元</b></span>
+            <span class="am"><em>卡在机器里的</em><span class="am-x">不计费</span><b>0.00 元</b></span>
+            <span class="am am--sum"><em>本次退款</em><span class="am-x">原路退回 · 1–3 个工作日</span><b>1.80 元</b></span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">打印退款凭条</span>
+              <span class="pick-s">一张 A4，上面有单号和金额，本机不收费</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">回打印台重打</span>
+              <span class="pick-s">剩下 9 页可以重新排一次</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">打到第 6 页卡纸，剩下的没出来</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">打张凭条带走，或回去重打剩下的</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">退款照常走，不用你申请</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">按没出的计费页数原路退回</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不退已出的纸，也不换退款渠道</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">已付</span><span class="d-v">3.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">6 <em>页</em></span></div>
+            <div class="d"><span class="d-k">本次退款</span><span class="d-v">1.80 <em>元</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-card"/></svg>
+            <span>到账时间由银行和支付平台决定，本机只能告诉你这笔已经提交出去了。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 4 退款已提交 ─────────── -->
+      <div class="pane" data-at="refund-done">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="bh-t">退款已提交 · 到账以银行为准</span>
+          <span class="bh-p">提交于 <b>17:41</b>，单号 RF-20260810-0342</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-done">
+        <div class="sec">
+          <div class="amt">
+            <span class="am"><em>退款金额</em><span class="am-x">按 9 计费页未出计算</span><b>1.80 元</b></span>
+            <span class="am"><em>退回方式</em><span class="am-x">从哪付退到哪</span><b>原路</b></span>
+            <span class="am"><em>提交时间</em><span class="am-x">本机已收到渠道受理</span><b>17:41</b></span>
+            <span class="am"><em>本机能确认</em><span class="am-x">已提交到支付渠道</span><b>是</b></span>
+            <span class="am am--sum"><em>钱到你账上没有</em><span class="am-x">本机查不到，以银行为准</span><b>1–3 天</b></span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">打印回执</span>
+              <span class="pick-s">单号、金额、时间都在上面，本机不收费</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">回首页办别的</span>
+              <span class="pick-s">进度在「我的 · 打印订单」里能看</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">上一笔退款已经提交给支付渠道</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">打回执带走，或按单号自己去查</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">到账不用你操作，1–3 个工作日</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">保留单号与金额，随时可查</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不宣称已到账，那不是本机能确认的</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">退款金额</span><span class="d-v">1.80 <em>元</em></span></div>
+            <div class="d"><span class="d-k">提交时间</span><span class="d-v">17:41</span><span class="d-s">已获渠道受理</span></div>
+            <div class="d"><span class="d-k">预计到账</span><span class="d-v">1–3 <em>个工作日</em></span></div>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>「已提交」不等于「已到账」。到账以你的银行或支付平台记录为准，有出入拿单号找服务台。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 5 退款失败 ─────────── -->
+      <div class="pane" data-at="refund-fail">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+          <span class="bh-t">原路退回没成功</span>
+          <span class="bh-p">钱<b>没有消失</b>，这笔改走线下处理</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-fail">
+        <div class="sec">
+          <div class="cause">
+            <div class="cs cs--hit"><i></i>
+              <span class="cs-b"><span class="cs-t">原支付渠道拒绝</span>
+                <span class="cs-s">付款账户被冻结、注销或换绑，退不回原处</span></span>
+              <span class="cs-m">本次原因</span></div>
+            <div class="cs"><i></i>
+              <span class="cs-b"><span class="cs-t">超过原路退回窗口</span>
+                <span class="cs-s">距离付款超过渠道允许的原路退回天数</span></span>
+              <span class="cs-m">线下处理</span></div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">呼叫服务台</span>
+              <span class="pick-s">带上凭条，按单号线下办</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">打印失败凭条</span>
+              <span class="pick-s">单号、金额、失败时间都在，本机不收费</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">原路退回被支付渠道拒绝了两次</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">打张凭条，找服务台线下处理</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">记录一直在，随时可以再来办</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">保留退款单号与金额，不作废</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不自动改退到别的账户</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">待退金额</span><span class="d-v">1.80 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已尝试</span><span class="d-v">2 <em>次</em></span></div>
+            <div class="d"><span class="d-k">退款单号</span><span class="d-v">0342</span><span class="d-s">RF-20260810 尾号</span></div>
+          </div>
+
+          <div class="notice notice--coral">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>任何人让你在这台机器上输银行卡号或密码来「办退款」，都是骗子。退款只走原路或服务台。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 6 耗材异常 ─────────── -->
+      <div class="pane" data-at="supply">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="bh-t">打印机耗材有问题</span>
+          <!-- 2026-08-11 整改 ④：全页统一 —— 「自动退」改「核对后退」。
+               逐页自动退款是规划中的能力，缺出纸页数的可信回执；见页头注释。 -->
+          <span class="bh-p">已出的照常算钱，<b>没出的核对后退</b></span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="supply">
+        <div class="sec">
+          <div class="sup">
+            <div class="sr sr--hd"><span>故障</span><span>你能不能自己处理</span><span>能不能换机</span><span>钱怎么算</span></div>
+            <div class="sr"><span class="sr-n">缺纸</span>
+              <span>不能 · 纸盒上锁</span><span>能 · 换一台机器</span><span>已出算钱 · 没出的退</span></div>
+            <div class="sr"><span class="sr-n">缺碳粉</span>
+              <span>不能 · 要找人换</span><span>能 · 换一台机器</span><span>已出算钱 · 没出的退</span></div>
+            <div class="sr sr--hit"><span class="sr-n">仓门未关</span>
+              <span>能 · 关好就继续</span><span>不用换机</span><span>不产生新费用</span></div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">我关好了，继续打</span>
+              <span class="pick-s">从没打完的第 7 页接着出</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">改到另一台机器</span>
+              <span class="pick-s">没出的先退，凭取件码在另一台重打</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">前盖没关严，走纸停在第 6 页</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">关好仓门继续，或者改到另一台机器</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">10 分钟后本单结算，没出的退回</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">按实际出纸计费，缺的部分核对后退</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不让你自己开机器加纸或者换粉</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">已出</span><span class="d-v">6 <em>页</em></span></div>
+            <div class="d"><span class="d-k">没出</span><span class="d-v">9 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已产生费用</span><span class="d-v">1.20 <em>元</em></span></div>
+          </div>
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>卡在里面的纸不要自己拆机器，找工作人员。这一单没出的部分核对后退。
+              <span class="ev ev--e2">E2 设备上报</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 7 安全取件认领 ─────────── -->
+      <div class="pane" data-at="claim">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-package"/></svg></span>
+          <span class="bh-t">出纸口有一份没人取</span>
+          <span class="bh-p">是你的就<b>凭取件码</b>认领，不是就叫人</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="claim">
+        <div class="sec">
+          <div class="vf">
+            <div class="vf-l">
+              <span class="vf-k">输入打印时给你的 4 位取件码</span>
+              <input class="vf-in" type="text" data-keypad="num" inputmode="numeric" maxlength="4"
+                     placeholder="————" aria-label="取件码" autocomplete="off">
+              <span class="vf-k">取件码在<b>付款成功那一屏</b>，也在打印订单里</span>
+            </div>
+            <div class="vf-r">
+              <span class="vf-qr"><svg class="ic"><use href="#i-qr"/></svg></span>
+              <span class="vf-c">或扫码调出你的取件码</span>
+            </div>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">确认认领</span>
+              <span class="pick-s">核对页数后从出纸口拿走</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">不是我的，叫服务台</span>
+              <span class="pick-s">工作人员来收走并登记</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">打印完成 6 分钟，没人从出纸口拿走</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">输取件码认领，或者叫服务台</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">满 10 分钟由工作人员收走封存</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">只按取件码放行，全程不显示内容</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不显示文件内容，也不退已出纸的钱</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">待取</span><span class="d-v">7 <em>页</em></span></div>
+            <div class="d"><span class="d-k">打印完成</span><span class="d-v">17:35</span><span class="d-s">已等 6 分钟</span></div>
+            <div class="d"><span class="d-k">超时封存</span><span class="d-v">10 <em>分钟</em></span></div>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>已经出纸的钱不退，纸是实实在在印出来的。取不走的由服务台封存 24 小时。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 8 错件事故 ─────────── -->
+      <div class="pane" data-at="wrongdoc">
+        <div class="bighead bh--stop">
+          <span class="bh-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+          <span class="bh-t">这不是你的文件</span>
+          <span class="bh-p">立刻停手，<b>不要继续翻看</b></span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="wrongdoc">
+        <div class="sec">
+          <div class="left">
+            <span class="left-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="left-b">
+              <span class="left-t">你的单是 3 页，手上这份 7 页</span>
+              <span class="left-s">页数和取件码都对不上。这份属于<b>另一位用户</b>，上面可能有姓名和电话。</span>
+            </span>
+          </div>
+
+          <div class="picks">
+            <button class="pick pick--go" type="button" aria-disabled="true">
+              <span class="pick-t">立即上报</span>
+              <span class="pick-s">记录机位与时间，同时通知服务台</span>
+            </button>
+            <button class="pick" type="button" aria-disabled="true">
+              <span class="pick-t">原样交回服务台</span>
+              <span class="pick-s">不要留副本，不要拍照</span>
+            </button>
+          </div>
+
+          <div class="tri">
+            <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
+              <span class="tb-v">你取走的这份和取件码对不上</span></div>
+            <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
+              <span class="tb-v">上报，然后原样交回服务台</span></div>
+            <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
+              <span class="tb-v">系统已记录，服务台会过来核对</span></div>
+            <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
+              <span class="tb-v">记录机位、时间与取件码并通知服务台</span></div>
+            <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
+              <span class="tb-v">不显示这份的内容，也不因此多收你钱</span></div>
+          </div>
+
+          <div class="dl">
+            <div class="d"><span class="d-k">你的单</span><span class="d-v">3 <em>页</em></span></div>
+            <div class="d"><span class="d-k">手上这份</span><span class="d-v">7 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已自动记录</span><span class="d-v">是</span><span class="d-s">机位、时间、取件码</span></div>
+          </div>
+
+          <div class="notice notice--coral">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>别人的材料上有姓名和电话。不要拍照、不要带走，原样交回服务台就行。</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- 入链说明：本页零入链是对的 —— 支付回调与硬件上报把人推过来 -->
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>这一页怎么出现的</b>
+          <span class="s">系统触发</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">触发方式</span><span class="v">支付回调 / 硬件上报</span></div>
+            <div class="kv-row"><span class="k">首页入口</span><span class="v v--fog">没有 · 办事不经过</span></div>
+            <div class="kv-row"><span class="k">主动查看</span><span class="v">我的 · 打印订单</span></div>
+            <div class="kv-row"><span class="k">这一页的卡片</span><span class="v v--fog">示意 · 不可点</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1 右 -->
+      <div class="pane" data-at="pay-fail">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本单金额</span><span class="v">3.00 元</span></div>
+            <div class="kv-row"><span class="k">已扣款</span><span class="v v--fog">0.00 元</span></div>
+            <div class="kv-row"><span class="k">已出</span><span class="v v--fog">0 计费页</span></div>
+            <div class="kv-row"><span class="k">失败原因</span><span class="v">支付超时</span></div>
+            <div class="kv-row"><span class="k">单子保留</span><span class="v">30 分钟</span></div>
+            <div class="kv-row"><span class="k">重试次数</span><span class="v">不限</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="pay-fail">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机怎么保证不多收</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸前先锁金额</span>
+                <span class="tl-s">计费页数与份数当场核对</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">只按实际出纸算</span>
+                <span class="tl-s">卡纸的那页不算钱</span></span></div>
+            <!-- 2026-08-11 整改 ④：原写「没出的自动退 / 不用你申请」。
+                 逐页自动退是规划中的能力（缺出纸页数可信回执），当前口径是
+                 核对后退，不用用户申请这一点不变。全页同一改法。 -->
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">没出的核对后退</span>
+                <span class="tl-s">不用你申请</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">每笔进打印订单</span>
+                <span class="tl-s">金额与计费页数都在</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">有异议按单号找人</span>
+                <span class="tl-s">服务台能查到同一笔</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">换个付法</span></div>
+            <div class="sp-i"><i></i><span>微信支付</span></div>
+            <div class="sp-i"><i></i><span>支付宝</span></div>
+            <div class="sp-i"><i></i><span>服务台窗口</span></div>
+          </div>
+          <div class="panel-note">本机不收会员费、加急费或者代办费。</div>
+        </div>
+      </div>
+
+      <!-- 2 右 -->
+      <div class="pane" data-at="pay-pending">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已扣款</span><span class="v">3.00 元</span></div>
+            <div class="kv-row"><span class="k">支付平台</span><span class="v">微信支付</span></div>
+            <div class="kv-row"><span class="k">已等待</span><span class="v">47 秒</span></div>
+            <div class="kv-row"><span class="k">自动转单</span><span class="v">满 5 分钟</span></div>
+            <div class="kv-row"><span class="k">重复扣款</span><span class="v v--fog">不会</span></div>
+            <div class="kv-row"><span class="k">幂等口径</span><span class="v">按单号</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="pay-pending">
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>回执没到的几种可能</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">支付平台在排队</span>
+                <span class="tl-s">高峰期最常见</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">本机到服务器慢</span>
+                <span class="tl-s">会自动重试</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">回执丢了</span>
+                <span class="tl-s">主动查单能补回来</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">满 5 分钟</span>
+                <span class="tl-s">自动转待打印订单</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">转单后照样能打</span>
+                <span class="tl-s">不用再付一次</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">你现在是安全的</span></div>
+            <div class="sp-i"><i></i><span>钱已经扣了，<b>有记录</b></span></div>
+            <div class="sp-i"><i></i><span>单号已经<b>生成</b></span></div>
+            <div class="sp-i"><i></i><span>再按也<b>不会二次扣</b></span></div>
+          </div>
+          <div class="panel-note">转单之后，在「我的 · 打印订单」里接着打。</div>
+        </div>
+      </div>
+
+      <!-- 3 右 -->
+      <div class="pane" data-at="refund-doing">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已付</span><span class="v">3.00 元</span></div>
+            <div class="kv-row"><span class="k">已出</span><span class="v">6 计费页</span></div>
+            <div class="kv-row"><span class="k">没出</span><span class="v">9 计费页</span></div>
+            <div class="kv-row"><span class="k">每计费页</span><span class="v" data-site-unit="bw"></span></div>
+            <div class="kv-row"><span class="k">本次退款</span><span class="v">1.80 元</span></div>
+            <div class="kv-row"><span class="k">退回方式</span><span class="v">原路</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-doing">
+        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>退款是怎么算的</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">按实际出纸计费</span>
+                <span class="tl-s">出一页算一页</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">卡在机器里的不算</span>
+                <span class="tl-s">这笔不收</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">没出计费页数 × 单价</span>
+                <span class="tl-s">9 计费页 × <span data-site-unit="bw"></span> = 1.80 元</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">原路退回</span>
+                <span class="tl-s">从哪付退到哪</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">1–3 个工作日</span>
+                <span class="tl-s">以银行为准</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">不用你做的事</span></div>
+            <div class="sp-i"><i></i><span>不用填申请单</span></div>
+            <div class="sp-i"><i></i><span>不用提供卡号</span></div>
+            <div class="sp-i"><i></i><span>不用来回跑</span></div>
+          </div>
+          <!-- 2026-08-11 整改 ④：这段是新加的前提说明。上面五步只在**出纸页数确认得了**
+               的时候成立；确认不了就不能自动按页算钱。缺的是出纸页数的可信回执。 -->
+          <div class="panel-note">上面五步的前提是<b>服务端已经确认这一单出了几页</b>。
+            如果出纸页数<b>确认不了</b>（部分出纸、打印队列没回执），本单会<b>停在「异常处理中」</b>：
+            优先<b>同单续打</b>（不再收费、不重复扣权益），确实不打了由<b>工作人员核对后处理</b> ——
+            <b>本机不会自己算一个页数就把钱退了</b>。<br>
+            退款与异常处理的进度在「我的 · 打印订单」里也能看。</div>
+        </div>
+      </div>
+
+      <!-- 4 右 -->
+      <div class="pane" data-at="refund-done">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一笔退款</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">退款金额</span><span class="v">1.80 元</span></div>
+            <div class="kv-row"><span class="k">提交时间</span><span class="v">17:41</span></div>
+            <div class="kv-row"><span class="k">退款单号</span><span class="v">RF-…0342</span></div>
+            <div class="kv-row"><span class="k">退回方式</span><span class="v">原路</span></div>
+            <div class="kv-row"><span class="k">预计到账</span><span class="v">1–3 个工作日</span></div>
+            <div class="kv-row"><span class="k">本机能确认</span><span class="v v--fog">仅"已提交"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-done">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机能说和不能说</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">能说：已提交渠道</span>
+                <span class="tl-s">有渠道受理号</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">能说：金额与单号</span>
+                <span class="tl-s">本机自己算的</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">不能说：钱到没到</span>
+                <span class="tl-s">本机查不到你的账户</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">不能说：几点入账</span>
+                <span class="tl-s">银行说了算</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">有出入：按单号找人</span>
+                <span class="tl-s">服务台能查同一笔</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">这几句本机不写</span></div>
+            <div class="sp-i"><i></i><span>「已退款到账」</span></div>
+            <div class="sp-i"><i></i><span>「退款成功」</span></div>
+            <div class="sp-i"><i></i><span>「请查收」</span></div>
+          </div>
+          <div class="panel-note">到账以你的银行或支付平台记录为准。</div>
+        </div>
+      </div>
+
+      <!-- 5 右 -->
+      <div class="pane" data-at="refund-fail">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一笔退款</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">待退金额</span><span class="v">1.80 元</span></div>
+            <div class="kv-row"><span class="k">已尝试</span><span class="v">2 次</span></div>
+            <div class="kv-row"><span class="k">失败原因</span><span class="v">渠道拒绝</span></div>
+            <div class="kv-row"><span class="k">退款单号</span><span class="v">RF-…0342</span></div>
+            <div class="kv-row"><span class="k">记录作废</span><span class="v v--fog">否</span></div>
+            <div class="kv-row"><span class="k">改走</span><span class="v">服务台线下</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="refund-fail">
+        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>线下怎么办</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先打一张失败凭条</span>
+                <span class="tl-s">本机不收这张的钱</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">拿凭条去服务台</span>
+                <span class="tl-s" data-site="serviceDesk"></span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">按单号核对</span>
+                <span class="tl-s">后台能查到同一笔</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">现金或改渠道退</span>
+                <span class="tl-s">当场确认金额</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">结果写回订单</span>
+                <span class="tl-s">在打印订单里能看</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">不要做的三件事</span></div>
+            <div class="sp-i"><i></i><span>不要输银行卡号</span></div>
+            <div class="sp-i"><i></i><span>不要给密码</span></div>
+            <div class="sp-i"><i></i><span>不要扫陌生的码</span></div>
+          </div>
+          <div class="panel-note">凭条上有单号、金额、时间，够服务台核对。</div>
+        </div>
+      </div>
+
+      <!-- 6 右 -->
+      <div class="pane" data-at="supply">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>本单出纸与费用</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已出</span><span class="v">6 计费页</span></div>
+            <div class="kv-row"><span class="k">没出</span><span class="v">9 计费页</span></div>
+            <div class="kv-row"><span class="k">已产生费用</span><span class="v">1.20 元</span></div>
+            <div class="kv-row"><span class="k">核对后退</span><span class="v">1.80 元</span></div>
+            <div class="kv-row"><span class="k">当前故障</span><span class="v">仓门未关</span></div>
+            <div class="kv-row kv-row--site"><span class="k">可换机</span><span class="v" data-site="peerTerminal"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="supply">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>耗材异常怎么处理</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">缺纸</span>
+                <span class="tl-s">纸盒上锁，你加不了</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">缺碳粉</span>
+                <span class="tl-s">要工作人员换硒鼓</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">仓门未关</span>
+                <span class="tl-s">你自己关好就继续</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">卡纸</span>
+                <span class="tl-s">不要拆机器，找人</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">四种都按实际出纸算</span>
+                <span class="tl-s">没出的核对后退</span></span></div>
+          </div>
+          <div class="sp sp--ok">
+            <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">换机怎么换</span></div>
+            <div class="sp-i"><i></i><span>没出的<b>先退</b></span></div>
+            <div class="sp-i"><i></i><span>凭取件码去<b>另一台机器</b></span></div>
+            <div class="sp-i"><i></i><span>参数会<b>带过去</b></span></div>
+          </div>
+          <!-- 2026-08-11 整改 ④：加一句前提，全页与 06 打印台同口径。
+               「按未出计费页自动退」是**规划中**的能力，缺出纸页数的可信回执
+               （打印机侧计数 + 服务端履约状态机）；补齐后这一段可去掉「核对」二字。 -->
+          <div class="panel-note">没出的那部分核对后退回，再在另一台重新下单。<br>
+            <b>「没出的自动按页退」是规划中的能力</b> <span class="ev ev--wire">待开发</span> ——
+            缺出纸页数的可信回执，所以现在由服务端与工作人员核对后处理。</div>
+        </div>
+      </div>
+
+      <!-- 7 右 -->
+      <div class="pane" data-at="claim">
+        <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>出纸口这一份</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">待取</span><span class="v">7 页</span></div>
+            <div class="kv-row"><span class="k">打印完成</span><span class="v">17:35</span></div>
+            <div class="kv-row"><span class="k">已等待</span><span class="v">6 分钟</span></div>
+            <div class="kv-row"><span class="k">取件码</span><span class="v">4 位</span></div>
+            <div class="kv-row"><span class="k">超时封存</span><span class="v">满 10 分钟</span></div>
+            <div class="kv-row"><span class="k">服务台保管</span><span class="v">24 小时</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="claim">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>取不走会怎样</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">满 10 分钟</span>
+                <span class="tl-s">工作人员来收走</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">登记并封存</span>
+                <span class="tl-s">不翻看内容</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">服务台保管 24 小时</span>
+                <span class="tl-s" data-site="serviceDesk"></span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">本人凭尾号取</span>
+                <span class="tl-s">当面核对</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">无人认领当日碎纸</span>
+                <span class="tl-s">碎纸也留记录</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">本机不做的事</span></div>
+            <div class="sp-i"><i></i><span>不显示文件内容</span></div>
+            <div class="sp-i"><i></i><span>不按人脸放行</span></div>
+            <div class="sp-i"><i></i><span>不退已出纸的钱</span></div>
+          </div>
+          <div class="panel-note">取件码忘了就找服务台，凭手机尾号当面核。</div>
+        </div>
+      </div>
+
+      <!-- 8 右 -->
+      <div class="pane" data-at="wrongdoc">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>这次错件</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">你的单</span><span class="v">3 页</span></div>
+            <div class="kv-row"><span class="k">手上这份</span><span class="v">7 页</span></div>
+            <div class="kv-row"><span class="k">取件码</span><span class="v v--fog">不匹配</span></div>
+            <div class="kv-row"><span class="k">已自动记录</span><span class="v">是</span></div>
+            <div class="kv-row"><span class="k">已通知服务台</span><span class="v">是</span></div>
+            <div class="kv-row"><span class="k">你那单</span><span class="v">重新排队打</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="wrongdoc">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>上报之后</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">记录机位与时间</span>
+                <span class="tl-s">连取件码一起</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">服务台过来核对</span>
+                <span class="tl-s" data-site="serviceHours"></span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">你原样交回</span>
+                <span class="tl-s">不留副本</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">原主凭尾号取回</span>
+                <span class="tl-s">当面核对</span></span></div>
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">你那单重新打</span>
+                <span class="tl-s">不额外收钱</span></span></div>
+          </div>
+          <div class="sp sp--no">
+            <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">不要做的三件事</span></div>
+            <div class="sp-i"><i></i><span>不要拍照</span></div>
+            <div class="sp-i"><i></i><span>不要带走</span></div>
+            <div class="sp-i"><i></i><span>不要继续翻看</span></div>
+          </div>
+          <div class="panel-note">你那一单不会因为这次错件多收钱。</div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页</b></div>
+        <div class="sec">
+          <div class="panel-note">从付款到拿到纸，八种不顺利的处境都在这里，每一种都写清钱在哪一步。</div>
+        </div>
+      </div>
+
+      <!-- 这八态不依赖 AI —— 常驻，四态都看得见。
+           2026-08-10 AI 落实度审查整改：这句话原来**只**写在下面 data-when="ai-down"
+           的面板里，而页面默认是 default 态，stage.js 会把它 hidden ——
+           真实用户根本看不到「付款到履约这八种状态不依赖 AI」。钱和纸的判定依据是
+           支付回执与出纸计数，这是**任何时候都成立**的事实，所以提到常驻区；
+           ai-down 面板保留，作为降级当场的复述。 -->
+      <div class="pane">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这八态不依赖 AI</b>
+          <span class="chip chip--info" style="margin-left:auto">四态都成立</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁在判定</span><span class="v">支付回执与出纸计数</span></div>
+            <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
+            <div class="kv-row"><span class="k">AI 挂了会怎样</span><span class="v">八态照常判定</span></div>
+          </div>
+          <div class="panel-note">付没付、出了几页、退多少 —— 依据是<b>支付渠道回执与打印机出纸计数</b>，没有一步经过模型，也<b>不由模型决定退款金额</b>。<span class="ev ev--e2">E2 来自支付回执与出纸计数</span></div>
+        </div>
+      </div>
+
+      <!-- AI 不可用：降级当场再复述一次（内容与上面那条常驻面板一致） -->
+      <div class="pane" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-brain"/></svg><b>AI 不可用时</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">这八态</span><span class="v">照常判定</span></div>
+            <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
+            <div class="kv-row"><span class="k">谁在判定</span><span class="v">支付回执与出纸计数</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设备离线：这一页里设备离线是真有影响，照实写 -->
+      <div class="pane" data-when="device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印机离线时</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">没出的计费页</span><span class="v">核对后退</span></div>
+            <div class="kv-row"><span class="k">新的打印单</span><span class="v v--fog">暂时不能付</span></div>
+            <div class="kv-row"><span class="k">取件与退款</span><span class="v">照常办</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 全页唯一一条合规声明 -->
+      <div class="pane">
+        <div class="notice notice--coral" style="padding:var(--s-4) var(--s-5)">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>金额只在打印台产生，本页只给状态与出路；退款到账以银行为准，不宣称已到账。</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="backbtn" href="39-print-hub.html" data-parent-label="打印中心"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印中心</span></span></a>
+    <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+
+    <button class="btn btn--lg btn--ghost" data-at="pay-fail" type="button">放弃并保留待打印</button>
+    <button class="btn btn--lg btn--ghost" data-at="pay-pending" type="button">转为待打印订单</button>
+    <button class="btn btn--lg btn--ghost" data-at="refund-doing" type="button">回打印台重打</button>
+    <a class="btn btn--lg btn--ghost" data-at="refund-done" href="01-home-v6.html">回首页</a>
+    <button class="btn btn--lg btn--ghost" data-at="refund-fail" type="button">打印失败凭条</button>
+    <button class="btn btn--lg btn--ghost" data-at="supply" type="button">改到另一台机器</button>
+    <button class="btn btn--lg btn--ghost" data-at="claim" type="button" data-help>叫服务台</button>
+    <button class="btn btn--lg btn--ghost" data-at="wrongdoc" type="button" data-help>原样交回</button>
+
+    <span class="actionbar-hint" data-at="pay-fail">这一单没扣钱，也没出纸</span>
+    <span class="actionbar-hint" data-at="pay-pending">同一单只会扣一次，按多少次都一样</span>
+    <span class="actionbar-hint" data-at="refund-doing">按没出的 9 计费页退，1.80 元</span>
+    <span class="actionbar-hint" data-at="refund-done">已提交渠道，到账以银行为准</span>
+    <span class="actionbar-hint" data-at="refund-fail">钱没消失，改走服务台线下</span>
+    <span class="actionbar-hint" data-at="supply">已出照常算，没出的核对后退</span>
+    <span class="actionbar-hint" data-at="claim">凭取件码认领，本机不显示内容</span>
+    <span class="actionbar-hint" data-at="wrongdoc">先停手，再上报，再原样交回</span>
+
+    <button class="btn btn--lg btn--primary" data-at="pay-fail" type="button"><svg class="ic"><use href="#i-card"/></svg>重新付一次</button>
+    <button class="btn btn--lg btn--primary" data-at="pay-pending" type="button"><svg class="ic"><use href="#i-refresh"/></svg>查询支付状态</button>
+    <button class="btn btn--lg btn--primary" data-at="refund-doing" type="button"><svg class="ic"><use href="#i-printer"/></svg>打印退款凭条</button>
+    <button class="btn btn--lg btn--primary" data-at="refund-done" type="button"><svg class="ic"><use href="#i-printer"/></svg>打印回执</button>
+    <button class="btn btn--lg btn--primary" data-at="refund-fail" type="button" data-help><svg class="ic"><use href="#i-phone"/></svg>呼叫服务台</button>
+    <button class="btn btn--lg btn--primary" data-at="supply" type="button">我关好了，继续打<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="claim" type="button">确认认领<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--lg btn--primary" data-at="wrongdoc" type="button"><svg class="ic"><use href="#i-alert"/></svg>立即上报</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=2"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

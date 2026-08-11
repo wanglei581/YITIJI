@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P36 招聘会 · 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P36 招聘会域首屏">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
+   骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
+   ① 文字密度：每卡正文只留一行（≤20 字）。合规、隐私、免责整页只在页脚写一条，
+      不在每张卡上重复 —— 用户不读满屏小字，只找"下一步点哪"。
+   ② 需要输入才能出结果的 AI 卡，把「先给什么」做成**可点的选择**（.pick），
+      不写成描述句。一体机没有定位权限，城市默认取**本机所在城市**并且可改，
+      不写"根据定位"。缺哪项先问，不猜。
+   ③ 右上角标记必挂：AI 卡 chip「AI · 仅供参考」，非 AI 卡 chip--info「不依赖 AI」。
+   ai-down：AI 带整块换成四个照常能办的真入口；AI 卡置灰并各自给替代路径。
+   device-off：只影响打印类卡。
+   ──────────────────────────────────────────────────────────────── */
+.work--hub { grid-template-columns: 1fr; }
+
+/* 域副标题（占 .rail 槽位） */
+.dsub { flex: 1 1 auto; min-width: 0; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.45; }
+.dsub b { color: var(--fog-900); font-weight: 600; }
+
+/* 服务状态条 */
+.rdy { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+  min-height: 68px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rdy .dot { flex: 0 0 auto; }
+.rdy-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rdy-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.rdy-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.rdy--warn { background: var(--amber-a12); border-color: var(--amber-a20); }
+
+/* ── 顶部 AI 带：三个大按钮是主体，说明只留一行 ── */
+.aibar { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3);
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg); border: 1px solid var(--jade-a20);
+  box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur)); }
+.aibar-hd { display: flex; align-items: center; gap: var(--s-3); }
+.aibar-hd > .ic { width: 21px; height: 21px; color: var(--jade-500); flex: 0 0 auto; }
+.aibar-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.aibar-hd .ev, .aibar-hd .chip { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+.aiuse { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
+.aiuse--4 { grid-template-columns: repeat(4, 1fr); }
+.aibtn { min-height: 88px; padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 600; line-height: 1.35;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px;
+  text-align: left; text-decoration: none; cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.aibtn:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.aibtn em { font-style: normal; font-size: var(--fz-1); font-weight: 400; color: var(--fog-600); line-height: 1.4; }
+.aibtn[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
+.aibar-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
+.aibar-note b { color: var(--fog-800); }
+/* ai-down：整带换成四个照常能办的真入口，不留空的 AI 壳子 */
+.aibar--down { border-color: var(--amber-a20); background: var(--amber-a12); }
+.aibar--down .aibar-hd > .ic { color: var(--amber-400); }
+
+/* ── 子能力卡（2 列） ──
+   顶边与图标用「招聘会 · 赤陶」服务身份色（README §6.1）；
+   AI / 非 AI 只由右上角标记说，不靠颜色暗示。 */
+.dgrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.dcard { position: relative; overflow: hidden; min-height: 180px;
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-top: 3px solid var(--cat-fair);
+  box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur));
+  text-decoration: none; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out); }
+a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
+.dcard-hd { display: flex; align-items: center; gap: var(--s-3); }
+.dcard-ic { width: 52px; height: 52px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-fair); }
+.dcard-ic .ic { width: 27px; height: 27px; }
+.dcard-hd .chip { margin-left: auto; flex: 0 0 auto; }
+.dcard-nm { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
+  font-weight: 600; letter-spacing: .02em; line-height: 1.25; word-break: keep-all; }
+.dcard-ds { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5; }
+.dcard-hint { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.dcard-go { margin-top: auto; display: flex; align-items: center; gap: 8px;
+  font-size: var(--fz-3); color: var(--jade-600); font-weight: 600; }
+.dcard-go .ic { width: 18px; height: 18px; }
+.dcard--spot { border-color: var(--jade-400); box-shadow: 0 0 0 3px var(--jade-a20), var(--sh-3); }
+/* 卡上的标记是标签不是入口 —— 同 27-toolbox 的 .chip--info 口径 */
+.chip--label { cursor: inherit; }
+
+/* 需要输入的 AI 卡：整卡不再是链接，先选后进；主动作是卡内那个 ≥48px 的真链接 */
+.dcard--pick { cursor: default; }
+.picks { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.pick { min-height: 48px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: border-color var(--dur-2) var(--ease-out); }
+.pick:hover { border-color: var(--jade-a32); }
+.pick .k { color: var(--fog-600); font-size: var(--fz-1); }
+.pick .v { color: var(--fog-900); font-weight: 600; }
+.pick--empty { border-color: var(--amber-a20); background: var(--amber-a12); }
+.pick--empty .v { color: var(--amber-200); }
+.dcard--pick .dcard-go { min-height: 48px; text-decoration: none; }
+/* 半栏 pick 卡的「选择行 + 主动作」并成一行（2026-08-10 第二轮全量回归）──────
+   #c-material 是唯一一张**半栏**的 pick 卡：卡头 52 + 标题 30 + 说明 23 + 选择行 48
+   + 两条提示 19/38 + 主动作 48 ＋ 六道 12 间距 ＋ 上下 19 内边距 = 实测 361px，
+   但 .dgrid 是定高栅格、这一行只分到 287px，.dcard 又是 overflow:hidden ——
+   多出来的 74px 正好把主动作「先选方向 / 生成材料清单」整条吃掉：
+   卡面留着两个待选项，却没有任何可点的出口（v3AuditPlus「内部裁切 · 严重 · 可交互被裁」
+   default / first / device-off 三态各 1 次；ai-down 因为不显示选择行反而没事）。
+   c-plan 靠 .dcard--wide 横排躲开了同一个问题，半栏卡没有那条路。
+   改法沿用 .dcard--row 的思路：主动作挪到选择行右端（本来也就是「选完再走」），
+   两条提示并成一条（一个字没删）。实测内容 361→270、栏高 274，四态不再有裁切；
+   顺带把原先被挤掉 3px 的 c-plan 那一行也还了回去（257→270）。 */
+.pickrow { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.pickrow .picks { flex: 0 1 auto; }
+.pickrow .dcard-go { margin-top: 0; margin-left: auto; }
+
+/* 时间：真实日期标签（Codex :297 整改）──────────────────────────────
+   原来时间是 .pick 轮换「本周 / 本月 / 指定日期」，选中「指定日期」却没有任何
+   日期控件，等于让用户选了一个选不出来的东西。一体机不弹系统日期选择器
+   （原生控件会挡住流程、也不适合触控），所以改成**可点的真实日期标签**：
+   每个标签把对应的起止日期写在脸上，点中即写进 from / to，直接带进 17-fair-desk。 */
+.dates { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.dtag { min-height: 48px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: baseline; gap: 8px; white-space: nowrap; line-height: 1.3;
+  transition: border-color var(--dur-2) var(--ease-out); }
+.dtag i { font-style: normal; font-size: var(--fz-1); font-weight: 400; color: var(--fog-600);
+  font-family: var(--ff-num); letter-spacing: .02em; }
+.dtag:hover { border-color: var(--jade-a32); }
+.dtag[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
+.dtag[aria-pressed="true"] i { color: var(--fog-700); }
+.dates-k { align-self: center; font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+
+/* 方向未选时主动作不可用：链接去掉 href，不留一个点了没反应的假入口 */
+.dcard-go[aria-disabled="true"] { color: var(--fog-600); cursor: not-allowed; }
+
+/* ai-down：AI 卡置灰（主动作仍是真链接，去向那一页的非 AI 部分照常） */
+.screen[data-state="ai-down"] .dcard--ai { opacity: .72; border-color: var(--brd-1);
+  border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
+.screen[data-state="ai-down"] .dcard--ai .dcard-nm,
+.screen[data-state="ai-down"] .dcard--ai .dcard-go,
+.screen[data-state="ai-down"] .dcard--ai .dcard-ic { color: var(--fog-600); }
+/* device-off：只影响打印类卡 */
+.screen[data-state="device-off"] .dcard--print { opacity: .72; border-color: var(--brd-1);
+  border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
+.screen[data-state="device-off"] .dcard--print .dcard-nm,
+.screen[data-state="device-off"] .dcard--print .dcard-go,
+.screen[data-state="device-off"] .dcard--print .dcard-ic { color: var(--fog-600); }
+
+/* 整行卡（首张大卡 + 整行卡）：横排，图标 / 文案 / 右侧标记与主动作 */
+.dcard--row { flex-direction: row; align-items: center; gap: var(--s-5); min-height: 150px; }
+.dcard--row .dcard-bd { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.dcard--row .dcard-rt { margin-left: auto; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-4); }
+.dcard--row .dcard-go { margin-top: 0; }
+.dcard--hero, .dcard--wide { grid-column: 1 / -1; }
+.dcard--wide { min-height: 150px; }
+
+/* ── 次卡：记录类，明细归业务页 ── */
+.dmore { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
+.dmore-hd { display: flex; align-items: baseline; gap: var(--s-3); }
+.dmore-hd b { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.dmore-hd > span { font-size: var(--fz-1); color: var(--fog-600); }
+.dmore-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+/* 2026-08-10：4 列变体。本页主栏高度已用满（实测多 40px 就裁 AI 卡里的控件），
+   所以新增的现场入口只能横着摊，不能竖着加行。 */
+.dmore-row--4 { grid-template-columns: repeat(4, 1fr); gap: var(--s-3); }
+.dmore-row--4 .dmore-go { gap: var(--s-3); padding-left: var(--s-4); padding-right: var(--s-4); }
+.dmore-go { display: flex; align-items: center; gap: var(--s-4);
+  min-height: 88px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  text-decoration: none; color: inherit; cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.dmore-go:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.dmore-ic { width: 44px; height: 44px; border-radius: var(--r-xs); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-700); }
+.dmore-ic .ic { width: 22px; height: 22px; }
+.dmore-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dmore-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.dmore-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+/* 数量单独一行：真实环境常年是 0，不许编一个数，也不许把 0 藏进句子里 */
+.dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
+.dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">招聘会信息</div>
+        <div class="brand-sub">职易达 · 01 号机 · 第三方与官方来源</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>本机与来源服务在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 场次照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响打印</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub">场次查询&nbsp;· 校园专场&nbsp;· AI参会规划&nbsp;· 材料打印，<b>投递预约请前往来源平台</b></span>
+    <span class="rail-count">域首屏&nbsp;· <b>6</b> 个子能力</span>
+  </div>
+
+  <div class="work work--hub">
+    <div class="wmain">
+
+      <!-- ── 服务状态条：四态各写各的 ── -->
+      <div class="rdy" data-when="default first">
+        <span class="dot dot--live"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接</span>
+          <span class="rdy-s">具体能力、设备和权益仍会在办理过程中再次确认</span>
+        </span>
+      </div>
+      <div class="rdy rdy--warn" data-when="ai-down">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
+          <span class="rdy-s">停掉的只有排顺序与生成清单；场次、签到、打印照常</span>
+        </span>
+      </div>
+      <div class="rdy rdy--warn" data-when="device-off">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接，本机打印机离线</span>
+          <span class="rdy-s">只影响资料打印这一张卡，其余照常</span>
+        </span>
+      </div>
+
+      <!-- ── 顶部 AI 带（默认 / 首次 / 设备离线）── -->
+      <div class="aibar" data-when="default first device-off">
+        <div class="aibar-hd">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span class="aibar-t">你想做哪件事</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原为 `E3 AI 判断 · 仅供参考`。
+               点哪个按钮 → 亮哪张卡是 data-spot 写死的映射（scripts/linkage.js），
+               背后没有模型。E3 是给模型判断用的标签，贴在确定性导航上会稀释它在
+               合规上的意义 —— 改标「选哪件不依赖 AI」；两张 AI 卡各自仍标 AI · 仅供参考。 -->
+          <span class="chip chip--info">选哪件不依赖 AI</span>
+        </div>
+        <div class="aiuse">
+          <button class="aibtn" type="button" data-spot="c-social c-campus" aria-pressed="false">我要挑一场去<em>先看有哪些场次</em></button>
+          <button class="aibtn" type="button" data-spot="c-plan" aria-pressed="false">帮我排逛展顺序<em>先选城市、日期、方向</em></button>
+          <button class="aibtn" type="button" data-spot="c-material" aria-pressed="false">去之前带什么材料<em>按这一场列清单</em></button>
+        </div>
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只排顺序和列清单，<b>不替你报名或预约</b>。</div>
+      </div>
+
+      <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
+      <div class="aibar aibar--down" data-when="ai-down">
+        <div class="aibar-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span class="aibar-t">下面这些照常能办</span>
+          <span class="chip chip--info">已自动上报</span>
+        </div>
+        <div class="aiuse aiuse--4">
+          <a class="aibtn" href="17-fair-desk.html?stage=s1">看场次<em>时间、地点、企业名录</em></a>
+          <!-- 2026-08-11 复核（Codex (b)-11 / #501）：?view=checkin 至今不被 17-fair-desk 消费
+               （该页全文 0 处 URLSearchParams）。已核实签到入口**确实在** s1 这一屏内
+               （17-fair-desk.html:533 .checkin「已经在现场？先签到再逛」），所以落点没错，
+               只是不会自动定位过去。参数按接线契约保留，副文如实写「入口在场次页内」，
+               不写"直接进签到"。 -->
+          <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>签到入口在场次页内 · 到场扫主办方的码</em></a>
+          <!-- 2026-08-10 Codex 错配整改：原指 17-fair-desk.html?stage=s3&view=booth-map。
+               17 不消费 view 参数，s3 是「排今天走哪几家的顺序」，根本没有展位图；
+               真正的场馆平面图在 P45 的 map 阶段（此前全站零入口）。改指 45。 -->
+          <a class="aibtn" href="45-fair-onsite.html?stage=map">看展位图<em>场馆导览 · 顺序自己定</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #503）：原指 ?stage=s3&title=简历与活动资料。
+               这一屏没上传也没扫描过任何材料，跳过 P06 第 1 步直接进核价，还让打印台
+               替一份不存在的「简历与活动资料」开交接回执。改为进 P06 第 1 步（选来源）。 -->
+          <a class="aibtn" href="06-print-workbench.html">打印材料<em>第 1 步先选文件：上传 / 扫描原件 / U 盘</em></a>
+        </div>
+      </div>
+
+      <!-- ── 六张子能力卡 ── -->
+      <div class="dgrid">
+
+        <!-- 1 社会招聘会（首张大卡 · 非 AI） -->
+        <a class="dcard dcard--hero dcard--row" id="c-social" href="17-fair-desk.html?stage=s1&amp;kind=social">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">社会招聘会</span>
+            <span class="dcard-ds">场次、参会企业、时间和地点</span>
+          </span>
+          <span class="dcard-rt">
+            <span class="chip chip--info">不依赖 AI</span>
+            <span class="dcard-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+        </a>
+
+        <!-- 2 校园招聘会（非 AI） -->
+        <a class="dcard" id="c-campus" href="18-campus.html?stage=s1&amp;kind=campus">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">校园招聘会</span>
+          <span class="dcard-ds">高校与机构的校园专场，含预约入口</span>
+          <span class="dcard-go">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 3 扫码签到（非 AI）
+             2026-08-11 复核（Codex (b)-11 / #506）：同 #501。落点 17-fair-desk s1「哪一场」
+             这一屏内就有入场签到块（17-fair-desk.html:533），所以这条不是"送错门"；
+             ?view=checkin 目前不被消费，进去不会自动滚到签到，副文按这个事实写。
+             不新增 .dcard-hint 行：这张卡与 c-campus 同一栅格行，多一行会顶高整行。 -->
+        <a class="dcard" id="c-checkin" href="17-fair-desk.html?stage=s1&amp;view=checkin">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">扫码签到</span>
+          <span class="dcard-ds">签到二维码在招聘会台的场次页内出示</span>
+          <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- ══ AI 接线契约 · P36-A「参会规划：排出去哪几场、几点到、先逛哪几个展位」══
+             输入（三项都在卡上当场选，不猜、不默认方向）：
+               · city  string  本机配置的服务城市，可改；取 .pick[data-key="city"]
+               · from/to  YYYY-MM-DD  取 .dtag[data-from][data-to]，四个真实起止范围
+               · dir   string  岗位方向，**必选**，未选不给主动作（data-need="dir"）
+               · fairs  服务端侧：city+日期窗内已审核通过（reviewStatus=approved）的场次
+             输出：
+               · { order: [{ fairId, startAt, booths:[{ boothNo, orgName, reason }] }],
+                   note: string }
+               · 证据级别 E3（模型判断 · 仅供参考）；只排顺序，**不替用户报名或预约**
+                 （合规红线：CLAUDE.md §2，招聘会只做第三方/官方来源信息入口）
+             降级：
+               · AI 不可用 → 主动作换成「只看展位图与名录」→ 45-fair-onsite.html?stage=map，
+                 顺序由用户自己定；卡面副文同步换成 data-when="ai-down" 那一句
+             当前阻塞：17-fair-desk.html 全文 0 处 URLSearchParams，city/from/to/dir 会被
+                 静默丢弃 —— 参数已按契约传出，目标页接上即生效（卡面已如实标「待接线」）。
+             ════════════════════════════════════════════════════════════════ -->
+        <!-- 4 AI 参会规划（AI · 先选三样再排 · 整行横排）
+             2026-08-10 Codex :297/:306 整改：
+             ① 时间原来是「本周 / 本月 / 指定日期」轮换，选中「指定日期」却没有日期控件 ——
+                换成写明起止日期的真实标签，点中即落进 from / to。
+             ② 三项原来只改卡面文字，17-fair-desk 什么都收不到 —— 现在按
+                ?stage=s1&city=&from=&to=&dir= 带过去。
+             ③ 「城市默认本机所在地」没说明来源、「方向取自你的简历」既没说来源也没让用户确认 ——
+                城市改写成「本机配置的服务城市」并注明可改；方向默认「未选」，必须显式选，
+                没选就不给主动作（不替用户猜一个方向再排顺序）。 -->
+        <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-plan">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">AI参会规划</span>
+            <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
+            <span class="dcard-ds" data-when="ai-down">展位图与企业名录照常看，顺序自己定</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-key="city" data-opts="广州市|深圳市|佛山市|东莞市">
+                <span class="k">城市</span><span class="v">广州市</span></button>
+              <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
+                <span class="k">方向</span><span class="v">未选</span></button>
+              <span class="dates" role="group" aria-label="选时间范围">
+                <span class="dates-k">时间</span>
+                <button class="dtag" type="button" aria-pressed="true" data-from="2026-08-10" data-to="2026-08-16">本周<i>8/10–8/16</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-01" data-to="2026-08-31">本月<i>8/1–8/31</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-12" data-to="2026-08-12">8/12<i>周三</i></button>
+                <button class="dtag" type="button" aria-pressed="false" data-from="2026-08-15" data-to="2026-08-15">8/15<i>周六</i></button>
+              </span>
+            </span>
+            <!-- 2026-08-10 AI 落实度审查整改：卡面承诺「按这三项排顺序」，但已核实
+                 17-fair-desk.html 全文 0 处 URLSearchParams —— city / from / to / dir
+                 会被目标页**静默丢弃**，进去看到的仍是全量场次。同类情况 34/38 都写了
+                 「接线后自动生效」，这张卡漏了。保留参数（接线契约），补如实提示。
+                 提示并进原有那一条、不另起一行：这张整行卡的可用高度只有 274px，
+                 多一行 .dcard-hint 会把主动作顶进 overflow:hidden（同 c-material 的教训）。 -->
+            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
+            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
+          </span>
+          <span class="dcard-rt">
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
+            <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="按这三项排顺序" href="17-fair-desk.html?stage=s1">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <!-- 2026-08-10 Codex 错配整改：同上，view=booth-map 不被消费，17 的 s3 是路线顺序页。
+                 AI 降级时要给的正是「不靠 AI 也能看的图和名录」= P45 map（图 + 服务点 + 展位企业）。 -->
+            <a class="dcard-go" data-when="ai-down" href="45-fair-onsite.html?stage=map">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          </span>
+        </div>
+
+        <!-- ══ AI 接线契约 · P36-B「求职材料准备：带几份简历、带哪些证明材料」══
+             输入：
+               · session string  场次（三选一，含"还没定"）；取 .pick[data-key="session"]
+               · dir     string  方向，**必选**，未选不给主动作（data-need="dir"）
+               · 账户侧：该用户已有的简历版本数与证件类文档（只读份数，不读内容）
+             输出：
+               · { resumeCopies: number, items: [{ name, why, optional:boolean }] }
+               · 证据级别 E3（模型判断 · 仅供参考）；**带几份最后由用户定**，页面不代按
+             降级：
+               · AI 不可用 → 主动作换成 12-material-factory.html?stage=t4&view=templates，
+                 用现成模板自己填；清单不生成，模板照常可用
+             当前阻塞：12-material-factory.html 只读 ?from=（用于改返回键父级），
+                 **不读 session / dir** —— 参数已按契约传出，接上即生效（卡面已如实标「待接线」）。
+             ════════════════════════════════════════════════════════════════ -->
+        <!-- 5 求职材料准备（AI · 先选场次与方向） -->
+        <div class="dcard dcard--ai dcard--pick" id="c-material">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
+          </span>
+          <span class="dcard-nm">求职材料准备</span>
+          <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
+          <span class="dcard-ds" data-when="ai-down">求职信、自我介绍、清单模板都是现成的</span>
+          <!-- 2026-08-10 第二轮回归：选择行与主动作并成一行 .pickrow（原因见样式表 .pickrow 注释：
+               半栏卡装不下「选择行 + 主动作 + 两条提示」，主动作原先被 overflow:hidden 整条吃掉）。
+               12-material-factory 的阶段轴是 t1 求职信 / t2 自我介绍 / t3 材料清单 / t4 简历模板，
+               不是 s1–s4；本卡去的是「材料清单」，所以传 stage=t3，ai-down 走 t4 模板。 -->
+          <div class="pickrow" data-when="default first device-off">
+            <div class="picks">
+              <button class="pick" type="button" data-key="session" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
+                <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
+              <button class="pick pick--empty" type="button" data-key="dir" data-opts="运营|销售|行政人事|技术">
+                <span class="k">方向</span><span class="v">未选</span></button>
+            </div>
+            <a class="dcard-go" data-base="12-material-factory.html?stage=t3&amp;from=P36" data-pick-scope="c-material" data-need="dir" data-need-label="先选方向" data-go-label="生成材料清单" href="12-material-factory.html?stage=t3&amp;from=P36">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          </div>
+          <!-- 2026-08-10 AI 落实度审查整改：同 c-plan。已核实 12-material-factory.html
+               只读 ?from=（用来改返回键的父级），**不读 session / dir** —— 这两项同样被
+               静默丢弃。保留参数（接线契约），补如实提示，不再让卡面独自承诺「按这一场列清单」。
+               第二轮回归把原来的两条提示并成这一条，字面内容一字未删。 -->
+          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定；这两项<b>按 ?session / dir 带过去</b>，材料工坊目前只读 ?from=，<b>接线后自动生效</b></span>
+          <a class="dcard-go" data-when="ai-down" href="12-material-factory.html?stage=t4&amp;from=P36&amp;view=templates">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+        </div>
+
+        <!-- 6 活动资料打印（非 AI）
+             2026-08-10 Codex :335 整改：device-off 卡面写「先存我的文档」，整张卡却仍链接
+             打印工作台 —— 用打印链接冒充保存。出纸链路断了，动作就得真的是「存进我的文档」，
+             所以这里按态拆成两张卡，各自挂各自真实的去向。 -->
+        <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #511）：原指 ?stage=s3&title=活动资料。
+             卡面自己写的就是「上传或扫描材料」—— 那两件事都还没发生，却直接落在
+             第 3 步核价，并让打印台开出一张「活动资料 · 收到交接」的回执。
+             材料是在 P06 第 1 步选的，所以落点改成第 1 步，主动作文案同步改掉「核价」。 -->
+        <a class="dcard dcard--print" id="c-print" data-when="default first ai-down" href="06-print-workbench.html">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">活动资料打印</span>
+          <span class="dcard-ds">上传或扫描材料，本机直接打印</span>
+          <span class="dcard-hint">第 1 步先选文件；本页不出价，以打印台核价为准</span>
+          <span class="dcard-go">去打印工作台选材料<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+        <a class="dcard dcard--print" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P36&amp;kind=material&amp;title=活动资料">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">活动资料打印</span>
+          <span class="dcard-ds">打印机离线，材料存进我的文档</span>
+          <span class="dcard-hint">只做保存，不进打印队列、不产生费用</span>
+          <span class="dcard-go">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+      </div>
+
+      <!-- ── 次卡：快捷入口 ──
+           2026-08-10 改：记录类原指 17-fair-desk.html?view=browse / view=jumps，
+           但招聘会台里没有任何浏览/跳转记录 UI，view 参数也不被消费 —— 送错门。
+           浏览与外部跳转记录统一落在「我的记录 · 足迹」标签。
+
+           2026-08-10 孤儿页接线：P45 招聘会现场（活动资料 / 现场数据）此前**全站零入口**。
+           为什么塞进这一排而不是新起一块：本页主栏高度已经用满，实测在 .dgrid 下方多插
+           **40px 就会把 AI 卡里的选择控件裁掉**（「先选方向」超出 39px）。所以改成
+           把这一排从 2 列扩成 4 列 —— 行数不变、总高不变，多出两个真入口。
+           展位企业与场馆导览已经由上面的「看展位图」与 AI 降级链接指向 P45，不再重复。 -->
+      <div class="dmore">
+        <div class="dmore-hd">
+          <b>快捷入口</b>
+          <span data-when="default ai-down device-off">现场信息随时能看；历史记录登录后可查</span>
+          <span data-when="first">现场信息随时能看；未登录，记录留不下</span>
+        </div>
+        <div class="dmore-row dmore-row--4">
+          <a class="dmore-go" href="45-fair-onsite.html?stage=materials">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">活动资料</span>
+              <span class="dmore-s">主办方会刊与名录</span>
+              <span class="dmore-n">勾选后免费出纸</span>
+            </span>
+          </a>
+          <a class="dmore-go" href="45-fair-onsite.html?stage=stats">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">现场数据</span>
+              <span class="dmore-s">规模与签到进度</span>
+              <span class="dmore-n">主办方同步</span>
+            </span>
+          </a>
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">浏览记录</span>
+              <span class="dmore-s">在「我的 · 足迹」看</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 条</span>
+            </span>
+          </a>
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P36">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">外部跳转记录</span>
+              <span class="dmore-s">在「我的 · 足迹」看</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 次</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 次</span>
+            </span>
+          </a>
+        </div>
+      </div>
+
+      <!-- ── 页脚：整页只此一条合规声明 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>招聘会信息来自第三方或官方来源；预约、报名请前往来源平台完成，本终端只提供信息展示与跳转入口。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">城市、日期、方向选完才排顺序</div></div>
+      <div data-when="first"><div class="t">不登录也能用，六张卡一张都不锁</div><div class="s">这一趟的记录留不下，离场即清</div></div>
+      <div data-when="ai-down"><div class="t">场次、签到、打印照常</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
+    </div>
+
+    <!-- 2026-08-11 链接落地整改（Codex (b)-12 / #518）：原指 13-jobs-desk.html。
+         按钮写的是域名「岗位信息」（跨域泛入口），落点应是岗位信息域首屏 P34；
+         P13 只是那个域里的一个子工作台（全部岗位台），不该替整个域收口。 -->
+    <a class="btn btn--lg btn--ghost" href="34-jobs-hub.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
+    <a class="btn btn--primary" href="17-fair-desk.html?stage=s1">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function shown (el) {
+    return el && !el.hidden && (el.offsetParent !== null || el.getClientRects().length > 0)
+  }
+
+  /* ── 选择项 → 下一页参数 ────────────────────────────────────────────
+     2026-08-10 Codex :297 整改：三项选择原来点完就停在本页，17-fair-desk 收不到。
+     现在城市 / 方向走 .pick[data-key]，日期走 .dtag[data-from][data-to]，
+     点完立刻把当前取值拼回主动作的 href：
+       17-fair-desk.html?stage=s1&city=…&dir=…&from=…&to=…
+     方向未选（data-need）时**不给 href**，按钮文字改成「先选方向」——
+     宁可点不动，也不能替用户猜一个方向就去排顺序。 */
+  function syncPickLinks () {
+    var links = scr.querySelectorAll('[data-pick-scope][data-base]')
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i]
+      var host = document.getElementById(a.getAttribute('data-pick-scope'))
+      if (!host) continue
+      var qs = '', missing = false
+      var picks = host.querySelectorAll('.pick[data-key]')
+      for (var j = 0; j < picks.length; j++) {
+        var pk = picks[j]
+        if (!shown(pk)) continue
+        var vEl = pk.querySelector('.v')
+        var raw = vEl ? (vEl.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+        if (raw === '未选') raw = ''
+        if (!raw && pk.getAttribute('data-key') === a.getAttribute('data-need')) missing = true
+        qs += '&' + pk.getAttribute('data-key') + '=' + encodeURIComponent(raw)
+      }
+      var on = host.querySelector('.dtag[aria-pressed="true"]')
+      if (on && shown(on)) {
+        qs += '&from=' + encodeURIComponent(on.getAttribute('data-from')) +
+              '&to=' + encodeURIComponent(on.getAttribute('data-to'))
+      }
+      var label = missing ? a.getAttribute('data-need-label') : a.getAttribute('data-go-label')
+      a.innerHTML = label + '<svg class="ic"><use href="#i-arrowRight"/></svg>'
+      if (missing) {
+        a.removeAttribute('href')
+        a.setAttribute('aria-disabled', 'true')
+      } else {
+        a.setAttribute('href', a.getAttribute('data-base') + qs)
+        a.removeAttribute('aria-disabled')
+      }
+    }
+  }
+  window.v3SyncPickLinks = syncPickLinks
+  syncPickLinks()
+  if (typeof window.v3ApplyVisibility === 'function') {
+    var origApply = window.v3ApplyVisibility
+    window.v3ApplyVisibility = function () { origApply.apply(this, arguments); syncPickLinks() }
+  }
+  if (window.MutationObserver) {
+    new window.MutationObserver(syncPickLinks)
+      .observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  }
+
+  scr.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+
+    /* ⓪ 日期标签：直接选中，起止日期写在标签脸上，不做"指定日期"这种选不出来的选项 */
+    var d = e.target.closest('.dtag')
+    if (d) {
+      var grp = d.parentNode.querySelectorAll('.dtag')
+      for (var n = 0; n < grp.length; n++) grp[n].setAttribute('aria-pressed', grp[n] === d ? 'true' : 'false')
+      syncPickLinks()
+      return
+    }
+
+    /* ① 卡上的输入项：点一下换一个值。缺输入时先变成真实取值，再进下一页 */
+    var p = e.target.closest('.pick')
+    if (p) {
+      var opts = (p.getAttribute('data-opts') || '').split('|')
+      var v = p.querySelector('.v')
+      if (opts.length > 1 && v) {
+        var i = opts.indexOf((v.textContent || '').replace(/^\s+|\s+$/g, ''))
+        v.textContent = opts[(i + 1) % opts.length]
+        p.classList.remove('pick--empty')
+      }
+      syncPickLinks()
+      return
+    }
+
+    /* ② 顶部 AI 带的用法按钮：只在页内高亮对应的卡，不跳假页 */
+    var b = e.target.closest('[data-spot]')
+    if (!b) return
+    var on = scr.querySelectorAll('.dcard--spot')
+    for (var j = 0; j < on.length; j++) on[j].classList.remove('dcard--spot')
+    var ids = (b.getAttribute('data-spot') || '').split(/\s+/)
+    for (var k = 0; k < ids.length; k++) {
+      var el = ids[k] && document.getElementById(ids[k])
+      if (el) el.classList.add('dcard--spot')
+    }
+    var all = scr.querySelectorAll('[data-spot]')
+    for (var m = 0; m < all.length; m++) {
+      all[m].setAttribute('aria-pressed', all[m] === b ? 'true' : 'false')
+    }
+  })
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

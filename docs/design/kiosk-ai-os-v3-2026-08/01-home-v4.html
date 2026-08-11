@@ -1,4 +1,15 @@
 <!DOCTYPE html>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     历史比稿 · 仅供 compare.html 对照，不作为线上口径
+     --------------------------------------------------------------------------
+     2026-08-10 逐屏对照结论：本页的服务入口卡**绕过域首屏直连工作台**
+     （如「打印扫描」直接进 06、「AI简历」直接进 09），与 v5/v6 定版的三层 IA
+     （首页 → 域首屏 32/34/36/37/38/39 → 工作台）冲突。
+     处置：本页是**历史快照**，服务卡链接一律**保持原样不动** —— 快照的价值
+     就在于它记录了当时的走法，改了就不是快照了。只在页面顶部加显著标注，
+     防止有人把这一版的走法当成线上口径去接线。
+     线上口径以 01-home-v5.html / 01-home-v6.html 为准。
+     ══════════════════════════════════════════════════════════════════════════ -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -12,6 +23,7 @@
 <link rel="stylesheet" href="styles/bench.css?v=3">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
   /* 本页专属：标题必须避开出血肖像；脊上"当前步"由状态决定 */
   .head-title { max-width: 7.6em; }
@@ -41,6 +53,17 @@
 
 <div class="stage">
 <div class="screen" data-state="default" data-theme="warm">
+  <!-- 历史比稿水印：绝对定位覆盖在 .screen 右上角，**不占版面高度**。
+       第一版做成了 main 里的常规横幅，实测把本页主体纵向溢出从 15px 顶到 122px
+       （历史快照本来就排到边了，多一行就出血）—— 快照的价值是保住当时的版面，
+       所以标注改成不参与布局的浮层，pointer-events:none，四态同显，不进 Tab 序。 -->
+  <div class="histmark" role="note" title="本页服务卡绕过域首屏直连工作台，与 v5/v6 三层 IA 冲突；「更多服务」当时只落到智慧校园，百宝箱无落点。链接一律保持原样，仅作历史对照。"
+    style="position:absolute;z-index:80;top:0;right:0;display:flex;align-items:center;
+    height:44px;padding:0 22px;pointer-events:none;border-bottom-left-radius:14px;
+    background:rgba(176,110,18,.95);color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.28);
+    font-family:var(--ff-ui);font-size:18px;font-weight:600;letter-spacing:.02em;white-space:nowrap">
+    历史比稿 · 仅供 compare.html 对照，不作为线上口径
+  </div>
 
   <div class="aurora"><i></i><i></i><i></i></div>
   <div class="grain"></div>
@@ -106,6 +129,7 @@
     <!-- ============ 版面 ============ -->
     <main class="sheet">
       <div class="marks"><i></i><i></i><i></i><i></i></div>
+
 
       <!-- 版头：巨型标题 + 出血肖像 -->
       <section class="head rise">
@@ -313,5 +337,7 @@
 
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/fx.js?v=3"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>V3 全站回归台</title>
+<!--
+  ============================================================
+  V3 · 全站回归台（可复现版）
+  ------------------------------------------------------------
+  为什么要有这个文件：
+
+  上一轮回归用的是「跑完就删」的临时驱动台。结果是 Codex 终审时给出
+  「候选稿在终审过程中仍在变化，当前不存在可复现的最终版」——
+  没有留下驱动台，就没有人能重跑出同一份结论，报告也就不能当作定版依据。
+  所以驱动台必须进仓库、必须版本化、必须能被别人原样跑出同样的数。
+
+  ── 测量环境（不照做会量出不同结果，这是实打实踩过的坑）──────
+  1) 必须走 HTTP，不能走 file://
+     file:// 下 iframe 跨文档访问被 Chrome 挡住，驱动台读不到子页 DOM。
+     在设计稿目录起：  python3 -m http.server 8899
+     然后开：          http://localhost:8899/tools/regress.html
+
+  2) 窗口必须 1120×2010
+     舞台是 1080×1920。窗口更小时 stage.js 的 fit() 会整体缩放，
+     一切像素测量（溢出、留白、可见比例）都跟着失真。
+
+  3) 每页每轮都要清 localStorage
+     themes.html 会把主题写进 localStorage。不清的话，同一份代码
+     在不同轮次会量出 0 / 44 / 68 三种不同的溢出值——这个坑吃过一次。
+     驱动台在每次装载前清一遍，并在 URL 上钉死 ?theme=warm。
+
+  4) 关 HTTP 缓存（DevTools → Network → Disable cache）
+     否则改完代码重跑，量的还是旧文件。
+
+  ── 审计驱动顺序（少一步就漏检）──────────────────────────
+     screen.setAttribute('data-state', st)
+     screen.setAttribute('data-stage', sg)
+     window.v3ApplyVisibility()
+     void document.body.offsetHeight      // 强制回流，否则量到的是旧版面
+     window.v3AuditPlus()
+
+  ── 轴发现（这一段是本文件最要紧的地方）────────────────────
+  V3 的页面状态由挂在 .screen 上的 data-* 轴决定。麻烦在于
+  data-src / data-file / data-redact 这类轴是**运行时才加到 .screen 上**的，
+  静态扫 HTML 根本看不见。上一轮就是这么漏检的：审计报全绿，
+  而那几条轴上的组合从头到尾没有被跑过。
+
+  所以这里的做法是：
+    · 轴的**取值**从后代元素的门控列表里取并集（那是写死在 HTML 里的，看得见）
+    · 轴的**名字**用白名单，因为轴是一个小的封闭集合
+    · 遇到白名单之外、但长得像轴的 data-* 属性，**报警**而不是跳过
+      —— 检测器自己也必须被检测。
+  ============================================================
+-->
+<style>
+  html, body { margin: 0; background: #0e1116; color: #dfe6f2;
+    font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif }
+  #bar { position: sticky; top: 0; z-index: 9; display: flex; gap: 10px; align-items: center;
+    padding: 12px 16px; background: #151a22; border-bottom: 1px solid #263041; flex-wrap: wrap }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #33415a;
+    background: #1d2530; color: #dfe6f2; cursor: pointer }
+  button:hover { background: #263041 }
+  #env { font-size: 12px; color: #8fa1bd }
+  #env b.bad { color: #ff8f8f }
+  #env b.ok { color: #8fe0a8 }
+  #log { padding: 12px 16px; white-space: pre-wrap; font: 12px/1.55 ui-monospace, Menlo, monospace }
+  .warn { color: #ffc46b }
+  .bad { color: #ff8f8f }
+  .ok { color: #8fe0a8 }
+  /* 舞台 iframe 必须是真实 1080×1920，不能缩放，否则测量失真 */
+  /* 舞台 iframe 必须是真实 1080×1920 且**留在视口里**。
+     一开始我把它丢到 left:-4000px，结果 Chrome 把屏外 iframe 的 rAF 节流到不触发，
+     装载握手永远不 resolve，整台子无声挂死 —— 台子自己会骗人，这也是一种假绿。
+     现在留在视口内、用 opacity 压掉、pointer-events 关掉。 */
+  #frame { width: 1080px; height: 1920px; border: 0;
+    position: fixed; right: 0; top: 0; opacity: .02; pointer-events: none; z-index: -1 }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <button id="run">开始全量回归</button>
+  <button id="runone">只跑一页…</button>
+  <button id="copy">复制 JSON 结果</button>
+  <span id="env"></span>
+</div>
+<div id="log">按「开始全量回归」。先看上面的环境自检，红的先修再跑。</div>
+<iframe id="frame" src="about:blank"></iframe>
+
+<script>
+/* ── 轴白名单 ────────────────────────────────────────────────
+   已知的轴。data-when 是四态、data-at 是阶段，两者单独处理。 */
+var AXIS_ALLOW = ['data-pay', 'data-job', 'data-src', 'data-file',
+                  'data-off', 'data-done', 'data-probe', 'data-redact', 'data-tab']
+
+/* 明确不是轴的 data-*（用于「长得像轴但没在白名单里」的报警去噪）。
+   这些要么是行为钩子，要么是数据槽，不参与可见性判定。 */
+var AXIS_DENY = ['data-go', 'data-ev', 'data-out', 'data-f', 'data-f22', 'data-when',
+  'data-at', 'data-stage', 'data-state', 'data-theme', 'data-notebar', 'data-site',
+  'data-site-price', 'data-site-mode', 'data-site-unit', 'data-site-time', 'data-site-missing',
+  'data-rail-count', 'data-parent-label', 'data-empty-cond', 'data-relax-from',
+  'data-jobpick', 'data-kw', 'data-region', 'data-region-value', 'data-region-text',
+  'data-opts', 'data-vals', 'data-key', 'data-count', 'data-pay-btn', 'data-help',
+  'data-keypad', 'data-nb-ceiling', 'data-capture',
+  /* 以下经 07-scan-workbench 实测确认不是轴：全部挂在按钮 / 数据行上，
+     既没写到 .screen，页面里也没有任何 setAttribute('data-…')。
+     它们是选择器的取值槽，不参与可见性判定。 */
+  'data-kind', 'data-kindrow', 'data-fmt', 'data-param', 'data-v', 'data-pg', 'data-fb',
+  /* 以下逐页看过，确认是**选择器与数据槽**，不参与可见性判定（2026-08-11）：
+     13 的筛选组结构 data-fgroup / data-fmode / data-jobtype / data-relax*；
+     16 同类 data-agrelax；21 的逐条政策槽 data-pol / data-pick / data-verdict /
+     data-cond / data-doc / data-doclb / data-hint / data-docbox / data-todo /
+     data-docpick / data-qrow / data-q；42/43 的 data-for / data-sel / data-g；
+     28 的选项按钮 data-opt；23 的 data-view（是定位器，被 ?view= 消费后加
+     is-located，不改可见性）与弹层开关 data-open；01 的 data-fx。
+     登记在这里而不是让它每页刷屏：**告警的价值在于「有没见过的轴」，
+     判过的就该记下来，否则噪声一多，真正该看的那条会被埋掉。** */
+  'data-fgroup', 'data-fmode', 'data-jobtype', 'data-relax', 'data-relax-axis',
+  'data-agrelax', 'data-pol', 'data-pick', 'data-verdict', 'data-cond', 'data-doc',
+  'data-doclb', 'data-hint', 'data-docbox', 'data-todo', 'data-docpick',
+  'data-qrow', 'data-q', 'data-for', 'data-sel', 'data-g', 'data-opt',
+  'data-view', 'data-open', 'data-fx',
+  /* data-gate(unquoted|quoted)：06 上只挂在 3 个按钮上，从没写到 .screen，
+     源码里 0 处 setAttribute，切换它可见元素数 216→216 一点不变 ——
+     是个没接线的遗留标记（当初大概打算做成轴，后来用 data-at/data-when 实现了）。
+     实测确认惰性后登记，不是猜的。 */
+  'data-gate']
+
+/* ── 本台子的已知盲区（写在这里，不写在报告的漂亮话里）──────────
+   1) **交互驱动的文本态没有覆盖。** 像 07 的扫描格式（PDF/JPG/可检索 PDF）、
+      分辨率、彩色/黑白，是页面局部脚本改**文字**而不是改可见性的。
+      本台子靠枚举 data-* 轴来驱动，够不到这一类。这些组合会改变文字长度，
+      因而可能造成溢出 —— 没跑过就是没跑过，不要把它算进"全覆盖"。
+      高风险页需要另写点击脚本，或人工过一遍。
+   2) **跨页链接的落地内容没有验。** 只验了本页；链接指向哪一页对不对，
+      要靠 closed-loop-map.md 的映射表另行核。
+   3) **动效与时序没有验。** 审计取的是某一帧的静态版面。
+   4) 抽样页（组合数超上限）按等距抽，不是全量；报告里逐页标了 sampled。 */
+
+var STATES = ['default', 'first', 'ai-down', 'device-off']
+
+/* 每页组合数上限。超过就等距抽样，并在报告里**明写抽了多少**——
+   静默截断会让报告读起来像"全覆盖"，那是最坏的一种假绿。
+
+   改成逐轴遍历之后，最大的一页（06 打印工作台，7 条附加轴）全量只有 868 组，
+   跑得完。上限抬到 1200 就是为了让全站**一页都不抽样** ——
+   报告里出现「等距抽样」四个字，就意味着那一页有没跑到的组合。 */
+var COMBO_CAP = 1200
+
+/* 跑哪一套主题。默认 warm（前几轮的基线都在这一套上）。
+   ------------------------------------------------------------
+   为什么要能换：`--fog-a04` 那次事故就是主题相关的 ——
+   26 个页面引用了三个从未定义的变量，整条 background / border 声明作废，
+   底色和边框全没了。而 themes.css 里每套主题各自覆盖 --surf-* / --brd-*，
+   **只在一套主题下跑，等于只验了九分之一。**
+   用 window.v3RunAll('', 'cobalt') 或 URL 上加 ?t=cobalt 换。 */
+var THEMES = ['warm', 'jade', 'cobalt', 'amber', 'neon', 'frost', 'honey', 'pine', 'ink']
+var THEME = (new URLSearchParams(location.search).get('t') || 'warm')
+if (THEMES.indexOf(THEME) < 0) THEME = 'warm'
+
+var PAGES = []          // 运行时从目录清单拉
+var RESULT = { env: {}, pages: [], startedAt: '', finishedAt: '' }
+
+var logEl = document.getElementById('log')
+var frame = document.getElementById('frame')
+function log (s, cls) {
+  var span = document.createElement('span')
+  if (cls) span.className = cls
+  span.textContent = s + '\n'
+  logEl.appendChild(span)
+  logEl.scrollTop = logEl.scrollHeight
+}
+
+/* ── 环境自检 ──────────────────────────────────────────────
+   注意这里检的是**真正决定测量是否可信的东西**，不是它的代理指标。
+
+   一开始我检的是外层 Chrome 窗口尺寸，那是错的：舞台 iframe 有显式的
+   1080×1920 CSS 尺寸，它的内部视口就等于这个盒子，跟外层窗口多大无关。
+   真正要保证的是两条 ——
+     ① iframe 内部视口正好 1080×1920
+     ② ?capture=1 生效，stage.js 的 fit() 把 transform 设成 none（完全不缩放）
+   这两条都在**子页里**验，见 verifyStage()。外层只剩一条：必须走 http。 */
+function checkEnv () {
+  var e = document.getElementById('env')
+  var proto = location.protocol === 'http:' || location.protocol === 'https:'
+  RESULT.env = { protocol: location.protocol, protocolOk: proto, ua: navigator.userAgent }
+  e.innerHTML =
+    '协议 <b class="' + (proto ? 'ok' : 'bad') + '">' + location.protocol + '</b>（须 http，file:// 下读不到子页 DOM）　' +
+    '<span style="color:#8fa1bd">舞台 1:1 与缩放在每页装载后逐页验　·　缓存请在 DevTools 里手动关</span>'
+  return proto
+}
+
+/* 逐页验舞台：视口须 1080×1920，且 capture 模式下不得有任何缩放。
+   任何一条不成立，这一页量出来的像素数都不可信，必须当作装载失败。 */
+function verifyStage (win) {
+  var vw = win.innerWidth, vh = win.innerHeight
+  var stage = win.document.querySelector('.stage')
+  var tf = stage ? win.getComputedStyle(stage).transform : 'none'
+  var scaled = tf && tf !== 'none' && tf !== 'matrix(1, 0, 0, 1, 0, 0)'
+  var ok = vw === 1080 && vh === 1920 && !scaled
+  return { ok: ok, viewport: vw + '×' + vh, transform: tf || 'none' }
+}
+checkEnv()
+window.addEventListener('resize', checkEnv)
+
+/* ── 页面清单 ──────────────────────────────────────────────
+   从 manifest.json 读；没有就退回目录列表解析。
+   不硬编码页名——硬编码就会在新增页时静默漏测。 */
+async function loadPages () {
+  var r = await fetch('../pages.json?t=' + Date.now(), { cache: 'no-store' })
+  if (!r.ok) throw new Error('读不到 pages.json —— 先在设计稿目录跑 sh tools/make-pages.sh')
+  var j = await r.json()
+  RESULT.manifest = { generatedAt: j.generatedAt, retired: j.retired || [], count: j.pages.length }
+
+  /* 清单陈旧是最隐蔽的漏检：报告看起来"全站都跑了"，实际少跑了新增页。
+     这里用清单生成时间与最新一页的 Last-Modified 对比，陈旧就明着报出来。 */
+  try {
+    var newest = 0
+    for (var i = 0; i < j.pages.length; i++) {
+      var h = await fetch('../' + j.pages[i], { method: 'HEAD', cache: 'no-store' })
+      var lm = Date.parse(h.headers.get('last-modified') || '')
+      if (lm > newest) newest = lm
+    }
+    var gen = Date.parse(j.generatedAt)
+    RESULT.manifest.stale = newest > gen
+    RESULT.manifest.newestPageAt = new Date(newest).toISOString()
+    if (newest > gen) log('⚠ pages.json 比最新改动的页面还旧（清单 ' + j.generatedAt
+      + '，最新页 ' + new Date(newest).toISOString() + '）。先跑 sh tools/make-pages.sh 再回归。', 'warn')
+  } catch (e) {}
+
+  if (j.retired && j.retired.length)
+    log('退役页（保留文件，不进交付集、不回归）：' + j.retired.join('、'), 'warn')
+  return j.pages
+}
+
+/* ── 装载一页 ──────────────────────────────────────────────
+   清 localStorage → 钉主题 → 等 load → 再等一帧让 stage.js 跑完初始化。 */
+function loadPage (name) {
+  return new Promise(function (resolve, reject) {
+    /* 超时**贯穿整个握手**，不在 onload 时清掉。
+       之前的写法是 onload 里 clearTimeout 再等 rAF —— rAF 一旦被节流，
+       超时已经没了，于是无声挂死。凡是等待，都必须有一个自己管不掉的兜底。 */
+    var settled = false
+    var to = setTimeout(function () {
+      if (settled) return
+      settled = true
+      reject(new Error('装载握手超时 12s'))
+    }, 12000)
+
+    frame.onload = function () {
+      var win = frame.contentWindow
+      try { win.localStorage.clear() } catch (e) {}
+      /* 用 setTimeout 而不是 rAF：rAF 在被节流的 iframe 里可能永远不触发。
+         两拍：一拍给 DOMContentLoaded 之后的脚本，一拍给它们触发的布局。 */
+      setTimeout(function () {
+        setTimeout(function () {
+          if (settled) return
+          settled = true
+          clearTimeout(to)
+          resolve(win)
+        }, 80)
+      }, 80)
+    }
+    try { frame.contentWindow.localStorage.clear() } catch (e) {}
+    frame.src = '../' + name + '?theme=' + THEME + '&capture=1&t=' + Date.now()
+  })
+}
+
+/* 任何一步都不许无限等：整页处理套一个硬超时，超了就记成失败继续跑下一页。
+   一台会挂死的回归台，比没有回归台更糟 —— 它会让人以为「还在跑」。 */
+function withTimeout (p, ms, what) {
+  return Promise.race([p, new Promise(function (_, rej) {
+    setTimeout(function () { rej(new Error(what + ' 超时 ' + ms + 'ms')) }, ms)
+  })])
+}
+
+/* ── 轴发现 ────────────────────────────────────────────────
+   取值从后代门控列表取并集；名字走白名单；白名单外的可疑项报警。 */
+function discoverAxes (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return { error: '没有 .screen' }
+
+  var stages = []
+  doc.querySelectorAll('[data-at]').forEach(function (el) {
+    String(el.getAttribute('data-at') || '').split(/\s+/).forEach(function (v) {
+      if (v && stages.indexOf(v) < 0) stages.push(v)
+    })
+  })
+
+  var axes = {}, suspicious = []
+  var seen = {}
+  doc.querySelectorAll('*').forEach(function (el) {
+    for (var i = 0; i < el.attributes.length; i++) {
+      var n = el.attributes[i].name
+      if (n.indexOf('data-') !== 0) continue
+      seen[n] = (seen[n] || 0) + 1
+    }
+  })
+  Object.keys(seen).forEach(function (n) {
+    if (AXIS_ALLOW.indexOf(n) > -1) {
+      var vals = []
+      doc.querySelectorAll('[' + n + ']').forEach(function (el) {
+        if (el === screen) return
+        String(el.getAttribute(n) || '').split(/\s+/).forEach(function (v) {
+          if (v && vals.indexOf(v) < 0) vals.push(v)
+        })
+      })
+      if (vals.length > 1) axes[n] = vals
+      return
+    }
+    if (AXIS_DENY.indexOf(n) > -1) return
+    /* `data-xxx-go` / `data-xxx-btn` 是**设置轴的按钮**，不是轴本身。
+       06 一页就有 data-src-go / data-file-go / data-redact-go / data-job-btn /
+       data-pay-go / data-off-go / data-done-go 七个，全报一遍纯属噪声。 */
+    if (/-(go|btn)$/.test(n)) return
+    /* 白名单外、出现在多个元素上、且取值像是枚举 —— 可能是新轴。
+       报出来，别静默跳过。上一轮的教训就是漏轴等于漏检。 */
+    if (seen[n] >= 3) {
+      var vs = {}
+      doc.querySelectorAll('[' + n + ']').forEach(function (el) {
+        String(el.getAttribute(n) || '').split(/\s+/).forEach(function (v) { if (v) vs[v] = 1 })
+      })
+      var k = Object.keys(vs)
+      /* 取值长什么样，基本就能判出它是轴还是数据。
+         轴用短的 ASCII 标识（default / first / s1 / pay-fail / booth / resume）；
+         而「个人简历.pdf」「广州××科技」「2026-08-12」「穗人社规〔2026〕3 号」
+         这些是内容。第一版没做这个区分，于是每页都刷一屏
+         「疑似未登记的轴：data-nm(个人简历.pdf|毕业证明扫描件.pdf|…)」——
+         噪声一多，真正该看的那条就被埋了，跟假红条一样有害。 */
+      var looksLikeSlug = k.every(function (x) {
+        return x.length <= 16 &&
+               /^[A-Za-z0-9_-]+$/.test(x) &&      // 纯 ASCII 标识
+               !/^\d{4}-\d{2}/.test(x) &&          // 不是日期
+               !/^\d+$/.test(x) &&                 // 不是纯数字（页码、份数）
+               !/^[A-Z]{1,3}-?\d{4,}/.test(x)      // 不是业务 ID（O-20260809-1023 / CO-4471）
+      })
+      if (k.length > 1 && k.length <= 12 && looksLikeSlug) {
+        suspicious.push({ attr: n, count: seen[n], values: k })
+      }
+    }
+  })
+
+  /* 默认阶段必须是第 1 步。
+     实测栽过：07 扫描台的 .screen 上写死 data-stage="s3"，s3 是「正在扫描」——
+     用户从打印扫描首屏点「材料扫描」进来，屏幕上直接是扫描中途。
+     全站 34 个多阶段页里有 5 页是这样，全都停在设计时最后调试的那一步。
+     阶段轨的第一个 [data-go] 就是第 1 步（与 stage.js 的 stageList() 同口径）。 */
+  var rail = doc.querySelector('.rail, .spine-rail, [data-rail]')
+  var railOrder = []
+  ;(rail || doc).querySelectorAll('[data-go]').forEach(function (el) {
+    var v = el.getAttribute('data-go')
+    if (v && stages.indexOf(v) > -1 && railOrder.indexOf(v) < 0) railOrder.push(v)
+  })
+  var declared = screen.getAttribute('data-stage') || ''
+  var defaultNotFirst = (rail && railOrder.length && declared && declared !== railOrder[0])
+    ? { declared: declared, shouldBe: railOrder[0] } : null
+
+  return { stages: stages, axes: axes, suspicious: suspicious,
+           hasStage: screen.hasAttribute('data-stage'),
+           defaultNotFirst: defaultNotFirst }
+}
+
+/* ── 组合枚举 ──────────────────────────────────────────────
+   一开始我做的是各轴笛卡尔积。跑起来才看清那是错的：
+   06 打印工作台有 7 条附加轴，全量组合 **193 万**，抽 260 个只覆盖 0.013%,
+   而且其中绝大多数现实里根本不可能同时成立（免费单 × 卡纸 × 正在选遮盖区）。
+   一个覆盖率 0.013% 的报告写成"跑过了"，比不跑更误导。
+
+   改成**逐轴遍历**：其余轴保持页面自己的默认值，一次只动一条轴。
+   规模从 prod(k_i) 降到 sum(k_i)，而且可以诚实地说清覆盖了什么：
+
+     ✓ 每条轴的每个取值，都在四态 × 全阶段下跑过
+     ✗ 轴与轴的交叉只跑了默认组合
+
+   后一条是本台子的**已知边界**，不是"全覆盖"。真要验特定交叉（例如
+   ai-down × 卡纸 × 已遮盖），得由页面所有者点名，另列用例。 */
+function buildCombos (disc, win) {
+  var stages = disc.hasStage && disc.stages.length ? disc.stages : ['']
+  var axisNames = Object.keys(disc.axes)
+  var screen = win.document.querySelector('.screen')
+
+  /* 各轴的默认值：优先取页面自己在 .screen 上写的，没有就取第一个取值 */
+  var base = {}
+  axisNames.forEach(function (n) {
+    var v = screen.getAttribute(n)
+    base[n] = (v && disc.axes[n].indexOf(v) > -1) ? v : disc.axes[n][0]
+  })
+
+  /* 每条轴只在**它真正起作用的阶段**上变化。
+     06 一开始是 868 组，其中大量组合毫无意义 —— 在「选来源」那一步去改
+     「收银状态」，那一步根本没有收银元素，跑一遍什么也验不到，
+     还把一台子拖到跑不完。
+     判据：带这条轴的元素自己（或其祖先）用 data-at 声明了哪些阶段。
+     没有任何 data-at 约束的，视为所有阶段都相关。 */
+  var axisStages = {}
+  axisNames.forEach(function (n) {
+    var set = null
+    win.document.querySelectorAll('[' + n + ']').forEach(function (el) {
+      if (el === screen) return
+      var at = null
+      for (var a = el; a && a !== screen; a = a.parentElement) {
+        if (a.hasAttribute && a.hasAttribute('data-at')) { at = a.getAttribute('data-at'); break }
+      }
+      if (!at) { set = 'all'; return }
+      if (set === 'all') return
+      if (!set) set = {}
+      at.split(/\s+/).forEach(function (s) { if (s) set[s] = 1 })
+    })
+    axisStages[n] = (set === 'all' || !set) ? null : Object.keys(set)
+  })
+
+  /* 每条轴要单独跑的取值 = 全部取值去掉默认值（默认值已在基线组合里跑过） */
+  var variants = [[]]                                    // [] = 全部用默认值
+  axisNames.forEach(function (n) {
+    disc.axes[n].forEach(function (v) {
+      if (v !== base[n]) variants.push([[n, v]])
+    })
+  })
+
+  var out = []
+  for (var s = 0; s < STATES.length; s++)
+    for (var g = 0; g < stages.length; g++)
+      for (var e = 0; e < variants.length; e++) {
+        var vary = variants[e][0]
+        if (vary && axisStages[vary[0]] && stages[g] &&
+            axisStages[vary[0]].indexOf(stages[g]) < 0) continue   // 这一步用不到这条轴
+        /* 每个组合都带上全套默认值，避免上一轮改过的轴留在 .screen 上污染下一轮 */
+        var extra = axisNames.map(function (n) { return [n, base[n]] })
+        variants[e].forEach(function (kv) {
+          for (var i = 0; i < extra.length; i++) if (extra[i][0] === kv[0]) extra[i][1] = kv[1]
+        })
+        out.push({ state: STATES[s], stage: stages[g], extra: extra, varied: variants[e][0] || null })
+      }
+
+  var full = out.length, sampled = false
+  if (full > COMBO_CAP) {
+    /* 抽样规则要可复现：等距抽，不用随机。随机会让两次跑不出同一份报告。 */
+    var step = full / COMBO_CAP, picked = []
+    for (var k = 0; k < COMBO_CAP; k++) picked.push(out[Math.floor(k * step)])
+    out = picked; sampled = true
+  }
+  return { list: out, full: full, ran: out.length, sampled: sampled,
+           axisCount: axisNames.length,
+           crossFull: axisNames.reduce(function (n, a) { return n * disc.axes[a].length }, 1) *
+                      STATES.length * stages.length }
+}
+
+/* ── 跑一个组合 ──────────────────────────────────────────── */
+function runCombo (win, c) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  screen.setAttribute('data-state', c.state)
+  if (c.stage) screen.setAttribute('data-stage', c.stage)
+  for (var i = 0; i < c.extra.length; i++) screen.setAttribute(c.extra[i][0], c.extra[i][1])
+  if (typeof win.v3ApplyVisibility === 'function') win.v3ApplyVisibility()
+  void doc.body.offsetHeight                      // 强制回流：不做就量到旧版面
+  var r = (typeof win.v3AuditPlus === 'function') ? win.v3AuditPlus()
+        : (typeof win.v3Audit === 'function') ? win.v3Audit() : null
+  return r
+}
+
+/* ── 遮挡检测 ────────────────────────────────────────────────
+   为什么单独加这一项：首页的「查看招聘会」在 default / device-off 两态
+   被页脚折叠条盖住、按不动，而全套审计报的是 0 缺陷 —— 因为它既没有溢出，
+   也在 1920 视口之内，只是**被另一个元素压在上面**。
+   一个按不动的按钮，比一个丑的按钮严重得多，却正好是既有检查的盲区。
+
+   做法：取按钮中心点做 elementFromPoint，命中的若不是它自己或它的后代，
+   就是被挡住了。有弹层打开时整页跳过（那时候盖住是对的）。 */
+function auditOcclusion (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  /* 弹层/遮罩打开时不查：那时候盖住下面的东西是设计意图 */
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden]), .modal:not([hidden])')) return []
+
+  var out = []
+  var els = screen.querySelectorAll('button, a.btn, .btn, .pick, [role="button"], a.card, .fc-card')
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i]
+    if (el.hidden || el.closest('[hidden]')) continue
+    var st = win.getComputedStyle(el)
+    if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < .1) continue
+    if (st.pointerEvents === 'none') continue
+    var r = el.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) continue
+    if (r.bottom <= 0 || r.top >= win.innerHeight || r.right <= 0 || r.left >= win.innerWidth) continue
+
+    var cx = Math.round(r.left + r.width / 2)
+    var cy = Math.round(r.top + r.height / 2)
+    if (cx < 0 || cy < 0 || cx >= win.innerWidth || cy >= win.innerHeight) continue
+
+    /* 第一版漏了这一步，于是报了一堆假的「被 .kw 压住」「被 .pane 压住」：
+       按钮在可滚动面板里被滚出可视区时，它的矩形仍在视口内，
+       中心点却落在别的内容上 —— 那不是遮挡，是「需要滚一下才看得到」。
+
+       但**不能一律跳过**。第二版我一律跳过，结果把首页那个真缺陷也放过了：
+       「查看招聘会」当初正是被 overflow:hidden 的祖先裁掉的。所以要分两种：
+         · 祖先是 auto / scroll  → 滚一下就能看到，不算缺陷（沿用 audit-plus 的既有口径）
+         · 祖先是 hidden / clip  → **永远看不到、永远按不着**，比被盖住更严重 */
+    var clippedBy = null, scrollable = false
+    for (var a = el.parentElement; a && a !== doc.body; a = a.parentElement) {
+      var as = win.getComputedStyle(a)
+      var ox = as.overflowX, oy = as.overflowY
+      if (ox === 'visible' && oy === 'visible') continue
+      var ar = a.getBoundingClientRect()
+      if (cx < ar.left || cx > ar.right || cy < ar.top || cy > ar.bottom) {
+        clippedBy = a
+        scrollable = (ox === 'auto' || ox === 'scroll' || oy === 'auto' || oy === 'scroll')
+        break
+      }
+    }
+    if (clippedBy) {
+      if (scrollable) continue                       // 滚得到，放过
+      out.push({ label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || el.className,
+                 blockedBy: (String(clippedBy.className).split(' ')[0] || clippedBy.tagName),
+                 kind: '被裁掉' })
+      continue
+    }
+
+    var hit = doc.elementFromPoint(cx, cy)
+    if (!hit) continue
+    if (hit === el || el.contains(hit) || hit.contains(el)) continue
+
+    var label = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24)
+    var by = (hit.className && String(hit.className).split(' ')[0]) || hit.tagName
+    out.push({ label: label || el.className, blockedBy: by })
+  }
+  return out
+}
+
+/* ── 从审计返回值里收集缺陷 ────────────────────────────────────────
+   一开始我只数了**顶层的数字键**。而 v3AuditPlus() 的返回里
+   「版面留白 / 内部裁切 / 联动接线 / 假入口 / 主区空壳 / 卡内溢出」是嵌套对象，
+   「违禁文案 / 量化红线 / 来源三字段缺」是数组 —— 全被跳过了。
+   于是全站报「0 缺陷」，而 04 那一屏其实写着「右栏底部空 676px」。
+
+   这是今天第二次栽在同一件事上（上一次是 stage.js 的 audit() 忘了 return）：
+   **检测器自己必须被检测。** 现在改成递归走完整棵树，
+   数字 > 0、非空数组，一律算缺陷。 */
+function collectDefects (node, path, out, combo, evidence) {
+  if (node === null || node === undefined) return
+  if (typeof node === 'number') {
+    if (node > 0) out.push({ combo: combo, check: path, value: node,
+      /* 把同级的「明细」当证据带上 —— 只报「主栏留白过大 = 1」没法定位，
+         带上「右栏 底部空 676px」才知道去哪一栏看。 */
+      detail: evidence ? JSON.stringify(evidence).slice(0, 240) : undefined })
+    return
+  }
+  if (Array.isArray(node)) {
+    if (node.length) out.push({ combo: combo, check: path, value: node.length,
+      detail: JSON.stringify(node).slice(0, 200) })
+    return
+  }
+  if (typeof node === 'object') {
+    Object.keys(node).forEach(function (k) {
+      /* 「明细」是上面那个计数的证据，不重复计一次 */
+      if (k === '明细') return
+      if (k === 'screen') return
+      /* 信息量，不是缺陷。递归收集第一版把它当缺陷报了 192 条 ——
+         「这一页声明了 N 条联动」是好事，报成缺陷就是喊狼来了。
+         检测器宁可漏一类，也不能把正常值染成红的：一旦人开始怀疑报告，
+         真缺陷也会被一起忽略。 */
+      if (INFO_KEYS.indexOf(k) > -1) return
+      collectDefects(node[k], path ? path + '·' + k : k, out, combo, node['明细'])
+    })
+  }
+}
+
+/* v3AuditPlus() 返回里属于「统计」而非「缺陷」的键 */
+var INFO_KEYS = ['声明条数']
+
+/* ── 卡内空洞 ────────────────────────────────────────────────────
+   audit-plus 的「版面留白」只量 .wmain / .wside 两根**主栏**的尾部，
+   理由写在它自己的注释里：「pane 内部留白是设计，主栏见底才是欠内容」。
+
+   这话对了一半。实测（28/27/08 整改时发现）存在一类它看不见的情况：
+   **主栏尾部读数是 0，但某一张卡片内部空着 400–800px。**
+   例如 28 的 s2，题干塞在 408px 小卡里，下面跟一张 952px 的卡而内容只有 285px；
+   主栏最后一个叶子贴着栏底，所以主栏读数 0，屏幕上却是一张大空盒。
+
+   这里补上：只看**有背景或边框的容器**（那才是「卡」，透明包裹层不算），
+   量它内容盒底边与最后一个内容叶子底边之差。
+   阈值同样取 200px，与主栏口径一致。
+
+   注意它同样是烟雾报警器：一张卡下方留 200px 也可能是刻意的呼吸带
+   （08 的手写板空着就是它的功能）。数值用来定位，改不改要看过。 */
+function auditCardVoid (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden])')) return []
+  var out = []
+  var boxes = screen.querySelectorAll('div, section, article, aside')
+  for (var i = 0; i < boxes.length; i++) {
+    var b = boxes[i]
+    if (b.hidden || b.closest('[hidden]')) continue
+    var cs = win.getComputedStyle(b)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    /* 只看画出来的卡：有非透明背景，或有可见边框 */
+    var hasBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent'
+    var hasBd = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0
+    if (!hasBg && !hasBd) continue
+    /* 声明式例外：有些卡空着就是它的功能（等你落笔的手写板、留白的纸样）。
+       页面用 data-void-ok="理由" 显式豁免 —— **必须写理由**，空值不算豁免。
+       做成声明式而不是在工具里硬编码类名，是因为例外应该被看见：
+       改页面的人一眼能读到「这里为什么允许空」，而不是去翻工具源码。 */
+    var okReason = b.getAttribute('data-void-ok')
+    if (okReason && okReason.trim()) continue
+    var r = b.getBoundingClientRect()
+    if (r.height < 300) continue                    // 矮卡不判
+    if (r.bottom <= 0 || r.top >= win.innerHeight) continue
+    /* 可滚的卡不算空洞：内容在下面，滚得到 */
+    if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') continue
+
+    /* 只数**在文档流内**的叶子。
+       出了流的元素（绝对/固定定位）常常被钉在卡底当装饰 —— 页码、角标、水印。
+       它们一贴底，「最后一个叶子的底边」就等于卡底，空洞看起来就是 0。
+       09 的纸样一直不报数正是因为纸底有 bottom:22px 的页码；
+       与「页脚折叠条永远贴底导致主栏永远读 0」是同一类。
+       **凡是「量最后一个叶子底边」的检查，都会被贴底元素骗过。** */
+    var maxBottom = r.top, minTop = r.bottom
+    var leaves = b.querySelectorAll('*')
+    for (var j = 0; j < leaves.length; j++) {
+      var n = leaves[j]
+      if (n.childElementCount > 0) continue
+      var ns
+      try { ns = win.getComputedStyle(n) } catch (e) { continue }
+      if (ns.display === 'none') continue
+      if (ns.position === 'absolute' || ns.position === 'fixed') continue
+      var nr = n.getBoundingClientRect()
+      if (nr.height <= 0) continue
+      if (nr.bottom > maxBottom) maxBottom = nr.bottom
+      if (nr.top < minTop) minTop = nr.top
+    }
+    /* 一个内容叶子都没有的元素**不是「卡里空了」，是背景层**。
+       第一版没这条，于是 03 的全屏遮罩 .scrim 被报成「高 1920 空 1920」，
+       .behind-row--tall 同理 —— 遮罩本来就该是空的，报它纯属噪声。
+       判据：找不到任何可见叶子（maxBottom 还停在容器顶边）。 */
+    if (maxBottom <= r.top + 1) continue
+
+    var pad = parseFloat(cs.paddingBottom) || 0
+    var padTop = parseFloat(cs.paddingTop) || 0
+    var gap = Math.round(r.bottom - pad - maxBottom)
+    var gapTop = Math.round(minTop - (r.top + padTop))
+
+    /* 居中构图不是空洞。
+       27 的「示意到此为止」实测上留白 194px、下留白 194px —— 完全对称，
+       而检测器只量底边，只看见一半，于是报成「底部空 215px」。
+       上下差不多时它是**围绕主体的均衡空间**（复核意见 (f) 节的原话），
+       不是「没写完」。判据：两头差值小于较大一头的 1/3，且上头也有像样的留白。 */
+    if (gapTop > 40 && Math.abs(gap - gapTop) < Math.max(gap, gapTop) / 3) continue
+
+    if (gap > 200) {
+      out.push({ cls: (String(b.className).split(' ').slice(0, 2).join('.') || b.tagName),
+                 gap: gap, h: Math.round(r.height) })
+    }
+  }
+  /* 只报最外层：父卡空，子卡通常也被算一遍，去掉重复噪声 */
+  return out.slice(0, 6)
+}
+
+/* ── 死按钮 ──────────────────────────────────────────────────────
+   所有者亲自逮到的一类：**登录页三选一里的「手机扫码」点下去什么都不发生**，
+   而扫码登录那一屏全站根本不存在。入口在、页面没有。
+
+   为什么既有检查抓不到：audit-plus 的「假入口」专门**跳过 <button> 标签**
+   （`if (tag === 'a' || tag === 'button' || tag === 'input') continue`）——
+   它查的是「看着像按钮的 span / div」。于是「真按钮但没接线」正好落在盲区里。
+   这已经是同一天里第四个「检测器自己看不见」的洞。
+
+   判据：一个可见的 <button>，既没有 data-go（页内换阶段）、
+   没有 onclick、没有 type=submit、不在 <form> 里、没有任何 data-* 行为钩子，
+   页面也没有任何脚本按它的类名或属性做委托 —— 那它按下去就是什么都不发生。
+
+   最后一条机器判不了（脚本可以用任意选择器委托），所以这里采取的办法是：
+   **真的按一下**，看有没有任何可观察的变化（阶段、URL、DOM、弹层、aria）。
+   有变化就算接线了，没有就报出来。按完立刻把现场复原。 */
+/* 按钮的「名字」只能有一套算法。
+   扫描阶段和复验阶段各算一遍就会漂，而漂的结果是**静默丢候选**（不是报错）。
+   图标按钮没有文字，所以回落到类名 —— 但两边必须回落得一模一样。 */
+function btnLabel (b) {
+  return (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || String(b.className || '')
+}
+
+function auditDeadButtons (win, only) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden])')) return []
+
+  var out = []
+  var startHref = win.location.href
+  var btns = screen.querySelectorAll('button')
+  for (var i = 0; i < btns.length && out.length < 8; i++) {
+    var b = btns[i]
+    /* 上一次点击把页面带走了（脚本里的 location.href = …，preventDefault 拦不住）——
+       后面的元素引用全都失效了，继续探测只会在一个已经不存在的文档上瞎按。
+       停在这里，把已经查到的报回去；这一页剩下的按钮标为未覆盖。 */
+    if (win.location.href !== startHref) {
+      out.push({ label: '（页面在探测中途被带走，本页剩余按钮未覆盖）', cls: 'PROBE-ABORTED' })
+      break
+    }
+    if (b.hidden || b.closest('[hidden]')) continue
+    if (b.disabled || b.getAttribute('aria-disabled') === 'true') continue
+    var cs = win.getComputedStyle(b)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    var r = b.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8) continue
+    if (r.bottom <= 0 || r.top >= win.innerHeight) continue
+    /* 明确声明了行为的，直接放过。
+       ⚠ 这里踩过一个坑：第一版写的是 `b.type === 'submit'` 就跳过 ——
+       而 HTML 里 <button> **不写 type 属性时默认就是 submit**。
+       结果它把全站几乎所有按钮都跳过了，这项检查**永远报 0**。
+       是靠「造一个死按钮，它必须报出来」的反例测出来的；
+       不做那个反例，就会交付一个瞎的检查还以为全站干净。
+       submit / reset 只有在 <form> 里才真的有行为，所以两条要一起判。 */
+    if (b.hasAttribute('data-go') || b.hasAttribute('onclick')) continue
+    if (b.closest('form') && (b.type === 'submit' || b.type === 'reset')) continue
+
+    /* 复验模式：只按指定的那一个。
+       不加这一条，复验时仍会把同组的 7 个「删除」依次按一遍 ——
+       第 1 个弹出确认层，第 2 个之后弹的是同一层同样文案，快照不变 → 又判死。
+       同类控件必然误报 N−1 个，这个成因在复验里会原样重演。
+
+       ⚠ 第二个坑（2026-08-11 实测发现，这一项的第 5 次失明）：
+       这里原本直接读 `b.textContent`，而**记录候选时**用的是 `btnLabel()`
+       （文字为空则回落成类名）。两处用了两套算法，于是：
+         纯 <svg> 图标按钮 textContent === ''，label 回落成 'pgbtn'，
+         `''.startsWith('pgbtn')` 恒为 false → **候选被静默丢弃，永远确认不成缺陷**。
+       表现是 11/17 的翻页键（文字箭头 ‹ ›）能报出来，
+       而 09/10 的翻页键（纯 svg）扫描阶段扫得到、复验阶段凭空消失。
+       份数 −／＋ 这种图标按钮同理 —— 恰恰是最要命的那类控件没有文字。
+       根因不是"少判了一种情况"，是**同一个标签在两处各算一遍**。
+       所以现在两处**共用 btnLabel()**，从结构上不允许再漂。 */
+    if (only && !btnLabel(b).startsWith(only.label.slice(0, 12))) continue
+
+    /* **已经处于选中态的选项，点了不变是对的。**
+       单选组里当前选中的那一个、当前所在的标签页、已激活的筛选片 ——
+       它们本来就该毫无反应。把这类报成缺陷，等于要求「按已选项要有变化」，
+       那反而是错的交互。 */
+    var st = (b.className || '') + ' ' + (b.getAttribute('aria-pressed') === 'true' ? 'aria-on' : '') +
+             ' ' + (b.getAttribute('aria-selected') === 'true' ? 'aria-sel' : '') +
+             ' ' + (b.getAttribute('aria-current') ? 'aria-cur' : '')
+    if (/(^|[\s-])(on|is-on|active|is-active|current|is-current|selected|is-selected|now|is-now)([\s-]|$)|aria-on|aria-sel|aria-cur/.test(st)) continue
+
+    /* 按一下，看有没有任何可观察的变化。
+       ── 观察面必须够宽，否则全是假阳性（第一版实测报了 215 条，大半是假的）──
+       · 比 **整个 body 的 outerHTML**，不是 .screen 的长度：
+         帮助层、离场确认层这些是挂到 document.body 上的，不在 .screen 里；
+         只看 .screen 就会把「需要帮助」判成死按钮。
+       · 比**内容本身**而不是**长度**：单选类按钮把选中态从一个元素挪到另一个，
+         总长度一个字符都不变（去掉一个 on、加上一个 on），只比长度必然漏判。
+       · 长按类按钮（按住说话）先补 pointerdown / pointerup —— 一次 click 触发不了它。
+       · 再等一拍：不少处理是异步的（渲染、setTimeout、fetch 之后才改 DOM）。 */
+    var snap = function () {
+      return win.location.href + '' +
+             (screen.getAttribute('data-stage') || '') + '' +
+             doc.body.outerHTML
+    }
+    var before = snap()
+    var moved = false
+    /* 探测时**拦掉默认行为，但让处理函数照常跑**。
+       不拦的话，凡是会跳转的按钮都会把 iframe 带走 —— 实测连点几百个之后
+       预览面板直接崩掉。拦在冒泡终点（document，非捕获），
+       页面自己的监听已经全部跑完，只挡最后的默认动作。 */
+    var block = function (e) { e.preventDefault() }
+    doc.addEventListener('click', block, false)
+    try {
+      try {
+        b.dispatchEvent(new win.PointerEvent('pointerdown', { bubbles: true }))
+        b.dispatchEvent(new win.PointerEvent('pointerup', { bubbles: true }))
+      } catch (e) {}
+      b.click()
+      moved = snap() !== before
+    } catch (e) { moved = true }        // 抛错至少说明有代码在跑
+    doc.removeEventListener('click', block, false)
+
+    if (!moved) {
+      out.push({ label: btnLabel(b), cls: String(b.className).split(' ')[0] })
+    }
+  }
+  return out
+}
+
+function comboLabel (c) {
+  var s = c.state + (c.stage ? '/' + c.stage : '')
+  for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
+  return s
+}
+
+/* ── 跨页链接校验 ────────────────────────────────────────────
+   用户最不能接受的一类错就是「点进去跳转的不是这个连接的页面，
+   或者这个页面根本不存在」。此前全靠人眼，没有任何自动检查。
+
+   这里查三件事：
+     ① 目标文件在不在（不在 = 死链）
+     ② 目标页存不存在这个 ?stage=（stage 不认识 = 到了页面也是空的/白屏）
+     ③ 链接文字承诺的和目标页是不是一回事 —— 这条**机器判不了**，
+        只把「文字 → 目标」的对照表导出来，留给人核。不假装机器能判。
+
+   注意：只能查静态 href。JS 运行时算出来的跳转（如 06 的交接契约）
+   查不到 —— 这是本检查的已知边界，不要当成"链接都验过了"。 */
+function collectLinks (win) {
+  var doc = win.document
+  var out = []
+  doc.querySelectorAll('a[href]').forEach(function (a) {
+    var h = a.getAttribute('href') || ''
+    if (!h || h.charAt(0) === '#' || /^(https?:|mailto:|tel:|javascript:)/i.test(h)) return
+    var file = h.split('?')[0].split('#')[0]
+    if (!file || !/\.html$/i.test(file)) return
+    var st = ''
+    var m = h.match(/[?&]stage=([^&#]+)/)
+    if (m) st = decodeURIComponent(m[1])
+    out.push({
+      href: h, file: file, stage: st,
+      text: (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+    })
+  })
+  return out
+}
+
+/* 两趟：先把每页的阶段清单都收齐，再回头验链接。
+   一趟做不到 —— 验 A 页的链接需要 B 页的阶段清单，而 B 页可能还没装载。 */
+function validateLinks (pages) {
+  var stagesOf = {}, exists = {}
+  pages.forEach(function (p) {
+    exists[p.page] = true
+    if (p.stages) stagesOf[p.page] = p.stages
+  })
+  var bad = []
+  pages.forEach(function (p) {
+    ;(p.links || []).forEach(function (l) {
+      if (!exists[l.file]) {
+        bad.push({ from: p.page, href: l.href, text: l.text, why: '目标页不存在' })
+        return
+      }
+      if (l.stage && stagesOf[l.file] && stagesOf[l.file].length &&
+          stagesOf[l.file].indexOf(l.stage) < 0) {
+        bad.push({ from: p.page, href: l.href, text: l.text,
+                   why: '目标页没有这个阶段（它有：' + stagesOf[l.file].join('/') + '）' })
+      }
+    })
+  })
+  return bad
+}
+
+/* ── 主流程 ──────────────────────────────────────────────── */
+async function runAll (only, theme) {
+  if (theme && THEMES.indexOf(theme) > -1) THEME = theme
+  if (!checkEnv()) {
+    log('环境自检没过。协议必须是 http、窗口必须 ~1120×2010，否则量出来的数不可复现。', 'bad')
+    return
+  }
+  logEl.textContent = ''
+  RESULT = { env: RESULT.env, pages: [], startedAt: new Date().toISOString(), finishedAt: '' }
+
+  PAGES = await loadPages()
+  if (only) PAGES = PAGES.filter(function (p) { return p.indexOf(only) > -1 })
+  log('共 ' + PAGES.length + ' 页。开始。\n')
+
+  var totalCombos = 0, totalDefects = 0, totalErrors = 0, pagesWithDefects = 0
+
+  for (var i = 0; i < PAGES.length; i++) {
+    var name = PAGES[i]
+    var rec = { page: name, combos: 0, fullCombos: 0, sampled: false,
+                defects: [], consoleErrors: [], suspicious: [], error: '' }
+    try {
+      var win = await withTimeout(loadPage(name), 15000, name + ' 装载')
+
+      /* 舞台不是 1:1 就没有测量意义 —— 直接判失败，不要拿失真的数去凑一份"跑过了"的报告 */
+      var vs = verifyStage(win)
+      rec.stage = vs
+      if (!vs.ok) {
+        rec.error = '舞台不是 1:1（视口 ' + vs.viewport + '，transform ' + vs.transform + '）'
+        log(name + '  ✗ ' + rec.error, 'bad')
+        RESULT.pages.push(rec); continue
+      }
+
+      /* 接管子页 console.error：脚本挂了但静态审计还报绿，是最危险的一种假绿。
+         P21 就发生过整段脚本被 URL 编码坏掉、静态审计照样全绿的事。 */
+      var errs = []
+      var oe = win.console.error
+      win.console.error = function () { errs.push([].slice.call(arguments).join(' ')); oe.apply(win.console, arguments) }
+      win.addEventListener('error', function (ev) { errs.push('window.onerror: ' + ev.message) })
+
+      var disc = discoverAxes(win)
+      if (disc.error) { rec.error = disc.error; log(name + '  ✗ ' + disc.error, 'bad'); RESULT.pages.push(rec); continue }
+      rec.suspicious = disc.suspicious
+      if (disc.defaultNotFirst) {
+        rec.defects.push({ combo: '（页面默认）', check: '打开就落在流程中途', value: 1,
+          detail: '.screen 写死 data-stage="' + disc.defaultNotFirst.declared
+                + '"，而第 1 步是 "' + disc.defaultNotFirst.shouldBe + '"' })
+      }
+
+      var cb = buildCombos(disc, win)
+      rec.combos = cb.ran; rec.fullCombos = cb.full; rec.sampled = cb.sampled
+
+      for (var j = 0; j < cb.list.length; j++) {
+        /* 每 20 组让出一次事件循环：组合循环是同步的，一页几百组会把主线程
+           占满，日志不刷新、页面像死了一样，分不清「在跑」还是「挂了」。 */
+        if (j && j % 20 === 0) await new Promise(function (r) { setTimeout(r, 0) })
+        var out = runCombo(win, cb.list[j])
+        if (out && typeof out === 'object') {
+          collectDefects(out, '', rec.defects, comboLabel(cb.list[j]))
+        } else if (out === undefined || out === null) {
+          rec.defects.push({ combo: comboLabel(cb.list[j]), check: '审计没有返回值', value: 1 })
+        }
+        /* 遮挡检测只在每个「态 × 阶段」的基线组合上跑一次。
+           它对每个按钮的每一层祖先调 getComputedStyle，会强制样式重算，
+           在 06 / 09 这种大页上按 868 组合逐一跑会把整台子拖死（实测 09 卡住数分钟）。
+           附加轴（data-pay / data-job / data-redact…）改的是卡片内容，
+           不改栏与页脚的几何，对遮挡没有影响 —— 所以按基线跑一次就够，
+           而这一点是**判断**，写在这里以便日后有人推翻它。 */
+        if (!cb.list[j].varied) {
+          var voids = auditCardVoid(win)
+          for (var vi = 0; vi < voids.length; vi++) {
+            rec.defects.push({ combo: comboLabel(cb.list[j]),
+              check: '卡内空洞', value: voids[vi].gap,
+              detail: '.' + voids[vi].cls + ' 高 ' + voids[vi].h + 'px，底部空 ' + voids[vi].gap + 'px' })
+          }
+        }
+        var occ = cb.list[j].varied ? [] : auditOcclusion(win)
+        for (var oi = 0; oi < occ.length; oi++) {
+          var cut = occ[oi].kind === '被裁掉'
+          rec.defects.push({ combo: comboLabel(cb.list[j]),
+            check: cut ? '按钮被裁掉看不见' : '按钮被遮挡按不动', value: 1,
+            detail: '「' + occ[oi].label + '」' + (cut ? '被 .' + occ[oi].blockedBy + ' 裁掉（overflow:hidden，滚也看不到）'
+                                                      : '被 .' + occ[oi].blockedBy + ' 压住') })
+        }
+      }
+      /* 死按钮检查放在**所有组合跑完之后**：它要真的按一下按钮，会改变现场。
+         放在组合循环里会污染后面的测量。这一页已经量完了，可以随便按。
+         逐阶段各按一遍 —— 不同阶段露出来的按钮不一样。 */
+      /* ── 死按钮：扫一遍，再逐个**在干净页面上复验** ────────────────────
+         第一版只扫一遍就报，结果是**同一份代码连跑四次得到 0 / 72 / 67 / 99**。
+         一个不可复现的检测器比没有更糟：它报出来的东西没人敢信，
+         真缺陷也会跟着被一起忽略。
+
+         成因实测两条，都来自「探测本身会改变现场，而改动留到了下一次探测」：
+           ① **同类控件必然误报 N−1 个**。43 有 7 个「删除」，点第 1 个弹出确认层
+              （HTML 变了 −11 字符），点第 2/3/4 个弹的是**同一层、同样文案** →
+              前后快照一模一样 → 判死。
+           ② **单选组里已经选中的那一个**：按已经选中的东西本就不该有变化。
+
+         所以改成两段：
+           扫描段（快，允许多报）→ 候选
+           复验段（慢，只对候选）：**每个候选单独在一张新装载的页面上按一次**。
+         干净页面上按下去仍然毫无变化的，才算数。
+         代价是候选多时慢，但换来的是「报出来的每一条都可复现」。 */
+      var stagesForDead = disc.hasStage && disc.stages.length ? disc.stages : ['']
+      var cand = []
+      for (var ds = 0; ds < stagesForDead.length; ds++) {
+        if (stagesForDead[ds]) win.document.querySelector('.screen')
+          .setAttribute('data-stage', stagesForDead[ds])
+        if (typeof win.v3ApplyVisibility === 'function') win.v3ApplyVisibility()
+        void win.document.body.offsetHeight
+        auditDeadButtons(win).forEach(function (b) {
+          if (b.cls === 'PROBE-ABORTED') return
+          cand.push({ stage: stagesForDead[ds] || '', label: b.label, cls: b.cls })
+        })
+      }
+      /* 去重：同一个（阶段 + 文字 + 类名）只复验一次 */
+      var seenCand = {}
+      cand = cand.filter(function (c) {
+        var k = c.stage + '|' + c.label + '|' + c.cls
+        if (seenCand[k]) return false
+        seenCand[k] = 1; return true
+      })
+      if (cand.length > 24) {
+        log('    ⚠ ' + name + ' 死按钮候选 ' + cand.length + ' 个，只复验前 24 个'
+          + '（其余未覆盖，不是「没问题」）', 'warn')
+        cand = cand.slice(0, 24)
+      }
+      for (var ci = 0; ci < cand.length; ci++) {
+        var c = cand[ci]
+        var fresh
+        try { fresh = await withTimeout(loadPage(name), 15000, name + ' 复验装载') }
+        catch (e) { break }
+        var fs = fresh.document.querySelector('.screen')
+        if (c.stage && fs) fs.setAttribute('data-stage', c.stage)
+        if (typeof fresh.v3ApplyVisibility === 'function') fresh.v3ApplyVisibility()
+        void fresh.document.body.offsetHeight
+        var still = auditDeadButtons(fresh, c).some(function (b) {
+          return b.label === c.label && b.cls === c.cls
+        })
+        if (still) {
+          rec.defects.push({ combo: c.stage || '默认', check: '按钮按下去什么都不发生', value: 1,
+            detail: '「' + c.label + '」（.' + c.cls + '）· 已在干净页面上复验' })
+        }
+      }
+
+      rec.consoleErrors = errs.slice(0, 20)
+      rec.stages = disc.stages
+      rec.links = collectLinks(win)
+
+      totalCombos += rec.combos
+      totalDefects += rec.defects.length
+      totalErrors += errs.length
+      if (rec.defects.length || errs.length) pagesWithDefects++
+
+      rec.axisCount = cb.axisCount
+      rec.crossFull = cb.crossFull
+      var line = name.padEnd(34) + String(rec.combos).padStart(4) + ' 组合'
+        + (cb.sampled ? '（逐轴全量 ' + cb.full + '，等距抽样）' : '')
+        + (cb.axisCount > 1 ? '　[' + cb.axisCount + ' 条附加轴，轴间交叉未跑，全交叉需 ' + cb.crossFull + ']' : '')
+        + '  缺陷 ' + rec.defects.length + '  console 错 ' + errs.length
+      log(line, (rec.defects.length || errs.length) ? 'warn' : 'ok')
+      if (rec.suspicious.length)
+        log('    ⚠ 疑似未登记的轴：' + rec.suspicious.map(function (s) {
+          return s.attr + '(' + s.values.join('|') + ')' }).join('，') + ' —— 确认后加进 AXIS_ALLOW 或 AXIS_DENY', 'warn')
+    } catch (e) {
+      rec.error = String(e && e.message || e)
+      log(name + '  ✗ ' + rec.error, 'bad')
+    }
+    RESULT.pages.push(rec)
+  }
+
+  RESULT.finishedAt = new Date().toISOString()
+
+  /* 跨页链接校验只在**跑了全站**时才有意义。
+     单页模式下 exists 表只有这一页，于是所有跨页链接都被报成「目标页不存在」——
+     一屏假红条会把真问题淹掉，也会让人开始不信这份报告。
+     （这一条是整改代理跑单页时发现的，用未改动的 02-standby 复现确认过。） */
+  var partial = PAGES.length < (RESULT.manifest && RESULT.manifest.count || PAGES.length)
+  if (partial) {
+    log('\n跨页链接：本次只跑了 ' + PAGES.length + ' 页，**跳过链接校验**'
+      + '（单页模式下无法判断其它页存不存在，报出来全是假的）。', 'warn')
+    RESULT.badLinks = null
+    RESULT.finishedAt = new Date().toISOString()
+    log('\n────────────────────────────────')
+    log('页数 ' + PAGES.length + '　组合 ' + totalCombos
+      + '　有问题的页 ' + pagesWithDefects + '　缺陷 ' + totalDefects + '　console 错 ' + totalErrors,
+      (totalDefects || totalErrors) ? 'bad' : 'ok')
+    window.V3_REGRESS_RESULT = RESULT
+    return
+  }
+
+  var badLinks = validateLinks(RESULT.pages)
+  RESULT.badLinks = badLinks
+  var linkCount = RESULT.pages.reduce(function (n, p) { return n + ((p.links || []).length) }, 0)
+  log('\n跨页链接：查了 ' + linkCount + ' 条静态 href（JS 运行时算出来的跳转查不到，见台子头部的已知盲区）')
+  if (badLinks.length) {
+    log('✗ ' + badLinks.length + ' 条对不上：', 'bad')
+    badLinks.slice(0, 40).forEach(function (b) {
+      log('   ' + b.from + ' 的「' + b.text + '」→ ' + b.href + '　' + b.why, 'bad')
+    })
+    if (badLinks.length > 40) log('   …还有 ' + (badLinks.length - 40) + ' 条，见 JSON', 'bad')
+  } else {
+    log('✓ 目标页都存在，?stage= 都是目标页真有的阶段', 'ok')
+  }
+  log('（链接文字承诺的和目标页是不是一回事，机器判不了 —— JSON 里有「文字 → 目标」对照表，留给人核）')
+
+  log('\n────────────────────────────────')
+  log('页数 ' + PAGES.length + '　组合 ' + totalCombos
+    + '　有问题的页 ' + pagesWithDefects
+    + '　缺陷 ' + totalDefects + '　console 错 ' + totalErrors,
+    (totalDefects || totalErrors) ? 'bad' : 'ok')
+  log('点「复制 JSON 结果」把完整结果取走。')
+  window.V3_REGRESS_RESULT = RESULT
+}
+
+document.getElementById('run').onclick = function () { runAll('') }
+document.getElementById('runone').onclick = function () {
+  var p = prompt('页名片段，例如 06 或 print-workbench')
+  if (p) runAll(p)
+}
+document.getElementById('copy').onclick = function () {
+  navigator.clipboard.writeText(JSON.stringify(RESULT, null, 2))
+  log('已复制。', 'ok')
+}
+window.v3RunAll = runAll
+</script>
+</body>
+</html>

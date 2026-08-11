@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P38 政策服务 · 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P38 政策服务域首屏">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
+   骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
+   ① 文字密度：每卡正文只留一行（≤20 字）。合规、免责整页只在页脚写一条。
+   ② 需要输入才能出结果的 AI 卡（政策条件核对要个人情况），把「先给什么」
+      做成**可点的选择**（.pick）：身份 / 参保状态 / 城市。城市默认取本机所在城市
+      并且可改，一体机没有定位权限，不写"根据定位"。缺哪项先问，不替你填。
+   ③ 右上角标记必挂：AI 卡 chip「AI · 仅供参考」，非 AI 卡 chip--info「不依赖 AI」。
+   本页红线：政策结论一律「以经办窗口审核为准」，不出现"你一定能办 / 一定能领"。
+   ai-down：AI 带整块换成四个照常能办的真入口；AI 卡置灰并给替代路径。
+   device-off：只影响打印类入口。
+   ──────────────────────────────────────────────────────────────── */
+.work--hub { grid-template-columns: 1fr; }
+
+.dsub { flex: 1 1 auto; min-width: 0; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.45; }
+.dsub b { color: var(--fog-900); font-weight: 600; }
+
+.rdy { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+  min-height: 68px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rdy .dot { flex: 0 0 auto; }
+.rdy-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rdy-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.rdy-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.rdy--warn { background: var(--amber-a12); border-color: var(--amber-a20); }
+
+/* ── 顶部 AI 带：三个大按钮是主体，说明只留一行 ── */
+.aibar { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3);
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg); border: 1px solid var(--jade-a20);
+  box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur)); }
+.aibar-hd { display: flex; align-items: center; gap: var(--s-3); }
+.aibar-hd > .ic { width: 21px; height: 21px; color: var(--jade-500); flex: 0 0 auto; }
+.aibar-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.aibar-hd .ev, .aibar-hd .chip { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+.aiuse { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
+.aiuse--4 { grid-template-columns: repeat(4, 1fr); }
+.aibtn { min-height: 88px; padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 600; line-height: 1.35;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px;
+  text-align: left; text-decoration: none; cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.aibtn:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.aibtn em { font-style: normal; font-size: var(--fz-1); font-weight: 400; color: var(--fog-600); line-height: 1.4; }
+.aibtn[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
+.aibtn--off { opacity: .68; }
+.aibar-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
+.aibar-note b { color: var(--fog-800); }
+.aibar--down { border-color: var(--amber-a20); background: var(--amber-a12); }
+.aibar--down .aibar-hd > .ic { color: var(--amber-400); }
+
+/* ── 子能力卡（2 列）── 顶边与图标用「政策服务 · 石板蓝」服务身份色（README §6.1） */
+.dgrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.dcard { position: relative; overflow: hidden; min-height: 180px;
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-top: 3px solid var(--cat-policy);
+  box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur));
+  text-decoration: none; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out); }
+a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
+.dcard-hd { display: flex; align-items: center; gap: var(--s-3); }
+.dcard-ic { width: 52px; height: 52px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-policy); }
+.dcard-ic .ic { width: 27px; height: 27px; }
+.dcard-hd .chip { margin-left: auto; flex: 0 0 auto; }
+.dcard-nm { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
+  font-weight: 600; letter-spacing: .02em; line-height: 1.25; word-break: keep-all; }
+.dcard-ds { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5; }
+.dcard-hint { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.dcard-go { margin-top: auto; display: flex; align-items: center; gap: 8px;
+  font-size: var(--fz-3); color: var(--jade-600); font-weight: 600; }
+.dcard-go .ic { width: 18px; height: 18px; }
+.dcard--spot { border-color: var(--jade-400); box-shadow: 0 0 0 3px var(--jade-a20), var(--sh-3); }
+/* 卡上的标记是标签不是入口 —— 同 27-toolbox 的 .chip--info 口径 */
+.chip--label { cursor: inherit; }
+
+/* 需要输入的 AI 卡：整卡不再是链接，先选后进；主动作是卡内那个 ≥48px 的真链接 */
+.dcard--pick { cursor: default; }
+.picks { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.pick { min-height: 48px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: border-color var(--dur-2) var(--ease-out); }
+.pick:hover { border-color: var(--jade-a32); }
+.pick .k { color: var(--fog-600); font-size: var(--fz-1); }
+.pick .v { color: var(--fog-900); font-weight: 600; }
+.pick--empty { border-color: var(--amber-a20); background: var(--amber-a12); }
+.pick--empty .v { color: var(--amber-200); }
+.dcard--pick .dcard-go { min-height: 48px; text-decoration: none; }
+
+/* ai-down：AI 卡置灰（主动作仍是真链接，政策原文与清单照常） */
+.screen[data-state="ai-down"] .dcard--ai { opacity: .72; border-color: var(--brd-1);
+  border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
+.screen[data-state="ai-down"] .dcard--ai .dcard-nm,
+.screen[data-state="ai-down"] .dcard--ai .dcard-go,
+.screen[data-state="ai-down"] .dcard--ai .dcard-ic { color: var(--fog-600); }
+
+/* 整行卡（首张大卡 + 整行的选择型 AI 卡）：横排，图标 / 文案与选择 / 右侧标记与主动作。
+   选择型卡竖排会把「图标行 + 标题 + 说明 + 选择 + 提示 + 主动作」堆到 310px 以上，
+   格子放不下就会被裁 —— 整行时改横排，高度回到 190px 左右。 */
+.dcard--row { flex-direction: row; align-items: center; gap: var(--s-5); min-height: 150px; }
+.dcard--row .dcard-bd { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.dcard--row .dcard-rt { margin-left: auto; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-4); }
+.dcard--row .dcard-go { margin-top: 0; }
+.dcard--hero, .dcard--wide { grid-column: 1 / -1; }
+
+/* ── 次卡：记录类，明细归业务页 ── */
+.dmore { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
+.dmore-hd { display: flex; align-items: baseline; gap: var(--s-3); }
+.dmore-hd b { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.dmore-hd > span { font-size: var(--fz-1); color: var(--fog-600); }
+.dmore-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.dmore-go { display: flex; align-items: center; gap: var(--s-4);
+  min-height: 88px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  text-decoration: none; color: inherit; cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.dmore-go:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.dmore-ic { width: 44px; height: 44px; border-radius: var(--r-xs); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-700); }
+.dmore-ic .ic { width: 22px; height: 22px; }
+.dmore-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dmore-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.dmore-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+/* 数量单独一行：真实环境常年是 0，不许编一个数 */
+.dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
+.dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">政策服务</div>
+        <div class="brand-sub">职易达 · 01 号机 · 官方来源 · 不代办</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>政策数据与官方入口在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 政策原文照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响打印</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub">就业政策&nbsp;· 社保指南&nbsp;· 档案登记&nbsp;· 补贴指引</span>
+    <span class="rail-count">域首屏&nbsp;· <b>6</b> 个子能力</span>
+  </div>
+
+  <div class="work work--hub">
+    <div class="wmain">
+
+      <!-- ── 服务状态条：四态各写各的 ── -->
+      <div class="rdy" data-when="default first">
+        <span class="dot dot--live"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接</span>
+          <span class="rdy-s">具体能力、设备和权益仍会在办理过程中再次确认</span>
+        </span>
+      </div>
+      <div class="rdy rdy--warn" data-when="ai-down">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
+          <span class="rdy-s">停掉的只有条件对照；政策原文、办事清单、官方入口照常</span>
+        </span>
+      </div>
+      <div class="rdy rdy--warn" data-when="device-off">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">在线服务已连接，本机打印机离线</span>
+          <span class="rdy-s">查政策照常，只有把要点打出来要换机取回</span>
+        </span>
+      </div>
+
+      <!-- ── 顶部 AI 带（默认 / 首次 / 设备离线）── -->
+      <div class="aibar" data-when="default first device-off">
+        <div class="aibar-hd">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <span class="aibar-t">你要办哪件事</span>
+          <!-- 2026-08-10 AI 落实度审查整改：原为 `E3 AI 判断 · 仅供参考`。
+               点哪个按钮 → 亮哪张卡是 data-spot 写死的映射，背后没有模型；
+               E3 贴在确定性导航上会稀释这个标签在合规上的意义。
+               真做推理的是下面那张 AI政策助手卡，它自己标 AI · 仅供参考。 -->
+          <span class="chip chip--info">选哪件不依赖 AI</span>
+        </div>
+        <div class="aiuse">
+          <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>筛出可能相关的政策</em></button>
+          <!-- 2026-08-10 AI 落实度审查整改：这一项原写「这一项要带什么材料 · 核对材料缺口」，
+               但整页没有任何卡片或下游能做"材料缺口核对"（政策页的 s3 是按事项列的办事清单，
+               不比对你缺哪几样）。承诺兑现不了就不写承诺，改成如实的去处：
+               直接进政策页第 3 步看这一项要带的材料清单（?stage=s3 已核实是「打印清单」那一步）。
+               "缺口核对"作为待接线能力仍留在下面的 AI政策助手卡上，并标明未接线。 -->
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;from=P38">看这一项要带的材料清单<em>政策页按事项列，不按人 · 不依赖 AI</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #543）：原指
+               06-print-workbench.html?stage=s3&kind=policy-checklist&title=政策要点。
+               本屏没有任何已生成的政策要点文件，只有一个中文标题，却跳过 P06 第 1 步直接落核价，
+               并让打印台开出「本次来自：政策服务域首屏 · 政策要点 · 收到交接」的回执 ——
+               那份清单还没生成过。「政策要点」这件产物本来就是在政策页勾选后才成形的
+               （21-policy s3「带走办事清单」：勾选清单 / 原文 → 合计页数与预估 → 去打印，
+               21-policy.html:805 那条 href 才带得出真实的 pages/copies），
+               所以按「先生成产物，再谈打印」改指那一步，而不是核价页。
+               与上一条同为 s3 是刻意的：看清单和打清单是同一步的两件事，文案已各自写明。 -->
+          <a class="aibtn" data-when="default first" href="21-policy.html?stage=s3&amp;from=P38">我要打印政策要点<em>去政策页第 3 步勾选要打的内容，再核价出纸</em></a>
+          <a class="aibtn aibtn--off" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点">先存我的文档<em>打印机离线 · 存进我的文档，换机取回再打</em></a>
+        </div>
+        <!-- 2026-08-10 整改：原写「AI 只做政策预筛与材料缺口核对」，缺口核对没有实现，
+             写在这里等于承诺一件办不成的事。改成如实分工。 -->
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 这一屏<b>只做政策预筛</b>，材料清单按事项列、不依赖 AI。</div>
+      </div>
+
+      <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
+      <div class="aibar aibar--down" data-when="ai-down">
+        <div class="aibar-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span class="aibar-t">下面这些照常能办</span>
+          <span class="chip chip--info">已自动上报</span>
+        </div>
+        <div class="aiuse aiuse--4">
+          <a class="aibtn" href="21-policy.html?stage=s2&amp;view=doc">政策原文<em>官方发布口径</em></a>
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;view=checklist">办事材料清单<em>按事项列，不按人</em></a>
+          <a class="aibtn" href="21-policy.html?stage=s2&amp;view=official">官方办理入口<em>热线与官网二维码</em></a>
+          <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #548）：同 #543，原来跳过 P06 第 1 步、
+               用一个标题冒充已交接的材料。要点清单在政策页第 3 步勾选生成后才存在，
+               那一步在 AI 降级态照常可用（21-policy.html:805 的去打印按钮含 ai-down）。 -->
+          <a class="aibtn" href="21-policy.html?stage=s3&amp;from=P38">打印政策要点<em>第 3 步勾选要打的内容，再核价出纸</em></a>
+        </div>
+      </div>
+
+      <!-- ── 六张子能力卡 ──
+           2026-08-10 说谎文案整改（第一轮）：四张分类卡原来写「进入后已按「X」分类筛好，只列这一类」，
+           当时 21-policy.html 还不读 ?cat=，进去看到的仍是全量列表 —— 明确说谎。
+           当时的处置：保留 ?cat= 参数，副文改成「按 X 分类筛选（接线后自动生效）」。
+
+           2026-08-10 AI 落实度审查整改（第二轮）：21-policy.html 已经真的消费 cat 了
+           （:892 `new URLSearchParams(location.search)`、:913 `carry.cat = inList(qval('cat'), CAT_KEYS)`），
+           「接线后自动生效」这句已经过时 —— 它是 under-claim，反而让用户以为参数没生效、
+           进去还得自己再筛一遍。四处注脚一并删掉，副文回到如实的「按 X 分类筛选」。 -->
+      <div class="dgrid">
+
+        <!-- 1 就业政策（首张大卡 · 非 AI · 带 cat=employment 进政策页） -->
+        <a class="dcard dcard--hero dcard--row" id="c-employ" href="21-policy.html?stage=s1&amp;cat=employment">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">就业政策</span>
+            <span class="dcard-ds">就业补贴、灵活就业等官方口径原文</span>
+            <span class="dcard-hint">进入政策页后按「就业」分类筛选</span>
+          </span>
+          <span class="dcard-rt">
+            <span class="chip chip--info">不依赖 AI</span>
+            <span class="dcard-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+        </a>
+
+        <!-- 2 社保指南（非 AI · 带 cat=social） -->
+        <a class="dcard" id="c-social" href="21-policy.html?stage=s1&amp;cat=social">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">社保指南</span>
+          <span class="dcard-ds">参保流程与办事材料清单</span>
+          <span class="dcard-hint">进入政策页后按「社保」分类筛选</span>
+          <span class="dcard-go">看社保指南<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 3 档案与登记（非 AI · 带 cat=archive） -->
+        <a class="dcard" id="c-archive" href="21-policy.html?stage=s1&amp;cat=archive">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">档案与登记</span>
+          <span class="dcard-ds">档案托管、就业登记与证明开具</span>
+          <span class="dcard-hint">进入政策页后按「档案」分类筛选</span>
+          <span class="dcard-go">看办理指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 4 补贴指引（非 AI · 带 cat=subsidy） -->
+        <a class="dcard" id="c-subsidy" href="21-policy.html?stage=s1&amp;cat=subsidy">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">补贴指引</span>
+          <span class="dcard-ds">失业保险、创业扶持与官方办理入口</span>
+          <span class="dcard-hint">进入政策页后按「补贴」分类筛选</span>
+          <span class="dcard-go">看补贴指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 5 政策收藏（非 AI）
+             2026-08-10 改：原指 21-policy.html?view=favorites —— favorites 是「我的」域的落区值，
+             政策页既不读这个参数、也没有个人收藏清单，等于把人送错门。
+             收藏是个人清单不是政策分类 → 归「我的记录 · 收藏」标签。 -->
+        <a class="dcard" id="c-fav" href="43-my-records.html?stage=fav&amp;from=P38">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">政策收藏</span>
+          <span class="dcard-ds">收藏过的政策条目，方便回头再看</span>
+          <span class="dcard-hint" data-when="default ai-down device-off">进入后只列你收藏的 · 本次会话 0 条</span>
+          <span class="dcard-hint" data-when="first">未登录，0 条，这一趟收藏的也留不下</span>
+          <span class="dcard-go">看我的收藏<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- ══ AI 接线契约 · P38-A「政策预筛 + （待接线）材料缺口核对」══
+             输入（三项当场选，其余六项由 21-policy 继续补问）：
+               · identity string  现在状态；白名单 = 21-policy QS 里 k='status' 的选项表
+               · insured  string  连续缴费；白名单 = 21-policy QS 里 k='soc' 的选项表
+               · city     string  本机配置的服务城市，可改；白名单 = scripts/region.js 字典
+               · （材料缺口核对额外需要）ownedDocs string[] —— 用户声明或账户里已有的材料，
+                 **本稿没有采集入口**，这是这一项还没接线的真正原因
+             输出：
+               · 预筛：{ candidates: [{ policyId, why }] } —— 已接线，由 21-policy 消费上述三参
+                 （21-policy :913 起 readCarry() 白名单校验 + 顶部回执，非法值当没传）
+               · 缺口：{ gaps: [{ policyId, missing: [docName], have: [docName] }] } —— **待接线**
+               · 证据级别一律 E3；资格结论只走页脚那条「以经办窗口审核为准」，本卡不另下结论
+             降级：
+               · AI 不可用 → 主动作换成「只看政策原文」→ 21-policy.html?stage=s2&view=doc；
+                 政策原文、办事清单、官方入口三条照常，条件由用户自己对
+             ════════════════════════════════════════════════════════════════ -->
+        <!-- 6 AI 政策助手（AI · 三项只做预筛，选完带进 21-policy 继续补问 · 整行横排）
+             2026-08-10 Codex :311/:314 整改：
+             ① 原文案「对照能办哪些 / 我能办哪些」是资格判断承诺 —— 改成「筛出可能相关的政策 ·
+                核对材料缺口」；资格结论一律走页脚那条（经办窗口审核为准），本卡不再另说一遍。
+             ② 这三项**替代不了** 21-policy 的「地区 + 九项条件」问答，所以只当预筛：
+                选项取值直接对齐政策页的 status / soc / city 三个问项，点完通过 URL 带过去，
+                剩下六项由政策页继续补问。未选就传空值，让政策页知道这项还得问。 -->
+        <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-ai">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">AI政策助手</span>
+            <!-- 2026-08-10 AI 落实度审查整改：副文原写「筛出可能相关的政策 · 核对材料缺口」，
+                 但缺口核对没有任何实现，主动作也只把三项预筛值带进政策页。
+                 按产品口径不删这项能力（设计成立、只是没接后端），改为如实分栏：
+                 已能办的写在前，待接线的明确标出来。 -->
+            <span class="dcard-ds" data-when="default first device-off">筛出可能相关的政策</span>
+            <span class="dcard-hint" data-when="default first device-off"><b>材料缺口核对：待接线</b> —— 本稿只把下面三项带进政策页预筛，<b>不出"你缺哪几样"的结论</b></span>
+            <span class="dcard-ds" data-when="ai-down">政策原文与办事清单照常看，条件自己对</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-key="identity" data-opts="离职找工作中|在职想换工作|应届毕业生|想创业 / 已创业">
+                <span class="k">现在状态</span><span class="v">离职找工作中</span></button>
+              <button class="pick" type="button" data-key="insured" data-when="default device-off" data-opts="未缴|不满 3 个月|满 3 个月以上">
+                <span class="k">连续缴费</span><span class="v">未缴</span></button>
+              <button class="pick pick--empty" type="button" data-key="insured" data-when="first" data-opts="未缴|不满 3 个月|满 3 个月以上">
+                <span class="k">连续缴费</span><span class="v">未选</span></button>
+              <button class="pick" type="button" data-key="city" data-opts="广州市|深圳市|佛山市|东莞市">
+                <span class="k">城市</span><span class="v">广州市</span></button>
+            </span>
+            <span class="dcard-hint" data-when="default device-off">这三项只做预筛；城市取本机配置的服务城市（可改），其余条件进政策页继续问</span>
+            <span class="dcard-hint" data-when="first">这三项只做预筛；没登录就手选，未选的项带空值进去，由政策页继续问</span>
+          </span>
+          <span class="dcard-rt">
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
+            <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
+            <a class="dcard-go" data-when="default first device-off" data-base="21-policy.html?stage=s1" data-pick-scope="c-ai" href="21-policy.html?stage=s1">筛出可能相关的政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="21-policy.html?stage=s2&amp;view=doc">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          </span>
+        </div>
+      </div>
+
+      <!-- ── 次卡：记录类 ──
+           2026-08-10 改：原指 21-policy.html?view=browse / view=qa-history，
+           但政策页没有浏览记录与问答历史 UI，view 参数也不被消费 —— 送错门。
+           浏览足迹归「我的记录 · 足迹」，AI 问答历史归「我的记录 · AI」。 -->
+      <div class="dmore">
+        <div class="dmore-hd">
+          <b>快捷入口</b>
+          <span data-when="default ai-down device-off">登录后可查看历史记录</span>
+          <span data-when="first">未登录，记录留不下</span>
+        </div>
+        <div class="dmore-row">
+          <a class="dmore-go" href="43-my-records.html?stage=trace&amp;from=P38">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">浏览记录</span>
+              <span class="dmore-s">记录在「我的 · 足迹」里看</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 条</span>
+            </span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </a>
+          <a class="dmore-go" href="43-my-records.html?stage=ai&amp;from=P38">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
+            <span class="dmore-b">
+              <span class="dmore-t">AI政策问答记录</span>
+              <span class="dmore-s">记录在「我的 · AI 服务」里看</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 条</span>
+            </span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- ── 页脚：整页只此一条合规声明 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>政策信息来自官方发布，仅供参考；本终端只做政策说明与材料指引，<b>不做资格判定、不代办、不承诺办理结果</b>，
+          够不够条件、能不能办、能不能领一律<b>以经办窗口审核为准</b>。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">先说你的情况，再筛出可能相关的政策</div><div class="s">条件由政策页逐项核对</div></div>
+      <div data-when="first"><div class="t">不登录也能查，六张卡一张都不锁</div><div class="s">这一趟的浏览与收藏留不下，离场即清</div></div>
+      <div data-when="ai-down"><div class="t">政策原文与清单照常</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，查政策不受影响</div><div class="s">要点可先存我的文档，换机取回再打</div></div>
+    </div>
+
+    <!-- 2026-08-11 链接落地整改（Codex (b)-8 / #559）：同 #543 / #548。
+         落点改成政策页第 3 步「带走办事清单」—— 要点是在那一步勾选生成并算页数的，
+         打印台的核价页只有拿到真实产物（接线后的 artifactId）才谈得上。
+         按钮加「去」字：它是去办这件事的入口，不是本页当场出纸。 -->
+    <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="21-policy.html?stage=s3&amp;from=P38"><svg class="ic"><use href="#i-printer"/></svg>去打印政策要点</a>
+    <!-- device-off：这里不能挂打印链接冒充保存 —— 出纸链路断了，动作就得真的是「存进我的文档」 -->
+    <a class="btn btn--lg btn--ghost" data-when="device-off" href="42-my-assets.html?stage=docs&amp;from=P38&amp;kind=policy-checklist&amp;title=政策要点"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</a>
+    <a class="btn btn--primary" href="21-policy.html?stage=s1">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* ── 选择项 → 下一页参数 ────────────────────────────────────────────
+     2026-08-10 Codex :314 整改：三项选择原来点完就停在本页，下一页收不到。
+     现在每个 .pick 带 data-key，主动作链接带 data-base + data-pick-scope，
+     点完立刻把当前取值拼回 href。**未选的项也要出现在 query 里、值留空** ——
+     空值是给政策页的信号：这一项还没问到，请继续补问，别当成用户答过了。
+     只有当前可见（未被 data-when 隐藏）的 pick 参与拼接，否则同一个 key
+     会被 first 态那份「未选」按钮覆盖成空。 */
+  function syncPickLinks () {
+    var links = scr.querySelectorAll('[data-pick-scope][data-base]')
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i]
+      var host = document.getElementById(a.getAttribute('data-pick-scope'))
+      if (!host) continue
+      var picks = host.querySelectorAll('.pick[data-key]')
+      var qs = ''
+      for (var j = 0; j < picks.length; j++) {
+        var pk = picks[j]
+        if (pk.hidden || (pk.offsetParent === null && pk.getClientRects().length === 0)) continue
+        var vEl = pk.querySelector('.v')
+        var raw = vEl ? (vEl.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+        if (raw === '未选') raw = ''
+        qs += '&' + pk.getAttribute('data-key') + '=' + encodeURIComponent(raw)
+      }
+      a.setAttribute('href', a.getAttribute('data-base') + qs)
+    }
+  }
+  window.v3SyncPickLinks = syncPickLinks
+  syncPickLinks()
+  /* 四态切换会换掉哪些 pick 可见，所以每次切态之后要重拼一次。
+     包一层 v3ApplyVisibility 覆盖脚本调用；再挂一个 observer 覆盖 stage.js 自己的态切换。 */
+  if (typeof window.v3ApplyVisibility === 'function') {
+    var origApply = window.v3ApplyVisibility
+    window.v3ApplyVisibility = function () { origApply.apply(this, arguments); syncPickLinks() }
+  }
+  if (window.MutationObserver) {
+    new window.MutationObserver(syncPickLinks)
+      .observe(scr, { attributes: true, attributeFilter: ['data-state'] })
+  }
+
+  scr.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+
+    /* ① 卡上的输入项：点一下换一个值。未选时先落到真实取值，再进下一页 */
+    var p = e.target.closest('.pick')
+    if (p) {
+      var opts = (p.getAttribute('data-opts') || '').split('|')
+      var v = p.querySelector('.v')
+      if (opts.length > 1 && v) {
+        var i = opts.indexOf((v.textContent || '').replace(/^\s+|\s+$/g, ''))
+        v.textContent = opts[(i + 1) % opts.length]
+        p.classList.remove('pick--empty')
+      }
+      syncPickLinks()
+      return
+    }
+
+    /* ② 顶部 AI 带的用法按钮：只在页内高亮对应的卡，不跳假页 */
+    var b = e.target.closest('[data-spot]')
+    if (!b) return
+    var on = scr.querySelectorAll('.dcard--spot')
+    for (var j = 0; j < on.length; j++) on[j].classList.remove('dcard--spot')
+    var ids = (b.getAttribute('data-spot') || '').split(/\s+/)
+    for (var k = 0; k < ids.length; k++) {
+      var el = ids[k] && document.getElementById(ids[k])
+      if (el) el.classList.add('dcard--spot')
+    }
+    var all = scr.querySelectorAll('[data-spot]')
+    for (var m = 0; m < all.length; m++) {
+      all[m].setAttribute('aria-pressed', all[m] === b ? 'true' : 'false')
+    }
+  })
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

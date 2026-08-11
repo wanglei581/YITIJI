@@ -15,28 +15,86 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
+<style>
+  /* ── 2026-08-10 品牌锁定升级（本页局部样式，不动共享 CSS）────────────
+     topbar 左侧三段式：主名「职易达」+ 副名「AI 求职操作系统」+「NATIVE-OS」徽章。
+     brand-sub（机位/地点行）按用户要求删除，topbar 高度不变，垂直居中吸收。 */
+  .brand-line { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
+  .brand-os {
+    font-size: var(--fz-2); color: var(--fog-700);
+    letter-spacing: .12em; white-space: nowrap;
+  }
+  .brand-ver {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 26px; padding: 0 11px; border-radius: var(--r-full);
+    border: 1px solid var(--jade-a32); color: var(--jade-600);
+    font-family: var(--ff-num); font-size: 11px; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; white-space: nowrap;
+  }
+  .brand-ver i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--jade-500);
+    animation: brand-breathe 2.2s var(--ease-in-out) infinite;
+  }
+  @keyframes brand-breathe {
+    0%, 100% { opacity: .35; transform: scale(.78); }
+    50%      { opacity: 1;   transform: scale(1); box-shadow: 0 0 8px var(--jade-a32); }
+  }
+
+  /* ── 八卡清爽化（用户 2026-08-10：首页不要太多小字）───────────────
+     每卡只留 图标 + 大标题 + 至多 1 条 chip--info 事实徽记；
+     go-pill 子入口全部撤销（子功能入口已移到各域首屏）。
+     撤掉后卡体高度不缩水：图标放大 + 留白吸收，四态高度预算保持 0 溢出。 */
+  .vgrid-a .card { padding: var(--s-5) var(--s-7); gap: var(--s-3); }
+  .vgrid-a .card-ic { width: 76px; height: 76px; border-radius: var(--r-md); margin-bottom: var(--s-2); }
+  .vgrid-a .card-ic .ic { width: 40px; height: 40px; }
+  .vgrid-a .card-name { font-size: var(--fz-8); }
+  .card--sm { padding: 18px var(--s-6); gap: var(--s-2); }
+  .card--sm .card-ic { width: 56px; height: 56px; border-radius: var(--r-sm); margin-bottom: var(--s-2); }
+  .card--sm .card-ic .ic { width: 29px; height: 29px; }
+  .card--sm .card-name { font-size: var(--fz-6); }
+</style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
 <div class="screen" data-state="default" data-theme="warm">
+  <!-- 2026-08-10 第二轮全量回归补标：与甲(01-home.html)、乙(01-home-v4.html)同一套水印。
+       基线首页已统一为 01-home-v6.html —— 全站 45 条底部导航「首页」、index.html 的
+       「打开基线首页」与 P01 卡片都指向 v6，没有任何产品页链到本页，只有 compare.html
+       作为四版比稿之一还打开它。本页此前是四版里唯一没有标注的历史版本，
+       容易被当成线上口径。水印与甲/乙同构：绝对定位、不占版面高度、pointer-events:none、
+       四态同显、不进 Tab 序，因此不影响本页既有的 0 硬缺陷结论。 -->
+  <div class="histmark" role="note" title="v6「AI 神经中枢」在本页的信息结构上继续演进，已取代本页成为基线首页。本页留档不删、不再维护。"
+    style="position:absolute;z-index:80;top:0;right:0;display:flex;align-items:center;
+    height:44px;padding:0 22px;pointer-events:none;border-bottom-left-radius:14px;
+    background:rgba(176,110,18,.95);color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.28);
+    font-family:var(--ff-ui);font-size:18px;font-weight:600;letter-spacing:.02em;white-space:nowrap">
+    历史比稿 · 已由 v6 取代，不作为线上口径
+  </div>
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
 
   <!-- ============ 顶栏 ============ -->
   <header class="topbar">
+    <!-- 2026-08-10 品牌锁定升级：三段式=主名 + 副名（基线对齐）+ NATIVE-OS 徽章（呼吸点）。
+         原 brand-sub「就业服务终端 · 01 号机 · 广州人才市场南门」按用户要求删除。 -->
     <div class="brand">
       <div class="brand-mark">职</div>
-      <div>
+      <div class="brand-line">
         <div class="brand-name">职易达</div>
-        <div class="brand-sub">就业服务终端 · 01 号机 · 广州人才市场南门</div>
+        <span class="brand-os">AI 求职操作系统</span>
+        <span class="brand-ver"><i></i>NATIVE-OS</span>
       </div>
     </div>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列空闲</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 扫描可用</div>
+    <!-- device-off = 打印扫描一体机（同一台 MFP）离线：扫描仪就长在这台机器上，
+         不能再写「扫描可用」。全站口径见 39-print-hub.html 文件头。 -->
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印扫描离线 · 其余功能可用</div>
     <div class="clock" data-clock>2026年8月8日 <b>09:41</b></div>
   </header>
 
@@ -106,7 +164,7 @@
             <span data-when="device-off">本次办理单 · 已按设备状况改过</span>
             <span class="ev ev--e1" data-when="default device-off">E1 你的材料</span>
             <span class="ev ev--e2" data-when="default device-off">E2 系统与来源</span>
-            <span class="ev ev--e3" data-when="default device-off">E3 排序是 AI 判断</span>
+            <span class="ev ev--e3" data-when="default device-off">E3 排序是 AI 判断 · 仅供参考</span>
           </div>
 
           <h2 class="verrand-h" data-when="default">建议先做简历诊断</h2>
@@ -123,7 +181,8 @@
             <span class="verrand-cost" data-when="default"><span>约 40 秒</span><span>免费</span><span>结果进「我的简历」</span></span>
             <span class="verrand-cost" data-when="first"><span>不收费</span><span>不需要登录</span><span>离场自动清空</span></span>
             <span class="verrand-cost" data-when="ai-down"><span>打印、扫描、上传、浏览正常</span><span>不影响已支付订单</span></span>
-            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>文件保留 7 天</span></span>
+            <!-- 2026-08-10 口径统一：这里存的是简历/求职材料 = 一般文档，基准表 90 天（原写 7 天串到取件码口径） -->
+            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>登录后存 90 天</span></span>
             <button class="btn btn--quiet" data-when="default" style="text-decoration:underline;text-underline-offset:4px">跳过，直接打印</button>
             <button class="btn btn--quiet" data-when="ai-down device-off" style="text-decoration:underline;text-underline-offset:4px">查看设备状态</button>
           </div>
@@ -164,79 +223,57 @@
 
       <!-- ============ 服务入口：身份色卡 ============ -->
       <section class="vgrid-a rise">
-        <a class="card card--print" href="06-print-workbench.html">
+        <!-- 2026-08-10 八卡清爽化：go-pill 子入口全部撤销（子功能入口在各域首屏，
+             如 P09 六卡选择器）；每卡只留 图标 + 大标题 + 至多 1 条事实徽记。 -->
+        <a class="card card--print" href="39-print-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
           <span class="card-name">打印扫描</span>
           <span class="card-foot">
-            <!-- 这三个是真快捷入口（linkage.js 绑 data-href 并阻止冒泡到外层卡片链接）。
-                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
-            <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
-            <span class="card-pill card-pill--info" data-when="device-off">打印离线 · 扫描可用</span>
+            <span class="card-pill card-pill--info" data-when="default first ai-down">A4 · 彩色</span>
+            <span class="card-pill card-pill--info" data-when="device-off">打印扫描离线 · 上传可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
         </a>
-        <a class="card card--resume" href="09-resume-workbench.html">
+        <a class="card card--resume" href="32-resume-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
           <span class="card-name">AI 简历服务</span>
           <span class="card-foot">
-            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(linkage.js 绑 data-href)。
-                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="22-career-plan.html">职业规划</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
-            <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">AI 暂不可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
           </span>
         </a>
       </section>
 
       <section class="vgrid-b rise">
-        <a class="card card--sm card--job" href="13-jobs-desk.html">
+        <a class="card card--sm card--job" href="34-jobs-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
           <span class="card-name">岗位信息</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
-            <span class="card-pill" data-dots="12">12 家来源</span>
-          </span>
+          <span class="card-foot"><span class="card-pill card-pill--info">12 家来源</span></span>
         </a>
-        <a class="card card--sm card--fair" href="17-fair-desk.html">
+        <a class="card card--sm card--fair" href="36-fairs-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="card-name">招聘会</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="17-fair-desk.html?stage=s3">展位导览</span>
-            <span class="card-pill" data-dots="3">本周 3 场</span>
-          </span>
+          <span class="card-foot"><span class="card-pill card-pill--info">本周 3 场</span></span>
         </a>
-        <a class="card card--sm card--mock" href="20-interview-pod.html">
+        <a class="card card--sm card--mock" href="37-interview-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
           <span class="card-name">AI 面试训练</span>
           <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="20-interview-pod.html?stage=s3">往期点评</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
-            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用</span>
           </span>
         </a>
-        <a class="card card--sm card--policy" href="21-policy.html">
+        <a class="card card--sm card--policy" href="38-policy-hub.html">
           <span class="card-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
           <span class="card-name">政策服务</span>
-          <span class="card-foot">
-            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="21-policy.html?stage=s3">办事清单</span><span class="card-pill card-pill--info">官方来源</span></span>
+          <span class="card-foot"><span class="card-pill card-pill--info">官方来源</span></span>
         </a>
         <!-- 2026-08-09 用户定:百宝箱/智慧校园升为正式成员,与六服务同级同大(原角落迷你卡撤销) -->
         <a class="card card--sm card--tool" href="27-toolbox.html">
           <span class="card-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
           <span class="card-name">百宝箱</span>
-          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务 · 后台上架控制</span></span>
+          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务</span></span>
         </a>
         <a class="card card--sm card--camp" href="19-smart-campus.html">
           <span class="card-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
@@ -263,11 +300,11 @@
           <div class="vrow"><span class="k">A4 纸张</span><span class="v" data-when="default first ai-down">78%</span><span class="v" data-when="device-off">—</span></div>
           <div class="vbar" data-when="default first ai-down"><i style="width:78%"></i></div>
           <div class="vrow"><span class="k">碳粉</span><span class="v" data-when="default first ai-down">62%</span><span class="v" data-when="device-off">—</span></div>
-          <div class="vrow"><span class="k">扫描仪</span><span class="v">就绪</span></div>
+          <div class="vrow"><span class="k">扫描仪</span><span class="v" data-when="default first ai-down">就绪</span><span class="v" data-when="device-off" style="color:var(--coral-400)">离线</span></div>
           <div class="vcalib">
             <span class="s"><i style="background:#1c1c1c"></i><i style="background:#00a0c6"></i><i style="background:#d6338c"></i><i style="background:#f2c200"></i></span>
             <span class="t" data-when="default first ai-down">黑白 / 彩色均可 · 费用以现场公示价为准</span>
-            <span class="t" data-when="device-off">打印能力暂不可用 · 扫描与转存正常</span>
+            <span class="t" data-when="device-off">打印与扫描暂不可用 · 上传与转存正常</span>
           </div>
         </div>
 
@@ -276,6 +313,49 @@
   </div>
 
   <!-- ============ ActionBar ============ -->
+
+  <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+       收进来的：合规边界 / AIGC 生成说明 / 证据分级 E1·E2·E3 解释 /
+                 隐私与保留期限 / 产物去向与费用口径 / AI 与设备离线的降级说明。
+       **没有**收进来（必须常驻）：办理单上的 E1 / E2 / E3 逐条徽章、
+       顶栏设备状态药丸、四态各自的一句话状态提示、按钮旁的时长与费用参数。 -->
+  <div class="nb-bar" data-notebar>
+    <button type="button" class="nb-sum">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="nb-sum-t">信息与边界&nbsp;· <b>不代收简历</b>&nbsp;· 证据分级&nbsp;· 隐私与费用口径</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+        <p class="nb-p">这台机器做的是<b>简历、材料、打印扫描与信息查询</b>。岗位、招聘会、校园招聘、企业展示都只是<b>第三方或官方来源的信息入口</b>：本机<b>不代收简历、不做平台内投递、不做企业筛选、不安排面试、不管 Offer</b>。要投递或预约，请到来源平台或主办方那边办。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-orbit"/></svg>哪些内容是 AI 生成的</div>
+        <p class="nb-p">办理单里的<b>顺序、建议与理由由 AI 生成</b>，页面上会挂 <span class="nb-e nb-e--3">E3</span> 标识，<b>仅供参考</b>，不是结论也不是承诺。本机<b>不预测录用结果、不给匹配百分比、不承诺薪资</b>；涉及钱和资格的事，一律以经办机构认定为准。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+        <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 来自<b>你自己的材料</b>：你上传的简历、你说过的话。<span class="nb-e nb-e--2">E2</span> 来自<b>系统与外部来源</b>：设备状态、来源机构同步过来的岗位与招聘会事实。<span class="nb-e nb-e--3">E3</span> 是 <b>AI 的判断</b>，需要你自己核实。页面上挂在具体结论旁的小徽章就是这三档，本条只解释含义。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+        <p class="nb-p"><b>不登录也能办事</b>：未登录时，本次上传的文件与生成的结果<b>只留在本次会话，离场或超时自动清空</b>，不进任何账号。登录只决定文件存不存得下来，<b>不解锁额外能力，也不收费</b>。</p>
+        <p class="nb-p">存进「我的文档」之后按文件类型算保留期：一般文档 <b>90 天</b>，含身份证号等敏感件 <b>7 天</b>；到期清理保留删除日志。文件只有你本人可见，管理员访问写审计日志，<b>不向任何企业提供</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用口径</div>
+        <p class="nb-p">AI 简历诊断、优化、材料生成这些<b>不收费</b>；<b>只有出纸收费</b>，费用以打印工作台核价与现场公示价为准（A4 黑白与彩色分别计价，双面按面计价、用纸减半）。核价、支付、出纸、取件都在打印工作台完成，首页不收款。生成的材料会进「我的简历 / 我的文档」，打印后进「打印订单」。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 或设备离线时会怎样</div>
+        <p class="nb-p"><b>AI 不可用：</b>对话与排序停掉，页面不会替你猜顺序；打印、扫描、上传、岗位与招聘会浏览<b>都不受影响</b>，故障已自动上报，不需要你操作。</p>
+        <p class="nb-p"><b>打印机离线：</b>不出纸，但材料可以先存进「我的文档」，<b>凭手机号在任一台空闲机器取回打印</b>；已支付的订单不受影响。当前处于哪一种状态，以顶栏状态与本页的状态提示为准。</p>
+      </div>
+    </div>
+  </div>
+
   <div class="actionbar">
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">下一步：简历诊断</div><div class="s">约 40 秒 · 免费 · 你确认后才开始</div></div>
@@ -303,6 +383,9 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/notebar.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

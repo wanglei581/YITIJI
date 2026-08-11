@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P35 线上招聘平台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P35 线上招聘平台">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
+<style>
+/* ══ P35 线上招聘平台 ══
+   需求真值 = 生产代码 apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx：
+   PLATFORMS 常量四条（Boss直聘 / 前程无忧 / 智联招聘 / 猎聘），
+   每条含 name / tagline / category / url。**不得增删捏造平台。**
+
+   2026-08-10 版面重排（Codex 评审）：
+     · 这是**平台目录**，不是岗位记录：不显示岗位数、不放来源三字段
+       —— 来源三字段是岗位条目的字段，进入具体岗位后才展示，硬套是伪造。
+     · 二维码**复用生产的全屏遮罩交互**，删掉常驻二维码右栏；
+       右栏一去，四张平台卡拿回整个 968px 正文宽。
+     · 删掉平台长科普（「这四家分别偏向什么」整段 + 每卡的类型点评）、
+       后台维护说明、扫码流程说明 —— 前两者收进页脚折叠，后者进弹层。
+     · 卡片为主、说明为辅：每卡正文 ≤1 行。
+
+   仍必须守住的口径：
+   ① 按钮文案是「扫码打开来源平台」。**不写「扫码投递」**——
+      这四个码指向平台**首页**（PLATFORMS[].url），不是某个岗位的投递页。
+      任何写法都不能连写成 '平台投递' —— 那是 stage.js 的违禁词。
+   ② 本机**不打开**这些平台的页面。屏上出码，操作全在用户自己手机上完成。
+   ③ 本页没有任何 AI：四个入口全部不依赖 AI，ai-down / device-off 不影响本页。
+   ══════════════════════════════════════════════════════════ */
+
+/* 全宽单栏：原 372px 常驻二维码右栏取消 */
+.work--plat { grid-template-columns: 1fr; }
+.work { padding: var(--s-4) var(--gutter); }
+.wmain { gap: var(--s-4); }
+
+/* ── 平台卡：卡片为主，每卡正文 ≤1 行 ── */
+.plist { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.prow {
+  flex: 1 1 0; min-height: 216px;
+  display: flex; align-items: center; gap: var(--s-6);
+  padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-left: 4px solid var(--azure-400);
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.prow.is-on { border-color: var(--jade-a32); border-left-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a12); }
+.pmark {
+  width: 88px; height: 88px; flex: 0 0 auto; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--azure-a12); border: 1px solid var(--azure-a20);
+  font-family: var(--ff-display); font-size: 38px; color: var(--azure-200); letter-spacing: 0;
+}
+.pbody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ptop { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.pnm { font-family: var(--ff-display); font-size: 34px; font-weight: 600; color: var(--fog-900); letter-spacing: .02em; }
+/* 每卡正文一行 —— 生产 PLATFORMS[].tagline 原文，不加评点 */
+.pds { font-size: 22px; color: var(--fog-700); line-height: 1.4; }
+.pbtn { flex: 0 0 auto; height: 64px; font-size: 22px; white-space: nowrap; }
+
+/* ── 页脚：全页唯一一条折叠说明（原 .cline 常驻声明 + .fold 长文合并进去）──
+   2026-08-10：合规声明、名单口径、记录范围、产物去向全部收进 styles/notebar.css
+   的统一折叠条，页面本体不再挂常驻说明段落。本页无 AI 产出、无岗位条目，
+   因此没有必须常驻的 AIGC 标识与来源三字段；状态提示仍在顶栏 devpill。 */
+
+/* ── 二维码全屏遮罩：不再常驻右栏 ── */
+.screen:not(.is-qr) #qr-sheet { display: none; }
+#qr-sheet .sheet { max-width: 620px; }
+.qmeta {
+  width: 100%; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--s-4); border-radius: var(--r-xs);
+  border: 1px dashed var(--brd-2); background: var(--surf-1);
+  font-size: 18px; color: var(--fog-700); line-height: 1.5; text-align: center;
+}
+.qmeta .u { font-family: var(--ff-num); font-size: 22px; color: var(--azure-200); word-break: break-all; }
+.qmeta .warn { color: var(--amber-200); }
+#qr-sheet .qr-box { width: 300px; height: 300px; }
+
+/* 状态标签不是入口（先例见 P14 / P17 / P27 / P32） */
+.chip--static { cursor: inherit; }
+.chip--label { cursor: inherit; }
+
+.actionbar .btn--primary { height: 64px; font-size: 22px; }
+.actionbar .btn--lg { height: 56px; font-size: 20px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">线上招聘平台</div>
+        <div class="brand-sub">职易达 · 01 号机</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <!-- 状态药丸只报状态，不重复合规边界（「不代投」那句留在页脚唯一那条声明里） -->
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>4 个平台入口 · 各出各的码</div>
+    <div class="devpill" data-when="first"><span class="dot dot--live"></span>未登录 · 记录只留本次会话</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--live"></span>本页不依赖 AI · 四个入口照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本页不受影响</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
+  </header>
+
+  <div class="work work--plat">
+    <div class="wmain">
+
+      <div class="plist">
+        <!-- 四张卡：平台名 + 类型 + 一行 tagline（生产 PLATFORMS 原文）+ 扫码按钮。
+             按钮一律「扫码打开来源平台」—— 码指向平台首页，不是某个岗位的投递页。 -->
+
+        <div class="prow" data-plat="boss">
+          <span class="pmark">B</span>
+          <span class="pbody">
+            <span class="ptop">
+              <span class="pnm">Boss直聘</span>
+              <span class="chip chip--azure chip--static">直聘平台</span>
+              <span class="chip chip--jade chip--label">不依赖 AI</span>
+            </span>
+            <span class="pds">直连招聘，直接与招聘负责人沟通</span>
+          </span>
+          <button type="button" class="btn pbtn" data-go-plat="boss"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
+        </div>
+
+        <div class="prow" data-plat="51job">
+          <span class="pmark">前</span>
+          <span class="pbody">
+            <span class="ptop">
+              <span class="pnm">前程无忧</span>
+              <span class="chip chip--azure chip--static">综合平台</span>
+              <span class="chip chip--jade chip--label">不依赖 AI</span>
+            </span>
+            <span class="pds">综合招聘求职一站式服务平台</span>
+          </span>
+          <button type="button" class="btn pbtn" data-go-plat="51job"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
+        </div>
+
+        <div class="prow" data-plat="zhilian">
+          <span class="pmark">智</span>
+          <span class="pbody">
+            <span class="ptop">
+              <span class="pnm">智联招聘</span>
+              <span class="chip chip--azure chip--static">综合平台</span>
+              <span class="chip chip--jade chip--label">不依赖 AI</span>
+            </span>
+            <span class="pds">职业发展综合服务，岗位丰富</span>
+          </span>
+          <button type="button" class="btn pbtn" data-go-plat="zhilian"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
+        </div>
+
+        <div class="prow" data-plat="liepin">
+          <span class="pmark">猎</span>
+          <span class="pbody">
+            <span class="ptop">
+              <span class="pnm">猎聘</span>
+              <span class="chip chip--azure chip--static">中高端平台</span>
+              <span class="chip chip--jade chip--label">不依赖 AI</span>
+            </span>
+            <span class="pds">中高端人才招聘，精准匹配职位</span>
+          </span>
+          <button type="button" class="btn pbtn" data-go-plat="liepin"><svg class="ic"><use href="#i-qr"/></svg>扫码打开来源平台</button>
+        </div>
+      </div>
+
+    <!-- ══════════ 页脚：信息与边界（全页唯一折叠条） ══════════ -->
+    <div class="nb-bar" data-notebar>
+      <button type="button" class="nb-sum">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span class="nb-sum-t">信息与边界&nbsp;· <b>不代收简历</b>&nbsp;· 名单与记录口径</span>
+        <span class="nb-x">展开</span>
+        <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="nb-body" hidden>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+          <p class="nb-p">投递请前往来源平台。本机<b>不代收简历</b>、不参与企业筛选、不替你投递、也不打开对方页面。屏上只出码，扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。</p>
+          <p class="nb-p">公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>名单口径与排序口径</div>
+          <p class="nb-p">这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。</p>
+          <p class="nb-p">本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事。所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段，进具体岗位后才展示。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围与保留期限</div>
+          <p class="nb-p">只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。</p>
+          <p class="nb-p" data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</p>
+          <p class="nb-p" data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+          <p class="nb-p">这一页<b>不出纸、不收款</b>。想把岗位信息打出来带走，回岗位台选中那一条，从详情页走打印；核价、支付与取件都在打印工作台完成。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+          <p class="nb-p">本页四个入口<b>全部不依赖 AI</b>：AI 不可用或打印扫描离线时，出码、跳转与本页说明照常。</p>
+        </div>
+      </div>
+    </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════ 二维码全屏遮罩：点平台卡的按钮才出现 ══════════ -->
+  <div class="sheet-mask" id="qr-sheet">
+    <div class="sheet">
+      <div class="sheet-hd">
+        <svg class="ic"><use href="#i-qr"/></svg>
+        <h2 class="sheet-t" id="qrTitle">扫码打开来源平台</h2>
+      </div>
+      <div class="qr" style="padding:var(--s-5)">
+        <!-- 图案由 JS 按该平台域名生成（见页尾脚本）：四家四个样子，不共用一张。
+             预留三个定位角，模块格由 #qrMods 填充。 -->
+        <div class="qr-box">
+          <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+            <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+            <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+            <g id="qrMods"></g>
+          </svg>
+        </div>
+        <div class="qmeta">
+          <span id="qrName">—</span>
+          <span class="u" id="qrUrl">—</span>
+          <span class="warn"><b>本稿这张是示意图案，扫不出东西</b>；真机此处是上面这个域名的可扫码二维码</span>
+        </div>
+        <span class="qr-cap">
+          用手机扫这个码，在<b>你自己手机上</b>打开该平台<br>
+          <span style="color:var(--fog-600)">本机屏幕不打开对方页面、不替你登录、不代填表单</span>
+        </span>
+      </div>
+      <div class="sheet-acts">
+        <button class="btn btn--lg btn--ghost" id="qr-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--lg btn--ghost" href="16-offline-agencies.html?stage=list"><svg class="ic"><use href="#i-agency"/></svg>线下机构</a>
+
+    <!-- 提示句写短，且不用带空格的「 · 」分隔：空格给了换行机会，下一行就以「·」开头 -->
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">四个平台各出各的码</div><div class="s">扫码在你自己手机上打开</div></div>
+      <div data-when="first"><div class="t">不登录也能扫码</div><div class="s">四个入口都能用，打开记录不进账号</div></div>
+      <div data-when="ai-down"><div class="t">本页不依赖 AI</div><div class="s">四个入口与类型说明照常</div></div>
+      <div data-when="device-off"><div class="t">打印机离线不影响本页</div><div class="s">这里只出码不出纸</div></div>
+    </div>
+
+    <a class="btn btn--primary" href="13-jobs-desk.html?stage=ok&amp;jobType=all">看本机岗位台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* 选平台 → **全屏遮罩**出那一家自己的码。四条数据抄自生产 OnlinePlatformsPage.tsx 的
+   PLATFORMS 常量，一条不增、一条不减。刻意不做的两件事：不在本机打开对方页面、
+   不把码做成一次性凭证（它就是平台首页链接，没有会话绑定，不该假装有）。
+
+   码图案按域名生成，互不相同：同一个域名永远得到同一张图（伪随机是**确定性**的，
+   不是每次刷新乱跳）。它仍然是**示意图案，扫不出内容** —— 这一点在码下面写死了。
+   真机上这里换成该域名的真码即可，接口不变。 */
+;(function () {
+  var P = {
+    boss:    { name: 'Boss直聘',   cat: '直聘平台',   url: 'https://www.zhipin.com' },
+    '51job': { name: '前程无忧',   cat: '综合平台',   url: 'https://www.51job.com' },
+    zhilian: { name: '智联招聘',   cat: '综合平台',   url: 'https://www.zhaopin.com' },
+    liepin:  { name: '猎聘',       cat: '中高端平台', url: 'https://www.liepin.com' }
+  }
+  var NS = 'http://www.w3.org/2000/svg'
+  var screen = document.querySelector('.screen')
+  var title = document.getElementById('qrTitle')
+  var nm = document.getElementById('qrName')
+  var url = document.getElementById('qrUrl')
+  var mods = document.getElementById('qrMods')
+  if (!screen || !nm) return
+
+  /* 域名 → 32 位种子（djb2）。确定性：同域名同图案。 */
+  function seedOf (s) {
+    var h = 5381
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
+    return h
+  }
+
+  /* 画图案：16×16 模块格，让开三个定位角，右下角补一个对齐方块。
+     只是"长得像码"的占位图，不是真码 —— 所以不做纠错、不做掩模。 */
+  function paint (u) {
+    if (!mods) return
+    while (mods.firstChild) mods.removeChild(mods.firstChild)
+    var s = seedOf(u)
+    function rnd () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 }
+    function box (x, y, w) {
+      var r = document.createElementNS(NS, 'rect')
+      r.setAttribute('x', x); r.setAttribute('y', y)
+      r.setAttribute('width', w); r.setAttribute('height', w)
+      mods.appendChild(r)
+    }
+    for (var iy = 0; iy < 16; iy++) {
+      for (var ix = 0; ix < 16; ix++) {
+        var corner = (ix <= 5 && iy <= 5) || (ix >= 11 && iy <= 5) || (ix <= 5 && iy >= 11)
+        var align = (ix >= 11 && ix <= 13 && iy >= 11 && iy <= 13)
+        if (corner || align) continue
+        if (rnd() < 0.44) box(2 + ix * 6, 2 + iy * 6, 6)
+      }
+    }
+    box(68, 68, 18)                       // 右下对齐方块（外框）
+    var hole = document.createElementNS(NS, 'rect')
+    hole.setAttribute('x', 74); hole.setAttribute('y', 74)
+    hole.setAttribute('width', 6); hole.setAttribute('height', 6)
+    hole.setAttribute('fill', '#fff')
+    mods.appendChild(hole)
+  }
+
+  /* 遮罩一律用 class 控制，不用 hidden —— hidden 是四态机制的地盘 */
+  function close () { screen.classList.remove('is-qr') }
+  var closeBtn = document.getElementById('qr-close')
+  if (closeBtn) closeBtn.addEventListener('click', close)
+  var mask = document.getElementById('qr-sheet')
+  if (mask) mask.addEventListener('click', function (e) { if (e.target === mask) close() })
+
+  screen.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-go-plat]')
+    if (!b) return
+    var k = b.getAttribute('data-go-plat')
+    var d = P[k]
+    if (!d) return
+
+    var rows = screen.querySelectorAll('[data-plat]')
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle('is-on', rows[i].getAttribute('data-plat') === k)
+    }
+    screen.classList.add('is-qr')
+    if (title) title.textContent = '扫码打开 ' + d.name
+    nm.textContent = d.name + ' · ' + d.cat
+    url.textContent = d.url
+    paint(d.url)
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  })
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

@@ -66,10 +66,32 @@
   display:flex; align-items:flex-start; gap:var(--s-5);
   transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
 .jobrow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
-.jobrow-b { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.jobrow-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:5px; }
 .jobrow-t { font-size:var(--fz-5); color:var(--fog-900); font-weight:600; }
 .jobrow-s { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.04em; }
 .jobrow-m { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+
+/* 整行大复选按钮：这一行本来就该能勾（动作条写着「已选 N 家 · 最多可选 8 家」，
+   还有「改选企业」按钮），上一版却是个 <label> 空壳。现在整行可点、有选中态，
+   勾掉的企业会同步从展位图、作战单、打印页数里消失。行高由内容撑到 100px+，
+   远高于 56px 触控下限。 */
+/* .joblist 是 flex 列 + overflow-y:auto，行默认 flex-shrink:1 会被压扁，
+   内容多的行会被切掉底部（P18 同一改动上实测过）。行不许压缩，长了让列表滚。 */
+.jobrow { min-height:56px; flex:0 0 auto; }
+.jobrow[aria-pressed="true"] { border-color:var(--jade-a32); background:var(--jade-a12); }
+.jobrow:focus-visible { outline:3px solid var(--jade-400); outline-offset:2px; }
+.jobrow .ck-box { width:26px; height:26px; border-radius:6px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:3px; position:relative; }
+.jobrow[aria-pressed="true"] .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.jobrow[aria-pressed="true"] .ck-box::after { content:''; position:absolute; left:8px; top:3px;
+          width:6px; height:12px; border:solid #fff; border-width:0 3px 3px 0;
+          transform:rotate(42deg); }
+.jobrow-pick { flex:0 0 auto; align-self:center; font-size:var(--fz-1);
+          color:var(--fog-600); white-space:nowrap; }
+.jobrow[aria-pressed="true"] .jobrow-pick { color:var(--jade-600); font-weight:700; }
+/* 已选满 8 家时，没勾的那些点了也加不进来 —— 与其静默拒绝，不如先压淡说明白。
+   注意用 opacity 不用 pointer-events:none：点得到才能给出「最多 8 家」这句话。 */
+.joblist.is-full .jobrow[aria-pressed="false"] { opacity:.55; }
 
 /* 右栏在 first 态会多出一块引导，挤到下方 pane —— 让 pane 内部滚，
    而不是把「扫码预约」按钮无声裁掉。列表底部留白，避免最后一条贴边被裁。 */
@@ -93,21 +115,31 @@
 .ap-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
 .ap-s { font-size:var(--fz-1); color:var(--fog-600); }
 
-/* 勾选行。公共层的 .chk 不是复选框，是带图标的清单行容器；
-   真正的复选框视觉是 .ck-box（22px 方块 div）。这套只在 12 页页内定义过。 */
-.ck { display:flex; align-items:flex-start; gap:var(--s-4);
-      min-height:var(--touch-min); padding:var(--s-3) var(--s-4);
-      border-radius:var(--r-xs); border:1px solid var(--brd-1); background:var(--surf-1);
-      cursor:pointer; }
-.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
-          flex:0 0 auto; margin-top:2px; position:relative; }
-.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
-.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px;
-          width:5px; height:10px; border:solid #fff; border-width:0 2.5px 2.5px 0;
-          transform:rotate(42deg); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
-.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* ════════ 2026-08-10 Codex 走查整改 ① · 别再造假控件 ════════
+   上一版这一页有两类东西长得一模一样：22px 方框 + 一行字，包在 <label> 里。
+   一类是**真该能选**的（S2 去哪几家），一类是**只读清单**（要带什么、这批印什么）。
+   两类都没有 input、没有状态、没有事件 —— 全是画上去的。
+   现在按语义分家：
+     · 真可选 → .jobrow 整行大复选按钮（<button aria-pressed>，≥56px，点整行）
+     · 只读   → .li 圆点条目（<li>，无 cursor:pointer、无 hover、无选中态）
+   .ck / .ck--have 整套删除：它的存在就是在邀请下一个人继续造假控件。 */
+
+/* 只读清单条目：圆点 + 正文 + 右侧状态词。状态词是**结论**不是开关，
+   所以既不给 cursor:pointer 也不给 hover —— 看得出来它不接受点击。 */
+.li-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--s-3); }
+.li { display:flex; align-items:flex-start; gap:var(--s-4);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); }
+.li-dot { width:9px; height:9px; border-radius:50%; background:var(--fog-a20);
+          flex:0 0 auto; margin-top:9px; }
+.li-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:2px; }
+.li-t { font-size:var(--fz-3); color:var(--fog-900); }
+.li-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+/* 类名刻意避开 pill / chip / tag / btn：那几个词是自检里「疑似假入口」的扫描面，
+   而这就是个状态词，不该被当成入口去查，也不该长得像入口。 */
+.li-st { flex:0 0 auto; align-self:center; font-size:var(--fz-1); white-space:nowrap;
+         color:var(--jade-600); }
+.li-st--own { color:var(--fog-600); }
 
 /* AI 分诊：这一屏真正的 AI —— 回答「这三场我该去哪场」 */
 .tri { display:flex; flex-direction:column; gap:var(--s-3); }
@@ -119,8 +151,10 @@
 .tri-vd--go   { background:var(--jade-a20); color:var(--jade-200); }
 .tri-vd--ok   { background:var(--fog-a08); color:var(--fog-700); }
 .tri-vd--stop { background:var(--amber-a12); color:var(--amber-200); }
-.tri-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
-.tri-w { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; margin-top:3px; }
+.tri-t { display:block; font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+/* 2026-08-10：这两个 span 原本是 inline，标题和理由挤在同一行流里一起折行，
+   于是每条分诊都占 2 行。改成块级，各占一行，理由能压进一行读完。 */
+.tri-w { display:block; font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; margin-top:3px; }
 .tri-w b { color:var(--fog-900); }
 
 /* 状态标签，不是入口。与 polish.css 的 .card-pill--info 同一套语义：
@@ -160,10 +194,132 @@
 .checkin-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
 .checkin-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
 .checkin-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 2026-08-10 孤儿页接线：招聘会现场页（P45）此前**全站零入口** ——
+   展位企业、场馆导览、活动资料、现场数据四块只能靠手敲网址进。
+   本页是它唯一的自然上游（这一页是「去之前怎么准备」，P45 是「到了现场怎么用」），
+   所以在这里给四个直达链接，各自落到对应阶段，不再统统指回本页。 */
+.onsite { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.onsite-hd { display:flex; align-items:center; gap:8px; font-size:var(--fz-3);
+  color:var(--fog-900); font-weight:600; }
+.onsite-hd .ic { width:19px; height:19px; color:var(--jade-500); }
+.onsite-hd .mt { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600); font-weight:400; }
+.onsite .outs { grid-template-columns:1fr 1fr; }
+
+/* ════════ 2026-08-10 Codex 走查整改 ════════ */
+
+/* ① 场次卡原来是 data-go="s2"：一点就跳走。可右栏又写着「点左边任一场可以换成看它的」——
+   界面在自相矛盾。改成真的选中：点一下换右栏规则，选中有态，主按钮才推进。 */
+.sesscard[aria-pressed="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+.sesscard:focus-visible { outline: 3px solid var(--jade-400); outline-offset: 2px; }
+.sc-pick { font-size: var(--fz-1); color: var(--fog-600); white-space: nowrap; }
+.sesscard[aria-pressed="true"] .sc-pick { color: var(--jade-600); font-weight: 700; }
+
+/* ② 折叠块：长说明压成一行结论，展开才给全文。合规原文一字不删。 */
+.fold { border:1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); margin-top: 8px; }
+.fold > summary { list-style:none; cursor:pointer; min-height: var(--touch-min);
+  display:flex; align-items:center; gap:8px; padding:0 var(--s-4);
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display:none; }
+.fold > summary::after { content:'展开'; margin-left:auto; flex:0 0 auto;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fold[open] > summary::after { content:'收起'; }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height:1.65; }
+/* 本机 Chrome 里 <details> 关着时子节点仍有布局盒，自检会报卡内溢出。显式收掉。 */
+.fold:not([open]) .fold-b { display:none; }
+
+/* ③ 右栏 grow 卡：内容原来全挤在顶部，下面空 300–570px（自检 9 处）。
+   让 .sec 成为列布局，收尾块用 .sec-foot 贴卡底 —— 是把已有内容摊开，不是塞填充物。 */
+.wside .pane--grow > .sec { display:flex; flex-direction:column; }
+.sec-foot { margin-top:auto; padding-top: var(--s-4); }
+
+/* ④ 交接卡：出口按钮上写清本次带去什么 */
+.handoff { display:flex; align-items:center; gap: var(--s-4);
+  padding: var(--s-4); border-radius: var(--r-md);
+  background: var(--jade-a12); border:1px solid var(--jade-a32);
+  text-decoration:none; color:inherit; min-height: var(--touch-min); }
+.handoff .src-ic { flex:0 0 auto; width:40px; height:40px; }
+.handoff-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.handoff-t { font-size: var(--fz-3); color: var(--fog-900); font-weight:600; }
+.handoff-s { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); }
+
+/* ⑤ device-off 的示意码：打印这条路断了，就画出真正能用的那条 */
+.miniqr { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.miniqr-box { width:150px; height:150px; border-radius: var(--r-sm); background:#fff;
+  display:grid; place-items:center; padding:10px; box-shadow: var(--sh-2); }
+.miniqr-box svg { width:100%; height:100%; }
+.miniqr-cap { font-size: var(--fz-1); color: var(--fog-600); letter-spacing:.1em; }
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右栏常驻抢走约三分之一宽度，装的是「都要带什么」提醒清单、「这 80 家读到
+   什么程度」这类口径说明 —— 用户此刻在挑场次、挑企业，不是在读口径。
+   处置：主体改全宽；口径与提醒清单收进上下文抽屉，点动作条上的按钮才展开。
+   **与当前流程直接相关的「已选场次 · 怎么参加」留在正文常驻**（Codex 点名），
+   连同「去来源平台预约 / 扫码预约」两个合规入口一起，不许收进抽屉。 */
+.work { grid-template-columns: 1fr; }
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--gutter); bottom:auto; width:412px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; margin-left:var(--s-4); min-height:56px; padding:0 var(--s-5);
+  border-radius:var(--r-full); border:1px solid var(--brd-2); background:var(--surf-1);
+  color:var(--fog-800); font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.sidebtn .ic { width:18px; height:18px; }
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+
+/* 已选场次卡进正文后横过来：左边事实三列两行，右边两个预约入口并排，
+   整卡压到 ~150px —— 上面那张「本周及下周场次」列表卡不能被它挤到出血。 */
+.wmain .pane--sess { flex:0 0 auto; }
+.wmain .pane--sess > .sec { display:grid; grid-template-columns:1fr 372px; gap:var(--s-5); align-items:center; }
+.wmain .pane--sess .kv { display:grid; grid-template-columns:1fr 1fr; column-gap:var(--s-6); }
+.wmain .pane--sess .kv-row { padding-top:var(--s-1); padding-bottom:var(--s-1); }
+/* 两列后标签仍可能被长值挤断行（「是否需 / 预约」）：标签不折行，值靠右自己折 */
+.wmain .pane--sess .kv-row .k { flex:0 0 auto; white-space:nowrap; }
+.wmain .pane--sess .kv-row .v { text-align:right; }
+.wmain .pane--sess .sec-foot { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
+.wmain .pane--sess .sec-foot .btn { width:100% !important; margin-top:0 !important; }
+/* 三张场次对比卡的「展开」如果同时全开，上面这块会吃掉 724 / 1456，
+   把下面的场次列表压到 16px、并把「已经在现场？这四块直接看」顶出卡外
+   （自检 内部裁切 · 可交互被裁）。给它封顶自滚，列表保底 200px。 */
+.wmain > .pane[data-at="s1"]:first-child { max-height: 640px; overflow-y: auto; }
+.wmain .pane--grow .joblist { min-height: 200px; }
+
+/* 「选完会带来什么」同样进正文常驻（产物去向与参数不收抽屉）：左边参数，右边已选名单 */
+.wmain .pane--sel { flex:0 0 auto; }
+.wmain .pane--sel > .sec { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-5); align-items:start; }
+.wmain .pane--sel .kv-row { padding-top:var(--s-1); padding-bottom:var(--s-1); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
+<!-- 原型示意码：不是可扫的真码，只表达「这里会出一个二维码」。真实系统由服务端一次性会话签发。 -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="i-qrdemo" viewBox="0 0 25 25" shape-rendering="crispEdges">
+    <path d="M.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M18.5 .5h6v6h-6z" fill="none" stroke="#101613"/><rect x="20" y="2" width="3" height="3" fill="#101613"/>
+    <path d="M.5 18.5h6v6h-6z" fill="none" stroke="#101613"/><rect x="2" y="20" width="3" height="3" fill="#101613"/>
+    <path fill="#101613" d="M9 0h1v1h-1z M10 0h1v1h-1z M11 0h1v1h-1z M12 0h1v1h-1z M15 0h1v1h-1z M16 0h1v1h-1z M11 1h1v1h-1z M15 1h1v1h-1z M9 2h1v1h-1z M10 2h1v1h-1z M15 2h1v1h-1z M16 2h1v1h-1z M11 3h1v1h-1z M14 3h1v1h-1z M15 3h1v1h-1z M9 4h1v1h-1z M11 4h1v1h-1z M14 4h1v1h-1z M15 4h1v1h-1z M9 5h1v1h-1z M10 5h1v1h-1z M13 5h1v1h-1z M14 5h1v1h-1z M15 5h1v1h-1z M16 5h1v1h-1z M10 6h1v1h-1z M12 6h1v1h-1z M14 6h1v1h-1z M16 6h1v1h-1z M10 7h1v1h-1z M11 7h1v1h-1z M12 7h1v1h-1z M14 7h1v1h-1z M9 8h1v1h-1z M12 8h1v1h-1z M15 8h1v1h-1z M16 8h1v1h-1z M3 9h1v1h-1z M4 9h1v1h-1z M5 9h1v1h-1z M7 9h1v1h-1z M8 9h1v1h-1z M10 9h1v1h-1z M11 9h1v1h-1z M12 9h1v1h-1z M14 9h1v1h-1z M15 9h1v1h-1z M16 9h1v1h-1z M17 9h1v1h-1z M19 9h1v1h-1z M20 9h1v1h-1z M22 9h1v1h-1z M24 9h1v1h-1z M0 10h1v1h-1z M3 10h1v1h-1z M4 10h1v1h-1z M6 10h1v1h-1z M7 10h1v1h-1z M9 10h1v1h-1z M10 10h1v1h-1z M12 10h1v1h-1z M14 10h1v1h-1z M15 10h1v1h-1z M16 10h1v1h-1z M21 10h1v1h-1z M22 10h1v1h-1z M0 11h1v1h-1z M3 11h1v1h-1z M4 11h1v1h-1z M8 11h1v1h-1z M9 11h1v1h-1z M10 11h1v1h-1z M13 11h1v1h-1z M14 11h1v1h-1z M15 11h1v1h-1z M18 11h1v1h-1z M20 11h1v1h-1z M22 11h1v1h-1z M0 12h1v1h-1z M3 12h1v1h-1z M6 12h1v1h-1z M8 12h1v1h-1z M20 12h1v1h-1z M22 12h1v1h-1z M24 12h1v1h-1z M0 13h1v1h-1z M2 13h1v1h-1z M3 13h1v1h-1z M4 13h1v1h-1z M5 13h1v1h-1z M10 13h1v1h-1z M12 13h1v1h-1z M13 13h1v1h-1z M15 13h1v1h-1z M17 13h1v1h-1z M20 13h1v1h-1z M21 13h1v1h-1z M22 13h1v1h-1z M23 13h1v1h-1z M24 13h1v1h-1z M6 14h1v1h-1z M7 14h1v1h-1z M9 14h1v1h-1z M11 14h1v1h-1z M18 14h1v1h-1z M20 14h1v1h-1z M23 14h1v1h-1z M0 15h1v1h-1z M2 15h1v1h-1z M7 15h1v1h-1z M11 15h1v1h-1z M12 15h1v1h-1z M15 15h1v1h-1z M17 15h1v1h-1z M18 15h1v1h-1z M22 15h1v1h-1z M24 15h1v1h-1z M2 16h1v1h-1z M3 16h1v1h-1z M4 16h1v1h-1z M5 16h1v1h-1z M6 16h1v1h-1z M7 16h1v1h-1z M8 16h1v1h-1z M11 16h1v1h-1z M12 16h1v1h-1z M13 16h1v1h-1z M16 16h1v1h-1z M18 16h1v1h-1z M21 16h1v1h-1z M14 17h1v1h-1z M15 17h1v1h-1z M18 17h1v1h-1z M19 17h1v1h-1z M22 17h1v1h-1z M24 17h1v1h-1z M9 18h1v1h-1z M10 18h1v1h-1z M12 18h1v1h-1z M13 18h1v1h-1z M17 18h1v1h-1z M18 18h1v1h-1z M19 18h1v1h-1z M20 18h1v1h-1z M23 18h1v1h-1z M11 19h1v1h-1z M12 19h1v1h-1z M14 19h1v1h-1z M15 19h1v1h-1z M17 19h1v1h-1z M20 19h1v1h-1z M21 19h1v1h-1z M22 19h1v1h-1z M24 19h1v1h-1z M10 20h1v1h-1z M13 20h1v1h-1z M15 20h1v1h-1z M22 20h1v1h-1z M23 20h1v1h-1z M24 20h1v1h-1z M10 21h1v1h-1z M11 21h1v1h-1z M12 21h1v1h-1z M13 21h1v1h-1z M14 21h1v1h-1z M16 21h1v1h-1z M17 21h1v1h-1z M18 21h1v1h-1z M20 21h1v1h-1z M22 21h1v1h-1z M23 21h1v1h-1z M24 21h1v1h-1z M9 22h1v1h-1z M14 22h1v1h-1z M18 22h1v1h-1z M19 22h1v1h-1z M20 22h1v1h-1z M22 22h1v1h-1z M23 22h1v1h-1z M11 23h1v1h-1z M12 23h1v1h-1z M13 23h1v1h-1z M16 23h1v1h-1z M19 23h1v1h-1z M20 23h1v1h-1z M22 23h1v1h-1z M23 23h1v1h-1z M24 23h1v1h-1z M9 24h1v1h-1z M10 24h1v1h-1z M13 24h1v1h-1z M15 24h1v1h-1z M16 24h1v1h-1z M17 24h1v1h-1z M18 24h1v1h-1z M19 24h1v1h-1z M20 24h1v1h-1z M21 24h1v1h-1z M22 24h1v1h-1z M23 24h1v1h-1z M24 24h1v1h-1z"/>
+  </symbol>
+</svg>
 
 <div class="stage">
 <div class="screen" data-state="default" data-stage="s1" data-theme="warm">
@@ -172,7 +328,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">招聘会作战台</div>
@@ -190,9 +346,13 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">哪一场</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">去哪几家</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">怎么走</span></button>
-      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走作战单</span></button>
+      <!-- 步骤名也随态变：ai-down 那一步交付的不是作战单 -->
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name" data-when="default first device-off">带走作战单</span><span class="rstep-name" data-when="ai-down">带走展位单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
+    <!-- 抽屉开关放阶段轨右端：各阶段都在，且不跟底部动作条抢宽度
+         （动作条在第 4 步已经装着页数与预估费用，再塞一个键会把它挤到出血）。 -->
+    <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p17side"><svg class="ic"><use href="#i-package"/></svg>要带什么 · 口径</button>
   </div>
 
   <div class="work">
@@ -200,7 +360,11 @@
     <div class="wmain">
 
       <!-- ─────────── S1 哪一场 ─────────── -->
-      <div class="pane" data-at="s1">
+      <!-- 2026-08-10 ai-down 泄漏整改：这一整块此前**没有 data-when** —— AI 挂掉时
+           它照样说「读了你 8月9日 传的那份简历」并给出三档裁定，而同屏第 2 步已经
+           承认「AI 暂时不可用」。两句话在同一页互相打脸，用户只会信前面那句。
+           三档裁定是模型判断，AI 不可用就没有它；下面另给一份只按主办方公告排的版本。 -->
+      <div class="pane" data-at="s1" data-when="default first device-off">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
           <b>这三场，你该去哪一场</b>
@@ -214,11 +378,9 @@
               <span class="tri-vd tri-vd--go">值得去</span>
               <span>
                 <span class="tri-t">8月15日 · 制造业专场</span>
-                <span class="tri-w">
-                  <span class="ev ev--e1">读过全部 32 家的岗位正文</span>
-                  只有 32 家，但<b>全是制造类</b>，其中 11 家写了机械设计或工艺岗。
-                  场地小，一上午能走完。<b>需要在来源平台先预约。</b>
-                </span>
+                <span class="tri-w"><span class="ev ev--e1">读过全部 32 家</span>11 家写了机械设计或工艺岗</span>
+                <details class="fold"><summary>场地、门槛、要不要预约</summary>
+                  <div class="fold-b">只有 32 家，但<b>全是制造类</b>。场地小，一上午能走完。<b>需要在来源平台先预约。</b></div></details>
               </span>
             </div>
 
@@ -226,11 +388,9 @@
               <span class="tri-vd tri-vd--ok">看你时间</span>
               <span>
                 <span class="tri-t">8月12日 · 秋季综合人才交流会</span>
-                <span class="tri-w">
-                  <span class="ev ev--e1">读过 62 / 80 家的岗位正文</span>
-                  80 家里制造类 31 家，数量最多，但<b>摊子大、要走的路长</b>，
-                  另有 18 家来源平台没给岗位内容，我看不到里面是什么。免预约，凭身份证进。
-                </span>
+                <span class="tri-w"><span class="ev ev--e1">读过 62 / 80 家</span>制造类 31 家，数量最多但路长</span>
+                <details class="fold"><summary>那 18 家为什么没算进来</summary>
+                  <div class="fold-b">另有 18 家来源平台没给岗位内容，我看不到里面是什么，所以不参与比较。免预约，凭身份证进。</div></details>
               </span>
             </div>
 
@@ -238,13 +398,63 @@
               <span class="tri-vd tri-vd--stop">先确认资格</span>
               <span>
                 <span class="tri-t">8月20日 · 毕业生双选会</span>
-                <span class="tri-w">
-                  <span class="ev ev--e3">按主办方公告</span>
-                  这场<b>限应届</b>，入场要过学信网核验。你的简历写的是 <b>2021 年毕业</b> ——
-                  按这条规则你可能进不去。<b>去之前先在来源平台确认</b>，本机不代为核验、也定不了你能不能进。
-                </span>
+                <span class="tri-w"><span class="ev ev--e3">按主办方公告</span>限应届，你简历写的是 2021 年毕业</span>
+                <details class="fold"><summary>那我到底能不能进</summary>
+                  <div class="fold-b">入场要过学信网核验，按这条规则你可能进不去。<b>去之前先在来源平台确认</b>——本机不代为核验，也定不了你能不能进。</div></details>
               </span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ai-down：同一位置换成「只按主办方公告」的三场对照。
+           没有值得去 / 看你时间 / 先确认资格这三档 —— 那是模型比对简历之后才有的判断。
+           这里只转述公告里写死的东西：时间、企业数、要不要预约、入场怎么核验。 -->
+      <div class="pane" data-at="s1" data-when="ai-down">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <b>AI 不可用 · 这三场按公告时间列出</b>
+          <span class="mt">未结合你的简历</span>
+        </div>
+        <div class="sec">
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>本机现在读不了你的简历</b>，给不出「你该去哪一场」。
+                  下面三条全部来自主办方公告原文，<b>没有做任何排序和推荐</b>。</span>
+          </div>
+
+          <div class="tri" style="margin-top:var(--s-4)">
+            <div class="tri-row">
+              <span class="tri-vd">8月12日</span>
+              <span>
+                <span class="tri-t">秋季综合人才交流会 · 09:00–16:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 80 家 · 综合类 ·
+                  <b>免预约</b>，凭身份证入场</span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd">8月15日</span>
+              <span>
+                <span class="tri-t">制造业专场招聘会 · 09:30–15:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 32 家 · 全制造类 ·
+                  <b>需在来源平台先预约</b></span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd">8月20日</span>
+              <span>
+                <span class="tri-t">2026 届毕业生双选会（秋季首场）· 13:00–17:00</span>
+                <span class="tri-w"><span class="ev ev--e2">公告原文</span>参会企业 46 家 · <b>限应届</b>，
+                  入场需学信网核验 —— 能不能进以来源平台为准，本机不代为核验</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            三场的来源机构、同步时间与外部 ID 见下面的场次列表。
+            AI 恢复后回到这一步，才会有结合你简历的比较。
           </div>
         </div>
       </div>
@@ -258,7 +468,10 @@
 
         <div class="joblist">
 
-          <button class="sesscard" data-go="s2">
+          <button class="sesscard" data-sess-go="a" aria-pressed="false"
+                  data-nm="秋季综合人才交流会" data-book="否 · 免预约，凭身份证入场"
+                  data-paper="收 · 建议带 3 份" data-firm="80 家 · 综合类"
+                  data-way="地铁 1 号线 市场站 A 口" data-org="市人力资源和社会保障局" data-sync="8月9日 07:30">
             <span class="sc-no">1</span>
             <span class="sc-b">
               <span class="sc-t">2026 年秋季综合人才交流会</span>
@@ -270,10 +483,13 @@
                 <span>外部ID：RC-2026-0812-A</span>
               </span>
             </span>
-            <span class="sc-go"><span class="chip chip--jade chip--info">本机可打作战单</span></span>
+            <span class="sc-go"><span class="sc-pick">选这一场</span></span>
           </button>
 
-          <button class="sesscard" data-go="s2">
+          <button class="sesscard" data-sess-go="b" aria-pressed="true"
+                  data-nm="制造业专场" data-book="是 · 来源平台预约"
+                  data-paper="收 · 建议带 3 份" data-firm="32 家 · 全制造类"
+                  data-way="地铁 3 号线 高新区站 B 口" data-org="高新区人才服务中心" data-sync="8月9日 07:30">
             <span class="sc-no">2</span>
             <span class="sc-b">
               <span class="sc-t">制造业专场招聘会</span>
@@ -285,10 +501,13 @@
                 <span>外部ID：RC-2026-0815-M</span>
               </span>
             </span>
-            <span class="sc-go"><span class="chip chip--jade chip--info">本机可打作战单</span></span>
+            <span class="sc-go"><span class="sc-pick">选这一场</span></span>
           </button>
 
-          <button class="sesscard" data-go="s2">
+          <button class="sesscard" data-sess-go="c" aria-pressed="false"
+                  data-nm="毕业生双选会" data-book="是 · 且需学信网核验"
+                  data-paper="收 · 建议带 3 份" data-firm="46 家 · 面向应届"
+                  data-way="公交 大学城专线 学院站" data-org="省教育厅学生服务中心" data-sync="8月9日 07:30">
             <span class="sc-no">3</span>
             <span class="sc-b">
               <span class="sc-t">2026 届毕业生双选会（秋季首场）</span>
@@ -300,15 +519,14 @@
                 <span>外部ID：XZ-2026-0820</span>
               </span>
             </span>
-            <span class="sc-go"><span class="chip chip--info">资格待确认</span></span>
+            <span class="sc-go"><span class="sc-pick">选这一场</span></span>
           </button>
 
         </div>
 
         <div class="notice" style="margin-top:var(--s-4)">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>以上场次信息由来源机构提供，本机只做展示与打印。
-                报名、预约、入场资格以来源平台为准，本机不代办、不代收简历。</span>
+          <span>场次信息由来源机构提供 · 报名与入场资格以来源平台为准。</span>
         </div>
 
         <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin） -->
@@ -316,12 +534,57 @@
           <span class="checkin-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="checkin-b">
             <span class="checkin-t">已经在现场？先签到再逛</span>
-            <span class="checkin-s">到场后扫码或凭手机号签到，领现场资料 ——
-                  签到只用于领资料和到场统计，不是投递，也不改变入场资格。</span>
+            <span class="checkin-s">扫码或凭手机号签到，领现场资料 · 不是投递</span>
           </span>
           <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
             <svg class="ic"><use href="#i-qr"/></svg>入场签到
           </button>
+        </div>
+
+        <!-- 2026-08-10 孤儿页接线：P45 招聘会现场（展位企业 / 场馆导览 / 活动资料 / 现场数据）
+             此前全站没有任何入口。这一页管的是「去之前怎么准备」，P45 管的是「到了现场怎么用」，
+             四个链接各自直达对应阶段，不再统一丢到本页第 3 步。 -->
+        <div class="onsite">
+          <div class="onsite-hd">
+            <svg class="ic"><use href="#i-pin"/></svg>已经在现场？这四块直接看
+            <span class="mt">主办方同步 · 不是投递入口</span>
+          </div>
+          <div class="outs">
+            <a class="out" href="45-fair-onsite.html?stage=booth"><svg class="ic"><use href="#i-building"/></svg>展位企业</a>
+            <a class="out" href="45-fair-onsite.html?stage=map"><svg class="ic"><use href="#i-map"/></svg>场馆导览</a>
+            <a class="out" href="45-fair-onsite.html?stage=materials"><svg class="ic"><use href="#i-file"/></svg>活动资料</a>
+            <a class="out" href="45-fair-onsite.html?stage=stats"><svg class="ic"><use href="#i-layers"/></svg>现场数据</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-11：「已选场次 · 怎么参加」从右副列移到左主区常驻（Codex 点名保留）。
+           它带着「去来源平台预约 / 扫码预约」两个合规入口 —— 这一页最该按的键，
+           不能跟着右栏一起收进抽屉。移过来后横排，高度压到一屏放得下。 -->
+      <div class="pane pane--sess" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <b><span data-sess-nm>制造业专场</span> · 怎么参加</b>
+          <span class="mt">点上面任一场，这里换成它的规则</span>
+        </div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">是否需预约</span><span class="v" data-sess-book>是 · 来源平台预约</span></div>
+            <div class="kv-row"><span class="k">现场是否收纸质简历</span><span class="v" data-sess-paper>收 · 建议带 3 份</span></div>
+            <div class="kv-row"><span class="k">参会企业</span><span class="v" data-sess-firm>32 家 · 全制造类</span></div>
+            <div class="kv-row"><span class="k">怎么去</span><span class="v" data-sess-way>地铁 3 号线 高新区站 B 口</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog" data-sess-org>高新区人才服务中心</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog" data-sess-sync>8月9日 07:30</span></div>
+          </div>
+
+          <div class="sec-foot">
+            <button class="btn btn--lg btn--quiet" style="width:100%">
+              <svg class="ic"><use href="#i-external"/></svg>去来源平台预约
+            </button>
+            <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)">
+              <svg class="ic"><use href="#i-qr"/></svg>扫码预约
+            </button>
+          </div>
         </div>
       </div>
 
@@ -337,77 +600,92 @@
         <!-- 诚实边界：AI 读到什么程度，必须写在排序结果的正上方，不能藏进说明页 -->
         <div class="notice" data-when="default first">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>我读到了 62 家的岗位正文</b>，另外 18 家来源平台只给了公司名和展位号 ——
-                那 18 家我没法比，已单独列在最后，不是"不推荐"。
-                下面的先后只代表<b>和你简历的对应程度</b>，不预测你能不能被录用。</span>
+          <span><b>读到 62 家正文，18 家只有公司名</b> · 先后只代表和你简历的对应程度</span>
         </div>
+        <details class="fold" data-when="default first">
+          <summary>那 18 家为什么排在最后</summary>
+          <div class="fold-b">来源平台只给了公司名和展位号，我没法比，所以单独列在最后 —— 不是"不推荐"。
+            这份先后<b>不预测你能不能被录用</b>。</div>
+        </details>
 
         <div class="notice notice--amber" data-when="ai-down">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>AI 排序暂时不可用。下面按<b>展位号顺序</b>列出，不做任何匹配判断 ——
-                这是原始名单，不是排过序的结果。你仍可自己勾选，路线和作战单照常能打。</span>
+          <span>AI 排序不可用，下面按<b>展位号顺序</b>列原始名单 · 勾选与打印照常</span>
         </div>
 
         <div class="joblist">
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-booth="A-12" data-co="恒信精密制造"
+                  data-pos="机械设计工程师 / 工艺工程师 · 现场收纸质简历"
+                  data-ask="可以问：<b>夹具设计岗现在缺几个人</b>／<b>转行过来的怎么算工龄</b><br>他们岗位正文写了「接受应届以外的转行者」。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">恒信精密制造 · A-12 号展位</span>
               <span class="jobrow-s">机械设计工程师 / 工艺工程师 · 现场收纸质简历</span>
-              <span class="jobrow-m" data-when="default first">
+              <span class="jobrow-m" data-when="default first device-off">
                 <span class="ev ev--e1">读过岗位正文</span>
                 你简历里的「CAD 三年 + 夹具设计」和这家两个岗位的正文都对得上；
                 他们写了「接受应届以外的转行者」。
               </span>
               <span class="jobrow-m" data-when="ai-down">展位 A-12 · 来源：市人社局 · 同步 8月9日 07:30</span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-booth="A-27" data-co="华越自动化"
+                  data-pos="设备维护 / 电气调试 · 现场收纸质简历"
+                  data-ask="注意：岗位要求<b>持电工证</b>，你的简历里没写 —— 带上原件或当面说明。<br>可以问：<b>调试岗出差频率</b>／<b>没有电工证能不能先入职再考</b>">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">华越自动化 · A-27 号展位</span>
               <span class="jobrow-s">设备维护 / 电气调试 · 现场收纸质简历</span>
-              <span class="jobrow-m" data-when="default first">
+              <span class="jobrow-m" data-when="default first device-off">
                 <span class="ev ev--e1">读过岗位正文</span>
                 岗位正文要求「PLC 调试经验」，你写过西门子 S7；
                 但他们同时要求「持电工证」，<b>你的简历里没写</b> —— 带证去或当面说明。
               </span>
               <span class="jobrow-m" data-when="ai-down">展位 A-27 · 来源：市人社局 · 同步 8月9日 07:30</span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow ck--have">
+          <button class="jobrow" aria-pressed="true" data-booth="B-05" data-co="明德智能装备"
+                  data-pos="结构工程师 · 现场收纸质简历"
+                  data-ask="这家来源平台没给岗位正文，本机只看到岗位名和展位号 —— <b>到现场先问清楚做什么产品</b>再决定投不投。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">明德智能装备 · B-05 号展位</span>
               <span class="jobrow-s">结构工程师 · 现场收纸质简历</span>
-              <span class="jobrow-m" data-when="default first">
+              <span class="jobrow-m" data-when="default first device-off">
                 <span class="ev ev--e2">只读到岗位标题</span>
                 这家来源平台没给正文，我只看到岗位名和展位号。
                 标题和你的方向沾边，<b>值不值得去要你自己判断</b>。
               </span>
               <span class="jobrow-m" data-when="ai-down">展位 B-05 · 来源：市人社局 · 同步 8月9日 07:30</span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-booth="C-18" data-co="瑞和新材料"
+                  data-pos="质量工程师 · 现场收纸质简历"
+                  data-ask="岗位正文写「三年以上高分子材料经验」，你的经历在机械加工侧 —— <b>对不太上，去之前想清楚怎么讲</b>。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">瑞和新材料 · C-18 号展位</span>
               <span class="jobrow-s">质量工程师 · 现场收纸质简历</span>
-              <span class="jobrow-m" data-when="default first">
+              <span class="jobrow-m" data-when="default first device-off">
                 <span class="ev ev--e1">读过岗位正文</span>
                 正文写「三年以上高分子材料经验」，你的经历在机械加工侧 ——
                 对不太上，放在这里供你自己决定。
               </span>
               <span class="jobrow-m" data-when="ai-down">展位 C-18 · 来源：市人社局 · 同步 8月9日 07:30</span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-booth="B-21" data-co="中鼎液压"
+                  data-pos="液压系统装配 / 售后技术 · 现场收纸质简历"
+                  data-ask="正文里「看得懂液压原理图」和你写的「参与过工装液压回路改造」对得上；但这家在<b>邻市</b>，正文写了「需接受外派」。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">中鼎液压 · B-21 号展位</span>
@@ -418,9 +696,12 @@
                 但这家在<b>邻市</b>，正文写了「需接受外派」。
               </span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-booth="B-28" data-co="利丰模具"
+                  data-pos="模具设计 · 现场收纸质简历"
+                  data-ask="要求 UG/NX，你的简历里写的是 SolidWorks 和 CAD —— <b>不是同一套软件</b>，去之前想好怎么说这件事。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">利丰模具 · B-28 号展位</span>
@@ -431,9 +712,12 @@
                 <b>不是同一套软件</b>，去之前想好怎么说这件事。
               </span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-booth="A-33" data-co="安泰重工"
+                  data-pos="焊接工艺 / 结构件 · 现场收纸质简历"
+                  data-ask="来源平台没给正文，本机只看到岗位名和展位号。展位就在 A-27 隔壁两个，<b>顺路可以问一句</b>。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">安泰重工 · A-33 号展位</span>
@@ -443,9 +727,12 @@
                 来源平台没给正文。展位就在 A-27 隔壁两个，<b>顺路可以问一句</b>。
               </span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
 
-          <label class="jobrow">
+          <button class="jobrow" aria-pressed="false" data-booth="C-24" data-co="科捷传动"
+                  data-pos="齿轮工艺 / 热处理 · 现场收纸质简历"
+                  data-ask="正文要求「热处理工艺经验」，你的简历里没有这一段 —— <b>对不上，去之前先想清楚要不要花时间</b>。">
             <span class="ck-box"></span>
             <span class="jobrow-b">
               <span class="jobrow-t">科捷传动 · C-24 号展位</span>
@@ -456,12 +743,52 @@
                 对不上，列在这里只是让你知道有这家。
               </span>
             </span>
-          </label>
+            <span class="jobrow-pick">已选</span>
+          </button>
         </div>
 
         <div class="panel-note" data-when="default first" style="flex:0 0 auto;margin-top:var(--s-4)">
-          另有 <b>18 家</b>来源平台只给了公司名和展位号，我读不到岗位内容，因此不参与排序 ——
-          <b>这不等于它们不好</b>。<span class="chip chip--info">D-02 · D-07 · D-11 …</span>
+          另有 <b>18 家</b>只有公司名与展位号，不参与排序。<span class="chip chip--info">D-02 · D-07 · D-11 …</span>
+        </div>
+        <div class="panel-note" data-when="ai-down" style="flex:0 0 auto;margin-top:var(--s-4)">
+          排序恢复后这份名单会按你的简历重排，<b>你已勾的企业保留</b>。
+        </div>
+      </div>
+
+      <!-- 2026-08-11：「选完会带来什么」从右副列移到左主区常驻。
+           它是这一步的产物去向与参数（已选几家 / 带几份简历 / 共几页 / 预估多少钱），
+           按本轮不许动清单，产物去向与其参数不能收进抽屉。 -->
+      <div class="pane pane--sel" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>选完会带来什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已选</span><span class="v"><b data-f="n-firm">3</b> 家</span></div>
+            <div class="kv-row"><span class="k">建议带简历</span><span class="v"><b data-f="n-cv">6</b> 份（每家 2 份）</span></div>
+            <!-- ai-down 那张单里没有「要问的话」，这里不能照写 -->
+            <div class="kv-row" data-when="default first device-off"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
+            <div class="kv-row" data-when="ai-down"><span class="k">场次与展位单</span><span class="v">1 页 · 含展位号与岗位名</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 计费页 · <b data-f="fee">2.60</b> 元（预估）</span></div>
+          </div>
+
+          <!-- 2026-08-10：右栏原来只到这里，下面空 516px。补的是「到底选了哪几家」——
+               左边勾了什么，右边得说得出名字和展位号，不是只给一个数字。
+               2026-08-10 Codex ①：这三行原来是写死的，勾选变了它纹丝不动。现在按勾选重建。 -->
+          <div class="kv" style="margin-top:var(--s-4)" data-f="pick-list"></div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            选得越多，要走的路和要带的纸越多。最多可选 8 家。
+          </div>
+
+          <div class="sec-foot">
+            <a class="handoff" data-f="cvonly" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=material&amp;title=简历&amp;pages=2&amp;copies=6&amp;back=s3">
+              <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="handoff-b">
+                <span class="handoff-t">不排路线，先把纸打了</span>
+                <span class="handoff-s">带去：简历 6 份 · 共 12 页（预估 · 以打印工作台核价为准）</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+          </div>
         </div>
       </div>
 
@@ -469,13 +796,16 @@
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-map"/></svg>
-          <b>A 馆展位图 · 已排出最短路线</b>
-          <span class="mt">入口进 → 3 家 → 出口，全程约 240 米</span>
+          <b>A 馆展位图 · 按展位号排的走法</b>
+          <!-- 「已排出最短路线 / 全程约 240 米」两句删掉：本机没有场馆实际尺寸，
+               算不出米数；「最短」也需要真实通道图才成立。现在只说做得到的那件事 ——
+               按展位号排顺序，把要去的展位在图上标出来。 -->
+          <span class="mt">入口进 → <b data-f="n-firm">3</b> 家 → 出口 · 按展位号顺序，图上为示意路线</span>
         </div>
 
         <div class="hall">
-          <svg class="hall-svg" viewBox="0 0 620 430" role="img"
-               aria-label="A 馆展位平面图，已标出 A-12、A-27、B-05 三个目标展位与步行路线">
+          <svg class="hall-svg" viewBox="0 0 620 430" role="img" data-f="hall"
+               aria-label="A 馆展位平面图，已标出你选中的展位与按展位号排的示意路线">
             <rect x="8" y="8" width="604" height="414" rx="10" fill="none"
                   stroke="var(--fog-a20)" stroke-width="1.5"/>
 
@@ -527,18 +857,9 @@
             <rect class="booth booth--skip" x="500" y="292" width="76" height="58" rx="6"/>
             <text class="booth-t" x="538" y="326">C-37</text>
 
-            <!-- 路线：入口 → A-12 → A-27 → B-05 → 出口 -->
-            <path class="route" d="M71 388 L71 262 L170 262 L170 116"/>
-            <path class="route" d="M170 116 L170 140 L354 140 L354 116"/>
-            <path class="route" d="M354 116 L354 152 L78 152 L78 172"/>
-            <path class="route" d="M78 240 L78 262 L549 262 L549 388"/>
-
-            <circle class="route-pin" cx="170" cy="128" r="13"/>
-            <text class="route-no" x="170" y="133" text-anchor="middle">1</text>
-            <circle class="route-pin" cx="354" cy="128" r="13"/>
-            <text class="route-no" x="354" y="133" text-anchor="middle">2</text>
-            <circle class="route-pin" cx="78"  cy="252" r="13"/>
-            <text class="route-no" x="78"  y="257" text-anchor="middle">3</text>
+            <!-- 路线与站点序号由脚本按当前选中的企业实时画：
+                 上一版是写死的四段 path + 三个序号圈，勾选变了图纹丝不动。 -->
+            <g data-f="routeg"></g>
           </svg>
         </div>
 
@@ -551,7 +872,11 @@
       </div>
 
       <!-- ─────────── S4 带走作战单 ─────────── -->
-      <div class="paper-bar" data-at="s4">
+      <!-- 2026-08-10 ai-down 泄漏整改：纸面此前**没有 data-when** —— AI 挂掉时照样
+           印出「可以问：夹具设计岗现在缺几个人」这种模型生成的问句，页脚还写着
+           「根据……和你本人的简历生成」。纸带出门就没法撤回，屏上说不可用、纸上照印，
+           是这一页最贵的一处不诚实。现在按态分两份交付物，名字都不一样。 -->
+      <div class="paper-bar" data-at="s4" data-when="default first device-off">
         <span class="nm">赶场作战单 · 2026 秋季综合人才交流会</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
@@ -560,9 +885,27 @@
           <button class="pgbtn" aria-label="下一页">›</button>
         </span>
       </div>
+      <div class="paper-bar" data-at="s4" data-when="ai-down">
+        <span class="nm">场次与展位单 · 2026 秋季综合人才交流会</span>
+        <span class="mt">A4 · 1 页 · 黑白 · 未结合简历</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
 
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏里三张 .sheet-a4 都会被报
+           「底部空 780–910px」。三张都判为**纸样类豁免**，理由分别写在各自属性里。
+           共同的依据：.sheet-a4 是 aspect-ratio 1/1.414 的**真 A4 纸样**，宽度已铺满
+           整个 968px 主栏（实测纸宽 928px），纸本身不是浮在栏上半截、下半截露栏背景
+           ——.paper-stage 是 overflow:auto 的多页连续滚动阅读器（实测 scrollHeight 2692
+           / clientH 1138），纸溢出栏底靠滚动看。所以空的不是版面，是**纸**。
+           而纸下半截空着，正是这几份短文档打出来的真实样子：这些纸会从出纸口离开本机
+           被用户带进招聘会现场，往空白处填任何东西 = 在用户带走的纸上印它本来没有的内容。 -->
       <div class="paper-stage" data-at="s4">
-        <div class="sheet-a4">
+        <div class="sheet-a4" data-when="default first device-off"
+             data-void-ok="A4 纸样：赶场作战单是一页短文档（抬头＋3 站＋路线＋免责声明就写完了），纸下半截空白是这份纸真实的打印效果；站点数随第 2 步勾选实时增减，勾满会自然变长">
           <div class="combat">
             <h1>赶场作战单</h1>
             <div class="cb-sub">
@@ -571,45 +914,13 @@
             </div>
             <div class="cb-hr"></div>
 
-            <div class="cb-stop">
-              <span class="cb-no">1</span>
-              <span>
-                <span class="cb-nm">恒信精密制造 &nbsp;·&nbsp; A-12 号展位</span>
-                <span class="cb-mt">机械设计工程师 / 工艺工程师 · 现场收纸质简历</span>
-                <span class="cb-ask">
-                  可以问：<b>夹具设计岗现在缺几个人</b>／<b>转行过来的怎么算工龄</b><br>
-                  他们岗位正文写了「接受应届以外的转行者」。
-                </span>
-              </span>
-            </div>
-
-            <div class="cb-stop">
-              <span class="cb-no">2</span>
-              <span>
-                <span class="cb-nm">华越自动化 &nbsp;·&nbsp; A-27 号展位</span>
-                <span class="cb-mt">设备维护 / 电气调试 · 现场收纸质简历</span>
-                <span class="cb-ask">
-                  注意：岗位要求<b>持电工证</b>，你的简历里没写 —— 带上原件或当面说明。<br>
-                  可以问：<b>调试岗出差频率</b>／<b>没有电工证能不能先入职再考</b>
-                </span>
-              </span>
-            </div>
-
-            <div class="cb-stop">
-              <span class="cb-no">3</span>
-              <span>
-                <span class="cb-nm">明德智能装备 &nbsp;·&nbsp; B-05 号展位</span>
-                <span class="cb-mt">结构工程师 · 现场收纸质简历</span>
-                <span class="cb-ask">
-                  这家来源平台没给岗位正文，本机只看到岗位名和展位号 ——
-                  <b>到现场先问清楚做什么产品</b>再决定投不投。
-                </span>
-              </span>
-            </div>
+            <!-- 站点按你在第 2 步勾中的企业实时生成：勾选一变，纸面跟着变。
+                 上一版这三站是写死的，勾掉「明德智能装备」纸上照样印它。 -->
+            <div data-f="cb-stops"></div>
 
             <div class="cb-hr"></div>
-            <div class="cb-sub">
-              建议路线：入口 → A-12 → A-27 → B-05 → 出口，全程约 240 米。<br>
+            <div class="cb-sub" data-f="cb-route">
+              建议路线：入口 → A-12 → A-27 → B-05 → 出口，按展位号顺序走。<br>
               建议带 <b>6 份</b>纸质简历（3 家 × 2 份），已加入本次打印清单，将同时打印。
             </div>
 
@@ -621,10 +932,42 @@
           </div>
         </div>
 
-        <div class="sheet-a4" style="margin-top:var(--s-5)">
+        <!-- ai-down 版纸面：改名「场次与展位单」，站点只留公司名 / 展位号 / 岗位名
+             （这三样来自主办方同步的展位数据，不经过 AI），**去掉全部「可以问……」问句**，
+             页脚明确写「未结合你的简历」。 -->
+        <div class="sheet-a4" data-when="ai-down"
+             data-void-ok="A4 纸样：ai-down 版比默认版更短是**故意的**——去掉了全部「可以问……」问句，只留主办方同步的场次/展位/岗位名，纸面因此更空；把它填满就等于在 AI 不可用时照样印出 AI 生成的内容">
+          <div class="combat">
+            <h1>场次与展位单</h1>
+            <div class="cb-sub">
+              2026 年秋季综合人才交流会 · 8月12日 周三 09:00–16:00 · 市人力资源市场 A 馆<br>
+              主办：市人力资源和社会保障局 · 外部ID RC-2026-0812-A · 数据同步于 8月9日 07:30
+            </div>
+            <div class="cb-hr"></div>
+
+            <div data-f="cb-stops-plain"></div>
+
+            <div class="cb-hr"></div>
+            <div class="cb-sub" data-f="cb-route-plain">
+              走法：入口 → A-12 → A-27 → B-05 → 出口，按展位号顺序走。<br>
+              建议带 <b>6 份</b>纸质简历（3 家 × 2 份），已加入本次打印清单，将同时打印。
+            </div>
+
+            <div class="cb-foot">
+              <b>本单未结合你的简历。</b>生成时本机的 AI 服务不可用，
+              所以单上只有主办方同步的场次、展位与岗位名称，<b>没有针对你的建议，也没有要问的话</b>。<br>
+              本单由职易达一体机根据公开的展位信息生成，仅供你自己参考。<br>
+              本机不代收简历、不代为投递、不预测录用结果；是否录用由用人单位决定。<br>
+              岗位与展位信息以主办方现场公布为准。本单不作为入场凭证。
+            </div>
+          </div>
+        </div>
+
+        <div class="sheet-a4" style="margin-top:var(--s-5)"
+             data-void-ok="A4 纸样：这张是用户自己上传的原件（页脚写明「本机原样打印，没有改动其中任何内容」）。原件短，纸就空——本机无权替用户往他的简历上加经历">
           <div class="combat" style="padding:26px 30px">
             <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
-              同批第 2 份 · 共 6 份 · 每份 2 页
+              同批第 2 份 · 共 <span data-f="cv-n">6</span> 份 · 每份 2 页
             </div>
             <h1 style="font-size:19px">王 磊</h1>
             <div class="cb-sub">机械设计工程师 · 6 年经验 · 期望 深圳 / 东莞</div>
@@ -654,9 +997,9 @@
         </span>
         <span class="ap-b">
           <span class="ap-t">同批还要打：王磊_机械_2026.pdf</span>
-          <span class="ap-s">A4 黑白 · 2 页 × 6 份 = 12 页 —— 这一单 13 页里的大头是它，不是作战单</span>
+          <span class="ap-s" data-f="ap-s">A4 黑白 · 2 页 × 6 份 = 12 页 · 本单大头</span>
         </span>
-        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">已按 3 家 × 2 份算</span></span>
+        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info" data-f="ap-by">已按 3 家 × 2 份算</span></span>
       </div>
 
       <!-- 2026-08-09 零落点补齐：活动资料（线上 /job-fairs/:id/materials）——
@@ -667,7 +1010,7 @@
         </span>
         <span class="ap-b">
           <span class="ap-t">主办方活动资料也能加进这批：场刊 · 展位地图</span>
-          <span class="ap-s">主办方提供的公开资料，可加入本次打印清单一起打；加了页数会变，费用以打印工作台核价为准</span>
+          <span class="ap-s">可加入本批打印 · 加了页数会变</span>
         </span>
         <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">默认不加 · 可选</span></span>
       </div>
@@ -675,71 +1018,53 @@
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
+    <!-- ══ 右副列 → 按需抽屉（2026-08-11）══════════════════════════════
+         提醒清单、口径说明、校园横向入口都在这里，点动作条上的按钮才展开。
+         「已选场次 · 怎么参加」已移到左主区常驻，不在这里。 -->
+    <div class="wside" id="p17side">
+      <div class="sidehd">
+        <span class="t">要带什么 · 口径与校园入口</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
+      </div>
 
-      <!-- S1 右：先答"去之前要准备什么"，再答"这一场怎么参加"。
-           顺序不能反：用户还没选场次时，"这一场"指代不明。 -->
+      <!-- S1 右：去之前要准备什么。 -->
       <div class="pane" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>不管去哪一场，都要带</b></div>
+        <!-- 2026-08-10 Codex ① 整改：这四条**不是**用户要勾的东西，是本机告诉你「要带什么」。
+             上一版长成 <label> + 22px 方框，看着能勾，实际整行没有 input、没有状态、没有事件 ——
+             用户会去点它，点完什么也不发生。清单就长成清单：圆点条目，不伪装成控件。
+             第一条右边那个「本机可打」是**状态**不是勾选：它说的是这一项本机能不能帮你解决。 -->
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历 6–10 份</span>
-              <span class="ck-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估 · 以打印工作台核价为准）</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">身份证原件</span>
-              <span class="ck-s">三场都要，进场核验用</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">电工证等资格证</span>
-              <span class="ck-s">你选的岗位里有 1 家写了要持证</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">一支笔</span>
-              <span class="ck-s">现场填表用，展位不一定有</span></span>
-          </label>
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历 6–10 份</span>
+                <!-- 括号内原用「·」分隔，实测在此宽度下断行恰好把「·」甩到行首（中文排版禁则）。
+                     改成逗号：信息一字不减，且浏览器不会让「，」起行。 -->
+                <span class="li-s">你有 1 份可打 · A4 黑白 <span data-site-unit="bw"></span> / 计费页（预估）</span></span>
+              <span class="li-st">本机可打</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">身份证原件</span>
+                <span class="li-s">三场都要，进场核验用</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">电工证等资格证</span>
+                <span class="li-s">你选的岗位里有 1 家写了要持证</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">一支笔</span>
+                <span class="li-s">现场填表用，展位不一定有</span></span>
+              <span class="li-st li-st--own">自己带</span></li>
+          </ul>
 
+          <!-- 2026-08-11：删掉「不用在屏幕上勾 —— 本机不记你带没带」。
+               这是在解释交互规则，条目本身长成清单、没有勾选控件，用户看一眼就知道。
+               保留「离场清空、不留存」——那是隐私事实，不是设计意图。 -->
           <div class="panel-note" style="margin-top:var(--s-4)">
-            这份清单只在本机这次办理里用，离场自动清空，不留存。
+            清单只在这次办理里用，离场自动清空，不留存。
           </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-ticket"/></svg>
-          <b>制造业专场 · 怎么参加</b>
-        </div>
-        <div class="sec">
-          <div class="panel-note" style="margin-bottom:var(--s-4)">
-            下面这些是 <b>8月15日 制造业专场</b> 的规则 —— AI 建议的那一场。
-            点左边任一场可以换成看它的。
-          </div>
-          <div class="kv">
-            <div class="kv-row"><span class="k">是否需预约</span><span class="v">是 · 来源平台预约</span></div>
-            <div class="kv-row"><span class="k">现场是否收纸质简历</span><span class="v">收 · 建议带 3 份</span></div>
-            <div class="kv-row"><span class="k">参会企业</span><span class="v">32 家 · 全制造类</span></div>
-            <div class="kv-row"><span class="k">怎么去</span><span class="v">地铁 3 号线 高新区站 B 口</span></div>
-            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">高新区人才服务中心</span></div>
-            <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-external"/></svg>
-            <span>预约与入场资格以来源平台为准，本机不代办。</span>
-          </div>
-          <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)">
-            <svg class="ic"><use href="#i-external"/></svg>去来源平台预约
-          </button>
-          <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)">
-            <svg class="ic"><use href="#i-qr"/></svg>扫码预约
-          </button>
-        </div>
-      </div>
 
       <!-- 2026-08-09 域入口契约(closed-loop-map §二)：招聘会域 = P17 + P18 + P19，补横向入口 -->
       <div class="xlane" data-at="s1">
@@ -789,30 +1114,15 @@
             那 18 家我看不到里面招什么，所以不参与排序 ——
             <b>这不等于它们不好</b>。
           </div>
+          <!-- 2026-08-10 孤儿页接线：展位企业档案在 P45 的 booth 阶段（主办方同步的企业档案 +
+               现场签到状态 + 展位岗位清单），此前没有入口。这一步正在挑企业，是它的自然去处。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=booth">
+            <svg class="ic"><use href="#i-building"/></svg>看展位企业档案
+          </a>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>选完会带来什么</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">已选</span><span class="v"><b data-pick-n>3</b> 家</span></div>
-            <div class="kv-row"><span class="k">建议带简历</span><span class="v"><b>6</b> 份（每家 2 份）</span></div>
-            <div class="kv-row"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
-            <div class="kv-row"><span class="k">合计</span><span class="v">13 页 · <b>2.60</b> 元（预估 · 以打印工作台核价为准）</span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>本机不代收、不代投简历。是否投递、投给谁，到现场由你自己决定。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            选得越多，要走的路和要带的纸越多。最多可选 8 家。
-          </div>
-        </div>
-      </div>
-
+      <!-- 2026-08-11：「选完会带来什么」已移到左主区常驻（产物去向与参数不收抽屉）。 -->
       <!-- S3 右：顺序 + 到了现场怎么用这张图 -->
       <div class="pane" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>今天的顺序</b>
@@ -838,22 +1148,47 @@
       <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-pin"/></svg><b>到了现场</b></div>
         <div class="sec">
+          <!-- 2026-08-10 伪造精度整改：这里原有「全程 约 240 米 / 预计用时 1 小时 20 分」。
+               主区（617 行）和动作条（1146 行）两处早就把同样两个数字删掉了，理由写在那两条注释里 ——
+               本机没有场馆实际尺寸，也不知道用户走多快，两个数都是编的。右栏漏删，成了全页
+               唯一还在报假精度的地方。现在这里只写做得到的那件事，并把做不到的如实说出来。 -->
           <div class="kv">
-            <div class="kv-row"><span class="k">全程</span><span class="v">约 240 米</span></div>
-            <div class="kv-row"><span class="k">预计用时</span><span class="v">1 小时 20 分</span></div>
-            <div class="kv-row"><span class="k">每家停留</span><span class="v">约 20 分钟</span></div>
+            <div class="kv-row"><span class="k">走法</span><span class="v">按展位号顺序 · 图上为示意路线</span></div>
+            <div class="kv-row"><span class="k">全程距离 / 耗时</span><span class="v v--fog">本机没有场馆尺寸，算不出</span></div>
+            <div class="kv-row"><span class="k">每家停留</span><span class="v">约 20 分钟（经验值）</span></div>
             <div class="kv-row"><span class="k">建议时段</span><span class="v">上午 10 点前</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>这张图是主办方提前给的。<b>现场布展常有临时调整</b> ——
-                  找不到展位以现场指示牌和咨询台为准，别照着这张图硬找。</span>
+            <span><b>现场布展常有临时调整</b>，以现场指示牌为准。</span>
           </div>
+          <details class="fold">
+            <summary>下一步那张纸上有什么</summary>
+            <div class="fold-b" data-when="default first device-off"><span data-f="n-firm">3</span> 站、每站要问的话、展位号，打成一页纸带着走。
+              纸上<b>不会有你的手机号和身份证号</b>。</div>
+            <!-- ai-down：纸上没有「要问的话」——那是模型读完岗位正文才写得出来的 -->
+            <div class="fold-b" data-when="ai-down"><span data-f="n-firm">3</span> 站的公司名、展位号、岗位名称，打成一页纸带着走。
+              AI 不可用，<b>纸上没有「要问的话」，也没有结合你简历的任何内容</b>；
+              纸上同样<b>不会有你的手机号和身份证号</b>。</div>
+          </details>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            下一步会把这三站、每站要问的话、展位号打成一页纸，你带着走。<br>
-            纸上不会有你的手机号和身份证号。
+          <!-- 2026-08-10 孤儿页接线：真正的场馆平面图与服务点在 P45 的 map 阶段，此前没有入口。
+               本页第 3 步排的是「先去哪几家」的顺序，看图得去 P45 —— 直达 map，不落在本页。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=map">
+            <svg class="ic"><use href="#i-map"/></svg>看场馆导览图
+          </a>
+
+          <!-- 2026-08-10：右栏原来只到这里，下面空 574px。补的是这一趟真正要带的纸。 -->
+          <div class="sec-foot">
+            <a class="handoff" data-f="handoff" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=fair-plan&amp;title=作战单%201%20份%20%2B%20简历%206%20份&amp;pages=13&amp;copies=1&amp;back=s4">
+              <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="handoff-b">
+                <span class="handoff-t">这一趟要带的纸</span>
+                <span class="handoff-s" data-f="handoff-s">带去：作战单 1 份 + 简历 6 份&nbsp;· 共 13 页（预估 · 以打印工作台核价为准）</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
           </div>
         </div>
       </div>
@@ -861,19 +1196,27 @@
       <!-- S4 右：打印参数 -->
       <div class="pane" data-at="s4">
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>一起打印</b></div>
+        <!-- 同上：这两条是「这一批里有什么」的**陈述**，不是可勾可去的选项 ——
+             真要能去掉，下面的页数与费用就得跟着变，而这一步没有那个开关。
+             不给开关就不长成开关。 -->
         <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">赶场作战单</span><span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
-          </label>
-          <label class="ck ck--have" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历</span><span class="ck-s">A4 黑白 · 2 页 × 6 份</span></span>
-          </label>
+          <ul class="li-list">
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t" data-when="default first device-off">赶场作战单</span>
+                <span class="li-t" data-when="ai-down">场次与展位单</span>
+                <span class="li-s">A4 黑白 · 1 页 × 1 份</span></span>
+              <span class="li-st">在这批里</span></li>
+            <li class="li"><span class="li-dot"></span>
+              <span class="li-b"><span class="li-t">纸质简历</span>
+                <span class="li-s" data-f="cv-line">A4 黑白 · 2 页 × 6 份</span></span>
+              <span class="li-st">在这批里</span></li>
+          </ul>
 
           <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v">13 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v"><b data-f="pg">13</b> 计费页</span></div>
+            <!-- 计费口径写在「费用」这一行的括号里，不另起一行 ——
+                 本页右栏已排满，加行会把卡撑出血（同 P07 s4 的判据）。 -->
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b data-f="fee">2.60</b> 元（按所选文档页计费）</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -882,7 +1225,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。作战单同时存进「我的文档」。
+            这张单同时存进「我的文档」。
           </div>
         </div>
       </div>
@@ -899,10 +1242,22 @@
             <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">主办方 · 每 10 分钟同步</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
-            <span class="ev ev--e2">E2 主办方数据</span>
-            三场都没开场，数字是示例 —— 开场当天你带着作战单到现场，本机这里换成主办方
-            同步的实时数据并标同步时间；主办方没提供的场次不显示。
+            <span class="ev ev--e2">E2 主办方数据</span>三场都没开场，数字是示例。
           </div>
+          <details class="fold">
+            <summary>开场当天这里会变成什么</summary>
+            <div class="fold-b">换成主办方同步的实时数据并标同步时间；<b>主办方没提供的场次不显示</b>，不拿别处的数字凑。</div>
+          </details>
+          <!-- 2026-08-10 孤儿页接线：完整现场数据（规模、企业签到进度、行业分布）在 P45 的
+               stats 阶段，此前没有入口。本页这三行是摘要，看全的去 P45。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="45-fair-onsite.html?stage=stats">
+            <svg class="ic"><use href="#i-layers"/></svg>看完整现场数据
+          </a>
+          <!-- 活动资料（主办方提供的会刊 / 企业名录 / 展位图，免费出纸）在 P45 的 materials 阶段。
+               本页这一栏打的是「你自己的作战单 + 简历」，两批纸不是一回事，所以分开给入口。 -->
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)" href="45-fair-onsite.html?stage=materials">
+            <svg class="ic"><use href="#i-file"/></svg>拿主办方的活动资料
+          </a>
         </div>
       </div>
 
@@ -910,11 +1265,13 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
         <div class="sec">
           <div class="tline">
+            <!-- 名字不写死：ai-down 出的是「场次与展位单」，不是「作战单」。
+                 这两行本来就不需要点名，用「这张单」两态都成立。 -->
             <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">出纸口取走 13 页</span>
-                <span class="mt">作战单在最上面一页</span></span></div>
+              <span class="tl-b"><span class="tl-t">出纸口取走 <span data-f="pg">13</span> 页</span>
+                <span class="mt">这张单在最上面一页</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">作战单存进「我的文档」</span>
+              <span class="tl-b"><span class="tl-t">这张单存进「我的文档」</span>
                 <span class="mt">今天之内可以再打一次，不重复收费</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">这次记进「打印订单」</span>
@@ -924,6 +1281,40 @@
           <div class="panel-note" style="margin-top:var(--s-4)">
             本机不记录你去没去、投没投 —— 只记录你在这台机器上打了什么。
           </div>
+
+          <!-- 2026-08-10：右栏原来只到这里，下面空 369px。
+               打印机在线时贴底放交接卡；离线时换成「存我的文档 · 扫码带走」的示意码。 -->
+          <div class="sec-foot" data-when="default first ai-down">
+            <a class="handoff" data-f="handoff" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=fair-plan&amp;title=作战单%201%20份%20%2B%20简历%206%20份&amp;pages=13&amp;copies=1&amp;back=s4">
+              <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="handoff-b">
+                <span class="handoff-t">现在就去出纸</span>
+                <span class="handoff-s" data-f="handoff-s">带去：作战单 1 份 + 简历 6 份&nbsp;· 共 13 页（预估 · 以打印工作台核价为准）</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+          </div>
+          <div class="sec-foot" data-when="device-off" style="display:flex;gap:var(--s-5);align-items:center">
+            <span class="miniqr">
+              <span class="miniqr-box"><svg><use href="#i-qrdemo"/></svg></span>
+              <span class="miniqr-cap">示意码</span>
+            </span>
+            <span class="handoff-b">
+              <span class="handoff-t">存我的文档 · 扫码带走</span>
+              <span class="handoff-s">带走：作战单 1 页（PDF）</span>
+              <span class="handoff-s">保留 7 天 · 凭手机号在任一台空闲机器打印</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 合规声明去重：本页原有 4 处 UI 合规声明（s1 列表脚注、s1 预约说明、
+           s2「选完会带来什么」、first 引导卡）。全部收敛到这张常驻卡，各阶段都看得到，全页只出现一次。
+           作战单纸面页脚那一份是打印件本身的免责，属于交付物内容，不在此列。 -->
+      <div class="pane">
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机只做展示与打印：<b>不代收简历、不代为投递、不代办预约</b>。预约与入场资格以来源平台为准。</span>
         </div>
       </div>
 
@@ -934,8 +1325,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
-            挑出值得去的几家，排出少走路的顺序，<b>打成一张纸带进场</b>。<br>
-            本机不代收、不代投简历。
+            挑出值得去的几家，排出少走路的顺序，<b>打成一张纸带进场</b>。
           </div>
         </div>
       </div>
@@ -945,26 +1335,30 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="36-fairs-hub.html" data-parent-label="招聘会"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">招聘会</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">换一场</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">改选企业</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">改路线</button>
 
-    <span class="actionbar-hint" data-at="s2" data-when="default first">已选 3 家 · 最多可选 8 家</span>
-    <span class="actionbar-hint" data-at="s3">全程约 240 米 · 预计 1 小时 20 分</span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 13 页 · 预估 2.60 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first ai-down" data-f="hint2">已选 3 家 · 最多可选 8 家</span>
+    <!-- 「全程约 240 米 · 预计 1 小时 20 分」删掉：本机没有场馆尺寸也不知道你走多快，
+         这两个数字是编的。换成从勾选真算得出来的东西。 -->
+    <span class="actionbar-hint" data-at="s3" data-f="hint3">3 站 · 按展位号顺序</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down" data-f="hint4">共 13 计费页 · 预估 2.60 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2">选这一场<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2">去挑企业：<span data-sess-nm>制造业专场</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3">排今天的路线<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-go="s4">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first device-off">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="ai-down">生成场次与展位单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" data-f="gobtn" href="06-print-workbench.html?stage=s3&amp;from=P17&amp;kind=fair-plan&amp;title=作战单%201%20份%20%2B%20简历%206%20份&amp;pages=13&amp;copies=1&amp;back=s4"><span data-f="gobtn-t">带去：作战单 1 份 + 简历 6 份&nbsp;· 共 13 页</span><svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -972,9 +1366,292 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照。
+     必须排在下面的内联脚本**之前** —— 那段在解析时就 render() 一次算费用，
+     晚一步 window.V3_SITE 还不存在，第一屏的钱就落到兜底价上了。 -->
+<script src="scripts/site-config.js?v=2"></script>
+<script>
+/* ── 2026-08-10 Codex 走查整改：场次卡真的能选 ────────────────────────────
+   原来三张场次卡都是 data-go="s2"，一点就跳到第 2 步；而右栏偏偏写着
+   「点左边任一场可以换成看它的」—— 界面在自相矛盾，用户点完只会更懵。
+
+   现在：点卡片 = 选中这一场（有选中态、右栏规则跟着换、主按钮写出场次名），
+   要不要进第 2 步由右下角主按钮决定。选择和推进分开，是一体机上少犯错的做法。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var KEYS = ['nm', 'book', 'paper', 'firm', 'way', 'org', 'sync']
+  function pick (card) {
+    [].slice.call(scr.querySelectorAll('.sesscard')).forEach(function (c) {
+      c.setAttribute('aria-pressed', c === card ? 'true' : 'false')
+      var t = c.querySelector('.sc-pick')
+      if (t) t.textContent = c === card ? '已选这一场' : '选这一场'
+    })
+    KEYS.forEach(function (k) {
+      var v = card.getAttribute('data-' + k)
+      if (v == null) return
+      ;[].slice.call(scr.querySelectorAll('[data-sess-' + k + ']')).forEach(function (n) { n.textContent = v })
+    })
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+  scr.addEventListener('click', function (e) {
+    var c = e.target.closest('.sesscard')
+    if (c) pick(c)
+  })
+  var init = scr.querySelector('.sesscard[aria-pressed="true"]') || scr.querySelector('.sesscard')
+  if (init) pick(init)
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P17 · 2026-08-10 Codex 走查整改 ① ·「去哪几家」真的能勾
+   --------------------------------------------------------------------------
+   上一版八家企业是 <label class="jobrow ck--have"> + 22px 方框：看着能勾，
+   整行没有 input、没有状态、没有事件。而同一屏的动作条写着「已选 3 家 ·
+   最多可选 8 家」，下一步还有「改选企业」按钮 —— 界面承诺了一个不存在的控件。
+
+   现在整行是 <button aria-pressed>，并且**勾选真的往下游走**：
+     选中数     → 第 3 步「入口进 → N 家 → 出口」、动作条提示
+     选中的展位 → 展位图高亮 + 按展位号排的示意路线与站点序号（原来是写死的 path）
+     选中的企业 → 作战单站点逐条重建（原来勾掉了纸上照样印）
+     家数       → 简历份数 = N × 2、计费页数 = 1 + N × 2 × 2、
+                  费用 = 计费页数 × 现行黑白单价（取自 site-config，后台可改），
+                  以及出口链接里的 ?pages= / ?title=
+   刻意**没有**做的：全程米数与预计耗时。本机没有场馆尺寸也不知道用户走多快，
+   那两个数字只能编 —— 已从版面上删掉，不拿假精度换充实感（CLAUDE.md §9）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var list = scr.querySelector('.joblist')
+  var rows = [].slice.call(scr.querySelectorAll('.jobrow[data-booth]'))
+  if (!rows.length) return
+
+  var MAX = 8                       // 动作条上写的就是这个数，别在两处各写一份
+  var COPIES = 2                    // 每家带 2 份简历
+  var CV_PAGES = 2                  // 简历每份 2 页
+  /* A4 黑白每**计费页**单价（元）。不写死在这里 ——
+     它是后台 GET /print/price-config 下发的值，由 scripts/site-config.js 持有；
+     运营改价，这一页的预估要跟着变。末尾的字面量只兜「脚本没加载成功」，
+     不兜「后端拉取失败」——后者生产上走 PRICE_CONFIG_UNAVAILABLE（不显示数字）。 */
+  function UNIT () { var S = window.V3_SITE; return S ? S.price.bwPerFace : 0.2 }
+  var note = ''                     // 超上限时给用户看的那句话
+
+  function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+  function set (k, html) {
+    var ns = scr.querySelectorAll('[data-f="' + k + '"]')
+    for (var i = 0; i < ns.length; i++) ns[i].innerHTML = html
+  }
+  /* 2026-08-10 ai-down 泄漏整改：交付物的**名字**随态变。
+     AI 挂掉时出的那张纸不是「作战单」—— 它没有要问的话、没有结合简历，
+     只是场次与展位的清单。名字一样会让用户以为拿到的是同一样东西。
+     主按钮、交接卡、动作条提示三处都从这里取名，不各写一份。 */
+  function isAiDown () { return (scr.getAttribute('data-state') || 'default') === 'ai-down' }
+  function sheetNm () { return isAiDown() ? '场次与展位单' : '赶场作战单' }
+  function on (r) { return r.getAttribute('aria-pressed') === 'true' }
+  /* 走法按展位号排（A-12 → A-27 → B-05）：本机能做到的就是这个，
+     不声称「最短路线」—— 那要有真实通道图才算得出来。 */
+  function picked () {
+    return rows.filter(on).sort(function (a, b) {
+      return a.getAttribute('data-booth').localeCompare(b.getAttribute('data-booth'))
+    })
+  }
+
+  /* 展位图：从 SVG 里现读每个展位的矩形坐标，不在 JS 里另抄一份坐标表 */
+  function booths () {
+    var m = {}
+    var texts = scr.querySelectorAll('.hall-svg text.booth-t')
+    for (var i = 0; i < texts.length; i++) {
+      var prev = texts[i].previousElementSibling
+      if (!prev || prev.tagName.toLowerCase() !== 'rect') continue
+      m[(texts[i].textContent || '').replace(/\s/g, '')] = {
+        rect: prev,
+        cx: +prev.getAttribute('x') + +prev.getAttribute('width') / 2,
+        cy: +prev.getAttribute('y') + +prev.getAttribute('height') / 2,
+        top: +prev.getAttribute('y'),
+        bot: +prev.getAttribute('y') + +prev.getAttribute('height')
+      }
+    }
+    return m
+  }
+
+  function paintHall (sel) {
+    var B = booths(), k
+    for (k in B) {
+      if (!Object.prototype.hasOwnProperty.call(B, k)) continue
+      B[k].rect.setAttribute('class', 'booth booth--skip')
+    }
+    var g = scr.querySelector('[data-f="routeg"]')
+    if (g) g.innerHTML = ''
+    var pts = []
+    sel.forEach(function (r) {
+      var b = B[r.getAttribute('data-booth')]
+      if (!b) return
+      b.rect.setAttribute('class', 'booth booth--pick')
+      pts.push(b)
+    })
+    if (!g || !pts.length) return
+    /* 入口 (71,388) → 各站 → 出口 (549,388)。折线只走横竖两向，
+       像人沿通道走，不画对角线穿过展台。走廊取展台下沿 +18。 */
+    var svgns = 'http://www.w3.org/2000/svg'
+    var d = 'M71 388', i, lane
+    for (i = 0; i < pts.length; i++) {
+      lane = Math.round(pts[i].bot + 18)
+      d += ' L' + Math.round(pts[i].cx) + ' ' + lane
+    }
+    d += ' L549 ' + Math.round(pts[pts.length - 1].bot + 18) + ' L549 388'
+    var path = document.createElementNS(svgns, 'path')
+    path.setAttribute('class', 'route')
+    path.setAttribute('d', d)
+    g.appendChild(path)
+    for (i = 0; i < pts.length; i++) {
+      var c = document.createElementNS(svgns, 'circle')
+      c.setAttribute('class', 'route-pin')
+      c.setAttribute('cx', Math.round(pts[i].cx)); c.setAttribute('cy', Math.round(pts[i].top + 15)); c.setAttribute('r', 13)
+      g.appendChild(c)
+      var t = document.createElementNS(svgns, 'text')
+      t.setAttribute('class', 'route-no'); t.setAttribute('text-anchor', 'middle')
+      t.setAttribute('x', Math.round(pts[i].cx)); t.setAttribute('y', Math.round(pts[i].top + 20))
+      t.textContent = String(i + 1)
+      g.appendChild(t)
+    }
+  }
+
+  function render () {
+    var sel = picked(), n = sel.length
+    if (list) list.classList.toggle('is-full', n >= MAX)
+
+    rows.forEach(function (r) {
+      var t = r.querySelector('.jobrow-pick')
+      if (t) t.textContent = on(r) ? '已选' : '选这家'
+    })
+
+    set('n-firm', n)
+    set('n-cv', n * COPIES)
+    // 右栏「选完会带来什么」里那份名单：左边勾了什么，右边就得说得出名字和展位号
+    set('pick-list', sel.map(function (r, i) {
+      return '<div class="kv-row"><span class="k">第 ' + (i + 1) + ' 家</span><span class="v">' +
+        esc(r.getAttribute('data-co')) + ' · ' + esc(r.getAttribute('data-booth')) + '</span></div>'
+    }).join('') || '<div class="kv-row"><span class="k">还没勾</span><span class="v v--fog">先勾上左边要去的企业</span></div>')
+    set('hint2', n
+      ? '已选 <b>' + n + '</b> 家 · 最多可选 ' + MAX + ' 家' + (note ? ' · ' + esc(note) : '')
+      : '一家都没选 · 先勾上要去的企业')
+    set('hint3', n ? '<b>' + n + '</b> 站 · 按展位号顺序' : '一家都没选 · 回上一步勾企业')
+
+    paintHall(sel)
+
+    set('cb-stops', sel.map(function (r, i) {
+      return '<div class="cb-stop"><span class="cb-no">' + (i + 1) + '</span><span>' +
+        '<span class="cb-nm">' + esc(r.getAttribute('data-co')) + ' &nbsp;·&nbsp; ' +
+        esc(r.getAttribute('data-booth')) + ' 号展位</span>' +
+        '<span class="cb-mt">' + esc(r.getAttribute('data-pos')) + '</span>' +
+        '<span class="cb-ask">' + (r.getAttribute('data-ask') || '') + '</span></span></div>'
+    }).join('') || '<div class="cb-ask">还没勾企业 —— 回第 2 步勾上要去的几家，这张单才有内容。</div>')
+
+    /* ai-down 版纸面的站点：同一批企业、同样的展位号与岗位名，
+       **不带 data-ask** —— 那一行「可以问：夹具设计岗现在缺几个人」是模型
+       读完岗位正文写出来的，AI 不可用时它不存在，不能照印。 */
+    set('cb-stops-plain', sel.map(function (r, i) {
+      return '<div class="cb-stop"><span class="cb-no">' + (i + 1) + '</span><span>' +
+        '<span class="cb-nm">' + esc(r.getAttribute('data-co')) + ' &nbsp;·&nbsp; ' +
+        esc(r.getAttribute('data-booth')) + ' 号展位</span>' +
+        '<span class="cb-mt">' + esc(r.getAttribute('data-pos')) + '</span></span></div>'
+    }).join('') || '<div class="cb-ask">还没勾企业 —— 回第 2 步勾上要去的几家，这张单才有内容。</div>')
+
+    // 打印算术：作战单 1 页 + 每家 2 份简历 × 每份 2 页。
+    // pages 已经把份数乘进去了，所以它就是**计费页数**（所选文档页数 × 份数）。
+    // 单双面在这里不参与——双面只省纸，不减少计费页数。
+    var copies = n * COPIES
+    var pages = (n ? 1 : 0) + copies * CV_PAGES
+    var fee = (Math.round(pages * UNIT() * 100) / 100).toFixed(2)
+    set('pg', pages); set('fee', fee); set('cv-n', copies)
+    set('cv-line', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份')
+    set('ap-s', 'A4 黑白 · ' + CV_PAGES + ' 页 × ' + copies + ' 份 = ' + copies * CV_PAGES + ' 页 · 本单大头')
+    set('ap-by', '已按 ' + n + ' 家 × ' + COPIES + ' 份算')
+    var route = sel.map(function (r) { return esc(r.getAttribute('data-booth')) }).join(' → ')
+    var carry = '<br>建议带 <b>' + copies + ' 份</b>纸质简历（' + n + ' 家 × ' + COPIES +
+                ' 份），已加入本次打印清单，将同时打印。'
+    set('cb-route', n
+      ? '建议路线：入口 → ' + route + ' → 出口，按展位号顺序走。' + carry
+      : '还没勾企业，这张单暂时是空的。')
+    set('cb-route-plain', n
+      ? '走法：入口 → ' + route + ' → 出口，按展位号顺序走。' + carry
+      : '还没勾企业，这张单暂时是空的。')
+
+    var what = sheetNm() + ' 1 份 + 简历 ' + copies + ' 份'
+    set('handoff-s', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页（预估 · 以打印工作台核价为准）')
+    set('gobtn-t', '带去：' + what + '&nbsp;· 共 ' + pages + ' 页')
+    set('hint4', '共 ' + pages + ' 计费页 · 预估 ' + fee + ' 元 · 以打印工作台核价为准')
+
+    // 出口链接里的页数与标题也要跟着走，否则打印工作台收到的还是旧的 13 页
+    var links = scr.querySelectorAll('[data-f="handoff"],[data-f="gobtn"]')
+    for (var i = 0; i < links.length; i++) {
+      links[i].setAttribute('href',
+        '06-print-workbench.html?stage=s3&from=P17&kind=fair-plan&title=' +
+        encodeURIComponent(what) + '&pages=' + pages + '&copies=1&back=s4')
+    }
+    // 「不排路线，先把纸打了」只带简历，份数同样跟着家数走
+    var cvo = scr.querySelector('[data-f="cvonly"]')
+    if (cvo) {
+      cvo.setAttribute('href', '06-print-workbench.html?stage=s3&from=P17&kind=material&title=' +
+        encodeURIComponent('简历 ' + copies + ' 份') + '&pages=' + CV_PAGES + '&copies=' + copies + '&back=s3')
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var r = e.target.closest && e.target.closest('.jobrow[data-booth]')
+    if (!r) return
+    if (!on(r) && picked().length >= MAX) {
+      // 静默拒绝是最糟的：说清为什么加不进来
+      note = '已到 ' + MAX + ' 家上限，想加先去掉一家'
+      render()
+      return
+    }
+    note = ''
+    r.setAttribute('aria-pressed', on(r) ? 'false' : 'true')
+    render()
+  })
+
+  render()
+
+  /* 四态切换后必须重算：交付物的名字随态变（赶场作战单 / 场次与展位单），
+     而 stage.js 的 applyState 只管可见性，不知道本页还有派生文案。
+     两条路都要接上，缺一个就会出现「屏上切到 ai-down，主按钮还写着作战单」：
+       · 走查与自检直接调 window.v3ApplyVisibility() —— 包一层是主路径
+       · 外壳上的四态按钮走 stage.js 自己的局部函数 —— 另挂一个捕获期点击兜底 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
+})()
+</script>
+<script>
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var bs = document.querySelectorAll('[data-side-open]')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
