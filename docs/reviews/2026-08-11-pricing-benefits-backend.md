@@ -208,8 +208,18 @@ data: { quantityRemaining: { decrement: 1 } }  // 只扣 1
 **不要另建第二套订单或核销账本** —— 现有 `PriceConfig` / `Order` /
 `BenefitGrant` / `RedemptionRecord` 与审计表都应继续复用。
 
-首期可以只支持一种规则：`free_units + document_page + 不叠加`，
-先把「7 页抵 7 页」做正确，再开放满减与折扣。
+首期只支持一种规则：
+
+```
+full_order_free + decrement_one_use + four_gates + no_partial
+```
+
+即：**四道闸全满足 → 整单免、扣 1 次；任一道不满足 → 整单正常价。**
+不补差、不部分抵扣、不叠加。
+
+> 口径修正（2026-08-11 交叉对账）：本节原写「先把『7 页抵 7 页』做正确」，
+> 那是**决策前的残留** —— 与本文 §二·补已拍板的「每月 N 次免单」相反。
+> 按页额度需要部分抵扣，后端没有；已移入「先搁置」。
 
 ---
 
