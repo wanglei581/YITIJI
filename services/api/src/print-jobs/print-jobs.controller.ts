@@ -16,6 +16,8 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { PrintJobsService } from './print-jobs.service'
 import { CreatePrintJobDto } from './dto/create-print-job.dto'
+import { ClaimPickupDto } from './dto/claim-pickup.dto'
+import { PickupOrderService } from './pickup-order.service'
 
 @Controller('print/jobs')
 export class PrintJobsController {
@@ -24,7 +26,26 @@ export class PrintJobsController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly pickupOrders: PickupOrderService,
   ) {}
+
+  @Post('claim-pickup')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  claimPickup(@Body() dto: ClaimPickupDto, @Headers('x-terminal-id') terminalId: string | undefined) {
+    return this.pickupOrders.claim(dto.code, terminalId)
+  }
+
+  @Post(':orderId/release')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  releasePickup(
+    @Param('orderId') orderId: string,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+    @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
+  ) {
+    return this.pickupOrders.release(orderId, terminalId, paymentSessionToken)
+  }
 
   // 鉴权取舍（HIGH-3）：本端点服务匿名 Kiosk 上传打印流程，加 JWT/设备鉴权会破坏
   // 一体机匿名打印，故采用「强校验签名 fileUrl（验签+有效期，SSRF 防护）+ IP 限流

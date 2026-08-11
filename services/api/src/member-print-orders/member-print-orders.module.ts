@@ -3,9 +3,13 @@ import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPendingTasksController, MemberPrintOrdersController } from './member-print-orders.controller'
 import { MemberPrintOrdersService } from './member-print-orders.service'
+import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { PrintJobsModule } from '../print-jobs/print-jobs.module'
+import { PaymentModule } from '../payment/payment.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 
 /**
- * 会员「我的打印订单」模块（Phase C-2C 后续小步，只读）。
+ * 会员「我的打印订单」模块：历史任务只读 + M2 Order-only 预提交。
  *
  * 自带 enduser 专用 JwtModule（与 MemberAuthModule 同 JWT_SECRET + audience='enduser'），
  * 并本地 provide EndUserAuthGuard，使 @UseGuards(EndUserAuthGuard) 能在本模块注入上下文里
@@ -13,6 +17,9 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
  */
 @Module({
   imports: [
+    PrintJobsModule,
+    PaymentModule,
+    TerminalsModule,
     JwtModule.registerAsync({
       useFactory: () => {
         const secret = process.env['JWT_SECRET']
@@ -27,6 +34,6 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
     }),
   ],
   controllers: [MemberPrintOrdersController, MemberPendingTasksController],
-  providers: [MemberPrintOrdersService, EndUserAuthGuard],
+  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, EndUserAuthGuard],
 })
 export class MemberPrintOrdersModule {}

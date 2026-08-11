@@ -26,9 +26,14 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": "scripts",
+        "type": "folder"
+      }
+    ],
     "include": []
   },
-  "appid": "touristappid",
+  "appid": "wxe9ba99a3a311c7df",
   "editorSetting": {}
 }

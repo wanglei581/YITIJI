@@ -16,6 +16,7 @@
 
 import { API_BASE_URL } from '../api/client'
 import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
+import { getTerminalId } from '../api/screensaver'
 
 export interface PaymentSessionInput {
   orderId: string
@@ -96,6 +97,33 @@ export async function getPayStatus(input: PaymentSessionInput): Promise<PayStatu
   })
   if (!res.ok) throw new Error(`getPayStatus failed: ${res.status} ${await readError(res)}`)
   return res.json() as Promise<PayStatusView>
+}
+
+export interface PickupReleaseView {
+  released: true
+  taskId: string
+  orderId: string
+  orderNo: string
+  terminalId: string
+  taskStatus: string
+  printTaskStatus: string
+  paymentSessionToken: string
+}
+
+/** Order-only 订单付款成功后，绑定本机并原子创建唯一 PrintTask。 */
+export async function releasePickupOrder(input: PaymentSessionInput): Promise<PickupReleaseView> {
+  const terminalId = getTerminalId()
+  if (!terminalId) throw new Error('TERMINAL_ID_REQUIRED')
+  const res = await fetch(`${API_BASE_URL}/print/jobs/${encodeURIComponent(input.orderId)}/release`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-terminal-id': terminalId,
+      ...paymentSessionHeaders(input),
+    },
+  })
+  if (!res.ok) throw new Error(`releasePickupOrder failed: ${res.status} ${await readError(res)}`)
+  return res.json() as Promise<PickupReleaseView>
 }
 
 /**

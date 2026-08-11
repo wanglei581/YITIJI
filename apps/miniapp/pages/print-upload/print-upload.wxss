@@ -15,6 +15,7 @@
 .opt-list { display: flex; flex-direction: column; gap: 16rpx; }
 .opt { display: flex; align-items: center; gap: 20rpx; padding: 26rpx 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; box-shadow: var(--sh-sm); }
 .opt.on { border-color: var(--teal); background: var(--teal-wash); }
+.opt.off, .duplex-opt.off { opacity: .58; }
 .o-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #fff; flex-shrink: 0; }
 .opt.on .o-radio { background: var(--teal); border-color: var(--teal); }
 .o-main { flex: 1; }
@@ -40,3 +41,10 @@
 
 /* 纸张规格行主内容区 */
 .pr-main { flex: 1; }
+.privacy-check { display: flex; flex-direction: column; gap: 18rpx; }
+.pc-state, .pc-note { font-size: 24rpx; line-height: 1.6; color: var(--ink-soft); }
+.pc-title { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.pc-error { color: var(--danger); font-size: 24rpx; }
+.pc-ready { color: var(--teal-deep); font-size: 25rpx; font-weight: 600; }
+.pc-finding { padding: 16rpx; background: var(--paper); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 8rpx; font-size: 24rpx; }
+.pc-snippet { color: var(--ink-soft); word-break: break-all; }

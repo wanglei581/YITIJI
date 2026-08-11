@@ -236,12 +236,17 @@ else bad('取件页真实能力', '不得恢复空白二维码、扫码关联或
 
 const documentsJs = read('pages/documents/documents.js')
 const printUploadJs = read('pages/print-upload/print-upload.js')
+const printPayJs = read('pages/print-pay/print-pay.js')
 if (
   documentsJs.includes('api.uploadPrintFile') &&
-  printUploadJs.includes('hasPageCount') &&
-  printUploadJs.includes('本版本不会把未知页数按 0 页计价')
-) ok('文档真实上传且未知页数拒绝按零计价')
-else bad('文档上传与计价诚实性', '缺少 print_doc 上传或可信页数 fail-closed')
+  printUploadJs.includes('api.createPrintPiiScan') &&
+  printUploadJs.includes("privacyStatus !== 'ready'") &&
+  printPayJs.includes('api.createCloudPrintOrder') &&
+  apiJs.includes("request('/me/print-orders', { method: 'POST'") &&
+  !/createCloudPrintOrder\(\{[\s\S]{0,500}\b(?:amountCents|billablePages|pages)\s*:/.test(printPayJs) &&
+  !printPayJs.includes('预提交接口尚未开通')
+) ok('文档真实上传、隐私确认且由服务端建单计价')
+else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
 
 const configJs = read('utils/config.js')
 if (/USE_MOCK:\s*false/.test(configJs)) ok('正式源码默认关闭 mock')

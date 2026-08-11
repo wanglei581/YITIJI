@@ -18,7 +18,12 @@ Page({
     priceError: '',
     priceCents: null,
     priceLabels: { bw: '读取中…', color: '读取中…' },
-    total: '—'
+    total: '—',
+    privacyStatus: 'idle', // idle | scanning | review | ready | error
+    privacyError: '',
+    privacyTaskId: '',
+    privacyFindings: [],
+    privacySubmitting: false,
   },
   onLoad(opts) {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 });
@@ -28,7 +33,10 @@ Page({
     }
     // 上游(如岗位匹配报告)已生成真实文件时会带 fileId + 真实页数,
     // 必须用真实页数,不能让下面的默认值 2 覆盖掉真实值。
-    if (o.fileId) this.setData({ fileId: o.fileId, hasFile: true });
+    if (o.fileId) {
+      this.setData({ fileId: o.fileId, hasFile: true });
+      this._runPrivacyScan(o.fileId);
+    }
     const pages = parseInt(o.pages, 10);
     if (pages > 0) this.setData({ 'file.pages': pages, hasPageCount: true });
     this._loadPricing();
@@ -65,11 +73,19 @@ Page({
     this.setData({ total });
   },
   pickColor(e) {
-    this.setData({ color: e.currentTarget.dataset.v });
+    if (e.currentTarget.dataset.v !== 'bw') {
+      wx.showToast({ title: '彩色打印尚未完成真机验收', icon: 'none' });
+      return;
+    }
+    this.setData({ color: 'bw' });
     this.calc();
   },
   pickDuplex(e) {
-    this.setData({ duplex: e.currentTarget.dataset.v });
+    if (e.currentTarget.dataset.v !== 'single') {
+      wx.showToast({ title: '双面打印尚未完成真机验收', icon: 'none' });
+      return;
+    }
+    this.setData({ duplex: 'single' });
   },
   minus() {
     if (this.data.copies > 1) {
@@ -118,10 +134,10 @@ Page({
       });
       return;
     }
-    if (!this.data.hasPageCount) {
+    if (this.data.privacyStatus !== 'ready') {
       wx.showModal({
-        title: '暂时无法估价',
-        content: '当前文档接口尚未返回可信页数。本版本不会把未知页数按 0 页计价，请在终端现场导入，或选择已生成页数的 AI 报告。',
+        title: '请先完成隐私检查',
+        content: this.data.privacyStatus === 'scanning' ? '文件仍在检查中，请稍候。' : '确认隐私检查结果后才能提交打印订单。',
         showCancel: false,
       });
       return;
@@ -131,5 +147,33 @@ Page({
       url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`
     });
   },
+  _runPrivacyScan(fileId) {
+    this.setData({ privacyStatus: 'scanning', privacyError: '', privacyFindings: [], privacyTaskId: '' });
+    api.createPrintPiiScan(fileId)
+      .then(task => {
+        const findings = Array.isArray(task.piiFindings) ? task.piiFindings.filter(item => item.action === 'pending') : [];
+        this.setData({
+          privacyTaskId: task.id || '',
+          privacyFindings: findings,
+          privacyStatus: findings.length ? 'review' : 'ready',
+        });
+      })
+      .catch(err => this.setData({ privacyStatus: 'error', privacyError: (err && err.message) || '隐私检查失败' }));
+  },
+  confirmPrivacy() {
+    if (this.data.privacySubmitting || !this.data.privacyTaskId) return;
+    const decisions = this.data.privacyFindings.map(item => ({ findingId: item.id, action: 'keep' }));
+    this.setData({ privacySubmitting: true });
+    api.decidePrintPiiFindings(this.data.privacyTaskId, decisions)
+      .then(() => {
+        this.setData({ privacySubmitting: false, privacyStatus: 'ready' });
+        wx.showToast({ title: '已确认', icon: 'success' });
+      })
+      .catch(err => {
+        this.setData({ privacySubmitting: false });
+        wx.showModal({ title: '确认失败', content: (err && err.message) || '请稍后重试', showCancel: false });
+      });
+  },
+  retryPrivacy() { if (this.data.fileId) this._runPrivacyScan(this.data.fileId); },
   back() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }); }
 });

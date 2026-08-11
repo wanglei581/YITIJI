@@ -15,6 +15,7 @@ import { ScanIcon, ArrowRightIcon, RotateCcwIcon, PrinterIcon } from 'lucide-rea
 import { KioskPageHeader } from '@ai-job-print/ui'
 import { PrintPageFrame } from './PrintPrototypeLayout'
 import { API_BASE_URL } from '../../services/api/client'
+import { getTerminalId } from '../../services/api/screensaver'
 
 // ── 取件码工具 ────────────────────────────────────────────────
 // 合法字符：32个无歧义字符（去掉 0,1,I,O）
@@ -29,21 +30,28 @@ function normalizeInput(raw: string): string {
 
 // ── 接口类型 ──────────────────────────────────────────────────
 interface ClaimPickupResult {
-  taskId: string
+  released: boolean
+  taskId?: string
   orderId: string
   orderNo: string
   terminalId: string | null
   taskStatus: string
   printTaskStatus: string
+  amountCents?: number
+  priceLines?: unknown[]
+  fileName?: string | null
+  paymentSessionToken: string
 }
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
 
 // ── API 调用（无登录态，Kiosk 匿名层） ────────────────────────
 async function claimPickup(code: string): Promise<ClaimPickupResult> {
+  const terminalId = getTerminalId()
+  if (!terminalId) throw new Error('终端身份尚未就绪，请稍后重试')
   const res = await fetch(`${API_BASE_URL}/print/jobs/claim-pickup`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-terminal-id': terminalId },
     body: JSON.stringify({ code }),
   })
   const body = (await res.json()) as {
@@ -112,7 +120,7 @@ export function PrintPickupClaimPage() {
       <PrintPageFrame>
         <KioskPageHeader
           title="认领成功"
-          description="打印任务已进入队列，请稍候出纸"
+          description={result.released ? '打印任务已进入队列，请稍候出纸' : '订单核验成功，请先完成现场支付'}
           onBack={() => navigate('/print-scan')}
           backLabel="返回"
         />
@@ -120,8 +128,8 @@ export function PrintPickupClaimPage() {
           <div className="pcs-icon-wrap">
             <PrinterIcon size={48} className="pcs-icon" />
           </div>
-          <h2 className="pcs-title">取件码已认领</h2>
-          <p className="pcs-sub">任务状态：已认领，等待打印机排队出纸</p>
+          <h2 className="pcs-title">{result.released ? '打印任务已释放' : '订单核验成功'}</h2>
+          <p className="pcs-sub">{result.released ? '等待打印机排队出纸' : '付款成功后系统才会创建打印任务，不会提前出纸'}</p>
 
           <dl className="pcs-meta">
             <div className="pcs-row">
@@ -139,14 +147,21 @@ export function PrintPickupClaimPage() {
           <div className="pcs-actions">
             <button
               className="btn-kiosk primary"
-              onClick={() =>
-                navigate('/print/progress', {
-                  state: { taskId: result.taskId, orderId: result.orderId },
-                })
-              }
+              onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
+                state: result.released
+                  ? { taskId: result.taskId, orderId: result.orderId, paymentSessionToken: result.paymentSessionToken }
+                  : {
+                      orderId: result.orderId,
+                      orderNo: result.orderNo,
+                      amountCents: result.amountCents,
+                      priceLines: result.priceLines ?? [],
+                      paymentSessionToken: result.paymentSessionToken,
+                      file: result.fileName ? { filename: result.fileName } : undefined,
+                    },
+              })}
             >
               <ArrowRightIcon size={20} />
-              查看打印进度
+              {result.released ? '查看打印进度' : '进入现场支付'}
             </button>
             <button className="btn-kiosk ghost" onClick={handleReset}>
               <RotateCcwIcon size={18} />
