@@ -181,7 +181,6 @@ for (const path of presentationFiles) {
 }
 
 const printScanPages = new Map([
-  ['src/pages/print-scan/PrintScanHomePage.tsx', 'print-scan-home'],
   ['src/pages/print-scan/PrintScanFeatureInfoPage.tsx', 'print-scan-feature'],
   ['src/pages/print-scan/ConvertImagesPage.tsx', 'print-scan-convert'],
   ['src/pages/print-scan/SignStampPage.tsx', 'print-scan-sign'],
@@ -196,6 +195,30 @@ for (const [path, marker] of printScanPages) {
     `${path} imports the scoped W2 stylesheet`
   )
 }
+const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
+const printScanHomeView = read('src/pages/print-scan/components/V6PrintHubView.tsx')
+const printHubV6Css = read('src/pages/print-scan/styles/print-hub-v6.css')
+assert.match(printScanHome, /KioskPageFrame/, 'V6 print-scan home uses the frozen page frame')
+assert.match(
+  printScanHome,
+  /V6PrintHubView/,
+  'V6 print-scan home delegates presentation to V6PrintHubView'
+)
+assert.match(
+  printScanHome,
+  /\.\/styles\/print-hub-v6\.css/,
+  'V6 print-scan home imports its scoped stylesheet'
+)
+assert.match(
+  printScanHomeView,
+  /data-w2-page=["']print-scan-home["']/,
+  'V6 print-scan view retains the route ownership marker'
+)
+assert.match(
+  printScanHomeView,
+  /data-v6-page=["']print-hub["']/,
+  'V6 print-scan view exposes its design-language marker'
+)
 const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
 const frameContentPaddingContracts = new Map([
   ['src/pages/print-scan/styles/print-scan-fusion.css', 'w2-print-scan-page'],
@@ -212,6 +235,11 @@ for (const [path, frameClass] of frameContentPaddingContracts) {
   )
 }
 assert.match(
+  printHubV6Css,
+  /\.v6-print-hub-page\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0\s*;/,
+  'V6 print hub neutralizes direct kiosk page content padding'
+)
+assert.match(
   printScanFusionCss,
   /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,
   'print-scan shell isolation must support both main and section content roots'
@@ -221,7 +249,6 @@ assert.doesNotMatch(
   /\.w2-print-scan-shell\s*>\s*main\s*\{/,
   'print-scan shell isolation must not drift back to a main-only selector'
 )
-const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 for (const marker of [
   'loadConfiguredCapabilities',
   'CARD_CAPABILITY_KEY',
@@ -229,30 +256,30 @@ for (const marker of [
 ]) {
   assert.match(printScanHome, new RegExp(marker), `print-scan home retains ${marker}`)
 }
-assert.match(
-  printScanHome,
-  /<KioskPageHeader[\s\S]*?onBack=\{\(\) => navigate\('\/'\)\}[\s\S]*?backLabel=["']返回["'][\s\S]*?\/>/,
-  'print-scan home exposes the prototype back button on the left of its page heading'
+assert.doesNotMatch(
+  printScanHomeView,
+  /KioskPageHeader/,
+  'V6 print-scan home uses the shared V6 topbar and does not duplicate a page heading'
 )
 assert.doesNotMatch(
-  printScanHome,
-  /<KioskPageHeader[\s\S]*?aside=\{/,
-  'print-scan home must not move its primary back action into a narrow heading aside'
-)
-assert.doesNotMatch(
-  printScanHome,
+  printScanHomeView,
   /<KioskActionBar\b/,
   'print-scan hub uses the prototype global navbar and must not render a second bottom action bar'
 )
 assert.match(
-  printScanFusionCss,
-  /\.w2-print-scan-shell\s*\{[^}]*padding:\s*0\s+48px\s+32px\s*;/,
-  'print-scan shell uses the prototype 48px content gutter without adding top padding to the pagehead'
+  printHubV6Css,
+  /\.v6-print-hub\s*\{[^}]*padding:\s*0\s+48px\s+40px\s*;/,
+  'V6 print hub uses the 48px content gutter without adding top padding to the pagehead'
 )
 assert.match(
-  printScanFusionCss,
-  /\.w2-print-scan-shell\s*>\s*\.ui-kiosk-page-header\s*\{[^}]*margin-inline:\s*-48px\s*;/,
-  'print-scan pagehead bleeds through the content gutter so its back button starts at 48px'
+  printScanHome,
+  /to:\s*['"]\/print\/upload\?source=document&tab=qr['"]/,
+  'phone upload opens the kiosk QR-session tab instead of the phone H5 page'
+)
+assert.doesNotMatch(
+  printScanHome,
+  /to:\s*['"]\/upload\/phone/,
+  'kiosk print hub never navigates directly to the phone-only route'
 )
 const convertImages = read('src/pages/print-scan/ConvertImagesPage.tsx')
 for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel']) {
@@ -264,7 +291,11 @@ assert.match(
   'convert-images renders each uploaded image instead of a paper skeleton'
 )
 const scanResultPreviewSource = read('src/pages/scan/ScanResultPage.tsx')
-assert.match(scanResultPreviewSource, /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/, 'scan result renders the real scanned file')
+assert.match(
+  scanResultPreviewSource,
+  /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/,
+  'scan result renders the real scanned file'
+)
 const signStamp = read('src/pages/print-scan/SignStampPage.tsx')
 for (const marker of [
   'signInspect',
@@ -490,11 +521,7 @@ assert.doesNotMatch(
   /:\s*'终端已接收任务，文件校验通过'/,
   'pending/claimed 不得共用「终端已接收且校验通过」的错误话术'
 )
-assert.doesNotMatch(
-  printProgress,
-  /:\s*'正在打印'\s*}/,
-  '真实任务主状态不得无条件显示正在打印'
-)
+assert.doesNotMatch(printProgress, /:\s*'正在打印'\s*}/, '真实任务主状态不得无条件显示正在打印')
 const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /getPayStatus/, 'print done obtains pickup code from payment status')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')

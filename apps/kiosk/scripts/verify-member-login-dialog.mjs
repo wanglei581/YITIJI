@@ -554,8 +554,8 @@ expectNoMatches(agreement, /href="#"|to="#"/, '共享协议组件不使用占位
 expectNoMatches(home, /<MemberLoginDialog|setLoginOpen|continueAsGuest/, '首页不再挂载或维护独立登录弹窗')
 expectMatches(
   home,
-  /const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/,
-  '首页登录入口统一跳转全屏 /login 并保留首页返回路径',
+  /actionId === ['"]login['"][\s\S]{0,160}?navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/,
+  '首页登录 action 统一跳转全屏 /login 并保留首页返回路径',
 )
 expectNoMatches(home, /\b(?:sendSmsCode|memberLogin)\s*\(/, '首页不复制认证 API')
 // P0-1B：screensaver 与 idle 控制器经 warning handler 接入 Guard，最终清场仍由 Guard.hardClear() 走 fail-closed 路径与统一敏感会话清理。

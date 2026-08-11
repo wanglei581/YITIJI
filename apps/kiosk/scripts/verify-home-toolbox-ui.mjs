@@ -29,6 +29,8 @@ const fail = (msg) => {
 }
 
 const home = read('src/pages/home/HomePage.tsx')
+const homeDomains = read('src/pages/home/homeV6Domains.ts')
+const homeView = read('src/pages/home/components/V6HomeView.tsx')
 const toolboxPage = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const launchHelpers = read('src/pages/home/components/kioskAppLaunch.ts')
 const toolboxHook = read('src/hooks/useToolboxConfig.ts')
@@ -53,16 +55,18 @@ if (
   fail('A. /toolbox 区页必须 config 驱动且空配置保留待配置占位')
 }
 
-// B. 首页 zone-row 百宝箱聚合卡在智慧校园之前，且 → /toolbox
-const toolboxCard = home.indexOf('z-plum')
-const campusCard = home.indexOf('z-teal')
+// B. V6 首页固定展示八个服务域；百宝箱在智慧校园之前，且 → /toolbox。
+const toolboxCard = homeDomains.indexOf("id: 'toolbox'")
+const campusCard = homeDomains.indexOf("id: 'campus'")
 if (
-  toolboxCard >= 0 && campusCard >= 0 && toolboxCard < campusCard &&
-  /z-plum[\s\S]{0,200}?onClick=\{\(\) => navigate\('\/toolbox'\)\}/.test(home)
+  toolboxCard >= 0 &&
+  campusCard >= 0 &&
+  toolboxCard < campusCard &&
+  /toolbox:\s*['"]\/toolbox['"]/.test(homeDomains)
 ) {
-  pass('B. 首页百宝箱聚合卡排在智慧校园前且点击进入 /toolbox')
+  pass('B. V6 首页百宝箱排在智慧校园前且 action 映射进入 /toolbox')
 } else {
-  fail('B. 首页百宝箱聚合卡必须排在智慧校园前并进入 /toolbox')
+  fail('B. V6 首页百宝箱必须排在智慧校园前并进入 /toolbox')
 }
 
 // /toolbox 路由已注册
@@ -95,32 +99,37 @@ if (
   launchModals.includes("action: 'cancel_external'") &&
   launchModals.includes('recordToolboxLaunchEventBeforeUnload')
 ) {
-  pass('C. /toolbox 从统一终端配置读取并支持站内/外部H5/二维码启动、扫码提示、外部离场确认和匿名事件上报')
+  pass(
+    'C. /toolbox 从统一终端配置读取并支持站内/外部H5/二维码启动、扫码提示、外部离场确认和匿名事件上报'
+  )
 } else {
   fail('C. /toolbox 统一终端配置、启动方式、扫码提示、外部离场确认或匿名事件上报缺失')
 }
 
 // C2. 外部 H5 不在点击时直接整页跳出
-if (!toolboxPage.includes('window.location.assign(item.externalUrl)') && !home.includes('window.location.assign(item.externalUrl)')) {
+if (
+  !toolboxPage.includes('window.location.assign(item.externalUrl)') &&
+  !home.includes('window.location.assign(item.externalUrl)')
+) {
   pass('C2. 百宝箱外部 H5 不在点击时直接整页跳出（先走离场确认）')
 } else {
   fail('C2. 百宝箱外部 H5 必须先展示离场提示，不得点击时直接跳转')
 }
 
-// D. 智慧校园终端开关隐藏 + 投放项渲染（首页 zone-row 内）
-// 修正(2026-07-20)：门控与 /smart-campus 对齐——校园开启即恒有校园卡/一卡通/校园网
-// 三项基础服务，故 showCampus 只依赖 campus.enabled（此前额外要求 modules/items 非空
-// 会在纯基础服务态漏掉首页入口）。
+// D. V6 首页保留两个域的位置，但配置关闭时必须 disabled + 可见原因，不能隐藏或放行。
 if (
   home.includes('useSmartCampusConfig()') &&
-  /const showCampus = campus\.enabled\b/.test(home) &&
-  !/const showCampus = campus\.enabled && \(campusModules/.test(home) &&
-  /campus\.items \?\? \[\]/.test(home) &&
-  /if \(!showToolbox && !showCampus\) return null/.test(home)
+  home.includes('useToolboxConfig()') &&
+  home.includes("actionId === 'smart-campus' && !campus.enabled") &&
+  home.includes("actionId === 'toolbox' && !toolbox.enabled") &&
+  /domain\.id === 'toolbox'[\s\S]{0,80}\? !toolboxEnabled/.test(homeView) &&
+  /domain\.id === 'campus'[\s\S]{0,80}\? !campusEnabled/.test(homeView) &&
+  homeView.includes('本机默认关闭，学校接入并完成配置后开放') &&
+  homeView.includes('本机尚未上架扩展服务')
 ) {
-  pass('D. 智慧校园保留终端开关隐藏逻辑并渲染后台投放项')
+  pass('D. V6 首页保留百宝箱/智慧校园位置，关闭时真实禁用并说明原因')
 } else {
-  fail('D. 智慧校园终端开关隐藏逻辑或投放项渲染缺失')
+  fail('D. V6 首页百宝箱/智慧校园必须可见但关闭时 fail-closed')
 }
 
 // E. 终端默认配置默认启用百宝箱空占位

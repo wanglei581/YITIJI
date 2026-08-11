@@ -1,411 +1,165 @@
+import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const appRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const read = (relativePath) => readFileSync(join(appRoot, relativePath), 'utf8')
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const read = (path) => readFileSync(join(root, path), 'utf8')
+const pass = (message) => console.log(`  PASS ${message}`)
+const check = (condition, message) => {
+  assert.ok(condition, message)
+  pass(message)
+}
 
 const home = read('src/pages/home/HomePage.tsx')
-const serviceGroups = read('src/pages/home/serviceGroups.ts')
-const css = read('src/styles/prototype-v1.css')
-const packageJson = read('package.json')
+const view = read('src/pages/home/components/V6HomeView.tsx')
+const manifest = read('src/pages/home/homeV6Domains.ts')
+const css = [
+  read('src/pages/home/styles/home-v6.css'),
+  read('src/pages/home/styles/home-v6-motion-responsive.css'),
+].join('\n')
+const kioskRoot = read('src/layouts/KioskRoot.tsx')
 
-let failures = 0
-const expect = (condition, message) => {
-  if (condition) console.log(`  PASS ${message}`)
-  else {
-    failures += 1
-    console.error(`  FAIL ${message}`)
-  }
-}
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+console.log('\n=== Kiosk V6 首页运行时合同 ===')
 
-function findCodeCharacter(source, character, from = 0) {
-  let quote = ''
-  let lineComment = false
-  let blockComment = false
-  let escaped = false
-
-  for (let index = from; index < source.length; index += 1) {
-    const current = source[index]
-    const next = source[index + 1]
-    if (lineComment) {
-      if (current === '\n') lineComment = false
-      continue
-    }
-    if (blockComment) {
-      if (current === '*' && next === '/') {
-        blockComment = false
-        index += 1
-      }
-      continue
-    }
-    if (quote) {
-      if (escaped) escaped = false
-      else if (current === '\\') escaped = true
-      else if (current === quote) quote = ''
-      continue
-    }
-    if (current === '/' && next === '/') {
-      lineComment = true
-      index += 1
-      continue
-    }
-    if (current === '/' && next === '*') {
-      blockComment = true
-      index += 1
-      continue
-    }
-    if (current === "'" || current === '"' || current === '`') {
-      quote = current
-      continue
-    }
-    if (current === character) return index
-  }
-  return -1
-}
-
-function extractBalanced(source, openIndex, openCharacter, closeCharacter) {
-  if (openIndex < 0 || source[openIndex] !== openCharacter) return ''
-  let depth = 0
-  let cursor = openIndex
-  while (cursor < source.length) {
-    const nextOpen = findCodeCharacter(source, openCharacter, cursor)
-    const nextClose = findCodeCharacter(source, closeCharacter, cursor)
-    if (nextClose < 0) return ''
-    if (nextOpen >= 0 && nextOpen < nextClose) {
-      depth += 1
-      cursor = nextOpen + 1
-      continue
-    }
-    depth -= 1
-    if (depth === 0) return source.slice(openIndex, nextClose + 1)
-    cursor = nextClose + 1
-  }
-  return ''
-}
-
-function extractAssignedArray(source, marker) {
-  const markerIndex = source.indexOf(marker)
-  const assignment = markerIndex >= 0 ? source.indexOf('=', markerIndex + marker.length) : -1
-  const open = assignment >= 0 ? findCodeCharacter(source, '[', assignment + 1) : -1
-  return extractBalanced(source, open, '[', ']')
-}
-
-function extractPropertyArray(source, property) {
-  const propertyMatch = new RegExp(`\\b${escapeRegExp(property)}\\s*:`).exec(source)
-  const open = propertyMatch ? findCodeCharacter(source, '[', propertyMatch.index + propertyMatch[0].length) : -1
-  return extractBalanced(source, open, '[', ']')
-}
-
-function directObjectBlocks(arraySource) {
-  const objects = []
-  let cursor = 1
-  while (cursor < arraySource.length - 1) {
-    const open = findCodeCharacter(arraySource, '{', cursor)
-    if (open < 0) break
-    const object = extractBalanced(arraySource, open, '{', '}')
-    if (!object) break
-    objects.push(object)
-    cursor = open + object.length
-  }
-  return objects
-}
-
-function stringField(source, field) {
-  const match = new RegExp(`\\b${escapeRegExp(field)}\\s*:\\s*(['"])([^'"]*)\\1`).exec(source)
-  return match?.[2] ?? null
-}
-
-function extractJsxOpeningTag(source, tagName) {
-  const start = source.search(new RegExp(`<${escapeRegExp(tagName)}\\b`))
-  return extractJsxOpeningTagAt(source, start)
-}
-
-function extractJsxOpeningTagAt(source, start) {
-  if (start < 0) return ''
-  let braces = 0
-  let quote = ''
-  let escaped = false
-  for (let index = start; index < source.length; index += 1) {
-    const current = source[index]
-    if (quote) {
-      if (escaped) escaped = false
-      else if (current === '\\') escaped = true
-      else if (current === quote) quote = ''
-      continue
-    }
-    if (current === "'" || current === '"' || current === '`') quote = current
-    else if (current === '{') braces += 1
-    else if (current === '}') braces -= 1
-    else if (current === '>' && braces === 0) return source.slice(start, index + 1)
-  }
-  return ''
-}
-
-function stripCommentsAndStrings(source) {
-  let result = ''
-  let quote = ''
-  let lineComment = false
-  let blockComment = false
-  let escaped = false
-
-  for (let index = 0; index < source.length; index += 1) {
-    const current = source[index]
-    const next = source[index + 1]
-    if (lineComment) {
-      if (current === '\n') {
-        lineComment = false
-        result += '\n'
-      } else result += ' '
-      continue
-    }
-    if (blockComment) {
-      if (current === '*' && next === '/') {
-        result += '  '
-        blockComment = false
-        index += 1
-      } else result += current === '\n' ? '\n' : ' '
-      continue
-    }
-    if (quote) {
-      if (escaped) escaped = false
-      else if (current === '\\') escaped = true
-      else if (current === quote) quote = ''
-      result += current === '\n' ? '\n' : ' '
-      continue
-    }
-    if (current === '/' && next === '/') {
-      result += '  '
-      lineComment = true
-      index += 1
-    } else if (current === '/' && next === '*') {
-      result += '  '
-      blockComment = true
-      index += 1
-    } else if (current === "'" || current === '"' || current === '`') {
-      result += ' '
-      quote = current
-    } else result += current
-  }
-  return result
-}
-
-function extractFunctionBody(source, functionName) {
-  const declaration = new RegExp(`\\bfunction\\s+${escapeRegExp(functionName)}\\s*\\(`).exec(source)
-  if (!declaration) return ''
-  const open = findCodeCharacter(source, '{', declaration.index + declaration[0].length)
-  return extractBalanced(source, open, '{', '}')
-}
-
-function extractReturnedRootTag(functionBody) {
-  const code = stripCommentsAndStrings(functionBody)
-  const returnMatch = /\breturn\s*\(/.exec(code)
-  if (!returnMatch) return ''
-  let rootStart = returnMatch.index + returnMatch[0].length
-  while (/\s/.test(code[rootStart] ?? '')) rootStart += 1
-  if (code[rootStart] !== '<' || code[rootStart + 1] === '>') return ''
-  return extractJsxOpeningTagAt(functionBody, rootStart)
-}
-
-function cssRule(source, selector) {
-  const match = new RegExp(`^${escapeRegExp(selector)}\\s*\\{`, 'm').exec(source)
-  if (!match) return ''
-  const open = source.indexOf('{', match.index)
-  return extractBalanced(source, open, '{', '}')
-}
-
-console.log('\n=== Kiosk 首页 Fusion 透明迁移静态合同 ===')
-
-const pageStart = home.indexOf('export function HomePage()')
-const page = pageStart >= 0 ? home.slice(pageStart) : ''
-const homePageBody = extractFunctionBody(home, 'HomePage')
-const frameTag = extractReturnedRootTag(homePageBody)
-const svcGridBody = extractFunctionBody(home, 'SvcGrid')
-const svcGridTag = extractReturnedRootTag(svcGridBody)
-
-expect(
-  /import\s*\{[^}]*\bKioskPageFrame\b[^}]*\}\s*from\s*['"]@ai-job-print\/ui['"]/.test(home),
-  '从 @ai-job-print/ui 导入 KioskPageFrame',
+check(home.includes('KioskPageFrame className="v6-home-page"'), '首页继续复用共享 KioskPageFrame')
+check(home.includes('<V6HomeView'), '容器与 V6 presentation 已拆分')
+check(home.includes("import './styles/home-v6.css'"), '首页只导入 V6 页级样式')
+check(
+  !home.includes('prototype-v1.css') &&
+    !home.includes('kiosk-uplift.css') &&
+    !view.includes('kpv1'),
+  '首页不再混入 75 屏 prototype-v1 视觉'
 )
-expect(
-  /^<KioskPageFrame\b/.test(frameTag) &&
-    /kpv1/.test(frameTag) &&
-    /kpv1--content-only/.test(frameTag) &&
-    !/\bheader\s*=/.test(frameTag) &&
-    !/\bfooter\s*=/.test(frameTag),
-  'HomePage return 的首个 JSX 根节点是 KioskPageFrame + kpv1--content-only（共享壳提供顶栏/底栏）',
+check(
+  home.includes('useOutletContext<TerminalDeviceStatusView>()') &&
+    home.includes('device.printerReady'),
+  '设备状态来自共享运行时真值'
 )
-expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
-expect(
-  /^<div\b/.test(svcGridTag) &&
-    /\bclassName\s*=\s*['"]svc-grid['"]/.test(svcGridTag) &&
-    /\brole\s*=\s*['"]navigation['"]/.test(svcGridTag) &&
-    /\baria-label\s*=\s*['"]服务入口['"]/.test(svcGridTag),
-  '主服务区使用 svc-grid 导航并保留可访问名称',
+check(
+  home.includes('useToolboxConfig()') && home.includes('useSmartCampusConfig()'),
+  '首页读取百宝箱与智慧校园真实配置'
 )
-expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
-const bodyIndexes = [
-  page.indexOf(frameTag),
-  page.search(/<HomeWelcome\b[^>]*\/>/),
-  page.search(/<ContinuePanel\s*\/>/),
-  page.search(/<HomeReception\s*\/>/),
-  page.search(/<HomeDispatch\s*\/>/),
-  page.search(/<HomeContinueBar\b[^>]*\/>/),
-  page.search(/<div\s+[^>]*className\s*=\s*['"]svc-header['"][^>]*>/),
-  page.search(/<SvcGrid\s*\/>/),
-  page.search(/<div\s+[^>]*className\s*=\s*['"]notice['"][^>]*>/),
-  page.indexOf('</KioskPageFrame>'),
-]
-expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保持欢迎、续办、AI 接待、调度、8 项服务与合规提示顺序')
-expect(!/<KioskTopBar\b/.test(page), '首页不再自绘 KioskTopBar')
-expect(!/<HomeNavbar\b/.test(page) && !/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
+check(
+  home.includes("actionId === 'smart-campus' && !campus.enabled") &&
+    home.includes("actionId === 'toolbox' && !toolbox.enabled"),
+  '关闭能力点击 fail-closed'
+)
+check(home.includes("navigate('/login', { state: { from: '/' } })"), '登录入口保留安全返回路径')
 
-const svcTilesArray = extractAssignedArray(svcGridBody, 'const tiles')
-const svcTileObjects = directObjectBlocks(svcTilesArray)
-const expectedSvcTiles = [
-  ['打印扫描', '/print-scan'],
-  ['AI简历服务', '/resume-service'],
-  ['岗位信息', '/jobs-service'],
-  ['招聘会', '/fairs-service'],
-  ['AI面试训练', '/interview-service'],
-  ['政策服务', '/policy-service'],
-  ['百宝箱', '/toolbox'],
-  ['智慧校园', '/smart-campus'],
-]
-const actualSvcTiles = svcTileObjects.map((tile) => [stringField(tile, 'title'), stringField(tile, 'to')])
-expect(JSON.stringify(actualSvcTiles) === JSON.stringify(expectedSvcTiles), 'SvcGrid 精确保留 8 个定版入口的标题、路由与顺序')
-expect(
-  /const\s+toolbox\s*=\s*useToolboxConfig\(\)/.test(svcGridBody) &&
-    /const\s+campus\s*=\s*useSmartCampusConfig\(\)/.test(svcGridBody),
-  '实际渲染的 SvcGrid 读取百宝箱与智慧校园真实配置',
-)
-expect(
-  /const\s+visibleTiles\s*=\s*tiles\.filter\([\s\S]*?toolbox\.enabled[\s\S]*?campus\.enabled[\s\S]*?\)/.test(svcGridBody) &&
-    /visibleTiles\.map\(/.test(svcGridBody) &&
-    !/\{tiles\.map\(/.test(svcGridBody),
-  'SvcGrid 只渲染后台 enabled 开关允许的百宝箱/智慧校园入口',
-)
-
-const groupsArray = extractAssignedArray(serviceGroups, 'export const SERVICE_GROUPS')
-const groupObjects = directObjectBlocks(groupsArray)
-const expectedGroups = [
-  ['resume', 'AI简历服务'],
-  ['jobs', '岗位信息'],
-  ['job-fairs', '招聘会'],
-  ['print-scan', '打印扫描'],
-  ['interview', 'AI面试训练'],
-  ['policy', '政策服务'],
-]
-const actualGroups = groupObjects.map((group) => [stringField(group, 'id'), stringField(group, 'title')])
-expect(JSON.stringify(actualGroups) === JSON.stringify(expectedGroups), 'SERVICE_GROUPS 保留六组 exact id/title/order')
-
-const tileObjects = groupObjects.flatMap((group) => directObjectBlocks(extractPropertyArray(group, 'tiles')))
-const expectedRoutes = new Map([
-  ['AI简历诊断', '/resume/source?intent=diagnose'], ['AI简历优化', '/resume/source?intent=optimize'],
-  ['简历素材库', '/resume/templates'], ['职业规划', '/resume/career-plan'],
-  ['简历打印', '/print/upload?source=resume'], ['求职材料', '/resume/materials'],
-  ['全职岗位', '/jobs?category=fulltime'], ['实习岗位', '/jobs?category=intern'],
-  ['兼职信息', '/jobs?category=parttime'], ['全部岗位', '/jobs'], ['找企业', '/companies'],
-  ['岗位大师', '/resume/job-fit'], ['社会招聘会', '/job-fairs'], ['校园招聘会', '/campus'],
-  ['扫码签到', '/job-fairs/checkin'], ['文档打印', '/print/upload?source=document'],
-  ['纸质扫描', '/scan/start'], ['格式转换', '/print-scan/convert'], ['模拟面试', '/interview/setup'],
-  ['面试技巧', '/interview/tips'], ['面试报告', '/interview/reports'], ['就业政策', '/renshi?tab=policy'],
-  ['社保指南', '/renshi?tab=social'], ['档案 / 登记', '/renshi?tab=register'],
+const domainManifest = manifest.slice(manifest.indexOf('export const HOME_V6_DOMAINS'))
+const domainIds = [
+  ...domainManifest.matchAll(/id: '(print|resume|jobs|fairs|interview|policy|toolbox|campus)'/g),
+].map((match) => match[1])
+assert.deepEqual(domainIds, [
+  'print',
+  'resume',
+  'jobs',
+  'fairs',
+  'interview',
+  'policy',
+  'toolbox',
+  'campus',
 ])
-for (const [title, route] of expectedRoutes) {
-  const matches = tileObjects.filter((tile) => stringField(tile, 'title') === title)
-  expect(matches.length === 1 && stringField(matches[0], 'to') === route, `真实入口保留：${title} → ${route}`)
+pass('八个 V6 服务域顺序唯一且完整')
+for (const route of [
+  '/print-scan',
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
+  '/toolbox',
+  '/smart-campus',
+]) {
+  check(manifest.includes(`'${route}'`), `真实域入口保留 ${route}`)
 }
+check(
+  manifest.includes("'print-phone': '/print/upload?source=document&tab=qr'"),
+  '手机扫码传先进入 Kiosk 真上传会话页'
+)
+check(
+  manifest.includes("'print-local': '/print/upload?source=document&tab=file'") &&
+    manifest.includes("'print-usb': '/print/upload?source=document&tab=usb'"),
+  '本机与 U 盘入口由既有 PrintUploadPage 消费'
+)
+check(!manifest.includes('/upload/phone'), 'Kiosk 首页不会直接打开手机辅助页')
 
-const disabledTiles = tileObjects.filter((tile) => /\bdisabled\s*:\s*(?:true|Boolean\s*\(\s*true\s*\))\s*(?=[,}])/.test(tile))
-const allDisabledFields = tileObjects.filter((tile) => /\bdisabled\s*:/.test(tile))
-const disabledTitles = disabledTiles.map((tile) => stringField(tile, 'title'))
-expect(
-  allDisabledFields.length === 2 &&
-    disabledTiles.length === 2 &&
-    JSON.stringify(disabledTitles) === JSON.stringify(['证件复印', '证件照打印']),
-  'disabled 语义精确为两项（兼容 true/Boolean(true)）：证件复印、证件照打印',
+check(
+  view.includes("HOME_V6_DOMAINS.filter((domain) => domain.size === 'large')"),
+  '大卡从唯一 typed manifest 渲染'
+)
+check(
+  view.includes("HOME_V6_DOMAINS.filter((domain) => domain.size === 'small')"),
+  '小卡从唯一 typed manifest 渲染'
+)
+check(
+  !view.includes('.filter((tile)') && !view.includes('visibleTiles'),
+  '智慧校园关闭时不从首页消失'
+)
+check(
+  /domain\.id === 'campus'[\s\S]{0,80}\? !campusEnabled/.test(view) &&
+    view.includes('学校接入并完成配置后开放'),
+  '智慧校园默认 visible-but-disabled 并显示原因'
+)
+check(
+  /domain\.id === 'toolbox'[\s\S]{0,80}\? !toolboxEnabled/.test(view) &&
+    view.includes('本机尚未上架扩展服务'),
+  '百宝箱无配置时 visible-but-disabled 并显示原因'
+)
+check(
+  view.includes('disabled={disabled}') && view.includes('aria-describedby='),
+  '禁用卡使用原生 disabled 与可访问原因'
+)
+check(view.includes('/assets/ai-advisor.png'), 'V6 Hero 复用真实小青视觉资产')
+check(
+  view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('来源平台办理'),
+  '首页常驻合规边界'
+)
+check(!/一键投递|立即投递/.test(`${home}\n${view}\n${manifest}`), '首页拒绝违规投递文案')
+check(
+  !/12 家来源|本周 3 场|已有 1 份|示例办理单/.test(view),
+  '运行时首页不渲染设计稿示例统计或个人数据'
 )
 
-const welcomeStart = home.indexOf('function HomeWelcome')
-const welcomeEnd = home.indexOf('function ServiceCard', welcomeStart)
-const welcome = welcomeStart >= 0 && welcomeEnd > welcomeStart ? home.slice(welcomeStart, welcomeEnd) : ''
-expect(/const\s*\{[^}]*\bisLoggedIn\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome), '登录态来自 useAuth.isLoggedIn')
-expect(/const\s*\{[^}]*\bdisplayName\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome) && welcome.includes('{displayName}'), '登录态展示真实 displayName')
-expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile['"]\s*\)\}[^>]*>[\s\S]*?进入我的/.test(welcome), '登录态「进入我的」导航到 /profile')
-expect(!page.includes('<MemberLoginDialog'), '首页不再挂载独立登录弹窗')
-expect(
-  /const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/.test(page) &&
-    /<HomeWelcome\s+onOpenLogin=\{openLogin\}\s*\/>/.test(page) &&
-    /<HomeContinueBar\s+onLogin=\{openLogin\}\s*\/>/.test(page),
-  '游客入口复用统一全屏登录页跳转并保留首页返回路径',
+check(
+  css.includes('.v6-home-services__primary') &&
+    /grid-template-columns:\s*1\.55fr\s+1fr/.test(css),
+  '1080×1920 首行保持 V6 一大一中布局'
 )
-expect(!/setLoginOpen|continueAsGuest/.test(page), '首页不再维护第二套登录弹窗状态')
-expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
-expect(read('src/layouts/KioskRoot.tsx').includes('<KioskTopbarStatus'), '共享顶栏注入设备状态')
-expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')
-expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '保留百宝箱/智慧校园真实配置 hooks')
-expect(/const showToolbox = toolbox\.enabled/.test(home) && /const showCampus = campus\.enabled/.test(home) && /if \(!showToolbox && !showCampus\) return null/.test(home), '保留百宝箱/智慧校园诚实门控')
-
-const complianceNotice = /岗位与招聘会信息均来自第三方\s*\/\s*官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。/
-expect(complianceNotice.test(home), '保留完整合规提示文案')
-const complianceSurface = `${home}\n${serviceGroups}\n${css}`
-expect(!/一键投递|立即投递/.test(complianceSurface), '拒绝「一键投递」/「立即投递」')
-expect(!/(?<!来源)平台投递/.test(complianceSurface), '「平台投递」仅允许「来源平台投递」语境')
-
-const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
-expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI顾问'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三个 Tab')
-expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
-expect(read('src/layouts/KioskRoot.tsx').includes("tabToPath") && read('src/layouts/KioskRoot.tsx').includes("'/assistant'") && read('src/layouts/KioskRoot.tsx').includes("'/profile'"), '导航目标保留 /assistant 与 /profile')
-
-const rootSrc = read('src/layouts/KioskRoot.tsx')
-const tabPathBody = (() => {
-  const start = rootSrc.indexOf('function tabToPath')
-  // tabToPath 之后可能紧跟 statusToneFor 等辅助函数；只截取到下一函数边界。
-  const nextFn = rootSrc.slice(start + 1).search(/\nfunction |\nexport function /)
-  const end = nextFn >= 0 ? start + 1 + nextFn : rootSrc.indexOf('export function KioskRoot', start)
-  return start >= 0 && end > start ? rootSrc.slice(start, end) : ''
-})()
-const declaredRoutes = new Set([
-  ...[...serviceGroups.matchAll(/(?:to|titleTo)\s*:\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
-  ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
-  ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
-])
-const allowedRoutes = new Set([
-  ...expectedRoutes.values(),
-  ...expectedSvcTiles.map(([, route]) => route),
-  '/print/upload', '/profile', '/assistant', '/login', '/',
-])
-expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
-expect(!/\bfetch\s*\(/.test(home + serviceGroups), '首页未新增 fetch')
-const productionIdentifiers = stripCommentsAndStrings(`${home}\n${serviceGroups}`).match(/\b[A-Za-z_$][\w$]*\b/g) ?? []
-const demoMockIdentifiers = productionIdentifiers.filter((identifier) => /^(?:demo|mock|useDemo|useMock)/i.test(identifier))
-expect(demoMockIdentifiers.length === 0, '首页生产代码未新增 demo*/mock*/useDemo*/useMock* 标识符')
-
-const kpv1RootRule = cssRule(css, '.kpv1')
-const kpv1ContentRule = cssRule(css, '.kpv1.kpv1--content-only')
-const kpv1ContentWrapperRule = cssRule(css, "[data-kiosk-presentation='fusion-youth'] .kpv1--content-only > .ui-kiosk-page-content")
-const zoneRowRule = cssRule(css, '.kpv1 .zone-row')
-expect(/^\.kpv1\s*\{/m.test(css) && !/(?:div|section|main)\.kpv1\s*\{/.test(css), '.kpv1 根规则非 tag-specific，兼容 section 根')
-expect(/width:\s*min\(1080px,\s*100%\)/.test(kpv1RootRule) && /display:\s*flex/.test(kpv1RootRule) && /flex-direction:\s*column/.test(kpv1RootRule), '.kpv1 保留关键根布局规则')
-expect(/background:\s*transparent/.test(kpv1ContentRule) && /min-height:\s*0/.test(kpv1ContentRule), '.kpv1--content-only 交给共享壳承载舞台背景')
-expect(
-  /padding:\s*0\s*(?:;|})/.test(kpv1ContentWrapperRule) && /gap:\s*0\s*(?:;|})/.test(kpv1ContentWrapperRule),
-  '.kpv1--content-only 精确消除共享 content padding/gap，避免双 inset 并确保百宝箱、智慧校园及合规提示在首屏可见',
+check(
+  css.includes('.v6-home-services__secondary') &&
+    /grid-template-columns:\s*repeat\(3,\s*1fr\)/.test(css),
+  '1080×1920 次行保持三列服务域'
 )
-expect(/margin:\s*18px\s+48px\s+0/.test(zoneRowRule), '共享壳内首页补偿 10px 可用高度差，专区与合规提示锚点对齐 01-home 原型')
-expect(
-  /@media\s*\(width:\s*1080px\)\s*and\s*\(height:\s*1920px\)\s*\{[\s\S]*?\.kpv1\s*\{[^}]*width:\s*1080px;[^}]*min-height:\s*0;/.test(css),
-  '1080×1920 共享壳内首页使用可收缩内容高度，不把 1920px 整机高度重复塞进内容区',
+check(
+  /@media\s*\(max-width:\s*760px\)/.test(css) &&
+    /@media\s*\(max-width:\s*430px\)/.test(css),
+  '手机与窄桌面有独立响应式降级'
 )
-expect(!/\.kpv1\s*\{[^}]*min-height:\s*1920px;/.test(css), '首页禁止用 1920px 内容高度把专区和提示压到底栏下方')
-console.log('  INFO Task 4 的 prototype-v1.css no-diff 由 review diff allowlist 负责；本脚本只验证 section 根兼容合同')
+check(
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(css) && css.includes('html.lowgpu'),
+  '动效提供 reduced-motion 与 lowgpu 退化'
+)
+check(
+  css.includes('@keyframes v6-home-sheen') && css.includes('@keyframes v6-home-orbit'),
+  'V6 语义动效已实现'
+)
+check(!css.includes('.kpv1'), 'V6 首页样式完全路由作用域化')
 
-expect(packageJson.includes('"verify:fusion-home": "node scripts/verify-fusion-home.mjs"'), 'package.json 精确注册 verify:fusion-home')
+check(
+  kioskRoot.includes('useTerminalDeviceStatus(true)') && kioskRoot.includes('<KioskTopbarStatus'),
+  '共享顶栏继续使用真实设备状态'
+)
+check(
+  kioskRoot.includes('<KioskStageFit enabled={!usesFluidViewport}>'),
+  '1080×1920 舞台缩放能力未被替换'
+)
+check(
+  home.split('\n').length < 120 &&
+    view.split('\n').length < 260 &&
+    manifest.split('\n').length < 180,
+  '运行时文件保持可维护体积'
+)
 
-if (failures > 0) {
-  console.error(`\nFAIL ${failures} 项 —— Kiosk 首页 Fusion 透明迁移合同未满足\n`)
-  process.exit(1)
-}
-console.log('\nALL PASS —— Kiosk 首页 Fusion 透明迁移合同满足\n')
+console.log('\nALL PASS — V6 首页视觉、动作、门控与响应式合同成立\n')

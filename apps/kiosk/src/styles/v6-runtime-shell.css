@@ -1,0 +1,97 @@
+/* V6 首批运行时壳：只作用于已迁移的 / 与 /print-scan，不污染未迁页面。 */
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar {
+  height: 100px;
+  padding: 0 56px;
+  color: var(--k-ink);
+  border-bottom: 1px solid var(--k-line);
+  background: color-mix(in srgb, var(--k-surface) 94%, transparent);
+  backdrop-filter: blur(14px);
+}
+.v6-runtime-shell .ui-kiosk-topbar__brand {
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  color: inherit;
+}
+.v6-runtime-shell .ui-kiosk-topbar__brand-action {
+  padding: 0;
+  border: 0;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.v6-runtime-shell .ui-kiosk-topbar__brand-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  flex: none;
+  border-radius: 15px;
+  color: var(--k-surface);
+  font-family: var(--k-serif);
+  font-size: 26px;
+  opacity: 1;
+  background: linear-gradient(148deg, var(--color-success), var(--color-success-fg));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+.v6-runtime-shell .ui-kiosk-topbar__brand-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+  opacity: 1;
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar__brand-copy b {
+  color: var(--k-ink);
+  font-size: 30px;
+  letter-spacing: 0.06em;
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar__brand-copy > span {
+  color: var(--k-muted);
+  font-size: 16px;
+  opacity: 1;
+  letter-spacing: 0.06em;
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar__right {
+  color: var(--k-muted);
+  gap: 22px;
+}
+.v6-runtime-shell .k-status-chip {
+  color: var(--k-ink);
+  border-color: var(--k-line);
+  background: var(--k-surface);
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-nav {
+  margin-top: 0;
+  color: var(--k-muted);
+  border-top: 1px solid var(--k-line);
+  background: color-mix(in srgb, var(--k-surface) 96%, transparent);
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-nav__item {
+  color: var(--k-muted);
+}
+[data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-nav__item[aria-current='page'] {
+  color: var(--k-teal-deep);
+}
+@media (max-width: 760px) {
+  [data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar {
+    height: 76px;
+    padding: 0 20px;
+  }
+  .v6-runtime-shell .ui-kiosk-topbar__brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    font-size: 22px;
+  }
+  [data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar__brand-copy b {
+    font-size: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v6-runtime-shell .ui-kiosk-topbar__brand-mark {
+    animation: none;
+  }
+}

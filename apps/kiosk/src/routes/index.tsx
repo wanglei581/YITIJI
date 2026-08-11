@@ -89,6 +89,7 @@ export const kioskRouter = createBrowserRouter([
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
+    errorElement: <KioskRouteErrorPage />,
     children: [
       {
         element: <Outlet />,
