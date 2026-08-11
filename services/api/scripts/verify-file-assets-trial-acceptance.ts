@@ -632,14 +632,23 @@ assert.doesNotMatch(
   'manual production evidence rows must remain unchecked in the template',
 )
 
-assert.match(filesService, /where:\s*\{\s*deletedAt:\s*null,\s*expiresAt:\s*\{\s*lt:\s*now\s*\}/, 'cleanupExpired must select only expired non-deleted rows')
+assert.match(filesService, /\{ expiresAt: \{ lt: now \} \}/, 'cleanupExpired must select expired rows')
+assert.match(
+  filesService,
+  /where:\s*\{[\s\S]*?id: f\.id,[\s\S]*?deletedAt: null,[\s\S]*?status: f\.status,[\s\S]*?updatedAt: f\.updatedAt,[\s\S]*?\.\.\.stillExpired/,
+  'cleanupExpired must re-check expiry, status and updatedAt when quarantining a stale candidate',
+)
 assert.match(filesService, /await this\.storage\.deleteObject\(f\.storageKey,\s*f\.bucket\)/, 'cleanupExpired must delete storage object before marking the row deleted')
 assert.match(filesService, /action:\s*'file\.cleanup_expired'/, 'cleanupExpired cron path must write audit log')
 assert.match(filesController, /action:\s*'file\.retention_update'/, 'updateRetention controller path must write audit log')
 assert.match(filesController, /action:\s*'file\.delete'/, 'ownerDelete controller path must write audit log')
 assert.match(filesController, /action:\s*'file\.cleanup_expired'/, 'manual cleanup controller path must write audit log')
 assert.match(filesCleanupTask, /@Cron\(CronExpression\.EVERY_HOUR\)/, 'FilesCleanupTask must remain hourly cron based')
-assert.match(filesModule, /providers:\s*\[\s*FilesService,\s*FilesCleanupTask\s*\]/, 'FilesCleanupTask must remain registered in FilesModule')
+assert.match(
+  filesModule,
+  /providers:\s*\[[\s\S]*?FilesService,[\s\S]*?FilesCleanupTask,[\s\S]*?\]/,
+  'FilesCleanupTask must remain registered in FilesModule',
+)
 assert.match(appModule, /ScheduleModule\.forRoot\(\)/, 'ScheduleModule must remain enabled in AppModule')
 
 console.warn('[STATIC DOC CHECK ONLY] This verification does NOT prove production/trial acceptance.')

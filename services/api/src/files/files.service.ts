@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
@@ -708,15 +709,16 @@ export class FilesService {
     requester: FileRequester,
     args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string }
   ): Promise<FileRetentionUpdateResponse> {
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireActive(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权修改此文件' },
       })
     }
     try {
+      const operationNow = new Date()
       const decision = computeRetentionDecision({
-        now: new Date(),
+        now: operationNow,
         policy: args.retentionPolicy,
         purpose: record.purpose as FilePurpose,
         sensitiveLevel: record.sensitiveLevel as FileSensitiveLevel,
@@ -728,8 +730,14 @@ export class FilesService {
         consentVersion: args.consentVersion,
         retentionLockedReason: record.retentionLockedReason,
       })
-      const updated = await this.prisma.fileObject.update({
-        where: { id: fileId },
+      const updated = await this.prisma.fileObject.updateMany({
+        where: {
+          id: fileId,
+          deletedAt: null,
+          status: 'active',
+          updatedAt: record.updatedAt,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: operationNow } }],
+        },
         data: {
           expiresAt: decision.expiresAt,
           retentionPolicy: decision.retentionPolicy,
@@ -738,11 +746,22 @@ export class FilesService {
           retentionConsentVersion: decision.retentionConsentVersion,
         },
       })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'FILE_RETENTION_STATE_CHANGED', message: '文件状态已变化，请刷新后重试' },
+        })
+      }
+      const current = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+      if (!current || current.deletedAt || current.status !== 'active') {
+        throw new ConflictException({
+          error: { code: 'FILE_RETENTION_STATE_CHANGED', message: '文件状态已变化，请刷新后重试' },
+        })
+      }
       return {
-        file: toMetadata(updated),
+        file: toMetadata(current),
         allowedPolicies: allowedPoliciesForFile({
-          purpose: updated.purpose,
-          assetCategory: updated.assetCategory,
+          purpose: current.purpose,
+          assetCategory: current.assetCategory,
         }),
       }
     } catch (err) {
@@ -823,7 +842,16 @@ export class FilesService {
           { purpose: 'contract_upload', expiresAt: null },
         ],
       },
-      select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
+      select: {
+        id: true,
+        storageKey: true,
+        bucket: true,
+        purpose: true,
+        sensitiveLevel: true,
+        status: true,
+        expiresAt: true,
+        updatedAt: true,
+      },
     })
 
     const deletedIds: string[] = []
@@ -841,8 +869,20 @@ export class FilesService {
           continue
         }
         // 先隔离，确保后续对象删除或最终 tombstone 写入任一失败时都不会继续签发 URL/读取内容。
+        // findMany 只是候选快照；隔离时必须再次 CAS 到期条件和原状态。
+        // confirm / retention update 若已延长 expiresAt 或推进状态，本轮不得按旧快照删除。
+        const stillExpired =
+          f.purpose === 'contract_upload' && !f.expiresAt
+            ? { purpose: 'contract_upload', expiresAt: null }
+            : { expiresAt: { lt: now } }
         const quarantined = await this.prisma.fileObject.updateMany({
-          where: { id: f.id, deletedAt: null },
+          where: {
+            id: f.id,
+            deletedAt: null,
+            status: f.status,
+            updatedAt: f.updatedAt,
+            ...stillExpired,
+          },
           data: { status: 'quarantined' },
         })
         if (quarantined.count === 0) continue

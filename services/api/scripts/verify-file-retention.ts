@@ -47,6 +47,7 @@ interface CleanupRecord {
   expiresAt: Date | null
   deletedAt: Date | null
   status: string
+  updatedAt: Date
 }
 
 async function verifyMalformedContractCleanup(): Promise<void> {
@@ -62,6 +63,7 @@ async function verifyMalformedContractCleanup(): Promise<void> {
         expiresAt: null,
         deletedAt: null,
         status: 'active',
+        updatedAt: now,
       },
     ],
     [
@@ -75,6 +77,7 @@ async function verifyMalformedContractCleanup(): Promise<void> {
         expiresAt: null,
         deletedAt: null,
         status: 'active',
+        updatedAt: now,
       },
     ],
     [
@@ -88,6 +91,7 @@ async function verifyMalformedContractCleanup(): Promise<void> {
         expiresAt: new Date(Date.now() - 60_000),
         deletedAt: null,
         status: 'active',
+        updatedAt: now,
       },
     ],
   ])
@@ -130,14 +134,26 @@ async function verifyMalformedContractCleanup(): Promise<void> {
         where,
         data,
       }: {
-        where: { id: string; deletedAt?: null; status?: string }
+        where: {
+          id: string
+          deletedAt?: null
+          status?: string
+          updatedAt?: Date
+          expiresAt?: { lt?: Date } | null
+        }
         data: Partial<CleanupRecord>
       }) => {
         const current = records.get(where.id)
         if (
           !current ||
           (where.deletedAt === null && current.deletedAt !== null) ||
-          (where.status && current.status !== where.status)
+          (where.status && current.status !== where.status) ||
+          (where.updatedAt && current.updatedAt.getTime() !== where.updatedAt.getTime()) ||
+          (where.expiresAt === null && current.expiresAt !== null) ||
+          (where.expiresAt &&
+            (!current.expiresAt ||
+              !where.expiresAt.lt ||
+              current.expiresAt >= where.expiresAt.lt))
         ) {
           return { count: 0 }
         }

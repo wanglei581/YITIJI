@@ -1,7 +1,12 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
-import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { FilesService } from '../src/files/files.service'
 
 function makeRecord() {
@@ -127,14 +132,17 @@ function makeQuarantineHarness(options: { failMetadata?: boolean; failStorage?: 
   }
 }
 
-function makeCleanupHarness() {
+function makeCleanupHarness(
+  options: { extendBeforeQuarantine?: boolean; confirmBeforeQuarantine?: boolean } = {}
+) {
   const record = makeRecord()
   record.expiresAt = new Date(Date.now() - 60_000)
+  if (options.confirmBeforeQuarantine) record.status = 'uploading'
   let deleteObjectCalls = 0
   let failFinalMetadata = true
   const prisma = {
     fileObject: {
-      findMany: async () => (record.deletedAt ? [] : [record]),
+      findMany: async () => (record.deletedAt ? [] : [{ ...record }]),
       findUnique: async () => record,
       update: async ({ data }: { data: Partial<typeof record> }) => {
         if (failFinalMetadata && data.status === 'deleted') {
@@ -143,7 +151,25 @@ function makeCleanupHarness() {
         Object.assign(record, data)
         return record
       },
-      updateMany: async ({ data }: { data: Partial<typeof record> }) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>
+        data: Partial<typeof record>
+      }) => {
+        const expiresWhere = where['expiresAt'] as { lt?: Date } | null | undefined
+        if (where['status'] && where['status'] !== record.status) return { count: 0 }
+        if (
+          where['updatedAt'] instanceof Date &&
+          where['updatedAt'].getTime() !== record.updatedAt.getTime()
+        ) {
+          return { count: 0 }
+        }
+        if (expiresWhere?.lt && (!record.expiresAt || record.expiresAt >= expiresWhere.lt)) {
+          return { count: 0 }
+        }
+        if (expiresWhere === null && record.expiresAt !== null) return { count: 0 }
         if (failFinalMetadata && data.status === 'deleted') {
           throw new Error('controlled cleanup final metadata failure')
         }
@@ -151,7 +177,19 @@ function makeCleanupHarness() {
         return { count: 1 }
       },
     },
-    fairMaterialPrintBridge: { findFirst: async () => null },
+    fairMaterialPrintBridge: {
+      findFirst: async () => {
+        if (options.extendBeforeQuarantine) {
+          record.expiresAt = new Date(Date.now() + 60_000)
+          record.updatedAt = new Date(record.updatedAt.getTime() + 1)
+        }
+        if (options.confirmBeforeQuarantine) {
+          record.status = 'active'
+          record.updatedAt = new Date(record.updatedAt.getTime() + 1)
+        }
+        return null
+      },
+    },
     printTask: { findMany: async () => [] },
   }
   const storage = {
@@ -177,6 +215,32 @@ function makeCleanupHarness() {
       { write: async () => undefined } as never,
       storage as never
     ),
+  }
+}
+
+function makeRetentionRaceHarness() {
+  const record = makeRecord()
+  const originalExpiry = record.expiresAt
+  const prisma = {
+    fileObject: {
+      findUnique: async () => record,
+      updateMany: async ({ where }: { where: { status?: string; updatedAt?: Date } }) => {
+        record.status = 'quarantined'
+        record.updatedAt = new Date(record.updatedAt.getTime() + 1)
+        if (
+          where.status !== record.status ||
+          where.updatedAt?.getTime() !== record.updatedAt.getTime()
+        ) {
+          return { count: 0 }
+        }
+        return { count: 1 }
+      },
+    },
+  }
+  return {
+    record,
+    originalExpiry,
+    service: new FilesService(prisma as never, {} as never, {} as never),
   }
 }
 
@@ -321,6 +385,33 @@ async function main(): Promise<void> {
   assert.equal(cleanup.record.status, 'deleted')
   assert.ok(cleanup.record.deletedAt)
   assert.equal(cleanup.deleteObjectCalls(), 2)
+
+  const extendedDuringCleanup = makeCleanupHarness({ extendBeforeQuarantine: true })
+  const skippedStaleCandidate = await extendedDuringCleanup.service.cleanupExpired('manual')
+  assert.equal(skippedStaleCandidate.deletedCount, 0)
+  assert.equal(extendedDuringCleanup.record.status, 'active')
+  assert.equal(extendedDuringCleanup.record.deletedAt, null)
+  assert.equal(extendedDuringCleanup.deleteObjectCalls(), 0)
+
+  const confirmedDuringCleanup = makeCleanupHarness({ confirmBeforeQuarantine: true })
+  const skippedConfirmedCandidate = await confirmedDuringCleanup.service.cleanupExpired('manual')
+  assert.equal(skippedConfirmedCandidate.deletedCount, 0)
+  assert.equal(confirmedDuringCleanup.record.status, 'active')
+  assert.equal(confirmedDuringCleanup.record.deletedAt, null)
+  assert.equal(confirmedDuringCleanup.deleteObjectCalls(), 0)
+
+  const retentionRace = makeRetentionRaceHarness()
+  await assert.rejects(
+    () =>
+      retentionRace.service.updateRetention(
+        'file-1',
+        { kind: 'member', endUserId: 'member-1' },
+        { retentionPolicy: 'months_3' }
+      ),
+    ConflictException
+  )
+  assert.equal(retentionRace.record.status, 'quarantined')
+  assert.equal(retentionRace.record.expiresAt, retentionRace.originalExpiry)
 
   console.log('PASS: file deletion tombstones metadata before idempotent object deletion')
 }

@@ -2,6 +2,12 @@
 
 > 最后更新：2026-08-11
 
+## 2026-08-11 文件与扫码上传生命周期收口
+
+- [x] **W1-D1：文件过期清理旧快照 CAS**（候选分支 `codex/file-cleanup-cas-20260811`，未合并/未部署）：cleanup 隔离时重验 `status + updatedAt + expiresAt`，保存期限更新使用 active/版本 CAS；查询后延寿不会被旧 cron 误删。
+- [ ] **W1-D2：物理对象删除持久重试账本**：新增 additive `storageDeletePendingAt`（或经 schema 审查确认的等价字段），统一 owner/admin 删除、直传隔离和过期清理为 quarantine/pending → 幂等删对象 → tombstone/清 pending；cron 必须重试 pending，且不重复处理已确认完成的对象。SQLite/PostgreSQL 双 schema、迁移、失败/404/连续重试与历史 tombstone 盘点同批完成。
+- [ ] **W1-D3：Upload Session 持久状态与终态锁**：在 W1-D2 后再把未确认普通上传固化为 `status=uploading + expiresAt=session.expiresAt`，confirm 通过数据库 CAS 转 active 并恢复合法 retention；upload/confirm/cancel/lazy-expire 共用 fencing lock。`contract_upload` 保持从上传起两小时的既有锁定规则，不以确认时间延长。
+
 > **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，
 > 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
 > 「2026-08-10 商用收口后续」及其后各节来自 main。
