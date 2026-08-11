@@ -8,6 +8,7 @@ test('sensitive system deletion never logs the full file id', async () => {
   const logs: string[] = []
   const storageDeletes: Array<{ storageKey: string; bucket: string }> = []
   const databaseWrites: unknown[] = []
+  const operationOrder: string[] = []
   const row = fileRow(fileId)
   const deletedRow = {
     ...row,
@@ -19,21 +20,25 @@ test('sensitive system deletion never logs the full file id', async () => {
   const service = new FilesService(
     {
       fileObject: {
-        update: async (args: unknown) => {
+        updateMany: async (args: unknown) => {
+          operationOrder.push('metadata-tombstone')
           databaseWrites.push(args)
-          return deletedRow
+          return { count: 1 }
         },
+        findUnique: async () => deletedRow,
       },
     } as never,
     {} as never,
     {
       deleteObject: async (storageKey: string, bucket: string) => {
+        operationOrder.push('object-delete')
         storageDeletes.push({ storageKey, bucket })
       },
     } as never
   )
-  ;(service as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
-    async () => row
+  ;(
+    service as unknown as { requireDeletionRecord: () => Promise<typeof row> }
+  ).requireDeletionRecord = async () => row
   ;(service as unknown as { logger: { log(value: string): void } }).logger = {
     log: (value) => logs.push(value),
   }
@@ -43,6 +48,7 @@ test('sensitive system deletion never logs the full file id', async () => {
   assert.equal(deleted.id, fileId)
   assert.deepEqual(storageDeletes, [{ storageKey: row.storageKey, bucket: row.bucket }])
   assert.equal(databaseWrites.length, 1)
+  assert.deepEqual(operationOrder, ['metadata-tombstone', 'object-delete'])
   assert.equal(logs.length, 1)
   assert.doesNotMatch(logs[0]!, new RegExp(fileId))
   assert.match(logs[0]!, /^Sensitive file deleted by system: [a-f0-9]{12}$/u)
@@ -55,14 +61,16 @@ test('generic system deletion keeps its existing full-id log behavior', async ()
   const service = new FilesService(
     {
       fileObject: {
-        update: async () => ({ ...row, status: 'deleted', deletedAt: new Date() }),
+        updateMany: async () => ({ count: 1 }),
+        findUnique: async () => ({ ...row, status: 'deleted', deletedAt: new Date() }),
       },
     } as never,
     {} as never,
     { deleteObject: async () => undefined } as never
   )
-  ;(service as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
-    async () => row
+  ;(
+    service as unknown as { requireDeletionRecord: () => Promise<typeof row> }
+  ).requireDeletionRecord = async () => row
   ;(service as unknown as { logger: { log(value: string): void } }).logger = {
     log: (value) => logs.push(value),
   }
@@ -77,17 +85,33 @@ test('generic expired cleanup redacts file ids, storage errors, and cron batch e
   const logs: string[] = []
   const service = new FilesService(
     {
-      fileObject: { findMany: async () => [{
-        id: fileId, storageKey: 'contracts/member-1/private.pdf', bucket: 'private',
-        purpose: 'contract_upload', sensitiveLevel: 'highly_sensitive',
-      }] },
+      fileObject: {
+        findMany: async () => [
+          {
+            id: fileId,
+            storageKey: 'contracts/member-1/private.pdf',
+            bucket: 'private',
+            purpose: 'contract_upload',
+            sensitiveLevel: 'highly_sensitive',
+          },
+        ],
+        updateMany: async () => ({ count: 1 }),
+      },
       fairMaterialPrintBridge: { findFirst: async () => null },
+      printTask: { findMany: async () => [] },
     } as never,
     {} as never,
-    { deleteObject: async () => { throw new Error(`storage failed ${fileId} contracts/member-1/private.pdf`) } } as never,
+    {
+      deleteObject: async () => {
+        throw new Error(`storage failed ${fileId} contracts/member-1/private.pdf`)
+      },
+    } as never
   )
-  ;(service as unknown as { logger: { warn(value: string): void; log(value: string): void } }).logger = {
-    warn: (value) => logs.push(value), log: (value) => logs.push(value),
+  ;(
+    service as unknown as { logger: { warn(value: string): void; log(value: string): void } }
+  ).logger = {
+    warn: (value) => logs.push(value),
+    log: (value) => logs.push(value),
   }
   await service.cleanupExpired('cron')
   assert.equal(logs.length, 1)
@@ -96,7 +120,9 @@ test('generic expired cleanup redacts file ids, storage errors, and cron batch e
 
   const cronLogs: string[] = []
   const cron = new FilesCleanupTask({
-    async cleanupExpired() { throw new Error(`database failed ${fileId}`) },
+    async cleanupExpired() {
+      throw new Error(`database failed ${fileId}`)
+    },
   } as never)
   ;(cron as unknown as { logger: { error(value: string): void } }).logger = {
     error: (value) => cronLogs.push(value),
@@ -112,19 +138,30 @@ test('cron audit stores irreversible digests instead of raw deleted file ids', a
   const service = new FilesService(
     {
       fileObject: {
-        findMany: async () => [{
-          id: fileId, storageKey: row.storageKey, bucket: row.bucket,
-          purpose: row.purpose, sensitiveLevel: row.sensitiveLevel,
-        }],
-        update: async () => ({ ...row, status: 'deleted', deletedAt: new Date() }),
+        findMany: async () => [
+          {
+            id: fileId,
+            storageKey: row.storageKey,
+            bucket: row.bucket,
+            purpose: row.purpose,
+            sensitiveLevel: row.sensitiveLevel,
+          },
+        ],
+        updateMany: async () => ({ count: 1 }),
       },
       fairMaterialPrintBridge: { findFirst: async () => null },
+      printTask: { findMany: async () => [] },
     } as never,
-    { write: async (entry: { payload?: { fileIdDigest?: string[] } }) => { audits.push(entry) } } as never,
-    { deleteObject: async () => undefined } as never,
+    {
+      write: async (entry: { payload?: { fileIdDigest?: string[] } }) => {
+        audits.push(entry)
+      },
+    } as never,
+    { deleteObject: async () => undefined } as never
   )
   ;(service as unknown as { logger: { warn(): void; log(): void } }).logger = {
-    warn: () => undefined, log: () => undefined,
+    warn: () => undefined,
+    log: () => undefined,
   }
   await service.cleanupExpired('cron')
   assert.equal(audits.length, 1)

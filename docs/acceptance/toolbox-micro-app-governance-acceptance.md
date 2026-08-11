@@ -262,7 +262,7 @@ where "terminalId" = '<TERMINAL_CODE>';
 
 不允许作为首批低风险上线：
 
-- `contract-review`：必须先完成合同文件留存、隐私删除、法务评审。
+- `contract-review`：已归档并移出百宝箱；不得发布投影，独立能力按「AI简历服务 → 签约与权益」的发布门禁验收。
 - `legal-risk-check`：必须先完成法律责任边界和法务评审。
 - `exam-paper-print`：必须先完成版权、授权材料来源和真机打印验收。
 - `ielts-practice` 或英语模拟练习：必须确认品牌 / 商标 / 题库版权和合作授权。

@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
 import { RedisService } from '../common/redis/redis.service'
 import type { WebhookPayloadDto } from './dto/webhook-payload.dto'
+import { assertDataSourceCapability } from '../jobs/partner-capabilities'
 
 const TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
 /** Nonce TTL in Redis — matches the timestamp acceptance window (300 s = 5 min). */
@@ -77,12 +78,23 @@ export class SyncService {
     if (Math.abs(Date.now() - tsMs) > TIMESTAMP_WINDOW_MS) denied()
 
     // 2) 取 JobSource 并校验启用 + accessMode=webhook
-    const source = await this.prisma.jobSource.findUnique({ where: { id: args.sourceId } })
-    if (!source || !source.enabled || source.accessMode !== 'webhook' || !source.webhookSecret) {
+    const source = await this.prisma.jobSource.findUnique({ where: { id: args.sourceId }, include: { org: true } })
+    if (
+      !source ||
+      !source.enabled ||
+      !source.org.enabled ||
+      source.accessMode !== 'webhook' ||
+      !source.webhookSecret
+    ) {
       denied()
     }
     // 此时 source 必非空,TS narrowing
     const src = source!
+    try {
+      assertDataSourceCapability(src.org.type, src.accessMode, src.sourceKind)
+    } catch {
+      denied()
+    }
 
     // 3) 签名校验
     const webhookSecret = (() => {
@@ -114,13 +126,55 @@ export class SyncService {
 
     // 5) 落库(走 JobsService.importJobsFromWebhook,与 Partner 手动导入共用 upsert 逻辑)
     const receivedRequestId = randomUUID()
-    const result = await this.jobs.importJobsFromWebhook(src.orgId, src.id, args.parsed.items)
+    let result: Awaited<ReturnType<JobsService['importJobsFromWebhook']>>
+    try {
+      result = await this.jobs.importJobsFromWebhook(src.orgId, src.id, args.parsed.items)
+    } catch (error) {
+      const errorDetail = error instanceof Error ? error.message.slice(0, 500) : 'Webhook import failed'
+      try {
+        await this.prisma.$transaction([
+          this.prisma.jobSource.update({
+            where: { id: src.id },
+            data: { lastSyncAt: new Date(), lastSyncStatus: 'failed' },
+          }),
+          this.prisma.syncLog.create({
+            data: {
+              sourceId: src.id,
+              orgId: src.orgId,
+              dataType: 'job',
+              syncMode: 'webhook',
+              totalCount: args.parsed.items.length,
+              errorCount: args.parsed.items.length,
+              errorDetail,
+              result: 'failed',
+            },
+          }),
+        ])
+      } catch (logError) {
+        this.logger.error(`webhook failure log write failed: sourceId=${src.id}`, logError as Error)
+      }
+      throw error
+    }
 
-    // 6) 更新 JobSource.lastSyncAt + lastSyncStatus
-    await this.prisma.jobSource.update({
-      where: { id: src.id },
-      data: { lastSyncAt: new Date(), lastSyncStatus: 'success' },
-    })
+    // 6) 更新来源状态并写入 Partner 可见的同步日志。
+    await this.prisma.$transaction([
+      this.prisma.jobSource.update({
+        where: { id: src.id },
+        data: { lastSyncAt: new Date(), lastSyncStatus: 'success' },
+      }),
+      this.prisma.syncLog.create({
+        data: {
+          sourceId: src.id,
+          orgId: src.orgId,
+          dataType: 'job',
+          syncMode: 'webhook',
+          totalCount: args.parsed.items.length,
+          addedCount: result.added ?? result.imported,
+          updatedCount: result.updated ?? 0,
+          result: 'success',
+        },
+      }),
+    ])
 
     // 7) 审计 — 同步落库不可篡改
     await this.audit.write({

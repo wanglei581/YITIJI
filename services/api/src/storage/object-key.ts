@@ -70,6 +70,7 @@ const PURPOSE_FOLDER: Record<
   id_scan: { scope: 'user', folder: 'scans' },
   print_doc: { scope: 'user', folder: 'print-files' },
   contract_upload: { scope: 'user', folder: 'contract-reviews' },
+  contract_review_report: { scope: 'user', folder: 'contract-review-reports' },
   signature_image: { scope: 'user', folder: 'signatures' },
   // 导出产物使用独立稳定前缀，便于单独配置对象存储生命周期。
   // key 只含随机 fileId，不嵌入 endUserId / requestId / 手机号。
@@ -97,7 +98,9 @@ export function generateObjectKey(args: ObjectKeyArgs): string {
   const mapping = PURPOSE_FOLDER[args.purpose] ?? PURPOSE_FOLDER.temp
   // 合同上传的匿名回退绝不使用可能来自二维码/请求的 token 作为 key 分桶。
   const session = safeSegment(
-    args.purpose === 'contract_upload' ? fileId : (args.uploadSessionId ?? fileId),
+    args.purpose === 'contract_upload' || args.purpose === 'contract_review_report'
+      ? fileId
+      : (args.uploadSessionId ?? fileId),
     fileId
   )
 

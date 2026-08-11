@@ -4,6 +4,7 @@ import type {
   ScanInputCandidateSnapshot,
   ScanInputHealth,
 } from '../types'
+import { inspectTrustedWindowsScanInputFolder } from './windows-secure-reader'
 
 function health(
   status: ScanInputHealth['status'],
@@ -23,7 +24,7 @@ export function inspectScanInputFolder(
   if (!folder) return health('unconfigured', 'not_configured')
 
   if (process.platform === 'win32') {
-    return health('degraded', 'reparse_point_unverifiable')
+    return inspectTrustedWindowsScanInputFolder(folder)
   }
 
   try {
@@ -49,7 +50,7 @@ export function classifyScanInputCandidate(
 ): ScanInputCandidateClassification {
   if (snapshot.nodeKind === 'symbolic_link') return 'rejected_symbolic_link'
   if (snapshot.nodeKind !== 'file') return 'rejected_non_regular_file'
-  if (!snapshot.name.toLowerCase().endsWith('.pdf')) return 'rejected_non_pdf'
+  if (!/\.(?:pdf|jpe?g|png)$/i.test(snapshot.name)) return 'rejected_non_pdf'
   return 'accepted'
 }
 

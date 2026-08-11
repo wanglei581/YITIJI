@@ -219,6 +219,18 @@ export interface PartnerDataSourceView {
   webhookUrl?: string
   /** Webhook 共享密钥 — **只在创建那一刻返回一次**，永不出现在 GET 响应里 */
   webhookSecretOnce?: string
+  /** API/Webhook 由管理员启停；文件/手工来源可由机构自助启停。 */
+  activationManagedBy?: 'admin' | 'partner'
+}
+
+export interface PartnerDataSourceCapabilities {
+  orgType: string
+  allowedAccessModes: AccessMode[]
+  allowedSourceKinds: SourceKind[]
+  defaultSourceKind: SourceKind
+  adminManagedAccessModes: AccessMode[]
+  canImportJobs: boolean
+  canImportFairs: boolean
 }
 
 // ============================================================

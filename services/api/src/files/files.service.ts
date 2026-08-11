@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { createHash, randomUUID } from 'crypto'
 import type {
@@ -99,7 +100,7 @@ export class FilesService {
     /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
   }): Promise<FileUploadResponse> {
-    if (args.purpose === 'member_data_export') {
+    if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
           code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
@@ -258,7 +259,7 @@ export class FilesService {
     createdBy?: string | null
   }): Promise<UploadIntentResponse> {
     const { body } = args
-    if (body.purpose === 'member_data_export') {
+    if (body.purpose === 'member_data_export' || body.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
           code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
@@ -383,12 +384,8 @@ export class FilesService {
     // 实测大小复核 purpose 上限(直传可能绕过意图阶段声明)。
     const policy = PURPOSE_POLICY[record.purpose as FilePurpose]
     if (policy && head.sizeBytes > policy.maxBytes) {
-      // 超限对象立即物理删除 + 标记 quarantined,不让违规文件留存。
-      await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
-      await this.prisma.fileObject.update({
-        where: { id: fileId },
-        data: { status: 'quarantined' },
-      })
+      // 先隔离元数据再删对象；DB 失败时不碰对象，存储失败时 quarantined 仍阻断访问并可重试。
+      await this.quarantineAndDeleteObject(record)
       throw new BadRequestException({
         error: { code: 'FILE_TOO_LARGE', message: '上传文件超出大小上限,已拒绝' },
       })
@@ -402,15 +399,11 @@ export class FilesService {
       const bytes = await this.storage.getObject(record.storageKey, record.bucket)
       const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
       if (!sniff.ok) {
-        // 与上方超限分支同款处理:物理删除 + quarantined,不让伪装文件留存。
+        // 与上方超限分支同款处理：先 quarantined，再物理删除。
         this.logger.warn(
           `Direct-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`
         )
-        await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
-        await this.prisma.fileObject.update({
-          where: { id: fileId },
-          data: { status: 'quarantined' },
-        })
+        await this.quarantineAndDeleteObject(record)
         throw new BadRequestException({
           error: {
             code: 'FILE_CONTENT_MISMATCH',
@@ -488,7 +481,7 @@ export class FilesService {
     record: { purpose: string; ownerType: string | null }
     needsAdminAudit: boolean
   }> {
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireActive(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
@@ -517,7 +510,7 @@ export class FilesService {
         fileId: record.id,
         url: signed.url,
         // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
-        // requireAlive 二次校验 file.expiresAt，不会因该 URL 的签名期越过文件寿命。
+        // requireActive 二次校验 status/deletedAt/expiresAt，不会因签名期越过文件寿命。
         printFileUrl: signFileUrl(record.id).url,
         expiresAt: this.ensureSignedExpiryWithinFileLifetime(
           signed.expiresAt,
@@ -538,7 +531,7 @@ export class FilesService {
       role: user.role,
       orgId: user.orgId,
     }
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireActive(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
@@ -572,7 +565,19 @@ export class FilesService {
   async readContent(
     fileId: string
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireDeletable(fileId, { allowContractReviewReport: true })
+    const expired = Boolean(record.expiresAt && record.expiresAt.getTime() <= Date.now())
+    const malformedContract = record.purpose === 'contract_upload' && !record.expiresAt
+    if (
+      record.status !== 'active' ||
+      malformedContract ||
+      (expired && (
+        record.purpose !== 'contract_review_report' ||
+        !(await this.hasActivePrintTaskForFile(fileId))
+      ))
+    ) {
+      this.throwFileNotFound()
+    }
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
       buffer,
@@ -595,10 +600,7 @@ export class FilesService {
     fileId: string,
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireAlive(fileId)
-    if (record.status !== 'active') {
-      this.throwFileNotFound()
-    }
+    const record = await this.requireActive(fileId)
     const allowed = endUserId
       ? record.endUserId === endUserId
       : record.endUserId === null && record.ownerType === 'system'
@@ -624,7 +626,9 @@ export class FilesService {
     const records = await this.prisma.fileObject.findMany({
       where: {
         ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose ? { purpose: args.purpose } : {}),
+        ...(args.purpose
+          ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
+          : { purpose: { not: 'contract_review_report' } }),
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(args.limit ?? 100, 500),
@@ -671,7 +675,9 @@ export class FilesService {
     requester: FileRequester,
     reason: string
   ): Promise<FileMetadata> {
-    const record = await this.requireDeletable(fileId)
+    // 已写 tombstone 但对象删除失败的记录仍允许原授权主体幂等重试；
+    // 其他读取入口继续把 deletedAt 行统一视为不存在。
+    const record = await this.requireDeletionRecord(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权删除此文件' },
@@ -762,18 +768,42 @@ export class FilesService {
     allowMemberDataExport = false,
     sensitiveLog = false
   ): Promise<FileMetadata> {
-    const record = await this.requireDeletable(fileId, { allowMemberDataExport })
-    await this.storage.deleteObject(record.storageKey, record.bucket)
-    const updated = await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { deletedAt: new Date(), deletedBy, deleteReason: reason, status: 'deleted' },
+    const record = await this.requireDeletionRecord(fileId, {
+      allowMemberDataExport,
+      allowContractReviewReport: sensitiveLog,
     })
+    if (!record.deletedAt) {
+      const deletedAt = new Date()
+      // DB tombstone 必须先于对象删除：写库失败时对象仍在，绝不留下 active metadata
+      // 指向已删除对象。updateMany 是 CAS，支持并发删除调用安全收敛到同一 tombstone。
+      await this.prisma.fileObject.updateMany({
+        where: { id: fileId, deletedAt: null },
+        data: { deletedAt, deletedBy, deleteReason: reason, status: 'deleted' },
+      })
+    }
+
+    const tombstone = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (!tombstone || !tombstone.deletedAt || tombstone.status !== 'deleted') {
+      this.throwFileNotFound()
+    }
+
+    try {
+      // COS 与本地后端均把对象不存在视为成功；首次失败后，同一授权主体可用
+      // 上方 tombstone 记录的 storageKey/bucket 幂等重试，不恢复 active 状态。
+      await this.storage.deleteObject(tombstone.storageKey, tombstone.bucket)
+    } catch (error) {
+      const errorType = error instanceof Error ? error.constructor.name : typeof error
+      this.logger.warn(
+        `code=FILE_OBJECT_DELETE_RETRY_REQUIRED file=${digestFileId(fileId)} errorType=${errorType}`
+      )
+      throw error
+    }
     if (sensitiveLog) {
       this.logger.log(`Sensitive file deleted by ${deletedBy}: ${digestFileId(fileId)}`)
     } else {
       this.logger.log(`File deleted by ${deletedBy}: ${fileId}`)
     }
-    return toMetadata(updated)
+    return toMetadata(tombstone)
   }
 
   // ── cron / 手动:清理所有已过期文件 ─────────────────────────────────────
@@ -805,12 +835,21 @@ export class FilesService {
           where: { fileObjectId: f.id },
           select: { id: true, status: true, revokedAt: true },
         })
-        if (bridge && (await this.hasActivePrintTaskForFile(f.id))) {
+        // 任意已建单且仍在履约中的文件都必须保留给 Agent 下载；合同风险提示报告
+        // 没有招聘会 bridge，不能把保护条件错误地绑在 bridge 存在上。
+        if (await this.hasActivePrintTaskForFile(f.id)) {
           continue
         }
+        // 先隔离，确保后续对象删除或最终 tombstone 写入任一失败时都不会继续签发 URL/读取内容。
+        const quarantined = await this.prisma.fileObject.updateMany({
+          where: { id: f.id, deletedAt: null },
+          data: { status: 'quarantined' },
+        })
+        if (quarantined.count === 0) continue
+
         await this.storage.deleteObject(f.storageKey, f.bucket)
-        await this.prisma.fileObject.update({
-          where: { id: f.id },
+        const finalized = await this.prisma.fileObject.updateMany({
+          where: { id: f.id, deletedAt: null, status: 'quarantined' },
           data: {
             deletedAt: now,
             deletedBy: 'auto',
@@ -819,6 +858,15 @@ export class FilesService {
             status: 'deleted',
           },
         })
+        if (finalized.count === 0) {
+          const concurrent = await this.prisma.fileObject.findUnique({
+            where: { id: f.id },
+            select: { status: true, deletedAt: true },
+          })
+          if (!concurrent?.deletedAt || concurrent.status !== 'deleted') {
+            throw new Error('FILE_CLEANUP_TOMBSTONE_NOT_FINALIZED')
+          }
+        }
         if (bridge && bridge.status === 'ready' && !bridge.revokedAt) {
           await this.prisma.fairMaterialPrintBridge.update({
             where: { id: bridge.id },
@@ -879,9 +927,9 @@ export class FilesService {
   private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {
     const tasks = await this.prisma.printTask.findMany({
       where: { status: { in: ['pending', 'claimed', 'printing'] } },
-      select: { fileUrl: true },
+      select: { fileId: true, fileUrl: true },
     })
-    return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
+    return tasks.some((task) => task.fileId === fileId || parseContentFileId(task.fileUrl) === fileId)
   }
 
   private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
@@ -907,20 +955,83 @@ export class FilesService {
     return signedExpiresAt
   }
 
-  private async requireAlive(fileId: string, options: { allowMemberDataExport?: boolean } = {}) {
+  private async requireAlive(
+    fileId: string,
+    options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {},
+  ) {
     return this.requireFile(fileId, { ...options, allowExpired: false })
   }
 
+  /** 对外 URL / content 只允许 active；uploading/quarantined 一律按不存在处理。 */
+  private async requireActive(fileId: string, options: { allowMemberDataExport?: boolean } = {}) {
+    const record = await this.requireAlive(fileId, options)
+    if (record.status !== 'active') this.throwFileNotFound()
+    return record
+  }
+
+  /** 删除/受控打印读取前的 metadata 查询；调用方仍须单独验证 status 与业务生命周期。 */
   private async requireDeletable(
     fileId: string,
-    options: { allowMemberDataExport?: boolean } = {}
+    options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {}
   ) {
     return this.requireFile(fileId, { ...options, allowExpired: true })
   }
 
+  /**
+   * 删除专用读取：允许 status=deleted 的 tombstone 仅用于重试物理对象删除。
+   * 普通访问仍走 requireAlive/requireFile 并按 deletedAt fail-closed。
+   */
+  private async requireDeletionRecord(
+    fileId: string,
+    options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {}
+  ) {
+    const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
+    if (
+      !record ||
+      (!options.allowMemberDataExport && record.purpose === 'member_data_export') ||
+      (!options.allowContractReviewReport && record.purpose === 'contract_review_report') ||
+      (record.deletedAt && record.status !== 'deleted')
+    ) {
+      this.throwFileNotFound()
+    }
+    return record
+  }
+
+  /** 直传违规对象的隔离删除：metadata-first，存储失败保留可重试且不可访问的 quarantined 状态。 */
+  private async quarantineAndDeleteObject(record: {
+    id: string
+    storageKey: string
+    bucket: string
+  }): Promise<void> {
+    const quarantined = await this.prisma.fileObject.updateMany({
+      where: { id: record.id, deletedAt: null },
+      data: { status: 'quarantined' },
+    })
+    if (quarantined.count !== 1) this.throwFileNotFound()
+
+    try {
+      await this.storage.deleteObject(record.storageKey, record.bucket)
+    } catch (error) {
+      const errorType = error instanceof Error ? error.constructor.name : typeof error
+      this.logger.warn(
+        `code=FILE_QUARANTINE_DELETE_RETRY_REQUIRED file=${digestFileId(record.id)} errorType=${errorType}`
+      )
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'FILE_STORAGE_DELETE_PENDING',
+          message: '文件已隔离，存储清理暂未完成，请稍后重试',
+        },
+      })
+    }
+  }
+
   private async requireFile(
     fileId: string,
-    options: { allowMemberDataExport?: boolean; allowExpired: boolean }
+    options: {
+      allowMemberDataExport?: boolean
+      allowContractReviewReport?: boolean
+      allowExpired: boolean
+    }
   ) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (
@@ -928,9 +1039,10 @@ export class FilesService {
       record.deletedAt ||
       (!options.allowExpired && record.purpose === 'contract_upload' && !record.expiresAt) ||
       (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
-      (!options.allowMemberDataExport && record.purpose === 'member_data_export')
+      (!options.allowMemberDataExport && record.purpose === 'member_data_export') ||
+      (!options.allowContractReviewReport && record.purpose === 'contract_review_report')
     ) {
-      // 禁止通用端点成为导出 artifact 存在性探针。
+      // 禁止通用端点成为导出或合同风险报告 artifact 的存在性探针。
       this.throwFileNotFound()
     }
     return record

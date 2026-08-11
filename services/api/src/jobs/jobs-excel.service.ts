@@ -24,6 +24,7 @@ import {
   type ParsedRow,
 } from './dto/excel-import.dto'
 import { JOB_WORK_TYPE_VALUES } from './work-type'
+import { assertDataSourceCapability, assertPartnerDataTypeCapability } from './partner-capabilities'
 import {
   loadPartnerImportRows,
   PARTNER_IMPORT_MAX_DATA_ROWS,
@@ -152,10 +153,18 @@ export class JobsExcelService {
     if (!args.user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
-    const source = await this.prisma.jobSource.findUnique({ where: { id: args.sourceId } })
+    const source = await this.prisma.jobSource.findUnique({ where: { id: args.sourceId }, include: { org: true } })
     if (!source || source.orgId !== args.user.orgId) {
       throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
     }
+    if (!source.enabled || !source.org.enabled) {
+      throw new BadRequestException({ error: { code: 'DATA_SOURCE_DISABLED', message: '数据源或所属机构已停用' } })
+    }
+    if (!['excel', 'csv', 'json'].includes(source.accessMode)) {
+      throw new BadRequestException({ error: { code: 'DATA_SOURCE_FILE_MODE_REQUIRED', message: '该数据源不是文件导入模式' } })
+    }
+    assertDataSourceCapability(source.org.type, source.accessMode, source.sourceKind)
+    assertPartnerDataTypeCapability(source.org.type, args.dataType)
     const allRows = await this.loadExcelRows(args.buffer, args.fileName)
     if (allRows.length < 1) {
       throw new BadRequestException({ error: { code: 'EXCEL_NO_HEADER', message: 'Excel/CSV 文件缺少表头行' } })
@@ -338,6 +347,15 @@ export class JobsExcelService {
     if (!org || !org.enabled) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
     }
+    assertPartnerDataTypeCapability(org.type, batch.dataType as 'job' | 'fair')
+    const source = await this.prisma.jobSource.findUnique({ where: { id: batch.sourceId } })
+    if (!source || source.orgId !== user.orgId || !source.enabled) {
+      throw new BadRequestException({ error: { code: 'DATA_SOURCE_DISABLED', message: '数据源已停用，不能确认导入' } })
+    }
+    if (!['excel', 'csv', 'json'].includes(source.accessMode)) {
+      throw new BadRequestException({ error: { code: 'DATA_SOURCE_FILE_MODE_REQUIRED', message: '该数据源不是文件导入模式' } })
+    }
+    assertDataSourceCapability(org.type, source.accessMode, source.sourceKind)
     const sourceOrgId = org.id
     const sourceName  = org.name
     const sync        = new Date()

@@ -5,6 +5,8 @@ import { verifyFileSignature } from '../files/signing'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
 import type { PrintPageCount } from './print-page-count.types'
 
+const CONTRACT_REPORT_MIN_PRINT_REMAINING_MS = 30 * 60 * 1000
+
 /**
  * P0a 后端计费页数识别（支付域底座，无 live 网关）。
  *
@@ -30,6 +32,16 @@ export class PrintPageCountService {
 
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file || file.deletedAt) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
+
+    if (
+      file.purpose === 'contract_review_report' && (
+        file.status !== 'active' ||
+        !file.expiresAt ||
+        file.expiresAt.getTime() - Date.now() < CONTRACT_REPORT_MIN_PRINT_REMAINING_MS
+      )
+    ) {
+      throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
+    }
 
     if (file.mimeType === 'application/pdf') {
       const buffer = await this.readOrFail(file.storageKey, file.bucket)

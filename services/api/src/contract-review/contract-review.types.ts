@@ -124,6 +124,8 @@ export interface ContractReviewTaskOwnerRow {
 
 export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   id: string
+  sourceFileId: string
+  resultFileId: string | null
   contractType: string
   status: string
   analyzedPages: number
@@ -134,6 +136,18 @@ export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   resultJson: string | null
   extractionFingerprint: string | null
   confirmedAt: Date | null
+}
+
+export interface ContractReviewReportView {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pages: number
+  expiresAt: string
+  printFileUrl: string
+  abandonToken: string
+  abandonTokenExpiresAt: string
 }
 
 export interface ContractReviewTaskView {

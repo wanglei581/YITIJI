@@ -3,6 +3,8 @@ import { registerW4Api } from '../../fixtures/fusion-w4-api'
 
 const success = (data: unknown) => ({ success: true, data })
 
+export const W6_MEMBER_TOKEN = 'w6-browser-memory-token'
+
 export const W6_LONG_LEGAL_TEXT =
   '这是用于 W6 路由验收的超长隐私政策段落：终端仅在用户主动发起简历分析、文档打印或扫描时处理完成当次服务所必需的信息，不建立企业可检索的简历库，不向企业转交求职材料，也不在平台内提供投递、筛选、面试邀约或录用管理。匿名文件和高敏材料按服务配置设置短期有效期，公共终端在退出、闲置超时或进入待机后清理会话信息。用户应在打印前复核文件内容、页数和打印参数，在使用 AI 或 OCR 结果前复核姓名、联系方式、经历与其他关键信息；如需查看、删除或调整本人记录，请在登录后使用「我的」相应入口，或联系现场工作人员处理。'
 
@@ -69,7 +71,30 @@ export function registerW6Api(api: ApiRouter): void {
     })
   )
   get('/api/v1/job-materials/templates', success([]))
-  get('/api/v1/me/pending-tasks', { data: [] })
+  post('/api/v1/member/auth/sms-code', success({ sent: true, cooldownSeconds: 60, expiresInSeconds: 300 }))
+  post('/api/v1/member/auth/login', success({
+    token: W6_MEMBER_TOKEN,
+    user: { id: 'member-w6', phoneMasked: '138****8000', nickname: 'W6 验收会员' },
+  }))
+  get('/api/v1/me/pending-tasks', success([
+    {
+      id: 'print-task-w6-pending',
+      type: 'print',
+      status: 'pending',
+      payStatus: 'unpaid',
+      fileName: 'W6 待续打材料.pdf',
+      updatedAt: '2026-08-09T08:00:00.000Z',
+      resume: {
+        kind: 'payment',
+        orderId: 'order-w6-pending',
+        orderNo: 'ORD-20260809-W6PENDING',
+        amountCents: 200,
+        priceLines: [{ serviceKey: 'print_bw_page', label: '黑白打印', unitCents: 100, quantity: 2, subtotalCents: 200 }],
+        paymentSessionToken: 'w6-payment-session-token',
+      },
+    },
+  ]))
+  get('/api/v1/me/favorites', success({ items: [], nextCursor: null, total: 0 }))
 
   const offlineJob = {
     id: 'offline-job-001',

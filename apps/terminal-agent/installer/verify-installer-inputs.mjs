@@ -18,6 +18,15 @@ const workflow = fs.readFileSync(
   path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
   'utf8',
 )
+const secureScanReaderVerify = read('verify-secure-scan-reader.ps1')
+const secureScanReader = [
+  '../native/secure-scan-reader.c',
+  '../native/secure-scan-protocol.h',
+].map((name) => fs.readFileSync(path.join(root, name), 'utf8')).join('\n')
+const secureScanMutation = fs.readFileSync(path.join(root, '../native/secure-scan-mutation.c'), 'utf8')
+const secureScanPath = fs.readFileSync(path.join(root, '../native/secure-scan-path.c'), 'utf8')
+const windowsScanAdapter = fs.readFileSync(path.join(root, '../src/agent/scan-input/windows-secure-reader.ts'), 'utf8')
+const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.ts'), 'utf8')
 
 console.log('\n=== verify Windows Agent installer inputs ===')
 
@@ -90,6 +99,16 @@ assert.match(
 )
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
 assert.match(staging, /Unexpected executable in staging/)
+assert.match(staging, /Microsoft\.VisualStudio\.Component\.VC\.Tools\.x86\.x64/)
+assert.match(staging, /secure-scan-reader\.c/)
+assert.match(staging, /secure-scan-path\.c/, 'native helper path boundary must compile as a separate auditable source')
+assert.match(staging, /secure-scan-mutation\.c/, 'native helper mutation boundary must compile as a separate auditable source')
+assert.match(staging, /\$quotedNativeSources\s*=/, 'native source arguments must be composed before the command array')
+assert.match(staging, /\$compileCommand\s*=/, 'the complete cl command must remain one cmd.exe line')
+assert.match(staging, /\$compileLines\s*=\s*@\([\s\S]*\$compileCommand,/, 'the command array must contain the precomposed cl command')
+assert.match(staging, /\/guard:cf/)
+assert.match(staging, /\/Brepro/)
+assert.match(staging, /\$nativeExecutable,/)
 assert.match(staging, /better-sqlite3/)
 assert.match(staging, /manifest\.json/)
 
@@ -114,6 +133,7 @@ assert.match(lifecycle, /bootstrap\\aijobprintagent\.exe/)
 assert.match(lifecycle, /bootstrap\\aijobprintagent\.xml/)
 assert.match(lifecycle, /node\\node\.exe/)
 assert.match(lifecycle, /app\\dist\\index\.js/)
+assert.match(lifecycle, /app\\native\\secure-scan-reader\.exe/)
 assert.match(lifecycle, /Get-FileHash -LiteralPath \$fullPath -Algorithm SHA256/)
 assert.match(lifecycle, /VersionInfo\.FileVersion/)
 assert.match(lifecycle, /& \$nodePath --version/)
@@ -130,6 +150,19 @@ assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
+assert.match(workflow, /Verify staged secure scan reader boundary/)
+assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
+assert.match(secureScanReaderVerify, /SECURE_SCAN_READER_PASS/)
+assert.match(secureScanReaderVerify, /New-Junction/)
+assert.match(secureScanReaderVerify, /SymbolicLink/)
+assert.match(secureScanReaderVerify, /HardLink/)
+assert.match(secureScanReaderVerify, /same metadata replacement/, 'Windows dynamic verification must reject a same-size\/mtime different-file-id replacement')
+assert.match(secureScanReaderVerify, /mode = "finalize-delete"/, 'Windows dynamic verification must cover handle-bound success deletion')
+assert.match(secureScanReaderVerify, /mode = "finalize-quarantine"/, 'Windows dynamic verification must cover handle-relative quarantine')
+assert.match(secureScanReaderVerify, /mode = "sweep"/, 'Windows dynamic verification must cover secure _unclaimed TTL mutation')
+assert.match(secureScanReaderVerify, /replace\(\/\^\\uFEFF\//, 'Windows PowerShell stdin BOM must be removed before JSON parsing')
+assert.match(secureScanReaderVerify, /FileAttributes\]::ReparsePoint/, 'cleanup must never treat an ordinary non-empty scan directory as a link')
+assert.match(lifecycle, /Installed secure scan reader boundary verification failed/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.ok(
@@ -138,5 +171,24 @@ assert.ok(
 )
 assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
 assert.match(workflow, /artifacts\/exe\/lifecycle-logs\//)
+
+assert.match(windowsScanAdapter, /AJPSR002/, 'Node must require secure-reader protocol v2')
+assert.match(windowsScanAdapter, /rootIdentity/, 'READ must return the pinned root identity token')
+assert.match(windowsScanAdapter, /candidateIdentity/, 'READ must return the candidate file identity token')
+assert.match(windowsScanAdapter, /finalizeTrustedWindowsCandidate/, 'success-delete and quarantine must cross the native mutation boundary')
+assert.match(windowsScanAdapter, /sweepTrustedWindowsUnclaimed/, 'TTL deletion must cross the native mutation boundary')
+assert.match(secureScanReader, /AJPSR002/, 'native helper must parse protocol v2')
+assert.match(secureScanMutation, /RootDirectory\s*=\s*unclaimed/, 'quarantine rename must be relative to the pinned _unclaimed handle')
+assert.match(secureScanMutation, /NtSetInformationFile/, 'relative quarantine must use the native handle-relative rename API')
+assert.match(secureScanMutation, /AJPS_FILE_RENAME_INFORMATION_CLASS\s+10u/, 'native rename must remain FileRenameInformation')
+assert.doesNotMatch(
+  secureScanMutation,
+  /SetFileInformationByHandle\s*\(\s*candidate\s*,\s*FileRenameInfo/,
+  'relative quarantine must not regress to the Win32 wrapper rejected by Windows Server 2022',
+)
+assert.match(secureScanPath, /FILE_TRAVERSE/, 'pinned directory handles must support relative rename traversal')
+assert.match(secureScanMutation, /FileDispositionInfo/, 'deletion must target an already verified handle')
+assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?finalizeTrustedWindowsCandidate[\s\S]*?return\s*\}/, 'Windows finalize must return after the native boundary without Node fallback')
+assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?sweepTrustedWindowsUnclaimed[\s\S]*?return\s*\}/, 'Windows sweep must return after the native boundary without Node fallback')
 
 console.log('ALL PASS: Windows Agent installer inputs')

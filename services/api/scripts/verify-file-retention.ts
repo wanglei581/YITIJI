@@ -126,9 +126,31 @@ async function verifyMalformedContractCleanup(): Promise<void> {
         records.set(where.id, updated)
         return updated
       },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { id: string; deletedAt?: null; status?: string }
+        data: Partial<CleanupRecord>
+      }) => {
+        const current = records.get(where.id)
+        if (
+          !current ||
+          (where.deletedAt === null && current.deletedAt !== null) ||
+          (where.status && current.status !== where.status)
+        ) {
+          return { count: 0 }
+        }
+        records.set(where.id, { ...current, ...data })
+        return { count: 1 }
+      },
+      findUnique: async ({ where }: { where: { id: string } }) => records.get(where.id) ?? null,
     },
     fairMaterialPrintBridge: {
       findFirst: async () => null,
+    },
+    printTask: {
+      findMany: async () => [],
     },
   }
   const storage = {

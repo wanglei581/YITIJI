@@ -9,10 +9,15 @@ export interface KioskWarningDescriptor {
   canContinue: boolean
 }
 
+export type KioskSessionClearDestination =
+  | { path: '/' | '/profile'; state?: never }
+  | { path: '/login'; state: { from: '/profile'; hint?: string } }
+
 export interface KioskSessionControlValue {
   warning: KioskWarningDescriptor | null
   continueSession: () => void
   hardClear: () => void
+  clearSessionTo: (destination: KioskSessionClearDestination) => void
   clearToScreensaver: () => void
 }
 
@@ -24,6 +29,7 @@ const failClosedValue: KioskSessionControlValue = {
   warning: null,
   continueSession: failClosed,
   hardClear: failClosed,
+  clearSessionTo: failClosed,
   clearToScreensaver: failClosed,
 }
 

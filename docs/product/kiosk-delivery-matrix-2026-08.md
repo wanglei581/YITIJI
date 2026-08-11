@@ -81,9 +81,9 @@
 
 其中 `/jobs-service` 8 张卡有 4 张是 `/jobs` 顶部分类 chip 的重复实现；`/fairs-service` 6 张卡有 3 张跳出本域；`/policy-service` 6 张卡有 4 张只是 `/renshi?tab=xxx` 换皮，且首页磁贴直接指向 `/renshi` 绕过该 Hub。
 
-### E. 已关闭且无入口（3 条）
+### E. 条件发布的签约风险提示（3 条）
 
-`/contract-review` ×3：`VITE_ENABLE_CONTRACT_REVIEW` 默认 false 且 fail-closed（严格 `=== 'true'`），关闭时 element 换成 `<Navigate to="/" replace/>`，chunk 不打包；全仓库无任何磁贴或 navigate 指向；即使打开，结果页打印按钮仍硬编码 `disabled`。**保留但不计入主架构**，待产品决定是否启用。
+`/contract-review` ×3：2026-08-09 已确定归入「AI简历服务 → 签约与权益」，不进入岗位信息、首页磁贴或百宝箱。入口和路由共同受 `VITE_ENABLE_CONTRACT_REVIEW` 保护，默认 false 且严格 `=== 'true'`；关闭时入口不渲染、路由回首页、页面 chunk 不打包。打开后报告打印仍诚实保持 `disabled`，真实模型、PostgreSQL、受控存储和浏览器隐私验收通过前不得在生产启用。
 
 ---
 

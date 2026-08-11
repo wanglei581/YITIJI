@@ -13,6 +13,7 @@ import {
   type INestApplication,
   type ValidationError,
 } from '@nestjs/common'
+import { MODULE_METADATA } from '@nestjs/common/constants'
 import { APP_GUARD, NestFactory } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
@@ -27,6 +28,7 @@ import {
 process.env['JWT_SECRET'] ||= 'contract-review-http-verifier-jwt-secret'
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'contract-review-http-terminal-admin-secret'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'contract-review-http-terminal-action-secret'
+const configuredRedisUrl = process.env['REDIS_URL']
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'contract-review-http-'))
 const fixtureDatabase = join(fixtureDirectory, 'harness.db')
 closeSync(openSync(fixtureDatabase, 'a'))
@@ -108,6 +110,11 @@ class LifecycleHarness {
   async createReport(id: string, requester: ContractReviewRequester): Promise<never> {
     this.requireTask(id, requester)
     throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
+  }
+
+  async abandonReport(fileId: string, token: string | null) {
+    if (fileId !== 'report-file-1' || token !== 'report-abandon-token-1') throw taskNotFound()
+    return { fileId, deleted: true, protectedByPrintTask: false }
   }
 
   async remove(id: string, requester: ContractReviewRequester) {
@@ -195,25 +202,17 @@ function assertError(response: { status: number; body: Envelope }, status: numbe
   if (code) assert.equal(response.body.error?.code, code)
 }
 
-async function verifyDefaultAppIsClosed(): Promise<void> {
-  const configuredRedisUrl = process.env['REDIS_URL']
+async function verifyDefaultAppHttpWiring(): Promise<void> {
+  // Import the default module graph with queue processors disabled; the isolated
+  // HTTP harness below supplies its own in-memory queue and must not contact Redis.
   delete process.env['REDIS_URL']
-  const { AppModule } = await import('../src/app.module')
+  const [{ AppModule }, { ContractReviewHttpModule }] = await Promise.all([
+    import('../src/app.module'),
+    import('../src/contract-review/contract-review-http.module'),
+  ])
   process.env['REDIS_URL'] = configuredRedisUrl ?? 'redis://127.0.0.1:6379'
-  const app = await NestFactory.create(AppModule, { logger: false })
-  try {
-    const port = await listen(app)
-    for (const [method, path] of [
-      ['POST', '/contract-reviews'], ['GET', '/contract-reviews/consent-scope'],
-      ['GET', '/contract-reviews/missing'], ['POST', '/contract-reviews/missing/confirm'],
-      ['POST', '/contract-reviews/missing/report'], ['DELETE', '/contract-reviews/missing'],
-    ] as const) {
-      const body = method === 'GET' || method === 'DELETE' ? undefined : {}
-      assert.equal((await request(port, method, path, body)).status, 404)
-    }
-  } finally {
-    await app.close()
-  }
+  const imports = (Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) ?? []) as unknown[]
+  assert.equal(imports.includes(ContractReviewHttpModule), true)
 }
 
 async function verifyExplicitHttpModule(): Promise<void> {
@@ -304,6 +303,22 @@ async function verifyExplicitHttpModule(): Promise<void> {
     }, tokenHeader), 400, 'VALIDATION_FAILED')
     assert.equal((await request(port, 'POST', `/contract-reviews/${task.id}/confirm`, confirmBody, tokenHeader)).status, 202)
     assertError(await request(port, 'POST', `/contract-reviews/${task.id}/report`, undefined, tokenHeader), 503, 'REPORT_NOT_AVAILABLE')
+    assertError(
+      await request(port, 'DELETE', '/contract-reviews/reports/report-file-1'),
+      404,
+      'CONTRACT_REVIEW_TASK_NOT_FOUND',
+    )
+    const abandoned = await request(
+      port,
+      'DELETE',
+      '/contract-reviews/reports/report-file-1',
+      undefined,
+      { 'X-Contract-Review-Report-Abandon-Token': 'report-abandon-token-1' },
+    )
+    assert.equal(abandoned.status, 200)
+    assert.deepEqual(abandoned.body.data, {
+      fileId: 'report-file-1', deleted: true, protectedByPrintTask: false,
+    })
 
     const throttleHeaders = {
       'X-Contract-Review-Source-File-Proof': 'proof:file-1',
@@ -332,11 +347,13 @@ async function verifyExplicitHttpModule(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    await verifyDefaultAppIsClosed()
+    await verifyDefaultAppHttpWiring()
     await verifyExplicitHttpModule()
-    console.log('contract review HTTP isolation, DTO, ownership, and throttling contract passed')
+    console.log('contract review AppModule wiring, DTO, ownership, and throttling contract passed')
   } finally {
     rmSync(fixtureDirectory, { recursive: true, force: true })
+    if (configuredRedisUrl === undefined) delete process.env['REDIS_URL']
+    else process.env['REDIS_URL'] = configuredRedisUrl
   }
 }
 

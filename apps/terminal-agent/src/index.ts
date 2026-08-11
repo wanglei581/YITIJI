@@ -25,7 +25,9 @@ import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/q
 import { acquireLock, releaseLock } from './agent/instance-lock'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
+import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
 import { writeStartupDiagnosticSafely } from './agent/startup-diagnostics'
+import { registerDeadLetterCommands } from './agent/dead-letter-operator'
 
 const program = new Command()
 
@@ -116,7 +118,10 @@ program
     // ── Step 7: Start offline PATCH retry loop ────────────────────────────
     const offlineRetryTimer = startOfflineRetry(config, db)
 
-    // ── Step 8: Start local QR-login bridge (best-effort) ─────────────────
+    // ── Step 8: Report PII-safe expired-scan deletion evidence ────────────
+    const scanDeletionAuditReporterTimer = startScanDeletionAuditReporter(config, db)
+
+    // ── Step 9: Start local QR-login bridge (best-effort) ─────────────────
     let qrLocalServer: LocalQrServerHandle | null = null
     try {
       qrLocalServer = startQrLoginLocalServer(config, { wakePrintQueue: taskRunner.wake })
@@ -132,6 +137,7 @@ program
       clearInterval(heartbeatTimer)
       taskRunner.stop()
       clearInterval(offlineRetryTimer)
+      clearInterval(scanDeletionAuditReporterTimer)
       void qrLocalServer?.close()
       void scanWatcherHandle?.stop()
       releaseLock()
@@ -148,6 +154,8 @@ program
       process.exit(1)
     })
   })
+
+registerDeadLetterCommands(program)
 
 // ── install-service (Windows only) ───────────────────────────────────────────
 
@@ -367,4 +375,4 @@ function printResultSummary(r: PrintResult): void {
   }
 }
 
-program.parse(process.argv)
+void program.parseAsync(process.argv)

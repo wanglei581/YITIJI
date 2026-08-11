@@ -1,8 +1,9 @@
 # PostgreSQL 生产数据底座 — 运维手册（第四阶段）
 
-> 状态：本地（macOS PG 16.14）与 CI（postgres:16 容器）已真实验证：空库 deploy、seed、
-> 核心 verify（含会员真实 HTTP E2E）、API 启动、SQLite→PG 数据迁移演练（37 表对账一致）。
-> **生产环境（Windows 服务器/云）部署后须按本手册再走一遍验证清单方可宣称生产就绪。**
+> 当前状态（2026-08-09）：生产 API 已运行 PostgreSQL，日常变更按“备份 → additive
+> migration → 应用发布 → 验证”执行，不再按 SQLite→PostgreSQL 首次切库流程操作。
+> 早期 37 模型搬数演练仅是历史证据；当前 schema 约 81 个模型，旧搬数脚本没有覆盖
+> 全部模型，不能据此宣称“全库对账一致”。
 
 ## 1. 架构
 
@@ -31,17 +32,25 @@ pnpm --filter @ai-job-print/api db:pg:generate
 POSTGRES_URL="postgresql://user:pass@host:5432/db" \
   pnpm --filter @ai-job-print/api db:pg:deploy
 
-# SQLite → PG 数据迁移（默认要求目标库为空；孤儿行跳过并告警；行数对账不一致退出码 1）
-DATABASE_URL="file:./prisma/dev.db" POSTGRES_URL="postgresql://..." \
-  pnpm --filter @ai-job-print/api db:pg:migrate-data
+# 当前不提供 SQLite → PG 全库搬数命令；旧工具已退役并从工作树移除
 ```
 
-## 3. 上线切换步骤（SQLite → PostgreSQL）
+> **警告**：历史 `db:pg:migrate-data` 的 `MODEL_ORDER` 只覆盖 37 个模型，且末尾对账仍只遍历
+> 同一清单，无法发现未列入清单的表；OfflineAgency、OfflineJob 等模型均被遗漏。该命令和脚本
+> 已在招聘内容域 P1 Wave 1A 删除，禁止从 Git 历史恢复执行，也不能用历史“对账通过”输出推断
+> 当前整库完整。未来若确需导入其他旧库，必须新建按领域、可 dry-run、可守恒对账的迁移工具。
+
+## 3. 历史首次切换步骤（SQLite → PostgreSQL，禁止直接复用）
+
+本节仅保留早期切库过程作为历史参考，不是当前生产操作手册。若未来确需从其他 SQLite
+环境向 PostgreSQL 搬数，必须单独设计替代工具、冻结模型清单、在备份恢复库
+完成 dry-run，并取得具名授权。
 
 1. 停止 API 写入（维护窗口；Kiosk 显示维护提示）。
 2. 备份 SQLite：复制 `dev.db`（见 §4）。
 3. 全新 PG 库：`createdb` → `db:pg:generate` → `db:pg:deploy`。
-4. `db:pg:migrate-data` 迁移数据；确认输出「迁移完成并对账通过」，记录孤儿行告警。
+4. 仅运行另行评审和具名授权的新领域迁移工具；旧 `db:pg:migrate-data` 已删除，禁止恢复。
+   新工具输出只作为已覆盖领域的对账证据，还必须独立核对 schema 全模型集合。
 5. API 环境改 `DATABASE_URL=postgresql://...`，重启。
 6. 验证清单：API 启动日志 `DB connected — postgresql://…`；`GET /api/v1/jobs` 返回
    真实数据；会员登录 → `/me/resumes`；Admin 登录 → 告警中心；打印链路建任务。
@@ -57,32 +66,35 @@ pg_dump --format=custom --file=backup_$(date +%Y%m%d_%H%M).dump "$POSTGRES_URL"
 createdb restore_test
 pg_restore --dbname=postgresql://.../restore_test backup_xxx.dump
 
-# SQLite（切换前的最后状态，保留为回退点）
+# SQLite（仅适用于历史首次切换或开发库备份，不是生产回退点）
 cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
 ```
 
-## 5. 回滚（PG 切换失败 → 退回 SQLite）
+## 5. 当前生产回滚（保持 PostgreSQL）
 
-1. API 环境改回 `DATABASE_URL=file:./prisma/dev.db`，重启 —— 代码无需改动
-   （工厂按协议自动选 SQLite adapter）。
-2. 切换窗口内 PG 上产生的增量数据会丢失：回滚决策须在观察期内尽早做出；
-   若已有不可丢增量，先用 `pg_dump` 留档再回滚，事后人工合并。
-3. 回滚后在 docs/progress/current-progress.md 记录原因与失败现象。
+1. Additive migration 发布失败时，优先回退应用到兼容的上一版本；保留新增表、可空字段和索引，
+   不切换生产 `DATABASE_URL`，也不尝试 PG→SQLite 搬数。
+2. 若故障涉及破坏性数据变更，停止写入并保留现场；将发布前 `pg_dump` 恢复到**新 PostgreSQL
+   数据库**完成校验后，再按受控切换流程恢复服务。不得覆盖唯一生产库后再尝试恢复。
+3. Contract/drop 类迁移必须与 expand/backfill/switch 分波，并至少经过两个发布周期的 legacy
+   零读写观察；发生问题时继续使用兼容字段或回退应用，不现场反向造 migration。
+4. 在 `docs/progress/current-progress.md` 记录故障、备份标识、恢复库验证、应用版本和最终决策。
 
 ## 6. 故障恢复
 
 | 故障 | 处置 |
 |------|------|
-| `migrate deploy` 失败 | 迁移有事务保护；查 `_prisma_migrations` 表失败行，修复 SQL 后 `prisma migrate resolve --applied/--rolled-back <name> --config prisma.postgres.config.ts` |
-| 迁移数据对账不一致 | 脚本已退出码 1；drop 目标库重来（脚本默认拒绝写非空库） |
+| `migrate deploy` 失败 | 立即停写并保留现场；迁移可能处于部分应用状态，先核对 `_prisma_migrations.logs`、实际 schema/数据、日志和备份。`resolve --rolled-back` 仅限确认无残留或已安全清理；`resolve --applied` 仅限人工完成完全等价变更并通过 schema diff/验收；否则恢复到新 PostgreSQL 库 |
+| 历史搬数工具或命令被引用 | 立即停止；工具已退役删除，不得从 Git 历史恢复，改为另立具名授权的领域迁移方案 |
 | 孤儿行告警 | 如实记录在切换日志；属 SQLite 历史脏数据（FK 未强制），不迁移是正确行为 |
 | 连接池耗尽 | adapter-pg 默认池；高并发可在 POSTGRES_URL 加 `?connection_limit=` 或前置 pgbouncer |
 
 ## 7. 已知边界（如实声明）
 
-- 本手册验证环境为 macOS 本地 PG 16 + ubuntu CI 容器；**Windows 生产服务器上的
-  PG 实例尚未实测**（上线部署时按 §3 清单逐项执行）。
-- `db:pg:migrate-data` 的 MODEL_ORDER 需随新模型手工维护（漏表会被对账兜底抓住，
-  但仍应在新增模型的 PR 中同步更新）。
+- 生产 PostgreSQL 已投入运行，但每次 schema 变更仍必须在 SQLite 主 CI 与真实
+  PostgreSQL CI/恢复库分别验证 fresh install 和已有库 upgrade；公开 health 不能替代私有表盘点。
+- 历史 `db:pg:migrate-data` 只列 37 个模型，无法发现 OfflineAgency、OfflineJob 等漏表，
+  已在招聘内容域 P1 Wave 1A 退役删除。任何后续旧库导入只能使用另行评审、可 dry-run、
+  可逐类守恒对账且获得具名授权的领域迁移工具。
 - SQLite 仍是开发默认；两库行为差异（如大小写排序、并发语义）由核心 verify 套件
-  在 CI 双 job 上持续回归。
+  在 CI 双 job 上持续回归。生产恢复目标始终是 PostgreSQL，不设计 PG→SQLite 回滚。

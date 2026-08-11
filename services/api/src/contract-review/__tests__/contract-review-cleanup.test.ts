@@ -89,6 +89,24 @@ test('defers physical deletion for a file shared by another unexpired contract t
   assert.equal(harness.taskRows.has(active.id), true)
 })
 
+test('defers report deletion while an active print task references it', async () => {
+  const task = expiredTask('task-printing', 'deleted-source', 'report-printing')
+  const harness = createHarness(
+    [task],
+    [
+      { id: 'deleted-source', deletedAt: NOW },
+      { id: 'report-printing', deletedAt: null },
+    ],
+    { activePrintFileIds: new Set(['report-printing']) },
+  )
+
+  const result = await harness.cleanup.runOnce(NOW)
+
+  assert.equal(result.sharedFiles, 1)
+  assert.equal(harness.deleteCalls.length, 0)
+  assert.equal(harness.taskRows.has(task.id), false)
+})
+
 test('treats a file already deleted by generic cleanup as idempotently complete', async () => {
   const task = expiredTask('task-already-deleted', 'source-already-deleted')
   const harness = createHarness(
@@ -225,6 +243,7 @@ function createHarness(
   options: {
     deleteFile?(fileId: string): Promise<void>
     readFile?(fileId: string, rows: Map<string, FileRow>): Promise<FileRow | null>
+    activePrintFileIds?: Set<string>
   } = {}
 ) {
   const taskRows = new Map(tasks.map((row) => [row.id, { ...row }]))
@@ -293,6 +312,11 @@ function createHarness(
       async findUnique(args: { where: { id: string } }) {
         if (options.readFile) return options.readFile(args.where.id, fileRows)
         return fileRows.get(args.where.id) ?? null
+      },
+    },
+    printTask: {
+      async findFirst(args: { where: { fileId: string } }) {
+        return options.activePrintFileIds?.has(args.where.fileId) ? { id: 'print-active' } : null
       },
     },
   }

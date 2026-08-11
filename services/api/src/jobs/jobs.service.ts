@@ -140,6 +140,10 @@ export class JobsService {
     return this.partner.getPartnerDataSources(user)
   }
 
+  getPartnerDataSourceCapabilities(user: AuthedUser) {
+    return this.partner.getPartnerDataSourceCapabilities(user)
+  }
+
   createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser) {
     return this.partner.createPartnerDataSource(dto, user)
   }

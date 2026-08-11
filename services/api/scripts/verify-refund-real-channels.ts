@@ -27,10 +27,6 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-refundreal-terminal-acti
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-refundreal-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-refundreal-payment-session-secret-0123456789'
 process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
-if (process.env['NODE_ENV'] === 'production') {
-  console.error('  FAIL verify:refund-real-channels 不得在 NODE_ENV=production 运行')
-  process.exit(1)
-}
 
 import 'dotenv/config'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
@@ -60,6 +56,7 @@ import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilit
 import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passCount = 0
 function pass(message: string): void {
@@ -236,7 +233,7 @@ function buildAlipayNotify(params: Record<string, string>): { rawBody: Buffer; h
 
 const PRINT_PARAMS = {
   copies: 2,
-  colorMode: 'color' as const,
+  colorMode: 'black_white' as const,
   duplex: 'simplex' as const,
   paperSize: 'A4' as const,
   orientation: 'auto' as const,
@@ -246,6 +243,8 @@ const PRINT_PARAMS = {
 }
 
 async function main(): Promise<void> {
+  assertIsolatedVerificationDatabase()
+
   console.log('\n=== W-B real channel refunds (wechat/alipay) verification ===')
 
   const { server, port } = await startFakeGateway()
@@ -309,7 +308,7 @@ async function main(): Promise<void> {
   }
 
   /** 建打印单并经真实回调路径打成 paid（channel=wechat|alipay），返回 order/attempt。 */
-  async function makePaidOrder(label: string, channel: 'wechat' | 'alipay'): Promise<{ orderId: string; orderNo: string; taskId: string; attemptId: string }> {
+  async function makePaidOrder(label: string, channel: 'wechat' | 'alipay'): Promise<{ orderId: string; orderNo: string; taskId: string; attemptId: string; amountCents: number }> {
     const printed = await printJobs.create(
       { fileUrl: await seedPdfFixture(label, 2), fileMd5: `sha256-refundreal-${label}`, fileName: `${label}.pdf`, params: PRINT_PARAMS },
       { endUserId: null, terminalId },
@@ -341,7 +340,13 @@ async function main(): Promise<void> {
     }
     const paid = await prisma.order.findUnique({ where: { id: order.id } })
     if (paid?.payStatus !== 'paid') fail(`makePaidOrder(${label}): not paid`)
-    return { orderId: order.id, orderNo: order.orderNo, taskId: printed.taskId, attemptId: attempt.attemptId }
+    return {
+      orderId: order.id,
+      orderNo: order.orderNo,
+      taskId: printed.taskId,
+      attemptId: attempt.attemptId,
+      amountCents: order.amountCents,
+    }
   }
 
   async function orderState(orderId: string) {
@@ -599,7 +604,7 @@ async function main(): Promise<void> {
       data: {
         orderId: W6.orderId,
         channel: 'wechat',
-        amountCents: 200,
+        amountCents: W6.amountCents,
         status: 'success',
         prepayId: `pa_dup_${suffix}`,
         channelTxnNo: `wxtxn_dup_${randomBytes(6).toString('hex')}`,

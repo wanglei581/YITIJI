@@ -20,8 +20,8 @@ import { Type } from 'class-transformer'
  *   - 非法枚举值 / 越界 copies / 非法 pageRange → 400 VALIDATION_FAILED
  *   - 未声明的扩展字段（collate/paperType/feeder 等）→ 400（不静默接收）
  *
- * 说明：quality / pagesPerSheet 当前前端已隐藏（Agent 暂不生效），但仍以安全默认值
- * 上送，故此处保留并做枚举校验（不接受非法值）。
+ * 说明：wire 类型保留历史枚举，但当前只接受已验证的黑白、单面、每张 1 页组合。
+ * 彩色、双面与 N-up 完成厂家确认和 Windows 真机验收后才能重新开放。
  */
 export class PrintJobParamsDto {
   @IsInt()
@@ -29,10 +29,10 @@ export class PrintJobParamsDto {
   @Max(99)
   copies!: number
 
-  @IsIn(['black_white', 'color'])
+  @IsIn(['black_white'])
   colorMode!: 'black_white' | 'color'
 
-  @IsIn(['simplex', 'duplex_long_edge', 'duplex_short_edge'])
+  @IsIn(['simplex'])
   duplex!: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
 
   /** CM2800ADN/CM2820ADN 系列仅支持 A4。 */
@@ -48,7 +48,7 @@ export class PrintJobParamsDto {
   @IsIn(['fit', 'actual'])
   scale!: 'fit' | 'actual'
 
-  @IsIn([1, 2, 4])
+  @IsIn([1])
   pagesPerSheet!: 1 | 2 | 4
 
   /** undefined = all pages；自定义如 '1-3,5,7-9'（仅数字/逗号/连字符/空格）。 */

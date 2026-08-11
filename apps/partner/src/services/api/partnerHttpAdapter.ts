@@ -2,6 +2,7 @@ import { API_BASE_URL, ApiHttpError, resolveApiUrl } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import type {
   PartnerDataSource,
+  PartnerDataSourceCapabilities,
   PartnerJobRecord,
   PartnerJobQualitySummary,
   PartnerFairRecord,
@@ -142,6 +143,8 @@ export const partnerHttpAdapter = {
   // Data Sources
   getDataSources: () =>
     get<PartnerDataSource[]>('/partner/data-sources'),
+  getDataSourceCapabilities: () =>
+    get<PartnerDataSourceCapabilities>('/partner/data-sources/capabilities'),
   toggleDataSource: (id: string) =>
     patch<PartnerDataSource>(`/partner/data-sources/${id}/toggle`, {}),
   createDataSource: (payload: CreateDataSourcePayload) =>

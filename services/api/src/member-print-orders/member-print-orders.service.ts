@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common'
-import type { MemberPrintOrderItem } from './member-print-orders.types'
+import type {
+  MemberPendingPrintStatus,
+  MemberPendingTaskItem,
+  MemberPrintOrderItem,
+} from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import { pickupCodeVisibleFor } from '../payment/order-status.service'
-import type { OrderPayStatus, PaymentSource } from '../payment/payment.types'
+import type { OrderPayStatus, PaymentSource, PrintPriceLine } from '../payment/payment.types'
+import { createPaymentSessionToken } from '../payment/payment-session-token'
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 
 // ============================================================
@@ -29,6 +34,11 @@ type ParsedParams = {
 }
 
 const EMPTY_PARAMS: ParsedParams = { fileName: null, copies: null, colorMode: null, paperSize: null }
+const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
+const RESUMABLE_PAYMENT_STATUSES = new Set<OrderPayStatus>(['unpaid', 'paying'])
+const NON_RESUMABLE_PAYMENT_STATUSES: OrderPayStatus[] = [
+  'refunding', 'partial_refunded', 'refunded', 'failed', 'closed',
+]
 
 /**
  * 从 PrintTask.paramsJson（写入时由强校验 DTO 产生，但读时仍按不可信处理）安全提取
@@ -54,6 +64,36 @@ function parseSafeParams(paramsJson: string): ParsedParams {
   const paperSize = typeof p['paperSize'] === 'string' && p['paperSize'].length > 0 ? p['paperSize'] : null
 
   return { fileName, copies, colorMode, paperSize }
+}
+
+function parseSafePriceLines(itemsJson: string): PrintPriceLine[] {
+  let raw: unknown
+  try {
+    raw = JSON.parse(itemsJson)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((candidate) => {
+    if (typeof candidate !== 'object' || candidate === null) return []
+    const line = candidate as Record<string, unknown>
+    if (
+      typeof line['serviceKey'] !== 'string' ||
+      !Number.isInteger(line['unitCents']) ||
+      !Number.isInteger(line['quantity']) ||
+      !Number.isInteger(line['subtotalCents']) ||
+      (line['unitCents'] as number) < 0 ||
+      (line['quantity'] as number) < 0 ||
+      (line['subtotalCents'] as number) < 0
+    ) return []
+    return [{
+      serviceKey: line['serviceKey'],
+      unitCents: line['unitCents'] as number,
+      quantity: line['quantity'] as number,
+      subtotalCents: line['subtotalCents'] as number,
+      ...(typeof line['description'] === 'string' ? { description: line['description'] } : {}),
+    }]
+  })
 }
 
 @Injectable()
@@ -123,6 +163,108 @@ export class MemberPrintOrdersService {
         refundedAmountCents: order ? order.refundedAmountCents : null,
         discountCents: order ? order.discountCents : null,
       }
+    })
+  }
+
+  /**
+   * 当前会员可续办任务。只读本人 active PrintTask，最多返回最近 20 条：
+   * - pending + unpaid/paying：恢复收银；必须能为本人真实 Order 重签 payment session。
+   * - pending + paid、claimed、printing：恢复真实打印进度。
+   * - 支付 closed/failed/refund*、任务终态、匿名/他人任务全部排除。
+   */
+  async listPending(endUserId: string): Promise<MemberPendingTaskItem[]> {
+    const rows = await this.prisma.printTask.findMany({
+      where: {
+        endUserId,
+        status: { in: [...ACTIVE_PRINT_STATUSES] },
+        OR: [
+          { order: { is: null } },
+          { order: { is: { payStatus: { notIn: NON_RESUMABLE_PAYMENT_STATUSES } } } },
+        ],
+      },
+      select: {
+        id: true,
+        status: true,
+        terminalId: true,
+        paramsJson: true,
+        updatedAt: true,
+        order: {
+          select: {
+            id: true,
+            orderNo: true,
+            terminalId: true,
+            amountCents: true,
+            payStatus: true,
+            itemsJson: true,
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: 20,
+    })
+
+    return rows.flatMap((row): MemberPendingTaskItem[] => {
+      const status = row.status as MemberPendingPrintStatus
+      const order = row.order
+      const payStatus = order ? (order.payStatus as OrderPayStatus) : null
+      const terminalId = order?.terminalId ?? row.terminalId
+      const fileName = parseSafeParams(row.paramsJson).fileName
+
+      if (status === 'pending' && order && RESUMABLE_PAYMENT_STATUSES.has(payStatus!)) {
+        if (order.amountCents <= 0 || !terminalId) return []
+        return [{
+          id: row.id,
+          type: 'print',
+          status,
+          payStatus,
+          fileName,
+          updatedAt: row.updatedAt.toISOString(),
+          resume: {
+            kind: 'payment',
+            orderId: order.id,
+            orderNo: order.orderNo,
+            amountCents: order.amountCents,
+            priceLines: parseSafePriceLines(order.itemsJson),
+            paymentSessionToken: createPaymentSessionToken({
+              orderId: order.id,
+              orderNo: order.orderNo,
+              terminalId,
+              amountCents: order.amountCents,
+              printTaskId: row.id,
+            }),
+          },
+        }]
+      }
+
+      if (status === 'pending' && order && payStatus !== 'paid') return []
+
+      let paymentSessionToken: string | undefined
+      if (order && terminalId && payStatus === 'paid') {
+        paymentSessionToken = createPaymentSessionToken({
+          orderId: order.id,
+          orderNo: order.orderNo,
+          terminalId,
+          amountCents: order.amountCents,
+          printTaskId: row.id,
+        })
+      }
+      return [{
+        id: row.id,
+        type: 'print',
+        status,
+        payStatus,
+        fileName,
+        updatedAt: row.updatedAt.toISOString(),
+        resume: {
+          kind: 'print-progress',
+          ...(order ? {
+            orderId: order.id,
+            orderNo: order.orderNo,
+            amountCents: order.amountCents,
+          } : {}),
+          ...(paymentSessionToken ? { paymentSessionToken } : {}),
+        },
+      }]
     })
   }
 }

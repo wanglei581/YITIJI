@@ -6,6 +6,8 @@ const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
 const MEMBER_CODE = '123456'
 const MEMBER_REPORT_POSITION = '隐私回归高级前端工程师'
+const PAYMENT_SESSION_TOKEN = 'privacy-payment-session-token'
+const PAYMENT_ORDER_ID = 'privacy-payment-order'
 const PRINT_TASK_ID = 'privacy-print-task'
 const SCAN_TASK_ID = 'privacy-scan-task'
 const SCAN_CONTROL_TOKEN = 'privacy-scan-control-token'
@@ -42,6 +44,14 @@ function registerKioskShell(api: ApiRouter): void {
     },
   })
   api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/ai-records', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+  api.respond('GET', '/api/v1/me/documents', {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
@@ -96,8 +106,8 @@ async function routeExact(
   })
 }
 
-async function loginThroughVisibleUi(page: Page): Promise<void> {
-  await page.goto(`/login?from=${encodeURIComponent('/interview/reports')}`)
+async function loginThroughVisibleUi(page: Page, returnTo = '/interview/reports'): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
   for (const digit of MEMBER_PHONE) {
     await page.getByRole('button', { name: digit, exact: true }).click()
@@ -108,7 +118,99 @@ async function loginThroughVisibleUi(page: Page): Promise<void> {
     await page.getByRole('button', { name: digit, exact: true }).click()
   }
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
-  await page.waitForURL((url) => url.pathname === '/interview/reports')
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+async function openResumedPaymentCashier(page: Page, api: ApiRouter): Promise<{
+  paymentRequests: () => Array<{ authorization: string; paymentSessionToken: string }>
+}> {
+  registerKioskShell(api)
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/payment/channels', {
+    status: 200,
+    json: { channels: ['sandbox'] },
+  })
+  api.respond('POST', '/api/v1/member/auth/logout', {
+    status: 200,
+    json: { success: true, data: { loggedOut: true } },
+  })
+
+  await routeExact(page, 'GET', '/api/v1/me/pending-tasks', async (route) => {
+    expect((await route.request().allHeaders()).authorization).toBe(`Bearer ${MEMBER_TOKEN}`)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: [{
+          id: 'privacy-resume-print-task',
+          type: 'print',
+          status: 'pending',
+          payStatus: 'unpaid',
+          fileName: '隐私回归待支付材料.pdf',
+          updatedAt: '2026-08-09T08:00:00.000Z',
+          resume: {
+            kind: 'payment',
+            orderId: PAYMENT_ORDER_ID,
+            orderNo: 'ORD-PRIVACY-HISTORY',
+            amountCents: 200,
+            priceLines: [{ serviceKey: 'print_bw_page', unitCents: 100, quantity: 2, subtotalCents: 200 }],
+            paymentSessionToken: PAYMENT_SESSION_TOKEN,
+          },
+        }],
+      }),
+    })
+  })
+
+  const paymentRequests: Array<{ authorization: string; paymentSessionToken: string }> = []
+  await routeExact(page, 'GET', `/api/v1/orders/${PAYMENT_ORDER_ID}/pay-status`, async (route) => {
+    const headers = await route.request().allHeaders()
+    paymentRequests.push({
+      authorization: headers.authorization ?? '',
+      paymentSessionToken: headers['x-payment-session-token'] ?? '',
+    })
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        orderId: PAYMENT_ORDER_ID,
+        orderNo: 'ORD-PRIVACY-HISTORY',
+        payStatus: 'unpaid',
+        paymentSource: null,
+        payChannel: null,
+        amountCents: 200,
+        paidAt: null,
+        pickupCode: null,
+        attempt: null,
+      }),
+    })
+  })
+
+  await loginThroughVisibleUi(page, '/session-resume')
+  await page.getByRole('button', { name: /隐私回归待支付材料/ }).click()
+  await page.waitForURL((url) => url.pathname === '/print/cashier')
+  await expect.poll(() => paymentRequests.length).toBeGreaterThan(0)
+  expect(paymentRequests[0]).toEqual({ authorization: '', paymentSessionToken: PAYMENT_SESSION_TOKEN })
+  expect(await page.evaluate(() => {
+    const state = window.history.state as { usr?: { paymentSessionToken?: string } } | null
+    return state?.usr?.paymentSessionToken ?? null
+  })).toBe(PAYMENT_SESSION_TOKEN)
+
+  return { paymentRequests: () => [...paymentRequests] }
+}
+
+async function walkHistory(page: Page, direction: 'back' | 'forward'): Promise<Array<{ path: string; token: string | null }>> {
+  const snapshots: Array<{ path: string; token: string | null }> = []
+  for (let step = 0; step < 5; step += 1) {
+    const move = direction === 'back' ? page.goBack.bind(page) : page.goForward.bind(page)
+    await move({ waitUntil: 'domcontentloaded' }).catch(() => null)
+    await page.waitForTimeout(150)
+    snapshots.push(await page.evaluate(() => {
+      const state = window.history.state as { usr?: { paymentSessionToken?: string } } | null
+      return { path: window.location.pathname, token: state?.usr?.paymentSessionToken ?? null }
+    }))
+  }
+  return snapshots
 }
 
 async function installMemberReportRoutes(page: Page): Promise<{
@@ -178,10 +280,21 @@ async function markCurrentDocument(page: Page, marker: string): Promise<void> {
 }
 
 async function readDocumentMarker(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const candidate = window as typeof window & { __privacyDocumentMarker?: string }
-    return candidate.__privacyDocumentMarker ?? null
-  })
+  let lastError: unknown
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      return await page.evaluate(() => {
+        const candidate = window as typeof window & { __privacyDocumentMarker?: string }
+        return candidate.__privacyDocumentMarker ?? null
+      })
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof Error) || !error.message.includes('Execution context was destroyed')) throw error
+      await page.waitForLoadState('domcontentloaded').catch(() => undefined)
+      await page.waitForTimeout(25)
+    }
+  }
+  throw lastError
 }
 
 test('member report hard-replaces a clean homepage after the privacy deadline @privacy-kiosk', async ({ page, api }) => {
@@ -214,6 +327,25 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   expect.soft(requests.reportRequestCount()).toBe(1)
   await expect.soft(page.getByText(MEMBER_REPORT_POSITION, { exact: false })).toHaveCount(0)
   await expect.soft(page.getByText('登录后可保存练习报告', { exact: true })).toBeVisible()
+})
+
+test('manual profile logout clears token-bearing cashier history @privacy-kiosk @privacy-manual-logout', async ({ page, api }) => {
+  const requests = await openResumedPaymentCashier(page, api)
+  await page.getByRole('button', { name: '退出支付', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/')
+  await page.getByRole('button', { name: '我的', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === '/profile')
+
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+  await expect(page.getByRole('button', { name: '手机号登录', exact: true })).toBeVisible()
+  const requestCountAfterLogout = requests.paymentRequests().length
+
+  for (const direction of ['back', 'forward'] as const) {
+    const snapshots = await walkHistory(page, direction)
+    expect(snapshots).not.toContainEqual(expect.objectContaining({ token: PAYMENT_SESSION_TOKEN }))
+    expect(snapshots).not.toContainEqual(expect.objectContaining({ path: '/print/cashier' }))
+  }
+  expect(requests.paymentRequests()).toHaveLength(requestCountAfterLogout)
 })
 
 test('legal documents cannot suspend an authenticated kiosk privacy deadline @privacy-kiosk', async ({ page, api }) => {
@@ -572,7 +704,7 @@ test('hard clear stops active print polling without cancelling the backend task 
     )
   }, PRINT_TASK_ID)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('任务已提交，正在等待终端处理，请留在机器旁', { exact: true })).toBeVisible()
+  await expect(page.getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)

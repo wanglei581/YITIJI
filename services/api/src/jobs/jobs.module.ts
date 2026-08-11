@@ -17,6 +17,7 @@ import { FairCompanyPrintService } from './fair-company-print.service'
 import { FairCompanyZoneService } from './fair-company-zone.service'
 import { FairMaterialService } from './fair-material.service'
 import { FairVenueGuideService } from './fair-venue-guide.service'
+import { RecruitmentIntegrationController } from './recruitment-integration.controller'
 
 @Module({
   // PrismaModule:供 importJobs 访问 prisma.job / prisma.organization
@@ -24,8 +25,8 @@ import { FairVenueGuideService } from './fair-venue-guide.service'
   // StorageService 为 @Global 模块导出,AdminFairsService 直接注入(活动资料落地)
   // N5/N6: AdminFairsService 拆为门面 + 3 个内部子服务(不对外 export)
   // N1: JobsService 拆为门面 + 4 个业务域子服务
-  imports:     [PrismaModule, AuthModule, FilesModule],
-  providers:   [
+  imports: [PrismaModule, AuthModule, FilesModule],
+  providers: [
     // N1 子服务（不对外 export，仅供 JobsService 门面注入）
     JobsKioskService,
     JobsAdminService,
@@ -42,7 +43,7 @@ import { FairVenueGuideService } from './fair-venue-guide.service'
     FairMaterialPrintBridgeCleanupTask,
     FairCompanyPrintService,
   ],
-  controllers: [JobsController, AdminFairsController],
-  exports:     [JobsService, AdminFairsService],
+  controllers: [JobsController, AdminFairsController, RecruitmentIntegrationController],
+  exports: [JobsService, AdminFairsService],
 })
 export class JobsModule {}

@@ -11,12 +11,17 @@ import {
   PackageCheckIcon,
   PrinterIcon,
 } from 'lucide-react'
-import type { PrintJobParams } from '@ai-job-print/shared'
+import {
+  hasUnverifiedPrintParams,
+  restrictToVerifiedPrintParams,
+  type PrintJobParams,
+} from '@ai-job-print/shared'
 import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
 import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
+import { abandonContractReviewReport } from '../../services/api/contractReview'
 import { formatCents } from './cashierStatus'
 import {
   clearPrintMaterialSession,
@@ -35,6 +40,10 @@ interface LocationState {
   params: PrintJobParams
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
+  contractReport?: {
+    fileId: string
+    abandonToken: string
+  }
 }
 
 interface SelfAssessmentSessionSnapshot {
@@ -95,16 +104,22 @@ export function PrintConfirmPage() {
   const state = location.state as LocationState | null
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
   const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
-  const params = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
+  const incomingParams = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
+  const paramsWereRestricted = hasUnverifiedPrintParams(incomingParams)
+  const params = restrictToVerifiedPrintParams(incomingParams)
   const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
   const source = state?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
+  const contractReport = state?.contractReport
+  const isContractReport = Boolean(contractReport)
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
+  const [abandoning, setAbandoning] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
   const selfAssessmentSnapshot = useMemo(() => readSelfAssessmentSnapshot(), [])
   const appendEligible =
+    !isContractReport &&
     appendSelfAssessment &&
     Boolean(selfAssessmentSnapshot?.taskId) &&
     Boolean(file.fileId) &&
@@ -171,15 +186,31 @@ export function PrintConfirmPage() {
     { label: '文件页数', value: file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页` },
     { label: '纸张规格', value: 'A4（210 × 297 mm）' },
     { label: '打印份数', value: `${params.copies} 份` },
-    { label: '色彩模式', value: params.colorMode === 'color' ? '彩色' : '黑白' },
+    { label: '色彩模式', value: '黑白' },
     { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
-    { label: '页面范围', value: params.pageRange ?? '全部页面' },
+    { label: '页面范围', value: !params.pageRange || params.pageRange === 'all' ? '全部页面' : params.pageRange },
   ]
 
   const confirmBlocked =
-    submitting || (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+    submitting || abandoning || (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+
+  const handleBack = async () => {
+    if (!contractReport) {
+      navigate(-1)
+      return
+    }
+    setAbandoning(true)
+    setSubmitError(null)
+    try {
+      await abandonContractReviewReport(contractReport.fileId, contractReport.abandonToken)
+      navigate('/resume-service', { replace: true })
+    } catch {
+      setSubmitError('风险提示报告删除失败，请重试。系统仍会按最长保留时限自动清理。')
+      setAbandoning(false)
+    }
+  }
 
   const handleConfirm = async () => {
     if (API_MODE === 'http') {
@@ -221,7 +252,7 @@ export function PrintConfirmPage() {
         })
         clearPrintMaterialSession()
         const nextState = {
-          ...location.state,
+          ...(isContractReport ? {} : location.state),
           file: { ...file, fileUrl: printFileUrl, name: printFileName, fileMd5: printFileMd5 },
           params,
           source,
@@ -245,7 +276,9 @@ export function PrintConfirmPage() {
       return
     }
     clearPrintMaterialSession()
-    navigate('/print/progress', { state: { ...location.state, file, params, source } })
+    navigate('/print/progress', {
+      state: { ...(isContractReport ? {} : location.state), file, params, source },
+    })
   }
 
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
@@ -296,8 +329,8 @@ export function PrintConfirmPage() {
         title="确认打印"
         subtitle="核对以下参数，确认无误后提交打印任务"
         step={5}
-        backLabel="返回修改"
-        onBack={() => navigate(-1)}
+        backLabel={isContractReport ? '放弃打印' : '返回修改'}
+        onBack={() => void handleBack()}
       />
 
       <div className="print-confirm-split" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -305,6 +338,11 @@ export function PrintConfirmPage() {
         <div className="print-confirm-left" style={{ overflowY: 'auto' }}>
 
           {/* 文件条 */}
+          {paramsWereRestricted && (
+            <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg">
+              参数已按当前已验证能力收口：仅黑白、单面、每张 1 页。原彩色、双面或多页合一选择不会参与报价。
+            </div>
+          )}
           <div className="print-file-strip">
             <div className="print-file-icon">
               <FileTextIcon aria-hidden="true" />
@@ -375,11 +413,6 @@ export function PrintConfirmPage() {
               <span className="k">计费方式</span>
               <span className="v" style={{ fontSize: 16 }}>{costCalcLabel}</span>
             </div>
-            {params.colorMode === 'color' && (
-              <div className="print-est-row">
-                <span className="k print-color-hint">彩色效果以设备支持和当前耗材状态为准</span>
-              </div>
-            )}
             <div className="print-cost-total">
               <span className="print-cost-label">
                 预计费用<br />
@@ -426,7 +459,7 @@ export function PrintConfirmPage() {
           </div>
 
           {/* 附加自我探索摘要（仅在已有测评结果且为 PDF 简历时出现） */}
-          {selfAssessmentSnapshot?.taskId && (
+          {!isContractReport && selfAssessmentSnapshot?.taskId && (
             <div className="print-rules-card print-self-assessment-card">
               <label className="print-self-assessment-toggle">
                 <input
@@ -452,8 +485,17 @@ export function PrintConfirmPage() {
           <div className="print-rules-card">
             <b className="print-rules-title" style={{ marginTop: 16 }}>打印须知</b>
             <ol className="print-rules-list">
-              <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
-              <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
+              {isContractReport ? (
+                <>
+                  <li>本次仅打印 AI 风险提示报告，不打印合同原件。</li>
+                  <li>报告可能包含敏感条款摘要，请勿离开终端并及时取件。</li>
+                </>
+              ) : (
+                <>
+                  <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
+                  <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
+                </>
+              )}
               <li>提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。</li>
               <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
             </ol>
@@ -474,11 +516,13 @@ export function PrintConfirmPage() {
         <button
           type="button"
           className="print-confirm-back"
-          disabled={submitting}
-          onClick={() => navigate(-1)}
+          disabled={submitting || abandoning}
+          onClick={() => void handleBack()}
         >
-          <ArrowLeftIcon aria-hidden="true" />
-          返回修改
+          {abandoning
+            ? <LoaderIcon style={{ width: 24, height: 24, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+            : <ArrowLeftIcon aria-hidden="true" />}
+          {isContractReport ? (abandoning ? '正在删除…' : '放弃打印') : '返回修改'}
         </button>
         <button
           type="button"
@@ -494,7 +538,11 @@ export function PrintConfirmPage() {
           ) : (
             <>
               <PrinterIcon aria-hidden="true" />
-              {appendEligible ? '打印合并版（简历+自我探索）' : '按以上设置打印原文件'}
+              {isContractReport
+                ? '按以上设置打印风险提示报告'
+                : appendEligible
+                  ? '打印合并版（简历+自我探索）'
+                  : '按以上设置打印原文件'}
             </>
           )}
         </button>

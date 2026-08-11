@@ -75,7 +75,7 @@ const httpIndex = confirmSrc.search(httpBranch)
 const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)\s*\{\s*setSubmitError/)
 
 // SIM 跳转 = 无 taskId 的 /print/progress 导航(仅非 http mock 模式使用)
-const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*source\s*\}\s*\}\)/
+const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.\(isContractReport\s*\?\s*\{\}\s*:\s*location\.state\),\s*file,\s*params,\s*source\s*\}\s*,?\s*\}\)/
 const simIndex = confirmSrc.search(simNavPattern)
 
 // C5-3:http 真实建单后按 amountCents 分流,两分支共用 nextState(履约状态载体)。
@@ -410,7 +410,6 @@ if (navigateSuccessCallCount === 1) {
 const hasIsSim = /(?:const|let)\s+isSim\s*=/.test(progressCode)
 const realPhrases = [
   { phrase: '完成支付确认', label: '完成支付确认' },
-  { phrase: '终端已接收任务，文件校验通过', label: '终端已接收任务，文件校验通过' },
   { phrase: '打印机正在出纸', label: '打印机正在出纸' },
 ]
 let realPhrasesIsolated = hasIsSim
@@ -427,6 +426,21 @@ for (const { phrase, label } of realPhrases) {
   }
 }
 
+const realStatusHelperHonest =
+  /case\s+'pending':[\s\S]{0,800}?stageTitle:\s*'等待终端领取'[\s\S]{0,800}?终端尚未领取/.test(progressCode) &&
+  /case\s+'claimed':[\s\S]{0,800}?stageTitle:\s*'终端已领取任务'[\s\S]{0,800}?终端已领取任务，正在准备打印/.test(progressCode) &&
+  /case\s+'printing':[\s\S]{0,800}?stageTitle:\s*'正在打印'[\s\S]{0,800}?打印机正在出纸/.test(progressCode)
+const realStatusPresentationIsolated =
+  /label:\s*isSim\s*\?[\s\S]{0,160}?:\s*realStatus\.queueLabel/.test(progressCode) &&
+  /desc:\s*isSim\s*\?[\s\S]{0,200}?:\s*realStatus\.queueDesc/.test(progressCode) &&
+  /:\s*realStatus\.stageTitle/.test(progressCode) &&
+  /:\s*realStatus\.stageSubtitle/.test(progressCode)
+if (realStatusHelperHonest && realStatusPresentationIsolated) {
+  pass('pending / claimed / printing 三态话术独立定义，且仅在真实任务分支渲染')
+} else {
+  fail('pending / claimed / printing 必须独立定义诚实话术，并与 SIM 演示分支隔离')
+}
+
 const simHonest =
   /isSim\s*\?[\s\S]{0,320}?未建单/.test(progressCode) &&
   /isSim\s*\?[\s\S]{0,320}?未支付/.test(progressCode) &&
@@ -439,7 +453,7 @@ if (simHonest) {
 
 if (!hasIsSim) {
   fail('PrintProgressPage 须定义 isSim，用于隔离真实进度话术与演示文案')
-} else if (realPhrasesIsolated && simHonest) {
+} else if (realPhrasesIsolated && realStatusHelperHonest && realStatusPresentationIsolated && simHonest) {
   pass('isSim 分支同时隔离真实话术并提供演示诚实文案')
 }
 

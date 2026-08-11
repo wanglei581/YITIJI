@@ -75,12 +75,30 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Repository integrity gate
+        # 全量 tracked 文件拒绝残留冲突标记；所有 GitHub Actions workflow 必须能通过 YAML 语法解析。
+        run: |
+          pnpm verify:repository-integrity
+          pnpm verify:ci-gate-coverage
+
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
         run: node scripts/verify-deploy-authorization-gate.mjs
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
+
+      - name: Cross-client deterministic static gates
+        # 只读取仓库源码/配置；不连外网、硬件、密钥或真实数据库。
+        run: |
+          pnpm --filter @ai-job-print/miniapp verify:static
+          pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness
+          pnpm --filter @ai-job-print/admin verify:refresh-safe
+          pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui
+          pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
+          pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
+          pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
+          pnpm --filter @ai-job-print/partner verify:partner-refresh-safe
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -92,10 +110,14 @@ jobs:
         run: pnpm verify:compliance-copy
 
       - name: Import review reset gate (forced re-review on partner import)
-        # 静态断言 Partner/Excel 主动导入的 job/jobFair upsert update 块一律回 pending+draft,
-        # 并反向断言 job-sync 自动拉取不覆写审核状态。纯 node,不需要 DB。
+        # 静态断言 Partner/Excel 导入及 job-sync 内容变化路径都回 pending+draft；
+        # job-sync 内容未变化路径只刷新 syncTime。纯 node,不需要 DB。
         working-directory: services/api
         run: pnpm verify:import-review-reset
+
+      - name: Backend P0 contract gates
+        working-directory: services/api
+        run: pnpm verify:backend-p0-contracts
 
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
@@ -104,6 +126,31 @@ jobs:
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
+
+      - name: Recruitment P1 schema + SQLite fresh/upgrade gates
+        # Applies the full migration history and an old-schema fixture in isolated temp DBs.
+        # It must not replace the shared db-push baseline used by the verify suites below.
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-schema
+
+      - name: Recruitment Wave 2 read-only planner contract
+        # Pure fixtures only: target guards, manifest conservation, collision handling and no-write CLI surface.
+        working-directory: services/api
+        run: pnpm verify:recruitment-wave2-readonly
+
+      - name: Recruitment Wave 2 full inventory contract
+        # Pure fixtures only: API target guards, pagination boundaries, drift and SQL read allowlist.
+        working-directory: services/api
+        run: |
+          pnpm typecheck:recruitment-wave2-full-inventory
+          pnpm verify:recruitment-wave2-full-inventory
+
+      - name: Recruitment Wave 2 proposed governance zero-write contract
+        # Pure fixtures: strict evidence packs, hypothetical-only decisions, conservation and redacted output.
+        working-directory: services/api
+        run: |
+          pnpm typecheck:recruitment-wave2-proposed-governance
+          pnpm verify:recruitment-wave2-proposed-governance
 
       - name: Lint
         run: |
@@ -129,6 +176,7 @@ jobs:
           VITE_API_BASE_URL: /api/v1
           VITE_USE_TRTC_CALL: 'true'
           VITE_TERMINAL_ID: KSK-001
+          VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
           pnpm --filter @ai-job-print/api build
           pnpm build:kiosk:production
@@ -184,6 +232,14 @@ jobs:
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
+          # Temp directory + temp SQLite fault injection; no production scan folder or Windows dependency.
+          pnpm exec ts-node scripts/verify-scan-deletion-audit.ts
+          # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
+          pnpm exec ts-node scripts/verify-task-reliability.ts
+          # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
+          pnpm run verify:task-runner-wake
+          # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
+          pnpm exec ts-node scripts/verify-print-monitor-truth.ts
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
@@ -191,6 +247,20 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Recruitment P1 read-only preflight contract
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-preflight
+
+      - name: Backend P0 real HTTP contracts
+        working-directory: services/api
+        run: pnpm verify:backend-p0-http
+
+      - name: Recruitment content Admin read-only HTTP contracts
+        working-directory: services/api
+        env:
+          RECRUITMENT_CONTENT_VERIFY_TARGET: isolated
+        run: pnpm verify:recruitment-content-http
 
       - name: Install SQLite terminal database guards
         working-directory: services/api
@@ -212,10 +282,14 @@ jobs:
           VITE_API_BASE_URL: /api/v1
           VITE_USE_TRTC_CALL: 'true'
           VITE_TERMINAL_ID: KSK-001
+          VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
+          pnpm --filter @ai-job-print/kiosk verify:contract-review-session
+          pnpm --filter @ai-job-print/kiosk verify:contract-review-report-print
           pnpm --filter @ai-job-print/kiosk verify:device-status-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
           pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
@@ -224,6 +298,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
           pnpm --filter @ai-job-print/kiosk verify:user-center-wave0
+          pnpm --filter @ai-job-print/kiosk verify:member-session-closure
           pnpm --filter @ai-job-print/kiosk verify:lightflow-profile-entry
           pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper
@@ -266,8 +341,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
+          pnpm --filter @ai-job-print/api verify:contract-review:preprod-readiness
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
+          pnpm --filter @ai-job-print/api verify:contract-review:report
+          pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
           pnpm --filter @ai-job-print/api verify:trust-proxy
@@ -279,10 +357,13 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
-          pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:print-parameter-capability
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
+          pnpm --filter @ai-job-print/api verify:terminal-status-idempotency
           pnpm --filter @ai-job-print/api verify:terminal-credentials
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
@@ -296,17 +377,20 @@ jobs:
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
-          pnpm --filter @ai-job-print/api verify:order
+          pnpm --filter @ai-job-print/api verify:isolated-verification-database
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
-          pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:material-task-token-transport
           pnpm --filter @ai-job-print/api verify:job-materials
-          pnpm --filter @ai-job-print/api verify:payment-flow
-          pnpm --filter @ai-job-print/api verify:payment-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
-          pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
-          pnpm --filter @ai-job-print/api verify:refund-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit
@@ -372,6 +456,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-retention
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
+          pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
@@ -379,10 +464,15 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
+          pnpm --filter @ai-job-print/api verify:backend-p0-contracts
+          pnpm --filter @ai-job-print/api verify:offline-agencies-contract
+          pnpm --filter @ai-job-print/api verify:partner-source-capabilities
+          pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:file-retention
+          pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
@@ -438,6 +528,14 @@ jobs:
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
+      - name: Recruitment P1 isolated PostgreSQL upgrade gate
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+          POSTGRES_UPGRADE_URL: postgresql://ci:ci@localhost:5432/ai_job_print_upgrade_ci
+        run: |
+          createdb -h localhost -U ci ai_job_print_upgrade_ci
+          pnpm verify:recruitment-p1-schema:postgres-upgrade
       - name: Generate clients (SQLite types + PG runtime)
         working-directory: services/api
         # create-client.ts 静态 import SQLite client(类型统一);两套产物都需生成
@@ -447,6 +545,19 @@ jobs:
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
+      - name: Recruitment Wave 2 isolated PostgreSQL read-only planner
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+        run: bash scripts/verify-recruitment-wave2-postgres-ci.sh
+      - name: Recruitment P1 fresh PostgreSQL drift gate
+        working-directory: services/api
+        run: >-
+          npx prisma migrate diff --config prisma.postgres.config.ts
+          --from-config-datasource --to-schema prisma/postgres/schema.prisma --exit-code
+      - name: Recruitment P1 read-only preflight on fresh PG
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-preflight
       - name: Verify first admin bootstrap concurrency on isolated PG
         working-directory: services/api
         env:
@@ -477,6 +588,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
+          pnpm --filter @ai-job-print/api verify:backend-p0-contracts
+          pnpm --filter @ai-job-print/api verify:offline-agencies-contract
+          pnpm --filter @ai-job-print/api verify:partner-source-capabilities
+          pnpm --filter @ai-job-print/api verify:backend-p0-http
+          RECRUITMENT_CONTENT_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-content-http
+          pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
@@ -490,26 +607,27 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
-          pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
-          pnpm --filter @ai-job-print/api verify:order
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
-          pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:job-materials
-          pnpm --filter @ai-job-print/api verify:payment-flow
-          pnpm --filter @ai-job-print/api verify:payment-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
-          pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
-          pnpm --filter @ai-job-print/api verify:refund-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit
@@ -585,6 +703,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w6
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
+          pnpm --filter @ai-job-print/kiosk test:browser:contract-review
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()

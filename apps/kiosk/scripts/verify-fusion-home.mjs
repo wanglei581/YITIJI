@@ -275,6 +275,17 @@ const expectedSvcTiles = [
 ]
 const actualSvcTiles = svcTileObjects.map((tile) => [stringField(tile, 'title'), stringField(tile, 'to')])
 expect(JSON.stringify(actualSvcTiles) === JSON.stringify(expectedSvcTiles), 'SvcGrid 精确保留 8 个定版入口的标题、路由与顺序')
+expect(
+  /const\s+toolbox\s*=\s*useToolboxConfig\(\)/.test(svcGridBody) &&
+    /const\s+campus\s*=\s*useSmartCampusConfig\(\)/.test(svcGridBody),
+  '实际渲染的 SvcGrid 读取百宝箱与智慧校园真实配置',
+)
+expect(
+  /const\s+visibleTiles\s*=\s*tiles\.filter\([\s\S]*?toolbox\.enabled[\s\S]*?campus\.enabled[\s\S]*?\)/.test(svcGridBody) &&
+    /visibleTiles\.map\(/.test(svcGridBody) &&
+    !/\{tiles\.map\(/.test(svcGridBody),
+  'SvcGrid 只渲染后台 enabled 开关允许的百宝箱/智慧校园入口',
+)
 
 const groupsArray = extractAssignedArray(serviceGroups, 'export const SERVICE_GROUPS')
 const groupObjects = directObjectBlocks(groupsArray)

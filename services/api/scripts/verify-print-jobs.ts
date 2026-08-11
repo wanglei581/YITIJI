@@ -6,14 +6,14 @@
  *   2. 非法 fileUrl（外部地址 / 无签名 / 篡改 sig）→ 400 PRINT_INVALID_FILE_URL（SSRF 防护）。
  *   3. 终端 claim：只领取已绑定本终端的 pending 任务；错 agentToken → 401。
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
- *   5. 终态幂等：重复回传 completed / 终态后再请求 printing 都返回 ack 且不重写 DB。
+ *   5. 终态幂等：只允许重复回传相同终态；不同终态或回退到 printing 必须拒绝且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
  *
  * service 直调真库（prisma），不起 HTTP server——确定性、CI 友好，与现有 verify 一致。
  * 运行：pnpm --filter ./services/api verify:print-jobs
  */
 import 'dotenv/config'
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 
 // terminals.service 在模块加载期 requireEnv 这两项；signing 在调用期读 FILE_SIGNING_SECRET。
 // 测试兜底（||= 不覆盖外部已设值；CI 已注入这些测试值）。须在动态 import terminals.service 之前设好。
@@ -36,6 +36,7 @@ import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.dto'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -59,6 +60,8 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
 }
 
 async function main() {
+  assertIsolatedVerificationDatabase()
+
   // 动态 import：terminals.service 模块级 requireEnv 必须在上面 env 设好后再加载。
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 
@@ -84,7 +87,13 @@ async function main() {
   const terminalId = `term_vpj_${suffix}`
   const agentToken = `vpj-agent-token-${suffix}`
   const fileId = `file_vpj_${suffix}`
+  const contractSourceFileId = `file_vpj_contract_${suffix}`
+  const contractReportFileId = `file_vpj_report_${suffix}`
   const storageKey = `verify/print-jobs/${fileId}.pdf`
+  const contractSourceStorageKey = `verify/print-jobs/${contractSourceFileId}.pdf`
+  const contractReportStorageKey = `verify/print-jobs/${contractReportFileId}.pdf`
+  const fixtureFileIds = [fileId, contractSourceFileId, contractReportFileId]
+  const fixtureStorageKeys = [storageKey, contractSourceStorageKey, contractReportStorageKey]
   const createdTaskIds: string[] = []
 
   async function cleanup() {
@@ -99,8 +108,10 @@ async function main() {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
-    await prisma.fileObject.deleteMany({ where: { id: fileId } })
-    await storage.deleteObject(storageKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
+    await Promise.all(fixtureStorageKeys.map((key) =>
+      storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
+    ))
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
   }
 
@@ -115,18 +126,49 @@ async function main() {
     // 计费接线后 create() 需真实 FileObject + 存储内容识别页数 + PriceConfig 报价（否则 fail-closed）。
     await seedDevDefaultPriceConfig(prisma)
     const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
-    await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
-    await prisma.fileObject.create({
-      data: {
-        id: fileId,
-        storageKey,
-        filename: 'vpj.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: pdfBytes.length,
-        sha256: '',
-        purpose: 'print_source',
-        bucket: LOCAL_BUCKET_SENTINEL,
-      },
+    const reportSha256 = createHash('sha256').update(pdfBytes).digest('hex')
+    await Promise.all(fixtureStorageKeys.map((key) =>
+      storage.putObject(key, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL),
+    ))
+    await prisma.fileObject.createMany({
+      data: [
+        {
+          id: fileId,
+          storageKey,
+          filename: 'vpj.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: '',
+          purpose: 'print_source',
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+        {
+          id: contractSourceFileId,
+          storageKey: contractSourceStorageKey,
+          filename: '劳动合同.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'contract_upload',
+          sensitiveLevel: 'highly_sensitive',
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+        {
+          id: contractReportFileId,
+          storageKey: contractReportStorageKey,
+          filename: 'AI签约风险提示报告.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'contract_review_report',
+          sensitiveLevel: 'highly_sensitive',
+          assetCategory: 'derived',
+          sourceFileId: contractSourceFileId,
+          status: 'active',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+      ],
     })
 
     await terminals.heartbeat(
@@ -160,6 +202,36 @@ async function main() {
     if (created.status === 'pending' && created.taskId.startsWith('ptask_')) {
       pass('1. 合法签名 fileUrl + 目标终端 → 创建任务 pending')
     } else fail(`1. 创建异常: ${JSON.stringify(created)}`)
+
+    await expectCode(
+      () => printJobs.create({ fileUrl: signFileUrl(contractSourceFileId, 30 * 60 * 1000).url }, { terminalId }),
+      'PRINT_CONTRACT_SOURCE_FORBIDDEN',
+      '1a. 合同审查原件签名 URL → 拒绝直接创建打印任务',
+    )
+
+    const reportCreated = await printJobs.create({
+      fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+      fileMd5: 'client-supplied-hash-must-not-win',
+      fileName: 'AI签约风险提示报告.pdf',
+    }, { terminalId })
+    createdTaskIds.push(reportCreated.taskId)
+    const reportTask = await prisma.printTask.findUnique({ where: { id: reportCreated.taskId } })
+    if (reportTask?.fileMd5 === reportSha256) {
+      pass('1b. 合同风险提示报告 → PrintTask 强制使用服务端 SHA-256')
+    } else {
+      fail(`1b. 合同报告哈希未采用服务端值: ${reportTask?.fileMd5 ?? 'missing'}`)
+    }
+
+    await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: 'invalid-server-hash' } })
+    await expectCode(
+      () => printJobs.create({
+        fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+        fileMd5: reportSha256,
+      }, { terminalId }),
+      'PRINT_CONTRACT_REPORT_INVALID',
+      '1c. 合同风险提示报告缺少有效服务端 SHA-256 → fail-closed',
+    )
+    await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
 
     // ── 2. 非法 fileUrl 拦截（SSRF 防护）──────────────────────────────
     await expectCode(
@@ -235,11 +307,21 @@ async function main() {
       pass('5a. 终态幂等：重复回传 completed → ack 且 completedAt 不变（DB 未重写）')
     } else fail(`5a. 幂等异常: ${JSON.stringify(afterRepatch)}`)
 
-    const ack2 = await terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId)
+    await expectCode(
+      () => terminals.patchTaskStatus(created.taskId, { status: 'failed' }, `Bearer ${agentToken}`, terminalId),
+      'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+      '5b. completed 后回传 failed → 409 终态冲突',
+    )
     const afterIllegal = await printJobs.getStatus(created.taskId)
-    if (ack2.acknowledged === true && afterIllegal.status === 'completed') {
-      pass('5b. 终态后再请求 printing → 幂等 ack，状态仍 completed（终态保护）')
-    } else fail(`5b. 终态保护异常: ${afterIllegal.status}`)
+    if (afterIllegal.status === 'completed' && afterIllegal.completedAt === completedAt1) {
+      pass('5c. 终态冲突被拒绝后状态与 completedAt 均保持不变')
+    } else fail(`5c. 终态冲突后状态异常: ${JSON.stringify(afterIllegal)}`)
+
+    await expectCode(
+      () => terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId),
+      'INVALID_STATUS_TRANSITION',
+      '5d. completed 后回退 printing → 400 非法转换',
+    )
 
     // ── 6. 状态查询 404 ───────────────────────────────────────────────
     await expectCode(

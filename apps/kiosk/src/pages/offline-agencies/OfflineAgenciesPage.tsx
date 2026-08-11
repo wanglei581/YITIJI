@@ -41,7 +41,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
             <span key={svc} className="jf-chip">{svc}</span>
           ))}
           <span className="jf-chip src">来源编号 {agency.orgCode}</span>
-          <span className="jf-chip ok">资质核验已通过</span>
+          <span className="jf-chip ok">机构信息已审核</span>
         </div>
       </div>
     </article>
@@ -53,7 +53,7 @@ function EmptyState() {
     <div className="oa-empty" role="status">
       <BuildingIcon aria-hidden="true" />
       <b>暂无线下招聘机构信息</b>
-      <span>可调整机构名称关键词再试；机构需完成资质核验后才会展示。</span>
+      <span>可调整机构名称关键词再试；机构信息需经管理员审核发布后才会展示。</span>
     </div>
   )
 }
@@ -117,7 +117,7 @@ export function OfflineAgenciesPage() {
       subtitle="合作人力资源机构门店 · 岗位咨询与应聘到店办理"
       backLabel="返回岗位信息"
       onBack={() => navigate('/jobs')}
-      badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
+      badge={<FusionBadge icon={ShieldCheckIcon}>机构信息审核后收录</FusionBadge>}
     >
       <div className="jf-filter-bar">
         <span className="jf-filter-label">区域</span>

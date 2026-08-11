@@ -49,6 +49,7 @@ import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const SANDBOX_SECRET = 'verify-cashier-sandbox-secret-0001'
 const OLD_DATE = new Date('2020-01-01T00:00:00.000Z')
@@ -80,6 +81,7 @@ async function expectCode(label: string, code: string, fn: () => Promise<unknown
 async function main(): Promise<void> {
   console.log('\n=== C5-3 Kiosk 收银 / 出纸门控 verification ===')
 
+  assertIsolatedVerificationDatabase()
   const { TerminalsService } = await import('../src/terminals/terminals.service')
   const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
   const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
@@ -221,12 +223,12 @@ async function main(): Promise<void> {
 
     // ── (5) 免费单：amountCents=0 + payStatus=paid，门控下可 claim；出码被拒 ──
     await prisma.priceConfig.upsert({
-      where: { serviceKey: 'print_color_page' },
-      create: { serviceKey: 'print_color_page', unitCents: 0, unit: 'page', active: true, description: 'verify 免费' },
+      where: { serviceKey: 'print_bw_page' },
+      create: { serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', active: true, description: 'verify 免费' },
       update: { unitCents: 0, active: true },
     })
     const free = await printJobs.create(
-      { fileUrl: await seedPdf('free', 1), fileMd5: 'sha256-cash-free', fileName: '免费打印.pdf', params: { copies: 1, colorMode: 'color' } },
+      { fileUrl: await seedPdf('free', 1), fileMd5: 'sha256-cash-free', fileName: '免费打印.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
     )
     taskIds.push(free.taskId)
@@ -235,6 +237,10 @@ async function main(): Promise<void> {
     await backdate(free.taskId)
     const claimFree = await claimOne()
     assert(claimFree.length === 1 && claimFree[0].taskId === free.taskId, '5c. 免费单（已 paid+free）门控开启下可 claim')
+    await prisma.priceConfig.update({
+      where: { serviceKey: 'print_bw_page' },
+      data: { unitCents: 20, active: true, description: '黑白打印' },
+    })
 
     // ── (6) 门控默认关闭回归：flag 关时未支付单可 claim（零静默回归）──────────
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'

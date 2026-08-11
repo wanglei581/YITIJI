@@ -16,6 +16,8 @@
  *     由 Provider 工厂启动期校验凭证齐全，缺一拒启动）
  *   - PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须显式声明 true|false（C5-6：未支付订单能否被
  *     claim 出纸是显式部署决策）；启用 wechat/alipay 时必须为 true（先付后印）
+ *   - PRINT_REQUIRE_PII_SCAN 必须为 true（用户原始材料未完成隐私检查与逐项裁决时，
+ *     生产环境不得创建打印任务）
  *   - PRINT_SCAN_CAPABILITY_MODE 必须显式声明 managed|strict（Task 11：打印扫描能力开关
  *     是每终端 × 能力键的 DB 配置，未配置行在 managed 模式放行既有闭环、strict 模式
  *     fail-closed 拒绝；选哪种是显式部署决策，生产不允许沉默缺省）
@@ -51,6 +53,7 @@ export interface ProductionRuntimeEnv {
   PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
+  PRINT_REQUIRE_PII_SCAN?: string
   PRINT_SCAN_CAPABILITY_MODE?: string
   TRUST_PROXY_HOPS?: string
   TERMINAL_LEGACY_REGISTER_ENABLED?: string
@@ -175,6 +178,15 @@ export function assertProductionRuntimeGates(
   if (realChannelEnabled && paidBeforeClaim !== 'true') {
     throw new Error(
       'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED: 启用真实支付通道（wechat/alipay）时 PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须为 true（先付后印，服务端门禁）',
+    )
+  }
+
+  // 商用隐私底线：生产环境不保留“只审计、不拦截”的观察模式。
+  // 必须与 print-jobs.service.ts 的精确 `=== 'true'` 判定一致，避免带空格或大小写
+  // 变体通过启动门禁、运行时却仍走 bypass。
+  if (env.PRINT_REQUIRE_PII_SCAN !== 'true') {
+    throw new Error(
+      'PRODUCTION_PRINT_PII_SCAN_REQUIRED: NODE_ENV=production 时 PRINT_REQUIRE_PII_SCAN 必须显式为 true（用户原始材料未完成隐私检查不得建打印任务）',
     )
   }
 

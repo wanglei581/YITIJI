@@ -36,7 +36,7 @@ export interface PublishedFairsParams {
 
 export interface PublishedFairQueryGroup {
   where: Prisma.JobFairWhereInput
-  orderBy: { startAt: 'asc' | 'desc' }
+  orderBy: Array<{ startAt?: 'asc' | 'desc'; id?: 'asc' | 'desc' }>
 }
 
 // ─── Exported DTO types ───────────────────────────────────────────────────────
@@ -205,6 +205,8 @@ export interface SingleResult<T> {
 export interface ImportResult<T> {
   imported: number
   items: T[]
+  added?: number
+  updated?: number
 }
 
 export interface PartnerDataSourceDto {
@@ -222,6 +224,7 @@ export interface PartnerDataSourceDto {
   endpoint?: string
   webhookUrl?: string
   webhookSecretOnce?: string
+  activationManagedBy?: 'admin' | 'partner'
 }
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
@@ -378,6 +381,7 @@ export function prismaJobSourceToPartnerDto(
     description: source.description ?? '',
     credentialConfigured: Boolean(source.encryptedCredential || source.webhookSecret),
     endpoint: source.endpoint ?? undefined,
+    activationManagedBy: source.accessMode === 'api' || source.accessMode === 'webhook' ? 'admin' : 'partner',
   }
 }
 

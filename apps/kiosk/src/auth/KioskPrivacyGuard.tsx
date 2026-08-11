@@ -8,6 +8,7 @@ import {
 import { clearKioskSensitiveSession } from './kioskSensitiveSession'
 import {
   KioskSessionControlProvider,
+  type KioskSessionClearDestination,
   type KioskSessionControlValue,
   type KioskWarningDescriptor,
   type KioskWarningExitTo,
@@ -167,23 +168,26 @@ function writePrivacyBoundary(): PrivacyBoundary {
   return boundary
 }
 
-function pushSanitizedHome(boundary: PrivacyBoundary): void {
+function pushSanitizedDestination(
+  boundary: PrivacyBoundary,
+  destination: KioskSessionClearDestination,
+): void {
   const state = readHistoryState()
   const sanitizedState = {
     ...state,
-    usr: null,
+    usr: destination.state ?? null,
     key: `privacy-${boundary.token}`,
     idx: boundary.minHistoryIndex,
     [PRIVACY_BOUNDARY_STATE_KEY]: boundary.token,
     [PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY]: boundary.createdAt,
   }
   try {
-    window.history.pushState(sanitizedState, '', '/')
+    window.history.pushState(sanitizedState, '', destination.path)
     window.location.reload()
   } catch {
-    // pushState 极端失败时仍遮罩并硬回首页；持久 boundary 会拦截旧历史。
-    window.history.replaceState(sanitizedState, '', '/')
-    window.location.replace('/')
+    // pushState 极端失败时仍遮罩并硬到受限目的地；持久 boundary 会拦截旧历史。
+    window.history.replaceState(sanitizedState, '', destination.path)
+    window.location.replace(destination.path)
   }
 }
 
@@ -249,7 +253,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     return nextBoundary
   }, [])
 
-  const hardClear = useCallback(() => {
+  const clearSessionTo = useCallback((destination: KioskSessionClearDestination) => {
     if (!claimClearing('hard')) return
     returningWarningRef.current = false
 
@@ -262,8 +266,12 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     setWarning(null)
 
     // 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
-    window.requestAnimationFrame(() => pushSanitizedHome(nextBoundary))
+    window.requestAnimationFrame(() => pushSanitizedDestination(nextBoundary, destination))
   }, [claimClearing, establishPrivacyBoundary, logout])
+
+  const hardClear = useCallback(() => {
+    clearSessionTo({ path: '/' })
+  }, [clearSessionTo])
 
   const startWarning = useCallback(
     (
@@ -515,9 +523,10 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       warning,
       continueSession,
       hardClear,
+      clearSessionTo,
       clearToScreensaver,
     }),
-    [clearToScreensaver, continueSession, hardClear, warning]
+    [clearSessionTo, clearToScreensaver, continueSession, hardClear, warning]
   )
 
   return (

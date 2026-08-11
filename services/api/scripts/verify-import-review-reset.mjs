@@ -28,22 +28,12 @@
  *   ③ 第一层出现计算属性名 `[expr]:`（键名运行时才定）；
  *   ④ 第一层出现重复键（JS 后者覆盖前者，静态取哪个都不安全）。
  *
- * ⚠️ 关于 job-sync.service.ts 的反向断言（务必读完再改）
+ * ⚠️ 关于 job-sync.service.ts 的内容变化退审（务必读完再改）
  *
- * 本脚本断言 job-sync（API 定时拉取）的 update 块**不含**无条件重置。
- * 这条断言**不是**在声明当前实现正确，而是把一个**已登记的 P0 缺口**冻结住：
- *
- *   现状缺口：自动拉取会改写已 approved+published 记录的 title/company/
- *   description/sourceUrl 等展示字段，却保留审核发布态，因此内容变更后
- *   继续对外公开而不重新过审。详见 docs/governance/standards-index.md 第十一节。
- *
- * 断言存在的理由：防止有人为"统一风格"把这里改成**无条件** pending 重置——
- * 那会让每 30 分钟一次的 Cron（见 job-sync.scheduler.ts:19 的 @Cron 表达式）
- * 把全部已审记录退回待审，压垮审核队列。
- *
- * 👉 如果你正在实施正解（按内容哈希判定：内容未变只更新 syncTime、
- *    展示字段变化才退审），那么这条断言需要同步放开——请改这里，
- *    不要绕过门禁，也不要简单删掉断言了事。
+ * 本脚本现在同时断言：
+ *   1. job-sync 的内容变更 upsert 必须回 pending+draft 并清理审核元数据；
+ *   2. 内容未变化时必须存在只刷新 syncTime 的短路分支，避免每 30 分钟一次
+ *      的 Cron 把所有已审记录反复退回待审。
  *
  * 退出码：0 = 全部通过  1 = 有失败（fail-closed：文件缺失/解析失败/块数不符均算失败）
  */
@@ -67,7 +57,7 @@ const SRC = resolve(__dir, '../src/jobs')
 const EXPECTED_SITES = {
   'jobs-partner.service.ts': ['importJobs·job', 'importJobsFromWebhook·job', 'importFairs·jobFair'],
   'jobs-excel.service.ts': ['confirmExcelImport·job', 'confirmExcelImport·jobFair'],
-  'job-sync.service.ts': ['upsertJobs·job', 'upsertFairs·jobFair'], // 反向断言
+  'job-sync.service.ts': ['upsertJobs·job', 'upsertFairs·jobFair'],
 }
 
 /** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
@@ -81,7 +71,7 @@ const EXPECTED_SELFTEST_CASES = 50
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
-  Object.values(EXPECTED_SITES).reduce((n, a) => n + a.length, 0) + EXPECTED_SELFTEST_CASES
+  Object.values(EXPECTED_SITES).reduce((n, a) => n + a.length, 0) + EXPECTED_SELFTEST_CASES + 1
 
 // ──────────────────────────────────────────────────────────────────────────────
 // AST 基础工具
@@ -1362,14 +1352,29 @@ runFile('jobs-partner.service.ts', resolve(SRC, 'jobs-partner.service.ts'), chec
 console.log('')
 runFile('jobs-excel.service.ts', resolve(SRC, 'jobs-excel.service.ts'), checkMustReset, 'excel')
 
-// ③ 反向断言：API 自动拉取不得出现【无条件】重置（已登记 P0 缺口冻结，见文件头 ⚠️）
+// ③ API 自动拉取：展示内容变化必须退审；内容未变必须只刷新 syncTime。
 console.log('')
 runFile(
   'job-sync.service.ts',
   resolve(__dir, '../src/job-sync/job-sync.service.ts'),
-  checkMustNotReset,
+  checkMustReset,
   'sync'
 )
+
+const syncSource = readFileSync(resolve(__dir, '../src/job-sync/job-sync.service.ts'), 'utf8')
+const syncGuardMarkers = [
+  "if (existing && !contentChanged)",
+  "data: { syncTime: sync }",
+  "此 upsert 只在 contentChanged=true 时执行",
+]
+const missingSyncGuardMarkers = syncGuardMarkers.filter((marker) => !syncSource.includes(marker))
+if (missingSyncGuardMarkers.length > 0) {
+  console.error(`  ❌  sync · 内容未变化短路门禁缺少标记: ${missingSyncGuardMarkers.join(', ')}`)
+  totalFail++
+} else {
+  console.log('  ✅  sync · 内容未变化只刷新 syncTime，变化路径才执行退审 upsert')
+  totalPass++
+}
 
 // ④ 门禁自测：已知绕过形态必须全被拦住，且不得产生假阳性（全内存，不写盘）
 console.log('\n── 门禁自测（对抗用例，全内存合成夹具，不写盘）')

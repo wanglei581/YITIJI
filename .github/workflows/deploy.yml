@@ -23,10 +23,15 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 30m
-          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN,PRINT_REQUIRE_PII_SCAN
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
+
+            if [ "${PRINT_REQUIRE_PII_SCAN:-}" != "true" ]; then
+              echo "::error::PRINT_REQUIRE_PII_SCAN 必须通过仓库变量显式设置为 true，禁止进入生产发布" >&2
+              exit 1
+            fi
 
             echo "=== 拉取并检出 CI 已验证提交 ==="
             EXPECTED_SHA='${{ github.event.workflow_run.head_sha }}'
@@ -35,12 +40,17 @@ jobs:
               echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
             else
               FETCH_OK=0
-              for ATTEMPT in 1 2; do
-                echo "fetch attempt $ATTEMPT/2"
-                if timeout --foreground --kill-after=10s 240s git fetch origin main; then
+              for ATTEMPT in 1 2 3 4; do
+                echo "fetch exact CI SHA attempt $ATTEMPT/4"
+                # 生产机网络偶发 early EOF。只拉取 CI 已验证的单个提交，避免
+                # 每次同步整条 main 历史；HTTP/1.1 可规避部分代理的 HTTP/2
+                # 长连接中断。目标 SHA 必须可从 origin/main 到达。
+                if timeout --foreground --kill-after=10s 180s \
+                  git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA"; then
                   FETCH_OK=1
                   break
                 fi
+                sleep "$((ATTEMPT * 5))"
               done
               test "$FETCH_OK" = "1"
               # 只部署 CI 已验证的精确 SHA；即使 main 在此期间继续前进（文档/其他合并），
@@ -54,7 +64,15 @@ jobs:
             pnpm install --frozen-lockfile
 
             echo "=== 构建 kiosk 前端 ==="
-            pnpm --filter @ai-job-print/kiosk build
+            if [ -z "${KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN:-}" ]; then
+              echo "::error::KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN 未配置，禁止发布空白扫码登录页" >&2
+              exit 1
+            fi
+            VITE_API_MODE=http \
+            VITE_API_BASE_URL=/api/v1 \
+            VITE_USE_TRTC_CALL=true \
+            VITE_TERMINAL_AGENT_BRIDGE_TOKEN="$KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN" \
+            pnpm build:kiosk:production
 
             echo "=== 构建 admin 前端 ==="
             VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build
@@ -118,3 +136,5 @@ jobs:
           DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
           DEPLOY_ADMIN_WEB_ROOT: ${{ secrets.DEPLOY_ADMIN_WEB_ROOT }}
           DEPLOY_PARTNER_WEB_ROOT: ${{ secrets.DEPLOY_PARTNER_WEB_ROOT }}
+          KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN: ${{ secrets.KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN }}
+          PRINT_REQUIRE_PII_SCAN: ${{ vars.PRINT_REQUIRE_PII_SCAN }}

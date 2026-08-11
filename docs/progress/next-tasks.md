@@ -1,5 +1,21 @@
 # 下一步任务
 
+> 最后更新：2026-08-11
+
+> **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，
+> 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
+> 「2026-08-10 商用收口后续」及其后各节来自 main。
+>
+> ⚠️ **V3 队列的 W1–W8 写于 2026-08-09/10，已被 2026-08-11 的四份文档部分取代**，
+> 以后者为准：
+> - [`docs/product/codex-handoff-plan-2026-08.md`](../product/codex-handoff-plan-2026-08.md) 窗口划分（两条线共用的唯一答案）
+> - [`docs/reviews/2026-08-11-two-line-reconciliation.md`](../reviews/2026-08-11-two-line-reconciliation.md) 两线对账裁定与最小一致集
+> - [`docs/reviews/2026-08-11-backend-buildout-spec.md`](../reviews/2026-08-11-backend-buildout-spec.md) 后端六项能力实施规格
+> - [`docs/design/kiosk-ai-os-v3-2026-08/wiring-map.md`](../design/kiosk-ai-os-v3-2026-08/wiring-map.md) 功能↔接口对接表
+>
+> 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
+> 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
+
 > 最后更新：2026-08-10
 
 ## V3 设计落地实施队列(分工:Claude=视觉与设计;Codex=以下全部实施,2026-08-09 用户定,2026-08-10 重建)
@@ -14,6 +30,38 @@
 - [ ] **W6 签约风险补全**:报告生成打印(版式=P31 s4,即 Task 14);**新增通用合同类型 `generic` + 八维度通用规则包**(主体/期限/费用/违约/解除/争议/对等性/格式条款),finding 带维度标注;Gate 0 过签后才开 VITE_ENABLE_CONTRACT_REVIEW;常见签约问题静态区。
 - [ ] **W7 全页 AI 补强接真**:六A 矩阵 7 个🔧项(设计稿已落)。
 - [ ] **W8 发布授权**:main 积压修复未上 zyidai.cn(门禁关),按部署清单具名授权发布(需用户拍板)。
+
+## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
+
+- [~] **Wave 8 Windows scan mutation boundary：Windows CI verified，真实现场 pending**：Windows-verified 功能代码候选 `65a3ebeb` 已包含共享功能提交 `b161a0c2`（来源独立提交 `e076c7a6`），完成 `AJPSR002`、READ root/candidate identity token、identity-bound success delete/quarantine/TTL、逐级 ancestor/root handle pin、`RootDirectory = unclaimed_handle` 相对 rename 和 audit intent → delete → result 顺序。同一 SHA 的 run `31331802378` 中 `unsigned-msi-candidate` **SUCCESS**（5m59s），覆盖 source contract、MSVC `/W4 /WX` 多源编译、动态 boundary、MSI/EXE install/repair/uninstall；run `31331802380` 的 build **SUCCESS**（7m55s）、PG **SUCCESS**（3m40s）、browser **SUCCESS**（9m17s）。下一门禁仍是在目标 Windows LocalSystem 服务账户与真实 SMB 扫描目录验证 ACL、杀毒/文件占用、服务重启、长驻 watcher、普通 PDF/JPG/PNG、失败隔离和 TTL 审计，再与 Pantum 真机完成扫描输入及打印回归；生产、法务、内容与密钥也仍未验收。Claude 未完成页面本 Wave 未触碰并继续受保护。任一现场或外部门禁未通过都不得部署或宣称商用完成，整体保持 **NO-GO**。
+- [x] **Wave 3C 全栈/治理/资产审计报告**：已形成 [`commercial-readiness-audit-and-remediation-2026-08-09.md`](../reviews/commercial-readiness-audit-and-remediation-2026-08-09.md)，覆盖前后端功能与接口断层、已修/未做/缺陷、废弃/孤儿/未合并资产、local↔remote 精确快照、CI/部署、目录/数据/fixture 优化与商用 GO/NO-GO。没有删除 worker、旧 Kiosk 路由、Prisma model/migration、worktree、分支、独立小程序或用户设计资产；后续按报告 P0→P1→P2 分阶段执行，禁止把报告本身记作代码、部署或真机验收完成。
+- [~] **Windows 扫描恢复门禁（Windows CI verified，真实现场 pending）**：代码候选 `9211b6d1` 的 manual dispatch run `31322154074` 全绿（5m49s），真实覆盖 `/W4 /WX` compile、staged dynamic boundary、WiX MSI/EXE、install/repair/uninstall 与 installed helper call。首轮 `76483704` 为 BOM/cleanup harness 失败，二轮 `e347ecd7` 为 Win32 broken-pipe EOF 误判；最终只做最小 harness/EOF 修复，安全边界未放宽。下一步是在真实 SMB 扫描目录覆盖普通 PDF/JPG/PNG、symlink/junction/reparse point、写入中替换、ACL/杀毒占用、服务重启和长驻 watcher；现场通过前不得宣称扫描可商用。
+- [~] **Agent 任务与扫描删除可靠性**：任务状态已具备 durable dead-letter、终态幂等补报及打印前 `dispatching` 持久化；Wave 7 新增 PII-safe `dead-letter list/show/audit/confirm/abandon/replay` 六项 CLI，只允许 `completed/failed`，单次 PATCH，`2xx + ack` 才归档，network/5xx 保留、4xx 清确认、全流程 durable audit。`audit --id <id>` 只读精确单 ID、可查看已归档记录，输出字段白名单/稳定顺序/无 PII，缺 ID 非零退出。Node 26 真 SQLite+HTTP 与 Node 22 typecheck/build/unauthorized 已绿，fresh Node 22 CI 仍待最终 HEAD。删除审计本地→API 已闭合；仍缺生产集中对账/留存告警、Windows 服务强杀、断网、真实 SMB/ACL/杀毒、spooler/奔图重启证据。
+- [~] **API 终态合同与 CAS 竞态复验**：RED 已证明旧实现对任一既有终态全 ack，且 CAS 丢失仍 ack；Wave 7 改为同终态幂等、不同终态 409、回退 400，CAS 后重读同状态 ack、不同终态冲突、其它变化 `PRINT_TASK_STATUS_CHANGED` 409，冲突路径零副作用。纯内存专项已绿，真实 SQLite/PostgreSQL 必须由最终 HEAD CI 裁决。
+- [x] **11 条 direct deterministic CI 接线（代码候选）**：已接 CI coverage 元守卫、Miniapp static、Kiosk service-entry、6 条 Admin/Partner 静态门禁、Agent task-runner wake 与 API terminal-status-idempotency。Admin account settings 只用 AST 校准旧 fixture 漂移，没有修改产品页面；deploy authorization 原已直接接线，不属于遗漏。
+- [~] **Wave 7 + 最新 main 最终文档 HEAD 复验**：功能提交 `48ac2cd6`；merge commit `0e885b0318ad218537ef297f93cae9f4ebb33b1a` 已语义合并 `origin/main@eb3fd726`，同时保留 Wave 7 终态/CAS、文件 metadata-first 删除、11 条 CI 门禁与主线合同报告生命周期。随后 `051c363515849cf03c161144fbbb812963be77ff` 修复合同敏感删除 test fixture 与 metadata-first 生命周期断层；四项 sensitive-delete 专项、API lint/typecheck 全绿，fixture 只校准安全顺序，没有放宽删除控制。当前相对 main behind 0 / ahead 28、相对 upstream behind 0 / ahead 9。PR #570 仍绑定旧 head `d0d29a54`，OPEN/Draft/CONFLICTING，因为新 merge 未推送；最终 docs commit 位于 `051c3635` 之后，必须推送最终同一 SHA 并让 Linux/PG/browser/Windows CI 全绿，再评估 Ready/合入。
+- [ ] **Claude 新页面完成后单独接线**：用户确认整套新页面尚未全部完成；合同审查三个 feature flag 必须继续默认 false，当前 Kiosk DOM 只是在主干候选上保留的安全基线，不代表 Claude 新页面已设计冻结。本轮不迁移、不覆盖设计资产，也不把半成品原型当运行时事实。待全部定稿后，单独建立 page→route→API→state/auth/failure mapping，逐页复用现有 API/Agent、支付打印扫描与隐私门禁后再接线和验收。
+- [~] **打印能力诚实门控**：API DTO/service、公开报价/建单和 Kiosk 已只允许 `black_white + simplex + pagesPerSheet=1`，未验证彩色/双面/2 或 4 页合一全环境 fail-closed，专项已接 CI；厂家/驱动确认彩色 mode、duplex、pages-per-sheet 与参数级 terminal capability 后仍须奔图真机验收，确认前不得开放或报价。
+- [x] **接口、持久化与会话断层（代码候选）**：`/me/pending-tasks` 已以会员 Bearer/本人隔离接真；AI 未落库不再返回成功；文件删除、过期清理与违规直传已 metadata-first 并阻断非 active 访问；materials 已 header-only，query token 统一 400 且不回显；`/session-resume`、Profile/MySettings 的手动退出/切换/重绑已统一清除 Router history 中的 `paymentSessionToken`，Back/Forward 不再恢复。以上高风险本地回归已接 CI 或专项门禁。真实 COS DELETE 超时/远端成功但客户端超时、生产 cron 恢复演练，以及 CDN/Nginx/APM 历史 query 日志脱敏/泄漏处置仍归入下方商用外部门禁。
+- [x] **写库 verifier 隔离防线（代码候选）**：四条会写行的 verifier 在创建 Prisma client 前要求显式 `VERIFICATION_DATABASE_TARGET=isolated`，production、远程 PostgreSQL、非测试库或缺 marker 一律拒绝；payment-flow、verify-order、device-status 已对齐 `black_white + simplex + 1-up` 和 80 分。Agent 四套隔离 SQLite 全绿；父任务 Node 22 在本机创建全新临时库时遇到 Prisma schema engine generic error，未进入断言，仍须由远程 CI 复验。
+- [x] **Wave 6 代码候选 CI**：`9211b6d1` 的 Linux build/PG/browser 与 Windows installer 均已全绿；这取代 `6d2ed347` 作为当前代码验证事实。首轮 BOM/cleanup 与二轮 broken-pipe EOF 红灯均为测试 harness/平台语义问题，最终最小修复未放宽生产或扫描安全门禁。live COS/OCR/支付、Windows service/真实 SMB/WMI、真打印仍不纳入自动化 CI，必须另做现场验收；最终 docs HEAD 复验见上方待办。
+- [~] **Security diff 封板**：52/52 changed files 已逐文件 discovery，6 个候选中唯一 reportable Low（Router history 残留 payment token）已修并有 RED→GREEN；外置封存器因 `target.snapshotDigest` 缺失拒绝完成，不能声称已有 sealed final report。后续如需要正式封存，须补齐 immutable target digest 后重新生成，不重复冒充代码复核。
+- [x] **pre-doc 仓库治理快照复测**：29 个 worktree、591 个本地分支、321 个真实远程 heads、335 个本地 `refs/remotes/*`（其中 `origin/*` 334 个，含 `origin/HEAD`；另 1 个 `github/*` ref；12 个 origin stale），29 个 monorepo worktree 当时均 clean；repository integrity 确认 3,127 个 tracked 文件无冲突标记、5 份 workflow YAML 有效。clean/stale/祖先关系均不构成删除授权，继续禁止批量清理 branch/worktree/ref。
+- [ ] **商用外部门禁**：Node 22 CI、PostgreSQL 生产实例、真实内容来源、支付商户配置、密钥轮换、法务文本、两台 Windows 主机及打印/扫描/TRTC 现场验收全部完成前，发布判定保持 NO-GO。
+
+> 最后更新：2026-08-10
+
+## 当前执行：后台招聘数据 P0/P1 收口
+
+- [x] **真实来源到位前的通用接入契约与无写入预检候选**：复用既有四轨导入和审核发布链，补 Partner-only 机器可读 contract 与岗位/招聘会 DTO preflight；预检按机构类型 fail-closed，只返回聚合摘要并明确不落库，未来数据方可先对接字段、HMAC 和目标状态。未部署、未连接生产、未写演示数据；真实来源到位后仍须创建/审批数据源、执行导入、逐条审核发布和线上验收。
+- [x] **P0 后台招聘数据两波升级与生产发布**：Admin 线下机构真实 HTTP 契约、内容变更回待审、父机构深链门禁、Webhook/Excel 计数与审核、5 类 Organization capability、API/Webhook Admin 启用、停源不级联、影响预览、批量下架及审计已由 PR #572–#574 收口，并以 `37025dc9` 完成生产发布；SQLite/PG/浏览器 CI 与公网 health、三端 bundle、公开空态均已复验。部署授权已恢复为 `false`。
+- [x] **P1 Wave 0 统一模型与迁移方案冻结**：完成当前模型/双库/公开生产状态只读盘点，冻结 Organization、JobSource、OnlinePlatformDirectory、OfflineAgencyProfile/Branch、QualificationRecord 与 canonical Job 的职责、有效可见性、存量 blocker、生产只读盘点、expand/backfill/switch/contract 和回滚门禁；本波不改 schema、不写生产、不新增页面、不部署。正式方案见 `docs/product/recruitment-content-domain-model-2026-08.md`。
+- [x] **P1 Wave 1A 迁移安全与 additive expand（PR #578）**：旧 37 模型全库搬数脚本/命令已退役删除；SQLite SSOT、PG 机械镜像、双 additive migration、旧 schema 只读 preflight、schema verifier 与独立 fresh/upgrade CI 已落地。PR CI run `31325581514` 的 build-and-verify、真实 PostgreSQL 16 fresh/upgrade/read-only preflight 和 Kiosk 浏览器冒烟全部通过。未改页面、未切 reader/writer、未迁生产数据、未部署。
+- [x] **P1 Wave 1B 共享契约与只读 API 骨架（[PR #580](https://github.com/wanglei581/YITIJI/pull/580)，未部署）**：平台目录、机构资料/门店/资质共享类型与 Admin-only 查询/嵌套详情/私有证据访问已完成，岗位 reader/writer 与三端页面仍未切换；可见性投影 fail-closed 覆盖审核/发布/current hash、主体信任、HTTPS 官方域、链接状态、门店及具证据的适用资质。隔离 SQLite / PostgreSQL 真实 HTTP + Prisma 已覆盖 RBAC、跨机构 404、未知参数、证号脱敏、证据强审计、无写端点和 verifier 生产防误写。三组独立专家终审均 `APPROVE`；GitHub Actions [`31328501975`](https://github.com/wanglei581/YITIJI/actions/runs/31328501975) 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 三项全绿。下一步只能进入 Wave 2 受控 backfill 准备，不能直接切换 reader/writer 或操作生产数据。
+- [x] **P1 Wave 2 第一批只读准备（[PR #581](https://github.com/wanglei581/YITIJI/pull/581)）**：production legacy backfill 子集 probe、恢复库显式 manifest planner、专用只读角色/marker/授权窗口守卫、三分守恒、两套 externalId 冲突和批次一致性门禁已形成候选，三组专家终审均 `APPROVE`；GitHub Actions [`31360437472`](https://github.com/wanglei581/YITIJI/actions/runs/31360437472) 的 Node 22 build、PostgreSQL 16 动态门禁与 Kiosk 浏览器冒烟三项全绿。probe 不是完整 production inventory，不能单独产生 GO 或推进生产 manifest；无 apply/write 参数，不写库、不迁数据、不切 reader/writer。下一步仍须另立冻结方案第 6 节完整 production inventory/公开 API 差集并取得执行授权，才能制作/批准生产人工映射清单与恢复演练。
+- [x] **P1 Wave 2 第二批完整只读盘点（[PR #586](https://github.com/wanglei581/YITIJI/pull/586) + 生产 run [`31387671591`](https://github.com/wanglei581/YITIJI/actions/runs/31387671591)）**：生产已用专用只读角色完成 `DB(A) → API(A/B) → DB(B)`，两侧快照稳定，Job / JobFair / Policy / legacy OfflineAgency / OfflineJob 的 current-reader/API 双向 ID 差集全为 0，证明现网公开空态与当前 reader 一致。但生产治理数据尚未补齐：219 Job 全部缺可证明内容域策略，6 Job 缺/孤儿来源，3 JobFair 缺来源与域策略，legacy 机构/岗位缺新 Profile/Branch/Qualification/用工企业/结构化 city 等事实，新 ReviewDecision 为 0，故正确结论为业务 blocker / Wave 2 NO-GO。报告已按 `0600` 受限保存；本次零生产业务写入、零 reader/writer 切换、零部署。
+- [~] **P1 Wave 2 单人执行第三批：五类受限治理证据包**：零写入 proposed-governance 校验器已通过 [PR #590](https://github.com/wanglei581/YITIJI/pull/590) 合入 `main`（merge commit `78a9d280`），同一 HEAD 的 GitHub Actions run [31405483030](https://github.com/wanglei581/YITIJI/actions/runs/31405483030) 三项全绿，后端数据、合规/后台契约、产品/运维三组专家终审均 **APPROVE**。校验器能够把完整 production inventory、五类 evidence pack、legacy manifest 与恢复库全量基线统一做守恒、fingerprint、canonical hash、域/最终跳转、资质/证据、Audit payload 摘要和 batch 1/100/1000 校验；拟议动作不进入历史 `ReviewDecision`，现有 planner 仍只认已落库事实。下一步由单一业主在受限目录实际填写：① 4 个 JobSource；② 6 条无源 canonical Job；③ 3 条 JobFair；④ 1 机构 + 1 legacy OfflineJob；⑤ 3 个负向审计候选，其余 213 Job 仅可按已核验 source/domain 机械归类。证据包校验 `exit 0` 后仍须另时点形成绑定全部 SHA 的批准记录；不直接开 writer，不把模拟结果冒充现有 dry-run 全绿，不授权生产写入、reader 切换、发布或部署。
+- [ ] **P1 Wave 2 后续 backfill writer 与 Wave 3–5 切换**：只有上述治理事实补齐、恢复库 dry-run 全绿、人工 manifest 获批后才另开独立 writer PR；shadow writer 必须 Job + legacy 映射 + checksum + AuditLog 同事务/CAS，所有新 Job `pending + draft`，任何生产执行另需新的具名写授权。重复组归零后再以双库独立 additive migration 收紧 `(sourceId, externalId)` unique，随后分批完成写切换、读切换、至少两个发布周期 legacy 零读写观察和独立 contract；禁止同批 drop OfflineJob、直写生产或把生产回退 SQLite。
 
 ## 当前执行：文件流程候选冻结前外部门禁
 
@@ -45,7 +93,7 @@
 - [x] **干净候选冻结范围门禁（已闭环）**：已在干净 worktree 的审定候选 `origin/main@55105fa8`（Node `v22.23.1` / pnpm `11.2.2`）串行重跑全部 Kiosk fusion 静态合同：baseline、shell、home、W2、W3、W4、W5、W6 均 ALL PASS，其中 W3 的 6 个硬冻结文件 SHA 全部保持不变、W4 的 25 路由归属与硬冻结文件守卫通过；证明此前失败源于共享脏工作区的他人未提交改动，不是产品缺陷。浏览器 W3/W4 行为套件仍以 CI `kiosk-browser-smoke` 与既有 Node 22 回归证据为准。
 - [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。现场按 `docs/device/windows-field-acceptance-runsheet-2026-08.md` 逐项执行并记录证据；扫码枪付款码与打印机面板扫描 SMB 专项见 `docs/device/peripheral-field-acceptance-2026-08.md`（摄像头不接入）。未知彩色 mode 不得假设，打印机型号不得硬编码。
 - [ ] **生产文件链路验收**：在具名授权和备份/回滚方案下复验 PostgreSQL、Redis、COS/OSS、签名 URL 过期/刷新、匿名与会员归属、文件 TTL/删除、Admin 审计和跨账号隔离；本地 HMAC/SQLite/Mock 结果不得替代生产证据。
-- [ ] **未开放格式保持 fail-closed**：Word 打印转换/内嵌预览、政策附件、合同审查报告生成在真实转换/文件服务、数据模型、权限、审计和测试完成前继续保持未开放或诚实禁用，不得恢复成可点击占位流程。
+- [ ] **未开放能力保持 fail-closed**：Word 打印转换/内嵌预览与政策附件在真实转换/文件服务完成前继续保持未开放；合同风险提示报告的本地代码与浏览器候选已完成，但生产和 Windows 真机验收前双端开关必须保持关闭，不得恢复成可点击占位流程。
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
@@ -53,7 +101,7 @@
 
 - [x] **共享视觉基线与关键服务页**：共享壳/首页恢复 7 月原型色彩、字体、导航和纸感；`/print-scan` 与简历、岗位、招聘会、面试、政策五个一级服务中心已完成层级收口，路由回顶已修复。Kiosk typecheck/lint/build、专项静态守卫、`git diff --check` 和 1080x1920 首页/打印扫描/服务中心浏览器抽检通过；本地候选未部署。
 - [x] **入口真实性与不可用门禁**：首页打印/扫描/双面静态就绪声明已移除；打印扫描以本机 capability 成功响应为放行条件；五个一级服务中心以 `/health` 做入口级 fail-closed，只有线上招聘平台二维码、面试技巧、社保指南、档案/登记保留离线阅读。新增真实性静态守卫，受控失败/重试恢复浏览器验证及 W6 `104/104` 通过；只证明入口行为与失败状态，不证明具体 AI 模型、业务数据、支付或硬件可用。
-- [ ] **生产内容数据运营收口（进行中，真实来源待接入）**：2026-08-07 已完成第一步（数据负责人确认后、先备份再执行，未删除数据）：215 条预生产/演示岗位全部下架、3 场已结束招聘会下架、演示机构/演示岗位下架、2 个预生产/样例数据源停用，公网 jobs/fairs 已为空态（`total=0`），审计行与备份锚点 `pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…`）已记录。替换清单与执行流程见 `docs/operations/production-content-data-replacement-list-2026-08.md`（数据负责人决策项、四类数据判定/导入路径/验证门禁、禁止项）。剩余：数据负责人提供有授权的真实岗位来源（含 API/Excel 授权与有效期）、真实政策正文，按 Admin/Partner 既有导入审核链路接入并发布；市人才网 API 与高校就业信息 Excel 两个数据源保持启用但当前无已发布岗位。未授权前不得继续删改生产数据库，也不得用 seed 或假数据填满页面。
+- [ ] **生产内容数据运营收口（进行中，真实来源待接入）**：2026-08-07 已完成第一步（数据负责人确认后、先备份再执行，未删除数据）：215 条预生产/演示岗位全部下架、3 场已结束招聘会下架、演示机构/演示岗位下架、2 个预生产/样例数据源停用，公网 jobs/fairs 已为空态（`total=0`），审计行与备份锚点 `pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…`）已记录。替换清单与执行流程见 `docs/operations/production-content-data-replacement-list-2026-08.md`（数据负责人决策项、岗位/招聘会/政策/线下机构/线上平台目录的判定、导入路径、验证门禁与禁止项）。剩余：数据负责人提供有授权的真实岗位来源（含 API/Excel 授权与有效期）、真实政策正文、线下机构资质/门店证据与官方平台目录核验依据，按冻结方案分波接入并发布；市人才网 API 与高校就业信息 Excel 两个数据源保持启用但当前无已发布岗位。未授权前不得继续删改生产数据库，也不得用 seed 或假数据填满页面。
 - [~] **75 屏逐屏差异清单与证据**：03/05/06 双栏差异已按 2026-08-07 当前 `main@f4981ce0` 源码与 `verify-fusion-w3.mjs` 契约复核为已落地（见 matrix 6.3：打印参数 `pp-split` 双栏、简历来源 `resume-source-split` 440px 方向栏、诊断报告分数/雷达行 + 两组 `lg` 双栏 grid），已从 `VISUAL_DIFF` 移除。剩余仍须为 21/23/26 决策型差异与 40 屏 `VISUAL_UNVERIFIED` 建立“原型编号 → 生产路由 → 真实状态 → 修改文件 → 验证证据”清单；不得把当前复核写成 75 页全部像素封板。
 - [ ] **Windows 真机验收**：Node 22 本地根级 typecheck/lint/build、W2-W6 和 warning 已通过；仍须在真实 Windows 1080x1920 触控一体机验证字体、缩放、触控目标、滚动、软键盘、支付、打印、扫描、异常恢复和隐私清场。打印机只能读取 `printerName` 配置，未知彩色 mode 不得硬编码。
 - [x] **本机打印即时唤醒代码候选**：不新增页面/按钮，Kiosk 真实 `/print/progress` 仅发送一次无 body/query 的 loopback wake；Agent 仍通过同一云端 claim 领取，并以 full-lifecycle single-flight 串行 interval/wake。Origin、bridge token、无 body/query、立即 `202`、不可用 `503`、并发合并、401 latch、付款配置与 Kiosk 静默回落专项门禁已通过；未部署。
@@ -91,9 +139,11 @@
 - [ ] **发布与商业验收**：完成正式 AppID/类目/隐私保护指引、备案 HTTPS 合法域名、微信支付商户配置、订阅消息模板、生产凭证注入、小额 live 支付退款、真实跨端履约、文件 TTL 与本人隔离、单位经济和运营 runbook。未完成前不得宣称小程序商用上线。
 - [ ] **自我探索 v1 小程序适配（M1 后候选）**：Gate 0、唯一工程底座和小程序隐私指引通过后，复用主仓现有 25 题五维共享数据、submit/get/withdraw/print API、纯函数评分、结果 TTL 与本人隔离，只重做原生小程序页面和会话清场；答案原文不进 Storage/URL/日志/埋点。先交付私人报告、撤回、删除、PDF 和本人记录；默认附加简历、综合总分、人格类型、岗位适配、企业/Partner/Admin 可见、朋友圈/微信群分享均禁止。
 - [ ] **视频自我介绍外链二维码试点（M2 后候选）**：只评审“审核过的外部 HTTPS 视频链接 + 至少 128 bit 随机分享令牌 + 哈希存储 + noindex 中性过渡页 + 本人撤回/过期 + 简历导出默认不勾选”，不托管视频、不记录扫码者身份/企业/招聘结果、不进入岗位投递。先补正式 PRD、威胁模型、中国法务与微信类目意见、域名白名单、失效体验和 20-50 人试点指标；任一 Gate 未通过不开发。平台托管视频不在当前 0-6 个月计划。
-- [ ] **职业生活服务试点（M4 候选）**：定位限于材料、入职决策、劳动权益、办事指引和公共就业服务机构；首批从合同风险提示、社保/公积金官方指引、服务机构三项中最多选择 3 项，全部通过既有百宝箱 `career/life/legal/hr` manifest、双人审核、域名白名单、数据政策和熔断发布，不新增首页卡片。贷款、保险销售、医疗/心理诊断、法律代理、泛 O2O、招聘撮合和政府事项代办永久不进入该阶段。
+- [ ] **职业生活服务试点（M4 候选）**：定位限于材料、入职决策、劳动权益、办事指引和公共就业服务机构；社保/公积金官方指引、服务机构等候选可通过既有百宝箱 `career/life/legal/hr` manifest、双人审核、域名白名单、数据政策和熔断发布，不新增首页卡片。合同风险提示已固定归入「AI简历服务 → 签约与权益」，不再进入百宝箱试点。贷款、保险销售、医疗/心理诊断、法律代理、泛 O2O、招聘撮合和政府事项代办永久不进入该阶段。
 
 ## Phase 0 真值收口后续
+
+- [~] **AI签约风险提示生产验收**：[PR #576](https://github.com/wanglei581/YITIJI/pull/576) 已合并到 `main@eb3fd726`，合并后 GitHub Actions 三项 job 全绿且 deploy workflow 因授权门禁跳过。预生产执行入口已固定为 `docs/acceptance/contract-review-preprod-acceptance-runbook.md`，并由 `verify:contract-review:preprod-readiness` 在 CI 防漂移。下一步按 CR-G0 至 CR-G7 顺序执行：本地冻结候选、预生产只读就绪、PostgreSQL/法务正文、Redis/BullMQ、获准境内模型/日志净化、私有对象存储/生命周期、会员/匿名公共终端隐私、Windows 奔图报告出纸；远程写入、模型 canary、环境变量修改、部署和真机操作均须各自单独授权。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。

@@ -28,6 +28,8 @@ export interface PaginationQuery {
 export interface AgencyListQuery extends PaginationQuery {
   district?: string
   orgType?: string
+  reviewStatus?: string
+  publishStatus?: string
   keyword?: string
   /** Kiosk 服务筛选（匹配 services JSON 数组中的项） */
   service?: string
@@ -94,7 +96,7 @@ export class OfflineAgenciesService {
         where: where as never,
         skip,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         select: {
           id: true, name: true, orgType: true, address: true, district: true,
           lat: true, lng: true, openHours: true, phone: true, contactEmail: true,
@@ -126,7 +128,7 @@ export class OfflineAgenciesService {
       include: {
         jobs: {
           where: { status: 'active' },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         },
       },
     })
@@ -190,7 +192,7 @@ export class OfflineAgenciesService {
         where: where as never,
         skip,
         take: pageSize,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.offlineJob.count({ where: where as never }),
     ])
@@ -206,13 +208,17 @@ export class OfflineAgenciesService {
           select: {
             id: true, name: true, orgType: true, address: true, district: true,
             phone: true, openHours: true, website: true,
-            reviewStatus: true, publishStatus: true,
+            status: true, reviewStatus: true, publishStatus: true,
           },
         },
       },
     })
     if (!job) throw new NotFoundException(`岗位 ${id} 不存在`)
-    if (job.agency.reviewStatus !== 'approved' || job.agency.publishStatus !== 'published') {
+    if (
+      job.agency.status !== 'active' ||
+      job.agency.reviewStatus !== 'approved' ||
+      job.agency.publishStatus !== 'published'
+    ) {
       throw new NotFoundException(`岗位 ${id} 不存在或机构未发布`)
     }
 
@@ -223,11 +229,13 @@ export class OfflineAgenciesService {
 
   async adminFindAll(query: AgencyListQuery) {
     const { page, pageSize, skip } = normalizePage(query)
-    const { district, orgType, keyword } = query
+    const { district, orgType, reviewStatus, publishStatus, keyword } = query
 
     const where: Record<string, unknown> = {}
     if (district) where['district'] = district
     if (orgType)  where['orgType']  = orgType
+    if (reviewStatus) where['reviewStatus'] = reviewStatus
+    if (publishStatus) where['publishStatus'] = publishStatus
     if (keyword) {
       where['OR'] = [
         { name:        { contains: keyword } },
@@ -283,6 +291,7 @@ export class OfflineAgenciesService {
 
   async adminUpdate(id: string, dto: UpdateOfflineAgencyDto) {
     await this._assertAgencyExists(id)
+    const hasContentChanges = Object.entries(dto).some(([key, value]) => key !== 'status' && value !== undefined)
     return this.prisma.offlineAgency.update({
       where: { id },
       data: {
@@ -302,11 +311,12 @@ export class OfflineAgenciesService {
         sourceOrgId:  dto.sourceOrgId,
         externalId:   dto.externalId,
         ...(dto.status ? { status: dto.status } : {}),
+        ...(hasContentChanges ? { reviewStatus: 'pending', publishStatus: 'draft' } : {}),
       },
     })
   }
 
-  async adminReview(id: string, action: 'reviewing' | 'approve' | 'reject', _reason?: string) {
+  async adminReview(id: string, action: 'reviewing' | 'approve' | 'reject', reason?: string) {
     await this._assertAgencyExists(id)
     const statusMap: Record<string, string> = {
       reviewing: 'reviewing',
@@ -315,6 +325,9 @@ export class OfflineAgenciesService {
     }
     const reviewStatus = statusMap[action]
     if (!reviewStatus) throw new BadRequestException(`无效审核操作: ${action}`)
+    if (action === 'reject' && !reason?.trim()) {
+      throw new BadRequestException('驳回必须填写原因')
+    }
 
     // reject 时强制将 publishStatus 置回 draft，防止已发布机构继续展示
     const publishStatusOverride = action === 'reject' ? { publishStatus: 'draft' } : {}
@@ -383,46 +396,61 @@ export class OfflineAgenciesService {
 
   async adminCreateJob(agencyId: string, dto: CreateOfflineJobDto) {
     await this._assertAgencyExists(agencyId)
-    return this.prisma.offlineJob.create({
-      data: {
-        agencyId,
-        title:        dto.title,
-        jobType:      dto.jobType      ?? 'fulltime',
-        salaryMin:    dto.salaryMin,
-        salaryMax:    dto.salaryMax,
-        salaryUnit:   dto.salaryUnit   ?? 'month',
-        requirements: dto.requirements,
-        description:  dto.description,
-        headcount:    dto.headcount    ?? 1,
-        location:     dto.location,
-        education:    dto.education,
-        experience:   dto.experience,
-        externalUrl:  dto.externalUrl,
-        externalId:   dto.externalId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.offlineJob.create({
+        data: {
+          agencyId,
+          title:        dto.title,
+          jobType:      dto.jobType      ?? 'fulltime',
+          salaryMin:    dto.salaryMin,
+          salaryMax:    dto.salaryMax,
+          salaryUnit:   dto.salaryUnit   ?? 'month',
+          requirements: dto.requirements,
+          description:  dto.description,
+          headcount:    dto.headcount    ?? 1,
+          location:     dto.location,
+          education:    dto.education,
+          experience:   dto.experience,
+          externalUrl:  dto.externalUrl,
+          externalId:   dto.externalId,
+        },
+      })
+      // OfflineJob 暂未迁入 canonical Job；P0 用机构级回审门禁阻止岗位绕过审核公开。
+      await tx.offlineAgency.update({
+        where: { id: agencyId },
+        data: { reviewStatus: 'pending', publishStatus: 'draft' },
+      })
+      return job
     })
   }
 
   async adminUpdateJob(agencyId: string, jobId: string, dto: UpdateOfflineJobDto) {
     await this._assertJobExists(agencyId, jobId)
-    return this.prisma.offlineJob.update({
-      where: { id: jobId },
-      data: {
-        title:        dto.title,
-        jobType:      dto.jobType,
-        salaryMin:    dto.salaryMin,
-        salaryMax:    dto.salaryMax,
-        salaryUnit:   dto.salaryUnit,
-        requirements: dto.requirements,
-        description:  dto.description,
-        headcount:    dto.headcount,
-        location:     dto.location,
-        education:    dto.education,
-        experience:   dto.experience,
-        externalUrl:  dto.externalUrl,
-        externalId:   dto.externalId,
-        ...(dto.status ? { status: dto.status } : {}),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.offlineJob.update({
+        where: { id: jobId },
+        data: {
+          title:        dto.title,
+          jobType:      dto.jobType,
+          salaryMin:    dto.salaryMin,
+          salaryMax:    dto.salaryMax,
+          salaryUnit:   dto.salaryUnit,
+          requirements: dto.requirements,
+          description:  dto.description,
+          headcount:    dto.headcount,
+          location:     dto.location,
+          education:    dto.education,
+          experience:   dto.experience,
+          externalUrl:  dto.externalUrl,
+          externalId:   dto.externalId,
+          ...(dto.status ? { status: dto.status } : {}),
+        },
+      })
+      await tx.offlineAgency.update({
+        where: { id: agencyId },
+        data: { reviewStatus: 'pending', publishStatus: 'draft' },
+      })
+      return job
     })
   }
 

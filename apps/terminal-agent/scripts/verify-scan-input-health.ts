@@ -10,6 +10,7 @@ import fs, {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ScanInputHealth } from '../src/agent/types'
+import { isAcceptedTrustedHelperResult } from '../src/agent/scan-input/windows-secure-reader'
 
 type CandidateNodeKind = 'file' | 'directory' | 'symbolic_link' | 'other'
 
@@ -88,6 +89,12 @@ function candidate(
 
 function verifySourceSafety(): void {
   const source = readFileSync(join(__dirname, '../src/agent/scan-input/verified-folder.ts'), 'utf8')
+  const adapter = readFileSync(join(__dirname, '../src/agent/scan-input/windows-secure-reader.ts'), 'utf8')
+  const native = [
+    'secure-scan-reader.c',
+    'secure-scan-path.c',
+    'secure-scan-mutation.c',
+  ].map((name) => readFileSync(join(__dirname, '../native', name), 'utf8')).join('\n')
 
   assert.match(source, /\blstatSync\s*\(/, 'health inspection must use lstatSync for the configured directory')
   assert.match(source, /\baccessSync\s*\(/, 'health inspection must use accessSync for directory readability')
@@ -98,6 +105,46 @@ function verifySourceSafety(): void {
   assert.doesNotMatch(source, /\brename(?:Sync)?\s*\(/, 'health inspection must not move files')
   assert.doesNotMatch(source, /\baxios\b/i, 'health inspection must not call axios')
   assert.doesNotMatch(source, /\bhttps?\b/i, 'health inspection must not make HTTP calls')
+  assert.match(
+    source,
+    /inspectTrustedWindowsScanInputFolder\(folder\)/,
+    'Windows health must use the packaged trusted helper instead of staying unconditionally degraded',
+  )
+  assert.match(adapter, /spawnSync\(packagedHelperPath\(\), \[\], \{/, 'helper paths and filenames must not enter argv')
+  assert.match(adapter, /input,/, 'helper requests must be framed over stdin')
+  assert.match(adapter, /timeout: HELPER_TIMEOUT_MS/, 'helper calls must have a bounded timeout')
+  assert.match(adapter, /maxBuffer:/, 'helper output must be bounded')
+  assert.match(native, /int wmain\(void\)/, 'native helper must not accept argv')
+  assert.match(native, /GetStdHandle\(STD_INPUT_HANDLE\)/, 'native helper must read the framed request from stdin')
+  assert.match(native, /ERROR_BROKEN_PIPE/, 'Windows pipe closure must be accepted as EOF without accepting extra request bytes')
+  assert.ok(
+    (native.match(/FILE_FLAG_OPEN_REPARSE_POINT/g)?.length ?? 0) >= 2,
+    'every pinned directory and candidate open must reject reparses',
+  )
+  assert.match(native, /FileAttributeTagInfo/, 'native helper must inspect generic reparse attributes, not only symlink tags')
+  assert.match(native, /FILE_ATTRIBUTE_REPARSE_POINT/, 'every reparse tag must be rejected')
+  assert.match(native, /GetFinalPathNameByHandleW/, 'native helper must compare handle-resolved root and candidate paths')
+  assert.match(native, /ajps_information_matches\(&after/, 'native helper must re-check the same handle identity after reading')
+  assert.match(adapter, /AJPSR002/, 'adapter must reject legacy helpers without the v2 identity contract')
+  assert.match(native, /RootDirectory = unclaimed_handle/, 'quarantine must rename relative to the pinned _unclaimed handle')
+  assert.match(native, /FileDispositionInfo/, 'deletion must target an already verified handle')
+}
+
+function verifyHelperResultGate(): void {
+  const accepted = {
+    pid: 1,
+    output: [null, Buffer.from('ok'), Buffer.alloc(0)],
+    stdout: Buffer.from('ok'),
+    stderr: Buffer.alloc(0),
+    status: 0,
+    signal: null,
+  } as Parameters<typeof isAcceptedTrustedHelperResult>[0]
+  assert.equal(isAcceptedTrustedHelperResult(accepted, 2), true, 'exact successful helper output must pass')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, status: 77 }, 2), false, 'unknown helper exit codes must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, signal: 'SIGTERM' as NodeJS.Signals }, 2), false, 'timed-out or signalled helpers must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, error: new Error('spawn failed') }, 2), false, 'missing helpers must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, stdout: Buffer.from('oversized') }, 2), false, 'oversized helper output must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, stderr: Buffer.from('unexpected') }, 2), false, 'unexpected helper stderr must fail closed')
 }
 
 function verifyPureCandidateRules(): void {
@@ -313,6 +360,7 @@ function verifyHealthTypeIsReadonly(health: ScanInputHealth): void {
 }
 
 verifySourceSafety()
+verifyHelperResultGate()
 verifyPureCandidateRules()
 verifyReadAndTraversePermissions()
 verifyFolderHealth()

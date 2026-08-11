@@ -21,6 +21,12 @@ import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import {
+  assertDataSourceCapability,
+  assertPartnerDataTypeCapability,
+  getPartnerCapabilities,
+  isAdminManagedAccessMode,
+} from './partner-capabilities'
+import {
   type PartnerDataSourceDto,
   type PartnerJobDto,
   type PartnerFairDto,
@@ -53,6 +59,14 @@ export class JobsPartnerService {
     }
   }
 
+  private async getEnabledPartnerOrg(orgId: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+    return org
+  }
+
   private async getDataSourceSyncSummaries(orgId: string, sourceIds: string[]) {
     if (sourceIds.length === 0) return new Map<string, {
       successCount: number
@@ -83,13 +97,24 @@ export class JobsPartnerService {
     return sources.map((source) => prismaJobSourceToPartnerDto(source, summaries.get(source.id)))
   }
 
+  async getPartnerDataSourceCapabilities(user: AuthedUser) {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    return getPartnerCapabilities(org.type)
+  }
+
   async createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser): Promise<PartnerDataSourceDto> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
     const accessMode = dto.accessMode ?? 'excel'
-    const sourceKind = dto.sourceKind ?? 'manual'
-    const syncFreq = dto.syncFreq ?? 'manual'
+    const capabilities = getPartnerCapabilities(org.type)
+    const sourceKind = dto.sourceKind ?? capabilities.defaultSourceKind
+    const syncFreq = accessMode === 'api' ? (dto.syncFreq ?? 'manual') : 'manual'
+    assertDataSourceCapability(org.type, accessMode, sourceKind)
     if (accessMode === 'api' && !dto.endpoint) {
       throw new BadRequestException({ error: { code: 'API_ENDPOINT_REQUIRED', message: 'API 数据源必须填写 endpoint' } })
     }
@@ -104,8 +129,10 @@ export class JobsPartnerService {
         accessMode,
         syncFreq,
         description: dto.description,
-        endpoint: dto.endpoint,
-        authType: dto.authType,
+        endpoint: accessMode === 'api' ? dto.endpoint : undefined,
+        authType: accessMode === 'api' ? dto.authType : undefined,
+        // API/Webhook 必须由 Admin 完成风险检查后启用；文件/手工来源可立即使用。
+        enabled: !isAdminManagedAccessMode(accessMode),
         encryptedCredential: accessMode === 'api' && dto.credential ? encryptSecret(dto.credential) : undefined,
         webhookSecret: webhookSecretOnce ? encryptSecret(webhookSecretOnce) : undefined,
         webhookSecretRotatedAt: webhookSecretOnce ? new Date() : undefined,
@@ -117,7 +144,13 @@ export class JobsPartnerService {
       action: 'data_source.create',
       targetType: 'job_source',
       targetId: source.id,
-      payload: { accessMode, sourceKind, credentialConfigured: Boolean(dto.credential || webhookSecretOnce) },
+      payload: {
+        accessMode,
+        sourceKind,
+        credentialConfigured: Boolean(dto.credential || webhookSecretOnce),
+        enabled: source.enabled,
+        activationManagedBy: isAdminManagedAccessMode(accessMode) ? 'admin' : 'partner',
+      },
     })
     return {
       ...prismaJobSourceToPartnerDto(source),
@@ -133,6 +166,16 @@ export class JobsPartnerService {
     const source = await this.prisma.jobSource.findUnique({ where: { id } })
     if (!source || source.orgId !== user.orgId) {
       throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertDataSourceCapability(org.type, source.accessMode, source.sourceKind)
+    if (isAdminManagedAccessMode(source.accessMode)) {
+      throw new ForbiddenException({
+        error: {
+          code: 'DATA_SOURCE_ADMIN_MANAGED',
+          message: 'API/Webhook 数据源由管理员启停，请提交管理员完成接入风险检查',
+        },
+      })
     }
     const updated = await this.prisma.jobSource.update({
       where: { id },
@@ -163,10 +206,8 @@ export class JobsPartnerService {
     if (user.role !== 'partner' || !user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
-    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
-    if (!org || !org.enabled) {
-      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
-    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertPartnerDataTypeCapability(org.type, 'job')
     const sourceOrgId = org.id
     const sourceName  = org.name
     const sync        = new Date()
@@ -241,72 +282,84 @@ export class JobsPartnerService {
   }
 
   async importJobsFromWebhook(orgId: string, sourceId: string, items: ImportJobItemDto[]): Promise<ImportResult<PartnerJobDto>> {
-    const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
-    if (!org || !org.enabled) {
-      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
-    }
+    const org = await this.getEnabledPartnerOrg(orgId)
+    assertPartnerDataTypeCapability(org.type, 'job')
     const sourceName = org.name
     const sync = new Date()
     const out: PartnerJobDto[] = []
     const touchedJobIds: string[] = []
-    for (const item of items) {
-      try {
-        const job = await this.prisma.job.upsert({
-          where: { sourceOrgId_externalId: { sourceOrgId: orgId, externalId: item.externalId } },
-          create: {
-            sourceOrgId: orgId, sourceId, externalId: item.externalId, sourceName,
-            sourceUrl: item.sourceUrl,
-            title: item.title, company: item.company, city: item.city,
-            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
-            salary: item.salary,
-            description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
-            educationRequirement: item.educationRequirement,
-            experienceRequirement: item.experienceRequirement,
-            skillsJson: JSON.stringify(item.skills ?? []),
-            benefitsJson: JSON.stringify(item.benefits ?? []),
-            salaryMin: item.salaryMin,
-            salaryMax: item.salaryMax,
-            salaryUnit: item.salaryUnit,
-            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
-            reviewStatus: 'pending', publishStatus: 'draft',
-            syncTime: sync,
-          },
-          update: {
-            sourceId,
-            sourceName, sourceUrl: item.sourceUrl,
-            title: item.title, company: item.company, city: item.city,
-            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
-            salary: item.salary,
-            description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
-            educationRequirement: item.educationRequirement,
-            experienceRequirement: item.experienceRequirement,
-            skillsJson: JSON.stringify(item.skills ?? []),
-            benefitsJson: JSON.stringify(item.benefits ?? []),
-            salaryMin: item.salaryMin,
-            salaryMax: item.salaryMax,
-            salaryUnit: item.salaryUnit,
-            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
-            // Partner Webhook 主动推送一律回 pending+draft 强制重审，即使已发布也立即下架。
-            // 同时清空上一次审核元数据，避免 pending 记录仍带旧审核人/时间/拒绝原因。
-            reviewStatus: 'pending',
-            publishStatus: 'draft',
-            rejectReason: null,
-            reviewedBy: null,
-            reviewedAt: null,
-            syncTime: sync,
-          },
-        })
-        touchedJobIds.push(job.id)
-        out.push(prismaJobToPartnerDto(job))
-      } catch (e) {
-        this.logger.error(`importJobsFromWebhook upsert failed: orgId=${orgId} extId=${item.externalId}`, e as Error)
-        throw new InternalServerErrorException({ error: { code: 'IMPORT_FAILED', message: 'Webhook 导入失败,请稍后重试' } })
-      }
+    let added = 0
+    let updated = 0
+    let currentExternalId = ''
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const existingExternalIds = new Set(
+          (await tx.job.findMany({
+            where: { sourceOrgId: orgId, externalId: { in: items.map((item) => item.externalId) } },
+            select: { externalId: true },
+          })).map((job) => job.externalId),
+        )
+        for (const item of items) {
+          currentExternalId = item.externalId
+          const job = await tx.job.upsert({
+            where: { sourceOrgId_externalId: { sourceOrgId: orgId, externalId: item.externalId } },
+            create: {
+              sourceOrgId: orgId, sourceId, externalId: item.externalId, sourceName,
+              sourceUrl: item.sourceUrl,
+              title: item.title, company: item.company, city: item.city,
+              category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+              salary: item.salary,
+              description: item.description, requirements: item.requirements,
+              tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+              educationRequirement: item.educationRequirement,
+              experienceRequirement: item.experienceRequirement,
+              skillsJson: JSON.stringify(item.skills ?? []),
+              benefitsJson: JSON.stringify(item.benefits ?? []),
+              salaryMin: item.salaryMin,
+              salaryMax: item.salaryMax,
+              salaryUnit: item.salaryUnit,
+              validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+              reviewStatus: 'pending', publishStatus: 'draft',
+              syncTime: sync,
+            },
+            update: {
+              sourceId,
+              sourceName, sourceUrl: item.sourceUrl,
+              title: item.title, company: item.company, city: item.city,
+              category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+              salary: item.salary,
+              description: item.description, requirements: item.requirements,
+              tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+              educationRequirement: item.educationRequirement,
+              experienceRequirement: item.experienceRequirement,
+              skillsJson: JSON.stringify(item.skills ?? []),
+              benefitsJson: JSON.stringify(item.benefits ?? []),
+              salaryMin: item.salaryMin,
+              salaryMax: item.salaryMax,
+              salaryUnit: item.salaryUnit,
+              validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+              // Partner Webhook 主动推送一律回 pending+draft 强制重审，即使已发布也立即下架。
+              // 同时清空上一次审核元数据，避免 pending 记录仍带旧审核人/时间/拒绝原因。
+              reviewStatus: 'pending',
+              publishStatus: 'draft',
+              rejectReason: null,
+              reviewedBy: null,
+              reviewedAt: null,
+              syncTime: sync,
+            },
+          })
+          touchedJobIds.push(job.id)
+          out.push(prismaJobToPartnerDto(job))
+          if (existingExternalIds.has(item.externalId)) updated++
+          else added++
+        }
+      })
+    } catch (e) {
+      this.logger.error(`importJobsFromWebhook upsert failed: orgId=${orgId} extId=${currentExternalId}`, e as Error)
+      throw new InternalServerErrorException({ error: { code: 'IMPORT_FAILED', message: 'Webhook 导入失败,请稍后重试' } })
     }
     await this.refreshJobQualitySnapshots(touchedJobIds)
-    return { imported: out.length, items: out }
+    return { imported: out.length, items: out, added, updated }
   }
 
   async unpublishPartnerJob(id: string, user: AuthedUser): Promise<PartnerJobDto> {
@@ -321,6 +374,14 @@ export class JobsPartnerService {
       where: { id },
       data: { publishStatus: 'unpublished' },
     })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'job.partner_unpublish',
+      targetType: 'job',
+      targetId: id,
+      payload: { fromPublishStatus: job.publishStatus, toPublishStatus: 'unpublished' },
+    })
     return prismaJobToPartnerDto(updated)
   }
 
@@ -328,10 +389,8 @@ export class JobsPartnerService {
     if (user.role !== 'partner' || !user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
-    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
-    if (!org || !org.enabled) {
-      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
-    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertPartnerDataTypeCapability(org.type, 'job')
     const job = await this.prisma.job.findUnique({ where: { id } })
     if (!job || job.sourceOrgId !== user.orgId) {
       throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
@@ -383,10 +442,8 @@ export class JobsPartnerService {
     if (user.role !== 'partner' || !user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
-    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
-    if (!org || !org.enabled) {
-      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
-    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertPartnerDataTypeCapability(org.type, 'fair')
     const sourceOrgId = org.id
     const sourceName  = org.name
     const sync        = new Date()
@@ -478,6 +535,14 @@ export class JobsPartnerService {
       where: { id },
       data: { publishStatus: 'unpublished' },
     })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'fair.partner_unpublish',
+      targetType: 'fair',
+      targetId: id,
+      payload: { fromPublishStatus: fair.publishStatus, toPublishStatus: 'unpublished' },
+    })
     return prismaFairToPartnerDto(updated)
   }
 
@@ -485,10 +550,8 @@ export class JobsPartnerService {
     if (user.role !== 'partner' || !user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
     }
-    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
-    if (!org || !org.enabled) {
-      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
-    }
+    const org = await this.getEnabledPartnerOrg(user.orgId)
+    assertPartnerDataTypeCapability(org.type, 'fair')
     const fair = await this.prisma.jobFair.findUnique({ where: { id } })
     if (!fair || fair.sourceOrgId !== user.orgId) {
       throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })

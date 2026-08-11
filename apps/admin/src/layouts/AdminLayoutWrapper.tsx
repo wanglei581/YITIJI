@@ -109,7 +109,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'fairs',          label: '招聘会管理',   icon: ConciergeBellIcon, href: KEY_TO_PATH.fairs },
   { key: 'companies',      label: '企业展示管理', icon: Building2Icon, href: KEY_TO_PATH.companies },
   { key: 'import-batches', label: 'Excel 导入记录', icon: FileSpreadsheetIcon, href: KEY_TO_PATH['import-batches'] },
-  { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
+  { key: 'sync-sources',   label: '数据接入通道', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
   { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户', href: KEY_TO_PATH.partners },
   { key: 'offline-agencies', label: '线下机构', icon: Building2Icon, href: KEY_TO_PATH['offline-agencies'] },
   { key: 'users',        label: '用户管理',     icon: UsersIcon, href: KEY_TO_PATH.users },

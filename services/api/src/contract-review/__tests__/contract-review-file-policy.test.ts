@@ -56,7 +56,8 @@ interface FileHarnessRecord {
 
 function makeFileAccessHarness(
   initialExpiresAt: Date | null,
-  overrides: Partial<FileHarnessRecord> = {}
+  overrides: Partial<FileHarnessRecord> = {},
+  activePrintTask = false,
 ) {
   const record: FileHarnessRecord = {
     id: 'contract-file-1',
@@ -102,6 +103,24 @@ function makeFileAccessHarness(
         Object.assign(record, data)
         return record
       },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { id: string; deletedAt?: null }
+        data: Partial<FileHarnessRecord>
+      }) => {
+        if (where.id !== record.id || (where.deletedAt === null && record.deletedAt !== null)) {
+          return { count: 0 }
+        }
+        Object.assign(record, data)
+        return { count: 1 }
+      },
+    },
+    printTask: {
+      findMany: async () => activePrintTask
+        ? [{ fileId: record.id, fileUrl: `/api/v1/files/${record.id}/content` }]
+        : [],
     },
   }
   const storage = {
@@ -387,6 +406,56 @@ test('readContentForEndUser reads only active records and hides non-active statu
   }
 })
 
+test('contract reports stay hidden from generic access while signed content and sensitive cleanup remain available', async () => {
+  const harness = makeFileAccessHarness(new Date(Date.now() + 60_000), {
+    purpose: 'contract_review_report',
+    filename: '合同风险提示报告.pdf',
+    assetCategory: 'derived',
+    sourceFileId: 'source-contract-1',
+  })
+  const member = { kind: 'member' as const, endUserId: 'member-1' }
+
+  await expectFileNotFound(() =>
+    harness.service.getAccessUrl('contract-file-1', member, 'attachment')
+  )
+  await expectFileNotFound(() =>
+    harness.service.getSignedUrl('contract-file-1', {
+      userId: 'admin-1', role: 'admin', orgId: null,
+    })
+  )
+  await expectFileNotFound(() =>
+    harness.service.readContentForEndUser('contract-file-1', 'member-1')
+  )
+  assert.equal((await harness.service.readContent('contract-file-1')).purpose, 'contract_review_report')
+  assert.equal(harness.calls().contentReadCalls, 1)
+
+  const deleted = await harness.service.systemDeleteSensitive(
+    'contract-file-1',
+    'contract_review_report_test_cleanup',
+  )
+  assert.equal(deleted.status, 'deleted')
+  assert.equal(harness.calls().deleteObjectCalls, 1)
+})
+
+test('an active PrintTask keeps an expired contract report readable only through its signed content path', async () => {
+  const expiredAt = new Date(Date.now() - 1)
+  const overrides = {
+    purpose: 'contract_review_report',
+    filename: '合同风险提示报告.pdf',
+    assetCategory: 'derived',
+    sourceFileId: 'source-contract-1',
+  }
+  const unprotected = makeFileAccessHarness(expiredAt, overrides)
+  await expectFileNotFound(() => unprotected.service.readContent('contract-file-1'))
+
+  const protectedReport = makeFileAccessHarness(expiredAt, overrides, true)
+  assert.equal(
+    (await protectedReport.service.readContent('contract-file-1')).purpose,
+    'contract_review_report',
+  )
+  assert.equal(protectedReport.calls().contentReadCalls, 1)
+})
+
 test('download URL TTL never crosses file expiry and fails closed below one second', async () => {
   const nearExpiry = makeFileAccessHarness(new Date(Date.now() + 10_900))
   const requester = { kind: 'member' as const, endUserId: 'member-1' }
@@ -568,7 +637,7 @@ test('contract scans map to contract_upload', () => {
   assert.equal(SCAN_TYPE_TO_PURPOSE.document, 'print_doc')
 })
 
-test('member document queries exclude both contract purpose and locked session derivatives', async () => {
+test('member document queries exclude contract originals, reports, and locked session derivatives', async () => {
   const whereClauses: Array<Record<string, unknown>> = []
   const prisma = {
     fileObject: {
@@ -588,7 +657,9 @@ test('member document queries exclude both contract purpose and locked session d
 
   assert.equal(whereClauses.length, 2)
   for (const where of whereClauses) {
-    assert.deepEqual(where.purpose, { notIn: ['signature_image', 'contract_upload'] })
+    assert.deepEqual(where.purpose, {
+      notIn: ['signature_image', 'contract_upload', 'contract_review_report'],
+    })
     assert.match(JSON.stringify(where), /contract_review_session_only/)
   }
 })
