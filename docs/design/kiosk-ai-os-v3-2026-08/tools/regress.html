@@ -677,6 +677,13 @@ function auditCardVoid (win) {
    最后一条机器判不了（脚本可以用任意选择器委托），所以这里采取的办法是：
    **真的按一下**，看有没有任何可观察的变化（阶段、URL、DOM、弹层、aria）。
    有变化就算接线了，没有就报出来。按完立刻把现场复原。 */
+/* 按钮的「名字」只能有一套算法。
+   扫描阶段和复验阶段各算一遍就会漂，而漂的结果是**静默丢候选**（不是报错）。
+   图标按钮没有文字，所以回落到类名 —— 但两边必须回落得一模一样。 */
+function btnLabel (b) {
+  return (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || String(b.className || '')
+}
+
 function auditDeadButtons (win, only) {
   var doc = win.document
   var screen = doc.querySelector('.screen')
@@ -715,9 +722,19 @@ function auditDeadButtons (win, only) {
     /* 复验模式：只按指定的那一个。
        不加这一条，复验时仍会把同组的 7 个「删除」依次按一遍 ——
        第 1 个弹出确认层，第 2 个之后弹的是同一层同样文案，快照不变 → 又判死。
-       同类控件必然误报 N−1 个，这个成因在复验里会原样重演。 */
-    if (only && !(b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24)
-                  .startsWith(only.label.slice(0, 12))) continue
+       同类控件必然误报 N−1 个，这个成因在复验里会原样重演。
+
+       ⚠ 第二个坑（2026-08-11 实测发现，这一项的第 5 次失明）：
+       这里原本直接读 `b.textContent`，而**记录候选时**用的是 `btnLabel()`
+       （文字为空则回落成类名）。两处用了两套算法，于是：
+         纯 <svg> 图标按钮 textContent === ''，label 回落成 'pgbtn'，
+         `''.startsWith('pgbtn')` 恒为 false → **候选被静默丢弃，永远确认不成缺陷**。
+       表现是 11/17 的翻页键（文字箭头 ‹ ›）能报出来，
+       而 09/10 的翻页键（纯 svg）扫描阶段扫得到、复验阶段凭空消失。
+       份数 −／＋ 这种图标按钮同理 —— 恰恰是最要命的那类控件没有文字。
+       根因不是"少判了一种情况"，是**同一个标签在两处各算一遍**。
+       所以现在两处**共用 btnLabel()**，从结构上不允许再漂。 */
+    if (only && !btnLabel(b).startsWith(only.label.slice(0, 12))) continue
 
     /* **已经处于选中态的选项，点了不变是对的。**
        单选组里当前选中的那一个、当前所在的标签页、已激活的筛选片 ——
@@ -761,8 +778,7 @@ function auditDeadButtons (win, only) {
     doc.removeEventListener('click', block, false)
 
     if (!moved) {
-      out.push({ label: (b.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 24) || b.className,
-                 cls: String(b.className).split(' ')[0] })
+      out.push({ label: btnLabel(b), cls: String(b.className).split(' ')[0] })
     }
   }
   return out
