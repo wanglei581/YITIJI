@@ -50,16 +50,6 @@
       </Directory>
     </StandardDirectory>
 
-    <StandardDirectory Id="DesktopFolder">
-      <Component Id="AgentPanelDesktopShortcutComponent" Guid="8A2B2483-6CA4-44DD-84EF-FE3E49846654" Bitness="always64">
-        <File
-          Id="AgentPanelDesktopInternetShortcut"
-          Source="$(var.InstallerSourceRoot)\assets\AI Job Print Terminal.url"
-          Name="AI 求职打印服务终端.url"
-          KeyPath="yes" />
-      </Component>
-    </StandardDirectory>
-
     <StandardDirectory Id="CommonAppDataFolder">
       <Directory Id="AGENTSTATEDIR" Name="AIJobPrintAgent">
         <Component Id="AgentStateDirectoryComponent" Guid="B5AEAB48-0EB6-496C-909E-B1F9E04EDE53" Permanent="yes" NeverOverwrite="yes" Bitness="always64">
@@ -73,7 +63,12 @@
             <Directory Id="CommonStartMenuProgramsFolder" Name="Programs">
               <Directory Id="AgentProgramMenuFolder" Name="AI Job Print Terminal">
                 <Component Id="AgentPanelShortcutComponent" Guid="E565227D-70C5-4C17-A63E-2322DA18C0E4" Bitness="always64">
-                  <File Id="AgentPanelInternetShortcut" Source="$(var.InstallerSourceRoot)\assets\AI Job Print Terminal.url" KeyPath="yes" />
+                  <File Id="AgentPanelInternetShortcut" Source="$(var.InstallerSourceRoot)\assets\AI Job Print Terminal.url" KeyPath="yes">
+                    <CopyFile
+                      Id="AgentPanelDesktopInternetShortcut"
+                      DestinationDirectory="DesktopFolder"
+                      DestinationName="AI 求职打印服务终端.url" />
+                  </File>
                   <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
                 </Component>
               </Directory>
@@ -87,7 +82,6 @@
       <ComponentRef Id="AgentServiceComponent" />
       <ComponentRef Id="AgentStateDirectoryComponent" />
       <ComponentRef Id="AgentPanelShortcutComponent" />
-      <ComponentRef Id="AgentPanelDesktopShortcutComponent" />
       <ComponentRef Id="ProvisioningWizardComponent" />
       <ComponentGroupRef Id="AgentPayload" />
     </Feature>
