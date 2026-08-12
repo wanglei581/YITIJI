@@ -79,8 +79,14 @@ function Assert-RestrictedRuntime([string]$Root) {
       if (-not (Test-FileSystemAccessRuleAppliesToItem $rule)) {
         continue
       }
+      if (-not (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) {
+        # Read-only identities do not affect the write-boundary decision. Avoid
+        # translating them because Windows can retain names/SIDs that the local
+        # machine cannot currently resolve (for example removed package SIDs).
+        continue
+      }
       $sid = ConvertTo-SidValue $rule.IdentityReference
-      if (-not (Test-IsPrivilegedRuntimeSid $sid) -and (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) {
+      if (-not (Test-IsPrivilegedRuntimeSid $sid)) {
         throw "Runtime grants write-like access to non-privileged SID $sid ($($rule.FileSystemRights)): $($item.FullName)"
       }
     }
