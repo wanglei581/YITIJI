@@ -86,5 +86,11 @@ $effectiveRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
 if (-not (Test-FileSystemAccessRuleAppliesToItem $effectiveRule)) {
   throw "Effective access rules must be evaluated on the current item"
 }
+if (-not (Test-IsPrivilegedRuntimeSid "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464")) {
+  throw "The exact TrustedInstaller service SID must be treated as privileged"
+}
+if (Test-IsPrivilegedRuntimeSid "S-1-5-32-545") {
+  throw "BUILTIN Users must not be treated as privileged"
+}
 
-Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative-inherit-only"
+Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative-inherit-only-trustedinstaller"

@@ -41,6 +41,18 @@ function Test-FileSystemAccessRuleAppliesToItem([System.Security.AccessControl.F
   return (($Rule.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0)
 }
 
+function Test-IsPrivilegedRuntimeSid([string]$Sid) {
+  # TrustedInstaller is the protected Windows Modules Installer service SID and
+  # holds FullControl on Program Files by default. Keep this exact SID allowlist
+  # narrow; arbitrary NT SERVICE identities are not privileged here.
+  $privilegedSids = @(
+    "S-1-5-18", # LocalSystem
+    "S-1-5-32-544", # BUILTIN\Administrators
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464" # NT SERVICE\TrustedInstaller
+  )
+  return ($privilegedSids -contains $Sid)
+}
+
 function Assert-RestrictedRuntime([string]$Root) {
   if ([string]::IsNullOrWhiteSpace($Root)) {
     throw "Restricted runtime check requires a non-empty path"
@@ -49,7 +61,6 @@ function Assert-RestrictedRuntime([string]$Root) {
   $rootItem = Get-Item -Force -LiteralPath $Root -ErrorAction Stop
   $pending = New-Object "System.Collections.Generic.Queue[System.IO.FileSystemInfo]"
   $pending.Enqueue($rootItem)
-  $allowedSids = @("S-1-5-18", "S-1-5-32-544")
 
   while ($pending.Count -gt 0) {
     $item = $pending.Dequeue()
@@ -57,8 +68,8 @@ function Assert-RestrictedRuntime([string]$Root) {
 
     $acl = Get-Acl -LiteralPath $item.FullName -ErrorAction Stop
     $ownerSid = ConvertTo-SidValue $acl.Owner
-    if ($allowedSids -notcontains $ownerSid) {
-      throw "Runtime owner must be SYSTEM or Administrators: $($item.FullName)"
+    if (-not (Test-IsPrivilegedRuntimeSid $ownerSid)) {
+      throw "Runtime owner must be SYSTEM, Administrators, or TrustedInstaller: $($item.FullName)"
     }
 
     foreach ($rule in @($acl.Access)) {
@@ -69,7 +80,7 @@ function Assert-RestrictedRuntime([string]$Root) {
         continue
       }
       $sid = ConvertTo-SidValue $rule.IdentityReference
-      if ($allowedSids -notcontains $sid -and (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) {
+      if (-not (Test-IsPrivilegedRuntimeSid $sid) -and (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) {
         throw "Runtime grants write-like access to non-privileged SID $sid ($($rule.FileSystemRights)): $($item.FullName)"
       }
     }
