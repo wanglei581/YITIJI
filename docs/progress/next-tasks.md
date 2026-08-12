@@ -39,7 +39,7 @@
 
 ## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
 
-- [~] **交付 Terminal Agent `0.4.2` 可视化安装体验候选**：源码已增加安装成功页“一键启动设备绑定向导”、all-users 桌面状态面板入口，以及绑定成功后自动打开 `http://127.0.0.1:9527/local/panel`；本地 Node 22 契约和 Agent 回归已绿。下一步由 Windows 2022 CI 从精确 `0.4.1@66579a4e` 构建 unsigned `0.4.2` MSI/EXE，必须通过 fresh install/repair/uninstall、桌面/开始菜单入口清理和 `0.4.1 -> 0.4.2` 原地升级；再将 CI 产物放到新 Windows 设备，完成打印机选择、一次性绑定、服务启动、状态面板、网站在线识别和重启恢复。签名与现场通过前不得替换现有安装包或宣称正式发布。
+- [~] **交付 Terminal Agent `0.4.3` PowerShell 5.1 兼容修复候选**：`0.4.2` 真实设备绑定已因随包中文 PowerShell 脚本采用 UTF-8 无 BOM 而失败，当前修复在 staging 强制写 UTF-8 BOM，并新增 Windows PowerShell 5.1 Parser 门禁。下一步由 Windows 2022 CI 从精确 `0.4.2@98eb3674` 构建 unsigned `0.4.3` MSI/EXE，必须通过实际 staging 脚本解析、fresh install/repair/uninstall、桌面/开始菜单入口清理和 `0.4.2 -> 0.4.3` 原地升级；再在报错机器直接升级，完成打印机选择、一次性绑定、服务启动、二维码自检、状态面板、网站在线识别和真实出纸。现场通过前不得继续使用 `0.4.2` 或宣称修复完成。
 
 - [~] **交付 Terminal Agent `0.4.1` 合并候选（自动化已绿，签名/现场 pending）**：`921f0129` 已以精确 `0.4.0@28c9202d` 为 predecessor，通过 Node 22 build、PostgreSQL、Kiosk browser 与 Windows unsigned installer CI，真实覆盖 `0.4.0 -> 0.4.1` Major Upgrade、状态面板、all-users 两个开始菜单入口、设备绑定向导、LocalSystem、DPAPI、ProgramData 保留、repair/uninstall、动态 bridge session 和 secrets 静态扫描；unsigned artifact manifest 与 SHA-256 已核对。当前仓库没有 Windows Authenticode 证书 Secret，禁止把 unsigned candidate 当正式发布。下一步先让同步最新 main 的最终 PR HEAD 四项 CI 全绿，再配置受控代码签名并验证签名链；最后在新设备输入一次性绑定码，验证旧凭据失效、新二维码 180 秒/一次性/terminal 绑定、登录回调、U 盘、打印唤醒、真实 Pantum 打印扫描和重启恢复。现场完成前不得部署或宣称换机完成。
 
