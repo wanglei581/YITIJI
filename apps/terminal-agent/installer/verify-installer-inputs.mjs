@@ -32,6 +32,10 @@ const productionInstaller = fs.readFileSync(
   path.join(root, '../scripts/install-production-agent.ps1'),
   'utf8',
 )
+const runtimeSecurity = fs.readFileSync(
+  path.join(root, '../scripts/provisioning-runtime-security.ps1'),
+  'utf8',
+)
 const workflow = fs.readFileSync(
   path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
   'utf8',
@@ -140,6 +144,10 @@ assert.match(stagedPowerShellVerify, /originMerge=executed/)
 assert.match(stagedPowerShellVerify, /aclRights=positive-negative/)
 assert.match(stagedPowerShellVerify, /ReadAndExecute/)
 assert.match(stagedPowerShellVerify, /Modify/)
+assert.match(stagedPowerShellVerify, /PropagationFlags\]::InheritOnly/)
+assert.match(stagedPowerShellVerify, /Test-FileSystemAccessRuleAppliesToItem/)
+assert.match(runtimeSecurity, /PropagationFlags\]::InheritOnly/)
+assert.match(runtimeSecurity, /Test-FileSystemAccessRuleAppliesToItem/)
 assert.match(staging, /install-production-agent\.ps1/)
 assert.match(provisionWizard, /-PromptForBindCode/)
 assert.match(provisionWizard, /-InstalledAgentRoot\s+\$agentRoot/)

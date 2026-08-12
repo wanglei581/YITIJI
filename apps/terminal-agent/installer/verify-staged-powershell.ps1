@@ -68,5 +68,23 @@ if (-not (Test-WriteLikeFileSystemRights ([System.Security.AccessControl.FileSys
 if (-not (Test-WriteLikeFileSystemRights ([System.Security.AccessControl.FileSystemRights]::WriteData))) {
   throw "WriteData must be classified as write-like access"
 }
+$inheritOnlyRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+  (New-Object System.Security.Principal.SecurityIdentifier("S-1-3-0")),
+  [System.Security.AccessControl.FileSystemRights]::FullControl,
+  ([System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit),
+  [System.Security.AccessControl.PropagationFlags]::InheritOnly,
+  [System.Security.AccessControl.AccessControlType]::Allow
+)
+if (Test-FileSystemAccessRuleAppliesToItem $inheritOnlyRule) {
+  throw "InheritOnly access rules must not be treated as effective on the current item"
+}
+$effectiveRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+  (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-545")),
+  [System.Security.AccessControl.FileSystemRights]::WriteData,
+  [System.Security.AccessControl.AccessControlType]::Allow
+)
+if (-not (Test-FileSystemAccessRuleAppliesToItem $effectiveRule)) {
+  throw "Effective access rules must be evaluated on the current item"
+}
 
-Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative"
+Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative-inherit-only"

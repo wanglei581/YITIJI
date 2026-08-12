@@ -33,6 +33,14 @@ function Test-WriteLikeFileSystemRights([System.Security.AccessControl.FileSyste
   return (($Rights -band $writeLikeRights) -ne 0)
 }
 
+function Test-FileSystemAccessRuleAppliesToItem([System.Security.AccessControl.FileSystemAccessRule]$Rule) {
+  # Program Files commonly carries a CREATOR OWNER FullControl ACE marked
+  # InheritOnly. It is a template for descendants and grants no access to the
+  # item whose ACL we are currently evaluating. Descendants are still walked
+  # recursively, so any inherited rule that becomes effective is checked there.
+  return (($Rule.PropagationFlags -band [System.Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0)
+}
+
 function Assert-RestrictedRuntime([string]$Root) {
   if ([string]::IsNullOrWhiteSpace($Root)) {
     throw "Restricted runtime check requires a non-empty path"
@@ -57,9 +65,12 @@ function Assert-RestrictedRuntime([string]$Root) {
       if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
         continue
       }
+      if (-not (Test-FileSystemAccessRuleAppliesToItem $rule)) {
+        continue
+      }
       $sid = ConvertTo-SidValue $rule.IdentityReference
       if ($allowedSids -notcontains $sid -and (Test-WriteLikeFileSystemRights $rule.FileSystemRights)) {
-        throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName)"
+        throw "Runtime grants write-like access to non-privileged SID $sid ($($rule.FileSystemRights)): $($item.FullName)"
       }
     }
 
