@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PREDECESSOR_VERSION = "0.4.0"
-$CANDIDATE_VERSION = "0.4.1"
+$PREDECESSOR_VERSION = "0.4.1"
+$CANDIDATE_VERSION = "0.4.2"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
@@ -17,6 +17,8 @@ $programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Prog
 $panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
 $provisionShortcutName = -join ([char[]](0x8BBE, 0x5907, 0x7ED1, 0x5B9A, 0x5411, 0x5BFC))
 $provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".lnk")
+$desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
+$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
 $provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
 $sentinelPath = Join-Path $stateRoot "installer-upgrade-state-sentinel.json"
 $logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
@@ -104,6 +106,16 @@ function Assert-ProvisioningShortcut {
   }
 }
 
+function Assert-DesktopShortcut {
+  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the local status panel desktop shortcut"
+  }
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $desktopShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
+    throw "Upgraded desktop shortcut does not use the fixed loopback URL"
+  }
+}
+
 $predecessorInstalled = $false
 $candidateInstalled = $false
 $upgradeCompleted = $false
@@ -128,11 +140,9 @@ try {
   Assert-AgentProductVersion -ExpectedVersion $PREDECESSOR_VERSION
   Assert-StoppedManualService
   Assert-PanelShortcut
-  if (
-    (Test-Path -LiteralPath $provisionShortcutPath) -or
-    (Test-Path -LiteralPath $provisionLauncherPath)
-  ) {
-    throw "0.4.0 predecessor unexpectedly contains the 0.4.1 provisioning wizard"
+  Assert-ProvisioningShortcut
+  if (Test-Path -LiteralPath $desktopShortcutPath) {
+    throw "0.4.1 predecessor unexpectedly contains the 0.4.2 desktop panel shortcut"
   }
 
   New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -148,6 +158,7 @@ try {
   Assert-StoppedManualService
   Assert-PanelShortcut
   Assert-ProvisioningShortcut
+  Assert-DesktopShortcut
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
   }
@@ -182,6 +193,9 @@ try {
   }
   if (Test-Path -LiteralPath $provisionShortcutPath) {
     throw "Device provisioning Start Menu shortcut remains after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $desktopShortcutPath) {
+    throw "Local status panel desktop shortcut remains after upgraded candidate uninstall"
   }
 
   Write-Host "EXE_UPGRADE_LIFECYCLE_PASS from=$PREDECESSOR_VERSION to=$CANDIDATE_VERSION stateRetained=true"

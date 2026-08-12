@@ -9,6 +9,7 @@
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
         LicenseUrl=""
+        LaunchTarget="[ProgramFiles64Folder]AIJobPrintAgent\provision\provision-terminal.cmd"
         SuppressOptionsUI="yes"
         Theme="hyperlinkLicense" />
     </BootstrapperApplication>

@@ -62,7 +62,7 @@ $printerName = [string]$printers[$selectedIndex - 1].Name
   -PromptForBindCode `
   -PrinterName $printerName `
   -InstalledAgentRoot $agentRoot `
-  -AgentVersion "0.4.1-production" `
+  -AgentVersion "0.4.2-production" `
   -ReplaceLocalApiAllowedOrigins `
   -LocalApiAllowedOrigins "https://zyidai.cn"
 if ($LASTEXITCODE -ne 0) { Fail "设备绑定未完成，错误码 $LASTEXITCODE" }
@@ -96,4 +96,4 @@ try {
 
 Write-Host ""
 Write-Host "CONFIG SUCCESS - 设备已绑定，可以打开 zyidai.cn" -ForegroundColor Green
-Start-Process "https://zyidai.cn/login"
+Start-Process "http://127.0.0.1:9527/local/panel"

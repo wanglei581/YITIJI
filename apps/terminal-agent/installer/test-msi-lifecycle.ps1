@@ -11,6 +11,8 @@ $programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Prog
 $panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
 $provisionShortcutName = -join ([char[]](0x8BBE, 0x5907, 0x7ED1, 0x5B9A, 0x5411, 0x5BFC))
 $provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".lnk")
+$desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
+$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
 $provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
@@ -70,6 +72,16 @@ function Assert-ProvisioningShortcut {
   }
   if ([System.IO.Path]::GetFullPath($shortcutTarget) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
     throw "Device provisioning shortcut target mismatch"
+  }
+}
+
+function Assert-DesktopShortcut {
+  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
+    throw "Local status panel desktop shortcut is missing"
+  }
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $desktopShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
+    throw "Local status panel desktop shortcut does not contain the fixed loopback URL"
   }
 }
 
@@ -245,6 +257,7 @@ if (Test-Path -LiteralPath $installRoot) {
 Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
 Assert-PanelShortcut
 Assert-ProvisioningShortcut
+Assert-DesktopShortcut
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
@@ -313,6 +326,7 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
 Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
 Assert-PanelShortcut
 Assert-ProvisioningShortcut
+Assert-DesktopShortcut
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped") {
   throw "Repair must preserve the unprovisioned stopped service"
@@ -333,6 +347,9 @@ if (Test-Path -LiteralPath $panelShortcutPath) {
 }
 if (Test-Path -LiteralPath $provisionShortcutPath) {
   throw "Device provisioning Start Menu shortcut remains after uninstall"
+}
+if (Test-Path -LiteralPath $desktopShortcutPath) {
+  throw "Local status panel desktop shortcut remains after uninstall"
 }
 
 Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"
