@@ -37,4 +37,24 @@ foreach ($script in $scripts) {
   }
 }
 
-Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell"
+$originUtilities = Join-Path $provisionRoot "provisioning-origin-utils.ps1"
+. $originUtilities
+$mergedOrigins = @(Merge-LocalApiAllowedOrigins `
+  -Origins @(
+    "https://zyidai.cn",
+    "https://zyidai.cn",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+  ) `
+  -CanonicalizeOrigin { param($originCandidate) ([System.Uri]$originCandidate).GetLeftPart([System.UriPartial]::Authority) })
+$expectedOrigins = @("https://zyidai.cn", "http://localhost:5173", "http://127.0.0.1:5173")
+if ($mergedOrigins.Count -ne $expectedOrigins.Count) {
+  throw "Origin merge returned $($mergedOrigins.Count) entries; expected $($expectedOrigins.Count)"
+}
+for ($index = 0; $index -lt $expectedOrigins.Count; $index++) {
+  if ($mergedOrigins[$index] -ne $expectedOrigins[$index]) {
+    throw "Origin merge mismatch at index ${index}: $($mergedOrigins[$index])"
+  }
+}
+
+Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed"

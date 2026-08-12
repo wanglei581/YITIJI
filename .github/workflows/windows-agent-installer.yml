@@ -22,11 +22,11 @@ jobs:
           # Installer provenance must identify the exact reviewed PR head, not GitHub's ephemeral merge ref.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Checkout exact 0.4.2 predecessor source
+      - name: Checkout exact 0.4.3 predecessor source
         uses: actions/checkout@v4
         with:
-          ref: 98eb3674b684d02f9db4f34d734d6dc5a5352914
-          path: predecessor-0.4.2
+          ref: b843b63801c50119145e21deca28d9b1a172276e
+          path: predecessor-0.4.3
 
       - uses: actions/setup-node@v4
         with:
@@ -66,12 +66,12 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
 
-      - name: Build exact predecessor 0.4.2 upgrade fixture
+      - name: Build exact predecessor 0.4.3 upgrade fixture
         shell: powershell
         run: |
-          & predecessor-0.4.2/apps/terminal-agent/installer/build-staging.ps1
-          & predecessor-0.4.2/apps/terminal-agent/installer/build-msi.ps1
-          & predecessor-0.4.2/apps/terminal-agent/installer/build-exe.ps1
+          & predecessor-0.4.3/apps/terminal-agent/installer/build-staging.ps1
+          & predecessor-0.4.3/apps/terminal-agent/installer/build-msi.ps1
+          & predecessor-0.4.3/apps/terminal-agent/installer/build-exe.ps1
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
@@ -88,7 +88,7 @@ jobs:
       - name: Exercise EXE predecessor-to-candidate upgrade
         shell: powershell
         run: |
-          $predecessor = Get-ChildItem predecessor-0.4.2/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $predecessor = Get-ChildItem predecessor-0.4.3/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
             -PredecessorExePath $predecessor.FullName `

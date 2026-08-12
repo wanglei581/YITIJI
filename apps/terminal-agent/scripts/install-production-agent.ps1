@@ -69,7 +69,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.3-production",
+  [string]$AgentVersion = "0.4.4-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -105,6 +105,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "service-identity.ps1")
+. (Join-Path $PSScriptRoot "provisioning-origin-utils.ps1")
 
 $agentServiceIdentity = "AIJobPrintAgent"
 
@@ -712,16 +713,14 @@ $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `
   -ProgramDataDir $programDataDir `
   -SkipOrigins ([bool]$ReplaceLocalApiAllowedOrigins)
-$localApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
 $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocalSettings.Contains("localApiAllowedOrigins")) {
   @($preservedLocalSettings["localApiAllowedOrigins"])
 } else {
   @()
 }
-foreach ($origin in @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) {
-  $canonicalOrigin = ConvertTo-CanonicalOrigin $origin
-  if (-not $localApiAllowedOrigins.Contains($canonicalOrigin)) { $localApiAllowedOrigins.Add($canonicalOrigin) }
-}
+$effectiveLocalApiAllowedOrigins = @(Merge-LocalApiAllowedOrigins `
+  -Origins (@($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) `
+  -CanonicalizeOrigin { param($originCandidate) ConvertTo-CanonicalOrigin $originCandidate })
 
 Write-Step "Production Agent hardening"
 Write-Host "Runtime mode : $(if ($installedMode) { 'installed MSI' } else { 'repository' })"
@@ -882,7 +881,7 @@ $config = [ordered]@{
   heartbeatIntervalMs    = $HeartbeatIntervalMs
   claimIntervalMs        = $ClaimIntervalMs
   localApiPort           = $effectiveLocalApiPort
-  localApiAllowedOrigins = @($localApiAllowedOrigins)
+  localApiAllowedOrigins = @($effectiveLocalApiAllowedOrigins)
 }
 if ($null -ne $effectiveScanWatchFolder) {
   $config.scanWatchFolder = $effectiveScanWatchFolder

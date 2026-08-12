@@ -177,6 +177,9 @@ Copy-WindowsPowerShellScript `
 Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\service-identity.ps1") `
   -Destination (Join-Path $provisionRoot "service-identity.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\provisioning-origin-utils.ps1") `
+  -Destination (Join-Path $provisionRoot "provisioning-origin-utils.ps1")
 
 Remove-Item -LiteralPath $deployRoot -Recurse -Force
 Remove-Item -LiteralPath $extractRoot -Recurse -Force
