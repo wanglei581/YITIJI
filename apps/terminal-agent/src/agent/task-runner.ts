@@ -45,6 +45,7 @@ import { print } from '../printer/print'
 import {
   getPrinterPreflight,
   getPrintJobStatus,
+  hasPrintServiceCompletionEvent,
   type PrinterPreflight,
   type PrintJobMonitorStatus,
 } from './wmi'
@@ -451,6 +452,7 @@ export async function executeTask(
         task.taskId,
         30_000,
         1_500,
+        { dispatchedAtMs: Date.parse(result.startedAt) },
       )
 
       // Log monitor warn regardless of failed/completed (covers Retained timeout detail).
@@ -547,6 +549,12 @@ interface MonitorDependencies {
   ) => Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }>
   sleep?: (ms: number) => Promise<void>
   now?: () => number
+  dispatchedAtMs?: number
+  queryCompletionEvent?: (
+    printerName: string,
+    taskId: string,
+    dispatchedAtMs: number,
+  ) => Promise<boolean>
 }
 
 /**
@@ -578,6 +586,7 @@ export async function monitorPrintJob(
   const queryStatus = dependencies.queryStatus ?? getPrintJobStatus
   const wait = dependencies.sleep ?? sleep
   const now = dependencies.now ?? Date.now
+  const queryCompletionEvent = dependencies.queryCompletionEvent ?? hasPrintServiceCompletionEvent
 
   if (platform !== 'win32') {
     return unconfirmedOutcome(
@@ -590,7 +599,10 @@ export async function monitorPrintJob(
   // is indistinguishable from DocumentName mismatch or query/driver failure.
   const NOT_FOUND_LIMIT = 5
 
-  const deadline = now() + timeoutMs
+  const dispatchedAtMs = Number.isFinite(dependencies.dispatchedAtMs)
+    ? Math.max(0, dependencies.dispatchedAtMs as number)
+    : now()
+  const deadline = dispatchedAtMs + timeoutMs
   let paperEmptyCount = 0
   let notFoundCount = 0
   let activeJobSeenOnce = false
@@ -637,6 +649,9 @@ export async function monitorPrintJob(
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
+        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         break
 
       case 'completed':
