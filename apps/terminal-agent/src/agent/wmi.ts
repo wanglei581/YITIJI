@@ -260,6 +260,41 @@ export async function getPrintJobStatus(
   return parsePrintJobStatus(output)
 }
 
+/**
+ * Confirm that Windows PrintService recorded Event ID 307 for this exact task.
+ *
+ * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
+ * `Printing, Retained` even after the spooler emitted its completion event.  We
+ * only accept 307 when printer name and taskId both occur in the event message
+ * and the event was created after this dispatch began.  This is spooler
+ * completion evidence; it still does not prove that paper physically exited.
+ */
+export async function hasPrintServiceCompletionEvent(
+  printerName: string,
+  taskId: string,
+  dispatchedAtMs: number,
+): Promise<boolean> {
+  if (process.platform !== 'win32') return false
+
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
+  const safeSince = Number.isFinite(dispatchedAtMs) ? Math.max(0, Math.floor(dispatchedAtMs)) : 0
+  const script =
+    `$line = [Console]::In.ReadLine(); ` +
+    `$first = $line.IndexOf('|'); ` +
+    `$last = $line.LastIndexOf('|'); ` +
+    `if ($first -lt 1 -or $last -le $first) { 'false'; exit }; ` +
+    `$pName = $line.Substring(0, $first); ` +
+    `$tId = $line.Substring($first + 1, $last - $first - 1); ` +
+    `$since = [DateTimeOffset]::FromUnixTimeMilliseconds([Int64]$line.Substring($last + 1)).LocalDateTime; ` +
+    `$event = Get-WinEvent -FilterHashtable @{ LogName='Microsoft-Windows-PrintService/Operational'; Id=307; StartTime=$since } -ErrorAction SilentlyContinue | ` +
+    `Where-Object { $_.Message -like "*$pName*" -and $_.Message -like "*$tId*" } | ` +
+    `Select-Object -First 1; ` +
+    `if ($event) { 'true' } else { 'false' }`
+
+  const output = await runPowerShell(script, `${printerName}|${safeTaskId}|${safeSince}`)
+  return output?.trim().toLowerCase() === 'true'
+}
+
 /** Pure JobStatus parser, exported for deterministic fault-injection verification. */
 export function parsePrintJobStatus(
   output: string | null,

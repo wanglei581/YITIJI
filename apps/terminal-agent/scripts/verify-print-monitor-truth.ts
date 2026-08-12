@@ -8,6 +8,7 @@ interface Scenario {
   statuses: PrintJobMonitorStatus[]
   expectedFailed: boolean
   expectedErrorCode: string
+  completionEvent?: boolean
 }
 
 async function runScenario(scenario: Scenario): Promise<void> {
@@ -25,6 +26,7 @@ async function runScenario(scenario: Scenario): Promise<void> {
       status: scenario.statuses[cursor++] ?? fallback,
       rawStatus: fallback === 'printing' ? 'Printing' : undefined,
     }),
+    queryCompletionEvent: async () => scenario.completionEvent ?? false,
   })
 
   assert.equal(result.failed, scenario.expectedFailed, `${scenario.name}: terminal disposition`)
@@ -80,6 +82,13 @@ async function main(): Promise<void> {
       statuses: ['retained'],
       expectedFailed: true,
       expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'retained job with matching PrintService 307 confirms completion',
+      statuses: ['retained'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
     },
     {
       name: 'observed job then queue removal confirms completion',
