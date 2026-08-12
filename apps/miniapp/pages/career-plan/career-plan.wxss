@@ -1,0 +1,108 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/*
+  已删除的样式(随伪造内容一起下线,不要复活):
+  - .di-fit / .fit-label  方向匹配度徽章。后端 directions 只有 title/why/firstStep,
+                          没有匹配度字段,这两个类没有任何真实数据可渲染。
+  - .field-group / .field-item / .fi-label / .fi-input / .fi-select / .fi-arr / .skill-textarea
+                          四字段表单。后端不接受 body,表单纯装饰。
+  - .da-tags / .da-tag / .di-actions  多步骤标签。后端每个方向只给一个 firstStep。
+  - .cs-title / .cs-sub / .cs-disc    旧渐变头卡的文字层,已无引用。
+*/
+
+/* 运行中 / 空态 / 失败态共用 */
+.running-state { display: flex; flex-direction: column; align-items: center;
+  padding: 100rpx 32rpx 0; gap: 20rpx; }
+.rs-anim { position: relative; width: 120rpx; height: 120rpx; margin-bottom: 16rpx; }
+.rs-ring { position: absolute; inset: 0; border-radius: 50%;
+  border: 4rpx solid transparent; border-top-color: var(--teal);
+  animation: spin 1s linear infinite; }
+.rs-ic { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 48rpx; color: var(--teal); }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 空态/失败态的图标底盘(与 job-fit 同口径,全局 app.wxss 里没有,必须页内定义) */
+.st-ic { width: 128rpx; height: 128rpx; border-radius: 50%; background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 56rpx; color: var(--muted); margin-bottom: 8rpx; }
+.st-ic.warn { background: var(--warn-soft); color: var(--warn); }
+.rs-title { font-size: 34rpx; font-weight: 700; color: var(--ink); }
+.rs-sub { font-size: 26rpx; color: var(--muted); text-align: center; line-height: 1.6; }
+.rs-disclaimer { font-size: 22rpx; color: var(--ghost); text-align: center; line-height: 1.6; }
+
+/* 空态/失败态的行动按钮。48px 是最小可点尺寸下限 */
+.cp-cta { margin-top: 12rpx; min-height: 96rpx; display: flex; align-items: center;
+  justify-content: center; padding: 0 40rpx; border-radius: 48rpx;
+  background: var(--teal-wash); color: var(--teal-deep);
+  font-size: 28rpx; font-weight: 600; }
+
+/* ready 态说明文字 */
+.cp-p { font-size: 27rpx; color: var(--muted); line-height: 1.75; margin-bottom: 14rpx; }
+.cp-p:last-child { margin-bottom: 0; }
+.cp-strong { color: var(--ink); font-weight: 600; }
+.cp-file { display: flex; align-items: center; gap: 12rpx; margin-top: 6rpx;
+  padding: 18rpx 20rpx; background: var(--paper); border-radius: 12rpx;
+  border: 1rpx solid var(--line); }
+.cp-file-ic { font-size: 30rpx; color: var(--teal); flex-shrink: 0; }
+.cp-file-name { flex: 1; font-size: 26rpx; color: var(--ink);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* 横向内缩用 px 与全局 .card 的 margin:0 16px 对齐,rpx 在宽屏机上会错位 */
+.cp-act { margin: 16px 16px 0; }
+
+/* 生成依据(如实展示参考了什么) */
+.cp-based { margin: 0 16px 12px; padding: 22rpx 24rpx;
+  background: var(--surface); border-radius: 14rpx; }
+.cb-cap { font-size: 24rpx; color: var(--muted); margin-bottom: 14rpx; }
+.cb-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6; margin-top: 12rpx; }
+
+.cp-summary { font-size: 27rpx; color: var(--ink); line-height: 1.8; }
+.cp-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6;
+  margin: 10rpx 16px 0; }
+
+/* 列表容器:与 .card 同一内缩 */
+.cp-list { margin: 0 16px; display: flex; flex-direction: column; gap: 12rpx; }
+
+/* 现状画像 */
+.cs-item { display: flex; gap: 14rpx; padding: 22rpx 24rpx;
+  background: var(--surface); border-radius: 14rpx; }
+.cs-mark { flex-shrink: 0; width: 32rpx; text-align: center; font-size: 32rpx;
+  font-weight: 700; color: var(--teal); line-height: 1.4; }
+.cs-body { flex: 1; min-width: 0; }
+.cs-point { font-size: 27rpx; color: var(--ink); font-weight: 600; line-height: 1.6; }
+.cs-ev { font-size: 23rpx; color: var(--muted); line-height: 1.6; margin-top: 8rpx;
+  padding-left: 16rpx; border-left: 3rpx solid var(--line); }
+
+/* 方向卡(无匹配度徽章) */
+.dir-list { margin: 0 16px; display: flex; flex-direction: column; gap: 16rpx; }
+.dir-item { background: var(--surface); border-radius: 14rpx; padding: 24rpx; }
+.di-head { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
+.di-rank { width: 36rpx; height: 36rpx; border-radius: 50%; background: var(--teal-wash);
+  color: var(--teal-deep); font-size: 22rpx; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.di-title { flex: 1; font-size: 30rpx; font-weight: 700; color: var(--ink); }
+.di-reason { font-size: 26rpx; color: var(--muted); line-height: 1.7; }
+.di-step { margin-top: 14rpx; padding: 16rpx 20rpx; background: var(--paper);
+  border-radius: 12rpx; }
+.ds-cap { font-size: 22rpx; color: var(--teal-deep); font-weight: 600; margin-bottom: 6rpx; }
+.ds-text { font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+
+/* 技能提升 */
+.sk-item { padding: 22rpx 24rpx; background: var(--surface); border-radius: 14rpx; }
+.sk-head { display: flex; align-items: center; gap: 12rpx; }
+.sk-name { flex: 1; font-size: 28rpx; font-weight: 600; color: var(--ink); }
+.sk-time { flex-shrink: 0; font-size: 22rpx; padding: 4rpx 14rpx; border-radius: 20rpx;
+  background: var(--paper); color: var(--muted); border: 1rpx solid var(--line); }
+.sk-act { font-size: 25rpx; color: var(--muted); line-height: 1.7; margin-top: 10rpx; }
+
+/* 行动清单 */
+.action-list { margin: 0 16px; display: flex; flex-direction: column;
+  background: var(--surface); border-radius: 14rpx; overflow: hidden; }
+.al-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 20rpx 24rpx;
+  border-bottom: 1rpx solid var(--line); }
+.al-item:last-child { border-bottom: none; }
+.al-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: var(--teal);
+  flex-shrink: 0; margin-top: 14rpx; }
+.al-text { flex: 1; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+
+/* actionbar 双按钮配比 */
+.flex-1-4 { flex: 1.4; }

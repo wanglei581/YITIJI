@@ -1,0 +1,88 @@
+<!--pages/orders/orders.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">打印订单</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="seg">
+    <view
+      class="s {{activeTab === item.key ? 'on' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="setTab"
+    >{{item.label}}</view>
+  </view>
+
+  <view class="content has-bar ord-content">
+
+    <block wx:if="{{!isLoggedIn}}">
+      <view class="card">
+        <view class="empty-slot">
+          <text class="ficon i-user es-ic"></text>
+          <view class="es-t">请先登录小程序</view>
+          <view class="es-d">登录后可查看打印订单、取件码与实时出纸状态</view>
+          <button class="btn primary block" hover-class="tap-press" bindtap="toLogin">去登录</button>
+        </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{filtered.length}}">
+      <view class="ord-card" wx:for="{{filtered}}" wx:key="id">
+        <view class="oc-top">
+          <view class="oc-store">
+            <text class="ficon i-location oc-store-ic"></text>
+            <text>{{item.store}}</text>
+          </view>
+          <view class="chip {{item.statusTone}}">{{item.statusLabel}}</view>
+        </view>
+        <view class="oc-body">
+          <view class="oc-thumb"><text class="ficon i-file-text"></text></view>
+          <view class="oc-info">
+            <view class="oc-title">{{item.title}}</view>
+            <view class="oc-spec">{{item.spec}}</view>
+          </view>
+        </view>
+        <view class="pk-strip" wx:if="{{item.status === 'waiting'}}">
+          <view class="pk-label">取件码</view>
+          <view class="pk-code">{{item.pickup}}</view>
+          <view class="pk-hint">到店后在一体机输入取件码</view>
+        </view>
+        <view class="oc-foot">
+          <view class="oc-price">{{item.price}}</view>
+          <view class="oc-btns">
+            <view class="oc-btn tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="detail">订单详情</view>
+            <view wx:if="{{item.action}}" class="oc-btn pri tap" hover-class="tap-press" data-id="{{item.id}}" bindtap="primary">{{item.actionLabel}}</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <view class="card" wx:else>
+      <view class="empty-slot">
+        <text class="ficon i-printer es-ic"></text>
+        <view class="es-t">暂无订单</view>
+        <view class="es-d">发起打印后可在此查看取件码与出纸状态</view>
+      </view>
+    </view>
+
+    <view class="compliance-note">
+      订单状态实时同步终端设备。取件前请确认设备在线、纸张与耗材充足。
+    </view>
+
+  </view>
+
+  <view class="actionbar">
+    <view wx:if="{{isLoggedIn}}" class="btn primary block" hover-class="tap-press" bindtap="toPrint">去打印文件</view>
+    <view wx:else class="btn primary block" hover-class="tap-press" bindtap="toLogin">微信一键登录</view>
+  </view>
+
+</view>

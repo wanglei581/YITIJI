@@ -1,0 +1,69 @@
+<!--pages/browse-history/browse-history.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">浏览与跳转记录</view>
+      <view class="nav-right tap" hover-class="tap-press" bindtap="clear">
+        <text class="nav-caps">清空</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <view class="filter-bar">
+      <view
+        class="f-chip {{activeFilter === item.key ? 'on' : ''}}"
+        wx:for="{{filters}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="setFilter"
+      >{{item.label}}</view>
+    </view>
+
+    <block wx:if="{{groups.length}}">
+      <view class="card" wx:for="{{groups}}" wx:key="day" wx:for-item="g">
+        <view class="hs-day">{{g.day}}</view>
+        <view
+          class="hs-item tap"
+          wx:for="{{g.items}}"
+          wx:key="rid"
+          wx:for-item="hs"
+          hover-class="tap-press"
+          data-id="{{hs.id}}"
+          data-type="{{hs.type}}"
+          bindtap="openItem"
+        >
+          <view class="hs-ic tone-{{hs.tone}}"><text class="ficon {{hs.icon}}"></text></view>
+          <view class="hs-body">
+            <view class="hs-t">{{hs.title}}</view>
+            <view class="hs-sub">
+              <text class="act-tag {{hs.act === 'jump' ? 'at-jump' : 'at-view'}}">{{hs.actLabel}}</text>
+              <text class="hs-src">来源:{{hs.source}}</text>
+            </view>
+          </view>
+          <view class="hs-time">{{hs.time}}</view>
+        </view>
+      </view>
+    </block>
+
+    <view class="card" wx:else>
+      <view class="empty-slot">
+        <text class="ficon i-history es-ic"></text>
+        <view class="es-t">暂无浏览记录</view>
+        <view class="es-d">浏览岗位、招聘会、企业与政策后可在此回看</view>
+      </view>
+    </view>
+
+    <view class="compliance-note">
+      仅记录你的浏览与打开来源平台 / 官方入口的行为,不记录任何投递或预约结果。相关操作均在来源平台完成。
+    </view>
+
+  </view>
+
+</view>

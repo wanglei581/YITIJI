@@ -1,0 +1,41 @@
+<!--pages/usb-import/usb-import.wxml  P16 U盘打印指引-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">U盘打印指引</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="content">
+    <view class="usb-hero rise-d1">
+      <view class="usb-ic">🔌</view>
+      <view class="usb-title">U盘打印在一体机上操作</view>
+      <view class="usb-sub">手机无法直接读取 U盘，请携带 U盘到附近终端，按以下步骤在一体机上完成打印。</view>
+    </view>
+
+    <view class="section-t rise-d2">操作步骤</view>
+    <view class="card rise-d2">
+      <view class="guide-step" wx:for="{{steps}}" wx:key="n">
+        <view class="gs-n">{{item.n}}</view>
+        <view class="gs-body">
+          <view class="gs-t">{{item.title}}</view>
+          <view class="gs-d">{{item.desc}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-t rise-d3">支持的文件格式</view>
+    <view class="card flat rise-d3">
+      <view class="fmt-chips">
+        <view class="chip" wx:for="{{formats}}" wx:key="*this">{{item}}</view>
+      </view>
+    </view>
+
+    <view class="notice info rise-d4">
+      <text class="ficon i-info n-ic"></text>
+      <text>需要先在手机准备文件时，可返回打印服务并从「我的文档」选择本人已上传文件。</text>
+    </view>
+
+  </view>
+</view>

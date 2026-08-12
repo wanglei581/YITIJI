@@ -129,6 +129,36 @@ export const SCENE_DEFAULT_MODULES: Record<SceneTemplate, EnabledModule[]> = {
 }
 
 // ============================================================
+// 机构类型 → 场景模板（服务端 ORG_TYPE_MATRIX 的只读投影）
+//
+// ⚠️ 2026-08-11 新增。这不是"建议值"，而是**严格 1:1 的硬约束**：
+// 服务端 `admin-orgs.service.ts` 的 ORG_TYPE_MATRIX 为每个机构类型指定了唯一场景模板，
+// 组合不符会直接抛 ORG_TYPE_MATRIX_VIOLATION。
+//
+// 新增本常量的原因：Admin 建机构 UI 此前把场景模板做成自由下拉框，
+// 导致 ① 新建默认组合（人社 + 空场景）必被服务端拒绝；
+//     ② 编辑时选"未设置"写成 undefined、JSON 省略字段，服务端保留旧值，UI 改不动。
+// 两个 bug 同源——**场景本就不该由人选**。
+//
+// 维护约定：本常量必须与服务端 ORG_TYPE_MATRIX 保持同步。
+// 服务端校验是唯一权威，本常量只用于前端自动带出与展示，**不替代服务端校验**。
+// null 表示该类型为 source-only（纯内容供给方，不拥有终端场景）。
+// ============================================================
+
+export const ORG_TYPE_SCENE_TEMPLATE: Record<PartnerType, SceneTemplate | null> = {
+  school_employment_center:  'school',
+  public_employment_service: 'public_employment',
+  licensed_hr_agency:        'licensed_hr_service',
+  fair_organizer:            null,
+  enterprise_source:         null,
+}
+
+/** 该机构类型是否为 source-only（不拥有终端场景，只供给内容） */
+export function isSourceOnlyOrgType(type: PartnerType): boolean {
+  return ORG_TYPE_SCENE_TEMPLATE[type] === null
+}
+
+// ============================================================
 // 展示标签（供前端组件直接使用，避免各端重复定义）
 // ============================================================
 

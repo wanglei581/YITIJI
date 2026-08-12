@@ -40,6 +40,9 @@ services/**/.env.bak-*
 *.swp
 *.swo
 
+# WeChat DevTools local machine state (generated when importing the miniapp)
+apps/miniapp/project.private.config.json
+
 # OS
 .DS_Store
 Thumbs.db

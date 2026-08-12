@@ -121,9 +121,34 @@ body.capture .stage { border-radius: 0; box-shadow: none; }
   background: var(--chrome-top);
   backdrop-filter: blur(14px);
 }
-.brand { display: flex; align-items: center; gap: var(--s-4); }
+/* ---------- 返回上一级：一体机没有浏览器后退键，每个非首页页面必须自带 ----------
+   触控 ≥64px；去向是该页的上一级（域首屏或所属页），不是笼统回首页。 */
+.backbtn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 10px;
+  min-height: 64px; padding: 0 var(--s-4);
+  margin-right: var(--s-2); white-space: nowrap;
+  border-radius: var(--r-md); text-decoration: none;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800);
+  font-family: var(--ff-ui); font-size: var(--fz-3); cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.backbtn .ic { width: 22px; height: 22px; color: var(--fog-700); }
+.backbtn:hover { border-color: var(--jade-a32); transform: translateX(-2px); }
+.backbtn:active { transform: translateX(-2px) scale(.98); }
+.backbtn-t { line-height: 1; }
+.backbtn-t { font-size: var(--fz-2); }
+/* 操作栏版：一体机竖屏立式安装时顶部约 1.9m 高，左上角要抬手够；
+   底部两角才在手自然抬起的高度。左角返回 / 右角主操作。 */
+.actionbar > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
+.brand { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
 .brand-mark {
-  width: 52px; height: 52px; border-radius: 15px;
+  width: 52px; height: 52px; border-radius: 15px; flex: 0 0 auto;
   background: linear-gradient(148deg, var(--jade-400), var(--jade-700) 78%);
   box-shadow: var(--sh-jade), var(--glass-hi);
   display: grid; place-items: center;
@@ -137,10 +162,12 @@ body.capture .stage { border-radius: 0; box-shadow: none; }
   animation: sheen 6.5s var(--ease-in-out) infinite;
 }
 @keyframes sheen { 0%, 72% { transform: translateX(-120%); } 88%, 100% { transform: translateX(130%); } }
-.brand-name { font-family: var(--ff-display); font-size: var(--fz-7); letter-spacing: .06em; color: var(--fog-900); line-height: 1.1; }
-.brand-sub { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .04em; margin-top: 3px; }
+.brand-name { font-family: var(--ff-display); font-size: var(--fz-7); letter-spacing: .06em; color: var(--fog-900); line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .04em; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-spacer { flex: 1; }
-.clock { font-family: var(--ff-num); font-size: var(--fz-4); color: var(--fog-700); letter-spacing: .04em; }
+.clock { font-family: var(--ff-num); font-size: var(--fz-4); color: var(--fog-700); letter-spacing: .04em;  white-space: nowrap;}
 .clock b { color: var(--fog-900); font-weight: 600; }
 
 /* ---------- 主体：唯一滚动容器 ---------- */

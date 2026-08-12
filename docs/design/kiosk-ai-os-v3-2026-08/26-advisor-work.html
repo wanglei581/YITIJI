@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
 <style>
 /* ── P26 专用 ───────────────────────────────────────────────────────────
    九个能力共用一个作业面，只有三种作业型：
@@ -64,6 +66,19 @@
 /* A 问答型 */
 .chat { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
         gap:var(--s-4); padding-bottom:var(--s-4); }
+/* ── 2026-08-11 卡内空洞整改 ─────────────────────────────────────────
+   sA 的对话卡实测高 1256px、最后一条消息之后空 536px（四态皆然）。
+   成因不是缺内容 —— 是对话贴着卡顶往下排，短对话就把一大片空留在下方，
+   而下方正是眼睛落点（紧挨着操作栏的「打印钉住的 2 条」）。
+   改成从底部往上堆：这是聊天界面的通行排法（消息少时贴底，多了自然向上滚）。
+   用首条 margin-top:auto 而不是 justify-content:flex-end —— 后者在
+   overflow:auto 的容器里会让溢出的顶部滚不到，是已知的 flexbox 坑。 */
+.chat > .msg:first-child { margin-top:auto; }
+
+/* B 填槽型：四问 + 成稿 + 提醒，末尾空 232px。这里不是对话，贴底反而怪；
+   改成四个问题按余量摊开 —— 站着填表时行距大一点本来就该。 */
+.slots { flex:1 1 auto; }
+.slots > .slot { flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; }
 .msg { display:flex; gap:var(--s-4); align-items:flex-start; }
 .msg-av { width:32px; height:32px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
           background:var(--fog-a08); }
@@ -165,6 +180,7 @@
       <!-- 型标识条：常驻。说清为什么是这个型，且能换 -->
       <div class="modebar" data-at="sC">
         <span class="mb-tag-status">比对型</span>
+        <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
         <span class="mb-txt">你说的是「<b>我够不够格</b>」——
           有明确的两样东西要放一起看，所以按比对型办。</span>
         <span class="mb-sw">
@@ -174,6 +190,7 @@
       </div>
       <div class="modebar" data-at="sB">
         <span class="mb-tag-status">填槽型</span>
+        <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
         <span class="mb-txt">你说的是「<b>我不会写</b>」——
           东西还不存在，得先问出来，所以按填槽型办。</span>
         <span class="mb-sw">
@@ -183,6 +200,7 @@
       </div>
       <div class="modebar" data-at="sA">
         <span class="mb-tag-status">问答型</span>
+        <span class="ev ev--e3">E3 AI 生成 · 仅供参考</span>
         <span class="mb-txt">你问的是一个<b>拿不准的判断</b>，没有现成的两样东西可比 ——
           所以按问答型办。</span>
         <span class="mb-sw">
@@ -254,7 +272,7 @@
           <span class="mt" data-when="ai-down">AI 不可用 · 停在第 3 问，已答的还在</span>
         </div>
 
-        <div class="sec" style="overflow-y:auto">
+        <div class="sec" style="overflow-y:auto;display:flex;flex-direction:column;flex:1 1 auto;min-height:0">
           <div class="slots">
             <div class="slot">
               <span class="slot-q">1 · 你现在做什么，做了多久？</span>
@@ -269,8 +287,7 @@
             <div class="slot slot--now">
               <span class="slot-q">3 · 你为什么想投这个岗？</span>
               <span class="slot-why">
-                自我介绍最后一句要落到「所以我想做什么」，否则听完不知道你要什么 ——
-                这是你上次面试练习里被标出的同一个缺口。
+                自我介绍最后一句要落到「所以我想做什么」，否则听完不知道你要什么。
               </span>
               <span class="slot-a">
                 想做<span class="blank">　　　　</span>方向，因为<span class="blank">　　　　　　</span>。
@@ -300,8 +317,7 @@
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
             <span><b>空着的地方她不会替你编。</b>
-                  数字、公司名、时间、离职原因这类只有你知道的事，一律留空 ——
-                  编出来你面试时答不上，比空着更糟。</span>
+                  数字、公司名、时间、离职原因一律留空 —— 编出来你面试时答不上。</span>
           </div>
         </div>
       </div>
@@ -354,6 +370,48 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界与「她不会替你编什么」的口径 / 三种作业型的解释 /
+                     证据分级与出处口径 / 隐私（对话不保存）/ 产物去向与费用 / AI 离线降级说明。
+           **没有**收进来（必须常驻）：逐条结论旁的证据徽章与出处标注（AIGC 标识）、
+           「数字、公司名、时间、离职原因一律留空」这张事实表、当前状态提示。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界&nbsp;· <b>不替你编内容</b>&nbsp;· 出处与隐私</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：她不会替你编什么</div>
+            <p class="nb-p">数字、公司名、时间、离职原因、证书资质<b>一律留空</b>——这些只有你知道，<b>编出来你面试时答不上，比空着更糟</b>，面试官追问细节的第一句就会露。她做的是<b>把你说的话顺成书面表达</b>，不是替你想内容：你随口说的口语，她会帮你改成能念出口的句子。</p>
+            <p class="nb-p">本机<b>不代收简历、不做平台内投递</b>，也不预测录用结果、不承诺薪资。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-layers"/></svg>三种作业型是怎么定的</div>
+            <p class="nb-p"><b>型由你的问题决定，不用你选。</b>比对型摆开逐条对（「够不够格」），填槽型一问一答替你补齐（「我不会写」），问答型直接给结论和依据（拿不准就直接问）。方案里每一步到了对应工作台<b>还要你自己确认</b>；不按这个顺序办，也不影响已完成的部分。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-check"/></svg>比对口径与证据分级</div>
+            <p class="nb-p">比的是<b>有没有写到</b>，不是<b>写得好不好</b>——后者要懂这一行的人才看得出来，<b>本机没有依据，所以不比</b>。「没写到」的那几条如果你其实做过，那是<b>简历漏写</b>，补上再重跑，结果会变。</p>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你说过的话与你的材料。<span class="nb-e nb-e--2">E2</span> 本机读到的岗位正文等来源事实。<span class="nb-e nb-e--3">E3</span> AI 的判断与建议，仅供参考。答案的出处不一样、可信度就不一样，所以页面上每条都带出处，<b>打印时也会带上，让你自己能分辨哪条更可信</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 对话保存口径</div>
+            <p class="nb-p">对话<b>不保存</b>；只有你主动钉住的条目会带进后续步骤。你的材料与回答只用于生成你自己的东西，<b>不发送企业、不沉淀到任何库</b>；未登录时离场即清。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">这里产出的方案、改写与清单会进「我的简历 / 我的文档」，可以拿去打印。顾问服务<b>不收费</b>，<b>只有出纸收费</b>，核价、支付与取件都在打印工作台完成。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">顾问作业依赖 AI：AI 不可用时这一页不给新结论，已钉住与已生成的内容不受影响，可以照常打印或存档。打印机离线时不出纸，可先存进「我的文档」，换一台在线的机器再打。当前状态以顶栏为准。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -364,9 +422,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>型是怎么定的</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            <b>型由你的问题决定，不用你选。</b><br><br>
-            你不知道"填槽型"是什么意思，也不该知道 ——
-            那是我们内部怎么实现的，不是你要操心的事。
+            <b>型由你的问题决定，不用你选。</b>
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">「够不够格」</span><span class="v">比对型</span></div>
@@ -375,6 +431,13 @@
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">
             <b>判错了顶部能一键换</b>，换的时候<b>已填的内容不丢</b>。
+          </div>
+          <!-- 入链说明（2026-08-10）：本页此前零入口，是 38 页里唯一的业务孤页。
+               现在的唯一产品入口写在这里，和 P25 右栏那一条对上，避免用户
+               「进来了却不知道自己在哪、也不知道怎么回去」。 -->
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这一页从 <b>AI 顾问 → 右栏「让她直接开工 · 顾问作业面」</b>进来。<br>
+            回去接着问：点左下<b>「返回 · AI 顾问」</b>或操作栏上的<b>「回去问别的」</b>。
           </div>
         </div>
       </div>
@@ -399,9 +462,7 @@
           <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="09-resume-workbench.html">
             <svg class="ic"><use href="#i-check"/></svg>按这个方案办 · 先去第 1 步
           </a>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            每一步到了对应工作台还要你自己确认；不按这个顺序办，也不影响已完成的部分。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">每一步到了对应工作台还要你自己确认。</div>
         </div>
       </div>
 
@@ -419,8 +480,7 @@
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>比的是<b>有没有写到</b>，不是<b>写得好不好</b>。<br>
-                  后者要懂这一行的人才看得出来，本机没有依据，所以不比。</span>
+            <span>比的是<b>有没有写到</b>，不是<b>写得好不好</b>。</span>
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
@@ -450,7 +510,6 @@
 
           <div class="panel-note" style="margin-top:var(--s-4)">
             她做的是<b>把你说的话顺成书面表达</b>，不是替你想内容。
-            你随口说的口语，她会帮你改成能念出口的句子。
           </div>
 
           <div class="notice" style="margin-top:var(--s-4)">
@@ -490,9 +549,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
-            小青干活的地方。<b>怎么干由你的问题决定</b> ——
-            要比就摆一起比，不会写就一问一答，拿不准就直接答。<br>
-            判错了顶部能一键换。
+            小青干活的地方。<b>怎么干由你的问题决定</b>。
           </div>
         </div>
       </div>
@@ -502,6 +559,8 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="25-advisor.html" data-parent-label="AI 顾问"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 顾问</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--lg btn--ghost" data-at="sC sB sA" href="25-advisor.html">回去问别的</a>
 
     <span class="actionbar-hint" data-at="sC" data-when="default first">7 条要求 · 你写到 3 条 · 2 条可能是漏写</span>
@@ -512,14 +571,14 @@
 
     <a class="btn btn--primary" data-at="sC" data-when="default first ai-down" href="09-resume-workbench.html">去简历里补这 2 条<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="sB" data-when="default first">答第 3 问<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="sB" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印已完成的部分 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
-    <a class="btn btn--primary" data-at="sA" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印钉住的 2 条 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="sB" data-when="ai-down" href="06-print-workbench.html?stage=s3&amp;from=P26&amp;kind=material&amp;title=顾问已完成的部分&amp;back=sB">打印已完成的部分 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="sA" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P26&amp;kind=material&amp;title=顾问钉住的%202%20条&amp;back=sA">打印钉住的 2 条 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="sC sB sA" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -527,10 +586,13 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/notebar.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

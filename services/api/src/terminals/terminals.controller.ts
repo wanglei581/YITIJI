@@ -74,6 +74,13 @@ export class TerminalsController {
   }
 
   // ── 3. Claim tasks ───────────────────────────────────────────────────────
+  // GET /api/v1/terminals/public — 小程序只读安全服务点目录。
+  @Get('terminals/public')
+  @HttpCode(HttpStatus.OK)
+  listPublicTerminals() {
+    return this.terminalsService.listPublicTerminals()
+  }
+
   // GET /api/v1/terminals/:terminalId/config
   @Get('terminals/:terminalId/config')
   @HttpCode(HttpStatus.OK)

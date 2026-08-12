@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>岗位信息源（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">这就是产品所有者点名「混乱」的那一组</span>
+    <b>原话：「岗位信息和数据内容里面的这些功能应该大概率是不匹配的，功能和接口都是混乱的，不知道哪个应该对接哪个。」</b><br>
+    诊断属实。这一组 7 个页面（岗位信息源 / 招聘会信息源 / 政策信息源 / 招聘会管理 / 企业展示管理 / Excel导入记录 / 数据接入通道）
+    存在两处结构性错配：
+    <b>① 「信息源」做审核、「管理」做内容，但界面上从不互相说明</b>——
+    运营点进「招聘会信息源」以为能改场次，点进「招聘会管理」又找不到审核按钮；
+    <b>② Excel导入记录 与 数据接入通道 是同一件事的两半</b>（都是「内容怎么进来」），却分成两个菜单项。
+    <br>本页演示<b>改法一：把职责和去向写在界面上</b>。
+  </div>
+
+  <!-- 页头：核心改造点 —— 副标题写清职责与去向 -->
+  <div class="pagehead">
+    <div>
+      <h1>岗位信息源</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页<b>只做审核</b>。通过并发布后，岗位会出现在一体机的
+        <a href="#">「岗位信息」列表与岗位详情页</a>（前台 P13 / P14）。
+        <b>要改岗位内容</b>，请去 <a href="#">合作机构后台 · 岗位信息管理</a> 或 <a href="#">数据接入通道</a>。
+      </p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">看终端效果</button>
+      <button class="btn btn--sm">导出待审清单</button>
+    </div>
+  </div>
+
+  <div class="proto">
+    <span class="proto__tag">为什么这句话必须写在界面上</span>
+    产品所有者要求「<b>要让客户知道每个功能是干什么的，对应的是前端用户界面里面的哪些页面哪些功能</b>」。
+    做法不是写帮助文档，而是<b>页头副标题做常驻文案</b>：一句话说清
+    ① 本页管什么（只做审核）② 结果出现在前台哪里（P13/P14）③ 相邻职责在哪（改内容去哪）。
+    <b>47 个后台页都要有这句话</b>，文案清单见对应总表。
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- 数据流可视化 -->
+  <div class="card isnew" data-newtag="新增 · 数据流说明" data-when="default" style="margin-bottom:16px">
+    <div class="card__body">
+      <div class="row row--wrap" style="gap:0;align-items:stretch">
+        <div style="flex:1;padding:12px 14px;background:var(--n-50);border-radius:10px 0 0 10px;border:1px solid var(--n-200)">
+          <div class="small muted">① 内容怎么进来</div>
+          <div class="strong small" style="margin-top:4px">机构导入 / API 同步 / Webhook</div>
+          <div class="cellsub">Partner 岗位管理 · 数据接入通道</div>
+        </div>
+        <div style="display:grid;place-items:center;padding:0 8px;color:var(--n-400)">→</div>
+        <div style="flex:1;padding:12px 14px;background:var(--p-50);border-radius:10px;border:2px solid var(--p-500)">
+          <div class="small" style="color:var(--p-700)">② 本页：审核</div>
+          <div class="strong small" style="margin-top:4px">pending → reviewing → approved / rejected</div>
+          <div class="cellsub">审核不通过会带理由回到机构侧</div>
+        </div>
+        <div style="display:grid;place-items:center;padding:0 8px;color:var(--n-400)">→</div>
+        <div style="flex:1;padding:12px 14px;background:var(--n-50);border:1px solid var(--n-200)">
+          <div class="small muted">③ 发布</div>
+          <div class="strong small" style="margin-top:4px">draft → published</div>
+          <div class="cellsub">审核通过 ≠ 已发布，是两个独立状态</div>
+        </div>
+        <div style="display:grid;place-items:center;padding:0 8px;color:var(--n-400)">→</div>
+        <div style="flex:1;padding:12px 14px;background:var(--info-bg);border-radius:0 10px 10px 0;border:1px solid #c6d9ea">
+          <div class="small" style="color:var(--info-fg)">④ 用户看到</div>
+          <div class="strong small" style="margin-top:4px">一体机「岗位信息」P13 → 详情 P14</div>
+          <div class="cellsub">求职者<b>扫码去来源平台投递</b>，平台不代收简历</div>
+        </div>
+      </div>
+      <div class="small muted" style="margin-top:12px">
+        <b>关键口径</b>：<code>reviewStatus</code>（审核）与 <code>publishStatus</code>（发布）<b>是解耦的两个字段</b>。
+        审核通过的内容仍可能是 draft 不可见；下架只改发布状态，不退回审核状态。
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 预审 -->
+  <div class="advice isnew" data-newtag="新增 · AI 预审排序" data-when="default">
+    <div class="advice__head"><span class="tag tag--ai">AI 预审</span>
+      <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+      <b>28 条待审里，有 5 条建议优先看</b></div>
+    <div class="advice__action">先处理 1 条疑似歧视表述的岗位，它已在终端曝光 40 分钟。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        该岗位标题含「限女性，25岁以下」（<span class="ev ev--3">E3</span> 模型判定，需人工确认）；
+        另有 4 条薪资区间跨度超过 5 倍（<span class="ev ev--1">E1</span> 规则实测）。</span></div>
+      <div class="advice__item"><b>代价</b><span>处理这 5 条约 3 分钟；其余 23 条低风险，可批量通过。</span></div>
+      <div class="advice__item"><b>备选</b><span>只驳回歧视那 1 条，薪资异常的 4 条改为「要求机构补充说明」。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">按风险分排序</button>
+      <button class="btn btn--sm">只看高风险 5 条</button>
+      <button class="btn btn--sm btn--ghost">批量通过低风险 23 条</button>
+      <span class="small muted">AI 判断，仅供参考——最终审核结论由人做</span>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown" style="margin-top:16px">
+    <div class="card__head">
+      <h3>待审核岗位</h3><span class="sub">28 条</span>
+      <div class="right">
+        <select class="select" style="width:auto;padding:6px 10px"><option>待审核</option><option>审核中</option><option>已通过</option><option>已驳回</option></select>
+        <span class="isnew" data-newtag="新增" style="display:inline-block">
+          <select class="select" style="width:auto;padding:6px 10px"><option>按风险分排序</option><option>按提交时间</option></select>
+        </span>
+      </div>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="table__wrap">
+        <table class="table">
+          <thead><tr>
+            <th style="width:30px"><input type="checkbox"></th>
+            <th style="width:24%">岗位</th><th>来源机构</th><th>外部ID</th><th>同步时间</th>
+            <th>风险</th><th style="width:20%">操作</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">客服专员（限女性，25岁以下）</div><div class="cellsub">ZZ服务有限公司</div></td>
+              <td class="small">XX职业学院就业中心</td><td class="mono small">JOB-8823</td>
+              <td class="small">今天 09:40</td>
+              <td><span class="ev ev--3">E3</span> <span class="tag tag--err">疑似歧视</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm btn--danger">驳回</button>
+                <button class="btn btn--sm">要求补充</button></div></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td><div class="cellmain">行政专员</div><div class="cellsub">XX科技有限公司</div></td>
+              <td class="small">XX职业学院就业中心</td><td class="mono small">JOB-8815</td>
+              <td class="small">今天 09:12</td>
+              <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">薪资跨度 50x</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm">要求补充</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">软件测试工程师</div><div class="cellsub">XX科技有限公司</div></td>
+              <td class="small">XX职业学院就业中心</td><td class="mono small">JOB-8821</td>
+              <td class="small">今天 08:55</td>
+              <td><span class="tag tag--ok">低风险</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm btn--primary">通过</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+            <tr>
+              <td><input type="checkbox" checked></td>
+              <td><div class="cellmain">仓库管理员</div><div class="cellsub">YY商贸集团</div></td>
+              <td class="small">市人才服务中心</td><td class="mono small">JOB-7702</td>
+              <td class="small">昨天 16:30</td>
+              <td><span class="tag tag--ok">低风险</span></td>
+              <td><div class="pill-list">
+                <button class="btn btn--sm btn--primary">通过</button>
+                <button class="btn btn--sm btn--ghost">详情</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card__foot">
+      <div class="row">
+        <span>已选 2 条</span>
+        <button class="btn btn--sm btn--primary">批量通过</button>
+        <button class="btn btn--sm">批量通过并发布</button>
+        <div class="spacer"></div>
+        <span class="small muted">
+          <b>风险详情放详情抽屉，不加独立列</b>——本表已 7 列，再加长文本会破坏可读性（Codex 复核）
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 详情抽屉 -->
+  <div class="drawer" data-when="default" style="margin-top:16px">
+    <div class="card__head">
+      <h3>客服专员（限女性，25岁以下）</h3>
+      <span class="tag tag--err">疑似歧视表述</span>
+      <div class="right">
+        <button class="btn btn--sm">在终端预览</button>
+        <button class="btn btn--sm">要求机构补充</button>
+        <button class="btn btn--sm btn--danger">驳回</button>
+      </div>
+    </div>
+    <div class="card__body">
+      <div class="grid grid--2">
+        <div class="stack">
+          <div class="card" style="background:var(--n-50);box-shadow:none">
+            <div class="card__body">
+              <b class="small serif">CLAUDE.md §10 要求的来源字段</b>
+              <dl class="kv" style="margin-top:10px">
+                <dt>来源机构</dt><dd>XX 职业学院就业指导中心</dd>
+                <dt>外部 ID</dt><dd class="mono">JOB-8823</dd>
+                <dt>来源平台</dt><dd class="mono small">https://example.edu.cn/jobs/8823</dd>
+                <dt>同步时间</dt><dd>2026-08-11 09:40</dd>
+                <dt>接入方式</dt><dd>手工录入（Partner 后台）</dd>
+                <dt>数据来源说明</dt><dd class="small">由该校就业中心提供，求职者通过来源平台投递</dd>
+              </dl>
+              <div class="hint" style="margin-top:10px">
+                这 6 项<b>前台详情页必须展示</b>——它们是「第三方来源信息入口」定位的证据，不是可选字段。
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card" style="border-color:#e6c5bc">
+            <div class="card__head"><h3>AI 预审详情</h3><span class="ev ev--3">E3</span></div>
+            <div class="card__body">
+              <div class="field" style="margin-bottom:12px">
+                <label>命中项</label>
+                <div class="pill-list">
+                  <span class="tag tag--err">性别限定「限女性」</span>
+                  <span class="tag tag--err">年龄限定「25岁以下」</span>
+                </div>
+              </div>
+              <div class="field" style="margin-bottom:12px">
+                <label>模型判断</label>
+                <div class="locked">岗位标题与要求中包含性别与年龄限定，属于就业歧视表述，
+建议驳回并要求机构改为客观岗位要求（如沟通能力、普通话水平）。</div>
+              </div>
+              <div class="proto proto--warn" style="margin:0">
+                <span class="proto__tag">红线</span>
+                <b>AI 只给判断依据，不替人做审核决定。</b>
+                驳回 / 通过必须由管理员点击，且落审计日志。
+                E3 输出必须带「AI 判断，仅供参考」。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空 / AI 不可用 / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">✓</div><h3>没有待审核的岗位</h3>
+      <p>所有提交的岗位都已处理完毕。新内容会在机构提交或数据源同步后出现在这里。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn">看已通过的</button><button class="btn">去数据接入通道</button></div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 预审暂时不可用</div>
+      <div class="degrade__body">
+        <b>审核工作照常进行</b>——列表、详情、通过、驳回、发布全部不依赖 AI。
+        暂时没有的是：风险分排序、疑似歧视表述提示（E3 那一档）。
+        <b>规则档（E1）仍然可用</b>：字段缺失、薪资区间异常、重复检测都是规则引擎，不调模型。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">按提交时间排序继续审</button>
+        <button class="btn btn--sm">只看规则命中的</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>待审列表加载失败</h3>
+      <p>无法读取（<code>GET /admin/jobs?reviewStatus=pending</code> 返回 500）。
+        已发布内容在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/job-sources</code>。核心改动是<b>页头副标题的常驻文案</b>与 AI 预审排序。</li>
+      <li><b>风险详情进抽屉不进列</b>：本表已 7 列，加长文本列会破坏可读性（Codex 复核）。</li>
+      <li>E1 规则档（字段/薪资/重复）与 E3 模型档（歧视表述）<b>分开标注</b>，AI 挂了 E1 照常。</li>
+      <li><b>AI 不替人做审核决定</b>：只给判断依据与排序，通过/驳回必须人工点击并落审计。</li>
+      <li>同样的改法适用于 <code>/fair-sources</code>（+时间冲突检测）与 <code>/policy-sources</code>（+时效性检测）；
+        三页可合并为「内容审核中心」3 Tab，但<b>只统一入口与状态词汇，不抽通用后端状态机</b>。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'job-sources'})</script>
+</body>
+</html>

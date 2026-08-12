@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P31 签约风险提示 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P31 签约风险提示">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=21">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
+<style>
+/* ── P31 专用 ── 签约风险提示（用户可见名不含「审查」）。
+   真实底盘：三步流程 + 状态机 + consent 快照 + PII 脱敏 + 安全门已实现，
+   但 Gate 0 六项发布门禁未过，production_default=false，报告端点 501。
+   所以 s0 = 本机真实锁定态（默认）；s1–s4 = 开放后流程示意（常驻横幅标明）；
+   faq = 常见签约问题静态参考，现在就真实可用。
+   固定免责条「仅作风险提示，不构成法律意见」钉在每阶段底部（.legalbar）。 */
+
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   本页主角：s0 = 本机真实门禁状态，faq = 现在真能用的 8 条。
+   右副列 348 → 280、页边 56 → 24，宽度还给门禁清单与条款卡
+   （主功能区占屏 41.3% → 50.4%）。同时删掉三处重复的免责声明
+   （s0 左、s0 右各写过一遍，与底部 .legalbar 同义）和两段解释设计意图的话
+   （「这台机器不拿你的合同当测试品」「为什么要逐条同意」的长篇理由）。 */
+.work { grid-template-columns: 1fr 280px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
+
+/* ── 内部治理信息折叠（2026-08-11）───────────────────────────────
+   门禁清单与 fail-closed / 报告端点这类工程状态不进用户可见区，
+   收进默认收起的折叠；评审要看，点开就在，内容一条未删。 */
+.gfold > summary {
+  list-style:none; cursor:pointer; min-height:var(--touch-min);
+  display:flex; align-items:center; gap:var(--s-3);
+}
+.gfold > summary::-webkit-details-marker { display:none; }
+.gfold > summary .t { font-size:var(--fz-3); font-weight:600; color:var(--fog-700); }
+.gfold > summary .s { font-family:var(--ff-num); font-size:var(--fz-1); color:var(--fog-600); }
+.gfold > summary::after {
+  content:'展开'; margin-left:auto; flex:0 0 auto;
+  font-size:var(--fz-1); color:var(--fog-600);
+  border:1px solid var(--brd-2); border-radius:var(--r-full); padding:4px 12px;
+}
+.gfold[open] > summary::after { content:'收起'; }
+.gfold:not([open]) .gfold-b { display:none; }
+
+/* 通用小节容器（本页自定，共享样式里没有 .sec 通用定义） */
+.sec { display:flex; flex-direction:column; gap:var(--s-3); }
+.pane--grow > .sec { flex:1 1 auto; min-height:0; overflow-y:auto; }
+.pane--grow { overflow:hidden; }
+
+/* 锁定态主视觉（P19/P27 同款口径：不是坏了，是门禁没过完） */
+.lockcard { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.lock-ic { width:64px; height:64px; border-radius:var(--r-md); display:grid; place-items:center;
+           background:var(--fog-a08); border:1px solid var(--fog-a12); }
+.lock-ic .ic { width:30px; height:30px; color:var(--fog-600); }
+.lock-t { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.lock-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.62; max-width:34em; } .lock-p b { color:var(--fog-900); }
+
+/* Gate 0 六项门禁清单：逐项 chip--info 待完成，不做假进度 */
+.gates { display:flex; flex-direction:column; }
+.gate { display:flex; align-items:center; gap:var(--s-4); min-height:54px; padding:4px 2px;
+        border-bottom:1px solid var(--surf-2); }
+.gate:last-child { border-bottom:0; }
+.gate-no { width:26px; height:26px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+           background:var(--fog-a08); border:1px solid var(--fog-a12);
+           font-family:var(--ff-num); font-size:12px; color:var(--fog-600); }
+.gate-b { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.gate-t { font-size:var(--fz-3); color:var(--fog-800); }
+.gate-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.45; }
+.gate .chip { margin-left:auto; flex:0 0 auto; }
+
+/* 预览横幅：s1–s4 常驻，不可关闭（同 P27 口径） */
+.previewbar { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.previewbar .ic { width:21px; height:21px; color:var(--amber-400); flex:0 0 auto; }
+.previewbar span { font-size:var(--fz-2); color:var(--amber-200); line-height:1.5; } .previewbar b { color:var(--fog-900); }
+
+/* 上传拖放区（示意，不出系统文件框） */
+.dropzone { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px;
+  padding:var(--s-6) var(--s-5); border-radius:var(--r-md); text-align:center;
+  border:1.5px dashed var(--fog-a20); background:var(--fog-a04); }
+.dropzone .ic { width:34px; height:34px; color:var(--fog-600); }
+.dz-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.dz-s { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.03em; }
+.dz-row { display:flex; gap:var(--s-3); margin-top:4px; }
+
+/* 五类型卡：2 列，「其他合同（通用）」整行并如实标注覆盖差异 */
+.ctypes { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
+.ctype { text-align:left; display:flex; flex-direction:column; gap:4px; cursor:pointer;
+  padding:var(--s-4); border-radius:var(--r-sm); font-family:var(--ff-ui);
+  background:var(--surf-1); border:1px solid var(--brd-2); min-height:var(--touch-min); }
+.ctype[aria-pressed="true"] { border-color:var(--jade-500); background:var(--jade-a12); }
+.ctype--wide { grid-column:1 / -1; }
+.ctype-t { display:flex; align-items:center; gap:8px; font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.ctype-t .ic { width:18px; height:18px; color:var(--fog-600); flex:0 0 auto; }
+.ctype-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.ctype-warn { font-size:var(--fz-1); color:var(--amber-200); line-height:1.5; }
+
+/* 范围 chips：随所选类型切换（专项 14 类条款 / 通用八维度） */
+.scopes { display:flex; flex-wrap:wrap; gap:8px; }
+.scope-hd { font-size:var(--fz-2); color:var(--fog-700); }
+.scope-hd b { color:var(--fog-900); }
+
+/* 知情同意五项：逐条大触区 checkbox */
+.consent { display:flex; flex-direction:column; }
+.crow { display:flex; align-items:flex-start; gap:var(--s-4); min-height:56px; padding:9px 2px;
+        cursor:pointer; border-bottom:1px solid var(--surf-2); }
+.crow:last-child { border-bottom:0; }
+.crow input { width:24px; height:24px; margin-top:3px; flex:0 0 auto; accent-color:var(--jade-500); }
+.crow-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.crow-t { font-size:var(--fz-3); color:var(--fog-900); }
+.crow-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* s2 确认弹层卡（页数 / 质量 / 类型，请确认后才继续） */
+.confirm { border-radius:var(--r-md); padding:var(--s-5); display:flex; flex-direction:column; gap:var(--s-3);
+  background:var(--azure-a12); border:1px solid var(--azure-a20); }
+.confirm-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+.confirm-facts { display:flex; flex-wrap:wrap; gap:8px; }
+.confirm-row { display:flex; gap:var(--s-3); flex-wrap:wrap; margin-top:2px; }
+
+/* s3 FindingCard：原文摘录(页码)→说明→依据→局限→追问 */
+.fsec { display:flex; align-items:center; gap:10px; margin-top:2px; }
+.fsec-dot { width:10px; height:10px; border-radius:50%; flex:0 0 auto; }
+.fsec-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.fsec-s { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+.fcard { border:1px solid var(--brd-1); border-radius:var(--r-sm); background:var(--surf-1);
+  padding:var(--s-4) var(--s-5); display:flex; flex-direction:column; gap:8px; }
+.fcard--p { border-color:var(--coral-a20); }
+.fcard-hd { display:flex; align-items:center; gap:9px; }
+.fcard-t { font-size:var(--fz-3); font-weight:600; color:var(--fog-900); }
+.fcard-hd .ev { margin-left:auto; flex:0 0 auto; }
+.dimlab { display:inline-flex; align-items:center; height:22px; padding:0 8px; border-radius:6px;
+  font-size:11px; letter-spacing:.06em; color:var(--azure-200);
+  background:var(--azure-a12); border:1px solid var(--azure-a20); flex:0 0 auto; }
+.fq { border-left:3px solid var(--fog-a20); background:var(--fog-a04); border-radius:0 6px 6px 0;
+  padding:8px 12px; font-size:var(--fz-2); color:var(--fog-800); line-height:1.6; }
+.fq--none { border-left-color:var(--amber-a20); color:var(--fog-600); }
+.frow { display:flex; gap:9px; font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.frow .fk { flex:0 0 auto; color:var(--fog-600); }
+.frow b { color:var(--fog-900); }
+
+/* s4 报告：A4 × 3 缩略 */
+.minis { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-4); }
+.mini { display:flex; flex-direction:column; }
+.minis .sheet-a4 { padding:15px 13px; gap:5px;
+  box-shadow:0 10px 24px -12px rgba(0,0,0,.5), 0 1px 4px rgba(0,0,0,.25); }
+.minis .sheet-a4 h4 { font-size:12px; letter-spacing:.02em; }
+.minis .sheet-a4 .meta { font-size:8px; line-height:1.5; letter-spacing:.02em; }
+.minis .sheet-a4 .sec { font-size:8.5px; margin-top:2px; gap:0; display:block; }
+.minis .sheet-a4 .ln { height:5px; }
+.minis .sheet-a4 .pgno { right:10px; bottom:6px; font-size:8px; }
+.mini-cap { font-size:var(--fz-1); color:var(--fog-600); text-align:center; margin-top:7px; line-height:1.45; }
+.mdim { font-size:7.5px; color:var(--paper-fog); flex:0 0 auto; align-self:center;
+  border:1px solid var(--paper-200); border-radius:3px; padding:0 3px; }
+.mrow { display:flex; gap:5px; align-items:center; }
+
+/* faq：8 条静态卡列（不做自由输入） */
+.faqcard { border:1px solid var(--brd-1); border-radius:var(--r-sm); background:var(--surf-1);
+  padding:var(--s-4) var(--s-5); display:flex; flex-direction:column; gap:6px; }
+.faq-q { font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.faq-a { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; } .faq-a b { color:var(--fog-900); }
+.faq-m { display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+
+/* s0 右栏：常见签约问题预览行（真入口，点了去 faq 步） */
+.fprev { display:flex; align-items:center; gap:var(--s-3); min-height:52px; padding:6px 2px; cursor:pointer;
+  background:transparent; border:0; border-bottom:1px solid var(--surf-2); width:100%;
+  font-family:var(--ff-ui); text-align:left; }
+.fprev .ic { width:17px; height:17px; color:var(--fog-600); flex:0 0 auto; }
+.fprev-t { font-size:var(--fz-2); color:var(--fog-800); line-height:1.45; }
+.fprev .ic:last-child { margin-left:auto; }
+
+/* 固定免责条：钉每阶段底部（不参与 data-at 门控） */
+.legalbar { flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:9px var(--gutter); border-top:1px solid var(--brd-1); background:var(--surf-1); }
+.legalbar .ic { width:15px; height:15px; color:var(--fog-600); flex:0 0 auto; }
+.legalbar span { font-size:var(--fz-1); color:var(--fog-600); letter-spacing:.02em; }
+.legalbar b { color:var(--fog-700); font-weight:600; }
+
+.chip--info, .chip-static { cursor:inherit; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<!-- 离场确认（scripts/leaveguard.js）：本页**一个阶段都不拦**。
+     s0 是「签约风险提示暂未开放 · 当前不接收合同」的当前状态页，faq 是静态参考资料；
+     s1–s4 顶着常驻横幅「这是开放后的流程示意，不是本机当前状态」——
+     合同根本传不进来，也就没有提取结果、没有风险报告，用户手里不存在任何会丢的东西。
+     在示意流程上弹「离开就没了：你上传的合同」，等于假装本机已经在收合同了，
+     与本页从 s0 到页脚一路守的「未开放就说未开放」正好相反。
+     公共件先引进来：等这条链路真开放（页面里「报告端点」还标着未开放），
+     再按那时真实存在的产物补 data-guard-at / data-guard-lose-*，以及真实落点的 keep。 -->
+<div class="screen" data-state="default" data-stage="s0" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">签约风险提示</div>
+        <div class="brand-sub">职易达 · 01 号机 · 市人力资源市场 A 馆</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <!-- 2026-08-11：「门禁 0 / 6 项完成」是内部验收进度，用户看不懂也用不上。 -->
+    <div class="devpill" data-when="default first"><span class="dot"></span>功能暂未开放 · 当前不接收合同</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 不能发起新分析</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 报告可先存文档</div>
+    <div class="clock" data-clock>2026年8月10日 <b>11:20</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s0"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
+      <button class="rstep" data-go="s1"><span class="rstep-dot">2</span><span class="rstep-name">上传与知情</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">3</span><span class="rstep-name">提取与确认</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">4</span><span class="rstep-name">风险提示结果</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">5</span><span class="rstep-name">报告与打印</span></button>
+      <button class="rstep" data-go="faq"><span class="rstep-dot">6</span><span class="rstep-name">常见签约问题</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 6 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S0 本机当前状态（真实锁定态） ─────────── -->
+      <div class="pane" data-at="s0">
+        <div class="lockcard">
+          <span class="lock-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <div class="lock-t">签约风险提示暂未开放</div>
+          <!-- 2026-08-11 整改（产品所有者口径：说明太多把页面真正要做的事挤小了）：
+               用户可见区压成一句 —— 是什么、现在能不能用、现在能干什么。
+               「六道发布门禁」是内部验收清单，收进下面的折叠区。 -->
+          <div class="lock-p">
+            这项服务能把你的合同<b>逐条对照法律规定</b>，把值得核对的条款标出来。
+            <b>现在还不接收合同</b> —— 可以先看常见签约问题。
+          </div>
+        </div>
+      </div>
+
+      <!-- 内部发布门禁清单：产品化时不该出现在用户界面（allowlist、算法备案、
+           安全评估、AIGC 标识、法务黄金集都是内部验收项）。内容一条未删，
+           收进默认收起的折叠区，标明「内部发布门禁（评审用）」。 -->
+      <div class="pane" data-at="s0">
+        <details class="gfold">
+        <summary><span class="t">内部发布门禁（评审用）</span><span class="s">0 / 6</span></summary>
+        <div class="gfold-b">
+        <div class="gates">
+          <div class="gate"><span class="gate-no">1</span>
+            <span class="gate-b"><span class="gate-t">境内模型 allowlist</span>
+              <span class="gate-s">分析只允许走白名单里的境内备案模型，白名单未启用</span></span>
+            <span class="chip chip--info">待完成</span></div>
+          <div class="gate"><span class="gate-no">2</span>
+            <span class="gate-b"><span class="gate-t">算法备案</span>
+              <span class="gate-s">深度合成 / 生成式算法备案手续未完成</span></span>
+            <span class="chip chip--info">待完成</span></div>
+          <div class="gate"><span class="gate-no">3</span>
+            <span class="gate-b"><span class="gate-t">生成式 AI 安全评估</span>
+              <span class="gate-s">上线前安全评估未完成</span></span>
+            <span class="chip chip--info">待完成</span></div>
+          <div class="gate"><span class="gate-no">4</span>
+            <span class="gate-b"><span class="gate-t">AIGC 可见标识</span>
+              <span class="gate-s">页面与报告上「AI 生成」的可见标注，待验收</span></span>
+            <span class="chip chip--info">待完成</span></div>
+          <div class="gate"><span class="gate-no">5</span>
+            <span class="gate-b"><span class="gate-t">AIGC 元数据标识</span>
+              <span class="gate-s">输出文件内的隐式元数据标识，待验收</span></span>
+            <span class="chip chip--info">待完成</span></div>
+          <div class="gate"><span class="gate-no">6</span>
+            <span class="gate-b"><span class="gate-t">法务黄金集验收</span>
+              <span class="gate-s">法务准备的验收题集未跑通，跑通才算合格</span></span>
+            <span class="chip chip--info">待完成</span></div>
+        </div>
+        </div>
+        </details>
+      </div>
+
+      <!-- 原来这一块叫「为什么还不能用」，写的是"这台机器不拿你的合同当测试品"——
+           解释设计意图；底部那条免责与页脚 .legalbar 同义，全页第三遍。
+           改成本机此刻的事实与真正能用的那一步。 -->
+      <div class="pane pane--grow" data-at="s0">
+        <div class="pane-hd"><span class="t">现在这里能做什么</span></div>
+        <div class="sec">
+          <!-- 2026-08-11：原文再讲一遍「门禁没过完」，与上面那句重复；
+               保留「不假装给结果」这条不伪造能力的承诺，去掉门禁口径。 -->
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            这里<b>收不进合同、发不起分析</b>，
+            也不会假装分析给你一份看起来像样的结果。
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span>现在真能用的是<b>第 6 步 · 常见签约问题</b>：8 条静态法规参考，不依赖 AI。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── 示意横幅：s1–s4 常驻 ─────────── -->
+      <div class="previewbar" data-at="s1 s2 s3 s4">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <!-- 2026-08-11：去掉「六项门禁」这个内部口径，保留「不是当前状态、现在收不进合同」
+             这两条不伪造能力的事实，以及现在真能走的那条路。 -->
+        <span><b>这是开放后的流程示意，不是本机当前状态。</b>
+              现在<b>收不进合同、发不起分析</b>；第 6 步的常见签约问题现在就能看。</span>
+      </div>
+
+      <!-- ─────────── S1 上传与知情（示意） ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">把合同放进来</span><span class="s">示意</span></div>
+        <div class="dropzone" data-when="default first device-off">
+          <svg class="ic"><use href="#i-upload"/></svg>
+          <span class="dz-t">拖进来，或选一种方式上传</span>
+          <span class="dz-s">PDF / DOC / DOCX / 照片 · 单份 ≤ 20MB</span>
+          <div class="dz-row">
+            <button class="btn btn--ghost"><svg class="ic"><use href="#i-file"/></svg>本机选择文件</button>
+            <button class="btn btn--ghost"><svg class="ic"><use href="#i-qr"/></svg>手机扫码传</button>
+            <a class="btn btn--ghost" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>纸质合同去扫描</a>
+          </div>
+        </div>
+        <div class="locked" data-when="ai-down" style="padding:var(--s-6) var(--s-5)">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <b>AI 暂不可用，现在不能发起分析</b>
+          <p>合同分析整条链路都要用 AI，服务恢复前这里发不起新任务。<br>
+             之前已经生成的结果（第 4、5 步）仍然可以查看。</p>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><span class="t">选类型 · 看范围 · 逐条同意</span><span class="s">三件事都在这一步</span></div>
+        <div class="sec">
+
+          <div class="scope-hd"><b>这是哪种合同？</b>选对类型，核对得更准。</div>
+          <div class="ctypes">
+            <button class="ctype" data-ctype="labor" aria-pressed="true">
+              <span class="ctype-t"><svg class="ic"><use href="#i-briefcase"/></svg>劳动合同</span>
+              <span class="ctype-s">专项规则包 · 覆盖 14 类常见条款</span>
+            </button>
+            <button class="ctype" data-ctype="intern" aria-pressed="false">
+              <span class="ctype-t"><svg class="ic"><use href="#i-campus"/></svg>实习协议</span>
+              <span class="ctype-s">专项规则包 · 在校 / 毕业实习的常见坑</span>
+            </button>
+            <button class="ctype" data-ctype="noncompete" aria-pressed="false">
+              <span class="ctype-t"><svg class="ic"><use href="#i-shield"/></svg>竞业限制协议</span>
+              <span class="ctype-s">专项规则包 · 限制范围、期限与补偿</span>
+            </button>
+            <button class="ctype" data-ctype="offer" aria-pressed="false">
+              <span class="ctype-t"><svg class="ic"><use href="#i-card"/></svg>录用通知书</span>
+              <span class="ctype-s">专项规则包 · 与正式合同不一致时怎么看</span>
+            </button>
+            <button class="ctype ctype--wide" data-ctype="generic" aria-pressed="false">
+              <span class="ctype-t"><svg class="ic"><use href="#i-file"/></svg>其他合同（通用）</span>
+              <span class="ctype-s">不属于上面四类的合同，按八个通用维度逐一核对</span>
+              <span class="ctype-warn">通用维度覆盖较宽，针对性弱于专项类型；劳动相关的合同请优先选上面的专项类型。</span>
+            </button>
+          </div>
+
+          <div data-scope="special">
+            <div class="scope-hd" style="margin-bottom:8px">会核对的 <b>14 类条款</b>（专项规则包）</div>
+            <div class="scopes">
+              <span class="chip chip--info">试用期</span><span class="chip chip--info">工资与支付</span>
+              <span class="chip chip--info">工时与加班</span><span class="chip chip--info">社会保险</span>
+              <span class="chip chip--info">违约金</span><span class="chip chip--info">服务期</span>
+              <span class="chip chip--info">竞业限制</span><span class="chip chip--info">保密条款</span>
+              <span class="chip chip--info">解除与终止</span><span class="chip chip--info">经济补偿</span>
+              <span class="chip chip--info">工作内容与地点</span><span class="chip chip--info">押金与证件</span>
+              <span class="chip chip--info">劳动保护</span><span class="chip chip--info">争议处理</span>
+            </div>
+          </div>
+          <div data-scope="generic" hidden>
+            <div class="scope-hd" style="margin-bottom:8px">会核对的<b>八个通用维度</b>（其他合同）</div>
+            <div class="scopes">
+              <span class="chip chip--info">主体资格</span><span class="chip chip--info">合同期限</span>
+              <span class="chip chip--info">费用与支付</span><span class="chip chip--info">违约责任</span>
+              <span class="chip chip--info">解除与终止</span><span class="chip chip--info">争议解决</span>
+              <span class="chip chip--info">权利义务对等性</span><span class="chip chip--info">格式条款风险</span>
+            </div>
+          </div>
+
+          <div class="scope-hd" style="margin-top:6px"><b>知情同意 · 五项都看完、都勾了才能继续</b>，不设「全选」。</div>
+          <div class="consent">
+            <label class="crow"><input type="checkbox">
+              <span class="crow-b"><span class="crow-t">处理目的与方式</span>
+                <span class="crow-s">只为向你本人输出签约风险提示：逐条比对 + AI 分析。不用于其他任何用途。</span></span></label>
+            <label class="crow"><input type="checkbox">
+              <span class="crow-b"><span class="crow-t">处理的数据类别</span>
+                <span class="crow-s">合同文本，以及其中出现的个人信息。手机号、身份证号会在分析前先遮盖。</span></span></label>
+            <label class="crow"><input type="checkbox">
+              <span class="crow-b"><span class="crow-t">受托方与境内处理</span>
+                <span class="crow-s">分析由白名单内的境内备案模型服务完成，数据不出境、不进入模型训练。</span></span></label>
+            <label class="crow"><input type="checkbox">
+              <span class="crow-b"><span class="crow-t">保存期限</span>
+                <span class="crow-s">最长保存 2 小时；报告打印完成或你离场，文件与结果立即删除。</span></span></label>
+            <label class="crow"><input type="checkbox">
+              <span class="crow-b"><span class="crow-t">撤回与删除权</span>
+                <span class="crow-s">分析中的任何时刻都可以撤回同意、取消并删除全部数据，删除会留下日志。</span></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 提取与确认（示意） ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><span class="t">分析走到哪一步了</span><span class="s">只报阶段与页数 · 不报百分比</span></div>
+        <div class="tline">
+          <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="tl-b"><span class="tl-t">文字提取（OCR）</span>
+              <span class="tl-s">已完成 · 共 6 页 · 第 5 页识别质量偏低</span></span></div>
+          <div class="tl tl--now"><span class="tl-dot"><svg class="ic"><use href="#i-eye"/></svg></span>
+            <span class="tl-b"><span class="tl-t">页数与类型确认</span>
+              <span class="tl-s">等你确认下面这张卡</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-layers"/></svg></span>
+            <span class="tl-b"><span class="tl-t">规则引擎逐条比对</span>
+              <span class="tl-s">你确认之后才开始</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-brain"/></svg></span>
+            <span class="tl-b"><span class="tl-t">AI 风险分析</span>
+              <span class="tl-s">境内备案模型 · 脱敏后的文本才会进入</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <span class="tl-b"><span class="tl-t">输出安全门</span>
+              <span class="tl-s">过滤越界表述，过了这道门结果才上屏</span></span></div>
+        </div>
+        <div class="panel-note" style="margin-top:var(--s-3)">
+          不显示百分比 —— 报到哪个阶段就是哪个阶段。
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><span class="t">请你确认</span><span class="s">确认前不往下走</span></div>
+        <div class="sec">
+          <div class="confirm">
+            <div class="confirm-t">读到的是这样一份文件 —— 对吗？</div>
+            <div class="confirm-facts">
+              <span class="chip chip--info">共 6 页</span>
+              <span class="chip chip--amber chip-static">识别质量 · 中</span>
+              <span class="chip chip--info">类型 · 劳动合同</span>
+            </div>
+            <div class="confirm-row">
+              <button class="btn btn--primary" data-go="s3">没错，继续分析</button>
+              <button class="btn btn--ghost" data-go="s1">类型不对，回去改选</button>
+            </div>
+          </div>
+          <div class="notice notice--coral">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>第 5 页识别置信度低</b>（扫描件模糊）。这一页的条款可能没有被完整读到 ——
+                  继续的话，结果里会如实标注这个缺口，不会装作读全了。</span>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-trash"/></svg>
+            <span><b>随时可以取消。</b>点右下角「取消并删除」，文件与中间结果立即删除、留删除日志。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 风险提示结果（示意） ─────────── -->
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd">
+          <span class="t">这份合同值得核对的地方</span>
+          <span class="s">共 5 条 · 优先核查 2 · 建议关注 2 · 信息不足 1</span>
+        </div>
+        <div class="sec">
+
+          <div class="notice notice--amber">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>覆盖不完整：</b>第 5 页识别质量低，该页条款可能未进入分析。
+                  下面的提示不覆盖那一页没读到的内容 —— 缺口就是缺口，不猜。</span>
+          </div>
+
+          <div class="fsec"><span class="fsec-dot" style="background:var(--coral-400)"></span>
+            <span class="fsec-t">优先核查</span><span class="fsec-s">2 条 · 签字前务必弄清</span></div>
+
+          <div class="fcard fcard--p">
+            <div class="fcard-hd"><span class="fcard-t">违约金约定超出法定允许范围</span><span class="ev ev--e1">E1 原文 · 第 3 页</span></div>
+            <div class="fq">「乙方提前离职的，应向甲方支付违约金人民币 20,000 元。」</div>
+            <div class="frow"><span class="fk">说明</span><span>对劳动者约定违约金，法律只允许两种情形：<b>专项培训服务期</b>和<b>竞业限制</b>。这份文本里没有读到对应的服务期或培训条款。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《劳动合同法》第二十五条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>培训约定可能写在附件里，本次没有收到附件，无法核对。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「这笔违约金对应哪次专项培训？能给我看培训协议吗？」</span></div>
+          </div>
+
+          <div class="fcard fcard--p">
+            <div class="fcard-hd"><span class="fcard-t">试用期工资约定低于法定下限</span><span class="ev ev--e1">E1 原文 · 第 2 页</span></div>
+            <div class="fq">「试用期内月工资为转正后月工资的 70%。」</div>
+            <div class="frow"><span class="fk">说明</span><span>试用期工资不得低于约定工资的 <b>80%</b>，也不得低于本单位相同岗位最低档工资和当地最低工资标准。70% 低于这条线。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《劳动合同法》第二十条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>若另有津贴、补贴使实发不低于下限，以实际发放为准 —— 文本里看不到实发数。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「试用期实发到手是多少？有没有不低于转正工资八成的书面保证？」</span></div>
+          </div>
+
+          <div class="fsec"><span class="fsec-dot" style="background:var(--amber-400)"></span>
+            <span class="fsec-t">建议关注</span><span class="fsec-s">2 条 · 弄清了再签</span></div>
+
+          <div class="fcard">
+            <div class="fcard-hd"><span class="fcard-t">竞业限制没有对应的经济补偿</span><span class="ev ev--e1">E1 原文 · 第 4 页</span></div>
+            <div class="fq">「乙方离职后两年内不得进入同行业企业工作。」</div>
+            <div class="frow"><span class="fk">说明</span><span>约定竞业限制的同时，法律要求在限制期内<b>按月给予经济补偿</b>；这份文本里没有读到补偿条款。没有补偿的竞业限制，实践中效力存在争议。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《劳动合同法》第二十三条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>补偿可能另行签协议约定，本次没有收到那份文件。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「竞业限制期间每月补偿多少？写进哪份文件？」</span></div>
+          </div>
+
+          <div class="fcard">
+            <div class="fcard-hd"><span class="fcard-t">工作地点约定得非常宽</span><span class="ev ev--e1">E1 原文 · 第 1 页</span></div>
+            <div class="fq">「工作地点：公司经营所需的各地。」</div>
+            <div class="frow"><span class="fk">说明</span><span>工作地点是劳动合同的必备条款。写成「各地」意味着调动空间很大 —— 接不接受由你决定，签之前想清楚。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《劳动合同法》第十七条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>实际调动还要受合理性约束，个案怎么认定，超出文本能回答的范围。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「常驻地点在哪里？要跨城市调动的话，怎么跟我协商？」</span></div>
+          </div>
+
+          <div class="fsec"><span class="fsec-dot" style="background:var(--fog-600)"></span>
+            <span class="fsec-t">信息不足</span><span class="fsec-s">1 条 · 读不到 ≠ 没问题</span></div>
+
+          <div class="fcard">
+            <div class="fcard-hd"><span class="fcard-t">社会保险条款没有读到明确约定</span><span class="ev ev--e3">E3 AI 判断</span></div>
+            <div class="fq fq--none">已识别的文本里没有找到社会保险相关条款 —— 第 5 页未完整识别，缺口可能在那里。</div>
+            <div class="frow"><span class="fk">说明</span><span>为员工缴纳社保是<b>法定义务</b>，不因合同没写而免除；但写清楚更利于你主张权利。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《劳动合同法》第十七条 ·《社会保险法》第五十八条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>「信息不足」只说明这次没读到，不等于合同里没有约定，更不等于没问题。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「社保从入职当月开始缴吗？缴费基数按什么算？」</span></div>
+          </div>
+
+          <div class="fsec"><span class="fsec-dot" style="background:var(--azure-400)"></span>
+            <span class="fsec-t">选「其他合同（通用）」时长这样</span><span class="fsec-s">示例 · 按八维度分组，每条带维度名</span></div>
+
+          <div class="fcard">
+            <div class="fcard-hd"><span class="dimlab">维度 · 违约责任</span><span class="fcard-t">违约金比例明显偏高</span><span class="ev ev--e1">E1 原文 · 第 2 页</span></div>
+            <div class="fq">「任一方违约的，应向守约方支付合同总额 50% 的违约金。」</div>
+            <div class="frow"><span class="fk">说明</span><span>约定的违约金<b>过分高于实际损失</b>的，可以请求法院或仲裁机构适当减少；50% 的比例在多数场景明显偏高。</span></div>
+            <div class="frow"><span class="fk">依据</span><span><span class="ev ev--e2">E2</span>《民法典》第五百八十五条</span></div>
+            <div class="frow"><span class="fk">局限</span><span>是否「过高」要结合实际损失认定，文本之外无从判断。</span></div>
+            <div class="frow"><span class="fk">追问</span><span>「这个比例的依据是什么？能不能改成按实际损失赔偿？」</span></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─────────── S4 报告与打印（示意） ─────────── -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd">
+          <span class="t">带走的报告 · A4 三页</span>
+          <span class="s">黑白即可 · 版式示意</span>
+        </div>
+        <div class="minis">
+          <div class="mini">
+            <div class="sheet-a4">
+              <h4>签约风险提示</h4>
+              <div class="meta">AI 生成内容</div>
+              <div class="hr"></div>
+              <div class="sec">版本信息</div>
+              <div class="meta">规则包 v1.3 · 境内备案模型 · 2026-08-10 11:20</div>
+              <div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <div class="sec">覆盖说明</div>
+              <div class="meta">共 6 页 · 第 5 页识别质量低，未完整覆盖</div>
+              <div class="ln ln--s"></div>
+              <span class="pgno">1 / 3</span>
+            </div>
+            <div class="mini-cap">封面 · 免责与版本</div>
+          </div>
+          <div class="mini">
+            <div class="sheet-a4">
+              <h4>提示正文</h4>
+              <div class="meta">优先核查 2 · 建议关注 2 · 信息不足 1</div>
+              <div class="hr"></div>
+              <div class="mrow"><span class="mdim">优先核查</span><span class="ln ln--m" style="flex:1"></span></div>
+              <div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <div class="mrow"><span class="mdim">建议关注</span><span class="ln ln--m" style="flex:1"></span></div>
+              <div class="ln ln--s"></div>
+              <div class="mrow"><span class="mdim">维度 · 违约责任</span><span class="ln ln--s" style="flex:1"></span></div>
+              <div class="ln ln--s"></div>
+              <span class="pgno">2 / 3</span>
+            </div>
+            <div class="mini-cap">正文 · 三档分节；通用合同带维度栏</div>
+          </div>
+          <div class="mini">
+            <div class="sheet-a4">
+              <h4>追问清单</h4>
+              <div class="meta">拿着这页去和用人单位逐条确认</div>
+              <div class="hr"></div>
+              <div class="sec">签字前要问清的 5 件事</div>
+              <div class="ln ln--m"></div><div class="ln ln--m"></div>
+              <div class="ln ln--s"></div><div class="ln ln--m"></div>
+              <div class="ln ln--s"></div>
+              <span class="pgno">3 / 3</span>
+            </div>
+            <div class="mini-cap">追问清单 · 独立一页方便带在手上</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><span class="t">打完即删 · 这份文件的一生</span></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-file"/></svg></span>
+              <span class="tl-b"><span class="tl-t">报告生成</span><span class="tl-s">只存在本次会话，最长 2 小时</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="tl-b"><span class="tl-t">送打印工作台核价出纸</span><span class="tl-s">价格以打印工作台核出的为准</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-trash"/></svg></span>
+              <span class="tl-b"><span class="tl-t">打印完成，立即删除</span><span class="tl-s">合同原件、分析结果、报告文件一并清除</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-history"/></svg></span>
+              <span class="tl-b"><span class="tl-t">删除留日志</span><span class="tl-s">删过什么、什么时候删的，可审计</span></span></div>
+          </div>
+          <div class="notice" data-when="device-off">
+            <svg class="ic"><use href="#i-offline"/></svg>
+            <span><b>打印机离线，这一步降级：</b>报告可以先存进「我的文档」，
+                  换一台机器或等打印恢复后再打。存文档同样按 2 小时口径清理。</span>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>费用是<b>预估口径</b>：A4 · 3 页 · 黑白；本页不代收任何费用。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── FAQ 常见签约问题（真实可用） ─────────── -->
+      <div class="pane pane--grow" data-at="faq">
+        <div class="pane-hd">
+          <span class="t">常见签约问题 · 8 条</span>
+          <span class="chip chip--jade chip-static" style="height:26px;font-size:11px">现在就能用</span>
+          <span class="s">E2 法规依据 · 静态参考 · 非 AI 生成 · 更新 2026-06</span>
+        </div>
+        <div class="sec">
+
+          <div class="faqcard">
+            <div class="faq-q">1 · 试用期最长能约定多久？</div>
+            <div class="faq-a">按合同期限分档：三个月以上不满一年的，试用期不超过 <b>1 个月</b>；一年以上不满三年的，不超过 <b>2 个月</b>；三年以上或无固定期限的，不超过 <b>6 个月</b>。同一单位与同一劳动者只能约定一次试用期。</div>
+            <div class="faq-m"><span>《劳动合同法》第十九条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">2 · 试用期工资有下限吗？</div>
+            <div class="faq-a">有。不得低于本单位相同岗位最低档工资或约定工资的 <b>80%</b>，并且不得低于用人单位所在地的最低工资标准。</div>
+            <div class="faq-m"><span>《劳动合同法》第二十条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">3 · 公司说试用期不缴社保，合法吗？</div>
+            <div class="faq-a">不合法。用人单位应当自用工之日起 <b>30 日内</b>为职工办理社会保险登记 —— 试用期也算用工期间，不存在「转正再缴」的说法。</div>
+            <div class="faq-m"><span>《社会保险法》第五十八条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">4 · 什么情况下才能让我付违约金？</div>
+            <div class="faq-a">只有两种：单位出钱做了<b>专项培训并约定服务期</b>、或者约定了<b>竞业限制</b>。除此之外，以任何名目要求劳动者承担违约金的约定都是无效的。</div>
+            <div class="faq-m"><span>《劳动合同法》第二十二、二十三、二十五条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">5 · 竞业限制有补偿吗？最长多久？</div>
+            <div class="faq-a">竞业限制期限<b>不得超过二年</b>，并且在限制期内单位要<b>按月</b>给予经济补偿。只限制、不补偿的条款，效力在实践中存在争议。</div>
+            <div class="faq-m"><span>《劳动合同法》第二十三、二十四条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">6 · 入职收押金、扣身份证，可以拒绝吗？</div>
+            <div class="faq-a">可以，而且应该拒绝。用人单位<b>不得扣押</b>劳动者的居民身份证等证件，<b>不得要求提供担保</b>或者以其他名义向劳动者收取财物。</div>
+            <div class="faq-m"><span>《劳动合同法》第九条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">7 · 加班费怎么算？</div>
+            <div class="faq-a">平日延长工作时间不低于工资的 <b>150%</b>；休息日安排工作又不能补休的不低于 <b>200%</b>；法定节假日不低于 <b>300%</b>。</div>
+            <div class="faq-m"><span>《劳动法》第四十四条</span></div>
+          </div>
+          <div class="faqcard">
+            <div class="faq-q">8 · 收到录用通知后被撤回，怎么办？</div>
+            <div class="faq-a">录用通知送达后单位反悔的，可能承担<b>缔约过失责任</b>。保留好通知原文和沟通记录，可以就辞职损失、路费等合理损失主张赔偿。</div>
+            <div class="faq-m"><span>《民法典》第五百条</span></div>
+          </div>
+
+          <div class="panel-note">这 8 条不针对你的具体合同；情形不同时以现行法规和专业意见为准。</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S0 右
+           2026-08-11 整改：fail-closed、报告端点这些是工程状态，不是用户信息。
+           整块收进折叠并标「内部状态（评审用）」，内容一条未删。 -->
+      <div class="pane" data-at="s0">
+        <details class="gfold">
+        <summary><span class="t">内部状态（评审用）</span></summary>
+        <div class="gfold-b">
+        <div class="kv">
+          <div class="kv-row"><span class="k">功能开关</span><span class="v"><span class="chip chip--info">关闭 · fail-closed</span></span></div>
+          <div class="kv-row"><span class="k">已收合同</span><span class="v v--fog">0 份</span></div>
+          <div class="kv-row"><span class="k">报告端点</span><span class="v v--fog">未开放</span></div>
+          <div class="kv-row"><span class="k">入口位置</span><span class="v">AI简历服务 → 签约与权益</span></div>
+        </div>
+        </div>
+        </details>
+      </div>
+
+      <div class="pane pane--grow" data-at="s0">
+        <div class="pane-hd"><span class="t">常见签约问题</span><span class="chip chip--jade chip-static" style="height:26px;font-size:11px">现在就能用</span></div>
+        <div class="sec">
+          <div style="display:flex;flex-direction:column">
+            <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-clock"/></svg>
+              <span class="fprev-t">试用期最长能约定多久？</span><svg class="ic"><use href="#i-chevron"/></svg></button>
+            <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-shield"/></svg>
+              <span class="fprev-t">公司说试用期不缴社保，合法吗？</span><svg class="ic"><use href="#i-chevron"/></svg></button>
+            <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-card"/></svg>
+              <span class="fprev-t">什么情况下才能让我付违约金？</span><svg class="ic"><use href="#i-chevron"/></svg></button>
+          </div>
+          <!-- 原来这里的免责与页脚 .legalbar 逐字同义（全页第二遍），删。 -->
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>一共 <b>8 条</b>，现在就能看。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">开放后，这一步会发生什么</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件去向</span><span class="v">仅本次会话</span></div>
+          <div class="kv-row"><span class="k">进分析前</span><span class="v">手机号 / 身份证号先遮盖</span></div>
+          <div class="kv-row"><span class="k">最长保存</span><span class="v">2 小时</span></div>
+          <div class="kv-row"><span class="k">打印完成后</span><span class="v v--fog">立即删除 · 留日志</span></div>
+        </div>
+        <div class="notice" data-when="ai-down" style="margin-top:var(--s-3)">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <span>AI 暂不可用，这一步的「发起分析」按钮是灰的 —— 恢复后自动放开，已有结果不受影响。</span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><span class="t">为什么要逐条同意</span></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            合同里有你的名字、身份证号、工资数字，属<b>敏感个人信息</b>，
+            法律要求逐项单独同意 —— 所以不设「一键全选」。
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-trash"/></svg>
+            <span><b>勾了也随时能反悔。</b>撤回同意即刻生效：停止分析、删除文件、留删除日志。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><span class="t">正在处理的这份文件</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件名</span><span class="v">劳动合同_扫描.pdf</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v">6 页</span></div>
+          <div class="kv-row"><span class="k">识别质量</span><span class="v" style="color:var(--amber-600)">中 · 第 5 页偏低</span></div>
+          <div class="kv-row"><span class="k">已遮盖</span><span class="v v--fog">手机号 ×2 · 身份证号 ×1</span></div>
+        </div>
+        <div class="panel-note" style="margin-top:var(--s-3)">遮盖发生在 AI 看到文本之前 —— 模型收到的就是遮盖后的版本。</div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><span class="t">中途取消会怎样</span></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">你点「取消并删除」</span><span class="tl-s">任何阶段都可以</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">分析立即停止</span><span class="tl-s">文件与中间结果一并删除</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">删除留日志</span><span class="tl-s">删了什么、何时删的，可查</span></span></div>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>取消不需要理由，也不影响你之后再来。<b>不取消的话</b>，一切也按最长 2 小时自动清理。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右：诚实边界卡 -->
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><span class="t">这份结果的边界</span></div>
+        <div class="sec">
+          <div class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg>
+            <span>只基于合同<b>文本</b>。口头承诺、实际执行情况，它一概不知道。</span></div>
+          <div class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg>
+            <span>条款是否适用你的情形，和<b>地区、事实细节</b>有关，个案要人来判断。</span></div>
+          <div class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg>
+            <span>第 5 页没读全，那一页的问题<b>不会出现在这里</b> —— 缺口已在上方标明。</span></div>
+          <div class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg>
+            <span>「信息不足」不等于没有问题，「没提示」也<b>不等于合同没毛病</b>。</span></div>
+          <div class="panel-note">没有提示时只写「本次未发现可提示项」，不下「安全」结论。</div>
+          <div class="notice" data-when="ai-down">
+            <svg class="ic"><use href="#i-offline"/></svg>
+            <span>AI 暂不可用：<b>发不起新的分析</b>，但这份已生成的结果照常可看、可打印。</span>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>这是帮你准备问题的<b>清单</b>，不是结论。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S4 右 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><span class="t">报告规格</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">幅面</span><span class="v">A4 · 3 页</span></div>
+          <div class="kv-row"><span class="k">色彩</span><span class="v">黑白即可</span></div>
+          <div class="kv-row"><span class="k">费用</span><span class="v v--fog">预估 · 以打印工作台核价为准</span></div>
+          <div class="kv-row"><span class="k">打完之后</span><span class="v">文件立即删除</span></div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><span class="t">拿到纸之后</span></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            第 3 页的<b>追问清单</b>拿去谈判桌：一条一条问，问完再签。
+            报告<b>不发给任何企业、不进任何库</b>。
+          </div>
+          <div class="notice" data-when="device-off">
+            <svg class="ic"><use href="#i-folder"/></svg>
+            <span><b>打印机离线：</b>先存「我的文档」，换机或恢复后再打，内容一样。</span>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>对报告内容有疑问，可以去<b>政策服务页</b>找官方渠道，或咨询现场工作人员。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAQ 右 -->
+      <div class="pane" data-at="faq">
+        <div class="pane-hd"><span class="t">关于这份参考</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">条目</span><span class="v">8 条</span></div>
+          <div class="kv-row"><span class="k">更新时间</span><span class="v">2026-06</span></div>
+          <div class="kv-row"><span class="k">内容属性</span><span class="v v--fog">人工整理</span></div>
+          <div class="kv-row"><span class="k">法规出处</span><span class="v">每条标注</span></div>
+        </div>
+        <div class="panel-note" style="margin-top:var(--s-3)">法规会修订 —— 以发布机关的现行有效版本为准。</div>
+      </div>
+
+      <div class="pane pane--grow" data-at="faq">
+        <div class="pane-hd"><span class="t">没找到你的问题？</span></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            静态参考答不了你的具体合同。你的情况走这两条路：
+          </div>
+          <a class="fprev" href="21-policy.html" style="border-top:1px solid var(--surf-2)">
+            <svg class="ic"><use href="#i-policy"/></svg>
+            <span class="fprev-t">政策服务页 · 官方渠道与办事入口</span><svg class="ic"><use href="#i-chevron"/></svg></a>
+          <div class="fprev" style="cursor:default"><svg class="ic"><use href="#i-users"/></svg>
+            <span class="fprev-t">现场工作人员 · 或当地劳动保障部门咨询窗口</span></div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>合同分析功能开放后，具体合同的逐条提示走第 2–5 步；在那之前，这里不假装能回答。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-10 重心整改：原来这里还有一张 first 态「第一次来这页？」引导卡，
+           说的和 s0 锁定卡、s1–s4 常驻横幅、s0 右栏那条「现在真能用第 6 步」
+           完全同义（第四遍），按钮也和操作栏的「常见签约问题」重复，删。 -->
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 固定免责条：每阶段底部常驻 ══════════════════ -->
+  <div class="legalbar">
+    <svg class="ic"><use href="#i-shield"/></svg>
+    <span><b>仅作风险提示，不构成法律意见</b> · 重要合同请咨询专业律师或劳动保障部门 · AI 生成内容均按规定标识</span>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+      <a class="backbtn" href="32-resume-hub.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s0" data-go="faq">常见签约问题</button>
+    <!-- 2026-08-10 全量回归修：s2 / s3 这两步操作栏原来同时挂着「回本机状态」和
+         「取消并删除」，连同返回键、需要帮助、主按钮共五个控件把 968px 净宽占满，
+         留给 hint 只剩 8px —— 提示整条画到操作栏外（实测溢出 165px，四态全中）。
+         口径：只摘 s2 / s3 的「回本机状态」，不摘「取消并删除」——
+         后者是删除已上传合同的隐私动作，必须留；前者是快捷跳转，
+         按返回键逐级退到 s1 仍然到得了（stage.js「返回 = 上一级」），路径没断。 -->
+    <button class="btn btn--lg btn--ghost" data-at="s1 s4" data-go="s0">回本机状态</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2 s3">取消并删除</button>
+    <button class="btn btn--lg btn--ghost" data-at="faq" data-go="s0">回本机状态</button>
+
+    <span class="actionbar-hint" data-at="s0">功能暂未开放 · 当前不接收合同，可以先看常见签约问题</span>
+    <span class="actionbar-hint" data-at="s1" data-when="default first device-off">示意 · 开放后需五项知情同意全部勾选才能继续</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 暂不可用 · 不能发起新的合同分析</span>
+    <!-- 同上：压到腾出来的宽度放得下的长度。「这是示意不是真分析」由 s1–s4 常驻
+         横幅（「这是开放后的流程示意，不是本机当前状态」）承担，不靠这一行兜合规。
+         「·」用 &nbsp; 绑住前一段，换行时不让它起行（中文排版禁则）。 -->
+    <span class="actionbar-hint" data-at="s2">示意&nbsp;· 确认后才继续</span>
+    <span class="actionbar-hint" data-at="s3">缺口与局限已逐条标明</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">A4 · 3 页 · 黑白</span>
+    <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线 · 先存「我的文档」，换机或恢复后再打</span>
+    <span class="actionbar-hint" data-at="faq">静态参考 · 更新至 2026-06</span>
+
+    <button class="btn btn--primary" data-at="s0" data-go="s1">看开放后的流程示意<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-when="default first device-off" data-go="s2">下一步 · 提取与确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-when="ai-down" aria-disabled="true" disabled>AI 不可用 · 暂不能发起</button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">确认无误 · 继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4">生成带走报告<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P31&amp;kind=contract-report&amp;title=合同风险报告&amp;pages=3&amp;copies=1&amp;back=s4">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-folder"/></svg>存进「我的文档」</button>
+    <button class="btn btn--primary" data-at="faq" data-go="s1">看流程示意<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* s1 范围 chips 随所选类型切换：专项 = 14 类条款 / 通用 = 八维度。
+   data-scope 不在 stage.js 的门控轴里，hidden 由这里单独管，互不干扰。 */
+;(function () {
+  function pick (kind) {
+    var cards = document.querySelectorAll('[data-ctype]')
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].setAttribute('aria-pressed', cards[i].getAttribute('data-ctype') === kind ? 'true' : 'false')
+    }
+    var generic = kind === 'generic'
+    var groups = document.querySelectorAll('[data-scope]')
+    for (var j = 0; j < groups.length; j++) {
+      groups[j].hidden = generic ? groups[j].getAttribute('data-scope') !== 'generic'
+                                 : groups[j].getAttribute('data-scope') !== 'special'
+    }
+  }
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest('[data-ctype]')
+    if (c) pick(c.getAttribute('data-ctype'))
+  })
+  pick('labor')
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P42 我的资产 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P42 我的资产">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   P42 我的资产（2026-08-10 新建）
+   --------------------------------------------------------------------------
+   为什么新建这一页：V3 把原型里 8 个独立资产列表页整层丢了，于是「我的文档」
+   链到了格式转换工具、「打印订单」链到了新建打印 —— 用户点进去看不到自己的
+   东西，只看到一个又要重新开始的工作台。这一页把原型的三页合并成三个标签：
+     16-me-resumes.html   → data-stage="resume"
+     17-me-documents.html → data-stage="docs"
+     18-me-print-orders.html → data-stage="orders"
+
+   合并的收益必须体现在「少点一次」，不是「多点一次」：
+   **三个标签都能被 URL 直达**（stages.js 消费 ?stage=）：
+     42-my-assets.html?stage=resume   我的简历
+     42-my-assets.html?stage=docs     我的文档
+     42-my-assets.html?stage=orders   打印订单
+   P23 的三张卡请分别指到上面三个地址，不要统一指到本页首个标签 ——
+   那样用户进来还得再点一次，合并就白做了。
+
+   操作方式与原型保持一致（功能与手势不变，变的只是它们现在同处一页）：
+   · 行内操作仍是「查看 / 打印 / 签名盖章 / 删除 / 再打一份」几个按钮，
+     位置在条目内，不改成滑动、不改成卡片墙；
+   · 删除仍是「点删除 → 再确认一次」两步，只是确认层不回显文件名全称（防肩窥）；
+   · 每条文档仍在自己那一行显示自己的到期日（原型 17 的「有效期至 10-15」）。
+
+   一处与原型不同并已知：原型 17 有「修改保存期限（3 个月 / 6 个月 / 长期）」。
+   V3 全站口径（interface-handoff.md §2B，用户可见基准表在 P23 账号设置）已经
+   改成**按文件类型定档**：敏感件 7 天 / 一般文档 90 天 / 未登录会话离场即清 /
+   面试作答从不保存。手工延长期限与该口径直接冲突，也没有后端支撑，
+   所以本页**不放那个控件**，改为在展开区写清「按类型定 · 不可手工延长」并
+   给出基准表位置。这是口径冲突，不是漏做，需要产品裁决后再定。
+
+   AI 落点只保留「能省步骤」的两处（不为了每页有 AI 而放）：
+     ① 我的简历：版本差异摘要 + 哪一版更适合投哪类岗位（E1 事实 / E3 建议分离）
+        —— 原来要挨个打开 2–3 份才知道差别，现在一屏看完。
+     ② 我的文档：AI 按内容归类 + 「有 N 份敏感件将在 X 天后自动删除」
+        —— 原来要逐条看到期日，现在顶部一句话给出唯一要紧的那几条。
+     ③ 打印订单：**明确标「不依赖 AI」**。订单是事实（金额、页数、取件码），
+        不许 AI 加工；那一栏只做事实展示与复打。
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右栏常驻抢走约三分之一宽度，里面装的是统计、保存期限口径、删除与日志制度 ——
+   都是「问了才想知道」的东西，不是用户此刻要做的事（看简历 / 看文件 / 看订单）。
+   处置：条目区改全宽；口径与统计整体收进上下文抽屉，点动作条上的按钮才展开。
+   合规声明留在正文常驻（每页一条，不许收起）。内容一条未删。 */
+.work--list { grid-template-columns: 1fr; }
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--gutter); bottom:auto; width:396px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; margin-left:var(--s-4); min-height:56px; padding:0 var(--s-5);
+  border-radius:var(--r-full); border:1px solid var(--brd-2); background:var(--surf-1);
+  color:var(--fog-800); font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.sidebtn .ic { width:18px; height:18px; }
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+/* 常驻合规声明：从右栏移到正文底部，一行装下 */
+.compline {
+  flex:0 0 auto; display:flex; align-items:center; gap:var(--s-3);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.5;
+}
+.compline > .ic { width:20px; height:20px; flex:0 0 auto; color:var(--jade-500); }
+.compline b { color:var(--fog-900); }
+/* 评审备注：产品视图不渲染，评审视图仍在 */
+body.capture .proto-only { display:none !important; }
+
+/* ---------- 条目行：整行头部可点（展开/收起），行内按钮独立可点 ---------- */
+.lwrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* 筛选筛空时才出现的空态：默认藏起来，由 .is-empty 打开。
+   刻意不用 hidden —— hidden 是 stage.js applyVisibility 的地盘，
+   两边都写会互相盖掉（P13 踩过）。 */
+.lwrap .blank--filter { display: none; }
+.lwrap.is-empty .blank--filter { display: flex; }
+.lwrap.is-empty .rlist { display: none; }
+
+.rrow {
+  flex: 0 0 auto;
+  border-radius: var(--r-md); background: var(--glass-1-bg);
+  border: 1px solid var(--glass-1-brd); box-shadow: var(--sh-1);
+  display: flex; flex-direction: column;
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.rrow.is-open { border-color: var(--jade-a32); }
+.rrow--off { opacity: .74; }
+.rrow-hd {
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; min-height: 74px; padding: var(--s-4) var(--s-5) 10px;
+  background: transparent; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--ff-ui); color: inherit;
+}
+.rrow-hd:active { transform: translateY(1px) scale(.998); }
+.rrow-hd:focus-visible { outline: 3px solid var(--jade-400); outline-offset: -3px; border-radius: var(--r-md); }
+.rrow-ic {
+  width: 44px; height: 44px; flex: 0 0 auto; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-1); color: var(--jade-400);
+}
+.rrow-ic .ic { width: 22px; height: 22px; }
+.rrow-ic--amber { color: var(--amber-400); }
+.rrow-ic--fog { color: var(--fog-700); }
+.rrow-b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.rrow-tl { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.rrow-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; line-height: 1.25; }
+/* 正文一行：条目说明只给一行，长了就是塞不下，得删字不是折行 */
+.rrow-m { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); line-height: 1.5; }
+.rrow-x { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600);
+  transition: transform var(--dur-2) var(--ease-out); }
+.rrow.is-open .rrow-x { transform: rotate(90deg); }
+.rrow-ops { display: flex; gap: var(--s-2); flex-wrap: wrap; padding: 0 var(--s-5) var(--s-4); }
+.rrow-ops .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+.rrow-det { display: none; margin: 0 var(--s-5) var(--s-4); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rrow.is-open .rrow-det { display: block; }
+.rrow-det .kv-row { min-height: var(--touch-min); }
+
+/* ---------- 文件信息层：我的文档「查看」的落点 ----------
+   2026-08-10 Codex 错配整改：三份文档的「查看」原来都指 08-file-tools.html
+   —— 那是**格式转换工具台**，点「查看」被推去转格式，是错的落点。
+   文档预览态本轮还没建，所以不假装能预览内容：改成本行内展开的信息层，
+   只写本机确实知道的六项（文件名 / 类型 / 页数 / 大小 / 到期 / 来源页），
+   外加打印、删除两个真动作。宁可少给一项，也不送人去别的工具台。 */
+.finfo-t { font-size: var(--fz-2); color: var(--fog-700); font-weight: 600;
+  display: flex; align-items: center; gap: 8px; margin-bottom: var(--s-3); }
+.finfo-t .ic { width: 17px; height: 17px; color: var(--jade-400); }
+.finfo-acts { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: var(--s-3); }
+.finfo-acts .btn { min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+.finfo-note { margin-top: var(--s-3); font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6; }
+
+/* ---------- 深链高亮：?stage=orders&orderId=xxx 落到哪一条，要看得出来 ----------
+   通知里点「看这一单」如果只是打开订单列表，用户还得自己在 6 条里找。
+   命中的那条直接展开 + 描边，并在列表顶部说明「按单号 xxx 定位」。 */
+.rrow.is-target { border-color: var(--jade-400); box-shadow: 0 0 0 2px var(--jade-a20), var(--sh-1); }
+.deep {
+  flex: 0 0 auto; display: none; align-items: center; gap: var(--s-3);
+  min-height: 52px; margin-bottom: var(--s-3); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  font-size: var(--fz-2); color: var(--fog-800);
+}
+.deep.is-on { display: flex; }
+.deep .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--jade-400); }
+.deep-b { flex: 1 1 auto; min-width: 0; }
+.deep-id { font-family: var(--ff-num); color: var(--fog-900); font-weight: 600; }
+.deep .btn { flex: 0 0 auto; min-height: var(--touch-min); padding: 0 var(--s-4); font-size: var(--fz-2); }
+
+/* ---------- 筛选条：状态/类型，与原型 18 的 filter-bar 同一位置同一手势 ---------- */
+.fbar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.fbar-n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+
+/* ---------- 折叠说明：长口径压成一行摘要，展开才给全文 ---------- */
+.fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+.fold > summary { list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px; padding: 0 var(--s-4);
+  font-size: var(--fz-2); color: var(--fog-700); }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fold[open] > summary::after { content: '收起'; }
+.fold-b { padding: 0 var(--s-4) var(--s-4); font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
+.fold:not([open]) .fold-b { display: none; }
+
+/* 正文里的裸 <a> 实测只有 17.5px 高，27 寸竖屏点不中（CLAUDE.md §9 ≥48px）。 */
+.inlink {
+  display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  min-height: var(--touch-min); padding: 0 var(--s-4); margin: 3px 0;
+  border-radius: var(--r-sm); border: 1px solid var(--glass-2-brd);
+  background: var(--fog-a04, var(--surf-1)); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+}
+.inlink .ic { width: 17px; height: 17px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* ---------- 保存期限表：全站口径的本页副本（数字以 P23 账号设置那张表为准） ---------- */
+.keep { display: flex; flex-direction: column; gap: 1px;
+  border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--brd-1); background: var(--brd-1); }
+.keep-hd, .keep-row {
+  display: grid; grid-template-columns: 1fr 82px; gap: var(--s-3);
+  align-items: center; padding: 10px var(--s-4); background: var(--surf-1);
+}
+.keep-hd { background: var(--surf-2); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
+.keep-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fz-2); color: var(--fog-900); }
+.keep-t i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.keep-v { font-family: var(--ff-num); font-size: var(--fz-3); font-weight: 700; color: var(--fog-900); text-align: right; }
+.keep-row--warn .keep-v { color: var(--amber-200); }
+.keep-row--none .keep-v { font-size: var(--fz-2); color: var(--fog-700); }
+
+/* ---------- 删除确认层（防肩窥：不回显文件名全称） ----------
+   刻意不叫 .sheet —— v3Audit 会把 .sheet 当页面主体量纵向溢出。 */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet);
+  display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+.ovl-panel {
+  position: relative; width: 100%; max-width: 620px; max-height: 100%; overflow-y: auto;
+  border-radius: var(--r-lg); padding: var(--s-6);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(140%);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--coral-400); }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x { margin-left: auto; width: 48px; height: 48px; border-radius: var(--r-sm);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  cursor: pointer; display: grid; place-items: center; }
+.ovl-x .ic { width: 20px; height: 20px; color: var(--fog-800); }
+.nrow { display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: var(--touch-min); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.nrow .dot { margin-top: 7px; }
+.nrow-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrow-t { font-size: var(--fz-3); color: var(--fog-900); }
+.nrow-s { font-size: var(--fz-1); color: var(--fog-600); }
+.ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+
+/* ---------- 返回键：永远回「我的」，不在标签之间倒退 ----------
+   stage.js 对 `.actionbar > .backbtn` 有一套「先退阶段、退无可退才离开本页」的
+   逻辑 —— 那是给打印 / 扫描这类**多步工作台**的。本页三/四个标签是**并列分类**，
+   不是流程步骤：用户从 P23 直达「我的文档」后按返回，应当回「我的」，
+   而不是被送到「我的简历」再按两次。把返回键包一层，公共选择器不再命中，
+   返回就老老实实按 href 走。不改公共脚本，只在本页失效那条规则。 */
+.backwrap { flex: 0 0 auto; display: flex; }
+.actionbar .backwrap > .backbtn {
+  min-height: 76px; padding: 0 var(--s-5); margin-right: var(--s-4);
+  font-size: var(--fz-4); background: var(--surf-0, transparent);
+}
+.actionbar .backwrap > .backbtn .ic { width: 26px; height: 26px; }
+.actionbar .backwrap > .backbtn .backbtn-t { font-size: var(--fz-4); }
+.actionbar .backwrap > .backbtn .backbtn-sub { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     2026-08-11 · 链接落地整改（Codex 复核 reviews-codex-2026-08-11.md (b) P0）
+     本页发出的 URL 参数契约 —— 谁该消费、消费不到时目标页该怎么办
+     --------------------------------------------------------------------------
+     一条总原则：**本页只负责把身份和意图传全；目标页解析不出来时必须停在自己的
+     第一步并说明原因，绝不许拿一份默认样例冒充用户点的那一份。**
+
+     ① returnTo / returnStage / from（→ 03 身份门）**03 已接线，按它落地的格式发**
+        03-identity-gate.html?returnTo=<站内页面文件名>&returnStage=<阶段 slug>&from=P42
+        returnTo 只放**文件名**，阶段单独走 returnStage —— 03 的白名单 RET 是按裸文件名
+        建的键，把 "42-my-assets.html?stage=docs" 整串塞进 returnTo 会比不中白名单、
+        被当成不认识的目标丢掉。42 在 RET 里登记的阶段名是 resume / docs / orders，
+        与本页三个标签一一对应。
+        03 已消费：命中白名单就把门上的「你刚才在哪一步」和跳过 / 登录两个出口都改写
+        过去；不认识就回首页并说明原因（且不回显原值），from=P42 是 returnTo 丢失时的兜底。
+
+     ② dir=take + from / title / kind / artifactId（→ 05 手机中转）**05 已接线**
+        05-phone-relay.html?dir=take&from=P42&title=<encodeURIComponent 中文名>
+                            &kind=<产物类型 slug>&artifactId=<产物编号>
+        dir=take 机器 → 手机（带走已有的这一份，本页所有「扫码带走」都是这个方向）
+        不带 dir 手机 → 机器（05 原有的上传形态，一个字不改）
+        05 已消费：dir 决定首屏形态；from 必须在它的 SRC 登记表里（P42 在），
+        from 不认识时 title/kind 一概不采纳；**认不出是哪一份就不显示任何一份**。
+        kind 取值必须在 05/06 共用的 KIND 白名单里，本页用到的是
+        resume-report / material / id-photo-sheet / interview-sheet，
+        与同一行「打印」按钮传给 06 的 kind 是同一个值。
+        （命名说明：dir 这个名字在 13 岗位情报台是「职业方向」，撞车是既成事实；
+          05 只认 take / send 两个字面量，其余当没说清并明写出来。）
+
+     ③ artifactId / title / pages（→ 08 文件加工台 t2 签名盖章）
+        08-file-tools.html?stage=t2&from=P42&artifactId=<id>&title=<enc>&pages=<n>
+        08 应消费：t2 右栏「要签的文件」当前写死「求职信_运营助理.pdf」，必须换成
+        artifactId 查到的真实文件；查不到就回 t1 并说明，不得让用户以为在签另一份。
+
+     ④ orderId（→ 06 打印台出纸进度 / 本页 orders 深链）
+        06-print-workbench.html?stage=s6&from=P42&orderId=O-xxxxxxxx-xxxx
+        本页 orders 标签已经在消费 orderId（见页尾 applyDeepOrder），06 还没有。
+        06 应消费：按单号查这一单的真实进度；查不到就停在 s1 并说明，
+        **不得把任意一单的默认进度画面当成用户点的那一单**。
+
+     ⑤ artifactId（→ 09 / 10 / 22 查看产物）
+        产物 ID 由服务端签发，口径见 interface-handoff.md §2A。本页现在写的是可读的
+        占位 ID（art-…），接线时整体替换为 art_… 真 ID。目标页查不到时停在自己的
+        第一步，不得拿示例产物顶替。
+
+     ⑥ fairId（→ 17 招聘会作战台）
+        17-fair-desk.html?stage=s1&fairId=<外部ID>&from=P42
+        17 应消费：按外部 ID 选中那一场；本机场次库里没有这一场时停在 s1 并写明
+        「这一场不在本机场次库里」，不得默认选中第一场。
+
+     ⑦ view（→ 23 我的）
+        23-me.html?view=settings —— 契约已存在，23 自己在消费（见 23-me.html 注释）。
+
+     未改动的口径：「打印」类出口继续用 06 已经在读的 kind/title/pages/copies；
+     interface-handoff.md §2A 要求生产改成 artifactId 查文件，那是接线期的统一动作，
+     本轮不在这里顺手改，以免把 06 现在能用的来源回执改坏。
+     ══════════════════════════════════════════════════════════════════════════ -->
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="resume" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="23-me.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">我</div>
+      <div>
+        <div class="brand-name">我的资产</div>
+        <div class="brand-sub">职易达 · 01 号机 · 只你自己看得到</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列 1 单</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 记录照常可看</div>
+    <div class="clock" data-clock>2026年8月10日 <b>15:22</b></div>
+  </header>
+
+  <!-- 三个标签是并列的三类东西，不是流程步骤，所以用标签不用阶段轨。
+       都能被 ?stage= 直达，见文件头注释。 -->
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="resume"><svg class="ic" style="width:17px;height:17px"><use href="#i-resume"/></svg>我的简历</button>
+      <button class="stbtn" data-go="docs"><svg class="ic" style="width:17px;height:17px"><use href="#i-folder"/></svg>我的文档</button>
+      <button class="stbtn" data-go="orders"><svg class="ic" style="width:17px;height:17px"><use href="#i-printer"/></svg>打印订单</button>
+    </div>
+    <span class="rail-count">三类都是你自己的东西：简历版本 / 存下的文件 / 打过的单</span>
+    <!-- 抽屉开关放标签条右端：三类都在，且不跟底部动作条抢宽度
+         （放动作条里会把「我的文档」那一态的提示挤出 8px，自检 卡内溢出）。 -->
+    <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p42side"><svg class="ic"><use href="#i-layers"/></svg>统计与口径</button>
+  </div>
+
+  <div class="work work--list">
+    <!-- ═════════════════ 左：条目列表 ═════════════════ -->
+    <div class="wmain">
+
+      <!-- ───────── 我的简历 · AI 顶栏（省掉逐份打开对比） ─────────
+           ══ AI 接线契约 · P42-A「历次简历版本比对」═══════════════════════════
+           输入：
+             · resumeVersions [{ id, ver, createdAt, sections:[{ name, text }] }]
+               —— 账户数据，本人历次简历版本；**只读本人的，不跨账号**
+             · 无需用户当场输入：有 ≥2 版就能比，没有就走 first 态那句"不猜也不举例"
+           输出：
+             · { diffs: [{ ver, added:[section], removed:[section], unchanged:[section] }],
+                 fitHint: { ver, direction, why } }
+             · 差异条目（补了哪两段、哪栏没改过）= E1 你的材料（文本事实，不是判断）
+             · 「哪一版更适合投哪类岗位」= E3 建议 · 仅供参考，且**不预测录用结果**
+           动作（省步骤，不止多一段话）：
+             · 结论后接「带 v3 去和岗位逐条比」→ 11-jobfit-compare.html?stage=s1&resumeVer=<ver>
+             · 刻意不传 need=job：11 的 carry-in 横幅写死了「从招聘会现场带来」，
+               从本页传 need 会让对面谎报来源。resumeVer 是接线契约，11 接上即生效。
+           降级：
+             · AI 不可用 → 顶栏换成 data-when="ai-down" 那句「本机这次不做版本比对，
+               简历都在下面」；查看、打印、删除三项照常，整页仍可用
+           ═══════════════════════════════════════════════════════════════════ -->
+      <div class="checks" data-at="resume">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">这几版差在哪：v3 比 v1 多了 2 段运营经历</span>
+          <span class="t" data-when="first">登录后这里会替你比对历次简历版本</span>
+          <span class="t" data-when="ai-down">本机这次不做版本比对，简历都在下面</span>
+          <span class="s" data-when="default device-off">6 条 · 最新 v3</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 条</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>v3 相比 v2：补了「活动运营」「社群维护」两段 <span class="ev ev--e1">E1 你的材料</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>v1 至今没改过联系方式那一栏 <span class="ev ev--e1">E1 你的材料</span></span>
+        </div>
+        <details class="fold" data-when="default device-off" style="margin-top:8px">
+          <summary>哪一版更适合投哪类岗位</summary>
+          <div class="fold-b">v3 的运营类经历写得更满，偏运营方向；v1 保留了完整实习段落，偏应届岗。
+            <span class="ev ev--e3">E3 建议 · 仅供参考</span>
+            这只是两版文字的对照，不预测录用结果，投哪一版由你定。
+            <a class="inlink" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42"><svg class="ic"><use href="#i-target"/></svg>带 v3 去和岗位逐条比</a>
+            <!-- 2026-08-10 交接不带货整改：原为裸链 11-jobfit-compare.html。上面刚说完
+                 「v3 偏运营方向」，出口却什么都不带，用户到了对面还得从头选。
+                 现按 11 的落点补 ?stage=s1（选岗位那一步）+ resumeVer=v3 + from=P42。
+                 刻意**不传 need=job**：11 的 carry-in 横幅写死了「从招聘会现场带来」，
+                 从「我的资产」传 need 会让对面谎报来源；不传则 11 早返回，逐像素不变。
+                 resumeVer 是接线契约，11 目前只读 need/jobId/jobTitle，所以下面写明。 -->
+            <span class="ev ev--e1">E1 你的材料</span> 带去：<b>简历 v3</b>（版本号接线后自动生效，对面暂只认岗位）</div>
+        </details>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有账号就没有历次版本，这里不猜也不举例</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>比对服务中断已自动上报；查看、打印、删除照常</span>
+        </div>
+      </div>
+
+      <!-- ───────── 我的文档 · AI 顶栏（省掉逐条看到期日） ───────── -->
+      <div class="checks" data-at="docs">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">有 2 份敏感件将在 6 天后自动删除</span>
+          <span class="t" data-when="first">登录后这里会替你盯着到期的文件</span>
+          <span class="t" data-when="ai-down">本机这次不做归类，文件都在下面</span>
+          <span class="s" data-when="default device-off">6 份 · 敏感件 2</span>
+          <span class="s" data-when="first">功能说明</span>
+          <span class="s" data-when="ai-down">6 份</span>
+        </div>
+        <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-alert"/></svg>身份证复印件、证件照排版 <b>8 月 16 日</b>前要留就先打印带走 <span class="ev ev--e1">E1 你的文件</span></span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>按内容归类：简历类 2 · 扫描件 2 · 报告类 2 <span class="ev ev--e1">E1 你的文件</span></span>
+        </div>
+        <details class="fold" data-when="default device-off" style="margin-top:8px">
+          <summary>为什么敏感件只留 7 天</summary>
+          <div class="fold-b">含身份证号、证件照的文件留得越久风险越大，所以按<b>文件类型</b>定 7 天，不按一般文档的 90 天。
+            期限不能手工延长；要长期留着，请打印带走或存到你自己的手机里。</div>
+        </details>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>未登录时上传或生成的文件<b>离场即清</b>，所以这里空着</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>到期日写在每一条自己那一行，不依赖 AI 也看得到</span>
+        </div>
+      </div>
+
+      <!-- ───────── 打印订单 · 明确不依赖 AI ─────────
+           订单是事实（金额、页数、取件码），不许 AI 加工。这一栏只做事实展示，
+           但它同样替用户省了一步：把「还有单没取」直接摆在顶上，不用逐条展开详单。 -->
+      <div class="checks" data-at="orders">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--fog-700)"><use href="#i-printer"/></svg>
+          <span class="t" data-when="default ai-down">还有 1 单没取：取件码 P-4172</span>
+          <span class="t" data-when="first">登录后这里会显示你的打印单据</span>
+          <span class="t" data-when="device-off">打印机离线：排队中的单等出纸恢复后继续</span>
+          <span class="s" data-when="default ai-down device-off">本页不依赖 AI</span>
+          <span class="s" data-when="first">功能说明</span>
+        </div>
+        <div class="checks-list" data-when="default ai-down device-off" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>金额、页数、支付状态与取件码<b>都是订单原文</b>，本机不做任何加工</span>
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>近 30 天 6 单：已完成 3 · 进行中 2 · 已取消 1</span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>没有账号就查不到历史单据；本次打印仍可在打印台看进度</span>
+        </div>
+      </div>
+
+      <!-- ───────── 筛选条：三个标签各一条 ───────── -->
+      <div class="fbar" data-at="resume" data-when="default ai-down device-off" data-for="lw-resume">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="diag" aria-pressed="false">诊断 3</button>
+        <button class="fchip" data-sel="gen" aria-pressed="false">生成 2</button>
+        <button class="fchip" data-sel="raw" aria-pressed="false">原件 1</button>
+        <button class="fchip" data-sel="run" aria-pressed="false">处理中 0</button>
+        <span class="fbar-n" data-shown>显示 6 条</span>
+      </div>
+
+      <div class="fbar" data-at="docs" data-when="default ai-down device-off" data-for="lw-docs">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="normal" aria-pressed="false">一般文档 4</button>
+        <button class="fchip" data-sel="sens" aria-pressed="false">敏感件 2</button>
+        <button class="fchip" data-sel="expired" aria-pressed="false">已到期 0</button>
+        <span class="fbar-n" data-shown>显示 6 条</span>
+      </div>
+
+      <div class="fbar" data-at="orders" data-when="default ai-down device-off" data-for="lw-orders">
+        <button class="fchip" data-sel="all" aria-pressed="true">全部 6</button>
+        <button class="fchip" data-sel="done" aria-pressed="false">已完成 3</button>
+        <button class="fchip" data-sel="run" aria-pressed="false">进行中 2</button>
+        <button class="fchip" data-sel="cancel" aria-pressed="false">已取消 1</button>
+        <button class="fchip" data-sel="fail" aria-pressed="false">失败 0</button>
+        <span class="fbar-n" data-shown>显示 6 条</span>
+      </div>
+
+      <!-- ═══════════ 我的简历 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-resume" data-at="resume">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="diag">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断报告 · 行政专员 v3</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">PDF · 3 页 · 8 月 9 日 10:05 · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原指 09?stage=s5 =「版本与导出」，那是简历版本的
+                   导出页，不是诊断报告。诊断报告在第 3 步「诊断结论」，改指 s3，并带上
+                   产物 ID（09 应按 ID 取这一份报告，取不到就回 s1，不得显示示例结论）。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s3&amp;from=P42&amp;artifactId=art-rpt-v3"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=resume-report&amp;title=简历诊断报告&amp;pages=3&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <!-- 2026-08-11 Codex 错配整改：原为裸链 05-phone-relay.html —— 05 默认主动作是
+                   「选文件传到机器」，方向与「带走」正好相反，也不知道要带走哪一份。
+                   按本页顶部契约 ② 补 relay=take + 产物身份。 -->
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%AE%80%E5%8E%86%E8%AF%8A%E6%96%AD%E6%8A%A5%E5%91%8A&amp;kind=resume-report&amp;artifactId=art-rpt-v3"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历诊断报告"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">任务号</span><span class="v">rt7f2a…c41d</span></div>
+                <div class="kv-row"><span class="k">派生记录</span><span class="v">优化版 v3 · 岗位匹配 1 次</span></div>
+                <div class="kv-row"><span class="k">保存期限</span><span class="v">一般文档 90 天 · 按类型定</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="gen">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">AI 优化版简历 v3</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">PDF · 2 页 · 8 月 9 日 10:18 · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 Codex 空白链接整改：原指 09-resume-workbench.html?stage=s6。
+                   简历工作台只有 s1–s5，s6 不存在，stages.js 会照单全收地把 data-stage 设成 s6，
+                   结果没有任何 data-at 命中 —— 打开是**整页空白**。
+                   优化版简历的落点是第 5 步「版本与导出」，改指 s5。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s5&amp;from=P42&amp;artifactId=art-resume-v3"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=优化版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E4%BC%98%E5%8C%96%E7%89%88%E7%AE%80%E5%8E%86%20v3&amp;kind=material&amp;artifactId=art-resume-v3"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <!-- 2026-08-10 交接不带货整改：这一行说的就是 v3，出口带上它（同上，不传 need=job） -->
+              <a class="btn btn--ghost" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42"><svg class="ic"><use href="#i-target"/></svg>拿 v3 去岗位匹配</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">改了什么</span><span class="v">补 2 段经历 · 重写自我评价</span></div>
+                <div class="kv-row"><span class="k">AI 生成标识</span><span class="v">文件内已标 · 打印件每页一次</span></div>
+                <div class="kv-row"><span class="k">原件</span><span class="v">不变 · 仍在下面第 3 条</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="raw">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-file"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">原件 · 王同学_行政专员_简历 v1</span>
+                  <span class="chip is-static">你上传的</span></span>
+                <span class="rrow-m">PDF · 2 页 · 8 月 2 日 09:12 · 存至 10 月 31 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原指 09?stage=s2 =「正在解析」，那是解析中的
+                   过程态，不是这份原件。原件是**你上传的文件**，本机不预览文件内容
+                   （同「我的文档」那一栏的口径），所以「查看」不再送人去工作台，
+                   改成本行内展开的文件信息层 —— 只写本机确实知道的几项。 -->
+              <button class="btn btn--ghost" type="button" data-finfo><svg class="ic"><use href="#i-info"/></svg>文件信息</button>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=原件简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%8E%8B%E5%90%8C%E5%AD%A6_%E8%A1%8C%E6%94%BF%E4%B8%93%E5%91%98_%E7%AE%80%E5%8E%86%20v1&amp;kind=material&amp;artifactId=art-resume-v1"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历原件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="finfo-t"><svg class="ic"><use href="#i-info"/></svg>文件信息</div>
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件名</span><span class="v">王同学_行政专员_简历 v1.pdf</span></div>
+                <div class="kv-row"><span class="k">类型</span><span class="v">PDF · 一般文档 · 你上传的原件</span></div>
+                <div class="kv-row"><span class="k">页数</span><span class="v">2 页</span></div>
+                <div class="kv-row"><span class="k">来路</span><span class="v">本机上传 · 8 月 2 日</span></div>
+                <div class="kv-row"><span class="k">派生记录</span><span class="v">诊断 v2 / v3 · 优化版 v3 都由它来</span></div>
+                <div class="kv-row"><span class="k">保存期限</span><span class="v">一般文档 90 天 · 不可手工延长</span></div>
+              </div>
+              <div class="finfo-note">本机<b>不预览文件内容</b> —— 预览要把简历铺在公共屏幕上，这一步没做。要看内容就打印带走，或扫码传回自己手机。要重新诊断这一份，用下面的<b>简历工作台</b>入口重新上传。</div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="diag">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断报告 · 运营方向 v2</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">PDF · 3 页 · 8 月 5 日 14:36 · 存至 11 月 3 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：同上，s5 是「版本与导出」不是诊断报告，改指 s3。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s3&amp;from=P42&amp;artifactId=art-rpt-v2"><svg class="ic"><use href="#i-eye"/></svg>查看报告</a>
+              <!-- 2026-08-10 Codex 空白链接整改：同上，s6 不存在 → 空白页。
+                   「继续优化」要去的是第 4 步「逐条优化」，改指 s4。 -->
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s4&amp;from=P42&amp;artifactId=art-rpt-v2"><svg class="ic"><use href="#i-pen"/></svg>继续优化</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历诊断报告"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">任务号</span><span class="v">rt55e0…9b2f</span></div>
+                <div class="kv-row"><span class="k">派生记录</span><span class="v">还没生成优化版</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="gen">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">AI 生成简历 · 应届版</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">PDF · 2 页 · 8 月 3 日 19:02 · 存至 11 月 1 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链 10-resume-interview.html，默认落 s1
+                   「先说方向」—— 那是重新开始生成的第一步，不是这份已经生成好的简历。
+                   成品在第 3 步「看成品」，改指 s3 并带产物 ID。 -->
+              <a class="btn btn--ghost" href="10-resume-interview.html?stage=s3&amp;from=P42&amp;artifactId=art-resume-fresh"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=应届版简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=AI%20%E7%94%9F%E6%88%90%E7%AE%80%E5%8E%86%20%C2%B7%20%E5%BA%94%E5%B1%8A%E7%89%88&amp;kind=material&amp;artifactId=art-resume-fresh"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="生成的简历"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">怎么来的</span><span class="v">访谈式生成 · 你答了 12 题</span></div>
+                <div class="kv-row"><span class="k">AI 生成标识</span><span class="v">文件内已标 · 打印件每页一次</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow rrow--off" data-g="diag">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-alert"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断 · 首次上传</span>
+                  <span class="chip chip--coral is-static">失败</span></span>
+                <span class="rrow-m">7 月 28 日 11:16 · 文件损坏 · 没有产出报告</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1"><svg class="ic"><use href="#i-upload"/></svg>重新上传</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="失败的诊断记录"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">失败原因</span><span class="v">PDF 结构损坏 · 读不出文字</span></div>
+                <div class="kv-row"><span class="k">有没有扣费</span><span class="v">没有 · 失败不计次</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 筛空：真实规则 —— 现在确实没有处理中的任务 -->
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <b>「<span data-empty-lb>处理中</span>」这一类现在没有记录</b>
+          <p>不凑数、不拿别的类别充数。换一个筛选，或者去做一份新的。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 条</button>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">上传新简历</a>
+            <a class="btn btn--ghost" href="10-resume-interview.html">让 AI 帮我生成</a>
+          </div>
+        </div>
+
+        <!-- 未登录 -->
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 简历留不下来</b>
+          <p>不登录也能用本机<b>全部功能</b>，只是简历、文档和单据离场就清空。</p>
+          <div class="acts">
+            <!-- 2026-08-11 Codex 错配整改：原为裸链 03-identity-gate.html —— 03 的门上说明与
+                 两个出口都写死招聘会上下文，从这里进门登录完会被送去招聘会作战台。
+                 按本页顶部契约 ① 补 returnTo，回到「我的简历」这一栏。 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=42-my-assets.html&amp;returnStage=resume&amp;from=P42">扫码登录</a>
+            <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s1">先做一份简历</a>
+            <!-- 2026-08-11 Codex 错配整改：原指 06?stage=s3 =「参数核价」，但这里一份文件都没选，
+                 06 收到只带 from 的交接会生成「未指定材料 · 请回第 1 步选文件」。改指 s1 选来源。 -->
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s1&amp;from=P42">直接去打印</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 我的文档 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-docs" data-at="docs">
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="normal">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">王同学_行政专员_简历.pdf</span>
+                  <span class="chip is-static">一般文档</span></span>
+                <span class="rrow-m">312 KB · 2 页 · 8 月 2 日 · 存至 10 月 31 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <button class="btn btn--ghost" type="button" data-finfo><svg class="ic"><use href="#i-info"/></svg>文件信息</button>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=行政专员简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%8E%8B%E5%90%8C%E5%AD%A6_%E8%A1%8C%E6%94%BF%E4%B8%93%E5%91%98_%E7%AE%80%E5%8E%86.pdf&amp;kind=material&amp;artifactId=art-doc-resume-admin"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <!-- 2026-08-11 Codex 错配整改：原为 08?stage=t2 裸阶段 —— 08 的 t2 右栏写死
+                   「求职信_运营助理.pdf」，本页两份不同文件点进去看到的是同一份别人的文件。
+                   按本页顶部契约 ③ 补文件身份。 -->
+              <a class="btn btn--ghost" href="08-file-tools.html?stage=t2&amp;from=P42&amp;artifactId=art-doc-resume-admin&amp;title=%E7%8E%8B%E5%90%8C%E5%AD%A6_%E8%A1%8C%E6%94%BF%E4%B8%93%E5%91%98_%E7%AE%80%E5%8E%86.pdf&amp;pages=2"><svg class="ic"><use href="#i-pen"/></svg>签名盖章</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="简历文件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="finfo-t"><svg class="ic"><use href="#i-info"/></svg>文件信息</div>
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件名</span><span class="v">王同学_行政专员_简历.pdf</span></div>
+                <div class="kv-row"><span class="k">类型</span><span class="v">PDF · 一般文档</span></div>
+                <div class="kv-row"><span class="k">页数</span><span class="v">2 页</span></div>
+                <div class="kv-row"><span class="k">大小</span><span class="v">312 KB</span></div>
+                <div class="kv-row"><span class="k">到期日</span><span class="v">10 月 31 日 · 还剩 82 天</span></div>
+                <div class="kv-row"><span class="k">来源页</span><span class="v">简历工作台 · 8 月 2 日上传</span></div>
+                <div class="kv-row"><span class="k">保存期限</span><span class="v">一般文档 90 天 · 按类型定，不可手工延长</span></div>
+                <div class="kv-row"><span class="k">到期怎么处理</span><span class="v">自动删除 · 留删除日志（不含内容）</span></div>
+              </div>
+              <div class="finfo-acts">
+                <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=行政专员简历&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印这份</a>
+                <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%8E%8B%E5%90%8C%E5%AD%A6_%E8%A1%8C%E6%94%BF%E4%B8%93%E5%91%98_%E7%AE%80%E5%8E%86.pdf&amp;kind=material&amp;artifactId=art-doc-resume-admin"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+                <button class="btn btn--ghost btn--danger" type="button" data-del="简历文件"><svg class="ic"><use href="#i-trash"/></svg>删除这份</button>
+              </div>
+              <div class="finfo-note">本机<b>不预览文件内容</b> —— 预览要把文件铺在公共屏幕上，这一步没做。要看内容就打印带走，或扫码传回自己手机。</div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="normal">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">纸质简历扫描_0809.pdf</span>
+                  <span class="chip is-static">一般文档</span></span>
+                <span class="rrow-m">2.4 MB · 3 页 · 8 月 9 日 · 存至 11 月 7 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <button class="btn btn--ghost" type="button" data-finfo><svg class="ic"><use href="#i-info"/></svg>文件信息</button>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=纸质简历扫描件&amp;pages=3&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%BA%B8%E8%B4%A8%E7%AE%80%E5%8E%86%E6%89%AB%E6%8F%8F_0809.pdf&amp;kind=material&amp;artifactId=art-doc-scan-0809"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <!-- 2026-08-11 Codex 错配整改：与上一条并列的两份不同文件原来都去 08?stage=t2，
+                   而 t2 写死「求职信_运营助理.pdf」。按契约 ③ 补这一份的身份。 -->
+              <a class="btn btn--ghost" href="08-file-tools.html?stage=t2&amp;from=P42&amp;artifactId=art-doc-scan-0809&amp;title=%E7%BA%B8%E8%B4%A8%E7%AE%80%E5%8E%86%E6%89%AB%E6%8F%8F_0809.pdf&amp;pages=3"><svg class="ic"><use href="#i-pen"/></svg>签名盖章</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="扫描件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="finfo-t"><svg class="ic"><use href="#i-info"/></svg>文件信息</div>
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件名</span><span class="v">纸质简历扫描_0809.pdf</span></div>
+                <div class="kv-row"><span class="k">类型</span><span class="v">PDF · 一般文档</span></div>
+                <div class="kv-row"><span class="k">页数</span><span class="v">3 页</span></div>
+                <div class="kv-row"><span class="k">大小</span><span class="v">2.4 MB</span></div>
+                <div class="kv-row"><span class="k">到期日</span><span class="v">11 月 7 日 · 还剩 89 天</span></div>
+                <div class="kv-row"><span class="k">来源页</span><span class="v">扫描工作台 · 本机扫描 300 dpi 彩色</span></div>
+              </div>
+              <div class="finfo-acts">
+                <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=纸质简历扫描件&amp;pages=3&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印这份</a>
+                <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E7%BA%B8%E8%B4%A8%E7%AE%80%E5%8E%86%E6%89%AB%E6%8F%8F_0809.pdf&amp;kind=material&amp;artifactId=art-doc-scan-0809"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+                <button class="btn btn--ghost btn--danger" type="button" data-del="扫描件"><svg class="ic"><use href="#i-trash"/></svg>删除这份</button>
+              </div>
+              <div class="finfo-note">本机<b>不预览文件内容</b>。要核对扫得清不清楚，打印一份或扫码传回手机看。</div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="sens">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-idcard"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">身份证复印件_0809.pdf</span>
+                  <span class="chip chip--amber is-static">敏感件 7 天</span></span>
+                <span class="rrow-m">480 KB · 1 页 · 8 月 9 日 · 存至 8 月 16 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <button class="btn btn--ghost" type="button" data-finfo><svg class="ic"><use href="#i-info"/></svg>文件信息</button>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=身份证复印件&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E8%BA%AB%E4%BB%BD%E8%AF%81%E5%A4%8D%E5%8D%B0%E4%BB%B6_0809.pdf&amp;kind=material&amp;artifactId=art-doc-idcard-0809"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="证件类文件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="finfo-t"><svg class="ic"><use href="#i-info"/></svg>文件信息</div>
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件名</span><span class="v">身份证复印件_0809.pdf</span></div>
+                <div class="kv-row"><span class="k">类型</span><span class="v">PDF · 敏感件</span></div>
+                <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
+                <div class="kv-row"><span class="k">大小</span><span class="v">480 KB</span></div>
+                <div class="kv-row"><span class="k">到期日</span><span class="v">8 月 16 日 · 还剩 6 天</span></div>
+                <div class="kv-row"><span class="k">来源页</span><span class="v">扫描工作台 · 本机扫描 8 月 9 日</span></div>
+                <div class="kv-row"><span class="k">为什么是 7 天</span><span class="v">含身份证号 · 按敏感件算</span></div>
+                <div class="kv-row"><span class="k">要长期留</span><span class="v">先打印带走 · 本机不长期保存</span></div>
+              </div>
+              <div class="finfo-acts">
+                <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=身份证复印件&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印这份</a>
+                <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E8%BA%AB%E4%BB%BD%E8%AF%81%E5%A4%8D%E5%8D%B0%E4%BB%B6_0809.pdf&amp;kind=material&amp;artifactId=art-doc-idcard-0809"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+                <button class="btn btn--ghost btn--danger" type="button" data-del="证件类文件"><svg class="ic"><use href="#i-trash"/></svg>删除这份</button>
+              </div>
+              <div class="finfo-note">敏感件<b>更不该在公共屏幕上铺开</b> —— 本机不预览证件内容，只给这几项信息。</div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="sens">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--amber"><svg class="ic"><use href="#i-image"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">证件照排版_2 寸_0808.jpg</span>
+                  <span class="chip chip--amber is-static">敏感件 7 天</span></span>
+                <span class="rrow-m">1.8 MB · 1 页 · 8 月 8 日 · 存至 8 月 15 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链 29-id-photo.html，默认落 sA =
+                   「证件照排版尚未开放」的锁定态 —— 点「查看」一份已经存下来的文件，
+                   看到的却是「这个功能还没建成」。而且证件照是敏感件，本机本来就
+                   不在公共屏幕上铺开内容（同上一条身份证复印件的口径）。
+                   改成本行内文件信息层，不送人去锁定页。 -->
+              <button class="btn btn--ghost" type="button" data-finfo><svg class="ic"><use href="#i-info"/></svg>文件信息</button>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=id-photo-sheet&amp;title=证件照排版&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E8%AF%81%E4%BB%B6%E7%85%A7%E6%8E%92%E7%89%88_2%20%E5%AF%B8_0808.jpg&amp;kind=id-photo-sheet&amp;artifactId=art-doc-idphoto-0808"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="证件照文件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="finfo-t"><svg class="ic"><use href="#i-info"/></svg>文件信息</div>
+              <div class="kv">
+                <div class="kv-row"><span class="k">文件名</span><span class="v">证件照排版_2 寸_0808.jpg</span></div>
+                <div class="kv-row"><span class="k">类型</span><span class="v">JPG · 敏感件</span></div>
+                <div class="kv-row"><span class="k">到期日</span><span class="v">8 月 15 日 · 还剩 5 天</span></div>
+                <div class="kv-row"><span class="k">规格</span><span class="v">2 寸 · 白底 · 一版 8 张</span></div>
+                <div class="kv-row"><span class="k">要长期留</span><span class="v">先打印带走 · 本机不长期保存</span></div>
+              </div>
+              <div class="finfo-note">证件照<b>不在公共屏幕上铺开</b>，本机只给这几项信息。要核对效果就打印一版，或扫码传回自己手机看。</div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="normal">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">职业规划建议_0805.pdf</span>
+                  <span class="chip is-static">一般文档</span></span>
+                <span class="rrow-m">340 KB · 4 页 · 8 月 5 日 · 存至 11 月 3 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-11 Codex 错配整改：原为裸链 22-career-plan.html，默认落 s1
+                   「你现在会什么」—— 那是重新做一遍规划的第一步。这份产物（行动清单）
+                   在第 3 步「带走行动清单」，改指 s3 并带产物 ID。 -->
+              <a class="btn btn--ghost" href="22-career-plan.html?stage=s3&amp;from=P42&amp;artifactId=art-plan-0805"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=职业规划建议&amp;pages=4&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E8%81%8C%E4%B8%9A%E8%A7%84%E5%88%92%E5%BB%BA%E8%AE%AE_0805.pdf&amp;kind=material&amp;artifactId=art-plan-0805"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="规划建议文件"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">到期日</span><span class="v">11 月 3 日 · 还剩 85 天</span></div>
+                <div class="kv-row"><span class="k">AI 生成标识</span><span class="v">文件内已标 · 打印件每页一次</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="normal">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">面试复盘单_0728.pdf</span>
+                  <span class="chip is-static">一般文档</span></span>
+                <span class="rrow-m">220 KB · 2 页 · 7 月 28 日 · 存至 10 月 26 日</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" href="20-interview-pod.html?stage=s3&amp;from=P42&amp;artifactId=art-interview-0728"><svg class="ic"><use href="#i-eye"/></svg>查看</a>
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>打印</a>
+              <a class="btn btn--ghost" data-when="device-off" href="05-phone-relay.html?dir=take&amp;from=P42&amp;title=%E9%9D%A2%E8%AF%95%E5%A4%8D%E7%9B%98%E5%8D%95_0728.pdf&amp;kind=interview-sheet&amp;artifactId=art-interview-0728"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</a>
+              <button class="btn btn--ghost btn--danger" type="button" data-del="面试复盘单"><svg class="ic"><use href="#i-trash"/></svg>删除</button>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">到期日</span><span class="v">10 月 26 日 · 还剩 77 天</span></div>
+                <div class="kv-row"><span class="k">作答原文</span><span class="v">从不保存 · 只记「练过一次」</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>现在没有「<span data-empty-lb>已到期</span>」的文件</b>
+          <p>到期的文件会<b>自动删除</b>并留一条删除日志（日志不含文件内容），不会停在列表里等你处理。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 份</button>
+            <a class="btn btn--ghost" href="07-scan-workbench.html">扫描原件存进来</a>
+            <a class="btn btn--ghost" href="08-file-tools.html">去文件加工台</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 文件离场即清</b>
+          <p>没登录时上传或生成的文件<b>不进长期存储</b>，会话结束或超时就没了。</p>
+          <div class="acts">
+            <!-- 2026-08-11 Codex 错配整改：补 returnTo（契约 ①），登录后回「我的文档」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=42-my-assets.html&amp;returnStage=docs&amp;from=P42">扫码登录</a>
+            <!-- 2026-08-11 Codex 错配整改：未登录时一份文件都没有，s3 核价没有材料可核，改指 s1 选来源 -->
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s1&amp;from=P42">先打印带走</a>
+            <a class="btn btn--ghost" href="07-scan-workbench.html">去扫描原件</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 打印订单 · 列表 ═══════════ -->
+      <div class="lwrap" id="lw-orders" data-at="orders">
+        <!-- 深链定位条：?stage=orders&orderId=xxx 命中时才出现（.is-on 由页内脚本加）。
+             参数缺失或写错就不显示，列表照常全量展示 —— 不因为一个查询参数把列表清空。 -->
+        <div class="deep" id="deep-order" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <span class="deep-b">已按单号 <span class="deep-id" data-deep-id>—</span> 定位到这一单，已展开在下面</span>
+          <button class="btn btn--ghost" type="button" data-deep-clear>看全部订单</button>
+        </div>
+        <div class="rlist" data-when="default ai-down device-off">
+
+          <div class="rrow" data-g="done" data-oid="O-20260809-1023">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">王同学_行政专员_简历.pdf</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">2 份 · 黑白 · A4 · 8 月 9 日 10:23 · ¥1.20 已付 · 单号 O-20260809-1023</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=行政专员简历&amp;pages=2&amp;copies=2"><svg class="ic"><use href="#i-refresh"/></svg>再打一份</a>
+              <!-- ══ 2026-08-11 「看设备状态」整改（Codex (b) P0 第 1 条）══════════════
+                   核过一遍：**全站没有一页在显示本机实时的纸量、粉量与队列**。
+                   最接近的实时读数是 06 打印工作台右栏那块「本机状态」（打印机在线/碳粉、
+                   A4 纸张 78%、扫描仪就绪，见 06 的 data-at="s1 s2 s5 s6 s7" 面板），
+                   但它是打印流程里的侧栏，不是一个能被链过去的状态页 —— 把人送进 06 s1
+                   等于让他为了看纸量去开一笔新打印，更糟。
+                   04 的实际内容：s1 帮助（编号、位置、现场服务台、服务时间、**报修**、
+                   三个最常见卡点），s6「本机状态与异常处置」是给运维复核与现场演示看的
+                   14 条状态样板，04 自己写明「不会改变这台机器现在的状态」。
+                   所以按第三种处置办：**目标改指 04 s1（求助与报修真的在那儿），
+                   文案不再承诺纸、墨、队列**。 -->
+              <a class="btn btn--ghost" data-when="device-off" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+              <a class="btn btn--ghost" href="43-my-records.html?stage=notice"><svg class="ic"><use href="#i-bell"/></svg>反馈</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">金额</span><span class="v">¥1.20 · 已支付（线下收款）</span></div>
+                <div class="kv-row"><span class="k">计费页数</span><span class="v">4 页（2 页 × 2 份）</span></div>
+                <div class="kv-row"><span class="k">再打一份</span><span class="v">会新建一笔任务与订单，不是重发这笔</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="run" data-oid="O-20260809-1024">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">简历诊断报告_0809.pdf</span>
+                  <span class="chip chip--amber is-static">打印中</span></span>
+                <span class="rrow-m">1 份 · 彩色 · A4 · 8 月 9 日 10:24 · ¥2.00 待现场确认 · 单号 O-20260809-1024</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 Codex 错配整改：原指 06-print-workbench.html?stage=s5 = **收银**。
+                   这一单已经在出纸了，把人送回收银台是错的落点。
+                   打印台第 6 步才是「正在出纸」，改指 s6。 -->
+              <!-- 2026-08-11 Codex 错配整改：两笔不同的单原来「看进度」指向完全相同的
+                   06?stage=s6，没有任何订单身份，点哪一单看到的都是同一屏默认进度。
+                   按本页顶部契约 ④ 补 orderId（本页自己的 orders 深链已经在这么用了）。 -->
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s6&amp;from=P42&amp;orderId=O-20260809-1024"><svg class="ic"><use href="#i-eye"/></svg>看进度</a>
+              <!-- 2026-08-11：这一单正在出纸，06 s6 那一屏右栏本来就有实时的纸/粉/队列，
+                   再放一个「看设备状态」是重复；这里改成 04 s1 的求助与报修（真在那儿）。 -->
+              <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">支付状态</span><span class="v">待现场确认 · 金额以打印台为准</span></div>
+                <div class="kv-row"><span class="k">计费页数</span><span class="v">3 页 · 系统识别 PDF 页数</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="run" data-oid="O-20260809-1020">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-package"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">活动资料_秋季综合.pdf</span>
+                  <span class="chip chip--amber is-static">排队中</span></span>
+                <span class="rrow-m">1 份 · 黑白 · A4 · 8 月 9 日 10:20 · 免费 · 取件码 P-4172 · 单号 O-20260809-1020</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <!-- 2026-08-10 Codex 错配整改：同上，s5 是收银，出纸进度在 s6。
+                   2026-08-11 补 orderId（契约 ④）：不带单号时这一单和上一单点开一模一样。 -->
+              <a class="btn btn--ghost" href="06-print-workbench.html?stage=s6&amp;from=P42&amp;orderId=O-20260809-1020"><svg class="ic"><use href="#i-eye"/></svg>看进度</a>
+              <!-- 2026-08-11：这一单打的是「活动资料_秋季综合.pdf」，「回招聘会」必须回到
+                   那一场，不能落到作战台的默认场次。按契约 ⑥ 补 fairId。
+                   2026-08-11 跨页对账：原 fairId=FA-2026-08 是 43 自造的号，17 场次库里没有，
+                   文件名也跟着写「夏季招聘会」。按主页面口径（招聘会＝17）改引 17 真实存在的
+                   RC-2026-0812-A「2026 年秋季综合人才交流会 · 8 月 12 日 · 市人力资源市场 A 馆 ·
+                   来源 市人力资源和社会保障局 · 同步 8 月 9 日 07:30」（17 第 471–487 行），
+                   文件名同步改成「活动资料_秋季综合.pdf」，与 43 第 1359、1366 行一致。
+                   没有往 17 里新增场次 —— 往主页面加条目就是凭空造数据。 -->
+              <a class="btn btn--ghost" href="17-fair-desk.html?stage=s1&amp;fairId=RC-2026-0812-A&amp;from=P42"><svg class="ic"><use href="#i-fair"/></svg>回招聘会</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">取件码</span><span class="v">P-4172 · 向现场工作人员出示</span></div>
+                <div class="kv-row"><span class="k">取件码有效期</span><span class="v">7 天 · 订单口径，不是文件保存期</span></div>
+                <div class="kv-row"><span class="k">出纸后</span><span class="v">取件码自动失效</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="done" data-oid="O-20260808-1640">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">证件照排版_2 寸_0808.jpg</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">1 份 · 彩色 · A4 · 8 月 8 日 16:40 · ¥2.00 已付 · 单号 O-20260808-1640</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=id-photo-sheet&amp;title=证件照排版&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-refresh"/></svg>再打一份</a>
+              <!-- 2026-08-11 「看设备状态」整改，理由同上面第一单 -->
+              <a class="btn btn--ghost" data-when="device-off" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+              <a class="btn btn--ghost" href="43-my-records.html?stage=notice"><svg class="ic"><use href="#i-bell"/></svg>反馈</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">金额</span><span class="v">¥2.00 · 已支付（人工确认）</span></div>
+                <div class="kv-row"><span class="k">原文件</span><span class="v">敏感件 · 8 月 15 日到期自动删除</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow rrow--off" data-g="cancel" data-oid="O-20260803-1102">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic rrow-ic--fog"><svg class="ic"><use href="#i-close"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">求职材料清单_0803.pdf</span>
+                  <span class="chip is-static">已取消</span></span>
+                <span class="rrow-m">1 份 · 黑白 · A4 · 8 月 3 日 11:02 · 暂无支付信息 · 单号 O-20260803-1102</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=material&amp;title=求职材料清单&amp;pages=1&amp;copies=1"><svg class="ic"><use href="#i-refresh"/></svg>重新下单</a>
+              <!-- 2026-08-11 「看设备状态」整改，理由同上面第一单 -->
+              <a class="btn btn--ghost" data-when="device-off" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">支付信息</span><span class="v">暂无 · 没关联到支付记录就不推断</span></div>
+                <div class="kv-row"><span class="k">取消原因</span><span class="v">你在收银台放弃了这一单</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rrow" data-g="done" data-oid="O-20260728-2011">
+            <button class="rrow-hd" type="button" aria-expanded="false">
+              <span class="rrow-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+              <span class="rrow-b">
+                <span class="rrow-tl"><span class="rrow-t">面试复盘单_0728.pdf</span>
+                  <span class="chip chip--jade is-static">已完成</span></span>
+                <span class="rrow-m">1 份 · 黑白 · A4 · 7 月 28 日 20:11 · ¥0.50 已付 · 单号 O-20260728-2011</span>
+              </span>
+              <svg class="ic rrow-x"><use href="#i-chevron"/></svg>
+            </button>
+            <div class="rrow-ops">
+              <a class="btn btn--ghost" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=interview-sheet&amp;title=面试复盘单&amp;pages=2&amp;copies=1"><svg class="ic"><use href="#i-refresh"/></svg>再打一份</a>
+              <!-- 2026-08-11 「看设备状态」整改，理由同上面第一单 -->
+              <a class="btn btn--ghost" data-when="device-off" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+            </div>
+            <div class="rrow-det">
+              <div class="kv">
+                <div class="kv-row"><span class="k">金额</span><span class="v">¥0.50 · 已支付（线下收款）</span></div>
+                <div class="kv-row"><span class="k">计费页数</span><span class="v">2 页</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="blank blank--filter" data-when="default ai-down device-off">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>近 30 天没有「<span data-empty-lb>失败</span>」的打印单</b>
+          <p>失败单会保留在这里并写明原因；出纸失败不重复计费，退款按订单原文显示。</p>
+          <div class="acts">
+            <button class="btn btn--primary" data-reset>看全部 6 单</button>
+            <!-- 2026-08-11：这里没有选好的文件，s3 核价没有材料可核，改指 s1 选来源 -->
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s1&amp;from=P42">去打印工作台</a>
+            <!-- 2026-08-11 「看本机状态」整改，理由见上面订单行的长注释 -->
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P42">求助与报修</a>
+          </div>
+        </div>
+
+        <div class="blank" data-when="first">
+          <svg class="ic"><use href="#i-qr"/></svg>
+          <b>未登录 · 查不到历史单据</b>
+          <p>没登录也能打印，只是<b>单据不跟着账号走</b>；本次进度仍能在打印台看到。</p>
+          <div class="acts">
+            <!-- 2026-08-11：补 returnTo（契约 ①），登录后回「打印订单」这一栏 -->
+            <a class="btn btn--primary" href="03-identity-gate.html?returnTo=42-my-assets.html&amp;returnStage=orders&amp;from=P42">扫码登录</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s1&amp;from=P42">去打印工作台</a>
+            <a class="btn btn--ghost" href="04-system-states.html?stage=s1&amp;from=P42">求助与报修</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ───────── 三个标签各自的出口（放 wmain 末尾，贴栏底） ───────── -->
+      <div class="xlane" data-at="resume">
+        <span class="xlane-hd">这一栏之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="09-resume-workbench.html?stage=s1">
+            <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">简历工作台</span>
+              <span class="xlane-ds">上传新简历 · 重新诊断与优化</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-10 交接不带货整改：出口带上最新那一版（v3）；不传 need=job 的理由见上 -->
+          <a class="xlane-go" href="11-jobfit-compare.html?stage=s1&amp;resumeVer=v3&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">岗位匹配对比</span>
+              <span class="xlane-ds">带去：简历 v3&nbsp;· 到对面挑岗位</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s3&amp;from=P42&amp;kind=resume-report&amp;title=简历诊断报告&amp;pages=3&amp;copies=1">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印诊断报告</span>
+              <span class="xlane-ds">带去：诊断报告 3 页&nbsp;· 预估价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 未登录时没有"你的诊断报告"可带，出口退回从选文件开始，不报个不存在的页数。
+               2026-08-11：文案写「从选文件开始」，href 却是 s3 参数核价，自相矛盾；改指 s1。 -->
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s1&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="docs">
+        <span class="xlane-hd">文件还能这样处理</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <a class="xlane-go" href="08-file-tools.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">文件加工台</span>
+              <span class="xlane-ds">合并 · 拆页 · 转格式 · 签名盖章</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="07-scan-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">扫描工作台</span>
+              <span class="xlane-ds">纸质原件扫成 PDF 存进这一栏</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-11 整改：这张卡原来写「打印所选文件 · 带去：所选文件 2 页」，
+               可这一栏根本没有"选中"这个动作 —— 文件是逐条列的，每条自己有「打印」。
+               卡面承诺了一个不存在的选择结果，还直接跳过 06 第 1 步进核价。
+               改成如实的说法：去打印台从我的文档里选一份，落在 s1 选来源。
+               要打某一份仍然用那一条自己行内的「打印」，那个是带 kind/title/pages 的。 -->
+          <a class="xlane-go" data-when="default ai-down device-off" href="06-print-workbench.html?stage=s1&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从我的文档里挑一份&nbsp;· 现场核价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" data-when="first" href="06-print-workbench.html?stage=s1&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">从选文件开始 · 现场核价</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="xlane" data-at="orders">
+        <span class="xlane-hd">单子之外，这三处也能往下走</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
+          <!-- 2026-08-11：文案写「从选文件开始」，href 却是 s3 参数核价，自相矛盾；改指 s1。 -->
+          <a class="xlane-go" href="06-print-workbench.html?stage=s1&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">新建一笔打印 · 从选文件开始</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="42-my-assets.html?stage=docs">
+            <span class="src-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">我的文档</span>
+              <span class="xlane-ds">复打从这里重新选文件</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <!-- 2026-08-11 「本机状态」整改（Codex (b) P0 第 1 条）：
+               这张卡原来承诺「纸、墨、队列与故障上报都在这儿」，可 04 打开是求助页，
+               04 自己也写明它列的是异常长什么样、不是这台机器现在的状态。
+               全站没有实时纸/粉/队列的落地页（最接近的是 06 打印台右栏的本机状态面板，
+               不是独立页，链过去等于逼人开一笔新打印）。
+               所以卡面改成 04 s1 真正给得出的东西：现场服务台、服务时间、报修、常见卡点。
+               纸量与队列想看，是在打印那一趟里由 06 右栏给，不在这里承诺。 -->
+          <a class="xlane-go" href="04-system-states.html?stage=s1&amp;from=P42">
+            <span class="src-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+            <span class="xlane-tx"><span class="xlane-nm">求助与报修</span>
+              <span class="xlane-ds">现场服务台 · 报修方式 · 三个最常见卡点</span></span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+      <!-- 常驻合规声明（每页一条，2026-08-11 从右栏移到正文，不随抽屉收起） -->
+      <div class="compline">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>本机只保管<b>你自己的材料</b>：不代收简历、不做企业筛选、不做面试邀约。</span>
+      </div>
+
+    </div>
+
+    <!-- ═════════════════ 右：口径与统计 → 按需抽屉（2026-08-11）═════════════════ -->
+    <div class="wside" id="p42side">
+      <div class="sidehd">
+        <span class="t">统计与口径</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
+      </div>
+
+      <!-- 统计：first 态不显示任何个性化数字 -->
+      <div class="pane" data-at="resume">
+        <div class="pane-hd"><span class="t">简历档案</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 条</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">最新版本</span>
+            <span class="v" data-when="default ai-down device-off">v3 · 8 月 9 日</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">诊断 / 生成</span>
+            <span class="v" data-when="default ai-down device-off">3 次 / 2 次</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">最近一条到期</span>
+            <span class="v" data-when="default ai-down device-off">10 月 26 日</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">展示范围</span><span class="v v--fog">只有元数据 · 不展示正文</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="docs">
+        <div class="pane-hd"><span class="t">文档资产</span><span class="s">只你自己看得到</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 份</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">一般文档</span>
+            <span class="v" data-when="default ai-down device-off">4 份 · 90 天</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">敏感件</span>
+            <span class="v" data-when="default ai-down device-off">2 份 · 7 天</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">最近到期</span>
+            <span class="v" data-when="default ai-down device-off">8 月 15 日 · 还剩 5 天</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">访问方式</span><span class="v v--fog">查看/打印时换一次短期链接</span></div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="orders">
+        <div class="pane-hd"><span class="t">近 30 天</span><span class="s">订单原文</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">共</span>
+            <span class="v" data-when="default ai-down device-off">6 单</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">已完成 / 进行中</span>
+            <span class="v" data-when="default ai-down device-off">3 单 / 2 单</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">合计已付</span>
+            <span class="v" data-when="default ai-down device-off">¥3.70</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">待取件</span>
+            <span class="v" data-when="default ai-down device-off">1 单 · P-4172</span>
+            <span class="v v--fog" data-when="first">登录后显示</span></div>
+          <div class="kv-row"><span class="k">金额口径</span><span class="v v--fog">以打印台核价为准</span></div>
+        </div>
+      </div>
+
+      <!-- 保存期限：三个标签共用，数字与 P23 账号设置那张基准表逐行对齐 -->
+      <div class="pane" data-at="resume docs orders">
+        <div class="pane-hd"><span class="t">保存期限</span><span class="s">全站口径</span></div>
+        <div class="keep">
+          <div class="keep-hd"><span>文件类型</span><span>保存多久</span></div>
+          <div class="keep-row keep-row--warn">
+            <span class="keep-t">敏感文件<i>证件照 · 身份证复印件 · 含身份证号的扫描件</i></span>
+            <span class="keep-v">7 天</span>
+          </div>
+          <div class="keep-row">
+            <span class="keep-t">一般文档<i>简历 · 求职材料 · 扫描件 · 生成产物</i></span>
+            <span class="keep-v">90 天</span>
+          </div>
+          <div class="keep-row keep-row--none">
+            <span class="keep-t">未登录的本次会话文件<i>没登录时上传或生成的东西</i></span>
+            <span class="keep-v">离场即清</span>
+          </div>
+          <div class="keep-row keep-row--none">
+            <span class="keep-t">面试练习作答<i>你答的内容</i></span>
+            <span class="keep-v">从不保存</span>
+          </div>
+          <div class="keep-row keep-row--warn">
+            <span class="keep-t">待打印订单里的文件<i>订单口径 · 凭取件码复打</i></span>
+            <span class="keep-v">7 天</span>
+          </div>
+        </div>
+        <details class="fold" style="margin-top:10px">
+          <summary>期限能不能自己改</summary>
+          <div class="fold-b">不能。期限<b>按文件类型定</b>，一份文件里只要含身份证号就按 7 天算。
+            要长期留着，请打印带走或存到你自己的手机里。基准表在
+            <!-- 2026-08-11：23 已经在消费 ?view=（见 23-me.html 内注释），带上 settings
+                 才会落到账号设置那张卡；裸链只到「我的」首屏，用户还得自己找。 -->
+            <a class="inlink" href="23-me.html?view=settings"><svg class="ic"><use href="#i-gear"/></svg>账号设置</a></div>
+        </details>
+      </div>
+
+      <!-- 2026-08-11：这一块的合规声明已移到正文常驻（.compline），不在抽屉里重复。 -->
+      <div class="pane pane--fill" data-at="resume docs orders">
+        <div class="pane-hd"><span class="t">删除与日志</span><span class="s">删了就没了</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">删除</span><span class="v">要点两次 · 第二次才真删</span></div>
+          <div class="kv-row"><span class="k">确认层</span><span class="v">不显示文件名全称 · 防旁人看到</span></div>
+          <div class="kv-row"><span class="k">删除之后</span><span class="v">不可恢复 · 留一条删除日志</span></div>
+          <div class="kv-row"><span class="k">日志内容</span><span class="v">谁删的、什么时候、删了几个</span></div>
+          <div class="kv-row"><span class="k">日志不含</span><span class="v">文件内容与文件名全称</span></div>
+          <div class="kv-row"><span class="k">到期自动删</span><span class="v">同样留日志 · 不需要你操作</span></div>
+          <div class="kv-row"><span class="k">删了能再打</span><span class="v">不能 · 要先重新上传或扫描</span></div>
+          <div class="kv-row"><span class="k">管理员看文件</span><span class="v">必须留访问日志</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 删除确认层：防肩窥，不回显文件名全称 ══════════ -->
+  <div class="ovl" id="ovl-del" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-trash"/></svg><b>确认删除？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t" id="del-what">将删除：简历文件 ×1</span>
+          <span class="nrow-s">为防旁人看到 · 此处不显示文件名全称</span></span></div>
+      <div class="notice">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>删除后不可恢复；会留一条删除日志（谁删的、什么时候、删了几个），<b>日志不含文件内容</b>。</span>
+      </div>
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
+        <button class="btn btn--commit" type="button" data-close>确认删除</button>
+        <!-- 2026-08-11：「原型稿 · …」是给评审看的实现备注，不是给站在机器前的人看的。
+             产品视图（?capture=1）里不渲染，评审视图仍在。 -->
+        <span class="panel-note proto-only" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="backwrap"><a class="backbtn" href="23-me.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a></div>
+    <div class="actionbar-hint">
+      <div data-at="resume">
+        <div data-when="default device-off"><div class="t">6 条简历记录 · 最新 v3</div><div class="s">版本差异在顶上一屏看完 · 点条目展开任务与派生记录</div></div>
+        <div data-when="first"><div class="t">未登录 · 简历留不下来</div><div class="s">功能不受影响 · 打印带走或登录后再上传</div></div>
+        <div data-when="ai-down"><div class="t">版本比对暂不可用</div><div class="s">查看、打印、删除照常 · 故障已自动上报</div></div>
+      </div>
+      <div data-at="docs">
+        <div data-when="default ai-down"><div class="t">6 份文件 · 2 份敏感件 6 天后自动删</div><div class="s">每一条自己那行就写着到期日 · 期限按类型定</div></div>
+        <div data-when="first"><div class="t">未登录 · 文件离场即清</div><div class="s">要留就先打印带走</div></div>
+        <div data-when="device-off"><div class="t">打印机离线 · 文件照常可看</div><div class="s">打印改为「扫码带走」，出纸恢复后可再打</div></div>
+      </div>
+      <div data-at="orders">
+        <div data-when="default ai-down"><div class="t">还有 1 单没取 · 取件码 P-4172</div><div class="s">订单是事实，本页不做 AI 加工 · 复打会新建一笔</div></div>
+        <div data-when="first"><div class="t">未登录 · 查不到历史单据</div><div class="s">本次打印的进度仍能在打印台看到</div></div>
+        <div data-when="device-off"><div class="t">打印机离线 · 排队单等恢复</div><div class="s">已支付的单在取件码有效期内可复打</div></div>
+      </div>
+    </div>
+
+    <a class="btn btn--lg btn--ghost" data-at="resume" href="09-resume-workbench.html?stage=s1"><svg class="ic"><use href="#i-upload"/></svg>上传新简历</a>
+    <a class="btn btn--lg btn--ghost" data-at="docs" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>扫描原件存档</a>
+    <!-- 2026-08-11 「查看本机状态」整改，理由见 orders 出口卡上的长注释 -->
+    <a class="btn btn--lg btn--ghost" data-at="orders" href="04-system-states.html?stage=s1&amp;from=P42"><svg class="ic"><use href="#i-help"/></svg>求助与报修</a>
+
+    <a class="btn btn--primary" data-at="resume" href="09-resume-workbench.html">去简历工作台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="docs" href="08-file-tools.html">去文件加工台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 2026-08-11：这是「新建一笔打印」的通用入口，没有带任何材料，落 s1 选来源 -->
+    <a class="btn btn--primary" data-at="orders" href="06-print-workbench.html?stage=s1&amp;from=P42">去打印工作台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html" aria-current="page"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* ── 标签选中态：data-stage 变了就同步三个 .stbtn ──────────────────────
+   （与 P13 同一份写法。?stage=docs 直达时也会走到这里，所以直达进来
+     标签是选中的，用户不用再点一次。） */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  /* 不认识的 ?stage= 兜底：stages.js 会照单全收地把 data-stage 设成任意字符串，
+     于是 42-my-assets.html?stage=typo 会渲染成**一片空白**（没有任何 data-at 命中）。
+     外部链接写错一个字母就白屏，代价太大。这里把取值收敛到白名单，
+     不认识就落回第一个标签。 */
+  var VALID = ['resume', 'docs', 'orders']
+  if (VALID.indexOf(scr.getAttribute('data-stage')) < 0) {
+    if (window.v3Stage) window.v3Stage(VALID[0])
+    else { scr.setAttribute('data-stage', VALID[0]); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P42 本页交互：条目展开 / 状态筛选 / 删除二次确认
+   --------------------------------------------------------------------------
+   手势与原型保持一致：
+     · 条目行头部点一下展开详情（原型 18 的「详单 / 收起详单」同一件事，
+       只是把触发点从一个小按钮扩成整行头部 —— 27 寸触控屏上更好点，
+       行内按钮仍然各自独立可点，不会误触发展开）。
+     · 状态筛选就是原型 18 的 filter-bar，点一下换一类，可数、可核对。
+     · 删除仍是两步：行内「删除」→ 确认层「确认删除」。
+       确认层**不回显文件名全称**（防肩窥），只说删几个、什么类型。
+   筛选判据写死并可核对，不猜、不随机：处理中 / 已到期 / 失败三类
+   在本原型的数据里确实是 0 条，所以选中它们就切到空态。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function applyFilter (bar, sel) {
+    var wrap = document.getElementById(bar.getAttribute('data-for'))
+    if (!wrap) return
+    var chips = bar.querySelectorAll('.fchip[data-sel]')
+    var i
+    for (i = 0; i < chips.length; i++) {
+      chips[i].setAttribute('aria-pressed', chips[i].getAttribute('data-sel') === sel ? 'true' : 'false')
+    }
+    var rows = wrap.querySelectorAll('.rrow')
+    var n = 0
+    for (i = 0; i < rows.length; i++) {
+      var g = String(rows[i].getAttribute('data-g') || '').split(/\s+/)
+      var ok = (sel === 'all') || g.indexOf(sel) > -1
+      rows[i].style.display = ok ? '' : 'none'
+      if (ok) n++
+    }
+    wrap.classList.toggle('is-empty', n === 0)
+    var cnt = bar.querySelector('[data-shown]')
+    if (cnt) cnt.textContent = n ? ('显示 ' + n + ' 条') : '这一类现在没有记录'
+    var lb = wrap.querySelector('[data-empty-lb]')
+    var cur = bar.querySelector('.fchip[aria-pressed="true"]')
+    if (!n && lb && cur) lb.textContent = cur.textContent.replace(/\s*\d+\s*$/, '').trim()
+  }
+
+  /* ── 订单深链：?stage=orders&orderId=xxx ─────────────────────────────────
+     通知里「看这一单」原来只能打开整张订单列表，用户还得自己在 6 条里找。
+     命中就展开那一条 + 描边 + 顶部说明；**参数缺失、写错、或那一单不在本机
+     就什么都不做，列表照常全量显示** —— 不为一个查询参数把列表清空，
+     也不编一条不存在的订单出来。 */
+  var deepBar = document.getElementById('deep-order')
+
+  function clearDeep () {
+    var i, rs = scr.querySelectorAll('.rrow.is-target')
+    for (i = 0; i < rs.length; i++) rs[i].classList.remove('is-target')
+    if (deepBar) deepBar.classList.remove('is-on')
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  function applyDeepOrder () {
+    var q, oid, row, hd
+    try { q = new URLSearchParams(location.search) } catch (e) { return }
+    oid = (q.get('orderId') || '').trim()
+    if (!oid) return
+    row = scr.querySelector('.rrow[data-oid="' + oid.replace(/"/g, '') + '"]')
+    if (!row) return                       // 找不到就当没传，不报错也不假装找到了
+    row.classList.add('is-open', 'is-target')
+    hd = row.querySelector('.rrow-hd')
+    if (hd) hd.setAttribute('aria-expanded', 'true')
+    if (deepBar) {
+      var lab = deepBar.querySelector('[data-deep-id]')
+      if (lab) lab.textContent = oid
+      deepBar.classList.add('is-on')
+    }
+    if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' })
+  }
+
+  applyDeepOrder()
+
+  scr.addEventListener('click', function (e) {
+    /* 条目展开 / 收起 */
+    var hd = e.target.closest('.rrow-hd')
+    if (hd) {
+      var row = hd.closest('.rrow')
+      var open = row.classList.toggle('is-open')
+      hd.setAttribute('aria-expanded', open ? 'true' : 'false')
+      return
+    }
+    /* 状态筛选 */
+    var chip = e.target.closest('.fchip[data-sel]')
+    if (chip) { applyFilter(chip.closest('.fbar'), chip.getAttribute('data-sel')); return }
+    /* 空态里的「看全部」：真的把筛选拨回全部 */
+    var rst = e.target.closest('[data-reset]')
+    if (rst) {
+      var wrap2 = rst.closest('.lwrap')
+      var bar2 = scr.querySelector('.fbar[data-for="' + (wrap2 && wrap2.id) + '"]')
+      if (bar2) applyFilter(bar2, 'all')
+      return
+    }
+    /* 文件信息：文档「查看」的落点。展开本行的信息层，不跳去别的工具台。
+       原来这三个按钮指 08-file-tools.html（格式转换工具），点「查看」被推去转格式。 */
+    var fi = e.target.closest('[data-finfo]')
+    if (fi) {
+      var frow = fi.closest('.rrow')
+      if (frow) {
+        frow.classList.add('is-open')
+        var fhd = frow.querySelector('.rrow-hd')
+        if (fhd) fhd.setAttribute('aria-expanded', 'true')
+        if (frow.scrollIntoView) frow.scrollIntoView({ block: 'nearest' })
+        if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+      }
+      return
+    }
+    /* 深链定位条上的「看全部订单」：撤掉高亮，回到普通列表 */
+    var dc = e.target.closest('[data-deep-clear]')
+    if (dc) { clearDeep(); return }
+    /* 删除：第一步只开确认层，什么都不删 */
+    var del = e.target.closest('[data-del]')
+    if (del) {
+      var o = document.getElementById('ovl-del')
+      var what = document.getElementById('del-what')
+      if (what) what.textContent = '将删除：' + del.getAttribute('data-del') + ' ×1'
+      if (o) o.hidden = false
+      return
+    }
+    var cl = e.target.closest('[data-close]')
+    if (cl) {
+      var ov = cl.closest('.ovl')
+      if (ov) ov.hidden = true
+    }
+  })
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return
+    var os = document.querySelectorAll('.ovl')
+    for (var i = 0; i < os.length; i++) os[i].hidden = true
+  })
+})()
+
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var b = document.querySelector('[data-side-open]')
+    if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
+<!-- audit-plus 必须放在 stage.js 之后：它靠 window.v3Audit 合并九项基础检查 -->
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI大模型（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/ai-config</code>「AI大模型」</b>（<code>apps/admin/src/routes/ai-config/index.tsx</code>，411 行）。
+    现状：一次只能配 1 个功能键，共 7 个键，靠下拉切换。
+    改后：同一页变成<b>能力清单 + 详情抽屉</b>——上半部分是新增的清单，下半部分就是现在这套表单，原样搬进抽屉的「模型绑定」Tab。
+    <b>路由不变、菜单位置不变、现有配置全部保留。</b>
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>AI大模型</h1>
+      <p>能力清单 · 模型绑定 · Prompt 版本 · 闸门与降级</p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">导出配置快照</button>
+      <button class="btn btn--sm btn--primary">新增能力</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- 共用键拆分向导 -->
+  <div class="card isnew" data-newtag="新增 · 迁移向导" data-when="default aidown" style="border-color:#e3ccb3;margin-bottom:16px">
+    <div class="card__body" style="display:flex;gap:16px;align-items:center">
+      <div style="flex:1">
+        <div class="row" style="gap:9px">
+          <span class="tag tag--warn">待处理</span>
+          <b class="serif" style="font-size:14.5px">6 项能力正共用同一份配置 <code class="mono">resume_optimize</code></b>
+        </div>
+        <div class="small muted" style="margin-top:6px;line-height:1.7">
+          AI简历优化 · 岗位大师/岗位匹配 · 职业规划 · 招聘会拜访计划 · 自我探索 · 岗位推荐/解读<br>
+          现在在这页把「AI简历优化」关掉或改错凭证，上面 6 个前台功能会<b>同时哑火</b>，
+          且各自只显示「未配置」，用户和运营都看不出是同一个开关。
+          代码里已自登记该风险（<code>llm-config.service.ts:94-108</code>）。
+        </div>
+      </div>
+      <div class="stack" style="gap:8px">
+        <button class="btn btn--primary">拆分为 6 份独立配置</button>
+        <div class="small muted center">拆分后默认继承当前值<br><b>行为完全不变</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 概览条 -->
+  <div class="grid grid--4 isnew" data-newtag="新增 · 概览" data-when="default aidown">
+    <div class="card metric">
+      <div class="metric__main">
+        <div class="metric__label">已注册能力</div>
+        <div class="metric__value">30</div>
+        <div class="metric__foot">29 能力 + 1 守卫 · 清单见方案附录 C</div>
+      </div>
+      <div class="metric__ico metric__ico--ai">◈</div>
+    </div>
+    <div class="card metric">
+      <div class="metric__main">
+        <div class="metric__label">启用中</div>
+        <div class="metric__value">24</div>
+        <div class="metric__foot">5 未配置 · 2 规划中</div>
+      </div>
+      <div class="metric__ico">✓</div>
+    </div>
+    <div class="card metric">
+      <div class="metric__main">
+        <div class="metric__label">降级中</div>
+        <div class="metric__value" data-when="default">2</div>
+        <div class="metric__value" data-when="aidown">24</div>
+        <div class="metric__foot down" data-when="default">岗位推荐 · 语音播报</div>
+        <div class="metric__foot down" data-when="aidown">主供应商不可用</div>
+      </div>
+      <div class="metric__ico metric__ico--warn">!</div>
+    </div>
+    <div class="card metric">
+      <div class="metric__main">
+        <div class="metric__label">今日成本 / 预算</div>
+        <div class="metric__value">¥68<small>.42 / 200</small></div>
+        <div class="bar"><i class="ai" style="width:34%"></i></div>
+      </div>
+      <div class="metric__ico metric__ico--info">¥</div>
+    </div>
+  </div>
+
+  <!-- AI 不可用态 -->
+  <div class="degrade isnew" data-newtag="新增 · 降级视图" data-when="aidown" style="margin-top:16px">
+    <div class="degrade__title"><span class="dotstate dotstate--err"></span>主供应商 DeepSeek 不可用（14:22 起，已 8 分钟）</div>
+    <div class="degrade__body">
+      24 个启用中的能力已按各自策略切换：<b>9 个</b>切备用供应商正常服务，<b>11 个</b>降为规则模式（不调模型），
+      <b>4 个</b>停用并向前台返回降级文案。<b>本机打印、扫描、浏览不受影响</b>——这条红线由服务端保证，不依赖 AI。
+    </div>
+    <div class="degrade__alts">
+      <button class="btn btn--sm btn--primary">一键全部切备用供应商</button>
+      <button class="btn btn--sm">查看前台当前显示的文案</button>
+    </div>
+  </div>
+
+  <!-- 能力清单 -->
+  <div class="sechead isnew" data-newtag="新增 · 能力清单" data-when="default aidown" style="margin-top:22px">
+    <h2>能力清单</h2>
+    <div class="right">
+      <select class="select" style="width:auto;padding:6px 10px"><option>全部域</option><option>打印扫描</option><option>AI简历服务</option><option>岗位信息</option><option>招聘会</option><option>AI面试训练</option><option>政策服务</option><option>我的</option><option>AI顾问</option></select>
+      <select class="select" style="width:auto;padding:6px 10px"><option>全部状态</option><option>启用中</option><option>降级中</option><option>未配置</option></select>
+    </div>
+  </div>
+
+  <div class="card" data-when="default aidown">
+    <div class="card__body card__body--flush">
+      <div class="table__wrap table__wrap--tall">
+        <table class="table">
+          <thead><tr>
+            <th style="width:24%">能力</th><th>前台页</th><th>供应商 / 模型</th><th>Prompt</th>
+            <th>证据</th><th>状态</th><th class="num">今日调用</th><th class="num">今日成本</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr class="is-picked">
+              <td><div class="cellmain">AI 简历诊断</div><div class="cellsub mono">resume_diagnosis</div></td>
+              <td><span class="tag tag--ghost">P09</span></td>
+              <td><div class="small">DeepSeek</div><div class="cellsub mono">deepseek-v4-pro</div></td>
+              <td><span class="tag tag--info">v4</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">612</td><td class="num">¥14.20</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">AI 简历优化</div><div class="cellsub mono">resume_optimize</div></td>
+              <td><span class="tag tag--ghost">P09</span></td>
+              <td><div class="small">DeepSeek</div><div class="cellsub mono">deepseek-v4-pro</div></td>
+              <td><span class="tag tag--info">v6</span> <span class="tag tag--ai">灰度 10%</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">438</td><td class="num">¥16.85</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">岗位大师 / 岗位匹配</div><div class="cellsub"><span class="tag tag--warn">待拆分 · 现读 resume_optimize</span></div></td>
+              <td><span class="tag tag--ghost">P11 / P30</span></td>
+              <td><div class="small muted">继承共用键</div></td>
+              <td><span class="tag tag--ghost">继承</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">207</td><td class="num muted">合并计</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">职业规划</div><div class="cellsub"><span class="tag tag--warn">待拆分</span></div></td>
+              <td><span class="tag tag--ghost">P22</span></td>
+              <td><div class="small muted">继承共用键</div></td>
+              <td><span class="tag tag--ghost">继承</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">86</td><td class="num muted">合并计</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">岗位 AI 推荐 / 解读</div><div class="cellsub"><span class="tag tag--warn">待拆分</span></div></td>
+              <td><span class="tag tag--ghost">P13 / P14</span></td>
+              <td><div class="small muted">继承共用键</div></td>
+              <td><span class="tag tag--ghost">继承</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--warn"><span class="dotstate dotstate--warn"></span>降级中</span></td>
+              <td class="num">301</td><td class="num muted">合并计</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">AI 助手对话</div><div class="cellsub mono">assistant_chat</div></td>
+              <td><span class="tag tag--ghost">P25 / P26</span></td>
+              <td><div class="small">通义千问</div><div class="cellsub mono">qwen-plus</div></td>
+              <td><span class="tag tag--info">v9</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">1,204</td><td class="num">¥18.07</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">AI 模拟面试</div><div class="cellsub mono">mock_interview</div></td>
+              <td><span class="tag tag--ghost">P20</span></td>
+              <td><div class="small">DeepSeek</div><div class="cellsub mono">deepseek-v4-flash</div></td>
+              <td><span class="tag tag--info">v3</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">173</td><td class="num">¥9.30</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">材料完整性预检</div><div class="cellsub mono">print_material_check</div></td>
+              <td><span class="tag tag--ghost">P06</span></td>
+              <td><div class="small muted">规则引擎 · 不调模型</div></td>
+              <td><span class="tag tag--ghost">—</span></td>
+              <td><span class="ev ev--1">E1</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num">1,842</td><td class="num">¥0.00</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">签约风险审查</div><div class="cellsub mono">contract_review</div></td>
+              <td><span class="tag tag--ghost">P31</span></td>
+              <td><div class="small">独立配置 · 未并入</div></td>
+              <td><span class="tag tag--warn">代码常量</span></td>
+              <td><span class="ev ev--3">E3</span></td>
+              <td><span class="tag tag--ok"><span class="dotstate dotstate--ok"></span>启用中</span></td>
+              <td class="num muted">未计量</td><td class="num muted">未计量</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">待机屏 AI 海报</div><div class="cellsub mono">poster_generation</div></td>
+              <td><span class="tag tag--ghost">P02</span></td>
+              <td><div class="small muted">disabled stub · 零外部费用</div></td>
+              <td><span class="tag tag--ghost">—</span></td>
+              <td><span class="ev ev--2">E2</span></td>
+              <td><span class="tag"><span class="dotstate dotstate--off"></span>未开放</span></td>
+              <td class="num muted">—</td><td class="num muted">—</td>
+              <td><button class="btn btn--sm btn--ghost">详情</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card__foot">
+      共 30 项 · 显示 10 项 ·
+      「未计量」「合并计」是<b>诚实标注</b>——没有独立归属或厂家单价时不编数字，绝不显示 ¥0.0000
+    </div>
+  </div>
+
+  <!-- 详情抽屉 -->
+  <div class="sechead isnew" data-newtag="改造 · 现有表单搬进这里" data-when="default aidown" style="margin-top:24px">
+    <h2>AI 简历诊断 · 配置</h2>
+    <div class="right">
+      <span class="tag tag--ghost mono">resume_diagnosis</span>
+      <span class="small muted">启用</span>
+      <button class="switch is-on"></button>
+    </div>
+  </div>
+
+  <div class="drawer" data-when="default aidown">
+    <div class="drawer__tabs" data-panels="cap">
+      <button class="is-on" data-tab="model">模型绑定</button>
+      <button data-tab="prompt">Prompt 版本</button>
+      <button data-tab="gate">闸门与预算</button>
+      <button data-tab="degrade">降级策略</button>
+      <button data-tab="ev">证据与免责</button>
+      <button data-tab="his">变更历史</button>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="model">
+      <div class="proto proto--err">
+        <span class="proto__tag">必修缺陷</span>
+        现有页的「连通性测试」<b>会先把表单值写进线上配置再测试</b>（<code>ai-config/index.tsx:119-150</code>）——
+        点一下测试就改了生产。改后测试走<b>影子调用</b>：用临时参数试跑，测试通过后才由你决定是否应用。
+      </div>
+      <div class="grid grid--2">
+        <div class="stack">
+          <div class="field"><label>供应商</label>
+            <select class="select"><option>DeepSeek 深度求索</option><option>通义千问 Qwen</option><option>MiniMax</option><option>鱼人 API（Yuren）</option></select>
+            <div class="hint">这 4 家与现有 <code>llm-presets.ts</code> 完全一致，不新增供应商</div>
+          </div>
+          <div class="field"><label>模型</label>
+            <select class="select"><option>deepseek-v4-pro</option><option>deepseek-v4-flash</option></select></div>
+          <div class="field"><label>Base URL</label><input class="input mono" value="https://api.deepseek.com/v1"></div>
+          <div class="field"><label>API Key</label>
+            <input class="input" type="password" placeholder="留空 = 不修改">
+            <div class="hint"><span class="tag tag--ok">已配置</span> 服务端加密保存，前端永不回显（沿用现有 <code>apiKeyConfigured</code> 口径）</div>
+          </div>
+          <div class="grid grid--2">
+            <div class="field"><label>温度</label><input class="input" value="0.3"></div>
+            <div class="field"><label>maxTokens</label><input class="input" value="4096"></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card isnew" data-newtag="新增 · 影子测试" style="background:var(--n-50)">
+            <div class="card__head"><h3>影子测试</h3><div class="right"><button class="btn btn--sm btn--primary">运行测试</button></div></div>
+            <div class="card__body">
+              <div class="small muted" style="margin-bottom:10px">用左侧表单的<b>临时参数</b>试跑一次，<b>不写入线上配置</b>。</div>
+              <dl class="kv">
+                <dt>结果</dt><dd><span class="tag tag--ok">连通正常</span></dd>
+                <dt>延迟</dt><dd class="mono">1,840 ms</dd>
+                <dt>token</dt><dd class="mono">in 1,203 / out 486</dd>
+                <dt>本次估算</dt><dd class="mono">¥0.0231</dd>
+                <dt>结构校验</dt><dd class="small">四维评分字段齐全 ✓</dd>
+              </dl>
+              <div class="row" style="margin-top:14px">
+                <button class="btn btn--sm btn--primary">应用到线上</button>
+                <button class="btn btn--sm btn--ghost">丢弃</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="prompt" style="display:none">
+      <div class="proto">
+        <span class="proto__tag">改造</span>
+        现有页对 4 个结构化能力标注 <code>allowCustomSystemPrompt: false</code>，理由（服务端强制防编造）是对的，
+        但实现是把 prompt <b>写死在 12 个 service 里</b>，改一句话要发版。
+        改后语义变成：<b>管理员不能自由填写，但能在受控版本之间切换与回滚</b>。
+      </div>
+      <div class="row" style="margin-bottom:14px">
+        <div class="field" style="width:260px"><label>当前生效版本</label>
+          <select class="select"><option>v4（active · 2026-08-03 发布）</option><option>v3</option><option>v2</option></select></div>
+        <div class="spacer"></div>
+        <button class="btn btn--sm">对比 v3 / v4</button>
+        <button class="btn btn--sm">回滚到 v3</button>
+        <button class="btn btn--sm btn--ai">新建灰度版本</button>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>不可编辑的固定片段 <span class="tag tag--err">服务端强制</span></label>
+        <div class="locked">【防编造契约】只依据用户提供的简历原文作判断，不得编造学历、证书、公司、项目或任职时间。
+【合规禁令】不得输出任何招聘承诺（包过 / 保offer / 保录用 / 内推保证 / 代投简历 / 帮你投递 / 推荐给企业）。
+【结果定位】诊断结论仅供求职者本人修改简历参考，不代表投递、面试或录用结果。
+【输出结构】必须返回四维评分 + ATS 兼容性 + 真实性提示的结构化 JSON。</div>
+        <div class="hint">任何版本都自动注入这段，管理员<b>看得到、改不了</b>；提交时服务端校验，缺失直接 422。</div>
+      </div>
+      <div class="field">
+        <label>可调部分（v4 当前内容）</label>
+        <textarea class="textarea" rows="5">你是就业服务终端的简历诊断助手。请从「岗位匹配度 / 表达清晰度 / 结构完整度 / 量化成果」四个维度评估简历，
+每个维度给出 1–5 分与一句具体理由。理由必须引用简历中的实际内容，不得空泛。
+若某维度信息不足以判断，明确写「简历中未体现」，不要猜测。</textarea>
+      </div>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="gate" style="display:none">
+      <div class="proto proto--warn">
+        <span class="proto__tag">必修缺陷</span>
+        现在成本阈值<b>只告警不阻断</b>（<code>ai-log.service.ts:450-480</code>）；
+        且只有岗位 AI 实现了次数配额（<code>job-ai-quota.service.ts:22-38</code>），其余能力裸奔。
+      </div>
+      <div class="grid grid--3">
+        <div class="field"><label>超时（ms）</label><input class="input" value="30000"></div>
+        <div class="field"><label>最大重试</label><input class="input" value="2"></div>
+        <div class="field"><label>熔断阈值（连续失败）</label><input class="input" value="5"></div>
+        <div class="field"><label>日预算（¥）</label><input class="input" value="60"></div>
+        <div class="field"><label>单用户日限（次）</label><input class="input" value="5"></div>
+        <div class="field"><label>单机构日限（次）</label><input class="input" value="500"></div>
+      </div>
+      <div class="hr"></div>
+      <div class="field" style="max-width:460px">
+        <label>超额动作</label>
+        <select class="select">
+          <option>硬拦截（返回额度用尽，不调模型）</option>
+          <option>降级（切规则模式，不调模型）</option>
+          <option>继续但告警（＝没有闸门，不推荐）</option>
+        </select>
+        <div class="hint">选「硬拦截」时前台显示本能力的降级文案，不是报错页。</div>
+      </div>
+      <div class="hr"></div>
+      <div class="row">
+        <div style="flex:1">
+          <div class="small muted">今日已用 ¥14.20 / 预算 ¥60</div>
+          <div class="bar"><i class="ai" style="width:24%"></i></div>
+        </div>
+        <div style="flex:1"><div class="small muted">今日因超额被拦：<b>0</b> 次</div></div>
+      </div>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="degrade" style="display:none">
+      <div class="grid grid--2">
+        <div class="stack">
+          <div class="field"><label>降级策略</label>
+            <select class="select"><option>切备用供应商</option><option>规则模式（不调模型）</option><option>停用（返回降级文案）</option></select></div>
+          <div class="field"><label>备用供应商 / 模型</label>
+            <select class="select"><option>通义千问 · qwen-plus</option><option>MiniMax · abab6.5s-chat</option></select></div>
+          <div class="field"><label>降级文案（直接渲染到前台）</label>
+            <textarea class="textarea" rows="3">简历诊断暂时不可用。你仍然可以上传、打印、扫描简历，或先去看岗位；诊断恢复后会在「我的 · AI服务记录」里通知你。</textarea>
+            <div class="hint">前台 V3 硬约束：AI 不可用时<b>整块换成「什么不可用、还能做什么」</b>，绝不显示空 AI 壳子或假建议。</div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card isnew" data-newtag="新增 · 前台镜像" style="background:var(--n-50)">
+            <div class="card__head"><h3>用户此刻会看到什么</h3></div>
+            <div class="card__body">
+              <div class="degrade">
+                <div class="degrade__title"><span class="dotstate dotstate--warn"></span>简历诊断暂时不可用</div>
+                <div class="degrade__body">你仍然可以上传、打印、扫描简历，或先去看岗位；诊断恢复后会在「我的 · AI服务记录」里通知你。</div>
+                <div class="degrade__alts">
+                  <button class="btn btn--sm btn--primary">直接打印这份简历</button>
+                  <button class="btn btn--sm">存入我的文档</button>
+                  <button class="btn btn--sm btn--ghost">去看岗位</button>
+                </div>
+              </div>
+              <div class="small muted" style="margin-top:12px">改左边的文案，这里立即变。<b>所见即所得</b>。</div>
+            </div>
+          </div>
+          <button class="btn btn--sm">在指定终端做一次降级演练</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="ev" style="display:none">
+      <div class="proto">
+        <span class="proto__tag">改造</span>
+        证据分级是前台 V3 的硬约束，现在只在前端自觉执行。改后由服务端出参校验：
+        <b>无 E1/E2 支撑不得使用祈使句</b>，违反自动降级为陈述式表达。
+      </div>
+      <div class="grid grid--3" style="margin-bottom:16px">
+        <div class="card"><div class="card__body">
+          <div class="row"><span class="ev ev--1">E1</span><b class="small">用户数据事实</b></div>
+          <div class="small muted" style="margin-top:7px">页数、缺项、历史订单。可陈述、可祈使。</div></div></div>
+        <div class="card"><div class="card__body">
+          <div class="row"><span class="ev ev--2">E2</span><b class="small">系统 / 设备 / 来源事实</b></div>
+          <div class="small muted" style="margin-top:7px">彩色可用、今天有场次、截止日。可陈述、可祈使。</div></div></div>
+        <div class="card" style="border-color:#d6cfe8"><div class="card__body">
+          <div class="row"><span class="ev ev--3">E3</span><b class="small">模型判断</b><span class="tag tag--ai">本能力</span></div>
+          <div class="small muted" style="margin-top:7px"><b>必须标注免责</b>，不得单独构成主建议。</div></div></div>
+      </div>
+      <div class="field" style="max-width:520px;margin-bottom:16px">
+        <label>免责声明文案（E3 强制携带）</label><input class="input" value="AI 判断，仅供参考">
+      </div>
+      <div class="field" style="max-width:560px">
+        <label>建议四要素校验</label>
+        <div class="small muted"><b>动作 / 理由 / 代价 / 备选</b> 缺一即不返回建议块（返回 <code>advice: null</code> + 降级原因），从根上杜绝「无理由的智能推荐」。</div>
+        <div class="row" style="margin-top:9px">
+          <span class="tag tag--ok">✓ 动作</span><span class="tag tag--ok">✓ 理由</span>
+          <span class="tag tag--ok">✓ 代价</span><span class="tag tag--ok">✓ 备选</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card__body" data-panel-of="cap" data-panel="his" style="display:none">
+      <div class="proto">
+        <span class="proto__tag">改造</span>
+        现在配置存在<b>本机 JSON 文件</b>（<code>llm-config.service.ts:175</code> → <code>ai-model-configs.json</code>），
+        改一次直接覆盖、无历史、无审计、多实例不同步。改后入库并写审计，可回滚。
+      </div>
+      <div>
+        <div class="tl"><div class="tl__time">08-03 14:22</div><div class="tl__rail"><div class="tl__dot tl__dot--ok"></div></div>
+          <div><b>Prompt v3 → v4 全量发布</b><div class="tl__meta">王磊 · 灰度 3 天后全量 · 人工抽检均分 4.1 → 4.4</div></div></div>
+        <div class="tl"><div class="tl__time">07-31 09:05</div><div class="tl__rail"><div class="tl__dot"></div></div>
+          <div><b>日预算 ¥40 → ¥60</b><div class="tl__meta">王磊 · 理由：招聘季调用量上涨</div></div></div>
+        <div class="tl"><div class="tl__time">07-28 16:40</div><div class="tl__rail"><div class="tl__dot tl__dot--warn"></div></div>
+          <div><b>模型 deepseek-v4-flash → deepseek-v4-pro</b><div class="tl__meta">系统管理员 · 理由：结构校验重试率偏高 · <a href="#">回滚</a></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空态 -->
+  <div class="card" data-when="empty">
+    <div class="card__body"><div class="empty">
+      <div class="empty__icon">◇</div>
+      <h3>还没有导入能力配置</h3>
+      <p>首次启用时，系统会把现有 7 个功能键导入为能力记录，并把共用
+        <code class="mono">resume_optimize</code> 的 6 项能力拆为独立记录（默认继承同一份配置，行为不变）。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">从现有配置导入</button><button class="btn">手动新增</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 错误态 -->
+  <div data-when="error">
+    <div class="errbox">
+      <h3>能力清单加载失败</h3>
+      <p>无法读取能力注册表（<code>GET /admin/ai/capabilities</code> 返回 503）。
+        这<b>不影响前台正在运行的 AI</b>——运行时读服务端缓存，本页只是管理面。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button><button class="btn btn--sm btn--ghost">查看服务状态</button></div>
+    </div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/ai-config</code>，侧栏位置不动。现有 411 行表单原样搬进「模型绑定」Tab。</li>
+      <li>新增端点：<code>GET/PATCH /admin/ai/capabilities</code>、<code>POST /admin/ai/capabilities/:key/test</code>（影子测试）、<code>POST /admin/ai/capabilities/split-shared-key</code>。</li>
+      <li>前置：能力注册表入库 + 调用网关（方案 S1）。不做内核，本页无数据可管。</li>
+      <li>数据为示意；「未计量 / 合并计 / 按量·未估算」是刻意保留的诚实标注。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'ai-config'})</script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工作台（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/</code>「工作台」</b>（654 行，多接口运营概览已接真）。
+    现状：打开后是 12 个数字 + 几张表——<b>它告诉你「有什么」，但不告诉你「该干什么」</b>。
+    加一块「AI 每日要点」：把今天最该处理的 3 件事排出来，每条带理由、代价、备选。
+    这是全站 15 个「🔧补强」页的<b>统一样板</b>——其他页照这个形态做。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 拆分前置</span>
+    本页 <b>654 行</b>（<code>dashboard/index.tsx:654</code>），已超 500 行阈值。
+    <b>要点卡必须抽成独立组件</b>，不能内联继续加聚合逻辑。
+    另：要点的质量取决于底层数据——<b>成本归因需要 orgId、审核积压需要 SLA 字段</b>，这些是服务端前置。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>工作台</h1>
+      <p>2026年8月11日星期二 · 运营概览，仅展示已有真实数据来源的指标</p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">刷新</button>
+      <button class="btn btn--sm btn--primary">处理告警 (1)</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- AI 每日要点 -->
+  <div class="isnew" data-newtag="新增 · AI 每日要点" data-when="default" style="margin-bottom:18px">
+    <div class="card" style="border-color:#d6cfe8">
+      <div class="card__head">
+        <h3>今天最该处理的 3 件事</h3>
+        <span class="tag tag--ai">AI 归因</span>
+        <div class="right"><span class="small muted">08:00 生成 · 每小时更新</span></div>
+      </div>
+      <div class="card__body stack">
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head">
+            <span class="tag tag--err">1</span><span class="ev ev--1">E1</span>
+            <b>AI 简历优化成本 24 小时内涨了 38%，已用掉日预算的 68%</b>
+          </div>
+          <div class="advice__action">去看一下是不是有终端在重复调用，或者把该能力的日预算临时提到 ¥90。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>
+              调用量只涨了 12%，但成本涨 38%——<b>单次成本变高了</b>。
+              可能原因：Prompt v6 灰度版本输出更长，或有超长简历触发了重试。</span></div>
+            <div class="advice__item"><b>代价</b><span>不处理的话，按当前速率约 16:40 会触发硬拦截，用户会看到「今日额度已用完」。</span></div>
+            <div class="advice__item"><b>备选</b><span>把 v6 灰度比例从 10% 降到 0，先观察成本是否回落。</span></div>
+          </div>
+          <div class="advice__foot">
+            <a class="btn btn--sm btn--primary" href="ai-services.html">看成本下钻</a>
+            <a class="btn btn--sm" href="ai-config.html">调预算</a>
+            <button class="btn btn--sm btn--ghost">停掉 v6 灰度</button>
+          </div>
+        </div>
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head">
+            <span class="tag tag--warn">2</span><span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+            <b>28 条待审岗位里有 1 条含疑似歧视表述，已在终端曝光 40 分钟</b>
+          </div>
+          <div class="advice__action">优先处理这一条，其余 23 条低风险可批量通过。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>
+              该岗位标题含性别与年龄限定（<span class="ev ev--3">E3</span> 模型判定，需人工确认）。
+              审核积压已达 28 条，平均等待 1.5 天（<span class="ev ev--1">E1</span>）。</span></div>
+            <div class="advice__item"><b>代价</b><span>处理高风险 5 条约 3 分钟；歧视表述若被截图外传，是舆情与法律双重风险。</span></div>
+            <div class="advice__item"><b>备选</b><span>先紧急下架该条，再从容审核。</span></div>
+          </div>
+          <div class="advice__foot">
+            <a class="btn btn--sm btn--primary" href="job-sources.html">去审核</a>
+            <button class="btn btn--sm btn--danger">紧急下架这一条</button>
+          </div>
+        </div>
+
+        <div class="advice" style="background:none;border-color:var(--n-200)">
+          <div class="advice__head">
+            <span class="tag">3</span><span class="ev ev--2">E2</span>
+            <b>KSK-003 已离线 4 小时 12 分，该点位今天有招聘会</b>
+          </div>
+          <div class="advice__action">联系现场确认电源与网络；同时把该点位的招聘会物料改为可在邻近终端打印。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>
+              终端心跳最后上报 05:48（<span class="ev ev--2">E2</span> 设备事实）；
+              该点位（XX 职业学院就业中心）今天 09:00–16:00 有秋季双选会。</span></div>
+            <div class="advice__item"><b>代价</b><span>不处理的话，现场求职者无法打印参会材料——这是招聘会当天最常见的投诉来源。</span></div>
+            <div class="advice__item"><b>备选</b><span>只做物料改派，不派人到现场（若下午还不恢复再派人）。</span></div>
+          </div>
+          <div class="advice__foot">
+            <button class="btn btn--sm btn--primary">看设备详情</button>
+            <button class="btn btn--sm">改派邻近终端</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="card__foot">
+        <b>每条必须四要素齐全</b>（动作 / 理由 / 代价 / 备选），缺一即不显示这条——
+        与前台 V3 同一条纪律，从根上杜绝「无理由的智能推荐」。
+        <b>E3 判断必须标注「AI 判断，仅供参考」，且不得单独构成主建议</b>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 现有指标（保留） -->
+  <div class="grid grid--4" data-when="default aidown">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">在线终端</div>
+      <div class="metric__value">5<small> / 8 台</small></div>
+      <div class="metric__foot down">3 台离线 · 点击设备管理查看</div></div><div class="metric__ico">▤</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">待审核数据</div>
+      <div class="metric__value">28<small> 条</small></div>
+      <div class="metric__foot">岗位 24 · 招聘会 2 · 政策 2</div></div><div class="metric__ico metric__ico--warn">◷</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">待清理文件</div>
+      <div class="metric__value">5<small> 个</small></div>
+      <div class="metric__foot">近 100 条内 · 高敏 2</div></div><div class="metric__ico">▣</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">AI 调用</div>
+      <div class="metric__value">3,847<small> 次</small></div>
+      <div class="metric__foot">成功率 96.4% · 成本 ¥68.42</div></div><div class="metric__ico metric__ico--ai">◈</div></div>
+  </div>
+
+  <div class="grid grid--2" data-when="default aidown" style="margin-top:16px">
+    <div class="card"><div class="card__head"><h3>最近打印任务</h3>
+      <div class="right"><a class="btn btn--link" href="#">进入订单管理 →</a></div></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th>任务</th><th>终端</th><th>参数</th><th>状态</th><th>时间</th></tr></thead>
+          <tbody>
+            <tr><td class="small">简历_演示.pdf</td><td class="mono small">KSK-001</td><td class="small">黑白 · 2 份</td>
+              <td><span class="tag tag--ok">已完成</span></td><td class="small">00:20</td></tr>
+            <tr><td class="small">求职材料_演示.pdf</td><td class="mono small">KSK-001</td><td class="small">彩色 · 1 份</td>
+              <td><span class="tag tag--err">失败</span></td><td class="small">00:20</td></tr>
+          </tbody>
+        </table>
+      </div></div>
+    <div class="card"><div class="card__head"><h3>待办审核</h3>
+      <div class="right"><a class="btn btn--link" href="job-sources.html">全部 →</a></div></div>
+      <div class="card__body stack" style="gap:11px">
+        <div class="row"><span class="metric__ico" style="width:32px;height:32px;font-size:13px">◈</span>
+          <div style="flex:1"><b class="small">24 条岗位信息待审核</b>
+            <div class="cellsub">来自岗位信息源 · 审核通过后才会在终端展示</div></div>
+          <a class="btn btn--sm" href="job-sources.html">去审核</a></div>
+        <div class="row"><span class="metric__ico" style="width:32px;height:32px;font-size:13px">▤</span>
+          <div style="flex:1"><b class="small">2 条招聘会信息待审核</b>
+            <div class="cellsub">来自招聘会信息源</div></div>
+          <button class="btn btn--sm">去审核</button></div>
+      </div></div>
+  </div>
+
+  <!-- 空 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◈</div><h3>今天没有需要优先处理的事</h3>
+      <p>成本、失败率、审核积压、设备状态都在正常范围。
+        <b>没有要点时显示这句话，不硬凑三条</b>——编出来的「建议」比没有建议更糟。</p>
+    </div></div></div>
+  </div>
+
+  <!-- AI 不可用 -->
+  <div data-when="aidown" style="margin-bottom:16px">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 每日要点暂时不可用</div>
+      <div class="degrade__body">
+        下面的<b>全部运营指标照常</b>——它们来自数据库，不依赖 AI。
+        暂时没有的只是「今天该干什么」的归因排序。
+        你仍然可以按老办法看：待审核 28 条、离线终端 3 台、失败任务 1 条。
+      </div>
+      <div class="degrade__alts">
+        <a class="btn btn--sm btn--primary" href="job-sources.html">去看待审核</a>
+        <button class="btn btn--sm">去看离线终端</button>
+        <a class="btn btn--sm btn--ghost" href="ai-services.html">看 AI 为什么不可用</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 错误 -->
+  <div data-when="error">
+    <div class="errbox"><h3>工作台数据加载失败</h3>
+      <p>部分接口超时（<code>GET /admin/ops/overview</code>）。这不影响终端运行与已发布内容。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/</code>。654 行需先把要点卡抽成独立组件再加。</li>
+      <li><b>这是 15 个「补强」页的统一样板</b>：告警中心、订单管理、打印扫描运维、计费对账、文件管理等，
+        AI 都以「四要素建议卡」这一种形态出现，不各造一套。</li>
+      <li><b>宁可没有要点，不要编要点</b>：无异常时显示「今天没有需要优先处理的事」，不硬凑三条。</li>
+      <li>服务端前置：成本归因需 <code>orgId</code>；审核积压需 SLA 字段；设备归因需终端点位与活动日历关联。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'dashboard'})</script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+.parse-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 48rpx 40rpx;
+}
+
+/* 不确定态指示环。
+   后端只返回 pending/processing/completed/failed，没有百分比进度，
+   因此这里不再用"半圆盘按比例旋入"表达进度（那需要一个真实的百分比），
+   改为匀速旋转的不确定态：只表示"正在进行"，不暗示完成度。 */
+.ring {
+  position: relative;
+  width: 220rpx;
+  height: 220rpx;
+  border-radius: 50%;
+  background: var(--line-soft); /* 轨道底色 */
+  margin-bottom: 28rpx;
+}
+
+/* 旋转弧放在 ::after 上，避免内圈文字被一起旋转 */
+.ring.spin::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  border: 10rpx solid transparent;
+  border-top-color: var(--plum);
+  box-sizing: border-box;
+  animation: ringSpin 1s linear infinite;
+}
+
+@keyframes ringSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.ring-inner {
+  position: absolute;
+  top: 26rpx;
+  left: 26rpx;
+  width: 168rpx;
+  height: 168rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.pr-pct {
+  font-family: var(--font-serif);
+  font-size: 52rpx;
+  font-weight: 700;
+  color: var(--plum-deep);
+  line-height: 1;
+}
+
+.pr-label {
+  font-size: 20rpx;
+  color: var(--muted);
+  margin-top: 6rpx;
+}
+
+/* 失败 / 缺文件态 */
+.fail-ic {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  background: var(--warn-soft, var(--surface-2));
+  color: var(--warn, var(--muted));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52rpx;
+  margin-bottom: 24rpx;
+}
+
+.fail-title {
+  font-family: var(--font-serif);
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12rpx;
+}
+
+.fail-msg {
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 解析环节说明（说明性列表，不表达完成状态） */
+.parse-stages {
+  display: flex;
+  flex-direction: column;
+}
+
+.ps-row {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+}
+
+.ps-row + .ps-row {
+  border-top: 2rpx solid var(--line-faint);
+}
+
+.ps-ic {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 22rpx;
+}
+
+.ps-label {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.ps-desc {
+  flex: 1;
+  font-size: 23rpx;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* 操作栏两按钮比例（与诊断页一致） */
+.flex-1-5 {
+  flex: 1.5;
+}

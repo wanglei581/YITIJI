@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>账号权限（空壳填充）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">填充 · 现有空壳页</span>
+    <b>改的是现有页 <code>/account</code>「账号权限」</b>——现在整页 15 行，只有
+    「账号与角色由平台侧统一管理」（<code>routes/account/index.tsx:5-12</code>）。
+    <b>而权限矩阵早就定好了配额</b>：高校 5 个 / 公共就业 20 个 / 持证HR 10 个 / 招聘会主办 5 个 / 企业来源 3 个
+    （<code>docs/product/partner-permission-matrix.md</code> §六）。多人机构现在只能共享一个账号。
+  </div>
+
+  <div class="proto">
+    <span class="proto__tag">Codex 复核 · 本页吸收了原拟新建的 /tickets</span>
+    我最初提议新建 <code>/tickets</code>「通知与工单」。Codex 判定<b>现在不该建</b>：
+    <code>routes/index.tsx:18</code> 当前没有通知/工单的路由、模型与客户端服务，直接建页<b>会成为新的空壳</b>；
+    现有通知接口（<code>member-notifications.controller.ts:9</code>）只面向终端会员，不支持机构账号。
+    所以并成本页的第三个 Tab，等真实工单量与 SLA 成立后再评估拆出。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>账号权限</h1><p>子账号 · 操作日志 · 通知与支持</p></div>
+    <div class="right"><button class="btn btn--sm btn--primary">新增子账号</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="acc">
+    <button class="is-on" data-tab="users">子账号</button>
+    <button data-tab="logs">操作日志<span class="newdot"></span></button>
+    <button data-tab="notice">通知与支持<span class="newdot"></span></button>
+  </div>
+
+  <!-- Tab 1 子账号 -->
+  <div data-panel-of="acc" data-panel="users">
+    <div class="proto proto--warn">
+      <span class="proto__tag">服务端前置</span>
+      <code>User</code> 模型目前只有粗粒度 role（<code>schema.prisma:500</code>），
+      <b>没有机构内的管理员 / 内容编辑 / 只读子角色</b>。本页的角色列必须等服务端先建模，
+      且必须有 <b>API 与路由双重校验</b>兜底——CLAUDE.md 红线：不得以「隐藏导航」代替权限控制。
+    </div>
+
+    <div class="grid grid--3" data-when="default">
+      <div class="card metric"><div class="metric__main"><div class="metric__label">子账号</div>
+        <div class="metric__value">3<small> / 5</small></div>
+        <div class="bar"><i style="width:60%"></i></div>
+        <div class="metric__foot">高校就业中心上限 5 个</div></div><div class="metric__ico">◉</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">近 30 天登录</div>
+        <div class="metric__value">3</div><div class="metric__foot">全部账号均有活跃</div></div><div class="metric__ico">✓</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">异常登录</div>
+        <div class="metric__value">0</div><div class="metric__foot">异地 / 多次失败均无</div></div><div class="metric__ico">⛨</div></div>
+    </div>
+
+    <div class="card" data-when="default" style="margin-top:16px">
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th>姓名</th><th>手机号</th><th>角色</th><th>最后登录</th><th>状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">王主任</td><td class="mono">138****2210</td>
+              <td><span class="tag tag--brand" style="background:var(--p-100);border-color:var(--p-200);color:var(--p-700)">机构管理员</span></td>
+              <td class="small">今天 09:14</td><td><span class="tag tag--ok">正常</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+            <tr><td class="cellmain">李老师</td><td class="mono">139****8802</td>
+              <td><span class="tag">内容编辑</span></td>
+              <td class="small">昨天 16:40</td><td><span class="tag tag--ok">正常</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+            <tr><td class="cellmain">张老师</td><td class="mono">137****5566</td>
+              <td><span class="tag">只读</span></td>
+              <td class="small">08-06</td><td><span class="tag tag--ok">正常</span></td>
+              <td><button class="btn btn--sm btn--ghost">编辑</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        角色只在<b>本机构范围内</b>生效，不是平台级 RBAC。可管的范围仍受机构类型限制（见权限矩阵）。
+      </div>
+    </div>
+
+    <div class="card" data-when="default" style="margin-top:16px;border-color:#e3ccb3">
+      <div class="card__head"><h3>高风险操作</h3></div>
+      <div class="card__body">
+        <div class="proto proto--warn" style="margin:0 0 14px">
+          <span class="proto__tag">Codex 复核 Y9 · 这不是接线，是安全决策</span>
+          <code>partner-account-action.controller.ts</code> 已实现 <b>9 个端点</b>
+          （挑战创建/验证/取消、操作票据撤销、手机换绑四步、账号删除），
+          但<b>整个 controller 被 <code>admin</code> 角色守卫锁死</b>（<code>:27-30</code>）。
+          放开哪些给机构自助，需要单独的安全评估。
+        </div>
+        <dl class="kv">
+          <dt>子账号增删改</dt><dd><span class="tag tag--ok">建议开放自助</span> <span class="small muted">受配额约束 + 短信二次验证</span></dd>
+          <dt>角色分配</dt><dd><span class="tag tag--ok">建议开放自助</span> <span class="small muted">仅机构内角色</span></dd>
+          <dt>手机号换绑</dt><dd><span class="tag tag--warn">建议保持平台侧</span> <span class="small muted">账号接管风险最高，走工单</span></dd>
+          <dt>账号删除</dt><dd><span class="tag tag--warn">建议保持平台侧</span> <span class="small muted">不可逆，走工单</span></dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 2 操作日志 -->
+  <div data-panel-of="acc" data-panel="logs" style="display:none">
+    <div class="proto">
+      <span class="proto__tag">新增 Tab</span>
+      机构现在只能看数据同步日志（<code>routes/sync-logs</code>），<b>无法追踪谁改了岗位 / 政策 / 数据源 / 终端配置</b>。
+      多人协作的机构没有这个就没法追责。
+      <b>服务端前置</b>：现有审计查询（<code>audit.controller.ts:9</code>）仅供 Admin，
+      需要新建<b>按 orgId 过滤的机构视图</b>，不能直接把 Admin 审计暴露给机构。
+    </div>
+    <div class="card">
+      <div class="card__head"><h3>本机构操作日志</h3>
+        <div class="right">
+          <select class="select" style="width:auto;padding:6px 10px"><option>全部操作</option><option>岗位</option><option>招聘会</option><option>政策</option><option>数据源</option><option>账号</option></select>
+          <select class="select" style="width:auto;padding:6px 10px"><option>全部成员</option><option>王主任</option><option>李老师</option></select>
+          <button class="btn btn--sm">导出</button>
+        </div></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>对象</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td class="mono small">08-11 09:22</td><td>李老师</td><td>批量下架岗位</td>
+              <td class="small">3 条（已过期）</td><td><span class="tag tag--ok">成功</span></td></tr>
+            <tr><td class="mono small">08-10 16:40</td><td>王主任</td><td>修改数据源配置</td>
+              <td class="small">校招平台 API</td><td><span class="tag tag--ok">成功</span></td></tr>
+            <tr><td class="mono small">08-10 14:05</td><td>李老师</td><td>Excel 导入岗位</td>
+              <td class="small">12 条 · 成功 12</td><td><span class="tag tag--ok">成功</span></td></tr>
+            <tr><td class="mono small">08-09 11:30</td><td>王主任</td><td>新增子账号</td>
+              <td class="small">张老师（只读）</td><td><span class="tag tag--ok">成功</span></td></tr>
+            <tr><td class="mono small">08-08 15:12</td><td>李老师</td><td>提交招聘会审核</td>
+              <td class="small">2026 秋季校园双选会</td><td><span class="tag tag--warn">待审核</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">只记录本机构成员对本机构内容的操作。<b>不含任何求职者数据</b>。</div>
+    </div>
+  </div>
+
+  <!-- Tab 3 通知与支持（吸收原 /tickets） -->
+  <div data-panel-of="acc" data-panel="notice" style="display:none">
+    <div class="grid grid--2">
+      <div class="card">
+        <div class="card__head"><h3>平台通知</h3><span class="tag tag--warn">3 条未读</span></div>
+        <div class="card__body">
+          <div class="tl"><div class="tl__time">今天 09:14</div><div class="tl__rail"><div class="tl__dot tl__dot--err"></div></div>
+            <div><b>人力资源服务许可证将于 30 天后到期</b>
+              <div class="tl__meta">到期后本机构内容将<b>自动转为不可见</b>（不是静默下架，会再次通知）· <a href="profile.html">去补件</a></div></div></div>
+          <div class="tl"><div class="tl__time">昨天 16:22</div><div class="tl__rail"><div class="tl__dot tl__dot--warn"></div></div>
+            <div><b>2 条岗位审核未通过</b>
+              <div class="tl__meta">薪资区间异常 · 疑似歧视表述 · <a href="jobs.html">看驳回归因</a></div></div></div>
+          <div class="tl"><div class="tl__time">08-09</div><div class="tl__rail"><div class="tl__dot"></div></div>
+            <div><b>数据源「校招平台 API」连续同步失败 3 次</b>
+              <div class="tl__meta">凭证可能已过期 · <a href="sources.html">去检查</a></div></div></div>
+          <div class="tl"><div class="tl__time">08-05</div><div class="tl__rail"><div class="tl__dot tl__dot--ok"></div></div>
+            <div><b>本月内容效果月报已生成</b>
+              <div class="tl__meta"><a href="stats.html">查看并导出 PDF</a></div></div></div>
+        </div>
+        <div class="card__foot">
+          通知类型：审核结果 · 资质到期 · 同步失败 · 凭证异常 · 系统维护 · 政策变更。
+          <b>顶栏应有未读角标</b>——现在机构只能逐页自己找（Codex Y8）。
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="card__head"><h3>我的工单</h3>
+            <div class="right"><button class="btn btn--sm btn--primary">提交工单</button></div></div>
+          <div class="card__body card__body--flush">
+            <table class="table">
+              <thead><tr><th>工单</th><th>类型</th><th>状态</th><th>SLA</th></tr></thead>
+              <tbody>
+                <tr><td class="small cellmain">申请新增高校投放点位</td><td><span class="tag tag--ghost">投放</span></td>
+                  <td><span class="tag tag--warn">处理中</span></td><td class="small">剩 1.5 天</td></tr>
+                <tr><td class="small cellmain">岗位驳回申诉（行政专员）</td><td><span class="tag tag--ghost">申诉</span></td>
+                  <td><span class="tag tag--ok">已回复</span></td><td class="small muted">已完成</td></tr>
+                <tr><td class="small cellmain">本月账单疑问</td><td><span class="tag tag--ghost">账单</span></td>
+                  <td><span class="tag">待受理</span></td><td class="small">剩 2 天</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__head"><h3>提交工单</h3></div>
+          <div class="card__body">
+            <div class="field" style="margin-bottom:10px"><label>类型</label>
+              <select class="select"><option>新增投放点位</option><option>数据源异常</option><option>审核申诉</option><option>账单疑问</option><option>手机号换绑</option><option>账号删除</option><option>其他</option></select></div>
+            <div class="field" style="margin-bottom:12px"><label>说明</label>
+              <textarea class="textarea" rows="3" style="font-family:var(--sans);font-size:13px"></textarea></div>
+            <button class="btn btn--sm btn--primary">提交</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="proto" style="margin-top:16px">
+      <span class="proto__tag">Admin 侧对接</span>
+      机构工单的<b>处理端并入现有 <code>/member-feedback</code>「意见反馈」</b>，
+      那页已具备回复与状态更新工作流（<code>admin/routes/member-feedback/index.tsx:115</code>），
+      不新建 Admin 客服页。两端必须同期建设，否则工单发出去没人接。
+    </div>
+  </div>
+
+  <!-- 空 / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◉</div><h3>本机构只有一个账号</h3>
+      <p>你可以为同事创建子账号并分配角色（内容编辑 / 只读）。
+        当前机构类型「高校就业中心」上限 <b>5 个</b>。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">新增子账号</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body"><div class="small muted">本页不依赖 AI，全部功能照常。</div></div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>账号信息加载失败</h3>
+      <p>无法读取本机构账号（<code>GET /partner/accounts</code> 返回 500）。你的登录状态不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变、不新建页</b>：仍是 <code>/account</code>，把空态换成 3 个 Tab；原拟的 <code>/tickets</code> 并入第三个 Tab。</li>
+      <li><b>服务端先行</b>：User 需建机构内子角色；审计需建按 orgId 过滤的机构视图；通知与工单需先建模型。<b>不得先做前端再补后端</b>，否则又是空壳。</li>
+      <li>红线：隐藏导航 ≠ 权限控制，所有可见性收窄必须有 API 与路由校验兜底。</li>
+      <li>高风险操作（换绑 / 删号）建议保持平台侧执行，机构通过工单发起。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'account'})</script>
+</body>
+</html>

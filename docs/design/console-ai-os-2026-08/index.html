@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>双后台 AI 化改造 · 原型总览</title>
+<link rel="stylesheet" href="styles/console.css?v=20260811a">
+<style>
+  body{background:var(--canvas)}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 26px 60px}
+  .hero h1{font-family:var(--serif);font-size:34px;margin:0 0 8px;letter-spacing:.01em}
+  .hero p{margin:0;color:var(--n-500);font-size:15px}
+  .lede{background:var(--surface);border:1px solid var(--n-200);border-radius:var(--radius-xl);
+    padding:24px 28px;margin:26px 0;box-shadow:var(--shadow-sm)}
+  .lede b{color:var(--n-900)}
+  .lede .big{font-family:var(--serif);font-size:19px;line-height:1.7;margin:0 0 12px}
+  .pagecard{background:var(--surface);border:1px solid var(--n-200);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow-sm);display:block;color:inherit;text-decoration:none}
+  .pagecard:hover{border-color:var(--p-400);box-shadow:var(--shadow-md);text-decoration:none}
+  .pagecard h3{font-family:var(--serif);font-size:15px;margin:0 0 5px;display:flex;align-items:center;gap:8px}
+  .pagecard p{margin:0;font-size:12.5px;color:var(--n-500);line-height:1.6}
+  .pagecard .route{font-family:var(--mono);font-size:11px;color:var(--n-400);margin-top:8px}
+  .pagecard--todo{opacity:.62;border-style:dashed}
+  .pagecard--todo:hover{border-color:var(--n-300);box-shadow:var(--shadow-sm)}
+  .count{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px}
+  .count>div{flex:1;min-width:140px}
+  .count b{font-family:var(--serif);font-size:30px;display:block;line-height:1.2}
+  .count small{color:var(--n-500);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>双后台 AI 化改造 · 原型</h1>
+    <p>管理员后台 · 合作机构后台 —— 在现有页面上改，不新建后台</p>
+  </div>
+
+  <div class="lede">
+    <p class="big">
+      前台已经是 <b>AI 操作系统</b>（30 个页面每一页都要回答「这里的 AI 是什么」），
+      后台还是 <b>表格管理系统</b>（Admin 34 页 + Partner 13 页里，AI 只占 2 页且管不住全站）。
+    </p>
+    <p style="margin:0;color:var(--n-600);font-size:14px;line-height:1.75">
+      中间缺的不是「AI 中台」这个大架子，而是一层 <b>AI 内核（ai-core）</b>——
+      把 <code class="mono">contract-review</code> 已经验证过的那套编排（脱敏 → 规则 → 模型 → 安全闸 → 落库 → 保留期）
+      从单个业务里抽出来，变成全站 AI 点共用的地基。地基铺完，Admin 才有东西可管，Partner 才有东西可卖。
+    </p>
+    <div class="count">
+      <div><b>0</b><small>新建页面</small></div>
+      <div><b>16</b><small>现有页改造</small></div>
+      <div><b>3</b><small>空壳页填充</small></div>
+      <div><b>1</b><small>从侧栏摘除</small></div>
+    </div>
+  </div>
+
+  <a class="pagecard" href="mapping.html" style="border-color:var(--p-400);border-width:2px;margin-bottom:20px">
+    <h3 style="font-size:17px">📋 后台 ↔ 前端 功能对应总表 <span class="tag tag--ok">先看这张</span></h3>
+    <p style="font-size:13.5px;margin-top:6px">
+      47 个后台页面逐页写清：<b>这页管什么 · 对应前台哪个页面 · 走哪些接口 · 本页的 AI 是什么</b>。
+      同时标出当前的<b>功能错配</b>（招聘会信息源 ↔ 招聘会管理职责重叠、Excel 导入记录 ↔ 数据接入通道应合并）。
+      表末附「每个后台页的页头副标题该写什么话」——直接抄进界面，让运营和机构一眼知道自己在改什么。
+    </p>
+    <div class="route">AI 原生 10 · 支撑 12 · 补强 15 · 刻意无 AI 10 —— 每页都有定位，没有第三种状态</div>
+  </a>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Claude × Codex 联审结论</span>
+    我最初提议新增 2 个页面（Admin 面试训练运营、Partner 通知与工单）。
+    <b>Codex（gpt-5.6-sol / xhigh）复核后判定：应该新增 0 页。</b>
+    ① 面试运营 → 并入 <code>/ai-services</code> 的 Tab，因为现有 12 条 mock-interview 路由是<b>求职者本人的会话接口</b>，不是 Admin 运营接口；
+    ② 通知与工单 → 并入 <code>/account</code> 的 Tab，因为现在没有通知/工单模型，直接建页<b>会成为新的空壳</b>。
+    Codex 同时纠正了另外 6 处（见各页顶部的橙色复核条）。
+  </div>
+
+  <div class="sechead" style="margin-top:34px"><h2>管理员后台 · 改造点</h2>
+    <div class="right muted small">现有 34 页 · 改造 6 · 摘除 1 · 新建 0</div></div>
+  <div class="grid grid--3">
+    <a class="pagecard pagecard--todo" href="admin/companies.html">
+      <h3>企业展示管理 <span class="tag">结论已撤回</span></h3>
+      <p><b>曾被我判为「全项目唯一真断点」，这个判断是错的</b>——审核/发布/下架/岗位关联早已实现
+        （192 行 + 5 个组件）。原因是我采信了一次受限范围的审查结论而未复核一手代码。
+        原型页保留作为教训记录。</p>
+      <div class="route">/companies · 仍成立的只有：批量操作无后端端点</div>
+    </a>
+    <a class="pagecard" href="admin/ai-config.html">
+      <h3>AI大模型 <span class="tag tag--info">改造</span></h3>
+      <p>7 个功能键 → 能力清单 + 详情抽屉 6 Tab。终结「6 项能力共用一个开关」，
+        并修掉「点测试就改线上配置」的真实缺陷。</p>
+      <div class="route">/ai-config · 现有 411 行</div>
+    </a>
+    <a class="pagecard" href="admin/ai-services.html">
+      <h3>AI服务管理 <span class="tag tag--info">改造</span></h3>
+      <p>纯观测页 → 运营中心。保留现有内容为第 1 Tab，加 质量抽检 / 事故与降级 / 合规拦截 / 面试训练。</p>
+      <div class="route">/ai-services · 现有 634 行（需先拆组件）</div>
+    </a>
+    <a class="pagecard" href="admin/dashboard.html">
+      <h3>工作台 <span class="tag tag--info">改造</span></h3>
+      <p>加「AI 每日要点」卡：今天最该看的 3 件事，每条带动作/理由/代价/备选。
+        <b>这是全站 15 个「补强」页的统一样板</b>。654 行需先拆组件。</p>
+      <div class="route">/ · 现有 654 行</div>
+    </a>
+    <a class="pagecard" href="admin/alerts.html">
+      <h3>告警中心 <span class="tag tag--info">改造</span></h3>
+      <p>加 AI 归因聚合（23 条聚成 6 组）。<b>确认/指派/静默/SLA 加不了</b>——
+        告警是即时派生、无持久实体，服务端也没有事故状态机。原型不放假按钮。</p>
+      <div class="route">/alerts · 处置闭环需独立后端立项</div>
+    </a>
+    <a class="pagecard" href="admin/job-sources.html">
+      <h3>岗位信息源 <span class="tag tag--info">改造</span></h3>
+      <p><b>你点名「混乱」的那一组，这页演示改法</b>：页头写清职责与去向 + 数据流四段图 + AI 预审排序。
+        风险原因进抽屉不进列（表格已 7 列）。</p>
+      <div class="route">/job-sources · 同法适用于 fair-sources / policy-sources</div>
+    </a>
+    <a class="pagecard" href="admin/online-platforms.html">
+      <h3>线上平台目录 <span class="tag tag--warn">新增页</span></h3>
+      <p><b>本轮唯一确实需要 Admin 新建的页面。</b>
+        <code>OnlinePlatformDirectory</code> 全局仅 2 处引用，<b>两个后台都没有写入口</b>，
+        而终端正在展示这份推荐目录。收录 / 排序 / 上下架必须由平台掌握——
+        <b>开放给机构自助发布，目录就变成竞价位</b>。</p>
+      <div class="route">/online-platforms · 对应前端「岗位信息 → 线上招聘平台」</div>
+    </a>
+    <a class="pagecard" href="admin/job-materials.html">
+      <h3>求职材料库 <span class="tag tag--info">改造</span></h3>
+      <p>加 <b>证件复印预设</b>（对应 08-11 产品决策：迎新只保留「证件与材料复印」）+ 材料包 两个 Tab。
+        <b>不得提供彩色/双面</b>——当前打印契约仅 A4/黑白/单面，硬件支持不等于驱动已验证。</p>
+      <div class="route">/job-materials · 复印预设可先落地，材料包需后端多文件契约</div>
+    </a>
+    <a class="pagecard" href="admin/benefit-activities.html">
+      <h3>权益活动 <span class="tag tag--err">堵洞</span></h3>
+      <p><b>🔴 接前端前必须先堵</b>：当前 <code>discountCents = order.amountCents</code>，
+        而 Grant 没有面值/范围/上限——<b>一张「免费打印1次」券能抵掉200页彩打订单</b>。
+        现在没出事只因前端没接（Kiosk 全端 0 处引用 <code>benefitGrantId</code>）。
+        加「核销规则」「卡券包模板」两个 Tab。</p>
+      <div class="route">/benefit-activities · 发券已通、用券未接、规则过粗</div>
+    </a>
+    <a class="pagecard" href="admin/billing.html">
+      <h3>计费与对账 <span class="tag tag--info">改造</span></h3>
+      <p><b>「收费设置」功能已经存在</b>（本页第一个 Tab，唯一合法改价路径）。
+        缺的是价目项——现在只有打印 2 项，<b>全部 AI 功能没定价</b>。
+        扩到全量 + 加「补贴资金项目」Tab。</p>
+      <div class="route">/billing · AI 价目须等 AiUsageLedger 落地才能启用</div>
+    </a>
+    <a class="pagecard" href="admin/audit.html">
+      <h3>日志审计 <span class="tag tag--info">改造</span></h3>
+      <p>加自然语言检索（「上周谁改过打印价目」）+ 成为 AI 治理变更历史的<b>统一真相源</b>——
+        各页「变更历史」只做过滤视图，不各存一份。</p>
+      <div class="route">/audit · AI 只生成筛选条件，不读日志内容</div>
+    </a>
+    <a class="pagecard pagecard--todo" href="javascript:void(0)">
+      <h3>权限管理 <span class="tag">摘除</span></h3>
+      <p><b>不填成假 RBAC。</b>服务端只有 admin/partner/kiosk 粗粒度角色，
+        真实 RBAC 前从侧栏摘掉、页面保留（沿用既有裁定）。</p>
+      <div class="route">/permissions · 15 行空壳</div>
+    </a>
+    <a class="pagecard pagecard--todo" href="javascript:void(0)">
+      <h3>计费与对账 <span class="tag tag--info">改造</span></h3>
+      <p>Codex 补充：AI <b>估算</b>成本留在 /ai-services；真实 SKU、履约账本、价目与对账放财务域。
+        两者不能混——运维日志不能当账本。</p>
+      <div class="route">/billing · 原型待补</div>
+    </a>
+    <a class="pagecard pagecard--todo" href="javascript:void(0)">
+      <h3>数据接入通道 / Excel 导入记录 <span class="tag tag--info">改造</span></h3>
+      <p>Codex 补充：<b>来源级</b>预审与批次风险汇总放接入入口，
+        <b>记录级</b>风险才放三类 source 页面。</p>
+      <div class="route">/sync-sources /import-batches</div>
+    </a>
+  </div>
+
+  <div class="sechead" style="margin-top:34px"><h2>合作机构后台 · 改造点</h2>
+    <div class="right muted small">现有 13 页 · 改造 9 · 填充 3 · 新建 0</div></div>
+  <div class="grid grid--3">
+    <a class="pagecard" href="partner/stats.html">
+      <h3>数据统计 <span class="tag tag--warn">填充</span></h3>
+      <p>20 行空壳 → 内容效果。<b>后端 <code>GET /partner/stats</code> 早就写好了，前端一行没调</b>——
+        全项目最明确的一处「后端有、机构侧看不到」。</p>
+      <div class="route">/stats · 空壳 20 行</div>
+    </a>
+    <a class="pagecard" href="partner/terminals.html">
+      <h3>终端数据 <span class="tag tag--warn">填充</span></h3>
+      <p>15 行空壳 → 投放视图。机构不需要知道打印机缺不缺纸，但必须知道内容投在哪、覆盖多少人。
+        <b>不复制运维后台</b>。</p>
+      <div class="route">/terminals · 空壳 15 行</div>
+    </a>
+    <a class="pagecard" href="partner/account.html">
+      <h3>账号权限 <span class="tag tag--warn">填充</span></h3>
+      <p>15 行空壳 → 子账号 + 操作日志 + 通知与支持。权限矩阵早就定了配额（5/20/10/5/3），
+        多人机构现在只能共享一个账号。</p>
+      <div class="route">/account · 空壳 15 行 · 吸收原拟 /tickets</div>
+    </a>
+    <a class="pagecard" href="partner/jobs.html">
+      <h3>岗位信息管理 <span class="tag tag--info">改造</span></h3>
+      <p>加 质检列 + 提交前预审 + 内容健康度 Tab + 驳回归因 + 批量操作。
+        <b>E1 规则与 E3 模型分两档</b>，不把确定性检查包装成 AI。</p>
+      <div class="route">/jobs · 现有 455 行（需先拆 4 个组件）</div>
+    </a>
+    <a class="pagecard" href="partner/sources.html">
+      <h3>数据源管理 <span class="tag tag--info">改造</span></h3>
+      <p>补生命周期：编辑 / 归档 / 手动同步 / 凭证轮换 / 连接测试。
+        <b>545 行，最明确的拆分前置项</b>（Codex）。</p>
+      <div class="route">/sources · 现有 545 行</div>
+    </a>
+    <a class="pagecard" href="partner/fairs.html">
+      <h3>招聘会信息管理 <span class="tag tag--info">改造</span></h3>
+      <p>加主办方作战室：参展企业 / 展位图 / 议程 / 活动资料 / 现场数据 / AI 准备助手。
+        <b>现在这些全归管理员管，主办方办会当天要打电话找平台改展位图</b>。</p>
+      <div class="route">/fairs · 现有 440 行</div>
+    </a>
+    <a class="pagecard" href="partner/profile.html">
+      <h3>机构资料 <span class="tag tag--info">改造</span></h3>
+      <p>加 4 个 Tab：资质合规 / 账单与用量 / <b>线下机构档案</b> / <b>线上平台收录</b>。
+        后两个对应前端岗位页新增的「线下招聘公司」「线上招聘平台」——
+        数据本就挂在本机构名下，<b>但两个后台都没给机构入口</b>。
+        线上平台<b>只能申请，不能自助发布</b>（目录须保持中立）。</p>
+      <div class="route">/profile · 现有 248 行 · 加 Tab 后建议按 Tab 拆子组件</div>
+    </a>
+    <a class="pagecard" href="partner/sync-logs.html">
+      <h3>同步日志 <span class="tag tag--info">改造</span></h3>
+      <p>加 AI 失败归因（三次 401 = 令牌过期）+ 错误明细导出。
+        <b>重试做不了</b>——SyncLog 只有汇总，未关联批次与失败行。原型不放假按钮。</p>
+      <div class="route">/sync-logs · 只做归因与导出</div>
+    </a>
+    <a class="pagecard" href="partner/smart-campus.html">
+      <h3>智慧校园 <span class="tag tag--info">改造</span></h3>
+      <p>迎新内容 CMS：报到流程 / 办事窗口 / 官方链接。<b>不新建入口</b>——
+        现有 <code>OrientationPanel</code> 已预留内容模型，在它里面填实。</p>
+      <div class="route">/smart-campus · 只做规则档质检，不上生成式 AI</div>
+    </a>
+    <a class="pagecard" href="partner/companies.html">
+      <h3>企业资料管理 <span class="tag tag--info">改造</span></h3>
+      <p>与岗位同一套：质检 + 预审 + AI 写简介（只用你填的事实，不编造规模荣誉）。
+        <b>本页正卡在那处真断点上</b>——平台侧不接审核，内容到不了前台。</p>
+      <div class="route">/companies · 631 行需先拆</div>
+    </a>
+    <a class="pagecard" href="partner/policy.html">
+      <h3>政策公告管理 <span class="tag tag--info">改造</span></h3>
+      <p>合规预审（申报期已过检测，E2）+ 撰写辅助（把官方文件整理成终端可读结构）。
+        <b>只整理结构不改实质</b>——金额/条件/截止日必须与原文一致。</p>
+      <div class="route">/policy · 现有 385 行</div>
+    </a>
+    <a class="pagecard" href="partner/dashboard.html">
+      <h3>工作台 <span class="tag tag--info">改造</span></h3>
+      <p>加「AI 每日要点」：资质到期 / 过期岗位 / 数据源失败。
+        <b>必须先做效果层</b>，否则要点只能重复现有卡片的信息。</p>
+      <div class="route">/ · 现有 228 行</div>
+    </a>
+  </div>
+
+  <div class="sechead" style="margin-top:34px"><h2>已立项登记 · 上线后启动</h2></div>
+  <div class="card" style="margin-bottom:20px"><div class="card__body">
+    <div class="row" style="align-items:flex-start;gap:14px">
+      <span class="tag tag--info" style="flex:0 0 auto">运营大屏</span>
+      <div style="flex:1">
+        <b class="serif" style="font-size:15px">一个引擎 + 四套视图（政务 / 运营 / 销售 / 机构），不是四块屏</b>
+        <div class="small muted" style="margin-top:7px;line-height:1.75">
+          产品所有者提出「要不要做数据大屏，数字孪生那种效果」。
+          <b>结论：值得做，但不叫数字孪生</b>——终端只有 <code>locationLabel</code> 文本<b>没有经纬度</b>、
+          全仓<b>没有 WebSocket/SSE</b>、心跳<b>没有耗材余量数值</b>、完全没有空间模型。
+          硬做只能买模板套假数据，而大屏是最容易被截图传播的界面。
+          <br>做法：<code>/screen?profile=gov|ops|sales|org</code> 一个引擎 + Admin 一个配置页。
+          <b>这是整个方案里唯一建议新建的页面</b>——它塞不进任何现有页（分辨率/交互/鉴权/刷新四件事全不同）。
+          <br>一期只上现有真实数据能撑起的 8 个模块；地图、实时推送、机构版按数据前置分二三期。
+          <b>排期：上线后启动（产品所有者拍板）。</b>
+        </div>
+        <div class="route" style="margin-top:9px">详见方案 §10 · 含模块矩阵 / 数据前置清单 / 合规红线 / 反面清单</div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="sechead" style="margin-top:34px"><h2>落地顺序</h2></div>
+  <div class="card"><div class="card__body">
+    <div class="stack">
+      <div class="row" style="align-items:flex-start">
+        <span class="tag tag--err" style="flex:0 0 60px">S0</span>
+        <div><b>必修缺陷</b>（随时可做，都是现有页的真实 bug）<br>
+          <span class="small muted">影子测试（测试不改线上）· getUsage 的 provider 过滤 ·
+          自我探索在 LLM 不可用时仍返回「完成」与确定性分数（违反「不伪造能力」）· 诊断链路解析 usage</span></div>
+      </div>
+      <div class="row" style="align-items:flex-start">
+        <span class="tag tag--warn" style="flex:0 0 60px">S1</span>
+        <div><b>ai-core 内核</b>（一切的前提，无此则后台无东西可管）<br>
+          <span class="small muted">能力注册表入库 · 调用网关 · 计量账本（补 orgId）· 证据与降级契约</span></div>
+      </div>
+      <div class="row" style="align-items:flex-start">
+        <span class="tag" style="flex:0 0 60px">S1.5</span>
+        <div><b>组件拆分</b>（Codex 追加的硬前置）<br>
+          <span class="small muted">ai-services 634 · dashboard 654 · companies 631 · sources 545 · jobs 455 · fairs 440
+          —— 全部逼近或超过 CLAUDE.md §8 的 500 行阈值，不拆就加会直接撞 800 行红线</span></div>
+      </div>
+      <div class="row" style="align-items:flex-start">
+        <span class="tag tag--info" style="flex:0 0 60px">S2–S3</span>
+        <div><b>Admin AI 中枢</b>：能力注册表 → 成本与预算 → 事故降级 → Prompt 版本 → 质量抽检 → 合规拦截</div>
+      </div>
+      <div class="row" style="align-items:flex-start">
+        <span class="tag tag--ok" style="flex:0 0 60px">S4–S6</span>
+        <div><b>Partner 三层</b>：效果层（可与 Admin 并行）→ 助手层 → 账户层<br>
+          <span class="small muted">效果层第一步只接已存在的 <code>/partner/stats</code>，空壳当场变真；
+          第二步补漏斗需先给日志加 sourceOrgId</span></div>
+      </div>
+    </div>
+    <div class="hr"></div>
+    <div class="proto proto--warn" style="margin:0">
+      <span class="proto__tag">时机</span>
+      正式计划已把「后台 IA / AI 治理」列为<b>非上线阻塞项</b>。若在最终验收之后动它们，
+      会作废已通过的 P0 证据。推荐沿用既定方案：<b>先上线，再做 S0–S6</b>；
+      若业务要求首发即交付，必须重跑完整 P0 最终验收。
+    </div>
+  </div></div>
+
+  <div class="protofoot">
+    <b>原型说明</b>
+    <ul>
+      <li><b>这不是新设计语言。</b>色值全部取自 <code>packages/ui/src/styles/inkpaper.css</code>（墨绿 #10302b / 纸色 #f4f1e8 / 青玉 #1f9e86 / Noto Serif SC），侧栏 1:1 复刻现有 <code>NAV_ITEMS</code>。落地时改动直接落在现有组件上，本目录不进生产。</li>
+      <li>每页右上角有<b>四态切换器</b>：默认 / 首次·空数据 / AI 不可用 / 加载失败——四态同一套版面，不重排。</li>
+      <li>虚线绿框是<b>原型注释</b>（说明改什么、为什么），橙色是 <b>Codex 复核修正</b>，红色是<b>必修缺陷</b>；这些落地时全部删除。</li>
+      <li>数据均为示意。「未计量 / 合并计 / 按量·未估算 / 样本不足」是<b>刻意保留的诚实标注</b>，不是占位符。</li>
+      <li>方案正文：<code>docs/product/console-ai-upgrade-plan-2026-08.md</code></li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

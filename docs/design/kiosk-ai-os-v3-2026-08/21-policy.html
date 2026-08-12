@@ -16,92 +16,332 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
 /* ── P21 专用 ───────────────────────────────────────────────────────────
-   这一页的真问题不是"找不到政策"，是**看不出自己够不够格**。
-   政策原文写得像公文，条件写在第三段第二句，人读完还是不确定。
+   2026-08-10 按走查结论重做。上一版的病不是"没写清楚"，是**写太多、问太少**：
+   ① 六条政策全按「本市户籍 / 本市社保」判，却从头到尾没问过是哪座城市 ——
+      逻辑漏洞。所以第一步先定城市，城市未定时**一律不出结论**。
+   ② 只问三项却敢给六条结论。补到九个问项；**没答的一律「待确认」**，不许猜成"像是符合"。
+   ③ 条件按钮点了不动、办事清单自动塞三项、政策原文说能打印却没入口 ——
+      全部改成真交互：单选有选中态、政策逐条勾选、原文可展开可勾选打印。
+   ④ 满屏说明文字删掉或折叠。留在主视线上的只有：能点的、有结论的、要带走的。
 
-   所以 AI 的落点是：把每一条拆成「你满足的 / 你不满足的 / 本机不知道的」三堆，
-   逐条指出**卡在哪一个条件上**。
+   文字纪律（本页硬指标）：
+   · 每张卡的正文说明只留一行（目标 ≤22 字），长解释进「看原文」折叠。
+   · 连续 ≥40 字且不可点的文字块，每屏不超过 2 个。
+   · 合规声明 / 免责 / 隐私说明，屏幕上各只出现一次：
+       - 合规边界 → .lawbar（页顶，常驻，全页唯一）
+       - 隐私     → S1 输入区一句「离场清空」（全页唯一）
+       - 纸面免责 → 办事清单页脚一行（那是**打印出去的纸**，不是屏幕文案，
+                    纸离开本机后必须自带这句，所以它与页顶那条不算重复）
+   · 三类披露不许因为删字丢掉：AIGC 标识（S2 的 .ev--e3）、以经办窗口审核为准
+     （.lawbar + 纸面页脚）、不代办不收费（.lawbar）。
 
-   最硬的一条纪律：**本机不做资格认定**。
-   够不够格由经办机构说了算，本机说的只是"按你填的信息看，像/不像"。
-   这不是免责声明摆设 —— 页面上每一条判断都必须带着这个前提出现，
-   否则用户会照着本机的话去办，扑空一趟。政策类扑空的成本是真实的：
-   请假、排队、来回车费。
-
-   组件备忘：.tl 本身是一步（容器 .tline）；复选框是 .ck-box；
-   .ck / .jobrow 只在 11、12 页页内定义过，本页自带。
+   组件备忘：.ck 复选按钮、.op 单选按钮、.pol 政策卡为本页自带；
+   .tl/.tline/.kv/.notice/.pane 走公共样式。
    ──────────────────────────────────────────────────────────────────── */
 
-/* padding-bottom 给足：最后一张政策卡的脚注曾被裁 49px。
-   它在滚动区内、滚得到，但贴边裁一半读起来像加载失败。 */
+/* 页顶合规条：全页唯一的边界声明。常驻，不随阶段与四态变化 */
+.lawbar { flex:0 0 auto; margin:0 var(--gutter) var(--s-3); padding:9px var(--s-4);
+  border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
+  display:flex; align-items:center; gap:var(--s-3);
+  font-size:var(--fz-1); color:var(--fog-700); line-height:1.4; }
+.lawbar .ic { width:16px; height:16px; color:var(--fog-600); flex:0 0 auto; }
+.lawbar b { color:var(--fog-800); font-weight:600; }
+
+.pane-hd > b { font-size:var(--fz-4); color:var(--fog-900); }
+.pane-hd .mt { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600); text-align:right; }
+.pane-hd .ev { margin-left:auto; flex:0 0 auto; }
+
+/* ── ① 城市门：政策按城市走，城市不定就不出结论 ────────────────────────
+   一体机没有 GPS，所以写「本机所在城市」（终端配置下发）而不是「根据定位」。 */
+.cityrow { display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; }
+.city-v { font-family:var(--ff-display); font-size:var(--fz-7); color:var(--fog-900); line-height:1.1; }
+.city-k { font-size:var(--fz-1); color:var(--fog-600); }
+.city-sw { margin-left:auto; min-height:var(--touch-min); }
+.city-v--none { color:var(--amber-200); font-size:var(--fz-5); }
+
+.citypick { margin-top:var(--s-4); padding-top:var(--s-4); border-top:1px solid var(--brd-1); }
+.citypick .field-lb { margin-bottom:var(--s-3); }
+/* 2026-08-10：省 / 市原来平铺在 .oprow 里（只有 5 个省，扩到 31 个必成标签墙）。
+   改用 scripts/region.js 的下钻选择器后 .oprow / .op--sm 已无引用，一并删掉，
+   不留死样式。.op 仍在用（下面九个问项）。 */
+
+/* ── ② 问项：单选有选中态 ── */
+.qs { display:flex; flex-direction:column; }
+.qrow { display:grid; grid-template-columns:96px 1fr; gap:var(--s-3);
+  padding:9px 0; border-bottom:1px solid var(--brd-1); align-items:start; }
+.qrow:last-child { border-bottom:0; }
+.qlb { font-size:var(--fz-2); color:var(--fog-700); padding-top:14px; }
+.qrow--miss .qlb { color:var(--amber-200); }
+.ops { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.op { min-height:var(--touch-min); padding:0 var(--s-4); border-radius:var(--r-xs);
+  background:var(--surf-1); border:1px solid var(--brd-1); color:var(--fog-800);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer; white-space:nowrap;
+  transition:border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out); }
+.op:hover { border-color:var(--jade-a32); }
+.op[aria-pressed="true"] { background:var(--jade-a12); border-color:var(--jade-400);
+  color:var(--fog-900); font-weight:600; }
+
+/* 计数条：只报「答了几项、缺几项」。
+   2026-08-10 Codex :319 整改：九项答案原来在这里铺一遍 chip、右栏「你答了什么」再铺一遍 kv，
+   同一份内容换个位置写两次。明细只留右栏一处，这里退成计数。 */
+.recap { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-3) var(--s-4);
+  border-radius:var(--r-xs); background:var(--jade-a12); border:1px solid var(--jade-a20);
+  display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.recap-k { font-size:var(--fz-1); color:var(--fog-700); flex:0 0 auto; }
+.recap-v { display:flex; gap:6px; flex-wrap:wrap; min-width:0; }
+.rc { font-size:var(--fz-1); color:var(--fog-900); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-radius:var(--r-full); padding:3px 10px; white-space:nowrap; }
+.rc--miss { color:var(--amber-200); border-color:var(--amber-a20); background:var(--amber-a12); }
+.recap-n { margin-left:auto; font-family:var(--ff-num); font-size:var(--fz-1); color:var(--fog-700); }
+
+/* ── ③ 政策卡：可勾选 + 逐条核对 + 看原文 ── */
 .joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
-           gap:var(--s-4); padding-bottom:var(--s-6); }
-
-.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
-      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
-      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
-.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
-          flex:0 0 auto; margin-top:2px; position:relative; }
-.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
-.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
-          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
-.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
-.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
-
-/* 情况选择：不问身份证号，只问判定政策要用的那几项 */
-.pick { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
-.pk { text-align:left; padding:var(--s-4) var(--s-5); border-radius:var(--r-xs); cursor:pointer;
-      background:var(--surf-1); border:1px solid var(--brd-1); font-family:var(--ff-ui);
-      min-height:var(--touch-min); display:flex; align-items:center; gap:var(--s-3);
-      transition:border-color var(--dur-2) var(--ease-out); }
-.pk:hover { border-color:var(--jade-a32); }
-.pk--on { border-color:var(--jade-400); background:var(--jade-a12); }
-.pk-t { font-size:var(--fz-3); color:var(--fog-900); }
-.pk--on .pk-t { font-weight:600; }
-
-/* 政策卡：判定结论 + 逐条条件核对 */
-.pol { padding:var(--s-5); border-radius:var(--r-md);
-       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
-       display:flex; flex-direction:column; gap:var(--s-3); }
-.pol-hd { display:flex; align-items:flex-start; gap:var(--s-4); }
-.pol-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
-.pol-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
+  gap:var(--s-3); padding-bottom:var(--s-4); }
+.pol { padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.pol--on { border-color:var(--jade-a32); }
+.pol-hd { display:flex; align-items:center; gap:var(--s-4); }
+.pol-t { flex:1 1 auto; min-width:0; font-size:var(--fz-5); font-weight:600;
+  color:var(--fog-900); line-height:1.25; }
+/* 来源 / 同步 / 文号 独占一行：挤在标题下面会被判定 chip 压到换行 */
+.pol-m { padding-left:64px; margin-top:-6px; font-size:var(--fz-1);
+  color:var(--fog-600); font-family:var(--ff-num); line-height:1.4; }
 .pol-verdict-status { flex:0 0 auto; font-size:var(--fz-2); font-weight:700;
-       padding:3px 11px; border-radius:999px; white-space:nowrap; }
+  padding:4px 12px; border-radius:999px; white-space:nowrap; }
 .pv--maybe { background:var(--jade-a20); color:var(--jade-200); }
-.pv--gap   { background:var(--amber-a12); color:var(--amber-200); }
-.pv--no    { background:var(--fog-a08); color:var(--fog-600); }
-.cond { display:flex; flex-direction:column; gap:6px; }
-.cd { display:grid; grid-template-columns:20px 1fr; gap:var(--s-3); align-items:start;
-      font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
-.cd i { width:15px; height:15px; border-radius:50%; margin-top:3px; flex:0 0 auto;
-        display:block; }
-.cd--ok i   { background:var(--jade-500); }
-.cd--no i   { background:var(--amber-400); }
-.cd--dunno i{ background:transparent; border:2px dashed var(--fog-a20); }
-.cd b { color:var(--fog-900); }
+.pv--gap   { background:var(--amber-a12); color:var(--amber-200); border:1px solid var(--amber-a20); }
+.pv--wait  { background:var(--surf-2); color:var(--fog-800); border:1px dashed var(--brd-2); }
+.pv--no    { background:var(--surf-1); color:var(--fog-600); }
 
-.chip--info { cursor:inherit; }
+/* 勾选框：勾了哪几条，办事清单就按哪几条生成 */
+.ckbox { width:var(--touch-min); height:var(--touch-min); flex:0 0 auto; border:0;
+  background:transparent; cursor:pointer; display:grid; place-items:center; }
+.ck-box { width:24px; height:24px; border-radius:6px; border:2px solid var(--brd-2);
+  position:relative; display:block; transition:all var(--dur-2) var(--ease-out); }
+[aria-pressed="true"] > .ck-box, .ck--have .ck-box {
+  background:var(--jade-500); border-color:var(--jade-500); }
+[aria-pressed="true"] > .ck-box::after, .ck--have .ck-box::after {
+  content:''; position:absolute; left:7px; top:2px; width:6px; height:12px;
+  border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+
+.cond { display:flex; flex-direction:column; gap:5px; }
+.cd { display:grid; grid-template-columns:18px 1fr; gap:var(--s-3); align-items:center;
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.5; }
+.cd i { width:14px; height:14px; border-radius:50%; display:block; }
+.cd--ok i    { background:var(--jade-500); }
+.cd--no i    { background:var(--amber-400); }
+.cd--dunno i { background:transparent; border:2px dashed var(--fog-600); }
+.cd b { color:var(--fog-900); }
+.cd em { font-style:normal; color:var(--fog-600); }
+
+.polact { display:flex; align-items:center; gap:var(--s-3); }
+.lnk { min-height:var(--touch-min); padding:0 var(--s-4); border-radius:var(--r-xs);
+  background:var(--surf-1); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; }
+.lnk:hover { border-color:var(--jade-a32); }
+.lnk .ic { width:17px; height:17px; }
+.polhint { margin-left:auto; font-size:var(--fz-1); color:var(--fog-600); }
+
+/* 原文：默认折叠，展开在页内看，不跳页、不假装能打开外部文件 */
+.doc { padding:var(--s-4); border-radius:var(--r-xs);
+  background:var(--field-bg); border:1px solid var(--brd-1); }
+.doc-h { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-bottom:6px; }
+.doc-p { font-size:var(--fz-2); color:var(--fog-800); line-height:1.7; }
+.doc-p b { color:var(--fog-900); }
+
+/* ── ④ 出发前问官方：给号码位与二维码，不再写"为什么不显示地址" ── */
+.bigb { width:100%; min-height:76px; padding:var(--s-3) var(--s-4); border-radius:var(--r-sm);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-900);
+  font-family:var(--ff-ui); cursor:pointer; display:flex; align-items:center; gap:var(--s-4);
+  text-align:left; transition:border-color var(--dur-2) var(--ease-out); }
+.bigb + .bigb { margin-top:var(--s-3); }
+.bigb:hover { border-color:var(--jade-a32); }
+.bigb[aria-pressed="true"] { border-color:var(--jade-400); background:var(--jade-a12); }
+.bigb-ic { width:44px; height:44px; border-radius:var(--r-xs); flex:0 0 auto; display:grid;
+  place-items:center; background:var(--surf-3); border:1px solid var(--brd-2); color:var(--jade-400); }
+.bigb-ic .ic { width:22px; height:22px; }
+.bigb-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.bigb-t { font-size:var(--fz-4); font-weight:600; }
+.bigb-s { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+
+.qr { display:flex; flex-direction:column; align-items:center; gap:var(--s-3);
+  margin-top:var(--s-3); padding:var(--s-4); border-radius:var(--r-sm);
+  background:var(--glass-2-bg); border:1px solid var(--glass-2-brd); }
+.qr-box { width:150px; height:150px; border-radius:var(--r-xs); background:#fff;
+  display:grid; place-items:center; padding:11px; }
+.qr-box svg { width:100%; height:100%; }
+.qr-cap { font-size:var(--fz-1); color:var(--fog-700); text-align:center; line-height:1.5; }
+
+/* ── ⑤ 打印出口：带走什么必须写在按钮和纸上 ── */
+.takebar { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--jade-a20);
+  display:flex; align-items:center; gap:var(--s-4); }
+.takebar .ic { width:22px; height:22px; color:var(--jade-400); flex:0 0 auto; }
+.take-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.take-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.take-s { font-size:var(--fz-1); color:var(--fog-600); }
+.take-n { margin-left:auto; font-family:var(--ff-num); font-size:var(--fz-5); color:var(--jade-200); }
+
+.ckrow { display:flex; align-items:center; gap:var(--s-3); width:100%;
+  min-height:var(--touch-min); padding:var(--s-2) var(--s-3); border-radius:var(--r-xs);
+  border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer;
+  font-family:var(--ff-ui); text-align:left; }
+.ckrow + .ckrow { margin-top:var(--s-2); }
+.ckrow:hover { border-color:var(--jade-a32); }
+.ckrow[aria-pressed="true"] { border-color:var(--jade-a32); background:var(--jade-a12); }
+.ckrow > .ck-box { flex:0 0 auto; }
+.ckrow-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ckrow-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ckrow-s { font-size:var(--fz-1); color:var(--fog-600); }
+.ckrow--fix { cursor:default; }
+
+.foldbtn { width:100%; min-height:var(--touch-min); margin-top:var(--s-3);
+  padding:0 var(--s-4); border-radius:var(--r-xs); background:transparent;
+  border:1px dashed var(--brd-2); color:var(--fog-700); font-family:var(--ff-ui);
+  font-size:var(--fz-2); cursor:pointer; display:flex; align-items:center; gap:var(--s-3); }
+.foldbtn:hover { border-color:var(--jade-a32); color:var(--fog-800); }
+.foldbtn .ic { width:16px; height:16px; margin-left:auto; }
+.foldbox { margin-top:var(--s-3); }
+
+/* 栏内滚动 + 关键块钉底：主栏底部不留大片空洞（自检的「版面留白」这一项） */
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
-.paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
+.pane--grow > .sec--col { flex:1 1 auto; min-height:0;
+  display:flex; flex-direction:column; overflow-y:auto; }
+.sec--col > .push { margin-top:auto; padding-top:var(--s-4); }
+.pane--grow > .sec--split { flex:1 1 auto; min-height:0;
+  display:flex; flex-direction:column; overflow:hidden; }
+.sec--split > .qs { flex:1 1 auto; min-height:0; overflow-y:auto; }
+.sec--split > .recap { flex:0 0 auto; }
+.paper-stage.is-one { justify-content:center; }
 
-/* 办事清单纸面 */
-.gd { padding:30px 34px; color:#17222b; }
-.gd h1 { font-size:21px; font-weight:800; }
-.gd .gd-sub { font-size:12.5px; color:#5b6b78; margin-top:3px; }
-.gd .gd-hr { height:1px; background:#d9e1e8; margin:14px 0 12px; }
-.gd-w { font-size:14px; font-weight:800; color:#0f5a45; margin:13px 0 5px; }
-.gd-i { display:grid; grid-template-columns:15px 1fr; gap:9px; margin-bottom:6px;
-        font-size:12.5px; color:#2c3a45; line-height:1.5; }
-.gd-i i { width:10px; height:10px; border:1.5px solid #96a4ae; border-radius:2px; margin-top:3px; }
+/* 办事清单纸面：页脚从四行免责压成一行 */
+.gd { padding:22px 26px; color:#17222b; }
+.gd h1 { font-size:20px; font-weight:800; }
+.gd .gd-sub { font-size:11.5px; color:#5b6b78; margin-top:3px; line-height:1.5; }
+.gd .gd-hr { height:1px; background:#d9e1e8; margin:10px 0 8px; }
+.gd-w { font-size:13.5px; font-weight:800; color:#0f5a45; margin:10px 0 4px; }
+.gd-i { display:grid; grid-template-columns:13px 1fr; gap:8px; margin-bottom:4px;
+  font-size:12px; color:#2c3a45; line-height:1.45; }
+.gd-i i { width:9px; height:9px; border:1.5px solid #96a4ae; border-radius:2px; margin-top:3px; }
 .gd-i b { color:#0f5a45; }
-.gd-warn { font-size:12.5px; color:#7a4a1e; line-height:1.55; margin-top:6px; }
-.gd-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
-           padding-top:9px; margin-top:14px; }
+.gd-foot { font-size:11px; color:#6b7a86; line-height:1.6; border-top:1px solid #d9e1e8;
+  padding-top:8px; margin-top:12px; }
+/* 原文附页做成「印哪几份」的清单页，不在预览里铺原文全文 ——
+   屏幕上要读原文走 S2 的「看原文」，纸上原文跟在清单后面按页打印 */
+.gd-row { display:grid; grid-template-columns:18px 1fr auto; gap:8px; align-items:baseline;
+  font-size:12.5px; color:#2c3a45; padding:6px 0; border-bottom:1px solid #eef2f5; }
+.gd-rn { color:#0f5a45; font-weight:800; }
+.gd-rp { color:#5b6b78; font-size:11.5px; }
+
+/* ── ⑤ 上一屏带进来的选择：回执条 ────────────────────────────────────
+   2026-08-10 参数消费整改：38-policy-hub 一直在传 ?cat= 与 identity/insured/city，
+   本页此前一个都不读 —— 用户在域首屏点的四张分类卡、选的三项条件全部白选。
+   现在读了就必须**让用户看见**：静默预填比不预填更糟，用户会以为这些答案
+   是本机自己猜的。所以规矩是三条：
+     ① 有回执 —— 顶部一行写清带进来了什么、从哪来；
+     ② 可改   —— 分类可换、可看全部，带入的问项就在下面照常能点；
+     ③ 不越权 —— 只认白名单取值，非法值一律当没传，绝不把 URL 里的字面量渲染出来。
+   本条只在**真的带了参数**时才插进 DOM；不带参数时这一块整个不存在，
+   页面与整改前逐像素相同。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
+
+/* 分类筛掉的那几条，得让用户知道被筛掉了几条、一键看全部 —— 不做静默隐藏 */
+.polfilter-tail { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4);
+  border-radius:var(--r-sm); background:var(--surf-1); border:1px dashed var(--brd-2);
+  display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; }
+.polfilter-tail .t { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.polfilter-tail .carryin-op { margin-left:auto; }
+.polempty { padding:var(--s-6) var(--s-4); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px dashed var(--brd-2);
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.65; }
+.polempty b { color:var(--fog-900); }
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右副列常驻抢走约三分之一宽度，装的是政策来源统计、注意事项、首次使用说明、
+   官方热线与二维码、「打完之后」——问了才想知道的东西，不是当下这一步要做的。
+   Codex 明确说本页「需要收窄，不需要推倒重做」，所以只动出现方式：
+     · 与当前流程直接相关的（核对进度 / 按作答派生的待办 / 打印勾选与页数费用）
+       整块移到左主区常驻；
+     · 其余口径与旁路动作收进上下文抽屉，点阶段轨右端的按钮才展开。
+   内容一条未删。 */
+.work { grid-template-columns: 1fr; }
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--gutter); bottom:auto; width:404px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; margin-left:var(--s-4); min-height:56px; padding:0 var(--s-5);
+  border-radius:var(--r-full); border:1px solid var(--brd-2); background:var(--surf-1);
+  color:var(--fog-800); font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+}
+.sidebtn .ic { width:18px; height:18px; }
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+
+/* 移进正文的三块横过来，别把主列表挤出血 */
+.wmain .pane--ans, .wmain .pane--todo, .wmain .pane--pick { flex:0 0 auto; }
+.wmain .pane--ans .kv { display:grid; grid-template-columns:1fr 1fr 1fr; column-gap:var(--s-6); }
+.wmain .pane--ans .kv-row { padding-top:var(--s-1); padding-bottom:var(--s-1); }
+.wmain .pane--ans .kv-row .k { flex:0 0 auto; white-space:nowrap; }
+.wmain .pane--ans .kv-row .v { text-align:right; }
+.wmain .pane--todo > .sec { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); align-items:start; }
+.wmain .pane--todo > .sec > .panel-note { grid-column:1 / -1; margin-bottom:0 !important; }
+.wmain .pane--pick > .sec {
+  display:grid; grid-template-columns:280px 1fr 340px; grid-template-rows:auto 1fr;
+  gap:var(--s-3) var(--s-5); align-items:start;
+}
+.wmain .pane--pick > .sec > .ckrow--fix { grid-column:1; grid-row:1 / span 2; }
+.wmain .pane--pick > .sec > .field-lb { grid-column:2; grid-row:1; }
+.wmain .pane--pick > .sec > #docPick { grid-column:2; grid-row:2; }
+.wmain .pane--pick > .sec > .push { grid-column:3; grid-row:1 / span 2; }
+.wmain .pane--pick .field-lb { margin-top:0 !important; }
+.wmain .pane--pick .push { margin-top:0; }
+/* device-off 的取回码要留着 —— 那是打印机离线时唯一能走的替代路径，不许藏 */
+.wmain .pane--pick .qr { flex-direction:row; align-items:center; gap:var(--s-4); text-align:left; }
+.wmain .pane--pick .qr-box { width:104px; height:104px; flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -114,7 +354,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">政策服务</div>
@@ -123,18 +363,29 @@
     </a>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 只能看原文</div>
+    <!-- 顶栏只报状态，不再重复「只能看原文」——后果由主区那条唯一的降级 notice 讲 -->
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 已上报</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
     <div class="clock" data-clock>2026年8月9日 <b>13:18</b></div>
   </header>
 
   <div class="rail">
     <div class="rail-track">
-      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">你的情况</span></button>
-      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">卡在哪一条</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走办事清单</span></button>
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">选情况</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span>
+        <span class="rstep-name" data-when="default first device-off">看缺口</span>
+        <span class="rstep-name" data-when="ai-down">看政策原文</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">打印清单</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+    <!-- 抽屉开关放阶段轨右端：三步都在，且不跟底部动作条抢宽度 -->
+    <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p21side"><svg class="ic"><use href="#i-agency"/></svg>来源与提醒</button>
+  </div>
+
+  <!-- 全页唯一的合规边界声明。删字不许删它 -->
+  <div class="lawbar">
+    <svg class="ic"><use href="#i-shield"/></svg>
+    <span>本机<b>不做资格认定、不代办、不收费</b>；能不能办以经办窗口审核为准。</span>
   </div>
 
   <div class="work">
@@ -144,21 +395,32 @@
       <!-- ─────────── S1 你的情况 ─────────── -->
       <div class="pane" data-at="s1">
         <div class="pane-hd">
-          <svg class="ic"><use href="#i-policy"/></svg>
-          <b>先说清楚这一页做什么</b>
+          <svg class="ic"><use href="#i-pin"/></svg>
+          <b>第 1 步：定城市</b>
+          <span class="mt">政策按城市走，城市不定不出结论</span>
         </div>
         <div class="sec">
-          <div class="advice-act">
-            政策原文写得像公文，条件常常藏在第三段第二句 ——
-            大多数人读完还是<b>不确定自己够不够格</b>。这一页就干这一件事：
-            <b>把每一条拆开，告诉你卡在哪个条件上。</b>
+          <div class="cityrow">
+            <span class="city-v" id="cityV">广州市</span>
+            <span class="city-k" id="cityK">广东省 · 本机所在城市 · 可改</span>
           </div>
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+          <!-- 2026-08-10：省 / 市原来平铺成两排 .oprow 标签（只有 5 个省）。
+               扩到 31 个省必然变成标签墙，所以改用全站统一的下钻选择器
+               （scripts/region.js）。城市未定不出结论的门控逻辑一字不动：
+               选「整个某某省」= 没定到市 → 仍然是「城市未定」。 -->
+          <div class="citypick" id="cityPick">
+            <div class="field-lb"><span>政策按<b>市</b>走 —— 只选到省份不算定了城市</span></div>
+            <button class="fpick" type="button" id="cityBtn" data-region
+                    data-region-value="广东省|广州市|" data-region-empty="城市未定">
+              <svg class="ic"><use href="#i-pin"/></svg>
+              <span class="fpick-v" data-region-text>广东省 · 广州市</span>
+              <span class="fpick-n">31 省</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+          </div>
+          <div class="notice notice--amber" id="cityWarn" hidden style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span><b>本机不做资格认定。</b>够不够格由经办机构说了算，
-                  本机说的只是「按你填的信息看，像 / 不像」。<br>
-                  政策扑空一趟的成本是真的 —— 请假、排队、来回车费。
-                  所以下面每条都会告诉你<b>去之前该先确认什么</b>。</span>
+            <span>城市未定 · 下一步不出结论</span>
           </div>
         </div>
       </div>
@@ -166,46 +428,16 @@
       <div class="pane pane--grow" data-at="s1">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-user"/></svg>
-          <b>选几项就够，不用填身份证号</b>
-          <span class="mt">只问判定政策要用的，多余的一律不问</span>
+          <b>第 2 步：选你的情况</b>
+          <span class="mt">只在本次办理里用 · 离场清空</span>
         </div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-5)">
-
-          <div>
-            <div class="field-lb">你现在的状态</div>
-            <div class="pick">
-              <button class="pk pk--on"><span class="pk-t">离职找工作中</span></button>
-              <button class="pk"><span class="pk-t">在职想换工作</span></button>
-              <button class="pk"><span class="pk-t">应届毕业生</span></button>
-              <button class="pk"><span class="pk-t">想创业 / 已创业</span></button>
-            </div>
-          </div>
-
-          <div>
-            <div class="field-lb">户籍与社保</div>
-            <div class="pick">
-              <button class="pk pk--on"><span class="pk-t">本市户籍</span></button>
-              <button class="pk"><span class="pk-t">外地户籍 · 本市缴社保</span></button>
-              <button class="pk"><span class="pk-t">外地户籍 · 未缴社保</span></button>
-              <button class="pk"><span class="pk-t">不确定</span></button>
-            </div>
-          </div>
-
-          <div>
-            <div class="field-lb">离开上一份工作多久了</div>
-            <div class="pick">
-              <button class="pk"><span class="pk-t">1 个月以内</span></button>
-              <button class="pk pk--on"><span class="pk-t">1–6 个月</span></button>
-              <button class="pk"><span class="pk-t">6 个月以上</span></button>
-              <button class="pk"><span class="pk-t">没工作过</span></button>
-            </div>
-          </div>
-
-          <div class="notice">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>这几项<b>只在本次办理里用</b>，离场自动清空，不留存、不上传。
-                  本机不问也不存你的身份证号、手机号和银行卡号 ——
-                  政策申领要用这些，但那是<b>到经办窗口</b>才填的，不在这里。</span>
+        <div class="sec sec--split">
+          <div class="qs" id="qs"></div>
+          <!-- 只报计数；九项答案的完整明细在右栏「你答了什么」，不在这里再铺一遍 -->
+          <div class="recap">
+            <span class="recap-k">本次作答</span>
+            <span class="recap-v" id="recapV"></span>
+            <span class="recap-n" id="recapN">明细见右栏「你答了什么」</span>
           </div>
         </div>
       </div>
@@ -214,388 +446,344 @@
       <div class="pane" data-at="s2">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <b>按你选的三项，逐条核对</b>
-          <span class="mt" data-when="default first">共 6 条相关政策</span>
-          <span class="mt" data-when="ai-down">AI 不可用 · 只能看原文</span>
+          <b data-when="default first device-off">按你答的逐条核对</b>
+          <b data-when="ai-down">政策与原文</b>
+          <span class="ev ev--e3" data-when="default first device-off">E3 · AI 核对，仅供参考</span>
+          <!-- 2026-08-10 Codex :334 整改：ai-down 下「AI 不可用」原来在顶栏状态丸、这条标题说明、
+               下面那条琥珀警告里连说三遍。全局降级只留下面那条 notice 说完整句，
+               局部一律缩成「未核对」，不再重复原因。 -->
+          <span class="mt" data-when="ai-down">未核对</span>
         </div>
         <div class="sec">
-          <div class="notice" data-when="default first">
+          <div class="notice" id="legend" data-when="default first device-off">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>圆点含义：<b style="color:var(--jade-200)">●</b> 按你填的看是满足的 ·
-                  <b style="color:var(--amber-200)">●</b> 按你填的看不满足 ·
-                  <b>○</b> 本机不知道，要你自己确认。<br>
-                  <b>三种都不是最终结论</b> —— 最终以经办机构认定为准。</span>
+            <span><b style="color:var(--jade-200)">●</b> 满足 ·
+                  <b style="color:var(--amber-200)">●</b> 不满足 ·
+                  <b>○</b> 待确认 · <span id="legendN">未答 2 项按待确认</span></span>
           </div>
+          <!-- 本屏唯一的 AI 降级说明：原因只在这里讲一次，别处只写「未核对」 -->
           <div class="notice notice--amber" data-when="ai-down">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>AI 暂时不可用，<b>本机这次不做任何条件核对</b>。
-                  下面只列政策标题和原文出处，条件要你自己读。</span>
+            <span>AI 不可用 · 本次不核对条件，只列政策与原文</span>
+          </div>
+          <div class="notice notice--amber" id="cityWarn2" hidden style="margin-top:var(--s-3)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>城市未定 · 本次不出结论，请回第 1 步</span>
           </div>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="s2">
-        <div class="joblist">
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">一次性求职创业补贴</span>
-                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕14 号</span>
-              </span>
-              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--ok"><i></i><span>本市户籍 —— <b>你选了本市户籍</b></span></div>
-              <div class="cd cd--ok"><i></i><span>处于失业状态并已做失业登记 —— 你选了离职找工作中</span></div>
-              <div class="cd cd--dunno"><i></i><span><b>你做过失业登记吗？</b>本机不知道。
-                没登记的话这条不成立 —— 登记可以在政务网或街道办办，<b>先办这个再去申领</b>。</span></div>
-              <div class="cd cd--dunno"><i></i><span>本年度未领取过同类补贴 —— 本机查不到你的领取记录。</span></div>
-            </div>
-          </div>
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">灵活就业人员社保补贴</span>
-                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕09 号</span>
-              </span>
-              <span class="pol-verdict-status pv--gap" style="margin-left:auto">卡一条</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--ok"><i></i><span>本市户籍 —— 满足</span></div>
-              <div class="cd cd--no"><i></i><span><b>要求以灵活就业身份连续缴纳社保满 3 个月</b> ——
-                你选的是「离职 1–6 个月」，如果这期间<b>没有自己交社保</b>，这条不成立。<br>
-                这是你目前卡住的那一条。</span></div>
-              <div class="cd cd--dunno"><i></i><span>年龄需在法定退休年龄前 —— 本机不知道你的年龄，也不问。</span></div>
-            </div>
-            <div class="panel-note">
-              如果你确实在自己交社保，把缴费记录带上再去 —— 这条可能就通了。
-            </div>
-          </div>
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">职业技能培训补贴</span>
-                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕21 号</span>
-              </span>
-              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--ok"><i></i><span>本市户籍或本市缴社保 —— 满足</span></div>
-              <div class="cd cd--ok"><i></i><span>法定劳动年龄内有就业需求 —— 满足</span></div>
-              <div class="cd cd--dunno"><i></i><span>需参加<b>目录内</b>的培训并取得证书才能申领 ——
-                培训目录每年调整，<b>去之前先查当年目录</b>，别先交钱再问。</span></div>
-            </div>
-          </div>
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">就业见习补贴</span>
-                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕11 号</span>
-              </span>
-              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--no"><i></i><span>面向<b>毕业 2 年内未就业的高校毕业生</b>或 16–24 岁失业青年 ——
-                你选的是「离职找工作中」，不是应届。<br>
-                如果你其实是毕业两年内，<b>回上一步改一下</b>，这条会重新判。</span></div>
-            </div>
-          </div>
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">创业担保贷款贴息</span>
-                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社财〔2026〕05 号</span>
-              </span>
-              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--no"><i></i><span>需已办理营业执照并正常经营 —— 你没选「想创业 / 已创业」。</span></div>
-            </div>
-          </div>
-
-          <div class="pol">
-            <div class="pol-hd">
-              <span>
-                <span class="pol-t">失业保险金申领</span>
-                <span class="pol-m">来源：市社会保险基金管理中心 · 同步 8月9日 07:30 · 文号 穗社保〔2026〕02 号</span>
-              </span>
-              <span class="pol-verdict-status pv--gap" style="margin-left:auto">要你自己确认两条</span>
-            </div>
-            <div class="cond">
-              <div class="cd cd--dunno"><i></i><span><b>累计缴纳失业保险满 1 年</b> —— 本机查不到你的参保记录，
-                这条只能你自己查（社保 App 或社保窗口）。</span></div>
-              <div class="cd cd--dunno"><i></i><span><b>非因本人意愿中断就业</b> ——
-                主动辞职通常不算。这条以经办机构对你离职原因的认定为准。</span></div>
-            </div>
-            <div class="panel-note">
-              这两条本机都判不了，所以不给结论 —— <b>不猜比猜错强</b>。
-            </div>
-          </div>
-
-        </div>
-
-        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
-          以上 6 条来自<b>官方公开文件</b>，同步于 8月9日 07:30。政策会调整，
-          <b>以经办机构当日执行口径为准</b>；本机只做展示与打印，不代办、不代领。
+        <div class="joblist" id="polList"></div>
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-3)">
+          6 条来自官方公开文件 · 同步 8月9日 07:30
         </div>
       </div>
 
       <!-- ─────────── S3 带走办事清单 ─────────── -->
       <div class="paper-bar" data-at="s3">
-        <span class="nm">办事清单 · 一次性求职创业补贴等 3 项</span>
-        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="nm" id="pbName">办事清单 · 3 项</span>
+        <span class="mt">A4 黑白</span>
         <span class="pg">
-          <button class="pgbtn" aria-label="上一页">‹</button>
-          <span>第 1 / 1 页</span>
-          <button class="pgbtn" aria-label="下一页">›</button>
+          <button class="pgbtn" id="pgPrev" aria-label="上一张">‹</button>
+          <span id="pbPg">第 1 / 2 张</span>
+          <button class="pgbtn" id="pgNext" aria-label="下一张">›</button>
         </span>
       </div>
 
-      <div class="paper-stage" data-at="s3">
-        <div class="sheet-a4">
-          <div class="gd">
-            <h1>办事清单</h1>
-            <div class="gd-sub">
-              2026年8月9日 13:18 由职易达一体机打印 · 政策同步于 8月9日 07:30<br>
-              按你在本机选的「离职找工作中 / 本市户籍 / 离职 1–6 个月」生成
+      <!-- ══ 打印件内容区（不是屏幕文案）══
+           2026-08-10 Codex :383 整改口径：本屏的合规边界只由顶部常驻 lawbar 说一次
+           （「本机不做资格认定、不代办、不收费；能不能办以经办窗口审核为准」）。
+           下面 .sheet-a4 里的 .gd-foot 是**要印在纸上的字**，纸会离开本机、脱离屏幕语境，
+           所以必须自带「以经办机构当日认定为准、本机不代办」这一句。
+           复核合规文案条数时，这两处不能都算成屏幕文案：屏幕 1 条 + 纸面 1 条，各归各的载体。 -->
+      <!-- 2026-08-11：以下三块从右副列移到左主区常驻 —— 核对进度、按作答派生的待办、
+           打印勾选与页数费用，都是「当前这一步正在做的事」，不能跟着右栏收进抽屉。 -->
+      <div class="pane pane--ans" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>你答了什么</b>
+          <span class="mt" id="sideN">已答 7 / 9</span></div>
+        <div class="sec">
+          <div class="kv" id="sideKv"></div>
+        </div>
+      </div>
+
+      <div class="pane pane--todo" data-at="s2" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先办的</b>
+          <span class="mt" id="todoMt">按你的作答派生</span></div>
+        <div class="sec" id="todoBox"></div>
+      </div>
+
+      <div class="pane pane--todo" data-at="s2" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b>
+          <span class="mt">通用提醒 · 不随你的作答变化</span></div>
+        <div class="sec">
+          <div class="panel-note" style="margin-bottom:var(--s-3)">
+            这一态<b>没做条件核对</b>，所以下面两条是通用提醒，
+            <b>不是按你的情况算出来的</b> —— 已经办过的请自行跳过。
+          </div>
+          <button class="ckrow" data-todo="reg-generic" aria-pressed="false">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">办失业登记</span>
+              <span class="ckrow-s">政务网或户籍地街道办</span></span>
+          </button>
+          <button class="ckrow" data-todo="soc-generic" aria-pressed="false">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">查失业保险缴了多久</span>
+              <span class="ckrow-s">社保 App 可查</span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="pane pane--pick" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>这次打什么</b>
+          <span class="mt">勾选即改页数</span></div>
+        <div class="sec sec--col">
+          <button class="ckrow ckrow--fix" aria-pressed="true" aria-disabled="true">
+            <span class="ck-box"></span>
+            <span class="ckrow-b"><span class="ckrow-t">办事清单</span>
+              <span class="ckrow-s">A4 黑白 · 1 页</span></span>
+          </button>
+          <div class="field-lb" style="margin-top:var(--s-4)">政策原文（按需勾选）</div>
+          <div id="docPick"></div>
+
+          <div class="push">
+            <div class="kv">
+              <div class="kv-row"><span class="k">合计</span><span class="v"><b id="sumPg">5</b> 页</span></div>
+              <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b id="sumFee">1.00</b> 元</span></div>
             </div>
-            <div class="gd-hr"></div>
-
-            <div class="gd-w">① 一次性求职创业补贴 —— 去之前先办失业登记</div>
-            <div class="gd-i"><i></i><span><b>先做失业登记</b>（政务网或户籍地街道办），没登记这条不成立</span></div>
-            <div class="gd-i"><i></i><span>带：身份证原件、离职证明、本人银行卡</span></div>
-            <div class="gd-i"><i></i><span>办理：户籍地街道（社区）就业服务窗口</span></div>
-            <div class="gd-warn">本机查不到你本年度有没有领过同类补贴 —— 窗口会查，重复申领会被驳回。</div>
-
-            <div class="gd-w">② 职业技能培训补贴 —— 先查当年培训目录</div>
-            <div class="gd-i"><i></i><span><b>先查目录再报名</b>，目录每年调整，不在目录内的培训不补</span></div>
-            <div class="gd-i"><i></i><span>带：身份证原件、培训结业证书 / 职业技能等级证书</span></div>
-            <div class="gd-i"><i></i><span>办理：市人社局职业能力建设科 或 区人社分局</span></div>
-            <div class="gd-warn">别先交培训费再问能不能补 —— 顺序反了拿不回来。</div>
-
-            <div class="gd-w">③ 失业保险金 —— 两条要自己先查</div>
-            <div class="gd-i"><i></i><span>查：累计缴纳失业保险<b>是否满 1 年</b>（社保 App 可查）</span></div>
-            <div class="gd-i"><i></i><span>确认：离职原因是否属于<b>非因本人意愿中断就业</b>（主动辞职通常不算）</span></div>
-            <div class="gd-i"><i></i><span>带：身份证原件、离职证明、本人银行卡</span></div>
-            <div class="gd-i"><i></i><span>办理：社保经办机构窗口</span></div>
-
-            <div class="gd-w">你目前卡住的一条</div>
-            <div class="gd-i"><i></i><span>灵活就业社保补贴要求<b>以灵活就业身份连续缴社保满 3 个月</b>。
-              如果你这期间自己交了社保，<b>带上缴费记录</b>再去问，这条可能就通了。</span></div>
-
-            <div class="gd-foot">
-              本单由职易达一体机根据公开政策文件生成，<b>不是资格认定</b>，仅供你自己参考。<br>
-              是否符合条件、能否申领、发放多少，<b>一律以经办机构当日认定为准</b>。<br>
-              本机不代办、不代领、不收取任何政策申领相关费用。<br>
-              政策会调整，本单打印于 8月9日，去之前请再确认一次。本单不作为申领凭证。
+            <div class="panel-note" style="margin-top:var(--s-3)" data-when="default first ai-down">
+              清单同时存进「我的文档」
+            </div>
+            <div class="qr" data-when="device-off">
+              <div class="qr-box">
+                <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+                  <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                  <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+                  <rect x="40" y="8" width="6" height="6"/><rect x="52" y="14" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/>
+                  <rect x="58" y="20" width="6" height="6"/><rect x="8" y="40" width="6" height="6"/><rect x="20" y="46" width="6" height="6"/>
+                  <rect x="40" y="40" width="6" height="6"/><rect x="52" y="40" width="6" height="6"/><rect x="64" y="46" width="6" height="6"/>
+                  <rect x="76" y="40" width="6" height="6"/><rect x="88" y="46" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/>
+                  <rect x="58" y="70" width="6" height="6"/><rect x="70" y="58" width="6" height="6"/><rect x="82" y="76" width="6" height="6"/>
+                  <rect x="40" y="82" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/><rect x="64" y="76" width="6" height="6"/>
+                  <rect x="8" y="58" width="6" height="6"/><rect x="20" y="70" width="6" height="6"/><rect x="88" y="82" width="6" height="6"/>
+                </svg>
+              </div>
+              <span class="qr-cap">取回码 <b>P-3155</b> · 示意码<br>存我的文档后扫码带走</span>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- data-void-ok（2026-08-11 卡内空洞复核）：这一栏两张 .sheet-a4 都判**纸样类豁免**。
+           共同依据（实测 default/s3）：.sheet-a4 是 aspect-ratio 1/1.414 的真 A4 纸样，
+           纸宽 928px 已铺满 968px 主栏，不是浮在栏上半截、下半截露栏背景；.paper-stage 是
+           overflow:auto 的连续滚动阅读器（clientH 886 / scrollHeight 2672），纸溢出栏底靠滚动看。
+           所以空的不是版面，是**纸**。纸会从出纸口带去经办窗口，往空白处填东西 =
+           在用户拿去办事的纸上印本机没有依据的内容。
+           两张纸的正文都随勾选实时变长（清单跟着办事项数、目录跟着勾中的原文份数），不是写死的短样张。 -->
+      <div class="paper-stage" data-at="s3" id="paperStage">
+        <div class="sheet-a4"
+             data-void-ok="A4 纸样：办事清单是一页短文档，3 项办事项各自的「带什么 / 去哪办」写完就到「本单仅供参考…本机不代办」收尾；项数由左侧勾选实时决定，勾更多纸面自然变长">
+          <div class="gd">
+            <h1>办事清单</h1>
+            <div class="gd-sub"><b id="gdCity">广州市</b> · 2026年8月9日 13:18 打印 · 同步 07:30</div>
+            <div class="gd-sub" data-when="default first device-off">本次选了 <b id="gdN">3</b> 项 · 按你答的 <b id="gdA">7</b> / 9 项生成</div>
+            <div class="gd-sub" data-when="ai-down">本次选了 <b id="gdN2">3</b> 项 · 本单未做条件核对</div>
+            <div class="gd-hr"></div>
+            <div id="gdBody"></div>
+            <!-- 纸面免责只此一行，且只属于打印件；屏幕上的那一次在顶部 lawbar，两者不重复计数 -->
+            <div class="gd-foot">
+              本单仅供参考，以经办机构当日认定为准；本机不代办。
+            </div>
+          </div>
+        </div>
+
+        <!-- 这张实测 top=2017 已在 1920 视口之外，审计器按「不在视口内」跳过、当前不报数；
+             但它跟上面那张是同一类东西（而且更短），一并声明，免得将来版面一动就冒出来。 -->
+        <div class="sheet-a4" id="docSheet"
+             data-void-ok="A4 纸样：这张是附页目录（告诉用户后面跟着哪几份原文、共几页），本身就只有目录那几行；真正的政策原文按官方公开文件另页转录，不在这张上">
+          <div class="gd">
+            <h1>政策原文 · 附页目录</h1>
+            <div class="gd-sub" id="dsSub">2 份 · 共 4 页 · 跟在清单后面打印</div>
+            <div class="gd-hr"></div>
+            <div id="dsBody"></div>
+            <div class="gd-foot">
+              原文照官方公开文件转录，本机不改写、不加条件。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="takebar" data-at="s3">
+        <svg class="ic"><use href="#i-package"/></svg>
+        <span class="take-b">
+          <span class="take-t" id="takeT">带去：办事清单 1 份 + 政策原文 2 份</span>
+          <span class="take-s" data-when="default first ai-down">以打印工作台核价为准</span>
+          <span class="take-s" data-when="device-off">打印机离线 · 存我的文档后扫码带走</span>
+        </span>
+        <span class="take-n" id="takeN">共 5 页</span>
       </div>
 
     </div>
 
-    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
-
-      <!-- S1 右 -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机不问什么</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">身份证号</span><span class="v v--fog">不问</span></div>
-            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">不问</span></div>
-            <div class="kv-row"><span class="k">银行卡号</span><span class="v v--fog">不问</span></div>
-            <div class="kv-row"><span class="k">社保账号</span><span class="v v--fog">不问</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            申领确实要这些，但那是<b>到经办窗口</b>填的。
-            公共场所的机器不该收这些，本机也没有接口去查。
-          </div>
-        </div>
+    <!-- ══ 右副列 → 按需抽屉（2026-08-11）══════════════════════════════
+         政策来源统计、注意事项、首次使用说明、官方热线与二维码、「打完之后」
+         都在这里，点阶段轨右端的「来源与提醒」才展开。
+         核对进度 / 待办 / 打印勾选已移到左主区常驻，不在这里。 -->
+    <div class="wside" id="p21side">
+      <div class="sidehd">
+        <span class="t">来源与提醒</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>政策类的三个坑</b></div>
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>政策来源</b></div>
         <div class="sec">
-          <div class="kv">
-            <div class="kv-row" style="align-items:flex-start">
-              <span class="k">代办收费</span>
-              <span class="v" style="text-align:right">政策申领<b>本身不收费</b></span>
-            </div>
-            <div class="kv-row" style="align-items:flex-start">
-              <span class="k">顺序做反</span>
-              <span class="v" style="text-align:right">先培训后查目录，钱拿不回</span>
-            </div>
-            <div class="kv-row" style="align-items:flex-start">
-              <span class="k">政策过期</span>
-              <span class="v" style="text-align:right">文件有有效期，去前再确认</span>
-            </div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>如果有人说「交钱就能帮你办下来」，<b>那是骗子</b>。
-                  本机也不收政策申领相关的任何费用 —— 只收打印纸张的钱，价格现场公示。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            本机只做展示与打印，<b>不代办、不代领、不替你提交任何申请</b>。
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-agency"/></svg><b>政策从哪来</b>
-          </div>
           <div class="kv">
             <div class="kv-row"><span class="k">市人社局</span><span class="v">4 条</span></div>
             <div class="kv-row"><span class="k">市社保中心</span><span class="v">1 条</span></div>
             <div class="kv-row"><span class="k">区人社分局</span><span class="v">1 条</span></div>
             <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
-            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">官方公开文件</span></div>
+            <div class="kv-row"><span class="k">申领费用</span><span class="v">官方不收取</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            本机只转述官方公开发布的文件，<b>不做二次解释、不添加原文没有的条件</b>。
-            原文可以在这里打印出来带走对照。
+          <button class="foldbtn" data-fold="tips" aria-expanded="false">
+            <span>注意事项（3 条）</span><svg class="ic"><use href="#i-chevron" style="transform:rotate(90deg);transform-origin:center"/></svg>
+          </button>
+          <div class="foldbox" data-foldbox="tips" hidden>
+            <div class="kv">
+              <div class="kv-row"><span class="k">代办收费</span><span class="v">说交钱包办的是骗子</span></div>
+              <div class="kv-row"><span class="k">顺序做反</span><span class="v">先培训后查目录，钱拿不回</span></div>
+              <div class="kv-row"><span class="k">政策过期</span><span class="v">文件有有效期，去前再确认</span></div>
+            </div>
+            <div class="panel-note" style="margin-top:var(--s-3)">
+              本机不问身份证号 / 手机号 / 银行卡号 / 社保账号。
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 首次使用：只在第 1 步出现一次 -->
+      <div class="pane" data-at="s1" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note">选情况 → 看缺口 → 打印清单，三步。</div>
         </div>
       </div>
 
       <!-- S2 右 -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这 6 条的结果</b></div>
+      <div class="pane" data-at="s2" data-when="default first device-off">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>核对结果</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">像是符合</span><span class="v"><b>2</b> 条</span></div>
-            <div class="kv-row"><span class="k">卡一条 / 待确认</span><span class="v"><b>2</b> 条</span></div>
-            <div class="kv-row"><span class="k">按你填的看不符合</span><span class="v"><b>2</b> 条</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            「像是符合」<b>不等于能领到</b>。窗口还会查你的参保记录、
-            领取历史这些本机看不到的东西。
+            <div class="kv-row"><span class="k">像是符合</span><span class="v"><b id="cntMaybe">1</b> 条</span></div>
+            <div class="kv-row"><span class="k">卡一条</span><span class="v"><b id="cntGap">1</b> 条</span></div>
+            <div class="kv-row"><span class="k">待确认</span><span class="v"><b id="cntWait">3</b> 条</span></div>
+            <div class="kv-row"><span class="k">看着不符合</span><span class="v"><b id="cntNo">1</b> 条</span></div>
           </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b></div>
+      <div class="pane" data-at="s2" data-when="ai-down">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次只列到这</b></div>
         <div class="sec">
-          <label class="ck">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">办失业登记</span>
-              <span class="ck-s">政务网或户籍地街道办 · 没登记，第 ① 条不成立</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">查失业保险缴了多久</span>
-              <span class="ck-s">社保 App 可查 · 不满 1 年领不了失业金</span></span>
-          </label>
+          <div class="kv">
+            <div class="kv-row"><span class="k">相关政策</span><span class="v"><b>6</b> 条</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v">8月9日 07:30</span></div>
+            <div class="kv-row"><span class="k">条件核对</span><span class="v v--fog">未做</span></div>
+          </div>
+        </div>
+      </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
+      <!-- 2026-08-10 不同源整改：这块此前是**写死的两条**，不随核对结果变。
+           默认答案里「失业登记：已办」，左边逐条核对已经把这条标成通过，
+           右边却还在让用户去办失业登记 —— 同一屏，同一件事，两个结论。
+           一页里最不该打架的就是「你卡在哪」和「所以你先去办什么」。
+
+           两个可选做法里选了**按核对结果派生**（另一个是标成「通用提醒」）：
+           本页的判定函数 cReg / cSoc3 / cAlways 已经在跑，`ans` 也在，
+           派生只是把已有结果换个说法，不需要任何新数据；标成通用提醒等于
+           承认这一栏永远帮不上忙，那还不如不放。
+
+           但 ai-down 例外：那一态本来就不做条件核对（右上角写着「条件核对 · 未做」），
+           派生无从谈起，所以那一态另给一份并**明写「通用提醒 · 不随你的作答变化」**。 -->
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-phone"/></svg><b>出发前问官方</b></div>
+        <div class="sec sec--col">
+          <button class="bigb" id="telBtn" aria-pressed="false">
+            <span class="bigb-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+            <span class="bigb-b"><span class="bigb-t">官方热线</span>
+              <span class="bigb-s">号码按城市配置下发</span></span>
+          </button>
+          <button class="bigb" id="qrBtn" aria-pressed="false">
+            <span class="bigb-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="bigb-b"><span class="bigb-t">官网二维码</span>
+              <span class="bigb-s">点这里页内出码</span></span>
+          </button>
+
+          <div class="notice" id="telBox" hidden style="margin-top:var(--s-3)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>这两件<b>本机都办不了、也查不到</b> ——
-                  没有接口，也不该在公共机器上查你的社保。<br>
-                  先办完再跑窗口，能少跑一趟。</span>
+            <span>请用你自己的手机拨打 · 本机不代拨</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            办完回来可以再来本机重新核对一遍，重打清单不额外收费（只算纸张）。
+          <div class="qr" id="qrWrap" hidden>
+            <div class="qr-box">
+              <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+                <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+                <rect x="40" y="8" width="6" height="6"/><rect x="52" y="8" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/>
+                <rect x="58" y="20" width="6" height="6"/><rect x="8" y="40" width="6" height="6"/><rect x="20" y="40" width="6" height="6"/>
+                <rect x="40" y="40" width="6" height="6"/><rect x="52" y="46" width="6" height="6"/><rect x="64" y="40" width="6" height="6"/>
+                <rect x="76" y="46" width="6" height="6"/><rect x="88" y="40" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/>
+                <rect x="58" y="64" width="6" height="6"/><rect x="70" y="58" width="6" height="6"/><rect x="82" y="70" width="6" height="6"/>
+                <rect x="40" y="76" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/><rect x="64" y="82" width="6" height="6"/>
+                <rect x="8" y="52" width="6" height="6"/><rect x="20" y="64" width="6" height="6"/><rect x="88" y="88" width="6" height="6"/>
+              </svg>
+            </div>
+            <span class="qr-cap">示意码 · 官网地址按城市配置下发</span>
           </div>
 
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-pin"/></svg><b>这几条去哪办</b>
-          </div>
-          <div class="tline">
-            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
-              <span class="tl-b"><span class="tl-t">求职创业补贴 · 失业登记</span>
-                <span class="tl-s">户籍地街道（社区）就业服务窗口</span></span></div>
-            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
-              <span class="tl-b"><span class="tl-t">技能培训补贴</span>
-                <span class="tl-s">市人社局职业能力建设科 / 区人社分局</span></span></div>
-            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
-              <span class="tl-b"><span class="tl-t">失业保险金</span>
-                <span class="tl-s">社保经办机构窗口</span></span></div>
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">更新 8月9日 07:30 · 以官方发布为准</div>
 
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>窗口地址与办公时间<b>本机不显示</b> ——
-                  这类信息变动频繁，本机同步不到最新的，写出来反而害你白跑。
-                  出发前打政务服务热线或官网确认一次。</span>
+          <div class="push">
+            <div class="field-lb">这几条去哪办</div>
+            <div class="tline">
+              <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+                <span class="tl-b"><span class="tl-t">求职创业补贴 · 失业登记</span>
+                  <span class="tl-s">户籍地街道就业服务窗口</span></span></div>
+              <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+                <span class="tl-b"><span class="tl-t">技能培训补贴</span>
+                  <span class="tl-s">市人社局 / 区人社分局</span></span></div>
+              <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+                <span class="tl-b"><span class="tl-t">失业保险金</span>
+                  <span class="tl-s">社保经办机构窗口</span></span></div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- S3 右 -->
+
       <div class="pane" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
-        <div class="sec">
-          <label class="ck ck--have">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">办事清单</span>
-              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
-          </label>
-          <label class="ck" style="margin-top:var(--s-3)">
-            <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">三份政策原文</span>
-              <span class="ck-s">A4 黑白 · 共 7 页 · 窗口一般不要，按需选</span></span>
-          </label>
-
-          <div class="kv" style="margin-top:var(--s-4)">
-            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元</span></div>
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>打印机离线，现在打不出来。可以扫码把清单存进手机。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。清单同时存进「我的文档」。
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
         <div class="sec">
           <div class="tline">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">出纸口取走 1 页</span>
-                <span class="tl-s">上面写了带什么、去哪个窗口</span></span></div>
+            <div class="tl tl--now" data-when="default first ai-down"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走</span>
+                <span class="tl-s">带什么、去哪个窗口都在纸上</span></span></div>
+            <div class="tl tl--now" data-when="device-off"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">扫码存到手机</span>
+                <span class="tl-s">打印机修好后凭取回码补打</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">先办失业登记，再跑窗口</span>
+              <span class="tl-b"><span class="tl-t">先办登记，再跑窗口</span>
                 <span class="tl-s">顺序反了要多跑一趟</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">窗口口径和本单不一致时</span>
-                <span class="tl-s"><b>以窗口为准</b> —— 本机不是认定机构</span></span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>本机<b>不记录你去没去、领没领到</b> ——
-                  只记录你在这台机器上打了一份清单。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            政策会调整。这份清单打印于 8月9日，隔一段时间再去办的话，
-            <b>回来重打一份</b>比照着旧的去更稳妥。
-          </div>
-        </div>
-      </div>
-
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            把政策拆开，告诉你<b>卡在哪个条件上</b>，再打成一张办事清单。<br>
-            本机<b>不做资格认定</b>，也不代办 —— 最终以经办机构为准。
+              <span class="tl-b"><span class="tl-t">口径不一致时听窗口的</span>
+                <span class="tl-s">本机不是认定机构</span></span></div>
           </div>
         </div>
       </div>
@@ -605,26 +793,33 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="38-policy-hub.html" data-parent-label="政策服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">政策服务</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">改一下情况</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看核对结果</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="default first device-off">回看核对结果</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="ai-down">回看政策原文</button>
 
-    <span class="actionbar-hint" data-at="s1">只用这三项判定 · 不问身份证号</span>
-    <span class="actionbar-hint" data-at="s2" data-when="default first">2 条像是符合 · 2 条待确认 · 2 条不符合</span>
-    <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 本次不做条件核对</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
-    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+    <span class="actionbar-hint" data-at="s1">三步：选情况 → 看缺口 → 打印清单</span>
+    <span class="actionbar-hint" data-at="s2" id="hintS2">已勾 3 条进清单</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">勾选变了，页数和预估跟着变</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，先存文档再扫码带走</span>
 
-    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看我卡在哪<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <!-- device-off 也要能往下走：打印机离线不影响条件核对，只影响最后出纸 -->
+    <button class="btn btn--primary" data-at="s1" data-go="s2" id="goS2" data-when="default first device-off">看我卡在哪<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成办事清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" id="goS3" data-when="default first device-off">生成办事清单 · 3 项<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成清单（未核对）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <!-- 材料交接：参数按全站契约拼（from / kind / title / pages / copies / back），
+         页数取本页自己算出来的合计，勾选一变这里跟着变，见 renderPaper() 里的 printHref()。
+         下面这份是初始勾选（清单 1 页 + 原文 2 份共 4 页 = 5 页）的静态兜底值。 -->
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" id="goPrint"
+       href="06-print-workbench.html?stage=s3&amp;from=P21&amp;kind=policy-checklist&amp;title=办事清单与政策原文%202%20份&amp;pages=5&amp;copies=1&amp;back=s3">去打印 · 清单 1 份 + 原文 2 份 · 共 5 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off" id="goSave"><svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走（5 页）</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -632,10 +827,875 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var bs = document.querySelectorAll('[data-side-open]')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   P21 页内交互（静态设计稿，不连后端；只表达交互模型）
+   ----------------------------------------------------------------------
+   三件此前缺的事，在这里补上：
+   ① 城市是政策判定的前置。城市未定 → 所有卡一律「待确认」，且不给结论。
+   ② 九个问项都能点、都有选中态；**没答的条件一律 ○ 待确认**，不许算成满足。
+   ③ 勾了哪几条政策，办事清单就按哪几条生成；勾了哪几份原文，页数与预估跟着变。
+   ══════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* ---------- 城市：本机所在城市由终端配置下发（一体机无定位权限） ----------
+     省 / 市字典不再写在本页：全国 31 省的名单由 scripts/region.js 统一提供，
+     这里只保管「当前选了哪个省、哪个市」以及「没定到市就不出结论」这条门控。 */
+  var HOME = { prov: '广东省', city: '广州市' }
+
+  /* ---------- 九个问项 ---------- */
+  var QS = [
+    { k: 'status', lb: '现在状态', o: ['离职找工作中', '在职想换工作', '应届毕业生', '想创业 / 已创业'] },
+    { k: 'hukou',  lb: '户籍社保', o: ['本市户籍', '外地 · 本市缴社保', '外地 · 未缴社保', '不确定'] },
+    { k: 'gap',    lb: '离职多久', o: ['1 个月内', '1–6 个月', '6 个月以上', '没工作过'] },
+    { k: 'age',    lb: '年龄段',   o: ['16–24 岁', '25–35 岁', '36–45 岁', '46 岁以上', '不确定'] },
+    { k: 'grad',   lb: '毕业年份', o: ['2026 应届', '2024–2025', '2023 及以前', '不适用', '不确定'] },
+    { k: 'reg',    lb: '失业登记', o: ['已办', '没办', '不确定'] },
+    { k: 'soc',    lb: '连续缴费', o: ['未缴', '不满 3 个月', '满 3 个月以上', '不确定'] },
+    { k: 'quit',   lb: '离职原因', o: ['裁员 / 合同到期', '本人主动辞职', '其他', '不确定'] },
+    { k: 'got',    lb: '领过补贴', o: ['没领过', '领过', '不确定'] }
+  ]
+
+  /* 预置 7 项，留 2 项未答 —— 让「未答 = 待确认」这条规则在默认态就看得见 */
+  var ans = {
+    status: '离职找工作中', hukou: '本市户籍', gap: '1–6 个月',
+    age: '25–35 岁', reg: '已办', soc: '未缴', got: '没领过'
+  }
+  var city = { prov: HOME.prov, city: HOME.city }
+
+  function known (k) { return ans[k] && ans[k] !== '不确定' }
+
+  /* ---------- 条件判定 ---------- ok / no / dunno 三值，绝不二值化 */
+  function cLocal () {                       // 本市户籍或本市缴社保
+    if (!known('hukou')) return 'dunno'
+    return ans.hukou === '外地 · 未缴社保' ? 'no' : 'ok'
+  }
+  function cJobless () {                     // 处于失业 / 未就业状态
+    if (!ans.status) return 'dunno'
+    if (ans.status === '离职找工作中') return 'ok'
+    if (ans.status === '在职想换工作') return 'no'
+    return 'dunno'
+  }
+  function cReg () { return !known('reg') ? 'dunno' : (ans.reg === '已办' ? 'ok' : 'no') }
+  function cGot () { return !known('got') ? 'dunno' : (ans.got === '没领过' ? 'ok' : 'no') }
+  function cSoc3 () {
+    if (!known('soc')) return 'dunno'
+    return ans.soc === '满 3 个月以上' ? 'ok' : 'no'
+  }
+  function cAgeWork () {                     // 法定劳动年龄内 / 未达退休年龄
+    if (!known('age')) return 'dunno'
+    return ans.age === '46 岁以上' ? 'dunno' : 'ok'
+  }
+  function cFresh () {                       // 毕业 2 年内或 16–24 岁失业青年
+    if (ans.age === '16–24 岁') return 'ok'
+    if (!known('grad')) return 'dunno'
+    if (ans.grad === '2026 应届' || ans.grad === '2024–2025') return 'ok'
+    return known('age') ? 'no' : 'dunno'
+  }
+  function cQuit () {                        // 非因本人意愿中断就业
+    if (!known('quit')) return 'dunno'
+    if (ans.quit === '裁员 / 合同到期') return 'ok'
+    if (ans.quit === '本人主动辞职') return 'no'
+    return 'dunno'
+  }
+  function cBiz () {                         // 已办营业执照并正常经营
+    if (!ans.status) return 'dunno'
+    return ans.status === '想创业 / 已创业' ? 'dunno' : 'no'
+  }
+  function cAlways () { return 'dunno' }
+
+  /* ---------- 政策分类 ----------
+     38-policy-hub 的四张分类卡传 ?cat=employment|social|archive|subsidy。
+     分类写在条目上，一条可属多类（就业见习补贴既是就业也是补贴）——
+     强行一条一类会让「按补贴看」漏掉一半真的是补贴的条目。 */
+  var CAT_NM = { employment: '就业政策', social: '社保指南', archive: '档案与登记', subsidy: '补贴指引' }
+  var CAT_KEYS = ['employment', 'social', 'archive', 'subsidy']
+
+  var POL = [
+    { id: 'p1', t: '一次性求职创业补贴', org: '市人社局', no: '人社〔2026〕14 号', pg: 2,
+      cat: ['employment', 'subsidy'],
+      c: [ { t: '本市户籍或本市缴社保', f: cLocal,  q: 'hukou' },
+           { t: '处于失业状态',         f: cJobless, q: 'status' },
+           { t: '已办失业登记',         f: cReg,    q: 'reg' },
+           { t: '本年度未领过同类补贴', f: cGot,    q: 'got' } ],
+      doc: '申领对象为在本市办理失业登记的城镇登记失业人员；<b>每人每年限领一次</b>，同一年度已领同类补贴的不再受理。申领时提交身份证、离职证明与本人银行账户。',
+      gd: ['带：身份证、离职证明、本人银行卡', '办理：户籍地街道（社区）就业服务窗口'] },
+
+    { id: 'p2', t: '灵活就业人员社保补贴', org: '市人社局', no: '人社〔2026〕09 号', pg: 2,
+      cat: ['social', 'subsidy'],
+      c: [ { t: '本市户籍或本市缴社保', f: cLocal, q: 'hukou' },
+           { t: '灵活就业连续缴满 3 个月', f: cSoc3, q: 'soc' },
+           { t: '未达法定退休年龄',     f: cAgeWork, q: 'age' } ],
+      doc: '以灵活就业身份在本市<b>连续缴纳社会保险满 3 个月</b>的人员可申请补贴；补贴按月计发，中断缴费的月份不计入。申领时需提供本人社保缴费记录。',
+      gd: ['带：本人社保缴费记录（社保 App 可打印）', '办理：区人社分局'] },
+
+    { id: 'p3', t: '职业技能培训补贴', org: '市人社局', no: '人社〔2026〕21 号', pg: 3,
+      cat: ['employment', 'subsidy'],
+      c: [ { t: '本市户籍或本市缴社保', f: cLocal, q: 'hukou' },
+           { t: '在法定劳动年龄内',     f: cAgeWork, q: 'age' },
+           { t: '培训在当年目录内并取证', f: cAlways, q: '' } ],
+      doc: '参加<b>当年度补贴性职业技能培训目录</b>内的项目并取得证书的，可申领培训补贴。目录每年调整，<b>不在目录内的培训不予补贴</b>；先培训后查目录的费用不予追补。',
+      gd: ['先查当年培训目录，再报名交费', '带：身份证、结业证书 / 技能等级证书', '办理：市人社局职业能力建设科'] },
+
+    { id: 'p4', t: '就业见习补贴', org: '区人社分局', no: '人社〔2026〕11 号', pg: 2,
+      cat: ['employment', 'subsidy'],
+      c: [ { t: '毕业 2 年内或 16–24 岁', f: cFresh, q: 'grad' },
+           { t: '目前未就业',             f: cJobless, q: 'status' },
+           { t: '未参加过见习补贴',       f: cAlways, q: '' } ],
+      doc: '面向<b>离校 2 年内未就业的高校毕业生</b>及 16–24 岁失业青年；见习期一般 3–12 个月，同一人只能参加一次。',
+      gd: ['带：身份证、毕业证、离校未就业证明', '办理：区人社分局见习管理岗'] },
+
+    { id: 'p5', t: '创业担保贷款贴息', org: '市人社局', no: '人社财〔2026〕05 号', pg: 3,
+      cat: ['subsidy'],
+      c: [ { t: '已办营业执照并正常经营', f: cBiz, q: 'status' },
+           { t: '本市户籍或本市缴社保',   f: cLocal, q: 'hukou' },
+           { t: '创业项目在本市经营',     f: cBiz, q: 'status' } ],
+      doc: '申请人须<b>已办理营业执照并正常经营</b>，创业项目在本市登记注册。贴息按实际贷款利息计算，<b>不得用于偿还他项债务</b>。',
+      gd: ['带：营业执照、贷款合同、经营流水', '办理：市人社局创业担保贷款窗口'] },
+
+    { id: 'p6', t: '失业保险金申领', org: '市社保中心', no: '穗社保〔2026〕02 号', pg: 2,
+      cat: ['social', 'subsidy'],
+      c: [ { t: '累计缴失业保险满 1 年', f: cAlways, q: '' },
+           { t: '非因本人意愿中断就业', f: cQuit, q: 'quit' },
+           { t: '已办失业登记',         f: cReg, q: 'reg' } ],
+      doc: '同时具备三项方可申领：失业前用人单位和本人<b>累计缴费满 1 年</b>；<b>非因本人意愿中断就业</b>；已办理失业登记并有求职要求。主动辞职一般不属于非因本人意愿。',
+      gd: ['查：失业保险累计缴费是否满 1 年', '带：身份证、离职证明、本人银行卡', '办理：社保经办机构窗口'] }
+  ]
+
+  var pick = { p1: 1, p2: 1, p3: 1 }        // 进办事清单的政策
+  var docs = { p1: 1, p2: 1 }               // 要打印的政策原文
+  var open = {}                             // 页内展开的原文
+  var sheetAt = 0                           // 预览翻到第几张纸
+
+  /* ══════════════════════════════════════════════════════════════════════
+     上一屏带过来的参数（38-policy-hub → 本页）
+
+     契约（对方一直在传，本页此前一个都不读 —— 用户白选）：
+       ?cat=employment|social|archive|subsidy   四张分类卡
+       ?identity=&insured=&city=                AI政策助手卡上的三项预筛
+
+     三条硬规矩：
+     ① **白名单**：identity / insured 只认本页对应问项自己的选项表，
+        cat 只认四个已知键，city 只认 scripts/region.js 字典里真有的市。
+        非法值 = 当作没传，不报错、不渲染字面量 —— URL 是用户可改的，
+        把 ?identity=%3Cscript%3E 直接印到屏幕上就是把输入当结论。
+     ② **不静默**：带入了就在顶部出一条回执，写清带了什么、从哪来。
+        预填而不告知，用户会以为这些答案是本机自己猜的。
+     ③ **不夺权**：预填只是把光标放在起点 —— 九个问项照常能点、分类能换、
+        城市能改；「城市未定不出结论」那道门控一个字没动。
+     ══════════════════════════════════════════════════════════════════════ */
+  var Q = new URLSearchParams(location.search)
+  function qval (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+  function inList (v, list) { return v && list.indexOf(v) > -1 ? v : '' }
+  function optsOf (k) {
+    for (var i = 0; i < QS.length; i++) if (QS[i].k === k) return QS[i].o
+    return []
+  }
+  /* 城市白名单不另起一份 —— 直接问全站地区字典，字典里没有的市一律不认 */
+  function provOfCity (nm) {
+    var D = (window.v3Region && window.v3Region.DICT) || []
+    for (var i = 0; i < D.length; i++) {
+      for (var j = 0; j < D[i].c.length; j++) if (D[i].c[j].n === nm) return D[i].p
+    }
+    return ''
+  }
+
+  /* ── ?view= 直达点（2026-08-11 补消费）────────────────────────────────────
+     38 政策服务首屏那三张卡各自承诺直达一块内容，此前本页**一个都不读**：
+       ?view=official   「官方办理入口 · 热线与官网二维码」  → 第 2 步 · 右侧抽屉
+       ?view=doc        「政策原文 · 官方发布口径」          → 第 2 步 · 逐条原文
+       ?view=checklist  「办事材料清单 · 按事项列」          → 第 3 步 · 打印清单
+     认下 view 之后顺手把阶段对齐到目标块所在的那一步 —— 把人送到一个
+     根本看不见目标块的阶段，和不读参数是同一种走错。
+     official 尤其要注意：那一块默认**收在抽屉里**，抽屉里的热线与二维码
+     两个大按钮也默认是收起的。链接文案写的就是「热线与官网二维码」，
+     只把抽屉拉开还不算直达，得让这两样直接露出来并滚到眼前。
+     白名单之外的值一律不认，并在回执里明写忽略了什么（同 identity / city 口径）。 */
+  var VIEW_KEYS = ['official', 'doc', 'checklist']
+  var VIEW_NM = { official: '官方办理入口', doc: '政策原文', checklist: '办事材料清单' }
+  var VIEW_AT = { official: 's2', doc: 's2', checklist: 's3' }
+  var VIEW_TIP = {
+    official: '：第 2 步右侧「出发前问官方」已展开，<b>热线与官网二维码都已打开</b>，不用再自己去翻抽屉。',
+    doc: '：第 2 步每条政策的<b>原文已逐条展开</b>，原文照官方公开文件转录，本机不改写、不加条件。',
+    checklist: '：已落在第 3 步<b>打印清单</b>，勾哪几条清单就按哪几条生成。'
+  }
+
+  var carry = { cat: '', identity: '', insured: '', city: '', prov: '', view: '', badView: '' }
+  var catSel = ''          // 当前生效的分类（'' = 全部）
+  var catBar = false       // URL 真带过分类，才出分类切换条
+
+  function readCarry () {
+    carry.cat = inList(qval('cat'), CAT_KEYS)
+    carry.view = inList(qval('view'), VIEW_KEYS)
+    if (qval('view') && !carry.view) carry.badView = qval('view')
+    carry.identity = inList(qval('identity'), optsOf('status'))
+    carry.insured = inList(qval('insured'), optsOf('soc'))
+    var c = qval('city')
+    var pv = c ? provOfCity(c) : ''
+    if (pv) { carry.city = c; carry.prov = pv }
+    catSel = carry.cat
+    catBar = !!carry.cat
+    if (carry.identity) ans.status = carry.identity
+    if (carry.insured) ans.soc = carry.insured
+    if (carry.city) { city.prov = carry.prov; city.city = carry.city }
+  }
+  function carryItems () {
+    var a = []
+    if (carry.identity) a.push(['现在状态', carry.identity])
+    if (carry.insured) a.push(['连续缴费', carry.insured])
+    if (carry.city) a.push(['城市', carry.city])
+    return a
+  }
+  /* 当前分类下的政策。分类为空 = 全部，与整改前逐条一致 */
+  function polsIn () {
+    if (!catSel) return POL
+    var a = []
+    for (var i = 0; i < POL.length; i++) {
+      if ((POL[i].cat || []).indexOf(catSel) > -1) a.push(POL[i])
+    }
+    return a
+  }
+  /* 换分类后勾选要跟着收敛到看得见的那几条，
+     否则办事清单会印出屏幕上根本没显示的政策 */
+  function trimPick () {
+    var vis = {}, list = polsIn(), k
+    for (var i = 0; i < list.length; i++) vis[list[i].id] = 1
+    for (k in pick) if (!vis[k]) delete pick[k]
+    for (k in docs) if (!vis[k]) delete docs[k]
+  }
+
+  /* ---------- 工具 ---------- */
+  function $ (id) { return document.getElementById(id) }
+  function state () { return scr.getAttribute('data-state') || 'default' }
+  function cityOK () { return !!city.city }
+  function esc (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+
+  function verdictOf (p) {
+    if (!cityOK()) return { k: 'wait', t: '待定城市' }
+    var no = 0, dn = 0
+    for (var i = 0; i < p.c.length; i++) {
+      var r = p.c[i].f()
+      if (r === 'no') no++
+      else if (r === 'dunno') dn++
+    }
+    if (no >= 2) return { k: 'no', t: '看着不符合' }
+    if (no === 1) return { k: 'gap', t: '卡一条' }
+    if (dn > 0) return { k: 'wait', t: '待确认 ' + dn + ' 条' }
+    return { k: 'maybe', t: '像是符合' }
+  }
+
+  function answered () {
+    var n = 0
+    for (var i = 0; i < QS.length; i++) if (ans[QS[i].k]) n++
+    return n
+  }
+
+  /* ---------- 首次建 DOM ---------- */
+  function buildQs () {
+    var h = ''
+    for (var i = 0; i < QS.length; i++) {
+      var q = QS[i], ops = ''
+      for (var j = 0; j < q.o.length; j++) {
+        ops += '<button class="op" data-q="' + q.k + '" data-v="' + esc(q.o[j]) + '" aria-pressed="false">' +
+               esc(q.o[j]) + '</button>'
+      }
+      h += '<div class="qrow" data-qrow="' + q.k + '"><span class="qlb">' + q.lb + '</span>' +
+           '<div class="ops">' + ops + '</div></div>'
+    }
+    $('qs').innerHTML = h
+  }
+
+  function buildPols () {
+    var h = '', list = polsIn()
+    /* 分类筛出 0 条时如实说「这一类本机一条都没有」，
+       不硬塞条目、也不悄悄退回全部 —— 那两种做法都是在骗人 */
+    if (!list.length) {
+      h += '<div class="polempty">本机政策库里<b>没有「' + esc(CAT_NM[catSel] || '') + '」这一类的条目</b>。' +
+           '现有 ' + POL.length + ' 条分别归就业政策 / 社保指南 / 补贴指引；' +
+           '档案托管、就业登记与证明开具这类事项本机还没收录，' +
+           '需要办的话按页脚的官方入口去经办窗口问。</div>'
+    }
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]
+      h += '<div class="pol" data-pol="' + p.id + '">' +
+             '<div class="pol-hd">' +
+               '<button class="ckbox" data-pick="' + p.id + '" aria-pressed="false" ' +
+                 'aria-label="把「' + esc(p.t) + '」选入办事清单"><span class="ck-box"></span></button>' +
+               '<span class="pol-t">' + esc(p.t) + '</span>' +
+               '<span class="pol-verdict-status pv--wait" data-verdict="' + p.id + '" ' +
+                 'data-when="default first device-off">待确认</span>' +
+             '</div>' +
+             '<div class="pol-m">来源 ' + p.org + ' · 同步 8/9 07:30 · 文号 ' + p.no + '</div>' +
+             '<div class="cond" data-cond="' + p.id + '" data-when="default first device-off"></div>' +
+             '<div class="polact">' +
+               '<button class="lnk" data-doc="' + p.id + '" aria-expanded="false">' +
+                 '<svg class="ic"><use href="#i-eye"/></svg><span data-doclb="' + p.id + '">看原文</span></button>' +
+               '<span class="polhint" data-hint="' + p.id + '">未选入清单</span>' +
+             '</div>' +
+             '<div class="doc" data-docbox="' + p.id + '" hidden>' +
+               '<div class="doc-h">原文摘录 · ' + p.no + ' · 共 ' + p.pg + ' 页</div>' +
+               '<div class="doc-p">' + p.doc + '</div>' +
+             '</div>' +
+           '</div>'
+    }
+    /* 被分类筛掉的那几条要说清筛掉了几条、一键能看全部。
+       静默隐藏 = 用户以为本机只有这么几条政策 */
+    if (catSel) {
+      var hid = POL.length - list.length
+      h += '<div class="polfilter-tail"><span class="t">已按<b>' + esc(CAT_NM[catSel]) + '</b>筛选' +
+           (hid ? ('，另有 ' + hid + ' 条属于其他分类没有列出。分类是本机给条目打的标签，一条可属多类。')
+                : ('：本机这 ' + POL.length + ' 条<b>全都属于这一类</b>，所以列出来和全部一样，不是筛选没生效。'))
+           + '</span>' +
+           '<button class="carryin-op" type="button" data-catset="all">看全部 ' + POL.length + ' 条</button></div>'
+    }
+    $('polList').innerHTML = h
+  }
+
+  /* ---------- 渲染 ---------- */
+  function renderCity () {
+    var v = $('cityV'), k = $('cityK')
+    if (cityOK()) {
+      v.textContent = city.city
+      v.className = 'city-v'
+      k.textContent = city.prov + ' · ' +
+        (city.prov === HOME.prov && city.city === HOME.city ? '本机所在城市 · 可改' : '你选的城市 · 可改')
+    } else {
+      v.textContent = '城市未定'
+      v.className = 'city-v city-v--none'
+      k.textContent = city.prov + ' · 还没定到市，点下面的地区按钮接着选'
+    }
+    $('cityWarn').hidden = cityOK()
+    $('cityWarn2').hidden = cityOK()
+
+    /* 把本页状态同步回选择器触发器（不走 v3Region.set，免得触发 change 再回调 render） */
+    var rb = $('cityBtn')
+    rb.setAttribute('data-region-value',
+      city.city ? (city.prov + '|' + city.city + '|') : (city.prov ? city.prov + '||' : ''))
+    rb.querySelector('[data-region-text]').textContent = cityOK()
+      ? (city.prov === city.city ? city.city : city.prov + ' · ' + city.city)
+      : (city.prov ? city.prov + ' · 城市未定' : '城市未定')
+
+    $('gdCity').textContent = cityOK() ? city.city : '城市未定'
+  }
+
+  function renderQs () {
+    var ops = $('qs').querySelectorAll('.op'), i
+    for (i = 0; i < ops.length; i++) {
+      ops[i].setAttribute('aria-pressed', ans[ops[i].getAttribute('data-q')] === ops[i].getAttribute('data-v') ? 'true' : 'false')
+    }
+    var rows = $('qs').querySelectorAll('[data-qrow]')
+    for (i = 0; i < rows.length; i++) {
+      rows[i].className = ans[rows[i].getAttribute('data-qrow')] ? 'qrow' : 'qrow qrow--miss'
+    }
+
+    /* 计数条：只给「已答 N / 9 · 未答 M」。九项答案的完整明细在右栏 sideKv，
+       两处都铺一遍等于把同一份内容换个位置重复（Codex :319）。 */
+    var miss = 0
+    for (i = 0; i < QS.length; i++) if (!ans[QS[i].k]) miss++
+    var n = answered()
+    var h = '<span class="rc">已答 ' + n + ' / 9</span>'
+    h += miss
+      ? '<span class="rc rc--miss">未答 ' + miss + ' 项 · 按待确认</span>'
+      : '<span class="rc">九项都答了</span>'
+    if (!cityOK()) h += '<span class="rc rc--miss">城市未定</span>'
+    $('recapV').innerHTML = h
+    $('sideN').textContent = '已答 ' + n + ' / 9'
+    $('legendN').textContent = miss ? ('未答 ' + miss + ' 项按待确认') : '9 项都答了'
+    $('gdA').textContent = String(n)
+
+    var kv = ''
+    for (i = 0; i < QS.length; i++) {
+      var a = ans[QS[i].k]
+      kv += '<div class="kv-row"><span class="k">' + QS[i].lb + '</span><span class="v' +
+            (a ? '' : ' v--fog') + '">' + (a ? esc(a) : '未答') + '</span></div>'
+    }
+    $('sideKv').innerHTML = '<div class="kv-row"><span class="k">城市</span><span class="v">' +
+      (cityOK() ? city.city : '未定') + '</span></div>' + kv
+  }
+
+  function renderPols () {
+    var cnt = { maybe: 0, gap: 0, wait: 0, no: 0 }, nPick = 0
+    var list = polsIn()          // 右栏四个计数只数当前分类里看得见的那几条
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]
+      var v = verdictOf(p)
+      cnt[v.k]++
+      var chip = scr.querySelector('[data-verdict="' + p.id + '"]')
+      chip.className = 'pol-verdict-status pv--' + v.k
+      chip.textContent = v.t
+
+      var rows = ''
+      for (var j = 0; j < p.c.length; j++) {
+        var c = p.c[j]
+        var r = cityOK() ? c.f() : 'dunno'
+        var tail = ''
+        if (!cityOK()) tail = ' <em>· 先定城市</em>'
+        else if (r === 'dunno') tail = c.q ? ' <em>· ' + (ans[c.q] ? '你答：' + esc(ans[c.q]) : '未答') + '</em>'
+                                          : ' <em>· 本机查不到</em>'
+        else tail = c.q && ans[c.q] ? ' <em>· 你答：' + esc(ans[c.q]) + '</em>' : ''
+        rows += '<div class="cd cd--' + r + '"><i></i><span>' + c.t + tail + '</span></div>'
+      }
+      scr.querySelector('[data-cond="' + p.id + '"]').innerHTML = rows
+
+      var on = !!pick[p.id]
+      if (on) nPick++
+      scr.querySelector('[data-pick="' + p.id + '"]').setAttribute('aria-pressed', on ? 'true' : 'false')
+      scr.querySelector('[data-pol="' + p.id + '"]').className = on ? 'pol pol--on' : 'pol'
+      scr.querySelector('[data-hint="' + p.id + '"]').textContent = on ? '已选入清单' : '未选入清单'
+
+      var box = scr.querySelector('[data-docbox="' + p.id + '"]')
+      box.hidden = !open[p.id]
+      scr.querySelector('[data-doc="' + p.id + '"]').setAttribute('aria-expanded', open[p.id] ? 'true' : 'false')
+      scr.querySelector('[data-doclb="' + p.id + '"]').textContent = open[p.id] ? '收起原文' : '看原文'
+    }
+    $('cntMaybe').textContent = String(cnt.maybe)
+    $('cntGap').textContent = String(cnt.gap)
+    $('cntWait').textContent = String(cnt.wait)
+    $('cntNo').textContent = String(cnt.no)
+
+    $('hintS2').textContent = nPick ? ('已勾 ' + nPick + ' 条进清单') : '还没勾选任何政策'
+    var g3 = $('goS3')
+    if (nPick) { g3.setAttribute('data-go', 's3'); g3.innerHTML = '生成办事清单 · ' + nPick + ' 项<svg class="ic"><use href="#i-arrowRight"/></svg>' }
+    else { g3.setAttribute('data-go', 's2'); g3.innerHTML = '先勾选要办的政策<svg class="ic"><use href="#i-arrowRight"/></svg>' }
+
+    var g2 = $('goS2')
+    if (cityOK()) { g2.setAttribute('data-go', 's2'); g2.innerHTML = '看我卡在哪<svg class="ic"><use href="#i-arrowRight"/></svg>' }
+    else { g2.setAttribute('data-go', 's1'); g2.innerHTML = '先定城市<svg class="ic"><use href="#i-arrowRight"/></svg>' }
+    return nPick
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     「去之前先办的」· 2026-08-10 不同源整改
+     ----------------------------------------------------------------------
+     这一栏原来是写死的两条，和左边逐条核对的结果毫无关系：默认答案里
+     「失业登记：已办」已经被核对判成通过，右栏照样让人去办登记。
+
+     现在每条待办声明它**解决的是哪个条件判定函数**，然后只在两个前提都成立时出现：
+       ① 当前分类里**真有政策用到这个条件**（换到「社保指南」就不该再提创业相关的事）
+       ② 这个条件现在**还没通过**（'no' 卡住 / 'dunno' 判不了）
+     已经通过的条件不生成待办 —— 这正是原来那条 bug。
+
+     待办后面必须写清**为什么是你**：是你答了「没办」，还是你没答，还是本机查不到。
+     不写原因的待办等于命令，用户没法判断该不该照做。
+     ══════════════════════════════════════════════════════════════════════ */
+  var todoDone = {}          // 用户在屏幕上打勾的那几条（render 重建时不能丢）
+
+  var TODO = [
+    { k: 'reg',  t: '办失业登记',
+      s: '政务网或户籍地街道办',        f: cReg,    q: 'reg' },
+    { k: 'soc3', t: '查灵活就业社保连续缴了几个月',
+      s: '社保 App 可查',              f: cSoc3,   q: 'soc' },
+    { k: 'ins1', t: '查失业保险累计缴了多久',
+      s: '社保 App 可查 · 本机查不到，只能你自己去查', f: cAlways, q: '' }
+  ]
+
+  /* 当前分类里是否有政策用到这个判定；用到了，它现在是什么结果 */
+  function condState (fn) {
+    var list = polsIn(), i, j
+    for (i = 0; i < list.length; i++) {
+      for (j = 0; j < list[i].c.length; j++) {
+        if (list[i].c[j].f !== fn) continue
+        return cityOK() ? fn() : 'dunno'
+      }
+    }
+    return ''                 // 这一分类下没有政策要这个条件 → 不生成待办
+  }
+
+  function todoWhy (it, r) {
+    /* 顺序要紧：本机压根查不到的那一项（没有对应问项），
+       理由永远是「查不到」—— 城市定没定都改变不了这件事。
+       先判城市会把它错写成「先定城市」，等于暗示定完城市本机就能替你查。 */
+    if (!it.q) return '本机查不到这项，谁都替你查不了'
+    if (!cityOK()) return '本机还没定到城市，判不了这条 —— 先在第 1 步定城市'
+    if (r === 'no') return '你答：' + esc(ans[it.q]) + ' —— 这条现在卡住了'
+    if (ans[it.q]) return '你答：' + esc(ans[it.q]) + ' —— 本机据此判不了'
+    return '这一项你还没答，所以本机没算它'
+  }
+
+  function renderTodo () {
+    var box = $('todoBox')
+    if (!box) return
+    var html = '', n = 0, i, r
+    for (i = 0; i < TODO.length; i++) {
+      r = condState(TODO[i].f)
+      if (r === '' || r === 'ok') continue          // 用不上 / 已经通了
+      n++
+      html += '<button class="ckrow" data-todo="' + TODO[i].k + '" aria-pressed="' +
+              (todoDone[TODO[i].k] ? 'true' : 'false') + '">' +
+              '<span class="ck-box"></span><span class="ckrow-b">' +
+              '<span class="ckrow-t">' + TODO[i].t + '</span>' +
+              '<span class="ckrow-s">' + TODO[i].s + '</span>' +
+              '<span class="ckrow-s">' + todoWhy(TODO[i], r) + '</span>' +
+              '</span></button>'
+    }
+    if (!n) {
+      html = '<div class="panel-note" style="margin-left:0">' +
+             '按你现在的作答，<b>没有需要先去办的事</b> —— 上面几条政策卡在哪，' +
+             '左边逐条列着。改了作答，这里会跟着变。</div>'
+    }
+    box.innerHTML = html
+    var mt = $('todoMt')
+    if (mt) mt.textContent = n ? ('按你的作答派生 · ' + n + ' 条') : '按你的作答派生 · 暂无'
+  }
+
+  /* ---------- 打印交接链接 ----------
+     全站契约：06-print-workbench.html?stage=s3&from=&kind=&title=&pages=&copies=&back=
+     · pages 用本页自己算出来的合计（清单 1 页 + 已勾原文页数），不是写死的 5；
+       勾选一变，页数、标题、按钮文案三者同源，不会出现「按钮写 3 页、打印台收到 5 页」。
+     · 打印台顶部的来源回执就靠这几个参数说话；这里给错，那边就骗人。 */
+  /* 2026-08-10 全量回归修：本段（原 998–1002 行）不知何时被整段 URL 百分号编码，
+     空格全变成 %20。JS 解析到 `%20%20%20…` 直接抛 Uncaught SyntaxError: Unexpected token '%'，
+     **整个内联脚本块（676–1190 行）一行都没执行** —— 城市选择、政策勾选、
+     办事清单渲染、printHref 交接参数全部失效，页面只剩 stage.js 撑着切阶段。
+     控制台早就在报，但四态自检只看版面不看 console，一直没抓到。 */
+  function printHref (nDoc, pages) {
+    var title = nDoc ? ('办事清单与政策原文 ' + nDoc + ' 份') : '办事清单'
+    return '06-print-workbench.html?stage=s3' +
+           '&from=P21&kind=policy-checklist' +
+           '&title=' + encodeURIComponent(title) +
+           '&pages=' + pages + '&copies=1&back=s3'
+  }
+
+  function renderPaper (nPick) {
+    var i, p, no = 0, gd = '', chosen = [], docList = [], docPg = 0
+    var vis = polsIn()           // 纸面只印当前分类里勾上的，屏幕与纸面同源
+
+    for (i = 0; i < vis.length; i++) {
+      p = vis[i]
+      if (!pick[p.id]) continue
+      chosen.push(p)
+      no++
+      gd += '<div><div class="gd-w">' + '①②③④⑤⑥'.charAt(no - 1) + ' ' + p.t + '</div>'
+      for (var j = 0; j < p.gd.length; j++) gd += '<div class="gd-i"><i></i><span>' + p.gd[j] + '</span></div>'
+      gd += '</div>'
+    }
+    if (!chosen.length) gd = '<div class="gd-i"><i></i><span>还没勾选政策 —— 回第 2 步勾选后本单才有内容</span></div>'
+    $('gdBody').innerHTML = gd
+    $('gdN').textContent = String(chosen.length)
+    $('gdN2').textContent = String(chosen.length)
+
+    /* 原文勾选清单：只列已选入清单的政策，勾选即改页数 */
+    var dp = ''
+    for (i = 0; i < chosen.length; i++) {
+      p = chosen[i]
+      var on = !!docs[p.id]
+      if (on) { docList.push(p); docPg += p.pg }
+      dp += '<button class="ckrow" data-docpick="' + p.id + '" aria-pressed="' + on + '">' +
+              '<span class="ck-box"></span><span class="ckrow-b">' +
+              '<span class="ckrow-t">' + p.t + '</span>' +
+              '<span class="ckrow-s">原文 ' + p.pg + ' 页 · 窗口一般不要，按需选</span></span></button>'
+    }
+    if (!chosen.length) dp = '<div class="panel-note">先在第 2 步勾选政策</div>'
+    $('docPick').innerHTML = dp
+
+    var total = (chosen.length ? 1 : 0) + docPg
+    var fee = (total * 0.2).toFixed(2)
+    $('sumPg').textContent = String(total)
+    $('sumFee').textContent = fee
+    $('pbName').textContent = '办事清单 · ' + chosen.length + ' 项'
+    $('pbPg').textContent = '第 ' + (sheetAt + 1) + ' / ' + (docList.length ? 2 : 1) + ' 张'
+
+    /* 一份原文都没勾时不写「政策原文 0 份」—— 那是把"没有"当成一项内容念出来 */
+    $('takeT').textContent = chosen.length
+      ? ('带去：办事清单 1 份' + (docList.length ? (' + 政策原文 ' + docList.length + ' 份') : '（未附原文）'))
+      : '这次没有可带走的东西'
+    $('takeN').textContent = '共 ' + total + ' 页'
+
+    /* 一条都没勾时不许还挂着"去打印"——那是把用户送去打一张空纸 */
+    var gp = $('goPrint'), gs = $('goSave')
+    if (chosen.length) {
+      gp.setAttribute('href', printHref(docList.length, total))
+      gp.removeAttribute('data-go')
+      gp.innerHTML = '去打印 · 清单 1 份' +
+        (docList.length ? (' + 原文 ' + docList.length + ' 份') : '') +
+        ' · 共 ' + total + ' 页<svg class="ic"><use href="#i-printer"/></svg>'
+      gs.setAttribute('data-go', 's3')
+      gs.innerHTML = '<svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走（' + total + ' 页）'
+    } else {
+      gp.removeAttribute('href')
+      gp.setAttribute('data-go', 's2')
+      gp.innerHTML = '回第 2 步勾选政策<svg class="ic"><use href="#i-arrowRight"/></svg>'
+      gs.setAttribute('data-go', 's2')
+      gs.innerHTML = '回第 2 步勾选政策<svg class="ic"><use href="#i-arrowRight"/></svg>'
+    }
+
+    /* 原文附页：勾了才出现，页数与上面同源 */
+    var ds = ''
+    for (i = 0; i < docList.length; i++) {
+      ds += '<div class="gd-row"><span class="gd-rn">' + '①②③④⑤⑥'.charAt(i) + '</span>' +
+            '<span>' + docList[i].t + '</span>' +
+            '<span class="gd-rp">' + docList[i].no + ' · ' + docList[i].pg + ' 页</span></div>'
+    }
+    $('dsSub').textContent = docList.length + ' 份 · 共 ' + docPg + ' 页 · 跟在清单后面打印'
+    $('dsBody').innerHTML = ds
+    $('docSheet').hidden = !docList.length
+    if (!docList.length) sheetAt = 0
+    $('paperStage').className = docList.length ? 'paper-stage' : 'paper-stage is-one'
+  }
+
+  /* ---------- 带入回执条 ----------
+     只在真的带了合法参数时才插进 DOM。不带参数 → 这一块整个不存在，
+     版面与整改前逐像素相同（自检基线不受影响）。 */
+  function buildCarry () {
+    if (!catBar && !carryItems().length && !carry.view && !carry.badView) return
+    var box = document.createElement('div')
+    box.className = 'carryin'
+    box.id = 'carryBox'
+    box.setAttribute('data-at', 's1 s2')   // 第 3 步是纸面预览，回执不跟到纸上
+    var wm = document.querySelector('.wmain')
+    if (wm) wm.insertBefore(box, wm.firstChild)
+  }
+
+  function renderCarry () {
+    var box = $('carryBox')
+    if (!box) return
+    var items = carryItems(), h = '', i
+    /* 「回第 1 步改」只在第 2 步有意义（第 1 步问项就在眼前）。
+       这里按当前 stage 现算，不用 data-at —— 本函数由 v3ApplyVisibility
+       的包装钩子在算完可见性**之后**调用，新塞进来的 [data-at] 节点
+       这一帧不会被算到，会在第 1 步也露出来。 */
+    var atS2 = (scr.getAttribute('data-stage') || 's1') === 's2'
+    var ttl
+    if (items.length && catBar) ttl = '已带入上一屏的选择：' + items.length + ' 项条件 + 1 个分类'
+    else if (items.length) ttl = '已带入你在上一屏选的 ' + items.length + ' 项'
+    else if (catBar) ttl = '已按上一屏点的分类筛选'
+    else if (carry.view) ttl = '已按上一屏点的入口直达'
+    else ttl = '上一屏带来的参数本机没认出来'
+
+    h += '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg><b>' + ttl + '</b>' +
+         '<span class="carryin-src">来自政策服务首屏 · 可改</span></div>'
+
+    /* 直达点回执：写清「直达了哪一块、那一块现在是什么状态」。
+       不写「已为你办好」之类 —— 本页只是把内容摊开，办事还在窗口。 */
+    if (carry.view) {
+      h += '<div class="carryin-note">已直达<b>' + VIEW_NM[carry.view] + '</b>' + VIEW_TIP[carry.view] + '</div>'
+    }
+    if (carry.badView) {
+      h += '<div class="carryin-note">链接里的 <b>view=' + esc(carry.badView) + '</b> 本机不认识，<b>已忽略</b>：' +
+           '本页只有「官方办理入口 / 政策原文 / 办事材料清单」三个直达点。' +
+           '这一屏<b>没有替你跳到任何地方</b>，按正常流程从第 1 步开始。</div>'
+    }
+
+    if (items.length) {
+      h += '<div class="carryin-items">'
+      for (i = 0; i < items.length; i++) {
+        h += '<span class="carryin-it"><i>' + items[i][0] + '</i><em>' + esc(items[i][1]) + '</em></span>'
+      }
+      h += '</div><div class="carryin-note">这几项已经填进第 2 步对应的问项，<b>点一下就能改</b>；' +
+           '其余问项本机没问过，一律按待确认算，不替你补答案。</div>'
+    }
+
+    if (catBar) {
+      h += '<div class="carryin-ops"><span class="carryin-lb">' +
+           (catSel ? ('已按「' + CAT_NM[catSel] + '」筛选 · 换一类') : ('已看全部 ' + POL.length + ' 条 · 可再选一类')) +
+           '</span>' +
+           '<button class="carryin-op" type="button" data-catset="all" aria-pressed="' +
+           (catSel ? 'false' : 'true') + '">全部</button>'
+      for (i = 0; i < CAT_KEYS.length; i++) {
+        h += '<button class="carryin-op" type="button" data-catset="' + CAT_KEYS[i] + '" aria-pressed="' +
+             (catSel === CAT_KEYS[i] ? 'true' : 'false') + '">' + CAT_NM[CAT_KEYS[i]] + '</button>'
+      }
+      h += '</div>'
+    }
+
+    if (items.length && atS2) {
+      h += '<div class="carryin-ops">' +
+           '<button class="carryin-op" type="button" data-go="s1">回第 1 步改这几项</button></div>'
+    }
+    box.innerHTML = h
+  }
+
+  /* 换分类：勾选收敛 → 重建列表 → 重算可见性（新节点带 data-when）→ 重排 */
+  function setCat (c) {
+    catSel = (c === 'all') ? '' : inList(c, CAT_KEYS)
+    trimPick()
+    buildPols()
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+    else render()
+  }
+
+  function render () {
+    renderCarry()
+    renderCity()
+    renderQs()
+    renderTodo()
+    renderPaper(renderPols())
+  }
+  window.p21Render = render
+
+  /* ---------- 交互 ---------- */
+  scr.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return
+    var t
+
+    if ((t = e.target.closest('[data-catset]'))) {
+      setCat(t.getAttribute('data-catset')); return
+    }
+    if ((t = e.target.closest('.op[data-q]'))) {
+      ans[t.getAttribute('data-q')] = t.getAttribute('data-v'); render(); return
+    }
+    if ((t = e.target.closest('[data-pick]'))) {
+      var pid = t.getAttribute('data-pick')
+      if (pick[pid]) { delete pick[pid]; delete docs[pid] } else { pick[pid] = 1 }
+      render(); return
+    }
+    if ((t = e.target.closest('[data-doc]'))) {
+      var did = t.getAttribute('data-doc')
+      if (open[did]) delete open[did]; else open[did] = 1
+      render(); return
+    }
+    if ((t = e.target.closest('[data-docpick]'))) {
+      var dk = t.getAttribute('data-docpick')
+      if (docs[dk]) delete docs[dk]; else docs[dk] = 1
+      render(); return
+    }
+    if ((t = e.target.closest('[data-todo]'))) {
+      var tk = t.getAttribute('data-todo')
+      var nowOn = t.getAttribute('aria-pressed') !== 'true'
+      t.setAttribute('aria-pressed', nowOn ? 'true' : 'false')
+      /* 打过的勾要记住：这一栏现在是 render() 重建的，
+         用户改一个答案就会重画，不记就会把他刚打的勾抹掉。 */
+      if (nowOn) todoDone[tk] = 1; else delete todoDone[tk]
+      return
+    }
+    if ((t = e.target.closest('[data-fold]'))) {
+      var fb = scr.querySelector('[data-foldbox="' + t.getAttribute('data-fold') + '"]')
+      fb.hidden = !fb.hidden
+      t.setAttribute('aria-expanded', fb.hidden ? 'false' : 'true')
+      return
+    }
+    if ((t = e.target.closest('#telBtn'))) {
+      var tb = $('telBox'); tb.hidden = !tb.hidden
+      t.setAttribute('aria-pressed', tb.hidden ? 'false' : 'true'); return
+    }
+    if ((t = e.target.closest('#qrBtn'))) {
+      var qw = $('qrWrap'); qw.hidden = !qw.hidden
+      t.setAttribute('aria-pressed', qw.hidden ? 'false' : 'true'); return
+    }
+    /* 翻页键不许是装饰：真的把预览滚到那一张纸 */
+    if ((t = e.target.closest('#pgPrev,#pgNext'))) {
+      var sheets = [], nodes = $('paperStage').querySelectorAll('.sheet-a4')
+      for (var s = 0; s < nodes.length; s++) if (!nodes[s].hidden) sheets.push(nodes[s])
+      sheetAt = Math.max(0, Math.min(sheets.length - 1, sheetAt + (t.id === 'pgNext' ? 1 : -1)))
+      if (sheets[sheetAt]) sheets[sheetAt].scrollIntoView({ block: 'start', behavior: 'smooth' })
+      $('pbPg').textContent = '第 ' + (sheetAt + 1) + ' / ' + sheets.length + ' 张'
+      return
+    }
+  })
+
+  /* 走查钩子（不接 UI，只给复核用）：批量灌答案 / 城市 / 勾选后重算。
+     在 console 里跑，例如：
+       p21Set({ ans: { reg: '没办' } })   → 第 ① 条从「像是符合」变「卡一条」
+       p21Set({ city: null })            → 城市未定时六条一律不出结论
+     再配合 screen.setAttribute('data-state'|'data-stage') + v3ApplyVisibility() + v3AuditPlus() */
+  /* 参数消费的走查把手：看本页到底认下了 URL 里的哪几个值 */
+  window.p21Carry = function () {
+    return { carry: carry, catSel: catSel, catBar: catBar, status: ans.status, soc: ans.soc, city: city.city,
+             view: carry.view, badView: carry.badView,
+             sideOpen: scr.classList.contains('is-side'),
+             telOpen: !!($('telBox') && !$('telBox').hidden),
+             qrOpen: !!($('qrWrap') && !$('qrWrap').hidden),
+             docsOpen: Object.keys(open).length }
+  }
+
+  window.p21Set = function (o) {
+    if (o.ans) { for (var k in o.ans) { if (o.ans[k] === null) delete ans[k]; else ans[k] = o.ans[k] } }
+    if (o.city !== undefined) city.city = o.city
+    if (o.prov !== undefined) city.prov = o.prov
+    if (o.pick) { pick = o.pick }
+    if (o.docs) { docs = o.docs }
+    render()
+  }
+
+  /* 地区选择器回来的结果：只到省 → 城市未定（门控不变）；到市或到区县 → 取市。
+     直辖市（北京/天津/上海/重庆）省市同名，city 直接取该市。 */
+  scr.addEventListener('v3region:change', function (e) {
+    var d = e.detail || {}
+    city.prov = d.province || ''
+    city.city = d.city || null
+    render()
+  })
+
+  /* ?view= 的落实：阶段对齐 + 把目标块摊开。
+     只在 DOM 建好、render() 跑过一轮之后做 —— 抽屉与原文块都要先存在。 */
+  function applyView () {
+    if (!carry.view) return
+    var want = VIEW_AT[carry.view]
+    if (want && (scr.getAttribute('data-stage') || '') !== want && window.v3Stage) window.v3Stage(want)
+
+    if (carry.view === 'official') {
+      /* 抽屉开关只切 .screen 上的一个 class（同页内那段 data-side-open 的实现），
+         这里走同一条路，不另起一套。 */
+      scr.classList.add('is-side')
+      var bs = document.querySelectorAll('[data-side-open]')
+      for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-expanded', 'true')
+      /* 热线提示与二维码：默认 hidden，直达就得直接可见 */
+      if ($('telBox')) { $('telBox').hidden = false; $('telBtn').setAttribute('aria-pressed', 'true') }
+      if ($('qrWrap')) { $('qrWrap').hidden = false; $('qrBtn').setAttribute('aria-pressed', 'true') }
+      /* 抽屉里「出发前问官方」排在政策来源、核对结果后面，不滚过去用户看不到 */
+      var pane = $('telBtn') && $('telBtn').closest('.pane')
+      if (pane && pane.scrollIntoView) { try { pane.scrollIntoView({ block: 'start' }) } catch (e) {} }
+    }
+
+    if (carry.view === 'doc') {
+      /* 「只看政策原文」：当前分类下的每一条都展开原文。
+         原文一字不改，只是不用再逐条点「看原文」。 */
+      var list = polsIn()
+      for (var j = 0; j < list.length; j++) open[list[j].id] = 1
+      render()
+    }
+  }
+
+  /* 先读参数再建 DOM：分类决定列表建哪几条，预填决定问项的初始选中态 */
+  readCarry()
+  trimPick()
+  buildCarry()
+  buildQs()
+  buildPols()
+  render()
+  applyView()
+  if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+
+  /* 四态 / 阶段切换后重算：
+     · stages.js 走 window.v3ApplyVisibility（这里包一层，自检脚本直接调它也能生效）
+     · stage.js 的四态按钮走的是它自己的局部函数，所以另外挂一个点击兜底 */
+  var origAV = window.v3ApplyVisibility
+  if (origAV) {
+    window.v3ApplyVisibility = function () { origAV.apply(this, arguments); render() }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.closest && e.target.closest('[data-state-btn]')) {
+      requestAnimationFrame(render)
+    }
+  }, true)
+})()
+</script>
 </body>
 </html>

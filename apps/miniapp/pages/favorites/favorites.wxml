@@ -1,0 +1,65 @@
+<!--pages/favorites/favorites.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">我的收藏</view>
+      <view class="nav-right tap" hover-class="tap-press" bindtap="toggleManage">
+        <text class="nav-caps">{{managing ? '完成' : '管理'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="seg">
+    <view
+      class="s {{activeTab === item.key ? 'on' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="setTab"
+    >{{item.label}}</view>
+  </view>
+
+  <view class="content fav-content">
+
+    <view class="card" wx:if="{{list.length}}">
+      <view
+        class="fav-item tap"
+        wx:for="{{list}}"
+        wx:key="id"
+        hover-class="tap-press"
+        data-id="{{item.id}}"
+        bindtap="openItem"
+      >
+        <view class="fav-ic tone-{{item.tone}}">{{item.initial}}</view>
+        <view class="fav-body">
+          <view class="fav-t">{{item.title}}</view>
+          <view class="fav-sub">{{item.sub}}</view>
+          <view class="fav-tags">
+            <text class="fav-salary" wx:if="{{item.salary}}">{{item.salary}}</text>
+            <view class="chip {{item.tagTone}}" wx:if="{{item.tag}}">{{item.tag}}</view>
+          </view>
+        </view>
+        <view wx:if="{{managing}}" class="fav-star tap" hover-class="tap-press" catchtap="unfav" data-id="{{item.id}}">✕</view>
+      </view>
+    </view>
+
+    <view class="card" wx:else>
+      <view class="empty-slot">
+        <text class="ficon i-inbox es-ic"></text>
+        <view class="es-t">还没有收藏</view>
+        <view class="es-d">在岗位、招聘会与企业页面点收藏后可在此查看</view>
+      </view>
+    </view>
+
+    <view class="compliance-note">
+      收藏的岗位来自第三方平台。投递请前往来源平台,本终端仅提供信息浏览与跳转。
+    </view>
+
+  </view>
+
+</view>

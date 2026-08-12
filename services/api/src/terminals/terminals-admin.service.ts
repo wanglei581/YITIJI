@@ -111,6 +111,15 @@ export interface UpdateTerminalLifecycleResult {
   lifecycleVersion: number
 }
 
+export interface PublicTerminalView {
+  id: string
+  terminalCode: string
+  displayName: string
+  locationLabel: string | null
+  isOnline: boolean
+  lastSeenAt: string | null
+}
+
 const ALLOWED_LIFECYCLE_TRANSITIONS: Record<TerminalLifecycleStatus, readonly TerminalLifecycleStatus[]> = {
   planned: [],
   commissioning: ['suspended', 'retired'],
@@ -724,5 +733,34 @@ export class TerminalAdminService {
       lastSeenAt,
       isOnline,
     }
+  }
+
+  /** 小程序只读安全目录：只暴露启用、active 且最近心跳在线的服务终端。 */
+  async listPublicTerminals(): Promise<PublicTerminalView[]> {
+    const rows = await this.prisma.terminal.findMany({
+      where: { enabled: true, lifecycleStatus: 'active' },
+      select: {
+        id: true,
+        terminalCode: true,
+        displayName: true,
+        locationLabel: true,
+        heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true, localTaskDatabaseAvailable: true } },
+      },
+      orderBy: [{ locationLabel: 'asc' }, { terminalCode: 'asc' }],
+    })
+    const now = Date.now()
+    return rows.flatMap((row) => {
+      const latest = row.heartbeats[0]
+      const isOnline = Boolean(latest && now - latest.createdAt.getTime() < 5 * 60 * 1000 && latest.localTaskDatabaseAvailable !== false)
+      if (!isOnline) return []
+      return [{
+        id: row.id,
+        terminalCode: row.terminalCode,
+        displayName: row.displayName?.trim() || row.terminalCode,
+        locationLabel: row.locationLabel ?? null,
+        isOnline,
+        lastSeenAt: latest?.createdAt.toISOString() ?? null,
+      }]
+    })
   }
 }

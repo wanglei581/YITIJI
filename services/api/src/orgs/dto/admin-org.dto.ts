@@ -60,8 +60,11 @@ export class CreateOrgDto {
   @IsOptional() @IsString() @MaxLength(50)
   contactPhone?: string
 
-  @IsOptional() @IsIn([...SCENE_TEMPLATES])
-  sceneTemplate?: string
+  // null = 明确清空场景（切换为 source-only 类型时必需）。
+  // 只允许 undefined(不改) / null(清空) / 合法模板值三种，服务端 update 用
+  // `dto.sceneTemplate !== undefined` 区分「不改」与「清空」。
+  @IsOptional() @IsIn([...SCENE_TEMPLATES, null])
+  sceneTemplate?: string | null
 
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(50, { each: true })
   enabledModules?: string[]
@@ -84,8 +87,11 @@ export class UpdateOrgDto {
   @IsOptional() @IsString() @MaxLength(50)
   contactPhone?: string
 
-  @IsOptional() @IsIn([...SCENE_TEMPLATES])
-  sceneTemplate?: string
+  // null = 明确清空场景（切换为 source-only 类型时必需）。
+  // 只允许 undefined(不改) / null(清空) / 合法模板值三种，服务端 update 用
+  // `dto.sceneTemplate !== undefined` 区分「不改」与「清空」。
+  @IsOptional() @IsIn([...SCENE_TEMPLATES, null])
+  sceneTemplate?: string | null
 
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(50, { each: true })
   enabledModules?: string[]

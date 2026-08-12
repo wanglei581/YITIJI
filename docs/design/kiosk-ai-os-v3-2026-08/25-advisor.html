@@ -16,607 +16,646 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
-/* ── P25 专用 ───────────────────────────────────────────────────────────
-   小青是**真人照片**顾问（TRTC 真人形象 + 文字对话）。
-   这带来一个别的页没有的风险：用户会以为真有个人在另一头回他。
+/* ── P25 专用 · 单屏驾驶舱（codex 复审终态） ─────────────────────────────
+   上一版是三段轨（问小青 / 她能帮你做的 / 带走要点）。复审结论：
+   对话、能力入口、可带走的纸不是三个先后阶段，是同时要看见的三件东西 ——
+   分三步走反而把「聊着聊着就能钉、钉了就能打」这条主线切断了。
+   所以本页收成单屏：左列聊，右列仪表 + 能力 + 托盘，不再有 rail / data-at。
 
-   在公共场所、面对正在找工作的人，这个误会不是小事 ——
-   他可能因此说出对真人才会说的话（家里的难处、上一份工作的私事）。
-   所以「这是 AI 生成的回答，不是真人在跟你说话」必须**常驻在对话框上方**，
-   而不是藏进设置页或首次弹窗。
+   三条从旧版继承、不许丢的纪律：
+   1) 小青是**真人照片**的虚拟顾问 ——「AI 生成 · 非真人」必须常驻头卡，
+      不藏进弹窗。对话不保存、离场即清，所以有用的结论要能「钉到托盘」打走。
+   2) 麦克风是真实功能位（生产走语音转文字），只标「按住说话」——
+      **不做假录音动画 / 伪造波形**（codex 抓过这一类：界面演出没发生的事）。
+   3) talk-track 合规：示例问答不许出现「帮你投递 / 保证面试 / 内推」；
+      岗位回答尾部固定「投递请去来源平台」（注意语序 —— 「去来源平台投递」
+      会连出违禁词「平台投递」，检测器与 CLAUDE.md §2 都不放行）；
+      政策回答固定「以窗口审核为准」。
 
-   第二条：**对话不留存**（既有实现里 chatAssistant 就是不落库的）。
-   那么用户聊出来的有用结论，必须有一个「带走」的出口 ——
-   否则聊完就没了，等于白聊。本页的出口是「钉住要点 → 打印」。
-
-   第三条：九个能力入口不能做成九张同义卡片。
-   每个入口必须说清**什么时候用它**，而不只是名字。
-   —— CLAUDE.md 明确禁止「继续堆重复入口 / 同义卡片」。
-
-   组件备忘：.tl 本身是一步（容器 .tline）；.ck / .jobrow 页内自带。
+   四态口径：ai-down = 右列 AI 引擎 gauge 变灰 + 左列输入条换成禁用蒙层
+   （非 AI 入口照常）+ 能力组纯 AI 项置灰但保留非 AI 真链；
+   device-off = 托盘「出纸暂停 · 先存我的文档」；first = 托盘诚实为空
+   （首次还没聊，不许摆一张「今天的建议清单」装闭环）。
    ──────────────────────────────────────────────────────────────────── */
 
-/* 顾问区 */
-.adv { display:flex; gap:var(--s-5); align-items:flex-start; }
-.adv-photo { width:132px; height:132px; border-radius:var(--r-md); flex:0 0 auto;
-  background:linear-gradient(155deg, var(--jade-a20), var(--fog-a08));
-  border:1px solid var(--glass-1-brd); display:grid; place-items:center; position:relative;
-  overflow:hidden; }
-.adv-photo .ic { width:52px; height:52px; color:var(--jade-400); opacity:.9; }
-.adv-photo::after { content:''; position:absolute; inset:auto 0 0 0; height:34px;
-  background:linear-gradient(to top, rgba(0,0,0,.22), transparent); }
-.adv-b { min-width:0; display:flex; flex-direction:column; gap:var(--s-3); }
-.adv-nm { font-size:var(--fz-6); font-weight:700; color:var(--fog-900); }
-.adv-role { font-size:var(--fz-2); color:var(--fog-600); }
+/* 布局：对话是本页唯一主体，右副列只留「仪表 + 作业面 + 托盘」。
+   2026-08-10 重心整改：副列 380 → 336，把宽度还给对话区
+   （主功能区占屏 50.0% → 53.5%）。右列原本还挂着「能帮你做的」9 个入口 ——
+   那是"你可能还想去"的横向导航，跟"和小青对话"这件事无关，已删；
+   用户要去别的功能按返回键即可，不需要每页都摆一排入口。 */
+/* 页边保持 var(--s-7)：小青头像用 transform:scale(2.1) 取头肩，
+   放大后的图元 bounding rect 比圆框宽 ~46px（视觉上被 .ava-clip 裁掉，
+   但自检量的是原始矩形）。页边一收窄它就探出屏幕左沿，横向溢出报 1。
+   宽度只从副列要：380 → 336。 */
+.work { grid-template-columns: 1fr 336px; padding: var(--s-5) var(--s-7); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行。标签不折行，值去折行。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
 
-/* 「这是 AI」常驻条：不可关闭、不折叠、在对话上方 */
-.aibar { display:flex; align-items:center; gap:var(--s-4);
-  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
-  background:var(--amber-a12); border:1px solid var(--amber-a20); flex:0 0 auto; }
-.aibar .ic { width:21px; height:21px; color:var(--amber-400); flex:0 0 auto; }
-.aibar span { font-size:var(--fz-3); color:var(--amber-200); line-height:1.55; }
-.aibar b { color:var(--fog-900); }
+/* ── 头卡：compact 人像 + 常驻披露 ── */
+.advhead { display:flex; align-items:center; gap:var(--s-5); }
+.ava { position:relative; width:88px; height:88px; flex:0 0 auto; }
+.ava-clip { position:absolute; inset:0; border-radius:50%; overflow:hidden;
+  border:2px solid var(--jade-a32); background:var(--jade-a12); }
+.ava img, .msg-av img { width:100%; height:100%; object-fit:cover; display:block;
+  /* advisor-cut.png 为 840×1496 透明抠图全身照，圆框放大取头肩 */
+  object-position:50% 8%; transform:scale(2.1); transform-origin:50% 10%; }
+.ava::after { content:''; position:absolute; inset:-6px; border-radius:50%;
+  border:1.5px solid var(--jade-a32); opacity:.6; pointer-events:none; }
+@media (prefers-reduced-motion:no-preference){
+  .ava::after { animation:p25halo 4s var(--ease-in-out) infinite; }
+}
+@keyframes p25halo {
+  0%,100% { transform:scale(1);    opacity:.6; }
+  50%     { transform:scale(1.1);  opacity:.12; }
+}
+.ava-dot { position:absolute; right:3px; bottom:3px; width:15px; height:15px;
+  border:3px solid var(--ink-100); box-sizing:content-box; }
+.screen[data-state="ai-down"] .ava img { filter:grayscale(.92) brightness(.8); }
+.screen[data-state="ai-down"] .ava::after { animation:none; opacity:.16; }
+.advhead-b { min-width:0; flex:1; display:flex; flex-direction:column; gap:7px; }
+.advhead-nm { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.advhead-nm b { font-family:var(--ff-display); font-size:var(--fz-6); color:var(--fog-900); }
+.advhead-nm span { font-size:var(--fz-2); color:var(--fog-700); }
+.advhead-role { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.chip--info { cursor:default; }
 
-/* 对话 */
-.chat { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
-        gap:var(--s-4); padding-bottom:var(--s-4); }
-.msg { display:flex; gap:var(--s-4); align-items:flex-start; }
-.msg-av { width:34px; height:34px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
-          background:var(--fog-a08); }
+/* ── 对话流：本页唯一主滚动区 ── */
+.chat { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  display:flex; flex-direction:column; gap:var(--s-4); padding-right:var(--s-2); }
+.chat::-webkit-scrollbar { width:6px; }
+.chat::-webkit-scrollbar-thumb { background:var(--surf-3); border-radius:3px; }
+.daymark { align-self:center; flex:0 0 auto; font-family:var(--ff-num);
+  font-size:var(--fz-1); color:var(--fog-600); padding:3px 14px;
+  border-radius:var(--r-full); background:var(--surf-1); }
+.msg { display:flex; gap:var(--s-3); align-items:flex-start; flex:0 0 auto; }
+@media (prefers-reduced-motion:no-preference){
+  .msg { animation:p25in var(--dur-2) var(--ease-out) both; }
+  .msg:nth-child(2){animation-delay:50ms} .msg:nth-child(3){animation-delay:100ms}
+  .msg:nth-child(4){animation-delay:150ms} .msg:nth-child(5){animation-delay:200ms}
+  .msg:nth-child(6){animation-delay:250ms} .msg:nth-child(7){animation-delay:300ms}
+}
+@keyframes p25in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+.msg-av { width:34px; height:34px; border-radius:50%; flex:0 0 auto;
+  display:grid; place-items:center; background:var(--fog-a08, var(--surf-2)); overflow:hidden; }
+.msg-av { border:1px solid var(--jade-a20); }
 .msg-av .ic { width:17px; height:17px; color:var(--fog-600); }
-.msg--ai .msg-av { background:var(--jade-a20); }
-.msg--ai .msg-av .ic { color:var(--jade-400); }
-.msg-b { min-width:0; padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
-         font-size:var(--fz-3); color:var(--fog-800); line-height:1.68; }
 .msg--me { flex-direction:row-reverse; }
+.msg-b { min-width:0; max-width:86%; padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  font-size:var(--fz-3); color:var(--fog-800); line-height:1.68; }
 .msg--me .msg-b { background:var(--jade-a12); border:1px solid var(--jade-a32); }
 .msg--ai .msg-b { background:var(--surf-1); border:1px solid var(--brd-1); }
 .msg-b b { color:var(--fog-900); }
-.msg-pin { margin-top:var(--s-3); display:inline-flex; align-items:center; gap:6px;
-  font-size:var(--fz-1); padding:4px 11px; border-radius:999px; cursor:pointer;
-  background:var(--fog-a08); color:var(--fog-700); border:1px solid var(--brd-1); }
-.msg-pin:hover { border-color:var(--jade-a32); color:var(--jade-200); }
-.msg-pin .ic { width:13px; height:13px; }
+.msg-evrow { display:flex; gap:6px; margin-bottom:8px; }
+/* 站内事实卡（E2）：嵌在气泡里，和 AI 的话（E3）视觉分开 */
+.fact { margin:10px 0; padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+  background:var(--azure-a12); border:1px solid var(--azure-a20);
+  display:flex; flex-direction:column; gap:5px; }
+.fact-v { font-size:var(--fz-4); color:var(--fog-900); }
+.fact-v b { font-family:var(--ff-num); font-size:var(--fz-7); color:var(--azure-200); }
+.fact-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num);
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.msg-acts { display:flex; gap:var(--s-3); margin-top:12px; flex-wrap:wrap; }
+.msg-go, .msg-pin { display:inline-flex; align-items:center; gap:8px;
+  min-height:var(--touch-min); padding:0 var(--s-4); border-radius:var(--r-full);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer; text-decoration:none;
+  transition:border-color var(--dur-2) var(--ease-out); }
+.msg-go { background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800); }
+.msg-go:hover { border-color:var(--jade-a32); }
+.msg-go .ic, .msg-pin .ic { width:16px; height:16px; }
+.msg-pin { background:var(--jade-a12); border:1px solid var(--jade-a20); color:var(--jade-200); }
+.msg-pin:hover { border-color:var(--jade-a32); }
+/* 已钉住：钉住与没钉住必须一眼分得出，否则用户会重复点、也不知道托盘里到底有什么。
+   不只靠颜色 —— 图标换成对勾、文字换成「已钉住」，色觉障碍下同样可读。 */
+.msg-pin[aria-pressed="true"] { background:var(--jade-a20); border-color:var(--jade-a32);
+  color:var(--jade-200); font-weight:600; }
+.msg-tail { margin-top:10px; padding-top:9px; border-top:1px dashed var(--brd-2);
+  font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; }
 
-/* 输入区 */
-.inputbar { flex:0 0 auto; display:flex; gap:var(--s-4); align-items:center;
-  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
-  background:var(--surf-1); border:1px solid var(--brd-1); min-height:64px; }
-.inputbar .ph { flex:1; font-size:var(--fz-3); color:var(--fog-600); }
-.inputbar .cursor { display:inline-block; width:2px; height:1.05em; background:var(--jade-500);
-  vertical-align:-2px; margin-left:1px; }
-@media (prefers-reduced-motion:no-preference){ .inputbar .cursor{ animation:p25cur 1.1s steps(2) infinite } }
-@keyframes p25cur { 50%{opacity:0} }
+/* ── 输入条：大麦克风（真实功能位）+ 文字 + 快捷问题 ── */
+.inbar { flex:0 0 auto; display:flex; flex-direction:column; gap:var(--s-3);
+  padding:var(--s-4); border-radius:var(--r-md);
+  background:var(--glass-2-bg); border:1px solid var(--glass-2-brd);
+  backdrop-filter:blur(var(--glass-blur)); }
+.inrow { display:flex; gap:var(--s-3); }
+.micbtn { flex:0 0 auto; min-width:168px; height:var(--touch-primary);
+  border-radius:var(--r-sm); border:0; cursor:pointer;
+  background:linear-gradient(160deg, var(--jade-500), var(--jade-600));
+  color:var(--on-primary); font-family:var(--ff-ui); font-size:var(--fz-4); font-weight:700;
+  display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  box-shadow:var(--sh-jade); }
+.micbtn .ic { width:23px; height:23px; }
+/* 按住时的反馈。口径抄 20 面试舱 .recbtn.is-rec：
+   **原型不接麦克风，但按钮必须有反馈，不能按了像坏的。** */
+.micbtn.is-rec { background:linear-gradient(160deg, var(--coral-400), var(--coral-600, #b3372c));
+  box-shadow:none; }
+/* 语音状态行：本页原来没有这一行，于是「按住说话」按下去连一句话都没有。
+   20 面试舱有 rec-tx，这里补齐同一个位置。 */
+.rec-tx { font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; min-height:1.2em; }
+.rec-tx b { color:var(--fog-800); }
+.intext { flex:1; min-width:0; height:var(--touch-primary); border-radius:var(--r-sm);
+  border:1px solid var(--brd-2); background:var(--field-bg); color:var(--fog-900);
+  font-family:var(--ff-ui); font-size:var(--fz-3); padding:0 var(--s-5); outline:0; }
+.intext::placeholder { color:var(--fog-600); }
+.intext:focus { border-color:var(--jade-a32); }
+.qprow { display:flex; gap:var(--s-3); flex-wrap:wrap; }
+.qp { display:inline-flex; align-items:center; gap:7px; min-height:var(--touch-min);
+  padding:0 var(--s-4); border-radius:var(--r-full); cursor:pointer;
+  border:1px solid var(--brd-2); background:var(--surf-1); color:var(--fog-800);
+  font-family:var(--ff-ui); font-size:var(--fz-2);
+  transition:border-color var(--dur-2) var(--ease-out); }
+.qp:hover { border-color:var(--jade-a32); }
+.qp .ic { width:15px; height:15px; color:var(--jade-500); }
+.in-note { font-size:var(--fz-1); color:var(--fog-600); line-height:1.55; }
 
-/* 九能力：每个说清什么时候用 */
-.caps { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
-.cap { display:flex; align-items:flex-start; gap:var(--s-4); padding:var(--s-4) var(--s-5);
-  border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
-  text-decoration:none; color:inherit; min-height:var(--touch-min);
+/* ai-down：输入条换成禁用蒙层（不许假装还能问） */
+.aidown-lock { flex:0 0 auto; padding:var(--s-5); border-radius:var(--r-md);
+  border:1.5px dashed var(--brd-2); background:var(--surf-1);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.aidown-lock-t { display:flex; align-items:center; gap:var(--s-3);
+  font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.aidown-lock-t .ic { width:22px; height:22px; color:var(--amber-400); }
+.aidown-lock-t em { font-style:normal; font-weight:400; font-size:var(--fz-2); color:var(--fog-600); }
+.aidown-links { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-3); }
+.aidown-links a { display:flex; align-items:center; justify-content:center; gap:7px;
+  min-height:var(--touch-min); border-radius:var(--r-xs); text-decoration:none;
+  border:1px solid var(--brd-2); background:var(--surf-2); color:var(--fog-800);
+  font-size:var(--fz-2); }
+.aidown-links a:hover { border-color:var(--jade-a32); }
+.aidown-links .ic { width:16px; height:16px; color:var(--jade-500); }
+
+/* ── 右列①：仪表组（3 行，不是 3 列）──
+   副列收窄到 336 后，三列并排每格只剩 ~90px，「今日已答」「设备状态」
+   全被折成两行读不动。改成一行一项：标签在左、数值在右、依据一行在下。 */
+.gauges { display:flex; flex-direction:column; gap:var(--s-2); }
+.gauge { min-height:56px; padding:var(--s-3) var(--s-4); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px solid var(--brd-1);
+  display:flex; flex-wrap:wrap; align-items:center; gap:4px var(--s-3); }
+.gauge-k { flex:0 0 auto; white-space:nowrap; font-size:var(--fz-2); color:var(--fog-600); }
+.gauge-v { margin-left:auto; flex:0 0 auto; display:flex; align-items:center; gap:8px;
+  white-space:nowrap; font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.gauge-v b { font-family:var(--ff-num); font-size:var(--fz-6); font-weight:600; }
+.gauge-v .u { font-size:var(--fz-2); color:var(--fog-700); font-weight:400; }
+.gauge-s { flex:0 0 100%; font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.screen[data-state="ai-down"] .gauge--ai { filter:grayscale(1); opacity:.55; }
+.screen[data-state="device-off"] .gauge--dev .gauge-v { color:var(--coral-200); }
+
+/* ── 右列②：作业面入口（真链大按钮 ≥56px） ── */
+.caps { display:flex; flex-direction:column; gap:var(--s-2); }
+.cap { display:flex; align-items:center; gap:var(--s-4); min-height:60px;
+  padding:var(--s-2) var(--s-4); border-radius:var(--r-xs);
+  background:var(--surf-1); border:1px solid var(--brd-1);
+  text-decoration:none; color:inherit;
   transition:border-color var(--dur-2) var(--ease-out); }
 .cap:hover { border-color:var(--jade-a32); }
-.cap .ic { width:20px; height:20px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; }
-.cap-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.cap > .ic:first-child { width:20px; height:20px; color:var(--jade-500); }
+.cap-b { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
 .cap-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
-.cap-w { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.cap-w { font-size:var(--fz-1); color:var(--fog-600); line-height:1.4; }
+.cap > .ic:last-child { width:15px; height:15px; color:var(--fog-600); }
+.cap-off { display:none; font-size:var(--fz-1); color:var(--amber-200); }
+/* 纯 AI 项在 ai-down 置灰断链；证件照 / 政策测算不依赖 AI，保持可用 */
+.screen[data-state="ai-down"] .cap--ai { opacity:.45; filter:grayscale(1); pointer-events:none; }
+.screen[data-state="ai-down"] .cap--ai .cap-off { display:inline; }
 
-/* 钉住的要点 = 这一页的交付物 */
-.pins { display:flex; flex-direction:column; gap:var(--s-3); }
-.pin { padding:var(--s-4) var(--s-5); border-radius:var(--r-xs);
-  background:var(--jade-a12); border:1px solid var(--jade-a32);
-  display:flex; flex-direction:column; gap:3px; }
-.pin-t { font-size:var(--fz-2); color:var(--fog-900); line-height:1.55; }
-.pin-t b { font-weight:600; }
-.pin-m { font-size:var(--fz-1); color:var(--fog-600); }
+/* ── 右列③：纸质带走托盘 ── */
+.traybadge { min-width:22px; height:22px; padding:0 6px; border-radius:var(--r-full);
+  background:var(--jade-500); color:var(--on-primary);
+  font-family:var(--ff-num); font-size:12px; font-weight:700;
+  display:inline-grid; place-items:center; }
+@media (prefers-reduced-motion:no-preference){
+  .traybadge { animation:p25pop .5s var(--ease-spring) .35s 1 both; }
+}
+@keyframes p25pop {
+  0% { transform:scale(.3); opacity:0; }
+  70% { transform:scale(1.18); opacity:1; }
+  100% { transform:scale(1); opacity:1; }
+}
+.tray-item { display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4); border-radius:var(--r-xs);
+  background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.tray-item > .ic { width:22px; height:22px; color:var(--jade-500); }
+.tray-item-b { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.tray-item-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.tray-item-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+.tray-x { font-family:var(--ff-num); font-size:var(--fz-3); color:var(--fog-800); }
+.tray-empty { padding:var(--s-5); border-radius:var(--r-xs); text-align:center;
+  border:1.5px dashed var(--brd-2); color:var(--fog-600);
+  font-size:var(--fz-2); line-height:1.6; }
+.tray-how { font-size:var(--fz-1); color:var(--fog-600); line-height:1.6; margin-top:var(--s-3); }
+.tray-how b { color:var(--fog-800); }
 
-.chip--info { cursor:inherit; }
-.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
-.wside .pane--grow { overflow:hidden; }
+/* ══ 托盘被取空的那一态（2026-08-11）════════════════════════════════════
+   「钉到托盘」接上之后就必然出现一个新处境：**用户把钉住的全取消了**。
+   这时托盘里没有任何东西，「去打印」「1 页黑白 · 预估 0.20 元」全都是空话 ——
+   点进打印台会发现没有可打的内容，比按钮无反应更糟。
+
+   开关落在 .screen 的 class（.tray-0）上，**不动 hidden** ——
+   hidden 是四态 / 阶段机制的地盘（本页抽屉开关那段注释已经立过这条规矩）。
+   两条规则都带 !important：要压过 .btn / .tray-item 自己的 display。 */
+.screen.tray-0 [data-tray-has] { display:none !important; }
+.screen:not(.tray-0) [data-tray-none] { display:none !important; }
+.tray-bottom { margin-top:auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.tray-bottom .btn { width:100%; }
+
+/* ══ 2026-08-11 · 常驻右栏 → 按需抽屉 ════════════════════════════════
+   起因（Codex 逐页评审 + 产品所有者口径「说明太多把页面真正要做的事挤小了」）：
+   右副列常驻，抢走约三分之一宽度，装的是本机仪表（统计口径）和作业面入口
+   （旁路动作）—— 跟"和小青对话"这件当下要做的事无关。
+   处置：对话区改全宽；仪表与作业面入口收进上下文抽屉，点按钮才展开。
+   **产物去向不许收起**：托盘的页数、黑白、费用与「去打印 / 先存我的文档」
+   留在对话下方常驻（CLAUDE.md §9 不伪造能力 + 本轮不许动清单）。
+   内容一条未删，只换了出现方式。 */
+.work { grid-template-columns: 1fr; }
+/* 高度跟着内容走、不撑满：抽屉撑满会在底部留一大片空，
+   自检的「版面留白」会照实报出来（它量的是内容底边，不是容器底边）。 */
+.wside {
+  position:absolute; z-index:60;
+  top:var(--s-4); right:var(--s-7); bottom:auto; width:396px;
+  max-height:calc(100% - var(--s-4) * 2);
+  padding:var(--s-4); border-radius:var(--r-lg);
+  background:var(--surf-1); border:1px solid var(--brd-2);
+  box-shadow:0 26px 70px rgba(0,0,0,.34);
+  overflow-y:auto; overflow-x:hidden;
+}
+.screen:not(.is-side) .wside { display:none; }
+.sidehd { display:flex; align-items:center; gap:var(--s-3); flex:0 0 auto; }
+.sidehd .t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sideclose {
+  margin-left:auto; min-height:48px; padding:0 var(--s-4); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:transparent; color:var(--fog-700);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+}
+.sidebtn {
+  flex:0 0 auto; min-height:56px; padding:0 var(--s-5); border-radius:var(--r-full);
+  border:1px solid var(--brd-2); background:var(--surf-1); color:var(--fog-800);
+  font-family:var(--ff-ui); font-size:var(--fz-2); cursor:pointer;
+  display:inline-flex; align-items:center; gap:8px;
+}
+.sidebtn[aria-expanded="true"] { background:var(--jade-a12); border-color:var(--jade-a32); }
+
+/* 产物去向常驻条：托盘明细进抽屉，但"打成几页、多少钱、去哪打"留在正文 */
+.traybar {
+  flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-3) var(--s-4); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+}
+.traybar > .ic { width:22px; height:22px; flex:0 0 auto; color:var(--jade-500); }
+.traybar-b { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.traybar-t { font-size:var(--fz-3); font-weight:600; color:var(--fog-900); }
+.traybar-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.traybar-s b { color:var(--fog-800); font-family:var(--ff-num); }
+.traybar .btn { flex:0 0 auto; }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+<div class="screen" data-state="default" data-theme="warm">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="backbtn" href="01-home-v6.html"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回 · 首页</span></a>
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">AI 助手</div>
+        <div class="brand-name">AI 顾问</div>
         <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #A-6614</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>小青在线 · 文字对话</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 只能用固定指引</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 要点存不成纸</div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>小青在线 · 打字或按住说话</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 非 AI 功能照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 可聊可存，暂不出纸</div>
     <div class="clock" data-clock>2026年8月9日 <b>16:48</b></div>
   </header>
 
-  <div class="rail">
-    <div class="rail-track">
-      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">问小青</span></button>
-      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">她能帮你做的</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走要点</span></button>
-    </div>
-    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
-  </div>
-
   <div class="work">
-    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <!-- ══════════════════ 左主列：对话驾驶位 ══════════════════ -->
     <div class="wmain">
 
-      <!-- ─────────── S1 问小青 ─────────── -->
-      <div class="aibar" data-at="s1 s2 s3">
-        <svg class="ic"><use href="#i-alert"/></svg>
-        <span><b>小青是 AI，不是真人在跟你说话。</b>
-              照片是虚拟形象，回答由程序生成，可能出错。<br>
-              <b>别把家里的事、身份证号、银行卡号告诉她</b> —— 她不需要，本机也不存。</span>
+      <!-- 头卡：身份与披露常驻，不藏进弹窗 -->
+      <div class="pane">
+        <div class="advhead">
+          <span class="ava">
+            <span class="ava-clip"><img src="assets/advisor-cut.png" alt="AI 求职顾问 小青（虚拟形象）"></span>
+            <span class="ava-dot dot dot--live" data-when="default first device-off"></span>
+            <span class="ava-dot dot dot--down" data-when="ai-down"></span>
+          </span>
+          <span class="advhead-b">
+            <span class="advhead-nm">
+              <b>小青</b><span>AI 求职顾问</span>
+              <span class="chip chip--amber chip--info" style="height:30px">
+                <svg class="ic"><use href="#i-alert"/></svg>AI 生成内容 · 仅供参考
+              </span>
+            </span>
+            <span class="advhead-role">
+              照片是虚拟形象，<b style="color:var(--fog-800)">不是真人在跟你说话</b> ·
+              回答可能出错 · 对话不保存，离场即清 · 本机不开摄像头
+            </span>
+          </span>
+        </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-brain"/></svg>
-          <b>小青 · AI 求职顾问</b>
-          <span class="mt" data-when="default first">对话不保存，离场即清</span>
-          <span class="mt" data-when="ai-down">AI 不可用 · 只能给固定指引</span>
+      <!-- 对话流：唯一主滚动区 -->
+      <div class="pane pane--grow">
+        <div class="chat" data-when="default first device-off">
+          <div class="daymark">今天 16:48</div>
+
+          <div class="msg msg--ai">
+            <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
+            <span class="msg-b">
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
+              我是小青。简历、岗位、政策、面试，直接问。
+            </span>
+          </div>
+
+          <div class="msg msg--ai" data-when="first">
+            <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
+            <span class="msg-b">
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
+              第一次用？先按下面的快捷问题试一句。<b>没带依据的就当参考。</b>
+            </span>
+          </div>
+
+          <div class="msg msg--me" data-when="default device-off">
+            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
+            <span class="msg-b">今天有新岗位吗？</span>
+          </div>
+
+          <div class="msg msg--ai" data-when="default device-off">
+            <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
+            <span class="msg-b">
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
+              有，刚同步进来一批：
+              <span class="fact">
+                <span class="fact-v">今日新增岗位 <b>12</b> 条</span>
+                <span class="fact-m"><span class="ev ev--e2">E2 · 站内数据</span>今日 16:00 同步 · 含机械/制造 5 条</span>
+              </span>
+              你之前看过机械设计类，可以先看这 5 条的岗位正文，再决定投不投。
+              <span class="msg-acts">
+                <a class="msg-go" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位情报台看这 12 条</a>
+                <!-- data-pin 是**这条回答落到纸上的那一句**，不是按钮文字。
+                     初始 aria-pressed="true"：右边托盘写着「2 条要点 · 16:53 钉住」，
+                     而本页正好只有这两条 AI 回答带钉按钮 —— 那 2 条就是它们。
+                     让按钮显示成未钉住，等于页面自己跟自己对不上。 -->
+                <button class="msg-pin" type="button" aria-pressed="true"
+                        data-pin="今日新增岗位 12 条（今日 16:00 同步，含机械/制造 5 条）；先看这 5 条的岗位正文再定">
+                  <svg class="ic"><use href="#i-check"/></svg>已钉住</button>
+              </span>
+              <span class="msg-tail">投递请去来源平台 —— 本机只做岗位信息入口，不代办投递。</span>
+            </span>
+          </div>
+
+          <div class="msg msg--me" data-when="default device-off">
+            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
+            <span class="msg-b">我刚离职，能领什么补贴？</span>
+          </div>
+
+          <div class="msg msg--ai" data-when="default device-off">
+            <span class="msg-av"><img src="assets/advisor-cut.png" alt=""></span>
+            <span class="msg-b">
+              <span class="msg-evrow"><span class="ev ev--e3">E3</span></span>
+              关键看<b>参保时长</b>和<b>离职原因</b>这两条。
+              我能按官方政策文件帮你逐条比对 —— 到政策测算台把情况填了，
+              符合哪条、卡在哪条，会一条条列出来，不笼统说「你可以领」。
+              <span class="msg-acts">
+                <a class="msg-go" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>去政策测算逐条核对</a>
+                <button class="msg-pin" type="button" aria-pressed="true"
+                        data-pin="能不能领补贴，关键看参保时长和离职原因两条；到政策测算台逐条比对，别听「你可以领」这种笼统说法">
+                  <svg class="ic"><use href="#i-check"/></svg>已钉住</button>
+              </span>
+              <span class="msg-tail">能不能领、领多少，以经办窗口审核为准。</span>
+            </span>
+          </div>
         </div>
 
-        <div class="sec chat" data-when="default first device-off">
-
-          <div class="msg msg--ai">
-            <span class="msg-av"><svg class="ic"><use href="#i-brain"/></svg></span>
-            <span class="msg-b">
-              我看到你今天传了简历、看过 4 个岗位、还练了几道面试题。<br>
-              有什么想问的直接说 —— 也可以问我「我接下来该干嘛」。
-            </span>
-          </div>
-
-          <div class="msg msg--me">
-            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
-            <span class="msg-b">我专科学历，投机械设计岗是不是没戏</span>
-          </div>
-
-          <div class="msg msg--ai">
-            <span class="msg-av"><svg class="ic"><use href="#i-brain"/></svg></span>
-            <span class="msg-b">
-              <b>我不知道你有没有戏 —— 那由用人单位决定，我预测不了。</b>
-              但我能告诉你本机读过的这批岗位里学历这一条是怎么写的：<br><br>
-              读过正文的 38 条机械设计岗里，<b>明确写「本科及以上」的有 11 条</b>，
-              写「大专及以上」或没写学历要求的有 27 条。<br>
-              也就是说，<b>学历这条卡掉的是不到三成，不是全部</b>。<br><br>
-              你今天看的恒信精密制造那条，正文里写的是「学历不限，有夹具设计经验优先」——
-              那家不卡你。
-              <span class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉住这条</span>
-            </span>
-          </div>
-
-          <div class="msg msg--me">
-            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
-            <span class="msg-b">那我简历上要不要写学历</span>
-          </div>
-
-          <div class="msg msg--ai">
-            <span class="msg-av"><svg class="ic"><use href="#i-brain"/></svg></span>
-            <span class="msg-b">
-              <b>要写，而且不要藏。</b>不写学历的简历在筛选时更容易被直接跳过，
-              因为对方会默认你在回避什么。<br><br>
-              比起藏学历，更管用的是<b>把六年做过的事写实</b> ——
-              你那条「卡料率从 12% 降到 3%，同口径对比」就是很硬的东西，
-              比学历更能说明你能干活。<br>
-              现在这句在你简历的第二页中间，<b>可以挪到第一屏</b>。
-              <span class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉住这条</span>
-            </span>
-          </div>
-
-        </div>
-
-        <div class="sec chat" data-when="ai-down">
+        <!-- ai-down：不许拿假回答顶上，如实说哪些还能办 -->
+        <div class="chat" data-when="ai-down">
+          <div class="daymark">今天 16:48 · AI 暂不可用</div>
           <div class="notice notice--amber">
             <svg class="ic"><use href="#i-alert"/></svg>
-            <span>AI 暂时不可用，<b>小青现在答不了话</b>。<br>
-                  下面是不依赖 AI 的固定指引，按你今天做过的事排的。</span>
+            <span>AI 暂时不可用，<b>小青现在答不了话</b> ——
+                  页面不会用编出来的回答顶上，恢复后这里自动回来。</span>
           </div>
-          <div class="tline" style="margin-top:var(--s-4)">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">你传了简历但还没改</span>
-                <span class="tl-s">去简历工作台 —— 那里的检查项不依赖 AI 也能跑</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">8月12日 有一场招聘会</span>
-                <span class="tl-s">去招聘会作战台，展位图和路线是本机算的，不用 AI</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">政策条件核对</span>
-                <span class="tl-s">条件比对是规则判断，AI 不可用时也能用</span></span></div>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-check"/></svg><b>AI 挂了也照常能用的</b>
-            <span class="mt">这些本来就不依赖 AI</span>
-          </div>
-          <div class="caps">
-            <a class="cap" href="06-print-workbench.html">
-              <svg class="ic"><use href="#i-printer"/></svg>
-              <span class="cap-b"><span class="cap-t">打印与扫描</span>
-                <span class="cap-w">全部功能正常</span></span>
-            </a>
-            <a class="cap" href="17-fair-desk.html">
-              <svg class="ic"><use href="#i-map"/></svg>
-              <span class="cap-b"><span class="cap-t">招聘会展位图与路线</span>
-                <span class="cap-w">路线是本机算的，不是 AI 猜的</span></span>
-            </a>
-            <a class="cap" href="21-policy.html">
-              <svg class="ic"><use href="#i-policy"/></svg>
-              <span class="cap-b"><span class="cap-t">政策条件核对</span>
-                <span class="cap-w">规则判断，逐条比对</span></span>
-            </a>
-            <a class="cap" href="12-material-factory.html">
-              <svg class="ic"><use href="#i-package"/></svg>
-              <span class="cap-b"><span class="cap-t">材料清单与打印</span>
-                <span class="cap-w">清单是固定的</span></span>
-            </a>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>受影响的只有<b>要读你简历、要理解岗位正文</b>的那几件：
-                  简历诊断、岗位匹配、面试点评、职业规划。<br>
-                  它们现在<b>会如实报错，不会给你一个编出来的结果</b>。</span>
-          </div>
-        </div>
-
-        <div class="inputbar" data-when="default first device-off">
-          <svg class="ic"><use href="#i-pen"/></svg>
-          <span class="ph">想问什么直接打字<span class="cursor"></span></span>
-          <span class="chip chip--info">语音见右栏说明</span>
-        </div>
-      </div>
-
-      <!-- ─────────── S2 她能帮你做的 ─────────── -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-toolbox"/></svg>
-          <b>九件她能帮上忙的事</b>
-          <span class="mt">每条都写了什么时候用它，不是九个同义入口</span>
-        </div>
-        <div class="sec">
+          <!-- 2026-08-10 重心整改：这里原来还有一条三格 tline（打印扫描 / 展位图 / 政策核对
+               照常），和下面 aidown-lock 里那三个真链说的是同一件事，重复一遍。
+               只留下面可点的那组，说明合一条。 -->
           <div class="notice">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>这九件<b>都能直接跟她说</b>，不用先找入口。
-                  下面列出来只是让你知道有这些 —— 不知道能问什么，是这类助手最常见的卡点。</span>
+            <span>受影响的是<b>要读你材料</b>的那几件（简历诊断、面试陪练等），
+                  它们现在<b>会如实报错，不给编出来的结果</b>。</span>
+          </div>
+        </div>
+
+        <!-- 输入条（default / first / device-off） -->
+        <div class="inbar" data-when="default first device-off" style="margin-top:var(--s-3)">
+          <div class="inrow">
+            <!-- aria-pressed 让「正在听」这一状态对读屏可读；
+                 原型不接麦克风的口径写在下面 .rec-tx 里，见文末脚本注释。 -->
+            <button class="micbtn" type="button" data-act="rec" aria-pressed="false">
+              <svg class="ic"><use href="#i-mic"/></svg>按住说话</button>
+            <input class="intext" type="text" placeholder="想问什么，点这里打字">
+          </div>
+          <!-- 语音状态行：按下去说什么、松开之后到哪一步，都写在这里。
+               本页原来没有这一行，于是「按住说话」按下去屏幕上一个字都不变。 -->
+          <div class="rec-tx" id="rec-tx" role="status" aria-live="polite"></div>
+          <div class="qprow">
+            <!-- data-q = 点了要填进输入框的那句话。**只填不发** ——
+                 发出去就得有一条 AI 回答，而本稿没有真实模型，
+                 编一条顶上就是伪造能力（CLAUDE.md §9）。 -->
+            <button class="qp" type="button" data-q="今天有新岗位吗"><svg class="ic"><use href="#i-briefcase"/></svg>今天有新岗位吗</button>
+            <button class="qp" type="button" data-q="我能领哪些补贴"><svg class="ic"><use href="#i-policy"/></svg>我能领哪些补贴</button>
+            <button class="qp" type="button" data-q="这台机器怎么用"><svg class="ic"><use href="#i-printer"/></svg>这台机器怎么用</button>
+          </div>
+          <div class="in-note">
+            大厅里语音旁人能听见，不方便就打字；录音不落盘，转成文字后即删。
+            别把身份证号、银行卡号告诉她 —— 她不需要，本机也不存。
+          </div>
+        </div>
+
+        <!-- ai-down：输入条禁用蒙层 -->
+        <div class="aidown-lock" data-when="ai-down" style="margin-top:var(--s-3)">
+          <div class="aidown-lock-t">
+            <svg class="ic"><use href="#i-offline"/></svg>
+            顾问暂时休息<em>· 下面这些不用 AI 也能办</em>
+          </div>
+          <div class="aidown-links">
+            <!-- 2026-08-11 链接落地整改（Codex (b)-12 / #359）：原指 06-print-workbench.html。
+                 这一条写的是域名「打印扫描」（跨域泛入口），落点应是域首屏 P39；
+                 旁边两条写的是具体任务（招聘会导览 / 政策核对），按判断表仍直达子页，不改。 -->
+            <a href="39-print-hub.html"><svg class="ic"><use href="#i-printer"/></svg>打印扫描</a>
+            <a href="17-fair-desk.html"><svg class="ic"><use href="#i-map"/></svg>招聘会导览</a>
+            <a href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>政策核对</a>
           </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="sec">
-          <div class="caps">
-            <a class="cap" href="09-resume-workbench.html">
-              <svg class="ic"><use href="#i-resume"/></svg>
-              <span class="cap-b"><span class="cap-t">看看我简历哪里不行</span>
-                <span class="cap-w">刚写完、或投了很久没回音的时候</span></span>
-            </a>
-            <a class="cap" href="26-advisor-work.html?stage=sB">
-              <svg class="ic"><use href="#i-pen"/></svg>
-              <span class="cap-b"><span class="cap-t">我不会写，你问我我来答</span>
-                <span class="cap-w">对着空白页写不出来的时候 · 她逐题问你，在作业面拼出来</span></span>
-            </a>
-            <a class="cap" href="26-advisor-work.html?stage=sC">
-              <svg class="ic"><use href="#i-target"/></svg>
-              <span class="cap-b"><span class="cap-t">这个岗我够不够格</span>
-                <span class="cap-w">看到一条岗位拿不准要不要投的时候 · 在作业面摆一起逐条比</span></span>
-            </a>
-            <a class="cap" href="20-interview-pod.html">
-              <svg class="ic"><use href="#i-interview"/></svg>
-              <span class="cap-b"><span class="cap-t">陪我练面试</span>
-                <span class="cap-w">约到面试了、或宣讲会后有初面的时候</span></span>
-            </a>
-            <a class="cap" href="21-policy.html">
-              <svg class="ic"><use href="#i-policy"/></svg>
-              <span class="cap-b"><span class="cap-t">我能领哪些补贴</span>
-                <span class="cap-w">刚离职、或听说有补贴但看不懂条件的时候</span></span>
-            </a>
-            <a class="cap" href="22-career-plan.html">
-              <svg class="ic"><use href="#i-route"/></svg>
-              <span class="cap-b"><span class="cap-t">我还能往哪走</span>
-                <span class="cap-w">本行做腻了、或想换方向拿不定主意的时候</span></span>
-            </a>
-            <a class="cap" href="17-fair-desk.html">
-              <svg class="ic"><use href="#i-fair"/></svg>
-              <span class="cap-b"><span class="cap-t">招聘会先去哪几家</span>
-                <span class="cap-w">要去招聘会、但几十家不知道从哪下手的时候</span></span>
-            </a>
-            <a class="cap" href="12-material-factory.html">
-              <svg class="ic"><use href="#i-package"/></svg>
-              <span class="cap-b"><span class="cap-t">帮我把材料备齐</span>
-                <span class="cap-w">要交一堆证明、怕漏东西的时候</span></span>
-            </a>
-            <a class="cap" href="26-advisor-work.html?stage=sA">
-              <svg class="ic"><use href="#i-printer"/></svg>
-              <span class="cap-b"><span class="cap-t">这台机器怎么用</span>
-                <span class="cap-w">不知道怎么打印、怎么扫描的时候 · 她一步步答，答完带你去对应台面</span></span>
-            </a>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-orbit"/></svg><b>聊起来之后，活儿在作业面干</b>
-          </div>
-          <div class="caps">
-            <a class="cap" href="26-advisor-work.html">
-              <svg class="ic"><use href="#i-orbit"/></svg>
-              <span class="cap-b"><span class="cap-t">进入作业面</span>
-                <span class="cap-w">她问你答、摆一起比、钉住要点，都在同一个台面上 —— 按哪种方式干，由你的问题决定</span></span>
-            </a>
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>她<b>不能</b>做的：代你投简历、替你报名、预测你能不能被录用、
-                  告诉你该报多少薪资、判断某家公司好不好。<br>
-                  这些要么本机没有依据，要么本就不该由机器替你决定。</span>
-          </div>
-
-          <div class="pane-hd" style="margin-top:var(--s-5)">
-            <svg class="ic"><use href="#i-pen"/></svg><b>不知道怎么开口，可以直接照着说</b>
-          </div>
-          <div class="pins">
-            <div class="pin"><span class="pin-t">「我离职三个月了，简历投出去没回音，你看看问题在哪」</span>
-              <span class="pin-m">→ 她会读你的简历，逐条指出没写实的地方</span></div>
-            <div class="pin"><span class="pin-t">「这个岗要求 UG，我只会 SolidWorks，还能投吗」</span>
-              <span class="pin-m">→ 她会告诉你本机读过的岗位里这条卡掉多少</span></div>
-            <div class="pin"><span class="pin-t">「我明天去招聘会，该带什么」</span>
-              <span class="pin-m">→ 她会按你选的场次和企业数算份数</span></div>
-            <div class="pin"><span class="pin-t">「我刚失业，有什么补贴能领」</span>
-              <span class="pin-m">→ 她会逐条核对条件，并说清卡在哪一条</span></div>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            <b>不知道能问什么，是这类助手最大的卡点</b> —— 所以这里给的是可以照抄的原话，
-            不是"你可以咨询简历相关问题"那种空话。
-          </div>
-        </div>
-      </div>
-
-      <!-- ─────────── S3 带走要点 ─────────── -->
-      <div class="pane" data-at="s3">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-bookmark"/></svg>
-          <b>你钉住的 2 条</b>
-          <span class="mt">对话会清空，钉住的能打成纸带走</span>
-        </div>
-        <div class="sec">
-          <div class="notice">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>整段对话<b>不保存、离场即清</b> —— 这是有意的：
-                  聊天里常带着你的具体处境，不该留在公共机器上。<br>
-                  所以有用的结论要<b>当场钉住</b>，走的时候打成一张纸。</span>
-          </div>
-
-          <div class="pins" style="margin-top:var(--s-5)">
-            <div class="pin">
-              <span class="pin-t">
-                读过正文的 38 条机械设计岗里，明确写「本科及以上」的<b>只有 11 条</b>；
-                恒信精密制造那条写的是「学历不限，有夹具设计经验优先」。
-              </span>
-              <span class="pin-m">16:50 钉住 · 依据：本机读过正文的岗位</span>
-            </div>
-            <div class="pin">
-              <span class="pin-t">
-                <b>简历要写学历，不要藏</b>；比藏学历更管用的是把
-                「卡料率 12%→3%、同口径对比」<b>挪到第一屏</b>。
-              </span>
-              <span class="pin-m">16:53 钉住 · 依据：你上传的简历</span>
-            </div>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-5)">
-            每条都带着<b>依据来源</b>一起打印 —— 免得过两天看到这行字，
-            想不起来是根据什么说的。
-          </div>
-        </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd">
-          <svg class="ic"><use href="#i-printer"/></svg>
-          <b>打成一张纸</b>
-        </div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">内容</span><span class="v">钉住的 2 条 + 依据</span></div>
-            <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元 · 以打印工作台核价为准</span></div>
-            <div class="kv-row"><span class="k">纸上含</span><span class="v v--fog">不含你的姓名与电话</span></div>
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>打印机离线，<b>钉住的要点现在存不成纸</b>。
-                  可以扫码带走，否则离场就没了。</span>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)" data-when="default first ai-down">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>打完这张纸后，<b>整段对话立即清空</b>，不等你离场。
-                  纸上只有你自己钉的这几条，没有完整聊天记录。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            钉住的要点<b>不进「我的文档」</b> —— 和面试复盘单一样，
-            对话内容不入档，只出纸。
-          </div>
-        </div>
+      <!-- ── 产物去向常驻条（2026-08-11 从右副列移过来）──────────────────
+           托盘明细、隐私账本与本机仪表都收进抽屉了，但「这次会打成什么纸、
+           几页、黑白还是彩色、多少钱、按哪个键」必须留在用户看得见的地方。 -->
+      <div class="traybar">
+        <svg class="ic"><use href="#i-file"/></svg>
+        <span class="traybar-b" data-when="default ai-down" data-tray-has>
+          <span class="traybar-t">纸质带走 · 今天的建议清单</span>
+          <!-- 金额不写死：1 计费页 × 现行黑白单价，data-site-price 由 scripts/site-config.js
+               填（后台 GET /print/price-config 的本机快照），后台改价这里跟着变。
+               注意 data-site-price 会把「N.NN 元」整串写进去，所以后面不能再留一个「元」。 -->
+          <span class="traybar-s"><b data-tray-n>2</b> 条要点 · 来自本次对话 · 1 计费页黑白 · 预估 <b data-site-price="1"></b> · 以打印工作台核价为准 · 纸上只有钉住的要点，不含姓名电话</span>
+        </span>
+        <span class="traybar-b" data-when="device-off" data-tray-has>
+          <span class="traybar-t">纸质带走 · 出纸暂停</span>
+          <span class="traybar-s">钉住的内容先存起来，换机或改天再打 · 存的和打的是同一份，只有要点，不含姓名电话</span>
+        </span>
+        <!-- 用户把钉住的全取消之后的处境。和 first 的「还没钉过」不是一回事：
+             那句是「去钉」，这句是「你刚取空了，要打就再钉回来」。 -->
+        <span class="traybar-b" data-when="default ai-down device-off" data-tray-none>
+          <span class="traybar-t">纸质带走 · 托盘已被取空</span>
+          <span class="traybar-s">钉住的要点都取消了，<b>现在没有可打的内容</b> · 想打就回上面的回答里重新点「钉到托盘」</span>
+        </span>
+        <span class="traybar-b" data-when="first">
+          <span class="traybar-t">纸质带走 · 托盘还是空的</span>
+          <span class="traybar-s">聊出有用的回答后，点气泡下的「钉到托盘」，走之前一次打成纸</span>
+        </span>
+        <a class="btn btn--primary btn--lg" data-when="default ai-down" data-tray-has href="06-print-workbench.html?stage=s3&amp;from=P25&amp;kind=material&amp;title=顾问钉住的要点&amp;pages=1&amp;copies=1">
+          去打印<svg class="ic"><use href="#i-printer"/></svg>
+        </a>
+        <button class="btn btn--primary btn--lg" data-when="device-off" data-tray-has>
+          <svg class="ic"><use href="#i-folder"/></svg>先存我的文档
+        </button>
+        <!-- 托盘空时不给「去打印」：点过去会发现没有可打的内容，
+             比按钮无反应更糟。这里换成一句说明，不是一颗按不动的按钮。 -->
+        <span class="traybar-s" data-when="default ai-down device-off" data-tray-none
+              style="flex:0 0 auto;max-width:220px">托盘空着，<b>暂时没有可打的</b></span>
+        <a class="btn btn--ghost btn--lg" data-when="first" href="06-print-workbench.html">
+          先去打印别的文件<svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <button class="sidebtn" type="button" data-side-open aria-expanded="false" aria-controls="p25side">
+          <svg class="ic"><use href="#i-layers"/></svg>托盘明细 · 本机仪表
+        </button>
       </div>
 
     </div>
 
-    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
-    <div class="wside">
+    <!-- ══════════════════ 右副列 → 按需抽屉（2026-08-11）══════════════════
+         仪表（统计口径）、作业面入口（旁路动作）与托盘明细都在这里，
+         点正文里的「托盘明细 · 本机仪表」才展开。内容一条未删。 -->
+    <div class="wside" id="p25side">
 
-      <!-- S1 右 -->
-      <div class="pane" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-brain"/></svg><b>小青</b></div>
-        <div class="sec">
-          <div class="adv">
-            <span class="adv-photo"><svg class="ic"><use href="#i-user"/></svg></span>
-            <span class="adv-b">
-              <span class="adv-nm">小青</span>
-              <span class="adv-role">AI 求职顾问<br>虚拟形象 · 非真人</span>
-            </span>
+      <div class="sidehd">
+        <span class="t">托盘明细 · 本机仪表</span>
+        <button class="sideclose" type="button" data-side-close>收起</button>
+      </div>
+
+
+      <!-- ① 仪表组 -->
+      <div class="pane">
+        <div class="pane-hd"><span class="t">本机仪表</span><span class="s">实时状态</span></div>
+        <div class="gauges">
+          <div class="gauge">
+            <span class="gauge-k">今日已答</span>
+            <span class="gauge-v"><b>86</b><span class="u">次</span></span>
+            <span class="gauge-s"><span class="ev ev--e2">E2</span> 站内计数 · 全天累计</span>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            照片是虚拟形象。她<b>看不到你</b> —— 本机不开摄像头。
+          <div class="gauge gauge--dev">
+            <span class="gauge-k">设备状态</span>
+            <span class="gauge-v" data-when="default first ai-down"><span class="dot dot--live"></span>正常</span>
+            <span class="gauge-v" data-when="device-off"><span class="dot dot--down"></span>离线</span>
+            <span class="gauge-s" data-when="default first ai-down">打印机可出纸</span>
+            <span class="gauge-s" data-when="device-off">出纸暂停 · 可先存文档</span>
+          </div>
+          <div class="gauge gauge--ai">
+            <span class="gauge-k">AI 引擎</span>
+            <span class="gauge-v" data-when="default first device-off"><span class="dot dot--live"></span>在线</span>
+            <span class="gauge-v" data-when="ai-down"><span class="dot dot--down"></span>休息中</span>
+            <span class="gauge-s" data-when="ai-down">恢复后自动上线</span>
           </div>
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-mic"/></svg><b>关于语音</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            这台机器在大厅里。用语音问「我专科学历是不是没戏」，
-            <b>周围的人能听见</b>。<br><br>
-            所以本页默认<b>打字</b>，语音要你自己主动开。
-          </div>
-
-          <div class="ck" style="margin-top:var(--s-4)">
-            <span class="ck-b">
-              <span class="ck-t">开启语音对话</span>
-              <span class="ck-s">开了之后你说话周围能听见 · 录音不落盘，转成文字后即删</span>
-            </span>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>无论打字还是语音，<b>本机不开摄像头、不录像、不做表情分析</b>。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            如果你要问的事不方便被旁边听到，<b>打字更稳妥</b> ——
-            这不是功能限制，是场地决定的。
-          </div>
+      <!-- ② 让她直接开工：本页只留这一个入口
+           2026-08-10 重心整改：这里原来是「能帮你做的」9 个入口（简历诊断 / 访谈生成 /
+           证件照 / 岗位大师 / 政策测算 / 签约风险 / 面试陪练 / 自我评估 / 作业面）。
+           它们跟"和小青对话"这件主功能无关，是横向导航 —— 按返回键回首页各板块一样到得了，
+           那 8 个在别处都还有 4 个以上入口，已删。
+           只留 26-advisor-work：它是「她动手替你办」的作业面，是本次对话的直接产物去向，
+           而且**全站 38 页里只有这一处指向它**（唯一路径，不能删）。 -->
+      <div class="pane">
+        <div class="pane-hd">
+          <span class="t">让她直接开工</span>
+          <span class="s" data-when="default first device-off">聊出方向后，去作业面动手</span>
+          <span class="s" data-when="ai-down">等 AI 恢复</span>
+        </div>
+        <div class="caps">
+          <a class="cap cap--ai" href="26-advisor-work.html">
+            <svg class="ic"><use href="#i-route"/></svg>
+            <span class="cap-b"><span class="cap-t">顾问作业面</span>
+              <span class="cap-w">摆开比 / 一问一答替你写 / 直接答<span class="cap-off"> · AI 恢复后可用</span></span></span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </a>
         </div>
       </div>
 
-      <!-- S2 右 -->
-      <div class="pane" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>怎么问她效果最好</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            <b>说具体的处境，别问大问题。</b><br><br>
-            ✗「怎么找工作」—— 她只能给一堆正确的废话<br>
-            ✓「我专科、六年机械、想投设计岗，学历会不会卡我」——
-            她能拿本机读过的岗位正文回答你
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            她手上有的是：<b>你上传的简历</b>、<b>本机读过正文的岗位</b>、
-            <b>官方政策文件</b>。问题落在这三样上，她答得实。
-          </div>
+      <!-- ③ 纸质带走托盘 -->
+      <div class="pane pane--grow">
+        <div class="pane-hd">
+          <span class="t">纸质带走</span>
+          <span class="traybadge" data-when="default ai-down device-off" data-tray-has>1</span>
+          <span class="s">对话会清空，纸留得住</span>
         </div>
-      </div>
 
-      <div class="pane pane--grow" data-at="s2">
-        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>她会答错</b></div>
-        <div class="sec">
-          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            AI 生成的回答<b>可能出错</b>，也可能把话说得比实际有把握。<br><br>
-            她答的每一条<b>尽量带出处</b>（读过的哪批岗位、你简历里的哪句、
-            哪份政策文件）—— <b>没有出处的结论，你就当参考</b>。
-          </div>
-
-          <div class="notice notice--amber" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span>涉及<b>钱和资格</b>的事（能不能领补贴、够不够格），
-                  一律以经办机构认定为准，别照着她的话直接去办。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            发现她答错了，可以直接告诉她 —— 但这一次的纠正<b>不会被记住</b>，
-            因为对话不保存。
-          </div>
+        <div class="tray-item" data-when="default ai-down device-off" data-tray-has>
+          <svg class="ic"><use href="#i-file"/></svg>
+          <span class="tray-item-b">
+            <span class="tray-item-t">今天的建议清单</span>
+            <span class="tray-item-m"><b data-tray-n>2</b> 条要点 · 来自本次对话 · <span data-tray-at>16:53</span> 钉住</span>
+          </span>
+          <span class="tray-x">×1</span>
         </div>
-      </div>
-
-      <!-- S3 右 -->
-      <div class="pane" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这次聊了什么</b></div>
-        <div class="sec">
-          <div class="kv">
-            <div class="kv-row"><span class="k">对话轮数</span><span class="v">4 轮</span></div>
-            <div class="kv-row"><span class="k">钉住</span><span class="v"><b>2</b> 条</span></div>
-            <div class="kv-row"><span class="k">对话保存</span><span class="v v--fog">不保存</span></div>
-            <div class="kv-row"><span class="k">进 AI 服务记录</span><span class="v">只记「用过一次」</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            AI 服务记录里只有<b>时间和用了哪个能力</b>，
-            没有你问了什么、她答了什么。
-          </div>
+        <!-- 取空之后：这份清单已经没有内容了，不能再摆一条「今天的建议清单 ×1」，
+             那是在说一份不存在的产物。 -->
+        <div class="tray-empty" data-when="default ai-down device-off" data-tray-none>
+          托盘已被取空 ——<br>钉住的要点都取消了，现在<b>没有可打的内容</b>。
         </div>
-      </div>
-
-      <div class="pane pane--grow" data-at="s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>照这两条，接下来做</b></div>
-        <div class="sec">
-          <div class="tline">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
-              <span class="tl-b"><span class="tl-t">把卡料率那句挪到第一屏</span>
-                <span class="tl-s">去简历工作台改，改完可以直接打</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
-              <span class="tl-b"><span class="tl-t">27 条不卡学历的岗位</span>
-                <span class="tl-s">去岗位匹配页按这个条件筛一遍</span></span></div>
-            <div class="tl"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">8月12日 那场带够简历</span>
-                <span class="tl-s">作战台会按选的企业数算份数</span></span></div>
-          </div>
-
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-info"/></svg>
-            <span>这三条<b>不会自动帮你做</b> —— 本机不代你操作，
-                  每一步都要你自己点进去确认。</span>
-          </div>
+        <div class="tray-empty" data-when="first">
+          托盘还是空的 ——<br>聊出有用的回答后，点气泡下的「钉到托盘」。
         </div>
-      </div>
 
-      <!-- 首次使用 -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            小青是 <b>AI，不是真人</b>。有什么想问的直接打字。<br>
-            对话<b>不保存、离场即清</b> —— 有用的结论记得当场钉住，走的时候能打成纸。
-          </div>
+        <!-- device-off 不显示：打印机离线时「走之前一次打成纸」是句办不到的话，
+             该态的做法写在下面那条橙色提示里（先存我的文档）。 -->
+        <div class="tray-how" data-when="default first ai-down">
+          有用的回答点<b>「钉到托盘」</b>，聚到这里，走之前一次打成纸。
         </div>
+
+        <!-- 隐私账本：这次聊了什么、留下什么，当面说清 -->
+        <div class="kv" data-when="default ai-down device-off" style="margin-top:var(--s-3)">
+          <div class="kv-row"><span class="k">本次对话</span><span class="v">4 轮</span></div>
+          <div class="kv-row"><span class="k">对话保存</span><span class="v v--fog">不保存</span></div>
+          <div class="kv-row"><span class="k">进 AI 服务记录</span><span class="v">只记「用过一次」，不记内容</span></div>
+        </div>
+
+        <div class="notice notice--amber" data-when="device-off" style="margin-top:var(--s-3)">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>出纸暂停 · 先存我的文档</b> —— 钉住的内容先存起来，换机或改天再打。
+                存的和打的是同一份：<b>只有要点，不含姓名电话</b>。</span>
+        </div>
+
+        <!-- 2026-08-11：原来的 .tray-bottom（页数 / 费用 / 纸上含 + 去打印 / 先存我的文档）
+             已移到对话下方的产物去向常驻条，不在抽屉里重复摆一遍入口。 -->
       </div>
 
     </div>
-  </div>
-
-  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
-  <div class="actionbar">
-    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>能问她什么</button>
-    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回去继续问</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">回去继续问</button>
-
-    <span class="actionbar-hint" data-at="s1" data-when="default first device-off">对话不保存 · 有用的记得钉住</span>
-    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 上面是不依赖 AI 的固定指引</span>
-    <span class="actionbar-hint" data-at="s2">九件都能直接跟她说，不用先找入口</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准 · 打完对话立即清空</span>
-    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线 · 要点存不成纸</span>
-
-    <button class="btn btn--primary" data-at="s1" data-go="s3">带走钉住的 2 条<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s1">去问她<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html" aria-current="page"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -624,10 +663,155 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* 上下文抽屉：常驻右栏改成点开才展开。开关只切 .screen 上的一个 class，
+   不动 hidden —— hidden 是四态 / 阶段机制的地盘。 */
+;(function () {
+  var sc = document.querySelector('.screen'); if (!sc) return
+  function set (on) {
+    sc.classList.toggle('is-side', on)
+    var b = document.querySelector('[data-side-open]')
+    if (b) b.setAttribute('aria-expanded', on ? 'true' : 'false')
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+    if (e.target.closest('[data-side-open]')) { set(!sc.classList.contains('is-side')); return }
+    if (e.target.closest('[data-side-close]')) set(false)
+  })
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P25 三组控件接线（2026-08-11）
+   --------------------------------------------------------------------------
+   实测（干净页面，pointer/mouse/touch/click 七种事件各打一遍，
+   比对整个 body.outerHTML + location + data-state/stage）：
+     .msg-pin「钉到托盘」×2   → 零变化
+     .micbtn「按住说话」      → 零变化（**pointerdown/mousedown/touchstart 也零变化**，
+                                 所以不是「探测器只发 click 够不到」，是真没接）
+     .qp 快捷问句 ×3          → 零变化
+   本页此前没有任何一行脚本处理它们；唯一的 inline script 只管右侧抽屉开合。
+
+   三组各自的处置口径不同，分开写在下面每一段的注释里。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict'
+  var sc = document.querySelector('.screen')
+  if (!sc) return
+
+  /* ── ① 钉到托盘：真的钉，不是弹提示 ────────────────────────────────
+     托盘是本页真实存在的落点（右侧抽屉里的「纸质带走」+ 正文的产物去向常驻条），
+     所以这一条**有真实去处**，可以做成真动作。
+
+     初始态为什么是「已钉住」：托盘写着「2 条要点 · 16:53 钉住」，而全页正好
+     只有这两条 AI 回答带钉按钮 —— 那 2 条就是它们。按钮显示成未钉住，
+     等于页面自己跟自己对不上，用户再点一次就会变成 3 条。
+
+     取消到 0 条时切 .tray-0：托盘里没东西，「去打印」「预估 0.20 元」就都是
+     空话，那一屏必须换成「已被取空」，而不是留一个点过去没内容可打的按钮。 */
+  var pins = [].slice.call(document.querySelectorAll('.msg-pin[data-pin]'))
+
+  function pinned () {
+    /* 数的是 DOM 里所有钉住的，**不管当前四态看不看得见**。
+       ai-down 那一态聊天区换成了故障提示，两条回答连同钉按钮一起被 data-when
+       隐藏；如果只数可见的，托盘会从 2 条突然掉到 0 条 ——
+       可那两条要点是 AI 挂掉之前就钉住的，并没有消失。 */
+    return pins.filter(function (b) { return b.getAttribute('aria-pressed') === 'true' })
+  }
+
+  function two (n) { return (n < 10 ? '0' : '') + n }
+
+  function render (stamp) {
+    var n = pinned().length
+    sc.classList.toggle('tray-0', n === 0)
+    ;[].forEach.call(document.querySelectorAll('[data-tray-n]'), function (el) {
+      el.textContent = String(n)
+    })
+    if (stamp) {
+      var d = new Date()
+      ;[].forEach.call(document.querySelectorAll('[data-tray-at]'), function (el) {
+        el.textContent = d.getHours() + ':' + two(d.getMinutes())
+      })
+    }
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+
+  pins.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var on = b.getAttribute('aria-pressed') === 'true'
+      b.setAttribute('aria-pressed', on ? 'false' : 'true')
+      /* 图标 + 文字一起换：只换颜色的话，色觉障碍用户分不出钉没钉 */
+      b.innerHTML = '<svg class="ic"><use href="#i-' + (on ? 'bookmark' : 'check') + '"/></svg>' +
+                    (on ? '钉到托盘' : '已钉住')
+      /* 钉住时才更新「几点钉的」—— 取消不该把时间戳往前推 */
+      render(!on)
+    })
+  })
+  render(false)
+
+  /* ── ② 按住说话：原型不接麦克风，但不能按了像坏的 ────────────────────
+     口径与 20 面试舱 .recbtn 完全一致（那边源码里写着「原型不接麦克风，
+     但按钮必须有反馈，不能按了像坏的」）：按下去有按下去的样子和一句话，
+     松开如实说明这一稿到不了转写那一步 —— **不伪造任何转写文字**。
+     本页原来连 20 那样的状态行都没有，所以补了一个 .rec-tx。
+
+     监听 pointerdown/up 而不是 click：这是一颗「按住」按钮，
+     语义就是按下与松开两个时刻，click 表达不了。 */
+  var mic = sc.querySelector('[data-act="rec"]')
+  var recT = document.getElementById('rec-tx')
+  function say (t) { if (recT) recT.innerHTML = t }
+  if (mic) {
+    var down = function () {
+      mic.classList.add('is-rec')
+      mic.setAttribute('aria-pressed', 'true')
+      say('正在听…（松开结束）')
+    }
+    var up = function () {
+      if (!mic.classList.contains('is-rec')) return
+      mic.classList.remove('is-rec')
+      mic.setAttribute('aria-pressed', 'false')
+      say('<b>原型不接麦克风，这一稿没有转写。</b>' +
+          '真机在这里出转写文字，你确认后再发出去 —— 录音不落盘，转成文字后即删。' +
+          '现在想问，请用右边的输入框打字。')
+    }
+    mic.addEventListener('pointerdown', down)
+    mic.addEventListener('mousedown', down)      // 无 PointerEvent 的旧内核兜底
+    mic.addEventListener('touchstart', down, { passive: true })
+    /* 松开可能发生在按钮外面（手指滑出去再抬起），所以监听挂在 window 上，
+       否则按钮会一直卡在「正在听」。 */
+    window.addEventListener('pointerup', up)
+    window.addEventListener('mouseup', up)
+    window.addEventListener('touchend', up)
+    window.addEventListener('pointercancel', up)
+  }
+
+  /* ── ③ 快捷问句：填进输入框，不替用户发 ──────────────────────────────
+     为什么只填不发：发出去就得有一条 AI 回答接上，而本稿没有真实模型。
+     编一条顶上就是伪造能力（CLAUDE.md §9），也违反本页自己的口径
+     ——「AI 暂不可用时不会用编出来的回答顶上」。
+     填进输入框是用户看得见的真实结果：文字进了框、光标在框里、可以改可以发。 */
+  var box = sc.querySelector('.intext')
+  ;[].forEach.call(document.querySelectorAll('.qp[data-q]'), function (b) {
+    b.addEventListener('click', function () {
+      if (!box) return
+      box.value = b.getAttribute('data-q')
+      box.focus()
+      try { box.setSelectionRange(box.value.length, box.value.length) } catch (e) {}
+      /* input 事件要补发：软键盘（keypad.js）和任何监听输入的逻辑都靠它。 */
+      try { box.dispatchEvent(new Event('input', { bubbles: true })) } catch (e) {}
+      say('已填进输入框：<b>' + b.getAttribute('data-q') + '</b> —— 可以改，改完按回车发出去。')
+    })
+  })
+})()
+</script>
+<!-- 单价的唯一来源：后台 GET /print/price-config 的本机快照，页面不许手抄 -->
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

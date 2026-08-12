@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>线上平台目录（新增）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--err">
+    <span class="proto__tag">本轮唯一确实需要 Admin 新增的页面</span>
+    <b>问题：<code>OnlinePlatformDirectory</code> 全局只有 2 处引用</b>——Prisma client 与一处只读 service。
+    <b>两个后台都没有写入口</b>，数据只能靠 seed 或直接改库。
+    而终端「岗位信息 → 线上招聘平台」正在向求职者展示这份目录。
+    <br><br>
+    这是产品所有者 2026-08-11 指出「前端加了线上招聘平台和线下招聘公司」后核查发现的。
+    与「线下招聘公司」不同——那一条<b>该开放给机构自助维护</b>（数据是机构自己的门店档案），
+    <b>本页这一条不能</b>：线上平台目录是<b>平台向求职者推荐第三方平台</b>，推荐权属于平台的编辑责任。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>线上平台目录</h1>
+      <p class="isnew" data-newtag="新增页面 · 常驻文案" style="display:block;padding-top:6px">
+        本页决定<b>终端向求职者推荐哪些第三方招聘平台</b>，以及它们的展示顺序。
+        机构只能在<a href="#">合作机构后台 · 机构资料 · 线上平台收录</a>提交<b>申请</b>；
+        <b>是否收录、排在第几位，只在本页决定</b>。
+      </p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">导出目录</button>
+      <button class="btn btn--sm btn--primary">+ 手工收录</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- ── 为什么必须由平台掌握 ── -->
+  <div class="card isnew" data-newtag="设计依据">
+    <div class="card__head"><h3>为什么不开放给机构自助发布</h3></div>
+    <div class="card__body">
+      <p class="small">
+        <code>OnlinePlatformDirectory</code> 的字段本身就带治理意图：
+      </p>
+      <dl class="kv" style="margin-top:10px;grid-template-columns:172px 1fr">
+        <dt class="mono">operatorLegalName</dt><dd>运营方法定名称——不是品牌名，要能对上营业执照</dd>
+        <dt class="mono">officialDomainsJson</dt><dd>官方域名白名单——决定终端扫码跳到哪里</dd>
+        <dt class="mono">evidenceFileId</dt><dd>资质证据文件——私有存储，不对外</dd>
+        <dt class="mono">neutralDescription</dt><dd><b>中立描述</b>——这个命名说明设计上就要求平台不做倾向性推荐</dd>
+        <dt class="mono">displayOrder</dt><dd>展示顺序——推荐位次</dd>
+      </dl>
+      <div class="degrade" style="margin-top:12px">
+        <b>若开放机构自助发布</b>：任何机构都能把自己的平台塞进推荐位，
+        目录立刻变成竞价位，<code>neutralDescription</code> 形同虚设。
+        <b>且曝光位不得按曝光 / 按跳转计费</b>（<code>compliance-boundary.md</code> §8.8.1 第二类，须先过许可边界审查）。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 待审申请 ── -->
+  <div class="card isnew" data-newtag="新增能力" style="margin-top:16px">
+    <div class="card__head">
+      <h3>待处理收录申请</h3>
+      <span class="tag tag--warn">2 条待审</span>
+      <div class="right">
+        <select class="select"><option>全部状态</option><option>待审核</option><option>已收录</option><option>已驳回</option></select>
+      </div>
+    </div>
+    <div class="card__body">
+      <table class="table">
+        <thead><tr>
+          <th>平台名称</th><th>申请机构</th><th>运营方法定名称</th>
+          <th>官方域名</th><th>资质证据</th><th>域名校验</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="cellmain">XX招聘</div><div class="cellsub">2026-08-09 提交</div></td>
+            <td>XX人力资源服务有限公司</td>
+            <td>XX网络科技有限公司</td>
+            <td class="mono small">zhaopin.example.com</td>
+            <td><span class="tag tag--warn">待补充</span></td>
+            <td><span class="tag tag--err">主体不一致</span></td>
+            <td><span class="tag tag--warn">审核中</span></td>
+            <td>
+              <button class="btn btn--sm">查看</button>
+              <button class="btn btn--sm">驳回</button>
+            </td>
+          </tr>
+          <tr>
+            <td><div class="cellmain">XX人才网</div><div class="cellsub">2026-08-07 提交</div></td>
+            <td>XX信息技术有限公司</td>
+            <td>XX信息技术有限公司</td>
+            <td class="mono small">xxrc.example.cn</td>
+            <td><span class="tag tag--ok">已上传</span></td>
+            <td><span class="tag tag--ok">已通过</span></td>
+            <td><span class="tag tag--warn">待收录</span></td>
+            <td>
+              <button class="btn btn--sm btn--primary">收录</button>
+              <button class="btn btn--sm">驳回</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small muted" style="margin-top:10px">
+        <b>驳回必须填原因</b>，且原因要回传给机构——
+        这是本次审查发现的通病（岗位与招聘会的 <code>rejectReason</code> 都不回传，机构只能看到「被拒」）。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 已收录目录 + 排序 ── -->
+  <div class="card isnew" data-newtag="新增能力" style="margin-top:16px">
+    <div class="card__head">
+      <h3>已收录目录（终端展示顺序）</h3>
+      <div class="right"><button class="btn btn--sm">保存排序</button></div>
+    </div>
+    <div class="card__body">
+      <table class="table">
+        <thead><tr>
+          <th style="width:70px">顺序</th><th>平台名称</th><th>中立描述</th>
+          <th>官方域名</th><th>链接巡检</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><input class="input" value="1" style="width:56px;text-align:center"></td>
+            <td><div class="cellmain">国家大学生就业服务平台</div><div class="cellsub">官方</div></td>
+            <td class="small">教育部主办的高校毕业生就业服务平台</td>
+            <td class="mono small">ncss.cn</td>
+            <td><span class="tag tag--ok">今日可达</span></td>
+            <td><span class="tag tag--ok">已上架</span></td>
+            <td><button class="btn btn--sm">编辑</button><button class="btn btn--sm">下架</button></td>
+          </tr>
+          <tr>
+            <td><input class="input" value="2" style="width:56px;text-align:center"></td>
+            <td><div class="cellmain">XX省公共招聘网</div><div class="cellsub">官方</div></td>
+            <td class="small">XX省人社厅主办的公共就业服务平台</td>
+            <td class="mono small">job.example.gov.cn</td>
+            <td><span class="tag tag--ok">今日可达</span></td>
+            <td><span class="tag tag--ok">已上架</span></td>
+            <td><button class="btn btn--sm">编辑</button><button class="btn btn--sm">下架</button></td>
+          </tr>
+          <tr>
+            <td><input class="input" value="3" style="width:56px;text-align:center"></td>
+            <td><div class="cellmain">XX人才网</div><div class="cellsub">第三方 · 商业</div></td>
+            <td class="small">区域性综合招聘平台</td>
+            <td class="mono small">xxrc.example.cn</td>
+            <td><span class="tag tag--err">连续 3 天不可达</span></td>
+            <td><span class="tag tag--warn">建议下架</span></td>
+            <td><button class="btn btn--sm">编辑</button><button class="btn btn--sm btn--primary">下架</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small muted" style="margin-top:10px">
+        <b>官方平台建议固定在前</b>，商业平台在后；同层级内不得按付费排序。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI 辅助 ── -->
+  <div class="grid grid--2" style="margin-top:16px">
+    <div class="card">
+      <div class="card__head"><h3>AI 巡检</h3><span class="tag tag--ai">L1 规则 + L2 聚合</span></div>
+      <div class="card__body stack">
+        <div class="advice isnew" data-newtag="AI 能力">
+          <div class="advice__head"><b>建议下架：XX人才网</b><span class="tag tag--ai">待采纳</span></div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>动作</b><span>将「XX人才网」置为下架</span></div>
+            <div class="advice__item"><b>理由</b><span>官方域名连续 3 天巡检不可达（08-09 / 08-10 / 08-11） <span class="ev ev--1">E1</span></span></div>
+            <div class="advice__item"><b>代价</b><span>该平台从终端推荐位移除；机构会收到通知</span></div>
+            <div class="advice__item"><b>备选</b><span>先联系机构确认是否更换域名，保留 7 天观察</span></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn btn--sm btn--primary">采纳（下架）</button>
+            <button class="btn btn--sm">改为观察</button>
+            <button class="btn btn--sm">忽略</button>
+          </div>
+        </div>
+        <div class="small muted">
+          巡检本身是<b>确定性规则</b>（HTTP 可达性 + 域名比对），不调模型、不标「AI」；
+          只有「建议怎么处置」这层才算 AI。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>中立描述改写</h3><span class="tag tag--ai">L3 · 模型</span></div>
+      <div class="card__body stack">
+        <div class="field">
+          <label>机构提交的原文</label>
+          <div class="locked small">「本地最大最专业的招聘平台，海量名企职位，求职首选！」</div>
+        </div>
+        <div class="field">
+          <label>AI 改写为中立描述 <span class="tag tag--ai">待采纳</span></label>
+          <textarea class="input" rows="2">区域性综合招聘平台，提供岗位检索与在线投递。</textarea>
+          <div class="hint">
+            去除「最大」「最专业」「首选」等未经证实的绝对化表述；
+            <b>改写结果必须由运营确认后才入库</b>，AI 不直接写。
+          </div>
+        </div>
+        <div class="row"><button class="btn btn--sm btn--primary">采纳</button><button class="btn btn--sm">自己改</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>目录为空</h3>
+      <p>尚未收录任何线上招聘平台。终端「线上招聘平台」入口<b>不会显示</b>，不显示空列表。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">手工收录第一个</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——收录、审核、排序、上下架<b>全部照常</b>。
+        受影响的只有「中立描述改写」与「处置建议」两项，可手工完成。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>目录加载失败</h3>
+      <p>无法读取（<code>GET /admin/online-platforms</code> 返回 500）。<b>终端已收录的平台不受影响</b>，仍按上次下发展示。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>新建页面</b>：<code>/online-platforms</code>，归入「数据内容」分组。
+        这是本轮审查中<b>唯一确实需要 Admin 新增的页面</b>——其余需求都能并进现有页的 Tab。</li>
+      <li><b>模型零改动即可起步</b>：<code>OnlinePlatformDirectory</code> 字段已齐（含 <code>reviewStatus</code> / <code>publishStatus</code> / <code>displayOrder</code>）。
+        需补的是 Admin 读写 API 与 Partner 侧的申请态。</li>
+      <li><b>权责分离</b>：Partner 只能申请 / 提交更新；<b>收录、排序、上下架、中立描述定稿只在本页</b>。
+        <code>displayOrder</code> 绝不下放。</li>
+      <li><b>域名白名单与政策「官方入口」合并成一套机制</b>——两处都决定用户从终端跳到哪里，
+        不要各写一份校验。百宝箱已有 <code>ToolboxAllowedHost</code> 可复用。</li>
+      <li><b>驳回必须回传原因</b>：修掉岗位/招聘会 <code>rejectReason</code> 不回传的同类问题，不要再复制一遍。</li>
+      <li><b>计费红线</b>：曝光位不得按曝光 / 按跳转计费；商业平台与官方平台<b>不得按付费混排</b>。</li>
+    </ul></div>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'online-platforms'})</script>
+</body>
+</html>

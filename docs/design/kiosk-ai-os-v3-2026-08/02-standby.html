@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
 <style>
 /* ── P02 待机唤醒屏 ─────────────────────────────────────────────────────
    这一页和别的 25 页结构完全不同：**没人在看的时候它才出现**。
@@ -106,6 +107,18 @@
 
 .sb-foot { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-5);
   font-size:var(--fz-2); color:var(--fog-600); flex-wrap:wrap; }
+
+/* ── 整屏热区（2026-08-10 补）─────────────────────────────────────────
+   原来「碰一下屏幕开始」只是一行字，点它什么也不会发生 ——
+   待机屏承诺的唯一交互落空，是最不该出现的那种假承诺。
+   待机屏下面本来就没有别的可点元素，所以直接把**整块屏幕**做成跳转目标：
+   碰哪儿都进首页，和真机上「触摸唤醒」的行为一致。 */
+.sb-hit { position:absolute; inset:0; z-index:5; display:block;
+  text-decoration:none; -webkit-tap-highlight-color:transparent; }
+/* 折叠条必须压在整屏热区之上（.sb-hit z-index:5），否则点「展开」会直接跳首页。
+   notebar.css 默认 z-index:38 已经够，这里只是把依赖写明，避免以后调 .sb-hit 时踩到。 */
+.standby .nb-bar { --nb-inset: 0; z-index: 6; }
+.standby .nb-body { --nb-max: 520px; }
 </style>
 </head>
 <body>
@@ -122,8 +135,8 @@
     <div class="sb-top">
       <span class="sb-mark">职</span>
       <span class="sb-id">
-        <span class="sb-nm">职易达</span>
-        <span class="sb-sub">AI 求职打印服务终端 · 01 号机 · 市人力资源市场 A 馆</span>
+        <span class="sb-nm" data-site="brand">职易达</span>
+        <span class="sb-sub">AI 求职打印服务终端 · <span data-site="terminalNo">01 号机</span> · <span data-site="venue">市人力资源市场 A 馆</span></span>
       </span>
       <span class="sb-clock">
         <span class="sb-time" data-clock>17:24</span>
@@ -191,17 +204,35 @@
     <!-- ═══ 轮播 ═══ -->
     <div class="sb-stage">
 
-      <!-- 幻灯 1：本机能做什么（default / first / ai-down） -->
-      <div class="slide" data-when="default first ai-down">
+      <!-- 幻灯 1（本轮新增）：今日信息 · 站内更新 ——
+           只用站内真实汇总数据说话：岗位 / 招聘会 / 政策三条事实，标 E2 系统事实。
+           待机屏没有用户，所以这一帧**没有任何个性化**，只有汇总口径；
+           ai-down 时整帧隐藏（今日信息服务断了就不播，不播壳子），改播「能做什么」帧。 -->
+      <div class="slide" data-when="default">
+        <span class="slide-kicker">今日信息 · 站内更新 <span class="ev ev--e2">E2 站内数据 · 每日更新</span></span>
+        <span class="slide-h">今天新到 12 条岗位，<br>本周有 2 场招聘会。</span>
+        <span class="slide-p">
+          · 今日新增岗位 <b>12 条</b>，来自 <b>3 家</b>来源机构<br>
+          · 本周招聘会 <b>2 场</b>，最近一场在<b>周六</b><br>
+          · 政策更新 <b>1 条</b>，可在政策服务里查看
+        </span>
+        <span class="slide-meta">
+          <span>站内数据 · 每日更新</span>
+          <span>同步 8月9日 07:30</span>
+          <span>汇总口径 · 待机屏不含任何个人信息</span>
+        </span>
+      </div>
+
+      <!-- 幻灯 2：本机能做什么（first / ai-down；default 态由上一帧「今日信息」占位演示） -->
+      <div class="slide" data-when="first ai-down">
         <span class="slide-kicker">这台机器能做什么</span>
         <span class="slide-h">改简历、打材料、<br>算好招聘会先去哪几家。</span>
         <span class="slide-p">
           <b>不用登录也能全部用完</b>。上传简历看问题在哪、把材料打齐、
-          按你的简历排出招聘会当天的走法 —— 都在这台机器上。<br>
-          本机<b>不代收简历、不代为投递</b>，你带走的是纸。
+          按你的简历排出招聘会当天的走法 —— 都在这台机器上。
         </span>
         <span class="slide-meta">
-          <span>打印 A4 黑白 0.20 元 / 页</span>
+          <span>打印 A4 黑白 <span data-site-unit="bw"></span> / 计费页</span>
           <span>AI 服务不收费</span>
           <span>价格以现场公示为准</span>
         </span>
@@ -211,15 +242,21 @@
       <div class="slide" data-when="device-off">
         <span class="slide-kicker">当前状态</span>
         <span class="slide-h">打印机暂时坏了，<br>但别的还能用。</span>
+        <!-- 替代路径的写法（2026-08-11 站点值收口）：
+             原来写死「去 B 馆 03 号机」—— 那是某一台机器的现场事实，换个场地就是错的，
+             而按错的指路跑一趟比不指路更糟。改成站点配置 peerTerminal，缺配置时落到
+             诚实兜底。要点：**行动不能只剩一句「未配置」** —— 所以先给不依赖配置的那条路
+             （扫码存手机、修好了再来打），就近终端只是附加项。 -->
         <span class="slide-p">
           扫描、改简历、练面试、查政策<b>都不受影响</b>。<br>
           要打印的话，<b>可以先把文件在这里准备好</b>，
-          扫码存进手机，修好了再来打；或者去 B 馆 03 号机。
+          扫码存进手机，修好了再来打。<br>
+          想换一台机器打：<span data-site="peerTerminal"></span>。
         </span>
         <span class="slide-meta">
           <span>故障已自动上报运维</span>
           <span>预计 18:30 前恢复</span>
-          <span>03 号机在 B 馆入口右手</span>
+          <span>扫码存进手机不收费</span>
         </span>
       </div>
 
@@ -236,11 +273,50 @@
     </div>
 
     <!-- ═══ 页脚：同步时间与合规 ═══ -->
+    <!-- 页脚只留「同步时间」这一条来源事实（来源清单、合规声明、入链说明全部收进折叠条）。
+         待机屏跟前通常没有人，所以折叠条只是**留个可查的地方**，不承担引导。 -->
     <div class="sb-foot">
       <span data-when="default first ai-down device-off">岗位与招聘会信息同步于 <b>8月9日 07:30</b></span>
-      <span data-when="default first ai-down device-off">来源：市人社局 · 高新区人才服务中心 · 省教育厅学生服务中心</span>
-      <span data-when="default first ai-down device-off">本机只做信息展示与打印，不代办、不代收简历</span>
     </div>
+
+    <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+         收进来的：合规边界 / 数据来源与同步口径 / 隐私（待机屏不含任何个人信息）/
+                   费用口径 / 本屏为什么会出现。
+         **没有**收进来（必须常驻）：三条设备与 AI 的当前状态、同步时间、
+         幻灯上的 E2 站内数据徽章、「碰一下屏幕开始」。 -->
+    <div class="nb-bar" data-notebar>
+      <button type="button" class="nb-sum">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span class="nb-sum-t">信息与边界&nbsp;· <b>不代办、不代收简历</b>&nbsp;· 数据来源&nbsp;· 费用口径</span>
+        <span class="nb-x">展开</span>
+        <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="nb-body" hidden>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+          <p class="nb-p">本机只做<b>信息展示与打印</b>，<b>不代办、不代收简历</b>、不做平台内投递、不参与企业筛选。岗位与招聘会只是第三方或官方来源的信息入口，投递与预约都在来源方那边完成。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>数据来源与同步口径</div>
+          <p class="nb-p">岗位与招聘会信息来源：市人社局、高新区人才服务中心、省教育厅学生服务中心。屏上这几条是<b>汇总口径</b>，每日更新；具体某一条岗位或招聘会的<b>来源机构、同步时间、外部 ID</b> 在它自己的详情页上展示。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私：待机屏上没有任何个人信息</div>
+          <p class="nb-p">这一屏<b>不含任何个人信息</b>，也不做个性化：上一位用户的材料、记录与结果不会出现在这里。碰屏进首页后，未登录时办的事只留在本次会话：<b>无操作满 <span data-site-time="hint">3 分钟</span></b>屏幕上会出提示条，<b>再 <span data-site-time="grace">60 秒</span>没人碰</b>（也就是无操作满 <b><span data-site-time="clear">4 分钟</span></b>）就自动清空回到本屏。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>费用口径</div>
+          <p class="nb-p">AI 服务<b>不收费</b>；只有出纸收费，A4 黑白 <span data-site-unit="bw"></span> / 计费页起，<b>按所选文档页计费</b>（计费页数 = 所选文档页数 × 份数），<b>打印双面只影响用纸张数，不减少计费页数</b>；<b>价格以现场公示与打印工作台核价为准</b>。不用登录也能把事办完。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-clock"/></svg>这一屏为什么会出现</div>
+          <p class="nb-p">本屏由<b>无操作满 <span data-site-time="clear">4 分钟</span>自动清空</b>后进入（系统触发），首页里没有指向它的入口，<b>碰屏即回首页</b>。设备与 AI 的当前状态就在上面那三条，不收进这里。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 整屏唤醒热区：碰哪儿都算「碰一下屏幕」，直接进首页 -->
+    <a class="sb-hit" href="01-home-v6.html" aria-label="碰一下屏幕开始 · 进入首页"></a>
 
   </div>
 
@@ -248,9 +324,11 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/site-config.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

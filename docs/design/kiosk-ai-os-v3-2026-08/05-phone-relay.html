@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/notebar.css?v=2">
 <style>
 /* ── P05 手机接力 ───────────────────────────────────────────────────────
    **390×844，不是 1080×1920。**这是全套里唯一的手机端页面。
@@ -114,6 +115,104 @@
   color:var(--fog-600); }
 .up-bar { height:6px; border-radius:3px; background:var(--fog-a12); overflow:hidden; }
 .up-bar i { display:block; height:100%; background:var(--jade-500); border-radius:3px; }
+
+/* 折叠条：手机版式（390×844）。面板上限比一体机小一档；
+   JS 还会按「.ph-top 下沿 → 横条上沿」的实际可用空间再收紧一次。 */
+.nb-bar--phone { --nb-max: 420px; }
+
+/* ══ 方向轴：手机 → 机器（send，默认） / 机器 → 手机（take）══════════════
+   Codex 复核 (b)§3：全站 14 条「扫码带走这份文件」进的是本页，而本页
+   **默认主动作是「选文件传到机器」——方向正好反了**，而且它不读文件 ID，
+   根本不知道要带走哪一份。用户想把机器上的东西拿走，打开却被要求上传。
+
+   为什么方向标记写成**无值属性**（data-relay-send / data-relay-take），
+   而不是一条 data-dir="send|take" 的轴：
+   tools/regress.html 会扫全文档的 data-*，凡是「白名单外、出现 ≥3 次、
+   取值像枚举」的就报「疑似新轴，确认后加进 AXIS_ALLOW/AXIS_DENY」——
+   那条设计是对的（检测器自己也要被检测），但方向不是需要被穷举驱动的轴：
+   它由链接决定，进页面就定死了，四态 × 阶段的组合里不该多出一维。
+   写成无值属性后取值集合为空，回归台不会把它当轴，也就不必去动共享白名单。
+   形态开关落在 .screen 的 class（.relay-take）上，同理不进轴扫描。
+
+   两条规则都带 !important：要压过 .act / .ph-btn 自己的 display:flex，
+   也要压过「有文件才显示」那几个元素的行内 display:none 兜底。 */
+.screen.relay-take [data-relay-send] { display:none !important; }
+.screen:not(.relay-take) [data-relay-take] { display:none !important; }
+
+/* ══ 递过去方向的三条分支：传文件 / 拍照 / 登录 ═══════════════════════════
+   2026-08-11：s1 上那三张 .act 卡（传文件到机器 / 拍照传过去 / 在手机上完成
+   登录）此前是**裸 <button>，没有 href、没有 data-go、没有任何监听** ——
+   实测七种事件（pointer/mouse/touch/click）全打一遍，整个 body 一个字节不变。
+   用户在自己手机上要点的三个动作，一个都点不动。
+
+   为什么不是弹一句「已完成」：这三条各自有对应的形态 ——
+   传文件与拍照进的是「正在传」（s2），登录进的是手机侧的号码 + 验证码表单
+   （slogin）。弹提示等于把分支入口做成了通知，用户仍然到不了那一步。
+
+   形态开关沿用本页既有口径：**落在 .screen 的 class 上，不新开 data-* 轴**
+   （见上面方向轴那段长注释）。传文件是默认，拍照加 .relay-photo；
+   登录不是同一屏的变体，它是另一步，所以走阶段（data-at="slogin"）。 */
+.screen.relay-photo [data-relay-mfile] { display:none !important; }
+.screen:not(.relay-photo) [data-relay-mphoto] { display:none !important; }
+
+/* 手机端触控下限：本页按钮一律 ≥52px（一体机是 48/56，手机这一页按 52 收）。
+   .act 原本只写了 min-height:48px —— 内容撑起来实际有 70px+，但下限写低了，
+   万一某一条文案缩到一行就会掉到 48。这里把下限提到 52 与页脚 .ph-btn 对齐。 */
+.act { min-height:52px; }
+/* 三条分支写成**无值属性**（data-relay-file / -photo / -login），
+   不是一条 data-relay-act="file|photo|login" 的枚举 —— 理由同上面方向轴那段：
+   回归台会把「白名单外、出现 ≥3 次、取值像枚举」的 data-* 报成疑似新轴，
+   而这三个只是行为钩子，不是可见性轴。实测确认过：写成枚举时
+   tools/regress.html 报 `data-relay-act(file|photo|login)`；改成无值属性后取值
+   集合为空，不再误报，也不必去动共享白名单（那是禁止修改的文件）。 */
+.act[data-relay-file], .act[data-relay-photo], .act[data-relay-login] {
+  cursor:pointer; text-align:left; font-family:var(--ff-ui); }
+.act[data-relay-file]:active, .act[data-relay-photo]:active, .act[data-relay-login]:active {
+  border-color:var(--jade-a32); background:var(--jade-a12); }
+
+/* ── slogin：在自己手机上完成登录 ──────────────────────────────────
+   这一步的存在理由写在 s1 那张卡上：号码不会出现在大厅那块屏幕上。
+   所以这里**不做任何回显打码之外的花样**，只要号码别被旁人看见。 */
+.lg-f { flex:0 0 auto; display:flex; flex-direction:column; gap:7px; }
+.lg-lb { font-size:12px; color:var(--fog-600); }
+.lg-in { min-height:52px; border-radius:12px; padding:0 14px; font-size:17px;
+  font-family:var(--ff-num); color:var(--fog-900);
+  background:var(--surf-1); border:1px solid var(--brd-1); width:100%; }
+.lg-in:focus { outline:2px solid var(--jade-500); outline-offset:1px; }
+.lg-row { display:flex; gap:9px; align-items:stretch; }
+.lg-row .lg-in { flex:1 1 auto; min-width:0; }
+.lg-code { flex:0 0 auto; min-height:52px; padding:0 15px; border-radius:12px;
+  font-size:14px; font-weight:600; font-family:var(--ff-ui); cursor:pointer;
+  background:var(--jade-a12); border:1px solid var(--jade-a32); color:var(--jade-200); }
+.lg-code[aria-disabled="true"] { opacity:.55; cursor:default; }
+
+/* 带走的是哪一份 —— 这张卡只在**真的收到文件身份**时才出现 */
+.take { flex:0 0 auto; display:flex; flex-direction:column; gap:7px;
+  padding:15px 16px; border-radius:14px;
+  background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.take-row { display:flex; align-items:center; gap:11px; }
+.take-row .ic { width:20px; height:20px; color:var(--jade-500); flex:0 0 auto; }
+.take-nm { font-size:15.5px; font-weight:700; color:var(--fog-900);
+  min-width:0; overflow-wrap:anywhere; }
+.take-k { font-size:12px; color:var(--fog-700); }
+.take-note { font-size:11.5px; color:var(--fog-600); line-height:1.55; }
+.take-note b { color:var(--fog-800); }
+
+/* 带走形态的常驻口径块。
+   为什么要有它：带走这条路的内容天然比「递过去」少一半（那边有四张动作卡），
+   实测 .ph-body 底部剩 170px 纯空白 —— 所有者这一轮明确提过「不要留出空白
+   什么也没有」。但空白不能拿假内容填：这里放的三条**全部是本页别处已经
+   写过的口径**（保留期限、清空规则、一次性会话），只是从折叠条里挪到常驻。
+   照 Codex (d)(e) 的处理口径：只移「当前这一步的决策必需项」，
+   来源全文与长隐私条款仍留在折叠条里。 */
+.trm { flex:0 0 auto; display:flex; flex-direction:column; gap:9px;
+  padding:13px 15px; border-radius:12px;
+  background:var(--fog-a04); border:1px solid var(--brd-1); }
+.trm-h { font-size:11.5px; color:var(--fog-600); letter-spacing:.08em; }
+.trm-r { display:flex; gap:10px; align-items:flex-start; font-size:12px; line-height:1.55; }
+.trm-k { flex:0 0 84px; color:var(--fog-600); }
+.trm-v { min-width:0; color:var(--fog-700); }
+.trm-v b { color:var(--fog-900); }
 </style>
 </head>
 <body>
@@ -128,34 +227,95 @@
   <div class="ph-top">
     <span class="ph-mark">职</span>
     <span class="ph-b">
-      <span class="ph-t">正在为 01 号机服务</span>
-      <span class="ph-s">市人力资源市场 A 馆 · 办理单 #F-2318</span>
+      <span class="ph-t">正在为 <span data-site="terminalNo">01 号机</span> 服务</span>
+      <span class="ph-s"><span data-site="venue">市人力资源市场 A 馆</span> · 办理单 #F-2318</span>
     </span>
     <!-- 手机页的四态不照抄一体机，而是「机器那边现在什么情况」：
          已连上 / 刚扫进来 / 机器的识别不可用（仍能传） / 机器离线（传了也出不来）。
          这一条最关键：用户在手机上看不到机器，机器出事只能靠这里说。 -->
     <span class="ph-live" data-at="s1 s2" data-when="default"><i></i>已连上</span>
-    <span class="ph-live" data-at="s1 s2" data-when="first"><i></i>刚连上 · 等你选文件</span>
+    <span class="ph-live" data-at="s1 s2" data-when="first" data-relay-send><i></i>刚连上 · 等你选文件</span>
+    <span class="ph-live" data-at="s1 s2" data-when="first" data-relay-take><i></i>刚连上 · 等你确认带走哪一份</span>
     <span class="ph-live" data-at="s1 s2" data-when="ai-down" style="color:var(--amber-600)">
       <i style="background:var(--amber-500)"></i>已连上 · 机器的识别功能不可用</span>
-    <span class="ph-live" data-at="s1 s2" data-when="device-off" style="color:var(--coral-400)">
+    <!-- device-off 在两个方向上的后果不一样，不能共用一句：
+         传上去是「传了也出不来」；带走是下载，出纸能力坏了并不挡它。
+         写成一样就等于劝用户白等一趟，或者反过来让他以为文件取不走。 -->
+    <span class="ph-live" data-at="s1 s2" data-when="device-off" data-relay-send style="color:var(--coral-400)">
       <i style="background:var(--coral-400)"></i>机器离线 · 现在传过去也出不来</span>
+    <span class="ph-live" data-at="s1 s2" data-when="device-off" data-relay-take style="color:var(--amber-600)">
+      <i style="background:var(--amber-500)"></i>机器离线 · 只影响出纸，不影响带走</span>
+    <!-- 登录这一步的机器状态单列：登录只跟短信与账号有关，
+         **机器离线并不挡它** —— 沿用上面那条「后果不一样就不能共用一句」。 -->
+    <span class="ph-live" data-at="slogin" data-when="default first ai-down"><i></i>已连上 · 等你在手机上登录</span>
+    <span class="ph-live" data-at="slogin" data-when="device-off" style="color:var(--amber-600)">
+      <i style="background:var(--amber-500)"></i>机器离线 · 不影响登录</span>
     <span class="ph-live" data-at="s3" style="color:var(--fog-600)">
       <i style="background:var(--fog-600)"></i>已结束</span>
   </div>
 
   <!-- ─────────── S1 能做什么 ─────────── -->
   <div class="ph-body" data-at="s1">
-    <div class="ph-h">手机能帮你做<br>那台机器做不了的两件事</div>
-    <div class="ph-p">
+
+    <!-- ══════════ 带走形态（?dir=take）══════════════════════════════════
+         这一段只在链接明说要带走时出现。默认渲染的是**没有文件身份**那一态
+         （#take-file 行内 display:none），脚本认领到文件才把它放出来 ——
+         和 P03 同一条口径：失败方向是「承认不知道」，不是「随便挑一份」。
+         在公共机器上随便挑一份的代价是：用户以为自己带走了简历，
+         实际带走的是上一个人留在会话里的东西。 -->
+    <!-- 标题也得分两态：认不出是哪一份的时候写「把这一份」，
+         「这一份」四个字本身就是在指认一份并不存在的文件。 -->
+    <div class="ph-h" id="take-h-file" data-relay-take style="display:none">把这一份<br>带到你自己的手机上</div>
+    <div class="ph-h" id="take-h-miss" data-relay-take>带走机器上<br>做好的东西</div>
+    <div class="ph-p" data-relay-take>
       这一页<b>只为你眼前那台机器服务</b> —— 没有首页、没有"我的"、没有消息。
       机器那边办完，这一页就失效。
     </div>
 
-    <div class="grp">把手机上有的递过去</div>
-    <div class="panel-note" style="margin:-4px 0 8px">原型说明:以下动作在真机手机页由上传会话执行,此稿仅呈现形态。</div>
+    <div class="take" id="take-file" data-relay-take style="display:none">
+      <div class="take-row">
+        <svg class="ic"><use href="#i-file"/></svg>
+        <span class="take-nm" id="take-nm">—</span>
+      </div>
+      <div class="take-k" id="take-k">—</div>
+      <!-- 署名口径抄 P06 回执那一套：URL 里的字一律标明是**来源页说的**，
+           不冒充本机读数。手机这一端连文件都没摸到，更没资格给它背书。 -->
+      <div class="take-note">
+        文件名与页数是<b>机器上那一条的标注</b>，这一页没有核对过。
+        对不上就回机器前面重新点一次。
+      </div>
+    </div>
 
-    <button class="act" type="button">
+    <div class="ph-note ph-note--warn" id="take-miss" data-relay-take>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span><b>这条链接没说要带走哪一份。</b>
+            本机<b>不替它挑一份</b> —— 挑错了，你带走的就是别人的文件。<br>
+            请回到机器前面，在<b>那一份的条目上重新点「扫码带走」</b>；
+            或者用下面那条，改成把手机上的文件传过去。</span>
+    </div>
+
+    <!-- 只在真的认领到文件时才出现：没有文件时页脚那条按钮是「改成传过去」，
+         再挂一句「按下不会真的保存」等于在说一个根本不存在的保存动作。 -->
+    <div class="panel-note" id="take-proto" data-relay-take style="margin:-4px 0 8px;display:none">原型说明:真机上由本次会话把文件发到手机,此稿只呈现形态,按下不会真的保存。</div>
+
+    <!-- ══════════ 递过去形态（默认）══════════════════════════════════ -->
+    <div class="ph-h" data-relay-send>手机能帮你做<br>那台机器做不了的两件事</div>
+    <div class="ph-p" data-relay-send>
+      这一页<b>只为你眼前那台机器服务</b> —— 没有首页、没有"我的"、没有消息。
+      机器那边办完，这一页就失效。
+    </div>
+
+    <!-- dir 传了但本机不认识时才出现。不静默回退：静默回退等于系统换了方向
+         还不告诉人，用户会以为自己点错了链接。 -->
+    <div class="ph-note ph-note--warn" id="dir-note" data-relay-send style="display:none">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span id="dir-note-t"></span>
+    </div>
+
+    <div class="grp" data-relay-send>把手机上有的递过去</div>
+    <div class="panel-note" data-relay-send style="margin:-4px 0 8px">原型说明:以下动作在真机手机页由上传会话执行,此稿仅呈现形态。</div>
+
+    <button class="act" type="button" data-relay-send data-relay-file>
       <svg class="ic"><use href="#i-upload"/></svg>
       <span class="act-b">
         <span class="act-t">传文件到机器</span>
@@ -163,7 +323,7 @@
       </span>
     </button>
 
-    <button class="act" type="button">
+    <button class="act" type="button" data-relay-send data-relay-photo>
       <svg class="ic"><use href="#i-image"/></svg>
       <span class="act-b">
         <span class="act-t">拍照传过去</span>
@@ -171,7 +331,7 @@
       </span>
     </button>
 
-    <button class="act" type="button">
+    <button class="act" type="button" data-relay-send data-relay-login>
       <svg class="ic"><use href="#i-phone"/></svg>
       <span class="act-b">
         <span class="act-t">在手机上完成登录</span>
@@ -179,15 +339,17 @@
       </span>
     </button>
 
-    <div class="grp">把机器上做完的接回来</div>
+    <div class="grp" data-relay-send>把机器上做完的接回来</div>
 
-    <button class="act" type="button">
+    <!-- 这一条在「递过去」形态里是入口（点了会切到带走方向）；
+         「带走」形态里它已经是当前任务，再列一遍是废话。 -->
+    <a class="act" href="05-phone-relay.html?dir=take" data-relay-send>
       <svg class="ic"><use href="#i-download"/></svg>
       <span class="act-b">
         <span class="act-t">存走刚生成的文件</span>
         <span class="act-s">作战单、复盘单、办事清单 —— 存进手机，纸和电子版都有</span>
       </span>
-    </button>
+    </a>
 
     <div class="ph-note ph-note--warn">
       <svg class="ic"><use href="#i-alert"/></svg>
@@ -195,21 +357,39 @@
             要出纸就回到机器前面点「开始打印」。</span>
     </div>
 
-    <div class="ph-note ph-note--calm">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <span>传过去的文件<b>只进入这一次办理</b>，跟着机器那边的规则走：
-            没登录就离场即清，登录了才存进账号。</span>
+    <!-- 带走形态的常驻口径（三条都是本页折叠条里已有的说法，只是挪到常驻） -->
+    <div class="trm" data-relay-take>
+      <div class="trm-h">带走之前先看清这三条</div>
+      <div class="trm-r"><span class="trm-k">存到手机后</span>
+        <span class="trm-v">文件进你自己的手机，<b>机器这边不跟着走</b>；
+          存进手机<b>不等于打印</b>，要纸仍然得回机器前面按。</span></div>
+      <div class="trm-r"><span class="trm-k">机器上那一份</span>
+        <span class="trm-v">没登录就<b>离场即清</b>；登录了按类型算 ——
+          证件类等敏感件 <b>7 天</b>，一般文档 <b>90 天</b>。</span></div>
+      <div class="trm-r"><span class="trm-k">这一页</span>
+        <span class="trm-v">机器那边办完<b>立即失效</b>，只承接这一次办理。
+          没有 App 要装，下次到机器前再扫一次码。</span></div>
     </div>
+
   </div>
 
   <!-- ─────────── S2 正在传 ─────────── -->
   <div class="ph-body" data-at="s2">
-    <div class="ph-h">正在传到 01 号机</div>
-    <div class="ph-p">
+    <div class="ph-h" data-relay-send>正在传到 <span data-site="terminalNo">01 号机</span></div>
+    <div class="ph-h" data-relay-take>正在存到你的手机</div>
+    <div class="ph-p" data-relay-send>
       别关这一页，也<b>别锁屏</b>。传完机器那边会自动出现。
     </div>
+    <div class="ph-p" data-relay-take>
+      别关这一页，也<b>别锁屏</b>。存完在手机的「文件」或「下载」里能找到。
+    </div>
 
-    <div class="up">
+    <!-- 进度条是**原型示例**，不是本机读数：下面那条 panel-note 说明了这一点。
+         两条分支各摆各的 —— 从「拍照传过去」进来却看见一份 PDF 在传，
+         等于告诉用户系统传错了东西。 -->
+    <div class="panel-note" data-relay-send style="margin:-4px 0 8px">原型说明:下面的文件名与百分比是示例,不是本机读数;真机在这里显示你刚选中/刚拍的那几份的真实进度。</div>
+
+    <div class="up" data-relay-send data-relay-mfile>
       <div class="up-row">
         <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-file"/></svg>
         <span class="up-nm">王磊_机械_2026.pdf</span>
@@ -218,7 +398,7 @@
       <div class="up-bar"><i style="width:100%"></i></div>
     </div>
 
-    <div class="up">
+    <div class="up" data-relay-send data-relay-mfile>
       <div class="up-row">
         <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-image"/></svg>
         <span class="up-nm">成绩单_扫描件.jpg</span>
@@ -227,21 +407,89 @@
       <div class="up-bar"><i style="width:62%"></i></div>
     </div>
 
-    <div class="ph-note ph-note--calm">
+    <!-- 拍照分支：一次拍一张，所以只有一条 -->
+    <div class="up" data-relay-send data-relay-mphoto>
+      <div class="up-row">
+        <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-image"/></svg>
+        <span class="up-nm">刚拍的照片.jpg</span>
+        <span class="up-pct">48%</span>
+      </div>
+      <div class="up-bar"><i style="width:48%"></i></div>
+    </div>
+    <div class="ph-note ph-note--calm" data-relay-send data-relay-mphoto>
+      <svg class="ic"><use href="#i-image"/></svg>
+      <span>拍的是纸质材料就<b>把纸压平、光打匀</b> ——
+            机器那边要拿它出纸，糊了打出来也是糊的。</span>
+    </div>
+
+    <!-- 带走方向只有一份，而且必须是链接指名的那一份 —— 名字由脚本填。
+         脚本没认领到文件时根本走不到 s2（s1 的主按钮那时是「改成传过去」），
+         所以这里不需要第二套「未知文件」文案。 -->
+    <div class="up" data-relay-take>
+      <div class="up-row">
+        <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-download"/></svg>
+        <span class="up-nm" id="take-nm2">—</span>
+        <span class="up-pct">62%</span>
+      </div>
+      <div class="up-bar"><i style="width:62%"></i></div>
+    </div>
+
+    <div class="ph-note ph-note--calm" data-relay-send>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span>传失败会明确告诉你是哪一个、为什么，<b>不会悄悄少传一份</b>。</span>
+    </div>
+    <div class="ph-note ph-note--calm" data-relay-take>
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span>存失败会明确告诉你为什么，<b>不会显示成已存好</b>。
+            存到手机<b>不等于打印</b> —— 要出纸仍然得回机器前面按。</span>
+    </div>
+  </div>
+
+  <!-- ─────────── SLOGIN 在自己手机上完成登录 ───────────
+       为什么这一步在手机上而不在一体机上：03 身份门的「扫码登录」那条路
+       承诺的就是「手机号和验证码都在你自己手机上完成，不出现在这块屏幕上」。
+       这一页是那句承诺的落地端 —— 大厅里旁边站着人，号码和验证码都不该
+       出现在 27 寸公共屏幕上。
+
+       诚实口径（CLAUDE.md §9）：原型不发短信、也不真的建会话。
+       所以这一步**不显示「已登录」**，按下去只说明真机会做什么、
+       以及现在这一稿做不到什么。 -->
+  <div class="ph-body" data-at="slogin">
+    <div class="ph-h">在这台手机上<br>完成登录</div>
+    <div class="ph-p">
+      号码和验证码都在<b>你自己手机上</b>输 ——
+      <b>不会出现在大厅那块屏幕上</b>，旁边有人也看不到。
+    </div>
+
+    <div class="panel-note" style="margin:-4px 0 4px">原型说明:此稿不发短信、不建登录会话;下面两栏可以真的输入,但按「完成登录」不会把你登进去。</div>
+
+    <div class="lg-f">
+      <label class="lg-lb" for="lg-phone">手机号</label>
+      <input class="lg-in" id="lg-phone" type="tel" inputmode="numeric"
+             autocomplete="tel" maxlength="11" placeholder="11 位手机号">
+    </div>
+
+    <div class="lg-f">
+      <label class="lg-lb" for="lg-otp">短信验证码</label>
+      <div class="lg-row">
+        <input class="lg-in" id="lg-otp" type="text" inputmode="numeric"
+               autocomplete="one-time-code" maxlength="6" placeholder="6 位数字">
+        <button class="lg-code" type="button" id="lg-send">获取验证码</button>
+      </div>
+    </div>
+
+    <div class="ph-note ph-note--calm" id="lg-say">
       <svg class="ic"><use href="#i-info"/></svg>
-      <span>用<b>手机流量</b>比连大厅公共 WiFi 稳 —— 公共 WiFi 常有认证页拦着，
-            传到一半会断。</span>
+      <span id="lg-say-t"><b>先填号码，再取验证码。</b>
+            验证码只验这一次，<b>本机不保存你的号码</b> ——
+            它只用来把这次办理挂到你自己的账号下。</span>
     </div>
 
     <div class="ph-note ph-note--warn">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <span>证件类文件传过去后，机器上默认<b>办完即清</b>。
-            如果你选了存进账号，保留期是 <b>7 天</b>。</span>
-    </div>
-
-    <div class="ph-note ph-note--calm">
       <svg class="ic"><use href="#i-alert"/></svg>
-      <span>传失败会明确告诉你是哪一个、为什么，<b>不会悄悄少传一份</b>。</span>
+      <span><b>不登录也能用。</b>不登录就是「离场即清」：
+            这次传的、做的，办完就没了。登录只决定<b>东西能不能留到下次</b>，
+            不决定你能不能办。</span>
     </div>
   </div>
 
@@ -249,7 +497,7 @@
   <div class="ph-body" data-at="s3">
     <div class="ph-h">这次办理结束了</div>
     <div class="ph-p">
-      01 号机那边已经<b>结束并清空</b>。这一页也跟着失效了 ——
+      <span data-site="terminalNo">01 号机</span>那边已经<b>结束并清空</b>。这一页也跟着失效了 ——
       它本来就只为那一次办理服务。
     </div>
 
@@ -266,36 +514,102 @@
 
     <div class="ph-note ph-note--calm">
       <svg class="ic"><use href="#i-info"/></svg>
-      <span><b>本机没有 App，也不需要你装。</b>
-            下次要用，还是走到机器前扫一次码 —— 那样最省事，
-            也不用在手机上多留一个东西。</span>
+      <span><b>本机没有 App，也不需要你装。</b></span>
     </div>
+  </div>
 
-    <div class="ph-note ph-note--calm">
+
+  <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条（手机版式） ══════════
+       收进来的：这一页是什么 / 合规边界 / 隐私与保留期限 / 传输口径 /
+                 产物去向（为什么这一页不能打印）/ AI 与设备离线的降级说明。
+       **没有**收进来（必须常驻）：顶部「正在为 01 号机服务」、「这一页不能打印」
+       这条当前能力状态、每一态的一句话状态提示与传输进度。 -->
+  <div class="nb-bar nb-bar--phone" data-notebar>
+    <button type="button" class="nb-sum">
       <svg class="ic"><use href="#i-shield"/></svg>
-      <span>这一页<b>不会给你发通知</b>，也不占后台 —— 关掉就行。</span>
+      <span class="nb-sum-t">信息与边界&nbsp;· 隐私与保留口径</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>这一页是什么 · 边界在哪</div>
+        <p class="nb-p">这不是第二个 App：<b>没有首页、没有「我的」、没有消息中心</b>，也不需要你装任何东西。它<b>只承接当前这台一体机的这一次办理</b>——机器那边办完，这一页立即失效。它<b>不会给你发通知</b>，也不占后台，关掉就行；下次要用，走到机器前再扫一次码。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>为什么这一页不能打印</div>
+        <p class="nb-p">出纸是机器上的动作，<b>必须在机器前面按</b>——这一页只负责把文件递过去、把做完的接回来。费用与核价都在机器上的打印工作台完成，手机这边不收款。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+        <p class="nb-p">传过去的文件<b>只进入这一次办理</b>，跟着机器那边的规则走：<b>没登录就离场即清</b>，登录了才存进账号。证件类文件在机器上默认<b>办完即清</b>；选了存进账号的按类型算：证件类等敏感件 <b>7 天</b>，一般文档 <b>90 天</b>。</p>
+        <p class="nb-p">在自己手机上输手机号，<b>号码不会出现在大厅那块屏幕上</b>——把敏感输入挪离公共屏幕是有意的设计。办理结束后没存、没打印的东西<b>已经清掉了</b>，机器那边不留，这一页也拿不回来；你存进手机的文件不受影响。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-upload"/></svg>传输口径</div>
+        <p class="nb-p">传的时候别关这一页、也别锁屏，传完机器那边会自动出现，不用手动刷新。用<b>手机流量比连大厅公共 WiFi 稳</b>——公共 WiFi 常有认证页拦着，传到一半会断。传失败会明确告诉你是哪一个、为什么，<b>不会悄悄少传一份</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 或机器离线时会怎样</div>
+        <p class="nb-p"><b>AI 不可用：</b>文件照样能传，机器那边暂时不做识别与建议。<b>机器离线：</b>传过去也打不出来，可以先存进「我的文档」，等机器好了或换一台在线的机器再打，别白跑一趟。当前是哪种情况，以底部那行状态提示为准。</p>
+        <p class="nb-p"><b>两个方向受影响的程度不一样：</b>「机器离线」挡的是出纸，所以往机器传文件这条路会白跑；而<b>把机器上已经做好的那一份存到手机，属于下载，不受出纸影响</b>。这一页永远不能打印——存进手机也不等于打印，要出纸仍然得回机器前面按。</p>
+      </div>
     </div>
   </div>
 
   <!-- 底部：单一动作，没有导航栏 -->
   <div class="ph-foot">
-    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down">
+    <!-- ── 递过去方向（默认）── -->
+    <!-- data-relay-file 不是多余的：没有它，用户先点过「拍照传过去」再退回
+         s1 按这颗主按钮，s2 会停在上一次的拍照形态，显示的是「刚拍的照片」而不是
+         他这次要传的文件。形态必须由**这一次按的是哪颗**决定。 -->
+    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down" data-relay-send data-relay-file>
       <svg class="ic"><use href="#i-upload"/></svg>选文件传过去
     </button>
-    <button class="ph-btn" data-at="s1" data-when="device-off" style="background:var(--fog-a12);color:var(--fog-800)">
+    <button class="ph-btn" data-at="s1" data-when="device-off" data-relay-send style="background:var(--fog-a12);color:var(--fog-800)">
       先存到「我的文档」，等机器好了再打
     </button>
-    <button class="ph-btn" data-at="s2" style="background:var(--fog-a12);color:var(--fog-800)">
+
+    <!-- ── 带走方向 ──
+         认领到文件才给「存到手机」；没认领到只给「改成传过去」。
+         没有第三种：不能给一个按下去不知道会存什么的按钮。 -->
+    <button class="ph-btn" id="take-btn-save" data-at="s1" data-go="s2" data-relay-take style="display:none">
+      <svg class="ic"><use href="#i-download"/></svg>存到手机
+    </button>
+    <a class="ph-btn" id="take-btn-miss" href="05-phone-relay.html" data-at="s1" data-relay-take
+       style="background:var(--fog-a12);color:var(--fog-800);text-decoration:none">
+      改成：把手机上的文件传过去
+    </a>
+
+    <button class="ph-btn" data-at="s2" data-relay-send style="background:var(--fog-a12);color:var(--fog-800)">
       取消这次传输
     </button>
+    <button class="ph-btn" data-at="s2" data-relay-take style="background:var(--fog-a12);color:var(--fog-800)">
+      取消这次保存
+    </button>
+    <!-- ── 登录这一步 ──
+         「完成登录」不写成 data-go：它不是换一步，它是一次要真的成/败的动作。
+         原型里它做不成，所以按下去说的是「做不成、以及真机会怎么做」，
+         **不显示已登录**。 -->
+    <button class="ph-btn" data-at="slogin" id="lg-done">
+      <svg class="ic"><use href="#i-check"/></svg>完成登录
+    </button>
+    <button class="ph-btn" data-at="slogin" data-go="s1" style="background:var(--fog-a12);color:var(--fog-800)">
+      先不登录，回上一步
+    </button>
+
     <button class="ph-btn" data-at="s3" style="background:var(--fog-a12);color:var(--fog-800)">
       关闭这一页
     </button>
 
     <span class="ph-hint" data-at="s1" data-when="default first">要出纸请回到机器前面 · 这一页不能打印</span>
-    <span class="ph-hint" data-at="s1" data-when="ai-down">文件照样能传 · 机器那边暂时不做识别与建议</span>
-    <span class="ph-hint" data-at="s1" data-when="device-off">机器离线，传过去也打不出来 · 别白跑一趟</span>
-    <span class="ph-hint" data-at="s2">传完机器那边会自动出现，不用手动刷新</span>
+    <span class="ph-hint" data-at="s1" data-when="ai-down" data-relay-send>文件照样能传 · 机器那边暂时不做识别与建议</span>
+    <span class="ph-hint" data-at="s1" data-when="ai-down" data-relay-take>已经做好的这一份照样能带走 · 机器那边暂时不做识别与建议</span>
+    <span class="ph-hint" data-at="s1" data-when="device-off" data-relay-send>机器离线，传过去也打不出来 · 别白跑一趟</span>
+    <span class="ph-hint" data-at="s1" data-when="device-off" data-relay-take>机器离线只影响出纸 · 这一份照样能存进手机，纸要等机器好了再打</span>
+    <span class="ph-hint" data-at="s2" data-relay-send>传完机器那边会自动出现，不用手动刷新</span>
+    <span class="ph-hint" data-at="s2" data-relay-take>存完在手机的「文件」或「下载」里能找到</span>
+    <span class="ph-hint" data-at="slogin">号码只在这台手机上输 · 不出现在大厅那块屏幕上</span>
     <span class="ph-hint" data-at="s3">没有 App 要装 · 下次到机器前扫码就行</span>
   </div>
 
@@ -303,7 +617,283 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/notebar.js?v=2"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   全站「手机接力方向契约」· P05 收件端（2026-08-11）
+   --------------------------------------------------------------------------
+   修的是什么：Codex 复核 (b)§3 —— 全站 14 条「扫码带走这份文件」进的都是
+   裸 05-phone-relay.html。本页既不读文件 ID，默认主动作还是「选文件传到机器」，
+   方向正好相反。用户想把机器上做好的东西拿到手机，打开却被要求从手机选文件上传。
+
+   ── 链接格式（42/08/12/28/39 等来源页按这个拼）─────────────────────────
+     05-phone-relay.html
+       ?dir=take                 方向。缺省 = send（手机 → 机器，即本页原有形态）
+       &from=P42                 来源标识，必须在下面 SRC 登记表里
+       &title=<中文文件名>        产物真名，来源页界面上叫什么就传什么
+       &kind=<类型slug>          可选，title 缺失时用它的中文名兜底
+       &artifactId=<产物编号>     可选，接线后是唯一可信的身份（见文末）
+     `title` 走 encodeURIComponent（中文必须编码）；其余四个值都是
+     [A-Za-z0-9_-]，编不编码写出来一样。接收端一律用 URLSearchParams.get()
+     取值（自带解码），**解码之后**再比白名单。
+     这套 from/kind/title 就是 06 打印台那份「打印材料交接契约」的同一份载荷，
+     不另立一套 —— 08 早就在按它给本页发链接了（08-file-tools.html 的 exits()）。
+
+   ── 三条硬规矩 ────────────────────────────────────────────────────────
+   ① **默认方向不变。**没带 dir 就还是「手机 → 机器」。14 条链接改不改得完
+      不由本页决定，但本页至少要保证：带了 dir=take 的一定走对方向，
+      没带的一定维持原样，不会因为本次改动把上传路径弄坏。
+   ② **dir 认不出来不静默回退。**回退了却不吭声，等于系统偷偷换了方向；
+      用户会以为是自己点错了链接。回退照做，但要说出来。
+      （站内 `dir` 这个名字在 13 岗位情报台那边是「职业方向」，
+      43 会发 dir=%E8%BF%90%E8%90%A5 这种值。名字撞车是既成事实，
+      所以本页只认 take / send 两个字面量，别的一律当没说清并明写出来。）
+   ③ **认不出是哪一份就不显示任何一份。**这是本页最容易犯错的地方：
+      随手摆一份默认文件，用户就以为自己带走了简历，实际带走的是
+      上一个人留在会话里的东西。没有身份 → 只说「没说要带走哪一份」+ 给真出路。
+      和 06 一样：`from` 不在登记表，`title` 一个字都不采纳。
+
+   ══════════════════════════════════════════════════════════════════════════
+   给 Codex 的接线契约
+   --------------------------------------------------------------------------
+   URL 上的 title 永远是可伪造的，本页能做的只有「不认识的来源不认领」和
+   「认领了也署上来源页的名」。根治仍然是 interface-handoff.md §2A 的
+   artifactId 资产链：产物先落地拿到服务端签发的 artifactId，来源页才点亮
+   「扫码带走」；本页只收 artifactId，按 ID 向服务端查文件名、大小、ownerId、
+   有效期，查不到 / 过期 / 不是本人 → 不显示任何文件，只给「回机器前重新点」。
+   届时 title 降级为「服务端没响应时的占位提示」，且必须继续标明是来源页说的。
+   另外：本页**永远不得**出现出纸动作（出纸只在机器上按），
+   也不得因为 dir=take 就把会话延长 —— 一次性会话口径不变。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  /* ══ 落地阶段修正（和 P03 同一处共享脚本的同一个坑）══
+     裸 05-phone-relay.html 打开时落在 s2「正在传到 01 号机」，不是 s1。
+     原因在 scripts/stages.js：没带 ?stage= 时取 firstStage() =
+     「阶段轨里第一个 [data-go]」；本页没有阶段轨，退化成全文档第一个
+     [data-go]，那是页脚「选文件传过去」上的 data-go="s2"。
+     后果：14 条「扫码带走」点进来，第一眼看到的是**一屏正在上传的进度条**，
+     还带着两个不属于他的文件名 —— 既是错方向，又是伪造的进行态。
+     只在本页拨回来，不动共享的 stages.js（31 个页在用）。 */
+  var VALID = { s1: 1, s2: 1, s3: 1 }
+  var wantStage = q.get('stage')
+  if ((!wantStage || !Object.prototype.hasOwnProperty.call(VALID, wantStage)) &&
+      typeof window.v3Stage === 'function') {
+    window.v3Stage('s1')
+  }
+
+  /* 来源页登记表：页号 → 页名。与 06 的 SRC 同源，只保留「会往手机递产物」的页。 */
+  var SRC = {
+    P06: '打印工作台',      P07: '扫描工作台',     P08: '文件加工台',
+    P09: '简历工作台',      P10: '访谈式生成',     P11: '材料工厂',
+    P12: '材料工厂',        P13: '岗位情报台',     P14: '岗位详情',
+    P15: '企业导览',        P16: '线下机构',       P17: '招聘会作战台',
+    P18: '校园招聘专区',    P19: '智慧校园',       P20: '面试训练舱',
+    P21: '政策服务',        P22: '职业规划',       P23: '我的',
+    P24: '权益活动',        P28: '自我探索',       P29: '证件照工作台',
+    P30: '岗位大师决策台',  P31: '签约风险提示',   P32: 'AI 简历服务',
+    P33: '简历素材库',      P36: '招聘会',         P38: '政策服务',
+    P39: '打印扫描服务',    P42: '我的资产',       P43: '我的记录',
+    P45: '招聘会现场',      P46: '校园服务'
+  }
+
+  /* 产物类型白名单：与 06 的 KIND 保持同一份，别处加了这里也要加 */
+  var KIND = {
+    'resume-report': '简历诊断报告', 'jobfit-report': '岗位匹配报告',
+    'material': '求职材料',          'job-list': '岗位清单',
+    'fair-plan': '参会作战单',       'policy-checklist': '办事清单',
+    'assessment-sheet': '自评参考单', 'id-photo-sheet': '证件照排版',
+    'contract-report': '合同风险报告', 'template': '简历版式',
+    'interview-sheet': '面试复盘单'
+  }
+
+  function clean (v, re, max) {
+    v = (v == null ? '' : String(v)).replace(re, '')
+    return v.length > max ? v.slice(0, max) : v
+  }
+  var CTRL = new RegExp('[\\u0000-\\u001f\\u007f<>]', 'g')
+  function set (id, fn) { var el = document.getElementById(id); if (el) fn(el) }
+
+  /* ── ① 方向 ───────────────────────────────────────────────────────── */
+  var rawDir = q.get('dir')
+  var dir = clean((rawDir || '').toLowerCase(), /[^a-z]/g, 8)
+  if (!rawDir) {
+    return                       /* 没说方向 = 原来的「手机 → 机器」，一个字都不改 */
+  }
+  if (dir !== 'take') {
+    if (dir !== 'send') {
+      /* 回退照做，但必须说出来（规矩②） */
+      set('dir-note', function (el) { el.style.display = '' })
+      set('dir-note-t', function (el) {
+        el.textContent = ''
+        var b = document.createElement('b')
+        b.textContent = '这条链接里的方向本机不认识。'
+        el.appendChild(b)
+        el.appendChild(document.createTextNode(
+          '已按默认的「把手机上的文件传过去」显示。要带走机器上做好的东西，' +
+          '请回到机器前面，在那一份的条目上点「扫码带走」。'))
+      })
+    }
+    return
+  }
+
+  /* ── ② 带走方向：先切形态，再决定认不认领文件 ─────────────────────── */
+  scr.classList.add('relay-take')
+
+  var from = clean((q.get('from') || '').toUpperCase(), /[^A-Z0-9]/g, 6)
+  var src = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : null
+
+  var reasons = []
+  if (!src) reasons.push(from
+    ? '链接里的来源页本机不认识，它写的文件名一律不采纳。'
+    : '链接里没写来源页，本机没法核对这一份是从哪来的。')
+
+  /* from 不认识 → title/kind 一个都不看（和 06 同一条口径） */
+  var title = src ? clean(q.get('title'), CTRL, 40).trim() : ''
+  var kind = src ? clean((q.get('kind') || '').toLowerCase(), /[^a-z-]/g, 24) : ''
+  var artifactId = src ? clean(q.get('artifactId'), /[^A-Za-z0-9_-]/g, 32) : ''
+  var name = title || (Object.prototype.hasOwnProperty.call(KIND, kind) ? KIND[kind] : '')
+
+  if (src && !name) {
+    reasons.push(artifactId
+      ? '链接里带了产物编号，但没写文件名，本机认不出这是哪一份。'
+      : '链接里没写这一份叫什么。')
+  }
+
+  if (!name) {
+    /* 认领失败：HTML 默认渲染的就是这一态（#take-miss 在、#take-file 不在），
+       只把原因补一句。失败路径不改 DOM 结构，就不会改错。 */
+    if (reasons.length) {
+      set('take-miss', function (el) {
+        var host = el.querySelector('span')
+        if (!host) return
+        var p = document.createElement('span')
+        p.style.display = 'block'
+        p.style.marginTop = '5px'
+        p.textContent = reasons.join('')
+        host.appendChild(p)
+      })
+    }
+    return
+  }
+
+  /* ── ③ 认领成功：把「哪一份」摆出来 ───────────────────────────────── */
+  set('take-miss', function (el) { el.style.display = 'none' })
+  set('take-h-miss', function (el) { el.style.display = 'none' })
+  set('take-file', function (el) { el.style.display = '' })
+  set('take-h-file', function (el) { el.style.display = '' })
+  set('take-proto', function (el) { el.style.display = '' })
+  set('take-nm', function (el) { el.textContent = name })
+  set('take-nm2', function (el) { el.textContent = name })
+  set('take-k', function (el) {
+    el.textContent = '来自机器上的「' + src + '」' +
+      (Object.prototype.hasOwnProperty.call(KIND, kind) ? ' · ' + KIND[kind] : '') +
+      (artifactId ? ' · 产物编号 ' + artifactId : '')
+  })
+  set('take-btn-miss', function (el) { el.style.display = 'none' })
+  set('take-btn-save', function (el) { el.style.display = '' })
+
+  if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+})()
+
+/* ══════════════════════════════════════════════════════════════════════════
+   s1 三条分支的接线（2026-08-11）
+   --------------------------------------------------------------------------
+   修的是什么：所有者亲自逮到「登录三选一里的手机扫码点下去什么都不发生」，
+   全站回归后本页 s1 的三张 .act 卡同样命中 —— 而且更严重：这三条是用户
+   **在自己手机上**要点的全部动作，一个都点不动。
+
+   实测（干净页面、七种事件各打一遍、比对整个 body.outerHTML）：
+     传文件到机器 / 拍照传过去 / 在手机上完成登录 → 全部零变化。
+     它们是裸 <button>，没有 href、没有 data-go、没有 onclick、没有任何监听。
+   同一组里第四张「存走刚生成的文件」是 <a href>，一直是好的 ——
+   所以这不是「整组没接」，是三张卡被漏掉了。
+
+   接法：**进对应形态，不弹提示。**
+     传文件 → s2（.relay-photo 关）  拍照 → s2（.relay-photo 开）
+     登录   → slogin（手机侧号码 + 验证码表单）
+   形态开关落在 .screen 的 class 上，不新开 data-* 轴（见页首方向轴注释）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  function go (st) {
+    if (typeof window.v3Stage === 'function') window.v3Stage(st)
+    else { scr.setAttribute('data-stage', st); if (window.v3ApplyVisibility) window.v3ApplyVisibility() }
+  }
+
+  scr.addEventListener('click', function (e) {
+    var b = e.target.closest &&
+            e.target.closest('[data-relay-file],[data-relay-photo],[data-relay-login]')
+    if (!b) return
+    var act = b.hasAttribute('data-relay-file') ? 'file'
+            : b.hasAttribute('data-relay-photo') ? 'photo' : 'login'
+
+    /* 拍照与传文件是同一步的两种形态，先把形态定死再切阶段 ——
+       反过来会让 s2 先按上一次的形态闪一帧。 */
+    if (act === 'file')  { scr.classList.remove('relay-photo'); go('s2'); return }
+    if (act === 'photo') { scr.classList.add('relay-photo');    go('s2'); return }
+    if (act === 'login') { go('slogin') }
+  })
+
+  /* ── 登录这一步：能真的输入，但不假装登录成功 ──────────────────────
+     原型不发短信、不建会话。所以这两个按钮**只说真话**：
+     该拦的先拦（号码没填够就说没填够），做不到的明说做不到。
+     绝不出现「已登录」「登录成功」—— 那是本稿根本没有的落点。 */
+  var say = document.getElementById('lg-say')
+  var sayT = document.getElementById('lg-say-t')
+  function tell (html, warn) {
+    if (!sayT || !say) return
+    sayT.innerHTML = html
+    say.className = 'ph-note ' + (warn ? 'ph-note--warn' : 'ph-note--calm')
+    /* 状态变化要能被读屏播报，否则视障用户按下去也是「没反应」 */
+    say.setAttribute('role', 'status')
+    say.setAttribute('aria-live', 'polite')
+  }
+  function digits (id) {
+    var el = document.getElementById(id)
+    return el ? (el.value || '').replace(/\D/g, '') : ''
+  }
+
+  var sendBtn = document.getElementById('lg-send')
+  if (sendBtn) sendBtn.addEventListener('click', function () {
+    var p = digits('lg-phone')
+    if (p.length !== 11) {
+      tell('<b>先把 11 位手机号填完。</b>现在填了 ' + p.length + ' 位 —— ' +
+           '号码不够位数，短信没法发。', true)
+      return
+    }
+    /* 号码中段打码：这一页的存在理由就是别让旁人看见号码，
+       回显整串等于自己拆自己的台。 */
+    tell('<b>原型不发短信。</b>真机这时会向 ' +
+         p.slice(0, 3) + '****' + p.slice(7) +
+         ' 发一条验证码，60 秒内可重发；<b>本稿收不到码</b>，' +
+         '下面那栏随便填也验不过。', true)
+  })
+
+  var doneBtn = document.getElementById('lg-done')
+  if (doneBtn) doneBtn.addEventListener('click', function () {
+    var p = digits('lg-phone'), c = digits('lg-otp')
+    if (p.length !== 11) { tell('<b>手机号还没填完。</b>要 11 位，现在是 ' + p.length + ' 位。', true); return }
+    if (c.length !== 6)  { tell('<b>验证码还没填完。</b>要 6 位，现在是 ' + c.length + ' 位。', true); return }
+    /* 两栏都填齐了 —— 但本稿**没有**校验端点，所以这里不能说「登录成功」。
+       说清楚差在哪、真机会怎么走、以及现在还能干什么。 */
+    tell('<b>这一稿到此为止：没有短信校验端点，验不了，也就没法把你登进去。</b><br>' +
+         '真机在这一步校验验证码，通过后把这次办理挂到你的账号下，' +
+         '并跳回机器那边继续。<br>' +
+         '<b>现在不登录也能办</b> —— 回上一步照样能传文件、拍照传过去，' +
+         '只是东西办完即清、留不到下次。', true)
+  })
+})()
+</script>
 </body>
 </html>

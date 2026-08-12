@@ -16,8 +16,40 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
 <style>
-  /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。 */
+  /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。
+
+     2026-08-10 重心整改：右副列 348 → 296、页边 56 → 24，宽度还给产出物
+     （主功能区占屏 42.4% → 51%）。同时把 t1「三处槽位要你核」从右栏说明
+     搬到稿纸正下方 —— 它是对这封信要动手的三件事，属于产出物，不是旁注；
+     顺带补上左栏长期存在的 564px 空洞（自检「主栏留白过大」一直报 1）。 */
+  .work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
+
+  /* 稿纸下方的槽位条：四态都在，内容随态换，不留空洞也不假装已经填好 */
+  .slots { flex: 0 0 auto; margin-top: var(--s-4); padding: var(--s-4) var(--s-5);
+    border-radius: var(--r-md); background: var(--glass-1-bg);
+    border: 1px solid var(--glass-1-brd); backdrop-filter: blur(var(--glass-blur));
+    display: flex; flex-direction: column; gap: var(--s-2); }
+  .slots-hd { display: flex; align-items: center; gap: var(--s-3);
+    font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+  .slots-hd .ic { width: 19px; height: 19px; color: var(--amber-400); }
+  .slots-hd em { font-style: normal; font-weight: 400; margin-left: auto;
+    font-size: var(--fz-1); color: var(--fog-600); }
+  .slotrow { display: flex; align-items: center; gap: var(--s-4);
+    min-height: var(--touch-min); padding: 0 var(--s-3);
+    border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .slotrow .k { flex: 0 0 96px; font-size: var(--fz-2); color: var(--fog-600); }
+  .slotrow .v { min-width: 0; flex: 1; font-size: var(--fz-3); color: var(--fog-900); }
+  .slotrow .st { flex: 0 0 auto; font-size: var(--fz-1); color: var(--amber-200); }
+
   .letter { font-size: 12px; line-height: 1.95; color: var(--paper-ink); }
   .letter p { margin: 0 0 11px; }
   .letter .sign { margin-top: 18px; text-align: right; }
@@ -57,6 +89,40 @@
   .tplgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); overflow-y: auto; }
   .speak > .locked { flex: 1 1 auto; }
   .paper-stage .paper-empty { flex: 1 1 auto; }
+  /* 2026-08-11 卡内空洞复核（t1）：纸台高 1154，纸只有 973（A4 按 688px 栏宽算死的高度），
+     纸原来贴着纸台上沿，下面 165px 露的是纸台底色 —— 那是版面没接住纸。
+     与 20 / 22 同一处置：单张纸在纸台里居中，上下各 82px 对称。
+     ai-down / first 两态换成 .paper-empty（flex:1 1 auto 自己撑满），这条规则不起作用。 */
+  [data-at="t1"] .paper-stage { justify-content: center; }
+  /* 2026-08-11 卡内空洞整改（口径与 08 的 t3 证件照同一套）：
+     上一版把 .locked 撑满 .speak 就算完了 —— 主栏尾部读数确实归零，但空洞只是从
+     栏背景搬进了卡里：实测 t2 的 .locked 高 1256px，里面只有 220px（first）/
+     297px（ai-down）内容居中，上下各空 470px 左右。
+     「没有内容可给」是真的，「所以这里可以空 470px」不是。按 08 的做法改三件事：
+       1) 按主内容尺寸放大：图标 88px、标题 fz-9、正文 fz-5、按钮 64px
+          （27 寸竖屏触控，CLAUDE.md §9 主按钮 ≥56px）；
+       2) 把真实原因和真实出口讲满，而不是一句话带过；
+       3) 下面补 .t2grid —— 两张卡的内容**一条没新增**：左边那张是本页
+          .actionbar-hint 里逐个工具、逐个态已经写好的状态（t1/t3/t4 三行原样搬过来），
+          右边那张是 .rail 那句「四件都基于你已有的简历」与 t3 pane 里
+          「清单来自主办方公告原文，不依赖 AI」的展开。
+     .locked 保留 flex:1 1 auto：它现在吸收的是 .t2grid / .slots 之后的剩余，
+     内容放大后自身余白落到 200px 以内，不再是空盒。 */
+  .screen[data-stage="t2"] .speak > .locked { gap: var(--s-5); padding: var(--s-7); }
+  .screen[data-stage="t2"] .speak > .locked > .ic { width: 88px; height: 88px; }
+  .screen[data-stage="t2"] .speak > .locked > b { font-size: var(--fz-9); }
+  .screen[data-stage="t2"] .speak > .locked p { font-size: var(--fz-5); line-height: 1.72; max-width: 40em; }
+  .screen[data-stage="t2"] .speak > .locked p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+  .screen[data-stage="t2"] .speak > .locked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-7); }
+  .t2grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); flex: 0 0 auto; }
+  .t2grid .pane { display: flex; flex-direction: column; }
+  .t2grid .kv-row { min-height: 58px; font-size: var(--fz-3); }
+  /* 左列标签不许从词中间断开（实测「AI 的角色」被断成「AI 的角 / 色」、
+     「结构卡」断成「结构 / 卡」）——中文排版禁则，也影响扫读。 */
+  .t2grid .kv-row .k { white-space: nowrap; }
+  .t2grid .pane-hd .t { font-size: var(--fz-5); }
+  .t2grid .notice { font-size: var(--fz-3); line-height: 1.66; padding: var(--s-5); }
+  .t2grid .notice .ic { width: 22px; height: 22px; }
   .screen[data-state="first"] .ck--have .ck-box,
   .screen[data-state="ai-down"] .ck--gen .ck-box { background: transparent; border-color: var(--brd-2); }
   .tpl {
@@ -74,13 +140,137 @@
     position: absolute; left: 0; right: 0; bottom: 0; padding: 4px 0; text-align: center;
     font-size: 11px; color: var(--paper-fog); background: rgba(255,255,255,.9);
   }
+  /* ── 2026-08-11 卡内空洞整改 · t4 六张模板缩略图 ────────────────────────
+     回归台报这六张各空 378–400px（卡高 498，正文只画到 60–100px）。判为 B：
+     **模板缩略图的全部内容就是「整页版面长什么样」**，只画顶上四五根条，
+     六张看起来几乎一模一样，「单栏 / 带侧栏 / 时间线 / 一页版」根本分不出来 ——
+     这不是留白，是预览没画完。
+     处置：沿用 .tpl i 自己那套记号（同色 --paper-200、4px 行高），把版面画到页脚，
+     并让六张按各自名字呈现真实结构差异。.fill 是**正文其余部分**的整块记号，
+     一个元素代替堆几十根空条；不含任何文字，也不代表任何人的简历内容。
+     .tpl 的 padding-bottom 由 16 抬到 26，让正文停在底部说明条之上。 */
+  /* T4 右栏「六张差在哪」：一列六行，行高由剩余空间摊（flex:1 1 0），
+     内容垂直居中 —— 摊出来的余量是围绕主体的均衡空间，不是卡底的空洞。
+     一体机站着点，行高实测 100px 上下，远在 48px 触控下限之上。 */
+  .tplc-wrap { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
+  /* flex-basis 必须是 auto 不是 0：取 0 时六行强行等高，而「带侧栏 · 技能突出」
+     那行标题会折行、注文也最长，实测被自己的行框切掉最后一行（.tplc 没有 overflow，
+     所以「卡内溢出」那一项也报不出来 —— 又是一次贴边元素骗过检查）。
+     auto 是「先按内容撑开，再把余量按比例摊给每一行」，谁也不会被切。 */
+  .tplc {
+    flex: 1 1 auto; min-height: 56px; display: flex; flex-direction: column;
+    justify-content: center; gap: 3px; text-align: left;
+    padding: 8px 11px; border-radius: var(--r-xs);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    color: inherit; font: inherit; cursor: pointer;
+  }
+  /* 用 --jade-a12 不是 --jade-a08：后者**全站都没有定义**（tokens.css 里只有
+     a12 / a20 / a32），写了等于整条 background 作废、选中行连底色都没有。
+     这正是回归报告里 --fog-aNN 那次事故的同一类，自查时按九套主题逐个取过
+     computed value 才发现。已知 11 / 14 / 15 三页也在用 var(--jade-a08)，
+     同样是死声明 —— 不在本轮授权范围，只登记不动。 */
+  .tplc[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+  .tplc-t { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+    font-size: var(--fz-2); font-weight: 600; color: var(--fog-900); }
+  .tplc-ats { margin-left: auto; flex: 0 0 auto; white-space: nowrap;
+    font-size: var(--fz-1); font-weight: 400; color: var(--jade-600); font-family: var(--ff-num); }
+  .tplc-ats--no { color: var(--amber-600); }
+  .tplc-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+
+  .tpl { padding-bottom: 26px; }
+  .tpl .fill {
+    flex: 1 1 auto; min-height: 0; height: auto; border-radius: 0;
+    background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 12px);
+  }
+  .tpl .fill--tight { background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 9px); }
+  .tpl .fill--loose { background: repeating-linear-gradient(to bottom, var(--paper-200) 0 4px, transparent 4px 17px); }
+  .tpl .cols { display: flex; gap: 9px; flex: 1 1 auto; min-height: 0; }
+  .tpl .cols > .side { width: 34%; flex: 0 0 auto; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .cols > .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .tlrail { position: relative; padding-left: 14px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+  .tpl .tlrail::before { content: ""; position: absolute; left: 4px; top: 3px; bottom: 3px; width: 1.5px; background: var(--paper-200); }
+  /* 本次要用的那一版：场合一改，两张稿子的主次跟着换 */
+  .speak-card[aria-current="true"] { border-color: var(--jade-a32); box-shadow: 0 0 0 1px var(--jade-a20) inset; }
+  .speak-now { font-size: var(--fz-1); color: var(--jade-600); background: var(--jade-a12);
+    border: 1px solid var(--jade-a20); border-radius: 4px; padding: 2px 7px; }
+  /* 结果反馈层：点了要有交代。无 data-when/data-at，applyVisibility 不碰它 */
+  .fb { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center;
+        background: rgba(4,8,10,.62); padding: var(--s-6); }
+  .fb-box { width: min(640px, 100%); max-height: 76%; overflow-y: auto;
+        border-radius: var(--r-lg); padding: var(--s-6);
+        background: var(--ink-100); border: 1px solid var(--glass-1-brd);
+        box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: var(--s-4); }
+  .fb-ic { width: 56px; height: 56px; border-radius: var(--r-md); display: grid; place-items: center;
+        background: var(--jade-a12); border: 1px solid var(--jade-a20); }
+  .fb-ic .ic { width: 27px; height: 27px; color: var(--jade-500); }
+  .fb-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); line-height: var(--lh-snug); }
+  .fb-p { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.66; }
+  .fb-p b { color: var(--fog-900); }
+  .fb-go { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+  .fb-go .btn { flex: 1 1 200px; min-height: 56px; }
+  /* 本域次要入口：主返回键按 ?from= 改去业务域之后，本域首屏不能没有门。
+     只在返回键被改走时由脚本插入。
+     **为什么挂在 rail 不挂在 actionbar**：本页操作栏已经满了 —— 返回键 117px、
+     两个大按钮之外留给提示区的只剩 108px，再塞任何东西（实测 56px 起）提示文案就
+     从 1 行挤成 2 行、撞出操作栏 11px，并把标点顶到行首（走查项「卡内溢出」「标点在行首」
+     由 3/0 涨到 10/4）。P06/P07/P18 操作栏还有余量，那三页仍挂在返回键右边。
+     rail 右端本来就空着 300px 以上，挂上去零回归（实测与基线完全相同）。 */
+  .rail > .altbtn {
+    margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 var(--s-4);
+    white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+    background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+    font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  }
+  .rail > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
+
+  /* ── 上一屏带来的参数 · 回执条（2026-08-11 URL 参数消费）─────────────────
+     只有 URL 真带了本页认得的参数时，脚本才把这一条**插进 DOM**；
+     不带参数 → 节点根本不存在，版面与整改前逐像素相同（自检基线不动）。
+     类名一律 mfrom- 前缀，不含 card / note / act / pane / row / item /
+     pill / chip / tag / btn 子串 —— audit-plus 按 [class*=] 选元素。 */
+  .mfrom {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px;
+    padding: 14px var(--s-4); margin-bottom: var(--s-4); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .mfrom-hd { display: flex; align-items: center; gap: 10px;
+    font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+  .mfrom-hd > .ic { width: 19px; height: 19px; flex: 0 0 auto; color: var(--azure-400); }
+  .mfrom-hd .src { margin-left: auto; flex: 0 0 auto;
+    font-size: var(--fz-1); font-weight: 400; color: var(--fog-600); white-space: nowrap; }
+  .mfrom-set { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* 状态回显，不是入口：不给 cursor、不给 hover（同全站「状态标签不是入口」口径） */
+  .mfrom-one {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 14px;
+    border-radius: var(--r-xs); background: var(--fog-a04); border: 1px solid var(--brd-1);
+    font-size: var(--fz-2); color: var(--fog-900); cursor: inherit;
+  }
+  .mfrom-one i { font-style: normal; color: var(--fog-600); }
+  .mfrom-nt { font-size: var(--fz-1); color: var(--fog-700); line-height: 1.6; }
+  .mfrom-nt b { color: var(--fog-900); }
+  .mfrom-nt em { font-style: normal; color: var(--fog-800); }
 </style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="t1" data-theme="warm">
+<!-- 离场确认（scripts/leaveguard.js）：
+     t1–t4 是四个并列的工具，不是流程步骤，所以按「这个台面上有没有你的东西」判。
+     只拦 t1 / t2 —— 这两样是对着你的简历和目标岗位写出来的稿子，一走就没了。
+     t3 不拦：材料清单取自主办方公告原文，回来还是那一份；勾选是按本机已有材料算的，
+     不是你输进去的东西，重进一次原样就回来了。
+     t4 不拦：那一步只是在版式里点一个，还没生成任何东西（要按「应用到我的简历」才生成 v3），
+     选错了重点一下就是，拦它纯属打扰。
+     data-guard-keep 只挂 t2：t2 的「这两版拿去做什么」里有一个四态常驻、真接了线的
+     「存进我的文档」按钮。t1 的同名按钮只在打印机离线那一态出现，默认态下这个落点并不存在，
+     所以不给 t1 写 keep —— 平时没有的按钮不该由弹层凭空补出来。 -->
+<div class="screen" data-state="default" data-stage="t1" data-theme="warm"
+     data-guard-at="t1 t2"
+     data-guard-lose-t1="刚写好的这封求职信（写给「用户运营专员」的那一版，含你核对过的三处槽位）"
+     data-guard-lose-t2="刚写好的自我介绍口述稿（30 秒版和 60 秒版两版）"
+     data-guard-keep-t2="存进「我的文档」">
 
   <div class="grain"></div>
   <div class="pulseline"></div>
@@ -117,99 +307,193 @@
       <!-- T1 求职信 -->
       <div class="paper" data-at="t1">
         <div class="paper-bar">
-          <span class="nm">求职信_用户运营专员.pdf</span>
-          <span class="mt" data-when="default device-off">A4 · 1 页 · 约 320 字</span>
+          <span class="nm" data-out="fname">求职信_用户运营专员.pdf</span>
+          <span class="mt" data-when="default device-off" data-out="fmeta">A4 · 1 页 · 约 320 字</span>
           <span class="mt" data-when="ai-down">未生成</span>
           <span class="mt" data-when="first">还没有简历</span>
+          <!-- 2026-08-11 死按钮复核：回归台报这两个翻页键「按下去什么都不发生」。
+               核实结果是**本来就不该有反应** —— 求职信恒定 1 页（下面 render() 里
+               fmeta 写的就是「A4 · 1 页」，篇幅 200/300/500 字只改纸面排布，不会翻到第 2 页），
+               一共一页，没有上一页也没有下一页。
+               所以不给它接线：为了消掉一条报警而造一个假翻页，比留着这条报警更糟。
+               改成 aria-disabled，让「没得翻」这件事读屏和回归台都能读出来，
+               不再是一个看起来能按、按了没反应的键。 -->
           <span class="pg" data-when="default device-off">
-            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <button class="pgbtn" aria-label="上一页 · 本文只有 1 页" aria-disabled="true"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
             <span>第 1 / 共 1 页</span>
-            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+            <button class="pgbtn" aria-label="下一页 · 本文只有 1 页" aria-disabled="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
           </span>
         </div>
         <div class="paper-stage">
-          <div class="sheet-a4" data-when="default device-off">
+          <!-- data-void-ok（2026-08-11 卡内空洞复核）：回归台报这张纸底部空 500px。判 A。
+               ① 内容确实写完了：这是一封完整的求职信 —— 称呼 → 开头（写明岗位来源）→
+                  正文 → 结语 → 落款「王 ×」+ 联系电话 + 日期，页脚就是落款，不是断在半截。
+                  长度由用户在右栏「篇幅」自己选，纸面跟着实时重排（实测同一张纸：
+                  200 字档 → 空 547px、300 字档 → 空 500px、500 字档 → 空 350px），
+                  不是写死的短样张。一封 300 字的中文求职信在 A4 上本来就占大半页不到，
+                  往下面补字等于替用户多写他没让本机写的话。
+               ② 纸在栏里的位置对：纸宽 688px 铺满 720px 主栏（左右各 16px 纸台内边距），
+                  纸台已按上面那条 CSS 居中，上下各 82px 对称，不是纸贴上沿、下面露底色。
+               另：纸下方紧接着「三处要你自己核」槽位条，它属于这份产出物本身，不是旁注。 -->
+          <div class="sheet-a4" data-when="default device-off"
+               data-void-ok="A4 纸样：一封完整的求职信（称呼→开头→正文→结语→落款与日期），篇幅由用户在右栏自选并实时重排（实测 200/300/500 字档纸面依次变长）；300 字的中文求职信在 A4 上本来就占不满一页，补字等于替用户多写他没让本机写的话">
             <h4 style="font-size:19px">求职信</h4>
-            <div class="meta">应聘岗位：用户运营专员 · <span class="slot-mark">某科技有限公司</span></div>
+            <div class="meta" data-out="lmeta">应聘岗位：用户运营专员 · <span class="slot-mark">某科技有限公司</span></div>
             <div class="hr"></div>
-            <div class="letter">
-              <p>尊敬的招聘负责人：</p>
-              <p>您好。我在<span class="slot-mark">前程无忧</span>看到贵公司招聘用户运营专员，特此应聘。</p>
-              <p>我有 2 年 3 个月运营经验。在上一家公司独立运营公众号，半年内粉丝从 3000 增至 12000；
-                 策划并执行 8 场线上活动，单场最高带来 340 个新增关注。这些数字都可以在面试时提供后台截图核对。</p>
-              <p>贵公司这个岗位要求熟练使用 SQL 独立取数，这一项我目前只做到能写基础查询，
-                 还没有独立支撑过完整的数据复盘。我会在入职前继续补，也希望能有机会在实际工作中练。</p>
-              <p>随信附上简历，期待有机会与您详谈。</p>
-              <div class="sign">
-                <span class="slot-mark">王 ×</span><br>
-                <span style="font-size:11px;color:var(--paper-fog)">联系电话 138****2046 · 2026 年 8 月 8 日</span>
-              </div>
-            </div>
+            <div class="letter" data-out="letter"></div>
             <span class="pgno">1 / 1</span>
           </div>
           <div class="paper-empty" data-when="ai-down">
             <svg class="ic"><use href="#i-offline"/></svg>
             <b>生成服务中断</b>
             <p>求职信是纯 AI 生成能力，现在不可用。<br>可以打印一份<b>空白求职信格式纸</b>手写，格式要点印在页脚。</p>
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印格式纸</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=空白求职信格式纸&amp;back=t1">打印格式纸</a>
           </div>
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
             <b>先得有简历</b>
-            <p>求职信里的经历和数字都来自你的简历，<br>不会另外问你一遍，也不会凭空编。</p>
+            <p>求职信里的经历和数字都来自你的简历。</p>
             <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
           </div>
+        </div>
+
+        <!-- 槽位条：稿纸上黄底那三处，就在稿纸正下方列出来，四态都在。
+             这不是旁注 —— 它是这封信里**只有你能填**的三格，属于产出物本身。 -->
+        <div class="slots">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span data-when="default device-off">三处要你自己核</span>
+            <span data-when="ai-down">格式纸上也是这三处要手填</span>
+            <span data-when="first">有简历后生成，这三处仍要你核</span>
+            <em>照公告写全</em>
+          </div>
+          <div class="slotrow"><span class="k">公司全称</span>
+            <span class="v" data-when="default device-off">某科技有限公司</span>
+            <span class="v v--fog" data-when="ai-down first">留空 · 手写</span>
+            <span class="st">待你核对</span></div>
+          <div class="slotrow"><span class="k">来源平台</span>
+            <span class="v" data-when="default device-off">前程无忧 · JX-88214</span>
+            <span class="v v--fog" data-when="ai-down first">留空 · 手写</span>
+            <span class="st">待你核对</span></div>
+          <div class="slotrow"><span class="k">你的署名</span>
+            <span class="v v--fog">本机不替你签名</span>
+            <span class="st">待你填写</span></div>
         </div>
       </div>
 
       <!-- T2 自我介绍 -->
       <div class="speak" data-at="t2" style="flex:1 1 auto;min-height:0;overflow-y:auto">
-        <div class="speak-card" data-when="default device-off">
-          <div class="speak-hd"><span class="t">30 秒版 · 现场递简历时用</span><span class="s">约 95 字</span></div>
-          <div class="speak-txt">
-            您好，我叫<b>王 ×</b>，做运营两年多。上一份工作在一家科技公司，
-            <b>独立运营公众号，半年从 3000 粉做到 12000</b>；也策划过 8 场线上活动。
-            我今天投的是用户运营专员，简历在这儿，您方便的话我可以补充说一下增长那部分是怎么做的。
-          </div>
+        <div class="speak-card" data-when="default device-off" data-card="s30">
+          <div class="speak-hd"><span class="t">30 秒版 · 现场递简历时用</span><span class="speak-now" data-out="now30" hidden>本次要用的</span><span class="s" data-out="len30">约 95 字</span></div>
+          <div class="speak-txt" data-out="txt30"></div>
         </div>
-        <div class="speak-card" data-when="default device-off">
-          <div class="speak-hd"><span class="t">1 分钟版 · 面试开场用</span><span class="s">约 210 字</span></div>
-          <div class="speak-txt">
-            您好，我叫王 ×，2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，主要负责两块：
-            <b>公众号从 0 到 1 的日常运营</b>，半年粉丝从 3000 到 12000；以及<b>线上活动</b>，
-            做过 8 场，单场最高带来 340 个新增关注。<br>
-            另外我在学校带过一个校园推广项目，带 5 个人在 3 所高校做地推。<br>
-            我看到这个岗位要求 SQL 取数，说实话我目前只能写基础查询，还没独立做过完整的数据复盘，
-            这块是我接下来想补的。其他要求我基本都做过。
-          </div>
+        <div class="speak-card" data-when="default device-off" data-card="s60">
+          <div class="speak-hd"><span class="t">1 分钟版 · 面试开场用</span><span class="speak-now" data-out="now60" hidden>本次要用的</span><span class="s" data-out="len60">约 210 字</span></div>
+          <div class="speak-txt" data-out="txt60"></div>
         </div>
         <!-- 2026-08-09 留白复核补实：代写边界卡——两版稿子里每个事实的出处，
              与 t1「没有新增任何事实」同口径。 -->
         <div class="speak-card" data-when="default device-off">
           <div class="speak-hd"><span class="t">这两版是怎么写出来的</span><span class="s">代写边界</span></div>
           <div class="speak-txt" style="font-size:var(--fz-3)">
-            里面每一个事实——2 年 3 个月、3000 到 12000、8 场活动、带 5 人地推——都取自你的简历 v2
-            <span class="ev ev--e1">E1 你的材料</span>，SQL 那句短板来自你诊断里的缺口。
-            AI 只把它们组织成口语稿 <span class="ev ev--e3">E3 表达属 AI 判断</span>，<b>没有替你新增任何经历</b>；
-            你没给过的内容，这里一个字也不会出现。
+            每个事实都取自简历 v2 <span class="ev ev--e1">E1 你的材料</span>，AI 只负责组织成口语稿
+            <span class="ev ev--e3">E3</span>，<b>没有替你新增任何经历</b>。
           </div>
         </div>
         <div class="notice notice--amber" style="margin-top:auto" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>照着念会很假。</b>这是给你熟悉逻辑用的稿子——记住三个数字和一句短板，
-            现场用自己的话说。缺点那句建议保留，主动说短板比被问出来好。<span class="ev ev--e3">E3 表达属 AI 判断</span></span>
+            现场用自己的话说。缺点那句建议保留，主动说短板比被问出来好。<span class="ev ev--e3">E3</span></span>
         </div>
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
-          <b>生成中断</b>
-          <p>可以先打印一张<b>自我介绍结构卡</b>：说什么、按什么顺序、哪三处该放数字。<br>不含具体内容，需要你自己填。</p>
-          <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印结构卡</a>
+          <b>自我介绍稿现在生成不了</b>
+          <p>口述稿是<b>纯 AI 生成能力</b>——它把你简历里已有的事实组织成能说出口的话。
+            现在 AI 服务中断，<b>没有稿子可以给你</b>，本机也不会拿一份通用模板套上你的名字充数。<br>
+            <b>打印不受影响</b>：可以先打一张自我介绍结构卡，说什么、按什么顺序、哪三处该放数字都印在纸上，
+            <b>不含具体内容</b>，你自己填；服务恢复后回这一页重新生成。</p>
+          <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍结构卡&amp;pages=1&amp;copies=1&amp;back=t2">打印结构卡</a>
+            <button class="btn btn--ghost" type="button" data-go="t3">去材料清单 · 不依赖 AI</button>
+          </div>
         </div>
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
-          <b>先得有简历</b>
-          <p>自我介绍里的经历与数字来自你的简历，不会凭空编。</p>
-          <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
+          <b>先得有简历，才能写自我介绍</b>
+          <p>这一页四件事<b>都基于你已有的简历</b>，不重复问你一遍：口述稿里的经历和数字
+            全部取自简历里已经写着的内容，<b>本机不替你编</b>。现在没有简历，就没有可组织的事实。<br>
+            做简历有两条路：把现成的<b>传进来或扫进来</b>，或者让顾问<b>问你几个问题边聊边成形</b>。</p>
+          <div style="display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="09-resume-workbench.html">去简历工作台 · 上传或扫描</a>
+            <a class="btn btn--ghost" href="10-resume-interview.html">让小青问你几个问题</a>
+          </div>
+        </div>
+
+        <!-- 2026-08-11 卡内空洞整改：两张卡的内容一条没新增 ——
+             左卡是 .actionbar-hint 里 t1 / t3 / t4 各自那一态已经写好的状态，原样搬过来
+             并排成一屏能看全的四行；右卡是 .rail「四件都基于你已有的简历」与
+             t3 pane「清单来自主办方公告原文，不依赖 AI」「AI 只组织表达」的展开。
+             为什么要搬：用户此刻卡住了，最需要知道的就是「那另外三件还能不能做」——
+             这个答案本来散在操作栏和右栏里，得切到那个工具才看得到。 -->
+        <div class="t2grid" data-when="ai-down first">
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">这四件现在能做哪几件</span>
+              <span class="s" data-when="ai-down">AI 中断时</span>
+              <span class="s" data-when="first">还没有简历时</span>
+            </div>
+            <div class="kv" data-when="ai-down">
+              <div class="kv-row"><span class="k">求职信</span><span class="v v--fog">生成不可用 · 可打印空白格式纸手写</span></div>
+              <div class="kv-row"><span class="k">自我介绍</span><span class="v v--fog">就是这一件 · 生成不可用</span></div>
+              <div class="kv-row"><span class="k">材料清单</span><span class="v">照常显示 · 不依赖 AI</span></div>
+              <div class="kv-row"><span class="k">简历模板</span><span class="v">只改排版 · 不依赖 AI</span></div>
+            </div>
+            <div class="kv" data-when="first">
+              <div class="kv-row"><span class="k">求职信</span><span class="v v--fog">先得有简历</span></div>
+              <div class="kv-row"><span class="k">自我介绍</span><span class="v v--fog">就是这一件 · 先得有简历</span></div>
+              <div class="kv-row"><span class="k">材料清单</span><span class="v">可以看该带什么 · 勾选状态要你的材料</span></div>
+              <div class="kv-row"><span class="k">简历模板</span><span class="v v--fog">先去做简历</span></div>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)" data-when="ai-down">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>中断只影响<b>要 AI 写字</b>的两件。清单来自主办方公告原文，模板只动排版，都照常。</span>
+            </div>
+            <div class="notice" style="margin-top:var(--s-4)" data-when="first">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>清单是<b>唯一不需要简历</b>的一件：它能告诉你该带什么，只是标不出哪些你已经有了。</span>
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">这一件的规矩</span>
+              <span class="s">开着关着都一样</span>
+            </div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">稿子里的事实</span><span class="v">全取自你的简历 · 无新增</span></div>
+              <div class="kv-row"><span class="k">AI 的角色</span><span class="v">只把事实组织成口语 · 不替你编经历</span></div>
+              <div class="kv-row"><span class="k">结构卡</span><span class="v v--fog">只有顺序与该放数字的位置 · 不含内容</span></div>
+              <div class="kv-row"><span class="k">给谁看</span><span class="v">只给你本人 · 不进任何库</span></div>
+            </div>
+            <div class="notice notice--amber" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-alert"/></svg>
+              <span><b>照着念会很假。</b>稿子是给你熟悉逻辑用的——现场用自己的话说，
+                三个数字和一句短板记住就够。</span>
+            </div>
+          </div>
+        </div>
+        <!-- 空态是居中块，栏底会空出一大截（自检「主栏留白过大」）。
+             这一条顶在栏底：说清没生成时纸上会是什么，不是装饰。 -->
+        <div class="slots" data-when="ai-down first">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span>现在能带走的</span>
+            <em>A4 · 1 页 · 黑白</em>
+          </div>
+          <div class="slotrow"><span class="k">纸上有</span>
+            <span class="v">说什么、按什么顺序、哪三处该放数字</span></div>
+          <div class="slotrow"><span class="k">纸上没有</span>
+            <span class="v v--fog">具体内容 —— 要你自己填，本机不代写</span></div>
         </div>
       </div>
 
@@ -219,57 +503,32 @@
         <div class="checks" style="margin-bottom:var(--s-4)">
           <div class="checks-hd">
             <svg class="ic" style="width:19px;height:19px;color:var(--azure-400)"><use href="#i-policy"/></svg>
-            <span class="t">周五招聘会 · 建议带的材料</span>
-            <span class="s" data-when="default device-off">来源：主办方公告 · 同步 08:52</span>
-            <span class="s" data-when="ai-down">来源：主办方公告 · 同步 08:52</span>
+            <span class="t" data-out="ckTitle">周五招聘会 · 建议带的材料</span>
+            <span class="s" data-when="default device-off" data-out="ckSrc">来源：主办方公告 · 同步 08:52</span>
+            <span class="s" data-when="ai-down" data-out="ckSrc">来源：主办方公告 · 同步 08:52</span>
           </div>
           <div class="checks-list" style="grid-template-columns:1fr">
-            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>清单来自<b>主办方公告原文</b>与你已收藏的 3 家企业要求 <span class="ev ev--e2">E2 来源信息</span>，不是模型凭经验列的。勾选状态按你在本机的材料自动判断 <span class="ev ev--e1">E1 你的材料</span>。</span>
+            <span class="chk"><svg class="ic"><use href="#i-info"/></svg>清单取自<b data-out="ckOrigin">主办方公告原文</b> <span class="ev ev--e2">E2 来源信息</span>；勾选按本机已有材料判断 <span class="ev ev--e1">E1 你的材料</span>。</span>
           </div>
         </div>
-        <div class="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
-          <div class="ck ck--have"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">纸质简历 5 份</span><span class="ck-s">现场普遍收纸质件；128 家参展，5 份偏保守</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已在打印队列</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">身份证原件</span><span class="ck-s">入场登记需要，主办方公告第 3 条</span></span>
-            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
-          <div class="ck ck--have"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">学位证 / 毕业证复印件 2 份</span><span class="ck-s">3 家收藏企业中 2 家在 JD 里要求</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已扫描存档</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">证件照 2 张</span><span class="ck-s">部分企业现场填表要贴</span></span>
-            <span class="ck-tag-status"><span class="chip chip--info">本机暂不能拍</span></span></div>
-          <div class="ck"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">笔</span><span class="ck-s">现场填表用，主办方不一定提供</span></span>
-            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
-          <!-- 2026-08-09：求职信状态跟 AI 走——t1 的 ai-down 态明说「未生成」，这里不能仍标已生成 -->
-          <div class="ck ck--have ck--gen"><span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">求职信 1 份（可选）</span><span class="ck-s">投递明确目标企业时递上去更显诚意</span></span>
-            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default device-off">已生成</span><span class="chip chip--info" data-when="ai-down">未生成 · 可手写</span></span></div>
+        <!-- 清单由「给哪件事准备」驱动：三件事各有各的清单，选择必须换内容，不能只换标题 -->
+        <div class="cklist" data-out="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
         </div>
-        <!-- 2026-08-09 留白复核补实：清单是给周五招聘会用的，就近给作战台与打印通道。
-             first 态不显示——locked 卡里已有「去准备材料」，避免重复入口。 -->
-        <div class="xlane" style="margin-top:var(--s-4)" data-when="default ai-down device-off">
-          <span class="xlane-hd">清单备齐之外，这两处也是给周五准备的</span>
-          <div class="xlane-row">
-            <a class="xlane-go" href="17-fair-desk.html">
-              <span class="src-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
-              <span class="xlane-tx">
-                <span class="xlane-nm">招聘会作战台</span>
-                <span class="xlane-ds">展位图、到场企业和现场提醒都在那边</span>
-              </span>
-              <svg class="ic"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="xlane-go" href="09-resume-workbench.html">
-              <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
-              <span class="xlane-tx">
-                <span class="xlane-nm">简历工作台</span>
-                <span class="xlane-ds">出发前想再顺一遍简历，从这里回去改</span>
-              </span>
-              <svg class="ic"><use href="#i-arrowRight"/></svg>
-            </a>
+        <!-- 2026-08-10 重心整改：这里原有一条横向通道（招聘会作战台 / 简历工作台），
+             是典型的"你可能还想去" —— 跟"备齐这份清单"这件事无关。
+             17-fair-desk 有 5 处别的入口、09-resume-workbench 有 9 处，都不是唯一路径，已删。
+             换成这条产物规格：清单打出来是什么、哪些本机办不了。它顶在栏底，
+             既是真实信息，也接住了 .cklist 撑开后的栏底（自检「主栏留白过大」）。 -->
+        <div class="slots" data-when="default ai-down device-off">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span>这份清单打出来</span>
+            <em>A4 · 1 页 · 黑白</em>
           </div>
+          <div class="slotrow"><span class="k">纸上有</span>
+            <span class="v">全部条目 + 每条的「已有 / 你自己带」</span></div>
+          <div class="slotrow"><span class="k">本机办不了</span>
+            <span class="v v--fog">标了「你自己带」的那几样，纸上照标</span></div>
         </div>
 
         <div class="locked" data-when="first">
@@ -282,12 +541,20 @@
 
       <!-- T4 简历模板 -->
       <div class="tplgrid" data-at="t4">
-        <div class="tpl" aria-current="true"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i></i><i></i><i class="s"></i><span>单栏 · 稳妥</span></div>
-        <div class="tpl"><i class="t"></i><i class="bar"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>单栏 · 紧凑</span></div>
-        <div class="tpl"><i class="t"></i><i></i><i class="bar"></i><i class="s"></i><i></i><span>带侧栏 · 技能突出</span></div>
-        <div class="tpl"><i class="t"></i><i class="s"></i><i></i><i class="bar"></i><i></i><i></i><span>时间线式</span></div>
-        <div class="tpl"><i class="t"></i><i></i><i></i><i class="s"></i><i class="bar"></i><span>校招 · 一页版</span></div>
-        <div class="tpl"><i class="t"></i><i class="bar"></i><i class="s"></i><i></i><i></i><i class="s"></i><span>项目优先</span></div>
+        <!-- 六张缩略图画的是**版面**，不是内容：条纹只表示「这里有一行字」，
+             不承载任何文字，也不代表任何人的简历。差别按各自名字来：
+             单栏行距宽 / 单栏行距紧 / 左侧栏 / 左时间轴 / 一页两大块 / 项目块提到最前。 -->
+        <div class="tpl" aria-current="true" data-tpl="0"><i class="t"></i><i></i><i class="s"></i><i class="bar"></i><i class="fill fill--loose"></i><span>单栏 · 稳妥</span></div>
+        <div class="tpl" data-tpl="1"><i class="t"></i><i class="s"></i><i class="bar"></i><i class="fill fill--tight"></i><i class="bar"></i><i class="fill fill--tight"></i><span>单栏 · 紧凑</span></div>
+        <div class="tpl" data-tpl="2"><i class="t"></i><i class="s"></i>
+          <div class="cols">
+            <div class="side"><i class="bar"></i><i></i><i class="s"></i><i class="bar"></i><i class="fill"></i></div>
+            <div class="main"><i class="bar"></i><i class="fill"></i></div>
+          </div><span>带侧栏 · 技能突出</span></div>
+        <div class="tpl" data-tpl="3"><i class="t"></i><i class="s"></i>
+          <div class="tlrail"><i class="bar"></i><i class="fill"></i><i class="bar"></i><i class="fill"></i></div><span>时间线式</span></div>
+        <div class="tpl" data-tpl="4"><i class="bar"></i><i class="t"></i><i class="s"></i><i class="fill fill--loose"></i><i class="bar"></i><i class="fill fill--loose"></i><span>校招 · 一页版</span></div>
+        <div class="tpl" data-tpl="5"><i class="t"></i><i class="bar"></i><i class="fill"></i><i class="s"></i><i class="bar"></i><i class="fill fill--tight"></i><span>项目优先</span></div>
       </div>
     </div>
 
@@ -298,41 +565,36 @@
       <div class="pane" data-at="t1">
         <div class="pane-hd"><span class="t">写给哪个岗位</span><span class="s">来自真实岗位</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">岗位</span><span class="v">用户运营专员</span></div>
-          <div class="kv-row"><span class="k">来源机构</span><span class="v" style="color:var(--azure-400)">前程无忧</span></div>
-          <div class="kv-row"><span class="k">同步时间</span><span class="v">8 月 8 日 09:20</span></div>
-          <div class="kv-row"><span class="k">外部 ID</span><span class="v">JX-88214</span></div>
+          <div class="kv-row"><span class="k">岗位</span><span class="v" data-out="jNm">用户运营专员</span></div>
+          <div class="kv-row"><span class="k">来源机构</span><span class="v" style="color:var(--azure-400)" data-out="jOrg">前程无忧</span></div>
+          <div class="kv-row"><span class="k">同步时间</span><span class="v" data-out="jSync">8 月 8 日 09:20</span></div>
+          <div class="kv-row"><span class="k">外部 ID</span><span class="v" data-out="jId">JX-88214</span></div>
         </div>
-        <button class="btn btn--ghost" style="width:100%;margin-top:12px">换一个岗位</button>
+        <button class="btn btn--ghost" style="width:100%;margin-top:12px" data-act="job">换一个岗位</button>
       </div>
       <div class="pane" data-at="t1">
         <div class="pane-hd"><span class="t">怎么写</span><span class="s" data-when="default device-off">已预设</span><span class="s" data-when="ai-down first">需你设置</span></div>
         <div class="field">
-          <div class="field-lb">语气<span class="prefill" data-when="default device-off">按岗位类型预设 · 可改</span></div>
-          <div class="seg"><button aria-pressed="true">务实</button><button aria-pressed="false">热情</button><button aria-pressed="false">正式</button></div>
+          <div class="field-lb">语气<span class="prefill" data-when="default device-off" data-out="pfTone">按岗位类型预设 · 可改</span></div>
+          <div class="seg" data-param="tone"><button aria-pressed="true" data-v="务实">务实</button><button aria-pressed="false" data-v="热情">热情</button><button aria-pressed="false" data-v="正式">正式</button></div>
         </div>
         <div class="field">
-          <div class="field-lb">长度</div>
-          <div class="seg"><button aria-pressed="false">200 字</button><button aria-pressed="true">300 字</button><button aria-pressed="false">500 字</button></div>
+          <div class="field-lb">长度<span class="prefill" data-when="default device-off" data-out="pfLen">约 320 字</span></div>
+          <div class="seg" data-param="len"><button aria-pressed="false" data-v="200">200 字</button><button aria-pressed="true" data-v="300">300 字</button><button aria-pressed="false" data-v="500">500 字</button></div>
         </div>
         <div class="field">
           <div class="field-lb">要不要主动写短板</div>
-          <div class="seg"><button aria-pressed="true">写</button><button aria-pressed="false">不写</button></div>
+          <div class="seg" data-param="weak"><button aria-pressed="true" data-v="写">写</button><button aria-pressed="false" data-v="不写">不写</button></div>
         </div>
       </div>
+      <!-- 原来这里叫「两处要你自己核」，第一条讲三处槽位 —— 已搬到左栏稿纸正下方
+           （那里才看得见黄底在哪）。这里只留隐私与事实来源口径。 -->
       <div class="pane pane--fill" data-at="t1" style="margin-top:auto">
-        <div class="pane-hd"><span class="t">两处要你自己核</span></div>
-        <div class="notice notice--amber">
-          <svg class="ic"><use href="#i-alert"/></svg>
-          <span>黄底标出来的三处是<b>槽位</b>：公司全称、来源平台、你的署名。公司全称请照招聘公告写全，
-            别用简称——正式信里写错公司名是硬伤。</span>
-        </div>
-        <div class="notice" style="margin-top:10px">
+        <div class="pane-hd"><span class="t">这封信的出处</span></div>
+        <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>信里的经历与数字全部取自你的简历 v2，<b>没有新增任何事实</b>。短板那段是按你在诊断里的缺口写的，
-            你可以改措辞，但建议保留——主动说比被问出来好。<span class="ev ev--e3">E3 表达属 AI 判断</span><br>
-            <b>求职信、自我介绍、材料清单都只给你本人看，不向任何企业提供、不进入任何库；</b>
-            未登录时只留到本次会话结束。</span>
+          <span>经历与数字取自简历 v2，<b>无新增事实</b> <span class="ev ev--e3">E3</span>；
+            <b>只给你本人看，不进任何库</b>，未登录离场即清。</span>
         </div>
       </div>
 
@@ -340,32 +602,31 @@
       <div class="pane" data-at="t2">
         <div class="pane-hd"><span class="t">用在什么场合</span></div>
         <div class="field">
-          <div class="field-lb">场合<span class="prefill" data-when="default device-off">按周五招聘会预设 · 可改</span></div>
-          <div class="seg"><button aria-pressed="true">招聘会递简历</button><button aria-pressed="false">面试开场</button></div>
+          <div class="field-lb">场合<span class="prefill" data-when="default device-off" data-out="pfScene">按周五招聘会预设 · 可改</span></div>
+          <div class="seg" data-param="scene"><button aria-pressed="true" data-v="招聘会递简历">招聘会递简历</button><button aria-pressed="false" data-v="面试开场">面试开场</button></div>
         </div>
         <div class="field">
           <div class="field-lb">要不要提短板</div>
-          <div class="seg"><button aria-pressed="true">提</button><button aria-pressed="false">不提</button></div>
+          <div class="seg" data-param="weak2"><button aria-pressed="true" data-v="提">提</button><button aria-pressed="false" data-v="不提">不提</button></div>
         </div>
         <div class="field" style="border-bottom:0">
           <div class="field-lb">突出哪一段</div>
-          <div class="seg"><button aria-pressed="true">公众号增长</button><button aria-pressed="false">校园地推</button></div>
+          <div class="seg" data-param="focus"><button aria-pressed="true" data-v="公众号增长">公众号增长</button><button aria-pressed="false" data-v="校园地推">校园地推</button></div>
         </div>
       </div>
+      <!-- 产物去向只留两个：打印、存文档。原来还有「对着练一遍」（与操作栏主按钮
+           同一个去处，重复）和「发到我手机」（第三个去向），已删。 -->
       <div class="pane pane--fill" data-at="t2" style="margin-top:auto">
-        <div class="pane-hd"><span class="t">练一遍再上场</span></div>
+        <div class="pane-hd"><span class="t">这两版拿去做什么</span></div>
         <div class="outs">
-          <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>对着练一遍</a>
-          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练习不可用</button>
-          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
+          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍小卡片&amp;back=t2"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-printer"/></svg>小卡片未生成</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
-          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
+          <button class="out" data-fb="save"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>打印小卡片是名片大小，能塞进证件套，现场瞄一眼就行，不用整页拿在手上。</span>
+          <span>小卡片是名片大小，能塞进证件套，现场瞄一眼就行。</span>
         </div>
       </div>
 
@@ -373,15 +634,15 @@
       <div class="pane" data-at="t3">
         <div class="pane-hd"><span class="t">给哪件事准备</span></div>
         <div class="field">
-          <div class="field-lb">事项<span class="prefill" data-when="default device-off">按你收藏的场次预设 · 可改</span></div>
-          <div class="seg" style="flex-wrap:wrap"><button aria-pressed="true">周五招聘会</button><button aria-pressed="false">补贴申领</button><button aria-pressed="false">入职报到</button></div>
+          <div class="field-lb">事项<span class="prefill" data-when="default device-off" data-out="pfItem">按你收藏的场次预设 · 可改</span></div>
+          <div class="seg" style="flex-wrap:wrap" data-param="item"><button aria-pressed="true" data-v="fair">周五招聘会</button><button aria-pressed="false" data-v="subsidy">补贴申领</button><button aria-pressed="false" data-v="onboard">入职报到</button></div>
         </div>
         <div class="field" style="border-bottom:0">
-          <div class="field-lb">份数按几家企业算</div>
-          <div class="stepper">
-            <button aria-label="减少"><svg class="ic"><use href="#i-minus"/></svg></button>
-            <span class="val">5<span class="unit"> 家</span></span>
-            <button aria-label="增加"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <div class="field-lb" data-out="stepLb">份数按几家企业算</div>
+          <div class="stepper" data-param="copies">
+            <button aria-label="减少" data-step="-1"><svg class="ic"><use href="#i-minus"/></svg></button>
+            <span class="val"><span data-out="copies">5</span><span class="unit" data-out="copiesUnit"> 家</span></span>
+            <button aria-label="增加" data-step="1"><svg class="ic"><use href="#i-plus"/></svg></button>
           </div>
         </div>
       </div>
@@ -389,23 +650,21 @@
            ai-down 态求职信未生成、结论也变了，不能沿用同一句。 -->
       <div class="pane pane--fill" data-at="t3" style="margin-top:auto">
         <div class="pane-hd">
-          <span class="t" data-when="default device-off">还差两样</span>
+          <span class="t" data-when="default device-off" data-out="ckLack">还差两样</span>
           <span class="t" data-when="ai-down">清单不受影响</span>
           <span class="t" data-when="first">先看该带什么</span>
-          <span class="s" data-when="default device-off">3 / 6 已有</span>
+          <span class="s" data-when="default device-off" data-out="ckCount">3 / 6 已有</span>
         </div>
         <div class="notice" data-when="first">
           <svg class="ic"><use href="#i-info"/></svg>
           <span>还没有你的材料，这一栏先不下结论。有了简历、扫描件或生成好的求职信之后，
             这里会标出<b>哪些已经有了、哪些本机办不了</b>。</span>
         </div>
+        <!-- 原来这里两条说的是同一件事（本机办不了的那几样），合成一条。 -->
         <div class="notice notice--amber" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>证件照本机拍不了</b>——没配补光和背景板，拍出来不合规格。请到照相馆拍，或用已有的电子照去「文件加工」打印。</span>
-        </div>
-        <div class="notice" style="margin-top:10px" data-when="default device-off">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>身份证原件和笔本机都给不了，清单上标了「你自己带」。<b>能办的和不能办的分开写</b>，别让你到现场才发现差东西。</span>
+          <span><b>证件照、身份证原件和笔，本机都给不了</b>，清单上标了「你自己带」——
+            别让你到现场才发现差东西。</span>
         </div>
         <div class="notice" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -415,18 +674,31 @@
 
       <!-- T4 模板 -->
       <div class="pane" data-at="t4">
-        <div class="pane-hd"><span class="t">选中：单栏 · 稳妥</span></div>
+        <div class="pane-hd"><span class="t" data-out="tplNm">选中：单栏 · 稳妥</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">适合</span><span class="v">大部分岗位</span></div>
-          <div class="kv-row"><span class="k">页数</span><span class="v">你的内容约 1 页</span></div>
-          <div class="kv-row"><span class="k">字号</span><span class="v">正文 10.5pt</span></div>
-          <div class="kv-row"><span class="k">机读友好</span><span class="v" style="color:var(--jade-600)">是</span></div>
+          <div class="kv-row"><span class="k">适合</span><span class="v" data-out="tplFor">大部分岗位</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" data-out="tplPg">你的内容约 1 页</span></div>
+          <div class="kv-row"><span class="k">字号</span><span class="v" data-out="tplFz">正文 10.5pt</span></div>
+          <div class="kv-row"><span class="k">机读友好</span><span class="v" data-out="tplAts" style="color:var(--jade-600)">是</span></div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>带侧栏和双栏模板在部分企业的简历筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
+          <span data-out="tplNote">带侧栏和双栏模板在部分企业的筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
         </div>
       </div>
+      <!-- ══ 2026-08-11 A30：t4 右栏这两张卡之间原来实测空 765px（y=565→1330）——
+           下面那张写着 margin-top:auto 贴在栏底，于是「主栏尾部」读数 0、
+           「卡内空洞」量的也是贴底的最后一个叶子，三项检查一个都报不出来。
+           处置按既定口径「放大主内容」：这一步用户要做的决定就是**在六张里挑一张**，
+           而右栏原来只讲选中的那一张，六张之间差在哪要靠一张张点过去试。
+           这里把决定所需的对照摆出来 —— 数据直接取自本页那份 TPL 表（见下方脚本），
+           不另写一份，改一处两处一起变，不可能对不上。点一行就切换，
+           与左栏缩略图同一个 P.tpl，不是第二套入口。 ══ -->
+      <div class="pane pane--fill pane--grow" data-at="t4">
+        <div class="pane-hd"><span class="t">六张差在哪</span><span class="s">点一行就换</span></div>
+        <div class="tplc-wrap" data-tplc></div>
+      </div>
+
       <div class="pane pane--fill" data-at="t4" style="margin-top:auto">
         <div class="pane-hd"><span class="t">换模板会怎样</span></div>
         <div class="notice">
@@ -435,7 +707,7 @@
         </div>
         <div class="outs" style="margin-top:14px">
           <a class="out" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-layers"/></svg>应用到我的简历</a>
-          <a class="out" data-when="default ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打样一份 · 去核价</a>
+          <a class="out" data-when="default ai-down" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=template&amp;title=简历版式打样&amp;pages=1&amp;copies=1&amp;back=t4"><svg class="ic"><use href="#i-printer"/></svg>打样一份 · 去核价</a>
           <a class="out" data-when="first" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>先去做简历</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
         </div>
@@ -444,53 +716,72 @@
   </div>
 
   <div class="actionbar">
+      <a class="backbtn" href="32-resume-hub.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="t1">
-        <div data-when="default device-off"><div class="t">经历与数字全部取自简历 v2，没有新增事实</div><div class="s">黄底三处是槽位：公司全称、来源平台、署名，要你自己核</div></div>
+        <!-- 2026-08-10 全量回归修：t1 这条最长，而 t1 的主按钮也最宽（核对 3 处后去核价打印），
+             操作栏留给 hint 的净宽只有 103px —— 两行文字被挤成 7 行、块高 152px，
+             从 118px 高的操作栏底下漏出去 17px（压在导航条上）。
+             这两句右栏本来就有：字数见槽位卡「长度 · 实际约 N 字」，
+             三处槽位见槽位卡整段说明。操作栏只留最短提示，信息一个字没丢。 -->
+        <div data-when="default device-off"><div class="t" data-out="hint1">写给用户运营专员</div><div class="s">三处槽位要你核对</div></div>
         <div data-when="ai-down"><div class="t">求职信生成不可用</div><div class="s">可打印空白格式纸手写</div></div>
-        <div data-when="first"><div class="t">先得有简历</div><div class="s">求职信不会另外问你一遍，也不凭空编</div></div>
+        <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写求职信</div></div>
       </div>
       <div data-at="t2">
-        <div data-when="default device-off"><div class="t">两个版本：30 秒递简历用，1 分钟面试开场用</div><div class="s">照着念会很假 · 记住三个数字和一句短板就够</div></div>
+        <div data-when="default device-off"><div class="t" data-out="hint2">本次用 30 秒版 · 招聘会递简历</div><div class="s">照着念会很假 · 记住三个数字和一句短板就够</div></div>
         <div data-when="ai-down"><div class="t">生成不可用，可打印结构卡自己填</div><div class="s">结构卡只给顺序，不含内容</div></div>
-        <div data-when="first"><div class="t">先得有简历</div><div class="s">内容来自你的简历，不凭空编</div></div>
+        <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写口述稿</div></div>
       </div>
       <div data-at="t3">
-        <div data-when="default device-off"><div class="t">6 样里已有 3 样，还差证件照和身份证原件</div><div class="s">清单来自主办方公告原文，不是模型凭经验列的</div></div>
+        <!-- 同上：device-off 的 t3 主按钮是「发到我手机 · 扫码带走」，同样把 hint 挤爆。
+             「来自主办方公告原文」在左栏清单卡里已逐条标注来源。 -->
+        <div data-when="default device-off"><div class="t" data-out="hint3">已有 3 样 · 差 3 样</div><div class="s">来自主办方公告原文</div></div>
         <div data-when="ai-down"><div class="t">清单照常显示，不依赖 AI</div><div class="s">只有「哪些你已经有了」需要读你的材料</div></div>
         <div data-when="first"><div class="t">清单可以看，勾选状态需要你的材料</div><div class="s">没有材料时只显示该带什么</div></div>
       </div>
       <div data-at="t4"><div class="t">换模板只改排版，不改一个字</div><div class="s">生成 v3，v1 与 v2 都保留，可随时切回</div></div>
     </div>
 
-    <button class="btn btn--lg btn--ghost" data-at="t1" data-when="default device-off">换一版措辞</button>
+    <button class="btn btn--lg btn--ghost" data-at="t1" data-when="default device-off" data-act="rephrase">换一版措辞</button>
     <button class="btn btn--lg btn--ghost" data-at="t1" data-when="ai-down first" data-go="t3">看材料清单</button>
-    <button class="btn btn--lg btn--ghost" data-at="t2">切换场合</button>
-    <button class="btn btn--lg btn--ghost" data-at="t3">加一样自定义</button>
+    <button class="btn btn--lg btn--ghost" data-at="t2" data-act="scene">切换场合</button>
+    <button class="btn btn--lg btn--ghost" data-at="t3" data-act="addck">加一样自定义</button>
     <button class="btn btn--lg btn--ghost" data-at="t4" data-go="t1">回求职信</button>
 
-    <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=求职信&amp;pages=1&amp;copies=1&amp;back=t1">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
     <a class="btn btn--primary" data-at="t1" data-when="first" href="09-resume-workbench.html">先去做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <button class="btn btn--primary" data-at="t1" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=空白求职信格式纸&amp;back=t1">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="t1" data-when="device-off" data-fb="save">存进我的文档 · 扫码带走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="t2" data-when="default device-off" href="20-interview-pod.html">对着练一遍<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html?stage=s3">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
-    <button class="btn btn--primary" data-at="t3" data-when="device-off">发到我手机<svg class="ic"><use href="#i-phone"/></svg></button>
+    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍结构卡&amp;pages=1&amp;copies=1&amp;back=t2">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=材料清单&amp;back=t3">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="t3" data-when="device-off" data-fb="phone">发到我手机 · 扫码带走<svg class="ic"><use href="#i-phone"/></svg></button>
     <a class="btn btn--primary" data-at="t4" href="09-resume-workbench.html?stage=s5">应用到我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
+
+  <!-- 结果反馈层：发手机 / 存文档点完必须有交代，并给返回入口 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
 
 </div>
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
@@ -504,14 +795,586 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
-  // 模板选中
-  scr.addEventListener('click', function (e) {
-    var t = e.target.closest('.tpl')
-    if (!t) return
-    scr.querySelectorAll('.tpl').forEach(function (x) { x.setAttribute('aria-current', x === t ? 'true' : 'false') })
-  })
 })()
 </script>
+<script>
+/* ============================================================================
+   四个台面的参数模型。为什么必须有：原来 7 组 seg、份数步进、换岗位、换措辞、
+   切场合、加自定义全部点了没反应，产出物（求职信正文 / 两版口述稿 / 材料清单 /
+   模板说明）是写死的 —— 参数与结论之间没有任何因果，等于把设定摆着好看。
+   现在信由「语气 × 长度 × 写不写短板 × 措辞版本」拼出来，口述稿由
+   「场合 × 提不提短板 × 突出哪段」拼出来，清单由「给哪件事准备 × 份数」决定。
+   事实池是固定的（简历 v2 里那几条），任何组合都不新增经历。
+   ========================================================================== */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* ── 事实池：全部取自简历 v2，任何参数组合都只是重新组织，不新增 ── */
+  var F = {
+    yrs: '2 年 3 个月', wx: '半年内粉丝从 3000 增至 12000', act: '策划并执行 8 场线上活动，单场最高带来 340 个新增关注',
+    campus: '带 5 个人在 3 所高校做校园地推', weak: 'SQL 只能写基础查询，还没独立支撑过完整的数据复盘'
+  }
+  var JOBS = [
+    { nm: '用户运营专员', org: '前程无忧', sync: '8 月 8 日 09:20', id: 'JX-88214' },
+    { nm: '新媒体运营',   org: '智联招聘', sync: '8 月 8 日 08:40', id: 'ZL-52307' },
+    { nm: '内容运营助理', org: '市人力资源市场官网', sync: '8 月 7 日 17:05', id: 'SH-20260807-19' }
+  ]
+  var TPL = [
+    { nm: '单栏 · 稳妥', to: '大部分岗位', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '最保守的一版，投大公司不会出错。' },
+    { nm: '单栏 · 紧凑', to: '经历较多时', pg: '你的内容约 1 页', fz: '正文 10pt',   ats: '是', note: '行距压紧，同样一页能多放两段。' },
+    { nm: '带侧栏 · 技能突出', to: '技能型岗位', pg: '你的内容约 1 页', fz: '正文 10pt', ats: '否 · 可能乱序', note: '侧栏在部分筛选系统里会<b>乱序</b>，投大公司慎用。' },
+    { nm: '时间线式', to: '经历连贯的人', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '时间轴清楚，空窗期也会一并显出来。' },
+    { nm: '校招 · 一页版', to: '应届与实习', pg: '强制 1 页', fz: '正文 10pt', ats: '是', note: '强制一页，超出的内容会被压缩。' },
+    { nm: '项目优先', to: '项目经历强的人', pg: '你的内容约 1 页', fz: '正文 10.5pt', ats: '是', note: '项目排在工作经历前面，适合作品说话。' }
+  ]
+  /* 三件事各有各的清单。来源都是外部公开信息，本机只做展示与勾选。 */
+  var LISTS = {
+    fair: {
+      title: '周五招聘会 · 建议带的材料', src: '来源：主办方公告 · 同步 08:52', origin: '主办方公告原文',
+      stepLb: '份数按几家企业算', unit: ' 家', pf: '按你收藏的场次预设 · 可改',
+      items: [
+        { t: '纸质简历 {n} 份', s: '现场普遍收纸质件', have: 1, tag: '已在打印队列', tone: 'jade', ai: 1 },
+        { t: '身份证原件', s: '入场登记需要', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '学位证 / 毕业证复印件 2 份', s: '3 家收藏企业中 2 家要求', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '证件照 2 张', s: '部分企业现场填表要贴', have: 0, tag: '本机暂不能拍', tone: '' },
+        { t: '笔', s: '现场填表用', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '求职信 1 份（可选）', s: '投明确目标企业时更显诚意', have: 1, tag: '已生成', tone: 'jade', gen: 1 }
+      ]
+    },
+    subsidy: {
+      title: '补贴申领 · 窗口要收的材料', src: '来源：人社局办事指南 · 同步 08:52', origin: '人社局办事指南',
+      stepLb: '复印件按几份准备', unit: ' 份', pf: '按办事指南默认 2 份 · 可改',
+      items: [
+        { t: '身份证复印件 {n} 份', s: '正反面复印在同一页', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '失业登记证明', s: '在就业服务窗口开具', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '本人一类银行卡', s: '补贴只打本人账户', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '解除劳动合同证明', s: '原单位出具', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '社保缴纳记录', s: '可在本机打印电子版', have: 1, tag: '可本机打印', tone: 'jade' },
+        { t: '申领表', s: '窗口现场领取填写', have: 0, tag: '现场领', tone: '' }
+      ]
+    },
+    onboard: {
+      title: '入职报到 · 单位要收的材料', src: '来源：用人单位入职通知 · 同步 08:52', origin: '入职通知原文',
+      stepLb: '复印件按几份准备', unit: ' 份', pf: '按入职通知默认 2 份 · 可改',
+      items: [
+        { t: '身份证复印件 {n} 份', s: '人事建档用', have: 1, tag: '已扫描存档', tone: 'jade' },
+        { t: '学位证 / 毕业证原件', s: '现场核验后退还', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '离职证明', s: '原单位出具，入职前必须有', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '体检报告', s: '指定医院一个月内有效', have: 0, tag: '你自己带', tone: 'amber' },
+        { t: '一寸证件照 2 张', s: '工牌与档案用', have: 0, tag: '本机暂不能拍', tone: '' },
+        { t: '银行卡复印件', s: '发薪账户', have: 1, tag: '可本机打印', tone: 'jade' }
+      ]
+    }
+  }
+  var EXTRA = ['成绩单复印件', '获奖证书复印件', '实习证明']
+
+  var P = { tone: '务实', len: '300', weak: '写', variant: 0, job: 0,
+            scene: '招聘会递简历', weak2: '提', focus: '公众号增长',
+            item: 'fair', copies: 5, tpl: 0, custom: [] }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     上一屏带过来的参数（2026-08-11 · URL 参数消费 · Codex 复核表「12 只读 from」）
+
+     谁在传、传什么（36-fairs-hub.html:405 那张「求职材料准备」卡）：
+       ?session=<场次>   三选一：8月12日 · 综合场 / 8月15日 · 校园专场 / 还没定
+       ?dir=<方向>       四选一：运营 / 销售 / 行政人事 / 技术
+       ?view=templates   ai-down 降级路径「用现成模板自己填」
+       ?from=P36         已被页尾那段「来源感知返回」消费（改返回键父级），这里不重复读
+     36 的卡面此前如实标着「待接线 · 目标页未读参数」「接线后自动生效」——
+     这一轮把能真做的做掉，做不到的照旧写明白，不含糊。
+
+     三项各自能做到什么，界线画在这里：
+       · view    → **真消费**：切到它承诺的那个台面（templates→t4 / checklist→t3）。
+       · session → **真消费一半**：场次意味着这是招聘会场景，所以把「给哪件事准备」
+                   切到「周五招聘会」那一套，并把场次名写进清单抬头。
+                   但**条目一条不改** —— 清单条目来自主办方公告原文，本机手上没有
+                   按场次分桶的第二份公告，换抬头就换条目那是编。回执写明这一点。
+       · dir     → **只登记，不改内容**：本页四个台面（求职信 / 自我介绍 / 材料清单 /
+                   简历模板）没有任何按岗位方向分化的数据，求职信里的经历与数字全部
+                   取自简历 v2 的运营事实池；拿运营的事实去写一封销售求职信就是造假。
+                   所以这一项如实写「已登记、未改动」，并在下面注明真机上该由谁消费。
+     真机接线口径（交后端 / P12 生产实现）：
+       AI 生成材料清单时把 session + dir 一起送进去，由服务端按该场次公告与该方向
+       返回 items；拿不到该场次公告 → 退回通用清单并**明说是通用的**，不要静默套用。
+
+     白名单之外的值一律不认，并在回执里明写忽略了什么 —— URL 是用户可改的，
+     把 ?dir=<script> 直接印到屏幕上就是把输入当结论。
+     ══════════════════════════════════════════════════════════════════════════ */
+  var SESSIONS = ['8月12日 · 综合场', '8月15日 · 校园专场', '还没定']
+  var DIRS = ['运营', '销售', '行政人事', '技术']
+  var VIEW_AT = { templates: 't4', checklist: 't3' }
+  var VIEW_NM = { templates: '简历模板', checklist: '材料清单' }
+  var carry = { session: '', dir: '', view: '', bad: [], at: {} }
+
+  /* 场次里有「 · 」这种带空格的分隔符，URL 往返容易多一个少一个空格：
+     比对时把空白全去掉，别让一个空格决定认不认。 */
+  function tight (s) { return String(s || '').replace(/\s+/g, '') }
+  function pickIn (v, list) {
+    for (var i = 0; i < list.length; i++) if (tight(list[i]) === tight(v)) return list[i]
+    return ''
+  }
+
+  function readCarry () {
+    var Q
+    try { Q = new URLSearchParams(location.search) } catch (e) { return }
+    function qv (k) { return String(Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+
+    var vw = qv('view')
+    if (vw) {
+      if (VIEW_AT[vw]) { carry.view = vw; carry.at[VIEW_AT[vw]] = 1 }
+      else carry.bad.push('view=' + vw)
+    }
+
+    var ss = qv('session')
+    if (ss) {
+      var s = pickIn(ss, SESSIONS)
+      if (s) {
+        carry.session = s
+        P.item = 'fair'          // 场次只可能是招聘会场景
+        carry.at.t3 = 1
+      } else carry.bad.push('session=' + ss)
+    }
+
+    var dr = qv('dir')
+    if (dr) {
+      var d = pickIn(dr, DIRS)
+      if (d) { carry.dir = d; carry.at.t3 = 1 }
+      else carry.bad.push('dir=' + dr)
+    }
+  }
+
+  function q (n) { return scr.querySelectorAll('[data-out="' + n + '"]') }
+  function set (n, v) {
+    var els = q(n)
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i]
+      if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = v
+      else el.textContent = v
+    }
+  }
+  function html (n, v) { var els = q(n); for (var i = 0; i < els.length; i++) els[i].innerHTML = v }
+  function setSeg (p, v) {
+    var g = scr.querySelector('.seg[data-param="' + p + '"]'); if (!g) return
+    var bs = g.querySelectorAll('button')
+    for (var i = 0; i < bs.length; i++) bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-v') === v ? 'true' : 'false')
+  }
+
+  /* ── T1 求职信：按语气 / 长度 / 短板 / 措辞版本拼 ── */
+  function letter () {
+    var j = JOBS[P.job], v = P.variant % 2
+    var slotOrg = '<span class="slot-mark">' + j.org + '</span>'
+    var HI = { '务实': '尊敬的招聘负责人：', '热情': '您好，招聘负责人：', '正式': '尊敬的贵公司人力资源部：' }
+    var OPEN = {
+      '务实': ['我在' + slotOrg + '看到贵公司招聘' + j.nm + '，特此应聘。这个岗位写的职责方向，和我这两年实际在做的事基本一致。',
+               '贵公司' + j.nm + '一岗的招聘信息，我是在' + slotOrg + '看到的，现来应聘。岗位说明里的几项要求，我先在下面逐条对一遍。'],
+      '热情': ['在' + slotOrg + '看到贵公司在招' + j.nm + '，这正是我一直想做的方向，所以第一时间投了过来。',
+               '我在' + slotOrg + '看到' + j.nm + '在招，越看越觉得对得上，就先把信写过来了。'],
+      '正式': ['本人现应聘贵公司' + j.nm + '一职，招聘信息来源为' + slotOrg + '。现将本人与该岗位相关的经历陈述如下。',
+               '兹应聘贵公司' + j.nm + '一职，信息见' + slotOrg + '所载公告。以下就岗位要求逐项说明本人情况。']
+    }
+    var END = { '务实': '随信附上简历，期待有机会与您详谈。', '热情': '简历随信附上，很期待能当面聊聊。', '正式': '现将本人简历随信呈上，恭候回音。' }
+    var CORE = '我有' + F.yrs + '运营经验。在上一家公司独立运营公众号，' + F.wx + '；' + F.act + '。这些数字都可以在面试时提供后台截图核对，简历里也写了对应的时间与口径。'
+    var SHORT = '我有' + F.yrs + '运营经验，独立运营公众号' + F.wx.replace('半年内', '，半年') + '，另' + F.act.split('，')[0] + '。详细时间与口径都写在简历里，可随时核对。'
+    var TAIL = '岗位要求里我做过的都写在上面，细节可以在面试时逐条说明。'
+    /* 写短板 / 不写短板两段长度接近，否则「300 字」这个档位会随开关忽长忽短 */
+    var WEAK = '贵公司这个岗位要求熟练使用 SQL 独立取数，这一项我' + F.weak + '。这一条我先说明白，免得入职之后才发现对不上；我会在入职前继续补，也希望能有机会在实际工作中练。'
+    var NOWEAK = '以上经历与数字都取自我的简历，没有另外加工；岗位说明里列的要求，能对上的我写在上面，对不上的我也不会绕过去。如需核对，我可以在面试时提供后台截图与时间口径。'
+    var MORE = '在校期间我带过一个校园推广项目，' + F.campus + '，从排期、物料到现场执行都跟过一遍。这段经历让我习惯把一个目标拆成可执行的动作，也是我后来做活动运营的底子。'
+    var WHY = '我看过贵公司在' + j.org + '上的岗位说明，其中提到的日常运营与活动执行两块，正是我这两年主要在做的事。'
+    var LONG = '如果贵公司希望我先补齐取数那一项再入职，我可以在面试时说明补课的安排；岗位上还有我没提到的要求，也请您直接问，我不会含糊过去。简历、活动记录和后台截图我都带着，随时可以提供核对。'
+
+    var ps = [HI[P.tone], OPEN[P.tone][v]]
+    if (P.len === '200') { ps.push(SHORT); ps.push(TAIL) }
+    else {
+      ps.push(CORE)
+      ps.push(P.weak === '写' ? WEAK : NOWEAK)
+      if (P.len === '500') { ps.push(MORE); ps.push(WHY); ps.push(LONG) }
+    }
+    ps.push(END[P.tone])
+    var body = ps.map(function (t) { return '<p>' + t + '</p>' }).join('')
+    body += '<div class="sign"><span class="slot-mark">王 ×</span><br>' +
+            '<span style="font-size:11px;color:var(--paper-fog)">联系电话 138****2046 · 2026 年 8 月 8 日</span></div>'
+    var chars = ps.join('').replace(/<[^>]+>/g, '').replace(/\s/g, '').length
+    return { body: body, chars: Math.round(chars / 10) * 10 }
+  }
+
+  /* ── T2 口述稿：按场合 / 提不提短板 / 突出哪段拼 ── */
+  function speak () {
+    var j = JOBS[P.job], f = P.focus === '公众号增长'
+    var hi = '您好，我叫<b>王 ×</b>，做运营两年多。'
+    var main30 = f
+      ? '上一份工作在一家科技公司，<b>独立运营公众号，半年从 3000 粉做到 12000</b>；也策划过 8 场线上活动。'
+      : '上一份工作在一家科技公司做运营；在校时我<b>带 5 个人在 3 所高校做地推</b>，从 0 组队到落地都跑过一遍。'
+    var end30 = P.scene === '招聘会递简历'
+      ? '我今天投的是' + j.nm + '，简历在这儿，您方便的话我可以补充说一下增长那部分是怎么做的。'
+      : '我应聘的是' + j.nm + '，想先从我最有把握的一段讲起。'
+    var w30 = P.weak2 === '提' ? 'SQL 取数我目前只能写基础查询，这块我在补。' : ''
+    var s30 = hi + main30 + w30 + end30
+
+    var main60 = f
+      ? '2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，主要负责两块：<b>公众号从 0 到 1 的日常运营</b>，半年粉丝从 3000 到 12000；以及<b>线上活动</b>，做过 8 场，单场最高带来 340 个新增关注。<br>另外我在学校带过一个校园推广项目，带 5 个人在 3 所高校做地推。'
+      : '在学校我带过一个校园推广项目，<b>带 5 个人在 3 所高校做地推</b>，从排期到现场执行都我来盯。<br>之后 2024 年 3 月到 2026 年 6 月在一家科技公司做运营专员，独立运营公众号，半年粉丝从 3000 到 12000，也做过 8 场线上活动。'
+    var w60 = P.weak2 === '提'
+      ? '<br>我看到这个岗位要求 SQL 取数，说实话我目前只能写基础查询，还没独立做过完整的数据复盘，这块是我接下来想补的。其他要求我基本都做过。'
+      : '<br>岗位上写的要求，我基本都做过。'
+    var s60 = '您好，我叫王 ×，' + main60 + w60
+    return { s30: s30, s60: s60,
+             n30: Math.round(s30.replace(/<[^>]+>/g, '').replace(/\s/g, '').length / 5) * 5,
+             n60: Math.round(s60.replace(/<[^>]+>/g, '').replace(/\s/g, '').length / 5) * 5 }
+  }
+
+  /* ── T3 清单：三件事各一套，份数随步进器走 ── */
+  function renderList () {
+    var L = LISTS[P.item]
+    /* 带进来的场次只改「这份清单是给哪一场准备的」这个抬头，**不动条目**：
+       条目来自主办方公告原文，本机没有按场次分桶的第二份公告，
+       换了抬头就换条目那是编。回执里对用户写明这一点。 */
+    var title = (P.item === 'fair' && carry.session && carry.session !== '还没定')
+      ? (carry.session + ' · 建议带的材料') : L.title
+    var items = L.items.map(function (it) { return it }).concat(P.custom.map(function (nm) {
+      return { t: nm, s: '你自己加的一项', have: 0, tag: '你自己带', tone: 'amber' }
+    }))
+    var box = q('cklist')[0]; if (!box) return
+    box.innerHTML = items.map(function (it) {
+      var t = it.t.replace('{n}', P.copies)
+      var tone = it.tone === 'jade' ? ' chip--jade' : it.tone === 'amber' ? ' chip--amber' : ''
+      var when = it.gen ? ' data-when="default device-off"' : it.have ? ' data-when="default ai-down device-off"' : ''
+      var tag = '<span class="chip' + tone + ' chip--info"' + when + '>' + it.tag + '</span>' +
+        (it.gen ? '<span class="chip chip--info" data-when="ai-down">未生成 · 可手写</span>' : '')
+      return '<div class="ck' + (it.have ? ' ck--have' : '') + (it.gen ? ' ck--gen' : '') + '"><span class="ck-box"></span>' +
+        '<span class="ck-b"><span class="ck-t">' + t + '</span><span class="ck-s">' + it.s + '</span></span>' +
+        '<span class="ck-tag-status">' + tag + '</span></div>'
+    }).join('')
+    var have = items.filter(function (i) { return i.have }).length
+    set('ckTitle', title); set('ckSrc', L.src); set('ckOrigin', L.origin)
+    set('stepLb', L.stepLb); set('copiesUnit', L.unit); set('copies', P.copies); set('pfItem', L.pf)
+    set('ckCount', have + ' / ' + items.length + ' 已有')
+    set('ckLack', '还差 ' + (items.length - have) + ' 样')
+    /* 2026-08-10 全量回归修：同 hint1，脚本覆盖会盖掉 HTML 里的短文案 */
+    set('hint3', '已有 ' + have + ' 样 · 差 ' + (items.length - have) + ' 样')
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  function render () {
+    var j = JOBS[P.job], L = letter(), S = speak(), T = TPL[P.tpl]
+    /* T1 */
+    set('jNm', j.nm); set('jOrg', j.org); set('jSync', j.sync); set('jId', j.id)
+    html('letter', L.body)
+    html('lmeta', '应聘岗位：' + j.nm + ' · <span class="slot-mark">某科技有限公司</span>')
+    set('fname', '求职信_' + j.nm + '.pdf')
+    set('fmeta', 'A4 · 1 页 · 约 ' + L.chars + ' 字')
+    set('pfLen', '实际约 ' + L.chars + ' 字')
+    set('pfTone', P.tone + '语气 · 第 ' + (P.variant % 2 + 1) + ' 版措辞')
+    /* 2026-08-10 全量回归修：这条会覆盖 HTML 里的短文案，不改这里等于白改。
+       字数与语气两项在右栏槽位卡（pfLen / pfTone）已有，操作栏只留「写给谁」。 */
+    set('hint1', '写给' + j.nm)
+    setSeg('tone', P.tone); setSeg('len', P.len); setSeg('weak', P.weak)
+    /* T2 */
+    html('txt30', S.s30); html('txt60', S.s60)
+    set('len30', '约 ' + S.n30 + ' 字'); set('len60', '约 ' + S.n60 + ' 字')
+    var use30 = P.scene === '招聘会递简历'
+    var n30 = q('now30')[0], n60 = q('now60')[0]
+    if (n30) n30.hidden = !use30
+    if (n60) n60.hidden = use30
+    var c30 = scr.querySelector('[data-card="s30"]'), c60 = scr.querySelector('[data-card="s60"]')
+    if (c30) c30.setAttribute('aria-current', use30 ? 'true' : 'false')
+    if (c60) c60.setAttribute('aria-current', use30 ? 'false' : 'true')
+    set('pfScene', P.scene + ' · 突出' + P.focus)
+    set('hint2', '本次用' + (use30 ? ' 30 秒版' : ' 1 分钟版') + ' · ' + P.scene)
+    setSeg('scene', P.scene); setSeg('weak2', P.weak2); setSeg('focus', P.focus)
+    /* T3 */
+    setSeg('item', P.item); renderList()
+    /* T4 */
+    set('tplNm', '选中：' + T.nm); set('tplFor', T.to); set('tplPg', T.pg); set('tplFz', T.fz); set('tplAts', T.ats)
+    html('tplNote', T.note)
+    var ts = scr.querySelectorAll('.tpl, .tplc')
+    for (var i = 0; i < ts.length; i++) {
+      var on = +ts[i].getAttribute('data-tpl') === P.tpl
+      ts[i].setAttribute('aria-current', on ? 'true' : 'false')
+      /* 右栏那六行是 <button>，选中态还要挂 aria-pressed —— 与本站 .seg / .fchip /
+         .pick2-tab 同一套写法，读屏能报出「已选中」。左栏缩略图是 <div>，只用 aria-current。 */
+      if (ts[i].tagName === 'BUTTON') ts[i].setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
+  }
+
+  /* 「六张差在哪」的六行由 TPL 现场生成 —— 不在 HTML 里再抄一份，
+     免得改了 TPL 而右栏还写着旧的（A29 那一类跨处对不上的病根就是抄两份）。 */
+  ;(function buildTplCompare () {
+    var host = scr.querySelector('[data-tplc]'); if (!host) return
+    for (var i = 0; i < TPL.length; i++) {
+      var t = TPL[i]
+      var b = document.createElement('button')
+      b.type = 'button'; b.className = 'tplc'; b.setAttribute('data-tpl', i)
+      b.innerHTML =
+        '<span class="tplc-t">' + t.nm +
+          '<span class="tplc-ats' + (t.ats.indexOf('否') === 0 ? ' tplc-ats--no' : '') + '">机读 ' + t.ats + '</span>' +
+        '</span>' +
+        '<span class="tplc-s">适合' + t.to + ' · ' + t.pg + ' · ' + t.fz + '</span>' +
+        '<span class="tplc-s">' + t.note + '</span>'
+      host.appendChild(b)
+    }
+  })()
+
+  /* ── 结果反馈层 ── */
+  var fb = document.getElementById('fb')
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    var go = document.getElementById('fb-go'); go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', function () { fb.hidden = true })
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+  function what () {
+    var st = scr.getAttribute('data-stage')
+    if (st === 't1') return '求职信_' + JOBS[P.job].nm + '.pdf'
+    if (st === 't2') return '自我介绍稿（30 秒版 + 1 分钟版）'
+    if (st === 't3') return LISTS[P.item].title
+    return '简历模板：' + TPL[P.tpl].nm
+  }
+  var FB = {
+    phone: function () {
+      return { t: '已生成取件二维码',
+        p: '<b>' + what() + '</b> 已打包，手机扫屏幕上的码就能取走。<br>链接 <b>30 分钟后失效</b>，过期回本页重新生成；本机不留副本。',
+        go: [{ t: '去手机接力页看码', href: '05-phone-relay.html', primary: true }, { t: '留在这一页' }] }
+    },
+    save: function () {
+      return { t: '已存进「我的文档」',
+        p: '<b>' + what() + '</b> 已存好。凭手机号在任一台机器登录都能取回，<b>文件跟人走，不跟机器走</b>。<br>只给你本人看，不向任何企业提供。',
+        /* 2026-08-10 改：原指 23-me.html（「我」的域首屏，无文档明细），承诺「查看」兑现不了
+           → 直落 42-my-assets.html?stage=docs 的文档标签 */
+        go: [{ t: '去「我的 · 文档」查看', href: '42-my-assets.html?stage=docs&from=P12', primary: true }, { t: '留在这一页' }] }
+    }
+  }
+
+  scr.addEventListener('click', function (e) {
+    var seg = e.target.closest('.seg[data-param] button[data-v]')
+    if (seg) { P[seg.closest('.seg').getAttribute('data-param')] = seg.getAttribute('data-v'); render(); return }
+    var st = e.target.closest('.stepper[data-param] button[data-step]')
+    if (st) { P.copies = Math.max(1, Math.min(20, P.copies + (+st.getAttribute('data-step')))); render(); return }
+    /* .tplc 是右栏「六张差在哪」的行，和左栏缩略图共用同一个 P.tpl —— 同一个选择，
+       两种看法（左边看版面长什么样，右边看事实差在哪），不是两套入口。 */
+    var tp = e.target.closest('.tpl, .tplc')
+    if (tp) { P.tpl = +tp.getAttribute('data-tpl'); render(); return }
+    var act = e.target.closest('[data-act]')
+    if (act) {
+      var a = act.getAttribute('data-act')
+      if (a === 'job') P.job = (P.job + 1) % JOBS.length
+      if (a === 'rephrase') P.variant += 1
+      if (a === 'scene') P.scene = P.scene === '招聘会递简历' ? '面试开场' : '招聘会递简历'
+      if (a === 'addck' && P.custom.length < EXTRA.length) P.custom.push(EXTRA[P.custom.length])
+      render(); return
+    }
+    var f = e.target.closest('[data-fb]')
+    if (f) { openFb(FB[f.getAttribute('data-fb')]()); return }
+  })
+  fb.addEventListener('click', function (e) { if (e.target === fb) fb.hidden = true })
+
+  /* ══════════════════════════════════════════════════════════════════════
+     离场确认里的「存进「我的文档」，再离开」——真正把它接上（2026-08-11）
+     ----------------------------------------------------------------------
+     本页 `.screen` 写了 data-guard-keep-t2，弹层会多出第三个按钮；可全站
+     `grep -rn "lg:keep"` 除 leaveguard.js 自己以外**零个监听**（那份文件 :158
+     的注释记着这条实测）。没人监听 → dispatchEvent 返回 true → close(true)
+     → 直接跳走。用户按的是「存下来再走」，实际发生的是「不存，直接走」。
+
+     三步同 07（两页刻意用同一套写法，免得下一个人要读两遍）：
+       ① preventDefault()：事件 `bubbles:false`，**只能挂捕获** —— 捕获阶段沿
+          window → document → body → .lg-mask 走，与 bubbles 无关；挂冒泡收不到。
+       ② 借弹层自己的「留在这一步」关掉它：不解掉 leaveguard 的 pending，
+          之后每一次会离开本页的点击都会被它 preventDefault + stopPropagation 吃掉。
+       ③ 走本页**真实存在**的存档路径 —— 就是 t2「这两版拿去做什么」里那个
+          四态常驻的「存进我的文档」（:618）所走的 FB.save()，回执一字不改地复用它。
+          刻意不为弹层另写一份回执：同一个动作在两个入口给两种说法，
+          用户没法判断哪一次才真的存了。
+          回执上补一个「继续去…」，按它才真正离开 —— 先回执后离开，顺序不能反。
+
+     只挂 t2，与 data-guard-keep-t2 的范围一致：t1 的同名按钮只在 device-off
+     那一态出现，默认态下没有落点，所以那一步本来就没有 keep 按钮可按。
+     ══════════════════════════════════════════════════════════════════════ */
+  document.addEventListener('lg:keep', function (e) {
+    e.preventDefault()
+    var href = (e.detail && e.detail.href) || ''
+    var mask = document.querySelector('.lg-mask')
+    var stay = mask && mask.querySelector('.lg-stay')
+    if (stay) stay.click()
+
+    var o = FB.save()
+    o.go = [{ t: '去「我的 · 文档」查看', href: '42-my-assets.html?stage=docs&from=P12', primary: true }]
+    if (href) o.go.push({ t: '继续去刚才那一页', href: href })
+    o.go.push({ t: '留在材料工厂' })
+    openFb(o)
+    if (window.v3Guard && window.v3Guard.off) window.v3Guard.off()
+  }, true)
+
+  /* ── 带入回执：只有真带了参数才插进 DOM（同 P13 / P21 口径）────────────── */
+  function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+  var mfrom = null
+
+  function buildCarry () {
+    if (mfrom || (!carry.session && !carry.dir && !carry.view && !carry.bad.length)) return
+    var at = Object.keys(carry.at)
+    /* 回执只在**这些参数真正影响到的台面**上出现：场次 / 方向属于材料清单（t3），
+       view 属于它自己承诺的那个台面。都没解析出来（只有非法值）就跟着当前台面走，
+       否则用户看不到「你带来的东西被忽略了」这句话。 */
+    if (!at.length) at = [scr.getAttribute('data-stage') || 't1']
+    mfrom = document.createElement('div')
+    mfrom.className = 'mfrom'
+    mfrom.setAttribute('data-at', at.join(' '))
+    var wm = scr.querySelector('.wmain')
+    if (wm) wm.insertBefore(mfrom, wm.firstChild)
+  }
+
+  function renderCarry () {
+    if (!mfrom) return
+    var h = '', set = [], nt = []
+    if (carry.session) set.push(['场次', carry.session])
+    if (carry.dir) set.push(['方向', carry.dir])
+    if (carry.view) set.push(['直达', VIEW_NM[carry.view]])
+
+    h += '<div class="mfrom-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+         (set.length ? ('已带入上一屏的 ' + set.length + ' 项选择') : '上一屏带来的参数本机没认出来') +
+         '<span class="src">来自招聘会首屏 · 都能改</span></div>'
+    if (set.length) {
+      h += '<div class="mfrom-set">'
+      for (var i = 0; i < set.length; i++) {
+        h += '<span class="mfrom-one"><i>' + esc(set[i][0]) + '</i>' + esc(set[i][1]) + '</span>'
+      }
+      h += '</div>'
+    }
+
+    if (carry.view) {
+      nt.push('已直达<b>' + VIEW_NM[carry.view] + '</b>那一格，右边的参数照常能改。')
+    }
+    if (carry.session && carry.session !== '还没定') {
+      nt.push('清单已切到<b>招聘会</b>那一套，抬头写的就是这一场；' +
+              '但<b>条目没有按场次替换</b> —— 条目取自主办方公告原文，' +
+              '本机手上没有按场次分桶的第二份公告，<b>不会替你编一份</b>。')
+    } else if (carry.session === '还没定') {
+      nt.push('场次你选的是<b>还没定</b>，所以清单按<b>招聘会通用清单</b>列，不按某一场。')
+    }
+    if (carry.dir) {
+      nt.push('方向 <b>' + esc(carry.dir) + '</b> <em>只做登记，这一屏没有按它改动任何内容</em>：' +
+              '本页四个台面都没有按方向分化的素材，求职信里的经历与数字全部取自你的简历，' +
+              '拿运营的事实去写别的方向就是编。<b>接线后由服务端按方向出清单</b>。')
+    }
+    if (carry.bad.length) {
+      nt.push('另有 <b>' + carry.bad.length + '</b> 项本机不认识，<em>已忽略</em>：' +
+              esc(carry.bad.join('、')) + '。这一屏<b>没有按它改任何东西</b>。')
+    }
+    h += '<div class="mfrom-nt">' + nt.join('<br>') + '</div>'
+    mfrom.innerHTML = h
+  }
+
+  /* view 承诺去哪个台面就去哪个：链接把人放在一个看不见目标的台面上，
+     和不读参数是同一种走错。?stage= 已经对上时不重复切。 */
+  function applyCarryStage () {
+    if (!carry.view) return
+    var want = VIEW_AT[carry.view]
+    if (want && (scr.getAttribute('data-stage') || '') !== want && window.v3Stage) window.v3Stage(want)
+  }
+
+  /* 走查把手：看本页到底认下了 URL 里的哪几个值 */
+  window.p12Carry = function () {
+    return { session: carry.session, dir: carry.dir, view: carry.view, bad: carry.bad.slice(0),
+             item: P.item, stage: scr.getAttribute('data-stage'),
+             ckTitle: (q('ckTitle')[0] || {}).textContent }
+  }
+
+  readCarry()
+  buildCarry()
+  render()
+  renderCarry()
+  applyCarryStage()
+  if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P12 · 来源感知返回（2026-08-10 Codex 闭环整改 · 06/07/12/18 同一份登记表）
+   --------------------------------------------------------------------------
+   材料工厂同时由简历域、招聘会域、百宝箱、智慧校园进入（32 / 36 / 27 / 19 都有入口），
+   可左下返回键永远指向「AI 简历服务」。从招聘会点「去备材料」进来，
+   写完求职信一按返回，人被放到简历域首屏 —— 招聘会那条线索断在半路。
+   现在按交接契约的 ?from=<页号> 查登记表：
+     · 认识且不同域 → 返回键 href 与副标签改成**真实来源域**，
+                      右边补一个「AI 简历服务首页」次要入口（既能回业务域也能回本域）
+     · 同域 / 不认识 / 缺失 → 一个字不改，保留 HTML 里的默认父级（现有行为）
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  var D = {
+    P01: ['首页', '01-home-v6.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+
+  /* 本页操作栏没有余量（见 head 里 .rail > .altbtn 的实测记录），次要入口挂 rail 右端 */
+  var rail = document.querySelector('.rail')
+  if (rail) {
+    var alt = document.createElement('a')
+    alt.className = 'altbtn'
+    alt.setAttribute('href', own.f)
+    alt.textContent = own.n + '首页'
+    rail.appendChild(alt)
+  }
+})()
+</script>
+<script src="scripts/leaveguard.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

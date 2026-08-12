@@ -8,6 +8,8 @@ Page({
     filters: ['全部', '岗位', '招聘会', '找企业', '政策'],
     activeFilter: 0,
     jobs: [],
+    visibleJobs: [],
+    query: '',
     loading: true,
     loadError: '',
   },
@@ -20,8 +22,27 @@ Page({
   loadJobs() {
     this.setData({ loading: true, loadError: '' })
     return api.getJobs()
-      .then((list) => this.setData({ jobs: list || [], loading: false }))
+      .then((list) => {
+        const jobs = list || []
+        this.setData({ jobs, visibleJobs: this._filterJobs(jobs, this.data.query), loading: false })
+      })
       .catch((err) => this.setData({ loading: false, loadError: (err && err.message) || '加载失败' }))
+  },
+
+  _filterJobs(jobs, query) {
+    const q = (query || '').trim().toLowerCase()
+    if (!q) return jobs
+    return jobs.filter((job) => [
+      job.title,
+      job.company,
+      job.source,
+      ...(Array.isArray(job.tags) ? job.tags : []),
+    ].some((value) => String(value || '').toLowerCase().includes(q)))
+  },
+
+  onSearchInput(e) {
+    const query = e.detail.value || ''
+    this.setData({ query, visibleJobs: this._filterJobs(this.data.jobs, query) })
   },
 
   reload() {
@@ -40,7 +61,7 @@ Page({
 
   tapFilter(e) {
     const idx = e.currentTarget.dataset.index
-    // 招聘会 / 找企业 / 政策 为独立信息入口页，跳转；岗位在本页内筛选
+    // 校园招聘 / 招聘会 / 找企业 / 政策 为独立信息入口页，跳转；岗位在本页内筛选
     const routes = {
       2: '/pages/fairs/fairs',
       3: '/pages/companies/companies',
@@ -58,17 +79,17 @@ Page({
     wx.navigateTo({ url: `/pages/job-detail/job-detail?id=${id}` })
   },
 
-  // M0.3：搜索尚未接入，诚实提示
-  tapSearch() {
-    wx.showToast({ title: '搜索将在后续版本上线', icon: 'none' })
-  },
-
-  // 合规：仅跳转来源平台，不做平台内投递
-  tapSource() {
-    wx.showToast({ title: '将跳转至来源平台投递', icon: 'none', duration: 1600 })
+  // Web 域名未统一配置前只复制后端返回的真实来源链接，不伪装成已跳转。
+  tapSource(e) {
+    const url = e.currentTarget.dataset.url || ''
+    if (!url) {
+      wx.showToast({ title: '来源链接暂不可用', icon: 'none' })
+      return
+    }
+    wx.setClipboardData({ data: url })
   },
 
   onShareAppMessage() {
-    return { title: '职易达 · 发现求职机会', path: '/pages/jobs/jobs' }
+    return { title: '智引答 · 发现求职机会', path: '/pages/jobs/jobs' }
   },
 })

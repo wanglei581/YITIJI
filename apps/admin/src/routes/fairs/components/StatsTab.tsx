@@ -8,7 +8,9 @@ export function StatsTab({ stats }: { stats: AdminFairStats | null }) {
     { label: '参展企业(已录入)', value: stats.companyTotal,        note: '本系统已录入的企业卡片数',  icon: BuildingIcon,  accent: 'text-info-fg bg-info-bg' },
     { label: '展区',             value: stats.zoneTotal,           note: '导览展区数量',              icon: MapPinIcon,    accent: 'text-teal-600 bg-teal-50' },
     { label: '活动资料',         value: stats.materialTotal,       note: `已发布 ${stats.materialPublished} 份`, icon: FileTextIcon, accent: 'text-purple-600 bg-purple-50' },
-    { label: '资料打印次数',     value: stats.materialPrintCount,  note: '一体机打印活动资料次数',    icon: PrinterIcon,   accent: 'text-warning-fg bg-warning-bg' },
+    // 2026-08-11（CLAUDE.md §9）：FairMaterial.printCount 全后端无递增写路径，恒为 0。
+    // 展示 0 会让运营误判「资料从未被打印」。恢复条件：打印完成回调中递增该字段。
+    { label: '资料打印次数',     value: '未接入',                  note: '打印完成回调尚未递增该字段', icon: PrinterIcon,   accent: 'text-neutral-500 bg-neutral-100' },
   ]
   return (
     <div className="space-y-4">
@@ -36,13 +38,19 @@ export function StatsTab({ stats }: { stats: AdminFairStats | null }) {
             <p className="text-lg font-bold text-neutral-800">{stats.snapshot.jobCount}</p>
             <p className="text-xs text-neutral-500">来源标称岗位数</p>
           </div>
+          {/*
+            2026-08-11（CLAUDE.md §9 不伪造能力）：
+            JobFair.viewCount 全项目**零递增写入**（schema 默认 0），因此恒为 0。
+            此处原样展示并标注「终端浏览次数」构成伪造数据——运营会以为该场次无人浏览。
+            改为明示未接入。真实浏览数据在 BrowseLog 里，接入需单独开发。
+          */}
           <div className="rounded-lg bg-neutral-50 p-3 text-center">
-            <p className="text-lg font-bold text-neutral-800">{stats.snapshot.viewCount}</p>
+            <p className="text-lg font-bold text-neutral-400">未接入</p>
             <p className="text-xs text-neutral-500">终端浏览次数</p>
           </div>
         </div>
         <p className="mt-3 text-xs text-neutral-400">
-          系统仅统计服务行为(录入 / 浏览 / 打印),不记录求职者个人信息,不参与招聘闭环。现场签到 / 展位入驻未建数据模型,此处不展示估算数据。
+          系统仅统计服务行为(录入 / 打印),不记录求职者个人信息,不参与招聘闭环。终端浏览次数尚未接入统计管线;现场签到 / 展位入驻未建数据模型,此处均不展示估算数据。
         </p>
       </Card>
     </div>

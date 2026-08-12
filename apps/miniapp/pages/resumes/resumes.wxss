@@ -1,0 +1,90 @@
+/* pages/resumes/resumes.wxss — Direction B: 奶油质感 */
+
+.page-wrap { min-height: 100vh; background: #FAF7F2; }
+
+/* ── 导航栏 ── */
+.navbar {
+  display: flex; align-items: center;
+  padding: 10rpx 28rpx 14rpx;
+  background: #FAF7F2;
+}
+.nb-back { font-size: 28rpx; color: #7A5C48; min-width: 80rpx; }
+.nb-title { flex: 1; text-align: center; font-size: 32rpx; font-weight: 800; color: #2C1A0E; }
+.nb-right { font-size: 28rpx; color: #C84B2F; font-weight: 600; min-width: 80rpx; text-align: right; }
+
+/* ── 页头统计 ── */
+.page-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16rpx 32rpx 24rpx;
+}
+.ph-stat { display: flex; align-items: baseline; gap: 6rpx; }
+.ph-num { font-size: 52rpx; font-weight: 900; color: #2C1A0E; letter-spacing: -2rpx; line-height: 1; }
+.ph-unit { font-size: 24rpx; color: #A89080; }
+.upload-btn {
+  background: #2C1A0E; color: #FFFDF9;
+  font-size: 26rpx; font-weight: 600;
+  padding: 16rpx 32rpx; border-radius: 200rpx;
+}
+
+/* ── 简历卡片列表 ── */
+.rz-list { padding: 0 32rpx; display: flex; flex-direction: column; gap: 20rpx; }
+.rz-card {
+  background: #FFFDF9;
+  border-radius: 28rpx;
+  padding: 28rpx 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(44,26,14,.07);
+  display: flex; gap: 20rpx; align-items: flex-start;
+}
+.rz-thumb {
+  width: 64rpx; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 6rpx;
+  padding-top: 4rpx;
+}
+.rz-ln { height: 8rpx; background: #E5D8C8; border-radius: 4rpx; }
+.ln-h { width: 100%; background: #C8B4A0; }
+.ln-s { width: 60%; }
+.rz-body { flex: 1; min-width: 0; }
+.rz-header-row { display: flex; align-items: center; gap: 10rpx; margin-bottom: 8rpx; }
+.rz-name { font-size: 30rpx; font-weight: 700; color: #2C1A0E; flex: 1; }
+.badge-primary {
+  background: #F5EDD8; color: #9C6E0A;
+  font-size: 20rpx; font-weight: 600;
+  padding: 4rpx 12rpx; border-radius: 200rpx; flex-shrink: 0;
+}
+.rz-meta { font-size: 24rpx; color: #A89080; display: block; margin-bottom: 12rpx; }
+.rz-tags { margin-bottom: 16rpx; }
+.tag { display: inline-block; font-size: 22rpx; font-weight: 600; padding: 5rpx 14rpx; border-radius: 200rpx; }
+.tg-green { background: #E8F0EA; color: #3A6648; }
+.tg-blue  { background: #E8EFF8; color: #2D5A8E; }
+.tg-amber { background: #F5EDD8; color: #9C6E0A; }
+.rz-acts { display: flex; gap: 12rpx; }
+.act-btn {
+  background: #F2EAE0; color: #4A3020;
+  font-size: 24rpx; font-weight: 600;
+  padding: 10rpx 24rpx; border-radius: 200rpx;
+}
+.act-red { background: #FAEDEA; color: #C84B2F; }
+.act-press { opacity: .7; }
+
+/* ── 空态 ── */
+.empty-wrap {
+  margin: 40rpx 32rpx;
+  background: #FFFDF9;
+  border-radius: 28rpx;
+  padding: 60rpx 40rpx;
+  text-align: center;
+  border: 1rpx solid #E5D8C8;
+}
+.ev-icon { font-size: 72rpx; display: block; margin-bottom: 20rpx; }
+.ev-title { font-size: 32rpx; font-weight: 800; color: #2C1A0E; margin-bottom: 12rpx; }
+.ev-desc { font-size: 26rpx; color: #A89080; line-height: 1.6; margin-bottom: 36rpx; display: block; }
+.btn-primary {
+  display: inline-block; background: #C84B2F; color: #fff;
+  font-size: 28rpx; font-weight: 700; padding: 20rpx 56rpx; border-radius: 200rpx;
+}
+.btn-secondary {
+  display: inline-block; background: #F2EAE0; color: #4A3020;
+  font-size: 28rpx; font-weight: 600; padding: 20rpx 56rpx; border-radius: 200rpx;
+}
+.tap { transition: opacity 80ms; }
+.tap-press { opacity: .7; }

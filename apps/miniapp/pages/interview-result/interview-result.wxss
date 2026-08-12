@@ -1,0 +1,59 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* ── 状态：loading / failed ── */
+.ri-state { display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
+.state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.7; }
+.ri-fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.ri-retry-btn { margin-top: 8rpx; }
+
+.spinner { width: 56rpx; height: 56rpx; border: 4rpx solid var(--line);
+  border-top-color: var(--teal); border-radius: 50%;
+  animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 总评卡 ── */
+.ri-hero { background: var(--surface); border-radius: 16rpx; padding: 36rpx 32rpx;
+  margin-top: 16rpx; }
+.rh-level { font-size: 44rpx; font-weight: 800; line-height: 1; }
+.rh-pos { font-size: 28rpx; color: var(--ink); font-weight: 600; margin-top: 12rpx; }
+.rh-iv { font-size: 26rpx; color: var(--muted); font-weight: 400; }
+.rh-summary { font-size: 28rpx; color: var(--muted); line-height: 1.7; margin-top: 16rpx; }
+
+/* ── 维度点评 & 通用 section ── */
+.ri-section { background: var(--surface); border-radius: 14rpx; padding: 24rpx 28rpx;
+  margin-top: 16rpx; }
+.rs-title { font-size: 28rpx; font-weight: 700; color: var(--ink); margin-bottom: 16rpx; }
+.rs-point { display: flex; align-items: flex-start; gap: 10rpx; margin-bottom: 10rpx; }
+.rs-dot { color: var(--teal); font-size: 28rpx; flex-shrink: 0; line-height: 1.6; }
+.rs-text { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
+
+/* ── 高概率追问 ── */
+.ri-pred-item { background: var(--paper); border-radius: 10rpx; padding: 20rpx 24rpx;
+  margin-bottom: 16rpx; }
+.ri-pred-item:last-child { margin-bottom: 0; }
+.rp-q { font-size: 28rpx; font-weight: 600; color: var(--ink); line-height: 1.5; margin-bottom: 10rpx; }
+.rp-why { font-size: 24rpx; color: var(--muted); line-height: 1.5; margin-bottom: 6rpx; }
+.rp-app { font-size: 24rpx; color: var(--teal); line-height: 1.5; }
+
+/* ── STAR 建议 ── */
+.ri-star { display: flex; flex-direction: column; gap: 12rpx; }
+.star-row { display: flex; align-items: flex-start; gap: 16rpx; }
+.star-k { font-size: 28rpx; font-weight: 800; color: var(--teal); width: 36rpx;
+  flex-shrink: 0; line-height: 1.6; }
+.star-v { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
+.star-reminder { font-size: 26rpx; color: var(--muted); line-height: 1.6;
+  padding-top: 10rpx; border-top: 1rpx solid var(--line); }
+
+/* ── 行动清单 ── */
+.ri-check-item { display: flex; align-items: flex-start; gap: 14rpx; margin-bottom: 12rpx; }
+.ri-check-item:last-child { margin-bottom: 0; }
+.chk-box { font-size: 28rpx; color: var(--muted); flex-shrink: 0; line-height: 1.5; }
+.chk-text { font-size: 28rpx; color: var(--ink); line-height: 1.5; }
+
+/* ── 免责声明间距 ── */
+.ri-disc { margin-top: 24rpx; }
+
+/* ── actionbar 打印按钮禁用 ── */
+.ri-btn-loading { opacity: .6; }
+.flex-1-4 { flex: 1.4; }

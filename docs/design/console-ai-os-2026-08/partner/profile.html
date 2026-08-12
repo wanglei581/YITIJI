@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>机构资料（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/profile</code>「机构资料」</b>（248 行，资料读取与联系人保存已接真）。
+    页面自己就写着「资质、终端绑定、合作协议尚未建模」（<code>routes/profile/index.tsx:12-14</code>）——
+    这是诚实的，但也意味着<b>付费客户无法自助维护商务关系</b>。
+    加四个 Tab：<b>资质合规</b>、<b>账单与用量</b>（需先过合规审查），
+    以及 2026-08-11 新增的 <b>线下机构档案</b> 与 <b>线上平台收录</b>——
+    后两个对应前端岗位页新加的「线下招聘公司」「线上招聘平台」，
+    <b>数据本就挂在本机构名下（<code>Organization.offlineAgencyProfile</code> / <code>onlinePlatformDirectories</code>），
+    但两个后台都没有给机构的入口</b>。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>机构资料</h1><p>基本信息 · 资质合规 · 线下机构档案 · 线上平台收录 · 账单与用量</p></div>
+    <div class="right"><button class="btn btn--sm btn--primary">保存</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="prof">
+    <button class="is-on" data-tab="base">基本信息</button>
+    <button data-tab="qual">资质合规<span class="newdot"></span></button>
+    <button data-tab="offline">线下机构档案<span class="newdot"></span></button>
+    <button data-tab="platform">线上平台收录<span class="newdot"></span></button>
+    <button data-tab="bill">账单与用量<span class="newdot"></span></button>
+  </div>
+
+  <!-- 基本信息（现有） -->
+  <div data-panel-of="prof" data-panel="base">
+    <div class="grid grid--2">
+      <div class="card"><div class="card__head"><h3>机构信息</h3><span class="tag tag--ghost">现有能力</span></div>
+        <div class="card__body stack">
+          <div class="field"><label>机构名称</label><input class="input" value="XX 职业学院就业指导中心" readonly>
+            <div class="hint">名称变更需管理员审核</div></div>
+          <div class="field"><label>机构类型</label>
+            <input class="input" value="高校就业中心（school_employment_center）" readonly>
+            <div class="hint">决定你能管什么——见下方能力范围</div></div>
+          <div class="field"><label>联系人</label><input class="input" value="王主任"></div>
+          <div class="field"><label>联系电话</label><input class="input" value="138****2210"></div>
+        </div></div>
+      <div class="card isnew" data-newtag="新增 · 能力范围可见">
+        <div class="card__head"><h3>本机构能力范围</h3></div>
+        <div class="card__body">
+          <div class="proto" style="margin:0 0 14px">
+            <span class="proto__tag">改造点</span>
+            现在 <b>5 类机构看到的是同一套 12 项菜单</b>——招聘会主办方看得到「政策公告管理」（矩阵里对它是 ❌），
+            企业来源方看得到「招聘会管理」（❌）。改后侧栏按<b>服务端 capability 投影</b>渲染，
+            并在这里明示范围，机构不用猜。
+          </div>
+          <dl class="kv">
+            <dt>岗位信息</dt><dd><span class="tag tag--ok">可管</span></dd>
+            <dt>招聘会</dt><dd><span class="tag tag--ok">可管</span> <span class="small muted">本校场次</span></dd>
+            <dt>政策公告</dt><dd><span class="tag tag--warn">受限</span> <span class="small muted">仅校内公告</span></dd>
+            <dt>企业展示</dt><dd><span class="tag tag--ok">可管</span></dd>
+            <dt>智慧校园</dt><dd><span class="tag tag--ok">可管</span> <span class="small muted">仅高校类型可见</span></dd>
+            <dt>数据源</dt><dd><span class="tag tag--ok">API / Excel / Webhook 三轨</span></dd>
+            <dt>子账号</dt><dd>上限 <b>5</b> 个</dd>
+          </dl>
+          <div class="hr"></div>
+          <div class="small muted">
+            <b>红线</b>：隐藏导航 ≠ 权限控制。这里显示的范围必须与服务端 API 校验一致，
+            前端隐藏只是展示优化。
+          </div>
+        </div></div>
+    </div>
+  </div>
+
+  <!-- 资质合规 -->
+  <div data-panel-of="prof" data-panel="qual" style="display:none">
+    <div class="proto">
+      <span class="proto__tag">新增 Tab · 有现成模型</span>
+      <code>QualificationRecord</code> 模型已存在于 schema（<code>schema.prisma:2241</code>），
+      缺的是<b>机构提交 → 平台核验 → 到期降级</b>这条状态机。
+      <b>为什么这页重要</b>：本项目公司暂无人力资源服务许可证（CLAUDE.md §1），
+      对合作机构的资质校验是<b>合规防线的关键一环</b>——
+      平台必须能自证「我们核验了每家机构的资质，且过期即停」。这是监管检查与招投标的必答题。
+    </div>
+
+    <div class="card" style="border-color:#e6c5bc;margin-bottom:16px">
+      <div class="card__body" style="display:flex;gap:16px;align-items:center">
+        <div style="flex:1">
+          <div class="row"><span class="tag tag--err">30 天后到期</span>
+            <b class="serif" style="font-size:14.5px">人力资源服务许可证</b></div>
+          <div class="small muted" style="margin-top:6px">
+            有效期至 <b>2026-09-10</b>。到期后本机构内容将<b>自动转为不可见</b>，
+            并在到期前 30 / 15 / 7 天各通知一次。
+            <b>不是静默下架</b>——你会收到通知，内容也能在补件通过后恢复。
+          </div>
+        </div>
+        <button class="btn btn--primary">上传新证件</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th style="width:26%">资质</th><th>证件号</th><th>有效期</th><th>核验状态</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="cellmain">营业执照 / 事业单位法人证书</td><td class="mono small">9111****XK</td>
+              <td class="small">长期</td><td><span class="tag tag--ok">已核验</span></td>
+              <td><button class="btn btn--sm btn--ghost">查看</button></td></tr>
+            <tr><td class="cellmain">人力资源服务许可证</td><td class="mono small">RC****0218</td>
+              <td class="small" style="color:var(--err-fg)">2026-09-10（剩 30 天）</td>
+              <td><span class="tag tag--ok">已核验</span></td>
+              <td><button class="btn btn--sm btn--primary">补件</button></td></tr>
+            <tr><td class="cellmain">办学许可证</td><td class="mono small">JY****1102</td>
+              <td class="small">2028-06-30</td><td><span class="tag tag--ok">已核验</span></td>
+              <td><button class="btn btn--sm btn--ghost">查看</button></td></tr>
+            <tr><td class="cellmain">数据来源授权书</td><td class="muted small">—</td>
+              <td class="small">2027-03-01</td><td><span class="tag tag--warn">待核验</span></td>
+              <td><button class="btn btn--sm btn--ghost">查看</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        不同机构类型的必备资质不同：<code>licensed_hr_agency</code> <b>必须</b>有人力资源服务许可证，
+        缺失或过期即不得发布岗位。
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══ 线下机构档案（新增 · J1 权责错配） ═══ -->
+  <div data-panel-of="prof" data-panel="offline" style="display:none">
+    <div class="proto">
+      <span class="proto__tag">新增 Tab · 模型已存在，只缺机构入口</span>
+      终端「岗位信息 → <b>线下招聘公司</b>」展示的就是这份档案。
+      模型 <code>OfflineAgencyProfile</code> + <code>OfflineAgencyBranch</code> 已经有了，
+      Admin 也有完整管理页（<code>AgencyForm</code> / <code>JobsDrawer</code> / <code>ReviewDialog</code>），
+      <b>但 <code>apps/partner/src</code> 全局搜不到任何相关入口</b>——
+      机构自己的门店地址、营业时间、服务项目要改，只能找平台管理员。
+      这与招聘会子实体（参展企业/展区/资料全归 Admin）是<b>同一类权责错配</b>：办事的是机构，管数据的是平台。
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>机构门店信息</h3><span class="tag tag--ghost">本机构自助维护</span></div>
+        <div class="card__body stack">
+          <div class="field"><label>对外展示名称</label><input class="input" value="XX人力资源服务有限公司">
+            <div class="hint">终端「线下招聘公司」列表中显示的名称</div></div>
+          <div class="field"><label>详细地址</label><input class="input" value="XX市XX区XX路 88 号 3 楼"></div>
+          <div class="field"><label>营业时间</label><input class="input" value="周一至周五 09:00–18:00；周六 09:00–12:00"></div>
+          <div class="field"><label>联系电话</label><input class="input" value="0532-8888-8888"></div>
+          <div class="field"><label>服务项目</label>
+            <div class="row" style="flex-wrap:wrap;gap:6px">
+              <span class="tag">岗位推荐</span><span class="tag">简历指导</span>
+              <span class="tag">政策咨询</span><span class="btn btn--sm btn--ghost">+ 添加</span>
+            </div>
+            <div class="hint">仅可选平台预置的合规服务项；<b>不得出现「代投简历」「保offer」等越界表述</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L3 · 模型</span></div>
+        <div class="card__body stack">
+          <div class="advice">
+            <div class="advice__head"><b>建议</b><span class="tag tag--ai">待采纳</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><b>动作</b><span>把服务项目「岗位推荐」的说明补上服务范围与是否收费</span></div>
+              <div class="advice__item"><b>理由</b><span>终端详情页该字段为空时只显示标签，求职者无法判断能否上门办理 <span class="ev ev--2">E2</span></span></div>
+              <div class="advice__item"><b>代价</b><span>需机构补一句话，约 1 分钟</span></div>
+              <div class="advice__item"><b>备选</b><span>留空并在详情页隐藏该区块</span></div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn btn--sm btn--primary">采纳并填入</button>
+              <button class="btn btn--sm">忽略</button>
+            </div>
+          </div>
+          <div class="small muted">AI 只生成待采纳建议，<b>不直接改档案</b>；采纳后仍走下方审核流程。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>门店 / 分支网点</h3>
+        <div class="right"><button class="btn btn--sm btn--primary">+ 新增网点</button></div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>网点名称</th><th>地址</th><th>营业时间</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>总部</td><td>XX市XX区XX路 88 号 3 楼</td><td>周一至周五 09:00–18:00</td>
+              <td><span class="tag tag--ok">已通过</span></td>
+              <td><button class="btn btn--sm">编辑</button></td></tr>
+            <tr><td>城阳分部</td><td>XX市城阳区XX大街 12 号</td><td>周一至周六 09:00–17:30</td>
+              <td><span class="tag tag--warn">待审核</span></td>
+              <td><button class="btn btn--sm">编辑</button></td></tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          修改后状态回落 <code>pending</code>，经平台审核通过才在终端更新——与岗位/政策同一套审核语义。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 线上平台收录（新增 · J2 两个后台都没有写入口） ═══ -->
+  <div data-panel-of="prof" data-panel="platform" style="display:none">
+    <div class="proto proto--warn">
+      <span class="proto__tag">新增 Tab · 申请制，不是自助发布</span>
+      终端「岗位信息 → <b>线上招聘平台</b>」展示的是 <code>OnlinePlatformDirectory</code>。
+      核查发现<b>全局仅 2 处引用</b>（Prisma client + 一处只读 service）——
+      <b>两个后台都没有写入口，数据只能靠 seed 或直接改库</b>。
+      <br><br>
+      <b>但这一条不能照「线下机构档案」的方式修</b>：线上平台目录是<b>平台向求职者推荐第三方平台</b>，
+      推荐权属于平台的编辑责任。该表字段本身就带治理意图——
+      <code>operatorLegalName</code>（运营方法定名称）、<code>officialDomainsJson</code>（官方域名白名单）、
+      <code>evidenceFileId</code>（资质证据）、<b><code>neutralDescription</code>（中立描述）</b>。
+      最后这个命名说明设计上就要求平台保持中立。
+      <b>若开放机构自助发布，任何机构都能把自己的平台塞进推荐位。</b>
+      因此本 Tab 只能<b>申请收录 / 提交更新</b>；发布、排序、上下架由平台管理员掌握。
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>我提交的收录申请</h3>
+        <div class="right"><button class="btn btn--sm btn--primary">+ 申请收录</button></div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>平台名称</th><th>运营方法定名称</th><th>官方域名</th><th>资质证据</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>XX人才网</td><td>XX信息技术有限公司</td>
+              <td class="mono">xxrc.example.cn</td>
+              <td><span class="tag tag--ok">已上传</span></td>
+              <td><span class="tag tag--ok">已收录</span></td>
+              <td><button class="btn btn--sm">提交更新</button></td></tr>
+            <tr><td>XX招聘</td><td>XX网络科技有限公司</td>
+              <td class="mono">zhaopin.example.com</td>
+              <td><span class="tag tag--warn">待补充</span></td>
+              <td><span class="tag tag--warn">审核中</span></td>
+              <td><button class="btn btn--sm">补充材料</button></td></tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          <b>本页看不到、也改不了排序位次</b>——展示顺序（<code>displayOrder</code>）由平台统一编排，
+          机构可见的只有「是否已收录」。
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>申请须知</h3></div>
+        <div class="card__body">
+          <ul style="margin:0;padding-left:19px;font-size:13.5px;line-height:1.75">
+            <div class="advice__item"><b>官方域名必须可验证</b><span>需与 ICP 备案主体一致，平台会做域名白名单校验（与政策「官方入口」共用同一套机制）</span></div>
+            <div class="advice__item"><b>中立描述由平台改写</b><span>机构提交的宣传语不会原样上终端，平台会改成中立表述</span></div>
+            <div class="advice__item"><b>不承诺收录</b><span>提交申请不等于会被收录，也不代表排序位次</span></div>
+            <div class="advice__item"><b>不得付费买位</b><span>曝光位不接受按曝光 / 按跳转计费（<code>compliance-boundary.md</code> §8.8.1 第二类）</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L1 · 规则</span></div>
+        <div class="card__body stack">
+          <div class="advice">
+            <div class="advice__head"><b>提交前自检</b><span class="tag">规则校验 · 不调模型</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><span>✅ 域名为 HTTPS 且非跳转短链</span></div>
+              <div class="advice__item"><span>⚠️ <b>域名主体与营业执照名称不一致</b> —— 请确认是否为同一运营方 <span class="ev ev--1">E1</span></span></div>
+              <div class="advice__item"><span>✅ 资质证据已上传且在有效期内</span></div>
+            </div>
+          </div>
+          <div class="small muted">这一步是<b>确定性规则校验</b>，不调用模型、不标「AI」。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 账单与用量 -->
+  <div data-panel-of="prof" data-panel="bill" style="display:none">
+    <div class="proto proto--err">
+      <span class="proto__tag">合规前置 · 未获结论前不得上线</span>
+      本 Tab <b>必须等许可边界审查结论</b>（<code>compliance-boundary.md</code> §8.8.1）。
+      <b>绝对不能收</b>：按候选人数 / 投递量 / 面试量 / Offer 量 / 简历数计费——
+      那等于效果付费招聘中介，直接撞无人力资源服务许可证红线。
+      另：<b>AI 运维日志不能当计费账本</b>（<code>compliance-boundary.md:345</code>），
+      必须先有不可丢的 <code>AiUsageLedger</code> + <code>orgId</code>。
+    </div>
+
+    <div class="grid grid--4" style="margin-top:16px">
+      <div class="card metric"><div class="metric__main"><div class="metric__label">当前套餐</div>
+        <div class="metric__value" style="font-size:20px">院校标准版</div><div class="metric__foot">2026-01-01 ~ 2026-12-31</div></div><div class="metric__ico">◈</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">本月内容托管</div>
+        <div class="metric__value">33<small> / 100</small></div><div class="bar"><i style="width:33%"></i></div></div><div class="metric__ico">▤</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">本月 AI 用量</div>
+        <div class="metric__value">412<small> 次</small></div><div class="metric__foot muted">需 orgId 计量后才准确</div></div><div class="metric__ico metric__ico--ai">◇</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">本期应付</div>
+        <div class="metric__value muted" style="font-size:20px">待定</div><div class="metric__foot">合规审查通过后启用</div></div><div class="metric__ico metric__ico--warn">¥</div></div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card"><div class="card__head"><h3>可计费项（合规内）</h3></div>
+        <div class="card__body card__body--flush">
+          <table class="table">
+            <thead><tr><th>项目</th><th>计量方式</th><th>为什么合规</th></tr></thead>
+            <tbody>
+              <tr><td class="cellmain small">数据接入服务费</td><td class="small">按数据源数量 / 接入方式</td>
+                <td class="small muted">卖技术服务，不是招聘结果</td></tr>
+              <tr><td class="cellmain small">内容托管服务费</td><td class="small">按在架条数 × 时长</td>
+                <td class="small muted">卖展示位与存储</td></tr>
+              <tr><td class="cellmain small">终端展示服务费</td><td class="small">按点位数 × 时长</td>
+                <td class="small muted">卖线下渠道，类似广告位</td></tr>
+              <tr><td class="cellmain small">招聘会活动服务费</td><td class="small">按场次</td>
+                <td class="small muted">卖活动技术支持</td></tr>
+              <tr><td class="cellmain small">AI 内容服务用量</td><td class="small">按调用量 / token</td>
+                <td class="small muted">卖算力</td></tr>
+              <tr><td class="cellmain small">增值报表订阅</td><td class="small">按月</td>
+                <td class="small muted">卖数据服务</td></tr>
+            </tbody>
+          </table>
+        </div></div>
+      <div class="card" style="border-color:#e6c5bc"><div class="card__head"><h3>绝对不能计费项</h3></div>
+        <div class="card__body">
+          <div class="stack" style="gap:11px">
+            <div class="row"><span class="tag tag--err">❌</span><div><b class="small">按候选人数 / 投递量 / 面试量 / Offer 量</b>
+              <div class="small muted">＝效果付费招聘中介，直接撞许可证红线</div></div></div>
+            <div class="row"><span class="tag tag--err">❌</span><div><b class="small">按简历数 / 推荐数</b>
+              <div class="small muted">平台根本不收简历、不做推荐</div></div></div>
+            <div class="row"><span class="tag tag--err">❌</span><div><b class="small">按求职者联系方式</b>
+              <div class="small muted">永久禁止</div></div></div>
+          </div>
+          <div class="hr"></div>
+          <div class="small muted">
+            这三条不是「暂不支持」，是<b>产品定位决定的永久边界</b>。
+            机构如果需要这类服务，平台的正确回答是「我们不做这个」。
+          </div>
+        </div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>账单历史</h3>
+        <div class="right"><button class="btn btn--sm">申请发票</button></div></div>
+      <div class="card__body">
+        <div class="empty" style="padding:28px">
+          <h3>账单功能尚未开放</h3>
+          <p>合规边界审查完成、<code class="mono">AiUsageLedger</code> 计量落地后启用。
+            <b>现在不展示任何金额</b>——没有真实账本时显示数字就是伪造。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空 / AI / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>机构资料未完善</h3>
+      <p>请先补齐联系人与资质材料，审核通过后才能发布内容。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">开始填写</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body"><div class="small muted">本页不依赖 AI，全部功能照常。</div></div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>机构资料加载失败</h3>
+      <p>无法读取（<code>GET /partner/org</code> 返回 500）。已发布内容不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/profile</code>，加 4 个 Tab。原页 248 行，加 Tab 后建议按 Tab 拆子组件，主文件保持在 300 行内。</li>
+      <li><b>线下机构档案</b>：复用已有 <code>OfflineAgencyProfile</code> / <code>OfflineAgencyBranch</code>，
+        <b>只需补 Partner 侧读写 API 与归属校验</b>（<code>orgId</code> 必须等于当前登录机构），模型零改动。
+        开放对象限定为名下确有 <code>offlineAgencyProfile</code> 的机构。</li>
+      <li><b>线上平台收录</b>：<b>Partner 侧只给「申请 / 提交更新」，不给发布、不给 <code>displayOrder</code></b>。
+        需新增申请态（或复用 <code>reviewStatus</code>），并新建 <b>Admin 治理页</b>（见 <code>admin/online-platforms.html</code>）——
+        那是本轮唯一确实需要 Admin 新增的页面。
+        域名白名单与政策「官方入口」<b>合并成一套机制</b>，不要各写一份。</li>
+      <li>资质：复用已有 <code>QualificationRecord</code>，补「机构提交 → 平台核验 → 到期降级」状态机。<b>过期自动转不可见 + 通知，不静默下架。</b></li>
+      <li>账单：<b>必须等许可边界审查结论</b>；前置是 <code>AiUsageLedger</code> + <code>orgId</code>。未就绪前本 Tab 显示「尚未开放」，不显示任何金额。</li>
+      <li>能力范围来自服务端 capability 投影，与 API 校验同源。</li>
+    </ul></div>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'profile'})</script>
+</body>
+</html>

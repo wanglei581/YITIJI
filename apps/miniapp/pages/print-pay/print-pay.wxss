@@ -1,0 +1,41 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+.store-mini { display: flex; align-items: center; gap: 20rpx; }
+.sm-ic { width: 72rpx; height: 72rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sm-ic .ficon { width: 38rpx; height: 38rpx; }
+.sm-name { font-size: 28rpx; font-weight: 600; color: var(--ink); }
+.sm-sub { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
+
+.order-file { display: flex; align-items: center; gap: 20rpx; }
+.order-file + .order-file { margin-top: 20rpx; padding-top: 20rpx; border-top: 1rpx solid var(--line); }
+.of-ic { width: 68rpx; height: 68rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.of-ic .ficon { width: 34rpx; height: 34rpx; }
+.of-main { flex: 1; }
+.of-name { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.of-desc { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
+.of-price { font-size: 27rpx; font-weight: 600; color: var(--clay-deep); }
+
+.fee { display: flex; flex-direction: column; gap: 16rpx; }
+.fee-row { display: flex; align-items: center; justify-content: space-between; font-size: 26rpx; color: var(--muted); }
+.fee-row text:last-child { color: var(--ink); }
+.fee-row .minus { color: var(--teal-deep); }
+.fee-row.total { padding-top: 16rpx; border-top: 1rpx solid var(--line); }
+.fee-row.total .amt { color: var(--clay-deep); font-weight: 700; font-size: 32rpx; }
+
+.pay-list { display: flex; flex-direction: column; gap: 16rpx; }
+.pay-opt { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; box-shadow: var(--sh-sm); }
+.pay-opt.on { border-color: var(--teal); }
+.po-ic { width: 64rpx; height: 64rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.po-ic.wx { background: #07c160; }
+.po-ic.bal { background: var(--wheat-deep); }
+.po-ic .ficon { width: 34rpx; height: 34rpx; color: #fff; }
+.po-main { flex: 1; }
+.po-title { font-size: 28rpx; font-weight: 600; color: var(--ink); }
+.po-sub { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
+.po-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #fff; flex-shrink: 0; }
+.pay-opt.on .po-radio { background: var(--teal); border-color: var(--teal); }
+
+.ab-label { font-size: 22rpx; color: var(--ink-soft); display: block; }
+.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--clay-deep); font-family: var(--font-serif); }
+
+/* 门店迷你卡主内容区 */
+.sm-main { flex: 1; }

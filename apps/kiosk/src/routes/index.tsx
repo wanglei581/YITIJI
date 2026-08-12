@@ -73,6 +73,7 @@ import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
 import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
+import { SmartCampusGuard } from '../pages/smart-campus/SmartCampusGuard'
 import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
 import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
@@ -186,12 +187,13 @@ export const kioskRouter = createBrowserRouter([
         path: 'campus/freshman-insights',
         lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
       },
-      // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
+      // 智慧校园：子页统一走 SmartCampusGuard。
+      // 关闭开关或机器搬离校园后，深链接直接访问也不得残留校园内容（见 SmartCampusGuard 注释）。
       { path: 'toolbox',                         lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
       { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
-      { path: 'smart-campus/welcome',            element: <SmartCampusWelcomePage /> },
-      { path: 'smart-campus/freshman-insights',  element: <FreshmanInsightsPage /> },
-      { path: 'smart-campus/service/:key',       element: <SmartCampusServicePage /> },
+      { path: 'smart-campus/welcome',            element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
+      { path: 'smart-campus/freshman-insights',  element: <SmartCampusGuard><FreshmanInsightsPage /></SmartCampusGuard> },
+      { path: 'smart-campus/service/:key',       element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },

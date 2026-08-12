@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>岗位信息管理（改造）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>改的是现有页 <code>/jobs</code>「岗位信息管理」</b>（455 行，列表/新增/编辑/重新提审/下架都已接真）。
+    加三样东西：<b>① 质检列</b>（每条岗位一个风险标记）<b>② 提交前预审</b>（提交前就知道会不会被驳回）
+    <b>③「内容健康度」Tab</b>——后端 <code>JobDataQualitySnapshot</code> 与
+    <code>GET /partner/jobs/quality-summary</code> 已存在，前端只用了一个 93 行小面板，能力被浪费。
+    另补 Codex 指出的<b>批量操作</b>与<b>岗位详情</b>（CLAUDE.md §10 要求详情展示来源机构 / 同步时间 / 外部ID / 外部链接）。
+  </div>
+
+  <div class="proto proto--err">
+    <span class="proto__tag">字段级审查 · 本页三处要注意</span>
+    <b>① 「截止日」列只对 Excel/API 导入的岗位有效。</b>
+    手工表单<b>填不了 <code>validThrough</code></b>（手工 9 字段 vs Excel 17 字段），
+    所以手工录入的岗位这一列永远为空，「已过期未下架」检测也覆盖不到它们。
+    <br><b>② 「驳回归因」Tab 的数据当前拿不到。</b>
+    Admin 拒绝时必填 <code>rejectReason</code>（<code>jobs-admin.service.ts:67</code>），
+    但 <b>Partner DTO 不返回它</b>（<code>jobs-shared.ts:120</code>）——
+    政策页与企业页<b>已经能看到</b>，唯独岗位页看不到。<b>需先补 DTO。</b>
+    <br><b>③ 机构填的 5 个字段前台不展示</b>：学历要求 / 经验要求 / 技能 / 福利 / 有效期。
+    数据已存库、API 已返回，<b>只差 Kiosk 详情页渲染</b>（后端零改动，是全项目性价比最高的一条修复）。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">Codex 复核 · 两处口径修正</span>
+    <b>① 规则 ≠ AI。</b> 现有 <code>quality-summary</code>（<code>jobs.controller.ts:345</code>）是<b>确定性元数据检查</b>，
+    不能标成「生成式 AI 质检」。本页因此分成两档：
+    <span class="ev ev--1">E1 规则</span>（字段缺失 / 过期 / 薪资区间异常 / 重复——不调模型、不花钱、AI 挂了也在）
+    与 <span class="ev ev--3">E3 模型</span>（疑似歧视表述 / 表达质量 / 改写建议——需要模型、需人工采纳）。
+    <b>② 本页 455 行已接近 500 行阈值</b>（<code>routes/jobs/index.tsx:455</code>），
+    加 2 个 Tab 会立即越线——<b>必须先拆成 列表 / 表单 / 详情 / 健康度 四个组件</b>再加。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>岗位信息管理</h1><p>本机构岗位 · 审核状态 · 内容质量</p></div>
+    <div class="right">
+      <button class="btn btn--sm">Excel 导入</button>
+      <button class="btn btn--sm btn--primary">新增岗位</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="jobs">
+    <button class="is-on" data-tab="list">岗位列表</button>
+    <button data-tab="health">内容健康度<span class="newdot"></span></button>
+    <button data-tab="reject">驳回归因<span class="newdot"></span></button>
+  </div>
+
+  <!-- ═══ Tab 1：岗位列表 ═══ -->
+  <div data-panel-of="jobs" data-panel="list">
+
+    <div class="advice isnew" data-newtag="新增 · 提交前 AI 预审" data-when="default">
+      <div class="advice__head"><span class="tag tag--ai">AI 预审</span>
+        <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+        <b>你有 6 条待提审岗位，按当前内容预计 4 条会被驳回</b></div>
+      <div class="advice__action">先补齐薪资区间和工作地点，再一起提审。</div>
+      <div class="advice__grid">
+        <div class="advice__item"><b>理由</b><span>
+          4 条缺薪资区间、2 条缺工作地点（<span class="ev ev--1">E1</span> 字段实测）。
+          本机构历史驳回原因里，「关键字段缺失」占 71%。</span></div>
+        <div class="advice__item"><b>代价</b><span>批量补齐约 5 分钟；直接提审则平均等 1.5 天才收到驳回通知，再改再等。</span></div>
+        <div class="advice__item"><b>备选</b><span>只提审已合格的 2 条，其余留草稿慢慢改。</span></div>
+      </div>
+      <div class="advice__foot">
+        <button class="btn btn--sm btn--primary">筛出这 4 条</button>
+        <button class="btn btn--sm">批量补字段</button>
+        <button class="btn btn--sm btn--ghost">只提审合格的 2 条</button>
+        <span class="small muted">AI 判断，仅供参考</span>
+      </div>
+    </div>
+
+    <div class="card" data-when="default aidown" style="margin-top:16px">
+      <div class="card__head">
+        <h3>岗位列表</h3>
+        <div class="right">
+          <select class="select" style="width:auto;padding:6px 10px"><option>全部状态</option><option>待审核</option><option>已发布</option><option>已驳回</option><option>草稿</option></select>
+          <span class="isnew" data-newtag="新增" style="display:inline-block">
+            <select class="select" style="width:auto;padding:6px 10px"><option>全部质检结果</option><option>E1 规则命中</option><option>E3 模型提示</option><option>合格</option></select>
+          </span>
+        </div>
+      </div>
+      <div class="card__body card__body--flush">
+        <div class="table__wrap">
+          <table class="table">
+            <thead><tr>
+              <th style="width:30px"><input type="checkbox"></th>
+              <th style="width:26%">岗位</th><th>来源</th><th>审核状态</th><th>发布状态</th>
+              <th>质检</th><th>截止日 <span class="tag tag--warn" style="font-size:9px;padding:0 4px">仅导入</span></th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cellmain">软件测试工程师</div><div class="cellsub">XX科技有限公司 · 外部ID JOB-8821</div></td>
+                <td><span class="tag tag--ghost">Excel 导入</span></td>
+                <td><span class="tag tag--ok">已通过</span></td>
+                <td><span class="tag tag--ok">已发布</span></td>
+                <td><span class="tag tag--ok">合格</span></td>
+                <td class="small">09-30</td>
+                <td><button class="btn btn--sm btn--ghost">详情</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" checked></td>
+                <td><div class="cellmain">销售代表（校招）</div><div class="cellsub">YY商贸 · 外部ID JOB-8822</div></td>
+                <td><span class="tag tag--ghost">Excel 导入</span></td>
+                <td><span class="tag tag--warn">待审核</span></td>
+                <td><span class="tag">草稿</span></td>
+                <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">缺薪资区间</span></td>
+                <td class="small">10-15</td>
+                <td><button class="btn btn--sm btn--ghost">详情</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" checked></td>
+                <td><div class="cellmain">客服专员（限女性，25岁以下）</div><div class="cellsub">ZZ服务 · 外部ID JOB-8823</div></td>
+                <td><span class="tag tag--ghost">手工录入</span></td>
+                <td><span class="tag tag--warn">待审核</span></td>
+                <td><span class="tag">草稿</span></td>
+                <td><span class="ev ev--3">E3</span> <span class="tag tag--err">疑似歧视表述</span></td>
+                <td class="small">10-01</td>
+                <td><button class="btn btn--sm btn--ghost">详情</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cellmain">行政专员</div><div class="cellsub">XX科技有限公司 · 外部ID JOB-8815</div></td>
+                <td><span class="tag tag--ghost">API 同步</span></td>
+                <td><span class="tag tag--err">已驳回</span></td>
+                <td><span class="tag">草稿</span></td>
+                <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">薪资区间异常</span></td>
+                <td class="small">08-06</td>
+                <td><button class="btn btn--sm btn--ghost">详情</button></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cellmain">运营助理</div><div class="cellsub">YY商贸 · 外部ID JOB-8790</div></td>
+                <td><span class="tag tag--ghost">Excel 导入</span></td>
+                <td><span class="tag tag--ok">已通过</span></td>
+                <td><span class="tag tag--warn">已过期</span></td>
+                <td><span class="ev ev--1">E1</span> <span class="tag tag--warn">已过期未下架</span></td>
+                <td class="small" style="color:var(--err-fg)">07-30</td>
+                <td><button class="btn btn--sm btn--ghost">详情</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card__foot isnew" data-newtag="新增 · 批量操作">
+        <div class="row">
+          <span>已选 2 条</span>
+          <button class="btn btn--sm">批量提审</button>
+          <button class="btn btn--sm">批量下架</button>
+          <button class="btn btn--sm">批量改截止日</button>
+          <button class="btn btn--sm">定时上下架</button>
+          <div class="spacer"></div>
+          <button class="btn btn--sm btn--ghost">导出 CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab 2：内容健康度 ═══ -->
+  <div data-panel-of="jobs" data-panel="health" style="display:none">
+    <div class="proto">
+      <span class="proto__tag">新增 Tab · 有现成后端</span>
+      <code>JobDataQualitySnapshot</code> 模型 + <code>GET /partner/jobs/quality-summary</code> 已经存在，
+      现在只被一个 93 行的小面板消费（<code>routes/jobs/components/JobQualitySummaryPanel.tsx</code>）。
+      这个 Tab 把它做完整，<b>同时降低管理员的人工审核量</b>——机构自己先改好，平台少驳回。
+    </div>
+
+    <div class="grid grid--5">
+      <div class="card metric"><div class="metric__main"><div class="metric__label">健康分</div>
+        <div class="metric__value">72<small>/100</small></div>
+        <div class="bar"><i class="warn" style="width:72%"></i></div>
+        <div class="metric__foot">同类机构中位 81</div></div><div class="metric__ico metric__ico--warn">◐</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">完整度</div>
+        <div class="metric__value">68<small>%</small></div><div class="metric__foot down">关键字段缺失 9 条</div></div><div class="metric__ico">▣</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">时效性</div>
+        <div class="metric__value">79<small>%</small></div><div class="metric__foot down">过期未下架 3 条</div></div><div class="metric__ico">⏱</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">合规性</div>
+        <div class="metric__value">96<small>%</small></div><div class="metric__foot down">疑似歧视 1 条</div></div><div class="metric__ico metric__ico--err">⚖</div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">可读性</div>
+        <div class="metric__value">84<small>%</small></div><div class="metric__foot">描述过短 2 条</div></div><div class="metric__ico">✎</div></div>
+    </div>
+
+    <div class="grid grid--r" style="margin-top:18px">
+      <div class="card">
+        <div class="card__head"><h3>问题清单</h3><span class="sub">按影响条数排序，每项可一键筛出</span></div>
+        <div class="card__body card__body--flush">
+          <table class="table">
+            <thead><tr><th style="width:34%">问题</th><th>类型</th><th class="num">影响</th><th>建议</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="cellmain">缺薪资区间</td><td><span class="tag tag--warn">完整度</span></td><td class="num">6</td>
+                <td class="small muted">终端上不显示薪资的岗位，详情浏览率平均低 34%</td>
+                <td><button class="btn btn--sm">筛出并批量补</button></td></tr>
+              <tr><td class="cellmain">已过期未下架</td><td><span class="tag tag--warn">时效性</span></td><td class="num">3</td>
+                <td class="small muted">占本周 18% 曝光但零跳转</td>
+                <td><button class="btn btn--sm">筛出并批量下架</button></td></tr>
+              <tr><td class="cellmain">疑似歧视表述</td><td><span class="tag tag--err">合规性</span></td><td class="num">1</td>
+                <td class="small muted">「限女性，25岁以下」——审核必驳，且有法律风险</td>
+                <td><button class="btn btn--sm btn--danger">立即处理</button></td></tr>
+              <tr><td class="cellmain">缺工作地点</td><td><span class="tag tag--warn">完整度</span></td><td class="num">3</td>
+                <td class="small muted">无法进入按地点筛选的结果</td>
+                <td><button class="btn btn--sm">筛出</button></td></tr>
+              <tr><td class="cellmain">疑似重复岗位</td><td><span class="tag">完整度</span></td><td class="num">2</td>
+                <td class="small muted">与 8 月 3 日导入批次高度相似</td>
+                <td><button class="btn btn--sm">对比</button></td></tr>
+              <tr><td class="cellmain">描述少于 50 字</td><td><span class="tag">可读性</span></td><td class="num">2</td>
+                <td class="small muted">可用 AI 内容助手扩写（只优化表达，不编造）</td>
+                <td><button class="btn btn--sm btn--ai">AI 帮我改</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card isnew" data-newtag="新增 · AI 内容助手">
+          <div class="card__head"><h3>AI 内容助手</h3><span class="tag tag--ai">E3</span></div>
+          <div class="card__body">
+            <div class="field" style="margin-bottom:10px">
+              <label>原文（客服专员）</label>
+              <div class="locked">岗位要求：限女性，25岁以下，形象好。负责接听电话。</div>
+            </div>
+            <div class="field" style="margin-bottom:12px">
+              <label>AI 改写建议</label>
+              <div class="locked" style="border-color:var(--p-300);background:var(--p-50)">岗位要求：具备良好的沟通表达能力与服务意识，普通话标准。
+主要职责：接听客户来电，记录并跟进客户问题，协助完成客户回访。</div>
+            </div>
+            <div class="proto proto--warn" style="margin:0 0 12px">
+              <span class="proto__tag">三条硬约束</span>
+              ① 只优化表达，<b>不编造</b>薪资、地点、公司信息；
+              ② 移除歧视性限定（性别 / 年龄 / 婚育 / 地域 / 院校）；
+              ③ <b>必须你点采纳才生效</b>，AI 不自动改你的内容、不自动提审。
+            </div>
+            <div class="row">
+              <button class="btn btn--sm btn--primary">采纳</button>
+              <button class="btn btn--sm">重新生成</button>
+              <button class="btn btn--sm btn--ghost">放弃</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__head"><h3>健康分趋势</h3></div>
+          <div class="card__body">
+            <div class="stack" style="gap:8px">
+              <div class="row"><span class="small muted" style="width:56px">07-14</span><div class="bar" style="flex:1;margin:0"><i style="width:64%"></i></div><span class="mono small">64</span></div>
+              <div class="row"><span class="small muted" style="width:56px">07-21</span><div class="bar" style="flex:1;margin:0"><i style="width:69%"></i></div><span class="mono small">69</span></div>
+              <div class="row"><span class="small muted" style="width:56px">07-28</span><div class="bar" style="flex:1;margin:0"><i class="warn" style="width:58%"></i></div><span class="mono small">58</span></div>
+              <div class="row"><span class="small muted" style="width:56px">08-04</span><div class="bar" style="flex:1;margin:0"><i style="width:72%"></i></div><span class="mono small">72</span></div>
+            </div>
+            <div class="small muted" style="margin-top:12px">
+              <span class="ev ev--1">E1</span> 7-28 那次下跌对应 8 月 3 日的批量导入——该批次 12 条里 9 条缺薪资区间。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab 3：驳回归因 ═══ -->
+  <div data-panel-of="jobs" data-panel="reject" style="display:none">
+    <div class="proto proto--err">
+      <span class="proto__tag">⚠️ 本 Tab 有数据前置，不能先做前端</span>
+      <b>驳回原因目前根本传不到机构侧。</b>
+      Admin 拒绝时必填并写库（<code>jobs-admin.service.ts:67</code>），
+      但 Partner 的 DTO 映射<b>遗漏了 <code>rejectReason</code></b>（<code>jobs-shared.ts:514-535</code>），
+      Partner 类型定义也止步于此（<code>partner/services/api/types.ts:105-126</code>）。
+      <br><b>政策页与企业页已经能看到驳回原因</b>（<code>policy/index.tsx:270-272</code>、
+      <code>companies/index.tsx:439-445</code>）——说明这是岗位链的遗漏，不是设计如此。
+      <br><b>做本 Tab 前必须先补 DTO</b>，否则页面只能显示空白。
+    </div>
+
+    <div class="proto">
+      <span class="proto__tag">新增 Tab</span>
+      机构现在<b>不知道自己为什么被驳回</b>——只能看到状态变成「已驳回」。
+      这个 Tab 把驳回理由、改法建议、重新提审入口放在一起，机构不用打电话问平台。
+    </div>
+    <div class="card">
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th>时间</th><th style="width:22%">内容</th><th>驳回理由</th><th>怎么改</th><th></th></tr></thead>
+          <tbody>
+            <tr><td class="mono small">08-06 10:22</td><td class="cellmain">行政专员</td>
+              <td><span class="tag tag--err">薪资区间异常</span><div class="cellsub">填写为 1000–50000，跨度不合理</div></td>
+              <td class="small muted">按实际岗位填写区间，跨度建议不超过 2 倍</td>
+              <td><button class="btn btn--sm btn--primary">改并重新提审</button></td></tr>
+            <tr><td class="mono small">08-02 15:40</td><td class="cellmain">前台接待</td>
+              <td><span class="tag tag--err">疑似歧视表述</span><div class="cellsub">含「仅限本地户籍」</div></td>
+              <td class="small muted">移除户籍限定，或改为具体的岗位客观要求</td>
+              <td><button class="btn btn--sm btn--ai">AI 帮我改</button></td></tr>
+            <tr><td class="mono small">07-29 09:15</td><td class="cellmain">仓库管理员</td>
+              <td><span class="tag tag--err">来源信息不全</span><div class="cellsub">缺外部投递链接</div></td>
+              <td class="small muted">岗位必须有来源平台的可访问链接（CLAUDE.md §10 数据边界）</td>
+              <td><button class="btn btn--sm btn--primary">补链接</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">驳回率 8.4% · 同类机构中位 6.1% · 主因：关键字段缺失（71%）</div>
+    </div>
+  </div>
+
+  <!-- 空 / AI 不可用 / 错误 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>还没有岗位数据</h3>
+      <p>你可以通过 Excel 批量导入、配置 API 数据源自动同步，或手工新增单条岗位。
+        所有导入内容默认为待审核状态，管理员审核通过后才会在终端展示。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">Excel 导入</button><button class="btn">配置数据源</button><button class="btn">手工新增</button>
+      </div>
+    </div></div></div>
+  </div>
+
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 质检与预审暂时不可用</div>
+      <div class="degrade__body">
+        <b>岗位的增删改查、提审、下架、Excel 导入全部照常</b>——这些不依赖 AI。
+        暂时看不到的是：质检风险分、提交前预审、AI 改写建议。
+        「内容健康度」Tab 里 <span class="ev ev--1">E1 规则</span>那一档<b>全部照常</b>（字段完整度 / 过期 / 薪资异常 / 重复——不调模型）；只有 <span class="ev ev--3">E3 模型</span>那一档暂停。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">继续管理岗位</button>
+        <button class="btn btn--sm">看规则版健康度</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-when="error">
+    <div class="errbox"><h3>岗位列表加载失败</h3>
+      <p>无法读取本机构岗位（<code>GET /partner/jobs</code> 返回 500）。已发布内容在终端的展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button><button class="btn btn--sm btn--ghost">提工单</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变，但先拆组件</b>：仍是 <code>/jobs</code>；必须先把 455 行拆成 列表 / 表单 / 详情 / 健康度 四个组件再加 Tab（Codex：不拆会立即越过 500 行阈值）。</li>
+      <li><b>规则先行</b>：健康度先出 E1 规则版（复用已有 <code>quality-summary</code>，不调模型、零成本），E3 模型版随后。<code>quality-summary</code> 是确定性元数据检查，<b>不得包装成「AI 质检」</b>。</li>
+      <li>机构侧 AI 三条硬约束：不对求职者做任何判断 · 不生成招聘承诺（与 Admin 共用违禁词库）· 必须人工采纳才生效。</li>
+      <li>补 CLAUDE.md §10：岗位详情必须展示来源机构 / 同步时间 / 外部ID / 外部投递链接 / 数据来源说明。</li>
+      <li>新增端点：<code>POST /partner/ai/content-check</code>、<code>POST /partner/ai/content-polish</code>、<code>GET /partner/health/*</code>。</li>
+      <li><b>同一套能力也要覆盖 <code>/companies</code> 与 <code>/policy</code></b>（Codex 指出本映射只覆盖岗位）；<code>/companies</code> 已 631 行，同样需先拆。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'jobs'})</script>
+</body>
+</html>

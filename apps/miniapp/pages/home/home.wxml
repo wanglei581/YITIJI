@@ -1,4 +1,4 @@
-<!-- pages/home/home.wxml（M0.1 壳：布局沿用已核验视觉，入口收敛到四个 Tab） -->
+<!-- pages/home/home.wxml -->
 <view class="home-wrap">
   <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
 
@@ -8,19 +8,30 @@
       <text class="greet-date">{{todayStr}}</text>
     </view>
     <view class="head-tools">
-      <view class="head-icon tap" hover-class="tap-press" bindtap="tapComingSoon">
+      <view
+        class="head-icon assistant-icon tap"
+        hover-class="tap-press"
+        bindtap="tapService"
+        data-url="/pages/assistant/assistant"
+      ><view class="ficon i-robot"></view></view>
+      <view class="head-icon tap" hover-class="tap-press" bindtap="tapNotify">
         <view class="ficon i-bell"></view>
       </view>
     </view>
   </view>
 
-  <view class="focus-strip tap" hover-class="tap-press" bindtap="tapComingSoon">
+  <view
+    class="focus-strip tap"
+    hover-class="tap-press"
+    bindtap="tapService"
+    data-url="/pages/resume-diagnose/resume-diagnose"
+  >
     <view class="focus-mark"><view class="ficon i-file-search"></view></view>
     <view class="focus-copy">
       <text class="focus-label">今日建议</text>
-      <text class="focus-title">简历诊断将在 M1 上线</text>
+      <text class="focus-title">先检查一遍现有简历</text>
     </view>
-    <text class="focus-action">敬请期待 ›</text>
+    <text class="focus-action">开始 ›</text>
   </view>
 
   <view class="workspace">
@@ -34,7 +45,7 @@
           class="prep-lead tap"
           hover-class="tap-press"
           bindtap="tapService"
-          data-url="/pages/ai/ai"
+          data-url="/pages/resume-diagnose/resume-diagnose"
         >
           <view class="lead-icon"><view class="ficon i-file-search"></view></view>
           <text class="lead-title">诊断简历</text>
@@ -45,10 +56,10 @@
           <view
             class="prep-link tap"
             wx:for="{{preparationTools}}"
-            wx:key="title"
+            wx:key="url"
             hover-class="tap-press"
             bindtap="tapService"
-            data-url="{{item.tab}}"
+            data-url="{{item.url}}"
           >
             <view class="mini-icon"><view class="ficon i-{{item.icon}}"></view></view>
             <text>{{item.title}}</text>
@@ -68,21 +79,21 @@
           class="bundle-lead tap"
           hover-class="tap-press"
           bindtap="tapService"
-          data-url="/pages/me/me"
+          data-url="/pages/documents/documents"
         >
           <view class="bundle-icon"><view class="ficon i-folder"></view></view>
-          <text class="bundle-title">我的材料</text>
-          <text class="bundle-sub">简历与文档统一整理</text>
-          <text class="bundle-action">去查看 ›</text>
+          <text class="bundle-title">选择本人文档</text>
+          <text class="bundle-sub">从真实文件发起到机打印</text>
+          <text class="bundle-action">去选择 ›</text>
         </view>
         <view class="material-grid">
           <view
             class="material-link {{item.wide ? 'wide' : ''}} tap"
             wx:for="{{materialLinks}}"
-            wx:key="title"
+            wx:key="url"
             hover-class="tap-press"
             bindtap="tapService"
-            data-url="{{item.tab}}"
+            data-url="{{item.url}}"
           >
             <view class="material-icon"><view class="ficon i-{{item.icon}}"></view></view>
             <text>{{item.title}}</text>
@@ -114,10 +125,10 @@
           <view
             class="discovery-link tap"
             wx:for="{{discoveryLinks}}"
-            wx:key="title"
+            wx:key="url"
             hover-class="tap-press"
             bindtap="tapService"
-            data-url="{{item.tab}}"
+            data-url="{{item.url}}"
           >
             <view class="discovery-icon"><view class="ficon i-{{item.icon}}"></view></view>
             <text>{{item.title}}</text>

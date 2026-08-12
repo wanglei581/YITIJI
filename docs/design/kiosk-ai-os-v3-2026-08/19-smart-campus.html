@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
 /* ── P19 专用 ───────────────────────────────────────────────────────────
    这一页的设计任务和别的页不一样：**它的主状态是「还没有」**。
@@ -82,10 +83,176 @@
 .alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
 .alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
 
+/* ── 补：子功能入口层（s4）─ 生产 SmartCampusHomePage.tsx 的六项服务预览 ──
+   六项名称与说明取生产代码原文（ENTRIES + SERVICE_ENTRIES 的 title/description）。
+   整页由终端开关 config.enabled 控制：关着时首页连入口都不渲染，直达 URL 只有空态。
+   所以这六张卡一律 aria-disabled + chip--info「学校开通后可用」，不做成能点的入口。 */
+
+/* AI 引导带：这一屏唯一能点的东西，指向本机自己已有的能力；ai-down 换静态对照表 */
+.aiguide { flex:0 0 auto; display:flex; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--jade-a12); border:1px solid var(--jade-a20); }
+.aiguide > .ic { width:22px; height:22px; color:var(--jade-400); flex:0 0 auto; margin-top:2px; }
+.aiguide--off { background:var(--fog-a04); border-color:var(--fog-a12); }
+.aiguide--off > .ic { color:var(--fog-600); }
+.ag-b { min-width:0; flex:1 1 auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.ag-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.ag-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.ag-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; } .ag-s b { color:var(--fog-900); }
+.ag-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-3); }
+.asug { display:flex; align-items:center; gap:var(--s-3); min-height:var(--touch-min);
+  padding:9px var(--s-4); border-radius:var(--r-xs); background:var(--surf-1);
+  border:1px solid var(--brd-2); text-decoration:none; color:inherit;
+  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.asug:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.asug .ic { width:19px; height:19px; color:var(--jade-500); flex:0 0 auto; }
+.asug-b { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.asug-k { font-size:var(--fz-1); color:var(--fog-600); line-height:1.35; }
+.asug-t { font-size:var(--fz-2); color:var(--fog-900); font-weight:600; line-height:1.35; }
+
+/* 六项服务行：沿用 s3 已有的 .alt 视觉，只把行距压紧一点，
+   否则 6 行 + 说明会把 previewwrap 撑破、压到下面那张卡上（实测溢出 53px）。 */
+.previewwrap[data-at="s4"] .alt { padding:10px var(--s-5); }
+.previewwrap[data-at="s4"] .alt-s { font-size:var(--fz-1); }
+
+/* 「待接线」标：不是证据级别。E1/E2/E3 说的是「这条结论有多硬」，
+   而这里**还没有结论** —— 是一个已经想清楚该长什么样、但数据还没接上的 AI 位。
+   所以刻意不借 E3 的琥珀色（那会让人以为已经有模型判断了），
+   改用虚线中性色，和本页 .wh「接入后会有什么」是同一套语言。 */
+.ev--wire { color:var(--fog-600); background:var(--fog-a04);
+            border-style:dashed; border-color:var(--fog-a20); }
+
+/* ai-down 静态对照表：六项 ↔ 现有替代路径。没有替代的就写没有，不硬凑 */
+.xmap { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-2) var(--s-5); }
+.xm { display:flex; align-items:baseline; gap:var(--s-2); font-size:var(--fz-1); line-height:1.5; }
+.xm-a { color:var(--fog-900); font-weight:600; flex:0 0 auto; }
+.xm-b { color:var(--fog-700); min-width:0; }
+
 .tl-s2 { font-size:var(--fz-1); color:var(--fog-600); }
 .chip--info { cursor:inherit; }
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
+
+/* 2026-08-10：「不用等接入，现在就能做的」这一栏原来正好 4 条填满 496px，
+   补进 P46 校园服务的三个入口后溢出 363px，三条全被裁掉。
+   右栏的 pane--grow 早就是「外层收边、内层滚动」（上面两行），
+   左栏这一块照同一套处理，不为了塞下去而删掉已有的四条真入口。 */
+.wmain .pane--grow.svc-list { overflow:hidden; }
+.wmain .pane--grow.svc-list > .sec { min-height:0; flex:1 1 auto; overflow-y:auto; }
+/* .alt 默认 flex-shrink:1，在滚动容器里会被压扁（实测 51px 高、内容 91px，
+   overflow:visible 让说明文字直接压到下一条上，自检查不出来但眼睛看得见）。
+   滚动容器里的条目一律不许压缩，让容器去滚。 */
+.wmain .pane--grow.svc-list > .sec > .alt { flex:0 0 auto; }
+
+/* ── 2026-08-11 版面留白整改 ──────────────────────────────────────────────
+   实测（栏高 1456px）：s2 左 745 / 右 768，s3 左 611 / 右 768，s1 右 233；s4 两栏都是 0。
+
+   成因分两类，不是同一件事：
+
+   ① s2 / s3 —— **内容量真的不够 + flex 分配**。
+      左栏 .previewwrap 外壳 1356px，里面只有 611px；.stophere 写着 flex:1 1 auto，
+      于是一个只有两行字的虚线框被拉到栏底。右栏 pane--grow 外壳 1089px、内容 321px。
+      这两步是「学校接入后长什么样」的预览，本来就没有数据可放 —— 但按 (f) 的判据，
+      「数据缺失是正确的」不等于「底下空 768px 是正确版式」。
+      处理：不编任何学校数据。改为
+        · 把该说的说到位：.stophere 由「两行字 + 撑满的空壳」改成逐项列清
+          **哪一项没有、谁提供** —— 屏上那 5 步 / 4 项各缺什么，本来就写在页面上，
+          这里只是把同一句话拆到它对应的那一项上，每一行的值都是「未接入」。
+        · 把真实出口做大：这一屏唯一能点的三条（打印 / 扫描 / 看校招活动）
+          原来是 90px 的小卡，现在按 §9 主操作尺寸做成 ≥140px 的大卡。
+        · 把「本机对你的数据做什么」从 s1 扩到 s2/s3 常驻 —— 页面自己写着
+          「这几条现在就成立，不等接入」，而用户正是在这两步判断值不值得推动学校开通。
+
+   ② s1 右 233 —— 纯粹是字太小。27 寸竖屏 1080px 铺在约 13.2 英寸宽上 ≈ 82 PPI，
+      60cm 距离下 13–16px 正文只有 4–4.6mm 字高。放大即可，不动结构。
+
+   s4 两栏本来就是 0，且左栏 .previewwrap 实测已经溢出 112px（六项服务那张卡），
+   靠 .alt 压行距硬塞。放大之前先给它内层滚动，既不会因为放大而挤破，
+   也顺手修掉那 112px 的静默溢出。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 通用放大：两栏同步，不按阶段切字号 */
+.work .pane-hd b { font-size:var(--fz-5); }
+.work .kv-row { min-height:58px; font-size:var(--fz-4); padding:var(--s-3) 2px; }
+.work .notice { font-size:var(--fz-3); line-height:1.72; padding:var(--s-5); }
+.work .panel-note { font-size:var(--fz-3); line-height:1.72; }
+.work .lock-p { font-size:var(--fz-4) !important; line-height:1.78; }
+.work .tl { padding:var(--s-4) 0; }
+.work .tl-t { font-size:var(--fz-4); line-height:1.5; }
+.work .tl-s2 { font-size:var(--fz-3); line-height:1.68; display:block; margin-top:5px; }
+.work .alt-t { font-size:var(--fz-5); }
+.work .alt-s { font-size:var(--fz-3); line-height:1.68; }
+.work .alt { padding:var(--s-5); }
+.wh-t { font-size:var(--fz-4); }
+.wh-s { font-size:var(--fz-2); line-height:1.6; }
+.previewbar span { font-size:var(--fz-4); line-height:1.68; }
+
+/* 预览两步的主区：时间线是这两步的主内容，行距按主区尺寸给 */
+.previewwrap .tl { padding:var(--s-5) 0; }
+.previewwrap .tl::before { top:38px; }
+.previewwrap .tl-dot { width:30px; height:30px; }
+.previewwrap .tl-t { font-size:var(--fz-5); }
+
+/* 「到此为止」：不再 flex 撑满，改成按内容收高的实体块 */
+.stophere { flex:0 0 auto; }
+.sh-t { font-size:var(--fz-5); }
+.sh-p { font-size:var(--fz-3); line-height:1.75; max-width:none; }
+/* 逐项列清「哪一项没有、谁提供」。值一律是「未接入」—— 这是本页的主张本身，
+   不是数据。two-column 网格，行高按触控尺寸给。 */
+.miss { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); margin-top:var(--s-4); }
+.ms { display:flex; flex-direction:column; gap:4px; min-height:var(--touch-min);
+      padding:var(--s-4); border-radius:var(--r-xs);
+      background:var(--fog-a04); border:1px dashed var(--fog-a20); }
+.ms-t { font-size:var(--fz-3); color:var(--fog-800); font-weight:600; }
+.ms-w { font-size:var(--fz-2); color:var(--fog-600); line-height:1.55; }
+.ms-v { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+
+/* s4 右栏那 5 条「不用等开通现在能做的」是次要出口清单（同样的入口在 s1 左栏已经大卡列过），
+   跟着通用放大会把整栏顶出 190px，末两条被推到可视区外。这一处保持紧凑行高，
+   触控高度仍由 .alt 的 min-height:var(--touch-min) 兜住。 */
+.wside [data-at="s4"] .alt { padding:var(--s-3) var(--s-4); }
+.wside [data-at="s4"] .alt-t { font-size:var(--fz-4); }
+.wside [data-at="s4"] .alt-s { font-size:var(--fz-2); line-height:1.5; }
+.wside [data-at="s4"] .kv-row { min-height:52px; }
+.wside [data-at="s4"] .lock-p { font-size:var(--fz-3) !important; line-height:1.7; }
+/* s2/s3 右栏三块加起来自然高 1503px、可用 1424px：不让它滚（滚会把
+   「具体开放哪些由学校方决定」最后一行推出可视区，实测被切 24px）。
+   压的是行距和 kv 行高，一个字都没删。 */
+.wside [data-at="s2 s3"] .kv-row { min-height:48px; }
+.wside [data-at="s2 s3"] .lock-p { line-height:1.7; }
+.wside [data-at="s2 s3"] .alt { padding:var(--s-4); }
+
+/* s4 六项服务卡：原来 6 条竖着排，previewwrap 只分到 419px，实测**溢出 112px 压在
+   下面那张卡上**（自检查不出来，眼睛看得见；页内注释里也承认过一次 53px）。
+   主区有 604px 宽，这六张卡只有图标 + 标题 + 一行说明，本来就不需要整行 ——
+   改成 2×3 网格，高度砍掉一半，六条全部露出来，不用滚也不压任何东西。
+   说明栏 notice 跨两列。滚动兜底仍保留，防止字号或文案变长时又悄悄压上去。 */
+.previewwrap[data-at="s4"] { overflow:hidden; }
+.previewwrap[data-at="s4"] > .pane { min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+.previewwrap[data-at="s4"] > .pane > .svc6 {
+  min-height:0; flex:1 1 auto; overflow-y:auto;
+  display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); align-content:start; }
+.previewwrap[data-at="s4"] > .pane > .svc6 > .alt { flex:0 0 auto; }
+.previewwrap[data-at="s4"] > .pane > .svc6 > .notice { grid-column:1 / -1; margin-top:var(--s-2) !important; }
+.previewwrap[data-at="s4"] .alt-t { font-size:var(--fz-4); }
+
+/* s1 右栏「如果你是学校老师」一块就有 4 步时间线 + 两组说明 + 第二组 kv —— 本来就满，
+   跟着通用放大会顶出 213px 被滚动条吃掉（首次使用态还要再加一张卡）。
+   这一栏压回接近原尺寸：它不是留白问题栏，只需要 233px 的富余被填掉即可。内容一字不动。 */
+.wside [data-at="s1"] .kv-row { min-height:44px; font-size:var(--fz-3); }
+.wside [data-at="s1"] .tl { padding:var(--s-3) 0; }
+.wside [data-at="s1"] .tl-t { font-size:var(--fz-3); }
+.wside [data-at="s1"] .tl-s2 { font-size:var(--fz-1); line-height:1.5; }
+.wside [data-at="s1"] .pane-hd b { font-size:var(--fz-4); }
+.wside [data-at="s1"] .notice { font-size:var(--fz-2); line-height:1.6; padding:var(--s-3) var(--s-4); }
+.wside [data-at="s1"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
+.wside [data-at="s1"] .lock-p { font-size:var(--fz-3) !important; line-height:1.66; }
+/* 首次使用那张卡在 s1 是**多出来的第三张** —— 右栏放不下就会把「如果你是学校老师」
+   那一栏顶出 130px。它只有两行字，按两行字的体量给，不占一张常规卡的高度。 */
+.wside [data-when="first"] .pane-hd { margin-bottom:var(--s-3); }
+.wside [data-when="first"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
+/* s4 右栏第三块（5 条替代入口）差 29px 才装得下，压条目间距即可 */
+.wside [data-at="s4"] .sec > div[style*="column"] { gap:var(--s-2) !important; }
+.wside [data-at="s4"] .panel-note { font-size:var(--fz-2); line-height:1.6; }
 </style>
 </head>
 <body>
@@ -98,7 +265,7 @@
   <div class="pulseline"></div>
 
   <header class="topbar">
-    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">智慧校园</div>
@@ -116,8 +283,9 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">接入后 · 迎新</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">接入后 · 自助服务</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">开通后 · 六项服务</span></button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
   </div>
 
   <div class="work">
@@ -181,23 +349,27 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s1">
+      <div class="pane pane--grow svc-list" data-at="s1">
         <div class="pane-hd">
           <svg class="ic"><use href="#i-check"/></svg>
           <b>不用等接入，现在就能做的</b>
-          <span class="mt">这些不依赖学校系统</span>
+          <span class="mt">这些不依赖学校系统 · 共 7 条，可上下滑动</span>
         </div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
-          <a class="alt" href="12-material-factory.html">
-            <svg class="ic"><use href="#i-package"/></svg>
+          <!-- 2026-08-10 Codex 闭环整改：这条原来指「求职材料生成」(P12)。
+               用户手上已经有电子版录取通知书 / 报到材料，要的是「上传打印」，
+               不是再生成一份新材料 —— 改指打印工作台第 1 步（选文件）。
+               ?from=P19 让打印台把返回键指回智慧校园，不把人换到打印扫描域。 -->
+          <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19">
+            <svg class="ic"><use href="#i-printer"/></svg>
             <span class="alt-b">
               <span class="alt-t">打印录取通知书、报到材料</span>
               <span class="alt-s">你手机里的电子版，扫码传到本机就能打。新生报到常要交的几样，一次打齐。</span>
             </span>
           </a>
 
-          <a class="alt" href="07-scan-workbench.html">
+          <a class="alt" href="07-scan-workbench.html?from=P19">
             <svg class="ic"><use href="#i-scan"/></svg>
             <span class="alt-b">
               <span class="alt-t">扫描身份证、学生证、纸质成绩单</span>
@@ -205,7 +377,7 @@
             </span>
           </a>
 
-          <a class="alt" href="18-campus.html">
+          <a class="alt" href="18-campus.html?from=P19">
             <svg class="ic"><use href="#i-campus"/></svg>
             <span class="alt-b">
               <span class="alt-t">看校招活动与截止日期</span>
@@ -221,17 +393,48 @@
             </span>
           </a>
 
+          <!-- 2026-08-10 孤儿页接线：P46 校园服务此前**全站零入口**，只能手敲网址进。
+               放在这一栏（不是放进下面那六张卡）是有意的：那六张卡是「学校开通后才出现的服务」，
+               本机开关关着，点不动是对的；而 P46 给的是**公开办事指引与展示**，
+               不读学校系统、不显示任何学生个人数据，所以现在就能看。
+               校园大数据那一块本机未接入，点进去是「未开放」说明页，不是数字 —— 卡面如实写。 -->
+          <a class="alt" href="46-campus-service.html?stage=welcome">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">看迎新报到指引</span>
+              <span class="alt-s">报到四步与办事窗口是公开流程，不用接入就能看。窗口的具体位置与时间本机未配置，以现场服务台为准。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="46-campus-service.html?stage=card">
+            <svg class="ic"><use href="#i-idcard"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">看校园卡办理指引</span>
+              <span class="alt-s">办卡四步与所需材料，全程不接 AI。办理本身在学校一卡通中心，本机不代办、不经手你的证件。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="46-campus-service.html?stage=bigdata">
+            <svg class="ic"><use href="#i-layers"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">校园大数据 · 未开放说明</span>
+              <span class="alt-s">面向学校管理端，本机未接入。点进去是「为什么没有数据、开通要满足什么」，<b>不摆任何假数字</b>。</span>
+            </span>
+          </a>
+
         </div>
       </div>
 
       <!-- ─────────── S2 接入后 · 迎新（预览） ─────────── -->
-      <div class="previewbar" data-at="s2 s3">
+      <div class="previewbar" data-at="s2 s3 s4">
         <svg class="ic"><use href="#i-alert"/></svg>
         <span data-at="s2"><b>这是学校接入后的样子，不是本机当前状态。</b>
               下面所有内容都是示意，<b>不是任何真实学生的数据</b> ——
               本机现在读不到任何学校系统。</span>
         <span data-at="s3"><b>这是学校接入后的样子，不是本机当前状态。</b>
               下面的办理项是示意，<b>现在一项都办不了</b>。</span>
+        <span data-at="s4"><b>下面六项是学校开通后才会出现的服务，不是本机当前状态。</b>
+              <b>本机校园开关现在是关的，六项一项都进不去。</b></span>
       </div>
 
       <div class="previewwrap" data-at="s2">
@@ -270,10 +473,29 @@
         <div class="stophere" data-at="s2">
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
-            接入后这一步下面还会有<b>具体的楼栋、窗口、时间、缴费状态</b> ——
-            但那些数据在学校手里，<b>本机不替学校编</b>。<br>
-            所以这块是空的，不是没做完，是<b>不该由本机填</b>。
-            学校开通后，这里会换成真实内容。
+            <b>这块是空的：楼栋、窗口、时间、缴费状态都在学校手里</b>，学校开通后换成真实内容。
+            下面把上面那 5 步各缺什么、由谁提供逐条列开 —— <b>每一项现在都是「未接入」，
+            本机不替学校填一个看起来像真的值</b>。
+          </div>
+          <!-- 2026-08-11 版面整改：这不是新数据，是把上面那句「楼栋、窗口、时间、
+               缴费状态都在学校手里」按上面 5 步拆到对应的那一项上。值一律「未接入」。 -->
+          <div class="miss">
+            <div class="ms"><span class="ms-t">院系报到处楼栋与窗口</span>
+              <span class="ms-w">由学校教务 / 学工处按院系下发</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">缴费与保险状态</span>
+              <span class="ms-w">由学校财务系统给，缺哪一项也由它判定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">宿舍楼号房号与领钥匙地点</span>
+              <span class="ms-w">由学校后勤宿管分配</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">校园卡办理窗口与所需材料</span>
+              <span class="ms-w">由学校一卡通中心设定</span>
+              <span class="ms-v">未接入</span></div>
+          </div>
+          <div class="sh-p" style="margin-top:var(--s-4)">
+            第 5 步「打印报到确认单」<b>不在这张表里</b> —— 那一步不依赖学校系统，
+            材料自带电子版，现在就能在本机打。
           </div>
         </div>
       </div>
@@ -334,11 +556,163 @@
         <div class="stophere" data-at="s3">
           <div class="sh-t">这里到此为止</div>
           <div class="sh-p">
-            接入后每一项下面还会有<b>办理条件、所需材料、是否需要审批、出多少份</b> ——
-            这些由学校设定，<b>本机不替学校编</b>。<br>
-            所以这块是空的。空着比编一套看起来合理的规则更诚实 ——
-            后者会让你按错的规则去准备。
+            <b>这块是空的：办理条件与材料由学校设定</b>，本机不编一套会让你按错规则去准备的。
+            上面 4 项各自还差什么，逐条列在下面 —— <b>四项现在全是「未接入」</b>。
           </div>
+          <!-- 2026-08-11 版面整改：同 s2，把「实际开放哪些由学校决定」按上面 4 项拆开。
+               每一项写的是**决定权在谁**，值一律「未接入」，不写任何办理条件。 -->
+          <div class="miss">
+            <div class="ms"><span class="ms-t">在读 / 学籍证明</span>
+              <span class="ms-w">是否带电子章、要不要学校审批，由学校设定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">成绩单</span>
+              <span class="ms-w">中英文、是否含绩点，由学校教务设定</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">活动与讲座报名凭证</span>
+              <span class="ms-w">报名本身在学校自己的系统里完成</span>
+              <span class="ms-v">未接入</span></div>
+            <div class="ms"><span class="ms-t">校内导览图</span>
+              <span class="ms-w">按院系高亮要学校给楼栋与窗口坐标</span>
+              <span class="ms-v">未接入</span></div>
+          </div>
+          <div class="sh-p" style="margin-top:var(--s-4)">
+            这四项<b>现在一项都办不了</b>。手上已经有纸质件的，扫描成 PDF 这条路今天就通 ——
+            右边第二个入口。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 开通后 · 六项服务（预览） ─────────── -->
+      <!-- 2026-08-10 E 标签错挂整改（口径已按产品所有者意见调整）：
+           上一版这块挂 `E3 提示 · 仅供参考`，但它的内容是**零输入的固定文案** ——
+           不读用户任何东西，四态下逐字相同，标 E3 等于给一段静态文字盖了个"模型判断"的章。
+           更露馅的是：它的 ai-down 替代品（下面那张六行对照表）信息更全、覆盖六项，
+           反而只在 AI 挂掉时才看得到。
+
+           整改口径**不是删掉这个 AI 位** —— 这块的位置是对的，只是还没接线。
+           现在分成两块，各自说清自己是什么：
+             · 上面 = AI 位，标「待接线」，写明接线后按你要办的事给路径；不再冒充 E3 结论。
+             · 下面 = 六行对照表，**四态常驻**（原来只在 ai-down 出现），三个跳转按钮
+               也挪到这里 —— 它们指的是本机自己的能力，不依赖 AI，凭什么 AI 挂了就没了。 -->
+      <div class="aiguide" data-at="s4" data-when="default first device-off">
+        <svg class="ic"><use href="#i-orbit"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">你要办的事，现在这台机器能怎么办</span>
+            <span class="ev ev--wire">待接线 · 尚未按你的情况计算</span></span>
+          <span class="ag-s"><b>这块还没接上。</b>接线后它按你在迎新流程里卡住的那一步，
+                只给当下这一步能走的路径；现在给不出那个结论，所以不装作给了 ——
+                下面那张六项对照表是写死的，<b>现在就能照着用</b>。</span>
+        </span>
+      </div>
+
+      <!-- 六项 ↔ 现在就能用的替代路径。四态常驻：这张表和三个入口都不经过 AI。 -->
+      <div class="aiguide aiguide--off" data-at="s4">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span class="ag-b">
+          <span class="ag-hd"><span class="ag-t">六项 ↔ 现在就能用的替代路径</span>
+            <span class="ev ev--e2">E2 本机能力</span></span>
+          <span class="ag-s">下面这张表是写死的，不经过 AI。
+                <b>没有替代的就写没有</b> —— 编一条听着能办的路径，只会让你白跑一趟。</span>
+          <span class="ag-s" data-when="ai-down"><b>AI 顾问暂时不可用</b>，上面那块给不出按你情况算的路径；
+                这张表与下面三个入口<b>不受影响</b>。</span>
+          <span class="xmap">
+            <span class="xm"><span class="xm-a">迎新系统</span>
+              <span class="xm-b">材料自带电子版 → 打印扫描台能打</span></span>
+            <span class="xm"><span class="xm-a">行李帮运</span>
+              <span class="xm-b">本机没有替代 → 问现场工作人员</span></span>
+            <span class="xm"><span class="xm-a">VR校园</span>
+              <span class="xm-b">本机没有替代 → 学校官网自己看</span></span>
+            <span class="xm"><span class="xm-a">校园卡办理</span>
+              <span class="xm-b">本机没有替代 → 学校窗口办</span></span>
+            <span class="xm"><span class="xm-a">一卡通开通</span>
+              <span class="xm-b">本机没有替代 → 学校窗口办</span></span>
+            <span class="xm"><span class="xm-a">校园网开通</span>
+              <span class="xm-b">本机没有替代 → 学校网络中心办</span></span>
+          </span>
+          <span class="ag-row">
+            <!-- 2026-08-10：本机手上并没有「报到材料」这份文件，不能按交接契约直落 s3 参数页
+                 （那等于替用户认领一份不存在的材料）。改落 s1，让他先把电子版传进来。 -->
+            <a class="asug" href="06-print-workbench.html?stage=s1&amp;from=P19">
+              <svg class="ic"><use href="#i-printer"/></svg>
+              <span class="asug-b"><span class="asug-k">报到材料要打印</span>
+                <span class="asug-t">打印扫描台</span></span></a>
+            <a class="asug" href="07-scan-workbench.html?from=P19">
+              <svg class="ic"><use href="#i-scan"/></svg>
+              <span class="asug-b"><span class="asug-k">证件、成绩单要电子版</span>
+                <span class="asug-t">扫描工作台</span></span></a>
+            <a class="asug" href="09-resume-workbench.html?from=P19">
+              <svg class="ic"><use href="#i-resume"/></svg>
+              <span class="asug-b"><span class="asug-k">入学后的求职准备</span>
+                <span class="asug-t">简历工作台</span></span></a>
+          </span>
+        </span>
+      </div>
+
+      <div class="previewwrap" data-at="s4">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-campus"/></svg>
+            <b>开通后会有这些</b>
+            <span class="mt">六项名称与说明取自线上已定好的配置</span>
+          </div>
+          <!-- 2026-08-11：由竖排 6 行改 2×3 网格（见上方 .svc6）。名称与说明一字未改。 -->
+          <div class="sec svc6">
+
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-users"/></svg>
+              <span class="alt-b"><span class="alt-t">迎新系统</span>
+                <span class="alt-s">报到流程、办事窗口、入学与求职准备</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-package"/></svg>
+              <span class="alt-b"><span class="alt-t">行李帮运</span>
+                <span class="alt-s">合作物流服务入口与服务点说明</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-eye"/></svg>
+              <span class="alt-b"><span class="alt-t">VR校园</span>
+                <span class="alt-s">360° 云游校园与重点场馆介绍</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-card"/></svg>
+              <span class="alt-b"><span class="alt-t">校园卡办理</span>
+                <span class="alt-s">新生办卡、补卡、挂失后快速办理</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-idcard"/></svg>
+              <span class="alt-b"><span class="alt-t">一卡通开通</span>
+                <span class="alt-s">开通食堂、门禁、图书馆等校园通行权限</span></span>
+            </div>
+            <div class="alt" style="cursor:default" aria-disabled="true">
+              <svg class="ic"><use href="#i-route"/></svg>
+              <span class="alt-b"><span class="alt-t">校园网开通</span>
+                <span class="alt-s">激活校园 Wi-Fi、宿舍网络与上网账号</span></span>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-3)">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span>这六项本机只做<b>入口与办理指引</b>，办理本身在学校窗口或学校自己的系统里完成；
+                    本机不在这几项里采集你的个人信息，也不保存办理结果。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s4">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-gear"/></svg>
+          <b>谁能开、开关关着时会怎样</b>
+          <span class="mt">取自线上配置</span>
+        </div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">谁提出</span><span class="v">学校（就业处 / 学工处）提出并授权</span></div>
+            <div class="kv-row"><span class="k">谁打开开关</span><span class="v">运营方在管理后台<b>按终端</b>打开校园模式</span></div>
+            <div class="kv-row"><span class="k">你能自己开吗</span><span class="v v--fog">不能 · 本机上没有这个开关</span></div>
+            <div class="kv-row"><span class="k">关着时首页</span><span class="v">不出现「智慧校园」入口</span></div>
+            <div class="kv-row"><span class="k">关着时直达网址</span><span class="v v--fog">只有「本机暂未开启」一句话</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">开关关着时入口不渲染，不是灰掉。</div>
         </div>
       </div>
 
@@ -357,9 +731,6 @@
             <div class="kv-row"><span class="k">已接入学校</span><span class="v v--fog">无</span></div>
             <div class="kv-row"><span class="k">可读学籍数据</span><span class="v v--fog">无</span></div>
             <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未接入</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几行是本机的真实状态，不是示意。
           </div>
         </div>
       </div>
@@ -429,32 +800,123 @@
         </div>
       </div>
 
-      <div class="pane pane--grow" data-at="s2 s3">
-        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
-        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
-          <a class="alt" href="12-material-factory.html">
-            <svg class="ic"><use href="#i-package"/></svg>
+      <!-- 2026-08-11 版面整改：这三条是这两步**唯一真能点**的东西，原来是 90px 的小卡，
+           摆在一个 1089px 的空壳里。按 §9 主操作尺寸做大，说明写全。 -->
+      <div class="pane" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b>
+          <span class="mt">不依赖学校系统</span></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-4)">
+          <!-- 2026-08-10：同上，打印入口由 P12 改指打印工作台第 1 步（上传打印） -->
+          <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19">
+            <svg class="ic"><use href="#i-printer"/></svg>
             <span class="alt-b"><span class="alt-t">打印报到材料</span>
               <span class="alt-s">手机里的电子版扫码传过来就能打</span></span>
           </a>
-          <a class="alt" href="07-scan-workbench.html">
+          <a class="alt" href="07-scan-workbench.html?from=P19">
             <svg class="ic"><use href="#i-scan"/></svg>
             <span class="alt-b"><span class="alt-t">扫描证件与纸质成绩单</span>
               <span class="alt-s">扫成 PDF，网申上传直接用</span></span>
           </a>
-          <a class="alt" href="18-campus.html">
+          <a class="alt" href="18-campus.html?from=P19">
             <svg class="ic"><use href="#i-campus"/></svg>
             <span class="alt-b"><span class="alt-t">看校招活动</span>
               <span class="alt-s">不需要接入学校系统</span></span>
           </a>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            这几件都不依赖学校系统，今天就能用。
+        </div>
+      </div>
+
+      <!-- 2026-08-11 版面整改：这一块原来只挂在 s1（`data-at="s1"` 那张卡的后半段），
+           但页面自己写着「这几条现在就成立，不等接入」。s2/s3 正是用户在判断
+           「值不值得推动学校开通」的两步 —— 要判断，就得知道接入后本机会怎么对待这些数据。
+           所以扩到 s2/s3 常驻。四行文字与 s1 一字不差，不是新结论。 -->
+      <div class="pane pane--grow" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机对你的数据做什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">学籍信息</span><span class="v">不落库</span></div>
+            <div class="kv-row"><span class="k">证件扫描件</span><span class="v">办完即清</span></div>
+            <div class="kv-row"><span class="k">管理员可见</span><span class="v">只见打印流水</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">不收集</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>即使接入，本机也只读学校授权范围内的数据，<b>不留存学籍信息</b>，
+                  办理结束即清。<b>具体开放哪些由学校方决定，不由本机决定。</b></span>
           </div>
         </div>
       </div>
 
-      <!-- 首次使用：一句话 -->
-      <div class="pane" data-when="first">
+      <!-- S4 右 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这六项里本机做什么</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            本机在这六项里的角色只有一个：<b>入口和指引</b>。
+            办卡、开网、运行李都不是本机在办，本机也不经手你的证件和账号。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">服务提供方</span><span class="v">学校 / 学校指定的服务商</span></div>
+            <div class="kv-row"><span class="k">本机角色</span><span class="v">入口与办理指引</span></div>
+            <div class="kv-row"><span class="k">个人信息</span><span class="v v--fog">不采集</span></div>
+            <div class="kv-row"><span class="k">办理结果</span><span class="v v--fog">不保存</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这四行开通前后都成立，不随开关变。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-layers"/></svg><b>开通后这六张卡会变成什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">卡片状态</span><span class="v">由「学校开通后可用」变成可进入</span></div>
+            <div class="kv-row"><span class="k">卡上的说明</span><span class="v">由学校与运营方配置</span></div>
+            <div class="kv-row"><span class="k">这六项本身</span><span class="v v--fog">线上已定好 · 本机不增不减</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">开哪几项由学校定，没开的不会摆在这儿。</div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这六张卡为什么点不动</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            本机的校园开关是关的；这里列名字只是让你知道<b>开通后会有什么</b>。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg><b>不用等开通，现在能做的</b>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:var(--s-3)">
+            <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19"><svg class="ic"><use href="#i-printer"/></svg>
+              <span class="alt-b"><span class="alt-t">打印报到材料</span>
+                <span class="alt-s">先把电子版传进来，再选纸张、看价格</span></span></a>
+            <a class="alt" href="07-scan-workbench.html?from=P19"><svg class="ic"><use href="#i-scan"/></svg>
+              <span class="alt-b"><span class="alt-t">扫描证件与成绩单</span>
+                <span class="alt-s">扫成 PDF，网申上传直接用</span></span></a>
+            <a class="alt" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>
+              <span class="alt-b"><span class="alt-t">改简历</span>
+                <span class="alt-s">入学后的求职准备，本机能改能打</span></span></a>
+            <a class="alt" href="18-campus.html?from=P19"><svg class="ic"><use href="#i-campus"/></svg>
+              <span class="alt-b"><span class="alt-t">看校招活动</span>
+                <span class="alt-s">学校就业网与主办方的公开公告</span></span></a>
+            <!-- 2026-08-10 孤儿页接线：P46 校园服务的入口。它给的是公开办事指引，
+                 不读学校系统，所以和上面四条一样，开关关着也能点。 -->
+            <a class="alt" href="46-campus-service.html?stage=welcome"><svg class="ic"><use href="#i-users"/></svg>
+              <span class="alt-b"><span class="alt-t">看迎新与校园卡办事指引</span>
+                <span class="alt-s">公开流程与所需材料 · 办理仍在学校窗口</span></span></a>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">这五条链接现在就能点。</div>
+        </div>
+      </div>
+
+      <!-- 首次使用：一句话。
+           2026-08-11：限定在 s1。s2 / s3 / s4 的顶部常驻横幅已经写明「这是接入后 / 开通后的样子，
+           不是本机当前状态」，右栏紧接着又把三条（s4 是五条）真出口列了一遍 ——
+           这张卡在那三步是逐字重复，还把右栏顶出 93–203px（末行被滚动条吃掉）。
+           不是删内容，是不在同一屏说第三遍；s1 是本机真实状态那一步，它留在那里。 -->
+      <div class="pane" data-when="first" data-at="s1">
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
@@ -469,22 +931,30 @@
 
   <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
   <div class="actionbar">
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到当前状态</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一页</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s4">看开通后的六项</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s1">回到当前状态</button>
 
     <span class="actionbar-hint" data-at="s1">本机未接入任何学校系统 · 这一页现在没有数据</span>
     <span class="actionbar-hint" data-at="s2 s3">以上为接入后示意 · 现在一项都办不了</span>
+    <span class="actionbar-hint" data-at="s4">以上六项为学校开通后才有 · 本机校园开关现在是关的</span>
 
-    <a class="btn btn--primary" data-at="s1" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 2026-08-10 Codex 闭环整改（P1）：这三处主操作原来指 12-material-factory（求职材料生成），
+         但用户要办的是「把手机里已有的电子版打出来」，属于上传打印，不是生成新材料。
+         统一改指打印工作台第 1 步，并带 ?from=P19 让返回键回得到智慧校园。 -->
+    <a class="btn btn--primary" data-at="s1" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s1" data-go="s2" style="display:none"></button>
-    <a class="btn btn--primary" data-at="s2" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s2" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html?from=P19">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
-    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
-    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
     <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
@@ -492,10 +962,12 @@
 </div>
 
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
 </body>
 </html>

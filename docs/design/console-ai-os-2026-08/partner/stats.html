@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数据统计（空壳填充）— 合作机构后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">填充 · 现有空壳页</span>
+    <b>改的是现有页 <code>/stats</code>「数据统计」</b>——现在整页只有 20 行，一个「统计报表本阶段不开放」的空态
+    （<code>apps/partner/src/routes/stats/index.tsx:10-17</code>）。
+    <b>而后端 <code>GET /partner/stats?period=week|month|quarter</code> 早就写好了</b>
+    （<code>services/api/src/orgs/partner-stats.controller.ts:28-35</code>），前端一行没调。
+    这是全项目最明确的一处「后端有能力、机构侧看不到」。
+  </div>
+
+  <div class="pagehead">
+    <div><h1>数据统计</h1><p>我发布的内容产生了什么效果</p></div>
+    <div class="right">
+      <select class="select" style="width:auto;padding:7px 12px"><option>本周</option><option>本月</option><option>本季度</option></select>
+      <button class="btn btn--sm">导出月报 PDF</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- AI 效果解读 -->
+  <div class="advice isnew" data-newtag="新增 · AI 效果解读" data-when="default">
+    <div class="advice__head">
+      <span class="tag tag--ai">AI 解读</span>
+      <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span>
+      <b>本周你最该处理的一件事</b>
+    </div>
+    <div class="advice__action">先把 3 条已过期未下架的岗位处理掉，它们占了本周 18% 的曝光却零跳转。</div>
+    <div class="advice__grid">
+      <div class="advice__item"><b>理由</b><span>
+        这 3 条岗位截止日已过 5–12 天（<span class="ev ev--1">E1</span> 你的数据），
+        本周共获得 1,204 次曝光、41 次详情浏览、<b>0 次去来源平台</b>——用户点进去发现过期就退出了。</span></div>
+      <div class="advice__item"><b>代价</b><span>处理约需 2 分钟（批量下架）。下架后这部分曝光会自动分给其他在架岗位。</span></div>
+      <div class="advice__item"><b>备选</b><span>若岗位仍在招，改截止日重新提审即可，不必下架。</span></div>
+    </div>
+    <div class="advice__foot">
+      <button class="btn btn--sm btn--primary">筛出这 3 条</button>
+      <button class="btn btn--sm">批量改截止日</button>
+      <span class="small muted">AI 判断，仅供参考</span>
+    </div>
+  </div>
+
+  <!-- 概览 -->
+  <div class="sechead" style="margin-top:22px"><h2>效果概览</h2>
+    <div class="right muted small">本周（08-05 ~ 08-11）· 与上周对比</div></div>
+  <div class="grid grid--5" data-when="default">
+    <div class="card metric"><div class="metric__main"><div class="metric__label">在架内容</div>
+      <div class="metric__value">33</div><div class="metric__foot">岗位 24 · 招聘会 4 · 政策 5</div></div><div class="metric__ico">▤</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">列表曝光</div>
+      <div class="metric__value">6,820</div><div class="metric__foot up">+12.4%</div></div><div class="metric__ico metric__ico--info">◉</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">详情浏览</div>
+      <div class="metric__value">1,437</div><div class="metric__foot up">+8.1%</div></div><div class="metric__ico metric__ico--info">▷</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">打开来源平台</div>
+      <div class="metric__value">312</div><div class="metric__foot down">−4.2%</div></div><div class="metric__ico">↗</div></div>
+    <div class="card metric"><div class="metric__main"><div class="metric__label">资料打印</div>
+      <div class="metric__value">86</div><div class="metric__foot up">+21%</div></div><div class="metric__ico">⎙</div></div>
+  </div>
+
+  <div class="proto" data-when="default">
+    <span class="proto__tag">合规</span>
+    「打开来源平台」<b>只能这么叫</b>——它统计的是用户点击外部跳转按钮的次数，
+    <b>不是投递数、不是意向数、不是简历数</b>。平台没有投递闭环，也不得暗示有（CLAUDE.md §2）。
+    系统只记录浏览与跳转，<b>不记录也不展示投递结果</b>。
+  </div>
+
+  <!-- 漏斗 -->
+  <div class="grid grid--r" data-when="default" style="margin-top:18px">
+    <div class="card">
+      <div class="card__head"><h3>转化漏斗</h3><span class="sub">从看见到离站</span></div>
+      <div class="card__body">
+        <div class="funnel">
+          <div class="funnel__step">
+            <div class="funnel__label">列表曝光<small>在终端岗位列表中出现</small></div>
+            <div class="funnel__bar"><i style="width:100%">6,820</i></div>
+            <div class="funnel__rate">基准</div>
+          </div>
+          <div class="funnel__step">
+            <div class="funnel__label">详情浏览<small>点进岗位详情页</small></div>
+            <div class="funnel__bar"><i style="width:21%">1,437</i></div>
+            <div class="funnel__rate"><b>21.1%</b><br>同类机构中位 18.4%</div>
+          </div>
+          <div class="funnel__step">
+            <div class="funnel__label">打开来源平台<small>扫码 / 点击外部链接</small></div>
+            <div class="funnel__bar"><i style="width:4.6%">312</i></div>
+            <div class="funnel__rate"><b>21.7%</b><br>同类机构中位 26.8%</div>
+          </div>
+          <div class="funnel__step">
+            <div class="funnel__label">资料打印<small>打印岗位清单 / 企业资料</small></div>
+            <div class="funnel__bar"><i style="width:1.3%">86</i></div>
+            <div class="funnel__rate"><b>6.0%</b><br>同类机构中位 4.1%</div>
+          </div>
+        </div>
+        <div class="hr"></div>
+        <div class="small muted">
+          对比值为<b>同类机构匿名分位</b>（同为高校就业中心，样本 ≥ 8 家）。
+          样本不足 8 家时不显示对比，避免反推到具体机构。
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card__head"><h3>内容排行</h3></div>
+        <div class="card__body card__body--flush">
+          <table class="table">
+            <thead><tr><th>岗位</th><th class="num">浏览</th><th class="num">跳转</th></tr></thead>
+            <tbody>
+              <tr><td class="cellmain small">软件测试工程师</td><td class="num">218</td><td class="num">71</td></tr>
+              <tr><td class="cellmain small">行政专员</td><td class="num">186</td><td class="num">52</td></tr>
+              <tr><td class="cellmain small">销售代表（校招）</td><td class="num">143</td><td class="num">38</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card__foot"><a href="#">查看完整排行（含垫底 20 条与归因）→</a></div>
+      </div>
+      <div class="card" style="border-color:#e3ccb3">
+        <div class="card__head"><h3>零跳转内容</h3><span class="tag tag--warn">3 条</span></div>
+        <div class="card__body">
+          <div class="small muted" style="margin-bottom:10px">有曝光有浏览、但一次都没人点去来源平台的内容，通常是过期、链接失效或信息不全。</div>
+          <button class="btn btn--sm btn--block">去内容健康度查原因</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 时段分布 -->
+  <div class="sechead" data-when="default" style="margin-top:22px"><h2>时段与点位分布</h2></div>
+  <div class="grid grid--2" data-when="default">
+    <div class="card"><div class="card__head"><h3>按时段</h3></div>
+      <div class="card__body">
+        <div class="stack" style="gap:9px">
+          <div class="row"><span class="small" style="width:80px">09:00–12:00</span>
+            <div class="bar" style="flex:1;margin:0"><i style="width:72%"></i></div><span class="mono small">2,410</span></div>
+          <div class="row"><span class="small" style="width:80px">12:00–14:00</span>
+            <div class="bar" style="flex:1;margin:0"><i style="width:38%"></i></div><span class="mono small">1,270</span></div>
+          <div class="row"><span class="small" style="width:80px">14:00–17:00</span>
+            <div class="bar" style="flex:1;margin:0"><i style="width:88%"></i></div><span class="mono small">2,940</span></div>
+          <div class="row"><span class="small" style="width:80px">17:00–21:00</span>
+            <div class="bar" style="flex:1;margin:0"><i style="width:6%"></i></div><span class="mono small">200</span></div>
+        </div>
+        <div class="small muted" style="margin-top:12px">
+          <span class="ev ev--2">E2</span> 你的内容主要在工作日白天被看到——如果面向在职求职者，可考虑调整招聘会时间。
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="card__head"><h3>按终端点位</h3>
+      <div class="right"><a class="btn btn--link" href="terminals.html">终端覆盖详情 →</a></div></div>
+      <div class="card__body card__body--flush">
+        <table class="table">
+          <thead><tr><th>点位</th><th class="num">曝光</th><th class="num">浏览</th><th class="num">跳转</th></tr></thead>
+          <tbody>
+            <tr><td class="small">市人才市场 · 一楼大厅</td><td class="num">2,840</td><td class="num">612</td><td class="num">142</td></tr>
+            <tr><td class="small">XX 职业学院 · 就业中心</td><td class="num">2,106</td><td class="num">498</td><td class="num">108</td></tr>
+            <tr><td class="small">城南街道便民中心</td><td class="num">1,204</td><td class="num">241</td><td class="num">47</td></tr>
+            <tr><td class="small muted">城北社区服务站</td><td class="num muted">样本不足</td><td class="num muted">—</td><td class="num muted">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card__foot">
+        <b>最小样本阈值</b>：任一分组不足 5 条时显示「样本不足」而非数字，防止小样本反推到个人。
+      </div>
+    </div>
+  </div>
+
+  <!-- 空态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div>
+      <h3>本周还没有产生效果数据</h3>
+      <p>你的内容需要先通过管理员审核并发布，才会在终端展示并产生浏览记录。
+        当前有 <b>4 条</b>待审核内容。</p>
+      <div class="row" style="justify-content:center;margin-top:16px">
+        <button class="btn btn--primary">查看待审核内容</button>
+        <button class="btn">去发布岗位</button>
+      </div>
+    </div></div></div>
+  </div>
+
+  <!-- AI 不可用 -->
+  <div data-when="aidown">
+    <div class="degrade">
+      <div class="degrade__title"><span class="dotstate dotstate--warn"></span>AI 效果解读暂时不可用</div>
+      <div class="degrade__body">
+        下面的<b>全部统计数据照常可用</b>——它们来自数据库，不依赖 AI。
+        只有顶部那条「本周你最该处理的一件事」需要模型生成，恢复后会重新出现。
+      </div>
+      <div class="degrade__alts">
+        <button class="btn btn--sm btn--primary">继续查看统计</button>
+        <button class="btn btn--sm">手动看零跳转内容</button>
+      </div>
+    </div>
+    <div class="grid grid--5" style="margin-top:16px">
+      <div class="card metric"><div class="metric__main"><div class="metric__label">在架内容</div><div class="metric__value">33</div></div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">列表曝光</div><div class="metric__value">6,820</div></div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">详情浏览</div><div class="metric__value">1,437</div></div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">打开来源平台</div><div class="metric__value">312</div></div></div>
+      <div class="card metric"><div class="metric__main"><div class="metric__label">资料打印</div><div class="metric__value">86</div></div></div>
+    </div>
+  </div>
+
+  <!-- 错误 -->
+  <div data-when="error">
+    <div class="errbox"><h3>统计数据加载失败</h3>
+      <p>无法读取本机构统计（<code>GET /partner/stats</code> 返回 500）。你的内容展示不受影响。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button><button class="btn btn--sm btn--ghost">提工单</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/stats</code>，只是把空态换成真内容。菜单位置不动。</li>
+      <li><b>可分两步走</b>：第一步只接已存在的 <code>GET /partner/stats</code>，空壳当场变真；
+        第二步补漏斗与内容排行——那需要先给 <code>BrowseLog</code>/<code>ExternalJumpLog</code> 加 <code>sourceOrgId</code> 字段与索引。</li>
+      <li>归因快照不可变：内容后续换来源机构时，历史统计不得漂移。</li>
+      <li>合规：只给聚合 + 最小样本阈值（N=5），不给求职者行为明细；文案不得出现「投递 / 意向 / 简历」。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'partner',active:'stats'})</script>
+</body>
+</html>

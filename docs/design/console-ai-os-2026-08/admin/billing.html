@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>计费与对账（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto">
+    <span class="proto__tag">改造 · 不新建页</span>
+    <b>产品所有者问「需要有一个设置功能收费的单独功能吧」——<span style="color:var(--ok-fg)">这个功能已经有了</span></b>：
+    本页的价目配置能改价、能启停，且是<b>唯一合法改价路径</b>（改价即时生效并记审计）。
+    <br><br>
+    真正的缺口是<b>价目项只有 2 个</b>（<code>print_bw_page</code> / <code>print_color_page</code>），
+    且 seed 里明写「开发默认价，<b>非正式价</b>」——
+    <b>全部 AI 功能没有定价，也没有计量账本</b>。
+    本页演示：① 价目表扩到全量；② 加「补贴资金项目」Tab（机构出资的补贴必须能对账）。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>计费与对账</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页决定<b>终端上每个功能收多少钱</b>。改价即时生效并记审计。
+        权益抵扣与活动优惠在<a href="#">权益活动</a>页配置；两者<b>共用同一套 serviceKey</b>。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm btn--primary">+ 新增价目项</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="bill">
+    <button class="is-on" data-tab="price">价目配置</button>
+    <button data-tab="fund">补贴资金项目<span class="newdot"></span></button>
+    <button data-tab="recon">对账</button>
+  </div>
+
+  <!-- ═══ 价目配置 ═══ -->
+  <div data-panel-of="bill" data-panel="price">
+
+    <div class="card isnew" data-newtag="扩充" style="margin-top:16px">
+      <div class="card__head"><h3>可收费项 · 第一类（工具与耗材）</h3>
+        <span class="tag tag--ok">合规安全</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>serviceKey</th><th>功能</th><th>单价</th><th>单位</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono small">print_bw_page</td><td>黑白打印</td>
+              <td><input class="input" value="0.50" style="width:76px"> 元</td><td>页</td>
+              <td><span class="tag tag--ok">启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr><td class="mono small">print_color_page</td><td>彩色打印</td>
+              <td><input class="input" value="1.50" style="width:76px"> 元</td><td>页</td>
+              <td><span class="tag tag--warn">待真机验证</span></td><td><button class="btn btn--sm" disabled>锁定</button></td></tr>
+            <tr class="isnew"><td class="mono small">print_bw_duplex_page</td><td>黑白打印 · <b>双面</b></td>
+              <td><input class="input" value="0.40" style="width:76px"> 元</td><td>页</td>
+              <td><span class="tag tag--ghost">待启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">print_color_duplex_page</td><td>彩色打印 · <b>双面</b></td>
+              <td><input class="input" value="1.20" style="width:76px"> 元</td><td>页</td>
+              <td><span class="tag tag--warn">待真机验证</span></td><td><button class="btn btn--sm" disabled>锁定</button></td></tr>
+            <tr class="isnew"><td class="mono small">copy_id_card</td><td>身份证复印（正反面合一张）</td>
+              <td><input class="input" value="1.00" style="width:76px"> 元</td><td><b>张</b></td>
+              <td><span class="tag tag--ghost">待启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">copy_document_page</td><td>证件 / 文件复印</td>
+              <td><input class="input" value="0.50" style="width:76px"> 元</td><td>张</td>
+              <td><span class="tag tag--ghost">待启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">scan_to_file_page</td><td>扫描成文件</td>
+              <td><input class="input" value="0.00" style="width:76px"> 元</td><td>页</td>
+              <td><span class="tag tag--info">建议免费引流</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">ai_resume_optimize</td><td>AI 简历优化</td>
+              <td><input class="input" value="3.00" style="width:76px"> 元</td><td>次</td>
+              <td><span class="tag tag--ghost">待启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">ai_mock_interview</td><td>模拟面试</td>
+              <td><input class="input" value="8.00" style="width:76px"> 元</td><td><b>场</b></td>
+              <td><span class="tag tag--ghost">待启用</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+            <tr class="isnew"><td class="mono small">ai_resume_diagnose</td><td>简历诊断</td>
+              <td><input class="input" value="0.00" style="width:76px"> 元</td><td>次</td>
+              <td><span class="tag tag--info">建议免费 · OCR 已含在内</span></td><td><button class="btn btn--sm">保存</button></td></tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:12px">
+          <b>双面现在完全不影响价格。</b>计价口径是「单价 × <b>内容页数</b> × 份数」，
+          代码注释写明「duplex / pagesPerSheet 影响的是<b>物理纸张而非计费内容页</b>」
+          （<code>price-config.seed.ts:19-20</code>）——
+          10 页文档单面双面都算 10 页、价格一样，<b>用户没有任何动力选双面</b>，平台白白多耗纸。
+          <br><br>
+          修法是<b>加两个 serviceKey 按 duplex 分流单价，不改计价模型</b>：
+          仍是「单价 × 内容页 × 份数」，只是 serviceKey 从 <code>colorMode</code> 一维
+          变成 <code>colorMode × duplex</code> 二维。
+          <b>八折而非半价</b>——成本 = 墨粉（按内容页）+ 纸张（按物理张），<b>双面省的是纸不是墨</b>；
+          定太低会诱使用户把要交上去的表格也印成双面。
+        </div>
+
+        <div class="degrade" style="margin-top:12px">
+          <b>⚠️ <code>effectiveFrom</code> 是假能力字段</b>：<code>PricingService</code> 只读 <code>active</code>，
+          <b>从不按生效时间切换价目</b>（<code>price-config.seed.ts:24-26</code> 自陈
+          「生产写入时不要依赖该列做排期改价」）。
+          <b>「下月 1 号起调价」当前做不到</b>——在实现前本页<b>不应出现生效时间输入框</b>，否则是伪造能力。
+        </div>
+
+        <div class="degrade" style="margin-top:12px">
+          <b>AI 类价目启用前必须先有计量账本</b>：<code>AiUsageLedger</code> 仍是待建模型
+          （开发任务书 §5.1）。<b>AI 运维日志不能当计费账本</b>（<code>compliance-boundary.md:345</code>）——
+          日志会丢，账本不能丢。<b>没有账本就启用价目 = 收了钱算不清账。</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="card isnew" data-newtag="口径澄清" style="margin-top:16px">
+      <div class="card__head"><h3>页数上限该配在哪</h3>
+        <span class="tag tag--warn">不要配在本页</span></div>
+      <div class="card__body">
+        <p class="small">产品所有者的担心是对的——<b>不限页数会被薅羊毛</b>。但要分清两种情况：</p>
+        <table class="table" style="margin-top:10px">
+          <thead><tr><th>场景</th><th>是否限页数</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td><b>自费打印</b></td><td><span class="tag tag--ok">❌ 不限</span></td>
+              <td class="small">用户自付，打得多反而是好事；限制只会赶走客人</td></tr>
+            <tr><td><b>免费 / 补贴打印</b></td><td><span class="tag tag--err">✅ 必须限</span></td>
+              <td class="small">不限即财政被薅</td></tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:12px">
+          <b>结论：「页数上限」是补贴策略的属性，不是打印功能的属性。</b>
+          做进 <code>PriceConfig</code> 是错的——那会<b>误伤自费用户</b>。
+          它应配在<a href="benefit-activities.html">权益活动 · 核销规则</a>与「补贴资金项目」里。
+          <br><br>
+          超额处理：<b>免费额度用完自动转自费</b>，且必须在<b>出纸前</b>于屏幕上明示——
+          「前 20 页由 XX 项目支付，超出 8 页需付 ¥4.00」。
+          <br><br>
+          另建议加<b>单次打印张数上限</b>（如 100 页），但那是<b>运营限制</b>
+          （防误操作打 500 页、防卡纸、防后面排队），<b>不是计费限制</b>，不要和补贴额度混在一起。
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>禁止计价项</h3><span class="tag tag--err">许可红线</span></div>
+      <div class="card__body">
+        <div class="grid grid--2">
+          <div>
+            <b class="small">第二类 · 须先过许可审查</b>
+            <ul style="margin:8px 0 0;padding-left:19px;font-size:13.5px;line-height:1.8">
+              <li>岗位浏览 / 岗位详情</li>
+              <li>招聘会查看 / 校园招聘</li>
+              <li>政策查询</li>
+              <li>外部投递或预约入口跳转</li>
+              <li><b>任何按曝光量 / 跳转量的计费</b></li>
+            </ul>
+          </div>
+          <div>
+            <b class="small" style="color:var(--err-fg)">永久红线 · 无论何种包装</b>
+            <ul style="margin:8px 0 0;padding-left:19px;font-size:13.5px;line-height:1.8">
+              <li>按<b>候选人数</b>计费</li>
+              <li>按<b>投递量 / 面试量</b>计费</li>
+              <li>按 <b>Offer 量 / 入职量</b>计费</li>
+              <li>按<b>简历数</b>计费</li>
+              <li>以上任一形式的<b>返利</b></li>
+            </ul>
+          </div>
+        </div>
+        <div class="degrade" style="margin-top:12px">
+          ⚠️ <b>关键词正则不能当合规门禁</b>：现有活动文案校验
+          （<code>benefit-activities.service.ts:22-23</code>）<b>不覆盖</b>
+          「投递量」「到面率」「入职量」「推荐成功抽成」等表达，必须有人工审核兜底。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 补贴资金项目（新增） ═══ -->
+  <div data-panel-of="bill" data-panel="fund" style="display:none">
+    <div class="proto proto--err">
+      <span class="proto__tag">新增 Tab · 需先补数据模型</span>
+      <b>现有模型答不出补贴的四个关键问题。</b>
+      <code>BenefitGrant</code> 能回答「补给谁」「还剩几次」，但
+      <code>sourceType='gov'</code> 只是个<b>类别标签</b>——
+      答不出<b>谁出资</b>（哪家人社、哪个项目）、<b>预算多少</b>、
+      <b>机构应付多少</b>、<b>怎么对账</b>。
+      <br><br>
+      而且 <code>RedemptionRecord.amountCents</code> 是<b>订单抵扣额，不是机构应付额</b>；
+      现有对账把 discount <b>排除在实收资金外</b>，没有按出资方的应收与结算单。
+      <br><br>
+      最小需要：<code>FundingProgram</code>（出资机构外键 + 预算 + 有效期 + 资格规则）、
+      发行批次、<code>SettlementEntry</code> + <code>Reversal</code>。
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>资金项目</h3>
+        <span class="tag tag--warn">需后端先落地</span>
+        <div class="right"><button class="btn btn--sm" disabled>+ 新建项目</button></div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>项目名称</th><th>出资机构</th><th>预算</th><th>已核销</th><th>结算状态</th><th>有效期</th></tr></thead>
+          <tbody>
+            <tr class="muted">
+              <td>就业困难人员打印补贴</td>
+              <td>XX区人力资源和社会保障局</td>
+              <td class="mono">¥50,000.00</td>
+              <td class="mono">¥12,340.00</td>
+              <td><span class="tag tag--warn">待结算</span></td>
+              <td class="small">2026-09-01 ~ 2026-12-31</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          上表为<b>目标形态示意</b>，当前无数据模型支撑，按钮为禁用态——<b>不放可点的假按钮</b>。
+        </div>
+      </div>
+    </div>
+
+    <!-- 补贴策略配置：场景 + 功能限定 -->
+    <div class="card isnew" data-newtag="核心：场景 + 功能限定" style="margin-top:16px">
+      <div class="card__head"><h3>补贴策略（这台机器上，什么免费、什么自费）</h3>
+        <div class="right"><button class="btn btn--sm" disabled>+ 新建策略</button></div></div>
+      <div class="card__body">
+        <div class="proto proto--err" style="margin:0 0 14px">
+          <span class="proto__tag">⚠️ 本节初稿判断错误，已按一手证据改写</span>
+          <b>初稿写的是「场景维度已经存在，不用新造」——那是错的。</b>
+          <code>FileObject.purpose</code> <b>不可信，且现有映射本身就是错的</b>：
+          <br><br>
+          ① <b>不是枚举</b>，数据库层只是必填 String，契约已漂移
+          （<code>contract_upload</code> 重复声明，代码又读未纳入联合类型的 <code>qualification_evidence</code>）。<br>
+          ② <b>简历打印入口实际写的是 <code>print_doc</code></b>——
+          <code>/print/upload?source=resume</code> 的 <code>source</code> 只留在浏览器状态，<b>后端拿不到</b>；
+          U 盘在通用页写 <code>print_doc</code>、在 AI 简历导入组件写 <code>resume_upload</code>，<b>口径不一致</b>；
+          招聘会参会准备单写 <code>print_doc</code>，被误归普通文档。<br>
+          ③ <b>匿名接口可直接声明任意 purpose</b>——后端只校验白名单/MIME/魔数，
+          <b>不验证「文件是否真的是简历」</b>，换入口或直接调接口即可绕过。<br>
+          ④ <b>报价与建单请求根本没有场景字段</b>；建单虽能解析 fileId 读 purpose，
+          但<b>只用于安全门禁，不参与计价</b>。
+        </div>
+
+        <div class="proto" style="margin:0 0 14px">
+          <b>正确做法：服务端推导 + 来源可信分级。</b>
+          新增服务端固化的 <code>scenarioKey</code> / <code>provenanceType</code> / <code>sourceRefId</code>，
+          <b>不接受客户端直接指定</b>。补贴规则按<b>来源可信级别</b>决定敢不敢给：
+          <br><br>
+          <span class="tag tag--ok">verified_material 服务端校验后生成</span>
+          <span class="tag tag--ok">system_generated 平台生成</span>
+          <span class="tag tag--warn">scan_declared 本机扫描+用户选类</span>
+          <span class="tag tag--err">user_declared 用户自报 · 风险最高</span>
+          <br><br>
+          → 政府规则可<b>只补可信来源</b>，或对 <code>user_declared</code> 明确<b>接受小额度自报风险</b>——
+          这比「识别文件是不是真简历」现实得多。
+        </div>
+
+        <div class="grid grid--2">
+          <div class="stack">
+            <div class="field"><label>策略名称</label><input class="input" value="XX区人社 · 求职材料打印补贴"></div>
+            <div class="field"><label>生效终端 / 机构</label>
+              <select class="select"><option>XX区人社局名下全部终端（3 台）</option><option>指定终端…</option></select>
+              <div class="hint"><code>Terminal.orgId</code> 已有，<b>能区分政府机与商业机</b></div>
+            </div>
+            <div class="field"><label><b>场景限定</b>（scenarioKey · 服务端推导）<span class="tag tag--err" style="margin-left:6px">核心</span></label>
+              <div class="row" style="flex-wrap:wrap;gap:6px">
+                <span class="tag tag--ok">✓ resume_print 简历打印</span>
+                <span class="tag tag--ok">✓ fair_material 招聘会资料</span>
+                <span class="tag tag--ghost">✗ general_print 通用打印</span>
+                <span class="tag tag--ghost">✗ id_copy 证件复印</span>
+              </div>
+              <div class="hint">
+                <b>这就是「机器也能当普通打印机用，但那部分不该财政买单」的落点</b>。
+                ⚠️ <b>scenarioKey 需新建</b>——不能直接用 <code>FileObject.purpose</code>（见上方说明）
+              </div>
+            </div>
+            <div class="field"><label><b>来源可信级别</b>（provenanceType）</label>
+              <select class="select">
+                <option>仅 verified_material + system_generated（最严）</option>
+                <option>含 scan_declared（本机扫描，中等）</option>
+                <option>含 user_declared（接受自报风险，配小额度）</option>
+              </select>
+              <div class="hint">决定「用户自己上传声称是简历」的文件补不补</div>
+            </div>
+            <div class="field"><label><b>功能限定</b>（serviceKey）</label>
+              <div class="row" style="flex-wrap:wrap;gap:6px">
+                <span class="tag tag--ok">✓ print_bw_page</span>
+                <span class="tag tag--ok">✓ print_bw_duplex_page</span>
+                <span class="tag tag--ghost">✗ print_color_page</span>
+                <span class="tag tag--ghost">✗ ai_*</span>
+              </div>
+              <div class="hint">彩色不补贴——就业服务用黑白足够，彩色属个人偏好</div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="field"><label><b>额度上限</b><span class="tag tag--err" style="margin-left:6px">防薅羊毛</span></label>
+              <div class="grid grid--2">
+                <div><input class="input" value="20"><div class="hint">页 / 人 / 周期</div></div>
+                <div><select class="select"><option>每月</option><option>每周</option><option>一次性</option></select></div>
+              </div>
+            </div>
+            <div class="field"><label>项目总预算</label><input class="input" value="50000.00"><div class="hint">元；耗尽后<b>转自费</b>，不静默按原价扣款</div></div>
+            <div class="field"><label>出资方</label>
+              <select class="select"><option>XX区人力资源和社会保障局</option><option>平台自己承担</option></select>
+              <div class="hint"><b>「免费」和「补贴」账务不是一回事</b>：平台自送 = 收入减项；政府买单 = <b>应收</b></div>
+            </div>
+            <div class="field"><label>人群限定</label>
+              <div class="locked small">首期不做 —— 见下方说明</div>
+            </div>
+            <div class="field"><label>多策略命中</label>
+              <div class="locked small">首期不叠加，按优先级取一条</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="degrade" style="margin-top:14px">
+          <b>用户能绕过吗？能</b>——在「简历打印」入口传一个普通文档，
+          <code>purpose</code> 照样是 <code>resume_upload</code>。
+          <b>建议不要试图杜绝，用额度控制</b>：内容识别成本高且<b>会误伤</b>
+          （真简历被判否，用户当场炸）；而真要滥用一次也就省几块钱，动机很弱。
+          <b>总量在预算内、单人有上限，财政风险就是可控的。</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="card isnew" data-newtag="必须先定" style="margin-top:16px">
+      <div class="card__head"><h3>匹配与降级规则</h3></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>问题</th><th>建议</th></tr></thead>
+          <tbody>
+            <tr><td>额度何时扣减</td><td class="small"><b>核销时扣，不是报价时</b>——报价只是预览，用户可能不下单</td></tr>
+            <tr><td>报价与核销之间额度被别人用完</td><td class="small">核销时以 CAS 为准，<b>失败则回到自费并重新提示</b>，不能静默全价扣款</td></tr>
+            <tr><td>预算耗尽</td><td class="small"><b>转自费</b>，出纸前明示：「本项目额度已用完，本次需付 ¥X」</td></tr>
+            <tr><td>对账区分</td><td class="small"><code>RedemptionRecord</code> 必须记<b>出资方</b>，否则分不清「平台自送」与「政府买单」</td></tr>
+            <tr><td>与权益券的关系</td><td class="small">两套机制（策略自动生效 / 券用户主动使用），<b>但共用同一个核销账本</b>，避免重复抵扣</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>人群限定为什么首期不做</h3><span class="tag tag--warn">合规</span></div>
+      <div class="card__body">
+        <p class="small">
+          政府可能只想补贴特定人群（已做失业登记、本地户籍）。
+          <b>但这类身份信息一旦采集，就超出了平台「不收集求职者身份档案」的边界</b>
+          （<code>CLAUDE.md</code> §2、§10）。
+        </p>
+        <div class="degrade" style="margin-top:10px">
+          <b>建议：需要人群区分时，让出资方在「发码环节」控制</b>——
+          他们按自己的名单发码，我们只负责核销。
+          <b>身份判定留在政府侧，平台不接触个人身份数据。</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>结算口径（决定性质）</h3><span class="tag tag--err">最关键</span></div>
+        <div class="card__body">
+          <table class="table">
+            <thead><tr><th>结算方式</th><th>性质</th><th>可否</th></tr></thead>
+            <tbody>
+              <tr><td class="small">按<b>实际消费</b>结算（打了多少页、用了几次）</td>
+                <td class="small">第一类 · 工具与耗材</td><td><span class="tag tag--ok">✅</span></td></tr>
+              <tr><td class="small">按<b>岗位曝光量 / 跳转量</b>释放预算</td>
+                <td class="small">第二类 · 须先过许可审查</td><td><span class="tag tag--warn">⚠️</span></td></tr>
+              <tr><td class="small">按<b>招聘成果</b>（投递 / 到面 / 入职）释放或返利</td>
+                <td class="small">效果付费招聘中介</td><td><span class="tag tag--err">❌ 红线</span></td></tr>
+            </tbody>
+          </table>
+          <div class="degrade" style="margin-top:10px">
+            <b>同一笔钱，结算口径不同，性质就变了。</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>对外表述与数据边界</h3></div>
+        <div class="card__body">
+          <ul style="margin:0;padding-left:19px;font-size:13.5px;line-height:1.8">
+            <li>只能说「<b>某机构提供的打印服务额度</b>」</li>
+            <li><b>不能</b>说「政府现金补贴到账」</li>
+            <li>赞助机构<b>不得</b>获得个人领取人名单、简历或行为明细</li>
+            <li>只能取得<b>履约对账数据</b>与满足最小样本阈值（N≥5）的聚合统计</li>
+          </ul>
+          <div class="small muted" style="margin-top:10px">
+            依据 <code>compliance-boundary.md:330-341</code>。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 对账（现有） ═══ -->
+  <div data-panel-of="bill" data-panel="recon" style="display:none">
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>本地账本对账</h3><span class="tag tag--ghost">现有能力</span></div>
+      <div class="card__body">
+        <div class="empty" style="padding:28px">
+          <h3>账本自洽</h3>
+          <p>未发现账本差异；渠道账单 diff 需在部署期用真实商户账单核对。</p>
+        </div>
+        <div class="degrade" style="margin-top:12px">
+          <b>当前对账把 discount 排除在实收资金外</b>（<code>reconciliation.service.ts:121-130</code>）——
+          这在「平台自己送券」时是对的，但<b>机构出资的补贴必须能算出机构应付多少</b>，
+          否则无法向出资方结算。这是「补贴资金项目」Tab 的前置。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">¥</div><h3>尚未配置价目</h3>
+      <p>终端所有收费功能<b>不可用</b>（不是「免费」）——没有价目就不能计价下单，避免出现算不清的订单。</p>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——本页<b>全部功能照常</b>。价目配置与对账不依赖 AI。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>价目加载失败</h3>
+      <p>无法读取（<code>GET /admin/billing/price-config</code> 返回 500）。
+        <b>终端下单会因取不到价目而拒绝建单</b>，不会按 0 元放行。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/billing</code>。<b>不新建「收费设置」页</b>——它就是本页第一个 Tab。</li>
+      <li><b>价目扩充可先做</b>：<code>PriceConfig</code> 模型与 <code>PUT</code> 端点都在，加行即可。
+        但 <b>AI 类价目必须等 <code>AiUsageLedger</code> 落地后才能启用</b>。</li>
+      <li><b>彩色打印保持锁定</b>：硬件支持不等于驱动控制已验证（<code>CLAUDE.md</code> §3）。</li>
+      <li><b>补贴资金项目需先补模型</b>：<code>FundingProgram</code> + 发行批次 + <code>SettlementEntry</code>/<code>Reversal</code>；
+        <code>Grant</code> 增 <code>programId</code>/<code>issuanceBatchId</code>，核销时记录资金方承担金额与结算期。</li>
+      <li><b>资金事件必须强审计</b>：<code>AuditService.write</code> 会吞掉数据库失败（任务书 §2.4 F-5），
+        补贴对账不能接受这种可靠性——用 <code>writeRequired</code> 或可靠 outbox。</li>
+      <li><b>价目与权益共用 serviceKey</b>：券的适用范围直接引用 <code>serviceKey</code>，
+        避免出现「有券但不知道能抵什么」。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'billing'})</script>
+</body>
+</html>

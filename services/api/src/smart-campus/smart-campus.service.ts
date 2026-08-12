@@ -121,7 +121,11 @@ export class SmartCampusService {
 
   async listSmartCampusTerminals(): Promise<SmartCampusTerminalView[]> {
     const [terminals, configs] = await Promise.all([
-      this.prisma.terminal.findMany({ include: { org: { select: { id: true, name: true } } }, orderBy: { registeredAt: 'desc' }, take: 500 }),
+      this.prisma.terminal.findMany({
+        include: { org: { select: { id: true, name: true } }, heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
+        orderBy: { registeredAt: 'desc' },
+        take: 500,
+      }),
       this.prisma.terminalSmartCampusConfig.findMany(),
     ])
     const byTerminal = new Map(configs.map((c) => [c.terminalId, c]))
@@ -134,7 +138,12 @@ export class SmartCampusService {
         terminalCode: t.terminalCode,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
-        isOnline: now - t.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS,
+        // ⚠️ 2026-08-11（CLAUDE.md §9）：lastSeenAt 是 @updatedAt（schema.prisma:38），
+        // 任意行更新都会刷新，断电终端也会显示「在线」。改用最新真实心跳判定。
+        isOnline: (() => {
+          const lastHeartbeatAt = t.heartbeats[0]?.createdAt
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+        })(),
         config: config ? toConfigView(config) : null,
       }
     })
@@ -163,6 +172,8 @@ export class SmartCampusService {
     const [terminals, configs] = await Promise.all([
       this.prisma.terminal.findMany({
         where: { orgId: org.id },
+        // Partner 分支同样需要真实心跳（Admin 与 Partner 两个查询都要改，不能只修一处）
+        include: { heartbeats: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } } },
         orderBy: { registeredAt: 'desc' },
         take: 500,
       }),
@@ -178,7 +189,12 @@ export class SmartCampusService {
         terminalCode: t.terminalCode,
         orgId: t.orgId,
         orgName: org.name,
-        isOnline: now - t.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS,
+        // ⚠️ 2026-08-11（CLAUDE.md §9）：lastSeenAt 是 @updatedAt（schema.prisma:38），
+        // 任意行更新都会刷新，断电终端也会显示「在线」。改用最新真实心跳判定。
+        isOnline: (() => {
+          const lastHeartbeatAt = t.heartbeats[0]?.createdAt
+          return !!lastHeartbeatAt && now - lastHeartbeatAt.getTime() < ONLINE_THRESHOLD_MS
+        })(),
         config: config ? toConfigView(config) : null,
       }
     })

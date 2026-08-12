@@ -98,9 +98,21 @@ export default function AlertsPage() {
 
       {state === 'ready' && (
         filtered.length === 0 ? (
+          /*
+            2026-08-11（CLAUDE.md §9）：原实现只看 filtered.length===0 就宣称
+            「所有终端在线、打印机正常、近 24 小时无失败任务」。
+            但 filtered 是**按类型筛选后**的结果，后端返回的是三类相互独立的告警
+            （admin-ops.service.ts:150）——筛选「打印机异常」且该类为空时，
+            终端离线/打印失败仍可能有故障，此时报全绿会让运维漏掉真实告警。
+            现区分两种空：整体无告警才敢下全绿结论；分类为空只说该分类。
+          */
           <EmptyState
-            title="当前无告警"
-            description="所有终端在线、打印机正常、近 24 小时无失败任务"
+            title={alerts.length === 0 ? '当前无告警' : '该分类当前无告警'}
+            description={
+              alerts.length === 0
+                ? '所有终端在线、打印机正常、近 24 小时无失败任务'
+                : `「${typeFilter ? TYPE_META[typeFilter as AdminAlertItem['type']]?.label ?? typeFilter : ''}」分类下无告警；其他分类仍有 ${alerts.length} 条，请切换分类查看`
+            }
             icon={AlertTriangleIcon}
             className="py-20"
           />

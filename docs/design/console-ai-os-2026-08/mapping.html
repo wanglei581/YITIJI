@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后台 ↔ 前端 功能对应总表</title>
+<link rel="stylesheet" href="styles/console.css?v=20260811a">
+<style>
+  body{background:var(--canvas)}
+  .wrap{max-width:1560px;margin:0 auto;padding:34px 26px 60px}
+  .hero h1{font-family:var(--serif);font-size:30px;margin:0 0 6px}
+  .hero p{margin:0;color:var(--n-500);font-size:14.5px}
+  table.map{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface)}
+  table.map th{position:sticky;top:0;z-index:2;background:var(--n-100);color:var(--n-700);
+    font-size:12px;font-weight:600;text-align:left;padding:10px 12px;border-bottom:2px solid var(--n-300);white-space:nowrap}
+  table.map td{padding:11px 12px;border-bottom:1px solid var(--n-100);vertical-align:top}
+  table.map tr:hover td{background:var(--n-50)}
+  table.map .grp td{background:var(--dark);color:#fff;font-family:var(--serif);font-weight:700;font-size:13.5px;padding:9px 12px}
+  table.map .grp td span{font-weight:400;font-size:12px;color:#8fb0a7;margin-left:10px;font-family:var(--sans)}
+  .pg{font-weight:600}
+  .rt{font-family:var(--mono);font-size:11px;color:var(--n-500);display:block;margin-top:2px}
+  .api{font-family:var(--mono);font-size:11px;line-height:1.65;color:var(--n-600)}
+  .ai{font-size:12.5px;line-height:1.6}
+  .lv{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .lv-a{background:var(--p-100);color:var(--p-700)}      /* 原生 */
+  .lv-b{background:var(--info-bg);color:var(--info-fg)}  /* 支撑 */
+  .lv-c{background:var(--ai-bg);color:var(--ai-fg)}      /* 补强 */
+  .lv-d{background:var(--n-100);color:var(--n-600)}      /* 刻意无 AI */
+  .warnrow td{background:var(--warn-bg)!important}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;margin:14px 0 0}
+  .legend div{font-size:12.5px;color:var(--n-600)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>后台 ↔ 前端 功能对应总表</h1>
+    <p>每一个后台页面：管的是什么 · 对应前台哪个页面 · 走哪些接口 · 本页的 AI 是什么</p>
+  </div>
+
+  <div class="lede" style="margin:22px 0">
+    <p style="margin:0 0 12px;font-size:14px;line-height:1.75;color:var(--n-700)">
+      <b>这张表回答两个问题。</b>
+      第一，产品所有者指出「后台有些功能和接口是混乱的，不知道哪个该对接哪个」——
+      本表把每个后台页面钉死到<b>它管的数据最终出现在前台的哪一页</b>，写不出来的直接标红。
+      第二，前台 V3 定了「每一页要么有 AI，要么有为什么没有的明文理由」——
+      本表把同一条纪律搬到后台：<b>47 个后台页，每页都有明确定位，没有第三种状态</b>。⚠️ 口径已修正：多数「补强」项应落在<b>确定性规则</b>而非生成式 AI，见方案 §11.3。
+    </p>
+    <div class="legend">
+      <div><span class="lv lv-a">原生</span> AI 是这页的主要功能</div>
+      <div><span class="lv lv-b">支撑</span> AI 在这页做辅助判断</div>
+      <div><span class="lv lv-c">补强</span> 该有但现在没有，进 backlog</div>
+      <div><span class="lv lv-d">刻意无</span> 有明文理由不用 AI</div>
+      <div style="color:var(--warn-fg)"><b>橙色行</b> = 对应关系有问题（孤儿 / 重复 / 错配）</div>
+    </div>
+  </div>
+
+  <div class="proto proto--err">
+    <span class="proto__tag">Codex 逐链复核 · 先看这一条</span>
+    追完「Partner 提交 → Admin 审核 → Admin 发布 → Kiosk 展示」三条链后：
+    <b>岗位、招聘会、政策三条主链都能闭合</b>；混乱的技术根因是<b>「来源」一词被同时用在两件事上</b>
+    （<code>/job-sources</code> 其实是审核队列，真正的数据源是 <code>/admin/job-sync/sources</code>）。
+    <b>⚠️ 曾判定「企业资料链断掉」——该结论已撤回，功能早已存在</b>（见企业展示管理那一行）。
+    另有 7 处口径混乱（<code>reviewing</code> 状态进不去、三端三个名字、单条创建复用 <code>/import</code>、
+    <code>toggle</code> vs <code>enabled</code> 等），详见方案 §9.2。
+  </div>
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">刻意无 AI 的四条理由</span>
+    <b>① 安全边界</b>：登录、账号、权限——AI 不参与身份与授权决策（与前台 P03 同一口径）。
+    <b>② 法律效力</b>：法务文档正文不得由 AI 生成或改写。
+    <b>③ 个人权利</b>：隐私请求与数据权利工单不得由 AI 判定，必须人工。
+    <b>④ 能力未开放</b>：前台就是锁定态的功能（如智慧校园未接入），后台不造 AI 壳子。
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <div class="card__body card__body--flush">
+      <div class="table__wrap">
+        <table class="map">
+          <thead><tr>
+            <th style="width:15%">后台页面</th>
+            <th style="width:19%">这页管什么</th>
+            <th style="width:19%">对应前台哪里</th>
+            <th style="width:19%">关键接口</th>
+            <th style="width:22%">本页的 AI 是什么</th>
+            <th style="width:6%">档</th>
+          </tr></thead>
+          <tbody>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 运营总览<span>1 页</span></td></tr>
+            <tr>
+              <td class="pg">工作台<span class="rt">/</span></td>
+              <td>全站运营概览：在线终端、待审核、待清理文件、AI 调用</td>
+              <td>不直接对应单页；是<b>全站健康的入口</b></td>
+              <td class="api">GET /admin/ops/overview<br>GET /admin/ai/usage</td>
+              <td class="ai"><b>AI 每日要点</b>：今天最该看的 3 件事（成本突增 / 失败率异常 / 审核积压 / 设备离线），每条带理由 <span class="ev ev--1">E1</span><span class="ev ev--2">E2</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 设备运维<span>5 页</span></td></tr>
+            <tr>
+              <td class="pg">设备管理<span class="rt">/devices（终端·打印机·外设 3 Tab）</span></td>
+              <td>终端在线状态、机构归属、打印机心跳、外设</td>
+              <td><b>P04 系统态</b>（设备离线 / 缺纸的降级文案来源）<br>全站「设备离线」态的真值</td>
+              <td class="api">GET /admin/terminals<br>GET /admin/printers<br>Agent 心跳上报</td>
+              <td class="ai"><b>AI 故障预测</b>：按历史卡纸 / 缺纸 / 离线模式提示「这台可能要缺纸了」<span class="ev ev--2">E2</span>；批量运维建议</td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">宣传屏<span class="rt">/screensaver</span></td>
+              <td>待机素材、播放方案、终端排期</td>
+              <td><b>P02 待机屏</b><span class="rt">kiosk /screensaver</span></td>
+              <td class="api">GET/POST /admin/screensaver/*<br>GET /screensaver/playlist</td>
+              <td class="ai"><b>AI 精选排期建议</b>（按时段与点位人流）<span class="ev ev--2">E2</span>；AI 海报草稿仍为二期 stub，当前 <code>AI_IMAGE_PROVIDER=disabled</code></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">百宝箱<span class="rt">/toolbox</span></td>
+              <td>微应用审核、域名白名单、终端投放、启动统计</td>
+              <td><b>P27 百宝箱</b><span class="rt">kiosk 首页磁贴 → 工具区</span></td>
+              <td class="api">GET/POST /admin/toolbox/*</td>
+              <td class="ai"><b>上架 AI 预检</b>：域名风险、权限申请合理性、描述与实际能力是否一致 <span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">智慧校园<span class="rt">/smart-campus</span></td>
+              <td>按终端的功能开关（默认 enabled:false）</td>
+              <td><b>P19 智慧校园</b>（前台就是<b>未接入锁定态</b>）</td>
+              <td class="api">GET/PATCH /admin/smart-campus/terminals</td>
+              <td class="ai"><b>刻意无 AI</b>：前台该功能本身处于未接入锁定态，后台不造 AI 壳子。接入后再评估</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">告警中心<span class="rt">/alerts</span></td>
+              <td>终端 / 打印机 / AI 成本告警（实时派生）</td>
+              <td><b>P04 系统态</b>；间接影响全站可用性</td>
+              <td class="api">GET /admin/ops/alerts</td>
+              <td class="ai"><b>AI 归因与建议处置</b>：同类告警聚合 + 「可能原因 + 建议动作」<span class="ev ev--2">E2</span>。<b>注：确认/指派/静默需服务端先建事故状态机</b></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 业务管理<span>7 页</span></td></tr>
+            <tr>
+              <td class="pg">订单管理<span class="rt">/orders</span></td>
+              <td>打印订单、支付状态、退款、关闭未支付</td>
+              <td><b>P06 打印工作台</b> 第 5–7 站（收银 → 出纸 → 取件）<span class="rt">kiosk /print/* + pickup-claim</span></td>
+              <td class="api">GET /admin/orders<br>POST /admin/orders/:id/refund</td>
+              <td class="ai"><b>AI 异常订单识别</b>：重复支付、支付成功未出纸、退款卡住 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">打印扫描运维<span class="rt">/print-scan</span></td>
+              <td>打印任务重试、扫描任务、文档处理</td>
+              <td><b>P06 打印工作台</b>（任务 6 态）<b>P07 扫描</b> <b>P08 文件加工</b></td>
+              <td class="api">GET /admin/print-jobs<br>GET /admin/scan-tasks</td>
+              <td class="ai"><b>AI 失败模式归因</b>：字体未内嵌 / 幅面不符 / 加密 / 页数超限——对应前台 <code>checkfail</code> 处境 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">计费与对账<span class="rt">/billing</span></td>
+              <td>价目配置（黑白 / 彩色 / 双面）+ 本地对账</td>
+              <td><b>P06 第 3–4 站</b>（参数核价 → 核对金额）<br>价目改动<b>即时全端生效</b></td>
+              <td class="api">GET/PATCH /admin/billing/prices<br>GET /admin/billing/reconciliation</td>
+              <td class="ai"><b>AI 对账差异解释</b>：把 5 类差异码翻成一句人话 + 建议动作 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">文件管理<span class="rt">/files</span></td>
+              <td>文件生命周期、签名预览、删除、过期清理</td>
+              <td>全站文件产物：<b>P06/P07/P08/P09/P12</b> 的产出都落这里</td>
+              <td class="api">GET /admin/files<br>DELETE /admin/files/:id</td>
+              <td class="ai"><b>AI PII 检测与遮挡建议</b>：身份证 / 简历敏感字段识别 <span class="ev ev--1">E1 规则</span>+<span class="ev ev--3">E3 模型</span>。<b>当前完全没有遮挡规则治理</b></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">求职材料库<span class="rt">/job-materials</span></td>
+              <td>材料模板与使用统计</td>
+              <td><b>P12 材料工厂</b><span class="rt">kiosk /resume/materials · /resume/templates</span></td>
+              <td class="api">GET /admin/job-materials/*</td>
+              <td class="ai"><b>AI 模板质量与使用建议</b>：哪些模板没人用、哪些生成后被弃用 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">AI服务管理<span class="rt">/ai-services</span></td>
+              <td>全站 AI 的用量 / 质量 / 事故 / 合规 / 面试运营</td>
+              <td><b>全部 30 个 AI 点</b>的运行面</td>
+              <td class="api">GET /admin/ai/usage · /cost/* · /quality/* · /health · /incidents · /compliance/*</td>
+              <td class="ai"><b>AI 就是这页的全部内容。</b>看得见（用量成本）+ 管得住（质量抽检 / 事故降级 / 合规拦截）</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">AI大模型<span class="rt">/ai-config</span></td>
+              <td>能力注册表：模型绑定 / Prompt 版本 / 闸门预算 / 降级策略 / 证据等级</td>
+              <td><b>全部 30 个 AI 点</b>的配置面；每条能力标注它长在前台哪一页；能力清单见方案附录 C（29 能力 + 1 守卫）</td>
+              <td class="api">GET/PATCH /admin/ai/capabilities<br>POST /admin/ai/capabilities/:key/test</td>
+              <td class="ai"><b>AI 就是这页的全部内容。</b>前台每个 AI 点的开关、模型、提示词、预算、降级文案都在这里</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 数据内容<span>7 页 —— 产品所有者点名「大概率不匹配」的一组</span></td></tr>
+            <tr>
+              <td class="pg">岗位信息源<span class="rt">/job-sources</span></td>
+              <td><b>审核</b>外部岗位：pending → reviewing → approved/rejected，以及发布 / 下架</td>
+              <td><b>P13 岗位情报台 · P14 岗位详情</b><span class="rt">kiosk /jobs · /jobs/:id</span><br>审核通过 + 已发布才在终端可见</td>
+              <td class="api">GET /admin/jobs?reviewStatus=<br>PATCH /admin/jobs/:id/review<br>PATCH /admin/jobs/:id/publish</td>
+              <td class="ai"><b>AI 预审风险分</b>：字段缺失 <span class="ev ev--1">E1</span> / 薪资异常 <span class="ev ev--1">E1</span> / 疑似歧视表述 <span class="ev ev--3">E3</span> / 重复。高分自动排前，人工审核量直接下降</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">招聘会信息源<span class="rt">/fair-sources</span></td>
+              <td><b>审核</b>外部招聘会（同上四态 + 发布/下架）</td>
+              <td><b>P17 招聘会作战台 · P18 校园招聘</b><span class="rt">kiosk /job-fairs · /campus</span></td>
+              <td class="api">GET /admin/fairs?reviewStatus=<br>PATCH /admin/fairs/:id/review</td>
+              <td class="ai">同岗位信息源；另加<b>时间冲突检测</b>（同场地同时段重复场次）<span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">政策信息源<span class="rt">/policy-sources</span></td>
+              <td><b>审核</b>政策公告（同上）</td>
+              <td><b>P21 政策服务</b><span class="rt">kiosk /renshi 四 Tab</span></td>
+              <td class="api">GET /admin/policies?reviewStatus=<br>PATCH /admin/policies/:id/review</td>
+              <td class="ai">同上；另加<b>时效性检测</b>（政策已废止 / 申报期已过）<span class="ev ev--2">E2</span></td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr class="warnrow">
+              <td class="pg">招聘会管理<span class="rt">/fairs</span></td>
+              <td><b>运营</b>招聘会本体：参会企业、展区、导览图、活动资料、现场统计</td>
+              <td><b>P17 作战台</b>的内容来源（与「招聘会信息源」<b>指向同一个数据模型</b>）</td>
+              <td class="api">GET /admin/fairs/:id/{companies,map,materials,stats}</td>
+              <td class="ai"><b>AI 展位分区建议 + 准备单校验</b> <span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr class="warnrow">
+              <td colspan="6" style="background:var(--warn-bg)">
+                <b style="color:var(--warn-fg)">⚠ 这里就是产品所有者说的「混乱」</b>：
+                <code>/fair-sources</code> 与 <code>/fairs</code> <b>管的是同一批 JobFair 记录</b>，
+                但一个叫「信息源」（做审核）、一个叫「管理」（做运营）——名字没体现这层分工，
+                运营点进「招聘会信息源」会以为能改场次内容，点进「招聘会管理」又找不到审核按钮。
+                <b>改法</b>：两页在界面上互相声明职责与跳转（「本页只做审核，改内容去招聘会管理 →」），
+                并在标题下写清「本页内容会出现在终端的 P17 招聘会作战台」。同一个问题在
+                <code>/job-sources</code> ↔ Partner <code>/jobs</code>、<code>/policy-sources</code> ↔ Partner <code>/policy</code> 上同样存在。
+              </td>
+            </tr>
+            <tr>
+              <td class="pg">企业展示管理<span class="rt">/companies</span></td>
+              <td>企业资料审核 / 发布 / 下架 / 岗位关联（<b>均已实现</b>）</td>
+              <td><b>P15 企业导览</b><span class="rt">kiosk /companies · /companies/:id</span></td>
+              <td class="api">GET /admin/companies<br>PATCH /admin/companies/:id/review<br>PATCH /admin/companies/:id/publish<br>GET/POST/DELETE .../jobs</td>
+              <td class="ai"><b>AI 资料完整度与一致性</b>：同一企业在不同来源的名称 / 规模 / 行业冲突检测 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td colspan="6" style="background:var(--n-50)">
+                <b>✅ 更正（2026-08-11）：这里曾被标为「全项目唯一真断点」，那个判断是错的。</b>
+                Admin 企业页早已拆为 192 行 + 5 个组件，<code>components/ReviewPublishSection.tsx</code>
+                完整实现通过/拒绝/发布/下架，<code>LinkedJobsSection.tsx</code> 实现岗位关联，
+                <code>companiesAdmin.ts:191-202</code> 四个 service 方法齐全 ——
+                <b>链路是通的</b>。<br>
+                错误根因：给 Codex 的审查题目限定了「只看调了哪些 service 方法，不读全文」，
+                它没进 <code>components/</code> 目录就报了否定结论，而我未复核即采信。
+                <b>受限范围审查的否定性断言必须复核一手代码。</b>
+                <br>仍成立的小项：「批量通过并发布」确实没有后端端点（现有全是单条操作），列 backlog。
+              </td>
+            </tr>
+            <tr class="warnrow">
+              <td class="pg">Excel 导入记录<span class="rt">/import-batches</span></td>
+              <td>只读展示导入批次</td>
+              <td><b>无直接前台对应</b>——它是<b>岗位/招聘会进入系统的通道之一</b>，最终仍走 P13/P17</td>
+              <td class="api">GET /admin/import-batches</td>
+              <td class="ai"><b>AI 批次风险汇总</b>：这一批里多少条会被驳回、主因是什么 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr class="warnrow">
+              <td class="pg">数据接入通道<span class="rt">/sync-sources</span></td>
+              <td>数据源配置、触发同步、启停、批量下架</td>
+              <td><b>无直接前台对应</b>——同上，是通道不是内容</td>
+              <td class="api">GET/POST /admin/sync/sources<br>POST /admin/sync/:id/trigger</td>
+              <td class="ai"><b>来源级 AI 预审</b>：这个来源的历史内容质量画像 + 字段映射建议 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr class="warnrow">
+              <td colspan="6" style="background:var(--warn-bg)">
+                <b style="color:var(--warn-fg)">⚠ 第二处混乱</b>：<code>/import-batches</code>（Excel 批次）与
+                <code>/sync-sources</code>（API/Webhook 通道）<b>是同一件事的两半</b>——都是「内容怎么进来的」。
+                但一个只读、一个可操作，分成两个菜单项，运营要在两处找同一批数据的来路。
+                <b>改法</b>：合并为「数据接入」一页三 Tab（数据源 / 文件导入 / 同步记录）。
+                注意 <code>AccessMode</code> 有 6 个值（api/excel/csv/json/webhook/manual），<b>不能只做 Excel + API 两 Tab</b>。
+              </td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 机构用户<span>8 页</span></td></tr>
+            <tr>
+              <td class="pg">合作机构管理<span class="rt">/partners</span></td>
+              <td>机构档案、类型、启停、后台账号</td>
+              <td>间接：机构类型决定<b>其终端开放哪些 Kiosk 能力</b>（sceneTemplate + allowedModules）</td>
+              <td class="api">GET/POST /admin/orgs</td>
+              <td class="ai"><b>AI 机构内容质量画像 + 资质到期预警</b> <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">线下机构<span class="rt">/offline-agencies</span></td>
+              <td>线下招聘机构档案、审核、发布</td>
+              <td><b>P16 线下机构</b><span class="rt">kiosk /offline-agencies · /jobs/:id/offline</span></td>
+              <td class="api">GET/PATCH /admin/offline-agencies</td>
+              <td class="ai"><b>到店问题清单质检</b>：前台 P16 会用 AI 生成「到店该问什么」，这里管它的口径与边界 <span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">用户管理<span class="rt">/users</span></td>
+              <td>会员列表、筛选、详情（只读）</td>
+              <td><b>P23 我的 · 资产中心</b>（后台只看元数据，不看内容）</td>
+              <td class="api">GET /admin/users</td>
+              <td class="ai"><b>AI 能力使用画像（聚合）</b>：哪些能力高频、哪些从没人用——决定砍什么推什么 <span class="ev ev--1">E1</span>。<b>不做个人画像</b></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">权益活动<span class="rt">/benefit-activities</span></td>
+              <td>活动创建、发布、结束</td>
+              <td><b>P24 权益活动</b><span class="rt">kiosk /activities · /activities/:id</span></td>
+              <td class="api">GET/POST /admin/benefit-activities</td>
+              <td class="ai"><b>AI 活动效果解读</b>：领取率、核销率、哪个点位效果好 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">会员权益<span class="rt">/member-benefits</span></td>
+              <td>人工发放与撤销</td>
+              <td><b>P24 / P23 我的权益</b></td>
+              <td class="api">POST /admin/member-benefits/grant</td>
+              <td class="ai">同上（与权益活动合并为「权益运营」两 Tab 后共用）</td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">意见反馈<span class="rt">/member-feedback</span></td>
+              <td>反馈查看、回复、状态更新</td>
+              <td>前台反馈入口 + <b>机构工单的处理端</b>（合并后）</td>
+              <td class="api">GET/PATCH /admin/member-feedback</td>
+              <td class="ai"><b>AI 反馈聚类与优先级</b>：把散乱反馈聚成「同一个问题被 12 个人提过」<span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">消息通知<span class="rt">/member-notifications</span></td>
+              <td>广播创建、查询、删除</td>
+              <td><b>P23 我的 · 通知</b></td>
+              <td class="api">GET/POST /admin/member-notifications</td>
+              <td class="ai"><b>AI 通知文案草稿</b>（必须人工审核后才发）<span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">会员隐私请求<span class="rt">/member-privacy</span></td>
+              <td>数据导出 / 删除 / 注销请求</td>
+              <td><b>P23 我的 · 隐私</b></td>
+              <td class="api">GET /admin/member-privacy/data-requests</td>
+              <td class="ai"><b>刻意无 AI</b>：个人数据权利的判定<b>必须人工</b>，不得由模型决定是否受理、是否删除</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">管理员后台 · 系统管理<span>4 页 + 账号设置</span></td></tr>
+            <tr>
+              <td class="pg">权限管理<span class="rt">/permissions</span></td>
+              <td>（空壳）</td>
+              <td>—</td>
+              <td class="api">—</td>
+              <td class="ai"><b>刻意无 AI</b>：权限与授权不得由 AI 决策。且服务端只有粗粒度角色，<b>真实 RBAC 前从侧栏摘除</b>，页面保留</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">日志审计<span class="rt">/audit</span></td>
+              <td>操作日志查询与筛选</td>
+              <td>全站；同时是 <b>AI 配置 / Prompt / 预算 / 降级变更历史的统一真相源</b></td>
+              <td class="api">GET /admin/audit</td>
+              <td class="ai"><b>AI 自然语言检索</b>：「上周谁改过打印价目」直接问出来 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">法务文档版本<span class="rt">/legal-docs</span></td>
+              <td>协议 / 隐私政策版本与激活</td>
+              <td><b>P04 系统态 · /legal/:doc</b>；登录同意快照</td>
+              <td class="api">GET/POST /admin/legal-docs</td>
+              <td class="ai"><b>刻意无 AI</b>：法务正文具有法律效力，<b>不得由 AI 生成或改写</b>。可做的只是「版本 diff 高亮」这类无判断的展示</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">数据权利工单<span class="rt">/privacy-requests</span></td>
+              <td>导出 / 删除 / 注销工单</td>
+              <td><b>P23 我的 · 隐私</b></td>
+              <td class="api">GET/PATCH /admin/privacy-requests</td>
+              <td class="ai"><b>刻意无 AI</b>：同会员隐私请求</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">登录<span class="rt">/login</span></td>
+              <td>密码 / 短信 / 找回 / 本人验证</td>
+              <td>—</td>
+              <td class="api">POST /auth/login</td>
+              <td class="ai"><b>刻意无 AI</b>：安全边界，与前台 P03 身份门同一口径。<b>⚠️ 但账号安全能力本身是缺口</b>——MFA / 会话管理 / 异常登录 / 账号锁定 / IP 白名单全无（方案 §3.6B 遗漏 ②）</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">账号设置<span class="rt">/account-settings</span></td>
+              <td>本人账号与改密</td>
+              <td>—</td>
+              <td class="api">GET /auth/me · POST /auth/password</td>
+              <td class="ai"><b>刻意无 AI</b>：安全边界，与前台 P03 身份门同一口径</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+
+            <tr class="grp"><td colspan="6">合作机构后台<span>13 页</span></td></tr>
+            <tr>
+              <td class="pg">工作台<span class="rt">/</span></td>
+              <td>本机构内容数量、待审核、近期同步</td>
+              <td>不直接对应单页</td>
+              <td class="api">GET /partner/dashboard</td>
+              <td class="ai"><b>AI 每日要点</b>。<b>注：现有数据只有数量与同步记录，不足以生成可靠归因——必须先有效果数据</b> <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-c">补强</span></td>
+            </tr>
+            <tr>
+              <td class="pg">机构资料<span class="rt">/profile</span></td>
+              <td>基本信息 + 资质合规 + 账单与用量</td>
+              <td>间接：资质过期 → 内容自动转不可见 → 前台 P13/P17 看不到</td>
+              <td class="api">GET/PATCH /partner/org<br>GET /partner/qualifications</td>
+              <td class="ai"><b>资质到期预警</b>（规则，<span class="ev ev--1">E1</span>）。账单页<b>刻意无 AI</b>：金额不得由模型估算</td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">岗位信息管理<span class="rt">/jobs</span></td>
+              <td>本机构岗位的增删改、提审、下架、健康度</td>
+              <td><b>P13 岗位情报台 · P14 岗位详情</b>——机构写的每个字段最终显示在这两页</td>
+              <td class="api">GET/POST/PATCH /partner/jobs<br>GET /partner/jobs/quality-summary</td>
+              <td class="ai"><b>质检 + 提交前预审 + 内容改写</b>。E1 规则档（字段/过期/薪资/重复）与 E3 模型档（歧视表述/表达质量）分开标注</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">企业资料管理<span class="rt">/companies</span></td>
+              <td>本机构关联企业的展示资料</td>
+              <td><b>P15 企业导览</b></td>
+              <td class="api">GET/POST /partner/companies</td>
+              <td class="ai">同岗位：质检 + 预审 + 改写（<b>Codex 指出我最初漏了这页</b>）</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">招聘会信息管理<span class="rt">/fairs</span></td>
+              <td>场次 + 参展企业 + 展位图 + 议程 + 物料 + 现场数据</td>
+              <td><b>P17 作战台</b>（场次→企业→导览→准备单→打印）<b>P18 校园招聘</b></td>
+              <td class="api">GET/POST /partner/fairs<br>（企业/展位/资料接口需从 Admin 权限搬来）</td>
+              <td class="ai"><b>AI 准备助手</b>：展区分区建议、参会指引草稿、物料清单 <span class="ev ev--3">E3</span>。不接触求职者数据</td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">智慧校园<span class="rt">/smart-campus</span></td>
+              <td>学校终端开关 + 迎新内容（OrientationPanel 已预留）</td>
+              <td><b>P19 智慧校园</b>（前台锁定态）</td>
+              <td class="api">GET/PATCH /partner/smart-campus</td>
+              <td class="ai"><b>迎新内容质检</b>（字段完整度、链接可达性）<span class="ev ev--1">E1</span>。功能未接入前不做生成式 AI</td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">政策公告管理<span class="rt">/policy</span></td>
+              <td>本机构政策公告（仅部分机构类型可用）</td>
+              <td><b>P21 政策服务</b></td>
+              <td class="api">GET/POST /partner/policies</td>
+              <td class="ai"><b>合规预审 + 撰写辅助</b>（结构化草稿，人工审校后发布）<span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">数据源管理<span class="rt">/sources</span></td>
+              <td>API / Webhook / Excel 三轨接入 + 生命周期</td>
+              <td>间接：内容进入系统的通道，最终仍到 P13/P17/P21</td>
+              <td class="api">GET/POST /partner/data-sources<br>POST /partner/excel/{parse,preview,confirm}</td>
+              <td class="ai"><b>AI 字段映射建议</b>（只在 Excel 映射步内，读表头与样例行）<span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">同步日志<span class="rt">/sync-logs</span></td>
+              <td>同步记录与错误详情</td>
+              <td>间接（内容通道的执行记录）</td>
+              <td class="api">GET /partner/sync-logs</td>
+              <td class="ai"><b>失败原因归因</b>：把 401/超时/字段不符翻成一句人话 + 建议动作 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">终端数据<span class="rt">/terminals</span></td>
+              <td>投放点位与覆盖（不含运维）</td>
+              <td>间接：我的内容在哪些终端的 P13/P17 上被看到</td>
+              <td class="api">GET /partner/coverage/points</td>
+              <td class="ai"><b>投放建议</b>：哪类点位对你的内容转化更好 <span class="ev ev--1">E1</span></td>
+              <td><span class="lv lv-b">支撑</span></td>
+            </tr>
+            <tr>
+              <td class="pg">数据统计<span class="rt">/stats</span></td>
+              <td>曝光 / 浏览 / 打开来源平台 / 资料打印</td>
+              <td><b>P13–P18 的浏览与外部跳转埋点</b>（BrowseLog / ExternalJumpLog）</td>
+              <td class="api">GET /partner/stats<br>GET /partner/effect/*</td>
+              <td class="ai"><b>AI 效果解读</b>：本周最该处理的一件事，带理由与代价 <span class="ev ev--1">E1</span><span class="ev ev--3">E3</span></td>
+              <td><span class="lv lv-a">原生</span></td>
+            </tr>
+            <tr>
+              <td class="pg">账号权限<span class="rt">/account</span></td>
+              <td>子账号 + 操作日志 + 通知与支持</td>
+              <td>—</td>
+              <td class="api">GET/POST /partner/accounts<br>GET /partner/audit-logs</td>
+              <td class="ai"><b>刻意无 AI</b>：账号与授权是安全边界，不由 AI 决策（与 Admin 权限管理同一理由）</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+            <tr>
+              <td class="pg">登录<span class="rt">/login</span></td>
+              <td>密码 / 短信 / 找回 / 本人验证</td>
+              <td>—</td>
+              <td class="api">POST /auth/login</td>
+              <td class="ai"><b>刻意无 AI</b>：安全边界，与前台 P03 身份门同一口径</td>
+              <td><span class="lv lv-d">刻意无</span></td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card__foot">
+      合计 <b>47 个后台页面</b>（Admin 34 + Partner 13）：AI 原生 11 · 支撑 13 · 补强 14 · 刻意无 AI 9。
+      <b>每一页都有 AI 定位，没有第三种状态</b>——与前台 V3「每一页要么有 AI，要么有为什么没有的明文理由」同一条纪律。
+    </div>
+  </div>
+
+  <div class="sechead" style="margin-top:30px"><h2>每个后台页面都要向用户说清「本页内容出现在前台哪里」</h2></div>
+  <div class="card"><div class="card__body">
+    <p style="margin:0 0 14px;font-size:14px;line-height:1.75;color:var(--n-700)">
+      产品所有者的要求：<b>「要让客户知道每个功能是干什么的，对应的是前端用户界面里的哪些页面哪些功能」</b>。
+      落地做法：<b>在每个后台页的页头副标题位，写一句固定的去向说明</b>，并给一个「看终端效果」的跳转。
+      这不是文档，是<b>界面上的常驻文案</b>——运营和机构不用记，看一眼就知道自己在改什么。
+    </p>
+    <div class="table__wrap">
+      <table class="table">
+        <thead><tr><th style="width:22%">页面</th><th>页头副标题应该写的话</th></tr></thead>
+        <tbody>
+          <tr><td class="mono small">/job-sources</td><td>本页只做<b>审核</b>。通过并发布后，岗位出现在一体机「岗位信息」列表与详情页。改内容请去合作机构后台或数据接入。</td></tr>
+          <tr><td class="mono small">/fair-sources</td><td>本页只做<b>审核</b>。通过并发布后，招聘会出现在一体机「招聘会」作战台与校园招聘专区。<b>改场次内容请去「招聘会管理」→</b></td></tr>
+          <tr><td class="mono small">/fairs</td><td>本页做招聘会的<b>运营内容</b>：参会企业、展区展位、导览图、活动资料。这些直接显示在一体机的招聘会作战台。<b>审核状态请去「招聘会信息源」→</b></td></tr>
+          <tr><td class="mono small">/policy-sources</td><td>本页只做<b>审核</b>。通过并发布后，政策出现在一体机「政策服务」的对应分类下。</td></tr>
+          <tr><td class="mono small">/companies</td><td>本页管企业展示资料。发布后出现在一体机「找企业」列表与企业详情页；指标是否展示由本页开关控制。</td></tr>
+          <tr><td class="mono small">/sync-sources</td><td>本页管<b>内容怎么进来</b>（API / Webhook / 文件）。进来的内容默认待审核，审核通过后才会出现在终端。</td></tr>
+          <tr><td class="mono small">/import-batches</td><td>本页是文件导入的<b>执行记录</b>，只读。导入的内容去「岗位信息源 / 招聘会信息源」审核。</td></tr>
+          <tr><td class="mono small">/screensaver</td><td>本页管一体机<b>无人操作时的待机轮播</b>：素材、播放方案、按终端排期。</td></tr>
+          <tr><td class="mono small">/toolbox</td><td>本页管一体机首页「百宝箱」里的受控小工具：上架审核、域名白名单、投放到哪些终端。</td></tr>
+          <tr><td class="mono small">/billing</td><td>本页改的价目<b>即时对所有终端生效</b>，直接影响用户在打印收银台看到的金额。停用某项价目会使对应报价失败（不是免费）。</td></tr>
+          <tr><td class="mono small">/ai-config</td><td>本页管一体机上<b>每一个 AI 功能</b>的开关、模型、提示词版本、预算与降级文案。每条能力都标注了它长在终端的哪一页。</td></tr>
+          <tr><td class="mono small">/ai-services</td><td>本页看一体机上<b>所有 AI 功能</b>的运行情况：调用量与成本、输出质量抽检、故障与降级、合规拦截记录。</td></tr>
+          <tr><td class="mono small">Partner /jobs</td><td>你在这里填的每个字段，会出现在一体机的<b>岗位列表与岗位详情页</b>。求职者从详情页扫码去你填的来源平台链接投递——平台不代收简历。</td></tr>
+          <tr><td class="mono small">Partner /fairs</td><td>你在这里配的参展企业、展位图、议程与物料，会出现在一体机的<b>招聘会作战台</b>；求职者可以现场打印你上传的资料。</td></tr>
+          <tr><td class="mono small">Partner /stats</td><td>这里统计的是你的内容在一体机上<b>被看了多少次、多少人点击去了你的来源平台</b>。不含投递结果——平台没有投递闭环。</td></tr>
+          <tr><td class="mono small">Partner /terminals</td><td>你的内容正在这些点位的一体机上展示。这里不显示设备运维信息（那由平台负责）。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div></div>
+
+  <div class="protofoot">
+    <b>怎么用这张表</b>
+    <ul>
+      <li><b>给 Codex 开发</b>：每一行的「关键接口」列就是对接清单；「对应前台哪里」列决定改动的回归验证范围。</li>
+      <li><b>给运营与机构</b>：最后那张「页头副标题」表直接抄进页面，不用另写帮助文档。</li>
+      <li><b>橙色行</b>是必须先解决的错配：<code>/fair-sources</code> ↔ <code>/fairs</code> 职责重叠、
+        <code>/import-batches</code> ↔ <code>/sync-sources</code> 应合并。</li>
+      <li>AI 档位与前台 V3 的四档一致（原生 / 支撑 / 补强 / 刻意无），便于两端对照评审。</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

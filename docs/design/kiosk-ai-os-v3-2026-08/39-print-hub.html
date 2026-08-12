@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P39 打印扫描服务&nbsp;· 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P39 打印扫描服务域首屏">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P39 专用 ══ 打印扫描服务「域首屏」
+   需求真值 = 生产代码 apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx：
+   CAPABILITIES 7 张（文档打印 / 手机扫码上传 / 材料扫描 / 照片打印 / 证件照 /
+   格式转换 / 签名盖章）+ 第 8 格「本机服务配置」状态卡 + QUICK_LINKS 3 张
+   （我的文档 / 打印订单 / 异常反馈）。
+   格式转换的真实能力边界照 ConvertImagesPage.tsx（多图合并 PDF，最多 20 张）；
+   签名盖章照 SignStampPage.tsx（版式合成，非 CA 电子签）。
+
+   ══════════════════════════════════════════════════════════════════
+   ★ 全站 device-off 语义（本轮裁定，四态口径以此为准）
+   ══════════════════════════════════════════════════════════════════
+   device-off = **打印扫描一体机（同一台 MFP）离线**。
+   不是「整台设备的能力都读不到」，更不是「这一屏全关」。
+
+     · 停（要 MFP 动起来才办得成）：
+       文档打印 / 照片打印 / 材料扫描 / 证件照排版出片 / 复印。
+     · 照常（纯软件与记录类，不经过 MFP）：
+       手机扫码上传 / 格式转换 / 签名盖章 /
+       我的文档 / 打印订单 / 异常反馈。
+
+   连带口径：
+     · 首页（01-home-v6.html、01-home-v6.html）的 device-off 状态文案同步改成
+       「打印扫描离线&nbsp;· 其余功能可用」，**不再写「扫描可用」** ——
+       扫描仪就长在这台 MFP 上，它离线，扫描一起没。
+     · 本页 ai-down 不许再说「七张卡全都照常可办」：证件照本来就还没开放，
+       照常可办的是**六张**（数字必须和卡面实际一致）。
+
+   ══════════════════════════════════════════════════════════════════
+   ★ 第五条轴：能力探测态 data-probe = ok | unknown
+   ══════════════════════════════════════════════════════════════════
+   线上还有一种处境是「服务状态无法确认&nbsp;· 暂不开放任务&nbsp;· 重新检测」：
+   本机连自己的能力配置都读不到。那是**能力探测失败**，与 device-off 是两件事，
+   此前本页把两者混成同一套 UI，导致上传 / 转换 / 签章这些纯软件功能被一起关掉。
+   本轮拆开：
+
+     · device-off（probe=ok）  = MFP 确定离线 → 敢说哪几项停、哪几项照常。
+     · probe=unknown           = 什么都不敢承诺 → 七项一律「暂不开放任务」，
+                                 只留不依赖本机能力的记录类入口。
+
+   实现：四态仍走 data-when（stage.js 的 hidden 机制，v3ApplyVisibility 只管它）；
+   探测态走 data-probe-when + CSS 属性选择器。两条轴是 AND 关系，互不覆盖，
+   所以自检脚本只切 data-state 时不会把探测态搅乱。
+
+   ══════════════════════════════════════════════════════════════════
+   ★ 标签口径（全站统一）
+   ══════════════════════════════════════════════════════════════════
+   AI 卡：默认「AI&nbsp;· 仅供参考」，ai-down 时「AI&nbsp;· 已降级」——
+   **标签不许消失**，否则降级后根本看不出它原本是一项 AI 能力。
+   非 AI 卡：恒为「不依赖 AI」。
+   状态标签一律带 chip--info 标记：它是状态不是入口（先例见 P14 / P17 / P27 / P32）。
+
+   ★ 密度口径：卡面只留「一行价值 + 一行状态」；
+     「AI 怎么帮 / 降级后怎么做 / 一体机离线时怎样」整段挪进分组标题右侧的展开层。
+   ★ 声明口径：隐私 + 非 CA 电子签 + 价格三条声明合并为**一条常驻声明**；
+     价格只保留指向 ——「本页不核价、不结算，以打印工作台核价为准」。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 域首屏容器：全宽单栏（同 P32；这一屏没有文件预览要占 55–65%） */
+.hub {
+  flex: 1 1 auto; min-height: 0; position: relative; z-index: var(--z-content);
+  padding: var(--s-5) var(--gutter);
+  display: flex; flex-direction: column; gap: var(--s-2); overflow: hidden;
+}
+
+/* ── 第五条轴：能力探测态 ─────────────────────────────────────
+   只做「不匹配就藏」，绝不反向把 hidden 掰回来 ——
+   四态用 hidden（base.css 的 [hidden]{display:none!important}），
+   探测态用 display:none，两条轴是 AND，谁也盖不掉谁。 */
+.screen[data-probe="ok"] [data-probe-when="unknown"],
+.screen[data-probe="unknown"] [data-probe-when="ok"] { display: none !important; }
+
+/* ── 顶部 AI 带 ─────────────────────────────────────────────
+   三个按钮是 AI 在打印这条链上真正干的活，不是装饰：
+   推荐入口 / 材料体检 / 打印前隐私检查。
+   2026-08-10 AI 落实度审查整改：整带原来标 `E3 AI 判断`，但**点哪一件、亮哪张卡
+   是页内写死的映射，背后没有模型** —— E3 是给模型判断用的标签，贴在确定性导航上
+   会稀释它在合规上的意义。改标「选哪件不依赖 AI」；三件事各自的 AI 属性
+   由各自那一段自己说（推荐入口现为「待接线」，见 tinput）。
+   ai-down / device-off / 探测失败 各换各的话，位置与高度不动。 */
+.tband {
+  flex: 0 0 auto; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  box-shadow: var(--sh-1);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.tband-hd { display: flex; align-items: center; gap: var(--s-3); }
+.tband-hd .ic { width: 22px; height: 22px; color: var(--cat-print, var(--jade-500)); flex: 0 0 auto; }
+.tband-t { font-family: var(--ff-display); font-size: var(--fz-6); font-weight: 600; color: var(--fog-900); }
+.tband-x { margin-left: auto; flex: 0 0 auto; }
+.tband--off .tband-hd .ic { color: var(--amber-400); }
+
+.tpick { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-3); }
+.tpick button {
+  min-height: var(--touch-primary); padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-sm); cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800);
+  font-family: var(--ff-ui);
+  transition: border-color var(--dur-2) var(--ease-out), background-color var(--dur-2) var(--ease-out);
+}
+.tpick button:hover { border-color: var(--jade-a32); }
+.tpick button[aria-pressed="true"] { background: var(--jade-a12); border-color: var(--jade-a32); }
+.tp-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); line-height: var(--lh-snug); }
+.tp-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+
+/* 「我不知道该用哪个」的真输入行。
+   2026-08-10 AI 落实度审查整改：这一件原来写「说你要办的事，按事推荐入口」，
+   可整屏没有任何地方能说，点下去永远弹同一句写死结论「多数人要办的是文档打印」——
+   零输入却给结论。处置按产品口径：**不删这件事，补上输入**。
+   一体机没有物理键盘，输入框走 scripts/keypad.js（本页第 1049 行已引入，
+   [data-keypad="text"] 即弹 26 键软键盘）。本稿不解析这句话，也不据此点亮任何卡，
+   卡面写明「待接线」；接线后由后端按这句话返回推荐入口。 */
+.tinput { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  padding: var(--s-3); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px dashed var(--brd-2); }
+.tinput[hidden] { display: none; }
+.tinput-lb { font-size: var(--fz-2); font-weight: 600; color: var(--fog-800); flex: 0 0 auto; }
+.tinput-f { flex: 1 1 260px; min-width: 0; min-height: var(--touch-min, 48px);
+  padding: 0 var(--s-3); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  color: var(--fog-900); font-family: var(--ff-ui); font-size: var(--fz-3); }
+.tinput-f::placeholder { color: var(--fog-600); }
+.tinput-f:focus { outline: none; border-color: var(--jade-a32); }
+.tinput-n { flex: 1 0 100%; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.tinput-n b { color: var(--fog-800); font-weight: 600; }
+/* 结论槽位：接线前是「去问小青」这条今天真能走的路，接线后换成「去 <推荐入口>」，
+   位置与尺寸不变，所以 Codex 换的只是文字与 href。≥48px 触控（README §触控）。 */
+.tinput-go { flex: 0 0 auto; min-height: var(--touch-min, 48px); padding: 0 var(--s-4);
+  border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  color: var(--jade-600); font-size: var(--fz-2); font-weight: 600; text-decoration: none;
+  transition: border-color var(--dur-2) var(--ease-out); }
+.tinput-go:hover { border-color: var(--jade-a32); }
+.tinput-go .ic { width: 17px; height: 17px; }
+
+/* 建议四要素：动作 / 理由 / 代价 / 备选，缺一不发（README §三） */
+.tadv { display: flex; flex-direction: column; gap: 5px; padding-top: 9px; border-top: 1px solid var(--brd-1); }
+.tadv-act { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); line-height: var(--lh-snug); }
+.tadv-ln { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+.tadv-ln b { color: var(--fog-900); font-weight: 600; }
+.tadv-ln .k { color: var(--fog-600); margin-right: 6px; }
+
+/* 探测失败带里的重新检测键：右下，和 ActionBar 主键不抢位 */
+.tband-act { display: flex; align-items: center; gap: var(--s-4); }
+.rebtn {
+  min-height: var(--touch-min); padding: 0 var(--s-6); border-radius: var(--r-sm); cursor: pointer;
+  background: var(--surf-2); border: 1px solid var(--glass-2-brd); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 600;
+}
+.rebtn:hover { border-color: var(--jade-a32); }
+.rebtn[disabled] { opacity: .5; cursor: default; }
+
+/* ── 分组标题 ── */
+.glabel { flex: 0 0 auto; display: flex; align-items: baseline; gap: var(--s-3); }
+.glabel b { font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); }
+.glabel span { font-size: var(--fz-2); color: var(--fog-600); }
+.glabel--row { align-items: center; }
+.gbtn {
+  margin-left: auto; flex: 0 0 auto;
+  min-height: var(--touch-min); padding: 0 var(--s-5); border-radius: var(--r-sm); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800);
+  font-family: var(--ff-ui); font-size: var(--fz-2); font-weight: 600;
+}
+.gbtn:hover { border-color: var(--jade-a32); }
+.gbtn .ic { width: 17px; height: 17px; color: var(--cat-print, var(--jade-500)); }
+/* 评审脚手架：切探测态。挂 data-review，不按终端触控尺寸算 */
+.rvbtn {
+  flex: 0 0 auto; margin-left: var(--s-2);
+  min-height: 34px; padding: 0 var(--s-3); border-radius: var(--r-xs); cursor: pointer;
+  background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-600);
+  font-family: var(--ff-ui); font-size: var(--fz-1);
+}
+
+/* ── 七张能力卡 + 第 8 格状态卡：2 列 4 行 ──
+   行高走 1fr：四态 × 探测态共用这一套栅格，某一态话多时整排一起收，
+   绝不出现卡片压到下一块上。 */
+.hgrid {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr; gap: var(--s-3);
+}
+.hcard {
+  position: relative; min-width: 0; overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--s-1);
+  padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-top: 3px solid var(--cat-print, var(--jade-500));
+  text-decoration: none; color: inherit;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out);
+}
+a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-shadow: var(--sh-2); }
+.hc-hd { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.hc-ic {
+  width: 44px; height: 44px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+}
+.hc-ic .ic { width: 23px; height: 23px; color: var(--cat-print, var(--jade-500)); }
+.hc-nm { font-family: var(--ff-display); font-size: var(--fz-6); font-weight: 600; color: var(--fog-900); letter-spacing: .02em; word-break: keep-all; }
+.hc-hd .chip { margin-left: auto; flex: 0 0 auto; height: 28px; padding: 0 var(--s-3); font-size: var(--fz-1); letter-spacing: .02em; }
+/* 卡面只留两行：一行价值 + 一行状态 */
+.hc-ds { flex: 0 0 auto; font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+.hc-st { flex: 0 0 auto; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.hc-st b { color: var(--fog-800); font-weight: 600; }
+.hc-ft { flex: 0 0 auto; margin-top: auto; padding-top: var(--s-2); display: flex; align-items: center; gap: var(--s-3); }
+.hc-ft .chip { flex: 0 0 auto; height: 28px; padding: 0 var(--s-3); font-size: var(--fz-1); letter-spacing: .02em; }
+.hc-go { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: var(--fz-2); font-weight: 600; color: var(--jade-600); }
+.hc-go .ic { width: 18px; height: 18px; }
+
+/* AI 带命中的卡：高亮，不跳页 */
+.hcard.is-rec { border-color: var(--jade-a32); box-shadow: 0 0 0 3px var(--jade-a20); }
+
+/* 不可用态：置灰，但「为什么停」和「那怎么办」写清楚 */
+.hcard--off { background: var(--surf-1); border-color: var(--brd-1); border-top-color: var(--ink-500); opacity: .82; }
+.hcard--off .hc-ic .ic, .hcard--off .hc-nm { color: var(--fog-600); }
+.hcard--off .hc-ds, .hcard--off .hc-st { color: var(--fog-600); }
+.hc-no { flex: 0 0 auto; font-size: var(--fz-2); font-weight: 600; color: var(--amber-200); line-height: 1.5; }
+
+/* 第 8 格：本机服务配置（非入口，div 不可点） */
+.hcard--stat { border-top-color: var(--azure-400); cursor: default; }
+.hcard--stat .hc-ic .ic { color: var(--azure-400); }
+.stg { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-1) var(--s-3); }
+.stg span {
+  display: flex; align-items: baseline; gap: 6px; min-width: 0;
+  font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45;
+}
+.stg span i { font-style: normal; color: var(--fog-800); font-weight: 600; flex: 0 0 auto; }
+.stnote { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.stnote b { color: var(--fog-800); font-weight: 600; }
+
+/* ── 三张次卡：我的打印记录 ──
+   两张是跳转（带 view 参数，落到「我的」对应分区），
+   一张是页内表单层 —— 异常反馈以前也指向 23-me.html，可那边根本没有反馈入口。 */
+.qrow { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-3); }
+.qcard {
+  display: flex; align-items: center; gap: var(--s-4); text-align: left;
+  min-height: 76px; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); text-decoration: none; color: inherit; cursor: pointer;
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  font-family: var(--ff-ui);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.qcard:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.qc-ic { width: 40px; height: 40px; border-radius: var(--r-xs); flex: 0 0 auto; display: grid; place-items: center; background: var(--surf-2); }
+.qc-ic .ic { width: 20px; height: 20px; color: var(--fog-700); }
+.qc-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.qc-h { display: flex; align-items: center; gap: var(--s-3); }
+.qc-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.qc-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.qc-x { margin-left: auto; flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: var(--fz-1); letter-spacing: .02em; }
+
+/* ── 底部：一条常驻合规声明（隐私 + 非 CA 电子签 + 价格口径，四态与探测态都不消失） ── */
+.foot { flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-3); }
+.foot .ic { width: 17px; height: 17px; color: var(--fog-600); flex: 0 0 auto; margin-top: 2px; }
+.foot span { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.foot b { color: var(--fog-800); font-weight: 600; }
+
+/* 状态标签不是入口（先例见 P14 / P17 / P27 / P32） */
+.chip--info { cursor: inherit; }
+
+/* ActionBar 提示：这一屏底栏按钮多，留给提示的只有一条窄缝。
+   实测原版把「问问小青 / 用手机传文件」两个大键和主键排在一起后，
+   提示只剩 8px 宽、被迫折成 342px 高，直接从 112px 的固定栏里溢出去
+   （自检报「卡内溢出 115–168px」+「文字被裁」）。
+   处置：底栏去掉「问问小青」（底部导航已有 AI顾问 一格，同一个去处不摆两遍），
+   提示改 13px / 1.35，两行以内说完。 */
+.actionbar-hint { font-size: var(--fz-1); line-height: 1.35; color: var(--fog-600); }
+.actionbar-hint b { color: var(--fog-800); font-weight: 600; }
+
+/* ── 展开层：AI 说明 / 异常反馈 ──────────────────────────────
+   自检口径：关闭态 hidden（display:none），一切矩形为 0，
+   stage.js 与 audit-plus.js 的检查全部跳过。 */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet); display: flex; align-items: center; justify-content: center; padding: var(--s-7) var(--gutter); }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+/* 面板底必须用 --glass-3-bg（浅色主题下接近实心白），不能用 --surf-*：
+   surf 是"在页面底色上再加一层微弱色调"，压在深色遮罩上会变成灰底 +
+   深色字，warm 主题下实测糊成一片。照 P23「我的」的浮层口径来。 */
+.ovl-panel {
+  position: relative; width: 100%; max-width: 900px; max-height: 100%;
+  overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-4);
+  padding: var(--s-6) var(--s-7); border-radius: var(--r-lg);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(140%);
+}
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--cat-print, var(--jade-500)); flex: 0 0 auto; }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x {
+  margin-left: auto; flex: 0 0 auto; width: 48px; height: 48px; border-radius: var(--r-sm); cursor: pointer;
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-700);
+}
+.ovl-x .ic { width: 20px; height: 20px; }
+.ovl-sec { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .06em; }
+.ovl-act { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+
+/* AI 说明层：七项逐条写「AI 怎么帮 / AI 挂了 / 一体机离线」 */
+.airow { display: flex; flex-direction: column; gap: 3px; padding: var(--s-3) 0; border-top: 1px solid var(--brd-1); }
+.airow:first-of-type { border-top: 0; padding-top: 0; }
+.ai-nm { display: flex; align-items: center; gap: var(--s-3); font-family: var(--ff-display); font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+/* 用 ai-label 而不是 chip/tag：它是纯标注，audit-plus 的假入口检查按类名判，
+   带 label 的名字本身就在豁免表里，不会被当成"看着能点却点不了" */
+.ai-label {
+  margin-left: auto; flex: 0 0 auto; height: 26px; padding: 0 10px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; font-size: var(--fz-1); letter-spacing: .02em;
+  background: var(--surf-2); color: var(--fog-700); border: 1px solid var(--brd-1);
+}
+.ai-label--ai { background: var(--amber-a12); color: var(--amber-200); border-color: var(--amber-a20); }
+.ai-ln { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+.ai-ln i { font-style: normal; color: var(--fog-600); margin-right: 8px; }
+.ai-ln b { color: var(--fog-900); font-weight: 600; }
+
+/* 异常反馈层：选类型 → 提交 → 说清工单号怎么来的 */
+.fbgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.fbgrid button {
+  min-height: 60px; padding: var(--s-2) var(--s-4); border-radius: var(--r-sm); cursor: pointer;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; text-align: left;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800); font-family: var(--ff-ui);
+}
+.fbgrid button:hover { border-color: var(--jade-a32); }
+.fbgrid button[aria-pressed="true"] { background: var(--jade-a12); border-color: var(--jade-a32); }
+.fb-t { font-size: var(--fz-3); font-weight: 600; color: var(--fog-900); }
+.fb-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.4; }
+.fb-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
+.fb-note b { color: var(--fog-800); font-weight: 600; }
+.fb-done { display: flex; flex-direction: column; gap: 6px; padding: var(--s-4); border-radius: var(--r-sm); background: var(--jade-a12); border: 1px solid var(--jade-a20); }
+.fb-done .t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.fb-done .s { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+.fb-done .s b { color: var(--fog-900); font-weight: 600; }
+
+/* ── 卡内 / 带内折叠：把运维口径收起来，点开才展开 ─────────────────── */
+.pfold, .stfold { margin-top: var(--s-2); }
+.pfold > summary, .stfold > summary {
+  list-style: none; cursor: pointer; min-height: var(--touch-min);
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--ff-ui); font-size: var(--fz-1); color: var(--fog-600);
+}
+.pfold > summary::-webkit-details-marker, .stfold > summary::-webkit-details-marker { display: none; }
+.pfold > summary::after, .stfold > summary::after {
+  content: '展开'; margin-left: auto; flex: 0 0 auto;
+  font-size: var(--fz-1); color: var(--fog-600);
+  border: 1px solid var(--brd-2); border-radius: var(--r-full); padding: 3px 11px;
+}
+.pfold[open] > summary::after, .stfold[open] > summary::after { content: '收起'; }
+.pfold-b, .stfold-b {
+  display: flex; flex-direction: column; gap: var(--s-2);
+  padding-bottom: var(--s-2);
+  font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6;
+}
+.pfold-b b, .stfold-b b { color: var(--fog-800); font-weight: 600; }
+.pfold:not([open]) .pfold-b, .stfold:not([open]) .stfold-b { display: none; }
+/* 卡片是 overflow:hidden 的固定格子：折叠展开得自己限高滚动，
+   否则会把卡尾那句「用上面的『重新检测』再试一次」顶出格子（自检 内部裁切）。 */
+.stfold[open] .stfold-b { max-height: 168px; overflow-y: auto; }
+.pfold[open] .pfold-b { max-height: 200px; overflow-y: auto; }
+
+/* ══ 原型外壳条 · 评审开关（不属于产品界面）═══════════════════════════
+   2026-08-11：能力探测态切换按钮与「原型稿：重新检测会直接成功」这句
+   原先摆在用户可见区，产品化时会让用户困惑。整体移到与 .shell 同级、
+   浮在舞台之外；平时隐身、碰到才现身；?capture=1 的产品视图里不渲染。
+   切换能力没有删，评审照常能进探测失败态。 */
+.proto-rail {
+  position: fixed; left: 16px; top: 62px; z-index: var(--z-shell);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  padding: 7px 10px; border-radius: var(--r-lg);
+  background: rgba(8, 16, 18, .86); border: 1px solid rgba(232, 241, 241, .12);
+  backdrop-filter: blur(14px);
+  font-family: var(--ff-ui); font-size: 12px;
+  opacity: .1; transition: opacity .18s ease-out;
+}
+.proto-rail:hover, .proto-rail:focus-within { opacity: 1; }
+.proto-rail-id { color: var(--fog-600); letter-spacing: .08em; padding: 0 6px 0 2px; }
+.proto-rail .rvbtn {
+  margin-left: 0; min-height: 28px; height: 28px; padding: 0 11px;
+  font-size: 12px; color: var(--fog-700); border-color: rgba(232, 241, 241, .16);
+}
+.proto-rail .rvbtn[aria-pressed="true"] { background: var(--jade-a20); color: var(--jade-200); }
+.proto-rail-n {
+  margin-left: 4px; padding-left: 8px; border-left: 1px solid rgba(232, 241, 241, .16);
+  font-size: 12px; color: var(--fog-600);
+}
+body.capture .proto-rail { display: none !important; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-probe="ok" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">打印扫描服务</div>
+        <div class="brand-sub">职易达&nbsp;· 01 号机&nbsp;· 市人力资源市场 A 馆</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default" data-probe-when="ok"><span class="dot dot--live"></span>本机服务配置已读取</div>
+    <div class="devpill" data-when="first" data-probe-when="ok"><span class="dot dot--live"></span>不登录也能打&nbsp;· 记录留不下</div>
+    <div class="devpill" data-when="ai-down" data-probe-when="ok"><span class="dot dot--down"></span>AI 暂不可用&nbsp;· 打印照常</div>
+    <div class="devpill" data-when="device-off" data-probe-when="ok"><span class="dot dot--down"></span>打印扫描离线&nbsp;· 其余功能可用</div>
+    <div class="devpill" data-probe-when="unknown"><span class="dot dot--down"></span>服务状态无法确认</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:30</b></div>
+  </header>
+
+  <div class="hub">
+
+    <!-- ══════════ AI 带&nbsp;· default / first ══════════ -->
+    <div class="tband" data-when="default first" data-probe-when="ok">
+      <div class="tband-hd">
+        <svg class="ic"><use href="#i-brain"/></svg>
+        <span class="tband-t">这一屏的 AI 只做三件事，点一件我给你下一步</span>
+        <!-- 2026-08-10 整改：原为 `E3 AI 判断`。点哪一件 → 亮哪张卡是页内写死的映射，
+             不是模型判断，标 E3 属于错挂。三件事本身的 AI 属性各自标。 -->
+        <span class="tband-x"><span class="chip chip--info">选哪件不依赖 AI</span></span>
+      </div>
+
+      <div class="tpick" role="group" aria-label="AI 能帮你做的三件事">
+        <button type="button" data-use="route" aria-pressed="false">
+          <span class="tp-t">我不知道该用哪个</span>
+          <span class="tp-s">说你要办的事，按事推荐入口</span>
+        </button>
+        <button type="button" data-use="check" aria-pressed="false">
+          <span class="tp-t">帮我检查这份文件能不能打</span>
+          <span class="tp-s">材料体检：页数、清晰度、边距、黑白彩色取舍</span>
+        </button>
+        <button type="button" data-use="privacy" aria-pressed="false">
+          <span class="tp-t">打印前隐私检查</span>
+          <span class="tp-s">提示文件里可能有身份证号等敏感信息</span>
+        </button>
+      </div>
+
+      <!-- 「我不知道该用哪个」的真输入 + 真动作：选中那一件才出现。
+           2026-08-10 整改：原来这一件承诺「说你要办的事」，整屏却没有能说的地方，
+           点下去永远返回同一句写死结论「多数人要办的是文档打印」。
+           处置按产品口径 —— **保留这个 AI 位，补输入 + 补动作**，升级到接线即可用：
+             · 输入：一体机没有物理键盘，输入框由 scripts/keypad.js（本页已引入）弹 26 键软键盘；
+             · 动作：结论槽位就在下面那个动作键，接线前它是「去问小青」这条今天真能走的路，
+               接线后 Codex 把它换成「去 <推荐入口>」即可，DOM 位置与尺寸都不用动。
+
+           ══ AI 接线契约 · P39-A「按你说的事推荐打印入口」 ═══════════════════════
+           输入：
+             · userIntent  string   用户当场在 #useAskF 输入，≤120 字，纯文本
+             · capsAvailable string[] 本机能力探测结果，取自 .screen[data-probe]/七张卡的
+                                      data-cap（doc/relay/scan/photo/idphoto/convert/sign）
+             · deviceState string   default|ai-down|device-off，取自 .screen[data-state]
+           输出：
+             · { entry: <data-cap 之一>, reason: string, cost: string, alt: string[] }
+             · entry 必须落在 capsAvailable 内；不在则返回 null，页面显示"说不准"而不是硬推一个
+             · 证据级别 E3（模型判断 · 仅供参考）—— 渲染进 #useAct/#useWhy/#useCost/#useAlt，
+               并把 entry 对应卡片加 .is-rec；**不自动跳页、不自动出纸**（README §四红线）
+           降级：
+             · AI 不可用 → 整条 .tband 换成 data-when="ai-down" 那块「下面这些照常能办」，
+               本行随之隐藏；七张卡里六张照常，打印链路完全不受影响
+             · 接口超时 / 返回 null → 保留输入框，四要素回到本稿这段"没说之前不替你猜"的文案
+           ═══════════════════════════════════════════════════════════════════ -->
+      <div class="tinput" id="useAsk" hidden>
+        <span class="tinput-lb">说一句你要办的事</span>
+        <input class="tinput-f" id="useAskF" type="text" data-keypad="text"
+               data-keypad-label="说一句你要办的事" autocomplete="off"
+               placeholder="例：我要把手机里的简历打两份双面">
+        <a class="tinput-go" href="25-advisor.html?from=P39">说不清就问小青<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+        <span class="tinput-n"><b>待接线：</b>本稿<b>不解析</b>你输入的这句话，也不会据此点亮任何一张卡 ——
+          接线后这里直接给出「去哪个入口」并把对应的卡点亮。<b>现在</b>要么右边找小青当面说，
+          要么直接看下面七张卡自己挑。</span>
+      </div>
+
+      <div class="tadv">
+        <!-- 2026-08-11：删掉「不会替你跳走、不会替你按下出纸」这类解释交互规则的话。
+             按钮自己会说话，不跳走这件事用户按一下就知道。红线本身在 README §四红线，
+             不需要在屏幕上向用户复述。 -->
+        <div class="tadv-act" id="useAct">点上面任一件，下面对应的卡会亮起来</div>
+        <div class="tadv-ln" id="useWhy"><span class="k">理由</span>这三件是 AI 在打印这条链上真正干的活：推荐入口、材料体检、打印前隐私检查。<b>三件都只出结论，不动你的文件</b>；其中<b>推荐入口尚未接线</b>，选它会先让你说一句话。</div>
+        <div class="tadv-ln" id="useCost"><span class="k">代价</span>三件都不需要登录；体检与隐私检查要读一遍文件内容。</div>
+        <div class="tadv-ln" id="useAlt"><span class="k">备选</span>不想让机器分诊，直接看下面七张卡自己挑。</div>
+      </div>
+    </div>
+
+    <!-- ══════════ AI 带&nbsp;· ai-down：整块换话，机械能力照常 ══════════
+         数字必须和卡面对得上：照常可办的是**六张**，证件照本来就还没开放。 -->
+    <div class="tband" data-when="ai-down" data-probe-when="ok">
+      <div class="tband-hd">
+        <svg class="ic"><use href="#i-offline"/></svg>
+        <span class="tband-t">下面这些照常能办</span>
+        <span class="tband-x"><span class="chip chip--info">出纸不受影响</span></span>
+      </div>
+      <div class="tadv" style="border-top:0;padding-top:0">
+        <div class="tadv-act">推荐入口、材料体检、打印前隐私检查这三件现在给不了 —— 但打印没有被关掉</div>
+        <div class="tadv-ln"><span class="k">还能做什么</span>七张卡里<b>六张照常可办：</b>文档打印、手机扫码上传、材料扫描、照片打印、格式转换、签名盖章。第七张「证件照」本来就还没开放，<b>和 AI 好不好没关系</b>。页数、纸张、份数、双面由本机自己算，不经过 AI。</div>
+        <div class="tadv-ln"><span class="k">代价</span>这一趟不会有体检结论，也不会有隐私提醒 —— 文件里有没有身份证号<b>要你自己看一眼</b>；扫描件这次不出文字识别结果，纸张照样扫成 PDF。</div>
+        <div class="tadv-ln"><span class="k">备选</span>要 AI 结论：先存「我的文档」，等恢复再来体检。已自动上报运维，<b>本机不替系统承诺时间</b>。</div>
+      </div>
+    </div>
+
+    <!-- ══════════ AI 带&nbsp;· device-off：一体机离线，停四项、留三项 ══════════ -->
+    <div class="tband tband--off" data-when="device-off" data-probe-when="ok">
+      <div class="tband-hd">
+        <svg class="ic"><use href="#i-offline"/></svg>
+        <span class="tband-t">打印扫描一体机离线 —— 要出纸的停了，其余照常</span>
+        <span class="tband-x"><span class="chip chip--info">AI 不受影响</span></span>
+      </div>
+      <div class="tadv" style="border-top:0;padding-top:0">
+        <div class="tadv-act">停的是同一台机器上的打印与扫描：文档打印、照片打印、材料扫描、证件照出片</div>
+        <div class="tadv-ln"><span class="k">照常可办</span>手机扫码上传、格式转换、签名盖章<b>不经过这台打印机，</b>现在就能用；我的文档、打印订单、异常反馈也照常。<span class="ev ev--e2">E2 来自本机设备状态</span></div>
+        <div class="tadv-ln"><span class="k">代价</span>这一趟拿不到纸。文件传上来、拼好、签好之后<b>要换一台机器才出得了纸，</b>凭手机号取回。</div>
+        <div class="tadv-ln"><span class="k">备选</span>先把材料存进「我的文档」，或找现场工作人员。离线已自动上报运维，<b>本机不替系统承诺恢复时间</b>。</div>
+      </div>
+    </div>
+
+    <!-- ══════════ AI 带&nbsp;· probe=unknown：能力探测失败，和上面那条是两件事 ══════════ -->
+    <div class="tband tband--off" data-probe-when="unknown">
+      <div class="tband-hd">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span class="tband-t" id="probeTitle">服务状态无法确认</span>
+        <span class="tband-x"><span class="chip chip--info" id="probeChip">暂不开放任务</span></span>
+      </div>
+      <!-- 2026-08-11 整改：探测失败态原来向用户讲「能力配置」「为什么七项全停」，
+           那是运维口径，站在机器前的人只需要知道：这次办不了、可以重试、可以换机。
+           用户可见区压成一句 + 替代路径；技术档案整段收进折叠，内容一字未删。 -->
+      <div class="tadv" style="border-top:0;padding-top:0">
+        <div class="tadv-act">这次打印扫描都开不了 —— <b>请重新检测，或换一台机器</b><span class="ev ev--e2">E2 来自本机能力探测</span></div>
+        <div class="tadv-ln"><span class="k">还能做什么</span>「我的打印记录」三个入口<b>不受影响；</b>已存进「我的文档」的文件<b>换机也能取回来打</b>，或找现场工作人员。</div>
+        <div class="tadv-ln" data-when="ai-down"><span class="k">另外</span>这一趟 AI 也不可用 —— 就算探测成功，体检与隐私检查<b>这次仍然给不了</b>。</div>
+        <details class="pfold">
+          <summary>技术档案（运维用）</summary>
+          <div class="pfold-b">
+            未取得本机打印扫描能力配置 —— 这和「一体机离线」不是一回事：那次知道坏在哪，这次连能力都读不到。
+            <!-- 「，」放进 <b> 里：跨元素边界时浏览器会在 </b> 后断行，把逗号甩到行首（中文排版禁则，自检会判） -->
+            读不到能力配置，本机就<b>无权声称任何一项正常，</b>连上传、格式转换、签名盖章也不敢开 ——
+            传上来接不接得住、合成完存不存得下，现在都答不上来。重新检测一次不花钱。
+          </div>
+        </details>
+      </div>
+      <div class="tband-act">
+        <button type="button" class="rebtn" id="probeBtn">重新检测</button>
+      </div>
+    </div>
+
+    <div class="glabel glabel--row">
+      <b>这个台面能做的七件事</b>
+      <span data-when="default first" data-probe-when="ok">右上角标了是不是 AI</span>
+      <span data-when="ai-down" data-probe-when="ok">标 AI 的这次只降建议&nbsp;· 打印扫描本身照常</span>
+      <span data-when="device-off" data-probe-when="ok">要出纸的四项停了&nbsp;· 上传、转换、签章照常</span>
+      <span data-probe-when="unknown">七项现在都开不了&nbsp;· 状态确认后自动恢复</span>
+      <button class="gbtn" type="button" data-open="ovl-ai"><svg class="ic"><use href="#i-brain"/></svg>AI 怎么帮&nbsp;· 降级后怎么做</button>
+      <!-- 2026-08-11：「评审：模拟能力探测失败」是原型开关，已移到 .stage 之外的
+           原型外壳条（见文件末尾 .proto-rail）。切换能力没有删，产品视图里看不到。 -->
+    </div>
+
+    <!-- ══════════ 七张能力卡 + 第 8 格状态卡 ══════════
+         每张卡三种形态：可用（a）/ 一体机离线停用（div，仅要出纸的四项）/
+         探测失败暂不开放（div，七项都有）。同一张卡的三个形态在 DOM 里相邻，
+         任一组合下恰好 8 格，栅格不会错位。 -->
+    <div class="hgrid">
+
+      <!-- ① 文档打印（要 MFP） -->
+      <a class="hcard" data-cap="doc" data-when="default first ai-down" data-probe-when="ok" href="06-print-workbench.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="hc-nm">文档打印</span>
+          <span class="chip chip--amber chip--info" data-when="default first">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">PDF、图片上传后设参数打印，A4 黑白 / 彩色、双面可选</span>
+        <span class="hc-st" data-when="default first">可用&nbsp;· 体检与参数都是建议，<b>最终由你按</b></span>
+        <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次没有体检结论，参数由本机自己算</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-when="device-off" data-probe-when="ok">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="hc-nm">文档打印</span>
+          <span class="chip chip--amber chip--info">AI&nbsp;· 仅供参考</span>
+        </span>
+        <span class="hc-no">暂停&nbsp;· 打印扫描一体机离线</span>
+        <span class="hc-st">这台机器出不了纸。文件可以先传上来存着，换一台再打。</span>
+      </div>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="hc-nm">文档打印</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">未取得本机打印能力配置，本机不会创建正式打印任务。</span>
+      </div>
+
+      <!-- ② 手机扫码上传（不经过 MFP，非 AI） -->
+      <a class="hcard" data-cap="phone" data-when="default first ai-down device-off" data-probe-when="ok" href="05-phone-relay.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+          <span class="hc-nm">手机扫码上传</span>
+          <span class="chip chip--info">不依赖 AI</span>
+        </span>
+        <span class="hc-ds">手机或其他联网设备扫码，把文件传到这台机器</span>
+        <span class="hc-st" data-when="default first ai-down">可用&nbsp;· 只是搬运，传完再去「文档打印」设参数</span>
+        <span class="hc-st" data-when="device-off"><b>照常可用</b>&nbsp;· 这一步不经过打印机，传上来先存着</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+          <span class="hc-nm">手机扫码上传</span>
+          <span class="chip chip--info">不依赖 AI</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">连本机能不能接住文件都不确定，先关着，免得白传一趟。</span>
+      </div>
+
+      <!-- ③ 材料扫描（要 MFP：扫描仪就长在这台机器上） -->
+      <a class="hcard" data-cap="scan" data-when="default first ai-down" data-probe-when="ok" href="07-scan-workbench.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="hc-nm">材料扫描</span>
+          <span class="chip chip--amber chip--info" data-when="default first">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">纸质材料扫成 PDF，可打印、可做简历识别</span>
+        <span class="hc-st" data-when="default first">可用&nbsp;· OCR 置信度低会标<b>需人工复核</b></span>
+        <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次不出文字识别结果，纸张照样扫成 PDF</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-when="device-off" data-probe-when="ok">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="hc-nm">材料扫描</span>
+          <span class="chip chip--amber chip--info">AI&nbsp;· 仅供参考</span>
+        </span>
+        <span class="hc-no">暂停&nbsp;· 扫描仪就在这台一体机上</span>
+        <span class="hc-st">打印和扫描是同一台机器，它离线，扫描一起停。</span>
+      </div>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="hc-nm">材料扫描</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">未取得本机扫描能力配置，本机不会创建正式扫描任务。</span>
+      </div>
+
+      <!-- ④ 照片打印（要 MFP）
+           2026-08-11 链接落地整改（Codex (b)-8 / #570）：原指 ?stage=s3&kind=material&title=照片。
+           这一屏没有上传过、也没有生成过任何照片文件，却跳过 P06 第 1 步直接进「参数核价」，
+           还用 title=照片 让打印台开出一张「本次来自：打印扫描服务域首屏 · 照片 · 收到交接」的回执 ——
+           标题不是文件，本机手上根本没有这份材料。改为进 P06 第 1 步（选来源）。
+           Codex (c) 写的是「照片打印 → P06 s1 并预选照片来源」，但已核实 P06 只消费
+           from/kind/title/pages/copies/back，**不读任何来源参数**（06:2225 KEYS 白名单），
+           传 source= 只会是一句目标页听不懂的承诺 —— 按「目标必须真实消费该参数，否则不要传」
+           的口径，这里不传，改成在卡面如实写清「照片和文档走同一条流程、进去自己选图片」。 -->
+      <a class="hcard" data-cap="photo" data-when="default first ai-down" data-probe-when="ok" href="06-print-workbench.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+          <span class="hc-nm">照片打印</span>
+          <span class="chip chip--amber chip--info" data-when="default first">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">和文档打印同一条流程：进去<b>第 1 步选图片</b>（本机上传 / 手机扫码传 / U 盘），再设参数</span>
+        <span class="hc-st" data-when="default first">可用&nbsp;· 彩色与纸张给取舍理由，<b>最终由你按</b></span>
+        <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次没有体检结论，彩色与纸张你自己定</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-when="device-off" data-probe-when="ok">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+          <span class="hc-nm">照片打印</span>
+          <span class="chip chip--amber chip--info">AI&nbsp;· 仅供参考</span>
+        </span>
+        <span class="hc-no">暂停&nbsp;· 同一台打印机</span>
+        <span class="hc-st">照片走文档打印同一条出纸链路，那条停了，这条也出不了。</span>
+      </div>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-image"/></svg></span>
+          <span class="hc-nm">照片打印</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">照片走文档打印同一条门禁，那条没开，这条也开不了。</span>
+      </div>
+
+      <!-- ⑤ 证件照（线上未开放；排版好也要 MFP 出片） -->
+      <a class="hcard" data-cap="idphoto" data-when="default first ai-down" data-probe-when="ok" href="29-id-photo.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
+          <span class="hc-nm">证件照</span>
+          <span class="chip chip--amber chip--info" data-when="default first">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">常见规格证件照排版打印，当前可先用「照片打印」</span>
+        <span class="hc-st" data-when="default first">规格体检与换底&nbsp;· <b>换底是重绘背景，不修改你的脸</b></span>
+        <span class="hc-st" data-when="ai-down">规格体检与换底都要模型，这次给不了</span>
+        <span class="hc-ft"><span class="chip chip--info">尚未开放&nbsp;· 可先了解</span><span class="hc-go">了解详情<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-when="device-off" data-probe-when="ok">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
+          <span class="hc-nm">证件照</span>
+          <span class="chip chip--amber chip--info">AI&nbsp;· 仅供参考</span>
+        </span>
+        <span class="hc-no">尚未开放&nbsp;· 出片也要这台打印机</span>
+        <span class="hc-st">功能本身还没开放；就算排好版，出片也要这台机器。</span>
+      </div>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-idcard"/></svg></span>
+          <span class="hc-nm">证件照</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">尚未开放&nbsp;· 服务状态也无法确认</span>
+        <span class="hc-st">本来就还没开放；现在连本机能力也读不到，说明页同样先关着。</span>
+      </div>
+
+      <!-- ⑥ 格式转换（服务端合成，不经过 MFP） -->
+      <a class="hcard" data-cap="convert" data-when="default first ai-down device-off" data-probe-when="ok" href="08-file-tools.html">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="hc-nm">格式转换</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">多张图片（最多 20 张）合并成一份 PDF，便于打印和存档</span>
+        <span class="hc-st" data-when="default first">可用&nbsp;· 页序与方向只提示，<b>调不调由你按</b></span>
+        <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次没有页序提示，顺序你自己排</span>
+        <span class="hc-st" data-when="device-off"><b>照常可用</b>&nbsp;· 合并不经过打印机，合完先存着</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-layers"/></svg></span>
+          <span class="hc-nm">格式转换</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">合完存不存得下现在答不上来，合并任务先不创建。</span>
+      </div>
+
+      <!-- ⑦ 签名盖章（服务端合成，不经过 MFP）
+           2026-08-11 链接落地整改（Codex (c) 分流表：格式转换 / 签名盖章 → P08「对应首步」）：
+           原指裸 08-file-tools.html，而 P08 默认落 t1「图片转 PDF」—— 点「签名盖章」
+           进去看到的是另一个工具，属于「跳转的不是这个链接承诺的页面」。
+           P08 是三个页签（t1 图片转 PDF / t2 签名盖章 / t3 证件照·未开放），不是线性流程，
+           所以「签名盖章的第一个可操作步骤」就是 t2 本身 → 显式 ?stage=t2。
+           上面第 ⑥ 张「格式转换」对应的正是默认的 t1，保持裸链接不动。 -->
+      <a class="hcard" data-cap="sign" data-when="default first ai-down device-off" data-probe-when="ok" href="08-file-tools.html?stage=t2">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
+          <span class="hc-nm">签名盖章</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-ds">在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）</span>
+        <span class="hc-st" data-when="default first">可用&nbsp;· 落款位只给参考，<b>位置大小由你按</b></span>
+        <span class="hc-st" data-when="ai-down">可用&nbsp;· 这次没有落款位参考，页码方位你自己选</span>
+        <span class="hc-st" data-when="device-off"><b>照常可用</b>&nbsp;· 合成不经过打印机，出纸要换机</span>
+        <span class="hc-ft"><span class="hc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span></span>
+      </a>
+      <div class="hcard hcard--off" data-probe-when="unknown">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
+          <span class="hc-nm">签名盖章</span>
+          <span class="chip chip--amber chip--info" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+          <span class="chip chip--amber chip--info" data-when="ai-down">AI&nbsp;· 已降级</span>
+        </span>
+        <span class="hc-no">暂不开放任务&nbsp;· 服务状态无法确认</span>
+        <span class="hc-st">合成完存不存得下现在答不上来，合成任务先不创建。</span>
+      </div>
+
+      <!-- ⑧ 本机服务配置（状态卡，不是入口）
+           2026-08-11 整改：这是设备运维卡，不是用户能力，原来六格参数 + 两段说明
+           常驻第 8 格，和七张「我能办什么」的卡等重。现在卡面只留一行结论，
+           六格参数与运维说明收进折叠（默认收起，点开才展开）。
+           栅格仍是 8 格，四态 × 探测态的组合都不会错位；内容一条未删。
+           更彻底的做法是整块移到系统状态页 P04，那要改 04-system-states.html，
+           本轮不在允许改动范围内，先按「收折叠」处理。 -->
+      <div class="hcard hcard--stat">
+        <span class="hc-hd">
+          <span class="hc-ic"><svg class="ic"><use href="#i-gear"/></svg></span>
+          <span class="hc-nm">本机服务配置</span>
+          <span class="chip chip--info">不依赖 AI</span>
+        </span>
+
+        <span class="hc-st" data-when="default first ai-down" data-probe-when="ok">纸张、耗材、双面与输稿器<b>在提交任务前确认</b></span>
+        <span class="hc-st" data-when="device-off" data-probe-when="ok">这一台打印扫描一体机离线&nbsp;· <b>上传、转换、签章不受影响</b></span>
+        <!-- 2026-08-11：原来这一态是「一行结论 + 折叠 + 卡尾 chip（用上面的重新检测再试一次）」，
+             三层叠起来超出卡格 26px（自检 内部裁切）。把 chip 那句并进结论行 ——
+             字一个没少，卡也不再被顶出血。 -->
+        <span class="hc-st" data-probe-when="unknown">本机现在读不到设备与耗材状态&nbsp;· <b>不会创建正式任务</b>&nbsp;· 用上面的「重新检测」再试一次</span>
+
+        <details class="stfold">
+        <summary>设备与耗材明细（运维信息）</summary>
+        <div class="stfold-b">
+        <span class="stg" data-when="default first ai-down" data-probe-when="ok">
+          <span><i>打印机</i>后台配置</span>
+          <span><i>扫描</i>后台配置</span>
+          <span><i>纸张</i>A4</span>
+          <span><i>耗材</i>提交前确认</span>
+          <span><i>双面</i>配置支持</span>
+          <span><i>输稿器</i>配置支持</span>
+        </span>
+        <span class="stnote" data-when="default first ai-down" data-probe-when="ok">纸张、耗材、双面与输稿器状态在提交任务前确认。<b>未确认能力不会创建正式打印或扫描任务</b>；费用一律预估。</span>
+
+        <span class="stg" data-when="device-off" data-probe-when="ok">
+          <span><i>打印机</i>离线</span>
+          <span><i>扫描</i>离线</span>
+          <span><i>纸张</i>—</span>
+          <span><i>耗材</i>—</span>
+          <span><i>上传</i>可用</span>
+          <span><i>转换签章</i>可用</span>
+        </span>
+        <span class="stnote" data-when="device-off" data-probe-when="ok">离线的是<b>这一台打印扫描一体机</b>，纸张与耗材跟着读不到；上传、格式转换、签名盖章在服务端做，<b>不受这台机器影响</b>。</span>
+
+        <span class="stnote" data-probe-when="unknown">未取得本机打印扫描能力配置 —— 打印机、扫描、纸张、耗材、双面与输稿器<b>本机现在都读不到</b>，所以一项也不敢说正常。<b>未确认能力不会创建正式任务</b>；费用一律预估。</span>
+        </div>
+        </details>
+
+      </div>
+
+    </div>
+
+    <!-- ══════════ 三张次卡：我的打印记录（不依赖本机设备，四态与探测态都可用） ══════════ -->
+    <div class="glabel">
+      <b>我的打印记录</b>
+      <span data-when="default ai-down">登录后可查看历史记录与凭证</span>
+      <span data-when="first">现在没登录，进去只会看到空的</span>
+      <span data-when="device-off">记录在你账号里&nbsp;· 一体机离线也照常查</span>
+    </div>
+    <div class="qrow">
+      <!-- 2026-08-10 改：原指 23-me.html?view=docs / ?view=orders —— 23 是「我」的域首屏，
+           没有文档明细与订单列表，view 参数也没人消费。改直落资产页对应标签。 -->
+      <a class="qcard" href="42-my-assets.html?stage=docs&amp;from=P39">
+        <span class="qc-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">我的文档</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">已上传 / 生成的文件</span>
+        </span>
+      </a>
+      <a class="qcard" href="42-my-assets.html?stage=orders&amp;from=P39">
+        <span class="qc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">打印订单</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">任务状态与取件凭证码</span>
+        </span>
+      </a>
+      <button class="qcard" type="button" data-open="ovl-fb">
+        <span class="qc-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">异常反馈</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">打印 / 扫描出问题，在这一页填单</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- ══════════ 一条常驻声明：隐私 + 非 CA 电子签 + 价格口径 ══════════ -->
+    <div class="foot">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span>证件照、身份证等敏感文件<b>仅用于本次打印 / 扫描，</b>完成后按隐私策略自动清理，不长期留存；打印前隐私检查会把扫描件与图片交第三方 OCR 服务识别文字。签名盖章是<b>版式合成，</b>不提供 CA 电子签、电子认证或合同签署服务，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。本页<b>不核价、不结算，</b>价格<b>以打印工作台核价与现场公示价为准</b>。</span>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+      <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <!-- 手机传文件：一体机离线时**照常可用**（不经过 MFP）；只有探测失败才关。
+         「问问小青」不在这里重复摆：底部导航第二格就是 AI顾问，同一个去处摆两遍
+         会把提示挤到 8px 宽（见上方 .actionbar-hint 注释）。 -->
+    <a class="btn btn--lg btn--ghost" href="05-phone-relay.html" data-probe-when="ok"><svg class="ic"><use href="#i-phone"/></svg>用手机传文件</a>
+    <button class="btn btn--lg btn--ghost" type="button" disabled data-probe-when="unknown"><svg class="ic"><use href="#i-phone"/></svg>手机传文件&nbsp;· 暂不开放</button>
+
+    <span class="actionbar-hint" data-when="default" data-probe-when="ok">七件事全在这一屏&nbsp;· 标 AI 的结论仅供参考</span>
+    <span class="actionbar-hint" data-when="first" data-probe-when="ok">不登录也能打&nbsp;· 记录留不下，要留在保存那一步再登录</span>
+    <span class="actionbar-hint" data-when="ai-down" data-probe-when="ok">AI 建议暂停&nbsp;· 打印、扫描、上传、合并照常，出纸不受影响</span>
+    <span class="actionbar-hint" data-when="device-off" data-probe-when="ok">打印扫描离线&nbsp;· 上传、转换、签章与记录照常，出纸要换机</span>
+    <!-- 探测失败这一态底栏挤：顶部胶囊、AI 带标题、七张卡都已经写了「服务状态无法确认」，
+         提示里不必再复述一遍，只说这一态还能干什么 -->
+    <span class="actionbar-hint" data-probe-when="unknown">七项暂不开放任务&nbsp;· 记录仍可查</span>
+
+    <a class="btn btn--primary" data-when="default first ai-down" data-probe-when="ok" href="06-print-workbench.html">去文档打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-when="device-off" data-probe-when="ok" href="42-my-assets.html?stage=docs&amp;from=P39">先存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-probe-when="unknown" href="42-my-assets.html?stage=orders&amp;from=P39">去打印订单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <!-- ══════════ 展开层 ①：AI 怎么帮 / 降级后怎么做 ══════════
+       从卡面挪下来的整段说明。卡面只留一行价值 + 一行状态，首屏不再堆七段。 -->
+  <div class="ovl" id="ovl-ai" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-brain"/></svg><b>AI 在这七件事里各干什么</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="ovl-sec">每项写三句：正常时 AI 干什么、AI 挂了怎么办、这台一体机离线时怎么办</div>
+
+      <div class="airow">
+        <span class="ai-nm">文档打印<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>材料体检与参数建议：页数、清晰度、边距，以及该黑白还是彩色。给的是预设，<b>参数最终由你按</b>。</span>
+        <span class="ai-ln"><i>AI 挂了</i>没有体检结论。页数、纸张、份数、双面由本机自己算，<b>照常出纸</b>。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>停</b>。出纸要这台机器；文件可以先传上来存着，换一台再打。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">手机扫码上传<span class="ai-label">不依赖 AI</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>不帮。传文件这一步<b>纯粹是搬运</b>，用不到模型；体检与隐私检查在「文档打印」那一步做。</span>
+        <span class="ai-ln"><i>AI 挂了</i>不受影响。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>照常可用</b>。文件不经过打印机，先传上来存进「我的文档」，换机取回来打。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">材料扫描<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>OCR 识别与置信度：置信度低会标「需人工复核」，<b>不拿低置信文本往下出结论</b>。</span>
+        <span class="ai-ln"><i>AI 挂了</i>不出文字识别结果，纸张<b>照样扫成 PDF</b>，存得下也打得出。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>停</b>。扫描仪就长在这台机器上，它离线，扫描一起没。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">照片打印<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>和文档打印同一套体检，另给彩色与纸张的取舍理由。</span>
+        <span class="ai-ln"><i>AI 挂了</i>没有体检结论，彩色、纸张、份数你自己定，<b>照片照常打</b>。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>停</b>。走的是文档打印同一条出纸链路。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">证件照<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>规格体检与换底：尺寸、人脸位置、底色是否合规；<b>换底是重绘背景，不修改你的脸</b>。</span>
+        <span class="ai-ln"><i>AI 挂了</i>这两项都要模型，给不了 —— 不过<b>功能本身也还没开放</b>，当前可先用「照片打印」。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>停</b>。排好版也要这台机器出片。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">格式转换<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>页序与方向识别：提示哪张像是倒的、顺序像是错的；<b>调不调由你按</b>。</span>
+        <span class="ai-ln"><i>AI 挂了</i>没有页序提示，顺序你自己排，<b>合并成 PDF 照常能办</b>。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>照常可用</b>。合并在服务端做，不经过打印机；合完先存着，出纸换机。</span>
+      </div>
+      <div class="airow">
+        <span class="ai-nm">签名盖章<span class="ai-label ai-label--ai">AI&nbsp;· 仅供参考</span></span>
+        <span class="ai-ln"><i>AI 怎么帮</i>落款位参考：放第几页、哪个方位、多大；<b>位置与大小最终由你按</b>。</span>
+        <span class="ai-ln"><i>AI 挂了</i>没有落款位参考，页码、九宫格方位、大小档你自己选，<b>合成照常</b>。</span>
+        <span class="ai-ln"><i>一体机离线</i><b>照常可用</b>。合成不经过打印机；这是版式合成，<b>不是 CA 电子签</b>。</span>
+      </div>
+
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>知道了</button>
+        <span class="fb-note" style="flex:1;min-width:0">「AI&nbsp;· 已降级」只出现在 ai-down 那一态：<b>标签不会消失</b>，你始终看得出哪几项本来是 AI 能力。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 展开层 ②：异常反馈（页内表单，不再假装 23-me.html 有这个入口） ══════════ -->
+  <div class="ovl" id="ovl-fb" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-alert"/></svg><b>异常反馈</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="ovl-sec">先选一个最接近的问题类型（单选）</div>
+
+      <div class="fbgrid" role="group" aria-label="问题类型">
+        <button type="button" data-fb="nopaper" aria-pressed="false">
+          <span class="fb-t">交了钱没出纸</span><span class="fb-s">任务显示完成，出纸口没东西</span>
+        </button>
+        <button type="button" data-fb="quality" aria-pressed="false">
+          <span class="fb-t">出纸不清楚 / 卡纸</span><span class="fb-s">发虚、条纹、缺角、中途卡住</span>
+        </button>
+        <button type="button" data-fb="scan" aria-pressed="false">
+          <span class="fb-t">扫描失败</span><span class="fb-s">进不了纸、扫出来是空白或歪的</span>
+        </button>
+        <button type="button" data-fb="upload" aria-pressed="false">
+          <span class="fb-t">手机传的文件没收到</span><span class="fb-s">手机说传完了，这台机器看不到</span>
+        </button>
+        <button type="button" data-fb="fee" aria-pressed="false">
+          <span class="fb-t">收费或退款</span><span class="fb-s">多扣、重复扣、该退没退</span>
+        </button>
+        <button type="button" data-fb="other" aria-pressed="false">
+          <span class="fb-t">其他</span><span class="fb-s">上面都不像，人工看一下</span>
+        </button>
+      </div>
+
+      <div class="fb-note" id="fbHint">本机会把<b>当前终端编号、时间、最近一次任务号</b>一起带上；不会上传你的文件内容。</div>
+
+      <div class="fb-done" id="fbDone" hidden>
+        <span class="t" id="fbDoneT">已记下这一条</span>
+        <span class="s">正式环境提交后会<b>立刻返回一个工单号</b>（形如 #F-2231），工单号同时进入「我的&nbsp;· 通知与反馈」，处理结果按工单号推送到你的账号。</span>
+        <span class="s"><b>原型稿不连后端，所以这里不发工单号，也不假造一个。</b>现场急事请找工作人员，不必等工单。</span>
+      </div>
+
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--primary" type="button" id="fbSubmit" disabled>提交反馈</button>
+        <button class="btn btn--lg btn--ghost" type="button" data-close>关闭</button>
+        <span class="fb-note" style="flex:1;min-width:0">打印扫描离线或服务状态无法确认时，这一层<b>照常可用</b> —— 反馈本来就不该依赖那台机器。</span>
+      </div>
+    </div>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<!-- ══ 原型外壳条（.shell 同级）· 评审开关，产品视图不渲染 ══════════════ -->
+<div class="proto-rail" data-review aria-label="评审用：能力探测态切换">
+  <span class="proto-rail-id">评审 · 能力探测</span>
+  <button class="rvbtn" type="button" data-probe-btn="ok">配置已读取</button>
+  <button class="rvbtn" type="button" data-probe-btn="unknown">模拟探测失败</button>
+  <span class="proto-rail-n">原型稿：点页内「重新检测」会直接探测成功，真机以后端返回为准</span>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ① AI 带：三件事 → 四要素建议 + 页内高亮。
+      刻意不做：不跳页、不预填参数、不替用户按下出纸或付款（README §四红线）。 */
+;(function () {
+  var USE = {
+    /* 2026-08-10 AI 落实度审查整改：
+       原来 caps:['doc']、act 写死「多数人要办的是文档打印」——
+       用户什么都没说，页面先给结论，且永远是同一句。
+       现改为：选中这一件 → 弹出真输入行（#useAsk，接 keypad.js），
+       四要素只说「说了才有推荐」，**不点亮任何一张卡**（caps 空数组），
+       接线前绝不替用户先猜一个入口。 */
+    route: {
+      caps: [],
+      ask: true,
+      act: '你选了「不知道该用哪个」 → 在下面那一行说一句你要办的事',
+      why: '<span class="k">理由</span>推荐入口要先知道你手上有什么、想拿到什么，<b>没说之前本机不替你猜</b> —— 上一版在这里写死了一句「多数人要办文档打印」，那不是按你的事推的。<b>待接线：本稿收下这句话但不解析</b>，接线后由后端按它返回入口。',
+      cost: '<span class="k">代价</span>不需要登录；这一行只传你打的字，不读你的文件。纸和耗材要钱，金额在打印工作台核价，<b>本页只给预估口径，不结算</b>。',
+      alt: '<span class="k">备选</span>不想打字：文件在手机里 → 「手机扫码上传」；手上是纸 → 「材料扫描」；一堆图片要拼一份 → 「格式转换」；已经有 PDF → 「文档打印」。'
+    },
+    check: {
+      caps: ['doc', 'photo'],
+      act: '你选了「检查这份文件能不能打」 → 材料体检在「文档打印」第 2 步',
+      why: '<span class="k">理由</span>页数、清晰度、边距、该黑白还是彩色，在设参数之前一次看完，<b>比出到第 7 页才发现糊了省一趟</b>。照片打印走的是同一套体检。',
+      cost: '<span class="k">代价</span>要读一遍文件内容才能体检；结论是参考，<b>参数最终由你按</b>，不满意可以全部改回去。',
+      alt: '<span class="k">备选</span>不想让机器读：跳过体检直接设参数照样能打；先自己在预览里翻一遍也行。'
+    },
+    privacy: {
+      caps: ['doc', 'scan', 'idphoto'],
+      act: '你选了「打印前隐私检查」 → 提示文件里可能有身份证号等敏感信息',
+      why: '<span class="k">理由</span>公共机器旁边有人，身份证、银行卡、社保号被打出来落在出纸口是真会发生的事。检查只做<b>提示</b>，不替你删、不替你打码。',
+      cost: '<span class="k">代价</span>扫描件与图片可能通过第三方 OCR 服务识别文字；敏感文件按隐私策略自动清理，不长期留存。',
+      alt: '<span class="k">备选</span>不想经 OCR：跳过隐私检查直接打，自己看一眼更稳；证件类材料也可以只扫描存文档，先不打印。'
+    }
+  }
+  var screen = document.querySelector('.screen')
+  var act = document.getElementById('useAct')
+  var why = document.getElementById('useWhy')
+  var cost = document.getElementById('useCost')
+  var alt = document.getElementById('useAlt')
+  var ask = document.getElementById('useAsk')
+  if (!screen || !act) return
+
+  screen.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-use]')
+    if (!b) return
+    var d = USE[b.getAttribute('data-use')]
+    if (!d) return
+
+    var picks = screen.querySelectorAll('[data-use]')
+    for (var i = 0; i < picks.length; i++) {
+      picks[i].setAttribute('aria-pressed', picks[i] === b ? 'true' : 'false')
+    }
+    act.textContent = d.act
+    why.innerHTML = d.why
+    cost.innerHTML = d.cost
+    alt.innerHTML = d.alt
+
+    /* 只有「我不知道该用哪个」这一件需要用户先说话，其余两件的输入是文件本身 */
+    if (ask) {
+      if (d.ask) { ask.removeAttribute('hidden') } else { ask.setAttribute('hidden', '') }
+    }
+
+    var cards = screen.querySelectorAll('.hcard[data-cap]')
+    for (var j = 0; j < cards.length; j++) {
+      cards[j].classList.toggle('is-rec', d.caps.indexOf(cards[j].getAttribute('data-cap')) > -1)
+    }
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  })
+})()
+
+/* ② 第五条轴：能力探测态 data-probe = ok | unknown。
+      为什么单开一条轴而不是塞进四态：
+        device-off  = 这台打印扫描一体机确定离线 —— 敢说哪几项停、哪几项照常；
+        probe=unknown = 连能力配置都读不到 —— 什么都不敢承诺，七项一律不开任务。
+      两者是两件事，此前混成一套 UI，把上传 / 转换 / 签章这些纯软件功能一起关了。
+      切换只改 .screen[data-probe]，可见性交给 CSS 属性选择器，
+      所以 v3ApplyVisibility()（只管四态的 hidden）不会被这条轴搅乱。 */
+;(function () {
+  var screen = document.querySelector('.screen')
+  if (!screen) return
+
+  function setProbe (k) {
+    screen.setAttribute('data-probe', k === 'unknown' ? 'unknown' : 'ok')
+    /* 2026-08-11：探测态切换按钮已移到 .screen 之外的原型外壳条，
+       这里改成 document 级查询，否则按钮的选中态点不亮。 */
+    var bs = document.querySelectorAll('[data-probe-btn]')
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-pressed', bs[i].getAttribute('data-probe-btn') === k ? 'true' : 'false')
+    }
+    if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+  }
+  window.v3Probe = setProbe
+
+  /* 委托挂 document：原型外壳条在 .screen 之外，挂 screen 上够不着。 */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-probe-btn]')
+    if (b) setProbe(b.getAttribute('data-probe-btn'))
+  })
+  setProbe(screen.getAttribute('data-probe') || 'ok')
+
+  /* 「重新检测」：还原线上能力探测的第三种处境 —— 加载中。
+     线上三种：检查中(正在确认本机服务配置) / 配置已读取 / 服务状态无法确认。
+     原型不连后端：这里点完直接回到「已读取」，并在按钮旁写明这一点，
+     不假装做了一次真的探测。 */
+  var btn = document.getElementById('probeBtn')
+  var title = document.getElementById('probeTitle')
+  var chip = document.getElementById('probeChip')
+  if (!btn || !title || !chip) return
+  var timer = null
+
+  btn.addEventListener('click', function () {
+    if (timer) return
+    title.textContent = '正在确认本机服务配置'
+    chip.textContent = '检查中'
+    btn.textContent = '正在检查'
+    btn.disabled = true
+    timer = setTimeout(function () {
+      title.textContent = '服务状态无法确认'
+      chip.textContent = '暂不开放任务'
+      btn.textContent = '重新检测'
+      btn.disabled = false
+      timer = null
+      setProbe('ok')
+    }, 1200)
+  })
+})()
+
+/* ③ 展开层：AI 说明 / 异常反馈。
+      关闭态用 hidden，矩形为 0，自检脚本全部跳过。 */
+;(function () {
+  var screen = document.querySelector('.screen')
+  if (!screen) return
+
+  screen.addEventListener('click', function (e) {
+    var op = e.target.closest('[data-open]')
+    if (op) {
+      var t = document.getElementById(op.getAttribute('data-open'))
+      if (t) {
+        t.hidden = false
+        if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+      }
+      return
+    }
+    var cl = e.target.closest('[data-close]')
+    if (cl) {
+      var ovl = cl.closest('.ovl')
+      if (ovl) ovl.hidden = true
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+    }
+  })
+})()
+
+/* ④ 异常反馈：选类型 → 提交 → 说清工单号怎么来。
+      刻意不做：不自造工单号。原型不连后端，编号只能由后端发，
+      本机编一个出来就是在伪造能力（CLAUDE.md §9）。 */
+;(function () {
+  var LABEL = {
+    nopaper: '交了钱没出纸',
+    quality: '出纸不清楚 / 卡纸',
+    scan: '扫描失败',
+    upload: '手机传的文件没收到',
+    fee: '收费或退款',
+    other: '其他'
+  }
+  var wrap = document.getElementById('ovl-fb')
+  if (!wrap) return
+  var submit = document.getElementById('fbSubmit')
+  var done = document.getElementById('fbDone')
+  var doneT = document.getElementById('fbDoneT')
+  var pick = ''
+
+  wrap.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-fb]')
+    if (b) {
+      pick = b.getAttribute('data-fb')
+      var bs = wrap.querySelectorAll('[data-fb]')
+      for (var i = 0; i < bs.length; i++) {
+        bs[i].setAttribute('aria-pressed', bs[i] === b ? 'true' : 'false')
+      }
+      submit.disabled = false
+      done.hidden = true
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+      return
+    }
+    if (e.target.closest('#fbSubmit')) {
+      if (!pick) return
+      doneT.textContent = '已记下：' + (LABEL[pick] || '其他')
+      done.hidden = false
+      submit.disabled = true
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+    }
+  })
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

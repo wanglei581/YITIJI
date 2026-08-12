@@ -15,25 +15,298 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
-  .work--co { grid-template-columns: 1fr 372px; }
+  /* ══════════════════════════════════════════════════════════════
+     2026-08-10 版面重排 — 按 Codex 版面评审的数值规格执行
+     实测起点：企业卡占屏 14.1%、首屏 3 家、可见非可点说明字 661、长说明块 8。
+
+     骨架：全宽业务主体（968px）+ 按需抽屉；
+       筛选条关闭态 76px、占屏 ≤7%，完整筛选走抽屉；
+       企业卡 216px、间距 12px、首屏 5 家；企业卡占整屏 50–56%。
+     Codex 逐页点名要折叠的段落，全部收进页脚/详情的单一折叠区：
+       「企业信息口径」「找到中意企业之后」「名单怎么排」「动作记录」「信到什么程度」。
+     ══════════════════════════════════════════════════════════════ */
+
+  /* 全宽单栏：原 372px 常驻筛选栏取消 */
+  .work--co { grid-template-columns: 1fr; }
+  .work { padding: var(--s-4) var(--gutter); }
+  .wmain { gap: var(--s-4); }
+
+  /* ── 筛选条：关闭态一行 76px ── */
+  .fbar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3);
+    height: 76px; padding: 0 var(--s-4); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .fbar-lb { flex: 0 0 auto; font-size: 20px; color: var(--fog-600); }
+  .fbar-sel { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s-2); }
+  .fbar-sel .fsel { min-height: 56px; font-size: 20px; }
+  .fbar-n {
+    flex: 0 0 auto; display: inline-flex; align-items: center; height: 56px; padding: 0 14px;
+    border-radius: var(--r-xs); border: 1px dashed var(--brd-2);
+    font-size: 20px; color: var(--fog-600);
+  }
+  .fbar-go { flex: 0 0 auto; white-space: nowrap; height: 56px; font-size: 20px; }
+
+  /* ── 企业卡：216px、间距 12px ── */
+  .clist {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  /* 类名不含 card/note/act/pane/row/item：audit-plus 的「卡内溢出」按 [class*=] 选容器 */
+  .cline2 {
+    flex: 0 0 auto; display: flex; align-items: stretch; min-height: 216px;
+    border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+    transition: border-color var(--dur-2) var(--ease-out);
+  }
+  .cline2[hidden] { display: none; }
+  .cline2:hover { border-color: var(--jade-a32); }
+  .cline2-a {
+    flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--s-5);
+    padding: 14px var(--s-5) 14px var(--s-6);
+    text-decoration: none; color: inherit; font-family: var(--ff-ui);
+    border: 0; background: transparent; text-align: left; cursor: pointer;
+    border-radius: var(--r-md) 0 0 var(--r-md);
+  }
+  .cline2-a:active { transform: translateY(1px) scale(.998); }
+  .cline2-a:focus-visible { outline: 3px solid var(--jade-400); outline-offset: -3px; }
   .cologo {
-    width: 56px; height: 56px; border-radius: var(--r-sm); flex: 0 0 auto;
-    display: grid; place-items: center; font-family: var(--ff-display); font-size: var(--fz-6);
+    width: 72px; height: 72px; border-radius: var(--r-sm); flex: 0 0 auto;
+    display: grid; place-items: center; font-family: var(--ff-display); font-size: 32px;
     background: var(--azure-a12); border: 1px solid var(--azure-a20); color: var(--azure-400);
   }
+  .cline2-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .cline2-h { display: flex; align-items: baseline; gap: var(--s-5); }
+  .cline2-nm { font-size: 32px; font-weight: 600; color: var(--fog-900); line-height: 1.2; }
+  .cline2-n { margin-left: auto; flex: 0 0 auto; font-family: var(--ff-num);
+    font-size: 32px; font-weight: 700; color: var(--jade-600); line-height: 1.2; }
+  .cline2-n .u { font-size: 18px; font-weight: 400; color: var(--fog-600); margin-left: 8px; }
+  /* nowrap 是中文禁则要求：这些行用「·」分隔，折行会把「·」甩到行首（自检判缺陷） */
+  .cline2-o, .cline2-m {
+    display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; white-space: nowrap;
+  }
+  .cline2-o { font-size: 22px; color: var(--fog-800); }
+  .cline2-m { font-size: 20px; color: var(--fog-700); }
+  .cline2-o .ic, .cline2-m .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--fog-600); }
+  .cline2-o .sep, .cline2-m .sep { opacity: .4; }
+  .cline2 .srcline { flex-wrap: nowrap; white-space: nowrap; font-size: 18px; }
+  .cline2-arw { width: 26px; height: 26px; flex: 0 0 auto; color: var(--fog-600); }
+  .cline2-fav {
+    flex: 0 0 auto; width: 96px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    border: 0; border-left: 1px solid var(--brd-1); background: transparent;
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+    color: var(--fog-600); font-family: var(--ff-ui); font-size: 18px; cursor: pointer;
+  }
+  .cline2-fav .ic { width: 26px; height: 26px; }
+  .cline2-fav:active { background: var(--fog-a04); }
+  .cline2-fav[aria-pressed="true"] { color: var(--jade-600); }
+
+  /* 0 命中时就地表达，不新增状态位 */
+  .conone { display: flex; flex-direction: column; gap: var(--s-4); align-items: flex-start; }
+
+  /* ── 详情：摘要 / 来源三字段 / 合规句 / 双列 ── */
+  .dsum {
+    flex: 0 0 auto; min-height: 220px; display: flex; flex-direction: column; gap: 12px;
+    padding: var(--s-5) var(--s-6); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .dsum-hd { display: flex; align-items: center; gap: var(--s-4); }
+  .dsum-t { font-family: var(--ff-display); font-size: 42px; line-height: 1.15; color: var(--fog-900); margin: 0; }
+  .dsum-org { font-size: 22px; color: var(--fog-800); }
+  .dsum-row { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+  .srcband {
+    flex: 0 0 auto; display: flex; align-items: center; height: 76px; padding: 0 var(--s-5);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+  }
+  .srcband .srcline { flex-wrap: nowrap; white-space: nowrap; font-size: 20px; }
+  .cband {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 var(--s-5);
+    border-radius: var(--r-sm); background: var(--jade-a08); border: 1px solid var(--jade-a20);
+    font-size: 20px; color: var(--fog-800); white-space: nowrap;
+  }
+  .cband .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .cband b { color: var(--fog-900); }
+  /* ── 2026-08-11 卡内空洞整改 ─────────────────────────────────────────
+     原来 .duo 挂 flex:1 去吃余量：企业简介只有一句话、经营资质只有三个格子，
+     两张卡各被撑到 539px，卡里空 380px（metricsoff 态最坏）。
+     余量给错了人 —— 本页的主内容不是这两张说明卡，是「在招岗位」：
+     动作条的主按钮就写着「看在招岗位」，而那张卡当时只列 2 条，
+     自己还挂着一句「完整 6 条在下面…里逐条列出」的静默截断说明。
+     （页面另一处 AI 文案已经在说「上面 6 个在招岗位照常可看」，与事实不符。）
+     改法：.duo 改为按内容收高，余量全部转给在招岗位那张卡，条目全列。
+     ⚠ 2026-08-11 补记：当时写「六条全列 · 都来自本页已有数据、没有新编任何一条」——
+     **本页已有数据本身就是编的**。那六条里有五条在岗位库（13 / 16）里查无此条，
+     只是它们在本页内部自洽，所以看不出来。**页内自洽不等于真实存在**。
+     现在按主页面口径收到两条真实岗位，详见下面 .dsec--jobs 处的整改注释。 */
+  .duo { flex: 0 0 auto; display: grid; grid-template-columns: 468px 468px; gap: var(--s-6); align-items: start; }
+  .duo .dsec { padding: var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .dsec-t { font-size: 20px; color: var(--fog-600); letter-spacing: .14em; }
+  .duo .dsec-body { font-size: 24px; line-height: 1.6; }
+
   .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); }
   .metric {
     padding: var(--s-4); border-radius: var(--r-sm);
-    background: var(--surf-1); border: 1px solid var(--brd-1);
+    background: var(--surf-2); border: 1px solid var(--brd-1);
     display: flex; flex-direction: column; gap: 4px;
   }
-  .metric b { font-family: var(--ff-num); font-size: var(--fz-6); color: var(--fog-900); font-variant-numeric: tabular-nums; }
-  .metric span { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.4; }
+  .metric b { font-family: var(--ff-num); font-size: 28px; color: var(--fog-900); font-variant-numeric: tabular-nums; }
+  .metric span { font-size: 18px; color: var(--fog-600); line-height: 1.4; }
   .metric-off { border-style: dashed; opacity: .72; }
-  .metric-off b { color: var(--fog-600); font-size: var(--fz-4); }
+  .metric-off b { color: var(--fog-600); font-size: 22px; }
+
+  /* 在招岗位：本页主内容，承接 .duo 让出来的余量 */
+  .dsec--jobs { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .dsec--jobs .jmini { flex: 1 1 auto; min-height: 0; }
+  .jmini { display: flex; flex-direction: column; gap: 10px; }
+  /* 各行平分 .jmini 的高度：min-height 取 56（>48 触控下限），行再按余量长高 ——
+     既填满，也不会把末尾那行来源说明顶到行上面去。
+     2026-08-11：条目从 6 条收到真实的 2 条后，余量由这条 flex:1 自己吃掉，
+     行会长高但内容仍垂直居中（上下留白对称 → 不触发「卡内空洞」那条检查，
+     它对居中构图有豁免）。**不拿内容凑版面**：宁可行高一点，也不补造岗位。 */
+  .jm {
+    flex: 1 1 auto; display: flex; align-items: center; gap: var(--s-4);
+    min-height: 56px; padding: 0 var(--s-5);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: inherit;
+  }
+  .jm-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .jm-t { font-size: 24px; font-weight: 600; color: var(--fog-900); }
+  .jm-m { font-size: 19px; color: var(--fog-700); white-space: nowrap; }
+  .jm-p { flex: 0 0 auto; font-family: var(--ff-num); font-size: 24px; font-weight: 700; color: var(--jade-600); }
+
+  /* 第二屏入口 */
+  .entries { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-4); }
+  .entry {
+    display: flex; align-items: center; gap: 12px; height: 88px; padding: 0 var(--s-5);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: var(--fog-800); font-size: 22px; font-family: var(--ff-ui);
+    cursor: pointer; text-align: left; width: 100%;
+  }
+  .entry:active { transform: scale(.99); }
+  .entry > .ic:first-child { width: 24px; height: 24px; flex: 0 0 auto; color: var(--jade-500); }
+  .entry-t { flex: 1 1 auto; min-width: 0; }
+  .entry > .ic:last-child { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+  .mfold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .mfold > summary { list-style: none; cursor: pointer; height: 88px; display: flex;
+    align-items: center; gap: 12px; padding: 0 var(--s-5); font-size: 22px; color: var(--fog-800); }
+  .mfold > summary::-webkit-details-marker { display: none; }
+  .mfold > summary > .ic:first-child { width: 24px; height: 24px; flex: 0 0 auto; color: var(--jade-500); }
+  .mfold > summary::after { content: '展开'; margin-left: auto; font-family: var(--ff-num);
+    font-size: 18px; color: var(--fog-600); }
+  .mfold[open] > summary::after { content: '收起'; }
+  .mfold-b { padding: 0 var(--s-5) var(--s-5); font-size: 22px; color: var(--fog-700); line-height: 1.6; }
+  .mfold:not([open]) .mfold-b { display: none; }
+
+  /* ── AI 位换事做：「这 6 个在招岗位，哪几个对得上我的简历」（2026-08-10）──
+     旧的「AI 帮你读这家企业」把同屏三件事（规模、岗位分布、想核实什么）
+     换个说法再讲一遍，读完什么都没多知道，也没有下一步 ——
+     那不是 AI 帮忙，是 AI 占位。**没有删这个 AI 位**，是换成它真能干的事：
+     用户站在这里的真问题是「这家的岗位跟我有关系吗」，
+     而本机手上正好有两样东西：会话里的简历 + 本企业在招岗位列表。
+
+     每一行都必须能走出去：档位是结论，「拿这个岗位去逐条比对」是动作。
+     六行占一整排，所以这张折叠卡横跨三列。 */
+  .mfold--wide { grid-column: 1 / -1; }
+  /* 静态导读：收起时占一格（和打印、展位并排成一行），展开才横跨三列。
+     一直放在 1/3 宽里的话，kv 的「规模与定位」会被压成一列三行竖排，读不成句。 */
+  .mfold--flow[open] { grid-column: 1 / -1; }
+  .jfits { display: flex; flex-direction: column; gap: 10px; }
+  .jfit {
+    display: flex; align-items: center; gap: var(--s-4); min-height: 104px;
+    padding: 12px var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: inherit;
+    transition: border-color var(--dur-2) var(--ease-out);
+  }
+  .jfit:hover { border-color: var(--jade-a32); }
+  .jfit:active { transform: translateY(1px) scale(.998); }
+  .jfit-x { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .jfit-h { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: nowrap; white-space: nowrap; }
+  .jfit-t { font-size: 24px; font-weight: 600; color: var(--fog-900); }
+  .jfit-p { font-family: var(--ff-num); font-size: 22px; font-weight: 700; color: var(--jade-600); }
+  .jfit-id { font-family: var(--ff-num); font-size: 17px; color: var(--fog-600); letter-spacing: .03em; }
+  .jfit-r { font-size: 19px; color: var(--fog-700); line-height: 1.5; }
+  .jfit .tier { flex: 0 0 auto; }
+  .jfit .tier-text { font-size: 19px; white-space: nowrap; }
+  .jfit-go {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 var(--s-4); border-radius: var(--r-xs);
+    border: 1px solid var(--glass-2-brd); background: var(--fog-a04);
+    font-size: 19px; color: var(--fog-900); white-space: nowrap;
+  }
+  .jfit-go .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--fog-600); }
+  .jfitnote { margin: var(--s-4) 0 0; font-size: 19px; color: var(--fog-600); line-height: 1.6; }
+  .jfitnote b { color: var(--fog-800); }
+  .jfitgate { display: flex; flex-direction: column; gap: var(--s-4); align-items: flex-start; }
+
+  /* ── 折叠信息条 ── */
+  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
+  .fold > summary { list-style: none; cursor: pointer; min-height: 56px;
+    display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
+    font-size: 20px; color: var(--fog-700); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
+    font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
+  .fold[open] > summary::after { content: '收起'; }
+  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px; color: var(--fog-700); line-height: 1.7; }
+  .fold:not([open]) .fold-b { display: none; }
+  .fold-b .kv { margin-top: 8px; }
+  .fold-b b { color: var(--fog-900); }
+
+  /* ── 页脚：全页唯一一条合规声明 + 唯一一处口径折叠 ── */
+  .cfoot {
+    flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
+    padding: 0 var(--s-4); border-radius: var(--r-md);
+    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  }
+  .cfoot-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+    min-height: 56px; font-size: 20px; color: var(--fog-700); }
+  .cfoot-t > span { white-space: nowrap; }
+  .cfoot-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .cfoot-t b { color: var(--fog-900); }
+  .cfoot .fold { flex: 0 0 auto; width: 300px; border: 0; background: transparent; }
+
+  /* ── 出口行 ── */
+  .exits { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .exit {
+    display: flex; align-items: center; gap: 12px; height: 76px; padding: 0 var(--s-4);
+    border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+    text-decoration: none; color: var(--fog-800); font-size: 20px;
+  }
+  .exit > .ic:first-child { width: 22px; height: 22px; flex: 0 0 auto; color: var(--jade-500); }
+  .exit-t { flex: 1 1 auto; min-width: 0; }
+  .exit > .ic:last-child { width: 20px; height: 20px; flex: 0 0 auto; color: var(--fog-600); }
+
+  /* ── 筛选抽屉 ── */
+  .screen:not(.is-filtering) #filter-sheet { display: none; }
+  #filter-sheet { align-items: end; padding: 0; }
+  #filter-sheet .sheet {
+    max-width: none; width: 100%; height: 800px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .fsheet-b { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: var(--s-5); padding-right: 6px; }
+  #filter-sheet .btn { height: 64px; font-size: 22px; }
+  #filter-sheet .btn--ghost { height: 56px; }
+  .fsearch {
+    width: 100%; min-height: 64px; padding: 0 var(--s-4);
+    border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+    background: var(--surf-1); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-3);
+  }
+  .fsearch::placeholder { color: var(--fog-600); }
+
   /* chip--info：状态标签，非入口（与 P17/P18/P20 同一先例） */
   .chip--info { cursor: inherit; }
+  .chip--label { cursor: inherit; }
+
+  .actionbar .btn--primary { height: 64px; font-size: 22px; }
+  .actionbar .btn--lg { height: 56px; font-size: 20px; }
 </style>
 </head>
 <body>
@@ -50,7 +323,7 @@
       <div class="brand-mark">职</div>
       <div>
         <div class="brand-name">找企业</div>
-        <div class="brand-sub">职易达 · 01 号机 · 来源企业与岗位导览，不是招聘平台</div>
+        <div class="brand-sub">01 号机 · 企业与岗位导览 · 非招聘平台</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
@@ -66,237 +339,480 @@
       <button class="stbtn" data-go="metricsoff"><svg class="ic" style="width:17px;height:17px"><use href="#i-eye"/></svg>指标未开启</button>
       <button class="stbtn" data-go="error"><svg class="ic" style="width:17px;height:17px"><use href="#i-offline"/></svg>加载失败</button>
     </div>
-    <span class="rail-count">企业指标由后台开关控制，关掉时不许装作有数据</span>
+    <span class="rail-count">指标开关关掉时不许装作有数据</span>
   </div>
 
   <div class="work work--co">
-    <!-- ================= 左 ================= -->
     <div class="wmain">
 
-      <!-- 列表 -->
-      <div class="rlist" data-at="list">
-        <div class="notice">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>这里是<b>来源企业与它们在招岗位的导览</b>。本机<b>不代企业收简历、不做候选人筛选、不安排面试</b>；
-            企业信息由来源机构提供并经管理员审核后展示。</span>
-        </div>
+      <!-- ① 筛选：关闭态 76px 一行，完整筛选走抽屉 -->
+      <div class="fbar" data-at="list">
+        <span class="fbar-lb">已选</span>
+        <span class="fbar-sel" data-fbar></span>
+        <button class="btn btn--ghost fbar-go" data-fopen>
+          <svg class="ic"><use href="#i-search"/></svg>筛选 · <b data-fcount>0</b> 项
+        </button>
+      </div>
 
-        <button class="rcard" data-go="detail">
-          <span class="rcard-top">
+      <!-- ② 企业列表：卡片 216px、首屏 5 家 -->
+      <div class="clist" data-at="list">
+
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|天河区" data-co-type="民营企业"
+             data-co-ind="互联网/软件" data-co-size="100–499 人"
+             data-co-recruit="社招 实习" data-co-src="第三方合规平台"
+             data-co-kw="广州科技 互联网 软件 运营 技术 销售 天河">
+          <button class="cline2-a" type="button" data-go="detail">
             <span class="cologo">科</span>
-            <span style="flex:1;min-width:0">
-              <span class="rcard-t">广州××科技有限公司</span>
-              <span class="rcard-org">互联网 · 100–499 人 · 民营 · 天河区</span>
+            <span class="cline2-x">
+              <!-- 2026-08-11 跨页一致性整改：这里原来写 6。详情页列的六条里有五条
+                   （JX-88240 / 88266 / 88301 / 88318 / 88352）在岗位库
+                   （13-jobs-desk / 16-offline-agencies）里根本查不到 ——
+                   用户点「查看岗位」会落到一个查无此条的东西上。
+                   按主页面口径，岗位以 13 / 16 为唯一真源；这家企业在 13 里
+                   真实存在的只有 JX-88214 与 JX-88377 两条，所以计数改 2，
+                   而不是往 13 里补五条 —— 往主页面里加条目就是凭空造数据。 -->
+              <span class="cline2-h"><span class="cline2-nm">广州××科技有限公司</span><span class="cline2-n">2<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">互联网/软件<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 天河区</span>
+              <span class="cline2-m">民营企业<span class="sep">·</span>100–499 人
+                <span class="chip chip--label">运营 / 技术</span>
+                <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 08-08 09:20</span><span class="sep">·</span><span>外部 ID CO-4471</span>
+              </span>
             </span>
-            <span class="rcard-pay"><b>6</b><span>个在招岗位</span></span>
-          </span>
-          <span class="rcard-meta">
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-briefcase"/></svg>运营 / 技术 / 销售</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-pin"/></svg>天河路 ×× 号</span>
-            <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
-          </span>
-          <span class="srcline">
-            <span class="org">来源 前程无忧</span><span class="sep">·</span>
-            <span>同步 8 月 8 日 09:20</span><span class="sep">·</span>
-            <span>外部 ID CO-4471</span>
-          </span>
-        </button>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××科技有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
 
-        <button class="rcard" data-go="detail">
-          <span class="rcard-top">
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|海珠区" data-co-type="民营企业"
+             data-co-ind="文旅传媒" data-co-size="20–99 人"
+             data-co-recruit="社招" data-co-src="人社平台"
+             data-co-kw="广州文化传播 文旅传媒 内容运营 设计 海珠">
+          <button class="cline2-a" type="button" data-go="detail">
             <span class="cologo">文</span>
-            <span style="flex:1;min-width:0">
-              <span class="rcard-t">广州××文化传播有限公司</span>
-              <span class="rcard-org">文化传媒 · 20–99 人 · 民营 · 海珠区</span>
+            <span class="cline2-x">
+              <span class="cline2-h"><span class="cline2-nm">广州××文化传播有限公司</span><span class="cline2-n">2<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">文旅传媒<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 海珠区</span>
+              <span class="cline2-m">民营企业<span class="sep">·</span>20–99 人
+                <span class="chip chip--label">内容运营</span>
+                <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:52</span><span class="sep">·</span><span>外部 ID CO-2210</span>
+              </span>
             </span>
-            <span class="rcard-pay"><b>2</b><span>个在招岗位</span></span>
-          </span>
-          <span class="rcard-meta">
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-briefcase"/></svg>内容运营 / 设计</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-pin"/></svg>海珠区新港东路</span>
-            <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
-          </span>
-          <span class="srcline">
-            <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span>
-            <span>同步 8 月 8 日 08:52</span><span class="sep">·</span>
-            <span>外部 ID CO-2210</span>
-          </span>
-        </button>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××文化传播有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
 
-        <button class="rcard" data-go="detail">
-          <span class="rcard-top">
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|番禺区" data-co-type="上市公司"
+             data-co-ind="智能制造" data-co-size="500 人以上"
+             data-co-recruit="社招 校招 招聘会参展" data-co-src="人社平台"
+             data-co-kw="广州智能制造 工艺 质量 行政 番禺">
+          <button class="cline2-a" type="button" data-go="detail">
             <span class="cologo">制</span>
-            <span style="flex:1;min-width:0">
-              <span class="rcard-t">广州××智能制造股份有限公司</span>
-              <span class="rcard-org">先进制造 · 500–999 人 · 上市 · 番禺区</span>
+            <span class="cline2-x">
+              <span class="cline2-h"><span class="cline2-nm">广州××智能制造股份有限公司</span><span class="cline2-n">11<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">智能制造<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 番禺区</span>
+              <span class="cline2-m">上市公司<span class="sep">·</span>500–999 人
+                <span class="chip chip--label">工艺 / 质量</span>
+                <span class="chip chip--azure chip--label">参加周五招聘会</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:52</span><span class="sep">·</span><span>外部 ID CO-1907</span>
+              </span>
             </span>
-            <span class="rcard-pay"><b>11</b><span>个在招岗位</span></span>
-          </span>
-          <span class="rcard-meta">
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-briefcase"/></svg>工艺 / 质量 / 行政</span>
-            <span><svg class="ic" style="width:15px;height:15px"><use href="#i-fair"/></svg>参加周五招聘会</span>
-            <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
-          </span>
-          <span class="srcline">
-            <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span>
-            <span>同步 8 月 8 日 08:52</span><span class="sep">·</span>
-            <span>外部 ID CO-1907</span>
-          </span>
-        </button>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××智能制造股份有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
 
-        <div class="notice">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>共 46 家已审核企业，显示 12 家。可按行业、规模、区域、是否参加本周招聘会筛选。</span>
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|黄埔区" data-co-type="高新技术企业"
+             data-co-ind="电子信息" data-co-size="100–499 人"
+             data-co-recruit="社招 校招" data-co-src="人社平台"
+             data-co-kw="广州电子 电子信息 硬件 测试 黄埔">
+          <button class="cline2-a" type="button" data-go="detail">
+            <span class="cologo">电</span>
+            <span class="cline2-x">
+              <span class="cline2-h"><span class="cline2-nm">广州××电子信息有限公司</span><span class="cline2-n">4<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">电子信息<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 黄埔区</span>
+              <span class="cline2-m">高新技术企业<span class="sep">·</span>100–499 人
+                <span class="chip chip--label">硬件 / 测试</span>
+                <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 高新区人才驿站</span><span class="sep">·</span><span>同步 08-08 08:30</span><span class="sep">·</span><span>外部 ID CO-3388</span>
+              </span>
+            </span>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××电子信息有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|越秀区" data-co-type="国企"
+             data-co-ind="公共服务" data-co-size="500 人以上"
+             data-co-recruit="校招 招聘会参展" data-co-src="人社平台"
+             data-co-kw="广州公共服务 国企 行政 财务 越秀">
+          <button class="cline2-a" type="button" data-go="detail">
+            <span class="cologo">公</span>
+            <span class="cline2-x">
+              <span class="cline2-h"><span class="cline2-nm">广州××公共服务集团</span><span class="cline2-n">8<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">公共服务<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 越秀区</span>
+              <span class="cline2-m">国企<span class="sep">·</span>500 人以上
+                <span class="chip chip--label">行政 / 财务</span>
+                <span class="chip chip--azure chip--label">参加周五招聘会</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 广州市人才服务中心</span><span class="sep">·</span><span>同步 08-08 08:12</span><span class="sep">·</span><span>外部 ID CO-0925</span>
+              </span>
+            </span>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××公共服务集团">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <div class="cline2" data-co
+             data-co-region="广东省|广州市|白云区" data-co-type="民营企业"
+             data-co-ind="商贸零售" data-co-size="20–99 人"
+             data-co-recruit="社招 兼职" data-co-src="第三方合规平台"
+             data-co-kw="广州商贸 零售 店长 导购 白云">
+          <button class="cline2-a" type="button" data-go="detail">
+            <span class="cologo">贸</span>
+            <span class="cline2-x">
+              <span class="cline2-h"><span class="cline2-nm">广州××商贸有限公司</span><span class="cline2-n">3<span class="u">个在招岗位</span></span></span>
+              <span class="cline2-o">商贸零售<span class="sep">·</span><svg class="ic"><use href="#i-pin"/></svg>广州 · 白云区</span>
+              <span class="cline2-m">民营企业<span class="sep">·</span>20–99 人
+                <span class="chip chip--label">店长 / 导购</span>
+                <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>岗位在来源平台</span>
+              </span>
+              <span class="srcline">
+                <span class="org">来源 58 同城</span><span class="sep">·</span><span>同步 08-08 07:58</span><span class="sep">·</span><span>外部 ID CO-6612</span>
+              </span>
+            </span>
+            <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+          </button>
+          <button class="cline2-fav" type="button" aria-pressed="false" aria-label="收藏：广州××商贸有限公司">
+            <svg class="ic"><use href="#i-bookmark"/></svg>收藏
+          </button>
+        </div>
+
+        <!-- 0 命中时就地表达，不新增状态位；三个动作都真的改抽屉里的条件 -->
+        <div class="notice notice--amber conone" data-conone hidden>
+          <span><b>这些条件同时满足的企业，这一刻一家也没有。</b>当前条件：<b data-cocond>未设条件</b>。</span>
+          <span style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn--ghost" data-corelax="region">地区放宽到整个广州市</button>
+            <button class="btn btn--ghost" data-corelax="ind">去掉行业条件</button>
+            <button class="btn btn--primary" data-corelax="all">清空全部条件</button>
+          </span>
         </div>
       </div>
 
-      <!-- 2026-08-09 留白复核补实：list 态列表下方原有 ~720px 无容器空洞。
-           补企业信息口径卡（真实边界）+ 同域互通入口（真 <a>）。不新造企业数据。 -->
-      <div class="pane" data-at="list">
-        <div class="pane-hd"><span class="t">这里的企业信息是什么口径</span><span class="s">看之前先知道</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">信息来自</span><span class="v">来源平台与企业公开资料，经管理员审核后展示</span></div>
-          <div class="kv-row"><span class="k">经营指标</span><span class="v">受后台开关控制；关闭时不显示，也不编造</span></div>
-          <div class="kv-row"><span class="k">在招岗位数</span><span class="v">按最近同步计算，投递仍在来源平台完成</span></div>
-          <div class="kv-row"><span class="k">本机不做</span><span class="v">代收简历 · 候选人筛选 · 面试邀约</span></div>
-        </div>
-        <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-          展示不代表本机对企业的评价或推荐。求职决策前，建议以来源平台与官方公示信息为准。
-        </p>
+      <!-- ③ 出口 -->
+      <div class="exits" data-at="list">
+        <a class="exit" href="13-jobs-desk.html">
+          <svg class="ic"><use href="#i-briefcase"/></svg>
+          <span class="exit-t">按岗位找</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <a class="exit" href="16-offline-agencies.html">
+          <svg class="ic"><use href="#i-agency"/></svg>
+          <span class="exit-t">线下服务机构</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
+        <a class="exit" href="17-fair-desk.html">
+          <svg class="ic"><use href="#i-fair"/></svg>
+          <span class="exit-t">招聘会 · 看展位</span>
+          <svg class="ic"><use href="#i-arrowRight"/></svg>
+        </a>
       </div>
 
-      <div class="xlane" data-at="list">
-        <span class="xlane-hd">不想按企业翻，这两条路也通</span>
-        <div class="xlane-row">
-          <a class="xlane-go" href="16-offline-agencies.html">
-            <span class="src-ic"><svg class="ic"><use href="#i-agency"/></svg></span>
-            <span class="xlane-tx">
-              <span class="xlane-nm">线下服务机构</span>
-              <span class="xlane-ds">7 家已审核 · 含官方公共就业服务机构，到店咨询指引</span>
-            </span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-          <a class="xlane-go" href="17-fair-desk.html">
-            <span class="src-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
-            <span class="xlane-tx">
-              <span class="xlane-nm">招聘会</span>
-              <span class="xlane-ds">看哪些企业设展位，现场直接面对面聊</span>
-            </span>
-            <svg class="ic"><use href="#i-arrowRight"/></svg>
-          </a>
-        </div>
-      </div>
-
-      <!-- 详情（指标开启 / 未开启共用同一版面） -->
+      <!-- ══════════ 详情（指标开启 / 未开启共用同一版面） ══════════ -->
       <div class="detail" data-at="detail metricsoff">
-        <div class="dhead">
-          <div class="dhead-row">
-            <span class="cologo" style="width:64px;height:64px;font-size:var(--fz-7)">科</span>
+
+        <div class="dsum">
+          <div class="dsum-hd">
+            <span class="cologo">科</span>
             <span>
-              <h1 class="dhead-t" style="font-size:var(--fz-8)">广州××科技有限公司</h1>
-              <span class="dhead-org">互联网 · 100–499 人 · 民营 · 成立 2016 年</span>
+              <h1 class="dsum-t">广州××科技有限公司</h1>
+              <span class="dsum-org">互联网 · 100–499 人 · 民营 · 成立 2016 年</span>
             </span>
           </div>
-          <div class="dhead-row">
-            <span class="chip chip--azure chip--info">6 个在招岗位</span>
+          <div class="dsum-row">
+            <span class="chip chip--azure chip--info">2 个在招岗位</span>
             <span class="chip chip--info" data-at="detail">参加周五招聘会 · 展位 B-12</span>
             <span class="chip chip--info">天河区天河路 ×× 号</span>
           </div>
         </div>
 
-        <div class="dsec">
-          <div class="dsec-t">企业简介</div>
-          <div class="dsec-body">
-            主营企业服务软件的研发与运营，客户以华南地区中小企业为主。
-            <span style="font-size:var(--fz-2);color:var(--fog-600)">
-              简介由来源机构提供，本机<b>未做核实</b>，也不代表本机对该企业的评价或推荐。
-            </span>
+        <div class="srcband">
+          <div class="srcline">
+            <span class="org">来源机构 前程无忧</span><span class="sep">·</span>
+            <span>同步时间 2026-08-08 09:20</span><span class="sep">·</span>
+            <span>外部 ID CO-4471</span>
           </div>
         </div>
 
-        <div class="dsec">
-          <div class="dsec-t">经营与资质信息</div>
-          <div class="metrics" data-at="detail">
-            <div class="metric"><b>2016</b><span>成立年份</span></div>
-            <div class="metric"><b>100–499</b><span>人员规模<br>来源机构填报</span></div>
-            <div class="metric"><b>正常</b><span>登记状态<br>来源机构填报</span></div>
-          </div>
-          <div class="metrics" data-at="metricsoff">
-            <div class="metric metric-off"><b>未开启</b><span>成立年份</span></div>
-            <div class="metric metric-off"><b>未开启</b><span>人员规模</span></div>
-            <div class="metric metric-off"><b>未开启</b><span>登记状态</span></div>
-          </div>
-          <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65" data-at="detail">
-            以上为<b>来源机构填报</b>的信息，不是本机的工商核验结果。求职前建议自行核对企业资质。
-          </p>
-          <div class="notice notice--amber" data-at="metricsoff" style="margin-top:10px">
-            <svg class="ic"><use href="#i-alert"/></svg>
-            <span><b>本机未开启企业指标展示</b>（后台开关关闭）。这里<b>不用来源数据凑几个数字充版面</b>——
-              没开启就是没开启。岗位信息与招聘会展位不受影响，照常可看。</span>
-          </div>
+        <div class="cband">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>投递在来源平台完成 · <b>本机不代收简历</b>、不做企业筛选与面试邀约</span>
         </div>
 
-        <div class="dsec">
-          <div class="dsec-t">在招岗位 · 6 个</div>
-          <div class="rlist" style="overflow:visible">
-            <a class="rcard" href="14-job-detail.html" style="padding:var(--s-4) var(--s-5)">
-              <span class="rcard-top">
-                <span style="flex:1"><span class="rcard-t" style="font-size:var(--fz-4)">用户运营专员</span>
-                  <span class="rcard-org" style="font-size:var(--fz-2)">天河区 · 1–3 年 · 本科</span></span>
-                <span class="rcard-pay"><b style="font-size:var(--fz-4)">6–9K</b><span>来源平台公示</span></span>
-              </span>
-              <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 09:20</span><span class="sep">·</span><span>外部 ID JX-88214</span></span>
-            </a>
-            <a class="rcard" href="14-job-detail.html" style="padding:var(--s-4) var(--s-5)">
-              <span class="rcard-top">
-                <span style="flex:1"><span class="rcard-t" style="font-size:var(--fz-4)">前端开发工程师</span>
-                  <span class="rcard-org" style="font-size:var(--fz-2)">天河区 · 3–5 年 · 本科</span></span>
-                <span class="rcard-pay"><b style="font-size:var(--fz-4)">12–18K</b><span>来源平台公示</span></span>
-              </span>
-              <span class="srcline"><span class="org">来源 前程无忧</span><span class="sep">·</span><span>同步 09:20</span><span class="sep">·</span><span>外部 ID JX-88301</span></span>
-            </a>
-            <div class="notice" style="margin-top:2px">
-              <svg class="ic"><use href="#i-info"/></svg>
-              <span>还有 4 个岗位。点任一岗位看详情，投递在来源平台自己完成。</span>
+        <div class="duo">
+          <div class="dsec">
+            <div class="dsec-t">企业简介</div>
+            <div class="dsec-body">主营企业服务软件的研发与运营，客户以华南地区中小企业为主。</div>
+          </div>
+          <div class="dsec">
+            <div class="dsec-t">经营与资质信息</div>
+            <div class="metrics" data-at="detail">
+              <div class="metric"><b>2016</b><span>成立年份</span></div>
+              <div class="metric"><b>100–499</b><span>人员规模</span></div>
+              <div class="metric"><b>正常</b><span>登记状态</span></div>
+            </div>
+            <div class="metrics" data-at="metricsoff">
+              <div class="metric metric-off"><b>未开启</b><span>成立年份</span></div>
+              <div class="metric metric-off"><b>未开启</b><span>人员规模</span></div>
+              <div class="metric metric-off"><b>未开启</b><span>登记状态</span></div>
             </div>
           </div>
         </div>
 
-        <div class="dsec">
-          <div class="dsec-t">数据来源</div>
-          <div class="srcline srcline--detail">
-            <span class="org">来源机构：前程无忧</span><span class="sep">·</span>
-            <span>同步时间：2026-08-08 09:20</span><span class="sep">·</span>
-            <span>外部 ID：CO-4471</span>
+        <!-- ── 2026-08-11 跨页一致性整改 ──────────────────────────────────
+             上一版这里列六条，其中五条（JX-88240 / 88266 / 88301 / 88318 / 88352）
+             **在岗位库里根本不存在** —— 13-jobs-desk 与 16-offline-agencies 一条都查不到。
+             用户在企业页看到「6 个在招岗位」，点进去落到查无此条的东西上，
+             他会开始怀疑这台机器上所有的数字。这一类矛盾最伤信任。
+
+             按主页面口径（岗位的唯一真源是 13 / 16）：这家企业在 13 里真实存在的
+             只有两条 —— JX-88214 用户运营专员、JX-88377 运营实习生。
+             所以这里**只列这两条**，字段（岗位名 / 薪资 / 区域 / 经验 / 学历 /
+             来源 / 同步时间）逐字对齐 13-jobs-desk，不往主页面里补造五条。
+
+             两条的同步时间不同（09:20 与 09:18），所以来源与同步改成**逐行写**，
+             不再用一句「六条同来源 · 同步 09:20」把两个不同的时间抹平。
+             卡里空出来的高度由 .jm 的 flex:1 自己吃掉（行会长高），
+             不需要拿内容凑版面。 -->
+        <div class="dsec dsec--jobs">
+          <div class="dsec-t">在招岗位 · 本机同步到 2 个</div>
+          <div class="jmini">
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">用户运营专员</span>
+                <span class="jm-m">全职 · 广州 · 天河区 · 1–3 年 · 本科</span>
+                <span class="jm-m">来源 前程无忧 · 同步 08-08 09:20 · 外部 ID JX-88214</span></span>
+              <span class="jm-p">6–9K</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="jm" href="14-job-detail.html">
+              <span class="jm-x"><span class="jm-t">运营实习生</span>
+                <span class="jm-m">实习 · 广州 · 天河区 · 经验不限 · 大专在读及以上</span>
+                <span class="jm-m">来源 前程无忧 · 同步 08-08 09:18 · 外部 ID JX-88377</span></span>
+              <span class="jm-p">150–200 元/天</span>
+              <svg class="ic cline2-arw"><use href="#i-arrowRight"/></svg>
+            </a>
           </div>
-          <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-            本机<b>不是</b>该企业的招聘代理，也不代其收取简历或安排面试。企业与岗位信息经管理员审核后展示；
-            如与来源平台不一致，以来源平台为准。
-          </p>
+          <p class="jfitnote">这两条是<b>本机已同步并审核通过</b>的全部。这家企业在来源平台上还有没有别的岗位，<b>本机不掌握，也不猜</b>——以来源平台公示为准。经验与学历只显示来源方给了的那几条，<b>没给的不替它补</b>。</p>
         </div>
 
-        <!-- 2026-08-09 留白复核补实：detail / metricsoff 态正文下方原有 ~440–470px 无容器空洞。
-             补「看完企业之后」的真实路径口径：路径都指向页面上已有的入口，不新增假动作。 -->
-        <div class="dsec" data-at="detail metricsoff">
-          <div class="dsec-t">找到中意企业之后</div>
-          <div class="kv">
-            <div class="kv-row"><span class="k">想投岗位</span><span class="v">点上方在招岗位进详情，扫码在来源平台完成投递</span></div>
-            <div class="kv-row"><span class="k">想当面聊</span><span class="v" data-at="detail">周五招聘会 B-12 展位，右侧有入口</span><span class="v" data-at="metricsoff">看该企业是否参加招聘会，以招聘会页展位信息为准</span></div>
-            <div class="kv-row"><span class="k">材料准备</span><span class="v">简历可在本机打印带去；现场投递把简历直接交给企业的人</span></div>
-            <div class="kv-row"><span class="k">先比一比</span><span class="v">右侧「和你的简历比」按在招岗位给三档参考——要有简历才比，不给百分比</span></div>
-          </div>
-          <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-            无论走哪条路，投递都发生在来源平台或招聘会现场——本机不代收简历，也不会替你联系企业。
-          </p>
+        <!-- 第二屏入口：岗位对得上吗（AI · 原位展开）/ 信息导读（静态）/ 打印 / 招聘会展位 -->
+        <div class="entries">
+
+          <!-- ═══ AI 位 · 换成它真能帮上忙的事（2026-08-10）═══════════════════
+               旧版这里是「AI 帮你读这家企业」，三行 kv 全部复述同屏已有信息：
+               规模与定位 ← 上面的 dsum-org；岗位分布 ← 上面的「在招岗位」计数；
+               你可能想核实 ← 一段通用提醒。读完不知道多了什么，也没有下一步 ——
+               **AI 位在，但没在干活。**
+
+               换成用户站在这块屏前真正想知道的那一件事：
+               「这家的岗位，跟我有关系吗。」这件事本机做得了：
+               输入是会话里的简历（E1）+ 本企业在招岗位列表（E2），
+               输出是三档参考 + 每条一句理由，出口是拿它去逐条比对。
+               三档不打百分比、不预测录用 —— 这是全站硬红线，不是本页的选择。
+
+               ── 接线契约（交 Codex）─────────────────────────────────────
+               · 需要的输入：
+                   resumeId（当前会话简历；未登录时用本次会话内的简历，离场即清）
+                   + companyId + jobs[]（本企业**已审核通过且在发布中**的在招岗位，
+                     每条带 externalId / title / salaryText / jdText / syncedAt）。
+                   jobs 必须来自与页面同一次查询，不许另取一份 —— 两份会数不一样。
+               · 需要的输出：
+                   matches: [{ externalId, tier, reason }]
+                   tier ∈ 'high' | 'mid' | 'low'（**只有三档**）；
+                   reason 为一句话，必须点名**岗位正文里的哪个要求**与
+                   **简历里有没有对应原文**，不许写「比较适合你」这类空话。
+                   **禁止字段**：score、percent、matchRate、rank、录用概率 ——
+                   接口层就不给，前端才没得渲染。
+               · 排序：high → mid → low；同档按 jobs[] 原顺序，不二次排序。
+               · 覆盖：**必须每条岗位都给一档**。给不出的那条要如实标出来，
+                   不许静默丢掉 —— 少一条，用户会以为那条不存在。
+               · 动作：每行跳
+                   11-jobfit-compare.html?stage=s1&need=job&from=P15&jobId=<externalId>&jobTitle=<title>
+                   P11 已经消费这四个参数：命中它自己的岗位白名单就替用户选好，
+                   没命中就如实说「本机没有这一条的原文」；from=P15 让 P11 的带入条
+                   写成「从企业详情带来」而不是默认的「从招聘会现场带来」
+                   （P11 的 FROM_SRC 表里已有 P15 这一项）。
+                   **这里不做白名单预判**，把判断留给 P11 一处，免得两边口径分叉。
+               · 失败 / 不可用怎么降级：
+                   － 没有简历（first）→ **不出任何档位**，如实拦住并给「先做一份简历」；
+                   － AI 服务中断（ai-down）→ 整块不出结论，也**不放缓存的旧结论**；
+                     企业简介、经营信息、在招岗位照常可看；
+                   － 岗位列表为空 → 整块不渲染（连折叠条都不出）；
+                   － 模型返回里带了分数或百分比 → 服务端**丢弃整个响应**并按中断处理，
+                     不做「去掉百分比再展示」的兜底：那等于默许模型越线。
+               · 记录：本次解读记进「我的 · AI 服务记录」；
+                   **不记录**你看了哪家企业给企业方，企业侧拿不到任何信号。 -->
+          <details class="mfold mfold--wide" data-at="detail">
+            <summary>
+              <svg class="ic"><use href="#i-brain"/></svg>
+              这 2 个在招岗位，哪个对得上我的简历
+              <span class="ev ev--e3" data-when="default device-off">E3 仅供参考</span>
+              <span class="ev ev--e1" data-when="first">E1 还没有你的材料</span>
+            </summary>
+            <div class="mfold-b">
+
+              <div data-when="default device-off">
+                <div class="jfits">
+                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88214&amp;jobTitle=用户运营专员">
+                    <span class="jfit-x">
+                      <span class="jfit-h"><span class="jfit-t">用户运营专员</span><span class="jfit-p">6–9K</span><span class="jfit-id">外部 ID JX-88214</span></span>
+                      <span class="jfit-r">岗位正文要的社群维护、活动策划，你的简历原文里都写过；差的是 SQL 取数那条的证据</span>
+                    </span>
+                    <span class="tier tier--high"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：较高</span></span>
+                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+                  </a>
+
+                  <!-- 2026-08-11 跨页一致性整改：这一块原来也是六条，与上面的
+                       在招岗位列表一一对应，同样有五条在岗位库里查不到。
+                       现在只对本机真有的两条给档位 —— 覆盖规则「每条岗位都要给一档」
+                       仍然成立，因为岗位列表本身就只有两条。 -->
+                  <a class="jfit" href="11-jobfit-compare.html?stage=s1&amp;need=job&amp;from=P15&amp;jobId=JX-88377&amp;jobTitle=运营实习生">
+                    <span class="jfit-x">
+                      <span class="jfit-h"><span class="jfit-t">运营实习生</span><span class="jfit-p">150–200 元/天</span><span class="jfit-id">外部 ID JX-88377</span></span>
+                      <span class="jfit-r">运营方向和你写过的经历同一条线；但来源方给的学历要求是「大专在读及以上」，你的简历里没有在读这一条</span>
+                    </span>
+                    <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
+                    <span class="jfit-go">拿这个岗位去逐条比对<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+                  </a>
+                </div>
+
+                <p class="jfitnote">
+                  两条逐行标了来源与同步时间（<b>前程无忧 · 08-08 09:20 / 09:18</b>），外部 ID 见各行。
+                  这两条是本机同步到的全部，<b>不代表这家企业在来源平台上只招两个岗位</b>。<br>
+                  <b>档位不是排名，也不是录用可能性。</b>它只说你的简历原文和这条岗位正文对不对得上——
+                  「偏低」不等于不能投，「较高」也不等于会被约。真正的逐条依据在下一步，
+                  <b>投递仍在来源平台完成，本机不代收简历</b>。
+                  <span data-when="device-off">打印机离线不影响这一段：比对与跳转都不用打印。</span>
+                </p>
+              </div>
+
+              <div data-when="first">
+                <div class="jfitgate">
+                  <span><b>还没有你的简历，这一条比不出来。</b>
+                    「哪几个对得上」要拿你的简历原文去对岗位正文——没有前一半，
+                    本机<b>不会凭岗位名猜一个档位给你</b>，那样的档位没有依据。</span>
+                  <a class="btn btn--primary" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先做一份简历</a>
+                  <span>企业简介、经营信息与上面 2 个在招岗位<b>照常可看</b>，也可以直接点岗位进详情、去来源平台办理。</span>
+                </div>
+              </div>
+
+              <div data-when="ai-down">
+                <b>比对服务中断，这里不给档位，也不放缓存的旧结论。</b>
+                企业简介、经营信息与在招岗位照常可看；故障已自动上报。
+                恢复后这里会按你的简历，对这 2 条各给一档参考和一句理由。
+              </div>
+            </div>
+          </details>
+
+          <!-- ═══ 原「AI 帮你读这家企业」的三行导读 · 降级为静态说明 ═══════════
+               内容一字未删，只做两件事：摘掉 AI 标签、换成不带 brain 图标的标题。
+               它本来就没用到模型 —— 三行全部来自同屏已展示的字段，
+               挂 AI 标签是在给静态排版贴一个它没做过的功劳。
+               静态说明不需要接线契约：没有输入、没有输出、没有降级，
+               它在四态下都一样，AI 挂掉也不影响。 -->
+          <details class="mfold mfold--flow" data-at="detail">
+            <summary>
+              <svg class="ic"><use href="#i-eye"/></svg>
+              这一页的信息怎么读
+            </summary>
+            <div class="mfold-b">
+              <div class="kv">
+                <div class="kv-row"><span class="k">规模与定位</span><span class="v">按填报口径，互联网行业百人规模的中型公司，主营企业服务软件</span></div>
+                <div class="kv-row"><span class="k">岗位分布</span><span class="v">本机同步到的 2 个都在运营方向，一个全职一个实习；不代表该企业只招运营</span></div>
+                <div class="kv-row"><span class="k">你可能想核实</span><span class="v">社保公积金缴纳口径、试用期约定——可在来源平台或面谈时确认</span></div>
+              </div>
+              以上只是把本页已展示的信息<b>重新组织</b>了一遍，不是风评，也不构成该不该投、该不该入职的判断。
+              <b>这一段不经过任何模型</b>，四态下都一样。
+            </div>
+          </details>
+          <details class="mfold" data-at="metricsoff">
+            <summary>
+              <svg class="ic"><use href="#i-eye"/></svg>
+              为什么指标是「未开启」
+            </summary>
+            <div class="mfold-b">
+              <b>本机未开启企业指标展示</b>（后台开关关闭）。这里<b>不用来源数据凑几个数字充版面</b>——没开启就是没开启。
+              指标未开启时 AI 解读也一并不给：指标都不展示，解读更不该有。岗位信息与招聘会展位不受影响，照常可看。
+            </div>
+          </details>
+          <a class="entry" href="06-print-workbench.html?stage=s3&amp;from=P15&amp;kind=job-list&amp;title=企业与岗位信息" data-when="default first ai-down">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="entry-t">打印企业与岗位信息</span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <button class="entry" type="button" aria-disabled="true" data-when="device-off">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="entry-t">打印机离线</span>
+          </button>
+          <a class="entry" href="17-fair-desk.html">
+            <svg class="ic"><use href="#i-fair"/></svg>
+            <span class="entry-t">招聘会 · B-12 展位</span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
         </div>
+
+        <!-- Codex 点名的五段口径全部收进这一个折叠区，原文一字不删 -->
+        <details class="fold">
+          <summary>口径：信息从哪来 · 信到什么程度 · 找到中意企业之后 · 记录什么</summary>
+          <div class="fold-b">
+            <b>信息从哪来。</b>简介与规模由来源机构填报，本机<b>未做核实</b>，也不代表本机对该企业的评价或推荐。
+            经营指标受后台开关控制，开启时展示的也是<b>填报口径，不是本机的工商核验结果</b>；关闭时不显示，也不编造。
+            在招岗位与展位不受指标开关影响。有出入时以来源平台与官方公示为准；做决定前建议在
+            「国家企业信用信息公示系统」自行核对，本机替代不了官方核验。
+            <b>找到中意企业之后。</b>
+            <div class="kv">
+              <div class="kv-row"><span class="k">想投岗位</span><span class="v">点上方在招岗位进详情，扫码在来源平台完成办理</span></div>
+              <div class="kv-row"><span class="k">想当面聊</span><span class="v">看该企业是否参加招聘会，以招聘会页展位信息为准</span></div>
+              <div class="kv-row"><span class="k">材料准备</span><span class="v">简历可在本机打印带去；现场把简历直接交给企业的人</span></div>
+              <div class="kv-row"><span class="k">联系方式</span><span class="v">本机不提供企业联系方式，也不代你投递</span></div>
+            </div>
+            <b>记录什么。</b>只记浏览与打开来源平台两件事。登录后记在本企业页的浏览记录里；未登录只留本次会话，离场即清。
+            企业那边不会收到「你看过它」的通知——看谁、比谁，是你自己的事。
+          </div>
+        </details>
       </div>
 
       <!-- 加载失败 -->
       <div class="blank" data-at="error">
         <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
         <b>企业数据没取到</b>
-        <p>本机与企业数据源连接失败，<b>不是你的操作问题</b>，已自动上报。<br>
-          <b>不显示上次缓存的企业与岗位</b>——企业可能已经停止招聘，你按旧数据跑一趟是白跑。</p>
+        <p>与企业数据源连接失败，<b>不是你的操作问题</b>，已自动上报。</p>
         <div class="acts">
           <button class="btn btn--primary">重试</button>
           <a class="btn btn--ghost" href="13-jobs-desk.html">按岗位找</a>
@@ -304,178 +820,147 @@
         </div>
       </div>
 
-      <!-- 2026-08-09 留白复核补实：error 态底部原为无容器空洞。
-           把 blank 页脚一行小字的故障事实挪成结构化档案卡，不新造数据。 -->
-      <div class="pane" data-at="error">
-        <div class="pane-hd"><span class="t">故障档案</span><span class="s">给你看，也给运维看</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 09:20</span></div>
-          <div class="kv-row"><span class="k">失败发生</span><span class="v">10:46</span></div>
-          <div class="kv-row"><span class="k">自动重试</span><span class="v">已试 2 次，仍失败</span></div>
-          <div class="kv-row"><span class="k">上报</span><span class="v">已自动上报运维，无需你操作</span></div>
-        </div>
+      <div data-at="error" style="flex:0 0 auto">
+        <details class="fold">
+          <summary>故障档案 · 影响范围 · 为什么不显示缓存</summary>
+          <div class="fold-b">
+            <b>不显示上次缓存的企业与岗位</b>——企业可能已经停止招聘，你按旧数据跑一趟是白跑。
+            <div class="kv">
+              <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 09:20</span></div>
+              <div class="kv-row"><span class="k">失败发生</span><span class="v">10:46 · 已自动重试 2 次</span></div>
+              <div class="kv-row"><span class="k">收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
+              <div class="kv-row"><span class="k">招聘会信息</span><span class="v">独立入口 · 照常可看</span></div>
+              <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+            </div>
+            恢复后名单自动回来，<b>不用你重新筛选</b>。投递在来源平台完成，本机不代收简历。
+          </div>
+        </details>
+      </div>
+
+      <!-- ④ 页脚：全页唯一一条合规声明（列表态）+ 名单口径折叠 -->
+      <div class="cfoot" data-at="list">
+        <span class="cfoot-t">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>投递在来源平台完成 · <b>本机不代收简历</b>、不做企业筛选与面试邀约</span>
+        </span>
+        <details class="fold">
+          <summary>名单口径与记录范围</summary>
+          <div class="fold-b">
+            这里是<b>来源企业与它们在招岗位的导览</b>，企业信息由来源机构提供并经管理员审核后展示；
+            展示不代表本机对企业的评价或推荐。
+            <div class="kv">
+              <div class="kv-row"><span class="k">收录</span><span class="v">46 家，全部经管理员审核</span></div>
+              <div class="kv-row"><span class="k">排序</span><span class="v">按同步时间与你的筛选条件，不卖排名</span></div>
+              <div class="kv-row"><span class="k">企业付费</span><span class="v">不影响展示顺序，也买不到「推荐」标签</span></div>
+              <div class="kv-row"><span class="k">经营指标</span><span class="v">受后台开关控制；关闭时不显示，也不编造</span></div>
+              <div class="kv-row"><span class="k">在招岗位数</span><span class="v">按最近同步计算，办理仍在来源平台完成</span></div>
+              <div class="kv-row"><span class="k">最近同步</span><span class="v">8 月 8 日 09:20 · 当前条件下显示 <b data-cocount>6</b> 家</span></div>
+            </div>
+            只记<b>浏览</b>与<b>打开来源平台</b>两件事。登录后记在本企业页的浏览记录里；未登录只留本次会话，离场即清。
+          </div>
+        </details>
       </div>
     </div>
+  </div>
 
-    <!-- ================= 右 ================= -->
-    <div class="wside">
+  <!-- ══════════ 筛选抽屉 ══════════ -->
+  <div class="sheet-mask" id="filter-sheet">
+    <div class="sheet">
+      <div class="sheet-hd">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <h2 class="sheet-t">筛选企业</h2>
+      </div>
+      <div class="fsheet-b">
+        <div class="fgroup" data-fgroup="kw">
+          <div class="fgroup-lb">关键词<span class="n">企业名 / 岗位方向</span></div>
+          <input class="fsearch" type="text" data-keypad="text" data-fkw autocomplete="off"
+                 placeholder="点这里用屏幕键盘输入" aria-label="搜索企业名或岗位方向">
+        </div>
 
-      <div class="pane pane--fill" data-at="list">
-        <div class="pane-hd"><span class="t">筛选</span><span class="s">46 家已审核</span></div>
-        <div class="filters">
-          <div class="fgroup">
-            <div class="fgroup-lb">行业<span class="n">GB/T 门类</span></div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">互联网</button>
-              <button class="fchip" aria-pressed="false">先进制造</button>
-              <button class="fchip" aria-pressed="false">文化传媒</button>
-              <button class="fmore">全部 20 个门类</button>
-            </div>
+        <!-- 地区：31 省 + 层级 → 按阈值走全屏下钻（scripts/region.js） -->
+        <div class="fgroup" data-fgroup="region">
+          <div class="fgroup-lb">地区<span class="n">省 / 市 / 区县</span></div>
+          <button class="fpick" type="button" data-region data-region-value="" data-region-empty="全国不限">
+            <svg class="ic"><use href="#i-pin"/></svg>
+            <span class="fpick-v" data-region-text>全国不限</span>
+            <span class="fpick-n">31 省</span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </button>
+          <div data-pickbag hidden></div>
+        </div>
+
+        <!-- 企业类型 12 项 → 两列弹层 -->
+        <div class="fgroup" data-fgroup="cotype">
+          <div class="fgroup-lb">企业类型<span class="n">字典 COMPANY_TYPES</span></div>
+          <button class="fpick" type="button" data-listpick="cotype" data-listpick-title="企业类型"
+                  data-listpick-src="#opt-cotype" data-listpick-mode="multi" data-listpick-value=""
+                  data-listpick-empty="全部 12 类"
+                  data-listpick-note="字典 packages/shared COMPANY_TYPES · 12 项，与后端 @IsIn 校验同源">
+            <span class="fpick-v" data-listpick-text>全部 12 类</span>
+            <span class="fpick-n">12 类</span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </button>
+          <div data-pickbag hidden></div>
+        </div>
+
+        <!-- 行业 18 项 → 两列弹层 + 搜索 -->
+        <div class="fgroup" data-fgroup="ind">
+          <div class="fgroup-lb">行业<span class="n">字典 COMPANY_INDUSTRIES</span></div>
+          <button class="fpick" type="button" data-listpick="ind" data-listpick-title="行业"
+                  data-listpick-src="#opt-ind" data-listpick-mode="multi" data-listpick-find="1"
+                  data-listpick-value="" data-listpick-empty="全部 18 类"
+                  data-listpick-note="字典 packages/shared COMPANY_INDUSTRIES · 18 项。不是 GB/T 4754 的 20 门类——那套在简历/面试域用，两套不通用">
+            <span class="fpick-v" data-listpick-text>全部 18 类</span>
+            <span class="fpick-n">18 类</span>
+            <svg class="ic"><use href="#i-chevron"/></svg>
+          </button>
+          <div data-pickbag hidden></div>
+        </div>
+
+        <div class="fgroup" data-fgroup="recruit" data-fmode="multi">
+          <div class="fgroup-lb">招聘类型<span class="n">可多选</span></div>
+          <div class="fgroup-row">
+            <button class="fchip" aria-pressed="false" data-v="社招">社招</button>
+            <button class="fchip" aria-pressed="false" data-v="校招">校招</button>
+            <button class="fchip" aria-pressed="false" data-v="实习">实习</button>
+            <button class="fchip" aria-pressed="false" data-v="兼职">兼职</button>
+            <button class="fchip" aria-pressed="false" data-v="招聘会参展">招聘会参展</button>
           </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">规模</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">20 人以下</button>
-              <button class="fchip" aria-pressed="false">20–99</button>
-              <button class="fchip" aria-pressed="false">100–499</button>
-              <button class="fchip" aria-pressed="false">500 以上</button>
-            </div>
-          </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">区域</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">天河</button>
-              <button class="fchip" aria-pressed="false">海珠</button>
-              <button class="fchip" aria-pressed="false">番禺</button>
-              <button class="fmore">选区县</button>
-            </div>
-          </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">现场机会</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">参加周五招聘会</button>
-              <button class="fchip" aria-pressed="false">校招进校</button>
-            </div>
+        </div>
+
+        <div class="fgroup" data-fgroup="src" data-fmode="multi">
+          <div class="fgroup-lb">来源<span class="n">字典 COMPANY_SOURCE_KINDS</span></div>
+          <div class="fgroup-row">
+            <button class="fchip" aria-pressed="false" data-v="人社平台">人社平台</button>
+            <button class="fchip" aria-pressed="false" data-v="大学就业网">大学就业网</button>
+            <button class="fchip" aria-pressed="false" data-v="招聘会主办方">招聘会主办方</button>
+            <button class="fchip" aria-pressed="false" data-v="第三方合规平台">第三方合规平台</button>
           </div>
         </div>
-        <div style="margin-top:var(--s-4);display:flex;gap:10px">
-          <button class="btn btn--ghost" style="flex:1">清空</button>
-          <button class="btn btn--primary" style="flex:1">筛选</button>
-        </div>
-      </div>
 
-      <!-- 2026-08-09 留白复核补实：list 态右栏筛选卡之下原有 ~800px 无容器空洞。
-           补名单排序口径与浏览记录去向两块真实规则；末卡撑底。 -->
-      <div class="pane" data-at="list">
-        <div class="pane-hd"><span class="t">这份名单怎么排</span><span class="s">规则公开</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">收录</span><span class="v">46 家，全部经管理员审核</span></div>
-          <div class="kv-row"><span class="k">排序</span><span class="v">按同步时间与你的筛选条件，不卖排名</span></div>
-          <div class="kv-row"><span class="k">最近同步</span><span class="v">8 月 8 日 09:20</span></div>
-          <div class="kv-row"><span class="k">企业付费</span><span class="v">不影响展示顺序，也买不到「推荐」标签</span></div>
-        </div>
-      </div>
-
-      <div class="pane pane--fill pane--grow" data-at="list">
-        <div class="pane-hd"><span class="t">你在这里的动作会被记下</span></div>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
-          只记<b>浏览</b>与<b>打开来源平台</b>两件事。登录后记录在<b>本企业页的浏览记录</b>里；未登录只留本次会话，离场即清。<br>
-          <span style="color:var(--fog-600)">企业那边不会收到「你看过它」的通知——看谁、比谁，是你自己的事。</span>
-        </p>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机不代收简历、不做候选人筛选、不安排面试。想联系企业，走岗位详情或招聘会展位。</span>
-        </div>
-      </div>
-
-      <div class="pane" data-at="detail metricsoff">
-        <div class="pane-hd"><span class="t">怎么联系这家企业</span></div>
-        <p style="margin:0 0 14px;font-size:var(--fz-3);color:var(--fog-800);line-height:1.7">
-          本机<b>不提供企业联系方式</b>，也不代你投递。三条真实可走的路：
-        </p>
-        <div class="outs">
-          <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
-          <a class="out" href="17-fair-desk.html" data-at="detail"><svg class="ic"><use href="#i-fair"/></svg>周五招聘会 B-12 展位</a>
-          <a class="out" href="06-print-workbench.html?stage=s3" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印企业与岗位信息</a>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-        </div>
-        <div class="notice" style="margin-top:14px">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>现场投递请把简历<b>直接交给企业的人</b>。本机只帮你把材料打出来，不代收、不转交。</span>
-        </div>
-      </div>
-
-      <div class="pane pane--fill" data-at="detail metricsoff">
-        <div class="pane-hd"><span class="t">和你的简历比</span><span class="s" data-when="default device-off">按在招岗位</span><span class="s" data-when="first">需要简历</span><span class="s" data-when="ai-down">不可用</span></div>
-        <div data-when="default device-off">
-          <div class="kv">
-            <div class="kv-row"><span class="k">用户运营专员</span><span class="v"><span class="tier tier--high"><span class="tier-bars"><i></i><i></i><i></i></span></span>较高</span></div>
-            <div class="kv-row"><span class="k">前端开发工程师</span><span class="v"><span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span></span>偏低</span></div>
-            <div class="kv-row"><span class="k">其余 4 个</span><span class="v v--fog">点进去看</span></div>
+        <div class="fgroup" data-fgroup="size" data-fmode="multi">
+          <div class="fgroup-lb">企业规模<span class="n">站内自由文本 · 按填报原文档位匹配</span></div>
+          <div class="fgroup-row">
+            <button class="fchip" aria-pressed="false" data-v="20 人以下">20 人以下</button>
+            <button class="fchip" aria-pressed="false" data-v="20–99 人">20–99 人</button>
+            <button class="fchip" aria-pressed="false" data-v="100–499 人">100–499 人</button>
+            <button class="fchip" aria-pressed="false" data-v="500 人以上">500 人以上</button>
           </div>
-          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55">
-            三档参考只是拿文字比文字。<b>不给百分比，也不预测录用概率。</b>
-          </p>
-        </div>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="first">
-          没有简历就不给档位——猜一个对你没用。
-        </p>
-        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="ai-down">
-          比对服务中断。企业信息与在招岗位照常可看。
-        </p>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>本机只记「你看过这家企业」和「你打开过来源平台」，登录后记录在企业业务页的浏览记录里；未登录只留本次会话。</span>
         </div>
       </div>
-
-      <!-- 2026-08-09 留白复核补实：detail / metricsoff 态右栏底部原有 ~600–880px 无容器空洞。
-           补企业信息核验口径（detail / metricsoff 两态口径不同，用 data-at 区分）；末卡撑底。 -->
-      <div class="pane pane--fill pane--grow" data-at="detail metricsoff">
-        <div class="pane-hd"><span class="t">这页信息，信到什么程度</span><span class="s">口径</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">简介与规模</span><span class="v">来源机构填报，本机未核实</span></div>
-          <div class="kv-row"><span class="k">经营指标</span><span class="v" data-at="detail">已开启 · 填报口径，非本机工商核验</span><span class="v" data-at="metricsoff">未开启 · 不用来源数据凑数字</span></div>
-          <div class="kv-row"><span class="k">在招岗位与展位</span><span class="v">不受指标开关影响，照常展示</span></div>
-          <div class="kv-row"><span class="k">有出入时</span><span class="v">以来源平台与官方公示为准</span></div>
-        </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>做求职决定前，建议在「国家企业信用信息公示系统」自行核对企业登记信息——那是官方核验，本机替代不了。</span>
-        </div>
-      </div>
-
-      <div class="pane" data-at="error">
-        <div class="pane-hd"><span class="t">现在能做的</span></div>
-        <div class="outs">
-          <button class="out"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
-          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>按岗位找</a>
-        </div>
-      </div>
-
-      <!-- 2026-08-09 留白复核补实：error 态右栏原只剩一张小卡，底部 ~1306px 无容器空洞。
-           补故障影响边界卡并撑底：影响 / 不影响是真实边界，不是装饰填充。 -->
-      <div class="pane pane--fill pane--grow" data-at="error">
-        <div class="pane-hd"><span class="t">这次故障影响什么</span><span class="s">边界说清楚</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">企业名单与详情</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
-          <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
-          <div class="kv-row"><span class="k">招聘会信息</span><span class="v">独立入口 · 照常可看</span></div>
-          <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
-          <div class="kv-row"><span class="k">来源平台与官方公示</span><span class="v">本机取不到数据，无法代为确认；可用手机直接访问确认</span></div>
-        </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>恢复后名单自动回来，<b>不用你重新筛选</b>。急着找岗位，左边「按岗位找」和「看招聘会」都能走。</span>
-        </div>
+      <div class="sheet-acts">
+        <button class="btn btn--lg btn--ghost" data-corelax="all">清空</button>
+        <button class="btn btn--primary" data-coapply>用这些条件找<svg class="ic"><use href="#i-arrowRight"/></svg></button>
       </div>
     </div>
   </div>
 
   <div class="actionbar">
+      <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-at="list"><div class="t">46 家已审核企业，显示 12 家</div><div class="s">来源企业与岗位导览 · 本机不代收简历、不做筛选与邀约</div></div>
-      <div data-at="detail"><div class="t">6 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
+      <div data-at="list"><div class="t">46 家已审核企业，当前条件下显示 <b data-cocount>6</b> 家</div><div class="s">来源企业与岗位导览 · 点整行看企业详情</div></div>
+      <div data-at="detail"><div class="t">2 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
       <div data-at="metricsoff"><div class="t">本机未开启企业指标展示</div><div class="s">不用来源数据凑数字充版面 · 岗位与展位照常可看</div></div>
       <div data-at="error"><div class="t">企业数据没取到，已自动上报</div><div class="s">不显示过期缓存——企业可能已停止招聘</div></div>
     </div>
@@ -490,7 +975,7 @@
   </div>
 
   <nav class="navbar">
-    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
@@ -498,8 +983,13 @@
 </div>
 </div>
 
+<!-- 字典：与 packages/shared/src/types/company.ts 逐字对齐。
+     <template> 的内容是惰性片段，不进 DOM 树，不参与任何自检测量。 -->
+<template id="opt-cotype">["央企","国企","事业单位","民营企业","外资企业","合资企业","上市公司","专精特新","高新技术企业","校企合作单位","公共机构","其他"]</template>
+<template id="opt-ind">["智能制造","互联网/软件","AI/大数据","电子信息","新能源","新材料","生物医药","金融","教育培训","医疗健康","建筑地产","交通物流","商贸零售","文旅传媒","农业食品","专业服务","公共服务","其他"]</template>
+
 <script src="scripts/stage.js?v=29"></script>
-<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
@@ -513,6 +1003,198 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+})()
+</script>
+<!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
+     于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
+<script>
+/* ── 筛选真的能选，名单真的跟着变 ─────────────────────────────────────
+   · 地区 = scripts/region.js 的省/市/区县下钻，前缀匹配（选到省就按省筛）；
+   · 企业类型 12 / 行业 18 = 同一组件的两列弹层，已选项回显成可单独清除的 chip；
+   · 招聘类型 5 / 来源 4 / 规模 4 = 平铺多选（≤6 项按阈值就该平铺）；
+   · 关键词 = 屏幕软键盘（scripts/keypad.js），一体机没有物理键盘。
+
+   判定是**写死可核对的**，不是随机：每张卡各自带 data-co-* 字段，
+   组内 OR、组间 AND，命中 0 家就地报空，不凑数。
+
+   2026-08-10 重排：七组条件从常驻右栏挪进抽屉，页面只留一行
+   「已选 chip + 筛选 · N 项」。chip 点 ✕ 就地去掉并重新筛。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var cards = [].slice.call(scr.querySelectorAll('[data-co]'))
+  var noneEl = scr.querySelector('[data-conone]')
+  var condEl = scr.querySelector('[data-cocond]')
+  var countEls = [].slice.call(scr.querySelectorAll('[data-cocount]'))
+  var kwEl = scr.querySelector('[data-fkw]')
+  var barEl = scr.querySelector('[data-fbar]')
+  var MAXCHIP = 4
+
+  function group (n) { return scr.querySelector('[data-fgroup="' + n + '"]') }
+  function chips (g) { return [].slice.call(g.querySelectorAll('.fchip')) }
+  function on (g) {
+    return chips(g).filter(function (c) { return c.getAttribute('aria-pressed') === 'true' })
+      .map(function (c) { return c.getAttribute('data-v') })
+  }
+  function picked (n) {
+    var b = scr.querySelector('[data-listpick="' + n + '"]')
+    return String(b && b.getAttribute('data-listpick-value') || '')
+      .split(',').filter(function (s) { return !!s })
+  }
+  function regionVal () {
+    var b = scr.querySelector('[data-region]')
+    return String(b && b.getAttribute('data-region-value') || '')
+  }
+  function esc (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') }
+
+  /* 地区前缀匹配：选「广东省」→ 广东省下全部；选到区县 → 只此区县 */
+  function regionHit (card, v) {
+    var want = v.split('|'), got = String(card.getAttribute('data-co-region') || '').split('|'), i
+    for (i = 0; i < 3; i++) { if (want[i] && want[i] !== got[i]) return false }
+    return true
+  }
+  function anyHit (want, got) {
+    var i, list = String(got || '').split(/\s+/)
+    if (!want.length) return true
+    for (i = 0; i < want.length; i++) if (list.indexOf(want[i]) > -1) return true
+    return false
+  }
+
+  function state () {
+    return {
+      kw: (kwEl && kwEl.value || '').trim(),
+      region: regionVal(),
+      cotype: picked('cotype'),
+      ind: picked('ind'),
+      recruit: on(group('recruit')),
+      src: on(group('src')),
+      size: on(group('size'))
+    }
+  }
+
+  /* 当前条件 → 一串可单独去掉的标签 */
+  function conditions () {
+    var s = state(), out = []
+    if (s.kw) out.push({ t: '「' + s.kw + '」', k: 'kw' })
+    if (s.region) {
+      out.push({
+        t: window.v3Region ? window.v3Region.get(scr.querySelector('[data-region]')).text
+                           : s.region.split('|').filter(Boolean).join(' · '),
+        k: 'region'
+      })
+    }
+    s.cotype.forEach(function (v) { out.push({ t: v, k: 'pick', g: 'cotype' }) })
+    s.ind.forEach(function (v) { out.push({ t: v, k: 'pick', g: 'ind' }) })
+    s.recruit.forEach(function (v) { out.push({ t: v, k: 'chip', g: 'recruit' }) })
+    s.src.forEach(function (v) { out.push({ t: v, k: 'chip', g: 'src' }) })
+    s.size.forEach(function (v) { out.push({ t: v, k: 'chip', g: 'size' }) })
+    return out
+  }
+
+  function apply () {
+    var s = state(), n = 0, i, c, ok
+    for (i = 0; i < cards.length; i++) {
+      c = cards[i]
+      ok = true
+      if (s.kw && String(c.getAttribute('data-co-kw') || '').indexOf(s.kw) === -1) ok = false
+      if (ok && s.region && !regionHit(c, s.region)) ok = false
+      if (ok && !anyHit(s.cotype, c.getAttribute('data-co-type'))) ok = false
+      if (ok && !anyHit(s.ind, c.getAttribute('data-co-ind'))) ok = false
+      if (ok && !anyHit(s.recruit, c.getAttribute('data-co-recruit'))) ok = false
+      if (ok && !anyHit(s.src, c.getAttribute('data-co-src'))) ok = false
+      if (ok && !anyHit(s.size, c.getAttribute('data-co-size'))) ok = false
+      c.hidden = !ok
+      if (ok) n++
+    }
+    for (i = 0; i < countEls.length; i++) countEls[i].textContent = String(n)
+    if (noneEl) noneEl.hidden = n > 0
+
+    var cond = conditions()
+    var fc = scr.querySelector('[data-fcount]')
+    if (fc) fc.textContent = String(cond.length)
+    if (condEl) condEl.textContent = cond.length ? cond.map(function (x) { return x.t }).join(' · ') : '未设条件'
+    if (barEl) {
+      if (!cond.length) {
+        barEl.innerHTML = '<span class="fbar-n">未设条件 · 显示全部已审核企业</span>'
+      } else {
+        var h = ''
+        cond.slice(0, MAXCHIP).forEach(function (x) {
+          h += '<button class="fsel" type="button" data-fkill="' + esc(x.k) + '|' + esc(x.g || '') + '|' + esc(x.t) + '"' +
+               ' aria-label="去掉筛选条件：' + esc(x.t) + '">' + esc(x.t) +
+               '<span class="fsel-x" aria-hidden="true">✕</span></button>'
+        })
+        if (cond.length > MAXCHIP) h += '<span class="fbar-n">+' + (cond.length - MAXCHIP) + ' 项</span>'
+        barEl.innerHTML = h
+      }
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+  window.p15Apply = apply
+
+  function openSheet (v) { scr.classList[v ? 'add' : 'remove']('is-filtering') }
+
+  scr.addEventListener('click', function (e) {
+    if (e.target.closest('[data-fopen]')) { openSheet(true); return }
+    if (e.target.closest('[data-coapply]')) { openSheet(false); apply(); return }
+    if (e.target.id === 'filter-sheet') { openSheet(false); return }
+
+    var fav = e.target.closest('.cline2-fav')
+    if (fav) {
+      fav.setAttribute('aria-pressed', fav.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+      return
+    }
+
+    /* 一行筛选条上的 ✕：真的去掉这个条件并重新筛 */
+    var kill = e.target.closest('[data-fkill]')
+    if (kill) {
+      var p = kill.getAttribute('data-fkill').split('|')
+      if (p[0] === 'kw') { if (kwEl) kwEl.value = '' }
+      else if (p[0] === 'region') { window.v3Region.set(scr.querySelector('[data-region]'), '') }
+      else if (p[0] === 'pick') {
+        var trig = scr.querySelector('[data-listpick="' + p[1] + '"]')
+        window.v3Pick.set(trig, window.v3Pick.get(trig).filter(function (v) { return v !== p[2] }))
+      } else {
+        var g0 = group(p[1])
+        if (g0) chips(g0).forEach(function (c) {
+          if (c.getAttribute('data-v') === p[2]) c.setAttribute('aria-pressed', 'false')
+        })
+      }
+      apply()
+      return
+    }
+
+    var chip = e.target.closest('.fchip')
+    if (chip && chip.closest('[data-fgroup]')) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+      apply(); return
+    }
+    var relax = e.target.closest('[data-corelax]')
+    if (relax) {
+      var kind = relax.getAttribute('data-corelax')
+      var rb = scr.querySelector('[data-region]')
+      if (kind === 'region') { window.v3Region.set(rb, '广东省|广州市|') }
+      else if (kind === 'ind') { window.v3Pick.set(scr.querySelector('[data-listpick="ind"]'), []) }
+      else {
+        window.v3Region.set(rb, '')
+        window.v3Pick.set(scr.querySelector('[data-listpick="cotype"]'), [])
+        window.v3Pick.set(scr.querySelector('[data-listpick="ind"]'), [])
+        ;[].slice.call(scr.querySelectorAll('[data-fgroup] .fchip'))
+          .forEach(function (c) { c.setAttribute('aria-pressed', 'false') })
+        if (kwEl) kwEl.value = ''
+      }
+      apply(); return
+    }
+  })
+
+  scr.addEventListener('v3region:change', apply)
+  scr.addEventListener('v3pick:change', apply)
+  if (kwEl) { kwEl.addEventListener('input', apply); kwEl.addEventListener('change', apply) }
+  apply()
+  window.addEventListener('load', apply)
 })()
 </script>
 </body>

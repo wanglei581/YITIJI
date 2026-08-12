@@ -1,0 +1,71 @@
+<!--pages/settings/settings.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">设置</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <!-- 账号 -->
+    <view class="grp-label">账号</view>
+    <view class="set-group">
+      <view class="set-item">
+        <view class="set-ic a-clay"><text class="ficon i-form"></text></view>
+        <view class="set-t">登录手机号</view>
+        <view class="set-v">{{phoneMasked}}</view>
+      </view>
+    </view>
+
+    <!-- 本人数据 -->
+    <view class="grp-label">本人数据</view>
+    <view class="set-group">
+      <view class="set-item tap" hover-class="tap-press" bindtap="toNotifications">
+        <view class="set-ic a-teal"><text class="ficon i-bell"></text></view>
+        <view class="set-t">消息通知</view>
+        <view class="set-go">›</view>
+      </view>
+      <view class="set-item tap" hover-class="tap-press" bindtap="toDocuments">
+        <view class="set-ic a-clay"><text class="ficon i-folder"></text></view>
+        <view class="set-t">我的文档与清理期限</view>
+        <view class="set-go">›</view>
+      </view>
+    </view>
+
+    <!-- 隐私与文件 -->
+    <view class="grp-label">隐私与文件</view>
+    <view class="set-group">
+      <view class="set-item tap" hover-class="tap-press" bindtap="toPrivacy">
+        <view class="set-ic a-teal"><text class="ficon i-solution"></text></view>
+        <view class="set-t">隐私设置</view>
+        <view class="set-go">›</view>
+      </view>
+    </view>
+
+    <!-- 其他 -->
+    <view class="grp-label">其他</view>
+    <view class="set-group">
+      <view class="set-item tap" hover-class="tap-press" bindtap="toHelp">
+        <view class="set-ic a-teal"><text class="ficon i-comment"></text></view>
+        <view class="set-t">使用帮助</view>
+        <view class="set-go">›</view>
+      </view>
+      <view class="set-item tap" hover-class="tap-press" bindtap="toAbout">
+        <view class="set-ic a-plum"><text class="ficon i-info"></text></view>
+        <view class="set-t">关于我们</view>
+        <view class="set-v">v1.0.2</view>
+        <view class="set-go">›</view>
+      </view>
+    </view>
+
+    <view class="logout tap" hover-class="tap-press" bindtap="logout">{{loggingOut ? '正在退出…' : '退出登录'}}</view>
+
+  </view>
+</view>

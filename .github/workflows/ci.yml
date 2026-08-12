@@ -334,6 +334,7 @@ jobs:
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/partner verify:partner-relative-api-url
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
+          pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:db-load-indexes

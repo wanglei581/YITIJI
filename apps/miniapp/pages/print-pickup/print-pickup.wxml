@@ -1,0 +1,78 @@
+<!--pages/print-pickup/print-pickup.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+
+  <!-- 导航栏 -->
+  <view class="navbar">
+    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
+    <view class="nb-title">取件码</view>
+    <view class="nb-right"></view>
+  </view>
+
+  <!-- ── 错误态 ── -->
+  <view class="state-center" wx:if="{{state === 'error'}}">
+    <view class="state-icon">⚠️</view>
+    <text class="state-label">{{errorMsg}}</text>
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="toOrders">查看订单</view>
+  </view>
+
+  <!-- ── 正常展示 ── -->
+  <block wx:elif="{{state === 'ready'}}">
+
+    <!-- 英雄区：状态+大码 -->
+    <view class="pickup-hero">
+      <view class="ph-status-dot"></view>
+      <text class="ph-status-text">{{taskStatus === 'pending' ? '等待取件' : taskStatus === 'claimed' ? '已认领排队' : taskStatus === 'printing' ? '打印中…' : '取件码已就绪'}}</text>
+      <view class="ph-code-wrap">
+        <text class="ph-code">{{code}}</text>
+      </view>
+      <text class="ph-hint">请在一体机上输入此取件码</text>
+      <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
+    </view>
+
+    <!-- 操作引导步骤 -->
+    <view class="steps-card">
+      <view class="step-item">
+        <view class="step-num">1</view>
+        <text class="step-text">走到附近一体机终端</text>
+      </view>
+      <view class="step-item">
+        <view class="step-num">2</view>
+        <text class="step-text">选择「输入取件码」并填写上方号码</text>
+      </view>
+      <view class="step-item">
+        <view class="step-num">3</view>
+        <text class="step-text">在终端确认预览、付款并等待出纸</text>
+      </view>
+    </view>
+
+    <!-- 订单信息 -->
+    <view class="info-card" wx:if="{{orderNo || taskStatus}}">
+      <view class="info-row" wx:if="{{orderNo}}">
+        <text class="info-key">订单号</text>
+        <text class="info-val">{{orderNo}}</text>
+      </view>
+      <view class="info-row" wx:if="{{taskStatus}}">
+        <text class="info-key">当前状态</text>
+        <text class="info-val iv-status">{{taskStatus === 'pending' ? '等待取件' : taskStatus === 'claimed' ? '已认领' : taskStatus === 'printing' ? '打印中' : taskStatus}}</text>
+      </view>
+    </view>
+
+    <!-- 隐私提示 -->
+    <view class="notice-card">
+      <text class="nc-text">取件码仅本人使用。实际有效期、付款与打印结果以后端和终端显示为准；本页不会生成二维码或猜测有效期。</text>
+    </view>
+
+    <view class="pk-actions">
+      <view class="btn-ghost tap" hover-class="tap-press" bindtap="toOrders">查看全部订单</view>
+    </view>
+
+  </block>
+
+  <view style="height:calc(140rpx + env(safe-area-inset-bottom))"></view>
+</view>
+
+<!-- 底部完成按钮 -->
+<view class="action-bar" wx:if="{{state === 'ready'}}">
+  <view class="ab-btn tap" hover-class="tap-press" bindtap="home">完成</view>
+</view>

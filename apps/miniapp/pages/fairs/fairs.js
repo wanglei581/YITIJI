@@ -43,6 +43,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '职易达 · 近期招聘会', path: '/pages/fairs/fairs' }
+    return { title: '智引答 · 近期招聘会', path: '/pages/fairs/fairs' }
   },
 })

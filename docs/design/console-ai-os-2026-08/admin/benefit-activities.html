@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>权益活动（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--err">
+    <span class="proto__tag">🔴 接前端之前必须先堵这个洞</span>
+    <b>当前核销逻辑是全额抵扣</b>：<code>discountCents = order.amountCents</code>，
+    而 <code>BenefitGrant</code> <b>没有面值、没有最高抵扣额、没有服务范围、没有页数上限</b>。
+    <br><br>
+    后果：<b>一张「免费打印 1 次」的券，可以抵掉一个 200 页彩打订单。</b>
+    <code>coupon</code> / <code>free_quota</code> / <code>package_entitlement</code>
+    任意一种只要还剩 1 份余量，就能全额覆盖<b>任意金额</b>的本人打印订单。
+    <br><br>
+    <b>现在没出事，只因为前端没接</b>（Kiosk 全端 0 处引用 <code>benefitGrantId</code>，后端 41 处）。
+    <b>一旦接通即为资损。</b>
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>权益活动</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页配置<b>发什么券、发多少、谁能领</b>。
+        券的<b>适用范围直接引用 <a href="billing.html">计费与对账</a> 里的 serviceKey</b>，
+        避免出现「有券但不知道能抵什么」。
+      </p>
+    </div>
+    <div class="right"><button class="btn btn--sm btn--primary">+ 新建活动</button></div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="ben">
+    <button class="is-on" data-tab="act">活动列表</button>
+    <button data-tab="rule">核销规则<span class="newdot"></span></button>
+    <button data-tab="pack">卡券包模板<span class="newdot"></span></button>
+  </div>
+
+  <!-- ═══ 活动列表（现有 + 补字段） ═══ -->
+  <div data-panel-of="ben" data-panel="act">
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>活动</h3><span class="tag tag--ghost">现有能力：建/编辑/发布/下架/看领取</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>活动名称</th><th>权益类型</th><th>适用范围</th><th>面值/上限</th><th>库存</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div class="cellmain">新用户首次打印免费</div><div class="cellsub">2026-08-01 ~ 09-30</div></td>
+              <td>free_quota</td>
+              <td class="isnew"><span class="tag">print_bw_page</span></td>
+              <td class="isnew"><b>≤ 10 页</b> / 单次</td>
+              <td>1,000 / 2,000</td>
+              <td><span class="tag tag--ok">已发布</span></td>
+              <td><button class="btn btn--sm">编辑</button></td>
+            </tr>
+            <tr>
+              <td><div class="cellmain">简历优化体验券</div><div class="cellsub">2026-08-10 ~ 08-31</div></td>
+              <td>coupon</td>
+              <td class="isnew"><span class="tag">ai_resume_optimize</span></td>
+              <td class="isnew"><b>¥3.00</b> 定额</td>
+              <td>400 / 500</td>
+              <td><span class="tag tag--ok">已发布</span></td>
+              <td><button class="btn btn--sm">编辑</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          <b>「适用范围」与「面值/上限」两列是本次新增</b>——现有模型没有这两个字段，
+          因此现在任何券都能全额抵任何订单。
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card isnew" data-newtag="新增字段">
+        <div class="card__head"><h3>活动编辑（补齐后）</h3></div>
+        <div class="card__body stack">
+          <div class="field"><label>权益类型</label>
+            <select class="select"><option>free_quota 免费额度</option><option>coupon 抵扣券</option><option>package_entitlement 套餐权益</option></select></div>
+          <div class="field"><label>适用范围（serviceKey）<span class="tag tag--err" style="margin-left:6px">新增 · 必填</span></label>
+            <select class="select"><option>print_bw_page 黑白打印</option><option>copy_id_card 身份证复印</option><option>ai_resume_optimize AI简历优化</option></select>
+            <div class="hint">直接引用价目表的 serviceKey；<b>不填则无法核销</b>，不再默认全场通用</div>
+          </div>
+          <div class="field"><label>抵扣方式 <code>discountMode</code><span class="tag tag--err" style="margin-left:6px">新增</span></label>
+            <select class="select"><option>定额抵扣（券面值）</option><option>全额抵扣（受上限约束）</option><option>按量抵扣（N 页 / N 次）</option></select></div>
+          <div class="grid grid--2">
+            <div class="field"><label>面值 / 最高抵扣额</label><input class="input" value="3.00"><div class="hint">元</div></div>
+            <div class="field"><label>页数 / 次数上限</label><input class="input" value="10"></div>
+          </div>
+          <div class="field"><label>叠加规则<span class="tag tag--err" style="margin-left:6px">新增</span></label>
+            <div class="locked small">不可叠加（首期固定，后端强校验）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L1 规则 + L3 文案</span></div>
+        <div class="card__body stack">
+          <div class="advice">
+            <div class="advice__head"><b>发布前合规自检</b><span class="tag">规则校验 · 不调模型</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><span>✅ 未出现按候选人 / 投递 / 面试 / Offer 计费表述</span></div>
+              <div class="advice__item"><span>⚠️ <b>未设置适用范围</b>——该券将无法核销 <span class="ev ev--1">E1</span></span></div>
+              <div class="advice__item"><span>⚠️ <b>可核销类型但未设额度</b>（<code>quantityTotal=null</code>）——用户能领但核销必失败 <span class="ev ev--1">E1</span></span></div>
+            </div>
+            <div class="small muted" style="margin-top:8px">
+              ⚠️ <b>关键词正则不能当合规门禁</b>：现有校验不覆盖「投递量」「到面率」「入职量」
+              「推荐成功抽成」等表达，<b>必须人工审核兜底</b>。
+            </div>
+          </div>
+          <div class="advice">
+            <div class="advice__head"><b>活动文案改写</b><span class="tag tag--ai">L3 · 待采纳</span></div>
+            <div class="advice__grid">
+              <div class="advice__item"><b>动作</b><span>把「投一份简历送一次免费打印」改为「新用户首次打印免费」</span></div>
+              <div class="advice__item"><b>理由</b><span>原文把权益与投递行为绑定，构成按投递量计费的变体 <span class="ev ev--2">E2</span></span></div>
+              <div class="advice__item"><b>代价</b><span>活动吸引力下降；但原表述过不了许可边界</span></div>
+              <div class="advice__item"><b>备选</b><span>改为「完善简历后可领」——与投递解耦</span></div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn btn--sm btn--primary">采纳</button><button class="btn btn--sm">自己改</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 核销规则（新增） ═══ -->
+  <div data-panel-of="ben" data-panel="rule" style="display:none">
+    <div class="proto proto--warn">
+      <span class="proto__tag">新增 Tab · 首期必须收窄</span>
+      Codex 的判断：<b>「API 层能通，但核销规则尚不适合直接开放」</b>。
+      首期必须把语义收窄为——<b>本人打印订单、不可叠加、一次全额或固定金额、明确面值/页数上限</b>。
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>首期核销约束（后端强校验）</h3></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>约束</th><th>取值</th><th>现状</th></tr></thead>
+          <tbody>
+            <tr><td>适用订单</td><td>仅本人打印订单</td><td><span class="tag tag--ok">已校验</span></td></tr>
+            <tr><td>叠加</td><td>不可叠加，一单一券</td><td><span class="tag tag--ok">已有一单一核销约束</span></td></tr>
+            <tr><td><b>抵扣额</b></td><td>券面值 或 受上限约束的全额</td><td><span class="tag tag--err">❌ 当前无限额</span></td></tr>
+            <tr><td><b>服务范围</b></td><td>必须匹配 serviceKey</td><td><span class="tag tag--err">❌ 当前不校验</span></td></tr>
+            <tr><td><b>页数上限</b></td><td>超出部分用户自付</td><td><span class="tag tag--err">❌ 无此概念</span></td></tr>
+            <tr><td>并发</td><td>订单 CAS + 权益余量 CAS + 幂等键</td><td><span class="tag tag--ok">已有，写得稳</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>退款与额度恢复</h3><span class="tag tag--err">必须先定</span></div>
+        <div class="card__body">
+          <div class="degrade">
+            <b>当前：voucher 退款额为 0，只把订单置 refunded，不恢复 Grant 额度</b>
+            （<code>refund.service.ts:263-318</code>）。
+            <b>未出纸退款会让用户永久损失一次额度。</b>
+          </div>
+          <ul style="margin:12px 0 0;padding-left:19px;font-size:13.5px;line-height:1.8">
+            <li><b>推荐</b>：未履约以<b>不可变冲正流水</b>恢复额度（不改原记录，追加反向分录）</li>
+            <li><b>若坚持不恢复</b>：必须在核销<b>前</b>显著告知用户</li>
+            <li>无论哪种，<b>都要在核销前把规则写在屏幕上</b>——不能事后解释</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>另两个已知缺陷</h3></div>
+        <div class="card__body">
+          <div class="kv" style="display:grid;grid-template-columns:52px 1fr;gap:8px 14px;font-size:13.5px">
+            <b>B1</b><span><b>手工撤销权益没有状态 CAS</b>——先读再按 id 更新，
+              并发撤销或与核销竞态会重复记审计或覆盖终态（<code>admin-member-benefits.service.ts:118-147</code>）</span>
+            <b>B2</b><span><b>「我的权益」不按 <code>validUntil</code> 判过期</b>——直接返回持久化 status，
+              用户看到「可用」但核销被拒（<code>member-benefits.service.ts:35-70</code>）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 卡券包模板（新增） ═══ -->
+  <div data-panel-of="ben" data-panel="pack" style="display:none">
+    <div class="proto proto--warn">
+      <span class="proto__tag">新增 Tab · 先分清是哪一种「卡券包」</span>
+      <table class="table" style="margin-top:10px">
+        <thead><tr><th>理解</th><th>要新模型吗</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>「我的券集中展示页」</td><td><span class="tag tag--ok">不需要</span></td>
+            <td class="small"><code>/me/benefits</code> 已能按类型展示多条 Grant</td></tr>
+          <tr><td>「一种权益有 N 次额度」</td><td><span class="tag tag--ok">不需要</span></td>
+            <td class="small">Grant 的 <code>quantityTotal/Remaining</code> 就是</td></tr>
+          <tr><td><b>「2 次打印券 + 1 次 AI 优化券」组合</b></td><td><span class="tag tag--warn">需要</span></td>
+            <td class="small"><code>package_entitlement</code> 只是一个字符串类型加数量，<b>表达不了异构组合</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>卡券包模板（目标形态）</h3>
+        <span class="tag tag--warn">需后端先落地</span>
+        <div class="right"><button class="btn btn--sm" disabled>+ 新建包</button></div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>包名称</th><th>包含权益</th><th>发放方式</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr class="muted">
+              <td>求职起步包</td>
+              <td class="small">黑白打印 ×20 页 · AI 简历优化 ×1 次 · 身份证复印 ×2 张</td>
+              <td>活动领取</td>
+              <td><span class="tag tag--ghost">待建模</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:12px">
+          <b>当前阻碍</b>：一次 Activity 领取只创建<b>一条</b> Grant，
+          且被 <code>BenefitClaim</code> 的 <code>activityId+endUserId</code> 唯一约束绑定，
+          <b>无法原子发放多个包内权益</b>（<code>benefit-activities.service.ts:184-208</code>）。
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>设计约束</h3><span class="tag tag--err">别踩</span></div>
+      <div class="card__body">
+        <ul style="margin:0;padding-left:19px;font-size:13.5px;line-height:1.8">
+          <li>新包模型是 Grant 的<b>模板 / 容器</b>：领取或购买包后<b>原子生成若干 BenefitGrant</b></li>
+          <li><b>Grant 继续作为唯一余额</b>，<code>RedemptionRecord</code> 继续作为<b>唯一核销账本</b></li>
+          <li>❌ <b>不要建一套与 BenefitGrant 并列的「卡券余额」</b>——
+            那会形成两套额度、两套退款口径，对账时无法收敛</li>
+          <li>❌ <b>不要把 BenefitGrant 演化成通用钱包</b>（跨商户 / 转让 / 提现）——
+            支付牌照风险显著上升</li>
+          <li>⚠️ 一旦允许<b>用户付费购买</b>长期额度，须按单用途预付消费场景评估
+            备案、资金管理、余额退款、有效期与消费者权益义务</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">◈</div><h3>暂无活动</h3>
+      <p>终端「活动」入口<b>不显示</b>，不显示空活动列表。</p>
+      <div class="row" style="justify-content:center;margin-top:16px"><button class="btn btn--primary">新建第一个活动</button></div>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——建活动、发布、下架、看领取<b>全部照常</b>。
+        受影响的只有「文案改写」建议；<b>合规自检是确定性规则，同样照常</b>。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>活动加载失败</h3>
+      <p>无法读取（<code>GET /admin/benefit-activities</code> 返回 500）。
+        <b>已发布活动与用户已领取的权益不受影响。</b></p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/benefit-activities</code>，加 2 个 Tab。</li>
+      <li><b>W0 顺序不可颠倒</b>：先收窄核销规则（补面值/范围/上限字段 + 后端强校验），
+        <b>再</b>接前端用券闭环。反过来就是资损。</li>
+      <li><b>发券链路不要动</b>：领取事务（建 Grant + 建 Claim + 库存 CAS）写得稳，
+        防超发防重领都到位，<b>本次不重构它</b>。</li>
+      <li><b>用券闭环接在现有页</b>：报价返回可用权益 → PrintConfirm 展示
+        <b>原价 · 券 · 抵扣额 · 应付额</b> → 用户确认后调 <code>/orders/:id/redeem</code>；
+        「我的权益」加使用 CTA 与核销记录，<b>不新建「我的卡券」重复入口</b>。</li>
+      <li><b>资金事件强审计</b>：<code>AuditService.write</code> 会吞掉数据库失败——
+        权益核销与补贴结算必须用 <code>writeRequired</code> 或可靠 outbox。</li>
+      <li><b>补 E2E</b>：建活动→发布→领取→建单→选券→<b>并发核销</b>→出纸门控→退款/冲正→本人记录与 Admin 对账。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'benefit-activities'})</script>
+</body>
+</html>

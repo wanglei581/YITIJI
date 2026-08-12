@@ -1,6 +1,6 @@
 {
   "name": "@ai-job-print/miniapp",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "private": true,
   "description": "职易达 · AI 求职与职业生活服务微信小程序（唯一发布源码）",
   "engines": {

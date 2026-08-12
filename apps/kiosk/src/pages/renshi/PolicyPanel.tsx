@@ -137,11 +137,11 @@ export function PolicyPanel({
                 {selected.officialUrl && isValidSourceUrl(selected.officialUrl) && (
                   <button type="button" onClick={() => onOfficialEntry(selected)} className={`k8-policy-detail-btn ${BTN_OFFICIAL}`}>
                     <QrCodeIcon className="h-6 w-6" aria-hidden="true" />
-                    扫码打开官方入口
+                    扫码打开来源链接
                   </button>
                 )}
               </div>
-              <p className="k8-policy-detail-note">办理结果以官方平台为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
+              <p className="k8-policy-detail-note">政策内容和办理要求以发布主体及目标网站最新信息为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
             </section>
           )}
         </div>

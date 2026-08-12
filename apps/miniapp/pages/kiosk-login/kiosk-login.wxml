@@ -1,0 +1,80 @@
+<!--pages/kiosk-login/kiosk-login.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack">
+      <view class="ficon i-right"></view>
+    </view>
+    <view class="nav-title">扫码登录一体机</view>
+  </view>
+
+  <view class="content">
+
+    <!-- 未登录：引导先登录 -->
+    <block wx:if="{{!isLoggedIn}}">
+      <view class="state-card">
+        <view class="sc-icon ficon i-user"></view>
+        <view class="sc-title">请先登录小程序</view>
+        <view class="sc-desc">扫码登录一体机需要您先完成账号登录</view>
+        <button class="btn-primary" bindtap="goLogin">去登录</button>
+      </view>
+    </block>
+
+    <!-- 已登录 + 空闲：引导扫码 -->
+    <block wx:elif="{{isLoggedIn && (phase === 'idle')}}">
+      <view class="guide-card">
+        <view class="guide-icon ficon i-printer"></view>
+        <view class="guide-title">扫描一体机二维码</view>
+        <view class="steps">
+          <view class="step">
+            <view class="step-num">1</view>
+            <view class="step-text">在一体机「登录」页切换到「手机扫码」标签</view>
+          </view>
+          <view class="step">
+            <view class="step-num">2</view>
+            <view class="step-text">用本小程序扫描终端屏幕上的二维码</view>
+          </view>
+          <view class="step">
+            <view class="step-num">3</view>
+            <view class="step-text">确认后即刻登录，无需输入手机号和验证码</view>
+          </view>
+        </view>
+        <button class="btn-scan tap rise" hover-class="tap-press" bindtap="scanCode">
+          <view class="ficon i-scan"></view>
+          <text>扫描二维码</text>
+        </button>
+      </view>
+    </block>
+
+    <!-- 扫码中 / 确认中：loading 态 -->
+    <block wx:elif="{{phase === 'scanning' || phase === 'confirming'}}">
+      <view class="state-card">
+        <view class="sc-spinner"></view>
+        <view class="sc-title">{{phase === 'scanning' ? '扫码中…' : '确认中…'}}</view>
+        <view class="sc-desc">{{phase === 'confirming' ? '正在与终端建立连接，请稍候' : '请对准终端屏幕上的二维码'}}</view>
+      </view>
+    </block>
+
+    <!-- 成功 -->
+    <block wx:elif="{{phase === 'success'}}">
+      <view class="state-card success">
+        <view class="sc-icon sc-symbol">✓</view>
+        <view class="sc-title">登录成功</view>
+        <view class="sc-desc">已在「{{deviceLabel}}」上完成登录，可在终端继续操作</view>
+        <button class="btn-secondary" bindtap="retry">再次扫码</button>
+      </view>
+    </block>
+
+    <!-- 失败 -->
+    <block wx:elif="{{phase === 'error'}}">
+      <view class="state-card error">
+        <view class="sc-icon sc-symbol">!</view>
+        <view class="sc-title">登录失败</view>
+        <view class="sc-desc">{{errorMsg}}</view>
+        <button class="btn-primary" bindtap="retry">重新扫码</button>
+      </view>
+    </block>
+
+  </view>
+</view>

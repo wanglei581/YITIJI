@@ -2,7 +2,7 @@
 // SmartCampusHomePage — 智慧校园服务中心（/smart-campus）
 //
 // 按终端开关：仅当后端返回 enabled 时，首页才出现入口卡进入本页。
-// 子模块按 config.modules 显隐。迎新系统 / 校园大数据为真实可达页面；
+// 子模块按 config.modules 显隐。迎新指引 / 校园大数据为真实可达页面；
 // 行李帮运 / 校园全景为校园服务说明页（仅信息展示与指引）。
 // 校园卡办理 / 一卡通开通 / 校园网开通为校园自助服务卡，随校园开启一并展示，点进
 // 各自说明页给出办理指引（本期前端入口/说明，未接真实办理后端）。
@@ -50,7 +50,7 @@ const ENTRIES: EntryDef[] = [
   {
     key: 'welcome',
     icon: PartyPopperIcon,
-    title: '迎新系统',
+    title: '迎新指引',
     description: '报到流程、办事窗口、入学与求职准备',
     to: '/smart-campus/welcome',
   },
@@ -150,7 +150,9 @@ export function SmartCampusHomePage() {
   const extensionItems: KioskToolboxItem[] = config.enabled
     ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
     : []
-  // 口径真实性：静态指引 cards 只称「可查看指引」；仅校方配置且可启动的扩展项称「已配置入口」。
+  // 口径真实性：静态指引 cards 只称「可查看指引」；仅已配置且可启动的扩展项称「已配置入口」。
+  // 2026-08-11：不再写「校方配置」——智慧校园开关与扩展投放平台 Admin 同样可设置
+  //（smart-campus.service.ts 保存路径对 admin 与 partner 均开放），无法单独归因给校方。
   // 无扩展项时不宣称「已开通」，避免暗示系统已接通。
   // enabled===false：不显示 header badge，避免与「本机暂未开启」空态重复「可查看指引 0 项」。
   const configuredEntries = extensionItems.filter(
@@ -167,7 +169,7 @@ export function SmartCampusHomePage() {
     <KioskPageFrame
       tone="wheat"
       title="智慧校园"
-      subtitle="校园场景服务专区 · 本机校园模式按校方配置开放"
+      subtitle="校园场景服务专区 · 按本机配置开放"
       backLabel="返回首页"
       onBack={() => navigate('/')}
       badge={statusBadge ? <FusionBadge>{statusBadge}</FusionBadge> : undefined}
@@ -176,7 +178,7 @@ export function SmartCampusHomePage() {
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>
-          校方授权的官方校园服务入口。仅信息展示与指引，不在本终端采集任何个人信息。
+          校园服务信息专区。仅信息展示与指引，不在本终端采集任何个人信息；具体办理请以学校官方通知为准。
             </p>
           </div>
 
@@ -225,7 +227,14 @@ export function SmartCampusHomePage() {
             <section aria-label="校园扩展应用">
               <div className="sc-ext-head">
                 <h2>扩展应用</h2>
-                <span>校方审核后上架的校园服务，进入第三方前会有明确提示</span>
+                {/*
+                  ⚠️ 2026-08-11（CLAUDE.md §9）：原文为「校方审核后上架」。
+                  扩展应用的审核接口是**仅限平台管理员**的 admin-toolbox.controller.ts:28,149，
+                  系统里**没有校方审批角色，也没有校方审批记录**——无法证明学校审过。
+                  产品所有者已拍板采用「文案收敛」方案（不新建校方审批角色）。
+                  恢复条件：确实建立校方审批角色与记录后，方可改回「校方审核」。
+                */}
+                <span>经平台审核后上架的校园服务，进入第三方前会有明确提示</span>
               </div>
               <div className="sc-mod-grid">
                 {extensionItems.map((item) => (
