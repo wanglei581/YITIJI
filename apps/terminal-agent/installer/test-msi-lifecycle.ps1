@@ -14,6 +14,7 @@ $provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".
 $desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
 $desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
 $provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
+$runtimeSecurityPath = Join-Path $installRoot "provision\provisioning-runtime-security.ps1"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -83,6 +84,14 @@ function Assert-DesktopShortcut {
   if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
     throw "Local status panel desktop shortcut does not contain the fixed loopback URL"
   }
+}
+
+function Assert-InstalledRuntimeAcl {
+  if (-not (Test-Path -LiteralPath $runtimeSecurityPath -PathType Leaf)) {
+    throw "Installed runtime security helper is missing"
+  }
+  . $runtimeSecurityPath
+  Assert-RestrictedRuntime -Root $installRoot
 }
 
 function Add-EvidenceError([string]$Phase, [string]$Message) {
@@ -258,6 +267,7 @@ Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
 Assert-PanelShortcut
 Assert-ProvisioningShortcut
 Assert-DesktopShortcut
+Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
@@ -327,6 +337,7 @@ Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
 Assert-PanelShortcut
 Assert-ProvisioningShortcut
 Assert-DesktopShortcut
+Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped") {
   throw "Repair must preserve the unprovisioned stopped service"

@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PREDECESSOR_VERSION = "0.4.3"
-$CANDIDATE_VERSION = "0.4.4"
+$PREDECESSOR_VERSION = "0.4.4"
+$CANDIDATE_VERSION = "0.4.5"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
@@ -142,7 +142,7 @@ try {
   Assert-PanelShortcut
   Assert-ProvisioningShortcut
   if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
-    throw "0.4.3 predecessor desktop panel shortcut is missing"
+    throw "0.4.4 predecessor desktop panel shortcut is missing"
   }
 
   New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null

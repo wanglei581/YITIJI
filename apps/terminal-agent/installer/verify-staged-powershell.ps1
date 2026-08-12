@@ -57,4 +57,16 @@ for ($index = 0; $index -lt $expectedOrigins.Count; $index++) {
   }
 }
 
-Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed"
+$runtimeSecurity = Join-Path $provisionRoot "provisioning-runtime-security.ps1"
+. $runtimeSecurity
+if (Test-WriteLikeFileSystemRights ([System.Security.AccessControl.FileSystemRights]::ReadAndExecute)) {
+  throw "ReadAndExecute must not be classified as write-like access"
+}
+if (-not (Test-WriteLikeFileSystemRights ([System.Security.AccessControl.FileSystemRights]::Modify))) {
+  throw "Modify must be classified as write-like access"
+}
+if (-not (Test-WriteLikeFileSystemRights ([System.Security.AccessControl.FileSystemRights]::WriteData))) {
+  throw "WriteData must be classified as write-like access"
+}
+
+Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative"
