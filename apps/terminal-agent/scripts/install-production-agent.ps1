@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.7-production",
+  [string]$AgentVersion = "0.4.8-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -304,11 +304,17 @@ function Get-PreservedLocalSettings(
     Fail "Existing Agent config is not protected or valid JSON; refusing to overwrite local settings: $($_.Exception.Message)"
   }
 
-  foreach ($field in @("scanWatchFolder", "localApiBridgeToken")) {
+  foreach ($field in @("scanWatchFolder", "localApiBridgeToken", "localUpdateControlToken")) {
     $property = $existing.PSObject.Properties[$field]
     if ($null -eq $property) { continue }
     if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$property.Value)) {
       Fail "Existing Agent config has an invalid $field; refusing to discard or rewrite it"
+    }
+    if ($field -eq "localUpdateControlToken") {
+      try { $tokenBytes = [Convert]::FromBase64String([string]$property.Value) } catch { Fail "Existing Agent config has an invalid localUpdateControlToken; refusing to rewrite it" }
+      if ($tokenBytes.Length -ne 32 -or [Convert]::ToBase64String($tokenBytes) -ne [string]$property.Value) {
+        Fail "Existing Agent config has an invalid localUpdateControlToken; refusing to rewrite it"
+      }
     }
     $preserved[$field] = [string]$property.Value
   }
@@ -768,6 +774,15 @@ if (-not [string]::IsNullOrWhiteSpace($BindCode)) { $bindCodeFlowCount++ }
 if ($bindCodeFlowCount -gt 1) {
   Fail "Use only one BindCode input flow"
 }
+
+$effectiveUpdateControlToken = if ($preservedLocalSettings.Contains("localUpdateControlToken")) {
+  [string]$preservedLocalSettings["localUpdateControlToken"]
+} else {
+  $randomBytes = New-Object byte[] 32
+  $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $random.GetBytes($randomBytes) } finally { $random.Dispose() }
+  [Convert]::ToBase64String($randomBytes)
+}
 if ($UseExistingToken -and ($PromptForBindCode -or $BindCodeFromStandardInput -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
   Fail "Use either a BindCode flow or -UseExistingToken, not both"
 }
@@ -824,6 +839,7 @@ $config = [ordered]@{
   claimIntervalMs        = $ClaimIntervalMs
   localApiPort           = $effectiveLocalApiPort
   localApiAllowedOrigins = @($effectiveLocalApiAllowedOrigins)
+  localUpdateControlToken = $effectiveUpdateControlToken
 }
 if ($null -ne $effectiveScanWatchFolder) {
   $config.scanWatchFolder = $effectiveScanWatchFolder

@@ -8,6 +8,15 @@ on:
       - "pnpm-workspace.yaml"
       - ".github/workflows/windows-agent-installer.yml"
   workflow_dispatch:
+    inputs:
+      release_channel:
+        description: "Optional signed release channel"
+        required: false
+        default: "unsigned"
+        type: choice
+        options:
+          - unsigned
+          - stable
 
 permissions:
   contents: read
@@ -15,14 +24,20 @@ permissions:
 jobs:
   unsigned-msi-candidate:
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           # Installer provenance must identify the exact reviewed PR head, not GitHub's ephemeral merge ref.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Checkout exact 0.4.6 predecessor source
+      - name: Checkout exact 0.4.7 predecessor source
+        uses: actions/checkout@v4
+        with:
+          ref: 37545691107b58d518a66f0129a9268fd540458f
+          path: predecessor-0.4.7
+
+      - name: Checkout exact deployed 0.4.6 source
         uses: actions/checkout@v4
         with:
           ref: 7f7378ed734b0569dacc00d7bfefba717090b559
@@ -54,6 +69,10 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-staged-powershell.ps1 -StagingRoot apps/terminal-agent/installer/artifacts/staging
 
+      - name: Verify signed update manifest contract and tamper rejection
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-update-helper.ps1 -StagingRoot apps/terminal-agent/installer/artifacts/staging
+
       - name: Verify staged secure scan reader boundary
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
@@ -66,7 +85,14 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
 
-      - name: Build exact predecessor 0.4.6 upgrade fixture
+      - name: Build exact predecessor 0.4.7 upgrade fixture
+        shell: powershell
+        run: |
+          & predecessor-0.4.7/apps/terminal-agent/installer/build-staging.ps1
+          & predecessor-0.4.7/apps/terminal-agent/installer/build-msi.ps1
+          & predecessor-0.4.7/apps/terminal-agent/installer/build-exe.ps1
+
+      - name: Build exact deployed 0.4.6 upgrade fixture
         shell: powershell
         run: |
           & predecessor-0.4.6/apps/terminal-agent/installer/build-staging.ps1
@@ -88,14 +114,230 @@ jobs:
       - name: Exercise EXE predecessor-to-candidate upgrade
         shell: powershell
         run: |
+          $predecessor = Get-ChildItem predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
+            -PredecessorExePath $predecessor.FullName `
+            -CandidateExePath $candidate.FullName `
+            -ExpectedPredecessorVersion "0.4.7" `
+            -ExpectedCandidateVersion "0.4.8"
+
+      - name: Exercise deployed 0.4.6-to-candidate upgrade
+        shell: powershell
+        run: |
           $predecessor = Get-ChildItem predecessor-0.4.6/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
             -PredecessorExePath $predecessor.FullName `
-            -CandidateExePath $candidate.FullName
+            -CandidateExePath $candidate.FullName `
+            -ExpectedPredecessorVersion "0.4.6" `
+            -ExpectedCandidateVersion "0.4.8"
+
+      - name: Verify stable signing secrets are complete
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_PUBLISHER: ${{ secrets.WINDOWS_CODESIGN_PUBLISHER }}
+          WINDOWS_CODESIGN_THUMBPRINT: ${{ secrets.WINDOWS_CODESIGN_THUMBPRINT }}
+          TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML: ${{ secrets.TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML }}
+          TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML: ${{ secrets.TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML }}
+        run: |
+          $required = @(
+            $env:WINDOWS_CODESIGN_PFX_BASE64,
+            $env:WINDOWS_CODESIGN_PFX_PASSWORD,
+            $env:WINDOWS_CODESIGN_PUBLISHER,
+            $env:WINDOWS_CODESIGN_THUMBPRINT,
+            $env:TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML,
+            $env:TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML
+          )
+          if ($required | Where-Object { [string]::IsNullOrWhiteSpace($_) }) {
+            throw "Signed stable release requires all Windows signing and update-manifest secrets"
+          }
+          $rsaPrivate = [System.Security.Cryptography.RSA]::Create()
+          $rsaPublic = [System.Security.Cryptography.RSA]::Create()
+          try {
+            $rsaPrivate.FromXmlString($env:TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML)
+            $rsaPublic.FromXmlString($env:TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML)
+            if ($rsaPrivate.KeySize -lt 2048 -or $rsaPublic.KeySize -lt 2048) {
+              throw "Update manifest RSA keys must be at least 2048 bits"
+            }
+            $probe = [System.Text.Encoding]::UTF8.GetBytes("terminal-update-key-pair-check")
+            $signature = $rsaPrivate.SignData(
+              $probe,
+              [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+              [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+            )
+            if (-not $rsaPublic.VerifyData(
+              $probe,
+              $signature,
+              [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+              [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+            )) {
+              throw "Update manifest private/public keys do not form one key pair"
+            }
+          } finally {
+            $rsaPrivate.Dispose()
+            $rsaPublic.Dispose()
+          }
+
+      - name: Rebuild candidate with pinned stable update policy
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        env:
+          WINDOWS_CODESIGN_PUBLISHER: ${{ secrets.WINDOWS_CODESIGN_PUBLISHER }}
+          WINDOWS_CODESIGN_THUMBPRINT: ${{ secrets.WINDOWS_CODESIGN_THUMBPRINT }}
+          TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML: ${{ secrets.TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML }}
+        run: |
+          $policyRoot = Join-Path $env:RUNNER_TEMP "terminal-update-policy"
+          New-Item -ItemType Directory -Path $policyRoot -Force | Out-Null
+          $publicKeyPath = Join-Path $policyRoot "manifest-public.xml"
+          [System.IO.File]::WriteAllText($publicKeyPath, $env:TERMINAL_UPDATE_MANIFEST_PUBLIC_KEY_XML, [System.Text.UTF8Encoding]::new($false))
+          Remove-Item apps/terminal-agent/installer/artifacts/staging -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item apps/terminal-agent/installer/artifacts/msi -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item apps/terminal-agent/installer/artifacts/exe -Recurse -Force -ErrorAction SilentlyContinue
+          & apps/terminal-agent/installer/build-staging.ps1 `
+            -ManifestSignerPublicKeyPath $publicKeyPath `
+            -UpdatePublisher $env:WINDOWS_CODESIGN_PUBLISHER
+          & apps/terminal-agent/installer/build-msi.ps1
+
+      - name: Sign inner MSIs, build bundles, and sign outer EXEs
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_PUBLISHER: ${{ secrets.WINDOWS_CODESIGN_PUBLISHER }}
+          WINDOWS_CODESIGN_THUMBPRINT: ${{ secrets.WINDOWS_CODESIGN_THUMBPRINT }}
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "terminal-agent-codesign.pfx"
+          [System.IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_PFX_BASE64))
+
+          Remove-Item predecessor-0.4.7/apps/terminal-agent/installer/artifacts/msi -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe -Recurse -Force -ErrorAction SilentlyContinue
+          & predecessor-0.4.7/apps/terminal-agent/installer/build-msi.ps1
+          $rollbackMsi = Get-ChildItem predecessor-0.4.7/apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
+          & apps/terminal-agent/installer/sign-windows-release.ps1 `
+            -Paths $rollbackMsi.FullName `
+            -CertificatePath $certificatePath `
+            -CertificatePassword $env:WINDOWS_CODESIGN_PFX_PASSWORD `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -ExpectedThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT
+          & predecessor-0.4.7/apps/terminal-agent/installer/build-exe.ps1
+          $rollbackExe = Get-ChildItem predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          & apps/terminal-agent/installer/sign-windows-release.ps1 `
+            -Paths $rollbackExe.FullName `
+            -CertificatePath $certificatePath `
+            -CertificatePassword $env:WINDOWS_CODESIGN_PFX_PASSWORD `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -ExpectedThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT
+
+          $candidateMsi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
+          & apps/terminal-agent/installer/sign-windows-release.ps1 `
+            -Paths $candidateMsi.FullName `
+            -CertificatePath $certificatePath `
+            -CertificatePassword $env:WINDOWS_CODESIGN_PFX_PASSWORD `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -ExpectedThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT
+          & apps/terminal-agent/installer/build-exe.ps1
+          $candidateExe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          & apps/terminal-agent/installer/sign-windows-release.ps1 `
+            -Paths $candidateExe.FullName `
+            -CertificatePath $certificatePath `
+            -CertificatePassword $env:WINDOWS_CODESIGN_PFX_PASSWORD `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -ExpectedThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT
+          Remove-Item -LiteralPath $certificatePath -Force
+
+      - name: Exercise signed predecessor-to-candidate upgrade
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        run: |
+          $predecessor = Get-ChildItem predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
+            -PredecessorExePath $predecessor.FullName `
+            -CandidateExePath $candidate.FullName `
+            -ExpectedPredecessorVersion "0.4.7" `
+            -ExpectedCandidateVersion "0.4.8"
+
+      - name: Exercise signed candidate over deployed 0.4.6
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        run: |
+          $predecessor = Get-ChildItem predecessor-0.4.6/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
+            -PredecessorExePath $predecessor.FullName `
+            -CandidateExePath $candidate.FullName `
+            -ExpectedPredecessorVersion "0.4.6" `
+            -ExpectedCandidateVersion "0.4.8"
+
+      - name: Create signed stable update manifest
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        env:
+          WINDOWS_CODESIGN_PUBLISHER: ${{ secrets.WINDOWS_CODESIGN_PUBLISHER }}
+          WINDOWS_CODESIGN_THUMBPRINT: ${{ secrets.WINDOWS_CODESIGN_THUMBPRINT }}
+          TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML: ${{ secrets.TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML }}
+        run: |
+          $privateKeyPath = Join-Path $env:RUNNER_TEMP "manifest-private.xml"
+          [System.IO.File]::WriteAllText($privateKeyPath, $env:TERMINAL_UPDATE_MANIFEST_PRIVATE_KEY_XML, [System.Text.UTF8Encoding]::new($false))
+          $exe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $rollbackExe = Get-ChildItem predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $releaseRoot = "apps/terminal-agent/installer/artifacts/release"
+          & apps/terminal-agent/installer/create-update-manifest.ps1 `
+            -PackagePath $exe.FullName `
+            -PackageUrl "https://zyidai.cn/downloads/terminal-agent/0.4.8/AIJobPrintTerminalSetup.exe" `
+            -Version "0.4.8" `
+            -MinimumVersion "0.4.8" `
+            -Publisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -PackageCertificateThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT `
+            -ReleaseNotes "连续打印 Retained 误报修复与受控在线升级" `
+            -RollbackVersion "0.4.7" `
+            -RollbackPackagePath $rollbackExe.FullName `
+            -RollbackUrl "https://zyidai.cn/downloads/terminal-agent/0.4.7/AIJobPrintTerminalSetup.exe" `
+            -RollbackCertificateThumbprint $env:WINDOWS_CODESIGN_THUMBPRINT `
+            -SigningPrivateKeyPath $privateKeyPath `
+            -OutputPath (Join-Path $releaseRoot "manifest.json")
+          Remove-Item -LiteralPath $privateKeyPath -Force
+
+      - name: Verify final manifest with the client-pinned public key
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        shell: powershell
+        env:
+          WINDOWS_CODESIGN_PUBLISHER: ${{ secrets.WINDOWS_CODESIGN_PUBLISHER }}
+        run: |
+          $helper = "apps/terminal-agent/installer/artifacts/staging/provision/terminal-update-helper.ps1"
+          $manifest = "apps/terminal-agent/installer/artifacts/release/manifest.json"
+          $result = Join-Path $env:RUNNER_TEMP "stable-manifest-verification.json"
+          $env:CI = "true"
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper `
+            -Action Check `
+            -ManifestUri "https://zyidai.cn/downloads/terminal-agent/stable/manifest.json" `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -CurrentVersion "0.4.7" `
+            -TestManifestPath $manifest `
+            -ResultPath $result
+          if ($LASTEXITCODE -eq 0) { throw "A 0.4.7 client must be below the signed channel minimum version" }
+          $minimumFailure = Get-Content -Raw -Encoding UTF8 -LiteralPath $result | ConvertFrom-Json
+          if ($minimumFailure.code -ne "UPDATE_CURRENT_VERSION_TOO_OLD") { throw "Unexpected minimum-version result: $($minimumFailure.code)" }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $helper `
+            -Action Check `
+            -ManifestUri "https://zyidai.cn/downloads/terminal-agent/stable/manifest.json" `
+            -ExpectedPublisher $env:WINDOWS_CODESIGN_PUBLISHER `
+            -CurrentVersion "0.4.8" `
+            -TestManifestPath $manifest `
+            -ResultPath $result
+          if ($LASTEXITCODE -ne 0) { throw "Final manifest did not verify with the client-pinned public key" }
+          $verified = Get-Content -Raw -Encoding UTF8 -LiteralPath $result | ConvertFrom-Json
+          if ($verified.status -ne "up_to_date" -or $verified.candidateVersion -ne "0.4.8") {
+            throw "Final stable manifest verification returned an invalid result"
+          }
 
       - name: Upload unsigned test evidence
-        if: always()
+        if: ${{ always() && !(github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable') }}
         uses: actions/upload-artifact@v4
         with:
           name: terminal-agent-unsigned-installer-candidates
@@ -107,3 +349,16 @@ jobs:
             apps/terminal-agent/installer/artifacts/staging/manifest.json
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Upload signed stable release candidate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_channel == 'stable' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-signed-stable-release
+          path: |
+            apps/terminal-agent/installer/artifacts/msi/*.msi
+            apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe
+            predecessor-0.4.7/apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe
+            apps/terminal-agent/installer/artifacts/release/manifest.json
+          if-no-files-found: error
+          retention-days: 30

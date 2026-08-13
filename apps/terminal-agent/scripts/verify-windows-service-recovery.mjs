@@ -60,7 +60,9 @@ assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\][\s\S]{0,80}?\[switch
 assert.match(installer, /ConvertTo-CanonicalOrigin/, 'installer must validate every local API origin')
 assert.match(installer, /localApiAllowedOrigins\s*=\s*@\(\$effectiveLocalApiAllowedOrigins\)/, 'installer must persist the production Kiosk origins')
 assert.match(installer, /Get-PreservedLocalSettings/, 'installer upgrades must inspect existing local-only settings')
-assert.match(installer, /@\("scanWatchFolder", "localApiBridgeToken"\)/, 'installer upgrades must preserve scan and local bridge settings')
+assert.match(installer, /@\("scanWatchFolder", "localApiBridgeToken", "localUpdateControlToken"\)/, 'installer upgrades must preserve scan, bridge, and updater handshake settings')
+assert.match(installer, /RandomNumberGenerator\]::Create\(\)/, 'installer must generate the updater handshake token with a CSPRNG')
+assert.match(installer, /localUpdateControlToken\s*=\s*\$effectiveUpdateControlToken/, 'installer must persist the protected updater handshake token')
 assert.match(
   installer,
   /Get-PreservedLocalSettings[\s\S]{0,220}?-SkipOrigins \(\[bool\]\$ReplaceLocalApiAllowedOrigins\)/,

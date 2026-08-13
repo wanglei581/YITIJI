@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
   [string]$OutputDirectory,
-  [string]$CacheDirectory
+  [string]$CacheDirectory,
+  [string]$ManifestSignerPublicKeyPath,
+  [string]$UpdatePublisher
 )
 
 $ErrorActionPreference = "Stop"
@@ -174,6 +176,20 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\provision-terminal.cm
 Copy-WindowsPowerShellScript `
   -Source (Join-Path $PSScriptRoot "provision\terminal-control-center.ps1") `
   -Destination (Join-Path $provisionRoot "terminal-control-center.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\terminal-update-helper.ps1") `
+  -Destination (Join-Path $provisionRoot "terminal-update-helper.ps1")
+if (-not [string]::IsNullOrWhiteSpace($ManifestSignerPublicKeyPath) -or -not [string]::IsNullOrWhiteSpace($UpdatePublisher)) {
+  if ([string]::IsNullOrWhiteSpace($ManifestSignerPublicKeyPath) -or [string]::IsNullOrWhiteSpace($UpdatePublisher)) {
+    Fail "Online update release policy requires public key and publisher together"
+  }
+  & (Join-Path $PSScriptRoot "inject-update-policy.ps1") `
+    -HelperPath (Join-Path $provisionRoot "terminal-update-helper.ps1") `
+    -ControlCenterPath (Join-Path $provisionRoot "terminal-control-center.ps1") `
+    -ManifestSignerPublicKeyPath $ManifestSignerPublicKeyPath `
+    -Publisher $UpdatePublisher
+  if ($LASTEXITCODE -ne 0) { Fail "Online update release policy injection failed" }
+}
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\launch-control-center.vbs") -Destination $provisionRoot
 Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\install-production-agent.ps1") `

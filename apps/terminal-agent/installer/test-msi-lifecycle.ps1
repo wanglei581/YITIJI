@@ -15,6 +15,7 @@ $controlCenterShortcutName = -join ([char[]](0x7EC8, 0x7AEF, 0x63A7, 0x5236, 0x4
 $controlCenterShortcutPath = Join-Path $programMenuRoot ($controlCenterShortcutName + ".lnk")
 $controlCenterLauncherPath = Join-Path $installRoot "provision\launch-control-center.vbs"
 $controlCenterScriptPath = Join-Path $installRoot "provision\terminal-control-center.ps1"
+$updateHelperPath = Join-Path $installRoot "provision\terminal-update-helper.ps1"
 $runtimeSecurityPath = Join-Path $installRoot "provision\provisioning-runtime-security.ps1"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
@@ -94,7 +95,7 @@ function Assert-ControlCenterSmoke {
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
   if ($LASTEXITCODE -ne 0) { throw "Terminal control center smoke test failed" }
   $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
-  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.7") {
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.8") {
     throw "Terminal control center smoke snapshot is invalid"
   }
 }
@@ -165,6 +166,7 @@ function Export-LifecycleEvidence([string]$Phase) {
       Get-PayloadEvidence -Name "nodeRuntime" -RelativePath "node\node.exe"
       Get-PayloadEvidence -Name "agentEntrypoint" -RelativePath "app\dist\index.js"
       Get-PayloadEvidence -Name "secureScanReader" -RelativePath "app\native\secure-scan-reader.exe"
+      Get-PayloadEvidence -Name "updateHelper" -RelativePath "provision\terminal-update-helper.ps1"
     )
     $nodeVersion = $null
     $nodePath = Join-Path $installRoot "node\node.exe"
@@ -297,6 +299,7 @@ foreach ($relativeProvisionPath in @(
   "provision\install-production-agent.ps1",
   "provision\service-identity.ps1",
   "provision\terminal-control-center.ps1",
+  "provision\terminal-update-helper.ps1",
   "provision\launch-control-center.vbs"
 )) {
   if (-not (Test-Path -LiteralPath (Join-Path $installRoot $relativeProvisionPath) -PathType Leaf)) {

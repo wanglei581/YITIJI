@@ -238,6 +238,8 @@ jobs:
           pnpm exec ts-node scripts/verify-task-reliability.ts
           # Pure in-process scheduler control; proves wake coalescing without HTTP, DB, or hardware.
           pnpm run verify:task-runner-wake
+          # Loopback-only update drain/health handshake plus expiring maintenance lease; no installer or external network.
+          pnpm run verify:update-drain
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm exec ts-node scripts/verify-print-monitor-truth.ts
           pnpm run verify:network-diagnostics

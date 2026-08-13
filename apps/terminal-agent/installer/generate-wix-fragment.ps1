@@ -14,6 +14,7 @@ $excluded = @(
   "provision/install-production-agent.ps1",
   "provision/service-identity.ps1",
   "provision/terminal-control-center.ps1",
+  "provision/terminal-update-helper.ps1",
   "provision/launch-control-center.vbs"
 )
 

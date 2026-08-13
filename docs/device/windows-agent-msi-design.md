@@ -1,6 +1,6 @@
 # Windows Terminal Agent MSI 实施设计
 
-> 状态：B1 MSI 未签名候选已通过 Windows CI；B2 Burn EXE 源码候选已实施，尚待 Windows CI、签名、Provisioner GUI 和真机发布验收。
+> 状态：B1/B2 未签名 MSI/Burn 候选已通过既有 Windows CI；`0.4.8` 受控在线升级为本地代码候选，尚待最终 Windows CI、企业签名、固定发布源与真机升级/回滚验收。
 > 适用范围：Windows Terminal Agent 的首次安装、修复、卸载和同机升级。
 > 上位设计：[终端机队管理与安全换机设计](./terminal-fleet-management-design.md)。
 
@@ -113,7 +113,13 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 
 `apps/terminal-agent/installer/` 现已提供固定输入清单、Node 22 x64 staging、生产依赖裁剪、原生 ABI 探针、WiX v4 工程、install/repair/uninstall Windows CI 和未签名 MSI 构建。MSI 直接拥有 WinSW wrapper、配置和 SCM 注册，不调用 `node-windows install-service`；未激活服务为 Manual/Stopped，避免无配置主机反复失败重启。`%ProgramData%\AIJobPrintAgent` 作为永久状态目录保留，二进制安装到 `%ProgramFiles%\AIJobPrintAgent`。
 
-当前仍是 **NO-GO 发布候选**：B1 已由 PR #422 的干净 Windows CI 覆盖 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 和 ProgramData 保留，但 WinSW 与 MSI 仍未经本企业 Authenticode 签名；安全交互式 Provisioner GUI 与签名发布 manifest 仍在后续批次。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
+当前仍是 **NO-GO 发布候选**：B1 已由 PR #422 的干净 Windows CI 覆盖 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 和 ProgramData 保留，后续 `0.4.6` 也已加入安全交互式原生控制中心；但 WinSW、MSI 与 Burn EXE 仍未经本企业 Authenticode 签名，签名 stable manifest 和固定下载源也未发布。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
+
+### 8.3 `0.4.8` 受控在线升级候选
+
+`0.4.8` 在既有原生控制中心内增加“检查在线更新”，更新执行仍由独立 PowerShell helper 完成。生产 helper 固定只访问 `zyidai.cn/downloads/terminal-agent/` 的 HTTPS 443 且拒绝重定向，校验内置至少 2048-bit RSA 公钥签名的 stable manifest、候选及精确回滚 EXE 的字节大小、SHA-256、Authenticode 发布者和各自证书指纹；测试替代路径只在 CI 环境开放。“检查”返回的签名清单确认指纹会与用户安装确认绑定；确认窗口打开后，版本、包哈希、回滚包或发布说明任一变化都必须重新检查。Agent 的 loopback drain/health 接口使用受 ProgramData ACL 保护的随机控制凭据，不开放浏览器 CORS；只有停止新 claim 与扫描入口、当前完整打印周期和在途扫描上传结束且所有未解决状态回执为零时才安装。维护结束恢复领取采用幂等有界重试，恢复扫描入口时会立即清点期间到达的文件，不依赖下一轮定时清点。
+
+安装前的短期维护标记跨 MSI Major Upgrade 保留，使新 Agent 在本地数据库、凭据与云端新版本心跳确认前不领取任务；成功后恢复 claim，失败则卸载候选、安装预下载且已验签的旧版并再次健康检查。发布流水线必须先签内层 MSI，再构建并签外层 Burn EXE；版本包与回滚包上传成功后，最后原子替换 stable manifest。当前仓库没有企业 Authenticode 证书与 manifest 私钥，固定 nginx 下载目录也尚未发布，故该按钮在 unsigned 候选中明确 fail-closed；不得用自签名证书、未签名 artifact 或可变 URL 绕过。
 
 ## 9. B2 Burn EXE 候选（2026-08-06）
 

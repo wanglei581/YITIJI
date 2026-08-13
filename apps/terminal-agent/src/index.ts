@@ -12,13 +12,24 @@ import { PrintResult } from './printer/types'
 import {
   isAgentStartupError,
   loadConfig,
+  saveConfig,
   type AgentStartupErrorCode,
 } from './agent/config-manager'
 import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
 import { sendHeartbeat, startHeartbeat } from './agent/heartbeat'
-import { startScanWatcher } from './agent/scan-watcher'
+import { getActiveScanDeliveryCount, startScanWatcher } from './agent/scan-watcher'
 import { startTaskRunner } from './agent/task-runner'
+import { createUpdateDrainController } from './agent/update-drain'
+import {
+  clearUpdateMaintenanceMarker,
+  isUpdateMaintenanceRequested,
+  startUpdateMaintenanceLease,
+} from './agent/update-maintenance'
+import {
+  ensureLocalUpdateControlToken,
+  isValidLocalUpdateControlToken,
+} from './agent/update-control-token'
 import type { AgentConfig } from './agent/types'
 import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/qr-login-server'
 import type { LocalAgentPanelStatus } from './local-api/types'
@@ -91,6 +102,17 @@ program
     } catch (error) {
       failStartup(error, 'AGENT_REGISTRATION_FAILED')
     }
+    try {
+      config = ensureLocalUpdateControlToken(
+        config,
+        (updated) => saveConfig(updated, { requireExistingSecureProgramData: true }),
+      )
+    } catch (error) {
+      failStartup(error, 'AGENT_STARTUP_FAILED')
+    }
+    if (!isValidLocalUpdateControlToken(config.localUpdateControlToken)) {
+      failStartup(new Error('local update control token was not initialized'), 'AGENT_STARTUP_FAILED')
+    }
     // ── Step 5: Start heartbeat ───────────────────────────────────────────
     let panelCloudConnected = false
     let panelLastHeartbeatAt: string | null = null
@@ -123,10 +145,32 @@ program
     }
     const heartbeatTimer = startHeartbeat(heartbeatOptions, false)
     const panelScanHealth = inspectScanInputFolder(config.scanWatchFolder)
-    const scanWatcherHandle = startScanWatcher(config)
+    const maintenanceRequestedAtStartup = isUpdateMaintenanceRequested()
+    const scanWatcherHandle = startScanWatcher(config, {
+      startPaused: maintenanceRequestedAtStartup,
+    })
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────
     const taskRunner = startTaskRunner({ config, db })
+    if (maintenanceRequestedAtStartup) taskRunner.pause()
+    const updateDrain = createUpdateDrainController(taskRunner, db, {
+      isMaintenanceRequested: () => isUpdateMaintenanceRequested(),
+      clearMaintenanceRequest: () => clearUpdateMaintenanceMarker(),
+      getActiveScanDeliveryCount,
+      pauseScanWatcher: () => scanWatcherHandle?.pause(),
+      resumeScanWatcher: () => scanWatcherHandle?.resume(),
+    })
+    const updateMaintenanceTimer = startUpdateMaintenanceLease(taskRunner, {
+      pauseAdditionalIntake: () => scanWatcherHandle?.pause(),
+      resumeAdditionalIntake: () => scanWatcherHandle?.resume(),
+    })
+    if (updateMaintenanceTimer) {
+      warn('update: maintenance mode active; print claims are paused until updater health checks finish')
+    } else if (maintenanceRequestedAtStartup) {
+      // The marker may expire between the two bounded checks above.
+      scanWatcherHandle?.resume()
+      taskRunner.resume()
+    }
 
     // ── Step 7: Start offline PATCH retry loop ────────────────────────────
     const offlineRetryTimer = startOfflineRetry(config, db)
@@ -138,7 +182,14 @@ program
     let qrLocalServer: LocalQrServerHandle | null = null
     try {
       qrLocalServer = startQrLoginLocalServer(config, {
-        wakePrintQueue: taskRunner.wake,
+        wakePrintQueue: () => {
+          if (isUpdateMaintenanceRequested()) return { accepted: false, coalesced: false }
+          return taskRunner.wake()
+        },
+        getUpdateDrainStatus: updateDrain.status,
+        beginUpdateDrain: updateDrain.begin,
+        cancelUpdateDrain: updateDrain.cancel,
+        completeUpdateDrain: updateDrain.complete,
         getPanelStatus: () => {
           return {
             runtimeVersion: AGENT_RUNTIME_VERSION,
@@ -165,6 +216,7 @@ program
       log(`Agent: received ${signal}, shutting down...`)
       clearInterval(heartbeatTimer)
       taskRunner.stop()
+      if (updateMaintenanceTimer) clearInterval(updateMaintenanceTimer)
       clearInterval(offlineRetryTimer)
       clearInterval(scanDeletionAuditReporterTimer)
       void qrLocalServer?.close()

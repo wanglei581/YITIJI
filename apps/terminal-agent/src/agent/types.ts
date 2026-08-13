@@ -108,6 +108,8 @@ export interface AgentConfig {
    * 使旧 Kiosk 构建可以继续工作。
    */
   localApiBridgeToken?: string
+  /** LocalSystem-only updater handshake secret stored in the protected ProgramData config. */
+  localUpdateControlToken?: string
 
   // ── Written on first registration / loaded from encrypted file at startup ──
   /** Assigned by backend on registration. Persisted to config.json. */

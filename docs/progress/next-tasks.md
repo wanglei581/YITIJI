@@ -4,7 +4,7 @@
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
-- [~] **构建、安装并真机复验 Agent `0.4.7` 的 `Printing, Retained` 修复**：源码已完成“同配置打印机 + 同 taskId + 派发后 Event 307”补证及独立监控窗口加固，Node 22 专项/typecheck/build/Agent 门禁通过；目标机已是 `0.4.6`，故禁止依赖同版本覆盖，候选已推进为 `0.4.7`，动态门禁固定验证 `0.4.6@7f7378ed -> 0.4.7`。下一步先让同一最终 SHA 的 Windows MSI/EXE lifecycle 全绿并核对 manifest/SHA-256，再升级目标机、重启服务；先创建一笔新的一页黑白单面任务，随后连续创建三笔，逐笔要求 API 最终 `completed`、PrintService 有对应 307、队列无明确异常且现场确认实际出纸。旧失败任务不得手工改成功或重复打印。
+- [~] **构建、安装并真机复验 Agent `0.4.8`（含 `Printing, Retained` 修复和在线升级引导）**：`0.4.7@37545691` 的 Event 307 补证与独立监控窗口已通过 Windows CI，`0.4.8` 在其上只叠加受控 updater；目标机仍是 `0.4.6`。下一步先让同一最终 SHA 的 Windows MSI/EXE lifecycle 以精确 `0.4.6 -> 0.4.8` 和 `0.4.7 -> 0.4.8` 两条路径全绿，再配置企业 Authenticode 证书与独立 manifest RSA 密钥、生成/验签候选与回滚包并发布到固定 `zyidai.cn` 路径；由用户确认精确签名 EXE 后完成最后一次手工安装。随后先创建一笔一页黑白单面任务，再连续创建三笔，逐笔要求 API 最终 `completed`、PrintService 有对应 307、队列无明确异常且现场确认实际出纸。旧失败任务不得手工改成功或重复打印。
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
 - [ ] **Windows + 真实打印机现场验收**：在绑定终端上用本人测试 PDF 跑完“小程序建单 → 输入到机码 → 支付 → Agent claim → 实际出纸 → 进度回流”，保留 orderId/taskId、支付尝试 ID、Agent 脱敏日志和出纸照片。覆盖错码、错终端、未支付、过期、断网重试、连点/刷新不重复出纸；没有这组证据不得写“打印已可用”。
@@ -41,9 +41,9 @@
 
 ## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
 
-- [~] **交付 Terminal Agent `0.4.7` 可视化控制中心 + 连续打印修复候选**：`0.4.6` 已把安装后绑定、换机、打印机/扫描目录配置、服务启停/重启、运行状态、二维码链路自检和日志入口统一放入原生 WinForms GUI；`0.4.7` 保留该唯一 GUI，并加入连续打印 `Retained` 补证加固。下一步必须让同一最终 SHA 的 Windows 2022 CI 从精确 `0.4.6@7f7378ed` 构建 unsigned `0.4.7`，通过 PowerShell 5.1 解析、fresh install/repair/uninstall、GUI smoke 与 `0.4.6 -> 0.4.7` 升级；再下载并核对 manifest/hash，在真实 Windows/Pantum 设备验证面板可见、配置保留、重启、二维码自检及真实出纸。现场通过前不得写“全部正常”。
+- [~] **交付 Terminal Agent `0.4.8` 可视化控制中心 + 连续打印修复 + 在线升级候选**：`0.4.7@37545691` 已通过 Windows 2022 门禁，`0.4.8` 保留唯一 GUI 与日志入口，并新增“检查在线更新”。下一步必须让同一最终 SHA 从精确 `0.4.6` 和 `0.4.7` 两个基线通过 PowerShell 5.1、fresh install/repair/uninstall、GUI smoke 和升级门禁；签名 stable workflow 还须验证内层 MSI/外层 EXE、签名 manifest、固定发布路径和精确回滚包。真实 Windows/Pantum 设备需验证配置保留、服务恢复、二维码、打印以及升级/回滚全过程，现场通过前不得写“全部正常”。
 
-- [ ] **实现 Terminal Agent 受控在线升级闭环（用户已确认方向，独立于 `0.4.7` 打印修复）**：复用终端云管正式基线，不新增第二套后台入口。先建立稳定 HTTPS 发布 manifest（版本、适用范围、最低可升级版、大小、SHA-256、签名证书指纹、回滚版与说明）和 Authenticode 签名流水线；再提供独立于主 Agent 的 LocalSystem 更新助手，控制中心增加“检查更新/安装已批准版本”。升级必须先停止 claim、确认无当前打印/状态补报阻塞，随后下载暂存、验签验 hash、调用受控 MSI/Burn 升级、启动服务并验证本地面板 + 云端新版本心跳；失败自动回滚并留脱敏结果。禁止任意 URL、远程 shell、unsigned 包静默执行和打印中强制升级。完成 fresh/repair、断网、下载损坏、签名错误、安装失败、服务启动失败及真实 `N -> N+1 -> rollback` Windows 门禁后，再从单机手动检查升级扩展到后台灰度推送。
+- [~] **完成 Terminal Agent 受控在线升级外部门禁**：代码候选已实现固定 HTTPS + RSA 签名 manifest、候选/回滚双包 SHA-256 与 Authenticode 校验、随机本机控制 token、打印/扫描 drain、未解决状态回执阻塞、可续租维护标记、服务/本地数据库/凭据/云端心跳检查及自动卸载候选后回滚；控制中心只提供手动检查/确认安装，不支持任意 URL、远程 shell 或 unsigned 包。剩余必须完成：① 企业 Windows 代码签名证书；② 独立 manifest RSA 密钥在仓库外生成并写入 GitHub Secrets；③ signed stable workflow 和 PowerShell 5.1 全绿；④ nginx 固定目录以先版本包、最后原子替换 manifest 的顺序发布；⑤ Windows 真实 `0.4.8 -> N+1 -> rollback`、断网、篡改、安装失败、服务失败及在途打印/扫描门禁。全部完成前在线升级保持 fail-closed，不扩展后台灰度推送。
 
 - [~] **交付 Terminal Agent `0.4.5` Program Files ACL 判定修复候选**：`0.4.4` 已通过中文脚本与 Origin 合并，但真实设备因复合 `Modify` 权限掩码包含读取位，把标准 `Users: ReadAndExecute` 误判为可写。当前修复只检查原子写权限位并保持递归 owner/reparse/ACE 守卫；Windows PowerShell 5.1 门禁必须通过 `ReadAndExecute` 安全、`Modify/WriteData` 拒绝正反例，MSI lifecycle 必须在真实安装树执行 ACL helper。下一步由 Windows 2022 CI 从精确 `0.4.4@35cd2e81` 构建 unsigned `0.4.5`，通过 fresh install/repair/uninstall 与 `0.4.4 -> 0.4.5` 升级；再在报错机器直接升级并完成一次性绑定、服务启动、二维码自检、网站在线和真实出纸。禁止手工放宽 ACL，现场通过前不得宣称完成。
 

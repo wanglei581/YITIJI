@@ -95,6 +95,16 @@ const heartbeatIndex = indexSource.indexOf('const heartbeatTimer = startHeartbea
 assert.notEqual(readyDiagnosticIndex, -1, 'registration success must use the non-blocking ready diagnostic')
 assert.notEqual(heartbeatIndex, -1, 'agent entrypoint must start the heartbeat loop')
 assert.ok(readyDiagnosticIndex < heartbeatIndex, 'ready diagnostic must be attempted before heartbeat startup')
+assert.match(
+  indexSource,
+  /saveConfig\(updated, \{ requireExistingSecureProgramData: true \}\)/,
+  'updater token bootstrap must require the installer-protected ProgramData root',
+)
+assert.doesNotMatch(
+  configManagerSource,
+  /export function saveConfig\(config: AgentConfig\): void \{[\s\S]{0,180}?assertSecureProgramDataDirectory/,
+  'generic registration persistence must retain its first-install path before ProgramData hardening',
+)
 
 const valid = {
   apiBaseUrl: 'https://api.example.test/api/v1',
@@ -145,6 +155,10 @@ try {
   assertStartupError(
     () => parseConfigText(JSON.stringify({ ...valid, apiBaseUrl: '   ' })),
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
+  )
+  assertStartupError(
+    () => parseConfigText(JSON.stringify({ ...valid, localUpdateControlToken: 'weak-token' })),
+    'AGENT_CONFIG_INVALID_FIELD',
   )
   const optionalFallbackConfig = parseConfigText(JSON.stringify({
     ...valid,

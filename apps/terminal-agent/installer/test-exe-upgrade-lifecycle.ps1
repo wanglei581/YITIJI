@@ -1,12 +1,14 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$PredecessorExePath,
-  [Parameter(Mandatory = $true)][string]$CandidateExePath
+  [Parameter(Mandatory = $true)][string]$CandidateExePath,
+  [ValidatePattern("^\d+\.\d+\.\d+$")][string]$ExpectedPredecessorVersion = "0.4.7",
+  [ValidatePattern("^\d+\.\d+\.\d+$")][string]$ExpectedCandidateVersion = "0.4.8"
 )
 
 $ErrorActionPreference = "Stop"
-$PREDECESSOR_VERSION = "0.4.6"
-$CANDIDATE_VERSION = "0.4.7"
+$PREDECESSOR_VERSION = $ExpectedPredecessorVersion
+$CANDIDATE_VERSION = $ExpectedCandidateVersion
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
@@ -21,8 +23,10 @@ $controlCenterShortcutName = -join ([char[]](0x7EC8, 0x7AEF, 0x63A7, 0x5236, 0x4
 $controlCenterShortcutPath = Join-Path $programMenuRoot ($controlCenterShortcutName + ".lnk")
 $controlCenterScriptPath = Join-Path $installRoot "provision\terminal-control-center.ps1"
 $controlCenterLauncherPath = Join-Path $installRoot "provision\launch-control-center.vbs"
+$updateHelperPath = Join-Path $installRoot "provision\terminal-update-helper.ps1"
 $sentinelPath = Join-Path $stateRoot "installer-upgrade-state-sentinel.json"
 $logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
+$logPrefix = "upgrade-" + ($PREDECESSOR_VERSION -replace "\.", "-") + "-to-" + ($CANDIDATE_VERSION -replace "\.", "-")
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
 function Invoke-Bundle([string]$ExePath, [string]$Action, [string]$LogName) {
@@ -72,12 +76,15 @@ function Assert-PanelShortcut {
   }
 }
 
-function Assert-DesktopShortcut {
+function Assert-DesktopShortcut([bool]$RequireUpdateHelper = $false) {
   if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
     throw "$CANDIDATE_VERSION upgrade did not install the terminal control center desktop shortcut"
   }
   if (-not (Test-Path -LiteralPath $controlCenterScriptPath -PathType Leaf) -or -not (Test-Path -LiteralPath $controlCenterLauncherPath -PathType Leaf)) {
     throw "$CANDIDATE_VERSION upgrade did not install the terminal control center payload"
+  }
+  if ($RequireUpdateHelper -and -not (Test-Path -LiteralPath $updateHelperPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the online update helper"
   }
   if (-not (Test-Path -LiteralPath $controlCenterShortcutPath -PathType Leaf)) {
     throw "$CANDIDATE_VERSION upgrade did not install the terminal control center Start Menu shortcut"
@@ -85,7 +92,7 @@ function Assert-DesktopShortcut {
 }
 
 function Assert-ControlCenterSmoke([string]$ExpectedVersion) {
-  $outputPath = Join-Path $logRoot "upgrade-control-center-smoke.json"
+  $outputPath = Join-Path $logRoot ($logPrefix + "-control-center-" + ($ExpectedVersion -replace "\.", "-") + "-smoke.json")
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
   if ($LASTEXITCODE -ne 0) { throw "Upgraded terminal control center smoke test failed" }
   $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
@@ -113,12 +120,12 @@ try {
     throw "EXE upgrade lifecycle requires the Agent MSI product to be absent"
   }
 
-  Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install" -LogName "upgrade-predecessor-install.log"
+  Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install" -LogName ($logPrefix + "-predecessor-install.log")
   $predecessorInstalled = $true
   Assert-AgentProductVersion -ExpectedVersion $PREDECESSOR_VERSION
   Assert-StoppedManualService
   Assert-PanelShortcut
-  Assert-DesktopShortcut
+  Assert-DesktopShortcut -RequireUpdateHelper $false
   Assert-ControlCenterSmoke -ExpectedVersion $PREDECESSOR_VERSION
 
   New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -128,12 +135,12 @@ try {
     [System.Text.UTF8Encoding]::new($false)
   )
 
-  Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-candidate-install.log"
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName ($logPrefix + "-candidate-install.log")
   $candidateInstalled = $true
   Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
   Assert-StoppedManualService
   Assert-PanelShortcut
-  Assert-DesktopShortcut
+  Assert-DesktopShortcut -RequireUpdateHelper $true
   Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
@@ -147,14 +154,14 @@ try {
   $upgradeCompleted = $true
 
   Remove-Item -LiteralPath $nodePath -Force
-  Invoke-Bundle -ExePath $resolvedCandidate -Action "/repair" -LogName "upgrade-candidate-repair.log"
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/repair" -LogName ($logPrefix + "-candidate-repair.log")
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Candidate repair did not restore the managed Node runtime after upgrade"
   }
-  Assert-DesktopShortcut
+  Assert-DesktopShortcut -RequireUpdateHelper $true
   Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
 
-  Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName "upgrade-candidate-uninstall.log"
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName ($logPrefix + "-candidate-uninstall.log")
   $candidateInstalled = $false
   $predecessorInstalled = $false
   if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
@@ -180,14 +187,14 @@ try {
 } finally {
   if ($candidateInstalled) {
     try {
-      Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName "upgrade-cleanup-candidate.log"
+      Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName ($logPrefix + "-cleanup-candidate.log")
     } catch {
       Write-Warning "Candidate cleanup failed: $($_.Exception.Message)"
     }
   }
   if ($predecessorInstalled -and -not $upgradeCompleted) {
     try {
-      Invoke-Bundle -ExePath $resolvedPredecessor -Action "/uninstall" -LogName "upgrade-cleanup-predecessor.log"
+      Invoke-Bundle -ExePath $resolvedPredecessor -Action "/uninstall" -LogName ($logPrefix + "-cleanup-predecessor.log")
     } catch {
       Write-Warning "Predecessor cleanup failed: $($_.Exception.Message)"
     }

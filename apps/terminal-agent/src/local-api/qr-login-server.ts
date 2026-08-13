@@ -29,6 +29,11 @@ import type {
   BackendQrCreateResult,
 } from './wire'
 import { createLocalBridgeSessionStore, type LocalBridgeSessionStore } from './bridge-session'
+import {
+  handleLocalUpdateRoute,
+  sendLocalUpdateError,
+  type LocalUpdateRouteOptions,
+} from './update-routes'
 
 const DEFAULT_LOCAL_API_PORT = 9527
 const LOCAL_HOST = '127.0.0.1'
@@ -47,9 +52,8 @@ export interface LocalQrServerHandle {
   close: () => Promise<void>
 }
 
-export interface LocalQrServerOptions {
+export interface LocalQrServerOptions extends LocalUpdateRouteOptions {
   wakePrintQueue?: () => { accepted: boolean; coalesced: boolean }
-  getPanelStatus?: () => LocalAgentPanelStatus
 }
 
 export function startQrLoginLocalServer(
@@ -77,9 +81,14 @@ export function startQrLoginLocalServer(
     void handleRequest({ req, res, origins, claims, client, bridgeToken, bridgeSessions, config, options }).catch((error) => {
       const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
       const isPrintRoute = (req.url ?? '').startsWith('/local/print/')
-      const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
+      const isUpdateRoute = (req.url ?? '').startsWith('/local/update/')
+      const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : isUpdateRoute ? 'update' : 'qr'
       const mapped = localExceptionFromUnknown(error, context)
       if (mapped.status >= 500) warn(`local-qr: unexpected request error — ${safeErrorMessage(error)}`)
+      if (isUpdateRoute) {
+        sendLocalUpdateError(res, mapped.status, mapped.error)
+        return
+      }
       sendJson(
         res,
         mapped.status,
@@ -144,6 +153,8 @@ async function handleRequest(input: {
     sendLocalAgentStatusPanel(res, status)
     return
   }
+
+  if (await handleLocalUpdateRoute({ req, res, url, config, options })) return
 
   if (!isOriginAllowed(origin, origins)) {
     sendJson(
@@ -468,16 +479,20 @@ async function readJsonBody<T>(req: IncomingMessage, context: 'qr' | 'usb' = 'qr
   return parsed as T
 }
 
-async function assertEmptyBody(req: IncomingMessage): Promise<void> {
+async function assertEmptyBody(
+  req: IncomingMessage,
+  prefix = 'LOCAL_PRINT',
+  message = '本机打印唤醒不接受请求体',
+): Promise<void> {
   let bytes = 0
   for await (const chunk of req) {
     bytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk))
     if (bytes > MAX_BODY_BYTES) {
-      throw { status: 413, error: { code: 'LOCAL_PRINT_BODY_TOO_LARGE', message: '请求体过大' } } satisfies LocalApiException
+      throw { status: 413, error: { code: `${prefix}_BODY_TOO_LARGE`, message: '请求体过大' } } satisfies LocalApiException
     }
   }
   if (bytes > 0) {
-    throw { status: 400, error: { code: 'LOCAL_PRINT_BODY_NOT_ALLOWED', message: '本机打印唤醒不接受请求体' } } satisfies LocalApiException
+    throw { status: 400, error: { code: `${prefix}_BODY_NOT_ALLOWED`, message } } satisfies LocalApiException
   }
 }
 
@@ -505,8 +520,11 @@ function backendError(error: unknown, context: 'qr' | 'usb' = 'qr'): LocalApiExc
   return { status: 502, error: { code: fallbackCode, message: fallbackMessage } }
 }
 
-function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' = 'qr'): LocalApiException {
+function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' | 'update' = 'qr'): LocalApiException {
   if (isLocalApiException(error)) return error
+  if (context === 'update') {
+    return { status: 500, error: { code: 'LOCAL_UPDATE_INTERNAL_ERROR', message: '本机升级控制服务异常' } }
+  }
   if (context === 'print') {
     return { status: 500, error: { code: 'LOCAL_PRINT_INTERNAL_ERROR', message: '本机打印唤醒服务异常' } }
   }

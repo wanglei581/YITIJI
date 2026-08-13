@@ -39,6 +39,29 @@ export interface LocalPrintWakeResponse {
   coalesced: boolean
 }
 
+export type LocalUpdateDrainReason =
+  | 'ready'
+  | 'task_active'
+  | 'scan_active'
+  | 'status_receipts_pending'
+  | 'database_unavailable'
+
+export interface LocalUpdateDrainStatus {
+  acceptingClaims: boolean
+  activeTask: boolean
+  activeScanDeliveries: number
+  pendingStatusReceipts: number
+  ready: boolean
+  reason: LocalUpdateDrainReason
+}
+
+export interface LocalUpdateHealthStatus {
+  runtimeVersion: string
+  cloudConnected: boolean
+  localTaskDatabaseAvailable: boolean
+  credentialStatus: 'ready' | 'unauthorized'
+}
+
 /** PII-safe snapshot rendered by the read-only loopback status panel. */
 export interface LocalAgentPanelStatus {
   runtimeVersion: string

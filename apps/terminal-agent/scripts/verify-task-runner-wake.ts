@@ -44,6 +44,11 @@ async function main(): Promise<void> {
   })
 
   try {
+    assert.deepEqual(control.getStatus(), {
+      accepting: true,
+      inFlight: false,
+      rerunRequested: false,
+    })
     assert.deepEqual(control.wake(), { accepted: true, coalesced: false })
     await waitFor(() => cycles === 1)
 
@@ -64,6 +69,31 @@ async function main(): Promise<void> {
     gates[1]!.resolve()
     await waitFor(() => active === 0)
     assert.equal(errors.length, 0)
+
+    control.pause()
+    assert.deepEqual(control.wake(), { accepted: false, coalesced: false })
+    assert.equal(await control.drain(100), true)
+    assert.deepEqual(control.getStatus(), {
+      accepting: false,
+      inFlight: false,
+      rerunRequested: false,
+    })
+
+    control.resume()
+    assert.deepEqual(control.wake(), { accepted: true, coalesced: false })
+    await waitFor(() => cycles === 3)
+    const draining = control.drain(1_000)
+    assert.deepEqual(control.wake(), { accepted: false, coalesced: false })
+    gates[2]!.resolve()
+    assert.equal(await draining, true, 'drain must wait for the full active task cycle')
+    assert.equal(active, 0)
+
+    control.resume()
+    assert.deepEqual(control.wake(), { accepted: true, coalesced: false })
+    await waitFor(() => cycles === 4)
+    assert.equal(await control.drain(5), false, 'drain must fail closed when the cycle stays active')
+    gates[3]!.resolve()
+    await waitFor(() => active === 0)
   } finally {
     control.stop()
   }

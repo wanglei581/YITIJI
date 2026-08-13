@@ -11,15 +11,26 @@ if (-not (Test-Path -LiteralPath $provisionRoot -PathType Container)) {
   throw "Staged provision directory is missing: $provisionRoot"
 }
 
-$scripts = @(Get-ChildItem -LiteralPath $provisionRoot -Filter "*.ps1" -File | Sort-Object Name)
+$sourceOnlyReleaseScripts = @(
+  (Join-Path $PSScriptRoot "create-update-manifest.ps1"),
+  (Join-Path $PSScriptRoot "inject-update-policy.ps1"),
+  (Join-Path $PSScriptRoot "sign-windows-release.ps1"),
+  (Join-Path $PSScriptRoot "verify-update-helper.ps1")
+)
+$scripts = @(
+  @(Get-ChildItem -LiteralPath $provisionRoot -Filter "*.ps1" -File | Sort-Object Name)
+  $sourceOnlyReleaseScripts | ForEach-Object { Get-Item -LiteralPath $_ -ErrorAction Stop }
+)
 if ($scripts.Count -eq 0) {
   throw "No staged Windows PowerShell scripts were found"
 }
 
 foreach ($script in $scripts) {
-  $bytes = [System.IO.File]::ReadAllBytes($script.FullName)
-  if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-    throw "Windows PowerShell 5.1 script must be UTF-8 with BOM: $($script.Name)"
+  if ($script.DirectoryName -eq (Resolve-Path -LiteralPath $provisionRoot).Path) {
+    $bytes = [System.IO.File]::ReadAllBytes($script.FullName)
+    if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+      throw "Windows PowerShell 5.1 script must be UTF-8 with BOM: $($script.Name)"
+    }
   }
 
   $tokens = $null
@@ -93,4 +104,4 @@ if (Test-IsPrivilegedRuntimeSid "S-1-5-32-545") {
   throw "BUILTIN Users must not be treated as privileged"
 }
 
-Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) encoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative-inherit-only-trustedinstaller"
+Write-Host "STAGED_POWERSHELL_OK scripts=$($scripts.Count) stagedEncoding=UTF8-BOM parser=WindowsPowerShell originMerge=executed aclRights=positive-negative-inherit-only-trustedinstaller"

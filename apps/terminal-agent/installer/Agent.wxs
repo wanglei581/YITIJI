@@ -38,6 +38,7 @@
             <File Id="ProvisionProductionScript" Source="$(var.StagingRoot)\provision\install-production-agent.ps1" Checksum="yes" />
             <File Id="ProvisionServiceIdentity" Source="$(var.StagingRoot)\provision\service-identity.ps1" Checksum="yes" />
             <File Id="ControlCenterScript" Source="$(var.StagingRoot)\provision\terminal-control-center.ps1" Checksum="yes" />
+            <File Id="TerminalUpdateHelper" Source="$(var.StagingRoot)\provision\terminal-update-helper.ps1" Checksum="yes" />
             <File Id="ControlCenterLauncher" Source="$(var.StagingRoot)\provision\launch-control-center.vbs" KeyPath="yes" Checksum="yes" />
             <Shortcut
               Id="ControlCenterStartMenuShortcut"

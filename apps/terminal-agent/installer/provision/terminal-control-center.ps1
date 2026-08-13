@@ -9,14 +9,18 @@ $serviceName = "aijobprintagent.exe"
 $installRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $agentRoot = Join-Path $installRoot "app"
 $productionScript = Join-Path $PSScriptRoot "install-production-agent.ps1"
+$updateHelper = Join-Path $PSScriptRoot "terminal-update-helper.ps1"
 $configRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $configPath = Join-Path $configRoot "agent-config.json"
 $tokenPath = Join-Path $configRoot "agent.token"
-$logsRoot = Join-Path $configRoot "logs"
 $panelUrl = "http://127.0.0.1:9527/local/panel"
 $siteUrl = "https://zyidai.cn"
 $apiBase = "https://zyidai.cn/api/v1"
-$agentVersion = "0.4.7-production"
+$agentVersion = "0.4.8-production"
+$updateManifestUri = "https://zyidai.cn/downloads/terminal-agent/stable/manifest.json"
+$updatePublisherBase64 = ""
+$updatePublisher = if ([string]::IsNullOrWhiteSpace($updatePublisherBase64)) { "" } else { [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($updatePublisherBase64)) }
+$logsRoot = Join-Path $configRoot "logs"
 
 function Test-IsAdministrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -119,9 +123,10 @@ function Add-Log([string]$Message) {
 }
 
 function Set-Busy([bool]$Busy, [string]$Message = "") {
-  foreach ($control in @($bindButton, $saveButton, $startButton, $restartButton, $refreshButton, $qrButton)) {
+  foreach ($control in @($bindButton, $saveButton, $startButton, $restartButton, $refreshButton, $panelButton, $qrButton, $updateButton, $logsButton)) {
     $control.Enabled = -not $Busy
   }
+  $form.ControlBox = -not $Busy
   $form.UseWaitCursor = $Busy
   if (-not [string]::IsNullOrWhiteSpace($Message)) { $statusText.Text = $Message }
   [System.Windows.Forms.Application]::DoEvents()
@@ -212,11 +217,50 @@ function Test-QrBridge {
   }
 }
 
+function Invoke-UpdateHelper([string]$Action, [string]$ExpectedCandidateVersion = "", [string]$ExpectedManifestApprovalId = "") {
+  if (-not (Test-Path -LiteralPath $updateHelper -PathType Leaf)) { throw "在线升级组件缺失，请修复安装" }
+  if ([string]::IsNullOrWhiteSpace($updatePublisher)) {
+    throw "在线升级发布通道尚未配置企业代码签名证书"
+  }
+  $arguments = @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Quote-ProcessArgument $updateHelper),
+    "-Action", $Action,
+    "-ManifestUri", (Quote-ProcessArgument $updateManifestUri),
+    "-ExpectedPublisher", (Quote-ProcessArgument $updatePublisher),
+    "-CurrentVersion", (Quote-ProcessArgument $agentVersion.Replace("-production", ""))
+  )
+  if ($Action -eq "Install") {
+    if ([string]::IsNullOrWhiteSpace($ExpectedCandidateVersion) -or $ExpectedManifestApprovalId -notmatch "^[A-Fa-f0-9]{64}$") { throw "安装更新前必须重新检查并确认签名清单" }
+    $arguments += @(
+      "-ExpectedCandidateVersion", (Quote-ProcessArgument $ExpectedCandidateVersion),
+      "-ExpectedManifestApprovalId", (Quote-ProcessArgument $ExpectedManifestApprovalId)
+    )
+  }
+  $resultPath = Join-Path $configRoot ("updates\control-center-result-" + $PID + ".json")
+  $arguments += @("-ResultPath", (Quote-ProcessArgument $resultPath))
+  Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
+  $process = Start-Process -FilePath "powershell.exe" -ArgumentList ($arguments -join " ") -PassThru -WindowStyle Hidden
+  while (-not $process.WaitForExit(250)) {
+    [System.Windows.Forms.Application]::DoEvents()
+  }
+  try {
+    if (-not (Test-Path -LiteralPath $resultPath -PathType Leaf)) { throw "在线升级未返回结果" }
+    $result = Get-Content -Raw -Encoding UTF8 -LiteralPath $resultPath | ConvertFrom-Json -ErrorAction Stop
+  } finally {
+    Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
+  }
+  if ($process.ExitCode -ne 0 -and [string]$result.status -ne "rolled_back") {
+    $detail = if ([string]::IsNullOrWhiteSpace([string]$result.message)) { "请查看本机更新日志" } else { [string]$result.message }
+    throw "在线升级操作失败（$($result.code)）：$detail"
+  }
+  return $result
+}
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "AI 求职打印服务终端 - 控制中心"
 $form.StartPosition = "CenterScreen"
-$form.Size = New-Object System.Drawing.Size(940, 720)
-$form.MinimumSize = New-Object System.Drawing.Size(940, 720)
+$form.Size = New-Object System.Drawing.Size(940, 760)
+$form.MinimumSize = New-Object System.Drawing.Size(940, 760)
 $form.MaximizeBox = $false
 $form.BackColor = [System.Drawing.ColorTranslator]::FromHtml("#F1F5F9")
 $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10)
@@ -241,7 +285,7 @@ $summary.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $terminalText = New-Label "终端：尚未绑定" 22 14 280 26
 $terminalText.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 11, [System.Drawing.FontStyle]::Bold)
 $serviceText = New-Label "服务：正在检查" 316 14 250 26
-$versionText = New-Label "版本：0.4.7" 588 14 180 26
+$versionText = New-Label "版本：0.4.8" 588 14 180 26
 $statusText = New-Label "正在读取本机状态…" 22 46 820 24
 $statusText.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#64748B")
 $summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText))
@@ -282,19 +326,20 @@ $form.Controls.Add($settings)
 $actions = New-Object System.Windows.Forms.GroupBox
 $actions.Text = "运行与维护"
 $actions.Location = New-Object System.Drawing.Point(24, 426)
-$actions.Size = New-Object System.Drawing.Size(884, 98)
+$actions.Size = New-Object System.Drawing.Size(884, 142)
 $actions.BackColor = [System.Drawing.Color]::White
 $startButton = New-Button "启动服务" 20 34 120
 $restartButton = New-Button "重启服务" 150 34 120
 $refreshButton = New-Button "刷新检测" 280 34 120
 $panelButton = New-Button "打开运行状态" 410 34 130
 $qrButton = New-Button "二维码链路自检" 550 34 140
-$logsButton = New-Button "打开日志目录" 700 34 140
-$actions.Controls.AddRange(@($startButton, $restartButton, $refreshButton, $panelButton, $qrButton, $logsButton))
+$updateButton = New-Button "检查在线更新" 700 34 140
+$logsButton = New-Button "打开日志目录" 700 80 140
+$actions.Controls.AddRange(@($startButton, $restartButton, $refreshButton, $panelButton, $qrButton, $updateButton, $logsButton))
 $form.Controls.Add($actions)
 
 $logBox = New-Object System.Windows.Forms.TextBox
-$logBox.Location = New-Object System.Drawing.Point(24, 542)
+$logBox.Location = New-Object System.Drawing.Point(24, 586)
 $logBox.Size = New-Object System.Drawing.Size(884, 112)
 $logBox.Multiline = $true
 $logBox.ReadOnly = $true
@@ -383,6 +428,41 @@ $panelButton.Add_Click({ Start-Process $panelUrl })
 $logsButton.Add_Click({
   if (-not (Test-Path -LiteralPath $logsRoot)) { New-Item -ItemType Directory -Path $logsRoot -Force | Out-Null }
   Start-Process "explorer.exe" -ArgumentList (Quote-ProcessArgument $logsRoot)
+})
+$updateButton.Add_Click({
+  $closeAfterUpdate = $false
+  try {
+    Set-Busy $true "正在检查签名发布通道…"
+    $result = Invoke-UpdateHelper "Check"
+    if ([string]$result.status -eq "available") {
+      $answer = [System.Windows.Forms.MessageBox]::Show(
+        "发现版本 $($result.candidateVersion)。`r`n`r`n更新说明：$($result.releaseNotes)`r`n`r`n安装会先停止领取新任务，等待当前打印与扫描上传完成，并验证签名与 SHA-256。是否现在安装？",
+        "发现在线更新",
+        "YesNo",
+        "Question"
+      )
+      if ($answer -eq [System.Windows.Forms.DialogResult]::Yes) {
+        Add-Log "开始安装已验证的版本 $($result.candidateVersion)"
+        $installResult = Invoke-UpdateHelper "Install" ([string]$result.candidateVersion) ([string]$result.manifestApprovalId)
+        if ([string]$installResult.status -eq "rolled_back") {
+          [System.Windows.Forms.MessageBox]::Show("新版本未通过健康检查，终端已自动恢复到 $($installResult.rollbackVersion)，且打印任务领取已恢复。请联系维护人员查看更新日志。", "已自动回滚", "OK", "Warning") | Out-Null
+        } else {
+          $rebootMessage = if ($installResult.rebootRequired -eq $true) { "`r`n`r`nWindows 已标记需要重启，请在无打印任务时安排重启。" } else { "" }
+          [System.Windows.Forms.MessageBox]::Show("在线更新已完成，并已通过服务、本地数据库和云端心跳检查。$rebootMessage`r`n`r`n控制中心将关闭，请重新打开确认版本。", "更新完成", "OK", "Information") | Out-Null
+        }
+        $closeAfterUpdate = $true
+      }
+    } else {
+      Add-Log "当前已是最新版本"
+      [System.Windows.Forms.MessageBox]::Show("当前已是最新版本。", "检查更新", "OK", "Information") | Out-Null
+    }
+  } catch {
+    Add-Log "在线更新失败：$($_.Exception.Message)"
+    [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "在线更新不可用", "OK", "Warning") | Out-Null
+  } finally {
+    Set-Busy $false
+    if ($closeAfterUpdate) { $form.Close() } else { [void](Refresh-View) }
+  }
 })
 $qrButton.Add_Click({
   try {
