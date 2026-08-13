@@ -414,9 +414,9 @@ async function verifyLocalHttpRoutes(): Promise<void> {
   }
 }
 
-// ── Part 3: Agent 侧未配置令牌 → 整个 /local/usb/* 分支 fail-closed ──────────
-// （Part 2 只测了客户端漏传/传错 header；这里测服务端根本没配置令牌的实例，
-//   即使客户端带上"正确"的令牌也必须 403，且 QR 路由不受影响。）
+// ── Part 3: Agent 侧未配置静态令牌 → 随机令牌拒绝，动态 session 放行 ───────
+// （Part 2 测旧静态令牌兼容；这里证明服务端不配置静态令牌时仍 fail-closed，
+//   只有从精确允许 Origin 换取的短期 session 才能访问 USB 路由。）
 
 async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
   const backend = await startBackendStub()
@@ -448,6 +448,20 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
     assert.equal(denied.status, 403, 'unconfigured bridge token must fail closed even with a client-side token')
     assert.equal(denied.json.error.code, 'LOCAL_USB_BRIDGE_TOKEN_INVALID')
 
+    const session = await callJson<{
+      success: true
+      data: { token: string; expiresInSeconds: number }
+    }>(`${localBase}/local/bridge/session`, 'POST', { origin: ALLOWED_ORIGIN })
+    assert.equal(session.status, 200)
+    assert.equal(session.json.data.expiresInSeconds, 300)
+
+    const dynamicStatus = await callJson<{ success: true; data: { present: boolean } }>(
+      `${localBase}/local/usb/status`,
+      'GET',
+      { origin: ALLOWED_ORIGIN, bridgeToken: session.json.data.token },
+    )
+    assert.equal(dynamicStatus.status, 200, 'dynamic local session must authorize USB status')
+
     // QR 路由不受未配置 USB 令牌影响（错误码属于 QR 分支自身逻辑，而非被 403 挡下）
     const qr = await callJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
@@ -456,7 +470,7 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
     )
     assert.notEqual(qr.json.error?.code, 'LOCAL_USB_BRIDGE_TOKEN_INVALID', 'QR routes must not be gated by the USB bridge token')
 
-    console.log('PASS unconfigured-token instance fail-closed checks (server-side missing token → 403, QR unaffected)')
+    console.log('PASS unconfigured static token fails closed while dynamic local session authorizes USB')
   } finally {
     await handle.close()
     await backend.close()

@@ -1,22 +1,6 @@
 import { API_BASE_URL } from '../api/client'
+import { fetchProtectedLocalAgent } from '../localAgentBridge'
 import { MemberApiError, type LoginResult } from './memberAuthApi'
-
-const configuredLocalAgentBaseUrl = (import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim()
-const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:9527'
-// 与 U 盘导入本地网桥共用同一个静态令牌:随 Kiosk 构建注入,须与本机 Terminal Agent 的
-// localApiBridgeToken 配置一致,安装时一起下发。
-const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
-
-function requireLocalAgentHeaders(): HeadersInit {
-  if (!BRIDGE_TOKEN) {
-    throw new MemberApiError(
-      'LOCAL_QR_BRIDGE_TOKEN_MISSING',
-      '当前终端版本未配置扫码登录本地网桥',
-      0,
-    )
-  }
-  return { 'X-Local-Bridge-Token': BRIDGE_TOKEN }
-}
 
 interface Envelope<T> {
   success: boolean
@@ -80,28 +64,44 @@ async function callEnvelope<T>(
   return json.data
 }
 
+async function callLocalEnvelope<T>(path: string, body: unknown): Promise<T> {
+  let res: Response
+  try {
+    res = await fetchProtectedLocalAgent(path, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new MemberApiError('NETWORK_ERROR', '本机扫码登录服务未连接', 0)
+  }
+
+  if (!res.ok) {
+    let code = 'UNKNOWN_ERROR'
+    let message = `请求失败（${res.status}）`
+    try {
+      const payload = (await res.json()) as { error?: { code?: string; message?: string } }
+      code = payload.error?.code ?? code
+      message = payload.error?.message ?? message
+    } catch {
+      /* keep default */
+    }
+    throw new MemberApiError(code, message, res.status)
+  }
+
+  return ((await res.json()) as Envelope<T>).data
+}
+
 export function createQrLoginViaLocalAgent(input: {
   deviceId?: string
   deviceLabel?: string
   returnTo?: string
 }): Promise<LocalQrCreateResult> {
-  return callEnvelope<LocalQrCreateResult>(
-    LOCAL_AGENT_BASE_URL,
-    '/local/qr-login/create',
-    'POST',
-    input,
-    requireLocalAgentHeaders(),
-  )
+  return callLocalEnvelope<LocalQrCreateResult>('/local/qr-login/create', input)
 }
 
 export function claimQrLoginViaLocalAgent(ticketId: string): Promise<LoginResult> {
-  return callEnvelope<LoginResult>(
-    LOCAL_AGENT_BASE_URL,
-    '/local/qr-login/claim',
-    'POST',
-    { ticketId },
-    requireLocalAgentHeaders(),
-  )
+  return callLocalEnvelope<LoginResult>('/local/qr-login/claim', { ticketId })
 }
 
 export function fetchQrLoginStatus(ticketId: string): Promise<QrLoginStatusResult> {

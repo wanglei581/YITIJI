@@ -534,6 +534,18 @@ export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
     .all(now) as unknown as PendingPatch[]
 }
 
+/** Number of terminal-status receipts that are not durably resolved yet. */
+export function getUnresolvedPatchCount(db: AgentDatabase): number {
+  if (!db) return 0
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_patches
+       WHERE resolvedAt IS NULL`,
+    )
+    .get()
+  return Number(row?.['count'] ?? 0)
+}
+
 /** Return durable, operator-actionable terminal status failures. */
 export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
   if (!db) return []

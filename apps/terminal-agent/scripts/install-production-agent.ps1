@@ -46,12 +46,10 @@ param(
   [ValidateNotNullOrEmpty()]
   [string]$ApiBaseUrl,
 
-  [Parameter(Mandatory = $true)]
-  [ValidateNotNullOrEmpty()]
+  [Parameter(Mandatory = $false)]
   [string]$TerminalCode,
 
-  [Parameter(Mandatory = $true)]
-  [ValidateNotNullOrEmpty()]
+  [Parameter(Mandatory = $false)]
   [string]$TerminalId,
 
   [Parameter(Mandatory = $false)]
@@ -59,6 +57,9 @@ param(
 
   [Parameter(Mandatory = $false)]
   [switch]$PromptForBindCode,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$BindCodeFromStandardInput,
 
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
@@ -71,7 +72,10 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.0-production",
+  [string]$AgentVersion = "0.4.8-production",
+
+  [Parameter(Mandatory = $false)]
+  [string]$InstalledAgentRoot,
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -104,6 +108,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "service-identity.ps1")
+. (Join-Path $PSScriptRoot "provisioning-origin-utils.ps1")
+. (Join-Path $PSScriptRoot "provisioning-runtime-security.ps1")
 
 $agentServiceIdentity = "AIJobPrintAgent"
 
@@ -298,11 +304,17 @@ function Get-PreservedLocalSettings(
     Fail "Existing Agent config is not protected or valid JSON; refusing to overwrite local settings: $($_.Exception.Message)"
   }
 
-  foreach ($field in @("scanWatchFolder", "localApiBridgeToken")) {
+  foreach ($field in @("scanWatchFolder", "localApiBridgeToken", "localUpdateControlToken")) {
     $property = $existing.PSObject.Properties[$field]
     if ($null -eq $property) { continue }
     if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$property.Value)) {
       Fail "Existing Agent config has an invalid $field; refusing to discard or rewrite it"
+    }
+    if ($field -eq "localUpdateControlToken") {
+      try { $tokenBytes = [Convert]::FromBase64String([string]$property.Value) } catch { Fail "Existing Agent config has an invalid localUpdateControlToken; refusing to rewrite it" }
+      if ($tokenBytes.Length -ne 32 -or [Convert]::ToBase64String($tokenBytes) -ne [string]$property.Value) {
+        Fail "Existing Agent config has an invalid localUpdateControlToken; refusing to rewrite it"
+      }
     }
     $preserved[$field] = [string]$property.Value
   }
@@ -338,27 +350,6 @@ function Get-PreservedLocalSettings(
     $preserved["localApiAllowedOrigins"] = @($preservedOrigins)
   }
   return $preserved
-}
-
-function ConvertTo-SidValue([object]$IdentityReference) {
-  if ($IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
-    return [string]$IdentityReference.Value
-  }
-
-  $account = if ($IdentityReference -is [System.Security.Principal.NTAccount]) {
-    $IdentityReference
-  } else {
-    New-Object System.Security.Principal.NTAccount([string]$IdentityReference)
-  }
-  return [string]$account.Translate(
-    [System.Security.Principal.SecurityIdentifier]
-  ).Value
-}
-
-function Assert-NotReparsePoint([System.IO.FileSystemInfo]$Item) {
-  if (($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-    throw "Refusing filesystem reparse point: $($Item.FullName)"
-  }
 }
 
 function Assert-ProgramDataAcl([string]$Path, [bool]$IsContainer) {
@@ -445,53 +436,6 @@ function Set-ProgramDataAcl([string]$Path) {
 
   Set-Acl -LiteralPath $Path -AclObject $acl
   Assert-ProgramDataAcl -Path $Path -IsContainer $isContainer
-}
-
-function Assert-RestrictedRuntime([string]$Root) {
-  if ([string]::IsNullOrWhiteSpace($Root)) {
-    throw "Restricted runtime check requires a non-empty path"
-  }
-
-  $rootItem = Get-Item -Force -LiteralPath $Root -ErrorAction Stop
-  $pending = New-Object "System.Collections.Generic.Queue[System.IO.FileSystemInfo]"
-  $pending.Enqueue($rootItem)
-  $allowedSids = @("S-1-5-18", "S-1-5-32-544")
-  $dangerousRights = [System.Security.AccessControl.FileSystemRights]::Write -bor `
-    [System.Security.AccessControl.FileSystemRights]::Modify -bor `
-    [System.Security.AccessControl.FileSystemRights]::Delete -bor `
-    [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor `
-    [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
-    [System.Security.AccessControl.FileSystemRights]::TakeOwnership
-
-  while ($pending.Count -gt 0) {
-    $item = $pending.Dequeue()
-    Assert-NotReparsePoint $item
-
-    $acl = Get-Acl -LiteralPath $item.FullName -ErrorAction Stop
-    $ownerSid = ConvertTo-SidValue $acl.Owner
-    if ($allowedSids -notcontains $ownerSid) {
-      throw "Runtime owner must be SYSTEM or Administrators: $($item.FullName)"
-    }
-
-    foreach ($rule in @($acl.Access)) {
-      if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
-        continue
-      }
-      $sid = ConvertTo-SidValue $rule.IdentityReference
-      if (
-        $allowedSids -notcontains $sid -and
-        (($rule.FileSystemRights -band $dangerousRights) -ne 0)
-      ) {
-        throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName)"
-      }
-    }
-
-    if ($item.PSIsContainer) {
-      foreach ($child in @(Get-ChildItem -Force -LiteralPath $item.FullName -ErrorAction Stop)) {
-        $pending.Enqueue($child)
-      }
-    }
-  }
 }
 
 function Get-NodeModuleRoots([string]$StartPath) {
@@ -691,8 +635,16 @@ function Exchange-BindCode([string]$ApiBase, [string]$Code) {
   }
 }
 
-$repoRoot = Resolve-RepoRoot
-$agentRoot = Join-Path $repoRoot "apps\terminal-agent"
+$repoRoot = $null
+$installedMode = -not [string]::IsNullOrWhiteSpace($InstalledAgentRoot)
+if ($installedMode) {
+  $agentRoot = (Resolve-Path -LiteralPath $InstalledAgentRoot -ErrorAction Stop).Path
+  $runtimeSecurityRoot = (Resolve-Path -LiteralPath (Join-Path $agentRoot "..") -ErrorAction Stop).Path
+} else {
+  $repoRoot = Resolve-RepoRoot
+  $agentRoot = Join-Path $repoRoot "apps\terminal-agent"
+  $runtimeSecurityRoot = $agentRoot
+}
 $programDataDir = Join-Path $env:ProgramData "AIJobPrintAgent"
 $configPath = Join-Path $programDataDir "agent-config.json"
 $tokenPath = Join-Path $programDataDir "agent.token"
@@ -703,22 +655,21 @@ $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `
   -ProgramDataDir $programDataDir `
   -SkipOrigins ([bool]$ReplaceLocalApiAllowedOrigins)
-$localApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
 $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocalSettings.Contains("localApiAllowedOrigins")) {
   @($preservedLocalSettings["localApiAllowedOrigins"])
 } else {
   @()
 }
-foreach ($origin in @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) {
-  $canonicalOrigin = ConvertTo-CanonicalOrigin $origin
-  if (-not $localApiAllowedOrigins.Contains($canonicalOrigin)) { $localApiAllowedOrigins.Add($canonicalOrigin) }
-}
+$effectiveLocalApiAllowedOrigins = @(Merge-LocalApiAllowedOrigins `
+  -Origins (@($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) `
+  -CanonicalizeOrigin { param($originCandidate) ConvertTo-CanonicalOrigin $originCandidate })
 
 Write-Step "Production Agent hardening"
-Write-Host "Repo root    : $repoRoot"
+Write-Host "Runtime mode : $(if ($installedMode) { 'installed MSI' } else { 'repository' })"
+if ($null -ne $repoRoot) { Write-Host "Repo root    : $repoRoot" }
 Write-Host "Agent root   : $agentRoot"
 Write-Host "API base     : $apiBase"
-Write-Host "Terminal     : $TerminalCode / $TerminalId"
+Write-Host "Terminal     : $(if ($TerminalCode -or $TerminalId) { "$TerminalCode / $TerminalId" } else { '(from one-time bind code)' })"
 Write-Host "Printer      : $PrinterName"
 
 if ($apiBase -match "localhost|127\.0\.0\.1") {
@@ -731,14 +682,20 @@ if (-not (Test-Path (Join-Path $agentRoot "dist\index.js"))) {
   Fail "Compiled Agent not found: apps/terminal-agent/dist/index.js. Run pnpm --filter ./apps/terminal-agent build first."
 }
 
-$node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $node) { Fail "node.exe not found in PATH" }
-Write-Ok "Node found: $($node.Source)"
+$nodePath = $null
+if ($installedMode) {
+  $nodePath = (Resolve-Path -LiteralPath (Join-Path $agentRoot "..\node\node.exe") -ErrorAction Stop).Path
+} else {
+  $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+  if ($nodeCommand) { $nodePath = $nodeCommand.Source }
+}
+if ([string]::IsNullOrWhiteSpace($nodePath)) { Fail "node.exe not found for Agent runtime" }
+Write-Ok "Node found: $nodePath"
 
 Write-Step "Verifying restricted Agent runtime"
 try {
-  Assert-RestrictedRuntime -Root $agentRoot
-  Assert-RestrictedRuntime -Root $node.Source
+  Assert-RestrictedRuntime -Root $runtimeSecurityRoot
+  Assert-RestrictedRuntime -Root $nodePath
   $nodeModuleRoots = @(Get-NodeModuleRoots -StartPath $agentRoot)
   if ($nodeModuleRoots.Count -eq 0) {
     throw "No node_modules dependency root is available to the Agent runtime"
@@ -755,7 +712,7 @@ $preflightService = $null
 try {
   $preflightService = Resolve-AgentService -Identity $agentServiceIdentity
   if ($null -ne $preflightService) {
-    Assert-AgentServiceSecurity -Service $preflightService -AgentRoot $agentRoot
+    Assert-AgentServiceSecurity -Service $preflightService -AgentRoot $runtimeSecurityRoot
   }
 } catch {
   Fail "Existing Windows service failed the LocalSystem/runtime-path security check: $($_.Exception.Message)"
@@ -801,26 +758,6 @@ if (-not $PSBoundParameters.ContainsKey("LocalApiPort") -and $preservedLocalSett
   $effectiveLocalApiPort = $preservedLocalSettings["localApiPort"]
 }
 
-$config = [ordered]@{
-  apiBaseUrl             = $apiBase
-  terminalId             = $TerminalId.Trim()
-  terminalCode           = $TerminalCode.Trim()
-  printerName            = $PrinterName.Trim()
-  agentVersion           = $AgentVersion.Trim()
-  heartbeatIntervalMs    = $HeartbeatIntervalMs
-  claimIntervalMs        = $ClaimIntervalMs
-  localApiPort           = $effectiveLocalApiPort
-  localApiAllowedOrigins = @($localApiAllowedOrigins)
-}
-if ($null -ne $effectiveScanWatchFolder) {
-  $config.scanWatchFolder = $effectiveScanWatchFolder
-}
-if ($null -ne $effectiveBridgeToken) {
-  $config.localApiBridgeToken = $effectiveBridgeToken
-}
-
-$configJson = Test-GeneratedConfig -Config $config
-
 Write-Step "Hardening ProgramData ACL"
 New-Item -ItemType Directory -Path $programDataDir -Force | Out-Null
 Set-ProgramDataTreeAcl -Root $programDataDir
@@ -828,16 +765,33 @@ Write-Ok "ProgramData ACL restricted to SYSTEM + Administrators: $programDataDir
 
 Write-Step "Preparing token"
 $tokenToPersist = $null
-if ($PromptForBindCode -and -not [string]::IsNullOrWhiteSpace($BindCode)) {
-  Fail "Use either -PromptForBindCode or -BindCode, not both"
+$effectiveTerminalId = if ($null -ne $TerminalId) { $TerminalId.Trim() } else { "" }
+$effectiveTerminalCode = if ($null -ne $TerminalCode) { $TerminalCode.Trim() } else { "" }
+$bindCodeFlowCount = 0
+if ($PromptForBindCode) { $bindCodeFlowCount++ }
+if ($BindCodeFromStandardInput) { $bindCodeFlowCount++ }
+if (-not [string]::IsNullOrWhiteSpace($BindCode)) { $bindCodeFlowCount++ }
+if ($bindCodeFlowCount -gt 1) {
+  Fail "Use only one BindCode input flow"
 }
-if ($UseExistingToken -and ($PromptForBindCode -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
+
+$effectiveUpdateControlToken = if ($preservedLocalSettings.Contains("localUpdateControlToken")) {
+  [string]$preservedLocalSettings["localUpdateControlToken"]
+} else {
+  $randomBytes = New-Object byte[] 32
+  $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $random.GetBytes($randomBytes) } finally { $random.Dispose() }
+  [Convert]::ToBase64String($randomBytes)
+}
+if ($UseExistingToken -and ($PromptForBindCode -or $BindCodeFromStandardInput -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
   Fail "Use either a BindCode flow or -UseExistingToken, not both"
 }
 $effectiveBindCode = $BindCode
 if ($PromptForBindCode) {
   $secureBindCode = Read-Host "One-time terminal bind code" -AsSecureString
   $effectiveBindCode = ConvertFrom-SecureStringToPlainText $secureBindCode
+} elseif ($BindCodeFromStandardInput) {
+  $effectiveBindCode = [Console]::In.ReadLine()
 }
 if (-not [string]::IsNullOrWhiteSpace($effectiveBindCode)) {
   Write-Ok "Exchanging one-time bind code with cloud API"
@@ -845,34 +799,68 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveBindCode)) {
   $effectiveBindCode = $null
   $secureBindCode = $null
   $BindCode = $null
-  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalId) -or $exchange.terminalId -ne $TerminalId) {
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalId)) {
+    Fail "BindCode exchange did not return a terminalId"
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalCode)) {
+    Fail "BindCode exchange did not return a terminalCode"
+  }
+  if (-not [string]::IsNullOrWhiteSpace($effectiveTerminalId) -and $exchange.terminalId -ne $effectiveTerminalId) {
     Fail "BindCode exchange terminalId does not match the requested TerminalId"
   }
-  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalCode) -or $exchange.terminalCode -ne $TerminalCode) {
+  if (-not [string]::IsNullOrWhiteSpace($effectiveTerminalCode) -and $exchange.terminalCode -ne $effectiveTerminalCode) {
     Fail "BindCode exchange terminalCode does not match the requested TerminalCode"
   }
   if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalToken)) {
     Fail "BindCode exchange did not return a terminal token"
   }
+  $effectiveTerminalId = ([string]$exchange.terminalId).Trim()
+  $effectiveTerminalCode = ([string]$exchange.terminalCode).Trim()
   $tokenToPersist = ([string]$exchange.terminalToken).Trim()
+  $exchange = $null
 } elseif ($UseExistingToken) {
+  if ([string]::IsNullOrWhiteSpace($effectiveTerminalId) -or [string]::IsNullOrWhiteSpace($effectiveTerminalCode)) {
+    Fail "-UseExistingToken requires -TerminalId and -TerminalCode"
+  }
   if (-not (Test-TokenFile $tokenPath)) { Fail "-UseExistingToken passed, but token file is missing or empty: $tokenPath" }
   Write-Ok "Using existing DPAPI token: $tokenPath"
   Set-ProgramDataAcl -Path $tokenPath
 } else {
-  Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
+  Fail "Provide -PromptForBindCode, -BindCodeFromStandardInput (GUI), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
 }
+
+$config = [ordered]@{
+  apiBaseUrl             = $apiBase
+  terminalId             = $effectiveTerminalId
+  terminalCode           = $effectiveTerminalCode
+  printerName            = $PrinterName.Trim()
+  agentVersion           = $AgentVersion.Trim()
+  heartbeatIntervalMs    = $HeartbeatIntervalMs
+  claimIntervalMs        = $ClaimIntervalMs
+  localApiPort           = $effectiveLocalApiPort
+  localApiAllowedOrigins = @($effectiveLocalApiAllowedOrigins)
+  localUpdateControlToken = $effectiveUpdateControlToken
+}
+if ($null -ne $effectiveScanWatchFolder) {
+  $config.scanWatchFolder = $effectiveScanWatchFolder
+}
+if ($null -ne $effectiveBridgeToken) {
+  $config.localApiBridgeToken = $effectiveBridgeToken
+}
+$configJson = Test-GeneratedConfig -Config $config
 
 Write-Step "Writing production config and token"
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
+$credentialReplaced = $null -ne $tokenToPersist
 Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
+$tokenToPersist = $null
 try {
   Assert-RestrictedRuntime -Root $configPath
 } catch {
   Fail "Production config was written but its runtime permissions are unsafe; service will not be started: $($_.Exception.Message)"
 }
 Write-Ok "Production config written: $configPath"
-if ($null -ne $tokenToPersist) {
+if ($credentialReplaced) {
   Write-Ok "BindCode exchanged; token protected with DPAPI + ProgramData ACL"
   try {
     if (Test-Path -LiteralPath $unauthorizedMarkerPath) {
@@ -912,7 +900,11 @@ if (-not $SkipServiceInstall) {
     }
 
     if ($null -eq $service) {
-      & node "dist\index.js" install-service
+      if ($installedMode) {
+        Fail "MSI-installed Windows service is missing; repair the MSI before provisioning"
+      }
+      & $nodePath "dist\index.js" install-service
+      if ($LASTEXITCODE -ne 0) { Fail "Agent service installation failed with exit code $LASTEXITCODE" }
       Start-Sleep -Seconds 3
     } else {
       Write-Ok "Service already exists: $($service.Name) ($($service.DisplayName))"
@@ -926,8 +918,8 @@ if (-not $SkipServiceInstall) {
 
     if ($null -ne $service) {
       try {
-        Assert-RestrictedRuntime -Root $agentRoot
-        Assert-AgentServiceSecurity -Service $service -AgentRoot $agentRoot
+        Assert-RestrictedRuntime -Root $runtimeSecurityRoot
+        Assert-AgentServiceSecurity -Service $service -AgentRoot $runtimeSecurityRoot
       } catch {
         Stop-Service -Name ([string]$service.Name) -Force -ErrorAction SilentlyContinue
         Fail "Windows service failed the LocalSystem/runtime-path security check and was stopped: $($_.Exception.Message)"
@@ -945,7 +937,7 @@ if (-not $SkipServiceInstall) {
         if ($null -eq $service) {
           throw "AIJobPrintAgent disappeared after start"
         }
-        Assert-AgentServiceSecurity -Service $service -AgentRoot $agentRoot
+        Assert-AgentServiceSecurity -Service $service -AgentRoot $runtimeSecurityRoot
       } catch {
         Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
         Fail "Windows service failed its post-start security check and was stopped: $($_.Exception.Message)"
@@ -964,7 +956,7 @@ if (-not $SkipServiceInstall) {
 if (-not $SkipHeartbeatVerify) {
   Write-Step "Verifying remote heartbeat"
   Start-Sleep -Seconds 8
-  $statusUrl = "$apiBase/terminals/$TerminalId/printer-status"
+  $statusUrl = "$apiBase/terminals/$effectiveTerminalId/printer-status"
   try {
     $status = Invoke-RestMethod -Uri $statusUrl -Method Get -TimeoutSec 15
     $status | ConvertTo-Json -Depth 6
@@ -978,5 +970,5 @@ if (-not $SkipHeartbeatVerify) {
 }
 
 Write-Step "Done"
-Write-Ok "Production Agent is pinned to $apiBase and terminal $TerminalId."
+Write-Ok "Production Agent is pinned to $apiBase and terminal $effectiveTerminalId."
 Write-Host "Next: submit a print task from the cloud/Kiosk that points to this same API and terminal."

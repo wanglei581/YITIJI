@@ -7,6 +7,7 @@ $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $nodePath = Join-Path $installRoot "node\node.exe"
 $serviceName = "aijobprintagent.exe"
+$updateHelperPath = Join-Path $installRoot "provision\terminal-update-helper.ps1"
 $logRoot = Join-Path (Split-Path -Parent $resolvedExe) "lifecycle-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
@@ -41,6 +42,9 @@ try {
   Assert-StoppedManualService
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after EXE install"
+  }
+  if (-not (Test-Path -LiteralPath $updateHelperPath -PathType Leaf)) {
+    throw "Online update helper is missing after EXE install"
   }
   if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
     throw "ProgramData state directory is missing after EXE install"

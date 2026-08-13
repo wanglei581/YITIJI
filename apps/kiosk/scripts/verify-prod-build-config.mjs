@@ -63,9 +63,9 @@ mustEqual('VITE_API_MODE', 'http', 'A1 生产构建使用真实 API 模式')
 mustEqual('VITE_API_BASE_URL', '/api/v1', 'A2 生产构建使用同源 /api/v1')
 const bridgeToken = env('VITE_TERMINAL_AGENT_BRIDGE_TOKEN')
 if (bridgeToken.length >= 24) {
-  pass('A3 生产构建已配置本地网桥令牌')
+  pass('A3 生产构建保留旧终端静态网桥令牌兼容')
 } else {
-  fail('A3 VITE_TERMINAL_AGENT_BRIDGE_TOKEN 未配置或长度不足，扫码登录不会生成二维码')
+  pass('A3 新终端使用 Agent 动态本机会话，无需构建期网桥令牌')
 }
 const allowTextOnly = env('VITE_ALLOW_TEXT_ONLY_ASSISTANT') === 'true'
 if (allowTextOnly) {
@@ -95,15 +95,17 @@ if (!existsSync(ASSETS)) {
   else fail('B4 生产产物未包含 /local/terminal-identity，终端身份会不可用')
 
   const qrBridgeAsset = jsAssets.find(({ src }) =>
-    src.includes('/local/qr-login/create') && src.includes('X-Local-Bridge-Token'),
+    src.includes('/local/qr-login/create') &&
+    src.includes('/local/bridge/session') &&
+    src.includes('X-Local-Bridge-Token'),
   )
   if (qrBridgeAsset) pass(`B5 扫码登录本地网桥调用已生成 (${qrBridgeAsset.name})`)
   else fail('B5 生产产物未包含扫码登录本地网桥调用')
 
-  if (bridgeToken && qrBridgeAsset?.src.includes(bridgeToken)) {
-    pass('B6 本地网桥令牌已注入生产产物')
+  if (qrBridgeAsset?.src.includes('/local/bridge/session')) {
+    pass('B6 动态本机会话已注入生产产物，MSI 无需携带共享令牌')
   } else {
-    fail('B6 本地网桥令牌未注入生产产物，二维码创建会被 Agent 拒绝')
+    fail('B6 生产产物缺少动态本机会话，新的无令牌终端无法调用 Agent')
   }
 
   const terminalConsumerSources = [

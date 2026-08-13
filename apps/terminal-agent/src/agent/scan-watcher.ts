@@ -109,6 +109,13 @@ function formatDuration(ms: number): string {
 
 export interface ScanWatcherHandle {
   stop: () => Promise<void>
+  pause: () => void
+  resume: () => void
+}
+
+/** Number of scan files currently being read or delivered by this process. */
+export function getActiveScanDeliveryCount(): number {
+  return inFlightPaths.size
 }
 
 function snapshotCandidate(filePath: string, filename: string): ScanInputCandidateSnapshot & {
@@ -573,9 +580,13 @@ function sanitizedErrorCode(error: unknown, fallback: string): string {
 }
 
 /** 目录清点：处理当前已存在、不在 _unclaimed 子目录里的文件；同时清理 _unclaimed 里的过期文件。 */
-export async function sweepFolder(scanWatchFolder: string, config: AgentConfig): Promise<void> {
+export async function sweepFolder(
+  scanWatchFolder: string,
+  config: AgentConfig,
+  shouldContinue: () => boolean = () => true,
+): Promise<void> {
   sweepUnclaimedDir(scanWatchFolder)
-  if (isUnauthorized()) return
+  if (isUnauthorized() || !shouldContinue()) return
 
   const health = inspectScanInputFolder(scanWatchFolder)
   if (health.status !== 'ready') {
@@ -591,6 +602,7 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     return
   }
   for (const name of entries) {
+    if (!shouldContinue()) break
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(scanWatchFolder, name)
     try {
@@ -614,7 +626,10 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
  * 启动扫描监听。未配置 config.scanWatchFolder 时直接返回 undefined，
  * 不影响心跳 / claim 等其余 Agent 功能。
  */
-export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undefined {
+export function startScanWatcher(
+  config: AgentConfig,
+  options: { startPaused?: boolean } = {},
+): ScanWatcherHandle | undefined {
   const folder = config.scanWatchFolder?.trim()
   if (!folder) {
     log('scan-watcher: scanWatchFolder 未配置，跳过扫描监听')
@@ -628,6 +643,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   }
 
   log(`scan-watcher: watching ${folder}`)
+  let paused = options.startPaused ?? false
 
   const watcher: FSWatcher = chokidar.watch(folder, {
     ignoreInitial: true,
@@ -636,6 +652,7 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   })
 
   watcher.on('add', (filePath: string) => {
+    if (paused) return
     const filename = filePath.split(/[\\/]/).pop() ?? filePath
     processCandidate(filePath, filename, config).catch((e) => {
       err(`scan-watcher: processCandidate threw unexpectedly for ${filename}: ${axiosErrorMessage(e)}`)
@@ -647,11 +664,19 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   })
 
   // 启动时清点一次（处理 Agent 重启期间到达、被 ignoreInitial 跳过的文件）
-  void sweepFolder(folder, config)
+  void sweepFolder(folder, config, () => !paused)
 
-  const sweepTimer = setInterval(() => void sweepFolder(folder, config), SWEEP_INTERVAL_MS)
+  const sweepTimer = setInterval(() => {
+    if (!paused) void sweepFolder(folder, config, () => !paused)
+  }, SWEEP_INTERVAL_MS)
 
   return {
+    pause: () => { paused = true },
+    resume: () => {
+      const wasPaused = paused
+      paused = false
+      if (wasPaused) void sweepFolder(folder, config, () => !paused)
+    },
     stop: async () => {
       clearInterval(sweepTimer)
       await watcher.close()

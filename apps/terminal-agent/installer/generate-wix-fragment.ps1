@@ -8,7 +8,14 @@ $ErrorActionPreference = "Stop"
 $resolvedStaging = (Resolve-Path -LiteralPath $StagingRoot).Path.TrimEnd("\")
 $excluded = @(
   "bootstrap/aijobprintagent.exe",
-  "bootstrap/aijobprintagent.xml"
+  "bootstrap/aijobprintagent.xml",
+  "provision/provision-installed-agent.ps1",
+  "provision/provision-terminal.cmd",
+  "provision/install-production-agent.ps1",
+  "provision/service-identity.ps1",
+  "provision/terminal-control-center.ps1",
+  "provision/terminal-update-helper.ps1",
+  "provision/launch-control-center.vbs"
 )
 
 function Get-StableId([string]$Prefix, [string]$Value) {

@@ -3,7 +3,7 @@
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <DefineConstants>StagingRoot=$(StagingRoot);ProductVersion=$(ProductVersion)</DefineConstants>
+    <DefineConstants>StagingRoot=$(StagingRoot);ProductVersion=$(ProductVersion);InstallerSourceRoot=$(MSBuildProjectDirectory)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Agent.wxs" />

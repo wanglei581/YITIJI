@@ -13,6 +13,7 @@ import { log } from '../logger'
 import { clearUnauthorized } from './auth-state'
 import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
+import { isValidLocalUpdateControlToken } from './update-control-token'
 
 const LEGACY_CONFIG_DIRECTORY = path.resolve(__dirname, '../../config')
 const PERSISTED_SECRET_KEYS = new Set(['_comment', 'agentToken', 'adminSecret', 'bindCode'])
@@ -120,6 +121,17 @@ function requireOptionalString(value: unknown, field: string): string | undefine
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
+function requireOptionalUpdateControlToken(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || !isValidLocalUpdateControlToken(value)) {
+    throw new AgentStartupError(
+      'AGENT_CONFIG_INVALID_FIELD',
+      'agent-config.json has invalid localUpdateControlToken',
+    )
+  }
+  return value
+}
+
 function requireOptionalStringArray(value: unknown, field: string): string[] | undefined {
   if (value === undefined) return undefined
   if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
@@ -134,6 +146,7 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
   const adminSecret = requireOptionalNonEmptyString(config.adminSecret, 'adminSecret')
   const scanWatchFolder = requireOptionalString(config.scanWatchFolder, 'scanWatchFolder')
   const localApiBridgeToken = requireOptionalString(config.localApiBridgeToken, 'localApiBridgeToken')
+  const localUpdateControlToken = requireOptionalUpdateControlToken(config.localUpdateControlToken)
   const localApiAllowedOrigins = requireOptionalStringArray(
     config.localApiAllowedOrigins,
     'localApiAllowedOrigins',
@@ -153,6 +166,7 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
     adminSecret,
     scanWatchFolder,
     localApiBridgeToken,
+    localUpdateControlToken,
     localApiAllowedOrigins,
   }
 }
@@ -356,8 +370,14 @@ export function loadConfig(): AgentConfig {
 }
 
 /** Persist a credential-free, validated configuration and keep a manual recovery candidate. */
-export function saveConfig(config: AgentConfig): void {
+export function saveConfig(
+  config: AgentConfig,
+  options?: { requireExistingSecureProgramData?: boolean },
+): void {
   const paths = resolveAgentConfigPaths()
+  if (paths.usesProgramData && options?.requireExistingSecureProgramData) {
+    assertSecureProgramDataDirectory(path.dirname(paths.configPath))
+  }
   writeValidatedConfigAt(paths.configPath, paths.lastKnownGoodPath, config)
 }
 

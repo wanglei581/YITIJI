@@ -5,7 +5,7 @@
   "adminSecret": "change-me-before-deploy",
   "printerName": "",
   "scanWatchFolder": "",
-  "agentVersion": "0.3.0",
+  "agentVersion": "0.4.8",
   "heartbeatIntervalMs": 30000,
   "claimIntervalMs": 5000,
   "localApiPort": 9527,

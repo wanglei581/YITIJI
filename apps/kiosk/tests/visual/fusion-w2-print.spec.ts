@@ -203,7 +203,7 @@ test('print intake keeps three upload sources and a separate scan CTA @w2', asyn
   })
 
   await page.goto('/print/upload?source=document')
-  for (const label of ['选择文件 桌面验证', '扫码上传 手机/浏览器', 'U盘导入 本机未配置']) {
+  for (const label of ['选择文件 桌面验证', '扫码上传 手机/浏览器', 'U盘导入']) {
     await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible()
   }
   await expect(page.getByRole('button', { name: /扫描原件/ })).toBeVisible()
