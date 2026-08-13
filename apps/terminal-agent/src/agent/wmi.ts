@@ -263,37 +263,58 @@ export async function getPrintJobStatus(
 }
 
 /**
+ * Build the Windows PrintService completion query used by the runtime and by
+ * the Windows fixture verifier.
+ *
+ * Event 307's formatted Message is localized, and some vendor drivers record a
+ * port/driver alias (for example `Pantum USB001`) instead of the configured
+ * Windows queue display name.  The raw event XML still contains the submitted
+ * document name.  Image and PDF spooler document names both contain the unique
+ * taskId, so taskId + Event ID 307 + the dispatch lower bound is the stable
+ * correlation key.
+ */
+export function buildPrintServiceCompletionEventScript(): string {
+  return (
+    `$line = [Console]::In.ReadLine(); ` +
+    `$sep = $line.LastIndexOf('|'); ` +
+    `if ($sep -lt 1) { 'false'; exit }; ` +
+    `$tId = $line.Substring(0, $sep); ` +
+    `$since = [DateTimeOffset]::FromUnixTimeMilliseconds([Int64]$line.Substring($sep + 1)).LocalDateTime; ` +
+    `$event = Get-WinEvent -FilterHashtable @{ LogName='Microsoft-Windows-PrintService/Operational'; Id=307; StartTime=$since } -ErrorAction SilentlyContinue | ` +
+    `Where-Object { try { $_.ToXml() -like "*$tId*" } catch { $false } } | ` +
+    `Select-Object -First 1; ` +
+    `if ($event) { 'true' } else { 'false' }`
+  )
+}
+
+/**
  * Confirm that Windows PrintService recorded Event ID 307 for this exact task.
  *
  * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
- * `Printing, Retained` even after the spooler emitted its completion event.  We
- * only accept 307 when printer name and taskId both occur in the event message
- * and the event was created after this dispatch began.  This is spooler
- * completion evidence; it still does not prove that paper physically exited.
+ * `Printing, Retained` even after the spooler emitted its completion event. We
+ * accept only a successful 307 whose raw XML contains the exact sanitized task
+ * correlation id and whose timestamp is after this dispatch began. The queue
+ * display name is intentionally not a completion gate because Windows vendor
+ * drivers may replace it with a port alias in Event 307. This remains spooler
+ * completion evidence; it does not prove that paper physically exited.
  */
 export async function hasPrintServiceCompletionEvent(
-  printerName: string,
+  _printerName: string,
   taskId: string,
   dispatchedAtMs: number,
 ): Promise<boolean> {
   if (process.platform !== 'win32') return false
 
   const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
-  const safeSince = Number.isFinite(dispatchedAtMs) ? Math.max(0, Math.floor(dispatchedAtMs)) : 0
-  const script =
-    `$line = [Console]::In.ReadLine(); ` +
-    `$first = $line.IndexOf('|'); ` +
-    `$last = $line.LastIndexOf('|'); ` +
-    `if ($first -lt 1 -or $last -le $first) { 'false'; exit }; ` +
-    `$pName = $line.Substring(0, $first); ` +
-    `$tId = $line.Substring($first + 1, $last - $first - 1); ` +
-    `$since = [DateTimeOffset]::FromUnixTimeMilliseconds([Int64]$line.Substring($last + 1)).LocalDateTime; ` +
-    `$event = Get-WinEvent -FilterHashtable @{ LogName='Microsoft-Windows-PrintService/Operational'; Id=307; StartTime=$since } -ErrorAction SilentlyContinue | ` +
-    `Where-Object { $_.Message -like "*$pName*" -and $_.Message -like "*$tId*" } | ` +
-    `Select-Object -First 1; ` +
-    `if ($event) { 'true' } else { 'false' }`
+  if (safeTaskId.length === 0 || safeTaskId !== taskId || !Number.isFinite(dispatchedAtMs)) {
+    return false
+  }
+  const safeSince = Math.max(0, Math.floor(dispatchedAtMs))
 
-  const output = await runPowerShell(script, `${printerName}|${safeTaskId}|${safeSince}`)
+  const output = await runPowerShell(
+    buildPrintServiceCompletionEventScript(),
+    `${safeTaskId}|${safeSince}`,
+  )
   return output?.trim().toLowerCase() === 'true'
 }
 

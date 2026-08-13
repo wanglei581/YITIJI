@@ -672,6 +672,12 @@ export async function monitorPrintJob(
         break
 
       case 'not_found':
+        // A small job can finish and leave a non-retained queue before the
+        // first Get-PrintJob sample. Event 307 is stronger evidence than queue
+        // visibility when it carries this exact taskId after dispatch.
+        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         if (activeJobSeenOnce) {
           // The matching job was observed active and then removed. This confirms
           // the Windows spooler lifecycle only, not physical paper delivery.
@@ -689,7 +695,11 @@ export async function monitorPrintJob(
         break
 
       case 'unknown':
-        // Query failure — don't penalise; keep waiting.
+        // Get-PrintJob can fail independently of the Operational event log.
+        // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
+        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+          return { failed: false, errorCode: '' }
+        }
         paperEmptyCount = 0
         break
     }

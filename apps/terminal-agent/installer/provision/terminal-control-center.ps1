@@ -16,7 +16,7 @@ $logsRoot = Join-Path $configRoot "logs"
 $panelUrl = "http://127.0.0.1:9527/local/panel"
 $siteUrl = "https://zyidai.cn"
 $apiBase = "https://zyidai.cn/api/v1"
-$agentVersion = "0.4.8-production"
+$agentVersion = "0.4.9-production"
 
 function Test-IsAdministrator {
   $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -241,7 +241,7 @@ $summary.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $terminalText = New-Label "终端：尚未绑定" 22 14 280 26
 $terminalText.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 11, [System.Drawing.FontStyle]::Bold)
 $serviceText = New-Label "服务：正在检查" 316 14 250 26
-$versionText = New-Label "版本：0.4.8" 588 14 180 26
+$versionText = New-Label "版本：0.4.9" 588 14 180 26
 $statusText = New-Label "正在读取本机状态…" 22 46 820 24
 $statusText.ForeColor = [System.Drawing.ColorTranslator]::FromHtml("#64748B")
 $summary.Controls.AddRange(@($terminalText, $serviceText, $versionText, $statusText))

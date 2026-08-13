@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { monitorPrintJob } from '../src/agent/task-runner'
-import { parsePrintJobStatus, type PrintJobMonitorStatus } from '../src/agent/wmi'
+import {
+  buildPrintServiceCompletionEventScript,
+  parsePrintJobStatus,
+  type PrintJobMonitorStatus,
+} from '../src/agent/wmi'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
 import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
 
@@ -12,6 +17,63 @@ interface Scenario {
   completionEvent?: boolean
   initialNow?: number
   dispatchedAtMs?: number
+}
+
+function verifyPrintServiceCompletionScriptContract(): void {
+  const script = buildPrintServiceCompletionEventScript()
+  assert.match(
+    script,
+    /LogName='Microsoft-Windows-PrintService\/Operational'; Id=307; StartTime=\$since/,
+    'completion evidence must be a PrintService 307 emitted after dispatch',
+  )
+  assert.match(
+    script,
+    /\$_\.ToXml\(\) -like "\*\$tId\*"/,
+    'completion correlation must inspect locale-independent Event XML for the taskId',
+  )
+  assert.doesNotMatch(
+    script,
+    /\.Message|\$pName/,
+    'localized message text and vendor-specific printer aliases must not gate completion',
+  )
+
+  if (process.platform !== 'win32') return
+
+  const taskId = 'ptask_kiosk_0123456789abcdef'
+  const runFixture = (xml: string): string => {
+    const escapedXml = xml.replace(/'/g, "''")
+    const fixtureScript =
+      `function Get-WinEvent { [CmdletBinding()] param([hashtable]$FilterHashtable); ` +
+      `if ($FilterHashtable.LogName -ne 'Microsoft-Windows-PrintService/Operational' -or ` +
+      `$FilterHashtable.Id -ne 307 -or $null -eq $FilterHashtable.StartTime) { return }; ` +
+      `$fixture = [pscustomobject]@{ Xml = '${escapedXml}' }; ` +
+      `$fixture | Add-Member -MemberType ScriptMethod -Name ToXml -Value { $this.Xml }; ` +
+      `$fixture }; ` +
+      script
+    const result = spawnSync(
+      'powershell',
+      ['-NonInteractive', '-NoProfile', '-Command', fixtureScript],
+      { input: `${taskId}|${Date.now()}`, encoding: 'utf8' },
+    )
+    assert.equal(result.status, 0, `PowerShell completion fixture failed: ${result.stderr}`)
+    return result.stdout.trim().toLowerCase()
+  }
+
+  assert.equal(
+    runFixture(
+      `<Event><EventData><Data Name="Param2">print_${taskId}_fixture.pdf</Data>` +
+        `<Data Name="Param5">Pantum USB001</Data></EventData></Event>`,
+    ),
+    'true',
+    'a matching taskId must confirm even when Event 307 contains only a driver/port alias',
+  )
+  assert.equal(
+    runFixture(
+      '<Event><EventData><Data Name="Param2">print_other_task_fixture.pdf</Data></EventData></Event>',
+    ),
+    'false',
+    'an unrelated Event 307 must not confirm the task',
+  )
 }
 
 async function runScenario(scenario: Scenario): Promise<void> {
@@ -50,6 +112,8 @@ async function runScenario(scenario: Scenario): Promise<void> {
 
 async function main(): Promise<void> {
   const failures: string[] = []
+
+  verifyPrintServiceCompletionScriptContract()
 
   const imageTaskId = 'ptask_kiosk_0123456789abcdef'
   const fixedUuid = '11111111-2222-4333-8444-555555555555'
@@ -99,10 +163,24 @@ async function main(): Promise<void> {
       expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
     },
     {
+      name: 'fast job left queue before first poll but has matching PrintService 307',
+      statuses: ['not_found'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+    },
+    {
       name: 'spooler query remains unknown until timeout',
       statuses: ['unknown'],
       expectedFailed: true,
       expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'spooler query unavailable but matching PrintService 307 confirms completion',
+      statuses: ['unknown'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
     },
     {
       name: 'job remains printing until timeout',
