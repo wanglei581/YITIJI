@@ -53,7 +53,7 @@ jobs:
       - name: Verify Windows PrintService completion correlation
         shell: powershell
         working-directory: apps/terminal-agent
-        run: pnpm exec ts-node scripts/verify-print-monitor-truth.ts
+        run: node installer/verify-printservice-completion.mjs
 
       - name: Parse staged provisioning scripts with Windows PowerShell 5.1
         shell: powershell

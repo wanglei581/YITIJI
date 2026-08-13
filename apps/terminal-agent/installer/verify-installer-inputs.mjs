@@ -20,6 +20,7 @@ const provisionLauncher = read('provision/provision-terminal.cmd')
 const controlCenter = read('provision/terminal-control-center.ps1')
 const controlCenterLauncher = read('provision/launch-control-center.vbs')
 const stagedPowerShellVerify = read('verify-staged-powershell.ps1')
+const printServiceCompletionVerify = read('verify-printservice-completion.mjs')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
 const agentCli = fs.readFileSync(path.join(root, '../src/index.ts'), 'utf8')
 const runtimeVersion = fs.readFileSync(path.join(root, '../src/runtime-version.ts'), 'utf8')
@@ -320,8 +321,11 @@ assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
 assert.match(
   workflow,
-  /working-directory: apps\/terminal-agent[\s\S]*?pnpm exec ts-node scripts\/verify-print-monitor-truth\.ts/,
+  /working-directory: apps\/terminal-agent[\s\S]*?node installer\/verify-printservice-completion\.mjs/,
 )
+assert.match(printServiceCompletionVerify, /require\('\.\.\/dist\/agent\/wmi\.js'\)/)
+assert.match(printServiceCompletionVerify, /Pantum USB001/)
+assert.match(printServiceCompletionVerify, /print_other_task_fixture\.pdf/)
 assert.match(workflow, /ref: bf0cc2ebfa9b759126dd855d9d242311bcf52564/)
 assert.match(workflow, /verify-staged-powershell\.ps1/)
 assert.match(workflow, /path: predecessor-0\.4\.8/)
