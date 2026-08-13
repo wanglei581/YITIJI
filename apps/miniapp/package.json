@@ -7,6 +7,6 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs"
+    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs"
   }
 }

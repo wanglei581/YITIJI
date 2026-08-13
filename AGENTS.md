@@ -51,6 +51,7 @@ AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 
 
 ```
 apps/kiosk/          # 一体机前台
+apps/miniapp/        # 原生微信小程序（唯一发布源）
 apps/admin/          # 管理员后台
 apps/partner/        # 合作机构后台
 apps/terminal-agent/ # Windows 本地 Agent

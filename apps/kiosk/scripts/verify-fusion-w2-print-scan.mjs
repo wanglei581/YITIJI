@@ -22,6 +22,7 @@ const directRoutes = new Map([
   ['/print/cashier', 'PrintCashierPage'],
   ['/print/progress', 'PrintProgressPage'],
   ['/print/done', 'PrintDonePage'],
+  ['/print/pickup-claim', 'PrintPickupClaimPage'],
   ['/scan/start', 'ScanStartPage'],
   ['/scan/settings', 'ScanSettingsPage'],
   ['/scan/progress', 'ScanProgressPage'],
@@ -143,7 +144,7 @@ for (const [path, owner] of directRoutes)
   assert.equal(actualRoutes.get(path), owner, `${path} owner`)
 for (const [path, target] of redirects)
   assert.equal(actualRedirects.get(path), target, `${path} redirect`)
-assert.equal(directRoutes.size + redirects.size, 19)
+assert.equal(directRoutes.size + redirects.size, 20)
 for (const [path, hash] of frozenHashes) assert.equal(sha256(path), hash, `${path} remains frozen`)
 
 assert.match(read('src/pages/print/PrintPrototypeLayout.tsx'), /KioskPageFrame/)
@@ -498,6 +499,28 @@ assert.doesNotMatch(
 const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /getPayStatus/, 'print done obtains pickup code from payment status')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
+
+const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
+for (const marker of [
+  'claimLockRef',
+  'VALID_CODE.test(nextCode)',
+  'void handleClaim(nextCode)',
+  'claimLockRef.current = false',
+  "setCode('')",
+  '扫描小程序二维码',
+]) {
+  assert.ok(pickupClaim.includes(marker), `pickup claim retains ${marker}`)
+}
+assert.match(
+  pickupClaim,
+  /if \(!VALID_CODE\.test\(submittedCode\) \|\| claimLockRef\.current\) return/,
+  'pickup scanner submission is format-gated and idempotently locked'
+)
+assert.match(
+  pickupClaim,
+  /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleClaim\(code\) \}\}/,
+  'pickup scanner Enter suffix reuses the same guarded submission path'
+)
 
 const scanPages = new Map([
   ['src/pages/scan/ScanStartPage.tsx', 'scan-start'],
