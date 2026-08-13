@@ -28,7 +28,7 @@
 > 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
 
 - [x] **A0 第一批原型确定性修正**：P03/P06 QR 居中；P05 390×844；P39 手机扫码入口先到 P06 创建会话；P06 `source` 白名单。仅设计原型，未冒充生产接线。
-- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成树已在 Node 22 下通过 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与本次重新生成的 P1 **83/83**。`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的 `horizontalOverflow` 自动信号、最终 merge SHA Claude 只读终审、真实 TRTC、CI、生产与真机均未完成。
+- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成 merge `993bf6631fdbad72ece973a0cebe7590922ec96a` 也已通过 Claude `FINAL: PASS`。同树 Node 22 门禁保持 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与 P1 **83/83 capture OK**；`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的自动 `horizontalOverflow` 已被通用 DOM 合同分类为局部 `nav.ui-kiosk-steps` 滚动容器误报，当前检测器实际 diff 已获 Claude `FINAL: PASS`，仍待用户批准本地提交。真实 TRTC、短信与生产 Agent 扫码/手机确认、正式 AppID、Windows/Pantum、PG/Redis/BOS、密钥、法务采购、CI、生产和真机均未完成。
 - [~] **A2 身份/会话/文件（仅 A2.1 登录切片已完成）**：A2.1 现有 `/login` V6 最小收口已以 `1149fef0db4bad3bb05c4157f863c6753ae8ea42` 本地冻结并通过 Claude 最终完整差异终审；其余 P03/P04/P05/P40 的 legal version、session lifecycle、upload/takeaway 与 provenance 尚未完成，W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
 - [ ] **A3 打印/扫描交易履约**：P06/P07/P08/P39/P41 的 quote/reservation/order/payment/PrintTask attempt/device outcome/refund；小程序到机码只能授权并绑定订单，付款后服务端幂等创建 `pending` PrintTask，PrintTask 的 `claimed` 仍只由 Agent 写；不得把订单 `pickupStatus=claimed` 与 Agent 任务租约混成同一状态机。
 - [ ] **A4–A7 业务纵切**：简历与 AI 资产 → 招聘/招聘会/政策来源 → 我的/权益 → 默认关闭能力；所有输出先生成真实 artifact，再允许打印/保存/带走；智慧校园首页可见但深链 fail-closed。
@@ -216,7 +216,7 @@
 - [ ] **响应式第二批深层流程页验收**：在可稳定切换 390×844、1440×900、1080×1920 的浏览器环境中，携带真实路由 state 逐页复验 `/print/preview`、`/resume/generate`、`/profile`、岗位/招聘会详情、打印/扫描 actionbar 流程的页头、内容滚动、底栏遮挡和触控尺寸；只修已有入口页面，不新增入口、业务流程或假数据。本项未完成前不得宣称三端所有页面视觉封板。
       `/profile` 的 1080×1920 高屏底部空白已形成局部样式候选并通过静态门禁、typecheck、build 与 lint；仍需刷新当前页面并在 Windows 真机确认剩余高度分配、滚动和触控表现。
 - [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；其后热更为 `index-CPD4lg4F.js`，再经 USB bridge / 备案包覆盖。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
-- [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65** / **57**；判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** TRTC）。不等于像素封板或硬件验收。
+- [~] **P1 逐屏视觉证据执行**：当前 **83/83 capture OK**，其中 **11 PROFILE_DEFER**，其余 judgment 仍为 **PENDING**；target 73 只证明生产 pre-call gate 可达，不证明 TRTC live。03/04/31/33/64/65/77 七个打印目标仅关闭局部步骤条导致的 `horizontalOverflow` 自动检测误报，截图主体/actionbar 未见横向裁切，但这不等于像素封板、业务状态验收或硬件验收；target 31 的「材料检查未完成 / Failed to fetch」与 target 64 的「页面暂时无法显示」仍须在各自业务闭环中处理。
 - [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
 - [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；其后现网 Kiosk 以备案包为准（见下）。
 
