@@ -5,13 +5,16 @@
 import { KioskPageFrame } from '@ai-job-print/ui'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
-import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import { useSmartCampusCapabilityState } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
-import { useToolboxConfig } from '../../hooks/useToolboxConfig'
+import { useToolboxCapabilityState } from '../../hooks/useToolboxConfig'
 import { ContinuePanel } from './components/ContinuePanel'
+import { V6HomeFooterPanels } from './components/V6HomeFooterPanels'
 import { V6HomeView } from './components/V6HomeView'
 import { HOME_V6_ROUTES, type HomeV6ActionId } from './homeV6Domains'
+import { useHomeJobFairHighlight } from './hooks/useHomeJobFairHighlight'
 import './styles/home-v6.css'
+import './styles/home-v6-footer.css'
 
 const ASSISTANT_TOPICS: Partial<Record<HomeV6ActionId, 'resume' | 'jobfair'>> = {
   'assistant-resume': 'resume',
@@ -22,12 +25,13 @@ export function HomePage() {
   const navigate = useNavigate()
   const auth = useAuth()
   const device = useOutletContext<TerminalDeviceStatusView>()
-  const toolbox = useToolboxConfig()
-  const campus = useSmartCampusConfig()
+  const toolbox = useToolboxCapabilityState()
+  const campus = useSmartCampusCapabilityState()
+  const jobFair = useHomeJobFairHighlight()
 
   const handleAction = (actionId: HomeV6ActionId) => {
-    if (actionId === 'smart-campus' && !campus.enabled) return
-    if (actionId === 'toolbox' && !toolbox.enabled) return
+    if (actionId === 'smart-campus' && !(campus.status === 'ready' && campus.enabled)) return
+    if (actionId === 'toolbox' && !(toolbox.status === 'ready' && toolbox.enabled)) return
 
     if (actionId === 'login') {
       navigate('/login', { state: { from: '/' } })
@@ -46,9 +50,17 @@ export function HomePage() {
         deviceLabel={device.loading ? '设备检查中' : device.printerLabel}
         deviceReady={device.printerReady}
         deviceLoading={device.loading}
-        toolboxEnabled={toolbox.enabled}
-        campusEnabled={campus.enabled}
+        toolboxEnabled={toolbox.status === 'ready' && toolbox.enabled}
+        campusEnabled={campus.status === 'ready' && campus.enabled}
         continueSlot={<ContinuePanel />}
+        footerSlot={
+          <V6HomeFooterPanels
+            jobFair={jobFair}
+            device={device}
+            onAction={handleAction}
+            onOpenFair={(fairId) => navigate(`/job-fairs/${encodeURIComponent(fairId)}`)}
+          />
+        }
         onAction={handleAction}
       />
     </KioskPageFrame>

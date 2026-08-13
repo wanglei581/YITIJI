@@ -36,6 +36,7 @@ interface V6HomeViewProps {
   toolboxEnabled: boolean
   campusEnabled: boolean
   continueSlot?: ReactNode
+  footerSlot?: ReactNode
   onAction: (actionId: HomeV6ActionId) => void
 }
 
@@ -102,6 +103,7 @@ export function V6HomeView({
   toolboxEnabled,
   campusEnabled,
   continueSlot,
+  footerSlot,
   onAction,
 }: V6HomeViewProps) {
   return (
@@ -217,6 +219,8 @@ export function V6HomeView({
           })}
         </div>
       </section>
+
+      {footerSlot}
 
       <footer className="v6-home-boundary">
         <ShieldCheckIcon aria-hidden="true" />

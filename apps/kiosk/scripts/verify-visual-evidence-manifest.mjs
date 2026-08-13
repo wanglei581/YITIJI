@@ -202,14 +202,14 @@ if (contract && routeManifest) {
   check('special target mappings', () => {
     const byId = new Map(visualEvidenceTargets.map((target) => [target.targetId, target]))
     assert.equal(byId.get('73')?.referenceKind, 'SUBVIEW_STATE', '73 must be a page-internal subview')
-    assert.deepEqual(byId.get('73')?.routeOrState, ['/assistant#call-state'])
+    assert.deepEqual(byId.get('73')?.routeOrState, ['/assistant#voice-gate'])
     assert.deepEqual(byId.get('73')?.captureUrls, ['/assistant'])
     assert.equal(byId.get('73')?.prototypePath, 'docs/design/kiosk-proto-2026-07/73-assistant-call.html')
     assert.deepEqual(byId.get('34A')?.routeOrState, ['/scan/start#pre-session', '/scan/settings#session-create-failed'])
     assert.deepEqual(byId.get('34A')?.captureUrls, ['/scan/start', '/scan/settings'])
     assert.deepEqual(byId.get('34A')?.capturePairs.map(({ captureKey }) => captureKey), ['scan-start', 'scan-settings'])
     assert.deepEqual(byId.get('34A')?.capturePairs.map(({ readyMarker }) => readyMarker), [
-      '[data-w2-page="scan-start"]:has-text("会话尚未创建")',
+      '[data-w2-page="scan-start"]:has-text("本页尚未创建任务")',
       '[data-w2-page="scan-settings"]:has-text("扫描任务未创建")',
     ])
     assert.equal(byId.get('34A')?.referenceKind, 'ROUTE_STATE')

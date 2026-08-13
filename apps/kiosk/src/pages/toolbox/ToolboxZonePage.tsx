@@ -11,8 +11,9 @@ import { ChevronRightIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
-import { useToolboxConfig } from '../../hooks/useToolboxConfig'
-import { itemBadge, itemLaunchable, launchKioskAppItem } from '../home/components/kioskAppLaunch'
+import { useToolboxCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
+import { isLaunchableKioskAppItem } from '../../services/api/kioskCapabilityValidation'
+import { itemBadge, launchKioskAppItem } from '../home/components/kioskAppLaunch'
 import { ExternalLaunchModal, QrLaunchModal } from '../home/components/ToolboxLaunchModals'
 import { ProtoIcon } from '../home/prototypeIcons'
 import '../../styles/prototype-v1.css'
@@ -49,7 +50,7 @@ function ToolboxItemTile({
   onExternal: (item: KioskToolboxItem) => void
 }) {
   const navigate = useNavigate()
-  const disabled = item.disabled || !itemLaunchable(item)
+  const disabled = !isLaunchableKioskAppItem(item)
   const badge = itemBadge(item)
   return (
     <button
@@ -79,7 +80,7 @@ function ToolboxItemTile({
 
 export function ToolboxZonePage() {
   const navigate = useNavigate()
-  const config = useToolboxConfig()
+  const { config } = useToolboxCapabilitySnapshot()
   const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
   const [externalItem, setExternalItem] = useState<KioskToolboxItem | null>(null)
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []

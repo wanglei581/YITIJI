@@ -4,7 +4,8 @@
  * 背景：01-home.html 原型把百宝箱画成首页聚合 zone-card；生产的可启动 items +
  * 启动弹窗 + 匿名事件上报能力经用户批准迁到 /toolbox 区页（ToolboxZonePage）。
  * 本守卫随结构迁移调整读取目标，真实能力断言等价或更强，不弱化：
- *   A. /toolbox 区页 config 驱动、空配置保留「待配置」占位。
+ *   A. /toolbox 区页 config 驱动，并保留组件内部防御性「待配置」分支；
+ *      路由父边界在无安全可启动项时不会挂载该业务页。
  *   B. 首页 zone-row 中百宝箱聚合卡排在智慧校园之前，并 → /toolbox。
  *   C. /toolbox 保留统一终端配置读取 + 站内/外部H5/二维码启动 + 扫码提示 +
  *      外部离场确认 + 匿名事件上报（launch modals 文件未变，断言保留）。
@@ -34,6 +35,8 @@ const homeView = read('src/pages/home/components/V6HomeView.tsx')
 const toolboxPage = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const launchHelpers = read('src/pages/home/components/kioskAppLaunch.ts')
 const toolboxHook = read('src/hooks/useToolboxConfig.ts')
+const capabilityGuard = read('src/auth/KioskCapabilityGuard.tsx')
+const capabilityValidation = read('src/services/api/kioskCapabilityValidation.ts')
 const launchModals = read('src/pages/home/components/ToolboxLaunchModals.tsx')
 const terminalConfig = read('src/services/api/terminalConfig.ts')
 const toolboxLaunchEvents = read('src/services/api/toolboxLaunchEvents.ts')
@@ -42,17 +45,17 @@ const packageJson = read('package.json')
 
 console.log('\n=== 百宝箱布局验证（prototype-v1 + /toolbox 区页）===')
 
-// A. /toolbox 区页 config 驱动 + 空配置「待配置」占位
+// A. /toolbox 区页 config 驱动 + 内部防御性「待配置」分支（不声明路由可达）
 if (
   toolboxPage.includes('export function ToolboxZonePage(') &&
-  toolboxPage.includes('useToolboxConfig()') &&
+  toolboxPage.includes('useToolboxCapabilitySnapshot()') &&
   toolboxPage.includes('config.enabled ?') &&
   toolboxPage.includes('待配置') &&
   toolboxPage.includes('后续功能上线后将在这里展示')
 ) {
-  pass('A. /toolbox 区页由真实 config 驱动且空配置保留「待配置」占位')
+  pass('A. /toolbox 区页由真实 config 驱动且保留内部防御性「待配置」分支')
 } else {
-  fail('A. /toolbox 区页必须 config 驱动且空配置保留待配置占位')
+  fail('A. /toolbox 区页必须 config 驱动且保留内部防御性待配置分支')
 }
 
 // B. V6 首页固定展示八个服务域；百宝箱在智慧校园之前，且 → /toolbox。
@@ -78,9 +81,11 @@ if (/path:\s*'toolbox'/.test(routes) && /ToolboxZonePage/.test(routes)) {
 
 // C. /toolbox 保留统一配置读取 + 三种启动方式 + 扫码提示 + 离场确认 + 事件上报
 if (
-  toolboxHook.includes('getCachedKioskTerminalConfig(terminalId)') &&
+  toolboxHook.includes('getKioskTerminalConfig(terminalId)') &&
   toolboxHook.includes('terminalConfig.toolbox') &&
+  toolboxHook.includes('parseKioskTerminalConfig') &&
   toolboxPage.includes('launchKioskAppItem') &&
+  toolboxPage.includes('isLaunchableKioskAppItem') &&
   toolboxPage.includes('QrLaunchModal') &&
   toolboxPage.includes('ExternalLaunchModal') &&
   // 启动分发逻辑已抽到共享助手 kioskAppLaunch（两侧同源不发散）；断言随之指向该文件
@@ -118,10 +123,10 @@ if (
 
 // D. V6 首页保留两个域的位置，但配置关闭时必须 disabled + 可见原因，不能隐藏或放行。
 if (
-  home.includes('useSmartCampusConfig()') &&
-  home.includes('useToolboxConfig()') &&
-  home.includes("actionId === 'smart-campus' && !campus.enabled") &&
-  home.includes("actionId === 'toolbox' && !toolbox.enabled") &&
+  home.includes('useSmartCampusCapabilityState()') &&
+  home.includes('useToolboxCapabilityState()') &&
+  home.includes("campus.status === 'ready' && campus.enabled") &&
+  home.includes("toolbox.status === 'ready' && toolbox.enabled") &&
   /domain\.id === 'toolbox'[\s\S]{0,80}\? !toolboxEnabled/.test(homeView) &&
   /domain\.id === 'campus'[\s\S]{0,80}\? !campusEnabled/.test(homeView) &&
   homeView.includes('本机默认关闭，学校接入并完成配置后开放') &&
@@ -132,11 +137,16 @@ if (
   fail('D. V6 首页百宝箱/智慧校园必须可见但关闭时 fail-closed')
 }
 
-// E. 终端默认配置默认启用百宝箱空占位
-if (terminalConfig.includes('toolbox: { enabled: true, items: [] }')) {
-  pass('E. Kiosk OFF_CONFIG 默认启用百宝箱空占位')
+// E. 终端底层兼容默认不能成为路由授权；能力边界必须只接受 ready+有效启动项。
+if (
+  terminalConfig.includes('toolbox: { enabled: true, items: [] }') &&
+  toolboxHook.includes('config.items.some(isLaunchableKioskAppItem)') &&
+  capabilityGuard.includes("state.status === 'ready'") &&
+  capabilityGuard.includes('state.terminalId === currentTerminalId')
+) {
+  pass('E. 百宝箱底层兼容默认不会绕过能力边界')
 } else {
-  fail('E. Kiosk OFF_CONFIG 必须默认启用百宝箱空占位')
+  fail('E. 百宝箱只有已确认且至少一个有效启动项时才可进入')
 }
 
 // E2. 事件上报 sendBeacon/keepalive 且不发送 URL/host
@@ -156,14 +166,17 @@ if (
 
 // E3. Kiosk 本地兜底同样必须为空，并完整尊重后端 enabled/items。
 if (
-  /const DEFAULT_TOOLBOX_CONFIG:[\s\S]*?enabled:\s*true,[\s\S]*?items:\s*\[\]/.test(toolboxHook) &&
-  toolboxHook.includes('cachedToolboxConfig = backendToolbox') &&
-  toolboxHook.includes('setConfig(backendToolbox)') &&
-  !toolboxHook.includes("key: 'contract-review'")
+  toolboxHook.includes("status: 'loading'") &&
+  toolboxHook.includes('enabled: false') &&
+  toolboxHook.includes('activeController?.abort()') &&
+  toolboxHook.includes('requestGeneration !== generation') &&
+  capabilityValidation.includes('isValidKioskAppItem') &&
+  !toolboxHook.includes('cached') &&
+  !toolboxHook.includes('stale')
 ) {
-  pass('E3. Kiosk 百宝箱本地兜底为空且完整尊重后端配置')
+  pass('E3. 百宝箱初始、刷新、异常与乱序响应均 fail-closed')
 } else {
-  fail('E3. Kiosk 百宝箱不得因空配置或请求失败自动公开未授权服务')
+  fail('E3. 百宝箱不得因缓存、畸形配置或请求失败公开未授权服务')
 }
 
 // F. package.json 注册

@@ -23,7 +23,17 @@ export function registerEvidenceShell(api: ApiRouter): void {
       smartCampus: { enabled: true, modules: { welcome: true, bigdata: false, luggage: true, panorama: true }, items: [] },
       toolbox: {
         enabled: true,
-        items: [{ key: 'policy-guide', title: '政策指引', description: '合成百宝箱服务', enabled: true }],
+        items: [{
+          key: 'policy-guide',
+          title: '政策指引',
+          description: '合成百宝箱服务',
+          icon: 'book-open',
+          to: '/policy-service',
+          disabled: false,
+          sortOrder: 1,
+          launchMode: 'internal_route',
+          placements: ['toolbox'],
+        }],
       },
       configVersion: 'p1-evidence',
       refreshIntervalMs: 300000,
@@ -108,7 +118,7 @@ export function registerAuthenticatedMemberApis(api: ApiRouter): void {
 }
 
 export async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
-  await page.goto(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   const phoneTab = page.getByRole('button', { name: '手机号登录', exact: true })
   if (await phoneTab.count()) await phoneTab.click()
   await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
@@ -119,6 +129,16 @@ export async function loginThroughVisibleUi(page: Page, returnTo: string): Promi
   for (const digit of MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
   await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+export async function prepareSessionTimeoutCapture(page: Page, api: ApiRouter): Promise<void> {
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200,
+    json: { enabled: false, idleTimeoutSec: 4, items: [] },
+  })
+  await page.goto('/interview/tips', { waitUntil: 'domcontentloaded' })
+  await page.waitForURL((url) => url.pathname === '/session-timeout', { timeout: 200_000 })
+  await page.locator('[data-kiosk-screen="session-timeout"]').waitFor({ state: 'visible', timeout: 5_000 })
 }
 
 export async function seedPrintFlow(page: Page, path: string, extra: Record<string, unknown> = {}): Promise<void> {
@@ -193,8 +213,12 @@ export function registerEmptyToolbox(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
     json: {
-      smartCampus: { enabled: false, modules: {}, items: [] },
-      toolbox: { enabled: true, items: [] },
+      smartCampus: {
+        enabled: false,
+        modules: { welcome: false, bigdata: false, luggage: false, panorama: false },
+        items: [],
+      },
+      toolbox: { enabled: false, items: [] },
       configVersion: 'p1-evidence-empty-toolbox',
       refreshIntervalMs: 300000,
       serverTime: '2026-07-26T00:00:00.000Z',

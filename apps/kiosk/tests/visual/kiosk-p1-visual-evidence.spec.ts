@@ -9,6 +9,7 @@ import {
   loginThroughVisibleUi,
   openLoginVerificationError,
   openScanSettingsCreateFailed,
+  prepareSessionTimeoutCapture,
   registerAuthenticatedMemberApis,
   registerEmptyToolbox,
   registerEvidenceShell,
@@ -31,6 +32,7 @@ const sha = execFileSync('git', ['rev-parse', '--short=8', 'HEAD'], { cwd: works
 const evidenceRoot = join(workspaceRoot, 'test-results', 'kiosk-p1-visual-evidence', sha)
 const PROTO_ORIGIN = process.env.P1_PROTO_ORIGIN ?? 'http://127.0.0.1:8399'
 const KIOSK_ORIGIN = process.env.P1_KIOSK_ORIGIN ?? 'http://127.0.0.1:58245'
+const LOCAL_TERMINAL_IDENTITY_URL = 'http://127.0.0.1:9527/local/terminal-identity'
 const LIVE = process.env.P1_LIVE === '1'
 const TARGET_IDS = new Set(
   (process.env.P1_TARGET_IDS ?? '')
@@ -158,6 +160,11 @@ async function prepareProduction(
 
   registerEvidenceShell(api)
 
+  if (target.targetId === '60') {
+    await prepareSessionTimeoutCapture(page, api)
+    return
+  }
+
   if (target.targetId === '76A') registerEmptyToolbox(api)
   if (AUTH_TARGETS.has(target.targetId)) {
     registerMemberLogin(api)
@@ -222,8 +229,7 @@ async function prepareProduction(
   await page.goto(captureUrl, { waitUntil: 'domcontentloaded' })
 
   if (target.targetId === '73') {
-    const callButton = page.getByRole('button', { name: /语音通话|开始通话|呼叫小青/ }).first()
-    if (await callButton.count()) await callButton.click().catch(() => undefined)
+    await page.getByRole('button', { name: '语音咨询', exact: true }).first().click()
   }
 }
 
@@ -327,6 +333,23 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
         colorScheme: 'light',
         reducedMotion: 'reduce',
       })
+      if (!LIVE) {
+        await context.route(LOCAL_TERMINAL_IDENTITY_URL, async (route) => {
+          if (route.request().method() !== 'GET') {
+            await route.abort('blockedbyclient')
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: { 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({
+              success: true,
+              data: { terminalId: 'KSK-001', terminalCode: 'KSK-001' },
+            }),
+          })
+        })
+      }
       const page = await context.newPage()
       const pageErrors = collectPageErrors(page)
       const api = LIVE ? null : new ApiRouter(page)
