@@ -3,6 +3,7 @@
  * apps/miniapp 静态门禁（原生 1.0.2 唯一工程底座）：
  * - JSON 全部可解析
  * - app.json pages 均有四件套（js/wxml/wxss/json）
+ * - 唯一工程目录、页面归类与运行时依赖方向不回退
  * - tabBar 四 Tab 与 custom-tab-bar 一致
  * - 页面路由不指向未注册页面
  * - 登录/合规/诚实能力与密钥残留扫描
@@ -79,6 +80,55 @@ const wxmlFiles = files.filter((f) => f.endsWith('.wxml'))
 const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
 const PAGE_PATHS = appJson ? (appJson.pages || []) : []
 
+const allowedTopLevel = new Set([
+  'README.md',
+  'app.js',
+  'app.json',
+  'app.wxss',
+  'custom-tab-bar',
+  'package.json',
+  'pages',
+  'project.config.json',
+  'scripts',
+  'sitemap.json',
+  'utils',
+])
+const generatedTopLevel = new Set([
+  '.DS_Store',
+  'miniprogram_npm',
+  'node_modules',
+  'project.private.config.json',
+])
+const unexpectedTopLevel = fs.readdirSync(ROOT)
+  .filter((name) => !allowedTopLevel.has(name) && !generatedTopLevel.has(name))
+if (unexpectedTopLevel.length) bad('小程序唯一目录分类', unexpectedTopLevel.join(','))
+else ok('小程序唯一目录分类受门禁')
+
+const registeredPageDirs = new Set(PAGE_PATHS.map((page) => path.dirname(page)))
+const physicalPageDirs = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => `pages/${entry.name}`)
+const loosePageFiles = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
+  .filter((entry) => entry.isFile())
+  .map((entry) => entry.name)
+const nonCanonicalPages = PAGE_PATHS.filter((page) => path.basename(page) !== path.basename(path.dirname(page)))
+const unregisteredPageDirs = physicalPageDirs.filter((dir) => !registeredPageDirs.has(dir))
+const missingPageDirs = [...registeredPageDirs].filter((dir) => !physicalPageDirs.includes(dir))
+const pageShapeErrors = [...nonCanonicalPages, ...unregisteredPageDirs, ...missingPageDirs, ...loosePageFiles]
+if (pageShapeErrors.length) bad('页面目录与注册路由一一对应', pageShapeErrors.join(','))
+else ok('页面目录与注册路由一一对应')
+
+const projectConfig = parsedJson['./project.config.json'] || {}
+const packageJson = parsedJson['./package.json'] || {}
+const packIgnoresScripts = (projectConfig.packOptions?.ignore || [])
+  .some((entry) => entry?.type === 'folder' && entry?.value === 'scripts')
+const runtimeDependencies = Object.keys(packageJson.dependencies || {})
+if (packIgnoresScripts && runtimeDependencies.length === 0) {
+  ok('发布包排除验证脚本且无运行时 npm 依赖')
+} else {
+  bad('发布包与运行时依赖', `scriptsExcluded=${packIgnoresScripts}; dependencies=${runtimeDependencies.join(',')}`)
+}
+
 for (const f of wxmlFiles) {
   const src = read(f)
   const urls = [...src.matchAll(/data-url="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.includes('{{'))
@@ -93,6 +143,73 @@ for (const f of wxmlFiles) {
 // M0.3：JS 跳转目标审计（navigateTo / switchTab / redirectTo）+ 死绑定检查
 const jsFiles = files.filter((f) => f.endsWith('.js') && !f.includes('/scripts/'))
 const pagePathSet = new Set(PAGE_PATHS)
+
+const dependencyErrors = []
+const dependencyGraph = new Map(jsFiles.map((file) => [file, []]))
+for (const file of jsFiles) {
+  const source = read(file)
+  const literalRequires = [...source.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)]
+  const requireCallCount = [...source.matchAll(/\brequire\s*\(/g)].length
+  if (requireCallCount !== literalRequires.length) dependencyErrors.push(`${file}: 禁止动态 require`)
+
+  for (const match of literalRequires) {
+    const specifier = match[1]
+    if (!specifier.startsWith('.')) {
+      dependencyErrors.push(`${file}: 运行时第三方依赖 ${specifier} 未登记`)
+      continue
+    }
+
+    const sourceAbsolute = path.join(ROOT, file)
+    const unresolved = path.resolve(path.dirname(sourceAbsolute), specifier)
+    const candidates = path.extname(unresolved)
+      ? [unresolved]
+      : [`${unresolved}.js`, `${unresolved}.json`, path.join(unresolved, 'index.js')]
+    const targetAbsolute = candidates.find((candidate) => fs.existsSync(candidate))
+    if (!targetAbsolute) {
+      dependencyErrors.push(`${file}: 找不到 ${specifier}`)
+      continue
+    }
+
+    const target = `./${path.relative(ROOT, targetAbsolute).split(path.sep).join('/')}`
+    const sourceDir = path.dirname(file)
+    const targetInsideRoot = !target.startsWith('./../')
+    const sourceIsPage = file.startsWith('./pages/')
+    const sourceIsUtils = file.startsWith('./utils/')
+    const sourceIsApp = file === './app.js'
+    const sourceIsTabBar = file.startsWith('./custom-tab-bar/')
+    const targetIsUtils = target.startsWith('./utils/')
+    const targetIsSamePage = sourceIsPage && path.dirname(target) === sourceDir
+    const targetIsSameTabBar = sourceIsTabBar && target.startsWith('./custom-tab-bar/')
+    const directionAllowed = targetInsideRoot && (
+      (sourceIsPage && (targetIsUtils || targetIsSamePage)) ||
+      (sourceIsUtils && targetIsUtils) ||
+      (sourceIsApp && targetIsUtils) ||
+      (sourceIsTabBar && (targetIsUtils || targetIsSameTabBar))
+    )
+    if (!directionAllowed) dependencyErrors.push(`${file}: 禁止依赖 ${target}`)
+    if (dependencyGraph.has(target)) dependencyGraph.get(file).push(target)
+  }
+}
+
+const dependencyVisitState = new Map()
+const dependencyStack = []
+function visitDependency(file) {
+  const state = dependencyVisitState.get(file) || 0
+  if (state === 2) return
+  if (state === 1) {
+    const start = dependencyStack.indexOf(file)
+    dependencyErrors.push(`循环依赖: ${dependencyStack.slice(start).concat(file).join(' -> ')}`)
+    return
+  }
+  dependencyVisitState.set(file, 1)
+  dependencyStack.push(file)
+  for (const target of dependencyGraph.get(file) || []) visitDependency(target)
+  dependencyStack.pop()
+  dependencyVisitState.set(file, 2)
+}
+for (const file of dependencyGraph.keys()) visitDependency(file)
+if (dependencyErrors.length) bad('运行时依赖方向', [...new Set(dependencyErrors)].join('; '))
+else ok('运行时依赖方向清晰且无循环')
 
 const syntaxErrors = []
 for (const f of jsFiles) {
@@ -226,13 +343,20 @@ if (honestyHits.length) bad('无伪造个人数据或商业能力', honestyHits.
 else ok('无伪造个人数据或商业能力')
 
 const pickupWxml = read('pages/print-pickup/print-pickup.wxml')
+const pickupJs = read('pages/print-pickup/print-pickup.js')
+const pickupQr = read('utils/pickup-qrcode.js')
 if (
-  pickupWxml.includes('输入此取件码') &&
-  !pickupWxml.includes('扫描下方二维码') &&
+  pickupWxml.includes('type="2d"') &&
+  pickupWxml.includes('请将此二维码对准一体机扫码器') &&
+  pickupWxml.includes('二维码只包含本订单的 10 位取件码') &&
+  pickupJs.includes("require('../../utils/pickup-qrcode')") &&
+  pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
+  pickupQr.includes("PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/") &&
+  pickupQr.includes('const HIGH_ECC_FORMAT_BITS = 2') &&
   !pickupWxml.includes('bindtap="scanTerminal"') &&
   !apiJs.includes('/pickup`')
-) ok('取件页不伪造二维码或不存在的详情接口')
-else bad('取件页真实能力', '不得恢复空白二维码、扫码关联或未实现 pickup 详情端点')
+) ok('取件页本地生成核销二维码并保留真实码兜底')
+else bad('取件页扫码核销能力', '必须离线编码真实 10 位码，不得恢复手机反扫终端或不存在的详情接口')
 
 const documentsJs = read('pages/documents/documents.js')
 const printUploadJs = read('pages/print-upload/print-upload.js')

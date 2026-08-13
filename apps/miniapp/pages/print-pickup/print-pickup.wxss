@@ -17,10 +17,29 @@
   background: #3A6648; margin: 0 auto 12rpx;
 }
 .ph-status-text { font-size: 24rpx; color: #3A6648; font-weight: 600; display: block; margin-bottom: 28rpx; }
+.pickup-qr-card {
+  display: flex; flex-direction: column; align-items: center;
+  margin: 0 auto 28rpx; padding: 20rpx 20rpx 24rpx;
+  background: #FFFFFF; border: 1rpx solid #EDE5D8; border-radius: 28rpx;
+}
+.pickup-qr { display: block; background: #FFFFFF; }
+.pickup-qr-error {
+  width: 420rpx; min-height: 300rpx; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  padding: 32rpx; background: #FAF7F2; border-radius: 18rpx;
+  color: #9C6E0A; font-size: 25rpx; line-height: 1.6;
+}
+.pickup-qr-title { display: block; margin-top: 16rpx; font-size: 28rpx; font-weight: 800; color: #2C1A0E; }
+.pickup-qr-sub { display: block; margin-top: 8rpx; font-size: 22rpx; line-height: 1.5; color: #7A5C48; }
+.ph-divider {
+  display: flex; align-items: center; justify-content: center;
+  margin: 4rpx 0 18rpx; font-size: 22rpx; color: #A89080;
+}
 .ph-code-wrap { margin: 0 0 20rpx; }
 .ph-code {
-  font-size: 72rpx; font-weight: 900; color: #2C1A0E;
-  letter-spacing: 8rpx; font-variant-numeric: tabular-nums;
+  font-size: 56rpx; font-weight: 900; color: #2C1A0E;
+  letter-spacing: 4rpx; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   display: block; line-height: 1.1;
 }
 .ph-hint { font-size: 24rpx; color: #A89080; display: block; line-height: 1.5; }

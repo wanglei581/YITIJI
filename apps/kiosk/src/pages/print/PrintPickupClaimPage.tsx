@@ -1,7 +1,7 @@
 // ============================================================
 // PrintPickupClaimPage — 步骤4：扫码取件认领
 //
-// 用户在一体机上输入取件码（手机小程序「打印订单」页显示），
+// 用户用一体机扫码器扫描二维码，或手动输入小程序中的取件码，
 // 调用 POST /api/v1/print/jobs/claim-pickup → 任务状态从 pending → claimed，
 // 然后跳到打印进度页（/print/progress）。
 //
@@ -79,6 +79,7 @@ async function claimPickup(code: string): Promise<ClaimPickupResult> {
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
+  const claimLockRef = useRef(false)
 
   const [code, setCode] = useState('')
   const [state, setState] = useState<ClaimState>('idle')
@@ -87,23 +88,33 @@ export function PrintPickupClaimPage() {
 
   const isValid = VALID_CODE.test(code)
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCode(normalizeInput(e.target.value))
-    if (state === 'error') { setState('idle'); setErrorMsg('') }
-  }
-
-  const handleClaim = async () => {
-    if (!isValid || state === 'loading') return
+  const handleClaim = async (inputCode = code) => {
+    const submittedCode = normalizeInput(inputCode)
+    if (!VALID_CODE.test(submittedCode) || claimLockRef.current) return
+    claimLockRef.current = true
+    setCode(submittedCode)
     setState('loading')
     setErrorMsg('')
     try {
-      const data = await claimPickup(code)
+      const data = await claimPickup(submittedCode)
       setResult(data)
       setState('success')
     } catch (err) {
+      claimLockRef.current = false
+      setCode('')
       setErrorMsg(err instanceof Error ? err.message : '请求失败，请重试')
       setState('error')
+      setTimeout(() => inputRef.current?.focus(), 80)
     }
+  }
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextCode = normalizeInput(e.target.value)
+    setCode(nextCode)
+    if (state === 'error') { setState('idle'); setErrorMsg('') }
+    // USB/HID 扫码器会像键盘一样一次性输入二维码内容。读满 10 位即
+    // 自动核销；提交锁同时拦住扫码器随后附带的 Enter，避免重复请求。
+    if (VALID_CODE.test(nextCode)) void handleClaim(nextCode)
   }
 
   const handleReset = () => {
@@ -111,6 +122,7 @@ export function PrintPickupClaimPage() {
     setState('idle')
     setResult(null)
     setErrorMsg('')
+    claimLockRef.current = false
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
@@ -178,7 +190,7 @@ export function PrintPickupClaimPage() {
     <PrintPageFrame>
       <KioskPageHeader
         title="扫码取件"
-        description="输入手机上的取件码，即可从本机出纸"
+        description="扫描小程序二维码，或输入 10 位取件码"
         onBack={() => navigate('/print-scan')}
         backLabel="返回"
       />
@@ -188,14 +200,14 @@ export function PrintPickupClaimPage() {
         <div className="pcp-lead">
           <ScanIcon size={32} className="pcp-lead-icon" />
           <p className="pcp-lead-text">
-            请在手机小程序「我的 → 打印订单」中找到待取件订单，记下 {CODE_LEN} 位取件码，在此输入。
+            打开小程序「我的 → 打印订单 → 查看取件码」，将二维码对准本机扫码器；无法扫码时可手动输入。
           </p>
         </div>
 
         {/* 输入框 */}
         <div className="pcp-input-section">
           <label className="pcp-label" htmlFor="pickup-code-input">
-            取件码（{CODE_LEN} 位）
+            扫码结果 / 取件码（{CODE_LEN} 位）
           </label>
           <input
             id="pickup-code-input"
@@ -208,7 +220,7 @@ export function PrintPickupClaimPage() {
             maxLength={CODE_LEN}
             value={code}
             onChange={handleInput}
-            onKeyDown={e => { if (e.key === 'Enter') void handleClaim() }}
+            onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}
             autoFocus
             autoCapitalize="characters"
             autoCorrect="off"
@@ -224,7 +236,7 @@ export function PrintPickupClaimPage() {
 
         {/* 格式说明 */}
         <p className="pcp-format-hint">
-          取件码由大写字母和数字组成，不含易混淆字符（0、1、I、O）
+          扫码器读满后自动核销；手动码由大写字母和数字组成，不含 0、1、I、O
         </p>
 
         {/* 错误信息 */}
@@ -260,7 +272,7 @@ export function PrintPickupClaimPage() {
           <ol className="pch-steps">
             <li>打开小程序，点击底部「我的」</li>
             <li>选择「打印订单」，找到待取件订单</li>
-            <li>点击「查看取件码」，记下 {CODE_LEN} 位码输入上方</li>
+            <li>点击「查看取件码」，对准扫码器；也可输入 {CODE_LEN} 位码</li>
           </ol>
         </div>
       </div>

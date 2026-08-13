@@ -1,11 +1,13 @@
 # 下一步任务
 
-> 最后更新：2026-08-12
+> 最后更新：2026-08-13
+
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
+- [~] **二维码扫码核销真机验收**：小程序已离线把同一 10 位到机码编码成不含 PII/文件链接的二维码，Kiosk 已支持 HID 扫码器读满自动提交并拦截 Enter 重复请求；本地编码、构建和浏览器模拟扫码通过。下一步必须在正式 AppID 真机页面和目标 Windows 终端的实际扫码器上覆盖一次成功、错码、过期码、重复扫码、扫码失败后手输兜底，并确认一次扫码只产生一次核销请求；现场通过前不得写“扫码可用”。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
-- [ ] **Windows + 真实打印机现场验收**：在绑定终端上用本人测试 PDF 跑完“小程序建单 → 输入到机码 → 支付 → Agent claim → 实际出纸 → 进度回流”，保留 orderId/taskId、支付尝试 ID、Agent 脱敏日志和出纸照片。覆盖错码、错终端、未支付、过期、断网重试、连点/刷新不重复出纸；没有这组证据不得写“打印已可用”。
+- [ ] **Windows + 真实打印机现场验收**：在绑定终端上用本人测试 PDF 跑完“小程序建单 → 扫码或输入到机码 → 支付 → Agent claim → 实际出纸 → 进度回流”，保留 orderId/taskId、支付尝试 ID、Agent 脱敏日志和出纸照片。覆盖错码、错终端、未支付、过期、断网重试、连点/刷新不重复出纸；没有这组证据不得写“打印已可用”。
 
 > **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，
 > 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
@@ -26,8 +28,8 @@
 > 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
 
 - [x] **A0 第一批原型确定性修正**：P03/P06 QR 居中；P05 390×844；P39 手机扫码入口先到 P06 创建会话；P06 `source` 白名单。仅设计原型，未冒充生产接线。
-- [~] **A1 第一条 V6 运行时纵切（首页双面板候选已补，待全量浏览器门禁/终审/合流）**：`/` 与 `/print-scan` 已替换为 V6 1080×1920 视图并交给既有 `/print/upload`；八域 typed manifest、真实设备/能力状态、visible-but-disabled 智慧校园、reduced-motion/lowgpu、路由安全错误页和 route-scoped V6 顶栏已落地。手机扫码固定走 `/print/upload?source=document&tab=qr`，不会让一体机直接打开 `/upload/phone`。A1 恢复候选进一步把 `/toolbox` 与智慧校园 8 条具体 URL 统一置于 fail-closed 父边界；首页已按 V6 基线恢复真实 `/job-fairs` 招聘会承接区与既有 printer-status 本机状态面板，未知纸张/碳粉/扫描仪明确「未单独上报」，定向 1080×1920 ready/loading/empty/error/device-offline 浏览器矩阵 3/3、完整 W5 21/21 通过。下一步仅处理本候选全量 W4/W6 与能力异常/竞态门禁、复核并冻结最终 28 文件 diff、提交与 PR/CI 合流；Fusion Shell 基线漂移须保留证据并单独裁决，不在本首页任务内放宽生产门禁或顺手扩入 A2。
-- [ ] **A2 身份/会话/文件**：P03/P04/P05/P40 的 QR/SMS、legal version、session lifecycle、upload/takeaway 与 provenance；W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
+- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成树已在 Node 22 下通过 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与本次重新生成的 P1 **83/83**。`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的 `horizontalOverflow` 自动信号、最终 merge SHA Claude 只读终审、真实 TRTC、CI、生产与真机均未完成。
+- [~] **A2 身份/会话/文件（仅 A2.1 登录切片已完成）**：A2.1 现有 `/login` V6 最小收口已以 `1149fef0db4bad3bb05c4157f863c6753ae8ea42` 本地冻结并通过 Claude 最终完整差异终审；其余 P03/P04/P05/P40 的 legal version、session lifecycle、upload/takeaway 与 provenance 尚未完成，W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
 - [ ] **A3 打印/扫描交易履约**：P06/P07/P08/P39/P41 的 quote/reservation/order/payment/PrintTask attempt/device outcome/refund；小程序到机码只能授权并绑定订单，付款后服务端幂等创建 `pending` PrintTask，PrintTask 的 `claimed` 仍只由 Agent 写；不得把订单 `pickupStatus=claimed` 与 Agent 任务租约混成同一状态机。
 - [ ] **A4–A7 业务纵切**：简历与 AI 资产 → 招聘/招聘会/政策来源 → 我的/权益 → 默认关闭能力；所有输出先生成真实 artifact，再允许打印/保存/带走；智慧校园首页可见但深链 fail-closed。
 - [ ] **C0 双后台事实冻结**：将 5303 的 `新增0页` 修为 Admin 35 + Partner 13 = 48、唯一新增 `/online-platforms`；补 V6 P01–P46/真实 React 路由映射；建立 378 个按钮与 77 个链接 action manifest，生产禁止 enabled `#`/`javascript:void(0)`。

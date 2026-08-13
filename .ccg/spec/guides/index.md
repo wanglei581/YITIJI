@@ -22,7 +22,7 @@
 功能归位声明：
 - 功能/业务闭环名称：
 - 涉及层和具体目录：
-  - 前端：apps/kiosk | apps/admin | apps/partner（填写具体页面、路由或服务适配器）
+  - 前端：apps/kiosk | apps/miniapp | apps/admin | apps/partner（填写具体页面、路由或服务适配器）
   - 后端：services/api | services/worker（填写具体 module、controller、service、prisma、异步队列或 verify）
   - 终端：apps/terminal-agent（填写具体硬件链路；不涉及则写“不涉及”）
   - 共享类型：packages/shared（填写协议、DTO、常量或纯函数；不涉及则写“不涉及”）
