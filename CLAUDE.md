@@ -160,6 +160,7 @@ sign = md5Hex(body + "&nonce=" + nonce + "&timeStamp=" + timeStamp + "&" + appSe
 ai-job-print-terminal/
   apps/
     kiosk/              # 一体机前台
+    miniapp/            # 原生微信小程序（唯一发布源）
     admin/              # 管理员后台
     partner/            # 合作机构后台
     terminal-agent/     # Windows 本地终端 Agent
