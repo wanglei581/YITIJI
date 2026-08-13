@@ -318,7 +318,10 @@ assert.match(
 )
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
-assert.match(workflow, /verify-print-monitor-truth\.ts/)
+assert.match(
+  workflow,
+  /working-directory: apps\/terminal-agent[\s\S]*?pnpm exec ts-node scripts\/verify-print-monitor-truth\.ts/,
+)
 assert.match(workflow, /ref: bf0cc2ebfa9b759126dd855d9d242311bcf52564/)
 assert.match(workflow, /verify-staged-powershell\.ps1/)
 assert.match(workflow, /path: predecessor-0\.4\.8/)
