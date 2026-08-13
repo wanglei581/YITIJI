@@ -17,14 +17,12 @@ assert.match(
 )
 assert.match(
   script,
-  /\$_\.ToXml\(\) -like "\*\$tId\*"/,
+  /\$raw -like "\*\$tId\*"/,
   'completion correlation must inspect locale-independent Event XML for the taskId',
 )
-assert.doesNotMatch(
-  script,
-  /\.Message|\$pName/,
-  'localized messages and vendor-specific printer aliases must not gate completion',
-)
+assert.match(script, /Param5/, 'generic-document fallback must read the target queue')
+assert.match(script, /S-1-5-18/, 'generic-document fallback must require LocalSystem')
+assert.doesNotMatch(script, /\.Message/, 'localized formatted messages must not gate completion')
 
 const taskId = 'ptask_kiosk_0123456789abcdef'
 
@@ -41,7 +39,14 @@ function runFixture(xml) {
   const result = spawnSync(
     'powershell',
     ['-NonInteractive', '-NoProfile', '-Command', fixtureScript],
-    { input: `${taskId}|${Date.now()}`, encoding: 'utf8' },
+    {
+      input: JSON.stringify({
+        taskId,
+        printerName: 'Configured Printer',
+        dispatchedAtMs: Date.now(),
+      }),
+      encoding: 'utf8',
+    },
   )
   assert.equal(result.status, 0, `PowerShell completion fixture failed: ${result.stderr}`)
   return result.stdout.trim().toLowerCase()
@@ -49,7 +54,8 @@ function runFixture(xml) {
 
 assert.equal(
   runFixture(
-    `<Event><EventData><Data Name="Param2">print_${taskId}_fixture.pdf</Data>` +
+    `<Event><System><Security UserID="S-1-5-18" /></System>` +
+      `<EventData><Data Name="Param2">print_${taskId}_fixture.pdf</Data>` +
       `<Data Name="Param5">Pantum USB001</Data></EventData></Event>`,
   ),
   'true',
@@ -63,4 +69,26 @@ assert.equal(
   'an unrelated Event 307 must not confirm the task',
 )
 
-console.log('PRINTSERVICE_COMPLETION_PASS alias=Pantum_USB001 unrelated=false')
+const genericPantumEvent =
+  `<Event><System><Security UserID="S-1-5-18" /></System><UserData>` +
+  `<DocumentPrinted><Param1>2</Param1><Param2>打印文档</Param2><Param3>SYSTEM</Param3>` +
+  `<Param4>\\DESKTOP-FIXTURE</Param4><Param5>Configured Printer</Param5>` +
+  `<Param6>USB001</Param6><Param7>129994520</Param7><Param8>1</Param8>` +
+  `</DocumentPrinted></UserData></Event>`
+assert.equal(
+  runFixture(genericPantumEvent),
+  'true',
+  'Pantum generic document names must confirm for the exact queue and LocalSystem',
+)
+assert.equal(
+  runFixture(genericPantumEvent.replace('Configured Printer', 'Other Printer')),
+  'false',
+  'generic document events from another queue must not confirm',
+)
+assert.equal(
+  runFixture(genericPantumEvent.replace('S-1-5-18', 'S-1-5-21-1234')),
+  'false',
+  'generic document events from another user must not confirm',
+)
+
+console.log('PRINTSERVICE_COMPLETION_PASS taskId=true genericPantum=true unrelated=false')
