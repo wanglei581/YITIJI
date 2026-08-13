@@ -4,7 +4,7 @@
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
-- [~] **构建、安装并真机复验 Agent `0.4.8`（含 `Printing, Retained` 修复和在线升级引导）**：`0.4.7@37545691` 的 Event 307 补证与独立监控窗口已通过 Windows CI，`0.4.8` 在其上只叠加受控 updater；目标机仍是 `0.4.6`。下一步先让同一最终 SHA 的 Windows MSI/EXE lifecycle 以精确 `0.4.6 -> 0.4.8` 和 `0.4.7 -> 0.4.8` 两条路径全绿，再配置企业 Authenticode 证书与独立 manifest RSA 密钥、生成/验签候选与回滚包并发布到固定 `zyidai.cn` 路径；由用户确认精确签名 EXE 后完成最后一次手工安装。随后先创建一笔一页黑白单面任务，再连续创建三笔，逐笔要求 API 最终 `completed`、PrintService 有对应 307、队列无明确异常且现场确认实际出纸。旧失败任务不得手工改成功或重复打印。
+- [~] **签名、安装并真机复验 Agent `0.4.8`（含 `Printing, Retained` 修复和在线升级引导）**：`0.4.7@37545691` 的 Event 307 补证与独立监控窗口已通过 Windows CI；`0.4.8@082b7366` 的 Windows unsigned MSI/EXE lifecycle、PowerShell 5.1、fresh/repair/uninstall、精确 `0.4.6 -> 0.4.8` 和 `0.4.7 -> 0.4.8` 两条路径亦已全绿，目标机仍是 `0.4.6`。下一步配置企业 Authenticode 证书与独立 manifest RSA 密钥、生成/验签候选与回滚包并发布到固定 `zyidai.cn` 路径；由用户确认精确签名 EXE 后完成最后一次手工安装。随后先创建一笔一页黑白单面任务，再连续创建三笔，逐笔要求 API 最终 `completed`、PrintService 有对应 307、队列无明确异常且现场确认实际出纸。旧失败任务不得手工改成功或重复打印。
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
 - [~] **二维码扫码核销真机验收**：小程序已离线把同一 10 位到机码编码成不含 PII/文件链接的二维码，Kiosk 已支持 HID 扫码器读满自动提交并拦截 Enter 重复请求；本地编码、构建和浏览器模拟扫码通过。下一步必须在正式 AppID 真机页面和目标 Windows 终端的实际扫码器上覆盖一次成功、错码、过期码、重复扫码、扫码失败后手输兜底，并确认一次扫码只产生一次核销请求；现场通过前不得写“扫码可用”。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
