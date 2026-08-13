@@ -4,6 +4,7 @@
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
+- [~] **构建、安装并真机复验 Agent `0.4.6` 的 `Printing, Retained` 修复**：源码已完成“同配置打印机 + 同 taskId + 派发后 Event 307”补证及独立监控窗口加固，Node 22 专项/typecheck/build/Agent 门禁通过。下一步先让同一最终 SHA 的 Windows MSI/EXE lifecycle 全绿并核对 manifest/SHA-256，再升级目标机、重启服务；先创建一笔新的一页黑白单面任务，随后连续创建三笔，逐笔要求 API 最终 `completed`、PrintService 有对应 307、队列无明确异常且现场确认实际出纸。旧失败任务不得手工改成功或重复打印。
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
 - [ ] **Windows + 真实打印机现场验收**：在绑定终端上用本人测试 PDF 跑完“小程序建单 → 输入到机码 → 支付 → Agent claim → 实际出纸 → 进度回流”，保留 orderId/taskId、支付尝试 ID、Agent 脱敏日志和出纸照片。覆盖错码、错终端、未支付、过期、断网重试、连点/刷新不重复出纸；没有这组证据不得写“打印已可用”。

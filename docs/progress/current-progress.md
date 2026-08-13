@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-13 完成 **连续打印 `Printing, Retained` 误报修复并入 Terminal Agent `0.4.6` 安装候选（源码回归已绿，Windows 最终构建与现场安装待完成）**：生产样例已证明旧 Agent 在实际提交打印后仍会因奔图队列长期保留 `Printing, Retained` 等待约 30 秒并回传 `PRINT_JOB_UNCONFIRMED`，导致下一笔任务看似停在「领取任务」，已出纸任务又在页面显示失败。`0.4.6` 候选已包含严格的 PrintService Event ID 307 补证，只接受同配置打印机、同 taskId、派发后的事件；本轮进一步把事件查询下界与 30 秒监控窗口分离，避免大文件转换或驱动提交耗时在首轮轮询前吃完窗口，并补充精确参数与慢派发回归。Node 22.22.0 下 `verify-print-monitor-truth`、Agent typecheck/build、`verify:print-scan-agent`、`verify:task-runner-wake` 已通过。明确卡纸/缺纸/删除、无匹配事件、旧事件与非 Windows 仍 fail-closed；未改 API、Kiosk、schema、生产配置、凭据或历史任务。必须以同一最终 SHA 通过 Windows MSI/EXE lifecycle，再安装到目标机并用一笔单页及连续三笔任务核对 API `completed`、对应 307、队列与实际出纸，才能关闭现场问题。
+
 2026-08-13 **`0.4.6` Windows lifecycle 第二轮反馈修正**：MSI/EXE、PowerShell 5.1 和 secure scan reader 已构建/验证通过，fresh EXE install/repair/uninstall 也通过；MSI lifecycle 在读取桌面 advertised shortcut 的 `TargetPath` 时得到空值而误判。该桌面入口由 Windows Installer 组件描述符解析，不能按普通 `.lnk` 强制读取目标；测试现改为验证 advertised shortcut 文件存在、GUI target component/payload 存在并执行 `SmokeTest`，开始菜单普通快捷方式仍核对精确 VBS 目标，卸载仍要求入口消失。未改 GUI 功能或安全边界，仍需新的最终 SHA 全量重跑。
 
 2026-08-13 **`0.4.6` CI 首轮反馈修正**：Windows WiX 首轮准确拦截 GUI payload 同时进入手写组件和自动 fragment，以及桌面快捷方式组件范围错误；已把两个 GUI 文件加入 fragment exclusion，并将桌面入口改为同一 per-machine advertised shortcut，不关闭 ICE30/43/57。主 CI 同时发现 API 的 terminal bind-code 静态合同仍匹配旧 fail-closed 提示文本，现已同步接受新增的 GUI stdin 凭据源；此处只更新验证合同，不放宽绑定码、DPAPI 或 long-lived token 安全边界。修正后仍须以新的最终 SHA 重跑 Windows 与三项主 CI。

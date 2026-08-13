@@ -9,10 +9,12 @@ interface Scenario {
   expectedFailed: boolean
   expectedErrorCode: string
   completionEvent?: boolean
+  initialNow?: number
+  dispatchedAtMs?: number
 }
 
 async function runScenario(scenario: Scenario): Promise<void> {
-  let now = 0
+  let now = scenario.initialNow ?? 0
   let cursor = 0
   const fallback = scenario.statuses.at(-1) ?? 'unknown'
 
@@ -26,7 +28,19 @@ async function runScenario(scenario: Scenario): Promise<void> {
       status: scenario.statuses[cursor++] ?? fallback,
       rawStatus: fallback === 'printing' ? 'Printing' : undefined,
     }),
-    queryCompletionEvent: async () => scenario.completionEvent ?? false,
+    dispatchedAtMs: scenario.dispatchedAtMs,
+    queryCompletionEvent: async (printerName, taskId, dispatchedAtMs) => {
+      assert.equal(printerName, 'Configured Printer', `${scenario.name}: completion printer`)
+      assert.equal(taskId, 'task-monitor-test', `${scenario.name}: completion taskId`)
+      if (scenario.dispatchedAtMs !== undefined) {
+        assert.equal(
+          dispatchedAtMs,
+          scenario.dispatchedAtMs,
+          `${scenario.name}: completion dispatch lower bound`,
+        )
+      }
+      return scenario.completionEvent ?? false
+    },
   })
 
   assert.equal(result.failed, scenario.expectedFailed, `${scenario.name}: terminal disposition`)
@@ -89,6 +103,15 @@ async function main(): Promise<void> {
       expectedFailed: false,
       expectedErrorCode: '',
       completionEvent: true,
+    },
+    {
+      name: 'slow command does not consume retained-job monitoring window',
+      statuses: ['retained'],
+      expectedFailed: false,
+      expectedErrorCode: '',
+      completionEvent: true,
+      initialNow: 100,
+      dispatchedAtMs: 1,
     },
     {
       name: 'observed job then queue removal confirms completion',

@@ -602,7 +602,11 @@ export async function monitorPrintJob(
   const dispatchedAtMs = Number.isFinite(dependencies.dispatchedAtMs)
     ? Math.max(0, dependencies.dispatchedAtMs as number)
     : now()
-  const deadline = dispatchedAtMs + timeoutMs
+  // `dispatchedAtMs` scopes PrintService evidence to this task dispatch. The
+  // monitor timeout starts only after the print command has returned, otherwise
+  // slow rendering/spooling can consume the entire observation window before
+  // the first queue poll.
+  const deadline = now() + timeoutMs
   let paperEmptyCount = 0
   let notFoundCount = 0
   let activeJobSeenOnce = false
