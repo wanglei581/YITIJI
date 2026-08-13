@@ -44,6 +44,49 @@ function registerPrice(api: ApiRouter): void {
   })
 }
 
+test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let claimCount = 0
+  let submittedCode = ''
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
+    claimCount += 1
+    const body = route.request().postDataJSON() as { code?: string }
+    submittedCode = body.code ?? ''
+    // Keep the input mounted long enough to deliver the HID scanner's trailing
+    // Enter. This makes the assertion exercise the submit lock instead of
+    // passing only because the success screen replaced the input first.
+    await new Promise(resolve => setTimeout(resolve, 150))
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        released: false,
+        orderId: 'w2-pickup-order',
+        orderNo: 'ORD-W2-PICKUP',
+        terminalId: 'KSK-001',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'w2-payment-session-token',
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  const input = page.getByLabel('取件码输入框')
+  await input.pressSequentially('AB2C7M9P3K', { delay: 5 })
+  await input.press('Enter')
+
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  expect(submittedCode).toBe('AB2C7M9P3K')
+  expect(claimCount).toBe(1)
+  expect(errors).toEqual([])
+})
+
 /** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
 function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
   const billablePages = opts?.billablePages ?? 2

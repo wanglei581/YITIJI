@@ -19,14 +19,30 @@
   <!-- ── 正常展示 ── -->
   <block wx:elif="{{state === 'ready'}}">
 
-    <!-- 英雄区：状态+大码 -->
+    <!-- 英雄区：扫码优先，10 位码兜底 -->
     <view class="pickup-hero">
       <view class="ph-status-dot"></view>
       <text class="ph-status-text">{{taskStatus === 'pending' ? '等待取件' : taskStatus === 'claimed' ? '已认领排队' : taskStatus === 'printing' ? '打印中…' : '取件码已就绪'}}</text>
+
+      <view class="pickup-qr-card">
+        <canvas
+          wx:if="{{qrStatus !== 'error'}}"
+          type="2d"
+          id="pickup-qr"
+          class="pickup-qr"
+          style="width:{{qrSizePx}}px;height:{{qrSizePx}}px"
+          aria-label="打印取件核销二维码"
+        ></canvas>
+        <view class="pickup-qr-error" wx:else>二维码暂不可用，请使用下方取件码</view>
+        <text class="pickup-qr-title">请将此二维码对准一体机扫码器</text>
+        <text class="pickup-qr-sub">扫码器读取后会自动核销，无需在手机上扫码</text>
+      </view>
+
+      <text class="ph-divider">扫码不便时，手动输入</text>
       <view class="ph-code-wrap">
         <text class="ph-code">{{code}}</text>
       </view>
-      <text class="ph-hint">请在一体机上输入此取件码</text>
+      <text class="ph-hint">二维码与下方 10 位码对应同一笔订单</text>
       <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
     </view>
 
@@ -38,7 +54,7 @@
       </view>
       <view class="step-item">
         <view class="step-num">2</view>
-        <text class="step-text">选择「输入取件码」并填写上方号码</text>
+        <text class="step-text">选择「扫码或输入取件码」</text>
       </view>
       <view class="step-item">
         <view class="step-num">3</view>
@@ -60,7 +76,7 @@
 
     <!-- 隐私提示 -->
     <view class="notice-card">
-      <text class="nc-text">取件码仅本人使用。实际有效期、付款与打印结果以后端和终端显示为准；本页不会生成二维码或猜测有效期。</text>
+      <text class="nc-text">二维码只包含本订单的 10 位取件码，不含文件、姓名或手机号。请勿转发；有效期、付款与打印结果以后端和终端显示为准。</text>
     </view>
 
     <view class="pk-actions">
