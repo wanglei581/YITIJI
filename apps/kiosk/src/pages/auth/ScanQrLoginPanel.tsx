@@ -7,8 +7,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CircleCheckIcon, QrCodeIcon, RefreshCwIcon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import type { LoginResult } from '../../services/auth/memberAuthApi'
-import { MemberApiError } from '../../services/auth/memberAuthApi'
+import {
+  type LoginResult,
+  MemberApiError,
+  resolveMemberApiErrorMessage,
+} from '../../services/auth/memberAuthApi'
 import { getMemberAuthDeviceId } from '../../services/auth/memberAuthDevice'
 import {
   buildQrLoginUrl,
@@ -138,7 +141,7 @@ export function ScanQrLoginPanel({
           }
           onLoginSuccess(claimed)
         } catch (err) {
-          const message = err instanceof MemberApiError ? err.message : '扫码登录失败，请刷新二维码重试'
+          const message = resolveMemberApiErrorMessage(err, '扫码登录状态获取失败，请刷新二维码重试')
           setNotice(null)
           setError(message)
           setClaiming(false)
@@ -249,5 +252,5 @@ function localQrErrorMessage(error: unknown): string {
   if (error.code === 'LOCAL_QR_ORIGIN_FORBIDDEN') return '当前页面来源未被本机扫码登录服务允许'
   if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_INVALID') return '本机扫码登录服务未正确配置，请使用手机号登录'
   if (error.status === 0 || error.code === 'NETWORK_ERROR') return '本机扫码登录服务未连接，请使用手机号登录'
-  return error.message || '扫码登录服务不可用，请使用手机号登录'
+  return resolveMemberApiErrorMessage(error, '扫码登录服务不可用，请使用手机号登录')
 }

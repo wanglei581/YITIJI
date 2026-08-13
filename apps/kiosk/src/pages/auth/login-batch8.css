@@ -113,7 +113,13 @@
 .k1-login .k-cells { display: grid; min-width: 0; flex: 1; grid-template-columns: repeat(6, 1fr); padding: 8px; }
 .k1-login .k-cell { min-width: 0; min-height: 58px; border-right: 1px solid var(--color-neutral-200); color: var(--color-neutral-900); font-size: 25px; }
 .k1-login .k-cell:last-child { border-right: 0; }
-.k1-login .k-send { min-width: 148px; min-height: 76px; padding: 0 18px; border: 1px solid var(--color-primary-300); border-radius: 14px; color: var(--color-primary-700); background: var(--color-surface); font-size: 18px; }
+.k1-login .k-send { min-width: 148px; min-height: 76px; padding: 0 18px; border: 1px solid var(--color-primary-600); border-radius: 14px; color: var(--color-surface); background: var(--color-primary-600); font-size: 18px; }
+.k1-login .k-send:not(:disabled):hover { border-color: var(--color-primary-700); color: var(--color-surface); background: var(--color-primary-700); transform: translateY(-2px); }
+.k1-login .k-send:focus-visible { outline: 4px solid color-mix(in srgb, var(--color-primary-600) 38%, transparent); outline-offset: 4px; }
+.k1-login .k-send:not(:disabled):active { border-color: var(--color-primary-700); color: var(--color-surface); background: var(--color-primary-700); transform: scale(.97); }
+.k1-login .k-send:disabled { opacity: 1; cursor: not-allowed; border-color: var(--color-neutral-300); color: var(--color-neutral-700); background: var(--color-neutral-100); box-shadow: none; transform: none; }
+.k1-login .k-send:disabled .ring circle { stroke: var(--color-neutral-700); }
+.k1-login .k-send:disabled .ring .bg { stroke: color-mix(in srgb, var(--color-neutral-700) 28%, transparent); }
 .k1-login .k-numpad { display: grid; min-height: 0; flex: 1 1 auto; grid-template-columns: repeat(3, 1fr); gap: 13px; }
 .k1-login .k-key { min-height: 72px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-900); background: var(--color-canvas); font-family: var(--font-serif); font-size: 32px; font-weight: 700; }
 .k1-login .k-key.fn { color: var(--color-neutral-500); font-family: var(--font-sans); font-size: 20px; font-weight: 650; }
