@@ -10,6 +10,7 @@ console.log('\n=== verify production Agent provisioning contract ===')
 
 for (const parameter of [
   'PromptForBindCode',
+  'BindCodeFromStandardInput',
   'ScanWatchFolder',
   'LocalApiAllowedOrigins',
   'ReplaceLocalApiAllowedOrigins',
@@ -23,7 +24,8 @@ for (const parameter of [
 assert.match(installer, /Read-Host "One-time terminal bind code" -AsSecureString/)
 assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
-assert.match(installer, /Use either -PromptForBindCode or -BindCode, not both/)
+assert.match(installer, /Use only one BindCode input flow/)
+assert.match(installer, /\[Console\]::In\.ReadLine\(\)/, 'GUI bind code must enter through redirected stdin, not argv')
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
 assert.match(installer, /BindCode exchange did not return a terminalId/)
 assert.match(installer, /BindCode exchange did not return a terminalCode/)

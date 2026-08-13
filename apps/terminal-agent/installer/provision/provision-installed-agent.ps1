@@ -62,7 +62,7 @@ $printerName = [string]$printers[$selectedIndex - 1].Name
   -PromptForBindCode `
   -PrinterName $printerName `
   -InstalledAgentRoot $agentRoot `
-  -AgentVersion "0.4.5-production" `
+  -AgentVersion "0.4.6-production" `
   -ReplaceLocalApiAllowedOrigins `
   -LocalApiAllowedOrigins "https://zyidai.cn"
 if ($LASTEXITCODE -ne 0) { Fail "设备绑定未完成，错误码 $LASTEXITCODE" }

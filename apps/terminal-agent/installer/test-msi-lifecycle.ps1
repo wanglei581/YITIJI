@@ -9,11 +9,12 @@ $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
 $serviceName = "aijobprintagent.exe"
 $programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal"
 $panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
-$provisionShortcutName = -join ([char[]](0x8BBE, 0x5907, 0x7ED1, 0x5B9A, 0x5411, 0x5BFC))
-$provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".lnk")
 $desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
-$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
-$provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
+$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".lnk")
+$controlCenterShortcutName = -join ([char[]](0x7EC8, 0x7AEF, 0x63A7, 0x5236, 0x4E2D, 0x5FC3))
+$controlCenterShortcutPath = Join-Path $programMenuRoot ($controlCenterShortcutName + ".lnk")
+$controlCenterLauncherPath = Join-Path $installRoot "provision\launch-control-center.vbs"
+$controlCenterScriptPath = Join-Path $installRoot "provision\terminal-control-center.ps1"
 $runtimeSecurityPath = Join-Path $installRoot "provision\provisioning-runtime-security.ps1"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
@@ -41,48 +42,60 @@ function Assert-PanelShortcut {
   }
 }
 
-function Assert-ProvisioningShortcut {
-  if (-not (Test-Path -LiteralPath $provisionShortcutPath -PathType Leaf)) {
-    throw "Device provisioning Start Menu shortcut is missing"
-  }
-  if (-not (Test-Path -LiteralPath $provisionLauncherPath -PathType Leaf)) {
-    throw "Device provisioning launcher is missing"
-  }
+function Assert-ShortcutTarget([string]$ShortcutPath, [string]$ExpectedTarget, [string]$Label) {
   $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($provisionShortcutPath)
+  $shortcut = $shell.CreateShortcut($ShortcutPath)
   $shortcutTarget = [string]$shortcut.TargetPath
   if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
     $shellApplication = New-Object -ComObject Shell.Application
-    $shortcutFolder = $shellApplication.Namespace($programMenuRoot)
-    $shortcutItem = if ($null -eq $shortcutFolder) { $null } else { $shortcutFolder.ParseName((Split-Path -Leaf $provisionShortcutPath)) }
+    $shortcutFolderPath = Split-Path -Parent $ShortcutPath
+    $shortcutFolder = $shellApplication.Namespace($shortcutFolderPath)
+    $shortcutItem = if ($null -eq $shortcutFolder) { $null } else { $shortcutFolder.ParseName((Split-Path -Leaf $ShortcutPath)) }
     if ($null -ne $shortcutItem) {
       $shortcutTarget = [string]$shortcutItem.ExtendedProperty("System.Link.TargetParsingPath")
     }
   }
   if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
-    # WScript.Shell returns an empty TargetPath for some Windows Installer-created
-    # links on hosted runners. If both Shell APIs decline to resolve it, verify the
-    # persisted link payload instead of passing an empty value to GetFullPath.
-    $shortcutBytes = [System.IO.File]::ReadAllBytes($provisionShortcutPath)
+    $shortcutBytes = [System.IO.File]::ReadAllBytes($ShortcutPath)
     $unicodePayload = [System.Text.Encoding]::Unicode.GetString($shortcutBytes)
     $ansiPayload = [System.Text.Encoding]::Default.GetString($shortcutBytes)
-    if (-not $unicodePayload.Contains($provisionLauncherPath) -and -not $ansiPayload.Contains($provisionLauncherPath)) {
-      throw "Device provisioning shortcut target is unreadable or missing"
+    if (-not $unicodePayload.Contains($ExpectedTarget) -and -not $ansiPayload.Contains($ExpectedTarget)) {
+      throw "$Label shortcut target is unreadable or missing"
     }
     return
   }
-  if ([System.IO.Path]::GetFullPath($shortcutTarget) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
-    throw "Device provisioning shortcut target mismatch"
+  if ([System.IO.Path]::GetFullPath($shortcutTarget) -ne [System.IO.Path]::GetFullPath($ExpectedTarget)) {
+    throw "$Label shortcut target mismatch"
   }
 }
 
 function Assert-DesktopShortcut {
   if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
-    throw "Local status panel desktop shortcut is missing"
+    throw "Terminal control center desktop shortcut is missing"
   }
-  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $desktopShortcutPath
-  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
-    throw "Local status panel desktop shortcut does not contain the fixed loopback URL"
+  if (-not (Test-Path -LiteralPath $controlCenterLauncherPath -PathType Leaf)) {
+    throw "Terminal control center launcher is missing"
+  }
+  if (-not (Test-Path -LiteralPath $controlCenterScriptPath -PathType Leaf)) {
+    throw "Terminal control center script is missing"
+  }
+  # The desktop link is an MSI advertised shortcut. Windows Installer resolves
+  # it through the component descriptor, so WScript.Shell can legitimately
+  # return an empty TargetPath. Its existence plus the installed GUI smoke test
+  # proves the advertised entry and target component are both present.
+  if (-not (Test-Path -LiteralPath $controlCenterShortcutPath -PathType Leaf)) {
+    throw "Terminal control center Start Menu shortcut is missing"
+  }
+  Assert-ShortcutTarget -ShortcutPath $controlCenterShortcutPath -ExpectedTarget $controlCenterLauncherPath -Label "Terminal control center Start Menu"
+}
+
+function Assert-ControlCenterSmoke {
+  $outputPath = Join-Path $logRoot "control-center-smoke.json"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
+  if ($LASTEXITCODE -ne 0) { throw "Terminal control center smoke test failed" }
+  $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne "0.4.6") {
+    throw "Terminal control center smoke snapshot is invalid"
   }
 }
 
@@ -265,8 +278,8 @@ if (Test-Path -LiteralPath $installRoot) {
 
 Invoke-Msi -Arguments @("/i", $resolvedMsi) -LogName "install.log"
 Assert-PanelShortcut
-Assert-ProvisioningShortcut
 Assert-DesktopShortcut
+Assert-ControlCenterSmoke
 Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
@@ -282,7 +295,9 @@ foreach ($relativeProvisionPath in @(
   "provision\provision-terminal.cmd",
   "provision\provision-installed-agent.ps1",
   "provision\install-production-agent.ps1",
-  "provision\service-identity.ps1"
+  "provision\service-identity.ps1",
+  "provision\terminal-control-center.ps1",
+  "provision\launch-control-center.vbs"
 )) {
   if (-not (Test-Path -LiteralPath (Join-Path $installRoot $relativeProvisionPath) -PathType Leaf)) {
     throw "Provisioning payload is missing after install: $relativeProvisionPath"
@@ -335,8 +350,8 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
 
 Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
 Assert-PanelShortcut
-Assert-ProvisioningShortcut
 Assert-DesktopShortcut
+Assert-ControlCenterSmoke
 Assert-InstalledRuntimeAcl
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped") {
@@ -356,11 +371,8 @@ if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
 if (Test-Path -LiteralPath $panelShortcutPath) {
   throw "Local status panel Start Menu shortcut remains after uninstall"
 }
-if (Test-Path -LiteralPath $provisionShortcutPath) {
-  throw "Device provisioning Start Menu shortcut remains after uninstall"
-}
 if (Test-Path -LiteralPath $desktopShortcutPath) {
-  throw "Local status panel desktop shortcut remains after uninstall"
+  throw "Terminal control center desktop shortcut remains after uninstall"
 }
 
 Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"

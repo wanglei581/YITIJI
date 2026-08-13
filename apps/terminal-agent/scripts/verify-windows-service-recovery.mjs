@@ -106,7 +106,7 @@ const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
 const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $effectiveBindCode')
 const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
 const failClosedTokenSource = installer.indexOf(
-  'Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
+  'Fail "Provide -PromptForBindCode, -BindCodeFromStandardInput (GUI), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
 )
 const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')

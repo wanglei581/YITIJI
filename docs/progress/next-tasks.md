@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-08-12
+> 最后更新：2026-08-13
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
@@ -38,6 +38,8 @@
 - [ ] **W8 发布授权**:main 积压修复未上 zyidai.cn(门禁关),按部署清单具名授权发布(需用户拍板)。
 
 ## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
+
+- [~] **交付 Terminal Agent `0.4.6` 可视化控制中心候选**：把安装后绑定、换机、打印机/扫描目录配置、服务启停/重启、运行状态、二维码链路自检和日志入口统一放入原生 WinForms GUI；安装完成页、桌面和开始菜单均打开该 GUI，不再把命令行向导作为用户入口，也不再创建第二个桌面状态页快捷方式。绑定码只走掩码输入框和重定向 stdin，继续复用现有 DPAPI、ProgramData/Program Files ACL、Origin 与 LocalSystem 安全合同。下一步必须让同一最终 SHA 的 Windows 2022 CI 从精确 `0.4.5@cd76b295` 构建 unsigned `0.4.6`，通过 PowerShell 5.1 解析、fresh install/repair/uninstall、GUI smoke 与 `0.4.5 -> 0.4.6` 升级；再下载并核对 manifest/hash，在真实 Windows/Pantum 设备验证面板可见、绑定/保存/重启/二维码自检及真实出纸。现场通过前不得部署或写“全部正常”。
 
 - [~] **交付 Terminal Agent `0.4.5` Program Files ACL 判定修复候选**：`0.4.4` 已通过中文脚本与 Origin 合并，但真实设备因复合 `Modify` 权限掩码包含读取位，把标准 `Users: ReadAndExecute` 误判为可写。当前修复只检查原子写权限位并保持递归 owner/reparse/ACE 守卫；Windows PowerShell 5.1 门禁必须通过 `ReadAndExecute` 安全、`Modify/WriteData` 拒绝正反例，MSI lifecycle 必须在真实安装树执行 ACL helper。下一步由 Windows 2022 CI 从精确 `0.4.4@35cd2e81` 构建 unsigned `0.4.5`，通过 fresh install/repair/uninstall 与 `0.4.4 -> 0.4.5` 升级；再在报错机器直接升级并完成一次性绑定、服务启动、二维码自检、网站在线和真实出纸。禁止手工放宽 ACL，现场通过前不得宣称完成。
 

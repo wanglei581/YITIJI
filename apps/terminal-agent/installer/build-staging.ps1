@@ -172,6 +172,10 @@ Copy-WindowsPowerShellScript `
   -Destination (Join-Path $provisionRoot "provision-installed-agent.ps1")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\provision-terminal.cmd") -Destination $provisionRoot
 Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\terminal-control-center.ps1") `
+  -Destination (Join-Path $provisionRoot "terminal-control-center.ps1")
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\launch-control-center.vbs") -Destination $provisionRoot
+Copy-WindowsPowerShellScript `
   -Source (Join-Path $agentRoot "scripts\install-production-agent.ps1") `
   -Destination (Join-Path $provisionRoot "install-production-agent.ps1")
 Copy-WindowsPowerShellScript `

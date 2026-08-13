@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PREDECESSOR_VERSION = "0.4.4"
-$CANDIDATE_VERSION = "0.4.5"
+$PREDECESSOR_VERSION = "0.4.5"
+$CANDIDATE_VERSION = "0.4.6"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
@@ -15,11 +15,13 @@ $nodePath = Join-Path $installRoot "node\node.exe"
 $serviceName = "aijobprintagent.exe"
 $programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal"
 $panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
-$provisionShortcutName = -join ([char[]](0x8BBE, 0x5907, 0x7ED1, 0x5B9A, 0x5411, 0x5BFC))
-$provisionShortcutPath = Join-Path $programMenuRoot ($provisionShortcutName + ".lnk")
 $desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
-$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
-$provisionLauncherPath = Join-Path $installRoot "provision\provision-terminal.cmd"
+$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".lnk")
+$predecessorDesktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".url")
+$controlCenterShortcutName = -join ([char[]](0x7EC8, 0x7AEF, 0x63A7, 0x5236, 0x4E2D, 0x5FC3))
+$controlCenterShortcutPath = Join-Path $programMenuRoot ($controlCenterShortcutName + ".lnk")
+$controlCenterScriptPath = Join-Path $installRoot "provision\terminal-control-center.ps1"
+$controlCenterLauncherPath = Join-Path $installRoot "provision\launch-control-center.vbs"
 $sentinelPath = Join-Path $stateRoot "installer-upgrade-state-sentinel.json"
 $logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -71,48 +73,25 @@ function Assert-PanelShortcut {
   }
 }
 
-function Assert-ProvisioningShortcut {
-  if (-not (Test-Path -LiteralPath $provisionShortcutPath -PathType Leaf)) {
-    throw "$CANDIDATE_VERSION upgrade did not install the device provisioning Start Menu shortcut"
+function Assert-DesktopShortcut {
+  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center desktop shortcut"
   }
-  if (-not (Test-Path -LiteralPath $provisionLauncherPath -PathType Leaf)) {
-    throw "$CANDIDATE_VERSION upgrade did not install the device provisioning launcher"
+  if (-not (Test-Path -LiteralPath $controlCenterScriptPath -PathType Leaf) -or -not (Test-Path -LiteralPath $controlCenterLauncherPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center payload"
   }
-  $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($provisionShortcutPath)
-  $shortcutTarget = [string]$shortcut.TargetPath
-  if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
-    $shellApplication = New-Object -ComObject Shell.Application
-    $shortcutFolder = $shellApplication.Namespace($programMenuRoot)
-    $shortcutItem = if ($null -eq $shortcutFolder) { $null } else { $shortcutFolder.ParseName((Split-Path -Leaf $provisionShortcutPath)) }
-    if ($null -ne $shortcutItem) {
-      $shortcutTarget = [string]$shortcutItem.ExtendedProperty("System.Link.TargetParsingPath")
-    }
-  }
-  if ([string]::IsNullOrWhiteSpace($shortcutTarget)) {
-    # WScript.Shell returns an empty TargetPath for some Windows Installer-created
-    # links on hosted runners. If both Shell APIs decline to resolve it, verify the
-    # persisted link payload instead of passing an empty value to GetFullPath.
-    $shortcutBytes = [System.IO.File]::ReadAllBytes($provisionShortcutPath)
-    $unicodePayload = [System.Text.Encoding]::Unicode.GetString($shortcutBytes)
-    $ansiPayload = [System.Text.Encoding]::Default.GetString($shortcutBytes)
-    if (-not $unicodePayload.Contains($provisionLauncherPath) -and -not $ansiPayload.Contains($provisionLauncherPath)) {
-      throw "Device provisioning shortcut target is unreadable or missing"
-    }
-    return
-  }
-  if ([System.IO.Path]::GetFullPath($shortcutTarget) -ne [System.IO.Path]::GetFullPath($provisionLauncherPath)) {
-    throw "Device provisioning shortcut target mismatch"
+  if (-not (Test-Path -LiteralPath $controlCenterShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center Start Menu shortcut"
   }
 }
 
-function Assert-DesktopShortcut {
-  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
-    throw "$CANDIDATE_VERSION upgrade did not install the local status panel desktop shortcut"
-  }
-  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $desktopShortcutPath
-  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
-    throw "Upgraded desktop shortcut does not use the fixed loopback URL"
+function Assert-ControlCenterSmoke {
+  $outputPath = Join-Path $logRoot "upgrade-control-center-smoke.json"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
+  if ($LASTEXITCODE -ne 0) { throw "Upgraded terminal control center smoke test failed" }
+  $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne $CANDIDATE_VERSION) {
+    throw "Upgraded terminal control center smoke snapshot is invalid"
   }
 }
 
@@ -140,9 +119,8 @@ try {
   Assert-AgentProductVersion -ExpectedVersion $PREDECESSOR_VERSION
   Assert-StoppedManualService
   Assert-PanelShortcut
-  Assert-ProvisioningShortcut
-  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
-    throw "0.4.4 predecessor desktop panel shortcut is missing"
+  if (-not (Test-Path -LiteralPath $predecessorDesktopShortcutPath -PathType Leaf)) {
+    throw "0.4.5 predecessor desktop panel shortcut is missing"
   }
 
   New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
@@ -157,8 +135,8 @@ try {
   Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
   Assert-StoppedManualService
   Assert-PanelShortcut
-  Assert-ProvisioningShortcut
   Assert-DesktopShortcut
+  Assert-ControlCenterSmoke
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
   }
@@ -175,6 +153,8 @@ try {
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Candidate repair did not restore the managed Node runtime after upgrade"
   }
+  Assert-DesktopShortcut
+  Assert-ControlCenterSmoke
 
   Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName "upgrade-candidate-uninstall.log"
   $candidateInstalled = $false
@@ -191,11 +171,14 @@ try {
   if (Test-Path -LiteralPath $panelShortcutPath) {
     throw "Local status panel Start Menu shortcut remains after upgraded candidate uninstall"
   }
-  if (Test-Path -LiteralPath $provisionShortcutPath) {
-    throw "Device provisioning Start Menu shortcut remains after upgraded candidate uninstall"
-  }
   if (Test-Path -LiteralPath $desktopShortcutPath) {
-    throw "Local status panel desktop shortcut remains after upgraded candidate uninstall"
+    throw "Terminal control center desktop shortcut remains after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $controlCenterShortcutPath) {
+    throw "Terminal control center Start Menu shortcut remains after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $predecessorDesktopShortcutPath) {
+    throw "Legacy status panel desktop shortcut remains after upgraded candidate uninstall"
   }
 
   Write-Host "EXE_UPGRADE_LIFECYCLE_PASS from=$PREDECESSOR_VERSION to=$CANDIDATE_VERSION stateRetained=true"

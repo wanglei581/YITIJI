@@ -58,6 +58,9 @@ param(
   [Parameter(Mandatory = $false)]
   [switch]$PromptForBindCode,
 
+  [Parameter(Mandatory = $false)]
+  [switch]$BindCodeFromStandardInput,
+
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
   [string]$PrinterName,
@@ -69,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.4.5-production",
+  [string]$AgentVersion = "0.4.6-production",
 
   [Parameter(Mandatory = $false)]
   [string]$InstalledAgentRoot,
@@ -758,16 +761,22 @@ Write-Step "Preparing token"
 $tokenToPersist = $null
 $effectiveTerminalId = if ($null -ne $TerminalId) { $TerminalId.Trim() } else { "" }
 $effectiveTerminalCode = if ($null -ne $TerminalCode) { $TerminalCode.Trim() } else { "" }
-if ($PromptForBindCode -and -not [string]::IsNullOrWhiteSpace($BindCode)) {
-  Fail "Use either -PromptForBindCode or -BindCode, not both"
+$bindCodeFlowCount = 0
+if ($PromptForBindCode) { $bindCodeFlowCount++ }
+if ($BindCodeFromStandardInput) { $bindCodeFlowCount++ }
+if (-not [string]::IsNullOrWhiteSpace($BindCode)) { $bindCodeFlowCount++ }
+if ($bindCodeFlowCount -gt 1) {
+  Fail "Use only one BindCode input flow"
 }
-if ($UseExistingToken -and ($PromptForBindCode -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
+if ($UseExistingToken -and ($PromptForBindCode -or $BindCodeFromStandardInput -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
   Fail "Use either a BindCode flow or -UseExistingToken, not both"
 }
 $effectiveBindCode = $BindCode
 if ($PromptForBindCode) {
   $secureBindCode = Read-Host "One-time terminal bind code" -AsSecureString
   $effectiveBindCode = ConvertFrom-SecureStringToPlainText $secureBindCode
+} elseif ($BindCodeFromStandardInput) {
+  $effectiveBindCode = [Console]::In.ReadLine()
 }
 if (-not [string]::IsNullOrWhiteSpace($effectiveBindCode)) {
   Write-Ok "Exchanging one-time bind code with cloud API"
@@ -802,7 +811,7 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveBindCode)) {
   Write-Ok "Using existing DPAPI token: $tokenPath"
   Set-ProgramDataAcl -Path $tokenPath
 } else {
-  Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
+  Fail "Provide -PromptForBindCode, -BindCodeFromStandardInput (GUI), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
 }
 
 $config = [ordered]@{
