@@ -19,8 +19,10 @@ try {
   $helper = $helperSource
   [System.IO.File]::WriteAllBytes($package, [System.Text.Encoding]::UTF8.GetBytes("signed-package-fixture"))
   [System.IO.File]::WriteAllBytes($rollbackPackage, [System.Text.Encoding]::UTF8.GetBytes("signed-rollback-fixture"))
-  $rsa = [System.Security.Cryptography.RSA]::Create()
-  $rsa.KeySize = 2048
+  # Windows PowerShell 5.1 can return an RSA implementation whose KeySize
+  # property is read-only. Construct the CI fixture with an explicit size so
+  # the same test works on the supported Windows runtime.
+  $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider -ArgumentList 2048
   try {
     [System.IO.File]::WriteAllText($privateKey, $rsa.ToXmlString($true), [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText($publicKey, $rsa.ToXmlString($false), [System.Text.UTF8Encoding]::new($false))
