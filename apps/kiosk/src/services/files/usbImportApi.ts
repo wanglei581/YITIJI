@@ -3,14 +3,11 @@
 //
 // 浏览器不直接读 U 盘：文件枚举与字节读取都由 Terminal Agent 在
 // 127.0.0.1 完成，本模块只负责调用 Agent 暴露的 /local/usb/* 接口。
-// 鉴权分两层：Origin 白名单（Agent 侧 CORS）+ 静态共享令牌
-// VITE_TERMINAL_AGENT_BRIDGE_TOKEN（随 Kiosk 构建注入，需与 Agent
-// 的 localApiBridgeToken 配置一致，安装时一起下发）。
+// 鉴权分两层：Agent 侧 Origin 白名单 + 短期本机会话；旧终端仍兼容
+// VITE_TERMINAL_AGENT_BRIDGE_TOKEN 静态令牌。
 // ============================================================
 
-const configuredLocalAgentBaseUrl = (import.meta.env['VITE_TERMINAL_AGENT_LOCAL_URL'] ?? '').trim()
-const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:9527'
-const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
+import { fetchProtectedLocalAgent, isLocalAgentBridgeAvailable } from '../localAgentBridge'
 
 export class LocalAgentApiError extends Error {
   constructor(
@@ -56,7 +53,7 @@ interface Envelope<T> {
 
 /** U 盘导入功能是否已在本终端完成配置（未配置令牌时前端不应展示为可用）。 */
 export function isUsbImportConfigured(): boolean {
-  return Boolean(BRIDGE_TOKEN)
+  return isLocalAgentBridgeAvailable()
 }
 
 async function callLocalAgent<T>(
@@ -65,17 +62,12 @@ async function callLocalAgent<T>(
   body?: unknown,
   endUserToken?: string | null,
 ): Promise<T> {
-  if (!BRIDGE_TOKEN) {
-    throw new LocalAgentApiError('LOCAL_USB_BRIDGE_TOKEN_MISSING', '当前终端未配置 U 盘导入本地令牌', 0)
-  }
-
   let res: Response
   try {
-    res = await fetch(`${LOCAL_AGENT_BASE_URL}${path}`, {
+    res = await fetchProtectedLocalAgent(path, {
       method,
       headers: {
         Accept: 'application/json',
-        'X-Local-Bridge-Token': BRIDGE_TOKEN,
         ...(endUserToken ? { Authorization: `Bearer ${endUserToken}` } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },

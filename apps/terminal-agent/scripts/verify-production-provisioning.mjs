@@ -10,11 +10,13 @@ console.log('\n=== verify production Agent provisioning contract ===')
 
 for (const parameter of [
   'PromptForBindCode',
+  'BindCodeFromStandardInput',
   'ScanWatchFolder',
   'LocalApiAllowedOrigins',
   'ReplaceLocalApiAllowedOrigins',
   'LocalApiPort',
   'PromptForLocalApiBridgeToken',
+  'InstalledAgentRoot',
 ]) {
   assert.match(installer, new RegExp(`\\$${parameter}\\b`), `installer must expose ${parameter}`)
 }
@@ -22,8 +24,13 @@ for (const parameter of [
 assert.match(installer, /Read-Host "One-time terminal bind code" -AsSecureString/)
 assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
-assert.match(installer, /Use either -PromptForBindCode or -BindCode, not both/)
+assert.match(installer, /Use only one BindCode input flow/)
+assert.match(installer, /\[Console\]::In\.ReadLine\(\)/, 'GUI bind code must enter through redirected stdin, not argv')
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
+assert.match(installer, /BindCode exchange did not return a terminalId/)
+assert.match(installer, /BindCode exchange did not return a terminalCode/)
+assert.match(installer, /-UseExistingToken requires -TerminalId and -TerminalCode/)
+assert.match(installer, /MSI-installed Windows service is missing; repair the MSI before provisioning/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)
@@ -40,7 +47,11 @@ assert.match(installer, /\$preservedLocalSettings\.Contains\("localApiPort"\)/)
 assert.match(installer, /localApiPort\s+=\s+\$effectiveLocalApiPort/)
 assert.match(installer, /Assert-NotReparsePoint \$scanFolderItem/)
 assert.match(installer, /GetLeftPart\(\[System\.UriPartial\]::Authority\)/)
-assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$localApiAllowedOrigins\)/)
+assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$effectiveLocalApiAllowedOrigins\)/)
+assert.match(installer, /Merge-LocalApiAllowedOrigins/)
+assert.doesNotMatch(installer, /\$localApiAllowedOrigins\s*=\s*New-Object/, 'parameter names are case-insensitive in PowerShell; do not shadow the fixed string array')
+assert.match(installer, /provisioning-runtime-security\.ps1/)
+assert.doesNotMatch(installer, /FileSystemRights\]::Modify\s+-bor/, 'composite Modify includes read bits and must not be used as a dangerous-rights mask')
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')

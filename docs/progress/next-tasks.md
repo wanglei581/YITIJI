@@ -1,9 +1,10 @@
 # 下一步任务
 
-> 最后更新：2026-08-13
+> 最后更新：2026-08-14
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
+- [x] **构建、安装并复验 Agent `0.4.10` 的 Windows 打印回执修复（系统回执级）**：现场证据确认 `0.4.9` 失败的真实原因是 Pantum 将 Event 307 文档名改为通用「打印文档」，原始 XML 不含 taskId；`0.4.10@75e07115` 以“精确 taskId 优先 + 派发后同打印机/LocalSystem 307 窄化兜底”修复，错误打印机/用户/时间窗继续拒绝。Windows run `31724300575` 与 build/PostgreSQL/browser run `31724300606` 全绿，unsigned EXE/MSI manifest 与 SHA-256 已核对。目标机已覆盖至 `0.4.10`，GUI 显示 `KSK-001 / Running / Pantum CM2800ADN Series`；正式站新建的一笔 `ai-advisor.png` 单页黑白 0 元任务已从等待领取自动进入「打印完成」，API/Agent/Windows 回执/Kiosk 状态链路通过，旧失败任务未被修改或重打。远控不能代替现场看纸，物理纸张与连续任务验收仍按下方独立待办执行。
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
 - [~] **二维码扫码核销真机验收**：小程序已离线把同一 10 位到机码编码成不含 PII/文件链接的二维码，Kiosk 已支持 HID 扫码器读满自动提交并拦截 Enter 重复请求；本地编码、构建和浏览器模拟扫码通过。下一步必须在正式 AppID 真机页面和目标 Windows 终端的实际扫码器上覆盖一次成功、错码、过期码、重复扫码、扫码失败后手输兜底，并确认一次扫码只产生一次核销请求；现场通过前不得写“扫码可用”。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
@@ -15,6 +16,7 @@
 >
 > ⚠️ **V3 队列的 W1–W8 写于 2026-08-09/10，已被 2026-08-11 的四份文档部分取代**，
 > 以后者为准：
+>
 > - [`docs/product/codex-handoff-plan-2026-08.md`](../product/codex-handoff-plan-2026-08.md) 窗口划分（两条线共用的唯一答案）
 > - [`docs/reviews/2026-08-11-two-line-reconciliation.md`](../reviews/2026-08-11-two-line-reconciliation.md) 两线对账裁定与最小一致集
 > - [`docs/reviews/2026-08-11-backend-buildout-spec.md`](../reviews/2026-08-11-backend-buildout-spec.md) 后端六项能力实施规格
@@ -40,6 +42,19 @@
 
 ## 2026-08-10 商用收口后续（Wave 8 Windows-verified 功能候选 `65a3ebeb`）
 
+- [x] **交付 Terminal Agent `0.4.10` 可视化控制中心 + 图片打印确认修复（系统回执级）**：`0.4.8` 修复图片转换任务名，`0.4.9` 改用原始 XML taskId，但现场又证明 Pantum 会把文档名彻底改成「打印文档」；最终 `0.4.10` 以同派发窗口、同配置打印机、LocalSystem 的 307 事件作严格兜底。精确 `0.4.9 -> 0.4.10` Windows 升级、PowerShell 5.1 fixture、fresh/repair/uninstall、GUI 与主 CI 已全绿，目标机 GUI/绑定/配置/服务均正常，一笔新的正式站 PNG 任务已到 completed。物理纸张、纸面内容和连续三笔仍不是远控可证明的事实，不并入本项。
+
+- [ ] **实现 Terminal Agent 受控在线升级闭环（用户已确认方向，独立于本次 `0.4.10` 打印回执修复）**：复用终端云管正式基线，不新增第二套后台入口。先建立稳定 HTTPS 发布 manifest（版本、适用范围、最低可升级版、大小、SHA-256、签名证书指纹、回滚版与说明）和 Authenticode 签名流水线；再提供独立于主 Agent 的 LocalSystem 更新助手，控制中心增加“检查更新/安装已批准版本”。升级必须先停止 claim、确认无当前打印/状态补报阻塞，随后下载暂存、验签验 hash、调用受控 MSI/Burn 升级、启动服务并验证本地面板 + 云端新版本心跳；失败自动回滚并留脱敏结果。禁止任意 URL、远程 shell、unsigned 包静默执行和打印中强制升级。完成 fresh/repair、断网、下载损坏、签名错误、安装失败、服务启动失败及真实 `N -> N+1 -> rollback` Windows 门禁后，再从单机手动检查升级扩展到后台灰度推送。
+
+- [~] **交付 Terminal Agent `0.4.5` Program Files ACL 判定修复候选**：`0.4.4` 已通过中文脚本与 Origin 合并，但真实设备因复合 `Modify` 权限掩码包含读取位，把标准 `Users: ReadAndExecute` 误判为可写。当前修复只检查原子写权限位并保持递归 owner/reparse/ACE 守卫；Windows PowerShell 5.1 门禁必须通过 `ReadAndExecute` 安全、`Modify/WriteData` 拒绝正反例，MSI lifecycle 必须在真实安装树执行 ACL helper。下一步由 Windows 2022 CI 从精确 `0.4.4@35cd2e81` 构建 unsigned `0.4.5`，通过 fresh install/repair/uninstall 与 `0.4.4 -> 0.4.5` 升级；再在报错机器直接升级并完成一次性绑定、服务启动、二维码自检、网站在线和真实出纸。禁止手工放宽 ACL，现场通过前不得宣称完成。
+
+- [~] **交付 Terminal Agent `0.4.1` 合并候选（自动化已绿，签名/现场 pending）**：`921f0129` 已以精确 `0.4.0@28c9202d` 为 predecessor，通过 Node 22 build、PostgreSQL、Kiosk browser 与 Windows unsigned installer CI，真实覆盖 `0.4.0 -> 0.4.1` Major Upgrade、状态面板、all-users 两个开始菜单入口、设备绑定向导、LocalSystem、DPAPI、ProgramData 保留、repair/uninstall、动态 bridge session 和 secrets 静态扫描；unsigned artifact manifest 与 SHA-256 已核对。当前仓库没有 Windows Authenticode 证书 Secret，禁止把 unsigned candidate 当正式发布。下一步先让同步最新 main 的最终 PR HEAD 四项 CI 全绿，再配置受控代码签名并验证签名链；最后在新设备输入一次性绑定码，验证旧凭据失效、新二维码 180 秒/一次性/terminal 绑定、登录回调、U 盘、打印唤醒、真实 Pantum 打印扫描和重启恢复。现场完成前不得部署或宣称换机完成。
+
+- [~] **交付 Terminal Agent `0.4.0` 本机只读状态面板候选（自动化已绿，现场 pending）**：代码 SHA `9c2ded83` 的 Windows run `31402465491` 已真实完成 WiX MSI/EXE、all-users `.url` 开始菜单入口、secure scan helper、EXE/MSI install/repair/uninstall 和 `0.3.9 -> 0.4.0` 升级；同 SHA 的 build、PostgreSQL、Kiosk browser 全绿。当前还不能直接安装：本文档提交位于代码候选之后，须以 PR 当前 checks 和同 final SHA 的手动 Windows run 复核；随后只下载该 SHA 的 unsigned EXE，核对 manifest `gitCommit == PR head` 与 SHA-256，由用户再次确认精确文件后才可升级目标机。升级后验证服务 Running、内置 Node 22、开始菜单面板、云端心跳版本 `0.4.0`、配置/DPAPI/SQLite 保留及 Pantum 打印扫描不回归。该面板只做本机运行状态，不复制 Kiosk/Admin 业务功能，也不固化 Claude 尚未冻结的页面设计。
+
+- [~] **Agent `0.3.9` 可升级安装候选（本条取代下方历史 `0.3.1` 候选，CI 与现场升级 pending）**：Burn 日志已明确识别 per-machine related bundle `{B083D1AB-8957-449E-8255-F41C349758BE}` 与 package `{F402B68F-4DCD-433A-BEA2-80B92FED6C84}` 版本均为 `0.3.8`，因此已校验的 `0.3.1` 候选被 WiX 正确按 downgrade 拒绝并返回 `0x80070666`；该候选正式作废，现有 Agent 未卸载、未覆盖。当前代码只把候选推进到 `0.3.9`，并将 Windows 动态升级合同改为真实的 `0.3.8 -> 0.3.9`，要求保留 ProgramData、单一产品、repair/uninstall、LocalSystem 服务及 secure scan helper。下一步必须让同一最终 SHA 的 Windows installer、build、PostgreSQL、Kiosk browser 四项 CI 全绿，只下载该 SHA 的 unsigned EXE，验证 manifest `gitCommit == PR head` 和新 SHA-256；随后由用户对精确 `0.3.9` 文件重新确认安装，再验证服务、内置 Node 22、loopback `127.0.0.1:9527`、配置/DPAPI/SQLite 保留和 Pantum 打印扫描回归。禁止卸载 `0.3.8`、删注册表或继续运行任何旧候选，也不得把自动化升级通过等同于现场或商用完成。
+
+- [~] **Agent `0.3.1` 可升级安装候选（Windows CI verified，精确 head provenance 重建中，现场升级 pending）**：现场已以精确 SHA-256 排除传输损坏，并用 MSI `0x80070666` 证实 `0.3.0` 同版本候选无法覆盖已安装产品；现有 Agent 未卸载且继续运行。代码候选 `c0558b07` 的 Windows run `31370942679` 真实完成 predecessor `0.3.0` 安装、ProgramData sentinel、Major Upgrade、单一 `0.3.1` 产品、repair、uninstall 与服务合同，并输出 `EXE_UPGRADE_LIFECYCLE_PASS from=0.3.0 to=0.3.1 stateRetained=true`；同 SHA 的 build、PostgreSQL、Kiosk browser 也全部通过。文档 SHA `5cc16e82` 的四项虽全绿，但 artifact manifest 指向 GitHub 临时 merge ref `7d774fd2` 而不是 PR head，故该次 EXE 哈希 `F6B16A…DF1A22` 已明确作废；本提交已将 workflow 收紧为精确 checkout PR head 并新增防回退门禁。下一步必须让本提交后的最终 SHA 重跑四项，只下载其 unsigned EXE，验证 manifest `gitCommit == PR head` 和新 SHA-256，再在目标机执行升级并验证 LocalSystem 服务、内置 Node 22、loopback `127.0.0.1:9527`、配置/DPAPI/SQLite 保留、secure scan helper 及真实打印扫描回归。禁止用卸载旧版绕过升级门禁，也不得把自动化升级通过等同于现场或商用完成。
 - [~] **Wave 8 Windows scan mutation boundary：Windows CI verified，真实现场 pending**：Windows-verified 功能代码候选 `65a3ebeb` 已包含共享功能提交 `b161a0c2`（来源独立提交 `e076c7a6`），完成 `AJPSR002`、READ root/candidate identity token、identity-bound success delete/quarantine/TTL、逐级 ancestor/root handle pin、`RootDirectory = unclaimed_handle` 相对 rename 和 audit intent → delete → result 顺序。同一 SHA 的 run `31331802378` 中 `unsigned-msi-candidate` **SUCCESS**（5m59s），覆盖 source contract、MSVC `/W4 /WX` 多源编译、动态 boundary、MSI/EXE install/repair/uninstall；run `31331802380` 的 build **SUCCESS**（7m55s）、PG **SUCCESS**（3m40s）、browser **SUCCESS**（9m17s）。下一门禁仍是在目标 Windows LocalSystem 服务账户与真实 SMB 扫描目录验证 ACL、杀毒/文件占用、服务重启、长驻 watcher、普通 PDF/JPG/PNG、失败隔离和 TTL 审计，再与 Pantum 真机完成扫描输入及打印回归；生产、法务、内容与密钥也仍未验收。Claude 未完成页面本 Wave 未触碰并继续受保护。任一现场或外部门禁未通过都不得部署或宣称商用完成，整体保持 **NO-GO**。
 - [x] **Wave 3C 全栈/治理/资产审计报告**：已形成 [`commercial-readiness-audit-and-remediation-2026-08-09.md`](../reviews/commercial-readiness-audit-and-remediation-2026-08-09.md)，覆盖前后端功能与接口断层、已修/未做/缺陷、废弃/孤儿/未合并资产、local↔remote 精确快照、CI/部署、目录/数据/fixture 优化与商用 GO/NO-GO。没有删除 worker、旧 Kiosk 路由、Prisma model/migration、worktree、分支、独立小程序或用户设计资产；后续按报告 P0→P1→P2 分阶段执行，禁止把报告本身记作代码、部署或真机验收完成。
 - [~] **Windows 扫描恢复门禁（Windows CI verified，真实现场 pending）**：代码候选 `9211b6d1` 的 manual dispatch run `31322154074` 全绿（5m49s），真实覆盖 `/W4 /WX` compile、staged dynamic boundary、WiX MSI/EXE、install/repair/uninstall 与 installed helper call。首轮 `76483704` 为 BOM/cleanup harness 失败，二轮 `e347ecd7` 为 Win32 broken-pipe EOF 误判；最终只做最小 harness/EOF 修复，安全边界未放宽。下一步是在真实 SMB 扫描目录覆盖普通 PDF/JPG/PNG、symlink/junction/reparse point、写入中替换、ACL/杀毒占用、服务重启和长驻 watcher；现场通过前不得宣称扫描可商用。

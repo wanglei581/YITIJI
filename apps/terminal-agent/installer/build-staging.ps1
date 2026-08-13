@@ -40,6 +40,13 @@ function Invoke-Checked([string]$Executable, [string[]]$Arguments) {
   }
 }
 
+function Copy-WindowsPowerShellScript([string]$Source, [string]$Destination) {
+  # Windows PowerShell 5.1 treats BOM-less UTF-8 as the active ANSI code page.
+  # Preserve non-ASCII prompts and syntax by emitting an explicit UTF-8 BOM.
+  $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $Source
+  [System.IO.File]::WriteAllText($Destination, $content, [System.Text.UTF8Encoding]::new($true))
+}
+
 function Assert-ChildPath([string]$Root, [string]$Candidate) {
   $rootPath = [System.IO.Path]::GetFullPath($Root).TrimEnd("\") + "\"
   $candidatePath = [System.IO.Path]::GetFullPath($Candidate)
@@ -78,7 +85,8 @@ Assert-Sha256 -Path $nodeExecutable -Expected $inputs.node.executableSha256
 $nodeRoot = Join-Path $stagingRoot "node"
 $appRoot = Join-Path $stagingRoot "app"
 $bootstrapRoot = Join-Path $stagingRoot "bootstrap"
-New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot -Force | Out-Null
+$provisionRoot = Join-Path $stagingRoot "provision"
+New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot, $provisionRoot -Force | Out-Null
 Copy-Item -LiteralPath $nodeExecutable -Destination (Join-Path $nodeRoot "node.exe")
 Copy-Item -LiteralPath (Join-Path $extractedNodeRoot "LICENSE") -Destination (Join-Path $nodeRoot "LICENSE")
 
@@ -159,6 +167,26 @@ $runtimePackage.dependencies.PSObject.Properties.Remove("node-windows")
 
 Copy-Item -LiteralPath $wrapperDownload -Destination (Join-Path $bootstrapRoot "aijobprintagent.exe")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "bootstrap\aijobprintagent.xml") -Destination $bootstrapRoot
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\provision-installed-agent.ps1") `
+  -Destination (Join-Path $provisionRoot "provision-installed-agent.ps1")
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\provision-terminal.cmd") -Destination $provisionRoot
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $PSScriptRoot "provision\terminal-control-center.ps1") `
+  -Destination (Join-Path $provisionRoot "terminal-control-center.ps1")
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "provision\launch-control-center.vbs") -Destination $provisionRoot
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\install-production-agent.ps1") `
+  -Destination (Join-Path $provisionRoot "install-production-agent.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\service-identity.ps1") `
+  -Destination (Join-Path $provisionRoot "service-identity.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\provisioning-origin-utils.ps1") `
+  -Destination (Join-Path $provisionRoot "provisioning-origin-utils.ps1")
+Copy-WindowsPowerShellScript `
+  -Source (Join-Path $agentRoot "scripts\provisioning-runtime-security.ps1") `
+  -Destination (Join-Path $provisionRoot "provisioning-runtime-security.ps1")
 
 Remove-Item -LiteralPath $deployRoot -Recurse -Force
 Remove-Item -LiteralPath $extractRoot -Recurse -Force

@@ -31,17 +31,27 @@ const IMAGE_EXTENSIONS_SUPPORTED = new Set(['.jpg', '.jpeg', '.png'])
 /** BMP/TIFF：扩展名已在 SUPPORTED_EXTENSIONS 中，但 Phase 8.1A 暂不支持 image-to-pdf 转换 */
 const IMAGE_EXTENSIONS_PHASE_NEXT = new Set(['.bmp', '.tiff', '.tif'])
 
+export interface PrintExecutionOptions {
+  /**
+   * Stable business identifier included in converted image PDF filenames so
+   * the Windows spooler queue and Event 307 can be correlated to this task.
+   */
+  correlationId?: string
+}
+
 /**
  * 统一打印函数（Phase 8.1A）。
  *
  * @param filePath     待打印文件的绝对路径
  * @param printerName  打印机名称（必须由 CLI 参数或 Agent 配置传入）
  * @param params       打印参数（W7 起真实传给 SumatraPDF -print-settings）
+ * @param options      Agent 执行上下文；图片转换时用 correlationId 保留任务关联名
  */
 export async function print(
   filePath: string,
   printerName: string,
   params?: Partial<PrintJobParams>,
+  options: PrintExecutionOptions = {},
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
@@ -107,7 +117,7 @@ export async function print(
 
     let tempPdfPath: string | undefined
     try {
-      tempPdfPath = await imageToPdf(filePath)
+      tempPdfPath = await imageToPdf(filePath, options.correlationId)
       return await printWithPdfToPrinter(tempPdfPath, printerName, params)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)

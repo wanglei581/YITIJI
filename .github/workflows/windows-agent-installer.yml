@@ -18,6 +18,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Installer provenance must identify the exact reviewed PR head, not GitHub's ephemeral merge ref.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Checkout exact 0.4.9 predecessor source
+        uses: actions/checkout@v4
+        with:
+          ref: bd92cd589e637c25e594919bff0c7f8fb9e919eb
+          path: predecessor-0.4.9
 
       - uses: actions/setup-node@v4
         with:
@@ -41,6 +50,15 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-staging.ps1
 
+      - name: Verify Windows PrintService completion correlation
+        shell: powershell
+        working-directory: apps/terminal-agent
+        run: node installer/verify-printservice-completion.mjs
+
+      - name: Parse staged provisioning scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-staged-powershell.ps1 -StagingRoot apps/terminal-agent/installer/artifacts/staging
+
       - name: Verify staged secure scan reader boundary
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
@@ -53,6 +71,13 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
 
+      - name: Build exact predecessor 0.4.9 upgrade fixture
+        shell: powershell
+        run: |
+          & predecessor-0.4.9/apps/terminal-agent/installer/build-staging.ps1
+          & predecessor-0.4.9/apps/terminal-agent/installer/build-msi.ps1
+          & predecessor-0.4.9/apps/terminal-agent/installer/build-exe.ps1
+
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
         run: |
@@ -64,6 +89,15 @@ jobs:
         run: |
           $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-msi-lifecycle.ps1 -MsiPath $msi.FullName
+
+      - name: Exercise EXE predecessor-to-candidate upgrade
+        shell: powershell
+        run: |
+          $predecessor = Get-ChildItem predecessor-0.4.9/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
+            -PredecessorExePath $predecessor.FullName `
+            -CandidateExePath $candidate.FullName
 
       - name: Upload unsigned test evidence
         if: always()

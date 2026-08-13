@@ -147,7 +147,7 @@ export function PrintUploadPage() {
     },
   ]
 
-  // U 盘状态轮询:仅在 usb tab 激活、本机已配置令牌、且尚未选定文件时才轮询,
+  // U 盘状态轮询:仅在 usb tab 激活、本机网桥可用、且尚未选定文件时才轮询,
   // 避免在其它 tab 停留时对 Agent 发起无意义请求。
   // 上传进行中也必须暂停轮询:每次 /local/usb/files 都会整体重建一次性 safeId
   // 注册表,若上传期间继续轮询,正在消费的 safeId 会被下一轮刷新作废(410 竞态)。

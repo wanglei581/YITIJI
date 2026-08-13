@@ -126,6 +126,11 @@ function verifyDispatchIntentIsDurableBeforePrinterInvocation(): void {
   assert.ok(printInvocation > dispatchPersist, 'dispatching must be durable before the physical printer invocation')
   assert.match(
     source,
+    /const result = await print\([\s\S]*?\{ correlationId: task\.taskId \},[\s\S]*?\)/,
+    'the physical print call must propagate taskId for image spooler correlation',
+  )
+  assert.match(
+    source,
     /localStatus === 'dispatching'.*PRINT_JOB_UNCONFIRMED/s,
     'a restarted dispatching task must reconcile as unconfirmed instead of printing again',
   )

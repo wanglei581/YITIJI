@@ -32,7 +32,7 @@ const REQUIRED_BRACE_OVERRIDES = {
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
 const REQUIRED_JS_YAML_VERSION = '4.3.1'
-const REQUIRED_NANOID_OVERRIDE = '3.3.17'
+const REQUIRED_NANOID_OVERRIDE = '3.3.18'
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))

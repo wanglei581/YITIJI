@@ -15,8 +15,8 @@ overrides:
   fast-uri: 3.1.5
   postcss: 8.5.18
   # nanoid: GHSA-28wg-ghj8-5hjv + GHSA-2v37-7h3g-55p8
-  # postcss still requests the vulnerable 3.3.12 line; 3.3.17 fixes both loop conditions.
-  nanoid@3.3.12: 3.3.17
+  # postcss still requests the vulnerable 3.3.12 line; 3.3.18 fixes both loop conditions.
+  nanoid@3.3.12: 3.3.18
   # brace-expansion: GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895
   # upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH (CVE-2026-14257 backport);
   # local patches are no longer needed. Direct overrides (pnpm does not chain resolutions).
