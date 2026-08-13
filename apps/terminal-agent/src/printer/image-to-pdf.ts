@@ -12,8 +12,8 @@ import { log, warn } from '../logger'
  * BMP / TIFF：Phase 8.1A 不支持（需 sharp 预处理，Phase 8.1B+ 实现）
  *
  * 临时文件路径：
- *   Windows：%ProgramData%\AIJobPrintAgent\temp\print_<uuid>.pdf
- *   macOS/Linux（开发/测试）：<tmpdir>/AIJobPrintAgent/temp/print_<uuid>.pdf
+ *   Agent 任务：print_<taskId>_<uuid>.pdf（让 Windows 队列 / Event 307 可关联任务）
+ *   CLI / 无任务上下文：print_<uuid>.pdf
  */
 
 const A4_WIDTH = 595.28
@@ -42,6 +42,24 @@ function ensureTempDir(dir: string): void {
 }
 
 /**
+ * Build the temporary PDF filename used as the Windows spooler document name.
+ *
+ * The Agent later monitors Get-PrintJob and PrintService Event 307 by taskId.
+ * Image jobs therefore must keep that exact safe taskId in the converted PDF
+ * basename; a random-only name makes a successfully dispatched job impossible
+ * to correlate and causes a false PRINT_JOB_UNCONFIRMED result.
+ */
+export function buildImageTempPdfFileName(
+  correlationId?: string,
+  uuid = crypto.randomUUID(),
+): string {
+  const safeCorrelationId = correlationId?.replace(/[^a-zA-Z0-9_-]/g, '') ?? ''
+  return safeCorrelationId
+    ? `print_${safeCorrelationId}_${uuid}.pdf`
+    : `print_${uuid}.pdf`
+}
+
+/**
  * 将图片文件转换为临时 PDF（A4 幅面），返回临时 PDF 路径。
  *
  * 支持：.jpg / .jpeg / .png（pdfkit 原生）
@@ -49,7 +67,7 @@ function ensureTempDir(dir: string): void {
  *
  * @throws Error 若图片格式不受支持或 pdfkit 生成失败
  */
-export function imageToPdf(imagePath: string): Promise<string> {
+export function imageToPdf(imagePath: string, correlationId?: string): Promise<string> {
   const ext = path.extname(imagePath).toLowerCase()
 
   if (!PDFKIT_NATIVE_EXTENSIONS.has(ext)) {
@@ -65,9 +83,7 @@ export function imageToPdf(imagePath: string): Promise<string> {
   const tempDir = getTempDir()
   ensureTempDir(tempDir)
 
-  // crypto.randomUUID() 在 Node.js 15+ 中原生可用（本项目要求 >=18）
-  const uuid = crypto.randomUUID()
-  const tempPdfPath = path.join(tempDir, `print_${uuid}.pdf`)
+  const tempPdfPath = path.join(tempDir, buildImageTempPdfFileName(correlationId))
 
   return new Promise<string>((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

@@ -419,6 +419,7 @@ export async function executeTask(
       tempFilePath,
       resolvedPrinter,
       task.params as Partial<PrintJobParams>,
+      { correlationId: task.taskId },
     )
 
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────

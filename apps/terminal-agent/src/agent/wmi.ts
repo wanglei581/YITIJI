@@ -226,7 +226,9 @@ export type PrintJobMonitorStatus =
  * so neither value can inject into the PowerShell parser.
  *
  * Matching: DocumentName -like "*<taskId>*"
- * The temp file is named "task_<taskId>.pdf" so DocumentName will contain the taskId.
+ * The submitted PDF filename always contains taskId: downloaded PDFs use
+ * "task_<taskId>.pdf", while converted images use
+ * "print_<taskId>_<uuid>.pdf".
  *
  * PaperOut confirmation: callers must require 2 consecutive 'paper_empty' results
  * before acting, to guard against transient driver state flicker.

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { monitorPrintJob } from '../src/agent/task-runner'
 import { parsePrintJobStatus, type PrintJobMonitorStatus } from '../src/agent/wmi'
 import { printWithPdfToPrinter } from '../src/printer/print-with-pdf-to-printer'
+import { buildImageTempPdfFileName } from '../src/printer/image-to-pdf'
 
 interface Scenario {
   name: string
@@ -49,6 +50,24 @@ async function runScenario(scenario: Scenario): Promise<void> {
 
 async function main(): Promise<void> {
   const failures: string[] = []
+
+  const imageTaskId = 'ptask_kiosk_0123456789abcdef'
+  const fixedUuid = '11111111-2222-4333-8444-555555555555'
+  assert.equal(
+    buildImageTempPdfFileName(imageTaskId, fixedUuid),
+    `print_${imageTaskId}_${fixedUuid}.pdf`,
+    'converted image PDF must preserve the exact taskId for spooler correlation',
+  )
+  assert.equal(
+    buildImageTempPdfFileName('task/with|unsafe:*chars', fixedUuid),
+    `print_taskwithunsafechars_${fixedUuid}.pdf`,
+    'converted image PDF correlation id must be safe for a Windows filename',
+  )
+  assert.equal(
+    buildImageTempPdfFileName(undefined, fixedUuid),
+    `print_${fixedUuid}.pdf`,
+    'CLI image printing without a task context must keep the legacy random filename',
+  )
 
   const commandTimeout = await printWithPdfToPrinter(
     '/fault-injection/task-timeout.pdf',

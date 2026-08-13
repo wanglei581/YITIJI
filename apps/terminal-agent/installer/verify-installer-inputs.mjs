@@ -55,7 +55,7 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.4.7')
+assert.equal(inputs.productVersion, '0.4.8')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
@@ -288,8 +288,8 @@ assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
 assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
-assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.6"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.7"/)
+assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.7"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.8"/)
 assert.match(upgradeLifecycle, /Assert-PanelShortcut/)
 assert.match(upgradeLifecycle, /Assert-DesktopShortcut/)
 assert.match(upgradeLifecycle, /Assert-ControlCenterSmoke -ExpectedVersion \$PREDECESSOR_VERSION/)
@@ -318,11 +318,11 @@ assert.match(
 )
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
-assert.match(workflow, /ref: 7f7378ed734b0569dacc00d7bfefba717090b559/)
+assert.match(workflow, /ref: 37545691107b58d518a66f0129a9268fd540458f/)
 assert.match(workflow, /verify-staged-powershell\.ps1/)
-assert.match(workflow, /path: predecessor-0\.4\.6/)
-assert.match(workflow, /predecessor-0\.4\.6\/apps\/terminal-agent\/installer\/build-staging\.ps1/)
-assert.match(workflow, /predecessor-0\.4\.6\/apps\/terminal-agent\/installer\/artifacts\/exe/)
+assert.match(workflow, /path: predecessor-0\.4\.7/)
+assert.match(workflow, /predecessor-0\.4\.7\/apps\/terminal-agent\/installer\/build-staging\.ps1/)
+assert.match(workflow, /predecessor-0\.4\.7\/apps\/terminal-agent\/installer\/artifacts\/exe/)
 assert.ok(
   workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
   'EXE lifecycle must run first on a clean ProgramData root',
