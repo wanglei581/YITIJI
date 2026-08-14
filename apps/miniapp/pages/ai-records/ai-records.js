@@ -1,7 +1,7 @@
 // pages/ai-records/ai-records.js
 const app = getApp()
 const api = require('../../utils/api')
-const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 
 /**
  * 后端 MemberAiRecordItem.kind → 页面显示元数据映射。
@@ -94,8 +94,7 @@ Page({
   },
 
   async _load() {
-    const token = storage.get(storage.KEYS.TOKEN)
-    if (!token) {
+    if (!auth.isLoggedIn()) {
       this.setData({ loginRequired: true, groups: [] })
       return
     }

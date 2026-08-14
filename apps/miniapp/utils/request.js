@@ -3,7 +3,7 @@
 // 真实请求走 wx.request;是否走真实请求由 api 层根据 config.USE_MOCK 决定。
 
 const config = require('./config');
-const storage = require('./storage');
+const auth = require('./auth');
 
 /**
  * 底层请求。仅在 config.USE_MOCK=false 时被 api 层调用。
@@ -16,7 +16,7 @@ function request(path, options = {}) {
 
   const finalHeader = { 'content-type': 'application/json', ...header };
   if (needAuth) {
-    const token = storage.get(storage.KEYS.TOKEN);
+    const token = auth.getToken();
     if (token) finalHeader.Authorization = `Bearer ${token}`;
   }
 
@@ -48,8 +48,7 @@ function request(path, options = {}) {
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
           // 登录失效:清理本地会话
-          storage.remove(storage.KEYS.TOKEN);
-          storage.remove(storage.KEYS.USER);
+          auth.clearSession();
           reject(makeError('登录已失效,请重新登录', 401));
         } else {
           reject(extractError(body, statusCode));
@@ -106,7 +105,7 @@ function uploadFile(path, filePath, options = {}) {
 
   const finalHeader = { ...header };
   if (needAuth) {
-    const token = storage.get(storage.KEYS.TOKEN);
+    const token = auth.getToken();
     if (token) finalHeader.Authorization = `Bearer ${token}`;
   }
 
@@ -141,8 +140,7 @@ function uploadFile(path, filePath, options = {}) {
           }
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
-          storage.remove(storage.KEYS.TOKEN);
-          storage.remove(storage.KEYS.USER);
+          auth.clearSession();
           reject(makeError('登录已失效,请重新登录', 401));
         } else {
           reject(extractError(body, statusCode));

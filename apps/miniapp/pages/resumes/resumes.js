@@ -1,7 +1,7 @@
 // pages/resumes/resumes.js
 const app = getApp()
 const api = require('../../utils/api')
-const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 
 function relDate(iso) {
   try {
@@ -61,8 +61,7 @@ Page({
   },
 
   async _load() {
-    const token = storage.get(storage.KEYS.TOKEN)
-    if (!token) {
+    if (!auth.isLoggedIn()) {
       this.setData({ loginRequired: true, resumes: [] })
       return
     }

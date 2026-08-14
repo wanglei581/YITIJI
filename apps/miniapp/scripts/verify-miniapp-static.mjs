@@ -288,6 +288,7 @@ const loginWxml = read('pages/launch/launch.wxml')
 const loginJs = read('pages/launch/launch.js')
 const apiJs = read('utils/api.js')
 const authJs = read('utils/auth.js')
+const requestJs = read('utils/request.js')
 const meWxml = read('pages/me/me.wxml')
 const settingsWxml = read('pages/settings/settings.wxml')
 const settingsJs = read('pages/settings/settings.js')
@@ -310,6 +311,43 @@ if (
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
 if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && settingsJs.includes('auth.clearSession()')) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
+
+function fakeMemberToken(exp) {
+  const encode = (value) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: 'verify-user', exp })}.signature`
+}
+
+function loadAuthForVerify(token) {
+  const state = { zyd_token: token, zyd_user: { maskedPhone: '183****1921' } }
+  const mockStorage = {
+    KEYS: { TOKEN: 'zyd_token', USER: 'zyd_user' },
+    get(key, fallback = null) { return Object.prototype.hasOwnProperty.call(state, key) ? state[key] : fallback },
+    set(key, value) { state[key] = value; return true },
+    remove(key) { delete state[key]; return true },
+  }
+  const authModule = { exports: {} }
+  const load = new Function('module', 'exports', 'require', authJs)
+  load(authModule, authModule.exports, (id) => {
+    if (id === './storage') return mockStorage
+    throw new Error(`unexpected require: ${id}`)
+  })
+  return { auth: authModule.exports, state }
+}
+
+try {
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const expired = loadAuthForVerify(fakeMemberToken(nowSeconds - 60))
+  const active = loadAuthForVerify(fakeMemberToken(nowSeconds + 3600))
+  const expiredCleared = !expired.auth.isLoggedIn() && !expired.state.zyd_token && !expired.state.zyd_user
+  const activeKept = active.auth.isLoggedIn() && Boolean(active.state.zyd_token)
+  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && requestJs.includes('auth.clearSession()')) {
+    ok('过期会员令牌会在展示与请求前主动清理')
+  } else {
+    bad('过期会员令牌会在展示与请求前主动清理', '登录态或请求层仍可能复用过期 token')
+  }
+} catch (e) {
+  bad('过期会员令牌会在展示与请求前主动清理', e.message)
+}
 
 // 1.0.2 诚实能力门禁：移除无后端支撑的可见页面，禁止已知 PII/商业承诺占位回流。
 const removedFakePages = [

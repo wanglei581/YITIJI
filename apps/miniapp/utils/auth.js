@@ -5,8 +5,55 @@
 
 const storage = require('./storage');
 
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const EXPIRY_SAFETY_MS = 5000;
+
+function decodeBase64Url(segment) {
+  const normalized = String(segment || '').replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/g, '');
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+
+  for (const char of normalized) {
+    const value = BASE64_ALPHABET.indexOf(char);
+    if (value < 0) throw new Error('invalid base64url');
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output += String.fromCharCode((buffer >> bits) & 0xff);
+      buffer &= bits ? (1 << bits) - 1 : 0;
+    }
+  }
+  return output;
+}
+
+function tokenExpiresAt(token) {
+  if (typeof token !== 'string') return 0;
+  const parts = token.split('.');
+  if (parts.length !== 3) return 0;
+  try {
+    const payload = JSON.parse(decodeBase64Url(parts[1]));
+    const exp = Number(payload && payload.exp);
+    return Number.isFinite(exp) && exp > 0 ? exp * 1000 : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function isTokenExpired(token, nowMs = Date.now()) {
+  const expiresAt = tokenExpiresAt(token);
+  return !expiresAt || expiresAt <= nowMs + EXPIRY_SAFETY_MS;
+}
+
 function getToken() {
-  return storage.get(storage.KEYS.TOKEN);
+  const token = storage.get(storage.KEYS.TOKEN);
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    clearSession();
+    return null;
+  }
+  return token;
 }
 
 function isLoggedIn() {
