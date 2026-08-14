@@ -16,6 +16,7 @@ import { KioskPageHeader } from '@ai-job-print/ui'
 import { PrintPageFrame } from './PrintPrototypeLayout'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
+import './styles/print-pickup-claim.css'
 
 // ── 取件码工具 ────────────────────────────────────────────────
 // 合法字符：32个无歧义字符（去掉 0,1,I,O）
@@ -136,7 +137,7 @@ export function PrintPickupClaimPage() {
           onBack={() => navigate('/print-scan')}
           backLabel="返回"
         />
-        <div className="pickup-claim-success">
+        <div className="pickup-claim-success" data-w2-page="pickup-claim-success" aria-live="polite">
           <div className="pcs-icon-wrap">
             <PrinterIcon size={48} className="pcs-icon" />
           </div>
@@ -158,7 +159,9 @@ export function PrintPickupClaimPage() {
 
           <div className="pcs-actions">
             <button
-              className="btn-kiosk primary"
+              type="button"
+              className="k-btn pcs-primary"
+              data-variant="primary"
               onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
                 state: result.released
                   ? { taskId: result.taskId, orderId: result.orderId, paymentSessionToken: result.paymentSessionToken }
@@ -175,7 +178,7 @@ export function PrintPickupClaimPage() {
               <ArrowRightIcon size={20} />
               {result.released ? '查看打印进度' : '进入现场支付'}
             </button>
-            <button className="btn-kiosk ghost" onClick={handleReset}>
+            <button type="button" className="k-btn pcs-secondary" data-variant="ghost" data-size="sm" onClick={handleReset}>
               <RotateCcwIcon size={18} />
               再取一件
             </button>
@@ -195,13 +198,16 @@ export function PrintPickupClaimPage() {
         backLabel="返回"
       />
 
-      <div className="pickup-claim-page">
+      <div className="pickup-claim-page" data-w2-page="pickup-claim" data-claim-state={state}>
         {/* 说明区 */}
         <div className="pcp-lead">
-          <ScanIcon size={32} className="pcp-lead-icon" />
-          <p className="pcp-lead-text">
-            打开小程序「我的 → 打印订单 → 查看取件码」，将二维码对准本机扫码器；无法扫码时可手动输入。
-          </p>
+          <span className="pcp-lead-icon" aria-hidden="true"><ScanIcon size={32} /></span>
+          <div className="pcp-lead-copy">
+            <span className="pcp-status">等待扫码输入</span>
+            <p className="pcp-lead-text">
+              打开小程序「我的 → 打印订单 → 查看取件码」，将二维码对准本机扫码器；无法扫码时可手动输入。
+            </p>
+          </div>
         </div>
 
         {/* 输入框 */}
@@ -210,28 +216,29 @@ export function PrintPickupClaimPage() {
             扫码结果 / 取件码（{CODE_LEN} 位）
           </label>
           {/* 小程序会把码显示为 AB-2C-…；分隔符不进入状态或接口。 */}
-          <input
-            id="pickup-code-input"
-            ref={inputRef}
-            className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
-            style={{ minHeight: '56px' }}
-            type="text"
-            inputMode="text"
-            placeholder="例：AB2C7M9P3K"
-            maxLength={CODE_LEN * 3}
-            value={code}
-            onChange={handleInput}
-            onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}
-            autoFocus
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            aria-label="取件码输入框"
-            aria-invalid={state === 'error'}
-            aria-describedby={state === 'error' ? 'pcp-error-msg' : 'pcp-hint'}
-          />
-          <div id="pcp-hint" className={`pcp-counter ${code.length === CODE_LEN ? 'pcp-counter--full' : ''}`}>
-            {code.length} / {CODE_LEN}
+          <div className="pcp-input-wrap">
+            <input
+              id="pickup-code-input"
+              ref={inputRef}
+              className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
+              type="text"
+              inputMode="text"
+              placeholder="例：AB2C7M9P3K"
+              maxLength={CODE_LEN * 3}
+              value={code}
+              onChange={handleInput}
+              onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}
+              autoFocus
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-label="取件码输入框"
+              aria-invalid={state === 'error'}
+              aria-describedby={state === 'error' ? 'pcp-error-msg' : 'pcp-hint'}
+            />
+            <div id="pcp-hint" className={`pcp-counter ${code.length === CODE_LEN ? 'pcp-counter--full' : ''}`}>
+              {code.length} / {CODE_LEN}
+            </div>
           </div>
         </div>
 
@@ -249,14 +256,16 @@ export function PrintPickupClaimPage() {
 
         {/* 确认按钮 */}
         <button
-          className={['btn-kiosk', 'primary', 'block', !isValid || state === 'loading' ? 'disabled' : ''].filter(Boolean).join(' ')}
+          type="button"
+          className="k-btn pcp-submit"
+          data-variant="primary"
           disabled={!isValid || state === 'loading'}
           onClick={() => void handleClaim()}
           aria-busy={state === 'loading'}
         >
           {state === 'loading' ? (
             <>
-              <span className="spinner-sm" aria-hidden />
+              <span className="pcp-spinner" aria-hidden />
               认领中…
             </>
           ) : (

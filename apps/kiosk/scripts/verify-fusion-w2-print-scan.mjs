@@ -511,6 +511,7 @@ assert.match(printDone, /getPayStatus/, 'print done obtains pickup code from pay
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
 
 const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
+const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')
 for (const marker of [
   'claimLockRef',
   'VALID_CODE.test(nextCode)',
@@ -518,6 +519,9 @@ for (const marker of [
   'claimLockRef.current = false',
   "setCode('')",
   '扫描小程序二维码',
+  "import './styles/print-pickup-claim.css'",
+  'data-w2-page="pickup-claim"',
+  'className="k-btn pcp-submit"',
 ]) {
   assert.ok(pickupClaim.includes(marker), `pickup claim retains ${marker}`)
 }
@@ -530,6 +534,20 @@ assert.match(
   pickupClaim,
   /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleClaim\(code\) \}\}/,
   'pickup scanner Enter suffix reuses the same guarded submission path'
+)
+for (const selector of [
+  '.pickup-claim-page',
+  '.pcp-input',
+  '.pcp-submit.k-btn',
+  '.pcp-help',
+  '.pickup-claim-success',
+]) {
+  assert.ok(pickupClaimCss.includes(selector), `pickup claim CSS retains ${selector}`)
+}
+assert.match(
+  pickupClaimCss,
+  /@media \(max-height: 900px\) and \(orientation: landscape\)/,
+  'pickup claim keeps a compact Windows landscape layout'
 )
 
 const scanPages = new Map([

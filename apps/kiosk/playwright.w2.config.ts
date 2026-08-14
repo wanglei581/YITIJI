@@ -37,6 +37,11 @@ export default defineConfig({
       grep: /@w2/,
       use: { viewport: { width: 1080, height: 1920 } },
     },
+    {
+      name: 'windows-1280x720',
+      grep: /@pickup-landscape/,
+      use: { viewport: { width: 1280, height: 720 } },
+    },
   ],
   webServer: {
     command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_API_PROXY_TARGET=http://127.0.0.1:3010 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4182 --strictPort',

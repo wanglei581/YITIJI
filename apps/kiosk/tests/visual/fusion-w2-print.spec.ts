@@ -78,12 +78,73 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
 
   await page.goto('/print/pickup-claim')
   const input = page.getByLabel('取件码输入框')
+  await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
+  await expect(page.getByText('等待扫码输入')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
   await input.pressSequentially('AB2C7M9P3K', { delay: 5 })
   await input.press('Enter')
 
   await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '进入现场支付' })).toBeVisible()
   expect(submittedCode).toBe('AB2C7M9P3K')
   expect(claimCount).toBe(1)
+  expect(errors).toEqual([])
+})
+
+test('pickup controls remain readable in Windows landscape @pickup-landscape', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        released: false,
+        orderId: 'w2-landscape-order',
+        orderNo: 'ORD-W2-LANDSCAPE',
+        terminalId: 'KSK-001',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'w2-landscape-payment-session-token',
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+
+  const input = page.getByLabel('取件码输入框')
+  const submit = page.getByRole('button', { name: '确认取件' })
+  const help = page.getByText('怎么找取件码？')
+  await expect(input).toBeVisible()
+  await expect(submit).toBeVisible()
+  await expect(help).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+
+  const [inputBox, submitBox] = await Promise.all([input.boundingBox(), submit.boundingBox()])
+  expect(inputBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  expect(submitBox?.height ?? 0).toBeGreaterThanOrEqual(56)
+  const layout = await page.locator('.ui-kiosk-content').evaluate((node) => {
+    const submitButton = node.querySelector<HTMLElement>('.pcp-submit')
+    const contentRect = node.getBoundingClientRect()
+    const submitRect = submitButton?.getBoundingClientRect()
+    return {
+      overflowY: node.scrollHeight - node.clientHeight,
+      submitVisible: Boolean(submitRect && submitRect.top >= contentRect.top && submitRect.bottom <= contentRect.bottom),
+    }
+  })
+  expect(layout.overflowY).toBeLessThanOrEqual(8)
+  expect(layout.submitVisible).toBe(true)
+
+  await input.fill('AB2C7M9P3K')
+  const paymentButton = page.getByRole('button', { name: '进入现场支付' })
+  await expect(paymentButton).toBeVisible()
+  const successFits = await page.locator('.ui-kiosk-content').evaluate((node) => {
+    const action = node.querySelector<HTMLElement>('.pcs-primary')
+    const contentRect = node.getBoundingClientRect()
+    const actionRect = action?.getBoundingClientRect()
+    return Boolean(actionRect && actionRect.top >= contentRect.top && actionRect.bottom <= contentRect.bottom)
+  })
+  expect(successFits).toBe(true)
   expect(errors).toEqual([])
 })
 

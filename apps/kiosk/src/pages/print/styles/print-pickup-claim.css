@@ -1,0 +1,375 @@
+[data-kiosk-presentation='fusion-youth'] .pickup-claim-page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
+  grid-template-areas:
+    'lead help'
+    'input help'
+    'hint help'
+    'submit help';
+  align-content: start;
+  gap: 16px 28px;
+  padding: 0 var(--print-page-gutter) 36px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] {
+  grid-template-areas:
+    'lead help'
+    'input help'
+    'error help'
+    'submit help';
+}
+
+[data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] .pcp-format-hint {
+  display: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-lead {
+  grid-area: lead;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px 26px;
+  border: 1px solid color-mix(in srgb, var(--print-teal) 24%, var(--print-line));
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--print-teal-soft), var(--print-surface) 78%);
+  box-shadow: 0 10px 30px rgb(16 48 43 / 6%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-lead-icon {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--print-teal);
+  color: var(--print-surface);
+  box-shadow: 0 8px 22px rgb(31 158 134 / 22%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-lead-icon svg {
+  width: 38px;
+  height: 38px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-lead-copy { min-width: 0; }
+
+[data-kiosk-presentation='fusion-youth'] .pcp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--print-teal-deep);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-status::before {
+  width: 10px;
+  height: 10px;
+  content: '';
+  border-radius: 50%;
+  background: var(--print-teal);
+  box-shadow: 0 0 0 5px rgb(31 158 134 / 13%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-lead-text {
+  margin: 0;
+  color: var(--print-ink);
+  font-size: 21px;
+  line-height: 1.65;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input-section {
+  grid-area: input;
+  padding: 24px 26px 26px;
+  border: 1px solid var(--print-line);
+  border-radius: 20px;
+  background: var(--print-surface);
+  box-shadow: 0 12px 36px rgb(16 48 43 / 6%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--print-ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input-wrap { position: relative; }
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input {
+  width: 100%;
+  min-height: 96px;
+  padding: 0 118px 0 24px;
+  border: 2px solid var(--print-line);
+  border-radius: 16px;
+  outline: none;
+  background: var(--print-paper);
+  color: var(--print-ink);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input::placeholder {
+  color: color-mix(in srgb, var(--print-muted) 58%, transparent);
+  font-size: .72em;
+  font-weight: 600;
+  letter-spacing: .05em;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input:focus {
+  border-color: var(--print-teal);
+  background: var(--print-surface);
+  box-shadow: 0 0 0 5px rgb(31 158 134 / 14%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-input.pcp-input--error {
+  border-color: var(--print-error);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--print-error) 14%, transparent);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-counter {
+  position: absolute;
+  top: 50%;
+  right: 22px;
+  transform: translateY(-50%);
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--print-surface);
+  color: var(--print-muted);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-counter--full {
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-format-hint {
+  grid-area: hint;
+  margin: 0;
+  padding: 2px 4px;
+  color: var(--print-muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-format-hint::before {
+  content: '提示 · ';
+  color: var(--print-teal-deep);
+  font-weight: 700;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-error {
+  grid-area: error;
+  padding: 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--print-error) 28%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--print-error) 9%, var(--print-surface));
+  color: var(--print-error);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn {
+  grid-area: submit;
+  width: 100%;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgb(255 255 255 / 42%);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: pcp-spin .75s linear infinite;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcp-help {
+  grid-area: help;
+  align-self: stretch;
+  padding: 28px 26px;
+  border: 1px solid var(--print-line);
+  border-top: 5px solid var(--print-wheat);
+  border-radius: 20px;
+  background: var(--print-surface);
+  box-shadow: 0 12px 36px rgb(16 48 43 / 5%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-title {
+  margin: 0 0 22px;
+  color: var(--print-ink);
+  font-family: var(--print-serif);
+  font-size: 25px;
+  font-weight: 900;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: pickup-step;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-steps li {
+  position: relative;
+  min-height: 64px;
+  padding: 5px 0 18px 50px;
+  color: var(--print-muted);
+  font-size: 18px;
+  line-height: 1.5;
+  counter-increment: pickup-step;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-steps li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  content: counter(pickup-step);
+  border-radius: 50%;
+  background: var(--print-wheat-soft);
+  color: var(--print-wheat-deep);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pch-steps li:not(:last-child)::after {
+  position: absolute;
+  top: 38px;
+  bottom: 0;
+  left: 16px;
+  width: 2px;
+  content: '';
+  background: var(--print-line);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pickup-claim-success {
+  flex: 1;
+  min-height: 0;
+  margin: 0 var(--print-page-gutter) 36px;
+  padding: 54px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--print-line);
+  border-radius: 24px;
+  background: var(--print-surface);
+  box-shadow: 0 16px 48px rgb(16 48 43 / 7%);
+  text-align: center;
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcs-icon-wrap {
+  width: 126px;
+  height: 126px;
+  display: grid;
+  place-items: center;
+  border-radius: 34px;
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcs-icon { width: 64px; height: 64px; }
+[data-kiosk-presentation='fusion-youth'] .pcs-title { margin: 26px 0 8px; font-family: var(--print-serif); font-size: 40px; font-weight: 900; }
+[data-kiosk-presentation='fusion-youth'] .pcs-sub { margin: 0; color: var(--print-muted); font-size: 21px; line-height: 1.6; }
+
+[data-kiosk-presentation='fusion-youth'] .pcs-meta {
+  width: min(640px, 100%);
+  margin: 30px 0;
+  padding: 0 26px;
+  border: 1px solid var(--print-line);
+  border-radius: 18px;
+  background: var(--print-paper);
+}
+
+[data-kiosk-presentation='fusion-youth'] .pcs-row { min-height: 70px; display: flex; align-items: center; gap: 24px; }
+[data-kiosk-presentation='fusion-youth'] .pcs-row + .pcs-row { border-top: 1px solid var(--print-line); }
+[data-kiosk-presentation='fusion-youth'] .pcs-row dt { color: var(--print-muted); font-size: 18px; }
+[data-kiosk-presentation='fusion-youth'] .pcs-row dd { margin: 0 0 0 auto; color: var(--print-ink); font-size: 19px; font-weight: 750; word-break: break-all; }
+[data-kiosk-presentation='fusion-youth'] .pcs-actions { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
+
+@keyframes pcp-spin { to { transform: rotate(360deg); } }
+
+@media (max-height: 900px) and (orientation: landscape) {
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-page {
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, .7fr);
+    gap: 8px 18px;
+    padding: 0 32px 10px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead { gap: 14px; padding: 13px 16px; border-radius: 14px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead-icon { width: 50px; height: 50px; border-radius: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead-icon svg { width: 28px; height: 28px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-status { margin-bottom: 3px; font-size: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-status::before { width: 7px; height: 7px; box-shadow: 0 0 0 3px rgb(31 158 134 / 13%); }
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead-text { font-size: 15px; line-height: 1.45; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-input-section { padding: 13px 16px 14px; border-radius: 14px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-label { margin-bottom: 7px; font-size: 15px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-input { min-height: 64px; padding-inline: 18px 96px; border-radius: 12px; font-size: 25px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-counter { right: 14px; padding: 6px 9px; font-size: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-format-hint { font-size: 14px; line-height: 1.4; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-error { padding: 9px 12px; border-radius: 10px; font-size: 14px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn { min-height: 60px; padding-inline: 28px; border-radius: 13px; font-size: 18px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn svg { width: 24px; height: 24px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-help { padding: 16px 18px; border-radius: 14px; }
+  [data-kiosk-presentation='fusion-youth'] .pch-title { margin-bottom: 10px; font-size: 19px; }
+  [data-kiosk-presentation='fusion-youth'] .pch-steps li { min-height: 48px; padding: 3px 0 10px 38px; font-size: 14px; line-height: 1.35; }
+  [data-kiosk-presentation='fusion-youth'] .pch-steps li::before { width: 27px; height: 27px; font-size: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pch-steps li:not(:last-child)::after { top: 30px; left: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-success { margin: 0 32px 18px; padding: 22px 32px; }
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-success { justify-content: flex-start; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-icon-wrap { width: 72px; height: 72px; border-radius: 20px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-icon { width: 38px; height: 38px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-title { margin-top: 12px; font-size: 28px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-sub { font-size: 16px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-meta { margin: 12px 0; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-row { min-height: 42px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-actions .k-btn { min-height: 56px; padding-inline: 24px; font-size: 17px; }
+}
+
+@media (max-width: 760px) {
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-page {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'lead' 'input' 'hint' 'submit' 'help';
+    gap: 14px;
+    padding: 0 20px 24px;
+    overflow: visible;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] {
+    grid-template-areas: 'lead' 'input' 'error' 'submit' 'help';
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead { padding: 16px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead-icon { width: 54px; height: 54px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-lead-text { font-size: 16px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-input-section { padding: 16px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-input { min-height: 72px; padding-right: 90px; font-size: 24px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-counter { right: 12px; font-size: 13px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-submit.k-btn { min-height: 60px; font-size: 18px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-help { padding: 22px 20px; }
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-success { margin: 0 20px 24px; padding: 34px 20px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-title { font-size: 30px; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-actions { width: 100%; flex-direction: column; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-actions .k-btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-kiosk-presentation='fusion-youth'] .pcp-spinner { animation-duration: 1.8s; }
+}
