@@ -36,6 +36,14 @@ function registerKioskShell(api: ApiRouter, options: KioskShellOptions = {}): vo
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: {
+      success: true,
+      data: [],
+      pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
     status: 200,
     json: { capabilities: [] },

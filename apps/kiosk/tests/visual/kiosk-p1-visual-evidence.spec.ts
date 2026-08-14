@@ -2,13 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
-import type { Browser, Page } from '@playwright/test'
-import { test, expect } from '@playwright/test'
+import type { Browser, BrowserContext, Page } from '@playwright/test'
+import { chromium, test, expect } from '@playwright/test'
 import { ApiRouter } from '../fixtures/api-router'
 import {
   loginThroughVisibleUi,
   openLoginVerificationError,
   openScanSettingsCreateFailed,
+  preparePrintPreviewCapture,
   prepareSessionTimeoutCapture,
   registerAuthenticatedMemberApis,
   registerEmptyToolbox,
@@ -16,6 +17,7 @@ import {
   registerMemberLogin,
   seedCashierFailed,
   seedCashierPending,
+  seedMaterialCheckReview,
   seedPrintDoneCompleted,
   seedPrintFlow,
   seedPrintProgress,
@@ -389,7 +391,19 @@ async function prepareProduction(
     return
   }
 
-  if (target.targetId === '03' || target.targetId === '31' || target.targetId === '64' || target.targetId === '65') {
+  if (target.targetId === '31') {
+    const rawAccessToken = await seedMaterialCheckReview(page)
+    await expect(page.getByText('可以继续设置打印参数', { exact: true })).toBeVisible()
+    await expect(page.getByText(rawAccessToken, { exact: true })).toHaveCount(0)
+    return
+  }
+
+  if (target.targetId === '64') {
+    await preparePrintPreviewCapture(page)
+    return
+  }
+
+  if (target.targetId === '03' || target.targetId === '65') {
     await seedPrintFlow(page, captureUrl)
     return
   }
@@ -529,10 +543,20 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
       notes: [],
     }
 
+    let productionContext: BrowserContext | null = null
+    let productionPage: Page | null = null
+    let ownedProductionBrowser: Browser | null = null
     try {
       await capturePrototype(browser, target, prototypeScreenshot)
 
-      const context = await browser.newContext({
+      const productionBrowser = target.targetId === '64'
+        ? await chromium.launch({ channel: 'chrome', headless: true })
+        : browser
+      if (target.targetId === '64') {
+        ownedProductionBrowser = productionBrowser
+        console.log(`[p1-evidence] target64 official Chrome ${productionBrowser.version()}`)
+      }
+      productionContext = await productionBrowser.newContext({
         baseURL: KIOSK_ORIGIN,
         viewport: target.viewport,
         locale: 'zh-CN',
@@ -541,7 +565,7 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
         reducedMotion: 'reduce',
       })
       if (!LIVE) {
-        await context.route(LOCAL_TERMINAL_IDENTITY_URL, async (route) => {
+        await productionContext.route(LOCAL_TERMINAL_IDENTITY_URL, async (route) => {
           if (route.request().method() !== 'GET') {
             await route.abort('blockedbyclient')
             return
@@ -557,7 +581,8 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
           })
         })
       }
-      const page = await context.newPage()
+      productionPage = await productionContext.newPage()
+      const page = productionPage
       const pageErrors = collectPageErrors(page)
       const api = LIVE ? null : new ApiRouter(page)
       if (api) await api.install()
@@ -572,14 +597,36 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
       autoSignals = await collectAutoSignals(page, pair.readyMarker, pageErrors)
       if (!autoSignals.readyMarkerFound) captureOk = false
       if (autoSignals.englishErrorPage || autoSignals.mojibake) captureOk = false
+      if (autoSignals.pageErrors.length > 0) captureOk = false
 
       mkdirSync(dirname(productionScreenshot), { recursive: true })
       await page.screenshot({ path: productionScreenshot, fullPage: false })
-      await context.close()
     } catch (error) {
       captureOk = false
       autoSignals.notes.push(error instanceof Error ? error.message : String(error))
       mkdirSync(dirname(productionScreenshot), { recursive: true })
+      if (productionPage && !productionPage.isClosed()) {
+        try {
+          await productionPage.screenshot({ path: productionScreenshot, fullPage: false })
+        } catch (screenshotError) {
+          autoSignals.notes.push(
+            `failed to refresh production failure screenshot: ${screenshotError instanceof Error ? screenshotError.message : String(screenshotError)}`,
+          )
+        }
+      }
+    } finally {
+      try {
+        await productionContext?.close()
+      } catch (error) {
+        captureOk = false
+        autoSignals.notes.push(error instanceof Error ? error.message : String(error))
+      }
+      try {
+        await ownedProductionBrowser?.close()
+      } catch (error) {
+        captureOk = false
+        autoSignals.notes.push(error instanceof Error ? error.message : String(error))
+      }
     }
 
     // Screenshot files existing counts as evidence even when ready marker missed.

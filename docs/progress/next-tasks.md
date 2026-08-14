@@ -1,6 +1,8 @@
 # 下一步任务
 
-> 最后更新：2026-08-13
+> 最后更新：2026-08-14
+
+> **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
@@ -216,7 +218,7 @@
 - [ ] **响应式第二批深层流程页验收**：在可稳定切换 390×844、1440×900、1080×1920 的浏览器环境中，携带真实路由 state 逐页复验 `/print/preview`、`/resume/generate`、`/profile`、岗位/招聘会详情、打印/扫描 actionbar 流程的页头、内容滚动、底栏遮挡和触控尺寸；只修已有入口页面，不新增入口、业务流程或假数据。本项未完成前不得宣称三端所有页面视觉封板。
       `/profile` 的 1080×1920 高屏底部空白已形成局部样式候选并通过静态门禁、typecheck、build 与 lint；仍需刷新当前页面并在 Windows 真机确认剩余高度分配、滚动和触控表现。
 - [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；其后热更为 `index-CPD4lg4F.js`，再经 USB bridge / 备案包覆盖。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
-- [~] **P1 逐屏视觉证据执行**：当前 **83/83 capture OK**，其中 **11 PROFILE_DEFER**，其余 judgment 仍为 **PENDING**；target 73 只证明生产 pre-call gate 可达，不证明 TRTC live。03/04/31/33/64/65/77 七个打印目标仅关闭局部步骤条导致的 `horizontalOverflow` 自动检测误报，截图主体/actionbar 未见横向裁切，但这不等于像素封板、业务状态验收或硬件验收；target 31 的「材料检查未完成 / Failed to fetch」与 target 64 的「页面暂时无法显示」仍须在各自业务闭环中处理。
+- [~] **P1 逐屏视觉证据执行**：当前 **83/83 capture OK**，其中 **11 PROFILE_DEFER**，其余 judgment 仍为 **PENDING**；target 73 只证明生产 pre-call gate 可达，不证明 TRTC live。03/04/31/33/64/65/77 七个打印目标已关闭局部步骤条导致的 `horizontalOverflow` 自动检测误报，截图主体/actionbar 未见横向裁切；target 31 已通过既有 W2 三任务合同的 synthetic evidence preparation 进入「可以继续设置打印参数」，仅证明证据准备而非真实材料服务；target 64 已使用官方 Chrome `151.0.7922.138` 取得 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页。上述结果只证明 synthetic evidence contract，不等于像素封板、业务状态验收、硬件验收、真实打印预览或 V6 完成。
 - [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
 - [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；其后现网 Kiosk 以备案包为准（见下）。
 
