@@ -6,6 +6,7 @@ Page({
     q: {},
     files: [{ name: '未选择文件', desc: '', price: '—' }],
     fee: { total: '—' },
+    isFreeOrder: false,
     submitting: false,
   },
 
@@ -16,11 +17,15 @@ Page({
     const pages = Number(q.pages) > 0 ? Number(q.pages) : 0
     const color = q.color === 'color' ? '彩色' : '黑白'
     const duplex = q.duplex === 'double' ? '双面' : '单面'
+    const amountCents = Number(q.amountCents)
+    const hasAmount = q.amountCents !== undefined && q.amountCents !== '' && Number.isSafeInteger(amountCents) && amountCents >= 0
+    const isFreeOrder = hasAmount && amountCents === 0
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
       q,
+      isFreeOrder,
       'fee.total': total,
-      'files[0].price': total,
+      'files[0].price': isFreeOrder ? '免费' : total,
       'files[0].name': q.name ? decodeURIComponent(q.name) : '未选择文件',
       'files[0].desc': `${color} · ${duplex} · ${pages || '未知'} 页 · ×${copies}`,
     })
@@ -45,8 +50,9 @@ Page({
       wx.hideLoading()
       this.setData({ submitting: false })
       if (!order || !order.pickupCode) throw new Error('服务端未返回到机码')
+      const amountCents = Number.isSafeInteger(Number(order.amountCents)) ? Number(order.amountCents) : ''
       wx.redirectTo({
-        url: `/pages/print-pickup/print-pickup?orderId=${encodeURIComponent(order.id)}&orderNo=${encodeURIComponent(order.orderNo || '')}&pickupCode=${encodeURIComponent(order.pickupCode)}&expiresAt=${encodeURIComponent(order.pickupCodeExpiresAt || '')}&taskStatus=${encodeURIComponent(order.taskStatus || 'pending_release')}&store=${encodeURIComponent(q.store || '')}&name=${encodeURIComponent(this.data.files[0].name)}&amountCents=${encodeURIComponent(order.amountCents || 0)}`,
+        url: `/pages/print-pickup/print-pickup?orderId=${encodeURIComponent(order.id)}&orderNo=${encodeURIComponent(order.orderNo || '')}&pickupCode=${encodeURIComponent(order.pickupCode)}&expiresAt=${encodeURIComponent(order.pickupCodeExpiresAt || '')}&taskStatus=${encodeURIComponent(order.taskStatus || 'pending_release')}&store=${encodeURIComponent(q.store || '')}&name=${encodeURIComponent(this.data.files[0].name)}&amountCents=${encodeURIComponent(amountCents)}`,
       })
     }).catch(err => {
       wx.hideLoading()

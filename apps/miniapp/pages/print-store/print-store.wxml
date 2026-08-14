@@ -14,12 +14,12 @@
     <view class="line"></view>
     <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">4</text><text class="nl">机端支付</text></view>
+    <view class="st"><text class="n">4</text><text class="nl">{{isFreeOrder ? '现场打印' : '机端支付'}}</text></view>
   </view>
 
   <view class="notice info rise-d2">
     <text class="ficon i-location n-ic"></text>
-    <text>请选择真实在线终端。到机核验后再现场支付与打印，终端状态以实时心跳为准。</text>
+    <text>{{isFreeOrder ? '当前为免费试运营。请选择真实在线终端，到机核验后直接进入打印队列。' : '请选择真实在线终端。到机核验后再现场支付与打印，终端状态以实时心跳为准。'}}</text>
   </view>
 
   <view class="store-list rise-d3">
@@ -53,12 +53,12 @@
   <view class="card flat summary rise-d4">
     <view class="summary-row"><text>文件</text><text>{{q.name || '未提供文件'}}</text></view>
     <view class="summary-row"><text>参数</text><text>{{q.color==='color'?'彩色':'黑白'}} · A4 · {{q.duplex==='double'?'双面':'单面'}} · ×{{q.copies || 1}}份</text></view>
-    <view class="summary-row total"><text>预估</text><text class="amt">{{q.total ? '¥' + q.total : '—'}}</text></view>
+    <view class="summary-row total"><text>{{isFreeOrder ? '试运营费用' : '预估'}}</text><text class="amt">{{isFreeOrder ? '免费' : (q.total ? '¥' + q.total : '—')}}</text></view>
   </view>
 </view>
 
 <view class="actionbar">
-  <view class="ab-price"><text class="ab-label">预估</text><text class="ab-amt">{{q.total ? '¥' + q.total : '—'}}</text></view>
+  <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : '预估'}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (q.total ? '¥' + q.total : '—')}}</text></view>
   <view class="btn primary lg {{picked ? '' : 'disabled'}}" bindtap="toPay">确认终端 →</view>
 </view>
 </view>

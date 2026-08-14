@@ -5,6 +5,12 @@ const { PICKUP_CODE_RE, createPickupQrMatrix, normalizePickupCode } = require('.
 const POLL_INTERVAL_MS = 3000
 const TERMINAL_STATES = new Set(['completed', 'failed', 'expired', 'cancelled', 'abandoned'])
 
+function parseAmountCents(value) {
+  if (value === undefined || value === null || value === '') return null
+  const amountCents = Number(value)
+  return Number.isSafeInteger(amountCents) && amountCents >= 0 ? amountCents : null
+}
+
 function formatCode(raw) {
   if (!raw) return ''
   const value = String(raw).replace(/\s/g, '').toUpperCase()
@@ -22,6 +28,7 @@ function formatCountdown(ms) {
 function resolveOrderState(order) {
   const pickupStatus = String(order.pickupStatus || '')
   const taskStatus = String(order.taskStatus || '')
+  const isFreeOrder = parseAmountCents(order.amountCents) === 0
 
   if (pickupStatus === 'expired' || taskStatus === 'expired') {
     return { key: 'expired', title: '取件码已过期', detail: '请返回打印订单重新发起打印。', showQr: false }
@@ -45,7 +52,9 @@ function resolveOrderState(order) {
     return { key: 'queued', title: '已进入打印队列', detail: '终端已核销并创建打印任务，请等待出纸。', showQr: false }
   }
   if (pickupStatus === 'claimed' || taskStatus === 'awaiting_payment') {
-    return { key: 'awaiting_payment', title: '已扫码，等待现场支付', detail: '请在一体机确认订单并完成现场支付。', showQr: false }
+    return isFreeOrder
+      ? { key: 'awaiting_release', title: '已扫码，正在进入打印队列', detail: '免费试运营订单无需付款，请在终端旁等待。', showQr: false }
+      : { key: 'awaiting_payment', title: '已扫码，等待现场支付', detail: '请在一体机确认订单并完成现场支付。', showQr: false }
   }
   return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入取件码。', showQr: true }
 }
@@ -73,6 +82,8 @@ Page({
     code: '',
     codeRaw: '',
     expiresAt: 0,
+    amountCents: null,
+    isFreeOrder: false,
     countdown: '',
     qrSizePx: 216,
     qrStatus: 'loading',
@@ -84,11 +95,13 @@ Page({
     const orderId = q.orderId ? decodeURIComponent(q.orderId) : ''
     const pickupCode = normalizePickupCode(q.pickupCode ? decodeURIComponent(q.pickupCode) : '')
     const expiresAt = q.expiresAt ? new Date(decodeURIComponent(q.expiresAt)).getTime() : 0
+    const initialAmountCents = parseAmountCents(q.amountCents)
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
     const qrSizePx = Math.round(Math.max(188, Math.min(232, windowInfo.windowWidth * 0.56)))
     const initial = resolveOrderState({
       pickupStatus: PICKUP_CODE_RE.test(pickupCode) ? 'pending' : '',
       taskStatus: q.taskStatus ? decodeURIComponent(q.taskStatus) : '',
+      amountCents: q.amountCents,
     })
 
     this.setData({
@@ -101,6 +114,8 @@ Page({
       code: formatCode(pickupCode),
       codeRaw: PICKUP_CODE_RE.test(pickupCode) ? pickupCode : '',
       expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+      amountCents: initialAmountCents,
+      isFreeOrder: initialAmountCents === 0,
       qrSizePx,
       qrStatus: 'loading',
       state: orderId ? 'loading' : (PICKUP_CODE_RE.test(pickupCode) ? 'ready' : 'error'),
@@ -151,6 +166,7 @@ Page({
         const status = resolveOrderState(order)
         const expiresAt = order.pickupCodeExpiresAt ? new Date(order.pickupCodeExpiresAt).getTime() : this.data.expiresAt
         const shouldRedraw = status.showQr && hasCode && pickupCode !== this.data.codeRaw
+        const amountCents = parseAmountCents(order.amountCents)
 
         this.setData({
           state: 'ready',
@@ -159,6 +175,8 @@ Page({
           orderNo: order.orderNo || this.data.orderNo,
           taskStatus: order.taskStatus || '',
           pickupStatus: order.pickupStatus || '',
+          amountCents,
+          isFreeOrder: amountCents === 0,
           statusKey: status.key,
           statusTitle: status.title,
           statusDetail: status.detail,

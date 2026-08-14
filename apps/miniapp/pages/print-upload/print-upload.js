@@ -214,9 +214,9 @@ Page({
       })
       return
     }
-    const { color, duplex, copies, total, file, fileId } = this.data
+    const { color, duplex, copies, total, amountCents, file, fileId } = this.data
     wx.navigateTo({
-      url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
+      url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
     })
   },
 

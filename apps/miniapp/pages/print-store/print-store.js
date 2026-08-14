@@ -7,6 +7,7 @@ Page({
   data: {
     statusBarHeight: 20,
     q: {},
+    isFreeOrder: false,
     stores: [],
     picked: '',
     loading: true,
@@ -14,9 +15,13 @@ Page({
   },
 
   onLoad(opts) {
+    const q = opts || {}
+    const amountCents = Number(q.amountCents)
+    const hasAmount = q.amountCents !== undefined && q.amountCents !== '' && Number.isSafeInteger(amountCents) && amountCents >= 0
     this.setData({
       statusBarHeight: getApp().globalData.statusBarHeight || 20,
-      q: opts || {},
+      q,
+      isFreeOrder: hasAmount && amountCents === 0,
     })
     this._loadTerminals()
   },
@@ -63,8 +68,9 @@ Page({
       })
       return
     }
+    const amountCents = q.amountCents === undefined ? '' : q.amountCents
     wx.navigateTo({
-      url: `/pages/print-pay/print-pay?fileId=${encodeURIComponent(q.fileId || '')}&pages=${encodeURIComponent(q.pages || '')}&color=${encodeURIComponent(q.color || '')}&duplex=${encodeURIComponent(q.duplex || '')}&copies=${encodeURIComponent(q.copies || '')}&total=${encodeURIComponent(q.total || '')}&store=${encodeURIComponent(store.displayName)}&storeId=${encodeURIComponent(store.id)}&name=${encodeURIComponent(q.name || '')}&bundleId=${encodeURIComponent(q.bundleId || '')}&pickupCode=${encodeURIComponent(q.pickupCode || '')}&expiresAt=${encodeURIComponent(q.expiresAt || '')}`,
+      url: `/pages/print-pay/print-pay?fileId=${encodeURIComponent(q.fileId || '')}&pages=${encodeURIComponent(q.pages || '')}&color=${encodeURIComponent(q.color || '')}&duplex=${encodeURIComponent(q.duplex || '')}&copies=${encodeURIComponent(q.copies || '')}&total=${encodeURIComponent(q.total || '')}&amountCents=${encodeURIComponent(amountCents)}&store=${encodeURIComponent(store.displayName)}&storeId=${encodeURIComponent(store.id)}&name=${encodeURIComponent(q.name || '')}&bundleId=${encodeURIComponent(q.bundleId || '')}&pickupCode=${encodeURIComponent(q.pickupCode || '')}&expiresAt=${encodeURIComponent(q.expiresAt || '')}`,
     })
   },
 

@@ -428,7 +428,11 @@ if (
 else bad('取件页首次请求失败二维码兜底', '回退为 ready 后必须重新绘码并恢复倒计时与轮询')
 
 const printUploadJs = read('pages/print-upload/print-upload.js')
+const printUploadWxml = read('pages/print-upload/print-upload.wxml')
+const printStoreJs = read('pages/print-store/print-store.js')
+const printStoreWxml = read('pages/print-store/print-store.wxml')
 const printPayJs = read('pages/print-pay/print-pay.js')
+const printPayWxml = read('pages/print-pay/print-pay.wxml')
 const ordersJs = read('pages/orders/orders.js')
 const ordersWxml = read('pages/orders/orders.wxml')
 if (
@@ -466,6 +470,23 @@ if (
   quoteRefreshBody.includes('if (seq !== this._quoteSeq) return')
 ) ok('打印份数变化立即作废旧报价并锁定继续操作')
 else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须发生在防抖等待之前，旧请求不得回写 ready')
+
+if (
+  printUploadJs.includes('amountCents=${encodeURIComponent(amountCents)}') &&
+  printUploadWxml.includes("amountCents === 0 ? '免费试运营' : '精确报价'") &&
+  printStoreJs.includes('isFreeOrder: hasAmount && amountCents === 0') &&
+  printStoreJs.includes("q.amountCents === undefined ? '' : q.amountCents") &&
+  printStoreWxml.includes("isFreeOrder ? '现场打印' : '机端支付'") &&
+  printPayJs.includes("'files[0].price': isFreeOrder ? '免费' : total") &&
+  printPayWxml.includes('免费试运营：到机核验后直接进入打印队列') &&
+  pickupJs.includes("key: 'awaiting_release'") &&
+  pickupJs.includes('parseAmountCents(order.amountCents) === 0') &&
+  pickupWxml.includes('核销后无需付款，直接等待进入打印队列') &&
+  ordersJs.includes("label: '正在进入队列'") &&
+  ordersJs.includes('const amountCents = parseAmountCents(item.amountCents)') &&
+  ordersJs.includes("amountCents=${encodeURIComponent(item.amountCents == null ? '' : item.amountCents)}")
+) ok('免费试运营订单全流程不再误导用户现场支付')
+else bad('免费试运营文案分流', '零元订单必须显示免费、现场打印和直接排队；付费订单仍保留机端支付')
 
 if (
   ordersJs.includes("!item.status && item.pickupStatus === 'pending'") &&

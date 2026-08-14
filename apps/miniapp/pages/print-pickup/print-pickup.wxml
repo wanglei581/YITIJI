@@ -48,7 +48,7 @@
 
       <view class="status-visual" wx:else>
         <view class="sv-icon">{{statusKey === 'completed' ? '✓' : (statusKey === 'failed' || statusKey === 'expired' || statusKey === 'cancelled' ? '!' : '…')}}</view>
-        <view class="sv-text">{{statusKey === 'awaiting_payment' ? '请继续在终端操作' : (statusKey === 'queued' || statusKey === 'printing' ? '请在终端旁等待' : '本次取件码已停止展示')}}</view>
+        <view class="sv-text">{{statusKey === 'awaiting_payment' ? '请继续在终端操作' : (statusKey === 'awaiting_release' || statusKey === 'queued' || statusKey === 'printing' ? '请在终端旁等待' : '本次取件码已停止展示')}}</view>
       </view>
     </view>
 
@@ -63,13 +63,13 @@
       </view>
       <view class="step-item">
         <view class="step-num">3</view>
-        <text class="step-text">核销后在终端确认、付款并等待出纸</text>
+        <text class="step-text">{{isFreeOrder ? '核销后无需付款，直接等待进入打印队列' : '核销后在终端确认、付款并等待出纸'}}</text>
       </view>
     </view>
 
-    <view class="next-card" wx:elif="{{statusKey === 'awaiting_payment'}}">
+    <view class="next-card" wx:elif="{{statusKey === 'awaiting_payment' || statusKey === 'awaiting_release'}}">
       <view class="next-title">二维码已自动撤下</view>
-      <view class="next-text">终端已经认领这笔订单。请查看一体机屏幕并完成现场支付，手机端会继续刷新打印状态。</view>
+      <view class="next-text">{{isFreeOrder ? '终端已经认领这笔免费试运营订单，无需付款。请在设备旁等待，手机端会继续刷新打印状态。' : '终端已经认领这笔订单。请查看一体机屏幕并完成现场支付，手机端会继续刷新打印状态。'}}</view>
     </view>
 
     <view class="next-card" wx:elif="{{statusKey === 'queued' || statusKey === 'printing'}}">
@@ -92,7 +92,7 @@
     <view class="sync-warning" wx:if="{{errorMsg}}">状态同步暂时失败，当前展示最近一次可用状态：{{errorMsg}}</view>
 
     <view class="notice-card">
-      <text class="nc-text">二维码只包含本订单的 10 位取件码，不含文件、姓名或手机号。扫码、付款和打印状态以服务端与终端实时结果为准。</text>
+      <text class="nc-text">二维码只包含本订单的 10 位取件码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
     </view>
 
     <view class="pk-actions">

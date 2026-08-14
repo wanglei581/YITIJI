@@ -90,13 +90,13 @@
     <view wx:else class="pc-state">选择文件后开始检查</view>
   </view>
 
-  <view class="compliance-note rise-d6">本期为小程序预提交、到机码核验和机端支付；到机确认前不会创建 Agent 可领取的打印任务。</view>
+  <view class="compliance-note rise-d6">{{amountCents === 0 ? '当前为免费试运营：到机核验后直接进入打印队列；到机确认前不会创建 Agent 可领取的打印任务。' : '本期为小程序预提交、到机码核验和机端支付；到机确认前不会创建 Agent 可领取的打印任务。'}}</view>
 </view>
 
 <view class="actionbar">
   <view class="ab-price">
-    <text class="ab-label">{{priceStatus === 'loading' ? '服务端正在报价' : (priceStatus === 'ready' ? '精确报价' : '报价暂不可用')}}</text>
-    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">¥{{total}}</text>
+    <text class="ab-label">{{priceStatus === 'loading' ? '服务端正在报价' : (priceStatus === 'ready' ? (amountCents === 0 ? '免费试运营' : '精确报价') : '报价暂不可用')}}</text>
+    <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{amountCents === 0 ? '免费' : '¥' + total}}</text>
   </view>
   <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端 →')}}</view>
 </view>

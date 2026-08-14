@@ -14,10 +14,21 @@ const STATUS_MAP = {
   cancelled: { key: 'done',     label: '已取消', tone: 'neutral'},
 }
 
+function parseAmountCents(value) {
+  if (value === undefined || value === null || value === '') return null
+  const amountCents = Number(value)
+  return Number.isSafeInteger(amountCents) && amountCents >= 0 ? amountCents : null
+}
+
 // payStatus 门控：未付款时覆盖显示
 function resolveDisplayStatus(item) {
+  const amountCents = parseAmountCents(item.amountCents)
   if (item.pickupStatus === 'pending') return { key: 'waiting', label: '待到机', tone: 'wheat' }
-  if (item.pickupStatus === 'claimed' && !item.printTaskId) return { key: 'waiting', label: '待现场支付', tone: 'wheat' }
+  if (item.pickupStatus === 'claimed' && !item.printTaskId) {
+    return amountCents === 0
+      ? { key: 'waiting', label: '正在进入队列', tone: 'teal' }
+      : { key: 'waiting', label: '待现场支付', tone: 'wheat' }
+  }
   if (item.pickupStatus === 'expired') return { key: 'done', label: '已过期', tone: 'neutral' }
   if (item.pickupStatus === 'cancelled') return { key: 'done', label: '已取消', tone: 'neutral' }
   const pay = item.payStatus
@@ -39,9 +50,10 @@ function buildSpec(item) {
 
 // 金额：分 → 元字符串（0 分 = 免费）
 function formatPrice(cents) {
-  if (cents == null) return '—'
-  if (cents === 0)   return '免费'
-  return '¥' + (cents / 100).toFixed(2)
+  const amountCents = parseAmountCents(cents)
+  if (amountCents == null) return '—'
+  if (amountCents === 0)   return '免费'
+  return '¥' + (amountCents / 100).toFixed(2)
 }
 
 // 取件码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
@@ -54,6 +66,7 @@ function fmtCode(raw) {
 // 后端 item → UI 展示对象
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
+  const amountCents = parseAmountCents(item.amountCents)
   const effectiveStatus = item.status || item.taskStatus || ''
   // 到机码只在尚未核销的 Order-only 阶段展示；扫码 claimed 或创建 PrintTask 后立即撤下。
   const pickupRaw = !item.status && item.pickupStatus === 'pending' ? (item.pickupCode || '') : ''
@@ -66,7 +79,7 @@ function toUiItem(item) {
     store:       item.terminalDisplayName || item.terminalName || item.storeName || item.locationLabel || '打印服务终端',
     title:       item.fileName || '打印文件',
     spec:        buildSpec(item),
-    price:       formatPrice(item.amountCents),
+    price:       formatPrice(amountCents),
     status:      ds.key,
     statusLabel: ds.label,
     statusTone:  ds.tone,
@@ -80,6 +93,7 @@ function toUiItem(item) {
                : action === 'reprint' ? '再打印一份'
                : '',
     orderId: item.id,
+    amountCents,
   }
 }
 
@@ -184,6 +198,7 @@ Page({
         `orderNo=${encodeURIComponent(item.orderNo)}`,
         `taskStatus=${encodeURIComponent(item.taskStatus)}`,
         `expiresAt=${encodeURIComponent(item.expiresAt)}`,
+        `amountCents=${encodeURIComponent(item.amountCents == null ? '' : item.amountCents)}`,
         'source=orders',
       ].join('&')
       wx.navigateTo({ url: `/pages/print-pickup/print-pickup?${query}` })
