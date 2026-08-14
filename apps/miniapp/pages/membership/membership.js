@@ -40,7 +40,9 @@ Page({
   onLoad() {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
     if (!auth.isLoggedIn()) {
-      wx.redirectTo({ url: '/pages/launch/launch' })
+      wx.redirectTo({
+        url: `/pages/launch/launch?returnTo=${encodeURIComponent('/pages/membership/membership')}`,
+      })
       return
     }
     this.loadBenefits()

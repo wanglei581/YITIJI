@@ -1,19 +1,15 @@
 <!--pages/ai-records/ai-records.wxml-->
 <view class="page-wrap">
-
   <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="nav-inner">
-      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
-        <text class="ficon i-right nav-back-ic"></text>
-      </view>
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
       <view class="nav-title">AI 服务记录</view>
       <view class="nav-right"></view>
     </view>
   </view>
 
   <view class="content">
-
     <view class="filter-bar">
       <view
         class="f-chip {{activeFilter === item.key ? 'on' : ''}}"
@@ -24,37 +20,42 @@
       >{{item.label}}</view>
     </view>
 
-    <!-- 未登录提示 -->
     <view class="card" wx:if="{{loginRequired}}">
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
         <view class="es-t">请先登录</view>
-        <view class="es-d">登录后可查看 AI 服务历史记录</view>
+        <view class="es-d">登录后可查看和管理本人 AI 服务记录</view>
         <view class="btn teal" style="margin-top:32rpx" bindtap="goLogin">去登录</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{loading}}">
+      <view class="empty-slot compact">
+        <view class="es-t">正在加载记录…</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{loadError}}">
+      <view class="empty-slot compact">
+        <view class="es-t">加载失败</view>
+        <view class="es-d">{{loadError}}</view>
+        <view class="btn ghost sm" style="margin-top:24rpx" bindtap="retryLoad">重新加载</view>
       </view>
     </view>
 
     <block wx:elif="{{groups.length}}">
       <view class="card" wx:for="{{groups}}" wx:key="day" wx:for-item="g">
         <view class="rec-day">{{g.day}}</view>
-        <view
-          class="rec-item tap"
-          wx:for="{{g.items}}"
-          wx:key="id"
-          wx:for-item="rec"
-          hover-class="tap-press"
-          data-id="{{rec.id}}"
-          bindtap="openRecord"
-        >
-          <view class="rec-ic tone-{{rec.tone}}"><text class="ficon {{rec.icon}}"></text></view>
-          <view class="rec-body">
-            <view class="rec-t">{{rec.title}}</view>
-            <view class="rec-sub">{{rec.sub}}</view>
+        <view class="rec-item" wx:for="{{g.items}}" wx:key="id" wx:for-item="rec">
+          <view class="rec-main tap" hover-class="tap-press" data-id="{{rec.id}}" bindtap="openRecord">
+            <view class="rec-ic tone-{{rec.tone}}"><text class="ficon {{rec.icon}}"></text></view>
+            <view class="rec-body">
+              <view class="rec-t">{{rec.title}}</view>
+              <view class="rec-sub">{{rec.time}} · {{rec.statusLabel}}</view>
+            </view>
+            <view class="rec-action {{rec.canOpen ? 'ready' : ''}}">{{rec.actionLabel}} ›</view>
           </view>
-          <view class="rec-r">
-            <view class="rec-score" wx:if="{{rec.score}}">{{rec.score}}</view>
-            <view class="chip teal">信息</view>
-          </view>
+          <view class="rec-more tap" hover-class="tap-press" data-id="{{rec.id}}" catchtap="moreRecord">•••</view>
         </view>
       </view>
     </block>
@@ -63,14 +64,12 @@
       <view class="empty-slot">
         <text class="ficon i-robot es-ic"></text>
         <view class="es-t">暂无 AI 服务记录</view>
-        <view class="es-d">使用简历诊断、优化、模拟面试后可在此回看</view>
+        <view class="es-d">使用简历诊断、优化、岗位匹配或职业规划后可在此回看</view>
       </view>
     </view>
 
     <view class="compliance-note">
-      AI 服务记录仅保存在你的账户中,所有 AI 结果均为参考,不代表任何招聘方评价。
+      仅已接真实结果页的记录可直接回看；其他类型如实展示状态。所有 AI 结果仅供本人参考。
     </view>
-
   </view>
-
 </view>

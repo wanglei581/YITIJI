@@ -378,10 +378,10 @@ const api = {
   // ── 以下 AI 能力都挂在解析任务 taskId 上,凭 RESUME_TASK 里的 accessToken 读取 ──
 
   /**
-   * 简历优化。注意两个实测特性:
-   *   1. 是 GET,但**每次调用都重跑一遍 LLM**(实测 11~19s),服务端不缓存结果
-   *   2. 后端有防编造校验(事实串必须逐字出现在简历原文),命中即返回 status:'failed'
-   * 所以页面只能由用户手动触发/重试,绝不能自动轮询——每次都是真金白银的模型调用。
+   * 简历优化。服务端先读取本人已持久化的 completed optimize 结果；命中缓存时直接返回，
+   * 不再次调用模型。只有尚无成功结果但 parse 任务仍有效时才会调用 LLM。
+   * 后端有防编造校验(事实串必须逐字出现在简历原文),命中即返回 status:'failed'。
+   * 因此生成失败后的重试仍必须由用户主动触发，页面绝不能自动轮询。
    */
   getResumeOptimize(taskId, accessToken) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历优化'));
@@ -604,6 +604,33 @@ const api = {
     return unwrapList(request('/me/documents', { method: 'GET', data: params, needAuth: true }));
   },
 
+  /**
+   * 本人文件的服务端精确打印报价。
+   *
+   * 两步都复用现有后端安全边界：
+   *   1. GET /files/:id/preview-url 校验会员本人归属，并签发短时 printFileUrl；
+   *   2. POST /orders/quote 由服务端识别真实页数并按 PriceConfig 计价。
+   *
+   * 页面不得传 pages / billablePages / amountCents，也不得把公开单价乘法当成最终报价。
+   */
+  quoteMyPrintOrder(fileId, params) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    const id = String(fileId || '').trim();
+    if (!id) return Promise.reject(new Error('缺少打印文件'));
+    return request(`/files/${encodeURIComponent(id)}/preview-url`, {
+      method: 'GET',
+      needAuth: true,
+    }).then((access) => {
+      const fileUrl = access && access.printFileUrl;
+      if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
+      return request('/orders/quote', {
+        method: 'POST',
+        data: { fileUrl, params },
+        needAuth: false,
+      });
+    });
+  },
+
   /** 删除本人文档：服务端校验归属，物理删除对象并保留删除审计。 */
   deleteMyDocument(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除文档'));
@@ -657,6 +684,15 @@ const api = {
   getMyAiRecords(params = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 服务记录'));
     return unwrapList(request('/me/ai-records', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  /** 删除本人 AI 服务记录；parse 记录的派生结果由服务端按既有规则级联删除。 */
+  deleteMyAiRecord(recordId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除 AI 服务记录'));
+    return request(`/me/ai-records/${encodeURIComponent(recordId)}`, {
+      method: 'DELETE',
+      needAuth: true,
+    });
   },
 
   // ── AI 助手 ──

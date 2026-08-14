@@ -2,6 +2,7 @@ const app = getApp()
 const api = require('../../utils/api')
 const N = require('../../utils/normalize')
 const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 
 /**
  * 职业规划参考。
@@ -32,10 +33,23 @@ Page({
     needReupload: false,
     plan: null,
     printing: false,
+    historyMode: false,
   },
 
-  onLoad() {
+  onLoad(options) {
     this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    const historyTaskId = options && options.taskId ? options.taskId : ''
+    if (historyTaskId) {
+      this.setData({ taskId: historyTaskId, historyMode: true })
+      if (!auth.isLoggedIn()) {
+        this._fail('登录已失效，请重新登录后查看历史结果')
+        return
+      }
+      this._token = ''
+      this.setData({ phase: 'history-loading' })
+      this._loadHistory()
+      return
+    }
     const saved = storage.get(storage.KEYS.RESUME_TASK)
     if (!saved || !saved.taskId) {
       this.setData({ phase: 'no-task' })
@@ -49,6 +63,25 @@ Page({
   onUnload() {
     this._stopped = true
     this._stopElapsed()
+  },
+
+  onShow() {
+    if (!this.data.historyMode || !this._waitingForHistoryLogin || !auth.isLoggedIn()) return
+    this._waitingForHistoryLogin = false
+    this._stopped = false
+    this.setData({ phase: 'history-loading', failMsg: '', needReupload: false })
+    this._loadHistory()
+  },
+
+  _openHistoryLogin() {
+    this._waitingForHistoryLogin = true
+    wx.navigateTo({
+      url: '/pages/launch/launch',
+      fail: () => {
+        this._waitingForHistoryLogin = false
+        wx.showToast({ title: '登录页面打开失败', icon: 'none' })
+      },
+    })
   },
 
   /**
@@ -72,7 +105,37 @@ Page({
       })
   },
 
+  _loadHistory() {
+    api.getCareerPlan(this.data.taskId, '')
+      .then((res) => {
+        if (this._stopped) return
+        const plan = N.careerPlan(res)
+        if (plan && plan.isCompleted && plan.summary) {
+          this.setData({ phase: 'done', plan })
+          return
+        }
+        this._fail('这条职业规划记录没有可展示的结果')
+      })
+      .catch((err) => {
+        if (this._stopped) return
+        if ((err && err.statusCode === 401) || !auth.isLoggedIn()) {
+          this._fail('登录已失效，请重新登录后查看历史结果')
+          return
+        }
+        this._fail((err && err.message) || '历史职业规划结果读取失败')
+      })
+  },
+
   tapGenerate() {
+    if (this.data.historyMode) {
+      if (!auth.isLoggedIn()) {
+        this._openHistoryLogin()
+        return
+      }
+      this.setData({ phase: 'history-loading', failMsg: '', needReupload: false })
+      this._loadHistory()
+      return
+    }
     if (this.data.phase === 'running') return
     this.setData({ phase: 'running', elapsed: 0, failMsg: '', needReupload: false })
     this._startElapsed()
@@ -122,6 +185,10 @@ Page({
 
   /** 重新生成会再花一次模型调用,先确认 */
   tapRegenerate() {
+    if (this.data.historyMode) {
+      wx.showToast({ title: '历史结果只读，请从当前简历重新生成', icon: 'none' })
+      return
+    }
     wx.showModal({
       title: '重新生成规划',
       content: '将重新调用 AI 生成一份新的规划,覆盖当前结果。',

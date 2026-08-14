@@ -48,3 +48,7 @@
 .pc-ready { color: var(--teal-deep); font-size: 25rpx; font-weight: 600; }
 .pc-finding { padding: 16rpx; background: var(--paper); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 8rpx; font-size: 24rpx; }
 .pc-snippet { color: var(--ink-soft); word-break: break-all; }
+.quote-error { display: flex; align-items: center; gap: 20rpx; padding: 22rpx 24rpx; border-radius: var(--r-lg); background: #fff6ec; border: 1rpx solid #f0d6b4; }
+.qe-main { flex: 1; min-width: 0; }
+.qe-title { color: var(--clay-deep); font-size: 25rpx; font-weight: 600; }
+.qe-text { margin-top: 6rpx; color: var(--ink-soft); font-size: 22rpx; line-height: 1.5; }

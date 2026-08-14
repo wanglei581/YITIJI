@@ -51,7 +51,7 @@
             <view class="oc-spec">{{item.spec}}</view>
           </view>
         </view>
-        <view class="pk-strip" wx:if="{{item.status === 'waiting'}}">
+        <view class="pk-strip" wx:if="{{item.pickup}}">
           <view class="pk-label">取件码</view>
           <view class="pk-code">{{item.pickup}}</view>
           <view class="pk-hint">到店后在一体机扫码，或手动输入取件码</view>

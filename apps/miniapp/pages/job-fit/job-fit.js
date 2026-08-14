@@ -32,6 +32,7 @@ Page({
     failMsg: '',
     fit: null,
     printing: false,
+    historyMode: false,
   },
 
   onLoad(options) {
@@ -39,7 +40,26 @@ Page({
     const opts = options || {}
     const jobId = opts.jobId || ''
     const hint = opts.jobTitle ? decodeURIComponent(opts.jobTitle) : ''
-    this.setData({ jobId, jobTitleHint: hint })
+    const historyTaskId = opts.taskId || ''
+    this.setData({
+      jobId,
+      jobTitleHint: hint,
+      taskId: historyTaskId,
+      historyMode: !!historyTaskId,
+    })
+
+    // 「我的 AI 记录」只包含会员本人结果；按 taskId 直接只读回看，不要求本机还保存最近任务。
+    if (historyTaskId) {
+      if (!auth.isLoggedIn()) {
+        this._fail('登录已失效，请重新登录后查看历史结果')
+        return
+      }
+      this._token = ''
+      this._isAnonymousTask = false
+      this.setData({ phase: 'history-loading', elapsed: 0 })
+      this._loadHistory()
+      return
+    }
 
     const saved = storage.get(storage.KEYS.RESUME_TASK)
     if (!saved || !saved.taskId) {
@@ -55,6 +75,25 @@ Page({
   onUnload() {
     this._stopped = true
     this._stopElapsed()
+  },
+
+  onShow() {
+    if (!this.data.historyMode || !this._waitingForHistoryLogin || !auth.isLoggedIn()) return
+    this._waitingForHistoryLogin = false
+    this._stopped = false
+    this.setData({ phase: 'history-loading', failMsg: '' })
+    this._loadHistory()
+  },
+
+  _openHistoryLogin() {
+    this._waitingForHistoryLogin = true
+    wx.navigateTo({
+      url: '/pages/launch/launch',
+      fail: () => {
+        this._waitingForHistoryLogin = false
+        wx.showToast({ title: '登录页面打开失败', icon: 'none' })
+      },
+    })
   },
 
   _checkConsent() {
@@ -93,6 +132,27 @@ Page({
       .catch(() => {
         if (this._stopped) return
         this.setData({ phase: 'target' })
+      })
+  },
+
+  _loadHistory() {
+    api.getJobFit(this.data.taskId, '')
+      .then((res) => {
+        if (this._stopped) return
+        const fit = N.jobFit(res)
+        if (fit && fit.isCompleted && (fit.summary || fit.matchPoints.length || fit.gapPoints.length)) {
+          this.setData({ phase: 'done', fit })
+          return
+        }
+        this._fail('这条岗位匹配记录没有可展示的结果')
+      })
+      .catch((err) => {
+        if (this._stopped) return
+        if ((err && err.statusCode === 401) || !auth.isLoggedIn()) {
+          this._fail('登录已失效，请重新登录后查看历史结果')
+          return
+        }
+        this._fail((err && err.message) || '历史岗位匹配结果读取失败')
       })
   },
 
@@ -225,6 +285,10 @@ Page({
   },
 
   tapOptimizeResume() {
+    if (this.data.historyMode) {
+      wx.showToast({ title: '历史结果只读，请从当前简历重新发起优化', icon: 'none' })
+      return
+    }
     const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
     if (!saved.taskId || saved.taskId !== this.data.taskId) {
       wx.showToast({ title: '简历任务已失效，请重新上传', icon: 'none' })
@@ -271,6 +335,15 @@ Page({
   goBack() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
   toUpload() { wx.navigateTo({ url: '/pages/resume-upload/resume-upload' }) },
   retry() {
+    if (this.data.historyMode) {
+      if (!auth.isLoggedIn()) {
+        this._openHistoryLogin()
+        return
+      }
+      this.setData({ phase: 'history-loading', failMsg: '' })
+      this._loadHistory()
+      return
+    }
     if (!this._isAnonymousTask && !auth.isLoggedIn()) {
       wx.navigateTo({ url: '/pages/launch/launch' })
       return

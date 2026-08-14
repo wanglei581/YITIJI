@@ -19,6 +19,15 @@
     <view class="cp-cta tap" bindtap="tapUpload">去上传简历 ›</view>
   </view>
 
+  <view wx:elif="{{phase === 'history-loading'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-history rs-ic"></view>
+    </view>
+    <view class="rs-title">正在读取历史职业规划…</view>
+    <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
+  </view>
+
   <!-- 可生成:说清依据与代价,由用户手动触发 -->
   <view wx:elif="{{phase === 'ready'}}" class="content">
     <view class="card">
@@ -56,7 +65,7 @@
     <view class="rs-title">规划没有生成成功</view>
     <view class="rs-sub">{{failMsg}}</view>
     <view wx:if="{{needReupload}}" class="cp-cta tap" bindtap="tapUpload">重新上传简历 ›</view>
-    <view wx:else class="cp-cta tap" bindtap="tapGenerate">重新生成 ›</view>
+    <view wx:else class="cp-cta tap" bindtap="tapGenerate">{{historyMode ? '重新加载 ›' : '重新生成 ›'}}</view>
   </view>
 
   <!-- 结果 -->
@@ -64,6 +73,11 @@
     <view class="notice plum">
       <view class="ficon i-info n-ic"></view>
       <text>以下建议由 AI 基于你的简历文本生成,仅供你本人参考,不构成职业指导意见,也不代表用人单位意见。</text>
+    </view>
+
+    <view wx:if="{{historyMode}}" class="notice info">
+      <view class="ficon i-history n-ic"></view>
+      <text>这是账户中的历史结果，只读展示；不会重新调用 AI，也不会覆盖当前简历任务。</text>
     </view>
 
     <view wx:if="{{plan.isMockProvider}}" class="notice warn">
@@ -152,7 +166,7 @@
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="actionbar">
-    <view class="btn ghost tap" bindtap="tapRegenerate">重新生成</view>
+    <view wx:if="{{!historyMode}}" class="btn ghost tap" bindtap="tapRegenerate">重新生成</view>
     <view class="btn primary tap flex-1-4 {{printing ? 'disabled' : ''}}" bindtap="tapPrint">
       {{printing ? '生成中…' : '生成建议单去打印'}}
     </view>

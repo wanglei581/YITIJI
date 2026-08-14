@@ -3,6 +3,20 @@ const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
 
+// 只允许回到已经明确需要登录的现有页面，禁止把任意 query 当成跳转地址。
+const LOGIN_RETURN_ROUTES = new Set([
+  '/pages/documents/documents',
+  '/pages/membership/membership',
+  '/pages/notifications/notifications',
+])
+
+function safeReturnTo(raw) {
+  if (!raw) return ''
+  let value = String(raw)
+  try { value = decodeURIComponent(value) } catch (_) {}
+  return LOGIN_RETURN_ROUTES.has(value) ? value : ''
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -18,11 +32,15 @@ Page({
     sending: false,
     submitting: false,
     codeHint: '',
+    returnTo: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     const fallback = () => (wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()).statusBarHeight
-    this.setData({ statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20 })
+    this.setData({
+      statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || fallback() || 20,
+      returnTo: safeReturnTo(options && options.returnTo),
+    })
   },
 
   onUnload() {
@@ -154,6 +172,13 @@ Page({
   },
 
   _afterLogin() {
+    if (this.data.returnTo) {
+      wx.redirectTo({
+        url: this.data.returnTo,
+        fail() { wx.switchTab({ url: '/pages/home/home' }) },
+      })
+      return
+    }
     const pages = getCurrentPages()
     if (pages.length > 1) {
       wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } })

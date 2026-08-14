@@ -17,6 +17,12 @@
   background: #3A6648; margin: 0 auto 12rpx;
 }
 .ph-status-text { font-size: 24rpx; color: #3A6648; font-weight: 600; display: block; margin-bottom: 28rpx; }
+.ph-status-detail { display: block; max-width: 560rpx; margin: -16rpx auto 24rpx; color: #7A5C48; font-size: 24rpx; line-height: 1.6; }
+.status-awaiting_payment .ph-status-dot, .status-queued .ph-status-dot, .status-printing .ph-status-dot { background: #9C6E0A; }
+.status-awaiting_payment .ph-status-text, .status-queued .ph-status-text, .status-printing .ph-status-text { color: #9C6E0A; }
+.status-completed .ph-status-dot { background: #3A6648; }
+.status-failed .ph-status-dot, .status-expired .ph-status-dot, .status-cancelled .ph-status-dot, .status-abandoned .ph-status-dot { background: #A44938; }
+.status-failed .ph-status-text, .status-expired .ph-status-text, .status-cancelled .ph-status-text, .status-abandoned .ph-status-text { color: #A44938; }
 .pickup-qr-card {
   display: flex; flex-direction: column; align-items: center;
   margin: 0 auto 28rpx; padding: 20rpx 20rpx 24rpx;
@@ -44,6 +50,15 @@
 }
 .ph-hint { font-size: 24rpx; color: #A89080; display: block; line-height: 1.5; }
 .ph-countdown { font-size: 22rpx; color: #9C6E0A; display: block; margin-top: 12rpx; }
+.status-visual { padding: 30rpx 0 16rpx; }
+.sv-icon {
+  width: 112rpx; height: 112rpx; margin: 0 auto 20rpx; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #F5EDD8; color: #9C6E0A; font-size: 60rpx; font-weight: 900;
+}
+.status-completed .sv-icon { background: #E8F1E9; color: #3A6648; }
+.status-failed .sv-icon, .status-expired .sv-icon, .status-cancelled .sv-icon, .status-abandoned .sv-icon { background: #F8E7E2; color: #A44938; }
+.sv-text { font-size: 25rpx; color: #7A5C48; line-height: 1.6; }
 
 /* 操作步骤 */
 .steps-card {
@@ -61,6 +76,12 @@
   flex-shrink: 0;
 }
 .step-text { font-size: 26rpx; color: #2C1A0E; line-height: 1.4; }
+.next-card {
+  background: #FFFDF9; margin: 0 32rpx 20rpx; border-radius: 24rpx;
+  padding: 26rpx 28rpx; box-shadow: 0 4rpx 16rpx rgba(44,26,14,.06);
+}
+.next-title { font-size: 28rpx; font-weight: 800; color: #2C1A0E; }
+.next-text { margin-top: 10rpx; font-size: 24rpx; line-height: 1.7; color: #7A5C48; }
 
 /* 订单信息 */
 .info-card {
@@ -82,6 +103,8 @@
   margin: 0 32rpx 20rpx; background: #F5EDD8; border-radius: 20rpx; padding: 18rpx 22rpx;
 }
 .nc-text { font-size: 23rpx; color: #9C6E0A; line-height: 1.6; }
+.sync-note { margin: 0 32rpx 14rpx; text-align: center; color: #7A5C48; font-size: 22rpx; }
+.sync-warning { margin: 0 32rpx 14rpx; padding: 16rpx 20rpx; border-radius: 16rpx; background: #FFF3DF; color: #9C6E0A; font-size: 22rpx; line-height: 1.5; }
 
 .pk-actions { text-align: center; padding: 8rpx 32rpx; }
 .btn-ghost {

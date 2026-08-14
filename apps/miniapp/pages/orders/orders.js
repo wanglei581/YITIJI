@@ -55,8 +55,10 @@ function fmtCode(raw) {
 function toUiItem(item) {
   const ds = resolveDisplayStatus(item)
   const effectiveStatus = item.status || item.taskStatus || ''
+  // 到机码只在尚未核销的 Order-only 阶段展示；扫码 claimed 或创建 PrintTask 后立即撤下。
+  const pickupRaw = !item.status && item.pickupStatus === 'pending' ? (item.pickupCode || '') : ''
   const action = ds.key === 'done' && effectiveStatus === 'completed' ? 'reprint'
-               : (item.pickupCode && ds.key === 'waiting')        ? 'pickup'
+               : (pickupRaw && ds.key === 'waiting')              ? 'pickup'
                : null
   return {
     id:          item.id,
@@ -68,8 +70,8 @@ function toUiItem(item) {
     status:      ds.key,
     statusLabel: ds.label,
     statusTone:  ds.tone,
-    pickup:      fmtCode(item.pickupCode),
-    pickupRaw:   item.pickupCode || '',
+    pickup:      fmtCode(pickupRaw),
+    pickupRaw,
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
     // 已完成可再打一份；取件码可见时显示"查看取件码"
@@ -175,13 +177,14 @@ Page({
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
     if (item.action === 'pickup') {
-      // 当前主项目没有独立取件详情端点；只传订单列表真实返回的取件码。
+      // 取件页先用列表字段首屏渲染，再按 orderId 轮询本人订单详情实时撤码/更新状态。
       const query = [
         `pickupCode=${encodeURIComponent(item.pickupRaw)}`,
         `orderId=${encodeURIComponent(item.orderId)}`,
         `orderNo=${encodeURIComponent(item.orderNo)}`,
         `taskStatus=${encodeURIComponent(item.taskStatus)}`,
         `expiresAt=${encodeURIComponent(item.expiresAt)}`,
+        'source=orders',
       ].join('&')
       wx.navigateTo({ url: `/pages/print-pickup/print-pickup?${query}` })
     } else if (item.action === 'reprint') {
@@ -189,7 +192,7 @@ Page({
     }
   },
 
-  // 当前后端没有独立的订单详情端点；用列表返回的真实字段展示只读详情。
+  // 列表卡片保持轻量只读；取件页会再按 orderId 读取真实详情并轮询状态。
   detail(e) {
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return

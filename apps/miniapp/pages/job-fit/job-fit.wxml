@@ -15,6 +15,15 @@
     <view class="jf-cta tap" bindtap="toUpload">去上传简历 ›</view>
   </view>
 
+  <view wx:elif="{{phase === 'history-loading'}}" class="running-state">
+    <view class="rs-anim">
+      <view class="rs-ring"></view>
+      <view class="ficon i-history rs-ic"></view>
+    </view>
+    <view class="rs-title">正在读取历史岗位匹配结果…</view>
+    <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
+  </view>
+
   <!-- 授权闸门:后端强制,未授权调用分析会被 403 -->
   <view wx:elif="{{phase === 'consent'}}" class="content">
     <view class="card">
@@ -78,7 +87,7 @@
     <view class="st-ic warn"><text class="ficon i-info"></text></view>
     <view class="rs-title">分析没有完成</view>
     <view class="rs-sub">{{failMsg}}</view>
-    <view class="jf-cta tap" bindtap="retry">重新分析 ›</view>
+    <view class="jf-cta tap" bindtap="retry">{{historyMode ? '重新加载 ›' : '重新分析 ›'}}</view>
   </view>
 
   <!-- 结果 -->
@@ -86,6 +95,11 @@
     <view class="notice plum">
       <view class="ficon i-info n-ic"></view>
       <text>以下结论由 AI 基于简历文本与岗位要求生成,仅供你本人参考,不代表用人单位的实际招聘判断。</text>
+    </view>
+
+    <view wx:if="{{historyMode}}" class="notice info">
+      <view class="ficon i-history n-ic"></view>
+      <text>这是账户中的历史结果，只读展示；不会重新调用 AI，也不会覆盖当前简历任务。</text>
     </view>
 
     <view wx:if="{{fit.isMockProvider}}" class="notice warn">
@@ -203,8 +217,8 @@
       </view>
     </block>
 
-    <view class="section-t">继续准备</view>
-    <view class="jf-next-list">
+    <view wx:if="{{!historyMode}}" class="section-t">继续准备</view>
+    <view wx:if="{{!historyMode}}" class="jf-next-list">
       <view class="jf-next tap" bindtap="tapOptimizeResume">
         <view class="jf-next-icon"><text class="ficon i-edit"></text></view>
         <view class="jf-next-main">
@@ -227,7 +241,7 @@
       <view class="ficon i-info n-ic"></view>
       <text>以上分析不代表招聘方意见。投递须前往来源平台操作。</text>
     </view>
-    <view class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>
+    <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>
   </view>
 
   <view wx:if="{{phase === 'done'}}" class="actionbar">

@@ -292,6 +292,7 @@ const requestJs = read('utils/request.js')
 const meWxml = read('pages/me/me.wxml')
 const settingsWxml = read('pages/settings/settings.wxml')
 const settingsJs = read('pages/settings/settings.js')
+const documentsJs = read('pages/documents/documents.js')
 const loginPageOk = PAGE_PATHS.includes('pages/launch/launch') &&
   PAGE_PATHS.includes('pages/legal/legal') &&
   PAGE_PATHS.includes('pages/privacy/privacy')
@@ -311,6 +312,17 @@ if (
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
 if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && settingsJs.includes('auth.clearSession()')) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
+
+const membershipJs = read('pages/membership/membership.js')
+const notificationsJs = read('pages/notifications/notifications.js')
+const loginReturnPages = [documentsJs, membershipJs, notificationsJs]
+if (
+  loginJs.includes('LOGIN_RETURN_ROUTES') &&
+  loginJs.includes('safeReturnTo') &&
+  loginJs.includes('this.data.returnTo') &&
+  loginReturnPages.every((source) => source.includes('returnTo=${encodeURIComponent('))
+) ok('登录后受控回到原会员页面')
+else bad('登录后受控回到原会员页面', '缺少 returnTo 白名单或受保护页面未传回跳地址')
 
 function fakeMemberToken(exp) {
   const encode = (value) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
@@ -396,9 +408,29 @@ if (
 ) ok('取件页本地生成核销二维码并保留真实码兜底')
 else bad('取件页扫码核销能力', '必须离线编码真实 10 位码，不得恢复手机反扫终端或不存在的详情接口')
 
-const documentsJs = read('pages/documents/documents.js')
+if (
+  pickupJs.includes('api.getCloudPrintOrder(this.data.orderId)') &&
+  pickupJs.includes("pickupStatus === 'claimed'") &&
+  pickupJs.includes("taskStatus === 'awaiting_payment'") &&
+  pickupJs.includes("taskStatus === 'completed'") &&
+  pickupJs.includes('showQr: false') &&
+  pickupJs.includes('onShow()') &&
+  pickupJs.includes('this._schedulePoll()') &&
+  pickupWxml.includes('二维码已自动撤下')
+) ok('取件页轮询真实订单状态并在扫码/终态撤码')
+else bad('取件页实时状态', '缺少订单详情轮询、待支付/完成状态或二维码撤下')
+
+if (
+  pickupJs.includes('const fallbackAvailable = this.data.state === \'ready\'') &&
+  pickupJs.includes('if (this.data.showQr) this._drawPickupQr()') &&
+  pickupJs.includes('if (fallbackAvailable) this._resumeVisibleWork()')
+) ok('取件页首次状态请求失败仍能绘制真实取件二维码')
+else bad('取件页首次请求失败二维码兜底', '回退为 ready 后必须重新绘码并恢复倒计时与轮询')
+
 const printUploadJs = read('pages/print-upload/print-upload.js')
 const printPayJs = read('pages/print-pay/print-pay.js')
+const ordersJs = read('pages/orders/orders.js')
+const ordersWxml = read('pages/orders/orders.wxml')
 if (
   documentsJs.includes('api.uploadPrintFile') &&
   printUploadJs.includes('api.createPrintPiiScan') &&
@@ -409,6 +441,72 @@ if (
   !printPayJs.includes('预提交接口尚未开通')
 ) ok('文档真实上传、隐私确认且由服务端建单计价')
 else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
+
+if (
+  apiJs.includes('quoteMyPrintOrder(fileId, params)') &&
+  apiJs.includes("/preview-url`") &&
+  apiJs.includes("request('/orders/quote'") &&
+  printUploadJs.includes('api.quoteMyPrintOrder') &&
+  printUploadJs.includes('quote.billablePages') &&
+  printUploadJs.includes('quote.amountCents') &&
+  !printUploadJs.includes('pricing.estimateText') &&
+  !/quoteMyPrintOrder\([\s\S]{0,500}\b(?:pages|billablePages|amountCents)\s*:/.test(printUploadJs)
+) ok('打印参数页使用服务端真实页数与精确报价')
+else bad('打印参数页服务端精确报价', '必须先取本人 printFileUrl 再调 /orders/quote，且不得提交或本地计算页数/金额')
+
+const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n  pickColor/)
+const quoteRefreshBody = quoteRefreshMatch ? quoteRefreshMatch[1] : ''
+const quoteSeqIndex = quoteRefreshBody.indexOf('const seq = ++this._quoteSeq')
+const quoteLoadingIndex = quoteRefreshBody.indexOf("priceStatus: 'loading'")
+const quoteDelayIndex = quoteRefreshBody.indexOf('setTimeout(run, delay)')
+if (
+  quoteSeqIndex >= 0 &&
+  quoteLoadingIndex > quoteSeqIndex &&
+  quoteDelayIndex > quoteLoadingIndex &&
+  quoteRefreshBody.includes('if (seq !== this._quoteSeq) return')
+) ok('打印份数变化立即作废旧报价并锁定继续操作')
+else bad('打印报价竞态保护', '递增请求序号和 loading 状态必须发生在防抖等待之前，旧请求不得回写 ready')
+
+if (
+  ordersJs.includes("!item.status && item.pickupStatus === 'pending'") &&
+  ordersJs.includes("'source=orders'") &&
+  ordersWxml.includes('wx:if="{{item.pickup}}"') &&
+  pickupJs.includes('err && err.statusCode === 401') &&
+  pickupJs.includes('this._stopPoll()') &&
+  pickupJs.includes('if (this.data.fromOrders)') &&
+  pickupJs.includes("taskStatus === 'abandoned'")
+) ok('扫码后撤下订单列表取件码且登录失效停止状态轮询')
+else bad('取件凭证撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询')
+
+const aiRecordsJs = read('pages/ai-records/ai-records.js')
+const jobFitJs = read('pages/job-fit/job-fit.js')
+const careerPlanJs = read('pages/career-plan/career-plan.js')
+if (
+  apiJs.includes('deleteMyAiRecord(recordId)') &&
+  aiRecordsJs.includes("route: '/pages/resume-diagnose/resume-diagnose'") &&
+  aiRecordsJs.includes("route: '/pages/resume-optimize/resume-optimize'") &&
+  aiRecordsJs.includes("route: '/pages/job-fit/job-fit'") &&
+  aiRecordsJs.includes("route: '/pages/career-plan/career-plan'") &&
+  aiRecordsJs.includes('api.deleteMyAiRecord(record.id)') &&
+  !aiRecordsJs.includes("key: 'interview'") &&
+  jobFitJs.includes('historyTaskId') && jobFitJs.includes('api.getJobFit(this.data.taskId') &&
+  careerPlanJs.includes('historyTaskId') && careerPlanJs.includes('api.getCareerPlan(this.data.taskId')
+) ok('AI 服务记录支持真实结果回看与删除')
+else bad('AI 服务记录闭环', '缺少真实类型筛选、已有结果页跳转、会员历史读取或删除入口')
+
+if (
+  jobFitJs.includes('taskId: historyTaskId') &&
+  jobFitJs.includes('_openHistoryLogin()') &&
+  jobFitJs.includes('this._waitingForHistoryLogin') &&
+  jobFitJs.includes('onShow()') &&
+  jobFitJs.includes('err && err.statusCode === 401') &&
+  careerPlanJs.includes('this.setData({ taskId: historyTaskId, historyMode: true })') &&
+  careerPlanJs.includes('_openHistoryLogin()') &&
+  careerPlanJs.includes('this._waitingForHistoryLogin') &&
+  careerPlanJs.includes('onShow()') &&
+  careerPlanJs.includes('err && err.statusCode === 401')
+) ok('AI 历史模式登录失效时保留任务并在登录后自动恢复')
+else bad('AI 历史模式登录失效保护', '岗位匹配和职业规划不得用空 taskId 重试，登录返回后必须自动读取原任务')
 
 const configJs = read('utils/config.js')
 if (/USE_MOCK:\s*false/.test(configJs)) ok('正式源码默认关闭 mock')

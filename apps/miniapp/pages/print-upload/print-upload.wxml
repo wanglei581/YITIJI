@@ -21,7 +21,7 @@
     <view class="fc-ic a-teal"><text class="ficon i-file-text"></text></view>
     <view class="fc-main">
       <view class="fc-name">{{file.name}}</view>
-      <view class="fc-meta">{{hasFile ? (hasPageCount ? file.pages + ' 页 · ' + file.size : '页数和金额由服务端提交时核定') : '从本人文档或真实 AI 成果选择'}}</view>
+      <view class="fc-meta">{{hasFile ? (hasPageCount ? '服务端核定 ' + file.pages + ' 页' : (priceStatus === 'loading' ? '正在由服务端识别页数…' : '页数和金额待服务端核定')) : '从本人文档或真实 AI 成果选择'}}</view>
     </view>
     <view class="fc-preview">{{hasFile ? '预览排版' : '选择文件'}} ›</view>
   </view>
@@ -30,7 +30,7 @@
   <view class="opt-list rise-d3">
     <view class="opt {{color==='bw'?'on':''}} tap" data-v="bw" bindtap="pickColor">
       <view class="o-radio">{{color==='bw'?'✓':''}}</view>
-      <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济,适合文字文档</view></view>
+      <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济，适合文字文档</view></view>
       <view class="o-price">{{priceLabels.bw}}</view>
     </view>
     <view class="opt off tap" data-v="color" bindtap="pickColor">
@@ -44,6 +44,14 @@
   <view class="card flat paper-row rise-d4">
     <view class="pr-main"><view class="o-title">A4 (210 × 297mm)</view><view class="o-sub">标准幅面</view></view>
     <view class="paper-badge">仅支持 A4</view>
+  </view>
+
+  <view wx:if="{{hasFile && priceStatus === 'unavailable'}}" class="quote-error rise-d4">
+    <view class="qe-main">
+      <view class="qe-title">暂时无法取得精确报价</view>
+      <view class="qe-text">{{priceError}}</view>
+    </view>
+    <view class="btn ghost sm" bindtap="retryQuote">重新报价</view>
   </view>
 
   <view class="section-t rise-d4">打印方式</view>
@@ -87,7 +95,7 @@
 
 <view class="actionbar">
   <view class="ab-price">
-    <text class="ab-label">{{priceStatus === 'loading' ? '正在读取价目' : (priceStatus === 'ready' ? '预估费用' : '价格暂不可用')}}</text>
+    <text class="ab-label">{{priceStatus === 'loading' ? '服务端正在报价' : (priceStatus === 'ready' ? '精确报价' : '报价暂不可用')}}</text>
     <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">¥{{total}}</text>
   </view>
   <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端 →')}}</view>

@@ -9,11 +9,12 @@
 .rec-item {
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 20rpx 0;
+  gap: 12rpx;
+  padding: 12rpx 0;
   border-bottom: 1rpx solid var(--line-faint);
 }
 .rec-item:last-child { border-bottom: none; }
+.rec-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 20rpx; padding: 8rpx 0; }
 
 .rec-ic {
   flex-shrink: 0;
@@ -44,19 +45,9 @@
   white-space: nowrap;
 }
 
-.rec-r {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10rpx;
-}
-.rec-score {
-  font-size: 26rpx;
-  font-weight: 700;
-  color: var(--plum-deep);
-  font-family: var(--font-serif);
-}
+.rec-action { flex-shrink: 0; color: var(--muted); font-size: 23rpx; }
+.rec-action.ready { color: var(--teal-deep); font-weight: 600; }
+.rec-more { flex-shrink: 0; padding: 22rpx 8rpx 22rpx 16rpx; color: var(--muted); font-size: 24rpx; letter-spacing: 2rpx; }
 
 .empty-slot {
   padding: 60rpx 20rpx;
@@ -65,6 +56,7 @@
   align-items: center;
   text-align: center;
 }
+.empty-slot.compact { padding: 38rpx 20rpx; }
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
