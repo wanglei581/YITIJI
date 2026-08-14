@@ -209,6 +209,7 @@ export function PrintPickupClaimPage() {
           <label className="pcp-label" htmlFor="pickup-code-input">
             扫码结果 / 取件码（{CODE_LEN} 位）
           </label>
+          {/* 小程序会把码显示为 AB-2C-…；分隔符不进入状态或接口。 */}
           <input
             id="pickup-code-input"
             ref={inputRef}
@@ -217,7 +218,7 @@ export function PrintPickupClaimPage() {
             type="text"
             inputMode="text"
             placeholder="例：AB2C7M9P3K"
-            maxLength={CODE_LEN}
+            maxLength={CODE_LEN * 3}
             value={code}
             onChange={handleInput}
             onKeyDown={e => { if (e.key === 'Enter') void handleClaim(code) }}

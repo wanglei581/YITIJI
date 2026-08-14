@@ -34,6 +34,7 @@ import {
   MessageSquareIcon,
   PenToolIcon,
   PrinterIcon,
+  QrCodeIcon,
   ScanLineIcon,
   ShieldCheckIcon,
   SparklesIcon,
@@ -250,6 +251,24 @@ export function PrintScanHomePage() {
           onBack={() => navigate('/')}
           backLabel="返回"
         />
+
+        <button
+          type="button"
+          className="ps-pickup-entry"
+          onClick={() => navigate('/print/pickup-claim')}
+        >
+          <span className="ps-pickup-entry__icon">
+            <QrCodeIcon aria-hidden="true" />
+          </span>
+          <span className="ps-pickup-entry__copy">
+            <b>扫码或输入取件码</b>
+            <span>扫描小程序取件二维码；无法扫码时可输入 10 位码</span>
+          </span>
+          <span className="ps-pickup-entry__action">
+            开始核销
+            <ChevronRightIcon aria-hidden="true" />
+          </span>
+        </button>
 
         <section className="ps-ai-rail" aria-label="在线服务状态" aria-live="polite">
           <SparklesIcon aria-hidden="true" />

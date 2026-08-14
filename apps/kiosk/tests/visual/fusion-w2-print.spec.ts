@@ -87,6 +87,62 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   expect(errors).toEqual([])
 })
 
+test('pickup manual fallback normalizes the displayed code before claiming @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let submittedCode = ''
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    submittedCode = (route.request().postDataJSON() as { code?: string }).code ?? ''
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        released: false,
+        orderId: 'w2-manual-order',
+        orderNo: 'ORD-W2-MANUAL',
+        terminalId: 'KSK-001',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'w2-manual-payment-session-token',
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  await page.getByLabel('取件码输入框').fill('ab-2c-7m-9p-3k')
+
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  expect(submittedCode).toBe('AB2C7M9P3K')
+  expect(errors).toEqual([])
+})
+
+test('pickup invalid code is rejected, cleared, and ready for the next scan @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  let claimCount = 0
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    claimCount += 1
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: false,
+        error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  const input = page.getByLabel('取件码输入框')
+  await input.fill('AB2C7M9P3K')
+
+  await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)
+  await expect(input).toHaveValue('')
+  await expect(input).toBeFocused()
+  expect(claimCount).toBe(1)
+  expect(errors).toEqual([])
+})
+
 /** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
 function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
   const billablePages = opts?.billablePages ?? 2

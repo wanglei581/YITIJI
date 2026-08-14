@@ -1,3 +1,96 @@
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry {
+  display: flex;
+  width: 100%;
+  min-height: 88px;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 14px 20px;
+  border: 1px solid color-mix(in srgb, var(--fy-clay) 34%, var(--k-line));
+  border-radius: var(--k-r-md);
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--color-clay-soft) 78%, var(--k-surface)),
+    var(--k-surface)
+  );
+  box-shadow: var(--shadow-sm);
+  color: var(--k-ink);
+  text-align: left;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--color-clay-soft);
+  color: var(--fy-clay);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__copy b,
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__copy span {
+  display: block;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__copy b {
+  font-family: var(--k-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__copy span {
+  margin-top: 3px;
+  color: var(--k-muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__action {
+  display: inline-flex;
+  min-height: 56px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  border-radius: var(--k-r-sm);
+  background: var(--fy-clay);
+  color: var(--k-paper);
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__action svg {
+  width: 20px;
+  height: 20px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry:hover {
+  border-color: color-mix(in srgb, var(--fy-clay) 58%, var(--k-line));
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry:active {
+  transform: scale(0.99);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-pickup-entry:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--fy-clay) 55%, transparent);
+  outline-offset: 3px;
+}
+
 [data-kiosk-presentation='fusion-youth'] .ps-ai-rail {
   display: flex;
   flex: none;
@@ -72,6 +165,18 @@
 [data-kiosk-presentation='fusion-youth'] .ps-ai-rail button:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+@media (max-width: 720px) {
+  [data-kiosk-presentation='fusion-youth'] .ps-pickup-entry {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-pickup-entry__action {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 [data-kiosk-presentation='fusion-youth'] .ps-notice {

@@ -54,6 +54,24 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
+test('tool center exposes the miniapp pickup claim entry @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
+
+  await page.goto('/print-scan')
+  const entry = page.getByRole('button', { name: /扫码或输入取件码/ })
+  await expect(entry).toBeVisible()
+  await entry.click()
+
+  await expect(page).toHaveURL(/\/print\/pickup-claim$/)
+  await expect(page.getByLabel('取件码输入框')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
 test('unknown tool feature key fails closed with a real recovery action @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)

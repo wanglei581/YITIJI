@@ -246,6 +246,16 @@ assert.doesNotMatch(
   'print-scan hub uses the prototype global navbar and must not render a second bottom action bar'
 )
 assert.match(
+  printScanHome,
+  /className=["']ps-pickup-entry["'][\s\S]*?navigate\(['"]\/print\/pickup-claim['"]\)/,
+  'print-scan home exposes a visible pickup-claim entry'
+)
+assert.match(
+  printScanHome,
+  /扫码或输入取件码/,
+  'print-scan pickup entry matches the miniapp instruction copy'
+)
+assert.match(
   printScanFusionCss,
   /\.w2-print-scan-shell\s*\{[^}]*padding:\s*0\s+48px\s+32px\s*;/,
   'print-scan shell uses the prototype 48px content gutter without adding top padding to the pagehead'
