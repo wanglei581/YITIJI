@@ -1,0 +1,46 @@
+<!--pages/help/help.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">使用帮助</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content has-bar">
+
+    <!-- FAQ 折叠列表 -->
+    <view class="section-t">热门问答</view>
+    <view class="card">
+      <view
+        class="faq-item tap"
+        wx:for="{{faqs}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="toggleFaq"
+      >
+        <view class="faq-q">
+          <view class="fq-t">{{item.q}}</view>
+          <view class="faq-arrow {{openId === item.id ? 'open' : ''}}">›</view>
+        </view>
+        <view class="faq-a" wx:if="{{openId === item.id}}">{{item.a}}</view>
+      </view>
+    </view>
+
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <view>没找到答案？可以进入 AI 百宝箱使用小青助手。</view>
+    </view>
+
+  </view>
+
+  <view class="actionbar">
+    <view class="btn primary block tap" hover-class="tap-press" bindtap="askAI">问小青</view>
+  </view>
+
+</view>

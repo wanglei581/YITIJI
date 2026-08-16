@@ -1,0 +1,49 @@
+<view class="vip-wrap">
+  <view class="vip-nav">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="vip-nav-inner">
+      <view class="vip-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right vip-back-ic"></text>
+      </view>
+      <view class="vip-nav-title">我的权益</view>
+      <view class="vip-nav-right"></view>
+    </view>
+  </view>
+
+  <view class="vip-body">
+    <view class="vcard">
+      <view class="vc-top"><view class="vc-badge">本人权益</view></view>
+      <view class="vc-name serif">以服务端实际发放记录为准</view>
+      <view class="vc-sub">本页不展示未配置的套餐、折扣或会员承诺</view>
+    </view>
+
+    <view class="sec-t-dark">权益记录</view>
+    <view class="ben-grid" wx:if="{{loading}}">
+      <view class="ben-cell"><view class="ben-t">正在加载…</view></view>
+    </view>
+    <view class="ben-grid" wx:elif="{{loadError}}">
+      <view class="ben-cell tap" bindtap="loadBenefits">
+        <view class="ben-t">加载失败，点此重试</view>
+        <view class="ben-s">{{loadError}}</view>
+      </view>
+    </view>
+    <view class="ben-grid" wx:elif="{{benefits.length}}">
+      <view class="ben-cell" wx:for="{{benefits}}" wx:key="id">
+        <view class="ben-t">{{item.title}}</view>
+        <view class="ben-s">{{item.description}}</view>
+        <view class="ben-s">{{item.quantity}} · {{item.status}}</view>
+        <view class="ben-s">{{item.validText}}</view>
+      </view>
+    </view>
+    <view class="ben-grid" wx:else>
+      <view class="ben-cell">
+        <view class="ben-t">暂无可展示权益</view>
+        <view class="ben-s">活动或服务发放后会显示在这里</view>
+      </view>
+    </view>
+
+    <view class="vip-note">
+      权益只用于平台工具与打印服务，不代表补贴到账、录用结果或第三方招聘服务。
+    </view>
+  </view>
+</view>

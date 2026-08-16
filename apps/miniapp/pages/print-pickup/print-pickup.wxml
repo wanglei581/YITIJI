@@ -1,0 +1,94 @@
+<!--pages/print-pickup/print-pickup.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+
+  <!-- 导航栏 -->
+  <view class="navbar">
+    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
+    <view class="nb-title">取件码</view>
+    <view class="nb-right"></view>
+  </view>
+
+  <!-- ── 错误态 ── -->
+  <view class="state-center" wx:if="{{state === 'error'}}">
+    <view class="state-icon">⚠️</view>
+    <text class="state-label">{{errorMsg}}</text>
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="toOrders">查看订单</view>
+  </view>
+
+  <!-- ── 正常展示 ── -->
+  <block wx:elif="{{state === 'ready'}}">
+
+    <!-- 英雄区：扫码优先，10 位码兜底 -->
+    <view class="pickup-hero">
+      <view class="ph-status-dot"></view>
+      <text class="ph-status-text">{{taskStatus === 'pending' ? '等待取件' : taskStatus === 'claimed' ? '已认领排队' : taskStatus === 'printing' ? '打印中…' : '取件码已就绪'}}</text>
+
+      <view class="pickup-qr-card">
+        <canvas
+          wx:if="{{qrStatus !== 'error'}}"
+          type="2d"
+          id="pickup-qr"
+          class="pickup-qr"
+          style="width:{{qrSizePx}}px;height:{{qrSizePx}}px"
+          aria-label="打印取件核销二维码"
+        ></canvas>
+        <view class="pickup-qr-error" wx:else>二维码暂不可用，请使用下方取件码</view>
+        <text class="pickup-qr-title">请将此二维码对准一体机扫码器</text>
+        <text class="pickup-qr-sub">扫码器读取后会自动核销，无需在手机上扫码</text>
+      </view>
+
+      <text class="ph-divider">扫码不便时，手动输入</text>
+      <view class="ph-code-wrap">
+        <text class="ph-code">{{code}}</text>
+      </view>
+      <text class="ph-hint">二维码与下方 10 位码对应同一笔订单</text>
+      <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
+    </view>
+
+    <!-- 操作引导步骤 -->
+    <view class="steps-card">
+      <view class="step-item">
+        <view class="step-num">1</view>
+        <text class="step-text">走到附近一体机终端</text>
+      </view>
+      <view class="step-item">
+        <view class="step-num">2</view>
+        <text class="step-text">选择「扫码或输入取件码」</text>
+      </view>
+      <view class="step-item">
+        <view class="step-num">3</view>
+        <text class="step-text">在终端确认预览、付款并等待出纸</text>
+      </view>
+    </view>
+
+    <!-- 订单信息 -->
+    <view class="info-card" wx:if="{{orderNo || taskStatus}}">
+      <view class="info-row" wx:if="{{orderNo}}">
+        <text class="info-key">订单号</text>
+        <text class="info-val">{{orderNo}}</text>
+      </view>
+      <view class="info-row" wx:if="{{taskStatus}}">
+        <text class="info-key">当前状态</text>
+        <text class="info-val iv-status">{{taskStatus === 'pending' ? '等待取件' : taskStatus === 'claimed' ? '已认领' : taskStatus === 'printing' ? '打印中' : taskStatus}}</text>
+      </view>
+    </view>
+
+    <!-- 隐私提示 -->
+    <view class="notice-card">
+      <text class="nc-text">二维码只包含本订单的 10 位取件码，不含文件、姓名或手机号。请勿转发；有效期、付款与打印结果以后端和终端显示为准。</text>
+    </view>
+
+    <view class="pk-actions">
+      <view class="btn-ghost tap" hover-class="tap-press" bindtap="toOrders">查看全部订单</view>
+    </view>
+
+  </block>
+
+  <view style="height:calc(140rpx + env(safe-area-inset-bottom))"></view>
+</view>
+
+<!-- 底部完成按钮 -->
+<view class="action-bar" wx:if="{{state === 'ready'}}">
+  <view class="ab-btn tap" hover-class="tap-press" bindtap="home">完成</view>
+</view>

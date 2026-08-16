@@ -1,9 +1,7 @@
 {
-  "desc": "AI 求职与职业生活服务小程序页面索引",
-  "rules": [
-    {
-      "action": "allow",
-      "page": "*"
-    }
-  ]
+    "desc": "关于本文件的更多信息，请参考文档 https://developers.weixin.qq.com/miniprogram/dev/framework/sitemap.html",
+    "rules": [{
+    "action": "allow",
+    "page": "*"
+    }]
 }

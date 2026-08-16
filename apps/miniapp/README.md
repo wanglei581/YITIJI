@@ -1,31 +1,96 @@
-# 职易达 · AI 求职与职业生活服务（微信小程序）
+# 职易达微信小程序
 
-唯一发布源码（M0.1 壳阶段）。原生微信小程序，不迁移 Taro。
+`apps/miniapp/` 是主项目唯一正式小程序源码。当前为原生微信小程序 `1.0.2` 收口候选，固定四个 Tab：
 
-## 当前范围（M0.3）
+> 仓库外旧副本、临时导出目录和 `.worktrees/` 的外层目录都不是发布入口。Git worktree 只用于隔离分支，其内部仍以 `apps/miniapp/` 为固定工程路径。
 
-- 四 Tab 壳：首页 / AI百宝箱 / 求职 / 我的（自定义 TabBar）。
-- 首页一屏：沿用已核验视觉基线，入口收敛到四个 Tab；未上线功能统一提示，不伪造页面。
-- 登录：微信一键登录（getPhoneNumber）+ 短信验证码降级；登录前强制协议/隐私勾选，
-  协议版本与后端校验一致；“我的”页含登录/退出与本地会话清理。
-- 公开浏览：求职 Tab 岗位列表（真实 API + 空态）、岗位详情（去来源平台投递/扫码投递）、
-  招聘会/招聘会详情、就业政策/政策详情、企业/企业详情；搜索与场馆导览、岗位匹配按版本诚实提示。
-- 其余本人数据继续为空态，M0.4 接入。
+- 首页
+- AI百宝箱
+- 求职
+- 我的
+
+## 当前真实能力
+
+- 微信手机号一键登录与短信验证码降级登录
+- 当前生效服务协议、隐私政策与一体机二维码登录确认
+- 岗位、招聘会、企业、政策公开浏览（无数据时显示真实空态）
+- 简历上传、解析、诊断、优化、岗位匹配、职业规划与模拟面试
+- 本人简历、文档、AI 记录、打印订单、权益与通知读取
+- 服务端打印价目和公开终端读取
+- Order-only 待到机订单、10 位取件码和本地二维码展示（当前分支候选，尚未发布或真机验收）
+
+材料包仍未完成；到机码核销和机端支付虽有本地代码候选，但未完成同一候选的受控发布、Windows 实际扫码器、支付和奔图出纸验收，不得宣称已上线。证件照、链接分析、静态会员套餐、模拟简历生成、扫码续传等没有后端闭环的入口未注册。
+
+## 目录职责
+
+| 目录 / 文件 | 唯一职责 | 允许依赖 |
+|---|---|---|
+| `app.js` / `app.json` / `app.wxss` | 应用生命周期、全局路由、全局样式 | `utils/`（如确有需要） |
+| `custom-tab-bar/` | 四个一级 Tab 导航 | 已注册 Tab 路由 |
+| `pages/<feature>/` | 单个页面功能，固定同名 `js/json/wxml/wxss` 四件套 | 本页目录、`utils/` |
+| `utils/` | 跨页公共模块与纯函数 | 只能依赖 `utils/` |
+| `scripts/` | 本地/CI 静态门禁 | 只读源码，不参与运行时打包 |
+| `project.config.json` | 可入库的微信工程配置 | 不存放密钥或个人测试参数 |
+
+`project.private.config.json` 只是微信开发者工具在本机生成的状态，已忽略，不属于正式源码。
+
+## 功能与依赖地图
+
+| 功能域 | 页面目录 | 直接公共依赖 |
+|---|---|---|
+| 入口与导航 | `home`、`ai`、`jobs`、`me`、`custom-tab-bar` | `auth`，其余通过注册路由跳转 |
+| 登录与法务 | `launch`、`legal`、`privacy`、`settings`、`about`、`help` | `api` → `request`，`auth` → `storage` |
+| AI 助手与记录 | `assistant`、`ai-records` | `api`、`storage` |
+| 简历主链 | `resume-upload` → `resume-parse` → `resume-diagnose` → `resume-optimize` | `api`、`storage`、`normalize` |
+| 岗位匹配与职业规划 | `job-fit`、`career-plan` | `api`、`auth`、`storage`、`normalize` |
+| 模拟面试 | `interview-entry` → `interview-qa` → `interview-result` | `api`、`storage` |
+| 公开信息 | `jobs`、`job-detail`、`companies`、`company-detail`、`fairs`、`fair-detail`、`policies`、`policy-detail` | `api`、`history`、`favorites` |
+| 打印建单 | `print`、`documents`、`print-upload`、`print-preview`、`print-store`、`print-pay` | `api`、`auth`、`print-pricing` |
+| 到机取件 | `orders` → `print-pickup` | `api`、`auth`、`pickup-qrcode`（纯本地编码） |
+| 一体机协同 | `kiosk-login`、`usb-import` | `api`、`auth`；硬件执行属于 `apps/terminal-agent` |
+| 本人资产 | `resumes`、`documents`、`orders`、`notifications`、`favorites`、`browse-history`、`membership` | `api`、`auth`、`storage`、`history`、`favorites` |
+
+公共模块的依赖方向：
+
+```text
+api → request → config + storage
+api → config + mock-data + normalize
+auth / favorites / history → storage
+normalize / print-pricing / pickup-qrcode / storage / config / mock-data → 无内部依赖
+```
+
+页面之间不相互 `require`；共享逻辑进 `utils/`，跨页跳转只使用 `app.json` 已注册路由。当前运行时为零 npm 第三方依赖；如需新增，必须同时更新 `package.json`、本表和微信构建验证，不得把第三方源码散落复制到页面目录。`utils/pickup-qrcode.js` 中经改编的 QR 编码核心已在文件头完整保留 MIT 许可和归属，不是未登记的 npm 依赖。
+
+## 跨端边界
+
+```text
+小程序 pages → utils/api → utils/request → https://zyidai.cn/api/v1
+                                                    ↓
+                                              services/api
+                                                    ↓
+                                    订单 / 取件码 / 打印任务
+                                                    ↓
+                    apps/kiosk 现场核销 → apps/terminal-agent 本机硬件执行
+```
+
+- 小程序不直连数据库、打印机、扫码器或 Terminal Agent；所有业务请求经 `utils/api` 门面和服务端 API。
+- Kiosk 负责现场交互与核销，Terminal Agent 负责 Windows 本机硬件；硬件逻辑不复制到小程序。
+- 取件二维码仅是后端 10 位取件码的本地图形编码，不是新订单、新令牌或云端二维码服务。
 
 ## 本地打开
 
-微信开发者工具 → 导入项目 → 选择本目录 `apps/miniapp`。
+微信开发者工具 → 导入项目 → 只选择本目录 `apps/miniapp`。
 
-- 仓库内 `project.config.json` 使用 `touristappid`（游客模式）；正式调试请在本机改回
-  已注册 AppID（`wxe9ba99a3a311c7df`），不要提交真实 AppID。
-- 调试时可勾选“不校验合法域名”；正式发布前必须在公众平台配置 `zyidai.cn` 的
-  request / uploadFile / downloadFile 合法域名。
+- 仓库内 `project.config.json` 使用已注册的正式 AppID；AppID 是公开工程标识，秘钥和私有配置仍严禁入库。
+- 正式发布前须在微信公众平台配置 `https://zyidai.cn` 的 request/uploadFile/downloadFile 合法域名。
+- 不使用微信云开发；API 统一走 `utils/request.js` 和 `utils/api.js`。
 
-## 门禁
+## 离线门禁
 
 ```bash
-node scripts/verify-miniapp-static.mjs
+pnpm --dir apps/miniapp verify:static
 ```
 
-检查 JSON 可解析、页面四件套、四 Tab 一致性、无死路由、合规文案与密钥残留。
-微信开发者工具编译 0 Error 与 UI 实点按 `docs/acceptance/miniprogram-jobfit-ui-real-click-runsheet-2026-08-07.md` 执行。
+门禁覆盖 JSON、43 个注册页面四件套、目录分类、依赖方向/循环依赖、发布包排除脚本、四 Tab、路由、JavaScript 语法、CommonJS 导入、事件处理器、dataset、图标、微信/短信登录、真实退出、合规文案、取件二维码、mock 默认关闭和密钥残留。
+
+微信开发者工具 Stable 2.01.2510290 已用正式 AppID 完成普通编译；本次取件页二维码和 10 位码已在模拟器正常渲染，控制台 0 error，仅有基础库 HarmonyOS 兼容提示。这不等于已上传、真机手机号能力通过或 M2 跨端打印闭环完成。

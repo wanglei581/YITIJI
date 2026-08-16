@@ -1,0 +1,62 @@
+<!--pages/print/print.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <!-- 导航 -->
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title left serif">打印扫描</view>
+    <view class="nav-right">
+      <view class="nav-caps" bindtap="tapScan">到机扫码</view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <!-- 页头说明 -->
+    <view class="pagehead">
+      <view class="ph-title">手机准备，到机取件</view>
+      <view class="ph-sub">在手机上备好文件，到一体机扫码出纸。打印进度以终端实时上报为准。</view>
+    </view>
+
+    <!-- 三步流程条 -->
+    <view class="step-bar">
+      <block wx:for="{{steps}}" wx:key="n">
+        <view class="step">
+          <view class="step-n">{{item.n}}</view>
+          <view class="step-label">{{item.label}}</view>
+        </view>
+        <view wx:if="{{index < steps.length - 1}}" class="step-sep">→</view>
+      </block>
+    </view>
+
+    <!-- 打印路径 -->
+    <view class="section-t">选择服务方式</view>
+    <view
+      class="path-card sheen tap rise-d{{index+1}}"
+      wx:for="{{paths}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      hover-class="tap-press"
+      bindtap="tapPath"
+    >
+      <view class="pc-ic {{item.accent ? 'a-'+item.accent : 'a-neutral'}}"><view class="ficon i-{{item.icon}}"></view></view>
+      <view class="pc-body">
+        <view class="pc-title-row">
+          <view class="pc-title">{{item.title}}</view>
+          <view wx:if="{{item.badge}}" class="pc-badge">{{item.badge}}</view>
+        </view>
+        <view class="pc-desc">{{item.desc}}</view>
+        <view class="pc-flow">{{item.flow}}</view>
+      </view>
+      <view class="pc-arrow">›</view>
+    </view>
+
+    <view class="compliance-note">
+      打印状态、出纸完成均以一体机终端实时上报为准，如与实际不符请到店核对。
+    </view>
+
+  </view>
+</view>

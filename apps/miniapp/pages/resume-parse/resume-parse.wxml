@@ -1,0 +1,84 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">AI 解析中</view>
+    <view style="width:64rpx"></view>
+  </view>
+
+  <!-- 步骤指示 -->
+  <view class="steps">
+    <view class="st done"><view class="n"><text class="ficon i-right" style="font-size:20rpx;transform:rotate(-45deg) scaleX(.8)"></text></view><view class="nl">上传</view></view>
+    <view class="line done"></view>
+    <view class="st on"><view class="n">2</view><view class="nl">解析</view></view>
+    <view class="line"></view>
+    <view class="st"><view class="n">3</view><view class="nl">诊断</view></view>
+  </view>
+
+  <scroll-view scroll-y class="content has-bar">
+
+    <!-- 解析中:后端只给总状态,不给分阶段进度,因此只显示真实已用时长,不显示百分比 -->
+    <view wx:if="{{phase === 'parsing'}}" class="parse-center">
+      <view class="ring spin">
+        <view class="ring-inner">
+          <view class="pr-pct">{{elapsed}}s</view>
+          <view class="pr-label">已用时</view>
+        </view>
+      </view>
+      <view class="ai-status">
+        <view class="dots"><view></view><view></view><view></view></view>
+        {{atext}}
+      </view>
+    </view>
+
+    <!-- 失败:把后端原因原样说清,不静默重试也不假装完成 -->
+    <view wx:elif="{{phase === 'failed'}}" class="parse-center">
+      <view class="fail-ic"><text class="ficon i-info"></text></view>
+      <view class="fail-title">解析未完成</view>
+      <view class="fail-msg">{{failMsg}}</view>
+    </view>
+
+    <!-- 无待解析文件 -->
+    <view wx:else class="parse-center">
+      <view class="fail-ic"><text class="ficon i-file-text"></text></view>
+      <view class="fail-title">缺少待解析的简历</view>
+      <view class="fail-msg">请先选择或拍摄一份简历文件,上传成功后才会开始 AI 解析。</view>
+    </view>
+
+    <!-- 解析环节说明。后端不返回分阶段进度,这里只说明 AI 会检查什么,不标注完成状态 -->
+    <view wx:if="{{phase === 'parsing'}}" class="section-t">本次解析包含</view>
+    <view wx:if="{{phase === 'parsing'}}" class="card">
+      <view class="parse-stages">
+        <block wx:for="{{stages}}" wx:key="id">
+          <view class="ps-row">
+            <view class="ps-ic"><text style="font-size:22rpx">·</text></view>
+            <view class="ps-label">{{item.label}}</view>
+            <view class="ps-desc">{{item.desc}}</view>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view wx:if="{{phase === 'parsing'}}" class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <view>AI 解析通常需要 20–40 秒,期间请勿退出。解析结果仅供参考,不代表用人单位意见。</view>
+    </view>
+    <view wx:if="{{phase === 'failed'}}" class="notice warn">
+      <text class="ficon i-info n-ic"></text>
+      <view>本次未产生诊断结果。上传的文件有有效期,超时后需要重新选择文件上传。</view>
+    </view>
+    <view style="height:40rpx"></view>
+  </scroll-view>
+
+  <view class="actionbar">
+    <button wx:if="{{phase === 'parsing' && !done}}" class="btn ghost block" disabled>等待解析完成…</button>
+    <button wx:elif="{{phase === 'parsing' && done}}" class="btn primary block" disabled>解析完成,正在进入诊断…</button>
+    <block wx:elif="{{phase === 'failed'}}">
+      <view class="btn ghost tap" bindtap="toUpload">重新选择</view>
+      <view class="btn primary tap flex-1-5" bindtap="retry">重试解析</view>
+    </block>
+    <view wx:else class="btn primary block tap" bindtap="toUpload">去选择简历</view>
+  </view>
+</view>

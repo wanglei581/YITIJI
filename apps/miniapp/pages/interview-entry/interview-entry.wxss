@@ -1,0 +1,25 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 表单 */
+.field-group { background: var(--surface); border-radius: 14rpx; overflow: hidden;
+  margin-top: 4rpx; }
+.field-item { display: flex; align-items: center; padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid var(--line); }
+.field-item:last-child { border-bottom: none; }
+.fi-label { font-size: 28rpx; color: var(--muted); width: 120rpx; flex-shrink: 0; }
+.fi-input { flex: 1; font-size: 28rpx; color: var(--ink); }
+.fi-select { flex: 1; font-size: 28rpx; color: var(--ink);
+  display: flex; justify-content: space-between; align-items: center; }
+.fi-arr { color: var(--ghost); font-size: 28rpx; }
+
+/* 选项组 */
+.option-group { margin-top: 16rpx; }
+.og-label { font-size: 26rpx; color: var(--muted); margin-bottom: 12rpx; }
+.og-chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
+.opt-chip { padding: 12rpx 28rpx; border-radius: 40rpx; border: 2rpx solid var(--line);
+  font-size: 26rpx; color: var(--ink); background: var(--surface); }
+.opt-chip.active { border-color: var(--teal); color: var(--teal);
+  background: rgba(31,158,134,.08); }
+
+/* full-width btn */
+.w-full { width: 100%; }

@@ -11,9 +11,11 @@ App({
       const statusBarHeight = win.statusBarHeight || 20;
       this.globalData.statusBarHeight = statusBarHeight;
 
+      // 胶囊按钮位置，用于自定义导航栏对齐
       if (wx.getMenuButtonBoundingClientRect) {
         const rect = wx.getMenuButtonBoundingClientRect();
         this.globalData.menuButtonRect = rect;
+        // 导航栏高度 = 胶囊上下间距对称 + 胶囊高度
         this.globalData.navBarHeight =
           (rect.top - statusBarHeight) * 2 + rect.height;
       }

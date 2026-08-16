@@ -11,25 +11,9 @@ Page({
     pageId: '',
     faved: false,
     fair: {
-      status: 'active', // active | upcoming
-      statusLabel: '进行中',
-      title: '2026 深圳春季综合招聘会',
-      org: '深圳市人力资源和社会保障局',
-      time: '2026-07-25 09:00–17:00',
-      format: '线下（现场招聘）',
-      companyCount: '168 家',
-      targetGroup: '应届生 / 社会人才',
-      sourceOrg: '深圳市公共就业服务中心',
-      externalId: 'FAIR-2026-041',
-      syncTime: '2026-07-24 08:00',
-      intro: '本次招聘会汇聚制造业、科技、服务等各类企业，现场提供就业咨询、简历打印等配套服务。',
-      booths: [
-        { zone: 'A', zoneClass: 'zone-a', name: '华为技术有限公司', pos: 'A-01' },
-        { zone: 'B', zoneClass: 'zone-b', name: '比亚迪股份有限公司', pos: 'B-07' },
-        { zone: 'C', zoneClass: 'zone-c', name: '腾讯科技（深圳）有限公司', pos: 'C-03' },
-        { zone: 'S', zoneClass: 'zone-s', name: '招商银行股份有限公司', pos: 'S-02' },
-      ],
-      externalUrl: 'https://example.com/fair/041',
+      status: '', statusText: '', statusLabel: '', title: '', name: '', org: '', host: '',
+      time: '', date: '', format: '', companyCount: '', targetGroup: '', target: '',
+      sourceOrg: '', externalId: '', syncTime: '', intro: '', booths: [], externalUrl: '',
     },
   },
 
@@ -90,20 +74,16 @@ Page({
     wx.showToast({ title: faved ? '已收藏' : '已取消收藏', icon: 'none', duration: 1400 });
   },
 
-  tapFairMap() {
-    // 场馆导览图在后续版本接入
-    wx.showToast({ title: '场馆导览图将在后续版本上线', icon: 'none' });
-  },
-
-  tapScanBook() {
-    wx.showToast({ title: '请对准屏幕上的二维码扫码预约', icon: 'none', duration: 2500 });
-  },
-
   tapExternalBook() {
     const f = this.data.fair || {};
-    history.recordJump('fair', { id: this.data.pageId, title: f.title || f.name, source: f.sourceOrg });
-    wx.showToast({ title: '将跳转至来源平台，在来源平台完成预约', icon: 'none', duration: 2500 });
-    // TODO: 打开 externalUrl
+    if (this.data.loading || this.data.loadError || !f.externalUrl) {
+      wx.showToast({ title: '来源链接暂不可用', icon: 'none' });
+      return;
+    }
+    wx.setClipboardData({
+      data: f.externalUrl,
+      success: () => history.recordJump('fair', { id: this.data.pageId, title: f.title || f.name, source: f.sourceOrg }),
+    });
   },
 
   onShareAppMessage() {

@@ -1,0 +1,67 @@
+<!--pages/interview-entry/interview-entry.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-center nav-title">模拟面试</view>
+  </view>
+  <view class="content has-bar">
+
+    <view class="notice plum">
+      <view class="ficon i-info n-ic"></view>
+      <text>模拟面试由 AI 出题并点评，仅供练习参考，不代表真实招聘标准。</text>
+    </view>
+
+    <view class="section-t">面试方向</view>
+    <view class="field-group">
+      <view class="field-item">
+        <view class="fi-label">目标岗位</view>
+        <input class="fi-input" placeholder="如：产品经理、Java 开发" value="{{form.position}}" bindinput="inputPosition" />
+      </view>
+    </view>
+
+    <view class="section-t">题目设置</view>
+    <view class="option-group">
+      <view class="og-label">难度</view>
+      <view class="og-chips">
+        <view
+          class="opt-chip tap {{activeLevel === item.val ? 'active' : ''}}"
+          wx:for="{{levels}}"
+          wx:key="val"
+          bindtap="tapLevel"
+          data-val="{{item.val}}"
+        >{{item.label}}</view>
+      </view>
+    </view>
+    <view class="option-group">
+      <view class="og-label">练习时长</view>
+      <view class="og-chips">
+        <view
+          class="opt-chip tap {{activeDuration === item.val ? 'active' : ''}}"
+          wx:for="{{durations}}"
+          wx:key="val"
+          bindtap="tapDuration"
+          data-val="{{item.val}}"
+        >{{item.label}}</view>
+      </view>
+    </view>
+    <view class="option-group">
+      <view class="og-label">题型</view>
+      <view class="og-chips">
+        <view
+          class="opt-chip tap {{activeType === item.val ? 'active' : ''}}"
+          wx:for="{{qtypes}}"
+          wx:key="val"
+          bindtap="tapType"
+          data-val="{{item.val}}"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
+  </view>
+  <view class="actionbar">
+    <view class="btn primary tap w-full {{creating ? 'disabled' : ''}}" bindtap="tapStart">
+      {{creating ? '创建中…' : '开始模拟面试'}}
+    </view>
+  </view>
+</view>

@@ -12,27 +12,8 @@ Page({
     faved: false,
     pageId: '',
     company: {
-      emoji: '🎨',
-      name: '杭州创意未来网络科技有限公司',
-      metaParts: ['互联网', '·', '100–500人', '·', '杭州·西湖区'],
-      tags: [
-        { text: 'A轮融资', tone: 'teal' }, { text: '设计工具', tone: '' },
-        { text: '电商平台', tone: '' }, { text: '弹性上下班', tone: '' },
-        { text: '五险一金', tone: 'teal' }, { text: '定期团建', tone: '' },
-      ],
-      desc: [
-        '杭州创意未来网络科技有限公司成立于2018年，是一家专注于创意设计工具和电商营销解决方案的互联网企业，总部位于杭州西湖区。公司旗下核心产品覆盖在线设计工具、图片素材库、营销模板市场三大方向。',
-        '截至2025年，公司注册用户超过1,200万，企业客户覆盖全国30个省市。公司于2022年完成A轮融资，致力于为中小企业提供高效、低门槛的数字营销能力。团队规模约200人，技术与设计人员占比超过60%。',
-        '公司文化强调创造力、协作与快速迭代，提供弹性工作制度、完善的职业晋升通道以及丰厚的绩效激励方案。',
-      ],
-      sourceOrg: '智联招聘',
-      firstSeen: '2024-03-15',
-      externalUrl: 'https://example.com/company/abc',
-      jobs: [
-        { id: 'j1', title: 'UI 设计师', meta: '杭州·西湖区 · 1–3年', salary: '8–14K' },
-        { id: 'j2', title: '前端工程师', meta: '杭州·西湖区 · 3–5年', salary: '15–22K' },
-        { id: 'j3', title: '产品经理', meta: '杭州·西湖区 · 2–5年', salary: '12–20K' },
-      ],
+      emoji: '', name: '', metaParts: [], tags: [], desc: [], sourceOrg: '',
+      firstSeen: '', externalUrl: '', jobs: [],
     },
   },
 
@@ -70,7 +51,7 @@ Page({
   tapFav() {
     const id = this.data.pageId
     const c = this.data.company || {}
-    // 加载中/加载失败时 company 仍是默认 mock,收藏会存错名称,禁止收藏
+    // 加载中/加载失败时禁止收藏，避免把空对象写入本地收藏。
     if (!id || this.data.loading || this.data.loadError) {
       wx.showToast({ title: '内容加载后可收藏', icon: 'none' })
       return
@@ -99,9 +80,14 @@ Page({
   // 合规：仅跳转来源平台，不做平台内投递 / 收简历
   tapExternal() {
     const c = this.data.company || {}
-    history.recordJump('company', { id: this.data.pageId, title: c.name, source: c.sourceOrg })
-    wx.showToast({ title: '将跳转至来源平台了解更多', icon: 'none', duration: 1800 })
-    // TODO: 打开 company.externalUrl（来源平台）
+    if (this.data.loading || this.data.loadError || !c.externalUrl) {
+      wx.showToast({ title: '来源链接暂不可用', icon: 'none' })
+      return
+    }
+    wx.setClipboardData({
+      data: c.externalUrl,
+      success: () => history.recordJump('company', { id: this.data.pageId, title: c.name, source: c.sourceOrg }),
+    })
   },
 
   onShareAppMessage() {

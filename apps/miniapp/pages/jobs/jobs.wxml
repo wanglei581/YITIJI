@@ -8,9 +8,10 @@
   </view>
 
   <!-- 搜索栏 -->
-  <view class="search-bar tap" hover-class="tap-press" bindtap="tapSearch">
+  <view class="search-bar">
     <view class="ficon i-search sb-ic"></view>
-    <text class="sb-ph">搜索职位、公司、行业…</text>
+    <input class="sb-input" type="text" value="{{query}}" placeholder="搜索职位、公司、行业…"
+      placeholder-class="sb-ph" confirm-type="search" bindinput="onSearchInput" />
   </view>
 
   <!-- 分类筛选条 -->
@@ -41,17 +42,17 @@
   </view>
 
   <!-- 空态 -->
-  <view class="empty-wrap" wx:elif="{{jobs.length === 0}}">
+  <view class="empty-wrap" wx:elif="{{visibleJobs.length === 0}}">
     <view class="ev-icon">📋</view>
-    <view class="ev-title">暂无岗位</view>
-    <view class="ev-desc">换个筛选条件，或稍后再来看看</view>
+    <view class="ev-title">{{query ? '没有匹配的岗位' : '暂无岗位'}}</view>
+    <view class="ev-desc">{{query ? '换个关键词试试' : '换个筛选条件，或稍后再来看看'}}</view>
   </view>
 
   <!-- 岗位卡列表 -->
   <view class="job-list" wx:else>
     <view
       class="job-card tap"
-      wx:for="{{jobs}}"
+      wx:for="{{visibleJobs}}"
       wx:key="id"
       hover-class="tap-press"
       data-id="{{item.id}}"
@@ -67,7 +68,7 @@
       </view>
       <view class="jc-footer">
         <text class="jc-source">来源：{{item.source}}<block wx:if="{{item.time}}"> · {{item.time}}</block></text>
-        <view class="jc-cta tap" hover-class="act-press" catchtap="tapSource" data-url="{{item.sourceUrl}}">去来源平台 →</view>
+        <view class="jc-cta tap" hover-class="act-press" catchtap="tapSource" data-url="{{item.sourceUrl || item.externalUrl}}">复制来源链接</view>
       </view>
     </view>
   </view>

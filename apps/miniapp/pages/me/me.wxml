@@ -1,23 +1,89 @@
-<!-- pages/me/me.wxml -->
-<view class="tab-page">
+<!--pages/me/me.wxml-->
+<view class="page-wrap">
   <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
-  <view class="tab-hd">
-    <text class="tab-title">{{title}}</text>
-  </view>
-  <view class="tab-body">
-    <view class="me-card">
-      <block wx:if="{{isLoggedIn}}">
-        <view class="me-avatar"><view class="ficon i-user"></view></view>
-        <text class="me-name">{{userName}}</text>
-        <text class="me-hint">已登录 · 本人数据将在 M0.4 起接入</text>
-        <button class="me-logout tap" hover-class="tap-press" bindtap="logout">退出登录</button>
-      </block>
-      <block wx:else>
-        <view class="me-avatar"><view class="ficon i-user"></view></view>
-        <text class="me-name">未登录</text>
-        <text class="me-hint">{{copy}}</text>
-        <button class="me-login tap" hover-class="tap-press" bindtap="goLogin">登录 / 注册</button>
-      </block>
+
+  <!-- 用户头部 Hero（CMB 风格：头像+大数字统计） -->
+  <view class="me-hero">
+    <view class="me-user-row">
+      <view class="avatar-wrap">
+        <view class="avatar"><view class="ficon i-user av-ic"></view></view>
+      </view>
+      <view class="me-id">
+        <text class="me-name">{{isLoggedIn ? (user.nickname || '用户') : '未登录'}}</text>
+        <view class="me-login-hint tap" hover-class="tap-press" bindtap="tapLogin" wx:if="{{!isLoggedIn}}">
+          <text>登录后同步简历与打印记录 →</text>
+        </view>
+        <text class="me-phone" wx:else>{{user.phoneMasked || '已登录'}}</text>
+        <view class="me-member-tag tap" hover-class="tap-press" bindtap="tapEntry" data-id="membership" wx:if="{{isLoggedIn}}">
+          <text>查看实际权益 →</text>
+        </view>
+      </view>
+      <view class="notify-btn tap" hover-class="tap-press" bindtap="tapNotify">
+        <view class="ficon i-bell"></view>
+      </view>
+    </view>
+
+    <!-- 大数字统计 -->
+    <view class="me-stats" wx:if="{{isLoggedIn}}">
+      <view class="ms-cell" wx:for="{{stats}}" wx:key="key">
+        <text class="ms-val">{{item.value}}</text>
+        <text class="ms-lbl">{{item.label}}</text>
+      </view>
     </view>
   </view>
+
+  <!-- 菜单分组 -->
+  <view class="menu-group">
+    <view class="mg-title">我的资产</view>
+    <view class="menu-card">
+      <view
+        class="menu-item tap"
+        wx:for="{{entries}}"
+        wx:key="id"
+        wx:if="{{index < 5}}"
+        hover-class="tap-press"
+        data-id="{{item.id}}"
+        bindtap="tapEntry"
+      >
+        <view class="mi-icon mi-ic-{{item.accent}}">
+          <view class="ficon i-{{item.icon}}"></view>
+        </view>
+        <view class="mi-body">
+          <text class="mi-title">{{item.title}}</text>
+          <text class="mi-sub">{{item.sub}}</text>
+        </view>
+        <text class="mi-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="menu-group">
+    <view class="mg-title">账号与设置</view>
+    <view class="menu-card">
+      <view
+        class="menu-item tap"
+        wx:for="{{entries}}"
+        wx:key="id"
+        wx:if="{{index >= 5}}"
+        hover-class="tap-press"
+        data-id="{{item.id}}"
+        bindtap="tapEntry"
+      >
+        <view class="mi-icon mi-ic-{{item.accent}}">
+          <view class="ficon i-{{item.icon}}"></view>
+        </view>
+        <view class="mi-body">
+          <text class="mi-title">{{item.title}}</text>
+          <text class="mi-sub">{{item.sub}}</text>
+        </view>
+        <text class="mi-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="compliance-note">
+    系统仅记录本人的浏览、收藏、外部跳转、打印与 AI 调用行为，不记录投递或预约结果，不保存企业招聘数据。
+  </view>
+
+  <view style="height:calc(100rpx + env(safe-area-inset-bottom))"></view>
 </view>

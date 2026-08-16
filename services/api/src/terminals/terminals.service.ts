@@ -167,4 +167,8 @@ export class TerminalsService {
   getTerminalPrinterStatus(terminalId: string) {
     return this.admin.getTerminalPrinterStatus(terminalId)
   }
+
+  listPublicTerminals() {
+    return this.admin.listPublicTerminals()
+  }
 }

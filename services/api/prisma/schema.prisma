@@ -266,6 +266,22 @@ model Order {
   endUserId  String?
   terminalId String?
 
+  // M2 第一片：小程序预提交只创建 Order，支付成功并到机释放后才创建 PrintTask。
+  // 文件内容与短签名 URL 不落 Order；仅保存稳定文件 ID、服务端哈希和白名单参数快照。
+  sourceFileId     String?
+  sourceFileSha256 String?
+  sourceFileName   String?
+  printParamsJson  String @default("{}")
+
+  // 到机码明文采用现有 SECRET_ENCRYPTION_KEY 加密，hash 用于精确查询与唯一约束；
+  // 日志、审计、Admin 视图均不得返回 codeEnc。
+  pickupCodeHash      String?   @unique
+  pickupCodeEnc       String?
+  pickupCodeCreatedAt DateTime?
+  pickupCodeExpiresAt DateTime?
+  pickupStatus        String    @default("none") // none | pending | claimed | used | expired | cancelled
+  pickupClaimedAt     DateTime?
+
   // 整数「分」存储,绝不用浮点。C5-2 起接真报价（PricingService），amountCents = 应付金额（>=0）。
   amountCents Int    @default(0)
   currency    String @default("CNY")
@@ -318,6 +334,7 @@ model Order {
   @@index([taskStatus])
   @@index([endUserId])
   @@index([terminalId])
+  @@index([pickupStatus, pickupCodeExpiresAt])
   @@index([createdAt])
 }
 
