@@ -54,3 +54,7 @@ page { background: var(--paper); }
 .sum-row { display: flex; flex-wrap: wrap; gap: 12rpx; }
 .sum-x { padding: 8rpx 16rpx; border-radius: 10rpx; font-size: 23rpx; font-weight: 700; }
 .sum-n { margin-top: 14rpx; font-size: 23rpx; color: var(--muted); line-height: 1.6; }
+.cr-nav { min-height: 88rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: space-between; }
+.cr-nav-title { font-size: 34rpx; font-weight: 750; color: var(--ink); }
+.cr-back, .cr-back-ph { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }
+.cr-back .ficon { width: 30rpx; height: 30rpx; transform: rotate(180deg); color: var(--ink-soft); }

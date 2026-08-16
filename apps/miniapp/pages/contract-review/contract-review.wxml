@@ -1,9 +1,19 @@
 <view class="cr-page">
+  <!-- app.json 全局 navigationStyle:"custom"，每页必须自画状态栏占位与导航栏。
+       此前遗漏导致页面内容被状态栏压住（真机验证发现）。 -->
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="cr-nav">
+    <view class="cr-back tap" hover-class="tap-press" bindtap="back" role="button" aria-label="返回">
+      <text class="ficon i-right"></text>
+    </view>
+    <view class="cr-nav-title">合同审查</view>
+    <view class="cr-back-ph"></view>
+  </view>
   <scroll-view class="cr-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="cr-body">
 
       <block wx:if="{{step === 'pick'}}">
-        <view class="cr-lead">拍下合同，AI 逐条指出需要留意的条款。结果仅供参考，不构成法律意见。</view>
+        <view class="cr-lead">上传或拍下合同，AI 逐条指出需要留意的条款。结果仅供参考，不构成法律意见。</view>
         <view class="cr-sec">这是什么材料</view>
         <view class="type-grid">
           <view class="type-item {{contractType === item.value ? 'on' : ''}} tap" wx:for="{{types}}" wx:key="value"
@@ -11,8 +21,8 @@
             {{item.label}}
           </view>
         </view>
-        <view class="cr-cta tap" hover-class="tap-press" bindtap="pickFile" role="button" aria-label="拍照或从相册选择合同">拍照 / 从相册选择</view>
-        <view class="cr-note">整页拍清楚，避免反光与遮挡。字太小时分多次拍。</view>
+        <view class="cr-cta tap" hover-class="tap-press" bindtap="pickFile" role="button" aria-label="选择合同：拍照、从相册选择，或从微信聊天中选择文件">选择合同</view>
+        <view class="cr-note">可以拍照、从相册选，也可以从微信聊天里选已有文件（{{formatHint}}，15MB 以内）。拍照时整页拍清楚，避免反光与遮挡；字太小时分多次拍。合同已有电子版时，直接选原文件比拍照识别更准。</view>
       </block>
 
       <block wx:elif="{{step === 'consent'}}">
@@ -51,7 +61,7 @@
           <view class="scope-row"><text class="scope-k">本次分析</text><text class="scope-v">前 {{pages.analyzed}} 页</text></view>
         </view>
         <view class="cr-warn" wx:if="{{pages.truncated}}">超出部分不会被分析，也不会出现在结果里。</view>
-        <view class="cr-warn" wx:if="{{pages.lowOcr}}">照片清晰度较低，文字识别可能有遗漏，建议重拍后重新上传。</view>
+        <view class="cr-warn" wx:if="{{pages.lowOcr}}">文字识别清晰度较低，可能有遗漏。建议重拍更清晰的照片，或改用合同的原始电子文件后重新上传。</view>
 
         <view class="ck-row tap" hover-class="tap-press" bindtap="toggleOk" data-k="coverage"
               role="checkbox" aria-label="确认识别页数与要审查的合同一致">

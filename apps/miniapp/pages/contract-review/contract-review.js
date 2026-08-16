@@ -14,10 +14,43 @@
 //   5. 合同属敏感个人信息，用户中途放弃时主动 DELETE，不留到自动清理。
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const uploadNames = require('../../utils/upload-name')
 
 const SELF_ROUTE = '/pages/contract-review/contract-review'
 const POLL_MS = 2000
 const MAX_POLLS = 150   // 约 5 分钟；OCR + 规则 + 模型串行，比单次 AI 调用长得多
+
+/**
+ * 「从微信聊天选文件」的扩展名白名单。
+ *
+ * 这不是抄 print_doc 的白名单，是服务端两道闸门的**交集**：
+ *   1. 上传闸门 file-validation.ts:104 —— contract_upload 的 mimes 是 PDF_DOC_IMG，
+ *      即 pdf / doc / docx / jpg / jpeg / png / webp；
+ *   2. 提取闸门 contract-review-extraction.service.ts:167-177 resolveSupportedKind()
+ *      只认 pdf / docx / jpg / jpeg / png / webp，并在 :176 对
+ *      `mime === DOC_MIME || extension === '.doc'` 显式 return null → :214
+ *      抛 CONTRACT_UNSUPPORTED_FILE_TYPE。
+ *
+ * 所以 .doc 是「传得上去、审不了」：放进选择器等于让用户走完同意流程、上传、
+ * 建任务，再在提取阶段失败。宁可在选择器里就不给它，也不制造这种白等。
+ * 反过来 webp 两道闸门都明确支持（:175），故保留。
+ */
+const CHAT_FILE_EXTENSIONS = ['pdf', 'docx', 'jpg', 'jpeg', 'png', 'webp']
+
+/** 给用户看的格式说明，必须与 CHAT_FILE_EXTENSIONS 同步，别让提示和实际能选的不一致。 */
+const FORMAT_HINT = 'PDF、DOCX 或 JPG / PNG / WEBP 图片'
+
+/**
+ * 上传大小上限。/files/kiosk-upload 是服务端代理上传，实际生效的是
+ * min(contract_upload 的 20MB, PROXY_MAX_BYTES 15MB) = 15MB
+ * （file-validation.ts:123 与 :203-204）。按 20MB 提示会让用户白传一次。
+ */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
+/** 用户主动取消不是失败，不该在页面上留一行红字。 */
+function isCancel(err) {
+  return /cancel/i.test((err && err.errMsg) || '')
+}
 
 const STAGE_TEXT = {
   uploaded:          '已上传，排队中…',
@@ -93,10 +126,14 @@ function buildScopeRows(d) {
 
 Page({
   data: {
+    statusBarHeight: 20,
     step: 'pick',          // pick → consent → running → confirm → running → report
+    // 页面上的格式说明直接取常量，避免文案和实际能选的扩展名各改各的。
+    formatHint: FORMAT_HINT,
     types: [],
     contractType: '',
     filePath: '',
+    fileName: '',          // 送给服务端落库的可读文件名，见 utils/upload-name.js
     // consent-scope 拆开后的展示字段（顶层没有 disclaimerVersion，版本在 disclaimer.version）
     scopeRows: [],
     consentVersion: '',
@@ -117,6 +154,7 @@ Page({
   },
 
   onLoad() {
+    this.setData({ statusBarHeight: (getApp().globalData || {}).statusBarHeight || 20 })
     this._stopped = false
     this._scope = null     // consent-scope 原样返回，只在提交时读，不进 data
     this._pending = null   // 待确认的分析范围，必须与服务端逐字段相等
@@ -145,20 +183,101 @@ Page({
     if (this.data.reviewId && !this.data.report) this._discard()
   },
 
+  back() { wx.navigateBack({ delta: 1 }) },
+
   pickType(e) { this.setData({ contractType: e.currentTarget.dataset.value, error: '' }) },
 
+  /**
+   * 原来只有 wx.chooseMedia 一条路径，等于要求「合同必须是纸的」。
+   * 现实里劳动合同、offer、竞业协议多半本来就是电子版 PDF/DOCX，躺在微信聊天里；
+   * 只给拍照就是逼用户把屏幕拍成照片再让 OCR 去猜——既多一道损耗，也更容易低置信度。
+   * 补一条 wx.chooseMessageFile 路径（小程序没有直接调起手机文件管理器的能力，
+   * 「微信聊天」是唯一可选已有文件的通道），后端 purpose=contract_upload 对来源无假设，
+   * 不需要改服务端。
+   */
   pickFile() {
     if (!this.data.contractType) { this.setData({ error: '请先选择合同类型' }); return }
+    wx.showActionSheet({
+      itemList: ['拍照或从相册选择', '从微信聊天中选择文件'],
+      success: (res) => {
+        if (res.tapIndex === 0) this._pickFromCamera()
+        else this._pickFromChat()
+      },
+      fail: (err) => {
+        if (isCancel(err)) return
+        this.setData({ error: '无法打开选择菜单，请重试' })
+      },
+    })
+  },
+
+  _pickFromCamera() {
     wx.chooseMedia({
       count: 1, mediaType: ['image'], sourceType: ['camera', 'album'],
       sizeType: ['original'],   // 合同要 OCR，压缩会吃掉小字
       success: (res) => {
         const f = (res.tempFiles || [])[0]
-        if (!f || !f.tempFilePath) return
-        this.setData({ filePath: f.tempFilePath })
-        this._loadScope()
+        if (!f || !f.tempFilePath) { this.setData({ error: '未取到照片，请重试' }); return }
+        // 拍照/相册的临时文件叫 tmp_8a3f… 这类系统名，没有「原始文件名」可言，
+        // 按来源和时间生成可读名不是伪造，是如实描述它是什么时候拍的。
+        // 扩展名必须沿用真实临时文件的扩展名：后端既校验扩展名与 MIME 一致
+        // （FILE_EXT_MISMATCH），又对真实字节做魔数校验（content-sniff.ts）。
+        const ext = uploadNames.extOf(f.tempFilePath) || 'jpg'
+        this._accept(f.tempFilePath, uploadNames.cameraFileName(ext), f.size)
+      },
+      fail: (err) => {
+        if (isCancel(err)) return
+        this.setData({ error: '无法打开相机或相册，请在微信设置里确认已允许访问' })
       },
     })
+  },
+
+  _pickFromChat() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: CHAT_FILE_EXTENSIONS,
+      success: (res) => {
+        const f = (res.tempFiles || [])[0]
+        if (!f || !f.path) { this.setData({ error: '未取到文件，请重试' }); return }
+        // f.name 才是用户在聊天里看到的真实文件名；f.path 是 tmp_xxx 临时名。
+        // 提取阶段按「mimeType + 扩展名」配对判定，所以文件名必须原样带到服务端。
+        const named = uploadNames.pickedFileName(f.name, f.path)
+        const ext = uploadNames.extOf(named) || uploadNames.extOf(f.path)
+        // extension 过滤在个别客户端/来源上不生效，这里按最终文件名再判一次：
+        // 与其让用户等到上传 400 或提取阶段 CONTRACT_UNSUPPORTED_FILE_TYPE，
+        // 不如当场说清楚不支持哪种格式。
+        if (CHAT_FILE_EXTENSIONS.indexOf(ext) < 0) {
+          this.setData({
+            error: `暂不支持${ext ? ` .${ext} ` : '该'}格式，请选择 ${FORMAT_HINT}`,
+          })
+          return
+        }
+        this._accept(f.path, named, f.size)
+      },
+      fail: (err) => {
+        if (isCancel(err)) return
+        this.setData({ error: '无法打开微信聊天文件，请重试' })
+      },
+    })
+  },
+
+  /**
+   * 选中文件后的统一入口。本地能判死的先判掉——超限和空文件不拦，
+   * 用户会走完整个同意流程再撞上传失败，白填一遍。
+   */
+  _accept(filePath, fileName, sizeBytes) {
+    const size = Number(sizeBytes)
+    if (Number.isFinite(size) && size > MAX_UPLOAD_BYTES) {
+      const mb = (size / 1024 / 1024).toFixed(1)
+      this.setData({ error: `文件 ${mb}MB，超出 15MB 上限，请压缩后再传，或分次上传` })
+      return
+    }
+    if (Number.isFinite(size) && size <= 0) {
+      this.setData({ error: '这个文件是空的，请重新选择' })
+      return
+    }
+    this.setData({ filePath, fileName, error: '' })
+    this._loadScope()
   },
 
   /** 取同意范围。取不到就不往下走——没有它 create 必然 400，且用户也没被真正告知。 */
@@ -198,7 +317,7 @@ Page({
   },
 
   agree() {
-    const { filePath, contractType, sensitiveRequired, sensitiveAgreed } = this.data
+    const { filePath, fileName, contractType, sensitiveRequired, sensitiveAgreed } = this.data
     const scope = this._scope
     if (!scope || this.data.busy) return
     if (sensitiveRequired && !sensitiveAgreed) {
@@ -215,7 +334,7 @@ Page({
       .then(() => {
         if (this._stopped) return null
         this.setData({ statusText: '正在上传合同…' })
-        return api.uploadContractFile(filePath)
+        return api.uploadContractFile(filePath, fileName)
       })
       .then((up) => {
         if (this._stopped || !up) return null
@@ -281,7 +400,7 @@ Page({
     return api.getContractReview(id).then(t => {
       if (this._stopped) return
       if (t.status === 'completed') return this._showResult(t)
-      if (t.status === 'failed')    { this._reset('分析失败，请重新上传更清晰的照片'); return }
+      if (t.status === 'failed')    { this._reset('分析失败，请换更清晰的照片或合同原始文件重试'); return }
       if (t.status === 'cancelled') { this._reset('任务已取消'); return }
       if (t.status === 'expired')   { this._reset('任务已过期，请重新发起'); return }
       if (t.status === 'awaiting_confirmation') return this._toConfirm(t)
@@ -299,7 +418,7 @@ Page({
   _toConfirm(t) {
     if (!Number.isSafeInteger(t.totalPages) || t.totalPages < 1) {
       // 页数对不上就无法通过服务端的 matchesExtraction 校验，这条任务走不下去了。
-      this._reset('未能识别出合同页数，请重新拍摄更清晰的照片')
+      this._reset('未能识别出合同页数，请换更清晰的照片或合同原始文件重试')
       return
     }
     this._pending = {
@@ -399,7 +518,7 @@ Page({
     this._discard()
     this._pending = null
     this.setData({
-      step: 'pick', reviewId: '', report: null, filePath: '', error: message || '',
+      step: 'pick', reviewId: '', report: null, filePath: '', fileName: '', error: message || '',
       pages: null, okCoverage: false, okPersonal: false, sensitiveAgreed: false, busy: false,
     })
   },
