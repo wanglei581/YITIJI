@@ -38,6 +38,7 @@ export type AiModelFeatureKey =
   | 'self_assessment'
   | 'job_recommend'
   | 'job_explain'
+  | 'print_param_prefill'
   | 'digital_human'
   | 'poster_generation'
 
@@ -200,6 +201,25 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     runtimeNote: '已被岗位解读运行链路消费（job-ai-llm.service.ts jobExplain）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
+  },
+  // ── S3-1：打印参数预填（P06）─────────────────────────────────────────────
+  // 独立功能位，**不继承 resume_optimize**：它与简历链没有任何依赖关系，挂在共用键上
+  // 会重演风险 R3（一个开关连坐多个能力）。
+  //
+  // ⚠️ 本键与其它键有一处本质不同：**它不发起模型调用**。
+  // 预填是确定性规则（读文件体检的页数/格式/像素，套已验证打印能力边界），
+  // 因此 vendor / model / baseURL / apiKey / temperature / systemPrompt 对它**全部无效**，
+  // 运行端只读 enabled 这一个字段当开关（见 print-param-suggestion.service.ts）。
+  // 特意不走 isReady()：否则「没配大模型凭证」会连带把「数页数」也关掉，属于假耦合。
+  {
+    key: 'print_param_prefill',
+    label: '打印参数预填',
+    status: 'active',
+    description:
+      '用于文件上传体检完成后，预填打印参数（份数 / 黑白彩色 / 单双面 / 每页张数）并给出每项依据。只建议不裁决，用户可改；不参与核价、收银与出纸判定。',
+    runtimeNote:
+      '已被打印参数预填运行链路消费（materials/print-param-suggestion.service.ts）。⚠️ 本能力是确定性规则推导，**不调用大模型**：厂商 / 模型 / API Key / 温度 / System Prompt 对它无效，只有「启用」开关生效。关闭后前台会明确显示「预填不可用，四项都需要你自己设」，打印流程不受影响。',
+    allowCustomSystemPrompt: false,
   },
   {
     key: 'mock_interview',
