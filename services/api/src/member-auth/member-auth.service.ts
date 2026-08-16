@@ -474,6 +474,29 @@ export class MemberAuthService {
       throw this.accountUnavailable()
     }
 
+    // 闸门：法务版本过期则不得续签。
+    //
+    // 这里修正了本方法初版的一个错误论证。初版理由是「续签是既有会话的
+    // 延续，一个 token 未过期的用户同样不会被要求重新同意」——该理由只在
+    // 单个 30 分钟窗口内成立。客户端在 401 时自动补签，使续签可以无限接力，
+    // 没有绝对会话上限，等于让用户永远不再经过 assertConsentMatches。
+    // 结果是隐私政策改版后，只有从未安装或清过缓存的用户会看到新版本。
+    const active = await this.resolveActiveLegalVersions()
+    const latest = await this.prisma.memberLegalConsent.findFirst({
+      where: { endUserId: existing.id },
+      orderBy: { createdAt: 'desc' },
+      select: { termsVersion: true, privacyVersion: true },
+    })
+    if (
+      !latest ||
+      latest.termsVersion !== active.termsVersion ||
+      latest.privacyVersion !== active.privacyVersion
+    ) {
+      throw new UnauthorizedException({
+        error: { code: 'MEMBER_LEGAL_VERSION_STALE', message: '服务条款已更新，请重新登录并确认' },
+      })
+    }
+
     await this.prisma.endUser.update({
       where: { id: existing.id },
       data: { lastLoginAt: new Date() },
