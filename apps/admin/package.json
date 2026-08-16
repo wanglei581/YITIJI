@@ -18,6 +18,7 @@
     "verify:data-request-ui": "node ../kiosk/scripts/verify-data-request-ui.mjs",
     "verify:admin-users-ui": "node scripts/verify-admin-users-ui.mjs",
     "verify:honest-placeholders": "node scripts/verify-honest-placeholders.mjs",
+    "verify:source-publish-actions": "node scripts/verify-source-publish-actions.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
     "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",

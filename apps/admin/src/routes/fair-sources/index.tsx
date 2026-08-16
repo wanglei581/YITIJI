@@ -286,7 +286,7 @@ export default function FairSourcesPage() {
                                 </button>
                               </>
                             )}
-                            {s.reviewStatus === 'approved' && s.publishStatus === 'draft' && (
+                            {s.reviewStatus === 'approved' && s.publishStatus !== 'published' && (
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
