@@ -102,8 +102,13 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     AdvisorArtifact —— 真实产物（可查 / 可打印 / 可保存）
  *   刻意**没有** AdvisorTurn：设计页对用户承诺「对话不保存」，
  *   问答上下文只在进程内存里，详见 prisma/schema.prisma 里 AdvisorSession 上方的说明。
+ * - 91（本次，S3-2 · P21 政策条件核对，+1）：
+ *     PolicyEligibilityRule —— 政策的结构化申领条件。此前 PolicyPost 只有一段
+ *     富文本 content + 一个 audience 单标签，两者都不可机读；前台展示的
+ *     「申领条件」是硬编码模板，与该条政策无关。判定为确定性比对（证据 E2），
+ *     支持 unknown 三态，不接模型 —— 政策口径不得由 AI 编造。
  */
-const EXPECTED_MODEL_COUNT = 90
+const EXPECTED_MODEL_COUNT = 91
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
