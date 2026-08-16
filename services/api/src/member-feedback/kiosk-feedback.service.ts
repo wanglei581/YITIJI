@@ -83,6 +83,12 @@ export class KioskFeedbackService {
 
     // 3) 分类由 issueCode 映射得到；再对既有枚举做一次防御性校验，
     //    映射表写错也不会把非法 category 落库。
+    //
+    //    这里的 category 是**权威分类**（服务端从封闭词表机械推出，来源可由 submitterType 判定）。
+    //    未来若接 AI 归类/聚类，只能新增可空的「AI 建议」字段，不得覆写本字段，
+    //    也不得据此改 status —— 工单处置权始终在 Admin 侧。
+    //    本批次不预留该字段：其形状（建议值/置信度/模型与提示词版本/聚类 id）现在无法确定，
+    //    且日后新增可空列同样是纯 additive 迁移，现在猜一个反而要改。
     const category = dto.issueCode ? KIOSK_FEEDBACK_ISSUE_MAP[dto.issueCode].category : 'general'
     if (!(FEEDBACK_CATEGORIES as readonly string[]).includes(category)) {
       badRequest('FEEDBACK_CATEGORY_INVALID', '反馈分类不支持')

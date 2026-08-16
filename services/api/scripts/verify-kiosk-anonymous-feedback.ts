@@ -315,9 +315,14 @@ async function main() {
 
     // 幂等命中不建行 → 不吃额度：额度已满的终端上重复提交老内容仍回原单。
     const before = await prisma.feedbackTicket.count({ where: { terminalId: T('rate') } })
-    const repeat = await kiosk.submit(await through({
-      terminalId: T('rate'), issueCode: 'other', content: '第 0 条互不相同的现场问题描述',
-    }))
+    let repeat: Awaited<ReturnType<typeof kiosk.submit>>
+    try {
+      repeat = await kiosk.submit(await through({
+        terminalId: T('rate'), issueCode: 'other', content: '第 0 条互不相同的现场问题描述',
+      }))
+    } catch (e) {
+      fail(`4g. 重复提交本应命中幂等直接回原单，却被限流拦下（${errCode(e) ?? (e as Error).message}）`)
+    }
     const after = await prisma.feedbackTicket.count({ where: { terminalId: T('rate') } })
     if (!repeat.deduplicated || after !== before) fail(`4g. 幂等命中消耗了额度或建了新行：${before} → ${after}`)
     pass('4g. 幂等命中不建行、不吃额度（额度已满的终端上重复提交仍回原单而非 429）')

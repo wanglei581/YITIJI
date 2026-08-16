@@ -382,6 +382,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
@@ -621,6 +622,7 @@ jobs:
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-anonymous-feedback
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
