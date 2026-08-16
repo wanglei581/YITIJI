@@ -321,6 +321,8 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 
 /* 磁贴颜色：浅色 wash 底 + 同色描边 + 深色图标（去饱和"糖果块"感） */
 .a-teal   { background: var(--teal-wash);  color: var(--teal-deep);  border: 1px solid rgba(35,84,230,.16); }
+/* ai 页「发起打印」用到 a-cyan；此前只有 me.wxss 的页面级 .tone-cyan，管不到这里 */
+.a-cyan   { background: #E0F7F3;            color: #0F766E;           border: 1px solid rgba(15,118,110,.16); }
 .a-clay   { background: var(--clay-wash);  color: var(--clay-deep);  border: 1px solid rgba(211,77,36,.18); }
 .a-wheat  { background: var(--wheat-wash); color: var(--wheat-deep); border: 1px solid rgba(226,150,12,.20); }
 .a-plum   { background: var(--plum-wash);  color: var(--plum-deep);  border: 1px solid rgba(124,58,237,.16); }

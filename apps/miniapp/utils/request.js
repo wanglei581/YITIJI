@@ -60,9 +60,14 @@ function silentResignin() {
  */
 function request(path, options = {}) {
   return rawRequest(path, options).catch((err) => {
+    // 必须要求「原本有 token」才补签。否则退出登录后的任何一次
+    // 需鉴权请求都会 401 → 静默 wx.login → 服务端凭 openid 认出账号
+    // → 用户又被登录回来。一体机是共用设备，退不出去是隐私问题。
+    // 无 token 的 401 是「未登录」，正确行为是让页面走登录引导。
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
-      && !options._retried;
+      && !options._retried
+      && !!auth.getToken();
     if (!retriable) throw err;
 
     return silentResignin().then(
@@ -201,7 +206,8 @@ function uploadFile(path, filePath, options = {}) {
           }
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
-          auth.clearSession();
+          // 与 rawRequest 一致：不在此清会话。上传是合同审查等流程的
+          // 第一个鉴权调用，过期即清会话会让用户「上传失败还被登出」。
           reject(makeError('登录已失效,请重新登录', 401));
         } else {
           reject(extractError(body, statusCode));
