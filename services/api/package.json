@@ -219,6 +219,7 @@
     "verify:aigc-pdf-metadata": "node -r @swc-node/register scripts/verify-aigc-pdf-metadata.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
+    "verify:ai-user-text-retention": "node -r @swc-node/register scripts/verify-ai-user-text-retention.ts",
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
     "verify:offline-agencies-page": "node -r @swc-node/register scripts/verify-offline-agencies-page.ts",
     "verify:offline-agencies-contract": "node -r @swc-node/register scripts/verify-offline-agencies-contract.ts",

@@ -470,6 +470,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:member-data-retention
+          pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
@@ -604,6 +605,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:companies

@@ -6,6 +6,7 @@ import { AdvisorController } from './advisor.controller'
 import { AdvisorService } from './advisor.service'
 import { AdvisorArtifactService } from './advisor-artifact.service'
 import { AdvisorPdfService } from './advisor-pdf.service'
+import { AdvisorRetentionTask } from './advisor-retention.task'
 import { LlmAdvisorService } from './llm-advisor.service'
 
 /**
@@ -36,6 +37,15 @@ import { LlmAdvisorService } from './llm-advisor.service'
     }),
   ],
   controllers: [AdvisorController],
-  providers: [AdvisorService, AdvisorArtifactService, AdvisorPdfService, LlmAdvisorService],
+  providers: [
+    AdvisorService,
+    AdvisorArtifactService,
+    AdvisorPdfService,
+    LlmAdvisorService,
+    // 留存清理：三张 advisor 表落的是用户原话，过期后必须物理删除而不是只在
+    // 读路径挡掉（详见 advisor-retention.task.ts 顶部注释）。cron 由 AppModule
+    // 顶层的 ScheduleModule.forRoot() 驱动。
+    AdvisorRetentionTask,
+  ],
 })
 export class AdvisorModule {}
