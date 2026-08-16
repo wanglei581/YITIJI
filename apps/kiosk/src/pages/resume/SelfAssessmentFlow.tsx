@@ -11,15 +11,10 @@
 //
 // ── S2-7 接线（接线矩阵 §四 S2-7 / §2.2 P28 行）─────────────────────────────
 // 本页的分工在接线时必须一直成立，它是「AI 是加速器不是前置条件」的落点：
-//   记分（strength + 依据题号）= 固定权重纯函数，服务端 `self-assessment-scoring.ts`
-//     不读库、不写日志、不调 LLM ⇒ **AI 挂了也照常出**，标 E1/E2，不标 E3。
+//   记分（strength + 依据题号）= 固定权重纯函数（服务端 `self-assessment-scoring.ts`
+//     不读库、不写日志、不调 LLM）⇒ 标 E1/E2，**AI 挂了也照常出**；
 //   解读（summary + 每维 note）= 唯一由 LLM 产出的东西 ⇒ 标 E3，AI 挂了如实缺。
-// 因此本页只有「解读区」被 AiTaskRegion 包住，记分区永远在外面直接渲染。
-//
-// AI 可用性取的是后端真值，不是前端猜的：
-//   providerName === 'llm_unavailable' → LLM 调不通（`llm-self-assessment.service.ts:113-118`）
-//   status === 'rejected'              → 整体合规拒答（同文件 :136-143，或 submit 层 catch）
-//   解读全空（parse 失败软拒到底）      → 也按失败处理，不把「没生成出来」画成「生成完了但为空」
+// 所以只有「解读区」被 AiTaskRegion 包住，记分区永远在外面直接渲染。
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -92,9 +87,9 @@ function SelfAssessmentFullscreenFrame({ children }: { children: ReactNode }) {
 }
 
 /**
- * 置灰但仍可读到原因的动作按钮。
- * 用 `aria-disabled` 而不是原生 `disabled`：原生 disabled 会把按钮踢出 Tab 序列、
- * 读屏直接跳过，用户永远读不到「为什么灰」（与 `ai/AiTaskRegion.tsx` 同一口径）。
+ * 置灰但仍可读到原因的动作按钮。用 `aria-disabled` 而不是原生 `disabled` ——
+ * 原生 disabled 会把按钮踢出 Tab 序列、读屏直接跳过，用户永远读不到「为什么灰」
+ * （与 `ai/AiTaskRegion.tsx` 同一口径，`verify:ai-artifact-print-url-contract` 守着）。
  */
 function GuardedButton({
   blockedReason,
@@ -107,7 +102,6 @@ function GuardedButton({
   children: ReactNode
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
   size?: 'sm' | 'md' | 'lg'
-  className?: string
 }) {
   const blocked = Boolean(blockedReason)
   return (
@@ -282,10 +276,9 @@ export function SelfAssessmentQuizPage() {
   }
 
   /**
-   * 交卷 = 存盘 + 换页。**提交请求本身不在这一页发**：
-   * 一次 `POST /resume/self-assessment` 里同步跑着 LLM 解读，那段等待是本页唯一
-   * 真实的「AI 在算」窗口，必须发生在能把 `data-aitask=running` 画出来的地方
-   * （结果页的 AiTaskRegion），而不是让用户对着一个写死「提交中…」的按钮干等。
+   * 交卷 = 存盘 + 换页。**提交请求本身不在这一页发**：`POST` 里同步跑着 LLM 解读，
+   * 那段等待是本流程唯一真实的「AI 在算」窗口，必须发生在能把 `data-aitask=running`
+   * 画出来的地方（结果页的 AiTaskRegion），而不是一个写死「提交中…」的按钮。
    */
   const handOff = () => {
     // 同意门禁：没有当前版本的显式同意就不往下走 —— 下一步会把作答送去调模型。
@@ -407,8 +400,7 @@ export function SelfAssessmentResultPage() {
   const result = session.result ?? null
   const taskId = session.taskId ?? result?.taskId ?? linkedTaskId
   const consentOk = hasCurrentConsent(session)
-  // 依赖必须是稳定引用：这个 effect 一旦被重复触发，清理函数会把上一发请求的
-  // active 置假、把已经回来的结果丢掉。
+  // 依赖必须是稳定引用，否则下面那个 effect 会被反复触发。
   const pendingAnswers = useMemo(() => flattenAnswers(session.answers), [session.answers])
   const pendingComplete = useMemo(() => {
     const { done, total } = progress(questionsFor(session.consent.sensitive === true), session.answers)
@@ -425,14 +417,12 @@ export function SelfAssessmentResultPage() {
   }, [])
 
   /**
-   * 本页负责两件网络事，二者互斥，都由真实生命周期驱动，没有任何计时器：
-   *   submit —— 作答完成后交卷（服务端在这一次调用里同步跑 LLM 解读）；
+   * 本页两件网络事，互斥，都由真实生命周期驱动，没有任何计时器：
+   *   submit —— 交卷（服务端在这一次调用里同步跑 LLM 解读）；
    *   fetch  —— 带 `?taskId=` 深链回看时按编号读回（GET /:taskId 的唯一消费点）。
    * 同意门禁在这里再拦一次：`consentOk` 为假一律不发 submit，深链绕不过去。
-   *
-   * 去重靠 `startedRef` 记住已经发过的那一发，**不靠 cleanup 里的 active 标志** ——
-   * effect 一旦重演（StrictMode 或依赖变动），cleanup 会把上一发的回调作废，
-   * 而去重又拦下第二发，结果就是永远停在「正在生成」。
+   * 去重靠 `startedRef`，**不靠 cleanup 里的 active 标志** —— effect 一旦重演，
+   * cleanup 作废上一发、去重又拦下第二发，结果是永远停在「正在生成」。
    */
   useEffect(() => {
     if (result) return
@@ -474,15 +464,12 @@ export function SelfAssessmentResultPage() {
   }, [attempt, consentOk, getToken, linkedTaskId, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive])
 
   // ── AI 任务四态（S1-1）。取的全是后端真值，前端没有可以自行推进的地方。 ──
-  //
-  // availability 的三档怎么判（不猜、不写死 available）：
-  //   unavailable —— 后端明说 LLM 调不通（`llm-self-assessment.service.ts:113-118`
-  //                  的降级出口把 providerName 置成 'llm_unavailable'）；
-  //   available   —— 已经拿到本次响应，或本次调用正在飞（还没有任何不可用的反证，
-  //                  且这一刻服务端确实在跑）；
-  //   unknown     —— 既没发出调用也没有响应。fail-closed 停在 idle，不画进度。
-  // 本项目没有 AI 专用健康探针，`useApiReadiness` 只证明 API 可达 —— 拿它当
-  // AI 可用性会是过度宣称，所以这里只认「这次调用自己的返回」。
+  //   unavailable —— 后端明说 LLM 调不通（`llm-self-assessment.service.ts:113-118`）；
+  //   available   —— 已拿到本次响应，或本次调用正在飞（尚无不可用的反证）；
+  //   unknown     —— 既没发调用也没有响应，fail-closed 停 idle，不画进度。
+  // 本项目没有 AI 专用健康探针，`useApiReadiness` 只证明 API 可达，拿它当 AI 可用性
+  // 是过度宣称 —— 这里只认「这次调用自己的返回」。
+  // failed 还含「解读全空」：不把「没生成出来」画成「生成完了但内容为空」。
   const hasInterpretation = (result?.dimensions.some((d) => Boolean(d.note)) ?? false) || Boolean(result?.summary)
   const aiUnavailable = result?.providerName === 'llm_unavailable'
   const availability: AiAvailability = aiUnavailable ? 'unavailable' : result || inflight ? 'available' : 'unknown'
@@ -624,19 +611,13 @@ export function SelfAssessmentResultPage() {
           <dl>
             <div><dt>记录编号</dt><dd className="self-assessment-lightflow__mono">{taskId}</dd></div>
             {completedAt && <div><dt>同意时间</dt><dd>{completedAt}</dd></div>}
-            <div>
-              <dt>同意版本</dt>
-              <dd>{session.consentVersion ?? '本机会话未记录（本次结果由记录编号读回）'}</dd>
-            </div>
+            <div><dt>同意版本</dt><dd>{session.consentVersion ?? '本机会话未记录（本次结果由记录编号读回）'}</dd></div>
             <div><dt>保留至</dt><dd>{expiresAt ?? '未返回到期时间（撤回后或整体拒答时无到期）'}</dd></div>
           </dl>
         </Card>
 
-        {/*
-          AI 只负责这一块。它挂了不影响下面的维度强度与依据题号。
-          走到这里 result 一定在手，四态只可能是 done / failed；
-          running / idle 由上面「还没有结果」那一支负责，不在这里重复挂一遍。
-        */}
+        {/* AI 只负责这一块，它挂了不影响下面的维度强度与依据题号。走到这里 result
+            一定在手，四态只可能是 done / failed，running / idle 由上一支负责。 */}
         <AiTaskRegion
           task={task}
           label="AI 陈述式解读"
@@ -723,9 +704,7 @@ function DimensionsGrid({ result, aiFailed }: { result: SelfAssessmentSubmitResp
         </span>
       </p>
       <div className="self-assessment-lightflow__grid">
-        {result.dimensions.map((d) => (
-          <DimensionCard key={d.key} d={d} aiFailed={aiFailed} />
-        ))}
+        {result.dimensions.map((d) => <DimensionCard key={d.key} d={d} aiFailed={aiFailed} />)}
       </div>
     </section>
   )
@@ -738,9 +717,7 @@ function DimensionCard({ d, aiFailed }: { d: SelfAssessmentDimensionResult; aiFa
         <h3>{d.label}</h3>
         <span className="self-assessment-lightflow__strength">强度 {d.strength}/5</span>
       </header>
-      {d.note ? (
-        <AiConclusion text={d.note} />
-      ) : (
+      {d.note ? <AiConclusion text={d.note} /> : (
         <p className="self-assessment-lightflow__muted">
           {aiFailed ? '本次解读未生成 —— 缺的只是这段文字，强度与依据题号已经算出来了。' : '本维度解读未生成。'}
         </p>
@@ -758,13 +735,11 @@ function DimensionCard({ d, aiFailed }: { d: SelfAssessmentDimensionResult; aiFa
 // ============================================================
 // 4) 记录页（生产口径：独立路由，不是结果页里的一个阶段）
 //
-// 与原型的切分差异（缺页规划 #619 G-11）：原型 `28-self-assessment.html` 把「往期记录」
-// 做成同一页的 s4 阶段；生产上它是 `/resume/self-assessment/history` 独立路由，
-// 已被 verify-fusion-w5 / w6 的路由清单锁定。**以生产的独立路由为准**：
-// 结果页只回答「这次是什么」，本页只回答「我做过没有、去哪看明细」，各自一屏一件事。
-//
-// 诚实边界：服务端没有「按人列出历次自我探索」的端点（只有 GET /:taskId 按编号读回），
-// 所以本页不编列表 —— 只显示当前会话的这一次，跨次明细指向「我的 → AI 服务记录」。
+// 切分差异（缺页规划 #619 G-11）：原型把「往期记录」做成同一页的 s4 阶段，生产是
+// 独立路由且被 verify-fusion-w5 / w6 的路由清单锁定 —— **以生产的独立路由为准**：
+// 结果页只回答「这次是什么」，本页只回答「我做过没有、去哪看明细」，一屏一件事。
+// 诚实边界：服务端没有「按人列出历次」的端点（只有 GET /:taskId 按编号读回），
+// 所以本页不编列表 —— 只显示当前会话这一次，跨次明细指向「我的 → AI 服务记录」。
 // ============================================================
 export function SelfAssessmentHistoryPage() {
   const navigate = useNavigate()
