@@ -132,8 +132,37 @@ Page({
     })
   },
 
+  // 原来只有 wx.chooseMessageFile 一条路径。该 API 只能从「微信聊天会话」里选文件，
+  // 小程序没有直接调起手机文件管理器的能力——意味着手机里没有电子版文件的用户
+  // （身份证、体检表、工牌这类只有纸质原件的材料）必须先退出小程序、
+  // 把照片发给文件传输助手、再回来重选。这是打印链路上最靠前也最致命的流失点。
+  // 补一条拍照/相册路径，后端 /files/kiosk-upload 对来源无假设，不需要改服务端。
   upload() {
     if (this.data.uploading) return
+    wx.showActionSheet({
+      itemList: ['拍照或从相册选择', '从微信聊天中选择文件'],
+      success: (res) => {
+        if (res.tapIndex === 0) this._pickFromCamera()
+        else this._pickFromChat()
+      },
+    })
+  },
+
+  _pickFromCamera() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['camera', 'album'],
+      sizeType: ['original'], // 打印件不能压缩，压过的图打出来会糊
+      success: (res) => {
+        const file = (res.tempFiles || [])[0]
+        if (!file || !file.tempFilePath) return
+        this._doUpload(file.tempFilePath)
+      },
+    })
+  },
+
+  _pickFromChat() {
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
@@ -141,26 +170,30 @@ Page({
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file || !file.path) return
-        this.setData({ uploading: true })
-        wx.showLoading({ title: '正在上传…', mask: true })
-        api.uploadPrintFile(file.path)
-          .then(() => {
-            wx.hideLoading()
-            this.setData({ uploading: false })
-            wx.showToast({ title: '文件已上传', icon: 'success' })
-            this.loadDocuments()
-          })
-          .catch((err) => {
-            wx.hideLoading()
-            this.setData({ uploading: false })
-            wx.showModal({
-              title: '上传失败',
-              content: (err && err.message) || '网络异常，请稍后重试',
-              showCancel: false,
-            })
-          })
+        this._doUpload(file.path)
       },
     })
+  },
+
+  _doUpload(filePath) {
+    this.setData({ uploading: true })
+    wx.showLoading({ title: '正在上传…', mask: true })
+    api.uploadPrintFile(filePath)
+      .then(() => {
+        wx.hideLoading()
+        this.setData({ uploading: false })
+        wx.showToast({ title: '文件已上传', icon: 'success' })
+        this.loadDocuments()
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        this.setData({ uploading: false })
+        wx.showModal({
+          title: '上传失败',
+          content: (err && err.message) || '网络异常，请稍后重试',
+          showCancel: false,
+        })
+      })
   },
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
 })

@@ -67,7 +67,7 @@
       <view class="empty-slot">
         <text class="ficon i-folder es-ic"></text>
         <view class="es-t">暂无文件</view>
-        <view class="es-d">上传文件后可再次发起打印</view>
+        <view class="es-d">拍下纸质材料，或上传已有文件，之后可再次发起打印</view>
       </view>
     </view>
 
@@ -79,7 +79,7 @@
   </view>
 
   <view class="actionbar">
-    <view class="btn primary block {{uploading ? 'disabled' : ''}}" hover-class="tap-press" bindtap="upload">{{uploading ? '上传中…' : '上传新文件'}}</view>
+    <view class="btn primary block {{uploading ? 'disabled' : ''}}" hover-class="tap-press" bindtap="upload">{{uploading ? '上传中…' : '拍照或上传文件'}}</view>
   </view>
 
 </view>
