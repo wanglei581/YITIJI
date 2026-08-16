@@ -59,6 +59,7 @@ Page({
         title: '想清楚再决定',
         sub: '岗位、面试、方向',
         items: [
+          { id: 'contract',  icon: 'file-search', title: '合同审查', desc: '拍照逐条提示需留意条款', accent: 'clay'  },
           { id: 'match',     icon: 'link',    title: '岗位匹配', desc: '三档参考，不代表录用结果', accent: 'teal'  },
           { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按岗位出题并复盘',       accent: 'plum'  },
           { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
@@ -110,6 +111,7 @@ Page({
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',
       print:     '/pages/print/print',
+      contract:  '/pages/contract-review/contract-review',
       match:     '/pages/job-fit/job-fit',
       interview: '/pages/interview-entry/interview-entry',
       plan:      '/pages/career-plan/career-plan',

@@ -1,0 +1,57 @@
+<view class="cr-page">
+  <scroll-view class="cr-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="cr-body">
+
+      <block wx:if="{{step === 'pick'}}">
+        <view class="cr-lead">拍下合同，AI 逐条指出需要留意的条款。结果仅供参考，不构成法律意见。</view>
+        <view class="cr-sec">这是什么材料</view>
+        <view class="type-grid">
+          <view class="type-item {{contractType === item.value ? 'on' : ''}} tap" wx:for="{{types}}" wx:key="value"
+                hover-class="tap-press" bindtap="pickType" data-value="{{item.value}}" role="button" aria-label="{{item.label}}">
+            {{item.label}}
+          </view>
+        </view>
+        <view class="cr-cta tap" hover-class="tap-press" bindtap="pickFile" role="button" aria-label="拍照或从相册选择合同">拍照 / 从相册选择</view>
+        <view class="cr-note">整页拍清楚，避免反光与遮挡。字太小时分多次拍。</view>
+      </block>
+
+      <block wx:elif="{{step === 'consent'}}">
+        <view class="cr-sec">开始前请确认</view>
+        <view class="scope-card">
+          <view class="scope-row"><text class="scope-k">处理方式</text><text class="scope-v">文字识别 + 规则比对 + 模型分析</text></view>
+          <view class="scope-row"><text class="scope-k">涉及数据</text><text class="scope-v">你上传的原件、识别出的文字、分析结果</text></view>
+          <view class="scope-row"><text class="scope-k">保留时长</text><text class="scope-v">最长 2 小时，结束会话即删除</text></view>
+          <view class="scope-row"><text class="scope-k">你的权利</text><text class="scope-v">可随时查看、删除、撤回同意</text></view>
+          <view class="scope-ver">告知版本 {{scope.consentVersion}} · 免责声明 {{scope.disclaimerVersion}}</view>
+        </view>
+        <view class="cr-cta tap" hover-class="tap-press" bindtap="agree" role="button" aria-label="我已阅读并同意，开始分析">我已阅读并同意，开始分析</view>
+        <view class="cr-sub tap" hover-class="tap-press" bindtap="discard" role="button" aria-label="取消">取消</view>
+      </block>
+
+      <block wx:elif="{{step === 'running'}}">
+        <view class="cr-run">
+          <view class="cr-run-t">{{statusText}}</view>
+          <view class="cr-note">合同页数多时需要稍等，请不要退出。</view>
+        </view>
+      </block>
+
+      <block wx:elif="{{step === 'report'}}">
+        <view class="cr-sec">审查结果</view>
+        <view class="risk-item" wx:for="{{report.findings}}" wx:key="index">
+          <view class="risk-h">
+            <text class="risk-lv lv-{{item.severity}}">{{item.severityLabel || item.severity}}</text>
+            <text class="risk-t">{{item.title}}</text>
+          </view>
+          <view class="risk-d">{{item.detail}}</view>
+          <view class="risk-q" wx:if="{{item.clause}}">原文：{{item.clause}}</view>
+        </view>
+        <view class="cr-empty" wx:if="{{!report.findings.length}}">本次未识别到需要特别提示的条款。这不代表合同没有问题，仅代表规则与模型未命中。</view>
+        <view class="cr-note">结果由 AI 生成，可能存在错误，不构成法律意见。涉及争议请咨询劳动监察或法律援助。</view>
+        <view class="cr-sub tap" hover-class="tap-press" bindtap="discard" role="button" aria-label="删除本次记录">删除本次记录</view>
+      </block>
+
+      <view class="cr-err" wx:if="{{error}}">{{error}}</view>
+      <view class="tab-spacer"></view>
+    </view>
+  </scroll-view>
+</view>

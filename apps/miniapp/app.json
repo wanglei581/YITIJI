@@ -31,6 +31,7 @@
     "pages/resume-parse/resume-parse",
     "pages/resumes/resumes",
     "pages/documents/documents",
+    "pages/contract-review/contract-review",
     "pages/orders/orders",
     "pages/ai-records/ai-records",
     "pages/browse-history/browse-history",
