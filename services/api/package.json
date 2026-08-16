@@ -157,6 +157,7 @@
     "verify:partner-stats-contract": "node -r @swc-node/register scripts/verify-partner-stats-contract.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
+    "verify:bulk-publish": "node -r @swc-node/register scripts/verify-bulk-publish.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
     "verify:admin-print-scan": "node -r @swc-node/register scripts/verify-admin-print-scan.ts",
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",

@@ -22,6 +22,7 @@ const requiredCommands = [
   'pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui',
   'pnpm --filter @ai-job-print/partner verify:partner-refresh-safe',
   'pnpm --filter @ai-job-print/api verify:terminal-status-idempotency',
+  'pnpm --filter @ai-job-print/api verify:bulk-publish',
 ]
 
 const missing = requiredCommands.filter((command) => !workflowLines.has(command))

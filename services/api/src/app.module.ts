@@ -11,6 +11,7 @@ import { JobsModule } from './jobs/jobs.module'
 import { JobSyncModule } from './job-sync/job-sync.module'
 import { OrgsModule } from './orgs/orgs.module'
 import { PoliciesModule } from './policies/policies.module'
+import { BulkPublishModule } from './bulk-publish/bulk-publish.module'
 import { AdminOpsModule } from './admin-ops/admin-ops.module'
 import { AdminOrderActionsModule } from './payment/admin-order-actions.module'
 import { AdminOrdersReadonlyModule } from './admin-orders-readonly/admin-orders-readonly.module'
@@ -112,6 +113,7 @@ const redisUrl = process.env['REDIS_URL']
     JobSyncModule,
     OrgsModule,
     PoliciesModule,
+    BulkPublishModule,
     AdminOpsModule,
     AdminOrdersReadonlyModule,
     AdminPrintScanModule,
