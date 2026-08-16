@@ -275,12 +275,23 @@ const VALID_CATEGORIES = new Set([
   'real-hardware', // 需要 Windows 真机、打印机、扫描仪等物理设备
   'running-server', // 需要本机已经起好 API 服务，CI 内无此前置
   'manual-acceptance', // 人工验收 / 演练用，不是自动回归
+  // 纯聚合别名：body 只是把若干子门禁串起来，自己没有独有断言。
+  // 子门禁全部已在 CI 时，别名再挂一遍只是把同一批断言跑第二遍。
+  // ⚠ 这个类别的前提由下面的 B-5 机器复核，不接受口头声明。
+  'redundant-alias',
   'pending-ci-wiring', // 真遗漏，尚未接线；reason 必须写明当前阻塞
 ])
 
 // pending-ci-wiring 是「欠账」而不是「结论」。这个上限只允许调低，不允许调高：
 // 想加新的 pending，先还掉一条旧的。防止豁免表退化成垃圾桶。
-const MAX_PENDING = 12
+//
+// 12 → 1（2026-08-16，GATE-WIRE）：#641 登记的 11 条欠账本批全部还清 ——
+// 10 条实跑绿后接进 ci.yml，1 条（member-login-data-closure）复核为纯聚合别名、
+// 改判 redundant-alias。当时上限 12 / 实际 11，留有 1 格余量；还清 11 条后
+// 按「还几条降几条」降到 1，保持同样的 1 格余量。
+// 不降到 0 是刻意的：留一格是为了让下一个确实接不进去的门禁能如实登记成欠账，
+// 而不是被迫塞进一个不准确的类别——那会把这张表从「账本」变回「遮羞布」。
+const MAX_PENDING = 1
 
 const exemptionsFile = JSON.parse(readFileSync(exemptionsPath, 'utf8'))
 const exemptions = exemptionsFile.exemptions || []
@@ -319,6 +330,39 @@ for (const gate of exemptionByGate.keys()) {
 for (const gate of exemptionByGate.keys()) {
   if (allGates.has(gate) && executed.has(gate)) {
     problems.push(`豁免条目已陈旧（该门禁已被 CI 执行，请删除本条）：${gate}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// B-5. redundant-alias 的前提必须由机器复核
+// ---------------------------------------------------------------------------
+// 「这个别名的子门禁已经全在 CI 了，所以别名本身不用挂」是一个**会过期**的结论：
+// 只要有人把其中一个子门禁从 ci.yml 里删掉，这句话就变成假话，而豁免条目还留在表里，
+// 下一个人读到的仍是「已覆盖」。所以不接受 reason 里的口头声明 —— 直接解析别名 body，
+// 把每个子门禁拿去和执行闭包比对。
+for (const item of exemptions) {
+  if (item.category !== 'redundant-alias') continue
+  const [pkgName, scriptName] = item.gate.split('::')
+  const pkg = packagesByName.get(pkgName)
+  if (!pkg || pkg.scripts[scriptName] === undefined) continue // 陈旧条目已在别处报过
+
+  const subGates = parseScriptInvocations(pkg.scripts[scriptName], pkg).map(
+    (invocation) => `${invocation.pkg.name}::${invocation.scriptName}`
+  )
+  if (subGates.length === 0) {
+    problems.push(
+      `redundant-alias 用错了：${item.gate} 的 body 里解析不出任何子门禁调用，` +
+        `它不是聚合别名。请改用其它类别。`
+    )
+    continue
+  }
+  const uncovered = [...new Set(subGates)].filter((sub) => !executed.has(sub))
+  if (uncovered.length > 0) {
+    problems.push(
+      `redundant-alias 的前提已不成立：${item.gate} 的 ${uncovered.length} 条子门禁不在 CI 闭包内 ——` +
+        ` ${uncovered.join(', ')}。` +
+        `要么把这些子门禁接回 ci.yml，要么这条豁免改用其它类别（别名此时是有独有覆盖的）。`
+    )
   }
 }
 

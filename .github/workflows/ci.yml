@@ -123,6 +123,16 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
           pnpm --filter @ai-job-print/admin verify:source-publish-actions
           pnpm --filter @ai-job-print/refresh verify:runtime
+          # ── GATE-WIRE 接线：#647 修好的漂移门禁，本批实跑绿后接进 CI ──
+          #    以下 5 条都不 import services/api/src（已逐条核验 src 引用数为 0），
+          #    且已在「把 src/generated/prisma 挪走」的条件下实跑通过，
+          #    等价于本步在 CI 里的真实前置（Prisma 客户端由后面的 Typecheck 步生成）。
+          #    因此可以留在本步拿快速失败；其余 5 条见下方 Verify suites。
+          pnpm --filter @ai-job-print/api verify:assess-isolation
+          pnpm --filter @ai-job-print/api verify:compliance
+          pnpm --filter @ai-job-print/api verify:jobfair-checkin
+          pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
+          pnpm --filter @ai-job-print/kiosk verify:visible-actions-truth
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -561,6 +571,20 @@ jobs:
           pnpm --filter @ai-job-print/api verify:toolbox-micro-app-platform
           pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-review-workflow
+          # ── GATE-WIRE 接线（#647 修好的漂移门禁，第二批）──────────────
+          # 这 5 条都 import services/api/src（src 引用数 1 / 3 / 1 / 11 / 4），
+          # 会传递依赖到 Prisma 客户端，因此必须留在本步（「Prepare fresh
+          # SQLite db」之后）。放进上面的静态步会报
+          # Cannot find module '../generated/prisma/client'。
+          pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-intents
+          pnpm --filter @ai-job-print/api verify:legacy-pending-print-task-disposition
+          pnpm --filter @ai-job-print/api verify:resume-voice-generate
+          # 无 target 时脚本会拒绝对共享 dev.db 动手；isolated 让它自建隔离库。
+          INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-auth-phone
+          # 进程内 NestFactory 起 AppModule 并监听 3097（无需外部 API 服务），
+          # 但会员会话与 BullMQ 需要**真实** Redis —— 本 job 的 redis:7-alpine
+          # service 提供。同形状的 verify:member-assets-c2d 已在本步长期绿。
+          pnpm --filter @ai-job-print/api verify:job-favorites-http
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。

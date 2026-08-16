@@ -12,7 +12,11 @@
     "  real-hardware     需要 Windows 真机、打印机、扫描仪等物理设备",
     "  running-server    需要本机先起好 API 服务，CI 内无此前置",
     "  manual-acceptance 人工验收 / 演练用，不是自动回归",
+    "  redundant-alias   纯聚合别名，子门禁已全部在 CI；别名本身无独有断言，再挂一遍只是重复跑",
     "  pending-ci-wiring 真遗漏，应该进 CI 但当前进不去；reason 必须写明阻塞点",
+    "",
+    "redundant-alias 不是「免跑」借口：脚本会解析别名 body、把每个子门禁拿去和 CI 执行闭包比对，",
+    "只要有一条子门禁不在闭包里，这条豁免立刻失效并让 CI 红。所以它是被机器盯着的结论，不是口头承诺。",
     "",
     "pending-ci-wiring 是欠账不是结论。verify-ci-gate-coverage.mjs 里的 MAX_PENDING",
     "只允许调低不允许调高 —— 想加新的 pending，先还掉一条旧的。"
@@ -44,59 +48,9 @@
       "reason": "扫码上传 HTTP 端到端，前置是 API 已在 localhost:3010 运行并显式指定 FILE_STORAGE_DRIVER=local。CI 无该前置，实测报 fetch failed。"
     },
     {
-      "gate": "@ai-job-print/api::verify:assess-isolation",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：src/ai/llm/llm-config.service.ts 第 38/180 行注册了 self_assessment 特性键，但不在门禁的 NOT_ALLOWED_FILE 白名单里。需先决定是补白名单还是改注册方式——不能为了让 CI 变绿而放宽这条合规隔离断言。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:compliance",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：禁词扫描按子串匹配，把 SelfAssessmentFlow.tsx 里「不打分、不排名」这类否定式表述判成违规（3 处）。文案本身是合规的，需先修门禁的否定式识别，不能改文案也不能放宽断言。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:file-assets-trial-acceptance",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：断言里的正则 /where:\\s*\\{\\s*deletedAt:\\s*null,\\s*expiresAt/ 与现行清理实现已经对不上，门禁落后于代码。需先确认是实现回退还是门禁过期。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:jobfair-checkin",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：断言要求 JobsService 映射并写入 checkinUrl，实际源码已无该映射。需先确认签到入口能力是被移除还是被重构。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:legacy-pending-print-task-disposition",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败（已在全新 db push 空库复现，排除脏数据）：脚本走到 cancelled → printing 转换被 INVALID_STATUS_TRANSITION 拒绝，夹具与现行状态机不一致。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:resume-voice-generate",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即崩溃：Cannot read properties of undefined (reading 'recognizeWav')，门禁引用的 ASR 服务形状已变。需先修门禁再接线。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:toolbox-ai-skill-intents",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：14 项里 1 项不通过（AI skill intent 接线断言）。需先定位是接线回退还是门禁过期。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:internal-auth-phone",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：设了 INTERNAL_AUTH_VERIFY_TARGET=isolated 后，脚本自建的隔离 SQLite 库报 SQLITE_ERROR: no such column: contentTrustStatus —— 建库路径落后于现行 schema。注意它的 target guard 兄弟门禁 verify:internal-auth-phone:target-guard 本次已接进 CI。"
-    },
-    {
-      "gate": "@ai-job-print/api::verify:job-favorites-http",
-      "category": "pending-ci-wiring",
-      "reason": "本地无 Redis 无法验证（CI 的 build-and-verify job 有 redis service，理论上可跑）。未经实跑不接线——只加不验会再造一条『看起来在守』的门禁。需在带 Redis 的环境验证后接入。"
-    },
-    {
       "gate": "@ai-job-print/api::verify:member-login-data-closure",
-      "category": "pending-ci-wiring",
-      "reason": "聚合脚本，串联 verify:resume-extraction / cos:files / mock-interview / ai-result-ownership 等；本地无 Redis 跑到一半卡死。其子门禁多数已单独进 CI，需确认聚合是否仍有独立价值再决定接线或删除。"
-    },
-    {
-      "gate": "@ai-job-print/kiosk::verify:visible-actions-truth",
-      "category": "pending-ci-wiring",
-      "reason": "当前在 main 上即失败：断言 /disabled title=\"尚无真实导出文件\"/ 在目标页面已不存在，门禁落后于页面重构。需先确认『无真实产物时按钮必须禁用』这条真值是否仍由别处保证。"
+      "category": "redundant-alias",
+      "reason": "纯 shell 别名：body 是 17 个 `pnpm run verify:*` 用 && 串起来，没有任何自己的断言、夹具或环境要求。2026-08-16 GATE-WIRE 复核：17 个子门禁**全部 17 条**都已在 CI 执行闭包内（#647 当时记的是 15/17，另 2 条已随本批接线补齐），因此把别名本身再挂一遍只是让同一批断言在同一个 job 里跑第二遍，徒增 CI 时长而不增加任何覆盖。本条不是欠账，故不占 pending-ci-wiring 名额；「子门禁全覆盖」这个前提由 verify-ci-gate-coverage.mjs 对 redundant-alias 类别做机器复核，一旦有子门禁被移出 CI 会立刻转红。"
     }
   ]
 }
