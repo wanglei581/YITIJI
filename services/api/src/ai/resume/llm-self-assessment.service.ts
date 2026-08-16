@@ -14,6 +14,7 @@
 
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
 
 const MAX_NOTE_CHARS = 300
@@ -81,6 +82,14 @@ export interface LlmSelfAssessmentInput {
   }
   /** 同意颗粒度（仅元数据；不向 LLM 透露用户是否勾选敏感题） */
   consent: { nonSensitive: boolean; sensitive: boolean }
+  /**
+   * 每次真实 LLM 调用结束后回调 provider + token usage。
+   *
+   * 缺了它，selfAssessment 这条**付费**调用会零 token 落账，
+   * Admin「分能力调用量与成本」把它当 token 计费能力渲染成 ¥0.0000，
+   * 即对一次真实花钱的调用谎称免费。
+   */
+  onLlmCall?: AiLlmCallSink
 }
 
 export interface LlmSelfAssessmentOutput {
@@ -107,7 +116,7 @@ export class LlmSelfAssessmentService {
     const providerName = this.config.getConfig('self_assessment').vendor
     let raw: string
     try {
-      raw = await this.callLlm(input.scored.dimensions)
+      raw = await this.callLlm(input.scored.dimensions, input.onLlmCall)
     } catch (err) {
       // LLM 不可用 → 优雅降级：返回 strength + null note（不阻塞主流程）
       this.logger.warn(`self_assessment.llm_unavailable degraded=${(err as Error).message}`)
@@ -195,12 +204,14 @@ export class LlmSelfAssessmentService {
    * 注：2026-07-31 的共用键注释漏登记了本消费方，S0-3 一并补上（风险 R3）。
    * 本键不可用只影响解读文字（note/summary 置 null），问卷打分是纯函数，主流程不受影响。
    */
-  private async callLlm(dimensions: SelfAssessmentDimensionResult[]): Promise<string> {
+  private async callLlm(dimensions: SelfAssessmentDimensionResult[], onLlmCall?: AiLlmCallSink): Promise<string> {
     const apiKey = this.config.getApiKey('self_assessment')
     const cfg = this.config.getConfig('self_assessment')
     if (!apiKey || !cfg.enabled) {
+      // 未配置 = 一次都没打到模型，不回调 onLlmCall（callCount 保持 0 → 不落账）
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用' } })
     }
+    const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
     const system =
       '你是「自我探索 · 倾向参考」工具的解读助手。' +
@@ -236,12 +247,16 @@ export class LlmSelfAssessmentService {
         }),
       })
     } catch {
+      // 已经发出请求（可能已计费），必须记一次调用，否则失败调用整条不落账
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败' } })
     }
     if (!res.ok) {
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage }
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
     return reply

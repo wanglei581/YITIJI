@@ -18,10 +18,8 @@ import { ExecutionContext } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { validate } from 'class-validator'
-import { execFileSync } from 'child_process'
 import { randomUUID } from 'crypto'
-import { mkdtempSync, readFileSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
+import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import type { AuditService } from '../src/audit/audit.service'
 import { AuthController } from '../src/auth/auth.controller'
@@ -39,6 +37,7 @@ import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService, type PrismaTransactionClient } from '../src/prisma/prisma.service'
 import type { SmsSender } from '../src/member-auth/sms/sms-sender'
+import { prepareIsolatedDatabase } from './support/internal-auth-verify-harness'
 
 process.env['JWT_SECRET'] ||= 'verify-internal-auth-phone-secret'
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-internal-auth-phone-secret-32b'
@@ -290,85 +289,19 @@ function createAuditFailingPrisma(prisma: PrismaService): PrismaService {
       ),
   } as PrismaService
 }
+/**
+ * 隔离库不再由本文件手写 DDL。
+ *
+ * 原来这里有一份 Organization / User / AuditLog 的手抄建表语句，与
+ * scripts/support/internal-auth-verify-harness.ts 里那份重复；schema 增列
+ * （618e4f6b0 给 Organization 加 contentTrustStatus 等 5 列）时只更新了 harness
+ * 那份，本文件这份没跟上，于是门禁一跑就 SQLITE_ERROR: no such column。
+ * 两份手抄必然分叉 —— 改为单一来源，直接复用 harness。
+ */
 function createIsolatedVerificationDatabase(): { cleanup: () => void } {
-  const tempDirectory = mkdtempSync(join(tmpdir(), 'verify-internal-auth-phone-'))
-  const databasePath = join(tempDirectory, 'verify.db')
-  const databaseUrl = `file:${databasePath}`
-  process.env['DATABASE_URL'] = databaseUrl
-
-  try {
-    execFileSync('sqlite3', [
-      databasePath,
-      `
-      PRAGMA foreign_keys = ON;
-      CREATE TABLE "Organization" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "type" TEXT NOT NULL,
-        "contact" TEXT,
-        "contactPhone" TEXT,
-        "sceneTemplate" TEXT,
-        "enabledModulesJson" TEXT NOT NULL DEFAULT '[]',
-        "enabled" BOOLEAN NOT NULL DEFAULT true,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE "User" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "username" TEXT NOT NULL,
-        "passwordHash" TEXT NOT NULL,
-        "passwordProofState" TEXT NOT NULL DEFAULT 'legacy',
-        "name" TEXT NOT NULL,
-        "role" TEXT NOT NULL,
-        "orgId" TEXT,
-        "phoneHash" TEXT,
-        "phoneEnc" TEXT,
-        "phoneVerifiedAt" DATETIME,
-        "emailHash" TEXT,
-        "emailEnc" TEXT,
-        "emailVerifiedAt" DATETIME,
-        "emailVerifyMethod" TEXT,
-        "tokenVersion" INTEGER NOT NULL DEFAULT 0,
-        "lastLoginAt" DATETIME,
-        "deletedAt" DATETIME,
-        "enabled" BOOLEAN NOT NULL DEFAULT true,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "User_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-      );
-      CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
-      CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash");
-      CREATE UNIQUE INDEX "User_emailHash_key" ON "User"("emailHash");
-      CREATE INDEX "User_orgId_idx" ON "User"("orgId");
-      CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt");
-      CREATE INDEX "User_emailVerifiedAt_idx" ON "User"("emailVerifiedAt");
-      CREATE TABLE "AuditLog" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "actorId" TEXT,
-        "actorRole" TEXT NOT NULL,
-        "action" TEXT NOT NULL,
-        "targetType" TEXT NOT NULL,
-        "targetId" TEXT,
-        "payloadJson" TEXT NOT NULL DEFAULT '{}',
-        "ipAddress" TEXT,
-        "userAgent" TEXT,
-        "requestId" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-      );
-      CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
-      CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
-      CREATE INDEX "AuditLog_targetType_targetId_idx" ON "AuditLog"("targetType", "targetId");
-      CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
-      `,
-    ], {
-      stdio: 'pipe',
-    })
-  } catch (error) {
-    rmSync(tempDirectory, { recursive: true, force: true })
-    throw error
-  }
-  return { cleanup: () => rmSync(tempDirectory, { recursive: true, force: true }) }
+  const isolated = prepareIsolatedDatabase('verify-internal-auth-phone-')
+  isolated.initialize()
+  return { cleanup: isolated.cleanup }
 }
 
 async function assertAdminInitialPhoneBindControllerDelegation(): Promise<void> {

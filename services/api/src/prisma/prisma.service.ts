@@ -183,6 +183,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.mockInterviewReport
   }
 
+  // ── S3-3 · P26 顾问作业面 ──────────────────────────────────────────────────
+
+  get advisorSession() {
+    return this.client.advisorSession
+  }
+
+  get advisorPin() {
+    return this.client.advisorPin
+  }
+
+  get advisorArtifact() {
+    return this.client.advisorArtifact
+  }
+
   get fairVenueGuide() {
     return this.client.fairVenueGuide
   }
@@ -203,6 +217,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get policyPost() {
     return this.client.policyPost
+  }
+
+  /** P21 政策条件核对：政策申领条件的结构化表达 */
+  get policyEligibilityRule() {
+    return this.client.policyEligibilityRule
   }
 
   // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────
