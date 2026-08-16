@@ -47,14 +47,25 @@ export function ResumeExportPage() {
           <p className="resume-lightflow__detail-label">暂无真实输出物</p>
           <h2>当前流程尚未生成可导出的真实文件</h2>
           <p>此页面不会虚构文件、保存结果或打印任务。请回到真实简历流程完成导出后，再使用对应的保存或打印操作。</p>
+          {/* 2026-08-16：原本是原生 disabled + title="尚无真实导出文件"。
+              这在本机的目标设备上等于没给原因——27 寸竖屏是触摸屏，没有 hover，
+              title 永远不会显示；而原生 disabled 又让按钮掉出 tab 顺序、读屏跳过。
+              用户面对两个灰按钮，没有任何途径知道为什么不能点。
+              改为 aria-disabled + 常显原因 + aria-describedby 关联：
+              按钮仍可聚焦、原因看得见也读得到。做法与已合入的 #613 权益卡一致。 */}
           <div className="resume-lightflow__split-actions">
-            <Button size="lg" disabled title="尚无真实导出文件">
+            <Button size="lg" aria-disabled="true" aria-describedby="resume-export-blocked-why"
+                    onClick={(event) => event.preventDefault()}>
               <SaveIcon aria-hidden="true" /> 保存到我的简历
             </Button>
-            <Button size="lg" variant="secondary" disabled title="尚无真实导出文件">
+            <Button size="lg" variant="secondary" aria-disabled="true" aria-describedby="resume-export-blocked-why"
+                    onClick={(event) => event.preventDefault()}>
               <PrinterIcon aria-hidden="true" /> 打印
             </Button>
           </div>
+          <p id="resume-export-blocked-why" className="resume-lightflow__detail-label">
+            这两项要等真实导出文件生成后才能用。请先走下面任一条流程，完成后回到对应页面保存或打印。
+          </p>
           <Button size="lg" className="resume-lightflow__primary-action" onClick={() => navigate('/resume/source')}>
             返回真实简历流程 <ArrowRightIcon aria-hidden="true" />
           </Button>
