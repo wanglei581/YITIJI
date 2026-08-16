@@ -1,41 +1,101 @@
-// 百宝箱终端配置 hook（真实终端配置驱动，5 分钟轮询）
-// 由首页动态专区卡片与 /toolbox 区页共同消费；模块级缓存避免重复请求闪烁。
 import type { KioskToolboxConfig } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
-import { getCachedKioskTerminalConfig, getTerminalId } from '../services/api/terminalConfig'
+import {
+  isLaunchableKioskAppItem,
+  parseKioskTerminalConfig,
+} from '../services/api/kioskCapabilityValidation'
+import { getKioskTerminalConfig, getTerminalId } from '../services/api/terminalConfig'
 
-// 后台未配置百宝箱时只显示空占位。生产入口必须由 Admin 明确配置，
-// 不能因配置为空或请求失败而自动公开尚未单独授权的服务。
-const DEFAULT_TOOLBOX_CONFIG: KioskToolboxConfig = {
-  enabled: true,
-  items: [],
+export type CapabilityStatus = 'loading' | 'ready'
+
+export interface ToolboxCapabilityState {
+  status: CapabilityStatus
+  enabled: boolean
+  terminalId: string
+  configVersion: string
+  config: KioskToolboxConfig
 }
 
-let cachedToolboxConfig: KioskToolboxConfig = DEFAULT_TOOLBOX_CONFIG
+const OFF_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
+export const OFF_TOOLBOX_CAPABILITY: ToolboxCapabilityState = {
+  status: 'loading',
+  enabled: false,
+  terminalId: '',
+  configVersion: '',
+  config: OFF_CONFIG,
+}
+const REFRESH_MS = 5 * 60 * 1000
 
-export function useToolboxConfig(): KioskToolboxConfig {
-  const [config, setConfig] = useState<KioskToolboxConfig>(() => cachedToolboxConfig)
+export function useToolboxCapabilityState(): ToolboxCapabilityState {
+  const [state, setState] = useState<ToolboxCapabilityState>(OFF_TOOLBOX_CAPABILITY)
 
   useEffect(() => {
-    let alive = true
+    let mounted = true
+    let generation = 0
+    let activeController: AbortController | null = null
+
     const load = async () => {
+      generation += 1
+      const requestGeneration = generation
+      activeController?.abort()
+      const controller = new AbortController()
+      activeController = controller
+      setState(OFF_TOOLBOX_CAPABILITY)
+
+      const terminalId = getTerminalId()
+      if (!terminalId) {
+        if (mounted && requestGeneration === generation) {
+          setState({ ...OFF_TOOLBOX_CAPABILITY, status: 'ready' })
+        }
+        return
+      }
+
       try {
-        const terminalId = getTerminalId()
-        const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
-        const backendToolbox = terminalConfig.toolbox
-        cachedToolboxConfig = backendToolbox
-        if (alive) setConfig(backendToolbox)
+        const rawConfig = await getKioskTerminalConfig(terminalId)
+        const terminalConfig = parseKioskTerminalConfig(rawConfig)
+        const currentTerminalId = getTerminalId()
+        if (
+          !mounted ||
+          controller.signal.aborted ||
+          requestGeneration !== generation ||
+          currentTerminalId !== terminalId
+        ) {
+          return
+        }
+        if (!terminalConfig) {
+          setState({ ...OFF_TOOLBOX_CAPABILITY, status: 'ready', terminalId })
+          return
+        }
+        const config = terminalConfig.toolbox
+        const enabled = config.enabled && config.items.some(isLaunchableKioskAppItem)
+        setState({
+          status: 'ready',
+          enabled,
+          terminalId,
+          configVersion: terminalConfig.configVersion,
+          config,
+        })
       } catch {
-        if (alive) setConfig(cachedToolboxConfig)
+        if (
+          mounted &&
+          !controller.signal.aborted &&
+          requestGeneration === generation &&
+          getTerminalId() === terminalId
+        ) {
+          setState({ ...OFF_TOOLBOX_CAPABILITY, status: 'ready', terminalId })
+        }
       }
     }
+
     void load()
-    const timer = window.setInterval(() => void load(), 5 * 60 * 1000)
+    const timer = window.setInterval(() => void load(), REFRESH_MS)
     return () => {
-      alive = false
+      mounted = false
+      generation += 1
+      activeController?.abort()
       window.clearInterval(timer)
     }
   }, [])
 
-  return config
+  return state
 }

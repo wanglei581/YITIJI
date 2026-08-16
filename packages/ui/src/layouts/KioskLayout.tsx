@@ -37,6 +37,10 @@ export interface KioskLayoutProps {
   brandTitle?: string
   /** 顶栏品牌副标题（原型 topbar 左侧次要说明），如终端编号。 */
   brandSubtitle?: string
+  /** V6 品牌标记与域首屏返回动作。 */
+  brandMark?: ReactNode
+  onBrandClick?: () => void
+  brandActionLabel?: string
   /** Hide the top status bar entirely. */
   hideHeader?: boolean
   /** Hide the bottom navigation entirely (e.g. immersive 招聘会 detail pages). */
@@ -55,6 +59,9 @@ export function KioskLayout({
   headerRight,
   brandTitle = '就业服务大厅',
   brandSubtitle = 'AI求职打印服务终端',
+  brandMark,
+  onBrandClick,
+  brandActionLabel,
   hideHeader = false,
   hideBottomNav = false,
   visualTheme = 'legacy',
@@ -72,7 +79,14 @@ export function KioskLayout({
 
       {/* ── Top status bar：原型 topbar（76px 墨绿，品牌 + 状态） ── */}
       {!hideHeader && (
-        <KioskTopbar brandTitle={brandTitle} brandSubtitle={brandSubtitle} right={headerRight} />
+        <KioskTopbar
+          brandMark={brandMark}
+          brandTitle={brandTitle}
+          brandSubtitle={brandSubtitle}
+          right={headerRight}
+          onBrandClick={onBrandClick}
+          brandActionLabel={brandActionLabel}
+        />
       )}
 
       {/* ── Main content — scrollable ────────────────────── */}

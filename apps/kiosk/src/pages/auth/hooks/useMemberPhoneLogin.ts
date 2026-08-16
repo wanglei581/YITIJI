@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type LoginResult,
-  MemberApiError,
   memberLogin,
+  resolveMemberApiErrorMessage,
   sendSmsCode,
 } from '../../../services/auth/memberAuthApi'
 import { getMemberAuthDeviceId } from '../../../services/auth/memberAuthDevice'
@@ -213,7 +213,7 @@ export function useMemberPhoneLogin(
       setActiveInput('code')
     } catch (cause) {
       if (!isCurrentRequest(requestGeneration)) return
-      raiseError(cause instanceof MemberApiError ? cause.message : '发送失败，请重试')
+      raiseError(resolveMemberApiErrorMessage(cause, '验证码发送失败，请稍后重试'))
     } finally {
       if (isCurrentRequest(requestGeneration)) {
         setLoading(false)
@@ -247,7 +247,7 @@ export function useMemberPhoneLogin(
       await options.onAuthenticated(result)
     } catch (cause) {
       if (!isCurrentRequest(requestGeneration)) return
-      raiseError(cause instanceof MemberApiError ? cause.message : '验证失败，请重试')
+      raiseError(resolveMemberApiErrorMessage(cause, '登录验证失败，请稍后重试'))
       setCode('')
     } finally {
       if (isCurrentRequest(requestGeneration)) {

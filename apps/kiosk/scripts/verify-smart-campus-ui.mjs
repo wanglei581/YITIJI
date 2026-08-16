@@ -27,6 +27,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -106,7 +107,7 @@ mustContain(
 // E2. /smart-campus 消费 config.items 并复用共享启动助手（每个配置项可启动）。
 mustContain(
   CAMPUS_PAGE,
-  ['config.items', 'launchKioskAppItem', 'itemLaunchable', 'extensionItems'],
+  ['config.items', 'launchKioskAppItem', 'isLaunchableKioskAppItem', 'extensionItems'],
   'E2 SmartCampusHomePage 消费 config.items 并复用共享启动助手（可启动）',
 )
 
@@ -198,13 +199,80 @@ for (const [rel, label] of [
   mustNotContainOutsideComments(rel, FAKE_SCHOOL_ENDORSEMENT, `${label}不得声称校方授权 / 校方官方 / 校方已开启`)
 }
 
-// F7：子页必须走统一门禁——关闭开关或机器搬离校园后，深链接不得残留校园内容
-mustContain('src/routes/index.tsx', ['SmartCampusGuard'], 'G7 智慧校园子路由必须包 SmartCampusGuard')
+function capabilityRouteInventory() {
+  const sourceText = read('src/routes/index.tsx')
+  if (sourceText === null) return []
+  const source = ts.createSourceFile('routes.tsx', sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const inventory = []
+  function visit(node, ancestors = []) {
+    if (!ts.isObjectLiteralExpression(node)) {
+      ts.forEachChild(node, (child) => visit(child, ancestors))
+      return
+    }
+    let path = null
+    let element = ''
+    let children = null
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property)) continue
+      const name = property.name.getText(source)
+      if (name === 'path' && ts.isStringLiteral(property.initializer)) path = property.initializer.text
+      if (name === 'element') element = property.initializer.getText(source)
+      if (name === 'children' && ts.isArrayLiteralExpression(property.initializer)) children = property.initializer
+    }
+    const nextAncestors = element ? [...ancestors, element] : ancestors
+    if (path === 'toolbox' || path?.startsWith('smart-campus')) {
+      inventory.push({ path, ancestors: nextAncestors, element })
+    }
+    if (children) {
+      for (const child of children.elements) visit(child, nextAncestors)
+    }
+  }
+  visit(source)
+  return inventory
+}
+
+const capabilityRoutes = capabilityRouteInventory()
+const smartRoutes = capabilityRoutes.filter((route) => route.path.startsWith('smart-campus'))
+const toolboxRoutes = capabilityRoutes.filter((route) => route.path === 'toolbox')
+const expectedPatterns = [
+  'smart-campus',
+  'smart-campus/welcome',
+  'smart-campus/freshman-insights',
+  'smart-campus/service/:key',
+]
+if (
+  smartRoutes.length === 4 &&
+  expectedPatterns.every((path) => smartRoutes.some((route) => route.path === path)) &&
+  smartRoutes.every((route) => route.ancestors.some((element) => element.includes('SmartCampusCapabilityBoundary')))
+) {
+  pass('G7 四个智慧校园路由 pattern 全是 SmartCampusCapabilityBoundary 后代且无重复旁路')
+} else {
+  fail(`G7 智慧校园路由门禁 AST 不成立: ${JSON.stringify(smartRoutes)}`)
+}
+if (
+  toolboxRoutes.length === 1 &&
+  toolboxRoutes[0].ancestors.some((element) => element.includes('ToolboxCapabilityBoundary'))
+) {
+  pass('G7a /toolbox 是 ToolboxCapabilityBoundary 后代且不存在无守卫同路径')
+} else {
+  fail(`G7a 百宝箱路由门禁 AST 不成立: ${JSON.stringify(toolboxRoutes)}`)
+}
+mustContain(
+  'src/pages/smart-campus/SmartCampusServicePage.tsx',
+  ["'campus-card'", "'all-in-one'", "'campus-network'", "'luggage'", "'panorama'"],
+  'G7b service key 域固定为 5 项，与 4 pattern 展开为 8 个具体 URL',
+)
 mustContain(
   'src/pages/smart-campus/SmartCampusGuard.tsx',
-  ['config.enabled', '本机暂未开启智慧校园服务'],
-  'G8 SmartCampusGuard 校验总开关并给出真实空态',
+  ["key === 'luggage'", "key === 'panorama'", 'config.modules[requiredModule]', '本机暂未开启这项智慧校园服务'],
+  'G8 SmartCampusGuard 使用父级同一快照校验 welcome/luggage/panorama 模块',
 )
+for (const rel of [
+  'src/pages/smart-campus/SmartCampusHomePage.tsx',
+  'src/pages/smart-campus/SmartCampusGuard.tsx',
+]) {
+  mustNotContain(rel, ['useSmartCampusCapabilityState', 'useSmartCampusConfig'], `G9 ${rel} 不得二次拉取能力配置`)
+}
 
 console.log('')
 if (failed > 0) {

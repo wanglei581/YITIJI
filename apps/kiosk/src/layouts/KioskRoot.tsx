@@ -8,10 +8,12 @@ import { KioskIconSprite } from '../components/kiosk-icon'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useKioskStageFit } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
+import '../styles/v6-runtime-shell.css'
 
 function getActiveTab(pathname: string): KioskTab {
   if (pathname.startsWith('/assistant')) return 'assistant'
-  if (pathname.startsWith('/profile') || pathname === '/me' || pathname.startsWith('/me/')) return 'profile'
+  if (pathname.startsWith('/profile') || pathname === '/me' || pathname.startsWith('/me/'))
+    return 'profile'
   return 'home'
 }
 
@@ -108,6 +110,8 @@ function KioskShell() {
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI顾问/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
+  const isV6Route = pathname === '/' || pathname === '/print-scan'
+  const isV6PrintHub = pathname === '/print-scan'
   const usesPageActionbar = routeUsesPageActionbar(pathname)
   const isCompactViewport = viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
   const isResponsiveHome = pathname === '/' && isCompactViewport
@@ -123,10 +127,21 @@ function KioskShell() {
       viewport={isCompactViewport ? 'mobile' : 'kiosk'}
       hideHeader={isCampusZone}
       hideBottomNav={isCampusZone || usesPageActionbar}
-      brandTitle={`就业服务大厅 · ${terminalCode}`}
-      brandSubtitle="AI求职打印服务终端"
+      brandMark={isV6Route ? '职' : undefined}
+      brandTitle={
+        isV6PrintHub ? '打印扫描服务' : isV6Route ? '职易达' : `就业服务大厅 · ${terminalCode}`
+      }
+      brandSubtitle={
+        isV6PrintHub
+          ? `职易达 · ${terminalCode}`
+          : isV6Route
+            ? 'AI 求职操作系统'
+            : 'AI求职打印服务终端'
+      }
+      onBrandClick={isV6PrintHub ? () => navigate('/') : undefined}
+      brandActionLabel={isV6PrintHub ? '返回首页' : undefined}
       headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-      className={isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'}
+      className={`${isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'}${isV6Route ? ' v6-runtime-shell' : ''}`}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
