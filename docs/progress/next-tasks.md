@@ -994,6 +994,30 @@ CONTRACT_REVIEW_API_KEY=
 
 **在配齐之前，该功能不得对外描述为可用。**
 
+#### 配置进展与两项待办（2026-08-16 夜）
+
+已确认可复用现有 DeepSeek 账号：代码白名单只允许 `deepseek` / `qwen`
+（`contract-review.module.ts:59`），而 `.env` 中 `AI_LLM_*` 配的正是 DeepSeek。
+之所以仍须独立声明四项而不能读 `AI_LLM_*`，是合规要求——门禁的
+`provider_allowlist` 与 `algorithm_filing` 均针对具体 provider/model 备案，
+合同数据由哪个模型处理必须显式、可审计，不能跟随通用 AI 配置漂移。
+
+选定 `CONTRACT_REVIEW_MODEL=deepseek-v4-pro`（通用 AI 用的是 `flash`）。
+理由：合同审查逐条指出法律风险，判断错误的代价高于简历诊断。
+
+| # | 待办 | 谁做 | 状态 |
+|---|---|---|---|
+| 1 | **服务器端 `services/api/.env` 配齐四项并重启 API** | 需服务器权限 | ⏳ **未做，功能仍不可用** |
+| 2 | **DeepSeek API key 轮换** | 产品/运维 | ⏳ 上线前必须 |
+
+**关于 #1**：本机 `services/api/.env` 已配好，但小程序 `config.js` 的
+`baseUrl` 指向 `https://zyidai.cn`，**读的是服务器那份**，本机配置对真机无效。
+本机保留是为本地调试与减少两侧漂移；`.env` 已被 `services/api/.gitignore:3` 覆盖。
+
+**关于 #2**：该 key 曾在协作对话中明文出现。本项目已有同类先例——
+`CLAUDE.md` §15 记录百度 OCR 密钥「曾在聊天暴露，上线前须在控制台重建应用轮换密钥」。
+DeepSeek 这一条按同样口径处理。
+
 > **流程教训**：本轮先修了一整天前端，才发现后端服务未启用。
 > 该信息一直在仓库里——`CLAUDE.md` §15 就写着「Gate 0 发布门禁维持 blocked……
 > 需三方签字后才能开放真实 AI 调用」。
