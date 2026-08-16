@@ -293,3 +293,162 @@
     font-size: 21px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════
+   S2-5 · P25 AI 顾问接线（2026-08-16）
+   provider 可识别 + data-aitask 四态 + manual 降级的本页适配。
+   共享原语自身的样式在 src/styles/ai-primitives.css，这里不重复定义。
+   ══════════════════════════════════════════════════════════ */
+
+/* 头卡常驻披露：AIGC 标识 + 「不是真人」。两条都不许折进弹窗。 */
+.kassist.kassist-lightflow .assistant-prototype-head .kiosk-aigc-mark {
+  margin-top: 6px;
+}
+.kassist.kassist-lightflow .assistant-advisor-disclosure {
+  margin-top: 6px;
+  color: var(--sd-text, #4a5a52);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 真实模型回答：E3 徽章一行 + 来源标识一行。两者只出现在 kind="ai" 的气泡里。 */
+.kassist.kassist-lightflow .assistant-message-evrow {
+  display: flex;
+  margin-bottom: 8px;
+}
+.kassist.kassist-lightflow .assistant-message-provider {
+  display: block;
+  margin-top: 8px;
+  color: var(--sd-text, #4a5a52);
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+/* 「这一轮没有 AI 回答」。刻意不用错误红 —— 它不是故障，是如实说明。 */
+.kassist.kassist-lightflow .assistant-message-bubble--not-ai {
+  border: 1px solid color-mix(in srgb, #b8683c 34%, transparent);
+  background: #f4e8dd;
+  color: #7a4526;
+}
+.kassist.kassist-lightflow .assistant-message-bubble--not-ai strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 17px;
+}
+
+/* 四态区：running / idle / done / failed 共用同一块位置。 */
+.kassist.kassist-lightflow .assistant-ai-status {
+  margin-top: 14px;
+}
+.kassist.kassist-lightflow .assistant-ai-idle {
+  color: var(--sd-text, #4a5a52);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.kassist.kassist-lightflow .assistant-ai-status .kiosk-ai-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* manual 降级的四条真实入口。一体机触控：整卡不小于 48px。 */
+.kassist.kassist-lightflow .assistant-manual-entries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.kassist.kassist-lightflow .assistant-manual-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid var(--sd-line, #dfe5e1);
+  border-radius: 14px;
+  background: var(--sd-surface, #fff);
+  color: var(--sd-text-strong, #1b2b25);
+  text-align: left;
+  cursor: pointer;
+}
+.kassist.kassist-lightflow .assistant-manual-entry strong {
+  font-size: 17px;
+}
+.kassist.kassist-lightflow .assistant-manual-entry small {
+  color: var(--sd-text, #4a5a52);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.kassist.kassist-lightflow .assistant-manual-entry:hover {
+  border-color: #1f9e86;
+  background: color-mix(in srgb, #e2f2ec 55%, var(--sd-surface, #fff));
+}
+
+/* 输入条锁定说明：常驻可见，不是 tooltip。 */
+.kassist.kassist-lightflow .assistant-composer-lock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, #b8683c 30%, transparent);
+  border-radius: 14px;
+  background: #f4e8dd;
+  color: #7a4526;
+}
+.kassist.kassist-lightflow .assistant-composer-lock p {
+  flex: 1 1 320px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.kassist.kassist-lightflow .assistant-composer-recheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--kassist-control-min, 48px);
+  padding: 0 20px;
+  border: 1px solid #b8683c;
+  border-radius: 12px;
+  background: transparent;
+  color: #7a4526;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* AI 专项工具置灰：用 aria-disabled 而非原生 disabled，外观要自己画。 */
+.kassist.kassist-lightflow .assistant-ai-tools-reason {
+  margin-bottom: 12px;
+  color: #7a4526;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.kassist.kassist-lightflow .assistant-ai-tool-card[aria-disabled='true'],
+.kassist.kassist-lightflow .assistant-quick-questions button[aria-disabled='true'],
+.kassist.kassist-lightflow .assistant-tool-button[aria-disabled='true'],
+.kassist.kassist-lightflow .assistant-send[aria-disabled='true'] {
+  opacity: 0.5;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+/* 置灰但仍在 Tab 序里，焦点环必须清晰可见。 */
+.kassist.kassist-lightflow [aria-disabled='true']:focus-visible {
+  outline: 3px solid #157a67;
+  outline-offset: 3px;
+}
+.kassist.kassist-lightflow .assistant-composer textarea[aria-disabled='true'] {
+  background: color-mix(in srgb, #5d6b63 6%, transparent);
+  color: var(--sd-text, #4a5a52);
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .kassist.kassist-lightflow .assistant-manual-entries {
+    grid-template-columns: 1fr;
+  }
+}
