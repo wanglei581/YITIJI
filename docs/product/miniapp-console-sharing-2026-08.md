@@ -140,3 +140,83 @@ Partner 当前路由只有 terminals/fairs/sync-logs/dashboard/profile/sources/s
 这与前两次（误判「企业链断点未接」「Admin 无价目配置界面」）是同一类错误，
 根因都是**基于不完整或非权威的信息下否定性断言**。
 处理办法见 [`fake-capability-audit-2026-08.md`](../reviews/fake-capability-audit-2026-08.md) §四。
+
+---
+
+## 六、交给 Codex 的任务卡（M1 / M2）
+
+> **分工**：Claude 负责审查、方案与规格；**真实功能开发由 Codex 执行**。
+> 以下两张卡已消除全部调研不确定性，可直接开工。
+> 跨会话协作记录：小程序线（`wechat-mini-app-review`）复核并提供了关键事实，逐条署来源。
+
+### 已确认事实（Codex 不必重复调研）
+
+| # | 事实 | 核实方式 |
+| --- | --- | --- |
+| **A** | 两条建单链路**完全独立、互不调用**：一体机 `print-jobs.service.ts:392` `tx.order.create`；小程序 `member-print-order-create.service.ts:111` `prisma.order.create`。小程序侧引用一体机 service **0 次** | Claude 按 `origin/main` 核实 |
+| **B** | 小程序建单请求体**只有** `fileId` / `terminalId` / `copies` / `colorMode` / `duplex`（`print-pay.js:38-44`），**不含 `amountCents`** | 小程序线提供，Claude 复核 |
+| **C** | `amountCents` 在小程序中**纯粹是客户端导航状态**——服务端 `/orders/quote` 算出 → 前端带着它决定显示「免费」还是「¥x」→ **建单时不传回**，后端在 `member-print-order-create.service.ts:105` 自己重新 `quote()` | 小程序线提供，Claude 复核 |
+| **D** | 因此 **channel 无需小程序传字段**，两处 `order.create` 各自硬编即可；且该方案**不受小程序 UI 改动影响**（建单参数面不在预览/参数页上） | 小程序线结论 |
+| **E** | 小程序侧目前**没有任何地方读或写 channel**（建单不传、订单列表 `toUiItem` 不消费），**落地时小程序零改动** | 小程序线确认 |
+
+### T-M1 🔴 `Order.channel` 渠道字段
+
+**为什么**：`Order` 现有 `terminalId`/`endUserId`/`paymentSource`/`payChannel` 无一表示来源入口；
+两端建单写的是**同样的字段**，「匿名 + 有 terminalId」只能判出一体机，**会员单完全分不出**
+——而会员单正是小程序主体。渠道对比、转化率、问题定位全部依赖它。
+
+**枚举取值（已定，勿自行更改）**：
+```
+kiosk          一体机现场下单
+miniapp_cloud  小程序云打印（到店取件）
+```
+- 扩展约定：将来加 H5 / 支付宝小程序 / 企业微信时按 `<platform>_<mode>` **追加**，不改已有值
+- **`UserAiConsent` 将来加渠道标识时用同一套取值**（已与小程序线达成一致），不要另起枚举
+
+**改哪里**：
+
+| 位置 | 做什么 |
+| --- | --- |
+| `schema.prisma` `model Order` | 加 `channel String?`（可空，存量为 null）+ 建议索引 `@@index([channel, createdAt])` |
+| `print-jobs.service.ts:392` | `tx.order.create` 硬编 `channel: 'kiosk'` |
+| `member-print-order-create.service.ts:111` | `prisma.order.create` 硬编 `channel: 'miniapp_cloud'` |
+| `admin-orders-readonly.controller.ts` | 查询参数加 `channel` 筛选（现有只有 type/payStatus/taskStatus/search） |
+| `admin-orders-readonly.service.ts` | 返回体加 `channel` 展示字段 |
+| `apps/admin/src/routes/orders/index.tsx` | 加渠道列与筛选（现有 9 列，见原型 `admin/orders.html`） |
+
+**存量处理（重要）**：
+- **不回填、不推断**。会员存量单无法可靠区分，界面显示「**未标注**」
+- ❌ **不要按「匿名 + terminalId → kiosk」批量回填**——那会把一体机匿名单和小程序单的边界猜错，污染统计
+- Admin 渠道对比表在有效数据不足时显示「未标注」而非 `0`（显示 0 会让运营误以为小程序没订单）
+
+**验收**：
+- 一体机下单 → `channel='kiosk'`；小程序云打印下单 → `channel='miniapp_cloud'`
+- Admin 订单页可按渠道筛选，存量单显示「未标注」
+- **小程序零改动**（事实 E）——若发现需要改小程序，说明方案理解有误，先停下确认
+- 双 CI 保持绿（SQLite + `postgres-readiness`）；schema 改动需同步生成 PG schema
+
+### T-M2 🟠 `pickupStatus` 接入 Admin 订单视图
+
+**为什么**：后端取件链路**已完整实现**——`pickupStatus`（`none|pending|claimed|used|expired|cancelled`）、
+`pickupCodeHash`（唯一索引）、`pickupCodeEnc`、`pickupCodeExpiresAt`、`pickupClaimedAt`，
+并建了 `@@index([pickupStatus, pickupCodeExpiresAt])`——**索引都为按这两维查询建好了，
+但 `apps/admin/src/routes/orders/index.tsx` 对 `pickupStatus` 是 0 处引用**。
+用户问「我的件怎么取 / 为什么过期了」，运营看不到任何取件信息。
+
+**改哪里**：Admin 订单页加取件列 + 筛选（见原型 `admin/orders.html`）。
+一体机单该列显示「—」并注明是**业务上不存在**（现场即时出纸，无取件环节），不是「无数据」。
+
+**处置动作需产品先确认，本卡不含**：过期件能否延期？能否重发取件码？退款与取件状态如何联动？
+——这些是**业务规则**，不该由开发默认。本卡只做**可见性**。
+
+**已知成因，写进界面说明**（小程序线提供）：
+> 后端 `cancel()` 实现完整（归属校验 + `pickupStatus:'pending'` 与 `printTaskId:null` 前置 +
+> 免费单分支 + 写 `member.print_order.cancel` 审计），`utils/api.js` 也定义了 `cancelCloudPrintOrder`，
+> **但小程序页面 0 处调用**——用户建了待到机订单只能等过期。
+> 运营看到的「已过期」里有一部分本可被用户取消。**属小程序线缺口**，Admin 侧仅标注成因。
+
+**验收**：Admin 订单页可按取件状态筛选；一体机单显示「—」；不出现任何未经产品确认的处置按钮。
+
+### 顺序建议
+
+**T-M1 先做**——T-M2 的渠道列依赖它，且渠道对比表在 M1 落地前算不出任何数。

@@ -198,6 +198,19 @@
         用户来问「我的件怎么取 / 为什么过期了 / 能不能延期」，<b>运营在后台看不到任何取件信息</b>。
         索引都建好了却没人查，是明显的「后端做完、前端没接」。
       </div>
+      <div class="degrade" style="margin-top:12px">
+        <b>为什么会有一批「本可取消却过期」的单</b>（2026-08-16 由小程序线复核提供）：
+        后端 <code>member-print-order-create.service.ts</code> 的 <code>cancel()</code> <b>实现是完整的</b>
+        （归属校验 + <code>pickupStatus:'pending'</code> 与 <code>printTaskId:null</code> 前置 +
+        免费单分支 + 写 <code>member.print_order.cancel</code> 审计），
+        <code>utils/api.js</code> 里也定义了 <code>cancelCloudPrintOrder</code>——
+        <b>但小程序页面 0 处调用</b>。
+        <br><br>
+        → <b>用户建了待到机订单只能等它过期，没有取消入口。</b>
+        运营在本页看到的「已过期」里，有一部分本可以被用户自己取消。
+        <b>这不是 Admin 的问题，属小程序线缺口</b>，此处仅标注成因，便于运营判断。
+      </div>
+
       <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">
         <span class="tag tag--warn">待取件 pending</span>
         <span class="tag">已亮码 claimed</span>
