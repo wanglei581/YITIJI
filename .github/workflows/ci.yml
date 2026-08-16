@@ -299,6 +299,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
           pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:contract-review-session
           pnpm --filter @ai-job-print/kiosk verify:contract-review-report-print
@@ -709,6 +710,9 @@ jobs:
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
 
+      - name: Verify Kiosk feedback entry gate
+        run: pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
+
       - name: Run Kiosk browser smoke
         run: |
           pnpm --filter @ai-job-print/kiosk test:browser:smoke
@@ -721,6 +725,10 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
+          # test:browser:truth 此前在 apps/kiosk/package.json 里有定义，却没有任何 CI job
+          # 引用它 —— 打印完成页「不得伪造已出纸」和匿名反馈入口的断言全在这一套里，
+          # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
+          pnpm --filter @ai-job-print/kiosk test:browser:truth
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
