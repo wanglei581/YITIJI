@@ -611,6 +611,12 @@ jobs:
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
+          # 简历提取诚实性门禁（REAL-FILE-RESUME 走查）：
+          #   verify:resume-extraction 断言「有文字层但过短」不得被说成扫描件；
+          #   verify-real-resume-diagnosis 断言截断必须如实告知（不限 OCR 来源）。
+          # 两条都涉及用户可见文案的真实性，与 PII 遮盖同理，两个 job 都要跑。
+          pnpm --filter @ai-job-print/api verify:resume-extraction
+          pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies

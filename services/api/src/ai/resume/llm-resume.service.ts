@@ -22,7 +22,7 @@ import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 // ============================================================
 
 /** 诊断输入文本上限（提取层已截断，这里再兜一道，防超长 + 控成本）。 */
-const MAX_DIAGNOSIS_INPUT_CHARS = 12000
+export const MAX_DIAGNOSIS_INPUT_CHARS = 12000
 /** 诊断要稳定，用低 temperature。 */
 const DIAGNOSIS_TEMPERATURE = 0.2
 

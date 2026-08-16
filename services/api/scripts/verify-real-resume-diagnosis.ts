@@ -487,6 +487,48 @@ async function main(): Promise<void> {
       r15b.status === 'failed' && !r15b.report && llmCallCount === before15b + 2,
       '15b. score=7.5 被拒绝（必须 0~10 整数）',
     )
+
+    // ── 16. 截断必须如实告知（不限 OCR 来源）────────────────────────────────────
+    //
+    // 回归背景：extractionNotice 此前只在 textSource 为 image_ocr / pdf_ocr 时下发，
+    // 文字层 PDF / DOCX 的 warnings（其中包含「已截断至 N 字符」）被整条丢弃。
+    // 结果是超长简历只有前一段进了诊断，用户却拿到一份看起来覆盖全文的报告。
+    const longText = `${defaultText}\n${'工作职责描述补充。'.repeat(3000)}`
+    extractionByFileId.set('long-pdf-file', {
+      ok: true,
+      fileId: 'long-pdf-file',
+      text: longText,
+      textSource: 'pdf_text',
+      confidence: 'high',
+      charCount: longText.length,
+      warnings: ['简历文本较长，已截断至 20000 字符用于后续分析'],
+    })
+    setResponses([{ status: 200, content: validReportJson() }])
+    const r16 = await submit('long-pdf-file', null)
+    assert(
+      r16.status === 'completed' && !!r16.extractionNotice,
+      `16a. 文字层来源（pdf_text）的截断提示也必须下发 extractionNotice，got ${JSON.stringify(r16.extractionNotice ?? null)}`,
+    )
+    assert(
+      (r16.extractionNotice?.warnings ?? []).some((w) => w.includes('截断')),
+      '16b. extractionNotice 保留提取层的「已截断」告警',
+    )
+    assert(
+      (r16.extractionNotice?.warnings ?? []).some((w) => w.includes('12000')),
+      '16c. 诊断层二次截断（12000 字符）同样如实告知，不再无声',
+    )
+    assert(
+      r16.extractionNotice?.textSource === 'pdf_text',
+      '16d. textSource 如实透出为 pdf_text，供前端区分「OCR 识别」与「文字层提取」文案',
+    )
+
+    // 16e) 无任何 warning 的普通文字层简历不应凭空多出 extractionNotice（避免噪声）
+    setResponses([{ status: 200, content: validReportJson() }])
+    const r16e = await submit('docx-file', null)
+    assert(
+      r16e.status === 'completed' && !r16e.extractionNotice,
+      `16e. 无警告的文字层简历不下发 extractionNotice，got ${JSON.stringify(r16e.extractionNotice ?? null)}`,
+    )
   } finally {
     if (createdTaskIds.length) {
       await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: createdTaskIds } } })
