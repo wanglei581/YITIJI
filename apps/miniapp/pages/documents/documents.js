@@ -1,6 +1,7 @@
 // 本人文档：只展示服务端返回的真实元数据，不在小程序保存文件内容或伪造样例。
 const app = getApp()
 const api = require('../../utils/api')
+const fileUrls = require('../../utils/file-url')
 const auth = require('../../utils/auth')
 const uploadNames = require('../../utils/upload-name')
 
@@ -115,7 +116,8 @@ Page({
     wx.showLoading({ title: '加载预览…', mask: true })
     api.getFilePreviewUrl(item.id)
       .then((res) => {
-        const url = res && (res.printFileUrl || res.previewUrl || res.url || '')
+        // 服务端返回的是相对路径，wx API 只接受绝对地址（见 utils/file-url.js）
+        const url = fileUrls.absoluteUrl(res && (res.printFileUrl || res.previewUrl || res.url))
         if (!url) throw new Error('服务端未返回预览链接')
         if (item.isImage) {
           wx.hideLoading()
