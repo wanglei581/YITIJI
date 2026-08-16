@@ -22,6 +22,11 @@ const requiredCommands = [
   'pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui',
   'pnpm --filter @ai-job-print/partner verify:partner-refresh-safe',
   'pnpm --filter @ai-job-print/api verify:terminal-status-idempotency',
+  // 硬件真实性门禁：这两条自身也会检查「我在不在 ci.yml 里」，但那个自查
+  // 只在它们被 CI 执行时才跑 —— 一旦有人删掉 CI 里那行，自查就跟着消失。
+  // 在这里登记以打破该循环：本门禁在 Repository integrity gate 步骤中执行。
+  'pnpm --filter @ai-job-print/kiosk verify:mic-capability-truth',
+  'pnpm run verify:image-scale-truth',
 ]
 
 const missing = requiredCommands.filter((command) => !workflowLines.has(command))

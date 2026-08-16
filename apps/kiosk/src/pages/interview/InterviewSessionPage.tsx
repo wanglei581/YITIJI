@@ -12,6 +12,15 @@ import { Button } from '@ai-job-print/ui'
 import { AlertCircleIcon } from 'lucide-react'
 import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
+import {
+  classifyMicError,
+  detectMicCapability,
+  subscribeMicDeviceChange,
+  MIC_FAILURE_REASON,
+  MIC_REASON,
+  MIC_STATUS_LABEL,
+  type MicCapabilityState,
+} from '../../utils/micCapability'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
@@ -64,7 +73,10 @@ export function InterviewSessionPage() {
   const [remainingSec, setRemainingSec] = useState((state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const [voiceAvailable, setVoiceAvailable] = useState(false)
+  const [asrEnabled, setAsrEnabled] = useState(false)
+  // null = 尚未探测完成。不预设 available，避免「语音回答可用」在探测出
+  // 本机没有麦克风之前先闪一下。
+  const [micCapability, setMicCapability] = useState<MicCapabilityState | null>(null)
   const [ttsOfficial, setTtsOfficial] = useState(false)
   const [mode, setMode] = useState<'voice' | 'text'>('text')
   const [voice, setVoice] = useState<InterviewVoiceState>({ kind: 'idle' })
@@ -94,21 +106,49 @@ export function InterviewSessionPage() {
 
   useEffect(() => {
     let cancelled = false
-    getVoiceCapability()
-      .then(({ asrEnabled, ttsEnabled }) => {
+    let asrOn = false
+
+    // 探测的是「机器上有没有音频输入设备」，不是「浏览器有没有这个 API」。
+    // 只在服务端 ASR 已启用时才自动切语音模式；能力探测本身始终执行，
+    // 这样状态胶囊与常显原因永远反映真实硬件情况。
+    const runDetect = (autoSwitch: boolean) => {
+      void detectMicCapability().then((capability) => {
         if (cancelled) return
-        setTtsOfficial(ttsEnabled === true)
-        const micSupported = !!navigator.mediaDevices?.getUserMedia
-        if (asrEnabled && micSupported) {
-          setVoiceAvailable(true)
-          setMode('voice')
-        } else if (asrEnabled && !micSupported) {
-          setVoiceHint('当前设备不支持麦克风，请使用文字输入完成练习')
+        setMicCapability(capability)
+        if (asrOn && capability === 'available') {
+          if (autoSwitch) setMode('voice')
+        } else if (asrOn) {
+          setVoiceHint(MIC_REASON[capability])
         }
       })
-      .catch(() => undefined)
-    return () => { cancelled = true }
+    }
+
+    getVoiceCapability()
+      .then(({ asrEnabled: asr, ttsEnabled }) => {
+        if (cancelled) return
+        asrOn = asr === true
+        setAsrEnabled(asrOn)
+        setTtsOfficial(ttsEnabled === true)
+        runDetect(true)
+      })
+      .catch(() => { if (!cancelled) runDetect(false) })
+
+    // 用户可能后插一个 USB 麦克风：热插拔后重新探测，语音入口自动恢复。
+    const unsubscribe = subscribeMicDeviceChange(() => runDetect(false))
+    return () => { cancelled = true; unsubscribe() }
   }, [])
+
+  /** 手动重探（改权限后 / 插上麦克风后）。 */
+  const recheckMic = () => {
+    setMicCapability(null)
+    setMicError(false)
+    setError(null)
+    void detectMicCapability().then((capability) => {
+      setMicCapability(capability)
+      setVoiceHint(MIC_REASON[capability])
+      if (capability === 'available' && asrEnabled) setVoiceHint(null)
+    })
+  }
 
   const interviewerMsgs = messages.filter((m) => m.role === 'interviewer')
   const lastInterviewerMsg = interviewerMsgs.slice(-1)[0]?.content ?? ''
@@ -196,6 +236,13 @@ export function InterviewSessionPage() {
   }
 
   const startRecording = async () => {
+    // 能力门禁：去掉原生 disabled 后按钮真的可点，守卫必须在 handler 内部。
+    if (micCapability !== null && micCapability !== 'available') {
+      setMicError(true)
+      setVoiceHint(MIC_REASON[micCapability])
+      setError(MIC_FAILURE_REASON[micCapability])
+      return
+    }
     setError(null)
     setMicError(false)
     setVoiceHint(null)
@@ -214,10 +261,19 @@ export function InterviewSessionPage() {
           return s + 1
         })
       }, 1000)
-    } catch {
+    } catch (err) {
+      // 关键：按 error.name 归因。NotFoundError 是「没有设备」，
+      // NotAllowedError 才是「权限问题」——旧代码把两者都说成权限问题，
+      // 让没有麦克风的用户去翻浏览器设置，而那里什么都查不出来。
+      const failure = classifyMicError(err)
       resetVoiceState()
       setMicError(true)
-      setError('无法访问麦克风，请检查浏览器权限或改用文字输入')
+      setError(MIC_FAILURE_REASON[failure])
+      // 归因为设备/权限/不支持时同步收紧能力门禁，语音入口随之置灰。
+      if (failure === 'no-device' || failure === 'permission-denied' || failure === 'unsupported') {
+        setMicCapability(failure)
+        setVoiceHint(MIC_REASON[failure])
+      }
     }
   }
 
@@ -317,8 +373,18 @@ export function InterviewSessionPage() {
   const busyTurn = phase === 'thinking' || phase === 'finishing'
   const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
   const ttsLabel = ttsOfficial ? '官方语音播报' : '浏览器语音兜底'
-  const micStatusLabel = micError || !voiceAvailable ? '麦克风不可用' : '语音回答可用'
-  const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
+  // 状态胶囊直述硬件事实：探测中不下结论，只有确实探到设备才敢说「可用」。
+  const micStatusLabel = micCapability === null ? '正在检测麦克风…' : MIC_STATUS_LABEL[micCapability]
+  const micStatusTone =
+    micCapability === null ? 'blue' : micCapability === 'available' ? 'green' : 'red'
+  // 语音入口是否放行 = 服务端 ASR 已启用 且 本机确实有可用麦克风。
+  const voiceAvailable = asrEnabled && micCapability === 'available'
+  // 门禁置灰就必须有常显原因，一个都不能漏：硬件原因优先，其次是服务端未启用。
+  const micBlockedReason =
+    micCapability === null ? null
+    : micCapability !== 'available' ? MIC_REASON[micCapability]
+    : !asrEnabled ? '语音转写服务未启用，请用文字作答'
+    : null
 
   return (
     <InterviewShell>
@@ -358,6 +424,8 @@ export function InterviewSessionPage() {
         maxRecordSec={MAX_RECORD_SEC}
         draft={draft}
         voiceAvailable={voiceAvailable}
+        micBlockedReason={micBlockedReason}
+        onRecheckMic={recheckMic}
         onDraftChange={setDraft}
         onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}
         onReviewSubmit={() => {
@@ -376,7 +444,17 @@ export function InterviewSessionPage() {
           setMode('text')
           setMicError(false)
         }}
-        onUseVoice={() => { setMode('voice'); setMicError(false); setError(null) }}
+        onUseVoice={() => {
+          // 能力门禁用 aria-disabled（触屏无 hover，原因常显在按钮下方），
+          // 因此按钮仍可点击，短路守卫必须放在 handler 内部。
+          if (!voiceAvailable) {
+            if (micCapability !== null && micCapability !== 'available') {
+              setVoiceHint(MIC_REASON[micCapability])
+            }
+            return
+          }
+          setMode('voice'); setMicError(false); setError(null)
+        }}
         onSkip={() => void submit({ text: '', skip: true })}
         onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
