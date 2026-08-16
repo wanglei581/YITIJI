@@ -176,10 +176,7 @@
       <a class="rstep" href="09-resume-workbench.html?stage=s2"><span class="rstep-dot">2</span><span class="rstep-name">正在解析</span></a>
       <a class="rstep rstep--done" href="09-resume-workbench.html?stage=s3"><span class="rstep-dot">3</span><span class="rstep-name">诊断结论</span></a>
       <span class="rstep rstep--now" aria-current="step"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></span>
-      <!-- 2026-08-16 回归补正：09 与本页都没有 data-stage="s5"，跳过去同样是空白。
-           与 09 第 5 步同样处理：可聚焦禁用 + 可解释原因，不留一个点了空屏的链接。 -->
-      <button type="button" class="rstep rstep--skip" aria-disabled="true"
-              title="本稿尚未实现「版本与导出」"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></button>
+      <a class="rstep" href="09-resume-workbench.html?stage=s5"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></a>
     </div>
     <span class="rail-count">第 <b>4</b> / 5 步</span>
   </div>
@@ -323,17 +320,7 @@
       <div data-when="ai-down first"><div class="t">改写不可用</div><div class="s">原件完好，可打印或存档</div></div>
     </div>
     <a class="btn btn--lg btn--ghost" href="09-resume-workbench.html?stage=s3">回看诊断</a>
-    <!-- 2026-08-16 回归补正：这是本页唯一的出口，原本指向 ?stage=s5，而 09 与本页
-         都没有 data-stage="s5" —— 用户逐条采纳完，点这个按钮会落到一片空白。
-         「版本与导出」是流程声明了却从未绘制的一页（生产侧已有 /resume/export，
-         原型缺）。在该页补出来之前，按 §9 改为可聚焦禁用 + 写明原因，
-         不留一个把人送进空屏的主操作。补页任务已单独立项。 -->
-    <button type="button" class="btn btn--primary" data-when="default device-off"
-            aria-disabled="true" aria-describedby="v2-blocked-why">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <p id="v2-blocked-why" class="note note--warn" style="flex-basis:100%;margin-top:8px">
-      「版本与导出」页本稿尚未绘制，生成 v2 暂不可用。你在本页做的采纳/保留决定已记录，
-      该页补齐后可直接继续；现在可以先回诊断结论页复核。
-    </p>
+    <a class="btn btn--primary" data-when="default device-off" href="09-resume-workbench.html?stage=s5">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-when="ai-down first" aria-disabled="true">改写不可用</button>
   </div>
 
