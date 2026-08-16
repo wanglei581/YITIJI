@@ -8,6 +8,7 @@ import type {
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -35,6 +36,12 @@ import { containsForbiddenWord } from '../llm/llm-guard'
 
 const MAX_INPUT_CHARS = 12000
 const OPTIMIZE_TEMPERATURE = 0.3
+
+/**
+ * 把「简历原文」「事实基线」「结构化简历 JSON」拼成一次遮盖调用时的分隔符。
+ * 必须是遮盖引擎不会改写、且不可能出现在简历正文里的串。
+ */
+const MASK_SPLIT = '\n<<<PII_MASK_SPLIT>>>\n'
 const MAX_SUMMARY_CHARS = 300
 const MAX_DESC_CHARS = 600
 const MAX_SKILL_CHARS = 40
@@ -176,7 +183,13 @@ export class LlmResumeOptimizeService {
       })
     }
 
-    const text = (extractedText ?? '').slice(0, MAX_INPUT_CHARS)
+    // S0-2 红线：简历原文送模型前必须遮盖高置信 PII。
+    // 送模型的是 masked.text，事实串校验也必须拿**送出去的那一份**做基线 ——
+    // 拿原文校验会让模型回包里的 `[手机号_1]` 判不在原文而整单作废。
+    // 产物是用户要打印的简历，因此最后用 restore() 把占位符换回真值（restore 只在
+    // 服务端内存里发生，真值从未离开本进程）。
+    const masked = maskUserTextForLlmReversible((extractedText ?? '').slice(0, MAX_INPUT_CHARS), 'resume_optimize')
+    const text = masked.text
     const reportBrief = report.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
     const directionPrompt = buildTargetContextPrompt(targetContext)
     const baseMessages: ChatMessage[] = [
@@ -192,7 +205,7 @@ export class LlmResumeOptimizeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
       const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages)
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
-      if (result) return result
+      if (result) return restoreOptimizeResult(result, masked.restore)
       this.logger.warn(`resume optimize: invalid output (attempt ${attempt}/2)`)
     }
 
@@ -224,7 +237,29 @@ export class LlmResumeOptimizeService {
         error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
       })
     }
-    const factSource = `${originalText}\n${extractResumeValueText(input.currentResume)}`
+    // S0-2 红线：原文与结构化简历都含 PII，必须在**同一次遮盖调用**里处理 ——
+    // 分多次调用会各自从 1 开始编号，同一个人在不同文本里拿到不同占位符，
+    // 事实串校验就会全线判假。用分隔符拼一次、遮盖、再切回来。
+    //
+    // 三段：原文 / 事实基线（仅字段值）/ 送模型的结构化 JSON。
+    // 事实基线仍然只由**字段值**构成 —— 不能改用 JSON 串，否则 "school"、"company"
+    // 这些字段名会变成合法事实来源，等于放宽既有的防编造断言。
+    //
+    // 预算：遮盖入口会把超过 LLM_MASK_INPUT_LIMIT 的部分静默截断，被截掉的是**后半段**。
+    // JSON 残缺会直接毁掉条目数量上限校验，所以优先保后两段完整，不够的额度从
+    // originalText 预算里扣（originalText 本来就已按 MAX_INPUT_CHARS 截断）。
+    const resumeJson = JSON.stringify(input.currentResume)
+    const resumeValues = extractResumeValueText(input.currentResume)
+    const originalBudget = Math.max(
+      0,
+      LLM_MASK_INPUT_LIMIT - resumeJson.length - resumeValues.length - MASK_SPLIT.length * 2,
+    )
+    const maskedTriple = maskUserTextForLlmReversible(
+      `${originalText.slice(0, originalBudget)}${MASK_SPLIT}${resumeValues}${MASK_SPLIT}${resumeJson}`,
+      'resume_layout_adjust',
+    )
+    const [maskedOriginal = '', maskedResumeValues = '', maskedResumeJson = ''] = maskedTriple.text.split(MASK_SPLIT)
+    const factSource = `${maskedOriginal}\n${maskedResumeValues}`
     const layoutHint = buildLayoutHint(input.layout)
     const actionHint =
       input.action === 'condense'
@@ -234,7 +269,7 @@ export class LlmResumeOptimizeService {
       { role: 'system', content: LAYOUT_ADJUST_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `${actionHint}\n${layoutHint}\n当前结构化简历(JSON,字段名不是事实来源):\n${JSON.stringify(input.currentResume)}\n\n原始简历文本:\n${originalText}`,
+        content: `${actionHint}\n${layoutHint}\n当前结构化简历(JSON,字段名不是事实来源):\n${maskedResumeJson}\n\n原始简历文本:\n${maskedOriginal}`,
       },
     ]
 
@@ -243,7 +278,11 @@ export class LlmResumeOptimizeService {
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
       const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages)
       const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
-      if (result) return result
+      if (result) {
+        // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；
+        // 这里只还原文本内容，basic 身份字段另以服务端权威值兜底。
+        return restoreLayoutAdjustResult(result, maskedTriple.restore, input.currentResume)
+      }
       this.logger.warn(`resume layout adjust: invalid output (attempt ${attempt}/2)`)
     }
 
@@ -571,6 +610,75 @@ function buildLayoutHint(layout?: ResumeLayoutSettings): string {
     layout.accent ? `主色=${layout.accent}` : '',
   ].filter(Boolean)
   return `排版参数:${parts.join('；') || '默认'}。`
+}
+
+type RestoreFn = (value: string) => string
+
+/**
+ * 把模型产物里的遮盖占位符换回真值。
+ *
+ * 为什么必须还原：这两个接口的产物就是**用户要导出/打印的那份简历**
+ * （ResumeOptimizePage → exportGeneratedResume）。只遮盖不还原，
+ * 用户简历上的联系方式会变成 `[手机号_1]` —— 那是拿功能损坏换合规。
+ * 还原全程只在服务端内存里发生，真值从未离开本进程、不落日志。
+ */
+function restoreGeneratedResume(resume: GeneratedResume, restore: RestoreFn): GeneratedResume {
+  const opt = (value: string | undefined): string | undefined => (value === undefined ? undefined : restore(value))
+  return {
+    ...resume,
+    basic: { ...resume.basic, name: restore(resume.basic.name), phone: opt(resume.basic.phone), email: opt(resume.basic.email), city: opt(resume.basic.city) },
+    intention: { ...resume.intention, position: restore(resume.intention.position), city: opt(resume.intention.city) },
+    summary: restore(resume.summary),
+    education: resume.education.map((item) => ({
+      ...item,
+      school: restore(item.school),
+      major: opt(item.major),
+      degree: opt(item.degree),
+      period: opt(item.period),
+      description: opt(item.description),
+    })),
+    experience: resume.experience.map((item) => ({
+      ...item,
+      company: restore(item.company),
+      role: restore(item.role),
+      period: opt(item.period),
+      description: restore(item.description),
+    })),
+    projects: resume.projects.map((item) => ({
+      ...item,
+      name: restore(item.name),
+      role: opt(item.role),
+      description: restore(item.description),
+    })),
+    skills: resume.skills.map((skill) => restore(skill)),
+    certificates: resume.certificates.map((cert) => restore(cert)),
+  }
+}
+
+function restoreOptimizeResult(result: OptimizeResult, restore: RestoreFn): OptimizeResult {
+  return {
+    optimizedResume: restoreGeneratedResume(result.optimizedResume, restore),
+    // 前后对比是直接展示给用户的文本，占位符同样必须还原
+    modules: result.modules.map((item) => ({
+      title: restore(item.title),
+      before: restore(item.before),
+      after: restore(item.after),
+    })),
+  }
+}
+
+function restoreLayoutAdjustResult(
+  result: LayoutAdjustResult,
+  restore: RestoreFn,
+  authoritative: GeneratedResume,
+): LayoutAdjustResult {
+  const restored = restoreGeneratedResume(result.resume, restore)
+  return {
+    // basic 是纯透传字段：排版调整不需要模型对姓名/电话/邮箱/城市做任何加工，
+    // 直接用服务端权威值覆盖 —— 既杜绝占位符漏回填，也杜绝模型篡改联系方式。
+    resume: { ...restored, basic: { ...authoritative.basic } },
+    warnings: result.warnings.map((warning) => restore(warning)),
+  }
 }
 
 function extractResumeValueText(resume: GeneratedResume): string {

@@ -63,8 +63,9 @@ const NON_TOKEN_BILLED_OPS: readonly AiOperation[] = ['voiceTranscribe', 'voiceS
 const NON_TOKEN_BILLED_NOTE: Record<string, string> = {
   voiceTranscribe: '按音频时长计费',
   voiceSynthesize: '按字符数计费',
-  selfAssessment: '自我探索 · 倾向参考',
-
+  // 注：selfAssessment 曾被误列在此。它是**按 token 计费**的付费 LLM 调用，
+  // 本表只在 !row.tokenBilled 时才会被读到，所以那条目永远读不到，
+  // 却会误导后来人以为它按量计费。已移除。
 }
 
 const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
