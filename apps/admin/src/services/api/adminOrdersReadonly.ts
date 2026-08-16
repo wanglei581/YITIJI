@@ -12,6 +12,11 @@ export interface AdminOrderReadonlyItem {
   terminalCode: string | null
   amountCents: number
   currency: string
+  /** 下单渠道：kiosk | miniapp_cloud；null = 存量单，必须显示「未标注」不得猜成一体机 */
+  channel: string | null
+  /** 取件状态：一体机单恒 none（现场即时出纸，业务上无取件环节） */
+  pickupStatus: string
+  pickupCodeExpiresAt: string | null
   payStatus: string
   taskStatus: string
   printFileName: string | null
@@ -160,6 +165,11 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   ownerType: 'member',
   userLabel: '演示会员',
   terminalCode: 'KSK-001',
+  // mock 用 null 而非 'kiosk'：让 mock 模式下也能看到「未标注」这个真实存在的存量态，
+  // 避免开发期误以为所有单都有渠道。
+  channel: null,
+  pickupStatus: 'none',
+  pickupCodeExpiresAt: null,
   amountCents: 0,
   currency: 'CNY',
   payStatus: 'unpaid',

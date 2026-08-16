@@ -112,6 +112,9 @@ export class MemberPrintOrderCreateService {
       data: {
         orderNo: makeOrderNo(),
         type: 'print',
+        // channel: 小程序云打印（到店取件）。小程序建单请求体不含该字段——
+        // 由服务端硬编，前端零改动（见 M1 任务卡事实 B/D/E）。
+        channel: 'miniapp_cloud',
         endUserId,
         terminalId: terminal.id,
         sourceFileId: file.id,

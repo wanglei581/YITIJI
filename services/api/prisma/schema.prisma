@@ -323,6 +323,16 @@ model Order {
   // refundedAmountCents: 已退金额累计（分，>=0）；全额退款 = 实付额。partial_refunded 场景本波仅预留，不接部分退款动作。
   refundedAmountCents Int @default(0)
 
+  // channel: 下单渠道（来源入口）。kiosk = 一体机现场；miniapp_cloud = 小程序云打印（到店取件）。
+  // 为什么必须显式存而不是推断：一体机与小程序建单写的是**同样的字段**
+  // （terminalId 在小程序侧是用户选的门店），「匿名 + 有 terminalId」只能判出一体机，
+  // 会员单完全分不出来——而会员单正是小程序主体。渠道对比、转化率、问题定位全部依赖它。
+  // 扩展约定：将来加 H5 / 支付宝小程序 / 企业微信时按 <platform>_<mode> 追加，不改已有取值。
+  // UserAiConsent 将来加渠道标识时共用同一套取值（已与小程序线达成一致），不要另起枚举。
+  // 可空：存量订单无法可靠回填（禁止按「匿名+terminalId → kiosk」批量猜），一律留 null，
+  // 前端显示「未标注」而非 0 或「一体机」。
+  channel String?
+
   paymentAttempts PaymentAttempt[]
   refunds         Refund[]
 
@@ -336,6 +346,7 @@ model Order {
   @@index([terminalId])
   @@index([pickupStatus, pickupCodeExpiresAt])
   @@index([createdAt])
+  @@index([channel, createdAt])
 }
 
 /// 服务端价目 SSOT（P0a 支付域）。首批仅开发默认价 seed，不对外宣称最终定价；
