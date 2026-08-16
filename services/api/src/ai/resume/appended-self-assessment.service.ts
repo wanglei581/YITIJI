@@ -14,6 +14,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PDFDocument } from 'pdf-lib'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
+import { signFileUrl } from '../../files/signing'
 import { AuditService } from '../../audit/audit.service'
 import {
   SelfAssessmentService,
@@ -56,6 +57,7 @@ export class AppendedSelfAssessmentService {
     pageCount: number
     signedUrl: string
     expiresAt: string
+    printFileUrl: string
   }> {
     const ctx = opts.auditCtx ?? EMPTY_AUDIT_CONTEXT
     // 1) 读取自我探索结果（已含归属校验）
@@ -139,6 +141,10 @@ export class AppendedSelfAssessmentService {
       pageCount: saPageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
+      // `/print/jobs` 只认内部 HMAC 签名 URL，不认对象存储的 signedUrl。
+      // 缺这一项时「去打印工作台核价」必然失败 —— 这正是 S2-7 判定本端点
+      // 打印链路断裂、宁可不接的原因（PR #622 §一）。与 printReport() 同款签发。
+      printFileUrl: signFileUrl(uploaded.fileId).url,
     }
   }
 

@@ -552,6 +552,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
+          pnpm --filter @ai-job-print/api verify:self-assessment-consent
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
@@ -741,6 +742,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
+          pnpm --filter @ai-job-print/api verify:self-assessment
+          pnpm --filter @ai-job-print/api verify:self-assessment-consent
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。

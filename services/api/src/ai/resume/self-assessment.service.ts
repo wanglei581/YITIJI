@@ -12,7 +12,7 @@
 // - 打印文件名带 -self-assessment 前缀；不进分享用途的 FileObject。
 // ============================================================
 
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
@@ -20,6 +20,7 @@ import { FilesService } from '../../files/files.service'
 import { signFileUrl } from '../../files/signing'
 import { SELF_ASSESSMENT_QUESTIONS_V1 } from './self-assessment-questions'
 import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './self-assessment.types'
+import { SELF_ASSESSMENT_CONSENT_VERSION } from './self-assessment.types'
 import { LlmSelfAssessmentService } from './llm-self-assessment.service'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
@@ -68,13 +69,33 @@ interface StoredSelfAssessment {
   summary: string | null
   aiProvider?: string | null
   completedAt: string
+  /**
+   * 本次作答同意的**说明版本号**。`null` = 未版本化同意（旧前端未上报版本）。
+   * 存的是「同意了哪个版本」而不是「同意过」：改版之后，靠 `=== 当前版本` 判定，
+   * 旧版本同意不会被当成新版本同意。
+   */
+  consentVersion?: string | null
+  /** 勾选时刻（ISO8601）；未版本化同意时缺省。 */
+  consentedAt?: string | null
   /** 撤回时间戳；存在则视为已删除（payload 字段已物理清空）。 */
   deletedAt?: string
 }
 
 export interface SelfAssessmentSubmitInput {
   answers: SelfAssessmentAnswerV1[]
-  consent: { nonSensitive: boolean; sensitive: boolean }
+  consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string }
+}
+
+/**
+ * 判定一条已存同意在**当前**说明版本下是否仍然有效。
+ *
+ * 这是整条版本化同意链路的判定点，口径与 `member-privacy.service.ts`
+ * 的 `consentStatus()` 完全一致：**严格相等，不做前缀 / 大小写 / 语义化版本兼容**。
+ * 任何「旧版本也算数」的放宽，都会让改版后的同意书自动继承旧同意。
+ * `null`（未版本化）同样判 false —— 没有版本的同意无法证明它覆盖当前说明。
+ */
+export function isConsentCurrent(storedVersion: string | null | undefined): boolean {
+  return storedVersion === SELF_ASSESSMENT_CONSENT_VERSION
 }
 
 export interface SelfAssessmentSubmitOutput {
@@ -87,6 +108,12 @@ export interface SelfAssessmentSubmitOutput {
   /** 匿名结果一次性访问令牌（仅匿名提交响应返回一次）。 */
   accessToken?: string
   expiresAt: string | null
+  /** 实际存下的同意版本；null = 未版本化同意（不冒充当前版本）。 */
+  consentVersion: string | null
+  /** 勾选时刻（ISO8601）；未版本化同意时为 null。 */
+  consentedAt: string | null
+  /** 存下的版本是否仍等于当前版本；false ⇒ 前端必须请用户重新确认。 */
+  consentCurrent: boolean
 }
 
 @Injectable()
@@ -114,6 +141,28 @@ export class SelfAssessmentService {
         error: { code: 'SELF_ASSESSMENT_CONSENT_REQUIRED', message: '请勾选非敏感题作答同意后再提交' },
       })
     }
+
+    // ── 版本化同意门禁 ────────────────────────────────────────────────
+    // 客户端**显式**带上一个非当前版本 ⇒ 它同意的是另一份说明，直接拒绝并要求
+    // 重新确认。这里绝不能「就近升级成当前版本」放行 —— 那正是把旧同意当成
+    // 新同意的实现方式。
+    //
+    // 版本号**缺省**（现网 S2-7 前端只发两个布尔）⇒ 如实记为 null「未版本化同意」，
+    // 同样**不补写当前版本**。null 在 `isConsentCurrent()` 下判 false，
+    // 读回时 `consentCurrent:false`，前端据此请用户重新确认。
+    const suppliedVersion =
+      typeof input.consent.consentVersion === 'string' ? input.consent.consentVersion.trim() : ''
+    if (suppliedVersion && suppliedVersion !== SELF_ASSESSMENT_CONSENT_VERSION) {
+      throw new BadRequestException({
+        error: {
+          code: 'SELF_ASSESSMENT_CONSENT_VERSION_STALE',
+          message: '知情同意说明已更新，请重新阅读并确认后再提交',
+        },
+      })
+    }
+    const consentVersion: string | null = suppliedVersion || null
+    const consentedAt: string | null = consentVersion ? new Date().toISOString() : null
+
     const t0 = Date.now()
 
     // taskId 在 t0 之后立刻提取,保证 ai_service_log / audit_log / ai_resume_result 三方一致
@@ -187,6 +236,8 @@ export class SelfAssessmentService {
       summary,
       aiProvider: providerName,
       completedAt,
+      consentVersion,
+      consentedAt,
     }
 
     if (!overallRejectReason) {
@@ -215,6 +266,8 @@ export class SelfAssessmentService {
         summary: null,
         aiProvider: providerName,
         completedAt,
+        consentVersion,
+        consentedAt,
       }
       await this.prisma.aiResumeResult.create({
         data: {
@@ -242,6 +295,9 @@ export class SelfAssessmentService {
         dimensionCount: scored.dimensions.length,
         unmatchedCount: scored.unmatched.length,
         status: overallRejectReason ? 'rejected' : 'completed',
+        // 只记「同意了哪个版本」这一事实；作答内容 / 选项 / 原文一律不进审计正文。
+        consentVersion,
+        consentVersioned: consentVersion !== null,
       },
       ipAddress: ctx.ipAddress,
       userAgent: ctx.userAgent,
@@ -256,6 +312,9 @@ export class SelfAssessmentService {
         dimensions: scored.dimensions.map((d) => ({ ...d, note: null })),
         summary: null,
         expiresAt: null,
+        consentVersion,
+        consentedAt,
+        consentCurrent: isConsentCurrent(consentVersion),
       }
     }
 
@@ -267,6 +326,9 @@ export class SelfAssessmentService {
       providerName: providerName ?? undefined,
       ...(accessToken ? { accessToken } : {}),
       expiresAt: expiresAt.toISOString(),
+      consentVersion,
+      consentedAt,
+      consentCurrent: isConsentCurrent(consentVersion),
     }
   }
 
@@ -294,6 +356,10 @@ export class SelfAssessmentService {
       userAgent: ctx.userAgent,
       requestId: ctx.requestId,
     })
+    // 回读只回**存下来的事实**：存的是哪个版本就回哪个版本，null 就回 null。
+    // 绝不用「当前版本」填充空值 —— 那等于把一条没有版本的旧同意
+    // 伪装成对当前说明的同意。consentCurrent 由严格相等判定，供前端决定是否重新确认。
+    const storedConsentVersion = stored.consentVersion ?? null
     return {
       taskId,
       status: 'completed' as const,
@@ -301,6 +367,9 @@ export class SelfAssessmentService {
       summary: stored.summary,
       providerName: stored.aiProvider ?? undefined,
       expiresAt: row.expiresAt?.toISOString() ?? null,
+      consentVersion: storedConsentVersion,
+      consentedAt: stored.consentedAt ?? null,
+      consentCurrent: isConsentCurrent(storedConsentVersion),
     }
   }
 
@@ -311,6 +380,9 @@ export class SelfAssessmentService {
     ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
   ) {
     const row = await this.loadAuthorizedRow(taskId, requester)
+    // 撤回 = 物理清空 payload 字段（含同意版本）。
+    // 「这个人在哪个版本下同意过」的审计证据不依赖本行：它在撤回前就已经写进
+    // `resume.self_assessment_create` 审计事件，撤回不会把它一起抹掉。
     const empty: StoredSelfAssessment = {
       version: 'v1',
       answersHash: '',
@@ -318,6 +390,8 @@ export class SelfAssessmentService {
       summary: null,
       aiProvider: null,
       completedAt: '',
+      consentVersion: null,
+      consentedAt: null,
       deletedAt: new Date().toISOString(),
     }
     await this.prisma.aiResumeResult.update({
