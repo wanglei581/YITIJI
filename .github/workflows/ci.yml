@@ -102,6 +102,27 @@ jobs:
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
+          # ── 2026-08-16 门禁全量体检补回：以下门禁此前写在 package.json 里
+          #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
+          #    不 import services/api/src、不碰 Prisma、不连 DB，故留在本步。
+          pnpm --filter @ai-job-print/kiosk verify:advisor-provider-gate
+          pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
+          pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
+          pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
+          pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
+          pnpm --filter @ai-job-print/kiosk verify:jobfair-size
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-runtime-error-boundary
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-visual-unity
+          pnpm --filter @ai-job-print/kiosk verify:print-cta-contrast
+          pnpm --filter @ai-job-print/kiosk verify:print-done-truth
+          pnpm --filter @ai-job-print/kiosk verify:print-entry-source-split
+          pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
+          pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
+          pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
+          pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
+          pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
+          pnpm --filter @ai-job-print/admin verify:source-publish-actions
+          pnpm --filter @ai-job-print/refresh verify:runtime
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -246,6 +267,13 @@ jobs:
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
+          # ── 2026-08-16 门禁全量体检补回。三条都只做静态读取 / 注入桩：
+          #    installer-inputs 校验安装器输入清单文本，printer-config 校验
+          #    printerName 可配置（不硬编码型号），local-print-wake 走进程内
+          #    调度控制。均不触发真实 spooler、打印机或 Windows API。
+          pnpm run verify:installer-inputs
+          pnpm run verify:printer-config
+          pnpm run verify:local-print-wake
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -491,6 +519,45 @@ jobs:
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files
+          # ── 2026-08-16 门禁全量体检补回 ────────────────────────────
+          # 以下门禁此前写在 services/api/package.json 里但没有任何 CI job
+          # 执行它们。它们 import services/api/src，会传递依赖到 Prisma 客户端，
+          # 因此必须留在本步（「Prepare fresh SQLite db」之后），不能上移到
+          # 「Cross-client deterministic static gates」——那时客户端还没生成，
+          # 会报 Cannot find module '../generated/prisma/client'。
+          # 同上：本步必须保持串行，勿改成并行。
+          pnpm --filter @ai-job-print/api verify:self-assessment
+          pnpm --filter @ai-job-print/api verify:print-param-suggestion
+          pnpm --filter @ai-job-print/api verify:resume-diagnosis-context
+          pnpm --filter @ai-job-print/api verify:admin-pending-dispose
+          pnpm --filter @ai-job-print/api verify:benefit-activities
+          pnpm --filter @ai-job-print/api verify:change-password
+          pnpm --filter @ai-job-print/api verify:change-password:target-guard
+          pnpm --filter @ai-job-print/api verify:internal-auth-phone:target-guard
+          pnpm --filter @ai-job-print/api verify:contract-review:http
+          pnpm --filter @ai-job-print/api verify:cos
+          pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy
+          pnpm --filter @ai-job-print/api verify:end-user-assets
+          pnpm --filter @ai-job-print/api verify:external-video
+          pnpm --filter @ai-job-print/api verify:external-video:e2e
+          pnpm --filter @ai-job-print/api verify:fair-stats-truth
+          pnpm --filter @ai-job-print/api verify:fair-visit-plan
+          pnpm --filter @ai-job-print/api verify:feedback-notifications
+          pnpm --filter @ai-job-print/api verify:field-mapping
+          pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
+          pnpm --filter @ai-job-print/api verify:member-assets
+          pnpm --filter @ai-job-print/api verify:member-benefits-admin
+          pnpm --filter @ai-job-print/api verify:member-favorites-benefits
+          pnpm --filter @ai-job-print/api verify:member-sms-provider-errors
+          pnpm --filter @ai-job-print/api verify:miniapp-cloud-print-m2
+          pnpm --filter @ai-job-print/api verify:sms-provider
+          pnpm --filter @ai-job-print/api verify:sms-send
+          pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-launch-events
+          pnpm --filter @ai-job-print/api verify:toolbox-micro-app-platform
+          pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-review-workflow
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
