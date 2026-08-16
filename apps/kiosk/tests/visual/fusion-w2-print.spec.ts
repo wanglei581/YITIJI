@@ -541,3 +541,309 @@ test('failed print status displays only the safe user reason and no pickup code 
   await expect(page.getByText('取件凭证码')).toHaveCount(0)
   await expectHealthy(page, errors, 'print-done')
 })
+
+// ============================================================
+// S2 权益卡六态（V6 原型 P06 s4，06-print-workbench.html:914-919）
+//
+// 每一态都由**真实数据**判定，测试也只通过真实端点响应来触发：
+//   guest             — 未登录（不发 /me/benefits）
+//   price_unavailable — POST /orders/quote 失败
+//   repriced          — /print/price-config 单价 ≠ 本单报价单价
+//   not_applicable    — 报价应付 0 元（服务端对免费单拒绝核销）
+//   available / none  — 登录后 GET /me/benefits 的真实内容
+//   error             — GET /me/benefits 失败（诚实态：不许滑成「没有权益」）
+//
+// 反向验证：每条用例断言 data-benefit-state 的**精确取值**，并断言互斥态不出现。
+// 判定错一态，属性值就不同，用例即失败。
+// ============================================================
+
+const W2_MEMBER_TOKEN = 'w2-benefit-memory-token'
+const W2_MEMBER_PHONE = '13800138000'
+const W2_MEMBER_CODE = '123456'
+
+function registerMemberLogin(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', { status: 200, json: { success: true, data: null } })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', { status: 200, json: { success: true, data: null } })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        token: W2_MEMBER_TOKEN,
+        user: { id: 'member-w2-benefit', phoneMasked: '138****8000', nickname: '权益验收用户' },
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/me/pending-tasks', { status: 200, json: { success: true, data: [] } })
+  // 登录后外壳会预取收藏；与权益卡无关，但必须登记，否则 ApiRouter 判为未处理请求。
+  api.respond('GET', '/api/v1/me/favorites', {
+    status: 200,
+    json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+  })
+}
+
+/**
+ * 通过真实可见 UI 登录。
+ *
+ * 登录会触发 AuthContext.clearKioskSensitiveSession()（公共终端切换身份即清上一位用户的
+ * 敏感材料，是产品既定行为），所以打印材料上下文必须在登录**之后**再送进来。
+ */
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of W2_MEMBER_PHONE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of W2_MEMBER_CODE) await page.getByRole('button', { name: digit, exact: true }).click()
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
+/**
+ * 客户端软跳转（pushState + popstate），**不重载文档**。
+ *
+ * 必须不重载：Kiosk 会话是纯内存态，reload 即登出（setReactRouterState 会 reload，
+ * 因此不能用在登录后的用例里）。这里只驱动 React Router 既有的 popstate 监听，
+ * 不改动任何应用代码。
+ */
+async function softNavigate(page: Page, path: string, usr: unknown): Promise<void> {
+  await page.evaluate(
+    ({ nextPath, state }) => {
+      window.history.pushState({ usr: state, key: 'w2-benefit-fixture', idx: 1 }, '', nextPath)
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+    },
+    { nextPath: path, state: usr },
+  )
+}
+
+function benefitGrant(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: 'grant-001',
+    benefitType: 'coupon',
+    title: '打印体验券',
+    description: null,
+    quantityTotal: 3,
+    quantityRemaining: 2,
+    status: 'active',
+    sourceType: 'platform',
+    validFrom: null,
+    validUntil: null,
+    createdAt: NOW,
+    ...overrides,
+  }
+}
+
+function registerBenefits(api: ApiRouter, items: Record<string, unknown>[]): void {
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 200,
+    json: { success: true, data: { items, nextCursor: null, total: items.length } },
+  })
+}
+
+const CONFIRM_STATE = { file: W2_FILE, params: W2_PRINT_PARAMS, source: 'document' }
+
+const benefitCard = (page: Page) => page.locator('[data-benefit-state]')
+
+test('benefit card reports 未认领身份 for a guest and never fabricates a discount @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  await seedMaterialSession(page)
+
+  await page.goto('/print/confirm')
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'guest')
+  await expect(page.getByRole('button', { name: '去登录查看我的权益' })).toBeVisible()
+  // 反向：游客态不得出现核销 CTA，也不得出现任何抵扣结论。
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expect(page.getByText('已抵扣')).toHaveCount(0)
+  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card survives the AI-down state and stays decoupled from 材料体检 @w2', async ({ page, api }) => {
+  // V6 原型 06-print-workbench.html:895 —— 权益卡 data-when="default first ai-down"：
+  // AI 材料体检不可用（ai-down）**不会**关掉权益卡；只有 device-off 才收起可选项。
+  // 这里用「无 materialCheck 的确认页上下文」复现 ai-down：体检结论缺席，
+  // 但价目、核价与权益仍必须照常工作（原型 :946「体检与预填中断 · 预览、参数、核价、出纸都不受影响」）。
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+
+  await page.goto('/print/confirm')
+  await setReactRouterState(page, '/print/confirm', CONFIRM_STATE)
+  // 体检摘要缺席（ai-down），但权益卡与金额都在。
+  await expect(page.getByText('隐私检查摘要')).toHaveCount(0)
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'guest')
+  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card reports 价目拉不到 when the quote fails and shows no amount @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 500,
+    json: { success: false, error: { code: 'PRICE_CONFIG_UNAVAILABLE', message: 'no active price config' } },
+  })
+  await seedMaterialSession(page)
+
+  await page.goto('/print/confirm')
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'price_unavailable')
+  await expect(page.getByText('本机没能取到现行价目', { exact: true })).toBeVisible()
+  // 反向：报价失败时既不显示金额，也不给出任何「有可用 / 已用完」结论。
+  await expect(page.getByText('¥2.00')).toHaveCount(0)
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /按以上设置打印原文件/ })).toBeDisabled()
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card reports 后台刚调价 when quote and price-config disagree @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  // 公示价 1.20 元/页，本单报价单价 1.00 元/页 —— 两次真实读取不一致 = 后台改过价。
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: {
+      billingEnabled: true,
+      items: [{ serviceKey: 'print_bw_page', unitCents: 120, unit: 'page', description: '黑白打印' }],
+    },
+  })
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  await seedMaterialSession(page)
+
+  await page.goto('/print/confirm')
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'repriced')
+  await expect(page.getByText('本单报价单价 ¥1.00，现行公示单价 ¥1.20')).toBeVisible()
+  // 反向：调价态不得退化成「未认领身份」，也不得给出任何权益结论。
+  await expect(benefitCard(page)).not.toHaveAttribute('data-benefit-state', 'guest')
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card reports 本单不适用 for a zero-amount order @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  // 免费试运营价目：公示价与报价单价一致（同为 0），排除「调价」干扰，只留「免费单」。
+  api.respond('GET', '/api/v1/print/price-config', {
+    status: 200,
+    json: {
+      billingEnabled: true,
+      items: [{ serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', description: '免费试运营' }],
+    },
+  })
+  registerQuote(api, { amountCents: 0, billablePages: 2, unitCents: 0 })
+  await seedMaterialSession(page)
+
+  await page.goto('/print/confirm')
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'not_applicable')
+  await expect(page.getByText('本单无需权益抵扣', { exact: true })).toBeVisible()
+  // 反向：免费单不得摆出核销入口，也不得声称权益被消耗。
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expect(page.getByText('已抵扣')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card lists usable grants but keeps redemption disabled and focusable @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  registerMemberLogin(api)
+  registerBenefits(api, [
+    benefitGrant({ id: 'grant-usable', title: '打印体验券', quantityRemaining: 2, quantityTotal: 3 }),
+    // 政策资格提示不在服务端 REDEEMABLE 白名单内，必须被挡掉（不能算成「有可用」）。
+    benefitGrant({ id: 'grant-hint', benefitType: 'subsidy_eligibility_hint', title: '就业补贴资格提示' }),
+  ])
+
+  await loginThroughVisibleUi(page, '/print/confirm')
+  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'available')
+  await expect(page.getByText('你有 1 项权益在有效期内', { exact: true })).toBeVisible()
+  await expect(page.getByText('打印体验券', { exact: true })).toBeVisible()
+  // 反向：不可核销的政策资格提示不得混进可用列表。
+  await expect(page.getByText('就业补贴资格提示')).toHaveCount(0)
+
+  // 核销 CTA：真 button + aria-disabled，保留焦点（不能用 disabled 属性），原因常驻可见。
+  const redeem = page.locator('[data-benefit-redeem="disabled"]')
+  await expect(redeem).toBeVisible()
+  await expect(redeem).toHaveAttribute('aria-disabled', 'true')
+  // 必须是 aria-disabled 而非 disabled 属性：disabled 会把按钮踢出 Tab 序列，
+  // 变成读屏用户完全摸不到的死控件。.disabled IDL 属性直接反映内容属性是否存在。
+  await expect(redeem).toHaveJSProperty('disabled', false)
+  await redeem.focus()
+  await expect(redeem).toBeFocused()
+  await expect(page.locator('#print-benefit-redeem-reason')).toBeVisible()
+  await expect(page.getByText(/本轮只展示、不核销/)).toBeVisible()
+
+  // 资损防线：不得伪造抵扣，应付金额保持报价原值。
+  await expect(page.getByText('已抵扣')).toHaveCount(0)
+  await expect(page.getByText('¥0.00')).toHaveCount(0)
+  await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card reports 已用完/过期 when no grant passes the server preconditions @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  registerMemberLogin(api)
+  // 每条 grant 只违反**一条**服务端前置条件，其余字段全部合格 —— 这样任何一条校验
+  // 被删掉，都会有对应的券漏进「有可用」，用例即失败（逐条可反向验证）。
+  registerBenefits(api, [
+    // 仅 status 不合格（对应服务端 BENEFIT_NOT_ACTIVE）
+    benefitGrant({ id: 'grant-revoked', status: 'revoked', quantityRemaining: 2, title: '已撤销的券' }),
+    // 仅 validUntil 已过（BENEFIT_EXPIRED）
+    benefitGrant({ id: 'grant-expired', validUntil: '2020-01-01T00:00:00.000Z', title: '过期的券' }),
+    // 仅 validFrom 未到（BENEFIT_NOT_STARTED）
+    benefitGrant({ id: 'grant-future', validFrom: '2099-01-01T00:00:00.000Z', title: '未生效的券' }),
+    // 仅余额为 0（BENEFIT_USED_UP）
+    benefitGrant({ id: 'grant-used', quantityRemaining: 0, title: '已用完的券' }),
+    // 仅额度为空（BENEFIT_NOT_QUANTIFIED）
+    benefitGrant({ id: 'grant-unquantified', quantityRemaining: null, quantityTotal: null, title: '无额度的券' }),
+    // 仅类型不在白名单（BENEFIT_NOT_REDEEMABLE）
+    benefitGrant({ id: 'grant-hint', benefitType: 'subsidy_eligibility_hint', title: '就业补贴资格提示' }),
+  ])
+
+  await loginThroughVisibleUi(page, '/print/confirm')
+  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'none')
+  await expect(page.getByText('当前没有可核销的权益', { exact: true })).toBeVisible()
+  // 反向：任何一条被服务端明确会拒的券都不得出现在卡里，也不得出现核销 CTA。
+  for (const blocked of ['已撤销的券', '过期的券', '未生效的券', '已用完的券', '无额度的券', '就业补贴资格提示']) {
+    await expect(page.getByText(blocked)).toHaveCount(0)
+  }
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})
+
+test('benefit card says 读不出来 instead of 没有权益 when /me/benefits fails @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  registerQuote(api, { amountCents: 200, billablePages: 2, unitCents: 100 })
+  registerMemberLogin(api)
+  api.respond('GET', '/api/v1/me/benefits', {
+    status: 500,
+    json: { success: false, error: { code: 'INTERNAL_ERROR', message: 'synthetic failure' } },
+  })
+
+  await loginThroughVisibleUi(page, '/print/confirm')
+  await softNavigate(page, '/print/confirm', CONFIRM_STATE)
+
+  await expect(benefitCard(page)).toHaveAttribute('data-benefit-state', 'error')
+  await expect(page.getByText('权益暂时读不出来', { exact: true })).toBeVisible()
+  // 反向：读取失败绝不能显示成「没有可核销的权益」。
+  await expect(page.getByText('当前没有可核销的权益')).toHaveCount(0)
+  await expect(page.locator('[data-benefit-redeem]')).toHaveCount(0)
+  await expectHealthy(page, errors, 'print-confirm')
+})

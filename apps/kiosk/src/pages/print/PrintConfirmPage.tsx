@@ -10,15 +10,26 @@ import {
   LoaderIcon,
   PackageCheckIcon,
   PrinterIcon,
+  TicketIcon,
 } from 'lucide-react'
 import {
   hasUnverifiedPrintParams,
   restrictToVerifiedPrintParams,
+  type BenefitType,
+  type MemberBenefitItem,
   type PrintJobParams,
 } from '@ai-job-print/shared'
 import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
+import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
+import {
+  fetchPrintBenefits,
+  resolvePrintBenefitState,
+  PRINT_BENEFIT_REDEEM_CTA_LABEL,
+  PRINT_BENEFIT_REDEEM_DISABLED_REASON,
+} from '../../services/api/benefits'
+import { fetchPrintPriceConfig, unitCentsFor } from '../../services/print/priceConfigApi'
 import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
 import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { abandonContractReviewReport } from '../../services/api/contractReview'
@@ -85,6 +96,31 @@ const ORIENTATION_LABEL: Record<string, string> = {
   landscape: '横向',
 }
 
+/** 权益卡展示用类型名（与 /me/benefits 返回的 benefitType 一一对应，不新增语义）。 */
+const BENEFIT_TYPE_LABEL: Record<BenefitType, string> = {
+  coupon: '优惠券',
+  free_quota: '免费次数',
+  package_entitlement: '服务额度',
+  subsidy_eligibility_hint: '政策资格提示',
+}
+
+/** 权益列表读取态（真实 GET /me/benefits 结果；loadedAt 用于有效期比对，避免每次渲染取新时间）。 */
+type BenefitsView =
+  | { status: 'loading' }
+  | { status: 'ready'; items: MemberBenefitItem[]; loadedAt: number }
+  | { status: 'error' }
+
+/** 公示价读取态（真实 GET /print/price-config；与本单报价单价比对识别「后台刚调价」）。 */
+type PriceCfgView =
+  | { status: 'loading' }
+  | { status: 'ready'; unitCents: number | null }
+  | { status: 'error' }
+
+function benefitQuantityLine(item: MemberBenefitItem): string {
+  const remaining = item.quantityRemaining ?? 0
+  return item.quantityTotal === null ? `剩余 ${remaining}` : `剩余 ${remaining} / ${item.quantityTotal}`
+}
+
 const DEFAULT_PARAMS: PrintJobParams = {
   copies: 1,
   colorMode: 'black_white',
@@ -100,7 +136,7 @@ const DEFAULT_PARAMS: PrintJobParams = {
 export function PrintConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { getToken } = useAuth()
+  const { getToken, isLoggedIn } = useAuth()
   const state = location.state as LocationState | null
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
   const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
@@ -127,6 +163,12 @@ export function PrintConfirmPage() {
   const [quote, setQuote] = useState<QuoteView>(
     API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
   )
+  // 权益卡只在真实后端模式、且本页确有文件上下文时才取数：
+  // 直达 /print/confirm（无文件）会走下方守卫分支，不该为一个不会渲染的卡片发请求。
+  const hasFileContext = Boolean(state?.file ?? restoredSession?.file)
+  const benefitCardEnabled = API_MODE === 'http' && hasFileContext
+  const [benefits, setBenefits] = useState<BenefitsView>({ status: 'loading' })
+  const [priceCfg, setPriceCfg] = useState<PriceCfgView>({ status: 'loading' })
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(effectivePages / params.pagesPerSheet)
@@ -180,6 +222,71 @@ export function PrintConfirmPage() {
     params.scale,
     params.paperSize,
   ])
+
+  // S2：公示价快照（GET /print/price-config）。与本单报价单价是对同一份 PriceConfig 的
+  // 两次独立读取；不一致即说明后台在两次读取之间改过价（六态之「后台刚调价」）。
+  useEffect(() => {
+    if (!benefitCardEnabled) return
+    let cancelled = false
+    setPriceCfg({ status: 'loading' })
+    void fetchPrintPriceConfig()
+      .then((config) => {
+        if (!cancelled) setPriceCfg({ status: 'ready', unitCents: unitCentsFor(config, params.colorMode) })
+      })
+      .catch(() => {
+        if (!cancelled) setPriceCfg({ status: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [benefitCardEnabled, params.colorMode])
+
+  // S2：本人权益列表（GET /me/benefits）。游客态不发请求 —— 权益挂在本人账号下，
+  // 拿不到就如实说「未认领身份」，不是「没有权益」。
+  useEffect(() => {
+    if (!benefitCardEnabled) return
+    if (!isLoggedIn) {
+      setBenefits({ status: 'ready', items: [], loadedAt: Date.now() })
+      return
+    }
+    let cancelled = false
+    setBenefits({ status: 'loading' })
+    void fetchPrintBenefits(getToken())
+      .then((page) => {
+        if (!cancelled) setBenefits({ status: 'ready', items: page.items, loadedAt: Date.now() })
+      })
+      .catch(() => {
+        if (!cancelled) setBenefits({ status: 'error' })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [benefitCardEnabled, isLoggedIn, getToken])
+
+  // S2：六态判定。四个输入全部是真实数据 —— 登录态、/me/benefits、/orders/quote、
+  // /print/price-config。没有任何一态来自 URL 参数、本地猜测或写死分支。
+  const benefitView = useMemo(() => {
+    if (!benefitCardEnabled) return null
+    const quoteInput =
+      quote.status === 'ready'
+        ? { status: 'ready' as const, amountCents: quote.amountCents, unitCents: quote.unitCents }
+        : quote.status === 'unavailable'
+          ? { status: 'unavailable' as const }
+          : { status: 'loading' as const }
+    return resolvePrintBenefitState({
+      isLoggedIn,
+      benefits:
+        benefits.status === 'ready'
+          ? { status: 'ready', items: benefits.items }
+          : { status: benefits.status, items: [] },
+      quote: quoteInput,
+      priceConfig:
+        priceCfg.status === 'ready'
+          ? { status: 'ready', unitCents: priceCfg.unitCents }
+          : { status: priceCfg.status, unitCents: null },
+      now: benefits.status === 'ready' ? benefits.loadedAt : Date.now(),
+    })
+  }, [benefitCardEnabled, isLoggedIn, benefits, quote, priceCfg])
 
   const summaryRows = [
     { label: '文件名称', value: file.name },
@@ -429,6 +536,71 @@ export function PrintConfirmPage() {
               </span>
             </div>
           </div>
+
+          {/* 权益卡（V6 P06 s4）：**只读**。六态由真实数据判定，核销 CTA 保持可聚焦禁用。 */}
+          {benefitView && (
+            <div className="print-benefit-card" data-benefit-state={benefitView.state}>
+              <div className="print-benefit-head">
+                <TicketIcon aria-hidden="true" />
+                <b>权益与本单价格</b>
+                <span className="print-benefit-snap">价目与权益均来自后台配置</span>
+              </div>
+              <p className="print-benefit-title">{benefitView.title}</p>
+              <p className="print-benefit-detail">{benefitView.detail}</p>
+
+              {benefitView.repricedUnits && (
+                <p className="print-benefit-units">
+                  本单报价单价 {formatCents(benefitView.repricedUnits.quoteUnitCents)}
+                  ，现行公示单价 {formatCents(benefitView.repricedUnits.configUnitCents)}
+                </p>
+              )}
+
+              {benefitView.grants.length > 0 && (
+                <ul className="print-benefit-list">
+                  {benefitView.grants.map((grant) => (
+                    <li key={grant.id} className="print-benefit-item">
+                      <b>{grant.title}</b>
+                      <span>
+                        {BENEFIT_TYPE_LABEL[grant.benefitType] ?? grant.benefitType}
+                        {' · '}
+                        {benefitQuantityLine(grant)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {benefitView.showLoginAction && (
+                <button
+                  type="button"
+                  className="print-benefit-login"
+                  onClick={() => navigate(loginPathForCurrentLocation())}
+                >
+                  去登录查看我的权益
+                </button>
+              )}
+
+              {/* 核销 CTA：真 <button> + aria-disabled（保持可聚焦、可被读屏播报），
+                  不加 disabled 属性以免退出 Tab 序列；不绑任何 /orders/:id/redeem 调用。
+                  原因常驻可见并经 aria-describedby 关联，杜绝「按了没反应」的死按钮。 */}
+              {benefitView.state === 'available' && (
+                <>
+                  <button
+                    type="button"
+                    className="print-benefit-redeem"
+                    aria-disabled="true"
+                    aria-describedby="print-benefit-redeem-reason"
+                    data-benefit-redeem="disabled"
+                  >
+                    {PRINT_BENEFIT_REDEEM_CTA_LABEL}
+                  </button>
+                  <p className="print-benefit-reason" id="print-benefit-redeem-reason">
+                    {PRINT_BENEFIT_REDEEM_DISABLED_REASON}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
 
           {/* 提交后流程 + 打印须知（合并，避免右栏碎卡堆叠） */}
           <div className="print-flow-card print-rules-card">

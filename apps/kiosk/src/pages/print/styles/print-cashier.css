@@ -624,6 +624,97 @@
   color: var(--print-muted);
 }
 
+/* 权益卡 (V6 P06 s4) — 只读六态；核销 CTA 为可聚焦禁用态 */
+.print-benefit-card {
+  padding: 18px 22px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--color-clay-deep, #a9781f);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-benefit-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.print-benefit-head svg { width: 24px; height: 24px; flex: none; color: var(--color-clay-deep, #a9781f); }
+.print-benefit-head b { font-size: 20px; font-weight: 700; color: var(--print-ink); }
+.print-benefit-snap {
+  font-size: 14px;
+  color: var(--print-muted);
+  margin-left: auto;
+}
+.print-benefit-title {
+  margin-top: 10px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--print-ink);
+}
+.print-benefit-detail,
+.print-benefit-units,
+.print-benefit-reason {
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--print-muted);
+}
+.print-benefit-units {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--print-ink);
+}
+.print-benefit-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.print-benefit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--print-paper);
+  border: 1px solid var(--print-line);
+  border-radius: 12px;
+}
+.print-benefit-item b { font-size: 17px; font-weight: 700; color: var(--print-ink); }
+.print-benefit-item span { font-size: 15px; color: var(--print-muted); }
+.print-benefit-login,
+.print-benefit-redeem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  margin-top: 14px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font: 600 18px var(--print-sans);
+  text-align: center;
+}
+.print-benefit-login {
+  background: var(--print-surface);
+  border: 1px solid var(--color-clay-deep, #a9781f);
+  color: var(--color-clay-deep, #a9781f);
+  cursor: pointer;
+}
+/* 禁用态用 aria-disabled 而非 disabled 属性：保留 Tab 焦点与读屏播报，
+   原因由紧随其后的 .print-benefit-reason 常驻说明（非 tooltip）。 */
+.print-benefit-redeem {
+  background: var(--print-paper);
+  border: 1px dashed var(--print-line);
+  color: var(--print-muted);
+  cursor: not-allowed;
+}
+.print-benefit-redeem[aria-disabled='true']:focus-visible {
+  outline: 3px solid var(--color-clay-deep, #a9781f);
+  outline-offset: 2px;
+}
+
 /* 底部行动条 */
 .print-confirm-actionbar {
   display: flex;
