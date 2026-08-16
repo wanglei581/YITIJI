@@ -20,7 +20,7 @@ const ADMIN_NAV = [
     { key:'alerts', label:'告警中心', href:'alerts.html', mark:'改造' },
   ]},
   { title:'业务管理', items:[
-    { key:'orders', label:'订单管理' },
+    { key:'orders', label:'订单管理', href:'orders.html', mark:'改造' },
     { key:'print-scan', label:'打印扫描运维' },
     { key:'billing', label:'计费与对账', href:'billing.html', mark:'改造' },
     { key:'files', label:'文件管理' },
@@ -48,7 +48,7 @@ const ADMIN_NAV = [
     { key:'member-benefits', label:'会员权益' },
     { key:'member-feedback', label:'意见反馈' },
     { key:'member-notifications', label:'消息通知' },
-    { key:'member-privacy', label:'会员隐私请求' },
+    { key:'member-privacy', label:'会员隐私请求', href:'member-privacy.html', mark:'改造' },
   ]},
   { title:'系统管理', items:[
     { key:'permissions', label:'权限管理', mark:'摘除' },
@@ -183,6 +183,8 @@ function initShell(o) {
 const ASSIST_CTX = {
   jobs:     { label: '岗位信息管理', quick: ['我的岗位为什么终端上看不到？','为什么被驳回了？','手工录入和 Excel 有什么区别？'] },
   fairs:    { label: '招聘会信息管理', quick: ['参展企业为什么我改不了？','招聘会资料怎么上传？','为什么主办方显示的不是我们？'] },
+  'member-privacy':{ label: '会员隐私', quick: ['用户说没同意过 AI 分析，怎么查？','撤回授权后还在调用怎么办？','小程序和一体机的授权分得开吗？'] },
+  orders:{ label: '订单管理', quick: ['怎么分辨小程序单和一体机单？','用户说取件码过期了怎么办？','小程序转化率怎么看？'] },
   billing:{ label: '计费与对账', quick: ['AI 功能什么时候能开始收费？','为什么彩色打印是锁定的？','机构补贴怎么对账？'] },
   'benefit-activities':{ label: '权益活动', quick: ['为什么券还不能用？','一张券能抵多少钱？','退款会退回额度吗？'] },
   'job-materials':{ label: '求职材料库', quick: ['证件复印预设怎么配？','为什么证件照排版还不能开？','材料包什么时候能用？'] },

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>订单管理（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--warn">
+    <span class="proto__tag">改造 · 小程序共用后台后的第一优先页</span>
+    <b>本页是小程序云打印与取件的<span style="color:var(--err-fg)">唯一管理面</span>。</b>
+    2026-08-16 裁定小程序与一体机<b>共用同一套后台</b>（数据底座已同源：同一张 <code>EndUser</code>、
+    同一张 <code>Order</code>、同一套 AI/简历/权益模型）。
+    但本页是<b>按一体机视角设计的</b>，两个关键维度缺失——
+    <b>① 分不出订单来自哪个入口；② 看不到取件生命周期。</b>
+    <br><br>
+    这两条不补，运营在小程序上线后会立刻遇到：
+    「用户问我的件怎么取，查不到」「老板问小程序转化率，算不出来」。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>订单管理</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        本页管<b>全渠道订单</b>——一体机现场下单与小程序云打印下单<b>在同一张表</b>。
+        取件流程只存在于小程序云单；一体机是现场即时出纸，无取件环节。
+      </p>
+    </div>
+    <div class="right">
+      <button class="btn btn--sm">导出</button>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <!-- ── 筛选条：新增渠道与取件状态 ── -->
+  <div class="card" style="margin-top:16px">
+    <div class="card__body">
+      <div class="row" style="flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div class="field" style="margin:0">
+          <label>订单号</label>
+          <input class="input" placeholder="搜索订单号" style="width:180px">
+        </div>
+        <div class="field" style="margin:0">
+          <label>任务状态</label>
+          <select class="select" style="width:130px"><option>全部</option><option>待处理</option><option>打印中</option><option>已完成</option><option>失败</option></select>
+        </div>
+        <div class="field" style="margin:0">
+          <label>支付状态</label>
+          <select class="select" style="width:120px"><option>全部</option><option>已支付</option><option>未支付</option><option>已退款</option></select>
+        </div>
+        <div class="field isnew" data-newtag="新增" style="margin:0">
+          <label><b>下单渠道</b></label>
+          <select class="select" style="width:150px">
+            <option>全部渠道</option>
+            <option>一体机现场</option>
+            <option>小程序云打印</option>
+          </select>
+        </div>
+        <div class="field isnew" data-newtag="新增" style="margin:0">
+          <label><b>取件状态</b></label>
+          <select class="select" style="width:140px">
+            <option>全部</option>
+            <option>待取件</option>
+            <option>已亮码</option>
+            <option>已取件</option>
+            <option>已过期</option>
+            <option>已取消</option>
+          </select>
+        </div>
+        <button class="btn btn--sm btn--primary">查询</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 订单表 ── -->
+  <div class="card" style="margin-top:16px">
+    <div class="card__head"><h3>订单</h3>
+      <span class="tag tag--ghost">现有 9 列 + 新增 2 列</span></div>
+    <div class="card__body">
+      <table class="table">
+        <thead><tr>
+          <th>订单号</th><th>文件</th><th>归属</th>
+          <th class="isnew" data-newtag="新增">渠道</th>
+          <th>终端</th><th>金额</th><th>支付</th><th>任务</th>
+          <th class="isnew" data-newtag="新增">取件</th>
+          <th>创建时间</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="mono small">PO-20260816-0031</td>
+            <td class="small">求职简历_张.pdf</td>
+            <td class="small">会员 · 138****2210</td>
+            <td><span class="tag tag--info">小程序云打印</span></td>
+            <td class="mono small">KSK-0007</td>
+            <td class="mono">¥3.00</td>
+            <td><span class="tag tag--ok">已支付</span></td>
+            <td><span class="tag tag--warn">待释放</span></td>
+            <td><span class="tag tag--warn">待取件</span><div class="cellsub">08-16 20:00 到期</div></td>
+            <td class="small">08-16 14:22</td>
+          </tr>
+          <tr>
+            <td class="mono small">PO-20260816-0028</td>
+            <td class="small">身份证复印件.pdf</td>
+            <td class="small">会员 · 139****7788</td>
+            <td><span class="tag tag--info">小程序云打印</span></td>
+            <td class="mono small">KSK-0007</td>
+            <td class="mono">¥1.00</td>
+            <td><span class="tag tag--ok">已支付</span></td>
+            <td><span class="tag tag--ok">已完成</span></td>
+            <td><span class="tag tag--ok">已取件</span><div class="cellsub">08-16 15:41</div></td>
+            <td class="small">08-16 13:05</td>
+          </tr>
+          <tr>
+            <td class="mono small">PO-20260815-0194</td>
+            <td class="small">材料清单.pdf</td>
+            <td class="small">匿名</td>
+            <td><span class="tag tag--ghost">一体机现场</span></td>
+            <td class="mono small">KSK-0002</td>
+            <td class="mono">¥2.50</td>
+            <td><span class="tag tag--ok">已支付</span></td>
+            <td><span class="tag tag--ok">已完成</span></td>
+            <td class="muted small">—</td>
+            <td class="small">08-15 16:38</td>
+          </tr>
+          <tr class="muted">
+            <td class="mono small">PO-20260814-0087</td>
+            <td class="small">合同扫描件.pdf</td>
+            <td class="small">会员 · 137****3355</td>
+            <td><span class="tag tag--info">小程序云打印</span></td>
+            <td class="mono small">KSK-0011</td>
+            <td class="mono">¥4.50</td>
+            <td><span class="tag tag--ok">已支付</span></td>
+            <td><span class="tag tag--warn">待释放</span></td>
+            <td><span class="tag tag--err">已过期</span><div class="cellsub">08-14 20:00</div></td>
+            <td class="small">08-14 11:20</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small muted" style="margin-top:10px">
+        <b>「取件」列只对小程序云单有值</b>——一体机是现场即时出纸，无取件环节，显示「—」。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 为什么必须加渠道字段 ── -->
+  <div class="card isnew" data-newtag="设计依据" style="margin-top:16px">
+    <div class="card__head"><h3>为什么必须加「渠道」而不是靠推断</h3>
+      <span class="tag tag--err">M1 · 一切统计的前提</span></div>
+    <div class="card__body">
+      <p class="small">
+        <code>Order</code> 现有字段只有
+        <code>terminalId</code>、<code>endUserId</code>、
+        <code>paymentSource</code>（资金性质：offline/free/manual_confirmed）、
+        <code>payChannel</code>（支付通道标识）——<b>没有一个表示「这单从哪个入口来」</b>。
+      </p>
+      <div class="degrade" style="margin-top:12px">
+        <b>目前只能靠推断，而且推不准</b>：
+        一体机下单写 <code>terminalId</code> + <code>endUserId</code>（匿名时为 null）；
+        小程序云打印下单<b>写的是同样的字段</b>（<code>terminalId</code> 是用户选的门店）。
+        <br><br>
+        → <b>「匿名 + 有 terminalId」只能判定为一体机；会员单完全分不出来。</b>
+        而会员单恰恰是小程序的主体。
+      </div>
+      <div class="kv" style="margin-top:12px;grid-template-columns:150px 1fr">
+        <dt class="mono">channel</dt><dd>建议取值 <code>kiosk</code> / <code>miniapp_cloud</code>；未来加入口（H5、支付宝小程序）时追加</dd>
+        <dt class="mono">写入位置</dt><dd>一体机 <code>print-jobs.service.ts</code> 建单处；小程序 <code>member-print-order-create.service.ts</code> 建单处</dd>
+        <dt class="mono">读取位置</dt><dd><code>admin-orders-readonly.controller.ts</code> 加 <code>channel</code> 查询参数；service 层加展示字段</dd>
+      </div>
+      <div class="small muted" style="margin-top:10px">
+        <b>存量订单</b>：迁移时可按「匿名 + terminalId → kiosk」回填一部分，
+        <b>但会员存量单无法可靠回填</b>——建议留空并在界面显示「未标注」，不要猜。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 取件生命周期 ── -->
+  <div class="card isnew" data-newtag="设计依据" style="margin-top:16px">
+    <div class="card__head"><h3>取件状态：字段已有，界面 0 处引用</h3>
+      <span class="tag tag--warn">M2</span></div>
+    <div class="card__body">
+      <p class="small">
+        后端<b>已经完整实现</b>了取件链路，字段与索引都在：
+      </p>
+      <div class="kv" style="margin-top:10px;grid-template-columns:190px 1fr">
+        <dt class="mono">pickupStatus</dt><dd><code>none | pending | claimed | used | expired | cancelled</code></dd>
+        <dt class="mono">pickupCodeHash</dt><dd>唯一索引，取件码哈希</dd>
+        <dt class="mono">pickupCodeEnc</dt><dd>加密存储的取件码</dd>
+        <dt class="mono">pickupCodeExpiresAt</dt><dd>有效期</dd>
+        <dt class="mono">pickupClaimedAt</dt><dd>亮码时间</dd>
+        <dt class="mono">@@index</dt><dd><code>[pickupStatus, pickupCodeExpiresAt]</code> —— 说明设计上就预期要按这两维查询</dd>
+      </div>
+      <div class="degrade" style="margin-top:12px">
+        <b>但 <code>apps/admin/src/routes/orders/index.tsx</code> 对 <code>pickupStatus</code> 是 0 处引用。</b>
+        用户来问「我的件怎么取 / 为什么过期了 / 能不能延期」，<b>运营在后台看不到任何取件信息</b>。
+        索引都建好了却没人查，是明显的「后端做完、前端没接」。
+      </div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">
+        <span class="tag tag--warn">待取件 pending</span>
+        <span class="tag">已亮码 claimed</span>
+        <span class="tag tag--ok">已取件 used</span>
+        <span class="tag tag--err">已过期 expired</span>
+        <span class="tag tag--ghost">已取消 cancelled</span>
+      </div>
+      <div class="small muted" style="margin-top:10px">
+        <b>处置动作需产品确认</b>：过期件能否延期？能否重新生成取件码？退款与取件状态如何联动？
+        这些是<b>业务规则</b>，不该由开发默认——本原型只画出可见性，不预设动作。
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI 辅助 ── -->
+  <div class="grid grid--2" style="margin-top:16px">
+    <div class="card">
+      <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L2 聚合 + L3 归因</span></div>
+      <div class="card__body stack">
+        <div class="advice isnew" data-newtag="AI 能力">
+          <div class="advice__head"><span class="ev ev--1">E1</span><b>今日 7 单小程序云打印将在 20:00 过期</b></div>
+          <div class="advice__action">这 7 单已支付但未取件，过期后会形成待处理退款。</div>
+          <div class="advice__grid">
+            <div class="advice__item"><b>理由</b><span>取件码有效期为当日 20:00，当前 14:30，7 单仍为 <code>pending</code></span></div>
+            <div class="advice__item"><b>代价</b><span>不处理则次日产生 7 笔退款工单；用户体验为「付了钱没拿到」</span></div>
+            <div class="advice__item"><b>备选</b><span>批量推送取件提醒（需 <code>me/notifications</code> 链路）；或延长有效期</span></div>
+          </div>
+          <div class="advice__foot">
+            <button class="btn btn--sm btn--primary">查看这 7 单</button>
+            <button class="btn btn--sm">忽略</button>
+          </div>
+        </div>
+        <div class="small muted">
+          「哪些单快过期」是<b>确定性查询</b>（<code>pickupStatus=pending AND expiresAt&lt;今日20:00</code>），
+          不调模型、不标「AI」；只有「建议怎么处置」那层才算 AI。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card__head"><h3>渠道对比（加 channel 后才可能）</h3><span class="tag tag--ai">L2 · 聚合</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>指标</th><th>一体机现场</th><th>小程序云打印</th></tr></thead>
+          <tbody>
+            <tr><td>今日订单</td><td class="muted">未标注</td><td class="muted">未标注</td></tr>
+            <tr><td>客单价</td><td class="muted">未标注</td><td class="muted">未标注</td></tr>
+            <tr><td>失败率</td><td class="muted">未标注</td><td class="muted">未标注</td></tr>
+            <tr><td>取件超时率</td><td class="muted">—</td><td class="muted">未标注</td></tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:10px">
+          <b>全部显示「未标注」而非 0</b>——<code>channel</code> 字段落地前，
+          这张表<b>算不出来</b>。显示 0 会让运营误以为小程序没有订单。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>暂无订单</h3>
+      <p>当前筛选条件下没有订单。<b>若刚接入小程序，请确认渠道筛选未误选</b>。</p>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——订单查询、筛选、退款、导出<b>全部照常</b>。
+        受影响的只有「过期预警归因」与「渠道对比建议」两项，
+        <b>过期单查询本身是确定性 SQL，同样照常</b>。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>订单加载失败</h3>
+      <p>无法读取（<code>GET /admin/orders</code> 返回 500）。
+        <b>终端出纸与小程序取件不受影响</b>——两者不依赖本页。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/orders</code>，加 2 列 + 2 个筛选。现有 539 行，加完后建议把筛选条抽成子组件。</li>
+      <li><b>M1 先做</b>：<code>Order.channel</code> 是渠道对比、转化统计、问题定位的共同前提，
+        不做则本页新增的一切都算不出来。</li>
+      <li><b>M2 只画可见性，不预设处置动作</b>：过期延期、重发取件码、退款联动都是业务规则，需产品确认。</li>
+      <li><b>存量不猜</b>：会员存量单无法可靠回填 channel，界面显示「未标注」，
+        <b>不要按 terminalId 猜成一体机</b>——那会污染统计。</li>
+      <li><b>一体机无取件环节</b>：「取件」列对 kiosk 单显示「—」，不是「无数据」，是<b>业务上不存在</b>。</li>
+      <li><b>Partner 侧暂不开放本页</b>：若将来开放，必须按 <code>orgId</code> 限定本机构终端，
+        否则一家机构可见全平台会员订单（见 <a href="../../../product/miniapp-console-sharing-2026-08.md">共用后台裁定</a> M3）。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'orders'})</script>
+</body>
+</html>

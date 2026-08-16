@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会员隐私（改造）— 管理后台</title>
+<link rel="stylesheet" href="../styles/console.css?v=20260811a">
+</head>
+<body>
+<div id="page">
+
+  <div class="proto proto--err">
+    <span class="proto__tag">改造 · 小程序共用后台后唯一有法律风险的一页</span>
+    <b>现状是「请求驱动」，缺「授权台账」。</b>
+    本页管的是<b>会员主动提交</b>的导出 / 撤回授权请求；
+    Admin 侧只有三个端点（<code>GET data-requests</code> / <code>retry</code> / <code>reject</code>）。
+    <br><br>
+    <b>但没有任何「查某个用户授权了什么」的能力。</b>
+    用户投诉「我没同意过用 AI 分析我的简历」时，运营<b>查不了</b>——
+    只能等对方走完提交请求的流程。小程序放量后这类问询会显著增加
+    （微信登录 + <code>resume/job-fit/consent</code> + <code>ai-consents/job_ai/revoke</code> 三条授权链路）。
+  </div>
+
+  <div class="pagehead">
+    <div>
+      <h1>会员隐私</h1>
+      <p class="isnew" data-newtag="核心改造 · 常驻文案" style="display:block;padding-top:6px">
+        隐私请求（导出 / 撤回 / 注销）与 <b>AI 授权台账</b>。
+        授权在一体机与小程序<b>共用同一张 <code>UserAiConsent</code></b>，本页两端都能查。
+      </p>
+    </div>
+  </div>
+
+  <div class="mockbar">当前为 mock 模式（VITE_API_MODE 不等于 http），页面数据和未接后端的操作不会写入数据库。</div>
+
+  <div class="tabs" data-panels="priv">
+    <button class="is-on" data-tab="req">隐私请求</button>
+    <button data-tab="ledger">AI 授权台账<span class="newdot"></span></button>
+  </div>
+
+  <!-- ═══ 隐私请求（现有） ═══ -->
+  <div data-panel-of="priv" data-panel="req">
+    <div class="card" style="margin-top:16px">
+      <div class="card__head"><h3>会员隐私请求</h3><span class="tag tag--ghost">现有能力</span></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr><th>请求号</th><th>会员</th><th>类型</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td class="mono small">DR-20260816-006</td><td class="small">138****2210</td>
+              <td>数据导出</td><td><span class="tag tag--warn">处理中</span></td><td class="small">08-16 10:12</td>
+              <td><button class="btn btn--sm">重试</button><button class="btn btn--sm">驳回</button></td></tr>
+            <tr><td class="mono small">DR-20260815-021</td><td class="small">139****7788</td>
+              <td>撤回授权</td><td><span class="tag tag--ok">已完成</span></td><td class="small">08-15 16:40</td>
+              <td><button class="btn btn--sm" disabled>—</button></td></tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          页面自陈口径：<b>撤回授权可即时完成；导出为后台元数据包；账号注销未开放</b>——这是诚实的，保持。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ AI 授权台账（新增） ═══ -->
+  <div data-panel-of="priv" data-panel="ledger" style="display:none">
+    <div class="proto" style="margin-top:16px">
+      <span class="proto__tag">新增 Tab · 模型已存在，只缺 Admin 读取端点</span>
+      <code>UserAiConsent</code> <b>已经是一张 append-only 授权事件表</b>——
+      服务端注释明写「Grant is an append-only authorization event; previous grant rows remain as history」，
+      撤回时写 <code>revokedAt</code> 而不删行，<b>历史完整可追溯</b>。
+      索引也建好了（<code>[endUserId, scope]</code> 与 <code>[revokedAt]</code>）。
+      <br><br>
+      <b>缺的只是 Admin 侧的读取端点与界面</b>——数据一直在，没人能查。
+    </div>
+
+    <div class="card isnew" data-newtag="新增能力" style="margin-top:16px">
+      <div class="card__head"><h3>按会员查授权</h3>
+        <div class="right">
+          <input class="input" placeholder="手机号 / 会员 ID" style="width:190px">
+          <button class="btn btn--sm btn--primary">查询</button>
+        </div></div>
+      <div class="card__body">
+        <table class="table">
+          <thead><tr>
+            <th>授权范围 scope</th><th>版本</th>
+            <th class="isnew" data-newtag="需补">来源渠道</th>
+            <th>授权时间</th><th>撤回时间</th><th>当前状态</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="mono small">job_ai</td><td class="mono small">v2</td>
+              <td class="muted small">未标注</td>
+              <td class="small">08-14 09:31</td><td class="muted small">—</td>
+              <td><span class="tag tag--ok">生效中</span></td>
+            </tr>
+            <tr>
+              <td class="mono small">resume_ai</td><td class="mono small">v2</td>
+              <td class="muted small">未标注</td>
+              <td class="small">08-10 15:02</td><td class="small">08-15 16:40</td>
+              <td><span class="tag tag--ghost">已撤回</span></td>
+            </tr>
+            <tr class="muted">
+              <td class="mono small">resume_ai</td><td class="mono small">v1</td>
+              <td class="muted small">未标注</td>
+              <td class="small">07-22 11:18</td><td class="small">08-10 15:02</td>
+              <td><span class="tag tag--ghost">历史版本</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="small muted" style="margin-top:10px">
+          <b>同一 scope 会有多行</b>——append-only 表，换版本或重新授权都追加新行。
+          界面按时间倒序展示完整历史，<b>不做去重</b>，那正是可追溯的价值所在。
+        </div>
+      </div>
+    </div>
+
+    <div class="card isnew" data-newtag="与订单 M1 同型" style="margin-top:16px">
+      <div class="card__head"><h3>来源渠道为什么显示「未标注」</h3>
+        <span class="tag tag--warn">需后端补</span></div>
+      <div class="card__body">
+        <p class="small">
+          <code>UserAiConsent</code> 有 <code>terminalId</code>（可为 null），
+          但<b>它不等于渠道</b>：
+        </p>
+        <table class="table" style="margin-top:10px">
+          <thead><tr><th>场景</th><th>terminalId</th><th>能否判定渠道</th></tr></thead>
+          <tbody>
+            <tr><td>一体机上授权（已登录）</td><td class="mono small">有值</td><td><span class="tag tag--ok">可以</span></td></tr>
+            <tr><td>小程序里授权</td><td class="mono small">null</td><td><span class="tag tag--warn">只能靠 null 反推</span></td></tr>
+            <tr><td>一体机匿名场景</td><td class="mono small">可能为 null</td><td><span class="tag tag--err">与小程序混淆</span></td></tr>
+          </tbody>
+        </table>
+        <div class="degrade" style="margin-top:12px">
+          <b>这与订单的渠道问题是同一型</b>（见 <a href="orders.html">订单管理 · M1</a>）。
+          建议<b>同一批做</b>：给 <code>UserAiConsent</code> 也加渠道标识，
+          与 <code>Order.channel</code> <b>共用同一套取值</b>（<code>kiosk</code> / <code>miniapp_cloud</code> …），
+          避免两处各定一套枚举。
+          <br><br>
+          <b>存量不猜</b>：已有授权记录无法可靠回填，界面显示「未标注」，
+          <b>不要按 terminalId 是否为 null 猜成小程序</b>——那会把一体机匿名授权错误归到小程序。
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:16px">
+      <div class="card">
+        <div class="card__head"><h3>合规用途</h3><span class="tag tag--err">这是本页的立身之本</span></div>
+        <div class="card__body">
+          <ul style="margin:0;padding-left:19px;font-size:13.5px;line-height:1.85">
+            <li><b>争议举证</b>：用户称「我没同意过」，可调出授权时间、版本与完整历史</li>
+            <li><b>版本追溯</b>：同意书改版后，能查出某用户当时同意的是哪一版</li>
+            <li><b>撤回核验</b>：确认撤回是否真正生效（<code>revokedAt</code> 有值且后续无新授权）</li>
+            <li><b>范围核对</b>：确认平台<b>实际使用</b>的 AI 能力是否都在已授权 scope 内</li>
+          </ul>
+          <div class="degrade" style="margin-top:12px">
+            <b>只读，不提供「代用户授权」动作。</b>
+            Admin 可以查、可以导出举证，<b>但不能替用户勾同意</b>——
+            那会让整套授权链失去法律意义。
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__head"><h3>AI 辅助</h3><span class="tag tag--ai">L1 规则为主</span></div>
+        <div class="card__body stack">
+          <div class="advice isnew" data-newtag="AI 能力">
+            <div class="advice__head"><span class="ev ev--1">E1</span><b>授权范围与实际调用不一致</b></div>
+            <div class="advice__action">该会员已撤回 <code>resume_ai</code>，但 08-15 之后仍有 2 条简历 AI 记录。</div>
+            <div class="advice__grid">
+              <div class="advice__item"><b>理由</b><span>比对 <code>UserAiConsent.revokedAt</code> 与 <code>AiServiceLog</code> 时间戳，属确定性查询</span></div>
+              <div class="advice__item"><b>代价</b><span>若属实是合规事故，需核查调用链是否漏判授权状态</span></div>
+              <div class="advice__item"><b>备选</b><span>先导出这 2 条记录的完整上下文再判定</span></div>
+            </div>
+            <div class="advice__foot">
+              <button class="btn btn--sm btn--primary">查看这 2 条记录</button>
+              <button class="btn btn--sm">标记已核查</button>
+            </div>
+          </div>
+          <div class="small muted">
+            这条比对是<b>确定性 SQL</b>（撤回时间 vs 调用时间），不调模型、不标「AI」；
+            只有「建议怎么处置」那层才算 AI。<b>它也是本页最有价值的一条</b>——
+            能自动发现「撤回后仍在用」这类合规事故。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四态 -->
+  <div data-when="empty">
+    <div class="card"><div class="card__body"><div class="empty">
+      <div class="empty__icon">▤</div><h3>该会员暂无授权记录</h3>
+      <p>说明其从未授权过任何 AI 能力。<b>不显示为「已拒绝」</b>——未授权与拒绝是两回事。</p>
+    </div></div></div>
+  </div>
+  <div data-when="aidown">
+    <div class="card"><div class="card__body">
+      <div class="degrade"><b>AI 不可用</b>——授权查询、导出举证、请求处理<b>全部照常</b>。
+        「授权与调用不一致」的比对本身是确定性 SQL，<b>同样照常</b>；
+        受影响的只有处置建议那一层。</div>
+    </div></div>
+  </div>
+  <div data-when="error">
+    <div class="errbox"><h3>授权记录加载失败</h3>
+      <p>无法读取。<b>用户侧的授权与撤回不受影响</b>——两端走的是 <code>me/ai-consents</code>，不依赖本页。</p>
+      <div class="row" style="margin-top:12px"><button class="btn btn--sm">重试</button></div></div>
+  </div>
+
+  <div class="protofoot">
+    <b>落地口径</b>
+    <ul>
+      <li><b>路由不变</b>：仍是 <code>/member-privacy</code>，加 1 个 Tab。现有 213 行，体积充裕。</li>
+      <li><b>模型零改动即可起步</b>：<code>UserAiConsent</code> 是 append-only 表、索引齐全，
+        只需补 <code>GET /admin/member-privacy/consents?endUserId=</code> 一个只读端点。</li>
+      <li><b>只读</b>：不提供「代用户授权」动作——那会让授权链失去法律意义。
+        撤回仍走会员本人的 <code>me/ai-consents/:scope/revoke</code>。</li>
+      <li><b>渠道标识与订单 M1 同批做</b>：<code>UserAiConsent</code> 与 <code>Order</code>
+        <b>共用同一套渠道取值</b>，不要两处各定一套枚举。</li>
+      <li><b>存量不猜</b>：无法可靠回填的显示「未标注」，
+        不按 <code>terminalId</code> 是否为 null 反推——一体机匿名授权同样为 null。</li>
+      <li><b>「授权与调用不一致」比对建议做成常驻巡检</b>：
+        它能自动发现「撤回后仍在调用」这类合规事故，价值高于人工抽查。</li>
+    </ul>
+  </div>
+
+</div>
+<script src="../scripts/shell.js?v=20260811a"></script>
+<script>initShell({side:'admin',active:'member-privacy'})</script>
+</body>
+</html>
