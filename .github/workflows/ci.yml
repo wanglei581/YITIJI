@@ -299,6 +299,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:contract-review-session
           pnpm --filter @ai-job-print/kiosk verify:contract-review-report-print
@@ -692,6 +693,7 @@ jobs:
       - name: Verify Kiosk fusion static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
+          pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:fusion-shell
           pnpm --filter @ai-job-print/kiosk verify:fusion-home
           pnpm --filter @ai-job-print/kiosk verify:fusion-w2
@@ -723,6 +725,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
+          pnpm --filter @ai-job-print/kiosk test:browser:scan-safety
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -746,5 +749,6 @@ jobs:
             test-results/kiosk-fusion-w6-report/**
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
+            test-results/kiosk-scan-safety/**
           if-no-files-found: ignore
           retention-days: 7
