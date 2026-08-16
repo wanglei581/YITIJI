@@ -316,7 +316,7 @@ V6（`docs/design/kiosk-ai-os-v3-2026-08/README.md:8`）自己写明范围是「
 | **H-9** | **SY-5 帮助中心（独立页形态）** | V6 是 `help.js` 全站浮层，生产是 228 行独立页 + 5 处入口 + 8 分类过滤。**能力在，形态不同**（与 G-06 同一处），归类为「形态需裁决」而非「会丢」 |
 | **H-10** | **AS-2 数字人语音通话** | `语音通话` / `数字人` 0 命中。P25 只画了文字顾问。该能力**默认关闭**，但一旦开启 V6 无处放 |
 | **H-11** | **SY-4 首页「继续上次」** | `继续上次` 在交付集内仅 P09 一处（简历内部续做）；P04 有「接着上次做」但那是系统态图谱页。**首页级的跨域续做面板 V6 没画** |
-| **H-12** | **RS-8 自我探索历史页形态** | 生产是独立路由 `/resume/self-assessment/history`，V6 是 P28 的 s4 阶段（与 G-11 同一处）。**注意**：该页在生产上是永久空态（后端无列表端点），见 §四 |
+| **H-12** | **RS-8 自我探索历史页形态** | 生产是独立路由 `/resume/self-assessment/history`，V6 是 P28 的 s4 阶段（与 G-11 同一处）。~~该页在生产上是永久空态~~ **⛔ 已订正：该页非空态，渲染单次回看 + 合规披露卡，且有两处站内入口。见 §三 H-12 顶部** |
 
 ### 2.3 V6 有但生产没有（反向缺口，简单标注；与 #619 互补）
 
@@ -448,13 +448,27 @@ V6（`docs/design/kiosk-ai-os-v3-2026-08/README.md:8`）自己写明范围是「
 
 > 顺带登记：生产还有一个 `/session-resume` 页，是 `GET /me/pending-tasks` 在 kiosk 的**唯一消费者**，功能真实（能恢复到 `/print/cashier` 续付），但**站内无入口**（见 §四）。`ContinuePanel` 并没有取代它 —— ContinuePanel 走的是另外两个端点。重新设计续做区时应把 `/me/pending-tasks` 的「支付续做」一起收进去，否则这条能力会永久失联。
 
-### H-12 · 自我探索历史（RS-8 的历史形态）—— **P2，确认可以下线**
+### H-12 · 自我探索历史（RS-8 的历史形态）—— **P1，必须在 V6 里承接，不得下线**
 
-**为什么 V6 不同**：生产是独立路由，V6 是 P28 的 s4 阶段。
+> ## ⛔ 订正（2026-08-16 第二轮）：本条初稿的「没有后果 / 确认可以下线」是错的
+>
+> 初稿写「该页必然为空、可以下线，并顺手消除那两个入口承诺」。**若照做会删掉一个能用的页面，以及页面上一段合规披露。**
+>
+> **事实（独立审查批次取证，协调者已复核）：**
+>
+> 1. **初稿引用的 `setHistory` 在 `origin/main` 上根本不存在。** `git grep setHistory origin/main` 源码 0 命中。该代码活在**落后分支**上（`origin/chore/type-floor-ratchet-gate`、`origin/claude/ai-s0-backend-hardening`、`origin/chore/wire-s0-s1-verifies-into-ci` 的同文件 462/468 行）。`origin/main` 的 465-469 行是「AI 任务四态（S1-1）」的注释块。
+> 2. **该页不是空态。** `SelfAssessmentFlow.tsx:744-798` 的 `SelfAssessmentHistoryPage` 读 `loadSession()` 并渲染记录编号 / 同意时间 / 维度 / 保留至 + 「回看这次结果」跳转，外加一张**恒渲染**的合规披露卡：答案原文从未入库、过期解读到期自动清理、撤回的那次已物理删除、**企业与合作机构与管理后台都看不到，也不参与岗位排序**。源码注释写明「服务端没有『按人列出历次』的端点……**所以本页不编列表**」—— 这是主动取舍，不是缺陷。
+> 3. **它不是孤儿路由。** 两处站内入口：`SelfAssessmentFlow.tsx:647`、`InterviewServiceHubPage.tsx:98`。主入口是结果页，从那里进来 `session.taskId` **必然有值** —— 恰恰是必然非空的路径。（本条初稿自己也承认这两个入口存在，与 §4.1「站内无任何入口」的分类定义直接打架而未察觉。）
+>
+> **溯源**：重写提交 `5518e6264`（2026-08-16，PR #622「P28 自我探索接线」）删掉了 `setHistory` 并重写该页。陈旧结论留在两份 main 上的文档里，其中一份正是本文 §1.4 自称「§四主要来源」的 `kiosk-control-integrity-audit-2026-08-16.md:131`（另一处 `kiosk-delivery-matrix-2026-08.md:58`）。
+>
+> **后果比 H-1 重**：H-1 是虚报缺口，不动手就没事；本条的处置是「确认可以下线」，**照做会真的删掉能力 + 一段合规披露** —— 正是本文在 H-7 里论证「那句合规声明比入口更要紧」的同一类东西。
+>
+> **改判：P1，迁移时必须在 V6 里承接该页的两件事** —— ①凭 taskId 回看单次结果；②那张合规披露卡。**不得按初稿"顺手消除入口承诺"。**
 
-**丢掉的后果**：**没有后果。** `services/api/src/ai/self-assessment.controller.ts` 下只有 5 个方法（`POST` / `GET :taskId` / `print` / `append` / `DELETE`），**没有任何 list 端点**；前端 `SelfAssessmentFlow.tsx:465-469` 的 effect 里干脆不发请求，直接 `setHistory([])`。这是一个**必然为空的页面**，且它的两个入口（P37 风格的「查看历史」卡、结果页「查看历史」按钮）构成「入口承诺 > 实际能力」。
+**为什么 V6 不同**：生产是独立路由 `/resume/self-assessment/history`，V6 是 P28 的 s4 阶段。
 
-**建议：确认可以下线独立历史页，按 V6 的 P28 s4 组织。** 真正的历史在 `/me/ai-records`（`kind='self_assessment'`），V6 已有 P43 `?stage=ai` 承接。**并顺手消除那两个通向空页的入口承诺。**
+**真正的差异**：不是"生产这页是空的"，而是**V6 的 s4 阶段是否承载了生产这页的两项内容**（单次回看 + 合规披露）。迁移前需逐项比对；缺哪项补哪项。
 
 ### 处置汇总
 
@@ -462,13 +476,29 @@ V6（`docs/design/kiosk-ai-os-v3-2026-08/README.md:8`）自己写明范围是「
 |---|---|---|
 | **在 V6 原型里新设计** | 8 | H-1(P1，已从 P0 订正)、H-2、H-3/H-4/H-5(合一页)、H-6、H-7、H-8、H-11 |
 | **留位并标明，不做完整设计** | 1 | H-10 |
-| **确认可以下线** | 2 | H-9（改用 V6 浮层形态）、H-12（并入 P28 s4） |
+| **确认可以下线** | **1** | H-9（改用 V6 浮层形态）。~~H-12~~ **已订正为 P1「必须承接」，见 §三 H-12** |
 
 ---
 
 ## 四、看起来有但其实没有
 
-> 这一节的东西**迁移时可以直接丢**。分四类。
+> ~~这一节的东西**迁移时可以直接丢**。~~ 分四类。
+>
+> ## ⛔ 订正（2026-08-16 第二轮）：本节的「可以直接丢」定性过强，且 4.1/4.3 各有实证错误
+>
+> 独立审查批次逐条复核后发现三件事，**在动手删任何东西之前必须先读**：
+>
+> **① 4.1 的 11 条孤儿路由被 CI 冻结清单锁着。** `verify:fusion-w6`（在 `ci.yml`，`verify-fusion-w6.mjs:236-266`）硬断言路由表**恰好 104 条** + 与冻结清单 `tests/visual/route-manifest.ts` `deepEqual` + wave 归属合计 104。**§4.1 的 11 条全部在这份清单里。** 删任意一条，三条断言同时红；另有 `verify:fusion-w3`（`/resume/export`）、`verify:fusion-w4`（`/campus/welcome`）在 CI，视觉夹具 `fusion-w6-route-cases.ts:99,123,124` 还实际渲染 `/campus/welcome`、`/ai/plan`、`/session-resume`。
+> **「它们不是能力」这个判断 10/11 成立，但「直接丢、不用心疼」低估了工作量** —— 每删一条是 router + 冻结清单 + verify 脚本 + 视觉夹具的联动改动。
+>
+> **② 4.1 里 `/resume/self-assessment/history` 判错**（非孤儿、非空态），详见 §三 H-12 顶部的订正。
+>
+> **③ 4.3「死代码」里至少 4 项是 CI 门禁的活依赖**，详见 4.3 小节顶部的订正。
+>
+> **本节的判据必须加强为三条同时满足才可判「可删」：**
+> 1. 无 ES import 消费者；
+> 2. **无任何 verify / 门禁脚本按路径 `readFileSync` 读它**（本节漏的正是这条）；
+> 3. **无在制分支上的活跃调用方** —— 「无后端端点」≠「可删」：另一会话实测中，`utils/api.js` 的 `getCommunityFeeds` / `getDailyReport` 后端确实不存在，但 `community.js:45` 与 `daily-report.js:24` 仍在调用，删掉直接打断在制工作。**它们不是死代码，是在制品的前半段。**
 
 ### 4.1 孤儿路由（能渲染，功能可能是真的，但站内无任何入口）
 
@@ -484,7 +514,7 @@ V6（`docs/design/kiosk-ai-os-v3-2026-08/README.md:8`）自己写明范围是「
 | `/campus/welcome` | 空壳 | 页面自己写「智慧校园迎新服务位于独立专区」。已被 `/smart-campus/welcome` 取代。**丢** |
 | `/campus/freshman-insights` | 空壳 | 同上。**丢** |
 | `/smart-campus/freshman-insights` | 永久「暂未开放」 | `SmartCampusHomePage` 刻意不列出该入口（「校园大数据本期严格冻结」），且 `bigdata` 模块被服务端强制冻结为 false。**丢** |
-| `/resume/self-assessment/history` | 必然空态 | 后端无 list 端点（见 H-12）。**丢** |
+| `/resume/self-assessment/history` | ~~必然空态~~ **⛔ 判错** | **非孤儿路由**（两处站内入口）、**非空态**（渲染单次回看 + 合规披露卡）。**不得丢**，见 §三 H-12 顶部订正 |
 
 > **故意保留、不是缺陷的 4 条旧入口别名**（`<Navigate>` 重定向，代码注释已说明）：`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/resume/upload`。迁移时按需保留或一次性清掉，不属于能力。
 > **不是孤儿的两条**：`/member/qr-login` 与 `/upload/phone` 都由**后端下发路径**（`member-qr-login.service.ts` / `upload-sessions.controller.ts` 的 `new URL('/upload/phone', origin)`），是手机侧扫码落点，不是站内导航目标。**必须保留。**
@@ -507,15 +537,38 @@ V6（`docs/design/kiosk-ai-os-v3-2026-08/README.md:8`）自己写明范围是「
 
 > **重要阴性结果**（避免下一轮重复排查）：收藏、权益领取、简历「已生成/已导出」、职业规划、收银台、打印进度、招聘会「已签到」（那是**参展企业**的后端状态，不是用户本人签到）—— 全部核查为**正确**的「真实请求成功后才显示成功」，不是假成功。
 
-### 4.3 死代码（在仓库里但零引用，迁移时直接删）
+### 4.3 死代码（在仓库里但零 ES import）
 
-- `apps/kiosk/src/pages/home/serviceGroups.ts` —— **危险的死代码**：它定义了一整套首页瓦片（含「简历打印」「找企业」「校园招聘会」「扫码签到」「面试技巧」「面试报告」等），**全仓零 import**。首页实际渲染的是 `homeV6Domains.ts`。**任何按 `serviceGroups.ts` 推断首页入口的分析都会得出错误结论。**
-- `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` —— 与顶栏 `useTerminalDeviceStatus` 同功能的第二份实现，零消费者，且它映射的 `paperLevel` 字段后端根本不返回
-- `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` —— 零引用
+> ## ⛔ 订正（2026-08-16 第二轮）：小节原标题「迁移时直接删」是错的，**至少 4 项删不得**
+>
+> 独立审查批次实证：下列四项虽无 ES import 消费者，但**被 CI 里的 verify 脚本按路径 `readFileSync` 读取**。
+> 这些 `read()` 是**顶层调用**，文件一旦不存在直接 `ENOENT` 崩，门禁全红。
+>
+> | 项 | 谁在读它 | 是否在 `ci.yml` |
+> |---|---|---|
+> | `pages/home/serviceGroups.ts` | 7 个 verify 脚本 | **是**（`verify:jobfair-ui`、`verify:job-material-library-ui`、`verify:jobfair-commercial-closure`、`verify:renshi-policy-ui`；另 2 个只在 package.json） |
+> | `hooks/useHomeDeviceStatus.ts` | `verify-prod-build-config.mjs:113` B7 检查 | **是** |
+> | `auth/components/MemberLoginDialog.tsx` | `verify-member-login-dialog.mjs:240` + 约 6 条断言 | **是** |
+> | `deleteMyBrowseLog` / `deleteMyJumpLog` | `verify-profile-activity-inkpaper.mjs:73-74` | **是** |
+>
+> 最后一项尤其说明问题:该门禁的断言文案本身就是「activity API **仍保留**浏览记录删除能力（本页不新增入口）」——
+> **门禁要求它们存在,这是刻意保留的记录,不是遗留垃圾。** 同理 `docs/progress/current-progress.md:215` 对
+> `MemberLoginDialog` 有明确决定:「旧弹窗组件**暂不做跨任务删除**,仅从首页生产入口解除挂载」。
+>
+> **同目录矛盾未察觉**:本文 §1.4 列为「§四主要来源」的 `kiosk-control-integrity-audit-2026-08-16.md:500`
+> 已白纸黑字写着「已知**至少 3 个 verify 脚本仍在断言** `pages/home/serviceGroups.ts`」。本节整段信任了该文档的结论，却漏读了它的这句警告。
+>
+> **判「可删」必须三条同时满足**：①无 ES import 消费者；②**无任何脚本按路径 `readFileSync` 读它**；③**无在制分支上的活跃调用方**。
+>
+> **下列各项经复核判定成立、确可删**：`App.tsx`（只剩 `export {}`）、3 个 `placeholders/PrintScan*.tsx`、`placeholders/OfflineAgenciesPage.tsx` 与 `OfflineJobDetailPage.tsx`、`getMyRedemptions`、`mergeLocalToAccount` / `localPendingCount`。
+
+- ⚠️ **删不得** `apps/kiosk/src/pages/home/serviceGroups.ts` —— 它定义了一整套首页瓦片（含「简历打印」「找企业」「校园招聘会」「扫码签到」「面试技巧」「面试报告」等），**零 ES import**，首页实际渲染的是 `homeV6Domains.ts`。**任何按 `serviceGroups.ts` 推断首页入口的分析都会得出错误结论** —— 但它是 4 条 CI 门禁的路径依赖，**不能删**，只能连门禁一起改。
+- ⚠️ **删不得** `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` —— 与顶栏 `useTerminalDeviceStatus` 同功能的第二份实现，零 ES 消费者，且它映射的 `paperLevel` 字段后端根本不返回；但 `verify-prod-build-config.mjs` 的 B7 检查读它。
+- ⚠️ **删不得** `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` —— 零 ES 引用，但 `verify-member-login-dialog.mjs` 读它并断言，且进度文档有「暂不做跨任务删除」的明确决定。
 - `apps/kiosk/src/App.tsx` —— 文件本体已声明不再被 `main.tsx` 引用，内容只剩 `export {}`
 - `apps/kiosk/src/pages/placeholders/{PrintScanConvertPage,PrintScanFeaturePage,PrintScanSignPage,OfflineAgenciesPage,OfflineJobDetailPage}.tsx` —— 路由已全部改指真实页，这 5 个占位组件零引用
 - `FavoritesProvider.mergeLocalToAccount` + `localPendingCount` —— Provider 注释说「由用户在『我的收藏』显式触发」，但 `MyFavoritesPage` 根本不 import `useFavorites`。**匿名期收藏无法合并到账号**
-- 前端已定义、后端端点真实、但零调用的函数：`getMyRedemptions`、`deleteMyBrowseLog`、`deleteMyJumpLog`
+- 前端已定义、后端端点真实、但零调用的函数：`getMyRedemptions`（**可删**）、⚠️ `deleteMyBrowseLog` / `deleteMyJumpLog`（**删不得** —— `verify-profile-activity-inkpaper.mjs:73-74` 断言其存在，文案即「仍保留删除能力」）
 
 ### 4.4 后端建好但前台没接（**不是"假"，是断链 —— 迁移时不要当成已有能力**）
 
