@@ -60,19 +60,20 @@ function silentResignin() {
  */
 function request(path, options = {}) {
   return rawRequest(path, options).catch((err) => {
-    // 必须要求「原本有 token」才补签。否则退出登录后的任何一次
-    // 需鉴权请求都会 401 → 静默 wx.login → 服务端凭 openid 认出账号
-    // → 用户又被登录回来。一体机是共用设备，退不出去是隐私问题。
-    // 无 token 的 401 是「未登录」，正确行为是让页面走登录引导。
+    // 准入依据是「曾登录过且未主动登出」，不是「当前有没有 token」。
+    // 后者会二选一地出错：getToken() 在 JWT 过期时先 clearSession
+    // 再返回 null，使「自然过期」与「主动登出」完全同形——
+    // 用 token 判断要么让过期补不了签（原始 401 问题原样存在），
+    // 要么让登出的用户被自动登回（共用设备隐私问题）。
     const retriable = err && err.statusCode === 401
       && options.needAuth !== false
       && !options._retried
-      && !!auth.getToken();
+      && auth.canSilentResignin();
     if (!retriable) throw err;
 
     return silentResignin().then(
       () => rawRequest(path, Object.assign({}, options, { _retried: true })),
-      () => { auth.clearSession(); throw err; },
+      () => { auth.logout(); throw err; },
     );
   });
 }

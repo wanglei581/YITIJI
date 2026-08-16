@@ -339,8 +339,22 @@ if (
   !/appSecret\s*[:=]/.test(apiJs)
 ) ok('登录实现无密钥残留')
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
-if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && settingsJs.includes('auth.clearSession()')) ok('登录与真实退出入口完整')
+if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && (settingsJs.includes('auth.logout()') || settingsJs.includes('auth.clearSession()'))) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
+
+// 401 静默补签的准入依据必须与「当前有没有 token」解耦。
+// getToken() 在 JWT 过期时会先 clearSession 再返回 null，使「自然过期」
+// 与「主动登出」完全同形；用 token 判断必然二选一地出错——要么过期后
+// 补不了签（取件页 401 原样存在），要么登出后被自动登回（共用设备隐私）。
+const storageJs = read('utils/storage.js')
+if (
+  storageJs.includes('RESIGNIN_ELIGIBLE') &&
+  authJs.includes('canSilentResignin') &&
+  requestJs.includes('auth.canSilentResignin()') &&
+  !/&&\s*!!auth\.getToken\(\)/.test(requestJs) &&
+  settingsJs.includes('auth.logout()')
+) ok('401 补签准入与 token 存在性解耦')
+else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getToken() 是否有值作为准入，登出须撤销补签资格')
 
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
@@ -381,7 +395,7 @@ try {
   const active = loadAuthForVerify(fakeMemberToken(nowSeconds + 3600))
   const expiredCleared = !expired.auth.isLoggedIn() && !expired.state.zyd_token && !expired.state.zyd_user
   const activeKept = active.auth.isLoggedIn() && Boolean(active.state.zyd_token)
-  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && requestJs.includes('auth.clearSession()')) {
+  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && (requestJs.includes('auth.logout()') || requestJs.includes('auth.clearSession()'))) {
     ok('过期会员令牌会在展示与请求前主动清理')
   } else {
     bad('过期会员令牌会在展示与请求前主动清理', '登录态或请求层仍可能复用过期 token')
