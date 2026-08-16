@@ -57,6 +57,19 @@ function fmt(iso: string): string {
   return iso.slice(0, 16).replace('T', ' ')
 }
 
+/**
+ * 提交方标识。一体机匿名工单（PR #612）没有账号归属，`phoneMasked` / `nickname`
+ * 服务端一律返回 null 且不编造占位值；此前这里直接渲染 `{item.phoneMasked}`，
+ * 匿名工单会渲染成空白并留下一个孤立的分隔点。
+ * 匿名工单改为标注来源终端，让运营知道该去哪台机器现场处置——它无法回复也无法推通知。
+ */
+function submitterLabel(item: Pick<AdminFeedbackTicketItem, 'submitterType' | 'phoneMasked' | 'nickname' | 'terminalId'>): string {
+  if (item.submitterType === 'anonymous_kiosk') {
+    return item.terminalId ? `一体机匿名 · ${item.terminalId}` : '一体机匿名'
+  }
+  return `${item.phoneMasked ?? '手机号缺失'} · ${item.nickname ?? '未设置昵称'}`
+}
+
 function brief(text: string): string {
   return text.length > 72 ? `${text.slice(0, 72)}…` : text
 }
@@ -219,7 +232,7 @@ export default function MemberFeedbackPage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-neutral-900">{item.title ?? CATEGORY_LABEL[item.category]}</p>
                       <p className="mt-1 text-xs text-neutral-400">
-                        {item.phoneMasked} · {item.nickname ?? '未设置昵称'} · {fmt(item.createdAt)}
+                        {submitterLabel(item)} · {fmt(item.createdAt)}
                       </p>
                     </div>
                     <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>
@@ -248,8 +261,15 @@ export default function MemberFeedbackPage() {
                     {CATEGORY_LABEL[detail.category]} · 创建于 {fmt(detail.createdAt)} · 更新于 {fmt(detail.updatedAt)}
                   </p>
                   <p className="mt-1 text-sm text-neutral-500">
-                    用户 {detail.phoneMasked} · 联系号码 {detail.contactPhoneMasked ?? '未填写'} · {detail.nickname ?? '未设置昵称'}
+                    {detail.submitterType === 'anonymous_kiosk'
+                      ? `${submitterLabel(detail)} · 联系号码 ${detail.contactPhoneMasked ?? '未填写'}`
+                      : `用户 ${submitterLabel(detail)} · 联系号码 ${detail.contactPhoneMasked ?? '未填写'}`}
                   </p>
+                  {detail.submitterType === 'anonymous_kiosk' && (
+                    <p className="mt-1 text-sm text-amber-700">
+                      匿名工单没有账号归属：回复不会送达、也不会推通知，只能在该终端现场处置。
+                    </p>
+                  )}
                 </div>
                 <select
                   value={detail.status}
@@ -286,25 +306,34 @@ export default function MemberFeedbackPage() {
                 )}
               </div>
 
-              <form onSubmit={(event) => void submitReply(event)} className="mt-5">
-                <label className="text-sm font-semibold text-neutral-900">回复用户</label>
-                <textarea
-                  value={reply}
-                  onChange={(event) => setReply(event.target.value)}
-                  disabled={detail.status === 'closed' || submitting}
-                  className="mt-2 min-h-[120px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-neutral-50"
-                  maxLength={500}
-                  placeholder="填写设备状态、文件处理、打印服务或系统维护说明"
-                />
-                <button
-                  type="submit"
-                  disabled={detail.status === 'closed' || submitting}
-                  className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
-                >
-                  <SendIcon className="h-4 w-4" />
-                  {submitting ? '发送中…' : '发送回复'}
-                </button>
-              </form>
+              {/* 匿名一体机工单没有 endUser 关联行，回复无处送达。不渲染输入框，
+                  而不是渲染一个点了没结果的按钮——按 CLAUDE.md §9「不伪造能力」。 */}
+              {detail.submitterType === 'anonymous_kiosk' ? (
+                <div className="mt-5 rounded-lg border border-dashed border-neutral-200 px-4 py-6 text-sm text-neutral-500">
+                  本工单为一体机匿名提交，没有可送达的账号，因此不提供回复入口。
+                  请在上方更新状态以记录处置结果。
+                </div>
+              ) : (
+                <form onSubmit={(event) => void submitReply(event)} className="mt-5">
+                  <label className="text-sm font-semibold text-neutral-900">回复用户</label>
+                  <textarea
+                    value={reply}
+                    onChange={(event) => setReply(event.target.value)}
+                    disabled={detail.status === 'closed' || submitting}
+                    className="mt-2 min-h-[120px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-neutral-50"
+                    maxLength={500}
+                    placeholder="填写设备状态、文件处理、打印服务或系统维护说明"
+                  />
+                  <button
+                    type="submit"
+                    disabled={detail.status === 'closed' || submitting}
+                    className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
+                  >
+                    <SendIcon className="h-4 w-4" />
+                    {submitting ? '发送中…' : '发送回复'}
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </Card>
