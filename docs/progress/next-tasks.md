@@ -826,6 +826,54 @@
 
 - **本地网桥令牌层升级为 Windows Named Pipe + ACL（安全二期，2026-07-13 审计记录）**：当前 `apps/terminal-agent/src/local-api/origin-guard.ts` 的静态共享令牌（`localApiBridgeToken`）已同时用于 `/local/qr-login/*` 与 `/local/usb/*`，但令牌随 Kiosk 构建注入前端包，对"Kiosk 页面本身被 XSS 攻陷"或"本机具备文件读取权限的恶意进程"无防护力（该局限已写在 `origin-guard.ts` 注释与 2026-07-13 审计记录里）。真正堵死本机任意进程需要改用 Windows Named Pipe + ACL 或运行期会话凭证，工作量较大。**候选，未立项**：需先有真实 Windows 一体机部署且暴露出对应威胁场景，再评估是否启动。
 
+## 小程序「职业生活圈」方案评审结论（2026-08-16，五方复核，只读评审未改代码）
+
+> **📌 后续以正式方案为准**：本节之后又完成了市场 / 用户 / 政务准入 / 商业模式的全方位调研（十一位专家），结论已沉淀为正式方案 **[docs/product/market-validated-strategy-2026-08.md](../product/market-validated-strategy-2026-08.md)**。该文修订了商业方向（自营铺机不成立 → 主攻高校设备采购）、产品重心（AI 简历 → 求职与办事材料）与四条政务硬约束（国标严禁终端商业广告、政务大厅禁按页收费、异常低价新规、一体机信创实质性要求）。**本节结论仍然有效，但商业方向部分以正式方案为准。**
+
+评审对象为外部方案 `zhiyida-plan.html`。完整报告见 Artifact「生活圈方案复核」。以下只记会影响后续排期与实现的结论。
+
+### 结论 0：该方案的 P0 前提不成立，**不得按其路线图排期**
+
+- 方案称 `getCommunityFeeds / likeFeed / commentFeed` 与 `getDailyReport` 「后端已就绪、仅需前端页面、零新后端成本」。**在 `origin/main`（67145a85）全仓零匹配**，`services/api/src` 无 community 模块，`schema.prisma` 87 model 无 Feed/Post/Comment。
+- 这些符号只存在于 WIP 快照 `acf629e3`（「小程序生活圈 52 页扩张」）与 `2e4e7340` 的**小程序前端文件**；该分支 `services/api/src/**` 同样零实现。即：前端在制品写了**调用不存在端点的客户端桩**，方案把桩当成了后端能力。
+- 这是 `docs/product/miniapp-console-sharing-2026-08.md` §五 记录的同类错误的**镜像版本**（那次据脏工作区下否定结论，这次下肯定结论）。**新增评审前置规则：任何「后端已有」断言必须给出 `origin/main` 上的文件路径与行号。** 本次 14 条此类断言中完全成立 2 条、部分成立 8 条、完全不成立 3 条。
+- 工期核算：路线图内约 37–40 人日，方案另有 3 个标 P0 但未排期的功能 23 人日，合计 60–63 人日（单人 12–13 周），与其「三周交付」相差约 4 倍。且与本文件首节「小程序到 Windows 真实出纸」抢同一发布通道。
+
+### 结论 1：三项当前 main 上的待办，真实状态与定性
+
+- [ ] **N1 AI 百宝箱工具卡死链（真 bug，已在独立会话处理）**：`apps/miniapp/pages/ai/ai.wxml:30-40` 的 `tools` 宫格有 `bindtap="tapTool"` 但缺 `data-id="{{item.id}}"`（同文件 `:50-51` 的 `services` 列表有），`ai.js:33` 读到 `dataset.id === undefined` → `routes[undefined]` → 静默不跳转。简历诊断/优化/模拟面试/职业规划/岗位匹配五张卡当前全部点不动。
+- [ ] **N2 权益核销「全额抵扣」——定性修正：不是失控缺陷，是本波有意的范围限制**。`benefit-redemption.service.ts:153` 的 `discountCents: order.amountCents` 配 `:159` 的 `decrement: 1`，看似「一张券抵掉任意金额整单」，但 `order-status.service.ts:233` 文档注释明确写「要求 discountCents >= order.amountCents（**全额核销**，本波不接部分抵扣）」，且 `paymentSource='voucher'` 已诚实标注为非真实资金收款。客户端**有意未接线**，`apps/kiosk/src/pages/activities/BenefitActivityDetailPage.tsx:204-211` 注释已写明原因并给出正确修法：「抵扣闭环接通后（需先收窄后端核销规则：**面值/服务范围/最高抵扣额**）」。→ **真正的前置工作是给 `BenefitGrant` 增加面值/服务范围/单次最高抵扣额字段**（双 schema + 双 migration + Admin 配置 + 核销规则收窄），属功能立项而非热修；在当前收口冻结期内**不擅自改动核销语义**。**任何权益兑换（含签到发券、职豆兑换）接通前，此项必须先完成。**
+- [ ] **N3 微信隐私保护指引——阻塞点在 mp 后台，不在代码**。`apps/miniapp` 全仓 `onNeedPrivacyAuthorization` / `getPrivacySetting` / `agreePrivacyAuthorization` 零命中，但经官方文档核实：自定义弹窗**是可选的**，开发者未响应时「微信将主动弹出官方弹窗」。硬阻塞是后台声明——「仅有在指引中声明所处理的用户信息，才可以调用平台提供的对应接口或组件。若未声明，对应接口或组件将直接禁用」（errno 112 `api scope is not declared in the privacy agreement`，补充声明后 5 分钟生效）。小程序**现有**功能已在用 `getPhoneNumber`、`wx.chooseMedia`、`wx.chooseMessageFile`、`wx.scanCode`。→ **须在 mp 后台《用户隐私保护指引》逐项声明**，与 `docs/compliance/launch-review-submissions.md` §B 法务定稿文本对齐；提审时勾「未采集隐私」会导致权限被回收。此项优先级高于任何生活圈新功能。
+
+### 结论 2：平台规则事实更正（多处流传口径已过时，按此为准）
+
+- **iOS 虚拟支付旧禁令条款已从《运营规范》删除**。现行 5.13 / 14.6 通篇无 iOS 字样，改为**虚拟商品全平台强制走小程序虚拟支付**，14.6 连「安卓支付」都列入禁止引导对象。→ 普通微信支付**不能**用于虚拟商品。
+- **官方《虚拟支付业务运营指南》逐条点名了本项目的 AI 业务**：「购买简历模板」「增加使用次数/额度」「付费导出 PDF」「付费购买 AI 使用次数或 token 额度」「开通 VIP 去广告」「购买积分」。且**混合型（虚拟＋实物同一笔）将被整体认定为虚拟支付**，须拆分为两笔交易 → 「打印额度为主体、AI 赠送」的打包套餐设计**不成立**。若小程序仅含虚拟类目，平台将关闭其安卓端普通微信支付能力。
+- **AI 服务大概率还需【深度合成】类目**：自研需本主体《互联网信息服务算法备案》，用第三方模型需技术方备案＋双方合作协议；且**AI 生成内容须在显著位置标注「AI 生成」**。`docs/compliance/compliance-boundary.md` 对此**零覆盖**，需补章节并核查各 AI 结果页是否已有标识。
+- **流量主门槛为累计独立访客 UV ≥ 500**（`ad.weixin.qq.com/docs/50` 现行原文），流传的 1000 是旧口径；分成为单日流水 50%。
+- **微信确有激励广告服务端验证（SSV）**（sha256 验签＋AES-256-CBC 回调，载荷含 `transaction_id` 天然幂等键），但该文档只挂在小游戏树下、`setServerSideVerificationData` 未进 API 参考页 → **小程序后台是否开放该入口须实测确认**，开不了则退化为自建一次性 ticket 校验。
+- **激励视频两条会致驳回的红线**：流量主运营规范 2.3 点名「所有运营内容都只能通过观看激励视频广告才能解锁」属二级违规（整改口径为「每天给一定免费使用次数」）；运营规范 5.34 点名缴费流程中弹广告（原文举例停车缴费，与打印付费同构）。
+- **长期订阅消息不向求职招聘开放**（仅政务民生、医疗、交通、金融、教育等），且不支持自定义长期模板 → **「岗位关键词有新岗位就推」无法实现**；打印完成通知可做，属一次性订阅（一单一次最契合）。
+- **小程序无任何打开任意外部 http 链接的 API**（`wx.openUrl` / `wx.launchApp` 经官方 API 索引与 typings 双重核验均不存在）；`web-view` 需自有已备案域名且校验文件置于根目录 → 「外链跳 B 站」不可实现，另撞运营规范 8.2 / 8.4。
+- **方案中 `wx.checkIsPure` 系编造 API**（官方索引、typings、文档路径四重核验零命中），生物识别正确接口为 SOTER 三件套；`wx.setVisualEffectOnCapture` 在 **iOS 上只对录屏生效、对截屏无效**（需基础库 ≥3.3.0 + iOS ≥16），不能宣称「截图自动遮挡」。
+
+### 结论 3：数据前提不成立、须改做或删除的功能
+
+- **「附近 5 公里岗位地图」数据前提不成立**：`model Job` 无 `address` / `lat` / `lng`，位置信息只有 `city`。全库有真实经纬度的只有 `JobFair` 与 `OfflineAgency` / `OfflineAgencyBranch` → 应改做**附近招聘会 / 附近线下人社机构**。导航用 `wx.openLocation`（**不在需申请的 8 个位置接口之列**，零权限成本）。
+- **「智慧校园轻量版」不可交付**：`smart-campus` 仅为每终端开关存储（`{enabled, modules, items}`，注释明写不含学生数据），无任何校园业务数据。
+- **「视频远程面试」应整行删除**：TRTC 是 `/assistant` 语音顾问「小青」的基础设施，非面试系统；且「面试邀约」属 CLAUDE.md §2 红线。
+- **「薪资参考看板」不得跨来源前端聚合**：会抹掉来源归属（违反 §10），且现网 jobs 已下架演示数据、`total=0`，此时展示分布即伪造（违反 §9）。
+- **签到「敬请期待」预告卡片不做**：`user-data-flow-matrix.md` §3.9「不为未开放能力保留可点击占位」，且属微信审核减分项。要么做完整，要么不留入口/页面/路由。
+- **被低估的真快赢**：`POST /resume/generate` + `GET /resume/generate/:taskId` + 导出端点**后端均已实现**、小程序零引用；但 `pages/resume-generate/resume-generate` 在 `verify-miniapp-static.mjs` 的 `removedFakePages` 名单内，重做须同 PR 落地后端并说明为何不重蹈覆辙。方案的「打印进度实时推送」同理命中名单内的 `push-print`。
+
+### 结论 4：工程侧遗留项
+
+- [ ] **miniapp 无 lint、无 typecheck**：根 `eslint.config.mjs` 三个 glob 全为 `*.{ts,tsx}`，小程序为纯 `.js`/`.wxml`，从无规则命中；CI 的 Lint / Typecheck 步骤亦不含 miniapp。唯一质量底线是 `verify-miniapp-static.mjs`。**在此基础上批量加页风险显著。**
+- [ ] **加图片预算门禁**：当前 main 的 miniapp **零本地图片**，主包 0.62MB 原始文本、余量充足；但 WIP 带入的 `apps/miniapp/assets/xiaoqing-card.png` 单文件 284KB＝2MB 主包预算的 14%。建议在 `verify-miniapp-static.mjs` 加「单张 ≤60KB、本地图片总量 ≤300KB」断言。**分包当前非必须**（页面数不是瓶颈）。
+- [ ] **WIP 分支处置**：`acf629e3` 含 `services/api/src/package-orders/package-orders.module.ts`，其 import 的 controller / service **在该提交中并不存在**（`git ls-tree` 仅返回 module.ts）→ 直接合入会打断 tsc；另含 22 个 `docs/design/kiosk-ai-os-v3-2026-08/` 文档删除且提交信息自陈「未跑任何构建/verify/渲染验证」，**不予接受**。按 CLAUDE.md §8.1，从干净 `main` 新建分支逐文件提取，提取完成前不得删除该分支。
+- [ ] **上线前重设 `AI_COST_ALERT_CNY`**：`ai-log.service.ts:223-226` 默认 ¥50，且 `:457` 比对的是 24 小时窗口聚合成本（`AI_USAGE_WINDOW_MS`）。按 deepseek 档成本模型，约 1000 DAU 即会持续触发并被运维忽略。
+
 ## 待用户确认
 
 - [x] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。
+- [ ] **生活圈方案的四项决策**（详见 Artifact「生活圈方案复核」§06）：① 虚拟支付何时接、两条商品线如何拆单；② 小程序主类目策略（求职/招聘类目需《人力资源服务许可证》，官方无「仅展示可豁免」条款，建议后台转人工取书面口径）；③ 社区做不做、做哪一档（A 不做 / B 官方只读经验内容 / C 最小 UGC，C 档需法务放行＋安全评估＋类目＋12 项治理机制且需人工审核队伍）；④ 当前收口冻结期是否为生活圈解冻。
