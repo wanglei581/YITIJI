@@ -451,6 +451,41 @@ export class MemberAuthService {
     })
   }
 
+  /**
+   * 微信续签：只凭 openid 为存量已绑号账号重新签发 token，不索取 phoneCode。
+   *
+   * 安全性等价于「token 尚未过期」的状态，而非一次新的身份认证：
+   * - openid 经 code2session 服务端换取，客户端无法伪造；code 一次性
+   * - 只查已绑定该 openid 的账号，永不建号——未绑定则退回完整登录
+   * - enabled / status 复核由 issueLoginForUser 承担，与其余登录路径一致
+   *
+   * 不在此处重收法务同意：续签是既有会话的延续，一个 token 未过期的用户
+   * 同样不会被要求重新同意。法务版本变更应由独立的再同意流程处理。
+   */
+  async wxResignin(code: string): Promise<MemberLoginResult> {
+    const openid = await this.fetchWxOpenId(code)
+    const existing = await this.prisma.endUser.findUnique({ where: { wxOpenId: openid } })
+    if (!existing) {
+      throw new UnauthorizedException({
+        error: { code: 'MEMBER_WX_NOT_BOUND', message: '请重新登录' },
+      })
+    }
+    if (!existing.enabled || existing.status !== 'active') {
+      throw this.accountUnavailable()
+    }
+
+    await this.prisma.endUser.update({
+      where: { id: existing.id },
+      data: { lastLoginAt: new Date() },
+    })
+
+    return this.issueLoginForUser({
+      id: existing.id,
+      phoneMasked: maskPhoneFromEnc(existing.phoneEnc),
+      nickname: existing.nickname,
+    })
+  }
+
   private async fetchWxOpenId(code: string): Promise<string> {
     const appid = process.env['WECHAT_MINIAPP_APPID']
     const secret = process.env['WECHAT_MINIAPP_APPSECRET']
