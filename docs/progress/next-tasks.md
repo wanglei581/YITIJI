@@ -2,6 +2,8 @@
 
 > 最后更新：2026-08-14
 
+> **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
+
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
@@ -24,6 +26,21 @@
 >
 > 其中「视觉一律对齐 V3」这条要按新口径读：**先把 `apps/kiosk` 接到新接口（A），
 > 按 V3 重做界面（B）单独立项** —— 见 handoff-plan §一。
+
+## 2026-08-12 V6 + 双后台统一施工队列（当前优先级）
+
+> 用户口径中的 V6 对应仓库历史目录 `kiosk-ai-os-v3-2026-08`；命名不影响实施。完整页面矩阵、双后台裁决与商用定义见 [`2026-08-12-v6-commercial-product-audit.md`](../reviews/2026-08-12-v6-commercial-product-audit.md)。下列顺序覆盖下方较早的 W1–W8 泛化队列；每个窗口仍须单独范围、文件预算、评审、验证和 progress 更新。
+
+- [x] **A0 第一批原型确定性修正**：P03/P06 QR 居中；P05 390×844；P39 手机扫码入口先到 P06 创建会话；P06 `source` 白名单。仅设计原型，未冒充生产接线。
+- [~] **A1 第一条 V6 运行时纵切（已本地冻结并完成最新 main 集成复验）**：A1 已以 `260f4f6ba73d7faa1a98079af207686607531fc6` 本地冻结并通过 Claude 最终完整差异终审；与 `origin/main@3a926c97` 的本地语义集成 merge `993bf6631fdbad72ece973a0cebe7590922ec96a` 也已通过 Claude `FINAL: PASS`。同树 Node 22 门禁保持 W2 **30/30**、W4 **27/27**、W5 **21/21**、W6 **104/104** 与 P1 **83/83 capture OK**；`/`、`/print-scan`、真实招聘会/本机状态双面板、手机扫码上传正确中继、`/toolbox` 与智慧校园 8 条 URL fail-closed 均保留，取件二维码/HID 扫码能力也未覆盖这些合同。target 73 仍仅是 pre-call gate 证据；七个打印页的自动 `horizontalOverflow` 已被通用 DOM 合同分类为局部 `nav.ui-kiosk-steps` 滚动容器误报，检测器实际 diff 已获 Claude `FINAL: PASS`，并以 `6db200c0a27862c30a883f27d04f77ce5f2d4dba` 本地冻结。真实 TRTC、短信与生产 Agent 扫码/手机确认、正式 AppID、Windows/Pantum、PG/Redis/BOS、密钥、法务采购、CI、生产和真机均未完成。
+- [~] **A2 身份/会话/文件（仅 A2.1 登录切片已完成）**：A2.1 现有 `/login` V6 最小收口已以 `1149fef0db4bad3bb05c4157f863c6753ae8ea42` 本地冻结并通过 Claude 最终完整差异终审；其余 P03/P04/P05/P40 的 legal version、session lifecycle、upload/takeaway 与 provenance 尚未完成，W1-D4 durable staging cap 未完成前手机上传不得宣称商用 GO。
+- [ ] **A3 打印/扫描交易履约**：P06/P07/P08/P39/P41 的 quote/reservation/order/payment/PrintTask attempt/device outcome/refund；小程序到机码只能授权并绑定订单，付款后服务端幂等创建 `pending` PrintTask，PrintTask 的 `claimed` 仍只由 Agent 写；不得把订单 `pickupStatus=claimed` 与 Agent 任务租约混成同一状态机。
+- [ ] **A4–A7 业务纵切**：简历与 AI 资产 → 招聘/招聘会/政策来源 → 我的/权益 → 默认关闭能力；所有输出先生成真实 artifact，再允许打印/保存/带走；智慧校园首页可见但深链 fail-closed。
+- [ ] **C0 双后台事实冻结**：将 5303 的 `新增0页` 修为 Admin 35 + Partner 13 = 48、唯一新增 `/online-platforms`；补 V6 P01–P46/真实 React 路由映射；建立 378 个按钮与 77 个链接 action manifest，生产禁止 enabled `#`/`javascript:void(0)`。
+- [ ] **C1 Partner Stats 快速闭环**：先修现有 timezone/响应解包合同，仅展示真实同步聚合；不等待 AI 内核、不伪造曝光漏斗。
+- [ ] **C2 Online Platform 三端闭环**：复用现有目录模型，补 Admin 治理、Partner 申请、Kiosk P35 发布投影；完成 URL/域名安全、maker-checker、CAS、reason、强审计与跨租户测试。
+- [ ] **C3–C6 双后台能力**：先堵 AI Base URL/凭证风险，再建设能力/Prompt/账本/事故；随后做 Partner capability、数据源/招聘会/统计，最后做子账号与 Ticket。高危写必须二次确认、RBAC、幂等/CAS、强审计；AI 观测日志不得当计费账本。
+- [ ] **最终商用验收**：SQLite + PostgreSQL 双库、三端 typecheck/lint/build、全部动作真实浏览器链路、跨租户/权限/并发/审计负向用例，以及 Windows Agent + Pantum 真机的扫描、付款、出纸、异常、退款、清场与跨机规则。生产配置、密钥、法务、内容来源和硬件任一未通过，整体保持 NO-GO。
 
 > 最后更新：2026-08-10
 
@@ -203,7 +220,7 @@
 - [ ] **响应式第二批深层流程页验收**：在可稳定切换 390×844、1440×900、1080×1920 的浏览器环境中，携带真实路由 state 逐页复验 `/print/preview`、`/resume/generate`、`/profile`、岗位/招聘会详情、打印/扫描 actionbar 流程的页头、内容滚动、底栏遮挡和触控尺寸；只修已有入口页面，不新增入口、业务流程或假数据。本项未完成前不得宣称三端所有页面视觉封板。
       `/profile` 的 1080×1920 高屏底部空白已形成局部样式候选并通过静态门禁、typecheck、build 与 lint；仍需刷新当前页面并在 Windows 真机确认剩余高度分配、滚动和触控表现。
 - [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；其后热更为 `index-CPD4lg4F.js`，再经 USB bridge / 备案包覆盖。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
-- [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65** / **57**；判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** TRTC）。不等于像素封板或硬件验收。
+- [~] **P1 逐屏视觉证据执行**：当前 **83/83 capture OK**，其中 **11 PROFILE_DEFER**，其余 judgment 仍为 **PENDING**；target 73 只证明生产 pre-call gate 可达，不证明 TRTC live。03/04/31/33/64/65/77 七个打印目标已关闭局部步骤条导致的 `horizontalOverflow` 自动检测误报，截图主体/actionbar 未见横向裁切；target 31 已通过既有 W2 三任务合同的 synthetic evidence preparation 进入「可以继续设置打印参数」，仅证明证据准备而非真实材料服务；target 64 已使用官方 Chrome `151.0.7922.138` 取得 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页。上述结果只证明 synthetic evidence contract，不等于像素封板、业务状态验收、硬件验收、真实打印预览或 V6 完成。
 - [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
 - [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；其后现网 Kiosk 以备案包为准（见下）。
 
@@ -237,7 +254,7 @@
 
 推荐顺序（2026-07-25）：
 
-0i. [ ] **30 天付费市场验证 Gate**：按 `docs/business/职易达首单付费试点成交工具包-2026-07.md` 执行；用户先补齐签约主体、联系人、开票、设备、演示时段和风险预算，再核验并联系第一周 A 组六家。总目标仍是访谈 12—15 家预算负责人，取得至少 1 个付费试点或预算负责人书面启动采购、2 个可落地场地/现场协作意向。达到门槛前不批量采购设备、不新增重复入口或非必要功能；12 家后无人谈价格则暂停硬件投入并重审客户问题。
+0i. [ ] **30 天付费市场验证 Gate**：当前树中旧链接 `docs/business/职易达首单付费试点成交工具包-2026-07.md` 不存在，不再把断链文件当执行依据；本轮统一按 [`2026-08-13-business-report-product-architecture-reconciliation.md`](../reviews/2026-08-13-business-report-product-architecture-reconciliation.md) §5 执行，并继续复用本 0i 条目，不建第二任务体系。用户先补齐签约主体、联系人、开票、设备、演示时段和风险预算，再核验并联系第一周 A 组六家。总目标仍是访谈 12—15 家预算负责人，取得至少 1 个付费试点或预算负责人书面启动采购、2 个可落地场地/现场协作意向；另补一场至少 100 人的双选会匿名行为观察、可追溯竞品原始证据、至少 2 份同口径供应商书面 RFQ，以及采购/法务对预算科目、数据处理、招投标、廉洁和宣传表述的书面核验。达到门槛前不批量采购设备、不新增重复入口或非必要功能，不发布 TAM/SAM/SOM、竞品价、BOM、毛利、回本或窗口期；12 家后无人谈价格则暂停硬件投入并重审客户问题。Windows/Pantum、真实短信/扫码、正式 AppID、生产部署和故障恢复继续按既有设备/部署 Gate 单独验收，不能用访谈或代码测试代替。
 
 0. [x] **预发事故：offline-agencies `pageSize` string → 500**：#366；现网 **`DEPLOY_SOURCE=83f2117f`** 仍固化；公网 `?pageSize=5` → 200
        0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含

@@ -26,7 +26,11 @@ const SELF_ASSESSMENT_V1_ROUTES = [
 const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 
 const FROZEN = new Map([
-  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '3181319ca52796ba6687991297a1319fea38f481fa382f36ce98146d85a8dae5'],
+  // 哈希随 A2.1 登录切片同步更新（V6 落 main）：该 hook 的两处错误文案由
+  // `cause instanceof MemberApiError ? cause.message : 兜底` 改为统一走
+  // resolveMemberApiErrorMessage(cause, 兜底)，行为等价且兜底文案更具体。
+  // 冻结契约本身不放宽，仍逐字节校验，只是基线随已评审的有意改动前移。
+  ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '8f60d06f1e9d0dc2825882f64095d7cf4263b5aa61f32ea2e6736ecef11c40f8'],
   ['src/pages/profile/assets/useMemberProfileOverview.ts', '3679de500e38d9d84b5f77680090997dc27eabca861af58c3d407eeb9e420395'],
   ['src/pages/profile/profileEntries.ts', 'dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],

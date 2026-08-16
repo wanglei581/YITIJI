@@ -99,6 +99,41 @@ function registerKioskShell(api: ApiRouter): void {
   })
 }
 
+function homeFair(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'w5-home-fair',
+    name: '2026 秋季高校毕业生招聘会',
+    organizer: '市公共就业服务中心',
+    startTime: '2026-10-18T01:00:00.000Z',
+    endTime: '2026-10-18T08:00:00.000Z',
+    venue: '市公共就业服务中心 A 馆',
+    status: 'upcoming',
+    sourceOrgId: 'source-w5',
+    externalId: 'external-w5-home-fair',
+    sourceName: '市公共就业服务网',
+    sourceUrl: 'https://jobs.example.gov.cn/fairs/w5-home-fair',
+    syncTime: '2026-08-12T00:00:00.000Z',
+    reviewStatus: 'approved',
+    publishStatus: 'published',
+    hasManagedData: false,
+    managedCompanyCount: 0,
+    managedMaterialCount: 0,
+    dataSourceNote: '招聘会信息由官方来源提供。',
+    ...overrides,
+  }
+}
+
+function registerHomeApi(api: ApiRouter, fairs: unknown[] = [homeFair()]): void {
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfig({ enabled: false, items: [] }),
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: fairs, pagination: { page: 1, pageSize: 20, total: fairs.length, totalPages: fairs.length ? 1 : 0 } },
+  })
+}
+
 function registerAuthenticatedShell(api: ApiRouter): void {
   registerKioskShell(api)
   api.respond('GET', '/api/v1/me/favorites', {
@@ -109,7 +144,7 @@ function registerAuthenticatedShell(api: ApiRouter): void {
 
 function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknown {
   return {
-    smartCampus: { enabled: false, modules: {}, items: [] },
+    smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] },
     toolbox,
     configVersion: 'w5-browser-fixture',
     refreshIntervalMs: 300000,
@@ -117,12 +152,113 @@ function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknow
   }
 }
 
+test('home restores real fair and device panels with balanced 1080x1920 geometry @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  registerHomeApi(api, [
+    homeFair({ id: 'rejected-fair', name: '未审核场次', reviewStatus: 'pending' }),
+    homeFair(),
+  ])
+
+  await page.goto('/')
+  const panels = page.locator('.v6-home-footer-panels')
+  const fairPanel = page.locator('[data-home-job-fair-panel]')
+  const devicePanel = page.locator('[data-home-device-panel]')
+  const boundary = page.locator('.v6-home-boundary')
+  const bottomNav = page.getByRole('navigation', { name: '主导航' })
+  await expect(fairPanel).toHaveAttribute('data-panel-state', 'ready')
+  await expect(fairPanel.getByRole('heading', { name: '2026 秋季高校毕业生招聘会' })).toBeVisible()
+  await expect(fairPanel.getByText('未审核场次')).toHaveCount(0)
+  await expect(devicePanel).toHaveAttribute('data-panel-state', 'ready')
+  await expect(devicePanel.getByText('未单独上报')).toHaveCount(3)
+  const [panelBox, fairBox, deviceBox, boundaryBox, navBox] = await Promise.all([
+    panels.boundingBox(),
+    fairPanel.boundingBox(),
+    devicePanel.boundingBox(),
+    boundary.boundingBox(),
+    bottomNav.boundingBox(),
+  ])
+  expect(panelBox).not.toBeNull()
+  expect(fairBox).not.toBeNull()
+  expect(deviceBox).not.toBeNull()
+  expect(boundaryBox).not.toBeNull()
+  expect(navBox).not.toBeNull()
+  expect(panelBox!.height).toBeGreaterThanOrEqual(212)
+  expect(panelBox!.width).toBeLessThanOrEqual(968)
+  expect(Math.abs(fairBox!.y - deviceBox!.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(fairBox!.height - deviceBox!.height)).toBeLessThanOrEqual(1)
+  expect(boundaryBox!.y - panelBox!.y - panelBox!.height).toBeLessThanOrEqual(24)
+  expect(navBox!.y - boundaryBox!.y - boundaryBox!.height).toBeLessThanOrEqual(160)
+  await expectTouchTargets(page)
+  await assertNoHorizontalOverflow(page)
+  expect(errors).toEqual([])
+})
+
+test('home fair loading, empty and error states remain honest and stable @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfig({ enabled: false, items: [] }),
+  })
+  let releaseFair!: (result: { status: number; json: unknown }) => void
+  api.respondWith('GET', '/api/v1/job-fairs', (requestNumber) => {
+    if (requestNumber === 1) return new Promise((resolve) => { releaseFair = resolve })
+    if (requestNumber === 2) {
+      return { status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } }
+    }
+    return { status: 503, json: { success: false, error: { code: 'W5_FAIRS_UNAVAILABLE', message: 'fixture unavailable' } } }
+  })
+
+  try {
+    await page.goto('/')
+    const fairPanel = page.locator('[data-home-job-fair-panel]')
+    await expect(fairPanel).toHaveAttribute('data-panel-state', 'loading')
+    const loadingHeight = (await fairPanel.boundingBox())!.height
+    releaseFair({ status: 200, json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } } })
+    await expect(fairPanel).toHaveAttribute('data-panel-state', 'empty')
+    expect((await fairPanel.boundingBox())!.height).toBe(loadingHeight)
+    await page.reload()
+    await expect(fairPanel).toHaveAttribute('data-panel-state', 'empty')
+    await page.reload()
+    await expect(fairPanel).toHaveAttribute('data-panel-state', 'error')
+    await expect(fairPanel.getByText('没有使用缓存或示例数据，请稍后重试。')).toBeVisible()
+    expect((await fairPanel.boundingBox())!.height).toBe(loadingHeight)
+  } finally {
+    releaseFair?.({ status: 503, json: { success: false } })
+  }
+  await assertNoHorizontalOverflow(page)
+  expect(errors).toEqual([])
+})
+
+test('home device offline state does not invent paper toner or scanner telemetry @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200,
+    json: { printerStatus: 'offline', isOnline: false },
+  })
+  registerHomeApi(api, [])
+
+  await page.goto('/')
+  const devicePanel = page.locator('[data-home-device-panel]')
+  await expect(devicePanel).toHaveAttribute('data-panel-state', 'offline')
+  await expect(devicePanel.getByRole('heading', { name: '打印机离线' })).toBeVisible()
+  await expect(devicePanel.getByText('未单独上报')).toHaveCount(3)
+  await expect(devicePanel.getByText(/78%|62%|碳粉充足|扫描仪就绪/)).toHaveCount(0)
+  await expectFusionAcceptance(page, errors)
+})
+
 test('profile permission state uses the canonical fusion shell @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
-    json: { smartCampus: { enabled: false, modules: {}, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w5', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
+    json: { smartCampus: { enabled: false, modules: { welcome: false, bigdata: false, luggage: false, panorama: false }, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w5', refreshIntervalMs: 300000, serverTime: '2026-07-24T00:00:00.000Z' },
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
   })
   await page.goto('/profile')
   await expect(page.locator('[data-kiosk-screen="profile"]')).toBeVisible()
@@ -268,8 +404,9 @@ for (const scenario of [
       items: [{ key: 'w5-help', title: '使用帮助', description: '打开站内帮助能力', icon: 'help-circle', to: '/help', disabled: false, sortOrder: 1, placements: ['toolbox'], launchMode: 'internal_route' }],
     },
     text: '使用帮助',
+    available: true,
   },
-  { label: 'empty', toolbox: { enabled: false, items: [] }, text: '待配置' },
+  { label: 'empty', toolbox: { enabled: false, items: [] }, text: '本机暂未开启百宝箱服务', available: false },
 ] as const) {
   test(`toolbox renders the ${scenario.label} terminal-config branch @w5-kiosk`, async ({ page, api }) => {
     const errors = runtimeErrors(page)
@@ -278,21 +415,31 @@ for (const scenario of [
       status: 200,
       json: terminalConfig(scenario.toolbox),
     })
+    api.respond('GET', '/api/v1/job-fairs', {
+      status: 200,
+      json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+    })
 
     await page.goto('/toolbox')
-    await expect(page.locator('[data-kiosk-screen="toolbox"]')).toBeVisible()
-    await expectSharedPageShell(page, '百宝箱')
-    const backButton = page.getByRole('button', { name: /返回/ }).first()
-    await expect(backButton).toBeVisible()
-    await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
-    if (scenario.label === 'configured') {
+    if (scenario.available) {
+      await expect(page.locator('[data-kiosk-screen="toolbox"]')).toBeVisible()
+      await expectSharedPageShell(page, '百宝箱')
+      const backButton = page.getByRole('button', { name: /返回/ }).first()
+      await expect(backButton).toBeVisible()
+      await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: /使用帮助/ })).toBeEnabled()
+      await backButton.click()
+      await expect(page).toHaveURL(/\/$/)
+      // 等待 V6 首页真实异步面板稳定后，再执行统一触控目标验收。
+      await expect(page.locator('[data-v6-page="home"]')).toBeVisible()
+      await expect(page.locator('[data-home-job-fair-panel]')).toHaveAttribute('data-panel-state', 'empty')
+      await expect(page.locator('[data-home-device-panel]')).toHaveAttribute('data-panel-state', 'ready')
     } else {
-      await expect(page.locator('.ktoolbox .tb-tile')).toHaveCount(0)
+      await expect(page.locator('[data-capability-state="unavailable"]')).toBeVisible()
+      await expect(page.locator('[data-kiosk-screen="toolbox"]')).toHaveCount(0)
+      await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
     }
     await expectFusionAcceptance(page, errors)
-    await backButton.click()
-    await expect(page).toHaveURL(/\/$/)
   })
 }
 
@@ -448,6 +595,10 @@ test('direct visit to /session-timeout without a pending warning fails closed to
     status: 200,
     json: terminalConfig({ enabled: false, items: [] }),
   })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
+  })
 
   await page.goto('/session-timeout')
 
@@ -456,8 +607,8 @@ test('direct visit to /session-timeout without a pending warning fails closed to
   await expect(page.getByRole('button', { name: '继续使用', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toHaveCount(0)
   await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: '简历、岗位、打印，一趟办完' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: '服务入口' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /说出你的处境/ })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])
 })
@@ -479,6 +630,10 @@ test('offline page follows a recovered health response in a fresh page @w5-kiosk
   api.respond('GET', '/api/v1/terminals/KSK-001/config', {
     status: 200,
     json: terminalConfig({ enabled: false, items: [] }),
+  })
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } },
   })
   api.respond('GET', '/api/v1/health', { status: 200, json: { success: true, data: { status: 'ok' } } })
   await page.goto('/error-offline')

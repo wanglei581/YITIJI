@@ -63,6 +63,14 @@ function registerKioskShell(api: ApiRouter): void {
     status: 200,
     json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
   })
+  // V6 首页会真实请求招聘会列表；给精确的 200 空列表，让清场后返回的首页呈现诚实
+  // empty 态。这是不含身份信息的公开只读列表，注册它不会削弱本套件的隐私断言
+  // ——「清场后不得携带旧 bearer / 不得恢复敏感历史」仍由各用例自己的断言守住。
+  // 其余未注册 API 仍由 ApiRouter fail-closed。
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
+  })
 }
 
 function registerMemberLogin(api: ApiRouter): void {
@@ -305,7 +313,10 @@ test('member report hard-replaces a clean homepage after the privacy deadline @p
 
   expect(new URL(page.url()).pathname).toBe('/')
   expect(await readDocumentMarker(page)).toBeNull()
-  await expect(page.getByRole('button', { name: /登录 \/ 注册/ })).toBeVisible()
+  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
+  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
+  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
 })
 
 test('member privacy clear sends the original bearer and blocks authenticated re-entry @privacy-kiosk', async ({ page, api }) => {
@@ -321,7 +332,10 @@ test('member privacy clear sends the original bearer and blocks authenticated re
     status: 200,
     json: { success: true, data: { status: 'ok' } },
   })
-  await page.getByRole('button', { name: /AI面试训练/ }).click()
+  // V6 首页该入口文案为「AI 面试训练」（AI 与中文之间有空格），旧首页无空格。
+  // 用 \s* 容忍两种写法，避免下次文案微调再挂；本用例真正的断言在后面的
+  // interview-reports 屏与 bearer 拦截，不依赖这个入口的具体排版。
+  await page.getByRole('button', { name: /AI\s*面试训练/ }).click()
   await page.getByRole('button', { name: /训练报告/ }).click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)
@@ -362,7 +376,10 @@ test('legal documents cannot suspend an authenticated kiosk privacy deadline @pr
   expect(new URL(page.url()).pathname).toBe('/')
   expect(await readDocumentMarker(page)).toBeNull()
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
-  await expect(page.getByRole('button', { name: /登录 \/ 注册/ })).toBeVisible()
+  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
+  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
+  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -570,7 +587,10 @@ test('an unknown terminal route remains inside the privacy guard @privacy-kiosk'
 
   expect(new URL(page.url()).pathname).toBe('/')
   expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
-  await expect(page.getByRole('button', { name: /登录 \/ 注册/ })).toBeVisible()
+  // 断言意图是「清场后回到未登录态首页」。V6 首页把该入口文案由「登录 / 注册」
+  // 改为「登录后查看本人记录」，仍是同一个未登录态 button（登录后变成「…·进入我的」），
+  // 因此只换锚点、不改语义：已登录文案出现即说明清场失败，本断言依然能抓住。
+  await expect(page.getByRole('button', { name: /登录后查看本人记录/ })).toBeVisible()
 })
 
 test('hard clear stops active scan polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {

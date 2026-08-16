@@ -82,25 +82,38 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
     status: 200,
     json: { enabled: false, idleTimeoutSec: 180, items: [] },
   })
+  // V6 首页真实请求招聘会列表；给 200 空列表，首页呈现诚实 empty 态。
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
+  })
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const shell = page.locator('.ui-kiosk-shell[data-kiosk-presentation="fusion-youth"]')
   await expect(shell).toHaveAttribute('data-kiosk-viewport', 'kiosk')
-  const frame = page.locator('.kpv1[data-kiosk-component="page-frame"]')
+  // 选择器随 V6 首页迁移（旧 .kpv1 原型框与旧文案已不存在），但本用例的实质合同不变：
+  // 首页在 fusion 壳内渲染、合规来源声明可见、触控目标不低于 CLAUDE.md §9 的下限、无横向溢出。
+  const frame = page.locator('.v6-home-page[data-kiosk-component="page-frame"]')
   await expect(frame).toBeVisible()
-  await expect(frame.getByRole('heading', { name: '简历、岗位、打印，一趟办完' })).toBeVisible()
-  await expect(frame.getByText('现场准备材料、了解机会，并在本机完成打印扫描', { exact: true })).toBeVisible()
-  await expect(frame.getByText('岗位与招聘会信息均来自第三方 / 官方来源', { exact: false })).toBeVisible()
+  await expect(frame.locator('.v6-home[data-v6-page="home"]')).toBeVisible()
+  await expect(frame.getByRole('heading', { name: /说出你的处境/ })).toBeVisible()
+  await expect(frame.getByText('先盘点材料，再排办理顺序', { exact: false })).toBeVisible()
+  await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)
-  await expectMinimumTargets(frame.locator('.login-btn, .svc-tile:not(:disabled), .nav-item'), 56)
-  await expectMinimumTargets(frame.locator('.svc-tile:not(:disabled)'), 56)
+  await expectMinimumTargets(frame.locator('.v6-home-domain__main, .v6-home-command__cta'), 56)
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })
 
 test('production home does not request terminal config without a local identity @w1-kiosk', async ({ page, api }) => {
-  void api
+  // 本用例的合同是「无本机身份时不得发出终端作用域请求 /api/v1/terminals//」，
+  // 由下面的 emptyIdentityRequests 断言守住。V6 首页新增的 /job-fairs 不是终端作用域
+  // 请求，不违反该合同；这里只是补注册让 ApiRouter 的 fail-closed 不误报。
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
+  })
   const emptyIdentityRequests: string[] = []
   await page.route('**/local/terminal-identity', (route) => route.abort('connectionrefused'))
   page.on('request', (request) => {

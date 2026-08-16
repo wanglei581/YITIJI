@@ -78,6 +78,10 @@ import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcome
 import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
+import {
+  SmartCampusCapabilityBoundary,
+  ToolboxCapabilityBoundary,
+} from '../auth/KioskCapabilityGuard'
 
 // Gate 0 requires production_default=false. Only an explicit build-time grant
 // may expose contract review; missing, empty, or malformed values fail closed.
@@ -89,6 +93,7 @@ export const kioskRouter = createBrowserRouter([
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
+    errorElement: <KioskRouteErrorPage />,
     children: [
       {
         element: <Outlet />,
@@ -187,13 +192,22 @@ export const kioskRouter = createBrowserRouter([
         path: 'campus/freshman-insights',
         lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
       },
-      // 智慧校园：子页统一走 SmartCampusGuard。
-      // 关闭开关或机器搬离校园后，深链接直接访问也不得残留校园内容（见 SmartCampusGuard 注释）。
-      { path: 'toolbox',                         lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
-      { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
-      { path: 'smart-campus/welcome',            element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
-      { path: 'smart-campus/freshman-insights',  element: <SmartCampusGuard><FreshmanInsightsPage /></SmartCampusGuard> },
-      { path: 'smart-campus/service/:key',       element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
+      // 百宝箱与智慧校园的根路由、所有深链先经终端配置能力边界；未知、失败和关闭均不挂载业务页。
+      {
+        element: <ToolboxCapabilityBoundary />,
+        children: [
+          { path: 'toolbox', lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
+        ],
+      },
+      {
+        element: <SmartCampusCapabilityBoundary />,
+        children: [
+          { path: 'smart-campus', element: <SmartCampusHomePage /> },
+          { path: 'smart-campus/welcome', element: <SmartCampusGuard module="welcome"><SmartCampusWelcomePage /></SmartCampusGuard> },
+          { path: 'smart-campus/freshman-insights', element: <SmartCampusGuard><FreshmanInsightsPage /></SmartCampusGuard> },
+          { path: 'smart-campus/service/:key', element: <SmartCampusGuard><SmartCampusServicePage /></SmartCampusGuard> },
+        ],
+      },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },

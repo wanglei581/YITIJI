@@ -15,6 +15,31 @@ export function registerW6Api(api: ApiRouter): void {
   const post = (path: string, json: unknown) => api.respond('POST', path, { status: 200, json })
   const del = (path: string, json: unknown) => api.respond('DELETE', path, { status: 200, json })
 
+  get('/api/v1/terminals/KSK-001/config', {
+    smartCampus: {
+      enabled: true,
+      modules: { welcome: true, bigdata: false, luggage: true, panorama: true },
+      items: [],
+    },
+    toolbox: {
+      enabled: true,
+      items: [{
+        key: 'w6-help',
+        title: '使用帮助',
+        description: '打开站内帮助',
+        icon: 'help-circle',
+        to: '/help',
+        disabled: false,
+        sortOrder: 1,
+        launchMode: 'internal_route',
+        placements: ['toolbox'],
+      }],
+    },
+    configVersion: 'w6-fixture',
+    refreshIntervalMs: 300000,
+    serverTime: '2026-07-24T08:00:00.000Z',
+  })
+
   get('/api/v1/health', { success: true, data: { status: 'ok' } })
   get('/api/v1/terminals/KSK-001/capabilities', { capabilities: [] })
   get('/api/v1/terminals/KSK-001/smart-campus', {

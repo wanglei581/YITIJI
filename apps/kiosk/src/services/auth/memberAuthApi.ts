@@ -23,6 +23,17 @@ export class MemberApiError extends Error {
   }
 }
 
+/**
+ * 将 API 错误收敛为可直接展示给用户的文案。
+ * 明确的业务消息原样保留；网络错误和通用 HTTP 占位消息使用调用场景自己的恢复提示。
+ */
+export function resolveMemberApiErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof MemberApiError)) return fallback
+  if (error.code === 'NETWORK_ERROR' || error.status === 0) return fallback
+  if (!error.message.trim() || /^请求失败（\d+）$/.test(error.message)) return fallback
+  return error.message
+}
+
 // ── 响应类型 ──────────────────────────────────────────────────
 
 export interface MemberUser {

@@ -103,7 +103,32 @@ interface WireOfflineJob {
   agency: WireOfflineJobAgency
 }
 
-export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: boolean } = {}): void {
+export interface W4ApiOptions {
+  smartCampusEnabled?: boolean
+  smartCampusModules?: Partial<Record<'welcome' | 'bigdata' | 'luggage' | 'panorama', boolean>>
+}
+
+export function w4TerminalConfig(options: W4ApiOptions = {}) {
+  return {
+    smartCampus: {
+      enabled: options.smartCampusEnabled ?? true,
+      modules: {
+        welcome: true,
+        bigdata: false,
+        luggage: true,
+        panorama: true,
+        ...options.smartCampusModules,
+      },
+      items: [],
+    },
+    toolbox: { enabled: false, items: [] },
+    configVersion: 'w4-fixture',
+    refreshIntervalMs: 300000,
+    serverTime: '2026-07-24T08:00:00.000Z',
+  }
+}
+
+export function registerW4Api(api: ApiRouter, options: W4ApiOptions = {}): void {
   const job = {
     id: 'job-001', title: '前端工程师', company: '青岛示例制造有限公司', city: '青岛市',
     salary: '8000-12000', salaryDisplay: '8,000–12,000 元/月', category: 'fulltime', tags: ['React', 'TypeScript'],
@@ -189,7 +214,7 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
   respond('/api/v1/job-fairs/fair-001/companies', { success: true, data: [fairCompany], pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 } })
   respond('/api/v1/job-fairs/fair-001/zones', { success: true, data: [fairZone] })
   respond('/api/v1/job-fairs/fair-001/stats', { success: true, data: { fairId: 'fair-001', fairName: fair.name, totalCompanies: 1, checkedInCompanies: 0, totalPositions: 1, totalHeadcount: 2, browseCount: 0, scanCount: 0, printCount: 0, checkinCount: 0, zoneBreakdown: [], lastUpdated: '2026-07-24T08:00:00.000Z', seekerIntent: [], industryDistribution: [], dataSourceLabel: '来源数据 · 非实时', isMockData: true } })
-  respond('/api/v1/terminals/KSK-001/config', { smartCampus: { enabled: options.smartCampusEnabled ?? true, modules: { welcome: true, bigdata: false, luggage: true, panorama: true }, items: [] }, toolbox: { enabled: false, items: [] }, configVersion: 'w4-fixture', refreshIntervalMs: 300000, serverTime: '2026-07-24T08:00:00.000Z' })
+  respond('/api/v1/terminals/KSK-001/config', w4TerminalConfig(options))
   respond('/api/v1/terminals/KSK-001/screensaver', { enabled: false, idleTimeoutSec: 180, items: [] })
   respond('/api/v1/terminals/KSK-001/printer-status', { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true })
   respond('/api/v1/policies', { success: true, data: [{ id: 'policy-001', kind: 'policy_guide', title: '高校毕业生就业服务指引', summary: '请通过官方入口查看办理条件。', audience: 'graduate', sourceName: '青岛市人力资源和社会保障局', syncTime: '2026-07-24T08:00:00.000Z', externalUrl: 'https://hrss.example.gov.cn/policy/001' }] })

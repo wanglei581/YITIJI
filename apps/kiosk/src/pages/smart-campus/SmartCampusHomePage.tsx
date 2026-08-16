@@ -27,8 +27,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
-import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
-import { itemBadge, itemLaunchable, launchKioskAppItem } from '../home/components/kioskAppLaunch'
+import { useSmartCampusCapabilitySnapshot } from '../../auth/KioskCapabilityGuard'
+import { isLaunchableKioskAppItem } from '../../services/api/kioskCapabilityValidation'
+import { itemBadge, launchKioskAppItem } from '../home/components/kioskAppLaunch'
 import { ExternalLaunchModal, QrLaunchModal } from '../home/components/ToolboxLaunchModals'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
@@ -100,7 +101,7 @@ function CampusExtensionTile({
   onExternal: (item: KioskToolboxItem) => void
 }) {
   const navigate = useNavigate()
-  const disabled = item.disabled || !itemLaunchable(item)
+  const disabled = !isLaunchableKioskAppItem(item)
   const badge = itemBadge(item)
   const isExternal = item.launchMode === 'external_url'
   const isQr = item.launchMode === 'qr_code' || item.launchMode === 'mini_program_qr'
@@ -138,7 +139,7 @@ function CampusExtensionTile({
 
 export function SmartCampusHomePage() {
   const navigate = useNavigate()
-  const config = useSmartCampusConfig()
+  const { config } = useSmartCampusCapabilitySnapshot()
   const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
   const [externalItem, setExternalItem] = useState<KioskToolboxItem | null>(null)
 
@@ -156,7 +157,7 @@ export function SmartCampusHomePage() {
   // 无扩展项时不宣称「已开通」，避免暗示系统已接通。
   // enabled===false：不显示 header badge，避免与「本机暂未开启」空态重复「可查看指引 0 项」。
   const configuredEntries = extensionItems.filter(
-    (item) => !item.disabled && itemLaunchable(item),
+    isLaunchableKioskAppItem,
   )
   const statusBadge =
     !config.enabled

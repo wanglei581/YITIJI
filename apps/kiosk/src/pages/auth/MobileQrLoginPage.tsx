@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CheckCircle2Icon, CircleAlertIcon, LoaderCircleIcon, MonitorIcon, QrCodeIcon, ShieldCheckIcon } from 'lucide-react'
-import { MemberApiError, sendSmsCode } from '../../services/auth/memberAuthApi'
+import { resolveMemberApiErrorMessage, sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
 import './mobile-qr-service-desk.css'
 
@@ -63,7 +63,7 @@ export function MobileQrLoginPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err instanceof MemberApiError ? err.message : '二维码已失效，请回到一体机刷新')
+        setError(resolveMemberApiErrorMessage(err, '二维码状态读取失败，请回到一体机刷新二维码'))
       })
     return () => {
       cancelled = true
@@ -82,7 +82,7 @@ export function MobileQrLoginPage() {
       countdown.start(result.cooldownSeconds > 0 ? result.cooldownSeconds : 60)
       setNotice(`验证码已发送至 ${formatPhone(phone)}`)
     } catch (err) {
-      setError(err instanceof MemberApiError ? err.message : '发送失败，请重试')
+      setError(resolveMemberApiErrorMessage(err, '验证码发送失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
@@ -98,7 +98,7 @@ export function MobileQrLoginPage() {
       setConfirmed(true)
       setNotice('登录已确认，请回到一体机继续使用')
     } catch (err) {
-      setError(err instanceof MemberApiError ? err.message : '确认失败，请重试')
+      setError(resolveMemberApiErrorMessage(err, '登录确认失败，请稍后重试'))
       setCode('')
     } finally {
       setLoading(false)
