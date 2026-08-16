@@ -154,7 +154,7 @@ FileProvenance
 | `41` pay-fail「重新付一次 / 换个付法」 | 重新出码 | `POST /orders/:id/pay` | ✅ | 换通道传不同 `channel` |
 | `41` pay-pending「查询支付状态」 | 主动查单 | `POST /orders/:id/pay/reconcile` | ✅ | 设计稿写「不产生新扣款」，与后端「同一幂等入账路径」一致 ✅ |
 | `41` pay-pending「转为待打印订单」 | 挂起等回执 | ⚠️ 惰性 | ⚠️ | 没有主动「转待打印」端点；订单本来就停在 `unpaid/paying`，到点惰性 `closed`。前端只能表述成「先离开，回来查」 |
-| `41` refund-doing / refund-done / refund-fail | 退款进度 | `POST /admin/orders/:id/refund`（**仅管理员**） | ⚠️ | 一体机**不能发起退款**。源码原话：「仅 admin auth/role 放行，**绝不新增匿名/会员自助退款入口**」（`admin-order-actions.controller.ts:44`）。而且**只全额退**：金额强制 `order.amountCents - discountCents`，结算断言相等（`refund.service.ts:273,354`），`partial_refunded` 只是类型占位 —— **「按未出面数退款」后端不存在**。用户可见的退款状态可从 `GET /me/print-orders`.`payStatus`（`refunding/refunded`）与 `refundedAmountCents` 读到 ✅ |
+| `41` refund-doing / refund-done / refund-fail | 退款进度 | `POST /me/print-orders/:orderId/refund`（**登录会员本人**，A3-S3）／`POST /admin/orders/:id/refund`（仅管理员） | ⚠️ | **口径更新（A3-S3，2026-08-16）**：本行原写「一体机不能发起退款」，现已收窄为——**匿名/游客单仍然不能自助退款**（服务台 + Admin 端点是唯一路径），**登录会员**多了一个受限触发面：原因码白名单 + 资金通道白名单（只放行 `wechat/alipay/sandbox`，线下/人工/免费/券单一律拒）+ 可退金额 > 0 + `payStatus × taskStatus` 组合表（只放行 `paid ×` `pending`/`pending_release`/`awaiting_payment`/`expired`/`failed`）+ 本人归属 + 限流。出款仍然只有 `RefundService` 一处实现。**免费试运营期打印单价为 0 → 该端点对所有 0 元单返 409 `SELF_REFUND_NO_REFUNDABLE_AMOUNT`，前端必须显示「本单免费，无款可退」而不是退款入口。** 而且**只全额退**：金额强制 `order.amountCents - discountCents`，结算断言相等（`refund.service.ts:273,354`），`partial_refunded` 只是类型占位 —— **「按未出面数退款」后端不存在**。用户可见的退款状态可从 `GET /me/print-orders`.`payStatus`（`refunding/refunded`）与 `refundedAmountCents` 读到 ✅ |
 | `41` 三处「打印退款凭条 / 回执 / 失败凭条」 | 把单号金额渲染成一张 A4 | **缺** | ❌ | 没有凭条渲染端点。要做成：`POST /orders/:id/receipt {kind:'refund'\|'paid'\|'refund_failed'}` → 与其他 `/print` 端点同形（`{fileId, filename, pageCount, printFileUrl}`），再由 `POST /print/jobs` 出纸。**必须免费**（设计已写「本机不收费」）—— 免费单走 `amountCents:0` 自动 paid 分支即可 |
 | `41` supply「我关好了，继续打」 | 卡纸后续打剩余份数 | **缺** | ❌ | 见 buildout-spec「⑥」：同一 Order 下由工作人员授权 attempt 2，`complimentaryRetry=true`，**不重新付款、不重新报价、不再次核销权益**。接口 `POST /admin/orders/:orderId/print-resolution {printTaskId, expectedVersion, resolution:'authorize_reprint', operatorNote}` |
 | `41` supply「改到另一台机器」 | 跨机续打 | **缺** | ❌ | 需要「凭取件码在另一台机重排」的能力：`POST /print/pickup/redeem {pickupCode, terminalId}` 校验后在新终端下建 attempt。约束：一次只能一台机认领（CAS）、原单不重复收费、取件码单次有效期内可重试 |
@@ -495,7 +495,7 @@ FileProvenance
 | C6 | **部分抵扣 / 抵扣叠加** | 后端 `@@unique([serviceType, serviceRefId])` + `REDEEM_REQUIRES_FULL_COVERAGE` 双重挡着。要做需先补五条（见 `backend-contract-pricing-benefits.md` §六），且与「一单一权益」冲突需一并决定。**在五条齐备前，屏上不得出现「已抵扣 X 元、还需付 Y 元」** |
 | C7 | **平台内签到写入** | 合规：招聘会只做第三方 / 官方来源信息入口。只做 `checkinUrl` 二维码 + 外部跳转打点 |
 | C8 | **未登录也记浏览 / 跳转** | 后端为公共终端隐私**刻意不记**（`activity.service.ts:21-22`）。设计 36/38 的「未登录 0 条」是对的，保持 |
-| C9 | **一体机自助退款** | 后端明写「绝不新增匿名 / 会员自助退款入口」。走服务台 + `POST /admin/orders/:id/refund`。**且只全额退，无「按未出面数退」** —— 41 的相关文案要按此收口 |
+| C9 | **一体机自助退款** | **已按 A3-S3 收窄（2026-08-16）**：**匿名/游客单仍无自助退款入口**，走服务台 + `POST /admin/orders/:id/refund`；**登录会员**可用 `POST /me/print-orders/:orderId/refund`（受限触发面，见 41 行）。**仍只全额退，无「按未出面数退」**；**0 元单一律拒（免费试运营期即全部订单）** —— 41 的相关文案要按此收口 |
 | C10 | **线上平台入口后台化** | `35` 现为静态四码，够用。要做成后台可配需 `GET /kiosk/online-platforms` + Admin 管理面，优先级低于上面全部 |
 
 ---

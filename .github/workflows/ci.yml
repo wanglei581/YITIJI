@@ -406,6 +406,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:payment-codepay
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-user-facing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression
@@ -644,6 +645,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:payment-codepay
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-user-facing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression

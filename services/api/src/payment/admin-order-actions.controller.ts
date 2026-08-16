@@ -41,7 +41,17 @@ export class AdminOrderActionsController {
   }
 
   // C5-4：Admin 退款走 canonical RefundService（Refund 账本 + sandbox provider 退款 + 幂等 + 审计）。
-  // refundNo 缺省按订单派生（一单一退幂等）；仅 admin auth/role 放行，绝不新增匿名/会员自助退款入口。
+  // refundNo 缺省按订单派生（一单一退幂等）。
+  //
+  // 口径更新（A3-S3，2026-08-16）：本行原文为「绝不新增匿名/会员自助退款入口」。
+  // 该口径已按 docs/reviews/a3-print-fulfillment-gap-spec-2026-08-16.md §5.2-1 收窄为：
+  //   - **匿名/游客单仍然没有自助退款入口**（本端点 + 服务台是唯一路径），原口径保留；
+  //   - **登录会员**多了一个受限触发面 `POST /me/print-orders/:orderId/refund`
+  //     （member-print-orders/member-self-refund.service.ts），它只是本 RefundService 前面的
+  //     门禁层：原因码白名单 + 资金通道白名单（只放行退款会原路回到付款人的通道）+
+  //     可退金额 > 0 + payStatus×taskStatus 组合表 + 本人归属 + 限流，
+  //     出款/幂等/CAS 仍然只有 RefundService 这一处实现。
+  // 新增平行退款实现依旧禁止。
   @Post('admin/orders/:id/refund')
   async refund(
     @Param('id') id: string,

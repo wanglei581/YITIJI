@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Header, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type { MemberPendingTaskItem, MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
@@ -7,7 +8,9 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
+import { RequestSelfRefundDto } from './dto/request-self-refund.dto'
 import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { MemberSelfRefundService, type MemberSelfRefundReceipt } from './member-self-refund.service'
 
 /**
  * 会员「我的打印订单」接口（Phase C-2C 后续小步）。路由前缀 /api/v1/me/print-orders。
@@ -27,6 +30,7 @@ export class MemberPrintOrdersController {
   constructor(
     private readonly orders: MemberPrintOrdersService,
     private readonly cloudOrders: MemberPrintOrderCreateService,
+    private readonly selfRefund: MemberSelfRefundService,
   ) {}
 
   /** 我的历史 PrintTask 订单列表（本人，只读；游标分页，pageSize 封顶 50）。 */
@@ -63,6 +67,30 @@ export class MemberPrintOrdersController {
     @Body() dto: CancelMemberPrintOrderDto,
   ) {
     return ApiResponse.ok(await this.cloudOrders.cancel(user.endUserId, orderId, dto))
+  }
+
+  /**
+   * A3-S3：会员自助退款受限触发面。
+   *
+   * 退款实现仍是 `RefundService.refund()`（幂等 / CAS / 渠道三分法），本端点只是它前面的门禁：
+   * 原因码白名单 + 资金通道白名单 + 可退金额 > 0 + `payStatus × taskStatus` 组合表 + 本人归属 + 限流。
+   * 拒绝一律是明确 4xx（403/404/409/429）并带机器码，前端据码出文案，绝不吞成 500。
+   *
+   * **不覆盖游客单**：本控制器挂 `EndUserAuthGuard`，匿名一体机订单（`endUserId=null`）
+   * 在这里拿到的是 401 —— 它们的退款仍然只能走服务台 + `POST /admin/orders/:id/refund`。
+   *
+   * `@Throttle` 6 次/分钟是 IP 层的突发保护（全局默认 60 次/分钟，这里收紧 10 倍）；
+   * 跨实例一致的额度由 service 里按会员落库计数负责。
+   */
+  @Post(':orderId/refund')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  async requestRefund(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param('orderId') orderId: string,
+    @Body() dto: RequestSelfRefundDto,
+  ): Promise<ApiResponse<MemberSelfRefundReceipt>> {
+    return ApiResponse.ok(await this.selfRefund.request(user.endUserId, orderId, dto))
   }
 }
 

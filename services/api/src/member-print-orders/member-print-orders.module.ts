@@ -4,6 +4,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPendingTasksController, MemberPrintOrdersController } from './member-print-orders.controller'
 import { MemberPrintOrdersService } from './member-print-orders.service'
 import { MemberPrintOrderCreateService } from './member-print-order-create.service'
+import { MemberSelfRefundService } from './member-self-refund.service'
 import { PrintJobsModule } from '../print-jobs/print-jobs.module'
 import { PaymentModule } from '../payment/payment.module'
 import { TerminalsModule } from '../terminals/terminals.module'
@@ -34,6 +35,8 @@ import { TerminalsModule } from '../terminals/terminals.module'
     }),
   ],
   controllers: [MemberPrintOrdersController, MemberPendingTasksController],
-  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, EndUserAuthGuard],
+  // MemberSelfRefundService 只是 RefundService 的门禁层：RefundService 由已 import 的
+  // PaymentModule 导出（canonical 退款唯一实现），本模块绝不自建第二个退款 provider。
+  providers: [MemberPrintOrdersService, MemberPrintOrderCreateService, MemberSelfRefundService, EndUserAuthGuard],
 })
 export class MemberPrintOrdersModule {}

@@ -195,3 +195,83 @@ export interface OrderRedemptionView {
   /** 核销时间（ISO 串）。 */
   createdAt: string
 }
+
+// ============================================================
+// A3-S3 · 会员自助退款受限触发面（POST /me/print-orders/:orderId/refund）
+//
+// 服务端唯一实现：services/api/src/member-print-orders/self-refund-policy.ts
+//   + member-self-refund.service.ts。本段是给前端的契约副本，
+//   取值变更必须两处同改（`verify:refund-user-facing` 断言两份清单逐字相等）。
+//
+// 硬边界：
+// - 退款出款仍然只有 RefundService 一处实现，本端点只是它前面的门禁层。
+// - **游客/匿名一体机订单不在覆盖范围内**：该端点挂 EndUserAuthGuard，匿名调用返回 401，
+//   其退款仍走服务台 + Admin 端点。前端不得对匿名会话渲染自助退款按钮。
+// - 免费试运营期打印单价为 0，实付 0 的订单一律 SELF_REFUND_NO_REFUNDABLE_AMOUNT，
+//   前端应显示「本单免费，无款可退」而不是退款入口。
+// ============================================================
+
+/**
+ * 用户可选的退款原因码（封闭词表）。**只做分类与审计，不参与准入判定** ——
+ * 能不能退由资金通道 / 可退金额 / payStatus×taskStatus 三闸决定。
+ */
+export const SELF_REFUND_REASON_CODES = [
+  /** 出纸失败（taskStatus=failed）。 */
+  'print_failed',
+  /** 已付款但一直没开始出纸。 */
+  'print_not_started',
+  /** 按提示处理过卡纸/缺纸，仍然没出纸。 */
+  'device_unrecovered',
+  /** 到机码过期未取件。 */
+  'pickup_expired',
+  /** 重复扣费，退掉多付的那一单。 */
+  'duplicate_charge',
+  /** 未出纸前不再需要。 */
+  'no_longer_needed',
+] as const
+export type SelfRefundReasonCode = (typeof SELF_REFUND_REASON_CODES)[number]
+
+/**
+ * 自助退款被拒的机器码。前端按码出文案，**不要按 message 文本判断**。
+ * 全部以 4xx 返回：404（订单不属于本人/不存在）、409（通道/金额/状态）、
+ * 400（原因码非法 / 说明含 PII）、429（限流）。
+ */
+export type SelfRefundDenyCode =
+  | 'SELF_REFUND_CHANNEL_UNSUPPORTED'
+  | 'SELF_REFUND_NO_REFUNDABLE_AMOUNT'
+  | 'SELF_REFUND_ORDER_NOT_PAID'
+  | 'SELF_REFUND_IN_PROGRESS'
+  | 'SELF_REFUND_ALREADY_REFUNDED'
+  | 'SELF_REFUND_TASK_IN_PROGRESS'
+  | 'SELF_REFUND_TASK_COMPLETED'
+  | 'SELF_REFUND_ORDER_CANCELLED'
+  | 'SELF_REFUND_STATE_UNSUPPORTED'
+  | 'SELF_REFUND_NOTE_PII_REJECTED'
+  | 'SELF_REFUND_RATE_LIMITED'
+
+/** 请求体。`note` 可选补充说明，含 PII 会被直接拒绝（不脱敏）。 */
+export interface SelfRefundRequestBody {
+  reasonCode: SelfRefundReasonCode
+  note?: string
+}
+
+/**
+ * 会员侧退款回执。刻意不含 `channelRefundNo`（内部账本流水）。
+ * `status` 原样透传渠道真实结果：`pending` = 受理中/待确认，**前端不得显示为「已退款」**。
+ */
+export interface SelfRefundReceipt {
+  refundNo: string
+  amountCents: number
+  status: 'pending' | 'success' | 'failed'
+  /** 退款去向通道（= 原支付通道，原路退回）。 */
+  channel: string
+  reasonCode: SelfRefundReasonCode
+  order: {
+    orderNo: string
+    payStatus: OrderPayStatus
+    refundedAmountCents: number
+    refundedAt: string | null
+  }
+  /** true = 命中既有退款记录（重复提交），本次未产生新的出款动作。 */
+  idempotent: boolean
+}
