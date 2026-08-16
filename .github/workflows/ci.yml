@@ -478,9 +478,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -602,9 +604,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
