@@ -183,6 +183,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.mockInterviewReport
   }
 
+  // ── S3-3 · P26 顾问作业面 ──────────────────────────────────────────────────
+
+  get advisorSession() {
+    return this.client.advisorSession
+  }
+
+  get advisorPin() {
+    return this.client.advisorPin
+  }
+
+  get advisorArtifact() {
+    return this.client.advisorArtifact
+  }
+
   get fairVenueGuide() {
     return this.client.fairVenueGuide
   }
