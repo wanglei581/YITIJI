@@ -746,16 +746,26 @@ body.capture .proto-rail { display: none !important; }
    键面、「不会出现哪些字符」那一行、扫码枪与键盘的合法性判定，
    全部从这一个常量算出来。改一处，三处跟着变，不会各说各的。
 
-   ⚠ 交接给本批次的口径说「32 个无歧义字符，去掉了 0/1/I/L/O/U」，
-     但同时给了字面串 '23456789ABCDEFGHJKMNPQRSTUVWXYZ'。两者对不上：
-       · 这个串实际是 **31** 个字符，不是 32；
-       · 串里 **有 U**（去掉的其实只有 0 1 I L O 这 5 个）；
-       · 32 个且去掉 I/L/O/U 的那一套是 Crockford Base32
-         （0123456789ABCDEFGHJKMNPQRSTVWXYZ），它保留 0 和 1、去掉 U ——
-         和这个串是两套不同的东西。
-     本页取**字面串**为准（具体的串比概括的数字可靠），并把矛盾记在这里。
-     真值以服务端实现为准；若日后确认是 Crockford Base32，
-     **只改下面这一行**，键面和文案会自己跟上。 */
+   ── 字符集口径：已核实。不要再按「32 个」改回去 ──────────────────────
+   本批次拿到的口径原话是「32 个无歧义字符，去掉了 0/1/I/L/O/U」，
+   而随口径一起给来的字面串是 '23456789ABCDEFGHJKMNPQRSTUVWXYZ'。数一遍就对不上：
+       · 这个串是 **31** 个字符，不是 32；
+       · 串里 **有 U** —— 真正排除掉的只有 **0 1 I L O** 这 5 个；
+       · 「32 个且排除 I/L/O/U」的那一套是 Crockford Base32
+         （0123456789ABCDEFGHJKMNPQRSTVWXYZ），它**保留** 0 和 1，是另一套东西。
+
+   ✅ 2026-08-16 由协调者对 origin/main 核实后确认（**本页作者不读 apps/，以下为转述**）：
+      **字面串是权威**，它在生产侧至少四处被当作真值使用 ——
+        · apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:23,25（校验正则）
+        · apps/miniapp/utils/pickup-qrcode.js:30（小程序侧生成器）
+        · apps/miniapp/scripts/verify-miniapp-static.mjs:404（门禁断言）
+        · apps/admin/src/services/api/adminMockAdapter.ts:618
+      「32 个」这个说法的源头是 PrintPickupClaimPage.tsx:8 的一句**过时注释**，
+      口径就是从那句注释抄下来的。那句注释由生产侧另行订正，本目录不碰 apps/。
+
+   所以下面这一行是真值，**不是待确认项**；再有人拿「32 个」来对，请回看这一段。
+   键面、「不会出现哪些字符」那一行、扫码枪与键盘的合法性判定全部由它算出来，
+   将来字符集真要改，也只改这一行。 */
 var CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
 var CODE_LEN = 10
 
