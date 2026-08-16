@@ -66,8 +66,15 @@ for (const key of ['social-insurance', 'archive']) {
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 check(printScanHome.includes('loadConfiguredCapabilities'), '打印扫描首页保留能力加载状态')
 check(!printScanHome.includes('getConfiguredCapabilities'), '打印扫描首页不再吞掉能力加载失败')
+// P39 迁移（V6 纵切第一刀）把「能力是否已确认」从行内三元收成
+// toProbeStatus() + confirmed 两步，断言随结构改写，**不变量一字未变**：
+// 只有探测结果不是 error 才判定为已确认，其余一律 fail-closed。
 check(
-  printScanHome.includes("capabilityLoad.status === 'ok'"),
+  /function toProbeStatus[\s\S]*?load\.status === 'error' \? 'error' : 'ok'/.test(printScanHome),
+  '能力探测失败一律判为未确认（不得把 error 当成可放行）'
+)
+check(
+  /const confirmed = probe === 'ok'/.test(printScanHome),
   '只有能力配置读取成功才放行任务入口'
 )
 check(/available: false,[\s\S]*?to: ''/.test(printScanHome), '能力未确认时正式任务入口 fail-closed')
