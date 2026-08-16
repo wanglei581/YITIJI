@@ -333,7 +333,7 @@ export function CareerPlanPage() {
                 <span className="career-plan-lightflow__chip">未登录 · 本次结果不进入「我的」记录，可先打印带走</span>
               )}
             </div>
-            <AiConclusion text={plan.summary ?? ''} />
+            {plan.summary ? <AiConclusion text={plan.summary} /> : null}
           </section>
           <ComplianceBanner tone="info">
             本机不预测前景、不预测薪资、不说「三年后你能到什么岗」—— 那些本机没有依据。
@@ -472,8 +472,10 @@ export function CareerPlanPage() {
           22-career-plan.html:437-455 的 ai-down 支线：AI 挂了也有三件事是用户自己能做的。
           它**不是**职业规划的等价替代（原型自己写着「通用建议，不是针对你这份简历的」），
           所以放在降级卡之外单独成节，不冒充 manual 降级路径。
+          只在**真的 ai-down**时出：模型跑了但没出结果（result-unavailable）时 AI 并没挂，
+          再说一句「AI 恢复后再来」就是把失败原因说错了。
         */}
-        {aiTask.isFailed && (
+        {aiTask.isFailed && aiOutage && (
           <Section title="不靠 AI 也能自己看的三件事" Icon={PencilLineIcon}>
             <ol className="career-plan-lightflow__checklist">
               <li>技能栏里没有事例撑着的词，先删掉 ——「团队协作」「项目管理」这类，正文里找不到对应的事就是虚的。这个判断不用 AI，你自己对着简历看一遍就知道。</li>
