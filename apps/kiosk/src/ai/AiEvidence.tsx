@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
+// 样式随组件走（与 AssistantPage 的 assistant-advisor.css 同一模式），
+// 不进 index.css —— index.css 的 import 顺序是 verify-fusion-shell 锁死的合同。
+import '../styles/ai-primitives.css'
 
 /**
  * AI 免责 / 证据分级共享组件（S1-2）。

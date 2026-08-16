@@ -172,7 +172,11 @@ mustNot('css', /\.kiosk-ev[^{]*\{[^}]*font-size:\s*1[12]px/, '证据徽章不得
 must('evidence', /className=\{\['kiosk-ev'/, '徽章必须使用 kiosk-ev 类名以套用字号令牌')
 
 // 样式必须真的被挂上，否则以上尺寸口径全部落空。
-must('indexCss', './styles/ai-primitives.css', 'index.css 必须引入 AI 原语样式')
+// 走组件级 import（index.css 的 import 顺序是 verify-fusion-shell 锁死的合同，不动它）；
+// 两个组件文件都要引，任一被深引时都不会掉样式。
+must('region', /^import '\.\.\/styles\/ai-primitives\.css'$/m, 'AiTaskRegion 必须引入 AI 原语样式')
+must('evidence', /^import '\.\.\/styles\/ai-primitives\.css'$/m, 'AiEvidence 必须引入 AI 原语样式')
+mustNot('indexCss', 'ai-primitives.css', 'AI 原语样式不得塞进 index.css（会破坏 shell import 顺序合同）')
 
 // 原语必须从统一出口导出，避免后续 17 页各自深引路径。
 // 整行锚定：改成 `X as _Unused` 之类的重命名不算导出。

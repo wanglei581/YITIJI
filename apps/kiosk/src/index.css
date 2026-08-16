@@ -8,8 +8,6 @@
 /* 设计稿舞台等比适配：仅 KioskRoot 布局路由；手机页/屏保不套用。 */
 @import "./styles/kiosk-stage-fit.css";
 @import "./pages/jobs-fairs-prototype.css";
-/* 全站共享 AI 前端原语：data-aitask 四态 + 证据分级 / 免责徽章。 */
-@import "./styles/ai-primitives.css";
 @import "tailwindcss";
 /* 温暖专业感主题覆盖层必须保持为最后一个 CSS import。 */
 @import "./styles/warm-professional-override.css";

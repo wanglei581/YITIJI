@@ -1,5 +1,7 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
+// 样式随组件走，直接深引 AiTaskRegion 而不经 barrel 时也不会掉样式。
+import '../styles/ai-primitives.css'
 import { AiCapabilityChip } from './AiEvidence'
 import type { AiTaskStatus } from './useAiTask'
 
