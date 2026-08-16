@@ -154,19 +154,16 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
 .dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
 
-/* ── 建设中（2026-08-10 逐屏对照整改）──────────────────────────────────
-   已核实 20-interview-pod.html 全文 0 处「面试技巧 / 谈薪要点 / 往期报告 /
-   历次训练记录」内容，它只有 s1–s4 四步的练习流程本身，且不读 ?view= 参数。
-   原来这几个入口链过去，用户只会落到练习第一步，看不到承诺的东西。
-   处置口径（IMPLEMENTATION-NOTES：宁可灰掉并写清原因，也不链到一个语义不同的页）：
-   改成 aria-disabled 的建设中卡 —— 不可点、不进 Tab 序、当场说明为什么还不能用。 */
-.dcard--soon, .aibtn--soon, .dmore-go--soon {
-  opacity: .62; cursor: not-allowed; pointer-events: none;
-  background: var(--surf-1); border-color: var(--brd-1); box-shadow: none; }
-.dcard--soon { border-top-color: var(--ink-500); }
-.dcard--soon .dcard-nm, .dcard--soon .dcard-ic, .dcard--soon .dcard-go { color: var(--fog-600); }
-.aibtn--soon, .aibtn--soon em { color: var(--fog-600); }
-.dmore-go--soon .dmore-t, .dmore-go--soon .dmore-ic { color: var(--fog-600); }
+/* ── 「建设中」灰卡样式已于 2026-08-16 删除 ─────────────────────────────
+   2026-08-10 曾为「面试技巧 / 往期训练报告 / 面试训练记录」三处加过
+   .dcard--soon / .aibtn--soon / .dmore-go--soon 三条灰卡规则，理由是
+   20-interview-pod 里没有那些内容，宁可灰掉也不链到语义不同的页 —— 那个判断没错。
+   但灰卡文案写成了「面试技巧页还没建」「往期报告页还没建」，**说的是原型自身**，
+   却被反复读成产品缺能力（缺口 G-03）。现在三处全部接上真链：
+     面试技巧   → 37a-interview-tips.html（新补的原型页）
+     往期训练报告 → 37b-interview-reports.html（新补的原型页）
+     面试训练记录 → 43-my-records.html?stage=ai（已有页，不另开同义入口）
+   删除依据：本页已 0 处引用这三个类名（grep 实证），其它页从未使用。 */
 </style>
 </head>
 <body>
@@ -214,9 +211,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
           <!-- 2026-08-10 AI 落实度审查整改：原写「题库、技巧、往期报告照常」，
-               可同屏「面试技巧」与「往期训练报告」都是 `建设中 · 暂不可用` ——
-               把还没建的东西说成"照常"，比不说更糟。只留真能办的。 -->
-          <span class="rdy-s">停掉的是出题、点评与解读；<b>题目照常看</b>，技巧与往期报告页还没建</span>
+               可同屏两张卡都是 `建设中 · 暂不可用`，把还没建的东西说成"照常"更糟。
+               2026-08-16 复核改回：面试技巧（37a）与往期训练报告（37b）两页**已经补上**，
+               而且**都不依赖 AI** —— 技巧是固定内容，报告是已生成的记录。
+               所以这一态下它们确确实实照常，写清楚即可。 -->
+          <span class="rdy-s">停掉的是出题、点评与解读；<b>题目、面试技巧与往期报告都照常看</b></span>
         </span>
       </div>
       <div class="rdy rdy--warn" data-when="device-off">
@@ -253,23 +252,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="aibar-t">下面这些照常能办</span>
           <span class="chip chip--info">已自动上报</span>
         </div>
-        <!-- 2026-08-10 AI 落实度审查整改：这一组的标题是「下面这些照常能办」，
-             原来却把两张 `建设中 · 暂不可用` 的灰卡也列进来 —— 自相矛盾：
-             一边说照常能办，一边点不动。降级出路只能给**现在真点得开**的去处，
-             所以换成同样不依赖 AI 的两条：评估往期记录（28 的 s4）与自我评估题目（28 的 s1，
-             28 只出解读要模型，答题本身不要）。面试技巧 / 往期训练报告仍在下面的卡里
-             如实标建设中，不在这里冒充可办。 -->
+        <!-- 2026-08-10 整改：这一组的标题是「下面这些照常能办」，原来却把两张
+             `建设中 · 暂不可用` 的灰卡也列进来，自相矛盾。当时只留真点得开的。
+             2026-08-16：37a 面试技巧与 37b 往期训练报告已补上，两页都不依赖 AI，
+             正是这一组该有的东西 —— 把它们放进来，替掉一条重复的自我评估入口。 -->
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="20-interview-pod.html?stage=s2&amp;view=questions">只看题目<em>自己写答案、自己掐时间</em></a>
-          <a class="aibtn" href="28-self-assessment.html?stage=s4">评估往期记录<em>历次自我评估，只列你本人的</em></a>
-          <a class="aibtn" href="28-self-assessment.html?stage=s1">自我评估题目<em>照常答题，解读等 AI 恢复再出</em></a>
-          <!-- Codex :237 同 :314：薪资原来跳 11-jobfit-compare，可那页的「方向与薪资参考」
-               挂在 data-when="default device-off"，ai-down 下根本不显示。改指岗位情报台，
-               那里每条岗位的公示薪资四态都在，且不需要先传简历。 -->
+          <a class="aibtn" href="37a-interview-tips.html">面试技巧<em>清单、8 题回答结构、STAR，固定内容</em></a>
+          <a class="aibtn" href="37b-interview-reports.html?from=P37">往期训练报告<em>已生成的报告照常看、照常打印</em></a>
+          <!-- Codex :237 同 :314 的落点保留：薪资原来跳 11-jobfit-compare，可那页的
+               「方向与薪资参考」挂在 data-when="default device-off"，ai-down 下根本不显示。
+               指岗位情报台，那里每条岗位的公示薪资四态都在，也不需要先传简历。
+               「自我评估题目」从这一组撤下：本页 c-assess 卡本身就是四态常在的真链接，
+               同一个去处不占两个位置（不堆同义入口）。 -->
           <a class="aibtn" href="13-jobs-desk.html?stage=ok">薪资区间<em>岗位公示原文转录</em></a>
         </div>
-        <!-- 建设中的两项在这里点名，免得用户以为是"降级藏起来了" -->
-        <div class="aibar-note"><b>面试技巧</b>与<b>往期训练报告</b>两个页面还没建，<b>和 AI 好不好没关系</b> —— 不在上面这一组里。</div>
+        <!-- 停掉的到底是什么，点名说清，免得用户以为整个域都停了 -->
+        <div class="aibar-note">停的只有<b>出题、逐题点评与评估解读</b>；面试技巧与往期训练报告<b>不依赖 AI</b>，照常。</div>
       </div>
 
       <!-- ── 六张子能力卡 ── -->
@@ -326,19 +325,21 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 
         <!-- 3 面试技巧（非 AI）
              2026-08-10 逐屏对照整改：原指 20-interview-pod.html?stage=s1&view=tips。
-             已核实那一页全文 0 处「常见问题 / 自我介绍模板 / 谈薪要点」，
-             s1 是「练什么·怎么答」的开场设置，?view= 也没人读 ——
-             点进去看不到技巧要点。灰掉并写明原因，比链到一个语义不同的页诚实。 -->
-        <div class="dcard dcard--soon" id="c-tips" aria-disabled="true">
+             那一页全文 0 处「常见问题 / 自我介绍模板」，点进去看不到技巧要点，故先灰掉。
+             2026-08-16 补页整改（缺口 G-03）：**「面试技巧页还没建」这句话说的是原型自身**，
+             而 origin/main 上 /interview/tips → InterviewTipsPage（285 行）与首页
+             serviceGroups.ts:107 的入口一直都在 —— 能力从来没缺过，缺的是这张稿。
+             现在原型页 37a 已补上，改成真链。 -->
+        <a class="dcard" id="c-tips" href="37a-interview-tips.html">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-book"/></svg></span>
-            <span class="chip chip--info">建设中</span>
+            <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">面试技巧</span>
-          <span class="dcard-ds">常见问题、自我介绍模板、谈薪要点</span>
-          <span class="dcard-hint"><b>面试技巧页还没建</b>，面试练习页里没有这段内容；<br>现在只能在练习结束后看本次复盘里的逐题点评。</span>
-          <span class="dcard-go">暂不可用</span>
-        </div>
+          <span class="dcard-ds">准备清单、高频问题的回答结构、STAR</span>
+          <span class="dcard-hint">讲的是<b>怎么答</b>，不给标准答案；固定内容，AI 停了也照常看</span>
+          <span class="dcard-go">看准备清单与 8 题结构<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
 
         <!-- 4 评估历史（非 AI） -->
         <a class="dcard" id="c-history" href="28-self-assessment.html?stage=s4&amp;view=history">
@@ -413,22 +414,29 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                2026-08-10 逐屏对照复核：20-interview-pod 的 s4 只有**本场**复盘，
                全文 0 处历次训练列表 / 往期报告列表，?view=history、?view=reports 也没人读 ——
                两条都是承诺了一件没发生的事。按 IMPLEMENTATION-NOTES 的口径灰掉并写清原因。 -->
-          <div class="dmore-go dmore-go--soon" aria-disabled="true">
+          <!-- 2026-08-16：「面试训练记录」**不另开一页**（补页规划 §4）——
+               43「我的记录」的 AI 服务记录那一栏已经承载了这件事，再开一页就是
+               第三个同义入口。改成指向 43?stage=ai 的真链。 -->
+          <a class="dmore-go" href="43-my-records.html?stage=ai">
             <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">面试训练记录&nbsp;· 建设中</span>
-              <span class="dmore-s">历次记录页还没建，面试页只保留本场</span>
+              <span class="dmore-t">面试训练记录</span>
+              <span class="dmore-s">在「我的记录 · AI 服务记录」里，和其它 AI 记录一起看</span>
             </span>
-            <span class="chip chip--info">暂不可用</span>
-          </div>
-          <div class="dmore-go dmore-go--soon" id="c-report" aria-disabled="true">
+            <span class="chip chip--info">不依赖 AI</span>
+          </a>
+          <!-- 2026-08-16 补页整改（缺口 G-03）：「往期报告页还没建」同样是**对原型自身**的
+               陈述；main 上 /interview/reports → InterviewReportsPage（180 行）与
+               serviceGroups.ts:108 的入口一直都在。原型页 37b 已补上，改成真链，
+               并把来路 ?from=P37 带过去（37b 真的会读它，用来决定返回去哪）。 -->
+          <a class="dmore-go" id="c-report" href="37b-interview-reports.html?from=P37">
             <span class="dmore-ic"><svg class="ic"><use href="#i-file"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">往期训练报告&nbsp;· 建设中</span>
-              <span class="dmore-s">往期报告页还没建，现在只能在练习结束后看本次复盘</span>
+              <span class="dmore-t">往期训练报告</span>
+              <span class="dmore-s">历次练习的报告，可回看、可打印复盘单</span>
             </span>
-            <span class="chip chip--info">暂不可用</span>
-          </div>
+            <span class="chip chip--info">只列你本人的</span>
+          </a>
         </div>
       </div>
 
@@ -447,12 +455,14 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">练一场，或者先弄清自己适合什么</div><div class="s">点评标 E3，只给你本人看</div></div>
       <div data-when="first"><div class="t">不登录也能练，六张卡一张都不锁</div><div class="s">这一趟的报告与评估记录留不下</div></div>
-      <div data-when="ai-down"><div class="t">题目照常，技巧与往期报告页还没建</div></div>
+      <div data-when="ai-down"><div class="t">题目、面试技巧与往期报告都照常</div><div class="s">停的只有出题、点评与解读</div></div>
       <div data-when="device-off"><div class="t">打印机离线，练习与看报告不受影响</div><div class="s">只有打复盘单要换机取回</div></div>
     </div>
 
-    <!-- 2026-08-10：同 c-tips，面试技巧页未建，20 页里没有这段内容 → 置灰不可点 -->
-    <button class="btn btn--lg btn--ghost" type="button" disabled aria-disabled="true"><svg class="ic"><use href="#i-book"/></svg>面试技巧&nbsp;· 建设中</button>
+    <!-- 2026-08-16：同 c-tips，37a 已补上 → 改回真入口。
+         顺带清掉这里的原生 disabled：全站口径是**只用 aria-disabled**
+         （触屏没有 hover，原生 disabled 还会掉出 Tab 序，用户读不到原因）。 -->
+    <a class="btn btn--lg btn--ghost" href="37a-interview-tips.html"><svg class="ic"><use href="#i-book"/></svg>面试技巧</a>
     <!-- 底栏这个主按钮进的是面试页第 1 步「练什么·怎么答」，岗位在那一步选，
          所以它不受本页卡上的岗位门控 —— 但也不带 target，免得看着像已经替你选好了 -->
     <a class="btn btn--primary" data-when="default first device-off" href="20-interview-pod.html?stage=s1">开始模拟面试<svg class="ic"><use href="#i-arrowRight"/></svg></a>

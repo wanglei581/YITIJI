@@ -632,14 +632,47 @@ assert.doesNotMatch(
   'manual production evidence rows must remain unchecked in the template',
 )
 
-assert.match(filesService, /where:\s*\{\s*deletedAt:\s*null,\s*expiresAt:\s*\{\s*lt:\s*now\s*\}/, 'cleanupExpired must select only expired non-deleted rows')
+// cleanupExpired 的选行条件：只准删「未删除 且 已过期」的行。
+// 2026-07/08 两次有意演进（69eb63c69 导出件交由 member-privacy 对账、
+// 410c4604a 合同上传的 null 寿命按已过期处理）把单一 where 拆成了 OR，
+// 原来那条整段正则从此永远匹配不上。这里改成逐条钉不变量，并且把
+// 「唯一允许的非 expiresAt<now 例外」显式钉死 —— 再多一个例外就必须先改门禁。
+const cleanupExpiredStart = filesService.indexOf('async cleanupExpired(')
+assert.ok(cleanupExpiredStart >= 0, 'files.service.ts must still define cleanupExpired')
+const cleanupSelectAt = filesService.indexOf('select: {', cleanupExpiredStart)
+assert.ok(cleanupSelectAt > cleanupExpiredStart, 'cleanupExpired must still narrow columns with select')
+const cleanupWhere = filesService.slice(cleanupExpiredStart, cleanupSelectAt)
+
+assert.match(cleanupWhere, /deletedAt:\s*null/, 'cleanupExpired must never re-delete already-deleted rows')
+assert.match(cleanupWhere, /expiresAt:\s*\{\s*lt:\s*now\s*\}/, 'cleanupExpired must select rows whose expiresAt is already past')
+assert.match(
+  cleanupWhere,
+  /\{\s*purpose:\s*'contract_upload',\s*expiresAt:\s*null\s*\}/,
+  'the only allowed non-expired branch is contract_upload with a missing lifetime (410c4604a)',
+)
+assert.equal(
+  (cleanupWhere.match(/expiresAt:/g) ?? []).length,
+  2,
+  'cleanupExpired must not grow additional expiresAt branches without updating this gate',
+)
 assert.match(filesService, /await this\.storage\.deleteObject\(f\.storageKey,\s*f\.bucket\)/, 'cleanupExpired must delete storage object before marking the row deleted')
 assert.match(filesService, /action:\s*'file\.cleanup_expired'/, 'cleanupExpired cron path must write audit log')
 assert.match(filesController, /action:\s*'file\.retention_update'/, 'updateRetention controller path must write audit log')
 assert.match(filesController, /action:\s*'file\.delete'/, 'ownerDelete controller path must write audit log')
 assert.match(filesController, /action:\s*'file\.cleanup_expired'/, 'manual cleanup controller path must write audit log')
 assert.match(filesCleanupTask, /@Cron\(CronExpression\.EVERY_HOUR\)/, 'FilesCleanupTask must remain hourly cron based')
-assert.match(filesModule, /providers:\s*\[\s*FilesService,\s*FilesCleanupTask\s*\]/, 'FilesCleanupTask must remain registered in FilesModule')
+// 原断言要求 providers 数组「恰好只有 FilesService, FilesCleanupTask 两项且顺序固定」，
+// 而模块后来正当地新增了导出件与合同报告打印两个 provider。守的东西是「清理任务仍被注册」，
+// 不是「数组长度不变」—— 改为对 providers 数组内容取证，与顺序和其他 provider 无关。
+const filesModuleProviders = /providers:\s*\[([\s\S]*?)\]/.exec(filesModule)?.[1] ?? ''
+assert.ok(filesModuleProviders.length > 0, 'FilesModule must still declare a providers array')
+for (const provider of ['FilesService', 'FilesCleanupTask']) {
+  assert.match(
+    filesModuleProviders,
+    new RegExp(`\\b${provider}\\b`),
+    `${provider} must remain registered in FilesModule providers`,
+  )
+}
 assert.match(appModule, /ScheduleModule\.forRoot\(\)/, 'ScheduleModule must remain enabled in AppModule')
 
 console.warn('[STATIC DOC CHECK ONLY] This verification does NOT prove production/trial acceptance.')
