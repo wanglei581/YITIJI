@@ -43,12 +43,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .tone-clay  { background: linear-gradient(145deg,#FFA857,#F0682C); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(240,104,44,.40); }
 .tone-wheat { background: linear-gradient(145deg,#FFC65C,#E2960C); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(226,150,12,.40); }
 .tone-slate { background: linear-gradient(145deg,#7C8CA8,#4A5B78); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(74,91,120,.38); }
-.asset-icon .ficon { width: 33rpx; height: 33rpx; }
-.tone-plum { background: #f0edff; color: #6c5ce7; }
-.tone-teal { background: #e9f2ff; color: #1677ff; }
-.tone-clay { background: #fff0e9; color: #f06a3c; }
-.tone-wheat { background: #fff4dd; color: #d88b0d; }
-.tone-slate { background: #edf2f8; color: #53627a; }
+.asset-icon .ficon { width: 36rpx; height: 36rpx; }
 .asset-title { margin-top: 18rpx; font-size: 27rpx; font-weight: 700; }
 .asset-desc { margin-top: 7rpx; font-size: 22rpx; color: var(--muted); line-height: 1.5; }
 .menu-card { border-radius: 26rpx; border: 1rpx solid var(--line-soft); background: #fff; overflow: hidden; }

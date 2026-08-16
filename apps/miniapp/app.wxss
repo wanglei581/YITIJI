@@ -321,10 +321,10 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 
 /* 磁贴颜色：浅色 wash 底 + 同色描边 + 深色图标（去饱和"糖果块"感） */
 .a-teal   { background: var(--teal-wash);  color: var(--teal-deep);  border: 1px solid rgba(35,84,230,.16); }
-.a-clay   { background: var(--clay-wash);  color: var(--clay-deep);  border: 1px solid rgba(184,104,60,.18); }
-.a-wheat  { background: var(--wheat-wash); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.18); }
-.a-plum   { background: var(--plum-wash);  color: var(--plum-deep);  border: 1px solid rgba(122,90,134,.18); }
-.a-slate  { background: var(--slate-wash); color: var(--slate-deep); border: 1px solid rgba(63,104,176,.16); }
+.a-clay   { background: var(--clay-wash);  color: var(--clay-deep);  border: 1px solid rgba(211,77,36,.18); }
+.a-wheat  { background: var(--wheat-wash); color: var(--wheat-deep); border: 1px solid rgba(226,150,12,.20); }
+.a-plum   { background: var(--plum-wash);  color: var(--plum-deep);  border: 1px solid rgba(124,58,237,.16); }
+.a-slate  { background: var(--slate-wash); color: var(--slate-deep); border: 1px solid rgba(74,91,120,.16); }
 .a-ink    { background: var(--surface-3);  color: var(--ink-soft);   border: 1px solid var(--line); }
 
 /* ── 列表行 ─────────────────────────────────────────────────── */
@@ -526,7 +526,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* 印章式字号头像（编辑感，替代 emoji 人像） */
 .avatar.mono-plum {
   background: var(--plum-wash);
-  border: 1px solid rgba(122,90,134,.28);
+  border: 1px solid rgba(124,58,237,.24);
   color: var(--plum-deep);
   font-weight: 700; letter-spacing: 1px;
 }
