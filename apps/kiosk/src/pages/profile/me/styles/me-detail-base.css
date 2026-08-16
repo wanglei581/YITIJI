@@ -441,7 +441,8 @@
 .me-inkdetail-documents .me-dialog-button {
   position: relative;
   display: inline-flex;
-  min-height: 44px;
+  /* CLAUDE.md §9：可点击区不小于 48px。原为 44px，低于下限。 */
+  min-height: 48px;
   align-items: center;
   justify-content: center;
   overflow: hidden;

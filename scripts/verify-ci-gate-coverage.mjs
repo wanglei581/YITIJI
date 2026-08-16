@@ -15,6 +15,7 @@ const requiredCommands = [
   'pnpm --filter @ai-job-print/miniapp verify:static',
   'pnpm run verify:task-runner-wake',
   'pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness',
+  'pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt',
   'pnpm --filter @ai-job-print/admin verify:refresh-safe',
   'pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui',
   'pnpm --filter @ai-job-print/admin verify:toolbox-review-ui',

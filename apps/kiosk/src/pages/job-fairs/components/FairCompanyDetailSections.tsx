@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FairCompanyDTO, FairCompanyPositionDTO } from '@ai-job-print/shared'
+import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../../lib/capabilityReasons'
 import { COMPANY_SCALE_LABELS } from '../../../types/fair'
 import {
   AwardIcon,
@@ -223,41 +224,71 @@ export function ActionBar({
       <div className="jf-qr-panel">
         <div className="jf-qr-box" aria-hidden="true" />
         <div className="qr-title">来源平台入口</div>
-        <div className="qr-sub">扫码或前往来源平台办理岗位投递</div>
+        <div className="qr-sub">
+          扫码或前往来源平台办理岗位投递
+          {sourceCanApply ? null : (
+            <b id="fair-company-apply-blocked" className="jf-blocked-reason">{SOURCE_APPLY_UNAVAILABLE_REASON}</b>
+          )}
+        </div>
       </div>
+      {/* 以下四个 tile 区分两类置灰：
+          · 能力门禁（没有来源链接 / 演示模式没有后端）→ aria-disabled + 常显原因，
+            点击在 onClick 里短路，行为不变但原因在触屏上读得到；
+          · 瞬时态（printing 正在准备文件）→ 保留原生 disabled，本来就有「正在准备打印文件…」作上下文。
+          原来这两个打印 tile 的原因只写在 title 里 —— 一体机是触屏，没有 hover，那句话永远不显示。 */}
       <div className="jf-next-grid">
-        <button type="button" className="jf-tile tinted" onClick={onScanQr} disabled={!sourceCanApply}>
+        <button
+          type="button"
+          className="jf-tile tinted"
+          onClick={() => { if (sourceCanApply) onScanQr() }}
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'fair-company-apply-blocked'}
+        >
           <span className="jf-tile-icon"><QrCodeIcon aria-hidden="true" /></span>
           <span><b>扫码投递</b><span>手机扫码前往来源平台</span></span>
         </button>
-        <button type="button" className="jf-tile" onClick={onOpenSource} disabled={!sourceCanApply}>
+        <button
+          type="button"
+          className="jf-tile"
+          onClick={() => { if (sourceCanApply) onOpenSource() }}
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'fair-company-apply-blocked'}
+        >
           <span className="jf-tile-icon"><ExternalLinkIcon aria-hidden="true" /></span>
           <span><b>去来源平台投递</b><span>系统不接收简历</span></span>
         </button>
         <button
           type="button"
           className="jf-tile"
-          onClick={onPrintProfile}
-          disabled={!canPrintProfile || printing !== null}
-          title={!canPrintProfile ? printDisabledHint : undefined}
+          onClick={() => { if (canPrintProfile) onPrintProfile() }}
+          disabled={printing !== null}
+          aria-disabled={!canPrintProfile || undefined}
+          aria-describedby={canPrintProfile ? undefined : 'fair-company-print-profile-blocked'}
         >
           <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
           <span>
             <b>打印企业资料</b>
             <span>{printing === 'profile' ? '正在准备打印文件…' : '用于现场咨询准备'}</span>
+            {canPrintProfile ? null : (
+              <span id="fair-company-print-profile-blocked" className="jf-blocked-reason">{printDisabledHint}</span>
+            )}
           </span>
         </button>
         <button
           type="button"
           className="jf-tile"
-          onClick={onPrintPositions}
-          disabled={!canPrintPositions || printing !== null}
-          title={!canPrintPositions ? printDisabledHint : undefined}
+          onClick={() => { if (canPrintPositions) onPrintPositions() }}
+          disabled={printing !== null}
+          aria-disabled={!canPrintPositions || undefined}
+          aria-describedby={canPrintPositions ? undefined : 'fair-company-print-positions-blocked'}
         >
           <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
           <span>
             <b>打印岗位清单</b>
             <span>{printing === 'positions' ? '正在准备打印文件…' : '按需打印本企业岗位'}</span>
+            {canPrintPositions ? null : (
+              <span id="fair-company-print-positions-blocked" className="jf-blocked-reason">{printDisabledHint}</span>
+            )}
           </span>
         </button>
       </div>

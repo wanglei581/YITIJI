@@ -238,7 +238,8 @@ export function ResumeGeneratePage() {
         setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
         return
       }
-      navigate('/resume/generate/preview', { state: { result, input } })
+      // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
+      navigate('/resume/generate/preview', { state: { result } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 简历生成失败，请稍后重试')
     } finally {

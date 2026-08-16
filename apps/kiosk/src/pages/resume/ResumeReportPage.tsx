@@ -433,7 +433,7 @@ export function ResumeReportPage() {
         <button
           type="button"
           className="resume-report-secondary-link"
-          onClick={() => navigate('/resume/self-assessment/intro?from=resume-report')}
+          onClick={() => navigate('/resume/self-assessment/intro')}
         >
           做一次自我探索
         </button>

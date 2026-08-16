@@ -96,7 +96,8 @@
     "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
     "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs",
     "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs",
-    "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs"
+    "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs",
+    "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

@@ -9,6 +9,7 @@ import type {
 import { makePrintParams } from '@ai-job-print/shared'
 import { ArrowRightIcon, FileTextIcon, ImageIcon, MailIcon, PrinterIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
 import { API_MODE } from '../../services/api/client'
 import {
@@ -305,23 +306,37 @@ export function JobMaterialLibraryPage() {
                     </Button>
                     {generated && (
                       <div className="resume-lightflow__split-actions">
+                        {/* 两个都是能力门禁：改 aria-disabled + 下面那句常显原因。
+                            原来原因只在 title 里 —— 一体机是触屏，没有 hover，永远显示不出来。 */}
                         <Button
                           size="md"
                           variant="secondary"
-                          disabled={API_MODE !== 'http'}
-                          title={API_MODE !== 'http' ? '演示模式未保存真实文件' : undefined}
-                          onClick={() => navigate('/me/documents')}
+                          aria-disabled={API_MODE !== 'http' || undefined}
+                          aria-describedby={API_MODE !== 'http' ? 'material-docs-blocked' : undefined}
+                          className={API_MODE !== 'http' ? 'cursor-not-allowed opacity-50' : undefined}
+                          onClick={() => { if (API_MODE === 'http') navigate('/me/documents') }}
                         >
                           查看我的文档
                         </Button>
                         <Button
                           size="md"
-                          disabled={!generated.printFileUrl}
-                          title={!generated.printFileUrl ? (API_MODE !== 'http' ? '演示模式未生成真实文件，暂不可打印' : '打印链接未就绪，请重新生成后再试') : undefined}
-                          onClick={() => printGenerated(generated)}
+                          aria-disabled={!generated.printFileUrl || undefined}
+                          aria-describedby={!generated.printFileUrl ? 'material-print-blocked' : undefined}
+                          className={!generated.printFileUrl ? 'cursor-not-allowed opacity-50' : undefined}
+                          onClick={() => { if (generated.printFileUrl) printGenerated(generated) }}
                         >
                           <PrinterIcon aria-hidden="true" /> 打印材料
                         </Button>
+                        {API_MODE !== 'http' ? (
+                          <p id="material-docs-blocked" className="text-sm text-neutral-500">
+                            {DEMO_MODE_NO_REAL_FILE_REASON}
+                          </p>
+                        ) : null}
+                        {!generated.printFileUrl ? (
+                          <p id="material-print-blocked" className="text-sm text-neutral-500">
+                            {API_MODE !== 'http' ? DEMO_MODE_NO_REAL_FILE_REASON : '打印链接未就绪，请重新生成后再试'}
+                          </p>
+                        ) : null}
                       </div>
                     )}
                   </div>
