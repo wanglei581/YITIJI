@@ -117,7 +117,11 @@ Page({
     api.getFilePreviewUrl(item.id)
       .then((res) => {
         // 服务端返回的是相对路径，wx API 只接受绝对地址（见 utils/file-url.js）
-        const url = fileUrls.absoluteUrl(res && (res.printFileUrl || res.previewUrl || res.url))
+        // 必须用 url 而非 printFileUrl。file.types.ts:122 明写：
+        // printFileUrl 是「系统 HMAC content URL，仅供 /print/jobs 使用；
+        // url 只用于预览/下载」。两者签名方案不同，拿 printFileUrl 去预览
+        // 会被 verifyFileSignature 判为无效签名 → 401 → 图片加载失败。
+        const url = fileUrls.absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回预览链接')
         if (item.isImage) {
           wx.hideLoading()

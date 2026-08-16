@@ -111,7 +111,11 @@ Page({
     this.setData({ state: 'loading', errorText: '' })
     api.getFilePreviewUrl(this.data.fileId)
       .then((res) => {
-        const url = absoluteUrl(res && (res.printFileUrl || res.url))
+        // 必须用 url 而非 printFileUrl。file.types.ts:122 明写：
+        // printFileUrl 是「系统 HMAC content URL，仅供 /print/jobs 使用；
+        // url 只用于预览/下载」。两者签名方案不同，拿 printFileUrl 去预览
+        // 会被 verifyFileSignature 判为无效签名 → 401 → 图片加载失败。
+        const url = absoluteUrl(res && (res.url || res.previewUrl))
         if (!url) throw new Error('服务端未返回可用的预览链接')
         this.setData({ fileUrl: url, state: this.data.isImage ? 'image' : 'doc' })
       })
