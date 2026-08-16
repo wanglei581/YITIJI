@@ -896,10 +896,32 @@
      自动化只在服务端口确认开启、且开发者工具由人工启动后再尝试 `connect`，不要再用 `launch` 抢实例。
 2. **`wx-resignin` 真机联调**：需真实微信 appid/appsecret + 已绑号账号跑通 code2session。未验证前不得宣称取件 401 已修复。
 
+### P0 · 合同审查页当前**不可用**，须先修 6 处契约不符（2026-08-16 独立复核发现）
+
+`pages/contract-review/` 已提交（`0d2ba064d`、`e33774575`），但独立复核发现与服务端契约仍有 6 处不符，
+其中 5 处阻断。**该页在修完前不可用，不要按「已接入」对外描述。** 前三条已由本人逐条核验属实。
+
+| # | 现状 | 服务端实际 | 后果 |
+|---|---|---|---|
+| 1 | 读 `scope.disclaimerVersion` | `getConsentScope()` 返回 `disclaimer:{id,version,content,publishedAt}`，顶层无 `disclaimerVersion`（`contract-review-consent.service.ts:79-89`） | `undefined` → DTO `@IsNotEmpty` → **400** |
+| 2 | confirm 传 4 字段 | 另有两个 `@Equals(true)` 必填：`ocrCoverageConfirmed`、`personalUseConfirmed`（`dto/contract-review.dto.ts:54-60`），且 lifecycle 二次校验 | **400 CONFIRMATION_INVALID** |
+| 3 | 从 `POST /:id/report` 读 `findings` | 该端点返回 PDF 文件元数据 `ContractReviewReportView`（`contract-review.types.ts:141-151`），无 findings；findings 在轮询响应 `GET /:id` 的 `result.findings` | 结果页恒空；且调用它会触发 `deleteSource` **删除合同原文**（`contract-review-report.service.ts:48`），并下发未被使用的 `abandonToken`，生成的 PDF 无人回收 |
+| 4 | 上传用 `uploadPrintFile`（purpose=`print_doc`） | 必须 `contract_upload`（`contract-review.service.ts:178` 校验，`extraction:203` 二次拦截）；该 purpose 另带 `highly_sensitive` + 短保留策略 | **404 SOURCE_NOT_FOUND**，且丢失合规保留策略 |
+| 5 | `uploadPrintFile` 传 formData `originalFilename` | `KioskUploadOptionsDto` 只白名单 `purpose`，全局 `forbidNonWhitelisted:true`（`main.ts:88-101`） | **400 VALIDATION_FAILED** |
+| 6 | 只弹前端 modal 表示同意 | 会员路径要求服务端已有 `contract_review` 授权记录（`contract-review.service.ts:97-102`）；需先 `POST /me/ai-consents {scope:'contract_review'}` | **403 USER_AI_CONSENT_REQUIRED** |
+
+另：6 个方法均 `needAuth:true`，但 `request.js` 是「有 token 才带」。未登录时服务端按匿名处理，需 `x-contract-review-source-file-proof`
+与 `x-contract-review-access-token` 两个头，小程序都没发 → 未登录整条链 404。**最简修法是该入口强制登录。**
+
+顺带发现的既有缺陷（不在本轮范围，未改）：Kiosk `apps/kiosk/src/services/api/contractReview.ts:47` 自定义的 `ConsentScope`
+同样凭空声明了顶层 `disclaimerVersion`，`ContractReviewHomePage.tsx:105` 照读——**不能拿 Kiosk 当已验证模板照抄这一行**。
+
+建议修复顺序：4+5 → 1 → 6 → 2 → 3 → 强制登录。
+
 ### P1 · 需决策或需补验
 
 3. **续签是否重收法务同意**：当前实现为「不重收」，理由与推翻条件见 `current-progress.md` 2026-08-16 条。需法务确认；不认可则加版本比对分支。
-4. **合同审查三处推断待证**：`uploadPrintFile` 返回字段名（现写 `up.fileId || up.id`）、轮询 `status` 取值（现按 `ready`/`completed`/`failed`）、`report.findings` 结构与 `severity` 取值。
+4. ~~合同审查三处推断待证~~ 已于 2026-08-16 静态核对：`status` 与 findings 字段名已修（`e33774575`）；`fileId` 确实存在；但复核又发现 6 处新的不一致，见上方 P0 条目。**原先把这些标为「需真实后端联调才能验证」是误判——读服务端类型定义即可验证。**
 5. **`app.json` 命名不一致**：主仓工作区 tabBar 写「职业生活圈」，custom-tab-bar 与本分支 `app.json` 写「AI百宝箱」。主仓属 WIP 未动，合流时须统一。
 
 ### P2 · 尚未接入的既有后端能力
