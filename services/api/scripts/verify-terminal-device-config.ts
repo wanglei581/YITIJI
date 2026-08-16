@@ -149,10 +149,31 @@ function runStaticChecks(): void {
     ["@Get('admin/toolbox/terminals')", "'toolbox_config.update'"],
     'D2. Admin 百宝箱配置接口和审计存在',
   )
+  // E 随 V6 capability hook 架构重写（2026-08-16）。
+  // 旧断言要求「统一配置缓存 + 旧接口回退」，与 fusion-w4 的三条安全用例直接冲突：
+  //   ① 「刷新开始即卸载旧页面，失败后保持关闭」要求每次刷新真的重新请求
+  //      —— 30s TTL 的 getCachedKioskTerminalConfig 会把第二次请求吃掉；
+  //   ② 「首次网络中断/HTTP 503 不挂载业务子树」要求配置拿不到就 unavailable
+  //      —— 回退到旧的 per-feature 接口一旦成功，状态会变成 ready，等于放行；
+  //   ③ 「乱序旧 ON 响应不能覆盖新 OFF」要求 generation 防护。
+  // 智慧校园承载校园专属入口，机器搬离校园后绝不能残留，可用性让位于 fail-closed。
+  // 因此新断言不是放宽，而是把门禁提到更强的位置：只认统一配置、必须校验、
+  // 必须 fail-closed、必须有 abort 与 generation 防护，且不得再退回 per-feature 接口。
   contains(
     '../../apps/kiosk/src/hooks/useSmartCampusConfig.ts',
-    ['getCachedKioskTerminalConfig(terminalId)', 'getSmartCampusConfig(terminalId)'],
-    'E. Kiosk 智慧校园优先走统一配置缓存并保留旧接口回退',
+    [
+      'getKioskTerminalConfig(terminalId)',
+      'parseKioskTerminalConfig(rawConfig)',
+      'OFF_SMART_CAMPUS_CAPABILITY',
+      'new AbortController()',
+      'requestGeneration !== generation',
+    ],
+    'E. Kiosk 智慧校园只走统一终端配置，畸形/失败一律 fail-closed，且乱序响应不能覆盖',
+  )
+  notContainsSource(
+    read('../../apps/kiosk/src/hooks/useSmartCampusConfig.ts'),
+    ['getSmartCampusConfig(', 'getCachedKioskTerminalConfig('],
+    'E1b. Kiosk 智慧校园不得回退到 per-feature 旧接口，也不得走会抑制刷新的 30s 缓存',
   )
   contains(
     '../../apps/kiosk/src/services/api/terminalConfig.ts',
@@ -163,10 +184,18 @@ function runStaticChecks(): void {
   // （config 驱动 / 启动 / 离场确认 / 占位文案）移入承载页 /toolbox（ToolboxZonePage）；
   // 统一配置缓存复用下沉到 useToolboxConfig hook。以下 E3* / E4 断言随职责位置重定向，
   // 契约（仅显式关闭才隐藏、空配置不隐藏而是占位、复用缓存、保留占位文案）保持不放宽。
+  // E3 同 E 一并随 V6 capability hook 重写：由「复用 30s 缓存」改为
+  // 「只走统一终端配置 + 校验 + fail-closed + abort/generation 防乱序」。
   contains(
     '../../apps/kiosk/src/hooks/useToolboxConfig.ts',
-    ['getCachedKioskTerminalConfig(terminalId)'],
-    'E3. Kiosk 百宝箱复用统一终端配置缓存（useToolboxConfig）',
+    [
+      'getKioskTerminalConfig(terminalId)',
+      'parseKioskTerminalConfig(rawConfig)',
+      'OFF_TOOLBOX_CAPABILITY',
+      'new AbortController()',
+      'requestGeneration !== generation',
+    ],
+    'E3. Kiosk 百宝箱只走统一终端配置，畸形/失败一律 fail-closed，且乱序响应不能覆盖',
   )
   contains(
     '../../apps/kiosk/src/pages/home/HomePage.tsx',
