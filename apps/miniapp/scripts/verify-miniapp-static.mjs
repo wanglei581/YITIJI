@@ -85,6 +85,9 @@ const allowedTopLevel = new Set([
   'app.js',
   'app.json',
   'app.wxss',
+  // assets：本地静态图片。放开该目录的同时必须由下方「本地图片体积预算」守住，
+  // 否则主包会被大图侵蚀（曾有 WIP 分支塞入 284KB 单图 = 2MB 主包预算的 14%）。
+  'assets',
   'custom-tab-bar',
   'package.json',
   'pages',
@@ -103,6 +106,32 @@ const unexpectedTopLevel = fs.readdirSync(ROOT)
   .filter((name) => !allowedTopLevel.has(name) && !generatedTopLevel.has(name))
 if (unexpectedTopLevel.length) bad('小程序唯一目录分类', unexpectedTopLevel.join(','))
 else ok('小程序唯一目录分类受门禁')
+
+// ── 本地图片体积预算 ──────────────────────────────────────────
+// 主包上限 2MB。小程序此前零本地图片，是重要资产；一旦放开 assets/ 必须钉死预算，
+// 否则头像、空态插画、徽章会迅速侵蚀主包。UGC/运营类图片一律走远程 URL，不进包。
+const IMG_MAX_SINGLE = 60 * 1024
+const IMG_MAX_TOTAL = 300 * 1024
+const imgExt = /\.(png|jpe?g|gif|webp|bmp)$/i
+const walkImages = (dir, acc = []) => {
+  if (!fs.existsSync(dir)) return acc
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name)
+    if (e.isDirectory()) walkImages(p, acc)
+    else if (imgExt.test(e.name)) acc.push({ p, size: fs.statSync(p).size })
+  }
+  return acc
+}
+const localImages = walkImages(ROOT).filter((f) => !f.p.includes(`${path.sep}node_modules${path.sep}`))
+const oversize = localImages.filter((f) => f.size > IMG_MAX_SINGLE)
+const imgTotal = localImages.reduce((s, f) => s + f.size, 0)
+if (oversize.length) {
+  bad('本地图片单张体积预算', oversize.map((f) => `${path.relative(ROOT, f.p)}=${Math.round(f.size / 1024)}KB`).join(','))
+} else if (imgTotal > IMG_MAX_TOTAL) {
+  bad('本地图片总量预算', `${Math.round(imgTotal / 1024)}KB > ${IMG_MAX_TOTAL / 1024}KB`)
+} else {
+  ok(`本地图片体积预算（${localImages.length} 张 / ${Math.round(imgTotal / 1024)}KB）`)
+}
 
 const registeredPageDirs = new Set(PAGE_PATHS.map((page) => path.dirname(page)))
 const physicalPageDirs = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })

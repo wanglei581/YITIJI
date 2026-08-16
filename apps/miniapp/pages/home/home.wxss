@@ -1,232 +1,76 @@
-/* pages/home/home.wxss — existing cream-paper visual, one-screen workspace */
-
-page { height: 100%; overflow: hidden; background: #FAF7F2; }
-
-.home-wrap {
-  height: 100vh;
-  overflow: hidden;
-  background: #FAF7F2;
-  color: #2C1A0E;
-  display: flex;
-  flex-direction: column;
+page { height: 100%; overflow: hidden; background: var(--paper); }
+.home-page { height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); }
+.home-head { height: 94rpx; padding: 8rpx 32rpx 10rpx; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.brand-row { display: flex; align-items: center; gap: 16rpx; }
+.brand-mark { width: 64rpx; height: 64rpx; border-radius: 18rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(35,84,230,.22); }
+.brand-mark .ficon { width: 34rpx; height: 34rpx; }
+.brand-copy { display: flex; flex-direction: column; gap: 1rpx; }
+.brand-name { font-size: 32rpx; line-height: 1.2; font-weight: 800; letter-spacing: 1rpx; }
+.brand-sub { font-size: 22rpx; color: var(--muted); }
+.head-btn { width: 88rpx; height: 88rpx; border-radius: 27rpx; border: 1rpx solid var(--line-soft); background: #fff; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
+.head-btn .ficon { width: 30rpx; height: 30rpx; }
+.home-scroll { flex: 1; min-height: 0; }
+.home-body { padding: 6rpx 28rpx 0; }
+.greeting { padding: 14rpx 4rpx 22rpx; display: flex; flex-direction: column; }
+.greet-title { font-size: 42rpx; line-height: 1.2; font-weight: 800; letter-spacing: -1rpx; }
+.greet-sub { margin-top: 9rpx; font-size: 23rpx; color: var(--muted); }
+.ask-bar { height: 92rpx; padding: 0 18rpx; background: #fff; border: 1rpx solid var(--line-soft); border-radius: 26rpx; box-shadow: var(--sh-sm); display: flex; align-items: center; gap: 14rpx; }
+.ask-icon { width: 52rpx; height: 52rpx; border-radius: 16rpx; color: var(--teal); background: var(--teal-soft); display: flex; align-items: center; justify-content: center; }
+.ask-icon .ficon { width: 28rpx; height: 28rpx; }
+.ask-placeholder { flex: 1; min-width: 0; color: var(--faint); font-size: 25rpx; }
+.ask-action { height: 52rpx; padding: 0 20rpx; border-radius: 15rpx; color: #fff; background: var(--teal); display: flex; align-items: center; font-size: 23rpx; font-weight: 650; }
+/* 小青对话入口条：从 320rpx 的营销 hero 压到 136rpx 的功能条，
+   省出的首屏空间留给真正该占位的内容。头像用真人小图 + 一圈品牌色描边，
+   保住"有个人在"的信任感，同时和整页扁平图标语言不冲突。 */
+.qing-bar { min-height: 136rpx; margin-top: 22rpx; padding: 22rpx 22rpx 22rpx 20rpx; border-radius: 30rpx; background: linear-gradient(120deg, var(--teal-wash) 0%, #fff 62%); border: 1rpx solid var(--teal-soft); display: flex; align-items: center; gap: 20rpx; }
+.qing-face { width: 92rpx; height: 92rpx; flex-shrink: 0; border-radius: 50%; background: var(--teal-soft); border: 3rpx solid #fff; box-shadow: 0 6rpx 16rpx -4rpx rgba(35,84,230,.30); }
+.qing-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7rpx; }
+.qing-name { font-size: 27rpx; font-weight: 700; color: var(--ink); }
+.qing-say { font-size: 23rpx; line-height: 1.4; color: var(--muted); }
+.qing-go { width: 46rpx; height: 46rpx; flex-shrink: 0; border-radius: 50%; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; }
+.qing-go .ficon { width: 20rpx; height: 20rpx; }
+.section-head { height: 90rpx; padding: 28rpx 4rpx 14rpx; display: flex; align-items: center; justify-content: space-between; }
+.section-title { font-size: 31rpx; font-weight: 750; color: var(--ink); }
+.section-more { font-size: 24rpx; color: var(--teal); font-weight: 600; }
+.service-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; }
+.service-item { min-width: 0; padding: 20rpx 8rpx 18rpx; border-radius: 24rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.service-icon { position: relative; width: 84rpx; height: 84rpx; border-radius: 26rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.service-icon .ficon { position: relative; z-index: 1; width: 42rpx; height: 42rpx; }
+/* 彩色渐变实底 + 白色图标：消费级产品的金刚区语言。
+   每个功能一个专属色相，图标反白后形态差异被放大，不再是"同一个灰图标染四种色"。
+   底部投影用各自色相的低透明度，让色块"落"在纸面上而不是贴上去。 */
+.tone-blue   { background: linear-gradient(145deg,#5B9CFF 0%,#2563EB 100%); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(37,99,235,.42); }
+.tone-violet { background: linear-gradient(145deg,#A98BFA 0%,#7C3AED 100%); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(124,58,237,.40); }
+.tone-cyan   { background: linear-gradient(145deg,#2ED3BE 0%,#0D9488 100%); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(13,148,136,.40); }
+.tone-orange { background: linear-gradient(145deg,#FFA857 0%,#F0682C 100%); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(240,104,44,.40); }
+/* 高光：左上一道极淡内高光，给色块一点弧面感，避免纯平贴纸感 */
+.service-icon::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(160deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 52%);
 }
-
-.page-hd {
-  height: 94rpx;
-  padding: 8rpx 30rpx 10rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-.greet-col { display: flex; flex-direction: column; gap: 2rpx; min-width: 0; }
-.greet-main { font-size: 38rpx; font-weight: 750; line-height: 1.2; color: #2C1A0E; letter-spacing: 0; }
-.greet-date { font-size: 21rpx; color: #A89080; }
-.head-tools { display: flex; align-items: center; gap: 12rpx; }
-.head-icon {
-  width: 62rpx;
-  height: 62rpx;
-  border: 1rpx solid #E5D8C8;
-  border-radius: 50%;
-  color: #7A5C48;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.head-icon .ficon { width: 29rpx; height: 29rpx; }
-.assistant-icon { background: #F3E8E1; color: #A4422D; border-color: #E6CFC3; }
-
-.focus-strip {
-  height: 112rpx;
-  margin: 0 30rpx 16rpx;
-  padding: 0 24rpx;
-  border-radius: 12rpx;
-  background: #FFFDF9;
-  border: 1rpx solid #E5D8C8;
-  box-shadow: 0 5rpx 18rpx rgba(44,26,14,.05);
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.focus-mark {
-  width: 58rpx;
-  height: 58rpx;
-  margin-right: 18rpx;
-  border-radius: 50%;
-  background: #FAEDEA;
-  color: #C84B2F;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.focus-mark .ficon { width: 28rpx; height: 28rpx; }
-.focus-copy { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.focus-label { font-size: 19rpx; font-weight: 700; color: #C84B2F; }
-.focus-title { margin-top: 2rpx; font-size: 28rpx; font-weight: 700; color: #2C1A0E; }
-.focus-action { flex-shrink: 0; font-size: 24rpx; font-weight: 700; color: #C84B2F; }
-
-.workspace {
-  flex: 1;
-  min-height: 0;
-  padding: 0 30rpx calc(150rpx + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-}
-.work-panel {
-  min-height: 0;
-  padding: 16rpx 18rpx;
-  border-radius: 12rpx;
-  background: #FFFDF9;
-  border: 1rpx solid #E5D8C8;
-  box-shadow: 0 4rpx 14rpx rgba(44,26,14,.04);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.prep-panel { flex: 1.08; }
-.material-panel { flex: 1; }
-.discovery-panel { flex: .72; }
-.panel-hd {
-  height: 38rpx;
-  margin-bottom: 10rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-.panel-tag { font-size: 24rpx; font-weight: 750; }
-.tag-clay { color: #B6442D; }
-.tag-wheat { color: #8B650E; }
-.tag-blue { color: #2D5A8E; }
-.panel-note { font-size: 19rpx; color: #A89080; }
-
-.prep-body,
-.material-body,
-.discovery-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  gap: 14rpx;
-}
-.prep-lead {
-  width: 41%;
-  padding: 16rpx;
-  border-radius: 10rpx;
-  background: #FAEDEA;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-.lead-icon,
-.bundle-icon,
-.jobs-icon {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.lead-icon { background: #C84B2F; color: #fff; }
-.lead-icon .ficon,
-.bundle-icon .ficon,
-.jobs-icon .ficon { width: 26rpx; height: 26rpx; }
-.lead-title { margin-top: 10rpx; font-size: 28rpx; font-weight: 750; color: #6F2E21; }
-.lead-sub { margin-top: 4rpx; max-width: 190rpx; font-size: 19rpx; line-height: 1.35; color: #98685B; }
-.lead-arrow { position: absolute; right: 14rpx; bottom: 10rpx; font-size: 34rpx; color: #C84B2F; }
-.prep-directory { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.prep-link,
-.discovery-link {
-  flex: 1;
-  min-height: 0;
-  border-bottom: 1rpx solid #F0E8DC;
-  display: flex;
-  align-items: center;
-  font-size: 23rpx;
-  font-weight: 650;
-  color: #4A3020;
-}
-.prep-link:last-child,
-.discovery-link:last-child { border-bottom: 0; }
-.mini-icon,
-.discovery-icon {
-  width: 44rpx;
-  color: #9B5F4C;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.mini-icon .ficon,
-.discovery-icon .ficon { width: 24rpx; height: 24rpx; }
-.mini-arrow { margin-left: auto; font-size: 29rpx; color: #C8B4A0; }
-
-.bundle-lead {
-  width: 38%;
-  padding: 14rpx 16rpx;
-  border-radius: 10rpx;
-  background: #F5EDD8;
-  display: flex;
-  flex-direction: column;
-}
-.bundle-icon { background: #9C6E0A; color: #fff; }
-.bundle-title { margin-top: 9rpx; font-size: 27rpx; font-weight: 750; color: #654909; }
-.bundle-sub { margin-top: 3rpx; font-size: 18rpx; line-height: 1.35; color: #8F783F; }
-.bundle-action { margin-top: auto; font-size: 21rpx; font-weight: 700; color: #8B650E; }
-.material-grid {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  gap: 8rpx;
-}
-.material-link {
-  min-width: 0;
-  padding: 0 10rpx;
-  border-radius: 8rpx;
-  background: #F8F3E9;
-  color: #624D31;
-  display: flex;
-  align-items: center;
-  gap: 7rpx;
-  font-size: 20rpx;
-  font-weight: 650;
-}
-.material-link.wide { grid-column: span 2; }
-.material-icon { color: #9C6E0A; display: flex; align-items: center; flex-shrink: 0; }
-.material-icon .ficon { width: 22rpx; height: 22rpx; }
-
-.jobs-lead {
-  width: 52%;
-  padding: 12rpx 14rpx;
-  border-radius: 10rpx;
-  background: #E8EFF8;
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-.jobs-icon { margin-right: 12rpx; background: #2D5A8E; color: #fff; }
-.jobs-copy { display: flex; flex-direction: column; min-width: 0; }
-.jobs-title { font-size: 26rpx; font-weight: 750; color: #244B76; }
-.jobs-sub { margin-top: 4rpx; max-width: 210rpx; font-size: 17rpx; line-height: 1.35; color: #68809B; }
-.jobs-arrow { position: absolute; right: 10rpx; bottom: 5rpx; font-size: 30rpx; color: #2D5A8E; }
-.discovery-directory { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.discovery-link { font-size: 21rpx; }
-.discovery-icon { color: #2D5A8E; }
-
-.tap { transition: opacity 80ms; }
-.tap-press { opacity: .68; }
-
-@media (max-height: 720px) {
-  .page-hd { height: 82rpx; }
-  .focus-strip { height: 96rpx; margin-bottom: 10rpx; }
-  .workspace { gap: 9rpx; padding-bottom: calc(142rpx + env(safe-area-inset-bottom)); }
-  .work-panel { padding: 11rpx 14rpx; }
-  .panel-hd { height: 32rpx; margin-bottom: 6rpx; }
-  .lead-sub,
-  .bundle-sub,
-  .jobs-sub { display: none; }
-}
+.service-title { margin-top: 13rpx; font-size: 23rpx; line-height: 1.25; font-weight: 650; white-space: nowrap; }
+.print-banner { min-height: 126rpx; margin-top: 22rpx; padding: 22rpx; border-radius: 27rpx; border: 1rpx solid #dce9ff; background: #f3f8ff; display: flex; align-items: center; gap: 18rpx; }
+.print-icon { width: 78rpx; height: 78rpx; flex-shrink: 0; border-radius: 23rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(35,84,230,.20); }
+.print-icon .ficon { width: 38rpx; height: 38rpx; }
+.print-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.print-title { font-size: 27rpx; font-weight: 700; color: #17233e; }
+.print-desc { margin-top: 7rpx; font-size: 21rpx; color: #66758d; }
+.print-go { width: 44rpx; height: 44rpx; border-radius: 50%; color: var(--teal); background: #fff; display: flex; align-items: center; justify-content: center; }
+.print-go .ficon, .info-arrow .ficon { width: 20rpx; height: 20rpx; }
+.info-card { border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: #fff; overflow: hidden; }
+.info-row { min-height: 118rpx; padding: 20rpx 22rpx; display: flex; align-items: center; gap: 18rpx; }
+.info-row + .info-row { border-top: 1rpx solid var(--line-faint); }
+.info-icon { width: 66rpx; height: 66rpx; border-radius: 20rpx; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.info-icon .ficon { width: 32rpx; height: 32rpx; }
+/* 次级列表用「浅色底 + 同色相深色图标」，与首屏服务区的「实底白图标」形成层级差：
+   主操作有重量、次级信息克制。三条各自色相，避免三行图标完全同形同色。 */
+.soft-indigo { background:#EEF2FF; color:#4F55C7; }
+.soft-rose   { background:#FFF0F3; color:#C6386B; }
+.soft-amber  { background:#FFF6E6; color:#A96A08; }
+.info-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.info-title { font-size: 27rpx; font-weight: 650; }
+.info-desc { margin-top: 5rpx; font-size: 21rpx; color: var(--muted); }
+.info-arrow { color: var(--ghost); }
+.home-note { padding: 24rpx 12rpx 8rpx; color: var(--muted); font-size: 22rpx; line-height: 1.6; text-align: center; }
+.tab-spacer { height: calc(130rpx + env(safe-area-inset-bottom)); }
+@media (max-height: 720px) { .section-head { height: 78rpx; padding-top: 20rpx; } }

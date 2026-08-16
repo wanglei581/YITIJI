@@ -1,6 +1,15 @@
 // pages/me/me.js
 const app = getApp()
 const auth = require('../../utils/auth')
+const api = require('../../utils/api')
+
+function countFromResult(res) {
+  if (!res) return '—'
+  if (typeof res.total === 'number') return String(res.total)
+  if (Array.isArray(res)) return String(res.length)
+  if (Array.isArray(res.items)) return String(res.items.length)
+  return '—'
+}
 
 Page({
   data: {
@@ -33,9 +42,31 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
-    // 每次显示时刷新登录态（从 launch 登录回来时 onShow 触发）
     const loggedIn = auth.isLoggedIn()
     this.setData({ isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null })
+    if (loggedIn) {
+      Promise.all([
+        api.getMyResumes({ pageSize: 1 }).catch(() => null),
+        api.getMyDocuments({ pageSize: 1 }).catch(() => null),
+        api.getMyPrintOrders({ pageSize: 1 }).catch(() => null),
+      ]).then(function(results) {
+        this.setData({
+          stats: [
+            { key: 'resume', label: '简历',   value: countFromResult(results[0]) },
+            { key: 'docs',   label: '文档',   value: countFromResult(results[1]) },
+            { key: 'order',  label: '打印单', value: countFromResult(results[2]) },
+          ],
+        })
+      }.bind(this)).catch(function() {})
+    } else {
+      this.setData({
+        stats: [
+          { key: 'resume', label: '简历',   value: '—' },
+          { key: 'docs',   label: '文档',   value: '—' },
+          { key: 'order',  label: '打印单', value: '—' },
+        ],
+      })
+    }
   },
 
   tapEntry(e) {
@@ -64,7 +95,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '智引答 · 我的',
+      title: '职易达 · 我的',
       path: '/pages/me/me',
     }
   },

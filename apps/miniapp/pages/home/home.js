@@ -27,21 +27,18 @@ Page({
     userName: '同学',
     greetWord: '你好',
     todayStr: '',
-    preparationTools: [
-      { title: '上传简历', icon: 'edit', url: '/pages/resume-upload/resume-upload' },
-      { title: '模拟面试', icon: 'comment', url: '/pages/interview-entry/interview-entry' },
-      { title: '职业规划', icon: 'aim', url: '/pages/career-plan/career-plan' },
-      { title: '岗位匹配', icon: 'solution', url: '/pages/job-fit/job-fit' },
-    ],
-    materialLinks: [
-      { title: '我的简历', icon: 'file-text', url: '/pages/resumes/resumes' },
-      { title: '打印订单', icon: 'history', url: '/pages/orders/orders', wide: true },
-      { title: '在线打印', icon: 'printer', url: '/pages/print/print' },
+    primaryServices: [
+      { title: '简历诊断', icon: 'file-search', tone: 'blue', url: '/pages/resume-diagnose/resume-diagnose' },
+      { title: '简历优化', icon: 'edit', tone: 'violet', url: '/pages/resume-optimize/resume-optimize' },
+      { title: '模拟面试', icon: 'comment', tone: 'cyan', url: '/pages/interview-entry/interview-entry' },
+      // 原「创建材料包」指向 pages/package-create（未实现页面，调 /orders/package 不存在的后端），
+      // 会形成死路由。改为已实现的职业规划，四格构成完整 AI 服务集：诊断→优化→面试→规划。
+      { title: '职业规划', icon: 'compass', tone: 'orange', url: '/pages/career-plan/career-plan' },
     ],
     discoveryLinks: [
-      { title: '招聘会', icon: 'calendar', url: '/pages/fairs/fairs' },
-      { title: '就业政策', icon: 'form', url: '/pages/policies/policies' },
-      { title: '企业信息', icon: 'bank', url: '/pages/companies/companies' },
+      { title: '发现岗位', desc: '查看第三方或官方来源岗位', icon: 'solution', tone: 'indigo', url: '/pages/jobs/jobs' },
+      { title: '招聘会', desc: '查看时间、地点与来源信息', icon: 'calendar', tone: 'rose', url: '/pages/fairs/fairs' },
+      { title: '就业政策', desc: '了解官方政策与办事入口', icon: 'form', tone: 'amber', url: '/pages/policies/policies' },
     ],
   },
 
@@ -73,7 +70,13 @@ Page({
   tapService(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
-    if (url === '/pages/jobs/jobs') {
+    const tabPages = new Set([
+      '/pages/home/home',
+      '/pages/ai/ai',
+      '/pages/jobs/jobs',
+      '/pages/me/me',
+    ])
+    if (tabPages.has(url)) {
       wx.switchTab({ url })
     } else {
       wx.navigateTo({ url })
@@ -84,9 +87,17 @@ Page({
     wx.navigateTo({ url: '/pages/notifications/notifications' })
   },
 
+  tapLifeCircle() {
+    wx.switchTab({ url: '/pages/ai/ai' })
+  },
+
+  tapJobs() {
+    wx.switchTab({ url: '/pages/jobs/jobs' })
+  },
+
   onShareAppMessage() {
     return {
-      title: '求职通 · AI求职打印服务',
+      title: '职易达 · AI 求职与打印服务',
       path: '/pages/home/home',
     }
   },

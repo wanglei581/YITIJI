@@ -1,89 +1,102 @@
-<!--pages/me/me.wxml-->
-<view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+<view class="me-page">
+  <view style="height:{{statusBarHeight}}px"></view>
 
-  <!-- 用户头部 Hero（CMB 风格：头像+大数字统计） -->
-  <view class="me-hero">
-    <view class="me-user-row">
-      <view class="avatar-wrap">
-        <view class="avatar"><view class="ficon i-user av-ic"></view></view>
-      </view>
-      <view class="me-id">
-        <text class="me-name">{{isLoggedIn ? (user.nickname || '用户') : '未登录'}}</text>
-        <view class="me-login-hint tap" hover-class="tap-press" bindtap="tapLogin" wx:if="{{!isLoggedIn}}">
-          <text>登录后同步简历与打印记录 →</text>
-        </view>
-        <text class="me-phone" wx:else>{{user.phoneMasked || '已登录'}}</text>
-        <view class="me-member-tag tap" hover-class="tap-press" bindtap="tapEntry" data-id="membership" wx:if="{{isLoggedIn}}">
-          <text>查看实际权益 →</text>
-        </view>
-      </view>
-      <view class="notify-btn tap" hover-class="tap-press" bindtap="tapNotify">
-        <view class="ficon i-bell"></view>
-      </view>
+  <view class="me-head">
+    <view>
+      <view class="me-page-title">我的</view>
+      <view class="me-page-sub">管理本人资料、记录与服务</view>
     </view>
-
-    <!-- 大数字统计 -->
-    <view class="me-stats" wx:if="{{isLoggedIn}}">
-      <view class="ms-cell" wx:for="{{stats}}" wx:key="key">
-        <text class="ms-val">{{item.value}}</text>
-        <text class="ms-lbl">{{item.label}}</text>
-      </view>
+    <view class="notify-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
+      <text class="ficon i-bell" aria-hidden="true"></text>
     </view>
   </view>
 
-  <!-- 菜单分组 -->
-  <view class="menu-group">
-    <view class="mg-title">我的资产</view>
-    <view class="menu-card">
-      <view
-        class="menu-item tap"
-        wx:for="{{entries}}"
-        wx:key="id"
-        wx:if="{{index < 5}}"
-        hover-class="tap-press"
-        data-id="{{item.id}}"
-        bindtap="tapEntry"
-      >
-        <view class="mi-icon mi-ic-{{item.accent}}">
-          <view class="ficon i-{{item.icon}}"></view>
+  <scroll-view class="me-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="me-body">
+      <view class="profile-card">
+        <view class="profile-row">
+          <view class="profile-avatar"><text class="ficon i-user"></text></view>
+          <view class="profile-copy">
+            <view class="profile-name">{{isLoggedIn ? (user.nickname || '职易达用户') : '登录职易达'}}</view>
+            <view wx:if="{{isLoggedIn}}" class="profile-meta">{{user.phoneMasked || '已登录并同步本人数据'}}</view>
+            <!-- 未登录态原本没有任何说明行，用户只看到一个标题。补一句真实状态与登录后能得到什么。 -->
+            <view wx:else class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
+            <view wx:else class="profile-login tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
+          </view>
+          <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" role="button" aria-label="打开账号设置">
+            <text class="ficon i-right"></text>
+          </view>
+          <view wx:else class="profile-arrow tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="登录职易达">
+            <text class="ficon i-right"></text>
+          </view>
         </view>
-        <view class="mi-body">
-          <text class="mi-title">{{item.title}}</text>
-          <text class="mi-sub">{{item.sub}}</text>
+
+        <view class="benefit-strip tap" hover-class="tap-press" bindtap="tapEntry" data-id="membership" role="button" aria-label="查看我的实际权益记录">
+          <view class="benefit-icon"><text class="ficon i-crown"></text></view>
+          <view class="benefit-copy">
+            <view class="benefit-title">我的权益</view>
+            <view class="benefit-desc">只展示服务端实际发放记录</view>
+          </view>
+          <view class="benefit-go">查看 <text class="ficon i-right"></text></view>
         </view>
-        <text class="mi-arrow">›</text>
       </view>
-    </view>
-  </view>
 
-  <view class="menu-group">
-    <view class="mg-title">账号与设置</view>
-    <view class="menu-card">
-      <view
-        class="menu-item tap"
-        wx:for="{{entries}}"
-        wx:key="id"
-        wx:if="{{index >= 5}}"
-        hover-class="tap-press"
-        data-id="{{item.id}}"
-        bindtap="tapEntry"
-      >
-        <view class="mi-icon mi-ic-{{item.accent}}">
-          <view class="ficon i-{{item.icon}}"></view>
+      <view class="stats-card" wx:if="{{isLoggedIn}}">
+        <view class="stat-item" wx:for="{{stats}}" wx:key="key">
+          <view class="stat-value">{{item.value}}</view>
+          <view class="stat-label">{{item.label}}</view>
         </view>
-        <view class="mi-body">
-          <text class="mi-title">{{item.title}}</text>
-          <text class="mi-sub">{{item.sub}}</text>
-        </view>
-        <text class="mi-arrow">›</text>
       </view>
+
+      <view class="section-row">
+        <text class="section-title">我的服务</text>
+      </view>
+      <view class="asset-grid">
+        <view
+          class="asset-item tap"
+          wx:for="{{entries}}"
+          wx:key="id"
+          wx:if="{{index < 4}}"
+          hover-class="tap-press"
+          data-id="{{item.id}}"
+          bindtap="tapEntry"
+          role="button"
+          aria-label="{{item.title}}，{{item.sub}}"
+        >
+          <view class="asset-icon tone-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
+          <view class="asset-title">{{item.title}}</view>
+          <view class="asset-desc">{{item.sub}}</view>
+        </view>
+      </view>
+
+      <view class="section-row">
+        <text class="section-title">更多功能</text>
+      </view>
+      <view class="menu-card">
+        <view
+          class="menu-item tap"
+          wx:for="{{entries}}"
+          wx:key="id"
+          wx:if="{{index >= 4 && item.id !== 'membership'}}"
+          hover-class="tap-press"
+          data-id="{{item.id}}"
+          bindtap="tapEntry"
+          role="button"
+          aria-label="{{item.title}}，{{item.sub}}"
+        >
+          <view class="menu-icon soft-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
+          <view class="menu-copy">
+            <view class="menu-title">
+              {{item.title}}
+            </view>
+            <view class="menu-desc">{{item.sub}}</view>
+          </view>
+          <view class="menu-arrow"><text class="ficon i-right"></text></view>
+        </view>
+      </view>
+
+      <view class="privacy-note">系统只记录本人的浏览、收藏、外部跳转、打印与 AI 调用行为，不记录投递或预约结果。</view>
+      <view class="tab-spacer"></view>
     </view>
-  </view>
-
-  <view class="compliance-note">
-    系统仅记录本人的浏览、收藏、外部跳转、打印与 AI 调用行为，不记录投递或预约结果，不保存企业招聘数据。
-  </view>
-
-  <view style="height:calc(100rpx + env(safe-area-inset-bottom))"></view>
+  </scroll-view>
 </view>
