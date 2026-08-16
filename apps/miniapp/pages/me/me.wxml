@@ -19,17 +19,19 @@
           <view class="profile-copy">
             <view class="profile-name">{{isLoggedIn ? (user.nickname || '职易达用户') : '登录职易达'}}</view>
             <view wx:if="{{isLoggedIn}}" class="profile-meta">{{user.phoneMasked || '已登录并同步本人数据'}}</view>
-            <!-- 未登录态原本没有任何说明行，用户只看到一个标题。补一句真实状态与登录后能得到什么。 -->
+            <!-- 未登录态原本没有任何说明行，用户只看到一个标题。
+                 补一句真实状态与登录后能得到什么，与登录按钮同属一个 wx:else 分支。 -->
             <view wx:else class="profile-meta">未登录 · 登录后同步本人简历、文档与打印订单</view>
-            <view wx:else class="profile-login tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
           </view>
           <view wx:if="{{isLoggedIn}}" class="profile-arrow tap" hover-class="tap-press" bindtap="tapEntry" data-id="settings" role="button" aria-label="打开账号设置">
             <text class="ficon i-right"></text>
           </view>
-          <view wx:else class="profile-arrow tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="登录职易达">
-            <text class="ficon i-right"></text>
-          </view>
         </view>
+
+        <!-- 未登录态原本把「微信一键登录」写成头像行里的第三行蓝字，
+             与姓名、说明堆成三行，右侧箭头因而失去对齐参照、显得孤立。
+             改为整行主按钮：登录是这张卡片唯一的主操作，应当有按钮的分量。 -->
+        <view wx:if="{{!isLoggedIn}}" class="profile-cta tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="微信一键登录，解锁完整服务">微信一键登录，解锁完整服务</view>
 
         <view class="benefit-strip tap" hover-class="tap-press" bindtap="tapEntry" data-id="membership" role="button" aria-label="查看我的实际权益记录">
           <view class="benefit-icon"><text class="ficon i-crown"></text></view>

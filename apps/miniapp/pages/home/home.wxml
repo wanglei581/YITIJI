@@ -2,12 +2,11 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="home-head">
+    <!-- 原为「方块 logo + 主标题 + 副标题」的 B 端 header 写法，
+         与下方「晚上好，同学」构成两个自我介绍区块叠在一起。
+         收敛成一行品牌字：C 端小程序顶部要克制，把注意力让给问候与主功能。 -->
     <view class="brand-row">
-      <view class="brand-mark"><text class="ficon i-aim"></text></view>
-      <view class="brand-copy">
-        <text class="brand-name">职易达</text>
-        <text class="brand-sub">求职、AI 与打印服务</text>
-      </view>
+      <text class="brand-name">职易达</text>
     </view>
     <view class="head-btn icon-action tap" hover-class="tap-press" bindtap="tapNotify" role="button" aria-label="查看消息通知">
       <text class="ficon i-bell" aria-hidden="true"></text>
@@ -21,11 +20,6 @@
         <text class="greet-sub">{{todayStr}} · 今天也向理想工作靠近一点</text>
       </view>
 
-      <view class="ask-bar tap" hover-class="tap-press" bindtap="tapService" data-url="/pages/assistant/assistant" role="button" aria-label="向小青提问">
-        <view class="ask-icon"><text class="ficon i-robot"></text></view>
-        <text class="ask-placeholder">问小青：简历、岗位、政策或打印</text>
-        <view class="ask-action">提问</view>
-      </view>
 
       <!-- 原为 320rpx 的落地页式 hero（大标题+描述+CTA+半身抠图）。
            那是营销页语言，占掉首屏三分之一却只承载一个入口。
@@ -36,7 +30,7 @@
         <image class="qing-face" src="/assets/xiaoqing-avatar.jpg" mode="aspectFill" aria-hidden="true" />
         <view class="qing-copy">
           <view class="qing-name">小青 · AI 职业助手</view>
-          <view class="qing-say">简历怎么改、政策怎么办，问我就行</view>
+          <view class="qing-say">问我：简历怎么改、岗位怎么选、政策怎么办</view>
         </view>
         <view class="qing-go"><text class="ficon i-right"></text></view>
       </view>

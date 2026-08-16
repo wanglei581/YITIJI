@@ -2,11 +2,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .home-page { height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); }
 .home-head { height: 94rpx; padding: 8rpx 32rpx 10rpx; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .brand-row { display: flex; align-items: center; gap: 16rpx; }
-.brand-mark { width: 64rpx; height: 64rpx; border-radius: 18rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(35,84,230,.22); }
-.brand-mark .ficon { width: 34rpx; height: 34rpx; }
-.brand-copy { display: flex; flex-direction: column; gap: 1rpx; }
-.brand-name { font-size: 32rpx; line-height: 1.2; font-weight: 800; letter-spacing: 1rpx; }
-.brand-sub { font-size: 22rpx; color: var(--muted); }
+.brand-name { font-size: 34rpx; line-height: 1.2; font-weight: 800; letter-spacing: 1rpx; color: var(--ink); }
 .head-btn { width: 88rpx; height: 88rpx; border-radius: 27rpx; border: 1rpx solid var(--line-soft); background: #fff; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
 .head-btn .ficon { width: 30rpx; height: 30rpx; }
 .home-scroll { flex: 1; min-height: 0; }
@@ -32,10 +28,13 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .section-head { height: 90rpx; padding: 28rpx 4rpx 14rpx; display: flex; align-items: center; justify-content: space-between; }
 .section-title { font-size: 31rpx; font-weight: 750; color: var(--ink); }
 .section-more { font-size: 24rpx; color: var(--teal); font-weight: 600; }
-.service-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; }
-.service-item { min-width: 0; padding: 20rpx 8rpx 18rpx; border-radius: 24rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.service-icon { position: relative; width: 84rpx; height: 84rpx; border-radius: 26rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.service-icon .ficon { position: relative; z-index: 1; width: 42rpx; height: 42rpx; }
+.service-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8rpx; padding: 4rpx 6rpx 0; }
+/* 去卡片化：原本每个图标外面还套一层白底描边卡片，形成「卡片里的图标」双层容器，
+   那是后台管理系统的写法。市面消费级小程序的金刚区是图标直接落在页面底色上、
+   靠间距分隔，图标本身就是视觉主体，因而可以做得更大。 */
+.service-item { min-width: 0; padding: 8rpx 0 0; background: transparent; border: none; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.service-icon { position: relative; width: 104rpx; height: 104rpx; border-radius: 30rpx; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.service-icon .ficon { position: relative; z-index: 1; width: 50rpx; height: 50rpx; }
 /* 彩色渐变实底 + 白色图标：消费级产品的金刚区语言。
    每个功能一个专属色相，图标反白后形态差异被放大，不再是"同一个灰图标染四种色"。
    底部投影用各自色相的低透明度，让色块"落"在纸面上而不是贴上去。 */
@@ -48,14 +47,24 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(160deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 52%);
 }
-.service-title { margin-top: 13rpx; font-size: 23rpx; line-height: 1.25; font-weight: 650; white-space: nowrap; }
-.print-banner { min-height: 126rpx; margin-top: 22rpx; padding: 22rpx; border-radius: 27rpx; border: 1rpx solid #dce9ff; background: #f3f8ff; display: flex; align-items: center; gap: 18rpx; }
-.print-icon { width: 78rpx; height: 78rpx; flex-shrink: 0; border-radius: 23rpx; background: var(--teal); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 10rpx 24rpx rgba(35,84,230,.20); }
-.print-icon .ficon { width: 38rpx; height: 38rpx; }
-.print-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.print-title { font-size: 27rpx; font-weight: 700; color: #17233e; }
-.print-desc { margin-top: 7rpx; font-size: 21rpx; color: #66758d; }
-.print-go { width: 44rpx; height: 44rpx; border-radius: 50%; color: var(--teal); background: #fff; display: flex; align-items: center; justify-content: center; }
+.service-title { margin-top: 16rpx; font-size: 23rpx; line-height: 1.25; font-weight: 650; white-space: nowrap; }
+/* 首屏视觉重心。商用 App 的首页都有一个明确的重心（京东快递的大促位、
+   Tracck 的数据卡），而不是一串等重的白卡片——后者正是「模板感」的根源。
+   这个产品真正的差异化是「手机准备 → 到机出纸」的双端联动，
+   所以把它做成深色渐变主卡，与周围白卡拉开量级。 */
+.print-banner { min-height: 168rpx; margin-top: 24rpx; padding: 30rpx 26rpx; border-radius: 32rpx; border: none;
+  background: linear-gradient(128deg, #2E5BEA 0%, #1A3FB8 62%, #16308C 100%);
+  box-shadow: 0 18rpx 40rpx -14rpx rgba(26,63,184,.55);
+  display: flex; align-items: center; gap: 20rpx; position: relative; overflow: hidden; }
+/* 右上角一枚淡光斑，避免大色块死板 */
+.print-banner::after { content:""; position:absolute; right:-60rpx; top:-70rpx; width:220rpx; height:220rpx; border-radius:50%;
+  background: radial-gradient(circle, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 70%); pointer-events:none; }
+.print-icon { width: 88rpx; height: 88rpx; flex-shrink: 0; border-radius: 26rpx; background: rgba(255,255,255,.18); color: #fff; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+.print-icon .ficon { width: 44rpx; height: 44rpx; }
+.print-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; z-index: 1; }
+.print-title { font-size: 31rpx; font-weight: 750; color: #fff; letter-spacing: -.3rpx; }
+.print-desc { margin-top: 9rpx; font-size: 22rpx; line-height: 1.45; color: rgba(255,255,255,.78); }
+.print-go { width: 52rpx; height: 52rpx; flex-shrink: 0; border-radius: 50%; color: #1A3FB8; background: #fff; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
 .print-go .ficon, .info-arrow .ficon { width: 20rpx; height: 20rpx; }
 .info-card { border: 1rpx solid var(--line-soft); border-radius: 26rpx; background: #fff; overflow: hidden; }
 .info-row { min-height: 118rpx; padding: 20rpx 22rpx; display: flex; align-items: center; gap: 18rpx; }
