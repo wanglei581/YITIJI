@@ -73,7 +73,12 @@ function request(path, options = {}) {
 
     return silentResignin().then(
       () => rawRequest(path, Object.assign({}, options, { _retried: true })),
-      () => { auth.logout(); throw err; },
+      (resignErr) => {
+        auth.logout();
+        // 补签自身若带业务码(如 MEMBER_LEGAL_VERSION_STALE),优先抛它:
+        // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
+        throw (resignErr && resignErr.code) ? resignErr : err;
+      },
     );
   });
 }
@@ -116,7 +121,14 @@ function rawRequest(path, options = {}) {
         } else if (statusCode === 401) {
           // 不在此处清会话:外层 request() 会先尝试静默补签,
           // 补签失败才清。否则一次可恢复的过期会把用户直接踢下线。
-          reject(makeError('登录已失效,请重新登录', 401));
+          //
+          // 保留服务端的 code 与文案,不再固定造一句「登录已失效」。
+          // 401 不都是同一回事:MEMBER_LEGAL_VERSION_STALE 要告诉用户
+          // 「服务条款已更新,请重新登录并确认」——丢掉响应体,这道
+          // 合规闸门的告知意图就永远到不了用户面前。
+          const e401 = extractError(body, statusCode);
+          if (!e401.code) e401.message = '登录已失效,请重新登录';
+          reject(e401);
         } else {
           reject(extractError(body, statusCode));
         }
