@@ -454,10 +454,17 @@
 }
 .tile-img .del .ic { width: 17px; height: 17px; }
 .tile-img .nm {
-  /* 2026-08-16：11px → --fz-1。文件名是用户确认"这张是不是我要的"的依据。 */
+  /* 2026-08-16：11px → --fz-1。文件名是用户确认"这张是不是我要的"的依据。
+     同日回归补正：单纯提字号会让 189px 的图块装不下 210px 的
+     「IMG_2044.JPG · 成绩单（偏暗）」，省略号恰好切掉后半截的用户说明——
+     而那正是用户用来认文件的部分，等于为了字号大反而更认不出来。
+     故改为两行钳制：字号保持 13px，宽度不够时向下换行而不是截断。 */
   position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 8px;
-  font-size: var(--fz-1); color: #eef3f1; background: rgba(6,10,10,.7);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: var(--fz-1); line-height: 1.35;
+  color: #eef3f1; background: rgba(6,10,10,.7);
+  white-space: normal; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 .tile-img--add {
   border-style: dashed; cursor: pointer; background: var(--surf-1);

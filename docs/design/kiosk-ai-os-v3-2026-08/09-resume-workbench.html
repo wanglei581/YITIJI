@@ -377,7 +377,14 @@
            会把所有 data-at 门控内容一起隐藏，整屏空白。
            拆页理由与「原来在哪→现在在哪」见 09b 页首注释。 -->
       <a class="rstep" href="09b-resume-optimize.html" style="text-decoration:none"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></a>
-      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></button>
+      <!-- 2026-08-16 回归补正：本页与 09b 都没有 data-stage="s5"，s5 从未实现过。
+           原来这里是 <button data-go="s5">，点下去会把所有 data-at 门控内容一起隐藏、
+           整屏空白——与上面 s4 被修掉的是同一个失败模式，当时漏了这一处。
+           按 CLAUDE.md §9「能力门禁 disabled 状态可解释」改为可聚焦的禁用步骤：
+           沿用本目录已有的 .rstep--skip + aria-disabled 写法（pay.css:135-140 有样式），
+           不用原生 disabled——那会让它掉出 tab 顺序、读屏跳过，用户读不到原因。 -->
+      <button type="button" class="rstep rstep--skip" aria-disabled="true"
+              title="本稿尚未实现「版本与导出」，先完成第 4 步逐条优化"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 5 步</span>
   </div>
