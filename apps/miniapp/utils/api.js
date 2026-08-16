@@ -1054,14 +1054,31 @@ const api = {
    *      换成别的 purpose 等于把合同按普通打印件留存。
    * formData 只能带 purpose：KioskUploadOptionsDto 只白名单了 purpose 一个字段，
    * 全局 forbidNonWhitelisted:true 会把 originalFilename 之类的多余字段直接 400。
+   *
+   * displayName 与 uploadPrintFile / uploadResumeFile 同理：wx.uploadFile 固定取
+   * filePath 的 basename 作为 multipart 文件名，直传临时路径会让服务端存下 tmp_xxx。
+   * 对合同尤其要紧——提取阶段的 resolveSupportedKind()
+   * （contract-review-extraction.service.ts:167）是拿 mimeType **和文件扩展名**
+   * 配对判定的，文件名丢了扩展名会直接 CONTRACT_UNSUPPORTED_FILE_TYPE。
+   *
+   * 注意 prepareNamedFile 会在 USER_DATA_PATH 留一份改名副本，合同属敏感个人信息，
+   * 因此 cleanup() 在成功与失败两条路径上都必须调用，不能只写 then。
+   *
+   * @param {string} filePath 本地临时路径
+   * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
    */
-  uploadContractFile(filePath) {
+  uploadContractFile(filePath, displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
-    return uploadFile('/files/kiosk-upload', filePath, {
-      name: 'file',
-      formData: { purpose: 'contract_upload' },
-      needAuth: true,
-    });
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose: 'contract_upload' },
+        needAuth: true,
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
   },
 
   /**
@@ -1153,6 +1170,98 @@ const api = {
   deleteContractReview(id) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
+
+  // ---------- 会员二次验证（step-up） ----------
+  // 契约来源（逐字段核对，勿凭字段名猜）：
+  //   services/api/src/member-auth/member-auth.controller.ts  POST member/auth/step-up/sms-code | verify
+  //   services/api/src/member-auth/dto/member-step-up.dto.ts  请求体白名单
+  //   services/api/src/member-auth/member-step-up.types.ts    action 白名单
+  //   services/api/src/member-auth/member-step-up.service.ts  返回结构与错误码
+  // 全局 ValidationPipe 开了 forbidNonWhitelisted，请求体多一个字段就 400 VALIDATION_FAILED，
+  // 因此下面两个方法只允许送 DTO 里存在的键。
+  //
+  // deviceId 一律不送：它在服务端只做两件事 —— 设备维度小时频控，以及审计里的
+  // deviceMatched 布尔。小程序没有终端号，编一个塞进去会污染审计；两侧都不送时
+  // deviceDigest 恒为 null，consumeGrant 比对 null === null 仍判定 matched。
+  // 同理不送 x-terminal-id（该头在服务端就是被当作 deviceId 用的）。
+
+  /**
+   * 为敏感动作发送二次验证短信，发到账号已绑定的手机号（前端无从选择号码）。
+   * @param {'export_data_request'|'export_data_download'|'close_account'|'phone_rebind'} action
+   * @returns {Promise<{challengeId:string, phoneMasked:string, expiresInSeconds:number, cooldownSeconds:number}>}
+   *   已知错误码：STEP_UP_SEND_TOO_FREQUENT / STEP_UP_RATE_LIMITED(429)、
+   *   ACCOUNT_UNAVAILABLE(403)、SMS_SEND_FAILED(502)。
+   */
+  sendMemberStepUpCode(action) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('二次验证'));
+    return request('/member/auth/step-up/sms-code', {
+      method: 'POST', data: { action }, needAuth: true,
+    });
+  },
+
+  /**
+   * 校验二次验证码，换一次性 stepUpToken。
+   * token 与 action 绑定、单次消费、有效期即 expiresInSeconds（服务端默认 300s）。
+   * @returns {Promise<{stepUpToken:string, action:string, expiresInSeconds:number}>}
+   *   已知错误码：STEP_UP_CHALLENGE_INVALID / STEP_UP_CODE_INVALID(401)、ACCOUNT_UNAVAILABLE(403)。
+   */
+  verifyMemberStepUp(challengeId, code) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('二次验证'));
+    return request('/member/auth/step-up/verify', {
+      method: 'POST', data: { challengeId, code }, needAuth: true,
+    });
+  },
+
+  // ---------- 会员数据权利请求 ----------
+  // 契约来源：services/api/src/member-privacy/member-privacy.controller.ts
+  //           services/api/src/member-privacy/member-data-request.service.ts
+  //           services/api/src/member-privacy/member-privacy.types.ts
+
+  /**
+   * 我的数据权利请求列表（倒序）。
+   * @returns {Promise<{items:Array, nextCursor:string|null, capabilities:{accountClosureAvailable:boolean}}>}
+   *   item: { id, requestType, status, requestedAt, handledAt, executionStep,
+   *           exportExpiresAt, failureCode, canRetry, canDownload }
+   *   status ∈ pending|handling|ready|completed|expired|failed|rejected|cancelled
+   *   ⚠️ capabilities.accountClosureAvailable 是服务端对「账号注销是否开放」的唯一真话，
+   *      当前实现恒为 false（create 对 requestType='delete' 固定抛 ACCOUNT_CLOSURE_NOT_AVAILABLE）。
+   */
+  listMemberDataRequests() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
+    return request('/me/data-requests', { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 创建数据权利请求。
+   * @param {'export'|'delete'|'revoke_consent'} requestType
+   * @param {{idempotencyKey:string, stepUpToken?:string}} opts
+   *   idempotencyKey 必填且必须是 UUID 形态，服务端正则 [1-8] 版本位 + [89ab] variant 位，
+   *   全局唯一：重试必须复用同一个 key，换 key 会被当成新请求。
+   *   stepUpToken 仅 export 需要（action=export_data_request），走 header 而非 body。
+   */
+  createMemberDataRequest(requestType, opts = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
+    const header = { 'idempotency-key': opts.idempotencyKey };
+    if (opts.stepUpToken) header['x-member-step-up-token'] = opts.stepUpToken;
+    return request('/me/data-requests', {
+      method: 'POST', data: { requestType }, header, needAuth: true,
+    });
+  },
+
+  /**
+   * 为已 ready 的导出请求换一次性下载授权。
+   * 需要 action=export_data_download 的 stepUpToken（与创建时那张不是同一张）。
+   * @returns {Promise<{requestId:string, downloadUrl:string, expiresAt:string}>}
+   *   downloadUrl 是一个网页地址，ticket 放在 URL fragment 里，见 pages/privacy/export-file.js。
+   *   已知错误码：DATA_EXPORT_DOWNLOAD_UNAVAILABLE(404)、
+   *   DATA_EXPORT_DOWNLOAD_CONFIG_UNAVAILABLE / DATA_EXPORT_DOWNLOAD_SERVICE_UNAVAILABLE(503)。
+   */
+  authorizeMemberDataExportDownload(requestId, stepUpToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据导出下载'));
+    return request(`/me/data-requests/${encodeURIComponent(requestId)}/download-authorizations`, {
+      method: 'POST', data: {}, header: { 'x-member-step-up-token': stepUpToken }, needAuth: true,
+    });
   },
 };
 
