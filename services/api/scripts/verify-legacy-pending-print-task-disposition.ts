@@ -293,18 +293,37 @@ async function main(): Promise<void> {
     const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
     const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
     const terminals = (() => { const _ag = new TerminalAgentService(prisma, null as never); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, null as never)) })()
-    const terminalAck = await terminals.patchTaskStatus(
-      unpaidTaskId,
-      { status: 'printing' },
-      `Bearer ${terminalToken}`,
-      terminalId
+    // 48ac2cd62（fix: close terminal dead-letter operations）之后，终态任务不再对
+    // 任意回传一律 ack：同终态才幂等 ack，不同终态 409，回退到非终态（cancelled→printing）
+    // 400 INVALID_STATUS_TRANSITION。该契约由 verify:terminal-status-idempotency
+    //（已在 CI）逐条钉住，本夹具原先断言的 ack 是它之前的旧行为。
+    // 这里守的不变量没变、而且钉得更死：请求被拒 + 行仍是 cancelled + 不追加状态日志。
+    const logsBeforeTerminalReport = await prisma.printTaskStatusLog.count({
+      where: { taskId: unpaidTaskId },
+    })
+    await expectReject(
+      'Agent 状态回传不能把 cancelled 终态退回 printing',
+      () =>
+        terminals.patchTaskStatus(
+          unpaidTaskId,
+          { status: 'printing' },
+          `Bearer ${terminalToken}`,
+          terminalId
+        ),
+      'INVALID_STATUS_TRANSITION'
     )
     const terminalProtected = await prisma.printTask.findUnique({ where: { id: unpaidTaskId } })
-    if (terminalAck.acknowledged && terminalProtected?.status === 'cancelled') {
-      pass('Agent 状态回传不能重写 cancelled 终态')
+    const logsAfterTerminalReport = await prisma.printTaskStatusLog.count({
+      where: { taskId: unpaidTaskId },
+    })
+    if (
+      terminalProtected?.status === 'cancelled' &&
+      logsAfterTerminalReport === logsBeforeTerminalReport
+    ) {
+      pass('被拒的回传不写库：cancelled 终态与状态日志都没被改动')
     } else
       fail(
-        `cancelled terminal-state protection mismatch: ${JSON.stringify({ terminalAck, terminalProtected })}`
+        `cancelled terminal-state protection mismatch: ${JSON.stringify({ terminalProtected, logsBeforeTerminalReport, logsAfterTerminalReport })}`
       )
 
     await expectReject(
