@@ -966,6 +966,42 @@ AI 百宝箱页有内容（此前观察到的「内容区空白」经真机确�
 **仍未验证**：合同审查 7 处契约修复、收藏/浏览记录接服务端、「我的」页改版、
 401 静默补签（需等 token 自然过期 30 分钟才能测）、账号注销与数据导出（开发中）。
 
+### 🔴 合同审查：前端已就绪，但功能不可用（AI 未启用）
+
+**真机验证结论**：小程序侧 7 处契约不符、状态栏遗漏、文件选择入口均已修复并验证渲染正常，
+但提交分析必然失败——**服务端根本没有调用大模型**。
+
+根因（`services/api/.env.example:79-86`）：
+
+```
+# CONTRACT_REVIEW_API_KEY 同时存在时才注册 BullMQ processor；
+# 配置不完整或身份不在下列精确白名单时 fail-closed，不回退 mock。
+CONTRACT_REVIEW_PROVIDER=
+CONTRACT_REVIEW_BASE_URL=
+CONTRACT_REVIEW_MODEL=
+CONTRACT_REVIEW_API_KEY=
+```
+
+四项在 `services/api/.env` 中**一个都未配置** → analyze processor 未注册 → 任务进队列无人处理 → failed。
+
+**这是刻意的 fail-closed 设计，不是缺陷**：配置不全时不回退 mock。合同审查若用假数据出报告，
+比直接失败危险得多。`docs/compliance/contract-review-release-gate.md` 为
+`production_default: false` + `fail_closed: true`，法务/合规/安全三方已于 2026-08-04 签字，但默认不开。
+
+**启用需要**（涉及真实 API 费用，需产品决策）：在 `services/api/.env` 配齐四项后重启 API 服务。
+另有 `CONTRACT_REVIEW_REPORT_PRINT_ENABLED=false`（报告打印独立开关，注释要求
+「生产依赖与 Windows 真机验收完成前保持 false」）。
+
+**在配齐之前，该功能不得对外描述为可用。**
+
+> **流程教训**：本轮先修了一整天前端，才发现后端服务未启用。
+> 该信息一直在仓库里——`CLAUDE.md` §15 就写着「Gate 0 发布门禁维持 blocked……
+> 需三方签字后才能开放真实 AI 调用」。
+> **正确顺序是先确认后端可运行，再投入前端修复。**
+> 这也暴露了静态验证的又一盲区：编译通过、契约正确、页面渲染正常，
+> 但服务未启用——任何静态检查都碰不到这一层。后续接入任何 AI 能力前，
+> 应先核对对应的 provider/api-key 配置与发布门禁状态。
+
 ### 🔴 跨线风险（不属本分支，需转达对应负责人）
 
 **主仓当前分支的打印上传缺少 PII 隐私扫描闸门，且是「已提交地缺失」。**
