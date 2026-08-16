@@ -35,6 +35,25 @@ export interface ContractPartyFacts {
 export interface ContractMaskResult {
   readonly pages: readonly ContractMaskPage[]
   readonly partyFacts: ContractPartyFacts
+  /**
+   * 占位符 → 被它替换掉的原文串（首次出现的那一份）。
+   *
+   * **只有显式传 collectRestoreMap: true 时才存在**，默认不返回。
+   * 合同审查链路刻意不取它 —— contract-review-pii-masker.test.ts 断言
+   * 遮盖结果的键集恒为 ['pages','partyFacts'] 且序列化后不含原文，
+   * 那条断言的用意就是「遮盖产物不得夹带 PII」，不能为了本功能放宽。
+   *
+   * ⚠️ 合规红线：本 Map 的 value 就是**未脱敏的 PII 原文**。
+   *   - 禁止落日志、禁止落库、禁止随响应出接口、禁止送模型；
+   *   - 只允许在同一次请求的内存里，用于把模型回包中的占位符还原成原值
+   *     （见 common/pii/llm-input-mask.ts 的 maskUserTextForLlmReversible）。
+   *
+   * 为什么需要它：简历优化 / 排版调整的产物是**用户要打印的那份简历**，
+   * 里面的姓名 / 手机 / 邮箱必须是真值。只遮盖不还原，等于把
+   * `[手机号_1]` 印到用户简历上 —— 那是拿功能损坏换合规，不可接受。
+   * 占位符按 `[类别_序号]` 全局去重编号，因此还原是无歧义的 1:1 映射。
+   */
+  readonly restoreMap?: ReadonlyMap<string, string>
 }
 
 type MaskCategory = '劳动者' | '用人单位' | '身份证' | '手机号' | '银行卡' | '邮箱' | '详细地址' | '统一社会信用代码'
@@ -126,6 +145,15 @@ export interface MaskOptions {
    * 关掉后调用方**必须自己承担**残留判定，见 common/pii/llm-input-mask.ts。
    */
   readonly assertComplete?: boolean
+
+  /**
+   * 是否在结果里带回 restoreMap（占位符 → 原文串），默认 false。
+   *
+   * 默认关闭是刻意的：restoreMap 的 value 是未脱敏 PII，
+   * 合同链路不需要还原，也不应该拿到它。只有「产物要还给本人、
+   * 必须把占位符换回真值」的简历链才显式开启。
+   */
+  readonly collectRestoreMap?: boolean
 }
 
 export function maskContractPages(pages: readonly ContractMaskPage[], options?: MaskOptions): ContractMaskResult {
@@ -164,11 +192,17 @@ export function maskContractPages(pages: readonly ContractMaskPage[], options?: 
     projectedOutputSize = nextOutputSize
     return { page, replacements, projectedLength }
   })
+  // 占位符 → 原文串。仅在内存内用于还原（见 ContractMaskResult.restoreMap 的红线注释）。
+  const restoreMap = new Map<string, string>()
   const maskedPages = pagePlans.map(({ page, replacements, projectedLength }) => {
     const chunks: string[] = []
     let cursor = 0
     for (const replacement of replacements) {
       chunks.push(page.text.slice(cursor, replacement.start), replacement.placeholder)
+      // 同一占位符可能命中多处（不同书写形式归一到同一 key）；只记首次出现的原文串。
+      if (!restoreMap.has(replacement.placeholder)) {
+        restoreMap.set(replacement.placeholder, page.text.slice(replacement.start, replacement.end))
+      }
       cursor = replacement.end
     }
     chunks.push(page.text.slice(cursor))
@@ -177,7 +211,10 @@ export function maskContractPages(pages: readonly ContractMaskPage[], options?: 
     return Object.freeze({ pageNumber: page.pageNumber, text })
   })
   if (options?.assertComplete !== false) assertNoHighConfidencePii(maskedPages)
-  return Object.freeze({ pages: Object.freeze(maskedPages), partyFacts })
+  // 默认不带 restoreMap：键集保持 ['pages','partyFacts']，合同链路行为逐字不变。
+  return options?.collectRestoreMap === true
+    ? Object.freeze({ pages: Object.freeze(maskedPages), partyFacts, restoreMap })
+    : Object.freeze({ pages: Object.freeze(maskedPages), partyFacts })
 }
 
 export function maskContractText(text: string): { readonly text: string; readonly partyFacts: ContractPartyFacts } { const output = maskContractPages([{ pageNumber: 1, text }]); return Object.freeze({ text: output.pages[0]!.text, partyFacts: output.partyFacts }) }

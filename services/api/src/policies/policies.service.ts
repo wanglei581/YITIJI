@@ -31,6 +31,8 @@ export interface PolicyPostDto {
   audience?: string
   category?: string
   externalUrl?: string
+  /** 来源方原始编号(CLAUDE.md §10 外部ID);来源未提供为 null,不得伪造 */
+  externalId: string | null
   publishedDate?: string
   sourceOrgId: string
   sourceName: string
@@ -50,6 +52,7 @@ interface PrismaPolicyRow {
   audience: string | null
   category: string | null
   externalUrl: string | null
+  externalId: string | null
   publishedDate: Date | null
   sourceOrgId: string
   sourceName: string
@@ -70,6 +73,7 @@ function mapPolicy(p: PrismaPolicyRow): PolicyPostDto {
     audience: p.audience ?? undefined,
     category: p.category ?? undefined,
     externalUrl: p.externalUrl ?? undefined,
+    externalId: p.externalId ?? null,
     publishedDate: p.publishedDate ? p.publishedDate.toISOString().slice(0, 10) : undefined,
     sourceOrgId: p.sourceOrgId,
     sourceName: p.sourceName,
@@ -147,6 +151,7 @@ export class PoliciesService {
         audience: dto.audience ?? null,
         category: dto.category ?? null,
         externalUrl: dto.externalUrl ?? null,
+        externalId: dto.externalId ?? null,
         publishedDate: dto.publishedDate ? new Date(dto.publishedDate) : null,
       },
     })
@@ -182,6 +187,7 @@ export class PoliciesService {
         ...(dto.audience !== undefined ? { audience: dto.audience } : {}),
         ...(dto.category !== undefined ? { category: dto.category } : {}),
         ...(dto.externalUrl !== undefined ? { externalUrl: dto.externalUrl } : {}),
+        ...(dto.externalId !== undefined ? { externalId: dto.externalId } : {}),
         ...(dto.publishedDate !== undefined ? { publishedDate: new Date(dto.publishedDate) } : {}),
         // 状态机:内容修订 → 强制重审(与岗位/招聘会一致)
         reviewStatus: 'pending',

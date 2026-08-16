@@ -5,7 +5,7 @@
 // 调用 POST /api/v1/print/jobs/claim-pickup → 任务状态从 pending → claimed，
 // 然后跳到打印进度页（/print/progress）。
 //
-// 取件码规格：10位，字符集 23456789ABCDEFGHJKMNPQRSTUVWXYZ（32个无歧义字符）。
+// 取件码规格：10 位，字符集 23456789ABCDEFGHJKMNPQRSTUVWXYZ（31 个字符，排除易混的 0 1 I L O）。
 // 认领接口无需登录态（Kiosk = 可控设备层），后端 Throttle 20次/min/IP 防滥用。
 // ============================================================
 
@@ -19,7 +19,9 @@ import { getTerminalId } from '../../services/api/screensaver'
 import './styles/print-pickup-claim.css'
 
 // ── 取件码工具 ────────────────────────────────────────────────
-// 合法字符：32个无歧义字符（去掉 0,1,I,O）
+// 合法字符：31 个无歧义字符（去掉 0 1 I L O）。
+// 这个字符串是权威定义，kiosk / miniapp / admin 三端必须逐字符一致，
+// 否则小程序出的码在一体机上校验不过。改注释可以，改字面量必须三端同改。
 const VALID_CHAR = /[^23456789ABCDEFGHJKMNPQRSTUVWXYZ]/g
 const CODE_LEN = 10
 const VALID_CODE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/

@@ -283,12 +283,11 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </div>
         <div class="aiuse aiuse--4">
           <a class="aibtn" href="17-fair-desk.html?stage=s1">看场次<em>时间、地点、企业名录</em></a>
-          <!-- 2026-08-11 复核（Codex (b)-11 / #501）：?view=checkin 至今不被 17-fair-desk 消费
-               （该页全文 0 处 URLSearchParams）。已核实签到入口**确实在** s1 这一屏内
-               （17-fair-desk.html:533 .checkin「已经在现场？先签到再逛」），所以落点没错，
-               只是不会自动定位过去。参数按接线契约保留，副文如实写「入口在场次页内」，
-               不写"直接进签到"。 -->
-          <a class="aibtn" href="17-fair-desk.html?stage=s1&amp;view=checkin">扫码签到<em>签到入口在场次页内 · 到场扫主办方的码</em></a>
+          <!-- 2026-08-11 复核（Codex (b)-11 / #501）：?view=checkin 不被 17-fair-desk 消费，
+               当时只能落到 s1 那一屏，靠用户自己在页内找到签到块。
+               2026-08-16 缺口 G-04 整改：签到已独立成页 17b-fair-checkin.html，
+               直链过去 —— 不再绕 17，也不再送一个没人读的参数。 -->
+          <a class="aibtn" href="17b-fair-checkin.html">扫码签到<em>到场扫主办方的码 · 签到在对方那边完成</em></a>
           <!-- 2026-08-10 Codex 错配整改：原指 17-fair-desk.html?stage=s3&view=booth-map。
                17 不消费 view 参数，s3 是「排今天走哪几家的顺序」，根本没有展位图；
                真正的场馆平面图在 P45 的 map 阶段（此前全站零入口）。改指 45。 -->
@@ -328,18 +327,17 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         </a>
 
         <!-- 3 扫码签到（非 AI）
-             2026-08-11 复核（Codex (b)-11 / #506）：同 #501。落点 17-fair-desk s1「哪一场」
-             这一屏内就有入场签到块（17-fair-desk.html:533），所以这条不是"送错门"；
-             ?view=checkin 目前不被消费，进去不会自动滚到签到，副文按这个事实写。
+             2026-08-11 复核（Codex (b)-11 / #506）：同 #501，当时只能落到 17 的 s1 屏。
+             2026-08-16 缺口 G-04 整改：签到独立成页（17b），这里直链过去。
              不新增 .dcard-hint 行：这张卡与 c-campus 同一栅格行，多一行会顶高整行。 -->
-        <a class="dcard" id="c-checkin" href="17-fair-desk.html?stage=s1&amp;view=checkin">
+        <a class="dcard" id="c-checkin" href="17b-fair-checkin.html">
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
           <span class="dcard-nm">扫码签到</span>
-          <span class="dcard-ds">签到二维码在招聘会台的场次页内出示</span>
-          <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-ds">出示主办方的码，签到在来源平台完成</span>
+          <span class="dcard-go">去签到页<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
         <!-- ══ AI 接线契约 · P36-A「参会规划：排出去哪几场、几点到、先逛哪几个展位」══

@@ -505,6 +505,13 @@ model PolicyPost {
   category String?
   /** 官方入口链接(扫码/跳转,info-only) */
   externalUrl String?
+  /**
+   * 来源方原始编号(如发文字号)。P21 补齐:CLAUDE.md §10 要求外部来源数据
+   * 展示「外部ID」,PolicyPost 此前缺该字段,条件核对结果无法给出与
+   * Job/JobFair 同口径的来源标识。可空 —— 存量行与未提供编号的来源为 null,
+   * 消费方按 null 展示「来源未提供编号」,不得伪造。
+   */
+  externalId String?
   /** 对外展示的发布日期(机构提供) */
   publishedDate DateTime?
 
@@ -514,6 +521,9 @@ model PolicyPost {
   reviewedAt    DateTime?
   rejectReason  String?
 
+  /** P21:结构化申领条件(条件核对的唯一依据来源) */
+  eligibilityRules PolicyEligibilityRule[]
+
   syncTime  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -522,6 +532,50 @@ model PolicyPost {
   @@index([kind])
   @@index([reviewStatus, publishStatus])
   @@index([publishedDate])
+}
+
+// ── PolicyEligibilityRule ─────────────────────────────────────────────────────
+// P21 政策条件核对(S3-2)。
+//
+// 为什么必须建表:改动前政策的「申领条件」只存在于 PolicyPost.content 富文本里,
+// 机器读不出来。没有结构化表达就只剩两条路 —— 要么让模型去猜条件、要么不做核对。
+// 前者违反 CLAUDE.md §9「不伪造能力」,所以选择把条件显式录进库。
+//
+// 硬约束(由 policy-eligibility.engine.ts 保证,verify:policy-eligibility 守门):
+//   1. sourceText 是政策原文摘录,一字不改,是每条判定唯一可追溯的依据;
+//      库里没有对应条款 → 结论只能是 unknown,不得由模型补一个 true/false。
+//   2. clauses 里只能出现问项字典中已登记的取值;「不确定」不得写进任何一侧。
+//   3. 判定是确定性比对,不调 LLM —— 因此证据分级是 E2(来源方事实),不是 E3。
+//
+// clauses 结构(JSON 文本,SQLite/PG 同构,本 schema 全库不用 Json 类型):
+//   [{ "questionKey": "...", "satisfiedValues": ["..."], "conflictValues": ["..."] }]
+// 两侧都没命中的取值一律判 unknown,绝不默认成「不符合」。
+
+model PolicyEligibilityRule {
+  id String @id @default(cuid())
+
+  policyPostId String
+  policy       PolicyPost @relation(fields: [policyPostId], references: [id], onDelete: Cascade)
+
+  /** 展示与核对顺序 */
+  orderIndex Int @default(0)
+
+  /** 条件标题(展示用概括,不作为判定依据) */
+  label String
+
+  /** 政策原文摘录 —— 判定依据,一字不改 */
+  sourceText String
+
+  /** 多子句合取方式:'all'(全部满足)| 'any'(任一满足) */
+  matchMode String @default("all")
+
+  /** 子句数组的 JSON 文本,见上方结构说明 */
+  clauses String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([policyPostId, orderIndex])
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -2579,4 +2633,102 @@ model ScreensaverContent {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ── S3-3 · P26 顾问作业面（/ai/plan）────────────────────────────────────────
+//
+// 设计真值：docs/design/kiosk-ai-os-v3-2026-08/26-advisor-work.html
+// 矩阵条目：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md §S3-3（风险 R6）
+//
+// 三种作业型由服务端按用户诉求判型（qa 问答 / slot_fill 填槽 / compare 比对），
+// 判错时用户可一键改型，**已填输入槽不丢**（slotsJson 与作业型解耦，按 slotKey 存）。
+//
+// ⚠️ 隐私口径（设计页「对话保存口径」硬约束，落到表结构上）：
+// **问答对话不落库**。本组表只保存三样东西：
+//   1. 输入槽（用户自己填的、他自己知道要留在这台机器上的内容）
+//   2. 用户**主动钉住**的条目（AdvisorPin）
+//   3. 已生成的产物（AdvisorArtifact）
+// QA 的多轮上下文只在服务进程内存里按 TTL 保留，重启即失，不写任何表。
+// 因此不要为了「方便排查」再加一张 AdvisorTurn —— 那会直接违反页面对用户的承诺。
+//
+// ⚠️ 留存口径：上面这三样保存的都是**用户本人写的原话**（topic / slotsJson /
+// AdvisorPin.content / AdvisorArtifact.payloadJson），一律未脱敏。因此 expiresAt
+// 不是「读取时过滤」的软标记，而是必须被物理执行的删除期限 ——
+// 由 AdvisorRetentionTask（每小时 cron）硬删过期会话（级联 pins/artifacts）与过期产物。
+// 期限口径同步在 docs/compliance/member-personal-data-retention.md。
+// 新增本组任何一张带 expiresAt 的表时，必须同时接上清理，否则
+// verify:ai-user-text-retention 会红。
+
+model AdvisorSession {
+  id              String   @id @default(cuid())
+  // 归属二选一（对齐 MockInterviewSession / AiResumeResult 口径）：
+  // 会员行挂 endUserId；匿名一体机行只存 accessToken 的 SHA-256，明文只回传一次。
+  endUserId       String?
+  accessTokenHash String?
+  /** 作业型：qa | slot_fill | compare */
+  skill           String
+  /** collecting（还在补输入）| ready（必填槽齐了）| completed（已出产物）| abandoned */
+  status          String   @default("collecting")
+  /**
+   * 用户原始诉求，用于判型与后续继续作业。
+   *
+   * ⚠️ 落库的是**未脱敏的原文**（advisor.service.ts: `topic.trim().slice(0, 600)`）。
+   * 脱敏只发生在送模型那一步（llm-advisor.service.ts 的 maskUserTextForLlmText），
+   * 是另一份临时字符串，不回写本字段。用户在页面上要看到自己写的原话，所以这里
+   * 刻意不存占位符版本。防线是：短 TTL + 到期物理删除（AdvisorRetentionTask）
+   * + 归属门禁（loadOwned）+ 不进日志 / 不进审计 payload。
+   */
+  topic           String
+  /** 判型理由，页面顶部「你说的是…所以按 X 型办」照此展示 */
+  skillReason     String?
+  /** 判型来源：llm（模型判的）| fallback（模型不可用，关键词兜底）| user_override（用户改的） */
+  skillSource     String   @default("llm")
+  /** 输入槽：{ [slotKey]: { value, filledAt } }。换型时整体保留，不按作业型裁剪 */
+  slotsJson       String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime
+
+  pins      AdvisorPin[]
+  artifacts AdvisorArtifact[]
+
+  @@index([endUserId, createdAt])
+  @@index([expiresAt])
+}
+
+/** 用户主动钉住的条目。这是问答型唯一会跨请求留下的东西，也是它能打成纸的依据。 */
+model AdvisorPin {
+  id            String   @id @default(cuid())
+  sessionId     String
+  session       AdvisorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  idx           Int
+  content       String
+  /** 证据分级：E1 本人材料与本人说过的话 / E2 本机读到的来源事实 / E3 AI 判断，仅供参考 */
+  evidenceLevel String
+  /** 出处说明（打印时随条目带上，让用户自己分辨哪条更可信） */
+  sourceNote    String?
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId, idx])
+}
+
+/** 真实产物：可查（GET）、可打印（→ PDF → FileObject → 打印订单）、可保存（我的文档）。 */
+model AdvisorArtifact {
+  id          String   @id @default(cuid())
+  sessionId   String
+  session     AdvisorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  /** qa_pins（钉住条目单）| slot_draft（填槽成稿）| compare_report（逐条比对表） */
+  kind        String
+  status      String   @default("completed")
+  payloadJson String
+  /** provider 标签：llm:<vendor>:<model>，用于前端区分真实模型与非模型产物（风险 R1 同源口径） */
+  provider    String
+  /** 打印/存档生成的 PDF FileObject id（首次打印后回填；产物本身不依赖它存在） */
+  fileId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expiresAt   DateTime
+
+  @@index([sessionId, createdAt])
+  @@index([expiresAt])
 }
