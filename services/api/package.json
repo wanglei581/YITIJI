@@ -51,6 +51,7 @@
     "verify:benefit-activities": "node -r @swc-node/register scripts/verify-benefit-activities.ts",
     "verify:benefit-redemption": "node -r @swc-node/register scripts/verify-benefit-redemption.ts",
     "verify:feedback-notifications": "node -r @swc-node/register scripts/verify-feedback-notifications.ts",
+    "verify:kiosk-anonymous-feedback": "node -r @swc-node/register scripts/verify-kiosk-anonymous-feedback.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:miniapp-cloud-print-m2": "node -r @swc-node/register scripts/verify-miniapp-cloud-print-m2.ts",
     "verify:isolated-verification-database": "node -r @swc-node/register scripts/verify-isolated-verification-database.ts",
