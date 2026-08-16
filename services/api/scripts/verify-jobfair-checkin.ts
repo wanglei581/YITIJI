@@ -8,11 +8,31 @@
  * - Activity 只记录 external_checkin_open 这个打开动作，snapshot sourceUrl 使用 checkinUrl。
  * - 禁止出现签到结果、入场状态、报名闭环字段。
  */
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const ROOT = join(__dirname, '..')
 const REPO_ROOT = join(ROOT, '..', '..')
+
+/**
+ * #318（refactor(n1): JobsService 2498→219 行 facade + 4 子服务拆分）之后，
+ * 招聘会来源字段的映射 / 写入 / 状态机分散在 src/jobs 下的多个文件里，
+ * 原来钉死 jobs.service.ts 的断言全部落空。改为对整棵 src/jobs 取证：
+ * 谁承担实现由拆分方案决定，但这些能力必须在这棵树里存在，且禁词扫描覆盖每一个文件。
+ */
+const JOBS_DIR = join(ROOT, 'src', 'jobs')
+
+function jobsTreeFiles(dir: string = JOBS_DIR, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) jobsTreeFiles(full, out)
+    else if (entry.name.endsWith('.ts')) out.push(full)
+  }
+  return out
+}
+
+const JOBS_TREE = jobsTreeFiles()
+const JOBS_TREE_SOURCE = JOBS_TREE.map((path) => readFileSync(path, 'utf8')).join('\n')
 
 let failed = 0
 function pass(message: string) { console.log(`  PASS ${message}`) }
@@ -59,18 +79,19 @@ mustContain(
   'Partner 编辑 DTO 允许可选 checkinUrl',
 )
 
-mustContain(
-  'src/jobs/jobs.service.ts',
-  [
+{
+  const markers = [
     'checkinUrl: string | null',
     'checkinUrl: f.checkinUrl ?? undefined',
     'normalizeOptionalHttpUrl',
     'checkinUrl: normalizeOptionalHttpUrl',
     'reviewStatus: \'pending\'',
     'publishStatus: \'draft\'',
-  ],
-  'JobsService 映射、写入 checkinUrl，并复用重新审核状态机',
-)
+  ]
+  const missing = markers.filter((marker) => !JOBS_TREE_SOURCE.includes(marker))
+  if (missing.length > 0) fail(`src/jobs 映射、写入 checkinUrl，并复用重新审核状态机: 缺少 ${missing.join(' | ')}`)
+  else pass('src/jobs 映射、写入 checkinUrl，并复用重新审核状态机')
+}
 
 mustContain(
   'src/activity/activity.types.ts',
@@ -133,12 +154,14 @@ const bannedStatusPatterns = [
   /\bcheckin(Status|Result|Code|Token|Users?)\b/,
   /签到成功|确认签到|平台内签到|入场成功|报名成功|报名状态|入场状态/,
 ]
-for (const rel of [
-  'src/jobs/jobs.service.ts',
-  'src/activity/activity.service.ts',
-  'src/activity/activity.types.ts',
+// 禁词扫描覆盖整棵 src/jobs（拆分后每个子服务都要守），外加 activity 两个文件。
+for (const abs of [
+  ...JOBS_TREE,
+  join(ROOT, 'src/activity/activity.service.ts'),
+  join(ROOT, 'src/activity/activity.types.ts'),
 ]) {
-  mustNotContain(rel, bannedStatusPatterns, `后端不建模签到结果 ${rel}`)
+  const rel = abs.slice(ROOT.length + 1)
+  mustNotContain(abs, bannedStatusPatterns, `后端不建模签到结果 ${rel}`)
 }
 
 if (failed > 0) {

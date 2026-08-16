@@ -98,8 +98,24 @@ async function verifyRuntimeShape() {
     activeProviderName: 'unit-asr',
     recognizeWav: async () => ({ ok: true, text: '真实转写文本' }),
   }
-  const controller = new AiController({} as never, {} as never, {} as never, {} as never, {} as never, fakeAsr as never)
+  // 按位置塞依赖会随 AiController 构造参数增删而静默错位（925af10e7 / 2c58ef6e0
+  // 两次加参后 fakeAsr 就落到了 prisma 的位置，门禁只会报 recognizeWav of undefined）。
+  // 改为按 arity 填桩、按属性名注入，构造参数怎么变都不影响本断言。
+  const controller = new AiController(
+    ...(Array.from({ length: AiController.length }, () => ({})) as never[]),
+  )
+  ;(controller as unknown as { asr: unknown }).asr = fakeAsr
+  // 转写路径已接 AI 服务记录（A-6 成本可见性），logService 必须给桩，
+  // 同时把断言 5 的「日志只记录元数据」从字符串匹配升级为对真实入参取证。
+  const recordedLogs: unknown[] = []
+  ;(controller as unknown as { logService: unknown }).logService = {
+    record: (entry: unknown) => { recordedLogs.push(entry) },
+  }
   const ok = await controller.transcribeResumeVoice({ buffer: wav } as Express.Multer.File)
+  if (recordedLogs.length !== 1) fail('6d. 转写成功必须且只写一条 AI 服务记录')
+  const recordedJson = JSON.stringify(recordedLogs[0])
+  if (recordedJson.includes('真实转写文本')) fail('6e. AI 服务记录不得包含转写正文')
+  if (!recordedJson.includes('voiceTranscribe')) fail('6e. AI 服务记录未标注 voiceTranscribe 操作')
   if (ok.text !== '真实转写文本' || ok.providerName !== 'unit-asr') {
     fail('6a. transcribeResumeVoice 成功路径未返回裸 text/providerName DTO')
   }
