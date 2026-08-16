@@ -90,7 +90,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = '上传文件过大，请缩小后重试'
     }
 
-    this.log(exception, request, status, code)
+    // 记日志绝不能反过来把错误响应打掉：过滤器自己抛异常会落到 Nest 默认处理，
+    // 客户端拿到的就不再是本仓的统一错误体了。宁可这一条日志丢掉。
+    try {
+      this.log(exception, request, status, code)
+    } catch {
+      /* 日志失败不影响响应 */
+    }
 
     const errorBody: ErrorResponseBody = {
       success: false,
