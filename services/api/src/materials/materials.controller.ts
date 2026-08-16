@@ -9,11 +9,14 @@ import { CreateMaterialTaskDto } from './dto/create-material-task.dto'
 import { DecidePiiFindingsDto } from './dto/decide-pii-findings.dto'
 import { MaterialsService } from './materials.service'
 import type { DocumentProcessTaskView, MaterialsRequester } from './materials.types'
+import { PrintParamSuggestionService } from './print-param-suggestion.service'
+import type { PrintParamSuggestionView } from './print-param-suggestion.types'
 
 @Controller('materials')
 export class MaterialsController {
   constructor(
     private readonly materials: MaterialsService,
+    private readonly printParamSuggestions: PrintParamSuggestionService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
@@ -36,6 +39,22 @@ export class MaterialsController {
   ): Promise<ApiResponse<DocumentProcessTaskView>> {
     const requester = await this.resolveRequester(req)
     return ApiResponse.ok(await this.materials.getTask(id, requester))
+  }
+
+  /**
+   * S3-1：按文件体检结果给出打印参数预填建议（份数 / 黑白彩色 / 单双面 / 每页张数）。
+   *
+   * 只读、只建议。服务端不会用返回值建单或报价，用户不确认就没有任何参数生效。
+   * 预填不可用时返回 200 + available:false + 明确原因，**不阻断打印流程**。
+   */
+  @Get('tasks/:id/print-param-suggestions')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  async getPrintParamSuggestions(
+    @Param('id') id: string,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<PrintParamSuggestionView>> {
+    const requester = await this.resolveRequester(req)
+    return ApiResponse.ok(await this.printParamSuggestions.suggestForInspectionTask(id, requester))
   }
 
   @Post('tasks/:id/pii-findings/decisions')

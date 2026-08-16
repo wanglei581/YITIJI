@@ -51,6 +51,20 @@ console.log('\n=== K2a AI 顾问青序 LightFlow 静态合同 ===')
 const packageJson = read('package.json')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
+/*
+ * 2026-08-16（S2-5 接线）：AssistantPage.tsx 逼近 CLAUDE.md §8 的 800 行硬上限，
+ * 已按 §8 拆成同目录四个模块。本脚本断的是「AI 顾问这一页有没有丢能力」，
+ * 断言单元因此从**单个文件**改为**这一页的模块集合** —— 拆文件不该被判成丢能力，
+ * 但把能力删掉仍然会被判 FAIL（每条 token 断言逐条保留，一条未减）。
+ * 页面语法顺序、根命名空间、禁用 token 等**只能出现在页面文件**的断言仍走 assistantPage。
+ */
+const assistantModule = [
+  assistantPage,
+  read('src/pages/assistant/AdvisorConversation.tsx'),
+  read('src/pages/assistant/AdvisorTools.tsx'),
+  read('src/pages/assistant/advisorScenes.ts'),
+  read('src/pages/assistant/advisorProvider.ts'),
+].join('\n')
 const assistantCssEntry = read('src/pages/assistant/assistant-inkpaper.css')
 const assistantCssPaths = [
   'src/pages/assistant/assistant-lightflow-shell.css',
@@ -122,8 +136,8 @@ expect(
     && conversationIndex < composerIndex,
   '助手按任务选择、真实对话、独立输入区顺序组织',
 )
-expectIncludes(assistantPage, 'src="/assets/ai-advisor.png"', '助手页继续使用既有小青图片')
-expect(!assistantPage.includes('ai-advisor-transparent'), '助手页不引入新的透明版资源依赖')
+expectIncludes(assistantModule, 'src="/assets/ai-advisor.png"', '助手页继续使用既有小青图片')
+expect(!assistantModule.includes('ai-advisor-transparent'), '助手页不引入新的透明版资源依赖')
 
 for (const [token, label] of [
   ['const ALLOWED_ROUTE_PREFIXES', '路由白名单'],
@@ -144,7 +158,7 @@ for (const [token, label] of [
   ['aria-label="输入咨询问题"', '咨询输入框名称'],
   ['if (messages.length <= 1 && !loading) return', '首屏不被初始欢迎语自动滚动跳过'],
 ]) {
-  expectIncludes(assistantPage, token, `助手对话合同保留：${label}`)
+  expectIncludes(assistantModule, token, `助手对话合同保留：${label}`)
 }
 expectMatches(
   assistantPage,
@@ -159,10 +173,10 @@ for (const [route, label] of [
   ["/job-fairs", '招聘会'],
   ["/renshi?tab=policy", '政策服务'],
 ]) {
-  expectIncludes(assistantPage, `route: '${route}'`, `任务咨询保留原有真实直达入口：${label}`)
+  expectIncludes(assistantModule, `route: '${route}'`, `任务咨询保留原有真实直达入口：${label}`)
 }
 expectIncludes(
-  assistantPage,
+  assistantModule,
   'serviceActions: readonly AssistantAction[]',
   '咨询任务以真实 AssistantAction 声明后续服务入口',
 )

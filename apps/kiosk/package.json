@@ -77,6 +77,7 @@
     "verify:price-single-source": "node scripts/verify-price-single-source.mjs",
     "verify:renshi-policy-ui": "node scripts/verify-renshi-policy-ui.mjs",
     "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs",
+    "verify:v6-type-floor": "node ../../docs/design/kiosk-ai-os-v3-2026-08/tools/verify-type-floor.mjs",
     "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs",
     "verify:fusion-home": "node scripts/verify-fusion-home.mjs",
     "verify:fusion-w2": "node scripts/verify-fusion-w2-print-scan.mjs",
@@ -94,7 +95,8 @@
     "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
     "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
     "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs",
-    "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs"
+    "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs",
+    "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

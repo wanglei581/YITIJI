@@ -33,6 +33,11 @@ export const diagnosis = {
   },
 } satisfies ResumeParseResponse
 
+/*
+ * 真实模型回答。`providerLabel` / `aiGenerated` 是 #617（S0-1）之后后端**恒定**
+ * 透出的两个字段（`ai.service.ts:763,778`），夹具必须带上它们才算镜像真后端 ——
+ * 前端对缺字段是 fail-closed 的，不带就等于在测「非 AI」那条路径。
+ */
 export const assistantReply = {
   sessionId: 'assistant-w3-browser-session',
   reply: '请基于真实经历，用背景、任务、行动、结果四步整理项目描述。',
@@ -41,6 +46,25 @@ export const assistantReply = {
     { label: '去做简历诊断', route: '/resume/source' },
     { label: '禁止动作', route: '/admin' },
   ],
+  providerLabel: 'llm:deepseek',
+  aiGenerated: true,
+} satisfies AssistantChatResponse
+
+/**
+ * 风险 R1 的夹具：后端 `assistant_chat` 未就绪时回落到 mock provider。
+ * `reply` 刻意写成一段**读起来完全像 AI 回答**的话 —— 这正是它危险的地方。
+ * 前端必须一个字都不显示它。
+ */
+export const ASSISTANT_MOCK_FALLBACK_REPLY_TEXT =
+  '根据你的情况，我建议你先梳理三段核心经历，再按岗位要求逐条对齐关键词。'
+
+export const assistantMockFallbackReply = {
+  sessionId: 'assistant-w3-mock-fallback-session',
+  reply: ASSISTANT_MOCK_FALLBACK_REPLY_TEXT,
+  intent: 'general',
+  actions: [{ label: '去做简历诊断', route: '/resume/source' }],
+  providerLabel: 'mock',
+  aiGenerated: false,
 } satisfies AssistantChatResponse
 
 export const interviewCreated = {

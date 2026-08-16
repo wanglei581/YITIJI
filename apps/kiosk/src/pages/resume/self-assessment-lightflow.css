@@ -15,6 +15,160 @@
   gap: 12px;
 }
 
+.self-assessment-lightflow__consent-version {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}
+
+.self-assessment-lightflow__consent label small {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--k-muted);
+}
+
+/* ── 「这一页里哪部分是 AI」说明卡 ─────────────────────────────── */
+
+.self-assessment-lightflow__ai-note-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.self-assessment-lightflow__ai-note ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.self-assessment-lightflow__ai-note li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.self-assessment-lightflow__ai-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}
+
+.self-assessment-lightflow__ai-hint .kiosk-ai-chip {
+  flex: none;
+}
+
+.self-assessment-lightflow__quiz-note {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}
+
+/*
+ * aria-disabled 的置灰外观。
+ * 这里刻意不用原生 disabled —— 原生 disabled 会把按钮踢出 Tab 序列、读屏跳过，
+ * 用户就永远读不到旁边那句「为什么灰」（与 ai/AiTaskRegion.tsx 同一口径）。
+ */
+.self-assessment-lightflow__guarded {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.self-assessment-lightflow__guarded button[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.self-assessment-lightflow__blocked-reason {
+  max-width: 340px;
+  text-align: right;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--k-muted);
+}
+
+/* ── 记录编号 / 同意版本 / 保留期 ──────────────────────────────── */
+
+.self-assessment-lightflow__meta h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.self-assessment-lightflow__meta dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px 20px;
+  margin: 0;
+}
+
+.self-assessment-lightflow__meta dt {
+  font-size: 13px;
+  color: var(--k-muted);
+}
+
+.self-assessment-lightflow__meta dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.self-assessment-lightflow__meta button {
+  margin-top: 14px;
+}
+
+.self-assessment-lightflow__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+}
+
+.self-assessment-lightflow__dims-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--k-muted);
+}
+
+.self-assessment-lightflow__summary footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--k-line);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}
+
+.self-assessment-lightflow__print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 10px;
+}
+
 .self-assessment-lightflow__consent label {
   display: flex;
   align-items: flex-start;
@@ -105,9 +259,15 @@
 .self-assessment-lightflow__summary header,
 .self-assessment-lightflow__dim-card header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+.self-assessment-lightflow__summary header h2 {
+  margin-right: auto;
 }
 .self-assessment-lightflow__summary header h2,
 .self-assessment-lightflow__dim-card header h3 {
@@ -148,6 +308,12 @@
 
 .self-assessment-lightflow__print-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.self-assessment-lightflow__print-card p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
 }

@@ -7,11 +7,36 @@
 //   - 对比基期：等长紧邻上一周期 [prevFrom, prevTo)
 //   - 成功率 = success 批次 / 全部批次 × 100；total=0 时 previous=null
 //   - deltaPercent=null 当 previous=0 或 null（不显示 ∞%）
+//
+// C1（2026-08-16）补充：
+//   - 时区由服务端单向声明（响应 `timezone` 字段），不接受客户端传参。
+//     分桶逻辑本来就硬编码 Asia/Shanghai，接收一个不被消费的 timezone 参数
+//     等于假实现；改为服务端把自己实际使用的时区告诉前端，前端照实渲染。
+//   - snapshot 扩展为四类在架内容 + 待审核数（全部 orgId 隔离的真实计数），
+//     待审核数用于「为什么还没有数据」的空态，不是装饰。
+//   - attribution（曝光/详情浏览/打开来源平台/资料打印/转化漏斗）**恒为不可用**：
+//     BrowseLog / ExternalJumpLog 在 origin/main 上均无 sourceOrgId 字段
+//     （已用 `git show origin/main:services/api/prisma/schema.prisma` 核实），
+//     无法按机构归因。可以用 targetId 反查 Job.sourceOrgId，但那是**当前**归属、
+//     不是不可变快照——内容换来源机构后历史统计会漂移，因此**刻意不做该 join**。
+//     此处如实返回 available:false，不编造漏斗。
 
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
 const TZ_OFFSET_MS = 8 * 60 * 60 * 1000 // Asia/Shanghai = UTC+8
+
+/** 服务端实际使用的统计时区；随响应下发，不接受客户端覆盖 */
+export const STATS_TIMEZONE = 'Asia/Shanghai' as const
+
+/**
+ * 最小聚合样本阈值：任一分组少于 5 条时不得给出数字。
+ * 防止小样本反推到具体求职者个人。归因分组落地后由该阈值统一把关。
+ */
+export const MIN_AGGREGATE_SAMPLE = 5
+
+/** 归因不可用的机器可读原因 */
+export const ATTRIBUTION_UNAVAILABLE_REASON = 'missing_immutable_source_org_snapshot'
 
 export type StatsPeriod = 'week' | 'month' | 'quarter'
 
@@ -66,20 +91,42 @@ export class PartnerStatsService {
     const days = periodDays(period)
 
     // 1. 并发拉取：当期同步日志 + 上期同步日志 + 快照
-    const [curLogs, prevLogs, publishedJobs, publishedFairs, activeSources] =
-      await Promise.all([
-        this.prisma.syncLog.findMany({
-          where:  { orgId, createdAt: { gte: from, lt: to } },
-          select: { result: true, addedCount: true, updatedCount: true, errorCount: true, createdAt: true },
-        }),
-        this.prisma.syncLog.findMany({
-          where:  { orgId, createdAt: { gte: prevFrom, lt: prevTo } },
-          select: { result: true, addedCount: true, errorCount: true },
-        }),
-        this.prisma.job.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
-        this.prisma.jobFair.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
-        this.prisma.jobSource.count({ where: { orgId, enabled: true } }),
-      ])
+    //    全部 where 都以 orgId / sourceOrgId 收口，跨机构不可达。
+    const PENDING = { in: ['pending', 'reviewing'] }
+    const [
+      curLogs,
+      prevLogs,
+      publishedJobs,
+      publishedFairs,
+      publishedCompanies,
+      publishedPolicies,
+      activeSources,
+      pendingJobs,
+      pendingFairs,
+      pendingCompanies,
+      pendingPolicies,
+    ] = await Promise.all([
+      this.prisma.syncLog.findMany({
+        where:  { orgId, createdAt: { gte: from, lt: to } },
+        select: { result: true, addedCount: true, updatedCount: true, errorCount: true, createdAt: true },
+      }),
+      this.prisma.syncLog.findMany({
+        where:  { orgId, createdAt: { gte: prevFrom, lt: prevTo } },
+        select: { result: true, addedCount: true, errorCount: true },
+      }),
+      this.prisma.job.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.jobFair.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.companyProfile.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.policyPost.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.jobSource.count({ where: { orgId, enabled: true } }),
+      this.prisma.job.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
+      this.prisma.jobFair.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
+      this.prisma.companyProfile.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
+      this.prisma.policyPost.count({ where: { sourceOrgId: orgId, reviewStatus: PENDING } }),
+    ])
+
+    const pendingReview =
+      pendingJobs + pendingFairs + pendingCompanies + pendingPolicies
 
     // 2. 当期聚合
     type CurLog = (typeof curLogs)[number]
@@ -113,12 +160,33 @@ export class PartnerStatsService {
 
     return {
       dataMode: 'live' as const,
+      /** 服务端实际用于分桶的时区，由服务端声明；客户端不得传参覆盖 */
+      timezone: STATS_TIMEZONE,
       period: {
         label,
         from: toShanghaiDay(from),
         to:   toShanghaiDay(new Date(to.getTime() - 1)),
       },
-      snapshot: { publishedJobs, publishedFairs, activeSources },
+      snapshot: {
+        publishedJobs,
+        publishedFairs,
+        publishedCompanies,
+        publishedPolicies,
+        activeSources,
+        /** 待管理员审核（pending + reviewing）的内容总数，用于解释「为什么还没有数据」 */
+        pendingReview,
+      },
+      /**
+       * 浏览 / 外部跳转 / 打印的机构归因。
+       * 恒为 available:false —— 行为日志无不可变 sourceOrgId 快照，见文件头注释。
+       * 前端必须据此显示「暂无归因数据」，不得回退成任何估算或演示漏斗。
+       */
+      attribution: {
+        available: false as const,
+        reason: ATTRIBUTION_UNAVAILABLE_REASON,
+        /** 归因落地后对每个分组生效的最小样本阈值 */
+        minSampleThreshold: MIN_AGGREGATE_SAMPLE,
+      },
       sync: {
         totalBatches: metric(curTotal,  prevTotal > 0 ? prevTotal  : null, compLabel),
         successRate:  metric(curRate,   prevTotal > 0 ? prevRate   : null, compLabel),
