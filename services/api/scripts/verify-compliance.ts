@@ -43,16 +43,38 @@ const FORBIDDEN_TERMS: readonly { term: string; reason: string }[] = [
   { term: '诊断书',       reason: '临床诊断书' },
 ]
 
-/** 报告措辞 —— "适合 / 不适合 / 必须 / 应该" 类指令性表达不应出现在自我探索结果中。 */
-const FORBIDDEN_PHRASES: readonly { phrase: string; reason: string }[] = [
+/**
+ * 报告措辞 —— "适合 / 不适合 / 必须 / 应该" 类指令性表达不应出现在自我探索结果中。
+ *
+ * allowNegated：该词被"不 / 无 / 没 / 未 / 非"直接否定时放行。
+ * 只给"排名"开，因为这条守的是**产品给出排行**这个行为，而"不打分、不排名"是
+ * 相反方向的免责声明 —— 把免责声明判成违规会逼着页面删掉合规文案。
+ * "适合岗位 / 不适合岗位"刻意不开：正反两种表述都算做了岗位匹配，都要拦。
+ */
+const FORBIDDEN_PHRASES: readonly { phrase: string; reason: string; allowNegated?: true }[] = [
   { phrase: '适合岗位',  reason: '自我探索不做岗位匹配' },
   { phrase: '不适合岗位', reason: '自我探索不做岗位匹配' },
   { phrase: '适合从事',  reason: '自我探索不替代职业指导' },
   { phrase: '你必须',    reason: '指令性表达，违反自助参考口径' },
   { phrase: '你应该',    reason: '指令性表达，违反自助参考口径' },
-  { phrase: '排名',      reason: '不应给出排行' },
+  { phrase: '排名',      reason: '不应给出排行', allowNegated: true },
   { phrase: 'Top%',      reason: '不应给出百分比排名' },
 ]
+
+/** 否定标记；向前最多回看 6 个字符，遇到句读即停（不跨小句借否定）。 */
+const NEGATION_MARKERS = /[不无没未非]/
+const CLAUSE_BOUNDARY = /[。！？；;.!?]/
+
+/** 该次命中是否处在显式否定语境里（如「不打分、不排名」「不做职业排名」）。 */
+function isNegatedOccurrence(line: string, matchIndex: number): boolean {
+  const start = Math.max(0, matchIndex - 6)
+  for (let i = matchIndex - 1; i >= start; i--) {
+    const ch = line[i] as string
+    if (CLAUSE_BOUNDARY.test(ch)) return false
+    if (NEGATION_MARKERS.test(ch)) return true
+  }
+  return false
+}
 
 /** 自我探索相关源文件 —— 仅扫描这些文件以避免噪音。 */
 const SELF_ASSESSMENT_FILES = [
@@ -164,8 +186,9 @@ for (const root of SCAN_ROOTS) {
           })
         }
       }
-      for (const { phrase, reason } of FORBIDDEN_PHRASES) {
-        if (line.includes(phrase)) {
+      for (const { phrase, reason, allowNegated } of FORBIDDEN_PHRASES) {
+        for (let at = line.indexOf(phrase); at >= 0; at = line.indexOf(phrase, at + 1)) {
+          if (allowNegated && isNegatedOccurrence(line, at)) continue
           violations.push({
             file: rel,
             line: idx + 1,
@@ -173,6 +196,7 @@ for (const root of SCAN_ROOTS) {
             reason,
             snippet: line.trim().slice(0, 160),
           })
+          break
         }
       }
     })
@@ -180,12 +204,15 @@ for (const root of SCAN_ROOTS) {
 }
 
 try {
-  assert.equal(violations.length, 0, () => {
-    return [
+  // node:assert 的 message 只接受 string | Error；传函数会被原样 stringify。
+  assert.equal(
+    violations.length,
+    0,
+    [
       'verify:compliance failed (self-assessment 临床/量表/疾病 关键词扫描):',
       ...violations.map((v) => `  - ${v.file}:${v.line}  term="${v.term}"  reason=${v.reason}\n      ${v.snippet}`),
-    ].join('\n')
-  })
+    ].join('\n'),
+  )
   // eslint-disable-next-line no-console
   console.log(`verify:compliance: PASS (scanned ${SELF_ASSESSMENT_FILES.length} entry paths, no clinical/forbidden terms)`)
   process.exit(0)

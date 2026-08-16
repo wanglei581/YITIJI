@@ -23,7 +23,7 @@ import type { SelfAssessmentAnswerV1, SelfAssessmentDimensionResult } from './se
 import { LlmSelfAssessmentService } from './llm-self-assessment.service'
 import { SelfAssessmentPdfService } from './self-assessment-pdf.service'
 import { scoreSelfAssessment } from './self-assessment-scoring'
-import { AiLogService } from '../ai-log.service'
+import { AiLogService, AiUsageAccumulator } from '../ai-log.service'
 
 const RESULT_TTL_HOURS = (() => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
@@ -138,10 +138,17 @@ export class SelfAssessmentService {
     let overallRejectReason: string | null = null
     let llmErrorCode: string | undefined
 
+    // selfAssessment 是**付费**的 token 计费调用。此前这里不收集 token usage，
+    // 落账恒为「无 token」，estimateCostCny 返回 undefined → 库里 estimatedCostCny=null，
+    // 而 Admin 把 selfAssessment 当 token 计费能力渲染成 ¥0.0000 + 「按 token 用量」，
+    // 等于对一次真实花钱的调用谎称免费。这里改为与 careerPlan / fairVisitPlan 同一套
+    // AiUsageAccumulator 口径：真实 token 落账，成本按 provider 单价估算。
+    const usage = new AiUsageAccumulator()
     try {
       const llmResult = await this.llm.summarize({
         scored: { dimensions: scored.dimensions, summary: null },
         consent,
+        onLlmCall: usage.add,
       })
       if (llmResult.status === 'rejected') {
         overallRejectReason = llmResult.failReason ?? 'LLM 解读命中合规词'
@@ -155,14 +162,19 @@ export class SelfAssessmentService {
       overallRejectReason = err instanceof Error ? err.message : 'LLM 调用失败'
       llmErrorCode = 'LLM_ERROR'
     }
-    this.log.record({
-      taskId,
-      provider: providerName ?? 'llm',
-      operation: 'selfAssessment',
-      latencyMs: Date.now() - t0,
-      status: overallRejectReason ? 'failed' : 'success',
-      ...(llmErrorCode ? { errorCode: llmErrorCode } : {}),
-    })
+    // callCount === 0 → 一次都没真的打到模型（未配置 / 已降级），不落账，
+    // 免得用一堆零成本行把「分能力成本」稀释成看起来很便宜。
+    if (usage.callCount > 0) {
+      this.log.record({
+        taskId,
+        provider: usage.provider ?? providerName ?? 'llm',
+        operation: 'selfAssessment',
+        latencyMs: Date.now() - t0,
+        status: overallRejectReason ? 'failed' : 'success',
+        tokenUsage: usage.tokenUsage,
+        ...(llmErrorCode ? { errorCode: llmErrorCode } : {}),
+      })
+    }
 
     // 4) 落库（仅会员：endUserId 归属；匿名不留库，会话由 token 持有）
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)

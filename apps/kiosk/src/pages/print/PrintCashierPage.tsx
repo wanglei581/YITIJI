@@ -87,12 +87,17 @@ export function PrintCashierPage() {
   const [channels, setChannels] = useState<string[] | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
-  const [authCode, setAuthCode] = useState('')
   const [codeSubmitting, setCodeSubmitting] = useState(false)
   const [reconciling, setReconciling] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
   const codeSubmitLockRef = useRef(false)
+  /**
+   * 付款码「仅内存缓冲区」。付款码是一次性支付凭证、等同现金，而一体机是 27 寸
+   * 公共竖屏 —— 它绝不能进 React state（会随渲染树外泄、会被 DevTools/错误边界
+   * 序列化），也绝不能进 DOM、URL、日志或 storage。只在提交的同步段读一次，读完清空。
+   */
+  const authCodeBufferRef = useRef('')
   const lastAutoReconcileAtRef = useRef(0)
 
   const proceedToPrint = useCallback(async () => {
@@ -197,10 +202,13 @@ export function PrintCashierPage() {
     [selectedChannel, paymentMethod, snapshot, issuing, codeSubmitting, hasActivePaymentAttempt, issue],
   )
 
-  const submitCodePayment = useCallback(async (inputCode?: string) => {
+  const submitCodePayment = useCallback(async () => {
     if (!orderId || !paymentSessionToken || !selectedChannel || codeSubmitting || codeSubmitLockRef.current) return
-    const submittedCode = (inputCode ?? authCode).trim()
+    // 同步段读走缓冲区并立刻清空：付款码在本函数之外不再有第二个副本。
+    const submittedCode = authCodeBufferRef.current.trim()
+    authCodeBufferRef.current = ''
     if (!/^\d{18}$/.test(submittedCode)) {
+      // 错误提示只描述状态，绝不回显原值。
       setIssueError('请输入 18 位数字付款码')
       return
     }
@@ -214,7 +222,6 @@ export function PrintCashierPage() {
         channel: selectedChannel,
         authCode: submittedCode,
       })
-      setAuthCode('')
       if (result.status === 'success') {
         if (cancelRef.current) return
         setSnapshot({
@@ -243,7 +250,7 @@ export function PrintCashierPage() {
       })
       if (result.status === 'failed') setIssueError(result.failReason ?? '支付未完成，请重新扫码')
     } catch (error) {
-      setAuthCode('')
+      authCodeBufferRef.current = ''
       const message = error instanceof Error ? error.message : ''
       setIssueError(
         message.includes('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
@@ -256,7 +263,7 @@ export function PrintCashierPage() {
       codeSubmitLockRef.current = false
       if (!cancelRef.current) setCodeSubmitting(false)
     }
-  }, [orderId, paymentSessionToken, selectedChannel, authCode, codeSubmitting, proceedToPrint])
+  }, [orderId, paymentSessionToken, selectedChannel, codeSubmitting, proceedToPrint])
 
   // ── 轮询支付状态 ──
   useEffect(() => {
@@ -577,15 +584,14 @@ export function PrintCashierPage() {
             channelsLoading={channels === null}
             issuing={issuing}
             codeSubmitting={codeSubmitting}
-            authCode={authCode}
+            authCodeBufferRef={authCodeBufferRef}
             qrContent={qrContent}
             remainSec={remainSec}
             reconciling={reconciling}
             canReissue={canReissue}
             isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
             canProceed={canProceed}
-            onAuthCodeChange={setAuthCode}
-            onSubmitCode={(code) => void submitCodePayment(code)}
+            onSubmitCode={() => void submitCodePayment()}
             onReconcile={() => void handleReconcile()}
             onReissue={handleReissue}
             onSimulateSandbox={(result) => void devSimulate(result)}

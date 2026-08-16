@@ -14,7 +14,19 @@
  */
 
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
+import {
+  DATABASE_SUBSYSTEM,
+  bootReadiness,
+  readTimeoutMs,
+  withBootTimeout,
+} from '../common/boot/boot-readiness'
 import { createPrismaClient, type AppPrismaClient, type DbKind } from './create-client'
+
+/**
+ * `$connect()` 的有界等待。默认 15s：PostgreSQL 驱动自身的 connect_timeout
+ * 通常更短，这里只是兜住「驱动既不连上也不报错」的极端情况，不改变正常路径。
+ */
+const DEFAULT_DB_CONNECT_TIMEOUT_MS = 15_000
 
 export type PrismaTransactionClient = Omit<AppPrismaClient, '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>
 
@@ -36,12 +48,29 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.client.$connect()
     // Do not log credentials embedded in DATABASE_URL.
     const safeUrl = (process.env['DATABASE_URL'] ?? '').replace(
       /\/\/[^:]+:[^@]+@/,
       '//<redacted>@',
     )
+    const timeoutMs = readTimeoutMs('DB_CONNECT_TIMEOUT_MS', DEFAULT_DB_CONNECT_TIMEOUT_MS)
+    try {
+      // 数据库是**硬依赖**：连不上就明确失败退出（非 0 退出码），
+      // 让进程管理器看得见。这里只保证等待有界，不吞任何错误。
+      await withBootTimeout(() => this.client.$connect(), {
+        subsystem: DATABASE_SUBSYSTEM,
+        operation: '$connect',
+        timeoutMs,
+      })
+    } catch (error) {
+      this.logger.error(
+        `BOOT_DEPENDENCY_FATAL subsystem=${DATABASE_SUBSYSTEM} code=DB_CONNECT_FAILED ` +
+          `target=${safeUrl} timeoutMs=${timeoutMs} errorType=${error instanceof Error ? error.name : 'UnknownError'}`,
+      )
+      this.logger.error('数据库是硬依赖，无法连接时不启动服务。请检查 DATABASE_URL、数据库进程与网络放行。')
+      throw error
+    }
+    bootReadiness.markOk(DATABASE_SUBSYSTEM, 'DB_CONNECTED', `数据库已连接（${this.dbKind}）。`)
     this.logger.log(`DB connected — ${safeUrl}`)
   }
 
@@ -217,6 +246,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get policyPost() {
     return this.client.policyPost
+  }
+
+  /** P21 政策条件核对：政策申领条件的结构化表达 */
+  get policyEligibilityRule() {
+    return this.client.policyEligibilityRule
   }
 
   // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────

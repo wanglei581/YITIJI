@@ -6,6 +6,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { AiLogService } from '../src/ai/ai-log.service'
 import { AdvisorService } from '../src/advisor/advisor.service'
+import { AdvisorRetentionTask } from '../src/advisor/advisor-retention.task'
 import { AdvisorArtifactService } from '../src/advisor/advisor-artifact.service'
 import { AdvisorPdfService } from '../src/advisor/advisor-pdf.service'
 import { LlmAdvisorService } from '../src/advisor/llm-advisor.service'
@@ -451,6 +452,89 @@ async function main() {
         'H6 正向：AI 挂着也能读回已有会话与进度（作业面停在当前进度，不是整页瘫痪）')
       await expectReject('ADVISOR_SESSION_NOT_FOUND', 'H7 反向：错误的匿名 token → NOT_FOUND',
         () => svc.getSession(created.sessionId, { endUserId: null, accessToken: 'wrong-token-value' }))
+    }
+
+    // ══ I. 留存清理：过期的用户原话必须被物理删除 ════════════════
+    //
+    // 合规背景（CLAUDE.md §11）：topic / slotsJson / AdvisorPin.content 落的是
+    // 用户**未脱敏的原话**。在 AdvisorRetentionTask 之前，expiresAt 只在
+    // loadOwned() 读路径挡人，行本身永久留库 —— 用户看不到也删不掉，但明文还在。
+    //
+    // 先反向（证明过期行确实还在库里、只是读不到），再正向（证明清理真的删掉它），
+    // 再反向（证明**没过期**的会话不会被误删 —— 这是「不得破坏现有功能」的证据）。
+    section('I. 留存清理（过期原话物理删除）')
+    {
+      const retention = new AdvisorRetentionTask(prisma, audit)
+      const svc = new AdvisorService(
+        prisma,
+        new LlmAdvisorService(readyConfig),
+        new AdvisorArtifactService(prisma, pdf, filesStub, audit),
+        audit,
+        aiLog,
+      )
+      const secretTopic = `我叫王某某手机13800138000_留存标记${s}`
+
+      const expiredId = `adv_expired_${s}`
+      await prisma.advisorSession.create({
+        data: {
+          id: expiredId, endUserId: userA, skill: 'qa', status: 'completed',
+          topic: secretTopic, slotsJson: '{}',
+          expiresAt: new Date(Date.now() - 60_000),
+        },
+      })
+      sessionIds.push(expiredId)
+      await prisma.advisorPin.create({
+        data: { sessionId: expiredId, idx: 0, content: secretTopic, evidenceLevel: 'E1' },
+      })
+      await prisma.advisorArtifact.create({
+        data: {
+          sessionId: expiredId, kind: 'qa_pins', payloadJson: JSON.stringify({ topic: secretTopic }),
+          provider: 'llm:verify:stub', expiresAt: new Date(Date.now() - 60_000),
+        },
+      })
+
+      const liveId = `adv_live_${s}`
+      await prisma.advisorSession.create({
+        data: {
+          id: liveId, endUserId: userA, skill: 'qa', status: 'collecting',
+          topic: `未过期会话_${s}`, slotsJson: '{}',
+          expiresAt: new Date(Date.now() + 3_600_000),
+        },
+      })
+      sessionIds.push(liveId)
+
+      // I1 反向：清理跑之前，过期行确实还躺在库里（这正是本批次查出来的缺口）
+      assert(await prisma.advisorSession.findUnique({ where: { id: expiredId } }) !== null,
+        'I1 反向：过期会话在清理前仍然物理存在（读不到 ≠ 已删除）')
+      await expectReject('ADVISOR_SESSION_NOT_FOUND', 'I2 反向：过期会话对本人也已读不到',
+        () => svc.getSession(expiredId, { endUserId: userA, accessToken: null }))
+
+      const result = await retention.cleanupExpired('manual')
+      assert(result.deletedSessions >= 1, 'I3 正向：清理任务报告删除了过期会话')
+
+      assert(await prisma.advisorSession.findUnique({ where: { id: expiredId } }) === null,
+        'I4 正向：过期会话已被物理删除')
+      assert(await prisma.advisorPin.count({ where: { sessionId: expiredId } }) === 0,
+        'I5 正向：过期会话的钉住条目原文一并消失')
+      assert(await prisma.advisorArtifact.count({ where: { sessionId: expiredId } }) === 0,
+        'I6 正向：过期会话的产物一并消失')
+
+      // I7 是「不得破坏现有功能」的硬证据：清理只碰过期行
+      assert(await prisma.advisorSession.findUnique({ where: { id: liveId } }) !== null,
+        'I7 反向：未过期会话不受影响（清理不是无差别删表）')
+      const stillReadable = await svc.getSession(liveId, { endUserId: userA, accessToken: null })
+      assert(stillReadable.topic === `未过期会话_${s}`,
+        'I8 正向：未过期会话本人仍读得到，且拿回的是自己写的原话而不是占位符')
+
+      // I9：删除必须留痕（CLAUDE.md §11），但痕里不许有原话
+      const auditRow = await prisma.auditLog.findFirst({
+        where: { action: 'advisor_session.cleanup_expired' },
+        orderBy: { createdAt: 'desc' },
+      })
+      assert(auditRow !== null, 'I9 正向：清理写了系统审计行')
+      assert(!!auditRow && !auditRow.payloadJson.includes(secretTopic),
+        'I10 反向：审计 payload 里不含被删掉的用户原话')
+      if (auditRow) await prisma.auditLog.deleteMany({ where: { id: auditRow.id } })
     }
 
     console.log(`\n=== 顾问作业面验证通过：${passCount} PASS ===\n`)
