@@ -82,17 +82,23 @@ function assertNoSqliteDrift(db: string, label: string): void {
   assert.equal(drift.status, 0, `${label} SQLite/schema drift:\n${drift.stdout}\n${drift.stderr}`)
 }
 
+// 两份 schema 必须始终同模型数（PG schema 由 scripts/sync-postgres-schema.ts
+// 从 SQLite schema 机械生成）。收成单一常量，杜绝「改了 SQLite 那处、忘了 PG 那处」
+// 这种只修一半的失败模式。新增/删除模型时自己 `grep -c "^model "` 两份分别数，
+// 不要把两份相加。
+const EXPECTED_MODEL_COUNT = 88
+
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
   const pgSchema = read(PG_SCHEMA)
   assert.equal(
     (sqliteSchema.match(/^model /gm) ?? []).length,
-    87,
+    EXPECTED_MODEL_COUNT,
     'SQLite schema model count drifted'
   )
   assert.equal(
     (pgSchema.match(/^model /gm) ?? []).length,
-    87,
+    EXPECTED_MODEL_COUNT,
     'PostgreSQL schema model count drifted'
   )
 
