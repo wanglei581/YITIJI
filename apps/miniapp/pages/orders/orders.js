@@ -130,13 +130,15 @@ Page({
     }
   },
 
+  // 始终返回 Promise：下拉刷新要等真实请求结束才能收起指示器，
+  // 提前 stopPullDownRefresh 会让「下拉刷新重试」看起来刷过但其实什么都没等到。
   _load(append = false) {
-    if (!auth.isLoggedIn()) return
+    if (!auth.isLoggedIn()) return Promise.resolve()
     const cursor = append ? this.data.nextCursor : null
     this.setData({ [append ? 'loadingMore' : 'loading']: true, error: '' })
     const legacyPromise = api.getMyPrintOrders({ pageSize: 20, ...(cursor ? { cursor } : {}) })
     const requestPromise = append ? legacyPromise.then(items => [[], items]) : Promise.all([api.getMyCloudPrintOrders(), legacyPromise])
-    requestPromise
+    return requestPromise
       .then(([cloudItems, items]) => {
         const combined = [...(Array.isArray(cloudItems) ? cloudItems : []), ...(Array.isArray(items) ? items : [])]
         const seen = new Set()
@@ -176,8 +178,8 @@ Page({
   },
 
   onPullDownRefresh() {
-    this._load()
-    wx.stopPullDownRefresh()
+    const stop = () => wx.stopPullDownRefresh()
+    this._load().then(stop, stop)
   },
 
   onReachBottom() {

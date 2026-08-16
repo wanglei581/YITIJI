@@ -162,21 +162,43 @@ Page({
     this._refreshQuote(500)
   },
 
-  preview() {
-    const { color, duplex, copies, total, file, fileId } = this.data
-    if (!fileId) {
-      wx.showToast({ title: '请先从“我的文档”选择真实文件', icon: 'none' })
-      return
+  // 「预览排版」和「去选门店」是同一条打印链路上的两个入口，必须走同一道闸门：
+  // 真实文件 → 服务端报价 → PII 隐私确认。此前 preview() 自带一套只查文件和报价的
+  // 弱校验，导致从预览页可以完全绕过隐私确认继续下单。闸门只允许存在这一处实现，
+  // 任何入口都不得再内联重复校验，否则两条路径会再次分叉。
+  _passPrintGate() {
+    if (!this.data.fileId) {
+      wx.showModal({
+        title: '尚未选择文件',
+        content: '本版本只允许从本人已上传文档或真实 AI 成果进入打印，不能用占位文件建单。',
+        confirmText: '选择文档',
+        success: (res) => { if (res.confirm) this.chooseSource() },
+      })
+      return false
     }
     if (this.data.priceStatus !== 'ready' || !this.data.hasPageCount) {
       wx.showToast({
-        title: this.data.priceStatus === 'loading' ? '服务端正在核定页数' : '请先取得服务端报价',
+        title: this.data.priceStatus === 'loading' ? '服务端正在核定页数和金额' : '报价暂不可用，请稍后重试',
         icon: 'none',
       })
-      return
+      return false
     }
+    if (this.data.privacyStatus !== 'ready') {
+      wx.showModal({
+        title: '请先完成隐私检查',
+        content: this.data.privacyStatus === 'scanning' ? '文件仍在检查中，请稍候。' : '确认隐私检查结果后才能提交打印订单。',
+        showCancel: false,
+      })
+      return false
+    }
+    return true
+  },
+
+  preview() {
+    if (!this._passPrintGate()) return
+    const { color, duplex, copies, total, amountCents, file, fileId } = this.data
     wx.navigateTo({
-      url: `/pages/print-preview/print-preview?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
+      url: `/pages/print-preview/print-preview?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
     })
   },
 
@@ -190,30 +212,7 @@ Page({
   },
 
   toStore() {
-    if (!this.data.fileId) {
-      wx.showModal({
-        title: '尚未选择文件',
-        content: '本版本只允许从本人已上传文档或真实 AI 成果进入打印，不能用占位文件建单。',
-        confirmText: '选择文档',
-        success: (res) => { if (res.confirm) this.chooseSource() },
-      })
-      return
-    }
-    if (this.data.priceStatus !== 'ready') {
-      wx.showToast({
-        title: this.data.priceStatus === 'loading' ? '服务端正在核定页数和金额' : '报价暂不可用，请稍后重试',
-        icon: 'none',
-      })
-      return
-    }
-    if (this.data.privacyStatus !== 'ready') {
-      wx.showModal({
-        title: '请先完成隐私检查',
-        content: this.data.privacyStatus === 'scanning' ? '文件仍在检查中，请稍候。' : '确认隐私检查结果后才能提交打印订单。',
-        showCancel: false,
-      })
-      return
-    }
+    if (!this._passPrintGate()) return
     const { color, duplex, copies, total, amountCents, file, fileId } = this.data
     wx.navigateTo({
       url: `/pages/print-store/print-store?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,

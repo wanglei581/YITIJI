@@ -14,7 +14,7 @@
       <text class="pp-dot">·</text><text class="pp-chip">A4</text>
       <text class="pp-dot">·</text><text class="pp-chip">{{duplexLabel}}</text>
       <text class="pp-dot">·</text><text class="pp-chip">×{{copies}} 份</text>
-      <text class="pp-dot">·</text><text class="pp-amt">¥{{total}}</text>
+      <text class="pp-dot">·</text><text class="pp-amt">{{isFreeOrder ? '免费' : '¥' + total}}</text>
     </view>
 
     <!-- A4 纸张近似预览 -->

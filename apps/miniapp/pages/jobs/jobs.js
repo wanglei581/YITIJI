@@ -2,15 +2,22 @@
 const app = getApp()
 const api = require('../../utils/api')
 
+const PAGE_SIZE = 20
+
 Page({
+  _searchTimer: null,
+  _seq: 0,
+
   data: {
     statusBarHeight: 20,
     filters: ['全部', '岗位', '招聘会', '找企业', '政策'],
     activeFilter: 0,
     jobs: [],
-    visibleJobs: [],
     query: '',
     loading: true,
+    loadingMore: false,
+    hasMore: false,
+    page: 1,
     loadError: '',
   },
 
@@ -19,30 +26,51 @@ Page({
     this.loadJobs()
   },
 
-  loadJobs() {
-    this.setData({ loading: true, loadError: '' })
-    return api.getJobs()
-      .then((list) => {
-        const jobs = list || []
-        this.setData({ jobs, visibleJobs: this._filterJobs(jobs, this.data.query), loading: false })
-      })
-      .catch((err) => this.setData({ loading: false, loadError: (err && err.message) || '加载失败' }))
+  onUnload() {
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this._searchTimer = null
+    this._seq += 1
   },
 
-  _filterJobs(jobs, query) {
-    const q = (query || '').trim().toLowerCase()
-    if (!q) return jobs
-    return jobs.filter((job) => [
-      job.title,
-      job.company,
-      job.source,
-      ...(Array.isArray(job.tags) ? job.tags : []),
-    ].some((value) => String(value || '').toLowerCase().includes(q)))
+  /**
+   * 岗位检索与翻页都交给服务端：/jobs 支持 keyword / page / pageSize。
+   * 之前只拉第一页再本地过滤，等于告诉用户「没有匹配的岗位」——实际只是没搜到第一页而已。
+   * append=true 为触底追加，其余情况都从第 1 页重新拉取。
+   */
+  loadJobs({ append = false } = {}) {
+    const page = append ? this.data.page + 1 : 1
+    const keyword = (this.data.query || '').trim()
+    // 每次请求都作废前一笔：快速改关键词时旧结果不得回写覆盖新结果。
+    const seq = ++this._seq
+    this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
+    return api.getJobs({ page, pageSize: PAGE_SIZE, ...(keyword ? { keyword } : {}) })
+      .then((list) => {
+        if (seq !== this._seq) return
+        const items = Array.isArray(list) ? list : []
+        const totalPages = Number(list && list.pagination && list.pagination.totalPages)
+        this.setData({
+          jobs: append ? this.data.jobs.concat(items) : items,
+          page,
+          // 后端给了 totalPages 就按它判断；没给就退化为「这一页是否装满」。
+          hasMore: Number.isFinite(totalPages) && totalPages > 0 ? page < totalPages : items.length >= PAGE_SIZE,
+          loading: false,
+          loadingMore: false,
+        })
+      })
+      .catch((err) => {
+        if (seq !== this._seq) return
+        this.setData({ loading: false, loadingMore: false, loadError: (err && err.message) || '加载失败' })
+      })
   },
 
   onSearchInput(e) {
     const query = e.detail.value || ''
-    this.setData({ query, visibleJobs: this._filterJobs(this.data.jobs, query) })
+    this.setData({ query })
+    if (this._searchTimer) clearTimeout(this._searchTimer)
+    this._searchTimer = setTimeout(() => {
+      this._searchTimer = null
+      this.loadJobs()
+    }, 300)
   },
 
   reload() {
@@ -50,7 +78,14 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.loadJobs().then(() => wx.stopPullDownRefresh())
+    const stop = () => wx.stopPullDownRefresh()
+    this.loadJobs().then(stop, stop)
+  },
+
+  onReachBottom() {
+    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
+      this.loadJobs({ append: true })
+    }
   },
 
   onShow() {
