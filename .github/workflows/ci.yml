@@ -353,6 +353,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          # 启动韧性：Redis 不可达时必须显式降级并照常监听端口，不得静默挂起。
+          # 会拉起真实 src/main.ts 子进程与临时 redis-server（用随机空闲端口）。
+          pnpm --filter @ai-job-print/api verify:boot-resilience
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
@@ -633,6 +636,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
+          # 启动韧性（PG 侧同样跑一遍：硬依赖=数据库、软依赖=Redis 的启动语义
+          # 必须在 PostgreSQL 上也成立）。会拉起真实 src/main.ts 与临时 redis-server。
+          pnpm --filter @ai-job-print/api verify:boot-resilience
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
