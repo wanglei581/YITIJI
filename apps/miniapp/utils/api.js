@@ -7,6 +7,7 @@ const config = require('./config');
 const { request, uploadFile } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
+const uploadNames = require('./upload-name');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -344,16 +345,30 @@ const api = {
     });
   },
 
-  /** 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。 */
-  uploadPrintFile(filePath, originalFilename) {
+  /**
+   * 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。
+   *
+   * 文件名只能走 multipart 文件段本身（wx.uploadFile 取 filePath 的 basename），
+   * 绝不能塞进 formData：后端 KioskUploadOptionsDto 只白名单了 purpose 一个字段，
+   * 配合 main.ts 全局 whitelist + forbidNonWhitelisted，多传字段会整体
+   * 400 VALIDATION_FAILED。旧实现的 originalFilename 形参正是这个陷阱
+   * （所幸从未被调用方传值，否则上传必失败）。
+   *
+   * @param {string} filePath 本地临时路径
+   * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
+   */
+  uploadPrintFile(filePath, displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印文件上传'));
-    const fd = { purpose: 'print_doc' };
-    if (originalFilename) fd.originalFilename = String(originalFilename);
-    return uploadFile('/files/kiosk-upload', filePath, {
-      name: 'file',
-      formData: fd,
-      needAuth: true,
-    });
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose: 'print_doc' },
+        needAuth: true,
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
   },
 
   /** 获取本人文件的预览 URL（短时签名，仅用于预览/打印报价）。 */

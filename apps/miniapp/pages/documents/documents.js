@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const uploadNames = require('../../utils/upload-name')
 
 function formatSize(bytes) {
   const n = Number(bytes) || 0
@@ -24,7 +25,7 @@ function formatExpiry(value) {
 }
 
 function toView(item) {
-  const filename = item.filename || '未命名文件'
+  const filename = item.filename || item.originalFilename || '未命名文件'
   const ext = filename.includes('.') ? filename.split('.').pop().slice(0, 5).toUpperCase() : 'FILE'
   const mime = String(item.mimeType || '')
   const kind = mime.startsWith('image/') ? 'img' : (mime === 'application/pdf' ? 'pdf' : 'doc')
@@ -38,6 +39,7 @@ function toView(item) {
     type: item.assetCategory || 'original',
     expire: formatExpiry(item.expiresAt),
     pages: Number(item.pageCount) > 0 ? Number(item.pageCount) : 0,
+    isImage: kind === 'img',
   }
 }
 
@@ -56,6 +58,7 @@ Page({
     loading: true,
     loadError: '',
     uploading: false,
+    previewing: false,
   },
 
   onLoad() {
@@ -94,6 +97,7 @@ Page({
     this.applyFilter(key)
   },
 
+  // 点击行 → 直接进打印流程
   openDoc(e) {
     const item = this.data.all.find((entry) => entry.id === String(e.currentTarget.dataset.id || ''))
     if (!item) return
@@ -102,20 +106,72 @@ Page({
     })
   },
 
+  // 预览文件内容
+  previewDoc(id) {
+    const item = this.data.all.find((entry) => entry.id === id)
+    if (!item) return
+    if (this.data.previewing) return
+    this.setData({ previewing: true })
+    wx.showLoading({ title: '加载预览…', mask: true })
+    api.getFilePreviewUrl(item.id)
+      .then((res) => {
+        const url = res && (res.printFileUrl || res.previewUrl || res.url || '')
+        if (!url) throw new Error('服务端未返回预览链接')
+        if (item.isImage) {
+          wx.hideLoading()
+          this.setData({ previewing: false })
+          wx.previewImage({ urls: [url], current: url })
+        } else {
+          wx.downloadFile({
+            url,
+            success: (dl) => {
+              wx.hideLoading()
+              this.setData({ previewing: false })
+              if (dl.statusCode === 200) {
+                wx.openDocument({
+                  filePath: dl.tempFilePath,
+                  showMenu: true,
+                  fail: () => wx.showToast({ title: '无法打开此文件', icon: 'none' }),
+                })
+              } else {
+                wx.showToast({ title: '下载失败，请重试', icon: 'none' })
+              }
+            },
+            fail: () => {
+              wx.hideLoading()
+              this.setData({ previewing: false })
+              wx.showToast({ title: '下载失败，请重试', icon: 'none' })
+            },
+          })
+        }
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        this.setData({ previewing: false })
+        wx.showToast({ title: (err && err.message) || '预览失败', icon: 'none' })
+      })
+  },
+
   more(e) {
     const id = String(e.currentTarget.dataset.id || '')
     const item = this.data.all.find((entry) => entry.id === id)
     if (!item) return
     wx.showActionSheet({
-      itemList: ['发起打印', '删除文件'],
+      itemList: ['预览文件', '发起打印', '删除文件'],
       success: (res) => {
         if (res.tapIndex === 0) {
-          this.openDoc({ currentTarget: { dataset: { id } } })
+          this.previewDoc(id)
+          return
+        }
+        if (res.tapIndex === 1) {
+          wx.navigateTo({
+            url: `/pages/print-upload/print-upload?fileId=${encodeURIComponent(item.id)}&name=${encodeURIComponent(item.name)}&pages=${item.pages}`,
+          })
           return
         }
         wx.showModal({
           title: '删除文件',
-          content: `确认删除“${item.name}”？文件内容将被删除，系统仅保留必要的删除审计。`,
+          content: `确认删除"${item.name}"？文件内容将被删除，系统仅保留必要的删除审计。`,
           confirmText: '删除',
           confirmColor: '#b5643c',
           success: (modal) => {
@@ -157,7 +213,12 @@ Page({
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file || !file.tempFilePath) return
-        this._doUpload(file.tempFilePath)
+        // 拍照/相册的临时文件本来就没有有意义的原名（tmp_8a3f… 这类），
+        // 直传上去列表里就是一串字母数字。这里按来源和时间生成可读名——
+        // 不是编造原名，而是如实描述这份文件是什么时候拍的。
+        // 扩展名必须沿用临时文件的真实扩展名，改了会被后端魔数校验打回。
+        const ext = uploadNames.extOf(file.tempFilePath) || 'jpg'
+        this._doUpload(file.tempFilePath, uploadNames.cameraFileName(ext))
       },
     })
   },
@@ -170,15 +231,17 @@ Page({
       success: (res) => {
         const file = (res.tempFiles || [])[0]
         if (!file || !file.path) return
-        this._doUpload(file.path)
+        // file.name 才是用户在聊天里看到的真实文件名；file.path 是 tmp_xxx 临时名。
+        // 之前只把 path 传下去，真实文件名就是在这一行丢掉的。
+        this._doUpload(file.path, uploadNames.pickedFileName(file.name, file.path))
       },
     })
   },
 
-  _doUpload(filePath) {
+  _doUpload(filePath, displayName) {
     this.setData({ uploading: true })
     wx.showLoading({ title: '正在上传…', mask: true })
-    api.uploadPrintFile(filePath)
+    api.uploadPrintFile(filePath, displayName)
       .then(() => {
         wx.hideLoading()
         this.setData({ uploading: false })
@@ -195,5 +258,6 @@ Page({
         })
       })
   },
+
   back() { wx.navigateBack({ delta: 1, fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
 })
