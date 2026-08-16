@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { BullModule } from '@nestjs/bullmq'
+import { AdvisorModule } from './advisor/advisor.module'
 import { AiModule } from './ai/ai.module'
 import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
@@ -107,6 +108,9 @@ const redisUrl = process.env['REDIS_URL']
     MemberPrivacyModule,
     JobAiModule,
     AiModule,
+    // S3-3 · P26 顾问作业面（/ai/plan）。放在 AiModule 之后：依赖它导出的
+    // LlmConfigService（advisor_work 功能位）与 AiLogService。
+    AdvisorModule,
     FilesModule,
     JobsModule,
     JobSyncModule,

@@ -355,6 +355,52 @@
   outline: none;
 }
 .cashier-code-input:focus { outline: 3px solid rgb(31 158 134 / 45%); border-color: transparent; }
+/* 付款码进度：非内容型反馈。只显示读到第几位，绝不显示任何一位码值。 */
+.cashier-code-field {
+  position: relative;
+  width: 100%;
+}
+.cashier-code-progress {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  pointer-events: none;
+}
+/* 未读入的位也必须看得见，用户才知道还差几位（--print-line 太浅，肉眼不可见）。 */
+.cashier-code-pip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgb(15 23 42 / 16%);
+  transition: background-color 120ms ease;
+}
+.cashier-code-pip[data-filled='true'] {
+  background: var(--print-teal);
+}
+.cashier-code-progress-text {
+  font: 600 18px var(--print-sans);
+  color: var(--print-muted);
+  text-align: center;
+}
+.cashier-code-clear {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--print-line);
+  background: var(--print-surface);
+  font: 600 19px var(--print-sans);
+  color: var(--print-ink);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cashier-code-pip { transition: none; }
+}
+
 .cashier-code-submit {
   width: 100%;
   min-height: 72px;
