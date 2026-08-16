@@ -19,6 +19,9 @@ interface OrderRow {
   currency: string
   payStatus: string
   taskStatus: string
+  channel: string | null
+  pickupStatus: string
+  pickupCodeExpiresAt: Date | null
   refundReason: string | null
   refundedAt: Date | null
   createdAt: Date
@@ -61,6 +64,8 @@ export interface ListAdminOrdersReadonlyParams {
   type?: string
   payStatus?: string
   taskStatus?: string
+  channel?: string
+  pickupStatus?: string
   search?: string
   page: number
   pageSize: number
@@ -110,6 +115,10 @@ export class AdminOrdersReadonlyService {
     if (params.type) where['type'] = params.type
     if (params.payStatus) where['payStatus'] = params.payStatus
     if (params.taskStatus) where['taskStatus'] = params.taskStatus
+    // channel / pickupStatus：M1/M2。存量 channel 为 null，前端显示「未标注」；
+    // 不提供「未标注」筛选值——那等价于 null 查询，语义上是「无法判定」而非一个渠道。
+    if (params.channel) where['channel'] = params.channel
+    if (params.pickupStatus) where['pickupStatus'] = params.pickupStatus
     if (params.search && params.search.trim()) where['orderNo'] = { contains: params.search.trim() }
 
     const [rows, total] = await Promise.all([
@@ -218,6 +227,10 @@ export class AdminOrdersReadonlyService {
       terminalCode: effectiveTerminalId ? labels.terminalCodes.get(effectiveTerminalId) ?? null : null,
       amountCents: row.amountCents,
       currency: row.currency,
+      // channel 为 null = 存量单，前端必须显示「未标注」而非猜成 kiosk
+      channel: row.channel,
+      pickupStatus: row.pickupStatus,
+      pickupCodeExpiresAt: row.pickupCodeExpiresAt ? row.pickupCodeExpiresAt.toISOString() : null,
       payStatus: row.payStatus,
       taskStatus: row.taskStatus,
       printFileName: printSummary.fileName,
@@ -244,6 +257,9 @@ function orderSelect() {
     currency: true,
     payStatus: true,
     taskStatus: true,
+    channel: true,
+    pickupStatus: true,
+    pickupCodeExpiresAt: true,
     refundReason: true,
     refundedAt: true,
     createdAt: true,

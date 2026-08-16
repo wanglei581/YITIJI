@@ -171,6 +171,14 @@ async function main(): Promise<void> {
       fail('到机码必须为 10 位且数据库不得保存可查询明文')
     }
     if (created.billablePages !== 2 || created.copies !== 2 || created.amountCents <= 0) fail('服务端页数/参数/报价快照不正确')
+
+    // M1 渠道标注：小程序云打印建单必须落 channel='miniapp_cloud'。
+    // 由服务端硬编、请求体不含该字段（小程序零改动）——若此断言失败，
+    // 说明 member-print-order-create.service.ts 的 order.create 漏了 channel，
+    // 后果是会员单与一体机单在库内不可区分。见 miniapp-console-sharing-2026-08 §六 T-M1。
+    if (stored.channel !== 'miniapp_cloud') {
+      fail(`小程序云打印建单 channel 应为 'miniapp_cloud'，实际: ${JSON.stringify(stored.channel)}`)
+    }
     pass('小程序建单为 Order-only；页数与金额来自服务端；到机码仅 hash + 密文落库')
 
     const cancellable = await memberOrders.create(userId, { fileId, terminalId, copies: 1, colorMode: 'black_white', duplex: 'simplex' })

@@ -53,6 +53,24 @@ const PAY_FILTERS = [
 const COLOR_LABELS: Record<string, string> = { black_white: '黑白', color: '彩色' }
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
 
+// M1：渠道展示。null = 存量单**无法可靠判定**（一体机与小程序建单写的字段相同），
+// 必须显示「未标注」——不得按 terminalId 猜成一体机，那会污染统计。
+function channelText(channel: string | null): string {
+  if (channel === 'kiosk') return '一体机现场'
+  if (channel === 'miniapp_cloud') return '小程序云打印'
+  return '未标注'
+}
+
+// M2：取件状态展示。一体机现场即时出纸，**业务上不存在取件环节**，显示「—」而非「无数据」。
+const PICKUP_LABELS: Record<string, string> = {
+  pending: '待取件', claimed: '已亮码', used: '已取件',
+  expired: '已过期', cancelled: '已取消',
+}
+function pickupText(order: { pickupStatus: string; channel: string | null }): string {
+  if (order.pickupStatus === 'none') return '—'
+  return PICKUP_LABELS[order.pickupStatus] ?? order.pickupStatus
+}
+
 function fmt(iso: string | null): string {
   return iso ? iso.slice(0, 16).replace('T', ' ') : '—'
 }
@@ -278,7 +296,7 @@ export default function OrdersPage() {
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr>
-                    {['订单号', '文件名', '用户', '终端', '金额', '支付状态', '任务状态', '错误码', '创建时间'].map((h) => (
+                    {['订单号', '文件名', '用户', '渠道', '终端', '金额', '支付状态', '任务状态', '取件', '错误码', '创建时间'].map((h) => (
                       <th key={h} className={TH_CLS}>{h}</th>
                     ))}
                   </tr>
@@ -286,7 +304,7 @@ export default function OrdersPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={9}>
+                      <td colSpan={11}>
                         <EmptyState title="暂无订单" description="一体机创建打印订单后会出现在这里" icon={FileTextIcon} className="py-12" />
                       </td>
                     </tr>
@@ -306,10 +324,12 @@ export default function OrdersPage() {
                           <td className={`${TD_CLS} font-bold text-primary-700`}>{order.orderNo}</td>
                           <td className={`${TD_CLS} max-w-56 truncate font-semibold text-neutral-900`}>{order.printFileName ?? '未记录'}</td>
                           <td className={`${TD_CLS} text-xs text-neutral-500`}>{OWNER_LABELS[order.ownerType]} · {order.userLabel}</td>
+                          <td className={`${TD_CLS} text-xs`}>{channelText(order.channel)}</td>
                           <td className={`${TD_CLS} font-mono text-xs text-neutral-500`}>{order.terminalCode ?? '—'}</td>
                           <td className={`${TD_CLS} tabular-nums text-neutral-700`}>{amountText(order.amountCents, order.currency)}</td>
                           <td className={TD_CLS}><StatusBadge dot status={pay.badge} label={pay.label} /></td>
                           <td className={TD_CLS}><StatusBadge dot status={taskStatus.badge} label={taskStatus.label} /></td>
+                          <td className={`${TD_CLS} text-xs`}>{pickupText(order)}</td>
                           <td className={`${TD_CLS} font-mono text-xs text-error-fg`}>{order.errorCode ?? '—'}</td>
                           <td className={`${TD_CLS} tabular-nums text-xs text-neutral-500`}>{fmt(order.createdAt)}</td>
                         </tr>

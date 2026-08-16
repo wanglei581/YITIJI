@@ -18,6 +18,12 @@ export interface AdminOrderReadonlyItem {
   terminalCode: string | null
   amountCents: number
   currency: string
+  /** 下单渠道：kiosk | miniapp_cloud；null = 存量单无法可靠判定，前端显示「未标注」 */
+  channel: string | null
+  /** 取件状态：none | pending | claimed | used | expired | cancelled；一体机单恒 none */
+  pickupStatus: string
+  /** 取件码过期时间（ISO）；仅小程序云单有值 */
+  pickupCodeExpiresAt: string | null
   payStatus: string
   taskStatus: string
   printFileName: string | null

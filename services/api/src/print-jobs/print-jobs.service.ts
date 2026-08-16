@@ -393,6 +393,9 @@ export class PrintJobsService {
         data: {
           orderNo,
           type:        'print',
+          // channel: 一体机现场下单。两端建单写的字段相同（小程序侧 terminalId 是用户选的门店），
+          // 不显式标注则会员单无法区分来源——见 docs/product/miniapp-console-sharing-2026-08.md M1。
+          channel:     'kiosk',
           printTaskId: task.id,
           endUserId:   ctx.endUserId ?? null,
           terminalId:  targetTerminalId,

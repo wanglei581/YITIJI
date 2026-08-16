@@ -203,6 +203,21 @@ async function main() {
       pass('1. 合法签名 fileUrl + 目标终端 → 创建任务 pending')
     } else fail(`1. 创建异常: ${JSON.stringify(created)}`)
 
+    // M1 渠道标注：一体机建单必须落 channel='kiosk'。
+    // 不显式标注则会员单无法与小程序云单区分（两端写的 terminalId/endUserId 相同），
+    // 渠道对比与转化统计全部失真。见 docs/product/miniapp-console-sharing-2026-08.md §六 T-M1。
+    {
+      const kioskOrder = await prisma.order.findFirst({
+        where: { printTaskId: created.taskId },
+        select: { channel: true },
+      })
+      if (kioskOrder?.channel === 'kiosk') {
+        pass("1a. 一体机建单落 channel='kiosk'")
+      } else {
+        fail(`1a. 一体机建单 channel 应为 'kiosk'，实际: ${JSON.stringify(kioskOrder?.channel)}`)
+      }
+    }
+
     await expectCode(
       () => printJobs.create({ fileUrl: signFileUrl(contractSourceFileId, 30 * 60 * 1000).url }, { terminalId }),
       'PRINT_CONTRACT_SOURCE_FORBIDDEN',
