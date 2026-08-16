@@ -943,7 +943,7 @@ const api = {
     return request('/assistant/daily-report', { method: 'POST', needAuth: false, timeout: config.aiTimeout });
   },
 
-  // ---------- 合同审查（后端 contract-review.controller.ts 已实现，此前小程序零引用） ----------
+  // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
   /**
    * 合同类型白名单，与服务端 dto/contract-review.dto.ts 的 CONTRACT_TYPES 一一对应。
    * 服务端用 @IsIn 强校验，前端传错值会 400，因此不要在页面里另写字面量。
@@ -951,9 +951,34 @@ const api = {
   CONTRACT_TYPES: ['labor_contract', 'internship_agreement', 'non_compete', 'offer'],
 
   /**
+   * 上传待审查合同原件。purpose 必须是 contract_upload，不能借用 print_doc：
+   *   1. contract-review.service.ts:178 只认 contract_upload，别的 purpose 一律
+   *      404 CONTRACT_REVIEW_SOURCE_NOT_FOUND（extraction 侧还有第二道拦截）；
+   *   2. 该 purpose 在服务端被判为 highly_sensitive，并由 retention-policy 锁定
+   *      两小时寿命（retentionLockedReason=contract_review_session_only），
+   *      换成别的 purpose 等于把合同按普通打印件留存。
+   * formData 只能带 purpose：KioskUploadOptionsDto 只白名单了 purpose 一个字段，
+   * 全局 forbidNonWhitelisted:true 会把 originalFilename 之类的多余字段直接 400。
+   */
+  uploadContractFile(filePath) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return uploadFile('/files/kiosk-upload', filePath, {
+      name: 'file',
+      formData: { purpose: 'contract_upload' },
+      needAuth: true,
+    });
+  },
+
+  /**
    * 取同意范围。必须先调这个：create 需要回传 consentVersion / consentScopeHash /
    * disclaimerVersion，服务端据此校验用户确实看过当前版本的告知内容。
    * 这是一道刻意设置的合规闸门，不能在前端伪造这几个值绕过去。
+   *
+   * 返回形状（contract-review-consent.service.ts:79-89 的 ContractReviewPublicConsentScope）：
+   *   { consentVersion, consentScopeHash,
+   *     disclaimer: { id, version, content, publishedAt },
+   *     disclosures: {...} }
+   * ⚠️ 顶层没有 disclaimerVersion，版本号在 disclaimer.version。
    */
   getContractConsentScope() {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
@@ -961,8 +986,35 @@ const api = {
   },
 
   /**
-   * 建审查任务。sourceFileId 来自 uploadPrintFile() 的上传结果；
-   * consent* 四个字段原样透传 getContractConsentScope() 的返回，不要自行构造。
+   * 会员合同审查 AI 授权状态。/me/ai-consents/status 返回全部 scope 的数组。
+   * 注意 granted=true 还不够：create 会额外要求授权事件的 grantedAt 不早于
+   * 当前生效免责声明的 publishedAt（contract-review.service.ts:232-239），
+   * 所以调用方必须再拿 grantedAt 与 consent-scope 的 disclaimer.publishedAt 比对。
+   */
+  getMemberContractConsent() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/me/ai-consents/status', { method: 'GET', needAuth: true }).then((list) => {
+      const item = Array.isArray(list) ? list.find((v) => v && v.scope === 'contract_review') : null;
+      return item || { scope: 'contract_review', granted: false, grantedAt: null };
+    });
+  },
+
+  /**
+   * 授予合同审查 AI 授权。会员路径的 create 走 requireActiveConsentInTransaction，
+   * 服务端没有授权记录就 403 USER_AI_CONSENT_REQUIRED —— 只在前端弹窗点"同意"没用。
+   * 服务端是 append-only 事件表，每次调用写一条新授权时间，不覆盖历史。
+   */
+  grantMemberContractConsent() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/me/ai-consents', {
+      method: 'POST', data: { scope: 'contract_review' }, needAuth: true,
+    });
+  },
+
+  /**
+   * 建审查任务。sourceFileId 来自 uploadContractFile() 的上传结果；
+   * consent* 四个字段原样透传 getContractConsentScope() 的返回，不要自行构造，
+   * 其中 disclaimerVersion 取 scope.disclaimer.version。
    * @param {{sourceFileId:string, contractType:string, consentVersion:string,
    *          consentedAt:string, consentScopeHash:string, disclaimerVersion:string}} payload
    */
@@ -971,13 +1023,24 @@ const api = {
     return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true });
   },
 
-  /** 轮询任务状态。 */
+  /**
+   * 轮询任务状态。这也是**唯一**能拿到审查结论的地方：
+   * status='completed' 时 result 里带 findings 与各优先级计数
+   * （contract-review.types.ts:153-168 的 ContractReviewTaskView）。
+   */
   getContractReview(id) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'GET', needAuth: true });
   },
 
-  /** 确认解析范围（页数与是否截断），由用户在看到实际识别页数后确认。 */
+  /**
+   * 确认解析范围。totalPages / analyzedPages / truncated 必须与轮询响应逐字段相等
+   * （lifecycle 的 assertConfirmation 做 matchesExtraction 比对，不等就 400）。
+   * ocrCoverageConfirmed / personalUseConfirmed 是两个 @Equals(true) 必填项，
+   * 代表用户确认了识别范围与个人用途——页面必须真的让用户勾选，不能默认写死。
+   * @param {{contractType:string,totalPages:number,analyzedPages:number,
+   *          truncated:boolean,ocrCoverageConfirmed:true,personalUseConfirmed:true}} payload
+   */
   confirmContractReview(id, payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
@@ -985,13 +1048,11 @@ const api = {
     });
   },
 
-  /** 生成审查报告。 */
-  getContractReviewReport(id) {
-    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
-    return request(`/contract-reviews/${encodeURIComponent(id)}/report`, {
-      method: 'POST', needAuth: true, timeout: config.aiTimeout,
-    });
-  },
+  // ⚠️ 故意不提供 POST /contract-reviews/:id/report 的封装。
+  // 该端点返回的是**报告 PDF 的文件元数据**（ContractReviewReportView），里面没有
+  // findings；结论一直在 getContractReview() 的 result 里。而调用它会有两个副作用：
+  // 服务端 deleteSource 删掉合同原文，且生成一份带 abandonToken 的高敏 PDF——
+  // 不消费 abandonToken 就没人回收。将来要做"打印审查报告"再单独设计整条回收链路。
 
   /** 删除审查记录。合同属敏感文件，用户放弃时应即时清除而非留存。 */
   deleteContractReview(id) {

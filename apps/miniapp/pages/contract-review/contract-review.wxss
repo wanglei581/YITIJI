@@ -19,9 +19,6 @@ page { background: var(--paper); }
 .risk-item { margin-top: 14rpx; padding: 22rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid var(--line-soft); }
 .risk-h { display: flex; align-items: center; gap: 12rpx; }
 .risk-lv { padding: 3rpx 14rpx; border-radius: 8rpx; font-size: 20rpx; font-weight: 700; }
-.lv-high { background: #FFEBEE; color: #C62828; }
-.lv-medium { background: #FFF6E6; color: #A96A08; }
-.lv-low { background: #E7EDFD; color: #1A3FB8; }
 .risk-t { flex: 1; font-size: 27rpx; font-weight: 700; color: var(--ink); }
 .risk-d { margin-top: 12rpx; font-size: 25rpx; color: var(--ink-soft); line-height: 1.6; }
 .risk-q { margin-top: 12rpx; padding: 14rpx; border-radius: 14rpx; background: var(--surface-2); font-size: 23rpx; color: var(--muted); line-height: 1.6; }
@@ -30,9 +27,30 @@ page { background: var(--paper); }
 .tab-spacer { height: 60rpx; }
 .risk-ask { margin-top: 12rpx; padding: 14rpx; border-radius: 14rpx; background: var(--teal-wash); font-size: 23rpx; color: var(--teal-deep); line-height: 1.6; }
 .risk-un { margin-top: 10rpx; font-size: 22rpx; color: var(--muted); line-height: 1.55; }
-.lv-high { background: #FFEBEE; color: #C62828; }
-.lv-medium { background: #FFF6E6; color: #A96A08; }
-.lv-low { background: #E7EDFD; color: #1A3FB8; }
 .lv-p1 { background:#FFEBEE; color:#C62828; }
 .lv-p2 { background:#FFF6E6; color:#A96A08; }
 .lv-p3 { background:#EDF0F5; color:#43506B; }
+
+/* 敏感个人信息单独同意 / 分析范围逐条确认 */
+.sens-card { margin-top: 20rpx; padding: 24rpx; border-radius: 26rpx; background: var(--wheat-wash); border: 1rpx solid var(--wheat-soft); }
+.sens-t { font-size: 27rpx; font-weight: 750; color: var(--wheat-deep); }
+.sens-d { margin-top: 12rpx; font-size: 24rpx; color: var(--ink-soft); line-height: 1.65; }
+.ck-row { margin-top: 16rpx; min-height: 96rpx; padding: 18rpx 20rpx; border-radius: 20rpx; background: #fff; border: 1rpx solid var(--line-soft); display: flex; align-items: center; gap: 16rpx; }
+.ck { width: 40rpx; height: 40rpx; flex-shrink: 0; border-radius: 10rpx; border: 2rpx solid var(--ghost); background: #fff; }
+.ck.on { border-color: var(--teal); background: var(--teal); position: relative; }
+.ck.on::after { content: ''; position: absolute; left: 13rpx; top: 6rpx; width: 10rpx; height: 20rpx; border: solid #fff; border-width: 0 4rpx 4rpx 0; transform: rotate(45deg); }
+.ck-t { flex: 1; font-size: 24rpx; color: var(--ink); line-height: 1.55; }
+
+/* 免责声明全文：版本号必须能对应到用户真正看到的内容 */
+.disc-card { margin-top: 20rpx; padding: 22rpx; border-radius: 26rpx; background: #fff; border: 1rpx solid var(--line-soft); }
+.disc-t { font-size: 25rpx; font-weight: 700; color: var(--ink); }
+.disc-body { margin-top: 12rpx; max-height: 360rpx; }
+.disc-x { font-size: 23rpx; color: var(--ink-soft); line-height: 1.7; white-space: pre-wrap; }
+
+.cr-cta.off { background: var(--surface-3); color: var(--ghost); box-shadow: none; }
+.cr-warn { margin-top: 16rpx; padding: 18rpx; border-radius: 16rpx; background: var(--warn-soft); color: var(--wheat-deep); font-size: 24rpx; line-height: 1.6; }
+
+.sum-card { margin-top: 16rpx; padding: 22rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid var(--line-soft); }
+.sum-row { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.sum-x { padding: 8rpx 16rpx; border-radius: 10rpx; font-size: 23rpx; font-weight: 700; }
+.sum-n { margin-top: 14rpx; font-size: 23rpx; color: var(--muted); line-height: 1.6; }
