@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import type {
   JobAiExplanationPayload,
   JobAiExplanationLlmResult,
@@ -55,7 +56,11 @@ export class JobAiLlmService {
       `描述=${(job.description ?? '').slice(0, 600)}`,
       `要求=${(job.requirements ?? '').slice(0, 600)}`,
     ].join('\n')).join('\n\n')
-    const user = `【简历原文】\n${resumePlainText.slice(0, 6000)}\n\n【候选岗位】\n${jobLines}`
+    // S0-2 红线：简历原文送模型前必须遮盖高置信 PII（姓名/手机/身份证/邮箱/住址）。
+    // 岗位推荐的产物只有 jobId / fitLevel / 参考说明，不回填任何身份字段，
+    // 因此这里只需遮盖，不需要 restore()。
+    const maskedResume = maskUserTextForLlmText(resumePlainText.slice(0, 6000), 'job_recommend')
+    const user = `【简历原文】\n${maskedResume}\n\n【候选岗位】\n${jobLines}`
     const raw = await this.callLlm(system, user, 'jobRecommend')
     const parsed = parseJson(raw.text)
     if (!Array.isArray(parsed)) throw unavailable('AI_JOB_RECOMMEND_FAILED', '岗位推荐生成失败，请稍后重试')
