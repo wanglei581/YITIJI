@@ -697,6 +697,74 @@ const api = {
     return request(`/me/browse-logs/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
   },
 
+  /** 本人外部跳转记录；只表示打开过来源平台/官方入口，不表示投递或预约结果。 */
+  getMyJumpLogs(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('跳转记录'));
+    return unwrapList(request('/me/external-jump-logs', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  deleteMyJumpLog(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除跳转记录'));
+    return request(`/me/external-jump-logs/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
+
+  /**
+   * 上报一次浏览。后端 ActivityController 为可选登录：匿名会诚实返回
+   * { recorded:false, reason:'LOGIN_REQUIRED' } 且不落库，故调用方只在登录态发。
+   * body 只收 targetType/targetId/terminalId，来源名称与外链一律由服务端从
+   * 「已审核+已发布」目标补齐，前端伪造不了；目标未发布 → 404。
+   * @param {{targetType:string,targetId:string}} payload targetType ∈
+   *        job | job_fair | policy | company_profile | fair_company
+   */
+  recordBrowseActivity(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('浏览记录上报'));
+    return request('/activity/browse', { method: 'POST', data: payload, needAuth: true });
+  },
+
+  /**
+   * 上报一次「打开来源平台 / 官方入口」。action 必须与 targetType 匹配，否则 400：
+   *   job / fair_company        → external_apply
+   *   job_fair                  → external_appointment | external_checkin_open
+   *   policy / company_profile  → external_open
+   */
+  recordJumpActivity(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('跳转记录上报'));
+    return request('/activity/external-jump', { method: 'POST', data: payload, needAuth: true });
+  },
+
+  /**
+   * 本人收藏列表。type ∈ job | job_fair | policy（后端 FAVORITE_TARGET_TYPES，
+   * 没有企业）；缺省返回全部。返回数组附 .nextCursor / .total。
+   * 条目字段只有 { id, targetType, targetId, title|null, createdAt }。
+   */
+  getMyFavorites(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return unwrapList(request('/me/favorites', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  /**
+   * 新增收藏（服务端 upsert 幂等）。AddFavoriteDto 走 whitelist +
+   * forbidNonWhitelisted，多传任何字段都会 400；title 服务端一律忽略并从
+   * 「已审核+已发布」目标重新派生，所以这里不传。目标未发布 → 404。
+   */
+  addMyFavorite(targetType, targetId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return request('/me/favorites', {
+      method: 'POST',
+      data: { targetType, targetId },
+      needAuth: true,
+    });
+  },
+
+  /** 取消收藏（幂等，未收藏也返回 { removed:false } 而不是报错）。 */
+  removeMyFavorite(targetType, targetId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return request(
+      `/me/favorites/${encodeURIComponent(targetType)}/${encodeURIComponent(targetId)}`,
+      { method: 'DELETE', needAuth: true },
+    );
+  },
+
   /**
    * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
    * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan

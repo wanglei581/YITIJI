@@ -26,7 +26,43 @@
 
   <view class="content fav-content">
 
-    <view class="card" wx:if="{{list.length}}">
+    <!-- 未登录：功能不消失，本机收藏照常可用，但如实说明不跨设备 -->
+    <view class="fav-bar" wx:if="{{!loggedIn && state !== 'loading'}}">
+      <view class="fav-bar-body">
+        <view class="fav-bar-t">收藏当前只存在这台手机上</view>
+        <view class="fav-bar-d">登录后收藏保存到账号，一体机上也能看到同一份。</view>
+      </view>
+      <view class="btn ghost sm" bindtap="goLogin">去登录</view>
+    </view>
+
+    <!-- 登录后仍有本机旧收藏：显式合并，不自动上传、不静默丢弃 -->
+    <view class="fav-bar" wx:elif="{{loggedIn && mergeCount > 0}}">
+      <view class="fav-bar-body">
+        <view class="fav-bar-t">本机还有 {{mergeCount}} 条收藏未同步</view>
+        <view class="fav-bar-d">这些是登录前收藏的内容，同步后可在一体机上看到。</view>
+      </view>
+      <view class="btn ghost sm {{merging ? 'disabled' : ''}}" bindtap="doMerge">同步到账号</view>
+    </view>
+
+    <view class="card" wx:if="{{state === 'loading'}}">
+      <view class="empty-slot compact">
+        <view class="es-t">正在加载收藏…</view>
+      </view>
+    </view>
+
+    <!-- 失败态与空态严格分开：加载不出来不得显示成"还没有收藏" -->
+    <view class="card" wx:elif="{{state === 'error'}}">
+      <view class="empty-slot compact">
+        <view class="es-t">加载失败</view>
+        <view class="es-d">{{loadError}}</view>
+        <view class="es-actions">
+          <view class="btn ghost sm" bindtap="retryLoad">重新加载</view>
+          <view class="btn ghost sm" wx:if="{{!loggedIn}}" bindtap="goLogin">去登录</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{list.length}}">
       <view
         class="fav-item tap"
         wx:for="{{list}}"
@@ -35,16 +71,19 @@
         data-id="{{item.id}}"
         bindtap="openItem"
       >
-        <view class="fav-ic tone-{{item.tone}}">{{item.initial}}</view>
+        <view class="fav-ic tone-{{item.tone}}"><text class="ficon i-{{item.icon}}"></text></view>
         <view class="fav-body">
           <view class="fav-t">{{item.title}}</view>
           <view class="fav-sub">{{item.sub}}</view>
           <view class="fav-tags">
             <text class="fav-salary" wx:if="{{item.salary}}">{{item.salary}}</text>
             <view class="chip {{item.tagTone}}" wx:if="{{item.tag}}">{{item.tag}}</view>
+            <view class="chip" wx:if="{{item.pending}}">未同步</view>
           </view>
         </view>
-        <view wx:if="{{managing}}" class="fav-star tap" hover-class="tap-press" catchtap="unfav" data-id="{{item.id}}">✕</view>
+        <view wx:if="{{managing}}" class="fav-star tap" hover-class="tap-press" catchtap="unfav" data-id="{{item.id}}">
+          <text class="ficon i-close"></text>
+        </view>
       </view>
     </view>
 
@@ -52,12 +91,14 @@
       <view class="empty-slot">
         <text class="ficon i-inbox es-ic"></text>
         <view class="es-t">还没有收藏</view>
-        <view class="es-d">在岗位、招聘会与企业页面点收藏后可在此查看</view>
+        <view class="es-d">在岗位、招聘会、政策与企业页面点收藏后可在此查看</view>
       </view>
     </view>
 
+    <view class="fav-note" wx:if="{{tabNote}}">{{tabNote}}</view>
+
     <view class="compliance-note">
-      收藏的岗位来自第三方平台。投递请前往来源平台,本终端仅提供信息浏览与跳转。
+      收藏的岗位与招聘会来自第三方平台。投递与预约请前往来源平台,本终端仅提供信息浏览与跳转。
     </view>
 
   </view>

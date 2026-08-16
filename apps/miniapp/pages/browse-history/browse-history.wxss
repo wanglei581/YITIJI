@@ -65,6 +65,44 @@
   color: var(--faint);
 }
 
+.hs-del {
+  flex-shrink: 0;
+  height: 56rpx;
+  padding: 0 22rpx;
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-full);
+  font-size: 23rpx;
+  font-weight: 600;
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+/* 登录引导条 */
+.hs-bar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+  padding: 24rpx 26rpx;
+  border-radius: var(--r);
+  background: var(--teal-wash);
+  border: 1rpx solid var(--line-faint);
+}
+.hs-bar-body { flex: 1; min-width: 0; }
+.hs-bar-t { font-size: 26rpx; font-weight: 600; color: var(--ink); }
+.hs-bar-d { margin-top: 6rpx; font-size: 22rpx; color: var(--muted); line-height: 1.5; }
+
+/* 数据归属说明：本机 / 账号必须写清楚 */
+.hs-note {
+  margin-top: 20rpx;
+  padding: 0 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.hs-clear { margin-top: 20rpx; display: flex; justify-content: center; }
+
 .empty-slot {
   padding: 60rpx 20rpx;
   display: flex;
@@ -72,6 +110,15 @@
   align-items: center;
   text-align: center;
 }
+.empty-slot.compact { padding: 38rpx 20rpx; }
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.es-actions {
+  margin-top: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex-wrap: wrap;
+  justify-content: center;
+}

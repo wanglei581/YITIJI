@@ -8,8 +8,8 @@
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">浏览与跳转记录</view>
-      <view class="nav-right tap" hover-class="tap-press" bindtap="clear">
-        <text class="nav-caps">清空</text>
+      <view class="nav-right tap" hover-class="tap-press" bindtap="toggleManage">
+        <text class="nav-caps">{{managing ? '完成' : '管理'}}</text>
       </view>
     </view>
   </view>
@@ -26,7 +26,34 @@
       >{{item.label}}</view>
     </view>
 
-    <block wx:if="{{groups.length}}">
+    <view class="hs-bar" wx:if="{{!loggedIn && state !== 'loading'}}">
+      <view class="hs-bar-body">
+        <view class="hs-bar-t">记录当前只存在这台手机上</view>
+        <view class="hs-bar-d">登录后浏览与跳转记录保存到账号，一体机上也能回看同一份。</view>
+      </view>
+      <view class="btn ghost sm" bindtap="goLogin">去登录</view>
+    </view>
+
+    <view class="card" wx:if="{{state === 'loading'}}">
+      <view class="empty-slot compact">
+        <view class="es-t">正在加载记录…</view>
+      </view>
+    </view>
+
+    <!-- 失败态与空态严格分开：加载不出来不得显示成"暂无浏览记录" -->
+    <view class="card" wx:elif="{{state === 'error'}}">
+      <view class="empty-slot compact">
+        <view class="es-t">加载失败</view>
+        <view class="es-d">{{loadError}}</view>
+        <view class="es-actions">
+          <view class="btn ghost sm" bindtap="retryLoad">重新加载</view>
+          <view class="btn ghost sm" wx:if="{{hasLocal}}" bindtap="showLocalCache">查看本机缓存</view>
+          <view class="btn ghost sm" wx:if="{{!loggedIn}}" bindtap="goLogin">去登录</view>
+        </view>
+      </view>
+    </view>
+
+    <block wx:elif="{{groups.length}}">
       <view class="card" wx:for="{{groups}}" wx:key="day" wx:for-item="g">
         <view class="hs-day">{{g.day}}</view>
         <view
@@ -47,7 +74,8 @@
               <text class="hs-src">来源:{{hs.source}}</text>
             </view>
           </view>
-          <view class="hs-time">{{hs.time}}</view>
+          <view wx:if="{{managing}}" class="hs-del tap" hover-class="tap-press" catchtap="removeItem" data-rid="{{hs.rid}}">删除</view>
+          <view wx:else class="hs-time">{{hs.time}}</view>
         </view>
       </view>
     </block>
@@ -58,6 +86,12 @@
         <view class="es-t">暂无浏览记录</view>
         <view class="es-d">浏览岗位、招聘会、企业与政策后可在此回看</view>
       </view>
+    </view>
+
+    <view class="hs-note" wx:if="{{note && state === 'ready'}}">{{note}}</view>
+
+    <view class="hs-clear" wx:if="{{managing && hasLocal}}">
+      <view class="btn ghost sm" bindtap="clearLocal">清空本机记录</view>
     </view>
 
     <view class="compliance-note">

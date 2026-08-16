@@ -299,12 +299,16 @@ for (const f of jsFiles.filter((x) => x.startsWith('./pages/'))) {
 if (datasetErrors.length) bad('dataset 绑定完整', datasetErrors.join('; '))
 else ok('dataset 绑定完整')
 
-const validIcons = new Set([
-  'i-aim','i-bank','i-bell','i-calendar','i-comment','i-compass','i-crown',
-  'i-edit','i-file-search','i-file-text','i-folder','i-form','i-history','i-home',
-  'i-inbox','i-info','i-link','i-location','i-printer','i-right','i-robot',
-  'i-scan','i-search','i-setting','i-solution','i-thunder','i-upload','i-user',
-])
+// 从 app.wxss 实际定义推导，不再维护硬编码清单。
+// 硬编码列表必然相对样式表漂移：i-close 已在 app.wxss 定义却不在旧清单里，
+// 导致真实可用的图标被判为违规；反过来漂移则会放过真正缺定义的图标。
+// 这里要守的不变量是「页面用到的每个图标都有 CSS 定义」，
+// 唯一可靠的事实来源就是 app.wxss 本身。
+const validIcons = new Set(
+  [...read('app.wxss').matchAll(/\.(i-[a-z0-9-]+)\s*(?:,|\{|::)/g)].map((m) => m[1]),
+)
+if (validIcons.size >= 20) ok(`图标定义已从 app.wxss 推导（${validIcons.size} 个）`)
+else bad('图标定义已从 app.wxss 推导', `只解析到 ${validIcons.size} 个，app.wxss 可能未被正确读取`)
 const invalidIcons = []
 for (const f of wxmlFiles) {
   for (const match of read(f).matchAll(/class="([^"]*\bficon\b[^"]*)"/g)) {
