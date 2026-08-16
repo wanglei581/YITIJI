@@ -282,6 +282,25 @@
     background: repeating-linear-gradient(to bottom, var(--paper-200) 0 7px, transparent 7px 19px);
   }
 
+  /* 简历原文正文（2026-08-16，v6 密度审查 Top 10 #4）───────────────────
+     原来是 11 处内联 `font-size:11px`。11px 在这块屏站姿 600mm 下是 19.6′，
+     中文笔画糊成一团 —— 而这一页的核心交互恰恰是
+     「点右边任意一条诊断，左边原文定位到具体位置」，
+     也就是**要求用户读这段原文去核对 AI 的判断**。读不了，这条交互就是空的：
+     用户只能选择盲信模型，而本设计稿处处在说"结论仅供参考、最终由你判断"。
+
+     提到 --fz-2(15px, 26.8′)＝正文下限。为什么不怕撑破纸面：
+     .sheet-a4 是 aspect-ratio 1/1.414 的定比例盒子，但页内正文下方是
+     .lnrest（flex:1 1 auto 的版面示意条），字号变大只会**吃掉示意条的高度**，
+     不会顶出 overflow:hidden，也不会动任何一处命中标记（.hit / .gapline）。
+     实测 516px 宽纸面、左右各 46px 内边距 → 行宽 424px ≈ 28 字/行，仍在 30–35 字舒适区内。
+
+     注意这里**不是**"把纸面按屏幕重排"：页码、页边距、分页位置全部照旧，
+     变的只有正文字号 —— 屏上看纸，纸的字也得看得见。 */
+  .sheet-a4 .rs-body {
+    font-size: var(--fz-2); line-height: 1.75; color: var(--paper-ink);
+  }
+
   /* s4「两条底线」展开后的正文与小标题 */
   .p09-line { margin: var(--s-4) 0 0; font-size: var(--fz-2); color: var(--fog-700); line-height: 1.65; }
   .pane-sub { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--brd-1);
@@ -323,10 +342,9 @@
      扫码就能把这一版拿到自己手机上，这才是「离开之前先把东西弄安全」的真解。
      并且只挂 s5：只有第 5 步手里有那一版成品。文末有对应的 lg:keep 监听。 -->
 <div class="screen" data-state="default" data-stage="s1" data-job="ok" data-theme="warm"
-     data-guard-at="s2 s3 s4 s5"
+     data-guard-at="s2 s3 s5"
      data-guard-lose-s2="刚上传的简历原件和正在解析的结果"
      data-guard-lose-s3="这份简历的六维诊断结论"
-     data-guard-lose-s4="诊断结论和你已经选定的逐条改写"
      data-guard-lose-s5="改好的这一版简历（原件不受影响，还在你手里）"
      data-guard-keep-s5="先扫码把这一版带走">
 
@@ -353,7 +371,12 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">简历来源</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">正在解析</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">诊断结论</span></button>
-      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></button>
+      <!-- 2026-08-16：第 4 步「逐条优化」已拆到 09b-resume-optimize.html 单独成页。
+           必须写成 <a> 而不是 data-go="s4" —— 阶段机的 data-go 点击处理**不做校验**
+           （stages.js:37 直接 apply()），本页删掉 s4 之后再点 data-go="s4"
+           会把所有 data-at 门控内容一起隐藏，整屏空白。
+           拆页理由与「原来在哪→现在在哪」见 09b 页首注释。 -->
+      <a class="rstep" href="09b-resume-optimize.html" style="text-decoration:none"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></a>
       <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 5 步</span>
@@ -704,19 +727,19 @@
             <div class="hr"></div>
             <div class="sec">工作经历</div>
             <div class="ln"></div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               2024.03–2026.06　某科技公司　运营专员<br>
               · <span class="hit" data-ev="i2">负责公众号日常运营与活动策划，配合完成各项运营工作</span><br>
               · <span class="hit" data-ev="i2">协助部门完成月度目标，参与用户增长相关项目</span><br>
               · 维护用户社群，处理日常反馈
             </div>
             <div class="sec">项目经历</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               校园推广项目　负责人<br>
               · <span class="hit" data-ev="i3">带领团队完成校园地推，效果良好</span>
             </div>
             <div class="sec">技能</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               Excel · SQL · Photoshop · 英语六级
             </div>
             <div class="gapline" data-ev="i4" style="margin-top:8px">这里缺一句：技能栏写了 SQL，但整份简历没有一句说明用它做过什么。</div>
@@ -726,18 +749,18 @@
           <!-- 2026-08-09 留白复核：预览本就是「多页连续滚动」，补第 2 页与 3 页 persona 一致 -->
           <div class="sheet-a4" data-when="default ai-down device-off">
             <div class="sec">项目经历（续）</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               社群促活月计划　执行<br>
               · 策划早晚打卡活动，维护 3 个 500 人群<br>
               · 输出周报，向运营主管同步数据
             </div>
             <div class="sec">校园经历</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               校学生会宣传部　干事<br>
               · 负责活动海报与推文排版
             </div>
             <div class="sec">证书</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               大学英语六级 · 普通话二级甲等
             </div>
             <div class="ln ln--m"></div><div class="ln ln--s"></div>
@@ -779,73 +802,7 @@
       </div>
 
       <!-- S4 逐条优化 -->
-      <div class="diff" data-at="s4">
-        <div class="diff-hd" data-when="default device-off">
-          <span><svg class="ic" style="width:17px;height:17px;color:var(--fog-600)"><use href="#i-file"/></svg>你写的（原件不会被改）</span>
-          <span><svg class="ic" style="width:17px;height:17px;color:var(--jade-500)"><use href="#i-brain"/></svg>候选改写 <span class="ev ev--e3">E3 AI 判断，仅供参考</span></span>
-        </div>
-        <div class="diff-body" data-when="default device-off">
-          <div class="pair pair--taken">
-            <div class="pair-box">负责公众号日常运营与活动策划，配合完成各项运营工作</div>
-            <div class="pair-box pair-box--new">
-              <span>独立运营公众号（<ins>粉丝 1.2 万</ins>），策划 <ins>8 场</ins>活动，<ins>单场最高带来 340 个新增关注</ins></span>
-              <span class="pair-why">原句没有可核对的数字。<b>数字要你自己填真实值。</b></span>
-              <span class="taken-flag" style="color:var(--amber-600)"><svg class="ic"><use href="#i-alert"/></svg>已采纳 · <b>3 个数字待你核实</b>，核实后才进 v2</span>
-              <span class="pair-act"><button class="btn btn--ghost">逐个核实数字</button><button class="btn btn--quiet">改回原文</button></span>
-            </div>
-          </div>
-          <div class="pair">
-            <div class="pair-box">协助部门完成月度目标，参与用户增长相关项目</div>
-            <div class="pair-box pair-box--new">
-              <span><del>协助</del><ins>承担</ins>用户增长项目中的<ins>渠道投放与数据复盘</ins>，<ins>月度目标连续 4 个月达成</ins></span>
-              <span class="pair-why">改动理由：「协助 / 参与」看不出你做了什么。把动作换成你实际负责的环节。</span>
-              <span class="pair-act">
-                <button class="btn btn--primary" style="min-height:48px;font-size:var(--fz-2)">采纳</button>
-                <button class="btn btn--ghost">保留原文</button>
-                <button class="btn btn--quiet">换一版</button>
-              </span>
-            </div>
-          </div>
-          <div class="pair">
-            <div class="pair-box">带领团队完成校园地推，效果良好</div>
-            <div class="pair-box pair-box--new">
-              <span>带 <ins>5 人</ins>团队在 <ins>3 所</ins>高校完成地推，<ins>累计触达 2000+ 学生，转化率 12%</ins>；「效果良好」<del>已删</del></span>
-              <span class="pair-why">改动理由：「效果良好」是自我评价，不是事实。团队规模与转化数据是可核对的。</span>
-              <span class="pair-act">
-                <button class="btn btn--primary" style="min-height:48px;font-size:var(--fz-2)">采纳</button>
-                <button class="btn btn--ghost">保留原文</button>
-                <button class="btn btn--quiet">换一版</button>
-              </span>
-            </div>
-          </div>
-          <div class="pair">
-            <div class="pair-box" style="border-style:dashed;color:var(--fog-600)">（技能栏只列了 SQL，正文里没有任何一句用到它）</div>
-            <div class="pair-box pair-box--new">
-              <span>建议在工作经历里补一句：用 SQL <ins>做过什么查询 / 出过什么报表 / 支撑了什么决策</ins></span>
-              <span class="pair-why">岗位要求熟练取数，看不到证据就当没有。<b>这句要你自己写。</b></span>
-              <span class="pair-act">
-                <button class="btn btn--ghost">我来补写</button>
-                <button class="btn btn--quiet">先跳过</button>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="locked" data-when="ai-down first">
-          <svg class="ic"><use href="#i-offline"/></svg>
-          <b data-when="ai-down">改写服务中断</b>
-          <b data-when="first">还没有简历</b>
-          <p data-when="ai-down">改写不可用，<b>你的原件完好</b>。</p>
-          <p data-when="first">先给一份简历，再来这里逐条优化。</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="ai-down">
-            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s4"><svg class="ic"><use href="#i-printer"/></svg>带去打印：原件 1 份 · 共 3 页</a>
-            <button class="btn btn--ghost">存进「我的文档」</button>
-          </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="first">
-            <a class="btn btn--primary" href="10-resume-interview.html"><svg class="ic"><use href="#i-brain"/></svg>让小青问你几个问题</a>
-            <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
-          </div>
-        </div>
-      </div>
+      
 
       <!-- S5 版本与导出：当前版本预览 -->
       <div class="paper" data-at="s5">
@@ -864,14 +821,14 @@
             <div class="meta">求职意向：运营专员 · 广州 · 电话 138****2046</div>
             <div class="hr"></div>
             <div class="sec">工作经历</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               2024.03–2026.06　某科技公司　运营专员<br>
               · <span class="hit hit--on">独立运营公众号（粉丝 1.2 万），策划 8 场活动，单场最高带来 340 个新增关注</span><br>
               · 协助部门完成月度目标，参与用户增长相关项目<br>
               · 维护用户社群，处理日常反馈
             </div>
             <div class="sec">项目经历</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               校园推广项目　负责人<br>
               · <span class="hit hit--on">带 5 人团队在 3 所高校完成地推，累计触达 2000+ 学生，转化率 12%</span>
             </div>
@@ -880,18 +837,18 @@
           </div>
           <div class="sheet-a4">
             <div class="sec">项目经历（续）</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               社群促活月计划　执行<br>
               · 策划早晚打卡活动，维护 3 个 500 人群<br>
               · 输出周报，向运营主管同步数据
             </div>
             <div class="sec">校园经历</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               校学生会宣传部　干事<br>
               · 负责活动海报与推文排版
             </div>
             <div class="sec">证书</div>
-            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+            <div class="rs-body">
               大学英语六级 · 普通话二级甲等
             </div>
             <div class="ln ln--m"></div><div class="ln ln--s"></div>
@@ -1213,32 +1170,7 @@
            这里按 first 态该有的内容补：那一态主区是「还没有简历」的空态，
            s4 的四个动作（采纳 / 保留原文 / 换一版 / 我来补写）一个都不在屏幕上，
            而它们正是这一步会发生的全部事情。四行照主区那四个按钮的原文写，不新增能力。 -->
-      <div class="pane" data-at="s4">
-        <div class="pane-hd">
-          <span class="t" data-when="default device-off ai-down">你已经决定了</span>
-          <span class="t" data-when="first">你会在这里决定什么</span>
-          <span class="s" data-when="default device-off">待决定 3 条</span>
-          <span class="s" data-when="first">四个动作</span>
-        </div>
-        <div class="kv" data-when="first">
-          <div class="kv-row"><span class="k">采纳</span><span class="v">这一条按候选改写走，数字核实过才进 v2</span></div>
-          <div class="kv-row"><span class="k">保留原文</span><span class="v">你写的那句原样留着，不进候选</span></div>
-          <div class="kv-row"><span class="k">换一版</span><span class="v">同一句再出一个候选，你接着挑</span></div>
-          <div class="kv-row"><span class="k">我来补写</span><span class="v">本机说不出的内容，留给你自己写</span></div>
-        </div>
-        <p class="p09-stepnote" data-when="first">
-          逐条按，<b>一条不按就什么都不会变</b>；v1 原件任何时候都不动。
-        </p>
-        <div class="kv" data-when="default device-off">
-          <div class="kv-row"><span class="k">已采纳待核实</span><span class="v" style="color:var(--amber-600)">1 处</span></div>
-          <div class="kv-row"><span class="k">保留原文</span><span class="v">0 处</span></div>
-          <div class="kv-row"><span class="k">待你决定</span><span class="v">3 处</span></div>
-          <div class="kv-row"><span class="k">需你自己写</span><span class="v" style="color:var(--amber-600)">1 处</span></div>
-        </div>
-        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
-          采纳且<b>数字核实过</b>的内容才进入 v2，<b>v1 原件不动</b>。任何时候都能在第 5 步回退。
-        </p>
-      </div>
+      
       <!-- ── 2026-08-11 卡内空洞整改（A27 同批）──────────────────────────────
            回归台报这张卡四态都空：default / device-off 583px（卡高 687）、
            ai-down 578px（682）、first 828px（932）—— 卡里原来只有标题加一句话。判 B。
@@ -1249,27 +1181,7 @@
            E1 / E2 / E3 那三行同理：每条候选改写旁边都挂着 E3 徽章，
            但三档各是什么，s4 一个字都没有（只在 s3 的 first 态那张卡里）。
            全部是页面已有口径的搬运与展开，没有新增任何结论、数字或能力。 -->
-      <div class="pane pane--fill pane--grow" data-at="s4">
-        <div class="pane-hd"><span class="t">两条底线</span><span class="s">按采纳之前先看这两条</span></div>
-        <div class="notice notice--amber">
-          <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>数字要你自己核对</b>；<b>AI 不替你编经历</b>。</span>
-        </div>
-        <p class="p09-line"><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是
-          <b>按你说过的内容填的示例，不是 AI 编的事实</b> —— 发出去之前请确认每一个数都是真的。
-          采纳且核实过的才进 v2。</p>
-        <p class="p09-line"><b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，
-          <b>不会凭空生成一段</b>；AI 只生成新版本，<b>永不覆盖原件</b>。</p>
-        <div class="pane-sub">每条候选改写旁边那个标是什么</div>
-        <div class="kv">
-          <div class="kv-row"><span class="k"><span class="ev ev--e1">E1 你的材料</span></span>
-            <span class="v">你自己写的那句话</span></div>
-          <div class="kv-row"><span class="k"><span class="ev ev--e2">E2 来源信息</span></span>
-            <span class="v">岗位公告等来源方给的事实</span></div>
-          <div class="kv-row"><span class="k"><span class="ev ev--e3">E3 AI 判断</span></span>
-            <span class="v">AI 写的，仅供参考 —— 候选改写都挂这一档</span></div>
-        </div>
-      </div>
+      
 
       <!-- S5 版本与导出 -->
       <div class="pane" data-at="s5">
@@ -1412,10 +1324,7 @@
         <div data-when="ai-down"><div class="t">诊断不可用，原文可正常翻看</div><div class="s">不猜、不给通用建议</div></div>
         <div data-when="first"><div class="t">还没有简历</div><div class="s">回第 1 步给一份</div></div>
       </div>
-      <div data-at="s4">
-        <div data-when="default device-off"><div class="t">逐条决定改不改，采纳的才进新版本</div><div class="s">数字要你自己核对 · AI 不替你编经历</div></div>
-        <div data-when="ai-down first"><div class="t">改写不可用</div><div class="s">原件完好，可打印或存档</div></div>
-      </div>
+      
       <div data-at="s5">
         <div data-when="default first ai-down"><div class="t">v2 已生成，v1 原件保留不被覆盖</div><div class="s">随时可回退 · 切换版本不销毁任何一版</div></div>
         <div data-when="device-off"><div class="t">v2 已生成，打印机离线</div><div class="s">可先存进「我的简历」换机取回打印</div></div>
@@ -1428,8 +1337,7 @@
     <button class="btn btn--lg btn--ghost" data-at="s2" data-job="upfail parsefail" data-go="s1">回第 1 步</button>
     <a class="btn btn--lg btn--ghost" data-at="s2" data-job="ocrlow" href="07-scan-workbench.html">重新扫描</a>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">换一份简历</button>
-    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看诊断</button>
-    <button class="btn btn--lg btn--ghost" data-at="s5" data-go="s4">继续优化</button>
+    <a class="btn btn--lg btn--ghost" data-at="s5" href="09b-resume-optimize.html">继续优化</a>
 
     <!-- 2026-08-10：原来这里直接 data-go="s2"，不选文件也能进解析。现在按 data-file 门控。 -->
     <button class="btn btn--primary" data-at="s1" data-src="none" data-src-go="local">上传简历文件<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -1442,11 +1350,9 @@
     <button class="btn btn--primary" data-at="s2" data-job="upfail" data-go="s1">重新上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="parsefail" data-job-go="ocrlow">按图片识别再试<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="ocrlow" data-job-go="ok" data-go="s3">核对完了，进诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default device-off">逐条优化<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default device-off" href="09b-resume-optimize.html">逐条优化<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s3">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="first" data-go="s1">回第 1 步<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-go="s5" data-when="default device-off">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="ai-down first" aria-disabled="true">改写不可用</button>
     <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历%20v2&amp;pages=3&amp;copies=5&amp;back=s5">带去：简历 v2 5 份 · 共 15 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s5" data-when="device-off">存我的文档 · 扫码带走<svg class="ic"><use href="#i-qr"/></svg></button>
   </div>

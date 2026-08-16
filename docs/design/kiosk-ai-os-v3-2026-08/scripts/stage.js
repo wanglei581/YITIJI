@@ -207,8 +207,17 @@
     var main = screen.querySelector('.main') || screen.querySelector('.sheet')
     out.主体纵向溢出 = main ? Math.max(0, main.scrollHeight - main.clientHeight) : 0
     // 触控尺寸
+    // 2026-08-16：补两个盲区（v6 密度审查 §S4）。
+    //   1) 选择器漏了 [data-href] / [onclick]。全站大量卡片是 <div data-href="…">
+    //      靠脚本跳转（34 的 8 个入口卡、06 的 6 张来源卡都是），根本不进检查集合。
+    //      今天它们尺寸达标是运气，不是门禁。
+    //   2) 只判高度不判宽度，且阈值写的是 47.5 —— 一个 30 宽 × 60 高的图标按钮判合格。
+    // 不加 .chip：实测 34px 的 .chip 全是状态标签而非可点目标，加进来会产生
+    // 100+ 条误报，把真问题淹掉。
     var small = []
-    var hit = screen.querySelectorAll('a,button,input,[role="button"],.tile,.step,.slab,.scene,.dir-row,.node')
+    var hit = screen.querySelectorAll(
+      'a,button,input,select,textarea,[role="button"],[data-href],[onclick],' +
+      '.tile,.step,.slab,.scene,.dir-row,.node')
     // .stage 为了塞进浏览器窗口会整体 transform: scale()，getBoundingClientRect 拿到的是缩放后的屏幕像素。
     // 0.33 倍预览下一个 48px 的按钮量出来是 16px —— 全部误报，还会把真实问题淹掉。
     // 触控尺寸的判据是 1080×1920 下的布局像素，所以先把缩放除掉。
@@ -223,7 +232,13 @@
       var b = hit[j].getBoundingClientRect()
       // 真实触控目标以外层包裹（label / 行容器）为准
       var wrap = hit[j].closest('label,.kv-row,.step,.readout,.node') || hit[j]
-      if (b.height / sc < 47.5 && wrap.getBoundingClientRect().height / sc < 47.5) small.push(hit[j])
+      var wb = wrap.getBoundingClientRect()
+      // 宽高都要够 48（CLAUDE.md §9）。内联链接（display:inline 的 <a>）不按块级
+      // 触控目标算 —— 它跟着正文走，行高就是它的高，单独判会全站误报。
+      if (getComputedStyle(hit[j]).display === 'inline' && hit[j].tagName === 'A') continue
+      var okSelf = b.width / sc >= 48 && b.height / sc >= 48
+      var okWrap = wb.width / sc >= 48 && wb.height / sc >= 48
+      if (!okSelf && !okWrap) small.push(hit[j])
     }
     out.触控不足48 = small.length
     // 文字裁切：容器比文字窄，字被切掉。
@@ -396,9 +411,63 @@
     }
     out.标点在行首 = lead.length
     window.__V3_LEAD__ = lead
+
+    // ⑥ 小字号（2026-08-16 补，v6 密度审查 §零 / §S1）。
+    //    判据不是"手感小"，是**站姿 600mm 视距下的视角**：
+    //      11px = 19.6′（中文笔画糊成一团）· 13px = 23.2′（辅助信息下限）· 15px = 26.8′（正文下限）
+    //    这块屏 0.311 mm/px（27 寸 16:9 转竖屏 1080×1920，约 81.6 PPI），
+    //    所以 13px 是**硬下限**，低于它的一律计入，不管挂的是什么类名。
+    //    只查"自己带文字"的元素：查容器会把父级重复计一遍。
+    var tiny = []
+    var texted = screen.querySelectorAll('*')
+    for (var ti = 0; ti < texted.length; ti++) {
+      var te = texted[ti]
+      if (te.offsetParent === null || te.hidden) continue
+      if (te.closest('[data-review],.aurora,.mesh,.grain')) continue
+      var ownTxt = ''
+      for (var tc = 0; tc < te.childNodes.length; tc++) {
+        if (te.childNodes[tc].nodeType === 3) ownTxt += te.childNodes[tc].nodeValue.trim()
+      }
+      if (!ownTxt) continue
+      var tfz = parseFloat(getComputedStyle(te).fontSize)
+      if (tfz < 13) tiny.push({ px: tfz, 文: ownTxt.slice(0, 24) })
+    }
+    out.字号不足13 = tiny.length
+    window.__V3_TINY__ = tiny
+
+    // ⑦ 孤字：末行只剩 1–2 个字（v6 密度审查 §S3）。
+    //    README §9.2 原本把它列为"只能人工看"，其实可以机器判 ——
+    //    判据就是渲染后行盒：末行宽度 / 字号 ≤ 2.2 个字宽。
+    //    18–22px 的标题掉一个字到第二行，站姿下非常刺眼。
+    var orphan = []
+    var rng3 = document.createRange()
+    var obs = screen.querySelectorAll('p,div,span,li,b,h1,h2,h3,h4')
+    for (var oi = 0; oi < obs.length; oi++) {
+      var oe = obs[oi]
+      if (oe.offsetParent === null || oe.hidden) continue
+      if (oe.closest('[data-review],.aurora,.mesh,.grain')) continue
+      for (var oc = 0; oc < oe.childNodes.length; oc++) {
+        var on = oe.childNodes[oc]
+        if (on.nodeType !== 3) continue
+        var ot = on.nodeValue.trim()
+        if (ot.length < 12) continue
+        rng3.selectNodeContents(on)
+        var orects = []
+        var allr = rng3.getClientRects()
+        for (var ri = 0; ri < allr.length; ri++) if (allr[ri].width > 1) orects.push(allr[ri])
+        if (orects.length < 2) continue
+        var ofz = parseFloat(getComputedStyle(oe).fontSize) || 16
+        var lastW = orects[orects.length - 1].width / ofz
+        if (lastW <= 2.2) orphan.push({ px: ofz, 末行字数: Math.round(lastW * 10) / 10, 文: ot.slice(0, 24) })
+      }
+    }
+    out.孤字 = orphan.length
+    window.__V3_ORPHAN__ = orphan
+
     var bad = out.横向溢出 || out.主体纵向溢出 || out.触控不足48 || out.文字裁切 ||
       out.违禁文案.length || out.量化红线.length || out.E3未标注 ||
-      out.来源三字段缺.length || out.四态未落地 || out.标点在行首
+      out.来源三字段缺.length || out.四态未落地 || out.标点在行首 ||
+      out.字号不足13 || out.孤字
     console.log('%c[V3 自查] ' + (bad ? '✗ 有问题' : '✓ 通过'),
       'color:' + (bad ? '#ff6f5e' : '#34e0a8') + ';font-weight:700', out)
     if (over.length) console.log('溢出元素：', over)

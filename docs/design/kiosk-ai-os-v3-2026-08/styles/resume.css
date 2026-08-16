@@ -35,7 +35,9 @@
 .issue[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
 .issue-hd { display: flex; align-items: center; gap: var(--s-3); }
 .issue-sev {
-  font-size: 10px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px;
+  /* 2026-08-16：10px(18.7′) → --fz-1。严重度「高 / 中 / 低」是这条诊断的分量本身，
+     用户靠它决定先改哪一条，不能是全屏最小的字。 */
+  font-size: var(--fz-1); letter-spacing: .06em; padding: 2px 8px; border-radius: 4px;
   border: 1px solid currentColor; flex: 0 0 auto;
 }
 .issue--high .issue-sev { color: var(--coral-400); }
@@ -51,8 +53,11 @@
 .hit--on { background: var(--jade-a20); box-shadow: 0 0 0 3px var(--jade-a32); }
 .gapline {
   border: 1.5px dashed var(--coral-400); border-radius: 5px;
-  background: var(--coral-a12); padding: 9px 11px;
-  font-size: 11px; color: var(--coral-600); line-height: 1.5;
+  background: var(--coral-a12); padding: 10px 12px;
+  /* 2026-08-16：11px → --fz-2(15px)。这是插在简历原文里成段的"这里缺什么"说明，
+     是正文不是标签，按正文下限走；同时限行长收孤字。 */
+  font-size: var(--fz-2); color: var(--coral-600); line-height: 1.6;
+  max-width: 32em; text-wrap: pretty;
 }
 
 /* ---------- 优化对比：原文 vs 候选改写 ---------- */
@@ -163,7 +168,8 @@
 .req:hover { border-color: var(--jade-a32); }
 .req[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
 .req-hd { display: flex; align-items: center; gap: var(--s-3); }
-.req-st { font-size: 11px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; border: 1px solid currentColor; flex: 0 0 auto; }
+/* 2026-08-16：11px → --fz-1。「符合 / 接近 / 缺」是逐条比对的结论标记。 */
+.req-st { font-size: var(--fz-1); letter-spacing: .06em; padding: 2px 8px; border-radius: 4px; border: 1px solid currentColor; flex: 0 0 auto; }
 .req--ok   .req-st { color: var(--jade-600); }
 .req--near .req-st { color: var(--amber-600); }
 .req--miss .req-st { color: var(--coral-400); }
@@ -180,6 +186,6 @@
   font-size: var(--fz-2); line-height: 1.85;
 }
 .resume-src h5 { margin: 0 0 4px; font-family: var(--ff-display); font-size: var(--fz-4); }
-.resume-src .grp { font-size: 11px; font-weight: 700; letter-spacing: .1em; margin: 14px 0 5px; }
+.resume-src .grp { font-size: var(--fz-1); font-weight: 700; letter-spacing: .1em; margin: 14px 0 5px; }
 .resume-src .row { display: block; }
 

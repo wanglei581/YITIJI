@@ -191,16 +191,20 @@
 .wside > .nb-bar,
 .main > .nb-bar { --nb-inset: 0; }
 
-/* ---------- 手机接力页（390×844）：缩进与上限都要小一号 ---------- */
+/* ---------- 手机接力页（390×844）：缩进与上限都要小一号 ----------
+   2026-08-16：这一档整体上调一级（10.5/11/12.5 → 12/13/14）。
+   手机的视距约 300mm，不是一体机的 600mm，所以这里本来就该比主屏小一档 ——
+   这个判断没变。但 10.5px 在 300mm 下也只有 24′，仍然低于中文舒适下限，
+   而且 P05 是用户在**自己手机**上读的唯一一页，读不了就没有兜底设备。 */
 .nb-bar--phone { --nb-inset: 20px; }
-.nb-bar--phone .nb-sum { min-height: 56px; font-size: 13.5px; padding: var(--s-2) 14px; border-radius: 12px; }
+.nb-bar--phone .nb-sum { min-height: 56px; font-size: 14px; padding: var(--s-2) 14px; border-radius: 12px; }
 .nb-bar--phone .nb-sum > .ic,
 .nb-bar--phone .nb-cue { width: 16px; height: 16px; }
-.nb-bar--phone .nb-x { font-size: 11px; }
+.nb-bar--phone .nb-x { font-size: var(--fz-1); }
 .nb-bar--phone .nb-body { padding: 14px 15px; border-radius: 12px; }
-.nb-bar--phone .nb-h { min-height: 48px; font-size: 14px; }
-.nb-bar--phone .nb-p { font-size: 12.5px; line-height: 1.62; }
-.nb-bar--phone .nb-e { font-size: 10.5px; }
+.nb-bar--phone .nb-h { min-height: 48px; font-size: 15px; }
+.nb-bar--phone .nb-p { font-size: 14px; line-height: 1.65; }
+.nb-bar--phone .nb-e { font-size: 12px; }
 
 @media (prefers-reduced-motion: reduce) {
   .nb-cue, .nb-sum { transition: none; }
