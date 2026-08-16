@@ -99,6 +99,9 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/partner verify:partner-refresh-safe
+          # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
+          # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -284,6 +287,15 @@ jobs:
           VITE_TERMINAL_ID: KSK-001
           VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
+          # ── S0 后端 AI 底座门禁（#617）─────────────────────────────
+          # 这四条 import services/api/src，会传递依赖到 Prisma 客户端，
+          # 因此必须放在「Prepare fresh SQLite db」之后——先前误放进上面的
+          # 「Cross-client deterministic static gates」步，那时客户端还没生成，
+          # 报 Cannot find module '../generated/prisma/client'。
+          pnpm --filter @ai-job-print/api verify:assistant-provider-label
+          pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
+          pnpm --filter @ai-job-print/api verify:ai-feature-keys
+          pnpm --filter @ai-job-print/api verify:aigc-pdf-metadata
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
@@ -463,6 +475,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
@@ -588,6 +601,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
