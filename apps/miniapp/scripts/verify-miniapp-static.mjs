@@ -23,8 +23,16 @@ function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), 'utf8')
 }
 
+// 必须跳过 .claude 与 node_modules：本仓把 git worktree 建在
+// apps/miniapp/.claude/worktrees/ 下，形成嵌套的小程序检出。
+// 不跳过的话，从主仓运行本门禁会走进嵌套检出并 EISDIR 崩溃——
+// 也就是说开发者工具实际读的那份代码上，门禁从来没跑起来过。
+// 这两个目录本来就在 app.json 的 packOptions.ignore 里，不属于产物。
+const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git'])
+
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue
     const rel = `${dir}/${entry.name}`
     if (entry.isDirectory()) walk(rel, out)
     else out.push(rel)
@@ -100,6 +108,9 @@ const generatedTopLevel = new Set([
   '.DS_Store',
   'miniprogram_npm',
   'node_modules',
+  // 本仓把 git worktree 建在 apps/miniapp/.claude/worktrees/ 下，
+  // 该目录已在 app.json 的 packOptions.ignore 中，不进小程序包。
+  '.claude',
   'project.private.config.json',
 ])
 const unexpectedTopLevel = fs.readdirSync(ROOT)
@@ -116,6 +127,7 @@ const imgExt = /\.(png|jpe?g|gif|webp|bmp)$/i
 const walkImages = (dir, acc = []) => {
   if (!fs.existsSync(dir)) return acc
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(e.name)) continue
     const p = path.join(dir, e.name)
     if (e.isDirectory()) walkImages(p, acc)
     else if (imgExt.test(e.name)) acc.push({ p, size: fs.statSync(p).size })
