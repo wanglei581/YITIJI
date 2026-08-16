@@ -13,6 +13,12 @@ export interface FeedbackReplyItem {
   createdAt: string
 }
 
+/**
+ * 工单提交方类型。`anonymous_kiosk` 由一体机匿名反馈端点写入（PR #612），
+ * 这类工单没有账号归属：不能回复、不能推通知，只能现场处置。
+ */
+export type FeedbackSubmitterType = 'member' | 'anonymous_kiosk'
+
 export interface AdminFeedbackTicketItem {
   id: string
   category: FeedbackCategory
@@ -24,9 +30,16 @@ export interface AdminFeedbackTicketItem {
   status: FeedbackStatus
   createdAt: string
   updatedAt: string
-  endUserId: string
-  phoneMasked: string
+  submitterType: FeedbackSubmitterType
+  // 以下三项对匿名一体机工单均为 null —— 服务端不编造占位值
+  // （services/api/src/member-feedback/member-feedback.service.ts:toAdminItem）。
+  // 此前本地类型把它们写成不可空，类型撒谎导致渲染处不判空，匿名工单显示为空白。
+  endUserId: string | null
+  phoneMasked: string | null
   nickname: string | null
+  relatedScanTaskId: string | null
+  /** 打印完成页满意度三档；null = 未评价。 */
+  satisfaction: 'good' | 'fair' | 'bad' | null
 }
 
 export interface AdminFeedbackTicketDetail extends AdminFeedbackTicketItem {
