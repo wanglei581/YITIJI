@@ -139,11 +139,12 @@ export class JobAiLlmService {
     provider: string
     tokenUsage?: JobAiTokenUsage
   }> {
-    // ⚠️ 借用 resume_optimize 功能位：该键被 6 项能力共用，关掉「AI简历优化」会静默停掉
-    // 岗位推荐（jobRecommend）与岗位解释（jobExplain）两项。
-    // 治理方向见 llm-config.service.ts 中 resume_optimize 条目上方注释。
-    const apiKey = this.config.getApiKey('resume_optimize')
-    const cfg = this.config.getConfig('resume_optimize')
+    // S0-3 / 风险 R3：岗位推荐与岗位解读已各自拆出独立功能位
+    // （job_recommend / job_explain），未单独配置时继承 resume_optimize，行为不变。
+    // 拆键后关掉其中一个不会连带停掉另一个，也不会影响简历优化。
+    const featureKey = operation === 'jobRecommend' ? 'job_recommend' : 'job_explain'
+    const apiKey = this.config.getApiKey(featureKey)
+    const cfg = this.config.getConfig(featureKey)
     if (!apiKey || !cfg.enabled) {
       throw unavailable('AI_NOT_CONFIGURED', 'AI 服务暂未启用，请联系管理员配置')
     }

@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type { JobFitPayload } from './llm-job-fit.service'
 
 interface FontCandidate {
@@ -53,6 +54,13 @@ export class JobFitPdfService {
 
   async render(meta: JobFitReportMeta, payload: JobFitPayload): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    applyAigcPdfMetadata(doc, {
+      title: 'AI 岗位匹配参考',
+      subject: 'AI 生成的岗位匹配参考，仅供求职者本人修改简历与准备投递参考，不代表招聘评估或录用结果',
+      kind: 'jobfit',
+      contentId: meta.job.id ?? null,
+    })
     const fontReady = fontCandidates().some((candidate) => {
       if (!existsSync(candidate.path)) return false
       try {

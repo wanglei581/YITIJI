@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
+import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
 // 2E 职业规划建议（真实化既有「职业规划」入口）。
@@ -105,7 +106,10 @@ export class LlmCareerPlanService {
       '"skillPlan":[{"skill":"要提升的能力","action":"具体行动","timeframe":"阶段，如 1-3 个月"}](2-4 条),' +
       '"actionChecklist":["近期可执行行动"](3-6 条)}'
 
-    const parts: string[] = [`【简历原文】\n${ctx.resumeText.slice(0, 8000)}`]
+    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII。
+    // 校验同样必须用送出去的这份，理由见 llm-job-fit.service.ts 同位置注释。
+    const maskedResume = maskUserTextForLlmText(ctx.resumeText.slice(0, 8000), 'career_plan')
+    const parts: string[] = [`【简历原文】\n${maskedResume}`]
     if (ctx.jobFit) {
       parts.push(
         `【最近岗位匹配参考】目标岗位「${ctx.jobFit.jobTitle}」，参考等级 ${ctx.jobFit.fitLevel}；` +
@@ -132,7 +136,7 @@ export class LlmCareerPlanService {
       const t0 = Date.now()
       const raw = await this.callLlm(sys, parts.join('\n\n'), ctx.onLlmCall)
       const parsed = this.parse(raw)
-      const payload = this.validate(parsed, ctx.resumeText)
+      const payload = this.validate(parsed, maskedResume)
       if (!payload) {
         this.logger.warn(`careerplan.invalid attempt=${attempt} ms=${Date.now() - t0}`)
         continue
@@ -222,14 +226,15 @@ export class LlmCareerPlanService {
   }
 
   /**
-   * 复用 resume_optimize 功能位（同"基于简历的定向输出"链路；密钥仅服务端）。
+   * 独立功能位 career_plan（S0-3 拆键；密钥仅服务端）。
    *
-   * ⚠️ 本键当前被 6 项用户可见能力共用，权威清单与后果见
-   * services/api/src/ai/llm/llm-config.service.ts 的共用键警示。
+   * 未被管理员单独配置时继承 resume_optimize，行为与拆键前一致；
+   * 单独配置后本功能位的开关与凭证只影响职业规划，不再连坐其它能力。
+   * 继承关系见 services/api/src/ai/llm/llm-config.service.ts 的共用键治理记录。
    */
   private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
-    const apiKey = this.config.getApiKey('resume_optimize')
-    const cfg = this.config.getConfig('resume_optimize')
+    const apiKey = this.config.getApiKey('career_plan')
+    const cfg = this.config.getConfig('career_plan')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }

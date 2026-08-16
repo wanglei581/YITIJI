@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
 // 2D 目标岗位定向优化 + 岗位匹配度参考。
@@ -154,13 +155,18 @@ export class LlmJobFitService {
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
       (job.description ? `岗位描述：${job.description.slice(0, 1500)}\n` : '') +
       (job.requirements ? `任职要求：${job.requirements.slice(0, 1500)}\n` : '')
-    const user = `【目标岗位】\n${jobText}\n【简历原文】\n${resumeText.slice(0, 8000)}`
+    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII，然后才拼 prompt。
+    // ⚠️ 校验必须用**送出去的这份**（maskedResume），不能用原文：
+    // 防编造校验的口径是「evidence 必须能在模型看得到的文本里找到」，
+    // 拿原文去校验会放宽这条不变量。
+    const maskedResume = maskUserTextForLlmText(resumeText.slice(0, 8000), 'job_fit')
+    const user = `【目标岗位】\n${jobText}\n【简历原文】\n${maskedResume}`
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const t0 = Date.now()
       const raw = await this.callLlm(sys, user)
       const parsed = this.parse(raw.text)
-      const payload = this.validate(parsed, resumeText, job)
+      const payload = this.validate(parsed, maskedResume, job)
       if (!payload) {
         this.logger.warn(`jobfit.invalid attempt=${attempt} ms=${Date.now() - t0}`)
         continue
@@ -355,16 +361,17 @@ export class LlmJobFitService {
     }
   }
 
-  /** 复用 resume_optimize 功能位（同一条"基于简历的定向输出"链路；密钥仅服务端）。 */
+  /** 独立功能位 job_fit（S0-3 拆键；未单独配置时继承 resume_optimize，密钥仅服务端）。 */
   private async callLlm(system: string, user: string): Promise<{
     text: string
     provider: string
     tokenUsage?: JobFitTokenUsage
   }> {
-    // ⚠️ 借用 resume_optimize 功能位：该键被 6 项能力共用，关掉「AI简历优化」会静默停掉本功能。
-    // 治理方向见 llm-config.service.ts 中 resume_optimize 条目上方注释。
-    const apiKey = this.config.getApiKey('resume_optimize')
-    const cfg = this.config.getConfig('resume_optimize')
+    // S0-3 / 风险 R3：本功能位已从共用键 resume_optimize 拆出。
+    // 未被管理员单独配置时自动继承 resume_optimize（行为与拆键前一致）；
+    // 单独配置后本功能位的开关与凭证只影响岗位匹配，不再连坐其它能力。
+    const apiKey = this.config.getApiKey('job_fit')
+    const cfg = this.config.getConfig('job_fit')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }

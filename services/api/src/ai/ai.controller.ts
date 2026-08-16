@@ -391,7 +391,11 @@ export class AiController {
       payload: {
         sessionId: result.sessionId,
         intent: result.intent ?? null,
-        providerName: this.aiService.getProviderName(),
+        // S0-1 / 风险 R1：这里过去写的是 getProviderName()（恒为回落 provider 名），
+        // 走真实大模型时会把审计记成 mock/stub —— 事后无法从审计判断这条回答
+        // 到底是不是 AI 生成。改记本次实际生效的 providerLabel + aiGenerated。
+        providerName: result.providerLabel,
+        aiGenerated: result.aiGenerated,
         // 故意不写聊天原文(合规)
       },
       ipAddress: ipOf(req),

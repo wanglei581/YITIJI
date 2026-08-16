@@ -1,5 +1,5 @@
 import { IsIn, IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator'
-import type { AssistantSkill, ChatOutput } from '../interfaces/ai-provider.interface'
+import type { AssistantSkill, AssistantChatResult } from '../interfaces/ai-provider.interface'
 
 const ASSISTANT_SKILLS = [
   'offer_compare',
@@ -35,5 +35,8 @@ export class AssistantChatRequestDto {
   context?: Record<string, unknown>
 }
 
-/** Response aligns with shared AssistantChatResponse */
-export type AssistantChatResponseDto = ChatOutput
+/**
+ * Response aligns with shared AssistantChatResponse。
+ * S0-1：额外透出 providerLabel / aiGenerated，供前端区分真实模型与 mock 回落。
+ */
+export type AssistantChatResponseDto = AssistantChatResult

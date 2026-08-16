@@ -302,6 +302,34 @@ export interface ChatOutput {
   actions?: AssistantAction[]
 }
 
+/**
+ * 助手对话对外响应（S0-1 / 风险 R1）。
+ *
+ * 背景：`AiService.chatWithAssistant` 是全站**唯一**在功能位未就绪时会回落到
+ * `this.provider`（可能是 mock provider 的预置话术）的 AI 路径。回落发生时
+ * 用户看到的仍然是一段像模像样的「回答」，无法分辨真假 —— 这是
+ * CLAUDE.md §9「不伪造能力」的正面违反。
+ *
+ * 处置：把服务端本来就算出来的 provider 标签透出到响应里。
+ * - `providerLabel === 'llm:<vendor>'` 才是真实大模型；
+ * - 任何其它取值（mock / stub provider 名）都**不是** AI 回答，
+ *   调用方（前端）不得把它呈现为 AI 生成内容。
+ * - `aiGenerated` 是同一判定的布尔化，服务端算好，前端不必自己解析前缀。
+ *
+ * 该字段只描述「这段文本由谁产生」，不含任何密钥、baseURL、模型名细节。
+ */
+export interface AssistantChatResult extends ChatOutput {
+  /** `llm:<vendor>` = 真实大模型；其它值 = 非模型回落，前端不得呈现为 AI 回答 */
+  providerLabel: string
+  /** 等价于 providerLabel.startsWith('llm:')；服务端唯一判定源 */
+  aiGenerated: boolean
+}
+
+/** providerLabel → 是否真实大模型。唯一判定实现，禁止在别处重写前缀判断。 */
+export function isLlmProviderLabel(providerLabel: string): boolean {
+  return providerLabel.startsWith('llm:')
+}
+
 // ─── 意图分类类型 ────────────────────────────────────────────
 
 export interface ClassifyIntentOutput {
