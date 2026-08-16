@@ -37,9 +37,9 @@
 }
 
 .kiosk-ev--e2 {
-  color: #1f5f8b;
-  border-color: color-mix(in srgb, #1f5f8b 32%, transparent);
-  background: color-mix(in srgb, #1f5f8b 10%, transparent);
+  color: var(--color-info-fg, #35608f);
+  border-color: color-mix(in srgb, var(--color-info, #3f68b0) 34%, transparent);
+  background: var(--color-info-bg, #e5edf4);
 }
 
 .kiosk-ev--e3 {
