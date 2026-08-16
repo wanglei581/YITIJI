@@ -393,14 +393,22 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                  「接线后自动生效」，这张卡漏了。保留参数（接线契约），补如实提示。
                  提示并进原有那一条、不另起一行：这张整行卡的可用高度只有 274px，
                  多一行 .dcard-hint 会把主动作顶进 overflow:hidden（同 c-material 的教训）。 -->
-            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
-            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜；这三项<b>按 ?city / from / to / dir 带过去</b>，招聘会台目前还不读，<b>接线后自动生效</b></span>
+            <!-- 2026-08-16（v6 密度审查 Top 10 #8）：措辞改成用户语言，事实一字未改。
+                 原文把 `?city / from / to / dir`、「接线后自动生效」直接渲染给用户 ——
+                 求职者不知道什么叫"接线"，更不该在一体机上读到参数名。
+                 要传达的意思只有一个：**这几项现在不会带到下一页，进去得再选一次**。
+                 接线契约仍在（data-base 上的参数原样保留），只是不再写在卡面上。 -->
+            <span class="dcard-hint" data-when="default device-off">城市来自本机配置的服务城市，可改；方向要你自己选。<b>这三项暂时不会带到招聘会台</b>，进去还要再选一次</span>
+            <span class="dcard-hint" data-when="first">城市来自本机配置；没登录就手选方向，不替你猜。<b>这三项暂时不会带到招聘会台</b>，进去还要再选一次</span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
-            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
+            <span class="chip chip--info" data-when="default first device-off">选项暂不带到下一页</span>
             <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
-            <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="按这三项排顺序" href="17-fair-desk.html?stage=s1">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <!-- 2026-08-16：按钮文案从「按这三项排顺序」改成「去招聘会台」。
+                 上一句刚说清"这三项暂时不会带过去"，按钮却仍承诺"按这三项排顺序" ——
+                 两句话自相矛盾，而按钮是用户真正读的那一句。改成它真的会做的事。 -->
+            <a class="dcard-go" data-when="default first device-off" data-base="17-fair-desk.html?stage=s1" data-pick-scope="c-plan" data-need="dir" data-need-label="先选方向" data-go-label="去招聘会台" href="17-fair-desk.html?stage=s1">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
             <!-- 2026-08-10 Codex 错配整改：同上，view=booth-map 不被消费，17 的 s3 是路线顺序页。
                  AI 降级时要给的正是「不靠 AI 也能看的图和名录」= P45 map（图 + 服务点 + 展位企业）。 -->
             <a class="dcard-go" data-when="ai-down" href="45-fair-onsite.html?stage=map">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -426,7 +434,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="dcard-hd">
             <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI · 仅供参考</span>
-            <span class="chip chip--info" data-when="default first device-off">待接线 · 目标页未读参数</span>
+            <span class="chip chip--info" data-when="default first device-off">选项暂不带到下一页</span>
             <span class="chip chip--amber chip--label" data-when="ai-down">AI · 已降级</span>
           </span>
           <span class="dcard-nm">求职材料准备</span>
@@ -449,7 +457,8 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                只读 ?from=（用来改返回键的父级），**不读 session / dir** —— 这两项同样被
                静默丢弃。保留参数（接线契约），补如实提示，不再让卡面独自承诺「按这一场列清单」。
                第二轮回归把原来的两条提示并成这一条，字面内容一字未删。 -->
-          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定；这两项<b>按 ?session / dir 带过去</b>，材料工坊目前只读 ?from=，<b>接线后自动生效</b></span>
+          <!-- 2026-08-16：同上，去掉参数名与「接线」口径，事实不变。 -->
+          <span class="dcard-hint" data-when="default first device-off">场次与方向都要你自己选，带几份最后由你定。<b>这两项暂时不会带到材料工坊</b>，进去还要再选一次</span>
           <a class="dcard-go" data-when="ai-down" href="12-material-factory.html?stage=t4&amp;from=P36&amp;view=templates">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
         </div>
 

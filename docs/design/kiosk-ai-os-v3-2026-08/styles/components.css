@@ -98,11 +98,18 @@
 .chip--amber { background: var(--amber-a12); color: var(--amber-200); border-color: var(--amber-a20); }
 .chip--coral { background: var(--coral-a12); color: var(--coral-200); border-color: var(--coral-a20); }
 
-/* 证据级别徽记：E1 用户事实 / E2 系统事实 / E3 模型判断 */
+/* 证据级别徽记：E1 用户事实 / E2 系统事实 / E3 模型判断
+   ------------------------------------------------------------
+   2026-08-16（v6 密度审查 Top 10 #1）：11px → var(--fz-1) 13px，高 22 → 26px。
+   E1/E2/E3 是「这句话是事实还是模型猜的」的**唯一**标记，全站 180+ 处、40 页在用，
+   却一直是每一屏上最小的字：11px 在这块屏（0.311 mm/px）站姿 600mm 下只有 19.6′，
+   中文笔画糊成一团 —— 等于把最该被读到的那个标记做成了最读不到的。
+   13px = 23.2′，是本设计系统辅助信息的硬下限（--fz-1）。
+   字号走令牌不再硬编码：README §6.5 早写了「字号一律走变量」，这里是漏网的一处。 */
 .ev {
   display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--ff-num); font-size: 11px; letter-spacing: .1em;
-  height: 22px; padding: 0 8px; border-radius: 6px;
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .1em;
+  height: 26px; padding: 0 9px; border-radius: 6px;
   background: var(--surf-2); color: var(--fog-600);
   border: 1px solid var(--brd-2);
 }
@@ -411,3 +418,117 @@
   cursor: not-allowed !important;
   border-style: dashed !important;
 }
+
+/* ============================================================
+   解释性小字：三档，不是一档（2026-08-16，v6 密度审查 §S2）
+   ------------------------------------------------------------
+   问题不是"话太多"，是**排版没跟上诚实度**。
+   本原型最强的地方恰恰是它不糊弄人：45 页里「暂无数据」出现 0 次，
+   空态全都写清了原因和下一步。代价是几乎每张卡下面都挂一条 13px 灰说明，
+   类名散在 .dcard-hint / .xlane-ds / .tl-s / .in-note / .thumbs-note …… 十几个地方，
+   同一个灰、同一个字号、同一个权重 —— 站着看就是一片噪声，
+   结果**该读的和不该读的一起被跳过**。
+
+   解法是给这些话分层级，不是把话删掉：
+     .note--risk  隐私 / 不可逆 / 费用      15px  琥珀底 + 左边框，最重
+     .note--how   这一步怎么用              15px  常驻显示
+     .note--meta  时间戳 / 外部 ID / 来源    13px  可弱化，允许被跳过
+
+   两个共同约束：
+     · max-width 用 em（跟着字号走）—— 中文超过 30–35 字/行回扫就困难，
+       全站实测有 40–72 字/行的段落，那是行长问题不是字号问题，光调字号治不好。
+     · text-wrap: pretty 收孤字。
+   ============================================================ */
+.note--risk, .note--how, .note--meta { text-wrap: pretty; }
+
+.note--risk {
+  font-size: var(--fz-2); line-height: 1.7; max-width: 30em;
+  color: var(--fog-800);
+  background: var(--amber-a12);
+  border-left: 3px solid var(--amber-400);
+  border-radius: var(--r-xs);
+  padding: var(--s-3) var(--s-4);
+  display: flex; gap: var(--s-3); align-items: flex-start;
+}
+.note--risk .ic { width: 19px; height: 19px; flex: 0 0 auto; color: var(--amber-400); margin-top: 2px; }
+.note--risk b { color: var(--fog-900); font-weight: 700; }
+/* 不可逆 / 费用这一类用朱砂，和「需本人确认」的按钮同一个色义 */
+.note--risk.note--stop { background: var(--coral-a12); border-left-color: var(--coral-400); }
+.note--risk.note--stop .ic { color: var(--coral-400); }
+
+.note--how {
+  font-size: var(--fz-2); line-height: 1.7; max-width: 32em;
+  color: var(--fog-700);
+}
+.note--how b { color: var(--fog-900); font-weight: 600; }
+
+.note--meta {
+  font-size: var(--fz-1); line-height: 1.6; max-width: 34em;
+  color: var(--fog-600);
+}
+
+/* ---------------- 合规免责段落（2026-08-16，v6 密度审查 Top 10 #2） ----------------
+   法律上最要紧的话，此前排得最不可读：13–15px × 40–72 字/行，至少 9 页如此。
+   隐私清理、第三方 OCR 外发（这是数据出境告知）、电子签法律效力、不核价 ——
+   这几件事挤成一整段灰字，站着没人读得完。
+   改法不是删字（合规文本删不得），是**拆条 + 限行长**：
+   .legal 是容器，.legal-i 是单条，一条只说一件事。 */
+.legal {
+  font-size: var(--fz-2); line-height: 1.75; max-width: 34em;
+  color: var(--fog-700); text-wrap: pretty;
+}
+.legal b { color: var(--fog-900); font-weight: 600; }
+/* 拆条版：每条 ≤30 字 */
+.legal--split { display: flex; flex-direction: column; gap: var(--s-2); max-width: none; }
+.legal--split .legal-i {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  max-width: 34em; line-height: 1.6;
+}
+.legal--split .legal-i .ic { width: 17px; height: 17px; flex: 0 0 auto; color: var(--fog-600); margin-top: 4px; }
+/* 数据出境告知不能和别的条目一个权重 */
+.legal--split .legal-i--key { color: var(--fog-800); }
+.legal--split .legal-i--key .ic { color: var(--amber-400); }
+
+/* ---------------- 评审脚手架注记（2026-08-16，v6 密度审查 Top 10 #8） ----------------
+   给「这一稿是原型、这一块还没接后端」这类**说给评审听**的话用。
+   本轮实测有 15 条这类话被当成产品文案渲染给用户，其中 P34 的两处是 24px 加粗，
+   比周围正文还醒目；P05 更严重 —— 那一页是用户在**自己手机**上打开的。
+
+   处置口径沿用 pay.css 里 .cash-demo 已经立好的规矩：
+   脚手架必须①挂 data-review（自检的触控与字号检查会跳过它），
+   ②一眼看得出"这不是给用户看的"，所以做成虚线框 + 前缀标签，
+   而不是和正文一个长相的灰色小字。
+   产品 UI 一律不许挂 data-review —— 挂了就等于把自己排除在门禁之外。 */
+.proto-note {
+  display: block; margin: var(--s-2) 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px dashed var(--brd-2); border-radius: var(--r-xs);
+  background: var(--surf-1);
+  font-family: var(--ff-num); font-size: var(--fz-1); line-height: 1.55;
+  color: var(--fog-600); max-width: 40em;
+}
+.proto-note::before {
+  content: "原型说明"; display: inline-block; margin-right: var(--s-2);
+  padding: 1px 7px; border-radius: 4px;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  color: var(--fog-700); font-size: 12px; letter-spacing: .08em;
+}
+
+/* ---------------- 孤字与断行（2026-08-16，v6 密度审查 §S3） ----------------
+   实测 83 个「页×阶段」组合里 66 个命中「末行只剩 1–2 个字」。
+   18–22px 的标题掉一个字到第二行，站姿下非常刺眼，
+   而且会把「请勿支付押金」这种防诈骗短句拆开。
+   balance 让标题各行等宽（Chrome 114+；Windows Edge/Chrome Kiosk 满足），
+   pretty 只管收正文末行，不重排整段，性能代价小。
+
+   pretty 挂在 .screen 上而不是挂 p —— text-wrap 是**继承属性**，
+   而本原型的正文几乎不用 <p>，全是 <div>/<span> 加业务类名
+   （.tl-s / .dcard-hint / .hc-st / .xlane-ds …十几个）。
+   逐个类名加等于漏，挂根节点一次覆盖全部后代。实测 18-campus 孤字 5 → 2。
+
+   .sheet-a4 内单独关掉：那里模拟的是印出来的纸，
+   断行应该跟着纸走，不跟着屏幕走。 */
+.screen { text-wrap: pretty; }
+.screen .sheet-a4, .screen .sheet-a4 * { text-wrap: wrap; }
+h1, h2, h3, h4,
+.display, .panel-title, .lead, .kicker { text-wrap: balance; }

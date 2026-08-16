@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P09B 简历逐条优化 · 原文与候选改写对照 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P09B 简历逐条优化">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/resume.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/leaveguard.css?v=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   P09B · 简历逐条优化（原 P09 第 4 步，2026-08-16 拆出来单独成页）
+
+   ── 为什么拆 ──────────────────────────────────────────────────
+   原来这一步和 s1/s2/s3/s5 挤在 09-resume-workbench.html 里（实测 1733 行），
+   而那一页是 556px 主栏 + 396px 右栏的两栏版式。结果是：
+   「你写的」和「候选改写」两栏各自只有 **250px 宽**，
+   一句话被切成三四行的窄条（「负责公众号日常运营与活动策 / 划，配合完成各项运营工作」），
+   而这一步的**全部意义**就是让人把左右两句话摆在一起比。
+   250px 宽的并排 = 没法比，只能挨个读，读完还得自己在脑子里对。
+   同一屏里还塞着 12 个动作按钮和右栏四块说明，
+   第一条的「已采纳 · 3 个数字待你核实」实测直接撞行叠字（250px 装不下 inline-flex）。
+
+   拆完之后：整屏只做一件事 —— **左右对照，逐条决定**。
+   两栏各 470px（1080 − 56×2 边距 − 24 间距 ÷ 2），一句话一行读得完。
+   功能一条没少，只是搬了位置（对应关系见 PR / 本页各段注释）。
+
+   ── 这一页刻意不做的事 ──────────────────────────────────────
+   · 不做右栏。这一步不需要"一边看别的一边改"，右栏只会把对照栏挤窄。
+     原右栏两块（「你已经决定了」「两条底线」）改成横向条带，见下。
+   · 不折叠「两条底线」。那是 AI 安全边界（数字要你自己核对 / AI 不替你编经历），
+     是这一步最该被读到的话，放在对照区**之前**常驻，不进折叠条。
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 单栏工作区：整宽给对照 */
+.optwrap {
+  flex: 1 1 auto; min-height: 0; position: relative; z-index: var(--z-content);
+  padding: var(--s-5) var(--gutter) 0;
+  display: flex; flex-direction: column; gap: var(--s-4); overflow: hidden;
+}
+
+/* ── 两条底线：AI 安全边界，整宽常驻条 ──
+   原来是右栏一块 396px 宽的 pane，两段正文各 40+ 字挤在窄栏里。
+   这一步用户正要按「采纳」，这两句必须先被读到，所以提到对照区之前、给整宽。 */
+.bottomline {
+  flex: 0 0 auto; border-radius: var(--r-md);
+  background: var(--amber-a12); border: 1px solid var(--amber-a20);
+  border-left: 5px solid var(--amber-400);
+  padding: var(--s-4) var(--s-5);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.bl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.bl-hd > .ic { width: 24px; height: 24px; color: var(--amber-400); flex: 0 0 auto; }
+.bl-hd b { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; }
+.bl-hd .s { margin-left: auto; font-size: var(--fz-2); color: var(--fog-600); }
+.bl-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-5); }
+/* 行长上限 34em：这两段是本页最要紧的话，不能再排成 60 字一行的灰墙 */
+.bl-p { font-size: var(--fz-2); color: var(--fog-800); line-height: 1.7; max-width: 34em; }
+.bl-p b { color: var(--fog-900); font-weight: 700; }
+
+/* ── 决定进度：原右栏「你已经决定了」，改成横向读数条 ── */
+.tally {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap;
+  min-height: 72px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+}
+.tally-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; flex: 0 0 auto; }
+.tally-i { display: flex; align-items: baseline; gap: 8px; font-size: var(--fz-2); color: var(--fog-700); }
+.tally-i .n { font-family: var(--ff-num); font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; }
+.tally-i--warn .n { color: var(--amber-600); }
+.tally-s { margin-left: auto; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; max-width: 34em; text-align: right; }
+
+/* ── 对照区：整宽两栏 ── */
+.optdiff { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-3); }
+.optdiff .diff-hd { grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.optdiff .diff-hd span { font-size: var(--fz-3); color: var(--fog-800); }
+.optdiff .diff-body { padding-bottom: var(--s-4); }
+/* 每一对之间加一条分隔，站着看时不容易串行 */
+/* align-items: start —— 覆盖 resume.css 的 stretch。
+   等高会把左边只有一行字的原文框拉成右边那么高（实测第 3 条空出 190px），
+   又变回"卡里一大片空白"。对照要的是**顶端对齐**，不是等高。 */
+.optdiff .pair { padding-bottom: var(--s-4); border-bottom: 1px solid var(--brd-1); align-items: start; }
+.optdiff .pair:last-child { border-bottom: 0; }
+/* 阶段轨拆页后是链接，不能带下划线（它在视觉上是步骤条，不是正文链接） */
+.rail .rstep { text-decoration: none; }
+/* 470px 宽下正文提到 fz-4(18px)：这是要逐字比对的两句话，不是说明文字 */
+.optdiff .pair-box { font-size: var(--fz-4); line-height: 1.75; }
+.optdiff .pair-why { font-size: var(--fz-2); line-height: 1.65; max-width: 32em; }
+/* 原来在 250px 宽下 inline-flex 撞行叠字；给整行并允许换行 */
+.optdiff .taken-flag {
+  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+  font-size: var(--fz-2); line-height: 1.6;
+}
+.optdiff .taken-flag .ic { width: 18px; height: 18px; margin-top: 3px; }
+.optdiff .pair-act .btn { min-height: 56px; font-size: var(--fz-3); padding: 0 var(--s-5); }
+
+/* 序号：站着看时"这是第几条"要一眼可见 */
+.pair-no {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s-3);
+  font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .06em;
+}
+.pair-no .i {
+  width: 30px; height: 30px; border-radius: 50%; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-700);
+}
+
+/* E 标说明：原右栏 kv，改成一行横排 */
+.evlegend {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  font-size: var(--fz-1); color: var(--fog-600);
+  padding-top: var(--s-3); border-top: 1px solid var(--brd-1);
+}
+.evlegend .i { display: inline-flex; align-items: center; gap: 8px; }
+
+/* 降级 / 空态：整宽居中 */
+.optlocked {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--s-5); text-align: center;
+  border-radius: var(--r-md); background: var(--surf-1); border: 1px dashed var(--brd-2);
+  padding: var(--s-8);
+}
+.optlocked > .ic { width: 88px; height: 88px; color: var(--fog-600); }
+.optlocked b { font-family: var(--ff-display); font-size: var(--fz-9); color: var(--fog-900); }
+.optlocked p { font-size: var(--fz-5); color: var(--fog-700); line-height: 1.72; max-width: 40em; }
+.optlocked p b { font-family: var(--ff-ui); font-size: inherit; font-weight: 700; }
+.optlocked .btn { min-height: 64px; font-size: var(--fz-4); padding: 0 var(--s-6); }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<!-- 离场确认：这一页手里是「诊断结论 + 已选定的逐条改写」，
+     和原 P09 s4 的 data-guard-lose-s4 同一句话，原样搬过来。 -->
+<div class="screen" data-state="default" data-stage="s4" data-theme="warm"
+     data-guard-at="s4"
+     data-guard-lose-s4="诊断结论和你已经选定的逐条改写">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">AI 简历服务</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-7742</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>AI 服务就绪 · 打印机在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 服务中断 · 已上报</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · AI 服务正常</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:58</b></div>
+  </header>
+
+  <!-- 阶段轨与母页同一条（五步不变，本页是第 4 步）。
+       拆页之后前后步都是**跨页**跳转，所以四个站是 <a> 而不是 data-go 按钮 ——
+       用 data-go 会让阶段机在本页找不到 s1/s2/s3/s5 而整屏空白。
+       第 4 站是本页自己，做成不可点的当前站。 -->
+  <div class="rail">
+    <div class="rail-track">
+      <a class="rstep" href="09-resume-workbench.html?stage=s1"><span class="rstep-dot">1</span><span class="rstep-name">简历来源</span></a>
+      <a class="rstep" href="09-resume-workbench.html?stage=s2"><span class="rstep-dot">2</span><span class="rstep-name">正在解析</span></a>
+      <a class="rstep rstep--done" href="09-resume-workbench.html?stage=s3"><span class="rstep-dot">3</span><span class="rstep-name">诊断结论</span></a>
+      <span class="rstep rstep--now" aria-current="step"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></span>
+      <a class="rstep" href="09-resume-workbench.html?stage=s5"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></a>
+    </div>
+    <span class="rail-count">第 <b>4</b> / 5 步</span>
+  </div>
+
+  <div class="optwrap">
+
+    <!-- ══════════ 两条底线（原 P09 s4 右栏「两条底线」pane，一字未删）══════════
+         这是 AI 安全边界，不是可省的说明文字：
+         「数字要你自己核对」防的是把模型填的示例数字当成事实发出去；
+         「AI 不替你编经历」防的是用户以为机器会替他写没做过的事。
+         原来它在 396px 右栏里、排在对照区旁边；现在提到对照区**之前**、给整宽，
+         因为用户是先按「采纳」再看右栏的 —— 顺序反了这两句就等于没写。 -->
+    <div class="bottomline" data-when="default device-off">
+      <div class="bl-hd">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <b>按「采纳」之前，先看这两条</b>
+        <span class="s">AI 只生成新版本，永不覆盖原件</span>
+      </div>
+      <div class="bl-two">
+        <p class="bl-p"><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是
+          <b>按你说过的内容填的示例，不是 AI 编的事实</b> —— 发出去之前请确认每一个数都是真的。
+          采纳且核实过的才进 v2。</p>
+        <p class="bl-p"><b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，
+          <b>不会凭空生成一段</b>；AI 只生成新版本，<b>永不覆盖原件</b>。</p>
+      </div>
+    </div>
+
+    <!-- ══════════ 决定进度（原右栏「你已经决定了」pane）══════════ -->
+    <div class="tally" data-when="default device-off">
+      <span class="tally-t">你已经决定了</span>
+      <span class="tally-i tally-i--warn"><span class="n">1</span>处 已采纳待核实</span>
+      <span class="tally-i"><span class="n">0</span>处 保留原文</span>
+      <span class="tally-i"><span class="n">3</span>处 待你决定</span>
+      <span class="tally-i tally-i--warn"><span class="n">1</span>处 需你自己写</span>
+      <span class="tally-s">采纳且<b>数字核实过</b>的内容才进入 v2，<b>v1 原件不动</b>。任何时候都能在第 5 步回退。</span>
+    </div>
+
+    <!-- first 态：这一步会发生什么。原 pane 里那张四行 kv 原样搬来 -->
+    <div class="tally" data-when="first">
+      <span class="tally-t">你会在这里决定什么</span>
+      <span class="tally-i"><b>采纳</b> · 按候选改写走</span>
+      <span class="tally-i"><b>保留原文</b> · 你写的那句原样留着</span>
+      <span class="tally-i"><b>换一版</b> · 同一句再出一个候选</span>
+      <span class="tally-i"><b>我来补写</b> · 本机说不出的留给你</span>
+      <span class="tally-s">逐条按，<b>一条不按就什么都不会变</b>；v1 原件任何时候都不动。</span>
+    </div>
+
+    <!-- ══════════ 对照区 ══════════ -->
+    <div class="optdiff" data-when="default device-off">
+      <div class="diff-hd">
+        <span><svg class="ic" style="width:19px;height:19px;color:var(--fog-600)"><use href="#i-file"/></svg>你写的（原件不会被改）</span>
+        <span><svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>候选改写 <span class="ev ev--e3">E3 AI 判断，仅供参考</span></span>
+      </div>
+      <div class="diff-body">
+
+        <div class="pair pair--taken">
+          <span class="pair-no"><span class="i">1</span>工作经历 · 第 1 条</span>
+          <div class="pair-box">负责公众号日常运营与活动策划，配合完成各项运营工作</div>
+          <div class="pair-box pair-box--new">
+            <span>独立运营公众号（<ins>粉丝 1.2 万</ins>），策划 <ins>8 场</ins>活动，<ins>单场最高带来 340 个新增关注</ins></span>
+            <span class="pair-why">原句没有可核对的数字。<b>数字要你自己填真实值。</b></span>
+            <span class="taken-flag" style="color:var(--amber-600)"><svg class="ic"><use href="#i-alert"/></svg><span>已采纳 · <b>3 个数字待你核实</b>，核实后才进 v2</span></span>
+            <span class="pair-act"><button class="btn btn--ghost">逐个核实数字</button><button class="btn btn--quiet">改回原文</button></span>
+          </div>
+        </div>
+
+        <div class="pair">
+          <span class="pair-no"><span class="i">2</span>工作经历 · 第 2 条</span>
+          <div class="pair-box">协助部门完成月度目标，参与用户增长相关项目</div>
+          <div class="pair-box pair-box--new">
+            <span><del>协助</del><ins>承担</ins>用户增长项目中的<ins>渠道投放与数据复盘</ins>，<ins>月度目标连续 4 个月达成</ins></span>
+            <span class="pair-why">改动理由：「协助 / 参与」看不出你做了什么。把动作换成你实际负责的环节。</span>
+            <span class="pair-act">
+              <button class="btn btn--primary" style="min-height:56px;font-size:var(--fz-3)">采纳</button>
+              <button class="btn btn--ghost">保留原文</button>
+              <button class="btn btn--quiet">换一版</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="pair">
+          <span class="pair-no"><span class="i">3</span>项目经历 · 校园推广</span>
+          <div class="pair-box">带领团队完成校园地推，效果良好</div>
+          <div class="pair-box pair-box--new">
+            <span>带 <ins>5 人</ins>团队在 <ins>3 所</ins>高校完成地推，<ins>累计触达 2000+ 学生，转化率 12%</ins>；「效果良好」<del>已删</del></span>
+            <span class="pair-why">改动理由：「效果良好」是自我评价，不是事实。团队规模与转化数据是可核对的。</span>
+            <span class="pair-act">
+              <button class="btn btn--primary" style="min-height:56px;font-size:var(--fz-3)">采纳</button>
+              <button class="btn btn--ghost">保留原文</button>
+              <button class="btn btn--quiet">换一版</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="pair">
+          <span class="pair-no"><span class="i">4</span>技能栏 · SQL</span>
+          <div class="pair-box" style="border-style:dashed;color:var(--fog-600)">（技能栏只列了 SQL，正文里没有任何一句用到它）</div>
+          <div class="pair-box pair-box--new">
+            <span>建议在工作经历里补一句：用 SQL <ins>做过什么查询 / 出过什么报表 / 支撑了什么决策</ins></span>
+            <span class="pair-why">岗位要求熟练取数，看不到证据就当没有。<b>这句要你自己写。</b></span>
+            <span class="pair-act">
+              <button class="btn btn--ghost">我来补写</button>
+              <button class="btn btn--quiet">先跳过</button>
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- E 标说明：原右栏 kv 三行，改横排。每条候选改写旁边都挂着 E3，
+           三档各是什么必须在同一屏说得清。 -->
+      <div class="evlegend">
+        <span class="i"><span class="ev ev--e1">E1 你的材料</span>你自己写的那句话</span>
+        <span class="i"><span class="ev ev--e2">E2 来源信息</span>岗位公告等来源方给的事实</span>
+        <span class="i"><span class="ev ev--e3">E3 AI 判断</span>AI 写的，仅供参考 —— 候选改写都挂这一档</span>
+      </div>
+    </div>
+
+    <!-- 降级与空态：原 .diff > .locked 的两态，整宽居中重排 -->
+    <div class="optlocked" data-when="ai-down first">
+      <svg class="ic"><use href="#i-offline"/></svg>
+      <b data-when="ai-down">改写服务中断</b>
+      <b data-when="first">还没有简历</b>
+      <p data-when="ai-down">改写不可用，<b>你的原件完好</b>。这一步不出任何结论 —— 不拿通用模板凑一版给你看。</p>
+      <p data-when="first">先给一份简历，再来这里逐条优化。</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="ai-down">
+        <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3&amp;from=P09B&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1"><svg class="ic"><use href="#i-printer"/></svg>带去打印：原件 1 份 · 共 3 页</a>
+        <a class="btn btn--ghost" href="09-resume-workbench.html?stage=s3">回看诊断结论</a>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center" data-when="first">
+        <a class="btn btn--primary" href="09-resume-workbench.html?stage=s1">回第 1 步给一份简历</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="actionbar">
+    <a class="backbtn" href="09-resume-workbench.html?stage=s3" data-parent-label="诊断结论"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">诊断结论</span></span></a>
+    <div class="actionbar-hint">
+      <div data-when="default device-off"><div class="t">逐条决定改不改，采纳的才进新版本</div><div class="s">数字要你自己核对 · AI 不替你编经历</div></div>
+      <div data-when="ai-down first"><div class="t">改写不可用</div><div class="s">原件完好，可打印或存档</div></div>
+    </div>
+    <a class="btn btn--lg btn--ghost" href="09-resume-workbench.html?stage=s3">回看诊断</a>
+    <a class="btn btn--primary" data-when="default device-off" href="09-resume-workbench.html?stage=s5">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-when="ai-down first" aria-disabled="true">改写不可用</button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=9"></script>
+<script src="scripts/leaveguard.js?v=1"></script>
+<script src="scripts/audit-plus.js?v=6"></script>
+</body>
+</html>

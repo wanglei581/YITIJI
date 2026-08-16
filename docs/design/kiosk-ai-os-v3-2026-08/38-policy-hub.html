@@ -370,7 +370,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
                  按产品口径不删这项能力（设计成立、只是没接后端），改为如实分栏：
                  已能办的写在前，待接线的明确标出来。 -->
             <span class="dcard-ds" data-when="default first device-off">筛出可能相关的政策</span>
-            <span class="dcard-hint" data-when="default first device-off"><b>材料缺口核对：待接线</b> —— 本稿只把下面三项带进政策页预筛，<b>不出"你缺哪几样"的结论</b></span>
+            <!-- 2026-08-16：「待接线」→「暂未开放」。能力本身保留、位置保留、
+                 说明一字未减（这是 AI 能力状态告知，不是冗余文案）；
+                 只把施工口径换成用户看得懂的说法。 -->
+            <span class="dcard-hint" data-when="default first device-off"><b>材料缺口核对：暂未开放</b> —— 本稿只把下面三项带进政策页预筛，<b>不出"你缺哪几样"的结论</b></span>
             <span class="dcard-ds" data-when="ai-down">政策原文与办事清单照常看，条件自己对</span>
             <span class="picks" data-when="default first device-off">
               <button class="pick" type="button" data-key="identity" data-opts="离职找工作中|在职想换工作|应届毕业生|想创业 / 已创业">

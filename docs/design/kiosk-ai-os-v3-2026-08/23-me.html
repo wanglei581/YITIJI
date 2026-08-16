@@ -926,6 +926,33 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
     </div>
   </div>
 
+  <!-- 结束并清空的二次确认。不可逆动作必须问一次，且要说清"清掉什么、留下什么"——
+       用户最怕的不是退出，是"我存的简历是不是也没了"。 -->
+  <div class="ovl ovl--top" id="ovl-end" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-close"/></svg><b>结束本次会话并清空屏幕？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t">会清掉：本机屏幕上的登录状态与本次浏览痕迹</span>
+          <span class="nrow-s">下一个人过来看不到你的任何信息</span></span></div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>你存进「我的文档」的文件<b>不会</b>被删除，下次登录还在；
+              未取的打印订单也还在，凭取件码可继续取。</span>
+      </div>
+
+      <div class="ovl-act">
+        <button class="btn btn--lg btn--ghost" type="button" data-close>先不清，继续用</button>
+        <button class="btn btn--commit" type="button" data-close data-logout>确认结束并清空</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════ 常驻 ActionBar ══════════ -->
   <div class="actionbar">
       <a class="backbtn" href="01-home-v6.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
@@ -946,7 +973,13 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       <div data-when="ai-down"><div class="t">AI 盘点暂不可用</div><div class="s">各卡里的记录不受影响 · 故障已自动上报</div></div>
       <div data-when="device-off"><div class="t">打印机离线 · 本页可正常查看</div><div class="s">出纸恢复后打印订单可续打</div></div>
     </div>
-    <button class="btn btn--primary" type="button"><svg class="ic"><use href="#i-close"/></svg>结束并清空</button>
+    <!-- 2026-08-16（v6 密度审查 Top 10 #6）：原来是 btn--primary，
+         和「去设参数 / 送 AI 诊断 / 获取核价」用的是**完全同一条翡翠渐变**。
+         清空会话不可逆，长得却和「继续下一步」一模一样 —— 站着赶时间的用户
+         靠肌肉记忆点右下角那颗绿的，会把自己的东西清掉。
+         README §6.1 自己定的规矩：朱砂只给不可逆动作，绿色只给「继续」。
+         这里改朱砂描边 + 二次确认（复用本页已有的 ovl 机制，和删简历同一套）。 -->
+    <button class="btn btn--lg btn--ghost btn--danger" type="button" data-open="ovl-end"><svg class="ic"><use href="#i-close"/></svg>结束并清空</button>
   </div>
 
   <nav class="navbar">

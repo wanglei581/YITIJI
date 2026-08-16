@@ -34,7 +34,10 @@
   width: 26px; height: 26px; border-radius: 50%; z-index: 2;
   display: grid; place-items: center;
   background: var(--ink-200); border: 2px solid var(--brd-2);
-  font-family: var(--ff-num); font-size: 11px; color: var(--fog-600);
+  /* 2026-08-16：11px → --fz-1(13px)。这一处是全站 11px 里数量最大的一个
+     （实测 90 处 / 20 页，比 .ev 还多）—— 步骤序号站姿 600mm 下 19.6′ 看不清，
+     而它正是「我现在走到第几步」的唯一数字。圆点 26px 装 13px 字仍有余量。 */
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600);
 }
 .rstep-name { font-size: var(--fz-2); color: var(--fog-600); white-space: nowrap; }
 .rstep--done .rstep-dot { background: var(--jade-600); border-color: var(--jade-600); color: #fff; }
@@ -130,10 +133,15 @@
   display: flex; flex-direction: column; gap: 12px;
 }
 .sheet-a4 h4 { margin: 0; font-family: var(--ff-display); font-size: 24px; letter-spacing: .04em; }
-.sheet-a4 .pgno { position: absolute; right: 46px; bottom: 22px; font-family: var(--ff-num); font-size: 10px; color: var(--paper-fog); }
-.sheet-a4 .meta { font-size: 11px; color: var(--paper-fog); letter-spacing: .04em; }
+/* 2026-08-16：纸面上的三处标注提到 --fz-1(13px)。
+   .sheet-a4 里的 .ln 是版面示意条（不是真文字），可以按纸的比例缩；
+   但 .meta（文件属性）/.sec（小节名）/.pgno（页码）是**用户真的要读**的字 ——
+   用户被要求"点缩略图翻页核对"，读不了就核对不了。
+   这三处不参与"模拟纸张缩放"那套逻辑，按屏幕可读下限走。 */
+.sheet-a4 .pgno { position: absolute; right: 46px; bottom: 22px; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--paper-fog); }
+.sheet-a4 .meta { font-size: var(--fz-1); color: var(--paper-fog); letter-spacing: .04em; }
 .sheet-a4 .hr { height: 1px; background: var(--paper-200); }
-.sheet-a4 .sec { font-size: 12px; font-weight: 700; letter-spacing: .1em; color: var(--paper-ink); margin-top: 5px; }
+.sheet-a4 .sec { font-size: var(--fz-1); font-weight: 700; letter-spacing: .1em; color: var(--paper-ink); margin-top: 5px; }
 .sheet-a4 .ln { height: 7px; border-radius: 2px; background: var(--paper-200); }
 .sheet-a4 .ln--s { width: 62%; }
 .sheet-a4 .ln--m { width: 84%; }
@@ -144,9 +152,11 @@
   background: var(--coral-a12);
 }
 .redact span {
-  position: absolute; right: 6px; top: -11px;
-  font-size: 10px; letter-spacing: .06em; color: #fff;
-  background: var(--coral-600); padding: 2px 7px; border-radius: 4px;
+  /* 2026-08-16：10px → --fz-1。这是"这里有身份证号"的标签，
+     隐私提示做成全站最小的字说不过去。 */
+  position: absolute; right: 6px; top: -13px;
+  font-size: var(--fz-1); letter-spacing: .06em; color: #fff;
+  background: var(--coral-600); padding: 2px 8px; border-radius: 4px;
 }
 .paper-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -239,9 +249,11 @@
 /* AI 预填标记：不得让用户误以为是自己设的，也不得以为不能改 */
 .prefill {
   display: inline-flex; align-items: center; gap: 5px;
-  font-size: 10px; letter-spacing: .06em; color: var(--jade-600);
+  /* 2026-08-16：10px → --fz-1。「AI 预填」是"这个值不是你设的"的唯一告知，
+     18.7′ 等于没告知。 */
+  font-size: var(--fz-1); letter-spacing: .06em; color: var(--jade-600);
   background: var(--jade-a12); border: 1px solid var(--jade-a20);
-  padding: 2px 7px; border-radius: 4px; margin-left: auto;
+  padding: 2px 8px; border-radius: 4px; margin-left: auto;
 }
 .seg { display: flex; gap: 10px; }
 .seg button {
@@ -311,7 +323,12 @@
   background: var(--surf-1); border: 1px solid var(--brd-1);
 }
 .thumb {
-  position: relative; width: 84px; flex: 0 0 auto; cursor: pointer;
+  /* 2026-08-16（v6 密度审查 §S5）：补 aspect-ratio。
+     此前实测 84×122 = 0.689，而同屏主预览 .sheet-a4 是 0.707–0.708（A4 精确值 1/1.414）。
+     同一页里"同一份文件"出现两个不同比例，是用户能察觉的不一致 ——
+     而且方向正好是"缩略图更瘦"，会让人以为内容被压过。
+     .scanpage 早就是这么写的（见本文件下方），这里对齐。 */
+  position: relative; width: 84px; aspect-ratio: 1 / 1.414; flex: 0 0 auto; cursor: pointer;
   border-radius: 6px; overflow: hidden;
   background: var(--paper-000); border: 2px solid transparent;
   box-shadow: var(--sh-1);
@@ -322,8 +339,8 @@
 .thumb i.t { height: 7px; width: 74%; background: #c9cfc9; margin-bottom: 3px; }
 .thumb span {
   position: absolute; left: 0; right: 0; bottom: 0; text-align: center;
-  font-family: var(--ff-num); font-size: 10px; color: var(--paper-fog);
-  background: rgba(255,255,255,.86); padding: 2px 0;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--paper-fog);
+  background: rgba(255,255,255,.9); padding: 2px 0;
 }
 .thumb[aria-current="true"] { border-color: var(--jade-500); }
 .thumb--flag::after {
@@ -401,8 +418,8 @@
 .scanpage i.s { width: 56%; }
 .scanpage span {
   position: absolute; left: 0; right: 0; bottom: 0; text-align: center;
-  font-family: var(--ff-num); font-size: 12px; color: var(--paper-fog);
-  background: rgba(255,255,255,.88); padding: 3px 0;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--paper-fog);
+  background: rgba(255,255,255,.9); padding: 3px 0;
 }
 .scanpage--pending {
   background: var(--surf-1); border: 1.5px dashed var(--brd-2); box-shadow: none;
@@ -410,9 +427,10 @@
 }
 .scanpage--pending em { font-style: normal; font-size: var(--fz-3); color: var(--fog-600); }
 .scanpage--low::after {
+  /* 2026-08-16：11px → --fz-1。这是"这一页识别得不好"的告警，不是装饰。 */
   content: "预检偏低 · 待终检"; position: absolute; right: 8px; top: 8px;
-  font-size: 11px; color: #fff; background: var(--amber-600);
-  padding: 2px 6px; border-radius: 4px;
+  font-size: var(--fz-1); color: #fff; background: var(--amber-600);
+  padding: 2px 7px; border-radius: 4px;
 }
 
 /* ---------- 图片托盘（转 PDF 用）：顺序就是装订顺序 ---------- */
@@ -436,9 +454,17 @@
 }
 .tile-img .del .ic { width: 17px; height: 17px; }
 .tile-img .nm {
+  /* 2026-08-16：11px → --fz-1。文件名是用户确认"这张是不是我要的"的依据。
+     同日回归补正：单纯提字号会让 189px 的图块装不下 210px 的
+     「IMG_2044.JPG · 成绩单（偏暗）」，省略号恰好切掉后半截的用户说明——
+     而那正是用户用来认文件的部分，等于为了字号大反而更认不出来。
+     故改为两行钳制：字号保持 13px，宽度不够时向下换行而不是截断。 */
   position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 8px;
-  font-size: 11px; color: #eef3f1; background: rgba(6,10,10,.66);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: var(--fz-1); line-height: 1.35;
+  color: #eef3f1; background: rgba(6,10,10,.7);
+  white-space: normal; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
 }
 .tile-img--add {
   border-style: dashed; cursor: pointer; background: var(--surf-1);
