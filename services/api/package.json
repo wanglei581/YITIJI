@@ -121,6 +121,7 @@
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
+    "verify:boot-resilience": "node -r @swc-node/register scripts/verify-boot-resilience.ts",
     "verify:contract-review:gate0": "node -r @swc-node/register scripts/verify-contract-review-gate0.ts",
     "verify:contract-review:contract": "node -r @swc-node/register scripts/verify-contract-review-contract.ts",
     "verify:contract-review:file-policy": "node -r @swc-node/register --test src/contract-review/__tests__/contract-review-file-policy.test.ts",
