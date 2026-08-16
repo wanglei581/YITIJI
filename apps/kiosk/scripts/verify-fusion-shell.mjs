@@ -269,7 +269,11 @@ for (const [label, pattern] of [
   ['compact viewport boundary', /const\s+isCompactViewport\s*=\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
   ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*isCompactViewport/],
   ['responsive viewport', /viewport\s*=\s*\{\s*isCompactViewport\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
-  ['responsive home stable class', /className\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]\s*\}/],
+  // V6 落 main 后 className 由裸三元改为模板串，用于在 V6 路由上追加
+  // v6-runtime-shell。响应式首页的两个类名与判定条件必须原样保留，
+  // 因此这里仍逐字校验 isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'，
+  // 只允许它被模板串包裹，不放宽成任意表达式。
+  ['responsive home stable class', /className\s*=\s*\{[\s\S]{0,40}?isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]/],
   ['fluid desktop boundary', /const\s+usesFluidViewport\s*=\s*isCompactViewport\s*\|\|\s*\(\s*viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
   ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!usesFluidViewport\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],

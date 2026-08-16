@@ -55,6 +55,12 @@ function registerHomeShellApi(api: ApiRouter) {
       items: [],
     },
   })
+  // V6 首页会真实请求招聘会列表；给精确的 200 空列表，让首页呈现诚实 empty 态。
+  // 其余未注册 API 仍由 ApiRouter fail-closed。
+  api.respond('GET', '/api/v1/job-fairs', {
+    status: 200,
+    json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
+  })
 }
 
 function registerPrivacyRuntimeApi(api: ApiRouter) {
@@ -88,8 +94,11 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   await expect(page).toHaveURL(/\/$/)
   const homeMain = page.locator('main').first()
   await expect(homeMain).toBeVisible()
+  // 断言意图是「已落到干净首页」，不是锁定某句营销文案。V6 首页不再有
+  // 「简历、岗位、打印」，改用首页底部的合规声明作锚点：它是 CLAUDE.md §2/§10
+  // 强制要求必须出现的文本，稳定且不会随视觉改版消失，断言它同时守住合规底线。
   await expect(
-    page.getByText('简历、岗位、打印', { exact: false }).first()
+    page.getByText('本终端仅展示与跳转，不代收简历', { exact: false }).first()
   ).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
