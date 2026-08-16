@@ -99,6 +99,15 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-terminal-bind-code-ui
           pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui
           pnpm --filter @ai-job-print/partner verify:partner-refresh-safe
+          # ── AI 底座静态门禁（S0 #617 / S1 #618）──────────────────────
+          # 两批当时都刻意没碰本文件（避免并行批次在共享文件上冲突），
+          # 各自在 PR 里给了待追加的行，由调度会话统一合入。
+          # 不挂进 CI，这些断言就只是装饰品。
+          pnpm --filter @ai-job-print/api verify:assistant-provider-label
+          pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
+          pnpm --filter @ai-job-print/api verify:ai-feature-keys
+          pnpm --filter @ai-job-print/api verify:aigc-pdf-metadata
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
