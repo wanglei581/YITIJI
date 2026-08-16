@@ -28,6 +28,7 @@ import type {
   FairVenueGuideDTO,
 } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
+import type { JobFairQueryParams } from './jobFairs'
 
 // ──────────────────────────────────────────────────────────────
 // 错误类型
@@ -241,11 +242,14 @@ function mapWireZone(z: WireFairZone, index: number): FairZoneDTO {
 
 export const httpJobFairAdapter = {
   async getJobFairs(
-    params?: { status?: string; terminalId?: string },
+    params?: JobFairQueryParams,
   ): Promise<PaginatedResponse<ExternalJobFairDTO>> {
     const query: Record<string, string> = {}
     if (params?.status) query.status = params.status
+    if (params?.keyword) query.keyword = params.keyword
     if (params?.terminalId) query.terminalId = params.terminalId
+    if (params?.page) query.page = String(params.page)
+    if (params?.pageSize) query.pageSize = String(params.pageSize)
     return get<PaginatedResponse<ExternalJobFairDTO>>('/job-fairs', query)
   },
 

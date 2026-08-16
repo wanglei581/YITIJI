@@ -42,13 +42,16 @@ export function RenshiPage() {
   }
 
   const [policies, setPolicies] = useState<PolicyPostView[]>([])
+  /** 服务端已发布政策总数;大于已取回条数时页面必须如实说明,不能静默截断。 */
+  const [policyTotal, setPolicyTotal] = useState(0)
   const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
 
   const loadPolicies = () => {
     setPolicyState('loading')
     getPublishedPolicies()
-      .then((rows) => {
-        setPolicies(rows)
+      .then((res) => {
+        setPolicies(res.items)
+        setPolicyTotal(res.total)
         setPolicyState('ready')
       })
       .catch(() => setPolicyState('error'))
@@ -71,7 +74,11 @@ export function RenshiPage() {
     if (policies.length === 0) return '当前展示内置办事指引（整理参考，以官方发布为准）；标注「政策发布」的为合作机构发布、管理员审核内容'
     const names = [...new Set(policies.map((p) => p.sourceName))].slice(0, 2).join('、')
     const latest = policies.map((p) => p.syncTime).sort().at(-1)?.slice(0, 10) ?? ''
-    return `「政策发布」来源：${names} · 同步于 ${latest}；其余为内置办事指引（整理参考，以官方发布为准）`
+    // 单页有上限，取回条数少于服务端总数时如实说明，不让多出来的条目无声消失。
+    const truncated = policyTotal > policies.length
+      ? `；共 ${policyTotal} 条已发布政策，当前展示 ${policies.length} 条，可用上方身份筛选缩小范围`
+      : ''
+    return `「政策发布」来源：${names} · 同步于 ${latest}；其余为内置办事指引（整理参考，以官方发布为准）${truncated}`
   })()
 
   const renderPolicyTab = () => {

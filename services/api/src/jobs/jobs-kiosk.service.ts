@@ -15,6 +15,8 @@ import {
   type JobListItemDto,
   type PrismaJobFairRow,
   buildJobIndustryTag,
+  buildPublishedFairGroups,
+  parseFairStatusFilter,
   prismaJobToListItem,
   prismaFairToListItem,
   parseSeekerIntent,
@@ -127,60 +129,36 @@ export class JobsKioskService {
     return { rows, total }
   }
 
+  /**
+   * 公开招聘会列表。
+   *
+   * status / keyword 全部下推到数据库(见 buildPublishedFairGroups),
+   * 因此返回的 total 就是「按当前条件真实可翻到的条数」,
+   * 不再出现 data 为空但 total 仍报全量的自相矛盾。
+   */
   async getPublishedFairs(params?: PublishedFairsParams): Promise<PaginatedResult<FairListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
-    const where = withPublicFairDemoExclusion({
+    const skip     = (page - 1) * pageSize
+    const now      = new Date()
+
+    const base = withPublicFairDemoExclusion({
       reviewStatus: 'approved',
       publishStatus: 'published',
     })
-    const skip = (page - 1) * pageSize
-    const hasTerminalScope = !!params?.terminalId?.trim()
     const preferredOrgId = await this.resolveCampusPreferredOrgId(params?.terminalId)
-    let rows: PrismaJobFairRow[]
-    let total: number
-    if (!preferredOrgId) {
-      if (!hasTerminalScope) {
-        const result = await Promise.all([
-          this.prisma.jobFair.findMany({
-            where,
-            orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-            skip,
-            take: pageSize,
-            include: { _count: { select: { companies: true } } },
-          }),
-          this.prisma.jobFair.count({ where }),
-        ])
-        rows = result[0]
-        total = result[1]
-      } else {
-        const now = new Date()
-        const result = await this.getPublishedFairRowsByGroups([
-          { where: { ...where, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
-          { where: { ...where, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
-        ], skip, pageSize)
-        rows = result.rows
-        total = result.total
-      }
-    } else {
-      const now = new Date()
-      const result = await this.getPublishedFairRowsByGroups([
-        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
-        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
-        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { gte: now } }, orderBy: [{ startAt: 'asc' }, { id: 'asc' }] },
-        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { lt: now } }, orderBy: [{ startAt: 'desc' }, { id: 'asc' }] },
-      ], skip, pageSize)
-      rows = result.rows
-      total = result.total
-    }
-    type FairStatusFilter = 'upcoming' | 'ongoing' | 'ended'
-    let data = rows.map(prismaFairToListItem)
-    if (params?.status && (params.status === 'upcoming' || params.status === 'ongoing' || params.status === 'ended')) {
-      const filterStatus = params.status as FairStatusFilter
-      data = data.filter((d) => d.status === filterStatus)
-    }
+
+    const groups = buildPublishedFairGroups({
+      base,
+      now,
+      status: parseFairStatusFilter(params?.status),
+      keyword: params?.keyword,
+      preferredOrgId,
+    })
+    const { rows, total } = await this.getPublishedFairRowsByGroups(groups, skip, pageSize)
+
     return {
-      data,
+      data: rows.map(prismaFairToListItem),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   }

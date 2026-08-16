@@ -29,6 +29,7 @@ export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual
 
 export interface PublishedFairsParams {
   status?: string
+  keyword?: string
   page?: number
   pageSize?: number
   terminalId?: string
@@ -37,6 +38,95 @@ export interface PublishedFairsParams {
 export interface PublishedFairQueryGroup {
   where: Prisma.JobFairWhereInput
   orderBy: Array<{ startAt?: 'asc' | 'desc'; id?: 'asc' | 'desc' }>
+}
+
+// ─── 招聘会公开列表:筛选下推 + 默认排序 ─────────────────────────────────────────
+//
+// 三条硬约束(改动前这里全部不成立,见 verify:fair-list-integrity):
+//   1. status 必须进 where —— 否则「取一页再内存过滤」会让整页被筛空,
+//      同时 total 仍是未筛选值,接口自相矛盾。
+//   2. keyword 必须进 where —— 与 /jobs 一致做服务端全表检索,
+//      而不是让前端在「当前已加载的那一页」里本地过滤。
+//   3. 默认排序必须让「还能参加的」在前 —— 招聘会列表以未来活动为主,
+//      纯 startAt asc 会把最老的已结束场次顶到第一页。
+
+/** FairStatus 的运行时取值(门禁与入参校验共用,避免各处各写一份硬编码清单)。 */
+export const FAIR_STATUS_VALUES = ['upcoming', 'ongoing', 'ended'] as const satisfies readonly FairStatus[]
+
+/** 只接受合法 status;非法/缺省一律返回 null(= 不按状态筛选)。 */
+export function parseFairStatusFilter(raw?: string): FairStatus | null {
+  const v = raw?.trim()
+  return v && (FAIR_STATUS_VALUES as readonly string[]).includes(v) ? (v as FairStatus) : null
+}
+
+/**
+ * status → 时间条件。必须与 deriveFairStatus() 的判定完全同构,
+ * 否则「筛选出来的」和「卡片上显示的状态」会对不上:
+ *   deriveFairStatus: now < startAt → upcoming;now > endAt → ended;其余 ongoing
+ */
+export function buildFairStatusWhere(status: FairStatus, now: Date): Prisma.JobFairWhereInput {
+  if (status === 'upcoming') return { startAt: { gt: now } }
+  if (status === 'ended')    return { endAt: { lt: now } }
+  return { AND: [{ startAt: { lte: now } }, { endAt: { gte: now } }] }
+}
+
+/** 招聘会关键词检索字段(对齐前端搜索框提示「招聘会、企业、地点」)。 */
+export const FAIR_KEYWORD_FIELDS = ['title', 'sourceName', 'venue', 'city', 'description'] as const
+
+/** 与 /jobs 的 keyword 一致:服务端 OR contains 全表检索。空词返回 null。 */
+export function buildFairKeywordWhere(keyword?: string): Prisma.JobFairWhereInput | null {
+  const kw = keyword?.trim()
+  if (!kw) return null
+  return { OR: FAIR_KEYWORD_FIELDS.map((field) => ({ [field]: { contains: kw } })) }
+}
+
+const FAIR_ORDER_ASC  = [{ startAt: 'asc'  as const }, { id: 'asc' as const }]
+const FAIR_ORDER_DESC = [{ startAt: 'desc' as const }, { id: 'asc' as const }]
+
+/**
+ * 构造公开招聘会的分组查询。
+ *
+ * 分桶顺序 = 展示顺序,组内各自排序,组间拼接:
+ *   [本校优先(可选)] × [未结束 startAt 升序 → 已结束 startAt 倒序]
+ *
+ * 未结束(endAt >= now)升序 = 最近一场能参加的排最前;
+ * 已结束(endAt < now)倒序 = 刚结束的排在很久以前的前面,整体沉底。
+ *
+ * 两个维度都是「互斥且穷尽」的划分,所以各组 count 之和 = 真实总数,
+ * total 不会虚高也不会漏计。
+ */
+export function buildPublishedFairGroups(opts: {
+  base: Prisma.JobFairWhereInput
+  now: Date
+  status: FairStatus | null
+  keyword?: string
+  preferredOrgId: string | null
+}): PublishedFairQueryGroup[] {
+  const { base, now, status, keyword, preferredOrgId } = opts
+
+  const narrowing: Prisma.JobFairWhereInput[] = []
+  if (status) narrowing.push(buildFairStatusWhere(status, now))
+  const keywordWhere = buildFairKeywordWhere(keyword)
+  if (keywordWhere) narrowing.push(keywordWhere)
+
+  const scope = (...parts: Prisma.JobFairWhereInput[]): Prisma.JobFairWhereInput => ({
+    AND: [base, ...parts, ...narrowing].filter((p) => Object.keys(p).length > 0),
+  })
+
+  const active: Prisma.JobFairWhereInput = { endAt: { gte: now } }
+  const ended:  Prisma.JobFairWhereInput = { endAt: { lt: now } }
+
+  // 注意:即使已按 status 收窄,两个时间桶也都保留。
+  // 剪掉「理论上必为空」的桶会在脏数据(endAt < startAt)时漏计,
+  // 宁可多两次 count,也不让 total 少算。
+  const orgBuckets: Prisma.JobFairWhereInput[] = preferredOrgId
+    ? [{ sourceOrgId: preferredOrgId }, { NOT: { sourceOrgId: preferredOrgId } }]
+    : [{}]
+
+  return orgBuckets.flatMap((org) => [
+    { where: scope(org, active), orderBy: FAIR_ORDER_ASC },
+    { where: scope(org, ended),  orderBy: FAIR_ORDER_DESC },
+  ])
 }
 
 // ─── Exported DTO types ───────────────────────────────────────────────────────
