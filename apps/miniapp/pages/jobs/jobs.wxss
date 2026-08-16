@@ -94,6 +94,13 @@
   font-size: 28rpx; font-weight: 600; padding: 18rpx 48rpx; border-radius: 200rpx;
 }
 
+/* 触底加载状态 */
+.list-more {
+  padding: 28rpx 0 8rpx;
+  text-align: center;
+  font-size: 24rpx; color: #C8B4A0;
+}
+
 /* 合规声明 */
 .compliance-note {
   margin: 24rpx 32rpx 0;
