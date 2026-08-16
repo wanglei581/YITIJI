@@ -9,6 +9,23 @@
 //   3. 合同属敏感文件，用户中途放弃时主动 DELETE，不留到自动清理。
 const api = require('../../utils/api')
 
+const STAGE_TEXT = {
+  uploaded:          '已上传，排队中…',
+  queued:            '排队中…',
+  extracting:        '正在识别文字…',
+  rule_checking:     '正在比对条款…',
+  ai_analyzing:      '正在分析…',
+  safety_reviewing:  '正在复核结果…',
+}
+
+// 服务端 ContractReviewPriority 三值。直接把 priority_check 这种内部值
+// 显示给用户没有意义，在此映射为中文与样式类。
+const PRIORITY = {
+  priority_check:     { label: '重点核对', cls: 'p1' },
+  attention:          { label: '留意',     cls: 'p2' },
+  insufficient_info:  { label: '信息不足', cls: 'p3' },
+}
+
 const TYPE_LABELS = {
   labor_contract:       '劳动合同',
   internship_agreement: '实习协议',
@@ -88,20 +105,64 @@ Page({
       .catch(e => this.setData({ busy: false, step: 'consent', error: e.message || '提交失败，请重试' }))
   },
 
-  /** 轮询到可出报告为止。失败不静默——用户需要知道是没结果还是没跑完。 */
+  /**
+   * 轮询。status 取值以服务端 ContractReviewStatus 联合类型为准：
+   *   uploaded / queued / extracting / awaiting_confirmation / rule_checking /
+   *   ai_analyzing / safety_reviewing / completed / failed / cancelled / expired
+   * 注意没有 'ready'。awaiting_confirmation 是必经的用户确认关口——
+   * 服务端识别出页数后要用户确认分析范围，不确认就不会继续，
+   * 只轮询不 confirm 会一直卡在这个状态直到超时。
+   */
   _poll(id, tries = 0) {
-    if (tries > 40) { this.setData({ busy: false, error: '分析超时，请稍后在记录中查看' }); return }
-    return api.getContractReview(id).then(r => {
-      if (r.status === 'failed') { this.setData({ busy: false, error: r.message || '分析失败' }); return }
-      if (r.status === 'ready' || r.status === 'completed') return this._report(id)
-      this.setData({ statusText: r.statusText || '正在分析…' })
-      return new Promise(res => setTimeout(res, 2000)).then(() => this._poll(id, tries + 1))
+    if (tries > 60) { this.setData({ busy: false, error: '分析超时，请稍后重试' }); return }
+    return api.getContractReview(id).then(t => {
+      if (t.status === 'completed') return this._report(id)
+      if (t.status === 'failed')    { this.setData({ busy: false, error: '分析失败，请重新上传更清晰的照片' }); return }
+      if (t.status === 'cancelled') { this.setData({ busy: false, error: '任务已取消' }); return }
+      if (t.status === 'expired')   { this.setData({ busy: false, error: '任务已过期，请重新发起' }); return }
+      if (t.status === 'awaiting_confirmation') return this._askConfirm(t)
+      this.setData({ statusText: STAGE_TEXT[t.status] || '正在处理…' })
+      return new Promise(r => setTimeout(r, 2000)).then(() => this._poll(id, tries + 1))
+    })
+  },
+
+  /**
+   * 确认分析范围。截断时必须让用户知道只分析了前 N 页——
+   * 直接替用户确认，等于把「只看了一部分」说成「全看了」。
+   */
+  _askConfirm(t) {
+    const total = t.totalPages == null ? '未知' : t.totalPages
+    const msg = t.truncated
+      ? `共识别到 ${total} 页，本次只分析前 ${t.analyzedPages} 页。未分析的部分不会出现在结果里。`
+      : `共识别到 ${total} 页，将全部分析。`
+    return new Promise(resolve => {
+      wx.showModal({
+        title: '确认分析范围',
+        content: msg + (t.ocrConfidence === 'low' ? '\n\n照片清晰度较低，建议重拍以提高准确性。' : ''),
+        confirmText: '继续分析',
+        cancelText: '取消',
+        success: (r) => {
+          if (!r.confirm) { this._discard(); this.setData({ busy: false, step: 'pick' }); resolve(); return }
+          this.setData({ statusText: '正在分析条款…' })
+          resolve(api.confirmContractReview(t.id, {
+            contractType:  t.contractType,
+            totalPages:    t.totalPages == null ? t.analyzedPages : t.totalPages,
+            analyzedPages: t.analyzedPages,
+            truncated:     t.truncated,
+          }).then(() => this._poll(t.id)))
+        },
+      })
     })
   },
 
   _report(id) {
-    return api.getContractReviewReport(id)
-      .then(report => this.setData({ report, step: 'report', busy: false }))
+    return api.getContractReviewReport(id).then(report => {
+      const findings = (report && report.findings ? report.findings : []).map(f => {
+        const m = PRIORITY[f.priority] || { label: f.priority, cls: 'p2' }
+        return Object.assign({}, f, { _label: m.label, _cls: m.cls })
+      })
+      this.setData({ report: Object.assign({}, report, { findings }), step: 'report', busy: false })
+    })
   },
 
   _discard() {

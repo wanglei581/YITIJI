@@ -28,3 +28,11 @@ page { background: var(--paper); }
 .cr-empty { margin-top: 16rpx; padding: 30rpx 22rpx; border-radius: 24rpx; background: #fff; border: 1rpx solid var(--line-soft); font-size: 25rpx; color: var(--muted); line-height: 1.6; }
 .cr-err { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #FFEBEE; color: #C62828; font-size: 24rpx; line-height: 1.55; }
 .tab-spacer { height: 60rpx; }
+.risk-ask { margin-top: 12rpx; padding: 14rpx; border-radius: 14rpx; background: var(--teal-wash); font-size: 23rpx; color: var(--teal-deep); line-height: 1.6; }
+.risk-un { margin-top: 10rpx; font-size: 22rpx; color: var(--muted); line-height: 1.55; }
+.lv-high { background: #FFEBEE; color: #C62828; }
+.lv-medium { background: #FFF6E6; color: #A96A08; }
+.lv-low { background: #E7EDFD; color: #1A3FB8; }
+.lv-p1 { background:#FFEBEE; color:#C62828; }
+.lv-p2 { background:#FFF6E6; color:#A96A08; }
+.lv-p3 { background:#EDF0F5; color:#43506B; }

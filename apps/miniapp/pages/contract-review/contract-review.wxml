@@ -37,13 +37,16 @@
 
       <block wx:elif="{{step === 'report'}}">
         <view class="cr-sec">审查结果</view>
-        <view class="risk-item" wx:for="{{report.findings}}" wx:key="index">
+        <view class="risk-item" wx:for="{{report.findings}}" wx:key="id">
           <view class="risk-h">
-            <text class="risk-lv lv-{{item.severity}}">{{item.severityLabel || item.severity}}</text>
+            <text class="risk-lv lv-{{item._cls}}">{{item._label}}</text>
             <text class="risk-t">{{item.title}}</text>
           </view>
-          <view class="risk-d">{{item.detail}}</view>
-          <view class="risk-q" wx:if="{{item.clause}}">原文：{{item.clause}}</view>
+          <view class="risk-d">{{item.explanation}}</view>
+          <view class="risk-q" wx:if="{{item.evidence.excerpt}}">原文<text wx:if="{{item.evidence.pageNumber}}">（第 {{item.evidence.pageNumber}} 页）</text>：{{item.evidence.excerpt}}</view>
+          <view class="risk-ask" wx:if="{{item.verificationQuestion}}">可以这样问对方：{{item.verificationQuestion}}</view>
+          <view class="risk-un" wx:if="{{item.uncertainty}}">不确定之处：{{item.uncertainty}}</view>
+          <view class="risk-un" wx:if="{{item.basisRef}}">依据：{{item.basisRef}}</view>
         </view>
         <view class="cr-empty" wx:if="{{!report.findings.length}}">本次未识别到需要特别提示的条款。这不代表合同没有问题，仅代表规则与模型未命中。</view>
         <view class="cr-note">结果由 AI 生成，可能存在错误，不构成法律意见。涉及争议请咨询劳动监察或法律援助。</view>
