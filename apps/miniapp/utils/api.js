@@ -336,13 +336,25 @@ const api = {
    * @param {string} purpose resume_upload | resume_scan(其余场景见后端白名单)
    * @returns {Promise<{fileId,filename,sizeBytes,mimeType,sha256,signedUrl,signedUrlExpiresAt,fileExpiresAt}>}
    */
-  uploadResumeFile(filePath, purpose = 'resume_upload') {
+  /**
+   * 上传本人简历文件。
+   *
+   * displayName 与 uploadPrintFile 同理：wx.uploadFile 固定取 filePath 的
+   * basename 作为 multipart 文件名，直传临时路径会让服务端存下 tmp_xxx，
+   * 简历记录里显示的就是那串英文数字。走同一套改名副本方案。
+   */
+  uploadResumeFile(filePath, purpose = 'resume_upload', displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历上传'));
-    return uploadFile('/files/kiosk-upload', filePath, {
-      name: 'file',
-      formData: { purpose },
-      needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
-    });
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose },
+        needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
   },
 
   /**
