@@ -505,6 +505,13 @@ model PolicyPost {
   category String?
   /** 官方入口链接(扫码/跳转,info-only) */
   externalUrl String?
+  /**
+   * 来源方原始编号(如发文字号)。P21 补齐:CLAUDE.md §10 要求外部来源数据
+   * 展示「外部ID」,PolicyPost 此前缺该字段,条件核对结果无法给出与
+   * Job/JobFair 同口径的来源标识。可空 —— 存量行与未提供编号的来源为 null,
+   * 消费方按 null 展示「来源未提供编号」,不得伪造。
+   */
+  externalId String?
   /** 对外展示的发布日期(机构提供) */
   publishedDate DateTime?
 
@@ -514,6 +521,9 @@ model PolicyPost {
   reviewedAt    DateTime?
   rejectReason  String?
 
+  /** P21:结构化申领条件(条件核对的唯一依据来源) */
+  eligibilityRules PolicyEligibilityRule[]
+
   syncTime  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -522,6 +532,50 @@ model PolicyPost {
   @@index([kind])
   @@index([reviewStatus, publishStatus])
   @@index([publishedDate])
+}
+
+// ── PolicyEligibilityRule ─────────────────────────────────────────────────────
+// P21 政策条件核对(S3-2)。
+//
+// 为什么必须建表:改动前政策的「申领条件」只存在于 PolicyPost.content 富文本里,
+// 机器读不出来。没有结构化表达就只剩两条路 —— 要么让模型去猜条件、要么不做核对。
+// 前者违反 CLAUDE.md §9「不伪造能力」,所以选择把条件显式录进库。
+//
+// 硬约束(由 policy-eligibility.engine.ts 保证,verify:policy-eligibility 守门):
+//   1. sourceText 是政策原文摘录,一字不改,是每条判定唯一可追溯的依据;
+//      库里没有对应条款 → 结论只能是 unknown,不得由模型补一个 true/false。
+//   2. clauses 里只能出现问项字典中已登记的取值;「不确定」不得写进任何一侧。
+//   3. 判定是确定性比对,不调 LLM —— 因此证据分级是 E2(来源方事实),不是 E3。
+//
+// clauses 结构(JSON 文本,SQLite/PG 同构,本 schema 全库不用 Json 类型):
+//   [{ "questionKey": "...", "satisfiedValues": ["..."], "conflictValues": ["..."] }]
+// 两侧都没命中的取值一律判 unknown,绝不默认成「不符合」。
+
+model PolicyEligibilityRule {
+  id String @id @default(cuid())
+
+  policyPostId String
+  policy       PolicyPost @relation(fields: [policyPostId], references: [id], onDelete: Cascade)
+
+  /** 展示与核对顺序 */
+  orderIndex Int @default(0)
+
+  /** 条件标题(展示用概括,不作为判定依据) */
+  label String
+
+  /** 政策原文摘录 —— 判定依据,一字不改 */
+  sourceText String
+
+  /** 多子句合取方式:'all'(全部满足)| 'any'(任一满足) */
+  matchMode String @default("all")
+
+  /** 子句数组的 JSON 文本,见上方结构说明 */
+  clauses String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([policyPostId, orderIndex])
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────

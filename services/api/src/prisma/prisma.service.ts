@@ -205,6 +205,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.policyPost
   }
 
+  /** P21 政策条件核对：政策申领条件的结构化表达 */
+  get policyEligibilityRule() {
+    return this.client.policyEligibilityRule
+  }
+
   // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────
 
   get syncLog() {
