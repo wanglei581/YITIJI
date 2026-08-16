@@ -38,6 +38,7 @@ export type AiModelFeatureKey =
   | 'self_assessment'
   | 'job_recommend'
   | 'job_explain'
+  | 'advisor_work'
   | 'print_param_prefill'
   | 'digital_human'
   | 'poster_generation'
@@ -201,6 +202,18 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     runtimeNote: '已被岗位解读运行链路消费（job-ai-llm.service.ts jobExplain）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
     allowCustomSystemPrompt: false,
     inheritsFrom: 'resume_optimize',
+  },
+  // ── S3-3 · P26 顾问作业面（默认继承 assistant_chat）─────────────────────────
+  {
+    key: 'advisor_work',
+    label: 'AI顾问作业面',
+    status: 'active',
+    description:
+      '用于顾问作业面（/ai/plan）的判型、问答、成稿与逐条比对。AI 只排序与解释，不替求职者做投递或预约决定；成稿不编造用户未提供的数字、公司名、时间与证书。',
+    runtimeNote:
+      '已被顾问作业面运行链路消费（advisor/llm-advisor.service.ts）；结构化 System Prompt 与防编造校验由服务端强制。未单独配置时继承「AI助手对话」——本能力与 P25 顾问同源，故不挂在「AI简历优化」下（S0-3 拆键后不再往那个键上加新能力）。本键不可用时作业面停在当前进度，已钉住与已生成的产物仍可查、可打印。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'assistant_chat',
   },
   // ── S3-1：打印参数预填（P06）─────────────────────────────────────────────
   // 独立功能位，**不继承 resume_optimize**：它与简历链没有任何依赖关系，挂在共用键上

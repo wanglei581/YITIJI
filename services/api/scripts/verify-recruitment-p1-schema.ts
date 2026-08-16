@@ -82,17 +82,40 @@ function assertNoSqliteDrift(db: string, label: string): void {
   assert.equal(drift.status, 0, `${label} SQLite/schema drift:\n${drift.stdout}\n${drift.stderr}`)
 }
 
+/**
+ * 两套 schema 的模型总数。
+ *
+ * 这道守卫的意图是**「改 schema 必须是有意识的」**，不是「禁止加模型」：
+ * 它盯的是 Recruitment P1 治理模型被人无意中改动/删除/被别的迁移覆盖掉。
+ * 正常新增业务模型时，本常量就该跟着 +N —— 连同下面的变更登记一起更新，
+ * 这样 review 时能一眼看出这批加了什么、是不是该加。
+ *
+ * ⚠️ 两套 schema 必须同数：SQLite 与 PostgreSQL 由 `pnpm db:pg:sync` 机械同步，
+ * 数量对不上说明有人只改了一边（postgres-readiness 会红）。所以这里只留一个常量，
+ * 不给两处各写一个字面量 —— 避免出现「只改了 SQLite 那处」的同类事故。
+ *
+ * 变更登记（每次改动追加一行，写清 +N 与加了哪些模型）：
+ * - 87：Recruitment P1 基线
+ * - 90（本次，S3-3 · P26 顾问作业面 /ai/plan，+3）：
+ *     AdvisorSession  —— 顾问会话：作业型 + 状态机 + 输入槽（slotsJson）
+ *     AdvisorPin      —— 用户主动钉住的条目（问答型唯一跨请求留存的内容）
+ *     AdvisorArtifact —— 真实产物（可查 / 可打印 / 可保存）
+ *   刻意**没有** AdvisorTurn：设计页对用户承诺「对话不保存」，
+ *   问答上下文只在进程内存里，详见 prisma/schema.prisma 里 AdvisorSession 上方的说明。
+ */
+const EXPECTED_MODEL_COUNT = 90
+
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
   const pgSchema = read(PG_SCHEMA)
   assert.equal(
     (sqliteSchema.match(/^model /gm) ?? []).length,
-    87,
+    EXPECTED_MODEL_COUNT,
     'SQLite schema model count drifted'
   )
   assert.equal(
     (pgSchema.match(/^model /gm) ?? []).length,
-    87,
+    EXPECTED_MODEL_COUNT,
     'PostgreSQL schema model count drifted'
   )
 
