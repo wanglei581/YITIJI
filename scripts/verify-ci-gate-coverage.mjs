@@ -50,6 +50,9 @@ const REQUIRED_COMMANDS = [
   'pnpm --filter @ai-job-print/miniapp verify:static',
   'pnpm run verify:task-runner-wake',
   'pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness',
+  // 扫码输入安全（FIX-SCAN-SAFETY）：付款码不落屏 + 非授权页吞掉 HID 突发。
+  // 钉进这里是因为本文件只做「不许被悄悄摘掉」的钉子，不会自动发现新门禁。
+  'pnpm --filter @ai-job-print/kiosk verify:scan-input-safety',
   'pnpm --filter @ai-job-print/admin verify:refresh-safe',
   'pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui',
   'pnpm --filter @ai-job-print/admin verify:toolbox-review-ui',

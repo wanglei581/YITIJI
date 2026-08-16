@@ -6,7 +6,7 @@
  * 本脚本只做本地静态链路检查：不连接真实大模型、不连接预生产数据库、
  * 不修改 env、不执行 migration。
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { plainToInstance } from 'class-transformer'
 import { validateSync } from 'class-validator'
@@ -19,6 +19,7 @@ const assistantDtoPath = join(repoRoot, 'services/api/src/ai/dto/assistant-chat.
 const llmChatPath = join(repoRoot, 'services/api/src/ai/llm/llm-chat.service.ts')
 const apiMockProviderPath = join(repoRoot, 'services/api/src/ai/providers/mock.provider.ts')
 const kioskAssistantPath = join(repoRoot, 'apps/kiosk/src/pages/assistant/AssistantPage.tsx')
+const kioskAssistantDirPath = join(repoRoot, 'apps/kiosk/src/pages/assistant')
 const kioskMockAdapterPath = join(repoRoot, 'apps/kiosk/src/services/api/aiMockAdapter.ts')
 const toolboxTypesPath = join(repoRoot, 'packages/shared/src/types/toolboxMicroApp.ts')
 const apiPackagePath = join(repoRoot, 'services/api/package.json')
@@ -85,6 +86,18 @@ function mustNotContainUnsafeForbiddenCopy(source: string, markers: string[], la
   }
 }
 
+/** 读 Kiosk 助手特性目录下全部 ts/tsx，用于对「拆到哪个文件」不敏感的内容断言。 */
+function readAssistantDir(): string {
+  if (!existsSync(kioskAssistantDirPath)) {
+    fail(`Kiosk 助手目录缺失: ${kioskAssistantDirPath.replace(`${repoRoot}/`, '')}`)
+    return ''
+  }
+  return readdirSync(kioskAssistantDirPath)
+    .filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'))
+    .map((name) => readFileSync(join(kioskAssistantDirPath, name), 'utf8'))
+    .join('\n')
+}
+
 function main(): void {
   console.log('\n=== 百宝箱 AI skill intent 接线门禁 ===')
 
@@ -94,6 +107,7 @@ function main(): void {
   const llmChat = mustExist(llmChatPath, 'LLM chat 服务存在')
   const apiMockProvider = mustExist(apiMockProviderPath, 'API mock provider 存在')
   const kioskAssistant = mustExist(kioskAssistantPath, 'Kiosk AssistantPage 存在')
+  const kioskAssistantDir = readAssistantDir()
   const kioskMockAdapter = mustExist(kioskMockAdapterPath, 'Kiosk mock adapter 存在')
   const toolboxTypes = mustExist(toolboxTypesPath, '百宝箱内置微应用类型存在')
   const packageJson = mustExist(apiPackagePath, 'API package.json 存在')
@@ -118,17 +132,25 @@ function main(): void {
   if (invalidSkillErrors.some((error) => error.property === 'skill')) pass('DTO 运行时拒绝未知 skill')
   else fail('DTO 运行时拒绝未知 skill — 非法 skill 未触发校验错误')
 
+  // #628（P25 AI 顾问接线）按 CLAUDE.md §8 把 AssistantPage.tsx 758→584 行，
+  // 场景表和免责文案拆去同目录 advisorScenes.ts。接线断言留在页面上，
+  // intent 清单与场景合规文案改为对整个 assistant 目录取证 —— 谁承载由拆分决定，
+  // 但这些字符串必须仍在这个特性目录里。
   mustContain(kioskAssistant, [
     'useSearchParams',
     'TOOLBOX_ASSISTANT_SCENES',
     'normalizeToolboxSkill',
     'skill: toolboxSkill',
     'source: \'toolbox_ai_skill\'',
+    'toolboxScene?.disclaimer',
+  ], 'Kiosk 助手页读取 URL intent、消费场景表并透传请求')
+
+  mustContain(kioskAssistantDir, [
     ...allSkillIntents,
     '不构成录用、入职或法律意见',
     '不构成涨薪或录用承诺',
     '不构成正式法律意见或官方政策承诺',
-  ], 'Kiosk 助手页读取全部 URL intent、展示场景文案并透传请求')
+  ], 'Kiosk 助手目录覆盖全部 AI skill intent 与场景合规文案')
 
   mustContain(llmChat, [
     'SKILL_SCOPED_PROMPTS',
