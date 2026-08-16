@@ -9,6 +9,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
 
 interface FontCandidate { path: string; family?: string }
@@ -49,6 +50,14 @@ export class SelfAssessmentPdfService {
     appendixDisclaimer?: string | undefined
   }): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）。
+    // 说明：维度强度由规则打分（纯函数）得出，PDF 里的解读文字才是 AI 生成；
+    // 解读缺席时（LLM 不可用）报告仍会出，标识按「含 AI 生成内容」统一标注。
+    applyAigcPdfMetadata(doc, {
+      title: '自我探索 · 倾向参考',
+      subject: '规则打分 + AI 文字解读，仅供求职者本人参考，不构成心理测评、人格判定或就业结果结论',
+      kind: 'selfassessment',
+    })
     const ok = fontCandidates().some((c) => {
       if (!existsSync(c.path)) return false
       try {

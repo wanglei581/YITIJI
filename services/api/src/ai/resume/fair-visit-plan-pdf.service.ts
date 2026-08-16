@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type { FairVisitPlanPayload } from './llm-fair-visit-plan.service'
 
 interface FontCandidate { path: string; family?: string }
@@ -39,6 +40,12 @@ export class FairVisitPlanPdfService {
     plan: FairVisitPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    applyAigcPdfMetadata(doc, {
+      title: 'AI 招聘会参会准备单',
+      subject: 'AI 生成的参会准备参考，仅供求职者本人现场准备使用；招聘会仅为第三方或官方来源信息入口',
+      kind: 'fairvisit',
+    })
     const ok = fontCandidates().some((candidate) => {
       if (!existsSync(candidate.path)) return false
       try {

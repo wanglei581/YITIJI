@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
 import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
 
@@ -146,6 +147,17 @@ export class ResumePdfService {
       margins: { top: cfg.margin, bottom: cfg.margin, left: cfg.margin, right: cfg.margin },
       bufferPages: true,
       info: { Title: `${resume.basic.name} 的简历` },
+    })
+    // S0-4 / 风险 R4：本服务只被 AI 简历生成 / 优化导出链路调用（ai.service.ts，
+    // createdBy='ai_resume_generate'），产物按 AIGC 标注文件级元数据。
+    //
+    // ⚠️ 只加隐式 metadata，**不加任何可见水印/页眉/页脚** —— 简历是用户要拿去
+    // 投递的材料，是否在版面上出现可见 AI 标识属于产品裁决，不由工程侧单方面决定。
+    // 事实字段仍由服务端逐字复制用户输入（防编造契约），AI 只参与表达润色。
+    applyAigcPdfMetadata(doc, {
+      title: `${resume.basic.name} 的简历`,
+      subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
+      kind: 'resume',
     })
     this.resolveFont(doc)
 

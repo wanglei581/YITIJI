@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
+import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // 招聘会 AI 参会准备单。
 // 合规：仅供本人参会准备参考，不包含任何就业结果承诺，不向企业传递候选人信息。
@@ -96,8 +97,10 @@ export class LlmFairVisitPlanService {
       '"questionsToAsk":["现场可向来源平台或企业展位咨询的问题"],' +
       '"onsiteTips":["现场路线、资料、打印等提醒"]}'
 
+    // S0-2 / 风险 R2：简历先截断再遮盖高置信 PII 才送模型。
+    // 参会准备单不依赖姓名 / 手机 / 身份证 / 邮箱 / 住址，遮盖不影响结论质量。
     const user = [
-      `【简历原文】\n${ctx.resumeText.slice(0, 8000)}`,
+      `【简历原文】\n${maskUserTextForLlmText(ctx.resumeText.slice(0, 8000), 'fair_visit_plan')}`,
       `【招聘会】\n${JSON.stringify(ctx.fair)}`,
       `【fairCompanies】\n${JSON.stringify(ctx.fairCompanies.slice(0, 40)).slice(0, 9000)}`,
     ].join('\n\n')
@@ -168,11 +171,11 @@ export class LlmFairVisitPlanService {
     }
   }
 
-  // ⚠️ 共享 feature key 'resume_optimize'（与 career-plan、job-fit 等共用同一 LLM 配置）。
+  // S0-3：独立 feature key 'fair_visit_plan'（未单独配置时继承 resume_optimize，行为不变）。
   // A-6 成本可见性：每次 callLlm 执行完毕（无论成功或失败前）都回调 onLlmCall。
   private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
-    const apiKey = this.config.getApiKey('resume_optimize')
-    const cfg = this.config.getConfig('resume_optimize')
+    const apiKey = this.config.getApiKey('fair_visit_plan')
+    const cfg = this.config.getConfig('fair_visit_plan')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }

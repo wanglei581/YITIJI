@@ -231,6 +231,16 @@ export interface AssistantChatResponse {
   intent?: AssistantIntent
   /** 可选的快捷操作按钮 */
   actions?: AssistantAction[]
+  /**
+   * S0-1 / 风险 R1：产生这段 reply 的 provider 标签。
+   * `llm:<vendor>` 才是真实大模型；其它取值（mock / stub provider 名）说明这是
+   * 未接模型时的预置话术，**调用方不得把它呈现为 AI 回答**。
+   * 可选：字段由服务端新增，旧版本后端 / 本地 mock adapter 不带该字段，
+   * 缺失同样按「不是 AI 回答」处理（fail-closed，不假设真）。
+   */
+  providerLabel?: string
+  /** 等价于 providerLabel?.startsWith('llm:')；缺失或 false 都不得呈现为 AI 回答 */
+  aiGenerated?: boolean
 }
 
 // ─── AI 简历生成（阶段2A）──────────────────────────────────────

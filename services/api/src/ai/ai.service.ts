@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
+import type { AiProvider, AiProviderName, AssistantChatResult, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
+import { isLlmProviderLabel } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -754,7 +755,7 @@ export class AiService {
     return { deletedCount }
   }
 
-  async chatWithAssistant(input: ChatInput): Promise<ChatOutput> {
+  async chatWithAssistant(input: ChatInput): Promise<AssistantChatResult> {
     const t0 = Date.now()
     const sessionId = input.sessionId ?? `session-${Date.now()}`
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
@@ -771,7 +772,10 @@ export class AiService {
         latencyMs: Date.now() - t0,
         status:    'success',
       })
-      return result
+      // S0-1 / 风险 R1：把 provider 标签透出，让调用方能分辨「真实模型」与
+      // 「mock/stub provider 预置话术」。回落时这里必须如实标 aiGenerated=false，
+      // 绝不因为 reply 看起来像 AI 回答就当成 AI 回答。
+      return { ...result, providerLabel, aiGenerated: isLlmProviderLabel(providerLabel) }
     } catch (err) {
       this.logService.record({
         taskId:    sessionId,

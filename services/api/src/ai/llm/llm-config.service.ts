@@ -32,6 +32,12 @@ export type AiModelFeatureKey =
   | 'resume_diagnosis'
   | 'resume_generate'
   | 'resume_optimize'
+  | 'job_fit'
+  | 'career_plan'
+  | 'fair_visit_plan'
+  | 'self_assessment'
+  | 'job_recommend'
+  | 'job_explain'
   | 'digital_human'
   | 'poster_generation'
 
@@ -42,16 +48,35 @@ export interface AiModelFeatureMeta {
   description: string
   runtimeNote: string
   allowCustomSystemPrompt: boolean
+  /**
+   * S0-3：本功能位尚未被单独配置时，继承哪个功能位的配置。
+   * 只允许继承一层（父键自身不得再有 inheritsFrom），由 assertSingleLevelInheritance 守住。
+   * 一旦管理员对本键调用过 update()，本键即固化为独立配置，不再跟随父键。
+   */
+  inheritsFrom?: AiModelFeatureKey
 }
 
 /** 前端可见的配置视图（不含 apiKey 明文） */
 export interface LlmConfigView extends LlmConfig {
   featureKey: AiModelFeatureKey
   apiKeyConfigured: boolean
+  /**
+   * S0-3：当前生效配置来自哪个功能位。
+   * null = 本键已独立配置；非 null = 仍在继承该父键（Admin 侧应如实标注「继承自 X」，
+   * 不得让运营以为这是本键自己的配置）。
+   */
+  inheritedFrom: AiModelFeatureKey | null
 }
 
 interface PersistedConfig extends LlmConfig {
   apiKeyEncrypted: string | null
+  /**
+   * S0-3：本功能位是否被管理员**单独配置过**。
+   * 只有 update() 会置 true。为 false 且 meta.inheritsFrom 存在时，读取一律解析到父键。
+   * 历史配置文件没有该字段 → 读作 false；老的 7 个键都没有 inheritsFrom，
+   * 因此对它们没有任何行为影响（向后兼容）。
+   */
+  explicitlyConfigured: boolean
 }
 
 type PersistedConfigMap = Record<AiModelFeatureKey, PersistedConfig>
@@ -91,28 +116,90 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     runtimeNote: '已被 AI 简历生成运行链路消费；生成结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与生成。',
     allowCustomSystemPrompt: false,
   },
-  // ⚠️ 共用键警示（2026-07-31 审计登记，见 docs/product/console-plan-for-kiosk-proto-2026-07.md §六）
-  // 下列 6 个用户可见能力目前全部读取 `resume_optimize` 的凭证与模型配置。
+  // ⚠️ 共用键治理记录（2026-07-31 登记 → 2026-08-16 S0-3 拆键）
+  //
+  // 历史问题（风险 R3）：下列 7 个用户可见能力曾**全部**读取 `resume_optimize` 的凭证与
+  // 模型配置。Admin 在「AI大模型」里关掉「AI简历优化」或改错凭证，会一并静默停掉全部 7 项，
+  // 而运行端只表现为「未配置 / 不可用」，不会说明这层依赖。
+  // 2026-07-31 的注释只登记了 6 项，**漏了自我探索解读**（llm-self-assessment.service.ts），
+  // 本次一并补全。
+  //
   // 权威清单请用以下检索命令复核（不写行号，避免注释自身改动导致行号漂移）：
   //   grep -rn --include='*.ts' -E "get(ApiKey|Config)\('resume_optimize'\)" services/api/src
-  //   1. AI 简历优化       llm-resume-optimize.service.ts（本键的名义归属）
-  //   2. 岗位大师/岗位匹配  llm-job-fit.service.ts
-  //   3. 职业规划          llm-career-plan.service.ts（callLlm）
-  //   4. 招聘会拜访计划     llm-fair-visit-plan.service.ts（callLlm）
-  //   5. 岗位推荐          job-ai-llm.service.ts（callLlm 'jobRecommend'）
-  //   6. 岗位解释          job-ai-llm.service.ts（callLlm 'jobExplain'）
-  // 后果：在 Admin「AI大模型」里关闭本功能或改错凭证，会一并停掉上述全部 6 项。
-  // 运行端不会说明这层依赖（各能力只会表现为"未配置/不可用"）；Admin 配置页已在
-  // 下方 runtimeNote 里展示共用清单，运营动开关时可见。
-  // 治理方向：为 2–6 各自建独立 feature key（默认继承本键配置以保持行为不变），
-  // 使开关与成本归属按能力隔离。新增能力请勿继续复用本键。
+  //   1. AI 简历优化 + 版式调整  llm-resume-optimize.service.ts（本键的名义归属，仍留在本键）
+  //   2. 岗位大师/岗位匹配       llm-job-fit.service.ts            → 已拆到 job_fit
+  //   3. 职业规划               llm-career-plan.service.ts        → 已拆到 career_plan
+  //   4. 招聘会拜访计划          llm-fair-visit-plan.service.ts    → 已拆到 fair_visit_plan
+  //   5. 自我探索解读            llm-self-assessment.service.ts    → 已拆到 self_assessment
+  //   6. 岗位推荐               job-ai-llm.service.ts jobRecommend → 已拆到 job_recommend
+  //   7. 岗位解释               job-ai-llm.service.ts jobExplain   → 已拆到 job_explain
+  //
+  // 拆键后的语义：2–7 各自持有独立 feature key，**未被单独配置时继承本键**（inheritsFrom），
+  // 因此默认行为与拆键前完全一致；管理员一旦单独配置某键，该键即脱离本键独立生效。
+  // 任一子键被单独关闭或配错，只影响它自己，不再连坐其它能力。
+  // 新增能力请建自己的 key，不要继续复用本键。
   {
     key: 'resume_optimize',
     label: 'AI简历优化',
     status: 'active',
     description: '用于基于简历原文与诊断报告生成优化版简历与新旧对比。AI 只优化表达，不编造经历；事实信息须出现在简历原文中。',
-    runtimeNote: '已被 AI 简历优化运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。⚠️ 本键当前被 6 项能力共用（简历优化 / 岗位大师 / 职业规划 / 招聘会拜访计划 / 岗位推荐 / 岗位解释），停用或改错凭证会一并影响全部 6 项。',
+    runtimeNote: '已被 AI 简历优化 / 简历版式调整运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。⚠️ 岗位匹配 / 职业规划 / 招聘会拜访计划 / 自我探索解读 / 岗位推荐 / 岗位解释 已拆为独立功能位，未单独配置时仍继承本键：本键停用或改错凭证会连带影响这些「继承中」的能力，单独配置过的能力不受影响。',
     allowCustomSystemPrompt: false,
+  },
+  // ── S0-3 拆出的 6 个独立功能位（默认继承 resume_optimize，行为不变）──────────
+  {
+    key: 'job_fit',
+    label: 'AI岗位匹配参考',
+    status: 'active',
+    description: '用于简历与目标岗位的匹配参考。只做排序与解释，不代表投递、面试或录用结果，也不替求职者做裁决。',
+    runtimeNote: '已被岗位匹配运行链路消费（llm-job-fit.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
+  },
+  {
+    key: 'career_plan',
+    label: 'AI职业规划建议',
+    status: 'active',
+    description: '用于基于简历生成职业方向与技能计划建议，仅供求职者本人参考。',
+    runtimeNote: '已被职业规划运行链路消费（llm-career-plan.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
+  },
+  {
+    key: 'fair_visit_plan',
+    label: 'AI招聘会拜访计划',
+    status: 'active',
+    description: '用于基于简历与招聘会参展信息生成参会准备单。招聘会仍只作为第三方/官方来源信息入口，不做平台内预约或投递。',
+    runtimeNote: '已被招聘会拜访计划运行链路消费（llm-fair-visit-plan.service.ts）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
+  },
+  {
+    key: 'self_assessment',
+    label: 'AI自我探索解读',
+    status: 'active',
+    description: '用于对自我探索问卷的规则打分结果做文字解读。打分本身是纯函数，不依赖模型；本功能位只影响解读文字。',
+    runtimeNote: '已被自我探索解读运行链路消费（llm-self-assessment.service.ts）；本键不可用时解读为 null，问卷打分与主流程不受影响。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
+  },
+  {
+    key: 'job_recommend',
+    label: 'AI岗位推荐排序',
+    status: 'active',
+    description: '用于对第三方来源岗位列表做收敛排序与理由说明。AI 只排序与解释，不自动裁决、不代替求职者投递。',
+    runtimeNote: '已被岗位推荐运行链路消费（job-ai-llm.service.ts jobRecommend）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
+  },
+  {
+    key: 'job_explain',
+    label: 'AI岗位解读',
+    status: 'active',
+    description: '用于把第三方来源岗位正文拆解为职责 / 硬性要求 / 加分项 / 准备建议，仅供求职者理解岗位信息。',
+    runtimeNote: '已被岗位解读运行链路消费（job-ai-llm.service.ts jobExplain）；结构化 System Prompt 由服务端强制。未单独配置时继承「AI简历优化」。',
+    allowCustomSystemPrompt: false,
+    inheritsFrom: 'resume_optimize',
   },
   {
     key: 'mock_interview',
@@ -141,6 +228,18 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
 ]
 
 const ACTIVE_FEATURE_KEYS = AI_MODEL_FEATURES.map((feature) => feature.key)
+
+const FEATURE_PARENT: Partial<Record<AiModelFeatureKey, AiModelFeatureKey>> = Object.fromEntries(
+  AI_MODEL_FEATURES.filter((feature) => feature.inheritsFrom).map((feature) => [feature.key, feature.inheritsFrom!]),
+)
+
+// 继承只允许一层：父键自身不得再有父键，否则 resolveFeature 的单跳解析会静默取错配置。
+// 这里在模块加载期就炸掉，不留到运行时才发现。
+for (const [child, parent] of Object.entries(FEATURE_PARENT) as Array<[AiModelFeatureKey, AiModelFeatureKey]>) {
+  if (FEATURE_PARENT[parent]) {
+    throw new Error(`AI_MODEL_FEATURES 继承层级非法：${child} → ${parent} → ...（只允许一层继承）`)
+  }
+}
 
 function isAiModelFeatureKey(value: unknown): value is AiModelFeatureKey {
   return typeof value === 'string' && ACTIVE_FEATURE_KEYS.includes(value as AiModelFeatureKey)
@@ -235,7 +334,18 @@ export class LlmConfigService {
       temperature:     typeof raw.temperature === 'number' ? raw.temperature : 0.7,
       enabled:         raw.enabled ?? false,
       apiKeyEncrypted: raw.apiKeyEncrypted ?? null,
+      explicitlyConfigured: raw.explicitlyConfigured === true,
     }
+  }
+
+  /**
+   * S0-3：把 featureKey 解析为**实际生效**的功能位。
+   * 未单独配置过的子键回落到父键；其余原样返回。只解析一层（模块加载期已断言无多级继承）。
+   */
+  private resolveFeature(feature: AiModelFeatureKey): AiModelFeatureKey {
+    const parent = FEATURE_PARENT[feature]
+    if (!parent) return feature
+    return this.cache[feature]?.explicitlyConfigured ? feature : parent
   }
 
   /** 从 env 取默认配置（首次启动；可复用 TRTC 的 DeepSeek key） */
@@ -255,6 +365,9 @@ export class LlmConfigService {
       temperature:     0.7,
       enabled:         Boolean(envKey),
       apiKeyEncrypted: envKey ? encryptSecret(envKey) : null,
+      // env 默认值不算「管理员单独配置过」：子键仍应继承父键，避免 env 兜底
+      // 把刚拆出来的 6 个键悄悄变成独立配置，破坏「默认行为不变」。
+      explicitlyConfigured: false,
     }
   }
 
@@ -270,20 +383,28 @@ export class LlmConfigService {
   }
 
   getView(feature: AiModelFeatureKey = 'assistant_chat'): LlmConfigView {
-    const { apiKeyEncrypted, ...rest } = this.cache[feature]
-    return { featureKey: feature, ...rest, apiKeyConfigured: Boolean(apiKeyEncrypted) }
+    const effective = this.resolveFeature(feature)
+    // 复用 getConfig：它已经剔除 apiKeyEncrypted 与 explicitlyConfigured 两个内部字段，
+    // 避免这里再写一份剔除逻辑（漏一处就等于把密文下发到前端）。
+    return {
+      featureKey: feature,
+      ...this.getConfig(feature),
+      apiKeyConfigured: Boolean(this.cache[effective].apiKeyEncrypted),
+      inheritedFrom: effective === feature ? null : effective,
+    }
   }
 
   getConfig(feature: AiModelFeatureKey = 'assistant_chat'): LlmConfig {
-    // 复制后剔除加密密钥，避免下发到下游（不泄漏到 LlmConfig 返回值）
-    const rest: PersistedConfig = { ...this.cache[feature] }
+    // 复制后剔除加密密钥与内部标记，避免下发到下游（不泄漏到 LlmConfig 返回值）
+    const rest: PersistedConfig = { ...this.cache[this.resolveFeature(feature)] }
     delete (rest as { apiKeyEncrypted?: unknown }).apiKeyEncrypted
+    delete (rest as { explicitlyConfigured?: unknown }).explicitlyConfigured
     return rest
   }
 
   /** 取解密后的 apiKey（仅服务端调用） */
   getApiKey(feature: AiModelFeatureKey = 'assistant_chat'): string | null {
-    const cfg = this.cache[feature]
+    const cfg = this.cache[this.resolveFeature(feature)]
     if (!cfg.apiKeyEncrypted) return null
     try {
       return decryptSecret(cfg.apiKeyEncrypted)
@@ -294,13 +415,16 @@ export class LlmConfigService {
   }
 
   isReady(feature: AiModelFeatureKey = 'assistant_chat'): boolean {
-    const cfg = this.cache[feature]
+    const cfg = this.cache[this.resolveFeature(feature)]
     return cfg.enabled && Boolean(cfg.apiKeyEncrypted)
   }
 
   // ── 更新 ──────────────────────────────────────────────────
   update(patch: Partial<LlmConfig> & { apiKey?: string }, feature: AiModelFeatureKey = 'assistant_chat'): LlmConfigView {
-    const next: PersistedConfig = { ...this.cache[feature] }
+    // S0-3：仍在继承的子键，编辑基线取「当前实际生效的配置」（父键），
+    // 而不是它自己那份从未生效过的 env 兜底 —— 否则管理员只改一个字段就会把
+    // 父键上的其它设置悄悄丢掉。写入后本键即固化为独立配置，不再跟随父键。
+    const next: PersistedConfig = { ...this.cache[this.resolveFeature(feature)], explicitlyConfigured: true }
 
     if (patch.vendor && isLlmVendor(patch.vendor) && patch.vendor !== next.vendor) {
       next.vendor = patch.vendor

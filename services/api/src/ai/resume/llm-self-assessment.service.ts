@@ -104,7 +104,7 @@ export class LlmSelfAssessmentService {
   constructor(private readonly config: LlmConfigService) {}
 
   async summarize(input: LlmSelfAssessmentInput): Promise<LlmSelfAssessmentOutput> {
-    const providerName = this.config.getConfig('resume_optimize').vendor
+    const providerName = this.config.getConfig('self_assessment').vendor
     let raw: string
     try {
       raw = await this.callLlm(input.scored.dimensions)
@@ -189,12 +189,15 @@ export class LlmSelfAssessmentService {
   }
 
   /**
-   * 复用 resume_optimize LLM 接入（密钥仅服务端）。
+   * 独立功能位 self_assessment（S0-3 拆键；未单独配置时继承 resume_optimize，密钥仅服务端）。
    * 答案原文不送 LLM：仅送维度 key/label/strength + 简短证据题号。
+   *
+   * 注：2026-07-31 的共用键注释漏登记了本消费方，S0-3 一并补上（风险 R3）。
+   * 本键不可用只影响解读文字（note/summary 置 null），问卷打分是纯函数，主流程不受影响。
    */
   private async callLlm(dimensions: SelfAssessmentDimensionResult[]): Promise<string> {
-    const apiKey = this.config.getApiKey('resume_optimize')
-    const cfg = this.config.getConfig('resume_optimize')
+    const apiKey = this.config.getApiKey('self_assessment')
+    const cfg = this.config.getConfig('self_assessment')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用' } })
     }

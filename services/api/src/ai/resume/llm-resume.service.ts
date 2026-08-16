@@ -9,6 +9,7 @@ import type {
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
 // LlmResumeService — 真实简历诊断（单轮、结构化 JSON，OpenAI 兼容协议）
@@ -171,7 +172,10 @@ export class LlmResumeService {
       })
     }
 
-    const text = (extractedText ?? '').slice(0, MAX_DIAGNOSIS_INPUT_CHARS)
+    // S0-2 / 风险 R2：先截断控成本，再遮盖高置信 PII，最后才拼 prompt。
+    // 诊断只看简历「文本表达」，姓名 / 手机 / 身份证 / 邮箱 / 住址对结论没有贡献，
+    // 没有理由原样出境到第三方模型。遮盖失败不阻塞诊断（见 llm-input-mask.ts 说明）。
+    const text = maskUserTextForLlmText((extractedText ?? '').slice(0, MAX_DIAGNOSIS_INPUT_CHARS), 'resume_diagnosis')
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: DIAGNOSIS_SYSTEM_PROMPT },
       { role: 'user', content: buildDiagnosisUserPrompt(text, context) },

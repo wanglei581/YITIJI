@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../../common/pdf/aigc-pdf-metadata'
 import type { CareerPlanPayload } from './llm-career-plan.service'
 
 // ============================================================
@@ -52,6 +53,12 @@ export class CareerPlanPdfService {
     plan: CareerPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    applyAigcPdfMetadata(doc, {
+      title: 'AI 职业规划建议',
+      subject: 'AI 生成的职业方向与技能计划建议，仅供求职者本人参考，不构成就业结果或薪资承诺',
+      kind: 'careerplan',
+    })
     const ok = fontCandidates().some((c) => {
       if (!existsSync(c.path)) return false
       try {

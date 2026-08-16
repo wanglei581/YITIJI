@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
+import { applyAigcPdfMetadata } from '../common/pdf/aigc-pdf-metadata'
 import type { InterviewReportPayload } from './mock-interview-llm.service'
 
 // ============================================================
@@ -46,6 +47,12 @@ export class InterviewReportPdfService {
 
   async render(meta: { position: string; industry: string; interviewerLabel: string; date: string }, report: InterviewReportPayload): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
+    // S0-4 / 风险 R4：AI 产物必须带文件级 AIGC 标识（本批次只加隐式 metadata，不加可见水印）
+    applyAigcPdfMetadata(doc, {
+      title: 'AI 模拟面试练习报告',
+      subject: 'AI 生成的模拟面试练习报告，仅供求职者本人练习复盘参考，不代表任何招聘结果，不参与企业筛选或面试邀约',
+      kind: 'interview',
+    })
     const ok = fontCandidates().some((c) => {
       if (!existsSync(c.path)) return false
       try {
