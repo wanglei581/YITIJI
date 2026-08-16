@@ -1,4 +1,4 @@
-<!--pages/print-preview/print-preview.wxml  P09 打印预览-->
+<!--pages/print-preview/print-preview.wxml  打印预览：只展示服务端真实文件与已核定参数-->
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
   <view class="navbar">
@@ -8,51 +8,73 @@
   </view>
 
   <view class="content has-bar">
-    <!-- 参数条 -->
-    <view class="preview-params rise-d1">
-      <text class="pp-chip">{{colorLabel}}</text>
-      <text class="pp-dot">·</text><text class="pp-chip">A4</text>
-      <text class="pp-dot">·</text><text class="pp-chip">{{duplexLabel}}</text>
-      <text class="pp-dot">·</text><text class="pp-chip">×{{copies}} 份</text>
-      <text class="pp-dot">·</text><text class="pp-amt">¥{{total}}</text>
-    </view>
 
-    <!-- A4 纸张近似预览 -->
-    <view class="a4-paper rise-d2">
-      <view class="p-name">{{docName}}</view>
-      <view class="p-tagline">以下为版式近似预览，实际以文件原始格式为准</view>
-      <view class="p-divider"></view>
-      <view class="p-section">第 {{page}} 页 · 共 {{pages}} 页</view>
-      <view class="p-line full"></view>
-      <view class="p-line med"></view>
-      <view class="p-line full"></view>
-      <view class="p-line short"></view>
-      <view class="p-line thin"></view>
-      <view class="p-line full"></view>
-      <view class="p-line med"></view>
-      <view class="p-line thin"></view>
-      <view class="p-line short"></view>
-    </view>
-
-    <!-- 翻页 -->
-    <view class="page-indicator rise-d3">
-      <view class="pi-nav tap {{page<=1?'off':''}}" hover-class="tap-press" bindtap="prevPage">‹</view>
-      <view class="pi-dots">
-        <view class="pi-dot {{page===idx+1?'on':''}}" wx:for="{{pageDots}}" wx:key="*this" wx:for-index="idx"></view>
+    <!-- 文件标识 -->
+    <view class="file-head rise-d1">
+      <view class="fh-ic {{isImage ? 'a-wheat' : 'a-teal'}}"><text class="ficon i-file-text"></text></view>
+      <view class="fh-main">
+        <view class="fh-name">{{docName}}</view>
+        <view class="fh-meta">
+          <text class="fh-tag">{{extLabel}}</text>
+          <text class="fh-sub">{{hasQuote ? '服务端核定 ' + pages + ' 页' : '页数待服务端核定'}}</text>
+        </view>
       </view>
-      <view class="pi-text">第 {{page}} / {{pages}} 页</view>
-      <view class="pi-nav tap {{page>=pages?'off':''}}" hover-class="tap-press" bindtap="nextPage">›</view>
+    </view>
+
+    <!-- 预览台：真实文件内容，绝不用占位线条冒充正文 -->
+    <view class="stage rise-d2">
+
+      <view wx:if="{{state === 'loading'}}" class="sheet">
+        <view class="sk-block"></view>
+        <view class="sk-line w80"></view>
+        <view class="sk-line w55"></view>
+        <view class="stage-text">正在获取本人文件的预览链接…</view>
+      </view>
+
+      <view wx:elif="{{state === 'image'}}" class="sheet img tap" hover-class="tap-press" bindtap="zoomImage">
+        <image class="pv-img" src="{{fileUrl}}" mode="aspectFit" binderror="imageError"></image>
+      </view>
+
+      <view wx:elif="{{state === 'doc'}}" class="sheet doc">
+        <view class="doc-ic"><text class="ficon i-file-text"></text></view>
+        <view class="doc-t">{{extLabel}} 原文需用微信阅读器打开</view>
+        <view class="doc-s">小程序无法内嵌排版 {{extLabel}}，也没有服务端逐页渲染。点下方按钮用微信自带阅读器查看真实内容与排版。</view>
+        <view class="btn primary lg doc-btn {{opening ? 'disabled' : ''}}" bindtap="openDoc">{{opening ? '正在打开…' : '打开原文查看'}}</view>
+      </view>
+
+      <view wx:else class="sheet err">
+        <view class="err-ic"><text class="ficon i-warning"></text></view>
+        <view class="err-t">预览加载失败</view>
+        <view class="err-s">{{errorText}}</view>
+        <view class="btn ghost lg err-btn" bindtap="retryPreview">重新加载预览</view>
+      </view>
+
+    </view>
+
+    <view wx:if="{{state === 'image'}}" class="stage-hint">轻触图片可全屏放大查看细节</view>
+
+    <!-- 参数复核 -->
+    <view class="section-t rise-d3">本次打印参数</view>
+    <view class="card flat spec rise-d3">
+      <view class="sp-row"><text class="sp-k">打印颜色</text><text class="sp-v">{{colorLabel}}</text></view>
+      <view class="sp-row"><text class="sp-k">纸张规格</text><text class="sp-v">A4 · 210 × 297mm</text></view>
+      <view class="sp-row"><text class="sp-k">打印方式</text><text class="sp-v">{{duplexLabel}}</text></view>
+      <view class="sp-row"><text class="sp-k">打印份数</text><text class="sp-v">×{{copies}} 份</text></view>
+      <view class="sp-row"><text class="sp-k">计费页数</text><text class="sp-v {{hasQuote ? '' : 'pending'}}">{{hasQuote ? pages + ' 页 / 份' : '待服务端核定'}}</text></view>
+      <view class="sp-row total">
+        <text class="sp-k">{{isFree ? '试运营费用' : '服务端报价'}}</text>
+        <text class="sp-amt {{hasQuote ? '' : 'pending'}}">{{hasQuote ? (isFree ? '免费' : '¥' + total) : '待服务端核定'}}</text>
+      </view>
     </view>
 
     <view class="notice rise-d4">
       <text class="ficon i-info n-ic"></text>
-      <text>预览为近似效果，实际打印以文件原始格式为准。出纸在所选门店一体机完成。</text>
+      <text>此处显示的是服务端上你本人的原始文件。实际出纸以文件原始格式为准，由所选门店一体机完成，本页不会触发任何打印动作。</text>
     </view>
 
   </view>
 
   <view class="actionbar">
-    <view class="btn ghost-ink" style="flex:1" bindtap="back">返回修改</view>
-    <view class="btn primary" style="flex:1.4" bindtap="confirm">确认参数，去选门店 →</view>
+    <view class="btn primary lg block" bindtap="back">确认无误，返回继续</view>
   </view>
 </view>

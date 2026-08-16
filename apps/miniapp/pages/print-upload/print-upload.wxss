@@ -1,54 +1,103 @@
+/* pages/print-upload/print-upload.wxss  打印参数 */
 .page-wrap { min-height: 100vh; background: var(--paper); }
-.file-card { display: flex; align-items: center; gap: 24rpx; }
-.fc-main { flex: 1; min-width: 0; }
-.fc-preview { flex-shrink: 0; font-size: 24rpx; font-weight: 600; color: var(--teal-deep); }
-.fc-ic { width: 88rpx; height: 88rpx; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.fc-ic .ficon { width: 44rpx; height: 44rpx; }
-.fc-name { font-size: 30rpx; font-weight: 600; color: var(--ink); }
-.fc-meta { font-size: 24rpx; color: var(--ink-soft); margin-top: 6rpx; }
+/* actionbar 里是 .btn.lg（60px），app.wxss 的 has-bar 只预留 80px，会压住合规说明 */
+.content.has-bar { padding-bottom: calc(112px + var(--sab)); }
 
-.ai-card { margin-top: 20rpx; padding: 24rpx 28rpx; border-radius: var(--r-lg); background: var(--teal-wash); border: 1rpx solid var(--teal-soft); }
-.ai-head { display: flex; align-items: center; gap: 10rpx; font-size: 26rpx; font-weight: 600; color: var(--teal-deep); }
-.ai-head .ficon { width: 32rpx; height: 32rpx; }
-.ai-body { margin-top: 12rpx; font-size: 25rpx; line-height: 1.6; color: var(--muted); }
+/* ── 文件卡 ─────────────────────────────────────────────────── */
+.file-card { display: flex; align-items: center; gap: 24rpx; border: 1rpx solid var(--line-soft); box-shadow: none; }
+.fc-ic { width: 88rpx; height: 88rpx; border-radius: var(--r-md); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+.fc-ic .ficon { width: 44rpx; height: 44rpx; }
+.fc-main { flex: 1; min-width: 0; }
+.fc-name { font-size: 30rpx; font-weight: 600; color: var(--ink); word-break: break-all; }
+.fc-meta { display: flex; align-items: center; gap: 12rpx; margin-top: 8rpx; }
+.fc-tag { flex-shrink: 0; font-size: 20rpx; font-weight: 700; letter-spacing: .5rpx;
+  color: var(--teal-deep); background: var(--teal-wash); border-radius: var(--r-xs); padding: 4rpx 12rpx; }
+.fc-sub { font-size: 23rpx; color: var(--muted); }
+.fc-go { flex-shrink: 0; font-size: 24rpx; font-weight: 600; color: var(--teal-deep);
+  display: flex; align-items: center; gap: 7rpx; }
+.fc-go .ficon { width: 18rpx; height: 18rpx; }
+
+/* ── 打印设置 ───────────────────────────────────────────────── */
+.setting { padding: 26rpx 28rpx; }
+.set-k { font-size: 25rpx; font-weight: 600; color: var(--muted); margin-bottom: 16rpx; }
+.set-k.tight { margin-bottom: 0; flex: 1; }
+.set-sep { height: 1rpx; background: var(--line-faint); margin: 26rpx 0; }
+.set-row { display: flex; align-items: center; gap: 20rpx; min-height: 96rpx; }
+.set-v { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.set-badge { flex-shrink: 0; font-size: 21rpx; color: var(--teal-deep);
+  background: var(--teal-wash); padding: 8rpx 18rpx; border-radius: var(--r-full); }
+.set-why { margin-top: 16rpx; font-size: 22rpx; line-height: 1.55; color: var(--faint); }
 
 .opt-list { display: flex; flex-direction: column; gap: 16rpx; }
-.opt { display: flex; align-items: center; gap: 20rpx; padding: 26rpx 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; box-shadow: var(--sh-sm); }
+/* 每个选项 ≥112rpx（56px），满足 CLAUDE.md §9 触控尺寸 */
+.opt { display: flex; align-items: center; gap: 20rpx; min-height: 112rpx; padding: 20rpx 24rpx;
+  background: var(--surface-2); border-radius: var(--r-md); border: 2rpx solid var(--line-soft); }
 .opt.on { border-color: var(--teal); background: var(--teal-wash); }
-.opt.off, .duplex-opt.off { opacity: .58; }
-.o-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 24rpx; color: #fff; flex-shrink: 0; }
+.opt.off { background: var(--surface-2); }
+.o-radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
 .opt.on .o-radio { background: var(--teal); border-color: var(--teal); }
-.o-main { flex: 1; }
+.opt.off .o-radio { border-style: dashed; border-color: var(--ghost); }
+.o-radio .ficon { width: 22rpx; height: 22rpx; }
+.o-main { flex: 1; min-width: 0; }
 .o-title { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.o-sub { font-size: 23rpx; color: var(--ink-soft); margin-top: 4rpx; }
-.o-price { font-size: 26rpx; font-weight: 600; color: var(--clay-deep); }
-
-.paper-row { display: flex; align-items: center; justify-content: space-between; }
-.paper-badge { font-size: 23rpx; color: var(--teal-deep); background: var(--teal-wash); padding: 8rpx 18rpx; border-radius: 999rpx; }
+.opt.off .o-title { color: var(--faint); }
+.o-sub { font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
+.o-price { flex-shrink: 0; font-size: 25rpx; font-weight: 700; color: var(--clay-deep); }
+.o-locked { flex-shrink: 0; font-size: 21rpx; color: var(--faint);
+  background: var(--surface-3); padding: 8rpx 16rpx; border-radius: var(--r-full); }
 
 .duplex-row { display: flex; gap: 16rpx; }
-.duplex-opt { flex: 1; text-align: center; padding: 26rpx 0; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; font-size: 27rpx; color: var(--muted); box-shadow: var(--sh-sm); }
-.duplex-opt.on { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); font-weight: 600; }
+.duplex-opt { flex: 1; min-height: 112rpx; padding: 20rpx 0; text-align: center;
+  background: var(--surface-2); border-radius: var(--r-md); border: 2rpx solid var(--line-soft);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; }
+.duplex-opt .d-t { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.duplex-opt .d-s { font-size: 21rpx; color: var(--muted); }
+.duplex-opt.on { border-color: var(--teal); background: var(--teal-wash); }
+.duplex-opt.on .d-t { color: var(--teal-deep); }
+.duplex-opt.off .d-t { color: var(--faint); }
 
-.stepper-row { display: flex; align-items: center; justify-content: space-between; }
-.stepper { display: flex; align-items: center; gap: 8rpx; }
-.s-btn { width: 64rpx; height: 64rpx; border-radius: var(--r-sm); background: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 40rpx; color: var(--ink); }
-.s-btn.off { color: var(--line); }
-.s-val { min-width: 72rpx; text-align: center; font-size: 30rpx; font-weight: 600; color: var(--ink); }
+/* 加减按钮 96rpx（48px），达到最小可点击尺寸 */
+.stepper { display: flex; align-items: center; gap: 10rpx; flex-shrink: 0; }
+.s-btn { width: 96rpx; height: 96rpx; border-radius: var(--r-sm); background: var(--surface-2);
+  border: 1rpx solid var(--line-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 40rpx; color: var(--ink); }
+.s-btn.off { color: var(--ghost); background: var(--surface-3); }
+.s-val { min-width: 88rpx; text-align: center; font-size: 32rpx; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums; }
 
-.ab-label { font-size: 22rpx; color: var(--ink-soft); display: block; }
-.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--clay-deep); font-family: var(--font-serif); }
+/* ── 页数与金额 ─────────────────────────────────────────────── */
+.bill { padding: 8rpx 28rpx 22rpx; }
+.bl-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; min-height: 84rpx; }
+.bl-k { font-size: 26rpx; color: var(--muted); }
+.bl-k.strong { font-size: 27rpx; font-weight: 600; color: var(--ink); }
+.bl-v { font-size: 27rpx; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bl-note { margin: -6rpx 0 10rpx; font-size: 21rpx; color: var(--faint); }
+.bl-row.total { margin-top: 6rpx; padding-top: 20rpx; border-top: 1rpx solid var(--line-faint); min-height: 96rpx; }
+.bl-amt { font-size: 40rpx; font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
 
-/* 纸张规格行主内容区 */
-.pr-main { flex: 1; }
-.privacy-check { display: flex; flex-direction: column; gap: 18rpx; }
+.bl-idle { padding: 30rpx 0; font-size: 24rpx; line-height: 1.6; color: var(--muted); }
+.bl-fail { padding: 22rpx 0; display: flex; flex-direction: column; gap: 14rpx; align-items: flex-start; }
+.bl-fail-t { display: flex; align-items: center; gap: 10rpx; font-size: 26rpx; font-weight: 600; color: var(--clay-deep); }
+.bl-fail-t .ficon { width: 26rpx; height: 26rpx; }
+.bl-fail-s { font-size: 23rpx; line-height: 1.55; color: var(--muted); }
+.bl-retry { height: 88rpx; padding: 0 32rpx; }
+
+/* ── 隐私检查 ───────────────────────────────────────────────── */
+.privacy-check { display: flex; flex-direction: column; gap: 18rpx; padding: 26rpx 28rpx; }
+.pc-block { display: flex; flex-direction: column; gap: 16rpx; align-items: flex-start; }
 .pc-state, .pc-note { font-size: 24rpx; line-height: 1.6; color: var(--ink-soft); }
 .pc-title { font-size: 27rpx; font-weight: 600; color: var(--ink); }
-.pc-error { color: var(--danger); font-size: 24rpx; }
-.pc-ready { color: var(--teal-deep); font-size: 25rpx; font-weight: 600; }
-.pc-finding { padding: 16rpx; background: var(--paper); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 8rpx; font-size: 24rpx; }
+.pc-error { color: var(--error); font-size: 24rpx; line-height: 1.55; }
+.pc-ready { color: var(--ok); font-size: 25rpx; font-weight: 600; display: flex; align-items: center; gap: 10rpx; }
+.pc-ready .ficon { width: 25rpx; height: 25rpx; }
+.pc-finding { width: 100%; box-sizing: border-box; padding: 18rpx; background: var(--surface-2);
+  border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 8rpx; font-size: 24rpx; }
 .pc-snippet { color: var(--ink-soft); word-break: break-all; }
-.quote-error { display: flex; align-items: center; gap: 20rpx; padding: 22rpx 24rpx; border-radius: var(--r-lg); background: #fff6ec; border: 1rpx solid #f0d6b4; }
-.qe-main { flex: 1; min-width: 0; }
-.qe-title { color: var(--clay-deep); font-size: 25rpx; font-weight: 600; }
-.qe-text { margin-top: 6rpx; color: var(--ink-soft); font-size: 22rpx; line-height: 1.5; }
+.pc-btn { height: 88rpx; padding: 0 32rpx; }
+
+/* ── 底栏 ───────────────────────────────────────────────────── */
+.ab-label { font-size: 22rpx; color: var(--muted); display: block; }
+.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
+.ab-amt.pending { font-size: 32rpx; color: var(--ghost); }
