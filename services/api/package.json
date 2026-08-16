@@ -210,6 +210,7 @@
     "typecheck:recruitment-wave2-proposed-governance": "tsc --noEmit --strict --noUnusedLocals --noUnusedParameters --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck scripts/recruitment-wave2-proposed-governance-dry-run.ts scripts/verify-recruitment-wave2-proposed-governance.ts scripts/support/recruitment-wave2-governance-readonly.ts scripts/support/recruitment-wave2-proposed-governance-input.ts src/recruitment-content/recruitment-wave2-proposed-governance.types.ts src/recruitment-content/recruitment-wave2-proposed-governance-plan.ts",
     "typecheck:recruitment-wave2-full-inventory": "tsc --noEmit --strict --target ES2021 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck scripts/recruitment-wave2-full-inventory.ts scripts/verify-recruitment-wave2-full-inventory.ts scripts/support/recruitment-wave2-full-inventory.ts scripts/support/recruitment-wave2-public-snapshot.ts",
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
+    "verify:career-plan-degraded": "node -r @swc-node/register scripts/verify-career-plan-degraded.ts",
     "verify:ai-cost-coverage": "node -r @swc-node/register scripts/verify-ai-cost-coverage.ts",
     "verify:assistant-provider-label": "node -r @swc-node/register scripts/verify-assistant-provider-label.ts",
     "verify:llm-input-pii-mask": "node -r @swc-node/register scripts/verify-llm-input-pii-mask.ts",
