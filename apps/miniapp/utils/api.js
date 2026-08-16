@@ -135,7 +135,17 @@ const api = {
   },
   getCompanyDetail(id) {
     if (config.USE_MOCK) return mockResolve(mock.companyById(id));
-    return request(`/companies/${id}`, { method: 'GET', needAuth: false });
+    return request(`/companies/${id}`, { method: 'GET', needAuth: false }).then(N.companyDetail);
+  },
+  getCompanyJobs(id, params = {}) {
+    if (config.USE_MOCK) {
+      const detail = mock.companyById(id);
+      return mockResolve(detail && Array.isArray(detail.jobs) ? detail.jobs : []);
+    }
+    return adaptList(
+      unwrapList(request(`/companies/${id}/jobs`, { method: 'GET', data: params, needAuth: false })),
+      N.companyJob,
+    );
   },
 
   // ---------- 政策 ----------
@@ -335,11 +345,22 @@ const api = {
   },
 
   /** 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。 */
-  uploadPrintFile(filePath) {
+  uploadPrintFile(filePath, originalFilename) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印文件上传'));
+    const fd = { purpose: 'print_doc' };
+    if (originalFilename) fd.originalFilename = String(originalFilename);
     return uploadFile('/files/kiosk-upload', filePath, {
       name: 'file',
-      formData: { purpose: 'print_doc' },
+      formData: fd,
+      needAuth: true,
+    });
+  },
+
+  /** 获取本人文件的预览 URL（短时签名，仅用于预览/打印报价）。 */
+  getFilePreviewUrl(fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('文件预览'));
+    return request(`/files/${encodeURIComponent(fileId)}/preview-url`, {
+      method: 'GET',
       needAuth: true,
     });
   },
@@ -783,6 +804,201 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('终端列表'));
     return request('/terminals/public', { method: 'GET', needAuth: false });
   },
+
+  // ---------- 材料包打印订单（小程序专用）----------
+
+  /**
+   * 创建材料包打印订单（一体机现场取件）
+   * @param {object} data { terminalId, files: [{ fileId, filename, pageCount }], params: { colorMode, duplex, copies }, totalAmount }
+   * @returns {Promise<{ orderId, pickupCode, qrCodeUrl, expiresAt }>}
+   */
+  createPackageOrder(data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
+    return request('/orders/package', { method: 'POST', data, needAuth: true });
+  },
+
+  /**
+   * 获取材料包订单详情
+   * @param {string} orderId
+   */
+  getPackageOrder(orderId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('订单详情'));
+    return request(`/orders/package/${encodeURIComponent(orderId)}`, { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 取消材料包订单
+   * @param {string} orderId
+   * @param {string} reason
+   */
+  cancelPackageOrder(orderId, reason) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消订单'));
+    return request(`/orders/package/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      data: { reason },
+      needAuth: true
+    });
+  },
+
+  // ---------- 职业圈动态 ----------
+
+
+  /**
+   * 获取动态详情
+   * @param {string} id
+   */
+  getFeedDetail(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('动态详情'));
+    return request(`/community/feeds/${encodeURIComponent(id)}`, { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 点赞动态
+   * @param {string} id
+   */
+  likeFeed(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞'));
+    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'POST', needAuth: true });
+  },
+
+  /**
+   * 取消点赞
+   * @param {string} id
+   */
+  unlikeFeed(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞'));
+    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'DELETE', needAuth: true });
+  },
+
+  /**
+   * 获取动态评论列表
+   * @param {string} feedId
+   * @param {object} params { cursor, pageSize }
+   */
+  getFeedComments(feedId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('评论列表'));
+    return unwrapList(request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
+      method: 'GET',
+      data: params,
+      needAuth: false
+    }));
+  },
+
+  /**
+   * 发表评论
+   * @param {string} feedId
+   * @param {object} data { content, replyToCommentId? }
+   */
+  commentFeed(feedId, data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('发表评论'));
+    return request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
+      method: 'POST',
+      data,
+      needAuth: true
+    });
+  },
+
+  /**
+   * 点赞评论
+   * @param {string} commentId
+   */
+  likeComment(commentId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞评论'));
+    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
+      method: 'POST',
+      needAuth: true
+    });
+  },
+
+  /**
+   * 取消点赞评论
+   * @param {string} commentId
+   */
+  unlikeComment(commentId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞评论'));
+    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
+      method: 'DELETE',
+      needAuth: true
+    });
+  },
+
+  // ---------- 今日早报 ----------
+
+  /**
+   * 职业圈动态 / 今日早报。
+   *
+   * ⚠️ 服务端 /community/feeds 与 /assistant/daily-report 目前均不存在。
+   * 保留这两个方法不是因为它们能用，而是 pages/community/ 与
+   * pages/daily-report/ 这两个在制页面仍在调用，删掉会直接打断
+   * 主仓正在进行的工作。等那两页连同后端一起落地或一起废弃时再处理。
+   * AI 百宝箱首页已不再引用（见 e2d8dcfb1）。
+   */
+  getCommunityFeeds(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('职业圈动态'));
+    return unwrapList(request('/community/feeds', { method: 'GET', data: params, needAuth: false }));
+  },
+
+  getDailyReport() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日早报'));
+    return request('/assistant/daily-report', { method: 'POST', needAuth: false, timeout: config.aiTimeout });
+  },
+
+  // ---------- 合同审查（后端 contract-review.controller.ts 已实现，此前小程序零引用） ----------
+  /**
+   * 合同类型白名单，与服务端 dto/contract-review.dto.ts 的 CONTRACT_TYPES 一一对应。
+   * 服务端用 @IsIn 强校验，前端传错值会 400，因此不要在页面里另写字面量。
+   */
+  CONTRACT_TYPES: ['labor_contract', 'internship_agreement', 'non_compete', 'offer'],
+
+  /**
+   * 取同意范围。必须先调这个：create 需要回传 consentVersion / consentScopeHash /
+   * disclaimerVersion，服务端据此校验用户确实看过当前版本的告知内容。
+   * 这是一道刻意设置的合规闸门，不能在前端伪造这几个值绕过去。
+   */
+  getContractConsentScope() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/contract-reviews/consent-scope', { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 建审查任务。sourceFileId 来自 uploadPrintFile() 的上传结果；
+   * consent* 四个字段原样透传 getContractConsentScope() 的返回，不要自行构造。
+   * @param {{sourceFileId:string, contractType:string, consentVersion:string,
+   *          consentedAt:string, consentScopeHash:string, disclaimerVersion:string}} payload
+   */
+  createContractReview(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true });
+  },
+
+  /** 轮询任务状态。 */
+  getContractReview(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'GET', needAuth: true });
+  },
+
+  /** 确认解析范围（页数与是否截断），由用户在看到实际识别页数后确认。 */
+  confirmContractReview(id, payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
+      method: 'POST', data: payload, needAuth: true,
+    });
+  },
+
+  /** 生成审查报告。 */
+  getContractReviewReport(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}/report`, {
+      method: 'POST', needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /** 删除审查记录。合同属敏感文件，用户放弃时应即时清除而非留存。 */
+  deleteContractReview(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
 };
+
 
 module.exports = api;
