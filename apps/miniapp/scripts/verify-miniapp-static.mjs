@@ -398,7 +398,7 @@ const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
   pickupWxml.includes('请将此二维码对准一体机扫码器') &&
-  pickupWxml.includes('二维码只包含本订单的 10 位取件码') &&
+  pickupWxml.includes('二维码只包含本订单的 10 位到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
   pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
   pickupQr.includes("PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/") &&
@@ -424,8 +424,34 @@ if (
   pickupJs.includes('const fallbackAvailable = this.data.state === \'ready\'') &&
   pickupJs.includes('if (this.data.showQr) this._drawPickupQr()') &&
   pickupJs.includes('if (fallbackAvailable) this._resumeVisibleWork()')
-) ok('取件页首次状态请求失败仍能绘制真实取件二维码')
+) ok('取件页首次状态请求失败仍能绘制真实到机码二维码')
 else bad('取件页首次请求失败二维码兜底', '回退为 ready 后必须重新绘码并恢复倒计时与轮询')
+
+// ── 两个码不许再混名 ────────────────────────────────────────────
+// 系统里有两个 10 位、同字符集但完全不同的码：
+//   Code A「到机码」 Order.pickupCodeHash/Enc + pickupStatus —— 小程序下单时生成，
+//                    到机核销后才付款出纸。后端错误文案（pickup-order.service.ts
+//                    「到机码无效或已过期」）与小程序下单页都叫它到机码。
+//   Code B「取件凭证码」Order.pickupCode —— 付款成功后才生成，向现场工作人员出示取纸，
+//                    只在 Kiosk 侧（PrintDonePage / 我的·打印订单）展示。
+// 小程序侧**只**持有 Code A，所以打印域这几个页面里不允许再出现「取件码」——
+// 它既是 Code B 的名字，也是终端改名前的旧名字，混用会让用户在终端上找错按钮。
+const ARRIVAL_CODE_FILES = [
+  'pages/print-pickup/print-pickup.wxml', 'pages/print-pickup/print-pickup.js',
+  'pages/orders/orders.wxml', 'pages/orders/orders.js',
+  'pages/print/print.js', 'pages/me/me.js', 'pages/ai/ai.js', 'pages/help/help.js',
+]
+const staleCodeName = ARRIVAL_CODE_FILES.filter((f) => read(f).includes('取件码'))
+// 跨端指引必须指到终端上真实存在的标签：Kiosk /print-scan 的卡片标题是「到机码核销」
+// （apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx）。指引写别的名字，
+// 用户到了机器前就找不到那个按钮。
+const arrivalGuideOk =
+  pickupWxml.includes('在终端选择「到机码核销」') &&
+  read('pages/orders/orders.wxml').includes('到机码核销')
+if (!staleCodeName.length && arrivalGuideOk) ok('到机码与取件凭证码不混名，且跨端指引对得上终端标签')
+else bad('到机码命名一致性', staleCodeName.length
+  ? `仍把到机码叫「取件码」：${staleCodeName.join(',')}`
+  : '指向终端的指引未使用终端现有卡片标题「到机码核销」')
 
 const printUploadJs = read('pages/print-upload/print-upload.js')
 const printUploadWxml = read('pages/print-upload/print-upload.wxml')
@@ -496,8 +522,8 @@ if (
   pickupJs.includes('this._stopPoll()') &&
   pickupJs.includes('if (this.data.fromOrders)') &&
   pickupJs.includes("taskStatus === 'abandoned'")
-) ok('扫码后撤下订单列表取件码且登录失效停止状态轮询')
-else bad('取件凭证撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询')
+) ok('扫码后撤下订单列表到机码且登录失效停止状态轮询')
+else bad('到机码撤下与轮询停机', 'claimed/PrintTask 阶段不得继续展示旧码，401 后不得持续轮询')
 
 const aiRecordsJs = read('pages/ai-records/ai-records.js')
 const jobFitJs = read('pages/job-fit/job-fit.js')
