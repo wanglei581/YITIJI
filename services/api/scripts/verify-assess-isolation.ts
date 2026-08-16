@@ -14,6 +14,8 @@
 //        - appended-self-assessment.service.ts（合并 PDF）
 //        - career-plan.service.ts（基于职业规划的 basedOn 上下文 hint，不参与签名门禁 / 校验 / 配额）
 //        - member-assets.service.ts / member-assets.types.ts（AI 服务记录归属本人）
+//        - llm/llm-config.service.ts（AiModelFeatureKey 配置位，只配模型/密钥/开关，
+//          不读 AiResumeResult；由 CONFIG_ONLY_FILES 反向断言守住）
 //   2) JobFit / LlmResume / PolicyMatcher / Assistant 相关源文件不得出现 'self_assessment' 字面量。
 //   3) AiResumeResult.kind 枚举白名单在 packages/shared 中含 self_assessment，
 //      而前两类业务文件不能读取该 kind 行。
@@ -43,7 +45,18 @@ const ALLOWED_SELF_ASSESSMENT_FILES = new Set<string>([
   'src/member-assets/member-assets.service.ts',
   'src/member-assets/member-assets.types.ts',
   'src/audit/audit.types.ts',
+  // #617 S0-3：'self_assessment' 在本文件里是 AiModelFeatureKey（模型厂商 / 密钥 / 开关的
+  // 配置位），与本门禁看管的 AiResumeResult.kind 是两个命名空间。拆键的目的正是让自我探索
+  // 解读脱离 resume_optimize 单点，属于加强隔离而不是打开读路径。
+  // 该文件不得读取自我探索结果 —— 由下面的 CONFIG_ONLY_FILES 断言单独守住。
+  'src/ai/llm/llm-config.service.ts',
 ])
+
+/**
+ * 允许出现 'self_assessment' 字面量、但只能作为配置键的文件：
+ * 一旦它们开始读取 AiResumeResult，白名单豁免立即失效。
+ */
+const CONFIG_ONLY_FILES = new Set<string>(['src/ai/llm/llm-config.service.ts'])
 
 /** 不得引用 'self_assessment' 字面量的服务端源文件（直接来源链路）。 */
 const FORBIDDEN_DIRECT_TOUCH = new Set<string>([
@@ -113,13 +126,33 @@ for (const root of TARGET_DIRECTORIES) {
   }
 }
 
+// 配置位豁免的代价必须付：这些文件只准把 'self_assessment' 当配置键，
+// 一旦读起 AiResumeResult（自我探索结果所在表），豁免作废。
+for (const rel of CONFIG_ONLY_FILES) {
+  const abs = join(REPO_ROOT, 'services', 'api', rel)
+  const text = readFileSync(abs, 'utf8')
+  text.split(/\r?\n/).forEach((line, idx) => {
+    if (!/aiResumeResult|AiResumeResult/.test(line)) return
+    violations.push({
+      file: rel,
+      line: idx + 1,
+      snippet: line.trim().slice(0, 160),
+      rule: 'CONFIG_ONLY_FILE_MUST_NOT_READ_RESULTS',
+    })
+  })
+}
+
 try {
-  assert.equal(violations.length, 0, () => {
-    return [
+  // 注意：node:assert 的 message 参数只接受 string | Error，传函数会被原样 stringify，
+  // 违规明细一行都印不出来。必须先拼好字符串。
+  assert.equal(
+    violations.length,
+    0,
+    [
       'verify:assess-isolation failed:',
       ...violations.map((v) => `  - [${v.rule}] ${v.file}:${v.line}  ${v.snippet}`),
-    ].join('\n')
-  })
+    ].join('\n'),
+  )
   // eslint-disable-next-line no-console
   console.log(`verify:assess-isolation: PASS (scanned ${TARGET_DIRECTORIES.length} trees, no isolation violations)`)
   process.exit(0)

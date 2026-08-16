@@ -260,9 +260,11 @@ export type IsolatedVerificationDatabase = {
   cleanup: () => void
 }
 
-export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
+export function prepareIsolatedDatabase(
+  tempDirectoryPrefix = 'verify-admin-phone-transfer-',
+): IsolatedVerificationDatabase {
   const previousDatabaseUrl = process.env['DATABASE_URL']
-  const tempDirectory = mkdtempSync(join(tmpdir(), 'verify-admin-phone-transfer-'))
+  const tempDirectory = mkdtempSync(join(tmpdir(), tempDirectoryPrefix))
   const databasePath = join(tempDirectory, 'verify.db')
   process.env['DATABASE_URL'] = `file:${databasePath}`
 

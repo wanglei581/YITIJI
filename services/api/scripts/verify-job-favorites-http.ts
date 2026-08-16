@@ -42,6 +42,21 @@ function assert(cond: boolean, msg: string): void {
 
 interface FavoriteItem { id: string; targetType: string; targetId: string; title: string | null }
 
+/**
+ * GET /me/favorites 的信封。
+ *
+ * 本脚本写于 6d53c53ce（2026-06-07），当时 data 直接就是数组；
+ * 4491591e3（2026-06-11，C-2D 会员资产中心）给 /me/* 列表统一加了游标分页，
+ * data 变成 { items, nextCursor, total }，脚本没跟上 —— 之后每次读列表都是
+ * 对着一个对象调 .some()，必然崩。这里按现行契约取 items。
+ */
+interface FavoritePage { items: FavoriteItem[]; nextCursor: string | null; total: number }
+
+async function readFavorites(url: string, init: RequestInit): Promise<FavoriteItem[]> {
+  const body = (await (await fetch(url, init)).json()) as { data?: FavoritePage }
+  return body.data?.items ?? []
+}
+
 async function main() {
   console.log('\n=== Phase C-2C 登录会员收藏 HTTP 端到端验证 ===')
 
@@ -101,18 +116,24 @@ async function main() {
 
     // 2. 读取：GET /me/favorites?type=job（kiosk getMyFavorites(token,'job')）
     const listRes = await fetch(`${BASE}/me/favorites?type=job`, authed())
-    const listBody = (await listRes.json()) as { data?: FavoriteItem[] }
-    const list = listBody.data ?? []
-    assert(listRes.status === 200 && list.some((f) => f.targetId === jobId), '2. 服务端可读回本人收藏（含刚入库岗位）')
+    const listBody = (await listRes.json()) as { data?: FavoritePage }
+    const list = listBody.data?.items ?? []
+    assert(
+      listRes.status === 200
+        && Array.isArray(listBody.data?.items)
+        && typeof listBody.data?.total === 'number'
+        && list.some((f) => f.targetId === jobId),
+      '2. 服务端按游标分页信封读回本人收藏（含刚入库岗位）',
+    )
 
     // 3. 幂等新增：再 POST 同岗位 → 列表仍只 1 条该岗位
     await fetch(`${BASE}/me/favorites`, authed({ method: 'POST', headers: jsonHeaders, body: JSON.stringify({ targetType: 'job', targetId: jobId, title: '前端工程师 · 青岛(再次)' }) }))
-    const list2 = ((await (await fetch(`${BASE}/me/favorites?type=job`, authed())).json()) as { data?: FavoriteItem[] }).data ?? []
+    const list2 = await readFavorites(`${BASE}/me/favorites?type=job`, authed())
     assert(list2.filter((f) => f.targetId === jobId).length === 1, '3. 幂等新增：重复收藏同岗位不产生重复行')
 
     // 4. type 过滤：加 job_fair 收藏，?type=job 不应出现
     await fetch(`${BASE}/me/favorites`, authed({ method: 'POST', headers: jsonHeaders, body: JSON.stringify({ targetType: 'job_fair', targetId: fairId, title: '春季招聘会' }) }))
-    const jobsOnly = ((await (await fetch(`${BASE}/me/favorites?type=job`, authed())).json()) as { data?: FavoriteItem[] }).data ?? []
+    const jobsOnly = await readFavorites(`${BASE}/me/favorites?type=job`, authed())
     assert(!jobsOnly.some((f) => f.targetId === fairId) && jobsOnly.some((f) => f.targetId === jobId), '4. type=job 过滤：不返回 job_fair 收藏')
 
     // 5. 取消（幂等）：DELETE /me/favorites/job/:id 两次
@@ -121,7 +142,7 @@ async function main() {
     assert(del1.data?.removed === true && del2.data?.removed === false, '5. 取消（幂等）：首次 removed:true，再次 removed:false')
 
     // 6. 取消后读取：岗位不再在列表
-    const after = ((await (await fetch(`${BASE}/me/favorites?type=job`, authed())).json()) as { data?: FavoriteItem[] }).data ?? []
+    const after = await readFavorites(`${BASE}/me/favorites?type=job`, authed())
     assert(!after.some((f) => f.targetId === jobId), '6. 取消后服务端列表不再含该岗位')
 
     // 7. 鉴权：匿名（无 token）→ 401
