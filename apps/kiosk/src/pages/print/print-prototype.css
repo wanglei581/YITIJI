@@ -43,6 +43,17 @@
   padding: 0;
 }
 
+/* 横屏窄高（Windows 窗口化 1280×720 一类）下给打印页框补上界。
+   .ui-kiosk-page-frame 只有 min-height:100%，且其父 .ui-kiosk-content 是 display:block，
+   所以框上的 flex:1 不生效、页框会被内容顶开并溢出可滚动容器 —— 页面底部的主操作
+   因此被推出可视区（实测 1280×720 下取件成功页余量仅 8px，字体度量一变就为负）。
+   这里只约束打印页框、只在横屏窄高生效，不动 packages/ui 的共享页框规则。 */
+@media (max-height: 900px) and (orientation: landscape) {
+  [data-kiosk-presentation='fusion-youth'] .print-proto.ui-kiosk-page-frame {
+    max-height: 100%;
+  }
+}
+
 [data-kiosk-presentation='fusion-youth'] .print-proto > .ui-kiosk-page-content.print-proto-content--guttered {
   padding-inline: var(--print-page-gutter);
 }

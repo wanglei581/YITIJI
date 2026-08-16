@@ -341,6 +341,22 @@
   [data-kiosk-presentation='fusion-youth'] .pcs-meta { margin: 12px 0; }
   [data-kiosk-presentation='fusion-youth'] .pcs-row { min-height: 42px; }
   [data-kiosk-presentation='fusion-youth'] .pcs-actions .k-btn { min-height: 56px; padding-inline: 24px; font-size: 17px; }
+
+  /* 横屏窄高下主操作必须始终可见。
+     此前该面板的竖向余量只有 8px，字体度量一有差异（Linux CI 的 CJK 回退字体比
+     macOS 高）就会把「进入现场支付 / 查看打印进度」挤出 .ui-kiosk-content，
+     用户在 1280×720 上按不到唯一出口。
+     因此不调像素，改为结构性分配：面板自身不被内容撑破，订单信息区吸收溢出并可滚动，
+     图标/标题/说明可压缩，主操作行 flex:none 永不参与压缩。 */
+  [data-kiosk-presentation='fusion-youth'] .pickup-claim-success { overflow: hidden; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-icon-wrap { flex: none; }
+  [data-kiosk-presentation='fusion-youth'] .pcs-meta {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  [data-kiosk-presentation='fusion-youth'] .pcs-actions { flex: none; }
 }
 
 @media (max-width: 760px) {
