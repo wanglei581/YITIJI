@@ -28,6 +28,7 @@ const resumePreview = read('apps/kiosk/src/pages/resume/ResumeGeneratePreviewPag
 const interviewReport = read('apps/kiosk/src/pages/interview/InterviewReportPage.tsx')
 const careerPlan = read('apps/kiosk/src/pages/resume/CareerPlanPage.tsx')
 const jobFit = read('apps/kiosk/src/pages/resume/JobFitPage.tsx')
+const selfAssessment = read('apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx')
 const fairPlan = read('apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx')
 const materialsPage = read('apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx')
 const myDocumentsPage = read('apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx')
@@ -111,6 +112,24 @@ expectMatch(fairMaterialPrintBridgeService, /assertSourceIntegrity\(material,\s*
 expectMatch(jobsController, /@Post\('job-fairs\/:id\/materials\/:materialId\/print-url'\)/, '招聘会资料暴露受控 print-url 端点')
 expectMatch(fairMaterialsPage, /fileUrl:\s*[^\n]*printFileUrl/, '招聘会资料打印只传 printFileUrl')
 expectNoMatch(fairMaterialsPage, /fileUrl:\s*(?:latest\.)?previewUrl/, '招聘会资料不得把专用预览 URL 传给打印任务')
+
+// ── P28 自我探索（S2-7 接线）──────────────────────────────────────────────
+// 报告 PDF 有两条出口，用途不同、URL 不能互换：
+//   页内预览 → signedUrl（COS 签名，只给 <iframe> / 扫码带走）
+//   打印交接 → printFileUrl（内部 HMAC，/print/jobs 只认这个）
+// 交换二者的后果是「点了打印但打不出来」，而页面已经把用户送进了核价流程。
+expectMatch(selfAssessment, /fileUrl:\s*printed\.printFileUrl/, '自我探索打印交接只传内部 HMAC printFileUrl')
+expectNoMatch(selfAssessment, /fileUrl:\s*printed\.signedUrl/, '自我探索不得把预览签名 URL 传给打印任务')
+expectMatch(selfAssessment, /if\s*\(\s*!printed\?\.printFileUrl\s*\)\s*return/, '自我探索缺内部打印 URL 时不进入打印')
+expectMatch(
+  selfAssessment,
+  /blockedReason=\{printed\.printFileUrl\s*\?\s*null\s*:/,
+  '自我探索缺内部打印 URL 时按钮置灰并给出常驻可见原因',
+)
+// AI 不可用 / 缺凭证的置灰一律 aria-disabled：原生 disabled 会退出 Tab 序列、
+// 读屏跳过，用户读不到「为什么灰」（CLAUDE.md §9 / ai/AiTaskRegion.tsx 同一口径）。
+expectNoMatch(selfAssessment, /\sdisabled=\{/, '自我探索置灰不使用原生 disabled')
+expectMatch(selfAssessment, /aria-disabled=\{blocked \|\| undefined\}/, '自我探索置灰走 aria-disabled')
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — AI / 求职产物打印 URL 契约未闭环`)
