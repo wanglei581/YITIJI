@@ -400,7 +400,18 @@ Page({
     return api.getContractReview(id).then(t => {
       if (this._stopped) return
       if (t.status === 'completed') return this._showResult(t)
-      if (t.status === 'failed')    { this._reset('分析失败，请换更清晰的照片或合同原始文件重试'); return }
+      if (t.status === 'failed') {
+        // 不替服务端猜原因。failed 可能来自：文件格式无法提取（如 .doc）、
+        // OCR 置信度过低、AI provider 调用失败、安全网关拒绝等。
+        // 一律说成「照片不清楚」会把用户引向错误的自救动作——反复重拍
+        // 一份本来就没问题的文件。真实原因由服务端给，前端只负责如实转达。
+        const why = t.failureReason || t.failureCode || t.message
+          || (t.error && (t.error.message || t.error.code)) || ''
+        this._reset(why
+          ? `分析失败：${why}`
+          : '分析失败，服务端未说明原因。可稍后重试；若反复失败，可能是该文件格式无法提取内容。')
+        return
+      }
       if (t.status === 'cancelled') { this._reset('任务已取消'); return }
       if (t.status === 'expired')   { this._reset('任务已过期，请重新发起'); return }
       if (t.status === 'awaiting_confirmation') return this._toConfirm(t)
