@@ -21,9 +21,9 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .benefit-icon { width: 56rpx; height: 56rpx; border-radius: 18rpx; background: #fff; color: var(--teal); display: flex; align-items: center; justify-content: center; }
 .benefit-icon .ficon { width: 28rpx; height: 28rpx; }
 .benefit-copy { flex: 1; }
-.benefit-title { font-size: 25rpx; font-weight: 700; color: #2f285e; }
-.benefit-desc { margin-top: 3rpx; font-size: 22rpx; color: #685f91; }
-.benefit-go { color: var(--plum); font-size: 21rpx; font-weight: 650; display: flex; align-items: center; gap: 6rpx; }
+.benefit-title { font-size: 25rpx; font-weight: 700; color: var(--teal-deep); }
+.benefit-desc { margin-top: 3rpx; font-size: 22rpx; color: var(--muted); }
+.benefit-go { color: var(--teal); font-size: 21rpx; font-weight: 650; display: flex; align-items: center; gap: 6rpx; }
 .benefit-go .ficon { width: 17rpx; height: 17rpx; }
 .stats-card { margin-top: 18rpx; padding: 22rpx 8rpx; border-radius: 26rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; }
 .stat-item { flex: 1; text-align: center; }
@@ -42,6 +42,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .tone-plum  { background: linear-gradient(145deg,#A98BFA,#7C3AED); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(124,58,237,.40); }
 .tone-clay  { background: linear-gradient(145deg,#FFA857,#F0682C); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(240,104,44,.40); }
 .tone-wheat { background: linear-gradient(145deg,#FFC65C,#E2960C); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(226,150,12,.40); }
+.tone-cyan  { background: linear-gradient(145deg,#2ED3BE,#0D9488); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(13,148,136,.40); }
 .tone-slate { background: linear-gradient(145deg,#7C8CA8,#4A5B78); color:#fff; box-shadow: 0 10rpx 20rpx -6rpx rgba(74,91,120,.38); }
 .asset-icon .ficon { width: 36rpx; height: 36rpx; }
 .asset-title { margin-top: 18rpx; font-size: 27rpx; font-weight: 700; }
@@ -55,6 +56,7 @@ page { height: 100%; overflow: hidden; background: var(--paper); }
 .soft-plum  { background:#F1EBFE; color:#6D28D9; }
 .soft-clay  { background:#FFEDE3; color:#C2410C; }
 .soft-wheat { background:#FFF6E0; color:#A96A08; }
+.soft-cyan  { background:#E0F7F3; color:#0F766E; }
 .soft-slate { background:#EDF0F5; color:#43506B; }
 .menu-icon .ficon { width: 29rpx; height: 29rpx; }
 .menu-copy { flex: 1; min-width: 0; }

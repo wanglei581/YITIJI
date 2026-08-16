@@ -26,7 +26,7 @@ Page({
       { id: 'resume',    icon: 'file-text', title: '我的简历',      sub: '本人上传与 AI 处理记录', accent: 'plum'  },
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '取件码与出纸状态',     accent: 'clay'  },
-      { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'plum'  },
+      { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
       { id: 'favorites', icon: 'inbox',     title: '我的收藏',      sub: '岗位、招聘会与政策',   accent: 'teal'  },
       { id: 'activity',  icon: 'history',   title: '浏览与跳转记录', sub: '仅记录本人浏览与跳转', accent: 'wheat' },
       { id: 'membership',icon: 'crown',     title: '我的权益',      sub: '查看本人实际权益记录', accent: 'wheat' },
