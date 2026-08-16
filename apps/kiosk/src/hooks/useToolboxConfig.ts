@@ -4,7 +4,7 @@ import {
   isLaunchableKioskAppItem,
   parseKioskTerminalConfig,
 } from '../services/api/kioskCapabilityValidation'
-import { getKioskTerminalConfig, getTerminalId } from '../services/api/terminalConfig'
+import { getCachedKioskTerminalConfig, getTerminalId } from '../services/api/terminalConfig'
 
 export type CapabilityStatus = 'loading' | 'ready'
 
@@ -51,7 +51,9 @@ export function useToolboxCapabilityState(): ToolboxCapabilityState {
       }
 
       try {
-        const rawConfig = await getKioskTerminalConfig(terminalId)
+        // 走统一配置缓存（TTL 30s，短于本 hook 的刷新周期）：避免同会话内跨页面
+        // 重复请求造成百宝箱入口闪烁。E3 门禁校验的正是这条复用。
+        const rawConfig = await getCachedKioskTerminalConfig(terminalId)
         const terminalConfig = parseKioskTerminalConfig(rawConfig)
         const currentTerminalId = getTerminalId()
         if (
