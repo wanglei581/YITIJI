@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P23b 账号设置与隐私 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P23b 账号设置与隐私">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P23b 账号设置与隐私 ═════════════════════════════════════════════
+   补页由来（缺口 G-05）：原型把账号这件事塞在 23-me.html 的一个页内浮层里，
+   而浮层的「隐私与删除」只有一个动作 —— 删除已存的简历文件；全文 0 处
+   「导出数据 / 数据导出 / 改绑 / 换绑」。生产侧是**两个页**：
+   /me/settings → MySettingsPage（541 行）、/me/privacy-requests →
+   MyPrivacyRequestsPage，入口在 profileEntries.ts:46 / ProfilePage.tsx:139。
+   wiring-map.md:412-413 还登记着：**个人数据导出整条链后端已具备**
+   （GET/POST /me/data-requests、POST /me/data-requests/:id/download-authorizations、
+   GET /member/data-exports/:id/content，含 step-up 二次验证与一次性票据），
+   「23 只画了删除，没画导出」。用户的法定数据权利在设计稿里没有入口。
+
+   本页把账号域的五件事各占一块摊开：登录与会话 / 保留期限 / 隐私与删除 /
+   数据导出 / 退出与无障碍。23-me 那张「账号设置」卡改为跳到本页，
+   原来的 ovl-set 浮层（连同它内部唯一的开启者 ovl-del）一并移到这里 ——
+   保留期限表是**全站口径**，不许两份，所以是搬过来而不是抄一份。
+
+   ══ 本页刻意不接 AI（这本身是对用户的一条承诺）══════════════════
+   与 ai-capability-spec.md §2 的「P03 身份门」「P40 会话安全六态」同类：
+   身份、隐私、删除、导出是**安全判定**，模型判断有害。所以：
+   · 整页 0 处 E3，0 处模型产出，0 处「AI 建议」。
+   · 四态（default / first / ai-down / device-off）**同版同文** ——
+     ai-down 与 default 显示完全一致，因为本页本来就没有可降级的 AI 能力。
+   · 这一点写在页脚，让用户看得见。
+
+   ══ 不伪造 ══════════════════════════════════════════════════════
+   导出与删除都不在原型里真的发生：申请层写清「本稿不发真实短信、不生成真实
+   票据」，**任何状态下都不显示「已导出」「已提交」「已删除」**。
+   隐私请求记录是真实空态（0 条），不摆样例。
+   ══════════════════════════════════════════════════════════════════ */
+.work--acc { grid-template-columns: 1fr; }
+.acols { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.acol { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); overflow-y: auto;
+  overscroll-behavior: contain; padding-right: var(--s-2); }
+
+.sec { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd); box-shadow: var(--sh-1); }
+.sec-hd { display: flex; align-items: center; gap: var(--s-3); }
+.sec-hd > .ic { width: 21px; height: 21px; color: var(--fog-700); flex: 0 0 auto; }
+.sec-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.sec-hd .chip { margin-left: auto; flex: 0 0 auto; }
+.sec-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6; }
+.sec-note b { color: var(--fog-800); }
+.sec-acts { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.sec-acts .btn { min-height: 56px; }
+.btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+.btn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+
+/* ── 导出：三步说清楚会发生什么，再给动作 ── */
+.steps3 { display: flex; flex-direction: column; gap: var(--s-2); }
+.st3 { display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.st3-n { flex: 0 0 auto; width: 28px; height: 28px; border-radius: var(--r-xs);
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-700); }
+.st3-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.st3-t { font-size: var(--fz-2); color: var(--fog-900); font-weight: 600; }
+.st3-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+
+/* ── 隐私请求记录：真实空态 ── */
+.reqs { display: flex; flex-direction: column; gap: var(--s-2); }
+.reqempty { display: flex; align-items: center; gap: var(--s-4);
+  min-height: 72px; padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
+  background: var(--surf-1); border: 1px dashed var(--brd-2); }
+.reqempty .ic { width: 24px; height: 24px; color: var(--fog-600); flex: 0 0 auto; }
+.reqempty span { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+
+/* ── 文件保存期限表（全站口径基准 · 自 23-me 的 ovl-set 迁入，不另写一份）── */
+.keep { display: flex; flex-direction: column; gap: 1px;
+  border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--brd-1); background: var(--brd-1); }
+.keep-hd, .keep-row { display: grid; grid-template-columns: 1fr 104px 1.05fr; gap: var(--s-4);
+  align-items: center; padding: var(--s-3) var(--s-4); background: var(--surf-1); }
+.keep-hd { background: var(--surf-2); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
+.keep-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fz-2); color: var(--fog-900); }
+.keep-t i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.keep-v { font-family: var(--ff-num); font-size: var(--fz-4); font-weight: 700; color: var(--fog-900); }
+.keep-row--warn .keep-v { color: var(--amber-200); }
+.keep-row--none .keep-v { font-size: var(--fz-3); color: var(--fog-700); }
+.keep-s { min-width: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+
+/* ── 无障碍：一个真的能按的本地开关 + 三条事实 ── */
+.a11y { display: flex; flex-direction: column; gap: var(--s-2); }
+.a11ybtn { width: 100%; min-height: 56px; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm); background: var(--surf-1); border: 1px solid var(--brd-1);
+  font-family: var(--ff-ui); font-size: var(--fz-3); color: var(--fog-900); }
+.a11ybtn .ic { width: 20px; height: 20px; color: var(--fog-600); flex: 0 0 auto; }
+.a11ybtn .sw { margin-left: auto; flex: 0 0 auto; min-width: 62px; min-height: 32px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2); font-size: var(--fz-1); color: var(--fog-600); }
+.a11ybtn[aria-pressed="true"] { border-color: var(--jade-a32); background: var(--jade-a12); }
+.a11ybtn[aria-pressed="true"] .sw { background: var(--jade-500); border-color: var(--jade-500); color: #fff; font-weight: 600; }
+/* 高对比：只加深文字与描边，不动任何尺寸 —— 不会带来溢出或裁切 */
+.screen.is-hc { --fog-600: var(--fog-800); --fog-700: var(--fog-900); --brd-1: var(--brd-2); }
+
+/* ── 浮层（删除确认 / 导出申请）：一律 class 控制显隐，hidden 是四态机制的地盘 ── */
+.ovl { position: absolute; inset: 0; z-index: var(--z-sheet);
+  display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
+.ovl[hidden] { display: none; }
+.ovl-scrim { position: absolute; inset: 0; background: rgba(4, 8, 10, .55); backdrop-filter: blur(6px); }
+.ovl-panel { position: relative; width: 100%; max-width: 660px; max-height: 100%; overflow-y: auto;
+  border-radius: var(--r-lg); padding: var(--s-6);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  display: flex; flex-direction: column; gap: var(--s-4); }
+.ovl-hd { display: flex; align-items: center; gap: var(--s-3); }
+.ovl-hd .ic { width: 24px; height: 24px; color: var(--jade-500); }
+.ovl-hd b { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900); }
+.ovl-x { margin-left: auto; width: 48px; height: 48px; border-radius: var(--r-sm);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  cursor: pointer; display: grid; place-items: center; }
+.ovl-x .ic { width: 20px; height: 20px; color: var(--fog-800); }
+.ovl-act { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ovl-act .btn { min-height: 56px; }
+.nrow { display: flex; gap: var(--s-3); align-items: flex-start;
+  min-height: var(--touch-min); padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.nrow-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrow-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.nrow-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="23-me.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">账号设置与隐私</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本机存了你什么、存多久、你能拿走什么</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <!-- 四态同版同文：本页不接 AI，所以 ai-down 与 default 显示完全一致 -->
+    <div class="devpill" data-when="default ai-down"><span class="dot dot--live"></span>本页不接 AI · 与 AI 状态无关</div>
+    <div class="devpill" data-when="first"><span class="dot dot--warn"></span>未登录 · 账号里没有可管理的数据</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--live"></span>本页不出纸 · 打印机状态无关</div>
+    <div class="clock" data-clock>2026年8月16日 <b>15:02</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub" style="flex:1 1 auto;font-size:var(--fz-3);color:var(--fog-700)">
+      登录与会话&nbsp;· 文件保留期限&nbsp;· 隐私与删除&nbsp;· <b style="color:var(--fog-900)">个人数据导出</b>&nbsp;· 退出与无障碍</span>
+    <span class="rail-count">账号域&nbsp;· <b>5</b>&nbsp;件事</span>
+  </div>
+
+  <div class="work work--acc">
+    <div class="wmain">
+      <div class="acols">
+
+        <!-- ══════════ 左栏 ══════════ -->
+        <div class="acol">
+
+          <!-- ① 登录方式与会话钟 -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-user"/></svg>
+              <span class="sec-t">登录方式与本次会话</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="kv">
+              <div class="kv-row" data-when="default ai-down device-off"><span class="k">手机号</span><span class="v">尾号 8000</span></div>
+              <div class="kv-row" data-when="default ai-down device-off"><span class="k">本机登录</span><span class="v v--fog">今天 15:02</span></div>
+              <div class="kv-row" data-when="first"><span class="k">当前状态</span><span class="v"><span class="chip chip--info">未登录</span></span></div>
+              <!-- 会话钟的分钟数由站点配置下发，与 P40 会话安全、P04 系统状态同一个值，
+                   三页不许各写各的 —— 所以这里写「按站点配置」而不是写死一个数 -->
+              <div class="kv-row"><span class="k">无操作自动退出</span><span class="v v--fog">按站点配置的空闲时长，到点清空本机会话并退出</span></div>
+              <div class="kv-row"><span class="k">这台机器</span><span class="v v--fog">公共终端 · 离场务必退出</span></div>
+            </div>
+            <p class="sec-note">
+              改绑手机号<b>不在本机办</b>：它和数据导出一样要过短信二次验证，请在你自己手机上的会员端办理。
+              本机是公共终端，<b>不在这里做账号安全类变更</b>。</p>
+          </div>
+
+          <!-- ② 隐私与删除 -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-trash"/></svg>
+              <span class="sec-t">隐私与删除</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="sec-acts" data-when="default ai-down device-off">
+              <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-del"><svg class="ic"><use href="#i-trash"/></svg>删除已存的简历文件</button>
+              <span class="panel-note" style="margin-left:0">删除会留日志&nbsp;· 日志不含文件内容</span>
+            </div>
+            <p class="sec-note" data-when="first">未登录，账号里没有可删的文件；这一趟在本机上传或生成的东西<b>离场时自动清空</b>。</p>
+            <p class="sec-note">
+              删除的是<b>你账号里已保存的文件本身</b>，不可恢复。删除记录（谁删的、什么时候、删了几个）会保留，
+              <b>但日志里不含文件内容、也不含文件名全称</b>。管理员访问任何用户文件都会单独留痕。</p>
+          </div>
+
+          <!-- ③ 个人数据导出 —— 本页新增的那件事（后端已具备，设计稿此前没有入口） -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-download"/></svg>
+              <span class="sec-t">导出我的数据</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="steps3">
+              <div class="st3"><span class="st3-n">1</span><span class="st3-b">
+                <span class="st3-t">提出导出申请</span>
+                <span class="st3-s">导出范围：你的账号资料、简历与文档清单、打印订单、AI 服务调用记录、浏览与外部跳转记录</span></span></div>
+              <div class="st3"><span class="st3-n">2</span><span class="st3-b">
+                <span class="st3-t">短信二次验证</span>
+                <span class="st3-s">给你登记的手机号发验证码，验证通过才生成导出件 —— 这一步是为了防止旁人在公共终端上拿走你的数据</span></span></div>
+              <div class="st3"><span class="st3-n">3</span><span class="st3-b">
+                <span class="st3-t">用一次性链接取走</span>
+                <span class="st3-s">链接一次有效、短时过期，<b>建议在你自己手机上打开</b>，不要在这台公共机器上下载</span></span></div>
+            </div>
+            <div class="sec-acts" data-when="default ai-down device-off">
+              <button class="btn btn--ghost" type="button" data-open="ovl-exp"><svg class="ic"><use href="#i-download"/></svg>申请导出我的数据</button>
+            </div>
+            <!-- 未登录：导出对象是账号里的数据，没有账号就没有对象。
+                 置灰用 aria-disabled 并写清原因，绝不用原生 disabled -->
+            <div class="sec-acts" data-when="first">
+              <button class="btn btn--ghost" type="button" aria-disabled="true"><svg class="ic"><use href="#i-download"/></svg>申请导出我的数据</button>
+              <span class="panel-note" style="margin-left:0">未登录：导出的是账号里的数据，先登录才有可导的东西</span>
+            </div>
+
+            <div class="sec-hd" style="margin-top:var(--s-2)">
+              <svg class="ic"><use href="#i-history"/></svg>
+              <span class="sec-t" style="font-size:var(--fz-3)">我提过的隐私请求</span>
+              <span class="chip chip--info">0 条</span>
+            </div>
+            <div class="reqs">
+              <!-- 真实空态：没有就是没有，不摆一条样例记录 -->
+              <div class="reqempty">
+                <svg class="ic"><use href="#i-folder"/></svg>
+                <span data-when="default ai-down device-off">你还没有提过导出或删除申请。提过之后，每一条的状态与处理时间都会列在这里。</span>
+                <span data-when="first">未登录，这里不显示任何记录。</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ══════════ 右栏 ══════════ -->
+        <div class="acol">
+
+          <!-- ④ 文件保留期限表（全站口径） -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-clock"/></svg>
+              <span class="sec-t">文件保留期限&nbsp;· 全站口径</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="keep">
+              <div class="keep-hd"><span>文件类型</span><span>保存多久</span><span>到期怎么处理</span></div>
+              <div class="keep-row keep-row--warn">
+                <span class="keep-t">敏感文件<i>证件照 · 身份证复印件 · 含身份证号的扫描件</i></span>
+                <span class="keep-v">7 天</span>
+                <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
+              </div>
+              <div class="keep-row">
+                <span class="keep-t">一般文档<i>简历 · 求职材料 · 扫描件 · 生成产物</i></span>
+                <span class="keep-v">90 天</span>
+                <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
+              </div>
+              <div class="keep-row keep-row--none">
+                <span class="keep-t">未登录的本次会话文件<i>没登录时上传或生成的东西</i></span>
+                <span class="keep-v">离场即清</span>
+                <span class="keep-s">不保存 · 结束或超时就没了，要留请先打印或登录</span>
+              </div>
+              <div class="keep-row keep-row--none">
+                <span class="keep-t">面试练习作答<i>你答的内容</i></span>
+                <span class="keep-v">从不保存</span>
+                <span class="keep-s">只记「练过一次」，不留内容</span>
+              </div>
+              <div class="keep-row keep-row--warn">
+                <span class="keep-t">待打印订单里的文件<i>已下单未出纸 · 已支付可复打</i></span>
+                <span class="keep-v">7 天</span>
+                <span class="keep-s">凭取件码复打 · 到期关单并清理 · 留删除日志</span>
+              </div>
+            </div>
+            <p class="sec-note">
+              <b>以文件类型定，不是所有文件都 90 天</b>——一份文件里只要含身份证号，就按敏感件的 7 天算；
+              最后一行是<b>订单口径</b>，取件码 7 天说的是「还能不能复打」，不是「文件存多久」。<br>
+              <b>单个功能可以更短，但不许更长</b>：自我评估结果 <b>24 小时</b>（撤回即物理删除）、合同分析文件 <b>2 小时</b>。
+              这张表是<b>全站口径</b>，打印、扫描、我的文档各页都以它为准。</p>
+          </div>
+
+          <!-- ⑤ 无障碍 -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-eye"/></svg>
+              <span class="sec-t">无障碍</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="a11y">
+              <!-- 这一个是真能按的本地开关：只加深文字与描边，不改任何尺寸。
+                   明写「只在这一屏生效，离开就恢复」—— 不假装本机替你存了一份偏好。 -->
+              <button class="a11ybtn" type="button" id="hc" aria-pressed="false">
+                <svg class="ic"><use href="#i-eye"/></svg>提高文字对比度
+                <span class="sw">关</span>
+              </button>
+              <p class="sec-note" style="margin:0">这个开关<b>只在这一屏生效，离开就恢复</b>；本机不替你保存界面偏好，公共终端上不留个人设置。</p>
+            </div>
+            <div class="kv">
+              <div class="kv-row"><span class="k">动效</span><span class="v v--fog">跟随系统「减弱动态效果」自动关闭</span></div>
+              <div class="kv-row"><span class="k">触控</span><span class="v v--fog">所有可点区域不小于 48px，主操作不小于 56px</span></div>
+              <div class="kv-row"><span class="k">文字</span><span class="v v--fog">界面文字不小于 13px（全站下限，有门禁看着）</span></div>
+            </div>
+          </div>
+
+          <!-- ⑥ 退出 -->
+          <div class="sec">
+            <div class="sec-hd">
+              <svg class="ic"><use href="#i-close"/></svg>
+              <span class="sec-t">退出登录</span>
+              <span class="chip chip--info">不依赖 AI</span>
+            </div>
+            <div class="sec-acts" data-when="default ai-down device-off">
+              <!-- 落点是 40 的「结束并清空」那一屏（data-at="endclear"）：
+                   清空前先列清单，说清「清掉什么」和「不受影响什么」，再由用户确认。 -->
+              <a class="btn btn--ghost" href="40-session-safety.html?stage=endclear"><svg class="ic"><use href="#i-close"/></svg>退出登录并清空本机会话</a>
+              <span class="panel-note" style="margin-left:0">账号里的文件不受影响</span>
+            </div>
+            <p class="sec-note" data-when="first">当前未登录。离场时本机会自动清空这一趟的会话文件。</p>
+            <p class="sec-note">退出会清掉本机这一次的登录状态、临时文件与页面痕迹；<b>你账号里已保存的文件不动</b>。</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── 页脚：整页唯一一条声明，并把「本页不接 AI」写给用户看 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span><b>这一页刻意不接 AI。</b>身份、隐私、删除与导出是安全判定，交给模型判断有害，
+          所以本页没有任何模型产出，四种状态下显示的内容完全一样。
+          导出与删除都要经过短信二次验证；<b>本机不显示「已导出 / 已提交 / 已删除」，一律以你手机上收到的回执为准</b>。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 浮层：删除确认（防肩窥：不回显文件名全称） ══════════ -->
+  <div class="ovl" id="ovl-del" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-trash"/></svg><b>删除已存的简历文件？</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="nrow">
+        <span class="dot dot--down"></span>
+        <span class="nrow-b">
+          <span class="nrow-t">将删除：简历文件 ×2 · 诊断报告 ×1</span>
+          <span class="nrow-s">为防旁人看到 · 此处不显示文件名全称</span>
+        </span>
+      </div>
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>删除后不可恢复；删除会留日志（谁删的、什么时候、删了几个），日志不含文件内容。</span>
+      </div>
+      <div class="ovl-act">
+        <button class="btn btn--ghost" type="button" data-close>先不删</button>
+        <button class="btn btn--ghost btn--danger" type="button" data-close><svg class="ic"><use href="#i-trash"/></svg>确认删除</button>
+        <span class="panel-note" style="margin-left:0">本稿点确认<b>不会真的删</b>，也不会显示「已删除」</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 浮层：导出申请（step-up 二次验证） ══════════ -->
+  <div class="ovl" id="ovl-exp" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-download"/></svg><b>申请导出我的数据</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="nrow">
+        <span class="dot dot--live"></span>
+        <span class="nrow-b">
+          <span class="nrow-t">验证码将发到 尾号 8000</span>
+          <span class="nrow-s">为防旁人在公共终端上拿走你的数据 · 此处不显示完整手机号</span>
+        </span>
+      </div>
+      <div class="nrow">
+        <span class="dot"></span>
+        <span class="nrow-b">
+          <span class="nrow-t">导出件包含</span>
+          <span class="nrow-s">账号资料 · 简历与文档清单 · 打印订单 · AI 服务调用记录 · 浏览与外部跳转记录。
+            不含你在来源平台上的任何行为，本机拿不到那些。</span>
+        </span>
+      </div>
+      <div class="notice notice--amber">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span>取件链接<b>一次有效、短时过期</b>。这是公共终端，<b>建议在你自己手机上打开链接</b>，不要在这台机器上下载。</span>
+      </div>
+      <div class="ovl-act">
+        <button class="btn btn--ghost" type="button" data-close>取消</button>
+        <button class="btn btn--lg btn--primary" type="button" data-close><svg class="ic"><use href="#i-phone"/></svg>发送验证码</button>
+      </div>
+      <p class="sec-note" style="margin:0">
+        <b>本稿不发真实短信、不生成真实票据</b>，点了也不会出现「已提交」。真机在这里走
+        step-up 二次验证，验证通过后才生成导出件，处理进度回到上一屏的「我提过的隐私请求」里看。</p>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="23-me.html" data-parent-label="我的"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">我的</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--lg btn--ghost" href="42-my-assets.html?stage=docs"><svg class="ic"><use href="#i-folder"/></svg>我的文档</a>
+
+    <div class="actionbar-hint">
+      <!-- 四态同版同文：ai-down 与 default 一字不差，因为本页没有 AI 可降级 -->
+      <div data-when="default ai-down"><div class="t">存了什么、存多久，都在这页</div><div class="s">导出与删除都要过短信验证</div></div>
+      <div data-when="first"><div class="t">未登录，账号里没有可管理的数据</div><div class="s">这一趟的文件离场即清</div></div>
+      <div data-when="device-off"><div class="t">这一页不出纸，打印机状态无关</div><div class="s">导出走手机，不走打印机</div></div>
+    </div>
+
+    <a class="btn btn--primary" href="43-my-records.html?stage=trace">看本机记了我什么<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* 浮层显隐：本页只有两层，用 hidden 属性直接开关（它们不挂 data-when/data-at，
+     不与四态机制争同一个属性）。高对比开关只加 class，不动任何尺寸。 */
+  scr.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+
+    var open = e.target.closest('[data-open]')
+    if (open) {
+      var t = document.getElementById(open.getAttribute('data-open'))
+      if (t) t.hidden = false
+      return
+    }
+
+    if (e.target.closest('[data-close]')) {
+      var ovs = scr.querySelectorAll('.ovl')
+      for (var i = 0; i < ovs.length; i++) ovs[i].hidden = true
+      return
+    }
+
+    var hc = e.target.closest('#hc')
+    if (hc) {
+      var on = hc.getAttribute('aria-pressed') !== 'true'
+      hc.setAttribute('aria-pressed', on ? 'true' : 'false')
+      scr.classList.toggle('is-hc', on)
+      var sw = hc.querySelector('.sw')
+      if (sw) sw.textContent = on ? '开' : '关'
+    }
+  })
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

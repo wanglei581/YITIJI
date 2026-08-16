@@ -299,6 +299,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
           pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:contract-review-session
@@ -353,6 +354,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          # 启动韧性：Redis 不可达时必须显式降级并照常监听端口，不得静默挂起。
+          # 会拉起真实 src/main.ts 子进程与临时 redis-server（用随机空闲端口）。
+          pnpm --filter @ai-job-print/api verify:boot-resilience
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
@@ -471,14 +475,17 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:member-data-retention
+          pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -600,9 +607,15 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:advisor-work
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
+          # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
+          # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
+          pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
+          pnpm --filter @ai-job-print/api verify:policy-eligibility
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -624,6 +637,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
+          # 启动韧性（PG 侧同样跑一遍：硬依赖=数据库、软依赖=Redis 的启动语义
+          # 必须在 PostgreSQL 上也成立）。会拉起真实 src/main.ts 与临时 redis-server。
+          pnpm --filter @ai-job-print/api verify:boot-resilience
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
@@ -691,6 +707,7 @@ jobs:
       - name: Verify Kiosk fusion static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
+          pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:fusion-shell
           pnpm --filter @ai-job-print/kiosk verify:fusion-home
           pnpm --filter @ai-job-print/kiosk verify:fusion-w2
@@ -725,6 +742,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
+          pnpm --filter @ai-job-print/kiosk test:browser:scan-safety
           # test:browser:truth 此前在 apps/kiosk/package.json 里有定义，却没有任何 CI job
           # 引用它 —— 打印完成页「不得伪造已出纸」和匿名反馈入口的断言全在这一套里，
           # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
@@ -752,5 +770,6 @@ jobs:
             test-results/kiosk-fusion-w6-report/**
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
+            test-results/kiosk-scan-safety/**
           if-no-files-found: ignore
           retention-days: 7

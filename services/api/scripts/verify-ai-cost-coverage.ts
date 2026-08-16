@@ -13,7 +13,7 @@
  *
  * 运行：pnpm --filter @ai-job-print/api verify:ai-cost-coverage
  */
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 const ROOT = join(__dirname, '..')
@@ -50,11 +50,126 @@ function assertNotContains(src: string, pattern: string | RegExp, label: string)
 // ─── 1. 后端 AiOperation 联合类型 ─────────────────────────────────────────────
 
 const logSvc = read('src/ai/ai-log.service.ts')
+
+// ⚠️ 这里过去写死 7 个 operation，而真值源 AiOperation 有 16 个 —— 名为 coverage
+// 实则只守一半。selfAssessment 这条**付费**调用零 token 落账、Admin 渲染成 ¥0.0000
+// 就是从这个缺口漏过去的。改为从联合类型**派生**：新增 operation 自动纳管，
+// 忘了接线就红，不再依赖「有人记得回来加一行」。
+const ALL_OPS = (() => {
+  const block = logSvc.match(/export type AiOperation =([\s\S]*?)\n\n/u)?.[1] ?? ''
+  return [...block.matchAll(/\|\s*'([A-Za-z]+)'/gu)].map((m) => m[1] as string)
+})()
+
+if (ALL_OPS.length >= 16) pass(`AiOperation 派生成功: ${ALL_OPS.length} 个 operation`)
+else fail(`AiOperation 派生失败: 只解析出 ${ALL_OPS.length} 个（解析规则已失效，必须修门禁）`)
+
+// 保留原有 7 个的逐条断言（不删、不放宽），其余由下面的派生清单覆盖
 const NEW_OPS = ['careerPlan', 'fairVisitPlan', 'interviewQuestion', 'interviewReport', 'voiceTranscribe', 'voiceSynthesize', 'adjustResumeLayout']
 
 for (const op of NEW_OPS) {
   assertContains(logSvc, `'${op}'`, `后端 AiOperation 包含: ${op}`)
 }
+
+// ─── 1b. 派生：每个按 token 计费的 operation 都必须真的收 token ──────────────
+//
+// 这是本门禁原来最大的洞：它只按名字检查 7 个 operation 的接线，
+// 完全没有「每个 operation 都得有 token 落账」这条横向断言。
+// 结果 selfAssessment 这条**付费**调用零 token 落账，
+// Admin 却把它当 token 计费能力渲染成 ¥0.0000 + 「按 token 用量」。
+//
+// 规则：token 计费 operation 的每个落账点所在文件都必须有 token 管路
+// （tokenUsage 字段）。没有 → 必须在 KNOWN_ZERO_COST_GAPS 显式登记并写明原因。
+
+function walkTs(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${entry.name}`
+    if (entry.isDirectory()) {
+      if (entry.name === 'node_modules' || entry.name === 'generated') continue
+      walkTs(rel, acc)
+    } else if (entry.name.endsWith('.ts') && !rel.includes('__tests__')) acc.push(rel)
+  }
+  return acc
+}
+
+const SRC_FILES = walkTs('src').map((rel) => ({ rel, src: readFileSync(join(ROOT, rel), 'utf8') }))
+const NON_TOKEN_BILLED = ['voiceTranscribe', 'voiceSynthesize']
+
+/**
+ * 已知「按 token 计费但当前零 token 落账」的缺口。
+ *
+ * ⚠️ 这不是豁免清单，是**欠账清单**：登记在此的 operation 今天在 Admin 上
+ * 仍然显示为 ¥0.0000，即对真实付费调用少算成本。登记只是为了让它可见、
+ * 可追踪、不再静默扩张 —— 不代表它已经修好。
+ *
+ * MAX_GAPS 是棘轮：**只允许调低**。想加新欠账，先还一条旧的。
+ */
+const KNOWN_ZERO_COST_GAPS: Record<string, string> = {
+  parseResume:
+    '落账点 src/ai/ai.service.ts 走 AiProvider 抽象，provider 层（llm.provider.ts）不回传 token usage，' +
+    '且 provider 标签恒为 "llm"（不含厂商名），estimateCostCny 因此永远匹配不到单价。' +
+    '修复需改 AiProvider 接口并同步 mock provider，属独立范围。',
+  optimizeResume: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
+  adjustResumeLayout: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
+  generateResume: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
+  chatAssistant:
+    '双落账点：src/advisor/advisor.service.ts 已带 token usage；' +
+    'src/ai/ai.service.ts 这一路经 AiProvider 抽象，仍不带 token，需与 parseResume 一并修。',
+  classifyIntent:
+    '当前没有任何直接落账点：它是 normalizeOperation 的兜底取值，' +
+    '真实意图分类调用被记在 chatAssistant 名下。需先确认该 operation 是否还应保留。',
+}
+const MAX_GAPS = 6 // 棘轮：只允许调低
+
+if (Object.keys(KNOWN_ZERO_COST_GAPS).length <= MAX_GAPS) {
+  pass(`零成本欠账未超上限（${Object.keys(KNOWN_ZERO_COST_GAPS).length}/${MAX_GAPS}）`)
+} else {
+  fail(`零成本欠账超上限（${Object.keys(KNOWN_ZERO_COST_GAPS).length}/${MAX_GAPS}）—— 该上限只允许调低`)
+}
+
+for (const op of ALL_OPS) {
+  if (NON_TOKEN_BILLED.includes(op)) continue
+  const sites = SRC_FILES.filter(
+    (f) => (f.src.includes('.record(') || f.src.includes('recordAiLog')) && f.src.includes(`'${op}'`),
+  )
+  const unplumbed = sites.filter((f) => !f.src.includes('tokenUsage')).map((f) => f.rel)
+  const registered = KNOWN_ZERO_COST_GAPS[op]
+  const healthy = sites.length > 0 && unplumbed.length === 0
+
+  if (healthy) {
+    pass(`成本管路: ${op} 的所有落账点都收 token`)
+    if (registered) fail(`成本管路: ${op} 已收 token，请从 KNOWN_ZERO_COST_GAPS 删除该条陈旧欠账`)
+    continue
+  }
+  if (!registered) {
+    const why = sites.length === 0 ? '找不到任何落账点' : `落账点无 token 管路: ${unplumbed.join(', ')}`
+    fail(`成本管路: ${op} ${why} —— 付费调用会在 Admin 显示 ¥0.0000，必须修或显式登记欠账`)
+    continue
+  }
+  if (registered.length < 20) fail(`成本管路: ${op} 的欠账理由过短，必须写清为什么还没修`)
+  else pass(`成本管路: ${op} 已登记零成本欠账（仍显示 ¥0.0000，未修复）`)
+}
+
+// 陈旧欠账：登记了一个已经不存在的 operation
+for (const op of Object.keys(KNOWN_ZERO_COST_GAPS)) {
+  if (!ALL_OPS.includes(op)) fail(`成本管路: KNOWN_ZERO_COST_GAPS 登记的 ${op} 已不在 AiOperation，请删除该条`)
+}
+
+// ─── 1c. selfAssessment 回归锚（本批次修复的那条）────────────────────────────
+//
+// 改回去必须红：这条是**付费** LLM 调用，此前完全不收 token。
+
+const selfAssessSvc = read('src/ai/resume/self-assessment.service.ts')
+assertContains(selfAssessSvc, 'AiUsageAccumulator', 'self-assessment: 使用 AiUsageAccumulator')
+assertContains(selfAssessSvc, 'onLlmCall: usage.add', 'self-assessment: 把 usage sink 传给 LLM 服务')
+assertContains(selfAssessSvc, 'tokenUsage: usage.tokenUsage', 'self-assessment: 落账带真实 token')
+assertContains(selfAssessSvc, 'usage.callCount > 0', 'self-assessment: callCount 守卫存在（没真调用就不落账）')
+
+const llmSelfAssess = read('src/ai/resume/llm-self-assessment.service.ts')
+assertContains(llmSelfAssess, 'normalizeLlmUsage(data.usage)', 'llm-self-assessment: 从上游回包读取 token usage')
+assertContains(llmSelfAssess, 'onLlmCall?.({ provider: providerLabel, tokenUsage:', 'llm-self-assessment: 回调带 provider + token')
+assertContains(llmSelfAssess, '`llm:${cfg.vendor}:${cfg.model}`', 'llm-self-assessment: provider 标签含厂商名（否则单价匹配不到）')
+// selfAssessment 是 token 计费能力，绝不能被塞进「非 token 计费」名单来掩盖 ¥0
+assertNotContains(logSvc, /NON_TOKEN_BILLED_OPERATIONS[\s\S]{0,200}selfAssessment/u, 'self-assessment: 未被误列入非 token 计费名单')
 
 // ─── 2. NON_TOKEN_BILLED_OPERATIONS ──────────────────────────────────────────
 

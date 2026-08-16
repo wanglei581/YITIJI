@@ -35,7 +35,25 @@ assert.doesNotMatch(fairMap, /入口 \/ 签到|咨询服务台|打印服务点/)
 assert.doesNotMatch(fairMap, /展位 \$\{zone\.zoneName\}01/)
 
 assert.match(resumeExport, /resume-lightflow__shell(?! resume-lightflow__shell--narrow)/)
-assert.match(resumeExport, /disabled title="尚无真实导出文件"/)
+// 无真实产物时保存/打印必须不可用 —— 这条真值没变，兑现方式变了。
+// #620（fix(kiosk): make disabled reasons reachable on the touch terminal）指出
+// 原来的「原生 disabled + title」在 27 寸竖屏触摸屏上等于没给原因：没有 hover，
+// title 永不显示；原生 disabled 还让按钮掉出 tab 序、读屏跳过。
+// 现契约 = aria-disabled + onClick 短路 + 常显原因段落 + aria-describedby 关联。
+// 断言按这四件事逐条钉，比原来那一条串更严，且拒绝退回原生 disabled。
+const resumeExportBlocked = /<Button[^>]*aria-disabled="true"[^>]*aria-describedby="resume-export-blocked-why"[\s\S]*?onClick=\{\(event\) => event\.preventDefault\(\)\}/g
+assert.equal(
+  (resumeExport.match(resumeExportBlocked) ?? []).length,
+  2,
+  '保存 / 打印两个按钮都必须是 aria-disabled + 原因关联 + 点击短路',
+)
+assert.match(resumeExport, /id="resume-export-blocked-why"/)
+assert.match(resumeExport, /这两项要等真实导出文件生成后才能用/)
+// 触屏上不可解释的禁用方式不得回潮：本页不许再出现原生 disabled / title 提示。
+// 剥掉 JSX 注释再判——页面里那段注释正是在记录「原本是原生 disabled + title」的历史。
+const resumeExportCode = resumeExport.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+assert.doesNotMatch(resumeExportCode, /<Button[^>]*\sdisabled(\s|>|=\{)/)
+assert.doesNotMatch(resumeExportCode, /title="尚无真实导出文件"/)
 assert.match(resumeExport, /navigate\('\/resume\/source'\)/)
 assert.doesNotMatch(resumeExport, /new Blob|URL\.createObjectURL|signedUrl|printFileUrl|fileId/)
 

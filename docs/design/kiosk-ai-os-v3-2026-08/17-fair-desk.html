@@ -529,16 +529,22 @@
           <span>场次信息由来源机构提供 · 报名与入场资格以来源平台为准。</span>
         </div>
 
-        <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin） -->
+        <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin）
+             2026-08-16 缺口 G-04 整改：这颗按钮此前**没有 href、没有 data-go、
+             没有任何监听** —— 真点一次 body / location.href / data-stage 三项零变化，
+             而且它不在 dead-buttons-2026-08-11.md 的 99 条名单里，属未登记的死控件。
+             承诺（「已经在现场？先签到再逛」）给了却没有兑现处。现在接到新补的
+             17b-fair-checkin.html：那一页有来源三字段、两种签到办法、三种签不上的
+             处境各自的出路，以及「本机不代为签到、不记录签到结果」的合规声明。 -->
         <div class="checkin">
           <span class="checkin-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
           <span class="checkin-b">
             <span class="checkin-t">已经在现场？先签到再逛</span>
-            <span class="checkin-s">扫码或凭手机号签到，领现场资料 · 不是投递</span>
+            <span class="checkin-s">扫主办方的码，或到入口处凭手机号登记 · 不是投递</span>
           </span>
-          <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
+          <a class="btn btn--lg btn--quiet" style="flex:0 0 auto" href="17b-fair-checkin.html">
             <svg class="ic"><use href="#i-qr"/></svg>入场签到
-          </button>
+          </a>
         </div>
 
         <!-- 2026-08-10 孤儿页接线：P45 招聘会现场（展位企业 / 场馆导览 / 活动资料 / 现场数据）
