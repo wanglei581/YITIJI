@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
 import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow } from './assert-layout'
 import {
+  ASSISTANT_MOCK_FALLBACK_REPLY_TEXT, assistantMockFallbackReply,
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
@@ -321,10 +322,82 @@ test('assistant filters actions and survives service failure @w3-kiosk', async (
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.getByRole('button', { name: '去做简历诊断' })).toBeVisible()
   await expect(page.getByText('禁止动作', { exact: true })).toHaveCount(0)
+
+  // S2-5：providerLabel 是 `llm:*` 时才允许呈现为 AI 回答，且必须挂 E3 与来源标识。
+  await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(1)
+  await expect(page.locator('[data-message-kind="ai"] [data-evidence="E3"]')).toBeVisible()
+  await expect(page.getByText('由真实模型生成 · 服务标识：llm:deepseek')).toBeVisible()
+  // 四态：真的拿到结果才是 done。
+  await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'done')
+
   api.abort('POST', '/api/v1/assistant/chat', 'internetdisconnected')
   await input.fill('再给一个建议')
   await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
   await expect(page.getByText('AI 服务暂不可用，请稍后再试', { exact: true })).toBeVisible()
+
+  // 失败停在 failed，且降级是 ① manual —— 功能不消失，四条不依赖 AI 的真实入口在。
+  await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
+  await expect(page.locator('.assistant-ai-status .kiosk-ai-fallback')).toHaveAttribute('data-ai-fallback-mode', 'manual')
+  await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^打印扫描/ })).toBeVisible()
+  // 一次网络失败不是「模型没接上」，输入条不该被锁死。
+  await expect(page.locator('.assistant-send')).not.toHaveAttribute('aria-disabled', 'true')
+
+  await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  terminalBaseline(api)
+  // 后端 assistant_chat 未就绪 → 回落 mock provider（风险 R1）。
+  api.respond('POST', '/api/v1/assistant/chat', { status: 200, json: assistantMockFallbackReply })
+  await page.goto('/assistant')
+
+  const input = page.getByLabel('输入咨询问题')
+  await input.fill('我该先做简历还是先看岗位？')
+  await page.getByRole('group', { name: '虚拟键盘' }).getByRole('button', { name: '发送', exact: true }).click()
+
+  // 最关键的一条：预置话术正文一个字都不许出现在页面上。
+  await expect(page.getByText('这一轮没有 AI 回答').first()).toBeVisible()
+  await expect(page.getByText(ASSISTANT_MOCK_FALLBACK_REPLY_TEXT)).toHaveCount(0)
+  await expect(page.locator('[data-message-kind="ai"]')).toHaveCount(0)
+  await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
+  // 不冒充 AI，也就不许挂 E3「AI 判断」徽章。
+  await expect(page.locator('.assistant-transcript [data-evidence="E3"]')).toHaveCount(0)
+  // mock 的 action 同样是预置的，不该被当成「AI 建议的下一步」。
+  await expect(page.getByText('服务标识：mock').first()).toBeVisible()
+
+  // ai-down 硬钳位：四态恒为 failed。
+  await expect(page.locator('.assistant-ai-status')).toHaveAttribute('data-aitask', 'failed')
+  await expect(page.locator('.assistant-ai-status .kiosk-ai-fallback')).toHaveAttribute('data-ai-fallback-mode', 'manual')
+  await expect(page.getByRole('navigation', { name: '不依赖 AI 的功能入口' })).toBeVisible()
+
+  // 置灰一律 aria-disabled，绝不用原生 disabled（触屏无 hover，原生 disabled 掉出 tab 序）。
+  const send = page.locator('.assistant-send')
+  await expect(send).toHaveAttribute('aria-disabled', 'true')
+  expect(await send.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false)
+  const toolCard = page.locator('.assistant-ai-tool-card').first()
+  await expect(toolCard).toHaveAttribute('aria-disabled', 'true')
+  expect(await toolCard.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false)
+  // 置灰原因常驻可见，不是 tooltip。
+  await expect(page.locator('.assistant-ai-tools-reason')).toBeVisible()
+
+  // 锁上之后不再发请求，也不会再冒出第二条假回答。
+  let extraChatCalls = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/assistant/chat') extraChatCalls += 1
+  })
+  await send.click()
+  await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
+  expect(extraChatCalls).toBe(0)
+
+  // 但不是死局：可以显式重新检查。
+  await page.getByRole('button', { name: '重新检查 AI 顾问' }).click()
+  await expect(send).not.toHaveAttribute('aria-disabled', 'true')
+
   await expect(page.locator('[data-kiosk-screen="assistant"]')).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])

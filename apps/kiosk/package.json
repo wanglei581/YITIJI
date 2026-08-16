@@ -94,7 +94,8 @@
     "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
     "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
     "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs",
-    "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs"
+    "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs",
+    "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",
