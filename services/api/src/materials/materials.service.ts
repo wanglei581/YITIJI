@@ -1,6 +1,12 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
-import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
+import { isSinglePageImage, resolvePdfPageCount } from '../files/file-page-count.util'
+import {
+  describeBlankPages,
+  estimateA4Dpi,
+  isA4PrintResolutionOk,
+  MIN_RECOMMENDED_DPI,
+} from './image-print-quality.util'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
@@ -337,7 +343,7 @@ export class MaterialsService {
     }
     try {
       const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
-      const pageCount = countPdfPages(buffer)
+      const pageCount = await resolvePdfPageCount(buffer)
       const warnings = pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : []
       const messages: InspectionMessage[] = pageCount === null
         ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
@@ -347,7 +353,19 @@ export class MaterialsService {
         messages.push({
           code: 'BLANK_PAGE_SUSPECTED',
           severity: 'warning',
-          text: `第 ${blankPageNumbers.join('、')} 页可能为空白页，如非有意留白请检查原文件`,
+          text: describeBlankPages(
+            blankPageNumbers,
+            pageCount,
+            pageCount === null ? undefined : Math.min(pageCount, BLANK_SCAN_MAX_PAGES),
+          ),
+        })
+      } else if (pageCount !== null && pageCount > BLANK_SCAN_MAX_PAGES) {
+        // 只扫了前 N 页却一条不报 → 用户会理解成「整份都没问题」。诚实声明扫描范围
+        // （与 pii_scan 的 'partial' 口径一致，见 PrintMaterialCheckPage.piiScanModeCopy）。
+        messages.push({
+          code: 'BLANK_PAGE_SCAN_PARTIAL',
+          severity: 'info',
+          text: `空白页检查仅覆盖前 ${BLANK_SCAN_MAX_PAGES} 页（共 ${pageCount} 页），其余页面请打印前自行核对`,
         })
       }
       return {
@@ -394,8 +412,8 @@ export class MaterialsService {
       const imageQuality: ImageQualitySummary = {
         ...dimensions,
         estimatedDpiForA4,
-        minRecommendedDpi: 150,
-        quality: estimatedDpiForA4 >= 150 ? 'ok' : 'low',
+        minRecommendedDpi: MIN_RECOMMENDED_DPI,
+        quality: isA4PrintResolutionOk(estimatedDpiForA4) ? 'ok' : 'low',
       }
       const lowResolution = imageQuality.quality === 'low'
       const messages: InspectionMessage[] = [
@@ -759,12 +777,6 @@ function looksLikeCompleteImage(buffer: Buffer): boolean {
   if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false
   const tail = buffer.subarray(-16).toString('ascii')
   return tail.includes('IEND')
-}
-
-function estimateA4Dpi(widthPx: number, heightPx: number): number {
-  const portraitDpi = Math.min(widthPx / 8.27, heightPx / 11.69)
-  const landscapeDpi = Math.min(widthPx / 11.69, heightPx / 8.27)
-  return Math.max(1, Math.round(Math.max(portraitDpi, landscapeDpi)))
 }
 
 function toTaskView(task: TaskRecord): DocumentProcessTaskView {

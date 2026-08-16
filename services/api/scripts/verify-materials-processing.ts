@@ -220,7 +220,13 @@ async function main() {
         ownerId: null,
       },
     })
-    const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n2 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
+    // 2026-08-17（批次 REAL-FILE-PRINT）：本夹具原来是 81 字节的裸片段——只有两个
+    // `<< /Type /Page >>`，没有 catalog、没有页树、没有 xref，任何 PDF 阅读器都打不开。
+    // 它能通过，只是因为旧实现按字节正则数 `/Type /Page` 出现次数。
+    // 页数识别改为 pdf.js 解析页树为准（结构损坏即 fail-closed，见 file-page-count.util.ts）
+    // 之后，这种「数得出来但打不开」的字节串必须、也应该被判为无法识别。
+    // 断言意图（2 页、可打印）不变，改用同文件里已有的**真实可解析** 2 页 PDF 构造器。
+    const pdfBytes = buildDeclaredBigPageCountPdf(2)
     const pdfPut = await storage.putObject(pdfObjectKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     const unknownPdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n')
     const unknownPdfPut = await storage.putObject(unknownPdfObjectKey, unknownPdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)

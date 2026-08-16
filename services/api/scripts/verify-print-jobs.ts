@@ -37,6 +37,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.dto'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { buildRealPdf } from './support/minimal-pdf'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -125,7 +126,7 @@ async function main() {
 
     // 计费接线后 create() 需真实 FileObject + 存储内容识别页数 + PriceConfig 报价（否则 fail-closed）。
     await seedDevDefaultPriceConfig(prisma)
-    const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
+    const pdfBytes = buildRealPdf(1)
     const reportSha256 = createHash('sha256').update(pdfBytes).digest('hex')
     await Promise.all(fixtureStorageKeys.map((key) =>
       storage.putObject(key, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL),

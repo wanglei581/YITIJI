@@ -299,6 +299,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:file-display-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
           pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:contract-review-session
@@ -378,6 +379,7 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
+          pnpm --filter @ai-job-print/api verify:file-display-truth
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-status-idempotency
@@ -611,6 +613,10 @@ jobs:
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
+          # 文件呈现真值门禁（页数识别 / A4 DPI 估算 / 上限文案）：计费页数走
+          # PrintPageCountService，两个 job 都必须跑——PDF 解析回归会直接影响收费页数。
+          pnpm --filter @ai-job-print/api verify:file-display-truth
+          pnpm --filter @ai-job-print/kiosk verify:file-display-truth
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies

@@ -30,6 +30,7 @@ import {
   type PrintFileState,
 } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { computePrintUsageEstimate } from './printUsageEstimate'
 
 type PrintFile = PrintFileState
 
@@ -219,7 +220,10 @@ export function PrintPreviewPage() {
     : false
   const source = locationState?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
-  const effectivePages = file.pages ?? 1
+  // 页数未识别时不假设 1 页:用量预估整块改为「待识别」,不给编出来的面数/张数。
+  // (2026-08-17 走查:30 页 PDF 页数未识别时,「文件页数」诚实显示「待识别」,
+  //  下面两行却写着「总打印面 1 面 / 预计用纸 1 张」——同一张卡自相矛盾,违反 CLAUDE.md §9。)
+  const knownPages = file.pages
 
   const {
     printerName,
@@ -273,12 +277,11 @@ export function PrintPreviewPage() {
   const hasBlockingWarning = warnings.some((w) => w.level === 'error') || !printerReady
 
   // ── Usage estimate ──────────────────────────────────────────────────────────
-  const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
-    const facesPerCopy = Math.ceil(effectivePages / pagesPerSheet)
-    const tf = facesPerCopy * copies
-    const su = duplex === 'simplex' ? tf : Math.ceil(tf / 2)
-    return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
-  }, [effectivePages, pagesPerSheet, copies, duplex])
+  // 页数未识别 → 三项全部为 null,页面显示「待识别」而不是编一个数(见 printUsageEstimate.ts)。
+  const { totalFaces, sheetsUsed, paperSaved } = useMemo(
+    () => computePrintUsageEstimate({ pages: knownPages, copies, pagesPerSheet, duplex }),
+    [knownPages, pagesPerSheet, copies, duplex],
+  )
 
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -549,8 +552,14 @@ export function PrintPreviewPage() {
             <InfoRow label="打印份数" value={`${copies} 份`} />
             <InfoRow label="颜色模式" value="黑白" />
             <InfoRow label="纸张规格" value="A4" />
-            <InfoRow label="总打印面" value={`${totalFaces} 面`} />
-            <InfoRow label="预计用纸" value={`${sheetsUsed} 张`} />
+            <InfoRow
+              label="总打印面"
+              value={totalFaces === null ? '待识别，以实际打印为准' : `${totalFaces} 面`}
+            />
+            <InfoRow
+              label="预计用纸"
+              value={sheetsUsed === null ? '待识别，以实际打印为准' : `${sheetsUsed} 张`}
+            />
 
             {paperSaved > 0 && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">
