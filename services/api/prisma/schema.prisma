@@ -2591,6 +2591,14 @@ model ScreensaverContent {
 //   3. 已生成的产物（AdvisorArtifact）
 // QA 的多轮上下文只在服务进程内存里按 TTL 保留，重启即失，不写任何表。
 // 因此不要为了「方便排查」再加一张 AdvisorTurn —— 那会直接违反页面对用户的承诺。
+//
+// ⚠️ 留存口径：上面这三样保存的都是**用户本人写的原话**（topic / slotsJson /
+// AdvisorPin.content / AdvisorArtifact.payloadJson），一律未脱敏。因此 expiresAt
+// 不是「读取时过滤」的软标记，而是必须被物理执行的删除期限 ——
+// 由 AdvisorRetentionTask（每小时 cron）硬删过期会话（级联 pins/artifacts）与过期产物。
+// 期限口径同步在 docs/compliance/member-personal-data-retention.md。
+// 新增本组任何一张带 expiresAt 的表时，必须同时接上清理，否则
+// verify:ai-user-text-retention 会红。
 
 model AdvisorSession {
   id              String   @id @default(cuid())
@@ -2602,7 +2610,15 @@ model AdvisorSession {
   skill           String
   /** collecting（还在补输入）| ready（必填槽齐了）| completed（已出产物）| abandoned */
   status          String   @default("collecting")
-  /** 用户原始诉求（送模型前已脱敏的那一份），用于判型与后续继续作业 */
+  /**
+   * 用户原始诉求，用于判型与后续继续作业。
+   *
+   * ⚠️ 落库的是**未脱敏的原文**（advisor.service.ts: `topic.trim().slice(0, 600)`）。
+   * 脱敏只发生在送模型那一步（llm-advisor.service.ts 的 maskUserTextForLlmText），
+   * 是另一份临时字符串，不回写本字段。用户在页面上要看到自己写的原话，所以这里
+   * 刻意不存占位符版本。防线是：短 TTL + 到期物理删除（AdvisorRetentionTask）
+   * + 归属门禁（loadOwned）+ 不进日志 / 不进审计 payload。
+   */
   topic           String
   /** 判型理由，页面顶部「你说的是…所以按 X 型办」照此展示 */
   skillReason     String?
