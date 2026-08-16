@@ -34,6 +34,34 @@ export type OrderPayStatus =
   | 'closed'
 
 /**
+ * `OrderPayStatus` 的运行时取值表（筛选白名单、下拉选项等只能引用这一份）。
+ *
+ * 存在的理由（实测事故）：Admin 订单只读接口曾自己维护一份四值白名单
+ * `['unpaid','paid','refunded','failed']`，漏掉 paying / refunding /
+ * partial_refunded / closed；白名单外的值被静默丢成 undefined，
+ * 于是「按退款中筛选」返回的是**全部**订单，而前端筛选芯片还是选中态 ——
+ * 运营看到的结论是「所有订单都在退款中」。这是假陈述，不是少一个选项。
+ *
+ * 下面的 `satisfies` + 穷尽性断言保证：往联合类型里加一个新态而忘了加进本表时，
+ * `pnpm --filter @ai-job-print/shared typecheck` 直接红，不会再漂移出第二份清单。
+ */
+export const ORDER_PAY_STATUSES = [
+  'unpaid',
+  'paying',
+  'paid',
+  'refunding',
+  'partial_refunded',
+  'refunded',
+  'failed',
+  'closed',
+] as const satisfies readonly OrderPayStatus[]
+
+/** 编译期穷尽性断言：联合类型里有、上表里没有的取值会让这一行报错。 */
+type MissingOrderPayStatus = Exclude<OrderPayStatus, (typeof ORDER_PAY_STATUSES)[number]>
+const _orderPayStatusesAreExhaustive: MissingOrderPayStatus extends never ? true : never = true
+void _orderPayStatusesAreExhaustive
+
+/**
  * 支付来源 —— 表示资金性质，绝不伪装线上真实收款：
  * - `offline`：线下收款（现金 / 对公 / 其它线下渠道）
  * - `free`：免费单（报价为 0）
