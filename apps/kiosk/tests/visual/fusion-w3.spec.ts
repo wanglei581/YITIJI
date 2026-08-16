@@ -390,7 +390,10 @@ test('assistant refuses to present mock fallback as an AI answer @w3-kiosk', asy
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/v1/assistant/chat') extraChatCalls += 1
   })
-  await send.click()
+  // force:true 绕过 Playwright 的可操作性检查 —— 它把 aria-disabled 当作不可点，
+  // 但真实浏览器里 aria-disabled 的按钮**照样会派发 click**（没有原生 disabled）。
+  // 用户在触屏上真的按得下去，所以这里必须模拟真按，才能验证按下去确实没有副作用。
+  await send.click({ force: true })
   await expect(page.locator('[data-message-kind="not-ai"]')).toHaveCount(1)
   expect(extraChatCalls).toBe(0)
 
