@@ -896,6 +896,57 @@
      自动化只在服务端口确认开启、且开发者工具由人工启动后再尝试 `connect`，不要再用 `launch` 抢实例。
 2. **`wx-resignin` 真机联调**：需真实微信 appid/appsecret + 已绑号账号跑通 code2session。未验证前不得宣称取件 401 已修复。
 
+### 🔴 跨线风险（不属本分支，需转达对应负责人）
+
+**主仓当前分支的打印上传缺少 PII 隐私扫描闸门，且是「已提交地缺失」。**
+
+| 证据 | 值 |
+|---|---|
+| `git show origin/main:apps/miniapp/pages/print-upload/print-upload.js \| grep -c _passPrintGate` | **3** |
+| 主仓工作区同文件 `grep -c _passPrintGate` | **0** |
+| `git status --porcelain` 该文件 | **未列出（干净）** |
+
+三者同时成立只有一个解释：闸门是在该分支的**已提交状态**里缺失的，不是谁改坏了没提交。
+因为 `git status` 干净，正常 review 不会注意到。按 `CLAUDE.md` §11 文件安全要求，属合规级。
+
+同一来源另报岗位搜索回退：`origin/main` 的 `jobs.js` 是服务端分页 + 关键词 + 请求序号防竞态，
+主仓工作区退回 `api.getJobs()` 无参 + 本地过滤，用户搜第一页之外的岗位会被告知「没有匹配岗位」。
+（该文件在 `git status` 中确为已修改状态。）
+
+**本分支不介入、不修改主仓工作区。** 仅记录并转达。
+
+### 🔴 分支冲突面（决定后续能改什么）
+
+小程序当前有三条并行线：`origin/main`（43 页基线）、主仓在制的 52 页生活圈扩张、本分支。
+
+**高冲突区（三条线都在改，不得单方面修改）**：
+`app.json`（对方还把 tab 文案改为「职业生活圈」）、`utils/api.js`、`pages/{home,ai,me}/*`、
+`custom-tab-bar/*`、`app.wxss`、`utils/{auth,request,storage}.js`。
+两条线都做了视觉改版且色系不同，合并时会被迫在「视觉」与「逻辑」之间二选一。
+
+**低冲突区（当前仅一条线在动，可安全推进）**：
+`pages/privacy/`、`pages/settings/`、`pages/favorites/`、`pages/browse-history/`、
+`pages/fair-detail/`、`pages/membership/`。
+
+另注：`services/api/src/package-orders/` 只有 `package-orders.module.ts` 一个文件，
+它 import 了不存在的 `.controller.ts` / `.service.ts`。当前未注册进 `app.module.ts` 故未炸——
+**谁注册谁编译失败**。要么补齐要么删除，不要留着。
+
+### P0 · 能力缺口（后端与一体机已就绪、小程序未接）
+
+按「用户能不能完成一件事」排序，前两项均为纯接线、零新页面、且落在低冲突区：
+
+1. **收藏与浏览记录未接服务端**：`utils/favorites.js` 明写「本机 wx.storage」，`job-detail.js` 只写本机 `utils/history`。
+   用户在手机收藏的岗位，到一体机「我的收藏」是空的。后端 `member-favorites.controller.ts:27/41/56`、
+   `activity.controller.ts:59/73`、`me-activity.controller.ts:40/52` 均已实现，一体机已用；
+   `api.js` 里 `getMyBrowseLogs` 等绑定已写好但 0 页面调用。需处理本机历史数据的迁移或弃用口径。
+2. **账号注销与数据导出未开放**：`pages/privacy/privacy.js:8-14` 主动弹窗告知「本版本尚未完成安全交互」。
+   小程序是独立发布源，**属 PIPL 硬要求、上线审核会看**，是阻塞项不是优化项。
+   后端 `/me/data-requests`（`member-privacy.controller.ts:94/102/120`）+ 短信二次验证
+   （`member-auth.controller.ts:89/106`）全就绪，一体机已跑通同一套。
+3. **无简历用户在 AI 百宝箱一步走不动**：5 个工具全要求先上传简历，应届生只能去一体机用访谈式生成。
+   后端 `ai.controller.ts:256/287/347` 完整，一体机 9 个文件可参照。**需新建整套页面**，独立排期。
+
 ### P0 · `wx-resignin` 两道闸门（优先级高于合同审查修复）
 
 `5ebbebb9b` 新增的 openid 续签解决了真实痛点（取件页必然 401），但独立复核发现两处设计缺陷。
