@@ -13,6 +13,7 @@
     "verify:job-quality-dashboard-ui": "node scripts/verify-job-quality-dashboard-ui.mjs",
     "verify:excel-template-download-ui": "node scripts/verify-excel-template-download-ui.mjs",
     "verify:partner-relative-api-url": "node scripts/verify-partner-relative-api-url.mjs",
+    "verify:partner-stats-contract": "node scripts/verify-partner-stats-contract.mjs",
     "preview": "vite preview --port 5175"
   },
   "dependencies": {

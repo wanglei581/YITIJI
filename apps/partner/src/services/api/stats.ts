@@ -9,6 +9,15 @@
 //   - deltaPercent=null 时显示"无可比基期"，不显示 ∞% 或伪造 0%
 //   - 时区统一 Asia/Shanghai；周期使用等长半开区间 [from,to)
 //   - 成功率 = successBatches / totalBatches × 100；total=0 时 rate=null
+//
+// ── C1 契约修复（2026-08-16）────────────────────────────────────────────────
+//   1. 不再发送 ?timezone= —— 服务端 DTO 只白名单 period，全局 ValidationPipe
+//      的 forbidNonWhitelisted 会把该参数拒成 400 VALIDATION_FAILED。
+//      时区改由服务端在响应 `timezone` 字段单向声明，本文件照实渲染。
+//   2. 不再取 body.data —— `services/api/src/orgs/` 的控制器一律返回裸对象
+//      （全模块 ApiResponse 出现 0 次），与 orgSelf.ts / policies.ts 同惯例。
+//   3. attribution 恒为 available:false —— 行为日志无不可变 sourceOrgId 快照，
+//      demo 模式同样不得伪造漏斗。
 
 import { API_BASE_URL, API_MODE } from './client'
 import { authHeader } from '../auth'
@@ -33,9 +42,27 @@ export interface StatsBucket {
   failed: number
 }
 
+/**
+ * 浏览 / 外部跳转 / 打印的机构归因。
+ *
+ * 当前恒为 `available: false`：`BrowseLog` / `ExternalJumpLog` 两张行为日志表
+ * 都没有 `sourceOrgId` 字段，无法按机构归因。可以用 targetId 反查
+ * `Job.sourceOrgId`，但那是**当前**归属而非不可变快照——内容换来源机构后
+ * 历史统计会漂移，因此刻意不做。前端据此显示「暂无归因数据」，
+ * 不得回退成估算值或演示漏斗。
+ */
+export interface StatsAttribution {
+  available: false
+  reason: string
+  /** 归因落地后对每个分组生效的最小样本阈值（防小样本反推到个人） */
+  minSampleThreshold: number
+}
+
 export interface PartnerStatsResponse {
   /** live = 真实数据；demo = 演示数据，不代表经营事实 */
   dataMode: 'live' | 'demo'
+  /** 服务端声明的统计时区；客户端不传参、只照实渲染 */
+  timezone: string
   period: {
     label: string    // "本周" / "本月" / "本季度"
     from: string
@@ -45,8 +72,14 @@ export interface PartnerStatsResponse {
   snapshot: {
     publishedJobs: number
     publishedFairs: number
+    publishedCompanies: number
+    publishedPolicies: number
     activeSources: number
+    /** 待管理员审核（pending + reviewing）的内容总数 */
+    pendingReview: number
   }
+  /** 浏览/跳转/打印归因，恒不可用；见 StatsAttribution */
+  attribution: StatsAttribution
   /** 周期内同步统计（含环比） */
   sync: {
     totalBatches: StatsMetric
@@ -102,8 +135,22 @@ function buildDemoStats(period: StatsPeriod): PartnerStatsResponse {
 
   return {
     dataMode: 'demo',
+    timezone: 'Asia/Shanghai',
     period: { label, from, to },
-    snapshot: { publishedJobs: 328, publishedFairs: 12, activeSources: 4 },
+    snapshot: {
+      publishedJobs: 328,
+      publishedFairs: 12,
+      publishedCompanies: 26,
+      publishedPolicies: 9,
+      activeSources: 4,
+      pendingReview: 4,
+    },
+    // demo 模式同样不伪造漏斗：归因缺不可变 sourceOrgId 快照，演示态也照实不可用
+    attribution: {
+      available: false,
+      reason: 'missing_immutable_source_org_snapshot',
+      minSampleThreshold: 5,
+    },
     sync: {
       totalBatches: {
         current: batches, previous: prevBatches,
@@ -139,15 +186,18 @@ function buildDemoStats(period: StatsPeriod): PartnerStatsResponse {
 // ─── HTTP 接口 ──────────────────────────────────────────────────────────────
 
 async function fetchPartnerStats(period: StatsPeriod): Promise<PartnerStatsResponse> {
-  const res = await fetch(`${API_BASE_URL}/partner/stats?period=${period}&timezone=Asia%2FShanghai`, {
+  // 只发 period：服务端 PartnerStatsQueryDto 只白名单该字段，
+  // 全局 ValidationPipe 的 forbidNonWhitelisted 会把任何多余参数（含 timezone）
+  // 拒成 400 VALIDATION_FAILED。时区改由响应的 timezone 字段声明。
+  const res = await fetch(`${API_BASE_URL}/partner/stats?period=${period}`, {
     headers: { Accept: 'application/json', ...authHeader() },
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
     throw new Error(err.error?.message ?? `HTTP ${res.status}`)
   }
-  const body = await res.json() as { data: PartnerStatsResponse }
-  return body.data
+  // orgs 模块控制器返回裸对象（全模块 ApiResponse 出现 0 次），不解包 body.data
+  return await res.json() as PartnerStatsResponse
 }
 
 // ─── 对外 API ───────────────────────────────────────────────────────────────
