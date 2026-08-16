@@ -161,3 +161,9 @@
 .ai-empty .ae-ic { font-size: 26px; color: var(--ghost); margin-bottom: 10px; }
 .ae-text { font-size: 14px; font-weight: 600; color: var(--ink-soft); letter-spacing: .3px; }
 .ae-sub { font-size: 12px; color: var(--faint); margin-top: 5px; line-height: 1.5; }
+
+/* 分组头：标题 + 一句处境说明。说明行是这次重组的关键——
+   光有「准备材料」四个字，用户仍需逐个点开才知道里面是什么。 */
+.grp-head { padding: 26rpx 4rpx 14rpx; }
+.grp-head .section-t { padding: 0; }
+.grp-sub { margin-top: 6rpx; font-size: 22rpx; color: var(--muted); }

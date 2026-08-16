@@ -3,7 +3,7 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-title left serif">职业生活圈</view>
+    <view class="nav-title left serif">AI百宝箱</view>
   </view>
 
   <view class="content has-tabbar">
@@ -26,41 +26,32 @@
     </view>
 
 
-    <!-- 工具网格 -->
-    <view class="section-t">AI 求职工具</view>
-    <view class="tiles">
-      <view
-        class="tile sheen tap rise-d{{index+1}}"
-        wx:for="{{tools}}"
-        wx:key="id"
-        hover-class="tap-press"
-        bindtap="tapTool"
-        data-id="{{item.id}}"
-      >
-        <view class="t-ic a-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
-        <view class="t-title">{{item.title}}</view>
-        <view class="t-desc">{{item.desc}}</view>
+    <!-- 按处境分组：每组一个标题 + 一句说明，组内是同一处境下的动作。
+         原本是「AI 求职工具」5 个 +「材料与打印」5 个，按技术属性分类；
+         但用户不按技术找东西——他按自己此刻卡在哪里找。 -->
+    <block wx:for="{{groups}}" wx:key="key" wx:for-item="g">
+      <view class="grp-head">
+        <view class="section-t">{{g.title}}</view>
+        <view class="grp-sub">{{g.sub}}</view>
       </view>
-    </view>
-
-    <view class="section-t utility-title">材料与打印</view>
-    <view class="service-list">
-      <view
-        class="service-row tap"
-        wx:for="{{services}}"
-        wx:key="id"
-        hover-class="tap-press"
-        bindtap="tapService"
-        data-id="{{item.id}}"
-      >
-        <view class="service-icon"><text class="ficon i-{{item.icon}}"></text></view>
-        <view class="service-copy">
-          <view class="service-name">{{item.title}}</view>
-          <view class="service-desc">{{item.desc}}</view>
+      <view class="tiles">
+        <view
+          class="tile sheen tap"
+          wx:for="{{g.items}}"
+          wx:key="id"
+          wx:for-item="item"
+          hover-class="tap-press"
+          bindtap="tapEntry"
+          data-id="{{item.id}}"
+          role="button"
+          aria-label="{{item.title}}，{{item.desc}}"
+        >
+          <view class="t-ic a-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
+          <view class="t-title">{{item.title}}</view>
+          <view class="t-desc">{{item.desc}}</view>
         </view>
-        <view class="service-arrow">›</view>
       </view>
-    </view>
+    </block>
 
     <view class="section-t">AI 服务记录</view>
     <view class="ai-empty tap" hover-class="tap-press" bindtap="toRecords">

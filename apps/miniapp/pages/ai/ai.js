@@ -39,19 +39,41 @@ Page({
     // 今日早报
     reportDate:  '',
     // 职业圈
-    tools: [
-      { id: 'diagnose',  icon: 'file-search', title: '简历诊断',  desc: '逐条给出问题与依据',     accent: 'plum' },
-      { id: 'optimize',  icon: 'edit',        title: '简历优化',  desc: '改写前后对照可选用',     accent: 'teal' },
-      { id: 'interview', icon: 'comment',      title: '模拟面试',  desc: '按岗位出题并复盘',       accent: 'clay' },
-      { id: 'plan',      icon: 'compass',      title: '职业规划',  desc: '方向建议仅供参考',       accent: 'wheat' },
-      { id: 'match',     icon: 'link',         title: '岗位匹配',  desc: '三档参考，不代表录用结果', accent: 'plum' },
-    ],
-    services: [
-      { id: 'print',     icon: 'printer', title: '打印服务',      desc: '选本人文档、终端与打印参数' },
-      { id: 'documents', icon: 'folder',  title: '我的文档',      desc: '管理材料并再次发起打印' },
-      { id: 'usb',       icon: 'printer', title: 'U盘打印指引',  desc: '查看现场导入与打印步骤' },
-      { id: 'orders',    icon: 'history', title: '打印订单',      desc: '查看取件码与出纸状态' },
-      { id: 'kiosk',     icon: 'scan',    title: '扫码登录一体机', desc: '快速连接现场服务终端' },
+    // 按「用户此刻在什么处境」分组，而不是按「这是不是 AI」分组。
+    // 用户不会想「我要用一个 AI 工具」，他想的是「我明天面试，材料还没弄好」。
+    // 三段对应一条真实动线：准备材料 → 想清楚 → 到机器前办完。
+    groups: [
+      {
+        key: 'prepare',
+        title: '准备材料',
+        sub: '改简历、管文档、发起打印',
+        items: [
+          { id: 'diagnose',  icon: 'file-search', title: '简历诊断', desc: '逐条给出问题与依据', accent: 'plum'  },
+          { id: 'optimize',  icon: 'edit',        title: '简历优化', desc: '改写前后对照可选用', accent: 'teal'  },
+          { id: 'documents', icon: 'folder',      title: '我的文档', desc: '管理材料并再次打印', accent: 'clay'  },
+          { id: 'print',     icon: 'printer',     title: '发起打印', desc: '选文档、终端与参数', accent: 'cyan'  },
+        ],
+      },
+      {
+        key: 'decide',
+        title: '想清楚再决定',
+        sub: '岗位、面试、方向',
+        items: [
+          { id: 'match',     icon: 'link',    title: '岗位匹配', desc: '三档参考，不代表录用结果', accent: 'teal'  },
+          { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按岗位出题并复盘',       accent: 'plum'  },
+          { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
+        ],
+      },
+      {
+        key: 'onsite',
+        title: '到机器前办',
+        sub: '取件码、扫码登录、U盘',
+        items: [
+          { id: 'orders',    icon: 'history', title: '打印订单',   desc: '取件码与出纸状态',   accent: 'clay'  },
+          { id: 'kiosk',     icon: 'scan',    title: '扫码登录',   desc: '连接现场服务终端',   accent: 'teal'  },
+          { id: 'usb',       icon: 'printer', title: 'U盘打印指引', desc: '现场导入与打印步骤', accent: 'wheat' },
+        ],
+      },
     ],
   },
 
@@ -81,14 +103,19 @@ Page({
 
 
 
-  tapTool(e) {
+  tapEntry(e) {
     const { id } = e.currentTarget.dataset
     const routes = {
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
+      documents: '/pages/documents/documents',
+      print:     '/pages/print/print',
+      match:     '/pages/job-fit/job-fit',
       interview: '/pages/interview-entry/interview-entry',
       plan:      '/pages/career-plan/career-plan',
-      match:     '/pages/job-fit/job-fit',
+      orders:    '/pages/orders/orders',
+      kiosk:     '/pages/kiosk-login/kiosk-login',
+      usb:       '/pages/usb-import/usb-import',
     }
     const url = routes[id]
     if (url) wx.navigateTo({ url })
@@ -96,19 +123,6 @@ Page({
 
   tapChat() {
     wx.navigateTo({ url: '/pages/assistant/assistant' })
-  },
-
-  tapService(e) {
-    const { id } = e.currentTarget.dataset
-    const routes = {
-      print:     '/pages/print/print',
-      documents: '/pages/documents/documents',
-      usb:       '/pages/usb-import/usb-import',
-      orders:    '/pages/orders/orders',
-      kiosk:     '/pages/kiosk-login/kiosk-login',
-    }
-    const url = routes[id]
-    if (url) wx.navigateTo({ url })
   },
 
   toRecords() {
