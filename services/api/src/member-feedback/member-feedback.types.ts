@@ -10,6 +10,9 @@ export interface FeedbackReplyItem {
   createdAt: string
 }
 
+/** member = 会员经 /me/feedback 提交；anonymous_kiosk = 一体机经 /kiosk/feedback 匿名提交。 */
+export type FeedbackSubmitterType = 'member' | 'anonymous_kiosk'
+
 export interface MemberFeedbackTicketItem {
   id: string
   category: FeedbackCategory
@@ -34,9 +37,14 @@ export interface MemberFeedbackPage {
 }
 
 export interface AdminFeedbackTicketItem extends MemberFeedbackTicketItem {
-  endUserId: string
-  phoneMasked: string
+  submitterType: FeedbackSubmitterType
+  /** 匿名一体机工单为 null —— 没有账号归属，不能回复、不能推通知，只能现场处置。 */
+  endUserId: string | null
+  phoneMasked: string | null
   nickname: string | null
+  relatedScanTaskId: string | null
+  /** 打印完成页满意度三档；null = 未评价。 */
+  satisfaction: 'good' | 'fair' | 'bad' | null
 }
 
 export interface AdminFeedbackTicketDetail extends AdminFeedbackTicketItem {

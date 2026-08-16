@@ -2209,14 +2209,27 @@ model BroadcastReadState {
 
 model FeedbackTicket {
   id             String   @id @default(cuid())
-  endUserId      String
-  endUser        EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  /// null = 一体机匿名反馈（submitterType='anonymous_kiosk'）。一体机是公共位设备，
+  /// 绝大多数用户不登录；强制挂会员会把「缺纸 / 质量 / 费用」这类现场问题挡在登录墙外。
+  endUserId      String?
+  endUser        EndUser? @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  /// member = 会员经 POST /me/feedback 提交；anonymous_kiosk = 一体机经 POST /kiosk/feedback 匿名提交。
+  /// 后台据此分开处理：匿名工单无账号可回复、无通知可推送，只能现场处置。
+  submitterType  String   @default("member")
   terminalId     String?
   relatedPrintTaskId String?
+  relatedScanTaskId  String?
   category       String   // device / print / file_process / general
   title          String?
   content        String
   contactPhoneEnc String?
+  /// 打印完成页满意度三档：good / fair / bad；null = 未评价。
+  /// 独立成列而不是塞进 title：评分要能按终端聚合统计，埋在字符串里等于没有这个能力。
+  satisfaction   String?
+  /// 匿名提交幂等键：sha256(terminalId|issueCode|contentHash|关联任务|时间桶)。
+  /// 会员提交恒为 null（SQLite / PostgreSQL 的 UNIQUE 都允许多个 NULL）。
+  /// 唯一约束把「同终端短时间重复提交同一内容」在并发下也收敛成一条工单。
+  dedupKey       String?  @unique
   status         String   @default("pending") // pending / processing / replied / closed
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -2226,6 +2239,7 @@ model FeedbackTicket {
   @@index([endUserId, createdAt])
   @@index([status, createdAt])
   @@index([category, createdAt])
+  @@index([submitterType, terminalId, createdAt])
 }
 
 model FeedbackReply {

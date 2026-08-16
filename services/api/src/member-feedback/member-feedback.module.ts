@@ -4,6 +4,8 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { AuthModule } from '../auth/auth.module'
 import { MemberNotificationsModule } from '../member-notifications/member-notifications.module'
 import { AdminMemberFeedbackController } from './admin-member-feedback.controller'
+import { KioskFeedbackController } from './kiosk-feedback.controller'
+import { KioskFeedbackService } from './kiosk-feedback.service'
 import { MemberFeedbackController } from './member-feedback.controller'
 import { MemberFeedbackService } from './member-feedback.service'
 
@@ -24,7 +26,8 @@ import { MemberFeedbackService } from './member-feedback.service'
       },
     }),
   ],
-  controllers: [MemberFeedbackController, AdminMemberFeedbackController],
-  providers: [MemberFeedbackService, EndUserAuthGuard],
+  // KioskFeedbackController 刻意不挂 EndUserAuthGuard：一体机公共位设备的匿名提交面。
+  controllers: [MemberFeedbackController, KioskFeedbackController, AdminMemberFeedbackController],
+  providers: [MemberFeedbackService, KioskFeedbackService, EndUserAuthGuard],
 })
 export class MemberFeedbackModule {}

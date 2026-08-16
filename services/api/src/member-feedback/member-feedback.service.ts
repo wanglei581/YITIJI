@@ -35,6 +35,8 @@ export class MemberFeedbackService {
     const row = await this.prisma.feedbackTicket.create({
       data: {
         endUserId,
+        // 显式声明：本服务只产出会员工单；匿名一体机工单走 KioskFeedbackService。
+        submitterType: 'member',
         terminalId: cleanNullable(dto.terminalId),
         relatedPrintTaskId: cleanNullable(dto.relatedPrintTaskId),
         category: dto.category,
@@ -144,21 +146,28 @@ export class MemberFeedbackService {
       data: { ticketId: id, senderType: 'admin', actorId: admin.userId, content: dto.content.trim() },
     })
     await this.prisma.feedbackTicket.update({ where: { id }, data: { status: 'replied' } })
-    await this.notifications.createForEndUser({
-      endUserId: ticket.endUserId,
-      title: '意见反馈已回复',
-      content: '工作人员已回复您的意见反馈，请到「我的-意见反馈」查看处理说明。',
-      category: 'feedback',
-      relatedType: 'feedback_ticket',
-      relatedId: id,
-    })
+    // 匿名一体机工单没有账号可推送。跳过通知而不是伪造一个收件人。
+    if (ticket.endUserId) {
+      await this.notifications.createForEndUser({
+        endUserId: ticket.endUserId,
+        title: '意见反馈已回复',
+        content: '工作人员已回复您的意见反馈，请到「我的-意见反馈」查看处理说明。',
+        category: 'feedback',
+        relatedType: 'feedback_ticket',
+        relatedId: id,
+      })
+    }
     await this.audit.write({
       actorId: admin.userId,
       actorRole: admin.role,
       action: 'feedback.reply',
       targetType: 'FeedbackTicket',
       targetId: id,
-      payload: { phoneMasked: maskPhoneFromEnc(ticket.endUser.phoneEnc), status: 'replied' },
+      payload: {
+        phoneMasked: ticket.endUser ? maskPhoneFromEnc(ticket.endUser.phoneEnc) : null,
+        submitterType: ticket.submitterType,
+        status: 'replied',
+      },
     })
     return this.getAdminDetailWithoutViewAudit(id)
   }
@@ -177,7 +186,12 @@ export class MemberFeedbackService {
       action: 'feedback.status_change',
       targetType: 'FeedbackTicket',
       targetId: id,
-      payload: { phoneMasked: maskPhoneFromEnc(ticket.endUser.phoneEnc), from: ticket.status, to: status },
+      payload: {
+        phoneMasked: ticket.endUser ? maskPhoneFromEnc(ticket.endUser.phoneEnc) : null,
+        submitterType: ticket.submitterType,
+        from: ticket.status,
+        to: status,
+      },
     })
     return this.getAdminDetailWithoutViewAudit(id)
   }
@@ -256,14 +270,21 @@ export class MemberFeedbackService {
   }
 
   private toAdminItem(row: Parameters<MemberFeedbackService['toMemberItem']>[0] & {
-    endUserId: string
-    endUser: { phoneEnc: string; nickname: string | null }
+    endUserId: string | null
+    submitterType: string
+    relatedScanTaskId: string | null
+    satisfaction: string | null
+    endUser: { phoneEnc: string; nickname: string | null } | null
   }): AdminFeedbackTicketItem {
     return {
       ...this.toMemberItem(row),
+      // 匿名一体机工单没有 endUser 关联行：手机号 / 昵称一律 null，不编造占位值。
+      submitterType: row.submitterType as AdminFeedbackTicketItem['submitterType'],
       endUserId: row.endUserId,
-      phoneMasked: maskPhoneFromEnc(row.endUser.phoneEnc),
-      nickname: row.endUser.nickname,
+      phoneMasked: row.endUser ? maskPhoneFromEnc(row.endUser.phoneEnc) : null,
+      nickname: row.endUser?.nickname ?? null,
+      relatedScanTaskId: row.relatedScanTaskId,
+      satisfaction: row.satisfaction as AdminFeedbackTicketItem['satisfaction'],
     }
   }
 
