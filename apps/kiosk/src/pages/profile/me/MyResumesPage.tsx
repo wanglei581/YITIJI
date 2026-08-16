@@ -256,8 +256,13 @@ function ActionButton({
   return (
     <button
       type="button"
-      disabled={disabled}
-      onClick={onClick}
+      // 2026-08-16：由原生 disabled 改为 aria-disabled。
+      // 原写法已把原因放进 aria-label（比 title 好），但原生 disabled 会让按钮
+      // 掉出 tab 顺序——读屏用户按 Tab 根本到不了它，那句原因永远不会被读出来。
+      // 本机目标设备是 27 寸触摸屏，title 也不会有 hover 去触发。
+      // 改后按钮可聚焦、原因可达；点击在 onClick 里短路，行为不变。
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? (event) => event.preventDefault() : onClick}
       title={disabled ? disabledReason : label}
       aria-label={disabled ? `${ariaLabel}（${disabledReason}）` : ariaLabel}
       className={[
