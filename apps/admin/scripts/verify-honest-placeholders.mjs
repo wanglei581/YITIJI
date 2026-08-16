@@ -1,6 +1,12 @@
 /**
  * 冻结占位页诚实文案守卫：禁止再写「功能建设中 / 敬请期待」假进度，
- * 并锁定 Admin / Partner 五页与定稿一致的诚实说明关键字。
+ * 并锁定 Admin / Partner 四页与定稿一致的诚实说明关键字。
+ *
+ * 2026-08-16（C1）：`apps/partner/src/routes/stats/index.tsx` 已接上真实
+ * `GET /partner/stats`，不再是空壳，故从本清单摘除。
+ * 该页自身的诚实性改由 `pnpm --filter @ai-job-print/partner verify:partner-stats-contract` 守：
+ * 它断言页面不伪造漏斗、不把曝光/跳转写成投递/预约。
+ * 其余四页（admin peripherals / permissions、partner terminals / account）继续钉住。
  *
  * Run: pnpm --filter @ai-job-print/admin verify:honest-placeholders
  */
@@ -23,10 +29,6 @@ const targets = [
   {
     path: join(repoRoot, 'apps/partner/src/routes/terminals/index.tsx'),
     must: ['终端明细暂由平台统一运营', '伪状态'],
-  },
-  {
-    path: join(repoRoot, 'apps/partner/src/routes/stats/index.tsx'),
-    must: ['统计报表本阶段不开放', '假报表'],
   },
   {
     path: join(repoRoot, 'apps/partner/src/routes/account/index.tsx'),

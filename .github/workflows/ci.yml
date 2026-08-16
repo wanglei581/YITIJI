@@ -333,6 +333,7 @@ jobs:
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/partner verify:partner-relative-api-url
+          pnpm --filter @ai-job-print/partner verify:partner-stats-contract
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
@@ -357,6 +358,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-excel-import
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
+          pnpm --filter @ai-job-print/api verify:partner-stats-contract
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability

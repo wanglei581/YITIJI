@@ -153,6 +153,7 @@
     "verify:change-password": "node scripts/run-verify-change-password.mjs",
     "maintenance:backfill-internal-phone": "node -r @swc-node/register scripts/backfill-internal-user-phone.ts",
     "verify:partner-org-self": "node -r @swc-node/register scripts/verify-partner-org-self.ts",
+    "verify:partner-stats-contract": "node -r @swc-node/register scripts/verify-partner-stats-contract.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
