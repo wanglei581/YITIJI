@@ -113,8 +113,8 @@ function homeFair(overrides: Record<string, unknown> = {}): Record<string, unkno
     sourceName: '市公共就业服务网',
     sourceUrl: 'https://jobs.example.gov.cn/fairs/w5-home-fair',
     syncTime: '2026-08-12T00:00:00.000Z',
-    reviewStatus: 'approved',
-    publishStatus: 'published',
+    // 不放 reviewStatus / publishStatus：FairListItemDto 不下发它们，
+    // 夹具带上就会让前端看起来「本可以」二次过滤，而生产上根本拿不到。
     hasManagedData: false,
     managedCompanyCount: 0,
     managedMaterialCount: 0,
@@ -155,8 +155,26 @@ function terminalConfig(toolbox: { enabled: boolean; items: unknown[] }): unknow
 test('home restores real fair and device panels with balanced 1080x1920 geometry @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
+  // 这里喂的必须是「服务端真会返回的响应」：/job-fairs 的 where 恒带
+  // reviewStatus:'approved' + publishStatus:'published'，且列表 DTO（FairListItemDto）
+  // **刻意不下发**这两个字段——所以前端结构上就没有二次审核过滤的能力。
+  //
+  // 早前这里喂一条 reviewStatus:'pending' 的场次并要求前端把它滤掉。那既是在断言一个
+  // 真实接口不可能返回的响应，也把「首页招聘会恒为空」这个 P0 钉死在原地：
+  // 前端为了通过它，就得比对两个运行时恒为 undefined 的字段，于是每一场都被判不合格。
+  //
+  // 「未审核 / 未发布不得展示」改由服务端门禁 verify:fair-list-integrity 验证——它用真实库
+  // 造 hidden-pending（未审核）与 hidden-approved（已审核未发布）两种夹具，断言它们在含
+  // keyword 检索在内的多个查询范围里都不泄漏。那是行为验证，比这里的文本断言强。
+  //
+  // 本用例改为验前端真正负责的那件事：同为 upcoming 时按 startTime 取更近的一场。
   registerHomeApi(api, [
-    homeFair({ id: 'rejected-fair', name: '未审核场次', reviewStatus: 'pending' }),
+    homeFair({
+      id: 'w5-home-fair-later',
+      name: '2026 冬季专场招聘会',
+      startTime: '2026-11-20T01:00:00.000Z',
+      endTime: '2026-11-20T08:00:00.000Z',
+    }),
     homeFair(),
   ])
 
@@ -168,7 +186,7 @@ test('home restores real fair and device panels with balanced 1080x1920 geometry
   const bottomNav = page.getByRole('navigation', { name: '主导航' })
   await expect(fairPanel).toHaveAttribute('data-panel-state', 'ready')
   await expect(fairPanel.getByRole('heading', { name: '2026 秋季高校毕业生招聘会' })).toBeVisible()
-  await expect(fairPanel.getByText('未审核场次')).toHaveCount(0)
+  await expect(fairPanel.getByText('2026 冬季专场招聘会')).toHaveCount(0)
   await expect(devicePanel).toHaveAttribute('data-panel-state', 'ready')
   await expect(devicePanel.getByText('未单独上报')).toHaveCount(3)
   const [panelBox, fairBox, deviceBox, boundaryBox, navBox] = await Promise.all([

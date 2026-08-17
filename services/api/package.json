@@ -117,6 +117,7 @@
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
     "verify:fair-info-fields": "node -r @swc-node/register scripts/verify-fair-info-fields.ts",
     "verify:jobfair-campus-priority": "node -r @swc-node/register scripts/verify-jobfair-campus-priority.ts",
+    "verify:fair-list-integrity": "node -r @swc-node/register scripts/verify-fair-list-integrity.ts",
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",

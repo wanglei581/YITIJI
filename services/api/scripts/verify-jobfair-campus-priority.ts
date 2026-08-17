@@ -2,7 +2,7 @@
  * Kiosk /campus 本校招聘会优先验证。
  *
  * 覆盖:
- *   1. GET /job-fairs 默认无 terminalId 时仍按原公开列表排序(startAt asc)。
+ *   1. GET /job-fairs 默认无 terminalId 时按「未结束升序 → 已结束倒序」排序。
  *   2. terminalId/terminalCode 归属到启用学校机构时,该学校招聘会排在其它公开招聘会前。
  *   3. 终端不存在 / 未绑定机构 / 非学校机构 / 停用机构 / 本校无场次时,降级为原公开排序。
  *   4. 本校优先只是展示排序,不隐藏其它公开招聘会。
@@ -128,15 +128,17 @@ async function main(): Promise<void> {
     const fairA = await mkFair('school-a-latest', schoolA, 5 * 86_400_000)
     const hiddenFairA = await mkFair('school-a-hidden', schoolA, -1 * 86_400_000, false)
     const testVisibleIds = [endedFairA.id, fairB.id, fairOther.id, activeOther.id, fairA.id]
-    const fallbackOrder = [fairB.id, fairOther.id, endedFairA.id, activeOther.id, fairA.id]
+    // 默认排序(无 terminalId)与终端态排序现在一致:未结束升序在前,已结束倒序沉底。
+    // 改动前默认走的是纯 startAt asc,会把最老的已结束场次顶到第一页 —— 见 verify:fair-list-integrity。
     const terminalFallbackOrder = [activeOther.id, fairA.id, endedFairA.id, fairOther.id, fairB.id]
+    const fallbackOrder = terminalFallbackOrder
     const schoolAOrder = [fairA.id, endedFairA.id, activeOther.id, fairOther.id, fairB.id]
 
     type FairQuery = NonNullable<Parameters<JobsService['getPublishedFairs']>[0]> & { terminalId?: string }
 
     const defaultList = await svc.getPublishedFairs({ pageSize: 100 })
     const defaultIds = defaultList.data.map((f) => f.id)
-    assertOrder(defaultIds, fallbackOrder, '1. 默认无 terminalId 保持公开列表 startAt asc')
+    assertOrder(defaultIds, fallbackOrder, '1. 默认无 terminalId 也按「未结束优先」排序')
 
     const byCode = await svc.getPublishedFairs({ pageSize: 100, terminalId: terminalACode } as FairQuery)
     const byCodeIds = byCode.data.map((f) => f.id)
@@ -163,9 +165,15 @@ async function main(): Promise<void> {
       assertOrder(res.data.map((f) => f.id), terminalFallbackOrder, `3. ${label} → 降级为终端公开未结束优先排序`)
     }
 
+    // 翻页上限按接口自报的 totalPages 推导,不写死。
+    // 写死 20 页(pageSize=2 → 只覆盖前 40 条)时,库里数据一多夹具就落在覆盖范围外,
+    // 门禁会在空库 CI 上通过、在真实数据量下失败 —— 属于假保证。
     const pagedIds: string[] = []
-    for (let page = 1; page <= 20 && !schoolAOrder.every((id) => pagedIds.includes(id)); page++) {
+    let pageCap = 20
+    for (let page = 1; page <= pageCap && !schoolAOrder.every((id) => pagedIds.includes(id)); page++) {
       const res = await svc.getPublishedFairs({ pageSize: 2, page, terminalId: terminalACode } as FairQuery)
+      pageCap = Math.max(pageCap, res.pagination.totalPages)
+      if (res.data.length === 0) break
       pagedIds.push(...res.data.map((f) => f.id))
     }
     assertOrder(pagedIds, schoolAOrder, '4b. 小 pageSize 跨本校/其它边界分页无重漏')

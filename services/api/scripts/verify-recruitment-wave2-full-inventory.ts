@@ -310,7 +310,13 @@ async function verifyReaderContracts(): Promise<void> {
   )
   const policies = await readFile(join(root, 'policies/policies.service.ts'), 'utf8')
   assert.match(jobs, /orderBy: \[\{ syncTime: 'desc' \}, \{ id: 'asc' \}\]/u)
-  assert.match(jobs, /orderBy: \[\{ startAt: 'asc' \}, \{ id: 'asc' \}\]/u)
+  // 招聘会默认排序：startAt 升序 + id 兜底，保证分页确定性。
+  // 断的是「这条排序契约存在」，不是「它写在哪个文件的哪一行上」——
+  // 排序被抽成 jobs-shared.ts 的 FAIR_ORDER_ASC 具名常量（语义逐字未变）后，
+  // 原先只读 jobs-kiosk.service.ts 的内联字面量断言会把一次纯重构判成回归。
+  const fairOrderSources = jobs + (await readFile(join(root, 'jobs/jobs-shared.ts'), 'utf8'))
+  assert.match(fairOrderSources, /\{ startAt: 'asc'\s*(?:as const)?\s*\}, \{ id: 'asc'\s*(?:as const)?\s*\}/u)
+  assert.match(fairOrderSources, /\{ startAt: 'desc'\s*(?:as const)?\s*\}, \{ id: 'asc'\s*(?:as const)?\s*\}/u)
   assert.match(agencies, /orderBy: \[\{ createdAt: 'desc' \}, \{ id: 'asc' \}\]/u)
   assert.match(policies, /\{ publishedDate: 'desc' \}, \{ createdAt: 'desc' \}, \{ id: 'asc' \}/u)
   assert.match(policies, /policyPost\.count\(\{ where \}\)/u)

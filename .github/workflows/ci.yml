@@ -488,6 +488,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:jobfair-campus-priority
+          pnpm --filter @ai-job-print/api verify:fair-list-integrity
           pnpm --filter @ai-job-print/api verify:public-fair-demo-guard
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:fair-info-fields
@@ -745,6 +746,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
+          # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
+          # SQLite 与 PostgreSQL 的日期比较、contains 语义不完全一致，PG 侧必须独立回归。
+          pnpm --filter @ai-job-print/api verify:fair-list-integrity
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:bulk-publish
           pnpm --filter @ai-job-print/api verify:companies
