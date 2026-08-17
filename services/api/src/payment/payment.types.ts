@@ -29,6 +29,34 @@ export type OrderPayStatus =
   | 'closed'
 
 /**
+ * `OrderPayStatus` 的运行时取值表 —— 任何筛选白名单只能引用这一份，不得就地再写一遍。
+ *
+ * 实测事故：`admin-orders-readonly.controller.ts` 曾自带一份四值白名单
+ * （unpaid / paid / refunded / failed），漏了 paying / refunding /
+ * partial_refunded / closed。白名单外的值被静默丢成 undefined → **返回全量**，
+ * 而前端「退款中」筛选芯片仍是选中态：库内 14 条 refunding，页面显示 200 条全部订单。
+ * 这是给运营一个假结论，不是少一个筛选项。
+ *
+ * `satisfies` + 穷尽性断言保证联合类型新增取值时本表必须同步，否则 typecheck 直接红。
+ * 与 packages/shared 的同名常量之间由 `verify:admin-order-filters` 做跨包一致性核对。
+ */
+export const ORDER_PAY_STATUSES = [
+  'unpaid',
+  'paying',
+  'paid',
+  'refunding',
+  'partial_refunded',
+  'refunded',
+  'failed',
+  'closed',
+] as const satisfies readonly OrderPayStatus[]
+
+/** 编译期穷尽性断言：联合类型里有、上表里没有的取值会让这一行报错。 */
+type MissingOrderPayStatus = Exclude<OrderPayStatus, (typeof ORDER_PAY_STATUSES)[number]>
+const _orderPayStatusesAreExhaustive: MissingOrderPayStatus extends never ? true : never = true
+void _orderPayStatusesAreExhaustive
+
+/**
  * 支付来源 —— 表示资金性质，绝不伪装线上真实收款：
  * offline（线下收款）/ free（免费单）/ manual_confirmed（管理员人工确认）/
  * sandbox（C5-2 沙箱测试通道入账，**非真实资金**，只能由回调成功入账路径写入）/

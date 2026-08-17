@@ -76,13 +76,19 @@ export class HealthController {
   }
 }
 
-/** 只暴露运维需要的字段；message 由服务端构造，不含凭证或用户数据。 */
+/**
+ * 只暴露运维需要的字段；message 由服务端构造，不含凭证或用户数据。
+ *
+ * `impact` 是 message 的机器可读版本：门禁按它逐个面实际发请求核对，
+ * 保证这里说的话与系统真实行为一致（历史事故：曾宣称「管理端不受影响」而管理端全线 500）。
+ */
 function toPublicState(state: BootSubsystemState) {
   return {
     subsystem: state.subsystem,
     status: state.status,
     code: state.code,
     message: state.message,
+    ...(state.impact ? { impact: state.impact } : {}),
     since: state.since,
   }
 }

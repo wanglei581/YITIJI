@@ -18,6 +18,7 @@ import { FairCompanyZoneService } from './fair-company-zone.service'
 import { FairMaterialService } from './fair-material.service'
 import { FairVenueGuideService } from './fair-venue-guide.service'
 import { RecruitmentIntegrationController } from './recruitment-integration.controller'
+import { JobRequirementStatsService } from './job-requirement-stats.service'
 
 @Module({
   // PrismaModule:供 importJobs 访问 prisma.job / prisma.organization
@@ -42,6 +43,8 @@ import { RecruitmentIntegrationController } from './recruitment-integration.cont
     FairMaterialPrintBridgeService,
     FairMaterialPrintBridgeCleanupTask,
     FairCompanyPrintService,
+    // 岗位要求计数（AI 降级来源）：只读 Prisma + 纯函数聚合，不进 JobsService 门面
+    JobRequirementStatsService,
   ],
   controllers: [JobsController, AdminFairsController, RecruitmentIntegrationController],
   exports: [JobsService, AdminFairsService],
