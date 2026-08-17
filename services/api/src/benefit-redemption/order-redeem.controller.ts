@@ -14,6 +14,11 @@ import { RedeemOrderDto } from './dto/redeem-order.dto'
  *
  * 合规：券 = 平台 credit / 权益，**非资金、非真实收款**；全额核销单联动 paid(voucher)，
  * 不承诺补贴到账；核销账本沿用既有 RedemptionRecord（禁重建第二套账本）。
+ *
+ * ⚠️ 当前状态（P0 止血）：本端点对**打印订单**一律返回 400 `REDEEM_PRINT_ORDER_UNSUPPORTED`。
+ * 权益模型没有面值 / 抵扣上限 / 适用范围字段，全额抵扣会让任意券整单免单（潜在资损）。
+ * 打印订单是当前生产唯一订单类型，故本端点在补齐面值前不会产生任何结算。
+ * 止血闸实现与根因见 BenefitRedemptionService.redeemForOrder。
  */
 @Controller()
 @UseGuards(EndUserAuthGuard)
