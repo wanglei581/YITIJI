@@ -119,7 +119,7 @@ jobs:
             o+W4uOWQjuWGjeaJi+WKqCBybSAtcmYgJFRSQVNIIO+8miIKZWNobyAiICBuZ2lueCAtdCAmJiBjdXJsIC1mc1MgaHR0cDovLzEy
             Ny4wLjAuMTozMDEwL2hlYWx0aCIKZWNobyAiICBwbTIgamxpc3QgPi9kZXYvbnVsbCAmJiBkZiAtaCAvIgplY2hvICLlu7rorq7o
             p4Llr58gMjQtNzIg5bCP5pe25peg5byC5bi45ZCO5YaN5Yig6Zmk6ZqU56a75Yy644CCIgo=
-B64
+            B64
             bash "$TMP"
             rc=$?
             rm -f "$TMP"
