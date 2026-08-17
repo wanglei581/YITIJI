@@ -18,6 +18,7 @@ import { ContractReviewRuleEngine } from './contract-review-rule-engine'
 import { ContractReviewSafetyGate } from './contract-review-safety-gate.service'
 import type { ContractReviewStatus } from './contract-review.types'
 import { assertContractReviewTaskId } from './contract-review.queue'
+import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
 
 export const CONTRACT_REVIEW_PROVIDER_RUNTIME = Symbol('CONTRACT_REVIEW_PROVIDER_RUNTIME')
 export const CONTRACT_REVIEW_ORCHESTRATOR_CLOCK = Symbol('CONTRACT_REVIEW_ORCHESTRATOR_CLOCK')
@@ -30,6 +31,11 @@ const PROCESSING_STATUSES = Object.freeze([
 
 export interface ContractReviewProviderRuntime {
   reviewWithIdentity(input: ContractProviderReviewInput): Promise<ContractProviderReviewOutput>
+  /**
+   * AI-COST-TRUTH：当前厂商标识，不发起调用。可选 —— 被封禁的 stub runtime 不实现。
+   * 失败路径拿不到 reviewWithIdentity 的返回值，靠它标出真实厂商。
+   */
+  identity?(): ContractProviderIdentity
 }
 
 export interface ContractReviewOrchestratorClock {
@@ -64,6 +70,7 @@ export class ContractReviewOrchestratorService {
     private readonly safetyGate: ContractReviewSafetyGate,
     @Inject(CONTRACT_REVIEW_PROVIDER_RUNTIME)
     private readonly provider: ContractReviewProviderRuntime,
+    private readonly aiLog: AiLogService,
     @Optional() @Inject(CONTRACT_REVIEW_ORCHESTRATOR_CLOCK)
     clock?: ContractReviewOrchestratorClock,
   ) {
@@ -181,10 +188,10 @@ export class ContractReviewOrchestratorService {
 
       await this.assertActive(taskId, 'rule_checking', deadline)
       await this.cas(taskId, 'rule_checking', { status: 'ai_analyzing' })
-      const reviewed = await this.provider.reviewWithIdentity({
-        pages: masked.pages,
-        partyFacts: masked.partyFacts,
-      })
+      const reviewed = await this.reviewWithCostLogging(
+        { pages: masked.pages, partyFacts: masked.partyFacts },
+        task.endUserId,
+      )
       await this.assertActive(taskId, 'ai_analyzing', deadline)
       const aiFindings = this.findingMapper.mapAi(
         reviewed.draft,
@@ -214,6 +221,60 @@ export class ContractReviewOrchestratorService {
       const safe = this.safeStageError(error, deadline, 'CONTRACT_REVIEW_ANALYSIS_FAILED')
       if (processingStarted) await this.bestEffortFail(taskId, safe.code)
       throw safe
+    }
+  }
+
+  /**
+   * 调 provider 并落一条 AiServiceLog（AI-COST-TRUTH）。
+   *
+   * 修复前：合同审查走 deepseek/qwen 的**付费**调用，却完全不落 AiServiceLog ——
+   * 这笔花费在 Admin 用量统计里根本不存在（比记错价更严重，因为连痕迹都没有）。
+   *
+   * 成本三态在这里的落点：
+   * - 上游回了 usage        → tokenUsage 落账，record() 按厂商名算出真实成本
+   * - 上游没回 usage / 失败 → tokenUsage 留空 → 成本 null（未采集），**绝不写 0**
+   *
+   * 失败路径也必须落账：调用已经发出，很可能已经计费，丢账就是少算成本。
+   * 落账本身绝不能影响审查主流程 —— record() 内部已是 fire-and-forget，
+   * 这里只额外保证取 identity 失败不抛出。
+   */
+  private async reviewWithCostLogging(
+    input: ContractProviderReviewInput,
+    endUserId: string | null,
+  ): Promise<ContractProviderReviewOutput> {
+    const startedAt = Date.now()
+    try {
+      const reviewed = await this.provider.reviewWithIdentity(input)
+      this.aiLog.record({
+        taskId: null,
+        provider: contractProviderLabel(reviewed.identity),
+        operation: 'contractReview',
+        latencyMs: Date.now() - startedAt,
+        status: 'success',
+        ...(reviewed.usage ? { tokenUsage: reviewed.usage } : {}),
+        endUserId,
+      })
+      return reviewed
+    } catch (error) {
+      this.aiLog.record({
+        taskId: null,
+        provider: contractProviderLabel(this.safeIdentity()),
+        operation: 'contractReview',
+        latencyMs: Date.now() - startedAt,
+        status: 'failed',
+        errorCode: aiErrorCodeOf(error, 'CONTRACT_REVIEW_ANALYSIS_FAILED'),
+        endUserId,
+      })
+      throw error
+    }
+  }
+
+  /** 取当前厂商标识；配置不可读时返回 null（落账退化成通用标签，不猜厂商）。 */
+  private safeIdentity(): ContractProviderIdentity | null {
+    try {
+      return this.provider.identity?.() ?? null
+    } catch {
+      return null
     }
   }
 
@@ -378,6 +439,19 @@ class ContractReviewSafeError extends Error {
 }
 
 function safeError(code: string): ContractReviewSafeError { return new ContractReviewSafeError(code) }
+
+/**
+ * AiServiceLog.provider 标签（AI-COST-TRUTH）。
+ *
+ * 沿用全站约定 `llm:<vendor>:<model>` —— 成本估算按标签里的厂商名做子串匹配，
+ * 少了厂商名就永远匹配不到单价。
+ *
+ * 只放 vendor / model：**不含** baseUrl、apiKey 或任何凭证片段（CLAUDE.md §12）。
+ * identity 不可得时退化成 'llm:unknown'，宁可标未知也不猜一个厂商去套单价。
+ */
+function contractProviderLabel(identity: ContractProviderIdentity | null): string {
+  return identity ? `llm:${identity.provider}:${identity.model}` : 'llm:unknown'
+}
 
 function normalizedOcrConfidence(
   confidence: ContractReviewOcrConfidence | null,
