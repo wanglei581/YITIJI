@@ -16,9 +16,19 @@ import type {
 import { LlmResumeService } from '../resume/llm-resume.service'
 import { computeMissingHints, LlmResumeGenerateService } from '../resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from '../resume/llm-resume-optimize.service'
+import { AiUsageAccumulator } from '../ai-log.service'
 
 let taskCounter = 0
 const nextTaskId = (): string => `llm-ai-${Date.now()}-${++taskCounter}`
+
+/**
+ * AI-COST-TRUTH：把累计器打包成用量回报。
+ *
+ * fallback 标签用 'llm'（AiProviderName）——它只在 callCount === 0 时才会被用到，
+ * 那种情况下成本按 0 记，不参与单价匹配，所以不含厂商名也无害。
+ * 真正要计费的调用一定已经带回 `llm:<vendor>:<model>`。
+ */
+const usageOf = (acc: AiUsageAccumulator) => acc.toReport('llm')
 
 /** 从 Nest 异常体里取 { error: { code } }，用于把诊断失败映射成诚实 failReason。 */
 function errorCodeOf(err: unknown): string | undefined {
@@ -51,16 +61,24 @@ export class LlmResumeProvider implements AiProvider {
     const text = input.extractedText
     if (!text || !text.trim()) {
       // 正常情况下 AiService 已先提取并在失败时直接返回；此处仅防御性兜底。
-      return { taskId: nextTaskId(), status: 'failed', failReason: '未获取到简历文本，无法生成诊断报告' }
+      // 一次都没打到模型 → callCount 0 → 成本确定为 0（不是「未采集」）。
+      return {
+        taskId: nextTaskId(), status: 'failed', failReason: '未获取到简历文本，无法生成诊断报告',
+        usage: usageOf(new AiUsageAccumulator()),
+      }
     }
+    // AI-COST-TRUTH：诊断可能重试两次，每次都真实花钱，必须累计而不是只记最后一次。
+    const usage = new AiUsageAccumulator()
     try {
       const report: ResumeReport = await this.resumeLlm.diagnose(text, {
         selectedDimensions: input.selectedDimensions,
         targetContext: input.targetContext,
+        onLlmCall: usage.add,
       })
-      return { taskId: nextTaskId(), status: 'completed', report }
+      return { taskId: nextTaskId(), status: 'completed', report, usage: usageOf(usage) }
     } catch (err) {
-      return { taskId: nextTaskId(), status: 'failed', failReason: this.failReasonOf(err) }
+      // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
+      return { taskId: nextTaskId(), status: 'failed', failReason: this.failReasonOf(err), usage: usageOf(usage) }
     }
   }
 
@@ -91,11 +109,14 @@ export class LlmResumeProvider implements AiProvider {
         taskId,
         status: 'failed',
         failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再生成优化版',
+        usage: usageOf(new AiUsageAccumulator()),
       }
     }
+    // AI-COST-TRUTH：优化可能重试两次，每次都真实花钱，必须累计。
+    const usage = new AiUsageAccumulator()
     try {
-      const { optimizedResume, modules } = await this.resumeOptimize.optimize(extractedText, report, targetContext)
-      return { taskId, status: 'completed', modules, optimizedResume }
+      const { optimizedResume, modules } = await this.resumeOptimize.optimize(extractedText, report, targetContext, usage.add)
+      return { taskId, status: 'completed', modules, optimizedResume, usage: usageOf(usage) }
     } catch (err) {
       const code = errorCodeOf(err)
       let failReason: string
@@ -107,7 +128,8 @@ export class LlmResumeProvider implements AiProvider {
       } else {
         failReason = 'AI 简历优化服务暂时不可用，请稍后重试'
       }
-      return { taskId, status: 'failed', failReason }
+      // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
+      return { taskId, status: 'failed', failReason, usage: usageOf(usage) }
     }
   }
 
@@ -116,13 +138,16 @@ export class LlmResumeProvider implements AiProvider {
    * 任何失败都返回 status:'failed' + 明确 failReason,绝不 fallback mock。
    */
   async generateResume(input: ResumeGenerateInput): Promise<GenerateResumeOutput> {
+    // AI-COST-TRUTH：生成可能重试两次，每次都真实花钱，必须累计。
+    const usage = new AiUsageAccumulator()
     try {
-      const resume = await this.resumeGenerate.generate(input)
+      const resume = await this.resumeGenerate.generate(input, usage.add)
       return {
         taskId: nextTaskId(),
         status: 'completed',
         resume,
         missingHints: computeMissingHints(input),
+        usage: usageOf(usage),
       }
     } catch (err) {
       const code = errorCodeOf(err)
@@ -130,7 +155,8 @@ export class LlmResumeProvider implements AiProvider {
         code === 'AI_PROVIDER_NOT_CONFIGURED'
           ? 'AI 简历生成模型尚未配置，请联系管理员后重试'
           : 'AI 简历生成服务暂时不可用，请稍后重试'
-      return { taskId: nextTaskId(), status: 'failed', failReason }
+      // 失败也要回报：重试期间的调用照样计费，丢账就等于少算成本。
+      return { taskId: nextTaskId(), status: 'failed', failReason, usage: usageOf(usage) }
     }
   }
 
