@@ -62,6 +62,43 @@ ContractReviewSafeError: CONTRACT_REVIEW_ANALYSIS_FAILED
 **这是推断，未验证**。验证方式：在 provider 调用处临时记录 `finish_reason` 与
 `content.length`（不要记录内容本身，合同正文不得入日志）。
 
+## 三A、根因已定位：30 秒超时上限 vs 推理模型（2026-08-17 追加）
+
+**错误码已从 `CONTRACT_REVIEW_ANALYSIS_FAILED` 收敛为 `CONTRACT_PROVIDER_TRANSPORT_FAILED`**
+（Redis 最新 analyze job，`finishedOn=1786946676841`）。
+
+排除网络：从生产服务器实测 `api.deepseek.com` —— DNS 正常解析、TLS 连接 17ms、
+`GET /models` 返回 200。**连通性没有问题。**
+
+**根因是代码内的一处矛盾**，见 `contract-review-provider.service.ts`：
+
+```
+:5    const DEFAULT_TIMEOUT_MS = 30_000                    // 30 秒
+:141  if (timeoutMs > DEFAULT_TIMEOUT_MS) throw ...        // 30 秒是硬上限，不可配置调高
+:148  const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+:9    deepseek: { model: 'deepseek-v4-pro' }               // 锁死推理模型
+```
+
+**同一个文件一边强制使用推理模型，一边把超时钉死在 30 秒且不允许调高。**
+推理模型在返回 `content` 前要先消耗大量 reasoning token，合同审查这种长文本任务
+极易超过 30 秒 → `controller.abort()` → fetch 抛错 → `CONTRACT_PROVIDER_TRANSPORT_FAILED`。
+
+**实测佐证**：用一段仅数十字的极简合同文本调用 `deepseek-v4-pro`，
+耗时 **13.2 秒**（HTTP 200）——**已占用 30 秒预算的 44%**。
+真实合同单页文字量远大于此，加上完整 system prompt 与结构化输出要求，超时是必然。
+
+### 建议修法（三选一，均需改 `services/api`）
+
+| 方案 | 说明 |
+|---|---|
+| 放宽超时 | 把 `DEFAULT_TIMEOUT_MS` 提高到推理模型的合理区间（如 120s），并让 `:141` 的上限校验随之调整。**最小改动，但需确认 BullMQ job 超时与 HTTP 网关超时能否配合。** |
+| 改用流式 | 走 SSE 流式返回，边收边判断，规避单次请求长耗时 |
+| 换非推理模型 | 需同步更新 `:9` 白名单与合规备案（`algorithm_filing` 针对具体 model），代价最大 |
+
+**注意**：不能只改 `.env` —— 模型白名单与超时上限都硬编码在代码里。
+本人曾试图改 `.env` 的模型，立即得到 `CONTRACT_PROVIDER_NOT_APPROVED`。
+
+
 ## 四、模型不可更换（本人已试错并回滚）
 
 `contract-review-provider.service.ts:9` 硬编码：
