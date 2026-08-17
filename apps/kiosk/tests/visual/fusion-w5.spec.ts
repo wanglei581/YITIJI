@@ -689,7 +689,11 @@ test('phone upload renders a real upload failure without exposing fixture creden
   const errors = runtimeErrors(page)
   api.abort('POST', '/api/v1/upload-sessions/w5-upload-session/files', 'internetdisconnected')
   await page.goto('/upload/phone#sessionId=w5-upload-session&token=w5-one-time-upload&purpose=print_doc')
-  await page.getByLabel('选择文件').setInputFiles({
+  // 2026-08-18（PR #598）：手机页改为按 purpose 显式映射文案与文件过滤器后，
+  // print_doc 的可访问名由「选择文件」变为「选择打印文件」（签名/印章、合同同理）。
+  // 只更新定位到该 input 的方式，下面三条断言（失败态可见、公共安全文案、
+  // 一次性令牌不外泄）保持原样，一条都没有放宽。
+  await page.getByLabel('选择打印文件').setInputFiles({
     name: 'w5-sample.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-w5-browser-fixture'),

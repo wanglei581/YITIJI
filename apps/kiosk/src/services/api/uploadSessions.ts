@@ -137,8 +137,10 @@ export function buildPhoneUploadUrl(uploadUrl: string, sessionId: string, upload
 export function uploadSessionUserMessage(error: unknown, fallback = '上传暂时不可用，请稍后重试。'): string {
   const code = error instanceof ApiHttpError ? error.code : undefined
   switch (code) {
+    // NETWORK_ERROR 的文案由本模块的 requestJson 自己合成，从不携带服务端内容，
+    // 本来就无需改写；保持与既有可见文案一致（fusion-w5 浏览器用例逐字钉死）。
     case 'NETWORK_ERROR':
-      return '网络连接失败，请检查网络后重试。'
+      return '网络连接失败，请稍后重试'
     case 'UPLOAD_SESSION_EXPIRED':
     case 'UPLOAD_SESSION_NOT_PENDING':
     case 'UPLOAD_SESSION_NOT_FOUND':
