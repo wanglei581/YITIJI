@@ -93,6 +93,9 @@ jobs:
         run: |
           pnpm --filter @ai-job-print/miniapp verify:static
           pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness
+          # V6 纵切第一刀（打印域 P39）迁移保真：读 docs/design 原型 + 生产源码做交叉断言。
+          # 纯静态，不连数据库/硬件，所以和其他 cross-client 静态门禁同步。
+          pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/admin verify:refresh-safe
           pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
@@ -102,6 +105,37 @@ jobs:
           # S1 前端 AI 原语合同（#618）。纯读 apps/kiosk 源码，不碰 Prisma，
           # 因此可以留在这一步；四个 api 侧的 AI 门禁见下方 Verify suites。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-ai-primitives
+          # ── 2026-08-16 门禁全量体检补回：以下门禁此前写在 package.json 里
+          #    但没有任何 CI job 执行它们。全部只读取仓库源码/文档文本，
+          #    不 import services/api/src、不碰 Prisma、不连 DB，故留在本步。
+          pnpm --filter @ai-job-print/kiosk verify:advisor-provider-gate
+          pnpm --filter @ai-job-print/kiosk verify:file-retention-ui
+          pnpm --filter @ai-job-print/kiosk verify:home-narrow-visual-balance
+          pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
+          pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
+          pnpm --filter @ai-job-print/kiosk verify:jobfair-size
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-runtime-error-boundary
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-visual-unity
+          pnpm --filter @ai-job-print/kiosk verify:print-cta-contrast
+          pnpm --filter @ai-job-print/kiosk verify:print-done-truth
+          pnpm --filter @ai-job-print/kiosk verify:print-entry-source-split
+          pnpm --filter @ai-job-print/kiosk verify:runtime-terminal-identity
+          pnpm --filter @ai-job-print/kiosk verify:scan-session-truth
+          pnpm --filter @ai-job-print/kiosk verify:screensaver-empty-shell
+          pnpm --filter @ai-job-print/kiosk verify:v6-type-floor
+          pnpm --filter @ai-job-print/kiosk verify:visual-evidence-manifest
+          pnpm --filter @ai-job-print/admin verify:source-publish-actions
+          pnpm --filter @ai-job-print/refresh verify:runtime
+          # ── GATE-WIRE 接线：#647 修好的漂移门禁，本批实跑绿后接进 CI ──
+          #    以下 5 条都不 import services/api/src（已逐条核验 src 引用数为 0），
+          #    且已在「把 src/generated/prisma 挪走」的条件下实跑通过，
+          #    等价于本步在 CI 里的真实前置（Prisma 客户端由后面的 Typecheck 步生成）。
+          #    因此可以留在本步拿快速失败；其余 5 条见下方 Verify suites。
+          pnpm --filter @ai-job-print/api verify:assess-isolation
+          pnpm --filter @ai-job-print/api verify:compliance
+          pnpm --filter @ai-job-print/api verify:jobfair-checkin
+          pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
+          pnpm --filter @ai-job-print/kiosk verify:visible-actions-truth
           # KIOSK-DEBT 三处前端欠账（同意版本 / 跨页上下文 / 禁用原因）。
           # 纯读 apps/kiosk 源码，不连库、不起服务，两个 job 都能跑。
           pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
@@ -249,6 +283,13 @@ jobs:
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
+          # ── 2026-08-16 门禁全量体检补回。三条都只做静态读取 / 注入桩：
+          #    installer-inputs 校验安装器输入清单文本，printer-config 校验
+          #    printerName 可配置（不硬编码型号），local-print-wake 走进程内
+          #    调度控制。均不触发真实 spooler、打印机或 Windows API。
+          pnpm run verify:installer-inputs
+          pnpm run verify:printer-config
+          pnpm run verify:local-print-wake
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -359,6 +400,13 @@ jobs:
           # 启动韧性：Redis 不可达时必须显式降级并照常监听端口，不得静默挂起。
           # 会拉起真实 src/main.ts 子进程与临时 redis-server（用随机空闲端口）。
           pnpm --filter @ai-job-print/api verify:boot-resilience
+          # Redis 故障时的鉴权语义 + 健康检查诚实性：撤销必须仍然生效、
+          # 后台不得再全线 500、/health 的每一条影响面声明都要被实际请求核对。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          # 异常可运维性：5xx 必须留下带 requestId 的日志，且日志不得含 PII / 凭证。
+          pnpm --filter @ai-job-print/api verify:error-observability
+          # 订单筛选不得静默失效（未知筛选值必须 400，不能退化成返回全量）。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
@@ -494,12 +542,66 @@ jobs:
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
           pnpm --filter @ai-job-print/api verify:partner-source-capabilities
           pnpm --filter @ai-job-print/api verify:job-sync
+          pnpm --filter @ai-job-print/api verify:job-requirement-stats
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files
+          # ── 2026-08-16 门禁全量体检补回 ────────────────────────────
+          # 以下门禁此前写在 services/api/package.json 里但没有任何 CI job
+          # 执行它们。它们 import services/api/src，会传递依赖到 Prisma 客户端，
+          # 因此必须留在本步（「Prepare fresh SQLite db」之后），不能上移到
+          # 「Cross-client deterministic static gates」——那时客户端还没生成，
+          # 会报 Cannot find module '../generated/prisma/client'。
+          # 同上：本步必须保持串行，勿改成并行。
+          pnpm --filter @ai-job-print/api verify:self-assessment
+          pnpm --filter @ai-job-print/api verify:print-param-suggestion
+          pnpm --filter @ai-job-print/api verify:resume-diagnosis-context
+          pnpm --filter @ai-job-print/api verify:admin-pending-dispose
+          pnpm --filter @ai-job-print/api verify:benefit-activities
+          pnpm --filter @ai-job-print/api verify:change-password
+          pnpm --filter @ai-job-print/api verify:change-password:target-guard
+          pnpm --filter @ai-job-print/api verify:internal-auth-phone:target-guard
+          pnpm --filter @ai-job-print/api verify:contract-review:http
+          pnpm --filter @ai-job-print/api verify:cos
+          pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy
+          pnpm --filter @ai-job-print/api verify:end-user-assets
+          pnpm --filter @ai-job-print/api verify:external-video
+          pnpm --filter @ai-job-print/api verify:external-video:e2e
+          pnpm --filter @ai-job-print/api verify:fair-stats-truth
+          pnpm --filter @ai-job-print/api verify:fair-visit-plan
+          pnpm --filter @ai-job-print/api verify:feedback-notifications
+          pnpm --filter @ai-job-print/api verify:field-mapping
+          pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
+          pnpm --filter @ai-job-print/api verify:member-assets
+          pnpm --filter @ai-job-print/api verify:member-benefits-admin
+          pnpm --filter @ai-job-print/api verify:member-favorites-benefits
+          pnpm --filter @ai-job-print/api verify:member-sms-provider-errors
+          pnpm --filter @ai-job-print/api verify:miniapp-cloud-print-m2
+          pnpm --filter @ai-job-print/api verify:sms-provider
+          pnpm --filter @ai-job-print/api verify:sms-send
+          pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-real-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-governance-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-launch-events
+          pnpm --filter @ai-job-print/api verify:toolbox-micro-app-platform
+          pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance
+          pnpm --filter @ai-job-print/api verify:toolbox-review-workflow
+          # ── GATE-WIRE 接线（#647 修好的漂移门禁，第二批）──────────────
+          # 这 5 条都 import services/api/src（src 引用数 1 / 3 / 1 / 11 / 4），
+          # 会传递依赖到 Prisma 客户端，因此必须留在本步（「Prepare fresh
+          # SQLite db」之后）。放进上面的静态步会报
+          # Cannot find module '../generated/prisma/client'。
+          pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-intents
+          pnpm --filter @ai-job-print/api verify:legacy-pending-print-task-disposition
+          pnpm --filter @ai-job-print/api verify:resume-voice-generate
+          # 无 target 时脚本会拒绝对共享 dev.db 动手；isolated 让它自建隔离库。
+          INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-auth-phone
+          # 进程内 NestFactory 起 AppModule 并监听 3097（无需外部 API 服务），
+          # 但会员会话与 BullMQ 需要**真实** Redis —— 本 job 的 redis:7-alpine
+          # service 提供。同形状的 verify:member-assets-c2d 已在本步长期绿。
+          pnpm --filter @ai-job-print/api verify:job-favorites-http
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
@@ -600,6 +702,9 @@ jobs:
           node -r @swc-node/register prisma/seed-fairs.ts
       - name: Core verify suites on PG
         run: |
+          # 与 SQLite job 同源的静态门禁：P39 迁移保真不依赖数据库形态，
+          # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
+          pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
@@ -626,6 +731,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:backend-p0-http
           RECRUITMENT_CONTENT_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-content-http
           pnpm --filter @ai-job-print/api verify:job-sync
+          pnpm --filter @ai-job-print/api verify:job-requirement-stats
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
@@ -642,6 +748,11 @@ jobs:
           # 启动韧性（PG 侧同样跑一遍：硬依赖=数据库、软依赖=Redis 的启动语义
           # 必须在 PostgreSQL 上也成立）。会拉起真实 src/main.ts 与临时 redis-server。
           pnpm --filter @ai-job-print/api verify:boot-resilience
+          # 三道门禁在 PG 侧同样跑一遍：鉴权回源真源、异常日志、订单筛选
+          # 都直接依赖数据库行为，SQLite 通过不等于 PostgreSQL 通过。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          pnpm --filter @ai-job-print/api verify:error-observability
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials

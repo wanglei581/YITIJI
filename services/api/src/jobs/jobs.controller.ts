@@ -5,6 +5,7 @@
 //
 // Kiosk（公开）:
 //   GET  /jobs                          — 已发布岗位列表
+//   GET  /jobs/requirement-stats        — 岗位要求计数表（确定性聚合，不调 AI，证据 E2）
 //   GET  /jobs/:id                      — 已发布岗位详情
 //   GET  /job-fairs                     — 已发布招聘会列表
 //   GET  /job-fairs/:id                 — 已发布招聘会详情
@@ -61,6 +62,7 @@ import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dt
 import { CreateDataSourceDto } from './dto/data-source.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
 import { FairCompanyPrintService } from './fair-company-print.service'
+import { JobRequirementStatsService } from './job-requirement-stats.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
@@ -88,6 +90,7 @@ export class JobsController {
     private readonly adminFairs: AdminFairsService,
     private readonly jobQuality: JobQualityService,
     private readonly fairCompanyPrint: FairCompanyPrintService,
+    private readonly jobRequirementStats: JobRequirementStatsService,
   ) {}
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
@@ -110,6 +113,27 @@ export class JobsController {
     const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
     return this.jobsService.getPublishedJobs({
       keyword, city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
+    })
+  }
+
+  /**
+   * 岗位要求计数表（AI 不可用时的确定性降级来源，证据分级 E2）。
+   *
+   * 必须声明在 `jobs/:id` **之前** —— Nest 按声明顺序匹配，放在后面会被 :id 吃掉。
+   * 无鉴权：与 GET /jobs 同为已审核已发布岗位的公开只读聚合，且不返回任何岗位标识。
+   */
+  @Get('jobs/requirement-stats')
+  getJobRequirementStats(
+    @Query('keyword')     keyword?:     string,
+    @Query('city')        city?:        string,
+    @Query('industry')    industry?:    string,
+    @Query('category')    category?:    string,
+    @Query('workType')    workType?:    string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+  ) {
+    const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
+    return this.jobRequirementStats.getStats({
+      keyword, city, industry, category: effectiveCategory, sourceOrgId,
     })
   }
 
