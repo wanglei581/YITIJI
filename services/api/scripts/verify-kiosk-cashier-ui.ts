@@ -50,6 +50,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { buildRealPdf } from './support/minimal-pdf'
 
 const SANDBOX_SECRET = 'verify-cashier-sandbox-secret-0001'
 const OLD_DATE = new Date('2020-01-01T00:00:00.000Z')
@@ -111,7 +112,7 @@ async function main(): Promise<void> {
     seq += 1
     const fileId = `f_cashier_${suffix}_${label}_${seq}`
     const storageKey = `verify/kiosk-cashier/${fileId}.pdf`
-    const pdfBytes = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(pages)}%%EOF\n`)
+    const pdfBytes = buildRealPdf(pages)
     await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {

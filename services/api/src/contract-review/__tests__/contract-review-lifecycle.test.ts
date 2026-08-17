@@ -484,6 +484,7 @@ function taskRow(overrides: Partial<ContractReviewTaskRow> = {}): ContractReview
     resultJson: null,
     extractionFingerprint: null,
     confirmedAt: null,
+    errorCode: null,
     ...overrides,
   }
 }

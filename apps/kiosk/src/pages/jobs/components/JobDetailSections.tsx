@@ -18,6 +18,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { SourceUrlQr } from '../../../components/SourceUrlQr'
+import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, formatFullDate, jobCompleteness, splitTextLines } from '../utils/jobDisplay'
 
@@ -235,16 +236,22 @@ export function JobNextActionsSection({
       <div className="jf-qr-panel">
         <div className="qr-title">扫码投递</div>
         <SourceUrlQr value={job.sourceUrl} size={170} />
-        <div className="qr-sub">手机扫码打开来源平台投递页，投递结果以来源平台为准</div>
-          <button
-            type="button"
-            disabled={!sourceCanApply}
-            onClick={onOpenQr}
+        <div className="qr-sub">
+          手机扫码打开来源平台投递页，投递结果以来源平台为准
+          {sourceCanApply ? null : (
+            <b id="job-qr-blocked" className="jf-blocked-reason">{SOURCE_APPLY_UNAVAILABLE_REASON}</b>
+          )}
+        </div>
+        <button
+          type="button"
           className="jf-btn ghost sm"
-          >
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'job-qr-blocked'}
+          onClick={onOpenQr}
+        >
           <QrCodeIcon aria-hidden="true" />
-            放大二维码
-          </button>
+          放大二维码
+        </button>
       </div>
     </div>
   )
@@ -289,12 +296,33 @@ export function StickyActionBar({
 }) {
   return (
     <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
+      {/* 能力门禁用 aria-disabled + 常显原因，不用原生 disabled（触屏无 hover，
+          原生 disabled 还会让读屏跳过按钮、读不到原因）。真正的放行由上层
+          onOpenSource / onOpenQr 内部的 `if (!sourceCanApply) return` 兜底。 */}
+      {sourceCanApply ? null : (
+        <p id="job-sticky-apply-blocked" className="mb-2 text-center text-sm text-neutral-500">
+          {SOURCE_APPLY_UNAVAILABLE_REASON}
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button size="lg" className="flex items-center gap-2" disabled={!sourceCanApply} onClick={onOpenSource}>
+        <Button
+          size="lg"
+          className={`flex items-center gap-2${sourceCanApply ? '' : ' cursor-not-allowed opacity-50'}`}
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'job-sticky-apply-blocked'}
+          onClick={onOpenSource}
+        >
           <ExternalLinkIcon className="h-4 w-4" />
           去来源平台投递
         </Button>
-        <Button size="lg" variant="secondary" className="flex items-center gap-2" disabled={!sourceCanApply} onClick={onOpenQr}>
+        <Button
+          size="lg"
+          variant="secondary"
+          className={`flex items-center gap-2${sourceCanApply ? '' : ' cursor-not-allowed opacity-50'}`}
+          aria-disabled={!sourceCanApply || undefined}
+          aria-describedby={sourceCanApply ? undefined : 'job-sticky-apply-blocked'}
+          onClick={onOpenQr}
+        >
           <QrCodeIcon className="h-4 w-4" />
           扫码投递
         </Button>

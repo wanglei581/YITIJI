@@ -14,6 +14,7 @@ import {
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
@@ -246,13 +247,36 @@ export function JobDetailPage() {
       badge={<FusionBadge icon={ExternalLinkIcon}>线上招聘平台来源</FusionBadge>}
       actionBar={
         <>
-          <span className="jf-action-note">投递在来源平台完成，本终端不接收简历、不参与招聘流程</span>
+          <span className="jf-action-note">
+            投递在来源平台完成，本终端不接收简历、不参与招聘流程
+            {sourceCanApply ? null : (
+              <b id="job-detail-apply-blocked" className="jf-blocked-reason">
+                {SOURCE_APPLY_UNAVAILABLE_REASON}
+              </b>
+            )}
+          </span>
           <div className="jf-spacer" />
-          <button type="button" className="jf-btn dark" disabled={!sourceCanApply} onClick={openSourceQr}>
+          {/* 能力门禁置灰：aria-disabled 而不是原生 disabled —— 原生 disabled 会把按钮
+              踢出 Tab 序列、读屏直接跳过，旁边那句原因就永远不会被念出来。
+              放行由 openSourceQr / openSourcePlatform 自身的 `if (!sourceCanApply) return`
+              兜底，置灰不是靠属性拦的，点了也不会真的跳出去。 */}
+          <button
+            type="button"
+            className="jf-btn dark"
+            aria-disabled={!sourceCanApply || undefined}
+            aria-describedby={sourceCanApply ? undefined : 'job-detail-apply-blocked'}
+            onClick={openSourceQr}
+          >
             <QrCodeIcon aria-hidden="true" />
             扫码投递
           </button>
-          <button type="button" className="jf-btn primary" disabled={!sourceCanApply} onClick={openSourcePlatform}>
+          <button
+            type="button"
+            className="jf-btn primary"
+            aria-disabled={!sourceCanApply || undefined}
+            aria-describedby={sourceCanApply ? undefined : 'job-detail-apply-blocked'}
+            onClick={openSourcePlatform}
+          >
             <ExternalLinkIcon aria-hidden="true" />
             去来源平台投递
           </button>
@@ -291,7 +315,12 @@ export function JobDetailPage() {
         onViewCompany={viewCompany}
         onExplainAi={() => void startExplain()}
         onMatchAi={() => void startMatch()}
-        onPrint={() => navigate('/print/upload', { state: { source: 'job_detail', jobId: currentJob.id, jobTitle: currentJob.title } })}
+        // 这里原来传 `state: { source:'job_detail', jobId, jobTitle }`，三个都没人读：
+        // `/print/upload` 的 source 取自 **query**（`searchParams.get('source')`）而不是 state，
+        // 且取值只认 'resume' | 'document'，'job_detail' 不是合法值；jobId / jobTitle
+        // 在整个打印链路里没有任何消费点。传了不用会让人以为岗位上下文已经带过去了，
+        // 实际落到的一直是默认的「文档打印」。改成如实不传。
+        onPrint={() => navigate('/print/upload')}
       />
       {(aiLoading || aiError || explanation || matchResult) && (
         <JobAiResultPanel

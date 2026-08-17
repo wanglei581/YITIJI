@@ -10,7 +10,11 @@ export type HomeJobFairHighlightState =
   | { status: 'error'; fair: null }
 
 function eligibleFair(fair: ExternalJobFairDTO, now: number): boolean {
-  if (fair.reviewStatus !== 'approved' || fair.publishStatus !== 'published') return false
+  // 审核/发布闸门由服务端把守:/job-fairs 只返回 approved + published。
+  // 公开列表 DTO 因此「刻意不下发」reviewStatus / publishStatus。
+  // 早前这里还额外比对这两个字段,真实接口下它们恒为 undefined,
+  // 于是每一条都被判不合格 —— 首页永远显示「暂无进行中或即将开始的招聘会」,
+  // 而库里明明有几十场在办。mock 数据带这两个字段,所以只在接真后才暴露。
   if (fair.status !== 'ongoing' && fair.status !== 'upcoming') return false
 
   const endTime = Date.parse(fair.endTime)

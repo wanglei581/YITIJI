@@ -51,6 +51,8 @@ const TASK_SELECT = {
   resultJson: true,
   extractionFingerprint: true,
   confirmedAt: true,
+  // 失败原因要能回到客户端：不取这一列，视图层就只能继续回「未说明原因」。
+  errorCode: true,
 } as const
 
 @Injectable()
@@ -201,10 +203,12 @@ export class ContractReviewLifecycleService {
 
   private async loadTask(id: string): Promise<ContractReviewTaskRow | null> {
     if (typeof id !== 'string' || id.length === 0 || id.length > 128) return null
+    // 不加 `as Promise<…>` 断言：那会抹掉 Prisma 对窄化 select 的推导，
+    // TASK_SELECT 少取一列时类型检查将完全失声（#668 的 errorCode 就差点这样丢掉）。
     return this.prisma.contractReviewTask.findUnique({
       where: { id },
       select: TASK_SELECT,
-    }) as Promise<ContractReviewTaskRow | null>
+    })
   }
 
   private assertConfirmation(

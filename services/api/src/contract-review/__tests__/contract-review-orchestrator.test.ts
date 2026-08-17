@@ -466,3 +466,58 @@ test('stage-two fingerprint rejects mode and page-count drift even when bytes ma
     assert.equal(current.calls.provider, 0)
   }
 })
+
+// ============================================================
+// A. 可观测性：模型之前抛出的机器码不再被折叠成兜底码
+//
+// 修复前 safeStageError 的放行名单只有 CONTRACT_PROVIDER_*，于是**任何**
+// 在模型之前抛出的裸 Error（PII 遮盖、规范化文本、事实合并、规则映射……）
+// 都变成 CONTRACT_REVIEW_ANALYSIS_FAILED。2026-08-17 生产上看到的正是这个
+// 兜底码：它只说明「analyze 在模型前挂了」，不说明挂在哪一条路径上。
+//
+// 这两条测试锁的是「码能穿透」这个性质本身，不预设哪条路径是当前的生产 cause。
+// ============================================================
+
+test('machine codes thrown before the model survive instead of collapsing into the fallback', async () => {
+  // 真实路径：analyze() 里 maskContractPages 对残留 PII 抛裸 Error。
+  const extracted = extraction({
+    pages: [{ pageNumber: 1, text: '银行卡 abc-def', source: 'text_layer', ocrConfidence: null }],
+  })
+  const current = harness(task({
+    status: 'rule_checking', confirmedAt: now,
+    extractionFingerprint: createContractReviewExtractionFingerprint('file-1', extracted, 'contract-review-v1'),
+  }), extracted)
+
+  await assert.rejects(() => current.service.analyze('task-1'), /CONTRACT_PII_MASK_INCOMPLETE/)
+  assert.equal(current.prisma.current.status, 'failed')
+  assert.equal(current.prisma.current.errorCode, 'CONTRACT_PII_MASK_INCOMPLETE')
+  // 遮盖在模型之前，所以一次模型调用都不该发生（生产上失败任务只耗时几百毫秒，
+  // 而真实模型调用要几十秒 —— 这条断言把那个观察固化下来）。
+  assert.equal(current.calls.provider, 0)
+})
+
+test('other pre-model machine codes survive too, and free-text errors still collapse safely', async () => {
+  const extracted = extraction()
+  const fingerprint = createContractReviewExtractionFingerprint('file-1', extracted, 'contract-review-v1')
+  const analyzing = () => task({
+    status: 'rule_checking', confirmedAt: now, extractionFingerprint: fingerprint,
+  })
+
+  // 事实合并抛机器码 —— 与 PII 同样是「模型之前的裸 Error」，同样必须穿透。
+  const machine = harness(analyzing(), extracted)
+  ;(machine.service as unknown as { factMerger: { merge(): never } }).factMerger = {
+    merge() { throw new Error('CONTRACT_REVIEW_FACT_INPUT_INVALID') },
+  }
+  await assert.rejects(() => machine.service.analyze('task-1'), /CONTRACT_REVIEW_FACT_INPUT_INVALID/)
+  assert.equal(machine.prisma.current.errorCode, 'CONTRACT_REVIEW_FACT_INPUT_INVALID')
+
+  // 自由文本错误必须继续被折叠，且原文不得落进任何一次写库
+  // —— 这个模块处理的是劳动合同全文（CLAUDE.md §11）。
+  const freeText = harness(analyzing(), extracted)
+  ;(freeText.service as unknown as { factMerger: { merge(): never } }).factMerger = {
+    merge() { throw new Error('乙方张三 身份证 370101199001011234 解析失败') },
+  }
+  await assert.rejects(() => freeText.service.analyze('task-1'), /CONTRACT_REVIEW_ANALYSIS_FAILED/)
+  assert.equal(freeText.prisma.current.errorCode, 'CONTRACT_REVIEW_ANALYSIS_FAILED')
+  assert.doesNotMatch(JSON.stringify(freeText.prisma.writes), /张三|370101199001011234/u)
+})

@@ -133,23 +133,32 @@ const legacyHexAllowlist = new Set([
   'src/styles/prototype-v1.css',
   'src/styles/warm-professional-override.css',
 ])
-let nakedHex = 0
+// 判定只看 allowlist 之外的文件，报错证据必须跟判定同源：
+// 早先这里的 offenders 样例是不过滤 allowlist 直接收集的，于是 2 处真违规会
+// 报成「总计 146」并举冻结债务文件当例子，把人指向根本不需要动的文件。
+let frozenHex = 0
 const offenders = []
 const unexpectedHexFiles = new Set()
 for (const file of pageCssFiles) {
   const text = readFileSync(file, 'utf8')
+  const rel = relative(kioskRoot, file)
+  const frozen = legacyHexAllowlist.has(rel)
   for (const match of text.matchAll(hexRe)) {
     const look = text.slice(Math.max(0, match.index - 40), match.index)
     if (/var\([^)]*,\s*$/.test(look)) continue
-    nakedHex += 1
-    const rel = relative(kioskRoot, file)
-    if (!legacyHexAllowlist.has(rel)) unexpectedHexFiles.add(rel)
+    if (frozen) {
+      frozenHex += 1
+      continue
+    }
+    unexpectedHexFiles.add(rel)
     if (offenders.length < 8) offenders.push(`${rel}:${match[0]}`)
   }
 }
 expect(
   unexpectedHexFiles.size === 0,
-  `V6/新增页面 CSS 无裸 hex；历史债务仅限冻结 allowlist（总计 ${nakedHex}${offenders.length ? `；例 ${offenders.join(', ')}` : ''}）`
+  `V6/新增页面 CSS 无裸 hex（待清退 ${offenders.length} 处 / ${unexpectedHexFiles.size} 文件${
+    offenders.length ? `：${offenders.join(', ')}` : ''
+  }；另有 ${frozenHex} 处冻结历史债务不计入判定）`
 )
 
 // token 定义文件必须继续持有原型色真值

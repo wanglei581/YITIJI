@@ -107,7 +107,9 @@ export async function print(
 
     let tempPdfPath: string | undefined
     try {
-      tempPdfPath = await imageToPdf(filePath)
+      // scale 必须在生成 PDF 时就生效：图片一旦铺满 A4 烘进 PDF，
+      // SumatraPDF 的 noscale 只会 100% 打印那张已被放大的页。
+      tempPdfPath = await imageToPdf(filePath, params?.scale === 'actual' ? 'actual' : 'fit')
       return await printWithPdfToPrinter(tempPdfPath, printerName, params)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)

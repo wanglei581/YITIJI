@@ -13,6 +13,9 @@ import {
   POLICY_ELIGIBILITY_PRIVACY_NOTICE,
   POLICY_ELIGIBILITY_QUESTIONS,
   POLICY_ELIGIBILITY_QUESTION_SET_VERSION,
+  POLICY_RULE_MANUAL_MODE,
+  isManualRuleMode,
+  type PolicyEligibilityCheckItem,
   type PolicyEligibilityCheckResult,
   type PolicyEligibilityClause,
   type PolicyEligibilityRuleInput,
@@ -111,20 +114,7 @@ export class PolicyEligibilityService {
       include: { eligibilityRules: { orderBy: { orderIndex: 'asc' } } },
     })) as unknown as PolicyRowForCheck[]
 
-    const items = rows.map((row) =>
-      evaluatePolicy(
-        {
-          id: row.id,
-          title: row.title,
-          kind: row.kind,
-          audience: row.audience,
-          category: row.category,
-          source: this.toSourceRef(row),
-        },
-        row.eligibilityRules.map((r) => this.toRuleRecord(r)),
-        answers,
-      ),
-    )
+    const items = rows.map((row) => this.evaluateRow(row, answers))
 
     // 只打条数，不打任何作答内容
     this.logger.log(
@@ -134,6 +124,70 @@ export class PolicyEligibilityService {
     )
 
     return buildCheckResult(items, answers, ignoredQuestionKeys, new Date())
+  }
+
+  /**
+   * 录入面「试算」：拿一组假想作答，看这条政策会被判成什么。
+   *
+   * ⚠️ 这里**没有**第二套判定逻辑。preview 与 checkEligibility 都只经
+   * `this.evaluateRow()` 这一条路（verify:policy-eligibility-authoring 的
+   * 静态 + 运行时双重断言守着）。理由：录入面若自己在前端或服务端另算一遍，
+   * 运营看到的「绿灯」和用户实际拿到的结论就可能不一致 —— 那比没有预览更糟。
+   *
+   * 与公开核对的唯一差别是**取数门槛**：预览按机构取本机构的政策，
+   * 不要求 approved+published（草稿状态下正要试算），公开核对则只取
+   * approved+published。判定本身一模一样。
+   *
+   * 隐私同口径：不写任何表、不落 AuditLog、日志不打作答。
+   */
+  async previewPartnerRules(
+    policyId: string,
+    input: { answers?: Record<string, unknown> },
+    user: AuthedUser,
+  ): Promise<PolicyEligibilityCheckResult> {
+    const row = (await this.prisma.policyPost.findUnique({
+      where: { id: policyId },
+      include: { eligibilityRules: { orderBy: { orderIndex: 'asc' } } },
+    })) as unknown as PolicyRowForCheck | null
+
+    if (!row || !user.orgId || row.sourceOrgId !== user.orgId) {
+      throw new NotFoundException({
+        error: { code: 'POLICY_NOT_FOUND', message: `Policy ${policyId} not found` },
+      })
+    }
+
+    const { answers, ignoredQuestionKeys } = sanitizeAnswers(input.answers ?? {})
+    const item = this.evaluateRow(row, answers)
+
+    this.logger.log(
+      `previewPartnerRules: policy=1 rules=${item.summary.total} answered=${
+        Object.keys(answers).length
+      } ignored=${ignoredQuestionKeys.length}`,
+    )
+
+    return buildCheckResult([item], answers, ignoredQuestionKeys, new Date())
+  }
+
+  /**
+   * 唯一的判定入口。公开核对与录入面预览都必须经这里 ——
+   * 谁再写第二条判定路径，预览就不再等于真实判定。
+   */
+  private evaluateRow(
+    row: PolicyRowForCheck,
+    answers: Readonly<Record<string, string>>,
+  ): PolicyEligibilityCheckItem {
+    return evaluatePolicy(
+      {
+        id: row.id,
+        title: row.title,
+        kind: row.kind,
+        audience: row.audience,
+        category: row.category,
+        source: this.toSourceRef(row),
+      },
+      row.eligibilityRules.map((r) => this.toRuleRecord(r)),
+      answers,
+    )
   }
 
   // ── 3. 条件读写 ───────────────────────────────────────────────────────────
@@ -249,6 +303,18 @@ export class PolicyEligibilityService {
     matchMode: string
     clauses: string
   }): PolicyEligibilityRuleRecord {
+    // 「只能人工核对」不解析子句：它本来就零子句，
+    // 走 parseClauses 会拿到那个恒 unknown 的损坏哨兵，回给录入面反而看不懂。
+    if (isManualRuleMode(row.matchMode)) {
+      return {
+        id: row.id,
+        orderIndex: row.orderIndex,
+        label: row.label,
+        sourceText: row.sourceText,
+        matchMode: POLICY_RULE_MANUAL_MODE,
+        clauses: [],
+      }
+    }
     return {
       id: row.id,
       orderIndex: row.orderIndex,

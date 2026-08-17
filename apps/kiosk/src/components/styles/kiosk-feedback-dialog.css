@@ -1,0 +1,193 @@
+/* ============================================================
+   一体机「反馈问题」弹层样式。
+   触控口径（CLAUDE.md §9）：主要按钮 ≥ 56px，任何可点击区 ≥ 48px。
+   这里的选项块与提交按钮都取 64px 起，留出 27 寸竖屏站立操作的余量。
+   ============================================================ */
+
+.kiosk-fb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.kiosk-fb-section-title {
+  display: block;
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fy-ink);
+}
+
+.kiosk-fb-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.kiosk-fb-option {
+  min-height: 64px;
+  min-width: 48px;
+  padding: 0 26px;
+  border: 2px solid var(--fy-line);
+  border-radius: 14px;
+  background: var(--fy-paper);
+  font-family: var(--fy-sans);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--fy-ink);
+  cursor: pointer;
+  transition: transform .08s ease, border-color .12s ease, background-color .12s ease;
+}
+
+.kiosk-fb-option:active { transform: scale(.97); }
+
+/* 选中态用 aria-pressed 驱动，读屏与视觉同源，不另设 class。 */
+.kiosk-fb-option[aria-pressed="true"] {
+  border-color: var(--fy-teal);
+  background: var(--fy-teal-soft);
+  color: var(--fy-teal-deep);
+}
+
+.kiosk-fb-textarea {
+  width: 100%;
+  min-height: 132px;
+  padding: 14px 16px;
+  border: 2px solid var(--fy-line);
+  border-radius: 14px;
+  background: var(--fy-paper);
+  font-family: var(--fy-sans);
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--fy-ink);
+  resize: none;
+}
+
+.kiosk-fb-textarea:focus {
+  outline: none;
+  border-color: var(--fy-teal);
+}
+
+.kiosk-fb-textarea:disabled {
+  background: var(--fy-surface);
+  color: var(--fy-muted);
+}
+
+.kiosk-fb-hint {
+  margin: 10px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--fy-muted);
+}
+
+.kiosk-fb-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--fy-error);
+  border-radius: 14px;
+  background: var(--fy-error-soft);
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--fy-error);
+}
+
+.kiosk-fb-error svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+}
+
+/* ── 动作按钮 ── */
+
+.kiosk-fb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 34px;
+  border-radius: 14px;
+  border: none;
+  font-family: var(--fy-sans);
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .08s ease;
+}
+
+.kiosk-fb-btn:active { transform: scale(.98); }
+
+.kiosk-fb-btn svg { width: 22px; height: 22px; }
+
+.kiosk-fb-btn-ghost {
+  background: var(--fy-surface);
+  border: 1px solid var(--fy-line);
+  color: var(--fy-ink);
+}
+
+.kiosk-fb-btn-primary {
+  background: var(--fy-teal);
+  color: var(--fy-surface);
+}
+
+.kiosk-fb-btn-primary:disabled {
+  background: var(--fy-line);
+  color: var(--fy-muted);
+  cursor: not-allowed;
+}
+
+/* ── 提交回执 ── */
+
+.kiosk-fb-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.kiosk-fb-result-icon {
+  width: 62px;
+  height: 62px;
+  color: var(--fy-teal);
+}
+
+.kiosk-fb-result-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--fy-ink);
+}
+
+.kiosk-fb-result-note {
+  margin: 0;
+  max-width: 42em;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--fy-muted);
+}
+
+.kiosk-fb-ticket {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px;
+  border: 1px dashed var(--fy-line);
+  border-radius: 14px;
+  background: var(--fy-surface);
+}
+
+.kiosk-fb-ticket-label {
+  font-size: 16px;
+  color: var(--fy-muted);
+}
+
+.kiosk-fb-ticket-code {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--fy-ink);
+}

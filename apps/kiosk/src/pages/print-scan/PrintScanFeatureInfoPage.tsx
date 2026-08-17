@@ -163,7 +163,9 @@ export function PrintScanFeatureInfoPage() {
               </span>
               <span>
                 <b className="block text-xl font-bold">{info.fallbackLabel ?? '先用照片打印'}</b>
-                <span className="mt-1 block text-base text-neutral-500">已有排好版的证件照图片，可直接上传打印</span>
+                {/* 默认「适合页面」会把图片等比放大铺满 A4；要保住用户已排好的
+                    尺寸，必须在打印参数里选「实际大小」。文案直说，不藏这一步。 */}
+                <span className="mt-1 block text-base text-neutral-500">已有排好版的证件照图片，可直接上传；在打印参数里选「实际大小」按原尺寸出图，选「适合页面」会放大铺满 A4</span>
               </span>
             </button>
           </section>

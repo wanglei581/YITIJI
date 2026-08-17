@@ -136,6 +136,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:jobfair-checkin
           pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
           pnpm --filter @ai-job-print/kiosk verify:visible-actions-truth
+          # KIOSK-DEBT 三处前端欠账（同意版本 / 跨页上下文 / 禁用原因）。
+          # 纯读 apps/kiosk 源码，不连库、不起服务，两个 job 都能跑。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -243,6 +246,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-prototype-v1
           pnpm --filter @ai-job-print/kiosk verify:member-login-dialog
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
+          # 麦克风能力探测必须测设备而非 API；纯静态读源码，不碰硬件。
+          pnpm --filter @ai-job-print/kiosk verify:mic-capability-truth
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-ai-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume
@@ -277,6 +282,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm exec ts-node scripts/verify-print-monitor-truth.ts
+          # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
+          pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
@@ -340,7 +347,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:file-display-truth
           pnpm --filter @ai-job-print/kiosk verify:scan-input-safety
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
           pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:contract-review-session
           pnpm --filter @ai-job-print/kiosk verify:contract-review-report-print
@@ -414,6 +423,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
+          # 合同审查超时口径：模型超时必须随合同页数伸缩（不得回到 30 秒硬上限），
+          # 服务端三层时限的包含链要恒成立、且与小程序预估口径同源；
+          # 失败原因必须对用户可读，日志必须有底层错误类型但没有合同正文。
+          # 纯进程内（不连库、不连 Redis、fetch 走替身），两个 job 都能跑。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:trust-proxy
           pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
@@ -426,6 +440,7 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
+          pnpm --filter @ai-job-print/api verify:file-display-truth
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-status-idempotency
@@ -478,6 +493,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:jobfair-campus-priority
+          pnpm --filter @ai-job-print/api verify:fair-list-integrity
           pnpm --filter @ai-job-print/api verify:public-fair-demo-guard
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:fair-info-fields
@@ -531,10 +547,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
+          pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -705,6 +723,10 @@ jobs:
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/api verify:contract-review:schema
+          # 与 SQLite job 同源：合同审查超时口径是纯静态/进程内断言，
+          # 不依赖数据库形态，但它守的是「长合同不得被 30 秒 abort」这条
+          # 生产故障，两个 job 都必须挡住。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-layout-export
@@ -714,14 +736,29 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
           pnpm --filter @ai-job-print/api verify:llm-input-pii-mask
+          # 文件呈现真值门禁（页数识别 / A4 DPI 估算 / 上限文案）：计费页数走
+          # PrintPageCountService，两个 job 都必须跑——PDF 解析回归会直接影响收费页数。
+          pnpm --filter @ai-job-print/api verify:file-display-truth
+          pnpm --filter @ai-job-print/kiosk verify:file-display-truth
+          # 简历提取诚实性门禁（REAL-FILE-RESUME 走查）：
+          #   verify:resume-extraction 断言「有文字层但过短」不得被说成扫描件；
+          #   verify-real-resume-diagnosis 断言截断必须如实告知（不限 OCR 来源）。
+          # 两条都涉及用户可见文案的真实性，与 PII 遮盖同理，两个 job 都要跑。
+          pnpm --filter @ai-job-print/api verify:resume-extraction
+          pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:ai-user-text-retention
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
+          # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
+          # SQLite 与 PostgreSQL 的日期比较、contains 语义不完全一致，PG 侧必须独立回归。
+          pnpm --filter @ai-job-print/api verify:fair-list-integrity
+          pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:bulk-publish
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
@@ -790,6 +827,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
+          # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，
+          # 放这里是为了两个 job 都拦得住（同 #635 对 self-assessment 门禁的处置）。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
@@ -840,6 +880,9 @@ jobs:
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
 
+      - name: Verify Kiosk feedback entry gate
+        run: pnpm --filter @ai-job-print/kiosk verify:kiosk-feedback-entry
+
       - name: Run Kiosk browser smoke
         run: |
           pnpm --filter @ai-job-print/kiosk test:browser:smoke
@@ -853,6 +896,11 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
           pnpm --filter @ai-job-print/kiosk test:browser:scan-safety
+          pnpm --filter @ai-job-print/kiosk test:browser:mic-capability
+          # test:browser:truth 此前在 apps/kiosk/package.json 里有定义，却没有任何 CI job
+          # 引用它 —— 打印完成页「不得伪造已出纸」和匿名反馈入口的断言全在这一套里，
+          # 长期处于「写了但从不运行」的状态。挂进来，否则它守不住任何东西。
+          pnpm --filter @ai-job-print/kiosk test:browser:truth
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -877,5 +925,7 @@ jobs:
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
             test-results/kiosk-scan-safety/**
+            test-results/kiosk-mic-capability/**
+            test-results/kiosk-mic-capability-report/**
           if-no-files-found: ignore
           retention-days: 7

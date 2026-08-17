@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
+import { COMPANY_NO_OPEN_JOBS_REASON } from '../../lib/capabilityReasons'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
@@ -147,14 +148,23 @@ function CompanyCard({ company, onDetail, onJobs }: {
       <div className="flex shrink-0 flex-col items-center gap-1">
         <div className="text-[30px] font-bold text-[var(--kp-accent-deep)] tabular-nums">{company.openJobCount}</div>
         <div className="mt-[-4px] text-base text-[var(--kp-muted)]">在招岗位</div>
+        {/* 能力门禁：确实没有在招岗位。旁边虽然有个「0 / 在招岗位」计数，但那不是
+            解释，读屏也不会把它和按钮关联；原生 disabled 还会让按钮掉出 Tab 序列。
+            改 aria-disabled + 常显原因 + aria-describedby，点击在 onClick 里短路。 */}
         <button
           type="button"
-          onClick={onJobs}
-          disabled={company.openJobCount === 0}
-          className="mt-1 min-h-[48px] rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[17px] font-bold text-[var(--kp-accent-deep)] disabled:opacity-45"
+          onClick={() => { if (company.openJobCount > 0) onJobs() }}
+          aria-disabled={company.openJobCount === 0 || undefined}
+          aria-describedby={company.openJobCount === 0 ? `company-no-jobs-${company.id}` : undefined}
+          className={`mt-1 min-h-[48px] rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[17px] font-bold text-[var(--kp-accent-deep)]${company.openJobCount === 0 ? ' cursor-not-allowed opacity-45' : ''}`}
         >
           查看在招岗位
         </button>
+        {company.openJobCount === 0 ? (
+          <span id={`company-no-jobs-${company.id}`} className="max-w-[9rem] text-center text-xs text-[var(--kp-muted)]">
+            {COMPANY_NO_OPEN_JOBS_REASON}
+          </span>
+        ) : null}
       </div>
       <ChevronRightIcon className="h-6 w-6 shrink-0 text-[var(--kp-muted)] opacity-60" aria-hidden="true" />
     </article>

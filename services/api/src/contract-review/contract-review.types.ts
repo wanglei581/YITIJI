@@ -136,6 +136,15 @@ export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   resultJson: string | null
   extractionFingerprint: string | null
   confirmedAt: Date | null
+  /**
+   * 失败时服务端写入的机器码；对外经白名单转成可读文案（见 failureReason）。
+   *
+   * **必填**（不是 `?:`）。写成可选时，`TASK_SELECT` 里一旦漏掉 `errorCode: true`，
+   * 类型检查也不会报错 —— 失败原因就会静默退回「未说明原因」，
+   * 而这正是本类型存在的意义。配合 loadTask 去掉 `as` 断言，
+   * Prisma 的窄化 select 现在能真正把这个字段的缺失顶回来。
+   */
+  errorCode: string | null
 }
 
 export interface ContractReviewReportView {
@@ -164,5 +173,14 @@ export interface ContractReviewTaskView {
     completedPages: number
     totalPages: number | null
   }
+  /**
+   * 服务端按页数算出的预计耗时（秒），与服务端自己的超时预算同源。
+   * 客户端据此展示等待预期，不必再复刻公式。
+   */
+  estimatedSeconds: number
+  /** 仅 status='failed' 时非空：白名单内的失败机器码，否则 null。 */
+  failureCode: string | null
+  /** 仅 status='failed' 时非空：可直接展示给用户的失败原因。 */
+  failureReason: string | null
   result: ContractReviewResult | null
 }

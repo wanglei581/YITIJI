@@ -24,6 +24,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from '../src/ai/resume/llm-career-plan.service'
 import { CareerPlanService } from '../src/ai/resume/career-plan.service'
 import { CareerPlanPdfService } from '../src/ai/resume/career-plan-pdf.service'
+import { CareerPlanDegradedPdfService } from '../src/ai/resume/career-plan-degraded-pdf.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { AiLogService } from '../src/ai/ai-log.service'
 
@@ -108,7 +109,12 @@ async function main() {
       signedUrl: 'http://localhost/test', signedUrlExpiresAt: new Date(Date.now() + 600_000).toISOString(),
     }),
   }
-  const svc = new CareerPlanService(prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog)
+  // 第 8 位是降级版式（AI 不可用时出纸）。本脚本只覆盖有 AI plan 的正常路径，
+  // 降级路径的门禁在 verify-career-plan-degraded.ts；这里如实注入，不留 undefined。
+  const svc = new CareerPlanService(
+    prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog,
+    new CareerPlanDegradedPdfService(),
+  )
   const assets = new MemberAssetsService(prisma)
 
   const suffix = Date.now().toString(36)

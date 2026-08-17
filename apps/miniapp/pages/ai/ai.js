@@ -15,7 +15,7 @@ Page({
       { id: 'print',     icon: 'printer', title: '打印服务', desc: '选本人文档、终端与打印参数' },
       { id: 'documents', icon: 'folder',  title: '我的文档', desc: '管理材料并再次发起打印' },
       { id: 'usb',       icon: 'printer', title: 'U盘打印指引', desc: '查看现场导入与打印步骤' },
-      { id: 'orders',    icon: 'history', title: '打印订单', desc: '查看取件码与出纸状态' },
+      { id: 'orders',    icon: 'history', title: '打印订单', desc: '查看到机码与出纸状态' },
       { id: 'kiosk',     icon: 'scan',    title: '扫码登录一体机', desc: '快速连接现场服务终端' },
     ],
   },

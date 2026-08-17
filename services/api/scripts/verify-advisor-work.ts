@@ -1,6 +1,9 @@
 import 'dotenv/config'
 import 'reflect-metadata'
 import { randomUUID } from 'crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createClient } from '@libsql/client'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -40,8 +43,15 @@ import type { AdvisorArtifactPayload } from '../src/advisor/advisor-artifact.typ
 // 运行：pnpm --filter @ai-job-print/api verify:advisor-work
 // ============================================================
 
-const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-advisor-${randomUUID().slice(0, 8)}.db`
-if (fallbackDbName) process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
+// 回退库建在系统临时目录,不落仓库。
+// 此前建在 ./prisma/ 且从不删除,残留的 verify-advisor-*.db 被 git add -A 顺手提交进版本控制。
+const fallbackDbDir = process.env['DATABASE_URL'] ? null : mkdtempSync(join(tmpdir(), 'verify-advisor-'))
+if (fallbackDbDir) process.env['DATABASE_URL'] = `file:${join(fallbackDbDir, 'verify-advisor.db')}`
+// 挂 exit 而不是 finally:本脚本的 fail() 直接走 process.exit(1),finally 不保证执行,
+// 用例失败时同样要把临时库带走。
+process.on('exit', () => {
+  if (fallbackDbDir) rmSync(fallbackDbDir, { recursive: true, force: true })
+})
 process.env['SECRET_ENCRYPTION_KEY'] ??= 'verify-advisor-secret-key-0123456789abcdef'
 process.env['JWT_SECRET'] ??= 'verify-advisor-jwt-secret-0123456789abcdef'
 process.env['FILE_SIGNING_SECRET'] ??= 'verify-advisor-file-signing-secret-0123456789abcdef'
@@ -118,7 +128,7 @@ const downConfig = {
 
 async function main() {
   console.log('\n=== S3-3 · P26 顾问作业面后端验证 ===')
-  if (fallbackDbName) await initFallbackDb()
+  if (fallbackDbDir) await initFallbackDb()
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()

@@ -47,6 +47,8 @@ import {
   type CapabilitiesLoadResult,
   type ConfiguredCapabilityMap,
 } from '../../services/api/printScanCapabilities'
+import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
+import { PRINT_HUB_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import {
   PRINT_HUB_PRICE_NOTICE,
   arrivalCodeHint,
@@ -232,7 +234,10 @@ const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> 
   not_verified: '待验收，暂未开放',
 }
 
-const QUICK_LINKS: readonly (V6PrintQuickLinkView & { to: string })[] = [
+/** 反馈入口的 key。它不跳路由，而是就地打开匿名反馈弹层（见 handleQuickLink）。 */
+const FEEDBACK_QUICK_LINK_KEY = 'feedback'
+
+const QUICK_LINKS: readonly (V6PrintQuickLinkView & { to?: string })[] = [
   {
     key: 'documents',
     icon: FilesIcon,
@@ -248,11 +253,12 @@ const QUICK_LINKS: readonly (V6PrintQuickLinkView & { to: string })[] = [
     to: '/me/print-orders',
   },
   {
-    key: 'feedback',
+    // 免登录：就地开弹层打匿名端点。旧实现跳 /me/feedback（会员面，必须登录），
+    // 一体机是公共位设备，绝大多数用户没登录，那个入口对他们是死的。
+    key: FEEDBACK_QUICK_LINK_KEY,
     icon: MessageSquareIcon,
-    title: '异常反馈',
-    description: '打印 / 扫描出问题，在这里填单',
-    to: '/me/feedback?category=print',
+    title: '反馈问题',
+    description: '反馈打印或扫描问题，无需登录',
   },
 ]
 
@@ -267,6 +273,7 @@ export function PrintScanHomePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const device = useTerminalDeviceStatus()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [capabilityLoad, setCapabilityLoad] = useState<
     CapabilitiesLoadResult | { status: 'loading'; map: ConfiguredCapabilityMap }
   >({ status: 'loading', map: {} })
@@ -378,8 +385,12 @@ export function PrintScanHomePage() {
   }
 
   const handleQuickLink = (key: string) => {
+    if (key === FEEDBACK_QUICK_LINK_KEY) {
+      setFeedbackOpen(true)
+      return
+    }
     const link = QUICK_LINKS.find((item) => item.key === key)
-    if (link) navigate(link.to)
+    if (link?.to) navigate(link.to)
   }
 
   const signedIn = Boolean(user)
@@ -413,6 +424,12 @@ export function PrintScanHomePage() {
         onCapability={handleCapability}
         onArrivalCode={() => navigate(ARRIVAL_CODE_ENTRY.to)}
         onQuickLink={handleQuickLink}
+      />
+      <KioskFeedbackDialog
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        issueOptions={PRINT_HUB_ISSUE_OPTIONS}
+        description="选择这次遇到的问题，工作人员会核实后现场处理"
       />
     </KioskPageFrame>
   )

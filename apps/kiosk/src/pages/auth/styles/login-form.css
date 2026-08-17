@@ -1,3 +1,6 @@
+/* 换绑 / 登出等原因提示。用户是被动跳到登录页的，必须说清为什么。 */
+.k1-login .k-login-hint { margin-top: 20px; padding: 14px 16px; border: 1px solid var(--sd-color-line); border-left: 4px solid var(--sd-color-primary); border-radius: 12px; background: var(--sd-color-canvas); color: var(--sd-color-text); font-size: 16px; font-weight: 700; line-height: 1.5; }
+
 .k1-login .k-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
 .k1-login .k-tab { min-height: 64px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 14px; color: var(--sd-color-text); background: var(--sd-color-canvas); border: 1px solid var(--sd-color-line); border-radius: 16px; cursor: pointer; font-size: 17px; font-weight: 780; transition: transform 150ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
 .k1-login .k-tab svg { color: var(--sd-color-primary); }

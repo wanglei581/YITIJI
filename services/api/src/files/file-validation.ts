@@ -203,10 +203,15 @@ export function validateUpload(args: {
   const maxBytes =
     args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
   if (args.sizeBytes > maxBytes) {
+    // 文案面向一体机终端用户:说清「多大」「超了多少」「怎么办」。
+    // 原文案「大文件请用直传」是内部实现词——kiosk 前台没有任何叫「直传」的入口,
+    // 用户看到只会卡住(2026-08-17 真实文件走查:16.9MB 图片被拒后无可执行下一步)。
+    const limitMb = Math.round(maxBytes / MB)
+    const actualMb = (args.sizeBytes / MB).toFixed(1)
     return {
       ok: false,
       code: 'FILE_TOO_LARGE',
-      message: `文件超出上限(${Math.round(maxBytes / MB)}MB)${args.mode === 'proxy' ? ',大文件请用直传' : ''}`,
+      message: `文件 ${actualMb}MB，超过单份上限 ${limitMb}MB。请压缩后重试，或分成多份分别上传。`,
     }
   }
 

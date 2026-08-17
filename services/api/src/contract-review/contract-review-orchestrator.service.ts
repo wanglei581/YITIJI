@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { Inject, Injectable, Optional } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
   ContractReviewExtractionService,
@@ -16,6 +16,12 @@ import {
 } from './contract-review-provider.service'
 import { ContractReviewRuleEngine } from './contract-review-rule-engine'
 import { ContractReviewSafetyGate } from './contract-review-safety-gate.service'
+import { formatContractReviewErrorLog } from './contract-review-error-log'
+import {
+  CONTRACT_REVIEW_EXTRACT_BUDGET_MS,
+  CONTRACT_REVIEW_STAGE_MIN_MS,
+  contractReviewAnalyzeBudgetMs,
+} from './contract-review-timing'
 import type { ContractReviewStatus } from './contract-review.types'
 import { assertContractReviewTaskId } from './contract-review.queue'
 import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
@@ -23,7 +29,6 @@ import { AiLogService, aiErrorCodeOf } from '../ai/ai-log.service'
 export const CONTRACT_REVIEW_PROVIDER_RUNTIME = Symbol('CONTRACT_REVIEW_PROVIDER_RUNTIME')
 export const CONTRACT_REVIEW_ORCHESTRATOR_CLOCK = Symbol('CONTRACT_REVIEW_ORCHESTRATOR_CLOCK')
 
-const EXECUTION_BUDGET_MS = 5 * 60 * 1_000
 const FINGERPRINT_VERSION = 'contract-review-extraction-fingerprint-v1'
 const PROCESSING_STATUSES = Object.freeze([
   'queued', 'extracting', 'rule_checking', 'ai_analyzing', 'safety_reviewing',
@@ -50,6 +55,8 @@ interface ContractReviewTaskSnapshot {
   readonly contractType: string
   readonly disclaimerVersion: string
   readonly schemaVersion: string
+  /** 用户在确认页确认过的分析页数；analyze 的时间预算按它伸缩。 */
+  readonly analyzedPages: number
   readonly extractionFingerprint: string | null
   readonly confirmedAt: Date | null
   readonly expiresAt: Date
@@ -60,6 +67,13 @@ const SYSTEM_CLOCK: ContractReviewOrchestratorClock = Object.freeze({ now: () =>
 @Injectable()
 export class ContractReviewOrchestratorService {
   private readonly clock: ContractReviewOrchestratorClock
+  /**
+   * 阶段失败的唯一日志出口。
+   *
+   * 此前本类没有 Logger —— 于是 `grep CONTRACT_REVIEW_*` 零输出是必然的，
+   * 而 2026-08-17 的排查曾把这个零输出误读成「处理器从没接手」。
+   */
+  private readonly logger = new Logger('ContractReview')
 
   constructor(
     private readonly prisma: PrismaService,
@@ -85,7 +99,9 @@ export class ContractReviewOrchestratorService {
     if (!execution || typeof execution.finalAttempt !== 'boolean') {
       throw safeError('CONTRACT_REVIEW_JOB_INVALID')
     }
-    const deadline = this.deadline()
+    // 抽取阶段预算保持原值：这一段在生产上本来就是好的（三条 extract job
+    // 全部有 finishedOn、failedReason 为空），本次不动它。
+    const deadline = this.deadlineAfter(CONTRACT_REVIEW_EXTRACT_BUDGET_MS)
     let processingStarted = false
     try {
       let task = await this.requireTask(taskId)
@@ -133,6 +149,7 @@ export class ContractReviewOrchestratorService {
       })
     } catch (error) {
       const safe = this.safeStageError(error, deadline, 'CONTRACT_REVIEW_EXTRACTION_FAILED')
+      this.logStageFailure(taskId, 'extract', safe.code, error)
       if (processingStarted && execution.finalAttempt) await this.bestEffortFail(taskId, safe.code)
       throw safe
     }
@@ -140,10 +157,15 @@ export class ContractReviewOrchestratorService {
 
   async analyze(taskId: string): Promise<void> {
     assertContractReviewTaskId(taskId)
-    const deadline = this.deadline()
+    // 先用下限起步（此时还没读到任务，不知道页数），拿到任务后按
+    // analyzedPages 放宽 —— 只放宽不收紧，所以中途改写是安全的。
+    // 页数是用户在确认页亲自确认过的那个数，也正是小程序算预计时间用的输入，
+    // 两边口径因此天然一致（见 contract-review-timing.ts）。
+    let deadline = this.deadlineAfter(CONTRACT_REVIEW_STAGE_MIN_MS)
     let processingStarted = false
     try {
       const task = await this.requireTask(taskId)
+      deadline = this.deadlineAfter(contractReviewAnalyzeBudgetMs(task.analyzedPages))
       this.assertWithinTaskLifetime(task, deadline)
       if (task.status === 'ai_analyzing' || task.status === 'safety_reviewing') {
         await this.bestEffortSettleFailedJob(taskId, 'analyze')
@@ -219,8 +241,28 @@ export class ContractReviewOrchestratorService {
       await this.commitResult(taskId, validated, reviewed.identity, extracted)
     } catch (error) {
       const safe = this.safeStageError(error, deadline, 'CONTRACT_REVIEW_ANALYSIS_FAILED')
+      this.logStageFailure(taskId, 'analyze', safe.code, error)
       if (processingStarted) await this.bestEffortFail(taskId, safe.code)
       throw safe
+    }
+  }
+
+  /**
+   * 记一条阶段失败日志。**绝不能影响主流程** —— 日志写不出去也要把
+   * 原来的错误照常抛给 BullMQ，所以整个调用被 try 包住。
+   *
+   * 取材白名单与不记 message 的理由见 contract-review-error-log.ts。
+   */
+  private logStageFailure(
+    taskId: string,
+    stage: 'extract' | 'analyze',
+    safeCode: string,
+    cause: unknown,
+  ): void {
+    try {
+      this.logger.error(formatContractReviewErrorLog({ taskId, stage, safeCode, cause }))
+    } catch {
+      // 可观测性不得反过来制造故障。
     }
   }
 
@@ -418,20 +460,58 @@ export class ContractReviewOrchestratorService {
   }
 
   private safeStageError(error: unknown, deadline: Date, fallback: string): ContractReviewSafeError {
+    // 超时先于 deadline 判定：模型自己 abort（CONTRACT_PROVIDER_TIMEOUT）与
+    // 整段预算耗尽（CONTRACT_REVIEW_TIMEOUT）是两回事，前者要如实保留，
+    // 否则「合同太长」又会被说成一个更笼统的阶段超时。
+    if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_TIMEOUT') {
+      return safeError('CONTRACT_PROVIDER_TIMEOUT')
+    }
     if (this.now().getTime() >= deadline.getTime()) return safeError('CONTRACT_REVIEW_TIMEOUT')
     if (error instanceof ContractReviewSafeError) return error
-    if (error instanceof Error && /^CONTRACT_PROVIDER_(?:NOT_APPROVED|CONFIG_INVALID|API_KEY_INVALID|NOT_ALLOWED|INPUT_INVALID|INPUT_LIMIT|TRANSPORT_FAILED|RESPONSE_INVALID|RESPONSE_TOO_LARGE)$/u.test(error.message)) {
-      return safeError(error.message)
-    }
+    if (error instanceof Error && isPreservableStageCode(error.message)) return safeError(error.message)
     return safeError(fallback)
   }
 
-  private deadline(): Date { return new Date(this.now().getTime() + EXECUTION_BUDGET_MS) }
+  private deadlineAfter(budgetMs: number): Date { return new Date(this.now().getTime() + budgetMs) }
   private now(): Date {
     const value = this.clock.now()
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw safeError('CONTRACT_REVIEW_CLOCK_INVALID')
     return new Date(value)
   }
+}
+
+/**
+ * 可以**原样保留**到 `errorCode` 的底层机器码。
+ *
+ * ── 修复前 ─────────────────────────────────────────────────────────────────
+ *
+ * 放行名单只有 `CONTRACT_PROVIDER_*` 一族。于是 PII 遮盖抛出的
+ * `CONTRACT_PII_MASK_INCOMPLETE`（裸 Error，既不是 ContractReviewSafeError，
+ * 也不带 CONTRACT_PROVIDER_ 前缀）被折叠成兜底码
+ * `CONTRACT_REVIEW_ANALYSIS_FAILED`。2026-08-17 生产上 analyze 阶段 100% 失败，
+ * 落库与接口看到的却只有那个笼统的兜底码，排查因此绕了一大圈。
+ *
+ * ── 安全性 ─────────────────────────────────────────────────────────────────
+ *
+ * 这里把 `error.message` 原样当成对外码，所以**必须**保证它不可能夹带合同正文：
+ *   - 正则整体锚定，字符集只允许 `[A-Z_]`（无数字、无小写、无中文、无冒号），
+ *     长度封顶 64 —— 合同正文不可能构成这种串；
+ *   - 前缀限定在本模块自己 `throw new Error('…')` 的固定字面量族。
+ * 形如 `CONTRACT_REVIEW_INVALID_TRANSITION:${from}:${to}` 的带参消息因为含 `:`
+ * 而落不进来，继续走兜底码。
+ *
+ * 对外文案不受影响：未登记进 contract-review-failure-reason 白名单的码
+ * 一律显示通用文案，原始码只出现在日志与 DB 的 `errorCode` 列里（运维可见）。
+ */
+const PRESERVABLE_PROVIDER_CODE =
+  /^CONTRACT_PROVIDER_(?:NOT_APPROVED|CONFIG_INVALID|API_KEY_INVALID|NOT_ALLOWED|INPUT_INVALID|INPUT_LIMIT|TRANSPORT_FAILED|RESPONSE_INVALID|RESPONSE_TOO_LARGE)$/u
+
+/** 新放行的族：遮盖、规范化文本、规则包、AI/规则/结果/事实映射。 */
+const PRESERVABLE_STAGE_CODE =
+  /^CONTRACT_(?:PII_MASK|REVIEW_(?:AI|RULE|RESULT|FACT)|CANONICAL|RULE)_[A-Z_]{1,64}$/u
+
+function isPreservableStageCode(message: string): boolean {
+  return PRESERVABLE_PROVIDER_CODE.test(message) || PRESERVABLE_STAGE_CODE.test(message)
 }
 
 class ContractReviewSafeError extends Error {

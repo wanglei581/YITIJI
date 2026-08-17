@@ -573,10 +573,28 @@ button.jf-chip {
   font-size: 22px;
 }
 
-.jf-btn:disabled {
+/* 能力门禁置灰用 aria-disabled（保持可聚焦、读屏能播报旁边那句原因），
+   瞬时态才用原生 disabled。两者外观必须一致，否则用户分不出「不能点」。 */
+.jf-btn:disabled,
+.jf-btn[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: .45;
   box-shadow: none;
+}
+
+.jf-tile[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .45;
+  box-shadow: none;
+}
+
+/* 置灰原因：常显。一体机是触屏，没有 hover，title 永远不显示。 */
+.jf-blocked-reason {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .jf-tile {

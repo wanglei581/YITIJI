@@ -258,7 +258,6 @@ export function ResumeSourcePage() {
       state: {
         intent,
         source: 'upload',
-        uploadChannel: uploadedFile.channel,
         file: { name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format },
         fileId: uploadedFile.fileId,
         selectedDimensions: genericDiagnosis ? [] : selectedDimensions,

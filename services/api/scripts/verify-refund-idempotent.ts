@@ -53,6 +53,7 @@ import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
+import { buildRealPdf } from './support/minimal-pdf'
 
 const SECRET = 'verify-refund-sandbox-secret-0001'
 let passed = 0
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
   async function seedPdf(label: string): Promise<string> {
     const fileId = `f_refund_${suffix}_${label}`
     const key = `verify/refund/${fileId}.pdf`
-    const bytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
+    const bytes = buildRealPdf(1)
     await storage.putObject(key, bytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: { id: fileId, storageKey: key, filename: `${label}.pdf`, mimeType: 'application/pdf', sizeBytes: bytes.length, sha256: '', purpose: 'print_source', bucket: LOCAL_BUCKET_SENTINEL },

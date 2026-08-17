@@ -18,6 +18,7 @@ import { JobFitPdfService } from './resume/job-fit-pdf.service'
 import { LlmCareerPlanService } from './resume/llm-career-plan.service'
 import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
+import { CareerPlanDegradedPdfService } from './resume/career-plan-degraded-pdf.service'
 import { CareerPlanController } from './career-plan.controller'
 import { LlmSelfAssessmentService } from './resume/llm-self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
@@ -66,6 +67,12 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
     LlmCareerPlanService,
     CareerPlanService,
     CareerPlanPdfService,
+    // 降级版式（AI 不可用时仍然出得了纸）。
+    // ⚠️ 岗位要求计数端口 CAREER_PLAN_JOB_REQUIREMENT_STATS 在 PR #636 合入前**故意不注册**：
+    //    CareerPlanService 用 @Optional() 注入，拿不到就在纸上如实印「本次未取到岗位要求计数」。
+    //    #636 合入后接线就是下面一行，不需要适配层：
+    //      { provide: CAREER_PLAN_JOB_REQUIREMENT_STATS, useExisting: JobRequirementStatsService },
+    CareerPlanDegradedPdfService,
     LlmSelfAssessmentService,
     SelfAssessmentService,
     SelfAssessmentPdfService,

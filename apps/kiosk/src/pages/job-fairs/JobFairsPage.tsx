@@ -181,7 +181,10 @@ export function JobFairsPage() {
   const [region,       setRegion]       = useState<RegionSelection>({})
   const [statusFilter, setStatusFilter] = useState('全部')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [fairs,        setFairs]        = useState<ExternalJobFairDTO[]>([])
+  /** 服务端按当前 status/keyword 统计的真实条数(不是本页条数)。 */
+  const [total,        setTotal]        = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [retryKey,     setRetryKey]     = useState(0)
@@ -196,28 +199,44 @@ export function JobFairsPage() {
     setQrFair(fair)
   }
 
+  // 搜索词防抖后交给服务端全表检索(与岗位页一致),不再只搜当前已加载的一页。
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
   useEffect(() => {
     let cancelled = false
     const terminalId = getTerminalId()
     setLoading(true); setError(false)
-    getJobFairs(terminalId ? { terminalId } : undefined)
-      .then((res) => { if (!cancelled) { setFairs(res.data); setLoading(false) } })
+    getJobFairs({
+      ...(terminalId ? { terminalId } : {}),
+      ...(statusFilter === '全部' ? {} : { status: STATUS_FILTER_MAP[statusFilter] }),
+      ...(debouncedQuery ? { keyword: debouncedQuery } : {}),
+      pageSize: 100,
+    })
+      .then((res) => {
+        if (cancelled) return
+        setFairs(res.data)
+        setTotal(res.pagination.total)
+        setLoading(false)
+      })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false) } })
     return () => { cancelled = true }
-  }, [retryKey])
+  }, [retryKey, statusFilter, debouncedQuery])
 
+  // 剩下的三个条件服务端不支持,仍在已取回集合内本地筛选。
+  // status 保留本地复筛,保证「卡片上显示的状态」与所选筛选始终一致。
   const visible = useMemo(() => {
     const statusVal = statusFilter === '全部' ? null : STATUS_FILTER_MAP[statusFilter]
-    const q = query.trim()
     return fairs.filter((f) => {
       if (favoritesOnly && !favoriteSet.has(f.id)) return false
       if (statusVal && f.status !== statusVal) return false
       if (!matchesRegion(f, region)) return false
       if (selectedDate && dateKey(f.startTime) !== selectedDate) return false
-      if (q && !`${f.name}${f.organizer}${f.venue}${f.city ?? ''}`.includes(q)) return false
       return true
     })
-  }, [fairs, statusFilter, region, selectedDate, query, favoritesOnly, favoriteSet])
+  }, [fairs, statusFilter, region, selectedDate, favoritesOnly, favoriteSet])
 
   // 即将开始/进行中计数，用于 count line 展示
   const upcomingCount = useMemo(() => visible.filter(f => f.status === 'upcoming').length, [visible])
@@ -288,8 +307,10 @@ export function JobFairsPage() {
           <ErrorState message="加载失败，请稍后重试" onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
         ) : (
           <>
+            {/* total 来自服务端(按当前状态/搜索条件的真实条数);
+                visible 是屏幕上实际渲染的条数。两个数都如实显示,不合并成一个。 */}
             <div className="jf-count-line mb-3">
-              共 <b>{visible.length}</b> 场招聘会
+              共 <b>{total}</b> 场招聘会 · 当前展示 <b>{visible.length}</b> 场
               {upcomingCount > 0 && <span> · 即将开始 {upcomingCount} 场</span>}
               {ongoingCount  > 0 && <span> · 进行中 {ongoingCount} 场</span>}
             </div>

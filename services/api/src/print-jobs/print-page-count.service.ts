@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { verifyFileSignature } from '../files/signing'
-import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
+import { isSinglePageImage, resolvePdfPageCount } from '../files/file-page-count.util'
 import type { PrintPageCount } from './print-page-count.types'
 
 const CONTRACT_REPORT_MIN_PRINT_REMAINING_MS = 30 * 60 * 1000
@@ -12,7 +12,11 @@ const CONTRACT_REPORT_MIN_PRINT_REMAINING_MS = 30 * 60 * 1000
  *
  * **绝不信任前端 `file.pages`**：只从本系统 files 服务签发并**验签**的 content URL 解析 fileId，
  * 读取 `FileObject`，经 `StorageService` 读取真实内容识别页数。
- * - PDF：轻量识别 `/Type /Page`；识别不到 / 0 页 → fail-closed。
+ * - PDF：`resolvePdfPageCount()`（pdf.js 解析页树为准，解析器不可用时才回落字节扫描）；
+ *   识别不到 / 0 页 / 文件结构损坏 → fail-closed。
+ *   注：`billingPageSource` 仍取 `'pdf_lightweight_scan'` —— 该取值是 shared `BillingPageSource`
+ *   契约值且已落库，改名需同步前端类型与历史数据，不在本次范围；它现在表示「PDF 页数识别」
+ *   这一类来源，不再字面对应正则扫描实现。
  * - 图片（png/jpeg/webp）：按 1 页。
  * - 签名不合法 / FileObject 缺失或已删 / 未知 MIME / 读取失败 → fail-closed。
  *
@@ -45,7 +49,7 @@ export class PrintPageCountService {
 
     if (file.mimeType === 'application/pdf') {
       const buffer = await this.readOrFail(file.storageKey, file.bucket)
-      const pages = countPdfPages(buffer)
+      const pages = await resolvePdfPageCount(buffer)
       if (pages === null || pages <= 0) throw new BadRequestException('PRINT_PAGE_COUNT_UNAVAILABLE')
       return { billablePages: pages, billingPageSource: 'pdf_lightweight_scan' }
     }

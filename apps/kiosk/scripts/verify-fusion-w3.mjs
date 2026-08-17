@@ -103,7 +103,12 @@ const frozen = {
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
-  'src/pages/interview/session/types.ts': 'f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369',
+  // 2026-08-17 重新冻结：删掉了路由 state 类型里的 `firstQType?: string`。
+  // 该键全仓 reader 数为 0（InterviewSessionPage 只读 firstQuestion），
+  // 属本批次「跨页上下文：要么消费，要么别传」清理的一部分；
+  // 由 verify:kiosk-frontend-debt ② 反向钉死「不得再传 / 不得再声明」。
+  // 旧哈希 f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369。
+  'src/pages/interview/session/types.ts': '76a8a9770e1132b416b74586039e07e4410fa4cf97ac2e7ad4ec1c56bf5d1374',
   'src/hooks/useAiAdvisorCallSession.ts': '75f2bdcc44b03e3c9bcaa505d32139036bc5e0b934d0bace5d6b8237d5bc76f8',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
@@ -236,7 +241,13 @@ includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'up
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
-includes('src/pages/resume/ResumeReportPage.tsx', 'extractionNotice.warnings', 'OCR warnings remain visible')
+// 提示语从「一律说走了 OCR」改成「按真实来源组织」后，warnings 仍照常转述，
+// 只是不再写死成 `extractionNotice.warnings` 这一个字面表达式。
+// 这里改断真实契约：①提示进得了渲染列表 ②warnings 被原样转述
+// ③「经 OCR 提取」这句必须以真实 textSource 为条件——否则就是对用户谎报处理方式。
+includes('src/pages/resume/ResumeReportPage.tsx', 'buildExtractionNotice(extractionNotice)', 'extraction notice reaches the notice list')
+includes('src/pages/resume/ResumeReportPage.tsx', 'notice.warnings', 'extraction warnings remain transcribed')
+includes('src/pages/resume/ResumeReportPage.tsx', "notice.textSource === 'image_ocr'", 'OCR claim is gated on real OCR source')
 includes('src/pages/resume/ResumeGeneratePage.tsx', 'submitResumeGenerate(input, getToken())', 'generation keeps real submission')
 includes('src/pages/resume/ResumeGeneratePreviewPage.tsx', 'exported?.printFileUrl', 'preview prints only a real file URL')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'confirmLeave', 'optimization keeps dirty-leave protection')
