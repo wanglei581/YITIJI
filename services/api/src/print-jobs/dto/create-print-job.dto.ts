@@ -20,8 +20,14 @@ import { Type } from 'class-transformer'
  *   - 非法枚举值 / 越界 copies / 非法 pageRange → 400 VALIDATION_FAILED
  *   - 未声明的扩展字段（collate/paperType/feeder 等）→ 400（不静默接收）
  *
- * 说明：wire 类型保留历史枚举，但当前只接受已验证的黑白、单面、每张 1 页组合。
- * 彩色、双面与 N-up 完成厂家确认和 Windows 真机验收后才能重新开放。
+ * 彩色 / 双面（2026-08-18 产品负责人拍板开放）：DTO 这一层只做**取值合法性**校验，
+ * 「这台机器验过没有」不在 DTO 判断 —— DTO 无终端上下文。真正的准入是服务端两层门禁：
+ *   第 1 层 assertVerifiedPrintParameters()：全局产品边界（N-up 仍恒拒）；
+ *   第 2 层 TerminalCapabilitiesService.assertPrintParamsAllowed()：按终端 fail-closed，
+ *          未登记 color_print / duplex_print 的终端一律拒绝。
+ * 因此这里放开枚举**不等于**放开能力；绕过 Kiosk 直接打 API 仍会被第 2 层拦下。
+ *
+ * pagesPerSheet 保持 @IsIn([1])：N-up 没有厂家确认，也没有产品决策。
  */
 export class PrintJobParamsDto {
   @IsInt()
@@ -29,10 +35,10 @@ export class PrintJobParamsDto {
   @Max(99)
   copies!: number
 
-  @IsIn(['black_white'])
+  @IsIn(['black_white', 'color'])
   colorMode!: 'black_white' | 'color'
 
-  @IsIn(['simplex'])
+  @IsIn(['simplex', 'duplex_long_edge', 'duplex_short_edge'])
   duplex!: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
 
   /** CM2800ADN/CM2820ADN 系列仅支持 A4。 */

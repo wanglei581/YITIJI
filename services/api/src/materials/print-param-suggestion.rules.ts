@@ -10,6 +10,12 @@
 //   本文件**不写死**「当前只允许黑白/单面/1页」，而是拿候选值去问生产环境真正的
 //   门禁 assertVerifiedPrintParameters()。门禁放开哪一项，建议就自动跟着放开哪一项；
 //   门禁收紧了，建议也立刻跟着收紧。杜绝「建议了一个建单会被 400 拒掉的值」。
+//
+//   2026-08-18 起门禁分成两层：第 1 层是全局产品边界（本文件探测的就是它），
+//   第 2 层是**按终端**的彩色/双面能力登记。只过第 1 层的取值在未验证的机器上
+//   仍会被拒，所以 readCapabilityProfile 必须再与终端放行集求交集 ——
+//   参数 terminalAllows **默认全 false**（fail-closed）：没有终端上下文时
+//   一律按「没验过」处理，宁可少建议，也不建议一个会被 403 拒掉的值。
 // ============================================================
 
 import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
@@ -47,16 +53,36 @@ function isAccepted(patch: { colorMode?: string; duplex?: string; pagesPerSheet?
   }
 }
 
+/**
+ * 终端侧放行集。默认全 false = fail-closed：调用方没给终端上下文时，
+ * 彩色/双面一律当作「本机未验证」，不进建议集合。
+ */
+export interface TerminalPrintAllows {
+  color?: boolean
+  duplex?: boolean
+}
+
 /** 由门禁探测出当前真实放行集合，不写死常量。 */
-export function readCapabilityProfile(): PrintCapabilityProfile {
+export function readCapabilityProfile(terminalAllows: TerminalPrintAllows = {}): PrintCapabilityProfile {
+  const colorAllowed = terminalAllows.color === true
+  const duplexAllowed = terminalAllows.duplex === true
+
+  const verifiedColorModes = CANDIDATE_COLOR_MODES.filter(
+    (value) => isAccepted({ colorMode: value }) && (value === 'black_white' || colorAllowed),
+  )
+  const verifiedDuplexModes = CANDIDATE_DUPLEX_MODES.filter(
+    (value) => isAccepted({ duplex: value }) && (value === 'simplex' || duplexAllowed),
+  )
+
   return {
     paperSize: 'A4',
-    verifiedColorModes: CANDIDATE_COLOR_MODES.filter((value) => isAccepted({ colorMode: value })),
-    verifiedDuplexModes: CANDIDATE_DUPLEX_MODES.filter((value) => isAccepted({ duplex: value })),
+    verifiedColorModes,
+    verifiedDuplexModes,
     verifiedPagesPerSheet: CANDIDATE_PAGES_PER_SHEET.filter((value) => isAccepted({ pagesPerSheet: value })),
     copiesRange: { ...COPIES_RANGE },
     note:
-      '奔图 CM2800/CM2820 系列仅支持 A4，不支持 A3。彩色、自动双面与多页合一须完成厂家确认及 Windows 真机验收后才会出现在已验证取值里。',
+      '奔图 CM2800/CM2820 系列仅支持 A4，不支持 A3。多页合一须完成厂家确认后开放；' +
+      '彩色与自动双面只在管理员已为该终端登记并验收后才会出现在已验证取值里。',
   }
 }
 

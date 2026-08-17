@@ -82,6 +82,8 @@ export interface PrintOrderQuote {
 export interface QuotePrintOrderInput {
   fileUrl: string
   params: PrintJobParams
+  /** 彩色 / 双面报价必填：后端据此按该终端的能力登记 fail-closed 复核。 */
+  terminalId?: string
 }
 
 /** DTO 只接受数字页码范围；'all' / 空串统一成 undefined，与建单口径一致。 */
@@ -99,7 +101,11 @@ export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<Prin
   const res = await fetch(`${API_BASE_URL}/orders/quote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileUrl: input.fileUrl, params: normalizePrintParams(input.params) }),
+    body: JSON.stringify({
+      fileUrl: input.fileUrl,
+      params: normalizePrintParams(input.params),
+      ...(input.terminalId ? { terminalId: input.terminalId } : {}),
+    }),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')

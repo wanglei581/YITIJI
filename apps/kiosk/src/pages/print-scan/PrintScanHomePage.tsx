@@ -93,13 +93,29 @@ interface CapabilityDefinition {
 // 七件事。顺序照原型 39-print-hub.html:644-914 的栅格顺序（2 列 × 4 行）。
 // 「到机码核销」不在这里 —— 它不是「在这台机器上从头办」的第八件事，
 // 见下方 ARRIVAL_CODE_ENTRY。
+/**
+ * 文档打印卡的描述行：彩色 / 双面只有在**本机**登记为 available 时才敢写进文案。
+ * 未登记的机器上写「彩色、双面可选」= 谎报能力（CLAUDE.md §9「不伪造能力」）。
+ */
+function describeDocPrint(map: ConfiguredCapabilityMap): string {
+  const on = (key: 'color_print' | 'duplex_print') => map[key]?.status === 'available'
+  const extras = [on('color_print') ? '彩色' : null, on('duplex_print') ? '双面' : null].filter(
+    (v): v is string => v !== null,
+  )
+  return extras.length > 0
+    ? `PDF、图片上传后设参数打印，A4 黑白 / ${extras.join(' / ')}可选`
+    : 'PDF、图片上传后设参数打印，A4 黑白（本机彩色 / 双面尚未通过真机验证）'
+}
+
 const CAPABILITIES: readonly CapabilityDefinition[] = [
   {
     key: 'doc-print',
     cap: 'doc',
     icon: FileTextIcon,
     title: '文档打印',
-    description: 'PDF、图片上传后设参数打印，A4 黑白 / 彩色、双面可选',
+    // 彩色 / 双面是否可选取决于**本机**能力登记，静态文案不得替真机打包票；
+    // 实际展示由下方 describeDocPrint() 按 color_print / duplex_print 动态改写。
+    description: 'PDF、图片上传后设参数打印，A4 黑白',
     to: '/print/upload?source=document&tab=file',
     aiRole: 'ai',
     needsMfp: true,
@@ -324,7 +340,12 @@ export function PrintScanHomePage() {
 
   const capabilities = useMemo(
     () =>
-      CAPABILITIES.map((capability) => {
+      CAPABILITIES.map((rawCapability) => {
+        // 文档打印卡的彩色/双面表述按本机能力登记动态改写，其余卡原样。
+        const capability =
+          rawCapability.key === 'doc-print'
+            ? { ...rawCapability, description: describeDocPrint(capabilityLoad.map) }
+            : rawCapability
         const capabilityKey = CARD_CAPABILITY_KEY[capability.key]
 
         // ① 探测轴优先：读不到能力配置 → 七项一律不开（含证件照说明页）。

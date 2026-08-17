@@ -103,6 +103,10 @@ const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   id_photo: '证件照',
   format_convert: '格式转换',
   signature_stamp: '签名盖章',
+  // 这两项未配置 = 拒绝（fail-closed）：必须在该终端真机验过彩色/双面出纸，
+  // 再配成「可用」才对用户放开。配错的代价是用户按彩色付费拿到黑白纸。
+  color_print: '彩色打印（需真机验证）',
+  duplex_print: '自动双面（需真机验证）',
 }
 
 const CAPABILITY_STATUS_OPTIONS: { value: PrintScanCapabilityStatus; label: string }[] = [

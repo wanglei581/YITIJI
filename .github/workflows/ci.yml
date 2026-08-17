@@ -451,6 +451,9 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
+          # 彩色/双面按终端能力开放（fail-closed）：未登记的终端必须拒绝，
+          # 且彩色订单必须按彩色价目计价 —— 误放的代价是用户按彩色付费拿到黑白纸。
+          pnpm --filter @ai-job-print/api verify:print-color-duplex-capability
           pnpm --filter @ai-job-print/api verify:file-display-truth
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
@@ -823,6 +826,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
+          # 彩色/双面按终端能力开放（fail-closed），PG 下同样必须成立
+          pnpm --filter @ai-job-print/api verify:print-color-duplex-capability
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders

@@ -20,6 +20,32 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   return errors
 }
 
+// 2026-08-18：打印预览 / 确认页新增依赖 GET /terminals/:id/capabilities —— 彩色与双面
+// 改为按**本机**能力登记决定可用性（服务端 fail-closed 门禁的体验层镜像）。
+// 这里给的是**未验证机器的生产默认态**：真实后端对一台没有任何 TerminalCapability 行的
+// 终端就是这样回的（每个键都下发，但 configured=false）。Kiosk 只采信 configured=true 的行，
+// 因此彩色/双面在默认夹具下保持禁用 —— 与放开之前的用户可见结果一致。
+const UNVERIFIED_CAPABILITIES = [
+  'document_print',
+  'phone_upload',
+  'cloud_upload',
+  'usb_import',
+  'material_pack',
+  'scan',
+  'copy',
+  'id_photo',
+  'format_convert',
+  'signature_stamp',
+  'color_print',
+  'duplex_print',
+].map((capabilityKey) => ({
+  capabilityKey,
+  status: 'not_verified',
+  note: null,
+  configured: false,
+  updatedAt: null,
+}))
+
 function registerShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
@@ -28,6 +54,10 @@ function registerShell(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { terminalCode: 'KSK-001', capabilities: UNVERIFIED_CAPABILITIES },
   })
 }
 
@@ -378,6 +408,90 @@ test('direct preview restores the material session and completes the PDF respons
   await expect(page.getByTitle(`${W2_FILE.name} 预览`)).toBeVisible()
   await expect.poll(() => page.locator(`iframe[src="${W2_FILE.fileUrl}"]`).count()).toBe(1)
   binary.assertPdfCompleted()
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+// ── 彩色 / 双面按终端能力开放（2026-08-18）────────────────────────────────────
+// 硬件（奔图 CM2800/CM2820）支持彩色与自动双面，但**驱动映射未在每台真机验证过**。
+// 误放的代价是用户按彩色付费拿到黑白纸，所以放行必须按台、显式、可审计。
+// 这两个用例锁住闸门的两端：未登记必须禁用且理由诚实；登记 available 后必须真的可选。
+
+function capabilitiesWith(overrides: Record<string, string>): unknown {
+  return {
+    terminalCode: 'KSK-001',
+    capabilities: UNVERIFIED_CAPABILITIES.map((row) =>
+      overrides[row.capabilityKey]
+        ? { ...row, status: overrides[row.capabilityKey], configured: true, updatedAt: NOW }
+        : row,
+    ),
+  }
+}
+
+test('unverified terminal disables color and duplex with an honest reason @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api) // 默认即「未登记」态
+  registerPrice(api)
+  await seedMaterialSession(page)
+
+  await page.goto('/print/preview')
+  const preview = page.locator('[data-w2-page="print-preview"]')
+
+  // 理由必须说「本机尚未通过真机验证」，不能说「不支持」—— 硬件确实支持，说不支持是谎报。
+  await expect(preview.getByText(/本机彩色打印尚未通过真机验证/)).toBeVisible()
+  await expect(preview.getByText(/本机自动双面尚未通过真机验证/)).toBeVisible()
+  await expect(preview.getByText(/不支持/)).toHaveCount(0)
+
+  // 禁用态必须是**可聚焦的 aria-disabled**，不是原生 disabled ——
+  // 原生 disabled 的按钮拿不到焦点，读屏和键盘用户根本读不到 aria-describedby 里的原因。
+  const colorBtn = preview.getByRole('button', { name: '彩色', exact: true })
+  await expect(colorBtn).toHaveAttribute('aria-disabled', 'true')
+  await expect(colorBtn).not.toHaveAttribute('disabled', /.*/)
+  await expect(colorBtn).toHaveAttribute('aria-describedby', 'print-color-capability-note')
+  // 真的能聚焦（这才是选 aria-disabled 而不是 disabled 的全部意义）
+  await colorBtn.focus()
+  await expect(colorBtn).toBeFocused()
+
+  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  await expect(duplexBtn).toHaveAttribute('aria-disabled', 'true')
+  await expect(duplexBtn).not.toHaveAttribute('disabled', /.*/)
+  await duplexBtn.focus()
+  await expect(duplexBtn).toBeFocused()
+
+  // 点下去不得选中：仍停在黑白 / 单面。
+  // force:true 绕过 Playwright 的 actionability —— 这里要证的正是「用户硬点也选不上」。
+  await colorBtn.click({ force: true })
+  await duplexBtn.click({ force: true })
+  await expect(preview.getByRole('button', { name: '黑白', exact: true })).toHaveClass(/bg-primary-600/)
+  await expect(preview.getByRole('button', { name: '单面', exact: true })).toHaveClass(/bg-primary-600/)
+
+  await expectHealthy(page, errors, 'print-preview')
+})
+
+test('terminal verified for color and duplex can actually select them @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  registerPrice(api)
+  // 管理员在该终端真机验过后显式配成 available —— 唯一的放行路径。
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: capabilitiesWith({ color_print: 'available', duplex_print: 'available' }),
+  })
+  await seedMaterialSession(page)
+
+  await page.goto('/print/preview')
+  const preview = page.locator('[data-w2-page="print-preview"]')
+
+  const colorBtn = preview.getByRole('button', { name: '彩色', exact: true })
+  await expect(colorBtn).not.toHaveAttribute('aria-disabled', 'true')
+  await expect(preview.getByText(/尚未通过真机验证/)).toHaveCount(0)
+
+  await colorBtn.click()
+  await expect(colorBtn).toHaveClass(/bg-primary-600/)
+
+  const duplexBtn = preview.getByRole('button', { name: '双面（长边）', exact: true })
+  await duplexBtn.click()
+  await expect(duplexBtn).toHaveClass(/bg-primary-600/)
+
   await expectHealthy(page, errors, 'print-preview')
 })
 

@@ -24,34 +24,44 @@ const kioskRootLayout = read(kioskRoot, 'src/layouts/KioskRoot.tsx')
 
 expect(
   shared.includes('VERIFIED_PRINT_PARAMETER_PROFILE') &&
-    shared.includes('restrictToVerifiedPrintParams') &&
-    shared.includes('hasUnverifiedPrintParams'),
-  'shared 提供安全 profile、旧参数收口与差异检测 helper',
+    shared.includes('restrictToAllowedPrintParams') &&
+    shared.includes('hasParamsBeyondCapability'),
+  'shared 提供最保守 profile + 按终端能力收口 / 差异检测 helper',
 )
 
+// 2026-08-18：彩色/双面已按终端能力开放。控件不再恒禁用，而是随**本机**能力登记变化。
+// 未验证的机器上仍必须禁用，且理由要说「本机未通过真机验证」而不是「不支持」。
+// PrintParamsPage 已于 #690 下线（与预览页重复且零导航），故只剩预览页一处参数入口。
 for (const [name, source] of [['PrintPreviewPage', preview]]) {
-  expect(source.includes('VERIFIED_PRINT_PARAMETER_PROFILE'), `${name} 从 shared 安全 profile 取参数`)
+  expect(source.includes('VERIFIED_PRINT_PARAMETER_PROFILE'), `${name} 从 shared 安全 profile 取初始参数`)
+  expect(source.includes('usePrintParamCapability'), `${name} 按本机能力登记决定彩色/双面可用性`)
+  expect(source.includes('setColorMode('), `${name} 在能力放行时允许切换彩色`)
+  expect(source.includes('setDuplex('), `${name} 在能力放行时允许切换双面`)
   expect(
-    source.includes('hasUnverifiedPrintParams') && source.includes('检测到旧会话参数，已明确收口为当前组合'),
-    `${name} 对恢复出的旧参数显式提示收口`,
+    !source.includes('当前仅开放黑白、单面、每张 1 页'),
+    `${name} 不再写死「仅开放黑白」（已验证的机器上属谎报）`,
   )
-  expect(!source.includes('setColorMode('), `${name} 不再允许切换彩色`)
-  expect(!source.includes('setDuplex('), `${name} 不再允许切换双面`)
-  expect(source.includes('当前仅开放黑白、单面、每张 1 页'), `${name} 明示当前能力边界`)
-  expect(source.includes('厂家确认和 Windows 真机验收后再开放'), `${name} 不把硬件规格冒充已验证能力`)
+  expect(
+    !source.includes('厂家确认和 Windows 真机验收后再开放'),
+    `${name} 不再把彩色/双面统一说成未开放`,
+  )
+  // 禁用态必须可聚焦可解释：原生 disabled 读屏读不到原因。
+  expect(source.includes('aria-disabled'), `${name} 禁用态使用可聚焦的 aria-disabled`)
+  expect(!/\n\s+disabled\n\s+\/>/.test(source), `${name} 不再用裸 disabled 属性恒禁用控件`)
+  expect(source.includes('capability.color.reason'), `${name} 展示彩色被禁用的真实原因`)
+  expect(source.includes('capability.duplex.reason'), `${name} 展示双面被禁用的真实原因`)
 }
 
 expect(
-  confirm.includes('restrictToVerifiedPrintParams') &&
-    confirm.includes('hasUnverifiedPrintParams') &&
-    confirm.includes('参数已按当前已验证能力收口') &&
-    confirm.indexOf('restrictToVerifiedPrintParams') < confirm.indexOf('quotePrintOrder('),
-  'PrintConfirmPage 在报价前识别旧会话并显式收口，避免按未验证参数计价',
+  confirm.includes('restrictToAllowedPrintParams') &&
+    confirm.includes('hasParamsBeyondCapability') &&
+    confirm.includes('参数已按本机已验证能力收口') &&
+    confirm.indexOf('restrictToAllowedPrintParams') < confirm.indexOf('quotePrintOrder('),
+  'PrintConfirmPage 在报价前按本机能力收口，避免按未验证参数计价',
 )
 expect(
-  !/params\.colorMode\s*===\s*['"]color['"]/.test(confirm) &&
-    !confirm.includes('彩色效果以设备支持'),
-  '确认页不再展示彩色可用暗示',
+  confirm.includes('terminalId: getTerminalId()'),
+  'PrintConfirmPage 报价带 terminalId，服务端才能按本机能力 fail-closed 复核',
 )
 
 // ── 打印参数页下线合同（2026-08-18）────────────────────────────────────────────
