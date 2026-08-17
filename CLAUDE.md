@@ -198,6 +198,7 @@ ai-job-print-terminal/
 4. `docs/product/feature-scope.md`
 5. `docs/compliance/compliance-boundary.md`
 6. `.ccg/spec/guides/index.md`（若存在）
+7. [docs/README.md](docs/README.md) —— docs 导航索引：哪份原型是当前真值、哪些目录只读、以及「判断某文件/功能是否存在」的取证规则（不要用 `ls` 或生产 dist，一律对 `origin/main` 验）
 
 记录保存规则：
 
