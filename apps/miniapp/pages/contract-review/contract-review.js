@@ -427,7 +427,7 @@ Page({
     const maxTries = Math.ceil((eta * 4) / (POLL_MS / 1000))
     if (tries > maxTries) {
       // 放弃等待时一并删除：任务还在服务端跑，合同原件也还在，不能只丢掉页面状态。
-      this._reset('分析用时超出预期，已删除本次上传，请稍后重新发起')
+      this._reset('分析用时超出预期，请稍后重新发起', true)
       return Promise.resolve()
     }
     return api.getContractReview(id).then(t => {
@@ -442,7 +442,7 @@ Page({
           || (t.error && (t.error.message || t.error.code)) || ''
         this._reset(why
           ? `分析失败：${why}`
-          : '分析失败，服务端未说明原因。可稍后重试；若反复失败，可能是该文件格式无法提取内容。')
+          : '分析失败。服务端已记录原因但当前未随任务返回，请把这次时间告知运维。', true)
         return
       }
       if (t.status === 'cancelled') { this._reset('任务已取消'); return }
@@ -562,10 +562,20 @@ Page({
     if (id) api.deleteContractReview(id).catch(() => { /* 放弃清理失败不打断返回 */ })
   },
 
-  /** 停轮询 + 删服务端任务 + 回到第一步。message 非空时把原因留在页面上。 */
-  _reset(message) {
+  /**
+   * 停轮询 + 回到第一步。message 非空时把原因留在页面上。
+   *
+   * keepTask=true 用于「分析失败」：此时不删服务端任务。
+   * 原因是任务记录里存着 errorCode（服务端已正确写入 ContractReviewTask.errorCode），
+   * 删掉它等于把「为什么失败」的唯一证据一并销毁——本轮排查就因此只剩一条历史记录。
+   * 合同原件的清理由服务端保留策略负责（contract_upload 为 highly_sensitive，
+   * 系统锁定短期过期），不依赖客户端删除，所以保留任务不会让原件多留。
+   *
+   * 用户主动放弃（取消 / 返回）仍然立即删除——那是用户的意思，且无排查价值。
+   */
+  _reset(message, keepTask) {
     this._stopped = true
-    this._discard()
+    if (!keepTask) this._discard()
     this._pending = null
     this.setData({
       step: 'pick', reviewId: '', report: null, filePath: '', fileName: '', error: message || '',
