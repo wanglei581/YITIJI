@@ -67,8 +67,17 @@ export class SelfAssessmentController {
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  /**
+   * `consent.consentVersion` 可选：现网前端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
+   * 显式带旧版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，要求重新确认。
+   * 判定逻辑集中在 service，controller 不做第二份版本比较（避免两处口径漂移）。
+   */
   async submit(
-    @Body() body: { answers: SelfAssessmentAnswerV1[]; consent: { nonSensitive: boolean; sensitive: boolean } },
+    @Body()
+    body: {
+      answers: SelfAssessmentAnswerV1[]
+      consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string }
+    },
     @Req() req: ReqLike,
   ) {
     return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))

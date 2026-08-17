@@ -47,9 +47,17 @@ export interface SelfAssessmentAnswerV1 {
   choice: string
 }
 
+/**
+ * 知情同意版本号 —— 真源在 `packages/shared/src/types/selfAssessment.ts`，本行是 CJS 镜像。
+ * 两处必须**逐字相等**，由 `verify:self-assessment-consent` 门禁锁死（连同 kiosk 那份）。
+ */
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
+
 export interface SelfAssessmentConsent {
   nonSensitive: boolean
   sensitive: boolean
+  /** 勾选时生效的同意版本号；缺省视为「未版本化同意」。 */
+  consentVersion?: string
 }
 
 export interface SelfAssessmentDimensionResult {
@@ -78,6 +86,12 @@ export interface SelfAssessmentSubmitResponse {
   providerName?: string
   accessToken?: string
   expiresAt: string | null
+  /** 本条记录实际存下的同意版本；null = 未版本化同意。 */
+  consentVersion?: string | null
+  /** 勾选时刻（ISO8601）；未版本化同意时为 null。 */
+  consentedAt?: string | null
+  /** 存下的版本是否仍等于当前版本；false ⇒ 必须重新确认。 */
+  consentCurrent?: boolean
 }
 
 export interface SelfAssessmentResponse extends SelfAssessmentSubmitResponse {
@@ -92,4 +106,18 @@ export interface SelfAssessmentPrintResponse {
   signedUrl: string
   expiresAt: string
   printFileUrl?: string
+}
+
+/**
+ * 追加到简历 PDF 的响应。`printFileUrl` 是内部 HMAC URL（`/print/jobs` 只认这种），
+ * 与仅供预览 / 扫码的 `signedUrl` 是两条链路，不可互换。
+ */
+export interface SelfAssessmentAppendResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
 }

@@ -55,10 +55,42 @@ export interface SelfAssessmentAnswerV1 {
   choice: string
 }
 
-/** 同意颗粒度：nonSensitive 必须勾选；sensitive 可选。 */
+/**
+ * 知情同意版本号 —— **全项目唯一真源**。
+ *
+ * 为什么必须版本化（不是字段偏好，是合规要求）：
+ * 只存一个布尔 `consented: true` 的系统，在同意书改版之后，会把用户对
+ * **旧版本说明**的同意当成对**新版本说明**的同意 —— 用户从未看过新条款，
+ * 系统却按「已同意」放行。版本号的唯一作用，就是让「用户当初同意的那份说明」
+ * 与「现在这份说明」可比：**不一致就必须重新确认，而不是静默继承**。
+ *
+ * 改动同意条目（kiosk `CONSENT_ITEMS`）任意一条**必须**同时提高本常量。
+ *
+ * 真源与镜像（三处必须逐字相等，由 `verify:self-assessment-consent` 门禁锁死）：
+ *   1. 本常量（真源）；
+ *   2. `services/api/src/ai/resume/self-assessment.types.ts`（服务端 CJS 副本，
+ *      理由见该文件头注释：services/api 走 commonjs，packages/shared 是 ESM-only）；
+ *   3. `apps/kiosk/src/pages/resume/selfAssessmentSession.ts` 的
+ *      `SELF_ASSESSMENT_CONSENT_VERSION`（前端仍为独立声明；应改为从本包 import，
+ *      属前端一行改动，不在后端批次内 —— 在门禁锁死前不得放任其漂移）。
+ */
+export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
+
+/**
+ * 同意颗粒度：nonSensitive 必须勾选；sensitive 可选。
+ *
+ * `consentVersion` 为可选：现网前端（S2-7）只发两个布尔、不发版本号。
+ * 服务端对三种情况的处置**互不相同**，且都不会把旧同意升级成新同意：
+ *   - 版本号缺省      → 按「未版本化同意」如实记为 null，**不补写当前版本**；
+ *   - 版本号 = 当前版 → 记录该版本 + 勾选时刻；
+ *   - 版本号 ≠ 当前版 → 直接拒绝（`SELF_ASSESSMENT_CONSENT_VERSION_STALE`），
+ *                       要求重新确认，**不静默放行**。
+ */
 export interface SelfAssessmentConsent {
   nonSensitive: boolean
   sensitive: boolean
+  /** 勾选时生效的同意版本号；缺省视为「未版本化同意」。 */
+  consentVersion?: string
 }
 
 /** 单维度结果：纯函数 strength + 自然语言解读。 */
@@ -100,6 +132,19 @@ export interface SelfAssessmentSubmitResponse {
   /** 匿名结果一次性访问令牌（仅匿名提交响应返回一次）。 */
   accessToken?: string
   expiresAt: string | null
+  /**
+   * 本条记录实际存下来的同意版本；`null` = 未版本化同意（旧前端未上报）。
+   * 服务端只回**存下来的事实**，不回「当前版本」冒充已同意。
+   */
+  consentVersion?: string | null
+  /** 勾选时刻（ISO8601）；未版本化同意时为 null。 */
+  consentedAt?: string | null
+  /**
+   * 存下来的同意版本是否仍等于当前版本。
+   * `false` ⇒ 同意书已改版或本条未版本化 ⇒ 前端必须请用户重新确认，
+   * **不得**因为记录里有一条同意就继续放行。
+   */
+  consentCurrent?: boolean
 }
 
 /** 读回响应。 */
@@ -117,4 +162,22 @@ export interface SelfAssessmentPrintResponse {
   signedUrl: string
   expiresAt: string
   printFileUrl?: string
+}
+
+/**
+ * 「自我探索报告追加到简历 PDF」响应。
+ *
+ * 注意 `printFileUrl` 与 `signedUrl` 是**两条不同用途的链路**，不可互换：
+ *   - `signedUrl`    = 对象存储签名 URL，给页内预览 / 扫码带走；
+ *   - `printFileUrl` = 内部 HMAC 签名 URL（`signFileUrl`），`/print/jobs` **只认这一种**。
+ * 缺 `printFileUrl` 时「去打印工作台核价」必然失败 —— 这正是 S2-7 未接本端点的原因。
+ */
+export interface SelfAssessmentAppendResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  printFileUrl: string
 }
