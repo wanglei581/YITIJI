@@ -7,6 +7,7 @@ import { JobFitService } from '../ai/resume/job-fit.service'
 import { MemberPrivacyService } from '../member-privacy/member-privacy.service'
 import type { MemberPageQuery } from '../common/utils/member-page'
 import { buildMemberPage, memberPageArgs } from '../common/utils/member-page'
+import { jobValidityWhere } from '../jobs/job-validity'
 import { JobAiLlmService } from './job-ai-llm.service'
 import { JobContextService } from './job-context.service'
 import { JobAiQuotaService } from './job-ai-quota.service'
@@ -281,12 +282,20 @@ export class JobAiService {
     await this.quota.rollback(ticket).catch(() => undefined)
   }
 
+  /**
+   * 推荐候选池。
+   *
+   * 有效期条件与 /jobs 列表同源（jobs/job-validity.ts）：推荐把一条 validThrough
+   * 已过的岗位端到用户面前，比列表里挂着它更糟 —— 那是系统**主动**让人去投一个
+   * 已经失效的岗位。候选池必须是「用户此刻真能在列表里看到的那批岗位」的子集。
+   */
   private async findCandidateJobs(input: JobRecommendationInput): Promise<CandidateJob[]> {
     const limit = Math.min(10, Math.max(1, input.limit ?? 6))
     const filters = input.filters ?? {}
     const where = {
       reviewStatus: 'approved',
       publishStatus: 'published',
+      ...jobValidityWhere(),
       ...(filters.city ? { city: filters.city } : {}),
       ...(filters.category ? { category: filters.category } : {}),
       ...(filters.sourceOrgId ? { sourceOrgId: filters.sourceOrgId } : {}),

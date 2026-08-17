@@ -22,6 +22,7 @@ import {
   parseSeekerIntent,
   withPublicFairDemoExclusion,
 } from './jobs-shared'
+import { jobValidityWhere } from './job-validity'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 
@@ -58,9 +59,21 @@ export class JobsKioskService {
     }
   }
 
+  /**
+   * 岗位详情。
+   *
+   * 有效期条件必须与列表一致（jobValidityWhere）：只筛列表不筛详情的话，
+   * 过期岗位虽然搜不到，但收藏夹/浏览记录/外部二维码里的旧链接仍能打开它，
+   * 求职者照样会照着一条失效岗位去投递。
+   */
   async getPublishedJobById(id: string): Promise<SingleResult<JobListItemDto>> {
     const j = await this.prisma.job.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: {
+        id,
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+        ...jobValidityWhere(),
+      },
     })
     return { data: j ? prismaJobToListItem(j) : null, success: true }
   }

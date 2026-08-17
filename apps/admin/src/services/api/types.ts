@@ -285,7 +285,30 @@ export interface AdminJobSourceRecord {
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
+  /** 来源标注的有效期限（ISO）；null = 来源未提供。 */
+  validThrough?: string | null
+  /**
+   * 后端派生（不落库）：已发布但 validThrough 已过。
+   *
+   * 与 publishStatus 并列而不是取代它 —— 表格的「下架」按钮按
+   * publishStatus === 'published' 显示，把过期岗位报成 'expired'
+   * 会把运营处置它的唯一按钮弄没。见 services/api/src/jobs/job-validity.ts。
+   */
+  expired?: boolean
+  /**
+   * 后端派生（不落库）：岗位正文命中的歧视性 / 限制流动表述，供人工复核。
+   * 命中**不等于**违规，系统不据此自动拒绝 —— UI 只能提示，不得代替审核员判定。
+   */
+  contentFlags?: JobContentFlagRecord[]
   rejectReason?: string | null
+}
+
+/** 与后端 services/api/src/jobs/job-content-screening.ts 的 JobContentFlag 对齐。 */
+export interface JobContentFlagRecord {
+  category: 'discrimination' | 'mobility_restriction'
+  term: string
+  label: string
+  field: string
 }
 
 // R1: Added sourceOrgId, sourceUrl, description

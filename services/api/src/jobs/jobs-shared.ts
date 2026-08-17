@@ -7,6 +7,8 @@
 
 import { BadRequestException } from '@nestjs/common'
 import type { Prisma } from '../generated/prisma/client'
+import { jobValidityWhere, isJobExpiredForAdmin } from './job-validity'
+import { screenJob, type JobContentFlag } from './job-content-screening'
 import {
   JOB_WORK_TYPE_VALUES,
   mapJobWorkTypeToCategory,
@@ -193,6 +195,23 @@ export interface AdminJobDto {
   industry?: string; workType?: WorkType; headcount?: number
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
   reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  /** 来源标注的有效期限；null = 来源未提供。 */
+  validThrough: string | null
+  /**
+   * 派生（不落库）：已发布但 validThrough 已过。
+   *
+   * 与 publishStatus **并列**而不是取代它 —— publishStatus 保持库里真值 'published'，
+   * 否则 Admin 表的「下架」按钮（按 publishStatus === 'published' 显示）会消失，
+   * 运营反而失去处置过期岗位的唯一动作。详见 job-validity.ts。
+   */
+  expired: boolean
+  /**
+   * 派生（不落库）：岗位正文命中的歧视性 / 限制流动表述，供审核员人工复核。
+   *
+   * **命中不等于违规，系统不据此自动拒绝**（见 job-content-screening.ts 顶部约束 1）。
+   * 空数组 = 本次扫描无命中，不代表内容一定合规。
+   */
+  contentFlags: JobContentFlag[]
   reviewedBy: string | null
   reviewedAt: string | null
   rejectReason: string | null
@@ -210,6 +229,10 @@ export interface AdminFairDto {
 export interface PartnerJobDto {
   id: string; externalId: string; title: string; company: string; city: string
   sourceUrl: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  /** 来源标注的有效期限；null = 来源未提供。 */
+  validThrough: string | null
+  /** 派生（不落库）：已发布但 validThrough 已过。与 publishStatus 并列，见 job-validity.ts。 */
+  expired: boolean
   sourceOrgId: string; sourceName: string
   category?: string; salary?: string; tags?: string[]
   description?: string; requirements?: string
@@ -341,19 +364,26 @@ export interface PublishedJobFilter {
  * 抽出来是为了让「岗位列表」和「岗位要求计数」永远描述**同一批岗位** ——
  * 计数表说的是「你在这台机器上能看到的这批岗位普遍要求什么」，
  * 两处 where 一旦漂移，计数就会变成对一批用户看不到的岗位的统计。
+ *
+ * 有效期条件走 jobValidityWhere（见 job-validity.ts）：
+ * publishStatus 永远不会被写成 'expired'，过期只能按 validThrough 实时派生。
+ * 它必须进 AND 数组而不是顶层 —— 顶层已被 keyword 的 OR 占用，
+ * 再写一个同级 OR 会把有效期条件覆盖掉（对象字面量后者胜），
+ * 那样过期岗位会在带关键词搜索时重新漏出来。
  */
-export function buildPublishedJobWhere(params?: PublishedJobFilter) {
+export function buildPublishedJobWhere(params?: PublishedJobFilter, now: Date = new Date()) {
   const kw = params?.keyword?.trim()
-  const tagContains: { tagsJson: { contains: string } }[] = []
-  if (params?.tag)      tagContains.push({ tagsJson: { contains: `"${params.tag}"` } })
-  if (params?.industry) tagContains.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
+  const and: Prisma.JobWhereInput[] = []
+  if (params?.tag)      and.push({ tagsJson: { contains: `"${params.tag}"` } })
+  if (params?.industry) and.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
+  and.push(jobValidityWhere(now))
   return {
     reviewStatus:  'approved',
     publishStatus: 'published',
     ...(params?.city        ? { city: params.city }               : {}),
     ...(params?.category    ? { category: params.category }       : {}),
     ...(params?.sourceOrgId ? { sourceOrgId: params.sourceOrgId } : {}),
-    ...(tagContains.length  ? { AND: tagContains }                : {}),
+    AND: and,
     ...(kw ? {
       OR: [
         { title:       { contains: kw } },
@@ -561,6 +591,9 @@ export function prismaJobToAdminDto(j: PrismaJobRow): AdminJobDto {
     syncTime: fmtSyncTime(j.syncTime),
     reviewStatus:  j.reviewStatus  as ReviewStatus,
     publishStatus: j.publishStatus as PublishStatus,
+    validThrough: j.validThrough ? j.validThrough.toISOString() : null,
+    expired: isJobExpiredForAdmin(j.publishStatus, j.validThrough),
+    contentFlags: screenJob(j),
     reviewedBy: j.reviewedBy,
     reviewedAt: j.reviewedAt ? j.reviewedAt.toISOString() : null,
     rejectReason: j.rejectReason,
@@ -574,6 +607,8 @@ export function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     syncTime: fmtSyncTime(j.syncTime),
     reviewStatus:  j.reviewStatus  as ReviewStatus,
     publishStatus: j.publishStatus as PublishStatus,
+    validThrough: j.validThrough ? j.validThrough.toISOString() : null,
+    expired: isJobExpiredForAdmin(j.publishStatus, j.validThrough),
     sourceOrgId: j.sourceOrgId, sourceName: j.sourceName,
     category: j.category ?? undefined,
     salary: j.salary ?? undefined,
