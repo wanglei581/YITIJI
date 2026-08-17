@@ -494,6 +494,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
           pnpm --filter @ai-job-print/api verify:partner-source-capabilities
           pnpm --filter @ai-job-print/api verify:job-sync
+          pnpm --filter @ai-job-print/api verify:job-requirement-stats
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
@@ -629,6 +630,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:backend-p0-http
           RECRUITMENT_CONTENT_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-content-http
           pnpm --filter @ai-job-print/api verify:job-sync
+          pnpm --filter @ai-job-print/api verify:job-requirement-stats
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
