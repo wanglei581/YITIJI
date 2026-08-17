@@ -174,6 +174,11 @@ must('apiResumePdf', /zyd-resume-draft-v1/, '草稿产物必须有独立标识�
   )
 }
 
+// 表单校验失败（「请先填写目标岗位」）不是 AI 挂了。直接拿 `error` 点亮降级区，
+// 等于把用户少填一个字说成服务不可用 —— 那是另一种伪造。
+mustNot('interviewSetup', /failed: Boolean\(error\)/, 'ai-down 判据不得直接用 error（它也承载表单校验提示）')
+must('interviewSetup', /failed: startFailed \|\| Boolean\(aiOutage\)/, 'ai-down 判据必须来自「进面试间真的失败过」而不是任意 error')
+
 must('interviewSetup', /<AiTaskRegion/, '面试设置页失败态必须挂 AiTaskRegion')
 must('interviewSetup', /mode: 'blocked'/, '降级模式必须是 blocked —— 通用题目单不是模拟面试的等价替代')
 must('interviewSetup', /通用题库/, '降级文案必须写明题目来自通用题库，不是按岗位定制')

@@ -140,6 +140,13 @@ export function InterviewSetupPage() {
   const [probed, setProbed] = useState(false)
   /** 通用题目单生成中（不经过模型，只是服务端排版 + 上传）。 */
   const [printingSheet, setPrintingSheet] = useState(false)
+  /**
+   * 「进面试间」这一步真的失败过。
+   *
+   * 不能直接用 `error` 判：本页的 `error` 也承载「请先填写目标岗位」这类**表单校验**提示，
+   * 拿它去点亮 ai-down 降级区，等于把用户少填一个字说成 AI 挂了 —— 那是另一种伪造。
+   */
+  const [startFailed, setStartFailed] = useState(false)
 
   useBusyLock(creating || uploading || printingSheet)
 
@@ -173,6 +180,7 @@ export function InterviewSetupPage() {
     setCreating(true)
     setError(null)
     setAiOutage(null)
+    setStartFailed(false)
     try {
       const input: CreateInterviewInput = {
         interviewerType,
@@ -205,6 +213,7 @@ export function InterviewSetupPage() {
     } catch (err) {
       const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
       setError(message)
+      setStartFailed(true)
       // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误只是本次失败，保留重试入口。
       if (isAiOutage(err)) setAiOutage(message)
       else setProbed(true)
@@ -265,12 +274,12 @@ export function InterviewSetupPage() {
   const aiTask = useAiTask({
     availability,
     pending: creating,
-    failed: Boolean(error) || Boolean(aiOutage),
+    failed: startFailed || Boolean(aiOutage),
     hasResult: false,
   })
   const fallback: AiTaskFallback = {
     mode: 'blocked',
-    reason: aiOutage ?? error ?? '本次没能进入 AI 面试间。',
+    reason: aiOutage ?? (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
     blockedActionLabel: '开始模拟面试（AI 面试官）',
     stillAvailable: pendingSession
       ? '题目本身不依赖 AI：本机有一份写死的通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
