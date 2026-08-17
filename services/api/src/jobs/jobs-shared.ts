@@ -325,6 +325,45 @@ export function buildJobIndustryTag(industry: string): string {
   return `${INDUSTRY_TAG_PREFIX}${industry.trim()}`
 }
 
+/** Kiosk 公开岗位的筛选条件（approved + published）。 */
+export interface PublishedJobFilter {
+  keyword?: string
+  city?: string
+  industry?: string
+  category?: string
+  sourceOrgId?: string
+  tag?: string
+}
+
+/**
+ * 已发布岗位的 where 条件。
+ *
+ * 抽出来是为了让「岗位列表」和「岗位要求计数」永远描述**同一批岗位** ——
+ * 计数表说的是「你在这台机器上能看到的这批岗位普遍要求什么」，
+ * 两处 where 一旦漂移，计数就会变成对一批用户看不到的岗位的统计。
+ */
+export function buildPublishedJobWhere(params?: PublishedJobFilter) {
+  const kw = params?.keyword?.trim()
+  const tagContains: { tagsJson: { contains: string } }[] = []
+  if (params?.tag)      tagContains.push({ tagsJson: { contains: `"${params.tag}"` } })
+  if (params?.industry) tagContains.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
+  return {
+    reviewStatus:  'approved',
+    publishStatus: 'published',
+    ...(params?.city        ? { city: params.city }               : {}),
+    ...(params?.category    ? { category: params.category }       : {}),
+    ...(params?.sourceOrgId ? { sourceOrgId: params.sourceOrgId } : {}),
+    ...(tagContains.length  ? { AND: tagContains }                : {}),
+    ...(kw ? {
+      OR: [
+        { title:       { contains: kw } },
+        { company:     { contains: kw } },
+        { description: { contains: kw } },
+      ],
+    } : {}),
+  }
+}
+
 export function safeJsonArr(s: string): string[] {
   try {
     const v = JSON.parse(s)

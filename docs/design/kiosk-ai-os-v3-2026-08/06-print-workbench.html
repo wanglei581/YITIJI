@@ -2576,7 +2576,11 @@
     P34: { n: '岗位信息域首屏', f: '34-jobs-hub.html',       s: '' },
     P36: { n: '招聘会域首屏',   f: '36-fairs-hub.html',      s: '' },
     P38: { n: '政策服务域首屏', f: '38-policy-hub.html',     s: '' },
-    P39: { n: '打印扫描服务域首屏', f: '39-print-hub.html',  s: '' }
+    P39: { n: '打印扫描服务域首屏', f: '39-print-hub.html',  s: '' },
+    /* P47 是「小程序下单 → 到机码核销」那条路的落点。它交接过来时**参数已经定死**
+       （文件、页数、份数、颜色都在小程序里选完了），所以它直落 s5 收银，
+       不像别的来源页那样落 s3 参数核价。回程 s 给 s2 —— 回去就是重新输一次码。 */
+    P47: { n: '到机码核销',     f: '47-arrival-code.html',   s: 's2' }
   }
 
   /* 产物类型白名单：只认这十种，别的一律当没传 */
@@ -2855,7 +2859,8 @@
     P36: ['招聘会', '36-fairs-hub.html'],
     P37: ['面试训练', '37-interview-hub.html'],
     P38: ['政策服务', '38-policy-hub.html'],
-    P39: ['打印扫描', '39-print-hub.html']
+    P39: ['打印扫描', '39-print-hub.html'],
+    P47: ['打印扫描', '39-print-hub.html']
   }
   if (!Object.prototype.hasOwnProperty.call(D, from)) return
   var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }

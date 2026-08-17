@@ -358,9 +358,18 @@ function verifyKioskContract(): void {
     !/!s\.attempt\.qrCodeContent/.test(cashier) &&
     /onSubmitCode\(\)/.test(panel) &&
     /autoFocus/.test(panel) &&
-    /maxLength=\{18\}/.test(panel)
+    // 付款码不再绑定到可见输入框：它是一次性支付凭证，27 寸公共屏上明文回显
+    // 等同于把现金摊在桌上（PR #648）。码只活在 authCodeBufferRef 里，输入框
+    // 每次按键即被排空，父层在 onSubmitCode() 的同步段读走后立刻擦除缓冲区。
+    //
+    // ⚠️ 这里断言的是「加固后的形态」，不是旧的 maxLength={18}。原断言钉的正是
+    // 被 #648 出于安全删掉的那个可见输入框——门禁钉住了一个安全缺陷。
+    // 下面两条一正一反：正的要求缓冲区存在，反的禁止把码绑回 DOM。
+    /authCodeBufferRef/.test(panel) &&
+    /AUTH_CODE_LENGTH/.test(panel) &&
+    !/value=\{authCode\}/.test(panel)
   ) {
-    pass('cashier enables both screen QR and scanner payment-code modes for every real channel, while retaining automatic reconciliation')
+    pass('cashier enables both screen QR and scanner payment-code modes for every real channel, while retaining automatic reconciliation and keeping the payment code out of the DOM')
   } else {
     fail('cashier QR auto-reconciliation guard missing')
   }
@@ -371,7 +380,13 @@ function verifyKioskContract(): void {
     /isScreenQrClosureConfirmed/.test(cashierStatus) &&
     /付款码支付可能仍在渠道处理中/.test(cashierStatus) &&
     /codeSubmitLockRef/.test(cashier) &&
-    /onSubmitCode\(nextCode\)/.test(panel)
+    // 「读满即提交、不等回车后缀」的断言。#648 之后码不再作为参数传给父层
+    // （签名从 onSubmitCode(nextCode) 变成 onSubmitCode()，父层在同步段从
+    // authCodeBufferRef 读走），所以这里改钉「凑满 AUTH_CODE_LENGTH 就提交」
+    // 这个行为本身，而不是钉早先那个传参形状。
+    /input\.value = ''/.test(panel) &&
+    /next\.length !== AUTH_CODE_LENGTH\) return/.test(panel) &&
+    /onSubmitCode\(\)/.test(panel)
   ) {
     pass('cashier distinguishes expired screen QR from payment-code reconciliation and accepts scanner input without an Enter suffix')
   } else {

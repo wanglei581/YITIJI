@@ -8,6 +8,7 @@ import {
   readTimeoutMs,
   withBootTimeout,
 } from '../boot/boot-readiness'
+import { REDIS_DEGRADED_IMPACT, redisDegradedImpactSentence } from './redis-degradation'
 import { REDIS_CLIENT } from './redis.service'
 
 /** 启动期 Redis 探活超时。默认 5s：足够本机/同机房握手，又不会把启动拖长。 */
@@ -64,12 +65,16 @@ export class RedisConnectivityService implements OnModuleInit {
       this.logger.log(`Redis 可达 target=${target}`)
     } catch (error) {
       const detail = error instanceof Error ? error.name : 'UnknownError'
+      // ⚠️ 这段文案此前写的是「打印、终端 Agent、管理端、合作机构端不受影响」——
+      // 与实测相反：管理端 / 合作机构端经 JwtAuthGuard 读会话状态缓存，
+      // Redis 挂掉时每个带守卫的端点都 500（单请求实测 37.9s）。
+      // 健康检查撒谎比服务挂掉更糟：它让运维不去查。现在文案与
+      // REDIS_DEGRADED_IMPACT 同源，并由 verify:redis-degradation-truth 逐条实测核对。
       const message =
         `Redis 在启动期不可达（${target}，${timeoutMs}ms 内未响应 PING，${detail}）。` +
-        'C 端会员登录会话 / 短信验证码 / 频控与会员隐私清理调度不可用；' +
-        '打印、终端 Agent、管理端、合作机构端不受影响。' +
+        redisDegradedImpactSentence() +
         '请检查 REDIS_URL、Redis 进程是否在运行、以及主机间防火墙/安全组是否放行该端口。'
-      bootReadiness.markDegraded(REDIS_SUBSYSTEM, 'REDIS_UNREACHABLE_AT_BOOT', message)
+      bootReadiness.markDegraded(REDIS_SUBSYSTEM, 'REDIS_UNREACHABLE_AT_BOOT', message, REDIS_DEGRADED_IMPACT)
       // 一条可 grep 的定长错误行 + 一条给人看的说明，二者都不含凭证。
       this.logger.error(
         `${BOOT_DEGRADED_LOG_MARKER} subsystem=${REDIS_SUBSYSTEM} code=REDIS_UNREACHABLE_AT_BOOT ` +
