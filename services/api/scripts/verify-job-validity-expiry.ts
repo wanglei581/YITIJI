@@ -16,7 +16,7 @@
  *   2.  过期岗位详情 /jobs/:id 返回 null（列表筛掉但详情能开 = 旧链接照样能投）
  *   3.  validThrough 为 null 的岗位**不**被判过期（缺有效期 ≠ 失效，误杀会清空列表）
  *   4.  边界：validThrough 恰为 now 仍然可见（strict `<`，与 isJobExpired 一致）
- *   5.  isJobExpired 与 jobValidityWhere 谓词严格互补（两处写法不得漂移）
+ *   5.  isJobExpired / jobValidityWhere / jobExpiredWhere 三处谓词严格同构（不得漂移）
  *   6.  管理端 DTO 能看见过期岗位，且 publishStatus 保持 'published'
  *       —— 派生成 'expired' 会让 Admin 表的「下架」按钮消失
  *   7.  静态：所有求职者可见的 Job 读取点都带了有效期条件
@@ -31,7 +31,7 @@ import { closeSync, openSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
-import { isJobExpired, jobValidityWhere, isJobExpiredForAdmin } from '../src/jobs/job-validity'
+import { isJobExpired, jobValidityWhere, jobExpiredWhere, isJobExpiredForAdmin } from '../src/jobs/job-validity'
 import { prismaJobToAdminDto } from '../src/jobs/jobs-shared'
 
 const apiRoot = path.resolve(__dirname, '..')
@@ -142,6 +142,31 @@ async function main(): Promise<void> {
       }
     }
     pass('5. isJobExpired 与 jobValidityWhere 谓词严格互补（-1d/-1ms/0/+1ms/+1d 全部相反）')
+
+    // ── 5b. 第三处写法 jobExpiredWhere 同样不得漂移 ──────────────────────
+    // 批量发布要如实统计「排除了多少条过期岗位」，只有可下推的反向条件才能 count()。
+    // 它不能由 jobValidityWhere 取反得到（Prisma 的 NOT 会把 validThrough IS NULL
+    // 的行一并丢掉），所以是独立的第三处写法，必须单独锁。
+    const expiredWhere = jobExpiredWhere(probeNow) as { validThrough: { lt?: Date } }
+    if (!(expiredWhere.validThrough?.lt instanceof Date)) {
+      fail(`5b. jobExpiredWhere 结构变了：${JSON.stringify(expiredWhere)}（期望 {validThrough:{lt}}）`)
+    }
+    if (expiredWhere.validThrough.lt.getTime() !== probeNow.getTime()) {
+      fail('5b. jobExpiredWhere 的 lt 不等于传入的 now —— 与 jobValidityWhere 用了不同时刻')
+    }
+    for (const offset of [-DAY, -1, 0, 1, DAY]) {
+      const vt = new Date(probeNow.getTime() + offset)
+      const memoryExpired = isJobExpired(vt, probeNow)
+      const sqlExpired = vt.getTime() < probeNow.getTime()   // lt 语义
+      if (memoryExpired !== sqlExpired) {
+        fail(`5b. 谓词漂移：validThrough=now${offset >= 0 ? '+' : ''}${offset}ms 时 isJobExpired=${memoryExpired} 而 SQL 过期=${sqlExpired}`)
+      }
+    }
+    // NULL 语义：validThrough 为空不得被 jobExpiredWhere 命中（SQL 里 NULL < now 是 UNKNOWN）。
+    if (isJobExpired(null, probeNow)) {
+      fail('5b. isJobExpired(null) 判成过期 —— 缺有效期不等于失效')
+    }
+    pass('5b. jobExpiredWhere 与 isJobExpired 同构（含 NULL 语义），三处写法未漂移')
 
     // ── 6. 管理端看得见,且 publishStatus 保持库里真值 ────────────────────
     const expiredRow = await prisma.job.findUnique({ where: { id: id('expired') } })

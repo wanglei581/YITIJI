@@ -24,6 +24,13 @@ import { JobsService } from '../jobs/jobs.service'
 import { PoliciesService } from '../policies/policies.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { listContentTrustedOrgIds, type OrgTrustReader } from '../common/content-trust'
+import {
+  bulkPublishExpiryField,
+  bulkPublishNotExpiredWhere,
+  bulkPublishExpiredWhere,
+  isBulkPublishExpired,
+  bulkPublishExpiredMessage,
+} from './bulk-publish-expiry'
 
 export type BulkPublishKind = 'job' | 'fair' | 'policy'
 
@@ -38,7 +45,15 @@ export type BulkPublishKind = 'job' | 'fair' | 'policy'
  */
 export const BULK_PUBLISH_MAX_BATCH = 100
 
-/** 允许被批量发布的起始发布态。expired 故意排除:批量动作不复活过期内容。 */
+/**
+ * 允许被批量发布的起始发布态。
+ *
+ * 注意:这里**只是发布状态机**的起点集合,不承担「过期」判定。
+ * PublishStatus 枚举里虽然有 'expired',但全仓从不把它落库
+ * (verify:job-validity-expiry §8 专门断言不得落库,有效期只允许读取时派生),
+ * 所以过期与否必须按各内容类型自己的日期字段实时判断 ——
+ * 见 ./bulk-publish-expiry.ts。
+ */
 const BULK_PUBLISHABLE_FROM: readonly string[] = ['draft', 'unpublished']
 
 export interface BulkPublishFilter {
@@ -61,16 +76,34 @@ export interface BulkPublishPreviewResult {
   kind: BulkPublishKind
   /** 本轮实际可提交的 id 上限 */
   batchLimit: number
-  /** 命中筛选且合格(approved + draft/unpublished)的**总数**,可能大于 items.length */
+  /** 命中筛选且合格(approved + draft/unpublished + 来源可信 + 未过期)的**总数**,可能大于 items.length */
   eligibleTotal: number
   /** 本轮候选明细,最多 batchLimit 条 */
   items: BulkPublishPreviewItem[]
   /** eligibleTotal > items.length 时为 true —— 需要多轮 */
   truncated: boolean
-  /** 命中筛选但被排除的条目数,按原因分列,便于操作者理解「为什么不是全部」 */
+  /**
+   * 命中筛选但被排除的条目数,按原因分列,便于操作者理解「为什么不是全部」。
+   *
+   * 这几个桶是**排除原因**,不是一个划分:同一条内容可以既过期又来源不可信,
+   * 会同时出现在 expired 和 orgTrustInactive 里。相加没有意义,分别看才有意义。
+   */
   excluded: {
     notApproved: number
     alreadyPublished: number
+    /**
+     * 已过审、且处于可发布态,但**已经过期**的条数。
+     *
+     * 判据按内容类型各自的日期字段实时算(岗位 validThrough / 招聘会 endAt),
+     * 见 ./bulk-publish-expiry.ts。
+     *
+     * 旧实现统计的是 publishStatus === 'expired' —— 那个值全仓从不落库,
+     * 于是这个数字对三种内容**恒为 0**,运营永远看不到「有 N 条已经过期了」,
+     * 同时候选池也没把它们排除掉。这是本字段存在的全部理由,别再改回去。
+     *
+     * 政策公告没有有效期字段(PolicyPost 只有 publishedDate 发布日期),
+     * 该类内容此项恒为 0 —— 这个 0 是「没有有效期概念」,不是「没算」。
+     */
     expired: number
     /**
      * 来源机构未通过内容信任核验(contentTrustStatus≠active 或已归档)。
@@ -105,7 +138,16 @@ interface KindDescriptor {
   /** prisma 模型访问器 */
   findMany: (args: Record<string, unknown>) => Promise<Record<string, unknown>[]>
   count: (args: Record<string, unknown>) => Promise<number>
-  /** 标题列名(招聘会是 name,岗位/政策是 title) */
+  /**
+   * 标题列名。三种内容**都是 title** —— JobFair 上没有 name 这一列。
+   *
+   * 曾经写成 'name',于是 kind='fair' 的 preview/execute 会
+   * `select: { name: true }`,真 Prisma 直接抛
+   * 「Invalid `prisma.jobFair.findMany()` invocation」→ 招聘会批量发布恒 500。
+   * 两个既有门禁没抓住,是因为它们的假 Prisma **完全忽略 select**、
+   * 且夹具给假行补了个 name 属性。
+   * 现在 verify:publish-expiry-completeness 的假 Prisma 会校验 select 列是否存在。
+   */
   titleField: string
   /** 复用的单条发布方法 —— 批量与单条的唯一执行路径 */
   publishOne: (id: string, user: AuthedUser) => Promise<unknown>
@@ -136,7 +178,7 @@ export class BulkPublishService {
       return {
         findMany: (args) => this.prisma.jobFair.findMany(args as never) as unknown as Promise<Record<string, unknown>[]>,
         count: (args) => this.prisma.jobFair.count(args as never),
-        titleField: 'name',
+        titleField: 'title',
         publishOne: (id, user) => this.jobs.publishFairSource(id, 'publish', user),
         auditTargetType: 'fair',
       }
@@ -196,18 +238,32 @@ export class BulkPublishService {
     // 事故正是这样发生的(见 src/common/content-trust.ts 顶部)。
     const trustedOrgIds = await listContentTrustedOrgIds(this.prisma as unknown as OrgTrustReader)
 
+    // 有效期条件同样在预览阶段生效:候选池排除已过期岗位 / 已结束招聘会。
+    // 判据见 ./bulk-publish-expiry.ts(岗位复用求职者可见性用的同一个条件)。
+    const now = new Date()
+    const notExpired = bulkPublishNotExpiredWhere(filter.kind, now)
+    const expiredWhere = bulkPublishExpiredWhere(filter.kind, now)
+
     // 用 AND 组合而不是对象展开:scope 里可能已经有 `sourceOrgId: '<按机构筛选>'`,
     // 直接 `{ ...scope, sourceOrgId: { in: ... } }` 会把操作者的机构筛选**悄悄覆盖掉**。
     const approvedAndPublishable = { reviewStatus: 'approved', publishStatus: { in: BULK_PUBLISHABLE_FROM } }
     const eligibleWhere = {
-      AND: [scope, approvedAndPublishable, { sourceOrgId: { in: trustedOrgIds } }],
+      AND: [
+        scope,
+        approvedAndPublishable,
+        { sourceOrgId: { in: trustedOrgIds } },
+        ...(notExpired ? [notExpired] : []),
+      ],
     }
 
     const [eligibleTotal, notApproved, alreadyPublished, expired, orgTrustInactive, rows] = await Promise.all([
       d.count({ where: eligibleWhere }),
       d.count({ where: { ...scope, reviewStatus: { not: 'approved' } } }),
       d.count({ where: { ...scope, reviewStatus: 'approved', publishStatus: 'published' } }),
-      d.count({ where: { ...scope, reviewStatus: 'approved', publishStatus: 'expired' } }),
+      // 「本来该能发、只差没过期」的条数。没有有效期概念的内容类型如实回 0。
+      expiredWhere
+        ? d.count({ where: { AND: [scope, approvedAndPublishable, expiredWhere] } })
+        : Promise.resolve(0),
       // 「本来该能发、只差来源机构核验」的条数:approved + draft/unpublished,但机构不可信。
       d.count({
         where: { AND: [scope, approvedAndPublishable, { sourceOrgId: { notIn: trustedOrgIds } }] },
@@ -286,16 +342,39 @@ export class BulkPublishService {
 
     const d = this.descriptor(kind)
 
-    // 预取标题,只为让失败明细能显示「是哪一条」,不参与任何发布判定。
-    const titleRows = await d.findMany({
+    // 预取标题(让失败明细能显示「是哪一条」)与有效期字段。
+    // 有效期必须在 execute 再判一次:preview 与 execute 之间可能隔很久,
+    // 期间条目会自然过期 —— 只在 preview 收窄候选池挡不住这条缝。
+    const expiryField = bulkPublishExpiryField(kind)
+    const now = new Date()
+    const prefetched = await d.findMany({
       where: { id: { in: ids } },
-      select: { id: true, [d.titleField]: true },
+      select: {
+        id: true,
+        [d.titleField]: true,
+        ...(expiryField ? { [expiryField]: true } : {}),
+      },
     })
-    const titleMap = new Map(titleRows.map((r) => [String(r.id), String(r[d.titleField] ?? '')]))
+    const rowMap = new Map(prefetched.map((r) => [String(r.id), r]))
 
     const results: BulkPublishItemResult[] = []
     for (const id of ids) {
-      const title = titleMap.get(id) ?? '(已不存在)'
+      const row = rowMap.get(id)
+      const title = row ? String(row[d.titleField] ?? '') : '(已不存在)'
+
+      // 过期条目直接计失败并给出可读原因。这里不写任何状态,
+      // 只是**不把它交给**单条发布方法 —— 仍然没有第二条写路径。
+      if (isBulkPublishExpired(kind, row, now)) {
+        results.push({
+          id,
+          title,
+          status: 'failed',
+          errorCode: 'BULK_PUBLISH_EXPIRED',
+          errorMessage: bulkPublishExpiredMessage(kind, row),
+        })
+        continue
+      }
+
       try {
         // ★ 与单条发布同一条路径。校验 / 审计 / 日志全部由它负责。
         const updated = (await d.publishOne(id, user)) as { publishStatus?: string }

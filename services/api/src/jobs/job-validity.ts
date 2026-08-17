@@ -57,6 +57,24 @@ export function jobValidityWhere(now: Date = new Date()): Prisma.JobWhereInput {
 }
 
 /**
+ * 已过有效期岗位的 SQL 条件 —— jobValidityWhere 的严格补集。
+ *
+ * 为什么需要「反向」写法而不是让调用方套 NOT:
+ *   Prisma 的 `NOT` 会翻成 SQL 的 NOT,而 `NOT (validThrough < now)` 在
+ *   validThrough IS NULL 时是 UNKNOWN,行会被整条丢掉 —— 「来源未提供有效期」
+ *   的岗位会被误判。所以正向条件必须写成显式 OR(jobValidityWhere),
+ *   反向条件必须写成裸比较(本函数),两者都不能由对方取反得到。
+ *
+ * NULL 语义与 isJobExpired 一致:validThrough 为空 = 不算过期。
+ * SQL 里 `validThrough < now` 对 NULL 恒为 UNKNOWN,天然不命中,无需额外分支。
+ *
+ * 三处写法的互补性由 verify:job-validity-expiry 断言,不得各自漂移。
+ */
+export function jobExpiredWhere(now: Date = new Date()): Prisma.JobWhereInput {
+  return { validThrough: { lt: now } }
+}
+
+/**
  * 管理端 / 机构端的过期标记。
  *
  * 与公开侧相反 —— 管理端**必须看得见**过期岗位，否则运营无从发现和处置。

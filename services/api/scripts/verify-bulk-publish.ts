@@ -60,6 +60,14 @@ function matches(row: Row, where: Record<string, unknown> | undefined): boolean 
       if (!clauses.every((c) => matches(row, c))) return false
       continue
     }
+    // OR 必须显式支持:候选池带了有效期条件(jobValidityWhere 是 OR 写法)。
+    // 少了这一支,未知键会落到下面的标量分支、恒真放行 —— 假 Prisma 比真库更宽松,
+    // 断言就静默退化成「什么都能过」。
+    if (key === 'OR') {
+      const clauses = (Array.isArray(cond) ? cond : [cond]) as Record<string, unknown>[]
+      if (!clauses.some((c) => matches(row, c))) return false
+      continue
+    }
     const val = row[key]
     if (cond !== null && typeof cond === 'object') {
       const c = cond as Record<string, unknown>
@@ -68,6 +76,11 @@ function matches(row: Row, where: Record<string, unknown> | undefined): boolean 
       if ('not' in c && val === c.not) return false
       if ('gte' in c && !(val instanceof Date && val >= (c.gte as Date))) return false
       if ('lte' in c && !(val instanceof Date && val <= (c.lte as Date))) return false
+      // SQL 语义:NULL 参与比较结果为 UNKNOWN,即不命中。
+      if ('lt' in c && !(val instanceof Date && val < (c.lt as Date))) return false
+    } else if (cond === null) {
+      // Prisma 的 `field: null` = IS NULL;假行用 undefined 表示同一件事。
+      if (val !== null && val !== undefined) return false
     } else if (val !== cond) {
       return false
     }
