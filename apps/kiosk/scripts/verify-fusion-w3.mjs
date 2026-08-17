@@ -236,7 +236,13 @@ includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'up
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
-includes('src/pages/resume/ResumeReportPage.tsx', 'extractionNotice.warnings', 'OCR warnings remain visible')
+// 提示语从「一律说走了 OCR」改成「按真实来源组织」后，warnings 仍照常转述，
+// 只是不再写死成 `extractionNotice.warnings` 这一个字面表达式。
+// 这里改断真实契约：①提示进得了渲染列表 ②warnings 被原样转述
+// ③「经 OCR 提取」这句必须以真实 textSource 为条件——否则就是对用户谎报处理方式。
+includes('src/pages/resume/ResumeReportPage.tsx', 'buildExtractionNotice(extractionNotice)', 'extraction notice reaches the notice list')
+includes('src/pages/resume/ResumeReportPage.tsx', 'notice.warnings', 'extraction warnings remain transcribed')
+includes('src/pages/resume/ResumeReportPage.tsx', "notice.textSource === 'image_ocr'", 'OCR claim is gated on real OCR source')
 includes('src/pages/resume/ResumeGeneratePage.tsx', 'submitResumeGenerate(input, getToken())', 'generation keeps real submission')
 includes('src/pages/resume/ResumeGeneratePreviewPage.tsx', 'exported?.printFileUrl', 'preview prints only a real file URL')
 includes('src/pages/resume/ResumeOptimizePage.tsx', 'confirmLeave', 'optimization keeps dirty-leave protection')

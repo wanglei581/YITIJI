@@ -8,6 +8,7 @@ import {
   Loader2Icon,
   MicIcon,
   PencilLineIcon,
+  RefreshCwIcon,
   RotateCcwIcon,
   SendIcon,
   SkipForwardIcon,
@@ -28,6 +29,9 @@ interface InterviewAnswerDockProps {
   maxRecordSec: number
   draft: string
   voiceAvailable: boolean
+  /** 语音不可用的常显原因（无设备 / 无权限 / 不支持）。可用时为 null。 */
+  micBlockedReason: string | null
+  onRecheckMic: () => void
   onDraftChange: (value: string) => void
   onReviewChange: (value: string) => void
   onReviewSubmit: () => void
@@ -43,8 +47,9 @@ interface InterviewAnswerDockProps {
 export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
   const {
     micError, error, voiceLocked, busyTurn, phase, mode, voice, recordSec, maxRecordSec,
-    draft, voiceAvailable, onDraftChange, onReviewChange, onReviewSubmit, onRetryVoice,
-    onStopRecording, onUseText, onUseVoice, onSkip, onSubmitText, onFinish,
+    draft, voiceAvailable, micBlockedReason, onRecheckMic, onDraftChange, onReviewChange,
+    onReviewSubmit, onRetryVoice, onStopRecording, onUseText, onUseVoice, onSkip,
+    onSubmitText, onFinish,
   } = props
   const answerStatus =
     phase === 'done_suggest' ? '本场已完成'
@@ -64,10 +69,13 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
         <span>{answerStatus}</span>
       </div>
       {micError && (
-        <div className="interview-session__mic-error">
-          <div><AlertCircleIcon aria-hidden="true" /><p><strong>无法访问麦克风，请检查浏览器权限或改用文字输入</strong><span>确认浏览器已允许麦克风，并检查设备是否被其他程序占用。</span></p></div>
+        <div className="interview-session__mic-error" data-mic-error>
+          {/* 文案来自按 error.name 归因的结果：没有设备就说没有设备，
+              不再统一说成「请检查浏览器权限」。 */}
+          <div><AlertCircleIcon aria-hidden="true" /><p><strong>{error ?? '麦克风调用失败'}</strong>{micBlockedReason && <span>{micBlockedReason}</span>}</p></div>
           <div>
             <Button size="lg" disabled={voiceLocked || busyTurn} onClick={onRetryVoice}><RotateCcwIcon aria-hidden="true" />重新尝试语音</Button>
+            <Button size="lg" variant="secondary" disabled={voiceLocked || busyTurn} onClick={onRecheckMic}><RefreshCwIcon aria-hidden="true" />重新检测麦克风</Button>
             <Button size="lg" variant="secondary" disabled={voiceLocked || busyTurn} onClick={onUseText}><KeyboardIcon aria-hidden="true" />改用文字输入</Button>
           </div>
         </div>
@@ -112,10 +120,31 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
           <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} disabled={busyTurn} rows={3} maxLength={2000} placeholder="在这里输入你的回答…" />
           <div>
             <Button size="lg" disabled={busyTurn} onClick={onSubmitText}><SendIcon aria-hidden="true" />提交回答</Button>
-            {voiceAvailable && <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onUseVoice}><MicIcon aria-hidden="true" />改用语音回答</Button>}
+            {/* 能力门禁：不隐藏入口（用户可能后插 USB 麦克风），用 aria-disabled
+                置灰 + 下方常显原因。触屏没有 hover，禁止用 title 承载原因。 */}
+            <Button
+              size="lg"
+              variant="secondary"
+              disabled={busyTurn}
+              aria-disabled={!voiceAvailable || undefined}
+              data-mic-gated={!voiceAvailable || undefined}
+              className={!voiceAvailable ? 'opacity-50' : undefined}
+              onClick={onUseVoice}
+            >
+              <MicIcon aria-hidden="true" />改用语音回答
+            </Button>
             <Button size="lg" variant="secondary" disabled={busyTurn} onClick={onSkip}><SkipForwardIcon aria-hidden="true" />跳过</Button>
             <Button size="lg" variant="secondary" className="is-danger" disabled={busyTurn} onClick={onFinish}><SquareIcon aria-hidden="true" />结束面试</Button>
           </div>
+          {!voiceAvailable && micBlockedReason && (
+            <p className="interview-session__mic-reason" data-mic-reason role="status">
+              <AlertCircleIcon aria-hidden="true" />
+              <span>{micBlockedReason}</span>
+              <button type="button" className="interview-session__mic-recheck" onClick={onRecheckMic}>
+                重新检测麦克风
+              </button>
+            </p>
+          )}
         </div>
       )}
       <p className="interview-session__privacy-note"><ClockIcon aria-hidden="true" />模拟练习仅供本人参考，对话内容不会发送给任何企业</p>

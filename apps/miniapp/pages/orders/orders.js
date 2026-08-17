@@ -56,7 +56,7 @@ function formatPrice(cents) {
   return '¥' + (amountCents / 100).toFixed(2)
 }
 
-// 取件码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
+// 到机码格式化：每 2 位一组方便阅读，如 "AB-C3-9M"
 function fmtCode(raw) {
   if (!raw) return ''
   const s = raw.replace(/\s/g, '').toUpperCase()
@@ -87,9 +87,9 @@ function toUiItem(item) {
     pickupRaw,
     expiresAt:   item.pickupCodeExpiresAt || item.expiresAt || item.pickupExpiresAt || '',
     taskStatus:  effectiveStatus,
-    // 已完成可再打一份；取件码可见时显示"查看取件码"
+    // 已完成可再打一份；到机码可见时显示"查看到机码"
     action,
-    actionLabel: action === 'pickup' ? '查看取件码'
+    actionLabel: action === 'pickup' ? '查看到机码'
                : action === 'reprint' ? '再打印一份'
                : '',
     orderId: item.id,
@@ -218,7 +218,7 @@ Page({
       `规格：${item.spec}`,
       `金额：${item.price}`,
     ]
-    if (item.pickup) lines.push(`取件码：${item.pickup}`)
+    if (item.pickup) lines.push(`到机码：${item.pickup}`)
     wx.showModal({
       title: item.title,
       content: lines.join('\n'),

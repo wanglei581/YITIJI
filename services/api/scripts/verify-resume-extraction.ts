@@ -315,6 +315,15 @@ async function main(): Promise<void> {
     purpose: 'resume_upload',
     endUserId: null,
   })
+  // 「只有姓名和电话」的极简历：有真实文字层，但字数低于 MIN_TEXT_CHARS。
+  // 这类文件绝不能被说成「扫描件 / 无文字层」（见 case 13）。
+  fixtures.set('short-pdf-1', {
+    buffer: buildTextPdf(['林小雨', '13800137902']),
+    mimeType: PDF_MIME,
+    filename: 'minimal.pdf',
+    purpose: 'resume_upload',
+    endUserId: null,
+  })
 
   // 1) DOCX 提取
   const r1 = await service.extractResumeText({ fileId: 'docx-1' })
@@ -439,6 +448,40 @@ async function main(): Promise<void> {
   } finally {
     unpdfSpyModule.extractText = originalUnpdfExtractText
   }
+
+  // 13) 有文字层但字数不足的 PDF：不得报「扫描件 / 无文字层」
+  //
+  // 回归背景：此前 extractPdf 把「抽不到字」和「抽到字但太少」合并成同一句
+  // PDF_TEXT_EMPTY「检测到扫描件 / 图片型 PDF（无文字层）」。对只写了姓名和电话的
+  // 极简历来说这句话是事实错误，且建议用户「上传带文字层的 PDF」——正是他已经做过的事。
+  process.env['OCR_PROVIDER'] = 'disabled'
+  const ocrDisabledForShortPdf = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
+  const svcShortPdf = new ResumeExtractionService(fakeFiles as never, ocrDisabledForShortPdf)
+  const r13 = await svcShortPdf.extractResumeText({ fileId: 'short-pdf-1' })
+  assert(
+    !r13.ok && r13.errorCode === 'TEXT_TOO_SHORT',
+    `13a. 有文字层但过短的 PDF 返回 TEXT_TOO_SHORT（而非 PDF_TEXT_EMPTY），got ${JSON.stringify(r13)}`,
+  )
+  assert(
+    !r13.ok && !(r13.errorMessage ?? '').includes('无文字层') && !(r13.errorMessage ?? '').includes('扫描件'),
+    `13b. 该失败文案不得声称文件是扫描件 / 无文字层，got ${JSON.stringify(r13.ok ? null : r13.errorMessage)}`,
+  )
+  assert(!r13.ok && r13.text === undefined, '13c. 失败结果仍不返回任何文本（不伪造成功）')
+
+  // 13d) OCR 可用时行为不变：短文字层 PDF 仍交给 OCR，不因上面的修复损失识别能力。
+  process.env['OCR_PROVIDER'] = 'tencent'
+  process.env['TENCENT_OCR_SECRET_ID'] = 'fake-id'
+  process.env['TENCENT_OCR_SECRET_KEY'] = 'fake-key'
+  const ocrOnForShortPdf = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
+  const svcShortPdfOcr = new ResumeExtractionService(fakeFiles as never, ocrOnForShortPdf)
+  const r13d = await svcShortPdfOcr.extractResumeText({ fileId: 'short-pdf-1' })
+  assert(
+    !r13d.ok && r13d.errorCode === 'OCR_FAILED' && r13d.text === undefined,
+    `13d. OCR 可用时短文字层 PDF 仍走 OCR 路径（占位 provider 诚实失败为 OCR_FAILED），got ${JSON.stringify(r13d)}`,
+  )
+  process.env['OCR_PROVIDER'] = 'disabled'
+  delete process.env['TENCENT_OCR_SECRET_ID']
+  delete process.env['TENCENT_OCR_SECRET_KEY']
 
   console.log('\n=== ALL PASS ===\n')
 }

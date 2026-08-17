@@ -34,7 +34,7 @@ test('direct visit without a task context cannot claim success @kiosk', async ({
 
   await expect(page.getByText('无法确认打印结果', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('打印完成', { exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '异常反馈' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '反馈问题' })).toHaveCount(0)
   await expect(page.getByRole('group', { name: '满意度评分' })).toHaveCount(0)
 })
 
@@ -176,15 +176,123 @@ for (const unavailable of [
   })
 }
 
-test('task-aware feedback uses the existing print feedback contract @kiosk', async ({ page, api }) => {
+// ============================================================
+// 反馈问题入口（匿名可提交）。
+//
+// 旧断言在这里期望点击后跳到 /me/feedback —— 那是会员面，必须登录。
+// 刚打印失败的人绝大多数没登录，等于把报障挡在登录墙外，所以那条契约本身是 bug，
+// 已随本批次改为就地打匿名端点 POST /kiosk/feedback。
+// ============================================================
+
+/** 让页面停在「后端确认失败」态：报障最典型的入口。 */
+async function openFailedDone(page: Page, api: ApiRouter): Promise<void> {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
     status: 200,
     json: { taskId: TASK_ID, status: 'failed', failureReasonForUser: '打印未完成' },
   })
-
   await openDoneWithState(page, { ...taskState, success: true })
-  await page.getByRole('button', { name: '异常反馈' }).click()
+}
 
-  await expect(page).toHaveURL(`/me/feedback?category=print&relatedPrintTaskId=${TASK_ID}`)
+test('anonymous user can submit print feedback without logging in @kiosk', async ({ page, api }) => {
+  const submissions: { headers: Record<string, string>; body: unknown }[] = []
+  await page.route('**/api/v1/kiosk/feedback', async (route) => {
+    const request = route.request()
+    submissions.push({ headers: request.headers(), body: request.postDataJSON() })
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          ticketId: 'FBK-ANON-001',
+          submitterType: 'anonymous_kiosk',
+          category: 'print',
+          issueCode: 'print_incomplete_or_jam',
+          satisfaction: null,
+          status: 'pending',
+          deduplicated: false,
+          createdAt: '2026-08-16T10:00:00.000Z',
+        },
+      }),
+    })
+  })
+
+  await openFailedDone(page, api)
+
+  // 没有任何登录动作：直接开弹层、选类型、提交。
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await page.getByRole('button', { name: '卡住没出完' }).click()
+  await page.getByRole('button', { name: '提交反馈' }).click()
+
+  await expect(page.getByText('已收到你的反馈')).toBeVisible()
+  await expect(page.getByText('FBK-ANON-001')).toBeVisible()
+  // 不跳登录墙。
+  await expect(page).not.toHaveURL(/\/me\/feedback/)
+
+  expect(submissions).toHaveLength(1)
+  const [submission] = submissions
+  // 匿名：不带 Authorization，也不捎带会话 Cookie。
+  expect(submission.headers['authorization']).toBeUndefined()
+  expect(submission.headers['cookie']).toBeUndefined()
+  // 只上报定位现场问题所需的字段，不夹带联系方式等个人信息。
+  expect(submission.body).toEqual({
+    terminalId: 'KSK-001',
+    issueCode: 'print_incomplete_or_jam',
+    relatedPrintTaskId: TASK_ID,
+  })
+})
+
+test('a rejected submission is shown honestly and never fakes success @kiosk', async ({ page, api }) => {
+  await page.route('**/api/v1/kiosk/feedback', async (route) => {
+    await route.fulfill({
+      status: 429,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: {
+          code: 'KIOSK_FEEDBACK_RATE_LIMITED',
+          message: '该设备反馈提交过于频繁，请稍后再试或联系现场工作人员',
+        },
+      }),
+    })
+  })
+
+  await openFailedDone(page, api)
+
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await page.getByRole('button', { name: '卡住没出完' }).click()
+  await page.getByRole('button', { name: '提交反馈' }).click()
+
+  // 服务端的真实原因原样展示。
+  await expect(page.getByRole('alert')).toContainText('该设备反馈提交过于频繁')
+  // 绝不出现回执 / 成功态。
+  await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
+  await expect(page.locator('[data-kiosk-feedback-result="submitted"]')).toHaveCount(0)
+  // 表单仍在，用户可以重试。
+  await expect(page.getByRole('button', { name: '提交反馈' })).toBeVisible()
+})
+
+test('network failure does not fabricate a receipt @kiosk', async ({ page, api }) => {
+  await page.route('**/api/v1/kiosk/feedback', (route) => route.abort('internetdisconnected'))
+
+  await openFailedDone(page, api)
+
+  await page.getByRole('button', { name: '反馈问题' }).click()
+  await page.getByRole('button', { name: '页数与预期不符' }).click()
+  await page.getByRole('button', { name: '提交反馈' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('网络连接失败')
+  await expect(page.getByText('已收到你的反馈')).toHaveCount(0)
+})
+
+test('the feedback surface never promises a refund @kiosk', async ({ page, api }) => {
+  await openFailedDone(page, api)
+  await page.getByRole('button', { name: '反馈问题' }).click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  // 退款裁决权在后台。一体机只上报，绝不出现「点一下就能拿到钱」的暗示。
+  for (const forbidden of ['退款', '申请退款', '赔付', '理赔', '已退款']) {
+    await expect(dialog.getByText(forbidden, { exact: false })).toHaveCount(0)
+  }
 })

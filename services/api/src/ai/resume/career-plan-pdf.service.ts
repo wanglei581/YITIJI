@@ -37,6 +37,24 @@ function fontCandidates(): FontCandidate[] {
   return list
 }
 
+/**
+ * 注册中文字体并选中；找不到任何候选返回 false（调用方负责诚实报错）。
+ *
+ * 抽出来是为了让降级版式（career-plan-degraded-pdf.service.ts）复用同一套候选，
+ * 避免两套版式在不同机器上「一套出得来、一套出不来」。
+ */
+export function registerCjkFont(doc: PDFKit.PDFDocument): boolean {
+  return fontCandidates().some((c) => {
+    if (!existsSync(c.path)) return false
+    try {
+      if (c.family) doc.registerFont('cjk', c.path, c.family)
+      else doc.registerFont('cjk', c.path)
+      doc.font('cjk')
+      return true
+    } catch { return false }
+  })
+}
+
 @Injectable()
 export class CareerPlanPdfService {
   private readonly logger = new Logger(CareerPlanPdfService.name)
@@ -59,15 +77,7 @@ export class CareerPlanPdfService {
       subject: 'AI 生成的职业方向与技能计划建议，仅供求职者本人参考，不构成就业结果或薪资承诺',
       kind: 'careerplan',
     })
-    const ok = fontCandidates().some((c) => {
-      if (!existsSync(c.path)) return false
-      try {
-        if (c.family) doc.registerFont('cjk', c.path, c.family)
-        else doc.registerFont('cjk', c.path)
-        doc.font('cjk')
-        return true
-      } catch { return false }
-    })
+    const ok = registerCjkFont(doc)
     if (!ok) {
       doc.end()
       throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少中文字体，无法生成建议单' } })

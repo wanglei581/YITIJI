@@ -6,7 +6,13 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 
+/** 剥注释后再判：否则「写清为什么不再跳 /me/feedback」的注释会把负向断言弄红。 */
+const withoutComments = (source) => source
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '')
+
 const doneSource = read('src/pages/print/PrintDonePage.tsx')
+const doneRuntime = withoutComments(doneSource)
 const routeCasesSource = read('tests/visual/fixtures/fusion-w6-route-cases.ts')
 const browserSpecSource = read('tests/visual/print-done-truth.spec.ts')
 
@@ -43,7 +49,20 @@ const checks = [
   ['未知状态不提供重打，且反馈和帮助进入真实入口', () => {
     assert.doesNotMatch(doneSource, /const\s+handleRetry|>\s*重试打印\s*</)
     assert.match(doneSource, /navigate\(\s*'\/help'\s*\)/)
-    assert.match(doneSource, /\/me\/feedback\?category=print&relatedPrintTaskId=/)
+    // 反馈入口曾断言「跳 /me/feedback?category=print&relatedPrintTaskId=」。那个会员面
+    // 必须登录，匿名用户点了只会撞登录墙 —— 断言钉死的正是本批次要修的缺陷。
+    // 现在的真实入口是就地开 KioskFeedbackDialog（匿名，直发 POST /kiosk/feedback），
+    // 所以改为断言「弹层真的接上了真实提交面，且带上本次打印任务号」。
+    assert.match(
+      doneRuntime,
+      /import\s*\{[^}]*KioskFeedbackDialog[^}]*\}\s*from\s*'\.\.\/\.\.\/components\/KioskFeedbackDialog'/,
+    )
+    // `[\s/>]` 收尾：否则改名成 <KioskFeedbackDialogXX 也能匹配，等于断言没生效。
+    assert.match(doneRuntime, /<KioskFeedbackDialog[\s/>]/)
+    assert.match(doneRuntime, /relatedPrintTaskId=\{taskId\}/)
+    assert.match(doneRuntime, /from '\.\.\/\.\.\/services\/api\/kioskFeedback'/)
+    // 不得回退到登录墙入口（剥注释后判，注释里提到旧路径不算回退）。
+    assert.doesNotMatch(doneRuntime, /\/me\/feedback/)
   }],
   ['无持久化来源的满意度控件已移除', () => {
     assert.doesNotMatch(doneSource, /满意度评分|setRating|print-done-rate-chip/)

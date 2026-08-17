@@ -1,4 +1,9 @@
+import {
+  contractReviewFailureReason,
+  isKnownContractReviewFailureCode,
+} from './contract-review-failure-reason'
 import { parsePersistedContractReviewResult } from './contract-review-safety-gate.service'
+import { contractReviewEtaSeconds } from './contract-review-timing'
 import type {
   ContractReviewResult,
   ContractReviewStatus,
@@ -49,7 +54,31 @@ export function mapContractReviewTaskView(task: ContractReviewTaskRow): Contract
       completedPages: task.analyzedPages,
       totalPages: task.totalPages,
     },
+    // 预计耗时由服务端算并下发，客户端不必再自己维护同一条公式
+    // （小程序当前的 `_estimate(pages)` 与此逐字同源，见 contract-review-timing.ts）。
+    // 页数取值顺序与小程序一致：analyzedPages → totalPages → 1。
+    estimatedSeconds: contractReviewEtaSeconds(task.analyzedPages || task.totalPages || 1),
+    ...failureOf(status, task.errorCode),
     result,
+  }
+}
+
+/**
+ * 失败原因。只在终态 `failed` 时给，其余状态一律 null ——
+ * 处理中的任务带着上一次的错误码会让客户端误判。
+ *
+ * `failureCode` 只回白名单内的码；未登记的码不外泄（回 null），
+ * 但 `failureReason` 仍给兜底文案，保证客户端永远有话可说。
+ * 字段名 `failureReason` / `failureCode` 是小程序 `_poll()` 已经在读的两个键。
+ */
+function failureOf(
+  status: ContractReviewStatus,
+  errorCode: string | null | undefined,
+): Pick<ContractReviewTaskView, 'failureCode' | 'failureReason'> {
+  if (status !== 'failed') return { failureCode: null, failureReason: null }
+  return {
+    failureCode: isKnownContractReviewFailureCode(errorCode) ? errorCode : null,
+    failureReason: contractReviewFailureReason(errorCode),
   }
 }
 

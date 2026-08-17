@@ -5,6 +5,8 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { getPayStatus } from '../../services/print/paymentApi'
 import { getPrintJobStatus } from '../../services/print/printJobsApi'
+import { KioskFeedbackDialog } from '../../components/KioskFeedbackDialog'
+import { PRINT_DONE_ISSUE_OPTIONS } from '../../services/api/kioskFeedback'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
@@ -56,9 +58,12 @@ export function PrintDonePage() {
   const { file, params } = state
   const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
-  const feedbackUrl = taskId
-    ? `/me/feedback?category=print&relatedPrintTaskId=${encodeURIComponent(taskId)}`
-    : null
+
+  // 反馈入口走匿名端点 POST /kiosk/feedback，不再跳 /me/feedback。
+  // 旧实现跳会员面，而会员面必须登录：刚打印失败的人绝大多数没登录，
+  // 按钮对他们是死的。仍以 taskId 为前提 —— 没有任务上下文就没有可核实的打印记录。
+  const canReportIssue = taskId !== null
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   const [verification, setVerification] = useState<PrintVerification | null>(null)
   const resultState: PrintResultState = !taskId
@@ -147,6 +152,18 @@ export function PrintDonePage() {
     ? file.pages * params.copies * (params.duplex === 'simplex' ? 1 : 2)
     : null
 
+  // 三个结果分支各自 return，共用同一个弹层实例定义。
+  // 满意度只在确认完成时收：打印失败还要用户打分是打扰，且评分对故障定位没有帮助。
+  const feedbackDialog = canReportIssue ? (
+    <KioskFeedbackDialog
+      open={feedbackOpen}
+      onClose={() => setFeedbackOpen(false)}
+      issueOptions={PRINT_DONE_ISSUE_OPTIONS}
+      relatedPrintTaskId={taskId}
+      showSatisfaction={resultState === 'completed'}
+    />
+  ) : null
+
   /* ── 核验中 / 无法确认 ── */
   if (resultState === 'loading' || resultState === 'unknown') {
     const isLoading = resultState === 'loading'
@@ -183,9 +200,9 @@ export function PrintDonePage() {
                   查看打印订单
                 </button>
               )}
-              {feedbackUrl && (
-                <button type="button" className="print-done-action-btn ghost" onClick={() => navigate(feedbackUrl)}>
-                  异常反馈
+              {canReportIssue && (
+                <button type="button" className="print-done-action-btn ghost" onClick={() => setFeedbackOpen(true)}>
+                  反馈问题
                 </button>
               )}
               <button type="button" className="print-done-action-btn primary" onClick={() => navigate('/help')}>
@@ -194,6 +211,7 @@ export function PrintDonePage() {
             </div>
           )}
         </div>
+        {feedbackDialog}
       </div></PrintPageFrame>
     )
   }
@@ -221,9 +239,9 @@ export function PrintDonePage() {
             <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/')}>
               返回首页
             </button>
-            {feedbackUrl && (
-              <button type="button" className="print-done-action-btn ghost" onClick={() => navigate(feedbackUrl)}>
-                异常反馈
+            {canReportIssue && (
+              <button type="button" className="print-done-action-btn ghost" onClick={() => setFeedbackOpen(true)}>
+                反馈问题
               </button>
             )}
             <button type="button" className="print-done-action-btn primary" onClick={() => navigate('/help')}>
@@ -231,6 +249,7 @@ export function PrintDonePage() {
             </button>
           </div>
         </div>
+        {feedbackDialog}
       </div></PrintPageFrame>
     )
   }
@@ -326,13 +345,13 @@ export function PrintDonePage() {
               <b className="print-done-card-hd">打印遇到问题？</b>
               <span className="print-done-card-sub">缺页、卡纸、质量不佳等问题可在此反馈</span>
               <div className="print-done-fb-group">
-                {feedbackUrl && (
-                  <button type="button" className="print-done-fb-btn" aria-label="异常反馈" onClick={() => navigate(feedbackUrl)}>
+                {canReportIssue && (
+                  <button type="button" className="print-done-fb-btn" aria-label="反馈问题" onClick={() => setFeedbackOpen(true)}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                       <path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z" />
                       <path d="M9 12h.01M13 12h.01M17 12h.01" />
                     </svg>
-                    异常反馈
+                    反馈问题
                   </button>
                 )}
                 <button type="button" className="print-done-fb-btn" aria-label="使用帮助" onClick={() => navigate('/help')}>
@@ -398,6 +417,7 @@ export function PrintDonePage() {
           如遇卡纸或缺页，请联系现场工作人员，凭任务号与取件凭证码可协助核验补打；打印文件请妥善保管，勿遗留在机器旁。
         </div>
       </section>
+      {feedbackDialog}
     </div></PrintPageFrame>
   )
 }

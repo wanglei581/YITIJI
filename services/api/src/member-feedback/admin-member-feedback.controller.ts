@@ -18,8 +18,9 @@ export class AdminMemberFeedbackController {
   async list(
     @Query('status') status?: string,
     @Query('category') category?: string,
+    @Query('submitterType') submitterType?: string,
   ): Promise<ApiResponse<{ items: AdminFeedbackTicketItem[] }>> {
-    return ApiResponse.ok(await this.feedback.listForAdmin({ status, category }))
+    return ApiResponse.ok(await this.feedback.listForAdmin({ status, category, submitterType }))
   }
 
   @Get(':id')

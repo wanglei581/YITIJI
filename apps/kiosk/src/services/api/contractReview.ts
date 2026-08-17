@@ -261,6 +261,10 @@ function mockGetTask(id: string): ContractReviewTaskView {
       ocrConfidence: 'high',
       expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       progress: { stage: 'completed', completedPages: 5, totalPages: 5 },
+      // 与服务端同一条公式：20 + 页数 × 15（秒）。
+      estimatedSeconds: 20 + 5 * 15,
+      failureCode: null,
+      failureReason: null,
       result: {
         priorityCheckCount: 2,
         attentionCount: 3,
@@ -373,6 +377,9 @@ function mockGetTask(id: string): ContractReviewTaskView {
       ocrConfidence: 'high',
       expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
       progress: { stage: 'awaiting_confirmation', completedPages: 5, totalPages: 5 },
+      estimatedSeconds: 20 + 5 * 15,
+      failureCode: null,
+      failureReason: null,
       result: null,
     }
   }
@@ -386,6 +393,10 @@ function mockGetTask(id: string): ContractReviewTaskView {
     ocrConfidence: null,
     expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     progress: { stage: status, completedPages: _mockStep, totalPages: 5 },
+    // 页数未识别时按 1 页算，与服务端 mapper 的取值顺序一致。
+    estimatedSeconds: 20 + (_mockStep || 1) * 15,
+    failureCode: null,
+    failureReason: null,
     result: null,
   }
 }

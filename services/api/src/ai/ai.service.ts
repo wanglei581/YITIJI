@@ -13,6 +13,7 @@ import { AiLogService, AiUsageAccumulator, aiLogFieldsFromUsageReport } from './
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
+import { MAX_DIAGNOSIS_INPUT_CHARS } from './resume/llm-resume.service'
 import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
@@ -223,11 +224,24 @@ export class AiService {
             extractedPageCount: extraction.pageCount,
           })
           // Stage 3:OCR 来源（图片 / 扫描件）附带置信度与复核提示,前端必须如实展示。
-          if (extraction.textSource === 'image_ocr' || extraction.textSource === 'pdf_ocr') {
+          //
+          // 此前这里只对 OCR 两种来源下发 extractionNotice，文字层 PDF / DOCX 的
+          // warnings 被整体丢弃 —— 其中就包括「简历文本较长，已截断至 N 字符」。
+          // 结果是：超长简历只有前一段进入诊断，用户却拿到一份看起来覆盖全文的报告，
+          // 属于 CLAUDE.md §9「不伪造能力」明确禁止的情况。改为所有来源都下发，
+          // 前端按 textSource 区分文案（OCR 才提识别置信度）。
+          const warnings = [...(extraction.warnings ?? [])]
+          // 提取层按 20000 截断并告警，但诊断层还会再按 12000 截一刀且此前完全无声。
+          // 只要实际送诊断的文本短于提取结果，就必须如实说出来。
+          if ((extraction.text ?? '').length > MAX_DIAGNOSIS_INPUT_CHARS) {
+            warnings.push(`简历内容较长，本次诊断仅分析前 ${MAX_DIAGNOSIS_INPUT_CHARS} 字符，其余部分未纳入评估`)
+          }
+          const isOcrSource = extraction.textSource === 'image_ocr' || extraction.textSource === 'pdf_ocr'
+          if (isOcrSource || warnings.length > 0) {
             result.extractionNotice = {
-              textSource: extraction.textSource,
+              textSource: extraction.textSource ?? 'unknown',
               confidence: extraction.confidence ?? 'low',
-              warnings: extraction.warnings ?? [],
+              warnings,
             }
           }
         }
