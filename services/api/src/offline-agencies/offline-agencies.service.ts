@@ -18,6 +18,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import type { CreateOfflineAgencyDto, UpdateOfflineAgencyDto } from './dto/create-offline-agency.dto'
 import type { CreateOfflineJobDto, UpdateOfflineJobDto } from './dto/create-offline-job.dto'
+import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 
 export interface PaginationQuery {
   /** HTTP query 可能是 string；须经 resolveOfflineListPage 后再交给 Prisma take/skip */
@@ -348,6 +349,17 @@ export class OfflineAgenciesService {
     const allowed = ['draft', 'published', 'unpublished']
     if (!allowed.includes(publishStatus)) {
       throw new BadRequestException(`无效发布状态: ${publishStatus}`)
+    }
+
+    // 发布闸门：本模型的 sourceOrgId 可空且无外键——**有**来源机构的（外部供稿）
+    // 必须过 contentTrust；**没有**来源机构的是 Admin 自录的线下机构目录，
+    // 不存在「来源机构信任」这个决策对象，因此不套闸门（详见
+    // src/common/content-trust.ts 顶部注释与本 PR 说明）。
+    if (publishStatus === 'published' && agency.sourceOrgId) {
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, agency.sourceOrgId, {
+        contentType: '线下机构',
+        contentId: id,
+      })
     }
 
     return this.prisma.offlineAgency.update({

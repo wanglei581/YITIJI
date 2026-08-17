@@ -444,7 +444,13 @@ model Organization {
   sceneTemplate String?
   enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
-  // P1 expand：nullable，旧 reader 不读取；Wave 2 经审计/人工清单回填后再切门禁。
+  // P1 expand：nullable。
+  // 2026-08-17 起**发布路径已切门禁**：所有把内容变成 published 的路径都要求
+  //   contentTrustStatus === 'active' && archivedAt == null（fail-closed，null≠active）。
+  //   判据与错误码见 src/common/content-trust.ts，门禁 verify:content-trust-publish-gate。
+  //   人工标记入口：PATCH /api/v1/admin/orgs/:id/content-trust；回填脚本
+  //   maintenance:backfill-org-content-trust（必须显式传 id，无「一键全量」开关）。
+  // **公开读取路径尚未切**：回填未完成时对读路径套同一判据会让前台整体变空，列为后续项。
   contentTrustStatus String?
   contentTrustReviewedBy String?
   contentTrustReviewedAt DateTime?

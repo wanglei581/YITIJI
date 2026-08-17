@@ -87,8 +87,9 @@ async function main() {
 
   try {
     // ── 测试数据：两个来源机构 + 三个岗位 ─────────────────────
-    await prisma.organization.create({ data: { id: orgA, name: `人社平台机构${tag}`, type: 'public_employment_service' } })
-    await prisma.organization.create({ data: { id: orgB, name: `高校就业网${tag}`, type: 'school_employment_center' } })
+    // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
+    await prisma.organization.create({ data: { id: orgA, name: `人社平台机构${tag}`, type: 'public_employment_service', contentTrustStatus: 'active' } })
+    await prisma.organization.create({ data: { id: orgB, name: `高校就业网${tag}`, type: 'school_employment_center', contentTrustStatus: 'active' } })
     await prisma.user.create({ data: { id: admin.userId, username: `vadmin-${tag}`, passwordHash: 'x', name: '验证管理员', role: 'admin' } })
     await prisma.user.create({ data: { id: `pu-${tag}`, username: `vpartner-${tag}`, passwordHash: 'x', name: '验证机构', role: 'partner', orgId: orgB } })
     const endUser = await prisma.endUser.create({ data: { phoneHash: `h-${tag}`, phoneEnc: 'enc' } })

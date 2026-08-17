@@ -53,10 +53,18 @@ interface Row {
 function matches(row: Row, where: Record<string, unknown> | undefined): boolean {
   if (!where) return true
   for (const [key, cond] of Object.entries(where)) {
+    // preview 用 AND 组合「筛选条件 / 状态条件 / 来源机构信任条件」,
+    // 不能用对象展开,否则信任过滤会把操作者的 sourceOrgId 筛选覆盖掉。
+    if (key === 'AND') {
+      const clauses = (Array.isArray(cond) ? cond : [cond]) as Record<string, unknown>[]
+      if (!clauses.every((c) => matches(row, c))) return false
+      continue
+    }
     const val = row[key]
     if (cond !== null && typeof cond === 'object') {
       const c = cond as Record<string, unknown>
       if ('in' in c && !(c.in as unknown[]).includes(val)) return false
+      if ('notIn' in c && (c.notIn as unknown[]).includes(val)) return false
       if ('not' in c && val === c.not) return false
       if ('gte' in c && !(val instanceof Date && val >= (c.gte as Date))) return false
       if ('lte' in c && !(val instanceof Date && val <= (c.lte as Date))) return false
@@ -159,7 +167,15 @@ function buildFixture() {
   ])
   const jobFair = makeTable([])
   const policyPost = makeTable([])
-  const prisma = { job, jobFair, policyPost } as unknown as PrismaService
+  // 发布闸门(src/common/content-trust.ts)要求来源机构 contentTrustStatus='active'
+  // 且未归档。本脚本验的是「审核状态 / 分轮 / 逐条明细」,不是信任闸门本身
+  // (那由 verify-content-trust-publish-gate.ts 负责),所以两个来源机构都标为已核验,
+  // 让本脚本的断言仍然只反映审核状态维度。
+  const organization = makeTable([
+    { id: 'org-a', name: '来源机构A', contentTrustStatus: 'active', archivedAt: null } as unknown as Row,
+    { id: 'org-b', name: '来源机构B', contentTrustStatus: 'active', archivedAt: null } as unknown as Row,
+  ])
+  const prisma = { job, jobFair, policyPost, organization } as unknown as PrismaService
 
   const adminSvc = new JobsAdminService(prisma, fakeAudit)
   const policiesSvc = new PoliciesService(prisma, fakeAudit)

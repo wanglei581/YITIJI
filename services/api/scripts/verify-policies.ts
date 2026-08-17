@@ -73,8 +73,9 @@ async function main() {
 
   await prisma.organization.createMany({
     data: [
-      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service' },
-      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service' },
+      // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
+      { id: orgA, name: `政策机构A_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
+      { id: orgB, name: `政策机构B_${suffix}`, type: 'public_employment_service', contentTrustStatus: 'active' },
     ],
   })
   const partnerARow = await prisma.user.create({
