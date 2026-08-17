@@ -112,6 +112,7 @@
     "verify:cos": "tsx scripts/verify-cos-storage.ts",
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",
     "verify:cos-lifecycle-policy": "node -r @swc-node/register scripts/verify-cos-lifecycle-policy.ts",
+    "verify:file-internal-auth": "node -r @swc-node/register scripts/verify-file-internal-auth.ts",
     "verify:file-retention": "node -r @swc-node/register scripts/verify-file-retention.ts",
     "verify:file-delete-consistency": "node -r @swc-node/register scripts/verify-file-delete-consistency.ts",
     "verify:file-assets-trial-acceptance": "node -r @swc-node/register scripts/verify-file-assets-trial-acceptance.ts",

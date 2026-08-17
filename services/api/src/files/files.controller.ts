@@ -22,8 +22,8 @@ import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
-import type { UserRole } from '../common/decorators/roles.decorator'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { resolveOptionalInternalUser } from '../common/auth/optional-internal-user'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -444,16 +444,12 @@ export class FilesController {
     const auth = extractAuth(req)
     const member = await resolveOptionalEndUser(auth, this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
-    if (auth && auth.toLowerCase().startsWith('bearer ')) {
-      const token = auth.slice(7).trim()
-      try {
-        const payload = this.jwt.verify<{ sub: string; role: UserRole; orgId: string | null; aud?: string }>(token)
-        if (payload.aud !== 'enduser') {
-          return { kind: 'user', userId: payload.sub, role: payload.role, orgId: payload.orgId }
-        }
-      } catch {
-        // 无效 User token → 视为未登录
-      }
+    // 内部账号(admin / partner / kiosk)与会员一样必须回源:role / orgId 取当前
+    // 数据库状态,已停用、已删除或 tokenVersion 过期的账号一律视为未登录。
+    // 否则一张未过期的旧 token 就能继续读取 / 删除求职者简历与证件扫描件(CLAUDE.md §11)。
+    const internal = await resolveOptionalInternalUser(auth, this.jwt, this.redis, this.prisma)
+    if (internal) {
+      return { kind: 'user', userId: internal.userId, role: internal.role, orgId: internal.orgId }
     }
     return null
   }
