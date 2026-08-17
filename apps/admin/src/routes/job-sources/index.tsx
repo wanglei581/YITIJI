@@ -272,13 +272,19 @@ export default function JobSourcesPage() {
                                 </button>
                               </>
                             )}
-                            {s.reviewStatus === 'approved' && s.publishStatus === 'draft' && (
+                            {/* 发布按钮此前只对 draft 显示，导致 approved + unpublished
+                                的岗位在界面上没有任何可用操作——生产库中 217 条正卡在该
+                                状态（曾发布后下架），运营无法重新上架。
+                                放宽为「已审核通过且当前不是 published」。
+                                unpublished 是有意下架的状态，重新发布应是一次显式决定，
+                                故文案区分为「重新发布」。 */}
+                            {s.reviewStatus === 'approved' && s.publishStatus !== 'published' && (
                               <button
                                 type="button"
                                 className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
                                 onClick={() => handlePublish(s.id)}
                               >
-                                发布
+                                {s.publishStatus === 'unpublished' ? '重新发布' : '发布'}
                               </button>
                             )}
                             {s.publishStatus === 'published' && (
