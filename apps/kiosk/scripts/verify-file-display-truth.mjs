@@ -142,5 +142,97 @@ if (!fmtMatch) {
   check(monotonic, 'formatBytes 单调不倒退（更大的文件不会显示成更小）')
 }
 
+// ── 3. 文件名中段截断：扩展名与尾部区分信息不得丢 ──────────────────────────────
+// 2026-08-18 打印域走查：上传页 5 处文件名全用 Tailwind `truncate`（只截尾部），
+// 「我的简历_张三_2026版_最终定稿.pdf」显示成「我的简历_张三_2026版_最终...」——
+// 扩展名和最能区分文件的尾部一起没了。打印场景用户常在几份相似文件里挑一个，
+// 尾部恰恰是唯一区分位，截尾直接影响他选对没有。
+// 同样按**行为**验（真的调用被测纯函数跑数），不是比对源码字符串。
+const nameSrc = read('src/lib/fileName.ts')
+const nameConsts = [
+  ...[...nameSrc.matchAll(/^const (\w+) = (.+)$/gm)].map(([, n, v]) => `const ${n} = ${v}`),
+  ...[...nameSrc.matchAll(/^export const (\w+) = (.+)$/gm)].map(([, n, v]) => `const ${n} = ${v}`),
+].join('\n')
+const truncMatch = nameSrc.match(/export function truncateFileNameMiddle\(([\s\S]*?)\n\}/)
+if (!truncMatch) {
+  fail('未找到 truncateFileNameMiddle 纯函数（中段截断必须留在可单测的纯模块里）')
+} else {
+  const truncBody = `function truncateFileNameMiddle(${truncMatch[1]}\n}`
+    .replace(/fileName:\s*string/, 'fileName')
+    .replace(/\}:\s*TruncateFileNameOptions\s*=\s*\{\}/, '} = {}')
+    .replace(/\):\s*string\s*\{/, ') {')
+  let truncate
+  try {
+    // eslint-disable-next-line no-new-func
+    truncate = new Function(`${nameConsts}\n${truncBody}\nreturn truncateFileNameMiddle`)()
+  } catch (error) {
+    fail(`中段截断纯函数无法求值：${String(error).slice(0, 160)}`)
+  }
+
+  if (truncate) {
+    const CARD = 36
+    const COMPACT = 24
+    // 关键不变量：只要原名有扩展名，截断结果必须仍以该扩展名结尾。
+    const longNames = [
+      '我的简历_张三_2026版_最终定稿_打印用_请勿外传.pdf',
+      'Zhang_San_Resume_Software_Engineer_2026_final_v3.docx',
+      '归档.2026.第一季度.岗位材料.汇总.最终.xlsx',
+      '身份证正反面扫描件_高清_2026年8月18日补办版.jpeg',
+      'a'.repeat(120) + '.png',
+      '毕业证书扫描件_中文名字很长很长很长很长很长很长.PDF',
+    ]
+    for (const name of longNames) {
+      for (const budget of [COMPACT, CARD]) {
+        const out = truncate(name, { maxLength: budget })
+        const ext = name.slice(name.lastIndexOf('.'))
+        const overBudget = Array.from(name).length > budget
+        check(out.endsWith(ext), `中段截断保住扩展名 ${ext}（budget=${budget}）：${out}`)
+        check(
+          Array.from(out).length <= budget,
+          `中段截断不超预算 ${budget}（实际 ${Array.from(out).length}）：${out}`,
+        )
+        // 超预算才该出现省略号；没超必须原样返回（不做无谓截断）
+        check(
+          out.includes('…') === overBudget,
+          `${overBudget ? '超预算时做中段截断' : '未超预算时不截断'}（budget=${budget}）：${out}`,
+        )
+        check(out.startsWith(Array.from(name)[0]), `中段截断保留头部起始字符：${out}`)
+      }
+    }
+    // 未超预算时必须原样返回，不得无谓截断
+    for (const short of ['短.pdf', '简历.pdf', 'resume_v2.docx', '我的文件_2026.png']) {
+      check(truncate(short, { maxLength: CARD }) === short, `未超预算原样返回：${short}`)
+    }
+    // 码点安全：中文不得被切出半个字（长度按码点算，且结果可往返）
+    const cjk = '打印材料汇总' .repeat(12) + '.pdf'
+    const cjkOut = truncate(cjk, { maxLength: CARD })
+    check(Array.from(cjkOut).join('') === cjkOut, '中文文件名按码点切分，不产生坏字')
+    check(cjkOut.endsWith('.pdf'), '中文超长名同样保住扩展名')
+    // 无扩展名时也不得崩，且仍做中段截断
+    const noExt = truncate('no-extension-but-a-really-long-file-name-here', { maxLength: CARD })
+    check(noExt.includes('…') && noExt.length <= CARD + 1, '无扩展名文件仍能中段截断')
+    // 尾部必须真的携带原名尾部信息（区分同前缀文件的关键）
+    const a = truncate('求职材料_张三_版本一_2026.pdf', { maxLength: COMPACT })
+    const b = truncate('求职材料_张三_版本二_2026.pdf', { maxLength: COMPACT })
+    check(a !== b || !a.includes('…'), '同前缀不同尾部的文件截断后仍可区分')
+  }
+}
+
+// 上传页 5 处文件名必须全部走 helper，不得留裸 `truncate`（只截尾部）
+const uploadPage = read('src/pages/print/PrintUploadPage.tsx')
+const helperCalls = (uploadPage.match(/truncateFileNameMiddle\(/g) ?? []).length
+check(helperCalls === 5, `上传页 5 处文件名全部走中段截断 helper（实际 ${helperCalls} 处）`)
+check(
+  !/truncate[^"]*"\s*>\s*\{\s*(?:file\.name|f\.filename|item\.fileName)/.test(uploadPage),
+  '上传页不再把文件名直接交给裸 `truncate`（尾部截断会吃掉扩展名）',
+)
+for (const expr of ['file.name', 'f.filename', 'item.fileName']) {
+  check(
+    new RegExp(`truncateFileNameMiddle\\(\\s*${expr.replace('.', '\\.')}`).test(uploadPage) ||
+      new RegExp(`truncateFileNameMiddle\\(${expr.replace('.', '\\.')}`).test(uploadPage),
+    `上传页 ${expr} 经中段截断呈现`,
+  )
+}
+
 console.log(failures === 0 ? '\n全部通过\n' : `\n${failures} 项失败\n`)
 process.exit(failures === 0 ? 0 : 1)

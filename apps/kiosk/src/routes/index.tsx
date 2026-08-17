@@ -34,7 +34,6 @@ import { ScanResultPage } from '../pages/scan/ScanResultPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
 import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
 import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
-import { PrintParamsPage } from '../pages/print/PrintParamsPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
@@ -224,7 +223,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
-      { path: 'print/params',      element: <PrintParamsPage /> },
+      // 2026-08-18 下线：/print/params 的每一个可编辑控件（份数/色彩/双面/方向/缩放/纸张）
+      // 都和 /print/preview 完全重复，页范围那张卡自己写着「（在预览步骤设置）」，
+      // 且全站零运行时导航指向它 —— 用户只能手敲 URL 才到得了。
+      // 保留路由做兼容重定向（不改 106 路由冻结基线），页面本体已删。
+      { path: 'print/params',      element: <Navigate to="/print/preview" replace /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },

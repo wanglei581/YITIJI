@@ -435,7 +435,7 @@ export function PrintConfirmPage() {
       <PrintPrototypeHeader
         title="确认打印"
         subtitle="核对以下参数，确认无误后提交打印任务"
-        step={5}
+        step={4}
         backLabel={isContractReport ? '放弃打印' : '返回修改'}
         onBack={() => void handleBack()}
       />

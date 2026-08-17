@@ -137,19 +137,30 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="relative flex min-h-[420px] flex-1 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+      {/*
+        预览框高度上限（2026-08-18 产品走查「预览比例不对」）：
+        原先只有 `min-h-[420px] flex-1`，没有任何 max-height —— 预览框会把剩余竖向空间
+        全部吃掉，在 1080×1920 竖屏上被拉成一个和 A4 纸完全不成比例的长条。
+
+        取值按竖屏实际列宽算，不照抄桌面习惯：
+          可用列宽 = 1080 − 48(左右 p-6) − 400(右侧参数栏) − 24(gap) ≈ 608px
+          A4 是 210×297，608px 宽对应高 608 × 297/210 ≈ 860px
+        所以 860px 正是「这一列铺满宽度时，A4 纸该有的高度」。
+        再用 min(56vh, 860px) 兜住矮屏（桌面浏览器验证时不至于顶出视口）。
+      */}
+      <div className="relative flex max-h-[min(56vh,860px)] min-h-[420px] flex-1 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
         {previewKind === 'pdf' && (
           <iframe
             title={`${file.name} 预览`}
             src={file.fileUrl}
-            className="h-full w-full bg-white"
+            className="h-full max-h-full w-full bg-white"
           />
         )}
         {previewKind === 'image' && (
           <img
             src={file.fileUrl}
             alt={`${file.name} 预览`}
-            className="h-full w-full object-contain"
+            className="h-full max-h-full w-full object-contain"
           />
         )}
         {(previewKind === 'unsupported' || previewKind === 'unavailable') && (

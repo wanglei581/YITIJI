@@ -52,17 +52,16 @@ else fail(`硬编码价格常量出现在：${offenders.join(', ')}`)
 // ── 2. 预览参考价 / 确认页后端报价 / 参数页本地估价（均无硬编码单价）──
 const preview = read(join(root, 'src/pages/print/PrintPreviewPage.tsx'))
 const confirm = read(join(root, 'src/pages/print/PrintConfirmPage.tsx'))
-const paramsPage = read(join(root, 'src/pages/print/PrintParamsPage.tsx'))
 expectAbsent(preview, /PRICE_BW|PRICE_COLOR|¥0\.20|¥0\.50/, 'PrintPreviewPage 无硬编码单价')
 expectMatches(confirm, /quotePrintOrder\(/, 'PrintConfirmPage 经 POST /orders/quote 取应付金额')
 expectMatches(confirm, /usePrintPriceConfig|quotePrintOrder/, 'PrintConfirmPage 不自持单价常量')
 expectAbsent(confirm, /totalFaces\s*\*\s*\w*[Pp]rice/, 'PrintConfirmPage 不再按「面」自行乘价')
 expectMatches(confirm, /演示模式不显示金额|页数待服务端确认，以最终计费为准|打印文件尚未就绪，无法报价/, 'PrintConfirmPage 无可靠报价时不展示具体金额')
-expectMatches(paramsPage, /usePrintPriceConfig\(\)/, 'PrintParamsPage 使用服务端价目 hook')
-expectMatches(paramsPage, /estimatePrintCents\(/, 'PrintParamsPage 估价经统一口径 helper（按内容页）')
-expectMatches(paramsPage, /countPagesInRange/, 'PrintParamsPage 估价纳入 pageRange')
-expectMatches(paramsPage, /以确认页报价为准/, 'PrintParamsPage 标明实付以确认页为准')
-expectAbsent(paramsPage, /totalFaces\s*\*\s*\w*[Pp]rice/, 'PrintParamsPage 不再按「面」自行乘价')
+// 2026-08-18：PrintParamsPage 下线。它原本是「预览之后、确认之前」的第二个本地估价点，
+// 而预览页早已明确「不在此页展示本地估算金额，避免与最终计费不一致」，实付金额只由确认页
+// POST /orders/quote 出。少一个本地估价点＝价格真相源更单一，这里改为守「不得复活」。
+expectAbsent(preview, /estimatePrintCents\(/, '预览页不自行本地估价（金额只由确认页服务端报价出）')
+expectMatches(preview, /应付金额在下一步确认页由服务端/, '预览页写明金额出处是确认页服务端报价')
 expectMatches(preview, /价格暂不可用|以收银台金额为准|确认页|报价/, 'PrintPreviewPage 取价失败态诚实提示（不显示假价）')
 expectMatches(confirm, /价格暂不可用|以收银台显示为准|以最终计费为准|无法报价|演示模式不显示金额/, 'PrintConfirmPage 取价失败态诚实提示')
 expectAbsent(preview, /请选择优惠券/, 'PrintPreviewPage 不再渲染假的优惠券入口')

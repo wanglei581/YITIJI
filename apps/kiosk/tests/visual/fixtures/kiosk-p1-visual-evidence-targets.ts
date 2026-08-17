@@ -89,7 +89,9 @@ const fusionState = (input: Omit<Parameters<typeof evidenceTarget>[0], 'targetGr
 export const visualEvidenceTargets: readonly VisualEvidenceTarget[] = [
   primary({ targetId: '01', prototypePath: 'docs/design/kiosk-proto-2026-07/01-home.html', referenceKind: 'PRIMARY', routeOrState: ['/'], captureUrls: ['/'], precondition: 'Open as a guest with fail-closed service fixtures.', readyMarker: '[data-v6-page="home"]' }),
   primary({ targetId: '02', prototypePath: 'docs/design/kiosk-proto-2026-07/02-print-hub.html', referenceKind: 'PRIMARY', routeOrState: ['/print-scan'], captureUrls: ['/print-scan'], precondition: 'Return the configured print/scan capabilities envelope.', readyMarker: '[data-w2-page="print-scan-home"]' }),
-  primary({ targetId: '03', prototypePath: 'docs/design/kiosk-proto-2026-07/03-print-settings.html', referenceKind: 'PRIMARY', routeOrState: ['/print/params'], captureUrls: ['/print/params'], precondition: 'Enter with a contract file context and price configuration.', readyMarker: '[data-w2-page="print-params"]' }),
+  // 03（打印参数原型）自 2026-08-18 起由 /print/preview 承载：参数控件本来就全在预览页内，
+  // /print/params 已下线为兼容重定向，不再产出独立视觉对。
+  primary({ targetId: '03', prototypePath: 'docs/design/kiosk-proto-2026-07/03-print-settings.html', referenceKind: 'PRIMARY', routeOrState: ['/print/preview'], captureUrls: ['/print/preview'], precondition: 'Enter with a contract file context and price configuration.', readyMarker: '[data-w2-page="print-preview"]' }),
   primary({ targetId: '04', prototypePath: 'docs/design/kiosk-proto-2026-07/04-print-progress.html', referenceKind: 'PRIMARY', routeOrState: ['/print/progress#active'], captureUrls: ['/print/progress'], precondition: 'Enter from the confirmed print flow with an active contract task.', readyMarker: '[data-w2-page="print-progress"]' }),
   primary({ targetId: '05', prototypePath: 'docs/design/kiosk-proto-2026-07/05-resume-source.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/source'], captureUrls: ['/resume/source'], precondition: 'Open the resume source chooser with no user document injected.', readyMarker: '[data-kiosk-screen="resume-source"]' }),
   primary({ targetId: '06', prototypePath: 'docs/design/kiosk-proto-2026-07/06-resume-diagnosis.html', referenceKind: 'PRIMARY', routeOrState: ['/resume/report'], captureUrls: ['/resume/report'], precondition: 'Provide a synthetic diagnosis response through the current API envelope.', readyMarker: '[data-kiosk-screen="resume-report"]' }),
@@ -250,8 +252,8 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   redirect('/print/scan-feature', '/print-scan/feature/id-photo'),
   route('/print/upload', ['77']),
   route('/print/material-check', ['31']),
-  route('/print/preview', ['64']),
-  route('/print/params', ['03']),
+  route('/print/preview', ['64', '03']),
+  redirect('/print/params', '/print/preview'),
   route('/print/confirm', ['65']),
   route('/print/cashier', ['32', '32A'], '/print/cashier'),
   route('/print/progress', ['04']),

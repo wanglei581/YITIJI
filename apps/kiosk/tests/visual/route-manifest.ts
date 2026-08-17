@@ -47,6 +47,9 @@ export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
   '/print/scan-sign': '/print-scan/sign',
   '/print/scan-feature': '/print-scan/feature/id-photo',
+  // 2026-08-18：打印参数页下线（控件与 /print/preview 完全重复且全站零导航），
+  // 路由保留为兼容重定向，106 路由冻结基线不变。
+  '/print/params': '/print/preview',
   '/resume': '/resume/source',
   '/resume/upload': '/resume/source',
 } as const

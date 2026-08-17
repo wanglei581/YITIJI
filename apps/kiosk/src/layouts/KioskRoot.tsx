@@ -34,7 +34,6 @@ const ACTIONBAR_ROUTES = new Set([
   '/print/upload',
   '/print/material-check',
   '/print/preview',
-  '/print/params',
   '/print/confirm',
   '/print/cashier',
   '/print/progress',

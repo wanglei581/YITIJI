@@ -17,7 +17,6 @@ const directRoutes = new Map([
   ['/print/upload', 'PrintUploadPage'],
   ['/print/material-check', 'PrintMaterialCheckPage'],
   ['/print/preview', 'PrintPreviewPage'],
-  ['/print/params', 'PrintParamsPage'],
   ['/print/confirm', 'PrintConfirmPage'],
   ['/print/cashier', 'PrintCashierPage'],
   ['/print/progress', 'PrintProgressPage'],
@@ -32,6 +31,8 @@ const redirects = new Map([
   ['/print/scan-convert', '/print-scan/convert'],
   ['/print/scan-sign', '/print-scan/sign'],
   ['/print/scan-feature', '/print-scan/feature/id-photo'],
+  // 2026-08-18：打印参数页下线为兼容重定向（控件与预览页完全重复且全站零导航）。
+  ['/print/params', '/print/preview'],
 ])
 const frozenHashes = new Map([
   [
@@ -433,7 +434,6 @@ for (const kind of ['inspection', 'normalize_a4', 'pii_scan', 'pii_redact']) {
 
 const printSetupPages = new Map([
   ['src/pages/print/PrintPreviewPage.tsx', 'print-preview'],
-  ['src/pages/print/PrintParamsPage.tsx', 'print-params'],
   ['src/pages/print/PrintConfirmPage.tsx', 'print-confirm'],
 ])
 for (const [path, marker] of printSetupPages) {
@@ -442,26 +442,21 @@ for (const [path, marker] of printSetupPages) {
   assert.match(body, /PrintPageFrame/, `${path} uses the shared print frame`)
   assert.match(body, /KioskActionBar/, `${path} uses the frozen action bar`)
 }
-for (const path of [
-  'src/pages/print/PrintPreviewPage.tsx',
-  'src/pages/print/PrintParamsPage.tsx',
-]) {
+for (const path of ['src/pages/print/PrintPreviewPage.tsx']) {
   const body = read(path)
-  const isPreview = path.includes('PrintPreviewPage')
   for (const marker of [
     'readPrintMaterialSession',
     'useTerminalDeviceStatus',
     'pageRange',
     'patchPrintMaterialSession',
-    ...(isPreview ? [] : ['usePrintPriceConfig', 'estimatePrintCents']),
   ]) {
     assert.match(body, new RegExp(marker), `${path} retains ${marker}`)
   }
 }
-assert.match(
-  read('src/pages/print/PrintParamsPage.tsx'),
-  /countPagesInRange/,
-  'PrintParamsPage estimates with pageRange'
+// 2026-08-18：PrintParamsPage 已删除，参数设置由预览页独家承担。
+assert.ok(
+  !existsSync(join(kioskRoot, 'src/pages/print/PrintParamsPage.tsx')),
+  'PrintParamsPage 已下线，不得复活重复参数页'
 )
 assert.match(
   read('src/hooks/useTerminalDeviceStatus.ts'),

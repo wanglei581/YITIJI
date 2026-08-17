@@ -115,7 +115,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/upload', url: '/print/upload', marker: w2('print-upload'), featureText: '文档打印' },
   { pattern: '/print/material-check', url: '/print/material-check', marker: 'p:text-is("未找到文件信息")', featureText: '未找到文件信息' },
   { pattern: '/print/preview', url: '/print/preview', marker: w2('print-preview'), featureText: '未找到文件信息' },
-  { pattern: '/print/params', url: '/print/params', marker: w2('print-params'), featureText: '未找到文件信息' },
+  { pattern: '/print/params', url: '/print/params', expectedPath: compatibilityRedirects['/print/params'], marker: w2('print-preview'), featureText: '未找到文件信息' },
   { pattern: '/print/confirm', url: '/print/confirm', marker: w2('print-confirm'), featureText: '未找到文件信息' },
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },

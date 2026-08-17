@@ -424,7 +424,7 @@ export function PrintCashierPage() {
       <PrintPrototypeHeader
         title="订单支付"
         subtitle={isPaymentFailed ? '本次支付未成功；未产生扣款，也未创建打印任务' : '请完成支付后开始打印；支付结果由系统自动确认'}
-        step={6}
+        step={5}
         backLabel="返回确认"
         onBack={() => navigate('/print/confirm', { state })}
         aside={isPaymentFailed ? (

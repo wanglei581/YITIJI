@@ -2,9 +2,13 @@ import { Fragment, type ReactNode } from 'react'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import './print-prototype.css'
 
-export type PrintFlowStep = 1 | 2 | 3 | 4 | 5 | 6 | 7
+export type PrintFlowStep = 1 | 2 | 3 | 4 | 5 | 6
 
-const PRINT_STEPS = ['上传', '材料检查', '预览', '参数', '确认', '支付', '打印']
+// 2026-08-18：删掉第 4 格「参数」。原七步条里的「参数」对应 /print/params，
+// 但全站零运行时导航指向该路由，preview 的「确认参数」直接跳 /print/confirm——
+// 用户看得到第 4 格却永远走不到，进度条还会从 3 直接跳到 5。
+// 参数控件本来就全在预览页内，所以「预览」这一步即参数设置步。
+const PRINT_STEPS = ['上传', '材料检查', '预览', '确认', '支付', '打印']
 
 interface PrintPrototypeHeaderProps {
   title: string
@@ -17,7 +21,7 @@ interface PrintPrototypeHeaderProps {
 }
 
 /**
- * 打印流程页头：统一页头 + 七步指示器。
+ * 打印流程页头：统一页头 + 六步指示器。
  *
  * 顶栏（品牌 / 时钟 / 设备状态）由 KioskLayout 全局提供，本组件不得自建，
  * 否则会出现双顶栏。步骤条复用 kiosk-shell.css 的 .ui-kiosk-steps 规范。
