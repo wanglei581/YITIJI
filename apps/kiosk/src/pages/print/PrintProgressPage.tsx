@@ -501,7 +501,7 @@ export function PrintProgressPage() {
               : '当前为演示模式，不会建单、支付或出纸')
             : realStatus.headerSubtitle
         }
-        step={7}
+        step={6}
         aside={
           isSim ? (
             <span className="pp-running-badge" role="note">

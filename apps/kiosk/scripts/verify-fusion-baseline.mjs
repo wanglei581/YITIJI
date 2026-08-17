@@ -200,8 +200,9 @@ await runGroup('compatibility redirect target parity', async (fail) => {
   const manifestRedirects = extractManifestRedirects(manifestSource)
   const routerSources = Object.keys(routerRedirects)
   const manifestSources = Object.keys(manifestRedirects)
-  if (manifestSources.length !== 5) {
-    fail(`${displayPath(manifestPath)}: expected exactly 5 compatibility redirects, actual ${manifestSources.length}`)
+  // 2026-08-18：/print/params 下线为兼容重定向后由 5 增至 6（106 路由总数不变）。
+  if (manifestSources.length !== 6) {
+    fail(`${displayPath(manifestPath)}: expected exactly 6 compatibility redirects, actual ${manifestSources.length}`)
   }
 
   const missingFromManifest = routerSources.filter((sourcePath) => !(sourcePath in manifestRedirects))

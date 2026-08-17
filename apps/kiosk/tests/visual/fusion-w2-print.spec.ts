@@ -381,18 +381,21 @@ test('direct preview restores the material session and completes the PDF respons
   await expectHealthy(page, errors, 'print-preview')
 })
 
-test('direct params restore real printer and server price fixtures @w2', async ({ page, api }) => {
+// 2026-08-18：/print/params 下线为兼容重定向。该页每个可编辑控件都与 /print/preview 重复，
+// 且全站零运行时导航指向它——用户只能手敲 URL 才到得了。原用例断言的「参数页本地估价」
+// 已按预览页既定口径退场（实付金额由确认页 POST /orders/quote 出）。
+test('retired params route redirects into preview with real printer fixtures @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
   await seedMaterialSession(page)
 
   await page.goto('/print/params')
-  const params = page.locator('[data-w2-page="print-params"]')
-  await expect(params.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(params.getByText('打印机在线', { exact: true })).toBeVisible()
-  await expect(params.getByText('¥2.00', { exact: true })).toHaveCount(2)
-  await expectHealthy(page, errors, 'print-params')
+  await expect(page).toHaveURL(/\/print\/preview$/)
+  const preview = page.locator('[data-w2-page="print-preview"]')
+  await expect(preview.getByText('已配置打印机', { exact: true })).toBeVisible()
+  await expect(preview.getByText('打印机在线', { exact: true })).toBeVisible()
+  await expectHealthy(page, errors, 'print-preview')
 })
 
 test('paid print-job amount routes confirmation to cashier @w2', async ({ page, api }) => {

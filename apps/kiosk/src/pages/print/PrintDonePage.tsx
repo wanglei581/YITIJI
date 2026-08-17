@@ -172,7 +172,7 @@ export function PrintDonePage() {
         <PrintPrototypeHeader
           title={isLoading ? '正在核验打印结果' : '无法确认打印结果'}
           subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : '当前未取得可信的任务终态，请勿据此判断已经出纸'}
-          step={7}
+          step={6}
           backLabel="返回首页"
           onBack={() => navigate('/')}
         />
@@ -223,7 +223,7 @@ export function PrintDonePage() {
         <PrintPrototypeHeader
           title="打印失败"
           subtitle="打印任务已由服务端确认失败"
-          step={7}
+          step={6}
           backLabel="返回首页"
           onBack={() => navigate('/')}
         />
@@ -260,7 +260,7 @@ export function PrintDonePage() {
       <PrintPrototypeHeader
         title="打印完成"
         subtitle="文件已从出纸口送出，请核对页数后取走"
-        step={7}
+        step={6}
         backLabel="返回首页"
         onBack={() => navigate('/')}
       />

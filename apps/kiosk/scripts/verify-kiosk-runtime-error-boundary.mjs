@@ -53,9 +53,11 @@ for (const route of routerArray.elements) {
 assert.match(main, /onError=\{handleRouterError\}/)
 assert.match(main, /\[kiosk-route-error\]/)
 
+// 2026-08-18：/print/params 已下线为指向 /print/preview 的兼容重定向，本身不再渲染页面，
+// actionbar 由重定向目的地 /print/preview 提供，故从本清单移除。
 for (const path of [
   '/print/upload',
-  '/print/material-check', '/print/preview', '/print/params', '/print/confirm',
+  '/print/material-check', '/print/preview', '/print/confirm',
   '/print/cashier', '/print/progress', '/scan/start', '/scan/settings',
   '/scan/progress', '/scan/result', '/print-scan/convert', '/print-scan/sign',
   '/resume/source', '/resume/generate', '/resume/generate/preview', '/resume/report',

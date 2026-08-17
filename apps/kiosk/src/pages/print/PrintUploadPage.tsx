@@ -30,6 +30,11 @@ import {
   UsbIcon,
   XIcon,
 } from 'lucide-react'
+import {
+  FILE_NAME_BUDGET_CARD,
+  FILE_NAME_BUDGET_COMPACT,
+  truncateFileNameMiddle,
+} from '../../lib/fileName'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import {
   getUsbStatus,
@@ -432,8 +437,13 @@ export function PrintUploadPage() {
                   className="flex min-h-[56px] items-center gap-3 rounded-lg bg-neutral-50 px-3"
                 >
                   <FileTextIcon className="h-5 w-5 shrink-0 text-primary-600" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">
-                    {item.fileName ?? '打印文件'}
+                  <span
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900"
+                    title={item.fileName ?? '打印文件'}
+                  >
+                    {truncateFileNameMiddle(item.fileName ?? '打印文件', {
+                      maxLength: FILE_NAME_BUDGET_COMPACT,
+                    })}
                   </span>
                   <span className="text-xs text-neutral-500">{item.status}</span>
                 </div>
@@ -469,7 +479,9 @@ export function PrintUploadPage() {
                     <FileTextIcon className="h-6 w-6 text-primary-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="truncate font-medium text-neutral-900" title={file.name}>
+                      {truncateFileNameMiddle(file.name, { maxLength: FILE_NAME_BUDGET_CARD })}
+                    </p>
                     <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 页数待识别</p>
                   </div>
                   <button
@@ -530,7 +542,9 @@ export function PrintUploadPage() {
                     <FileTextIcon className="h-6 w-6 text-primary-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="truncate font-medium text-neutral-900" title={file.name}>
+                      {truncateFileNameMiddle(file.name, { maxLength: FILE_NAME_BUDGET_CARD })}
+                    </p>
                     <p className="mt-0.5 text-sm text-neutral-500">
                       {file.size} · 已确认，可点击下方"下一步"
                     </p>
@@ -577,7 +591,9 @@ export function PrintUploadPage() {
                     <FileTextIcon className="h-6 w-6 text-primary-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="truncate font-medium text-neutral-900" title={file.name}>
+                      {truncateFileNameMiddle(file.name, { maxLength: FILE_NAME_BUDGET_CARD })}
+                    </p>
                     <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已从 U 盘导入</p>
                   </div>
                   <button
@@ -616,7 +632,9 @@ export function PrintUploadPage() {
                       >
                         <FileTextIcon className="h-6 w-6 shrink-0 text-primary-600" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-neutral-900">{f.filename}</p>
+                          <p className="truncate font-medium text-neutral-900" title={f.filename}>
+                            {truncateFileNameMiddle(f.filename, { maxLength: FILE_NAME_BUDGET_CARD })}
+                          </p>
                           <p className="text-sm text-neutral-500">{formatBytes(f.sizeBytes)}</p>
                         </div>
                         {usbUploading && (
