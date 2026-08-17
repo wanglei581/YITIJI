@@ -110,6 +110,10 @@ jobs:
             du -xsm /* 2>/dev/null | sort -rn | head -12 | awk '{printf "  %-24s %s MB\n", $2, $1}'
             echo "--- /var 下（MB，降序前 6）---"
             du -xsm /var/* 2>/dev/null | sort -rn | head -6 | awk '{printf "  %-24s %s MB\n", $2, $1}'
+            echo "--- /srv 下两级（MB，降序前 15）——19.75GB 的去向 ---"
+            du -xsm /srv/*/* /srv/* 2>/dev/null | sort -rn | awk '!seen[$2]++' | head -15 | awk '{printf "  %-40s %s MB\n", $2, $1}'
+            echo "--- /root 下（MB，降序前 8）---"
+            du -xsm /***/* /***/.[!.]* 2>/dev/null | sort -rn | head -8 | awk '{printf "  %-32s %s MB\n", $2, $1}'
 
             echo "=== 7. 本次发布需要的空间量级 ==="
             # 注意：这条 SQL 含括号，务必用单引号包住并先赋值再 echo。
