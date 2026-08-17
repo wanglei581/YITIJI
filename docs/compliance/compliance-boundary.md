@@ -144,6 +144,22 @@ interface JobFairData {
   随后在 upsert 时被丢弃 —— 即合作机构可能已经在报送，而系统在静默丢数据。
   `ExternalJobDTO.headcount` / `JobListItemDto.headcount` 也已在读取契约里声明，恒为 `undefined`。
   补齐需改两份 Prisma schema（PostgreSQL 那份由 `pnpm --filter @ai-job-print/api db:pg:sync` 机器生成，不得手改）+ 两份迁移。
+- **发布路径完全不校验字段完整性（条款 1 的其余五项）**。条款 1 要求六项：用人单位基本情况、
+  招聘人数、招聘条件、工作内容、工作地点、基本劳动报酬。当前只有 `company`（用人单位）与
+  `city`（工作地点）实际必填（`JOB_REQUIRED_FIELDS` = externalId/title/company/city/sourceUrl）；
+  `salary` / `salaryMin` / `salaryMax`（基本劳动报酬）、`description`（工作内容）、
+  `requirements`（招聘条件）**全部可空且不阻断发布**。
+  `JobQualityService` 已经算出 `qualityLevel: ready / partial / insufficient`，
+  但 `jobs-admin.service.ts` 的 `publishJobSource` **完全不读它** —— 一条 `insufficient`
+  岗位照样能发布上线。补法应是在发布闸门加字段完整性判定（可复用 content-trust 的
+  「预览阶段分流 + 单条发布拦截」双层形态），属产品决策，需先定「哪几项缺失时禁止发布」。
+- **「标注有效期限**或者**及时更新」的第二条腿未落地**。条款 1 是二选一：本轮实现的是第一条腿
+  （`validThrough` 已过即不展示）。第二条腿「及时更新」对应数据新鲜度：`job-quality.service.ts`
+  已按 30 天窗口算出 `syncTimeStale`，但它**只进质量快照与按来源聚合的 `staleJobs` 计数**，
+  不影响任何求职者可见路径。因此一条 `validThrough = null` 且 `syncTime` 是半年前的岗位，
+  两条腿都不满足，却仍照常公开展示。
+  注意本轮**刻意**对 `validThrough = null` 放行（缺有效期是数据质量问题，不等于失效，
+  按缺失即判过期会误杀大批仍在招的岗位），所以这个缺口不会被 `verify:job-validity-expiry` 覆盖。
 - **来源方岗位正文的虚假宣传检测（条款 3）**：现有禁词门禁只扫我方 UI 文案，
   不扫导入进来的岗位正文中的「高薪」「保录」类表述。
 - **歧视性表述筛查的能力边界**：确定性关键词只能抓写得直白的部分，
