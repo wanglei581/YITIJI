@@ -45,6 +45,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
 import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
+import { buildRealPdf } from './support/minimal-pdf'
 
 let passCount = 0
 function pass(msg: string): void {
@@ -160,8 +161,7 @@ async function main(): Promise<void> {
   async function seedPdf(label: string): Promise<string> {
     const fid = `f_wxrn_${suffix}_${label}`
     const sk = `verify/wxrn/${fid}.pdf`
-    // 每页含 /Type /Page（无 /Pages）以匹配 countPdfPages 轻量识别逻辑
-    const pdf = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(2)}%%EOF\n`)
+    const pdf = buildRealPdf(2)
     await storage.putObject(sk, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: { id: fid, storageKey: sk, filename: `${label}.pdf`, mimeType: 'application/pdf', sizeBytes: pdf.length, sha256: '', purpose: 'print_source', bucket: LOCAL_BUCKET_SENTINEL },

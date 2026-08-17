@@ -47,6 +47,7 @@ import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilit
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { buildRealPdf } from './support/minimal-pdf'
 
 const VERIFY_SECRET = 'verify-sandbox-payment-secret-0001'
 const CHANNEL = 'sandbox'
@@ -155,7 +156,7 @@ async function main(): Promise<void> {
   async function seedPdfFixture(label: string, pages: number): Promise<string> {
     const fileId = `f_payflow_${suffix}_${label}`
     const storageKey = `verify/payment-flow/${fileId}.pdf`
-    const pdfBytes = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(pages)}%%EOF\n`)
+    const pdfBytes = buildRealPdf(pages)
     await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {

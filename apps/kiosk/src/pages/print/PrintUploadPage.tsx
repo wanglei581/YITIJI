@@ -57,12 +57,32 @@ import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
+/**
+ * 打印上传的**实际生效**大小上限(MB)。
+ *
+ * 服务端 file-validation.ts:validateUpload 对 multipart 代理上传取
+ * `min(PURPOSE_POLICY.print_doc.maxBytes = 20MB, PROXY_MAX_BYTES = 15MB)` = 15MB,
+ * kiosk-upload 与 U 盘导入都走这条 proxy 路径。
+ *
+ * 2026-08-17 走查:本页原先写「不超过 20MB」,而 16.9MB 文件上传后被拒并提示
+ * 「文件超出上限(15MB)」——先告诉用户 20MB 再按 15MB 拒收。这里改为单一常量,
+ * 并由 services/api 的 verify:file-display-truth 门禁对着服务端策略核对,不再手抄。
+ */
+export const PRINT_UPLOAD_MAX_MB = 15
+
 type UploadedFile = PrintFileState & { fileId: string; fileUrl: string; fileMd5: string }
 
+// 单位换算按「四舍五入后是否还落在本档」判定,不能只比原始字节数。
+// 反例(2026-08-17 走查):1 048 500 B < 1MiB 走 KB 档,(1048500/1024).toFixed(0) = "1024",
+// 显示成「1024 KB」——用户看到一个本该进位成 1.0 MB 的数。B→KB 边界同理。
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (!Number.isFinite(bytes) || bytes < 0) return '大小未知'
+  const KB = 1024
+  const MB = KB * 1024
+  if (bytes < KB) return `${Math.round(bytes)} B`
+  const kb = bytes / KB
+  if (kb < 1024 && Math.round(kb) < 1024) return `${Math.round(kb)} KB`
+  return `${(bytes / MB).toFixed(1)} MB`
 }
 
 // 入口卡片（"照片打印" vs "文档打印"）只能表达用户点了哪个入口，不能证明用户最终选中的
@@ -485,8 +505,8 @@ export function PrintUploadPage() {
                         </p>
                         <p className="mt-1.5 text-sm text-neutral-400">
                           {source === 'resume'
-                            ? '支持 PDF、图片格式，适合已有电子简历直接打印'
-                            : '支持 PDF、图片格式，上传后将先做材料检查'}
+                            ? `支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB，适合已有电子简历直接打印`
+                            : `支持 PDF、JPG、PNG，单份不超过 ${PRINT_UPLOAD_MAX_MB}MB，上传后将先做材料检查`}
                         </p>
                       </div>
                     </>
@@ -582,7 +602,7 @@ export function PrintUploadPage() {
                     <UsbIcon className="h-10 w-10 text-neutral-400" />
                     <p className="text-base font-medium text-neutral-700">未检测到可导入的文件</p>
                     <p className="text-sm text-neutral-500">
-                      仅支持 PDF、JPG、PNG 格式，且不超过 20MB
+                      仅支持 PDF、JPG、PNG 格式，且不超过 {PRINT_UPLOAD_MAX_MB}MB
                     </p>
                   </Card>
                 ) : (
