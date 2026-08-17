@@ -9,10 +9,12 @@
   max-width: min(720px, calc(100vw - 48px));
   padding: 18px 24px;
   border-radius: 16px;
-  border: 1px solid rgb(180 83 9 / 35%);
-  background: #fffbeb;
-  box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
-  color: #7c2d12;
+  /* 警示色走主题语义 token（陶土），与 ai-primitives 的 warning 口径一致；
+     不再用 Tailwind 默认 amber，否则在青绿米纸主题里是一块外来色。 */
+  border: 1px solid color-mix(in srgb, var(--color-warning, #b8683c) 34%, transparent);
+  background: var(--color-warning-bg, #f4e8dd);
+  box-shadow: 0 12px 32px rgb(16 48 43 / 18%);
+  color: var(--color-warning-fg, #9e5330);
   pointer-events: none;
   animation: kiosk-hid-notice-in 160ms ease-out;
 }
@@ -34,7 +36,8 @@
   margin-top: 4px;
   font-size: 15px;
   line-height: 1.5;
-  opacity: 0.8;
+  /* 不再用 opacity 压弱：陶土前景本身比原 Tailwind amber 浅，叠 0.8 后对比度只有
+     3.28:1，低于 AA 4.5:1（CLAUDE.md §9 可访问性不得降低）。层级交给字号即可。 */
 }
 
 @keyframes kiosk-hid-notice-in {

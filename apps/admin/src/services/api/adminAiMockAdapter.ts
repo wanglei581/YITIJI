@@ -1,4 +1,15 @@
-import type { AdminAiLogEntry, AdminAiUsage, AdminAiLogsResult, JobSourceQualitySummary } from './types'
+import type {
+  AdminAiLogEntry, AdminAiUsage, AdminAiLogsResult, JobSourceQualitySummary,
+  AiOperation, AiOperationCost,
+} from './types'
+
+/** 与后端 AiOperation 联合类型一一对应；漏一项会被 verify:ai-cost-coverage 拦下。 */
+const ALL_AI_OPERATIONS: readonly AiOperation[] = [
+  'parseResume', 'optimizeResume', 'adjustResumeLayout', 'generateResume',
+  'chatAssistant', 'classifyIntent', 'jobRecommend', 'jobExplain', 'jobMatch',
+  'careerPlan', 'fairVisitPlan', 'interviewQuestion', 'interviewReport',
+  'voiceTranscribe', 'voiceSynthesize', 'selfAssessment', 'contractReview',
+]
 
 // ─── Mock 数据（仅元数据，无简历内容/聊天原文/文件名/fileId）──
 
@@ -30,6 +41,16 @@ function computeUsage(entries: AdminAiLogEntry[]): AdminAiUsage {
     if (e.errorCode) errorCounts[e.errorCode] = (errorCounts[e.errorCode] ?? 0) + 1
   }
 
+  // AI-COST-TRUTH：mock 数据全部来自 MockAiProvider —— 它不打任何上游，
+  // 所以成本确定为 0（measuredCalls === calls），这是「成本为 0」态，
+  // **不是**「未采集」态。两者在 UI 上必须长得不一样，mock 也不例外。
+  const byOperation = Object.fromEntries(
+    ALL_AI_OPERATIONS.map((op) => [op, entries.filter((e) => e.operation === op).length]),
+  ) as Record<AiOperation, number>
+  const costByOperation = Object.fromEntries(
+    ALL_AI_OPERATIONS.map((op) => [op, { cny: 0, calls: byOperation[op], measuredCalls: byOperation[op] }]),
+  ) as Record<AiOperation, AiOperationCost>
+
   return {
     providerName:    'MockAiProvider',
     totalCalls:      total,
@@ -37,46 +58,14 @@ function computeUsage(entries: AdminAiLogEntry[]): AdminAiUsage {
     failCount:       failList.length,
     successRate:     total > 0 ? Math.round((successList.length / total) * 1000) / 10 : 0,
     avgLatencyMs,
-    byOperation: {
-      parseResume:       entries.filter((e) => e.operation === 'parseResume').length,
-      optimizeResume:    entries.filter((e) => e.operation === 'optimizeResume').length,
-      adjustResumeLayout: 0,
-      generateResume:    0,
-      chatAssistant:     entries.filter((e) => e.operation === 'chatAssistant').length,
-      classifyIntent:    entries.filter((e) => e.operation === 'classifyIntent').length,
-      jobRecommend:      0,
-      jobExplain:        0,
-      jobMatch:          0,
-      careerPlan:        0,
-      fairVisitPlan:     0,
-      interviewQuestion: 0,
-      interviewReport:   0,
-      voiceTranscribe:   0,
-      voiceSynthesize:   0,
-      selfAssessment:    0,
-    },
+    byOperation,
     errorDistribution: Object.entries(errorCounts).map(([code, count]) => ({ code, count })),
     tokenUsageTotals: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-    costByOperation: {
-      parseResume:        0,
-      optimizeResume:     0,
-      adjustResumeLayout: 0,
-      generateResume:     0,
-      chatAssistant:      0,
-      classifyIntent:     0,
-      jobRecommend:       0,
-      jobExplain:         0,
-      jobMatch:           0,
-      careerPlan:         0,
-      fairVisitPlan:      0,
-      interviewQuestion:  0,
-      interviewReport:    0,
-      voiceTranscribe:    0,
-      voiceSynthesize:    0,
-      selfAssessment:     0,
-    },
+    costByOperation,
     alerts: [],
     estimatedCostCny: 0,
+    unmeasuredCalls: 0,
+    costCollectionSince: '2026-08-17',
   }
 }
 
