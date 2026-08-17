@@ -18,7 +18,8 @@ const uploadNames = require('../../utils/upload-name')
 
 const SELF_ROUTE = '/pages/contract-review/contract-review'
 const POLL_MS = 2000
-const MAX_POLLS = 150   // 约 5 分钟；OCR + 规则 + 模型串行，比单次 AI 调用长得多
+// 轮询上限已改为按内容体量动态推算，见 _estimate() 与 _poll()。
+// 保留此常量仅作为 etaSec 尚未就绪时的兜底下限参考。
 
 /**
  * 「从微信聊天选文件」的扩展名白名单。
@@ -407,9 +408,24 @@ Page({
    * 服务端识别出页数后要用户确认分析范围，不确认就不会继续。
    * 结论也只在这里拿：completed 时 result.findings 即审查结果。
    */
+  /**
+   * 预计耗时：按识别页数推算，不写死常量。
+   * 依据 2026-08-17 实测：单页合同文本调用 deepseek-v4-pro 约 13 秒，
+   * 加排队与文字识别的固定开销。这是给用户的预期，不是硬上限——
+   * 成败以服务端状态为准。
+   */
+  _estimate(pages) {
+    const p = Number.isFinite(pages) && pages > 0 ? pages : 1
+    return 20 + p * 15
+  },
+
   _poll(id, tries = 0) {
     if (this._stopped) return Promise.resolve()
-    if (tries > MAX_POLLS) {
+    // 上限随内容体量伸缩，不用常量。仍保留上限是因为：服务端若既不返回
+    // completed 也不返回 failed，页面不能无限转圈——那时如实告知已超预期。
+    const eta = this.data.etaSec || this._estimate(1)
+    const maxTries = Math.ceil((eta * 4) / (POLL_MS / 1000))
+    if (tries > maxTries) {
       // 放弃等待时一并删除：任务还在服务端跑，合同原件也还在，不能只丢掉页面状态。
       this._reset('分析用时超出预期，已删除本次上传，请稍后重新发起')
       return Promise.resolve()
