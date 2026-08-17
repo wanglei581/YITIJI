@@ -5,6 +5,7 @@ import type {
   ScanSessionStatusResponse,
 } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
+import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
 
 interface ResponseEnvelope<T> {
@@ -29,6 +30,10 @@ async function requestJson<T>(
   // 与 uploadSessions.ts 的 X-Upload-Session-Control 同一惯例：controlToken 走 header，不进
   // query string/浏览器历史（见 scan-tasks.controller.ts 上的说明）。
   if (init?.controlToken) headers.set('X-Scan-Session-Control', init.controlToken)
+  // 限流按台计数（后端 @TerminalScopedThrottle）：扫描会话状态会被定时轮询，
+  // 不带这个头时同一大厅多台机器共用一个 IP 桶。取不到终端身份时不发。
+  const terminalId = getTerminalId()
+  if (terminalId) headers.set('X-Terminal-Id', terminalId)
 
   let res: Response
   try {

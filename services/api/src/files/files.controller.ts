@@ -32,6 +32,7 @@ import { AuditService } from '../audit/audit.service'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService, type FileRequester } from './files.service'
+import { PROXY_MAX_BYTES } from './file-validation'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
@@ -101,9 +102,12 @@ export class FilesController {
 
   // ── 服务端代理上传 ─────────────────────────────────────────────────────────
 
+  // fileSize 必须真赋值：multer 默认 memory storage，整个 body 先进内存，
+  // 而 PROXY_MAX_BYTES 的体积校验在 file-validation.ts 里发生——那时内存已经占掉了。
+  // 这里与 PROXY_MAX_BYTES 对齐（同一个 15MB 常量），让 multer 在流阶段就掐断。
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: PROXY_MAX_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: UploadOptionsDto,
@@ -127,9 +131,11 @@ export class FilesController {
   }
 
   /** Kiosk 一体机匿名 / 会员上传(无 User 登录态;有会员 token 则绑定 endUserId)。 */
+  // 本端点免认证（一体机匿名上传），单个超大请求即可打爆内存，不需要并发。
+  // fileSize 与 PROXY_MAX_BYTES 对齐，multer 在流阶段就拒绝，body 不会整份进内存。
   @Post('kiosk-upload')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: PROXY_MAX_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async kioskUpload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: KioskUploadOptionsDto,

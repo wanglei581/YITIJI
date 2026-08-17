@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { BullModule } from '@nestjs/bullmq'
+import { buildThrottlerConfig } from './common/throttler/terminal-throttle'
 import { AdvisorModule } from './advisor/advisor.module'
 import { AiModule } from './ai/ai.module'
 import { AuditModule } from './audit/audit.module'
@@ -75,9 +76,13 @@ const redisUrl = process.env['REDIS_URL']
   imports: [
     // Throttler:防字典爆破。默认全局每 IP 每分钟 60 次,
     // /auth/login 单独用更严格的 5 次/60 秒(见 auth.controller)。
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 60 },
-    ]),
+    //
+    // 桶维度见 common/throttler/terminal-throttle.ts:
+    //   - `default` 仍按纯 IP 计数,阈值与口径均未放宽;
+    //   - 新增 `ip-wide` 纯 IP 兜底桶,给显式声明了终端维度的路由封顶。
+    // 一体机大厅共用 NAT 出口 IP,轮询类路由必须按台计数,否则第 3 台机器
+    // 就会把打印进度轮询打成 429(伪装成「后端挂了」)。
+    ThrottlerModule.forRoot(buildThrottlerConfig()),
     // BE-1 文件清理 cron 依赖 ScheduleModule 在根模块初始化。
     ScheduleModule.forRoot(),
     // BullMQ root config：有 REDIS_URL 时注册，否则跳过（JobSyncModule 自行处理）。

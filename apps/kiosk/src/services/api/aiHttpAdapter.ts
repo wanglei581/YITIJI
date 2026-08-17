@@ -27,6 +27,7 @@ import type {
 import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
+import { getTerminalId } from './screensaver'
 import { ApiHttpError } from './httpAdapter'
 
 const TIMEOUT_MS = 15_000
@@ -83,6 +84,12 @@ async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** 空对象表示本机没有已验证的终端身份（Agent 未就绪），此时不发这个头。 */
+function terminalHeader(): Record<string, string> {
+  const terminalId = getTerminalId()
+  return terminalId ? { 'X-Terminal-Id': terminalId } : {}
+}
+
 async function post<T>(path: string, body: unknown, token?: string | null): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
@@ -94,6 +101,10 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
         Accept: 'application/json',
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // 限流与日配额的「终端」维度（后端 @TerminalScopedThrottle +
+        // AiPublicQuotaService）。同一大厅多台机器共用 NAT 出口 IP，不带这个头
+        // 就会共用一份 AI 额度。取不到本机终端身份时不发，后端退化回按 IP 计数。
+        ...terminalHeader(),
       },
       credentials: 'include',
       body: JSON.stringify(body),

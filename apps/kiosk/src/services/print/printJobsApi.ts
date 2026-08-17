@@ -146,7 +146,16 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
 }
 
 export async function getPrintJobStatus(taskId: string): Promise<PrintJobStatusResult> {
-  const res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`)
+  // 限流按台计数用（后端 @TerminalScopedThrottle）。PrintProgressPage 每 3 秒轮询、
+  // 最长 10 分钟；不带这个头时同一大厅第 3 台机器就会把 IP 桶打满，前端会把 429
+  // 显示成「无法连接打印服务」。
+  //
+  // 与 createPrintJob 不同，这里**不**因缺少终端身份而抛错：查状态不需要设备身份，
+  // 硬要求会把「Agent 未就绪」变成看不到打印进度。取不到就不发，后端退化回按 IP 计数。
+  const terminalId = getTerminalId()
+  const res = await fetch(`${API_BASE_URL}/print/jobs/${taskId}`, {
+    headers: terminalId ? { 'X-Terminal-Id': terminalId } : {},
+  })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`getPrintJobStatus failed: ${res.status} ${text}`)
