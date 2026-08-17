@@ -232,6 +232,61 @@ must(
   'AI 标签不随可用性变化（标签不许消失）'
 )
 
+// ── E. 能力真实性（CLAUDE.md §9 不伪造能力）─────────────────
+// ⚠ 这一组与 A 组方向相反，是**刻意允许的原型 / 生产分歧**：
+// 下面这些话原型 39-print-hub.html 里**都还有**，但它们描述的能力在前后端都不存在。
+// #653 把它们逐字迁进了生产（尚未部署），卡面 .hc-st 会直接渲染给终端用户看。
+// A 组的「以原型为准」只适用于原型说的是真话时；原型描述了不存在的能力，
+// 就不能照抄 —— 合规红线高于设计稿。原型本身要不要改由设计侧决定，
+// 但生产源码里不许再出现这些串。
+console.log('\n[E] 能力真实性（不得宣称不存在的能力）')
+const FORBIDDEN_COPY = [
+  // 打印参数建议：后端 GET materials/tasks/:id/print-param-suggestions 已实现，
+  // 但 apps/ 下零消费，用户拿不到 → 不得写进卡面。
+  ['体检与参数都是建议', '打印参数建议前端零消费，用户拿不到'],
+  // 材料扫描：services/api/src/scan-tasks/ 全目录零 OCR，「需人工复核」标记全链路不存在。
+  ['OCR 置信度低会标「需人工复核」', '扫描链路无 OCR，且全仓无「需人工复核」标记'],
+  ['置信度低会标「需人工复核」', '同上（AI 说明浮层里的同一句）'],
+  // 照片打印：颜色 / 纸张没有任何建议能力。
+  ['彩色与纸张给取舍理由', '颜色与纸张无任何建议能力，全部由用户自己设'],
+  // 证件照：/print-scan/feature/id-photo 只是 PrintScanFeatureInfoPage 静态说明页。
+  ['规格体检与换底', '证件照规格体检 / 换底前后端均无实现'],
+  // 格式转换：ConvertImagesPage 只有手动上移 / 下移，服务端零 LLM / 零 OCR。
+  ['页序与方向只提示', '无方向识别、无自动排序，只有手动上移 / 下移'],
+  ['页序与方向识别', '同上（AI 说明浮层里的同一句）'],
+  // 签名盖章：POST /print/sign/inspect 只返回 { pages }，服务端零 LLM / 零 OCR。
+  ['落款位只给参考', 'sign/inspect 只返回页数，无落款位建议'],
+  ['落款位参考', '同上（AI 说明浮层里的同一句）'],
+]
+for (const [line, why] of FORBIDDEN_COPY) {
+  must(
+    !productionSrc.includes(line),
+    `不宣称不存在的能力：「${line}」（${why}）`
+  )
+}
+
+// AI 标签必须反映真实是否用到 AI。convert / sign 两条链路前后端都零 AI，
+// 标成 AI 卡等于虚标一个不存在的能力。
+const capAiRole = Object.fromEntries(
+  [...homeSrc.matchAll(/cap: '([^']+)',[\s\S]{0,600}?aiRole: '(ai|none)'/g)].map((m) => [m[1], m[2]])
+)
+for (const cap of ['convert', 'sign']) {
+  must(
+    capAiRole[cap] === 'none',
+    `${cap} 标「不依赖 AI」（该链路前后端零 LLM / 零 OCR，实测 aiRole=${capAiRole[cap] ?? '未解析到'}）`
+  )
+}
+// 卡面标签与 AI 说明浮层的标签必须一致，否则同一张卡在两处自相矛盾。
+const explainerIsAi = Object.fromEntries(
+  [...contentSrc.matchAll(/cap: '([^']+)',[\s\S]{0,200}?isAi: (true|false)/g)].map((m) => [m[1], m[2] === 'true'])
+)
+for (const [cap, role] of Object.entries(capAiRole)) {
+  must(
+    explainerIsAi[cap] === (role === 'ai'),
+    `${cap} 卡面标签与 AI 说明浮层一致（卡面 aiRole=${role}，浮层 isAi=${explainerIsAi[cap]}）`
+  )
+}
+
 console.log(
   failures === 0
     ? '\n✅ P39 迁移保真门禁通过\n'
