@@ -100,6 +100,25 @@ jobs:
             echo "NGINX_LOGS_MB=$(du -sm /var/log/nginx 2>/dev/null | cut -f1)"
             echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
 
+            echo "=== 6b. 磁盘去向全量分解（回答「88% 用在哪」）==="
+            # 已测项加起来只有约 8.5GB，而已用约 35GB —— 差的约 27GB 必须找出来。
+            # 只输出目录名与 MB 数，不输出文件名，避免公开日志泄漏信息。
+            echo "--- 根目录下各一级目录（MB，降序前 12）---"
+            du -xsm /* 2>/dev/null | sort -rn | head -12 | awk '{printf "  %-28s %s MB\n", $2, $1}'
+            echo "--- /var 下（MB，降序前 8）---"
+            du -xsm /var/* 2>/dev/null | sort -rn | head -8 | awk '{printf "  %-28s %s MB\n", $2, $1}'
+            echo "--- 常见大件 ---"
+            echo "DOCKER_MB=$(du -xsm /var/lib/docker 2>/dev/null | cut -f1)"
+            echo "SNAP_MB=$(du -xsm /var/lib/snapd 2>/dev/null | cut -f1)"
+            echo "APT_CACHE_MB=$(du -xsm /var/cache/apt 2>/dev/null | cut -f1)"
+            echo "PG_DATA_MB=$(du -xsm /var/lib/postgresql 2>/dev/null | cut -f1)"
+            echo "HOME_ROOT_MB=$(du -xsm /root 2>/dev/null | cut -f1)"
+            echo "NODE_MODULES_TOTAL_MB=$(du -xsm --exclude=/proc --exclude=/sys / 2>/dev/null >/dev/null; find / -xdev -maxdepth 6 -type d -name node_modules -prune 2>/dev/null | xargs -r du -sm 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+            echo "--- 大于 200MB 的单文件（只输出大小与所在目录）---"
+            find / -xdev -type f -size +200M 2>/dev/null | head -10 | while read -r f; do
+              echo "  $(du -m "$f" 2>/dev/null | cut -f1) MB  in  $(dirname "$f")"
+            done
+
             echo "=== 7. 本次发布需要的空间量级 ==="
             # 注意：这条 SQL 含括号，务必用单引号包住并先赋值再 echo。
             # 之前写成 `$(... -tAc \"SELECT pg_database_size(current_database())...\")` 嵌在双引号里，
