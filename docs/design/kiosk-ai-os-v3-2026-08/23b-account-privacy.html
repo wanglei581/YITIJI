@@ -20,30 +20,41 @@
 /* ══ P23b 账号设置与隐私 ═════════════════════════════════════════════
    补页由来（缺口 G-05）：原型把账号这件事塞在 23-me.html 的一个页内浮层里，
    而浮层的「隐私与删除」只有一个动作 —— 删除已存的简历文件；全文 0 处
-   「导出数据 / 数据导出 / 改绑 / 换绑」。生产侧是**两个页**：
+   「改绑 / 换绑 / 撤回授权」。生产侧是**两个页**：
    /me/settings → MySettingsPage（541 行）、/me/privacy-requests →
    MyPrivacyRequestsPage，入口在 profileEntries.ts:46 / ProfilePage.tsx:139。
-   wiring-map.md:412-413 还登记着：**个人数据导出整条链后端已具备**
-   （GET/POST /me/data-requests、POST /me/data-requests/:id/download-authorizations、
-   GET /member/data-exports/:id/content，含 step-up 二次验证与一次性票据），
-   「23 只画了删除，没画导出」。用户的法定数据权利在设计稿里没有入口。
 
    本页把账号域的五件事各占一块摊开：登录与会话 / 保留期限 / 隐私与删除 /
-   数据导出 / 退出与无障碍。23-me 那张「账号设置」卡改为跳到本页，
+   岗位 AI 授权 / 退出与无障碍。23-me 那张「账号设置」卡改为跳到本页，
    原来的 ovl-set 浮层（连同它内部唯一的开启者 ovl-del）一并移到这里 ——
    保留期限表是**全站口径**，不许两份，所以是搬过来而不是抄一份。
 
+   ══ 2026-08-17 产品裁决（三条，逐条对生产代码核过）══════════════
+   本页初版把第 4 块画成「个人数据导出」，并在第 1 块写着「改绑手机号不在本机办」。
+   两处都与生产不符，按裁决改成：
+   ① **换绑手机号：提供。** MySettingsPage.tsx:84 是完整的四步换绑弹层
+      （:113 发旧号码 → :119 验旧号 → :132 提交新号 → :189/:298 换绑后清会话），
+      入口 :467。原型写「不在本机办」等于把已上线的能力从设计稿里抹掉，
+      所以保留能力、改文案（见第 1 块）。
+   ② **个人数据导出：不提供。** 后端链路虽然具备（wiring-map.md:412-413），
+      但一体机上**没有开放提交入口**：MyPrivacyRequestsPage.tsx:4 /:88 /:120、
+      MySettingsPage.tsx:438 /:497 都写着「导出与注销暂未开放」。
+      画了入口用户点下去只会扑空 = 伪造能力，因此导出块与 ovl-exp 一并删除。
+   ③ **撤回岗位 AI 授权：补上。** 11-jobfit-compare.html:1365 已向用户承诺
+      「登录后可在『我的 · 账号设置』随时撤回」，而本页初版没有这个入口 ——
+      空头承诺至今挂着。生产能力为真（MySettingsPage.tsx:312 /:413 /:523）。
+
    ══ 本页刻意不接 AI（这本身是对用户的一条承诺）══════════════════
    与 ai-capability-spec.md §2 的「P03 身份门」「P40 会话安全六态」同类：
-   身份、隐私、删除、导出是**安全判定**，模型判断有害。所以：
+   身份、隐私、删除、授权是**安全判定**，模型判断有害。所以：
    · 整页 0 处 E3，0 处模型产出，0 处「AI 建议」。
    · 四态（default / first / ai-down / device-off）**同版同文** ——
      ai-down 与 default 显示完全一致，因为本页本来就没有可降级的 AI 能力。
    · 这一点写在页脚，让用户看得见。
 
    ══ 不伪造 ══════════════════════════════════════════════════════
-   导出与删除都不在原型里真的发生：申请层写清「本稿不发真实短信、不生成真实
-   票据」，**任何状态下都不显示「已导出」「已提交」「已删除」**。
+   换绑、撤回与删除都不在原型里真的发生：弹层写清「本稿不发真实短信」，
+   **任何状态下都不显示「已换绑」「已撤回」「已删除」**。
    隐私请求记录是真实空态（0 条），不摆样例。
    ══════════════════════════════════════════════════════════════════ */
 .work--acc { grid-template-columns: 1fr; }
@@ -65,7 +76,7 @@
 .btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
 .btn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
 
-/* ── 导出：三步说清楚会发生什么，再给动作 ── */
+/* ── 步骤条：把一条多步流程说清楚，再给动作（原为导出三步，现用于换绑四步）── */
 .steps3 { display: flex; flex-direction: column; gap: var(--s-2); }
 .st3 { display: flex; align-items: flex-start; gap: var(--s-3);
   padding: var(--s-3) var(--s-4); border-radius: var(--r-xs);
@@ -113,7 +124,7 @@
 /* 高对比：只加深文字与描边，不动任何尺寸 —— 不会带来溢出或裁切 */
 .screen.is-hc { --fog-600: var(--fog-800); --fog-700: var(--fog-900); --brd-1: var(--brd-2); }
 
-/* ── 浮层（删除确认 / 导出申请）：一律 class 控制显隐，hidden 是四态机制的地盘 ── */
+/* ── 浮层（删除确认 / 撤回授权 / 换绑手机号）：一律 class 控制显隐，hidden 是四态机制的地盘 ── */
 .ovl { position: absolute; inset: 0; z-index: var(--z-sheet);
   display: flex; align-items: center; justify-content: center; padding: var(--s-8) var(--gutter); }
 .ovl[hidden] { display: none; }
@@ -167,7 +178,7 @@
 
   <div class="rail">
     <span class="dsub" style="flex:1 1 auto;font-size:var(--fz-3);color:var(--fog-700)">
-      登录与会话&nbsp;· 文件保留期限&nbsp;· 隐私与删除&nbsp;· <b style="color:var(--fog-900)">个人数据导出</b>&nbsp;· 退出与无障碍</span>
+      登录与会话&nbsp;· 文件保留期限&nbsp;· 隐私与删除&nbsp;· <b style="color:var(--fog-900)">岗位 AI 授权</b>&nbsp;· 退出与无障碍</span>
     <span class="rail-count">账号域&nbsp;· <b>5</b>&nbsp;件事</span>
   </div>
 
@@ -194,9 +205,23 @@
               <div class="kv-row"><span class="k">无操作自动退出</span><span class="v v--fog">按站点配置的空闲时长，到点清空本机会话并退出</span></div>
               <div class="kv-row"><span class="k">这台机器</span><span class="v v--fog">公共终端 · 离场务必退出</span></div>
             </div>
+            <!-- 2026-08-17 产品裁决①：这里原来写着「改绑手机号**不在本机办**……请在你自己
+                 手机上的会员端办理」。**那句话是错的** —— 生产一体机上换绑链路是真的、
+                 而且是四步二次验证：MySettingsPage.tsx:84 PhoneRebindOverlay
+                 （:113 发旧号验证码 → :119 验旧号换 step-up 票据 → :132 提交新号与新号验证码
+                 → :189/:298 换绑成功后旧会话全部失效、清内存 token 跳登录页），入口在 :467。
+                 原型照着那句话把入口去掉，等于把已经上线的能力从设计稿里抹掉。
+                 所以：保留能力、改文案。公共终端的顾虑用**二次验证 + 换绑即退出会话**回应，
+                 而不是用「不给办」回应。 -->
+            <div class="sec-acts" data-when="default ai-down device-off">
+              <button class="btn btn--ghost" type="button" data-open="ovl-rebind"><svg class="ic"><use href="#i-phone"/></svg>换绑手机号</button>
+              <span class="panel-note" style="margin-left:0">先验当前号，再验新号&nbsp;· 换绑后本机会话立即退出</span>
+            </div>
+            <p class="sec-note" data-when="first">未登录 · 登录后可以在这里换绑手机号。</p>
             <p class="sec-note">
-              改绑手机号<b>不在本机办</b>：它和数据导出一样要过短信二次验证，请在你自己手机上的会员端办理。
-              本机是公共终端，<b>不在这里做账号安全类变更</b>。</p>
+              换绑要过<b>两道短信验证</b>（先证明你是当前号的本人，再证明新号在你手上），
+              <b>换绑成功后本机这次会话立刻退出</b>，需要用新号重新登录 —— 这两条就是公共终端上的防护。
+              换绑<b>不影响</b>账号里已存的简历、文档与打印订单：它们跟账号走，不跟手机号走。</p>
           </div>
 
           <!-- ② 隐私与删除 -->
@@ -216,33 +241,46 @@
               <b>但日志里不含文件内容、也不含文件名全称</b>。管理员访问任何用户文件都会单独留痕。</p>
           </div>
 
-          <!-- ③ 个人数据导出 —— 本页新增的那件事（后端已具备，设计稿此前没有入口） -->
+          <!-- ③ 岗位 AI 授权 —— 2026-08-17 产品裁决②③，本块整体换过一次
+               ══ 裁决③：补「撤回岗位 AI 授权」════════════════════════════
+               这不是新功能，是**兑现原型自己已经作出的承诺**：
+               11-jobfit-compare.html:1365 对用户写着「登录后可在『我的 · 账号设置』
+               随时撤回」，而账号域这一页从来没有撤回入口 —— 用户是按那句话决定
+               要不要授权的，空头承诺比缺功能更伤。
+               生产端能力为真：MySettingsPage.tsx:32 revokeJobAiConsent 引入、
+               :312 调用、:403 说明、:413 入口、:523 二次确认；
+               MyPrivacyRequestsPage.tsx:74/:220 同一条链路的第二个入口。
+
+               ══ 裁决②：拿掉「个人数据导出」════════════════════════════
+               这一块原来画的是导出三步 + 申请入口。**一体机上不开放导出与注销**：
+               MyPrivacyRequestsPage.tsx:4「仅开放撤回授权；导出需 step-up（一体机无提交）；
+               账号注销暂未开放」、:88/:120 副文同口径；
+               MySettingsPage.tsx:438「撤回岗位 AI 授权；导出与注销暂未开放」、
+               :497「账号注销和数据导出尚未开放」。
+               后端链路具备（wiring-map.md:412-413）**不等于**一体机开放 ——
+               原型画了入口，用户点下去只会扑空，这正是本仓库定义的「伪造能力」。
+               所以导出块与它的 ovl-exp 浮层一并删除；等一体机真开放那天再画。
+               「我提过的隐私请求」保留：生产上它列的就是撤回申请的处理记录。 -->
           <div class="sec">
             <div class="sec-hd">
-              <svg class="ic"><use href="#i-download"/></svg>
-              <span class="sec-t">导出我的数据</span>
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span class="sec-t">岗位 AI 授权</span>
               <span class="chip chip--info">不依赖 AI</span>
             </div>
-            <div class="steps3">
-              <div class="st3"><span class="st3-n">1</span><span class="st3-b">
-                <span class="st3-t">提出导出申请</span>
-                <span class="st3-s">导出范围：你的账号资料、简历与文档清单、打印订单、AI 服务调用记录、浏览与外部跳转记录</span></span></div>
-              <div class="st3"><span class="st3-n">2</span><span class="st3-b">
-                <span class="st3-t">短信二次验证</span>
-                <span class="st3-s">给你登记的手机号发验证码，验证通过才生成导出件 —— 这一步是为了防止旁人在公共终端上拿走你的数据</span></span></div>
-              <div class="st3"><span class="st3-n">3</span><span class="st3-b">
-                <span class="st3-t">用一次性链接取走</span>
-                <span class="st3-s">链接一次有效、短时过期，<b>建议在你自己手机上打开</b>，不要在这台公共机器上下载</span></span></div>
+            <div class="kv" data-when="default ai-down device-off">
+              <div class="kv-row"><span class="k">当前状态</span><span class="v"><span class="chip chip--jade">已授权</span></span></div>
+              <div class="kv-row"><span class="k">用途</span><span class="v v--fog">读简历内容做岗位比对 · 结果只给你看</span></div>
             </div>
             <div class="sec-acts" data-when="default ai-down device-off">
-              <button class="btn btn--ghost" type="button" data-open="ovl-exp"><svg class="ic"><use href="#i-download"/></svg>申请导出我的数据</button>
+              <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-revoke"><svg class="ic"><use href="#i-shield"/></svg>撤回岗位 AI 授权</button>
+              <span class="panel-note" style="margin-left:0">撤回后再用岗位比对要重新确认</span>
             </div>
-            <!-- 未登录：导出对象是账号里的数据，没有账号就没有对象。
-                 置灰用 aria-disabled 并写清原因，绝不用原生 disabled -->
-            <div class="sec-acts" data-when="first">
-              <button class="btn btn--ghost" type="button" aria-disabled="true"><svg class="ic"><use href="#i-download"/></svg>申请导出我的数据</button>
-              <span class="panel-note" style="margin-left:0">未登录：导出的是账号里的数据，先登录才有可导的东西</span>
-            </div>
+            <p class="sec-note" data-when="first">
+              未登录 · 岗位比对按<b>本次任务</b>授权，会话结束即失效，不用来这里撤回。</p>
+            <p class="sec-note">
+              撤回的是<b>授权状态</b>，不是删数据：简历、我的文档、打印订单、收藏都不受影响，
+              已生成的比对报告仍在「AI服务记录」里，要删另走删除。撤回随时可做，也随时可以再授权。<br>
+              <b>账号注销与数据导出不在本机办理</b>：这两件事一体机上没有开放提交入口，请联系现场工作人员。</p>
 
             <div class="sec-hd" style="margin-top:var(--s-2)">
               <svg class="ic"><use href="#i-history"/></svg>
@@ -253,7 +291,7 @@
               <!-- 真实空态：没有就是没有，不摆一条样例记录 -->
               <div class="reqempty">
                 <svg class="ic"><use href="#i-folder"/></svg>
-                <span data-when="default ai-down device-off">你还没有提过导出或删除申请。提过之后，每一条的状态与处理时间都会列在这里。</span>
+                <span data-when="default ai-down device-off">你还没有提过撤回或删除申请。提过之后，每一条的状态与处理时间都会列在这里。</span>
                 <span data-when="first">未登录，这里不显示任何记录。</span>
               </div>
             </div>
@@ -352,9 +390,10 @@
       <!-- ── 页脚：整页唯一一条声明，并把「本页不接 AI」写给用户看 ── -->
       <div class="notice">
         <svg class="ic"><use href="#i-shield"/></svg>
-        <span><b>这一页刻意不接 AI。</b>身份、隐私、删除与导出是安全判定，交给模型判断有害，
+        <span><b>这一页刻意不接 AI。</b>身份、隐私、删除与授权是安全判定，交给模型判断有害，
           所以本页没有任何模型产出，四种状态下显示的内容完全一样。
-          导出与删除都要经过短信二次验证；<b>本机不显示「已导出 / 已提交 / 已删除」，一律以你手机上收到的回执为准</b>。</span>
+          换绑手机号要经过两道短信验证；<b>本稿不显示「已换绑 / 已撤回 / 已删除」，真机以你手机上收到的回执为准</b>。
+          账号注销与数据导出<b>本机不开放</b>，需要请联系现场工作人员。</span>
       </div>
     </div>
   </div>
@@ -386,40 +425,80 @@
     </div>
   </div>
 
-  <!-- ══════════ 浮层：导出申请（step-up 二次验证） ══════════ -->
-  <div class="ovl" id="ovl-exp" hidden>
+  <!-- ══════════ 浮层：撤回岗位 AI 授权（二次确认） ══════════
+       撤回是**授权状态**变更，不是删数据 —— 这两件事最容易被用户混起来，
+       所以这里把「不动什么」写在正面，而不是只说「不可恢复」。
+       口径与生产一致（MySettingsPage.tsx:403 说明、:524 二次确认文案）：
+       撤回后再用岗位 AI 需重新确认，已生成的记录仍在「AI服务记录」里，要删另走删除。 -->
+  <div class="ovl" id="ovl-revoke" hidden>
     <div class="ovl-scrim" data-close></div>
     <div class="ovl-panel">
       <div class="ovl-hd">
-        <svg class="ic"><use href="#i-download"/></svg><b>申请导出我的数据</b>
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-shield"/></svg><b>撤回岗位 AI 授权？</b>
         <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
       </div>
-      <div class="nrow">
-        <span class="dot dot--live"></span>
-        <span class="nrow-b">
-          <span class="nrow-t">验证码将发到 尾号 8000</span>
-          <span class="nrow-s">为防旁人在公共终端上拿走你的数据 · 此处不显示完整手机号</span>
-        </span>
+
+      <div class="nrow"><span class="dot dot--down"></span>
+        <span class="nrow-b"><span class="nrow-t">撤回后：本机不再凭这次授权读你的简历做岗位比对</span>
+          <span class="nrow-s">下次用岗位比对会重新问你一次</span></span></div>
+      <div class="nrow"><span class="dot"></span>
+        <span class="nrow-b"><span class="nrow-t">不动的：简历、我的文档、打印订单、收藏</span>
+          <span class="nrow-s">已生成的比对报告仍在「AI服务记录」里，要删请到那里删</span></span></div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>撤回随时可做，也随时可以再授权；本机不因为你撤回而少给其他服务。</span>
       </div>
-      <div class="nrow">
-        <span class="dot"></span>
-        <span class="nrow-b">
-          <span class="nrow-t">导出件包含</span>
-          <span class="nrow-s">账号资料 · 简历与文档清单 · 打印订单 · AI 服务调用记录 · 浏览与外部跳转记录。
-            不含你在来源平台上的任何行为，本机拿不到那些。</span>
-        </span>
+
+      <div class="ovl-act">
+        <button class="btn btn--ghost" type="button" data-close>先不撤回</button>
+        <button class="btn btn--ghost btn--danger" type="button" data-close>确认撤回</button>
+        <span class="panel-note" style="margin-left:0">本稿点确认<b>不会真的撤回</b>，也不会显示「已撤回」</span>
       </div>
-      <div class="notice notice--amber">
-        <svg class="ic"><use href="#i-alert"/></svg>
-        <span>取件链接<b>一次有效、短时过期</b>。这是公共终端，<b>建议在你自己手机上打开链接</b>，不要在这台机器上下载。</span>
+    </div>
+  </div>
+
+  <!-- ══════════ 浮层：换绑手机号（四步说清，只做第 1 步） ══════════
+       生产是四步（验旧号 → 填新号 → 验新号 → 换绑完成并退出会话，
+       MySettingsPage.tsx:84 PhoneRebindOverlay）。
+       原型把四步**说清楚**，但只让第 1 步可点 —— 把四步都做成能点的假流程，
+       等于在原型里伪造一条根本没接后端的验证链路。
+       （这块复用导出块留下的 .steps3 版式：那块按裁决②删了，版式留给这里用。） -->
+  <div class="ovl" id="ovl-rebind" hidden>
+    <div class="ovl-scrim" data-close></div>
+    <div class="ovl-panel">
+      <div class="ovl-hd">
+        <svg class="ic"><use href="#i-phone"/></svg><b>换绑手机号</b>
+        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
       </div>
+
+      <div class="steps3">
+        <div class="st3"><span class="st3-n">1</span><span class="st3-b">
+          <span class="st3-t">先确认是本人</span>
+          <span class="st3-s">向<b>当前</b>手机号 尾号 8000 发验证码 · 此处不显示完整手机号</span></span></div>
+        <div class="st3"><span class="st3-n">2</span><span class="st3-b">
+          <span class="st3-t">填新手机号</span>
+          <span class="st3-s">验证通过后才允许填新号</span></span></div>
+        <div class="st3"><span class="st3-n">3</span><span class="st3-b">
+          <span class="st3-t">验新号</span>
+          <span class="st3-s">给新号发一次验证码，证明新号在你手上</span></span></div>
+        <div class="st3"><span class="st3-n">4</span><span class="st3-b">
+          <span class="st3-t">换绑完成，本机立即退出</span>
+          <span class="st3-s">旧会话全部失效，需要用新号重新登录 —— 这是公共终端上的防护，不是故障</span></span></div>
+      </div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>换绑不影响已存的简历、文档与打印订单；它们跟账号走，不跟手机号走。</span>
+      </div>
+
       <div class="ovl-act">
         <button class="btn btn--ghost" type="button" data-close>取消</button>
         <button class="btn btn--lg btn--primary" type="button" data-close><svg class="ic"><use href="#i-phone"/></svg>发送验证码</button>
       </div>
       <p class="sec-note" style="margin:0">
-        <b>本稿不发真实短信、不生成真实票据</b>，点了也不会出现「已提交」。真机在这里走
-        step-up 二次验证，验证通过后才生成导出件，处理进度回到上一屏的「我提过的隐私请求」里看。</p>
+        <b>本稿不发真实短信</b>，点了也不会出现「已发送」「已换绑」。
+        真机在这里走 step-up 二次验证，后三步在本弹层内继续。</p>
     </div>
   </div>
 
@@ -430,9 +509,9 @@
 
     <div class="actionbar-hint">
       <!-- 四态同版同文：ai-down 与 default 一字不差，因为本页没有 AI 可降级 -->
-      <div data-when="default ai-down"><div class="t">存了什么、存多久，都在这页</div><div class="s">导出与删除都要过短信验证</div></div>
+      <div data-when="default ai-down"><div class="t">存了什么、存多久，都在这页</div><div class="s">换绑与撤回都要先验证是本人</div></div>
       <div data-when="first"><div class="t">未登录，账号里没有可管理的数据</div><div class="s">这一趟的文件离场即清</div></div>
-      <div data-when="device-off"><div class="t">这一页不出纸，打印机状态无关</div><div class="s">导出走手机，不走打印机</div></div>
+      <div data-when="device-off"><div class="t">这一页不出纸，打印机状态无关</div><div class="s">换绑与撤回都不经过打印机</div></div>
     </div>
 
     <a class="btn btn--primary" href="43-my-records.html?stage=trace">看本机记了我什么<svg class="ic"><use href="#i-arrowRight"/></svg></a>
@@ -456,8 +535,10 @@
   var scr = document.querySelector('.screen')
   if (!scr) return
 
-  /* 浮层显隐：本页只有两层，用 hidden 属性直接开关（它们不挂 data-when/data-at，
-     不与四态机制争同一个属性）。高对比开关只加 class，不动任何尺寸。 */
+  /* 浮层显隐：本页三层（删除确认 / 撤回授权 / 换绑手机号），用 hidden 属性直接开关
+     （它们不挂 data-when/data-at，不与四态机制争同一个属性）。
+     开关按 data-open 的 id 查，新增浮层不用改这段。
+     高对比开关只加 class，不动任何尺寸。 */
   scr.addEventListener('click', function (e) {
     if (!e.target.closest) return
 

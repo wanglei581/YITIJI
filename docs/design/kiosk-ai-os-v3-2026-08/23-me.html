@@ -32,7 +32,21 @@
        未登录会话离场即清。完整口径做成一张表放进「账号设置 · 文件保存期限」，
        作为全站基准；卡副文只给一句概括，不再单写「90 天」。）
    ④ 「账号设置」卡副文压缩为 3 个事实：登录方式 / 隐私与删除 / 无障碍；
+      （2026-08-17：账号域整页迁到 23b-account-privacy.html 之后，那边补入
+       「换绑手机号」「撤回岗位 AI 授权」，本页副文第三项相应改为「隐私与授权」；
+       同时去掉「数据导出」—— 一体机不开放导出，见 ⑥。仍是 4 个事实、不加第五格。）
    ⑤ 删除记录带防肩窥：确认弹层不回显文件名全称，只显示「简历文件 ×N」。
+   ⑥ 2026-08-17 产品裁决（内容落在 23b，本页只改这张卡的副文）：
+      账号域原来只有「登录方式（只读）/ 保存期限 / 删除 / 无障碍」，
+      漏了两项**生产上真实存在**的用户自助能力：
+        · 撤回岗位 AI 授权（MySettingsPage.tsx:312 / :413 / :523）
+        · 换绑手机号（MySettingsPage.tsx:84 四步弹层 / :467 入口）
+      前者尤其要紧：11-jobfit-compare.html:1365 已经对用户承诺
+      「登录后可在『我的 · 账号设置』随时撤回」，不给入口就是空头承诺。
+      **刻意不画「个人数据导出」**：生产在一体机上不开放导出与注销
+      （MyPrivacyRequestsPage.tsx:4「仅开放撤回授权」、:88/:120 副文同口径，
+       MySettingsPage.tsx:438/:497 同样写着「导出与注销暂未开放」）。
+      后端链路具备 ≠ 一体机开放；画上去等于给设计稿加一个生产关掉的能力。
 
    数据边界（合规红线，docs/product/user-data-flow-matrix.md 2026-06-14）：
    浏览 / 外部跳转明细归岗位、招聘会、政策各业务页，本页不聚合明细，
@@ -742,15 +756,22 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 
       <!-- 8 账号设置与隐私（2026-08-16 缺口 G-05 整改：由页内浮层改为跳页）
            原来这里点开的是本页的 ovl-set 浮层，浮层里「隐私与删除」只有一个动作
-           （删除已存的简历文件），全文 0 处「导出数据」—— 而 wiring-map.md:412-413
-           已登记个人数据导出整条链后端都已具备（含 step-up 二次验证与一次性票据），
-           生产侧也是 /me/settings（541 行）+ /me/privacy-requests **两个页**。
-           一个 541 行的页塞进一个浮层是职责过载，拆出来之后本页少一层浮层，
+           （删除已存的简历文件）。生产侧是 /me/settings（541 行）+ /me/privacy-requests
+           **两个页**，一个 541 行的页塞进一个浮层是职责过载，拆出来之后本页少一层浮层，
            账号域的每一件事各占一块。**入口仍然只有这一个，不新增第二个同义入口。**
-           ?view=settings 的深链照常工作：它定位的是这张卡本身（:1108 按 data-view 查）。 -->
+           ?view=settings 的深链照常工作：它定位的是这张卡本身（:1108 按 data-view 查）。
+
+           2026-08-17 副文按产品裁决改（三项逐条对生产代码核过）：
+             · 去掉「数据导出」—— 一体机不开放导出与注销
+               （MyPrivacyRequestsPage.tsx:4/:88/:120、MySettingsPage.tsx:438/:497 同一口径）。
+               后端链路具备不等于一体机开放；副文写了它，用户点进去只会扑空。
+             · 「隐私与删除」改为「隐私与授权」—— 页内补了「撤回岗位 AI 授权」，
+               它归在隐私这一格里，不另开第五格（副文再长会被卡片宽度裁掉）。
+             · 换绑手机号是真能力（MySettingsPage.tsx:84 四步弹层 / :467 入口），
+               归在「登录方式」这一格里，同样不单开一格。 -->
       <a class="fcard rise" href="23b-account-privacy.html" data-view="settings" style="--c1:var(--fog-600)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-gear"/></svg></span></span><span class="fc-t">账号设置与隐私</span>
-        <span class="fc-s">登录方式 · 文件保存期限 · 隐私与删除 · 数据导出 · 无障碍</span>
+        <span class="fc-s">登录方式 · 文件保存期限 · 隐私与授权 · 无障碍</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </a>
 
@@ -817,7 +838,6 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
        其它页对本页的 ?view=settings 深链（42:1348、43:1191/1512/1829）不受影响 ——
        :1108 的定位脚本按 .fcard[data-view="settings"] 找卡，那张卡还在。
        退出登录在本页仍有两处入口（:559 用户条、:951 结束并清空确认层），未受影响。 -->
-
 
   <!-- 结束并清空的二次确认。不可逆动作必须问一次，且要说清"清掉什么、留下什么"——
        用户最怕的不是退出，是"我存的简历是不是也没了"。 -->
