@@ -266,9 +266,374 @@
   text-align: center;
 }
 
+/* ── P21 条件核对 ──────────────────────────────────────────────────────────
+   一体机 1080×1920 竖屏：主按钮 ≥56px，所有可点区 ≥48px。
+   置灰按钮用 aria-disabled，外观必须自己画（原生 :disabled 选择器命不中）。 */
+
+.k8-elig {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.k8-elig-steps {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.k8-elig-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-step[aria-current='step'] {
+  font-weight: 700;
+  color: var(--color-wheat-fg);
+}
+
+.k8-elig-step-n {
+  display: inline-flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-neutral-100);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.k8-elig-step[aria-current='step'] .k8-elig-step-n {
+  background: var(--color-wheat-soft);
+  color: var(--color-wheat-fg);
+}
+
+.k8-elig-privacy,
+.k8-elig-why {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-neutral-50);
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+}
+
+.k8-elig-questions {
+  display: grid;
+  flex-shrink: 0;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 16px;
+}
+
+.k8-elig-q {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-surface);
+  padding: 16px 18px;
+}
+
+.k8-elig-q-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.k8-elig-q-title small {
+  margin-left: 10px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.k8-elig-opt {
+  display: inline-flex;
+  min-height: 56px;
+  align-items: center;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 0 22px;
+  font-size: 19px;
+  color: var(--color-neutral-600);
+  transition: border-color 160ms ease, background 160ms ease, transform 80ms ease;
+}
+
+.k8-elig-opt[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--color-wheat) 55%, transparent);
+  background: var(--color-wheat-soft);
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+}
+
+.k8-elig-opt:active {
+  transform: scale(0.98);
+}
+
+.k8-elig-actionbar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.k8-elig-count {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+}
+
+.k8-elig-count small {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-submit,
+.k8-elig-restart,
+.k8-elig-print-blocked,
+.k8-elig-notice-retry {
+  display: inline-flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-surface);
+  padding: 0 26px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+  transition: background 160ms ease, transform 80ms ease;
+}
+
+.k8-elig-submit {
+  border-color: color-mix(in srgb, var(--color-wheat) 55%, transparent);
+  background: var(--color-wheat-soft);
+  color: var(--color-wheat-fg);
+}
+
+.k8-elig-submit:active,
+.k8-elig-restart:active {
+  transform: scale(0.98);
+}
+
+/* 置灰但保持可聚焦：外观自己画，不用原生 disabled。 */
+.k8-elig-submit[aria-disabled='true'],
+.k8-elig-print-blocked[aria-disabled='true'] {
+  border-color: var(--color-neutral-200);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-400);
+  cursor: not-allowed;
+}
+
+.k8-elig-notice {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-md, 18px);
+  background: var(--color-surface);
+  padding: 22px 24px;
+}
+
+.k8-elig-notice--amber {
+  border-color: color-mix(in srgb, var(--color-warning, #d97706) 40%, transparent);
+  background: var(--color-warning-bg, #fffbeb);
+}
+
+.k8-elig-notice b {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.k8-elig-notice p {
+  margin-top: 8px;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--color-neutral-600);
+}
+
+.k8-elig-headline {
+  flex-shrink: 0;
+  border: 1px solid var(--color-neutral-200);
+  border-top: 4px solid var(--color-wheat);
+  border-radius: var(--k-r-md, 18px);
+  background: var(--color-surface);
+  padding: 20px 24px;
+}
+
+.k8-elig-headline-text {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--color-neutral-900);
+}
+
+.k8-elig-headline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-e2 {
+  border-radius: 999px;
+  background: var(--color-wheat-soft);
+  padding: 3px 12px;
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+}
+
+.k8-elig-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.k8-elig-card {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-md, 18px);
+  background: var(--color-surface);
+  padding: 22px 24px;
+}
+
+.k8-elig-card h3 {
+  font-family: var(--font-serif);
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-neutral-900);
+}
+
+.k8-elig-card-src {
+  margin-top: 8px;
+  font-size: 16px;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-card-overall {
+  margin-top: 12px;
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-neutral-50);
+  padding: 12px 16px;
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--color-neutral-700);
+}
+
+.k8-elig-conds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.k8-elig-cond {
+  display: flex;
+  gap: 12px;
+  border: 1px solid var(--color-neutral-200);
+  border-left-width: 4px;
+  border-radius: var(--k-r-sm, 14px);
+  padding: 14px 16px;
+}
+
+.k8-elig-cond b {
+  font-size: 20px;
+  color: var(--color-neutral-900);
+}
+
+.k8-elig-cond-tag {
+  margin-left: 10px;
+  border-radius: 999px;
+  background: var(--color-neutral-100);
+  padding: 2px 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-neutral-600);
+}
+
+.k8-elig-cond--matched {
+  border-left-color: var(--color-success, #16a34a);
+}
+
+.k8-elig-cond--conflict {
+  border-left-color: var(--color-warning, #d97706);
+}
+
+.k8-elig-cond--unknown {
+  border-left-color: var(--color-neutral-300);
+}
+
+.k8-elig-cond-reason,
+.k8-elig-cond-basis {
+  margin-top: 6px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+}
+
+.k8-elig-cond-src {
+  margin-top: 8px;
+  border-left: 3px solid var(--color-neutral-200);
+  padding-left: 12px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+}
+
+.k8-elig-disclaimer {
+  flex-shrink: 0;
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-neutral-50);
+  padding: 12px 18px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+}
+
 @media (max-width: 900px) {
   .k8-policy-grid {
     grid-template-columns: 1fr;
+  }
+
+  .k8-elig-questions {
+    grid-template-columns: 1fr;
+  }
+
+  .k8-elig-actionbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .k8-policy-tabs {

@@ -9,6 +9,7 @@ import { fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type T
 import { BUILTIN_GUIDES } from './builtinData'
 import { OfficialEntryQrOverlay, TabBar } from './components'
 import { PolicyPanel } from './PolicyPanel'
+import { EligibilityPanel } from './EligibilityPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
 import { NoticePanel } from './NoticePanel'
@@ -131,6 +132,13 @@ export function RenshiPage() {
       <TabBar active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'policy' && renderPolicyTab()}
+      {/*
+        条件核对自己取数（两个 P21 端点），不复用上面的 /policies 结果：
+        比对面只认 approved+published 且 kind=policy_guide 的条目，
+        与列表页的取数口径不同，借用会让「有没有可比对的政策」判错。
+        它也**不依赖 AI**（服务端确定性比对，零 LLM），所以不挂任何 AI 降级分支。
+      */}
+      {activeTab === 'eligibility' && <EligibilityPanel />}
       {activeTab === 'notice' && renderNoticeTab()}
       {activeTab === 'social' && <SocialPanel onOfficialEntry={(title, url) => setQrEntry({ title, url })} />}
       {activeTab === 'register' && <RegisterPanel />}
