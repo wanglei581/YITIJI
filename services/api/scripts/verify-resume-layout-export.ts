@@ -105,11 +105,13 @@ function assertStaticContracts(): void {
   if (!/exportGeneratedResume\([\s\S]*format: ResumeExportFormat = 'pdf',\s*layout\?: ResumeLayoutSettings,\s*templateId\?: string/.test(aiSrc)) {
     fail('4a. AiService.exportGeneratedResume 未接收 layout 可选参数')
   }
-  if (!aiSrc.includes('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset })')) fail('4a. AiService 未把 layout 透传给 ResumePdfService')
-  if (!controllerSrc.includes('const { taskId, format, layout, templateId, ...resume } = dto')) {
-    fail('4b. AiController 导出接口未从 dto 中剥离 layout')
+  if (!aiSrc.includes('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })')) fail('4a. AiService 未把 layout / draft 透传给 ResumePdfService')
+  // draft 与 layout 一样必须从 dto 剥离并透传：漏了它，ai-down 时导出的原样草稿
+  // 会被当成 AI 产物打上 AIGenerated=true。
+  if (!controllerSrc.includes('const { taskId, format, layout, templateId, draft, ...resume } = dto')) {
+    fail('4b. AiController 导出接口未从 dto 中剥离 layout / draft')
   }
-  if (!controllerSrc.includes("format ?? 'pdf', layout, templateId")) fail('4b. AiController 未把 layout 透传给 AiService')
+  if (!controllerSrc.includes("format ?? 'pdf', layout, templateId, draft === true")) fail('4b. AiController 未把 layout / draft 透传给 AiService')
   pass('4. 导出 controller/service 已透传 layout')
 }
 
@@ -218,6 +220,31 @@ async function main(): Promise<void> {
       const printBuffer = await storage.getObject(printFileRow!.storageKey)
       if (!printBuffer.subarray(0, 4).equals(Buffer.from('%PDF', 'latin1'))) fail(`6. [${format}] PDF 副本产物不是合法 PDF`)
       pass(`6. [${format}] 接收 layout 不报错,且 layout 已透传到另外渲染的打印用 PDF 副本`)
+    }
+
+    // ── 7. ai-down 原样草稿：内容是用户自己写的，元数据不得标成 AI 产物 ──────
+    // 这是「不伪造能力」在简历链上的运行时证明：AI 生成失败时用户仍能把已填内容
+    // 导出打印带走，但那份 PDF 必须自称非 AI 产物。
+    {
+      const readInfo = (buffer: Buffer, key: string): string | null => {
+        const raw = buffer.toString('latin1')
+        // PDF info 字典的值是间接对象（/AIGenerated 19 0 R），必须顺着引用读。
+        const ref = raw.match(new RegExp(`\\/${key} (\\d+) 0 R`))
+        if (!ref) return null
+        const value = raw.match(new RegExp(`${ref[1]} 0 obj\\s*\\(([^)]*)\\)`))
+        return value ? value[1] : null
+      }
+
+      const aiPdf = await pdf.render(FIXTURE)
+      if (readInfo(aiPdf.buffer, 'AIGenerated') !== 'true') fail('7. AI 版简历 PDF 必须仍写 AIGenerated=true')
+
+      const draftPdf = await pdf.render(FIXTURE, { draft: true })
+      if (draftPdf.buffer.subarray(0, 4).toString('latin1') !== '%PDF') fail('7. 草稿产物不是合法 PDF')
+      if (draftPdf.pageCount < 1) fail('7. 草稿 pageCount 应 ≥1')
+      const draftFlag = readInfo(draftPdf.buffer, 'AIGenerated')
+      if (draftFlag !== 'false') fail(`7. 原样草稿必须写 AIGenerated=false，实际 ${draftFlag}`)
+      if (readInfo(draftPdf.buffer, 'ServiceProviderCode') !== 'zyd-resume-draft-v1') fail('7. 原样草稿必须有独立 ServiceProviderCode')
+      pass(`7. ai-down 原样草稿真实渲染且元数据诚实（${draftPdf.buffer.length} bytes / ${draftPdf.pageCount} 页 / AIGenerated=false）`)
     }
 
     console.log('\n=== ALL PASS ===')

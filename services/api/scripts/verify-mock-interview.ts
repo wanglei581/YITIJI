@@ -14,6 +14,8 @@
  *  9. 会员删除：硬删级联（turns/report 物理消失）+ 审计行存在
  * 10. 日志脱敏：捕获 Logger，断言不含问题/回答原文
  * 11. 报告 PDF：真实 pdfkit 渲染（中文字体 + pageCount ≥1），含合规声明文本
+ * 15. ai-down：模型断连 → start 失败，但通用题目单照常渲染出真实 PDF
+ *     （variant=degraded / AIGenerated=false / 文件名写明通用题库）
  *
  * 运行：pnpm --filter @ai-job-print/api verify:mock-interview
  */
@@ -27,6 +29,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { MockInterviewLlmService, type InterviewReportPayload } from '../src/mock-interview/mock-interview-llm.service'
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
+import { InterviewPracticeSheetPdfService } from '../src/mock-interview/interview-practice-sheet-pdf.service'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
 import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
 import { AiLogService } from '../src/ai/ai-log.service'
@@ -101,7 +104,9 @@ async function main() {
   }
   const llm = new MockInterviewLlmService(stubConfig as never)
   const pdf = new InterviewReportPdfService()
-  const svc = new MockInterviewService(prisma, llm, pdf, {} as never, {} as never, audit, aiLog)
+  // ai-down 题目单渲染器：与 AI 版式并列注入（位置参数，顺序必须与构造函数一致）。
+  const practiceSheetPdf = new InterviewPracticeSheetPdfService()
+  const svc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, {} as never, audit, aiLog)
   const suffix = Date.now().toString(36)
   const endUserA = `vmi_a_${suffix}`
   const endUserB = `vmi_b_${suffix}`
@@ -138,7 +143,7 @@ async function main() {
           }
         },
       }
-      const guardedSvc = new MockInterviewService(prisma, llm, pdf, {} as never, guardedExtraction as never, audit, aiLog)
+      const guardedSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, {} as never, guardedExtraction as never, audit, aiLog)
       const created = await guardedSvc.createSession(
         { ...baseCfg, resumeFileId: ownedResumeFileId },
         { endUserId: endUserA, accessToken: null },
@@ -509,6 +514,74 @@ async function main() {
       if (pageCount < 1) fail('11. pageCount 应 ≥1')
       if (buffer.slice(0, 4).toString() !== '%PDF') fail('11. 输出不是 PDF')
       pass(`11. 报告 PDF 真实渲染（${buffer.length} bytes / ${pageCount} 页）`)
+    }
+
+    // ── 15. ai-down：模型挂掉时仍然拿得到一张纸 ──────────────────────────────
+    // 这条是「AI 是加速器不是前置条件」在面试链上的运行时证明：
+    // start 走不通（模型 503），但 printPracticeSheet 必须照常出一份真实 PDF，
+    // 且这张纸必须**自称降级版**（variant=degraded + AIGenerated=false），不冒充 AI 报告。
+    {
+      // 只有 files 是桩：真实上传要打对象存储，与本断言无关。PDF 是真渲染的。
+      const uploads: Array<{ buffer: Buffer; filename: string }> = []
+      const filesStub = {
+        upload: async (input: { buffer: Buffer; filename: string }) => {
+          uploads.push({ buffer: input.buffer, filename: input.filename })
+          return {
+            fileId: `pshe_${Date.now().toString(36)}`,
+            filename: input.filename,
+            sizeBytes: input.buffer.length,
+            signedUrl: 'https://example.invalid/stub',
+            signedUrlExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+          }
+        },
+      }
+      const downSvc = new MockInterviewService(prisma, llm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog)
+      const created = await downSvc.createSession(
+        { interviewerType: 'tech', industry: '互联网 / AI', position: '前端开发工程师', experience: 'y1_3', difficulty: 'standard', durationMin: 8 },
+        { endUserId: endUserA, accessToken: null },
+      )
+      cleanupSessionIds.push(created.sessionId)
+
+      // 模拟模型不可用：stub 直接断连，nextQuestion 抛错 → start 必然失败。
+      const downStub = createServer((_req, res) => res.destroy())
+      await new Promise<void>((resolve) => downStub.listen(0, '127.0.0.1', () => resolve()))
+      const downAddr = downStub.address()
+      const downUrl = `http://127.0.0.1:${typeof downAddr === 'object' && downAddr ? downAddr.port : 0}`
+      const downLlm = new MockInterviewLlmService({
+        getApiKey: () => 'stub-key',
+        getConfig: () => ({
+          vendor: 'deepseek', model: 'stub-model', baseURL: downUrl, systemPrompt: '', roleScope: '',
+          forbiddenWords: [], temperature: 0, enabled: true, apiKeyEncrypted: 'x',
+        }),
+      } as never)
+      const brokenSvc = new MockInterviewService(prisma, downLlm, pdf, practiceSheetPdf, filesStub as never, {} as never, audit, aiLog)
+      let startFailed = false
+      try {
+        await brokenSvc.start(created.sessionId, { endUserId: endUserA, accessToken: null })
+      } catch { startFailed = true }
+      downStub.close()
+      if (!startFailed) fail('15. 前置不成立：模型断连时 start 竟然成功了')
+
+      // 关键断言：AI 挂了，纸还得出得来。
+      const sheet = await downSvc.printPracticeSheet(created.sessionId, { endUserId: endUserA, accessToken: null })
+      if (sheet.variant !== 'degraded') fail('15. 题目单必须自称 degraded')
+      if (sheet.questionCount !== 8) fail(`15. 8 分钟档应印 8 题，实际 ${sheet.questionCount}`)
+      if (!sheet.printFileUrl) fail('15. 题目单必须签发真实打印链接')
+      if (sheet.pageCount < 1) fail('15. pageCount 应 ≥1')
+      const sheetPdf = uploads.at(-1)
+      if (!sheetPdf) fail('15. 没有产生任何文件')
+      if (sheetPdf.buffer.slice(0, 4).toString() !== '%PDF') fail('15. 输出不是 PDF')
+      // 不伪造：这张纸一个字都不是模型写的，元数据不得标成 AI 产物。
+      // PDF info 字典里的值是**间接对象**（/AIGenerated 19 0 R），必须顺着引用去读，
+      // 直接 grep '/AIGenerated (false)' 会永远断不到。
+      const raw = sheetPdf.buffer.toString('latin1')
+      const ref = raw.match(/\/AIGenerated (\d+) 0 R/)
+      if (!ref) fail('15. 题目单 PDF 缺少 AIGenerated 元数据')
+      const aigcValue = raw.match(new RegExp(`${ref![1]} 0 obj\\s*\\(([^)]*)\\)`))
+      if (!aigcValue) fail('15. 读不到 AIGenerated 的值')
+      if (aigcValue![1] !== 'false') fail(`15. 题目单必须写 AIGenerated=false，实际 ${aigcValue![1]}`)
+      if (!sheetPdf.filename.includes('通用题库')) fail('15. 文件名必须写明通用题库')
+      pass(`15. ai-down 仍能出纸：${sheetPdf.filename} · ${sheet.questionCount} 题 / ${sheet.pageCount} 页 / ${sheetPdf.buffer.length} bytes（variant=degraded, AIGenerated=false）`)
     }
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
