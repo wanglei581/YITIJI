@@ -243,6 +243,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-prototype-v1
           pnpm --filter @ai-job-print/kiosk verify:member-login-dialog
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
+          # 麦克风能力探测必须测设备而非 API；纯静态读源码，不碰硬件。
+          pnpm --filter @ai-job-print/kiosk verify:mic-capability-truth
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-ai-career
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume
@@ -277,6 +279,8 @@ jobs:
           pnpm run verify:task-runner-wake
           # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
           pnpm exec ts-node scripts/verify-print-monitor-truth.ts
+          # Generates PNG fixtures in a temp dir and measures the produced PDF; no printer, no spooler.
+          pnpm run verify:image-scale-truth
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
@@ -414,6 +418,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
+          # 合同审查超时口径：模型超时必须随合同页数伸缩（不得回到 30 秒硬上限），
+          # 服务端三层时限的包含链要恒成立、且与小程序预估口径同源；
+          # 失败原因必须对用户可读，日志必须有底层错误类型但没有合同正文。
+          # 纯进程内（不连库、不连 Redis、fetch 走替身），两个 job 都能跑。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:trust-proxy
           pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
@@ -532,10 +541,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:policy-eligibility
+          pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
@@ -706,6 +717,10 @@ jobs:
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/api verify:contract-review:schema
+          # 与 SQLite job 同源：合同审查超时口径是纯静态/进程内断言，
+          # 不依赖数据库形态，但它守的是「长合同不得被 30 秒 abort」这条
+          # 生产故障，两个 job 都必须挡住。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-layout-export
@@ -715,6 +730,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:advisor-work
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:career-plan-degraded
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           # 简历链 PII 遮盖门禁此前只挂在 SQLite job；它现在含派生清单与还原往返断言，
           # 两个 job 都要跑（PG job 的 Prisma 客户端形态不同，回归面不完全重合）。
@@ -726,6 +742,7 @@ jobs:
           # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
           # SQLite 与 PostgreSQL 的日期比较、contains 语义不完全一致，PG 侧必须独立回归。
           pnpm --filter @ai-job-print/api verify:fair-list-integrity
+          pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:bulk-publish
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
@@ -857,6 +874,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:warning
           pnpm --filter @ai-job-print/kiosk test:browser:contract-review
           pnpm --filter @ai-job-print/kiosk test:browser:scan-safety
+          pnpm --filter @ai-job-print/kiosk test:browser:mic-capability
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -881,5 +899,7 @@ jobs:
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
             test-results/kiosk-scan-safety/**
+            test-results/kiosk-mic-capability/**
+            test-results/kiosk-mic-capability-report/**
           if-no-files-found: ignore
           retention-days: 7

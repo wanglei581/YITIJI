@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common'
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
@@ -7,6 +7,14 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
+import { CareerPlanDegradedPdfService, DEGRADED_PDF_FILENAME } from './career-plan-degraded-pdf.service'
+import {
+  CAREER_PLAN_JOB_REQUIREMENT_STATS,
+  type CareerPlanJobRequirementStatsPort,
+  type DegradedCareerPlanContent,
+  type DegradedJobRequirementStats,
+  type DegradedSelfAssessmentDimension,
+} from './career-plan-degraded'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 
 // ============================================================
@@ -66,6 +74,14 @@ export class CareerPlanService {
     private readonly pdf: CareerPlanPdfService,
     private readonly audit: AuditService,
     private readonly aiLog: AiLogService,
+    private readonly degradedPdf: CareerPlanDegradedPdfService,
+    /**
+     * 岗位要求计数（E2）。PR #636 合入前本 token 不注册 —— 拿不到就在纸上如实写
+     * 「本次未取到」，绝不留白或编一张空表。见 career-plan-degraded.ts 的接线说明。
+     */
+    @Optional()
+    @Inject(CAREER_PLAN_JOB_REQUIREMENT_STATS)
+    private readonly jobRequirementStats?: CareerPlanJobRequirementStatsPort,
   ) {}
 
   async generate(taskId: string, requester: CareerPlanRequester) {
@@ -125,28 +141,9 @@ export class CareerPlanService {
     // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额 / 校验；
     //    服务端按本人 endUserId 读取，匿名 parse 不强制要求，仅尝试按 accessTokenHash 匹配）。
     //    §1.7: 只读 dimensions,LLM 上轮拒答 summary 不注入下游(防跨轮污染)。
-    let selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null = null
-    {
-      const where = parse.endUserId
-        ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
-        : { accessTokenHash: parse.accessTokenHash, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
-      const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
-      if (row) {
-        try {
-          // self-assessment payloadJson 顶层就是 dimensions/summary(StoredSelfAssessment),
-          // 不是 { payload: { ... } }。配套 §1.7 修复:沿用正确 schema 仅读 dimensions。
-          const stored = JSON.parse(row.payloadJson) as {
-            dimensions?: Array<{ key: string; label: string; strength: number }>
-          }
-          const dims = (stored.dimensions ?? [])
-            .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
-            .filter((d) => d.key && d.label)
-          if (dims.length > 0) {
-            selfAssessmentCtx = { dimensions: dims }
-          }
-        } catch { /* 损坏行按无上下文处理 */ }
-      }
-    }
+    const selfAssessmentDims = await this.loadSelfAssessmentDimensions(parse)
+    const selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null =
+      selfAssessmentDims.length > 0 ? { dimensions: [...selfAssessmentDims] } : null
 
     // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
     // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
@@ -208,21 +205,32 @@ export class CareerPlanService {
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredCareerPlan)
   }
 
-  /** 打印版建议单：服务端真实 PDF → FileObject（我的文档）→ 既有打印链路（打印订单）。 */
+  /**
+   * 打印版建议单：服务端真实 PDF → FileObject（我的文档）→ 既有打印链路（打印订单）。
+   *
+   * 两套版式，按「是否有已落库的 AI plan」二选一：
+   *
+   *   有 plan  → `variant:'ai'`，走原来的 AI 版式，行为与本次改动前**逐字一致**。
+   *   无 plan  → `variant:'degraded'`，走降级版式（未含 AI 规划），内容只有
+   *              用户自己填的记分（E1）+ 通用自检项 + 岗位要求计数（E2）。
+   *
+   * 为什么不再抛 CAREER_PLAN_NOT_FOUND：
+   *   AI 挂掉时页面按降级规则①照常展示通用自检项与岗位要求计数，但这里一抛错，
+   *   用户在一台**打印终端**上一张纸也拿不走 —— 降级路径只做了一半。
+   *   降级态本身不是错误状态，不该用 404 表达。
+   */
   async printPlan(taskId: string, requester: CareerPlanRequester) {
     const parse = await this.loadAuthorizedParse(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'career_plan' } } })
-    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
-      throw new NotFoundException({ error: { code: 'CAREER_PLAN_NOT_FOUND', message: '暂无职业规划记录，请先生成' } })
-    }
-    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
-    const { buffer, pageCount } = await this.pdf.render(
-      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
-      stored.payload,
-    )
+    const hasPlan = !!row && !!row.expiresAt && row.expiresAt.getTime() >= Date.now()
+
+    const rendered = hasPlan
+      ? await this.renderAiPlanPdf(row!)
+      : await this.renderDegradedPdf(parse, row ? 'expired' : 'never_generated')
+
     const uploaded = await this.files.upload({
-      buffer,
-      filename: `职业规划建议单.pdf`,
+      buffer: rendered.buffer,
+      filename: rendered.filename,
       mimeType: 'application/pdf',
       purpose: 'print_doc',
       uploaderId: null,
@@ -235,17 +243,101 @@ export class CareerPlanService {
       action: 'resume.career_plan_print',
       targetType: 'ai_task',
       targetId: taskId,
-      payload: { fileId: uploaded.fileId, pageCount },
+      // variant 让审计能区分「用户拿走的是 AI 版还是降级版」——两张纸内容完全不同。
+      payload: { fileId: uploaded.fileId, pageCount: rendered.pageCount, variant: rendered.variant },
       ipAddress: null, userAgent: null, requestId: null,
     })
     return {
       fileId: uploaded.fileId,
       filename: uploaded.filename,
       sizeBytes: uploaded.sizeBytes,
-      pageCount,
+      pageCount: rendered.pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
       printFileUrl: signFileUrl(uploaded.fileId).url,
+      /** 新增只读字段（加字段不改既有字段语义）：前端据此如实提示用户这次拿到的是哪一版。 */
+      variant: rendered.variant,
+    }
+  }
+
+  /** AI 版式。逻辑与改动前一致，只是抽成方法。 */
+  private async renderAiPlanPdf(row: { payloadJson: string; updatedAt: Date }) {
+    const stored = JSON.parse(row.payloadJson) as StoredCareerPlan
+    const { buffer, pageCount } = await this.pdf.render(
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10), basedOn: stored.basedOn },
+      stored.payload,
+    )
+    return { buffer, pageCount, filename: `职业规划建议单.pdf`, variant: 'ai' as const }
+  }
+
+  /**
+   * 降级版式。内容只允许来自「不经过模型」的三个来源，任何一项拿不到就如实说没有。
+   *
+   * `why` 只描述本机可观测的真实状态，不猜 AI 为什么挂：
+   *   never_generated 这个任务从没成功生成过规划
+   *   expired         生成过，但已按 TTL 到期清理
+   */
+  private async renderDegradedPdf(
+    parse: { endUserId: string | null; accessTokenHash: string | null },
+    why: 'never_generated' | 'expired',
+  ) {
+    const content: DegradedCareerPlanContent = {
+      date: new Date().toISOString().slice(0, 10),
+      reason: {
+        text: why === 'expired'
+          ? '此前生成的 AI 规划建议已按隐私留存策略到期清理，本次没有可打印的 AI 内容。'
+          : '本次没有可用的 AI 规划建议（本任务尚未成功生成过）。',
+      },
+      selfAssessment: await this.loadSelfAssessmentDimensions(parse),
+      jobRequirementStats: await this.loadJobRequirementStats(),
+    }
+    const { buffer, pageCount } = await this.degradedPdf.render(content)
+    return { buffer, pageCount, filename: DEGRADED_PDF_FILENAME, variant: 'degraded' as const }
+  }
+
+  /**
+   * 岗位要求计数（E2）。端口没注册（PR #636 未合入）或读取失败时返回 null，
+   * 由版式如实印「本次未取到」—— 绝不因为这一节拿不到就让整张纸印不出来。
+   */
+  private async loadJobRequirementStats(): Promise<DegradedJobRequirementStats | null> {
+    if (!this.jobRequirementStats) return null
+    try {
+      const { data } = await this.jobRequirementStats.getStats({})
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 自我探索的**确定性记分**（E1）。
+   *
+   * 只读 key / label / strength：`scoreSelfAssessment` 是固定权重累加的纯函数，不经过模型。
+   * 刻意不读 `note` / `summary` —— 那两个字段由 LLM 生成，把它们印进一份自称
+   * 「未含 AI 规划」的纸里会让这张纸的自我标识失真。
+   * （§1.7 同款口径：LLM 上轮拒答的 summary 也不注入下游。）
+   *
+   * 撤回（withdraw）会把 dimensions 物理清空，因此撤回后这里自然返回 []。
+   */
+  private async loadSelfAssessmentDimensions(
+    parse: { endUserId: string | null; accessTokenHash: string | null },
+  ): Promise<DegradedSelfAssessmentDimension[]> {
+    const where = parse.endUserId
+      ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+      : { accessTokenHash: parse.accessTokenHash, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+    const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
+    if (!row) return []
+    try {
+      // self-assessment payloadJson 顶层就是 dimensions/summary(StoredSelfAssessment),
+      // 不是 { payload: { ... } }。配套 §1.7 修复:沿用正确 schema 仅读 dimensions。
+      const stored = JSON.parse(row.payloadJson) as {
+        dimensions?: Array<{ key: string; label: string; strength: number }>
+      }
+      return (stored.dimensions ?? [])
+        .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
+        .filter((d) => d.key && d.label)
+    } catch {
+      return [] // 损坏行按无上下文处理
     }
   }
 

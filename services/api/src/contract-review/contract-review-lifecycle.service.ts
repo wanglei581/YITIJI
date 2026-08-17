@@ -51,6 +51,8 @@ const TASK_SELECT = {
   resultJson: true,
   extractionFingerprint: true,
   confirmedAt: true,
+  // 失败原因要能回到客户端：不取这一列，视图层就只能继续回「未说明原因」。
+  errorCode: true,
 } as const
 
 @Injectable()

@@ -60,6 +60,10 @@ const REQUIRED_COMMANDS = [
   'pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui',
   'pnpm --filter @ai-job-print/partner verify:partner-refresh-safe',
   'pnpm --filter @ai-job-print/api verify:terminal-status-idempotency',
+  // P21 申领条件录入面（#645）：该门禁自己的 10c 断言会反向读取本清单，确认
+  // 自己被钉住。B 段的闭包检查也覆盖它，但那两条守的不是同一件事 —— B 段保证
+  // 「在 CI 里跑」，本条保证「在 ci.yml 里逐字可见、不被藏进聚合脚本」。
+  'pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring',
   // 后台可用性与可运维性（FIX-CONSOLE-P0）：Redis 故障时后台曾全线 500 而
   // /health 宣称「管理端不受影响」；所有 500 在服务端零痕迹。这两条都被
   // 「摘掉门禁就悄悄回归」的类型，因此钉进本文件。
