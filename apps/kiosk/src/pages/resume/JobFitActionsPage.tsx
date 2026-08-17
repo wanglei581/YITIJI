@@ -255,15 +255,30 @@ export function JobFitActionsPage() {
                 <p className="text-base text-neutral-500">正在读取差距清单…</p>
               </div>
             }
+            /*
+              同 `ResumeOptimizeComparePage`：availability 为 unknown 时状态恒为 idle，
+              首次往返完成前也落在这里。读取中必须说「在读取」，
+              不能把一次正常加载写成「服务状态未确认」。
+            */
             idle={
-              <div className="job-fit-state-card" role="status">
-                <p className="text-base text-neutral-500">
-                  还没有确认 AI 服务状态，本页暂不展示差距清单 —— 状态不明时不假装能算。
-                </p>
-                <Button size="lg" className="job-fit-primary-action" onClick={backToCompare}>
-                  返回比对结果
-                </Button>
-              </div>
+              loading ? (
+                <div className="job-fit-state-card" role="status" aria-live="polite">
+                  <Loader2Icon
+                    className="h-10 w-10 animate-spin text-primary-600"
+                    aria-hidden="true"
+                  />
+                  <p className="text-base text-neutral-500">正在读取差距清单…</p>
+                </div>
+              ) : (
+                <div className="job-fit-state-card" role="status">
+                  <p className="text-base text-neutral-500">
+                    还没有确认 AI 服务状态，本页暂不展示差距清单 —— 状态不明时不假装能算。
+                  </p>
+                  <Button size="lg" className="job-fit-primary-action" onClick={backToCompare}>
+                    返回比对结果
+                  </Button>
+                </div>
+              )
             }
             fallback={fallback}
           >

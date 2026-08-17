@@ -239,15 +239,32 @@ export function ResumeOptimizeComparePage() {
               <p className="text-base text-neutral-500">正在读取逐条改写候选…</p>
             </div>
           }
+          /*
+            为什么 idle 槽要分两种写法：
+            `deriveAiTaskState` 对 `availability: 'unknown'` 一律返回 idle（fail-closed，
+            服务状态没探到就不许渲染成「在算」），而首次往返完成前 availability 恒为 unknown。
+            于是「正在读取」和「探测无结论」会落进同一个槽。两句话必须分开 ——
+            读取中却写「还没有确认 AI 服务状态」，等于把一次正常加载说成故障。
+          */
           idle={
-            <div className="resume-compare__state-card" role="status">
-              <p className="text-base text-neutral-500">
-                还没有确认 AI 服务状态，本页暂不展示改写候选 —— 状态不明时不假装能算。
-              </p>
-              <Button size="lg" className="resume-compare__primary-action" onClick={backToOptimize}>
-                返回优化页
-              </Button>
-            </div>
+            loading ? (
+              <div className="resume-compare__state-card" role="status" aria-live="polite">
+                <Loader2Icon
+                  className="h-10 w-10 animate-spin text-primary-600"
+                  aria-hidden="true"
+                />
+                <p className="text-base text-neutral-500">正在读取逐条改写候选…</p>
+              </div>
+            ) : (
+              <div className="resume-compare__state-card" role="status">
+                <p className="text-base text-neutral-500">
+                  还没有确认 AI 服务状态，本页暂不展示改写候选 —— 状态不明时不假装能算。
+                </p>
+                <Button size="lg" className="resume-compare__primary-action" onClick={backToOptimize}>
+                  返回优化页
+                </Button>
+              </div>
+            )
           }
           fallback={fallback}
         >
@@ -258,7 +275,7 @@ export function ResumeOptimizeComparePage() {
           <Card className="resume-compare__summary p-5">
             <p className="resume-compare__summary-count">{modules.length} 组可对照修改项</p>
             <p className="resume-compare__summary-hint">
-              本次已选「采用候选」{adoptCount} 处、「保留原文」{keepCount} 处、待你决定
+              本次已选「采用候选」{adoptCount} 处、「保留原文」{keepCount} 处、待你决定{' '}
               {undecidedCount} 处。以上仅是本页的阅读标记，未保存。
             </p>
           </Card>
