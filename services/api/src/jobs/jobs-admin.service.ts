@@ -19,6 +19,11 @@ import type { PublishAction } from './dto/publish.dto'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import {
+  assertPublishFieldsComplete,
+  JOB_PUBLISH_REQUIRED_FIELDS,
+  FAIR_PUBLISH_REQUIRED_FIELDS,
+} from '../common/publish-completeness'
+import {
   type AdminJobDto,
   type AdminFairDto,
   type AdminImportBatchDto,
@@ -112,6 +117,10 @@ export class JobsAdminService {
         contentType: '岗位',
         contentId: id,
       })
+      // 发布闸门:来源必须可追溯(CLAUDE.md §10)。空字符串能过 Prisma 的 NOT NULL,
+      // 所以这道校验必须在发布路径上,不能只指望各条导入路径都写对。
+      // 见 src/common/publish-completeness.ts。
+      assertPublishFieldsComplete('岗位', job as unknown as Record<string, unknown>, JOB_PUBLISH_REQUIRED_FIELDS)
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
     const updated = await this.prisma.job.update({
@@ -196,6 +205,7 @@ export class JobsAdminService {
         contentType: '招聘会',
         contentId: id,
       })
+      assertPublishFieldsComplete('招聘会', fair as unknown as Record<string, unknown>, FAIR_PUBLISH_REQUIRED_FIELDS)
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
     const updated = await this.prisma.jobFair.update({

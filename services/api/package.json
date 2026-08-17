@@ -170,6 +170,7 @@
     "verify:policy-eligibility": "node -r @swc-node/register scripts/verify-policy-eligibility.ts",
     "verify:policy-eligibility-authoring": "node -r @swc-node/register scripts/verify-policy-eligibility-authoring.ts",
     "verify:bulk-publish": "node -r @swc-node/register scripts/verify-bulk-publish.ts",
+    "verify:publish-expiry-completeness": "node -r @swc-node/register scripts/verify-publish-expiry-completeness.ts",
     "verify:content-trust-publish-gate": "node -r @swc-node/register scripts/verify-content-trust-publish-gate.ts",
     "maintenance:backfill-org-content-trust": "node -r @swc-node/register scripts/backfill-org-content-trust.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
