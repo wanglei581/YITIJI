@@ -23,6 +23,11 @@ overrides:
   brace-expansion@1.1.14: 1.1.18
   brace-expansion@2.1.1: 2.1.4
   brace-expansion@5.0.6: 5.0.9
+  # deepmerge-ts: GHSA-ggr8-5vv4-36mx（HIGH，2026-08-17T13:32Z 发布）
+  # 合并递归对象图时栈耗尽；影响 <8.0.0，首个修复版 8.0.0。
+  # 传递自 @prisma/config@7.8.0，它精确锁 7.1.5，所以只能靠 override 抬版本。
+  # 这是跨大版本覆盖：升级 prisma 到自带 8.x 的版本后应删掉本条。
+  deepmerge-ts@7.1.5: 8.0.0
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true
