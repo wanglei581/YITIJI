@@ -9,13 +9,12 @@ name: Cleanup Stale Releases (guarded)
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: 'dry-run（只列清单）或 execute（隔离到 trash）'
-        type: choice
-        options: [dry-run, execute]
-        default: dry-run
+      execute:
+        description: '取消勾选=dry-run（只列清单）；勾选=execute（隔离到 trash，需下方 confirm）'
+        type: boolean
+        default: false
       confirm:
-        description: 'execute 模式必须输入：CLEANUP-CONFIRM'
+        description: 'execute 时必须输入：CLEANUP-CONFIRM'
         type: string
         default: ''
 
@@ -35,7 +34,7 @@ jobs:
           envs: CLEANUP_MODE,CLEANUP_CONFIRM,CLEANUP_EXPECT_CONFIRM,CLEANUP_B64
           script: |
             set -uo pipefail
-            CLEANUP_MODE="${{ inputs.mode }}"
+            CLEANUP_MODE="$([ "${{ inputs.execute }}" = "true" ] && echo execute || echo dry-run)"
             CLEANUP_CONFIRM="${{ inputs.confirm }}"
             CLEANUP_EXPECT_CONFIRM="CLEANUP-CONFIRM"
             export CLEANUP_MODE CLEANUP_CONFIRM CLEANUP_EXPECT_CONFIRM
