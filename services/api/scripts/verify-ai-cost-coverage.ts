@@ -104,21 +104,17 @@ const NON_TOKEN_BILLED = ['voiceTranscribe', 'voiceSynthesize']
  * MAX_GAPS 是棘轮：**只允许调低**。想加新欠账，先还一条旧的。
  */
 const KNOWN_ZERO_COST_GAPS: Record<string, string> = {
-  parseResume:
-    '落账点 src/ai/ai.service.ts 走 AiProvider 抽象，provider 层（llm.provider.ts）不回传 token usage，' +
-    '且 provider 标签恒为 "llm"（不含厂商名），estimateCostCny 因此永远匹配不到单价。' +
-    '修复需改 AiProvider 接口并同步 mock provider，属独立范围。',
-  optimizeResume: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
-  adjustResumeLayout: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
-  generateResume: '同 parseResume：经 AiProvider 抽象落账，provider 层不回传 token usage，标签恒为 "llm"。',
-  chatAssistant:
-    '双落账点：src/advisor/advisor.service.ts 已带 token usage；' +
-    'src/ai/ai.service.ts 这一路经 AiProvider 抽象，仍不带 token，需与 parseResume 一并修。',
+  // ── AI-COST-TRUTH（2026-08-17）已还清 5 条 ──────────────────────────────
+  // parseResume / optimizeResume / adjustResumeLayout / generateResume / chatAssistant
+  // 原欠账理由是「经 AiProvider 抽象落账，provider 层不回传 token usage，
+  // 且标签恒为 'llm' 不含厂商名」。现已通过 AiProvider.usage（AiUsageReport）
+  // 回传真实厂商标识与 token，落账走 aiLogFieldsFromUsageReport 统一翻译。
+  // 改回去 → healthy 变 false 且此处无登记 → 本门禁直接红。
   classifyIntent:
     '当前没有任何直接落账点：它是 normalizeOperation 的兜底取值，' +
     '真实意图分类调用被记在 chatAssistant 名下。需先确认该 operation 是否还应保留。',
 }
-const MAX_GAPS = 6 // 棘轮：只允许调低
+const MAX_GAPS = 1 // 棘轮：只允许调低（AI-COST-TRUTH 已从 6 还到 1）
 
 if (Object.keys(KNOWN_ZERO_COST_GAPS).length <= MAX_GAPS) {
   pass(`零成本欠账未超上限（${Object.keys(KNOWN_ZERO_COST_GAPS).length}/${MAX_GAPS}）`)
@@ -131,7 +127,14 @@ for (const op of ALL_OPS) {
   const sites = SRC_FILES.filter(
     (f) => (f.src.includes('.record(') || f.src.includes('recordAiLog')) && f.src.includes(`'${op}'`),
   )
-  const unplumbed = sites.filter((f) => !f.src.includes('tokenUsage')).map((f) => f.rel)
+  // token 管路的两种合法形态：
+  //  1. 直接写 tokenUsage 字段（career-plan / mock-interview / advisor 等）
+  //  2. 走 aiLogFieldsFromUsageReport —— AI-COST-TRUTH 的统一翻译层，它同时
+  //     负责 provider 厂商标签、tokenUsage 和「未采集不写 0」的三态语义。
+  //     这是唯一允许的替代形态；随手写个 estimatedCostCny: 0 不算数。
+  const unplumbed = sites
+    .filter((f) => !f.src.includes('tokenUsage') && !f.src.includes('aiLogFieldsFromUsageReport'))
+    .map((f) => f.rel)
   const registered = KNOWN_ZERO_COST_GAPS[op]
   const healthy = sites.length > 0 && unplumbed.length === 0
 
@@ -170,6 +173,77 @@ assertContains(llmSelfAssess, 'onLlmCall?.({ provider: providerLabel, tokenUsage
 assertContains(llmSelfAssess, '`llm:${cfg.vendor}:${cfg.model}`', 'llm-self-assessment: provider 标签含厂商名（否则单价匹配不到）')
 // selfAssessment 是 token 计费能力，绝不能被塞进「非 token 计费」名单来掩盖 ¥0
 assertNotContains(logSvc, /NON_TOKEN_BILLED_OPERATIONS[\s\S]{0,200}selfAssessment/u, 'self-assessment: 未被误列入非 token 计费名单')
+
+// ─── 1d. AI-COST-TRUTH 回归锚：provider 必须回传可定价的用量 ──────────────────
+//
+// 改回去必须红。这五条能力此前恒显 ¥0.0000 且**结构上无法定价**：
+// 落账 provider 用的是 AiProviderName（恒为 'llm'，不含厂商名），
+// estimateCostCny 按厂商名子串匹配，所以即使补上 token 也永远定不了价。
+
+const providerIface = read('src/ai/interfaces/ai-provider.interface.ts')
+assertContains(providerIface, 'interface AiUsageReport', 'AiProvider: 声明结构化用量回报 AiUsageReport')
+assertContains(providerIface, 'callCount', 'AiProvider: 用量回报含 callCount（区分「没花钱」与「没采集到」）')
+assertContains(providerIface, 'providerLabel', 'AiProvider: 用量回报含真实厂商标识 providerLabel')
+// 接口必须 additive 可选，否则既有 provider 实现（5 个 stub + mock）会全部编译失败
+assertContains(providerIface, 'usage?: AiUsageReport', 'AiProvider: usage 为可选字段（既有实现不破坏）')
+
+const llmProvider = read('src/ai/providers/llm.provider.ts')
+assertContains(llmProvider, 'AiUsageAccumulator', 'llm provider: 用累计器汇总跨重试用量')
+assertContains(llmProvider, 'onLlmCall: usage.add', 'llm provider: 把 usage sink 传给诊断服务')
+assertContains(llmProvider, 'usage: usageOf(usage)', 'llm provider: 成功/失败都回传用量')
+
+const aiSvc = read('src/ai/ai.service.ts')
+assertContains(aiSvc, 'aiLogFieldsFromUsageReport', 'ai.service: 落账走统一用量翻译层')
+// 关键回归点：这五个落账点过去写死 provider: this.provider.name（恒为 'llm'）
+for (const op of ['parseResume', 'optimizeResume', 'adjustResumeLayout', 'generateResume', 'chatAssistant']) {
+  const idx = aiSvc.indexOf(`operation: '${op}'`)
+  const block = idx >= 0 ? aiSvc.slice(Math.max(0, idx - 500), idx) : ''
+  if (block.includes('aiLogFieldsFromUsageReport')) pass(`ai.service: ${op} 落账带真实厂商标识 + token`)
+  else fail(`ai.service: ${op} 落账未走 aiLogFieldsFromUsageReport —— 会退回恒为 'llm' 的标签，永远定不了价`)
+}
+
+// 四个 LLM 服务必须真的从上游回包读 usage，并带含厂商名的标签
+for (const [rel, label] of [
+  ['src/ai/resume/llm-resume.service.ts', 'llm-resume'],
+  ['src/ai/resume/llm-resume-optimize.service.ts', 'llm-resume-optimize'],
+  ['src/ai/resume/llm-resume-generate.service.ts', 'llm-resume-generate'],
+  ['src/ai/llm/llm-chat.service.ts', 'llm-chat'],
+] as const) {
+  const src = read(rel)
+  assertContains(src, 'normalizeLlmUsage(', `${label}: 从上游回包读取 token usage`)
+  assertContains(src, /`llm:\$\{[^}]*vendor[^}]*\}/u, `${label}: provider 标签含厂商名（否则单价匹配不到）`)
+  assertContains(src, 'onLlmCall?.({ provider: providerLabel', `${label}: 回调带 provider 标签`)
+}
+
+// ─── 1e. 合同审查落账（此前**完全不落** AiServiceLog）────────────────────────
+//
+// 这比「记错价」严重：那笔 deepseek/qwen 付费调用在用量统计里根本不存在。
+
+const crOrchestrator = read('src/contract-review/contract-review-orchestrator.service.ts')
+assertContains(crOrchestrator, 'AiLogService', 'contract-review: orchestrator 注入 AiLogService')
+assertContains(crOrchestrator, "operation: 'contractReview'", "contract-review: operation='contractReview'")
+assertContains(crOrchestrator, 'contractProviderLabel', 'contract-review: 用带厂商名的 provider 标签')
+assertContains(crOrchestrator, /status: 'failed'[\s\S]{0,400}contractReview|contractReview[\s\S]{0,400}status: 'failed'/u,
+  'contract-review: 失败路径也落账（调用可能已计费）')
+// 红线：凭证 / baseURL 绝不进落账标签
+assertNotContains(crOrchestrator, 'identity.baseUrl', 'contract-review: 落账标签不含 baseUrl')
+const crProvider = read('src/contract-review/contract-review-provider.service.ts')
+assertContains(crProvider, 'extractUsage', 'contract-review: provider 从上游回包提取 token usage')
+assertNotContains(crProvider, /extractUsage[\s\S]{0,600}return 0/u, 'contract-review: 取不到 usage 时不伪造 0')
+
+// ─── 1f. 成本三态：接口层必须能区分「未采集」与「成本为 0」──────────────────
+//
+// 这是①能长期藏住的根因之一：costByOperation 是纯 number，
+// 前端**就算想诚实也没数据可用** —— 分不出「花了 0 元」和「没采集到」。
+
+assertContains(logSvc, 'interface AiOperationCost', '成本三态: 声明 AiOperationCost 结构')
+assertContains(logSvc, 'measuredCalls', '成本三态: 含 measuredCalls（已采集笔数）')
+assertContains(logSvc, 'Record<AiOperation, AiOperationCost>', '成本三态: costByOperation 不再是纯 number')
+assertContains(logSvc, 'unmeasuredCalls', '成本三态: 顶层暴露未采集笔数')
+assertContains(logSvc, 'costCollectionSince', '成本三态: 暴露采集起始日期（历史不完整需如实标注）')
+// 绝不允许把「未采集」重新塌缩成 0
+assertNotContains(logSvc, 'costByOperation[e.operation] += e.estimatedCostCny ?? 0',
+  '成本三态: 聚合不再用 ?? 0 把未采集吞成 0')
 
 // ─── 2. NON_TOKEN_BILLED_OPERATIONS ──────────────────────────────────────────
 
@@ -267,6 +341,25 @@ assertContains(
 )
 // 明细表的成本单元格必须按 tokenBilled 分支渲染，不能无条件 toFixed 成金额
 assertContains(aiServicesRoute, 'row.tokenBilled', 'ai-services route: 成本按 tokenBilled 分支渲染')
+
+// ─── 10c. Admin 必须渲染成本三态，而不是把未采集画成 ¥0 ─────────────────────
+
+assertContains(adminTypes, 'AiOperationCost', 'Admin types: 引入成本三态 AiOperationCost')
+assertContains(adminTypes, 'Record<AiOperation, AiOperationCost>', 'Admin types: costByOperation 不再是纯 number')
+assertContains(adminTypes, 'unmeasuredCalls', 'Admin types: 暴露未采集笔数')
+assertContains(adminTypes, 'costCollectionSince', 'Admin types: 暴露采集起始日期')
+assertContains(aiServicesRoute, 'costState', 'ai-services route: 按成本三态渲染')
+assertContains(aiServicesRoute, "'uncollected'", 'ai-services route: 存在「未采集」态')
+assertContains(aiServicesRoute, 'usage.costCollectionSince', 'ai-services route: 如实标注历史成本不完整（带日期）')
+assertContains(aiServicesRoute, '不做回填', 'ai-services route: 明示不回填历史数据（D-2）')
+// token 计费能力的成本单元格绝不能无条件 toFixed —— 那正是 ¥0.0000 的来源
+assertNotContains(aiServicesRoute, 'usage.costByOperation.jobRecommend.toFixed',
+  'ai-services route: 岗位 AI 卡片不再无条件把未采集渲染成 ¥0')
+assertContains(aiServicesRoute, 'contractReview', 'ai-services route: 覆盖 contractReview')
+assertContains(adminTypes, 'contractReview', 'Admin types: AiOperation 包含 contractReview')
+const mockAdapter = readApps('admin/src/services/api/adminAiMockAdapter.ts')
+assertContains(mockAdapter, 'measuredCalls', 'Admin mock adapter: costByOperation 已改成三态结构')
+assertContains(mockAdapter, 'contractReview', 'Admin mock adapter: 覆盖 contractReview')
 
 // ─── 11. 运行时：ASR / TTS 日志真的落进 AiServiceLog ──────────────────────────
 //
@@ -411,7 +504,145 @@ async function runtimeChecks(): Promise<void> {
   await prisma.aiServiceLog.deleteMany({
     where: { createdAt: { gte: since }, operation: { in: ['voiceTranscribe', 'voiceSynthesize'] } },
   })
+
+  await costTriStateRuntimeChecks(prisma, aiLog)
+  await providerCompatRuntimeChecks()
+
   await prisma.onModuleDestroy()
+}
+
+/**
+ * 运行时：改 AiProvider 接口后，**既有 provider 实现全部仍可调用**。
+ *
+ * AiProvider 是所有 AI 能力的公共接口。AI-COST-TRUTH 给四个 Output 类型加了
+ * `usage?: AiUsageReport`。加成可选字段是为了让 mock + 5 个 stub 一行不改就继续编译；
+ * 这里再从运行时证明它们真的还能构造和调用，而不是只靠 tsc 过了就算。
+ */
+async function providerCompatRuntimeChecks(): Promise<void> {
+  const mods = await Promise.all([
+    import('../src/ai/providers/mock.provider'),
+    import('../src/ai/providers/claude.provider.stub'),
+    import('../src/ai/providers/openai.provider.stub'),
+    import('../src/ai/providers/qwen.provider.stub'),
+    import('../src/ai/providers/zhipu.provider.stub'),
+    import('../src/ai/providers/local.provider.stub'),
+  ])
+  const [mockMod, claudeMod, openaiMod, qwenMod, zhipuMod, localMod] = mods
+  const providers = [
+    ['mock', new mockMod.MockAiProvider()],
+    ['claude', new claudeMod.ClaudeProvider()],
+    ['openai', new openaiMod.OpenAiProvider()],
+    ['qwen', new qwenMod.QwenProvider()],
+    ['zhipu', new zhipuMod.ZhipuProvider()],
+    ['local', new localMod.LocalAiProvider()],
+  ] as const
+
+  for (const [label, provider] of providers) {
+    const ok = typeof provider.parseResume === 'function'
+      && typeof provider.optimizeResume === 'function'
+      && typeof provider.chatAssistant === 'function'
+      && typeof provider.classifyIntent === 'function'
+      && typeof provider.name === 'string'
+    if (ok) pass(`provider 兼容: ${label} 仍满足 AiProvider 接口`)
+    else fail(`provider 兼容: ${label} 不再满足 AiProvider 接口 —— 改接口破坏了既有实现`)
+  }
+
+  // mock provider 必须仍能真的跑完一次调用（stub 按设计抛 NotImplemented，不在此断言）
+  const mock = new mockMod.MockAiProvider()
+  try {
+    const parsed = await mock.parseResume({
+      fileId: 'verify-file', fileName: 'r.pdf', fileFormat: 'pdf', source: 'upload',
+    })
+    if (parsed.report) pass('provider 兼容: mock provider 仍可正常产出诊断报告')
+    else fail('provider 兼容: mock provider 未产出报告')
+
+    const chat = await mock.chatAssistant({ message: '你好' })
+    if (chat.reply) pass('provider 兼容: mock provider 仍可正常对话')
+    else fail('provider 兼容: mock provider 未产出回复')
+  } catch (error) {
+    fail(`provider 兼容: mock provider 调用抛错 —— ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  // mock 不打任何上游 → 成本确定为 0（「成本为 0」态），不得被算成「未采集」
+  const { AiUsageAccumulator } = await import('../src/ai/ai-log.service')
+  const report = new AiUsageAccumulator().toReport('mock')
+  if (report.callCount === 0) pass('provider 兼容: 空累计器 callCount===0（表示未产生上游调用）')
+  else fail('provider 兼容: 空累计器 callCount 应为 0')
+}
+
+/**
+ * 运行时：「未采集 / 成本为 0 / 有成本」在接口层必须真的可区分。
+ *
+ * 静态断言只能证明类型里有 measuredCalls；证明不了聚合真的没把 null 吞成 0。
+ * 这里落三条真实的 AiServiceLog，再回读 getUsage 断言三态各自的形状。
+ */
+async function costTriStateRuntimeChecks(
+  prisma: { aiServiceLog: { deleteMany: (a: unknown) => Promise<unknown> } },
+  aiLog: import('../src/ai/ai-log.service').AiLogService,
+): Promise<void> {
+  const since = new Date()
+  await new Promise((r) => setTimeout(r, 5))
+
+  // ① 有成本：真实厂商标签 + token → 可定价
+  aiLog.record({
+    taskId: null, provider: 'llm:deepseek:deepseek-chat', operation: 'contractReview',
+    latencyMs: 10, status: 'success',
+    tokenUsage: { promptTokens: 1_000_000, completionTokens: 1_000_000, totalTokens: 2_000_000 },
+  })
+  // ② 未采集：打到模型了但上游没回 usage → 成本必须留空
+  aiLog.record({
+    taskId: null, provider: 'llm:deepseek:deepseek-chat', operation: 'careerPlan',
+    latencyMs: 10, status: 'success',
+  })
+  // ③ 成本为 0：mock provider 压根不打上游 → 0 是实测
+  aiLog.record({
+    taskId: null, provider: 'mock', operation: 'jobMatch',
+    latencyMs: 10, status: 'success',
+  })
+  await aiLog.flush()
+
+  const usage = await aiLog.getUsage('AiServiceLog')
+
+  const measured = usage.costByOperation.contractReview
+  if (measured.measuredCalls >= 1 && measured.cny > 0) {
+    pass('三态运行时: 有成本 → measuredCalls>0 且 cny>0（真实厂商标签可定价）')
+  } else {
+    fail(`三态运行时: 有成本态错误 —— ${JSON.stringify(measured)}`)
+  }
+
+  const uncollected = usage.costByOperation.careerPlan
+  if (uncollected.calls >= 1 && uncollected.measuredCalls === 0) {
+    pass('三态运行时: 未采集 → calls>0 但 measuredCalls===0（未被吞成 ¥0）')
+  } else {
+    fail(`三态运行时: 未采集态错误 —— ${JSON.stringify(uncollected)}；未采集被当成 0 会让付费调用显示免费`)
+  }
+
+  const zero = usage.costByOperation.jobMatch
+  if (zero.calls >= 1 && zero.measuredCalls >= 1 && zero.cny === 0) {
+    pass('三态运行时: 成本为 0 → measuredCalls>0 且 cny===0（与「未采集」形状不同）')
+  } else {
+    fail(`三态运行时: 成本为 0 态错误 —— ${JSON.stringify(zero)}`)
+  }
+
+  // 「未采集」与「成本为 0」必须真的长得不一样，否则三态形同虚设
+  if (uncollected.measuredCalls !== zero.measuredCalls) {
+    pass('三态运行时: 未采集 与 成本为 0 在接口层可区分')
+  } else {
+    fail('三态运行时: 未采集 与 成本为 0 形状相同 —— 前端无法诚实展示')
+  }
+
+  if (usage.unmeasuredCalls >= 1) pass('三态运行时: 顶层 unmeasuredCalls 已计数（总成本自曝是下限）')
+  else fail('三态运行时: 顶层 unmeasuredCalls 未计数')
+
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(usage.costCollectionSince)) {
+    pass(`三态运行时: costCollectionSince 有效（${usage.costCollectionSince}）`)
+  } else {
+    fail(`三态运行时: costCollectionSince 非法 —— ${usage.costCollectionSince}`)
+  }
+
+  await prisma.aiServiceLog.deleteMany({
+    where: { createdAt: { gte: since }, operation: { in: ['contractReview', 'careerPlan', 'jobMatch'] } },
+  })
 }
 
 // ─── 结果 ─────────────────────────────────────────────────────────────────────

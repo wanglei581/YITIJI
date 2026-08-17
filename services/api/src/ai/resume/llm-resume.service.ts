@@ -10,6 +10,7 @@ import type {
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // ============================================================
 // LlmResumeService — 真实简历诊断（单轮、结构化 JSON，OpenAI 兼容协议）
@@ -83,6 +84,11 @@ const RETRY_HINT =
 export interface ResumeDiagnosisContext {
   selectedDimensions?: ResumeScoringDimensionKey[]
   targetContext?: ResumeTargetContext
+  /**
+   * AI-COST-TRUTH：每次真实 LLM 调用（含失败重试）回调一次元数据，
+   * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
+   */
+  onLlmCall?: AiLlmCallSink
 }
 
 function cleanText(value: unknown, maxLen: number): string | null {
@@ -184,7 +190,10 @@ export class LlmResumeService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
-      const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, DIAGNOSIS_TEMPERATURE, messages)
+      const raw = await this.callLlm(
+        cfg.baseURL, apiKey, cfg.model, DIAGNOSIS_TEMPERATURE, messages,
+        `llm:${cfg.vendor}:${cfg.model}`, context?.onLlmCall,
+      )
       const report = this.parseReport(raw, cfg.forbiddenWords)
       if (report) return report
       this.logger.warn(`resume diagnose: invalid JSON output (attempt ${attempt}/2)`)
@@ -203,6 +212,12 @@ export class LlmResumeService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    /**
+     * AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。
+     * 由调用方传入，因为 cfg 只在 diagnose 作用域内。**不含任何凭证**。
+     */
+    providerLabel: string,
+    onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Response
@@ -224,6 +239,9 @@ export class LlmResumeService {
     }
 
     if (!res.ok) {
+      // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，
+      // 不塞 tokenUsage —— 上游 4xx/5xx 也可能已经计费。
+      onLlmCall?.({ provider: providerLabel })
       // 仅记状态码，绝不记响应正文
       this.logger.error(`resume diagnose http ${res.status}`)
       throw new ServiceUnavailableException({
@@ -233,7 +251,10 @@ export class LlmResumeService {
 
     const data = (await res.json().catch(() => null)) as {
       choices?: Array<{ message?: { content?: string } }>
+      usage?: RawLlmUsage
     } | null
+    // 在「内容为空」判断之前回报：内容为空这次调用照样花钱，不能因为解析失败就丢账。
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const content = data?.choices?.[0]?.message?.content?.trim()
     if (!content) {
       throw new ServiceUnavailableException({
