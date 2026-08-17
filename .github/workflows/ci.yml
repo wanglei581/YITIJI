@@ -397,6 +397,13 @@ jobs:
           # 启动韧性：Redis 不可达时必须显式降级并照常监听端口，不得静默挂起。
           # 会拉起真实 src/main.ts 子进程与临时 redis-server（用随机空闲端口）。
           pnpm --filter @ai-job-print/api verify:boot-resilience
+          # Redis 故障时的鉴权语义 + 健康检查诚实性：撤销必须仍然生效、
+          # 后台不得再全线 500、/health 的每一条影响面声明都要被实际请求核对。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          # 异常可运维性：5xx 必须留下带 requestId 的日志，且日志不得含 PII / 凭证。
+          pnpm --filter @ai-job-print/api verify:error-observability
+          # 订单筛选不得静默失效（未知筛选值必须 400，不能退化成返回全量）。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
@@ -738,6 +745,11 @@ jobs:
           # 启动韧性（PG 侧同样跑一遍：硬依赖=数据库、软依赖=Redis 的启动语义
           # 必须在 PostgreSQL 上也成立）。会拉起真实 src/main.ts 与临时 redis-server。
           pnpm --filter @ai-job-print/api verify:boot-resilience
+          # 三道门禁在 PG 侧同样跑一遍：鉴权回源真源、异常日志、订单筛选
+          # 都直接依赖数据库行为，SQLite 通过不等于 PostgreSQL 通过。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth
+          pnpm --filter @ai-job-print/api verify:error-observability
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials

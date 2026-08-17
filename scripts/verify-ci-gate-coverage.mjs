@@ -60,6 +60,12 @@ const REQUIRED_COMMANDS = [
   'pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui',
   'pnpm --filter @ai-job-print/partner verify:partner-refresh-safe',
   'pnpm --filter @ai-job-print/api verify:terminal-status-idempotency',
+  // 后台可用性与可运维性（FIX-CONSOLE-P0）：Redis 故障时后台曾全线 500 而
+  // /health 宣称「管理端不受影响」；所有 500 在服务端零痕迹。这两条都被
+  // 「摘掉门禁就悄悄回归」的类型，因此钉进本文件。
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:redis-degradation-truth',
+  'pnpm --filter @ai-job-print/api verify:error-observability',
+  'VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-order-filters',
 ]
 
 const workflowText = readFileSync(workflowPath, 'utf8')
