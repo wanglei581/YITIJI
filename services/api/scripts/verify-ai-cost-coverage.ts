@@ -575,6 +575,19 @@ async function providerCompatRuntimeChecks(): Promise<void> {
  *
  * 静态断言只能证明类型里有 measuredCalls；证明不了聚合真的没把 null 吞成 0。
  * 这里落三条真实的 AiServiceLog，再回读 getUsage 断言三态各自的形状。
+ *
+ * ⚠️ 必须按**增量**断言，不能按绝对值。getUsage 聚合的是最近 24h 的**全表**，
+ * 不只是本函数写的那三行。CI 两个 job 里 verify:career-plan 都紧邻在本门禁之前
+ * 跑（且都没走 VERIFICATION_DATABASE_TARGET=isolated，共用同一个库），它会留下
+ * 6 条 provider='llm:deepseek:stub' 的 careerPlan 行 —— 'stub' 命中
+ * estimateCostCny 的 mock/stub 短路分支返回 0，于是这 6 条被如实记为
+ * 「已采集，¥0」。绝对值断言 measuredCalls===0 因此在空库绿、在 CI 必红
+ * （实测 {"cny":0,"calls":7,"measuredCalls":6}，7-6=1 正是本函数那条未采集行，
+ * 说明实现是对的、断言的作用域错了）。
+ *
+ * 取前后差值既与库里既有数据无关，又把断言从 `>=1` / `===0` 收紧成精确增量，
+ * 是**加强**而不是放宽 —— 三态诚实性（未采集绝不折叠成 ¥0）仍由
+ * `careerPlan` 的 Δcalls===1 且 ΔmeasuredCalls===0 守住。
  */
 async function costTriStateRuntimeChecks(
   prisma: { aiServiceLog: { deleteMany: (a: unknown) => Promise<unknown> } },
@@ -582,6 +595,8 @@ async function costTriStateRuntimeChecks(
 ): Promise<void> {
   const since = new Date()
   await new Promise((r) => setTimeout(r, 5))
+
+  const before = await aiLog.getUsage('AiServiceLog')
 
   // ① 有成本：真实厂商标签 + token → 可定价
   aiLog.record({
@@ -603,25 +618,37 @@ async function costTriStateRuntimeChecks(
 
   const usage = await aiLog.getUsage('AiServiceLog')
 
-  const measured = usage.costByOperation.contractReview
-  if (measured.measuredCalls >= 1 && measured.cny > 0) {
-    pass('三态运行时: 有成本 → measuredCalls>0 且 cny>0（真实厂商标签可定价）')
-  } else {
-    fail(`三态运行时: 有成本态错误 —— ${JSON.stringify(measured)}`)
+  // 同一条 getUsage 聚合路径的前后差值 —— 断言的仍是 getUsage 的三态聚合行为，
+  // 没有绕开它去直接读表（绕开就等于不再验「聚合有没有把 null 吞成 0」）。
+  function deltaOf(operation: 'contractReview' | 'careerPlan' | 'jobMatch') {
+    const a = usage.costByOperation[operation]
+    const b = before.costByOperation[operation]
+    return {
+      cny: Math.round((a.cny - b.cny) * 10_000) / 10_000,
+      calls: a.calls - b.calls,
+      measuredCalls: a.measuredCalls - b.measuredCalls,
+    }
   }
 
-  const uncollected = usage.costByOperation.careerPlan
-  if (uncollected.calls >= 1 && uncollected.measuredCalls === 0) {
-    pass('三态运行时: 未采集 → calls>0 但 measuredCalls===0（未被吞成 ¥0）')
+  const measured = deltaOf('contractReview')
+  if (measured.calls === 1 && measured.measuredCalls === 1 && measured.cny > 0) {
+    pass('三态运行时: 有成本 → Δ measuredCalls===1 且 Δcny>0（真实厂商标签可定价）')
   } else {
-    fail(`三态运行时: 未采集态错误 —— ${JSON.stringify(uncollected)}；未采集被当成 0 会让付费调用显示免费`)
+    fail(`三态运行时: 有成本态错误 —— Δ${JSON.stringify(measured)}`)
   }
 
-  const zero = usage.costByOperation.jobMatch
-  if (zero.calls >= 1 && zero.measuredCalls >= 1 && zero.cny === 0) {
-    pass('三态运行时: 成本为 0 → measuredCalls>0 且 cny===0（与「未采集」形状不同）')
+  const uncollected = deltaOf('careerPlan')
+  if (uncollected.calls === 1 && uncollected.measuredCalls === 0) {
+    pass('三态运行时: 未采集 → Δcalls===1 但 Δ measuredCalls===0（未被吞成 ¥0）')
   } else {
-    fail(`三态运行时: 成本为 0 态错误 —— ${JSON.stringify(zero)}`)
+    fail(`三态运行时: 未采集态错误 —— Δ${JSON.stringify(uncollected)}；未采集被当成 0 会让付费调用显示免费`)
+  }
+
+  const zero = deltaOf('jobMatch')
+  if (zero.calls === 1 && zero.measuredCalls === 1 && zero.cny === 0) {
+    pass('三态运行时: 成本为 0 → Δ measuredCalls===1 且 Δcny===0（与「未采集」形状不同）')
+  } else {
+    fail(`三态运行时: 成本为 0 态错误 —— Δ${JSON.stringify(zero)}`)
   }
 
   // 「未采集」与「成本为 0」必须真的长得不一样，否则三态形同虚设
@@ -631,8 +658,9 @@ async function costTriStateRuntimeChecks(
     fail('三态运行时: 未采集 与 成本为 0 形状相同 —— 前端无法诚实展示')
   }
 
-  if (usage.unmeasuredCalls >= 1) pass('三态运行时: 顶层 unmeasuredCalls 已计数（总成本自曝是下限）')
-  else fail('三态运行时: 顶层 unmeasuredCalls 未计数')
+  const unmeasuredDelta = usage.unmeasuredCalls - before.unmeasuredCalls
+  if (unmeasuredDelta === 1) pass('三态运行时: 顶层 unmeasuredCalls 已计数（总成本自曝是下限）')
+  else fail(`三态运行时: 顶层 unmeasuredCalls 未计数 —— Δ${unmeasuredDelta}，应为 1`)
 
   if (/^\d{4}-\d{2}-\d{2}$/u.test(usage.costCollectionSince)) {
     pass(`三态运行时: costCollectionSince 有效（${usage.costCollectionSince}）`)
