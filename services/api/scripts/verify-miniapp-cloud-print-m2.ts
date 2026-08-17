@@ -20,6 +20,7 @@ import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { setPrintScanCapabilityModeForTest, TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { buildRealPdf } from './support/minimal-pdf'
 
 const apiRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(apiRoot, '../..')
@@ -129,7 +130,7 @@ async function main(): Promise<void> {
   }
   async function seedFile(id: string, label: string, piiAction: 'keep' | 'pending', expiresInMs = 30 * 60 * 60 * 1000): Promise<void> {
     const storageKey = `verify/miniapp-m2/${id}.pdf`
-    const pdf = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(2)}%%EOF\n`)
+    const pdf = buildRealPdf(2)
     await storage.putObject(storageKey, pdf, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     storageKeys.push(storageKey)
     await prisma.fileObject.create({
