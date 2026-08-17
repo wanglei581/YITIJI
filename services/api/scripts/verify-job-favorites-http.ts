@@ -69,6 +69,7 @@ async function main() {
   const endUserId = `eu_favhttp_${suffix}`
   const jobId = `job_favhttp_${suffix}`
   const fairId = `fair_favhttp_${suffix}`
+  const orgId = `org_favhttp_${suffix}`
   const sessionId = randomUUID()
 
   // 会员 token + 会话（与 member-auth.login 同方案）。
@@ -81,7 +82,59 @@ async function main() {
 
   async function cleanup() {
     await prisma.endUser.deleteMany({ where: { id: endUserId } }) // Favorite onDelete: Cascade
+    await prisma.job.deleteMany({ where: { id: jobId } })
+    await prisma.jobFair.deleteMany({ where: { id: fairId } })
+    // 机构必须最后删：Job / JobFair 的 sourceOrgId 外键指向它
+    await prisma.organization.deleteMany({ where: { id: orgId } })
     await redis.del(memberSessionKey(sessionId))
+  }
+
+  /**
+   * 收藏目标夹具。
+   *
+   * MemberFavoritesService.resolvePublishedTitle() 只认「已审核 + 已发布」的目标，
+   * 找不到就 NotFoundException（→ 404）。此前本脚本只铸了 endUser，从没建过
+   * jobId / fairId 指向的行，于是断言 1~5 在有真实 DB 的环境里必然 404 —— 空库
+   * 本地跑同样失败，只是没人跑到过（该门禁 2026-08-17 才接进 CI）。
+   *
+   * 标题由服务端从库里派生、不信前端传值，所以这里的 title 就是断言里期望的那个。
+   */
+  async function seedFavoriteTargets() {
+    const published = { reviewStatus: 'approved', publishStatus: 'published' }
+    // Job.sourceOrgId / JobFair.sourceOrgId 都是指向 Organization 的真外键
+    // （`org Organization @relation("JobOrg", fields: [sourceOrgId], ...)`），
+    // 不先建机构会直接 Foreign key constraint violated。
+    await prisma.organization.create({
+      data: { id: orgId, name: '收藏HTTP验证机构', type: 'partner' },
+    })
+    await prisma.job.create({
+      data: {
+        id: jobId,
+        sourceOrgId: orgId,
+        externalId: `ext_favhttp_${suffix}`,
+        sourceName: '收藏HTTP验证源',
+        sourceUrl: `https://example.invalid/favhttp/${suffix}`,
+        title: '前端工程师 · 青岛',
+        company: '收藏HTTP验证公司',
+        city: '青岛',
+        ...published,
+      },
+    })
+    await prisma.jobFair.create({
+      data: {
+        id: fairId,
+        sourceOrgId: orgId,
+        externalId: `extfair_favhttp_${suffix}`,
+        sourceName: '收藏HTTP验证源',
+        sourceUrl: `https://example.invalid/favhttp-fair/${suffix}`,
+        title: '春季招聘会',
+        startAt: new Date(Date.now() + 86_400_000),
+        endAt: new Date(Date.now() + 172_800_000),
+        venue: '收藏HTTP验证会场',
+        city: '青岛',
+        ...published,
+      },
+    })
   }
 
   // 进程内起真实 app（镜像 main.ts 关键装配）。
@@ -106,7 +159,8 @@ async function main() {
     await cleanup()
     await prisma.endUser.create({ data: { id: endUserId, phoneHash: `favhttp-${suffix}`, phoneEnc: `favhttp-enc-${suffix}`, nickname: '收藏HTTP会员' } })
     await redis.setex(memberSessionKey(sessionId), SESSION_TTL, endUserId)
-    console.log('  会员 + 会话已铸')
+    await seedFavoriteTargets()
+    console.log('  会员 + 会话 + 收藏目标已铸')
 
     // 1. 入库：POST /me/favorites { targetType:'job', targetId, title }
     const addRes = await fetch(`${BASE}/me/favorites`, authed({ method: 'POST', headers: jsonHeaders, body: JSON.stringify({ targetType: 'job', targetId: jobId, title: '前端工程师 · 青岛' }) }))
