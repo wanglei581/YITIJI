@@ -1132,7 +1132,8 @@ const api = {
    */
   createContractReview(payload) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
-    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true });
+    // 建任务要落库并校验同意快照，15 秒默认值偏紧。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
   },
 
   /**
@@ -1157,6 +1158,8 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
     return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
       method: 'POST', data: payload, needAuth: true,
+      // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
+      timeout: config.aiTimeout,
     });
   },
 
