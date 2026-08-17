@@ -41,10 +41,14 @@ export interface ContractReviewCreatedTaskView {
   accessToken?: string
 }
 
+// 形状必须与服务端 `ContractReviewPublicConsentScope` 逐字段一致。
+// 服务端只返回嵌套的 `disclaimer.version`，**没有**平铺的 `disclaimerVersion`；
+// 曾经多出的那个平铺字段在 http 模式下恒为 undefined，导致
+// `POST /contract-reviews` 必然 400（disclaimerVersion should not be empty）。
+// mock 当时伪造了该平铺字段，所以 mock 用例全绿而真实后端 100% 失败。
 export interface ConsentScope {
   consentVersion: string
   consentScopeHash: string
-  disclaimerVersion: string
   disclaimer: {
     id: string
     version: string
@@ -216,7 +220,6 @@ function mockConsentScope(): ConsentScope {
   return {
     consentVersion: 'v1.0',
     consentScopeHash: 'a'.repeat(64),
-    disclaimerVersion: 'v1.0',
     disclaimer: {
       id: 'disclaimer-v1',
       version: 'v1.0',

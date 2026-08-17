@@ -102,7 +102,7 @@ export function ContractReviewHomePage() {
         {
           consentVersion: consentScope.consentVersion,
           consentScopeHash: consentScope.consentScopeHash,
-          disclaimerVersion: consentScope.disclaimerVersion,
+          disclaimerVersion: consentScope.disclaimer.version,
         },
         { token: getToken() },
       )

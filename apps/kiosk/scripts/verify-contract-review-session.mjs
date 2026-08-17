@@ -44,4 +44,21 @@ assert.match(notice, /当前合同和结果无法从此终端恢复/)
 assert.match(processing, /<ContractReviewSessionNotice expiresAt=\{session\.expiresAt\}/)
 assert.match(result, /<ContractReviewSessionNotice expiresAt=\{session\.expiresAt\}/)
 
+// ── consent-scope 形状必须与服务端一致 ───────────────────────────────────────
+// 服务端 `ContractReviewPublicConsentScope` 只返回嵌套的 `disclaimer.version`，
+// 没有平铺的 `disclaimerVersion`。此前 kiosk 侧类型和 mock 各自多出一个平铺字段：
+// http 模式下它恒为 undefined，`POST /contract-reviews` 必然 400
+// （disclaimerVersion should not be empty），而 mock 伪造了该字段，
+// 于是三条 mock Playwright 用例全绿、真实后端 100% 失败。
+// 这里同时钉住「类型不得有平铺字段」「mock 不得伪造该字段」「调用点走嵌套版本」，
+// 保证 mock 不能再遮蔽同类前后端契约漂移。
+const contractApi = read('src/services/api/contractReview.ts')
+const consentScopeType = contractApi.match(/export interface ConsentScope \{[\s\S]*?\n\}/)?.[0] ?? ''
+assert.ok(consentScopeType, 'ConsentScope 接口必须存在')
+assert.doesNotMatch(consentScopeType, /disclaimerVersion/)
+const mockScope = contractApi.match(/function mockConsentScope\(\)[\s\S]*?\n\}\n/)?.[0] ?? ''
+assert.ok(mockScope, 'mockConsentScope 必须存在')
+assert.doesNotMatch(mockScope, /disclaimerVersion/)
+assert.match(home, /disclaimerVersion:\s*consentScope\.disclaimer\.version/)
+
 console.log('PASS contract review volatile session contract')
