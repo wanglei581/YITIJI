@@ -29,7 +29,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          command_timeout: 3m
+          # du -xsm /* 在 35GB 盘上要几分钟，3m 会把整个探测截断（2026-08-17 实测两次）
+          command_timeout: 20m
           envs: EXPECT_DIR,EXPECT_PM2,EXPECT_BACKUP
           script: |
             set -uo pipefail
