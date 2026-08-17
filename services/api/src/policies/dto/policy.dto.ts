@@ -115,13 +115,34 @@ export class PolicyEligibilityRuleDto {
   @IsString() @IsNotEmpty() @MaxLength(2000)
   sourceText!: string
 
+  /** 'all' / 'any' = 机械比对；'manual' = 只能人工核对（必须零子句）。 */
   @IsIn([...POLICY_RULE_MATCH_MODES])
   matchMode!: string
 
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(4)
+  /**
+   * 机械比对模式下必填且非空；'manual' 模式必须为空/省略。
+   *
+   * 「非空」与「manual 零子句」两条都由引擎层的 validatePolicyEligibilityRules
+   * 判定（POLICY_RULE_CLAUSES_REQUIRED / POLICY_RULE_MANUAL_CLAUSES_NOT_ALLOWED），
+   * 不在这里用 @ValidateIf 表达 —— class-validator 的 @ValidateIf 为假时会跳过
+   * 该属性**全部**校验（含 @IsArray / @ValidateNested），等于给 manual 开了一个
+   * 不校验形状的口子。这里只留形状校验，语义交给一处判定。
+   */
+  @IsOptional() @IsArray() @ArrayMaxSize(4)
   @ValidateNested({ each: true })
   @Type(() => PolicyEligibilityClauseDto)
-  clauses!: PolicyEligibilityClauseDto[]
+  clauses?: PolicyEligibilityClauseDto[]
+}
+
+/**
+ * 录入面「试算」：拿一组假想作答预览判定结果。
+ *
+ * 只有 answers，没有 rules —— 预览的是**库里已保存**的条件。
+ * 若允许预览未保存的条件，运营看到的绿灯与真正入库的条件可能不是同一份。
+ */
+export class PolicyEligibilityPreviewDto {
+  @IsOptional() @IsObject()
+  answers?: Record<string, unknown>
 }
 
 export class ReplacePolicyEligibilityRulesDto {

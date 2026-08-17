@@ -22,6 +22,7 @@ import {
   POLICY_ELIGIBILITY_UNSURE,
   POLICY_RULE_MATCH_MODES,
   findEligibilityQuestion,
+  isManualRuleMode,
   type PolicyConditionBasis,
   type PolicyConditionCheck,
   type PolicyConditionResult,
@@ -54,6 +55,9 @@ export const MAX_CLAUSES_PER_RULE = 4
  *   - 取值必须是问项字典里登记过的取值，杜绝自造取值让判定悄悄失配。
  *   - satisfiedValues 与 conflictValues 不得相交，否则同一取值既满足又冲突。
  *   - sourceText 必填：没有政策原文摘录的条件不许入库 —— 判定必须可追溯。
+ *   - matchMode='manual'（只能人工核对）必须 **零子句**：既然承认机器判不了，
+ *     就不许再挂一个「顺便也比一下」的子句 —— 那会让某些作答把本该恒 unknown
+ *     的条款判成 matched/conflict，等于偷偷替政策做了它没做的判定。
  */
 export function validatePolicyEligibilityRules(
   rules: PolicyEligibilityRuleInput[],
@@ -80,6 +84,18 @@ export function validatePolicyEligibilityRules(
     if (!(POLICY_RULE_MATCH_MODES as readonly string[]).includes(rule.matchMode)) {
       return { code: 'POLICY_RULE_MATCH_MODE_INVALID', message: `${at}的 matchMode 非法` }
     }
+
+    // 「只能人工核对」：零子句，且不再走下面的子句校验。
+    if (isManualRuleMode(rule.matchMode)) {
+      if (Array.isArray(rule.clauses) && rule.clauses.length > 0) {
+        return {
+          code: 'POLICY_RULE_MANUAL_CLAUSES_NOT_ALLOWED',
+          message: `${at}标为「只能人工核对」，不得再挂机械比对子句`,
+        }
+      }
+      continue
+    }
+
     if (!Array.isArray(rule.clauses) || rule.clauses.length === 0) {
       return { code: 'POLICY_RULE_CLAUSES_REQUIRED', message: `${at}至少需要一个判定子句` }
     }
@@ -248,6 +264,22 @@ export function evaluateRule(
   rule: PolicyEligibilityRuleRecord,
   answers: Readonly<Record<string, string>>,
 ): PolicyConditionCheck {
+  // 「只能人工核对」在任何作答下都恒为 unknown。
+  // 短路必须发生在 combineClauseResults 之前：'all' 模式对空子句集合会合取成
+  // matched（「零条件即全部满足」），那正是本能力最危险的一种错法。
+  if (isManualRuleMode(rule.matchMode)) {
+    return {
+      ruleId: rule.id,
+      orderIndex: rule.orderIndex,
+      label: rule.label,
+      result: 'unknown',
+      reasonCode: 'MANUAL_REVIEW_ONLY',
+      reason: POLICY_CONDITION_REASON_TEXT.MANUAL_REVIEW_ONLY,
+      sourceText: rule.sourceText,
+      basis: [],
+    }
+  }
+
   const outcomes = rule.clauses.map((clause) => evaluateClause(clause, answers))
   const result = combineClauseResults(
     rule.matchMode,

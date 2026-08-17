@@ -8,6 +8,7 @@ import {
   type ContractProviderTransport,
   type ContractProviderTransportRequest,
 } from '../contract-review-provider.service'
+import { CONTRACT_PROVIDER_MIN_TIMEOUT_MS } from '../contract-review-timing'
 
 const deepseekEnv = {
   CONTRACT_REVIEW_PROVIDER: 'deepseek', CONTRACT_REVIEW_BASE_URL: 'https://api.deepseek.com/',
@@ -474,7 +475,9 @@ test('strict fetch transport sets redirect error and aborts on timeout without r
     }),
     1,
   )
-  await assert.rejects(() => timedOut.send(fakeTransportRequest()), /CONTRACT_PROVIDER_TRANSPORT_FAILED/)
+  // 超时不再塌成 TRANSPORT_FAILED —— 两者含义完全不同，混在一起正是
+  // 2026-08-17 生产排查了整晚的直接原因（网络实测完好，其实是自己 abort 的）。
+  await assert.rejects(() => timedOut.send(fakeTransportRequest()), /CONTRACT_PROVIDER_TIMEOUT/)
 
   const oversized = new StrictFetchContractProviderTransport(async () => new Response('x'.repeat(512 * 1024 + 1)))
   await assert.rejects(() => oversized.send(fakeTransportRequest()), /CONTRACT_PROVIDER_TRANSPORT_FAILED/)
@@ -524,5 +527,7 @@ function fakeTransportRequest(): ContractProviderTransportRequest {
         { role: 'user', content: '{}' },
       ],
     },
+    // 超时现在逐次请求携带（按合同页数伸缩），不再是 transport 构造时的常量。
+    timeoutMs: CONTRACT_PROVIDER_MIN_TIMEOUT_MS,
   }
 }
