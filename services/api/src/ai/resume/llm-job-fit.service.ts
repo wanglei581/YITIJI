@@ -1,5 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../llm/llm-http'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
@@ -376,24 +384,38 @@ export class LlmJobFitService {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: cfg.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: cfg.temperature,
-          stream: false,
-          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-          ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
-        }),
-      })
-    } catch {
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: cfg.temperature,
+            stream: false,
+            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
+            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+          }),
+        },
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
+    } catch (error) {
+      if (error instanceof LlmBusyError) {
+        this.logger.warn(`jobfit.llm busy limit=${error.limit}`)
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`jobfit.llm timeout ms=${error.timeoutMs}`)
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_JOB_FIT_TIMEOUT', message: llmTimeoutMessage('AI 岗位匹配参考', error.timeoutMs) },
+        })
+      }
       this.logger.error('jobfit.llm network_error')
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
     }
@@ -401,7 +423,7 @@ export class LlmJobFitService {
       this.logger.error(`jobfit.llm upstream_non_2xx status=${res.status}`)
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as {
+    const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
       usage?: {
         prompt_tokens?: number
@@ -411,15 +433,15 @@ export class LlmJobFitService {
         completionTokens?: number
         totalTokens?: number
       }
-    }
-    const reply = data.choices?.[0]?.message?.content?.trim()
+    } | null
+    const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
     }
     return {
       text: reply,
       provider: `llm:${cfg.vendor}:${cfg.model}`,
-      tokenUsage: normalizeTokenUsage(data.usage),
+      tokenUsage: normalizeTokenUsage(data?.usage),
     }
   }
 }

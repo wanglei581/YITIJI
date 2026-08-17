@@ -7,6 +7,14 @@ import type {
   ResumeTargetContext,
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_LONG_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../llm/llm-http'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -322,14 +330,28 @@ export class LlmResumeOptimizeService {
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
-      })
-    } catch {
+      // 长文档档（90 秒）：整份简历的重写，输出体量远大于对话类调用。
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
+        },
+        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+      )
+    } catch (error) {
+      if (error instanceof LlmBusyError) {
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`resume optimize timeout ms=${error.timeoutMs}`)
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_OPTIMIZE_TIMEOUT', message: llmTimeoutMessage('AI 简历优化', error.timeoutMs) },
+        })
+      }
       throw new ServiceUnavailableException({
         error: { code: 'AI_OPTIMIZE_UNAVAILABLE', message: 'AI 简历优化服务连接失败，请稍后重试' },
       })
@@ -342,7 +364,7 @@ export class LlmResumeOptimizeService {
         error: { code: 'AI_OPTIMIZE_UNAVAILABLE', message: `AI 简历优化服务返回错误 (${res.status})` },
       })
     }
-    const data = (await res.json().catch(() => null)) as {
+    const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
       usage?: RawLlmUsage
     } | null

@@ -541,8 +541,15 @@ async function main(): Promise<void> {
       'ServiceUnavailableException',
       'AI_NOT_CONFIGURED',
       'AI_OUTPUT_INVALID',
-      'AbortController',
+      // 超时机制从「本文件里自己 new AbortController」改为「走统一底座 llmFetchJson」，
+      // 断言随之跟到新位置：底座同样是 AbortController + signal（不是 Promise.race），
+      // 且 verify:llm-timeout-concurrency 会**真跑**一次证明它确实会 abort。
+      // 顺带把 job-ai 纳入了全局 AI 并发闸门。超时行为与错误码 AI_TIMEOUT 均未变。
+      'llmFetchJson',
       'AI_TIMEOUT',
+      // 并发闸门拒绝要能和超时/网络失败分开报，不许塌成一个码。
+      'LlmBusyError',
+      'AI_BUSY',
     ],
     'JobAiLlmService 使用真实 LLM 配置并包含输出安全防线',
   )

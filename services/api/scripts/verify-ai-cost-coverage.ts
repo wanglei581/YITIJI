@@ -168,7 +168,9 @@ assertContains(selfAssessSvc, 'tokenUsage: usage.tokenUsage', 'self-assessment: 
 assertContains(selfAssessSvc, 'usage.callCount > 0', 'self-assessment: callCount 守卫存在（没真调用就不落账）')
 
 const llmSelfAssess = read('src/ai/resume/llm-self-assessment.service.ts')
-assertContains(llmSelfAssess, 'normalizeLlmUsage(data.usage)', 'llm-self-assessment: 从上游回包读取 token usage')
+// `data?.usage`：回包解析失败时统一底座回 null（既有的「未返回内容」分支接住），
+// 所以这里放行可选链。仍然钉死「从回包的 usage 字段读」，没有放宽成只匹配函数名。
+assertContains(llmSelfAssess, /normalizeLlmUsage\(data\??\.usage\)/u, 'llm-self-assessment: 从上游回包读取 token usage')
 assertContains(llmSelfAssess, 'onLlmCall?.({ provider: providerLabel, tokenUsage:', 'llm-self-assessment: 回调带 provider + token')
 assertContains(llmSelfAssess, '`llm:${cfg.vendor}:${cfg.model}`', 'llm-self-assessment: provider 标签含厂商名（否则单价匹配不到）')
 // selfAssessment 是 token 计费能力，绝不能被塞进「非 token 计费」名单来掩盖 ¥0

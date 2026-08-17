@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import { LLM_BUSY_MESSAGE, LlmBusyError, LlmTimeoutError, llmFetchJson } from '../ai/llm/llm-http'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import type {
   JobAiExplanationPayload,
@@ -154,28 +155,31 @@ export class JobAiLlmService {
       throw unavailable('AI_NOT_CONFIGURED', 'AI 服务暂未启用，请联系管理员配置')
     }
     const startedAt = Date.now()
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS)
+    // 超时行为不变（仍是 AI_JOB_LLM_TIMEOUT_MS / 默认 45 秒），改走统一底座是为了
+    // 同时纳入**全局并发闸门** —— 否则岗位推荐可以绕过上限，把「全局」变成半个。
     try {
-      const res = await fetch(`${cfg.baseURL.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: cfg.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: Math.min(0.4, cfg.temperature),
-          stream: false,
-        }),
-      })
+      const res = await llmFetchJson(
+        `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: Math.min(0.4, cfg.temperature),
+            stream: false,
+          }),
+        },
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
       if (!res.ok) {
         this.logger.warn(`${operation}.upstream_non_2xx status=${res.status}`)
         throw unavailable('AI_UNAVAILABLE', `AI 模型返回错误 (${res.status})`)
       }
-      const data = (await res.json()) as {
+      const data = res.data as {
         choices?: Array<{ message?: { content?: string } }>
         usage?: {
           prompt_tokens?: number
@@ -185,24 +189,32 @@ export class JobAiLlmService {
           completionTokens?: number
           totalTokens?: number
         }
-      }
-      const reply = data.choices?.[0]?.message?.content?.trim()
+      } | null
+      const reply = data?.choices?.[0]?.message?.content?.trim()
       if (!reply) throw unavailable('AI_UNAVAILABLE', 'AI 模型未返回内容')
       return {
         text: reply,
         provider: `llm:${cfg.vendor}:${cfg.model}`,
-        tokenUsage: normalizeTokenUsage(data.usage),
+        tokenUsage: normalizeTokenUsage(data?.usage),
       }
     } catch (error) {
       if (error instanceof ServiceUnavailableException) throw error
+      if (error instanceof LlmBusyError) {
+        this.logger.warn(`${operation}.busy limit=${error.limit}`)
+        throw unavailable('AI_BUSY', LLM_BUSY_MESSAGE)
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`${operation}.timeout ms=${Date.now() - startedAt}`)
+        throw unavailable('AI_TIMEOUT', 'AI 模型响应超时，请稍后重试')
+      }
+      // 兜底保留：若将来有人从外部传入自己的 signal，abort 会以 AbortError 冒出来，
+      // 仍然按超时报，而不是塌成「连接失败」。
       if (error instanceof Error && error.name === 'AbortError') {
         this.logger.warn(`${operation}.timeout ms=${Date.now() - startedAt}`)
         throw unavailable('AI_TIMEOUT', 'AI 模型响应超时，请稍后重试')
       }
       this.logger.warn(`${operation}.network_error ms=${Date.now() - startedAt}`)
       throw unavailable('AI_UNAVAILABLE', 'AI 模型连接失败，请稍后重试')
-    } finally {
-      clearTimeout(timeout)
     }
   }
 }

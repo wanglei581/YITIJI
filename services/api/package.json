@@ -227,6 +227,7 @@
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
     "verify:advisor-work": "node -r @swc-node/register scripts/verify-advisor-work.ts",
     "verify:career-plan-degraded": "node -r @swc-node/register scripts/verify-career-plan-degraded.ts",
+    "verify:llm-timeout-concurrency": "node -r @swc-node/register scripts/verify-llm-timeout-concurrency.ts",
     "verify:ai-cost-coverage": "node -r @swc-node/register scripts/verify-ai-cost-coverage.ts",
     "verify:assistant-provider-label": "node -r @swc-node/register scripts/verify-assistant-provider-label.ts",
     "verify:llm-input-pii-mask": "node -r @swc-node/register scripts/verify-llm-input-pii-mask.ts",

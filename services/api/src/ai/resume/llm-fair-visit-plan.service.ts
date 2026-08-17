@@ -1,5 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../llm/llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
@@ -180,24 +188,41 @@ export class LlmFairVisitPlanService {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }
     const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(`${cfg.baseURL.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: cfg.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: cfg.temperature,
-          stream: false,
-          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-          ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
-        }),
-      })
-    } catch {
+      res = await llmFetchJson(
+        `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: cfg.temperature,
+            stream: false,
+            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
+            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+          }),
+        },
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
+    } catch (error) {
+      if (error instanceof LlmBusyError) {
+        // 闸门拒绝时请求根本没发出 → 不落账，否则等于凭空记一次没花过的调用。
+        this.logger.warn(`fairvisit.llm busy limit=${error.limit}`)
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        // 超时：请求已发出、上游可能已计费 → 与既有 network_error 分支一样要落账。
+        this.logger.warn(`fairvisit.llm timeout ms=${error.timeoutMs}`)
+        onLlmCall?.({ provider: providerLabel })
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_FAIR_VISIT_PLAN_TIMEOUT', message: llmTimeoutMessage('AI 参会准备单', error.timeoutMs) },
+        })
+      }
       this.logger.error('fairvisit.llm network_error')
       onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
@@ -207,9 +232,9 @@ export class LlmFairVisitPlanService {
       onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage }
-    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
-    const reply = data.choices?.[0]?.message?.content?.trim()
+    const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
+    const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
     }

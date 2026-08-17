@@ -1,5 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../ai/llm/llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 
 // ============================================================
@@ -277,22 +285,38 @@ export class MockInterviewLlmService {
     }
     const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: cfg.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: cfg.temperature,
-          stream: false,
-        }),
-      })
-    } catch {
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: cfg.temperature,
+            stream: false,
+          }),
+        },
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
+    } catch (error) {
+      if (error instanceof LlmBusyError) {
+        // 闸门拒绝时请求根本没发出 → 不落账，否则等于凭空记一次没花过的调用。
+        this.logger.warn(`interview.llm busy limit=${error.limit}`)
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`interview.llm timeout ms=${error.timeoutMs}`)
+        onLlmCall?.({ provider: providerLabel })
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_MOCK_INTERVIEW_TIMEOUT', message: llmTimeoutMessage('AI 模拟面试', error.timeoutMs) },
+        })
+      }
       this.logger.error('interview.llm network_error')
       onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
@@ -302,9 +326,9 @@ export class MockInterviewLlmService {
       onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage }
-    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
-    const reply = data.choices?.[0]?.message?.content?.trim()
+    const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
+    const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
     }
