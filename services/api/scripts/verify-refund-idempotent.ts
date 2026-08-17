@@ -16,7 +16,7 @@
  * 运行：pnpm --filter @ai-job-print/api verify:refund-idempotent
  */
 import 'dotenv/config'
-import { randomBytes, randomUUID } from 'crypto'
+import { createHash, randomBytes, randomUUID } from 'crypto'
 
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-refund-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-refund-terminal-action-secret-0123456789'
@@ -48,7 +48,6 @@ import type {
   QrPaymentCreateInput,
   RefundExecuteInput,
 } from '../src/payment/payment-provider.types'
-import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { StorageService } from '../src/storage/storage.service'
@@ -112,7 +111,6 @@ async function main(): Promise<void> {
   const refundService = new RefundService(prisma, audit, new PaymentProviderRegistry([spy]))
   const adminPrintScan = new AdminPrintScanService(prisma)
   const printJobs = new PrintJobsService(prisma, audit, new PrintPageCountService(prisma, storage), pricing, orderStatus, new TerminalCapabilitiesService(prisma))
-  const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
   const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma))) })()
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
@@ -243,7 +241,26 @@ async function main(): Promise<void> {
       data: { id: `bg_refund_${suffix}`, endUserId, benefitType: 'free_quota', title: '免费打印次数', quantityTotal: 3, quantityRemaining: 3, status: 'active' },
     })
     grantIds.push(grant.id)
-    await redemption.redeemForOrder({ endUserId, orderId: oVoucher, benefitGrantId: grant.id })
+    // 本节被测对象是**退款**，不是核销。打印订单核销已被止血闸关闭
+    //（REDEEM_PRINT_ORDER_UNSUPPORTED，权益模型缺面值/上限/范围，见 BenefitRedemptionService.redeemForOrder），
+    // 但退款侧仍必须正确处理 voucher 全额核销单：不调 provider、不恢复权益额度。
+    // 因此这里直接播种「已 voucher 结算」终态（等价于止血前 redeemForOrder 的落库结果），
+    // 而不是走已关闭的核销通道。
+    await prisma.order.update({
+      where: { id: oVoucher },
+      data: {
+        payStatus: 'paid', paymentSource: 'voucher', payChannel: 'voucher',
+        discountCents: 120, paidAt: new Date(), paidBy: 'redemption',
+      },
+    })
+    await prisma.benefitGrant.update({ where: { id: grant.id }, data: { quantityRemaining: 2 } })
+    await prisma.redemptionRecord.create({
+      data: {
+        endUserId, orderId: oVoucher, kind: 'free_quota', benefitRef: grant.id,
+        serviceType: 'order_redeem', serviceRefId: oVoucher, quantity: 1, amountCents: 120,
+        idempotencyKey: createHash('sha256').update(`${grant.id}:order_redeem:${oVoucher}`).digest('hex'),
+      },
+    })
     const vOrder = await prisma.order.findUnique({ where: { id: oVoucher } })
     assert(vOrder?.payStatus === 'paid' && vOrder.paymentSource === 'voucher', '5a. 全额核销单 → paid(voucher)')
     const remainBefore = (await prisma.benefitGrant.findUnique({ where: { id: grant.id } }))!.quantityRemaining

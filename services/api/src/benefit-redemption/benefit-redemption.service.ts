@@ -90,6 +90,10 @@ export class BenefitRedemptionService {
    *
    * 幂等：同订单同权益重复调用 → RedemptionRecord 回放 + markPaidByRedemption 幂等，不二次扣。
    * 一单一核销：`@@unique([serviceType,serviceRefId])` 保证同一订单只被核销一次（换权益也拒）。
+   *
+   * ⚠️ 当前状态（P0 止血）：**打印订单一律拒绝**（`REDEEM_PRINT_ORDER_UNSUPPORTED`）。
+   * 权益模型缺面值 / 抵扣上限 / 适用范围，全额抵扣会让任意券整单免单。详见方法体内止血闸注释。
+   * 打印订单是当前生产唯一订单类型，故本方法在补齐面值前实际不产生任何结算。
    */
   async redeemForOrder(params: RedeemForOrderParams): Promise<RedeemForOrderResult> {
     const { endUserId, orderId, benefitGrantId } = params
@@ -146,6 +150,34 @@ export class BenefitRedemptionService {
         }
         if (grant.quantityRemaining === null) {
           throw new BadRequestException({ error: { code: 'BENEFIT_NOT_QUANTIFIED', message: '该权益无可核销额度' } })
+        }
+
+        // ── 止血闸（P0，打印订单 fail-closed）────────────────────────────────
+        // 根因是**能力缺失**，不是这里算错了：BenefitGrant 只有 quantityTotal / quantityRemaining
+        // （次数额度），**没有面值 / 抵扣上限 / 适用服务范围**任何字段（schema.prisma model BenefitGrant、
+        // packages/shared 的 MemberBenefitItem 同样没有）。系统压根没有「这张券值多少钱」的概念。
+        // 于是下面 settleRedemptionInTransaction 只能按 discountCents = order.amountCents 走整单免单，
+        // OrderStatusService 又要求 discountCents >= amountCents（全额覆盖）——两边一夹，
+        // 任意 coupon / free_quota / package_entitlement 命中未付打印订单都会把应付打到 0，
+        // **与这张券本身值多少钱无关**。这不是「有字段没读」，是没有字段可读。
+        //
+        // 在补齐「面值 / 抵扣上限 / 适用服务范围」之前，这里对打印订单 fail-closed：
+        // - 只拒 order.type === 'print'（当前生产唯一订单类型，见 member-print-order-create /
+        //   print-jobs 两处建单）；将来出现非打印订单类型时不误伤。
+        // - 只拒**订单金额结算**这一条路径。resume_optimize 等非订单核销走 redeem()，
+        //   orderId 恒 null、amountCents 恒 0，不经过本方法，**不受影响**。
+        // - 拒绝发生在任何写入之前：settleRedemptionInTransaction / 扣额度 / 落账本全在其后，
+        //   且整体在同一事务内，不会留下半个核销。
+        // 口径来源：docs/design/kiosk-ai-os-v3-2026-08/wiring-map.md §12 第 1 条
+        //（「在补齐前立即止血：/orders/:id/redeem 对打印订单默认拒绝」）。
+        if (order.type === 'print') {
+          throw new BadRequestException({
+            error: {
+              code: 'REDEEM_PRINT_ORDER_UNSUPPORTED',
+              message:
+                '打印订单暂不支持权益抵扣：权益尚未定义面值、抵扣上限与适用范围，无法计算抵扣金额。请照常支付，本次不会扣减权益额度。',
+            },
+          })
         }
 
         // 先获取订单唯一结算锁；后续任何 grant / 账本写入都在同一事务内，失败会完整回滚。
