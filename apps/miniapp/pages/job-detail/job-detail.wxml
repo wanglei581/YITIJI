@@ -4,13 +4,23 @@
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">岗位详情</view>
-    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
+    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"
+          role="button" aria-label="{{faved ? '取消收藏' : '收藏这个岗位'}}">
+      <text class="ficon i-inbox"></text>
+      <!-- 图标库无星形/心形，i-inbox 单独出现时用户认不出是收藏。
+           带字按钮对本项目中位数用户（43 岁、初中及以下学历占 65.4%）
+           比任何图标都好认，故补文字而非换图标。 -->
+      <text class="nav-right-t">{{faved ? '已收藏' : '收藏'}}</text>
+    </view>
   </view>
 
-  <view class="content has-bar">
+  <view class="content has-bar detail-content">
 
     <!-- 加载中 -->
-    <view wx:if="{{loading}}" class="detail-state">加载中…</view>
+    <view wx:if="{{loading}}" class="detail-state">
+      <view class="state-icon"><text class="ficon i-solution"></text></view>
+      <view class="ds-msg">正在加载岗位详情</view>
+    </view>
 
     <!-- 加载失败 -->
     <view wx:elif="{{loadError}}" class="detail-state">
@@ -23,6 +33,7 @@
     <block wx:else>
     <!-- 岗位头部 -->
     <view class="job-header rise-d1">
+      <view class="source-pill">第三方来源信息</view>
       <view class="jh-title">{{job.title}}</view>
       <view class="jh-salary">{{job.salary}}</view>
       <view class="jh-company">{{job.company}}</view>
@@ -33,7 +44,13 @@
 
     <!-- 来源信息 -->
     <view class="info-card rise-d2">
-      <view class="ic-title">来源信息</view>
+      <view class="ic-head">
+        <view class="ic-head-icon"><text class="ficon i-link"></text></view>
+        <view>
+          <view class="ic-title">来源信息</view>
+          <view class="ic-subtitle">请在来源平台确认职位有效性</view>
+        </view>
+      </view>
       <view class="ic-row"><text class="ic-k">来源机构</text><text class="ic-v">{{job.sourceOrg}}</text></view>
       <view class="ic-row"><text class="ic-k">外部 ID</text><text class="ic-v mono">{{job.externalId}}</text></view>
       <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{job.syncTime}}</text></view>
@@ -54,7 +71,7 @@
 
     <!-- 工作职责 -->
     <view class="section-t rise-d3">工作职责</view>
-    <view class="duty-list rise-d3">
+    <view class="duty-list section-card rise-d3">
       <view class="duty-item" wx:for="{{job.duties}}" wx:key="*this">
         <view class="duty-dot"></view>
         <text class="duty-text">{{item}}</text>
@@ -63,7 +80,7 @@
 
     <!-- 任职要求 -->
     <view class="section-t rise-d4">任职要求</view>
-    <view class="duty-list rise-d4">
+    <view class="duty-list section-card rise-d4">
       <view class="duty-item" wx:for="{{job.requirements}}" wx:key="*this">
         <view class="duty-dot"></view>
         <text class="duty-text">{{item}}</text>

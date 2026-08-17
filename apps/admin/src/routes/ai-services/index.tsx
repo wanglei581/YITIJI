@@ -48,6 +48,8 @@ const OPERATION_LABELS: Record<AiOperation, string> = {
   voiceSynthesize:    '语音播报 (TTS)',   // 按字符计费，成本 Admin 展示 N/A
   // 自我探索 · 倾向参考（2026-08-01）
   selfAssessment:     '自我探索 · 倾向参考',
+  // 合同审查（2026-08-17）：此前完全不落 AiServiceLog，花费在统计里根本查不到
+  contractReview:     '合同审查',
 }
 
 /**
@@ -63,8 +65,9 @@ const NON_TOKEN_BILLED_OPS: readonly AiOperation[] = ['voiceTranscribe', 'voiceS
 const NON_TOKEN_BILLED_NOTE: Record<string, string> = {
   voiceTranscribe: '按音频时长计费',
   voiceSynthesize: '按字符数计费',
-  selfAssessment: '自我探索 · 倾向参考',
-
+  // 注：selfAssessment 曾被误列在此。它是**按 token 计费**的付费 LLM 调用，
+  // 本表只在 !row.tokenBilled 时才会被读到，所以那条目永远读不到，
+  // 却会误导后来人以为它按量计费。已移除。
 }
 
 const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
@@ -94,6 +97,9 @@ const OP_FILTERS: OpFilter[] = [
   'interviewReport',
   'voiceTranscribe',
   'voiceSynthesize',
+  // selfAssessment 此前有标签但漏在筛选列表外，日志页筛不出来；一并补上。
+  'selfAssessment',
+  'contractReview',
 ]
 const OP_FILTER_LABELS: Record<OpFilter, string> = {
   all:                '全部',
@@ -113,6 +119,7 @@ const OP_FILTER_LABELS: Record<OpFilter, string> = {
   voiceTranscribe:    '语音转写',
   voiceSynthesize:    '语音播报',
   selfAssessment:     '自我探索 · 倾向参考',
+  contractReview:     '合同审查',
 }
 const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
 const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
@@ -197,26 +204,55 @@ export default function AiServicesPage() {
 
   const successRate    = usage.successRate
   const estimatedCost  = `¥${usage.estimatedCostCny.toFixed(2)}`
-  const costNote       = usage.estimatedCostCny === 0
-    ? `${usage.providerName} 暂无已记录 token 成本`
-    : '基于 token 用量估算'
+  // 头部大数字必须自曝不完整：有未采集调用时它是下限，不是全部花费。
+  const costNote       = usage.unmeasuredCalls > 0
+    ? `下限 · 另有 ${usage.unmeasuredCalls} 次调用未采集成本`
+    : usage.estimatedCostCny === 0
+      ? `${usage.providerName} 暂无已记录 token 成本`
+      : '基于 token 用量估算'
   const jobAiCalls = usage.byOperation.jobRecommend + usage.byOperation.jobExplain + usage.byOperation.jobMatch
-  const jobAiCost = usage.costByOperation.jobRecommend + usage.costByOperation.jobExplain + usage.costByOperation.jobMatch
+  /** 岗位 AI 三项成本：只取已采集部分，并单独给出「未估算」笔数，不把未采集当 0。 */
+  const jobAiOps: AiOperation[] = ['jobRecommend', 'jobExplain', 'jobMatch']
+  const jobAiCost = jobAiOps.reduce((sum, op) => sum + (usage.costByOperation[op]?.cny ?? 0), 0)
+  const jobAiUnmeasured = jobAiOps.reduce((sum, op) => {
+    const cost = usage.costByOperation[op]
+    return sum + (cost ? cost.calls - cost.measuredCalls : 0)
+  }, 0)
+  /** 单个能力的成本文案：未采集显示「未估算」，绝不显示 ¥0.0000。 */
+  const opCostText = (op: AiOperation): string => {
+    const cost = usage.costByOperation[op]
+    if (!cost || cost.measuredCalls === 0) return cost && cost.calls > 0 ? '成本未估算' : '成本 ¥0.0000'
+    const suffix = cost.measuredCalls < cost.calls ? `（+${cost.calls - cost.measuredCalls} 笔未估算）` : ''
+    return `成本 ¥${cost.cny.toFixed(4)}${suffix}`
+  }
 
-  // A-6：全量 operation 明细。只列有调用的行，避免 15 行里 12 行是 0 的噪声。
+  // A-6：全量 operation 明细。只列有调用的行，避免 16 行里 12 行是 0 的噪声。
+  //
+  // AI-COST-TRUTH：costByOperation 现在是三态结构，不是纯 number。
+  // tokenBilled 只说明「这个能力**应该**按 token 计费」，说明不了「成本采到了没有」——
+  // 旧实现把这两件事混为一谈，于是 token 计费能力一律 toFixed(4) 渲染成 ¥0.0000，
+  // 对真实付费调用少算成本。costState 才是真正的展示依据。
   const operationRows = (Object.keys(OPERATION_LABELS) as AiOperation[])
-    .map((op) => ({
-      op,
-      calls: usage.byOperation[op] ?? 0,
-      cost: usage.costByOperation[op] ?? 0,
-      tokenBilled: !NON_TOKEN_BILLED_OPS.includes(op),
-    }))
+    .map((op) => {
+      const cost = usage.costByOperation[op] ?? { cny: 0, calls: 0, measuredCalls: 0 }
+      const calls = usage.byOperation[op] ?? 0
+      const tokenBilled = !NON_TOKEN_BILLED_OPS.includes(op)
+      const costState: 'measured' | 'partial' | 'uncollected' =
+        cost.measuredCalls === 0 ? 'uncollected'
+          : cost.measuredCalls < cost.calls ? 'partial'
+            : 'measured'
+      return { op, calls, cost: cost.cny, tokenBilled, costState, unmeasured: cost.calls - cost.measuredCalls }
+    })
     .filter((row) => row.calls > 0)
     .sort((a, b) => b.calls - a.calls)
   const totalOperationCalls = operationRows.reduce((sum, row) => sum + row.calls, 0)
+  // 只累计**已采集**的成本。未采集的那部分不能当 0 加进来充数。
   const totalTokenBilledCost = operationRows
     .filter((row) => row.tokenBilled)
     .reduce((sum, row) => sum + row.cost, 0)
+  const totalUnmeasuredCalls = operationRows
+    .filter((row) => row.tokenBilled)
+    .reduce((sum, row) => sum + row.unmeasured, 0)
   const qualityTotals = qualitySummary.reduce(
     (acc, item) => ({
       totalJobs: acc.totalJobs + item.totalJobs,
@@ -367,21 +403,23 @@ export default function AiServicesPage() {
           <MetricCard
             label="岗位推荐"
             value={usage.byOperation.jobRecommend}
-            note={`成本 ¥${usage.costByOperation.jobRecommend.toFixed(4)}`}
+            note={opCostText('jobRecommend')}
             icon={SparklesIcon}
             iconClass="text-violet-600 bg-violet-50"
           />
           <MetricCard
             label="岗位解读"
             value={usage.byOperation.jobExplain}
-            note={`成本 ¥${usage.costByOperation.jobExplain.toFixed(4)}`}
+            note={opCostText('jobExplain')}
             icon={ScanTextIcon}
             iconClass="text-info-fg bg-info-bg"
           />
           <MetricCard
             label="匹配参考"
             value={usage.byOperation.jobMatch}
-            note={`岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
+            note={jobAiUnmeasured > 0
+              ? `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}（+${jobAiUnmeasured} 笔未估算）`
+              : `岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
             icon={CheckCircleIcon}
             iconClass="text-success-fg bg-success-bg"
           />
@@ -419,12 +457,24 @@ export default function AiServicesPage() {
                       <td className="px-4 py-3 font-mono text-xs text-neutral-400">{row.op}</td>
                       <td className="px-4 py-3 text-right font-mono text-neutral-700">{row.calls}</td>
                       <td className="px-4 py-3 text-right font-mono text-xs">
-                        {row.tokenBilled
-                          ? <span className="text-neutral-700">¥{row.cost.toFixed(4)}</span>
-                          : <span className="text-neutral-400">未估算</span>}
+                        {/* 三态：未采集绝不显示 ¥0（那等于谎称免费）；部分采集要标出缺口 */}
+                        {!row.tokenBilled || row.costState === 'uncollected'
+                          ? <span className="text-neutral-400">未估算</span>
+                          : (
+                            <span className="text-neutral-700">
+                              ¥{row.cost.toFixed(4)}
+                              {row.costState === 'partial' && (
+                                <span className="ml-1 text-warning">+{row.unmeasured} 笔未估算</span>
+                              )}
+                            </span>
+                          )}
                       </td>
                       <td className="px-4 py-3 text-xs text-neutral-500">
-                        {row.tokenBilled ? '按 token 用量' : NON_TOKEN_BILLED_NOTE[row.op]}
+                        {!row.tokenBilled
+                          ? NON_TOKEN_BILLED_NOTE[row.op]
+                          : row.costState === 'uncollected'
+                            ? '按 token 计费，但本窗口未采集到用量'
+                            : '按 token 用量'}
                       </td>
                     </tr>
                   ))
@@ -436,7 +486,11 @@ export default function AiServicesPage() {
                     <td className="px-4 py-3 font-medium text-neutral-600" colSpan={2}>合计（按 token 计费部分）</td>
                     <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{totalOperationCalls}</td>
                     <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">¥{totalTokenBilledCost.toFixed(4)}</td>
-                    <td className="px-4 py-3 text-neutral-500">语音能力成本未含在内</td>
+                    <td className="px-4 py-3 text-neutral-500">
+                      {totalUnmeasuredCalls > 0
+                        ? `语音能力未含在内；另有 ${totalUnmeasuredCalls} 笔未采集，合计为下限`
+                        : '语音能力成本未含在内'}
+                    </td>
                   </tr>
                 </tfoot>
               )}
@@ -445,6 +499,15 @@ export default function AiServicesPage() {
         </Card>
         <p className="mt-2 text-xs text-neutral-400">
           语音转写 / 语音播报按时长与字符计费，缺少厂家确认单价，此处不估算成本，请以厂商账单为准。
+        </p>
+        {/*
+          历史数据说明（交付章程 D-2）：token 用量从来没采集过，少算部分不可恢复。
+          任何回填都是拿估算冒充实测，属第二次编造，比承认数据不全更糟 —— 故不回填，
+          只如实标注。日期由后端 AI_COST_COLLECTION_SINCE 提供，不在前端写死。
+        */}
+        <p className="mt-1 text-xs text-neutral-400">
+          成本采集自 {usage.costCollectionSince} 起生效；该日期之前的调用未采集 token 用量，
+          历史成本统计不完整且不做回填（回填等于用估算冒充实测）。
         </p>
       </section>
 
