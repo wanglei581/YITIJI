@@ -178,6 +178,17 @@
 }
 .tiles .tile.pending .t-title { color: var(--muted); }
 .tiles .tile.pending .t-desc  { color: var(--faint); }
+/* 未开放原因直接写在卡片上：用户点之前就知道为什么走不通。 */
+.tiles .tile.pending .t-why {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--slate-deep);
+}
+.tiles .tile.pending .t-why-ic { font-size: 11px; flex-shrink: 0; }
 .t-badge {
   margin-left: 6px;
   padding: 1px 6px;

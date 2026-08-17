@@ -54,11 +54,13 @@
     </block>
 
     <!-- 未开放能力：不伪装成可用，也不藏起来假装没规划过。
-         按 CLAUDE.md §9「不伪造能力」，这里既不显示成功态，也不用原生 disabled
-         把用户挡在一个没有解释的灰块前面——条目仍可点、可聚焦，点开说明缺哪个后端。 -->
+         按 CLAUDE.md §9「不伪造能力」：入口处就写明未开放**并说明原因**（item.why
+         直接渲染在卡片上），用户在点之前就知道这条路走不通，而不是走进去撞墙。
+         aria-disabled 让读屏软件也播报「不可用」；但卡片仍可点、可聚焦，
+         点开是完整解释——点了没反应的死按钮会让用户以为是自己点错了。 -->
     <view class="grp-head">
       <view class="section-t">尚未开放</view>
-      <view class="grp-sub">已完成页面，等待服务端接口后开放</view>
+      <view class="grp-sub">页面已完成，等服务端接口上线后开放</view>
     </view>
     <view class="tiles">
       <view
@@ -70,11 +72,13 @@
         bindtap="tapPending"
         data-id="{{item.id}}"
         role="button"
-        aria-label="{{item.title}}，未开放，{{item.desc}}，点击查看原因"
+        aria-disabled="true"
+        aria-label="{{item.title}}，当前未开放，{{item.why}}。{{item.desc}}。点击查看完整说明"
       >
         <view class="t-ic a-slate"><text class="ficon i-{{item.icon}}"></text></view>
         <view class="t-title">{{item.title}}<text class="t-badge">未开放</text></view>
         <view class="t-desc">{{item.desc}}</view>
+        <view class="t-why"><text class="ficon i-info t-why-ic"></text>{{item.why}}</view>
       </view>
     </view>
 
