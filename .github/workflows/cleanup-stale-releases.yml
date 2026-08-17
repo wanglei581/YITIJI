@@ -1,0 +1,127 @@
+name: Cleanup Stale Releases (guarded)
+
+# 清理 /srv 下 7 月手动部署时代遗留的历史发布目录（约 6.3GB，保守白名单）。
+# 双模式：dry-run（只列清单，纯只读）/ execute（需 confirm，且只 mv 到隔离区不真删）。
+# 白名单与护栏由 DeepSeek + antigravity 两份独立审查合成。
+# 脚本正文以 base64 内联（ssh-action 远端无 repo 文件），源文件见
+# .github/scripts/cleanup-stale-releases.sh —— 二者必须一致，改脚本后需重新生成本 base64。
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run（只列清单）或 execute（隔离到 trash）'
+        type: choice
+        options: [dry-run, execute]
+        default: dry-run
+      confirm:
+        description: 'execute 模式必须输入：CLEANUP-CONFIRM'
+        type: string
+        default: ''
+
+jobs:
+  cleanup:
+    name: Guarded cleanup of stale /srv release dirs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run guarded cleanup via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 20m
+          envs: CLEANUP_MODE,CLEANUP_CONFIRM,CLEANUP_EXPECT_CONFIRM,CLEANUP_B64
+          script: |
+            set -uo pipefail
+            CLEANUP_MODE="${{ inputs.mode }}"
+            CLEANUP_CONFIRM="${{ inputs.confirm }}"
+            CLEANUP_EXPECT_CONFIRM="CLEANUP-CONFIRM"
+            export CLEANUP_MODE CLEANUP_CONFIRM CLEANUP_EXPECT_CONFIRM
+            TMP="$(mktemp)"
+            base64 -d > "$TMP" <<'B64'
+            IyEvdXNyL2Jpbi9lbnYgYmFzaAojIOa4heeQhiAvc3J2IOS4iyA3IOaciOaJi+WKqOmDqOe9suaXtuS7o+mBl+eVmeeahOWOhuWP
+            suWPkeW4g+ebruW9leOAggojCiMg6K6+6K6h5Y6f5YiZ77yI5ZCI5oiQIERlZXBTZWVrICsgYW50aWdyYXZpdHkg5Lik5Lu954us
+            56uL5a6h5p+l77yJ77yaCiMgICAxLiDpu5jorqQgZHJ5LXJ1bu+8muWPqui3keaKpOagjyArIOWIl+a4heWNle+8jOe7neS4jeWK
+            qOS7u+S9leaWh+S7tuOAggojICAgMi4g57K+56Gu55uu5b2V5ZCN55m95ZCN5Y2V77yMKirnu53kuI3nlKjpgJrphY3nrKYqKiDi
+            gJTigJQg5LiA5LiqIHJtIC1yZiAvc3J2L2FpLWpvYi1wcmludC0qIOWwseaYr+eBvumavuOAggojICAgMy4g5q+P5Liq5b6F5Yig
+            55uu5b2V6YCQ6aG56L+HIHByZWZsaWdodO+8muS4jeaYr+W9k+WJjei/kOihjOebruW9leOAgeS4jeaYr+i9r+mTvuaOpeebruag
+            h+OAgeaXoOi/m+eoi+aMgeacieOAgQojICAgICAg5LiN5ZyoIG5naW54L3BtMiDlvJXnlKjph4zjgIHkuI3mmK/mjILovb3ngrnj
+            gILku7vkuIDkuI3ov4fljbPmlbTkvZPkuK3mraLjgIIKIyAgIDQuIGV4ZWN1dGUg55So5Lik6Zi25q6177ya5YWIIG12IOWIsOma
+            lOemu+WMuiAvc3J2Ly5jbGVhbnVwLXRyYXNoLzzml7bpl7TmiLM+77yMCiMgICAgICAqKuS4jeebtOaOpSBybSoqIOKAlOKAlCDo
+            r6/liKTkuZ/og73nq4vliLvmgaLlpI3jgILnnJ/liKDnlLHkurrlnKjop4Llr5/nqpflj6PlkI7miYvliqjmiafooYzjgIIKIyAg
+            IDUuIHVzYi1icmlkZ2UtbGl2ZSAvIC1maW5hbC0gLyByZWxlYXNlcyDkuInnsbsqKuS4jeWcqCoq5pys55m95ZCN5Y2V77yM6L+b
+            56ys5LqM5om55Lq65bel56Gu6K6k44CCCnNldCAtdW8gcGlwZWZhaWwKCk1PREU9IiR7Q0xFQU5VUF9NT0RFOi1kcnktcnVufSIg
+            ICAgICAgICAgIyBkcnktcnVuIHwgZXhlY3V0ZQpDT05GSVJNPSIke0NMRUFOVVBfQ09ORklSTTotfSIgICAgICAgICAgICMgZXhl
+            Y3V0ZSDmqKHlvI/lv4XpobvnrYnkuo4gRVhQRUNUX0NPTkZJUk0KRVhQRUNUX0NPTkZJUk09IiR7Q0xFQU5VUF9FWFBFQ1RfQ09O
+            RklSTTotfSIKCkNVUlJFTlQ9IiQocmVhZGxpbmsgLWYgL3Nydi9haS1qb2ItcHJpbnQgMj4vZGV2L251bGwgfHwgZWNobyAvc3J2
+            L2FpLWpvYi1wcmludCkiClRSQVNIPSIvc3J2Ly5jbGVhbnVwLXRyYXNoLyQoZGF0ZSArJVklbSVkVCVIJU0lUykiCgojIOKAlOKA
+            lCDkv53lrojnmb3lkI3ljZXvvJphbnRpZ3Jhdml0eSDliKTlrprjgIzml6DmrafkuYnjgIHkuI3mtonlj4ogbGl2ZS9maW5hbC9y
+            ZWxlYXNlc+OAjeeahCA2IOS4qiDigJTigJQKIyAgICDmr4/kuKrpg73mmK8gNyDmnIjkuK3kuIrml6znmoTljoblj7Llia/mnKzv
+            vIznsr7noa7ot6/lvoTvvIzml6DpgJrphY3nrKbjgIIKREVMRVRFX0xJU1Q9KAogICIvc3J2L2FpLWpvYi1wcmludC1kZXBsb3kt
+            YmFja3VwcyIKICAiL3Nydi9haS1qb2ItcHJpbnQtYmFja3VwLTNhYjA1NmIzLTIwMjYwNzA3MjEzMTMyIgogICIvc3J2L2FpLWpv
+            Yi1wcmludC1iYWNrdXAtZTU5OTZlODQtMjAyNjA3MTAxOTU2MDAiCiAgIi9zcnYvYWktam9iLXByaW50LXByZXYtYzg1OWI4ZTIt
+            MjAyNjA3MTRUMDczNTE1WiIKICAiL3Nydi9haS1qb2ItcHJpbnQtcHJldi1lNjJhOTc4OS0yMDI2MDcxNlQxNDMxMjMiCiAgIi9z
+            cnYvYWktam9iLXByaW50LWZhaWxlZC1lMmIzODU4ZC0yMDI2MDcxM1QxMTQ3MTFaIgopCgojIOKAlOKAlCDkv53nlZnplJrngrnv
+            vJrlvZPliY3ov5DooYznm67lvZUgKyDmnIDov5HkuKTkuKrlj5fmjqflj5HluIMgcnVudGltZSDplJrngrkg4oCU4oCUCktFRVBf
+            TElTVD0oCiAgIi9zcnYvYWktam9iLXByaW50IgogICIvc3J2L2FpLWpvYi1wcmludC1iYWNrdXBzIgopCgpyZWZ1c2UoKSB7IGVj
+            aG8gIuKdjCBSRUZVU0U6ICQqIiA+JjI7IGV4aXQgMTsgfQoKZWNobyAiPT09IOi/kOihjOaooeW8j++8miRNT0RFID09PSIKZWNo
+            byAiPT09IOW9k+WJjeeUn+S6p+ebruW9le+8iOS/neeVme+8ie+8miRDVVJSRU5UID09PSIKZWNobwoKcHJlZmxpZ2h0KCkgewog
+            IGxvY2FsIHRhcmdldD0iJDEiIHJlc29sdmVkIGtlZXAKICBlY2hvICItLS0g5qOA5p+lICR0YXJnZXQiCgogICMgMC4g55m95ZCN
+            5Y2V5q2j5YiZ77ya5Y+q5YWB6K64IC9zcnYvYWktam9iLXByaW50LTzlkI3lrZc+77yM56aB6YCa6YWN56ym5LiO55u45a+56Lev
+            5b6ECiAgY2FzZSAiJHRhcmdldCIgaW4KICAgIC9zcnYvYWktam9iLXByaW50LSopIDogOzsKICAgICopIHJlZnVzZSAi5LiN5Yy5
+            6YWNIC9zcnYvYWktam9iLXByaW50LSog55m95ZCN5Y2V5b2i5oCB77yaJHRhcmdldCIgOzsKICBlc2FjCiAgW1sgIiR0YXJnZXQi
+            ID09ICoiKiIqIHx8ICIkdGFyZ2V0IiA9PSAqIi4uIiogXV0gJiYgcmVmdXNlICLlkKvpgJrphY3nrKbmiJbnm7jlr7not6/lvoTv
+            vJokdGFyZ2V0IgoKICAjIDEuIOW/hemhu+aYr+aZrumAmuebruW9le+8jOS4jeaYr+i9r+mTvuaOpQogIFtbIC1lICIkdGFyZ2V0
+            IiBdXSB8fCB7IGVjaG8gIiAgIO+8iOS4jeWtmOWcqO+8jOi3s+i/h++8iSI7IHJldHVybiAxOyB9CiAgW1sgLWQgIiR0YXJnZXQi
+            ICYmICEgLUwgIiR0YXJnZXQiIF1dIHx8IHJlZnVzZSAi5LiN5piv5pmu6YCa55uu5b2V77yI5Y+v6IO95piv6L2v6ZO+5o6l77yJ
+            77yaJHRhcmdldCIKCiAgcmVzb2x2ZWQ9IiQocmVhZGxpbmsgLWYgIiR0YXJnZXQiKSIKCiAgIyAyLiDnu53kuI3nrYnkuo7jgIHn
+            u53kuI3ljIXlkKvlvZPliY3ov5DooYznm67lvZUKICBbWyAiJHJlc29sdmVkIiAhPSAiJENVUlJFTlQiIF1dIHx8IHJlZnVzZSAi
+            562J5LqO5b2T5YmN6L+Q6KGM55uu5b2V77yaJHRhcmdldCIKICBbWyAiJHJlc29sdmVkIiAhPSAiJENVUlJFTlQiLyogXV0gfHwg
+            cmVmdXNlICLlnKjlvZPliY3ov5DooYznm67lvZXlhoXpg6jvvJokdGFyZ2V0IgoKICAjIDMuIOe7neS4jeaYr+S/neeVmemUmueC
+            ueaIluWFtuWtkOebruW9lQogIGZvciBrZWVwIGluICIke0tFRVBfTElTVFtAXX0iOyBkbwogICAgbG9jYWwga3I7IGtyPSIkKHJl
+            YWRsaW5rIC1mICIka2VlcCIgMj4vZGV2L251bGwgfHwgZWNobyAiJGtlZXAiKSIKICAgIFtbICIkcmVzb2x2ZWQiID09ICIka3Ii
+            IHx8ICIkcmVzb2x2ZWQiID09ICIka3IiLyogXV0gJiYgcmVmdXNlICLlkb3kuK3kv53nlZnplJrngrkgJGtlZXDvvJokdGFyZ2V0
+            IgogIGRvbmUKCiAgIyA0LiDkuI3mmK/mjILovb3ngrkKICBtb3VudCAyPi9kZXYvbnVsbCB8IGF3ayAne3ByaW50ICQzfScgfCBn
+            cmVwIC1GeHEgIiRyZXNvbHZlZCIgJiYgcmVmdXNlICLmmK/mjILovb3ngrnvvJokdGFyZ2V0IgoKICAjIDUuIOaXoOi/m+eoi+aM
+            geacieWFtuWGheaWh+S7tgogIGlmIGNvbW1hbmQgLXYgbHNvZiA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICAgIGxzb2YgK0QgIiR0
+            YXJnZXQiID4vZGV2L251bGwgMj4mMSAmJiByZWZ1c2UgIuaciei/m+eoi+aJk+W8gOWFtuWGheaWh+S7tu+8miR0YXJnZXQiCiAg
+            ZWxzZQogICAgZWNobyAiICAg4pqg77iPIOaXoCBsc29m77yM6Lez6L+H5paH5Lu25Y+l5p+E5qOA5p+l77yIZXhlY3V0ZSDliY3o
+            r7fkurrlt6Xnoa7orqTvvIkiCiAgZmkKCiAgIyA2LiDml6Dov5vnqIsgY3dkIC8gcm9vdCDmjIflkJHlroMKICBmaW5kIC9wcm9j
+            L1swLTldKi9jd2QgL3Byb2MvWzAtOV0qL3Jvb3QgLW1heGRlcHRoIDAgLWxuYW1lICIkcmVzb2x2ZWQqIiAyPi9kZXYvbnVsbCB8
+            IGdyZXAgLXEgLiBcCiAgICAmJiByZWZ1c2UgIuaciei/m+eoiyBjd2Qvcm9vdCDmjIflkJHvvJokdGFyZ2V0IgoKICAjIDcuIOaX
+            oOi/m+eoi+WRveS7pOihjOW8leeUqOWugwogIHBzIC1lbyBhcmdzIDI+L2Rldi9udWxsIHwgZ3JlcCAtRiAiJHJlc29sdmVkIiB8
+            IGdyZXAgLXYgZ3JlcCB8IGdyZXAgLXEgLiBcCiAgICAmJiByZWZ1c2UgIuaciei/m+eoi+WRveS7pOihjOW8leeUqO+8miR0YXJn
+            ZXQiCgogICMgOC4g5LiN5ZyoIG5naW54IHJvb3QvYWxpYXMg6YeMCiAgaWYgY29tbWFuZCAtdiBuZ2lueCA+L2Rldi9udWxsIDI+
+            JjE7IHRoZW4KICAgIG5naW54IC1UIDI+L2Rldi9udWxsIHwgZ3JlcCAtRSAnXlxzKihyb290fGFsaWFzKVxzJyB8IGdyZXAgLUYg
+            IiRyZXNvbHZlZCIgPi9kZXYvbnVsbCBcCiAgICAgICYmIHJlZnVzZSAi6KKrIG5naW54IHJvb3QvYWxpYXMg5byV55So77yaJHRh
+            cmdldCIKICBmaQoKICAjIDkuIOS4jeWcqCBwbTIgY3dkIC8g6ISa5pys6Lev5b6E6YeMCiAgaWYgY29tbWFuZCAtdiBwbTIgPi9k
+            ZXYvbnVsbCAyPiYxICYmIGNvbW1hbmQgLXYganEgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgICBwbTIgamxpc3QgMj4vZGV2L251
+            bGwgfCBqcSAtciAnLltdLnBtMl9lbnYuY3dkLCAuW10ucG0yX2Vudi5wbV9leGVjX3BhdGgnIDI+L2Rldi9udWxsIFwKICAgICAg
+            fCBncmVwIC1GICIkcmVzb2x2ZWQiID4vZGV2L251bGwgJiYgcmVmdXNlICLooqsgcG0yIOW8leeUqO+8miR0YXJnZXQiCiAgZmkK
+            CiAgZWNobyAiICAg4pyFIHByZWZsaWdodCDlhajov4ciCiAgcmV0dXJuIDAKfQoKIyDngb7lpIflupXluqflv4Xpobvlrozlpb3m
+            iY3lhYHorrjmuIXnkIYKQks9L3Nydi9haS1qb2ItcHJpbnQtYmFja3VwcwpCS19NQj0iJChkdSAtc20gIiRCSyIgMj4vZGV2L251
+            bGwgfCBjdXQgLWYxKSIKW1sgLW4gIiR7QktfTUI6LX0iICYmICIkQktfTUIiIC1ndCAxMDI0IF1dIHx8IHJlZnVzZSAi54G+5aSH
+            5bqV5bqnICRCSyDkuI3otrMgMUdC77yIJEJLX01CIE1C77yJ77yM5ouS57ud5riF55CGIgplY2hvICLngb7lpIflupXluqcgJEJL
+            ID0gJHtCS19NQn1NQu+8iD4gMUdC77yMT0vvvIkiCmVjaG8KClJFQ0xBSU09MApPS19UQVJHRVRTPSgpCmZvciB0IGluICIke0RF
+            TEVURV9MSVNUW0BdfSI7IGRvCiAgaWYgcHJlZmxpZ2h0ICIkdCI7IHRoZW4KICAgIG1iPSIkKGR1IC1zbSAiJHQiIDI+L2Rldi9u
+            dWxsIHwgY3V0IC1mMSkiOyBSRUNMQUlNPSQoKCBSRUNMQUlNICsgJHttYjotMH0gKSkKICAgIE9LX1RBUkdFVFMrPSgiJHQiKQog
+            ICAgZWNobyAiICAg4oaSIOWPr+WbnuaUtiAke21ifU1CIgogIGZpCmRvbmUKZWNobwplY2hvICI9PT0g6YCa6L+HIHByZWZsaWdo
+            dCDnmoTnm67lvZUgJHsjT0tfVEFSR0VUU1tAXX0g5Liq77yM5ZCI6K6h5Y+v5Zue5pS257qmICR7UkVDTEFJTX1NQiA9PT0iCgpp
+            ZiBbWyAiJE1PREUiICE9IGV4ZWN1dGUgXV07IHRoZW4KICBlY2hvICI9PT0gZHJ5LXJ1biDnu5PmnZ/vvJrmnKrnp7vliqgv5Yig
+            6Zmk5Lu75L2V5paH5Lu244CCID09PSIKICBlY2hvICLnoa7orqTmuIXljZXml6Dor6/lkI7vvIznlKggZXhlY3V0ZSDmqKHlvI8g
+            KyDmraPnoa4gY29uZmlybSDph43mlrDop6blj5HjgIIiCiAgZXhpdCAwCmZpCgojIOKAlOKAlCBleGVjdXRl77yaY29uZmlybSDp
+            l6ggKyDkuKTpmLbmrrUgbXYg4oCU4oCUCltbIC1uICIkRVhQRUNUX0NPTkZJUk0iICYmICIkQ09ORklSTSIgPT0gIiRFWFBFQ1Rf
+            Q09ORklSTSIgXV0gXAogIHx8IHJlZnVzZSAiY29uZmlybSDkuI3ljLnphY3vvIxleGVjdXRlIOS4reatou+8iOacquenu+WKqOS7
+            u+S9leaWh+S7tu+8iSIKCm1rZGlyIC1wICIkVFJBU0giCmZvciB0IGluICIke09LX1RBUkdFVFNbQF19IjsgZG8KICBlY2hvICJN
+            T1ZFICR0IOKGkiAkVFJBU0gvIgogIG12IC0tICIkdCIgIiRUUkFTSC8kKGJhc2VuYW1lICIkdCIpIgpkb25lCmVjaG8KZWNobyAi
+            PT09IOW3sumalOemu+WIsCAkVFJBU0jvvIjmnKrnnJ/liKDvvIk9PT0iCmVjaG8gIuivt+S+neasoemqjOivge+8jOWFqOmDqOat
+            o+W4uOWQjuWGjeaJi+WKqCBybSAtcmYgJFRSQVNIIO+8miIKZWNobyAiICBuZ2lueCAtdCAmJiBjdXJsIC1mc1MgaHR0cDovLzEy
+            Ny4wLjAuMTozMDEwL2hlYWx0aCIKZWNobyAiICBwbTIgamxpc3QgPi9kZXYvbnVsbCAmJiBkZiAtaCAvIgplY2hvICLlu7rorq7o
+            p4Llr58gMjQtNzIg5bCP5pe25peg5byC5bi45ZCO5YaN5Yig6Zmk6ZqU56a75Yy644CCIgo=
+B64
+            bash "$TMP"
+            rc=$?
+            rm -f "$TMP"
+            exit $rc
