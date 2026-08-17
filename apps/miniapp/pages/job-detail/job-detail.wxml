@@ -4,14 +4,6 @@
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">岗位详情</view>
-    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"
-          role="button" aria-label="{{faved ? '取消收藏' : '收藏这个岗位'}}">
-      <text class="ficon i-inbox"></text>
-      <!-- 图标库无星形/心形，i-inbox 单独出现时用户认不出是收藏。
-           带字按钮对本项目中位数用户（43 岁、初中及以下学历占 65.4%）
-           比任何图标都好认，故补文字而非换图标。 -->
-      <text class="nav-right-t">{{faved ? '已收藏' : '收藏'}}</text>
-    </view>
   </view>
 
   <view class="content has-bar detail-content">
@@ -97,7 +89,15 @@
 
   </view>
 
+  <!-- 收藏原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——
+       胶囊是系统浮层，自定义导航栏右侧永远不可用。移到底部操作条：
+       拇指可达，且与主操作并列时用户一眼能看到。 -->
   <view class="actionbar">
+    <view class="fav-btn tap {{faved ? 'on' : ''}}" hover-class="tap-press" bindtap="tapFav"
+          role="button" aria-label="{{faved ? '取消收藏' : '收藏这个岗位'}}">
+      <text class="ficon i-inbox"></text>
+      <text class="fav-btn-t">{{faved ? '已收藏' : '收藏'}}</text>
+    </view>
     <view class="btn primary block tap" bindtap="tapExternalApply">复制来源链接</view>
   </view>
 

@@ -57,8 +57,12 @@
 .detail-state .state-icon .ficon { width: 44rpx; height: 44rpx; }
 .detail-state .ds-msg { color: var(--muted); line-height: 1.6; }
 .detail-state .ds-back { min-width: 220rpx; }
-/* 收藏入口由纯图标改为图标+文字：图标库无星形/心形，i-inbox 不具备可识别性。 */
-.nav-right { display: flex; align-items: center; gap: 8rpx; min-height: 64rpx; padding: 0 18rpx; border-radius: 20rpx; }
-.nav-right-t { font-size: 24rpx; font-weight: 650; color: var(--ink-soft); }
-.nav-right.faved { background: var(--teal-wash); }
-.nav-right.faved .nav-right-t, .nav-right.faved .ficon { color: var(--teal-deep); }
+
+/* 收藏按钮：与主操作并列在底部操作条。不可放导航栏右侧——微信胶囊常驻遮挡。 */
+.actionbar { display: flex; align-items: center; gap: 20rpx; }
+.fav-btn { flex-shrink: 0; min-width: 140rpx; height: 96rpx; padding: 0 24rpx; border-radius: 26rpx;
+  border: 1rpx solid var(--line-soft); background: #fff; color: var(--ink-soft);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4rpx; }
+.fav-btn .ficon { width: 34rpx; height: 34rpx; }
+.fav-btn-t { font-size: 21rpx; font-weight: 650; }
+.fav-btn.on { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); }
