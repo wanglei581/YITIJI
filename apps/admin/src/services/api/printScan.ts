@@ -25,6 +25,14 @@ export type PrintScanTaskType =
   | 'signature_stamp'
   | 'document_process'
 
+/**
+ * ⚠️ 这是能力键契约的**第三份副本**（前两份：packages/shared/src/types/printScanCapability.ts
+ * 与 services/api/src/terminals/terminal-capabilities.types.ts —— 那两份的文件头只提到彼此，
+ * 漏了这里）。改键必须三处同步；verify:print-color-duplex-capability 已把三份一起断言。
+ *
+ * color_print / duplex_print 是 fail-closed 键：未配置 = 拒绝，
+ * 管理员必须在该终端真机验过彩色/双面出纸后才配成 available。
+ */
 export type PrintScanCapabilityKey =
   | 'document_print'
   | 'phone_upload'
@@ -36,6 +44,8 @@ export type PrintScanCapabilityKey =
   | 'id_photo'
   | 'format_convert'
   | 'signature_stamp'
+  | 'color_print'
+  | 'duplex_print'
 
 export type PrintScanCapabilityStatus = 'available' | 'testing' | 'maintenance' | 'unsupported' | 'not_verified'
 

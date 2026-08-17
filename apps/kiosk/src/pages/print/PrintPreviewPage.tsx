@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, KioskActionBar } from '@ai-job-print/ui'
 import {
@@ -15,12 +15,15 @@ import {
 import {
   hasUnverifiedPrintParams,
   VERIFIED_PRINT_PARAMETER_PROFILE,
+  ColorMode,
+  DuplexMode,
   PrintJobParams,
   PrintOrientation,
   PrintQuality,
   PrintScale,
 } from '@ai-job-print/shared'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import {
   patchPrintMaterialSession,
   printUploadPathForSource,
@@ -85,35 +88,51 @@ function ParamCard({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
+/**
+ * 选项组。禁用态用 **aria-disabled 而不是原生 disabled**：
+ * 原生 disabled 的按钮无法聚焦，读屏和键盘用户根本读不到「为什么不能选」。
+ * 这里保留可聚焦 + aria-describedby 指向理由文案，点击则被忽略。
+ * 触控高度 48px（h-12）满足一体机可点击区下限。
+ */
 function ToggleGroup({
   options,
   value,
   onChange,
   disabled = false,
+  disabledReason,
+  describedById,
 }: {
   options: { label: string; value: string }[]
   value: string
   onChange: (v: string) => void
   disabled?: boolean
+  disabledReason?: string | null
+  describedById?: string
 }) {
   return (
     <div
       className={[
         'flex overflow-hidden rounded-lg border',
-        disabled ? 'border-neutral-100 opacity-50' : 'border-neutral-200',
+        disabled ? 'border-neutral-100 opacity-60' : 'border-neutral-200',
       ].join(' ')}
     >
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          disabled={disabled}
-          onClick={() => onChange(opt.value)}
+          aria-disabled={disabled || undefined}
+          aria-describedby={disabled && describedById ? describedById : undefined}
+          title={disabled ? (disabledReason ?? undefined) : undefined}
+          onClick={() => {
+            if (disabled) return
+            onChange(opt.value)
+          }}
           className={[
             'flex h-12 flex-1 items-center justify-center text-sm font-medium transition-colors',
             value === opt.value
               ? 'bg-primary-600 text-white'
-              : 'bg-white text-neutral-600 active:bg-neutral-100',
+              : 'bg-white text-neutral-600',
+            disabled ? 'cursor-not-allowed' : 'active:bg-neutral-100',
           ].join(' ')}
         >
           {opt.label}
@@ -247,8 +266,18 @@ export function PrintPreviewPage() {
 
   // ── Parameter state ─────────────────────────────────────────────────────────
   const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
-  const colorMode = VERIFIED_PRINT_PARAMETER_PROFILE.colorMode
-  const duplex = VERIFIED_PRINT_PARAMETER_PROFILE.duplex
+  // 彩色 / 双面按**本机**能力登记决定是否可选（服务端 fail-closed 门禁的体验层镜像）。
+  // 起始值一律取安全基线：能力还没确认前不能先把用户放到彩色上再打回。
+  const capability = usePrintParamCapability()
+  const [colorMode, setColorMode] = useState<ColorMode>(VERIFIED_PRINT_PARAMETER_PROFILE.colorMode)
+  const [duplex, setDuplex] = useState<DuplexMode>(VERIFIED_PRINT_PARAMETER_PROFILE.duplex)
+
+  // 能力被收回（管理员改配置 / 换了未验证终端）时，把已选中的未验证值拉回基线，
+  // 避免带着一个必被服务端拒绝的参数走到确认页。
+  useEffect(() => {
+    if (!capability.color.allowed && colorMode !== 'black_white') setColorMode('black_white')
+    if (!capability.duplex.allowed && duplex !== 'simplex') setDuplex('simplex')
+  }, [capability.color.allowed, capability.duplex.allowed, colorMode, duplex])
   const [orientation, setOrientation] = useState<PrintOrientation>(restoredPrintParams?.orientation ?? 'auto')
   const [scale, setScale] = useState<PrintScale>(restoredPrintParams?.scale ?? 'fit')
   const [pageRange, setPageRange] = useState<'all' | 'custom'>(
@@ -457,12 +486,16 @@ export function PrintPreviewPage() {
                 { label: '彩色', value: 'color' },
               ]}
               value={colorMode}
-              onChange={() => undefined}
-              disabled
+              onChange={(v) => setColorMode(v as ColorMode)}
+              disabled={!capability.color.allowed}
+              disabledReason={capability.color.reason}
+              describedById="print-color-capability-note"
             />
-            <p className="mt-2 text-xs text-neutral-500">
-              当前仅开放黑白、单面、每张 1 页
-              {restoredParamsWereRestricted ? '；检测到旧会话参数，已明确收口为当前组合' : ''}
+            <p id="print-color-capability-note" className="mt-2 text-xs text-neutral-500">
+              {capability.color.allowed
+                ? '彩色按彩色单价计费，具体金额以下一步报价为准'
+                : capability.color.reason}
+              {restoredParamsWereRestricted ? '；检测到旧会话参数，已明确收口为当前可用组合' : ''}
             </p>
           </ParamCard>
 
@@ -475,11 +508,15 @@ export function PrintPreviewPage() {
                 { label: '双面（短边）', value: 'duplex_short_edge' },
               ]}
               value={duplex}
-              onChange={() => undefined}
-              disabled
+              onChange={(v) => setDuplex(v as DuplexMode)}
+              disabled={!capability.duplex.allowed}
+              disabledReason={capability.duplex.reason}
+              describedById="print-duplex-capability-note"
             />
-            <p className="mt-2 text-xs text-neutral-400">
-              彩色、双面和多页合一将在厂家确认和 Windows 真机验收后再开放
+            <p id="print-duplex-capability-note" className="mt-2 text-xs text-neutral-500">
+              {capability.duplex.allowed
+                ? '双面按内容页计费，单价与单面相同，用纸更省'
+                : capability.duplex.reason}
             </p>
           </ParamCard>
 

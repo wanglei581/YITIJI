@@ -103,7 +103,9 @@ export class MemberPrintOrderCreateService {
 
     const params = printParams(dto)
     const signed = signFileUrl(file.id, SIGNED_URL_TTL_MS)
-    const quote = await this.quotes.quote({ fileUrl: signed.url, params })
+    // 带上 terminalId：彩色/双面报价要按该终端的能力登记判定（fail-closed），
+    // 未登记的机器在这里就被拒，不会先按彩色价建单再在出纸时翻车。
+    const quote = await this.quotes.quote({ fileUrl: signed.url, params, terminalId: terminal.id })
     const code = randomPickupCode()
     // 到机码绝不能活得比源文件更久；否则用户会拿到“码仍有效、文件已清理”的假承诺。
     const pickupDeadline = now.getTime() + PICKUP_TTL_MS

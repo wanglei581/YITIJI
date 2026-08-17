@@ -13,8 +13,8 @@ import {
   TicketIcon,
 } from 'lucide-react'
 import {
-  hasUnverifiedPrintParams,
-  restrictToVerifiedPrintParams,
+  hasParamsBeyondCapability,
+  restrictToAllowedPrintParams,
   type BenefitType,
   type MemberBenefitItem,
   type PrintJobParams,
@@ -23,6 +23,8 @@ import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { API_MODE } from '../../services/api/client'
+import { getTerminalId } from '../../services/api/screensaver'
+import { usePrintParamCapability } from '../../hooks/usePrintParamCapability'
 import {
   fetchPrintBenefits,
   resolvePrintBenefitState,
@@ -141,8 +143,18 @@ export function PrintConfirmPage() {
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
   const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
   const incomingParams = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
-  const paramsWereRestricted = hasUnverifiedPrintParams(incomingParams)
-  const params = restrictToVerifiedPrintParams(incomingParams)
+  // 按**本机**能力收口：已验收的彩色/双面原样保留，未验收的才砍回基线。
+  // 无条件砍成黑白会把管理员已验收的能力静默降级，用户选了彩色却按黑白出纸。
+  const capability = usePrintParamCapability()
+  const capabilityAllows = useMemo(
+    () => ({ color: capability.color.allowed, duplex: capability.duplex.allowed }),
+    [capability.color.allowed, capability.duplex.allowed],
+  )
+  const paramsWereRestricted = hasParamsBeyondCapability(incomingParams, capabilityAllows)
+  const params = useMemo(
+    () => restrictToAllowedPrintParams(incomingParams, capabilityAllows),
+    [incomingParams, capabilityAllows],
+  )
   const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
   const source = state?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
@@ -189,7 +201,8 @@ export function PrintConfirmPage() {
     }
     let cancelled = false
     setQuote({ status: 'loading' })
-    void quotePrintOrder({ fileUrl: file.fileUrl, params })
+    // 带 terminalId：彩色/双面必须按本机能力登记计价，服务端会 fail-closed 复核。
+    void quotePrintOrder({ fileUrl: file.fileUrl, params, terminalId: getTerminalId() || undefined })
       .then((q) => {
         if (cancelled) return
         const line = q.priceLines[0]
@@ -447,7 +460,10 @@ export function PrintConfirmPage() {
           {/* 文件条 */}
           {paramsWereRestricted && (
             <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg">
-              参数已按当前已验证能力收口：仅黑白、单面、每张 1 页。原彩色、双面或多页合一选择不会参与报价。
+              参数已按本机已验证能力收口
+              {!capabilityAllows.color ? '：彩色未在本机通过真机验证，已改为黑白' : ''}
+              {!capabilityAllows.duplex ? '；双面未在本机通过真机验证，已改为单面' : ''}
+              。收口后的参数才参与报价。
             </div>
           )}
           <div className="print-file-strip">

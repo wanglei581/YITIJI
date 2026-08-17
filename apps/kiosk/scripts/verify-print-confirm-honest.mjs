@@ -175,9 +175,12 @@ expectMatches(
   /import\s*\{[^}]*quotePrintOrder[^}]*\}\s*from\s*'\.\.\/\.\.\/services\/print\/printJobsApi'/,
   'PrintConfirmPage 引入 quotePrintOrder',
 )
+// 2026-08-18：报价入参新增 terminalId（彩色/双面须按本机能力登记 fail-closed 复核），
+// 故不再钉死实参列表末尾。断言意图不变：必须用**真实** fileUrl + params 去问后端要价，
+// 不得改用本地估算或写死金额。
 expectMatches(
   confirmSrc,
-  /quotePrintOrder\(\{\s*fileUrl:\s*file\.fileUrl,\s*params\s*\}\)/,
+  /quotePrintOrder\(\{\s*fileUrl:\s*file\.fileUrl,\s*params\b/,
   'PrintConfirmPage 用真实 fileUrl + params 请求后端报价',
 )
 if (!/PRICE_BW|PRICE_COLOR/.test(confirmSrc)) {

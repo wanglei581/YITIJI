@@ -108,9 +108,44 @@ export function hasUnverifiedPrintParams(params: CapabilitySensitivePrintParams)
     params.pagesPerSheet !== VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet
 }
 
-/** 显式收口旧会话；调用方必须同时向用户说明参数发生了变化。 */
-export function restrictToVerifiedPrintParams(params: PrintJobParams): PrintJobParams {
-  return { ...params, ...VERIFIED_PRINT_PARAMETER_PROFILE }
+// ── 按终端能力收口（2026-08-18 彩色/双面开放后的口径） ─────────────────────────
+//
+// VERIFIED_PRINT_PARAMETER_PROFILE 是**全局最保守基线**，能力未知时用它。
+// 一旦拿到该终端的能力登记，收口就不该再无条件砍掉彩色/双面 ——
+// 那会把管理员已经验收过的能力又静默降级回黑白，用户选了彩色却按黑白出纸。
+
+/** 该终端放行了哪些 fail-closed 打印能力。 */
+export interface PrintCapabilityAllows {
+  color: boolean
+  duplex: boolean
+}
+
+/** 参数里是否含有**该终端未获放行**的项（N-up 恒不放行）。 */
+export function hasParamsBeyondCapability(
+  params: CapabilitySensitivePrintParams,
+  allows: PrintCapabilityAllows,
+): boolean {
+  if (params.pagesPerSheet !== VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet) return true
+  if (!allows.color && params.colorMode !== 'black_white') return true
+  if (!allows.duplex && params.duplex !== 'simplex') return true
+  return false
+}
+
+/**
+ * 按该终端能力收口：只砍掉**未获放行**的项，已验收的彩色/双面原样保留。
+ * 调用方必须在收口发生时向用户说明参数变了（不能静默降级）。
+ */
+export function restrictToAllowedPrintParams(
+  params: PrintJobParams,
+  allows: PrintCapabilityAllows,
+): PrintJobParams {
+  return {
+    ...params,
+    colorMode: allows.color ? params.colorMode : 'black_white',
+    duplex: allows.duplex ? params.duplex : 'simplex',
+    // N-up 是全局产品边界，与终端能力无关，恒收口到 1。
+    pagesPerSheet: VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet,
+  }
 }
 
 /**

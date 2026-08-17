@@ -329,8 +329,11 @@ export class PrintJobsService {
     // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
 
-    // 彩色、双面、N-up 尚无厂家/Windows 真机验证证据；在解析页数、报价与落库前统一拒绝。
+    // 打印参数门禁第 1 层（全局产品边界）：N-up 恒拒；彩色/双面在此层放行。
     assertVerifiedPrintParameters(dto.params)
+    // 第 2 层（按终端 fail-closed）：这台机器的彩色/双面验过没有。未登记一律拒绝，
+    // 必须在报价与落库**之前** —— 否则会出现「按彩色计价成单、实际出黑白纸」的资损。
+    await this.capabilities.assertPrintParamsAllowed(targetTerminalId, dto.params)
 
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。

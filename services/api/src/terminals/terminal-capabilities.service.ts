@@ -14,10 +14,12 @@
 
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import {
+  CAPABILITY_DENIAL_REASON,
   DEPRECATED_CAPABILITY_ALIAS,
   PRINT_SCAN_CAPABILITY_KEYS,
   PRINT_SCAN_CAPABILITY_STATUSES,
   canCreateFormalPrintScanTask,
+  requiredPrintCapabilityKeys,
   type PrintScanCapabilityKey,
   type PrintScanCapabilityStatus,
   type TerminalCapabilityView,
@@ -178,6 +180,60 @@ export class TerminalCapabilitiesService {
         message: effectiveRow.note ? `该终端当前不提供此服务：${effectiveRow.note}` : '该终端当前不提供此服务，请咨询现场工作人员',
       },
     })
+  }
+
+  /**
+   * 打印能力门禁 **第 2 层：按终端判定彩色 / 双面是否验过**（fail-closed）。
+   *
+   * 与 assertUserTaskAllowed 的关键差别：**未配置 = 拒绝**，且不看
+   * PRINT_SCAN_CAPABILITY_MODE。理由见 terminal-capabilities.types.ts 的
+   * DEFAULT_DENY_CAPABILITY_KEYS —— 彩色/双面没有「能力开关引入前就已验收」的
+   * 既有闭环可兼容，未配置的真实含义就是「这台机器没验过」。
+   *
+   * 放行只有一条路径：管理员在该终端真机验过后，把 color_print / duplex_print
+   * 显式配成 available（写入带 updatedBy，controller 记 AuditLog，可审计、可回溯）。
+   *
+   * 错误码按能力分开（PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL /
+   * PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL），便于前端精确提示与门禁断言。
+   */
+  async assertPrintParamsAllowed(
+    terminalId: string,
+    params?: { colorMode?: string | null; duplex?: string | null },
+  ): Promise<void> {
+    const required = requiredPrintCapabilityKeys(params ?? {})
+    if (required.length === 0) return // 黑白单面基线：不需要任何额外能力
+
+    for (const key of required) {
+      const row = await this.prisma.terminalCapability.findUnique({
+        where: { terminalId_capabilityKey: { terminalId, capabilityKey: key } },
+        select: { status: true, note: true },
+      })
+
+      const reason = CAPABILITY_DENIAL_REASON[key] ?? '本机该打印能力尚未通过真机验证'
+      const code =
+        key === 'color_print'
+          ? 'PRINT_COLOR_NOT_VERIFIED_ON_TERMINAL'
+          : 'PRINT_DUPLEX_NOT_VERIFIED_ON_TERMINAL'
+
+      // 未配置：fail-closed。managed 模式在这里**不放行**。
+      if (!row) {
+        throw new ForbiddenException({
+          error: { code, message: `${reason}。可改用黑白单面打印，或联系现场工作人员。` },
+        })
+      }
+
+      const status = this.asStatus(row.status)
+      if (canCreateFormalPrintScanTask(status)) continue
+
+      throw new ForbiddenException({
+        error: {
+          code,
+          message: row.note
+            ? `${reason}：${row.note}`
+            : `${reason}。可改用黑白单面打印，或联系现场工作人员。`,
+        },
+      })
+    }
   }
 
   /** DB 中出现枚举外的脏值时按 fail-closed 归入 not_verified，不放大成可用。 */
