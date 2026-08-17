@@ -190,8 +190,21 @@ export class ResumeExtractionService {
       pageCount = declaredPageCount
     }
     // 文字层为空 / 极少 → 扫描件：OCR 已配置则走受控页数渲染识别，否则明确失败（不编造）
+    //
+    // MIN_TEXT_CHARS 以下其实有两种完全不同的情况，此前被合并成同一句「无文字层」：
+    //   a) 抽取结果为空 → 真的是扫描件 / 图片型 PDF；
+    //   b) 抽取到了真实文字，只是内容太少（例如只写了姓名和电话的极简历）。
+    // 对 (b) 说「检测到扫描件 / 图片型 PDF（无文字层）」是事实错误，而且给出的补救建议
+    // （「请上传带文字层的 PDF」）恰好是用户已经做过的事，等于把人堵死。
+    //
+    // 区分方式不引入新阈值（任何阈值都会在「扫描件残留页码」与「极简历」之间二选一踩错），
+    // 而是按 OCR 是否可用分流：OCR 可用时一律仍交给 OCR（行为不变，不损失识别能力）；
+    // OCR 不可用时 OCR 本来就救不了，此时才按「有没有抽到字」给出如实文案。
     if (this.meaningfulLen(rawText) < MIN_TEXT_CHARS) {
       if (this.ocr.activeProviderName === 'disabled') {
+        if (this.meaningfulLen(rawText) > 0) {
+          return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt)
+        }
         return this.fail(
           fileId,
           'PDF_TEXT_EMPTY',
