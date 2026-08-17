@@ -1,11 +1,11 @@
 <!--pages/print-pickup/print-pickup.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+  <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
-    <view class="nb-title">打印取件</view>
-    <view class="nb-right"></view>
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">打印取件</view>
+    <view class="nav-right"></view>
   </view>
 
   <view class="state-center" wx:if="{{state === 'loading'}}">
@@ -14,7 +14,7 @@
   </view>
 
   <view class="state-center" wx:elif="{{state === 'error'}}">
-    <view class="state-icon">⚠️</view>
+    <view class="state-icon"><text class="ficon i-warning"></text></view>
     <text class="state-label">{{errorMsg}}</text>
     <view class="btn-retry tap" hover-class="tap-press" bindtap="retry">重新加载</view>
   </view>
@@ -34,7 +34,7 @@
           style="width:{{qrSizePx}}px;height:{{qrSizePx}}px"
           aria-label="打印取件核销二维码"
         ></canvas>
-        <view class="pickup-qr-error" wx:else>二维码暂不可用，请使用下方取件码</view>
+        <view class="pickup-qr-error" wx:else>二维码暂不可用，请使用下方到机码</view>
         <text class="pickup-qr-title">请将此二维码对准一体机扫码器</text>
         <text class="pickup-qr-sub">扫码器读取后会自动核销，无需在手机上扫码</text>
       </view>
@@ -42,13 +42,15 @@
       <block wx:if="{{showQr}}">
         <text class="ph-divider">扫码不便时，手动输入</text>
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
-        <text class="ph-hint">二维码与下方 10 位码对应同一笔订单</text>
+        <text class="ph-hint">二维码与下方 10 位到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
       </block>
 
       <view class="status-visual" wx:else>
-        <view class="sv-icon">{{statusKey === 'completed' ? '✓' : (statusKey === 'failed' || statusKey === 'expired' || statusKey === 'cancelled' ? '!' : '…')}}</view>
-        <view class="sv-text">{{statusKey === 'awaiting_payment' ? '请继续在终端操作' : (statusKey === 'awaiting_release' || statusKey === 'queued' || statusKey === 'printing' ? '请在终端旁等待' : '本次取件码已停止展示')}}</view>
+        <view class="sv-icon">
+          <text class="ficon {{statusKey === 'completed' ? 'i-check' : (statusKey === 'failed' || statusKey === 'expired' || statusKey === 'cancelled' ? 'i-warning' : 'i-history')}}"></text>
+        </view>
+        <view class="sv-text">{{statusKey === 'awaiting_payment' ? '请继续在终端操作' : (statusKey === 'awaiting_release' || statusKey === 'queued' || statusKey === 'printing' ? '请在终端旁等待' : '本次到机码已停止展示')}}</view>
       </view>
     </view>
 
@@ -59,7 +61,7 @@
       </view>
       <view class="step-item">
         <view class="step-num">2</view>
-        <text class="step-text">在终端选择「扫码或输入取件码」</text>
+        <text class="step-text">在终端首页选择「到机码核销」，扫码或输入本页的码</text>
       </view>
       <view class="step-item">
         <view class="step-num">3</view>
@@ -92,7 +94,7 @@
     <view class="sync-warning" wx:if="{{errorMsg}}">状态同步暂时失败，当前展示最近一次可用状态：{{errorMsg}}</view>
 
     <view class="notice-card">
-      <text class="nc-text">二维码只包含本订单的 10 位取件码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
+      <text class="nc-text">二维码只包含本订单的 10 位到机码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
     </view>
 
     <view class="pk-actions">
