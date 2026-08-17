@@ -35,7 +35,7 @@ export const CONSULTATION_TASKS: readonly ConsultationTask[] = [
       { label: 'AI 简历服务', route: '/resume-service' },
       { label: '简历诊断', route: '/resume/source' },
       { label: '打印文件', route: '/print/upload' },
-      { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' },
+      { label: '自我探索', route: '/resume/self-assessment/intro' },
     ],
   },
   {

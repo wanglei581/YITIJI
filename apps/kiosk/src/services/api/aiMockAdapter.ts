@@ -198,7 +198,7 @@ export const aiMockAdapter = {
       },
       career_explore: {
         reply: '请告诉我您的专业背景、感兴趣的领域，或者您目前的困惑，我们一起通过对话梳理可匹配的岗位方向和下一步行动路径。',
-        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' }],
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '自我探索', route: '/resume/self-assessment/intro' }],
       },
       cover_letter_gen: {
         reply: '请告诉我目标公司名称、岗位、您的核心经历和想打动对方的一两个点，我会生成一封300-500字的求职信，可直接在本机打印带走。',

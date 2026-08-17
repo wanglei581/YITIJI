@@ -40,6 +40,7 @@ import {
 import { getCompanyById, getCompanyJobs } from '../../services/api/companies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
+import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import { KioskPageFrame } from '../jobs/components/W4Presentation'
@@ -357,15 +358,24 @@ export function CompanyDetailPage() {
                       <EyeIcon aria-hidden="true" />
                       查看岗位
                     </button>
+                    {/* 能力门禁：aria-disabled + 常显原因（触屏无 hover，原生 disabled 还会
+                        让读屏跳过按钮）。openJobQr 自己不判链接有效性、还会记一条外部跳转，
+                        所以这里必须在 onClick 里短路，不能只靠属性置灰。 */}
                     <button
                       type="button"
-                      onClick={() => openJobQr(job)}
-                      disabled={!isValidSourceUrl(job.sourceUrl)}
-                      className="kproto-btn sm primary disabled:opacity-45"
+                      onClick={() => { if (isValidSourceUrl(job.sourceUrl)) openJobQr(job) }}
+                      aria-disabled={!isValidSourceUrl(job.sourceUrl) || undefined}
+                      aria-describedby={isValidSourceUrl(job.sourceUrl) ? undefined : `company-job-apply-blocked-${job.id}`}
+                      className={`kproto-btn sm primary${isValidSourceUrl(job.sourceUrl) ? '' : ' cursor-not-allowed opacity-45'}`}
                     >
                       <QrCodeIcon aria-hidden="true" />
                       去来源平台投递
                     </button>
+                    {isValidSourceUrl(job.sourceUrl) ? null : (
+                      <p id={`company-job-apply-blocked-${job.id}`} className="mt-1 text-xs text-neutral-500">
+                        {SOURCE_APPLY_UNAVAILABLE_REASON}
+                      </p>
+                    )}
                     </div>
                   </div>
                 </div>

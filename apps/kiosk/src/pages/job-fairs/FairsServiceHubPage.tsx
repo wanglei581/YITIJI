@@ -86,7 +86,8 @@ const CAPABILITIES: Capability[] = [
     title: 'AI参会规划',
     description: '告诉AI顾问你想参加的招聘会，小青为你生成参会清单和时间安排',
     to: '/assistant',
-    state: { topic: 'jobfair' },
+    // 不传 `state.topic`：`/assistant` 不读 location.state（认的是 `?intent=`，
+    // 且取值须是 advisorScenes 的 skill id，'jobfair' 不是）。传了必被丢弃。
   },
   {
     key: 'resume-prepare',

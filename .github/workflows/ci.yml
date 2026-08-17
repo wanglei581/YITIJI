@@ -136,6 +136,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:jobfair-checkin
           pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
           pnpm --filter @ai-job-print/kiosk verify:visible-actions-truth
+          # KIOSK-DEBT 三处前端欠账（同意版本 / 跨页上下文 / 禁用原因）。
+          # 纯读 apps/kiosk 源码，不连库、不起服务，两个 job 都能跑。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
 
       - name: Dependency security gate
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
@@ -824,6 +827,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
+          # KIOSK-DEBT 三处前端欠账。纯读 apps/kiosk 源码、不连库，
+          # 放这里是为了两个 job 都拦得住（同 #635 对 self-assessment 门禁的处置）。
+          pnpm --filter @ai-job-print/kiosk verify:kiosk-frontend-debt
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest

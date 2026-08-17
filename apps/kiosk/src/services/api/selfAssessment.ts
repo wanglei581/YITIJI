@@ -61,10 +61,21 @@ async function call<T>(path: string, access: SelfAssessmentAccess, init?: { meth
   return (await res.json()) as T
 }
 
+/**
+ * 交卷。`consent.consentVersion` 送的是**用户当时勾选的那一版**（会话里存下来的），
+ * 不是「当前常量」—— 两者在同意门禁下必然相等，但一旦门禁被绕过，
+ * 送当前常量等于把旧同意伪装成新同意，正是版本化同意要防的那件事。
+ *
+ * 服务端处置（`services/api/src/ai/resume/self-assessment.service.ts`）：
+ *   - 等于当前版本 → 记版本 + 勾选时刻；
+ *   - 不等于       → 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，不落库；
+ *   - 缺省         → 如实记 `null`，绝不补写当前版本。
+ * 缺省一档是为老客户端留的，服务端刻意不拒；新客户端不该再走那一档。
+ */
 export function submitSelfAssessment(
   body: {
     answers: SelfAssessmentAnswerV1[]
-    consent: { nonSensitive: boolean; sensitive: boolean }
+    consent: { nonSensitive: boolean; sensitive: boolean; consentVersion?: string }
   },
   access: SelfAssessmentAccess,
 ): Promise<SelfAssessmentSubmitResponse> {

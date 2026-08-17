@@ -96,7 +96,31 @@ expectMatch(careerPlan, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '职业规
 expectMatch(jobFit, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '岗位匹配缺内部打印 URL 时诚实报错')
 expectMatch(fairPlan, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '招聘会准备单缺内部打印 URL 时诚实报错')
 expectMatch(materialsPage, /if\s*\(\s*!file\.printFileUrl\s*\)\s*return/, '求职材料缺内部打印 URL 时不进入打印')
-expectMatch(materialsPage, /disabled=\{!generated\.printFileUrl\}/, '求职材料 mock/缺 URL 时打印按钮诚实禁用')
+// 这里曾断言原生 `disabled={!generated.printFileUrl}`。批次 KIOSK-DEBT ③ 把能力门禁
+// 从原生 disabled 改成 `aria-disabled` + 常显原因 + onClick 短路：触屏上 title 永不显示，
+// 原生 disabled 的按钮既不可聚焦也说不出为什么，读屏用户与一体机用户都拿不到原因。
+// 断言意图（缺 URL 时按钮必须诚实禁用、且不得偷偷放行）不变，且现在要求得更多：
+// 除禁用态外还必须给出可见原因，并在 onClick 里真的短路。
+expectMatch(
+  materialsPage,
+  /aria-disabled=\{!generated\.printFileUrl\s*\|\|\s*undefined\}/,
+  '求职材料 mock/缺 URL 时打印按钮诚实禁用（aria-disabled）',
+)
+expectMatch(
+  materialsPage,
+  /onClick=\{\(\)\s*=>\s*\{\s*if\s*\(generated\.printFileUrl\)/,
+  '求职材料打印按钮在缺 URL 时于 onClick 内短路（置灰不是装饰）',
+)
+expectMatch(
+  materialsPage,
+  /aria-describedby=\{!generated\.printFileUrl\s*\?\s*'material-print-blocked'/,
+  '求职材料打印禁用态绑定常显原因（触屏上 title 不显示）',
+)
+expectNoMatch(
+  materialsPage,
+  /disabled=\{!generated\.printFileUrl\}/,
+  '求职材料打印按钮不得退回原生 disabled（原因说不出口）',
+)
 
 expectMatch(filesService, /printFileUrl:\s*signFileUrl\(record\.id\)\.url/, '文件访问响应同时返回内部 HMAC printFileUrl')
 expectMatch(myDocumentsPage, /fileUrl:\s*res\.printFileUrl/, '我的文档打印只传 printFileUrl')
