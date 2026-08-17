@@ -101,6 +101,7 @@
     "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
     "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs",
     "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs",
+    "verify:ai-down-fallbacks": "node scripts/verify-ai-down-fallbacks.mjs",
     "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs",
     "verify:scan-input-safety": "node scripts/verify-scan-input-safety.mjs",
     "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",

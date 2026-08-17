@@ -120,6 +120,13 @@ export function CareerPlanPage() {
   const [loading, setLoading] = useState(!!taskId)
   const [generating, setGenerating] = useState(false)
   const [printing, setPrinting] = useState(false)
+  /**
+   * 后端实际给了降级版、而本页据当前状态预期的是 AI 版时，暂存待确认的打印件。
+   * 出现这种分歧的真实原因：规划在「读回」和「点打印」之间按 TTL 过期了。
+   * 这时候直接把用户送去打印，他会以为拿到的是刚才屏幕上那份 AI 规划 —— 那是拿
+   * 模板输出冒充 AI 结果。所以停一步，如实说清楚再让他自己决定。
+   */
+  const [degradedPrint, setDegradedPrint] = useState<{ filename: string; pageCount: number; go: () => void } | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** 后端明确不认这份简历解析结果（AI_TASK_NOT_FOUND：不存在 / 已过期 / 不属于当前身份）。 */
   const [rejectedTask, setRejectedTask] = useState(false)
@@ -241,7 +248,7 @@ export function CareerPlanPage() {
     try {
       const file = await printCareerPlan(taskId, { token: getToken(), accessToken })
       if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
-      navigate('/print/confirm', {
+      const goPrint = () => navigate('/print/confirm', {
         state: {
           file: {
             name: file.filename,
@@ -254,6 +261,18 @@ export function CareerPlanPage() {
           params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
         },
       })
+      // 后端在没有已落库 AI 规划时改发**降级版式**（career-plan.service.ts printPlan 的
+      // variant:'degraded'）。这个字段此前在共享类型里根本没声明，于是前端拿到降级版
+      // 也只能说「已生成建议单」—— 那就是拿模板输出冒充 AI 结果。
+      // 判 `=== 'degraded'`，不写 `?? 'ai'`：字段缺失时按未知处理，不默认当成 AI 版。
+      //
+      // 本页已经有 plan 却拿回降级版 = 规划在这两步之间过期了。这种分歧必须先说明再打印；
+      // 本来就没有 plan 的那条路径按钮文案已经写明「未含 AI 规划」，不再多一次确认。
+      if (file.variant === 'degraded' && plan) {
+        setDegradedPrint({ filename: file.filename, pageCount: file.pageCount, go: goPrint })
+        return
+      }
+      goPrint()
     } catch (err) {
       setError(errorMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
@@ -405,6 +424,22 @@ export function CareerPlanPage() {
 
           <EvidenceLegend />
 
+          {degradedPrint && (
+            <section className="career-plan-lightflow__state-card" role="alert" aria-labelledby="career-plan-degraded-print-title">
+              <p className="career-plan-lightflow__eyebrow">这次拿到的不是上面那份</p>
+              <h2 id="career-plan-degraded-print-title">生成出来的是「{degradedPrint.filename}」</h2>
+              <p>
+                你屏幕上这份 AI 规划已经按留存期限到期清理了，所以本次打印件里**没有** AI 规划正文，
+                只有你自己填的自我探索记分、通用求职自检清单和岗位要求计数（共 {degradedPrint.pageCount} 页）。
+                要拿到按你简历原文逐条对应的完整版本，需要重新生成一次。
+              </p>
+              <div className="career-plan-lightflow__next-actions">
+                <Button size="lg" onClick={degradedPrint.go}>仍然打印这份参考单</Button>
+                <Button size="lg" variant="secondary" onClick={() => setDegradedPrint(null)}>先不打印</Button>
+              </div>
+            </section>
+          )}
+
           {error && <p className="career-plan-lightflow__alert" role="alert">{error}</p>}
         </div>
 
@@ -489,13 +524,29 @@ export function CareerPlanPage() {
         {error && <p className="career-plan-lightflow__alert" role="alert">{error}</p>}
       </div>
 
-      {(aiTask.canStart || aiTask.isRunning) && (
-        <KioskActionBar className="career-plan-lightflow__action-bar">
-          <Button size="lg" className="career-plan-lightflow__primary-action" aria-disabled={generating} onClick={() => void handleGenerate()} aria-live="polite">
+      {/*
+        动作条**无条件**渲染。改动前整条 `KioskActionBar` 被 `aiTask.canStart || isRunning`
+        包着 —— AI 一挂，`canStart` 恒 false，整页连一个打印按钮都没有，
+        而打印这条能力根本不依赖 AI（后端 printPlan 会发降级版式）。
+        AI 任务面只治理「生成」这一个按钮，出纸能力必须留在它外面。
+      */}
+      <KioskActionBar className="career-plan-lightflow__action-bar">
+        <Button
+          size="lg"
+          className="career-plan-lightflow__print-action"
+          aria-disabled={printing}
+          onClick={() => void handlePrint()}
+        >
+          {printing ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : <PrinterIcon aria-hidden="true" />}
+          {/* 这条路径上后端必定发降级版式（本页没有已生成的 plan），文案就得先说清楚。 */}
+          {printing ? '正在生成参考单…' : '打印求职参考单（未含 AI 规划）'}
+        </Button>
+        {(aiTask.canStart || aiTask.isRunning) && (
+          <Button size="lg" variant="secondary" className="career-plan-lightflow__primary-action" aria-disabled={generating} onClick={() => void handleGenerate()} aria-live="polite">
             {generating ? <><Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />正在生成（约 15–30 秒）…</> : <>生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>}
           </Button>
-        </KioskActionBar>
-      )}
+        )}
+      </KioskActionBar>
     </main>
     </CareerPlanFullscreenFrame>
   )

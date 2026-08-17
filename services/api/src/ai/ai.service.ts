@@ -624,6 +624,11 @@ export class AiService {
     format: ResumeExportFormat = 'pdf',
     layout?: ResumeLayoutSettings,
     templateId?: string,
+    /**
+     * 原样草稿：内容逐字来自用户填写，未经模型润色（AI 生成失败时的出纸路径）。
+     * 只影响 PDF 元数据诚实性（AIGenerated='false'），排版与既有导出逐字一致。
+     */
+    draft = false,
   ): Promise<{
     fileId: string
     filename: string
@@ -675,7 +680,7 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset })
+        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset, draft })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
@@ -685,9 +690,11 @@ export class AiService {
     }
 
     const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
+    // 文件名也要诚实：草稿叫「AI简历_x」会在「我的文档」里冒充成 AI 产物。
+    const namePrefix = draft ? '简历草稿（未经AI润色）' : 'AI简历'
     const uploaded = await this.files.upload({
       buffer,
-      filename: `AI简历_${safeName}.${ext}`,
+      filename: `${namePrefix}_${safeName}.${ext}`,
       mimeType,
       purpose: 'resume_upload',
       uploaderId: null,
@@ -705,10 +712,10 @@ export class AiService {
     } else {
       // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
       // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
-      const pdfRendered = await this.resumePdf.render(resume, { layout })
+      const pdfRendered = await this.resumePdf.render(resume, { layout, draft })
       const pdfUploaded = await this.files.upload({
         buffer: pdfRendered.buffer,
-        filename: `AI简历_${safeName}.pdf`,
+        filename: `${namePrefix}_${safeName}.pdf`,
         mimeType: 'application/pdf',
         purpose: 'resume_upload',
         uploaderId: null,

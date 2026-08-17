@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsObject,
@@ -178,6 +179,17 @@ export class ResumeGenerateExportDto {
   /** 关联的生成任务(仅审计溯源用,可缺省) */
   @IsOptional() @IsString() @MaxLength(100)
   taskId?: string
+
+  /**
+   * 原样草稿导出：内容逐字来自用户填写，**未经模型润色**。
+   *
+   * AI 生成失败时前端仍允许把已填内容导出成 PDF 打印带走（不然用户在一台打印终端上
+   * 一张纸也拿不走）。这个标记只影响**元数据诚实性**：为 true 时 PDF 写
+   * AIGenerated='false'，不把一份一个字都不是 AI 写的文件标成 AI 产物。
+   * 排版与既有导出逐字一致，不引入第二套版式。
+   */
+  @IsOptional() @IsBoolean()
+  draft?: boolean
 
   /** 导出格式,缺省 pdf。docx/txt/md 页数恒为 0。 */
   @IsOptional() @IsIn(['pdf', 'docx', 'txt', 'md'])

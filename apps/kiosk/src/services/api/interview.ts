@@ -12,6 +12,7 @@ import type {
   CreateInterviewResponse,
   InterviewQuestionResponse,
   InterviewReportResponse,
+  InterviewPracticeSheetResponse,
   InterviewPrintResponse,
   MemberInterviewItem,
 } from '@ai-job-print/shared'
@@ -147,6 +148,27 @@ export function printInterviewReport(sessionId: string, access: InterviewAccess)
     return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
   }
   return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/report/print`, access, { method: 'POST', body: {} })
+}
+
+/**
+ * 通用题目与答案单（ai-down 支线）。
+ *
+ * 这是模拟面试链上**唯一不经过模型**的出纸路径：`/start` 一 503，会话永远停在
+ * configured，既没有 turn 也没有报告，`printInterviewReport` 只会再 404 一次。
+ * 服务端按用户自己选的面试官身份从写死的通用题库取题，返回 `variant:'degraded'`。
+ */
+export function printInterviewPracticeSheet(
+  sessionId: string,
+  access: InterviewAccess,
+): Promise<InterviewPracticeSheetResponse> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
+  }
+  return call<InterviewPracticeSheetResponse>(
+    `/mock-interviews/${encodeURIComponent(sessionId)}/practice-sheet`,
+    access,
+    { method: 'POST', body: {} },
+  )
 }
 
 /** 语音能力探测：ASR 未启用时前端自动回退文字输入；TTS 不可用时降级浏览器本地播报。 */

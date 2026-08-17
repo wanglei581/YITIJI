@@ -534,6 +534,16 @@ export interface CareerPlanResponse {
   providerName?: string
 }
 
+/**
+ * 打印件版式标识。**必须**如实透出到前端：
+ *   'ai'       AI 版式，纸上有模型生成的规划正文
+ *   'degraded' 降级版式，一个字都不是模型生成的（未含 AI 规划）
+ *
+ * 少了这个字段，前端在 AI 挂掉时拿到降级 PDF 却只能说「已生成建议单」，
+ * 等于把模板输出冒充成 AI 结果（CLAUDE.md §9 不伪造能力）。
+ */
+export type PrintArtifactVariant = 'ai' | 'degraded'
+
 export interface CareerPlanPrintResponse {
   fileId: string
   filename: string
@@ -543,6 +553,13 @@ export interface CareerPlanPrintResponse {
   expiresAt: string
   /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
   printFileUrl?: string
+  /**
+   * 这次拿到的是哪一版。后端 `career-plan.service.ts printPlan` 已经在返回它
+   * （无已落库 plan 时走降级版式），此前共享类型里没有声明 ——
+   * 于是前端拿到降级版也没法如实告诉用户。缺省视为 'ai' 是错的，
+   * 所以消费方必须显式判 `=== 'degraded'`，不要写 `?? 'ai'`。
+   */
+  variant?: PrintArtifactVariant
 }
 
 // ── 招聘会 AI 参会准备单 ───────────────────────────────────────────────────

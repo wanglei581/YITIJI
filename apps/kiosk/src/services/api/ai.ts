@@ -77,6 +77,8 @@ export interface AiServiceInterface {
     format?: ResumeExportFormat,
     layout?: ResumeLayoutSettings,
     templateId?: string,
+    /** 原样草稿（未经 AI 润色）。只影响产物元数据与文件名的诚实性，排版不变。 */
+    draft?: boolean,
   ): Promise<ResumeGenerateExportResponse>
 }
 
@@ -143,4 +145,15 @@ export const exportGeneratedResume = (
   format?: ResumeExportFormat,
   layout?: ResumeLayoutSettings,
   templateId?: string,
-) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)
+  draft?: boolean,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)
+
+/**
+ * AI 生成失败时的出纸路径：把用户**已经填好的内容**原样导出成 PDF。
+ *
+ * 这条路径不经过任何模型 —— 服务端 `/resume/generate/export` 只做 pdfkit 排版
+ * （`ai.service.ts exportGeneratedResume`），所以 AI 挂掉时它照常可用。
+ * `draft:true` 让产物元数据与文件名如实标成「未经 AI 润色」，不冒充 AI 成品。
+ */
+export const exportResumeDraft = (resume: GeneratedResume, token?: string | null) =>
+  adapter.exportGeneratedResume(resume, undefined, token, 'pdf', undefined, undefined, true)
