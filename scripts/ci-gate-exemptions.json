@@ -1,0 +1,56 @@
+{
+  "$schema": "由 scripts/verify-ci-gate-coverage.mjs 校验，不是 JSON Schema",
+  "$readme": [
+    "本文件登记「存在于 package.json 但不进 CI」的 verify:* / ui:* 门禁，以及为什么。",
+    "",
+    "为什么需要它：门禁存在 ≠ 门禁在跑。一条写好却没人执行的门禁不会报错、不会提示，",
+    "只是不测 —— 它给人「已覆盖」的错觉，比没有门禁更危险。所以规则反过来：",
+    "新门禁默认必须进 CI；不进的，必须在这里写清楚原因，否则 verify:ci-gate-coverage 会失败。",
+    "",
+    "category 取值：",
+    "  live-credentials  需要真实外部服务密钥 / 会消耗真实额度，CI 里不放真实凭证",
+    "  real-hardware     需要 Windows 真机、打印机、扫描仪等物理设备",
+    "  running-server    需要本机先起好 API 服务，CI 内无此前置",
+    "  manual-acceptance 人工验收 / 演练用，不是自动回归",
+    "  redundant-alias   纯聚合别名，子门禁已全部在 CI；别名本身无独有断言，再挂一遍只是重复跑",
+    "  pending-ci-wiring 真遗漏，应该进 CI 但当前进不去；reason 必须写明阻塞点",
+    "",
+    "redundant-alias 不是「免跑」借口：脚本会解析别名 body、把每个子门禁拿去和 CI 执行闭包比对，",
+    "只要有一条子门禁不在闭包里，这条豁免立刻失效并让 CI 红。所以它是被机器盯着的结论，不是口头承诺。",
+    "",
+    "pending-ci-wiring 是欠账不是结论。verify-ci-gate-coverage.mjs 里的 MAX_PENDING",
+    "只允许调低不允许调高 —— 想加新的 pending，先还掉一条旧的。"
+  ],
+  "exemptions": [
+    {
+      "gate": "@ai-job-print/api::verify:cos:live",
+      "category": "live-credentials",
+      "reason": "需要真实腾讯云 COS 密钥做 put/head/get/delete 实测。无凭证时脚本自跳过并 exit 0，放进 CI 只会恒定打印 SKIPPED，没有守护价值。"
+    },
+    {
+      "gate": "@ai-job-print/api::verify:ocr-baidu-live",
+      "category": "live-credentials",
+      "reason": "需要 .env 里的真实百度智能云 OCR 密钥并消耗约 3 次真实调用额度。附带缺陷：缺密钥时它打印 SKIP 却以非 0 退出（对比 verify:cos:live 的 exit 0），进 CI 会直接红。"
+    },
+    {
+      "gate": "@ai-job-print/api::verify:llm-connectivity",
+      "category": "live-credentials",
+      "reason": "对真实 LLM 上游发一次最小 chat completion 请求，需要真实厂商密钥且要求对应 feature 已在库中启用；CI 的 AI_PROVIDER=mock 下必然 FEATURE_DISABLED。"
+    },
+    {
+      "gate": "@ai-job-print/api::verify:field-mapping:http",
+      "category": "running-server",
+      "reason": "走完整 HTTP，前置是 API 已在 localhost:3010 运行且 dev.db 已 seed。CI 无该前置，实测报 fetch failed。service 层等价覆盖由 verify:field-mapping 承担，后者本次已接进 CI。"
+    },
+    {
+      "gate": "@ai-job-print/api::verify:upload-sessions:http",
+      "category": "running-server",
+      "reason": "扫码上传 HTTP 端到端，前置是 API 已在 localhost:3010 运行并显式指定 FILE_STORAGE_DRIVER=local。CI 无该前置，实测报 fetch failed。"
+    },
+    {
+      "gate": "@ai-job-print/api::verify:member-login-data-closure",
+      "category": "redundant-alias",
+      "reason": "纯 shell 别名：body 是 17 个 `pnpm run verify:*` 用 && 串起来，没有任何自己的断言、夹具或环境要求。2026-08-16 GATE-WIRE 复核：17 个子门禁**全部 17 条**都已在 CI 执行闭包内（#647 当时记的是 15/17，另 2 条已随本批接线补齐），因此把别名本身再挂一遍只是让同一批断言在同一个 job 里跑第二遍，徒增 CI 时长而不增加任何覆盖。本条不是欠账，故不占 pending-ci-wiring 名额；「子门禁全覆盖」这个前提由 verify-ci-gate-coverage.mjs 对 redundant-alias 类别做机器复核，一旦有子门禁被移出 CI 会立刻转红。"
+    }
+  ]
+}

@@ -14,7 +14,7 @@ import {
   type FairStatsDto,
   type JobListItemDto,
   type PrismaJobFairRow,
-  buildJobIndustryTag,
+  buildPublishedJobWhere,
   prismaJobToListItem,
   prismaFairToListItem,
   parseSeekerIntent,
@@ -39,27 +39,8 @@ export class JobsKioskService {
   }): Promise<PaginatedResult<JobListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
-    const kw = params?.keyword?.trim()
-
-    const tagContains: { tagsJson: { contains: string } }[] = []
-    if (params?.tag)      tagContains.push({ tagsJson: { contains: `"${params.tag}"` } })
-    if (params?.industry) tagContains.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
-
-    const where = {
-      reviewStatus:  'approved',
-      publishStatus: 'published',
-      ...(params?.city        ? { city: params.city }                 : {}),
-      ...(params?.category     ? { category: params.category }         : {}),
-      ...(params?.sourceOrgId  ? { sourceOrgId: params.sourceOrgId }   : {}),
-      ...(tagContains.length   ? { AND: tagContains }                  : {}),
-      ...(kw ? {
-        OR: [
-          { title:       { contains: kw } },
-          { company:     { contains: kw } },
-          { description: { contains: kw } },
-        ],
-      } : {}),
-    }
+    // where 由 jobs-shared 统一构造：岗位要求计数端点必须命中同一批岗位（见该函数注释）
+    const where = buildPublishedJobWhere(params)
     const [rows, total] = await Promise.all([
       this.prisma.job.findMany({
         where,

@@ -1,20 +1,46 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { ORDER_PAY_STATUSES } from '../payment/payment.types'
 import { AdminOrdersReadonlyService } from './admin-orders-readonly.service'
 
-const VALID_TYPES = new Set(['print', 'scan', 'photo', 'ai'])
-const VALID_PAY_STATUS = new Set(['unpaid', 'paid', 'refunded', 'failed'])
-const VALID_TASK_STATUS = new Set(['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled'])
+const VALID_TYPES = ['print', 'scan', 'photo', 'ai'] as const
+/** 支付状态白名单唯一来源，禁止在此就地再写一份（历史事故见 payment.types.ts 注释）。 */
+const VALID_PAY_STATUS = ORDER_PAY_STATUSES
+const VALID_TASK_STATUS = ['pending', 'claimed', 'printing', 'completed', 'failed', 'cancelled'] as const
 // M1/M2：渠道与取件状态筛选。
 // channel 不含「未标注」——那是 null，语义是「无法判定」而非一个渠道，不作为可选筛选值。
-const VALID_CHANNELS = new Set(['kiosk', 'miniapp_cloud'])
-const VALID_PICKUP_STATUS = new Set(['none', 'pending', 'claimed', 'used', 'expired', 'cancelled'])
+const VALID_CHANNELS = ['kiosk', 'miniapp_cloud'] as const
+const VALID_PICKUP_STATUS = ['none', 'pending', 'claimed', 'used', 'expired', 'cancelled'] as const
 
 function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
   const n = value !== undefined ? Number(value) : defaultValue
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
+}
+
+/**
+ * 未知筛选值必须明确拒绝，**绝不能静默丢成 undefined**。
+ *
+ * 旧行为：白名单外的值被丢弃 → 查询退化成无筛选 → 返回全量。
+ * 于是「按退款中筛选」在页面上呈现为「全部 200 条订单都在退款中」——
+ * 一个没有任何报错的假结论。宁可 400 让前端暴露契约不一致，
+ * 也不能给运营一个看起来正常、实则错误的列表。
+ */
+function pickFilter(
+  field: string,
+  raw: string | undefined,
+  allowed: readonly string[],
+): string | undefined {
+  if (raw === undefined || raw === '') return undefined
+  if (allowed.includes(raw)) return raw
+  throw new BadRequestException({
+    error: {
+      code: 'INVALID_FILTER_VALUE',
+      message: `筛选参数 ${field} 取值不受支持`,
+      details: [`${field} 允许的取值：${allowed.join(' | ')}`],
+    },
+  })
 }
 
 /**
@@ -45,11 +71,11 @@ export class AdminOrdersReadonlyController {
     @Query('pageSize') sizeStr?: string,
   ) {
     return this.orders.list({
-      type: type && VALID_TYPES.has(type) ? type : undefined,
-      payStatus: payStatus && VALID_PAY_STATUS.has(payStatus) ? payStatus : undefined,
-      taskStatus: taskStatus && VALID_TASK_STATUS.has(taskStatus) ? taskStatus : undefined,
-      channel: channel && VALID_CHANNELS.has(channel) ? channel : undefined,
-      pickupStatus: pickupStatus && VALID_PICKUP_STATUS.has(pickupStatus) ? pickupStatus : undefined,
+      type: pickFilter('type', type, VALID_TYPES),
+      payStatus: pickFilter('payStatus', payStatus, VALID_PAY_STATUS),
+      taskStatus: pickFilter('taskStatus', taskStatus, VALID_TASK_STATUS),
+      channel: pickFilter('channel', channel, VALID_CHANNELS),
+      pickupStatus: pickFilter('pickupStatus', pickupStatus, VALID_PICKUP_STATUS),
       search: search?.trim() || undefined,
       page: safeInt(pageStr, 1, 1, 10_000),
       pageSize: safeInt(sizeStr, 20, 1, 100),
