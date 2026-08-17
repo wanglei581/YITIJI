@@ -1,10 +1,14 @@
 import { assertNoHighConfidencePii, type ContractMaskPage, type ContractPartyFacts } from './contract-review-pii-masker'
+import {
+  CONTRACT_PROVIDER_MAX_TIMEOUT_MS,
+  CONTRACT_PROVIDER_MIN_TIMEOUT_MS,
+  contractProviderTimeoutMs,
+} from './contract-review-timing'
 import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
 import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
-const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_FINDINGS = 100
 
 const SUPPORT = {
@@ -54,6 +58,14 @@ export interface ContractProviderTransportRequest {
   readonly url: string
   readonly apiKey: string
   readonly payload: ContractProviderPayload
+  /**
+   * 本次调用的超时（毫秒），由调用方按合同体量算出（见 contract-review-timing.ts）。
+   *
+   * 修复前这个值根本不存在：超时是 transport 构造时钉死的 30 秒常量，
+   * 而且同一个常量还兼任「传入值不得超过它」的硬上限，
+   * 于是长合同永远在 30 秒被 abort。现在它随页数伸缩、逐次传入。
+   */
+  readonly timeoutMs: number
 }
 
 export interface ContractProviderTransportResponse {
@@ -144,18 +156,27 @@ export function loadContractProviderConfig(env: ContractProviderEnv): ContractPr
 }
 
 export class StrictFetchContractProviderTransport implements ContractProviderTransport {
+  /**
+   * @param maxTimeoutMs 本 transport 允许的**最大**单次超时。
+   *
+   * 与修复前的语义差别是关键的一点：原来的构造参数既是默认值又是硬上限
+   * （`timeoutMs > DEFAULT_TIMEOUT_MS` 直接抛错），所以 30 秒永远调不高。
+   * 现在它只是一个安全护栏，实际超时由每次请求自带、按体量算出。
+   */
   constructor(
     private readonly fetchImpl: FetchLike = fetch,
-    private readonly timeoutMs = DEFAULT_TIMEOUT_MS,
+    private readonly maxTimeoutMs = CONTRACT_PROVIDER_MAX_TIMEOUT_MS,
   ) {
-    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > DEFAULT_TIMEOUT_MS) {
+    if (!Number.isInteger(maxTimeoutMs) || maxTimeoutMs <= 0 || maxTimeoutMs > CONTRACT_PROVIDER_MAX_TIMEOUT_MS) {
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_CONFIG_INVALID')
     }
   }
 
   async send(request: ContractProviderTransportRequest): Promise<ContractProviderTransportResponse> {
+    const timeoutMs = this.resolveTimeout(request.timeoutMs)
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    let timedOut = false
+    const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
     try {
       const response = await this.fetchImpl(request.url, {
         method: 'POST',
@@ -170,10 +191,32 @@ export class StrictFetchContractProviderTransport implements ContractProviderTra
       const body = await readBoundedBody(response)
       return { status: response.status, redirected: response.redirected, body }
     } catch {
+      // 超时和「网络真的断了」必须分开报。此前两者一律塌成
+      // CONTRACT_PROVIDER_TRANSPORT_FAILED，生产上排查了整晚才从 Redis 的
+      // stacktrace 里反推出「其实是自己 abort 的」——而当时网络实测是好的
+      // （DNS 正常、TLS 17ms、GET /models 200）。分开之后错误码自己会说话。
+      //
+      // 原始 error 刻意不外传：它可能带上游回包片段。分类只看自己设的
+      // timedOut 标记（AbortError 的 name 在不同 runtime 上并不稳定）。
+      if (timedOut) throw new Error('CONTRACT_PROVIDER_TIMEOUT')
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  /**
+   * 逐次请求的超时；非法值退化到下限而不是抛错 —— 宁可短也不要不设防。
+   *
+   * 下限本身也要被 `maxTimeoutMs` 夹一次：门禁需要用一个很小的 max 构造
+   * 一个真实会 abort 的 transport 来实测这条路径，否则「超时确实会触发」
+   * 只能靠读代码推断。生产侧构造不传参，max 就是 300 秒。
+   */
+  private resolveTimeout(requested: unknown): number {
+    const floor = Math.min(CONTRACT_PROVIDER_MIN_TIMEOUT_MS, this.maxTimeoutMs)
+    if (typeof requested !== 'number' || !Number.isInteger(requested) || requested <= 0) return floor
+    if (requested < floor) return floor
+    return requested > this.maxTimeoutMs ? this.maxTimeoutMs : requested
   }
 }
 
@@ -228,8 +271,14 @@ export class ContractReviewProviderService {
         url: `${config.baseUrl}chat/completions`,
         apiKey: config.apiKey,
         payload,
+        // 超时按本次真实送出的页数算，而不是一个写死的常量。
+        // input.pages 就是马上要发给模型的那批页，没有比它更准的体量来源。
+        timeoutMs: contractProviderTimeoutMs(input.pages.length),
       })
-    } catch {
+    } catch (error) {
+      // 超时必须原样冒泡：塌成 TRANSPORT_FAILED 就等于把「合同太长」
+      // 说成「网络不通」，用户会去重连 WiFi，而真正该做的是换短一点的文件。
+      if (error instanceof Error && error.message === 'CONTRACT_PROVIDER_TIMEOUT') throw error
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
     }
     if (!response || typeof response !== 'object') throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
