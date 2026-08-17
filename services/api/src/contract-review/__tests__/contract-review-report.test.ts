@@ -55,6 +55,7 @@ const TASK: ContractReviewTaskRow = {
   resultJson: JSON.stringify(RESULT),
   extractionFingerprint: 'a'.repeat(64),
   confirmedAt: new Date(),
+  errorCode: null,
 }
 
 test('PDF renderer emits a parseable A4 report with explicit AI metadata', async () => {
