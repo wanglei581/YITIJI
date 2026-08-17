@@ -94,6 +94,7 @@
     "verify:print-done-truth": "node scripts/verify-print-done-truth.mjs",
     "verify:scan-session-truth": "node scripts/verify-scan-session-truth.mjs",
     "verify:visible-actions-truth": "node scripts/verify-kiosk-visible-actions-truth.mjs",
+    "verify:deploy-vite-env-coverage": "node scripts/verify-deploy-vite-env-coverage.mjs",
     "verify:contract-review-session": "node scripts/verify-contract-review-session.mjs",
     "verify:contract-review-report-print": "node scripts/verify-contract-review-report-print.mjs",
     "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",

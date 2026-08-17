@@ -96,6 +96,12 @@ jobs:
           # V6 纵切第一刀（打印域 P39）迁移保真：读 docs/design 原型 + 生产源码做交叉断言。
           # 纯静态，不连数据库/硬件，所以和其他 cross-client 静态门禁同步。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
+          # kiosk 代码读到的 VITE_* 必须与 deploy.yml 给 kiosk 构建实设的值对齐：
+          # 差集里的每一个都要在 apps/kiosk/deploy-env-registry.json 写明
+          # 「为什么不需要设」。缺这条门禁时，代码新增的开关可以永远不进部署配置
+          # 而不报任何错 —— VITE_ENABLE_CONTRACT_REVIEW 就是这样在一体机生产上
+          # 从未存在过（入口不渲染、路由回首页、chunk 不打包）。纯静态取证。
+          pnpm --filter @ai-job-print/kiosk verify:deploy-vite-env-coverage
           pnpm --filter @ai-job-print/admin verify:refresh-safe
           pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui

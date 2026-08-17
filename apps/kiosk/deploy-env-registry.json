@@ -1,0 +1,107 @@
+{
+  "$comment": [
+    "Kiosk 构建期 VITE_* 变量登记表。",
+    "",
+    "背景：deploy.yml 只给 kiosk 构建设了 4 个 VITE_ 变量，但 apps/kiosk/src 实际读 16 个。",
+    "差集里的 12 个在生产构建里恒为 undefined —— 没有任何机制保证代码新增的开关会被",
+    "部署配置覆盖到。VITE_ENABLE_CONTRACT_REVIEW 就是这样一个从未在一体机生产上",
+    "存在过的功能开关（入口不渲染、路由 Navigate 回首页、chunk 不打包）。",
+    "",
+    "本表让缺口显式可见：scripts/verify-deploy-vite-env-coverage.mjs 会做",
+    "「代码读到的」与「deploy.yml 实设的」差集，差集里每一个都必须在此登记并写明理由，",
+    "未登记即红。登记不等于批准，只等于「有人看过并给了判断依据」。",
+    "",
+    "status 取值：",
+    "  deploy-set        必须由 deploy.yml 显式设置（缺失即构建失败或功能静默消失）",
+    "  terminal-local    按机器不同，应由终端本地 .env / 安装时下发，不进统一 CI 构建",
+    "  safe-default      代码内有明确且安全的默认值，不设即走默认，行为可预期",
+    "  pending-decision  待产品负责人裁决，当前不设的后果已写明"
+  ],
+  "variables": [
+    {
+      "name": "VITE_API_MODE",
+      "status": "deploy-set",
+      "reason": "生产必须为 http。vite.config.ts assertProdApiMode 在生产构建下强制校验，缺失直接构建失败。"
+    },
+    {
+      "name": "VITE_API_BASE_URL",
+      "status": "deploy-set",
+      "reason": "生产统一 /api/v1，与 Nginx 反代路径绑定。"
+    },
+    {
+      "name": "VITE_USE_TRTC_CALL",
+      "status": "deploy-set",
+      "reason": "AI 助手数字人开关。生产默认 true；若确为纯文字部署需同时显式设 VITE_ALLOW_TEXT_ONLY_ASSISTANT=true，否则构建期报错。"
+    },
+    {
+      "name": "VITE_TERMINAL_AGENT_BRIDGE_TOKEN",
+      "status": "deploy-set",
+      "reason": "本机网桥静态令牌，deploy.yml 已加空值守卫（缺失即 ::error:: 退出），防止发布空白扫码登录页。注意：当前一份构建产物对应一个令牌，多机差异化需另行设计。"
+    },
+    {
+      "name": "VITE_ENABLE_CONTRACT_REVIEW",
+      "status": "pending-decision",
+      "reason": "产品负责人已裁决「打开」，但 2026-08-18 实跑证明真实后端链路当前跑不通，故本 PR 不设。三处硬阻塞：(1) 生产库没有 isActive 的 contract_review_disclaimer 法务正文，GET /contract-reviews/consent-scope 返回 503 CONTRACT_REVIEW_LEGAL_CONFIGURATION_INVALID，页面显示「无法加载知情同意信息」；且 verify-legal-doc-version.ts 明确断言该文档保持未激活，激活属法务签字项。(2) 前后端 consent-scope 形状漂移导致 POST /contract-reviews 必然 400 —— 本 PR 已修。(3) 缺 REDIS_URL + CONTRACT_REVIEW_API_KEY 时 POST /contract-reviews 返回 503 CONTRACT_REVIEW_QUEUE_UNAVAILABLE。设为 true 的后果：求职者在 27 寸屏上看到入口，点进去必然失败。前置门禁见 docs/compliance/contract-review-release-gate.md「生产激活前置门禁」。"
+    },
+    {
+      "name": "VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT",
+      "status": "pending-decision",
+      "reason": "报告打印是本功能的价值兑现点（用户来这台机器就是为了拿纸），但按发布门禁必须排在入口开关之后，且需 Windows 奔图真机出纸验收（CR-G7）与服务端 CONTRACT_REVIEW_REPORT_PRINT_ENABLED 同时开启。入口尚未开，此项更不能先开。"
+    },
+    {
+      "name": "VITE_API_PROXY_TARGET",
+      "status": "safe-default",
+      "reason": "只在 vite.config.ts 的 dev server proxy 里读，供本地联调把 /api 转发到本机 API；生产是静态产物 + Nginx 反代，不经 vite dev server，设了也不生效。不该设。"
+    },
+    {
+      "name": "VITE_TERMINAL_ID",
+      "status": "terminal-local",
+      "reason": "按机器不同。且代码已限定其只在 import.meta.env.DEV 下作为回退（screensaver.ts），生产始终从本机 Agent 读身份，Agent 不可达时 fail-closed，不使用该构建变量。deploy.yml 统一构建里设它反而会给所有终端注入同一个 ID。不该设。"
+    },
+    {
+      "name": "VITE_PRINTER_NAME",
+      "status": "terminal-local",
+      "reason": "按机器不同，且仅影响打印设置页的显示名，不影响实际打印逻辑；未配置时显示「已配置打印机」。真实型号由终端 heartbeat 上报。CLAUDE.md §3 禁止硬编码具体型号，统一构建里写死更违规。不该设。"
+    },
+    {
+      "name": "VITE_TERMINAL_DISPLAY_NAME",
+      "status": "terminal-local",
+      "reason": "展示给手机确认页的本机设备名，按机器不同；未配置时回退当前页面 host，行为可接受。不该设。"
+    },
+    {
+      "name": "VITE_TERMINAL_AGENT_LOCAL_URL",
+      "status": "safe-default",
+      "reason": "代码默认 http://127.0.0.1:9527，与 Terminal Agent 默认监听一致。仅当某台机器改了 Agent 端口才需覆盖，属终端本地事项。"
+    },
+    {
+      "name": "VITE_QR_LOGIN_PUBLIC_BASE_URL",
+      "status": "pending-decision",
+      "reason": "未配置时回退 window.location.origin。一体机若通过 localhost 或内网地址访问，手机扫码将打不开该地址，扫码登录静默失效（前端只 console.warn，用户侧无明确提示）。是否需要按站点设置公网可达基址，需产品负责人确认部署拓扑后裁决。当前不设 = 依赖 Kiosk 本身以手机可达的地址访问。"
+    },
+    {
+      "name": "VITE_KIOSK_LOGOUT_IDLE_SEC",
+      "status": "safe-default",
+      "reason": "未配置默认 180 秒，与待机宣传屏默认空闲阈值一致。属运营可调参数，不设即走默认，行为明确。"
+    },
+    {
+      "name": "VITE_KIOSK_PRIVACY_IDLE_SEC",
+      "status": "safe-default",
+      "reason": "未配置默认 300 秒。公共终端硬性隐私上限，独立计时不受 busy 抑制。默认值本身即为隐私防线，不设不会放宽。"
+    },
+    {
+      "name": "VITE_KIOSK_SESSION_WARNING_SEC",
+      "status": "safe-default",
+      "reason": "未配置默认 30 秒的到期前告警窗口（useIdleLogout.resolveWarningWindow）。不设即走默认。"
+    },
+    {
+      "name": "VITE_ALLOW_TEXT_ONLY_ASSISTANT",
+      "status": "safe-default",
+      "reason": "生产构建的逃生阀：只在确认为纯文字助手部署时才显式设 true。当前 VITE_USE_TRTC_CALL=true，不需要设；若误设 true 会放过数字人未启用的构建期告警，因此保持不设更安全。"
+    },
+    {
+      "name": "VITE_AMAP_KEY",
+      "status": "pending-decision",
+      "reason": "招聘会详情页地图（JobFairDetailTabs.tsx / MapBlock.tsx）。未配置时地图块降级不渲染。是否采购并注入高德 key 属产品/成本决策，且 key 进前端包即公开，需先确认高德侧域名白名单与配额限制再裁决。当前不设 = 招聘会地图不显示。"
+    }
+  ]
+}
