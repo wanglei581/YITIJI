@@ -1,0 +1,134 @@
+{
+  "$comment": [
+    "前端 mock / 桩 ↔ 服务端真实返回形状的绑定清单。门禁：scripts/verify-mock-server-contract.mjs。",
+    "",
+    "为什么需要这份清单（背景见 docs/progress/current-progress.md 2026-08-18 条目）：",
+    "  一份 mock 只要和它自己那份前端 Interface 自洽，typecheck 就全绿；",
+    "  哪怕两者都把服务端的嵌套字段写成了平铺字段，也没有任何东西会红。",
+    "  实测事故：kiosk ConsentScope 自己声明了平铺 disclaimerVersion，mock 也填了它，",
+    "  三条 mock 用例长期全绿，真实后端 100% 返回 400 VALIDATION_FAILED。",
+    "",
+    "本清单把「真值」钉死在服务端源文件上：serverType 指向 services/api（或 packages/shared）",
+    "里那个真实被 controller 返回的类型；前端的 clientType 和 mock 都只能和它比，",
+    "自己那份声明没有投票权。",
+    "",
+    "字段说明：",
+    "  id          稳定标识，失败信息里会打印。",
+    "  lane        风险车道。当前门禁强制 payment / privacy / ai / device 四条",
+    "              （资损·隐私·AI·硬件能力）。取值白名单在门禁的 ENFORCED_LANES，",
+    "              写别的值会被清单自检直接打回，逼人去 deferred 里说清为什么不强制。",
+    "  endpoint    对应 HTTP 端点，仅供人读。",
+    "  serverType  { file, name } —— 服务端真实返回类型的声明位置。file 相对仓库根。",
+    "  clientType  { file, name } —— 前端自己声明的响应类型；null 表示前端直接用 shared 类型。",
+    "  mocks       [{ file, fn }] —— 返回该响应的 mock 函数；门禁读它的 return 对象字面量。",
+    "  optionalOnServer  服务端可选、mock 允许不填的路径（默认由类型的 ? 推出，这里只做补充）。",
+    "  opaquePaths 显式声明「该子树不做逐字段比对」的路径 + 原因（例如服务端是 Record/any）。"
+  ],
+  "enforced": [
+    {
+      "id": "contract-review.consent-scope",
+      "lane": "privacy",
+      "endpoint": "GET /api/v1/contract-reviews/consent-scope",
+      "serverType": {
+        "file": "services/api/src/contract-review/contract-review-consent.service.ts",
+        "name": "ContractReviewPublicConsentScope"
+      },
+      "clientType": {
+        "file": "apps/kiosk/src/services/api/contractReview.ts",
+        "name": "ConsentScope"
+      },
+      "mocks": [
+        { "file": "apps/kiosk/src/services/api/contractReview.ts", "fn": "mockConsentScope" }
+      ],
+      "note": "2026-08-18 修复前：clientType 与 mock 各多一个平铺 disclaimerVersion，且 disclosures 只写了 8 个字段里的 2 个。"
+    },
+    {
+      "id": "contract-review.created-task",
+      "lane": "privacy",
+      "endpoint": "POST /api/v1/contract-reviews",
+      "serverType": {
+        "file": "services/api/src/contract-review/contract-review.types.ts",
+        "name": "ContractReviewCreatedTask"
+      },
+      "clientType": {
+        "file": "apps/kiosk/src/services/api/contractReview.ts",
+        "name": "ContractReviewCreatedTaskView"
+      },
+      "mocks": [
+        { "file": "apps/kiosk/src/services/api/contractReview.ts", "fn": "mockCreateTask" }
+      ],
+      "note": "服务端建单后 status 恒为 'uploaded'；修复前 mock 返回 'queued'，是真实后端在这一步给不出的值。"
+    },
+    {
+      "id": "print.price-config",
+      "lane": "payment",
+      "endpoint": "GET /api/v1/print/price-config",
+      "serverType": {
+        "file": "services/api/src/payment/payment.types.ts",
+        "name": "PrintPriceConfigView"
+      },
+      "clientType": {
+        "file": "packages/shared/src/types/payment.ts",
+        "name": "PrintPriceConfigView"
+      },
+      "mocks": [
+        { "file": "apps/kiosk/src/services/print/priceConfigApi.ts", "fn": "DEMO_PRICE_CONFIG" }
+      ],
+      "note": "「后端本地副本 + 手工同步」双写点（services/api/src/payment/payment.types.ts 的文件头注释即要求两处同改）。本条把手工同步变成机器核对：serverType 是后端副本，clientType 是 packages/shared 的契约源。"
+    },
+    {
+      "id": "terminals.capabilities-row",
+      "lane": "device",
+      "endpoint": "GET /api/v1/terminals/:terminalCode/capabilities（响应 capabilities[] 的元素）",
+      "serverType": {
+        "file": "services/api/src/terminals/terminal-capabilities.types.ts",
+        "name": "TerminalCapabilityView"
+      },
+      "clientType": {
+        "file": "packages/shared/src/types/printScanCapability.ts",
+        "name": "TerminalCapabilityView"
+      },
+      "mocks": [
+        { "file": "apps/kiosk/tests/visual/fusion-w2-print.spec.ts", "fn": "UNVERIFIED_CAPABILITIES" }
+      ],
+      "note": "补 #692 那条断言够不到的方向。#692 的 verify-print-color-duplex-capability.ts 里，12 个能力键和 5 个状态枚举都是 runtime import（活锚，不该动），但『桩字段集必须等于 TerminalCapabilityView』那条把 5 个字段名写成了硬编码字面量 —— TS interface 运行时被擦除，脚本反射不到。后果：往 TerminalCapabilityView 加一个新字段，桩不跟着加，那条断言照样绿（桩少字段它不管，只管桩多字段）。本条用类型检查器解析该 interface，加字段即红。#692 的三条断言一条不动。"
+    }
+  ],
+  "deferred": [
+    {
+      "id": "kiosk.mockAdapter.*",
+      "lane": "content",
+      "reason": "招聘会/岗位展示域。mock 全部标注 packages/shared 的 DTO 类型，excess-property-check 已挡住「多字段」；剩余风险是 shared DTO 与服务端 DTO 之间的漂移，属另一条战线（verify:*-contract 系列）。非资损非隐私，本轮不强制。"
+    },
+    {
+      "id": "admin.adminMockAdapter.*",
+      "lane": "console",
+      "reason": "管理后台只读展示域。同上，mock 由 shared 类型约束；且后台 mock 模式不在一体机生产链路上。"
+    },
+    {
+      "id": "partner.partnerMockAdapter.*",
+      "lane": "console",
+      "reason": "合作机构后台数据源管理域。22 个 mock 方法里 5 个用 shared 别名、约 11 个是本地 View/Record 类型（漂移风险与 admin 同级）。不在一体机生产链路、不涉资损与个人敏感信息，本轮不强制；接入顺序排在 admin 之后。"
+    },
+    {
+      "id": "kiosk.aiMockAdapter.*",
+      "lane": "ai",
+      "reason": "AI 结果视图 mock 已全部标注 shared 的 Ai* 类型，且 packages/shared/src/types/ai.ts 与 services/api 的 ai-provider.interface.ts 之间已有契约镜像注释 + verify:ai-* 系列门禁。待 serverType 有单一可指向的返回类型声明后接入本门禁。"
+    },
+    {
+      "id": "miniapp.utils/mock-data.js",
+      "lane": "content",
+      "reason": "纯 JS、无类型系统，字段是展示形态（emoji / metaLines / tagTone），与服务端 DTO 本就不同构；且 http 路径经 utils/normalize.js 归一而 mock 路径直接绕过。本门禁基于 TS 类型检查器，对无类型 JS 不适用；该处应先做「mock 也走 normalize」的改造，再谈契约核对。"
+    },
+    {
+      "id": "kiosk.tests/**/fixtures",
+      "lane": "content",
+      "reason": "11 个 Playwright fixture 模块共桩了 87 个 /api/v1 路径，payload 类型是 ApiRouter 的 `json: unknown` —— 零类型约束，属本类缺陷面积最大的一块。本门禁读的是「mock 函数的 return 字面量」，fixture 是路由表形态，需要另做一层路径→绑定的映射才能接入。排在 admin/partner 之后。"
+    },
+    {
+      "id": "services/api/scripts/**/*.ts 不在 typecheck 范围内",
+      "lane": "backend",
+      "reason": "services/api/tsconfig.json 的 include 只有 src/**/*，223 个 verify 脚本全部不参与编译，桩回包上的类型标注是装饰性的（@swc-node/register 只剥类型不校验）。实测纳入编译后 71 个文件 536 处报错，本轮体量不允许；应单独立项分批收敛，收敛完再把 scripts 加进 include 作为长期门禁。"
+    }
+  ]
+}

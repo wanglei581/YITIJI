@@ -30,6 +30,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
   createContractReview,
+  describeDataCategories,
   getConsentScope,
   type ConsentScope,
 } from '../../services/api/contractReview'
@@ -283,7 +284,9 @@ export function ContractReviewHomePage() {
                 </p>
                 {consentScope && (
                   <p style={{ fontSize: 17, color: 'var(--muted)' }}>
-                    数据类别：{consentScope.disclosures.dataCategories.join('、')}。
+                    {/* 服务端返回的是稳定编码（source_file 等），不是展示文案；
+                        直接 join 会把机器码念给用户听。 */}
+                    数据类别：{describeDataCategories(consentScope.disclosures.dataCategories).join('、')}。
                     最长保存 {consentScope.disclosures.retention.maximumHours} 小时。
                   </p>
                 )}

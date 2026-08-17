@@ -41,11 +41,23 @@ export interface ContractReviewCreatedTaskView {
   accessToken?: string
 }
 
-// 形状必须与服务端 `ContractReviewPublicConsentScope` 逐字段一致。
-// 服务端只返回嵌套的 `disclaimer.version`，**没有**平铺的 `disclaimerVersion`；
-// 曾经多出的那个平铺字段在 http 模式下恒为 undefined，导致
-// `POST /contract-reviews` 必然 400（disclaimerVersion should not be empty）。
-// mock 当时伪造了该平铺字段，所以 mock 用例全绿而真实后端 100% 失败。
+/**
+ * 形状必须与服务端 `ContractReviewPublicConsentScope` 逐字段一致
+ * （services/api/src/contract-review/contract-review-consent.service.ts），
+ * 由 `pnpm run verify:mock-server-contract` 机械核对。
+ *
+ * 修复前这里有两处漂移，mock 用例全绿而真实后端必挂：
+ *   1. 多了一个**平铺**的 `disclaimerVersion` —— 服务端只返回嵌套的
+ *      `disclaimer.version`。http 模式下它恒为 undefined，
+ *      `POST /contract-reviews` 必然 400（disclaimerVersion should not be empty）。
+ *   2. `disclosures` 只写了 8 个字段里的 2 个，且 `dataCategories` 被写成了中文
+ *      展示文案 —— 服务端返回的是稳定编码（source_file / ocr_text /
+ *      ai_review_result）。同意页因此在生产上会把机器码直接念给用户听。
+ *      中文文案由本文件的 DATA_CATEGORY_LABELS 负责，不再靠 mock 顶包。
+ *
+ * 第 1 条已由 #691 单独修过（它另有一条手写正则断言钉在
+ * apps/kiosk/scripts/verify-contract-review-session.mjs，本门禁不取代它）。
+ */
 export interface ConsentScope {
   consentVersion: string
   consentScopeHash: string
@@ -56,9 +68,33 @@ export interface ConsentScope {
     publishedAt: string
   }
   disclosures: {
-    dataCategories: string[]
+    processorIdentityAndContact: string
+    processingPurposeAndMethod: readonly string[]
+    dataCategories: readonly string[]
+    entrustedProcessingRoles: readonly string[]
     retention: { maximumHours: number; sessionDeletionFirst: boolean }
+    dataSubjectRights: readonly string[]
+    sensitivePersonalInformation: {
+      separateConsentRequired: boolean
+      necessityAndImpactNoticeRequired: boolean
+    }
   }
+}
+
+/**
+ * 服务端 `disclosures.dataCategories` 的编码 → 同意页中文说明。
+ *
+ * 认不出的编码原样显示：宁可让用户看到一个陌生编码，也不能编一句它没说的话。
+ */
+const DATA_CATEGORY_LABELS: Readonly<Record<string, string>> = {
+  source_file: '合同原件',
+  ocr_text: '合同文字（OCR 识别结果）',
+  ai_review_result: 'AI 审查结果',
+}
+
+/** 把服务端返回的数据类别编码翻成同意页可读文案。 */
+export function describeDataCategories(codes: readonly string[]): string[] {
+  return codes.map((code) => DATA_CATEGORY_LABELS[code] ?? code)
 }
 
 // ── 内部请求工具 ───────────────────────────────────────────
@@ -216,6 +252,8 @@ export async function abandonContractReviewReport(
 
 // ── Mock 实现（开发调试用） ────────────────────────────────
 
+// mock 的字段集合与取值口径由 verify:mock-server-contract 钉住服务端
+// CONTRACT_REVIEW_CONSENT_DISCLOSURES：少写、多写、写服务端给不出的值都会红。
 function mockConsentScope(): ConsentScope {
   return {
     consentVersion: 'v1.0',
@@ -227,8 +265,24 @@ function mockConsentScope(): ConsentScope {
       publishedAt: new Date().toISOString(),
     },
     disclosures: {
-      dataCategories: ['合同原文（OCR文字）', 'AI 审查结果'],
+      processorIdentityAndContact: 'provided_by_active_disclaimer',
+      processingPurposeAndMethod: [
+        'contract_risk_notice',
+        'ocr_extraction',
+        'deterministic_rules',
+        'domestic_llm_analysis',
+      ],
+      dataCategories: ['source_file', 'ocr_text', 'ai_review_result'],
+      entrustedProcessingRoles: [
+        'baidu_ocr_as_ocr_processor',
+        'domestic_llm_as_ai_inference_processor',
+      ],
       retention: { maximumHours: 2, sessionDeletionFirst: true },
+      dataSubjectRights: ['access', 'delete', 'withdraw_consent'],
+      sensitivePersonalInformation: {
+        separateConsentRequired: true,
+        necessityAndImpactNoticeRequired: true,
+      },
     },
   }
 }
@@ -236,12 +290,14 @@ function mockConsentScope(): ConsentScope {
 let _mockStep = 0
 let _mockConfirmed = false
 
+// 服务端 `ContractReviewCreatedTask.status` 恒为 'uploaded'（建单即上传完成，
+// 入队后才转 queued）。mock 此前直接返回 'queued'，跳过了真实后端必经的一态。
 function mockCreateTask(): ContractReviewCreatedTaskView {
   _mockStep = 0
   _mockConfirmed = false
   return {
     id: 'mock-task-001',
-    status: 'queued',
+    status: 'uploaded',
     expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     accessToken: 'mock-contract-review-access-token',
   }

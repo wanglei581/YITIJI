@@ -159,6 +159,13 @@ jobs:
         # 放在重装依赖之前:只依赖 node + 仓库,违规能最快失败。
         run: pnpm verify:compliance-copy
 
+      - name: Mock ↔ server contract gate
+        # 挡「mock 全绿、生产 100% 失败」：mock 不得声明服务端不返回的字段、
+        # 不得遗漏服务端必返的字段、不得写服务端给不出的取值。
+        # 锚点是 services/api 的真实返回类型，不是前端自己那份声明 ——
+        # 前端 Interface 和 mock 一起错时 typecheck 是全绿的（实测事故见脚本头注释）。
+        run: pnpm verify:mock-server-contract
+
       - name: Import review reset gate (forced re-review on partner import)
         # 静态断言 Partner/Excel 导入及 job-sync 内容变化路径都回 pending+draft；
         # job-sync 内容未变化路径只刷新 syncTime。纯 node,不需要 DB。
