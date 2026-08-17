@@ -8,9 +8,6 @@
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">浏览与跳转记录</view>
-      <view class="nav-right tap" hover-class="tap-press" bindtap="toggleManage">
-        <text class="nav-caps">{{managing ? '完成' : '管理'}}</text>
-      </view>
     </view>
   </view>
 
@@ -24,6 +21,16 @@
         data-key="{{item.key}}"
         bindtap="setFilter"
       >{{item.label}}</view>
+    </view>
+
+    <!-- 「管理」原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+         自定义导航栏右侧永远不可用。删除记录是低频次级操作，移到列表上方的工具栏。 -->
+    <view class="list-toolbar" wx:if="{{groups.length && state !== 'loading' && state !== 'error'}}">
+      <text class="lt-label">{{managing ? '点条目右侧「删除」移除记录' : '记录仅本人可见'}}</text>
+      <view class="lt-action {{managing ? 'on' : ''}} tap" hover-class="tap-press" bindtap="toggleManage"
+            role="button" aria-label="{{managing ? '退出管理模式' : '进入管理模式，删除浏览记录'}}">
+        {{managing ? '完成' : '管理'}}
+      </view>
     </view>
 
     <view class="hs-bar" wx:if="{{!loggedIn && state !== 'loading'}}">

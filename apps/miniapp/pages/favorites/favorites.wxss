@@ -1,6 +1,23 @@
 /* pages/favorites/favorites.wxss */
 .fav-content { padding-top: 20rpx; }
 
+/* 列表工具栏：承接原导航栏右上角的「管理」。导航栏右侧被微信胶囊常驻遮挡，不可放操作。
+   触控区 96rpx = 48px，满足 CLAUDE.md §9 最小可点击尺寸。 */
+.list-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16rpx; padding: 0 32rpx 8rpx;
+}
+.lt-label { font-size: 24rpx; color: var(--muted); flex: 1; }
+.lt-action {
+  flex-shrink: 0;
+  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 22rpx; border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: 27rpx; font-weight: 600;
+}
+.lt-action.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+
 .fav-item {
   display: flex;
   align-items: center;

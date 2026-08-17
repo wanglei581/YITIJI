@@ -1,4 +1,21 @@
 /* pages/documents/documents.wxss */
+
+/* 列表标题行 + 刷新：承接原导航栏右上角的「刷新」。
+   导航栏右侧被微信胶囊常驻遮挡，不可放操作。触控区 96rpx = 48px（CLAUDE.md §9）。 */
+.list-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16rpx; padding-right: 32rpx; padding-bottom: 8rpx;
+}
+.lt-title { flex: 1; padding-bottom: 0; }
+.lt-action {
+  flex-shrink: 0;
+  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 22rpx; border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: 27rpx; font-weight: 600;
+}
+
 .doc-item {
   display: flex;
   align-items: center;

@@ -1,6 +1,25 @@
 /* pages/notifications/notifications.wxss */
+
+/* 列表工具栏：承接原导航栏右上角的「全部已读」。
+   导航栏右侧被微信胶囊常驻遮挡，不可放操作。触控区 96rpx = 48px（CLAUDE.md §9）。 */
+.list-toolbar {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 16rpx; padding: 0 32rpx 12rpx;
+}
+.lt-action {
+  flex-shrink: 0;
+  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 22rpx; border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: 27rpx; font-weight: 600;
+}
+
+/* .content（app.wxss）没有横向内边距，列表若直接铺开会贴死屏幕左右边缘。
+   与 jobs / resumes / fairs 等列表页统一取 32rpx 左右留白。 */
+.nt-list { padding: 0 32rpx; }
+
 .nt-item {
-  position: relative;
   display: flex;
   align-items: flex-start;
   padding: 28rpx 0;
@@ -8,16 +27,19 @@
 }
 .nt-item:last-child { border-bottom: none; }
 
-/* 未读红点 */
-.nt-item.unread::before {
+/* 未读红点。
+   原实现用 .nt-item::before 绝对定位到 left:-18rpx，而列表左侧无留白，
+   红点整体落在屏幕外不可见，已读/未读无法区分。改为跟在标题前的内联圆点：
+   不依赖容器留白，任何留白取值下都在可视区内。 */
+.nt-item.unread .nt-t::before {
   content: "";
-  position: absolute;
-  top: 32rpx;
-  left: -18rpx;
+  display: inline-block;
   width: 14rpx;
   height: 14rpx;
+  margin-right: 12rpx;
+  vertical-align: middle;
   border-radius: 50%;
-  background: #e5474b;
+  background: var(--error);
 }
 
 .nt-ic {
@@ -30,7 +52,7 @@
   flex-shrink: 0;
   margin-right: 22rpx;
 }
-.nt-ic .ficon { font-size: 42rpx; }
+.nt-ic .ficon { width: 40rpx; height: 40rpx; }
 
 .tone-teal  { background: var(--teal-wash);  }
 .tone-teal .ficon  { color: var(--teal-deep);  }
@@ -66,12 +88,15 @@
   color: var(--ink-soft);
 }
 .nt-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
   margin-top: 14rpx;
   font-size: 27rpx;
   font-weight: 500;
   color: var(--teal-deep);
 }
+.nt-link-arrow { width: 18rpx; height: 18rpx; }
 /* 空态 */
 .empty-slot { padding: 60rpx 20rpx; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
