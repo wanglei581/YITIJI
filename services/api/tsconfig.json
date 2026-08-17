@@ -18,14 +18,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    // 临时排除：src/package-orders/ 下只有 package-orders.module.ts 一个文件，
-    // 它 import 了并不存在的 ./package-orders.controller 与 ./package-orders.service，
-    // 导致 `pnpm build` 整体失败（TS2307 ×2）。该模块零引用、未注册进 app.module，
-    // 运行时不受影响，但它自 2026-08-16 起使整个 API 无法构建——线上产物因而停留在 8/14。
-    // 补齐缺失文件后请删除此行。不删除源文件，以免影响作者在制工作。
-    "src/package-orders/**"
-  ]
+  "exclude": ["node_modules", "dist"]
 }
