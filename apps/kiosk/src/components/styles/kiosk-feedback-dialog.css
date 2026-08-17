@@ -129,7 +129,7 @@
 
 .kiosk-fb-btn-primary {
   background: var(--fy-teal);
-  color: #fff;
+  color: var(--fy-surface);
 }
 
 .kiosk-fb-btn-primary:disabled {
