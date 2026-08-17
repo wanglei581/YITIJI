@@ -68,6 +68,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
+  // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
+  { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '职业规划', requiresFusionRoot: false },
   { pattern: '/interview/setup', url: '/interview/setup', marker: screen('interview-setup'), featureText: '模拟面试', requiresFusionRoot: false },
   { pattern: '/interview/session', url: '/interview/session', marker: screen('interview-session'), featureText: '会话已失效', requiresFusionRoot: false },
@@ -131,6 +133,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/parse', url: '/resume/parse', marker: screen('resume-parse'), featureText: '未找到简历文件' },
   { pattern: '/resume/report', url: '/resume/report', marker: screen('resume-report'), featureText: '还没有诊断报告' },
   { pattern: '/resume/optimize', url: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
+  // S2-1 拆页。同上，无 taskId 直达停在前置缺失态。
+  { pattern: '/resume/optimize/compare', url: '/resume/optimize/compare', marker: screen('resume-optimize-compare'), featureText: '请先完成简历上传与解析' },
   { pattern: '/resume/export', url: '/resume/export', marker: screen('resume-export'), featureText: '导出与打印' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },

@@ -22,6 +22,14 @@ export {
 } from './AiTaskRegion'
 
 export {
+  AI_OUTAGE_CODES,
+  aiErrorCodeOf,
+  aiErrorMessageOf,
+  deriveAiAvailability,
+  isAiOutage,
+} from './aiOutage'
+
+export {
   AI_JUDGEMENT_DISCLAIMER,
   AI_JUDGEMENT_TEXT,
   AIGC_MARK_TEXT,

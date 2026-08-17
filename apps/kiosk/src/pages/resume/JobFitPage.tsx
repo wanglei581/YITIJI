@@ -39,11 +39,11 @@ import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscre
 import { readAiResumeSession } from './aiResumeSession'
 import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
 import { FitSkillMap } from './jobFit/FitSkillMap'
-import { GapActionCards } from './jobFit/GapActionCards'
-import { ResumeRewriteCard } from './jobFit/ResumeRewriteCard'
 import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
 import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
+import { JobAiConsentModal } from '../jobs/components/JobAiConsentModal'
+import { grantJobAiConsent } from '../../services/api/jobAi'
 import './jobFit-inkpaper.css'
 import './jobFit-inkpaper-ext.css'
 import './resume-fusion-youth.css'
@@ -79,6 +79,8 @@ export function JobFitPage() {
   const [keyword, setKeyword] = useState('')
   const [jobs, setJobs] = useState<ExternalJobDTO[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
+  /** 岗位列表**读取失败**；与「关键词没搜到」必须分开呈现。 */
+  const [jobsError, setJobsError] = useState(false)
   const [selectedJob, setSelectedJob] = useState<ExternalJobDTO | null>(null)
   const [manualTitle, setManualTitle] = useState('')
   const [manualReq, setManualReq] = useState('')
@@ -92,6 +94,11 @@ export function JobFitPage() {
   const [showAnonymousConsent, setShowAnonymousConsent] = useState(false)
   const [consentError, setConsentError] = useState<string | null>(null)
   const [memberConsentRequired, setMemberConsentRequired] = useState(false)
+  /** 会员就地授权弹窗（scope `job_ai`，复用岗位域同一套文案）。 */
+  const [showMemberConsent, setShowMemberConsent] = useState(false)
+  const [memberConsentBusy, setMemberConsentBusy] = useState(false)
+  /** 授权后要立刻重跑的那次分析入参，避免用户再点一遍。 */
+  const [pendingMemberInput, setPendingMemberInput] = useState<JobFitRequest | null>(null)
   const [anonymousConsentActive, setAnonymousConsentActive] = useState(false)
   const [revokingConsent, setRevokingConsent] = useState(false)
   const anonymousConsentRevisionRef = useRef(0)
@@ -102,8 +109,18 @@ export function JobFitPage() {
     let cancelled = false
     setJobsLoading(true)
     getJobs({ keyword: keyword || undefined, page: 1, pageSize: 8 })
-      .then((res) => { if (!cancelled) setJobs(res.data) })
-      .catch(() => { if (!cancelled) setJobs([]) })
+      .then((res) => {
+        if (cancelled) return
+        setJobsError(false)
+        setJobs(res.data)
+      })
+      .catch(() => {
+        if (cancelled) return
+        // 「没搜到岗位」和「岗位列表没取回来」对用户是两件事，
+        // 原实现一律渲染成空列表，等于把故障说成没有结果（章程门槛①）。
+        setJobsError(true)
+        setJobs([])
+      })
       .finally(() => { if (!cancelled) setJobsLoading(false) })
     return () => { cancelled = true }
   }, [keyword])
@@ -207,8 +224,11 @@ export function JobFitPage() {
           return
         }
         if (err.code === 'USER_AI_CONSENT_REQUIRED' && token) {
+          // 就地授权：记下本次入参，授权成功后直接重跑，用户不用离开本页也不用再点一次。
           setMemberConsentRequired(true)
-          setError('请先确认岗位 AI 辅助授权，再返回进行岗位匹配参考分析。')
+          setPendingMemberInput(input)
+          setShowMemberConsent(true)
+          setConsentError(null)
           return
         }
       }
@@ -244,6 +264,52 @@ export function JobFitPage() {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  /**
+   * 会员就地授权 → 立刻重跑分析。
+   *
+   * 与匿名路径的关键差别：匿名调 `POST /resume/job-fit/consent`（绑 taskId），
+   * 会员调 `POST /me/ai-consents`（scope `job_ai`，全局）。
+   * 那三个匿名端点对 Bearer 返回 400 是有意设计，不能拿会员 token 去调。
+   */
+  const handleConfirmMemberConsent = async () => {
+    const token = getToken()
+    const input = pendingMemberInput
+    if (!token || !input) return
+    setMemberConsentBusy(true)
+    setConsentError(null)
+    let granted = false
+    try {
+      await grantJobAiConsent(token)
+      granted = true
+      setShowMemberConsent(false)
+      setMemberConsentRequired(false)
+      setPendingMemberInput(null)
+      setAnalyzing(true)
+      const res = await analyzeJobFit(input, { token, accessToken })
+      if (res.status === 'failed') {
+        setError(res.failReason ?? '分析未完成，请稍后重试')
+      } else {
+        setResult(res)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '授权失败，请稍后重试'
+      // 已授权后失败的是分析本身，属页面级错误；授权本身失败才留在弹窗里。
+      if (granted) setError(message)
+      else setConsentError(message)
+    } finally {
+      setMemberConsentBusy(false)
+      setAnalyzing(false)
+    }
+  }
+
+  const handleCancelMemberConsent = () => {
+    setShowMemberConsent(false)
+    setPendingMemberInput(null)
+    setConsentError(null)
+    // 卡片继续留在页面上，用户随时可以再点一次授权 —— 不静默吞掉这件事。
+    setError('岗位匹配参考需要先同意岗位 AI 辅助；你可以在下方卡片重新授权。')
   }
 
   const handleCancelAnonymousConsent = () => {
@@ -298,6 +364,12 @@ export function JobFitPage() {
 
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
+    /**
+     * 行动页入口只在**真有内容**时出现。
+     * 计数是确定性逻辑（数组长度相加），不是 AI 判断 —— 因此不标 E3。
+     */
+    const gapActionCount =
+      (result.gapPoints ?? []).length + (result.targetedSuggestions ?? []).length
     return (
       <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-header">
@@ -323,8 +395,29 @@ export function JobFitPage() {
             matchPoints={result.matchPoints ?? []}
             keywordCoverage={result.decisionSupport?.keywordCoverage}
           />
-          <GapActionCards gapPoints={result.gapPoints ?? []} />
-          <ResumeRewriteCard items={result.targetedSuggestions ?? []} />
+          {/*
+            「怎么办」已拆到 `/resume/job-fit/actions`（S2-2，矩阵 §3.5）：
+            本页专心做「差在哪」（等级 + 逐条证据 + 关键词命中），
+            行动页专心做「怎么补」（差距项 + 定向改写 + 打印/改简历/备材料）。
+            原先两块同屏，27 寸竖屏上要一边读比对一边找按钮，两件事互相打断。
+          */}
+          {gapActionCount > 0 && (
+            <Card className="job-fit-card job-fit-gap-entry p-5">
+              <p className="text-sm leading-relaxed text-neutral-600">
+                这次一共列出 {gapActionCount} 条可以着手补的地方。补什么、怎么补、本机能不能补，
+                单独放在一屏里。
+              </p>
+              <Button
+                size="lg"
+                className="job-fit-primary-action mt-3 h-14 w-full"
+                onClick={() =>
+                  navigate('/resume/job-fit/actions', { state: { taskId, accessToken } })
+                }
+              >
+                我要补这些差距
+              </Button>
+            </Card>
+          )}
 
           {result.job?.sourceName && (
             <Card className="job-fit-card job-fit-source p-5">
@@ -397,6 +490,17 @@ export function JobFitPage() {
           onConfirm={() => void handleConfirmAnonymousConsent()}
         />
       )}
+      {/*
+        会员就地授权（S2-2 / 问题 F2）。复用岗位域的同一个弹窗与同一段法律文案 ——
+        同一个 scope `job_ai` 不能有两份说法。
+      */}
+      <JobAiConsentModal
+        open={showMemberConsent}
+        loading={memberConsentBusy}
+        error={consentError}
+        onCancel={handleCancelMemberConsent}
+        onConfirm={() => void handleConfirmMemberConsent()}
+      />
       <div className="job-fit-header">
         <KioskPageHeader
           title="岗位匹配参考"
@@ -448,6 +552,11 @@ export function JobFitPage() {
                 <p className="flex items-center gap-2 py-6 text-sm text-neutral-400" role="status">
                   <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />正在加载岗位…
                 </p>
+              ) : jobsError ? (
+                <p className="py-6 text-center text-sm text-error-fg" role="alert">
+                  岗位列表这次没取回来（不是没有岗位）。可以稍后重试，或直接切到「手填目标岗位」——
+                  手填不依赖岗位库，照常能做匹配参考。
+                </p>
               ) : jobs.length === 0 ? (
                 <p className="py-6 text-center text-sm text-neutral-400">没有找到岗位，可切换「手填目标岗位」</p>
               ) : (
@@ -498,7 +607,10 @@ export function JobFitPage() {
         {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
         {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
         {memberConsentRequired && (
-          <MemberJobFitConsentCard onNavigate={() => navigate('/jobs')} />
+          <MemberJobFitConsentCard
+            busy={memberConsentBusy}
+            onAuthorize={() => setShowMemberConsent(true)}
+          />
         )}
         {isAnonymous && anonymousConsentActive && (
           <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />

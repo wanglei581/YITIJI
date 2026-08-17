@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import ReactDiffViewer from 'react-diff-viewer-continued'
 import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import {
@@ -100,6 +99,12 @@ export function ResumeOptimizePage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [resumeTemplates, setResumeTemplates] = useState<ResumeTemplate[]>([])
+  /**
+   * 模板列表**读取失败**，与「模板列表为空」是两件事，屏幕上必须长得不一样。
+   * 原实现 `.catch(() => setResumeTemplates([]))` 把拿不到数据渲染成没有数据，
+   * 属交付章程门槛①「不撒谎」的直接违反（`interface-handoff.md` §4A 硬线）。
+   */
+  const [templatesError, setTemplatesError] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
@@ -121,13 +126,19 @@ export function ResumeOptimizePage() {
     getResumeTemplates()
       .then((templates) => {
         if (cancelled) return
+        setTemplatesError(false)
         setResumeTemplates(templates)
         setSelectedTemplateId((current) => {
           if (current && templates.some((template) => template.id === current)) return current
           return templates[0]?.id ?? ''
         })
       })
-      .catch(() => { if (!cancelled) setResumeTemplates([]) })
+      .catch(() => {
+        if (cancelled) return
+        // 失败就说失败：不把读取失败伪装成「没有可选模板」。
+        setTemplatesError(true)
+        setResumeTemplates([])
+      })
     return () => { cancelled = true }
   }, [])
 
@@ -327,21 +338,31 @@ export function ResumeOptimizePage() {
               </Card>
             )}
 
-            {modules.map((mod, idx) => (
-              <Card key={`${mod.title}-${idx}`} className="resume-lightflow__comparison-card overflow-hidden p-0">
-                <div className="flex items-center gap-3 border-b border-neutral-200 px-5 py-3">
-                  <p className="text-sm font-semibold text-neutral-800">{mod.title}</p>
-                  <span className="ml-auto rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-500">
-                    优化前(摘自原文)→ 建议参考
-                  </span>
-                </div>
-                <div className="text-xs [overflow-wrap:anywhere] [&_pre]:whitespace-pre-wrap">
-                  <ReactDiffViewer oldValue={mod.before} newValue={mod.after} splitView={false}
-                    disableWordDiff={false} hideLineNumbers={true}
-                    leftTitle="优化前(摘自原文)" rightTitle="建议参考" useDarkTheme={false} />
-                </div>
+            {/*
+              逐条对照已拆到 `/resume/optimize/compare`（S2-1，设计基线 09b-resume-optimize.html）。
+              本页保留「有多少条 + 去哪看」，把「一条一条决定改不改」交给专门那一屏 ——
+              27 寸竖屏上原先诊断评分与 N 组 diff 同屏，两块都读不清、按钮都点不准。
+            */}
+            {modules.length > 0 && (
+              <Card className="resume-lightflow__comparison-card p-5">
+                <p className="text-sm leading-relaxed text-neutral-600">
+                  这 {modules.length} 组建议是「原句 → 候选表达」的逐条对照。对照要一条一条读才有用，
+                  已单独放在一屏里，那里一次只让你决定一条。
+                </p>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="resume-lightflow__compare-entry mt-4"
+                  onClick={() =>
+                    requestLeave(() =>
+                      navigate('/resume/optimize/compare', { state: { taskId, accessToken } }),
+                    )
+                  }
+                >
+                  逐条看完整对照
+                </Button>
               </Card>
-            ))}
+            )}
 
             {optimizedResume && (
               <div className="resume-lightflow__editor-region">
@@ -378,6 +399,17 @@ export function ResumeOptimizePage() {
                 <p className="fy-side-sub">调整后编辑区实时预览，导出 PDF 按此排版</p>
                 <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
               </div>
+
+              {/* 读取失败 ≠ 没有模板：说清是取不到，并给出仍然可用的路径。 */}
+              {templatesError && (
+                <div className="fy-side-card resume-lightflow__template-card" role="status">
+                  <h3>简历模板</h3>
+                  <p className="fy-side-sub">
+                    模板列表这次没读取到，不是没有模板。导出仍可正常进行，只是会使用默认版式；
+                    右侧「排版调整」照常可用。
+                  </p>
+                </div>
+              )}
 
               {resumeTemplates.length > 0 && (
                 <div className="fy-side-card resume-lightflow__template-card">

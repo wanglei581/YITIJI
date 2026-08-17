@@ -60,6 +60,9 @@ console.log('\n=== 岗位匹配 M1.5 前端整合门禁 ===')
 const sharedAi = read(repoRoot, 'packages/shared/src/types/ai.ts')
 const jobFitApi = read(kioskRoot, 'src/services/api/jobFit.ts')
 const jobFitPage = read(kioskRoot, 'src/pages/resume/JobFitPage.tsx')
+// S2-2 拆页：「怎么补」搬到差距行动页，因此这两个组件的断言随之搬过去。
+// 门禁覆盖面不缩水 —— 原来断在结果页上的每一条，现在都在行动页上重新断一次。
+const jobFitActionsPage = read(kioskRoot, 'src/pages/resume/JobFitActionsPage.tsx')
 const recordsPage = read(kioskRoot, 'src/pages/profile/me/MyAiRecordsPage.tsx')
 const packageJson = read(kioskRoot, 'package.json')
 const ci = read(repoRoot, '.github/workflows/ci.yml')
@@ -88,19 +91,36 @@ expectIncludes(jobFitPage, 'fileUrl: file.printFileUrl', '打印确认页只接�
 expectIncludes(jobFitPage, "navigate('/print/confirm'", '岗位匹配进入现有打印确认页')
 expectIncludes(jobFitPage, "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })", '岗位匹配复用统一打印参数')
 expectAbsent(`${jobFitApi}\n${jobFitPage}`, /fileUrl:\s*file\.signedUrl|signedUrl/, '前端不把 signedUrl 交给打印任务')
-expectMatches(jobFitPage, /<ResumeRewriteCard[\s\S]{0,1200}\{error && <p[^>]*>{error}<\/p>\}/, '结果态打印失败会在当前页面诚实展示错误')
+// 打印动作已随「怎么补」搬到行动页，因此这四条打印合同在行动页上原样重断一次。
+expectIncludes(jobFitActionsPage, 'printJobFit(taskId, { token: getToken(), accessToken })', '行动页使用当前会员或匿名凭证生成报告')
+expectMatches(jobFitActionsPage, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '行动页内部打印 URL 缺失时诚实阻断')
+expectIncludes(jobFitActionsPage, 'fileUrl: file.printFileUrl', '行动页打印确认页只接收内部 printFileUrl')
+expectAbsent(jobFitActionsPage, /fileUrl:\s*file\.signedUrl|signedUrl/, '行动页不把 signedUrl 交给打印任务')
+// 原断言以 <ResumeRewriteCard 作锚点证明「打印失败在当前页可见」。组件搬走后锚点改为
+// 结果视图仍然存在的来源卡，断言的**性质不变**：错误必须渲染在同一屏，不是跳走或吞掉。
+expectMatches(jobFitPage, /job-fit-source[\s\S]{0,1600}\{error && <p[^>]*>{error}<\/p>\}/, '结果态失败会在当前页面诚实展示错误')
+// 比距离正则更硬的两条：错误必须以 alert 语义渲染在本页，且失败后仍保留重试入口。
+expectMatches(jobFitActionsPage, /\{error && \([\s\S]{0,240}role="alert"/, '行动页打印失败以告警语义在当前页面展示')
+expectIncludes(jobFitActionsPage, 'finally {\n      setPrinting(false)', '行动页打印失败后保留再次尝试入口')
 
 expectIncludes(jobFitPage, 'result.job?.id', '恢复结果以持久化岗位 id 决定查看入口')
 expectIncludes(jobFitPage, '查看岗位', '岗位 CTA 为查看岗位')
 expectMatches(jobFitPage, /navigate\(`\/jobs\/\$\{result\.job\.id\}`\)/, '查看岗位进入既有岗位详情')
 expectAbsent(jobFitPage, /\/jobs\/master|JobMaster|window\.open|去来源平台投递/, '岗位匹配页不复活独立入口或直接外跳')
+expectAbsent(jobFitActionsPage, /\/jobs\/master|JobMaster|window\.open|去来源平台投递/, '差距行动页不复活独立入口或直接外跳')
+// 合规红线随页面一起搬：行动页同样不得出现平台内投递文案（CLAUDE.md §2）。
+expectAbsent(jobFitActionsPage, /一键投递|立即投递|平台投递|投递简历/, '差距行动页不出现平台内投递文案')
+expectIncludes(jobFitActionsPage, '本平台不提供投递功能', '差距行动页保留不提供投递的合规文案')
+// 拆页的意义在于两页职责不重叠：结果页不得再自己渲染这两个组件。
+expectAbsent(jobFitPage, /<GapActionCards|<ResumeRewriteCard/, '结果页不再同屏渲染差距与改写（已拆至行动页）')
+expectIncludes(jobFitPage, "navigate('/resume/job-fit/actions'", '结果页提供差距行动页入口')
 
 for (const [source, label] of [[summary, '摘要'], [fitMap, '匹配依据'], [gaps, '差距行动'], [rewrite, '简历改写']]) {
   expectAbsent(source, /JobMaster|job_master|\/jobs\/master/, `${label}组件不依赖废弃岗位大师模型或路由`)
 }
 expectIncludes(fitMap, 'keywordCoverage', '关键词组件只读取可选 decisionSupport 关键词字段')
 expectIncludes(jobFitPage, 'result.decisionSupport?.keywordCoverage', '旧缓存无 decisionSupport 时页面自然降级')
-expectAbsent(`${jobFitPage}\n${summary}\n${fitMap}\n${gaps}\n${rewrite}`, /面试预判|晋升路径|风险与建议/, '无真实契约字段时不展示面试、晋升或风险结论')
+expectAbsent(`${jobFitPage}\n${jobFitActionsPage}\n${summary}\n${fitMap}\n${gaps}\n${rewrite}`, /面试预判|晋升路径|风险与建议/, '无真实契约字段时不展示面试、晋升或风险结论')
 expectIncludes(jobFitPage, "import './jobFit-inkpaper.css'", '岗位匹配页引入局部 LightFlow 样式')
 expectMatches(jobFitPage, /className="service-desk job-fit-inkpaper[^"]*"/, '岗位匹配页使用局部 LightFlow 根作用域')
 expectIncludes(jobFitPage, 'data-visual-theme="service-desk"', '岗位匹配页声明 service-desk 视觉主题')

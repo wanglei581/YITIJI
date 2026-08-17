@@ -1,0 +1,73 @@
+/*
+ * P11 岗位匹配 · 差距行动清单（S2-2 拆页）。
+ *
+ * 只消费语义 token，无裸 hex（`verify-kiosk-visual-unity` 对新增 CSS 零容忍）。
+ * 触控：主操作 ≥56px，可点区域 ≥48px（CLAUDE.md §9）。
+ */
+
+.job-fit-actions__region {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 空 / 加载 / 前置缺失共用卡片，与比对页保持同一形态。 */
+.job-fit-actions .job-fit-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 32px;
+  border: 1px solid var(--k-line);
+  border-radius: 18px;
+  background: var(--k-surface);
+  text-align: center;
+}
+
+.job-fit-actions__do {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.job-fit-actions__do-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--k-ink);
+}
+
+.job-fit-actions__do-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .job-fit-actions__do-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.job-fit-actions__do-btn {
+  min-height: 56px;
+  font-size: 16px;
+}
+
+.job-fit-actions__source-btn {
+  min-height: 56px;
+  min-width: 180px;
+}
+
+.job-fit-actions__legend {
+  margin-top: 4px;
+}
+
+.job-fit-actions__aigc {
+  align-self: flex-start;
+}
+
+.job-fit-actions__anon-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}

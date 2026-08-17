@@ -1,0 +1,220 @@
+/*
+ * P09B 简历逐条优化对照页（S2-1 拆页）。
+ *
+ * 只消费语义 token，不写裸 hex —— `verify-kiosk-visual-unity` 对新增 CSS 零容忍，
+ * allowlist 只冻结历史债务文件，新文件出现裸 hex 直接打红。
+ *
+ * 触控口径（CLAUDE.md §9）：主操作 ≥56px，任何可点区域 ≥48px。
+ * 27 寸竖屏上「一屏只做一个决定」，所以单条卡片给足留白，两栏在窄屏下堆叠。
+ */
+
+.resume-compare-lightflow {
+  gap: 0;
+}
+
+/* ── 常驻的「未保存」提示 ──────────────────────────────────────────────
+   不是 toast、不是 tooltip：用户在做第一个决定之前就得读到。 */
+.resume-compare__unsaved {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--color-warning);
+  border-radius: 14px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.resume-compare__region {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── 空 / 加载 / 前置缺失的统一卡片 ────────────────────────────────── */
+.resume-compare__state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 32px;
+  border: 1px solid var(--k-line);
+  border-radius: 18px;
+  background: var(--k-surface);
+  text-align: center;
+}
+
+.resume-compare__primary-action {
+  min-height: 56px;
+  min-width: 200px;
+  padding-inline: 28px;
+  font-size: 17px;
+}
+
+/* ── 概览条 ────────────────────────────────────────────────────────── */
+.resume-compare__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-compare__summary-count {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--k-ink);
+}
+
+.resume-compare__summary-hint {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--k-muted);
+}
+
+/* ── 逐条列表 ──────────────────────────────────────────────────────── */
+.resume-compare__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-compare__item {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border-left: 4px solid var(--k-line);
+}
+
+/* 已做决定的条目给一条左边框色差 —— 只是阅读进度标记，不表示已保存。 */
+.resume-compare__item[data-decision='adopt'] {
+  border-left-color: var(--k-teal-deep);
+}
+
+.resume-compare__item[data-decision='keep'] {
+  border-left-color: var(--k-action-deep);
+}
+
+.resume-compare__item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.resume-compare__item-no {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-muted);
+}
+
+.resume-compare__item-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--k-ink);
+}
+
+/* 两栏：左原文右候选。窄屏堆叠，避免 27 寸竖屏之外的设备横向裁切。 */
+.resume-compare__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .resume-compare__cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.resume-compare__col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  background: var(--k-paper);
+}
+
+.resume-compare__col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--k-muted);
+}
+
+.resume-compare__col-body {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--k-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ── 逐字差异（默认收起，避免每条都铺满一屏）────────────────────────── */
+.resume-compare__diff > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding-inline: 4px;
+  color: var(--k-teal-deep);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.resume-compare__diff-body {
+  margin-top: 8px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.resume-compare__diff-body pre {
+  white-space: pre-wrap;
+}
+
+/* ── 决定按钮 ──────────────────────────────────────────────────────── */
+.resume-compare__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.resume-compare__decision {
+  min-height: 56px;
+  min-width: 160px;
+  padding-inline: 24px;
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  background: var(--k-surface);
+  color: var(--k-ink);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.resume-compare__decision[aria-pressed='true'] {
+  border-color: var(--k-teal-deep);
+  background: var(--k-teal-soft);
+  color: var(--k-teal-deep);
+}
+
+.resume-compare__legend {
+  margin-top: 4px;
+}
+
+.resume-compare__aigc {
+  align-self: flex-start;
+}
+
+.resume-compare__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+}

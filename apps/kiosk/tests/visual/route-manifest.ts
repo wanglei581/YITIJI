@@ -1,6 +1,6 @@
 export const productionRoutePatterns = [
   '/', '/login', '/member/qr-login', '/upload/phone', '/legal/:doc',
-  '/resume/job-fit', '/resume/career-plan', '/interview/setup',
+  '/resume/job-fit', '/resume/job-fit/actions', '/resume/career-plan', '/interview/setup',
   '/interview/session', '/interview/report', '/interview/tips',
   '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   '/assistant', '/profile', '/me/resumes', '/me/print-orders', '/me/documents',
@@ -17,7 +17,7 @@ export const productionRoutePatterns = [
   '/print/cashier', '/print/progress', '/print/done', '/resume',
   '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
-  '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials', '/resume-service',
+  '/resume/optimize', '/resume/optimize/compare', '/resume/export', '/resume/templates', '/resume/materials', '/resume-service',
   '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
   '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/jobs-service', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',

@@ -197,7 +197,9 @@ const WAVE_ROUTES = new Map([
   ['W3', [
     '/resume', '/resume/upload', '/resume/source', '/resume/generate',
     '/resume/generate/preview', '/resume/parse', '/resume/report', '/resume/optimize',
+    '/resume/optimize/compare',
     '/resume/export', '/resume/templates', '/resume/materials', '/resume/job-fit',
+    '/resume/job-fit/actions',
     '/resume/career-plan', '/assistant', '/interview/setup', '/interview/session',
     '/interview/report', '/interview/tips', '/interview/reports',
     '/ai/plan', '/session-resume', '/resume-service', '/interview-service',
@@ -233,12 +235,12 @@ const WAVE_ROUTES = new Map([
 const routeInventory = routerInventory()
 const manifest = manifestInventory()
 
-check('104/104 routes', () => {
+check('106/106 routes', () => {
   const actual = routeInventory.map((route) => route.path)
-  assert.equal(actual.length, 104, `router exposes ${actual.length} normalized route patterns`)
-  assert.equal(new Set(actual).size, 104, 'router route patterns must be unique')
-  assert.equal(manifest.paths.length, 104, `manifest exposes ${manifest.paths.length} route patterns`)
-  assert.equal(new Set(manifest.paths).size, 104, 'manifest route patterns must be unique')
+  assert.equal(actual.length, 106, `router exposes ${actual.length} normalized route patterns`)
+  assert.equal(new Set(actual).size, 106, 'router route patterns must be unique')
+  assert.equal(manifest.paths.length, 106, `manifest exposes ${manifest.paths.length} route patterns`)
+  assert.equal(new Set(manifest.paths).size, 106, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   assert.equal(manifest.redirects.size, 5, 'manifest must contain five compatibility redirects')
   for (const [path, target] of manifest.redirects) {
@@ -260,7 +262,7 @@ check('wave ownership', () => {
   }
   const invalid = [...owners].filter(([, waves]) => waves.length !== 1)
   assert.deepEqual(invalid, [], `missing/duplicate ownership: ${JSON.stringify(invalid)}`)
-  assert.equal([...WAVE_ROUTES.values()].flat().length, 104, 'wave inventories must total 104')
+  assert.equal([...WAVE_ROUTES.values()].flat().length, 106, 'wave inventories must total 106')
 })
 
 function jsxDescendant(source, rootName, descendantName) {
@@ -498,10 +500,11 @@ check('W6 route acceptance contract', () => {
     assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
     return { pattern, viewport }
   })
-  assert.equal(routes.length, 104, 'W6 route cases must total 104')
-  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 104, 'W6 route cases must be unique')
+  assert.equal(routes.length, 106, 'W6 route cases must total 106')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 106, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 102, 'W6 kiosk allocation')
+  // 106 = 104 kiosk + 2 mobile。S2-1 / S2-2 两条新拆页都是一体机竖屏页，故 kiosk 由 102 增至 104。
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 104, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })
 
