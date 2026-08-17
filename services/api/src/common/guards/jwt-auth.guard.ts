@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { createHash } from 'node:crypto'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
@@ -6,6 +6,7 @@ import type { AuthedUser } from '../decorators/current-user.decorator'
 import type { UserRole } from '../decorators/roles.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
+import { tryRedis } from '../redis/redis-degradation'
 import { RedisService } from '../redis/redis.service'
 
 export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
@@ -38,9 +39,26 @@ interface CachedSessionState {
  *   @Roles('admin')
  *
  * 不主动检查角色 — 单独使用时表示"任意已登录用户"。
+ *
+ * ── Redis 在本守卫里到底是什么（决定了它挂掉时该怎么办）──────────────────────
+ *
+ * `internal:session-state:{userId}` 是**数据库行的只读缓存**，不是登出黑名单：
+ * 会话是否仍然有效，唯一真源是 `User` 表的 `tokenVersion / enabled / deletedAt`
+ * 与 `Organization.enabled`。全部撤销动作（改密、禁用账号、删除账号、机构停用、
+ * 手机号换绑）都是先提交数据库，再把新状态**镜像**进 Redis；
+ * `POST /auth/logout` 在源码注释里已明确声明「本端点不声称在服务端撤销已签发 JWT」。
+ *
+ * 因此 Redis 不可用时绕过缓存直接回源数据库，**不是放松鉴权**：
+ * 它得到的是与缓存命中时同一个判据的、更新鲜的版本，
+ * 反而消掉了缓存最多 60s 的陈旧窗口。真正危险的做法是相反方向 ——
+ * 「Redis 挂了就放行」或「缓存写失败就当鉴权失败」，两者本仓都不采用。
+ *
+ * 缓存写入失败同理不影响判定：下次请求读不到缓存就再回源一次。
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name)
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
@@ -104,15 +122,16 @@ export class JwtAuthGuard implements CanActivate {
 
   private async loadSessionState(userId: string): Promise<CachedSessionState | null> {
     const cacheKey = `internal:session-state:${userId}`
-    const cached = await this.redis.get(cacheKey)
-    if (cached) {
-      const parsed = this.parseSessionState(cached)
+    // 缓存读取有界且绝不抛出：读不到（超时/故障/未命中）一律按未命中处理，回源数据库。
+    const cached = await tryRedis('session-state:get', () => this.redis.get(cacheKey), this.logger)
+    if (cached.ok && cached.value) {
+      const parsed = this.parseSessionState(cached.value)
       if (parsed) {
         if (parsed.role !== 'partner') return parsed
         // Partner 缓存命中也必须回源，避免 Redis 残留把已删除账号短暂复活。
         return this.loadSessionStateFromDatabase(userId, cacheKey)
       }
-      await this.redis.del(cacheKey)
+      await tryRedis('session-state:del', () => this.redis.del(cacheKey), this.logger)
     }
 
     return this.loadSessionStateFromDatabase(userId, cacheKey)
@@ -146,15 +165,22 @@ export class JwtAuthGuard implements CanActivate {
       deletedAt: user.deletedAt?.toISOString() ?? null,
       orgEnabled,
     }
-    const writeResult = await this.redis.setJsonIfVersionNotOlder(
-      cacheKey,
-      INTERNAL_SESSION_CACHE_TTL_SECONDS,
-      JSON.stringify(state),
-      state.tokenVersion,
+    // 回写只是加速下一次请求。写失败不改变本次判定 —— state 已经是数据库真源。
+    const writeResult = await tryRedis(
+      'session-state:set',
+      () => this.redis.setJsonIfVersionNotOlder(
+        cacheKey,
+        INTERNAL_SESSION_CACHE_TTL_SECONDS,
+        JSON.stringify(state),
+        state.tokenVersion,
+      ),
+      this.logger,
     )
-    if (writeResult === 'stale') {
-      const latest = await this.redis.get(cacheKey)
-      const parsed = latest ? this.parseSessionState(latest) : null
+    if (writeResult.ok && writeResult.value === 'stale') {
+      // 缓存里有更高的 tokenVersion（并发撤销已经先落缓存）——以那份更新的为准。
+      // 读不回来时退回本次数据库快照，不会因此放行更旧的版本。
+      const latest = await tryRedis('session-state:get', () => this.redis.get(cacheKey), this.logger)
+      const parsed = latest.ok && latest.value ? this.parseSessionState(latest.value) : null
       return parsed ?? state
     }
     return state

@@ -1,6 +1,7 @@
 export * from './types/user'
 export * from './types/device'
 export * from './types/job'
+export * from './types/jobRequirementStats'
 export * from './types/recruitmentDirectory'
 export * from './types/recruitmentAgency'
 export * from './types/recruitmentIntegration'

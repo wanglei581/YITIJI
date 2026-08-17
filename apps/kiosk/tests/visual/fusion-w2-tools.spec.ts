@@ -54,7 +54,11 @@ test('tool center honors terminal capability configuration @w2', async ({ page, 
   await expectHealthy(page, errors, 'print-scan-home')
 })
 
-test('tool center exposes the miniapp pickup claim entry @w2', async ({ page, api }) => {
+// P39 迁移（V6 纵切第一刀）后，这个入口改名叫「到机码核销」并移出「七件事」栅格：
+// 后端与小程序下单页本来就叫它到机码（pickup-order.service.ts 的「到机码无效或已过期」），
+// 它和付款后生成的「取件凭证码」(Order.pickupCode) 是两个码。
+// 合同不变：入口必须可见、可点、落到 /print/pickup-claim。
+test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
@@ -63,8 +67,12 @@ test('tool center exposes the miniapp pickup claim entry @w2', async ({ page, ap
   })
 
   await page.goto('/print-scan')
-  const entry = page.getByRole('button', { name: /扫码或输入取件码/ })
+  const entry = page.getByRole('button', { name: /到机码核销/ })
   await expect(entry).toBeVisible()
+  // 两个码必须在卡面上被区分开，否则用户拿错码白跑一趟。
+  await expect(entry).toContainText('不是付款后的取件凭证码')
+  // 它不占「七件事」栅格的格子 —— 标题写着七件事，就必须只有七张能力卡。
+  await expect(page.locator('.v6-ph-grid .v6-ph-card')).toHaveCount(8) // 7 张能力卡 + 1 张状态卡
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)

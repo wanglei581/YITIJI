@@ -35,6 +35,7 @@
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
     "verify:production-real-services": "node scripts/verify-production-real-services.mjs",
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
+    "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:print-parameter-capability": "node scripts/verify-print-parameter-capability.mjs",
     "verify:device-status-honest": "node scripts/verify-device-status-honest.mjs",

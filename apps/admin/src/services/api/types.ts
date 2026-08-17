@@ -331,6 +331,7 @@ export type AiOperation =
   | 'voiceTranscribe'   // ASR：按时长计费，estimatedCostCny 通常为 undefined
   | 'voiceSynthesize'   // TTS：按字符计费，estimatedCostCny 通常为 undefined
   | 'selfAssessment'    // 自我探索 · 倾向参考（2026-08-01）
+  | 'contractReview'    // 合同审查（2026-08-17）：此前完全不落 AiServiceLog
 
 
 export type AiLogStatus = 'success' | 'failed'
@@ -353,6 +354,21 @@ export interface AdminAiLogEntry {
   terminalId?: string | null
 }
 
+/**
+ * 单个能力的成本三态（后端真相源：services/api/src/ai/ai-log.service.ts AiOperationCost）。
+ *
+ * 纯 number 的 0 同时兼表「花了 0 元」和「没采集到」，前端只能一律渲染 ¥0.0000，
+ * 对真实付费调用少算成本且运营看不出来。三态判定：
+ * - calls === 0                      → 无调用
+ * - calls > 0 且 measuredCalls === 0 → **未采集**，必须显示「未估算」，禁止显示 ¥0
+ * - measuredCalls > 0                → cny 为已采集部分；不足 calls 时还要标注剩余未估算
+ */
+export interface AiOperationCost {
+  cny: number
+  calls: number
+  measuredCalls: number
+}
+
 export interface AdminAiUsage {
   providerName: string
   totalCalls: number
@@ -367,14 +383,20 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
-  costByOperation: Record<AiOperation, number>
+  /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost。 */
+  costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{
     level: 'warning' | 'critical'
     code: string
     title: string
     detail: string
   }>
+  /** 已采集部分的成本合计。unmeasuredCalls > 0 时这是**下限**，不是全部花费。 */
   estimatedCostCny: number
+  /** 窗口内成本未采集的调用数。 */
+  unmeasuredCalls: number
+  /** token 用量开始采集的日期（YYYY-MM-DD）。此前的调用未采集，且**不回填**。 */
+  costCollectionSince: string
 }
 
 export interface AdminAiLogsResult {
