@@ -136,7 +136,14 @@ must('reportExits', '不拿通用建议顶替', '失败态必须写明不给结�
 // 原型口径：10-resume-interview.html:394「把已答的部分导出成草稿带走」/ :523「草稿 ≠ 成文简历」
 
 must('generate', /<AiTaskRegion/, '生成页失败态必须挂 AiTaskRegion（fallback 是必填 prop，防止支线被摘掉）')
-must('generate', /mode: 'blocked'/, '降级模式必须是 blocked —— 草稿不是 AI 润色的等价替代，套 manual 就是伪造能力')
+// 两档都要有，且必须按「是不是能力级故障」二选一：
+//   blocked            AI 真的挂了 → 入口按钮这次按了也没用，置灰 + 写清原因
+//   result-unavailable 模型跑了但这次没出结果 → 服务是通的，入口保留可重试
+// 一律用 blocked 会出现「灰按钮说不可用」和「底部生成按钮仍可点」自相矛盾；
+// 一律用 manual 则是宣称草稿等价于 AI 润色（伪造能力，CLAUDE.md §9）。
+must('generate', /mode: 'blocked'/, 'ai-down（能力级故障）必须走 blocked')
+must('generate', /mode: 'result-unavailable'/, '本次失败但服务可用时必须走 result-unavailable，不得说成能力不可用')
+mustNot('generate', /mode: 'manual'/, '草稿不是 AI 润色的等价替代，不得套 manual')
 must('generate', /没有丢/, 'stillAvailable 必须如实告诉用户已填内容没丢')
 must('generate', /onClick: \(\) => void handleExportDraft\(\)/, '降级动作必须真的挂到草稿导出处理器上')
 
@@ -180,7 +187,9 @@ mustNot('interviewSetup', /failed: Boolean\(error\)/, 'ai-down 判据不得直�
 must('interviewSetup', /failed: startFailed \|\| Boolean\(aiOutage\)/, 'ai-down 判据必须来自「进面试间真的失败过」而不是任意 error')
 
 must('interviewSetup', /<AiTaskRegion/, '面试设置页失败态必须挂 AiTaskRegion')
-must('interviewSetup', /mode: 'blocked'/, '降级模式必须是 blocked —— 通用题目单不是模拟面试的等价替代')
+must('interviewSetup', /mode: 'blocked'/, 'ai-down（能力级故障）必须走 blocked')
+must('interviewSetup', /mode: 'result-unavailable'/, '本次失败但服务可用时必须走 result-unavailable，不得说成能力不可用')
+mustNot('interviewSetup', /mode: 'manual'/, '通用题目单不是模拟面试的等价替代，不得套 manual')
 must('interviewSetup', /通用题库/, '降级文案必须写明题目来自通用题库，不是按岗位定制')
 must('interviewSetup', /不含任何点评/, '降级文案必须写明本单不含点评')
 must('interviewSetup', "navigate('/interview/tips')", '必须保留一条完全不依赖 AI 的准备要点出路')

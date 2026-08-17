@@ -277,23 +277,35 @@ export function InterviewSetupPage() {
     failed: startFailed || Boolean(aiOutage),
     hasResult: false,
   })
-  const fallback: AiTaskFallback = {
-    mode: 'blocked',
-    reason: aiOutage ?? (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
-    blockedActionLabel: '开始模拟面试（AI 面试官）',
-    stillAvailable: pendingSession
-      ? '题目本身不依赖 AI：本机有一份写死的通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
-        + '这张单子不含任何点评、评分或通过率 —— 点评依赖 AI，本次没有，也不会拿通用建议冒充。'
-      : '本次连练习会话都没建起来，因此印不出按本场配置取题的题目单。面试准备要点是本机固定内容，不依赖 AI，现在照常可看。',
-    ...(pendingSession
-      ? {
-          action: {
-            label: printingSheet ? '正在生成题目单…' : '打印通用题目与答案单',
-            onClick: () => void handlePracticeSheet(),
-          },
-        }
-      : {}),
-  }
+  const STILL_AVAILABLE = pendingSession
+    ? '题目本身不依赖 AI：本机有一份写死的通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
+      + '这张单子不含任何点评、评分或通过率 —— 点评依赖 AI，本次没有，也不会拿通用建议冒充。'
+    : '本次连练习会话都没建起来，因此印不出按本场配置取题的题目单。面试准备要点是本机固定内容，不依赖 AI，现在照常可看。'
+  const sheetAction = pendingSession
+    ? {
+        action: {
+          label: printingSheet ? '正在生成题目单…' : '打印通用题目与答案单',
+          onClick: () => void handlePracticeSheet(),
+        },
+      }
+    : {}
+  const fallback: AiTaskFallback = aiOutage
+    ? {
+        // 能力级不可用：底部「开始模拟面试」这次按了也没用，置灰它并写清原因。
+        mode: 'blocked',
+        reason: aiOutage,
+        blockedActionLabel: '开始模拟面试（AI 面试官）',
+        stillAvailable: STILL_AVAILABLE,
+        ...sheetAction,
+      }
+    : {
+        // 这一次失败但服务是通的（限流 / 参数等）：**不是**能力不可用。
+        // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
+        mode: 'result-unavailable',
+        reason: (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「开始模拟面试」；不想等的话，${STILL_AVAILABLE}`,
+        ...sheetAction,
+      }
 
   return (
     <InterviewShell>

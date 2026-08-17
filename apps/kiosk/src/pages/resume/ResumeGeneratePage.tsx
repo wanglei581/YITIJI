@@ -328,15 +328,30 @@ export function ResumeGeneratePage() {
     failed: Boolean(error) || Boolean(aiOutage),
     hasResult: false,
   })
-  const fallback: AiTaskFallback = {
-    mode: 'blocked',
-    reason: aiOutage ?? error ?? '本次没能生成简历。',
-    blockedActionLabel: 'AI 润色成文',
-    stillAvailable:
-      '你填的内容还留在这一页上，没有丢 —— 上下翻页、继续补充都照常。'
-      + '导出与打印不经过 AI：下面这条可以把你填的原话直接排成 A4 PDF 打印带走（未经润色，也没有缺失提示）。',
-    action: { label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）', onClick: () => void handleExportDraft() },
+  const draftAction = {
+    label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）',
+    onClick: () => void handleExportDraft(),
   }
+  const STILL_AVAILABLE =
+    '你填的内容还留在这一页上，没有丢 —— 上下翻页、继续补充都照常。'
+    + '导出与打印不经过 AI：下面这条可以把你填的原话直接排成 A4 PDF 打印带走（未经润色，也没有缺失提示）。'
+  const fallback: AiTaskFallback = aiOutage
+    ? {
+        // 能力级不可用：底部「生成我的简历」这次按了也没用，置灰它并写清原因。
+        mode: 'blocked',
+        reason: aiOutage,
+        blockedActionLabel: 'AI 润色成文',
+        stillAvailable: STILL_AVAILABLE,
+        action: draftAction,
+      }
+    : {
+        // 模型跑了但这一次没出可用结果：**不是**能力不可用。
+        // 这里若也用 blocked，就会出现「灰按钮说不可用」和「底部生成按钮仍可点」自相矛盾。
+        mode: 'result-unavailable',
+        reason: error ?? '本次没能生成简历。',
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「生成我的简历」；不想等的话，${STILL_AVAILABLE}`,
+        action: draftAction,
+      }
 
   const stepIcon = [UserRoundIcon, BriefcaseIcon, GraduationCapIcon, BriefcaseIcon, FolderGitIcon, WrenchIcon][step]
   const StepIcon = stepIcon
