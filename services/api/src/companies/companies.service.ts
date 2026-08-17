@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import {
   COMPANY_INDUSTRIES,
   COMPANY_RECRUIT_TYPES,
@@ -398,11 +399,22 @@ export class CompaniesService {
   }
 
   async adminPublish(id: string, dto: AdminPublishCompanyDto, actor: { userId: string }) {
-    const existing = await this.prisma.companyProfile.findUnique({ where: { id }, select: { reviewStatus: true } })
+    const existing = await this.prisma.companyProfile.findUnique({
+      where: { id },
+      select: { reviewStatus: true, sourceOrgId: true },
+    })
     if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
     // 合规红线：未审核通过的企业绝不能发布
     if (dto.publish && existing.reviewStatus !== 'approved') {
       throw new BadRequestException({ error: { code: 'COMPANY_NOT_APPROVED', message: '企业未审核通过，不能发布' } })
+    }
+    if (dto.publish) {
+      // 发布闸门：来源机构必须 contentTrustStatus='active' 且未归档（fail-closed）。
+      // 详见 src/common/content-trust.ts 顶部注释。下架（publish=false）不受限制。
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, existing.sourceOrgId, {
+        contentType: '企业资料',
+        contentId: id,
+      })
     }
     const updated = await this.prisma.companyProfile.update({
       where: { id },

@@ -10,6 +10,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { CreatePolicyPostDto, UpdatePolicyPostDto } from './dto/policy.dto'
 import type { ReviewAction } from '../jobs/dto/review.dto'
 import type { PublishAction } from '../jobs/dto/publish.dto'
+import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 
 // ============================================================
 // PoliciesService — 阶段1D:政策服务(政策扶持条目 + 政策公告)
@@ -297,6 +298,14 @@ export class PoliciesService {
     if (action === 'publish' && post.reviewStatus !== 'approved') {
       throw new BadRequestException({
         error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的政策内容不得发布' },
+      })
+    }
+    if (action === 'publish') {
+      // 发布闸门:来源机构必须 contentTrustStatus='active' 且未归档(fail-closed)。
+      // 详见 src/common/content-trust.ts 顶部注释。unpublish 不受闸门限制。
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, post.sourceOrgId, {
+        contentType: '政策内容',
+        contentId: id,
       })
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'

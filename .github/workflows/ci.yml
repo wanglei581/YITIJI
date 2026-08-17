@@ -446,6 +446,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-status-idempotency
           # 批量发布:纯内存假 Prisma,不连库、不起 HTTP,两个 job 都能直接跑
           pnpm --filter @ai-job-print/api verify:bulk-publish
+          # 发布闸门:来源机构 contentTrustStatus≠active(或已归档)的内容一律不得发布。
+          # 事故背景:治理清单裁定「未授权不进入生产」的机构,其岗位仍被推上生产公网 ——
+          # 因为闸门只存在于管理端只读视图,发布路径零引用。同样是纯内存假 Prisma。
+          pnpm --filter @ai-job-print/api verify:content-trust-publish-gate
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
@@ -760,6 +764,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-list-integrity
           pnpm --filter @ai-job-print/api verify:policy-eligibility-authoring
           pnpm --filter @ai-job-print/api verify:bulk-publish
+          # 发布闸门（见 build-and-verify 同名条目）：PG 侧同样跑一遍，
+          # 因为 preview 的 sourceOrgId in/notIn 下推会生成 SQL，两种 provider 都要回归。
+          pnpm --filter @ai-job-print/api verify:content-trust-publish-gate
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts

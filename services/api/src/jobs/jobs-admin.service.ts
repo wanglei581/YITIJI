@@ -17,6 +17,7 @@ import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.ser
 import type { ReviewAction } from './dto/review.dto'
 import type { PublishAction } from './dto/publish.dto'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import {
   type AdminJobDto,
   type AdminFairDto,
@@ -105,6 +106,12 @@ export class JobsAdminService {
           error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的岗位不得发布' },
         })
       }
+      // 发布闸门:来源机构必须 contentTrustStatus='active' 且未归档(fail-closed)。
+      // 只拦 publish;unpublish（下架）永远放行，否则不可信内容将无法被撤下。
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, job.sourceOrgId, {
+        contentType: '岗位',
+        contentId: id,
+      })
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
     const updated = await this.prisma.job.update({
@@ -181,6 +188,13 @@ export class JobsAdminService {
     if (action === 'publish' && fair.reviewStatus !== 'approved') {
       throw new BadRequestException({
         error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的招聘会不得发布' },
+      })
+    }
+    if (action === 'publish') {
+      // 发布闸门:见 publishJobSource 同处注释。
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, fair.sourceOrgId, {
+        contentType: '招聘会',
+        contentId: id,
       })
     }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'

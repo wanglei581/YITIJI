@@ -12,6 +12,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { signFairMaterialPreviewUrl, signFairMaterialUrl } from './fair-material-signing'
 import type { UpdateFairMaterialDto } from './dto/admin-fair.dto'
 import type { PublishAction } from './dto/publish.dto'
+import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
 import { FairMaterialPrintBridgeService, type FairMaterialPrintView } from './fair-material-print-bridge.service'
 
 // ============================================================
@@ -195,6 +196,15 @@ export class FairMaterialService {
 
   async publishMaterial(fairId: string, materialId: string, action: PublishAction, user: AuthedUser): Promise<FairMaterialDto> {
     const material = await this.assertMaterialInFair(fairId, materialId)
+    if (action === 'publish') {
+      // 发布闸门:资料本身没有 sourceOrgId,信任归属跟随所属招聘会的来源机构。
+      // 详见 src/common/content-trust.ts 顶部注释。unpublish / delete 不受限制。
+      const fair = await this.prisma.jobFair.findUnique({ where: { id: fairId }, select: { sourceOrgId: true } })
+      await assertOrgContentTrustActive(this.prisma as unknown as OrgTrustReader, fair?.sourceOrgId, {
+        contentType: '招聘会资料',
+        contentId: materialId,
+      })
+    }
     const toStatus = action === 'publish' ? 'published' : 'unpublished'
     const updated = await this.prisma.fairMaterial.update({
       where: { id: materialId },

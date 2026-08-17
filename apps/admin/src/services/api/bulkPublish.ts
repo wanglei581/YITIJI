@@ -55,7 +55,13 @@ export interface BulkPublishPreviewResult {
   eligibleTotal: number
   items: BulkPublishPreviewItem[]
   truncated: boolean
-  excluded: { notApproved: number; alreadyPublished: number; expired: number }
+  excluded: {
+    notApproved: number
+    alreadyPublished: number
+    expired: number
+    /** 来源机构未通过内容信任核验(contentTrustStatus≠active 或已归档),发布闸门在预览阶段就排除 */
+    orgTrustInactive: number
+  }
 }
 
 export interface BulkPublishItemResult {
@@ -145,7 +151,7 @@ const mockAdapter: BulkPublishServiceInterface = {
       eligibleTotal: items.length,
       items,
       truncated: false,
-      excluded: { notApproved: 2, alreadyPublished: 1, expired: 0 },
+      excluded: { notApproved: 2, alreadyPublished: 1, expired: 0, orgTrustInactive: 3 },
     }
   },
   async execute(kind, ids) {

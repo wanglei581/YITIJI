@@ -127,6 +127,8 @@ async function main() {
         id: orgId,
         name: `招聘会审核验证机构_${suffix}`,
         type: 'fair_organizer',
+        // 发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
+        contentTrustStatus: 'active',
       },
     })
 

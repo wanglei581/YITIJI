@@ -13,6 +13,8 @@ import {
   UpdateOrgDto,
 } from './dto/admin-org.dto'
 import { BindAccountEmailDto } from './dto/bind-account-email.dto'
+import { OrgContentTrustDto } from './dto/org-content-trust.dto'
+import { AdminOrgContentTrustService } from './admin-org-content-trust.service'
 
 /**
  * Admin 合作机构管理(阶段1B)。
@@ -27,6 +29,8 @@ import { BindAccountEmailDto } from './dto/bind-account-email.dto'
  *   PATCH  /admin/orgs/:id/accounts/:accountId/status   账号启停
  *   PATCH  /admin/orgs/:id/accounts/:accountId/password 重置账号密码
  *   PUT    /admin/orgs/:id/accounts/:accountId/email    代绑/换绑登录邮箱（Admin 人工核验，无 SMTP）
+ *   GET    /admin/orgs/:id/content-trust                内容信任状态（发布闸门读什么，这里就显示什么）
+ *   PATCH  /admin/orgs/:id/content-trust                标记内容信任（active 才允许发布该机构内容）
  *
  * 合规:机构 = 外部数据来源方/运营协作方;启用模块白名单校验,招聘闭环模块硬拒绝。
  */
@@ -34,7 +38,10 @@ import { BindAccountEmailDto } from './dto/bind-account-email.dto'
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminOrgsController {
-  constructor(private readonly orgs: AdminOrgsService) {}
+  constructor(
+    private readonly orgs: AdminOrgsService,
+    private readonly contentTrust: AdminOrgContentTrustService,
+  ) {}
 
   @Get('admin/orgs')
   listOrgs() {
@@ -84,6 +91,18 @@ export class AdminOrgsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.orgs.resetAccountPassword(id, accountId, dto.password, user)
+  }
+
+  /** 发布闸门读的就是这三个 reviewed 字段 + status,这里原样回显,不做美化。 */
+  @Get('admin/orgs/:id/content-trust')
+  getContentTrust(@Param('id') id: string) {
+    return this.contentTrust.getContentTrust(id)
+  }
+
+  /** 标记内容信任。只有 active + 未归档的机构,其岗位/招聘会/政策/企业内容才允许发布。 */
+  @Patch('admin/orgs/:id/content-trust')
+  setContentTrust(@Param('id') id: string, @Body() dto: OrgContentTrustDto, @CurrentUser() user: AuthedUser) {
+    return this.contentTrust.setContentTrust(id, dto, user)
   }
 
   @Put('admin/orgs/:id/accounts/:accountId/email')

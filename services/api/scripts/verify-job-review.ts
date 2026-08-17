@@ -88,7 +88,8 @@ async function main() {
 
   try {
     await cleanup()
-    await prisma.organization.create({ data: { id: orgId, name: '审核验证机构', type: 'hr_company' } })
+    // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)。
+    await prisma.organization.create({ data: { id: orgId, name: '审核验证机构', type: 'hr_company', contentTrustStatus: 'active' } })
     // 审核/发布会写审计（actorId → User FK）；建 admin User 夹具使审计真正落库（对齐真实管理员操作）。
     await prisma.user.create({ data: { id: user.userId, username: `vjr_admin_${sfx}`, passwordHash: 'x', name: '审核管理员', role: 'admin' } })
 

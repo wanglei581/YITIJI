@@ -23,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { JobsService } from '../jobs/jobs.service'
 import { PoliciesService } from '../policies/policies.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { listContentTrustedOrgIds, type OrgTrustReader } from '../common/content-trust'
 
 export type BulkPublishKind = 'job' | 'fair' | 'policy'
 
@@ -71,6 +72,14 @@ export interface BulkPublishPreviewResult {
     notApproved: number
     alreadyPublished: number
     expired: number
+    /**
+     * 来源机构未通过内容信任核验(contentTrustStatus≠active 或已归档)。
+     *
+     * 这些条目**在预览阶段就被排除**,不进候选列表 —— 运营点「批量发布」之前
+     * 就能看见「有 N 条因为来源机构没过核验发不了」,而不是提交后才逐条报错。
+     * 判据与单条发布闸门同源,见 src/common/content-trust.ts。
+     */
+    orgTrustInactive: number
   }
 }
 
@@ -182,17 +191,27 @@ export class BulkPublishService {
     const d = this.descriptor(filter.kind)
     const scope = this.scopeWhere(filter)
 
+    // 发布闸门在预览阶段就生效:候选池只留来源机构 contentTrust=active 且未归档的条目。
+    // 不这么做的话,运营会先看到一份「看起来可发」的清单,提交后才逐条 400 ——
+    // 事故正是这样发生的(见 src/common/content-trust.ts 顶部)。
+    const trustedOrgIds = await listContentTrustedOrgIds(this.prisma as unknown as OrgTrustReader)
+
+    // 用 AND 组合而不是对象展开:scope 里可能已经有 `sourceOrgId: '<按机构筛选>'`,
+    // 直接 `{ ...scope, sourceOrgId: { in: ... } }` 会把操作者的机构筛选**悄悄覆盖掉**。
+    const approvedAndPublishable = { reviewStatus: 'approved', publishStatus: { in: BULK_PUBLISHABLE_FROM } }
     const eligibleWhere = {
-      ...scope,
-      reviewStatus: 'approved',
-      publishStatus: { in: BULK_PUBLISHABLE_FROM },
+      AND: [scope, approvedAndPublishable, { sourceOrgId: { in: trustedOrgIds } }],
     }
 
-    const [eligibleTotal, notApproved, alreadyPublished, expired, rows] = await Promise.all([
+    const [eligibleTotal, notApproved, alreadyPublished, expired, orgTrustInactive, rows] = await Promise.all([
       d.count({ where: eligibleWhere }),
       d.count({ where: { ...scope, reviewStatus: { not: 'approved' } } }),
       d.count({ where: { ...scope, reviewStatus: 'approved', publishStatus: 'published' } }),
       d.count({ where: { ...scope, reviewStatus: 'approved', publishStatus: 'expired' } }),
+      // 「本来该能发、只差来源机构核验」的条数:approved + draft/unpublished,但机构不可信。
+      d.count({
+        where: { AND: [scope, approvedAndPublishable, { sourceOrgId: { notIn: trustedOrgIds } }] },
+      }),
       d.findMany({
         where: eligibleWhere,
         select: {
@@ -225,7 +244,7 @@ export class BulkPublishService {
       eligibleTotal,
       items,
       truncated: eligibleTotal > items.length,
-      excluded: { notApproved, alreadyPublished, expired },
+      excluded: { notApproved, alreadyPublished, expired, orgTrustInactive },
     }
   }
 

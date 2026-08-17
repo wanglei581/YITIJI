@@ -51,6 +51,8 @@ export type AuditAction =
   | 'auth.phone_released_by_admin'
   | 'organization.create'
   | 'organization.update'
+  /** 内容信任标记（发布闸门的人工核验决策，见 src/common/content-trust.ts） */
+  | 'organization.content_trust'
   | 'user.create'
   | 'user.disable'
   | 'system.login'

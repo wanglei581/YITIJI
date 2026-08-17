@@ -336,6 +336,13 @@ function PreviewStep({ preview, label }: { preview: BulkPublishPreviewResult; la
           命中筛选但不在本次发布范围内:未通过审核 {excluded.notApproved} 条(需先审核)、已发布{' '}
           {excluded.alreadyPublished} 条、已过期 {excluded.expired} 条。
         </p>
+        {excluded.orgTrustInactive > 0 && (
+          <p className="mt-1 text-xs text-warning-fg">
+            另有 {excluded.orgTrustInactive} 条已过审但<strong>来源机构未通过内容信任核验</strong>
+            (未标记 / 已暂停 / 已撤销 / 已归档),按 fail-closed 不进本次发布范围。
+            需先完成来源授权核验,再到「合作机构」把该机构标记为内容可信。
+          </p>
+        )}
       </div>
 
       {items.length === 0 ? (

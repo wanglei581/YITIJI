@@ -155,7 +155,8 @@ async function main() {
   const adminUser: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
   // ── 测试数据:机构 + 两场招聘会(一场已发布、一场待审核)────────────────
-  await prisma.organization.create({ data: { id: orgId, name: `验证机构_${suffix}`, type: 'gov' } })
+  // contentTrustStatus='active':发布闸门要求来源机构已通过内容信任核验(见 src/common/content-trust.ts)
+  await prisma.organization.create({ data: { id: orgId, name: `验证机构_${suffix}`, type: 'gov', contentTrustStatus: 'active' } })
   const fairPublished = await prisma.jobFair.create({
     data: {
       sourceOrgId: orgId, externalId: `VAF-PUB-${suffix}`, sourceName: '验证来源', sourceUrl: 'https://example.org/f1',

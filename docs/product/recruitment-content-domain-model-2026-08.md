@@ -111,6 +111,8 @@ OfflineAgency / OfflineJob：迁移期 legacy，只兼容读取和映射，最�
 
 - 目标枚举补 `pending`；新 Organization / JobSource 的 trust 与 approval 默认 `pending`，不得默认信任。
 - Expand 阶段新增字段保持 nullable，旧 reader 不读取新门禁；`null` 不等于 `active`。
+- **2026-08-17 起发布路径已切门禁**（`services/api/src/common/content-trust.ts`）：所有把内容变成 `published` 的路径（岗位 / 招聘会 / 政策 / 企业资料 / 招聘会资料 / 有来源机构的线下机构）都要求 `contentTrustStatus === 'active' && archivedAt == null`，否则 400 `ORG_CONTENT_TRUST_REQUIRED`；批量发布在**预览阶段**就把不可信来源计入 `excluded.orgTrustInactive`。下架（unpublish）不受闸门限制，否则不可信内容撤不下来。**公开读取路径仍未切**（回填未完成时会让前台整体变空），是后续项。
+- 人工标记入口 `PATCH /api/v1/admin/orgs/:id/content-trust`（仅 admin，写 `contentTrustReviewedBy/At/Reason` + `organization.content_trust` 审计；标 `active` 必须填核验依据）；存量批量标记走 `maintenance:backfill-org-content-trust`（必须显式传 id，默认 dry-run，**没有「全部一键 active」开关**）。门禁：`verify:content-trust-publish-gate`。
 - `enabled → syncEnabled` 可机械回填，但 `enabled` 不能反推 approval/trust；后两者必须由 AuditLog、来源证明和人工清单确认。
 - 兼容期写路径同时维护 `enabled` 与 `syncEnabled`，读取同步开关使用 `syncEnabled ?? enabled`；只有 backfill 完整率 100%、blocker=0 且验收通过后才切换新 reader。
 - Contract 前必须证明新状态字段 `null=0`，再收紧 NOT NULL。
