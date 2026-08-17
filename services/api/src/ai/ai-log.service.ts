@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { AiProviderName } from './interfaces/ai-provider.interface'
+import type { AiProviderName, AiTokenUsage, AiUsageReport } from './interfaces/ai-provider.interface'
 import { PrismaService } from '../prisma/prisma.service'
 
 // ============================================================
@@ -39,6 +39,9 @@ export type AiOperation =
   | 'voiceSynthesize'
   // ── 自我探索 · 倾向参考（2026-08-01） ──
   | 'selfAssessment'
+  // ── AI-COST-TRUTH（2026-08-17）：合同审查此前**完全不落 AiServiceLog**，
+  //    即 deepseek/qwen 的付费调用在用量统计里根本不存在（比记错价更严重）──
+  | 'contractReview'
 /**
  * 按时长/字符计费、不按 token 计费的 operation。
  *
@@ -58,11 +61,13 @@ export interface AiLogEntry {
   operation: AiOperation
   latencyMs: number
   status: 'success' | 'failed'
-  tokenUsage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
+  /** 缺省 = 未采集到 token（**不是 0**）。 */
+  tokenUsage?: AiTokenUsage
+  /**
+   * 估算成本（元）。三态语义，落库映射到 AiServiceLog.estimatedCostCny：
+   * - 数字（含 0）→ 已确定成本（0 = 确实没花钱，如 mock provider / 一次都没打到模型）
+   * - undefined → **未采集**，落库为 null。绝不回落成 0：那等于谎称免费。
+   */
   estimatedCostCny?: number
   errorCode?: string
   createdAt?: string            // ISO string; set by record() if omitted
@@ -73,6 +78,29 @@ export interface AiLogEntry {
 }
 
 // ─── Admin 接口响应类型 ────────────────────────────────────────
+
+/**
+ * 单个能力的成本聚合（AI-COST-TRUTH）。
+ *
+ * 为什么不能是纯 number：纯 number 的 0 同时兼表「这个能力花了 0 元」和
+ * 「这个能力的成本没采集到」，前端**就算想诚实也没数据可用**，只能一律渲染
+ * ¥0.0000 —— 对真实付费调用少算成本，且运营看不出来。
+ *
+ * 三态由 calls / measuredCalls 组合判定（cny 只在 measuredCalls > 0 时有意义）：
+ * - calls === 0                        → 窗口内无调用
+ * - calls > 0 且 measuredCalls === 0   → **未采集**，UI 必须显示「未估算」，禁止显示 ¥0
+ * - measuredCalls > 0                  → cny 为**已采集那部分**的成本合计；
+ *                                        measuredCalls < calls 时属部分采集，
+ *                                        UI 必须同时标注还有几笔未估算
+ */
+export interface AiOperationCost {
+  /** 已采集到成本的那部分调用的成本合计（元）。measuredCalls === 0 时恒为 0 且无意义。 */
+  cny: number
+  /** 窗口内该能力的总调用数。 */
+  calls: number
+  /** 其中成本已采集（estimatedCostCny 非空）的调用数。 */
+  measuredCalls: number
+}
 
 export interface AdminAiUsage {
   providerName: string
@@ -88,14 +116,27 @@ export interface AdminAiUsage {
     completionTokens: number
     totalTokens: number
   }
-  costByOperation: Record<AiOperation, number>
+  /** 分能力成本三态。**不是纯 number** —— 见 AiOperationCost 的注释。 */
+  costByOperation: Record<AiOperation, AiOperationCost>
   alerts: Array<{
     level: 'warning' | 'critical'
     code: string
     title: string
     detail: string
   }>
+  /** 已采集部分的成本合计（元）。窗口内还有 unmeasuredCalls 笔未采集，未计入本数。 */
   estimatedCostCny: number
+  /** 窗口内成本未采集的调用数。>0 时 estimatedCostCny 是**下限**，不是全部花费。 */
+  unmeasuredCalls: number
+  /**
+   * token 用量开始采集的日期（YYYY-MM-DD）。
+   *
+   * 该日期之前的调用从未采集 token，少算部分**不可恢复**。按交付章程 D-2 决定
+   * **不回填**：任何回填都是拿估算冒充实测，比承认数据不全更糟。Admin 必须据此
+   * 如实展示「X 之前成本不完整」，不得把历史窗口渲染成完整成本。
+   * 由 AI_COST_COLLECTION_SINCE 覆盖为真实上线日期（默认值为本修复的合入日期）。
+   */
+  costCollectionSince: string
 }
 
 export interface AdminAiLogsResult {
@@ -133,6 +174,7 @@ const OPERATIONS: AiOperation[] = [
   'voiceTranscribe',
   'voiceSynthesize',
   'selfAssessment',
+  'contractReview',
 ]
 
 // ─── 跨重试用量累计（A-6）────────────────────────────────────────
@@ -146,7 +188,7 @@ const OPERATIONS: AiOperation[] = [
 
 export interface AiLlmCallMeta {
   provider: string
-  tokenUsage?: AiLogEntry['tokenUsage']
+  tokenUsage?: AiTokenUsage
 }
 
 export type AiLlmCallSink = (meta: AiLlmCallMeta) => void
@@ -209,7 +251,7 @@ export class AiUsageAccumulator {
   }
 
   /** 累计 token；一次都没拿到 usage 时返回 undefined（不伪造 0）。 */
-  get tokenUsage(): AiLogEntry['tokenUsage'] {
+  get tokenUsage(): AiTokenUsage | undefined {
     if (this.totalTokens <= 0 && this.promptTokens <= 0 && this.completionTokens <= 0) return undefined
     return {
       promptTokens: this.promptTokens,
@@ -217,9 +259,63 @@ export class AiUsageAccumulator {
       totalTokens: this.totalTokens > 0 ? this.totalTokens : this.promptTokens + this.completionTokens,
     }
   }
+
+  /**
+   * 打包成 provider → 调用方的用量回报（AI-COST-TRUTH）。
+   *
+   * @param fallbackLabel 一次都没打到模型时使用的标签（此时没有真实厂商信息）。
+   */
+  toReport(fallbackLabel: string): AiUsageReport {
+    return {
+      providerLabel: this.lastProvider ?? fallbackLabel,
+      callCount: this.calls,
+      ...(this.tokenUsage ? { tokenUsage: this.tokenUsage } : {}),
+    }
+  }
+}
+
+/**
+ * 把 provider 的用量回报翻译成 AiLogService.record 的落账字段（AI-COST-TRUTH）。
+ *
+ * 这是「三态」在写入侧的唯一实现，禁止在调用点各写一份 —— 一旦有人在别处
+ * 写成 `estimatedCostCny: 0`，那条付费调用就会在 Admin 上显示成免费。
+ *
+ * @param report 缺省表示 provider 尚未接用量管路 → 按未采集处理（成本留空）。
+ * @param fallbackProvider report 缺省时的 provider 标签（通常是 AiProviderName）。
+ */
+export function aiLogFieldsFromUsageReport(
+  report: AiUsageReport | undefined,
+  fallbackProvider: string,
+): { provider: string; tokenUsage?: AiTokenUsage; estimatedCostCny?: number } {
+  // provider 没回报 → 我们对这次调用的花费一无所知。留空 = 未采集。
+  if (!report) return { provider: fallbackProvider }
+
+  const provider = report.providerLabel || fallbackProvider
+
+  // 一次都没打到模型（未配置 / 参数校验就失败）→ 确实没花钱，0 是实测不是编造。
+  if (report.callCount === 0) return { provider, estimatedCostCny: 0 }
+
+  // 打到模型了：成本交给 estimateCostCny 按 provider 厂商名 + token 计算。
+  // 拿不到 token 或匹配不到单价时它返回 undefined → 未采集，绝不回落成 0。
+  return {
+    provider,
+    ...(report.tokenUsage ? { tokenUsage: report.tokenUsage } : {}),
+  }
 }
 
 const AI_USAGE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * token 用量开始采集的日期（YYYY-MM-DD）。
+ *
+ * 默认值 = AI-COST-TRUTH 修复的合入日期。此日期之前的 AiServiceLog 行从未采集
+ * token，少算部分不可恢复；按交付章程 D-2 **不回填**（回填 = 拿估算冒充实测）。
+ * 部署时用 AI_COST_COLLECTION_SINCE 覆盖为真实上线日期。
+ */
+const AI_COST_COLLECTION_SINCE = (() => {
+  const raw = process.env['AI_COST_COLLECTION_SINCE']
+  return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '2026-08-17'
+})()
 const AI_COST_ALERT_CNY = (() => {
   const value = Number(process.env['AI_COST_ALERT_CNY'])
   return Number.isFinite(value) && value > 0 ? value : 50
@@ -319,13 +415,24 @@ export class AiLogService {
       : 0
 
     const byOperation = operationRecord(0)
-    const costByOperation = operationRecord(0)
+    const costByOperation = emptyOperationCosts()
     const tokenUsageTotals = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
     const errorCounts: Record<string, number> = {}
     const callsByTerminal = new Map<string, number>()
+    let unmeasuredCalls = 0
     for (const e of entries) {
       byOperation[e.operation] += 1
-      costByOperation[e.operation] += e.estimatedCostCny ?? 0
+      // 三态聚合：成本为 null 的行只增加 calls，**不增加** measuredCalls/cny。
+      // 旧实现在这里写 `+= e.estimatedCostCny ?? 0`，把「未采集」直接吞成 0，
+      // 于是下游再也分不出「花了 0 元」和「没采集到」。
+      const cost = costByOperation[e.operation]
+      cost.calls += 1
+      if (e.estimatedCostCny !== undefined && e.estimatedCostCny !== null) {
+        cost.measuredCalls += 1
+        cost.cny += e.estimatedCostCny
+      } else {
+        unmeasuredCalls += 1
+      }
       tokenUsageTotals.promptTokens += e.tokenUsage?.promptTokens ?? 0
       tokenUsageTotals.completionTokens += e.tokenUsage?.completionTokens ?? 0
       tokenUsageTotals.totalTokens += e.tokenUsage?.totalTokens ?? 0
@@ -333,6 +440,7 @@ export class AiLogService {
       if (e.terminalId) callsByTerminal.set(e.terminalId, (callsByTerminal.get(e.terminalId) ?? 0) + 1)
     }
     const errorDistribution = Object.entries(errorCounts).map(([code, count]) => ({ code, count }))
+    // 只累计**已采集**的部分。unmeasuredCalls > 0 时这是下限，不是全部花费。
     const estimatedCostCny = roundMoney(entries.reduce((sum, e) => sum + (e.estimatedCostCny ?? 0), 0))
 
     return {
@@ -346,8 +454,10 @@ export class AiLogService {
       errorDistribution,
       tokenUsageTotals,
       costByOperation: roundOperationCosts(costByOperation),
-      alerts: buildAiUsageAlerts({ total, failCount: failList.length, estimatedCostCny, callsByTerminal }),
+      alerts: buildAiUsageAlerts({ total, failCount: failList.length, estimatedCostCny, callsByTerminal, unmeasuredCalls }),
       estimatedCostCny,
+      unmeasuredCalls,
+      costCollectionSince: AI_COST_COLLECTION_SINCE,
     }
   }
 
@@ -398,6 +508,12 @@ function operationRecord(value: number): Record<AiOperation, number> {
   return Object.fromEntries(OPERATIONS.map((operation) => [operation, value])) as Record<AiOperation, number>
 }
 
+function emptyOperationCosts(): Record<AiOperation, AiOperationCost> {
+  return Object.fromEntries(
+    OPERATIONS.map((operation) => [operation, { cny: 0, calls: 0, measuredCalls: 0 }]),
+  ) as Record<AiOperation, AiOperationCost>
+}
+
 function normalizeOperation(value: string): AiOperation {
   return OPERATIONS.includes(value as AiOperation) ? value as AiOperation : 'classifyIntent'
 }
@@ -420,10 +536,17 @@ function toNonNegativeInt(value: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
 }
 
+/**
+ * 按 provider 标签里的厂商名 + token 估算成本。
+ *
+ * 返回 undefined = **未采集/无法定价**，调用方必须如实留空，绝不回落成 0。
+ * 注意：mock / stub 判定必须在「有没有 token」之前 —— 它们压根不打上游，
+ * 没花钱是事实（0 是实测），不该被算成「未采集」。
+ */
 function estimateCostCny(provider: string, usage: AiLogEntry['tokenUsage']): number | undefined {
-  if (!usage || usage.totalTokens <= 0) return undefined
   const normalized = provider.toLowerCase()
-  if (normalized.includes('mock')) return 0
+  if (normalized.includes('mock') || normalized.includes('stub')) return 0
+  if (!usage || usage.totalTokens <= 0) return undefined
   const price = normalized.includes('qwen')
     ? { input: 20, output: 60 }
     : normalized.includes('deepseek')
@@ -441,9 +564,11 @@ function roundMoney(value: number): number {
   return Math.round(value * 10_000) / 10_000
 }
 
-function roundOperationCosts(costs: Record<AiOperation, number>): Record<AiOperation, number> {
-  const out = operationRecord(0)
-  for (const operation of OPERATIONS) out[operation] = roundMoney(costs[operation])
+function roundOperationCosts(costs: Record<AiOperation, AiOperationCost>): Record<AiOperation, AiOperationCost> {
+  const out = emptyOperationCosts()
+  for (const operation of OPERATIONS) {
+    out[operation] = { ...costs[operation], cny: roundMoney(costs[operation].cny) }
+  }
   return out
 }
 
@@ -452,6 +577,7 @@ function buildAiUsageAlerts(input: {
   failCount: number
   estimatedCostCny: number
   callsByTerminal: Map<string, number>
+  unmeasuredCalls: number
 }): AdminAiUsage['alerts'] {
   const alerts: AdminAiUsage['alerts'] = []
   if (input.estimatedCostCny >= AI_COST_ALERT_CNY) {
@@ -460,6 +586,17 @@ function buildAiUsageAlerts(input: {
       code: 'ai_cost_watch',
       title: 'AI 成本告警',
       detail: `近 24 小时 AI 估算成本 ¥${input.estimatedCostCny.toFixed(2)}，已达到安全关注阈值 ¥${AI_COST_ALERT_CNY.toFixed(2)}。`,
+    })
+  }
+  // 成本不完整必须主动说出来：否则运营看到的是一个偏小的数字，却以为它是全部花费。
+  if (input.unmeasuredCalls > 0) {
+    alerts.push({
+      level: 'warning',
+      code: 'ai_cost_incomplete',
+      title: 'AI 成本统计不完整',
+      detail:
+        `近 24 小时有 ${input.unmeasuredCalls} 次调用未采集到用量，其花费未计入 ¥${input.estimatedCostCny.toFixed(2)}。` +
+        '该金额是下限，不是全部花费。',
     })
   }
   if (input.total >= 10 && input.failCount / input.total >= 0.3) {

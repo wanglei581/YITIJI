@@ -12,7 +12,47 @@
 export type AiTaskStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 // 'llm'：复用后台 LlmConfigService 加密凭证（OpenAI 兼容）的真实简历诊断 provider（Phase 1B）。
+//
+// ⚠️ AiProviderName 是**部署形态**标签，不是厂商标签：AI_PROVIDER=llm 时它恒为 'llm'，
+// 不含 deepseek/qwen 等真实厂商名。成本定价按厂商名做子串匹配（ai-log.service.ts
+// estimateCostCny），所以**绝不能拿 AiProviderName 当落账 provider 标签**——那样即使
+// 补上 token 也永远匹配不到单价。真实厂商标识走下面的 AiUsageReport.providerLabel。
 export type AiProviderName = 'openai' | 'claude' | 'qwen' | 'zhipu' | 'local' | 'mock' | 'llm'
+
+// ─── 用量回报（AI-COST-TRUTH）────────────────────────────────
+
+/** token 用量。字段缺失（整个对象为 undefined）= 未采集，**不等于 0**。 */
+export interface AiTokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/**
+ * provider 对一次能力调用的真实用量回报。
+ *
+ * 为什么必须由 provider 上报、而不是让调用方猜：
+ * 1. 只有 provider 层知道真实厂商与模型（AiProviderName 恒为 'llm'，定价表匹配不到）；
+ * 2. 只有 provider 知道自己**有没有真的打到模型**——「没花钱」和「没采集到」是两回事，
+ *    调用方在外面看到的都是一个失败，无从区分。
+ *
+ * 三态由 callCount + tokenUsage 组合表达，**禁止用 0 兼表「未采集」**：
+ * - callCount === 0                → 一次都没打到模型，成本确定为 0（如未配置直接抛错）
+ * - callCount > 0 且有 tokenUsage  → 成本可按 providerLabel 里的厂商名计算
+ * - callCount > 0 且无 tokenUsage  → **未采集**，成本必须留空（落库 null），绝不写 0
+ */
+export interface AiUsageReport {
+  /**
+   * 真实厂商标识，形如 `llm:deepseek:deepseek-chat`。
+   * 必须含厂商名，否则 estimateCostCny 匹配不到单价 → 永远算不出成本。
+   * 只放厂商/模型名，**不得**包含 apiKey、baseURL 或任何凭证片段。
+   */
+  providerLabel: string
+  /** 实际打到模型的次数（含失败重试）。0 = 未产生任何上游调用，即未花钱。 */
+  callCount: number
+  /** 累计 token；上游没回 usage 时为 undefined —— 表示未采集，不是 0。 */
+  tokenUsage?: AiTokenUsage
+}
 
 // ─── 简历解析类型 ────────────────────────────────────────────
 
@@ -133,6 +173,11 @@ export interface ParseResumeOutput {
    * experience/scene/skipped），不含简历原文，不产生新的 PII 留存面。
    */
   targetContext?: ResumeTargetContext
+  /**
+   * 本次调用的真实用量回报（AI-COST-TRUTH，additive 可选）。
+   * 缺省 = provider 未接用量管路 → 落账按「未采集」处理，绝不记 ¥0。
+   */
+  usage?: AiUsageReport
 }
 
 // ─── 简历优化类型 ────────────────────────────────────────────
@@ -156,6 +201,8 @@ export interface OptimizeResumeOutput {
    * 防编造:学校/公司/证书等事实串必须出现在简历原文中,服务端校验,缺失即拒绝输出。
    */
   optimizedResume?: GeneratedResume
+  /** 本次调用的真实用量回报（AI-COST-TRUTH，additive 可选）。语义同 ParseResumeOutput.usage。 */
+  usage?: AiUsageReport
 }
 
 // ─── 简历生成类型（阶段2A）────────────────────────────────────
@@ -255,6 +302,8 @@ export interface GenerateResumeOutput {
   failReason?: string
   /** 匿名结果一次性访问令牌,语义同 ParseResumeOutput.accessToken */
   accessToken?: string
+  /** 本次调用的真实用量回报（AI-COST-TRUTH，additive 可选）。语义同 ParseResumeOutput.usage。 */
+  usage?: AiUsageReport
 }
 
 // ─── AI 助手类型 ─────────────────────────────────────────────
@@ -300,6 +349,13 @@ export interface ChatOutput {
   reply: string
   intent?: AssistantIntent
   actions?: AssistantAction[]
+  /**
+   * 本次调用的真实用量回报（AI-COST-TRUTH，additive 可选）。
+   *
+   * ⚠️ 该字段只用于服务端落账，**不得**透传给前端 —— AssistantChatResult 由
+   * AiService 显式重建，不会带上它。
+   */
+  usage?: AiUsageReport
 }
 
 /**

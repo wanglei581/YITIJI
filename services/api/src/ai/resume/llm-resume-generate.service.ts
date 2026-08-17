@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type { GeneratedResume, ResumeGenerateInput } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // ============================================================
 // LlmResumeGenerateService — 阶段2A 真实简历生成(单轮、结构化 JSON,OpenAI 兼容)
@@ -90,7 +91,14 @@ export class LlmResumeGenerateService {
    * - 未配置 / 未启用 → AI_PROVIDER_NOT_CONFIGURED(绝不 fallback mock)。
    * - 非法 JSON / 数组长度漂移 → 重试一次;仍失败 → AI_GENERATE_INVALID_OUTPUT。
    */
-  async generate(input: ResumeGenerateInput): Promise<GeneratedResume> {
+  async generate(
+    input: ResumeGenerateInput,
+    /**
+     * AI-COST-TRUTH：每次真实 LLM 调用（含失败重试）回调一次元数据，
+     * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
+     */
+    onLlmCall?: AiLlmCallSink,
+  ): Promise<GeneratedResume> {
     const apiKey = this.config.getApiKey('resume_generate')
     const cfg = this.config.getConfig('resume_generate')
     if (!apiKey || !cfg.enabled) {
@@ -107,7 +115,10 @@ export class LlmResumeGenerateService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
-      const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, GENERATE_TEMPERATURE, messages)
+      const raw = await this.callLlm(
+        cfg.baseURL, apiKey, cfg.model, GENERATE_TEMPERATURE, messages,
+        `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,
+      )
       const polish = this.parsePolish(raw, input)
       if (polish) return assembleResume(input, polish, cfg.forbiddenWords)
       this.logger.warn(`resume generate: invalid output (attempt ${attempt}/2)`)
@@ -126,6 +137,9 @@ export class LlmResumeGenerateService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    /** AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。**不含任何凭证**。 */
+    providerLabel: string,
+    onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Response
@@ -145,6 +159,8 @@ export class LlmResumeGenerateService {
     }
 
     if (!res.ok) {
+      // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
+      onLlmCall?.({ provider: providerLabel })
       this.logger.error(`resume generate http ${res.status}`)
       throw new ServiceUnavailableException({
         error: { code: 'AI_GENERATE_UNAVAILABLE', message: `AI 简历生成服务返回错误 (${res.status})` },
@@ -153,7 +169,10 @@ export class LlmResumeGenerateService {
 
     const data = (await res.json().catch(() => null)) as {
       choices?: Array<{ message?: { content?: string } }>
+      usage?: RawLlmUsage
     } | null
+    // 在「内容为空」判断之前回报：内容为空这次调用照样花钱，不能因为解析失败就丢账。
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const content = data?.choices?.[0]?.message?.content?.trim()
     if (!content) {
       throw new ServiceUnavailableException({
