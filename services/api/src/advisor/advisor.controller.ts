@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { AdvisorService } from './advisor.service'
 import { ADVISOR_SKILLS, EVIDENCE_LEVELS, type AdvisorSkill } from './advisor-skills'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 // ============================================================
 // S3-3 · P26 顾问作业面（/api/v1/advisor）—— 前端 /ai/plan 的后端。
@@ -94,7 +95,7 @@ export class AdvisorController {
   }
 
   @Post('sessions')
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @PaidAiThrottle(10)
   async create(@Body() dto: CreateAdvisorSessionDto, @Req() req: ReqLike) {
     return this.service.createSession(dto.topic, await this.requesterOf(req))
   }
@@ -129,14 +130,14 @@ export class AdvisorController {
 
   /** 出活：按当前作业型生成产物并落库。必填项没答完时 400 并回报缺哪几项。 */
   @Post('sessions/:sessionId/run')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async run(@Param('sessionId') sessionId: string, @Req() req: ReqLike) {
     return this.service.run(sessionId, await this.requesterOf(req))
   }
 
   /** 问答型追问：在同一会话上继续，不是每次从零。 */
   @Post('sessions/:sessionId/ask')
-  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @PaidAiThrottle(12)
   async ask(@Param('sessionId') sessionId: string, @Body() dto: AskDto, @Req() req: ReqLike) {
     return this.service.ask(sessionId, dto.question, await this.requesterOf(req))
   }

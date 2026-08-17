@@ -11,7 +11,6 @@ import {
   NotFoundException,
   HttpCode,
 } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -20,6 +19,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { JobSyncService } from './job-sync.service'
 import { UnpublishSourceContentDto, UpdateSourceEnabledDto } from './dto/source-operations.dto'
 import { assertPartnerDataTypeCapability } from '../jobs/partner-capabilities'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 /**
  * 路由前缀：/api/v1（由 main.ts 全局设置）
@@ -43,7 +43,7 @@ export class JobSyncController {
    */
   @Post('sources/:sourceId/trigger')
   @HttpCode(202)
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @PaidAiThrottle(10)
   async triggerSync(
     @Param('sourceId') sourceId: string,
   ): Promise<ApiResponse<{ queued: boolean; jobId: string | null; sourceId: string }>> {

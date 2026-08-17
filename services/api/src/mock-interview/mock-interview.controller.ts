@@ -14,6 +14,7 @@ import { MockInterviewService, type InterviewRequester } from './mock-interview.
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 import { AiLogService } from '../ai/ai-log.service'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
 
@@ -110,20 +111,20 @@ export class MockInterviewController {
   }
 
   @Post()
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async create(@Body() dto: CreateInterviewDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     return ApiResponse.ok(await this.service.createSession(dto, requester))
   }
 
   @Post(':id/start')
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @PaidAiThrottle(10)
   async start(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.start(id, await this.requesterOf(req)))
   }
 
   @Post(':id/answer')
-  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @PaidAiThrottle(20)
   async answer(@Param('id') id: string, @Body() dto: InterviewAnswerDto, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.answer(id, {
       answer: dto.answer,
@@ -140,7 +141,7 @@ export class MockInterviewController {
    * 转写文本由用户在前端确认/编辑后随 /answer 提交。归属门禁与会话一致。
    */
   @Post(':id/transcribe')
-  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @PaidAiThrottle(12)
   @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: ASR_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribe(
     @Param('id') id: string,
@@ -179,7 +180,7 @@ export class MockInterviewController {
    * 问题文本生成时已过禁词扫描)。失败 → 前端降级浏览器本地 TTS。
    */
   @Post(':id/turns/:idx/audio')
-  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @PaidAiThrottle(20)
   async questionAudio(@Param('id') id: string, @Param('idx') idx: string, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const session = await this.service.getSession(id, requester)
@@ -216,7 +217,7 @@ export class MockInterviewController {
   }
 
   @Post(':id/end')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async end(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.end(id, await this.requesterOf(req)))
   }

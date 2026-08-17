@@ -66,6 +66,7 @@ import { JobRequirementStatsService } from './job-requirement-stats.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -381,6 +382,7 @@ export class JobsController {
     if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
     return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
   }
+  @PaidAiThrottle(10)
 
   /**
    * Phase #5 — Partner 导入岗位(只能写入自己机构,默认 pending+draft)。
@@ -411,6 +413,7 @@ export class JobsController {
   ) {
     return this.jobsService.unpublishPartnerJob(id, user)
   }
+  @PaidAiThrottle(30)
 
   /**
    * 阶段1C — Partner 编辑本机构岗位(展示字段白名单)。
@@ -585,6 +588,7 @@ export class JobsController {
       user,
     })
   }
+  @PaidAiThrottle(10)
 
   @Post('partner/excel/:batchId/confirm')
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -32,7 +32,17 @@ if (!controllerSrc.includes('FileInterceptor(RESUME_VOICE_AUDIO_FIELD')) {
 if (!controllerSrc.includes('fileSize: RESUME_VOICE_MAX_AUDIO_BYTES')) {
   fail('1c. 简历语音端点必须设置 RESUME_VOICE_MAX_AUDIO_BYTES 文件大小上限')
 }
-if (!controllerSrc.includes('@Throttle({ default: { ttl: 60_000, limit: 6 } })')) {
+// 本断言守的是「简历语音端点必须有公共终端限流，且每分钟不超过 6 次」。
+// 限流的**写法**在演进，判据要跟着写法走，但不放宽强度：
+//   - `@Throttle({ default: { ttl: 60_000, limit: 6 } })`：历史形态，按纯 IP 计数；
+//   - `@PaidAiThrottle(6)`：现行形态，按客户端（IP+终端/会话）6 次/分钟，
+//     **另加**每 IP 每小时的花费天花板 —— 强度只增不减（见 common/throttler/terminal-throttle.ts）。
+// 「这条路由到底有没有声明限流维度」由 verify:ai-throttle-dimension 的派生式断言兜底。
+const VOICE_THROTTLE_FORMS = [
+  '@PaidAiThrottle(6)',
+  '@Throttle({ default: { ttl: 60_000, limit: 6 } })',
+]
+if (!VOICE_THROTTLE_FORMS.some((form) => controllerSrc.includes(form))) {
   fail('1d. 简历语音端点必须设置公共终端限流')
 }
 pass('1. 简历语音转写端点、内存音频字段、文件上限和限流存在')

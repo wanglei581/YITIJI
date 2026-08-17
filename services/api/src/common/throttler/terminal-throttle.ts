@@ -91,6 +91,56 @@ export function resolveIpWideLimit(): number {
 /** 兜底桶名。@Throttle({ default: ... }) 不会覆盖它，因此天花板始终在。 */
 export const IP_WIDE_THROTTLER_NAME = 'ip-wide'
 
+/**
+ * 会花钱的 AI 路由专用的「每 IP 每小时」花费天花板桶。
+ *
+ * 为什么需要第三个桶：把 default 从纯 IP 换成按客户端之后，**单个大厅的总量
+ * 被放大了 N 倍**（10 台机器各 6 次/分钟 = 60 次/分钟，而不是原来的 6）。
+ * 对只读轮询端点这没关系，对按次计费的模型调用则等于成本上限放大 10 倍。
+ *
+ * 所以调 LLM 的路由额外挂一层**纯 IP、按小时**的桶：
+ *   - default（按客户端 / 分钟）→ 保证同一大厅的机器之间不互相抢额度；
+ *   - ai-ip（纯 IP / 小时）    → 不可伪造的花费天花板，换请求头也逃不掉。
+ * 这正是 #698 里 assistant/chat 的分层思路（member/terminal 做细粒度，
+ * ip 做不可伪造的花费封顶），只是从「日配额服务」下沉成了限流桶。
+ */
+export const AI_IP_THROTTLER_NAME = 'ai-ip'
+
+const AI_IP_WINDOW_MS = 60 * 60 * 1000
+
+/**
+ * `@Throttle({ 'ai-ip': ... })` 会写下的元数据键（`THROTTLER_LIMIT + 名字`）。
+ *
+ * 这个字符串是和 @nestjs/throttler 内部常量的约定。约定一旦失效，skipIf 会
+ * 「永远跳过」，天花板静默失灵 —— 属于最难发现的那类故障，所以
+ * verify:ai-throttle-dimension 有一条断言专门证明这个键真的被写下了。
+ */
+export const AI_IP_LIMIT_METADATA_KEY = 'THROTTLER:LIMITai-ip'
+
+/** 默认每 IP 每小时的付费 AI 调用上限。 */
+export function resolveAiIpHourlyCeiling(): number {
+  const raw = Number(process.env['AI_IP_HOURLY_CEILING'])
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 300
+}
+
+/**
+ * ai-ip 桶只对显式声明了它的路由生效，其余 400+ 条路由直接跳过，
+ * 不做无谓的计数。判据就是「这条路由有没有写下 ai-ip 的 limit 元数据」。
+ */
+function skipUnlessPaidAiRoute(context: {
+  getHandler: () => object
+  getClass: () => object
+}): boolean {
+  const reflectApi = Reflect as unknown as {
+    getMetadata?: (key: string, target: object) => unknown
+  }
+  if (typeof reflectApi.getMetadata !== 'function') return true
+  const onHandler = reflectApi.getMetadata(AI_IP_LIMIT_METADATA_KEY, context.getHandler())
+  if (onHandler !== undefined) return false
+  const onClass = reflectApi.getMetadata(AI_IP_LIMIT_METADATA_KEY, context.getClass())
+  return onClass === undefined
+}
+
 type HeaderBag = Record<string, string | string[] | undefined>
 
 function headerOf(req: unknown, name: string): string | null {
@@ -165,16 +215,34 @@ export function buildThrottlerConfig(): ThrottlerOptions[] {
       limit: resolveIpWideLimit(),
       getTracker: resolveIpTracker,
     },
+    {
+      // 只对 @PaidAiThrottle 声明过的路由生效（见 skipUnlessPaidAiRoute）。
+      name: AI_IP_THROTTLER_NAME,
+      ttl: AI_IP_WINDOW_MS,
+      limit: resolveAiIpHourlyCeiling(),
+      getTracker: resolveIpTracker,
+      skipIf: skipUnlessPaidAiRoute,
+    },
   ]
 }
 
 /**
- * 把某条路由的 `default` 桶换成「每台终端」计数。
+ * 把某条路由的 `default` 桶换成「每个客户端」计数。
  *
- * 用在一体机会**定时轮询**或**高频匿名调用**的路由上。`ip-wide` 兜底桶不受影响，
- * 因此单 IP 总量仍有天花板。
+ * 名字里的 Terminal 是历史包袱（首次落地时只服务一体机轮询）。实际维度是
+ * `resolveTerminalScopedTracker` 的退化链：
  *
- * @param limit 每终端每分钟允许的次数
+ *     IP + 终端(x-terminal-id) → IP + 会话(Authorization 摘要) → 纯 IP
+ *
+ * 所以它同时覆盖两类调用方：
+ *   - 一体机：大厅共用 NAT 出口 IP，靠终端维度拆开；
+ *   - 小程序 / 会员 Web：无终端标识，但有会员 token，靠会话维度拆开
+ *     （运营商 CGNAT 同样会让大量手机共用出口 IP）。
+ *
+ * 完全匿名且无终端的调用方退化成纯 IP，即未声明维度时的行为，不会更差。
+ * `ip-wide` 兜底桶不受影响，因此单 IP 总量始终有天花板。
+ *
+ * @param limit 每客户端每分钟允许的次数
  */
 export function TerminalScopedThrottle(limit: number): MethodDecorator & ClassDecorator {
   return Throttle({
@@ -182,6 +250,61 @@ export function TerminalScopedThrottle(limit: number): MethodDecorator & ClassDe
       ttl: THROTTLE_WINDOW_MS,
       limit,
       getTracker: resolveTerminalScopedTracker,
+    },
+  })
+}
+
+/**
+ * 会花钱的 AI 路由：按客户端计分钟额度 + 按 IP 计小时花费天花板。
+ *
+ * 只改维度而不加天花板是不够的：一个大厅 10 台机器各 6 次/分钟，
+ * 相对改动前的「整个大厅共用 6 次/分钟」，成本上限被放大了 10 倍。
+ *
+ * @param perClientPerMinute 每客户端（终端/会话）每分钟的调用次数
+ * @param perIpPerHour       每出口 IP 每小时的调用次数；缺省用 AI_IP_HOURLY_CEILING
+ */
+export function PaidAiThrottle(
+  perClientPerMinute: number,
+  perIpPerHour?: number,
+): MethodDecorator & ClassDecorator {
+  return Throttle({
+    default: {
+      ttl: THROTTLE_WINDOW_MS,
+      limit: perClientPerMinute,
+      getTracker: resolveTerminalScopedTracker,
+    },
+    [AI_IP_THROTTLER_NAME]: {
+      ttl: AI_IP_WINDOW_MS,
+      limit: perIpPerHour ?? resolveAiIpHourlyCeiling(),
+      getTracker: resolveIpTracker,
+    },
+  })
+}
+
+/**
+ * 显式声明「这条路由**就该**按纯 IP 计数」。
+ *
+ * 行为上等价于不写任何 tracker（`default` 本来就是纯 IP），存在的意义是**把沉默
+ * 变成表态**：`verify:ai-throttle-dimension` 要求每条会花钱的 AI 路由都必须在
+ * 两个维度里显式选一个，漏写即 CI 红。没有这个装饰器的话，「忘了想」和
+ * 「想过了，IP 是对的」在代码里长得一模一样。
+ *
+ * 什么时候该用它：**被计数的主体正是攻击者能任意更换的那个东西**。
+ * 典型是凭证爆破 —— 按会话计数等于「每换一个 token 就重置一次额度」，
+ * 那正是攻击者免费拥有的能力。这种路由必须锚在 IP 上。
+ *
+ * @param limit  每 IP 每分钟允许的次数
+ * @param reason 为什么这条路由不能按客户端计数（写给下一个读代码的人，门禁要求非空）
+ */
+export function IpScopedThrottle(limit: number, reason: string): MethodDecorator & ClassDecorator {
+  if (!reason.trim()) {
+    throw new Error('IpScopedThrottle 必须写明为什么这条路由只能按 IP 计数')
+  }
+  return Throttle({
+    default: {
+      ttl: THROTTLE_WINDOW_MS,
+      limit,
+      getTracker: resolveIpTracker,
     },
   })
 }

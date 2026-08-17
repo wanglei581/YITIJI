@@ -5,6 +5,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -33,7 +34,7 @@ export class FairVisitPlanController {
   }
 
   @Post(':taskId')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async generate(@Param('fairId') fairId: string, @Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.generate(fairId, taskId, await this.requesterOf(req))
   }

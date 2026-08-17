@@ -1,7 +1,7 @@
 import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
-import { TerminalScopedThrottle, throttleTerminalIdOf } from '../common/throttler/terminal-throttle'
+import { TerminalScopedThrottle, throttleTerminalIdOf, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { AiPublicQuotaService } from './ai-public-quota.service'
 import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
@@ -182,6 +182,7 @@ export class AiController {
     const requester = await this.resolveAiResultRequester(req)
     return this.aiService.getResumeRecord(taskId, requester)
   }
+  @PaidAiThrottle(20)
 
   // benefitGrantId（可选，P1 权益核销）：会员在此按次核销一项本人权益（coupon/free_quota/
   // package_entitlement），serviceRefId 用稳定的 taskId → 幂等键 = hash(grant:resume_optimize:taskId)，
@@ -236,7 +237,7 @@ export class AiController {
   }
 
   @Post('resume/records/:taskId/layout-adjust')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } }) // 真实 LLM 调整,公共一体机单 IP 收紧
+  @PaidAiThrottle(6)
   async adjustResumeLayout(
     @Param('taskId') taskId: string,
     @Body() dto: ResumeLayoutAdjustDto,
@@ -270,7 +271,7 @@ export class AiController {
    * 审计只放元数据(条目数/状态/taskId),绝不包含姓名、联系方式或简历内容。
    */
   @Post('resume/generate')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } }) // 触发 LLM 调用,公共一体机单 IP 收紧
+  @PaidAiThrottle(6)
   async submitResumeGenerate(
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
@@ -316,7 +317,7 @@ export class AiController {
    * 调用方必须让用户确认转写文本后再写入简历生成表单。
    */
   @Post('resume/voice/transcribe')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
