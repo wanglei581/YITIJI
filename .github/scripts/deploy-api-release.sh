@@ -111,6 +111,35 @@ prune_old_backups() {
 echo "=== 0. 校验源码位于目标提交 ==="
 test "$(git -C "$DEPLOY_PATH" rev-parse HEAD)" = "$TARGET_SHA"
 
+echo "=== 0b. 磁盘空间闸门（必须在任何写操作之前）==="
+# 为什么放在这里：步骤 2 的 pg_dump 是本脚本第一次写盘。
+# 2026-08-09 真实事故是备份把 40GB 根分区撑到 100%，此时正在运行的 API 与
+# PostgreSQL 一并受影响。空间不足必须在**动任何东西之前**中止 ——
+# 把「发布到一半盘满」变成「发布没启动」，后者无害。
+#
+# 2026-08-17 实测：ROOT_TOTAL_GB=40 / ROOT_USED_PCT=88 / 备份盘可用 5GB，
+# 备份目录 4372MB（13 组，最老 46 天）——清理只在健康检查通过后跑，
+# 而连续三天没有发布成功过，所以它一直没执行。
+mkdir -p "$BACKUP_ROOT"
+AVAIL_MB="$(df -Pm "$BACKUP_ROOT" 2>/dev/null | awk 'NR==2{print $4}')"
+API_DIR_MB="$(du -sm "$API_DIR" 2>/dev/null | cut -f1)"
+: "${AVAIL_MB:=0}" ; : "${API_DIR_MB:=1500}"
+# 需要的空间 = 整目录备份 + PG dump（压缩后远小于目录，按目录量级留冗余）+ 1GB 安全边界
+NEED_MB=$(( API_DIR_MB + 1024 ))
+MARGIN_MB="${DEPLOY_MIN_FREE_MARGIN_MB:-1024}"
+REQUIRED_MB=$(( NEED_MB + MARGIN_MB ))
+echo "DISK_AVAIL_MB=$AVAIL_MB REQUIRED_MB=$REQUIRED_MB (api_dir=${API_DIR_MB}MB + 1024 备份冗余 + ${MARGIN_MB} 安全边界)"
+if [ "$AVAIL_MB" -lt "$REQUIRED_MB" ]; then
+  echo "::error::磁盘空间不足，发布已中止 —— 未做任何修改（未备份、未迁移、未重启）。"
+  echo "可用 ${AVAIL_MB}MB < 需要 ${REQUIRED_MB}MB。"
+  echo "回收空间的常用手段（按收益排序，均可安全执行）："
+  echo "  1) pnpm store prune            # 清未被引用的包缓存，2026-08-17 实测约占 2663MB"
+  echo "  2) 手工清理 $BACKUP_ROOT 下较旧的备份组（保留最近 2-3 组即可）"
+  echo "  3) journalctl --vacuum-size=100M"
+  exit 1
+fi
+echo "磁盘空间充足，继续。"
+
 echo "=== 1. 读取 DATABASE_URL（不打印）==="
 DBURL="$(sed -n 's/^DATABASE_URL="\([^"]*\)"/\1/p' "$API_DIR/.env" | head -n1)"
 if [ -z "$DBURL" ]; then
