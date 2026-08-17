@@ -92,6 +92,8 @@
     "bootstrap:first-admin": "node -r @swc-node/register scripts/bootstrap-first-admin.ts",
     "verify:first-admin-bootstrap": "node -r @swc-node/register scripts/verify-first-admin-bootstrap.ts",
     "verify:first-admin-bootstrap:postgres": "node -r @swc-node/register scripts/verify-first-admin-bootstrap-postgres.ts",
+    "verify:job-content-screening": "node -r @swc-node/register scripts/verify-job-content-screening.ts",
+    "verify:job-validity-expiry": "node -r @swc-node/register scripts/verify-job-validity-expiry.ts",
     "verify:db-load-indexes": "node -r @swc-node/register scripts/verify-db-load-indexes.ts",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",
     "verify:audit-logs": "node -r @swc-node/register scripts/verify-audit-logs.ts",

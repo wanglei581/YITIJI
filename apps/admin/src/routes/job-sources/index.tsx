@@ -221,7 +221,11 @@ export default function JobSourcesPage() {
               ) : (
                 paginated.map((s) => {
                   const review  = REVIEW_MAP[s.reviewStatus]
-                  const publish = PUBLISH_MAP[s.publishStatus]
+                  // 过期是后端按 validThrough 实时派生的，与 publishStatus 并列展示：
+                  // 库里仍是「已发布」（所以「下架」按钮还在），但对求职者已不再放出。
+                  const publish = s.expired
+                    ? { badge: 'default' as const, label: '已发布 · 已过期' }
+                    : PUBLISH_MAP[s.publishStatus]
                   return (
                     <tr key={s.id} className="hover:bg-neutral-50">
                       <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{s.sourceName}</td>
@@ -230,6 +234,16 @@ export default function JobSourcesPage() {
                         <p>{s.title}</p>
                         {s.reviewStatus === 'rejected' && s.rejectReason && (
                           <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{s.rejectReason}</p>
+                        )}
+                        {/*
+                          确定性关键词筛查结果（后端读取时派生，非 AI 判定）。
+                          命中只表示「需人工看一眼」,系统不会据此自动拒绝 ——
+                          文案必须保持「疑似 / 请人工复核」口径,不得写成结论。
+                        */}
+                        {s.contentFlags && s.contentFlags.length > 0 && (
+                          <p className="mt-0.5 text-xs text-warning-fg">
+                            疑似违规表述，请人工复核:{s.contentFlags.map((f) => `「${f.term}」${f.label}`).join('；')}
+                          </p>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.company}</td>
@@ -347,6 +361,12 @@ export default function JobSourcesPage() {
             <DetailRow label="同步时间" value={viewing.syncTime} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
+            <DetailRow
+              label="有效期"
+              value={viewing.validThrough
+                ? `${viewing.validThrough.slice(0, 10)}${viewing.expired ? '（已过期，求职者端已自动不再展示；请下架或联系来源机构更新）' : ''}`
+                : '来源未提供'}
+            />
             {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (
               <DetailRow label="拒绝原因" value={viewing.rejectReason} />
             ) : null}

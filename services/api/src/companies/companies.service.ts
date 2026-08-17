@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import { assertOrgContentTrustActive, type OrgTrustReader } from '../common/content-trust'
+import { jobValidityWhere } from '../jobs/job-validity'
 import {
   COMPANY_INDUSTRIES,
   COMPANY_RECRUIT_TYPES,
@@ -29,6 +30,16 @@ import type {
 // ============================================================
 
 const PUBLISHED = { reviewStatus: 'approved', publishStatus: 'published' } as const
+
+/**
+ * 求职者可见岗位 = 已发布 **且** 未过有效期。
+ *
+ * 本页对用户的措辞是「在招岗位 / openJobCount」——「在招」是个**事实断言**，
+ * 把一条 validThrough 已过的岗位算进去就是 CLAUDE.md §9「不伪造能力」里的谎报，
+ * 也违反五部门《通知》「标注信息有效期限或者及时更新」。
+ * 判据与 /jobs 列表同源（jobs/job-validity.ts），两处不得各写一份。
+ */
+const publishedJob = () => ({ ...PUBLISHED, ...jobValidityWhere() })
 
 export interface PublicCompanyFilters {
   keyword?: string
@@ -79,14 +90,14 @@ function publicWhere(f: PublicCompanyFilters) {
   if (f.recruitType === 'fair') {
     where['fairParticipant'] = true
   } else if (f.recruitType) {
-    where['jobs'] = { some: { ...PUBLISHED, category: f.recruitType } }
+    where['jobs'] = { some: { ...publishedJob(), category: f.recruitType } }
   }
   const kw = f.keyword?.trim()
   if (kw) {
     where['OR'] = [
       { name: { contains: kw } },
       { description: { contains: kw } },
-      { jobs: { some: { ...PUBLISHED, title: { contains: kw } } } },
+      { jobs: { some: { ...publishedJob(), title: { contains: kw } } } },
     ]
   }
   return where
@@ -111,14 +122,14 @@ export class CompaniesService {
         id: true, name: true, logoUrl: true, companyType: true, industry: true,
         sourceName: true, province: true, city: true, district: true,
         description: true, tagsJson: true, fairParticipant: true,
-        _count: { select: { jobs: { where: { ...PUBLISHED } } } },
+        _count: { select: { jobs: { where: publishedJob() } } },
       },
       ...memberPageArgs(page),
     })
     // 代表岗位：当前页企业的已发布岗位标题各取前 3（真实数据，无则空数组）
     const ids = rows.map((r) => r.id)
     const jobRows = ids.length === 0 ? [] : await this.prisma.job.findMany({
-      where: { companyProfileId: { in: ids }, ...PUBLISHED },
+      where: { companyProfileId: { in: ids }, ...publishedJob() },
       select: { companyProfileId: true, title: true },
       orderBy: [{ syncTime: 'desc' }],
       take: ids.length * 6,
@@ -152,7 +163,7 @@ export class CompaniesService {
     const where = publicWhere(filters)
     const companyCount = await this.prisma.companyProfile.count({ where })
     const fairCompanyCount = await this.prisma.companyProfile.count({ where: { ...where, fairParticipant: true } })
-    const jobWhere = { ...PUBLISHED, companyProfile: { is: where } }
+    const jobWhere = { ...publishedJob(), companyProfile: { is: where } }
     const openJobCount = await this.prisma.job.count({ where: jobWhere })
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
@@ -202,7 +213,7 @@ export class CompaniesService {
   async getPublic(id: string) {
     const c = await this.prisma.companyProfile.findFirst({
       where: { id, ...PUBLISHED },
-      include: { _count: { select: { jobs: { where: { ...PUBLISHED } } } } },
+      include: { _count: { select: { jobs: { where: publishedJob() } } } },
     })
     if (!c) {
       throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在或未发布' } })
@@ -244,7 +255,7 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在或未发布' } })
     }
-    const where = { companyProfileId: companyId, ...PUBLISHED }
+    const where = { companyProfileId: companyId, ...publishedJob() }
     const total = await this.prisma.job.count({ where })
     const rows = await this.prisma.job.findMany({
       where,
