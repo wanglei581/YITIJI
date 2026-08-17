@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedUser } from '../decorators/current-user.decorator'
@@ -18,11 +18,16 @@ export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-sessio
  *
  * 不主动检查角色 — 单独使用时表示"任意已登录用户"。
  *
- * 身份判定本体在 `../auth/optional-internal-user`(回源数据库 + 会话状态缓存),
- * 与混合鉴权路由(FilesController)共用同一份实现,避免出现第二套内部鉴权口径。
+ * 身份判定本体在 `../auth/optional-internal-user`:回源数据库 +
+ * `internal:session-state` 缓存 + `tryRedis` 有界降级。**Redis 在本守卫里
+ * 是什么、挂掉时为什么回源数据库不等于放松鉴权,那段口径写在该文件的头注释里**,
+ * 不要只改一处。抽出来是为了让混合鉴权路由(FilesController 同时接受会员与内部
+ * 账号 token)复用同一份判定,而不是各写一套 —— 两份副本必然漂移。
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name)
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
@@ -38,7 +43,13 @@ export class JwtAuthGuard implements CanActivate {
       })
     }
 
-    const user = await resolveOptionalInternalUser(header, this.jwtService, this.redis, this.prisma)
+    const user = await resolveOptionalInternalUser(
+      header,
+      this.jwtService,
+      this.redis,
+      this.prisma,
+      this.logger,
+    )
     if (!user) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' },

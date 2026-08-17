@@ -21,6 +21,7 @@ import { FilesController } from '../src/files/files.controller'
 import { canAccessFile, type FileRequester } from '../src/files/files.service'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../src/common/constants/internal-session.constants'
 import { memberSessionKey } from '../src/common/guards/end-user-auth.guard'
+import { resetRedisCooldownForTests } from '../src/common/redis/redis-degradation'
 
 const JWT_SECRET = 'verify-file-internal-auth-secret-0123456789'
 const jwt = new JwtService({ secret: JWT_SECRET, signOptions: { expiresIn: '2h' } })
@@ -55,6 +56,8 @@ interface WorldOptions {
   /** 预置的 internal:session-state 缓存(模拟热路径缓存命中)。 */
   seedSessionState?: Array<{ key: string; value: string }>
   memberSessions?: Array<{ sessionId: string; endUserId: string }>
+  /** 模拟 Redis 不可达:每条命令都直接 reject(真实故障现场是连接被拒/超时)。 */
+  redisDown?: boolean
 }
 
 interface Calls {
@@ -99,19 +102,29 @@ function createWorld(options: WorldOptions = {}) {
     },
   }
 
+  const down = options.redisDown === true
+  const refuse = async (): Promise<never> => {
+    const error = new Error('connect ECONNREFUSED 127.0.0.1:6379')
+    error.name = 'MaxRetriesPerRequestError'
+    throw error
+  }
   const redis = {
     get: async (key: string) => {
       calls.redisGet += 1
+      if (down) return refuse()
       return store.get(key) ?? null
     },
     del: async (key: string) => {
+      if (down) return refuse()
       store.delete(key)
     },
     setJsonIfVersionNotOlder: async (key: string, _ttl: number, value: string) => {
+      if (down) return refuse()
       store.set(key, value)
       return 'stored' as const
     },
     unregisterMemberSession: async (_endUserId: string, sessionId: string) => {
+      if (down) return refuse()
       store.delete(memberSessionKey(sessionId))
     },
   }
@@ -427,6 +440,42 @@ async function main(): Promise<void> {
       '已停用管理员修改保存期限',
     )
   })
+
+  if (failures.length > 0) {
+    console.error(`\n${failures.length} 项失败:`)
+    for (const failure of failures) console.error(`  - ${failure}`)
+    throw new Error(`文件端点内部账号身份回源验证失败:${failures.length}/${failures.length + passed}`)
+  }
+  // 14. Redis 不可达时,文件端点的内部身份判定必须降级回源而不是 500。
+  //     本项直接钉住 optional-internal-user 里的 tryRedis 有界降级层:
+  //     一旦有人把它换回裸 redis.get(),这里会先炸(500 / 超时),而不是等到
+  //     verify:redis-degradation-truth 才在 CI 里发现。
+  await scenario('Redis 不可达时内部身份回源降级(不 500、有界)', async () => {
+    resetRedisCooldownForTests()
+    const world = createWorld({ users: [ACTIVE_ADMIN], redisDown: true })
+    const token = internalToken({ sub: 'admin-1', role: 'admin', orgId: null, ver: 3 })
+    const started = Date.now()
+    const result = await world.controller.downloadUrl(MEMBER_RESUME.id, request(token))
+    const elapsedMs = Date.now() - started
+    assert.equal(result.data?.fileId, MEMBER_RESUME.id, 'Redis 挂掉不得让在职管理员拿不到文件')
+    assert.ok(world.calls.userFindUnique >= 1, 'Redis 挂掉必须回源数据库,而不是放行或 500')
+    assert.ok(elapsedMs < 5_000, `单次判定必须有界,实测 ${elapsedMs}ms`)
+  })
+
+  // 15. Redis 不可达也不得变成「一律放行」:停用账号仍按数据库真源拒绝。
+  await scenario('Redis 不可达时停用账号仍被拒(降级不等于放行)', async () => {
+    resetRedisCooldownForTests()
+    const world = createWorld({ users: [{ ...ACTIVE_ADMIN, enabled: false }], redisDown: true })
+    const token = internalToken({ sub: 'admin-1', role: 'admin', orgId: null, ver: 3 })
+    await expectRejection(
+      () => world.controller.downloadUrl(MEMBER_RESUME.id, request(token)),
+      { status: 401, code: 'AUTH_REQUIRED' },
+      'Redis 不可达 + 已停用管理员',
+    )
+    assert.equal(world.calls.getAccessUrl, 0, 'Redis 挂掉时也不得放行已停用账号')
+  })
+
+  resetRedisCooldownForTests()
 
   if (failures.length > 0) {
     console.error(`\n${failures.length} 项失败:`)
