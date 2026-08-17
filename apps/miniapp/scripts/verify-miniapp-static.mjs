@@ -457,7 +457,10 @@ const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
   pickupWxml.includes('请将此二维码对准一体机扫码器') &&
-  pickupWxml.includes('二维码只包含本订单的 10 位取件码') &&
+  // 术语随终端对齐为「到机码」（kiosk 入口名为「到机码核销 · 不是取件码」）。
+  // 这里只是定位锚点；真正守能力的是下面的 createPickupQrMatrix / PICKUP_CODE_RE /
+  // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
+  pickupWxml.includes('二维码只包含本订单的 10 位到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
   pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
   pickupQr.includes("PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/") &&
