@@ -497,3 +497,128 @@ test('fails closed when a high-confidence value survives an overlapping or malfo
     /CONTRACT_PII_MASK_INCOMPLETE/,
   )
 })
+
+// ============================================================
+// 2026-08-17 生产故障回归：检测器比遮盖器宽 ⇒ analyze 阶段 100% 失败
+//
+// 失败任务耗时 152–483ms，而该机器一次真实模型调用要 31–82s —— 根本没到模型。
+// 卡点是 assertNoHighConfidencePii：`联系电话` / `传真` / `账号` / `证件`
+// 这些标签检测侧全都认识，但座机、400 热线、传真、<16 位账号遮盖侧都不认，
+// 「数量词」还被当成残留值 ⇒ 抛 CONTRACT_PII_MASK_INCOMPLETE。
+//
+// 下面三条**两个方向都验**：既要求不再误杀，也要求真实 PII 仍然遮得掉。
+// 只验「不再报错」会退化成把检测器关掉。
+// ============================================================
+
+test('masks landline, hotline, fax and short account numbers behind their labels', () => {
+  for (const [input, expected] of [
+    ['联系电话：021-62345678', '联系电话：[手机号_1]'],
+    ['联系电话：02162345678', '联系电话：[手机号_1]'],
+    ['联系电话：400-800-8888', '联系电话：[手机号_1]'],
+    ['联系电话：4008008888', '联系电话：[手机号_1]'],
+    ['电话：010-1234567转8080', '电话：[手机号_1]'],
+    ['传真：021-62345679', '传真：[手机号_1]'],
+    ['传真号码：021-62345679', '传真号码：[手机号_1]'],
+    ['账号：622202123456', '账号：[银行卡_1]'],
+    ['账号 622202123456', '账号 [银行卡_1]'],
+    ['银行账户：12345678', '银行账户：[银行卡_1]'],
+  ] as const) {
+    assert.equal(maskContractPages([{ pageNumber: 1, text: input }]).pages[0]!.text, expected)
+  }
+})
+
+test('quantities after a PII label are not treated as residual PII', () => {
+  for (const input of [
+    '入职需提交证件2份',
+    '身份证复印件1份',
+    '需提交证件 2 份',
+    '证件3张、银行卡1张',
+  ]) {
+    const output = maskContractPages([{ pageNumber: 1, text: input }])
+    assert.equal(output.pages[0]!.text, input)
+  }
+})
+
+test('a full contract with landline, fax and quantities masks every real PII value', () => {
+  const text = [
+    '劳动合同书',
+    '甲方：上海示例科技有限公司',
+    '统一社会信用代码：91310000MA1FL1234X',
+    '联系电话：021-62345678',
+    '传真：021-62345679',
+    '乙方：张三',
+    '身份证：110101199003072316',
+    '手机号：13812345678',
+    '邮箱：zhangsan@example.com',
+    '账号：622202123456',
+    '入职需提交证件2份，身份证复印件1份。',
+    '月薪为8000元，合同期限为3年。',
+  ].join('\n')
+
+  // 方向一：不再误杀。
+  const masked = maskContractPages([{ pageNumber: 1, text }]).pages[0]!.text
+
+  // 方向二：真实 PII 一个都不许留下。
+  for (const secret of [
+    '021-62345678', '021-62345679', '110101199003072316', '13812345678',
+    'zhangsan@example.com', '622202123456', '91310000MA1FL1234X',
+    '张三', '上海示例科技有限公司',
+  ]) {
+    assert.equal(masked.includes(secret), false, `未遮盖：${secret}`)
+  }
+
+  // 法律事实与数量词必须原样保留，否则模型读到的是残缺合同。
+  for (const kept of ['月薪为8000元', '合同期限为3年', '证件2份', '身份证复印件1份']) {
+    assert.equal(masked.includes(kept), true, `被误删：${kept}`)
+  }
+})
+
+test('fax and contact-number labels are mask-only and never widen the fail-closed surface', () => {
+  // `传真` / `联系号码` 本来就不在 LOOSE_VALUE_LABEL 里 —— 它们不是本次故障的
+  // 触发源，只是**泄漏**（传真号原样送进模型）。因此只补遮盖、不补检测：
+  // 补检测会让 `传真：N/A` 这类内容开始抛 CONTRACT_PII_MASK_INCOMPLETE，
+  // 等于用一个新的线上失败去换一个并不存在的失败。
+  for (const input of ['传真：N/A', '传真：待补充', '联系号码：N/A', '传真号码：暂无']) {
+    assert.equal(maskContractPages([{ pageNumber: 1, text: input }]).pages[0]!.text, input)
+  }
+  // 但真实传真号必须被遮掉（修复前是原样泄漏给模型的）。
+  assert.equal(
+    maskContractPages([{ pageNumber: 1, text: '传真：021-62345679' }]).pages[0]!.text,
+    '传真：[手机号_1]',
+  )
+})
+
+test('every detected label has a masker: detection labels are a subset of masking labels', () => {
+  // 故障的性质是「检测比遮盖宽」。这条守卫把不变量钉死：
+  // 表里每个标签，后面跟着该类别的真实 PII 时，遮盖必须成功（不抛）
+  // 且产出**检测侧期待的那一类**占位符。两侧再漂移这条就红。
+  for (const [label, sample, category] of [
+    ['身份证号', '110101199003072316', '身份证'],
+    ['证件号码', '110101199003072316', '身份证'],
+    ['手机号', '13812345678', '手机号'],
+    ['联系电话', '021-62345678', '手机号'],
+    ['联系号码', '13812345678', '手机号'],
+    ['传真号码', '021-62345679', '手机号'],
+    ['传真号', '021-62345679', '手机号'],
+    ['传真', '021-62345679', '手机号'],
+    ['银行卡号', '6222021234567890123', '银行卡'],
+    ['银行账号', '6222021234567890123', '银行卡'],
+    ['账户号', '622202123456', '银行卡'],
+    ['电子邮箱', 'a@example.com', '邮箱'],
+    ['邮箱地址', 'a@example.com', '邮箱'],
+    ['统一社会信用代码', '91310000MA1FL1234X', '统一社会信用代码'],
+    ['银行卡', '6222021234567890123', '银行卡'],
+    ['银行账户', '6222021234567890123', '银行卡'],
+    ['账号', '622202123456', '银行卡'],
+    ['账户', '622202123456', '银行卡'],
+    ['身份证', '110101199003072316', '身份证'],
+    ['证件', '110101199003072316', '身份证'],
+    ['手机', '13812345678', '手机号'],
+    ['电话', '021-62345678', '手机号'],
+    ['邮箱', 'a@example.com', '邮箱'],
+  ] as const) {
+    const text = `${label}：${sample}`
+    const output = maskContractPages([{ pageNumber: 1, text }])
+    assert.equal(output.pages[0]!.text, `${label}：[${category}_1]`, `标签 ${label} 未同源`)
+  }
+})
