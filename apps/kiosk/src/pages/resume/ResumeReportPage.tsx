@@ -8,6 +8,7 @@ import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
+import { ResumeDiagnosisFailExits } from './components/ResumeDiagnosisFailExits'
 import { readAiResumeSession } from './aiResumeSession'
 import './resume-diagnosis-lightflow.css'
 import './resume-diagnosis-ext.css'
@@ -17,7 +18,13 @@ interface ReportState {
   /** intent 分流(diagnose/optimize):由上传页随 state 透传 */
   intent?: string
   source?: string
-  file?: { name: string; size: string; format: string }
+  /**
+   * 上传文件元信息。`fileUrl` / `mimeType` 由 ResumeSourcePage 随 state 透传
+   * （kiosk-upload 下发的 HMAC content URL，30 分钟 TTL），诊断失败时凭它把
+   * **原件**送进既有打印链路 —— 打印不依赖 AI。刷新后 state 丢失则两者为空，
+   * 那时按钮如实置灰写明原因，不给一个点了没反应的按钮。
+   */
+  file?: { name: string; size: string; format: string; fileUrl?: string; mimeType?: string }
   taskId?: string
   /** 匿名结果一次性令牌（Phase C-2A）；登录会员无此值 */
   accessToken?: string
@@ -148,22 +155,19 @@ export function ResumeReportPage() {
 
   if (!success) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
-        <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-error-bg">
-          <AlertCircleIcon className="h-14 w-14 text-error-fg" />
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" data-ai-down-exits="resume-diagnosis" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center overflow-y-auto p-8">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-error-bg">
+          <AlertCircleIcon className="h-12 w-12 text-error-fg" />
         </div>
         <h1 className="text-2xl font-bold text-neutral-900">诊断失败</h1>
-        <p className="mt-2 text-base text-neutral-500">
+        <p className="mt-2 max-w-xl text-center text-base text-neutral-500">
           {reason ?? '简历解析未能完成，请重试'}
         </p>
-        <div className="mt-8 flex w-full max-w-sm gap-3">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-          <Button size="lg" className="resume-primary-action flex-1" onClick={handleRetry}>
-            重新解析
-          </Button>
-        </div>
+        <ResumeDiagnosisFailExits
+          file={state.file}
+          onRetry={handleRetry}
+          onHome={() => navigate('/')}
+        />
       </section></KioskPageFrame>
     )
   }

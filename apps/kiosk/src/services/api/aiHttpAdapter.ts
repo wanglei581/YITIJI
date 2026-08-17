@@ -250,10 +250,11 @@ export const aiHttpAdapter = {
     format?: ResumeExportFormat,
     layout?: ResumeLayoutSettings,
     templateId?: string,
+    draft?: boolean,
   ): Promise<ResumeGenerateExportResponse> {
     return post<ResumeGenerateExportResponse>(
       '/resume/generate/export',
-      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}), ...(templateId ? { templateId } : {}) },
+      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}), ...(templateId ? { templateId } : {}), ...(draft ? { draft: true } : {}) },
       token,
     )
   },

@@ -8,6 +8,7 @@ import { MemberMockInterviewController, MockInterviewController } from './mock-i
 import { MockInterviewService } from './mock-interview.service'
 import { MockInterviewLlmService } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
+import { InterviewPracticeSheetPdfService } from './interview-practice-sheet-pdf.service'
 import { TtsService } from './asr/tts.service'
 
 /**
@@ -33,6 +34,15 @@ import { TtsService } from './asr/tts.service'
     }),
   ],
   controllers: [MockInterviewController, MemberMockInterviewController],
-  providers: [MockInterviewService, MockInterviewLlmService, InterviewReportPdfService, TtsService, EndUserAuthGuard],
+  providers: [
+    MockInterviewService,
+    MockInterviewLlmService,
+    InterviewReportPdfService,
+    // ai-down 支线的出纸能力：不依赖任何 LLM provider，必须与 AI 版式并列注册，
+    // 否则 AI 挂掉时连这张纸也生成不出来。
+    InterviewPracticeSheetPdfService,
+    TtsService,
+    EndUserAuthGuard,
+  ],
 })
 export class MockInterviewModule {}

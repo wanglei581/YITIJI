@@ -293,9 +293,11 @@ export const aiMockAdapter = {
     format?: ResumeExportFormat,
     _layout?: ResumeLayoutSettings,
     _templateId?: string,
+    _draft?: boolean,
   ): Promise<ResumeGenerateExportResponse> {
     void _layout
     void _templateId
+    void _draft
     // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)
     const ext = format ?? 'pdf'

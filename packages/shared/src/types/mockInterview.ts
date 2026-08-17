@@ -96,6 +96,31 @@ export interface InterviewPrintResponse {
   printFileUrl?: string
 }
 
+/**
+ * 通用题目与答案单（ai-down 支线）。
+ *
+ * 口径来源：`docs/design/kiosk-ai-os-v3-2026-08/20-interview-pod.html`
+ * 的 ai-down 支线（「AI 不可用 · 只能用通用题库」/「题目与答案单」/「本单不含点评」）。
+ *
+ * 与 `InterviewPrintResponse` 的区别不是格式而是**内容来源**：
+ * 这张纸上的题目全部来自服务端写死的通用题库，一个字都不经过模型，
+ * 因此 `variant` 恒为 'degraded'，且纸面自己会写明「本单不含点评」。
+ */
+export interface InterviewPracticeSheetResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
+  printFileUrl?: string
+  /** 恒为 'degraded'：本单不含任何模型生成内容。写成字面量类型，防止将来被标成 AI 产物。 */
+  variant: 'degraded'
+  /** 纸上实际印了几道题（来自通用题库，按本场配置的题量截取）。 */
+  questionCount: number
+}
+
 export interface MemberInterviewItem {
   sessionId: string
   interviewerType: InterviewerType

@@ -41,6 +41,26 @@ const LEVEL_LABEL: Record<string, string> = {
   needs_work: '需要加强', pass: '基础达标', good: '表现良好', excellent: '表现突出',
 }
 
+/**
+ * 注册中文字体并选中；找不到任何候选返回 false（调用方负责诚实报错）。
+ *
+ * 抽出来是为了让降级版式（interview-practice-sheet-pdf.service.ts）复用同一套候选，
+ * 避免两套版式在同一台机器上「一套出得来、一套出不来」——
+ * 降级那套出不来的后果更重：AI 已经挂了，它是用户唯一的出纸路径。
+ * 同源做法见 ai/resume/career-plan-pdf.service.ts 的 registerCjkFont。
+ */
+export function registerInterviewCjkFont(doc: PDFKit.PDFDocument): boolean {
+  return fontCandidates().some((c) => {
+    if (!existsSync(c.path)) return false
+    try {
+      if (c.family) doc.registerFont('cjk', c.path, c.family)
+      else doc.registerFont('cjk', c.path)
+      doc.font('cjk')
+      return true
+    } catch { return false }
+  })
+}
+
 @Injectable()
 export class InterviewReportPdfService {
   private readonly logger = new Logger(InterviewReportPdfService.name)
@@ -53,15 +73,7 @@ export class InterviewReportPdfService {
       subject: 'AI 生成的模拟面试练习报告，仅供求职者本人练习复盘参考，不代表任何招聘结果，不参与企业筛选或面试邀约',
       kind: 'interview',
     })
-    const ok = fontCandidates().some((c) => {
-      if (!existsSync(c.path)) return false
-      try {
-        if (c.family) doc.registerFont('cjk', c.path, c.family)
-        else doc.registerFont('cjk', c.path)
-        doc.font('cjk')
-        return true
-      } catch { return false }
-    })
+    const ok = registerInterviewCjkFont(doc)
     if (!ok) {
       doc.end()
       throw new InternalServerErrorException({ error: { code: 'RESUME_PDF_FONT_NOT_FOUND', message: '服务器缺少中文字体，无法生成打印版报告' } })

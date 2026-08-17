@@ -8,6 +8,12 @@ import { signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
+import { InterviewPracticeSheetPdfService } from './interview-practice-sheet-pdf.service'
+import {
+  PRACTICE_SHEET_FILENAME_PREFIX,
+  PRACTICE_SHEET_INTERVIEWER_LABEL,
+  pickPracticeQuestions,
+} from './interview-practice-sheet'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
 
 // ============================================================
@@ -58,6 +64,7 @@ export class MockInterviewService {
     private readonly prisma: PrismaService,
     private readonly llm: MockInterviewLlmService,
     private readonly pdf: InterviewReportPdfService,
+    private readonly practiceSheetPdf: InterviewPracticeSheetPdfService,
     private readonly files: FilesService,
     private readonly extraction: ResumeExtractionService,
     private readonly audit: AuditService,
@@ -336,6 +343,71 @@ export class MockInterviewService {
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
       printFileUrl: signFileUrl(uploaded.fileId).url,
+    }
+  }
+
+  /**
+   * 通用题目与答案单（ai-down 支线）：服务端真实 PDF → FileObject → 既有打印链路。
+   *
+   * 为什么现有端点不够，必须新增这一条：
+   *   - `POST :id/report/print` 要求已落库的 AI 报告，没有就 404。而这条路径存在的场景
+   *     恰恰是**报告根本没机会产生** —— `start` 第一步就调 LLM 出题（本文件 `start` →
+   *     `this.llm.nextQuestion`），模型 503 时会话永远停在 `configured`，既没有 turn 也没有
+   *     report，`printReport` 只会再抛一次 404。
+   *   - `POST /resume/generate/export` 是简历版式，跟面试题无关。
+   *   - 让前端自己拼一张纸做不到：本机是打印终端，出纸必须走 FileObject + 签名 URL 链路。
+   *
+   *   所以这是「AI 挂了也得能带走一张纸」这条规则在面试链上唯一的落点，
+   *   与 career-plan 的 `variant:'degraded'` 是同一套处置（PR #639 已立的先例）。
+   *
+   * 这条路径**不调用任何模型**：题目来自写死的通用题库，按用户自己选的面试官身份取。
+   * 因此它在 AI 全挂时照常可用 —— 这正是它存在的意义。
+   *
+   * 允许在任何会话状态下调用（configured / in_progress / completed 都行）：
+   * 用户中途 AI 挂了也该能把剩下的题带走用笔答。
+   */
+  async printPracticeSheet(sessionId: string, requester: InterviewRequester) {
+    const session = await this.loadAuthorized(sessionId, requester)
+    const questions = pickPracticeQuestions(session.interviewerType, session.questionTarget)
+    const { buffer, pageCount } = await this.practiceSheetPdf.render({
+      date: new Date().toISOString().slice(0, 10),
+      position: session.position,
+      industry: session.industry,
+      interviewerLabel:
+        PRACTICE_SHEET_INTERVIEWER_LABEL[session.interviewerType] ?? session.interviewerType,
+      questions,
+    })
+    const safePosition = session.position.replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '岗位'
+    const uploaded = await this.files.upload({
+      buffer,
+      filename: `${PRACTICE_SHEET_FILENAME_PREFIX}_${safePosition}.pdf`,
+      mimeType: 'application/pdf',
+      purpose: 'print_doc',
+      uploaderId: null,
+      endUserId: session.endUserId,
+      createdBy: 'mock_interview_practice_sheet',
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: session.endUserId ? 'enduser' : 'kiosk',
+      action: 'mock_interview.practice_sheet_print',
+      targetType: 'mock_interview_session',
+      targetId: session.id,
+      // variant 让审计能区分「用户拿走的是 AI 报告还是通用题目单」——两张纸内容完全不同。
+      payload: { fileId: uploaded.fileId, pageCount, questionCount: questions.length, variant: 'degraded' },
+      ipAddress: null, userAgent: null, requestId: null,
+    })
+    return {
+      fileId: uploaded.fileId,
+      filename: uploaded.filename,
+      sizeBytes: uploaded.sizeBytes,
+      pageCount,
+      signedUrl: uploaded.signedUrl,
+      expiresAt: uploaded.signedUrlExpiresAt,
+      printFileUrl: signFileUrl(uploaded.fileId).url,
+      /** 恒 'degraded'：本单不含任何模型生成内容，前端据此如实提示用户。 */
+      variant: 'degraded' as const,
+      questionCount: questions.length,
     }
   }
 

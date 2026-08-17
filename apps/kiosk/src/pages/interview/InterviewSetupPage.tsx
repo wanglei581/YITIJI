@@ -26,10 +26,20 @@ import {
   GraduationCapIcon,
   ListFilterIcon,
   Loader2Icon,
+  NotebookPenIcon,
   UserRoundCheckIcon,
   XIcon,
 } from 'lucide-react'
-import { createInterview, startInterview } from '../../services/api/interview'
+import { makePrintParams } from '@ai-job-print/shared'
+import {
+  AiTaskRegion,
+  useAiTask,
+  aiErrorMessageOf,
+  isAiOutage,
+  type AiAvailability,
+  type AiTaskFallback,
+} from '../../ai'
+import { createInterview, printInterviewPracticeSheet, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -118,8 +128,27 @@ export function InterviewSetupPage() {
   const [uploading, setUploading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * `POST /mock-interviews` 建会话时**不调模型**（写一行配置就返回），
+   * 真正调 LLM 的是紧随其后的 `/start`。所以 start 503 之后这个 sessionId 仍然有效 ——
+   * 它是通用题目单唯一的落点（题目单端点要凭它做归属校验并取本场配置）。
+   */
+  const [pendingSession, setPendingSession] = useState<{ sessionId: string; accessToken?: string } | null>(null)
+  /** AI 能力级不可用的真实原因；null 表示未观测到不可用。 */
+  const [aiOutage, setAiOutage] = useState<string | null>(null)
+  /** 已完成过一次真实往返 —— 没探到之前一律 fail-closed（aiOutage.ts 口径）。 */
+  const [probed, setProbed] = useState(false)
+  /** 通用题目单生成中（不经过模型，只是服务端排版 + 上传）。 */
+  const [printingSheet, setPrintingSheet] = useState(false)
+  /**
+   * 「进面试间」这一步真的失败过。
+   *
+   * 不能直接用 `error` 判：本页的 `error` 也承载「请先填写目标岗位」这类**表单校验**提示，
+   * 拿它去点亮 ai-down 降级区，等于把用户少填一个字说成 AI 挂了 —— 那是另一种伪造。
+   */
+  const [startFailed, setStartFailed] = useState(false)
 
-  useBusyLock(creating || uploading)
+  useBusyLock(creating || uploading || printingSheet)
 
   const positionReady = position.trim().length > 0
   const visibleIndustries = POPULAR_INDUSTRIES.includes(industry)
@@ -150,6 +179,8 @@ export function InterviewSetupPage() {
     }
     setCreating(true)
     setError(null)
+    setAiOutage(null)
+    setStartFailed(false)
     try {
       const input: CreateInterviewInput = {
         interviewerType,
@@ -162,7 +193,10 @@ export function InterviewSetupPage() {
       }
       const token = getToken()
       const created = await createInterview(input, { token })
+      // 先记下来再 start：start 一旦 503，这个 sessionId 就是通用题目单的落点。
+      setPendingSession({ sessionId: created.sessionId, accessToken: created.accessToken })
       const first = await startInterview(created.sessionId, { token, accessToken: created.accessToken })
+      setProbed(true)
       navigate('/interview/session', {
         state: {
           sessionId: created.sessionId,
@@ -177,11 +211,101 @@ export function InterviewSetupPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建练习失败，请稍后重试')
+      const message = aiErrorMessageOf(err, '创建练习失败，请稍后重试')
+      setError(message)
+      setStartFailed(true)
+      // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误只是本次失败，保留重试入口。
+      if (isAiOutage(err)) setAiOutage(message)
+      else setProbed(true)
     } finally {
       setCreating(false)
     }
   }
+
+  /**
+   * 通用题目与答案单：AI 挂掉时唯一不经过模型的出纸路径。
+   *
+   * 为什么不是「重试 start」：`/start` 第一步就调 LLM 出题
+   * （`mock-interview.service.ts` 的 `start` → `llm.nextQuestion`），模型不可用时
+   * 会话永远停在 configured，既没有 turn 也没有报告 —— `/report/print` 只会 404。
+   *
+   * 口径来源：docs/design/kiosk-ai-os-v3-2026-08/20-interview-pod.html 的 ai-down 支线
+   * （:497「AI 不可用 · 只能用通用题库」/ :1137「生成题目与答案单」/ :1894「本单不含点评」）。
+   */
+  const handlePracticeSheet = async () => {
+    if (!pendingSession || printingSheet) return
+    setPrintingSheet(true)
+    setError(null)
+    try {
+      const file = await printInterviewPracticeSheet(pendingSession.sessionId, {
+        token: getToken(),
+        accessToken: pendingSession.accessToken,
+      })
+      if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
+      navigate('/print/confirm', {
+        state: {
+          file: {
+            name: file.filename,
+            size: file.sizeBytes >= 1024 * 1024
+              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+            pages: file.pageCount,
+            fileId: file.fileId,
+            fileUrl: file.printFileUrl,
+            mimeType: 'application/pdf',
+          },
+          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+        },
+      })
+    } catch (err) {
+      setError(aiErrorMessageOf(err, '题目单生成失败，请稍后重试'))
+    } finally {
+      setPrintingSheet(false)
+    }
+  }
+
+  /**
+   * 降级处置用 `blocked`：AI 面试官是这条能力的唯一产出源，页面上有明确的入口按钮。
+   * 刻意**不用** `manual` —— 通用题目单不是模拟面试的等价替代（没有追问、没有点评），
+   * 套 manual 等于宣称有一条等价手动路径，那是伪造能力（CLAUDE.md §9）。
+   * 它作为 `stillAvailable` 如实写明，并挂成真正可点的动作。
+   */
+  const availability: AiAvailability = aiOutage ? 'unavailable' : probed ? 'available' : 'unknown'
+  const aiTask = useAiTask({
+    availability,
+    pending: creating,
+    failed: startFailed || Boolean(aiOutage),
+    hasResult: false,
+  })
+  const STILL_AVAILABLE = pendingSession
+    ? '题目本身不依赖 AI：本机有一份写死的通用题库，可以按你选的面试官身份印一张「题目与答案单」带走，用笔作答。'
+      + '这张单子不含任何点评、评分或通过率 —— 点评依赖 AI，本次没有，也不会拿通用建议冒充。'
+    : '本次连练习会话都没建起来，因此印不出按本场配置取题的题目单。面试准备要点是本机固定内容，不依赖 AI，现在照常可看。'
+  const sheetAction = pendingSession
+    ? {
+        action: {
+          label: printingSheet ? '正在生成题目单…' : '打印通用题目与答案单',
+          onClick: () => void handlePracticeSheet(),
+        },
+      }
+    : {}
+  const fallback: AiTaskFallback = aiOutage
+    ? {
+        // 能力级不可用：底部「开始模拟面试」这次按了也没用，置灰它并写清原因。
+        mode: 'blocked',
+        reason: aiOutage,
+        blockedActionLabel: '开始模拟面试（AI 面试官）',
+        stillAvailable: STILL_AVAILABLE,
+        ...sheetAction,
+      }
+    : {
+        // 这一次失败但服务是通的（限流 / 参数等）：**不是**能力不可用。
+        // 用 blocked 会和底部仍可点的「开始模拟面试」自相矛盾。
+        mode: 'result-unavailable',
+        reason: (startFailed ? error : null) ?? '本次没能进入 AI 面试间。',
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「开始模拟面试」；不想等的话，${STILL_AVAILABLE}`,
+        ...sheetAction,
+      }
 
   return (
     <InterviewShell>
@@ -343,7 +467,29 @@ export function InterviewSetupPage() {
         </div>
 
         {error && (
-          <p className="mt-4 rounded-xl bg-error-bg px-4 py-3 text-sm font-medium text-error-fg">{error}</p>
+          <p className="mt-4 rounded-xl bg-error-bg px-4 py-3 text-sm font-medium text-error-fg" role="alert">{error}</p>
+        )}
+
+        {/*
+          失败态不再只剩「创建练习失败」一行。红字保留（它是原因），下面挂上不依赖 AI 的出路。
+          AiTaskRegion 的 fallback 是必填 prop，由类型系统保证这条支线不会被悄悄摘掉。
+        */}
+        <AiTaskRegion
+          className="interview-setup-fallback mt-4"
+          task={aiTask}
+          label="AI 面试官出题与点评"
+          fallback={fallback}
+        />
+
+        {aiTask.isFailed && (
+          <Button
+            variant="secondary"
+            className="mt-3 flex min-h-[56px] w-full items-center justify-center gap-2 text-base"
+            onClick={() => navigate('/interview/tips')}
+          >
+            <NotebookPenIcon className="h-5 w-5" aria-hidden="true" />
+            查看面试准备要点（本机固定内容，不依赖 AI）
+          </Button>
         )}
       </div>
 

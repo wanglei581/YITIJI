@@ -97,10 +97,18 @@ export interface RenderedResumePdf {
 export interface ResumePdfRenderOptions {
   layout?: ResumeLayoutSettings
   templatePreset?: ResumeTemplateLayoutPreset
+  /**
+   * 原样草稿：内容逐字来自用户填写，**没有经过任何模型**。
+   *
+   * AI 生成失败时前端仍允许把已填内容导出成 PDF 打印带走（不然用户在一台打印终端上
+   * 一张纸也拿不走）。那条路径必须走这个标记 —— 否则元数据会写成 AIGenerated='true'，
+   * 把一份一个字都不是 AI 写的文件标成 AI 产物，和反过来把 AI 产物标成人工一样失真。
+   */
+  draft?: boolean
 }
 
 function isRenderOptions(value: ResumeLayoutSettings | ResumePdfRenderOptions | undefined): value is ResumePdfRenderOptions {
-  return Boolean(value && ('layout' in value || 'templatePreset' in value))
+  return Boolean(value && ('layout' in value || 'templatePreset' in value || 'draft' in value))
 }
 
 @Injectable()
@@ -138,6 +146,23 @@ export class ResumePdfService {
     })
   }
 
+  /**
+   * 原样草稿的诚实元数据。刻意不复用 `applyAigcPdfMetadata` —— 那个 helper 固定写
+   * AIGenerated='true'。键名沿用同一组，便于统一检索；用独立 ServiceProviderCode
+   * 让事后能区分「AI 润色版」和「用户原样草稿」两类产物。
+   */
+  private applyDraftMetadata(doc: { info: PDFKit.DocumentInfo }, name: string): void {
+    const generatedAt = new Date()
+    const info = doc.info as unknown as Record<string, string | Date>
+    info['Title'] = `${name} 的简历（原样草稿）`
+    info['Author'] = '青序 AI 求职服务'
+    info['Subject'] = '用户本人填写的简历内容原样排版，未经 AI 润色；仅供本人保存与打印'
+    info['CreationDate'] = generatedAt
+    info['AIGenerated'] = 'false'
+    info['ServiceProviderCode'] = 'zyd-resume-draft-v1'
+    info['GeneratedAt'] = generatedAt.toISOString()
+  }
+
   /** 渲染简历 PDF(A4 受控排版)。返回 buffer + 页数。 */
   async render(resume: GeneratedResume, options?: ResumeLayoutSettings | ResumePdfRenderOptions): Promise<RenderedResumePdf> {
     const renderOptions = isRenderOptions(options) ? options : { layout: options }
@@ -154,11 +179,18 @@ export class ResumePdfService {
     // ⚠️ 只加隐式 metadata，**不加任何可见水印/页眉/页脚** —— 简历是用户要拿去
     // 投递的材料，是否在版面上出现可见 AI 标识属于产品裁决，不由工程侧单方面决定。
     // 事实字段仍由服务端逐字复制用户输入（防编造契约），AI 只参与表达润色。
-    applyAigcPdfMetadata(doc, {
-      title: `${resume.basic.name} 的简历`,
-      subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
-      kind: 'resume',
-    })
+    if (renderOptions.draft) {
+      // 原样草稿：一个字都不是模型写的，绝不能标 AIGenerated='true'。
+      // 版面刻意保持一致（不印「草稿」水印）—— 简历是用户要拿去投递的材料，
+      // 是否出现可见标识属于产品裁决，口径与上面同源；页面侧已如实说明这是未润色版本。
+      this.applyDraftMetadata(doc, resume.basic.name)
+    } else {
+      applyAigcPdfMetadata(doc, {
+        title: `${resume.basic.name} 的简历`,
+        subject: '经 AI 简历服务生成/优化的简历文件；事实信息来自用户本人填写或原简历，AI 只参与表达润色',
+        kind: 'resume',
+      })
+    }
     this.resolveFont(doc)
 
     const chunks: Buffer[] = []

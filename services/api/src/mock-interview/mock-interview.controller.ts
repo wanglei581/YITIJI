@@ -236,6 +236,17 @@ export class MockInterviewController {
   async print(@Param('id') id: string, @Req() req: ReqLike) {
     return ApiResponse.ok(await this.service.printReport(id, await this.requesterOf(req)))
   }
+
+  /**
+   * 通用题目与答案单（ai-down 支线）。不调模型，因此 AI 全挂时照常可用 ——
+   * 这是「模拟面试」在打印终端上唯一的出纸兜底。为什么不能复用 :id/report/print，
+   * 见 MockInterviewService.printPracticeSheet 的注释。
+   */
+  @Post(':id/practice-sheet')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  async practiceSheet(@Param('id') id: string, @Req() req: ReqLike) {
+    return ApiResponse.ok(await this.service.printPracticeSheet(id, await this.requesterOf(req)))
+  }
 }
 
 /** 会员历史练习记录（/api/v1/me/mock-interviews，EndUserAuthGuard 保护）。 */

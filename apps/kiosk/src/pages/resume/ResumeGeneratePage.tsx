@@ -11,13 +11,15 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type {
+  GeneratedResume,
   ResumeGenEducation,
   ResumeGenExperience,
   ResumeGenProject,
   ResumeGenerateInput,
   ResumeGenerateResponse,
 } from '@ai-job-print/shared'
-import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
+import { EDUCATION_LEVEL_OPTIONS, makePrintParams } from '@ai-job-print/shared'
+import { AiTaskRegion, useAiTask, isAiOutage, type AiAvailability, type AiTaskFallback } from '../../ai'
 import {
   GraduationCapIcon,
   BriefcaseIcon,
@@ -30,7 +32,7 @@ import {
   UserRoundIcon,
   WrenchIcon,
 } from 'lucide-react'
-import { submitResumeGenerate } from '../../services/api'
+import { exportResumeDraft, submitResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
@@ -169,6 +171,12 @@ export function ResumeGeneratePage() {
   const [step, setStep] = useState(0)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** AI 能力级不可用的**真实原因**（原样透出后端 message）；null 表示未观测到不可用。 */
+  const [aiOutage, setAiOutage] = useState<string | null>(null)
+  /** 已完成过一次真实往返 —— 没探到之前一律 fail-closed（aiOutage.ts 的口径）。 */
+  const [probed, setProbed] = useState(false)
+  /** 原样草稿导出中（不经过 AI，只是服务端排版 + 上传）。 */
+  const [exportingDraft, setExportingDraft] = useState(false)
 
   // 表单数据只在组件内存(公共设备隐私):刷新/待机即丢失,不写任何本地存储。
   const [basic, setBasic] = useState({ name: '', phone: '', email: '', city: '' })
@@ -180,8 +188,9 @@ export function ResumeGeneratePage() {
   const [certsText, setCertsText] = useState('')
   const [selfIntro, setSelfIntro] = useState('')
 
-  // 生成期间豁免待机宣传屏(打断会丢表单)
-  useBusyLock(generating)
+  // 生成期间豁免待机宣传屏(打断会丢表单)。导出草稿同样豁免：那一步正在把用户
+  // 填的内容变成一张能带走的纸，被待机屏打断等于把它又弄丢一次。
+  useBusyLock(generating || exportingDraft)
 
   const canNext = useMemo(() => {
     if (step === 0) return basic.name.trim().length > 0
@@ -231,9 +240,12 @@ export function ResumeGeneratePage() {
   const handleGenerate = async () => {
     setGenerating(true)
     setError(null)
+    setAiOutage(null)
     const input = buildInput()
     try {
       const result: ResumeGenerateResponse = await submitResumeGenerate(input, getToken())
+      // 拿到结构化响应就算一次真实往返 —— 即便 status 是 failed，服务本身是通的。
+      setProbed(true)
       if (result.status !== 'completed' || !result.resume) {
         setError(result.failReason ?? 'AI 简历生成失败，请稍后重试')
         return
@@ -241,11 +253,105 @@ export function ResumeGeneratePage() {
       // 只传 result：预览页的 LocationState 虽然声明了 input，但从未解引用过。
       navigate('/resume/generate/preview', { state: { result } })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI 简历生成失败，请稍后重试')
+      const message = err instanceof Error ? err.message : 'AI 简历生成失败，请稍后重试'
+      setError(message)
+      // 只有能力级故障才判成「AI 不可用」；限流 / 参数错误等只是本次失败，
+      // 那些必须保留重试入口，不许拿去把能力说成挂了（aiOutage.ts 口径）。
+      if (isAiOutage(err)) setAiOutage(message)
+      else setProbed(true)
     } finally {
       setGenerating(false)
     }
   }
+
+  /**
+   * 原样草稿：把用户**已经填好的内容**逐字导出成 PDF，进既有打印链路。
+   *
+   * 这条路径不经过任何模型 —— 服务端 `/resume/generate/export` 只做 pdfkit 排版，
+   * 所以 AI 挂掉时它照常可用。它**不是** AI 润色的等价替代：拿到的就是自己写的原话，
+   * 页面与产物元数据都如实标成「未经 AI 润色」，不冒充成品。
+   *
+   * 口径来源：docs/design/kiosk-ai-os-v3-2026-08/10-resume-interview.html 的 ai-down 支线
+   * （:394「现在可以把已答的部分导出成草稿带走」/ :523「草稿 ≠ 成文简历」）。
+   */
+  const handleExportDraft = async () => {
+    if (exportingDraft) return
+    setExportingDraft(true)
+    setError(null)
+    const input = buildInput()
+    const draft: GeneratedResume = {
+      basic: input.basic,
+      intention: input.intention,
+      // AI 不介入时不替用户写个人简介：他自己填了什么就是什么，没填就留空。
+      summary: input.selfIntro ?? '',
+      education: input.education,
+      experience: input.experience,
+      projects: input.projects,
+      skills: input.skills,
+      certificates: input.certificates,
+    }
+    try {
+      const file = await exportResumeDraft(draft, getToken())
+      if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
+      navigate('/print/confirm', {
+        state: {
+          file: {
+            name: file.filename,
+            size: file.sizeBytes >= 1024 * 1024
+              ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+              : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+            pages: file.pageCount,
+            fileId: file.fileId,
+            fileUrl: file.printFileUrl,
+            mimeType: 'application/pdf',
+          },
+          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '草稿导出失败，请稍后重试')
+    } finally {
+      setExportingDraft(false)
+    }
+  }
+
+  /**
+   * 降级处置只用 `blocked`，不用 `manual`：
+   * 「导出原样草稿」拿到的**不是**同一份结果（没有润色、没有缺失提示），
+   * 套 manual 等于宣称有一条等价的手动路径，那是伪造能力（CLAUDE.md §9）。
+   * 它是 `stillAvailable` 里如实说明的「仍然拿得到的东西」，并挂成可用动作。
+   */
+  const availability: AiAvailability = aiOutage ? 'unavailable' : probed ? 'available' : 'unknown'
+  const aiTask = useAiTask({
+    availability,
+    pending: generating,
+    failed: Boolean(error) || Boolean(aiOutage),
+    hasResult: false,
+  })
+  const draftAction = {
+    label: exportingDraft ? '正在导出草稿…' : '导出并打印我填的内容（未经 AI 润色）',
+    onClick: () => void handleExportDraft(),
+  }
+  const STILL_AVAILABLE =
+    '你填的内容还留在这一页上，没有丢 —— 上下翻页、继续补充都照常。'
+    + '导出与打印不经过 AI：下面这条可以把你填的原话直接排成 A4 PDF 打印带走（未经润色，也没有缺失提示）。'
+  const fallback: AiTaskFallback = aiOutage
+    ? {
+        // 能力级不可用：底部「生成我的简历」这次按了也没用，置灰它并写清原因。
+        mode: 'blocked',
+        reason: aiOutage,
+        blockedActionLabel: 'AI 润色成文',
+        stillAvailable: STILL_AVAILABLE,
+        action: draftAction,
+      }
+    : {
+        // 模型跑了但这一次没出可用结果：**不是**能力不可用。
+        // 这里若也用 blocked，就会出现「灰按钮说不可用」和「底部生成按钮仍可点」自相矛盾。
+        mode: 'result-unavailable',
+        reason: error ?? '本次没能生成简历。',
+        retryHint: `这不是你的操作问题，AI 服务本身是通的。可以直接再点一次「生成我的简历」；不想等的话，${STILL_AVAILABLE}`,
+        action: draftAction,
+      }
 
   const stepIcon = [UserRoundIcon, BriefcaseIcon, GraduationCapIcon, BriefcaseIcon, FolderGitIcon, WrenchIcon][step]
   const StepIcon = stepIcon
@@ -451,9 +557,20 @@ export function ResumeGeneratePage() {
           )}
         </Card>
 
+            {/*
+              失败态不再只剩一行红字。红字保留（它是原因），下面挂上不依赖 AI 的出路：
+              内容没丢 + 可以把已填内容原样导出打印带走。AiTaskRegion 的 fallback 是
+              必填 prop，由类型系统保证这条支线不会在后续改动里被悄悄摘掉。
+            */}
             {error && (
-              <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
+              <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>
             )}
+            <AiTaskRegion
+              className="resume-generate-fallback mt-3"
+              task={aiTask}
+              label="AI 简历润色成文"
+              fallback={fallback}
+            />
         </div>
 
         <ProgressSidebar currentStep={step} />

@@ -258,7 +258,16 @@ export function ResumeSourcePage() {
       state: {
         intent,
         source: 'upload',
-        file: { name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format },
+        // fileUrl / mimeType 一起透传:诊断失败时报告页要凭它们把**原件**送进打印链路。
+        // 原来只带 name/size/format,于是 AI 一挂,文件明明还在服务端,用户却一张纸也拿不走。
+        // 这是 kiosk-upload 下发的 HMAC content URL(30 分钟 TTL),与 PrintUploadPage 同一条路径。
+        file: {
+          name: uploadedFile.name,
+          size: uploadedFile.size,
+          format: uploadedFile.format,
+          fileUrl: uploadedFile.fileUrl,
+          mimeType: uploadedFile.mimeType,
+        },
         fileId: uploadedFile.fileId,
         selectedDimensions: genericDiagnosis ? [] : selectedDimensions,
         targetContext: buildTargetContext(),
