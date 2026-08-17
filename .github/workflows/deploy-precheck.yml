@@ -101,7 +101,28 @@ jobs:
             echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
 
             echo "=== 7. 本次发布需要的空间量级 ==="
-            echo "PG_DB_SIZE_MB=$(sudo -n -u postgres psql -tAc \"SELECT pg_database_size(current_database())/1024/1024;\" 2>/dev/null || echo 'unknown（无免密 sudo，可忽略）')"
+            # 注意：这条 SQL 含括号，务必用单引号包住并先赋值再 echo。
+            # 之前写成 `$(... -tAc \"SELECT pg_database_size(current_database())...\")` 嵌在双引号里，
+            # bash 在**解析期**就看到裸的 `(` 而报 `syntax error near unexpected token '('` ——
+            # 语法错误发生在解析阶段，整个脚本一行都不会执行，九个检查项全部无输出。
+            # 这就是本工作流此前从未产出过任何结果的原因。
+            PG_DB_SIZE_MB="$(sudo -n -u postgres psql -tAc 'SELECT pg_database_size(current_database())/1024/1024;' 2>/dev/null | tr -d ' ')"
+            echo "PG_DB_SIZE_MB=${PG_DB_SIZE_MB:-unknown（无免密 sudo，可忽略）}"
+
+            echo "=== 7b. Redis 可达性（发布前置条件，缺它会在健康检查阶段炸）==="
+            # 为什么必须查：deploy-api-release.sh 第 8 步健康检查是 grep '"status":"ok"'，
+            # 而当前代码在 Redis 降级时返回 "degraded"。若重启那一刻 Redis 不可达，
+            # 健康检查会连续失败然后 deploy 报错 —— 但此时迁移已执行、rsync 已完成、
+            # PM2 已重启新代码。结果是「一份部署失败的日志」配「一个已经换成新版本的生产环境」。
+            if command -v redis-cli >/dev/null 2>&1; then
+              if [ "$(redis-cli ping 2>/dev/null)" = "PONG" ]; then
+                echo "REDIS_REACHABLE=yes"
+              else
+                echo "REDIS_REACHABLE=no  （发布会在健康检查阶段失败，且此时迁移已执行）"
+              fi
+            else
+              echo "REDIS_REACHABLE=unknown  （本机无 redis-cli，需另行确认）"
+            fi
 
             echo "=== 8. 发布后验证：#555 资金门禁启动告警是否出现在应用日志 ==="
             if pm2 logs "$EXPECT_PM2" --lines 200 --nostream 2>/dev/null | grep -q "PRINT_REQUIRE_PAID_BEFORE_CLAIM"; then
