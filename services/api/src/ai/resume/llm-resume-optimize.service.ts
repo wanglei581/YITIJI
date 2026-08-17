@@ -9,6 +9,7 @@ import type {
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { LLM_MASK_INPUT_LIMIT, maskUserTextForLlmReversible } from '../../common/pii/llm-input-mask'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
@@ -109,6 +110,11 @@ export interface LayoutAdjustInput {
   originalText: string
   action: ResumeLayoutAdjustAction
   layout?: ResumeLayoutSettings
+  /**
+   * AI-COST-TRUTH：每次真实 LLM 调用（含失败重试）回调一次元数据，
+   * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
+   */
+  onLlmCall?: AiLlmCallSink
 }
 
 export interface LayoutAdjustResult {
@@ -174,7 +180,13 @@ export class LlmResumeOptimizeService {
    * - 未配置 / 未启用 → AI_PROVIDER_NOT_CONFIGURED(绝不 fallback mock)。
    * - 非法 JSON / 事实串不在原文 / 命中承诺类拦截词 → 重试一次;仍坏 → AI_OPTIMIZE_INVALID_OUTPUT。
    */
-  async optimize(extractedText: string, report: ResumeReport, targetContext?: ResumeTargetContext): Promise<OptimizeResult> {
+  async optimize(
+    extractedText: string,
+    report: ResumeReport,
+    targetContext?: ResumeTargetContext,
+    /** AI-COST-TRUTH：真实用量回调，见 LayoutAdjustInput.onLlmCall。 */
+    onLlmCall?: AiLlmCallSink,
+  ): Promise<OptimizeResult> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -203,7 +215,10 @@ export class LlmResumeOptimizeService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: RETRY_HINT }]
-      const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages)
+      const raw = await this.callLlm(
+        cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
+        `llm:${cfg.vendor}:${cfg.model}`, onLlmCall,
+      )
       const result = this.parseAndValidate(raw, text, cfg.forbiddenWords)
       if (result) return restoreOptimizeResult(result, masked.restore)
       this.logger.warn(`resume optimize: invalid output (attempt ${attempt}/2)`)
@@ -276,7 +291,10 @@ export class LlmResumeOptimizeService {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages =
         attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
-      const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages)
+      const raw = await this.callLlm(
+        cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages,
+        `llm:${cfg.vendor}:${cfg.model}`, input.onLlmCall,
+      )
       const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
       if (result) {
         // 条目数量上限校验用的是原始 currentResume（未遮盖，长度不受遮盖影响）；
@@ -299,6 +317,9 @@ export class LlmResumeOptimizeService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    /** AI-COST-TRUTH：真实厂商标识（`llm:<vendor>:<model>`）。**不含任何凭证**。 */
+    providerLabel: string,
+    onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Response
@@ -314,6 +335,8 @@ export class LlmResumeOptimizeService {
       })
     }
     if (!res.ok) {
+      // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
+      onLlmCall?.({ provider: providerLabel })
       this.logger.error(`resume optimize http ${res.status}`)
       throw new ServiceUnavailableException({
         error: { code: 'AI_OPTIMIZE_UNAVAILABLE', message: `AI 简历优化服务返回错误 (${res.status})` },
@@ -321,7 +344,10 @@ export class LlmResumeOptimizeService {
     }
     const data = (await res.json().catch(() => null)) as {
       choices?: Array<{ message?: { content?: string } }>
+      usage?: RawLlmUsage
     } | null
+    // 在「内容为空」判断之前回报：内容为空这次调用照样花钱，不能因为解析失败就丢账。
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const content = data?.choices?.[0]?.message?.content?.trim()
     if (!content) {
       throw new ServiceUnavailableException({
