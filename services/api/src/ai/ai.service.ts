@@ -9,7 +9,7 @@ import { LocalAiProvider } from './providers/local.provider.stub'
 import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmResumeProvider } from './providers/llm.provider'
-import { AiLogService } from './ai-log.service'
+import { AiLogService, AiUsageAccumulator, aiLogFieldsFromUsageReport } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
@@ -252,7 +252,9 @@ export class AiService {
       await this.persistResult(resultWithProvider.taskId, 'parse', resultWithProvider.status, resultWithProvider, endUserId ?? null, accessTokenHash)
       this.logService.record({
         taskId:    resultWithProvider.taskId,
-        provider:  this.provider.name,
+        // AI-COST-TRUTH：provider 标签取 provider 回报的真实厂商标识，
+        // 不再用恒为 'llm' 的 AiProviderName（那样定价表永远匹配不到）。
+        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
         status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
@@ -392,7 +394,7 @@ export class AiService {
       }
       this.logService.record({
         taskId,
-        provider:  this.provider.name,
+        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'optimizeResume',
         latencyMs: Date.now() - t0,
         status:    withProvider.status === 'failed' ? 'failed' : 'success',
@@ -437,6 +439,9 @@ export class AiService {
     }
 
     const t0 = Date.now()
+    // AI-COST-TRUTH：排版调整可能重试两次，每次都真实花钱。累计器在 try 外声明，
+    // 这样失败路径也能拿到已经发生的调用用量，不至于丢账。
+    const usage = new AiUsageAccumulator()
     try {
       const parseOwner = await this.prisma.aiResumeResult.findUnique({
         where: { taskId_kind: { taskId, kind: 'parse' } },
@@ -458,10 +463,10 @@ export class AiService {
       }
 
       const optimizer = new LlmResumeOptimizeService(this.llmConfig)
-      const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout })
+      const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout, onLlmCall: usage.add })
       this.logService.record({
         taskId,
-        provider: this.provider.name,
+        ...aiLogFieldsFromUsageReport(usage.toReport(this.provider.name), this.provider.name),
         operation: 'adjustResumeLayout',
         latencyMs: Date.now() - t0,
         status: 'success',
@@ -470,7 +475,8 @@ export class AiService {
     } catch (err) {
       this.logService.record({
         taskId,
-        provider: this.provider.name,
+        // 失败前可能已经打过模型（重试、上游 5xx）——那些调用照样计费，必须落账。
+        ...aiLogFieldsFromUsageReport(usage.toReport(this.provider.name), this.provider.name),
         operation: 'adjustResumeLayout',
         latencyMs: Date.now() - t0,
         status: 'failed',
@@ -508,7 +514,7 @@ export class AiService {
       await this.persistResult(withProvider.taskId, 'generate', withProvider.status, withProvider, endUserId ?? null, accessTokenHash)
       this.logService.record({
         taskId:    withProvider.taskId,
-        provider:  this.provider.name,
+        ...aiLogFieldsFromUsageReport(result.usage, this.provider.name),
         operation: 'generateResume',
         latencyMs: Date.now() - t0,
         status:    withProvider.status === 'failed' ? 'failed' : 'success',
@@ -761,13 +767,16 @@ export class AiService {
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
     const useLlm = this.llmConfig.isReady('assistant_chat')
     const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig('assistant_chat').vendor}` : this.provider.name
+    // AI-COST-TRUTH：chat 无重试，但仍用累计器统一形状，且 callCount 能区分
+    // 「回落到 mock 话术、没花钱」和「真打了模型但没拿到 usage」。
+    const usage = new AiUsageAccumulator()
     try {
       const result = useLlm
-        ? await this.llmChat.chat({ ...input, sessionId })
+        ? await this.llmChat.chat({ ...input, sessionId }, usage.add)
         : await this.provider.chatAssistant({ ...input, sessionId })
       this.logService.record({
         taskId:    sessionId,
-        provider:  providerLabel,
+        ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'success',
@@ -779,7 +788,8 @@ export class AiService {
     } catch (err) {
       this.logService.record({
         taskId:    sessionId,
-        provider:  providerLabel,
+        // 失败前可能已经打过模型（上游 5xx / 空内容）——那次调用照样计费，必须落账。
+        ...aiLogFieldsFromUsageReport(usage.toReport(providerLabel), providerLabel),
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'failed',

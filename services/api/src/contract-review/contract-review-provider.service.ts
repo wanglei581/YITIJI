@@ -1,4 +1,6 @@
 import { assertNoHighConfidencePii, type ContractMaskPage, type ContractPartyFacts } from './contract-review-pii-masker'
+import { normalizeLlmUsage, type RawLlmUsage } from '../ai/ai-log.service'
+import type { AiTokenUsage } from '../ai/interfaces/ai-provider.interface'
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
@@ -88,6 +90,14 @@ export interface ContractProviderReviewInput {
 export interface ContractProviderReviewOutput {
   readonly identity: ContractProviderIdentity
   readonly draft: ContractModelDraft
+  /**
+   * AI-COST-TRUTH：上游回包里的 token 用量。
+   *
+   * 合同审查走 deepseek/qwen 的**付费**调用，此前完全不落 AiServiceLog，
+   * 即这笔花费在用量统计里根本不存在。缺省 = 上游没回 usage → 未采集，
+   * 落账时成本必须留空，绝不写 0。
+   */
+  readonly usage?: AiTokenUsage
 }
 
 type ContractProviderEnv = Readonly<Record<string, string | undefined>>
@@ -188,6 +198,16 @@ export class ContractReviewProviderService {
     return (await this.reviewWithIdentity(input)).draft
   }
 
+  /**
+   * AI-COST-TRUTH：当前配置的厂商标识，不发起任何调用。
+   *
+   * 失败路径（transport 抛错、回包非法）拿不到 reviewWithIdentity 的返回值，
+   * 但那次调用照样可能已经计费，落账仍需标出真实厂商。
+   */
+  identity(): ContractProviderIdentity {
+    return identityOf(readConfig(this.env))
+  }
+
   async reviewWithIdentity(input: ContractProviderReviewInput): Promise<ContractProviderReviewOutput> {
     const config = readConfig(this.env)
     const identity = identityOf(config)
@@ -223,7 +243,10 @@ export class ContractReviewProviderService {
     if (Buffer.byteLength(body, 'utf8') > MAX_RESPONSE_BYTES) {
       throw new Error('CONTRACT_PROVIDER_RESPONSE_TOO_LARGE')
     }
-    return Object.freeze({ identity, draft: parseResponse(body, input.pages) })
+    // usage 与 draft 分开解析：draft 那条路径带严格的 isExactObject / 长度校验，
+    // 是安全面，不能为了顺手取 token 去动它。取不到 usage 就是 undefined（未采集）。
+    const usage = extractUsage(body)
+    return Object.freeze({ identity, draft: parseResponse(body, input.pages), ...(usage ? { usage } : {}) })
   }
 }
 
@@ -312,6 +335,25 @@ function parseResponse(body: string, pages: readonly ContractMaskPage[]): Contra
     throw new Error('CONTRACT_PROVIDER_RESPONSE_INVALID')
   }
   return validateDraft(draft, pages)
+}
+
+/**
+ * AI-COST-TRUTH：从上游回包里取 token 用量。
+ *
+ * 纯尽力而为：解析失败、字段缺失、非对象一律返回 undefined（= 未采集），
+ * **绝不**因为读不到就返回 0 —— 0 会被当成「这次调用免费」。
+ * 本函数不抛异常，成本采集失败不得影响合同审查主流程。
+ */
+function extractUsage(body: string): AiTokenUsage | undefined {
+  try {
+    const wire = JSON.parse(body) as unknown
+    if (!wire || typeof wire !== 'object') return undefined
+    const usage = (wire as Record<string, unknown>)['usage']
+    if (!usage || typeof usage !== 'object') return undefined
+    return normalizeLlmUsage(usage as RawLlmUsage)
+  } catch {
+    return undefined
+  }
 }
 
 function extractContent(wire: unknown): string {
