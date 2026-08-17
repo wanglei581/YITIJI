@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P37a 面试技巧 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P37a 面试技巧">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P37a 面试技巧 ══════════════════════════════════════════════════
+   补页由来：37-interview-hub.html 的「面试技巧」卡此前是 aria-disabled 的
+   建设中灰卡，hint 写「面试技巧页还没建」。**那句话是对原型自身说的**，
+   而 origin/main 上 apps/kiosk/src/pages/interview/InterviewTipsPage.tsx
+   （285 行）与路由 /interview/tips 一直都在，首页 serviceGroups.ts:107
+   也挂着入口 —— 生产能力从来没缺过，缺的是原型这一页。本页把它补上，
+   同时把 37 那五处「还没建」的文案改掉。**本页不新增任何生产能力。**
+
+   内容真值 = 生产 InterviewTipsPage.tsx 的四个常量，一条不增一条不减：
+     CHECKLIST 6 项 / FAQS 8 题（考察什么·回答结构·常见错误·提示）
+     STAR 4 段（完整，不截断）/ INTRO_STRUCTURES 3 档（30 秒 / 1 分钟 / 3 分钟）
+
+   三条本页红线：
+   ① 通用准备方法属**来源方/系统事实**，标 E2；**不标 E3** —— 它不是模型判断。
+      整页只有「按目标岗位挑重点」那一块是模型判断，单独标 E3 + 仅供参考。
+   ② 无「保过 / 通过率 / 录用概率 / 百分比匹配」任何表述（stage.js 会拦）。
+   ③ 勾选是**本机这一屏的本地态**，不写进任何账号、不产生「已完成」记录。
+
+   AI 角色（加速器，不是前置条件 · 类型①）：
+     选了目标岗位后，可挑出该重点准备的 3 项，标 E3 + 仅供参考。
+     ai-down：清单、8 题、STAR、自我介绍结构**整页照常**，只撤下那条排序建议，
+     并给出不依赖 AI 的手动替代路径（照 JD 关键词自己对照）。
+   device-off：本页不出纸，打印机离线不影响任何内容。
+   ══════════════════════════════════════════════════════════════════ */
+.work--tips { grid-template-columns: 1fr; }
+
+/* ── 顶部 AI 带：整页唯一的模型判断区 ── */
+.aibar { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-5);
+  border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg); border: 1px solid var(--jade-a20);
+  box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur)); }
+.aibar > .ic { width: 24px; height: 24px; color: var(--jade-500); flex: 0 0 auto; }
+.aibar-b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.aibar-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.aibar-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.aibar-rt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3); }
+.aibar--down { border-color: var(--amber-a20); background: var(--amber-a12); }
+.aibar--down > .ic { color: var(--amber-400); }
+
+/* 选择项：先给目标岗位，再挑重点。不选就不给结论（输入门） */
+.pick { min-height: 48px; min-width: 48px; padding: 0 var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px; }
+.pick:hover { border-color: var(--jade-a32); }
+.pick .k { color: var(--fog-600); font-size: var(--fz-1); }
+.pick .v { color: var(--fog-900); font-weight: 600; }
+.pick--empty { border-color: var(--amber-a20); background: var(--amber-a12); }
+.pick--empty .v { color: var(--amber-200); }
+/* 未选目标时主动作置灰：一律 aria-disabled，绝不用原生 disabled
+   —— 触屏没有 hover，原生 disabled 还会掉出 Tab 序，用户读不到原因 */
+.hotbtn { min-height: 48px; min-width: 48px; }
+.hotbtn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+
+/* ── 两栏 ── */
+.tcols { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.tcol { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+
+/* ── 准备清单：可勾选，本地态 ── */
+.cklist { display: flex; flex-direction: column; gap: var(--s-2); }
+.ckrow { width: 100%; min-height: 76px; text-align: left; cursor: pointer;
+  display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1); font-family: var(--ff-ui);
+  transition: border-color var(--dur-2) var(--ease-out); }
+.ckrow:hover { border-color: var(--jade-a32); }
+.ckbox { flex: 0 0 auto; width: 30px; height: 30px; margin-top: 2px; border-radius: var(--r-xs);
+  border: 2px solid var(--brd-2); display: grid; place-items: center; color: transparent; }
+.ckbox .ic { width: 20px; height: 20px; }
+.ckrow[aria-pressed="true"] { border-color: var(--jade-a32); background: var(--jade-a12); }
+.ckrow[aria-pressed="true"] .ckbox { border-color: var(--jade-500); background: var(--jade-500); color: #fff; }
+.ckb { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ckt { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600;
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ckd { font-size: var(--fz-1); color: var(--fog-700); line-height: 1.5; }
+/* 置灰的「打印这份清单」+ 它的原因：一律 aria-disabled，绝不用原生 disabled */
+.ckprint { margin-top: var(--s-3); display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ckprint .btn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+.ckprint .panel-note { flex: 1 1 220px; min-width: 0; font-size: var(--fz-1); line-height: 1.5; }
+/* 模型挑出的重点：只加一枚 E3 标记，不改勾选状态 —— AI 不替用户勾 */
+.ckrow.is-hot { border-color: var(--amber-a20); background: var(--amber-a12); }
+.hotmark { display: none; }
+.ckrow.is-hot .hotmark { display: inline-flex; }
+
+/* ── 高频问题：四段式，滚动列表 ── */
+.qlist { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--s-3); padding-right: var(--s-2); }
+.qcard { padding: var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; flex-direction: column; gap: var(--s-3); }
+.qq { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; line-height: 1.35;
+  display: flex; align-items: flex-start; gap: var(--s-3); }
+.qno { flex: 0 0 auto; width: 26px; height: 26px; border-radius: var(--r-xs);
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-700); }
+.qgrid { display: flex; flex-direction: column; gap: 7px; }
+.qrow { display: grid; grid-template-columns: 92px 1fr; gap: var(--s-3); align-items: baseline; }
+.qk { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
+.qv { font-size: var(--fz-2); color: var(--fog-800); line-height: 1.55; }
+.qrow--bad .qk { color: var(--coral-400); }
+.qrow--bad .qv { color: var(--fog-700); }
+.qrow--tip .qk { color: var(--jade-600); }
+
+/* ── STAR / 自我介绍结构 ── */
+.star { display: flex; flex-direction: column; gap: var(--s-2); }
+.starow { display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.stark { flex: 0 0 auto; width: 40px; height: 40px; border-radius: var(--r-xs);
+  display: grid; place-items: center; background: var(--jade-a12); border: 1px solid var(--jade-a20);
+  font-family: var(--ff-display); font-size: var(--fz-5); color: var(--jade-600); }
+.starb { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.starn { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.stard { font-size: var(--fz-1); color: var(--fog-700); line-height: 1.55; }
+
+.intro { display: flex; flex-direction: column; gap: var(--s-2); }
+.introw { display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.introd { flex: 0 0 auto; min-width: 76px; font-family: var(--ff-num); font-size: var(--fz-3);
+  color: var(--azure-400); font-weight: 600; }
+.introp { font-size: var(--fz-2); color: var(--fog-800); line-height: 1.6; }
+.introp i { font-style: normal; color: var(--fog-600); }
+
+/* device-off 下本页不出纸，也没有打印动作可置灰 —— 不做任何视觉降级 */
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="37-interview-hub.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">面试技巧</div>
+        <div class="brand-sub">职易达 · 01 号机 · 通用准备方法，仅供参考</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>本页内容不依赖 AI · 照常看</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 只影响「挑重点」</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本页不出纸</div>
+    <div class="clock" data-clock>2026年8月16日 <b>14:20</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub" style="flex:1 1 auto;font-size:var(--fz-3);color:var(--fog-700)">
+      准备清单&nbsp;· 高频问题的<b style="color:var(--fog-900)">回答结构</b>（不是标准答案）&nbsp;· STAR&nbsp;· 自我介绍</span>
+    <span class="rail-count">清单&nbsp;<b>6</b>&nbsp;项&nbsp;· 高频问题&nbsp;<b>8</b>&nbsp;题</span>
+  </div>
+
+  <div class="work work--tips">
+    <div class="wmain">
+
+      <!-- ── AI 带（默认 / 首次 / 设备离线）：整页唯一的模型判断区 ──
+           输入门：没选目标岗位就不出结论，主动作 aria-disabled 并写明原因。 -->
+      <div class="aibar" data-when="default first device-off">
+        <svg class="ic"><use href="#i-brain"/></svg>
+        <span class="aibar-b">
+          <span class="aibar-t">按你的目标岗位，挑出该重点准备的 3 项</span>
+          <span class="aibar-s" id="hot-why">下面 6 项都得过一遍；选了方向可以先告诉你哪 3 项对这个方向最吃紧。<b>挑出来的只是先后，不是能不能过。</b></span>
+        </span>
+        <span class="aibar-rt">
+          <button class="pick pick--empty" type="button" id="pk-target" data-opts="运营|销售|行政人事|技术">
+            <span class="k">目标</span><span class="v">未选</span></button>
+          <span class="chip chip--amber chip--label">AI · 仅供参考</span>
+          <button class="btn btn--ghost hotbtn" type="button" id="hot-go" aria-disabled="true">先选目标岗位</button>
+        </span>
+      </div>
+
+      <!-- ── AI 带（AI 不可用）：类型① 降级 —— 整页照常，只撤下这一条建议，并给手动替代路径 ── -->
+      <div class="aibar aibar--down" data-when="ai-down">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span class="aibar-b">
+          <span class="aibar-t">「挑重点」暂不可用，下面整页照常看</span>
+          <span class="aibar-s">清单 6 项、高频问题 8 题、STAR 与自我介绍结构都是固定内容，<b>和 AI 好不好没关系</b>。
+            自己挑重点的办法：把目标岗位的岗位描述抄下来，圈出重复出现的词，对着清单第 2 项逐条准备。</span>
+        </span>
+        <span class="aibar-rt"><span class="ev ev--e2">已自动上报</span></span>
+      </div>
+
+      <div class="tcols">
+
+        <!-- ══ 左栏：准备清单 + STAR ══ -->
+        <div class="tcol">
+
+          <div class="pane pane--fill">
+            <div class="pane-hd">
+              <span class="t">面试前准备清单</span>
+              <span class="ev ev--e2">通用准备方法</span>
+              <span class="s">勾选只留在这一屏</span>
+            </div>
+            <div class="cklist">
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="1">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">背景调研<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">了解公司核心业务、近期动态、企业文化，并在面试中自然地表达出来</span>
+                </span>
+              </button>
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="2">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">岗位匹配<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">提取岗位描述里的关键词，对应准备你的经历故事</span>
+                </span>
+              </button>
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="3">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">基础演练<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">准备 1 分钟 / 3 分钟自我介绍，回顾简历上每段经历的细节，不留被问住的空白</span>
+                </span>
+              </button>
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="4">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">形象着装<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">按公司性质选着装（互联网偏休闲，金融与国企偏正装），保持整洁精神</span>
+                </span>
+              </button>
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="5">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">面试材料<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">简历、作品集、证件、纸质材料按需备齐，简历可在本机打印台印</span>
+                </span>
+              </button>
+              <button class="ckrow" type="button" aria-pressed="false" data-ck="6">
+                <span class="ckbox"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="ckb">
+                  <span class="ckt">面试安排<span class="ev ev--e3 hotmark">该重点准备 · 仅供参考</span></span>
+                  <span class="ckd">确认时间、地点、交通路线；线上面试提前测试设备与网络</span>
+                </span>
+              </button>
+            </div>
+            <p class="panel-note" style="margin:var(--s-3) 0 0">
+              勾选<b>只在本机这一屏记着</b>，不写进任何账号、不生成「已完成」记录，离开这一页就没了。</p>
+
+            <!-- 「打印这份清单」为什么置灰、以及为什么放在这里而不是底栏：
+                 ① 06-print-workbench 的来源登记表（:2549 var SRC）里没有本页的页号，
+                    带 from=P37A 过去会当场判成「这条链接没有可识别的来源页」；
+                    而这份清单本身也还没做成一份可打印的文件 —— 摆一个点了会翻车的入口更糟。
+                 ② 底栏放不下把原因说清的长文案（实测挤到 307px，把提示区压成 76px 宽）。
+                    灰掉可以，但原因必须同屏读得到，所以连原因一起放进正文。
+                 置灰一律 aria-disabled，不用原生 disabled。 -->
+            <div class="ckprint">
+              <button class="btn btn--ghost" type="button" aria-disabled="true">
+                <svg class="ic"><use href="#i-printer"/></svg>打印这份清单</button>
+              <span class="panel-note" style="margin-left:0">
+                <b>暂不可用</b>：这份清单还没做成可打印的文件，打印台也还不认本页这个来源。
+                要带走的话，练完一场之后打印那份复盘单。</span>
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">STAR：讲经历的四段结构</span>
+              <span class="ev ev--e2">通用方法</span>
+            </div>
+            <div class="star">
+              <div class="starow"><span class="stark">S</span><span class="starb">
+                <span class="starn">情境 Situation</span>
+                <span class="stard">简述事件发生的背景，遇到了什么问题或挑战。</span></span></div>
+              <div class="starow"><span class="stark">T</span><span class="starb">
+                <span class="starn">任务 Task</span>
+                <span class="stard">明确你在这个情境中需要完成的目标或承担的角色。</span></span></div>
+              <div class="starow"><span class="stark">A</span><span class="starb">
+                <span class="starn">行动 Action</span>
+                <span class="stard">详细描述你为了达成目标采取了哪些具体的行动步骤，重点突出你自己的能力。</span></span></div>
+              <div class="starow"><span class="stark">R</span><span class="starb">
+                <span class="starn">结果 Result</span>
+                <span class="stard">说明最终取得了什么成果，尽量用数据说话：提升转化、缩短周期、降低成本、服务人数、完成数量等。</span></span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ══ 右栏：高频问题 + 自我介绍结构 ══ -->
+        <div class="tcol">
+
+          <div class="pane pane--grow">
+            <div class="pane-hd">
+              <span class="t">高频问题 · 回答结构</span>
+              <span class="ev ev--e2">通用准备方法</span>
+              <span class="s">8 题 · 可上下翻</span>
+            </div>
+            <div class="qlist">
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">1</span>请简单自我介绍一下？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">表达能力、重点提炼能力、与岗位的初步匹配</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">控制在 2–3 分钟：我是谁 + 我做过什么（核心成绩）+ 我为什么适合这个岗位</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">背诵简历逐条复述；讲童年成长经历；超过 5 分钟</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">结尾落到「所以我希望在这个岗位上……」，把话题引向岗位</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">2</span>你为什么想应聘这个岗位？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">求职动机的真实性、对岗位的理解程度</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">岗位职责的理解 + 自己能力的对应点 + 想在岗位上解决或达成什么</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">只说「想找份工作」「离家近」；对岗位职责一无所知</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">提前读 3 遍岗位描述，至少能说出两条核心职责</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">3</span>你最大的优势是什么？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">自我认知，以及优势与岗位的关联度</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">一个明确优势 + 一个具体事例支撑 + 与岗位的关联</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">罗列五六个空泛形容词（认真、负责、能吃苦）却没有事例</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">优势只讲一两个，但配上能讲细节的真实例子</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">4</span>你最大的不足是什么？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">自我认知的诚实度、改进意识</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">一个真实的、非致命的不足 + 正在采取的改进行动</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">说「我太追求完美」这类包装答案；说出岗位核心能力上的硬伤</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">重点在「我正在怎么改」，给出具体行动</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">5</span>讲一个你解决困难或挫折的经历。</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">问题分析、行动力、复盘能力</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">用 STAR：背景 → 你的任务 → 具体行动 → 量化结果与收获</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">只抱怨困难本身；说不清自己在其中做了什么</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">突出「我」做了什么，而不是「我们团队」做了什么</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">6</span>你为什么想来我们公司？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">求职诚意、对公司的了解程度</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">公司行业地位或业务方向 + 个人职业规划的契合点</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">说「贵公司是大公司 / 工资高」；明显没做任何了解</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">至少了解公司主营业务和一条近期动态</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">7</span>你对薪资有什么期待？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">自我定位是否客观、沟通方式</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">给出有依据的区间 + 表达对综合发展的关注 + 留出协商空间</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">一口咬死具体数字；完全不敢谈，说「随便都行」</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">先在岗位台看同方向岗位的公示薪资区间，那是来源平台原文；本机不预测你个人能拿多少</span></div>
+                </div>
+              </div>
+
+              <div class="qcard">
+                <div class="qq"><span class="qno">8</span>你还有什么想问我们的？</div>
+                <div class="qgrid">
+                  <div class="qrow"><span class="qk">考察什么</span><span class="qv">求职意愿、思考深度，这几乎是必问的收尾题</span></div>
+                  <div class="qrow"><span class="qk">回答结构</span><span class="qv">准备 2–3 个问题：岗位的工作内容细节 / 团队情况 / 入职后的成长路径</span></div>
+                  <div class="qrow qrow--bad"><span class="qk">常见错误</span><span class="qv">说「没有问题了」；上来就问加班和假期</span></div>
+                  <div class="qrow qrow--tip"><span class="qk">提示</span><span class="qv">问「这个岗位前三个月最重要的目标是什么」是稳妥的好问题</span></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="pane">
+            <div class="pane-hd">
+              <span class="t">自我介绍：三档时长的结构</span>
+              <span class="ev ev--e2">通用方法</span>
+            </div>
+            <div class="intro">
+              <div class="introw"><span class="introd">30 秒</span>
+                <span class="introp">我是谁（姓名 + 当前身份）<i> → </i>一句话核心优势<i> → </i>我为什么来应聘这个岗位</span></div>
+              <div class="introw"><span class="introd">1 分钟</span>
+                <span class="introp">我是谁<i> → </i>我做过什么（1 个核心成绩）<i> → </i>我为什么适合这个岗位</span></div>
+              <div class="introw"><span class="introd">3 分钟</span>
+                <span class="introp">我是谁<i> → </i>我做过什么（2–3 段经历 + 量化成绩）<i> → </i>我为什么适合这个岗位<i> → </i>我希望在这个岗位解决什么问题</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── 页脚：整页只此一条合规声明 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>面试是展示自我、与企业双向选择的过程。以上是<b>通用准备建议</b>，标 E2；只有「按目标岗位挑重点」是模型判断，标 E3。
+          本机<b>不预测录用概率、不给通过率、不做面试打分排名</b>，也不代表用人单位的判断。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="37-interview-hub.html" data-parent-label="面试训练"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">面试训练</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+
+    <!-- 「打印这份清单」那颗置灰按钮连同原因一起放在正文里（准备清单下方），
+         不放这里 —— 底栏塞不下把原因说清的文案。 -->
+    <a class="btn btn--lg btn--ghost" href="37b-interview-reports.html?from=P37"><svg class="ic"><use href="#i-history"/></svg>往期报告</a>
+
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">清单过一遍，再去练一场</div><div class="s">这里只讲结构，不给标准答案</div></div>
+      <div data-when="first"><div class="t">不登录也能全看，内容一条都不锁</div><div class="s">勾选不进账号，离开这一页就没了</div></div>
+      <div data-when="ai-down"><div class="t">整页照常，只有「挑重点」停了</div><div class="s">自己挑：照岗位描述里重复出现的词准备</div></div>
+      <div data-when="device-off"><div class="t">打印机离线不影响本页</div><div class="s">这一页本来就不出纸</div></div>
+    </div>
+
+    <a class="btn btn--primary" href="20-interview-pod.html?stage=s1">照着练一场<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  /* 目标岗位 → 该重点准备的 3 项。确定性映射（真机由 A5 同源的岗位正文比对给出），
+     本稿写死四组是为了让评审能看到"选不同方向，重点不一样"这件事本身。
+     无论结果如何，**只加一枚 E3 标记，不替用户勾选** —— 勾不勾是用户的事。 */
+  var HOT = {
+    运营:     { ids: [2, 1, 3], why: '运营岗常问「你做过什么、数据怎么样」：先把岗位关键词对上你的经历，再补公司近期动态与演练。' },
+    销售:     { ids: [3, 1, 6], why: '销售岗看临场表达：演练与背景调研最吃紧，面试安排也要提前确认，路上迟到最伤。' },
+    行政人事: { ids: [4, 6, 2]  , why: '行政人事岗看细致与得体：着装与面试安排是当场就被看见的部分，岗位职责也要对齐。' },
+    技术:     { ids: [2, 5, 3], why: '技术岗看项目细节：岗位关键词、作品集与简历细节演练最吃紧，着装反而不是重点。' }
+  }
+
+  var pk = document.getElementById('pk-target')
+  var go = document.getElementById('hot-go')
+  var why = document.getElementById('hot-why')
+  var whyBase = why ? why.innerHTML : ''
+
+  function val () {
+    var v = pk && pk.querySelector('.v')
+    var t = v ? (v.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+    return t === '未选' ? '' : t
+  }
+
+  function sync () {
+    if (!go) return
+    var t = val()
+    go.textContent = t ? ('挑出该重点准备的 3 项') : '先选目标岗位'
+    if (t) go.removeAttribute('aria-disabled')
+    else go.setAttribute('aria-disabled', 'true')
+  }
+
+  function clearHot () {
+    var on = scr.querySelectorAll('.ckrow.is-hot')
+    for (var i = 0; i < on.length; i++) on[i].classList.remove('is-hot')
+  }
+
+  scr.addEventListener('click', function (e) {
+    if (!e.target.closest) return
+
+    /* ① 选目标岗位：点一下换一个值。换了方向就撤掉上一次的结论，不留过期的重点 */
+    if (pk && e.target.closest('#pk-target')) {
+      var opts = (pk.getAttribute('data-opts') || '').split('|')
+      var v = pk.querySelector('.v')
+      if (opts.length > 1 && v) {
+        var i = opts.indexOf((v.textContent || '').replace(/^\s+|\s+$/g, ''))
+        v.textContent = opts[(i + 1) % opts.length]
+        pk.classList.remove('pick--empty')
+      }
+      clearHot()
+      if (why) why.innerHTML = whyBase
+      sync()
+      return
+    }
+
+    /* ② 挑重点：没选方向就什么都不做（输入门，缺输入不出结论） */
+    if (go && e.target.closest('#hot-go')) {
+      if (go.getAttribute('aria-disabled') === 'true') return
+      var d = HOT[val()]
+      if (!d) return
+      clearHot()
+      for (var k = 0; k < d.ids.length; k++) {
+        var row = scr.querySelector('.ckrow[data-ck="' + d.ids[k] + '"]')
+        if (row) row.classList.add('is-hot')
+      }
+      if (why) why.textContent = d.why + ' 这是先后建议，不是能不能过；6 项一项都不能省。'
+      if (window.v3AuditPlus) requestAnimationFrame(window.v3AuditPlus)
+      return
+    }
+
+    /* ③ 勾选：纯本地态，只改 aria-pressed，不写任何存储 */
+    var ck = e.target.closest('.ckrow')
+    if (ck) ck.setAttribute('aria-pressed', ck.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+  })
+
+  sync()
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

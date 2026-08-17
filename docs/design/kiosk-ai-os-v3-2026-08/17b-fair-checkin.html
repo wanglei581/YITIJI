@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P17b 入场签到 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P17b 入场签到">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P17b 入场签到 ═══════════════════════════════════════════════════
+   补页由来（缺口 G-04）：17-fair-desk.html:539「入场签到」是一颗**未登记的
+   死按钮** —— 没有 href、没有 data-go、没有任何监听，真点一次 body / href /
+   data-stage 三项零变化，而且它不在 dead-buttons-2026-08-11.md 的 99 条名单里。
+   同时 36-fairs-hub.html 的两个「扫码签到」入口把人送到 17?stage=s1&view=checkin，
+   而 17 全文不读任何 URL 参数。承诺给了（「已经在现场？先签到再逛」），没有兑现处。
+   生产侧 /job-fairs/checkin → JobFairCheckinPage 一直都在，缺的是原型这一页。
+
+   ══ 合规红线（本页最要紧的一条）══════════════════════════════════
+   签到**只做到场登记，不是投递**，而且**本机不做平台内签到闭环**：
+   本机只出主办方的码 / 指路到入口处，签到动作发生在来源平台或主办方现场，
+   本机**不代为签到、不接收报名信息、不收简历、不记录签到结果**。
+   按钮文案走白名单（CLAUDE.md §2）：「扫码去来源平台签到」「去来源平台签到」。
+   与生产 JobFairCheckinPage 同一口径：「请以来源平台显示为准」。
+
+   ══ 不伪造 ══════════════════════════════════════════════════════
+   本机拿不到主办方的回执，所以这一页**任何情况下都不显示「已签到」**。
+   下面三种签不上的处境**各自单独写**，不合并成一个「签到失败」——
+   码过期 / 手机号未登记 / 主办方系统不通，处置路径完全不同。
+
+   ══ AI 角色（加速器，不是前置条件 · 类型①）══════════════════════
+   签到本身**完全不依赖 AI**（纯事实登记）。AI 只用在签完之后的逛展顺序
+   （A12，与 45 的 map 同源），标 E3 + 仅供参考。
+   ai-down：签到照常，顺序区改成「按展区编号顺序给，不猜先后」（与 45:589 同口径）。
+   device-off：只影响现场资料打印，签到与导览不受影响。
+   ══════════════════════════════════════════════════════════════════ */
+.work--ck { grid-template-columns: 1fr; }
+
+/* ── 场次头 ── */
+.fhead { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-top: 3px solid var(--cat-fair); box-shadow: var(--sh-1); }
+.fhead-t { font-family: var(--ff-display); font-size: var(--fz-7); color: var(--fog-900);
+  font-weight: 600; line-height: 1.25; margin: 0; }
+.fhead-m { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); font-size: var(--fz-3); color: var(--fog-700); }
+.fhead-m span { display: inline-flex; align-items: center; gap: 8px; }
+.fhead-m .ic { width: 19px; height: 19px; color: var(--fog-600); }
+
+/* ── 两种签到方式 ── */
+.ways { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.way { display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.way-hd { display: flex; align-items: center; gap: var(--s-3); }
+.way-ic { width: 44px; height: 44px; border-radius: var(--r-xs); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--jade-a12); border: 1px solid var(--jade-a20); color: var(--jade-500); }
+.way-ic .ic { width: 22px; height: 22px; }
+.way-t { font-size: var(--fz-4); color: var(--fog-900); font-weight: 600; }
+.way-hd .chip { margin-left: auto; flex: 0 0 auto; }
+.way-s { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+.way-s b { color: var(--fog-900); }
+.way-act { margin-top: auto; display: flex; flex-direction: column; gap: var(--s-2); }
+.way-act .btn { min-height: 56px; }
+.way--offline .way-ic { background: var(--amber-a12); border-color: var(--amber-a20); color: var(--amber-400); }
+
+/* 二维码：本稿是示意图案，扫不出东西 —— 这句写死在码下面 */
+.qwrap { display: flex; align-items: center; gap: var(--s-5); }
+.qbox { width: 148px; height: 148px; flex: 0 0 auto; border-radius: var(--r-sm); background: #fff;
+  display: grid; place-items: center; padding: 12px; box-shadow: var(--sh-2); }
+.qbox svg { width: 100%; height: 100%; }
+.qnote { min-width: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.6; }
+.qnote b { color: var(--amber-200); }
+
+/* ── 签不上怎么办：三种处境各自一行，不合并 ── */
+.trouble { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-2); }
+.trow { display: flex; align-items: flex-start; gap: var(--s-4);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1); border-left: 3px solid var(--amber-a20); }
+.trow-ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: var(--r-xs);
+  display: grid; place-items: center; background: var(--amber-a12); color: var(--amber-400); }
+.trow-ic .ic { width: 19px; height: 19px; }
+.trow-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.trow-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.trow-s { font-size: var(--fz-1); color: var(--fog-700); line-height: 1.55; }
+.trow-s b { color: var(--fog-900); }
+
+/* ── 签完之后：两个真去处 + AI 顺序建议 ── */
+.after { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+/* 三条去处把左栏铺满：不铺满时底部会空出 265px（audit-plus 的「版面留白」会报），
+   而这一栏本来就只有三件事 —— 与其塞第四条凑数，不如让这三条各占一份高度。 */
+.outs2 { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.out2 { flex: 1 1 0; display: flex; align-items: center; gap: var(--s-4); min-height: 76px;
+  padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  text-decoration: none; color: inherit;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.out2:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.out2-ic { width: 42px; height: 42px; border-radius: var(--r-xs); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--fog-700); }
+.out2-ic .ic { width: 21px; height: 21px; }
+.out2-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.out2-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.out2-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.out2 > .ic { margin-left: auto; flex: 0 0 auto; width: 20px; height: 20px; color: var(--jade-600); }
+.out2[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+
+.route { display: flex; flex-direction: column; gap: var(--s-2); }
+.rrow2 { display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-2) var(--s-3); border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rno2 { flex: 0 0 auto; width: 26px; height: 26px; border-radius: var(--r-xs);
+  display: grid; place-items: center; background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-700); }
+.rb2 { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rt2 { font-size: var(--fz-2); color: var(--fog-900); font-weight: 600; }
+.rs2 { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+
+/* device-off 只影响现场资料打印那一条 */
+.screen[data-state="device-off"] .out2--print { opacity: .78; border-color: var(--brd-1); }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="17-fair-desk.html?stage=s1" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">入场签到</div>
+        <div class="brand-sub">职易达 · 01 号机 · 到场登记，不是投递</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>主办方签到入口在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 签到不受影响</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响资料打印</div>
+    <div class="clock" data-clock>2026年8月16日 <b>09:12</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub" style="flex:1 1 auto;font-size:var(--fz-3);color:var(--fog-700)">
+      两种办法：扫主办方的码，或到入口处凭手机号找主办方登记。<b style="color:var(--fog-900)">签到在主办方那边完成</b></span>
+    <span class="rail-count">当前场次&nbsp;· <b>1</b>&nbsp;场</span>
+  </div>
+
+  <div class="work work--ck">
+    <div class="wmain">
+
+      <!-- ── 场次头：来源三字段一个都不能省（CLAUDE.md §10）。
+           这一场取自 17-fair-desk 的场次库（招聘会的主页面口径就是 17），
+           名称、来源机构、同步时间、外部 ID 与那一页逐字一致，不另写一份。 -->
+      <div class="fhead">
+        <h1 class="fhead-t">2026 年秋季综合人才交流会</h1>
+        <div class="fhead-m">
+          <span><svg class="ic"><use href="#i-clock"/></svg>8月12日 周三 09:00–16:00</span>
+          <span><svg class="ic"><use href="#i-pin"/></svg>市人力资源市场 A 馆</span>
+          <span><svg class="ic"><use href="#i-building"/></svg>参会企业 80 家</span>
+          <span><svg class="ic"><use href="#i-ticket"/></svg>免预约，凭身份证入场</span>
+        </div>
+        <div class="srcline srcline--detail">
+          <span class="org">来源机构：市人力资源和社会保障局</span>
+          <span>同步时间：8月9日 07:30</span>
+          <span>外部ID：RC-2026-0812-A</span>
+        </div>
+      </div>
+
+      <!-- ── 合规声明：签到是什么、不是什么，本机做什么、不做什么 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>签到是<b>到场登记</b>，用来领现场资料、进场核验，<b>不是投递</b>。本机只出主办方的码或告诉你去哪登记，
+          <b>签到在来源平台或主办方现场完成</b>；本机不代为签到、不接收报名信息、不代收简历、也不记录签到结果，
+          <b>能不能进以来源平台与主办方现场为准</b>。</span>
+      </div>
+
+      <!-- ══ 两种签到方式 ══ -->
+      <div class="ways">
+
+        <div class="way">
+          <div class="way-hd">
+            <span class="way-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="way-t">扫主办方的码</span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </div>
+          <div class="qwrap">
+            <span class="qbox">
+              <svg viewBox="0 0 100 100" fill="var(--paper-ink)" aria-hidden="true">
+                <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+                <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+                <rect x="38" y="8" width="6" height="6"/><rect x="50" y="8" width="6" height="6"/><rect x="44" y="20" width="6" height="6"/>
+                <rect x="56" y="20" width="6" height="6"/><rect x="38" y="32" width="6" height="6"/><rect x="8" y="38" width="6" height="6"/>
+                <rect x="20" y="44" width="6" height="6"/><rect x="32" y="44" width="6" height="6"/><rect x="44" y="44" width="6" height="6"/>
+                <rect x="62" y="38" width="6" height="6"/><rect x="74" y="44" width="6" height="6"/><rect x="86" y="38" width="6" height="6"/>
+                <rect x="50" y="56" width="6" height="6"/><rect x="38" y="62" width="6" height="6"/><rect x="20" y="62" width="6" height="6"/>
+                <rect x="8" y="56" width="6" height="6"/><rect x="62" y="62" width="6" height="6"/><rect x="86" y="62" width="6" height="6"/>
+                <rect x="38" y="86" width="6" height="6"/><rect x="50" y="74" width="6" height="6"/><rect x="62" y="86" width="6" height="6"/>
+                <rect x="68" y="68" width="18" height="18"/><rect x="74" y="74" width="6" height="6" fill="#fff"/>
+              </svg>
+            </span>
+            <span class="qnote">用<b style="color:var(--fog-900)">你自己的手机</b>扫这个码，在主办方的页面上完成签到。
+              本机屏幕不打开对方页面、不替你登录、不代填表单。<br>
+              <b>本稿这张是示意图案，扫不出东西</b>；真机此处是主办方下发的可扫码二维码。</span>
+          </div>
+          <div class="way-act">
+            <!-- 这里刻意**不放一颗「扫码签到」按钮**：码就在左边，扫它就是这个动作本身。
+                 再加一颗按钮，要么什么都不干（就是 17:539 那颗死按钮的老毛病），
+                 要么把人送去别的页 —— 两种都比不放更糟。 -->
+            <span class="panel-note" style="margin-left:0">
+              <b>码就在左边，用手机扫它</b>即可；扫完在你自己手机上看结果，
+              <b>本机这边不会显示「已签到」</b>，也不保存扫没扫。</span>
+          </div>
+        </div>
+
+        <div class="way way--offline">
+          <div class="way-hd">
+            <span class="way-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+            <span class="way-t">到入口处凭手机号登记</span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </div>
+          <div class="way-s">
+            没有手机、扫不出码、或者预约信息对不上时走这条：
+            <b>直接到 A 馆入口的主办方签到台</b>，报预约时用的手机号，由主办方现场核验登记。<br>
+            这条路不经过本机 —— 本机既不发送验证码，也不代为核验身份。带好<b>身份证</b>，
+            这一场是免预约、凭身份证入场。
+          </div>
+          <div class="way-act">
+            <a class="btn btn--lg btn--ghost" href="45-fair-onsite.html?stage=map"><svg class="ic"><use href="#i-map"/></svg>看入口与签到台在哪</a>
+            <span class="panel-note" style="margin-left:0">签到台位置来自主办方同步的场馆图</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ══ 签不上怎么办：三种处境各自单独写，不合并成一个「签到失败」 ══ -->
+      <div class="trouble">
+        <div class="trow">
+          <span class="trow-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <span class="trow-b">
+            <span class="trow-t">扫出来提示「码已过期」</span>
+            <span class="trow-s">主办方的签到码通常按场次当天生效。<b>回上一页重新进这一场，本机会取一次最新的码</b>；
+              仍然过期就说明主办方还没放出当天的码，到入口处按第二种办法登记。</span>
+          </span>
+        </div>
+        <div class="trow">
+          <span class="trow-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+          <span class="trow-b">
+            <span class="trow-t">对方提示「这个手机号没有登记」</span>
+            <span class="trow-s">这一场免预约，本来就<b>不需要先登记手机号</b>；如果你走的是另一场需要预约的场次，
+              说明预约没成功。<b>本机补不了这个登记</b> —— 到入口处凭身份证找主办方现场补，或去来源平台重新预约。</span>
+          </span>
+        </div>
+        <div class="trow">
+          <span class="trow-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
+          <span class="trow-b">
+            <span class="trow-t">主办方系统不通，本机取不到码</span>
+            <span class="trow-s"><b>本机没有收到主办方的签到回执，所以这一页不会显示「已签到」</b>。
+              这种情况下签到只能在入口处人工办：带身份证到 A 馆入口签到台。本机的展位导览与现场资料照常能看。</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- ══ 签完之后去哪 ══ -->
+      <div class="after">
+
+        <div class="outs2">
+          <div class="pane-hd"><span class="t">签完之后，这两块在本机接着用</span><span class="s">不依赖签到结果</span></div>
+          <a class="out2 out2--print" href="45-fair-onsite.html?stage=materials">
+            <span class="out2-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="out2-b">
+              <span class="out2-t">现场资料</span>
+              <span class="out2-s" data-when="default first ai-down">主办方同步的会刊与企业名录，可在打印台印</span>
+              <span class="out2-s" data-when="device-off">本机打印机离线，资料能看不能印，要印请换一台机器</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="out2" href="45-fair-onsite.html?stage=booth">
+            <span class="out2-ic"><svg class="ic"><use href="#i-building"/></svg></span>
+            <span class="out2-b">
+              <span class="out2-t">展位企业</span>
+              <span class="out2-s">80 家参会企业与展位号，来源方同步</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="out2" href="45-fair-onsite.html?stage=map">
+            <span class="out2-ic"><svg class="ic"><use href="#i-map"/></svg></span>
+            <span class="out2-b">
+              <span class="out2-t">场馆导览</span>
+              <span class="out2-s">分区平面图与入口位置</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+
+        <!-- AI 只出现在这一块：逛展顺序（A12，与 45 的 map 同源）。
+             签到本身完全不受它影响 —— 这是「加速器，不是前置条件」的标准形态。 -->
+        <div class="pane pane--fill">
+          <div class="pane-hd">
+            <span class="t">先逛哪几个展位</span>
+            <span class="ev ev--e3" data-when="default first device-off">AI 判断 · 仅供参考</span>
+            <span class="ev ev--e2" data-when="ai-down">不依赖 AI · 按展区编号</span>
+          </div>
+
+          <div data-when="default device-off">
+            <div class="route">
+              <div class="rrow2"><span class="rno2">1</span><span class="rb2"><span class="rt2">A 区 A12 / A18 / A25</span>
+                <span class="rs2">这三家的展位岗位正文里出现了你简历上的运营方向</span></span></div>
+              <div class="rrow2"><span class="rno2">2</span><span class="rb2"><span class="rt2">B 区 B04 / B11</span>
+                <span class="rs2">同方向但要求更高，看完 A 区再来</span></span></div>
+              <div class="rrow2"><span class="rno2">3</span><span class="rb2"><span class="rt2">其余按 A → B → C 展区编号走</span>
+                <span class="rs2">80 家里其余 75 家没有明确方向线索，不替你排先后</span></span></div>
+            </div>
+            <p class="panel-note" style="margin:var(--s-3) 0 0">
+              依据是<b>你的简历方向 + 展位岗位正文</b>；这是逛的先后建议，<b>不代表这些企业会要你</b>，
+              也不是投递顺序 —— 投不投、怎么投都在对方那边。</p>
+          </div>
+
+          <div data-when="first">
+            <div class="route">
+              <div class="rrow2"><span class="rno2">1</span><span class="rb2"><span class="rt2">A 区 A01 → A40</span><span class="rs2">综合类 40 家</span></span></div>
+              <div class="rrow2"><span class="rno2">2</span><span class="rb2"><span class="rt2">B 区 B01 → B24</span><span class="rs2">制造与技术 24 家</span></span></div>
+              <div class="rrow2"><span class="rno2">3</span><span class="rb2"><span class="rt2">C 区 C01 → C16</span><span class="rs2">现代服务 16 家</span></span></div>
+            </div>
+            <p class="panel-note" style="margin:var(--s-3) 0 0">
+              还没有你的简历方向，<b>猜一个顺序会让你白跑</b>，所以这里按展区编号给。
+              想要结合你方向的顺序，先在简历工作台传一份简历。</p>
+          </div>
+
+          <!-- 类型①降级：结论撤下，事实保留，并写明这里按什么排（与 45:589 同一口径） -->
+          <div data-when="ai-down">
+            <div class="route">
+              <div class="rrow2"><span class="rno2">1</span><span class="rb2"><span class="rt2">A 区 A01 → A40</span><span class="rs2">综合类 40 家</span></span></div>
+              <div class="rrow2"><span class="rno2">2</span><span class="rb2"><span class="rt2">B 区 B01 → B24</span><span class="rs2">制造与技术 24 家</span></span></div>
+              <div class="rrow2"><span class="rno2">3</span><span class="rb2"><span class="rt2">C 区 C01 → C16</span><span class="rs2">现代服务 16 家</span></span></div>
+            </div>
+            <p class="panel-note" style="margin:var(--s-3) 0 0">
+              排序服务中断，这里<b>按展区编号顺序给，不猜先后</b>。签到、展位名录、场馆图与资料打印都不受影响。</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" href="17-fair-desk.html?stage=s1" data-parent-label="招聘会作战台"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">招聘会作战台</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--lg btn--ghost" href="36-fairs-hub.html"><svg class="ic"><use href="#i-fair"/></svg>换一场</a>
+
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">签到在主办方那边完成</div><div class="s">本机不显示「已签到」</div></div>
+      <div data-when="first"><div class="t">不登录也能签到</div><div class="s">签到走主办方，跟本机账号无关</div></div>
+      <div data-when="ai-down"><div class="t">签到完全不受影响</div><div class="s">只有逛展顺序改成按展区编号</div></div>
+      <div data-when="device-off"><div class="t">签到与导览照常</div><div class="s">只有现场资料打印要换机</div></div>
+    </div>
+
+    <!-- 主按钮是「签完之后」的去处，不是签到动作本身 —— 签到动作是扫上面那个码，
+         发生在主办方那边，本机没有可按的「完成签到」。 -->
+    <a class="btn btn--primary" href="45-fair-onsite.html?stage=booth">签完了，去看展位<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

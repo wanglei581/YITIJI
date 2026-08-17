@@ -32,18 +32,21 @@
        未登录会话离场即清。完整口径做成一张表放进「账号设置 · 文件保存期限」，
        作为全站基准；卡副文只给一句概括，不再单写「90 天」。）
    ④ 「账号设置」卡副文压缩为 3 个事实：登录方式 / 隐私与删除 / 无障碍；
-      （2026-08-16：浮层补入「换绑手机号」「撤回岗位 AI 授权」后，
-       副文第三项改为「隐私与授权」，仍是 4 个事实、不加第五格。）
+      （2026-08-17：账号域整页迁到 23b-account-privacy.html 之后，那边补入
+       「换绑手机号」「撤回岗位 AI 授权」，本页副文第三项相应改为「隐私与授权」；
+       同时去掉「数据导出」—— 一体机不开放导出，见 ⑥。仍是 4 个事实、不加第五格。）
    ⑤ 删除记录带防肩窥：确认弹层不回显文件名全称，只显示「简历文件 ×N」。
-   ⑥ 2026-08-16：账号设置浮层原来只有「登录方式（只读）/ 保存期限 / 删除 / 无障碍」，
+   ⑥ 2026-08-17 产品裁决（内容落在 23b，本页只改这张卡的副文）：
+      账号域原来只有「登录方式（只读）/ 保存期限 / 删除 / 无障碍」，
       漏了两项**生产上真实存在**的用户自助能力：
         · 撤回岗位 AI 授权（MySettingsPage.tsx:312 / :413 / :523）
         · 换绑手机号（MySettingsPage.tsx:84 四步弹层 / :467 入口）
       前者尤其要紧：11-jobfit-compare.html:1365 已经对用户承诺
-      「登录后可在『我的 · 账号设置』随时撤回」，这里不给入口就是空头承诺。
-      **刻意不补「个人数据导出」**：生产在一体机上不开放导出与注销
-      （MyPrivacyRequestsPage.tsx:4「仅开放撤回授权」、:88/:120 副文同口径），
-      原型补上等于给设计稿加一个生产关掉的能力。
+      「登录后可在『我的 · 账号设置』随时撤回」，不给入口就是空头承诺。
+      **刻意不画「个人数据导出」**：生产在一体机上不开放导出与注销
+      （MyPrivacyRequestsPage.tsx:4「仅开放撤回授权」、:88/:120 副文同口径，
+       MySettingsPage.tsx:438/:497 同样写着「导出与注销暂未开放」）。
+      后端链路具备 ≠ 一体机开放；画上去等于给设计稿加一个生产关掉的能力。
 
    数据边界（合规红线，docs/product/user-data-flow-matrix.md 2026-06-14）：
    浏览 / 外部跳转明细归岗位、招聘会、政策各业务页，本页不聚合明细，
@@ -488,27 +491,12 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 .ovl-act .btn { flex: 0 0 auto; }
 .btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
 
-/* ---------- 文件保存期限表（2026-08-10 · 全站口径基准） ----------
-   起因：同一件事三处打架 —— P08 写 24 小时、本页写 90 天、P07 写长期保存
-   或证件类 7 天。用户要的是"我的东西还在不在"，三个数字里没有一个能信。
-   收口方式不是挑一个数字统一，而是**承认它本来就按文件类型分档**，
-   把分档写成一张表；其余页面一律引用这张表，不得另立数字。 */
-.keep {
-  display: flex; flex-direction: column; gap: 1px;
-  border-radius: var(--r-sm); overflow: hidden;
-  border: 1px solid var(--brd-1); background: var(--brd-1);
-}
-.keep-hd, .keep-row {
-  display: grid; grid-template-columns: 1fr 104px 1.05fr; gap: var(--s-4);
-  align-items: center; padding: var(--s-3) var(--s-4); background: var(--surf-1);
-}
-.keep-hd { background: var(--surf-2); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
-.keep-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fz-2); color: var(--fog-900); }
-.keep-t i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
-.keep-v { font-family: var(--ff-num); font-size: var(--fz-4); font-weight: 700; color: var(--fog-900); }
-.keep-row--warn .keep-v { color: var(--amber-200); }
-.keep-row--none .keep-v { font-size: var(--fz-3); color: var(--fog-700); }
-.keep-s { min-width: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+/* ---------- 文件保存期限表 —— 2026-08-16 随 ovl-set 迁到 23b ----------
+   这张表是**全站口径基准**（2026-08-10 立）：同一件事曾三处打架，收口方式不是挑一个
+   数字统一，而是承认它按文件类型分档，把分档写成一张表，其余页面一律引用、不另立数字。
+   正因为它是唯一真源，迁走时只能**搬**、不能抄一份留在这里 ——
+   两处各写一份，迟早又打架。现在它在 23b-account-privacy.html 里。
+   删除依据（grep 实证）：本页已 0 处 class="keep*"。 */
 </style>
 </head>
 <body>
@@ -766,15 +754,26 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </button>
 
-      <!-- 8 账号设置（本页分区浮层；副文 = 4 个事实，四态同文）
-           2026-08-16：浮层里补了「换绑手机号」与「撤回岗位 AI 授权」后，
-           副文第三项由「隐私与删除」改为「隐私与授权」—— 授权撤回归在隐私这一格里，
-           不另开第五格（副文再长会被卡片宽度裁掉）。 -->
-      <button class="fcard rise" type="button" data-open="ovl-set" data-view="settings" style="--c1:var(--fog-600)">
-        <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-gear"/></svg></span></span><span class="fc-t">账号设置</span>
+      <!-- 8 账号设置与隐私（2026-08-16 缺口 G-05 整改：由页内浮层改为跳页）
+           原来这里点开的是本页的 ovl-set 浮层，浮层里「隐私与删除」只有一个动作
+           （删除已存的简历文件）。生产侧是 /me/settings（541 行）+ /me/privacy-requests
+           **两个页**，一个 541 行的页塞进一个浮层是职责过载，拆出来之后本页少一层浮层，
+           账号域的每一件事各占一块。**入口仍然只有这一个，不新增第二个同义入口。**
+           ?view=settings 的深链照常工作：它定位的是这张卡本身（:1108 按 data-view 查）。
+
+           2026-08-17 副文按产品裁决改（三项逐条对生产代码核过）：
+             · 去掉「数据导出」—— 一体机不开放导出与注销
+               （MyPrivacyRequestsPage.tsx:4/:88/:120、MySettingsPage.tsx:438/:497 同一口径）。
+               后端链路具备不等于一体机开放；副文写了它，用户点进去只会扑空。
+             · 「隐私与删除」改为「隐私与授权」—— 页内补了「撤回岗位 AI 授权」，
+               它归在隐私这一格里，不另开第五格（副文再长会被卡片宽度裁掉）。
+             · 换绑手机号是真能力（MySettingsPage.tsx:84 四步弹层 / :467 入口），
+               归在「登录方式」这一格里，同样不单开一格。 -->
+      <a class="fcard rise" href="23b-account-privacy.html" data-view="settings" style="--c1:var(--fog-600)">
+        <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-gear"/></svg></span></span><span class="fc-t">账号设置与隐私</span>
         <span class="fc-s">登录方式 · 文件保存期限 · 隐私与授权 · 无障碍</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-      </button>
+      </a>
 
     </div>
   </div>
@@ -830,210 +829,15 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
     </div>
   </div>
 
-  <!-- ══════════ 浮层：账号设置 ══════════ -->
-  <div class="ovl" id="ovl-set" hidden>
-    <div class="ovl-scrim" data-close></div>
-    <div class="ovl-panel">
-      <div class="ovl-hd">
-        <svg class="ic"><use href="#i-gear"/></svg><b>账号设置</b>
-        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
-      </div>
-
-      <div class="ovl-sec">登录方式</div>
-      <div class="kv">
-        <div class="kv-row" data-when="default ai-down device-off"><span class="k">手机号</span><span class="v">尾号 8000</span></div>
-        <div class="kv-row" data-when="default ai-down device-off"><span class="k">本机登录</span><span class="v v--fog">今天 15:02</span></div>
-        <div class="kv-row" data-when="first"><span class="k">当前状态</span><span class="v"><span class="chip chip--info">未登录</span></span></div>
-      </div>
-      <!-- 2026-08-16 补：换绑手机号。生产端这条链路是真的、且是四步验证
-           （先验旧号 → 换发新号 → 验新号 → 换绑后退出会话），
-           见 apps/kiosk/src/pages/profile/me/MySettingsPage.tsx:84 PhoneRebindOverlay、:467 入口。
-           原型只画了「手机号：尾号 8000」这一行只读事实，等于把已有能力藏起来。
-           这里只补入口与后果说明；四步弹层的逐屏细节属 P03 身份门的范畴，本页不铺。 -->
-      <div class="ovl-act" data-when="default ai-down device-off">
-        <button class="btn btn--ghost" type="button" data-open="ovl-rebind"><svg class="ic"><use href="#i-phone"/></svg>换绑手机号</button>
-        <span class="panel-note" style="margin-left:0">先验当前号再验新号 · 换绑后本机会话退出，需用新号重新登录</span>
-      </div>
-      <div class="panel-note" style="margin-left:0" data-when="first">未登录 · 登录后可在这里换绑手机号。</div>
-
-      <!-- 2026-08-16 补：岗位 AI 授权的撤回入口。
-           这不是新功能，是**兑现原型自己已经作出的承诺** ——
-           11-jobfit-compare.html:1365 对用户写着「登录后可在『我的 · 账号设置』随时撤回」，
-           而这张浮层里从来没有撤回入口。空头承诺比缺功能更伤：
-           用户是按那句话决定要不要授权的。
-           生产端能力为真：MySettingsPage.tsx:312 revokeJobAiConsent、:413 入口、:523 二次确认；
-           范围口径与 MyPrivacyRequestsPage.tsx 一致 —— **只开放撤回**，
-           账号注销与数据导出在一体机上不开放，所以这里也不画那两项。 -->
-      <div class="ovl-sec">岗位 AI 授权</div>
-      <div class="kv" data-when="default ai-down device-off">
-        <div class="kv-row"><span class="k">当前状态</span><span class="v"><span class="chip chip--jade">已授权</span></span></div>
-        <div class="kv-row"><span class="k">用途</span><span class="v v--fog">读简历内容做岗位比对 · 结果只给你看</span></div>
-      </div>
-      <div class="ovl-act" data-when="default ai-down device-off">
-        <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-revoke"><svg class="ic"><use href="#i-shield"/></svg>撤回岗位 AI 授权</button>
-        <span class="panel-note" style="margin-left:0">撤回后再用岗位比对要重新确认 · 简历、文档、打印订单、收藏都不受影响</span>
-      </div>
-      <div class="panel-note" style="margin-left:0" data-when="first">
-        未登录 · 岗位比对按<b>本次任务</b>授权，会话结束即失效，不用来这里撤回。</div>
-
-      <div class="ovl-sec">文件保存期限 · 全站口径</div>
-      <div class="keep">
-        <div class="keep-hd"><span>文件类型</span><span>保存多久</span><span>到期怎么处理</span></div>
-        <div class="keep-row keep-row--warn">
-          <span class="keep-t">敏感文件<i>证件照 · 身份证复印件 · 含身份证号的扫描件</i></span>
-          <span class="keep-v">7 天</span>
-          <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
-        </div>
-        <div class="keep-row">
-          <span class="keep-t">一般文档<i>简历 · 求职材料 · 扫描件 · 生成产物</i></span>
-          <span class="keep-v">90 天</span>
-          <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
-        </div>
-        <div class="keep-row keep-row--none">
-          <span class="keep-t">未登录的本次会话文件<i>没登录时上传或生成的东西</i></span>
-          <span class="keep-v">离场即清</span>
-          <span class="keep-s">不保存 · 结束或超时就没了，要留请先打印或登录</span>
-        </div>
-        <div class="keep-row keep-row--none">
-          <span class="keep-t">面试练习作答<i>你答的内容</i></span>
-          <span class="keep-v">从不保存</span>
-          <span class="keep-s">只记「练过一次」，不留内容</span>
-        </div>
-        <!-- 2026-08-10 补第 5 行：P06/P17 的「保留 7 天」说的不是文件保存期，是**取件码有效期**。
-             不补这一行，读者会拿它跟上面「一般文档 90 天」对冲，以为又打架了。
-             这是订单口径，与文件保存期并列，不互相覆盖。 -->
-        <div class="keep-row keep-row--warn">
-          <span class="keep-t">待打印订单里的文件<i>已下单未出纸 · 已支付可复打</i></span>
-          <span class="keep-v">7 天</span>
-          <span class="keep-s">凭取件码复打 · 到期关单并清理 · 留删除日志</span>
-        </div>
-      </div>
-      <div class="panel-note" style="margin-left:0">
-        <b>以文件类型定，不是所有文件都 90 天。</b>
-        一份文件里只要含身份证号，就按敏感文件的 7 天算，不按 90 天。<br>
-        最后一行是<b>订单口径</b>：取件码 7 天说的是「还能不能复打」，不是「文件存多久」；
-        同一份文件你另外存进「我的文档」，按上面的类型算期限。<br>
-        <!-- 2026-08-10 补：P28 自评结果 24 小时、P31 合同分析 2 小时，都比本表更短。
-             不给它们各加一行（表会越滚越长），改成写清「只许更短、不许更长」的规则，
-             并把两个已知的更短档点名，读者对得上号，页面也不用改口径。 -->
-        <b>单个功能可以定得更短，但不许更长。</b>
-        已知更短的两处：自我评估结果 <b>24 小时</b>（可随时撤回，撤回即物理删除）、
-        合同分析文件 <b>2 小时</b>（打印完成或离场立即删除）。<br>
-        这张表是<b>全站口径</b>：打印、扫描、我的文档各页显示的期限都以它为准。
-      </div>
-
-      <div class="ovl-sec">隐私与删除</div>
-      <div class="ovl-act" data-when="default ai-down device-off">
-        <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-del"><svg class="ic"><use href="#i-trash"/></svg>删除已存的简历文件</button>
-        <span class="panel-note" style="margin-left:0">删除会留日志 · 日志不含文件内容</span>
-      </div>
-      <div class="panel-note" style="margin-left:0" data-when="first">未登录 · 账号里没有可删的文件；本机会话在离场时自动清空。</div>
-
-      <div class="ovl-sec">无障碍</div>
-      <div class="kv">
-        <div class="kv-row"><span class="k">动效</span><span class="v v--fog">跟随系统「减弱动态效果」自动关闭</span></div>
-        <div class="kv-row"><span class="k">触控</span><span class="v v--fog">所有按钮不小于 48px</span></div>
-        <div class="kv-row"><span class="k">文字</span><span class="v v--fog">界面文字不小于 13px</span></div>
-      </div>
-
-      <div class="ovl-act" data-when="default ai-down device-off">
-        <button class="btn btn--ghost" type="button" data-logout data-close><svg class="ic"><use href="#i-close"/></svg>退出登录并清空本机会话</button>
-        <span class="panel-note" style="margin-left:0">账号里的文件不受影响</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ 浮层：删除确认（防肩窥：不回显文件名全称） ══════════ -->
-  <div class="ovl ovl--top" id="ovl-del" hidden>
-    <div class="ovl-scrim" data-close></div>
-    <div class="ovl-panel">
-      <div class="ovl-hd">
-        <svg class="ic" style="color:var(--coral-400)"><use href="#i-trash"/></svg><b>删除已存的简历文件？</b>
-        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
-      </div>
-
-      <div class="nrow"><span class="dot dot--down"></span>
-        <span class="nrow-b"><span class="nrow-t">将删除：简历文件 ×2 · 诊断报告 ×1</span>
-          <span class="nrow-s">为防旁人看到 · 此处不显示文件名全称</span></span></div>
-
-      <div class="notice">
-        <svg class="ic"><use href="#i-shield"/></svg>
-        <span>删除后不可恢复；删除会留日志（谁删的、什么时候、删了几个），
-              日志不含文件内容。</span>
-      </div>
-
-      <div class="ovl-act">
-        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
-        <button class="btn btn--commit" type="button" data-close>确认删除</button>
-        <span class="panel-note" style="margin-left:auto">原型稿 · 确认后由后端执行并落删除日志</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ 浮层：撤回岗位 AI 授权（二次确认） ══════════
-       撤回是**授权状态**变更，不是删数据 —— 这两件事最容易被用户混起来，
-       所以这里把「不动什么」写在正面，而不是只说「不可恢复」。
-       口径与生产一致（MySettingsPage.tsx:524）：撤回后再用岗位 AI 需重新确认，
-       已生成的记录仍在「AI服务记录」里，要删另走删除。 -->
-  <div class="ovl ovl--top" id="ovl-revoke" hidden>
-    <div class="ovl-scrim" data-close></div>
-    <div class="ovl-panel">
-      <div class="ovl-hd">
-        <svg class="ic" style="color:var(--coral-400)"><use href="#i-shield"/></svg><b>撤回岗位 AI 授权？</b>
-        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
-      </div>
-
-      <div class="nrow"><span class="dot dot--down"></span>
-        <span class="nrow-b"><span class="nrow-t">撤回后：本机不再凭这次授权读你的简历做岗位比对</span>
-          <span class="nrow-s">下次用岗位比对会重新问你一次</span></span></div>
-      <div class="nrow"><span class="dot"></span>
-        <span class="nrow-b"><span class="nrow-t">不动的：简历、我的文档、打印订单、收藏</span>
-          <span class="nrow-s">已生成的比对报告仍在「AI服务记录」里，要删请到那里删</span></span></div>
-
-      <div class="notice">
-        <svg class="ic"><use href="#i-shield"/></svg>
-        <span>撤回随时可做，也随时可以再授权；本机不因为你撤回而少给其他服务。</span>
-      </div>
-
-      <div class="ovl-act">
-        <button class="btn btn--lg btn--ghost" type="button" data-close>先不撤回</button>
-        <button class="btn btn--commit" type="button" data-close>确认撤回</button>
-        <span class="panel-note" style="margin-left:auto">原型稿 · 确认后由后端撤回并留操作日志</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ 浮层：换绑手机号（第 1 步） ══════════
-       生产是四步（验旧号 → 填新号 → 验新号 → 退出会话，MySettingsPage.tsx:84）。
-       原型只画第 1 步并写明后面还有几步 —— 把四步都画成能点的假流程，
-       等于在原型里伪造一条根本没接后端的验证链路。 -->
-  <div class="ovl ovl--top" id="ovl-rebind" hidden>
-    <div class="ovl-scrim" data-close></div>
-    <div class="ovl-panel">
-      <div class="ovl-hd">
-        <svg class="ic"><use href="#i-phone"/></svg><b>换绑手机号</b>
-        <button class="ovl-x" type="button" data-close aria-label="关闭"><svg class="ic"><use href="#i-close"/></svg></button>
-      </div>
-
-      <div class="nrow"><span class="dot"></span>
-        <span class="nrow-b"><span class="nrow-t">第 1 步：先确认是本人</span>
-          <span class="nrow-s">向当前手机号 尾号 8000 发验证码</span></span></div>
-      <div class="nrow"><span class="dot dot--down"></span>
-        <span class="nrow-b"><span class="nrow-t">后面还有：填新号 · 验新号 · 换绑完成</span>
-          <span class="nrow-s">换绑成功后本机会话退出，需用新号重新登录</span></span></div>
-
-      <div class="notice">
-        <svg class="ic"><use href="#i-shield"/></svg>
-        <span>换绑不影响已存的简历、文档与打印订单；它们跟账号走，不跟手机号走。</span>
-      </div>
-
-      <div class="ovl-act">
-        <button class="btn btn--lg btn--ghost" type="button" data-close>取消</button>
-        <button class="btn btn--commit" type="button" data-close>发送验证码</button>
-        <span class="panel-note" style="margin-left:auto">原型稿 · 验证码由后端下发，后三步在本弹层内继续</span>
-      </div>
-    </div>
-  </div>
+  <!-- ══════════ 浮层：账号设置 / 删除确认 —— 2026-08-16 迁出本页 ══════════
+       缺口 G-05 整改：这两层（ovl-set 账号设置、以及只由它内部按钮开启的 ovl-del
+       删除确认）已整体迁到独立页 23b-account-privacy.html。
+       迁出而不是复制一份的理由：**文件保存期限表是全站口径**，两处各写一份迟早打架。
+       删除依据（grep 实证）：ovl-set 的唯一开启者是上面那张「账号设置」卡，
+       该卡已改为跳 23b；ovl-del 的唯一开启者在 ovl-set 内部，随之一并迁走。
+       其它页对本页的 ?view=settings 深链（42:1348、43:1191/1512/1829）不受影响 ——
+       :1108 的定位脚本按 .fcard[data-view="settings"] 找卡，那张卡还在。
+       退出登录在本页仍有两处入口（:559 用户条、:951 结束并清空确认层），未受影响。 -->
 
   <!-- 结束并清空的二次确认。不可逆动作必须问一次，且要说清"清掉什么、留下什么"——
        用户最怕的不是退出，是"我存的简历是不是也没了"。 -->

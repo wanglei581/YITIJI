@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
+import { bootReadiness } from './common/boot/boot-readiness'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
@@ -104,6 +105,16 @@ async function bootstrap(): Promise<void> {
   await app.listen(port)
   console.log(`AI Job Print API running on http://localhost:${port}/api/v1`)
 
+  // 启动期降级如实上屏：运维在部署日只看控制台也能知道「起来了但不完整」。
+  // 明细同时可从 GET /api/v1/health 与 GET /api/v1/health/ready 读到。
+  const degraded = bootReadiness.degraded()
+  if (degraded.length > 0) {
+    console.warn(
+      `[WARN] API 以降级状态启动：${degraded.map((s) => `${s.subsystem}(${s.code})`).join(', ')}。` +
+        '详见 GET /api/v1/health；readiness 探针 GET /api/v1/health/ready 将返回 503。',
+    )
+  }
+
   // 出纸资金门禁的可见性：生产已有启动期强制显式声明
   // （production-runtime-gates.ts，缺省抛 PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED），
   // 但非生产环境缺省即关闭，且此前**全程无任何提示** —— 演示机、预生产、
@@ -117,4 +128,10 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-bootstrap()
+// 启动失败必须是「一条明确的致命行 + 非 0 退出码」，不能只留一个 unhandled rejection。
+// 硬依赖（数据库 / 生产运行时门禁）失败走这里；软依赖（Redis）走 degraded-start，
+// 不在这里退出，语义见 src/common/redis/redis.module.ts 与 src/common/boot/boot-readiness.ts。
+bootstrap().catch((error: unknown) => {
+  console.error('[FATAL] API_BOOTSTRAP_FAILED —— 服务未启动，端口未监听。', error)
+  process.exit(1)
+})

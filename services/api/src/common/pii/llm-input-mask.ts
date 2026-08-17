@@ -47,15 +47,29 @@ const logger = new Logger('LlmInputMask')
 const MAX_MASK_INPUT_CHARS = 20_000
 
 /**
+ * 对外暴露的输入上限。调用方若要把多段文本拼成一次遮盖调用（保证占位符编号一致），
+ * 必须自己按这个上限分配预算 —— 超限会被 normalizeForMask 静默截断，
+ * 拼接场景下截断掉的是后半段，会直接毁掉结构化载荷。
+ */
+export const LLM_MASK_INPUT_LIMIT = MAX_MASK_INPUT_CHARS
+
+/**
  * 最后一道兜底：遮盖引擎本身抛错（理论上不该发生，输入已被规整并限长）时使用。
  * 只覆盖无歧义的高置信模式，宁可漏遮也不误伤正文；绝不退回送原文。
  */
 const FALLBACK_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/(?<![0-9A-Za-z])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[0-9Xx](?![0-9A-Za-z])/gu, '[身份证]'],
-  [/(?<!\d)1[3-9]\d{9}(?!\d)/gu, '[手机号]'],
-  [/(?<![A-Z0-9._%+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}/giu, '[邮箱]'],
-  [/(?<!\d)\d{16,19}(?!\d)/gu, '[银行卡]'],
+  [/(?<![0-9A-Za-z])\d{6}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[0-9Xx](?![0-9A-Za-z])/gu, '身份证'],
+  [/(?<!\d)1[3-9]\d{9}(?!\d)/gu, '手机号'],
+  [/(?<![A-Z0-9._%+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}/giu, '邮箱'],
+  [/(?<!\d)\d{16,19}(?!\d)/gu, '银行卡'],
 ]
+
+/**
+ * 遮盖占位符 token，形态与 pii-masker 的 placeholderFor 输出严格一致。
+ * 用于把模型回包里的占位符换回原值。
+ */
+const PLACEHOLDER_TOKEN =
+  /\[(?:劳动者|用人单位|身份证|手机号|银行卡|邮箱|详细地址|统一社会信用代码)_\d+\]/gu
 
 export interface LlmInputMaskResult {
   /** 遮盖后的文本。**这就是应当送模型的文本**，调用方不得再用原文拼 prompt。 */
@@ -68,6 +82,24 @@ export interface LlmInputMaskResult {
   readonly degraded: boolean
 }
 
+export interface LlmInputMaskReversibleResult extends LlmInputMaskResult {
+  /**
+   * 把模型回包里的占位符还原成原值；未知占位符原样保留（模型可能编造）。
+   *
+   * ⚠️ 只能作用于**要交还给本人**的产物（优化后的简历、前后对比文本）。
+   * 禁止把还原结果再送模型、写日志或落到与本人无关的存储里。
+   */
+  restore(value: string): string
+}
+
+/** 空映射时 restore 是恒等函数；有映射时按 token 精确替换。 */
+function makeRestore(map: ReadonlyMap<string, string>): (value: string) => string {
+  return (value: string): string => {
+    if (typeof value !== 'string' || value.length === 0 || map.size === 0) return typeof value === 'string' ? value : ''
+    return value.replace(PLACEHOLDER_TOKEN, (token) => map.get(token) ?? token)
+  }
+}
+
 /**
  * 送模型前遮盖用户材料里的高置信 PII。
  *
@@ -78,12 +110,24 @@ export interface LlmInputMaskResult {
  * @param scene 只用于日志定位的场景标识，**不得**传入任何用户内容
  */
 export function maskUserTextForLlm(raw: string, scene: string): LlmInputMaskResult {
+  return maskUserTextForLlmReversible(raw, scene)
+}
+
+/**
+ * 与 maskUserTextForLlm 完全相同的遮盖行为，额外返回 restore()。
+ *
+ * 用于「产物要还给本人」的链路（简历优化 / 排版调整）：模型只看得到占位符，
+ * 回包里的占位符在服务端换回原值，用户拿到的简历仍是完整真值。
+ */
+export function maskUserTextForLlmReversible(raw: string, scene: string): LlmInputMaskReversibleResult {
   const normalized = normalizeForMask(raw)
-  if (!normalized) return { text: '', changed: false, strict: true, degraded: false }
+  if (!normalized) {
+    return { text: '', changed: false, strict: true, degraded: false, restore: (value) => value }
+  }
 
   try {
     // assertComplete=false：先无条件拿到遮盖结果，断言另算（理由见文件头）
-    const masked = maskContractPages([{ pageNumber: 1, text: normalized }], { assertComplete: false })
+    const masked = maskContractPages([{ pageNumber: 1, text: normalized }], { assertComplete: false, collectRestoreMap: true })
     const text = masked.pages[0]!.text
     let strict = true
     try {
@@ -93,7 +137,7 @@ export function maskUserTextForLlm(raw: string, scene: string): LlmInputMaskResu
       // 只报场景与长度，不报原文/摘录/命中值
       logger.warn(`llm_input_mask.residual scene=${scene} chars=${normalized.length}`)
     }
-    return { text, changed: text !== normalized, strict, degraded: false }
+    return { text, changed: text !== normalized, strict, degraded: false, restore: makeRestore(masked.restoreMap ?? new Map()) }
   } catch (error) {
     // 引擎异常（超限 / 输入非法等）：退到兜底正则，绝不退到「送原文」
     logger.warn(
@@ -101,8 +145,21 @@ export function maskUserTextForLlm(raw: string, scene: string): LlmInputMaskResu
       `code=${error instanceof Error ? error.message : 'UNKNOWN'}`,
     )
     let text = normalized
-    for (const [pattern, placeholder] of FALLBACK_PATTERNS) text = text.replace(pattern, placeholder)
-    return { text, changed: text !== normalized, strict: false, degraded: true }
+    // 兜底路径同样产出 `[类别_序号]`，保证 restore() 在降级时依然可用
+    const fallbackMap = new Map<string, string>()
+    for (const [pattern, category] of FALLBACK_PATTERNS) {
+      let seq = 0
+      text = text.replace(pattern, (hit) => {
+        for (const [token, original] of fallbackMap) {
+          if (original === hit && token.startsWith(`[${category}_`)) return token
+        }
+        seq += 1
+        const token = `[${category}_${seq}]`
+        fallbackMap.set(token, hit)
+        return token
+      })
+    }
+    return { text, changed: text !== normalized, strict: false, degraded: true, restore: makeRestore(fallbackMap) }
   }
 }
 

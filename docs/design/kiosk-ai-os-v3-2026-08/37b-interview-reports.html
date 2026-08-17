@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P37b 往期训练报告 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P37b 往期训练报告">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P37b 往期训练报告 ═══════════════════════════════════════════════
+   补页由来：37-interview-hub.html 的「往期训练报告」曾是 aria-disabled 灰行，
+   副文写「往期报告页还没建」。**那是对原型自身的陈述**，而 origin/main 上
+   /interview/reports → InterviewReportsPage（180 行）与首页 serviceGroups.ts:108
+   的入口一直都在。补的是原型页，**不是新增生产能力**。
+
+   职责一句话：列出**本人**历次模拟面试的报告，可回看、可打印、可带走。
+
+   三条本页规矩：
+   ① 列表本身**不接 AI** —— 它是记录，不是判断。报告正文由 20-interview-pod
+      的 A14 生成并在那一页标 E3，本页不重复给结论、不重新排名。
+   ② 未登录（first 态）如实说「这一趟做的练习留不下」，并给身份门入口，
+      **不摆一份样例报告冒充"你的"记录**。
+   ③ 条数与内容一律来自 GET /me/mock-interviews；真机 0 条就显示 0 条。
+
+   降级分工（三类各用一处，别混）：
+   · 类型①（有手动替代）：AI 不可用时，列表与已有报告**照常看、照常打印**。
+   · 类型②（AI 是唯一产出源、有按钮）：「再练一场」要现组卷 →
+     ai-down 下 aria-disabled + 写清「组卷服务暂不可用，已有报告不受影响」。
+   · 「发到我手机」不是 AI 问题，是 takeaway-sessions 尚未接通 →
+     同样 aria-disabled + 写清原因，不摆一个点了没反应的按钮。
+   置灰一律 aria-disabled，**绝不用原生 disabled**（触屏无 hover、
+   原生 disabled 掉出 Tab 序，用户读不到原因）。
+
+   来路：从 37（域首屏）、20 的 s4 复盘页、43 的 AI 服务记录三处进来，
+   ?from= 必须**真的被消费**（G-09 的教训：送过去的上下文大面积被丢弃）。
+   ══════════════════════════════════════════════════════════════════ */
+.work--rep { grid-template-columns: 1fr; }
+
+/* ── 顶部说明条 ── */
+.rdy { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+  min-height: 72px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1); }
+.rdy-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rdy-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.rdy-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.rdy--warn { background: var(--amber-a12); border-color: var(--amber-a20); }
+.rdy .n { margin-left: auto; flex: 0 0 auto; font-family: var(--ff-num);
+  font-size: var(--fz-2); color: var(--fog-700); white-space: nowrap; }
+
+/* ── 报告行 ── */
+/* 列表吃掉多余高度：3 场只占上半屏，余下的空间归**列表自己**（它是滚动容器，
+   条数多了正是往这里长）。不把余量分给下面那两个盒子 —— 4 条要点撑成半屏
+   会显得是在凑版面；也不靠多摆一条样例记录去填，条数是真值。 */
+.reps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--s-3); padding-right: var(--s-2); }
+.rep { padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  border-left: 4px solid var(--cat-mock); box-shadow: var(--sh-1);
+  display: flex; flex-direction: column; gap: var(--s-3); }
+.rep-hd { display: flex; align-items: flex-start; gap: var(--s-4); flex-wrap: wrap; }
+.rep-t { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; line-height: 1.3; }
+.rep-when { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); white-space: nowrap; }
+/* 每条的六个事实：时间、面试官类型、岗位方向、难度、时长、有没有复盘单 */
+.rep-facts { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); font-size: var(--fz-2); color: var(--fog-700); }
+.rep-facts span { display: inline-flex; align-items: baseline; gap: 7px; }
+.rep-facts i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
+.rep-facts b { color: var(--fog-900); font-weight: 600; }
+.rep-ops { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.rep-ops .btn { min-height: 48px; font-size: var(--fz-2); }
+.rep-ops .panel-note { font-size: var(--fz-1); }
+/* 没出复盘单的那一场：说清为什么，不摆一个点不出东西的「看复盘单」 */
+.rep--nodoc { border-left-color: var(--ink-500); }
+
+/* 置灰：一律 aria-disabled + 同屏写原因 */
+.btn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+/* ai-down 下「再练一场」按类型② 处置（组卷是 AI 唯一产出源） */
+.screen[data-state="ai-down"] .actionbar .btn--primary { opacity: .62; cursor: not-allowed; }
+
+/* ── 报告里有什么 / 没有什么 ──
+   三条记录只占列表上半屏，下面空着 700px 不好看，但**不能拿样例记录去填** ——
+   条数是真值，多摆一条就是伪造。填的是这一页真正欠用户的一句交代：
+   点开一份报告会看到什么、以及本机在报告里**永远不会写**什么（红线的正面表述）。 */
+.what { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.wbox { padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; flex-direction: column; gap: var(--s-3); }
+.wbox--no { border-color: var(--coral-a20); background: var(--coral-a12); }
+.wbox-hd { display: flex; align-items: center; gap: var(--s-3);
+  font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.wbox-hd .ic { width: 20px; height: 20px; color: var(--jade-500); flex: 0 0 auto; }
+.wbox--no .wbox-hd .ic { color: var(--coral-400); }
+.wbox ul { margin: 0; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; }
+.wbox li { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.55; }
+.wbox li b { color: var(--fog-900); }
+
+/* ── 空态：未登录 ── */
+.blank .acts .btn { min-height: 56px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="37-interview-hub.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">往期训练报告</div>
+        <div class="brand-sub">职易达 · 01 号机 · 只列你本人的，不外传</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default"><span class="dot dot--live"></span>已登录 · 报告跟着账号走</div>
+    <div class="devpill" data-when="first"><span class="dot dot--warn"></span>未登录 · 本次会话留不下</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 已有报告照常看</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响打印复盘单</div>
+    <div class="clock" data-clock>2026年8月16日 <b>14:20</b></div>
+  </header>
+
+  <div class="rail">
+    <span class="dsub" style="flex:1 1 auto;font-size:var(--fz-3);color:var(--fog-700)">
+      历次模拟面试的报告：可<b style="color:var(--fog-900)">回看</b>、可打印复盘单</span>
+    <span class="rail-count" data-when="default ai-down device-off">共&nbsp;<b>3</b>&nbsp;场</span>
+    <span class="rail-count" data-when="first">共&nbsp;<b>0</b>&nbsp;场</span>
+  </div>
+
+  <div class="work work--rep">
+    <div class="wmain">
+
+      <!-- ── 状态条：四态各写各的 ── -->
+      <div class="rdy" data-when="default">
+        <span class="dot dot--live"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">下面 3 场都是你本人的练习</span>
+          <span class="rdy-s">报告只给你自己看，不发给任何用人单位，也不参与任何评分或排名</span>
+        </span>
+        <span class="n">最近一次 8 月 15 日</span>
+      </div>
+      <div class="rdy rdy--warn" data-when="ai-down">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">AI 暂不可用，已有报告不受影响</span>
+          <span class="rdy-s">下面 3 场<b>照常看、照常打印</b>；停掉的只有「再练一场」要用的现场组卷</span>
+        </span>
+        <span class="n">已自动上报</span>
+      </div>
+      <div class="rdy rdy--warn" data-when="device-off">
+        <span class="dot dot--down"></span>
+        <span class="rdy-b">
+          <span class="rdy-t">本机打印机离线，看报告不受影响</span>
+          <span class="rdy-s">复盘单要打出来得换一台机器；报告本身在这里照常翻</span>
+        </span>
+        <span class="n">3 场</span>
+      </div>
+
+      <!-- ══ 有记录：default / ai-down / device-off ══
+           本稿列的是**样例记录**，用来定行的结构与出口。真机按
+           GET /me/mock-interviews 的真实返回渲染：0 条就显示 0 条，不补样例。 -->
+      <div class="reps" data-when="default ai-down device-off">
+
+        <div class="rep">
+          <div class="rep-hd">
+            <span class="rep-t">用户运营方向 · 第 3 次练习</span>
+            <span class="chip chip--jade chip--label">有复盘单</span>
+            <span class="rep-when">8 月 15 日 16:40</span>
+          </div>
+          <div class="rep-facts">
+            <span><i>面试官</i><b>结构化面试官</b></span>
+            <span><i>岗位方向</i><b>用户运营</b></span>
+            <span><i>难度</i><b>进阶</b></span>
+            <span><i>时长</i><b>24 分钟 · 10 题</b></span>
+            <span><i>复盘单</i><b>已生成</b></span>
+          </div>
+          <div class="rep-ops">
+            <a class="btn btn--ghost" href="20-interview-pod.html?stage=s4&amp;from=P37B"><svg class="ic"><use href="#i-eye"/></svg>回看这一场</a>
+            <a class="btn btn--ghost" data-when="default ai-down" href="20-interview-pod.html?stage=s4&amp;from=P37B"><svg class="ic"><use href="#i-printer"/></svg>去打印复盘单</a>
+            <!-- device-off：打印是设备能力，机器离线就点不了。写清替代路径，不假装能印 -->
+            <button class="btn btn--ghost" type="button" data-when="device-off" aria-disabled="true"><svg class="ic"><use href="#i-printer"/></svg>打印复盘单&nbsp;· 打印机离线</button>
+            <span class="panel-note" data-when="device-off">报告能看；要纸质件请到另一台机器打印</span>
+            <!-- 「发到我手机」：与 AI 无关，是 takeaway-sessions 还没接通。
+                 类型②处置 —— aria-disabled + 当场说明，不摆点了没反应的按钮 -->
+            <button class="btn btn--ghost" type="button" aria-disabled="true"><svg class="ic"><use href="#i-phone"/></svg>发到我手机&nbsp;· 暂不可用</button>
+            <span class="panel-note">「发到手机」的取件通道还没接通，接通前只能在本机看或打印</span>
+          </div>
+        </div>
+
+        <div class="rep">
+          <div class="rep-hd">
+            <span class="rep-t">用户运营方向 · 第 2 次练习</span>
+            <span class="chip chip--jade chip--label">有复盘单</span>
+            <span class="rep-when">8 月 12 日 10:05</span>
+          </div>
+          <div class="rep-facts">
+            <span><i>面试官</i><b>业务主管</b></span>
+            <span><i>岗位方向</i><b>用户运营</b></span>
+            <span><i>难度</i><b>中等</b></span>
+            <span><i>时长</i><b>15 分钟 · 6 题</b></span>
+            <span><i>复盘单</i><b>已生成</b></span>
+          </div>
+          <div class="rep-ops">
+            <a class="btn btn--ghost" href="20-interview-pod.html?stage=s4&amp;from=P37B"><svg class="ic"><use href="#i-eye"/></svg>回看这一场</a>
+            <a class="btn btn--ghost" data-when="default ai-down" href="20-interview-pod.html?stage=s4&amp;from=P37B"><svg class="ic"><use href="#i-printer"/></svg>去打印复盘单</a>
+            <button class="btn btn--ghost" type="button" data-when="device-off" aria-disabled="true"><svg class="ic"><use href="#i-printer"/></svg>打印复盘单&nbsp;· 打印机离线</button>
+            <button class="btn btn--ghost" type="button" aria-disabled="true"><svg class="ic"><use href="#i-phone"/></svg>发到我手机&nbsp;· 暂不可用</button>
+          </div>
+        </div>
+
+        <!-- 中途退出的一场：**不补一份复盘单**。没生成就是没生成，写清原因与去处 -->
+        <div class="rep rep--nodoc">
+          <div class="rep-hd">
+            <span class="rep-t">行政人事方向 · 第 1 次练习</span>
+            <span class="chip chip--info chip--label">没有复盘单</span>
+            <span class="rep-when">8 月 9 日 09:18</span>
+          </div>
+          <div class="rep-facts">
+            <span><i>面试官</i><b>结构化面试官</b></span>
+            <span><i>岗位方向</i><b>行政人事</b></span>
+            <span><i>难度</i><b>入门</b></span>
+            <span><i>时长</i><b>4 分钟 · 答了 1 题</b></span>
+            <span><i>复盘单</i><b>未生成</b></span>
+          </div>
+          <div class="rep-ops">
+            <span class="panel-note" style="margin-left:0">这一场中途离开了，只答了 1 题，<b>本机没有生成复盘单</b>——
+              没生成就是没生成，这里不补一份。要复盘请重新练一场完整的。</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ══ 报告里有什么 / 没有什么（登录态常驻，与条数无关） ══ -->
+      <div class="what" data-when="default ai-down device-off">
+        <div class="wbox">
+          <div class="wbox-hd"><svg class="ic"><use href="#i-check"/></svg>点开一份报告会看到</div>
+          <ul>
+            <li>你的<b>作答原文</b>，逐题对照当时的题目</li>
+            <li>每题的点评：<b>说清楚了没有</b>、漏了哪一段、可以怎么补</li>
+            <li>时间分配：哪一题答得过长、哪一题几乎没展开</li>
+            <li>一份可打印的<b>复盘单</b>，纸面带 AI 生成标识</li>
+          </ul>
+        </div>
+        <div class="wbox wbox--no">
+          <div class="wbox-hd"><svg class="ic"><use href="#i-shield"/></svg>报告里永远不会有</div>
+          <ul>
+            <li><b>分数、等级、排名</b>——练习不打分，也不和别人比</li>
+            <li><b>录用概率、通过率</b>这类预测</li>
+            <li>用人单位的判断：点评是模型给的（E3），<b>不代表任何企业的意见</b></li>
+            <li>对外共享：报告只有你本人能看，<b>不发给任何第三方</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ══ 未登录：真实空态，不摆样例 ══ -->
+      <div class="blank" data-when="first">
+        <svg class="ic"><use href="#i-history"/></svg>
+        <b>这里还没有你的报告</b>
+        <p>往期报告跟着账号走。<b>现在未登录，这一趟做的练习留不下</b>——
+          练完可以当场看复盘、当场打印，但离场之后本机不保留。<br>
+          先登录，之后每一场练完都会自动进这一页。</p>
+        <div class="acts">
+          <a class="btn btn--lg btn--primary" href="03-identity-gate.html?from=P37B&amp;returnTo=37b-interview-reports.html"><svg class="ic"><use href="#i-user"/></svg>登录后再看</a>
+          <a class="btn btn--lg btn--ghost" href="20-interview-pod.html?stage=s1"><svg class="ic"><use href="#i-interview"/></svg>不登录，直接练一场</a>
+        </div>
+      </div>
+
+      <!-- ── 页脚：整页只此一条合规声明 ── -->
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>模拟面试仅供练习参考，不代表真实面试流程。报告<b>只有你本人能看</b>，不对外共享、不发给用人单位；
+          本机<b>不预测录用概率、不给通过率、不做面试打分排名</b>。条数与内容来自你账号下的真实记录，没有就显示没有。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+      <a class="backbtn" id="bk" href="37-interview-hub.html" data-parent-label="面试训练"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub" id="bk-sub">面试训练</span></span></a>
+      <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--lg btn--ghost" href="37a-interview-tips.html"><svg class="ic"><use href="#i-book"/></svg>面试技巧</a>
+
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">3 场都能回看，复盘单能打印</div><div class="s">只给你本人，不外传</div></div>
+      <div data-when="first"><div class="t">未登录，这一趟的报告留不下</div><div class="s">练习本身不锁，登录只为把报告留住</div></div>
+      <div data-when="ai-down"><div class="t">已有报告照常看、照常打印</div><div class="s">停的只有开新场要用的组卷</div></div>
+      <div data-when="device-off"><div class="t">看报告不受影响</div><div class="s">只有打复盘单要换机取回</div></div>
+    </div>
+
+    <a class="btn btn--primary" data-when="default first device-off" href="20-interview-pod.html?stage=s1">再练一场<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 类型②：组卷是 AI 唯一产出源，AI 停了就开不了新场。
+         置灰用 aria-disabled（不用原生 disabled），原因写在按钮上；
+         「已有报告不受影响」那句完整版在顶部状态条里，底栏只留短的，
+         否则按钮撑长会把提示区挤到溢出（实测 ai-down 下溢出 8px）。 -->
+    <button class="btn btn--primary" type="button" data-when="ai-down" aria-disabled="true">再练一场&nbsp;· 组卷暂不可用</button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ?from= 真的被消费：三个来路各自回各自那一页。
+   G-09 记的就是「送过去的上下文大面积被丢弃」——本页不再犯：
+   认识的来路才改返回键，不认识就保持默认（面试训练域首屏），
+   绝不把 URL 里的字符串直接当地址用。 */
+;(function () {
+  var SRC = {
+    P37: { n: '面试训练', f: '37-interview-hub.html' },
+    P20: { n: '面试训练舱', f: '20-interview-pod.html?stage=s4' },
+    P43: { n: '我的记录', f: '43-my-records.html?stage=ai' }
+  }
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  if (!Object.prototype.hasOwnProperty.call(SRC, from)) return
+  var d = SRC[from]
+  var bk = document.getElementById('bk')
+  var sub = document.getElementById('bk-sub')
+  if (bk) bk.setAttribute('href', d.f)
+  if (bk) bk.setAttribute('data-parent-label', d.n)
+  if (sub) sub.textContent = d.n
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>

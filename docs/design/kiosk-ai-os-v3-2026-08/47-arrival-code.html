@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P47 到机码核销 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P47 到机码核销">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<style>
+/* ══ P47 专用 ══ 到机码核销
+   ─────────────────────────────────────────────────────────────────────────
+   这一页补的是什么
+   ─────────────────────────────────────────────────────────────────────────
+   用户在小程序上把文件传好、参数选好、单下好，拿到一个**到机码**；走到机器前，
+   要把这个码交给本机，认领并核销自己那一单，然后付款、出纸。
+   V6 原型此前没有这一段 —— 于是整体迁 V6 时这条路会凭空消失。
+
+   ─────────────────────────────────────────────────────────────────────────
+   为什么是**新页**，不是往 P06 加一个阶段
+   ─────────────────────────────────────────────────────────────────────────
+   1) P39 打印域首屏没有阶段机（.screen 上只有 data-state / data-probe，
+      没有 data-stage），stages.js 在那一页直接 return —— 「往 P39 加一个阶段」
+      在结构上不成立。
+   2) P06 打印工作台已经 3602 行、七阶段 × 八种支付态。CLAUDE.md §8 的口径是
+      800 行以上不得继续堆新功能。往那儿再插一个带 31 键键盘的阶段是逆着规矩走。
+   3) 原型自己的主流做法就是**另起一页，办完了用 ?stage= 汇进 P06**：
+      P24:799 / P11:1616 / P13:872 / P29:937 / P09B:306 / P22:929 / P28:1004 /
+      P31:916 / P33:431 —— 九处都是 `06-print-workbench.html?stage=…&from=P…`。
+      本页只是第十处，走的是同一条已经跑熟的路。
+   4) 域首屏拆页（32/34/36/37/38/39）也说明这套稿子的组织方式是**拆**，不是堆。
+
+   ─────────────────────────────────────────────────────────────────────────
+   ★ 两个码必须分清楚 —— 这一页存在的第二个理由
+   ─────────────────────────────────────────────────────────────────────────
+     · **到机码**：小程序下单后给你的。用途是**在这台机器上认领并核销你那一单**，
+       发生在**付款之前**。就是本页要输的这个。
+     · **取件码**：本机**付款成功后**发给你的。用途是**在出纸口认领已经打好的件**，
+       发生在**出纸之后**（P41 的 claim 态、P06 s7、P42 订单栏）。
+   两者背后是两套流程，方向相反。本页 s1 右栏常驻一张对照表，
+   s2 的成功态再说一次「取件码等付完款才有」。
+
+   ⚠ 已知的上游矛盾（本页**不**替它做决定，只是不跟着错）：
+     「取件码」在原型里现在有**三种互相打架的形态**——
+       · P06:1434 `.pickup-code` 写 `7742 106 358`（10 位数字，4-3-3 分组）
+       · P41:703 认领输入框写「输入打印时给你的 **4 位**取件码」（maxlength=4）
+       · P42:1018 / P23:614 / P43:1226 订单栏写 `取件码 P-4172`（P- 前缀 + 4 位）
+     而 P41 那句话恰恰指着另外两处说「取件码在付款成功那一屏，也在打印订单里」。
+     哪一种是对的属于产品口径，不该由本批次单方面裁定，所以本页的对照表
+     **只说取件码的来源与用途，不写它有几位**。等口径定了再补。
+
+   ─────────────────────────────────────────────────────────────────────────
+   ★ 码输入框：为什么不能沿用原型现有那个
+   ─────────────────────────────────────────────────────────────────────────
+   全站现有的「码」输入框只有两个半，而且没有一个能用在这里：
+     · P41:704  maxlength="4" inputmode="numeric" —— 取件码，4 位纯数字
+     · P40:335  maxlength="4" inputmode="numeric" —— **手机号后四位**，
+                这不是「码」，是身份证明（锁屏复验用）
+     · P05:475  maxlength="6" autocomplete="one-time-code" —— 短信验证码，**6 位**
+   到机码是 **10 位、数字与大写字母混排**。往 maxlength=4 的数字框里
+   **在结构上就填不进去** —— 这不是尺寸问题，是类型问题。
+   所以本页自己做输入：10 个字位 + 一块只出得来合法字符的键盘。
+
+   ─────────────────────────────────────────────────────────────────────────
+   ★ 键盘为什么自己做，而不是用 scripts/keypad.js
+   ─────────────────────────────────────────────────────────────────────────
+   共享键盘只有两套布局（keypad.js:41 NUM_ROWS / 47 TEXT_ROWS）：
+     · num  —— 只有数字和 - ，**打不出字母**
+     · text —— 26 键**小写**，且含 0 1 i l o 这些到机码里根本不存在的字符，
+               还带一个空格键
+   两套都不合用。而 keypad.js 自己写着「31 个页面共用，改它要全站回归」
+   （03-identity-gate.html:191），所以**不动它**，本页自备一块。
+   这不是新发明的做法：03 身份门当初就是这么定的 ——
+   「本轮只做登录页这一处固定式，没有动 keypad.js」（03:191-192）。
+
+   本页键盘沿用 keypad.js 的**既有键契约**（这也是 03:192-194 写下的共用约定）：
+     · 字符键带 data-ch，功能键带 data-fn
+     · data-fn 语义与 keypad.js 一致：back = 删最后一位，clear = 清空整栏
+   只有 31 个字符键，**键面上出不来非法字符** —— 输错字符这件事被结构消灭了。
+
+   ⚠ 03 身份门那块固定键盘的 CSS（03:206-284，.p3-pad/.p3-key/.p3-fld/.p3-s 等
+     约 79 行）在页面里**没有任何对应 DOM**，实测 0 个元素、该页 0 个 input。
+     那段样式已经是死代码。所以本页只继承它写下的**契约**，不继承它的类名。
+
+   ─────────────────────────────────────────────────────────────────────────
+   ★ 不弹共享键盘：字位行是「假输入行」，不是 <input>
+   ─────────────────────────────────────────────────────────────────────────
+   keypad.js:351 的委托是 `target.closest('input,textarea,[data-keypad]')`。
+   本页字位行是 <span> 拼的、不挂 data-keypad，所以共享键盘**不会**弹出来盖住
+   本页自己的键盘。keypad.js:186 自己也提到「原型里的假输入行」这种用法。
+
+   ─────────────────────────────────────────────────────────────────────────
+   ★ 扫码枪不可用时怎么办（降级）
+   ─────────────────────────────────────────────────────────────────────────
+   第五条轴 data-scanner = on | off（仿 P39 的 data-probe 加轴做法，P39:85-88）。
+     · on  —— 扫码枪可用：扫一下最快，键盘**照样摆在那儿**
+     · off —— 本机没配扫码枪 / 扫码口坏了：顶部换一条说明，**键盘一个键都不少**
+   键盘在两种情况下都是常驻的，不藏在任何按钮后面 ——
+   降级路径不是「点开才有」，它本来就一直在。
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── 第五条轴：扫码枪可用性。只做「不匹配就藏」，与四态是 AND 关系 ──
+   （同 P39:85-88 的写法：四态走 hidden，本轴走 display:none，谁也盖不掉谁） */
+.screen[data-scanner="on"]  [data-scan-when="off"],
+.screen[data-scanner="off"] [data-scan-when="on"] { display: none !important; }
+
+/* ── 核销结果轴：只在 s2 起作用，同 P06 的 data-pay 做法 ── */
+.screen[data-redeem="ok"]       [data-redeem-when]:not([data-redeem-when~="ok"]),
+.screen[data-redeem="notfound"] [data-redeem-when]:not([data-redeem-when~="notfound"]),
+.screen[data-redeem="expired"]  [data-redeem-when]:not([data-redeem-when~="expired"]),
+.screen[data-redeem="used"]     [data-redeem-when]:not([data-redeem-when~="used"]) { display: none !important; }
+
+/* ── 大标题（本页自有，不占用别页的类名） ── */
+.achd { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+.achd-ic {
+  width: 62px; height: 62px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+}
+.achd-ic .ic { width: 31px; height: 31px; color: var(--jade-500); }
+.achd-b { min-width: 0; flex: 1 1 260px; display: flex; flex-direction: column; gap: 3px; }
+.achd-t { font-family: var(--ff-display); font-size: var(--fz-7); font-weight: 600; color: var(--fog-900); }
+.achd-s { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.55; }
+.achd-s b { color: var(--fog-900); }
+.achd--stop .achd-ic { border-color: var(--coral-a32); }
+.achd--stop .achd-ic .ic { color: var(--coral-400); }
+.achd--warn .achd-ic { border-color: var(--amber-a20); }
+.achd--warn .achd-ic .ic { color: var(--amber-600); }
+
+/* ── 扫码口提示条 ── */
+.acscan {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+  background: var(--jade-a12); border: 1px solid var(--jade-a32);
+}
+.acscan--off { background: var(--surf-2); border-color: var(--brd-2); }
+.acscan-ic { width: 46px; height: 46px; flex: 0 0 auto; display: grid; place-items: center; }
+.acscan-ic .ic { width: 32px; height: 32px; color: var(--jade-500); }
+.acscan--off .acscan-ic .ic { color: var(--fog-600); }
+.acscan-b { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.acscan-t { font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.acscan-s { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5; }
+.acscan-s b { color: var(--fog-900); }
+
+/* ── 10 个字位 ──
+   分组刻意用 **5-5**，不用 P06 取件码那种 4-3-3。
+   两个码摆在同一台机器上，连分组节奏都不该长得像。 */
+.acslots { display: flex; align-items: center; gap: 7px; }
+.acslot {
+  flex: 1 1 0; min-width: 0; height: 92px; border-radius: var(--r-xs);
+  display: grid; place-items: center;
+  background: var(--surf-2); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-8); font-weight: 600;
+  color: var(--fog-900); letter-spacing: .02em;
+}
+.acslot--gap { margin-left: 22px; }
+.acslot--on { border-color: var(--jade-a32); background: var(--jade-a12); }
+.acslot--cur { border-color: var(--jade-400); box-shadow: inset 0 -4px 0 var(--jade-400); }
+.acslot-e { color: var(--fog-500); font-size: var(--fz-6); }
+/* 回显行：只读。高度跟着卡走（失败态那张卡会长高），字号跟着高度提。 */
+.acslots--ro { align-items: stretch; }
+.acslots--ro .acslot { height: auto; min-height: 68px; font-size: var(--fz-8); cursor: default; }
+
+.acmeter {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  font-size: var(--fz-2); color: var(--fog-600);
+}
+.acmeter b { font-family: var(--ff-num); color: var(--fog-900); }
+
+/* ── 本页自备键盘 ──
+   键盘吃掉左栏剩下的高度（flex:1 1 auto + grid-auto-rows:1fr）：
+   一体机是站着按的，多出来的高度全给键高比留白值钱。
+   实测 5 行键在 1080×1920 下从 76px 长到 ~120px，触控只会更稳。 */
+.acpad { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 9px; }
+.acpad-hd {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  font-size: var(--fz-2); color: var(--fog-600);
+}
+.acpad-hd b { color: var(--fog-800); }
+.acpad-keys {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: repeat(8, 1fr); grid-auto-rows: 1fr; gap: 9px;
+}
+.ackey {
+  min-height: 76px; border-radius: var(--r-xs); cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--surf-1); border: 1px solid var(--brd-2);
+  font-family: var(--ff-num); font-size: var(--fz-6); font-weight: 600;
+  color: var(--fog-900); letter-spacing: .04em;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.ackey:active { background: var(--jade-a12); border-color: var(--jade-400); }
+.ackey--fn {
+  font-family: var(--ff-ui); font-size: var(--fz-3); font-weight: 600;
+  color: var(--fog-700); border-style: dashed;
+}
+.ackey--fn .ic { width: 22px; height: 22px; }
+.ackey--w3 { grid-column: span 3; }
+.ackey--w5 { grid-column: span 5; }
+.ackey--go {
+  background: var(--jade-500); border-color: var(--jade-500);
+  color: var(--on-primary, #fff); font-family: var(--ff-ui); font-size: var(--fz-4);
+}
+.ackey--go[aria-disabled="true"] { background: var(--surf-2); border-color: var(--brd-2); color: var(--fog-600); }
+.ackey--go .ic { width: 22px; height: 22px; }
+
+/* ── 右栏：码长什么样 / 两码对照 ── */
+.acfacts { display: flex; flex-direction: column; gap: var(--s-3); }
+.acfact { display: flex; flex-direction: column; gap: 2px; }
+.acfact-k { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .04em; }
+.acfact-v { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; line-height: 1.45; }
+.acfact-v em { font-style: normal; font-family: var(--ff-num); letter-spacing: .12em; }
+
+/* 两码对照：三行两列。用表格语义 —— 它就是一张对照表。 */
+.accmp { width: 100%; border-collapse: collapse; }
+.accmp th, .accmp td {
+  padding: 9px 8px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--brd-1); font-size: var(--fz-1); line-height: 1.5;
+}
+.accmp tr:last-child th, .accmp tr:last-child td { border-bottom: 0; }
+.accmp thead th { font-size: var(--fz-2); font-weight: 600; color: var(--fog-900); }
+.accmp tbody th { font-weight: 400; color: var(--fog-600); white-space: nowrap; }
+.accmp td { color: var(--fog-800); }
+.accmp .accmp-now { color: var(--jade-600); font-weight: 600; }
+
+/* site-config 的兜底文案是整句话，塞进 .kv-row 会把左边的键挤到换行。
+   处置照抄 P41:278-279 已经用过的那一版，不另起一套。 */
+.kv-row--site { align-items: flex-start; padding: 9px 2px; }
+.kv-row--site .k { white-space: nowrap; padding-top: 1px; }
+.kv-row--site .v { text-align: right; display: block; line-height: 1.45; }
+
+/* ── s2 订单摘要 ── */
+.acsum { display: flex; flex-direction: column; gap: var(--s-3); }
+.acsum-f {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding-bottom: var(--s-3); border-bottom: 1px solid var(--brd-1);
+}
+.acsum-f .ic { width: 26px; height: 26px; color: var(--fog-600); flex: 0 0 auto; }
+.acsum-nm { font-size: var(--fz-5); font-weight: 600; color: var(--fog-900); min-width: 0; }
+.acamt {
+  display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap;
+  padding: var(--s-4) 0 var(--s-3);
+}
+.acamt-k { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .05em; }
+.acamt-n { font-family: var(--ff-num); font-size: 46px; font-weight: 600; color: var(--fog-900); line-height: 1; }
+.acamt-n i { font-size: 24px; font-style: normal; margin-left: 5px; color: var(--fog-700); }
+.acamt-b { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .03em; }
+
+/* ── 三段解释（沿用 P41 「为什么会到这 / 你能做什么 / …」的说法结构） ── */
+.acwhy { display: flex; flex-direction: column; gap: 9px; }
+/* ⚠ 这里试过 `justify-content: space-around` 把四句话摊满整张卡 ——
+   实测（s2 · 已过期）四行之间被拉出 200px 以上的空档，读起来像内容掉了。
+   audit-plus.js:562 那条注释说得对：为了把留白数字压到 0 塞出来的排版，
+   比留白本身更糟。所以改成**行距正常、卡按内容收高**，
+   剩下的高度交给下面真正该放大的东西（失败态是那 10 位回显）。 */
+.pane--grow > .acwhy { flex: 0 0 auto; }
+/* 卡底的说明贴底，别浮在半空 */
+.pane--grow > .panel-note { margin-top: auto; }
+.pane--grow > .acsum { flex: 1 1 auto; }
+.acsum > .panel-note { margin-top: auto; }
+
+/* 失败态的主角是「你到底输了哪 10 位」—— 让人对着手机核。
+   所以回显卡吃掉左栏剩下的高度；字位块用 auto 外边距**居中**，
+   底下那句处置说明跟着落到卡底，中间不留悬空的洞。 */
+.acecho { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.acecho .acslots { flex: 0 0 auto; height: 150px; margin: auto 0; }
+/* 找到了这一单时，主角是订单摘要那张卡，回显退回自然高度 */
+.screen[data-redeem="ok"] .acecho { flex: 0 0 auto; }
+.screen[data-redeem="ok"] .acecho .acslots { height: 92px; margin: 0; }
+.acwhy-l { display: flex; gap: var(--s-3); font-size: var(--fz-2); line-height: 1.55; }
+.acwhy-k {
+  flex: 0 0 auto; width: 116px; color: var(--fog-600);
+  display: flex; align-items: baseline; gap: 7px;
+}
+.acwhy-k i { width: 6px; height: 6px; border-radius: 50%; background: var(--fog-500); flex: 0 0 auto; }
+.acwhy-v { min-width: 0; color: var(--fog-800); }
+.acwhy-v b { color: var(--fog-900); font-weight: 600; }
+
+/* ── 原型外壳条（评审开关，不属于产品界面） ──
+   字号一律 ≥13px：tools/verify-type-floor.mjs 的下限是 13，
+   而 .proto-rail 不在豁免名单里（只豁免 #ss / .themebar / .screen-name）。
+   P39 那条外壳条用的 12px 正是它 3 处基线欠账的全部来源 —— 本页不再新开这个债。 */
+.proto-rail {
+  position: fixed; left: 16px; top: 62px; z-index: var(--z-shell);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  padding: 7px 10px; border-radius: var(--r-lg);
+  background: rgba(8, 16, 18, .86); border: 1px solid rgba(232, 241, 241, .12);
+  backdrop-filter: blur(14px);
+  font-family: var(--ff-ui); font-size: 13px;
+  opacity: .1; transition: opacity .18s ease-out;
+}
+.proto-rail:hover, .proto-rail:focus-within { opacity: 1; }
+.proto-rail-id { color: var(--fog-600); letter-spacing: .08em; padding: 0 6px 0 2px; }
+.proto-rail .rvbtn {
+  margin-left: 0; min-height: 28px; height: 28px; padding: 0 11px;
+  font-size: 13px; color: var(--fog-700); border-color: rgba(232, 241, 241, .16);
+}
+.proto-rail .rvbtn[aria-pressed="true"] { background: var(--jade-a20); color: var(--jade-200); }
+body.capture .proto-rail { display: none !important; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-scanner="on" data-redeem="ok" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo"></span> · <span data-site="venue"></span></div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · 可核销</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--live"></span>核销与收款不经过 AI</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本机先别核销</div>
+    <div class="clock" data-clock>2026年8月10日 <b>14:36</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">输入到机码</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">核对这一单</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 2 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ═════════ s1 · 输入到机码（device-off 以外的三态） ═════════ -->
+      <div class="pane" data-at="s1" data-when="default first ai-down">
+        <div class="achd">
+          <span class="achd-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">把到机码交给这台机器</span>
+            <span class="achd-s" data-when="default ai-down">在小程序上下好的那一单，<b>输码就能在这台机器上接着办</b>。</span>
+            <span class="achd-s" data-when="first">这一步<b>不用登录</b> —— 到机码本身就是这一单的凭证。</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 扫码口：可用 / 不可用两条，位置与高度不变 -->
+      <div class="acscan" data-at="s1" data-when="default first ai-down" data-scan-when="on">
+        <span class="acscan-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+        <span class="acscan-b">
+          <span class="acscan-t">最快：把小程序上的到机码对准扫码口</span>
+          <span class="acscan-s">扫一下 10 位一次进来，<b>不用一个一个按</b>。扫不出来就用下面的键盘，两条路结果一样。</span>
+        </span>
+        <span class="ev ev--e2">E2 来自本机扫码枪</span>
+      </div>
+      <div class="acscan acscan--off" data-at="s1" data-when="default first ai-down" data-scan-when="off">
+        <span class="acscan-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
+        <span class="acscan-b">
+          <span class="acscan-t">这台机器现在扫不了码 —— <b>手动输入照样能办</b></span>
+          <span class="acscan-s">本机没有配扫码枪，或者扫码口读不到。<b>下面的键盘不受影响</b>，把 10 位按进去就行，办得成的事一件不少。</span>
+        </span>
+        <span class="ev ev--e2">E2 来自本机外设状态</span>
+      </div>
+
+      <!-- 10 个字位。JS 按 SLOTS 生成，第 6 位起留一段间距（5-5 分组） -->
+      <div class="pane" data-at="s1" data-when="default first ai-down">
+        <div class="acslots" id="acSlots" role="group" aria-label="到机码 10 位"></div>
+        <p class="acmeter">
+          <span>已输入 <b id="acCount">0</b> / 10 位</span>
+          <span id="acTip">按下面的键盘，或直接扫码</span>
+        </p>
+      </div>
+
+      <!-- 本页自备键盘：31 个合法字符 + 退格 + 清空 + 确认。JS 按 CODE_CHARS 生成 -->
+      <div class="acpad" data-at="s1" data-when="default first ai-down">
+        <p class="acpad-hd">
+          <b>只有到机码用得上的字符</b>
+          <span id="acPadHint">这块键盘上没有的字符，到机码里也不会出现</span>
+        </p>
+        <div class="acpad-keys" id="acPad" role="group" aria-label="到机码键盘"></div>
+      </div>
+
+      <!-- 四句话说清这一步的边界。沿用 P41 每一态都有的
+           「为什么会到这 / 你能做什么 / 机器会做什么 / 机器不会做什么」结构（41:727-737）。
+           这里最要紧的是第二条：**核销不收钱**。站在机器前的人最怕的就是
+           「按下去是不是就扣钱了」，不说清楚他会一直不敢按。 -->
+      <div class="pane" data-at="s1" data-when="default first ai-down">
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>这一步做什么</span>
+            <span class="acwhy-v">按这个码找到你在小程序上下的那一单，<b>认领到这台机器上</b>。文件、页数、份数都是你在手机上选好的，本机不改。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>这一步不收钱</span>
+            <span class="acwhy-v">核销只是认领，<b>付款是下一步</b>。这一屏怎么按都不会扣钱，也不会出纸。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>输错了会怎样</span>
+            <span class="acwhy-v">只会告诉你没找到。<b>不会把你的单作废</b>，也不限次数，重来就行。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>没带码也能打</span>
+            <span class="acwhy-v">回上一页走「文档打印」，在这台机器上<b>直接传文件现场打</b>，不用先在手机上下单。</span></div>
+        </div>
+      </div>
+
+      <!-- ═════════ s1 · device-off：打印机离线，别在这核销 ═════════
+           核销 + 付款之后才发现出不了纸，是这条路上最坏的结果。
+           所以离线时**不让核销**，并且把「码还有效」这件事说清楚 —— 换台机器就行。 -->
+      <div class="pane" data-at="s1" data-when="device-off">
+        <div class="achd achd--stop">
+          <span class="achd-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">这台机器出不了纸 —— 先别在这核销</span>
+            <span class="achd-s">核销、付款都能做，<b>但做完了纸出不来</b>。这一趟在这台机器上办不完。</span>
+          </span>
+        </div>
+      </div>
+      <div class="pane pane--grow" data-at="s1" data-when="device-off">
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>你的码还在</span>
+            <span class="acwhy-v">到机码<b>没有被用掉</b>，有效期照原样走。换一台空闲机器扫同一个码，接着办。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>你能做什么</span>
+            <span class="acwhy-v">去本场地另一台机器；或者在小程序里先看着这一单，等这台修好再来。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>机器会做什么</span>
+            <span class="acwhy-v">离线已自动上报运维。<b>本机不替系统承诺什么时候修好</b>。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>机器不会做什么</span>
+            <span class="acwhy-v">不会在这一台上先把你的码核销掉，也<b>不会先收钱</b>。</span></div>
+        </div>
+        <p class="panel-note">出不了纸的是这台打印机；小程序上的订单本身没有受影响。</p>
+      </div>
+
+      <!-- ═════════ s2 · 核销成功 ═════════ -->
+      <div class="pane" data-at="s2" data-redeem-when="ok">
+        <div class="achd">
+          <span class="achd-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">找到了这一单</span>
+            <span class="achd-s">下面是<b>小程序下单时的原文</b>，本机一个字都没改。核对无误再去付款。</span>
+          </span>
+        </div>
+      </div>
+      <div class="pane pane--grow" data-at="s2" data-redeem-when="ok">
+        <div class="acsum">
+          <div class="acsum-f">
+            <svg class="ic"><use href="#i-file"/></svg>
+            <span class="acsum-nm">王同学_行政专员_简历.pdf</span>
+          </div>
+          <div class="acwhy">
+            <div class="acwhy-l"><span class="acwhy-k"><i></i>这些数字哪来的</span>
+              <span class="acwhy-v">全部是<b>你在小程序上下单时定的</b>。本机只是把它取出来，一个参数都没有替你改。<span class="ev ev--e1">E1 来自你的订单</span></span></div>
+            <div class="acwhy-l"><span class="acwhy-k"><i></i>不对怎么办</span>
+              <span class="acwhy-v">文件或份数不对就<b>别往下走</b> —— 回小程序改那一单，或者在这台机器上重新传一份现场打。</span></div>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">页数 × 份数</span><span class="v">3 页 × 2 份 = 6 个计费页</span></div>
+            <div class="kv-row"><span class="k">颜色与单双面</span><span class="v">黑白 · A4 · 双面</span></div>
+            <div class="kv-row"><span class="k">下单时间</span><span class="v">8 月 10 日 14:02 · 微信小程序</span></div>
+            <div class="kv-row"><span class="k">到机码有效期</span><span class="v">今天 <b>20:02</b> 前有效（下单后 6 小时）</span></div>
+          </div>
+          <div class="acamt">
+            <span class="acamt-k">应付</span>
+            <span class="acamt-n">1.20<i>元</i></span>
+            <!-- 单价走 site-config.js 的 data-site-unit（后台 GET /print/price-config 的本机快照），
+                 不手抄字面量 —— 运营改价这一行跟着变。同 P06:1918 / P41 的用法。 -->
+            <span class="acamt-b">6 个计费页 × <span data-site-unit="bw"></span> · 黑白双面 · 2 份</span>
+          </div>
+          <p class="panel-note">双面只省纸，<b>不减计费页</b> —— 与打印工作台同一口径。金额以收银台为准。</p>
+        </div>
+      </div>
+
+      <!-- ═════════ s2 · 没找到这个码 ═════════ -->
+      <div class="pane" data-at="s2" data-redeem-when="notfound">
+        <div class="achd achd--stop">
+          <span class="achd-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">没找到这个码</span>
+            <span class="achd-s">本机<b>没有核销任何东西</b>，也没有收钱。</span>
+          </span>
+        </div>
+      </div>
+      <div class="pane" data-at="s2" data-redeem-when="notfound">
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>可能是什么</span>
+            <span class="acwhy-v">有一位按错了；或者手上这个<b>不是到机码</b> —— 取件码、验证码都不是这一个。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>你能做什么</span>
+            <span class="acwhy-v">回上一步<b>重新输一次</b>；对着小程序订单里的那一行念一遍最稳。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>还是不行</span>
+            <span class="acwhy-v">找现场工作人员，或在小程序里确认这一单还在不在。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>机器不会做什么</span>
+            <span class="acwhy-v">不会因为输错就把你的单作废，<b>码还能接着用</b>。</span></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">收到的位数</span><span class="v">10 / 10 位&nbsp;· 长度是对的</span></div>
+          <div class="kv-row"><span class="k">比对结果</span><span class="v">本机没有查到对应的订单</span></div>
+          <div class="kv-row"><span class="k">还能试几次</span><span class="v">不限次数</span></div>
+          <div class="kv-row"><span class="k">本机收钱了吗</span><span class="v">没有</span></div>
+        </div>
+      </div>
+
+      <!-- ═════════ s2 · 码已过期 ═════════ -->
+      <div class="pane" data-at="s2" data-redeem-when="expired">
+        <div class="achd achd--warn">
+          <span class="achd-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">这个码已经过期</span>
+            <span class="achd-s">超过有效期，这一单<b>已经关闭</b>。本机没有收钱。</span>
+          </span>
+        </div>
+      </div>
+      <div class="pane" data-at="s2" data-redeem-when="expired">
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>为什么会这样</span>
+            <span class="acwhy-v">到机码有有效期。过期后订单自动关闭，<b>码也跟着作废</b>。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>你能做什么</span>
+            <span class="acwhy-v">回小程序<b>重新下一单</b>，会拿到一个新的到机码；文件不用重传。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>钱怎么算</span>
+            <span class="acwhy-v">这一单<b>本来就没付过款</b> —— 到机码是付款之前用的。没有需要退的钱。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>不想重下单</span>
+            <span class="acwhy-v">也可以在这台机器上<b>直接传文件现场打</b>，走打印工作台那条路。</span></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">有效期</span><span class="v">下单后 6 小时</span></div>
+          <div class="kv-row"><span class="k">这一单现在</span><span class="v">已关闭</span></div>
+          <div class="kv-row"><span class="k">本机收钱了吗</span><span class="v">没有&nbsp;· 这一单从头到尾没付过款</span></div>
+        </div>
+      </div>
+
+      <!-- ═════════ s2 · 码已核销过 ═════════ -->
+      <div class="pane" data-at="s2" data-redeem-when="used">
+        <div class="achd achd--warn">
+          <span class="achd-ic"><svg class="ic"><use href="#i-history"/></svg></span>
+          <span class="achd-b">
+            <span class="achd-t">这个码已经核销过了</span>
+            <span class="achd-s">同一个到机码<b>只能核销一次</b>。本机这次没有重复扣钱。</span>
+          </span>
+        </div>
+      </div>
+      <div class="pane" data-at="s2" data-redeem-when="used">
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>可能是什么</span>
+            <span class="acwhy-v">这一单<b>已经在某台机器上办过了</b> —— 可能已经打完，也可能正在打。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>你能做什么</span>
+            <span class="acwhy-v">去<b>打印订单</b>看这一单现在到哪一步了；已经出纸的话，那里也有取件码。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>不是你办的</span>
+            <span class="acwhy-v">如果你确定自己没办过，<b>先找现场工作人员</b>，不要重复下单。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>机器不会做什么</span>
+            <span class="acwhy-v">不会为同一个码收第二次钱，也不会重复出纸。</span></div>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">这一单现在</span><span class="v">已核销&nbsp;· 进度去打印订单看</span></div>
+          <div class="kv-row"><span class="k">一个码能核几次</span><span class="v">1 次</span></div>
+          <div class="kv-row"><span class="k">本机这次收钱了吗</span><span class="v">没有</span></div>
+        </div>
+      </div>
+
+      <!-- 四种结果共用的回显：把**刚才实际进到机器里的那 10 位**摆出来。
+           摆在 s2 组的最后，所以任何一种结果下它都排在那一态的正文之后。
+           为什么值得占这块地方：没找到 / 已过期这两种结果，用户第一个念头是
+           「我是不是按错了」。让他对着手机核一遍，比让他凭记忆重输一次快得多。
+           这一行是只读的 —— 没有 data-slot，也不接键盘。 -->
+      <div class="pane pane--grow acecho" data-at="s2">
+        <div class="pane-hd"><span class="t">刚才进到机器里的是这 10 位</span>
+          <span class="s">对着手机上的那一行核一遍</span></div>
+        <div class="acslots acslots--ro" id="acEcho" role="group" aria-label="刚才输入的到机码"></div>
+        <p class="panel-note" data-redeem-when="notfound">对不上就回上一步重输。<b>常见的错法是把取件码当成了到机码</b> —— 右边那张表能对一下。</p>
+        <p class="panel-note" data-redeem-when="ok">这 10 位已经用掉了：<b>同一个码不会再核销第二次</b>。</p>
+        <p class="panel-note" data-redeem-when="expired">码本身没输错，是<b>过了有效期</b>。重新下单会给一个新的 10 位。</p>
+        <p class="panel-note" data-redeem-when="used">这 10 位<b>之前已经被核销过一次</b>，不是你这次输错了。</p>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右栏 ══════════════════ -->
+    <div class="wside">
+
+      <!-- 到机码长什么样：字符集口径由 JS 从同一个常量算出来，不手写第二份 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">到机码长什么样</span></div>
+        <div class="acfacts">
+          <div class="acfact">
+            <span class="acfact-k">位数</span>
+            <span class="acfact-v"><em>10</em> 位</span>
+          </div>
+          <div class="acfact">
+            <span class="acfact-k">字符</span>
+            <span class="acfact-v">数字 + 大写字母</span>
+          </div>
+          <div class="acfact">
+            <span class="acfact-k">不会出现</span>
+            <span class="acfact-v"><em id="acExcluded">—</em></span>
+          </div>
+          <div class="acfact">
+            <span class="acfact-k">在哪儿看</span>
+            <span class="acfact-v">小程序下单成功那一屏，<br>以及小程序的订单详情</span>
+          </div>
+        </div>
+        <p class="panel-note">长得像的字母数字（比如 O 和 0）<b>一开始就没放进去</b>，所以不用纠结是哪一个。</p>
+      </div>
+
+      <!-- ★ 两码对照：本批次的硬要求。s1 常驻 —— 走错门的人正是在这一屏。 -->
+      <div class="pane" data-at="s1 s2">
+        <div class="pane-hd"><span class="t">别和取件码搞混</span></div>
+        <table class="accmp">
+          <thead>
+            <tr><th scope="col"></th><th scope="col" class="accmp-now">到机码</th><th scope="col">取件码</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">谁给你的</th><td class="accmp-now">小程序下单之后</td><td>本机付款成功之后</td></tr>
+            <tr><th scope="row">干什么用</th><td class="accmp-now">在这台机器上认领你那一单</td><td>在出纸口认领打好的件</td></tr>
+            <tr><th scope="row">什么时候</th><td class="accmp-now">付款之前</td><td>出纸之后</td></tr>
+            <tr><th scope="row">就是现在这个</th><td class="accmp-now">是</td><td>不是</td></tr>
+          </tbody>
+        </table>
+        <!-- 取件码「有几位」在原型里目前有三种写法（见本页顶部说明），
+             口径未定之前不在这张表里写位数 —— 写一个就等于替产品做了裁定。 -->
+        <p class="panel-note">手上那个如果是<b>付完款之后</b>拿到的，那是取件码，不在这一步用。</p>
+      </div>
+
+      <!-- 码就是拿不出来的时候的兜底出口。位置、时间、电话、就近机器都走 site-config.js，
+           未配置时它自己落到「本机未配置 · 问现场工作人员」，不会印出一个假的窗口号。
+           （同 P41:1039 / P04:381 的用法） -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">码实在拿不出来</span></div>
+        <div class="kv">
+          <div class="kv-row kv-row--site"><span class="k">找人问</span><span class="v" data-site="serviceDesk"></span></div>
+          <div class="kv-row kv-row--site"><span class="k">服务时间</span><span class="v" data-site="serviceHours"></span></div>
+          <div class="kv-row kv-row--site"><span class="k">换台机器</span><span class="v" data-site="peerTerminal"></span></div>
+        </div>
+        <p class="panel-note">手机没电、小程序打不开都属于这一类。<b>本机不能凭姓名或手机号替你翻订单</b> —— 那要工作人员在后台核。</p>
+      </div>
+
+      <!-- 整条路摆出来，让人知道自己站在第几步、后面还有什么。
+           版式沿用 work.css 已有的 .tl 时间线（P06 s6 出纸进度、P41 退款进度都用它）。 -->
+      <div class="pane pane--grow" data-at="s1 s2">
+        <div class="pane-hd"><span class="t">这一趟怎么走</span></div>
+        <!-- 第几步是「现在」由页尾脚本按 data-stage 标（s1 → 核销，s2 → 付款）。
+             不写死也不复制两份：复制两份迟早会有一份忘了改。 -->
+        <div class="tline" id="acFlow" data-step-s1="2" data-step-s2="3">
+          <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="tl-b"><span class="tl-t">在小程序上下单</span>
+              <span class="tl-s">传文件、选参数 —— 已经做完了</span></span></div>
+          <div class="tl tl--now"><span class="tl-dot">2</span>
+            <span class="tl-b"><span class="tl-t">在这台机器上核销</span>
+              <span class="tl-s">就是现在这一步 · 不收钱</span></span></div>
+          <div class="tl"><span class="tl-dot">3</span>
+            <span class="tl-b"><span class="tl-t">收银台付款</span>
+              <span class="tl-s">核对金额后扫码付</span></span></div>
+          <div class="tl"><span class="tl-dot">4</span>
+            <span class="tl-b"><span class="tl-t">出纸，拿到取件码</span>
+              <span class="tl-s">取件码到这一步才有</span></span></div>
+        </div>
+      </div>
+
+      <!-- s2 右栏：接下来会发生什么 -->
+      <div class="pane" data-at="s2" data-redeem-when="ok">
+        <div class="pane-hd"><span class="t">接下来</span></div>
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>下一步</span>
+            <span class="acwhy-v">去收银台付款。付款成功之后<b>才会出纸</b>。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>取件码</span>
+            <span class="acwhy-v"><b>付完款那一屏才会给</b>，现在还没有。</span></div>
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>不想打了</span>
+            <span class="acwhy-v">现在退出不收钱，码还在有效期内可以再来。</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s2" data-redeem-when="notfound expired used">
+        <div class="pane-hd"><span class="t">这一步没有花钱</span></div>
+        <p class="panel-note">到机码核销发生在<b>付款之前</b>。这一屏无论哪种结果，本机都<b>没有向你收取任何费用</b>，也没有出纸。</p>
+        <div class="acwhy">
+          <div class="acwhy-l"><span class="acwhy-k"><i></i>还能打吗</span>
+            <span class="acwhy-v">能。这台机器上<b>直接传文件现场打</b>那条路一直开着。</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="backbtn" href="39-print-hub.html" data-parent-label="打印扫描"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">打印扫描</span></span></a>
+    <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+
+    <button class="btn btn--lg btn--ghost" data-at="s2" type="button" data-go="s1"><svg class="ic"><use href="#i-refresh"/></svg>重新输一次</button>
+    <a class="btn btn--lg btn--ghost" data-at="s1" data-when="device-off" href="42-my-assets.html?stage=orders&amp;from=P47">去打印订单</a>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default ai-down" data-scan-when="on">扫码或手输都行 · 这一步不收钱</span>
+    <span class="actionbar-hint" data-at="s1" data-when="default ai-down" data-scan-when="off">本机扫不了码 · 用键盘输，这一步不收钱</span>
+    <span class="actionbar-hint" data-at="s1" data-when="first">凭码办理 · 不登录也能核销</span>
+    <span class="actionbar-hint" data-at="s1" data-when="device-off">这台出不了纸 · 码没被用掉，换台机器</span>
+    <span class="actionbar-hint" data-at="s2" data-redeem-when="ok">核对无误再付款 · 付完才出纸</span>
+    <span class="actionbar-hint" data-at="s2" data-redeem-when="notfound">没找到这个码 · 本机没收钱</span>
+    <span class="actionbar-hint" data-at="s2" data-redeem-when="expired">码已过期 · 回小程序重新下单</span>
+    <span class="actionbar-hint" data-at="s2" data-redeem-when="used">已核销过 · 去订单里看进度</span>
+
+    <!-- s2 成功 → 汇入 P06 收银台。参数按 P06:2660 的交接契约给：
+         from 必须在 P06 的 SRC 登记表里（本批次已补 P47），否则整条回执作废。
+         pages/copies 交给 P06 自己算钱 —— 实测 3×2 在 s5 出「6 个计费页 · 1.20 元」。 -->
+    <a class="btn btn--lg btn--commit" data-at="s2" data-redeem-when="ok"
+       href="06-print-workbench.html?stage=s5&amp;from=P47&amp;kind=material&amp;title=%E7%8E%8B%E5%90%8C%E5%AD%A6_%E8%A1%8C%E6%94%BF%E4%B8%93%E5%91%98_%E7%AE%80%E5%8E%86.pdf&amp;pages=3&amp;copies=2">去收银台付款<svg class="ic"><use href="#i-card"/></svg></a>
+    <a class="btn btn--lg btn--primary" data-at="s2" data-redeem-when="expired" href="39-print-hub.html">回打印扫描首页<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--lg btn--primary" data-at="s2" data-redeem-when="used" href="42-my-assets.html?stage=orders&amp;from=P47">去打印订单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--lg btn--primary" data-at="s2" data-redeem-when="notfound" type="button" data-go="s1">回去重新输<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--lg btn--primary" data-at="s1" data-when="device-off" href="39-print-hub.html">回打印扫描首页<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v6.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI顾问</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<!-- 原型外壳条：评审用开关，不属于产品界面（同 P39:1036 的做法）。
+     data-review 让 stage.js 的 48px 触控检查跳过它（stage.js:230）。 -->
+<div class="proto-rail" data-review aria-label="评审用：扫码枪与核销结果切换">
+  <span class="proto-rail-id">评审 · 扫码枪</span>
+  <button class="rvbtn" type="button" data-scan-btn="on">扫码枪可用</button>
+  <button class="rvbtn" type="button" data-scan-btn="off">模拟扫不了码</button>
+  <span class="proto-rail-id">核销结果</span>
+  <button class="rvbtn" type="button" data-redeem-btn="ok">找到了</button>
+  <button class="rvbtn" type="button" data-redeem-btn="notfound">没找到</button>
+  <button class="rvbtn" type="button" data-redeem-btn="expired">已过期</button>
+  <button class="rvbtn" type="button" data-redeem-btn="used">已核销</button>
+  <span class="proto-rail-n">原型稿：本机不校验这 10 位码，第 2 步给哪种结果由这里切；真机以服务端核销结果为准</span>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=2"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   到机码字符集 —— 全页唯一的一份
+   ──────────────────────────────────────────────────────────────────────────
+   键面、「不会出现哪些字符」那一行、扫码枪与键盘的合法性判定，
+   全部从这一个常量算出来。改一处，三处跟着变，不会各说各的。
+
+   ── 字符集口径：已核实。不要再按「32 个」改回去 ──────────────────────
+   本批次拿到的口径原话是「32 个无歧义字符，去掉了 0/1/I/L/O/U」，
+   而随口径一起给来的字面串是 '23456789ABCDEFGHJKMNPQRSTUVWXYZ'。数一遍就对不上：
+       · 这个串是 **31** 个字符，不是 32；
+       · 串里 **有 U** —— 真正排除掉的只有 **0 1 I L O** 这 5 个；
+       · 「32 个且排除 I/L/O/U」的那一套是 Crockford Base32
+         （0123456789ABCDEFGHJKMNPQRSTVWXYZ），它**保留** 0 和 1，是另一套东西。
+
+   ✅ 2026-08-16 由协调者对 origin/main 核实后确认（**本页作者不读 apps/，以下为转述**）：
+      **字面串是权威**，它在生产侧至少四处被当作真值使用 ——
+        · apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:23,25（校验正则）
+        · apps/miniapp/utils/pickup-qrcode.js:30（小程序侧生成器）
+        · apps/miniapp/scripts/verify-miniapp-static.mjs:404（门禁断言）
+        · apps/admin/src/services/api/adminMockAdapter.ts:618
+      「32 个」这个说法的源头是 PrintPickupClaimPage.tsx:8 的一句**过时注释**，
+      口径就是从那句注释抄下来的。那句注释由生产侧另行订正，本目录不碰 apps/。
+
+   所以下面这一行是真值，**不是待确认项**；再有人拿「32 个」来对，请回看这一段。
+   键面、「不会出现哪些字符」那一行、扫码枪与键盘的合法性判定全部由它算出来，
+   将来字符集真要改，也只改这一行。 */
+var CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+var CODE_LEN = 10
+
+;(function () {
+  var scr = document.querySelector('.screen')
+  var slotsEl = document.getElementById('acSlots')
+  var padEl = document.getElementById('acPad')
+  var countEl = document.getElementById('acCount')
+  var tipEl = document.getElementById('acTip')
+  var excludedEl = document.getElementById('acExcluded')
+  if (!scr || !slotsEl || !padEl) return
+
+  var buf = ''
+
+  /* ── 「不会出现哪些字符」由字符集反推，不手写 ── */
+  ;(function () {
+    var ALL = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    var miss = []
+    for (var i = 0; i < ALL.length; i++) {
+      if (CODE_CHARS.indexOf(ALL.charAt(i)) < 0) miss.push(ALL.charAt(i))
+    }
+    if (excludedEl) excludedEl.textContent = miss.join(' ')
+  })()
+
+  /* ── 10 个字位 ── */
+  ;(function () {
+    var html = ''
+    for (var i = 0; i < CODE_LEN; i++) {
+      /* 5-5 分组：第 6 位起加一段间距。刻意不用 P06 取件码的 4-3-3 节奏 */
+      html += '<span class="acslot' + (i === 5 ? ' acslot--gap' : '') + '" data-slot="' + i + '">' +
+              '<span class="acslot-e">·</span></span>'
+    }
+    slotsEl.innerHTML = html
+  })()
+
+  /* ── 键盘：31 个字符键 + 退格 + 清空 + 确认 ──
+       键契约沿用 keypad.js：字符键 data-ch，功能键 data-fn（back / clear）。
+       8 列铺开：数字一排、字母三排，最后一排补功能键。 */
+  ;(function () {
+    var html = ''
+    for (var i = 0; i < CODE_CHARS.length; i++) {
+      html += '<button class="ackey" type="button" data-ch="' + CODE_CHARS.charAt(i) + '">' +
+              CODE_CHARS.charAt(i) + '</button>'
+    }
+    html += '<button class="ackey ackey--fn" type="button" data-fn="back" aria-label="退格，删除最后一位">退格</button>'
+    html += '<button class="ackey ackey--fn ackey--w3" type="button" data-fn="clear">清空</button>'
+    html += '<button class="ackey ackey--go ackey--w5" type="button" data-fn="ok" aria-disabled="true">' +
+            '确认核销</button>'
+    padEl.innerHTML = html
+  })()
+
+  var okBtn = padEl.querySelector('[data-fn="ok"]')
+
+  function render () {
+    var cells = slotsEl.querySelectorAll('.acslot')
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i]
+      c.classList.remove('acslot--on', 'acslot--cur')
+      if (i < buf.length) {
+        c.textContent = buf.charAt(i)
+        c.classList.add('acslot--on')
+      } else {
+        c.innerHTML = '<span class="acslot-e">·</span>'
+        if (i === buf.length) c.classList.add('acslot--cur')
+      }
+    }
+    if (countEl) countEl.textContent = String(buf.length)
+    var full = buf.length === CODE_LEN
+    if (okBtn) {
+      /* 原生 disabled 不用：按不动又不说为什么，站在机器前的人只会反复按。
+         用 aria-disabled + 一句**常显**的原因（就在下面 tipEl 那行）。 */
+      okBtn.setAttribute('aria-disabled', full ? 'false' : 'true')
+    }
+    if (tipEl) {
+      tipEl.textContent = full
+        ? '10 位齐了，可以确认核销'
+        : (buf.length === 0
+            ? '按下面的键盘，或直接扫码'
+            : '还差 ' + (CODE_LEN - buf.length) + ' 位才能核销')
+    }
+  }
+
+  function put (ch) {
+    if (buf.length >= CODE_LEN) return
+    if (CODE_CHARS.indexOf(ch) < 0) return
+    buf += ch
+    render()
+  }
+
+  /* 回显：把提交那一刻的 10 位固定下来。
+     不直接跟着 buf 走 —— 回到 s1 会清空 buf，那时 s2 的回显就该留着刚才那一次。 */
+  var echoEl = document.getElementById('acEcho')
+  function renderEcho (code) {
+    if (!echoEl) return
+    var html = ''
+    for (var i = 0; i < CODE_LEN; i++) {
+      html += '<span class="acslot acslot--on' + (i === 5 ? ' acslot--gap' : '') + '">' +
+              (code.charAt(i) || '·') + '</span>'
+    }
+    echoEl.innerHTML = html
+  }
+
+  function submit () {
+    if (buf.length !== CODE_LEN) return
+    renderEcho(buf)
+    if (typeof window.v3Stage === 'function') window.v3Stage('s2')
+  }
+
+  padEl.addEventListener('click', function (e) {
+    var k = e.target.closest('[data-ch],[data-fn]')
+    if (!k) return
+    var ch = k.getAttribute('data-ch')
+    if (ch) { put(ch); return }
+    var fn = k.getAttribute('data-fn')
+    if (fn === 'back') { buf = buf.slice(0, -1); render() }
+    else if (fn === 'clear') { buf = ''; render() }
+    else if (fn === 'ok') { submit() }
+  })
+
+  /* ── 扫码枪 ──
+     真机上扫码枪是 HID 键盘楔式：一次把 10 位「打」进来，末尾通常补一个回车。
+     所以这里监听整页 keydown —— 不是为了让人用物理键盘打字（一体机没有键盘），
+     而是让这条路在原型里**真的能走通**，评审可以拿扫码枪或键盘直接试。
+     扫码枪不可用（data-scanner="off"）时这条路自然就不会有输入进来，
+     键盘那条路一个键都不少。 */
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    var t = e.target
+    if (t && t.closest && t.closest('input,textarea,[contenteditable="true"],.proto-rail')) return
+    if (scr.getAttribute('data-stage') !== 's1') return
+    if (e.key === 'Enter') { submit(); return }
+    if (e.key === 'Backspace') { e.preventDefault(); buf = buf.slice(0, -1); render(); return }
+    if (e.key && e.key.length === 1) {
+      var ch = e.key.toUpperCase()
+      if (CODE_CHARS.indexOf(ch) > -1) { e.preventDefault(); put(ch) }
+    }
+  }, false)
+
+  /* 直接 ?stage=s2 进来时没人输过码。s2 整屏本来就是样例单
+     （王同学_行政专员_简历.pdf · ¥1.20），回显给出这一单对应的样例码，
+     和同屏其余样例数据同一批，不是另编一个。真输过码就被覆盖掉。 */
+  renderEcho('7K3M9XQ2VB')
+  render()
+
+  /* ── 「这一趟怎么走」把「现在」标在对应那一步 ──
+     s1 = 第 2 步核销，s2 = 第 3 步付款。前面的标 done，后面的不标。 */
+  ;(function () {
+    var flow = document.getElementById('acFlow')
+    if (!flow) return
+    var items = flow.querySelectorAll('.tl')
+    function mark () {
+      var st = scr.getAttribute('data-stage')
+      var n = parseInt(flow.getAttribute('data-step-' + st) || '2', 10)
+      for (var i = 0; i < items.length; i++) {
+        items[i].classList.remove('tl--now', 'tl--done')
+        if (i < n - 1) items[i].classList.add('tl--done')
+        else if (i === n - 1) items[i].classList.add('tl--now')
+      }
+    }
+    var baseStage = window.v3Stage
+    if (typeof baseStage === 'function') {
+      window.v3Stage = function () { baseStage.apply(this, arguments); mark() }
+    }
+    scr.addEventListener('click', function () { requestAnimationFrame(mark) })
+    mark()
+  })()
+
+  /* ── 评审开关：扫码枪可用性 / 核销结果 ── */
+  function wire (attr, btnAttr) {
+    var btns = document.querySelectorAll('[' + btnAttr + ']')
+    function sync () {
+      var cur = scr.getAttribute(attr)
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute('aria-pressed', String(btns[i].getAttribute(btnAttr) === cur))
+      }
+      if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+      if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+    }
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('click', function () {
+        scr.setAttribute(attr, this.getAttribute(btnAttr))
+        sync()
+      })
+    }
+    sync()
+  }
+  wire('data-scanner', 'data-scan-btn')
+  wire('data-redeem', 'data-redeem-btn')
+
+  /* 回到 s1 时把上一次输的清掉 —— 留着上一单的码会让人以为已经填好了 */
+  var railAndBtns = document.querySelectorAll('[data-go="s1"]')
+  for (var i = 0; i < railAndBtns.length; i++) {
+    railAndBtns[i].addEventListener('click', function () { buf = ''; render() })
+  }
+})()
+</script>
+<script src="scripts/help.js?v=1"></script>
+<script src="scripts/keypad.js?v=1"></script>
+</body>
+</html>
