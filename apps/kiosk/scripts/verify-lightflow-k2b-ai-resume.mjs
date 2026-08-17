@@ -130,7 +130,7 @@ for (const [sourceCode, marker, label] of [
   [parse, 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'parse keeps minimal session only'],
   [report, 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report keeps token-gated record read'],
   [report, "navigate('/resume/optimize'", 'report keeps optimize handoff'],
-  [generate, 'useBusyLock(generating)', 'generate keeps busy lock'],
+  [generate, 'useBusyLock(generating || exportingDraft)', 'generate keeps busy lock (含 ai-down 草稿导出)'],
   [generate, 'submitResumeGenerate(input, getToken())', 'generate keeps wrapper submission'],
   [preview, 'exportGeneratedResume(resume, result.taskId, getToken())', 'preview keeps real export wrapper'],
   [preview, 'exported?.printFileUrl', 'preview only enables real print URL'],

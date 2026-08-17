@@ -162,7 +162,7 @@ assertIncludes(optimize, "from '../../services/api'", 'optimize page imports res
 
 assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
 assertIncludes(aiWrapper, 'layout?: ResumeLayoutSettings', 'api wrapper exportGeneratedResume accepts optional layout')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates format and layout to the selected adapter')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)', 'api wrapper delegates format / layout / draft to the selected adapter')
 
 // ── Wave2 Task 3:优化页拆分 + 受控排版参数 + PDF layout 导出 ────────────────
 assertIncludes(optimize, 'ResumeLayoutControls', 'optimize page renders layout controls component')
@@ -219,7 +219,7 @@ assertIncludes(optimize, 'PDF 导出按所选模板自动填充版式', 'optimiz
 assertIncludes(optimize, 'Word/TXT/Markdown 保持内容格式导出', 'optimize page does not overpromise non-PDF template printing')
 assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected template id')
 assertIncludes(aiWrapper, 'templateId?: string', 'api wrapper exportGeneratedResume accepts optional templateId')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates templateId to selected adapter')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId, draft)', 'api wrapper delegates templateId / draft to selected adapter')
 assertIncludes(httpAdapter, 'templateId?: string', 'http adapter accepts optional templateId')
 assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapter sends templateId only when selected')
 assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
