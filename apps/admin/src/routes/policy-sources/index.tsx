@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
 import { policiesAdminService, type AdminPolicyRecord } from '../../services/api/policiesAdmin'
 import { Pagination, useTableState } from '../components/DataTable'
+import { BulkPublishButton } from '../components/BulkPublishButton'
+import { toOrgOptions } from '../../services/api/bulkPublish'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -53,6 +55,13 @@ export default function PolicySourcesPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  // 批量发布后重新拉取,让页面状态与库一致(不做本地猜测式更新)
+  const reload = useCallback(() => {
+    policiesAdminService.getPolicySources().then(setRecords).catch(() => setError(true))
+  }, [])
+
+  const orgOptions = useMemo(() => toOrgOptions(records), [records])
 
   const applyUpdate = (updated: AdminPolicyRecord) => {
     setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r))
@@ -117,7 +126,11 @@ export default function PolicySourcesPage() {
   }
 
   return (
-    <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
+    <Page
+      title="政策信息源"
+      subtitle="合作机构提交的政策扶持/公告内容审核与发布"
+      actions={<BulkPublishButton kind="policy" orgOptions={orgOptions} onDone={reload} />}
+    >
       {/* 筛选标签 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex gap-2">
