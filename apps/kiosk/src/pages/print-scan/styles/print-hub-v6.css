@@ -1,148 +1,321 @@
+/* ══════════════════════════════════════════════════════════════
+   print-hub-v6.css — P39 打印域首屏（docs/design/kiosk-ai-os-v3-2026-08/39-print-hub.html）
+
+   样式落地口径（后续 47 页照此办理）：
+   原型有自己一整套 token（styles/tokens.css 里的 fz / s / jade / fog 系列），
+   **不把那套 token 搬进生产** —— 生产已有 --k-* / --fy-* / --color-* 一套在用，
+   两套并存会让后续页面无从选择。做法是在页面根上建一层**别名**，
+   把原型语义映射到生产 token，页内只写别名。这样：
+     · 原型改色 → 只改这一段别名；
+     · 生产换主题 → 页面自动跟着走，不用逐页改；
+     · 没有第二套全局 token 进仓。
+   ══════════════════════════════════════════════════════════════ */
+
 .v6-print-hub-page > .ui-kiosk-page-content {
   padding: 0;
 }
+
 .v6-print-hub {
+  /* ── 原型 token → 生产 token 的别名层 ── */
   --ph-paper: var(--k-paper);
   --ph-card: var(--k-surface);
   --ph-ink: var(--k-ink);
+  --ph-muted: var(--k-muted);
   --ph-jade: var(--color-success);
   --ph-line: rgba(75, 67, 50, 0.17);
+  --ph-line-soft: rgba(75, 67, 50, 0.1);
+  --ph-amber: var(--fy-clay);
+
   min-height: 100%;
   padding: 0 48px 40px;
   color: var(--ph-ink);
   background:
     radial-gradient(680px 360px at 80% 0, rgba(216, 164, 72, 0.1), transparent 65%), var(--ph-paper);
 }
+
+/* 触控底线：可点击区 ≥48px（CLAUDE.md §9）。 */
 .v6-print-hub button {
   min-height: 48px;
 }
-.v6-print-guide {
-  padding: 20px;
+
+/* ── 顶部带：AI 三件事 / 一体机离线 / 探测失败，同一副骨架换话 ── */
+.v6-ph-band {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px;
   border: 1px solid var(--ph-line);
   border-radius: 22px;
   background: rgba(255, 253, 248, 0.88);
   box-shadow: 0 12px 30px rgba(51, 68, 59, 0.07);
 }
-.v6-print-guide__title {
+.v6-ph-band--off {
+  border-color: color-mix(in srgb, var(--ph-amber) 42%, var(--ph-line));
+  background: color-mix(in srgb, var(--fy-clay-soft, rgba(188, 116, 78, 0.08)) 60%, var(--k-surface));
+}
+.v6-ph-band__head {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.v6-print-guide__title > svg {
+.v6-ph-band__head > svg {
+  flex: none;
   width: 23px;
   color: var(--ph-jade);
 }
-.v6-print-guide__title h2 {
+.v6-ph-band--off .v6-ph-band__head > svg {
+  color: var(--ph-amber);
+}
+.v6-ph-band__head h2 {
   flex: 1;
   margin: 0;
   font-family: var(--k-serif, 'Songti SC', serif);
   font-size: 26px;
+  line-height: 1.3;
 }
-.v6-print-guide__title > span {
-  padding: 8px 14px;
-  border: 1px solid var(--ph-line);
-  border-radius: 999px;
-  color: var(--k-muted);
-  background: var(--k-paper);
+.v6-ph-band__act {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
 }
-.v6-print-guide__actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 16px;
+.v6-ph-band__line {
+  margin: 0;
+  color: var(--ph-muted);
+  font-size: 14px;
+  line-height: 1.6;
 }
-.v6-print-guide__actions button {
+.v6-ph-band__line > i,
+.v6-ph-airow__line > i {
+  margin-right: 8px;
+  color: var(--ph-ink);
+  font-style: normal;
+  font-weight: 600;
+}
+.v6-ph-band__act-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+.v6-ph-advice {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ph-line-soft);
+}
+
+/* 三件事的选择行 */
+.v6-ph-picks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.v6-ph-picks button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  /* 主操作行：≥56px（CLAUDE.md §9）。 */
+  min-height: 56px;
+  padding: 12px 16px;
   border: 1px solid var(--ph-line);
   border-radius: 15px;
   color: var(--ph-ink);
   text-align: left;
-  background: var(--k-surface);
+  background: var(--ph-card);
+  cursor: pointer;
 }
-.v6-print-guide__actions b {
+.v6-ph-picks button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--ph-jade) 45%, transparent);
+  background: color-mix(in srgb, var(--ph-jade) 10%, var(--ph-card));
+}
+.v6-ph-picks b {
   font-size: 17px;
 }
-.v6-print-guide__actions span {
-  color: var(--k-muted);
+.v6-ph-picks span {
+  color: var(--ph-muted);
   font-size: 13px;
+  line-height: 1.45;
 }
-.v6-print-guide > p {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--ph-line);
-  color: var(--k-muted);
+
+.v6-ph-rebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 22px;
+  border: 1px solid var(--ph-line);
+  border-radius: 14px;
+  color: var(--ph-jade);
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--ph-card);
+  cursor: pointer;
+}
+.v6-ph-rebtn > svg {
+  width: 18px;
+}
+.v6-ph-rebtn[disabled] {
+  color: var(--ph-muted);
+  cursor: default;
+}
+
+/* 折叠：运维口径不占用户可见区，但一个字不删 */
+.v6-ph-fold {
+  margin-top: 4px;
+  color: var(--ph-muted);
   font-size: 14px;
 }
-.v6-print-state {
+.v6-ph-fold > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  color: var(--ph-jade);
+  font-weight: 600;
+  cursor: pointer;
+}
+.v6-ph-fold p {
+  margin: 6px 0 0;
+  line-height: 1.6;
+}
+
+/* ── 分组标题 ── */
+.v6-ph-glabel {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 14px;
-  padding: 14px 18px;
-  border: 1px solid var(--ph-line);
-  border-radius: 18px;
-  background: rgba(255, 253, 248, 0.72);
+  margin: 22px 0 12px;
 }
-.v6-print-state__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--fy-clay);
-  box-shadow: 0 0 0 6px rgba(188, 116, 78, 0.1);
-}
-.v6-print-state__dot.is-ready {
-  background: var(--ph-jade);
-  box-shadow: 0 0 0 6px rgba(42, 128, 106, 0.1);
-}
-.v6-print-state div {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-}
-.v6-print-state strong {
-  font-size: 17px;
-}
-.v6-print-state span {
-  color: var(--k-muted);
-  font-size: 14px;
-}
-.v6-print-state button {
-  padding: 0 18px;
-  border: 1px solid var(--ph-line);
-  border-radius: 12px;
-  color: var(--ph-jade);
-  background: var(--k-surface);
-}
-.v6-print-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 20px 0 12px;
-}
-.v6-print-section-head h2 {
-  margin: 0;
+.v6-ph-glabel > b {
   font-family: var(--k-serif, 'Songti SC', serif);
   font-size: 28px;
 }
-.v6-print-section-head span {
-  color: var(--k-muted);
+.v6-ph-glabel > span {
+  color: var(--ph-muted);
   font-size: 14px;
 }
-.v6-print-capabilities {
+.v6-ph-gbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 18px;
+  border: 1px solid var(--ph-line);
+  border-radius: 14px;
+  color: var(--ph-ink);
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--ph-card);
+  cursor: pointer;
+}
+.v6-ph-gbtn > svg {
+  width: 17px;
+  color: var(--ph-jade);
+}
+
+/* ── 到机码核销：单卡整行 ──
+   复用记录卡的骨架（同一页里「一行卡片」只该有一种长相），
+   只加整行铺满 + 右侧「进入」。 */
+.v6-ph-arrival {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 84px;
+  padding: 14px 20px;
+  border: 1px solid color-mix(in srgb, var(--ph-jade) 32%, transparent);
+  border-radius: 18px;
+  color: var(--ph-ink);
+  text-align: left;
+  background: rgba(255, 253, 248, 0.88);
+  cursor: pointer;
+}
+.v6-ph-arrival__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  color: var(--ph-jade);
+  background: color-mix(in srgb, var(--ph-jade) 12%, transparent);
+}
+.v6-ph-arrival__icon svg {
+  width: 22px;
+}
+.v6-ph-arrival__body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+.v6-ph-arrival__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.v6-ph-arrival__head b {
+  font-size: 20px;
+}
+.v6-ph-arrival__desc {
+  color: var(--ph-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* 「这台出不了纸」必须留在卡面上，不藏进 tooltip。 */
+.v6-ph-arrival__note {
+  color: var(--ph-amber);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.v6-ph-arrival__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--ph-jade);
+  font-size: 16px;
+  font-weight: 700;
+}
+.v6-ph-arrival__go svg {
+  width: 19px;
+}
+
+/* ── 状态标签：它是状态不是入口 ── */
+.v6-ph-chip {
+  flex: none;
+  padding: 6px 11px;
+  border: 1px solid var(--ph-line);
+  border-radius: 999px;
+  color: var(--ph-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  background: var(--ph-paper);
+}
+.v6-ph-chip--ai {
+  border-color: rgba(139, 112, 54, 0.22);
+  color: color-mix(in srgb, var(--fy-wheat) 76%, black);
+  background: var(--fy-wheat-soft);
+}
+
+/* ── 七张能力卡 + 第 8 格状态卡：2 列 4 行 ── */
+.v6-ph-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
 }
-.v6-print-capability {
+.v6-ph-card {
   position: relative;
   display: flex;
-  min-height: 190px;
+  min-height: 178px;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 18px;
   overflow: hidden;
   border: 1px solid var(--ph-line);
@@ -152,201 +325,322 @@
   text-align: left;
   background: var(--ph-card);
   box-shadow: 0 10px 24px rgba(65, 72, 59, 0.06);
+  cursor: pointer;
 }
-.v6-print-capability--clay {
-  border-top-color: var(--fy-clay);
-}
-.v6-print-capability--wheat {
-  border-top-color: var(--fy-wheat);
-}
-.v6-print-capability--plum {
-  border-top-color: var(--color-plum, var(--k-muted));
-}
-.v6-print-capability--slate {
-  border-top-color: var(--fy-slate);
-}
-.v6-print-capability.is-unavailable {
-  color: var(--k-muted);
-  border-top-color: var(--k-muted);
-  background: color-mix(in srgb, var(--k-paper) 84%, var(--k-line));
+/* 七张卡的顶边一律是打印域色（原型 .hcard 的 border-top: var(--cat-print)）。
+   迁移前生产给每张卡配了不同的 accent 色，那是 V6 之前留下的做法：
+   一屏里同级卡片用五种颜色，颜色就不再表示「属于哪个域」，只剩装饰。
+   第 8 格状态卡保留另一种颜色，因为它确实不是同一类东西（不是入口）。 */
+/* 停用态：置灰，但「为什么停」和「那怎么办」写清楚（见 .v6-ph-card__note）。 */
+.v6-ph-card.is-unavailable {
+  color: var(--ph-muted);
+  border-top-color: var(--ph-muted);
+  background: color-mix(in srgb, var(--ph-paper) 84%, var(--k-line));
   box-shadow: none;
 }
-.v6-print-capability:disabled {
-  cursor: not-allowed;
-  opacity: 1;
+.v6-ph-card[aria-disabled='true'] {
+  cursor: default;
 }
-.v6-print-capability__top {
+.v6-ph-card__top {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
 }
-.v6-print-capability__icon {
+.v6-ph-card__icon {
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(42, 128, 106, 0.18);
+  border: 1px solid color-mix(in srgb, var(--ph-jade) 18%, transparent);
   border-radius: 13px;
   color: var(--ph-jade);
-  background: rgba(42, 128, 106, 0.08);
+  background: color-mix(in srgb, var(--ph-jade) 8%, transparent);
 }
-.v6-print-capability__icon svg {
+.v6-ph-card__icon svg {
   width: 23px;
 }
-.v6-print-capability__top b {
+.v6-ph-card.is-unavailable .v6-ph-card__icon {
+  color: var(--ph-muted);
+  border-color: var(--ph-line);
+  background: transparent;
+}
+.v6-ph-card__top b {
   font-family: var(--k-serif, 'Songti SC', serif);
   font-size: 24px;
+  line-height: 1.25;
 }
-.v6-print-capability__tag {
-  padding: 7px 11px;
-  border: 1px solid rgba(139, 112, 54, 0.18);
-  border-radius: 999px;
-  color: color-mix(in srgb, var(--fy-wheat) 76%, black);
-  font-size: 12px;
-  background: var(--fy-wheat-soft);
-}
-.v6-print-capability__description {
-  color: var(--k-muted);
+.v6-ph-card__desc {
+  color: var(--ph-muted);
   font-size: 15px;
   line-height: 1.5;
 }
-.v6-print-capability__note {
-  color: var(--fy-clay);
-  font-size: 13px;
+/* 停用原因行（原型 .hc-no）：常显，不是 tooltip、不是 title。 */
+.v6-ph-card__badge {
+  color: var(--ph-amber);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
 }
-.v6-print-capability__go {
+/* 「那怎么办」/ 可用时的一行状态（原型 .hc-st）。 */
+.v6-ph-card__note {
+  color: var(--ph-amber);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.v6-ph-card__note.is-ok {
+  color: var(--ph-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.v6-ph-card__go {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   margin-top: auto;
+  padding-top: 6px;
   color: var(--ph-jade);
   font-size: 16px;
   font-weight: 700;
 }
-.v6-print-capability__go svg {
+.v6-ph-card.is-unavailable .v6-ph-card__go {
+  color: var(--ph-muted);
+}
+.v6-ph-card__go svg {
   width: 19px;
 }
-.v6-print-device-card {
-  min-height: 190px;
-  padding: 20px;
-  border: 1px solid var(--ph-line);
-  border-top: 4px solid var(--k-muted);
-  border-radius: 20px;
+
+/* 第 8 格：本机服务配置（状态卡，不是入口） */
+.v6-ph-card--status {
+  border-top-color: var(--fy-slate, var(--ph-muted));
+  cursor: default;
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--k-paper) 88%, var(--k-line)),
+    color-mix(in srgb, var(--ph-paper) 88%, var(--k-line)),
     var(--k-line)
   );
 }
-.v6-print-device-card h3 {
-  margin: 0;
-  font-family: var(--k-serif, 'Songti SC', serif);
-  font-size: 24px;
+.v6-ph-card--status .v6-ph-card__icon {
+  color: var(--ph-muted);
+  border-color: var(--ph-line);
+  background: transparent;
 }
-.v6-print-device-card p {
-  margin: 10px 0;
-  color: var(--k-muted);
-  line-height: 1.5;
-}
-.v6-print-device-card div {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.v6-print-device-card span {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--k-muted);
-  font-size: 14px;
-}
-.v6-print-device-card svg {
-  width: 17px;
-  color: var(--ph-jade);
-}
-.v6-print-records {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 18px;
-  margin-top: 18px;
-  padding: 18px;
-  border: 1px solid var(--ph-line);
-  border-radius: 20px;
-  background: rgba(255, 253, 248, 0.82);
-}
-.v6-print-records h2 {
-  margin: 0 0 7px;
-  font-family: var(--k-serif, 'Songti SC', serif);
-  font-size: 24px;
-}
-.v6-print-records p {
-  margin: 0;
-  color: var(--k-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-.v6-print-records__links {
+.v6-ph-statgrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 4px 12px;
+  margin-top: 6px;
 }
-.v6-print-records__links button {
+.v6-ph-statgrid > span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ph-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.v6-ph-statgrid i {
+  flex: none;
+  color: var(--ph-ink);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ── 我的打印记录：三张次卡 ── */
+.v6-ph-records {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.v6-ph-records button {
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: 14px;
+  min-height: 78px;
+  padding: 12px 16px;
   border: 1px solid var(--ph-line);
-  border-radius: 14px;
+  border-radius: 16px;
   color: var(--ph-ink);
   text-align: left;
-  background: var(--k-surface);
+  background: var(--ph-card);
+  cursor: pointer;
 }
-.v6-print-records__links button > svg {
-  width: 21px;
+.v6-ph-records__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   color: var(--ph-jade);
+  background: var(--ph-paper);
 }
-.v6-print-records__links span {
+.v6-ph-records__icon svg {
+  width: 20px;
+}
+.v6-ph-records__body {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 3px;
 }
-.v6-print-records__links small {
-  overflow: hidden;
-  color: var(--k-muted);
+.v6-ph-records__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.v6-ph-records__head b {
+  font-size: 18px;
+}
+.v6-ph-records small {
+  color: var(--ph-muted);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.v6-print-notices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 14px;
-}
-.v6-print-notices div {
+
+/* ── 底部一条常驻合规声明 ── */
+.v6-ph-foot {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 13px 15px;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
   border: 1px solid var(--ph-line);
-  border-radius: 15px;
-  color: var(--k-muted);
+  border-radius: 16px;
   background: rgba(255, 253, 248, 0.68);
 }
-.v6-print-notices svg {
+.v6-ph-foot > svg {
   flex: none;
   width: 20px;
   color: var(--ph-jade);
 }
-.v6-print-notices p {
+.v6-ph-foot p {
   margin: 0;
+  color: var(--ph-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.v6-ph-guest {
+  margin: 12px 0 0;
+  color: var(--ph-muted);
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* ── 展开层：AI 怎么帮 / 降级后怎么做 ── */
+.v6-ph-overlay {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 48px;
+  inset: 0;
+}
+.v6-ph-overlay__scrim {
+  position: absolute;
+  border: 0;
+  background: rgba(4, 8, 10, 0.55);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  inset: 0;
+}
+.v6-ph-overlay__panel {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 900px;
+  max-height: 100%;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 30px;
+  overflow-y: auto;
+  border: 1px solid var(--ph-line);
+  border-radius: 24px;
+  background: var(--ph-card);
+  box-shadow: 0 30px 70px rgba(12, 20, 16, 0.32);
+}
+.v6-ph-overlay__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.v6-ph-overlay__head > svg {
+  flex: none;
+  width: 24px;
+  color: var(--ph-jade);
+}
+.v6-ph-overlay__head b {
+  flex: 1;
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 26px;
+}
+.v6-ph-overlay__x {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--ph-line);
+  border-radius: 14px;
+  color: var(--ph-muted);
+  background: var(--ph-paper);
+  cursor: pointer;
+}
+.v6-ph-overlay__x svg {
+  width: 20px;
+}
+.v6-ph-overlay__sec {
+  margin: 0;
+  color: var(--ph-muted);
+  font-size: 14px;
+}
+.v6-ph-overlay__rows {
+  display: flex;
+  flex-direction: column;
+}
+.v6-ph-airow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 0;
+  border-top: 1px solid var(--ph-line-soft);
+}
+.v6-ph-airow:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.v6-ph-airow__name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 19px;
+  font-weight: 600;
+}
+.v6-ph-airow__line {
+  color: var(--ph-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.v6-ph-overlay__act {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ph-line-soft);
+}
+.v6-ph-overlay__act > span {
+  flex: 1;
+  min-width: 0;
+  color: var(--ph-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v6-print-hub * {
     scroll-behavior: auto !important;
