@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, Drawer, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -12,6 +12,8 @@ import {
   unpublishJobSource,
 } from '../../services/api'
 import { Pagination, useTableState } from '../components/DataTable'
+import { BulkPublishButton } from '../components/BulkPublishButton'
+import { toOrgOptions } from '../../services/api/bulkPublish'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -69,6 +71,13 @@ export default function JobSourcesPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  // 批量发布后重新拉取,让页面状态与库一致(不做本地猜测式更新)
+  const reload = useCallback(() => {
+    getJobSources().then(setSources).catch(() => setError(true))
+  }, [])
+
+  const orgOptions = useMemo(() => toOrgOptions(sources), [sources])
 
   // sourceId filter: when arriving from import-batches page
   const bySource = sourceIdFilter
@@ -147,7 +156,11 @@ export default function JobSourcesPage() {
   }
 
   return (
-    <Page title="岗位信息源" subtitle="第三方平台同步岗位数据管理">
+    <Page
+      title="岗位信息源"
+      subtitle="第三方平台同步岗位数据管理"
+      actions={<BulkPublishButton kind="job" orgOptions={orgOptions} onDone={reload} />}
+    >
       {/* 来自 Excel 导入批次的上下文 banner */}
       {sourceIdFilter && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning-bg px-4 py-2.5">
