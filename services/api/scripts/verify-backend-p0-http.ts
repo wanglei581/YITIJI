@@ -22,6 +22,7 @@ import type { JobsAdminService } from '../src/jobs/jobs-admin.service'
 import type { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
 import { FairCompanyPrintService } from '../src/jobs/fair-company-print.service'
+import { JobRequirementStatsService } from '../src/jobs/job-requirement-stats.service'
 import { JobQualityService } from '../src/job-ai/job-quality.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -76,6 +77,9 @@ const redisStub = {
     { provide: JobQualityService, useValue: qualityStub },
     { provide: AdminFairsService, useValue: {} },
     { provide: FairCompanyPrintService, useValue: {} },
+    // 只依赖 PrismaService（本模块已真实提供），因此按 jobs.module.ts 的方式真实注册，
+    // 不用空对象打桩——保持 JobsController 能被真实实例化
+    JobRequirementStatsService,
     {
       provide: JobsService,
       inject: [JobsPartnerService],
