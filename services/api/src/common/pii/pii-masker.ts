@@ -70,8 +70,8 @@ const PHONE = /(?<!\d)(?:\+?86[\s-]?)?1[3-9](?:[\s-]?\d){9}(?!\d)/gu
 const BANK_CARD = /(?<!\d)(?:\d[\s-]?){15,18}\d(?!\d)/gu
 const EMAIL = /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9.-]+\.[A-Z]{2,63}/giu
 const USCC = /(?<![0-9A-Z])(?=[0-9A-HJ-NPQRTUWXY]{18}(?![0-9A-Z]))(?=[0-9A-HJ-NPQRTUWXY]*[A-HJ-NPQRTUWXY])[0-9A-HJ-NPQRTUWXY]{18}/gu
-const NEXT_FIELD_LABEL = '(?:姓名|乙方|劳动者|甲方|用人单位(?:名称)?|通讯地址|联系地址|住所|住址|地址|身份证号?|证件号码?|手机号?|联系电话|电子邮箱|邮箱地址|银行卡号?|银行账户|银行账号|账户号?|账号|统一社会信用代码)\\s*[:：]'
-const LOOSE_FIELD_LABEL = '(?:身份证号?|证件号码?|身份证|证件|手机号?|联系电话|电话|联系号码|电子邮箱|邮箱地址|邮箱|银行卡号?|银行账户|银行账号|账户号?|账号)'
+const NEXT_FIELD_LABEL = '(?:姓名|乙方|劳动者|甲方|用人单位(?:名称)?|通讯地址|联系地址|住所|住址|地址|身份证号?|证件号码?|手机号?|联系电话|传真(?:号码?)?|电子邮箱|邮箱地址|银行卡号?|银行账户|银行账号|账户号?|账号|统一社会信用代码)\\s*[:：]'
+const LOOSE_FIELD_LABEL = '(?:身份证号?|证件号码?|身份证|证件|手机号?|联系电话|电话|联系号码|传真(?:号码?)?|电子邮箱|邮箱地址|邮箱|银行卡号?|银行账户|银行账号|账户号?|账号)'
 const CHINESE_NUMBER = '[零〇一二两三四五六七八九十百千万亿壹贰叁肆伍陆柒捌玖拾佰仟萬]+'
 const ARABIC_NUMBER = '(?:\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?)'
 const NUMBER_VALUE = `(?:${ARABIC_NUMBER}|${CHINESE_NUMBER})`
@@ -106,7 +106,7 @@ const NEXT_FIELD_AT = new RegExp(NEXT_FIELD_LABEL, 'uy')
 const CONDITIONAL_SEPARATOR_BOUNDARY = `[，,;；]\\s*(?=(?:$|${NEXT_FIELD_LABEL}|${LOOSE_FIELD_LABEL}|${SAFE_LEGAL_FACT_PREFIX}|${SAFE_BOILERPLATE_PREFIX}))`
 const FIELD_BOUNDARY_BODY = `(?:[。\\n]|$|\\s*${NEXT_FIELD_LABEL}|[ \\t]+${SAFE_LEGAL_FACT_PREFIX}|${CONDITIONAL_SEPARATOR_BOUNDARY})`
 const FIELD_BOUNDARY = `(?=${FIELD_BOUNDARY_BODY})`
-const WORKER_BOUNDARY = `(?=(?:${SAFE_LEGAL_FACT_PREFIX}|${FIELD_BOUNDARY_BODY}|[ \\t]+(?:身份证|证件|手机|电话|联系号码|邮箱|银行卡|账户|账号)))`
+const WORKER_BOUNDARY = `(?=(?:${SAFE_LEGAL_FACT_PREFIX}|${FIELD_BOUNDARY_BODY}|[ \\t]+(?:身份证|证件|手机|电话|联系号码|传真|邮箱|银行卡|账户|账号)))`
 const LABELED_WORKER = new RegExp(
   `(?:乙方|劳动者|姓名)\\s*[:：]\\s*([㐀-鿿·]{2,20}?|[A-Za-z][A-Za-z .'-]{1,60}?)${WORKER_BOUNDARY}`,
   'gu',
@@ -115,8 +115,14 @@ const LABELED_EMPLOYER = new RegExp(
   `(?:甲方|用人单位)(?:名称)?\\s*[:：]\\s*(.{2,100}?)${FIELD_BOUNDARY}`,
   'gu',
 )
+// `(?<!邮箱)`：`邮箱地址：a@example.com` 里的 `地址` 不是住址标签。
+// 没有这个否定后顾时，邮箱值会被当成「详细地址」遮成 [详细地址_N]，
+// 而检测侧按 `邮箱地址` 期待的是 [邮箱_N] —— 类别对不上即判残留，
+// 于是任何写了「邮箱地址：」的合同都必定抛 CONTRACT_PII_MASK_INCOMPLETE。
+// 这是与座机/传真同一类的检测–遮盖不对称，且在 main 上同样复现。
+const ADDRESS_LABEL = '(?<!邮箱)(?:通讯地址|联系地址|住所|住址|地址)'
 const LABELED_ADDRESS = new RegExp(
-  `(?:通讯地址|联系地址|住所|住址|地址)\\s*[:：]\\s*(.{3,120}?)${FIELD_BOUNDARY}`,
+  `${ADDRESS_LABEL}\\s*[:：]\\s*(.{3,120}?)${FIELD_BOUNDARY}`,
   'gu',
 )
 const LABELED_ID = /(?:身份证|证件)\s*[:：]?\s*([0-9Xx][0-9Xx\s-]{14,40})/gu
@@ -124,11 +130,124 @@ const LABELED_BANK = /(?:银行卡|银行账户|银行账号|账户|账号)\s*[:
 const LABELED_USCC = /(?:统一社会信用代码)\s*[:：]\s*([0-9A-Z]{18})/gu
 const BANK_LABEL = /(?:银行卡|银行账户|银行账号|账户|账号)\s*[:：]/gu
 const USCC_LABEL = /统一社会信用代码\s*[:：]/gu
-const SENSITIVE_LABEL = /(姓名|乙方|劳动者|甲方|用人单位(?:名称)?|通讯地址|联系地址|住所|住址|地址)\s*[:：]\s*/gu
-const LOOSE_VALUE_LABEL = /(?:身份证号|证件号码|手机号|联系电话|银行卡号|银行账号|账户号|电子邮箱|邮箱地址|统一社会信用代码|银行卡|银行账户|账号|账户|身份证|证件|手机|电话|邮箱)/gu
+const SENSITIVE_LABEL = new RegExp(
+  `(姓名|乙方|劳动者|甲方|用人单位(?:名称)?|${ADDRESS_LABEL})\\s*[:：]\\s*`,
+  'gu',
+)
+
+// ============================================================
+// 松散标签表 —— 检测侧与遮盖侧的**唯一来源**
+//
+// 2026-08-17 生产故障（analyze 阶段 100% 失败、错误码
+// CONTRACT_REVIEW_ANALYSIS_FAILED）的直接成因就是这张表在修复前不存在：
+// 检测侧（LOOSE_VALUE_LABEL + looseLabelCategory）自己维护一串标签，
+// 遮盖侧（LABELED_* 与整值正则）另外维护一串，两边逐渐漂移到
+//
+//   「`联系电话` 这个标签检测得到，`021-62345678` 这个座机号遮盖不掉」
+//
+// 于是 assertNoHighConfidencePii 判定「检测到标签、却没看到对应占位符」
+// ⇒ 抛 CONTRACT_PII_MASK_INCOMPLETE。该异常是**裸 Error**，在 orchestrator 的
+// safeStageError 里被折叠成兜底码，线上只看得到笼统的 ANALYSIS_FAILED。
+// 遮盖只在 analyze() 跑、extract() 不跑，这正是 extract 成功而 analyze 必死的原因。
+//
+// 现在两侧都从本表派生：
+//   - 检测：LOOSE_VALUE_LABEL（标签正则）+ LOOSE_LABEL_CATEGORY（标签 → 类别）
+//   - 遮盖：LABELED_PHONE / LABELED_SHORT_ACCOUNT（按类别筛出标签再拼正则）
+// 标签集合再也不可能只改一侧。
+//
+// 第三列 `detect`：该标签是否参与**检测**。
+//   true  —— 检测 + 遮盖。这一组必须与修复前的 LOOSE_VALUE_LABEL 逐字相同，
+//            扩大检测面 = 扩大 fail-closed 面 = 制造新的线上失败，不做。
+//   false —— **只遮盖、不检测**。`传真` / `联系号码` 属于此类：它们本来就不在
+//            LOOSE_VALUE_LABEL 里（`传真：021-12345678` 既不被遮也不被判残留），
+//            所以它们不是本次故障的触发源。但传真号是实打实的 PII 且当前
+//            原样送进模型，属于**泄漏**而非误杀 —— 补遮盖是纯粹的安全收益，
+//            补检测则会凭空新增失败路径（例如 `传真：N/A` 会开始判残留）。
+//
+// 由此得到本表要维持的不变量：**检测标签 ⊆ 遮盖标签**。
+// 遮盖侧可以更宽（更安全），检测侧永远不许比遮盖侧宽（这正是故障成因）。
+//
+// ⚠️ 顺序即正则备选顺序：**长标签必须排在与它同前缀的短标签之前**
+//    （身份证号 → 身份证、银行卡号 → 银行卡、手机号 → 手机、联系电话 → 电话、
+//      传真号码 → 传真号 → 传真）。过滤保序，因此两侧派生出的正则都正确。
+// ============================================================
+const LOOSE_LABEL_RULES = Object.freeze([
+  ['身份证号', '身份证', true],
+  ['证件号码', '身份证', true],
+  ['手机号', '手机号', true],
+  ['联系电话', '手机号', true],
+  ['联系号码', '手机号', false],
+  ['传真号码', '手机号', false],
+  ['传真号', '手机号', false],
+  ['传真', '手机号', false],
+  ['银行卡号', '银行卡', true],
+  ['银行账号', '银行卡', true],
+  ['账户号', '银行卡', true],
+  ['电子邮箱', '邮箱', true],
+  ['邮箱地址', '邮箱', true],
+  ['统一社会信用代码', '统一社会信用代码', true],
+  ['银行卡', '银行卡', true],
+  ['银行账户', '银行卡', true],
+  ['账号', '银行卡', true],
+  ['账户', '银行卡', true],
+  ['身份证', '身份证', true],
+  ['证件', '身份证', true],
+  ['手机', '手机号', true],
+  ['电话', '手机号', true],
+  ['邮箱', '邮箱', true],
+] as const satisfies ReadonlyArray<readonly [string, MaskCategory, boolean]>)
+
+/** 标签 → 占位符类别。**只含检测标签**，检测侧据此判断该出现哪一类占位符。 */
+const LOOSE_LABEL_CATEGORY: ReadonlyMap<string, MaskCategory> = new Map(
+  LOOSE_LABEL_RULES.filter(([, , detect]) => detect).map(([label, category]) => [label, category]),
+)
+
+/** 遮盖侧的标签备选（含只遮不检的标签），保证「检测标签 ⊆ 遮盖标签」。 */
+function looseLabelAlternation(category: MaskCategory): string {
+  return LOOSE_LABEL_RULES.filter(([, value]) => value === category).map(([label]) => label).join('|')
+}
+
+const LOOSE_VALUE_LABEL = new RegExp(
+  `(?:${[...LOOSE_LABEL_CATEGORY.keys()].join('|')})`,
+  'gu',
+)
+
+// 电话号码的形状。修复前只有 PHONE（仅手机号 1[3-9]…），座机 / 400 热线 / 传真
+// 一律遮不掉；而 `联系电话` `传真` 这些标签检测侧全都认识 —— 不对称就在这里。
+// 每个备选都带明确前缀（0 / 400 / 800 / 1[3-9]），因此不会吞掉
+// `2026-08-01` 这类带分隔符的日期（它们凑不出连续 7 位以上数字）。
+const PHONE_HOTLINE = '(?:400|800)[\\s-]?\\d{3}[\\s-]?\\d{4}'
+const PHONE_LANDLINE = '0\\d{2,3}[\\s-]?\\d{7,8}(?:\\s*(?:转|-)\\s*\\d{1,6})?'
+const PHONE_MOBILE = '1[3-9](?:[\\s-]?\\d){9}'
+const PHONE_LOCAL = '\\d{7,8}'
+// 座机必须排在 PHONE_LOCAL 之前，否则 `021-62345678` 会被 \d{7,8} 截成前缀。
+const LABELED_PHONE_VALUE =
+  `(?:\\+?86[\\s-]?)?(?:${PHONE_HOTLINE}|${PHONE_LANDLINE}|${PHONE_MOBILE}|${PHONE_LOCAL})`
+const LABELED_PHONE = new RegExp(
+  `(?:${looseLabelAlternation('手机号')})\\s*[:：]?\\s*(${LABELED_PHONE_VALUE})`,
+  'gu',
+)
+
+// 短账号。LABELED_BANK 要求 ≥16 位、BANK_CARD 要求 ≥16 位，于是
+// `账号：622202123456`（12 位）遮不掉，而 `账号` 标签检测侧认识 —— 同一类不对称。
+const LABELED_SHORT_ACCOUNT = new RegExp(
+  `(?:${looseLabelAlternation('银行卡')})\\s*[:：]?\\s*(\\d[\\d\\s-]{4,30})`,
+  'gu',
+)
+
+/**
+ * 「数量」不是 PII：`证件2份` / `身份证复印件1份` 里的 `2份`、`1份`。
+ *
+ * 修复前检测侧只要看到标签后面跟着任意 `[0-9A-Za-z]` 就判残留，
+ * 于是「入职需提交证件2份」这种纯事务性条款也会把整份合同判死。
+ * 数量词天然与 PII 形状互斥（PII 不会是「≤4 位数字 + 量词」），
+ * 所以这条豁免不会放过任何真实 PII。
+ */
+const QUANTITY_VALUE_AT = /\d{1,4}\s*(?:份|张|个|本|页|次|条|项|件|套|枚|人|名|位|部|台|种|类)/uy
+
 const MASKED_NEXT_FIELD_PREFIXES = [
   /(?:身份证号?|证件|证件号码?)\s*[:：]?\s*\[身份证_\d+\]/uy,
-  /(?:手机号?|联系电话|电话|联系号码)\s*[:：]?\s*\[手机号_\d+\]/uy,
+  /(?:手机号?|联系电话|电话|联系号码|传真(?:号码?)?)\s*[:：]?\s*\[手机号_\d+\]/uy,
   /(?:电子邮箱|邮箱地址|邮箱)\s*[:：]?\s*\[邮箱_\d+\]/uy,
   /(?:银行卡号?|银行账户|银行账号|账户号?|账号)\s*[:：]?\s*\[银行卡_\d+\]/uy,
   /统一社会信用代码\s*[:：]?\s*\[统一社会信用代码_\d+\]/uy,
@@ -280,6 +399,10 @@ function findCandidates(text: string, knownEntities: readonly KnownEntity[]): Ca
   addLabeledNumber(candidates, text, LABELED_BANK, '银行卡', 160, digitsOnly, isBankAccount)
   addLabeledNumber(candidates, text, LABELED_ID, '身份证', 160, digitsAndX, isStrictIdentity)
   addLabeledNumber(candidates, text, LABELED_USCC, '统一社会信用代码', 160, normalizeText, isUscc)
+  // 优先级低于上面三条严格规则（160），高于整值扫描（≤110）：
+  // 既不改变既有分类结果，又保证「标签认识的值」一定有人遮。
+  addLabeledNumber(candidates, text, LABELED_SHORT_ACCOUNT, '银行卡', 155, digitsOnly, isShortAccount)
+  addLabeledNumber(candidates, text, LABELED_PHONE, '手机号', 150, normalizePhone, isPhoneNumber)
   const compatible = mapText(text, false)
   addMappedWhole(candidates, compatible, DOB_ID, '身份证', 110, digitsAndX)
   addMappedWhole(candidates, compatible, ID_18, '身份证', 100, digitsAndX)
@@ -402,6 +525,21 @@ function isStrictIdentity(value: string): boolean {
 
 function isBankAccount(value: string): boolean { return /^\d{16,19}$/u.test(digitsOnly(value)) || value.normalize('NFKC').match(DATE_TOKEN)?.length === 2 }
 
+/**
+ * 显式账号标签下的短账号（6–19 位）。银行卡是 16–19 位，但工资卡以外的
+ * 内部账号 / 折号常常更短 —— 标签既然写了「账号」，就按 PII 处理。
+ */
+function isShortAccount(value: string): boolean {
+  const digits = digitsOnly(value)
+  return digits.length >= 6 && digits.length <= 19
+}
+
+/** 电话号码位数上下界（含 86 国码时最长 13 位，留到 15 位兼容分机）。 */
+function isPhoneNumber(value: string): boolean {
+  const digits = digitsOnly(value)
+  return digits.length >= 7 && digits.length <= 15
+}
+
 function containsLikelyBankAccount(text: string): boolean {
   for (const match of text.matchAll(BANK_CARD)) {
     if (!isStrictIdentity(match[0]) && !hasMatch(match[0], DATE_TOKEN)) return true
@@ -444,7 +582,10 @@ function hasResidualLooseValueLabel(text: string, checkTail = true, checkMissing
   for (const match of text.matchAll(LOOSE_VALUE_LABEL)) {
     const matchStart = match.index ?? 0
     if (matchStart > 0 && text[matchStart - 1] === '[') continue
-    const expected = looseLabelCategory(match[0])
+    // 标签集合与类别都来自 LOOSE_LABEL_RULES，正则也由它派生，因此这里必然命中。
+    // 万一将来有人只改了正则没改表，取不到类别就按残留处理（fail-closed）。
+    const expected = LOOSE_LABEL_CATEGORY.get(match[0])
+    if (expected === undefined) return true
     const suffixStart = matchStart + match[0].length
     const separated = execAt(FIELD_VALUE_SEPARATOR_AT, text, suffixStart)
     const valueStart = separated?.index === suffixStart ? suffixStart + separated[0].length : suffixStart
@@ -453,23 +594,28 @@ function hasResidualLooseValueLabel(text: string, checkTail = true, checkMissing
       if (checkTail && !isAllowedPlaceholderTailAt(text, tail)) return true
       continue
     }
-    if (checkMissing && (text[valueStart] === '[' || /[+0-9A-Za-z._-]/u.test(text[valueStart] ?? ''))) return true
+    if (checkMissing && isResidualValueAt(text, valueStart)) return true
   }
   return false
+}
+
+/**
+ * 标签后面的这段文字算不算「没遮干净的值」。
+ *
+ * 保留原有的 fail-closed 口径：只要是 `[` 或 `[+0-9A-Za-z._-]` 就算残留 ——
+ * `银行卡 abc-def` 这类 OCR 乱码必须继续判死（见 pii-masker.test.ts 的
+ * 「fails closed when a high-confidence value survives…」）。
+ * **唯一**放宽的是数量词，理由见 QUANTITY_VALUE_AT。
+ */
+function isResidualValueAt(text: string, offset: number): boolean {
+  if (execAt(QUANTITY_VALUE_AT, text, offset)) return false
+  return text[offset] === '[' || /[+0-9A-Za-z._-]/u.test(text[offset] ?? '')
 }
 
 function sensitiveLabelCategory(label: string): MaskCategory {
   if (/^(?:姓名|乙方|劳动者)$/u.test(label)) return '劳动者'
   if (/^(?:甲方|用人单位(?:名称)?)$/u.test(label)) return '用人单位'
   return '详细地址'
-}
-
-function looseLabelCategory(label: string): MaskCategory {
-  if (/(?:身份证|证件)/u.test(label)) return '身份证'
-  if (/(?:手机|电话)/u.test(label)) return '手机号'
-  if (/邮箱/u.test(label)) return '邮箱'
-  if (/统一社会信用代码/u.test(label)) return '统一社会信用代码'
-  return '银行卡'
 }
 
 function consumePlaceholderAt(text: string, offset: number, expected: MaskCategory): number | null {

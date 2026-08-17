@@ -468,9 +468,7 @@ export class ContractReviewOrchestratorService {
     }
     if (this.now().getTime() >= deadline.getTime()) return safeError('CONTRACT_REVIEW_TIMEOUT')
     if (error instanceof ContractReviewSafeError) return error
-    if (error instanceof Error && /^CONTRACT_PROVIDER_(?:NOT_APPROVED|CONFIG_INVALID|API_KEY_INVALID|NOT_ALLOWED|INPUT_INVALID|INPUT_LIMIT|TRANSPORT_FAILED|RESPONSE_INVALID|RESPONSE_TOO_LARGE)$/u.test(error.message)) {
-      return safeError(error.message)
-    }
+    if (error instanceof Error && isPreservableStageCode(error.message)) return safeError(error.message)
     return safeError(fallback)
   }
 
@@ -480,6 +478,40 @@ export class ContractReviewOrchestratorService {
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) throw safeError('CONTRACT_REVIEW_CLOCK_INVALID')
     return new Date(value)
   }
+}
+
+/**
+ * 可以**原样保留**到 `errorCode` 的底层机器码。
+ *
+ * ── 修复前 ─────────────────────────────────────────────────────────────────
+ *
+ * 放行名单只有 `CONTRACT_PROVIDER_*` 一族。于是 PII 遮盖抛出的
+ * `CONTRACT_PII_MASK_INCOMPLETE`（裸 Error，既不是 ContractReviewSafeError，
+ * 也不带 CONTRACT_PROVIDER_ 前缀）被折叠成兜底码
+ * `CONTRACT_REVIEW_ANALYSIS_FAILED`。2026-08-17 生产上 analyze 阶段 100% 失败，
+ * 落库与接口看到的却只有那个笼统的兜底码，排查因此绕了一大圈。
+ *
+ * ── 安全性 ─────────────────────────────────────────────────────────────────
+ *
+ * 这里把 `error.message` 原样当成对外码，所以**必须**保证它不可能夹带合同正文：
+ *   - 正则整体锚定，字符集只允许 `[A-Z_]`（无数字、无小写、无中文、无冒号），
+ *     长度封顶 64 —— 合同正文不可能构成这种串；
+ *   - 前缀限定在本模块自己 `throw new Error('…')` 的固定字面量族。
+ * 形如 `CONTRACT_REVIEW_INVALID_TRANSITION:${from}:${to}` 的带参消息因为含 `:`
+ * 而落不进来，继续走兜底码。
+ *
+ * 对外文案不受影响：未登记进 contract-review-failure-reason 白名单的码
+ * 一律显示通用文案，原始码只出现在日志与 DB 的 `errorCode` 列里（运维可见）。
+ */
+const PRESERVABLE_PROVIDER_CODE =
+  /^CONTRACT_PROVIDER_(?:NOT_APPROVED|CONFIG_INVALID|API_KEY_INVALID|NOT_ALLOWED|INPUT_INVALID|INPUT_LIMIT|TRANSPORT_FAILED|RESPONSE_INVALID|RESPONSE_TOO_LARGE)$/u
+
+/** 新放行的族：遮盖、规范化文本、规则包、AI/规则/结果/事实映射。 */
+const PRESERVABLE_STAGE_CODE =
+  /^CONTRACT_(?:PII_MASK|REVIEW_(?:AI|RULE|RESULT|FACT)|CANONICAL|RULE)_[A-Z_]{1,64}$/u
+
+function isPreservableStageCode(message: string): boolean {
+  return PRESERVABLE_PROVIDER_CODE.test(message) || PRESERVABLE_STAGE_CODE.test(message)
 }
 
 class ContractReviewSafeError extends Error {

@@ -136,8 +136,15 @@ export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   resultJson: string | null
   extractionFingerprint: string | null
   confirmedAt: Date | null
-  /** 失败时服务端写入的机器码；对外经白名单转成可读文案（见 failureReason）。 */
-  errorCode?: string | null
+  /**
+   * 失败时服务端写入的机器码；对外经白名单转成可读文案（见 failureReason）。
+   *
+   * **必填**（不是 `?:`）。写成可选时，`TASK_SELECT` 里一旦漏掉 `errorCode: true`，
+   * 类型检查也不会报错 —— 失败原因就会静默退回「未说明原因」，
+   * 而这正是本类型存在的意义。配合 loadTask 去掉 `as` 断言，
+   * Prisma 的窄化 select 现在能真正把这个字段的缺失顶回来。
+   */
+  errorCode: string | null
 }
 
 export interface ContractReviewReportView {
