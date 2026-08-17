@@ -271,6 +271,24 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
 .qc-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
 .qc-x { margin-left: auto; flex: 0 0 auto; height: 26px; padding: 0 10px; font-size: var(--fz-1); letter-spacing: .02em; }
 
+/* ── 到机码核销这一条：单卡整行 ──
+   复用 .qcard 的骨架（同一页里「一行卡片」只该有一种长相），
+   只加三件事：整行铺满、右侧「进入」箭头、离线/探测失败的停用皮肤。 */
+.qrow--one { grid-template-columns: 1fr; }
+.qcard--go { border-color: var(--jade-a32); background: var(--glass-1-bg); }
+.qcard--go .qc-ic { background: var(--jade-a12); }
+.qcard--go .qc-ic .ic { color: var(--jade-500); }
+.qc-s b { color: var(--fog-800); font-weight: 600; }
+.qc-go {
+  margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fz-2); font-weight: 600; color: var(--jade-600);
+}
+.qc-go .ic { width: 18px; height: 18px; }
+/* 停用态：置灰，但「为什么停」和「码还在」必须留在卡面上（同 .hcard--off 的口径） */
+.qcard--off { background: var(--surf-1); border-color: var(--brd-1); opacity: .82; cursor: default; }
+.qcard--off .qc-ic .ic, .qcard--off .qc-t { color: var(--fog-600); }
+.qcard--off .qc-s { color: var(--fog-600); }
+
 /* ── 底部：一条常驻合规声明（隐私 + 非 CA 电子签 + 价格口径，四态与探测态都不消失） ── */
 .foot { flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-3); }
 .foot .ic { width: 17px; height: 17px; color: var(--fog-600); flex: 0 0 auto; margin-top: 2px; }
@@ -561,6 +579,50 @@ body.capture .proto-rail { display: none !important; }
       </div>
       <div class="tband-act">
         <button type="button" class="rebtn" id="probeBtn">重新检测</button>
+      </div>
+    </div>
+
+    <!-- ══════════ 手机上已经下过单的人：到机码核销 ══════════
+         为什么单独一条、不塞进下面那七张卡：
+           · 下面那一格是「这个台面能做的七件事」，说的是**在这台机器上从头办**。
+             拿着到机码来的人，选文件、设参数、核价这几步**已经在小程序里做完了**，
+             他要的不是第八件事，是一条直接认领自己那一单的路。
+           · 那块 .hgrid 是 2 列 × 4 行 = 恰好 8 格（7 张能力卡 + 1 张状态卡），
+             页内注释写明「任一组合下恰好 8 格，栅格不会错位」。塞第 9 格会让
+             栅格空一格，还要改掉全页十几处「七件事 / 七张卡 / 七项」的说法。
+         位置放在七张卡**之前**：手里有码的人不该先滚过七张用不上的卡。
+         版式沿用本页已有的 .glabel + 卡片行结构（和下面「我的打印记录」同一套）。 -->
+    <div class="glabel glabel--row">
+      <b>在手机上已经下好单了？</b>
+      <span data-when="default ai-down" data-probe-when="ok">输到机码，直接认领这一单</span>
+      <span data-when="first" data-probe-when="ok">凭码办理&nbsp;· 不登录也能核销</span>
+      <span data-when="device-off" data-probe-when="ok">这台出不了纸&nbsp;· 码没被用掉，换台机器</span>
+      <span data-probe-when="unknown">状态确认后才能核销&nbsp;· 码不会因此作废</span>
+    </div>
+    <div class="qrow qrow--one">
+      <a class="qcard qcard--go" data-when="default first ai-down" data-probe-when="ok" href="47-arrival-code.html">
+        <span class="qc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">到机码核销</span><span class="chip chip--info qc-x">不依赖 AI</span></span>
+          <span class="qc-s">小程序下单后拿到的 <b>10 位</b>到机码，扫码或手输，核销后付款出纸&nbsp;· <b>不是取件码</b></span>
+        </span>
+        <span class="qc-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+      </a>
+      <!-- 一体机离线：核销本身能做，但做完出不了纸。与其让人付完款才发现，
+           不如在入口就说清楚，并且把「码还有效」写在脸上。 -->
+      <div class="qcard qcard--off" data-when="device-off" data-probe-when="ok">
+        <span class="qc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">到机码核销</span><span class="chip chip--info qc-x">暂停&nbsp;· 这台出不了纸</span></span>
+          <span class="qc-s">核销完也拿不到纸，所以先关着。<b>你的到机码没有被用掉</b>，换一台空闲机器扫同一个码就行。</span>
+        </span>
+      </div>
+      <div class="qcard qcard--off" data-probe-when="unknown">
+        <span class="qc-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+        <span class="qc-b">
+          <span class="qc-h"><span class="qc-t">到机码核销</span><span class="chip chip--info qc-x">暂不开放&nbsp;· 服务状态无法确认</span></span>
+          <span class="qc-s">连本机能不能出纸都读不到，不敢先把你的码核销掉。<b>码不会因此作废</b>。</span>
+        </span>
       </div>
     </div>
 

@@ -73,7 +73,11 @@ export class MemberPrivacyScheduler implements OnModuleInit {
     } catch (error) {
       const message =
         `会员数据导出对账扫描调度未注册（${timeoutMs}ms 内 Redis 未响应或注册失败）。` +
-        '已过期的导出文件不会被周期性回收，需人工关注；用户主动发起的导出请求不受影响。' +
+        // 「不受影响」必须限定到本子系统自身的因果范围内：本调度缺席不阻断导出请求，
+        // 但同一次 Redis 故障会让 C 端会员登录本身不可用（见 redis 子系统），
+        // 不加这句限定就会被读成「会员导出照常可用」。
+        '已过期的导出文件不会被周期性回收，需人工关注；' +
+        '本调度缺席本身不阻断用户主动发起的导出请求（Redis 故障对 C 端会员登录的影响见 redis 子系统）。' +
         'Redis 恢复连接后本调度会自动补注册，无需重启。'
       bootReadiness.markDegraded(MEMBER_PRIVACY_SCHEDULER_SUBSYSTEM, 'EXPORT_SCHEDULER_UNAVAILABLE', message)
       this.logger.error(
