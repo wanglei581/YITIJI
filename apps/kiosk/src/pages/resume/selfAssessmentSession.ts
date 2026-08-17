@@ -25,10 +25,15 @@ export const IDLE_TIMEOUT_MS = 60_000
  *
  * 落点口径（诚实声明，UI 上不得说得比这更多）：
  *   - 版本号与勾选时刻记在本机会话（sessionStorage），用于门禁与结果页回显；
- *   - 服务端 `POST /resume/self-assessment` 当前只收 `{nonSensitive, sensitive}`
- *     两个布尔（`services/api/src/ai/self-assessment.controller.ts:70-76`），
- *     **不落版本号**。后端补 `consentVersion` 字段前，本页不得声称
- *     「同意版本已上报服务端」。
+ *   - 提交时该版本号随 `consent.consentVersion` 一起发给服务端
+ *     （`apps/kiosk/src/services/api/selfAssessment.ts` → `submitSelfAssessment`）。
+ *   - **服务端是否落库，取决于后端版本化同意是否已合入**：合入前该字段被静默忽略
+ *     （`@Body()` 是内联类型，ValidationPipe 对 `Object` metatype 不校验，
+ *     故多送字段不会 400）。在能读到回读响应的 `consentVersion` 之前，
+ *     本页不得声称「同意版本已在服务端留存」。
+ *
+ * 单一真源待办：后端合入后，本常量应改为从 `@ai-job-print/shared` import，
+ * 不再本地声明。在那之前由后端门禁断言三处声明逐字相等来防漂移。
  */
 export const SELF_ASSESSMENT_CONSENT_VERSION = 'sa-consent-v1.2026-08-16'
 

@@ -29,6 +29,7 @@ import { TerminalsService } from '../src/terminals/terminals.service'
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
+import { buildRealPdf } from './support/minimal-pdf'
 
 const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
 
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
   async function seedPdfFixture(label: string, pageCount: number): Promise<string> {
     const fileId = `f_order_${suffix}_${label}`
     const storageKey = `verify/order/${fileId}.pdf`
-    const pdfBytes = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(pageCount)}%%EOF\n`)
+    const pdfBytes = buildRealPdf(pageCount)
     await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {

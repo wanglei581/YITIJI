@@ -87,7 +87,10 @@ const CAPABILITIES: PolicyCapability[] = [
     goColor: 'text-wheat',
     title: '补贴指引',
     description: '就业补贴、失业保险、创业扶持政策说明与来源链接',
-    to: '/renshi?tab=subsidy',
+    // `/renshi` 只认 policy|social|register|notice 四个 tab（`renshi/shared.ts`）。
+    // 原来写的 `?tab=subsidy` 不在白名单里，会被静默丢弃回落到 policy ——
+    // 传了不用比不传更糟：它让人以为存在一个补贴 tab。补贴内容本来就在政策 tab 里。
+    to: '/renshi',
   },
   {
     key: 'ai-assistant',
@@ -98,8 +101,9 @@ const CAPABILITIES: PolicyCapability[] = [
     goColor: 'text-primary-700',
     title: 'AI政策助手',
     description: '提问政策疑问、补贴资格、办事材料，AI顾问给出个性化解答',
+    // 不传 `state.topic`：`/assistant` 从头到尾没有读过 location.state
+    // （它认的是 `?intent=`，取值须是 advisorScenes 里的 skill id，'policy' 不是）。
     to: '/assistant',
-    state: { topic: 'policy' },
   },
   {
     key: 'policy-fav',
@@ -110,8 +114,9 @@ const CAPABILITIES: PolicyCapability[] = [
     goColor: 'text-plum',
     title: '政策收藏',
     description: '查看已收藏的政策文章与AI问答记录，方便随时回顾',
+    // 不传 `state.type`：`/me/ai-records` 没有按类型筛选的能力（该页连
+    // react-router 都没 import）。留着它会让人以为这个入口已经带了筛选。
     to: '/me/ai-records',
-    state: { type: 'policy' },
   },
 ]
 

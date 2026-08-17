@@ -95,6 +95,12 @@ export function LoginPage() {
   useRipple(rootRef)
 
   const fromState = (location.state as { from?: unknown } | null)?.from
+  // 换绑手机号后旧会话被踢出，跳回登录页时带着这句提示（`MySettingsPage` 的
+  // `handleRebindDone`）。以前没人读它，用户被登出却看不到任何解释。
+  // 只认本站自己写进 state 的字符串，不从 query 取：query 可被外部构造，
+  // 会变成一个能在登录页显示任意文案的注入点。
+  const hintState = (location.state as { hint?: unknown } | null)?.hint
+  const hint = typeof hintState === 'string' && hintState.trim() !== '' ? hintState.trim() : null
   const queryFrom = new URLSearchParams(location.search).get('from')
   const safeQueryFrom = typeof queryFrom === 'string' && isSafeInternalPath(queryFrom) ? queryFrom : null
   const returnTo =
@@ -229,6 +235,12 @@ export function LoginPage() {
                 <p>手机号验证码或手机扫码，全程不超过 3 步</p>
               </div>
             </div>
+
+            {hint ? (
+              <p className="k-login-hint" role="status">
+                {hint}
+              </p>
+            ) : null}
 
             <div className="k-tabs">
               <button

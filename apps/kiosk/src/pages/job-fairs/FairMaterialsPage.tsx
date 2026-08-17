@@ -8,6 +8,7 @@ import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { BriefcaseIcon, CalendarIcon, FileTextIcon, MapIcon, MapPinIcon, NewspaperIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById, prepareFairMaterialPrint } from '../../services/api'
+import { DEMO_MODE_NO_REAL_FILE_REASON } from '../../lib/capabilityReasons'
 import { API_MODE } from '../../services/api/client'
 import { FusionBadge, FusionNotice, FusionSectionHead, FusionSourceMeta, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
 
@@ -173,15 +174,25 @@ export function FairMaterialsPage() {
                     </div>
                   </div>
                   {mat.allowPrint ? (
-                    <button
-                      type="button"
-                      className="jf-btn sm ghost flex-none self-center"
-                      disabled={!canPrint}
-                      title={API_MODE !== 'http' ? '演示模式未生成真实招聘会资料文件，暂不可打印' : undefined}
-                      onClick={() => handlePrint(mat)}
-                    >
-                      {printLabel}
-                    </button>
+                    <div className="flex-none self-center text-right">
+                      {/* printingId 是瞬时态（保留原生 disabled）；演示模式没有后端是能力门禁，
+                          改 aria-disabled + 常显原因 —— 原来只写在 title 里，触屏读不到。 */}
+                      <button
+                        type="button"
+                        className="jf-btn sm ghost"
+                        disabled={printingId !== null}
+                        aria-disabled={API_MODE !== 'http' || undefined}
+                        aria-describedby={API_MODE !== 'http' ? `fair-material-blocked-${mat.id}` : undefined}
+                        onClick={() => { if (canPrint) handlePrint(mat) }}
+                      >
+                        {printLabel}
+                      </button>
+                      {API_MODE !== 'http' ? (
+                        <span id={`fair-material-blocked-${mat.id}`} className="jf-blocked-reason">
+                          {DEMO_MODE_NO_REAL_FILE_REASON}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="flex-none self-center text-[18px] text-[var(--muted)]">
                       该资料暂不开放打印
