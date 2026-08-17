@@ -1,42 +1,53 @@
-<view class="vip-wrap">
-  <view class="vip-nav">
+<view class="page-wrap">
+  <view class="navbar col">
     <view style="height:{{statusBarHeight}}px"></view>
-    <view class="vip-nav-inner">
-      <view class="vip-back tap" hover-class="tap-press" bindtap="back">
-        <text class="ficon i-right vip-back-ic"></text>
-      </view>
-      <view class="vip-nav-title">我的权益</view>
-      <view class="vip-nav-right"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+      <view class="nav-title">我的权益</view>
+      <view class="nav-right"></view>
     </view>
   </view>
 
-  <view class="vip-body">
-    <view class="vcard">
-      <view class="vc-top"><view class="vc-badge">本人权益</view></view>
-      <view class="vc-name serif">以服务端实际发放记录为准</view>
-      <view class="vc-sub">本页不展示未配置的套餐、折扣或会员承诺</view>
+  <view class="content benefit-content">
+    <view class="benefit-hero">
+      <view class="bh-icon"><text class="ficon i-crown"></text></view>
+      <view class="bh-copy">
+        <view class="bh-badge">本人真实权益</view>
+        <view class="bh-title">已发放的服务权益</view>
+        <view class="bh-sub">所有数量、状态与有效期均来自服务端记录</view>
+      </view>
     </view>
 
-    <view class="sec-t-dark">权益记录</view>
+    <view class="section-head">
+      <view class="section-title">权益记录</view>
+      <view class="section-sub">未配置的套餐和折扣不会在这里展示</view>
+    </view>
     <view class="ben-grid" wx:if="{{loading}}">
-      <view class="ben-cell"><view class="ben-t">正在加载…</view></view>
+      <view class="ben-cell state-cell"><view class="ben-t">正在加载权益记录</view></view>
     </view>
     <view class="ben-grid" wx:elif="{{loadError}}">
-      <view class="ben-cell tap" bindtap="loadBenefits">
+      <view class="ben-cell state-cell tap" bindtap="loadBenefits">
         <view class="ben-t">加载失败，点此重试</view>
         <view class="ben-s">{{loadError}}</view>
       </view>
     </view>
     <view class="ben-grid" wx:elif="{{benefits.length}}">
       <view class="ben-cell" wx:for="{{benefits}}" wx:key="id">
+        <view class="ben-top">
+          <view class="ben-ic"><text class="ficon i-crown"></text></view>
+          <view class="ben-status">{{item.status}}</view>
+        </view>
         <view class="ben-t">{{item.title}}</view>
         <view class="ben-s">{{item.description}}</view>
-        <view class="ben-s">{{item.quantity}} · {{item.status}}</view>
-        <view class="ben-s">{{item.validText}}</view>
+        <view class="ben-meta">
+          <view class="ben-qty">{{item.quantity}}</view>
+          <view class="ben-valid">{{item.validText}}</view>
+        </view>
       </view>
     </view>
     <view class="ben-grid" wx:else>
-      <view class="ben-cell">
+      <view class="ben-cell state-cell">
+        <view class="ben-empty-icon"><text class="ficon i-inbox"></text></view>
         <view class="ben-t">暂无可展示权益</view>
         <view class="ben-s">活动或服务发放后会显示在这里</view>
       </view>

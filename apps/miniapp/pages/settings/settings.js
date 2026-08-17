@@ -5,15 +5,25 @@ const auth = require('../../utils/auth')
 Page({
   data: {
     statusBarHeight: 20,
+    isLoggedIn: false,
     phoneMasked: '未绑定',
     loggingOut: false,
   },
 
   onLoad() {
-    const user = auth.getUser() || {}
+    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20 })
+    this.refreshSessionState()
+  },
+
+  onShow() { this.refreshSessionState() },
+
+  refreshSessionState() {
+    const isLoggedIn = auth.isLoggedIn()
+    const user = isLoggedIn ? (auth.getUser() || {}) : {}
     this.setData({
-      statusBarHeight: app.globalData.statusBarHeight || 20,
+      isLoggedIn,
       phoneMasked: user.phoneMasked || '未绑定',
+      loggingOut: false,
     })
   },
 
@@ -21,10 +31,12 @@ Page({
   toPrivacy() { wx.navigateTo({ url: '/pages/privacy/privacy' }) },
   toHelp() { wx.navigateTo({ url: '/pages/help/help' }) },
   toAbout() { wx.navigateTo({ url: '/pages/about/about' }) },
+  toLogin() { wx.navigateTo({ url: '/pages/launch/launch' }) },
   toNotifications() { wx.navigateTo({ url: '/pages/notifications/notifications' }) },
   toDocuments() { wx.navigateTo({ url: '/pages/documents/documents' }) },
 
   logout() {
+    if (!this.data.isLoggedIn) { this.toLogin(); return }
     if (this.data.loggingOut) return
     wx.showModal({
       title: '退出登录',
@@ -42,7 +54,7 @@ Page({
   },
 
   finishLogout(message) {
-    auth.clearSession()
+    auth.logout()
     wx.showToast({ title: message, icon: 'none', duration: 1000 })
     setTimeout(() => wx.reLaunch({ url: '/pages/home/home' }), 250)
   },

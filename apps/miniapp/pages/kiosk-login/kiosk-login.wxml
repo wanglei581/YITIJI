@@ -4,7 +4,7 @@
 
   <view class="navbar">
     <view class="nav-back tap" hover-class="tap-press" bindtap="goBack">
-      <view class="ficon i-right"></view>
+      <text class="ficon i-right"></text>
     </view>
     <view class="nav-title">扫码登录一体机</view>
   </view>
@@ -14,7 +14,7 @@
     <!-- 未登录：引导先登录 -->
     <block wx:if="{{!isLoggedIn}}">
       <view class="state-card">
-        <view class="sc-icon ficon i-user"></view>
+        <text class="sc-icon ficon i-user"></text>
         <view class="sc-title">请先登录小程序</view>
         <view class="sc-desc">扫码登录一体机需要您先完成账号登录</view>
         <button class="btn-primary" bindtap="goLogin">去登录</button>
@@ -24,7 +24,7 @@
     <!-- 已登录 + 空闲：引导扫码 -->
     <block wx:elif="{{isLoggedIn && (phase === 'idle')}}">
       <view class="guide-card">
-        <view class="guide-icon ficon i-printer"></view>
+        <text class="guide-icon ficon i-printer"></text>
         <view class="guide-title">扫描一体机二维码</view>
         <view class="steps">
           <view class="step">
@@ -41,7 +41,7 @@
           </view>
         </view>
         <button class="btn-scan tap rise" hover-class="tap-press" bindtap="scanCode">
-          <view class="ficon i-scan"></view>
+          <text class="ficon i-scan"></text>
           <text>扫描二维码</text>
         </button>
       </view>
@@ -59,7 +59,7 @@
     <!-- 成功 -->
     <block wx:elif="{{phase === 'success'}}">
       <view class="state-card success">
-        <view class="sc-icon sc-symbol">✓</view>
+        <view class="sc-icon sc-symbol"><text class="ficon i-check"></text></view>
         <view class="sc-title">登录成功</view>
         <view class="sc-desc">已在「{{deviceLabel}}」上完成登录，可在终端继续操作</view>
         <button class="btn-secondary" bindtap="retry">再次扫码</button>
@@ -69,7 +69,7 @@
     <!-- 失败 -->
     <block wx:elif="{{phase === 'error'}}">
       <view class="state-card error">
-        <view class="sc-icon sc-symbol">!</view>
+        <view class="sc-icon sc-symbol"><text class="ficon i-warning"></text></view>
         <view class="sc-title">登录失败</view>
         <view class="sc-desc">{{errorMsg}}</view>
         <button class="btn-primary" bindtap="retry">重新扫码</button>

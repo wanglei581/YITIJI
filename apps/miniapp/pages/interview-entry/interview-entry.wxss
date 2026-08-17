@@ -1,8 +1,8 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
 /* 表单 */
-.field-group { background: var(--surface); border-radius: 14rpx; overflow: hidden;
-  margin-top: 4rpx; }
+.field-group { background: var(--surface); border: 1rpx solid var(--line-soft);
+  border-radius: 26rpx; overflow: hidden; margin-top: 4rpx; }
 .field-item { display: flex; align-items: center; padding: 22rpx 24rpx;
   border-bottom: 1rpx solid var(--line); }
 .field-item:last-child { border-bottom: none; }
@@ -16,10 +16,10 @@
 .option-group { margin-top: 16rpx; }
 .og-label { font-size: 26rpx; color: var(--muted); margin-bottom: 12rpx; }
 .og-chips { display: flex; flex-wrap: wrap; gap: 16rpx; }
-.opt-chip { padding: 12rpx 28rpx; border-radius: 40rpx; border: 2rpx solid var(--line);
+.opt-chip { min-height: 70rpx; padding: 0 28rpx; border-radius: 22rpx; border: 2rpx solid var(--line);
   font-size: 26rpx; color: var(--ink); background: var(--surface); }
 .opt-chip.active { border-color: var(--teal); color: var(--teal);
-  background: rgba(31,158,134,.08); }
+  background: var(--teal-soft); }
 
 /* full-width btn */
 .w-full { width: 100%; }

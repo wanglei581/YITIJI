@@ -4,7 +4,6 @@
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">招聘会详情</view>
-    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
   </view>
 
   <view class="content has-bar">
@@ -21,53 +20,78 @@
 
     <!-- 详情内容 -->
     <block wx:else>
-    <!-- Hero banner -->
     <view class="fair-hero rise-d1">
-      <view class="fh-badge {{fair.status}}">{{fair.statusText}}</view>
-      <view class="fh-title">{{fair.name}}</view>
-      <view class="fh-org">主办：{{fair.host}}</view>
+      <view class="fh-top">
+        <view wx:if="{{fair.tag}}" class="fh-badge {{fair.tagTone}}">{{fair.tag}}</view>
+        <view class="fh-icon"><text class="ficon i-calendar"></text></view>
+      </view>
+      <view class="fh-title">{{fair.title || '招聘会详情'}}</view>
+      <view class="fh-org">{{fair.organizer ? '主办：' + fair.organizer : (fair.sourceOrg ? '来源：' + fair.sourceOrg : '主办方未标注')}}</view>
     </view>
 
-    <!-- 关键信息四格 -->
+    <view class="section-head rise-d2">
+      <view class="section-title">活动信息</view>
+      <view class="section-sub">时间、地点与公开规模</view>
+    </view>
     <view class="info-grid rise-d2">
-      <view class="ig-cell">
-        <view class="ig-label">时间</view>
-        <view class="ig-val">{{fair.date}}</view>
+      <view wx:if="{{fair.startTime}}" class="ig-cell wide">
+        <view class="ig-icon"><text class="ficon i-calendar"></text></view>
+        <view class="ig-copy">
+          <view class="ig-label">开始时间</view>
+          <view class="ig-val">{{fair.startTime}}</view>
+          <view wx:if="{{fair.endTime}}" class="ig-sub">结束：{{fair.endTime}}</view>
+        </view>
       </view>
-      <view class="ig-cell">
-        <view class="ig-label">形式</view>
-        <view class="ig-val">{{fair.format}}</view>
+      <view wx:if="{{fair.venue || fair.city}}" class="ig-cell wide">
+        <view class="ig-icon"><text class="ficon i-location"></text></view>
+        <view class="ig-copy">
+          <view class="ig-label">举办地点</view>
+          <view class="ig-val">{{fair.venue || fair.city}}</view>
+          <view wx:if="{{fair.venue && fair.city}}" class="ig-sub">{{fair.city}}</view>
+        </view>
       </view>
-      <view class="ig-cell">
-        <view class="ig-label">参会单位</view>
-        <view class="ig-val">{{fair.companyCount}} 家</view>
+      <view wx:if="{{fair.boothCount !== undefined && fair.boothCount !== null}}" class="ig-cell metric">
+        <view class="ig-num">{{fair.boothCount}}</view>
+        <view class="ig-label">公开展位数</view>
       </view>
-      <view class="ig-cell">
-        <view class="ig-label">面向对象</view>
-        <view class="ig-val">{{fair.target}}</view>
+      <view wx:if="{{fair.jobCount !== undefined && fair.jobCount !== null}}" class="ig-cell metric">
+        <view class="ig-num">{{fair.jobCount}}</view>
+        <view class="ig-label">公开岗位数</view>
+      </view>
+      <view wx:if="{{fair.expectedAttendance !== undefined && fair.expectedAttendance !== null}}" class="ig-cell metric">
+        <view class="ig-num">{{fair.expectedAttendance}}</view>
+        <view class="ig-label">预计参与人数</view>
       </view>
     </view>
 
-    <!-- 来源信息 -->
-    <view class="info-card rise-d3">
-      <view class="ic-title">来源信息</view>
-      <view class="ic-row"><text class="ic-k">来源机构</text><text class="ic-v">{{fair.sourceOrg}}</text></view>
-      <view class="ic-row"><text class="ic-k">外部 ID</text><text class="ic-v mono">{{fair.externalId}}</text></view>
-      <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{fair.syncTime}}</text></view>
+    <view wx:if="{{fair.description}}" class="detail-card rise-d3">
+      <view class="dc-icon"><text class="ficon i-file-text"></text></view>
+      <view class="dc-body">
+        <view class="dc-title">活动介绍</view>
+        <view class="dc-text">{{fair.description}}</view>
+      </view>
     </view>
 
-    <!-- 活动介绍 -->
-    <view class="section-t rise-d3">活动介绍</view>
-    <view class="body-text rise-d3">{{fair.intro}}</view>
-
-    <!-- 展位预览 -->
-    <view class="section-t rise-d4">展位信息</view>
-    <view class="booth-list rise-d4">
-      <view class="booth-item" wx:for="{{fair.booths}}" wx:key="pos">
-        <view class="bi-zone {{item.zone}}">{{item.zoneLabel}}</view>
-        <view class="bi-name">{{item.company}}</view>
-        <view class="bi-pos">{{item.boothNo}}</view>
+    <view wx:if="{{fair.trafficInfo}}" class="detail-card rise-d4">
+      <view class="dc-icon slate"><text class="ficon i-compass"></text></view>
+      <view class="dc-body">
+        <view class="dc-title">交通信息</view>
+        <view class="dc-text">{{fair.trafficInfo}}</view>
       </view>
+    </view>
+
+    <view class="source-card rise-d4">
+      <view class="source-head">
+        <view class="source-icon"><text class="ficon i-link"></text></view>
+        <view>
+          <view class="source-title">来源信息</view>
+          <view class="source-sub">保留来源与同步记录，方便核验</view>
+        </view>
+      </view>
+      <view class="ic-row"><text class="ic-k">来源机构</text><text class="ic-v">{{fair.sourceOrg || '未标注'}}</text></view>
+      <view wx:if="{{fair.externalId}}" class="ic-row"><text class="ic-k">外部 ID</text><text class="ic-v mono">{{fair.externalId}}</text></view>
+      <view wx:if="{{fair.syncTime}}" class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{fair.syncTime}}</text></view>
+      <view wx:if="{{fair.dataSourceNote}}" class="source-note">{{fair.dataSourceNote}}</view>
     </view>
 
     <!-- 合规提示 -->
@@ -80,8 +104,22 @@
 
   </view>
 
+  <!-- 收藏原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+       自定义导航栏右侧永远不可用。移到底部操作条，与「提醒我」「复制来源链接」并列。 -->
   <view class="actionbar">
-    <view class="btn primary block tap" bindtap="tapExternalBook">复制来源链接</view>
+    <view class="fav-btn tap {{faved ? 'on' : ''}}" hover-class="tap-press" bindtap="tapFav"
+          role="button" aria-label="{{faved ? '取消收藏这场招聘会' : '收藏这场招聘会'}}">
+      <text class="ficon i-inbox"></text>
+      <text class="fav-btn-t">{{faved ? '已收藏' : '收藏'}}</text>
+    </view>
+    <view class="btn remind-btn tap {{reminded ? 'on' : ''}}" hover-class="tap-press" bindtap="tapRemind"
+          role="button" aria-label="{{reminded ? '已设置开场提醒，点击取消' : '设置开场提醒'}}">
+      <text class="ficon i-bell remind-ic"></text>
+      <text>{{reminded ? '已提醒' : '提醒我'}}</text>
+    </view>
+    <view class="btn primary tap {{fair.externalUrl ? '' : 'disabled'}} flex-1-4" bindtap="tapExternalBook">
+      {{fair.externalUrl ? '复制来源链接' : '来源链接暂不可用'}}
+    </view>
   </view>
 
 </view>

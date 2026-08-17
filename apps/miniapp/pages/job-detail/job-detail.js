@@ -19,22 +19,31 @@ Page({
   onLoad(opts) {
     const { statusBarHeight } = app.globalData;
     const id = (opts && opts.id) || '';
-    // 提前用本机收藏初始化 faved,避免加载期间图标先显未收藏再闪成已收藏
+    // 先用同步的保守值渲染（本机收藏或已热的服务端缓存），再由 _syncFaved 用账号
+    // 数据纠正。同步值只会「少显示已收藏」，不会凭空显示成已收藏。
     this.setData({ statusBarHeight: statusBarHeight || 20, pageId: id, faved: favorites.isFaved('job', id) });
+    this._syncFaved();
     this.loadDetail(id);
   },
 
   onShow() {
     // navigateBack 只触发 onShow 不触发 onLoad;从收藏页取消后返回需重新同步 faved
-    if (this.data.pageId && !this.data.loading && !this.data.loadError) {
-      this.setData({ faved: favorites.isFaved('job', this.data.pageId) });
-    }
+    this._syncFaved();
+  },
+
+  // 以账号为准回填收藏状态。读取失败时保留当前值——宁可显示旧状态，也不谎报"未收藏"。
+  _syncFaved() {
+    const id = this.data.pageId;
+    if (!id) return;
+    favorites.resolveFaved('job', id)
+      .then((faved) => { if (this.data.pageId === id) this.setData({ faved }); })
+      .catch(() => {});
   },
 
   loadDetail(id) {
     this.setData({ loading: true, loadError: '' });
     api.getJobDetail(id).then((job) => {
-      this.setData({ job, loading: false, faved: favorites.isFaved('job', id) });
+      this.setData({ job, loading: false });
       // 真实拿到内容后才记录浏览，不记录 loading/错误态的空对象。
       history.recordView('job', { id, title: job.title, source: job.sourceOrg });
     }).catch((err) => {
@@ -58,7 +67,9 @@ Page({
       wx.showToast({ title: '内容加载后可收藏', icon: 'none' });
       return;
     }
-    // 只存列表渲染所需展示字段(§10 允许记录本人「收藏」;不涉及投递结果)
+    if (this._favBusy) return;
+    // 只存列表渲染所需展示字段(§10 允许记录本人「收藏」;不涉及投递结果)。
+    // 登录态下这些字段只用于未登录降级视图——服务端收藏只保存 targetId + 标题快照。
     const item = {
       id,
       initial: (j.title || '岗').slice(0, 1),
@@ -69,9 +80,17 @@ Page({
       tagTone: '',
       tone: 'teal',
     };
-    const faved = favorites.toggle('job', item);
-    this.setData({ faved });
-    wx.showToast({ title: faved ? '已收藏' : '已取消收藏', icon: 'none', duration: 1400 });
+    this._favBusy = true;
+    favorites.toggle('job', item).then((res) => {
+      this._favBusy = false;
+      this.setData({ faved: res.faved });
+      const title = res.hint || (res.faved ? '已收藏' : '已取消收藏');
+      wx.showToast({ title, icon: 'none', duration: res.hint ? 1800 : 1400 });
+    }).catch((err) => {
+      // 服务端写入失败就保持原状态，不假装收藏成功
+      this._favBusy = false;
+      wx.showToast({ title: (err && err.message) || '收藏失败，请稍后重试', icon: 'none', duration: 1800 });
+    });
   },
 
   // 必须带上真实 jobId,否则 job-fit 只能退化成手填岗位,拿不到来源信息

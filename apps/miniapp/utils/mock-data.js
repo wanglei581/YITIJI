@@ -37,12 +37,12 @@ const JOBS = {
 // ---------- 招聘会 ----------
 const FAIRS = {
   f1: {
-    id: 'f1', emoji: '🎪', live: true, status: 'active', statusLabel: '进行中',
+    id: 'f1', icon: 'calendar', live: true, status: 'active', statusLabel: '进行中',
     title: '2026 春季高校毕业生现场招聘会', org: '市人力资源和社会保障局',
     time: '2026-03-28 09:00–16:00', format: '线下（现场招聘）', companyCount: '186 家',
     targetGroup: '应届生 / 社会人才', sourceOrg: '市人社局', externalId: 'FAIR-2026-0f1',
     syncTime: '2026-07-24 08:00',
-    metaLines: ['🗓 3月28日 09:00–16:00', '📍 市人力资源市场 · A馆', '🏢 186 家参会单位'],
+    metaLines: ['3月28日 09:00–16:00', '市人力资源市场 · A馆', '186 家参会单位'],
     source: '市人社局', sync: '同步 2h 前', tag: '现场', tagTone: 'wheat', bannerStyle: '',
     intro: '本次招聘会汇聚制造业、科技、服务等各类企业,现场提供就业咨询、简历打印等配套服务。',
     booths: [
@@ -54,25 +54,25 @@ const FAIRS = {
     externalUrl: 'https://example.com/fair/f1',
   },
   f2: {
-    id: 'f2', emoji: '💻', live: false, status: 'upcoming', statusLabel: '即将开始',
+    id: 'f2', icon: 'calendar', live: false, status: 'upcoming', statusLabel: '即将开始',
     title: '互联网 & 科技行业线上双选会', org: '智联招聘',
     time: '2026-04-02 – 2026-04-05', format: '线上（视频面试）', companyCount: '92 家',
     targetGroup: '应届生 / 社会人才', sourceOrg: '智联招聘', externalId: 'FAIR-2026-0f2',
     syncTime: '2026-07-23 08:00',
-    metaLines: ['🗓 4月2日 – 4月5日', '🌐 线上举办 · 视频面试', '🏢 92 家企业'],
+    metaLines: ['4月2日 – 4月5日', '线上举办 · 视频面试', '92 家企业'],
     source: '智联招聘', sync: '同步 1天前', tag: '即将开始', tagTone: '',
-    bannerStyle: 'background:linear-gradient(135deg,var(--slate-soft),var(--slate-wash))',
+    bannerStyle: '',
     intro: '面向互联网与科技行业的线上双选会,支持在线投递与视频面试(在来源平台完成)。',
     booths: [],
     externalUrl: 'https://example.com/fair/f2',
   },
   f3: {
-    id: 'f3', emoji: '🏛️', live: false, status: 'upcoming', statusLabel: '即将开始',
+    id: 'f3', icon: 'calendar', live: false, status: 'upcoming', statusLabel: '即将开始',
     title: '先进制造业专场招聘会', org: '经开区管委会',
     time: '2026-04-10 09:30–15:00', format: '线下（现场招聘）', companyCount: '—',
     targetGroup: '制造业技能人才', sourceOrg: '经开区管委会', externalId: 'FAIR-2026-0f3',
     syncTime: '2026-07-21 08:00',
-    metaLines: ['🗓 4月10日 09:30–15:00', '📍 经开区人才服务中心'],
+    metaLines: ['4月10日 09:30–15:00', '经开区人才服务中心'],
     source: '经开区管委会', sync: '同步 3天前', tag: '即将开始', tagTone: '', bannerStyle: '',
     intro: '聚焦先进制造业的专场招聘会,现场提供岗位咨询与政策解读。',
     booths: [],
@@ -83,7 +83,7 @@ const FAIRS = {
 // ---------- 企业 ----------
 const COMPANIES = {
   c1: {
-    id: 'c1', emoji: '🎨', name: '杭州创意未来网络科技有限公司',
+    id: 'c1', icon: 'form', name: '杭州创意未来网络科技有限公司',
     metaParts: ['互联网', '·', '100–500人', '·', '杭州·西湖区'],
     listMeta: '互联网 · 100–500人 · A轮', jobCount: 8,
     tags: [
@@ -104,7 +104,7 @@ const COMPANIES = {
     ],
   },
   c2: {
-    id: 'c2', emoji: '🏦', name: '招商银行股份有限公司',
+    id: 'c2', icon: 'bank', name: '招商银行股份有限公司',
     metaParts: ['金融/银行', '·', '10000人以上', '·', '上市'],
     listMeta: '金融/银行 · 10000人以上 · 上市', jobCount: 23,
     tags: [{ text: '国有控股', tone: 'wheat' }, { text: '零售银行', tone: '' }],
@@ -113,7 +113,7 @@ const COMPANIES = {
     jobs: [{ id: 'j2', title: '客户经理', meta: '深圳 · 3–5年', salary: '面议' }],
   },
   c3: {
-    id: 'c3', emoji: '🏭', name: '比亚迪汽车工业有限公司',
+    id: 'c3', icon: 'setting', name: '比亚迪汽车工业有限公司',
     metaParts: ['制造/汽车', '·', '10000人以上', '·', '上市'],
     listMeta: '制造/汽车 · 10000人以上 · 上市', jobCount: 61,
     tags: [{ text: '新能源汽车', tone: '' }, { text: '应届友好', tone: 'teal' }],
@@ -122,7 +122,7 @@ const COMPANIES = {
     jobs: [{ id: 'j1', title: '嵌入式工程师', meta: '深圳 · 1–3年', salary: '12–20K' }],
   },
   c4: {
-    id: 'c4', emoji: '📚', name: '好未来教育科技集团',
+    id: 'c4', icon: 'solution', name: '好未来教育科技集团',
     metaParts: ['教育科技', '·', '1000–5000人', '·', '上市'],
     listMeta: '教育科技 · 1000–5000人 · 上市', jobCount: 15,
     tags: [{ text: 'K12教育', tone: 'plum' }, { text: '在线学习', tone: '' }],
@@ -131,7 +131,7 @@ const COMPANIES = {
     jobs: [{ id: 'j3', title: '课程运营', meta: '北京 · 应届可', salary: '8–12K' }],
   },
   c5: {
-    id: 'c5', emoji: '🏥', name: '丁香园医疗健康平台',
+    id: 'c5', icon: 'info', name: '丁香园医疗健康平台',
     metaParts: ['医疗/健康', '·', '500–1000人', '·', 'D轮'],
     listMeta: '医疗/健康 · 500–1000人 · D轮', jobCount: 9,
     tags: [{ text: '医疗互联网', tone: 'teal' }, { text: '六险一金', tone: '' }],
@@ -196,4 +196,3 @@ module.exports = {
   companyById: (id) => COMPANIES[id] || null,
   policyById: (id) => POLICIES[id] || null,
 };
-

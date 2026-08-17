@@ -1,0 +1,100 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  
+  <view class="navbar col">
+    <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <text class="nav-title">到机码</text>
+  </view>
+
+  <scroll-view class="code-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="code-body">
+      <!-- 成功提示 -->
+      <view class="success-banner">
+        <view class="success-icon"><text class="ficon i-check"></text></view>
+        <view class="success-copy">
+          <text class="success-title">材料包创建成功</text>
+          <text class="success-desc">请到服务点扫码取件</text>
+        </view>
+      </view>
+
+      <!-- 二维码 -->
+      <view class="qr-card">
+        <view class="qr-box">
+          <view class="qr-placeholder">
+            <view class="qr-icon"><text class="ficon i-scan"></text>
+            <text class="qr-text">二维码</text>
+          </view>
+        </view>
+        <text class="qr-hint">请在一体机上扫描此码</text>
+      </view>
+      </view>
+
+      <!-- 数字码 -->
+      <view class="digital-code tap" hover-class="tap-press" bindtap="copyCode" role="button" aria-label="复制到机码">
+        <text class="code-label">到机码</text>
+        <text class="pickup-code big">{{pickupCode}}</text>
+        <text class="code-hint">也可以在一体机上手动输入</text>
+      </view>
+
+      <!-- 订单信息 -->
+      <view class="section-t">订单信息</view>
+      <view class="card flat">
+        <view class="card-inner">
+          <view class="info-row tap" hover-class="tap-press" bindtap="copyOrderId">
+            <text class="info-label">订单编号</text>
+            <text class="info-val">{{orderId}}</text>
+          </view>
+          <view class="divider"></view>
+          <view class="info-row">
+            <text class="info-label">文件数量</text>
+            <text class="info-val">{{fileCount}} 个</text>
+          </view>
+          <view class="divider"></view>
+          <view class="info-row">
+            <text class="info-label">服务点</text>
+            <text class="info-val">{{storeName}}</text>
+          </view>
+          <view class="divider"></view>
+          <view class="info-row">
+            <text class="info-label">有效期</text>
+            <text class="info-val">{{expireTime}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 使用说明 -->
+      <view class="section-t">使用说明</view>
+      <view class="card flat">
+        <view class="card-inner">
+          <view class="step-list">
+            <view class="step-item">
+              <view class="step-num">1</view>
+              <text class="step-text">前往选择的服务点</text>
+            </view>
+            <view class="step-item">
+              <view class="step-num">2</view>
+              <text class="step-text">在一体机上扫描二维码或输入到机码</text>
+            </view>
+            <view class="step-item">
+              <view class="step-num">3</view>
+              <text class="step-text">确认打印参数后开始打印</text>
+            </view>
+            <view class="step-item">
+              <view class="step-num">4</view>
+              <text class="step-text">取走打印好的材料</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="spacer-lg"></view>
+    </view>
+  </scroll-view>
+
+  <view class="actionbar">
+    <view class="btn ghost tap" hover-class="tap-press" bindtap="viewOrder" role="button" aria-label="查看订单详情">查看订单</view>
+    <view class="btn primary tap" hover-class="tap-press" bindtap="goHome" role="button" aria-label="返回首页">返回首页</view>
+  </view>
+</view>

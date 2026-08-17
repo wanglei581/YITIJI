@@ -1,5 +1,47 @@
-/* WeChat 已把自定义 tabBar 放进底部固定容器，组件内改为静态定位 */
 .tabbar {
   position: static;
   width: 100%;
+  min-height: 116rpx;
+  padding: 14rpx 8rpx calc(16rpx + env(safe-area-inset-bottom));
+  border-radius: 0;
+  border-top: 1rpx solid #edf1f6;
+  box-shadow: 0 -8rpx 24rpx rgba(31, 50, 77, .035);
+  background: #fff;
+}
+
+.tabbar .tab {
+  gap: 5rpx;
+  min-height: 96rpx;
+  padding-top: 0;
+}
+
+.tabbar .tab .tb {
+  width: 72rpx;
+  height: 48rpx;
+}
+
+.tabbar .tab .ti {
+  width: 42rpx;
+  height: 42rpx;
+  color: #8d98a9;
+}
+
+.tabbar .tab .tl {
+  color: #667085;
+  font-size: 22rpx;
+  line-height: 1.2;
+}
+
+.tabbar .tab.on .tb {
+  background: #eaf2ff;
+  transform: none;
+}
+
+.tabbar .tab.on .ti,
+.tabbar .tab.on .tl {
+  color: var(--teal);
+}
+
+.tabbar .tab.on .tl {
+  font-weight: 650;
 }

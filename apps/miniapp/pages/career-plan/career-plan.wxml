@@ -16,13 +16,15 @@
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有可用的简历</view>
     <view class="rs-sub">职业规划完全基于你的简历原文生成,需要先上传并解析一份简历</view>
-    <view class="cp-cta tap" bindtap="tapUpload">去上传简历 ›</view>
+    <view class="cp-cta tap" bindtap="tapUpload">
+      <text>去上传简历</text><text class="ficon i-right cp-cta-arrow"></text>
+    </view>
   </view>
 
   <view wx:elif="{{phase === 'history-loading'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
-      <view class="ficon i-history rs-ic"></view>
+      <text class="ficon i-history rs-ic"></text>
     </view>
     <view class="rs-title">正在读取历史职业规划…</view>
     <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
@@ -42,7 +44,7 @@
       </view>
     </view>
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>只输出方向与行动建议,不预测薪资,也不提供录用或面试通过率。</text>
     </view>
     <view class="cp-act"><view class="btn primary block tap" bindtap="tapGenerate">生成规划建议</view></view>
@@ -52,7 +54,7 @@
   <view wx:elif="{{phase === 'running'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
-      <view class="ficon i-compass rs-ic"></view>
+      <text class="ficon i-compass rs-ic"></text>
     </view>
     <view class="rs-title">AI 正在依据简历生成规划…</view>
     <view class="rs-sub">已用 {{elapsed}} 秒,校验不通过时会自动重试一次,请勿离开页面</view>
@@ -64,24 +66,28 @@
     <view class="st-ic warn"><text class="ficon i-info"></text></view>
     <view class="rs-title">规划没有生成成功</view>
     <view class="rs-sub">{{failMsg}}</view>
-    <view wx:if="{{needReupload}}" class="cp-cta tap" bindtap="tapUpload">重新上传简历 ›</view>
-    <view wx:else class="cp-cta tap" bindtap="tapGenerate">{{historyMode ? '重新加载 ›' : '重新生成 ›'}}</view>
+    <view wx:if="{{needReupload}}" class="cp-cta tap" bindtap="tapUpload">
+      <text>重新上传简历</text><text class="ficon i-right cp-cta-arrow"></text>
+    </view>
+    <view wx:else class="cp-cta tap" bindtap="tapGenerate">
+      <text>{{historyMode ? '重新加载' : '重新生成'}}</text><text class="ficon i-right cp-cta-arrow"></text>
+    </view>
   </view>
 
   <!-- 结果 -->
   <view wx:elif="{{phase === 'done'}}" class="content has-bar">
     <view class="notice plum">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>以下建议由 AI 基于你的简历文本生成,仅供你本人参考,不构成职业指导意见,也不代表用人单位意见。</text>
     </view>
 
     <view wx:if="{{historyMode}}" class="notice info">
-      <view class="ficon i-history n-ic"></view>
+      <text class="ficon i-history n-ic"></text>
       <text>这是账户中的历史结果，只读展示；不会重新调用 AI，也不会覆盖当前简历任务。</text>
     </view>
 
     <view wx:if="{{plan.isMockProvider}}" class="notice warn">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>当前服务端使用占位模型,以下内容仅用于流程演示,不能作为求职依据。</text>
     </view>
 
@@ -107,7 +113,7 @@
       <view class="cp-list">
         <view class="cs-item tap" wx:for="{{plan.currentSnapshot}}" wx:key="point"
               data-title="{{item.point}}" data-text="{{item.evidence}}" bindtap="tapText">
-          <view class="cs-mark">·</view>
+          <view class="cs-mark"><text class="ficon i-check"></text></view>
           <view class="cs-body">
             <view class="cs-point">{{item.point}}</view>
             <view wx:if="{{item.evidence}}" class="cs-ev">简历原文：{{item.evidence}}</view>
@@ -160,7 +166,7 @@
     </block>
 
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>规划为参考建议,不预测薪资与录用结果。投递须前往来源平台操作。</text>
     </view>
   </view>

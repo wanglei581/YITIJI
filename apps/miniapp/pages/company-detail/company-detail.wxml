@@ -5,7 +5,6 @@
   <view class="navbar">
     <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">企业详情</view>
-    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
   </view>
 
   <view class="content has-bar">
@@ -21,54 +20,94 @@
 
     <!-- 详情内容 -->
     <block wx:else>
-    <!-- 企业头部 -->
     <view class="company-hero">
-      <view class="ch-logo">{{company.emoji}}</view>
+      <view class="ch-top">
+        <view class="ch-logo"><text class="ficon i-{{company.icon}}"></text></view>
+        <view wx:if="{{company.metrics.openJobCount !== undefined}}" class="ch-count">
+          {{company.metrics.openJobCount}} 个公开岗位
+        </view>
+      </view>
       <view class="ch-name">{{company.name}}</view>
-      <view class="ch-meta">
-        <text wx:for="{{company.metaParts}}" wx:key="*this">{{item}}</text>
+      <view wx:if="{{company.legalName && company.legalName !== company.name}}" class="ch-legal">{{company.legalName}}</view>
+      <view wx:if="{{company.meta}}" class="ch-meta">{{company.meta}}</view>
+      <view wx:if="{{company.tags && company.tags.length}}" class="ch-chips">
+        <view class="chip {{index === 0 ? 'teal' : ''}}" wx:for="{{company.tags}}" wx:key="*this">{{item}}</view>
       </view>
     </view>
 
-    <view class="chips ch-chips">
-      <view class="chip {{tag.tone}}" wx:for="{{company.tags}}" wx:for-item="tag" wx:key="text">{{tag.text}}</view>
-    </view>
-
-    <!-- 企业简介 -->
-    <view class="card">
-      <view class="card-inner">
-        <view class="cd-block-t">企业简介</view>
-        <view class="cd-desc" wx:for="{{company.desc}}" wx:key="*this">{{item}}</view>
+    <view wx:if="{{company.metrics.city || company.metrics.employeeScale || company.metrics.boothNo}}" class="metrics-grid">
+      <view wx:if="{{company.metrics.city}}" class="metric-card">
+        <view class="metric-icon"><text class="ficon i-location"></text></view>
+        <view class="metric-value">{{company.metrics.city}}</view>
+        <view class="metric-label">所在城市</view>
+      </view>
+      <view wx:if="{{company.metrics.employeeScale}}" class="metric-card">
+        <view class="metric-icon"><text class="ficon i-user"></text></view>
+        <view class="metric-value">{{company.metrics.employeeScale}}</view>
+        <view class="metric-label">员工规模</view>
+      </view>
+      <view wx:if="{{company.metrics.boothNo}}" class="metric-card">
+        <view class="metric-icon"><text class="ficon i-bank"></text></view>
+        <view class="metric-value">{{company.metrics.boothNo}}</view>
+        <view class="metric-label">展位号</view>
       </view>
     </view>
 
-    <!-- 来源信息（合规必须） -->
-    <view class="section-cap">DATA SOURCE · 来源信息</view>
-    <view class="card flat">
-      <view class="card-inner tight">
-        <view class="src-row"><text class="sr-l">来源机构</text><text class="sr-v">{{company.sourceOrg}}</text></view>
-        <view class="src-row"><text class="sr-l">首次收录</text><text class="sr-v">{{company.firstSeen}}</text></view>
-        <view class="src-row"><text class="sr-l">数据说明</text><text class="sr-v faint">信息来源于招聘平台公开企业页，仅展示基础资料，不代表招聘关系</text></view>
-      </view>
+    <view class="section-head">
+      <view class="section-title">企业简介</view>
+      <view class="section-sub">来自公开企业资料</view>
     </view>
+    <view wx:if="{{company.descriptionLines && company.descriptionLines.length}}" class="article-card">
+      <view class="cd-desc" wx:for="{{company.descriptionLines}}" wx:key="*this">{{item}}</view>
+    </view>
+    <view wx:else class="article-card article-empty">
+      <view class="article-empty-icon"><text class="ficon i-file-text"></text></view>
+      <view>当前来源未提供企业简介。</view>
+    </view>
+
+    <view class="section-head">
+      <view class="section-title">来源信息</view>
+      <view class="section-sub">保留来源与同步记录，方便核验</view>
+    </view>
+    <view class="source-card">
+      <view class="source-head">
+        <view class="source-icon"><text class="ficon i-link"></text></view>
+        <view>
+          <view class="source-title">公开资料来源</view>
+          <view class="source-sub">本平台仅作信息展示</view>
+        </view>
+      </view>
+      <view class="src-row"><text class="sr-l">来源机构</text><text class="sr-v">{{company.sourceOrg || '未标注'}}</text></view>
+      <view wx:if="{{company.externalId}}" class="src-row"><text class="sr-l">外部 ID</text><text class="sr-v mono">{{company.externalId}}</text></view>
+      <view wx:if="{{company.syncTime}}" class="src-row"><text class="sr-l">同步时间</text><text class="sr-v">{{company.syncTime}}</text></view>
+      <view wx:if="{{company.address}}" class="src-row"><text class="sr-l">公开地址</text><text class="sr-v">{{company.address}}</text></view>
+      <view wx:if="{{company.dataSourceNote}}" class="source-note">{{company.dataSourceNote}}</view>
+    </view>
+
     <view class="notice info">
       <text class="ficon i-info n-ic"></text>
       <view>企业信息来源于招聘平台公开资料，仅供参考，不代表招聘关系。本终端不代企业招聘，不收取求职者简历。</view>
     </view>
 
-    <!-- 在招岗位 -->
-    <view class="section-cap">IN RECRUITMENT · 在招岗位</view>
-    <view class="card">
-      <view class="card-inner">
-        <view class="job-row tap" wx:for="{{company.jobs}}" wx:key="id"
-          hover-class="tap-press" bindtap="tapJob" data-id="{{item.id}}">
-          <view class="jr-left">
-            <view class="jr-title">{{item.title}}</view>
-            <view class="jr-meta">{{item.meta}}</view>
-          </view>
-          <text class="jr-salary">{{item.salary}}</text>
-          <text class="jr-arrow">›</text>
+    <view class="section-head">
+      <view class="section-title">公开岗位</view>
+      <view class="section-sub">点击岗位查看来源与要求</view>
+    </view>
+    <view wx:if="{{jobsLoading}}" class="jobs-state">正在加载公开岗位</view>
+    <view wx:elif="{{jobsError}}" class="jobs-state error tap" bindtap="retryJobs">
+      {{jobsError}}，点此重试
+    </view>
+    <view wx:elif="{{jobs.length === 0}}" class="jobs-state">当前没有已发布岗位</view>
+    <view wx:else class="jobs-card">
+      <view class="job-row tap" wx:for="{{jobs}}" wx:key="id"
+        hover-class="tap-press" bindtap="tapJob" data-id="{{item.id}}">
+        <view class="jr-left">
+          <view class="jr-title">{{item.title}}</view>
+          <view wx:if="{{item.meta}}" class="jr-meta">{{item.meta}}</view>
+          <view wx:if="{{item.source}}" class="jr-source">来源：{{item.source}}</view>
         </view>
+        <text class="jr-salary">{{item.salary}}</text>
+        <text class="ficon i-right jr-arrow"></text>
       </view>
     </view>
 
@@ -76,7 +115,16 @@
     </block>
   </view>
 
+  <!-- 收藏原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+       自定义导航栏右侧永远不可用。移到底部操作条：拇指可达，且与主操作并列时一眼能看到。 -->
   <view class="actionbar">
-    <view class="btn primary lg block" bindtap="tapExternal">复制来源链接</view>
+    <view class="fav-btn tap {{faved ? 'on' : ''}}" hover-class="tap-press" bindtap="tapFav"
+          role="button" aria-label="{{faved ? '取消收藏这家企业' : '收藏这家企业'}}">
+      <text class="ficon i-inbox"></text>
+      <text class="fav-btn-t">{{faved ? '已收藏' : '收藏'}}</text>
+    </view>
+    <view class="btn primary lg ab-main {{company.externalUrl ? '' : 'disabled'}}" bindtap="tapExternal">
+      {{company.externalUrl ? '复制企业来源链接' : '来源链接暂不可用'}}
+    </view>
   </view>
 </view>

@@ -1,6 +1,23 @@
 /* pages/favorites/favorites.wxss */
 .fav-content { padding-top: 20rpx; }
 
+/* 列表工具栏：承接原导航栏右上角的「管理」。导航栏右侧被微信胶囊常驻遮挡，不可放操作。
+   触控区 96rpx = 48px，满足 CLAUDE.md §9 最小可点击尺寸。 */
+.list-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16rpx; padding: 0 32rpx 8rpx;
+}
+.lt-label { font-size: 24rpx; color: var(--muted); flex: 1; }
+.lt-action {
+  flex-shrink: 0;
+  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 22rpx; border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: 27rpx; font-weight: 600;
+}
+.lt-action.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+
 .fav-item {
   display: flex;
   align-items: center;
@@ -18,10 +35,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
-  font-weight: 700;
-  font-family: var(--font-serif);
 }
+.fav-ic .ficon { width: 42rpx; height: 42rpx; }
 .fav-ic.tone-teal  { background: var(--teal-wash);  color: var(--teal-deep); }
 .fav-ic.tone-clay  { background: var(--clay-wash);  color: var(--clay-deep); }
 .fav-ic.tone-wheat { background: var(--wheat-wash); color: var(--wheat-deep); }
@@ -64,8 +79,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
-  color: var(--wheat-deep);
+  border-radius: 50%;
+  color: var(--error);
+  background: var(--error-soft);
+}
+.fav-star .ficon { width: 28rpx; height: 28rpx; }
+
+/* 登录引导 / 本机收藏合并提示条 */
+.fav-bar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 20rpx;
+  padding: 24rpx 26rpx;
+  border-radius: var(--r);
+  background: var(--teal-wash);
+  border: 1rpx solid var(--line-faint);
+}
+.fav-bar-body { flex: 1; min-width: 0; }
+.fav-bar-t { font-size: 26rpx; font-weight: 600; color: var(--ink); }
+.fav-bar-d { margin-top: 6rpx; font-size: 22rpx; color: var(--muted); line-height: 1.5; }
+
+/* 数据归属说明：本机 / 账号必须写清楚，不让用户误判是否跨设备 */
+.fav-note {
+  margin-top: 20rpx;
+  padding: 0 8rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .empty-slot {
@@ -75,6 +116,13 @@
   align-items: center;
   text-align: center;
 }
+.empty-slot.compact { padding: 38rpx 20rpx; }
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.es-actions {
+  margin-top: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}

@@ -68,8 +68,31 @@ function getUser() {
  * 保存后端下发的会话。data: { token, user }
  */
 function saveSession(data = {}) {
-  if (data.token) storage.set(storage.KEYS.TOKEN, data.token);
+  if (data.token) {
+    storage.set(storage.KEYS.TOKEN, data.token);
+    // 登录成功即取得补签资格，直到用户主动登出为止
+    storage.set(storage.KEYS.RESIGNIN_ELIGIBLE, 1);
+  }
   if (data.user) storage.set(storage.KEYS.USER, data.user);
+}
+
+/**
+ * 是否允许 401 静默补签。
+ *
+ * 必须与「当前有没有可用 token」解耦：getToken() 在 JWT 过期时会
+ * 先 clearSession() 再返回 null，因此「自然过期」和「主动登出」
+ * 在 token 维度上完全同形。只用 token 判断会二选一地出错——
+ * 要么过期后补不了签（原始 401 问题原样存在），
+ * 要么登出后被自动登回（共用设备上的隐私问题）。
+ */
+function canSilentResignin() {
+  return !!storage.get(storage.KEYS.RESIGNIN_ELIGIBLE);
+}
+
+/** 用户主动登出：连补签资格一并撤销。 */
+function logout() {
+  clearSession();
+  storage.remove(storage.KEYS.RESIGNIN_ELIGIBLE);
 }
 
 function clearSession() {
@@ -97,6 +120,8 @@ function wxLogin() {
 }
 
 module.exports = {
+  canSilentResignin,
+  logout,
   getToken,
   isLoggedIn,
   getUser,

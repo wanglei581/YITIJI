@@ -6,12 +6,13 @@ Page({
   data: {
     statusBarHeight: 20,
     cats: [
-      { label: '应届生', emoji: '🎓', accent: 'slate' },
-      { label: '求职补贴', emoji: '💰', accent: 'teal' },
-      { label: '创业扶持', emoji: '🚀', accent: 'wheat' },
-      { label: '落户住房', emoji: '🏠', accent: 'clay' },
-      { label: '技能认证', emoji: '📜', accent: 'plum' },
+      { key: 'all', label: '全部政策', icon: 'file-text', accent: 'teal' },
+      { key: 'graduate', label: '高校毕业生', icon: 'solution', accent: 'slate' },
+      { key: 'flexible', label: '灵活就业', icon: 'compass', accent: 'wheat' },
+      { key: 'startup', label: '创业者', icon: 'aim', accent: 'plum' },
+      { key: 'hardship', label: '就业困难', icon: 'form', accent: 'clay' },
     ],
+    activeCat: 'all',
     policies: [],
     loading: true,
     loadError: '',
@@ -24,9 +25,16 @@ Page({
 
   loadPolicies() {
     this.setData({ loading: true, loadError: '' })
-    return api.getPolicies()
+    const audience = this.data.activeCat === 'all' ? undefined : this.data.activeCat
+    return api.getPolicies(audience ? { audience } : {})
       .then((list) => this.setData({ policies: list || [], loading: false }))
       .catch((err) => this.setData({ loading: false, loadError: (err && err.message) || '加载失败' }))
+  },
+
+  tapCat(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key || key === this.data.activeCat) return
+    this.setData({ activeCat: key }, () => this.loadPolicies())
   },
 
   reload() {
@@ -44,6 +52,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '智引答 · 就业创业政策', path: '/pages/policies/policies' }
+    return { title: '职易达 · 就业创业政策', path: '/pages/policies/policies' }
   },
 })

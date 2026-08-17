@@ -8,7 +8,6 @@
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">消息通知</view>
-      <view class="nav-right nav-caps tap" hover-class="tap-press" bindtap="markAllRead">全部已读</view>
     </view>
   </view>
 
@@ -26,6 +25,13 @@
 
   <view class="content">
 
+    <!-- 「全部已读」原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+         自定义导航栏右侧永远不可用。这是低频次级操作，移到消息列表上方的工具栏。 -->
+    <view class="list-toolbar" wx:if="{{!loading && !loadError && list.length > 0}}">
+      <view class="lt-action tap" hover-class="tap-press" bindtap="markAllRead"
+            role="button" aria-label="把全部通知标记为已读">全部已读</view>
+    </view>
+
     <view class="empty-slot card" wx:if="{{loading}}">
       <view class="es-t">正在加载本人通知…</view>
     </view>
@@ -35,7 +41,7 @@
       <view class="es-d">{{loadError}}</view>
     </view>
 
-    <block wx:elif="{{list.length > 0}}">
+    <view class="nt-list" wx:elif="{{list.length > 0}}">
       <view
         class="nt-item {{item.unread ? 'unread' : ''}} tap"
         wx:for="{{list}}"
@@ -56,10 +62,10 @@
             wx:if="{{item.link}}"
             data-id="{{item.id}}"
             catchtap="tapLink"
-          >{{item.link}} ›</view>
+          ><text>{{item.link}}</text><text class="ficon i-right nt-link-arrow"></text></view>
         </view>
       </view>
-    </block>
+    </view>
 
     <view class="empty-slot card" wx:else>
       <view class="es-ic"><text class="ficon i-bell"></text></view>

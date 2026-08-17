@@ -18,30 +18,175 @@
           <view class="pv-t">隐私政策</view>
           <view class="pv-s">查看当前生效版本、处理目的与保存期限</view>
         </view>
-        <view class="pv-go">›</view>
+        <text class="ficon i-right pv-go"></text>
       </view>
       <view class="pv-item tap" hover-class="tap-press" bindtap="toDocuments">
         <view class="pv-main">
           <view class="pv-t">我的文档与到期时间</view>
           <view class="pv-s">查看服务端返回的真实文件期限并可主动删除</view>
         </view>
-        <view class="pv-go">›</view>
+        <text class="ficon i-right pv-go"></text>
       </view>
     </view>
 
-    <view class="grp-label">高敏操作</view>
-    <view class="pv-group">
-      <view class="pv-item tap" hover-class="tap-press" bindtap="explainSensitiveAction">
+    <view class="grp-label">我的数据权利</view>
+
+    <view wx:if="{{!isLoggedIn}}" class="pv-group">
+      <view class="pv-item tap" hover-class="tap-press" bindtap="toLogin">
         <view class="pv-main">
-          <view class="pv-t">数据导出与账号注销</view>
-          <view class="pv-s">需短信二次验证；本版本小程序端尚未完成安全交互</view>
+          <view class="pv-t">登录后可导出数据或提交注销</view>
+          <view class="pv-s">数据权利只对本人开放，需服务端核验身份</view>
         </view>
-        <view class="pv-go">›</view>
+        <text class="ficon i-right pv-go"></text>
       </view>
     </view>
+
+    <block wx:else>
+      <!-- 数据导出 -->
+      <view class="dr-card">
+        <view class="dr-head">
+          <text class="ficon i-inbox dr-ic"></text>
+          <view class="dr-hmain">
+            <view class="dr-t">导出我的数据</view>
+            <view class="dr-s">短信二次验证后，由服务端后台生成导出包</view>
+          </view>
+        </view>
+
+        <view wx:if="{{latestExport}}" class="dr-state">
+          <view class="dr-row">
+            <text class="dr-k">最近一次</text>
+            <text class="dr-v">{{latestExport.requestedAtText}} · {{latestExport.statusLabel}}</text>
+          </view>
+          <view wx:if="{{latestExport.exportExpiresAtText}}" class="dr-row">
+            <text class="dr-k">导出包到期</text>
+            <text class="dr-v">{{latestExport.exportExpiresAtText}}</text>
+          </view>
+          <view wx:if="{{latestExport.failureText}}" class="dr-row">
+            <text class="dr-k">失败原因</text>
+            <text class="dr-v warn">{{latestExport.failureText}}</text>
+          </view>
+        </view>
+
+        <view wx:if="{{latestExport.canDownload}}" class="dr-acts">
+          <view class="btn primary block lg tap" hover-class="tap-press" bindtap="startDownload">取回导出包</view>
+          <view class="dr-tip">下载授权一次性：服务端发送完成后即标记已取件。</view>
+        </view>
+        <view wx:else class="dr-acts">
+          <view class="btn primary block lg tap" hover-class="tap-press" bindtap="startExport">发起数据导出</view>
+          <view wx:if="{{hasActiveRequest}}" class="dr-tip">已有请求在处理中，完成后才能再次提交。</view>
+        </view>
+      </view>
+
+      <!-- 本机导出件 -->
+      <block wx:if="{{savedFiles.length}}">
+        <view class="grp-label">本机导出件</view>
+        <view class="pv-group">
+          <view class="ef-item" wx:for="{{savedFiles}}" wx:key="fileName">
+            <view class="ef-name">{{item.fileName}}</view>
+            <view class="ef-meta">{{item.sizeText}} · 仅存在本机，不会自动上传</view>
+            <view class="ef-acts">
+              <view class="ef-btn tap" hover-class="tap-press" data-index="{{index}}" bindtap="shareFile">转发到微信</view>
+              <view class="ef-btn tap" hover-class="tap-press" data-index="{{index}}" bindtap="saveFileToDisk">另存到电脑</view>
+              <view class="ef-btn tap" hover-class="tap-press" data-index="{{index}}" bindtap="copyFile">复制内容</view>
+              <view class="ef-btn danger tap" hover-class="tap-press" data-index="{{index}}" bindtap="removeFile">删除副本</view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 授权与注销 -->
+      <view class="pv-group">
+        <view class="pv-item tap" hover-class="tap-press" bindtap="revokeConsent">
+          <view class="pv-main">
+            <view class="pv-t">撤回岗位 AI 授权</view>
+            <view class="pv-s">立即生效；不删除简历、文档、打印订单或收藏</view>
+          </view>
+          <text class="ficon i-right pv-go"></text>
+        </view>
+        <view class="pv-item tap" hover-class="tap-press" bindtap="requestAccountClosure">
+          <view class="pv-main">
+            <view class="pv-t danger">账号注销</view>
+            <view class="pv-s" wx:if="{{!capabilityLoaded}}">正在读取服务端状态…</view>
+            <view class="pv-s" wx:elif="{{accountClosureAvailable}}">服务端已开放；不可逆，需二次确认</view>
+            <view class="pv-s" wx:else>服务端当前未开放线上自助注销，提交会被拒绝</view>
+          </view>
+          <text class="ficon i-right pv-go danger"></text>
+        </view>
+      </view>
+
+      <!-- 处理记录 -->
+      <view class="grp-label">处理记录</view>
+      <view wx:if="{{loading}}" class="state-box">正在读取服务端记录…</view>
+      <view wx:elif="{{loadError}}" class="state-box">
+        <view class="state-msg">{{loadError}}</view>
+        <view class="ef-btn tap" hover-class="tap-press" bindtap="reload">重试</view>
+      </view>
+      <view wx:elif="{{!requests.length}}" class="state-box">暂无数据权利请求记录。</view>
+      <view wx:else class="pv-group">
+        <view class="rq-item" wx:for="{{requests}}" wx:key="id">
+          <view class="rq-line">
+            <text class="rq-t">{{item.typeLabel}}</text>
+            <text class="rq-st">{{item.statusLabel}}</text>
+          </view>
+          <view class="rq-sub">{{item.requestedAtText}}</view>
+          <view wx:if="{{item.failureText}}" class="rq-sub warn">{{item.failureText}}</view>
+        </view>
+      </view>
+    </block>
 
     <view class="compliance-note">
+      导出包为本人相关元数据清单：账号摘要、文件清单、AI 服务记录摘要、打印订单、收藏、权益、浏览与外部跳转记录、通知、反馈、授权与历史请求；不含文件原文与简历正文全文，单个分区超过 500 条会导出失败。导出包由服务端生成后约 23 小时到期。
+    </view>
+    <view class="compliance-note">
       简历、文件和 AI 结果只服务本人，不提供给招聘企业或合作机构。岗位和招聘会仅提供来源信息入口。
+    </view>
+  </view>
+
+  <!-- 短信二次验证。整屏浮层且内容贴顶：键盘只会遮住下半屏，输入框与按钮始终可见。 -->
+  <view wx:if="{{su.open}}" class="su-mask" bindtap="closeStepUp">
+    <view class="su-panel" catchtap="keepOpen">
+      <view style="height:{{statusBarHeight}}px"></view>
+      <view class="su-bar">
+        <view class="su-title">{{su.title}}</view>
+        <view class="su-close tap" hover-class="tap-press" catchtap="closeStepUp">
+          <text class="ficon i-close su-close-ic"></text>
+        </view>
+      </view>
+
+      <view class="su-body">
+        <view class="su-desc">{{su.desc}}</view>
+        <view wx:if="{{su.phoneMasked}}" class="su-phone">验证码已发送至 {{su.phoneMasked}}</view>
+        <view wx:elif="{{su.sending}}" class="su-phone">正在发送验证码…</view>
+
+        <input
+          class="su-input"
+          type="number"
+          maxlength="6"
+          placeholder="请输入 6 位验证码"
+          confirm-type="done"
+          adjust-position="{{false}}"
+          cursor-spacing="24"
+          value="{{su.code}}"
+          bindinput="onCodeInput"
+        />
+
+        <view class="su-meta">
+          <view class="su-resend {{su.cooldown > 0 || su.sending ? 'off' : ''}} tap" hover-class="tap-press" catchtap="resendCode">
+            <text wx:if="{{su.cooldown > 0}}">{{su.cooldown}}s 后可重发</text>
+            <text wx:elif="{{su.sending}}">发送中…</text>
+            <text wx:else>重新发送验证码</text>
+          </view>
+          <view wx:if="{{su.expiresIn > 0}}" class="su-expire">{{su.expiresIn}}s 内有效</view>
+          <view wx:elif="{{su.challengeId}}" class="su-expire warn">验证码已过期，请重新发送</view>
+        </view>
+
+        <view wx:if="{{su.error}}" class="su-error">{{su.error}}</view>
+
+        <view class="btn primary block lg tap {{su.verifying ? 'disabled' : ''}}" hover-class="tap-press" catchtap="submitStepUp">
+          {{su.verifying ? '验证中…' : '验证并继续'}}
+        </view>
+        <view class="su-foot">验证码只发往你账号已绑定的手机号，本页无法更换接收号码。</view>
+      </view>
     </view>
   </view>
 </view>

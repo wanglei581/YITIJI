@@ -1,0 +1,105 @@
+/* pages/daily-report/daily-report.wxss */
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+.navbar { display: flex; align-items: center; padding: 8px 16px 10px; }
+.nav-back { font-size: 22px; color: var(--ink); margin-right: 8px; }
+.nav-title { flex: 1; font-size: 18px; font-weight: 700; color: var(--ink); }
+.nav-date  { font-size: 12px; color: var(--muted); }
+
+.content { padding: 8px 0 0; }
+
+/* 加载 */
+.dr-loading {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 20px;
+}
+.loading-ring {
+  width: 36px; height: 36px;
+  border: 3px solid var(--line);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+/* 错误 */
+.dr-error { display: flex; flex-direction: column; align-items: center; padding: 50px 20px; }
+.err-icon { font-size: 28px; color: var(--ghost); margin-bottom: 10px; }
+.err-msg  { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.5; }
+.btn-retry {
+  margin-top: 16px; padding: 8px 24px;
+  border: 1px solid var(--teal); border-radius: var(--r-full);
+  font-size: 13px; color: var(--teal);
+}
+
+/* 英雄区 */
+.dr-hero {
+  margin: 0 16px 16px;
+  padding: 18px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+}
+.dr-hero-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 700; color: #fff;
+  background: var(--teal); padding: 2px 8px;
+  border-radius: var(--r-full); margin-bottom: 8px;
+}
+.dr-hero-title { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+
+/* 各section */
+.dr-section { margin: 0 16px 14px; }
+.dr-section-hd {
+  font-size: 13px; font-weight: 700; color: var(--ink-soft);
+  border-left: 3px solid var(--teal); padding-left: 8px;
+  margin-bottom: 10px;
+}
+.dr-section-body {
+  font-size: 13.5px; color: var(--ink); line-height: 1.65;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: 12px 14px;
+}
+
+/* 日程 */
+.sched-list { display: flex; flex-direction: column; gap: 8px; }
+.sched-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 10px 12px;
+}
+.sched-time { font-size: 12px; font-weight: 700; color: var(--teal); flex-shrink: 0; min-width: 36px; }
+.sched-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+.sched-loc   { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+/* 提示 */
+.tips-list { display: flex; flex-direction: column; gap: 8px; }
+.tip-item { display: flex; align-items: flex-start; gap: 10px; }
+.tip-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--plum-wash); color: var(--plum-deep);
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.tip-text { font-size: 13px; color: var(--ink); line-height: 1.55; }
+
+/* 推荐岗位 */
+.job-list {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); overflow: hidden;
+}
+.job-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.job-row:last-child { border-bottom: 0; }
+.job-info  { flex: 1; min-width: 0; }
+.job-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+.job-co    { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.job-arrow { font-size: 18px; color: var(--ghost); flex-shrink: 0; }
+
+.page-pad { height: 40px; }

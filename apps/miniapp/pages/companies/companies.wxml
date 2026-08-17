@@ -8,39 +8,62 @@
     <view class="nav-right"></view>
   </view>
 
-  <view class="content has-bar">
-    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+  <view class="content companies-content">
+    <view class="companies-hero">
+      <view class="coh-copy">
+        <view class="coh-kicker">公开企业信息</view>
+        <view class="coh-title">了解企业与来源岗位</view>
+        <view class="coh-sub">企业资料和岗位均保留来源，本平台不接收简历</view>
+      </view>
+      <view class="coh-icon"><text class="ficon i-bank"></text></view>
+    </view>
 
-    <view wx:elif="{{loadError}}" class="empty">
-      <view class="e-ic">!</view>
-      <view class="e-title">加载失败</view>
-      <view class="e-desc">{{loadError}}</view>
+    <view class="companies-section-head">
+      <view class="companies-section-title">企业列表</view>
+      <view class="companies-section-sub">点击查看企业资料与公开岗位</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="state-card">
+      <view class="state-icon"><text class="ficon i-bank"></text></view>
+      <view class="state-title">正在加载企业</view>
+      <view class="state-desc">请稍候，正在同步公开企业信息</view>
+    </view>
+
+    <view wx:elif="{{loadError}}" class="state-card">
+      <view class="state-icon warn"><text class="ficon i-warning"></text></view>
+      <view class="state-title">加载失败</view>
+      <view class="state-desc">{{loadError}}</view>
       <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
     </view>
 
-    <view wx:elif="{{companies.length === 0}}" class="empty">
-      <view class="e-ic">🏢</view>
-      <view class="e-title">暂无企业</view>
-      <view class="e-desc">换个筛选条件试试</view>
+    <view wx:elif="{{companies.length === 0}}" class="state-card">
+      <view class="state-icon"><text class="ficon i-bank"></text></view>
+      <view class="state-title">暂无企业</view>
+      <view class="state-desc">稍后再来查看最新公开信息</view>
     </view>
 
-    <block wx:else>
-    <view class="company-card tap rise-d{{index+1}}" wx:for="{{companies}}" wx:key="id"
-      hover-class="tap-press" bindtap="tapCompany" data-id="{{item.id}}">
-      <view class="cc-logo">{{item.emoji}}</view>
-      <view class="cc-info">
-        <view class="cc-name">{{item.name}}</view>
-        <view class="cc-meta">{{item.meta}}</view>
-        <view class="cc-tags">
-          <view class="chip {{tag.tone}}" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="text">{{tag.text}}</view>
+    <view wx:else class="company-list">
+      <view class="company-card tap rise-d{{index+1}}" wx:for="{{companies}}" wx:key="id"
+        hover-class="tap-press" bindtap="tapCompany" data-id="{{item.id}}">
+        <view class="cc-logo"><text class="ficon i-{{item.icon}}"></text></view>
+        <view class="cc-info">
+          <view class="cc-name">{{item.name}}</view>
+          <view wx:if="{{item.meta}}" class="cc-meta">{{item.meta}}</view>
+          <view class="cc-tags" wx:if="{{item.companyTypeLabel || item.industryLabel || (item.tags && item.tags.length)}}">
+            <view wx:if="{{item.companyTypeLabel}}" class="chip teal">{{item.companyTypeLabel}}</view>
+            <view wx:if="{{item.industryLabel}}" class="chip">{{item.industryLabel}}</view>
+            <view class="chip" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</view>
+          </view>
+          <view wx:if="{{item.repJobTitles && item.repJobTitles.length}}" class="cc-jobs-line">
+            代表岗位：{{item.repJobsText}}
+          </view>
+        </view>
+        <view class="cc-right">
+          <view wx:if="{{item.jobs !== undefined}}" class="jobs-count">{{item.jobs}} 个岗位</view>
+          <text class="ficon i-right cc-arrow"></text>
         </view>
       </view>
-      <view class="cc-right">
-        <view class="jobs-count">在招 {{item.jobs}} 个</view>
-        <text class="cc-arrow">›</text>
-      </view>
     </view>
-    </block>
 
     <view class="compliance-note">企业信息来自第三方授权数据源，仅供参考，请到来源平台查看详细资料与岗位投递方式。</view>
     <view class="spacer-lg"></view>

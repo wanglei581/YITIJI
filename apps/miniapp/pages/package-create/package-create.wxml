@@ -1,0 +1,126 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  
+  <view class="navbar col">
+    <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <text class="nav-title">创建材料包</text>
+  </view>
+
+  <scroll-view class="package-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="package-body">
+      <!-- 步骤指示 -->
+      <view class="steps">
+        <view class="st done on">
+          <view class="n">1</view>
+          <text class="nl">选择文件</text>
+        </view>
+        <view class="line done"></view>
+        <view class="st done">
+          <view class="n">2</view>
+          <text class="nl">打印设置</text>
+        </view>
+        <view class="line"></view>
+        <view class="st">
+          <view class="n">3</view>
+          <text class="nl">确认支付</text>
+        </view>
+      </view>
+
+      <!-- 文件选择 -->
+      <view class="section-t">选择文件</view>
+      <view class="file-list">
+        <view 
+          class="file-item tap" 
+          wx:for="{{files}}" 
+          wx:key="id" 
+          hover-class="tap-press"
+          role="listitem"
+          aria-label="文件：{{item.name}}，{{item.size}}"
+        >
+          <view class="file-icon"><text class="ficon i-file-text"></text></view>
+          <view class="file-info">
+            <text class="file-name">{{item.name}}</text>
+            <text class="file-size">{{item.size}} · {{item.pages}} 页</text>
+          </view>
+          <view class="file-remove icon-action tap" catchtap="removeFile" data-id="{{item.id}}" role="button" aria-label="删除文件">
+            <text class="ficon i-close"></text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="add-file-btn btn ghost block tap" hover-class="tap-press" bindtap="addFile" role="button" aria-label="添加文件">
+        <text class="ficon i-upload"></text>
+        <text>添加文件</text>
+      </view>
+
+      <!-- 打印参数 -->
+      <view class="section-t">打印设置</view>
+      <view class="card flat">
+        <view class="card-inner">
+          <view class="param-row">
+            <text class="param-label">彩色/黑白</text>
+            <view class="seg">
+              <view class="s {{colorMode === 'bw' ? 'on' : ''}}" bindtap="setColorMode" data-mode="bw" role="button" aria-label="黑白打印">黑白</view>
+              <view class="s {{colorMode === 'color' ? 'on' : ''}}" bindtap="setColorMode" data-mode="color" role="button" aria-label="彩色打印">彩色</view>
+            </view>
+          </view>
+          <view class="divider"></view>
+          <view class="param-row">
+            <text class="param-label">单双面</text>
+            <view class="seg">
+              <view class="s {{duplex === 'single' ? 'on' : ''}}" bindtap="setDuplex" data-mode="single" role="button" aria-label="单面打印">单面</view>
+              <view class="s {{duplex === 'double' ? 'on' : ''}}" bindtap="setDuplex" data-mode="double" role="button" aria-label="双面打印">双面</view>
+            </view>
+          </view>
+          <view class="divider"></view>
+          <view class="param-row">
+            <text class="param-label">份数</text>
+            <view class="counter">
+              <view class="counter-btn icon-action tap" hover-class="tap-press" bindtap="decreaseCopies" role="button" aria-label="减少份数">
+                <text>-</text>
+              </view>
+              <text class="counter-val">{{copies}}</text>
+              <view class="counter-btn icon-action tap" hover-class="tap-press" bindtap="increaseCopies" role="button" aria-label="增加份数">
+                <text>+</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 价格预览 -->
+      <view class="price-card">
+        <view class="price-row">
+          <text class="price-label">文件数量</text>
+          <text class="price-val">{{files.length}} 个</text>
+        </view>
+        <view class="price-row">
+          <text class="price-label">预计页数</text>
+          <text class="price-val">{{totalPages}} 页</text>
+        </view>
+        <view class="price-row">
+          <text class="price-label">打印份数</text>
+          <text class="price-val">{{copies}} 份</text>
+        </view>
+        <view class="divider"></view>
+        <view class="price-row total">
+          <text class="price-label">合计</text>
+          <text class="price-val price"><text class="sup">¥</text>{{totalPrice}}</text>
+        </view>
+      </view>
+
+      <view class="spacer-lg"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部操作栏 -->
+  <view class="actionbar">
+    <view class="ab-price">
+      <view class="label">合计</view>
+      <view class="val"><text class="sup">¥</text>{{totalPrice}}</view>
+    </view>
+    <view class="btn primary tap" hover-class="tap-press" bindtap="createPackage" role="button" aria-label="创建材料包">创建材料包</view>
+  </view>
+</view>

@@ -3,10 +3,10 @@ const api = require('../../utils/api.js')
 const storage = require('../../utils/storage.js')
 
 const LEVEL_MAP = {
-  needs_work: { label: '需要加强', color: '#e67e22' },
-  pass:        { label: '基本合格', color: '#3498db' },
-  good:        { label: '表现良好', color: '#1f9e86' },
-  excellent:   { label: '表现出色', color: '#16a085' },
+  needs_work: { label: '需要加强', color: '#d88b0d' },
+  pass:        { label: '基本合格', color: '#3e6fe5' },
+  good:        { label: '表现良好', color: '#1677ff' },
+  excellent:   { label: '表现出色', color: '#12a879' },
 }
 const SECTION_TITLES = {
   expression:   '表达能力',
@@ -28,7 +28,7 @@ Page({
     position:         '',
     interviewerLabel: '',
     overallLabel:     '',
-    overallColor:     '#1f9e86',
+    overallColor:     '#1677ff',
     overallSummary:   '',
     sections:         [],
     predictedQuestions: [],

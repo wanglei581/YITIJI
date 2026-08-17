@@ -1,90 +1,62 @@
-/* pages/resumes/resumes.wxss — Direction B: 奶油质感 */
+.page-wrap { min-height: 100vh; background: var(--paper); }
+/* 导航栏右上角原有一个「上传」，被微信胶囊（···⊙）完全遮挡且与页内两处上传入口重复，
+   已删除；上传统一走 section-head 的「上传新简历」与空态的「上传第一份简历」。 */
+.resume-content { padding-top: 8rpx; }
 
-.page-wrap { min-height: 100vh; background: #FAF7F2; }
+.resume-hero {
+  min-height: 210rpx;
+  margin: 0 32rpx;
+  padding: 30rpx;
+  border-radius: 32rpx;
+  border: 1rpx solid #dce9ff;
+  background: #eef5ff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+.rh-copy { flex: 1; min-width: 0; }
+.rh-kicker { font-size: 21rpx; font-weight: 650; color: var(--teal-deep); }
+.rh-title { margin-top: 10rpx; font-size: 34rpx; font-weight: 760; color: var(--ink); }
+.rh-num { font-size: 48rpx; font-weight: 800; color: var(--teal); }
+.rh-sub { margin-top: 7rpx; font-size: 22rpx; color: var(--muted); }
+.rh-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 30rpx;
+  background: var(--teal);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 28rpx rgba(22, 119, 255, .18);
+}
+.rh-icon .ficon { width: 47rpx; height: 47rpx; }
 
-/* ── 导航栏 ── */
-.navbar {
-  display: flex; align-items: center;
-  padding: 10rpx 28rpx 14rpx;
-  background: #FAF7F2;
-}
-.nb-back { font-size: 28rpx; color: #7A5C48; min-width: 80rpx; }
-.nb-title { flex: 1; text-align: center; font-size: 32rpx; font-weight: 800; color: #2C1A0E; }
-.nb-right { font-size: 28rpx; color: #C84B2F; font-weight: 600; min-width: 80rpx; text-align: right; }
+.section-head { padding: 34rpx 36rpx 18rpx; display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; }
+.section-title { font-size: 31rpx; font-weight: 750; color: var(--ink); }
+.section-sub { margin-top: 5rpx; font-size: 21rpx; color: var(--muted); }
+/* 删掉导航栏那个被胶囊遮挡的「上传」后，本按钮成为列表态唯一上传入口，
+   触控区提到 96rpx = 48px，满足 CLAUDE.md §9 最小可点击尺寸。 */
+.upload-button { min-height: 96rpx; padding: 0 26rpx; border-radius: 22rpx; background: var(--surface); border: 1rpx solid var(--line); color: var(--teal); display: flex; align-items: center; gap: 9rpx; font-size: 25rpx; font-weight: 650; flex-shrink: 0; }
+.upload-button .ficon { width: 28rpx; height: 28rpx; }
 
-/* ── 页头统计 ── */
-.page-hd {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16rpx 32rpx 24rpx;
-}
-.ph-stat { display: flex; align-items: baseline; gap: 6rpx; }
-.ph-num { font-size: 52rpx; font-weight: 900; color: #2C1A0E; letter-spacing: -2rpx; line-height: 1; }
-.ph-unit { font-size: 24rpx; color: #A89080; }
-.upload-btn {
-  background: #2C1A0E; color: #FFFDF9;
-  font-size: 26rpx; font-weight: 600;
-  padding: 16rpx 32rpx; border-radius: 200rpx;
-}
+.resume-list { margin: 0 32rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.resume-card { padding: 24rpx; border-radius: 28rpx; background: var(--surface); border: 1rpx solid var(--line-soft); display: flex; align-items: flex-start; gap: 20rpx; }
+.resume-file-icon { width: 82rpx; height: 82rpx; border-radius: 24rpx; background: var(--teal-soft); color: var(--teal); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.resume-file-icon .ficon { width: 40rpx; height: 40rpx; }
+.resume-main { flex: 1; min-width: 0; }
+.resume-title-row { display: flex; align-items: center; gap: 12rpx; }
+.resume-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 29rpx; font-weight: 700; color: var(--ink); }
+.resume-meta { margin-top: 6rpx; font-size: 22rpx; color: var(--muted); }
+.resume-status { margin-top: 12rpx; }
+.resume-actions { margin-top: 18rpx; display: flex; gap: 12rpx; }
+.action-button { min-height: 60rpx; padding: 0 22rpx; border-radius: 18rpx; background: var(--surface-2); color: var(--ink-soft); border: 1rpx solid var(--line-soft); display: flex; align-items: center; justify-content: center; font-size: 23rpx; font-weight: 650; }
+.action-button.primary { color: var(--teal-deep); background: var(--teal-soft); border-color: #dce9ff; }
+.resume-arrow { width: 22rpx; height: 22rpx; color: var(--ghost); margin-top: 29rpx; }
 
-/* ── 简历卡片列表 ── */
-.rz-list { padding: 0 32rpx; display: flex; flex-direction: column; gap: 20rpx; }
-.rz-card {
-  background: #FFFDF9;
-  border-radius: 28rpx;
-  padding: 28rpx 24rpx;
-  box-shadow: 0 4rpx 20rpx rgba(44,26,14,.07);
-  display: flex; gap: 20rpx; align-items: flex-start;
-}
-.rz-thumb {
-  width: 64rpx; flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 6rpx;
-  padding-top: 4rpx;
-}
-.rz-ln { height: 8rpx; background: #E5D8C8; border-radius: 4rpx; }
-.ln-h { width: 100%; background: #C8B4A0; }
-.ln-s { width: 60%; }
-.rz-body { flex: 1; min-width: 0; }
-.rz-header-row { display: flex; align-items: center; gap: 10rpx; margin-bottom: 8rpx; }
-.rz-name { font-size: 30rpx; font-weight: 700; color: #2C1A0E; flex: 1; }
-.badge-primary {
-  background: #F5EDD8; color: #9C6E0A;
-  font-size: 20rpx; font-weight: 600;
-  padding: 4rpx 12rpx; border-radius: 200rpx; flex-shrink: 0;
-}
-.rz-meta { font-size: 24rpx; color: #A89080; display: block; margin-bottom: 12rpx; }
-.rz-tags { margin-bottom: 16rpx; }
-.tag { display: inline-block; font-size: 22rpx; font-weight: 600; padding: 5rpx 14rpx; border-radius: 200rpx; }
-.tg-green { background: #E8F0EA; color: #3A6648; }
-.tg-blue  { background: #E8EFF8; color: #2D5A8E; }
-.tg-amber { background: #F5EDD8; color: #9C6E0A; }
-.rz-acts { display: flex; gap: 12rpx; }
-.act-btn {
-  background: #F2EAE0; color: #4A3020;
-  font-size: 24rpx; font-weight: 600;
-  padding: 10rpx 24rpx; border-radius: 200rpx;
-}
-.act-red { background: #FAEDEA; color: #C84B2F; }
-.act-press { opacity: .7; }
-
-/* ── 空态 ── */
-.empty-wrap {
-  margin: 40rpx 32rpx;
-  background: #FFFDF9;
-  border-radius: 28rpx;
-  padding: 60rpx 40rpx;
-  text-align: center;
-  border: 1rpx solid #E5D8C8;
-}
-.ev-icon { font-size: 72rpx; display: block; margin-bottom: 20rpx; }
-.ev-title { font-size: 32rpx; font-weight: 800; color: #2C1A0E; margin-bottom: 12rpx; }
-.ev-desc { font-size: 26rpx; color: #A89080; line-height: 1.6; margin-bottom: 36rpx; display: block; }
-.btn-primary {
-  display: inline-block; background: #C84B2F; color: #fff;
-  font-size: 28rpx; font-weight: 700; padding: 20rpx 56rpx; border-radius: 200rpx;
-}
-.btn-secondary {
-  display: inline-block; background: #F2EAE0; color: #4A3020;
-  font-size: 28rpx; font-weight: 600; padding: 20rpx 56rpx; border-radius: 200rpx;
-}
-.tap { transition: opacity 80ms; }
-.tap-press { opacity: .7; }
+.empty-card { margin: 30rpx 32rpx 0; padding: 60rpx 40rpx; border-radius: 30rpx; background: var(--surface); border: 1rpx solid var(--line-soft); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.empty-icon { width: 94rpx; height: 94rpx; border-radius: 29rpx; background: var(--teal-soft); color: var(--teal); display: flex; align-items: center; justify-content: center; }
+.empty-icon .ficon { width: 45rpx; height: 45rpx; }
+.empty-title { margin-top: 22rpx; font-size: 31rpx; font-weight: 750; color: var(--ink); }
+.empty-desc { margin: 10rpx 0 30rpx; max-width: 540rpx; font-size: 24rpx; color: var(--muted); line-height: 1.65; }
