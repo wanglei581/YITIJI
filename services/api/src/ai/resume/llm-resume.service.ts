@@ -8,6 +8,14 @@ import type {
   ResumeTargetContext,
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_LONG_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../llm/llm-http'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
@@ -220,19 +228,34 @@ export class LlmResumeService {
     onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
+      // 长文档档（90 秒）：整份简历的结构化诊断，输出体量远大于对话类调用。
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空 / JSON 诊断失败。
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空 / JSON 诊断失败。
-        body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
-      })
-    } catch {
-      // 不记请求/响应正文（可能回显简历文本），只抛明确错误
+        { timeoutMs: LLM_LONG_TIMEOUT_MS },
+      )
+    } catch (error) {
+      // 不记请求/响应正文（可能回显简历文本），只抛明确错误。
+      // 「忙」「超时」「连不上」三态各自独立成码，不合并 —— 合并等于放弃根因。
+      if (error instanceof LlmBusyError) {
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`resume diagnose timeout ms=${error.timeoutMs}`)
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_DIAGNOSIS_TIMEOUT', message: llmTimeoutMessage('AI 诊断', error.timeoutMs) },
+        })
+      }
       throw new ServiceUnavailableException({
         error: { code: 'AI_DIAGNOSIS_UNAVAILABLE', message: 'AI 诊断服务连接失败，请稍后重试' },
       })
@@ -249,7 +272,7 @@ export class LlmResumeService {
       })
     }
 
-    const data = (await res.json().catch(() => null)) as {
+    const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
       usage?: RawLlmUsage
     } | null

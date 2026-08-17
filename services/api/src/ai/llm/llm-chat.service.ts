@@ -18,6 +18,14 @@ import type {
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from './llm-config.service'
 import type { AiModelFeatureKey } from './llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from './llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 
@@ -272,17 +280,35 @@ export class LlmChatService {
     // 只放 vendor/model，**不含** apiKey / baseURL。
     const providerLabel = `llm:${vendor}:${model}`
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
         },
-        body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
-      })
-    } catch {
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
+    } catch (error) {
+      // 「AI 正忙」和「超时」都必须能和下面的 network_error 分开报：三者的处置完全不同
+      // （加容量 / 查模型端 / 查网络）。糊成一个码就等于把根因抹掉。
+      if (error instanceof LlmBusyError) {
+        this.logger.warn(`LLM 请求被并发闸门拒绝: feature=${featureKey} limit=${error.limit}`)
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(
+          `LLM 请求超时: category=timeout feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)} ms=${error.timeoutMs}`,
+        )
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_CHAT_TIMEOUT', message: llmTimeoutMessage('AI 助手', error.timeoutMs) },
+        })
+      }
       this.logger.error(
         `LLM 请求失败: category=network_error feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
@@ -298,13 +324,13 @@ export class LlmChatService {
       throw new ServiceUnavailableException(`AI 模型返回错误 (${res.status})`)
     }
 
-    const data = await res.json() as {
+    const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
       usage?: RawLlmUsage
-    }
+    } | null
     // 在「内容为空」判断之前回报：内容为空这次调用照样花钱，不能因为解析失败就丢账。
-    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
-    const reply = data.choices?.[0]?.message?.content?.trim()
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
+    const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException('AI 模型未返回内容')
     }

@@ -1,5 +1,13 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import {
+  LLM_BUSY_MESSAGE,
+  LLM_TIMEOUT_MS,
+  LlmBusyError,
+  LlmTimeoutError,
+  llmFetchJson,
+  llmTimeoutMessage,
+} from '../ai/llm/llm-http'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import {
@@ -436,24 +444,38 @@ export class LlmAdvisorService {
       })
     }
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
-    let res: Response
+    let res: Awaited<ReturnType<typeof llmFetchJson>>
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: cfg.model,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: cfg.temperature,
-          stream: false,
-          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
-          ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
-        }),
-      })
-    } catch {
+      res = await llmFetchJson(
+        url,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: cfg.model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+            temperature: cfg.temperature,
+            stream: false,
+            // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
+            ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
+          }),
+        },
+        { timeoutMs: LLM_TIMEOUT_MS },
+      )
+    } catch (error) {
+      if (error instanceof LlmBusyError) {
+        this.logger.warn(`advisor.llm busy limit=${error.limit}`)
+        throw new ServiceUnavailableException({ error: { code: 'AI_BUSY', message: LLM_BUSY_MESSAGE } })
+      }
+      if (error instanceof LlmTimeoutError) {
+        this.logger.warn(`advisor.llm timeout ms=${error.timeoutMs}`)
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_ADVISOR_TIMEOUT', message: llmTimeoutMessage('AI 顾问', error.timeoutMs) },
+        })
+      }
       this.logger.error('advisor.llm network_error')
       throw new ServiceUnavailableException({
         error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' },
@@ -467,12 +489,12 @@ export class LlmAdvisorService {
         error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` },
       })
     }
-    const data = (await res.json()) as {
+    const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
       usage?: RawLlmUsage
-    }
-    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
-    const reply = data.choices?.[0]?.message?.content?.trim()
+    } | null
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
+    const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({
         error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' },
