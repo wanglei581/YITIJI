@@ -18,6 +18,7 @@ import type {
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from './llm-config.service'
 import type { AiModelFeatureKey } from './llm-config.service'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 
 interface ChatMessage {
@@ -202,7 +203,14 @@ export class LlmChatService {
     }
   }
 
-  async chat(input: ChatInput): Promise<ChatOutput> {
+  async chat(
+    input: ChatInput,
+    /**
+     * AI-COST-TRUTH：每次真实 LLM 调用回调一次元数据，由调用方累计后落 AiServiceLog。
+     * 只传 provider/token 元数据，不含任何对话正文。
+     */
+    onLlmCall?: AiLlmCallSink,
+  ): Promise<ChatOutput> {
     const sessionId = input.sessionId ?? `session-${Date.now()}`
     const apiKey = this.config.getApiKey('assistant_chat')
     const cfg = this.config.getConfig('assistant_chat')
@@ -224,7 +232,7 @@ export class LlmChatService {
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
-    const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages)
+    const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages, onLlmCall)
     const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
@@ -258,7 +266,11 @@ export class LlmChatService {
     model: string,
     temperature: number,
     messages: ChatMessage[],
+    onLlmCall?: AiLlmCallSink,
   ): Promise<string> {
+    // AI-COST-TRUTH：落账标签必须含厂商名，否则定价表匹配不到 → 永远算不出成本。
+    // 只放 vendor/model，**不含** apiKey / baseURL。
+    const providerLabel = `llm:${vendor}:${model}`
     const url = `${baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Response
     try {
@@ -278,6 +290,8 @@ export class LlmChatService {
     }
 
     if (!res.ok) {
+      // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
+      onLlmCall?.({ provider: providerLabel })
       this.logger.error(
         `LLM 上游错误: category=upstream_non_2xx status=${res.status} statusText=${safeLogValue(res.statusText)} feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
       )
@@ -286,7 +300,10 @@ export class LlmChatService {
 
     const data = await res.json() as {
       choices?: Array<{ message?: { content?: string } }>
+      usage?: RawLlmUsage
     }
+    // 在「内容为空」判断之前回报：内容为空这次调用照样花钱，不能因为解析失败就丢账。
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException('AI 模型未返回内容')
