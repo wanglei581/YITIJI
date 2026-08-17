@@ -68,8 +68,25 @@ preflight() {
     [[ "$resolved" == "$kr" || "$resolved" == "$kr"/* ]] && refuse "命中保留锚点 $keep：$target"
   done
 
-  # 4. 不是挂载点
+  # 4. 自身不是挂载点
   mount 2>/dev/null | awk '{print $3}' | grep -Fxq "$resolved" && refuse "是挂载点：$target"
+
+  # 4b. **内部**也不得有挂载点。
+  # 2026-08-17 实测发现：/srv/ai-job-print-deploy-backups 用 `du -xsm`（不跨文件系统）
+  # 量出 1126MB，用 `du -sm`（跨）量出 2055MB —— 差 929MB，说明它内部挂着别的文件系统。
+  # 只查目录自身是不够的：mv 一个内含挂载点的目录会失败或产生意外行为（跨设备 rename）。
+  if mount 2>/dev/null | awk '{print $3}' | grep -q "^$resolved/"; then
+    refuse "内部含挂载点（mv 会跨设备失败）：$target"
+  fi
+
+  # 4c. 报出两种口径的体积差，差异大即提示内部有跨文件系统内容
+  local sz_x sz_all
+  sz_x="$(du -xsm "$target" 2>/dev/null | cut -f1)"
+  sz_all="$(du -sm "$target" 2>/dev/null | cut -f1)"
+  if [ -n "$sz_x" ] && [ -n "$sz_all" ] && [ "$sz_all" -gt "$(( sz_x + 100 ))" ]; then
+    echo "   ⚠️ 体积口径差异：du -xsm=${sz_x}MB / du -sm=${sz_all}MB（差 $(( sz_all - sz_x ))MB）"
+    echo "      说明内部含跨文件系统内容。已通过挂载点检查，但请人工确认后再 execute。"
+  fi
 
   # 5. 无进程持有其内文件
   if command -v lsof >/dev/null 2>&1; then
