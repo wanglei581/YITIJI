@@ -9,9 +9,11 @@ import { PolicyEligibilityService } from './policy-eligibility.service'
 import {
   CreatePolicyPostDto,
   PolicyEligibilityCheckDto,
+  PolicyEligibilityPreviewDto,
   ReplacePolicyEligibilityRulesDto,
   UpdatePolicyPostDto,
 } from './dto/policy.dto'
+import { POLICY_RULE_MANUAL_MODE, type PolicyRuleMatchMode } from './policy-eligibility.types'
 import { ReviewActionDto } from '../jobs/dto/review.dto'
 import { PublishActionDto } from '../jobs/dto/publish.dto'
 
@@ -29,6 +31,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
  *     PATCH  /partner/policies/:id                编辑(强制回 pending+draft 重审)
  *     GET    /partner/policies/:id/eligibility-rules
  *     PUT    /partner/policies/:id/eligibility-rules  整组替换(强制回 pending+draft)
+ *     POST   /partner/policies/:id/eligibility-preview 录入面试算(与公开核对同一判定路径)
  *     PATCH  /partner/policies/:id/publish        下架(unpublish)
  *     DELETE /partner/policies/:id                删除(留审计)
  *   Admin(Bearer + admin):
@@ -127,18 +130,46 @@ export class PoliciesController {
   ) {
     return this.eligibility.replacePartnerRules(
       id,
-      dto.rules.map((r) => ({
-        label: r.label,
-        sourceText: r.sourceText,
-        matchMode: r.matchMode === 'any' ? 'any' : 'all',
-        clauses: r.clauses.map((c) => ({
-          questionKey: c.questionKey,
-          satisfiedValues: c.satisfiedValues,
-          conflictValues: c.conflictValues ?? [],
-        })),
-      })),
+      dto.rules.map((r) => {
+        const matchMode = (['all', 'any', POLICY_RULE_MANUAL_MODE].includes(r.matchMode)
+          ? r.matchMode
+          : 'all') as PolicyRuleMatchMode
+        return {
+          label: r.label,
+          sourceText: r.sourceText,
+          matchMode,
+          // 「只能人工核对」一律丢弃子句：写入校验会拒非空子句，
+          // 这里不做静默清洗，把非法输入原样送进校验，让机构看到明确报错。
+          clauses: (r.clauses ?? []).map((c) => ({
+            questionKey: c.questionKey,
+            satisfiedValues: c.satisfiedValues,
+            conflictValues: c.conflictValues ?? [],
+          })),
+        }
+      }),
       user,
     )
+  }
+
+  /**
+   * 录入面「试算」：拿一组假想作答，预览这条政策会被判成什么。
+   *
+   * 与公开 POST /policies/eligibility-check 走**同一条**判定路径
+   * （PolicyEligibilityService.evaluateRow），差别只在取数门槛：
+   * 这里按机构取本机构政策、不要求已审已发（草稿状态下正要试算）。
+   *
+   * 假想作答同样不落库、不进审计（与公开核对同口径）。
+   */
+  @Post('partner/policies/:id/eligibility-preview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  previewPartnerEligibility(
+    @Param('id') id: string,
+    @Body() dto: PolicyEligibilityPreviewDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.eligibility.previewPartnerRules(id, { answers: dto.answers }, user)
   }
 
   @Patch('partner/policies/:id/publish')

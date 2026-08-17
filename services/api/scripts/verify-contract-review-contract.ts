@@ -88,6 +88,12 @@ type ExpectedContractReviewTaskView = {
   ocrConfidence: 'high' | 'medium' | 'low' | null
   expiresAt: string
   progress: ExpectedContractReviewProgress
+  // 服务端下发的预计耗时与服务端自己的超时预算同源；客户端不再各自维护公式。
+  estimatedSeconds: number
+  // 失败原因必须能到达客户端。缺了这两个字段，小程序拿到 failed
+  // 就只能显示「服务端未说明原因」——那是产品缺陷，不只是排查不便。
+  failureCode: string | null
+  failureReason: string | null
   result: ExpectedContractReviewResult | null
 }
 
@@ -173,6 +179,9 @@ const view: ContractReviewTaskView = {
   ocrConfidence: 'high',
   expiresAt: '2026-08-01T12:00:00.000Z',
   progress: { stage: 'completed', completedPages: 1, totalPages: 1 },
+  estimatedSeconds: 35,
+  failureCode: null,
+  failureReason: null,
   result: {
     priorityCheckCount: 1,
     attentionCount: 0,

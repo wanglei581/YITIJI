@@ -228,6 +228,34 @@
 .interview-session__mic-error strong,
 .interview-session__mic-error span { display: block; color: var(--interview-error); }
 .interview-session__mic-error span { margin-top: 2px; font-size: 12px; }
+/* 语音入口被能力门禁置灰时的常显原因。触屏无 hover，原因不能只放 title。 */
+.interview-session__mic-reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 13px;
+  border: 1px solid rgba(193, 74, 52, .28);
+  border-radius: var(--interview-radius-sm);
+  background: var(--interview-error-soft);
+  color: var(--interview-error);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.interview-session__mic-reason > svg { flex: none; width: 18px; height: 18px; }
+.interview-session__mic-reason > span { flex: 1 1 220px; }
+/* 一体机触控：可点区域不小于 48px（CLAUDE.md §9）。 */
+.interview-session__mic-recheck {
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
 .interview-session__error {
   flex: none;
   margin-bottom: 12px;
