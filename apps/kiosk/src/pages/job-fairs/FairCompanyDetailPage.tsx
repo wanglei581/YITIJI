@@ -5,6 +5,7 @@ import { BuildingIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getFairCompanyById, prepareFairCompanyPrint } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { recordExternalJump } from '../../services/api/activity'
+import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
 import {
@@ -84,8 +85,10 @@ export function FairCompanyDetailPage() {
   // 打印文件由后端按库内展示数据实时渲染成短期 FileObject，前端只消费真实的
   // fileId / printFileUrl / pageCount；不再自造没有 fileUrl 的假 PrintFile
   // （那会让 PrintPreviewPage 判定 unavailable，点了永远不出纸）。
-  const returnUrl   = company ? `/job-fairs/${fairId}/companies/${companyId}` : undefined
-  const returnLabel = company?.companyName
+  // 这里原来算了 returnUrl / returnLabel 传给 `/print/preview`，但打印链路
+  // 从头到尾没有消费点：`PrintPreviewPage` 的 LocationState 只有
+  // {file, materialCheck?, source?}，且它往下游只显式转发这几个键，
+  // 所以这两个值连传都传不过去。删掉，不留「返回路径已经接好了」的假象。
   // mock 模式没有后端渲染能力，按钮如实置灰，而不是点了没反应
   const printBackendReady = API_MODE === 'http'
 
@@ -106,8 +109,6 @@ export function FairCompanyDetailPage() {
             fileUrl:  printable.printFileUrl,
             mimeType: printable.mimeType,
           },
-          returnUrl,
-          returnLabel,
         },
       })
     } catch (err) {
@@ -159,12 +160,32 @@ export function FairCompanyDetailPage() {
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
             返回列表
           </button>
+          {isValidSourceUrl(company.sourceUrl) ? null : (
+            <span id="fair-company-bar-blocked" className="jf-action-note">
+              {SOURCE_APPLY_UNAVAILABLE_REASON}
+            </span>
+          )}
           <div className="jf-spacer" />
-          <button type="button" className="jf-btn primary" disabled={!isValidSourceUrl(company.sourceUrl)} onClick={openApplyQr}>
+          {/* 能力门禁：aria-disabled + 上面那句常显原因。原生 disabled 会让读屏跳过按钮，
+              触屏又没有 hover，用户就完全拿不到「为什么灰」。放行由 openApplyQr 内部
+              的 `if (!company || !isValidSourceUrl(company.sourceUrl)) return` 兜底。 */}
+          <button
+            type="button"
+            className="jf-btn primary"
+            aria-disabled={!isValidSourceUrl(company.sourceUrl) || undefined}
+            aria-describedby={isValidSourceUrl(company.sourceUrl) ? undefined : 'fair-company-bar-blocked'}
+            onClick={openApplyQr}
+          >
             <QrCodeIcon aria-hidden="true" />
             扫码投递
           </button>
-          <button type="button" className="jf-btn dark" disabled={!isValidSourceUrl(company.sourceUrl)} onClick={openApplyQr}>
+          <button
+            type="button"
+            className="jf-btn dark"
+            aria-disabled={!isValidSourceUrl(company.sourceUrl) || undefined}
+            aria-describedby={isValidSourceUrl(company.sourceUrl) ? undefined : 'fair-company-bar-blocked'}
+            onClick={openApplyQr}
+          >
             <ExternalLinkIcon aria-hidden="true" />
             去来源平台投递
           </button>

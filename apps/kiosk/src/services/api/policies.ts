@@ -24,13 +24,28 @@ export interface PolicyPostView {
   syncTime: string
 }
 
-async function fetchPolicies(): Promise<PolicyPostView[]> {
+/**
+ * 服务端已发布政策数(可能大于本次取回条数)。
+ * /policies 单页上限 200,超过部分不会静默消失 —— 页面据此如实说明。
+ */
+export interface PublishedPoliciesResult {
+  items: PolicyPostView[]
+  /** 服务端 total;拿不到时回退为本次取回条数(不虚构)。 */
+  total: number
+}
+
+async function fetchPolicies(): Promise<PublishedPoliciesResult> {
   const res = await fetch(`${API_BASE_URL}/policies`, {
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error(`HTTP_${res.status}`)
-  const body = (await res.json()) as { data: PolicyPostView[] }
-  return body.data
+  const body = (await res.json()) as {
+    data: PolicyPostView[]
+    pagination?: { total?: number }
+  }
+  const items = body.data
+  const total = typeof body.pagination?.total === 'number' ? body.pagination.total : items.length
+  return { items, total }
 }
 
 const now = () => new Date().toISOString()
@@ -54,9 +69,9 @@ const MOCK_POLICIES: PolicyPostView[] = [
   },
 ]
 
-export async function getPublishedPolicies(): Promise<PolicyPostView[]> {
+export async function getPublishedPolicies(): Promise<PublishedPoliciesResult> {
   if (API_MODE !== 'http') {
-    return [...MOCK_POLICIES]
+    return { items: [...MOCK_POLICIES], total: MOCK_POLICIES.length }
   }
   return fetchPolicies()
 }

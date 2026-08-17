@@ -38,6 +38,7 @@
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
     "verify:p39-print-hub-fidelity": "node scripts/verify-p39-print-hub-fidelity.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
+    "verify:file-display-truth": "node scripts/verify-file-display-truth.mjs",
     "verify:kiosk-feedback-entry": "node scripts/verify-kiosk-feedback-entry.mjs",
     "verify:print-parameter-capability": "node scripts/verify-print-parameter-capability.mjs",
     "verify:device-status-honest": "node scripts/verify-device-status-honest.mjs",
@@ -102,7 +103,8 @@
     "verify:kiosk-ai-primitives": "node scripts/verify-kiosk-ai-primitives.mjs",
     "verify:advisor-provider-gate": "node scripts/verify-advisor-provider-gate.mjs",
     "verify:scan-input-safety": "node scripts/verify-scan-input-safety.mjs",
-    "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts"
+    "test:browser:scan-safety": "playwright test --config=playwright.scan-safety.config.ts",
+    "verify:kiosk-frontend-debt": "node scripts/verify-kiosk-frontend-debt.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

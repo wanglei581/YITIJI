@@ -33,6 +33,7 @@ import type {
   FairLiveStats,
 } from '../../types/fair'
 import type { ExternalJobFair } from '@ai-job-print/shared'
+import type { JobFairQueryParams } from './jobFairs'
 import { MOCK_FAIRS } from '../../data/externalSources'
 import {
   FAIR_ZONES_MAP,
@@ -208,9 +209,20 @@ const FAIR_STATUS_RANK: Record<ExternalJobFair['status'], number> = {
   ended: 2,
 }
 
-function orderTerminalScopedMockFairs(fairs: ExternalJobFair[], terminalId?: string): ExternalJobFair[] {
-  if (!terminalId) return fairs
+/**
+ * 与服务端默认排序保持一致:未结束的排在前面,已结束的沉底。
+ * (改动前这里只在传了 terminalId 时才排序,和服务端旧实现犯同一个错。)
+ */
+function orderMockFairs(fairs: ExternalJobFair[]): ExternalJobFair[] {
   return [...fairs].sort((a, b) => FAIR_STATUS_RANK[a.status] - FAIR_STATUS_RANK[b.status])
+}
+
+/** 与服务端 keyword 一致:对整个集合检索,而不是只搜当前页。 */
+function matchesMockFairKeyword(fair: ExternalJobFair, keyword?: string): boolean {
+  const kw = keyword?.trim()
+  if (!kw) return true
+  return [fair.name, fair.sourceName, fair.venue, fair.city, fair.description]
+    .some((field) => (field ?? '').includes(kw))
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -218,15 +230,14 @@ function orderTerminalScopedMockFairs(fairs: ExternalJobFair[], terminalId?: str
 // ──────────────────────────────────────────────────────────────
 
 export const mockJobFairAdapter = {
-  async getJobFairs(params?: { status?: string; terminalId?: string }): Promise<PaginatedResponse<ExternalJobFairDTO>> {
-    const fairs = orderTerminalScopedMockFairs(
+  async getJobFairs(params?: JobFairQueryParams): Promise<PaginatedResponse<ExternalJobFairDTO>> {
+    const fairs = orderMockFairs(
       MOCK_FAIRS
         .filter((f) => f.reviewStatus === 'approved' && f.publishStatus === 'published')
-        .filter((f) => !params?.status || f.status === params.status),
-      params?.terminalId,
-    )
-      .map(toJobFairDTO)
-    return makePaginated(fairs)
+        .filter((f) => !params?.status || f.status === params.status)
+        .filter((f) => matchesMockFairKeyword(f, params?.keyword)),
+    ).map(toJobFairDTO)
+    return makePaginated(fairs, params?.page ?? 1, params?.pageSize ?? 100)
   },
 
   async getJobFairById(id: string): Promise<ApiResponse<ExternalJobFairDTO | null>> {

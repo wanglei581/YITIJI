@@ -172,7 +172,8 @@ export function InterviewSetupPage() {
           interviewerType,
           position: pos,
           firstQuestion: first.question,
-          firstQType: first.qType,
+          // 不传 firstQType：会话页读的是 firstQuestion / questionTarget 等键，
+          // 从未读过 qType。类型里声明过不等于有人消费。
         },
       })
     } catch (err) {

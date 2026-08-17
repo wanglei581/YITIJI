@@ -437,7 +437,16 @@ export function SelfAssessmentResultPage() {
     setTaskError(null)
     const request = mode === 'submit'
       ? submitSelfAssessment(
-          { answers: pendingAnswers, consent: { nonSensitive: session.consent.nonSensitive, sensitive: session.consent.sensitive } },
+          {
+            answers: pendingAnswers,
+            // 送会话里存的那一版，不是 SELF_ASSESSMENT_CONSENT_VERSION 常量：
+            // 报「用户实际同意的是哪一版」，而不是「本次构建认为当前是哪一版」。
+            consent: {
+              nonSensitive: session.consent.nonSensitive,
+              sensitive: session.consent.sensitive,
+              consentVersion: session.consentVersion,
+            },
+          },
           { token: getToken(), accessToken: session.accessToken },
         )
       : getLatestSelfAssessment(linkedTaskId as string, { token: getToken(), accessToken: session.accessToken })
@@ -461,7 +470,7 @@ export function SelfAssessmentResultPage() {
         if (mountedRef.current) setTaskError(err instanceof SelfAssessmentApiError ? err.message : mode === 'submit' ? '提交失败，请稍后重试' : '这次结果读取失败，请稍后重试')
       })
       .finally(() => { if (mountedRef.current) setInflight(null) })
-  }, [attempt, consentOk, getToken, linkedTaskId, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive])
+  }, [attempt, consentOk, getToken, linkedTaskId, pendingAnswers, pendingComplete, result, session.accessToken, session.consent.nonSensitive, session.consent.sensitive, session.consentVersion])
 
   // ── AI 任务四态（S1-1）。取的全是后端真值，前端没有可以自行推进的地方。 ──
   //   unavailable —— 后端明说 LLM 调不通（`llm-self-assessment.service.ts:113-118`）；

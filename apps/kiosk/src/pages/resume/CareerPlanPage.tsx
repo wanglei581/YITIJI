@@ -63,7 +63,7 @@ type PreconditionGate = 'missing' | 'rejected'
  */
 const AI_OUTAGE_CODES = new Set(['AI_NOT_CONFIGURED', 'AI_UNAVAILABLE', 'MOCK_MODE', 'NETWORK_ERROR'])
 
-const SELF_ASSESSMENT_ROUTE = '/resume/self-assessment/intro?from=career-plan'
+const SELF_ASSESSMENT_ROUTE = '/resume/self-assessment/intro'
 
 /**
  * AI 挂掉时仍然拿得到的东西。

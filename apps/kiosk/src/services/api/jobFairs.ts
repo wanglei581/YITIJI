@@ -30,8 +30,21 @@ import { httpJobFairAdapter } from './httpAdapter'
 // 服务接口类型（供两种 adapter 共同实现）
 // ──────────────────────────────────────────────────────────────
 
+/**
+ * 招聘会列表查询参数。
+ * status / keyword 由服务端下推到数据库(不是前端在当前页本地过滤),
+ * 因此返回的 pagination.total 是「按该条件真实可翻到的条数」。
+ */
+export interface JobFairQueryParams {
+  status?: string
+  keyword?: string
+  terminalId?: string
+  page?: number
+  pageSize?: number
+}
+
 export interface JobFairServiceInterface {
-  getJobFairs(params?: { status?: string; terminalId?: string }): Promise<PaginatedResponse<ExternalJobFairDTO>>
+  getJobFairs(params?: JobFairQueryParams): Promise<PaginatedResponse<ExternalJobFairDTO>>
   getJobFairById(id: string): Promise<ApiResponse<ExternalJobFairDTO | null>>
   getFairCompanies(fairId: string): Promise<PaginatedResponse<FairCompanyDTO>>
   getFairCompanyById(fairId: string, companyId: string): Promise<ApiResponse<FairCompanyDTO | null>>
@@ -61,7 +74,7 @@ const adapter: JobFairServiceInterface =
 // 导出服务函数（页面层不感知 adapter 切换）
 // ──────────────────────────────────────────────────────────────
 
-export const getJobFairs        = (params?: { status?: string; terminalId?: string }) => adapter.getJobFairs(params)
+export const getJobFairs        = (params?: JobFairQueryParams) => adapter.getJobFairs(params)
 export const getJobFairById     = (id: string)                    => adapter.getJobFairById(id)
 export const getFairCompanies   = (fairId: string)                => adapter.getFairCompanies(fairId)
 export const getFairCompanyById = (fairId: string, companyId: string) => adapter.getFairCompanyById(fairId, companyId)

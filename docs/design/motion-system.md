@@ -3,7 +3,7 @@
 > 适用范围：AI求职打印服务终端 —— 一体机前台（Kiosk）、管理员后台、合作机构后台。
 > 本文档为历史动效参考，不再要求所有页面统一遵守。各页可根据当前设计任务自定义时长、缓动、动画库和动效语言。
 > 不可覆盖的底线是：不伪造成功状态、不掩盖错误 / 离线 / 硬件失败、不降低触控可用性和可访问性。
-> 配套可交互演示台：`docs/design/motion-playground.html`。
+> 配套演示台 `docs/design/motion-playground.html` 已于 2026-08-17 删除（全仓零引用，仅本文提及）。本文即动效 token 的唯一口径。
 
 ---
 
@@ -214,4 +214,4 @@
 
 ---
 
-_维护：本参考与 `motion-playground.html` 为配套资产。修改 token 时建议同步更新两者，并在 `docs/progress/current-progress.md` 记录。_
+_维护：本文是动效 token 的唯一口径（配套演示台已删除）。修改 token 时在 `docs/progress/current-progress.md` 记录。_

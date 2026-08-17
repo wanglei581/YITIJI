@@ -107,7 +107,8 @@ const CAPABILITIES: Capability[] = [
     title: '行业薪资参考',
     description: '问AI顾问了解目标岗位的市场薪资范围和谈薪技巧',
     to: '/assistant',
-    state: { topic: 'salary' },
+    // 不传 `state.topic`：`/assistant` 不读 location.state（认的是 `?intent=`，
+    // 且取值须是 advisorScenes 的 skill id，'salary' 不是）。传了必被丢弃。
   },
 ]
 

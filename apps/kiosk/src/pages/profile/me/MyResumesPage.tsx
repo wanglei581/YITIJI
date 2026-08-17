@@ -266,7 +266,8 @@ function ActionButton({
       title={disabled ? disabledReason : label}
       aria-label={disabled ? `${ariaLabel}（${disabledReason}）` : ariaLabel}
       className={[
-        'me-ripple inline-flex min-h-[44px] items-center gap-1.5 overflow-hidden rounded-full border px-3 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-100',
+        // CLAUDE.md §9：可点击区不小于 48px。原为 44px，低于下限（#620 已登记未修）。
+        'me-ripple inline-flex min-h-[48px] items-center gap-1.5 overflow-hidden rounded-full border px-3 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-100',
         disabled
           ? 'cursor-not-allowed border-[rgba(16,48,43,0.08)] bg-[rgba(16,48,43,0.04)] text-[color:var(--muted)] opacity-55'
           : 'border-[rgba(16,48,43,0.12)] bg-[rgba(255,253,248,0.78)] text-[color:var(--ink-2)] hover:bg-[rgba(16,48,43,0.08)] hover:text-[color:var(--ink)]',
