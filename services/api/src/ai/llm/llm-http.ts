@@ -236,7 +236,14 @@ export async function llmFetchJson(
 /** 用户可见的「AI 正忙」文案：如实说明发生了什么 + 其他功能没坏。 */
 export const LLM_BUSY_MESSAGE = 'AI 当前请求过多，本次未开始处理，请稍后再试；打印、扫描等其他功能不受影响'
 
-/** 用户可见的超时文案：明说「响应超时」和「未生成结果」，不写成含糊的「请稍后重试」。 */
+/**
+ * 用户可见的超时文案：明说「响应超时」和「未生成结果」，不写成含糊的「请稍后重试」。
+ *
+ * 秒数下取 1：`Math.round` 对亚秒值会算出 0，界面上「已等待 0 秒」是句假话。
+ * 生产路径上到不了（env 读取把下限夹在 5 秒），但文案函数不该依赖调用方夹好了值 ——
+ * 这是本 PR 与 #698 配额回滚做联合验证时用 400ms 触发出来的。
+ */
 export function llmTimeoutMessage(label: string, timeoutMs: number): string {
-  return `${label}响应超时（已等待 ${Math.round(timeoutMs / 1000)} 秒），本次未生成结果，请稍后重试`
+  const seconds = Math.max(1, Math.round(timeoutMs / 1000))
+  return `${label}响应超时（已等待 ${seconds} 秒），本次未生成结果，请稍后重试`
 }

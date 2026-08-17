@@ -384,6 +384,8 @@ async function runtimeChecks(): Promise<void> {
   check('6.a 超时文案明说「超时」', timeoutText.includes('超时'), timeoutText)
   check('6.b 超时文案说明未生成结果（不伪造成功）', timeoutText.includes('未生成结果'), timeoutText)
   check('6.c 超时文案带上实际等待时长', timeoutText.includes('45'), timeoutText)
+  // 亚秒值不能渲染成「已等待 0 秒」—— 那是句假话。
+  check('6.c2 亚秒超时不会说成「0 秒」', !llmTimeoutMessage('AI 助手', 400).includes('0 秒'), llmTimeoutMessage('AI 助手', 400))
   check('6.d 「正忙」文案不伪造成功态', !/已完成|已生成|成功/.test(LLM_BUSY_MESSAGE), LLM_BUSY_MESSAGE)
   check(
     '6.e 「正忙」文案说明其他功能不受影响',
