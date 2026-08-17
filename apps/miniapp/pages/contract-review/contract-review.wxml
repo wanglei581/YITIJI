@@ -81,8 +81,26 @@
 
       <block wx:elif="{{step === 'running'}}">
         <view class="cr-run">
-          <view class="cr-run-t">{{statusText}}</view>
-          <view class="cr-note">合同页数多时需要稍等，请不要退出。</view>
+          <!-- 进度按服务端真实状态推进，不做匀速假动画：没有真实进度数据时
+               编一个自己会走的条，等于伪造能力（§9）。每一格点亮都对应
+               服务端一次真实状态变化。 -->
+          <view class="pg-bar">
+            <view class="pg-fill" style="width:{{stageIdx < 0 ? 0 : (stageIdx + 1) * 20}}%"></view>
+          </view>
+          <view class="pg-step">第 {{stageIdx < 0 ? 1 : stageIdx + 1}} 步 / 共 5 步</view>
+
+          <view class="pg-list">
+            <view class="pg-item {{index < stageIdx ? 'done' : (index === stageIdx ? 'cur' : '')}}"
+                  wx:for="{{stages}}" wx:key="key">
+              <view class="pg-dot"><text wx:if="{{index < stageIdx}}" class="ficon i-check"></text></view>
+              <view class="pg-copy">
+                <view class="pg-label">{{item.label}}</view>
+                <view class="pg-note" wx:if="{{index === stageIdx}}">{{item.note}}</view>
+              </view>
+            </view>
+          </view>
+
+          <view class="cr-note">已等待 {{waitedSec}} 秒{{etaSec ? '，预计约 ' + etaSec + ' 秒' : ''}}。AI 分析这一步最慢，请不要退出。</view>
         </view>
       </block>
 

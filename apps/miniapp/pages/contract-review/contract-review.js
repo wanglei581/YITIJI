@@ -52,6 +52,19 @@ function isCancel(err) {
   return /cancel/i.test((err && err.errMsg) || '')
 }
 
+// 服务端状态机的真实阶段。进度条按「第 N 步 / 共 5 步」推进，
+// 不用假的百分比动画——没有真实进度数据时，编一个匀速前进的条
+// 等于伪造能力（§9）。用户看到的每一次前进，都对应服务端一次真实状态变化。
+const STAGES = [
+  { key: 'queued',           label: '排队中',     note: '任务已提交，等待处理' },
+  { key: 'extracting',       label: '识别文字',   note: '正在从文件中提取合同文本' },
+  { key: 'rule_checking',    label: '比对条款',   note: '按规则库逐条比对' },
+  { key: 'ai_analyzing',     label: 'AI 分析',    note: '模型正在逐条判断风险，这一步最慢' },
+  { key: 'safety_reviewing', label: '复核结果',   note: '校验结论是否可靠' },
+]
+// uploaded 归入 queued，二者对用户是同一件事
+const STAGE_INDEX = { uploaded: 0, queued: 0, extracting: 1, rule_checking: 2, ai_analyzing: 3, safety_reviewing: 4 }
+
 const STAGE_TEXT = {
   uploaded:          '已上传，排队中…',
   queued:            '排队中…',
@@ -127,7 +140,11 @@ function buildScopeRows(d) {
 Page({
   data: {
     statusBarHeight: 20,
-    step: 'pick',          // pick → consent → running → confirm → running → report
+    step: 'pick',
+    stages: STAGES,
+    stageIdx: -1,
+    waitedSec: 0,
+    etaSec: 0,          // pick → consent → running → confirm → running → report
     // 页面上的格式说明直接取常量，避免文案和实际能选的扩展名各改各的。
     formatHint: FORMAT_HINT,
     types: [],
@@ -415,7 +432,12 @@ Page({
       if (t.status === 'cancelled') { this._reset('任务已取消'); return }
       if (t.status === 'expired')   { this._reset('任务已过期，请重新发起'); return }
       if (t.status === 'awaiting_confirmation') return this._toConfirm(t)
-      this.setData({ statusText: STAGE_TEXT[t.status] || '正在处理…' })
+      const idx = STAGE_INDEX[t.status]
+      this.setData({
+        statusText: STAGE_TEXT[t.status] || '正在处理…',
+        stageIdx: idx === undefined ? this.data.stageIdx : idx,
+        waitedSec: tries * 2,
+      })
       return new Promise(r => setTimeout(r, POLL_MS)).then(() => this._poll(id, tries + 1))
     })
   },
@@ -427,6 +449,7 @@ Page({
    * 所以原样带走，不做任何兜底填充。
    */
   _toConfirm(t) {
+    this.setData({ etaSec: this._estimate(t.analyzedPages || t.totalPages || 1) })
     if (!Number.isSafeInteger(t.totalPages) || t.totalPages < 1) {
       // 页数对不上就无法通过服务端的 matchesExtraction 校验，这条任务走不下去了。
       this._reset('未能识别出合同页数，请换更清晰的照片或合同原始文件重试')
