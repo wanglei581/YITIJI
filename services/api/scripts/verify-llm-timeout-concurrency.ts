@@ -49,6 +49,41 @@ import {
 
 const SRC_ROOT = join(__dirname, '..', 'src')
 
+// ---------------------------------------------------------------------------
+// 失败闭合（fail-closed）：门禁只有「跑完并打印结论」才算通过
+//
+// 这三道防线是被自己抓出来的：注入「拆掉并发上限判断」时，第 3 个调用不再被拒、
+// 转而永久挂起，脚本停在 3.d 不动；等所有 setTimeout 烧完，事件循环排空，
+// **Node 以退出码 0 静默退出**，连最终汇总都没打印 —— 门禁「变绿」了。
+// 挂起而不失败是最危险的形态：CI 会当它通过，或者当成 flaky 重跑掉。
+//
+//   ① 退出码默认 1，只有走到最后一行才置 0：任何提前排空都是红。
+//   ② 全局看门狗：既兜住「卡住不动」，又因为它是活跃 timer，
+//      事件循环不可能在它到期前排空 —— 静默退出这条路被物理堵死。
+//   ③ 单点看门狗：见各处 withWatchdog()，让红报在具体那条断言上而不是笼统超时。
+// ---------------------------------------------------------------------------
+process.exitCode = 1
+
+const GLOBAL_WATCHDOG_MS = 120_000
+const globalWatchdog = setTimeout(() => {
+  console.log(`\n  FAIL  门禁自身超过 ${GLOBAL_WATCHDOG_MS / 1000} 秒未跑完 —— 存在挂起路径，按失败处理`)
+  console.log('FAILED  门禁未跑完（挂起）')
+  process.exit(1)
+}, GLOBAL_WATCHDOG_MS)
+
+/**
+ * 给可能永久挂起的 await 套一层看门狗。
+ * 超时返回一个 Error（而不是继续等），让调用处的断言正常判负。
+ */
+async function withWatchdog<T>(promise: Promise<T>, ms: number, what: string): Promise<T | Error> {
+  const marker = Symbol('watchdog')
+  const outcome = await Promise.race([
+    promise.catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
+    new Promise<typeof marker>((resolve) => setTimeout(() => resolve(marker), ms)),
+  ])
+  return outcome === marker ? new Error(`看门狗触发：${what}没有在 ${ms}ms 内返回`) : (outcome as T | Error)
+}
+
 let passed = 0
 const failures: string[] = []
 
@@ -312,12 +347,14 @@ async function runtimeChecks(): Promise<void> {
   check('3.c 前 2 个占住槽位', gate.inFlightCount === 2, `在途 ${gate.inFlightCount}`)
 
   const rejectedAt = Date.now()
-  let third: unknown = null
-  try {
-    await llmFetchJson('http://127.0.0.1:1/chat/completions', init, opts)
-  } catch (error) {
-    third = error
-  }
+  // 看门狗必需：闸门一旦失效，第 3 个不会被拒而是跟着挂起，这里会永久卡住。
+  // 没有它，脚本会停在这一行、等所有 timer 烧完后事件循环排空，
+  // Node 退出码 0 静默退出 —— 门禁「变绿」。这条路必须堵死。
+  const third = await withWatchdog(
+    llmFetchJson('http://127.0.0.1:1/chat/completions', init, opts),
+    3_000,
+    '超限的第 3 个调用',
+  )
   const rejectElapsed = Date.now() - rejectedAt
 
   check(
@@ -331,20 +368,14 @@ async function runtimeChecks(): Promise<void> {
 
   // 放掉前两个，槽位必须能复用 —— 否则闸门会把自己锁死。
   for (const settle of settlers) settle()
-  await Promise.all([first, second])
+  await withWatchdog(Promise.all([first, second]), 3_000, '前两个调用收尾')
   check('3.h 释放后槽位归零', gate.inFlightCount === 0, `在途 ${gate.inFlightCount}`)
 
-  let fourth: unknown = 'no-throw'
-  try {
-    const done = llmFetchJson('http://127.0.0.1:1/chat/completions', init, opts)
-    await new Promise((r) => setTimeout(r, 20))
-    for (const settle of settlers) settle()
-    await done
-    fourth = null
-  } catch (error) {
-    fourth = error
-  }
-  check('3.i 槽位释放后可以继续服务', fourth === null, `实际：${String(fourth)}`)
+  const done = llmFetchJson('http://127.0.0.1:1/chat/completions', init, opts)
+  await new Promise((r) => setTimeout(r, 20))
+  for (const settle of settlers) settle()
+  const fourth = await withWatchdog(done, 3_000, '释放后的新调用')
+  check('3.i 槽位释放后可以继续服务', !(fourth instanceof Error), `实际：${String(fourth)}`)
 
   // -------------------------------------------------------------------------
   console.log('\n[6] 用户可见文案如实说明发生了什么')
@@ -365,12 +396,23 @@ async function runtimeChecks(): Promise<void> {
   check('7.b 长文档档更长但仍有硬上限', LLM_LONG_TIMEOUT_MS > LLM_TIMEOUT_MS && LLM_LONG_TIMEOUT_MS <= 180_000, `${LLM_LONG_TIMEOUT_MS}ms`)
 }
 
+/**
+ * 断言条数下限：防「跑了一半就宣布通过」。
+ * 派生出的调用点数量会随代码增长，所以只钉一个保守下限，不钉精确值。
+ */
+const MIN_EXPECTED_ASSERTIONS = 55
+
 runtimeChecks()
   .then(() => {
+    clearTimeout(globalWatchdog)
     console.log(`\n${'='.repeat(70)}`)
     if (failures.length > 0) {
       console.log(`FAILED  ${passed} 通过 / ${failures.length} 失败`)
       for (const f of failures) console.log(`  - ${f}`)
+      process.exit(1)
+    }
+    if (passed < MIN_EXPECTED_ASSERTIONS) {
+      console.log(`FAILED  只跑了 ${passed} 条断言（下限 ${MIN_EXPECTED_ASSERTIONS}）—— 门禁被截断，不算通过`)
       process.exit(1)
     }
     console.log(`PASSED  ${passed} 项断言全部通过`)
