@@ -49,6 +49,8 @@ export interface AdminFeedbackTicketDetail extends AdminFeedbackTicketItem {
 export interface ListFeedbackParams {
   status?: FeedbackStatus | 'all'
   category?: FeedbackCategory | 'all'
+  /** 按提交方筛选。匿名一体机工单只能现场处置，运营需要把它单独拉成一条队列。 */
+  submitterType?: FeedbackSubmitterType | 'all'
 }
 
 interface Envelope<T> {
@@ -92,6 +94,7 @@ function feedbackQuery(params: ListFeedbackParams): string {
   const query = new URLSearchParams()
   if (params.status && params.status !== 'all') query.set('status', params.status)
   if (params.category && params.category !== 'all') query.set('category', params.category)
+  if (params.submitterType && params.submitterType !== 'all') query.set('submitterType', params.submitterType)
   const text = query.toString()
   return text ? `?${text}` : ''
 }
