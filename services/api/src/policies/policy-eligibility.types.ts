@@ -163,8 +163,34 @@ export function findEligibilityQuestion(key: string): PolicyEligibilityQuestion 
 
 // ── 条件（规则）模型 ─────────────────────────────────────────────────────────
 
-export const POLICY_RULE_MATCH_MODES = ['all', 'any'] as const
+/**
+ * 条件的判定方式（不只是「多子句合取方式」）：
+ *   all    机械比对：全部子句都要满足
+ *   any    机械比对：任一子句满足即可
+ *   manual **只能人工核对** —— 该条款天然无法机器判定
+ *
+ * 为什么必须有 manual（P21-PARTNER-UI 补齐）：
+ * 真实政策里有大量「经街道办核实的困难家庭」「经认定的就业困难人员」这类条款，
+ * 它们的事实来源在窗口和外部系统，不在用户的九项自述里。若录入面只允许
+ * all/any，运营面对这类条款只有两条路：要么硬塞一个能比对但与政策原文不符的
+ * 规则（＝替政策编造口径，违反红线「政策口径不得由 AI / 任何人猜测补全」），
+ * 要么干脆不录（＝条件在核对结果里彻底消失，用户以为不存在这一关）。
+ * manual 是第三条路：条款照录、原文照留、结论恒为 unknown +「需人工核对」。
+ *
+ * 实现上复用既有 matchMode 字符串列，不新增数据库列 —— 存量行默认 'all' 不受影响。
+ */
+export const POLICY_RULE_MATCH_MODES = ['all', 'any', 'manual'] as const
 export type PolicyRuleMatchMode = (typeof POLICY_RULE_MATCH_MODES)[number]
+
+/** 只能人工核对：不参与机械比对，结论恒为 unknown。 */
+export const POLICY_RULE_MANUAL_MODE = 'manual'
+
+/** 机械比对模式（manual 之外的取值）。 */
+export const POLICY_RULE_AUTOMATIC_MODES = ['all', 'any'] as const
+
+export function isManualRuleMode(mode: string): boolean {
+  return mode === POLICY_RULE_MANUAL_MODE
+}
 
 export interface PolicyEligibilityClause {
   questionKey: string
@@ -179,6 +205,7 @@ export interface PolicyEligibilityRuleInput {
   /** 政策原文摘录，一字不改 —— 判定唯一可追溯的依据 */
   sourceText: string
   matchMode: PolicyRuleMatchMode
+  /** manual 模式必须为空数组：人工核对条款不得挂任何机械比对子句 */
   clauses: PolicyEligibilityClause[]
 }
 
@@ -203,6 +230,7 @@ export const POLICY_CONDITION_REASON_CODES = [
   'ANSWER_UNSURE',
   'ANSWER_NOT_COVERED_BY_RECORDED_CONDITION',
   'MIXED_CLAUSE_RESULTS',
+  'MANUAL_REVIEW_ONLY',
 ] as const
 export type PolicyConditionReasonCode = (typeof POLICY_CONDITION_REASON_CODES)[number]
 
@@ -214,6 +242,7 @@ export const POLICY_CONDITION_REASON_TEXT: Record<PolicyConditionReasonCode, str
   ANSWER_NOT_COVERED_BY_RECORDED_CONDITION:
     '你填写的取值没有被这条政策的已录入条件覆盖，本条无法判定，需人工核对。',
   MIXED_CLAUSE_RESULTS: '本条包含多项子条件，其中有子条件无法判定，需人工核对。',
+  MANUAL_REVIEW_ONLY: '本条按政策原文只能由经办窗口人工核对，本机不做机械比对。',
 }
 
 export interface PolicyConditionBasis {
