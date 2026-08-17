@@ -53,14 +53,25 @@ check(
   home.includes('useHomeJobFairHighlight()') && home.includes('<V6HomeFooterPanels'),
   '首页恢复真实招聘会与本机状态双面板'
 )
+// 审核 / 发布闸门在服务端：getPublishedFairs 的 where 恒带
+// `reviewStatus:'approved', publishStatus:'published'`，而公开列表 DTO
+// （FairListItemDto）**刻意不下发**这两个字段。
+//
+// 这条断言原先要求 hook 里也比对它们，等于把一个 P0 钉死：真实接口下两者恒为
+// undefined，`undefined !== 'approved'` 恒真，每一场都被判不合格，首页永远显示
+// 「暂无进行中或即将开始的招聘会」。mock 数据带这两个字段，所以只在接真后才暴露。
+//
+// 现在反过来断言它们**不在**：谁再把这层不可能成立的过滤加回来就打红。
 check(
   fairHook.includes('getJobFairs(terminalId ? { terminalId } : undefined)') &&
-    fairHook.includes("fair.reviewStatus !== 'approved'") &&
-    fairHook.includes("fair.publishStatus !== 'published'") &&
     fairHook.includes("fair.status !== 'ongoing'") &&
     fairHook.includes("fair.status !== 'upcoming'") &&
     fairHook.includes('endTime > now'),
-  '首页招聘会复用真实接口并二次过滤审核、发布、时态与结束时间'
+  '首页招聘会复用真实接口并过滤时态与结束时间'
+)
+check(
+  !fairHook.includes('fair.reviewStatus') && !fairHook.includes('fair.publishStatus'),
+  '首页不拿列表 DTO 不下发的字段做过滤（审核/发布闸门归服务端）'
 )
 check(
   footer.includes('暂无进行中或即将开始的招聘会') &&
