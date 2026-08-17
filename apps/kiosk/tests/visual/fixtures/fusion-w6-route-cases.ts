@@ -68,6 +68,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/upload/phone', url: '/upload/phone', marker: screen('phone-upload'), featureText: '上传链接已失效' },
   { pattern: '/legal/:doc', url: '/legal/privacy', marker: screen('legal-doc'), featureText: '隐私政策', longText: W6_LONG_LEGAL_TEXT, landmark: 'none' },
   { pattern: '/resume/job-fit', url: '/resume/job-fit', marker: screen('resume-job-fit'), featureText: '岗位匹配', requiresFusionRoot: false },
+  // S2-2 拆页。无 taskId 直达时停在前置缺失态，文案即断言锚点。
+  { pattern: '/resume/job-fit/actions', url: '/resume/job-fit/actions', marker: screen('resume-job-fit-actions'), featureText: '请先完成一次岗位匹配参考', requiresFusionRoot: false },
   { pattern: '/resume/career-plan', url: '/resume/career-plan', marker: screen('resume-career-plan'), featureText: '职业规划', requiresFusionRoot: false },
   { pattern: '/interview/setup', url: '/interview/setup', marker: screen('interview-setup'), featureText: '模拟面试', requiresFusionRoot: false },
   { pattern: '/interview/session', url: '/interview/session', marker: screen('interview-session'), featureText: '会话已失效', requiresFusionRoot: false },
@@ -131,6 +133,8 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/parse', url: '/resume/parse', marker: screen('resume-parse'), featureText: '未找到简历文件' },
   { pattern: '/resume/report', url: '/resume/report', marker: screen('resume-report'), featureText: '还没有诊断报告' },
   { pattern: '/resume/optimize', url: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
+  // S2-1 拆页。同上，无 taskId 直达停在前置缺失态。
+  { pattern: '/resume/optimize/compare', url: '/resume/optimize/compare', marker: screen('resume-optimize-compare'), featureText: '请先完成简历上传与解析' },
   { pattern: '/resume/export', url: '/resume/export', marker: screen('resume-export'), featureText: '导出与打印' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
@@ -168,7 +172,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/', marker: '[data-v6-page="home"]', featureText: '选一件事，直接开始' },
   { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
-] as const // 104 routes (was 99)
+] as const // 106 routes (was 104)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -180,8 +184,9 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 104) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 106) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 102) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+// S2-1 / S2-2 两条新拆页都是一体机竖屏页，kiosk 由 102 增至 104；mobile 仍为 2。
+if (w6KioskCases.length !== 104) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)

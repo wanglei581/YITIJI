@@ -6,6 +6,7 @@ import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
+import { JobFitActionsPage } from '../pages/resume/JobFitActionsPage'
 import { CareerPlanPage } from '../pages/resume/CareerPlanPage'
 import { InterviewSetupPage } from '../pages/interview/InterviewSetupPage'
 import { InterviewSessionPage } from '../pages/interview/InterviewSessionPage'
@@ -65,6 +66,7 @@ import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreview
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
 import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
+import { ResumeOptimizeComparePage } from '../pages/resume/ResumeOptimizeComparePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
 import { JobMaterialLibraryPage } from '../pages/resume/JobMaterialLibraryPage'
@@ -104,6 +106,8 @@ export const kioskRouter = createBrowserRouter([
       // 法律文档可从已登录终端会话进入，不能成为暂停硬隐私截止的逃逸路由。
       { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
+      // S2-2 拆页：比对页做「差在哪」，本页做「怎么办」（矩阵 §3.5）。
+      { path: '/resume/job-fit/actions', element: <JobFitActionsPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/self-assessment/intro', element: <SelfAssessmentIntroPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
@@ -236,6 +240,8 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/parse',      element: <ResumeParsePage /> },
       { path: 'resume/report',     element: <ResumeReportPage /> },
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
+      // S2-1 拆页：逐条原文 vs 候选改写独立成屏（设计基线 09b-resume-optimize.html）。
+      { path: 'resume/optimize/compare', element: <ResumeOptimizeComparePage /> },
       { path: 'resume/export',     element: <ResumeExportPage /> },
       { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
       { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
