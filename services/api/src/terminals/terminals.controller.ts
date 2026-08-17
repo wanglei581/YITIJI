@@ -25,6 +25,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
+import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -102,8 +103,18 @@ export class TerminalsController {
 
   // ── 3. Claim tasks ───────────────────────────────────────────────────────
   // POST /api/v1/terminals/:terminalId/tasks/claim
+  //
+  // 本端点此前无 @Throttle，落进 60 次/分钟的**每 IP** 默认桶。Terminal Agent 每
+  // 5 秒 claim 一次（task-runner.ts `claimIntervalMs ?? 5_000`）= 12 次/分钟/台，
+  // 而一个大厅的 Agent 共用同一个 NAT 出口 IP：
+  //
+  //     5 台 Agent × 12 次/分钟 = 60 次/分钟 = 桶满 → 第 6 台起 claim 429
+  //     → 打印任务领不走 → **整个大厅停印**（不只是进度条不动）
+  //
+  // Agent 本来就发 X-Terminal-Id（api-client.ts:52），所以按台计数无需改 Agent。
   @Post('terminals/:terminalId/tasks/claim')
   @HttpCode(HttpStatus.OK)
+  @TerminalScopedThrottle(30)
   claimTasks(
     @Param('terminalId') terminalId: string,
     @Body() dto: ClaimTasksDto,

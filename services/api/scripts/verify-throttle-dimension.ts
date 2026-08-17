@@ -48,6 +48,9 @@ const TERMINAL_SCOPED_ROUTES = [
   { file: 'src/print-jobs/print-jobs.controller.ts', handler: 'getStatus' },
   { file: 'src/materials/materials.controller.ts', handler: 'getTask' },
   { file: 'src/scan-tasks/scan-tasks.controller.ts', handler: 'status' },
+  // Terminal Agent 每 5 秒 claim 一次；5 台 Agent 就能打满 60 次/分钟的每 IP 桶，
+  // 后果是整个大厅领不走打印任务（比进度条不动严重得多）。
+  { file: 'src/terminals/terminals.controller.ts', handler: 'claimTasks' },
   { file: 'src/ai/ai.controller.ts', handler: 'submitResumeParse' },
   { file: 'src/ai/ai.controller.ts', handler: 'chatWithAssistant' },
 ] as const
