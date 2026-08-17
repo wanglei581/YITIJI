@@ -88,6 +88,19 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
     'JobDetailPage.tsx: 不得向 /print/upload 传 jobId / jobTitle（打印链路没有消费点）',
   )
 
+  // 面试会话页只读 state.firstQuestion；firstQType 全仓无 reader，
+  // 连路由 state 类型里的声明也一并清掉，避免「类型有就等于有人用」的错觉。
+  assert(
+    !/firstQType/.test(read('src/pages/interview/InterviewSetupPage.tsx')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')),
+    'InterviewSetupPage.tsx: 不得向 /interview/session 传 firstQType（会话页只读 firstQuestion）',
+  )
+  assert(
+    !/firstQType/.test(read('src/pages/interview/session/types.ts')),
+    'session/types.ts: 不得保留 firstQType 声明（无消费点）',
+  )
+
   // 自我探索 intro 页不读 `?from=`。
   for (const f of ['src/pages/assistant/advisorScenes.ts', 'src/pages/resume/ResumeReportPage.tsx', 'src/pages/resume/CareerPlanPage.tsx', 'src/services/api/aiMockAdapter.ts']) {
     assert(!/self-assessment\/intro\?from=/.test(read(f)), `${f}: 不得给 self-assessment/intro 带 ?from=（该页不读它）`)

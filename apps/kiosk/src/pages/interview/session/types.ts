@@ -6,7 +6,6 @@ export interface InterviewSessionRouteState {
   interviewerType: string
   position: string
   firstQuestion?: string
-  firstQType?: string
 }
 
 export interface InterviewMessage {

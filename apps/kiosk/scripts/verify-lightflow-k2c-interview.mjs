@@ -89,10 +89,13 @@ for (const token of [
   'accessToken: created.accessToken',
   'questionTarget: created.questionTarget',
   'firstQuestion: first.question',
-  'firstQType: first.qType',
+  // 这里曾要求 `firstQType: first.qType`。该键在 kiosk 侧零消费点：
+  // InterviewSessionPage 只读 state.firstQuestion，`firstQType` 全仓无 reader。
+  // 「传了没人消费」正是 verify:kiosk-frontend-debt ② 要清的形态，
+  // 由那条门禁反向钉死「不得再传」，本合同不再要求它存在。
   'className="flex h-12 w-12',
 ]) {
-  check(setup.includes(token), `Setup 真实链路合同缺失：${token}`)
+  check(setup.includes(token), `${pages[0]} — Setup 真实链路合同缺失：${token}`)
 }
 
 for (const token of [
@@ -109,7 +112,7 @@ for (const token of [
   'const report = await endInterview(state.sessionId, access)',
   'accessToken: state.accessToken, report',
 ]) {
-  check(session.includes(token), `Session 状态/清场合同缺失：${token}`)
+  check(session.includes(token), `${pages[1]} — Session 状态/清场合同缺失：${token}`)
 }
 check(
   /useEffect\(\(\) => \(\) => \{[\s\S]*?recorderRef\.current\?\.cancel\(\)[\s\S]*?clearInterval\(recordTimerRef\.current\)[\s\S]*?stopPlayback\(\)/.test(session),
@@ -118,12 +121,12 @@ check(
 
 const report = read(pages[2])
 for (const token of ['printInterviewReport(', 'accessToken: state.accessToken', 'file.printFileUrl', 'fileUrl: file.printFileUrl', "throw new Error('打印链接未就绪，请稍后重试')", "navigate('/print/confirm'", "makePrintParams({ copies: 1, duplex: 'single', color: 'bw' })"]) {
-  check(report.includes(token), `Report 打印合同缺失：${token}`)
+  check(report.includes(token), `${pages[2]} — Report 打印合同缺失：${token}`)
 }
 
 const reports = read(pages[4])
 for (const token of ['getMyInterviews(', 'deleteMyInterview(', '!isLoggedIn', "'loading' | 'error' | 'ready'", 'confirmId !== sessionId']) {
-  check(reports.includes(token), `Reports 真实记录合同缺失：${token}`)
+  check(reports.includes(token), `${pages[4]} — Reports 真实记录合同缺失：${token}`)
 }
 
 const tips = read(pages[3])
@@ -161,8 +164,10 @@ check(packageJson.includes('"verify:lightflow-k2c-interview"'), 'Kiosk package.j
 check(ci.includes('pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview'), 'CI 未注册 K2c LightFlow 门禁')
 
 if (failures.length > 0) {
+  // 先逐条打印失败断言，再打汇总：CI 日志被 tail 截断时，
+  // 留下来的必须是「哪一条挂了」，而不是只剩一个 N/M 数字。
+  for (const failure of failures) console.error(`FAIL - ${failure}`)
   console.error(`FAIL lightflow K2c interview contract: ${failures.length}/${checks}`)
-  for (const failure of failures) console.error(`- ${failure}`)
   process.exit(1)
 }
 
