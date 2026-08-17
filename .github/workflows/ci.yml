@@ -600,6 +600,9 @@ jobs:
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           pnpm --filter @ai-job-print/api verify:upload-sessions
+          # 文件端点内部账号身份回源:停用/删号/降权后旧 token 不得再取走求职者简历。
+          # 纯内存桩(真实 JwtService + 真实 FilesController),不需要 DB/Redis/网络。
+          pnpm --filter @ai-job-print/api verify:file-internal-auth
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files

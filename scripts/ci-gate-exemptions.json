@@ -48,11 +48,6 @@
       "reason": "扫码上传 HTTP 端到端，前置是 API 已在 localhost:3010 运行并显式指定 FILE_STORAGE_DRIVER=local。CI 无该前置，实测报 fetch failed。"
     },
     {
-      "gate": "@ai-job-print/api::verify:file-internal-auth",
-      "category": "pending-ci-wiring",
-      "reason": "阻塞点是流程不是技术：本门禁纯内存桩（真实 JwtService + 真实 FilesController + 真实 canAccessFile，Prisma/Redis 为内存桩），不需要 DB、Redis、网络或密钥，本地实跑 13/13 绿、未修复代码上 9/13 红，随时可进 CI；但提出它的分支被明确禁止修改 .github/workflows/**，无法自行接线。**接线动作**：在 ci.yml 的 build-and-verify → 「Verify suites」列表里 verify:file-retention 之前加一行 `pnpm --filter @ai-job-print/api verify:file-internal-auth`（它 import services/api/src，必须排在「Prepare fresh SQLite db」之后），**并同时删除本条豁免**——否则 verify:ci-gate-coverage 会按「豁免条目已陈旧（该门禁已被 CI 执行）」转红。本条占用 MAX_PENDING 的唯一名额，接线后名额即归还。"
-    },
-    {
       "gate": "@ai-job-print/api::verify:member-login-data-closure",
       "category": "redundant-alias",
       "reason": "纯 shell 别名：body 是 17 个 `pnpm run verify:*` 用 && 串起来，没有任何自己的断言、夹具或环境要求。2026-08-16 GATE-WIRE 复核：17 个子门禁**全部 17 条**都已在 CI 执行闭包内（#647 当时记的是 15/17，另 2 条已随本批接线补齐），因此把别名本身再挂一遍只是让同一批断言在同一个 job 里跑第二遍，徒增 CI 时长而不增加任何覆盖。本条不是欠账，故不占 pending-ci-wiring 名额；「子门禁全覆盖」这个前提由 verify-ci-gate-coverage.mjs 对 redundant-alias 类别做机器复核，一旦有子门禁被移出 CI 会立刻转红。"
