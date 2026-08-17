@@ -42,6 +42,7 @@ const JOB_FIELDS = [
   { key: 'salaryMax',  label: '最高薪资', required: false },
   { key: 'salaryUnit', label: '薪资单位', required: false },
   { key: 'validThrough', label: '有效期', required: false },
+  { key: 'headcount', label: '招聘人数', required: false },
 ] as const
 
 const FAIR_FIELDS = [

@@ -150,6 +150,9 @@ function verifyStaticContract(): void {
       'archivedAt     DateTime?',
     ])
     requireTokens(modelBlock(schema, 'Job'), 'Job', [
+      // 招聘人数：五部门《关于规范网络平台招聘类信息发布的通知》（2026-01）要求字段。
+      // 两份 schema 都要有 —— 只改一边会让 postgres-readiness 红。
+      'headcount      Int?',
       'sourceLastSeenAt',
       'contentHash',
       'contentVersion',

@@ -779,6 +779,10 @@ model Job {
   salaryMax      Int?
   salaryUnit     String?
   validThrough   DateTime?
+  // 招聘人数。五部门《关于规范网络平台招聘类信息发布的通知》（2026-01）要求
+  // 招聘信息包含招聘人数。null = 来源未提供（前台显示「未提供」，不得补默认值）。
+  // 该字段此前已被 WebhookJobItemDto / ImportJobItemDto 接收并校验后丢弃。
+  headcount      Int?
 
   // P1 canonical 内容版本与来源存活性；Wave 2 backfill 前均保持 nullable。
   sourceLastSeenAt     DateTime?

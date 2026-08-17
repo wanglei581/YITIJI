@@ -1,6 +1,6 @@
 # 合规边界文档
 
-> 最后更新：2026-08-18（新增 §4.3A 五部门《关于规范网络平台招聘类信息发布的通知》条款依据、§4.3B 已知缺口）
+> 最后更新：2026-08-18（新增 §4.3A 五部门《关于规范网络平台招聘类信息发布的通知》条款依据、§4.3B 已知缺口；招聘人数字段已补齐）
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [next-tasks.md](../progress/next-tasks.md)
 
 ---
@@ -115,7 +115,7 @@ interface JobFairData {
 
 | # | 条款要点 | 本产品现状 |
 |---|---|---|
-| 1 | 招聘信息应包含用人单位基本情况、**招聘人数**、招聘条件、工作内容、工作地点、**基本劳动报酬**，并**标注有效期限或者及时更新** | 有效期限：`Job.validThrough` 已有字段，且已按其**读取时派生过滤**（见下）。**招聘人数：字段缺失**，见 4.3B |
+| 1 | 招聘信息应包含用人单位基本情况、**招聘人数**、招聘条件、工作内容、工作地点、**基本劳动报酬**，并**标注有效期限或者及时更新** | 有效期限：`Job.validThrough` 已有字段，且已按其**读取时派生过滤**（见下）。招聘人数：`Job.headcount` 已补齐并贯通四条导入链路，缺值显示「来源平台未提供」 |
 | 2 | 不得含有民族、种族、性别、宗教信仰等**歧视性内容**；不得在户籍、地域、身份等方面设置**限制人力资源流动**的条件 | 已有确定性关键词筛查，命中进审核队列供人工复核（`services/api/src/jobs/job-content-screening.ts`），**不自动拒绝** |
 | 3 | 不得以高薪、保录等噱头进行**虚假宣传** | 现有禁词门禁 `verify:compliance-copy` 覆盖我方 UI 文案；来源方岗位正文的夸大宣传目前**未做检测** |
 | 4 | 转发招聘信息需**严格标注信息来源** | 已满足：`sourceOrgId` / `externalId` / `sourceName` / `sourceUrl` / `syncTime` 为必填，岗位详情页强制展示（见 4.1、4.3） |
@@ -139,11 +139,12 @@ interface JobFairData {
 
 ### 4.3B 已知缺口（尚未实现，登记备查）
 
-- **招聘人数（`headcount`）字段缺失**：条款 1 明确要求。当前 `Job` 模型无该列；
-  但 `WebhookJobItemDto` 与 `ImportJobItemDto` **已经接收并校验** `headcount`，
-  随后在 upsert 时被丢弃 —— 即合作机构可能已经在报送，而系统在静默丢数据。
-  `ExternalJobDTO.headcount` / `JobListItemDto.headcount` 也已在读取契约里声明，恒为 `undefined`。
-  补齐需改两份 Prisma schema（PostgreSQL 那份由 `pnpm --filter @ai-job-print/api db:pg:sync` 机器生成，不得手改）+ 两份迁移。
+- ~~招聘人数（`headcount`）字段缺失~~ **已补齐（2026-08-18）**：此前该字段是「两端都接了、中间断掉」——
+  `WebhookJobItemDto` / `ImportJobItemDto` 已接收并校验后丢弃（机构报送在静默消失），
+  而 `ExternalJobDTO.headcount` / `JobListItemDto.headcount` 已在读取契约里声明且恒为 `undefined`。
+  现已补 `Job.headcount Int?`（两份 schema + 两份迁移），并贯通 Excel 确认导入 / Partner 导入 /
+  Webhook / API 拉取四条链路，Kiosk 详情页展示，缺值显示「来源平台未提供」（不补 0 / 不估算）。
+  门禁：`verify:job-headcount`。
 - **发布路径完全不校验字段完整性（条款 1 的其余五项）**。条款 1 要求六项：用人单位基本情况、
   招聘人数、招聘条件、工作内容、工作地点、基本劳动报酬。当前只有 `company`（用人单位）与
   `city`（工作地点）实际必填（`JOB_REQUIRED_FIELDS` = externalId/title/company/city/sourceUrl）；

@@ -96,6 +96,15 @@ export function JobSummarySection({
         <SummaryMetric label="薪资" value={job.salaryDisplay || '薪资面议'} />
         <SummaryMetric label="类型" value={job.category ? CATEGORY_LABEL[job.category] ?? job.category : '来源平台未提供'} />
         <SummaryMetric label="行业" value={job.industry || '来源平台未提供'} />
+        {/*
+          招聘人数：五部门《关于规范网络平台招聘类信息发布的通知》（2026-01）要求
+          招聘信息包含招聘人数。来源未提供时如实显示「来源平台未提供」——
+          绝不填 0、不填 1、不按其他字段估算（CLAUDE.md §9 不伪造能力）。
+        */}
+        <SummaryMetric
+          label="招聘人数"
+          value={typeof job.headcount === 'number' ? `${job.headcount} 人` : '来源平台未提供'}
+        />
         <SummaryMetric label="字段完整度" value={`${completeness}%`} />
       </div>
 
