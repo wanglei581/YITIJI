@@ -212,6 +212,46 @@ mustContain(
   else pass('H. 招聘会相关页面 0 招聘闭环禁词')
 }
 
+// ── I. 不伪造能力(CLAUDE.md §9):展位签到数不得把适配层占位 0 当真实指标 ──────
+// 后端 FairZone 模型没有展位/签到字段,httpAdapter.mapWireZone 只能给 boothCount=0、
+// checkedInCount=0 占位。FairMapPage 因此必须用 boothCount>0 过滤后才渲染签到区块,
+// 否则真机上会恒显示「已签到 0」——把「没有这项数据」冒充成「真实统计为 0」。
+// 这两件事对用户完全不同,本节把该守卫钉死,防止有人删掉过滤直接渲染。
+{
+  const mapRel = 'src/pages/job-fairs/FairMapPage.tsx'
+  const src = read(mapRel)
+  if (src === null) {
+    fail(`I. 文件缺失: ${mapRel}`)
+  } else {
+    const guardDecl = 'const metricZones = zones.filter((zone) => zone.boothCount > 0)'
+    const guardRender = '{metricZones.length > 0 && ('
+    if (!src.includes(guardDecl)) {
+      fail(`I-1. ${mapRel} 缺少展位签到守卫: ${guardDecl}`)
+    } else pass('I-1. FairMapPage 保留 boothCount>0 过滤(适配层 0 占位不进统计区)')
+
+    if (!src.includes(guardRender)) {
+      fail(`I-2. ${mapRel} 签到统计区块未被 metricZones 守卫包裹`)
+    } else pass('I-2. FairMapPage 签到统计区块由 metricZones 守卫')
+
+    // 「已签到」必须只出现在守卫之后,即被守卫覆盖。
+    const guardIdx = src.indexOf(guardRender)
+    const occurrences = [...src.matchAll(/已签到/g)].map((m) => m.index)
+    const unguarded = occurrences.filter((idx) => idx < guardIdx)
+    if (unguarded.length > 0) {
+      fail(`I-3. ${mapRel} 存在未被 metricZones 守卫覆盖的「已签到」渲染(${unguarded.length} 处)`)
+    } else pass('I-3. FairMapPage「已签到」渲染全部落在守卫内')
+  }
+
+  // 适配层不得凭空造非零签到数(后端根本没有这个字段)。
+  const adapterRel = 'src/services/api/httpAdapter.ts'
+  const adapterSrc = read(adapterRel)
+  if (adapterSrc === null) {
+    fail(`I-4. 文件缺失: ${adapterRel}`)
+  } else if (/checkedInCount:\s*(?!0\b)\d/.test(adapterSrc)) {
+    fail(`I-4. ${adapterRel} 出现非零 checkedInCount 硬编码——后端无该字段,不得伪造`)
+  } else pass('I-4. httpAdapter 未伪造非零展位签到数')
+}
+
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) — 招聘会/校园招聘 UI 疑似回退,合入前必须修复 ===`)
   process.exit(1)

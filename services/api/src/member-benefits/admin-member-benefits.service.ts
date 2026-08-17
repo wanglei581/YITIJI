@@ -4,6 +4,7 @@ import { hashPhone, isValidCnMobile, maskPhone, maskPhoneFromEnc, normalizePhone
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { BenefitSourceType, BenefitStatus, BenefitType, MemberBenefitItem } from './member-benefits.types'
+import { deriveBenefitStatus } from './benefit-status'
 import type { GrantBenefitDto, RevokeBenefitDto } from './dto/admin-member-benefits.dto'
 
 export interface AdminEndUserSearchItem {
@@ -211,7 +212,11 @@ export class AdminMemberBenefitsService {
       description: row.description,
       quantityTotal: row.quantityTotal,
       quantityRemaining: row.quantityRemaining,
-      status: STATUS_TYPES.includes(row.status as BenefitStatus) ? (row.status as BenefitStatus) : 'revoked',
+      // 不伪造能力：与会员侧同一套有效期派生，避免管理员看到"可用"而核销侧按过期拒绝。
+      status: deriveBenefitStatus(
+        STATUS_TYPES.includes(row.status as BenefitStatus) ? (row.status as BenefitStatus) : 'revoked',
+        row.validUntil,
+      ),
       sourceType: row.sourceType as BenefitSourceType,
       validFrom: row.validFrom ? row.validFrom.toISOString() : null,
       validUntil: row.validUntil ? row.validUntil.toISOString() : null,

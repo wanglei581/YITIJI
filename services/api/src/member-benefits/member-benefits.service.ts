@@ -8,6 +8,7 @@ import type {
 } from './member-benefits.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { deriveBenefitStatus } from './benefit-status'
 
 // ============================================================
 // 会员权益只读服务（Phase C-2C 底座 + Wave 3 核销记录查看）。
@@ -55,6 +56,8 @@ export class MemberBenefitsService {
       },
       ...memberPageArgs(page),
     })
+    // 整页共用一个时刻，避免同一响应内不同条目按不同"现在"判定。
+    const now = new Date()
     return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
       benefitType: r.benefitType as BenefitType,
@@ -62,7 +65,8 @@ export class MemberBenefitsService {
       description: r.description,
       quantityTotal: r.quantityTotal,
       quantityRemaining: r.quantityRemaining,
-      status: r.status as BenefitStatus,
+      // 不伪造能力：库里没有"过期"写入路径，按 validUntil 实时派生，与核销侧判定一致。
+      status: deriveBenefitStatus(r.status as BenefitStatus, r.validUntil, now),
       sourceType: r.sourceType as BenefitSourceType,
       validFrom: r.validFrom ? r.validFrom.toISOString() : null,
       validUntil: r.validUntil ? r.validUntil.toISOString() : null,
