@@ -376,6 +376,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:prod-build-config
           pnpm --filter @ai-job-print/kiosk verify:job-info-ui
           pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
+          pnpm --filter @ai-job-print/kiosk verify:policy-eligibility-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/kiosk verify:data-request-ui

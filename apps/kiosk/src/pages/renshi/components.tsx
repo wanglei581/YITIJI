@@ -1,8 +1,10 @@
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import {
+  ArrowRightIcon,
   CheckCircle2Icon,
   ClipboardListIcon,
   FileTextIcon,
+  ScaleIcon,
   ScrollTextIcon,
   ShieldCheckIcon,
   XIcon,
@@ -39,8 +41,12 @@ export function OfficialEntryQrOverlay({ title, url, onClose }: { title: string;
 }
 
 export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => void }) {
+  // 「条件核对」不是新的首页入口，也不是既有入口的同义卡片：
+  // 它是政策服务这个已有入口内部新增的一个能力面，后端 P21 早已建好、
+  // 合作机构录入面也已接线，此前唯独一体机零引用。
   const tabs: { key: TabKey; label: string; icon: LucideIcon }[] = [
     { key: 'policy', label: '就业政策', icon: FileTextIcon },
+    { key: 'eligibility', label: '条件核对', icon: ScaleIcon },
     { key: 'social', label: '社保指南', icon: ShieldCheckIcon },
     { key: 'register', label: '就业登记', icon: ClipboardListIcon },
     { key: 'notice', label: '政策公告', icon: ScrollTextIcon },
@@ -61,6 +67,22 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
         </button>
       ))}
     </div>
+  )
+}
+
+/** 条件核对两步进度条（放在这里而不是面板里，避免两个面板互相 import 成环）。 */
+export function EligibilityStepBar({ step }: { step: 1 | 2 }) {
+  const steps = ['选你的情况', '看逐条结果']
+  return (
+    <ol className="k8-elig-steps">
+      {steps.map((label, i) => (
+        <li key={label} className="k8-elig-step" aria-current={step === i + 1 ? 'step' : undefined}>
+          <span className="k8-elig-step-n">{i + 1}</span>
+          {label}
+          {i === 0 && <ArrowRightIcon className="h-5 w-5 shrink-0" aria-hidden="true" />}
+        </li>
+      ))}
+    </ol>
   )
 }
 

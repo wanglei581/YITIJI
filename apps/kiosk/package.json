@@ -81,6 +81,7 @@
     "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs",
     "verify:price-single-source": "node scripts/verify-price-single-source.mjs",
     "verify:renshi-policy-ui": "node scripts/verify-renshi-policy-ui.mjs",
+    "verify:policy-eligibility-ui": "node scripts/verify-policy-eligibility-ui.mjs",
     "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs",
     "verify:v6-type-floor": "node ../../docs/design/kiosk-ai-os-v3-2026-08/tools/verify-type-floor.mjs",
     "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs",

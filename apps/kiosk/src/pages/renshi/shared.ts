@@ -11,8 +11,8 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type TabKey = 'policy' | 'social' | 'register' | 'notice'
-const VALID_TABS = new Set<TabKey>(['policy', 'social', 'register', 'notice'])
+export type TabKey = 'policy' | 'eligibility' | 'social' | 'register' | 'notice'
+const VALID_TABS = new Set<TabKey>(['policy', 'eligibility', 'social', 'register', 'notice'])
 
 export function getInitialTab(searchParams: URLSearchParams): TabKey {
   const tab = searchParams.get('tab')
