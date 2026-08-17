@@ -58,10 +58,15 @@ if [ "$MODE" = purge-trash ]; then
 
   echo "=== 删前健康检查（不正常就不删，那时更可能要 mv 回去）==="
   HEALTH_OK=no
+  # 路径必须是 /api/v1/health —— 应用设了全局前缀 api/v1（main.ts setGlobalPrefix）。
+  # 2026-08-17 首次 purge 因为只探了裸 /health 而被自己的护栏拒绝，
+  # 当时公网 https://zyidai.cn/api/v1/health 明明是 ok 的。探错路径 ≠ 服务不健康。
   for port in 3010 3000 8080; do
-    if curl -fsS --max-time 5 "http://127.0.0.1:$port/health" 2>/dev/null | grep -q '"status"'; then
-      echo "  API /health @:$port → 可达"; HEALTH_OK=yes; break
-    fi
+    for path in /api/v1/health /health; do
+      if curl -fsS --max-time 5 "http://127.0.0.1:$port$path" 2>/dev/null | grep -q '"status"'; then
+        echo "  API $path @:$port → 可达"; HEALTH_OK=yes; break 2
+      fi
+    done
   done
   [[ "$HEALTH_OK" == yes ]] || refuse "本机 API 健康检查不通过，拒绝删除隔离区"
   if command -v pm2 >/dev/null 2>&1; then
