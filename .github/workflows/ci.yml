@@ -429,6 +429,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-status-idempotency
+          # 批量发布:纯内存假 Prisma,不连库、不起 HTTP,两个 job 都能直接跑
+          pnpm --filter @ai-job-print/api verify:bulk-publish
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
@@ -724,6 +726,7 @@ jobs:
           # 招聘会列表结构性门禁两个 job 都要跑：筛选下推靠 Prisma where 生成 SQL，
           # SQLite 与 PostgreSQL 的日期比较、contains 语义不完全一致，PG 侧必须独立回归。
           pnpm --filter @ai-job-print/api verify:fair-list-integrity
+          pnpm --filter @ai-job-print/api verify:bulk-publish
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:backend-p0-contracts
