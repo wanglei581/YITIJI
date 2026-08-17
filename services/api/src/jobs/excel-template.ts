@@ -44,6 +44,7 @@ export const JOB_TEMPLATE_FIELDS = [
   { key: 'salaryMax', label: '最高薪资', required: false, guide: '数字，不带单位。' },
   { key: 'salaryUnit', label: '薪资单位', required: false, guide: '建议填写 monthly、yearly、daily、hourly 或来源平台公开单位。' },
   { key: 'validThrough', label: '有效期', required: false, guide: '岗位有效期，建议 ISO 日期或 YYYY-MM-DD。' },
+  { key: 'headcount', label: '招聘人数', required: false, guide: '数字，仅填来源已公开的招聘人数；未公开请留空，不要估算。' },
 ] as const satisfies readonly PartnerExcelTemplateField<JobStandardField>[]
 
 export const FAIR_TEMPLATE_FIELDS = [

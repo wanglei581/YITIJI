@@ -233,6 +233,7 @@ export class JobsPartnerService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            headcount: item.headcount ?? undefined,
             reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
@@ -251,6 +252,7 @@ export class JobsPartnerService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            headcount: item.headcount ?? undefined,
             // Partner 主动导入一律回 pending+draft 强制重审，即使已发布也立即下架。
             // 同时清空上一次审核元数据，否则会出现「当前 pending 却仍显示上次审核人/时间/拒绝原因」的脏状态。
             reviewStatus: 'pending',
@@ -319,6 +321,7 @@ export class JobsPartnerService {
               salaryMax: item.salaryMax,
               salaryUnit: item.salaryUnit,
               validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            headcount: item.headcount ?? undefined,
               reviewStatus: 'pending', publishStatus: 'draft',
               syncTime: sync,
             },
@@ -338,6 +341,7 @@ export class JobsPartnerService {
               salaryMax: item.salaryMax,
               salaryUnit: item.salaryUnit,
               validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            headcount: item.headcount ?? undefined,
               // Partner Webhook 主动推送一律回 pending+draft 强制重审，即使已发布也立即下架。
               // 同时清空上一次审核元数据，避免 pending 记录仍带旧审核人/时间/拒绝原因。
               reviewStatus: 'pending',

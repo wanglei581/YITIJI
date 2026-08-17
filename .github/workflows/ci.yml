@@ -612,6 +612,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-benefits-admin
           pnpm --filter @ai-job-print/api verify:member-favorites-benefits
           pnpm --filter @ai-job-print/api verify:job-content-screening
+          pnpm --filter @ai-job-print/api verify:job-headcount
           pnpm --filter @ai-job-print/api verify:job-validity-expiry
           pnpm --filter @ai-job-print/api verify:member-sms-provider-errors
           pnpm --filter @ai-job-print/api verify:miniapp-cloud-print-m2

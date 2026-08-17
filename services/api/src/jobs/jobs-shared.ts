@@ -553,7 +553,7 @@ export function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     tags: displayTags(rawTags),
     industry: extractIndustry(rawTags),
     workType: categoryToWorkType(j.category),
-    headcount: undefined,
+    headcount: j.headcount ?? undefined,
     educationRequirement: j.educationRequirement ?? undefined,
     experienceRequirement: j.experienceRequirement ?? undefined,
     skills: safeJsonArr(j.skillsJson),
@@ -585,7 +585,7 @@ export function prismaJobToAdminDto(j: PrismaJobRow): AdminJobDto {
     requirements: j.requirements ?? undefined,
     industry: undefined,
     workType: undefined,
-    headcount: undefined,
+    headcount: j.headcount ?? undefined,
     sourceOrgId: j.sourceOrgId, externalId: j.externalId,
     sourceName: j.sourceName, sourceUrl: j.sourceUrl,
     syncTime: fmtSyncTime(j.syncTime),
@@ -770,6 +770,8 @@ export interface PrismaJobRow {
   salaryMax: number | null
   salaryUnit: string | null
   validThrough: Date | null
+  /** 招聘人数（五部门《通知》要求字段）。null = 来源未提供，前台显示「未提供」。 */
+  headcount: number | null
   reviewStatus:  string
   publishStatus: string
   reviewedBy:    string | null

@@ -44,6 +44,7 @@ interface MappedJob {
   salaryMax?: number
   salaryUnit?: string
   validThrough?: Date
+  headcount?: number
 }
 
 interface MappedFair {
@@ -548,6 +549,7 @@ export class JobSyncService {
         salaryMax: getNumber(raw, resolveKeys('salaryMax', fields, 'maxSalary', 'salary_max')),
         salaryUnit: r('salaryUnit', 'salary_unit', 'payPeriod'),
         validThrough: getDate(raw, resolveKeys('validThrough', fields, 'expireAt', 'valid_until', 'deadline')),
+        headcount: getNumber(raw, resolveKeys('headcount', fields, 'recruitCount', 'hire_count', '招聘人数')),
       },
     }
   }
@@ -674,6 +676,7 @@ export class JobSyncService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough,
+            headcount: item.headcount,
             reviewStatus: 'pending', publishStatus: 'draft', syncTime: sync,
           },
           update: {
@@ -690,6 +693,7 @@ export class JobSyncService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough,
+            headcount: item.headcount,
             // 此 upsert 只在 contentChanged=true 时执行；未变化分支仅刷新 syncTime。
             reviewStatus: 'pending',
             publishStatus: 'draft',
