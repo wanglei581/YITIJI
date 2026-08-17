@@ -78,6 +78,27 @@ export interface ContractReviewTaskView {
     completedPages: number
     totalPages: number | null
   }
+  /**
+   * 服务端按页数算出的预计耗时（秒）。
+   *
+   * 与服务端自己的模型超时、阶段预算同源（services/api 的
+   * contract-review-timing.ts），客户端据此展示等待预期即可，
+   * 不必再各自维护一份公式 —— 两边公式一旦分叉，就会出现
+   * 「前端说预计 80 秒、服务端 30 秒就 abort」这类用户只看到失败的故障。
+   */
+  estimatedSeconds: number
+  /**
+   * 仅 `status === 'failed'` 时非空：白名单内的失败机器码。
+   * 未登记的码不外泄，此处为 null（但 failureReason 仍有兜底文案）。
+   */
+  failureCode: string | null
+  /**
+   * 仅 `status === 'failed'` 时非空：可直接展示给用户的失败原因。
+   *
+   * 此前只回 status，客户端拿到 failed 无从告知用户，只能显示
+   * 「服务端未说明原因」。文案里不含机器码、堆栈、厂商名或模型名。
+   */
+  failureReason: string | null
   result: ContractReviewResult | null
 }
 

@@ -79,9 +79,23 @@ class FakePrisma {
   }
 }
 
-function harness(initial: ReturnType<typeof task>, extracted = extraction()) {
+/** provider 行为可注入，用于覆盖「上游回了 usage / 没回 usage / 直接失败」三种落账形态。 */
+interface ProviderBehavior {
+  usage?: { promptTokens: number; completionTokens: number; totalTokens: number }
+  fail?: boolean
+}
+
+function harness(
+  initial: ReturnType<typeof task>,
+  extracted = extraction(),
+  providerBehavior: ProviderBehavior = {},
+) {
   const prisma = new FakePrisma(initial).init()
-  const calls = { provider: 0, extraction: 0, rules: [] as unknown[], gate: [] as unknown[][] }
+  const calls = {
+    provider: 0, extraction: 0, rules: [] as unknown[], gate: [] as unknown[][],
+    // AI-COST-TRUTH：合同审查此前完全不落 AiServiceLog，这里把落账捕获下来做断言。
+    aiLogs: [] as Array<Record<string, unknown>>,
+  }
   const candidate: ContractReviewResult = {
     priorityCheckCount: 0, attentionCount: 0, insufficientInfoCount: 0,
     coverage: 'complete', ocrConfidence: 'high', disclaimerVersion: 'disclaimer-v1',
@@ -103,11 +117,16 @@ function harness(initial: ReturnType<typeof task>, extracted = extraction()) {
     { validate: (...args: unknown[]) => { calls.gate.push(args); return candidate } } as never,
     { async reviewWithIdentity() {
       calls.provider += 1
+      if (providerBehavior.fail) throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')
       return {
         identity: { provider: 'deepseek', baseUrl: 'https://api.deepseek.com/', model: 'deepseek-v4-pro' },
         draft: { findings: [] },
+        ...(providerBehavior.usage ? { usage: providerBehavior.usage } : {}),
       }
-    } } as never,
+    },
+    identity: () => ({ provider: 'deepseek', baseUrl: 'https://api.deepseek.com/', model: 'deepseek-v4-pro' }),
+    } as never,
+    { record: (entry: Record<string, unknown>) => { calls.aiLogs.push(entry) } } as never,
     { now: () => new Date(now) },
   )
   return { service, prisma, calls, candidate }
@@ -173,6 +192,69 @@ test('analyze uses masked canonical pages and commits validated result in one fi
   assert.deepEqual(JSON.parse(String(finalWrite?.data.resultJson)), candidate)
   assert.equal(finalWrite?.data.aiProvider, 'deepseek')
   assert.equal(finalWrite?.data.aiModel, 'deepseek-v4-pro')
+})
+
+// ── AI-COST-TRUTH：合同审查落 AiServiceLog ────────────────────────────────────
+//
+// 修复前这三条全都不存在：合同审查走 deepseek/qwen 的付费调用，却完全不落
+// AiServiceLog —— 这笔花费在 Admin 用量统计里根本查不到。
+
+function analyzeReadyTask(extracted: ReturnType<typeof extraction>) {
+  return task({
+    status: 'rule_checking', confirmedAt: now,
+    extractionFingerprint: createContractReviewExtractionFingerprint('file-1', extracted, 'contract-review-v1'),
+  })
+}
+
+test('contract review lands an AiServiceLog row with real vendor label and token usage', async () => {
+  const extracted = extraction()
+  const { service, calls } = harness(analyzeReadyTask(extracted), extracted, {
+    usage: { promptTokens: 1200, completionTokens: 300, totalTokens: 1500 },
+  })
+
+  await service.analyze('task-1')
+
+  assert.equal(calls.aiLogs.length, 1)
+  const entry = calls.aiLogs[0]!
+  assert.equal(entry.operation, 'contractReview')
+  assert.equal(entry.status, 'success')
+  // 标签必须含厂商名，否则定价表永远匹配不到 → 即使有 token 也算不出成本
+  assert.equal(entry.provider, 'llm:deepseek:deepseek-v4-pro')
+  assert.deepEqual(entry.tokenUsage, { promptTokens: 1200, completionTokens: 300, totalTokens: 1500 })
+  // 红线：凭证/baseURL 绝不进落账
+  const serialized = JSON.stringify(entry)
+  assert.doesNotMatch(serialized, /api\.deepseek\.com/u)
+  assert.doesNotMatch(serialized, /apiKey|Bearer/u)
+})
+
+test('contract review without upstream usage records no cost rather than a fake zero', async () => {
+  const extracted = extraction()
+  const { service, calls } = harness(analyzeReadyTask(extracted), extracted, {}) // 上游没回 usage
+
+  await service.analyze('task-1')
+
+  assert.equal(calls.aiLogs.length, 1)
+  const entry = calls.aiLogs[0]!
+  assert.equal(entry.status, 'success')
+  // 未采集：tokenUsage 必须缺省，且**绝不**能写 estimatedCostCny: 0（那是谎称免费）
+  assert.equal(entry.tokenUsage, undefined)
+  assert.equal(entry.estimatedCostCny, undefined)
+})
+
+test('contract review failure still lands a log row (the call may already have been billed)', async () => {
+  const extracted = extraction()
+  const { service, calls } = harness(analyzeReadyTask(extracted), extracted, { fail: true })
+
+  await assert.rejects(() => service.analyze('task-1'))
+
+  assert.equal(calls.aiLogs.length, 1)
+  const entry = calls.aiLogs[0]!
+  assert.equal(entry.operation, 'contractReview')
+  assert.equal(entry.status, 'failed')
+  // 失败路径拿不到返回值，但仍要标出真实厂商（靠 provider.identity()）
+  assert.equal(entry.provider, 'llm:deepseek:deepseek-v4-pro')
+  assert.equal(entry.tokenUsage, undefined)
+  assert.equal(entry.estimatedCostCny, undefined)
 })
 
 test('safety rejection never persists candidate or raw model output and fixes the task as failed', async () => {

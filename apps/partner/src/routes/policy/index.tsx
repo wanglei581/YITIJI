@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { ClipboardListIcon, FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import EligibilityRulesDrawer from './EligibilityRulesDrawer'
 import {
   partnerPoliciesService,
   type PartnerPolicyRecord,
@@ -82,6 +83,8 @@ export default function PolicyPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  /** P21 申领条件录入面(只对政策扶持条目开放;公告没有申领条件) */
+  const [rulesFor, setRulesFor] = useState<PartnerPolicyRecord | null>(null)
 
   const { data, status, refresh } = useRefreshable(
     PARTNER_POLICIES_REFRESH_KEY,
@@ -94,7 +97,7 @@ export default function PolicyPage() {
   )
 
   useInteractionLock(
-    editing !== null || saving || busyId !== null || deletingId !== null,
+    editing !== null || saving || busyId !== null || deletingId !== null || rulesFor !== null,
     [PARTNER_POLICIES_REFRESH_KEY],
     'hard',
   )
@@ -284,6 +287,16 @@ export default function PolicyPage() {
                           <button onClick={() => openEdit(r)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
                             <PencilIcon className="h-3.5 w-3.5" />
                           </button>
+                          {r.kind === 'policy_guide' && (
+                            <button
+                              onClick={() => setRulesFor(r)}
+                              title="录入可机械比对的申领条件"
+                              className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                            >
+                              <ClipboardListIcon className="h-3.5 w-3.5" />
+                              申领条件
+                            </button>
+                          )}
                           {r.publishStatus === 'published' && (
                             <button
                               disabled={busyId === r.id}
@@ -315,7 +328,19 @@ export default function PolicyPage() {
 
       <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与来源链接;不承诺补贴到账、不代申请。提交后需管理员审核通过并发布,才会在一体机「政策服务」页展示。
+        政策扶持条目可另行录入「申领条件」:条件按政策原文逐条录入,一体机据此给出「相符 / 不符 / 无法判定」的机械比对结果,不做资格认定;未录入条件的政策不会出现任何判定结论。
       </p>
+
+      {rulesFor && (
+        <EligibilityRulesDrawer
+          policy={rulesFor}
+          onClose={() => setRulesFor(null)}
+          onSaved={() => {
+            setNotice('申领条件已保存。该政策已重新进入待审核,审核通过并重新发布前,一体机不会使用这组条件。')
+            void refresh()
+          }}
+        />
+      )}
 
       {/* 新增/编辑抽屉 */}
       <Drawer

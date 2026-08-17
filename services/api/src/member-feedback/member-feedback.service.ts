@@ -5,6 +5,7 @@ import type {
   FeedbackCategory,
   FeedbackReplyItem,
   FeedbackStatus,
+  FeedbackSubmitterType,
   MemberFeedbackPage,
   MemberFeedbackTicketDetail,
   MemberFeedbackTicketItem,
@@ -15,7 +16,7 @@ import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { MemberNotificationsService } from '../member-notifications/member-notifications.service'
 import type { AddFeedbackReplyDto, CreateFeedbackDto, UpdateFeedbackStatusDto } from './dto/member-feedback.dto'
-import { FEEDBACK_CATEGORIES, FEEDBACK_STATUSES } from './dto/member-feedback.dto'
+import { FEEDBACK_CATEGORIES, FEEDBACK_STATUSES, FEEDBACK_SUBMITTER_TYPES } from './dto/member-feedback.dto'
 
 const FORBIDDEN_RECRUITING_COPY = /一键投递|立即投递|平台投递|面试邀约|录用通知|Offer|候选人推荐|企业筛选|收取简历|投递结果|预约结果/i
 
@@ -104,13 +105,21 @@ export class MemberFeedbackService {
     return this.toMemberDetail(updated)
   }
 
-  async listForAdmin(query: { status?: string; category?: string }): Promise<{ items: AdminFeedbackTicketItem[] }> {
+  async listForAdmin(
+    query: { status?: string; category?: string; submitterType?: string },
+  ): Promise<{ items: AdminFeedbackTicketItem[] }> {
     const status = query.status ? this.validateStatus(query.status) : undefined
     const category = query.category ? this.validateCategory(query.category) : undefined
+    // 匿名一体机工单与会员工单混在同一张表里，处置方式完全不同：
+    // 匿名单无账号可回复、只能现场处置。不能按提交方筛选，运营就没法把
+    // 「需要现场跑一趟的队列」单独拉出来 —— 这正是 @@index([submitterType, terminalId, createdAt])
+    // 建了却一直没有查询使用的原因。
+    const submitterType = query.submitterType ? this.validateSubmitterType(query.submitterType) : undefined
     const rows = await this.prisma.feedbackTicket.findMany({
       where: {
         ...(status ? { status } : {}),
         ...(category ? { category } : {}),
+        ...(submitterType ? { submitterType } : {}),
       },
       include: { endUser: { select: { phoneEnc: true, nickname: true } } },
       orderBy: { createdAt: 'desc' },
@@ -219,6 +228,15 @@ export class MemberFeedbackService {
       throw new BadRequestException({ error: { code: 'FEEDBACK_STATUS_INVALID', message: '反馈状态不支持' } })
     }
     return value as FeedbackStatus
+  }
+
+  private validateSubmitterType(value: string): FeedbackSubmitterType {
+    if (!(FEEDBACK_SUBMITTER_TYPES as readonly string[]).includes(value)) {
+      throw new BadRequestException({
+        error: { code: 'FEEDBACK_SUBMITTER_TYPE_INVALID', message: '反馈提交方类型不支持' },
+      })
+    }
+    return value as FeedbackSubmitterType
   }
 
   private async getAdminDetailWithoutViewAudit(id: string): Promise<AdminFeedbackTicketDetail> {

@@ -47,6 +47,24 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
+const CONFIDENCE_LABEL: Record<'high' | 'medium' | 'low', string> = {
+  high: '较高',
+  medium: '中等',
+  low: '较低',
+}
+
+/** 按真实提取来源组织提示语：只有 OCR 来源才提识别置信度，其余来源只如实转述 warnings。 */
+function buildExtractionNotice(notice?: ReportState['extractionNotice']): string | null {
+  if (!notice) return null
+  const isOcr = notice.textSource === 'image_ocr' || notice.textSource === 'pdf_ocr'
+  const warningText = notice.warnings.length > 0 ? notice.warnings.join('；') : ''
+  if (isOcr) {
+    const head = `本简历经文字识别（OCR）提取，识别置信度${CONFIDENCE_LABEL[notice.confidence]}。`
+    return warningText ? `${head} ${warningText}。` : head
+  }
+  return warningText ? `${warningText}。` : null
+}
+
 function ReportNoticePanel({
   isDemoReport,
   extractionNotice,
@@ -57,11 +75,9 @@ function ReportNoticePanel({
   const notices = [
     isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
     '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
-    extractionNotice
-      ? `本简历经文字识别（OCR）提取，识别置信度${
-        extractionNotice.confidence === 'high' ? '较高' : extractionNotice.confidence === 'medium' ? '中等' : '较低'
-      }。${extractionNotice.warnings.length > 0 ? ` ${extractionNotice.warnings.join('；')}。` : ''}`
-      : null,
+    // extractionNotice 现在对所有提取来源都可能下发（超长截断等提示不限于 OCR），
+    // 因此「经 OCR 识别」这句只能在真的走了 OCR 时说，否则就是对用户谎报处理方式。
+    buildExtractionNotice(extractionNotice),
   ].filter((item): item is string => Boolean(item))
 
   return (
