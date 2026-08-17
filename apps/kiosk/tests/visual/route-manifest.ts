@@ -41,7 +41,7 @@ export const productionRoutePatterns = [
   '/contract-review/processing',
   '/contract-review/result',
   '/policy-service',
-] as const // 104 routes (was 99)
+] as const // 106 routes (was 104)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

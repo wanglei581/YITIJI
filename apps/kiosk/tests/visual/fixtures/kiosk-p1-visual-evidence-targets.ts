@@ -196,6 +196,16 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/upload/phone', ['62']),
   route('/legal/:doc', ['59'], '/legal/privacy'),
   route('/resume/job-fit', ['55']),
+  // S2-2 拆页，2026-07 原型冻结之后新增：本合同的原型集内没有对应文件，只登记生产侧证据与原型缺口，不认领截图对。
+  routeDisposition({
+    routePattern: '/resume/job-fit/actions',
+    referenceKind: 'NO_INDEPENDENT_PROTOTYPE',
+    targetIds: [],
+    captureUrl: '/resume/job-fit/actions',
+    precondition: 'Capture production presentation without fabricating a prototype counterpart.',
+    claimScope: 'Production-only route evidence and explicit prototype-gap record.',
+    knownLimits: 'Added after the 2026-07 prototype freeze; its design baseline sits in the separate kiosk-ai-os-v3-2026-08 set, which this contract does not own. Target 55 stays bound to /resume/job-fit, so no prototype/production screenshot pair may be claimed for this route.',
+  }),
   route('/resume/career-plan', ['56']),
   route('/interview/setup', ['38']),
   route('/interview/session', ['39']),
@@ -254,6 +264,16 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/resume/parse', ['27']),
   route('/resume/report', ['06']),
   route('/resume/optimize', ['07']),
+  // S2-1 拆页，2026-07 原型冻结之后新增：同上，只登记生产侧证据与原型缺口。
+  routeDisposition({
+    routePattern: '/resume/optimize/compare',
+    referenceKind: 'NO_INDEPENDENT_PROTOTYPE',
+    targetIds: [],
+    captureUrl: '/resume/optimize/compare',
+    precondition: 'Capture production presentation without fabricating a prototype counterpart.',
+    claimScope: 'Production-only route evidence and explicit prototype-gap record.',
+    knownLimits: 'Added after the 2026-07 prototype freeze; its design baseline sits in the separate kiosk-ai-os-v3-2026-08 set, which this contract does not own. Target 07 stays bound to /resume/optimize, so no prototype/production screenshot pair may be claimed for this route.',
+  }),
   route('/resume/export', ['28']),
   route('/resume/templates', ['29']),
   route('/resume/materials', ['30']),
