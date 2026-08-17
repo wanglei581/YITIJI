@@ -68,6 +68,31 @@ function apiErrorCode(error: unknown): string | null {
   return null
 }
 
+/**
+ * 服务端已经无法再用这些会话接收文件，因此「旧码已失效」这个前提已经成立：
+ * 记录不在（NOT_FOUND）、已过期（EXPIRED）、已确认消费（CONFIRMED）。
+ * 其余失败（网络故障、控制令牌无效）不能证明旧码已死，必须阻止签发新码。
+ */
+const ALREADY_REVOKED_CODES: ReadonlySet<string> = new Set([
+  'UPLOAD_SESSION_NOT_FOUND',
+  'UPLOAD_SESSION_EXPIRED',
+  'UPLOAD_SESSION_CONFIRMED',
+])
+
+/**
+ * 旧二维码必须先在服务端失效，新码才允许签发 —— 否则旁人拍到的旧码仍能往会话里传文件。
+ * 只有在无法证明旧码已失效时才向外抛错，由 refresh 阻止签发新码。
+ */
+async function revokePreviousSession(existing: QrState): Promise<void> {
+  try {
+    await cancelUploadSession(existing.sessionId, existing.controlToken)
+  } catch (err) {
+    const code = apiErrorCode(err)
+    if (code && ALREADY_REVOKED_CODES.has(code)) return
+    throw err
+  }
+}
+
 function expiredStatus(qr: QrState, current: UploadSessionStatusResponse | null, purpose: FilePurpose): UploadSessionStatusResponse {
   return {
     sessionId: qr.sessionId,
@@ -150,8 +175,8 @@ export function UploadSessionQrPanel({
         return
       }
       if (existing) {
-        // 新码只有在旧码已被服务端撤销时才生成，避免用户或旁人手里的旧码继续可用。
-        await cancelUploadSession(existing.sessionId, existing.controlToken)
+        // 新码只有在旧码已被服务端撤销（或已确认失效）时才生成，避免旁人手里的旧码继续可用。
+        await revokePreviousSession(existing)
         setQr(null)
         setStatus(null)
       }

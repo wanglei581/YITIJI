@@ -41,7 +41,12 @@ const FROZEN = new Map([
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
   ['src/pages/home/components/ToolboxLaunchModals.tsx', 'bb79f207e4e1fbb22cdfc33239dbefc58cbdcd18f7df89adf08e4061354fe99c'],
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50'],
+  // 2026-08-18 重新冻结（PR #598 手机扫码上传公共界面收口）：刷新二维码时先 await 撤销
+  // 旧会话再签发新码（旧码此前刷新后仍可被旁人用来上传），且「手机端已上传」状态下刷新
+  // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
+  // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
+  // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0'],
 ])
 
 function propertyName(node) {
