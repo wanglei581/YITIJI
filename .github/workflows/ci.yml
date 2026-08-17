@@ -418,6 +418,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
+          # 合同审查超时口径：模型超时必须随合同页数伸缩（不得回到 30 秒硬上限），
+          # 服务端三层时限的包含链要恒成立、且与小程序预估口径同源；
+          # 失败原因必须对用户可读，日志必须有底层错误类型但没有合同正文。
+          # 纯进程内（不连库、不连 Redis、fetch 走替身），两个 job 都能跑。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:trust-proxy
           pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
@@ -709,6 +714,10 @@ jobs:
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
           pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/api verify:contract-review:schema
+          # 与 SQLite job 同源：合同审查超时口径是纯静态/进程内断言，
+          # 不依赖数据库形态，但它守的是「长合同不得被 30 秒 abort」这条
+          # 生产故障，两个 job 都必须挡住。
+          pnpm --filter @ai-job-print/api verify:contract-review:timeout
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-layout-export

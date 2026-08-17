@@ -136,6 +136,8 @@ export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   resultJson: string | null
   extractionFingerprint: string | null
   confirmedAt: Date | null
+  /** 失败时服务端写入的机器码；对外经白名单转成可读文案（见 failureReason）。 */
+  errorCode?: string | null
 }
 
 export interface ContractReviewReportView {
@@ -164,5 +166,14 @@ export interface ContractReviewTaskView {
     completedPages: number
     totalPages: number | null
   }
+  /**
+   * 服务端按页数算出的预计耗时（秒），与服务端自己的超时预算同源。
+   * 客户端据此展示等待预期，不必再复刻公式。
+   */
+  estimatedSeconds: number
+  /** 仅 status='failed' 时非空：白名单内的失败机器码，否则 null。 */
+  failureCode: string | null
+  /** 仅 status='failed' 时非空：可直接展示给用户的失败原因。 */
+  failureReason: string | null
   result: ContractReviewResult | null
 }
