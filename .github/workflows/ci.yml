@@ -594,6 +594,9 @@ jobs:
           # 限流计数维度：一个大厅的 N 台一体机走同一个 NAT 出口 IP，按 IP 计数时
           # 第 3 台机器就会把打印进度轮询打成 429（伪装成「后端挂了」）。
           pnpm --filter @ai-job-print/api verify:throttle-dimension
+          # 会花钱的 AI 路由：限流维度必须显式声明。派生式 —— 用 TypeChecker 建调用图，
+          # 从「按次计费的厂商调用」反向可达推导出路由集合，新增路由漏声明即红。
+          pnpm --filter @ai-job-print/api verify:ai-throttle-dimension
           # 匿名公网 AI 端点（/assistant/chat、/resume/parse）的限流 + 日配额。
           pnpm --filter @ai-job-print/api verify:ai-public-quota
           pnpm --filter @ai-job-print/api verify:upload-sessions

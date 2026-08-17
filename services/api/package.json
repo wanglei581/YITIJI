@@ -269,7 +269,8 @@
     "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts",
     "verify:throttle-dimension": "node -r @swc-node/register scripts/verify-throttle-dimension.ts",
-    "verify:ai-public-quota": "node -r @swc-node/register scripts/verify-ai-public-quota.ts"
+    "verify:ai-public-quota": "node -r @swc-node/register scripts/verify-ai-public-quota.ts",
+    "verify:ai-throttle-dimension": "node -r @swc-node/register scripts/verify-ai-throttle-dimension.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

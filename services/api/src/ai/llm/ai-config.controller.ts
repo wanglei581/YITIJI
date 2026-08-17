@@ -15,6 +15,7 @@ import { Roles } from '../../common/decorators/roles.decorator'
 import { LlmConfigService } from './llm-config.service'
 import { LlmChatService } from './llm-chat.service'
 import { LLM_PRESETS, isLlmVendor } from './llm-presets'
+import { PaidAiThrottle } from '../../common/throttler/terminal-throttle'
 
 interface UpdateAiConfigDto {
   feature?:      string
@@ -68,6 +69,7 @@ export class AiConfigController {
     const feature = body.feature === undefined ? 'assistant_chat' : this.config.assertValidFeatureKey(body.feature)
     return this.config.update(patch, feature)
   }
+  @PaidAiThrottle(4)
 
   @Post('test')
   async test(@Body() body: TestAiConfigDto) {
@@ -117,6 +119,7 @@ export class AiConfigsController {
     if (body.apiKey !== undefined)       patch.apiKey = body.apiKey
     return this.config.update(patch, this.config.assertValidFeatureKey(featureKey))
   }
+  @PaidAiThrottle(4)
 
   @Post(':featureKey/test')
   async testOne(@Param('featureKey') featureKey: string) {
