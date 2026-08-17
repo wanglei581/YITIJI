@@ -628,6 +628,9 @@ Claude Code 每次开发前必须：
 
 每次开发后必须：
 
+0. **改动 `.github/workflows/**` 的，推之前跑 `pnpm verify:repository-integrity`**（校验所有 workflow YAML 语法）。
+   跳过的代价见 [docs/reviews/verification-antipatterns-2026-08-17.md](docs/reviews/verification-antipatterns-2026-08-17.md) §三：
+   坏 YAML 进 main 会让 GitHub 无法解析该文件（dispatch 一律 422），并使 `Repository integrity gate` 转红、**连带所有在跑的 PR 全部失败**。
 1. 运行 lint
 2. 检查页面是否能打开
 3. 检查移动端和大屏布局
