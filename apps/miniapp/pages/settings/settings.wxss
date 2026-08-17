@@ -1,6 +1,6 @@
 /* pages/settings/settings.wxss */
 .grp-label {
-  margin: 28rpx 8rpx 14rpx;
+  margin: 30rpx 40rpx 14rpx;
   font-size: 24rpx;
   color: var(--muted);
   letter-spacing: .5rpx;
@@ -8,9 +8,10 @@
 .grp-label:first-of-type { margin-top: 8rpx; }
 
 .set-group {
+  margin: 0 32rpx;
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
-  border-radius: var(--r-lg);
+  border-radius: 28rpx;
   box-shadow: var(--sh-xs);
   overflow: hidden;
 }
@@ -33,7 +34,7 @@
   margin-right: 22rpx;
   flex-shrink: 0;
 }
-.set-ic .ficon { font-size: 34rpx; }
+.set-ic .ficon { width: 32rpx; height: 32rpx; }
 .set-ic.a-teal  { background: var(--teal-wash); }
 .set-ic.a-teal .ficon  { color: var(--teal-deep); }
 .set-ic.a-clay  { background: var(--clay-wash); }
@@ -55,9 +56,9 @@
 }
 .set-go {
   margin-left: 12rpx;
-  font-size: 34rpx;
+  width: 22rpx;
+  height: 22rpx;
   color: var(--faint);
-  line-height: 1;
 }
 
 /* 开关 */
@@ -86,7 +87,7 @@
 .tgl.on::after { right: 6rpx; }
 
 .logout {
-  margin: 40rpx 0 20rpx;
+  margin: 40rpx 32rpx 20rpx;
   height: 100rpx;
   border-radius: var(--r-lg);
   background: var(--surface);
@@ -97,4 +98,10 @@
   font-size: 30rpx;
   font-weight: 600;
   color: var(--clay-deep);
+}
+.logout.login-cta {
+  color: #fff;
+  background: var(--teal);
+  border-color: var(--teal);
+  box-shadow: 0 12rpx 28rpx rgba(22,119,255,.16);
 }

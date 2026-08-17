@@ -41,11 +41,11 @@
       "runtimeArgs": [
         "-m",
         "http.server",
-        "5303",
+        "5304",
         "--directory",
         "docs/design/console-ai-os-2026-08"
       ],
-      "port": 5303,
+      "port": 5304,
       "autoPort": false
     },
     {

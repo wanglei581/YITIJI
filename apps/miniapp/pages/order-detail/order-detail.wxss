@@ -1,0 +1,56 @@
+/* pages/order-detail/order-detail.wxss */
+.od-card { padding: 28rpx; }
+
+.od-filename {
+  font-size: 34rpx;
+  font-weight: 750;
+  color: var(--ink);
+  margin-bottom: 16rpx;
+}
+
+.od-status-row {
+  margin-bottom: 20rpx;
+}
+
+.od-rows { }
+
+.od-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid var(--line-faint);
+  font-size: 26rpx;
+}
+.od-row:last-child { border-bottom: none; }
+
+.od-label { color: var(--muted); }
+.od-val { color: var(--ink); font-weight: 600; }
+
+.od-pickup-card { padding: 0; }
+
+.od-pickup {
+  text-align: center;
+  padding: 30rpx 0;
+}
+.od-pickup-label {
+  font-size: 24rpx;
+  color: var(--muted);
+  margin-bottom: 12rpx;
+}
+.od-pickup-code {
+  font-size: 56rpx;
+  font-weight: 800;
+  letter-spacing: 8rpx;
+  color: var(--teal-deep);
+  font-family: var(--font-mono, monospace);
+}
+.od-pickup-hint {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: var(--muted);
+}
+
+.od-actions {
+  padding: 24rpx 0 8rpx;
+}

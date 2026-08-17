@@ -8,9 +8,9 @@
 
 <view class="content has-bar">
   <view class="steps rise-d1">
-    <view class="st done"><text class="n">✓</text><text class="nl">选择文件</text></view>
+    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选择文件</text></view>
     <view class="line done"></view>
-    <view class="st done"><text class="n">✓</text><text class="nl">选终端</text></view>
+    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选终端</text></view>
     <view class="line done"></view>
     <view class="st on"><text class="n">3</text><text class="nl">到机码</text></view>
     <view class="line"></view>

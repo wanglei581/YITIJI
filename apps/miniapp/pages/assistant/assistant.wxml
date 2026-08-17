@@ -1,5 +1,4 @@
 <view class="as-wrap">
-  <!-- 顶部 header（teal 渐变） -->
   <view class="as-top">
     <view style="height:{{statusBarHeight}}px"></view>
     <view class="as-row">
@@ -7,14 +6,14 @@
         <text class="ficon i-right as-back-ic"></text>
       </view>
       <view class="as-av">
-        <text class="ficon i-robot as-av-ic"></text>
+        <image src="/assets/xiaoqing-card.jpg" mode="aspectFill" />
       </view>
       <view style="flex:1">
         <view class="as-name">小青</view>
         <view class="as-role">求职服务智能助手</view>
       </view>
-      <view class="tap" hover-class="tap-press" bindtap="tapMore" style="padding:16rpx">
-        <text style="color:rgba(255,255,255,.85);font-size:40rpx;letter-spacing:4rpx">···</text>
+      <view class="as-more tap" hover-class="tap-press" bindtap="tapMore">
+        <text class="ficon i-setting"></text>
       </view>
     </view>
   </view>
@@ -29,7 +28,7 @@
         <!-- AI 消息 -->
         <view wx:if="{{item.role === 'ai'}}" class="msg msg-ai">
           <view class="msg-av-wrap">
-            <text class="ficon i-robot msg-av-ic"></text>
+            <image src="/assets/xiaoqing-card.jpg" mode="aspectFill" />
           </view>
           <view class="b-ai">
             <view wx:if="{{item.loading}}" class="bt msg-loading">
@@ -63,13 +62,13 @@
       </block>
 
       <!-- 快捷问题 -->
-      <scroll-view scroll-x class="quick-scroll">
+      <view class="quick-scroll">
         <view class="quick-row">
           <view wx:for="{{quickChips}}" wx:key="index"
             class="q-chip tap" hover-class="tap-press"
             data-text="{{item}}" bindtap="tapChip">{{item}}</view>
         </view>
-      </scroll-view>
+      </view>
 
       <view style="height:240rpx"></view>
     </view>

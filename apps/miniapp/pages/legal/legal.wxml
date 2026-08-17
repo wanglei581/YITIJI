@@ -24,7 +24,9 @@
       <view class="legal-meta">版本 {{version}}<text wx:if="{{publishedAt}}"> · 发布于 {{publishedAt}}</text></view>
       <block wx:for="{{blocks}}" wx:key="key">
         <view wx:if="{{item.kind === 'heading'}}" class="legal-heading">{{item.text}}</view>
-        <view wx:elif="{{item.kind === 'bullet'}}" class="legal-paragraph legal-bullet">• {{item.text}}</view>
+        <view wx:elif="{{item.kind === 'bullet'}}" class="legal-paragraph legal-bullet">
+          <text class="legal-bullet-dot"></text><text class="legal-bullet-text">{{item.text}}</text>
+        </view>
         <view wx:elif="{{item.kind === 'numbered'}}" class="legal-paragraph legal-numbered">{{item.text}}</view>
         <view wx:else class="legal-paragraph">{{item.text}}</view>
       </block>

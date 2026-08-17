@@ -1,6 +1,15 @@
 // pages/me/me.js
 const app = getApp()
 const auth = require('../../utils/auth')
+const api = require('../../utils/api')
+
+function countFromResult(res) {
+  if (!res) return '—'
+  if (typeof res.total === 'number') return String(res.total)
+  if (Array.isArray(res)) return String(res.length)
+  if (Array.isArray(res.items)) return String(res.items.length)
+  return '—'
+}
 
 Page({
   data: {
@@ -17,7 +26,7 @@ Page({
       { id: 'resume',    icon: 'file-text', title: '我的简历',      sub: '本人上传与 AI 处理记录', accent: 'plum'  },
       { id: 'docs',      icon: 'folder',    title: '我的文档',      sub: '可再次发起打印',       accent: 'teal'  },
       { id: 'orders',    icon: 'printer',   title: '打印订单',      sub: '取件码与出纸状态',     accent: 'clay'  },
-      { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'plum'  },
+      { id: 'ai',        icon: 'robot',     title: 'AI 服务记录',   sub: '服务端实际任务记录',   accent: 'cyan'  },
       { id: 'favorites', icon: 'inbox',     title: '我的收藏',      sub: '岗位、招聘会与政策',   accent: 'teal'  },
       { id: 'activity',  icon: 'history',   title: '浏览与跳转记录', sub: '仅记录本人浏览与跳转', accent: 'wheat' },
       { id: 'membership',icon: 'crown',     title: '我的权益',      sub: '查看本人实际权益记录', accent: 'wheat' },
@@ -33,9 +42,31 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
-    // 每次显示时刷新登录态（从 launch 登录回来时 onShow 触发）
     const loggedIn = auth.isLoggedIn()
     this.setData({ isLoggedIn: loggedIn, user: loggedIn ? auth.getUser() : null })
+    if (loggedIn) {
+      Promise.all([
+        api.getMyResumes({ pageSize: 1 }).catch(() => null),
+        api.getMyDocuments({ pageSize: 1 }).catch(() => null),
+        api.getMyPrintOrders({ pageSize: 1 }).catch(() => null),
+      ]).then(function(results) {
+        this.setData({
+          stats: [
+            { key: 'resume', label: '简历',   value: countFromResult(results[0]) },
+            { key: 'docs',   label: '文档',   value: countFromResult(results[1]) },
+            { key: 'order',  label: '打印单', value: countFromResult(results[2]) },
+          ],
+        })
+      }.bind(this)).catch(function() {})
+    } else {
+      this.setData({
+        stats: [
+          { key: 'resume', label: '简历',   value: '—' },
+          { key: 'docs',   label: '文档',   value: '—' },
+          { key: 'order',  label: '打印单', value: '—' },
+        ],
+      })
+    }
   },
 
   tapEntry(e) {
@@ -64,7 +95,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '智引答 · 我的',
+      title: '职易达 · 我的',
       path: '/pages/me/me',
     }
   },

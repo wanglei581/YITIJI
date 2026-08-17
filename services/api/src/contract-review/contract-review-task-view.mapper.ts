@@ -35,9 +35,17 @@ export function mapContractReviewTaskView(task: ContractReviewTaskRow): Contract
     : OCR_CONFIDENCE.has(task.ocrConfidence)
       ? task.ocrConfidence as 'high' | 'medium' | 'low'
       : invalidResult()
+  // 只放行形如 CONTRACT_XXX 的稳定错误码。任何不符合该形状的值一律置 null，
+  // 避免把上游报文片段或合同内容经由错误信息带出服务端（§11）。
+  const errorCode = status === 'failed'
+    && typeof task.errorCode === 'string'
+    && /^CONTRACT_[A-Z0-9_]{3,60}$/u.test(task.errorCode)
+      ? task.errorCode
+      : null
   return {
     id: task.id,
     status,
+    errorCode,
     contractType: task.contractType as ContractType,
     analyzedPages: task.analyzedPages,
     totalPages: task.totalPages,

@@ -1,91 +1,81 @@
-<!--pages/resumes/resumes.wxml-->
 <view class="page-wrap">
-
-  <!-- 状态栏占位 -->
-  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
-
-  <!-- 导航栏 -->
-  <view class="navbar">
-    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
-    <view class="nb-title">我的简历</view>
-    <view class="nb-right tap" hover-class="tap-press" bindtap="upload">上传</view>
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">我的简历</view>
+    </view>
   </view>
 
-  <!-- 内容区 -->
-  <view class="content">
-
-    <!-- 头部统计 + 上传 -->
-    <view class="page-hd" wx:if="{{!loginRequired}}">
-      <view class="ph-stat">
-        <text class="ph-num">{{resumes.length}}</text>
-        <text class="ph-unit">份简历</text>
+  <view class="content resume-content">
+    <view class="resume-hero" wx:if="{{!loginRequired}}">
+      <view class="rh-copy">
+        <view class="rh-kicker">简历资产</view>
+        <view class="rh-title"><text class="rh-num">{{resumes.length}}</text> 份简历</view>
+        <view class="rh-sub">集中管理诊断、优化与打印版本</view>
       </view>
-      <view class="upload-btn tap" hover-class="tap-press" bindtap="upload">
-        <text>＋ 上传新简历</text>
-      </view>
+      <view class="rh-icon"><text class="ficon i-folder"></text></view>
     </view>
 
-    <!-- ── 未登录空态 ── -->
-    <view class="empty-wrap" wx:if="{{loginRequired}}">
-      <view class="ev-icon">📄</view>
-      <view class="ev-title">登录后管理简历</view>
-      <view class="ev-desc">查看和管理你的全部简历版本，享受AI诊断与打印服务</view>
-      <view class="btn-primary tap" hover-class="tap-press" bindtap="goLogin">立即登录</view>
+    <view class="empty-card" wx:if="{{loginRequired}}">
+      <view class="empty-icon"><text class="ficon i-user"></text></view>
+      <view class="empty-title">登录后管理简历</view>
+      <view class="empty-desc">查看本人全部简历版本，并继续使用 AI 诊断、优化与打印服务。</view>
+      <view class="btn primary block tap" hover-class="tap-press" bindtap="goLogin">微信一键登录</view>
     </view>
 
-    <!-- ── 简历列表 ── -->
-    <view class="rz-list" wx:elif="{{resumes.length}}">
-      <view
-        class="rz-card tap"
-        wx:for="{{resumes}}"
-        wx:key="id"
-        hover-class="tap-press"
-        bindtap="openResume"
-        data-id="{{item.id}}"
-        data-task-id="{{item.taskId}}"
-      >
-        <!-- 简历缩略图 -->
-        <view class="rz-thumb">
-          <view class="rz-ln ln-h"></view>
-          <view class="rz-ln"></view>
-          <view class="rz-ln"></view>
-          <view class="rz-ln ln-s"></view>
+    <block wx:elif="{{resumes.length}}">
+      <view class="section-head">
+        <view>
+          <view class="section-title">最近更新</view>
+          <view class="section-sub">点击简历可查看诊断报告</view>
         </view>
-
-        <!-- 简历信息 -->
-        <view class="rz-body">
-          <view class="rz-header-row">
-            <text class="rz-name">{{item.name}}</text>
-            <text class="badge-primary" wx:if="{{item.isDefault}}">主版本</text>
-          </view>
-          <text class="rz-meta">PDF · {{item.updated}}</text>
-
-          <!-- 状态标签 -->
-          <view class="rz-tags" wx:if="{{item.tag}}">
-            <text class="tag tg-green" wx:if="{{item.tag === '已优化'}}">{{item.tag}}</text>
-            <text class="tag tg-blue" wx:elif="{{item.tag === '已诊断'}}">{{item.tag}}</text>
-            <text class="tag tg-amber" wx:else>{{item.tag}}</text>
-          </view>
-
-          <!-- 操作按钮（catchtap 阻止冒泡到卡片 bindtap） -->
-          <view class="rz-acts">
-            <view class="act-btn tap" hover-class="act-press" catchtap="openResume" data-task-id="{{item.taskId}}">诊断</view>
-            <view class="act-btn tap" hover-class="act-press" catchtap="optimize" data-task-id="{{item.taskId}}">优化</view>
-          </view>
+        <view class="upload-button tap" hover-class="tap-press" bindtap="upload"
+              role="button" aria-label="上传新简历">
+          <text class="ficon i-upload"></text>
+          <text>上传新简历</text>
         </view>
       </view>
+
+      <view class="resume-list">
+        <view
+          class="resume-card tap rise-d{{index + 1}}"
+          wx:for="{{resumes}}"
+          wx:key="id"
+          hover-class="tap-press"
+          bindtap="openResume"
+          data-id="{{item.id}}"
+          data-task-id="{{item.taskId}}"
+        >
+          <view class="resume-file-icon"><text class="ficon i-file-text"></text></view>
+          <view class="resume-main">
+            <view class="resume-title-row">
+              <text class="resume-name">{{item.name}}</text>
+              <text class="chip teal" wx:if="{{item.isDefault}}">主版本</text>
+            </view>
+            <view class="resume-meta">PDF · {{item.updated}}</view>
+            <view class="resume-status" wx:if="{{item.tag}}">
+              <text class="chip ok" wx:if="{{item.tag === '已优化'}}">{{item.tag}}</text>
+              <text class="chip plum" wx:elif="{{item.tag === '已诊断'}}">{{item.tag}}</text>
+              <text class="chip warn" wx:else>{{item.tag}}</text>
+            </view>
+            <view class="resume-actions">
+              <view class="action-button tap" hover-class="tap-press" catchtap="openResume" data-task-id="{{item.taskId}}">查看诊断</view>
+              <view class="action-button primary tap" hover-class="tap-press" catchtap="optimize" data-task-id="{{item.taskId}}">继续优化</view>
+            </view>
+          </view>
+          <text class="ficon i-right resume-arrow"></text>
+        </view>
+      </view>
+    </block>
+
+    <view class="empty-card" wx:else>
+      <view class="empty-icon"><text class="ficon i-file-text"></text></view>
+      <view class="empty-title">还没有简历</view>
+      <view class="empty-desc">上传本人简历后，可继续使用真实 AI 诊断、优化和打印流程。</view>
+      <view class="btn primary block tap" hover-class="tap-press" bindtap="upload">上传第一份简历</view>
     </view>
-
-    <!-- ── 无简历空态 ── -->
-    <view class="empty-wrap" wx:else>
-      <view class="ev-icon">📄</view>
-      <view class="ev-title">还没有简历</view>
-      <view class="ev-desc">上传简历开始享受 AI 诊断、优化与打印服务</view>
-      <view class="btn-primary tap" hover-class="tap-press" bindtap="upload">上传第一份简历</view>
-    </view>
-
-  </view><!-- /content -->
-
-  <!-- tabBar 安全区 -->
-  <view style="height:calc(80rpx + env(safe-area-inset-bottom))"></view>
+  </view>
 </view>

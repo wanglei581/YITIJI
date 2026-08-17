@@ -9,7 +9,7 @@ import { PhoneRebindDto } from './dto/phone-rebind.dto'
 import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-step-up.dto'
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
 import { SendSmsCodeDto } from './dto/send-sms-code.dto'
-import { WxMiniappLoginDto } from './dto/wx-miniapp-login.dto'
+import { WxMiniappLoginDto, WxMiniappResigninDto } from './dto/wx-miniapp-login.dto'
 import {
   MemberAuthService,
   type MemberAuthUser,
@@ -83,6 +83,18 @@ export class MemberAuthController {
         clientIp(req),
       ),
     )
+  }
+
+  /**
+   * 微信续签：只凭 wx.login() 的 code 为已绑号账号重签 token，不索取 phoneCode。
+   * 供客户端拦截 401 后静默补签，修复「下单后超过 30 分钟走到机前取件页 401」。
+   * 限流比完整登录更紧：这是自动路径，正常用户不会高频触发。
+   */
+  @Post('auth/wx-resignin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Header('Cache-Control', 'no-store')
+  async wxResignin(@Body() dto: WxMiniappResigninDto): Promise<ApiResponse<MemberLoginResult>> {
+    return ApiResponse.ok(await this.service.wxResignin(dto.code))
   }
 
   /** 已登录会员为数据导出/账号注销等敏感动作发送二次验证短信。 */

@@ -23,8 +23,16 @@ function read(rel) {
   return fs.readFileSync(path.join(ROOT, rel), 'utf8')
 }
 
+// 必须跳过 .claude 与 node_modules：本仓把 git worktree 建在
+// apps/miniapp/.claude/worktrees/ 下，形成嵌套的小程序检出。
+// 不跳过的话，从主仓运行本门禁会走进嵌套检出并 EISDIR 崩溃——
+// 也就是说开发者工具实际读的那份代码上，门禁从来没跑起来过。
+// 这两个目录本来就在 app.json 的 packOptions.ignore 里，不属于产物。
+const SKIP_DIRS = new Set(['.claude', 'node_modules', '.git'])
+
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+    if (SKIP_DIRS.has(entry.name)) continue
     const rel = `${dir}/${entry.name}`
     if (entry.isDirectory()) walk(rel, out)
     else out.push(rel)
@@ -85,6 +93,9 @@ const allowedTopLevel = new Set([
   'app.js',
   'app.json',
   'app.wxss',
+  // assets：本地静态图片。放开该目录的同时必须由下方「本地图片体积预算」守住，
+  // 否则主包会被大图侵蚀（曾有 WIP 分支塞入 284KB 单图 = 2MB 主包预算的 14%）。
+  'assets',
   'custom-tab-bar',
   'package.json',
   'pages',
@@ -97,12 +108,42 @@ const generatedTopLevel = new Set([
   '.DS_Store',
   'miniprogram_npm',
   'node_modules',
+  // 本仓把 git worktree 建在 apps/miniapp/.claude/worktrees/ 下，
+  // 该目录已在 app.json 的 packOptions.ignore 中，不进小程序包。
+  '.claude',
   'project.private.config.json',
 ])
 const unexpectedTopLevel = fs.readdirSync(ROOT)
   .filter((name) => !allowedTopLevel.has(name) && !generatedTopLevel.has(name))
 if (unexpectedTopLevel.length) bad('小程序唯一目录分类', unexpectedTopLevel.join(','))
 else ok('小程序唯一目录分类受门禁')
+
+// ── 本地图片体积预算 ──────────────────────────────────────────
+// 主包上限 2MB。小程序此前零本地图片，是重要资产；一旦放开 assets/ 必须钉死预算，
+// 否则头像、空态插画、徽章会迅速侵蚀主包。UGC/运营类图片一律走远程 URL，不进包。
+const IMG_MAX_SINGLE = 60 * 1024
+const IMG_MAX_TOTAL = 300 * 1024
+const imgExt = /\.(png|jpe?g|gif|webp|bmp)$/i
+const walkImages = (dir, acc = []) => {
+  if (!fs.existsSync(dir)) return acc
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (SKIP_DIRS.has(e.name)) continue
+    const p = path.join(dir, e.name)
+    if (e.isDirectory()) walkImages(p, acc)
+    else if (imgExt.test(e.name)) acc.push({ p, size: fs.statSync(p).size })
+  }
+  return acc
+}
+const localImages = walkImages(ROOT).filter((f) => !f.p.includes(`${path.sep}node_modules${path.sep}`))
+const oversize = localImages.filter((f) => f.size > IMG_MAX_SINGLE)
+const imgTotal = localImages.reduce((s, f) => s + f.size, 0)
+if (oversize.length) {
+  bad('本地图片单张体积预算', oversize.map((f) => `${path.relative(ROOT, f.p)}=${Math.round(f.size / 1024)}KB`).join(','))
+} else if (imgTotal > IMG_MAX_TOTAL) {
+  bad('本地图片总量预算', `${Math.round(imgTotal / 1024)}KB > ${IMG_MAX_TOTAL / 1024}KB`)
+} else {
+  ok(`本地图片体积预算（${localImages.length} 张 / ${Math.round(imgTotal / 1024)}KB）`)
+}
 
 const registeredPageDirs = new Set(PAGE_PATHS.map((page) => path.dirname(page)))
 const physicalPageDirs = fs.readdirSync(path.join(ROOT, 'pages'), { withFileTypes: true })
@@ -258,12 +299,16 @@ for (const f of jsFiles.filter((x) => x.startsWith('./pages/'))) {
 if (datasetErrors.length) bad('dataset 绑定完整', datasetErrors.join('; '))
 else ok('dataset 绑定完整')
 
-const validIcons = new Set([
-  'i-aim','i-bank','i-bell','i-calendar','i-comment','i-compass','i-crown',
-  'i-edit','i-file-search','i-file-text','i-folder','i-form','i-history','i-home',
-  'i-inbox','i-info','i-link','i-location','i-printer','i-right','i-robot',
-  'i-scan','i-search','i-setting','i-solution','i-thunder','i-upload','i-user',
-])
+// 从 app.wxss 实际定义推导，不再维护硬编码清单。
+// 硬编码列表必然相对样式表漂移：i-close 已在 app.wxss 定义却不在旧清单里，
+// 导致真实可用的图标被判为违规；反过来漂移则会放过真正缺定义的图标。
+// 这里要守的不变量是「页面用到的每个图标都有 CSS 定义」，
+// 唯一可靠的事实来源就是 app.wxss 本身。
+const validIcons = new Set(
+  [...read('app.wxss').matchAll(/\.(i-[a-z0-9-]+)\s*(?:,|\{|::)/g)].map((m) => m[1]),
+)
+if (validIcons.size >= 20) ok(`图标定义已从 app.wxss 推导（${validIcons.size} 个）`)
+else bad('图标定义已从 app.wxss 推导', `只解析到 ${validIcons.size} 个，app.wxss 可能未被正确读取`)
 const invalidIcons = []
 for (const f of wxmlFiles) {
   for (const match of read(f).matchAll(/class="([^"]*\bficon\b[^"]*)"/g)) {
@@ -310,8 +355,22 @@ if (
   !/appSecret\s*[:=]/.test(apiJs)
 ) ok('登录实现无密钥残留')
 else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
-if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && settingsJs.includes('auth.clearSession()')) ok('登录与真实退出入口完整')
+if (meWxml.includes('bindtap="tapLogin"') && meWxml.includes('未登录') && settingsWxml.includes('退出登录') && settingsJs.includes('api.logout()') && (settingsJs.includes('auth.logout()') || settingsJs.includes('auth.clearSession()'))) ok('登录与真实退出入口完整')
 else bad('登录与真实退出入口完整', '缺少登录按钮、服务端 logout 或本地会话清理')
+
+// 401 静默补签的准入依据必须与「当前有没有 token」解耦。
+// getToken() 在 JWT 过期时会先 clearSession 再返回 null，使「自然过期」
+// 与「主动登出」完全同形；用 token 判断必然二选一地出错——要么过期后
+// 补不了签（取件页 401 原样存在），要么登出后被自动登回（共用设备隐私）。
+const storageJs = read('utils/storage.js')
+if (
+  storageJs.includes('RESIGNIN_ELIGIBLE') &&
+  authJs.includes('canSilentResignin') &&
+  requestJs.includes('auth.canSilentResignin()') &&
+  !/&&\s*!!auth\.getToken\(\)/.test(requestJs) &&
+  settingsJs.includes('auth.logout()')
+) ok('401 补签准入与 token 存在性解耦')
+else bad('401 补签准入与 token 存在性解耦', '补签不得以 auth.getToken() 是否有值作为准入，登出须撤销补签资格')
 
 const membershipJs = read('pages/membership/membership.js')
 const notificationsJs = read('pages/notifications/notifications.js')
@@ -352,7 +411,7 @@ try {
   const active = loadAuthForVerify(fakeMemberToken(nowSeconds + 3600))
   const expiredCleared = !expired.auth.isLoggedIn() && !expired.state.zyd_token && !expired.state.zyd_user
   const activeKept = active.auth.isLoggedIn() && Boolean(active.state.zyd_token)
-  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && requestJs.includes('auth.clearSession()')) {
+  if (expiredCleared && activeKept && requestJs.includes('auth.getToken()') && (requestJs.includes('auth.logout()') || requestJs.includes('auth.clearSession()'))) {
     ok('过期会员令牌会在展示与请求前主动清理')
   } else {
     bad('过期会员令牌会在展示与请求前主动清理', '登录态或请求层仍可能复用过期 token')
@@ -398,7 +457,10 @@ const pickupQr = read('utils/pickup-qrcode.js')
 if (
   pickupWxml.includes('type="2d"') &&
   pickupWxml.includes('请将此二维码对准一体机扫码器') &&
-  pickupWxml.includes('二维码只包含本订单的 10 位取件码') &&
+  // 术语随终端对齐为「到机码」（kiosk 入口名为「到机码核销 · 不是取件码」）。
+  // 这里只是定位锚点；真正守能力的是下面的 createPickupQrMatrix / PICKUP_CODE_RE /
+  // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
+  pickupWxml.includes('二维码只包含本订单的 10 位到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
   pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
   pickupQr.includes("PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/") &&

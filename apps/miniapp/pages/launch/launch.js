@@ -8,6 +8,9 @@ const LOGIN_RETURN_ROUTES = new Set([
   '/pages/documents/documents',
   '/pages/membership/membership',
   '/pages/notifications/notifications',
+  // 合同审查 6 个端点全部要会员身份：未登录时服务端走匿名路径，
+  // 需要 x-contract-review-source-file-proof 等头，小程序不具备 → 整条链 404。
+  '/pages/contract-review/contract-review',
 ])
 
 function safeReturnTo(raw) {

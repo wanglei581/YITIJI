@@ -10,7 +10,7 @@
   <view wx:if="{{status === 'loading'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
-      <view class="ficon i-file-text rs-ic"></view>
+      <text class="ficon i-file-text rs-ic"></text>
     </view>
     <view class="rs-title">正在获取诊断报告…</view>
     <view class="rs-sub">AI 分析结果由服务端生成,请稍候</view>
@@ -23,7 +23,8 @@
     <view class="rs-title">还没有诊断报告</view>
     <view class="rs-sub">上传或拍摄一份简历,AI 解析完成后会在这里生成报告</view>
     <view wx:if="{{hasSavedTask}}" class="saved-tip tap" bindtap="viewSaved">
-      查看上一次的诊断{{savedFileName ? '(' + savedFileName + ')' : ''}} ›
+      <text>查看上一次的诊断{{savedFileName ? '(' + savedFileName + ')' : ''}}</text>
+      <text class="ficon i-right saved-tip-arrow"></text>
     </view>
   </view>
 
@@ -39,17 +40,17 @@
 
     <!-- 占位 provider 必须明示,否则用户会把演示结论当成真实分析 -->
     <view wx:if="{{report.isMockProvider}}" class="notice warn">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为简历评估结论。</text>
     </view>
 
     <!-- 文本抽取质量:低置信度时必须提醒人工复核 -->
     <view wx:if="{{report.noticeConfidence !== null && report.noticeConfidence < 0.8}}" class="notice warn">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>简历文字识别置信度较低({{report.noticeConfidence}}),部分内容可能未被正确读取,建议核对后再参考评分。</text>
     </view>
     <view wx:for="{{report.noticeWarnings}}" wx:for-item="w" wx:key="*this" class="notice warn">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>{{w}}</text>
     </view>
 
@@ -95,7 +96,7 @@
           <view class="ii-title">{{item.focus}}</view>
           <view class="ii-tip">{{item.reason}}</view>
         </view>
-        <view class="ii-arr">›</view>
+        <text class="ficon i-right ii-arr"></text>
       </view>
     </view>
 
@@ -113,7 +114,7 @@
       >
         <view class="ii-left"><view class="sev-dot mid"></view></view>
         <view class="ii-body"><view class="ii-tip">{{rk}}</view></view>
-        <view class="ii-arr">›</view>
+        <text class="ficon i-right ii-arr"></text>
       </view>
     </view>
 
@@ -131,12 +132,12 @@
       >
         <view class="ii-left"><view class="sev-dot low"></view></view>
         <view class="ii-body"><view class="ii-tip">{{sg}}</view></view>
-        <view class="ii-arr">›</view>
+        <text class="ficon i-right ii-arr"></text>
       </view>
     </view>
 
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>诊断结果由 AI 生成,仅供参考。评分不代表用人单位意见,最终以招聘方要求为准。</text>
     </view>
 

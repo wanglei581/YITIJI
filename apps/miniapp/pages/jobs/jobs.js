@@ -90,6 +90,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '智引答 · 发现求职机会', path: '/pages/jobs/jobs' }
+    return { title: '职易达 · 发现求职机会', path: '/pages/jobs/jobs' }
   },
 })

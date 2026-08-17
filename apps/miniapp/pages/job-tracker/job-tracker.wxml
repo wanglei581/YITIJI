@@ -1,0 +1,155 @@
+<!--pages/job-tracker/job-tracker.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">求职进度看板</view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <!-- 总览条 -->
+    <view class="summary-bar">
+      <text class="ficon i-solution summary-ic"></text>
+      <text class="summary-text">共 <text class="summary-num">{{total}}</text> 条申请</text>
+    </view>
+
+    <!-- 看板（横向滚动） -->
+    <scroll-view class="board-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="board-row">
+        <view class="board-col" wx:for="{{columns}}" wx:key="key">
+
+          <view class="col-header">
+            <view class="col-dot col-dot-{{item.color}}"></view>
+            <text class="col-label">{{item.label}}</text>
+            <view class="col-badge">{{item.items.length}}</view>
+          </view>
+
+          <view class="col-body">
+            <view class="col-empty" wx:if="{{item.items.length === 0}}">
+              <text class="ficon i-inbox col-empty-ic"></text>
+              <text class="col-empty-text">暂无</text>
+            </view>
+
+            <view
+              class="jt-card tap"
+              wx:for="{{item.items}}"
+              wx:for-item="card"
+              wx:key="id"
+              hover-class="tap-press"
+              bindtap="openEdit"
+              bindlongpress="longPressCard"
+              data-id="{{card.id}}"
+              role="button"
+              aria-label="{{card.company}} {{card.position}}"
+            >
+              <view class="card-head">
+                <text class="ficon i-briefcase card-ic"></text>
+                <view class="card-del tap" catchtap="deleteItem" data-id="{{card.id}}" role="button" aria-label="删除">
+                  <text class="ficon i-close"></text>
+                </view>
+              </view>
+              <text class="card-company">{{card.company}}</text>
+              <text class="card-position">{{card.position}}</text>
+              <view class="card-meta" wx:if="{{card.salary}}">
+                <text class="ficon i-dollar-sign card-meta-ic"></text>
+                <text class="card-salary">{{card.salary}}</text>
+              </view>
+              <text class="card-note" wx:if="{{card.note}}">{{card.note}}</text>
+            </view>
+          </view>
+
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 空状态（全空时） -->
+    <view class="empty-slot" wx:if="{{total === 0}}">
+      <text class="ficon i-solution es-ic"></text>
+      <view class="es-t">还没有申请记录</view>
+      <view class="es-d">点击下方「添加求职记录」记下第一条</view>
+    </view>
+
+  </view>
+
+  <!-- 底部添加按钮 -->
+  <view class="add-bar">
+    <view class="btn primary block tap" hover-class="tap-press" bindtap="openAdd" role="button" aria-label="添加求职记录">
+      <text class="ficon i-plus btn-ic"></text>
+      <text>添加求职记录</text>
+    </view>
+  </view>
+
+  <!-- 新增/编辑弹窗 -->
+  <view class="modal-mask" wx:if="{{showModal}}" bindtap="closeModal"></view>
+  <view class="modal-sheet" wx:if="{{showModal}}">
+    <view class="modal-drag-bar"></view>
+    <view class="modal-title">{{editing ? '编辑申请' : '添加求职记录'}}</view>
+
+    <view class="form-group">
+      <text class="form-label">公司名称 *</text>
+      <input class="form-input" placeholder="如：字节跳动" value="{{form.company}}"
+        bindinput="onInput" data-field="company" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">应聘岗位 *</text>
+      <input class="form-input" placeholder="如：前端工程师、产品经理" value="{{form.position}}"
+        bindinput="onInput" data-field="position" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">当前状态</text>
+      <picker mode="selector" range="{{statusOptions}}" range-key="label"
+        value="{{statusIdx}}" bindchange="onStatusChange">
+        <view class="form-picker">
+          <text class="picker-val">{{statusOptions[statusIdx].label}}</text>
+          <text class="ficon i-right picker-arrow"></text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">薪资 / Offer</text>
+      <input class="form-input" placeholder="如：20-30K · 16薪" value="{{form.salary}}"
+        bindinput="onInput" data-field="salary" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">备注</text>
+      <textarea class="form-textarea" placeholder="面试情况、联系人、笔试安排…" value="{{form.note}}"
+        bindinput="onInput" data-field="note" auto-height maxlength="200" />
+    </view>
+
+    <view class="modal-actions">
+      <view class="btn ghost tap" hover-class="tap-press" bindtap="closeModal">取消</view>
+      <view class="btn primary tap" hover-class="tap-press" bindtap="saveForm">保存</view>
+    </view>
+  </view>
+
+  <!-- 长按快速改状态 -->
+  <view class="modal-mask" wx:if="{{showStatusPicker}}" bindtap="closeStatusPicker"></view>
+  <view class="status-picker" wx:if="{{showStatusPicker}}">
+    <view class="modal-drag-bar"></view>
+    <view class="sp-title">移动到哪个阶段？</view>
+    <view
+      class="sp-item tap"
+      wx:for="{{statusOptions}}"
+      wx:key="key"
+      hover-class="tap-press"
+      bindtap="pickStatus"
+      data-key="{{item.key}}"
+    >
+      <view class="sp-dot sp-dot-{{item.color}}"></view>
+      <text class="sp-label">{{item.label}}</text>
+      <text class="ficon i-right sp-arrow"></text>
+    </view>
+    <view class="sp-cancel tap" hover-class="tap-press" bindtap="closeStatusPicker">取消</view>
+  </view>
+
+</view>

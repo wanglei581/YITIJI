@@ -8,7 +8,7 @@
 
 <view class="content has-bar">
   <view class="steps rise-d1">
-    <view class="st done"><text class="n">✓</text><text class="nl">选择文件</text></view>
+    <view class="st done"><text class="n"><text class="ficon i-check"></text></text><text class="nl">选择文件</text></view>
     <view class="line done"></view>
     <view class="st on"><text class="n">2</text><text class="nl">选门店</text></view>
     <view class="line"></view>
@@ -32,7 +32,7 @@
       <view class="e-desc">{{loadError}}</view>
     </view>
     <view wx:elif="{{stores.length === 0}}" class="empty">
-      <view class="e-ic">📍</view>
+      <view class="e-ic"><text class="ficon i-location"></text></view>
       <view class="e-title">暂无可选门店</view>
       <view class="e-desc">仅展示已启用且有真实心跳的公开终端</view>
     </view>
@@ -40,7 +40,7 @@
     <view wx:for="{{stores}}" wx:key="id" class="store-card {{picked===item.id?'selected':''}} tap" data-id="{{item.id}}" bindtap="pick">
       <view class="sc-top">
         <view class="sc-name">{{item.displayName}}</view>
-        <view class="sc-radio">{{picked===item.id?'✓':''}}</view>
+        <view class="sc-radio"><text wx:if="{{picked===item.id}}" class="ficon i-check"></text></view>
       </view>
       <view class="sc-addr">{{item.locationLabel || '暂未配置服务点说明'}}</view>
       <view class="sc-badges">
@@ -59,6 +59,6 @@
 
 <view class="actionbar">
   <view class="ab-price"><text class="ab-label">{{isFreeOrder ? '免费试运营' : '预估'}}</text><text class="ab-amt">{{isFreeOrder ? '免费' : (q.total ? '¥' + q.total : '—')}}</text></view>
-  <view class="btn primary lg {{picked ? '' : 'disabled'}}" bindtap="toPay">确认终端 →</view>
+  <view class="btn primary lg {{picked ? '' : 'disabled'}}" bindtap="toPay">确认终端</view>
 </view>
 </view>

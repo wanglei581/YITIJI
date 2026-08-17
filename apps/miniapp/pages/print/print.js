@@ -11,10 +11,10 @@ Page({
       { n: '3', label: '到机完成' },
     ],
     paths: [
-      { id: 'docs',     icon: 'folder',    accent: 'teal',  title: '从我的文档打印', badge: '推荐', desc: '只使用本人服务端真实文件，不用占位文件建单', flow: '选文档 → 选参数 → 选终端' },
-      { id: 'usb',      icon: 'printer',   accent: 'slate', title: 'U盘打印指引', desc: '携带 U盘到一体机现场打印，查看操作步骤', flow: '插 U盘 → 一体机导入 → 出纸' },
-      { id: 'bind',     icon: 'link',                       title: '扫码登录一体机', desc: '用微信扫描一体机屏幕上的二维码，快速完成手机与终端绑定', flow: '扫一体机二维码 → 手机确认 → 终端已登录' },
-      { id: 'orders',   icon: 'history',   accent: 'clay',  title: '打印订单', desc: '查看本人服务端订单与真实打印状态', flow: '订单 → 状态 → 取件码' },
+      { id: 'docs',     icon: 'folder',  accent: 'teal',  title: '从我的文档打印', badge: '推荐', desc: '只使用本人服务端真实文件，不用占位文件建单', flow: '选文档 · 选参数 · 选终端' },
+      { id: 'usb',      icon: 'printer', accent: 'slate', title: 'U盘打印指引', desc: '携带 U盘到一体机现场打印，查看操作步骤', flow: '插 U盘 · 一体机导入 · 出纸' },
+      { id: 'bind',     icon: 'scan',    accent: 'teal',  title: '扫码登录一体机', desc: '用微信扫描一体机屏幕上的二维码，快速完成手机与终端绑定', flow: '扫一体机二维码 · 手机确认 · 终端已登录' },
+      { id: 'orders',   icon: 'history', accent: 'clay',  title: '打印订单', desc: '查看本人服务端订单与真实打印状态', flow: '订单 · 状态 · 取件码' },
     ],
   },
 

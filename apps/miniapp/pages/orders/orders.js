@@ -207,22 +207,11 @@ Page({
     }
   },
 
-  // 列表卡片保持轻量只读；取件页会再按 orderId 读取真实详情并轮询状态。
+  // 列表卡片保持轻量只读；详情页按 orderId 读取真实详情。
   detail(e) {
     const item = this.data.filtered.find(o => o.id === e.currentTarget.dataset.id)
     if (!item) return
-    const lines = [
-      `状态：${item.statusLabel}`,
-      `规格：${item.spec}`,
-      `金额：${item.price}`,
-    ]
-    if (item.pickup) lines.push(`取件码：${item.pickup}`)
-    wx.showModal({
-      title: item.title,
-      content: lines.join('\n'),
-      showCancel: false,
-      confirmText: '知道了',
-    })
+    wx.navigateTo({ url: `/pages/order-detail/order-detail?orderId=${encodeURIComponent(item.id)}` })
   },
 
   // 去登录

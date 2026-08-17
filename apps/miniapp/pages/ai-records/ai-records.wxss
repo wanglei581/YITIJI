@@ -45,9 +45,13 @@
   white-space: nowrap;
 }
 
-.rec-action { flex-shrink: 0; color: var(--muted); font-size: 23rpx; }
+.rec-action { flex-shrink: 0; color: var(--muted); font-size: 23rpx;
+  display: flex; align-items: center; gap: 7rpx; }
 .rec-action.ready { color: var(--teal-deep); font-weight: 600; }
-.rec-more { flex-shrink: 0; padding: 22rpx 8rpx 22rpx 16rpx; color: var(--muted); font-size: 24rpx; letter-spacing: 2rpx; }
+.rec-arrow { width: 17rpx; height: 17rpx; }
+.rec-more { flex-shrink: 0; width: 58rpx; height: 58rpx; margin-left: 2rpx;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--muted); }
+.rec-more .ficon { width: 26rpx; height: 26rpx; transform: rotate(90deg); }
 
 .empty-slot {
   padding: 60rpx 20rpx;

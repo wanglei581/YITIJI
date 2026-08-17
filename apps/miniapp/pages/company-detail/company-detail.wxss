@@ -1,43 +1,74 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
-/* 收藏态:图标染青色表示已收藏(ficon 无实心星,用颜色区分) */
-.nav-right.faved .ficon { color: var(--teal-deep); }
+/* 收藏按钮：与主操作并列在底部操作条。不可放导航栏右侧——微信胶囊常驻遮挡。
+   ficon 无实心星/心形，纯图标不可识别，故图标下必须带文字标签。 */
+.actionbar { display: flex; align-items: center; gap: 20rpx; }
+.actionbar .ab-main { flex: 1; min-width: 0; }
+.fav-btn { flex-shrink: 0; min-width: 140rpx; height: 96rpx; padding: 0 24rpx; border-radius: 26rpx;
+  border: 1rpx solid var(--line-soft); background: #fff; color: var(--ink-soft);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4rpx; }
+.fav-btn .ficon { width: 34rpx; height: 34rpx; }
+.fav-btn-t { font-size: 21rpx; font-weight: 650; }
+.fav-btn.on { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); }
 
-.company-hero { padding: 48rpx 32rpx 40rpx; display: flex; flex-direction: column;
-  align-items: center; background: var(--surface); margin-bottom: 16rpx; text-align: center; }
-.ch-logo { width: 168rpx; height: 168rpx; border-radius: 40rpx; background: var(--teal-soft);
-  display: flex; align-items: center; justify-content: center; font-size: 76rpx;
-  margin-bottom: 26rpx; border: 4rpx solid var(--line-soft); }
-.ch-name { font-family: var(--font-serif); font-size: 38rpx; font-weight: 700; color: var(--ink); }
-.ch-meta { font-size: 25rpx; color: var(--muted); margin-top: 12rpx; display: flex;
-  gap: 16rpx; justify-content: center; flex-wrap: wrap; }
+.company-hero { margin: 12rpx 32rpx 0; padding: 30rpx; border-radius: 32rpx;
+  border: 1rpx solid #dce9ff; background: #eef5ff; }
+.ch-top { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.ch-logo { width: 82rpx; height: 82rpx; border-radius: 26rpx; background: var(--teal);
+  color: #fff; display: flex; align-items: center; justify-content: center; }
+.ch-logo .ficon { width: 40rpx; height: 40rpx; }
+.ch-count { padding: 7rpx 16rpx; border-radius: 999rpx; background: #fff; color: var(--teal-deep);
+  font-size: 21rpx; font-weight: 650; }
+.ch-name { margin-top: 22rpx; font-size: 38rpx; font-weight: 780; color: var(--ink); line-height: 1.4; }
+.ch-legal { margin-top: 7rpx; font-size: 21rpx; color: var(--muted); }
+.ch-meta { margin-top: 11rpx; font-size: 23rpx; color: var(--muted); line-height: 1.5; }
+.ch-chips { margin-top: 16rpx; display: flex; flex-wrap: wrap; gap: 7rpx; }
 
-.ch-chips { padding: 8rpx 32rpx 20rpx; }
+.metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14rpx; margin: 16rpx 32rpx 0; }
+.metric-card { min-height: 142rpx; padding: 20rpx; border-radius: 26rpx; background: var(--surface);
+  border: 1rpx solid var(--line-soft); }
+.metric-icon { width: 50rpx; height: 50rpx; border-radius: 16rpx; background: var(--teal-soft);
+  color: var(--teal); display: flex; align-items: center; justify-content: center; }
+.metric-icon .ficon { width: 24rpx; height: 24rpx; }
+.metric-value { margin-top: 12rpx; font-size: 27rpx; font-weight: 700; color: var(--ink); }
+.metric-label { margin-top: 4rpx; font-size: 20rpx; color: var(--muted); }
 
-.cd-block-t { font-size: 27rpx; font-weight: 600; color: var(--ink); margin-bottom: 20rpx; }
-.cd-desc { font-size: 27rpx; color: var(--ink-soft); line-height: 1.75; margin-bottom: 18rpx; }
+.section-head { padding: 30rpx 32rpx 16rpx; }
+.section-title { font-size: 32rpx; font-weight: 760; color: var(--ink); }
+.section-sub { margin-top: 5rpx; font-size: 21rpx; color: var(--muted); }
+.article-card, .source-card, .jobs-card { margin: 0 32rpx; padding: 26rpx; border-radius: 28rpx;
+  background: var(--surface); border: 1rpx solid var(--line-soft); }
+.cd-desc { font-size: 26rpx; color: var(--ink-soft); line-height: 1.85; margin-bottom: 20rpx; }
 .cd-desc:last-child { margin-bottom: 0; }
-
-.section-cap { font-size: 22rpx; font-weight: 600; color: var(--muted);
-  letter-spacing: 1rpx; padding: 16rpx 32rpx 12rpx; }
-.card-inner.tight { padding-top: 8rpx; padding-bottom: 12rpx; }
-
-.src-row { display: flex; align-items: center; justify-content: space-between; padding: 18rpx 0; font-size: 25rpx; }
-.src-row + .src-row { border-top: 1rpx solid var(--line-faint); }
+.article-empty { display: flex; align-items: center; gap: 16rpx; color: var(--muted); font-size: 24rpx; }
+.article-empty-icon { width: 60rpx; height: 60rpx; border-radius: 19rpx; background: var(--surface-2);
+  color: var(--faint); display: flex; align-items: center; justify-content: center; }
+.article-empty-icon .ficon { width: 29rpx; height: 29rpx; }
+.source-head { display: flex; align-items: center; gap: 16rpx; padding-bottom: 18rpx; }
+.source-icon { width: 64rpx; height: 64rpx; border-radius: 20rpx; background: var(--teal-soft);
+  color: var(--teal); display: flex; align-items: center; justify-content: center; }
+.source-icon .ficon { width: 30rpx; height: 30rpx; }
+.source-title { font-size: 27rpx; font-weight: 700; color: var(--ink); }
+.source-sub { margin-top: 3rpx; font-size: 20rpx; color: var(--muted); }
+.src-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 17rpx 0;
+  border-top: 1rpx solid var(--line-faint); }
 .sr-l { color: var(--muted); flex-shrink: 0; }
-.sr-v { color: var(--ink-soft); font-weight: 500; text-align: right; max-width: 62%; }
-.sr-v.faint { font-size: 22rpx; color: var(--faint); font-weight: 400; }
-
-.compliance-note.tight { margin-top: -8rpx; }
+.sr-v { color: var(--ink); font-weight: 500; text-align: right; max-width: 66%; overflow-wrap: anywhere; }
+.sr-v.mono { font-family: 'Courier New', monospace; color: var(--muted); }
+.source-note { margin-top: 14rpx; padding: 16rpx 18rpx; border-radius: 18rpx; background: var(--surface-2);
+  font-size: 21rpx; color: var(--muted); line-height: 1.6; }
 
 .job-row { display: flex; align-items: center; gap: 16rpx; padding: 24rpx 0; }
 .job-row + .job-row { border-top: 1rpx solid var(--line-faint); }
 .jr-left { flex: 1; min-width: 0; }
-.jr-title { font-size: 29rpx; font-weight: 500; color: var(--ink); }
+.jr-title { font-size: 29rpx; font-weight: 680; color: var(--ink); }
 .jr-meta { font-size: 23rpx; color: var(--muted); margin-top: 6rpx; }
-.jr-salary { font-family: var(--font-serif); font-size: 28rpx; font-weight: 700;
-  color: var(--clay); white-space: nowrap; }
-.jr-arrow { font-size: 32rpx; color: var(--ghost); }
+.jr-source { margin-top: 7rpx; font-size: 20rpx; color: var(--faint); }
+.jr-salary { font-size: 27rpx; font-weight: 720; color: var(--teal); white-space: nowrap; }
+.jr-arrow { width: 20rpx; height: 20rpx; color: var(--ghost); }
+.jobs-state { margin: 0 32rpx; padding: 44rpx 24rpx; border-radius: 28rpx; background: var(--surface);
+  border: 1rpx solid var(--line-soft); text-align: center; font-size: 23rpx; color: var(--muted); }
+.jobs-state.error { color: var(--error); }
 
 /* 加载 / 错误态 */
 .detail-state { padding: 120rpx 48rpx; text-align: center; color: var(--ink-soft);

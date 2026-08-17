@@ -34,7 +34,7 @@ Page({
     this.setData({ uploading: true })
     wx.showLoading({ title: '正在上传…', mask: true })
 
-    api.uploadResumeFile(filePath, purpose)
+    api.uploadResumeFile(filePath, purpose, fileName)
       .then((res) => {
         wx.hideLoading()
         this.setData({ uploading: false })
@@ -44,8 +44,10 @@ Page({
         // 后端文件约 30 分钟过期,必须立刻进入解析,不做中间停留
         const q = [
           `fileId=${encodeURIComponent(fileId)}`,
-          `fileName=${encodeURIComponent(res.filename || fileName)}`,
-          `fileFormat=${encodeURIComponent(this._extOf(res.filename || fileName))}`,
+          // 优先本地 fileName：它是用户选择时的第一手真实名字。
+          // 服务端返回值经改名副本后通常一致，但本地来源更可靠。
+          `fileName=${encodeURIComponent(fileName || res.filename)}`,
+          `fileFormat=${encodeURIComponent(this._extOf(fileName || res.filename))}`,
           `source=${purpose === 'resume_scan' ? 'scan' : 'upload'}`,
         ].join('&')
         wx.navigateTo({ url: `/pages/resume-parse/resume-parse?${q}` })

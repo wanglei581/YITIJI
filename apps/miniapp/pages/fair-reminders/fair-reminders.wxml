@@ -1,0 +1,74 @@
+<!--pages/fair-reminders/fair-reminders.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">招聘会提醒</view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <block wx:if="{{list.length}}">
+
+      <!-- 「管理」原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+           自定义导航栏右侧永远不可用。删除提醒是低频次级操作，移到列表上方的工具栏。 -->
+      <view class="list-toolbar">
+        <text class="lt-label">{{managing ? '点条目右侧 ✕ 删除提醒' : '共 ' + list.length + ' 条提醒'}}</text>
+        <view class="lt-action {{managing ? 'on' : ''}} tap" hover-class="tap-press" bindtap="toggleManage"
+              role="button" aria-label="{{managing ? '退出管理模式' : '进入管理模式，删除提醒'}}">
+          {{managing ? '完成' : '管理'}}
+        </view>
+      </view>
+
+      <view class="card rm-list">
+        <view
+          class="rm-item tap"
+          wx:for="{{list}}"
+          wx:key="id"
+          hover-class="tap-press"
+          data-id="{{item.id}}"
+          bindtap="openFair"
+        >
+          <view class="rm-ic {{item.expired ? 'expired' : ''}}">
+            <text class="ficon i-bell"></text>
+          </view>
+          <view class="rm-body">
+            <view class="rm-title">{{item.title}}</view>
+            <view class="rm-meta">
+              <text wx:if="{{item.timeStr}}">{{item.timeStr}}</text>
+              <text wx:if="{{item.venue}}" class="rm-sep"> · </text>
+              <text wx:if="{{item.venue}}">{{item.venue}}</text>
+            </view>
+            <view class="rm-expired-tag" wx:if="{{item.expired}}">已过期</view>
+          </view>
+          <view wx:if="{{managing}}" class="rm-del tap" hover-class="tap-press" catchtap="removeReminder" data-id="{{item.id}}">
+            <text class="ficon i-close"></text>
+          </view>
+          <view wx:else class="rm-arrow">
+            <text class="ficon i-right"></text>
+          </view>
+        </view>
+      </view>
+
+      <view class="clear-btn tap" hover-class="tap-press" bindtap="clearExpired" wx:if="{{hasExpired}}">
+        清除已过期提醒
+      </view>
+    </block>
+
+    <view class="card" wx:else>
+      <view class="empty-slot">
+        <text class="ficon i-bell es-ic"></text>
+        <view class="es-t">暂无设置提醒</view>
+        <view class="es-d">在招聘会详情页点「提醒我」，下次打开 App 时会在这里看到提醒</view>
+      </view>
+    </view>
+
+    <view class="remind-note">提醒存储在本机，仅在打开 App 时触发提示，不发送系统推送。</view>
+
+  </view>
+</view>

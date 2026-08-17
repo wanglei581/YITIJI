@@ -2,7 +2,20 @@ import { assertNoHighConfidencePii, type ContractMaskPage, type ContractPartyFac
 
 const MAX_INPUT_CODE_UNITS = 500_000
 const MAX_RESPONSE_BYTES = 512 * 1024
+// 默认值与上限必须分开。此前二者共用一个常量，导致构造函数把 30 秒同时当作
+// 「默认」和「最大」，任何调用方都无法传更大的值——而 SUPPORT 里锁定的
+// deepseek-v4-pro 是推理模型，返回 content 前要先消耗大量 reasoning token。
+// 实测（2026-08-17）：仅数十字的合同文本即耗时 13.2 秒，占满 30 秒预算的 44%；
+// 真实合同必然触发 abort，表现为 CONTRACT_PROVIDER_TRANSPORT_FAILED。
 const DEFAULT_TIMEOUT_MS = 30_000
+// 上限按推理模型的实际需要设定。不是"换一个更大的固定值"——
+// 具体超时由调用方按内容体量计算后传入，这里只封顶。
+//
+// ⚠️ 多页合同（10 页以上）按上述系数会超过此上限而被截断，届时仍可能超时失败。
+// 提高上限前必须先确认 BullMQ job 的 timeout / lockDuration 与反代网关超时，
+// 否则请求会在更外层被先掐断，届时错误码将不再是 CONTRACT_PROVIDER_TRANSPORT_FAILED
+// 而更难定位。该项尚未验证。
+const MAX_TIMEOUT_MS = 300_000
 const MAX_FINDINGS = 100
 
 const SUPPORT = {
@@ -52,6 +65,12 @@ export interface ContractProviderTransportRequest {
   readonly url: string
   readonly apiKey: string
   readonly payload: ContractProviderPayload
+  /**
+   * 本次请求的超时（毫秒），可选。由调用方按内容体量计算后传入。
+   * 不传则用实例默认值。传入值仍受 MAX_TIMEOUT_MS 封顶——
+   * 封顶发生在使用处，不抛错，避免因体量估算偏大而让整个请求失败。
+   */
+  readonly timeoutMs?: number
 }
 
 export interface ContractProviderTransportResponse {
@@ -138,14 +157,19 @@ export class StrictFetchContractProviderTransport implements ContractProviderTra
     private readonly fetchImpl: FetchLike = fetch,
     private readonly timeoutMs = DEFAULT_TIMEOUT_MS,
   ) {
-    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > DEFAULT_TIMEOUT_MS) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_TIMEOUT_MS) {
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_CONFIG_INVALID')
     }
   }
 
   async send(request: ContractProviderTransportRequest): Promise<ContractProviderTransportResponse> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    // 请求级超时优先于实例默认值，并在此封顶（不抛错）：
+    // 体量估算偏大不应让请求直接失败，截到上限即可。
+    const effective = Number.isInteger(request.timeoutMs) && (request.timeoutMs as number) > 0
+      ? Math.min(request.timeoutMs as number, MAX_TIMEOUT_MS)
+      : this.timeoutMs
+    const timer = setTimeout(() => controller.abort(), effective)
     try {
       const response = await this.fetchImpl(request.url, {
         method: 'POST',
@@ -204,10 +228,26 @@ export class ContractReviewProviderService {
     }
     let response: unknown
     try {
+      // 超时按输入体量伸缩，而不是换一个更大的固定值。
+      //
+      // 系数来自 2026-08-17 对 deepseek-v4-pro 的两次实测（生产 key、真实 API）：
+      //   数十字        →  13.2 秒
+      //   1215 字符     →  34.1 秒   ← 已超过原先 30 秒的硬超时
+      // 即约 28ms/字符，另有十余秒固定开销。真实单页合同约 2500–3000 字符，
+      // 推算需 60–90 秒；原系数（30s + 每 2000 字符 20s）会给出 50–70 秒，余量不足。
+      //
+      // 现取 30 秒基线 + 每 1000 字符 30 秒，约为实测值的 2 倍余量：
+      //   1215 字符 → 90 秒（实测 34 秒）
+      //   一页      → 120 秒
+      // 余量取 2 倍而非贴合实测，因为推理模型耗时随内容复杂度波动较大，
+      // 且超时失败的代价（用户白等一轮）高于多等几十秒。
+      const inputChars = JSON.stringify(payload.messages ?? []).length
+      const scaledTimeoutMs = DEFAULT_TIMEOUT_MS + Math.ceil(inputChars / 1000) * 30_000
       response = await this.transport.send({
         url: `${config.baseUrl}chat/completions`,
         apiKey: config.apiKey,
         payload,
+        timeoutMs: scaledTimeoutMs,
       })
     } catch {
       throw new Error('CONTRACT_PROVIDER_TRANSPORT_FAILED')

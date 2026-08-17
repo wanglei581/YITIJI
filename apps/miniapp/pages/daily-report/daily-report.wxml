@@ -1,0 +1,81 @@
+<!--pages/daily-report/daily-report.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack"><text class="nav-back-ic ficon i-right"></text></view>
+    <view class="nav-title serif">今日早报</view>
+    <view class="nav-date">{{dateStr}}</view>
+  </view>
+
+  <scroll-view class="content" scroll-y>
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="dr-loading">
+      <view class="loading-ring"></view>
+      <view class="loading-text">AI 正在生成今日早报…</view>
+    </view>
+
+    <!-- 错误态 -->
+    <view wx:elif="{{error}}" class="dr-error">
+      <text class="ficon i-info err-icon"></text>
+      <view class="err-msg">{{error}}</view>
+      <view class="btn-retry tap" hover-class="tap-press" bindtap="retry">重试</view>
+    </view>
+
+    <!-- 正文 -->
+    <block wx:elif="{{report}}">
+      <view class="dr-hero">
+        <view class="dr-hero-badge">今日早报</view>
+        <view class="dr-hero-title">{{report.title}}</view>
+      </view>
+
+      <!-- 摘要 -->
+      <view wx:if="{{report.summary}}" class="dr-section">
+        <view class="dr-section-hd">今日摘要</view>
+        <view class="dr-section-body">{{report.summary}}</view>
+      </view>
+
+      <!-- 今日日程 -->
+      <view wx:if="{{report.schedule && report.schedule.length}}" class="dr-section">
+        <view class="dr-section-hd">今日日程</view>
+        <view class="sched-list">
+          <view class="sched-item" wx:for="{{report.schedule}}" wx:key="index">
+            <view class="sched-time">{{item.time || '待定'}}</view>
+            <view class="sched-body">
+              <view class="sched-title">{{item.title}}</view>
+              <view class="sched-loc" wx:if="{{item.location}}">{{item.location}}</view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 求职提示 -->
+      <view wx:if="{{report.tips && report.tips.length}}" class="dr-section">
+        <view class="dr-section-hd">今日提示</view>
+        <view class="tips-list">
+          <view class="tip-item" wx:for="{{report.tips}}" wx:key="index">
+            <view class="tip-num">{{index + 1}}</view>
+            <view class="tip-text">{{item}}</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 推荐岗位 -->
+      <view wx:if="{{report.recommendedJobs && report.recommendedJobs.length}}" class="dr-section">
+        <view class="dr-section-hd">推荐岗位</view>
+        <view class="job-list">
+          <view class="job-row tap" wx:for="{{report.recommendedJobs}}" wx:key="id"
+            hover-class="tap-press" bindtap="tapJob" data-id="{{item.id}}">
+            <view class="job-info">
+              <view class="job-title">{{item.title || item.name}}</view>
+              <view class="job-co" wx:if="{{item.company || item.companyName}}">{{item.company || item.companyName}}</view>
+            </view>
+            <view class="job-arrow">›</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <view class="page-pad"></view>
+  </scroll-view>
+</view>

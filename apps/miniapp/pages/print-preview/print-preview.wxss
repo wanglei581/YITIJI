@@ -1,61 +1,71 @@
-/* pages/print-preview/print-preview.wxss  P09 打印预览 */
-.preview-params { display: flex; align-items: center; flex-wrap: wrap; gap: 8rpx; padding: 16rpx 20rpx;
-  background: var(--surface); border: 2rpx solid var(--line); border-radius: var(--r-md); box-shadow: var(--sh-sm); }
-.preview-params .pp-chip { font-size: 24rpx; font-weight: 600; color: var(--ink-soft); }
-.preview-params .pp-dot { color: var(--faint); font-size: 22rpx; }
-.preview-params .pp-amt { margin-left: auto; font-size: 28rpx; font-weight: 700; color: var(--teal-deep); }
+/* pages/print-preview/print-preview.wxss  打印预览 */
+.page-wrap { min-height: 100vh; background: var(--paper); }
+/* actionbar 用 .btn.lg（60px），app.wxss 的 has-bar 只留了 80px，会压住最后一块内容 */
+.content.has-bar { padding-bottom: calc(108px + var(--sab)); }
 
-.a4-paper { margin: 24rpx auto 0; width: 84%; aspect-ratio: 210 / 297; background: #fff;
-  border: 2rpx solid var(--line); border-radius: 8rpx; box-shadow: var(--sh-md); padding: 44rpx 40rpx; box-sizing: border-box; }
-.a4-paper .p-name { font-family: var(--font-serif); font-size: 32rpx; font-weight: 700; color: var(--ink); }
-.a4-paper .p-tagline { font-size: 20rpx; color: var(--muted); margin-top: 8rpx; }
-.a4-paper .p-divider { height: 2rpx; background: var(--line); margin: 20rpx 0; }
-.a4-paper .p-section { font-size: 22rpx; font-weight: 600; color: var(--teal-deep); margin-bottom: 20rpx; }
-.a4-paper .p-line { height: 14rpx; border-radius: 4rpx; background: var(--line-soft); margin-bottom: 18rpx; }
-.a4-paper .p-line.full { width: 100%; }
-.a4-paper .p-line.med { width: 72%; }
-.a4-paper .p-line.short { width: 46%; }
-.a4-paper .p-line.thin { width: 88%; height: 10rpx; background: var(--line-faint); }
+/* ── 文件标识 ────────────────────────────────────────────────── */
+.file-head { display: flex; align-items: center; gap: 24rpx; margin: 8rpx 32rpx 0;
+  padding: 26rpx 28rpx; background: var(--surface); border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-md); }
+.fh-ic { width: 88rpx; height: 88rpx; border-radius: var(--r-md); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+.fh-ic .ficon { width: 42rpx; height: 42rpx; }
+.fh-main { flex: 1; min-width: 0; }
+.fh-name { font-size: 30rpx; font-weight: 600; color: var(--ink); word-break: break-all; }
+.fh-meta { display: flex; align-items: center; gap: 12rpx; margin-top: 10rpx; }
+.fh-tag { flex-shrink: 0; font-size: 20rpx; font-weight: 700; letter-spacing: .5rpx;
+  color: var(--teal-deep); background: var(--teal-wash); border-radius: var(--r-xs);
+  padding: 4rpx 12rpx; }
+.fh-sub { font-size: 23rpx; color: var(--muted); }
 
-.page-indicator { display: flex; align-items: center; justify-content: center; gap: 20rpx; margin-top: 28rpx; }
-.page-indicator .pi-nav { width: 64rpx; height: 64rpx; border-radius: 50%; background: var(--surface);
-  border: 2rpx solid var(--line); display: flex; align-items: center; justify-content: center;
-  font-size: 34rpx; color: var(--ink-soft); }
-.page-indicator .pi-nav.off { color: var(--faint); opacity: .5; }
-.page-indicator .pi-dots { display: flex; gap: 10rpx; }
-.page-indicator .pi-dot { width: 14rpx; height: 14rpx; border-radius: 50%; background: var(--line); }
-.page-indicator .pi-dot.on { background: var(--teal); }
-.page-indicator .pi-text { font-size: 24rpx; color: var(--muted); }
+/* ── 预览台 ─────────────────────────────────────────────────── */
+/* 固定 A4 比例的白纸，是「这张纸上会印什么」的直观容器；
+   但纸里只放真实内容或明确的状态说明，不放任何模拟正文的装饰线条。 */
+.stage { margin: 24rpx 32rpx 0; }
+/* min-height 是 aspect-ratio 的兜底：rpx 恒为屏宽的 1/750，
+   左右各留 32rpx 时纸宽 686rpx，A4 高 = 686 × 297/210 ≈ 970rpx。
+   基础库不支持 aspect-ratio 时，没有兜底会让图片态塌成 0 高度而看不见文件。 */
+.sheet { width: 100%; aspect-ratio: 210 / 297; min-height: 968rpx; background: #fff;
+  border: 1rpx solid var(--line-soft); border-radius: var(--r); box-shadow: var(--sh-sm);
+  box-sizing: border-box; padding: 48rpx 44rpx;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18rpx; }
 
-/* AI 版式诊断入口 */
-.layout-check-entry {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  margin: 24rpx 32rpx 0;
-  padding: 24rpx 28rpx;
-  background: var(--surface);
-  border: 2rpx solid var(--line-faint);
-  border-radius: var(--r-md);
-  box-shadow: var(--sh-xs);
-}
-.lce-ic {
-  width: 72rpx; height: 72rpx;
-  border-radius: 20rpx;
-  background: var(--teal-wash);
-  color: var(--teal-deep);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 34rpx; flex-shrink: 0;
-}
-.lce-main { flex: 1; }
-.lce-t {
-  font-size: 28rpx; font-weight: 600; color: var(--ink);
-  display: flex; align-items: center; gap: 8rpx;
-}
-.lce-badge {
-  font-size: 18rpx; font-weight: 700; color: #fff;
-  background: var(--teal); border-radius: var(--r-full);
-  padding: 2rpx 12rpx;
-}
-.lce-s { font-size: 22rpx; color: var(--muted); margin-top: 4rpx; }
-.lce-go { color: var(--teal); font-size: 32rpx; }
+.sheet.img { display: block; padding: 16rpx; overflow: hidden; }
+.pv-img { width: 100%; height: 100%; border-radius: var(--r-xs); }
+
+/* 加载骨架：形状明显不是文字，避免被误读成「文件里就这些内容」 */
+.sk-block { width: 46%; height: 88rpx; border-radius: var(--r-sm); background: var(--surface-3); }
+.sk-line { height: 18rpx; border-radius: 6rpx; background: var(--line-faint); }
+.sk-line.w80 { width: 80%; }
+.sk-line.w55 { width: 55%; }
+.stage-text { margin-top: 12rpx; font-size: 24rpx; color: var(--muted); }
+
+.sheet.doc .doc-ic { width: 128rpx; height: 128rpx; border-radius: var(--r-lg);
+  background: var(--teal-wash); color: var(--teal-deep);
+  display: flex; align-items: center; justify-content: center; }
+.sheet.doc .doc-ic .ficon { width: 60rpx; height: 60rpx; }
+.doc-t { font-size: 30rpx; font-weight: 600; color: var(--ink); text-align: center; }
+.doc-s { font-size: 23rpx; line-height: 1.6; color: var(--muted); text-align: center; }
+.doc-btn { margin-top: 14rpx; }
+
+.sheet.err .err-ic { width: 112rpx; height: 112rpx; border-radius: 50%;
+  background: var(--error-soft); color: var(--error);
+  display: flex; align-items: center; justify-content: center; }
+.sheet.err .err-ic .ficon { width: 52rpx; height: 52rpx; }
+.err-t { font-size: 30rpx; font-weight: 600; color: var(--ink); }
+.err-s { font-size: 23rpx; line-height: 1.6; color: var(--muted); text-align: center; }
+.err-btn { margin-top: 14rpx; }
+
+.stage-hint { margin: 16rpx 32rpx 0; font-size: 22rpx; color: var(--faint); text-align: center; }
+
+/* ── 参数复核 ───────────────────────────────────────────────── */
+.spec { padding: 6rpx 28rpx; }
+.sp-row { display: flex; align-items: center; justify-content: space-between; gap: 24rpx;
+  min-height: 92rpx; border-bottom: 1rpx solid var(--line-faint); }
+.sp-row:last-child { border-bottom: none; }
+.sp-k { font-size: 26rpx; color: var(--muted); flex-shrink: 0; }
+.sp-v { font-size: 27rpx; font-weight: 600; color: var(--ink); text-align: right; }
+.sp-v.pending, .sp-amt.pending { font-weight: 500; color: var(--faint); }
+.sp-row.total { min-height: 104rpx; }
+.sp-amt { font-size: 36rpx; font-weight: 700; color: var(--teal-deep);
+  font-variant-numeric: tabular-nums; }
