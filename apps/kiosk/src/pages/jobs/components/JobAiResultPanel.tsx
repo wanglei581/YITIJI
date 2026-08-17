@@ -70,7 +70,7 @@ export function JobAiResultPanel({
         <div className="mt-4 space-y-4">
           {recommendations && <RecommendationList items={recommendations} onOpen={onOpenRecommendation} />}
           {explanation && <ExplanationBlock value={explanation} />}
-          {match && <MatchBlock value={match} />}
+          {match && <MatchBlock value={match} onRetry={onRetry} />}
         </div>
       )}
     </Card>
@@ -122,20 +122,100 @@ function ExplanationBlock({ value }: { value: JobExplainResponse }) {
   )
 }
 
-function MatchBlock({ value }: { value: JobAiMatchResponse }) {
-  const fitLevel = value.jobFit.fitLevel ?? 'reference_medium'
+function MatchBlock({ value, onRetry }: { value: JobAiMatchResponse; onRetry?: () => void }) {
+  const { jobFit } = value
+
+  // 后端 governed-job-fit.service.ts 在分析失败时仍返回 HTTP 200，只把
+  // JobFitResponse.status 置为 'failed'（见 packages/shared/src/types/ai.ts:405）。
+  // 不看这个字段就会把「没生成出来」渲染成「生成完了但内容为空」——
+  // 而且 fitLevel 缺失时旧代码还会兜底成 reference_medium，等于替模型编了一个
+  // 「匹配参考：中等」。两者都违反 CLAUDE.md §9「不伪造能力」。
+  // 处置对齐 JobFitPage.tsx:196/235 的既有口径：如实说没生成出来，并给重试。
+  if (jobFit.status === 'failed') {
+    return (
+      <div className="rounded-xl bg-warning-bg px-4 py-3">
+        <div className="flex items-start gap-2 text-sm text-warning-fg">
+          <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{jobFit.failReason ?? '这次没有生成出匹配参考，请稍后重试。'}</span>
+        </div>
+        <p className="mt-2 text-xs text-neutral-500">
+          没有生成结果不影响你查看岗位详情，也不影响去来源平台投递。
+        </p>
+        {onRetry && (
+          <Button size="sm" variant="secondary" className="mt-3 h-12 w-full" onClick={onRetry}>
+            重新生成
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  // fitLevel 缺失时不兜底成「中等」——查不到就只说「匹配参考」，不替模型定级。
+  const fitLabel = jobFit.fitLevel ? (FIT_LABEL[jobFit.fitLevel] ?? '匹配参考') : '匹配参考'
+  const matchPoints = jobFit.matchPoints ?? []
+  const keywordCoverage = jobFit.decisionSupport?.keywordCoverage
+  const hasKeywords = Boolean(
+    keywordCoverage && (keywordCoverage.matched.length > 0 || keywordCoverage.missing.length > 0)
+  )
+
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-primary-50 px-4 py-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-primary-800">
           <TrendingUpIcon className="h-4 w-4" aria-hidden="true" />
-          {FIT_LABEL[fitLevel] ?? '匹配参考'}
+          {fitLabel}
         </div>
-        {value.jobFit.summary && <p className="mt-2 text-sm leading-relaxed text-neutral-700">{value.jobFit.summary}</p>}
+        {jobFit.summary && <p className="mt-2 text-sm leading-relaxed text-neutral-700">{jobFit.summary}</p>}
       </div>
-      <SuggestionList title="匹配点" items={(value.jobFit.matchPoints ?? []).map((item) => item.point)} />
-      <SuggestionList title="差距与建议" items={(value.jobFit.gapPoints ?? []).map((item) => `${item.gap}：${item.suggestion}`)} />
-      <SuggestionList title="准备动作" items={value.jobFit.targetedSuggestions ?? []} />
+
+      {/* 匹配点连同 evidence 一起给。evidence 是服务端核验过必须出自简历原文的摘录
+          （packages/shared/src/types/ai.ts:365），丢掉它等于把「有依据的结论」
+          降级成「无出处的断言」。呈现口径对齐 resume/jobFit/FitSkillMap.tsx:29。 */}
+      {matchPoints.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold text-neutral-400">匹配点 · 每条附简历原文依据</p>
+          <ul className="space-y-2">
+            {matchPoints.slice(0, 6).map((item, index) => (
+              <li
+                key={`${item.point.slice(0, 24)}-${index}`}
+                className="rounded-lg border border-neutral-100 bg-white px-3 py-2"
+              >
+                <div className="flex gap-2 text-sm leading-relaxed text-neutral-600">
+                  <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
+                  <span>{item.point}</span>
+                </div>
+                {item.evidence && (
+                  <p className="mt-1 pl-6 text-xs leading-relaxed text-neutral-400">
+                    原文依据：「{item.evidence}」
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <SuggestionList title="差距与建议" items={(jobFit.gapPoints ?? []).map((item) => `${item.gap}：${item.suggestion}`)} />
+      <SuggestionList title="准备动作" items={jobFit.targetedSuggestions ?? []} />
+
+      {/* 关键词覆盖：后端已产出且已校验，此前这一处整块丢弃。 */}
+      {hasKeywords && keywordCoverage && (
+        <div>
+          <p className="mb-2 text-xs font-semibold text-neutral-400">关键词覆盖</p>
+          <div className="flex flex-wrap gap-1.5">
+            {keywordCoverage.matched.map((kw) => (
+              <span key={`m-${kw}`} className="rounded-full bg-primary-50 px-2.5 py-1 text-xs text-primary-700">
+                已具备 · {kw}
+              </span>
+            ))}
+            {keywordCoverage.missing.map((kw) => (
+              <span key={`g-${kw}`} className="rounded-full bg-warning-bg px-2.5 py-1 text-xs text-warning-fg">
+                待补足 · {kw}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

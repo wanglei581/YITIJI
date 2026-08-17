@@ -104,7 +104,10 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     aiRole: 'ai',
     needsMfp: true,
     available: true,
-    stateNote: '可用 · 体检与参数都是建议，最终由你按',
+    // 真有的：/print/material-check（页数识别 + A4 规范化评估 + 隐私片段检查）。
+    // 没有的：打印参数建议 —— 后端 GET materials/tasks/:id/print-param-suggestions
+    // 已实现，但前端零消费，用户拿不到，所以不写进卡面。
+    stateNote: '可用 · 第 2 步材料体检：页数、A4 规范化、隐私片段；打印参数由你自己设',
     mfpOffBadge: '暂停 · 打印扫描一体机出不了纸',
     mfpOffNote: '这台机器出不了纸。文件可以先传上来存着，换一台再打。',
   },
@@ -131,7 +134,10 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     aiRole: 'ai',
     needsMfp: true,
     available: true,
-    stateNote: '可用 · OCR 置信度低会标「需人工复核」',
+    // 扫描这一步本身不做文字识别（services/api/src/scan-tasks/ 全目录零 OCR）。
+    // OCR 在结果页选「AI 简历识别」之后的简历链路里才发生，置信度也在那边的报告页
+    // 如实标注（ResumeReportPage.tsx:62）。「需人工复核」这个标记全链路不存在。
+    stateNote: '可用 · 扫成 PDF；文字识别在结果页的「AI 简历识别」里做，不在这一步',
     mfpOffBadge: '暂停 · 扫描仪就在这台一体机上',
     mfpOffNote: '打印和扫描是同一台机器，它出不了纸，扫描一起停。',
   },
@@ -146,7 +152,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     aiRole: 'ai',
     needsMfp: true,
     available: true,
-    stateNote: '可用 · 彩色与纸张给取舍理由，最终由你按',
+    // 走的就是文档打印那条流程，所以体检是同一套。「彩色与纸张的取舍理由」
+    // 没有任何实现 —— 颜色、纸张、份数都在预览页由用户自己设。
+    stateNote: '可用 · 和文档打印同一条流程、同一套材料体检；彩色与纸张由你自己设',
     mfpOffBadge: '暂停 · 同一台打印机',
     mfpOffNote: '照片走文档打印同一条出纸链路，那条停了，这条也出不了。',
   },
@@ -160,7 +168,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     aiRole: 'ai',
     needsMfp: true,
     available: false,
-    stateNote: '规格体检与换底 · 换底是重绘背景，不修改你的脸',
+    // /print-scan/feature/id-photo 是 PrintScanFeatureInfoPage 的一个静态说明页。
+    // 「规格体检」「换底」在前后端都没有任何实现，不能写成这张卡的能力。
+    stateNote: '进去只有常见规格说明 · 本机现在不做证件照排版，也不做换底',
     unavailableBadge: '尚未开放 · 可先了解',
     mfpOffBadge: '尚未开放 · 出片也要这台打印机',
     mfpOffNote: '功能本身还没开放；就算排好版，出片也要这台机器。',
@@ -172,10 +182,12 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     title: '格式转换',
     description: '多张图片（最多 20 张）合并成一份 PDF，便于打印和存档',
     to: '/print-scan/convert',
-    aiRole: 'ai',
+    // ConvertImagesPage 全页只有手动「上移 / 下移 / 移除」，服务端 print-convert
+    // 也没有任何 LLM / OCR 调用。这条链路自始至终不依赖 AI，标 ai 是虚标。
+    aiRole: 'none',
     needsMfp: false,
     available: true,
-    stateNote: '可用 · 页序与方向只提示，调不调由你按',
+    stateNote: '可用 · 页序用「上移 / 下移」自己排；本机不识别方向、不自动排序',
     mfpOffStateNote: '照常可用 · 合并不经过打印机，合完先存着',
   },
   {
@@ -185,10 +197,12 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     title: '签名盖章',
     description: '在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）',
     to: '/print-scan/sign',
-    aiRole: 'ai',
+    // POST /print/sign/inspect 只返回 { pages }（print-sign.service.ts:78-95），
+    // 服务端 print-sign 目录零 LLM / 零 OCR。落款位没有任何建议能力。
+    aiRole: 'none',
     needsMfp: false,
     available: true,
-    stateNote: '可用 · 落款位只给参考，位置大小由你按',
+    stateNote: '可用 · 本机只读出总页数；落款页码、方位与大小全部由你选',
     mfpOffStateNote: '照常可用 · 合成不经过打印机，出纸要换机',
   },
 ]
