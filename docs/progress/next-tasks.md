@@ -1,8 +1,12 @@
 # 下一步任务
 
-> 最后更新：2026-08-14
+> 最后更新：2026-08-18
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
+
+## 扫码上传后端生命周期（PR #598 拆出，2026-08-18）
+
+- [ ] **扫码上传后端生命周期独立收口**：当前公共 UI 已保证刷新先撤销旧码、手机成功态不可伪造重传，但 Redis 会话自然过期后未确认 `FileObject` 的删除仍不能只靠 UI 证明。需独立设计并验证：自然超时、上传/确认/取消竞态、匿名与会员归属、确认后进入打印履约的短留存；不得将旧会话 token、终端展示名或原始错误带入手机页。
 
 ## 平台可靠性遗留（FIX-CONSOLE-P0 拆出，2026-08-17）
 
@@ -20,7 +24,6 @@
 - [~] **二维码扫码核销真机验收**：小程序已离线把同一 10 位到机码编码成不含 PII/文件链接的二维码，Kiosk 已支持 HID 扫码器读满自动提交并拦截 Enter 重复请求；本地编码、构建和浏览器模拟扫码通过。下一步必须在正式 AppID 真机页面和目标 Windows 终端的实际扫码器上覆盖一次成功、错码、过期码、重复扫码、扫码失败后手输兜底，并确认一次扫码只产生一次核销请求；现场通过前不得写“扫码可用”。
 - [ ] **同一提交受控发布**：先获得新候选精确 SHA 的具名部署授权，备份 PostgreSQL/运行目录，执行双库 additive migration，同步发布 API + Kiosk，保持 `PRINT_REQUIRE_PII_SCAN=true`，发布后恢复 `DEPLOY_API_ENABLED=false`。小程序在后端上线前不得单独上传，否则会再次出现前后端断层。
 - [ ] **Windows + 真实打印机现场验收**：在绑定终端上用本人测试 PDF 跑完“小程序建单 → 扫码或输入到机码 → 支付 → Agent claim → 实际出纸 → 进度回流”，保留 orderId/taskId、支付尝试 ID、Agent 脱敏日志和出纸照片。覆盖错码、错终端、未支付、过期、断网重试、连点/刷新不重复出纸；没有这组证据不得写“打印已可用”。
-
 > **合流说明（2026-08-11）**：`design/v3-entry-remodel` 与 `main` 在本文件上各加了一段，
 > 两段内容互不重叠，**都保留**。下面「V3 设计落地实施队列」来自设计线；
 > 「2026-08-10 商用收口后续」及其后各节来自 main。

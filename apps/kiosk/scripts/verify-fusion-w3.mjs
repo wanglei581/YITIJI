@@ -99,7 +99,12 @@ const manifest = read('tests/visual/route-manifest.ts')
 for (const route of routes) check(manifest.includes(`'${route}'`), `manifest retains ${route}`)
 
 const frozen = {
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50',
+  // 2026-08-18 重新冻结（PR #598 手机扫码上传公共界面收口）：刷新二维码时先 await 撤销
+  // 旧会话再签发新码（旧码此前刷新后仍可被旁人用来上传），且「手机端已上传」状态下刷新
+  // 按钮不可点（此前一次误触即丢弃已上传文件）。冻结契约不放宽，仍逐字节校验；新行为由
+  // verify:resume-phone-upload-ui 的两条 AST 断言反向钉死。
+  // 旧哈希 c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50。
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': '6e9fdb90b7a2876583598258f6e266f00acc093ec784ad794f5b2c9239f3f3c0',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',

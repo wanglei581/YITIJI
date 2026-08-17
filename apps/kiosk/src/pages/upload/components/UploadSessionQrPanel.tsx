@@ -11,6 +11,7 @@ import {
   confirmUploadSession,
   createUploadSession,
   getUploadSessionStatus,
+  uploadSessionUserMessage,
 } from '../../../services/api/uploadSessions'
 
 export interface PhoneUploadedFile {
@@ -67,6 +68,31 @@ function apiErrorCode(error: unknown): string | null {
   return null
 }
 
+/**
+ * 服务端已经无法再用这些会话接收文件，因此「旧码已失效」这个前提已经成立：
+ * 记录不在（NOT_FOUND）、已过期（EXPIRED）、已确认消费（CONFIRMED）。
+ * 其余失败（网络故障、控制令牌无效）不能证明旧码已死，必须阻止签发新码。
+ */
+const ALREADY_REVOKED_CODES: ReadonlySet<string> = new Set([
+  'UPLOAD_SESSION_NOT_FOUND',
+  'UPLOAD_SESSION_EXPIRED',
+  'UPLOAD_SESSION_CONFIRMED',
+])
+
+/**
+ * 旧二维码必须先在服务端失效，新码才允许签发 —— 否则旁人拍到的旧码仍能往会话里传文件。
+ * 只有在无法证明旧码已失效时才向外抛错，由 refresh 阻止签发新码。
+ */
+async function revokePreviousSession(existing: QrState): Promise<void> {
+  try {
+    await cancelUploadSession(existing.sessionId, existing.controlToken)
+  } catch (err) {
+    const code = apiErrorCode(err)
+    if (code && ALREADY_REVOKED_CODES.has(code)) return
+    throw err
+  }
+}
+
 function expiredStatus(qr: QrState, current: UploadSessionStatusResponse | null, purpose: FilePurpose): UploadSessionStatusResponse {
   return {
     sessionId: qr.sessionId,
@@ -89,11 +115,14 @@ export function UploadSessionQrPanel({
 }: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const pollFailuresRef = useRef(0)
+  const qrRef = useRef<QrState | null>(null)
+  const statusRef = useRef<UploadSessionStatusResponse | null>(null)
   const [qr, setQr] = useState<QrState | null>(null)
   const [status, setStatus] = useState<UploadSessionStatusResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
 
   const active = Boolean(qr && status?.status !== 'confirmed' && status?.status !== 'cancelled' && status?.status !== 'expired')
 
@@ -101,19 +130,56 @@ export function UploadSessionQrPanel({
     onBusyChange?.(active || loading || confirming)
   }, [active, confirming, loading, onBusyChange])
 
+  useEffect(() => {
+    qrRef.current = qr
+  }, [qr])
+
+  useEffect(() => {
+    statusRef.current = status
+  }, [status])
+
+  useEffect(() => {
+    if (!qr || status?.status === 'uploaded' || status?.status === 'confirmed' || status?.status === 'cancelled' || status?.status === 'expired') {
+      return undefined
+    }
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [qr, status?.status])
+
+  useEffect(() => {
+    if (!qr || !status || status.status === 'uploaded' || status.status === 'confirmed' || status.status === 'cancelled' || status.status === 'expired') {
+      return
+    }
+    if (new Date(qr.expiresAt).getTime() <= now) {
+      setStatus((current) => expiredStatus(qr, current, purpose))
+    }
+  }, [now, purpose, qr, status])
+
   const expiresLabel = useMemo(() => {
     if (!qr) return ''
-    const seconds = Math.max(0, Math.round((new Date(qr.expiresAt).getTime() - Date.now()) / 1000))
+    const seconds = Math.max(0, Math.round((new Date(qr.expiresAt).getTime() - now) / 1000))
     const minutes = Math.floor(seconds / 60)
     const remain = seconds % 60
     return `${minutes}:${String(remain).padStart(2, '0')}`
-  }, [qr])
+  }, [now, qr])
 
   const refresh = useCallback(async () => {
     pollFailuresRef.current = 0
     setLoading(true)
     setError(null)
     try {
+      const existing = qrRef.current
+      if (statusRef.current?.status === 'uploaded') {
+        setError('手机端已上传文件，请先在一体机确认，或取消本次上传后重新开始。')
+        return
+      }
+      if (existing) {
+        // 新码只有在旧码已被服务端撤销（或已确认失效）时才生成，避免旁人手里的旧码继续可用。
+        await revokePreviousSession(existing)
+        setQr(null)
+        setStatus(null)
+      }
       const token = getToken()
       const memberMode = Boolean(token && isLoggedIn)
       let effectiveMemberMode = memberMode
@@ -151,7 +217,7 @@ export function UploadSessionQrPanel({
         expiresAt: created.expiresAt,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '二维码生成失败，请重试')
+      setError(uploadSessionUserMessage(err, '二维码生成失败，请稍后重试。'))
     } finally {
       setLoading(false)
     }
@@ -181,7 +247,7 @@ export function UploadSessionQrPanel({
               : '二维码状态获取失败，请刷新二维码重试。')
             return
           }
-          setError(err instanceof Error ? err.message : '二维码状态获取失败')
+          setError(uploadSessionUserMessage(err, '二维码状态获取失败，请稍后重试。'))
         })
     }, 2000)
     return () => window.clearInterval(timer)
@@ -206,7 +272,7 @@ export function UploadSessionQrPanel({
       })
       setStatus({ ...status, status: 'confirmed', file })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '确认失败，请刷新二维码重试')
+      setError(uploadSessionUserMessage(err, '确认失败，请刷新二维码重试。'))
     } finally {
       setConfirming(false)
     }
@@ -282,7 +348,7 @@ export function UploadSessionQrPanel({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={loading || confirming} onClick={refresh}>
+            <Button size="sm" variant="secondary" disabled={loading || confirming || uploaded} onClick={refresh}>
               <RefreshCwIcon className="mr-1 h-4 w-4" aria-hidden="true" />
               刷新二维码
             </Button>

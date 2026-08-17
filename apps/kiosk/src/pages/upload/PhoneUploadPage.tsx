@@ -11,13 +11,42 @@ import {
   Trash2Icon,
   UploadCloudIcon,
 } from 'lucide-react'
-import { uploadPhoneSessionFile } from '../../services/api/uploadSessions'
+import { uploadPhoneSessionFile, uploadSessionUserMessage } from '../../services/api/uploadSessions'
 
 const RESUME_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
 const PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
 const MAX_BYTES = 10 * 1024 * 1024
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
+
+interface PhoneUploadPurposeConfig {
+  noun: string
+  accept: string
+  helper: string
+}
+
+const PHONE_UPLOAD_PURPOSES: Readonly<Record<string, PhoneUploadPurposeConfig>> = {
+  resume_upload: {
+    noun: '简历文件',
+    accept: RESUME_ACCEPT,
+    helper: '简历支持 PDF / Word / JPG / PNG / WEBP；单个最大 10MB，选择后自动上传',
+  },
+  print_doc: {
+    noun: '打印文件',
+    accept: PRINT_DOC_ACCEPT,
+    helper: '打印支持 PDF / JPG / PNG；单个最大 10MB，选择后自动上传',
+  },
+  signature_image: {
+    noun: '签名或印章图片',
+    accept: '.jpg,.jpeg,.png,image/jpeg,image/png',
+    helper: '支持 JPG / PNG；单个最大 10MB，选择后自动上传',
+  },
+  contract_upload: {
+    noun: '合同文件',
+    accept: '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png',
+    helper: '支持 PDF / JPG / PNG；单个最大 10MB，选择后自动上传',
+  },
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -40,15 +69,15 @@ export function PhoneUploadPage() {
   const hashParams = useMemo(() => new URLSearchParams(location.hash.replace(/^#/, '')), [location.hash])
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
-  const isPrintDoc = hashParams.get('purpose')?.trim() === 'print_doc'
+  const purpose = hashParams.get('purpose')?.trim() ?? ''
+  const purposeConfig = PHONE_UPLOAD_PURPOSES[purpose]
   const [state, setState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [fileLabel, setFileLabel] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
 
-  const fileNoun = isPrintDoc ? '文件' : '简历文件'
-  const accept = isPrintDoc ? PRINT_DOC_ACCEPT : RESUME_ACCEPT
-  const ready = Boolean(sessionId && uploadToken)
+  const fileNoun = purposeConfig?.noun ?? '文件'
+  const ready = Boolean(sessionId && uploadToken && purposeConfig)
   const pageTitle = useMemo(() => {
     if (!ready) return '上传链接无效'
     if (state === 'success') return '上传完成'
@@ -59,7 +88,7 @@ export function PhoneUploadPage() {
   const uploadFile = async (file: File) => {
     if (!ready) {
       setState('error')
-      setMessage('上传链接无效，请回到一体机重新生成二维码。')
+      setMessage('上传链接无效或用途不受支持，请回到一体机重新生成二维码。')
       return
     }
     if (file.size > MAX_BYTES) {
@@ -77,7 +106,7 @@ export function PhoneUploadPage() {
       setMessage(`上传完成，请回到一体机屏幕确认使用这份${fileNoun}。`)
     } catch (err) {
       setState('error')
-      setMessage(err instanceof Error ? err.message : '上传失败，请重新扫码或稍后重试。')
+      setMessage(uploadSessionUserMessage(err, '上传失败，请重新扫码或稍后重试。'))
     }
   }
 
@@ -129,29 +158,35 @@ export function PhoneUploadPage() {
 
           <div className="ph-up-target">
             <MonitorIcon aria-hidden="true" />
-            上传目标：<b>就业服务大厅 · 01号机</b>
+            上传完成后，请回到发起二维码的一体机确认。
           </div>
 
-          <label
-            onDragOver={(event) => {
-              event.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            className={[
-              'ph-up-pick',
-              dragging ? 'ph-up-pick--drag' : '',
-              state === 'uploading' ? 'is-busy' : '',
-            ].join(' ').trim()}
-          >
-            <input type="file" accept={accept} aria-label={`选择${fileNoun}`} className="sr-only" disabled={state === 'uploading'} onChange={handleFile} />
-            {state === 'uploading' ? <Loader2Icon aria-hidden="true" /> : state === 'success' ? <CheckCircleIcon aria-hidden="true" /> : <UploadCloudIcon aria-hidden="true" />}
-            <b>{state === 'success' ? '已上传到一体机' : '选择手机中的文件'}</b>
-            <span>
-              {isPrintDoc ? '打印支持 PDF / JPG / PNG；单个最大 10MB，选择后自动上传' : '简历支持 PDF / Word / JPG / PNG / WEBP；单个最大 10MB，选择后自动上传'}
-            </span>
-          </label>
+          {state === 'success' ? (
+            <div className="ph-up-pick is-busy" role="status">
+              <CheckCircleIcon aria-hidden="true" />
+              <b>已上传到一体机</b>
+              <span>请回到一体机确认使用这份{fileNoun}。</span>
+            </div>
+          ) : (
+            <label
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              className={[
+                'ph-up-pick',
+                dragging ? 'ph-up-pick--drag' : '',
+                state === 'uploading' ? 'is-busy' : '',
+              ].join(' ').trim()}
+            >
+              <input type="file" accept={purposeConfig?.accept ?? ''} aria-label={`选择${fileNoun}`} className="sr-only" disabled={state === 'uploading'} onChange={handleFile} />
+              {state === 'uploading' ? <Loader2Icon aria-hidden="true" /> : <UploadCloudIcon aria-hidden="true" />}
+              <b>选择手机中的文件</b>
+              <span>{purposeConfig?.helper ?? '请回到一体机重新生成二维码。'}</span>
+            </label>
+          )}
 
           <div className="ph-up-count">本次文件{fileLabel ? '（1）' : '（0）'}</div>
           {fileLabel ? (
@@ -161,15 +196,17 @@ export function PhoneUploadPage() {
                 <b>{fileParts[0]}</b>
                 <span>{fileParts.slice(1).join(' · ')}</span>
               </span>
-              <button
-                type="button"
-                disabled={state === 'uploading'}
-                onClick={reset}
-                className="ph-up-remove"
-                aria-label="移除文件"
-              >
-                <Trash2Icon aria-hidden="true" />
-              </button>
+              {state !== 'success' && (
+                <button
+                  type="button"
+                  disabled={state === 'uploading'}
+                  onClick={reset}
+                  className="ph-up-remove"
+                  aria-label="移除文件"
+                >
+                  <Trash2Icon aria-hidden="true" />
+                </button>
+              )}
             </div>
           ) : (
             <div className="ph-up-empty">尚未选择文件</div>
