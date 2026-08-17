@@ -28,6 +28,27 @@ export const BOOT_RECOVERED_LOG_MARKER = 'BOOT_DEPENDENCY_RECOVERED'
 
 export type BootSubsystemStatus = 'ok' | 'degraded'
 
+/**
+ * 一个对外可观察面在当前降级下的真实处境。
+ *
+ * - `unavailable`：请求会失败（4xx/5xx），能力确实没有了。
+ * - `degraded`：请求仍然成功，但代价变了（更慢 / 走后备路径 / 精度下降）。
+ * - `unaffected`：与本次降级完全无关，行为与正常态一致。
+ */
+export type BootSurfaceImpact = 'unavailable' | 'degraded' | 'unaffected'
+
+/**
+ * 降级影响面的**机器可读**声明，键为稳定的面标识（例如 `internal-auth`）。
+ *
+ * 存在的理由：`message` 是给人看的散文，散文可以撒谎且无法被门禁检验 ——
+ * 本仓就出过一次「Redis 降级时管理端不受影响」的错误措辞，而实际上管理端全线 500。
+ * 把结论同时写成结构化字段后，门禁可以对**每一个被声明的面**实际发一次请求，
+ * 用观察到的行为反过来判定这条声明是不是真话（见 verify:redis-degradation-truth）。
+ *
+ * 因此：新增一个面 = 必须同时给出可探测的判据，否则门禁会因为「无法验证」而失败。
+ */
+export type BootImpactDeclaration = Readonly<Record<string, BootSurfaceImpact>>
+
 export interface BootSubsystemState {
   /** 子系统标识，例如 redis / member-privacy-scheduler / database。 */
   subsystem: string
@@ -36,6 +57,8 @@ export interface BootSubsystemState {
   code: string
   /** 人读说明：出了什么问题、影响什么能力、下一步查什么。不得含密钥。 */
   message: string
+  /** 与 message 同义但可被门禁检验的结构化影响面声明；未声明时为 undefined。 */
+  impact?: BootImpactDeclaration
   /** 进入当前状态的时间（ISO）。 */
   since: string
 }
@@ -77,6 +100,32 @@ export async function withBootTimeout<T>(
   },
 ): Promise<T> {
   const { subsystem, operation, timeoutMs, onSettleAfterTimeout } = options
+  return withDeadline(op, {
+    timeoutMs,
+    makeTimeoutError: () => new BootDependencyTimeoutError(subsystem, operation, timeoutMs),
+    onSettleAfterTimeout,
+  })
+}
+
+/**
+ * 通用「有界等待」原语 —— `withBootTimeout` 的启动期无关内核。
+ *
+ * 抽出来的理由：请求热路径同样需要「等不到就放弃」这件事（例如
+ * `JwtAuthGuard` 读会话缓存），但它抛的不该是名字里带「启动期」的错误类型，
+ * 也不该带 subsystem/operation 这种启动登记表语义。两处共用同一份竞态实现，
+ * 避免出现第二套行为略有差异的超时代码。
+ */
+export async function withDeadline<T>(
+  op: () => Promise<T>,
+  options: {
+    timeoutMs: number
+    /** 超时时抛什么错误由调用方决定（启动期 / 请求期语义不同）。 */
+    makeTimeoutError: () => Error
+    /** 超时之后原始 promise 才 settle 时的回调。 */
+    onSettleAfterTimeout?: (result: { ok: true; value: T } | { ok: false; error: unknown }) => void
+  },
+): Promise<T> {
+  const { timeoutMs, makeTimeoutError, onSettleAfterTimeout } = options
   const pending = op()
   let timedOut = false
 
@@ -91,7 +140,7 @@ export async function withBootTimeout<T>(
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       timedOut = true
-      reject(new BootDependencyTimeoutError(subsystem, operation, timeoutMs))
+      reject(makeTimeoutError())
     }, timeoutMs)
     // 不阻止进程退出：超时定时器本身不该成为「进程活着」的理由。
     timer.unref?.()
@@ -119,8 +168,15 @@ class BootReadinessRegistry {
     this.states.set(subsystem, { subsystem, status: 'ok', code, message, since: new Date().toISOString() })
   }
 
-  markDegraded(subsystem: string, code: string, message: string): void {
-    this.states.set(subsystem, { subsystem, status: 'degraded', code, message, since: new Date().toISOString() })
+  markDegraded(subsystem: string, code: string, message: string, impact?: BootImpactDeclaration): void {
+    this.states.set(subsystem, {
+      subsystem,
+      status: 'degraded',
+      code,
+      message,
+      ...(impact ? { impact } : {}),
+      since: new Date().toISOString(),
+    })
   }
 
   /** 当前是否已登记为降级（用于避免重复打恢复日志）。 */

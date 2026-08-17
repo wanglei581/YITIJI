@@ -4,6 +4,14 @@
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
+## 平台可靠性遗留（FIX-CONSOLE-P0 拆出，2026-08-17）
+
+两条都在修「Redis 故障时后台全 500 + 异常零日志」时查实，但不在该批范围内，需另立任务：
+
+- [ ] **`EndUserAuthGuard` 的 Redis 等待未加界**：C 端会员端点在 Redis 不可达时单请求实测 **23.6 秒**后返回 500。它的 fail-closed 判定本身是**正确**的（Redis 就是会员会话真源，读不到就该拒绝，绝不能改成放行），问题只在耗时与错误码不诚实：应收敛为有界等待 + 明确的 503/`MEMBER_SESSION_STORE_UNAVAILABLE`，而不是让每个请求把连接占满 23 秒再塌成通用 500。修的时候**不得改变「拒绝」这个判定**。
+- [ ] **`admin-orgs.service.ts` 的 `invalidateAccountSession` 在 Redis 故障时造成「看起来失败其实成功了」**：账号启停 / 改密 / 换邮箱的数据库更新已提交后，缓存失效调用抛错 → 端点返回 500，管理员以为没生效；重试时因为状态已经是目标值会跳过整个分支，反而**连缓存失效也不做了**。当前只在 `/health` 里如实声明为 `internal-console-redis-actions=unavailable`，代码未改。修的时候要一并想清楚「部分 Redis 故障（写失败读成功）」下最长 60s 的陈旧缓存窗口如何处置。
+- [ ] **`admin-ops.service.ts:203` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
+
 ## 当前最高优先级：小程序到 Windows 真实出纸
 
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
