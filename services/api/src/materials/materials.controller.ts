@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
-import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
+import { TerminalScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
@@ -24,7 +24,7 @@ export class MaterialsController {
   ) {}
 
   @Post('tasks')
-  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @PaidAiThrottle(30)
   async createTask(
     @Body() dto: CreateMaterialTaskDto,
     @Req() req: ReqLike,

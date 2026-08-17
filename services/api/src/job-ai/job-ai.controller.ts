@@ -1,5 +1,4 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
@@ -15,6 +14,7 @@ import { GovernedJobFitService } from './governed-job-fit.service'
 import type { JobAiQuotaContext } from './job-ai-quota.service'
 
 import { resolveClientIp } from '../common/client-ip'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
@@ -102,7 +102,7 @@ export class JobAiController {
   ) {}
 
   @Post('ai/recommendations')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async recommendations(@Body() dto: JobRecommendationsDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
@@ -116,7 +116,7 @@ export class JobAiController {
   }
 
   @Post(':id/ai/explain')
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @PaidAiThrottle(10)
   async explain(@Param('id') id: string, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
@@ -124,7 +124,7 @@ export class JobAiController {
   }
 
   @Post(':id/ai/match')
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)

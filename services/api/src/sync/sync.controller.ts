@@ -1,10 +1,10 @@
 import { Body, Controller, Headers, Post, Query, Req, UnauthorizedException } from '@nestjs/common'
-import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { SyncService } from './sync.service'
 import { WebhookPayloadDto } from './dto/webhook-payload.dto'
 
 import { resolveClientIp } from '../common/client-ip'
+import { IpScopedThrottle } from '../common/throttler/terminal-throttle'
 interface RawReq {
   rawBody?: Buffer
   requestId?: string
@@ -39,7 +39,8 @@ export class SyncController {
   constructor(private readonly sync: SyncService) {}
 
   @Post('webhook')
-  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  @IpScopedThrottle(30, '第三方系统推送：无 Authorization，只有 HMAC 签名头，按会话计数无从谈起；' +
+    '且放宽维度等于让单个来源换头就能提高推送配额')
   async webhook(
     @Query('source') sourceId: string,
     @Headers('x-webhook-timestamp') timestamp: string | undefined,

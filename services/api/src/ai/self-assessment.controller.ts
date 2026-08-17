@@ -9,6 +9,7 @@ import type { AuditContext } from './resume/self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
 import type { SelfAssessmentAnswerV1 } from './resume/self-assessment.types'
+import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
@@ -66,7 +67,7 @@ export class SelfAssessmentController {
   }
 
   @Post()
-  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @PaidAiThrottle(6)
   /**
    * `consent.consentVersion` 可选：现网前端只发两个布尔。缺省 ⇒ 记为「未版本化同意」；
    * 显式带旧版本 ⇒ 400 `SELF_ASSESSMENT_CONSENT_VERSION_STALE`，要求重新确认。
