@@ -65,6 +65,14 @@ export interface ContractReviewResult {
 }
 
 export interface ContractReviewTaskView {
+  /**
+   * 失败原因码，仅在 status==='failed' 时非 null。
+   * 服务端 ContractReviewTask.errorCode 一直有写入，此前未随任务返回，
+   * 客户端只能显示「服务端未说明原因」。
+   * 只回传形如 CONTRACT_XXX 的稳定错误码（服务端按形状白名单过滤），
+   * 不回传 errorMessage —— 后者可能含上游报文片段或合同内容（§11）。
+   */
+  errorCode?: string | null
   id: string
   status: ContractReviewStatus
   contractType: ContractType

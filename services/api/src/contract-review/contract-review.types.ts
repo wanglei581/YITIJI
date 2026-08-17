@@ -136,6 +136,12 @@ export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
   resultJson: string | null
   extractionFingerprint: string | null
   confirmedAt: Date | null
+  /**
+   * DB 列一直存在且已写入；此前未进类型，故也未随任务视图返回。
+   * 声明为可选：既有测试用例按部分字段构造该行，且 mapper 已对类型做判断，
+   * 可选不降低任何运行时保证。
+   */
+  errorCode?: string | null
 }
 
 export interface ContractReviewReportView {
@@ -153,6 +159,13 @@ export interface ContractReviewReportView {
 export interface ContractReviewTaskView {
   id: string
   status: ContractReviewStatus
+  /**
+   * 失败原因码，仅在 status==='failed' 时非 null。
+   * 取自 ContractReviewTask.errorCode，服务端一直有写入，此前未随任务返回，
+   * 导致客户端只能显示「服务端未说明原因」。
+   * 只回传稳定错误码，不回传 errorMessage —— 后者可能含上游报文片段。
+   */
+  errorCode: string | null
   contractType: ContractType
   analyzedPages: number
   totalPages: number | null

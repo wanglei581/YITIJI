@@ -56,6 +56,17 @@ function isCancel(err) {
 // 服务端状态机的真实阶段。进度条按「第 N 步 / 共 5 步」推进，
 // 不用假的百分比动画——没有真实进度数据时，编一个匀速前进的条
 // 等于伪造能力（§9）。用户看到的每一次前进，都对应服务端一次真实状态变化。
+// 服务端错误码 → 用户能看懂的话。不把 CONTRACT_XXX 这种内部码原文展示给用户，
+// 但未知码保留原文——排障时看得见，好过一句「未知错误」。
+const FAILURE_TEXT = {
+  CONTRACT_PROVIDER_TRANSPORT_FAILED: 'AI 分析超时或服务暂时不可用。合同较长时更容易发生，可稍后重试或分批上传。',
+  CONTRACT_PROVIDER_TIMEOUT:          'AI 分析超时。合同较长时更容易发生，可稍后重试或分批上传。',
+  CONTRACT_UNSUPPORTED_FILE_TYPE:     '该文件格式无法提取内容，请改用 PDF、DOCX 或清晰的照片。',
+  CONTRACT_REVIEW_ANALYSIS_FAILED:    '分析未能完成，请稍后重试。',
+  CONTRACT_REVIEW_SAFETY_REJECTED:    '结果未通过可靠性复核，本次不展示，以免给出不准确的提示。',
+  CONTRACT_REVIEW_TIMEOUT:            '合同分析超时，请重新上传。',
+}
+
 const STAGES = [
   { key: 'queued',           label: '排队中',     note: '任务已提交，等待处理' },
   { key: 'extracting',       label: '识别文字',   note: '正在从文件中提取合同文本' },
@@ -438,8 +449,11 @@ Page({
         // OCR 置信度过低、AI provider 调用失败、安全网关拒绝等。
         // 一律说成「照片不清楚」会把用户引向错误的自救动作——反复重拍
         // 一份本来就没问题的文件。真实原因由服务端给，前端只负责如实转达。
-        const why = t.failureReason || t.failureCode || t.message
-          || (t.error && (t.error.message || t.error.code)) || ''
+        // errorCode 是服务端唯一稳定的失败原因来源（ContractReviewTaskView.errorCode）。
+        // 其余字段作为兼容兜底保留。
+        const code = t.errorCode || t.failureCode || (t.error && t.error.code) || ''
+        const why = FAILURE_TEXT[code] || t.failureReason || t.message
+          || (t.error && t.error.message) || (code ? `服务端返回 ${code}` : '')
         this._reset(why
           ? `分析失败：${why}`
           : '分析失败。服务端已记录原因但当前未随任务返回，请把这次时间告知运维。', true)
