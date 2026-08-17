@@ -37,6 +37,52 @@ KEEP_LIST=(
 
 refuse() { echo "❌ REFUSE: $*" >&2; exit 1; }
 
+# —— purge-trash 模式：真删指定隔离区，释放空间 ——
+# 为什么需要单独一个模式：execute 只做 mv，而 mv 在同一分区内**不释放任何空间**
+# （2026-08-17 实测：mv 7319MB 后 df 仍是 88% / 可用 5GB，与 mv 前一致）。
+# 空间只有 rm 才回来。这一步不可逆，所以：
+#   · 必须显式传入目标隔离区路径（不接受通配、不接受 /srv/.cleanup-trash 本身）
+#   · 删之前先验服务健康，服务不正常就拒绝删（那时更可能需要把内容 mv 回去）
+if [ "$MODE" = purge-trash ]; then
+  TARGET="${CLEANUP_PURGE_PATH:-}"
+  [[ -n "$TARGET" ]] || refuse "purge-trash 需要 CLEANUP_PURGE_PATH"
+  case "$TARGET" in
+    /srv/.cleanup-trash/*) : ;;
+    *) refuse "只允许删 /srv/.cleanup-trash/<时间戳>：$TARGET" ;;
+  esac
+  [[ "$TARGET" != *"*"* && "$TARGET" != *".."* ]] || refuse "含通配符或相对路径：$TARGET"
+  [[ "$TARGET" != "/srv/.cleanup-trash" && "$TARGET" != "/srv/.cleanup-trash/" ]]     || refuse "拒绝删整个隔离区根目录，必须指定具体时间戳子目录"
+  [[ -d "$TARGET" ]] || refuse "目录不存在：$TARGET"
+
+  [[ -n "$EXPECT_CONFIRM" && "$CONFIRM" == "$EXPECT_CONFIRM" ]]     || refuse "confirm 不匹配，purge 中止（未删除任何文件）"
+
+  echo "=== 删前健康检查（不正常就不删，那时更可能要 mv 回去）==="
+  HEALTH_OK=no
+  # 路径必须是 /api/v1/health —— 应用设了全局前缀 api/v1（main.ts setGlobalPrefix）。
+  # 2026-08-17 首次 purge 因为只探了裸 /health 而被自己的护栏拒绝，
+  # 当时公网 https://zyidai.cn/api/v1/health 明明是 ok 的。探错路径 ≠ 服务不健康。
+  for port in 3010 3000 8080; do
+    for path in /api/v1/health /health; do
+      if curl -fsS --max-time 5 "http://127.0.0.1:$port$path" 2>/dev/null | grep -q '"status"'; then
+        echo "  API $path @:$port → 可达"; HEALTH_OK=yes; break 2
+      fi
+    done
+  done
+  [[ "$HEALTH_OK" == yes ]] || refuse "本机 API 健康检查不通过，拒绝删除隔离区"
+  if command -v pm2 >/dev/null 2>&1; then
+    pm2 jlist >/dev/null 2>&1 || refuse "pm2 jlist 异常，拒绝删除隔离区"
+    echo "  pm2 正常"
+  fi
+
+  echo "=== 删除前空间 ==="; df -h /srv | tail -1
+  SZ="$(du -sm "$TARGET" 2>/dev/null | cut -f1)"
+  echo "即将删除 $TARGET（${SZ}MB）"
+  rm -rf -- "$TARGET"
+  echo "=== 删除后空间 ==="; df -h /srv | tail -1
+  echo "=== 已释放约 ${SZ}MB ==="
+  exit 0
+fi
+
 echo "=== 运行模式：$MODE ==="
 echo "=== 当前生产目录（保留）：$CURRENT ==="
 echo
@@ -68,8 +114,25 @@ preflight() {
     [[ "$resolved" == "$kr" || "$resolved" == "$kr"/* ]] && refuse "命中保留锚点 $keep：$target"
   done
 
-  # 4. 不是挂载点
+  # 4. 自身不是挂载点
   mount 2>/dev/null | awk '{print $3}' | grep -Fxq "$resolved" && refuse "是挂载点：$target"
+
+  # 4b. **内部**也不得有挂载点。
+  # 2026-08-17 实测发现：/srv/ai-job-print-deploy-backups 用 `du -xsm`（不跨文件系统）
+  # 量出 1126MB，用 `du -sm`（跨）量出 2055MB —— 差 929MB，说明它内部挂着别的文件系统。
+  # 只查目录自身是不够的：mv 一个内含挂载点的目录会失败或产生意外行为（跨设备 rename）。
+  if mount 2>/dev/null | awk '{print $3}' | grep -q "^$resolved/"; then
+    refuse "内部含挂载点（mv 会跨设备失败）：$target"
+  fi
+
+  # 4c. 报出两种口径的体积差，差异大即提示内部有跨文件系统内容
+  local sz_x sz_all
+  sz_x="$(du -xsm "$target" 2>/dev/null | cut -f1)"
+  sz_all="$(du -sm "$target" 2>/dev/null | cut -f1)"
+  if [ -n "$sz_x" ] && [ -n "$sz_all" ] && [ "$sz_all" -gt "$(( sz_x + 100 ))" ]; then
+    echo "   ⚠️ 体积口径差异：du -xsm=${sz_x}MB / du -sm=${sz_all}MB（差 $(( sz_all - sz_x ))MB）"
+    echo "      说明内部含跨文件系统内容。已通过挂载点检查，但请人工确认后再 execute。"
+  fi
 
   # 5. 无进程持有其内文件
   if command -v lsof >/dev/null 2>&1; then
