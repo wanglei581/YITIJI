@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
+import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -45,8 +46,9 @@ export class ScanTasksController {
   // （X-Upload-Session-Control，见 upload-sessions.controller.ts）：header 通常不进
   // 访问日志/浏览器历史，query string 通常会。B1-8（Kiosk 前台接线）请使用
   // `X-Scan-Session-Control` 这个 header 名传递 controlToken。
+  // 扫描会话同样被 Kiosk 定时轮询；按 IP 计数时同一大厅的多台机器共用这 60 次。
   @Get('scan/sessions/:id')
-  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  @TerminalScopedThrottle(60)
   async status(
     @Param('id') id: string,
     @Headers('x-scan-session-control') controlToken: string | undefined,

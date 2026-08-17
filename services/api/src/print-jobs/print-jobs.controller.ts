@@ -11,6 +11,7 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Param, Post } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
+import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
@@ -69,7 +70,11 @@ export class PrintJobsController {
     })
   }
 
+  // PrintProgressPage 每 3 秒轮询一次、最长 10 分钟 = 20 次/分钟/台。
+  // 按 IP 计数时一个大厅的 3 台机器就能打满 60 次/分钟的默认桶，第 4 次轮询 429，
+  // 前端 catch 分支会把它显示成「无法连接打印服务」。改成按台计数后每台各有一份。
   @Get(':taskId')
+  @TerminalScopedThrottle(40)
   getStatus(@Param('taskId') taskId: string) {
     return this.service.getStatus(taskId)
   }

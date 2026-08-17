@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
+import { TerminalScopedThrottle } from '../common/throttler/terminal-throttle'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
@@ -32,7 +33,10 @@ export class MaterialsController {
     return ApiResponse.ok(await this.materials.createTask(dto, requester))
   }
 
+  // PrintMaterialCheckPage 每 1 秒轮询、最多 30 次 = 单台机器 30 秒吃掉半个默认桶。
+  // 按 IP 计数时同一大厅两台机器同时做材料检查就会撞线，故按台计数。
   @Get('tasks/:id')
+  @TerminalScopedThrottle(90)
   async getTask(
     @Param('id') id: string,
     @Req() req: ReqLike,

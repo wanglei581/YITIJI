@@ -1,4 +1,5 @@
 import { API_BASE_URL, API_MODE } from './client'
+import { getTerminalId } from './screensaver'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { ApiHttpError } from './httpAdapter'
 
@@ -89,6 +90,11 @@ function authHeaders(access?: MaterialTaskAccess): HeadersInit {
   }
   if (access?.token) headers.Authorization = `Bearer ${access.token}`
   if (access?.accessToken) headers['x-material-task-token'] = access.accessToken
+  // 限流按台计数用（后端 @TerminalScopedThrottle）。材料检查页每 1 秒轮询一次、
+  // 最多 30 次，不带这个头时同一大厅的多台机器会共用一个 IP 桶而互相打成 429。
+  // 取不到本机终端身份（Agent 未就绪）时不发，后端退化回按 IP 计数，即改动前行为。
+  const terminalId = getTerminalId()
+  if (terminalId) headers['x-terminal-id'] = terminalId
   return headers
 }
 

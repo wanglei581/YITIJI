@@ -1,6 +1,8 @@
 import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
+import { TerminalScopedThrottle, throttleTerminalIdOf } from '../common/throttler/terminal-throttle'
+import { AiPublicQuotaService } from './ai-public-quota.service'
 import { JwtService } from '@nestjs/jwt'
 import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
@@ -98,6 +100,7 @@ export class AiController {
     private readonly prisma: PrismaService,
     private readonly asr: AsrService,
     private readonly benefitRedemption: BenefitRedemptionService,
+    private readonly publicQuota: AiPublicQuotaService,
   ) {}
 
   /**
@@ -120,12 +123,25 @@ export class AiController {
    * 绝不包含简历正文 / 解析结果。CLAUDE.md §11/§12 已规约。
    */
   @Post('resume/parse')
+  @TerminalScopedThrottle(6) // 触发 LLM/OCR，与兄弟 LLM 路由同档；按台计数以免整个大厅共用 6 次
   async submitResumeParse(
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
     const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
-    const result = await this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null)
+    const quotaTicket = await this.publicQuota.consume('resume_parse', {
+      member: endUser?.endUserId ?? null,
+      terminal: throttleTerminalIdOf(req),
+      ip: ipOf(req),
+    })
+    let result: ResumeParseResponseDto
+    try {
+      result = await this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null)
+    } catch (error) {
+      // 没真正提交成功就不该吃掉今日额度。
+      await this.publicQuota.rollback(quotaTicket)
+      throw error
+    }
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -377,11 +393,25 @@ export class AiController {
   }
 
   @Post('assistant/chat')
+  @TerminalScopedThrottle(12) // 对话式调用比单次生成频繁，但远低于此前落进的 60 次/分钟公共桶
   async chatWithAssistant(
     @Body() dto: AssistantChatRequestDto,
     @Req() req: ReqLike,
   ): Promise<AssistantChatResponseDto> {
-    const result = await this.aiService.chatWithAssistant(dto)
+    // 匿名是产品口径（不加 Guard）；这里只加限流与日配额，不加认证门槛。
+    const chatMember = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
+    const quotaTicket = await this.publicQuota.consume('assistant_chat', {
+      member: chatMember?.endUserId ?? null,
+      terminal: throttleTerminalIdOf(req),
+      ip: ipOf(req),
+    })
+    let result: AssistantChatResponseDto
+    try {
+      result = await this.aiService.chatWithAssistant(dto)
+    } catch (error) {
+      await this.publicQuota.rollback(quotaTicket)
+      throw error
+    }
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',

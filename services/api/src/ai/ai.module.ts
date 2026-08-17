@@ -5,6 +5,7 @@ import { AsrModule } from '../asr/asr.module'
 import { AiController } from './ai.controller'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
+import { AiPublicQuotaService } from './ai-public-quota.service'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -54,6 +55,8 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
   providers: [
     AiService,
     AiLogService,
+    // 匿名公网 AI 端点（/assistant/chat、/resume/parse）的日配额闸门。
+    AiPublicQuotaService,
     MockAiProvider,
     OpenAiProvider,
     ClaudeProvider,
