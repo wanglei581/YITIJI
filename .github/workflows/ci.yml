@@ -93,6 +93,9 @@ jobs:
         run: |
           pnpm --filter @ai-job-print/miniapp verify:static
           pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness
+          # V6 纵切第一刀（打印域 P39）迁移保真：读 docs/design 原型 + 生产源码做交叉断言。
+          # 纯静态，不连数据库/硬件，所以和其他 cross-client 静态门禁同步。
+          pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/admin verify:refresh-safe
           pnpm --filter @ai-job-print/admin verify:admin-job-materials-ui
           pnpm --filter @ai-job-print/admin verify:toolbox-review-ui
@@ -597,6 +600,9 @@ jobs:
           node -r @swc-node/register prisma/seed-fairs.ts
       - name: Core verify suites on PG
         run: |
+          # 与 SQLite job 同源的静态门禁：P39 迁移保真不依赖数据库形态，
+          # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
+          pnpm --filter @ai-job-print/kiosk verify:p39-print-hub-fidelity
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs

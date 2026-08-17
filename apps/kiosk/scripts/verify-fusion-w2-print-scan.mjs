@@ -267,17 +267,31 @@ assert.doesNotMatch(
   /<KioskActionBar\b/,
   'print-scan hub uses the prototype global navbar and must not render a second bottom action bar'
 )
-// 取件核销入口的防回归合同：V6 迁移把该入口从独立按钮 .ps-pickup-entry 改成
-// 打印 Hub 的能力卡，断言随结构改写，但契约不变——入口和话术都必须仍然存在。
+// 到机码核销入口的防回归合同。
+//
+// 演进史（改断言时请连着读）：
+//   · 最早是打印扫描首页上的独立按钮 .ps-pickup-entry；
+//   · A0′ V6 运行时切片把它改成打印 Hub 的第 8 张能力卡；
+//   · P39 迁移（V6 纵切第一刀）按原型 39-print-hub.html:585-627（PR #644）
+//     把它移出「七件事」栅格 —— 那块栅格的标题写着「七件事」，塞进第 8 张卡
+//     会让标题和卡数对不上；而且拿着码来的人要的不是第八件事，
+//     是一条直接认领自己那一单的路，所以它在七张卡**之前**单独一行。
+//
+// 契约不变：入口必须存在、必须指向 /print/pickup-claim、必须不被本机能力探测关闭。
 assert.match(
   printScanHome,
-  /key:\s*['"]pickup-claim['"][\s\S]{0,400}?to:\s*['"]\/print\/pickup-claim['"]/,
-  'print-scan home exposes a visible pickup-claim entry'
+  /ARRIVAL_CODE_ENTRY\s*=\s*\{[\s\S]{0,600}?to:\s*['"]\/print\/pickup-claim['"]/,
+  'print-scan home exposes a visible arrival-code (到机码) entry'
 )
+// 话术口径：后端与小程序下单页都把这个码叫「到机码」
+// （pickup-order.service.ts 的「到机码无效或已过期」、小程序 print-pay 的
+// 「提交并生成到机码」），它与付款后才生成的「取件凭证码」(Order.pickupCode)
+// 是两个不同的码。原型据此要求卡面显式区分，避免两码同名继续互相污染。
+assert.match(printScanHome, /到机码/, 'arrival-code entry uses the backend/miniapp name 到机码')
 assert.match(
   printScanHome,
-  /扫码或输入取件码/,
-  'print-scan pickup entry matches the miniapp instruction copy'
+  /不是付款后的取件凭证码/,
+  'arrival-code entry disambiguates itself from the post-payment 取件凭证码'
 )
 // 核销的是订单而非新建打印任务，不得被本机打印/扫描能力探测结果关闭。
 // 只在 CARD_CAPABILITY_KEY 的字面量块内查找，避免正则跨越整个文件误报。
@@ -285,8 +299,8 @@ const cardCapabilityKeyBlock = /const CARD_CAPABILITY_KEY[^=]*=\s*\{([\s\S]*?)\n
 assert.ok(cardCapabilityKeyBlock, 'print-scan home still declares CARD_CAPABILITY_KEY')
 assert.doesNotMatch(
   cardCapabilityKeyBlock[1],
-  /['"]pickup-claim['"]/,
-  'pickup-claim entry stays ungated by local print/scan capability probing'
+  /['"](?:pickup-claim|arrival-code)['"]/,
+  'arrival-code entry stays ungated by local print/scan capability probing'
 )
 assert.match(
   printHubV6Css,
