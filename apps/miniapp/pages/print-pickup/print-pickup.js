@@ -31,10 +31,10 @@ function resolveOrderState(order) {
   const isFreeOrder = parseAmountCents(order.amountCents) === 0
 
   if (pickupStatus === 'expired' || taskStatus === 'expired') {
-    return { key: 'expired', title: '取件码已过期', detail: '请返回打印订单重新发起打印。', showQr: false }
+    return { key: 'expired', title: '到机码已过期', detail: '请返回打印订单重新发起打印。', showQr: false }
   }
   if (pickupStatus === 'cancelled' || taskStatus === 'cancelled') {
-    return { key: 'cancelled', title: '订单已取消', detail: '本次取件码已经失效。', showQr: false }
+    return { key: 'cancelled', title: '订单已取消', detail: '本次到机码已经失效。', showQr: false }
   }
   if (taskStatus === 'failed') {
     return { key: 'failed', title: '打印失败', detail: '请查看终端提示，或联系现场工作人员处理。', showQr: false }
@@ -56,7 +56,7 @@ function resolveOrderState(order) {
       ? { key: 'awaiting_release', title: '已扫码，正在进入打印队列', detail: '免费试运营订单无需付款，请在终端旁等待。', showQr: false }
       : { key: 'awaiting_payment', title: '已扫码，等待现场支付', detail: '请在一体机确认订单并完成现场支付。', showQr: false }
   }
-  return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入取件码。', showQr: true }
+  return { key: 'pending', title: '等待终端扫码', detail: '将二维码对准一体机扫码器，或手动输入到机码。', showQr: true }
 }
 
 Page({
@@ -209,14 +209,14 @@ Page({
           })
           return
         }
-        // 首次请求失败时仍可使用 URL 中的真实取件码离线绘码；后续失败保留最近一次状态。
+        // 首次请求失败时仍可使用 URL 中的真实到机码离线绘码；后续失败保留最近一次状态。
         const fallbackAvailable = this.data.state === 'ready' || Boolean(this.data.showQr && this.data.codeRaw)
         this.setData({
           state: fallbackAvailable ? 'ready' : 'error',
           refreshing: false,
           errorMsg: (err && err.message) || '订单状态加载失败，请稍后重试',
         }, () => {
-          // onReady 可能早于首次请求失败；回退到 URL 里的真实取件码后必须主动补画。
+          // onReady 可能早于首次请求失败；回退到 URL 里的真实到机码后必须主动补画。
           if (this.data.showQr) this._drawPickupQr()
           if (fallbackAvailable) this._resumeVisibleWork()
         })
@@ -294,7 +294,7 @@ Page({
           codeRaw: '',
           code: '',
           statusKey: 'expired',
-          statusTitle: '取件码已过期',
+          statusTitle: '到机码已过期',
           statusDetail: '请返回打印订单重新发起打印。',
         })
         this._stopTimers()

@@ -29,7 +29,7 @@
         <view class="empty-slot">
           <text class="ficon i-user es-ic"></text>
           <view class="es-t">请先登录小程序</view>
-          <view class="es-d">登录后可查看打印订单、取件码与实时出纸状态</view>
+          <view class="es-d">登录后可查看打印订单、到机码与实时出纸状态</view>
           <button class="btn primary block" hover-class="tap-press" bindtap="toLogin">去登录</button>
         </view>
       </view>
@@ -52,9 +52,9 @@
           </view>
         </view>
         <view class="pk-strip" wx:if="{{item.pickup}}">
-          <view class="pk-label">取件码</view>
+          <view class="pk-label">到机码</view>
           <view class="pk-code">{{item.pickup}}</view>
-          <view class="pk-hint">到店后在一体机扫码，或手动输入取件码</view>
+          <view class="pk-hint">到店在终端「到机码核销」扫码或手输</view>
         </view>
         <view class="oc-foot">
           <view class="oc-price">{{item.price}}</view>
@@ -70,7 +70,7 @@
       <view class="empty-slot">
         <text class="ficon i-printer es-ic"></text>
         <view class="es-t">暂无订单</view>
-        <view class="es-d">发起打印后可在此查看取件码与出纸状态</view>
+        <view class="es-d">发起打印后可在此查看到机码与出纸状态</view>
       </view>
     </view>
 

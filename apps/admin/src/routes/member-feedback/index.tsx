@@ -8,6 +8,7 @@ import {
   type AdminFeedbackTicketItem,
   type FeedbackCategory,
   type FeedbackStatus,
+  type FeedbackSubmitterType,
 } from '../../services/api/memberFeedbackAdmin'
 
 const CATEGORIES: { value: FeedbackCategory | 'all'; label: string }[] = [
@@ -25,6 +26,19 @@ const STATUSES: { value: FeedbackStatus | 'all'; label: string }[] = [
   { value: 'replied', label: '已回复' },
   { value: 'closed', label: '已关闭' },
 ]
+
+const SUBMITTER_TYPES: { value: FeedbackSubmitterType | 'all'; label: string }[] = [
+  { value: 'all', label: '全部来源' },
+  { value: 'anonymous_kiosk', label: '一体机匿名' },
+  { value: 'member', label: '会员提交' },
+]
+
+/** 打印完成页满意度三档；null = 未评价，不显示。 */
+const SATISFACTION_LABEL: Record<'good' | 'fair' | 'bad', string> = {
+  good: '满意',
+  fair: '一般',
+  bad: '不满意',
+}
 
 const STATUS_LABEL: Record<FeedbackStatus, string> = {
   pending: '待查看',
@@ -77,6 +91,7 @@ function brief(text: string): string {
 export default function MemberFeedbackPage() {
   const [status, setStatus] = useState<FeedbackStatus | 'all'>('all')
   const [category, setCategory] = useState<FeedbackCategory | 'all'>('all')
+  const [submitterType, setSubmitterType] = useState<FeedbackSubmitterType | 'all'>('all')
   const [items, setItems] = useState<AdminFeedbackTicketItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<AdminFeedbackTicketDetail | null>(null)
@@ -90,14 +105,14 @@ export default function MemberFeedbackPage() {
     setListState('loading')
     setMessage(null)
     try {
-      const res = await memberFeedbackAdminApi.list({ status, category })
+      const res = await memberFeedbackAdminApi.list({ status, category, submitterType })
       setItems(res.items)
       setListState('ready')
     } catch (error) {
       setListState('error')
       setMessage(error instanceof Error ? error.message : '反馈列表加载失败')
     }
-  }, [category, status])
+  }, [category, status, submitterType])
 
   useEffect(() => {
     void loadList()
@@ -198,6 +213,14 @@ export default function MemberFeedbackPage() {
         >
           {CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
+        <select
+          value={submitterType}
+          onChange={(event) => setSubmitterType(event.target.value as FeedbackSubmitterType | 'all')}
+          className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
+          aria-label="按提交来源筛选"
+        >
+          {SUBMITTER_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
       </div>
 
       {message && (
@@ -286,6 +309,45 @@ export default function MemberFeedbackPage() {
               <div className="mt-4 rounded-lg border border-neutral-100 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-700">
                 {detail.content}
               </div>
+
+              {/* 处置上下文。没有这块，管理员看到「卡住没出完」也无从核实是哪一次打印。
+                  只渲染服务端真的给了值的行 —— 缺失项不显示，也不填占位符。 */}
+              {(detail.terminalId || detail.relatedPrintTaskId || detail.relatedScanTaskId || detail.satisfaction) && (
+                <dl className="mt-4 grid gap-x-6 gap-y-2 rounded-lg border border-neutral-100 p-4 text-sm sm:grid-cols-2">
+                  {detail.terminalId && (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-neutral-400">来源终端</dt>
+                      <dd className="font-medium text-neutral-800">{detail.terminalId}</dd>
+                    </div>
+                  )}
+                  {detail.satisfaction && (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-neutral-400">满意度</dt>
+                      <dd className="font-medium text-neutral-800">{SATISFACTION_LABEL[detail.satisfaction]}</dd>
+                    </div>
+                  )}
+                  {detail.relatedPrintTaskId && (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-neutral-400">打印任务</dt>
+                      <dd className="break-all font-mono text-xs text-neutral-800">{detail.relatedPrintTaskId}</dd>
+                    </div>
+                  )}
+                  {detail.relatedScanTaskId && (
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-neutral-400">扫描任务</dt>
+                      <dd className="break-all font-mono text-xs text-neutral-800">{detail.relatedScanTaskId}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+
+              {/* 退款不在本页执行。裁决后走「订单管理」既有的 admin 退款入口
+                  （POST /admin/orders/:id/refund → RefundService，含 refundEligible 判定、
+                  幂等与审计）。在工单页另开一个退款按钮等于绕开那套账本，绝对不做。 */}
+              <p className="mt-3 text-xs leading-relaxed text-neutral-400">
+                本页只做工单处置与状态记录，不执行退款。如核实后需要退款，
+                请依据上方打印任务号在「订单管理」中找到对应订单，使用该页的退款入口操作。
+              </p>
 
               <div className="mt-5">
                 <p className="mb-3 text-sm font-semibold text-neutral-900">沟通记录</p>
