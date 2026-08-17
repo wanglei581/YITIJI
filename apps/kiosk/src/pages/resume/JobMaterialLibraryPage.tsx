@@ -187,9 +187,15 @@ export function JobMaterialLibraryPage() {
       <div className="resume-lightflow__shell">
         <header className="resume-lightflow__header">
           <div>
-            <p className="resume-lightflow__eyebrow">AI 求职材料 · 真实生成</p>
+            {/*
+              不伪造能力（CLAUDE.md §9）：本页后端 services/api/src/job-materials 全链没有 LLM 调用，
+              产物由 job-material-templates.ts 的固定模板 + 用户手填字段渲染而成。
+              因此这里只能写「模板生成」，不得宣称由 AI 撰写；
+              verify:job-material-library-ui 会按后端真实能力守住这条文案。
+            */}
+            <p className="resume-lightflow__eyebrow">求职材料 · 模板生成</p>
             <h1>求职材料库</h1>
-            <p>选择所需材料，补充真实信息后生成个人可查看、可打印的 PDF。</p>
+            <p>选择所需材料，补充真实信息后按固定模板生成个人可查看、可打印的 PDF。</p>
           </div>
           <Button size="sm" variant="secondary" className="resume-lightflow__return" onClick={() => navigate('/')}>
             返回首页

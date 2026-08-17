@@ -1,7 +1,19 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
+
+/** 递归列出目录下所有文件的绝对路径（手写游走，避免依赖 readdirSync recursive 的 Node 版本）。 */
+function walkFiles(dir) {
+  if (!existsSync(dir)) return []
+  const out = []
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry)
+    if (statSync(full).isDirectory()) out.push(...walkFiles(full))
+    else out.push(full)
+  }
+  return out
+}
 
 function pass(message) {
   console.log(`  PASS ${message}`)
@@ -123,6 +135,39 @@ for (const page of ['src/pages/resume/ResumeTemplateLibraryPage.tsx', 'src/pages
     ['一键投递', '立即投递', '平台投递', '发送给企业'],
     `${page} avoids forbidden recruiting flow wording`,
   )
+}
+
+// ── 不伪造能力（CLAUDE.md §9）：AI 措辞必须与后端真实能力一致 ─────────────
+// 后端 services/api/src/job-materials 全链只做「固定模板 + 用户手填字段」渲染，
+// 没有任何 LLM 调用。因此求职材料库页面不得宣称「AI 生成」。
+// 本断言是**双向耦合**的：若将来该目录真的接入 LLM，断言自动放开，不会挡住正当改动。
+{
+  const backendDir = join(root, '..', '..', 'services', 'api', 'src', 'job-materials')
+  const backendFiles = walkFiles(backendDir).filter((f) => f.endsWith('.ts'))
+  if (backendFiles.length === 0) {
+    fail(`Job material backend not found for capability cross-check: ${backendDir}`)
+  }
+  const LLM_MARKERS = [
+    'LlmService', 'llmService', 'AiProvider', 'aiProvider',
+    'openai', 'OpenAI', 'anthropic', 'deepseek', 'chatCompletion', 'onLlmCall',
+  ]
+  const backendUsesLlm = backendFiles.some((file) => {
+    const src = readFileSync(file, 'utf8')
+    return LLM_MARKERS.some((marker) => src.includes(marker))
+  })
+
+  const pagePath = 'src/pages/resume/JobMaterialLibraryPage.tsx'
+  const AI_GENERATION_CLAIMS = ['AI 求职材料', 'AI求职材料', 'AI 生成', 'AI生成', '智能生成', 'AI 智能生成']
+  if (backendUsesLlm) {
+    pass(`Job material backend now calls an LLM — AI wording assertion intentionally relaxed`)
+  } else {
+    assertNotContains(
+      pagePath,
+      AI_GENERATION_CLAIMS,
+      'Job material page does not claim AI generation while backend is template-only',
+    )
+    assertContains(pagePath, '模板生成', 'Job material page states template generation as its real capability')
+  }
 }
 
 console.log('\nALL PASS')

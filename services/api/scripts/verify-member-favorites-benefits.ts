@@ -244,6 +244,11 @@ async function main() {
 
     // ── 权益：构造数据（直接落库，模拟后续活动/套餐发放）────────────
     const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    // 关键样本：**库里 status 仍是 'active'，但 validUntil 已过**。
+    // 全仓没有任何代码把 status 写成 'expired'（只有 used_up / revoked / active），
+    // 也没有到期扫描任务，所以这是生产里过期券的**真实形态**。
+    await prisma.benefitGrant.create({ data: { endUserId: userA, benefitType: 'coupon', title: '已过期券（库内仍为 active）', status: 'active', sourceType: 'platform', validUntil: past } })
     await prisma.benefitGrant.create({ data: { endUserId: userA, benefitType: 'free_quota', title: '免费打印 5 次', quantityTotal: 5, quantityRemaining: 3, status: 'active', sourceType: 'campus', validUntil: future } })
     await prisma.benefitGrant.create({ data: { endUserId: userA, benefitType: 'coupon', title: '简历打印 8 折券', status: 'expired', sourceType: 'platform' } })
     await prisma.benefitGrant.create({ data: { endUserId: userA, benefitType: 'subsidy_eligibility_hint', title: '高校毕业生求职补贴资格提示', description: '符合条件可按官方指引准备材料清单，前往人社官方入口申请。具体以官方审核为准。', status: 'active', sourceType: 'gov' } })
@@ -251,10 +256,31 @@ async function main() {
 
     // ── 6. 本人可读 + 只回元数据 ──────────────────────────────────
     const benA = (await benefits.list(userA, firstPage)).items
-    const readableOk = benA.length === 3 && benA.some((b) => b.status === 'active') && benA.some((b) => b.status === 'expired')
+    const readableOk = benA.length === 4 && benA.some((b) => b.status === 'active') && benA.some((b) => b.status === 'expired')
     const quotaOk = benA.some((b) => b.benefitType === 'free_quota' && b.quantityRemaining === 3 && b.quantityTotal === 5)
-    if (readableOk && quotaOk) pass('6. 本人可读权益：A 得到 3 条，active/expired 状态与额度字段正确')
+    if (readableOk && quotaOk) pass('6. 本人可读权益：A 得到 4 条，active/expired 状态与额度字段正确')
     else fail(`6. A 权益列表异常：${JSON.stringify(benA)}`)
+
+    // ── 6b. 不伪造能力（CLAUDE.md §9）：过期券不得显示为「可用」──────────
+    // 核销侧 benefit-redemption.service.ts 按 validUntil 实时判定并抛 BENEFIT_EXPIRED，
+    // 读取侧必须给出同样结论，否则用户看到"可用"、点核销被拒。
+    const expiredByDate = benA.find((b) => b.title === '已过期券（库内仍为 active）')
+    if (!expiredByDate) {
+      fail('6b. 未取到"库内 active + validUntil 已过"的样本券')
+    } else if (expiredByDate.status !== 'expired') {
+      fail(`6b. 过期券仍被报成 "${expiredByDate.status}" —— 页面会显示「可用」，但核销会以 BENEFIT_EXPIRED 拒绝`)
+    } else {
+      pass('6b. validUntil 已过的券读取侧派生为 expired（与核销侧 BENEFIT_EXPIRED 判定一致）')
+    }
+
+    // 反向：未到期的 active 券不得被误判为过期（validUntil 在未来 / 为 null 都应保持 active）。
+    const stillActive = benA.find((b) => b.benefitType === 'free_quota')
+    const noExpiryHint = benA.find((b) => b.benefitType === 'subsidy_eligibility_hint')
+    if (stillActive?.status === 'active' && noExpiryHint?.status === 'active') {
+      pass('6c. 未到期券与无有效期权益保持 active（有效期派生无误杀）')
+    } else {
+      fail(`6c. 有效期派生误杀未过期权益：future=${stillActive?.status} noExpiry=${noExpiryHint?.status}`)
+    }
 
     // ── 7. 跨用户隔离 ────────────────────────────────────────────
     const benB = (await benefits.list(userB, firstPage)).items
