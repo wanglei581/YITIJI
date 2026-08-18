@@ -26,6 +26,7 @@ import {
 import { JOB_WORK_TYPE_VALUES } from './work-type'
 import { assertDataSourceCapability, assertPartnerDataTypeCapability } from './partner-capabilities'
 import {
+  importSyncModeOf,
   loadPartnerImportRows,
   PARTNER_IMPORT_MAX_DATA_ROWS,
   PARTNER_IMPORT_MAX_FILE_BYTES,
@@ -78,6 +79,23 @@ export class JobsExcelService {
       if ((error as Error).message === 'IMPORT_XLSX_ARCHIVE_LIMIT_EXCEEDED') {
         throw new BadRequestException({
           error: { code: 'EXCEL_ARCHIVE_TOO_LARGE', message: 'Excel 解压后内容过大或结构过于复杂，请精简后重试' },
+        })
+      }
+      // 「格式不受支持」必须和「文件为空/内容坏了」分开报。
+      //
+      // 数据源的 accessMode 闸门放行 ['excel','csv','json'](见本文件 previewExcelImport /
+      // confirmExcelImport),但解析器 loadPartnerImportRows 只认 .xlsx 与 .csv。
+      // 于是一个 accessMode='json' 的源上传 .json 时,底层抛 UNSUPPORTED_FILE_FORMAT ——
+      // 这一档此前没有 catch 分支,统一落到 EXCEL_EMPTY「文件为空或格式不正确」。
+      // 运营会照着这句话去查文件是不是空的,而真实原因是**这个格式压根没有解析器**,
+      // 且没有任何地方告诉他受支持的是哪两种。错误必须说清实情,否则等于把
+      // 「能力缺失」伪装成「用户的文件有问题」。
+      if ((error as Error).message === 'UNSUPPORTED_FILE_FORMAT') {
+        throw new BadRequestException({
+          error: {
+            code: 'UNSUPPORTED_FILE_FORMAT',
+            message: '文件格式不受支持：当前仅支持 .xlsx 与 .csv 两种格式，请另存为后重新上传。',
+          },
         })
       }
       throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel/CSV 文件为空或格式不正确' } })
@@ -477,7 +495,10 @@ export class JobsExcelService {
             sourceId: batch.sourceId,
             orgId: sourceOrgId,
             dataType: batch.dataType,
-            syncMode: 'excel',
+            // 按**实际文件格式**记,不能硬编码 'excel'。
+            // SyncLog 是 Partner 后台「同步日志」页直接给运营看的记录;原先 CSV 导入
+            // 在日志里伪装成 Excel 导入,运营排查「这批数据是怎么进来的」时会被误导。
+            syncMode: importSyncModeOf(batch.fileName),
             totalCount: totalValid + batch.dupRows + batch.invalidRows,
             addedCount: totalValid,
             updatedCount: 0,

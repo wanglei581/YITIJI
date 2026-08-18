@@ -154,6 +154,20 @@ function parseCsv(text: string): string[][] {
   return rows
 }
 
+/**
+ * 文件导入的**同步方式**标签,写进 SyncLog.syncMode 给运营看。
+ *
+ * 与 {@link loadPartnerImportRows} 的分流判据保持同一份来源:两处都按文件名后缀判定,
+ * 分开写的话迟早漂移成「按 xlsx 解析、却记成 csv」。
+ *
+ * 取值与 SyncLog.syncMode 的既有词表一致('excel' / 'csv' / 'webhook' / api)。
+ * 非 .csv 一律记 'excel' —— 能走到写日志这一步的只可能是 .xlsx 或 .csv,
+ * 其余格式在 loadPartnerImportRows 就已 UNSUPPORTED_FILE_FORMAT 抛出。
+ */
+export function importSyncModeOf(fileName: string): 'excel' | 'csv' {
+  return /\.csv$/i.test(fileName) ? 'csv' : 'excel'
+}
+
 export async function loadPartnerImportRows(buffer: Buffer, fileName: string): Promise<string[][]> {
   if (buffer.byteLength > PARTNER_IMPORT_MAX_FILE_BYTES) throw new Error('IMPORT_FILE_TOO_LARGE')
   if (/\.csv$/i.test(fileName)) {
