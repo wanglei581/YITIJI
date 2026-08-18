@@ -11,11 +11,21 @@
 > 免费打印 = 每月 N 次免单券；四道闸全满足则整单免 + 扣 1 次，否则整单正常价；
 > 不补差、不部分抵扣、不叠加；双面不变价；打印链计价单位「计费页」。
 >
-> **本文新发现一个原六项之外的上线阻塞**（见文末「需要纠正的几点」第 1 条）：
-> Terminal Agent 有三条路径在**未确认出纸的情况下上报 completed**，
-> 已由 Claude 读 `apps/terminal-agent/src/agent/task-runner.ts:495` 附近的
-> doc comment 复核确认（原文写着 conservative completed）。
-> 对一台收了钱的无人值守机器，这等于「用户付了钱、纸可能没出来、系统说打好了」。
+> **［2026-08-18 订正］本文原在此处列出的「原六项之外的上线阻塞」判定已不成立，且方向是反的。**
+> 原文（保留以便追溯）：「本文新发现一个原六项之外的上线阻塞（见文末「需要纠正的几点」第 1 条）：
+> Terminal Agent 有三条路径在**未确认出纸的情况下上报 completed**，已由 Claude 读
+> `apps/terminal-agent/src/agent/task-runner.ts:495` 附近的 doc comment 复核确认（原文写着
+> conservative completed）。对一台收了钱的无人值守机器，这等于『用户付了钱、纸可能没出来、系统说打好了』。」
+>
+> 对 `origin/main@85eb7a3b4` 重验：**那三条路径已全部 fail-closed**，
+> `PRINT_JOB_UNCONFIRMED` 现在是不确定结果的唯一出口，取证与逐条行号见文末「需要纠正的几点」第 1 条的订正。
+> 变化时点：2026-08-09 提交 `fbc762dd0`（fix: fail closed on unverified print outcomes），
+> 随 PR #570 于 2026-08-10 合入 main（`c05a9dc90`）；**本规格成稿于 08-11，但所据分支早于 #570**，
+> 因此把当时源码里已被改掉的旧行为写成了现状。`conservative` 字样在该文件现已零命中。
+>
+> **本次只重验了这一条打印履约判定，其余小节未逐条复核。** 本文件位于 `docs/reviews/`，
+> 按 [docs/README.md](../README.md) §三属「过程材料 —— 有历史价值，无当前效力」，
+> 订正后**仍不是当前口径**；照本文开工前请按 §四取证规则对 `origin/main` 自行复验。
 
 ---
 
@@ -933,7 +943,24 @@ PRINT_OUTCOME_V2
 
 # 需要纠正的几点
 
-1. “队列未出现或超时都会进入 `PRINT_JOB_UNCONFIRMED`”并不完全正确。当前 Agent 仍有“队列多次未出现后按完成处理”“普通监控超时按完成处理”“跳过监控按完成处理”的路径，只有部分 Pantum 保留任务超时走 unconfirmed。这是无人值守上线阻塞，见 [task-runner.ts](/Users/wanglei/AI求职打印服务终端/apps/terminal-agent/src/agent/task-runner.ts:495)。
+1. **［2026-08-18 订正］本条已经反过来了：原判定不成立，`PRINT_JOB_UNCONFIRMED` 才是当前唯一出口。**
+
+   原文（保留以便追溯）：「『队列未出现或超时都会进入 `PRINT_JOB_UNCONFIRMED`』并不完全正确。当前 Agent 仍有『队列多次未出现后按完成处理』『普通监控超时按完成处理』『跳过监控按完成处理』的路径，只有部分 Pantum 保留任务超时走 unconfirmed。这是无人值守上线阻塞，见 task-runner.ts:495。」
+
+   对 `origin/main@85eb7a3b4` 重验 `apps/terminal-agent/src/agent/task-runner.ts`：`monitorPrintJob()` 把**四类不确定结果统一 fail-closed 成 `failed` + `PRINT_JOB_UNCONFIRMED`**，且 `unconfirmedOutcome()`（`:699`）是唯一出口——
+
+   - **非 Windows**：`platform !== 'win32'` 直接 unconfirmed（`:582-585`）。原文说的「跳过监控按完成处理」已不存在。
+   - **队列多次未出现**：连续 5 次 `not_found` **且从未见过活动作业**（`NOT_FOUND_LIMIT`）才 unconfirmed（`:662-668`），不再按完成处理。
+   - **硬超时**：Pantum `Printing, Retained` 态（`seenRetainedOnce`）与普通超时**两条都** unconfirmed（`:679-696`）；原文说的「只有部分 Pantum 保留任务超时走 unconfirmed」现在两边都走。
+   - **崩溃后恢复**：重启遇到本地 `spooled` / `dispatching` 一律 unconfirmed 并禁止自动重印（`:286-299`）。
+
+   只有两条路径回 `failed: false`：**显式 `Complete` / `Printed` 的 spooler 状态**，与**先见到活动作业、随后离开队列**。源码 doc comment 同时写明这两条**只确认 Windows 打印后台生命周期，不证明纸到了用户手上**（`:558-560`），因此「出纸真实性」的口径没有被放宽，只是不再假报 completed。
+
+   回归脚本 `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 覆盖了上述路径，含非 Windows、队列从未匹配、查询恒 unknown 到超时、`printing` / `retained` 到超时，以及「一次 paper-out 后消失不算完成证据」。
+
+   变化时点：2026-08-09 提交 `fbc762dd0`（fix: fail closed on unverified print outcomes），随 PR #570 于 2026-08-10 合入 main（`c05a9dc90`）。**本规格成稿于 08-11，但所据分支早于 #570。** 原文引用的 `task-runner.ts:495` 现在是「监控未报失败 → PATCH `completed`」的正常分支，附近已无 `conservative` 字样（`git grep conservative origin/main -- apps/terminal-agent/src/agent/task-runner.ts` 零命中）。**行号会漂，以符号名 `monitorPrintJob` / `unconfirmedOutcome` 与提交号为准。**
+
+   本条对应的上线阻塞随之关闭；下方验收表「履约」行的判据（未出现队列 / 超时不得 complete）现已由 Agent 侧满足，**服务端侧如何消费 `PRINT_JOB_UNCONFIRMED` 仍按本文原方案执行**。
 
 2. `@@unique([serviceType, serviceRefId])` 不是需要移除的障碍。它正好保证一单只核销一次；续打和恢复应通过 PrintTask attempt 与 RedemptionAdjustment 解决。
 
