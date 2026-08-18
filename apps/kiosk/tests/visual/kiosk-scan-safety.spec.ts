@@ -280,7 +280,7 @@ test('pickup page still accepts scanner input and shows no guard notice @scan-sa
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await expect(input).toBeVisible()
 
   // 同样的 5ms 突发节奏 —— 在授权页必须照常工作，不能被守卫吞掉。

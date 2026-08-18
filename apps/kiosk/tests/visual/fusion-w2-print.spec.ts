@@ -107,7 +107,7 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
   await expect(page.getByText('等待扫码输入')).toBeVisible()
   await assertNoHorizontalOverflow(page)
@@ -142,9 +142,9 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
 
   await page.goto('/print/pickup-claim')
 
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   const submit = page.getByRole('button', { name: '确认取件' })
-  const help = page.getByText('怎么找取件码？')
+  const help = page.getByText('怎么找到机码？')
   await expect(input).toBeVisible()
   await expect(submit).toBeVisible()
   await expect(help).toBeVisible()
@@ -200,7 +200,7 @@ test('pickup manual fallback normalizes the displayed code before claiming @w2',
   })
 
   await page.goto('/print/pickup-claim')
-  await page.getByLabel('取件码输入框').fill('ab-2c-7m-9p-3k')
+  await page.getByLabel('到机码输入框').fill('ab-2c-7m-9p-3k')
 
   await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
   expect(submittedCode).toBe('AB2C7M9P3K')
@@ -237,7 +237,7 @@ test('pickup accepts 8-digit codes without truncating a legacy 10-char code @w2'
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await expect(input).toBeVisible()
   // 纯数字码必须唤起数字键盘，而不是全键盘。
   await expect(input).toHaveAttribute('inputmode', 'numeric')
@@ -274,7 +274,7 @@ test('pickup invalid code is rejected, cleared, and ready for the next scan @w2'
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await input.fill('AB2C7M9P3K')
 
   await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)

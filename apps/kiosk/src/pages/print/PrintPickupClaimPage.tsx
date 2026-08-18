@@ -1,16 +1,16 @@
 // ============================================================
 // PrintPickupClaimPage — 步骤4：扫码取件认领
 //
-// 用户用一体机扫码器扫描二维码，或手动输入小程序中的取件码，
+// 用户用一体机扫码器扫描二维码，或手动输入小程序中的到机码，
 // 调用 POST /api/v1/print/jobs/claim-pickup → 任务状态从 pending → claimed，
 // 然后跳到打印进度页（/print/progress）。
 //
-// 取件码规格：6 位纯数字（2026-08-18 产品裁决）。规格常量来自
+// 到机码规格：8 位纯数字（2026-08-18 方案 A 定案）。规格常量来自
 // @ai-job-print/shared 的 pickupCode —— 本页**不许再内联自己那份正则**，
 // 内联副本正是「小程序发一种长度、一体机收另一种长度」的事故来源。
 // 认领接口无需登录态（Kiosk = 可控设备层），后端 Throttle 20次/min/IP 防滥用。
 //
-// 过渡期：同时受理 10 位存量码。删除条件与后端一致（上线满 24h，取件码 TTL 到期）。
+// 过渡期：同时受理 10 位存量码。删除条件与后端一致（上线满 24h，到机码 TTL 到期）。
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
@@ -30,7 +30,7 @@ import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import './styles/print-pickup-claim.css'
 
-// ── 取件码工具 ────────────────────────────────────────────────
+// ── 到机码工具 ────────────────────────────────────────────────
 const CODE_LEN = PICKUP_CODE_LENGTH
 // 可键入字符 = 新码(纯数字) ∪ 存量码(31 字符集) 的并集，由 shared 常量反推，不手写。
 const VALID_CHAR = new RegExp(`[^${PICKUP_CODE_INPUT_ALPHABET}]`, 'g')
@@ -95,7 +95,7 @@ async function claimPickup(code: string): Promise<ClaimPickupResult> {
     const errMsg =
       body.error?.message ??
       (Array.isArray(body.message) ? body.message.join('; ') : (body.message as string | undefined)) ??
-      `取件码无效或已过期（${errCode}）`
+      `到机码无效或已过期（${errCode}）`
     throw new Error(errMsg)
   }
   return body as ClaimPickupResult
@@ -242,7 +242,7 @@ export function PrintPickupClaimPage() {
     <PrintPageFrame>
       <KioskPageHeader
         title="扫码取件"
-        description={`扫描小程序二维码，或输入 ${CODE_LEN} 位取件码`}
+        description={`扫描小程序二维码，或输入 ${CODE_LEN} 位到机码`}
         onBack={() => navigate('/print-scan')}
         backLabel="返回"
       />
@@ -254,7 +254,7 @@ export function PrintPickupClaimPage() {
           <div className="pcp-lead-copy">
             <span className="pcp-status">等待扫码输入</span>
             <p className="pcp-lead-text">
-              打开小程序「我的 → 打印订单 → 查看取件码」，将二维码对准本机扫码器；无法扫码时可手动输入。
+              打开小程序「我的 → 打印订单 → 查看到机码」，将二维码对准本机扫码器；无法扫码时可手动输入。
             </p>
           </div>
         </div>
@@ -262,7 +262,7 @@ export function PrintPickupClaimPage() {
         {/* 输入框 */}
         <div className="pcp-input-section">
           <label className="pcp-label" htmlFor="pickup-code-input">
-            扫码结果 / 取件码（{CODE_LEN} 位）
+            扫码结果 / 到机码（{CODE_LEN} 位）
           </label>
           {/* 小程序会把码显示为 12-34-56；分隔符不进入状态或接口。 */}
           <div className="pcp-input-wrap">
@@ -285,11 +285,11 @@ export function PrintPickupClaimPage() {
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              aria-label="取件码输入框"
+              aria-label="到机码输入框"
               aria-invalid={state === 'error'}
               aria-describedby={state === 'error' ? 'pcp-error-msg' : 'pcp-hint'}
             />
-            {/* 计数器按当前输入形态显示目标长度：正在输入存量码时不该催用户「只要 6 位」。 */}
+            {/* 计数器按当前输入形态显示目标长度：正在输入存量码时不该催用户「只要 8 位」。 */}
             <div id="pcp-hint" className={`pcp-counter ${isValid ? 'pcp-counter--full' : ''}`}>
               {code.length} / {code.length > CODE_LEN ? PICKUP_CODE_MAX_INPUT_LENGTH : CODE_LEN}
             </div>
@@ -298,7 +298,7 @@ export function PrintPickupClaimPage() {
 
         {/* 格式说明 */}
         <p className="pcp-format-hint">
-          取件码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
+          到机码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
           {' '}早前下单拿到的 {PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍然有效，可直接输入。
         </p>
 
@@ -333,11 +333,11 @@ export function PrintPickupClaimPage() {
 
         {/* 操作指引 */}
         <div className="pcp-help">
-          <p className="pch-title">怎么找取件码？</p>
+          <p className="pch-title">怎么找到机码？</p>
           <ol className="pch-steps">
             <li>打开小程序，点击底部「我的」</li>
             <li>选择「打印订单」，找到待取件订单</li>
-            <li>点击「查看取件码」，对准扫码器；也可手动输入 {CODE_LEN} 位数字</li>
+            <li>点击「查看到机码」，对准扫码器；也可手动输入 {CODE_LEN} 位数字</li>
           </ol>
         </div>
       </div>

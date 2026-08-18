@@ -238,7 +238,7 @@ check(
   pickupCodeSrc.includes('LEGACY_PICKUP_CODE_PATTERN') &&
     pickupCodeSrc.includes('[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}') &&
     /PICKUP_CODE_ACCEPTED_PATTERN = .*\[0-9\]\{8\}\|\[23456789ABCDEFGHJKMNPQRSTUVWXYZ\]\{10\}/.test(pickupCodeSrc),
-  '受理正则同时收 6 位新码与 10 位存量码（已付费用户的在途取件码不得被拒）',
+  '受理正则同时收 8 位新码与 10 位存量码（已付费用户的在途取件码不得被拒）',
 )
 check(
   pickupCodeSrc.includes('m2-pickup-v1|') && pickupOrderSrc.includes('pickupCodeHash: hashPickupCode(code)'),

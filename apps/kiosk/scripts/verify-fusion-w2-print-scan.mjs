@@ -566,7 +566,7 @@ const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
 const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')
 for (const marker of [
   'claimLockRef',
-  // 取件码改 6 位后符号更名：扫码路径仍必须先过格式判据，且新旧两种码各有分支
+  // 到机码改 8 位后符号更名：扫码路径仍必须先过格式判据，且新旧两种码各有分支
   'isLegacyPickupCode(nextCode)',
   'PICKUP_CODE_PATTERN.test(nextCode)',
   'void handleClaim(nextCode)',
