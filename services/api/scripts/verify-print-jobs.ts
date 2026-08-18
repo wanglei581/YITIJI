@@ -72,12 +72,13 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
+  const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(
     prisma,
     audit,
     new PrintPageCountService(prisma, storage),
     new PricingService(prisma),
-    new OrderStatusService(prisma, audit),
+    orderStatus,
     new TerminalCapabilitiesService(prisma),
   )
   // N3 拆分后 TerminalsService 需要 agent + admin 两个子服务
@@ -294,9 +295,18 @@ async function main() {
       },
       `Bearer ${agentToken}`,
     )
+    // 出纸前置：claim 只领已付款订单（付费门控已写死，不再是可关闭的 env 开关）。
+    // 这里按线下收款口径把该单标为 paid，再验证 Agent 能领取——原先夹具留在 unpaid
+    // 也能领，那正是 P0-1 的资损路径。
+    const beforePayClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (beforePayClaim.length === 0) {
+      pass('3c-pre. 未支付时本终端 pending 任务不可领取（先付后印）')
+    } else fail(`3c-pre. 未支付任务被领取: ${JSON.stringify(beforePayClaim.map((c) => c.taskId))}`)
+
+    await orderStatus.markPaid(created.orderId, { paymentSource: 'offline' })
     const claimed = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
     if (claimed.length === 1 && claimed[0].taskId === created.taskId && claimed[0].claimedBy === terminalId && !!claimed[0].fileUrl) {
-      pass('3c. Agent 恢复 online 后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
+      pass('3c. 线下收款入账后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
     } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
     const afterClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
@@ -375,6 +385,9 @@ async function main() {
         where: { id: failCreated.taskId },
         data:  { createdAt: new Date(backdateIso) },
       })
+      // 先付后印是硬规则：本节要验的是「失败回传如何脱敏」，不是绕开付费门控，
+      // 所以夹具按线下收款入账后再让 Agent 领取。
+      await orderStatus.markPaid(failCreated.orderId, { paymentSource: 'offline' })
       const claim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
       if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId) {
         fail(`7 预备(${label}) — 失败任务未被本终端 claim: ${JSON.stringify(claim.map((c) => c.taskId))}`)

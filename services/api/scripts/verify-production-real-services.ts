@@ -21,7 +21,6 @@ const PROD_OK: Env = {
   AI_LLM_API_KEY: 'llm-api-key',
   PAYMENT_SESSION_SECRET: 'ci-production-payment-session-secret-0123456789',
   // C5-6：生产必须显式声明 paid-before-claim（缺省启动即拒）
-  PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
   PRINT_REQUIRE_PII_SCAN: 'true',
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
   TRUST_PROXY_HOPS: '1',

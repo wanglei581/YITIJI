@@ -235,6 +235,14 @@ async function main(): Promise<void> {
       data: { createdAt: new Date(0) },
     })
 
+    // 本节验的是 Order.taskStatus 与 PrintTask.status 的镜像关系，不是付费门控。
+    // claim 只领已付款订单（写死，无 env 开关），所以夹具先按线下收款入账。
+    const claimedBeforePay = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${terminalToken}`)
+    if (claimedBeforePay.length !== 0) {
+      fail(`unpaid order must not be claimable: ${JSON.stringify(claimedBeforePay.map((c) => c.taskId))}`)
+    }
+    await orderStatus.markPaid(statusPrint.orderId, { paymentSource: 'offline' })
+
     const claimed = await terminals.claimTasks(
       terminalId,
       { maxTasks: 1 },
@@ -589,8 +597,20 @@ async function main(): Promise<void> {
         }
       }
       const svc = new mod.OrderStatusService(prisma, audit)
-      const unpaidOrder = await prisma.order.findUnique({ where: { printTaskId: statusPrint.taskId } })
-      if (!unpaidOrder) return false
+      // 单独造一笔未支付单：statusPrint 那笔已在 claim 用例里按线下收款入账
+      // （claim 只领已付款订单），复用它会让「拒绝退未支付单」这条契约恒真失效。
+      const refundProbe = await printJobs.create(
+        {
+          fileUrl: await seedPdfFixture('refund-probe', 2),
+          fileMd5: 'sha256-order-refund-probe',
+          fileName: '退款契约探针.pdf',
+          params: PRINT_PARAMS,
+        },
+        { endUserId: null, terminalId },
+      )
+      taskIds.push(refundProbe.taskId)
+      const unpaidOrder = await prisma.order.findUnique({ where: { printTaskId: refundProbe.taskId } })
+      if (!unpaidOrder || unpaidOrder.payStatus !== 'unpaid') return false
       let rejectsUnpaidRefund = false
       try {
         await svc.refund(unpaidOrder.id, { reason: 'x' })

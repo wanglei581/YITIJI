@@ -22,7 +22,6 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-refund-terminal-admin-secret-01
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-refund-terminal-action-secret-0123456789'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-refund-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-refund-payment-session-secret-0123456789'
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
 if (process.env['NODE_ENV'] === 'production') {
   console.error('  FAIL verify:refund-idempotent 不得在 NODE_ENV=production 运行（沙箱模拟支付被禁用）')
   process.exit(1)
@@ -338,13 +337,13 @@ async function main(): Promise<void> {
       safeLinearization && raceOrderAfter?.payStatus === 'refunded',
       '7b. retry/refund 最终仅落入退款先或 retry 先的安全状态',
     )
-    const previousPaidGate = process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+    // 旧开关已删除；塞回 false 用于反向证明它不再有任何效果。
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
     const claimRefundRace = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = previousPaidGate
+    delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
     assert(
       claimRefundRace.length === 0 && raceOrderAfter?.payStatus === 'refunded',
-      '7c. refund 态订单在 PRINT_REQUIRE_PAID_BEFORE_CLAIM=false 时仍不可 claim',
+      '7c. refund 态订单不可 claim（旧开关塞回 false 也无效）',
     )
 
     // ── (8) C5-3 出纸门控回归：退款态始终不可 claim ───────────────────────
@@ -363,26 +362,27 @@ async function main(): Promise<void> {
     const claimRefunding = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
     assert(claimRefunding.length === 0, '8b. refunding 订单的打印任务不可 claim')
 
-    // 付费门控默认关闭只放行未支付历史单，不得放宽退款态的拒领规则。
-    const unpaidWhenPaidGateDisabled = await printJobs.create(
+    // 旧开关塞回 false 后：未支付单与退款态都不可 claim，三者一起保持 pending。
+    const unpaidWhenLegacyEnvSet = await printJobs.create(
       { fileUrl: await seedPdf('gate-unpaid'), fileName: 'gate-unpaid.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
     )
-    taskIds.push(unpaidWhenPaidGateDisabled.taskId)
+    taskIds.push(unpaidWhenLegacyEnvSet.taskId)
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
-    const claimWithPaidGateDisabled = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    const [afterRefundedClaim, afterRefundingClaim] = await Promise.all([
+    const claimWithLegacyEnvSet = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const [afterRefundedClaim, afterRefundingClaim, afterUnpaidClaim] = await Promise.all([
       prisma.printTask.findUnique({ where: { id: created.taskId } }),
       prisma.printTask.findUnique({ where: { id: created2.taskId } }),
+      prisma.printTask.findUnique({ where: { id: unpaidWhenLegacyEnvSet.taskId } }),
     ])
     assert(
-      claimWithPaidGateDisabled.length === 1 &&
-        claimWithPaidGateDisabled[0]?.taskId === unpaidWhenPaidGateDisabled.taskId &&
+      claimWithLegacyEnvSet.length === 0 &&
         afterRefundedClaim?.status === 'pending' &&
-        afterRefundingClaim?.status === 'pending',
-      '8c. PRINT_REQUIRE_PAID_BEFORE_CLAIM=false 时退款态仍不可 claim，未支付订单保持可 claim',
+        afterRefundingClaim?.status === 'pending' &&
+        afterUnpaidClaim?.status === 'pending',
+      '8c. 旧开关塞回 false 无效：未支付与退款态一律不可 claim，任务保持 pending',
     )
-    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
+    delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
 
     console.log(`\n  ✅ verify:refund-idempotent 全部通过（${passed} checks）`)
   } finally {

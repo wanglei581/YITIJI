@@ -161,9 +161,11 @@ const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'pri
 const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
 /**
- * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启。
- * 与 PRINT_REQUIRE_PAID_BEFORE_CLAIM 同一模式：关闭时只记录不拦截，
- * 便于先观察真实流量中有多少文件绕过了 material-check，再决定何时收紧。
+ * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启；
+ * 关闭时只记录不拦截，便于先观察真实流量中有多少文件绕过了 material-check，
+ * 再决定何时收紧。生产由 production-runtime-gates 强制为 true。
+ *
+ * 注意：出纸付费门控已不再是同类开关 —— 它已被删除，claim 无条件只领已付款订单。
  */
 export function requirePiiScanBeforePrint(): boolean {
   return process.env['PRINT_REQUIRE_PII_SCAN'] === 'true'

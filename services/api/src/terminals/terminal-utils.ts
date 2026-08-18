@@ -150,13 +150,6 @@ export function makeBindCode(): string {
 }
 
 /**
- * C5-3 出纸门控（paid 后才 claim 出纸）。默认关闭，由 PRINT_REQUIRE_PAID_BEFORE_CLAIM=true 显式开启。
- */
-export function requirePaidBeforeClaim(): boolean {
-  return process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] === 'true'
-}
-
-/**
  * Fail closed: the test print task is available only to an explicitly opted-in development process.
  */
 export function shouldSeedTestPrintTask(): boolean {
