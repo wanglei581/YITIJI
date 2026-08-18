@@ -1,5 +1,27 @@
 # 当前开发进度
 
+2026-08-18 完成 **内容信息库端到端链路实测 + 三处修复（分支 `claude/content-pipeline-e2e`，基于 `origin/main@7d6feaf31`，未合入、未部署）**：新增 `pnpm --filter @ai-job-print/api verify:content-pipeline-e2e`（117 断言，真实 HTTP + 真实 Prisma + 真实 Guard）。
+
+**为什么要跑这一趟。** 岗位 / 招聘会 / 政策三个库是一体机的主内容，机器摆出去、求职者点进「岗位信息」看到空列表，就等于这台机器没用。同日合入的两道发布闸门（`content-trust` / `publish-completeness`）各自都有**纯内存假 Prisma** 的单元门禁，但没有任何门禁在真实数据流上证明过两件事：该拦的拦住了、**不该拦的放行了**。只验拒绝等于可能把发布焊死而没人发现 —— 这正是本次补上的判别力。
+
+**结论先行：链路本身是通的，不是坏的。** 完整链路（建机构 → 标内容可信 → 配数据源 → 导入 → 审核 → 发布 → 一体机可见 → 浏览/跳转落库）对三类内容各跑通一遍，117 断言全绿。**信息库空不是因为链路断，是因为没录数据。** 因此本次没有为了「显得有产出」去改任何一段本来正确的代码。
+
+**6 种 accessMode × 3 类内容逐格实测**（矩阵与运营操作说明见 [../operations/content-ingestion-operator-guide.md](../operations/content-ingestion-operator-guide.md)）：`manual` 三类全通；`excel` / `csv` 岗位与招聘会全通（**四格各自跑了一遍，没有用「代码路径相同所以应该也通」推断**）；`webhook` 只收岗位，推招聘会字段被 DTO 白名单 400 拒收（不静默吞），与 `partner-capabilities.ts` 里「尚无招聘会 Webhook，先 fail-closed」的注释一致；`api` 判**半通** —— 落库半段实测通过（映射 / upsert / 内容变化强制回 pending），内网回环被 SSRF 守卫拒绝并写进 SyncLog，但「真能从第三方公网 API 拉到数据」本机离线**判别不了**，如实标注未验；`json` 判**只有壳** —— `accessMode` 闸门放行 `['excel','csv','json']`，而解析器只认 `.xlsx`/`.csv`，没有任何 JSON 解析器。政策的文件导入 / API 三格标**不适用**并写明理由（条目量小、正文长、要人工核对官方原文、政策表本就不在数据源体系里、无数据源外键），**不建议为凑齐矩阵新增入口**（CLAUDE.md §8.1）。
+
+**修的三处，都属于「把能力缺失伪装成用户的问题」，不是新增能力。** ① `.json` 上传原先落到 catch 阶梯的兜底档，报 `EXCEL_EMPTY: Excel/CSV 文件为空或格式不正确` —— 运营会照着去查文件是不是空的，而真因是这个格式压根没有解析器，且没有任何地方说明受支持的是哪两种；补 `UNSUPPORTED_FILE_FORMAT` 分支并点名 `.xlsx` / `.csv`。② `confirmExcelImport` 把 `syncMode` 硬编码成 `'excel'`，CSV 导入在 Partner「同步日志」页伪装成 Excel 导入，运营排查「这批数据是怎么进来的」会被误导；改为 `importSyncModeOf(fileName)`，与 `loadPartnerImportRows` 的分流判据同源（分开写迟早漂移成「按 xlsx 解析、却记成 csv」）。③ Partner 数据源页把「字段映射」按钮只发给 `accessMode === 'excel'` 的源，**后端完全支持 CSV，但 csv 源在控制台上没有任何入口**（半通）；改为 `FILE_IMPORT_ACCESS_MODES = ['excel','csv']` —— **刻意不含 json**，后端没有解析器，放进去点了必然失败，那是伪造能力，比少一个入口更糟。
+
+**先破后立。** 4 条新断言在未修复代码上全红并贴出实测输出（`EXCEL_EMPTY` 实际文案、`syncMode=excel`、UI 仍以单值 `=== 'excel'` 判断），修复后 117/117 全绿。**另做三次变异验证，证明闸门断言真的有判别力**（此前只有「拒绝」方向被覆盖）：摘掉 `assertOrgContentTrustActive` → 3 红，其中「未核验机构的内容不出现在一体机前台」直接报**发生泄漏**，精确复现 8/17 事故形态；摘掉 `assertPublishFieldsComplete` → 3 红；把判据写严（`'active'` → `'verified'`，模拟**该放行的被拦**）→ **13 红，横跨岗位/招聘会/政策全部三类内容** —— 这个方向是既有门禁完全没有覆盖的。变异后源码已还原，工作区仅剩两处有意修改。
+
+**本机环境的可判别性问题（解决而非绕过）。** 本机无 Redis，而 `RedisModule` 在 `REDIS_URL` 缺省时直接抛错、应用起不来；指向死端口又会让 webhook 的 nonce 防重放在 ~10s 后以 MaxRetriesPerRequestError 失败，「webhook 能不能进数据」就退化成环境噪声而不是结论。新增 `scripts/support/inmemory-redis-server.ts`（进程内 RESP2 子集，**不实现 Lua、遇未知命令显式报错，绝不静默假装成功**），把这一格从不可判别变成可判别。配套的 `verification-api-server.ts` 有一处刻意的装配顺序：**先摘掉 `REDIS_URL` 再 import AppModule，import 完再塞回去** —— BullMQ 相关模块在**模块加载期**读该变量决定「注册队列」还是「inline 回退」，而 `REDIS_CLIENT` 工厂在 **DI 实例化期**才读；不这么做，队列会连上不支持 Lua 的桩，每几秒吐一屏 BullMQ 脚本源码把验证输出淹掉（第一版实测就是这样）。因此 `api` 模式按仓库既有口径（`verify-job-sync.ts` 的确定性 fetch 边界）验 inline 路径，**队列投递不在本门禁范围，已在报告与文档中标注**。
+
+**运营交付物。** 新增 [../operations/content-ingestion-operator-guide.md](../operations/content-ingestion-operator-guide.md)：六种接入方式各写一遍（在哪个后台的哪个页面、前置条件、失败提示原文）、6×3 覆盖矩阵含每个「不适用」格子的理由、失败提示速查表。**重点回答了手动录入的 `externalId` / `sourceUrl` 该填什么**：`externalId` 用系统自动生成的 `MANUAL-<时间戳>-<随机>`（含义是「本机构手工台账第 N 条」，不声称来自任何第三方系统，是诚实的），**禁止**手抄一个像其他平台编号的值；`sourceUrl` 的判据只有一条 —— 求职者打开它之后真的能看到这个岗位并完成投递吗，**三种合法填法之外若都没有，说明这是纯线下岗位，应走「线下机构 / 线下岗位」那条线（`OfflineJob.externalUrl` 本就可空），而不是硬塞进岗位库编一个链接** —— 那与 8/17 事故同性质。
+
+**⚠️ 需要有 workflow 权限的人补一行 CI（本次未改 `.github/workflows/**`，也未在 `scripts/ci-gate-exemptions.json` 登记豁免糊绿）**：`verify:ci-gate-coverage` 现在会红，提示新门禁未被任何 CI job 执行。应在 `ci.yml` 的 `Verify suites` 步骤内（**必须在「Prepare fresh SQLite db」之后** —— 该门禁 import `services/api/src`，放前面会报 `Cannot find module '../generated/prisma/client'`）加一行：
+
+```
+VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:content-pipeline-e2e
+```
+
 2026-08-18 完成 **过时文档订正（[PR #703](https://github.com/wanglei581/YITIJI/pull/703)，仅文档，未改任何代码）**：`wiring-map.md`、`codex-handoff-plan-2026-08.md`、`2026-08-11-backend-buildout-spec.md` 三份成稿于 2026-08-11，**所据分支早于 PR #570**（2026-08-10 合入 main），此后主干陆续实现了它们判定为「缺 / 不存在 / 后端零实现」的能力，文档没跟上。因 `wiring-map` §11 是施工清单、且明文要求「一律引用 buildout-spec，不另出方案」，照原文开工等于去重造已存在的端点。对 `origin/main@85eb7a3b4` 逐条取证后订正 11 处已反转的存在性判定：`GET /me/pending-tasks`（`83588b8f1`/#570）、`POST /print/jobs/claim-pickup`（`c61b7e06f` 08-12）、Agent 四类不确定出纸结果已 fail-closed 成 `PRINT_JOB_UNCONFIRMED`（`fbc762dd0`/#570，有 `verify-print-monitor-truth.ts` 覆盖）、`/orders/:id/redeem` 打印订单止血闸（#683）、`GET /jobs/requirement-stats`（#636）、`POST /policies/eligibility-check` + `GET /policies/eligibility-questions`（#631/#645）、`GET /policies` 真分页、`GET /job-fairs` 新增 keyword 且分页 bug 已修（#652）、`POST /kiosk/feedback` 匿名提交面（#612）。**其中三条是「形态不同」而非「存在与否」，比单纯的存不存在更危险**（照旧文档写会编译得过但拿不到数据）：端点名是 `requirement-stats` 不是 `requirement-counts` 且不回岗位标识、`claim-pickup` 的 body 只有 `{code}`（终端走 `x-terminal-id` 头）、政策条件核对路径不带 `:id`。订正一律「改成当前事实 + 保留旧结论与变化时点」，不抹掉旧判断。未反转的条目（四个 `kiosk/*` 空壳桩、`redactedFileId` 恒 null、服务端会话钟零实现、`FileProvenance`/`OrderQuote`/`BenefitReservation` 全无、`GET /policies/:id`、站点配置下发面、A1–A5 规则链）复核后仍成立，未动。验证：`verify:repository-integrity`、`verify:compliance-copy` 均通过（后者只扫 `apps/*/src`，故另对新增行单独核了 SSOT 全部 7 项禁词，零命中）。**⚠️ 连带发现（未处理，待裁决）**：[PR #600](https://github.com/wanglei581/YITIJI/pull/600)「remove fake pickup claim flow」创建于 2026-08-11，要删除 `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx` 与 `/print/pickup-claim` 路由并加反回归门禁，其前提「该页调用不存在的接口」**已于次日（08-12）失效** —— 端点现在真实存在，页面在 main 上仍有路由且调的就是它。**该 PR 若按原样合入会删掉一个正在工作的功能。**
 
 2026-08-18 修复 **文件端点内部账号身份不回源（分支 `claude/files-internal-auth-db-backed`，基于 `origin/main@0eea1661b`，未合入、未部署）**。

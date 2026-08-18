@@ -55,6 +55,21 @@ const SOURCE_KIND_OPTIONS: { value: SourceKind; label: string }[] = [
 
 type SourceMode = 'api' | 'webhook' | 'excel'
 
+/**
+ * 走「上传文件 + 字段映射」这条导入流程的接入方式。
+ *
+ * 判据取自服务端:`jobs-excel.service.ts` 的 preview / confirm 都放行
+ * `['excel','csv','json']`,而真正的解析器 `partner-import-file.ts`
+ * 只认 `.xlsx` 与 `.csv`。所以这里**只列 excel 与 csv**:
+ *
+ *   - 漏掉 csv 的代价(修复前的实际状态):后端完全支持 CSV,但本页把「字段映射」
+ *     按钮只发给 `accessMode === 'excel'` 的源 —— 一个 csv 源建出来之后
+ *     在控制台上没有任何入口,运营只能干瞪眼。
+ *   - 把 json 加进来的代价:后端没有 JSON 解析器,点进去必然失败。
+ *     那属于伪造能力,比少一个入口更糟。json 要能用,得先有解析器。
+ */
+const FILE_IMPORT_ACCESS_MODES: readonly string[] = ['excel', 'csv']
+
 const MODE_OPTIONS: Array<{
   value: SourceMode
   title: string
@@ -452,7 +467,7 @@ export default function SourcesPage() {
                       <div className="flex flex-col gap-1">
                         <div className="flex gap-2">
                           {/* 「测试连接」已移除:后端暂无连通性测试端点,不放死按钮(审计修复) */}
-                          {s.accessMode === 'excel' && (
+                          {FILE_IMPORT_ACCESS_MODES.includes(s.accessMode) && (
                             <button
                               className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
                               type="button"
