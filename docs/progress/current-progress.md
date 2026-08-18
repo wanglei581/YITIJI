@@ -1,5 +1,25 @@
 # 当前开发进度
 
+2026-08-18 完成 **V6 壳批 0：六个服务域 hub +「我的」并入 V6 暖纸壳（分支 `claude/v6-shell-batch0`，基于 `origin/main@15d9333d9`，未合入、未部署）**。
+
+**问题形态。** 首页 `/` 与 `/print-scan` 已是 V6 暖纸壳，但 `isV6Route` 是 `KioskRoot.tsx:112` 两个硬编码字面量比较，于是**从首页点进任何一个服务域，第一跳立刻掉回旧的深藏青壳** —— 首页承诺的观感当场被推翻。1080×1920 实测像素取证（顶栏中点 / 底栏中点）：改前 `/jobs-service` 为 `rgb(49,66,83)` / `rgb(14,34,56)`，`/`与`/print-scan` 为 `(254,252,246)` / `(255,253,247)`；改后八条路由全部为后者。**页面主体本来就是暖纸（`bg-canvas`），深色的只有顶栏与底栏** —— 所以这是一次纯壳修复，不是改版。
+
+**改法：白名单从散落判断收敛成一张具名表。** 新增 `V6_SHELL_ROUTES: Map<string, V6ShellRoute>`，是「哪些路由是 V6」的唯一真值，加一条 V6 路由只改这张表。表项三个字段各自对应一个真实差异，不是配置膨胀：`domainTitle`（`null` = 该页自带页内 `KioskPageHeader` 承载域名，顶栏只显示「职易达」，避免同屏 76px 内两个同名标题；字符串 = 该页无页内页头，域名必须由顶栏承载）、`withTerminalCode`（首页是品牌页不挂机号，其余页保留，运维要能一眼读出是哪台机器）、`brandReturnsHome`（只给没有页内返回键的页，避免和页内返回重复）。`/print-scan` 与 `/` 的顶栏输出**逐字未变**。
+
+**「我的」判定为应当纳入批 0。** 它虽不是服务域 hub，但一是底部导航常驻入口、首跳可达，二是页面主体同样已是暖纸、只有壳不一致，三是**它的 `h1` 是 `kprofile-sr-only`（实测 1×1px），没有可见页内标题**，因此按 `domainTitle: '我的'` 由顶栏承载域名 —— 与 `/print-scan` 同形态。若把它留在批外，底部导航自己的「我的」标签会跳进深色壳，正是本轮要消除的不一致。
+
+**门禁复核（逐条实跑，不靠推断）。** ① `verify-fusion-baseline.mjs:162` 的 106 路由**等式**：批 0 不增删路由，未触发，实跑通过。② `verify-visual-evidence-manifest`：五个 `*-service` 在 manifest 里是 `productionOnly` / `NO_INDEPENDENT_PROTOTYPE`、`targetIds: []`，**没有截图对，不存在补拍义务**；`/profile` 是 target 14（`PROFILE_DEFER`）；该门禁是对 TS fixture 的静态形状契约，**无 sha256/mtime 变更侦测**，改页面不会让它转红 —— 实跑通过。③ `verify:kiosk-visual-unity` 字面量锁 `KioskRoot` 的 `visualTheme` / `presentation` / `hideHeader` / `hideBottomNav` / `useTerminalDeviceStatus(true)` 等表达式，本次一处未动；新增 CSS 零裸 hex —— 通过。④ `verify-fusion-shell.mjs:276` 字面量锁 `className={...isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'...}`，模板串结构原样保留 —— 通过。
+
+**Playwright 四支的真实影响与之前的判断不同，如实记录。** 事前判断是「w2/w3/w5/w6 锚在旧类名上、换皮会让它们失效」；**逐文件核对后不成立**：四支中没有任何一条断言锚在 `.ui-kiosk-topbar` / `.ui-kiosk-nav` / `v6-runtime-shell` / 品牌文案上，w6 对六个 hub 的 marker 是 `h1:text-is("岗位信息")` 这类**页内**标题，而批 0 保留了五个 hub 的页内 `KioskPageHeader`，故 **marker 逐条原样通过，未改动、更未删除任何既有断言**。
+
+**先破后立（两条新断言，均先在未修复代码上贴出红）。** ① **行为断言**：`fusion-w6-routes.spec.ts` 新增 `expectV6ShellConsistency`，对全部 106 条路由**双向**校验 —— 白名单内必须真的挂上 `v6-runtime-shell` 且顶栏相对亮度 > 0.6（按亮度分辨暖纸/深藏青，不锁具体色值，避免把断言写成配色快照），白名单外不得被染色。把 `KioskRoot.tsx` 单独还原成 `origin/main` 后实跑：`/jobs-service`、`/resume-service`、`/profile` **3 红**（报「V6 壳归属必须与 KioskRoot 的 V6_SHELL_ROUTES 一致（期望 true）」），同批的非 V6 路由 `/jobs` **通过** —— 证明反方向不误伤。② **跨文件同源静态断言**：`verify-fusion-shell.mjs` 用 TS AST 抽取 `KioskRoot` 的 `V6_SHELL_ROUTES` 键与 w6 fixture 的 `V6_SHELL_ROUTE_PATTERNS`，`deepEqual` 校验两张表逐条一致，并禁止 `KioskShell` 绕开表对 V6 路由另写 `pathname === '/xxx'`。未修复代码上报 `KioskRoot.tsx must declare V6_SHELL_ROUTES`。
+
+**1080×1920 比例实测（协调方要求：不能只换配色）。** 内容填充率（正文最后一个内容叶子的底边 / 可视内容高）：`/resume-service` 100.9%、`/jobs-service` 101.1%、`/profile` 98.6%、`/fairs-service` 87.5%、`/policy-service` 87.4%、`/interview-service` 85.5%。**盘点报告里 `/print/upload` 下方约 55% 纯空白的比例失衡，在这六页上不存在**（那是打印域页面，不在批 0 范围）。触控实测：八条路由**零个** <48px 的可点目标；主操作（能力卡 ~200px、快捷入口 96px、返回键 72px）全部远超 56px。
+
+**登记两项，只报不修。** ① **末行孤卡 + 尾部空白**：`fairs` / `interview` / `policy` 三页能力卡为奇数，二列网格末行只剩一张卡、右侧留空，页尾另有约 12–14.5%（210–245px）空白。这属于**页面体**裁量，原型（`36/37/38-*-hub.html`）给的目标形态是 hero + 收敛条目数的网格，与现有 editorial 模板不是一个骨架，**不在「只换壳」的批 0 范围**，建议作为批 1 单独评估。② **原型 `34-jobs-hub.html` 的「三张类型卡是假入口」结论不适用于生产**：该注释断言 `?jobType=fulltime|intern|parttime` 三个 URL 进去列表完全一致。生产链路已逐段取证 —— `JobsPage.tsx:24` 有 `VALID_CATEGORIES` 白名单、`:130` 把 `category` 传给服务端，`services/api/src/jobs/jobs-shared.ts:384` 的 `buildPublishedJobWhere` 确实按 `category` 落到 Prisma `where`。**生产是真筛的，不要照着原型注释删这三个入口。**
+
+**验证。** `verify:fusion-shell` / `fusion-home` / `fusion-w2` / `w3` / `w5` / `w6` / `fusion-baseline` / `kiosk-visual-unity` / `visual-evidence-manifest` / `v6-type-floor` / `home-narrow-visual-balance` / `runtime-terminal-identity` / `kiosk-feedback-entry` / `fusion-youth-foundation` / `scan-input-safety` 全通过；`shared` / `ui` / `kiosk` typecheck 通过；kiosk lint 0 error（9 条既有 react-refresh warning，均不在本次改动文件）。`verify:fusion-w4` 的「W4 scope」检查按设计只看 `git diff --name-only HEAD` + untracked，**是未提交工作区守卫**，CI 干净检出下 `changes` 为空恒不触发；提交后本地复跑亦通过。改动 5 个文件。
+
 2026-08-18 新增 **上线种子内容录入清单（分支 `claude/seed-content-checklist`，基于 `origin/main@a26eae3ca`，纯文档，未改任何代码）**：[../operations/seed-content-entry-checklist-2026-08.md](../operations/seed-content-entry-checklist-2026-08.md)。承接上一条「链路是通的，空是因为没录数据」的结论，给出 30 条政策 + 20 场招聘会的可执行录入清单：字段字典与合法取值、前置条件、待录表格模板（示范行**只给结构、逐格标注「示例·需替换」**，不含任何编造的政策名称/文号/金额/日期/链接）、录入方式推荐与验收步骤。
 
 **澄清了一处运营最容易搞错的差异**：政策与招聘会的发布闸门**不一样**。招聘会过两道（`assertOrgContentTrustActive` + `assertPublishFieldsComplete`，`jobs-admin.service.ts:192-210`，10 个必填字段、`sourceUrl` 必须 http/https）；**政策只过第一道**（`policies.service.ts:293-311` 无完整性校验调用，`PolicyPost` 也不在 `publish-completeness.ts` 的字段表里），因此政策的 `externalUrl` / `externalId` 可空且不影响发布——这是刻意设计（很多地方政策只有红头文件、没有网页原文，也不是每条都有发文字号，schema 注释明确「不得伪造」）。**录入方式给单一推荐：两类都走 `manual` 手动录入**——政策本就不在数据源体系里（无数据源外键，excel/csv/api/webhook 四种对政策全不适用），20 场招聘会摊不平 Excel 的建源+配映射成本，且手动录入的 `externalId` 由系统生成不会填错；`json` 只有壳、`api` 半通、`webhook` 只收岗位。
