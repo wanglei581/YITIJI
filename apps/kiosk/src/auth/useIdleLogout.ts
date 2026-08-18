@@ -80,6 +80,12 @@ export function useIdleLogout(
   useIdleTimer({
     timeoutMs: triggerMs,
     // 覆盖登录 + 匿名；屏保接管（screensaverActive）时关闭，避免与 useScreensaverController 双触发。
+    //
+    // 刻意不在这里用「清场是否空操作」关计时器：enabled 只在渲染时求值，而
+    // sessionStorage 的写入不会触发重渲染。曾经这样写过，结果是用户在首页留下
+    // 敏感会话后计时器不再武装，该清的一次也没清（回归用例
+    // 「standby countdown still fires when sensitive session data is present」抓到）。
+    // 空操作判定统一放在 KioskPrivacyGuard.startWarning，在计时器到点那一刻读实时状态。
     enabled: !busy && !onScreensaverRoute && !onSessionTimeoutRoute && !screensaverActive,
     onIdle: handleIdle,
   })
