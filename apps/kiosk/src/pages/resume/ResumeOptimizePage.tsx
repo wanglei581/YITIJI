@@ -373,21 +373,40 @@ export function ResumeOptimizePage() {
 
             {exportError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{exportError}</p>}
 
+            {/*
+              R10：标题不得先说「已生成」再由正文承认没有真实文件。
+              没有 signedUrl 就是没有产物 —— 标题必须先说清这一点，
+              否则用户读到的第一行就是一句假话（CLAUDE.md §9 不伪造能力）。
+            */}
             {exported && (
-              <Card className="resume-lightflow__export-card border-success-bg bg-success-bg/60 p-5">
-                <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
-                  <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
-                  优化版{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 已生成
+              <Card className={[
+                'resume-lightflow__export-card p-5',
+                exported.signedUrl ? 'border-success-bg bg-success-bg/60' : 'border-warning-bg bg-warning-bg/60',
+              ].join(' ')}>
+                <p className={[
+                  'flex items-center gap-2 text-base font-semibold',
+                  exported.signedUrl ? 'text-success-fg' : 'text-warning-fg',
+                ].join(' ')}>
+                  {exported.signedUrl
+                    ? <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
+                    : <AlertCircleIcon className="h-5 w-5" aria-hidden="true" />}
+                  {exported.signedUrl
+                    ? `优化版${EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 已生成`
+                    : `优化版${EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 未生成真实文件`}
                 </p>
-                <p className="mt-1 text-sm text-success-fg">
+                <p className={['mt-1 text-sm', exported.signedUrl ? 'text-success-fg' : 'text-warning-fg'].join(' ')}>
                   {exported.filename}
                   {exported.pageCount > 0 ? ` · ${exported.pageCount} 页` : ''}
                   {exported.sizeBytes > 0 ? ` · ${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB` : ''}
                 </p>
                 {!exported.signedUrl && (
-                  <p className="mt-1 text-xs text-warning-fg">演示模式未生成真实文件，接入后端后可下载或打印。</p>
+                  <p className="mt-1 text-xs text-warning-fg">
+                    上面这个文件名只是本次导出的命名，没有对应的真实文件可下载或打印；接入真实 AI 服务后才会生成。
+                  </p>
                 )}
-                <p className="mt-1 text-xs text-success-fg/80">文件短期保留后自动清理，本机不长期保存你的简历。</p>
+                {exported.signedUrl && (
+                  <p className="mt-1 text-xs text-success-fg/80">文件短期保留后自动清理，本机不长期保存你的简历。</p>
+                )}
               </Card>
             )}
         </div>

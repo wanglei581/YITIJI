@@ -1,8 +1,12 @@
 // ============================================================
 // AI Mock Adapter — Phase 7 AI Service Layer
 //
-// 返回与页面原有 mock 结果一致的数据结构。
 // mock 模式下不调用任何真实 AI 服务。
+//
+// ⚠️ 简历诊断链（parse / report / optimize / compare）在本适配器里**一律拒绝**，
+//    不返回任何结果 —— 见下方 `rejectMockMode` 处的事故说明。
+//    只有「AI 简历生成」还会返回结构化结果，因为它逐字复制用户自己填的内容，
+//    不对用户的材料做任何判断，不存在「假装读过你的简历」这回事。
 // ============================================================
 
 import type {
@@ -15,8 +19,6 @@ import type {
   ResumeVoiceTranscribeResponse,
   ResumeParseRequest,
   ResumeParseResponse,
-  ResumeReport,
-  ResumeOptimizeModule,
   ResumeOptimizeResponse,
   AssistantChatRequest,
   AssistantChatResponse,
@@ -24,49 +26,46 @@ import type {
 } from '@ai-job-print/shared'
 import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 
-// ──────────────────────────────────────────────────────────────
-// Mock 数据（原 ResumeParsePage.mockReport / ResumeOptimizePage.OPTIMIZE_MODULES）
-// ──────────────────────────────────────────────────────────────
-
-const MOCK_REPORT: ResumeReport = {
-  sections: [
-    { key: 'basic',          label: '基础信息完整度', score: 8, maxScore: 10 },
-    { key: 'objective',      label: '求职目标清晰度', score: 6, maxScore: 10 },
-    { key: 'experience',     label: '经历表达清晰度', score: 6, maxScore: 10 },
-    { key: 'quantification', label: '成果量化程度',   score: 5, maxScore: 10 },
-    { key: 'keyword',        label: '岗位关键词覆盖', score: 5, maxScore: 10 },
-    { key: 'readability',    label: '版式与可读性',   score: 7, maxScore: 10 },
-  ],
-  suggestions: [
-    '项目描述建议使用"负责、主导、实现"等动词开头，尽量量化成果',
-    '技能模块建议补充岗位相关技术栈关键词，提升简历匹配度',
-    '个人简介建议精简至 2-3 句，突出核心优势',
-    '工作经历建议每条控制在 3-5 点，避免流水账式描述',
-  ],
+/**
+ * 演示模式拒绝错误。
+ *
+ * `code` 必须正好是 `'MOCK_MODE'`：`ai/aiOutage.ts` 的 `AI_OUTAGE_CODES` 只认这个值，
+ * 别的码点不亮既有降级 UI。与 jobFit / careerPlan / selfAssessment 三个 service
+ * 各自定义 `*ApiError` 的写法一致；刻意不复用 `httpAdapter.ApiHttpError`，
+ * 那会把 `client.ts`（读 `import.meta.env`）拖进本模块的运行时依赖。
+ */
+export class AiMockModeError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message)
+    this.name = 'AiMockModeError'
+  }
 }
 
-const MOCK_OPTIMIZE_MODULES: ResumeOptimizeModule[] = [
-  {
-    title: '个人简介表达优化',
-    before: '热爱工作，积极向上，有较强的学习能力和团队合作精神。',
-    after: '建议改为具体可量化的表达，如：具有 X 年前端开发经验，熟练掌握 React、TypeScript，参与过中型商业项目全程开发，注重代码质量与用户体验。',
-  },
-  {
-    title: '项目经历表达优化',
-    before: '参与了公司内部系统的开发工作，完成了部分功能。',
-    after: '建议改为具体职责+成果，如：主导前端模块开发（React + Vite），实现用户管理、权限控制等核心功能；优化页面加载流程，系统响应时间降低约 40%。',
-  },
-  {
-    title: '技能关键词建议',
-    before: '已有：React、JavaScript、CSS。',
-    after: '建议补充：TypeScript、Vite、Git、RESTful API 等关键词，与目标岗位方向更好匹配（根据实际求职方向按需添加）。',
-  },
-  {
-    title: '排版建议',
-    before: '经历条目格式不统一，字体层级不清晰，段落间距偏小。',
-    after: '建议统一使用"公司名 | 职位 | 时间段"格式；正文使用无衬线字体；段落间距建议 1.5 倍行距，整体视觉更清爽专业。',
-  },
-]
+/**
+ * 简历诊断链在演示模式下的唯一出路：如实拒绝。
+ *
+ * 事故原样（2026-08-18 走查）：本适配器过去对 parse / getResumeRecord /
+ * getResumeOptimize 直接 `return` 一份写死的成功结果。于是 8 份完全不同的文件
+ * —— 包括一份打印机说明书和一份加密 PDF —— 全部拿到同一份 37/60、同样六个分项
+ * 8,6,6,5,5,7、同样四条建议；两张报告像素比对只差页眉时钟和雷达图动画一帧。
+ * 说明书那次给出的建议是「项目描述建议使用『负责、主导、实现』等动词开头」。
+ *
+ * 最伤的一处在 `/resume/optimize/compare`：一句写死的演示文案
+ * 「热爱工作，积极向上……」被挂上 `E1 你的材料` 证据标、写成「你写的（原件不会被改）」。
+ * 用户从来没写过那句话 —— 前面所有诚实的免责声明，在这一句面前一起失效。
+ *
+ * 自我探索 / 岗位匹配 / 职业规划 / 模拟面试在非 http 模式都是这么拒绝的，
+ * 对应的降级 UI（`AiTaskRegion` 的 blocked / result-unavailable）早已写好并验证过。
+ * 简历链接上它即可，不需要新页面。
+ */
+const rejectMockMode = <T>(what: string): Promise<T> =>
+  Promise.reject(
+    new AiMockModeError('MOCK_MODE', `演示模式不提供${what}，请连接真实 AI 服务`, 0),
+  )
 
 // ──────────────────────────────────────────────────────────────
 // 工具
@@ -82,49 +81,26 @@ const nextTaskId = () => `mock-ai-${Date.now()}-${++taskCounter}`
 // ──────────────────────────────────────────────────────────────
 
 export const aiMockAdapter = {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async submitResumeParse(_req: ResumeParseRequest, _token?: string | null): Promise<ResumeParseResponse> {
-    // 极短延迟，不干扰页面已有的步骤动画时序
-    await delay(80)
-    return {
-      taskId: nextTaskId(),
-      status: 'completed',
-      providerName: 'mock',
-      report: MOCK_REPORT,
-    }
+  // ── 简历诊断链：演示模式一律拒绝，不返回任何「读过你的简历」的结论 ──────
+  // 见文件顶部 `rejectMockMode` 的事故说明。这三个方法是整条链
+  // （解析 → 报告 → 优化 → 逐条对照）的全部数据来源，堵住它们就够了。
+
+  submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse> {
+    void req
+    void token
+    return rejectMockMode('简历解析与诊断')
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getResumeRecord(taskId: string, _access?: ResumeReadAccess): Promise<ResumeParseResponse> {
-    await delay(80)
-    return {
-      taskId,
-      status: 'completed',
-      providerName: 'mock',
-      report: MOCK_REPORT,
-    }
+  getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse> {
+    void taskId
+    void access
+    return rejectMockMode('简历诊断报告')
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getResumeOptimize(taskId: string, _access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
-    await delay(120)
-    return {
-      taskId,
-      status: 'completed',
-      providerName: 'mock',
-      modules: MOCK_OPTIMIZE_MODULES,
-      // 阶段2B:演示用结构化优化版简历(页面据 providerName 显示演示标记)
-      optimizedResume: {
-        basic: { name: '演示用户', city: '青岛' },
-        intention: { position: '前端开发工程师', city: '青岛' },
-        summary: '具有扎实前端基础的求职者,熟悉 React 与组件化开发,注重代码质量与用户体验。(演示内容)',
-        education: [{ school: '演示大学', major: '计算机科学与技术', degree: '本科', period: '2021-2025', description: '主修核心课程,成绩优良。(演示内容)' }],
-        experience: [{ company: '演示科技公司', role: '前端实习生', period: '2024.07-2024.12', description: '参与官网改版,负责组件库维护与页面性能优化。(演示内容)' }],
-        projects: [],
-        skills: ['JavaScript', 'React', 'CSS'],
-        certificates: [],
-      },
-    }
+  getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
+    void taskId
+    void access
+    return rejectMockMode('简历优化建议与逐条改写候选')
   },
 
   async adjustResumeLayoutDraft(

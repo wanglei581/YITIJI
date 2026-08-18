@@ -28,6 +28,24 @@
   line-height: 1.6;
 }
 
+/*
+ * 演示提示横幅（R2）。与报告页 / 优化页同一句文案、同一套 warning 配色，
+ * 本页此前是全链唯一没有它的页面。
+ */
+.resume-compare__demo-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border: 1px solid var(--color-warning);
+  border-radius: 14px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .resume-compare__region {
   display: flex;
   flex-direction: column;

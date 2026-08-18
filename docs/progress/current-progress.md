@@ -1,5 +1,29 @@
 # 当前开发进度
 
+2026-08-18 修复 **AI 简历链「演示态假装读过你的简历」+ 换文件不清 session + 两处触控/布局缺陷（分支 `claude/resume-chain-truth-fix`，基于 `origin/main@22127deaf` rebase，未合入、未部署）**。起因是一次 1080×1920 真实走查：用 8 份不同文件（含中文简历 PDF、拍照式 JPG、纯图片 PDF、加密 PDF、DOCX、一份打印机说明书）把「选择来源 → 上传 → 解析 → 报告 → 优化 → 逐条对照 → 导出」整条链当普通用户走了一遍。
+
+**洞在哪（R1/R2，最严重）。** `apps/kiosk/src/services/api/aiMockAdapter.ts` 的 `submitResumeParse` / `getResumeRecord` / `getResumeOptimize` 在演示模式下**直接 return 一份写死的成功结果**。于是 8 份完全不同的文件全部拿到同一份 `37/60`、同样六个分项 `8,6,6,5,5,7`、同样四条建议；两张报告截图像素比对只差页眉时钟与雷达图动画一帧，**文字一字不差**。说明书那次给出的建议是「项目描述建议使用『负责、主导、实现』等动词开头」。**最伤的一处在 `/resume/optimize/compare`**：一句固定演示文案「热爱工作，积极向上……」被挂上 `E1 你的材料` 证据标、写成「你写的（原件不会被改）」，而**这一页是全链唯一没有演示提示横幅的**（报告页、优化页都有）。用户从没写过那句话——前面所有诚实的免责声明，在这一句面前一起失效。
+
+**根因是口径不一致，不是缺功能。** 同项目的自我探索 / 岗位匹配 / 职业规划 / 模拟面试在非 http 模式都**主动抛 `MOCK_MODE`** 触发既有降级 UI（`AiTaskRegion` 的 blocked / result-unavailable），唯独简历链的 mock 适配器返回成功。修法就是把简历链接上同一条口径：三个方法改为 `Promise.reject(new AiMockModeError('MOCK_MODE', …))`，**并删除那份演示报告与演示优化版简历**（留着就还会被接回去）；解析页 `catch` 改用 `aiErrorMessageOf` 透出真实原因，否则演示模式会被一律改写成「服务暂时不可用」，用户以为是网络问题反复重试同一份文件。对照页另外补上演示横幅，并把左栏归属标签改成**按 `providerName` 切换**（演示态：`E3` +「示例原句（演示内容，不是你的简历原文）」；真实结果照旧 `E1`「你写的」，正常路径的证据表达不削弱）。
+
+**范围复核（走查报告说「生产构建会因 `VITE_API_MODE≠http` 直接编译失败」——实测成立）。** 本机实跑 `env -u VITE_API_MODE vite build` 退出码 1，`apps/kiosk/vite.config.ts` 的 `assertProdApiMode` 在**配置加载期**就抛（「生产构建被拒绝：VITE_API_MODE 必须为 http」），根本进不到打包。加上 `client.ts` 的运行时 throw 与 `verify:prod-build-config` A1 共三层，故 R1/R2 确认**只影响 dev/preview，危害等级不上调**。
+
+**R3（与后端模式无关的真实缺陷）。** 优化过简历 A 后回上传页选 B，最小会话里仍是 A 的 taskId；此时直接进对照页，渲染的是 **A 的四条改写建议**，不是空态（已实测复现）。三页读 taskId 的顺序都是 state → query → session，只要 session 不清就一定读到上一份。`clearAiResumeSession()` 此前只在待机超时 / 隐私清理时被调用。修法是在**三个「选中了新文件」的处理器**里各调一次；**刻意不挂在 mount/unmount 上**——那会把「从报告页返回上一步再继续」这条正常路径的诊断结果清掉，逼用户重跑一遍。
+
+**R5 比走查报告里更糟（两处新发现）。** 报告说 56px 的主 CTA 首屏只露 21px（内容 1903px 挤进 1844px 可视区，差 59px），实测复现无误；但另外两种**同样常见**的情形下该按钮 **0px 可见**：一是 `?intent=optimize`（「AI 简历优化」卡片的默认入口，溢出 92px），二是上传失败横幅在屏时（超 10MB 被拒是真实代码路径，`uploadedFile` 保留 + `error` 同时显示，溢出 121px）——而这恰恰是用户最需要看到「更换文件」的时刻，那个按钮也一起被推出屏幕。只砍留白最多回收 42px，四种情形里只能救一种；因此改为**把 8 项诊断维度清单收进默认折叠的 `<details>`**（合规声明「系统不会编造……」留在折叠区外常驻可见）**再叠加约 40px 留白削减**，四种情形实测溢出全部归零、CTA 56/56 完整可见。同页的自相矛盾文案一并修掉：文件卡写「已就绪」、正下方预览卡却让用户重新上传（`FileContentPreview` 在预览 URL 不可用时的固定文案）——预览失败 ≠ 上传失败，且该组件还用在「我的文档」「扫描结果」上，那些地方根本没有「重新上传」这个动作。
+
+**R4 触控。** 优化页「排版调整」5 组分段控件此前并排挤在 348px 宽侧栏（外层五列 grid），组内再切 3 列，**14 个按钮实测各宽 18px**，「紧凑」被压成上下两个字竖排。改为每组一行后实测 84×56，最小 67×48，`under48` 归零。
+
+**顺带修掉的小项。** R7 报告页同屏两个「目标岗位匹配参考」入口（onClick 完全相同），去掉动作条里那个，剩下两个按钮不再断行；R8 `Failed to fetch` 英文原文不再直接甩给用户（本页自己写着「上传失败会如实提示原因」）；R9 文案承诺 DOC 但 `accept` 与后端都不收；R10 导出卡标题「已生成」与正文「未生成真实文件」打架，改为按 `signedUrl` 切换标题；R11 报告页「由演示用 AI 生成」与「仅基于上传文件中可解析出的内容生成」两条相邻互相打脸，后者改为随 `isDemoReport` 换口径。**R6（右栏与页脚两个并列「导出 PDF」）确认成立但本轮未改**——它的正解是拆页（见下），且 `tests/visual/fusion-w3.spec.ts` 以 `name: '导出 PDF', exact: true` 选中其中一个，单独动它只会把选择器改乱。
+
+**先破后立。** 28 条新断言全部先在**干净 `origin/main` 的独立 worktree** 上证明会红（13 条并入已被 CI 执行的 `verify:ai-down-fallbacks`，15 条并入 `verify:resume-diagnosis-flow-ui`），**未新增任何 `ci.yml` 行、未登记任何豁免**。其中 R1 的判据刻意**不写「有没有抛错」**——那种断言 `throw new Error('x')` 也能变绿：改为用 kiosk 自带的 `typescript` 把 `aiMockAdapter.ts` 在内存里转译后**真的 import 进来调一遍**，断言拒绝错误的 `code` 正好是 `MOCK_MODE`（`AI_OUTAGE_CODES` 只认这个值），并对捏造载荷做**可观测副作用**断言（分项评分 / 固定建议 / 演示身份字段一律不得残留）。未修复代码上该运行时判据报的是「演示模式下仍 resolve 成功结果（status=completed）」，正是事故本体。
+
+**⚠️ 过程中自己踩到并记下的两点。** ① 三条新断言首次变绿是**假绿**：`verify-fusion-w4` 的 scope 守卫报 `verify-resume-diagnosis-flow-ui.mjs` 越界，查明其 `changedFiles()` 只看 `git diff HEAD`（未提交工作区），提交后即消失——属工具口径不是缺陷，但「未提交状态下的绿/红都不能直接采信」。② 我给自己的三条门禁一开始把**注释里引用事故原文**也判成违规（`热爱工作` / 五列 grid 的类名 / 「请重新上传文件」），逼着人删掉事故说明才能变绿，是反效果；按仓库已有先例（`apiPracticePdf` 那条「只禁调用与导入、不禁注释提到它」）改为剥掉注释后再扫，或改写注释措辞。另有一条**真实**的门禁命中：`verify:resume-phone-upload-ui` 禁止 `ResumeSourcePage.tsx` 出现 `sessionStorage` 字样（简历预览 URL 绝不落盘的隐私红线），我的注释触发了它——按红线改写措辞，未放宽该断言。
+
+**验证。** kiosk 侧从 `ci.yml` 抽出的 81 条 verify 全绿（`prod-build-config` 需先产出 dist，已用 CI 同款 `VITE_API_MODE=http …` 真跑生产构建后 ALL PASS）；根级 `verify:repository-integrity` / `verify:compliance-copy` / `verify:mock-server-contract` / `verify:ci-gate-coverage` 全绿；kiosk + shared + ui typecheck 全绿、lint 0 error；`fusion-baseline-contract` 10/10 且覆盖率闸门达标；**`test:browser:w3` Playwright 12 passed**（该套件跑在 http 模式 + 路由夹具上，是简历链最接近真实的回归网）。UI 结论均为 1080×1920 `deviceScaleFactor=1` 实测数字，非目测。
+
+**产品建议（只给建议，本轮未做）：优化页仍应继续拆。** 修完 R4/R5 之后重新判断——**该拆，而且判据比走查时更清楚**。R4 把 14 个 18px 竖条改成每组一行是**必须的**，代价是「排版调整」卡从约 120px 长到约 440px；也就是说这块内容本来就需要一整屏的高度，只是之前用「压到看不清也点不中」的方式假装塞下了。按产品负责人的判据（**「这个功能需不需要整屏」，不是「能不能塞得下」**），优化页目前把「读 AI 建议 / 改正文 / 调排版 / 选模板 / AI 辅助 / 选导出格式 / 导出」七件事塞在一屏，右栏五张设置卡叠放，且**两个并列的「导出 PDF」（R6）正是同屏挤压的产物**。最省的拆法：把「排版调整 + 模板选择 + 导出格式 + 导出动作」整体挪到一个新的「导出前排版」页，优化页只留「读建议 + 改正文」，R6 随之自然消失（导出 CTA 只剩排版页那一个）。**本轮不做的理由**：新增路由会触碰 `verify:fusion-baseline` / `verify:fusion-w6` 的「恰好 106 条路由」等式门禁，需要连同 `route-manifest` 与 W3/W6 夹具一起改，属独立排期。
+
 2026-08-18 **删除 5 个零引用 placeholder 死页**：`apps/kiosk/src/pages/placeholders/` 下的 `OfflineAgenciesPage` / `OfflineJobDetailPage` / `PrintScanConvertPage` / `PrintScanFeaturePage` / `PrintScanSignPage`。删除依据（CLAUDE.md §8 五条）：全路径引用 0（`placeholders/XxxPage` 全仓零命中）、无路由引用（`routes/index.tsx` 指向的是 `offline-agencies/` 下的同名真实页）、无 verify 依赖、无当前文档声明、不被生产或硬件链路使用。**同名撞车提醒**：按组件名搜 `OfflineAgenciesPage` 会命中 7 处，全部指向 `offline-agencies/` 下的真实页——这正是 `docs/README.md` §四警告的 basename 陷阱，判定必须用全路径。证据来源：项目图谱孤儿检测（PR #716）与 `docs/design/kiosk-v6-migration-matrix.md` §(c) 双向独立印证，两套方法收敛到完全相同的这 5 个。产品负责人 2026-08-18 明确授权「只删那 5 个 placeholder」，同批候选中的其余 16 个源文件与 122 份文档本轮不动。
 
 2026-08-18 修复 **已结束招聘会的「AI参会准备单」改为「参会回顾」语义（分支 `claude/fair-visit-review`，基于 `origin/main@c66a970f6`，未合入、未部署）**。产品裁决：不隐藏入口，改语义。
