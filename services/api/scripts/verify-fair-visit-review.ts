@@ -16,6 +16,7 @@
  * 不连数据库、不起 HTTP，两个 CI job 都能跑。
  * Run: node -r @swc-node/register scripts/verify-fair-visit-review.ts
  */
+import { createHash } from 'node:crypto'
 import { FairVisitPlanService } from '../src/ai/resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService as RealPdfService, REVIEW_DISCLOSURE } from '../src/ai/resume/fair-visit-plan-pdf.service'
 import { buildSystemPrompt } from '../src/ai/resume/llm-fair-visit-plan.service'
@@ -38,6 +39,13 @@ let failed = 0
 function assert(label: string, condition: boolean, detail?: string): void {
   if (condition) { console.log(`  ✓ ${label}`); passed++ }
   else { console.error(`  ✗ ${label}${detail ? ` — ${detail}` : ''}`); failed++ }
+}
+
+/** 取 Nest 异常里的业务错误码；取不到返回 null（用于区分「有意拒绝」与「意外错误」）。 */
+function errorCodeOf(err: unknown): string | null {
+  const res = (err as { getResponse?: () => unknown } | null)?.getResponse?.()
+  const code = (res as { error?: { code?: unknown } } | undefined)?.error?.code
+  return typeof code === 'string' ? code : null
 }
 
 const DAY = 24 * 60 * 60 * 1000
@@ -258,12 +266,20 @@ async function main() {
     let latestErr: unknown = null
     try { latest = (await svc.getLatest(ENDED_FAIR_ID, 'task-stale', requester)) as Record<string, unknown> }
     catch (e) { latestErr = e }
-    const latestRefused = !!latestErr
-      || (latest !== null && latest['preparationChecklist'] === undefined && latest['onsiteTips'] === undefined)
+    // 「抛错即通过」是第十种空转形态：环境坏了看起来会跟保护生效一模一样。
+    // 所以这里既不接受任意异常，也要求异常必须是那条**有意**的判定。
+    const latestErrCode = errorCodeOf(latestErr)
+    const latestRefused = latestErrCode === 'FAIR_VISIT_PLAN_STALE_MODE'
+      || (!latestErr && latest !== null
+          && latest['preparationChecklist'] === undefined && latest['onsiteTips'] === undefined)
     assert(
       'B3. 活动已结束后，存量「参会准备」形态不得再被读出（直接敲 URL / 旧链接）',
       latestRefused,
-      latest ? `仍返回 preparationChecklist=${JSON.stringify(latest['preparationChecklist'])} onsiteTips=${JSON.stringify(latest['onsiteTips'])}` : '',
+      latestErr
+        ? `拒绝了，但不是有意判定：${latestErrCode ?? String((latestErr as Error).message)}`
+        : latest
+          ? `仍返回 preparationChecklist=${JSON.stringify(latest['preparationChecklist'])} onsiteTips=${JSON.stringify(latest['onsiteTips'])}`
+          : '',
     )
 
     let printErr: unknown = null
@@ -281,8 +297,8 @@ async function main() {
     )
     assert(
       'B4b. 拒绝必须是服务端的有意判定，而不是缺环境变量之类的意外错误',
-      !printErr || !/FILE_SIGNING_SECRET|ENOENT|font/i.test(String((printErr as Error).message)),
-      printErr ? `实际错误：${String((printErr as Error).message)}` : '',
+      errorCodeOf(printErr) === 'FAIR_VISIT_PLAN_STALE_MODE',
+      printErr ? `实际错误：${errorCodeOf(printErr) ?? String((printErr as Error).message)}` : '未抛出任何拒绝',
     )
   }
 
@@ -312,22 +328,25 @@ async function main() {
   {
     const results = new Map<string, Record<string, unknown>>()
     const capture = { pdfCalls: [] as unknown[], llmContexts: [] as Record<string, unknown>[] }
+    // 早前这条把「授权失败抛错」也算通过 —— 那样断言根本没落到 requiresLogin 上，
+    // 是同一种「抛错即通过」的空转。改成给匿名任务一个真实可通过的 token 哈希，
+    // 让它真的走完生成，断言才有判别力。
+    const anonToken = 'anon-access-token'
     results.set('task-anon::parse', {
       endUserId: null,
-      accessTokenHash: null,
+      accessTokenHash: createHash('sha256').update(anonToken, 'utf8').digest('hex'),
       expiresAt: new Date(Date.now() + DAY),
       payloadJson: JSON.stringify({ fileId: 'resume-file-1' }),
     })
     const svc = makeService(results, capture)
-    let anonErr: unknown = null
-    let anonRes: Record<string, unknown> | null = null
-    try { anonRes = (await svc.generate(ENDED_FAIR_ID, 'task-anon', { endUserId: null, accessToken: 'tok' })) as Record<string, unknown> }
-    catch (e) { anonErr = e }
-    // 无 accessTokenHash 的匿名任务本就取不到授权，这里只要求「不静默编造记录」。
-    const anonLocal = anonRes?.['localRecords'] as { requiresLogin?: boolean } | undefined
-    assert('B9. 未登录时不得凭空显示本机记录',
-      !!anonErr || anonLocal === undefined || anonLocal.requiresLogin === true,
-      JSON.stringify(anonLocal))
+    const anonRes = (await svc.generate(ENDED_FAIR_ID, 'task-anon', {
+      endUserId: null, accessToken: anonToken,
+    })) as Record<string, unknown>
+    const anonLocal = anonRes['localRecords'] as { requiresLogin?: boolean; openedCompanySourceEntries?: string[] } | undefined
+    assert('B9.1 未登录时如实标记 requiresLogin，而不是显示「无记录」',
+      anonLocal?.requiresLogin === true, JSON.stringify(anonLocal))
+    assert('B9.2 未登录时不得凭空列出任何企业记录',
+      (anonLocal?.openedCompanySourceEntries ?? []).length === 0, JSON.stringify(anonLocal))
   }
 
   // ── B5 纸面：已结束场次印出来的小节必须跟着语义变 ────────────────────────────
