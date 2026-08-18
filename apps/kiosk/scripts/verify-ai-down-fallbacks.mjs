@@ -50,6 +50,7 @@ const files = {
   apiCareerPlan: repo('services/api/src/ai/resume/career-plan.service.ts'),
   // ⑤ 简历链演示态：mock 适配器与对照页
   aiMock: kiosk('src/services/api/aiMockAdapter.ts'),
+  aiOutage: kiosk('src/ai/aiOutage.ts'),
   optimizeCompare: kiosk('src/pages/resume/ResumeOptimizeComparePage.tsx'),
   parse: kiosk('src/pages/resume/ResumeParsePage.tsx'),
   jobFitApi: kiosk('src/services/api/jobFit.ts'),
@@ -384,6 +385,98 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     'optimizeCompare',
     /<EvidenceBadge level="E1" \/>\s*\n\s*你写的（原件不会被改）/,
     '「你写的」不得写死在 JSX 里 —— 演示态下左栏内容并非用户原文，必须按 providerName 切换归属说法',
+  )
+}
+
+// ── ⑥ 能力级码表的准入分类 ──────────────────────────────────────────────────
+//
+// 「哪些错误码算能力不可用」是一条判定契约：进了表就意味着**可以把入口置灰**。
+// 把「这次没成」误当成「这个功能没了」，就是在用 UI 伪造能力状态 ——
+// 用户被限流时看到「AI 暂时无法使用」，会以为功能坏了而不是稍后再试。
+//
+// 本节钉的不是「表里恰好有几个码」（那种断言只会挡住正常演进），
+// 而是**分类**：能力级白名单之外的一律不许进；单次失败黑名单必须零交集。
+{
+  const setLiteral = /AI_OUTAGE_CODES:\s*ReadonlySet<string>\s*=\s*new Set\(\[([\s\S]*?)\]\)/
+    .exec(files.aiOutage)?.[1]
+  assert(Boolean(setLiteral), 'aiOutage: 找不到 AI_OUTAGE_CODES 的 Set 字面量（本节无法判定，视为失败）')
+
+  if (setLiteral) {
+    const members = [...setLiteral.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1])
+    assert(members.length > 0, 'aiOutage: 码表为空 —— AI 真的没配好时将没有任何页面进入降级态')
+
+    // 能力级：只可能由「没配好 / 根本没接真模型」产生，不可能是「这次没成」。
+    const CAPABILITY_LEVEL = new Set([
+      'AI_NOT_CONFIGURED',
+      'AI_PROVIDER_NOT_CONFIGURED',
+      'MOCK_MODE',
+    ])
+    // 单次失败：后端同一个码还会用于超时 / 限流 / 空回复 / 上游非 2xx。
+    // 这些进表就会把可重试的入口置灰。`*_UNAVAILABLE` 系列目前全部属于此类：
+    // 后端把「连不上」「任意非 2xx（含 429）」「空内容」抛成同一个码
+    // （llm-fair-visit-plan.service.ts:318/323/329 及同型 5+ 处）。
+    // 后端拆码之后可以把拆出来的「连不上」码移进白名单，那是另一刀。
+    const SINGLE_CALL_FAILURE = [
+      'AI_UNAVAILABLE', 'AI_DIAGNOSIS_UNAVAILABLE', 'AI_GENERATE_UNAVAILABLE', 'AI_OPTIMIZE_UNAVAILABLE',
+      'AI_BUSY', 'AI_TIMEOUT', 'AI_CHAT_TIMEOUT', 'AI_CAREER_PLAN_TIMEOUT', 'AI_JOB_FIT_TIMEOUT',
+      'AI_FAIR_VISIT_PLAN_TIMEOUT', 'AI_MOCK_INTERVIEW_TIMEOUT', 'AI_OPTIMIZE_TIMEOUT',
+      'AI_DIAGNOSIS_TIMEOUT', 'AI_GENERATE_TIMEOUT', 'REQUEST_TIMEOUT',
+      'AI_OUTPUT_INVALID', 'AI_DIAGNOSIS_INVALID_OUTPUT', 'AI_GENERATE_INVALID_OUTPUT',
+      'AI_OPTIMIZE_INVALID_OUTPUT', 'AI_LAYOUT_ADJUST_INVALID_OUTPUT',
+      'AI_TASK_NOT_FOUND', 'AI_RESULT_PERSISTENCE_FAILED',
+      'AI_RESUME_SOURCE_UNAVAILABLE', 'AI_RESUME_SOURCE_EXPIRED', 'AI_RESUME_TEMPLATE_UNSUPPORTED',
+      'AI_PUBLIC_QUOTA_EXCEEDED', 'AI_PUBLIC_QUOTA_UNAVAILABLE',
+      'JOB_AI_QUOTA_EXCEEDED', 'JOB_AI_QUOTA_UNAVAILABLE',
+      'AI_JOB_RECOMMEND_FAILED', 'AI_JOB_EXPLAIN_FAILED', 'AI_CAREER_PLAN_FAILED',
+      'AI_JOB_FIT_FAILED', 'AI_FAIR_VISIT_PLAN_FAILED',
+      'AI_INTERVIEW_QUESTION_FAILED', 'AI_INTERVIEW_REPORT_FAILED',
+      // 连服务端都没够着：天然瞬态，且是 CareerPlan 粘滞死锁的历史来源。
+      'NETWORK_ERROR', 'UNKNOWN_ERROR',
+    ]
+
+    for (const code of members) {
+      assert(
+        CAPABILITY_LEVEL.has(code),
+        `aiOutage: '${code}' 不在能力级白名单里 —— 进了码表就意味着可以把入口置灰。`
+        + '若它在后端还会用于超时/限流/空回复，请先在后端拆码，不要直接加进表',
+      )
+    }
+    for (const code of SINGLE_CALL_FAILURE) {
+      assert(
+        !members.includes(code),
+        `aiOutage: '${code}' 是单次调用失败，不得进能力级码表 —— 会把可重试的入口置灰`,
+      )
+    }
+  }
+
+  // 码表只能有一份真值：页面自己 new Set([...]) 抄一份会造成「共享表已改、该页仍不认」
+  // 的假绿（门禁只看得到标识符出现过）。CareerPlanPage 就踩过这个坑。
+  // 判据不能只认 `AI_OUTAGE_CODES` 这个名字 —— 改名就能绕过（本门禁自测时实证过：
+  // 写成 `const AI_OUTAGE_CODES_LOCAL_REGRESSION = new Set([...])` 时旧断言全绿）。
+  // 改为按**内容**判定：任何页面里出现「装着 AI_ / MOCK_MODE / NETWORK_ERROR 这类
+  // 错误码字面量的 new Set(...)」都算私建码表，不管它叫什么。
+  for (const key of ['careerPlan', 'generate', 'interviewSetup', 'optimizeCompare']) {
+    const localSets = [...files[key].matchAll(/new Set\(\[([\s\S]{0,400}?)\]\)/g)]
+      .map((m) => m[1])
+      .filter((body) => /'(?:AI_[A-Z_]+|MOCK_MODE|NETWORK_ERROR|REQUEST_TIMEOUT)'/.test(body))
+    assert(
+      localSets.length === 0,
+      `${key}: 页面内私建了错误码 Set（内容含 AI_*/MOCK_MODE 字面量）—— `
+      + '必须从 ../../ai 引共享 AI_OUTAGE_CODES。私建副本会造成「共享表已改、本页仍不认」的假绿',
+    )
+  }
+  must('careerPlan', /AI_OUTAGE_CODES,/, '必须从 ../../ai 引入共享 AI_OUTAGE_CODES')
+
+  // 粘滞死锁防线：生成入口不得被 canStart 藏起来，且用户主动重试时必须先清 outage。
+  mustNot(
+    'careerPlan',
+    /\{\(aiTask\.canStart \|\| aiTask\.isRunning\) && \(/,
+    '生成钮不得被 aiTask.canStart 包住 —— 一次能力级失败后按钮消失，用户再也无法重试',
+  )
+  must(
+    'careerPlan',
+    /setGenerating\(true\)\s*\n\s*setAiOutage\(null\)/,
+    '用户主动生成时必须先清除 aiOutage，否则上一次失败会把能力判定粘住',
   )
 }
 
