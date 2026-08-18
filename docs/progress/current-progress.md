@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-18 **删除 5 个零引用 placeholder 死页**：`apps/kiosk/src/pages/placeholders/` 下的 `OfflineAgenciesPage` / `OfflineJobDetailPage` / `PrintScanConvertPage` / `PrintScanFeaturePage` / `PrintScanSignPage`。删除依据（CLAUDE.md §8 五条）：全路径引用 0（`placeholders/XxxPage` 全仓零命中）、无路由引用（`routes/index.tsx` 指向的是 `offline-agencies/` 下的同名真实页）、无 verify 依赖、无当前文档声明、不被生产或硬件链路使用。**同名撞车提醒**：按组件名搜 `OfflineAgenciesPage` 会命中 7 处，全部指向 `offline-agencies/` 下的真实页——这正是 `docs/README.md` §四警告的 basename 陷阱，判定必须用全路径。证据来源：项目图谱孤儿检测（PR #716）与 `docs/design/kiosk-v6-migration-matrix.md` §(c) 双向独立印证，两套方法收敛到完全相同的这 5 个。产品负责人 2026-08-18 明确授权「只删那 5 个 placeholder」，同批候选中的其余 16 个源文件与 122 份文档本轮不动。
+
 2026-08-18 修复 **已结束招聘会的「AI参会准备单」改为「参会回顾」语义（分支 `claude/fair-visit-review`，基于 `origin/main@c66a970f6`，未合入、未部署）**。产品裁决：不隐藏入口，改语义。
 
 **洞在哪。** AI参会准备单全链路对招聘会状态完全无感，四层都没有 `endAt` 条件：`JobFairDetailPage.tsx` 的按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到 / 预约都收了，只有它漏了）、`JobFairDetailTabs.tsx` 磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 查询只有 `approved+published`。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。该洞由 [PR #708](https://github.com/wanglei581/YITIJI/pull/708) 复核「已结束招聘会」线索时顺带发现（那条线索本身判定不成立）。

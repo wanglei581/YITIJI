@@ -35,6 +35,11 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// C 段复用项目图谱的门禁解析（同样只依赖 node 内置模块，可在 pnpm install 之前跑）。
+// 共用一套判定是刻意的：图谱和本门禁若各写一份「什么算门禁脚本」，迟早会给出
+// 互相矛盾的答案，而那正是本门禁存在的理由。
+import { buildGateIndex, gateHelperModules } from './project-graph/gates.mjs'
+import { trackedFiles } from './project-graph/repo.mjs'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const workflowPath = join(repoRoot, '.github/workflows/ci.yml')
@@ -382,6 +387,102 @@ for (const gate of unexplained) {
   problems.push(`门禁未被任何 CI job 执行，且未登记豁免原因：${gate}`)
 }
 
+// ---------------------------------------------------------------------------
+// C. scripts/ 下的门禁脚本文件必须有 package.json 脚本名
+// ---------------------------------------------------------------------------
+// A 段守「清单里的门禁在 ci.yml 里逐字可见」，B 段守「已声明的脚本名进 CI 闭包」。
+// 两段都是从 **package.json 的脚本名** 出发的 —— 于是它们共享同一个盲区：
+//
+//   一个 .mjs 文件躺在 scripts/ 下，但没有任何 package.json 给它起过名字。
+//
+// 它连 allGates 的枚举入口都进不去，A、B 两段都不会看它一眼。这不是理论风险：
+// 2026-08-18 的图谱扫描在本仓库找到 3 个这样的文件，**逐个跑起来，3 个全部 FAIL**。
+// 也就是说「门禁存在 ≠ 门禁在跑」这句话在本仓库的实测命中率是 100%。
+// 其中 verify-partner-account-delete-ui.mjs 更严重：它断言必须存在的
+// PartnerAccountDeletionDialog.tsx 已被删除，而同目录的
+// verify-partner-account-action-ui.mjs 断言的恰恰是该文件**必须不存在** ——
+// 两条门禁互相矛盾，作者互相不知道对方存在，而只有被接线的那条在跑。
+//
+// 本段把默认值再反一次：scripts/ 下的门禁脚本**默认必须有脚本名**，没有就必须
+// 在 ci-gate-exemptions.json 的 unwiredScripts 里写明为什么。于是「写完没接线」
+// 从「安静地什么都不发生」变成「CI 红」。
+//
+// 判定复用 scripts/project-graph/gates.mjs（图谱同一套解析），保证图谱和本门禁
+// 不可能给出互相矛盾的答案。被别的脚本 import / spawn / 读源码比对 / 被 shell
+// 包装脚本拉起的辅助模块不算门禁入口，本来就不该有脚本名。
+const trackedSet = new Set(trackedFiles())
+const { gates: gateFileIndex } = buildGateIndex(trackedSet)
+const helperScripts = gateHelperModules(trackedSet)
+
+const unwiredScriptFiles = [...gateFileIndex.values()]
+  .filter((gate) => gate.scriptNames.length === 0 && !helperScripts.has(gate.file))
+  .map((gate) => gate.file)
+  .sort()
+
+const VALID_UNWIRED_CATEGORIES = new Set([
+  // 断言对象已被删除，或与另一条门禁互相矛盾 —— 该删的是门禁本身，不是接线
+  'broken-pending-deletion',
+  // 门禁断言的功能确实没实现：现在接线会让 CI 红，须先修功能或改断言
+  'broken-pending-fix',
+])
+
+// 这个上限同样只允许调低。想加新的未接线脚本，先还掉一条旧的。
+// 3（2026-08-18，图谱首次扫描）：全部为「跑起来就红」的存量欠账，逐条登记在案。
+const MAX_UNWIRED = 3
+
+const unwiredRegistry = exemptionsFile.unwiredScripts || []
+/** @type {Map<string, object>} */
+const unwiredByScript = new Map()
+for (const item of unwiredRegistry) {
+  if (!item.script || !item.category || !item.reason) {
+    problems.push(`unwiredScripts 条目字段不全（需 script / category / reason）：${JSON.stringify(item)}`)
+    continue
+  }
+  if (!VALID_UNWIRED_CATEGORIES.has(item.category)) {
+    problems.push(
+      `unwiredScripts 类别非法：${item.script} → "${item.category}"` +
+        `（合法值：${[...VALID_UNWIRED_CATEGORIES].join(', ')}）`
+    )
+  }
+  if (item.reason.trim().length < 12) {
+    problems.push(`unwiredScripts 原因过短：${item.script} → "${item.reason}"`)
+  }
+  if (unwiredByScript.has(item.script)) {
+    problems.push(`unwiredScripts 条目重复：${item.script}`)
+  }
+  unwiredByScript.set(item.script, item)
+}
+
+for (const script of unwiredScriptFiles) {
+  if (unwiredByScript.has(script)) continue
+  problems.push(
+    `门禁脚本存在，但没有任何 package.json 脚本名指向它 —— 它从写完那天起就没跑过：${script}。` +
+      `修法：给它加一个 verify:* 脚本名并接进 CI；确实不该跑的，在 ` +
+      `scripts/ci-gate-exemptions.json 的 unwiredScripts 里登记类别与原因。`
+  )
+}
+
+// 陈旧登记：文件没了，或者已经被接线了
+for (const [script, item] of unwiredByScript) {
+  if (!trackedSet.has(script)) {
+    problems.push(`unwiredScripts 条目已陈旧（脚本文件已不存在，请删除本条）：${script}`)
+    continue
+  }
+  if (!unwiredScriptFiles.includes(script)) {
+    problems.push(
+      `unwiredScripts 条目已陈旧（该脚本已有 package.json 脚本名，请删除本条）：${script}` +
+        `（登记类别 ${item.category}）`
+    )
+  }
+}
+
+if (unwiredScriptFiles.length > MAX_UNWIRED) {
+  problems.push(
+    `未接线门禁脚本 ${unwiredScriptFiles.length} 个，超过上限 ${MAX_UNWIRED}。` +
+      `该上限只允许调低：请先还掉已有欠账，而不是调高上限。`
+  )
+}
+
 // pending 欠账棘轮
 const pendingCount = exemptions.filter((e) => e.category === 'pending-ci-wiring').length
 if (pendingCount > MAX_PENDING) {
@@ -420,5 +521,7 @@ const coveredCount = [...allGates].filter((gate) => executed.has(gate)).length
 console.log(
   `OK: ${REQUIRED_COMMANDS.length} deterministic CI gates are directly executed; ` +
     `${coveredCount}/${allGates.size} verify/ui 门禁在 CI 执行闭包内，` +
-    `${exemptionByGate.size} 条已登记豁免（其中 ${pendingCount} 条待接线，上限 ${MAX_PENDING}）`
+    `${exemptionByGate.size} 条已登记豁免（其中 ${pendingCount} 条待接线，上限 ${MAX_PENDING}）；` +
+    `${gateFileIndex.size} 个门禁脚本文件中 ${unwiredScriptFiles.length} 个无脚本名` +
+    `（全部已登记，上限 ${MAX_UNWIRED}）`
 )

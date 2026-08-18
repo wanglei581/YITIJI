@@ -1,8 +1,10 @@
 /**
- * Offline QR encoder for a 10-character pickup code.
+ * Offline QR encoder for an arrival / pickup code.
  *
- * The restricted payload always fits QR Model 2 version 1-H (21x21, 30% ECC),
- * so the miniapp does not need a network QR image endpoint or an npm build step.
+ * Accepts the live 10-character Crockford alphabet codes and the 8-digit
+ * numeric codes issued after the pickup-code scheme change. Both payloads
+ * still fit QR Model 2 version 1-H (21x21, 30% ECC), so the miniapp does
+ * not need a network QR image endpoint or an npm build step.
  * The implementation follows ISO/IEC 18004 placement and Reed-Solomon rules.
  *
  * QR encoding core adapted from Project Nayuki's QR Code generator library.
@@ -27,7 +29,9 @@
  * SOFTWARE.
  */
 
-const PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/
+const LEGACY_PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/
+const CURRENT_PICKUP_CODE_RE = /^[0-9]{8}$/
+const PICKUP_CODE_RE = /^(?:[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}|[0-9]{8})$/
 const ALPHANUMERIC = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:'
 const SIZE = 21
 const DATA_CODEWORDS = 9
