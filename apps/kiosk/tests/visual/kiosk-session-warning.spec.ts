@@ -80,6 +80,56 @@ async function expectSensitiveSessionCleared(page: Page): Promise<void> {
   await expect.poll(() => readSensitiveSession(page)).toBeNull()
 }
 
+const MEMBER_PHONE = '13800138000'
+const MEMBER_CODE = '123456'
+
+function registerMemberLogin(api: ApiRouter): void {
+  // 登录后首页会拉「我的」摘要；给不含身份细节的空列表即可，倒计时断言不依赖其内容。
+  for (const path of ['/api/v1/me/favorites', '/api/v1/me/print-orders', '/api/v1/me/resumes']) {
+    api.respond('GET', path, {
+      status: 200,
+      json: { success: true, data: { items: [], nextCursor: null, total: 0 } },
+    })
+  }
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+  api.respond('POST', '/api/v1/member/auth/sms-code', {
+    status: 200,
+    json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
+  })
+  api.respond('POST', '/api/v1/member/auth/login', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        token: 'standby-member-token',
+        user: { id: 'standby-member', phoneMasked: '138****8000', nickname: '待机回归会员' },
+      },
+    },
+  })
+}
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of MEMBER_PHONE) {
+    await page.getByRole('button', { name: digit, exact: true }).click()
+  }
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of MEMBER_CODE) {
+    await page.getByRole('button', { name: digit, exact: true }).click()
+  }
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+}
+
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
   page,
   api,
@@ -780,4 +830,240 @@ test('user cancel with a failing DELETE sends exactly one attempt and falls back
   await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
+})
+
+// ── 待机 / 已退出态不得出现清场倒计时（公共设备现场反馈） ────────────────────
+//
+// 现场问题：一体机整天摆在人才市场大厅，没人使用时仍每隔一个 idle 周期弹出
+// 「还在使用吗？30 秒后自动退出」并硬刷新一次。此时页面停在干净首页：没有登录、
+// 没有 guestMode、没有任何敏感 sessionStorage —— 清场是一次不折不扣的空操作，
+// 却把空操作包装成需要用户回答的隐私警告。
+//
+// 判定口径（必须保持严格）：只有当清场「什么都清不掉」时才允许跳过；
+// 只要有登录态 / guestMode / 任一敏感会话键 / 处在非中性路由，倒计时一律照旧。
+// 下面三条 must-still-fire 用例就是守这条线的，不允许为了让前两条变绿而放宽。
+
+const SENSITIVE_SESSION_KEYS_ALL = [
+  'ai-job-print:current-ai-resume',
+  'ai-job-print:current-print-material-check',
+  'ai-job-print:job-material-draft:v1',
+] as const
+
+const IDLE_WINDOW_SETTLE_MS = 7_000
+
+/**
+ * 跨导航累计「是否出现过 /session-timeout 清场页」。
+ *
+ * 不能只在结束时看一眼 URL：倒计时页会自己在 2s 后跳走，轮询很容易整段错过。
+ * 用 addInitScript + MutationObserver 把「见过 session-timeout 屏」单调写进
+ * sessionStorage，hardClear 触发的整页 reload 之后继续累计，最后统一读回。
+ */
+async function trackSessionTimeoutSightings(page: Page): Promise<() => Promise<number>> {
+  await page.addInitScript(() => {
+    const KEY = 'kiosk-standby-timeout-sightings:v1'
+    const bump = (): void => {
+      const seen =
+        document.querySelector('[data-kiosk-screen="session-timeout"]') !== null ||
+        location.pathname === '/session-timeout'
+      if (!seen) return
+      const prev = Number(window.sessionStorage.getItem(KEY) ?? '0')
+      window.sessionStorage.setItem(KEY, String(prev + 1))
+    }
+    const start = (): void => {
+      bump()
+      new MutationObserver(bump).observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      })
+    }
+    if (document.documentElement) start()
+    else document.addEventListener('DOMContentLoaded', start, { once: true })
+  })
+
+  return async () => {
+    const raw = await page.evaluate(() =>
+      window.sessionStorage.getItem('kiosk-standby-timeout-sightings:v1'),
+    )
+    return Number(raw ?? '0')
+  }
+}
+
+async function expectNothingToClear(page: Page): Promise<void> {
+  const leftovers = await page.evaluate(
+    (keys) => keys.filter((key) => window.sessionStorage.getItem(key) !== null),
+    [...SENSITIVE_SESSION_KEYS_ALL],
+  )
+  expect(leftovers).toEqual([])
+}
+
+test('clean standby homepage never raises the privacy exit countdown @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: false })
+  const sightings = await trackSessionTimeoutSightings(page)
+
+  await page.goto('/')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+  // 先证明这确实是「干净待机」：匿名 + 无任何敏感会话残留。
+  await expectNothingToClear(page)
+
+  // 完整 idle 周期(4s)+ 预警窗(2s)+ 余量，全程不触摸。
+  await page.waitForTimeout(IDLE_WINDOW_SETTLE_MS)
+
+  expect(await sightings()).toBe(0)
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
+})
+
+test('a completed privacy clear does not immediately re-arm another countdown @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: false })
+  await page.goto('/interview/tips')
+  await page.evaluate(({ key, value }) => window.sessionStorage.setItem(key, value), {
+    key: SENSITIVE_SESSION_KEY,
+    value: 'standby-loop-sensitive',
+  })
+
+  // 第一次清场必须照常发生——这是真有东西要清的场景。
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
+  await expectSensitiveSessionCleared(page)
+
+  // 落回干净首页之后，机器已经「退出完毕」，不该再自己弹第二次倒计时。
+  const sightings = await trackSessionTimeoutSightings(page)
+  await page.evaluate(() =>
+    window.sessionStorage.removeItem('kiosk-standby-timeout-sightings:v1'),
+  )
+  await page.waitForTimeout(IDLE_WINDOW_SETTLE_MS)
+
+  expect(await sightings()).toBe(0)
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+})
+
+test('screensaver standby enters the ad screen without a privacy countdown @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: true, idleTimeoutSec: 4 })
+  const sightings = await trackSessionTimeoutSightings(page)
+
+  await page.goto('/')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+  await expectNothingToClear(page)
+
+  // 干净首页进待机宣传屏是产品行为，不是隐私清场：不该先问「还在使用吗？」。
+  await expect(page).toHaveURL(/\/screensaver$/, { timeout: 8_000 })
+  await expect(page.locator('[data-kiosk-screen="screensaver"]')).toBeVisible()
+  expect(await sightings()).toBe(0)
+})
+
+// ── 以下三条守「不得削弱清场」：有东西可清时倒计时必须照常出现 ──────────────
+
+test('standby countdown still fires when sensitive session data is present @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: false })
+  await page.goto('/')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+  await page.evaluate(({ key, value }) => window.sessionStorage.setItem(key, value), {
+    key: SENSITIVE_SESSION_KEY,
+    value: 'homepage-leftover-from-previous-user',
+  })
+
+  // 上一位用户把匿名 AI 简历会话(含一次性 accessToken)留在了首页 —— 必须清。
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
+  await expectSensitiveSessionCleared(page)
+})
+
+test('standby countdown still fires when a print material session is present @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: false })
+  await page.goto('/')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+  await page.evaluate(
+    ({ key, value }) => window.sessionStorage.setItem(key, value),
+    { key: 'ai-job-print:current-print-material-check', value: 'print-leftover' },
+  )
+
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.sessionStorage.getItem('ai-job-print:current-print-material-check'),
+      ),
+    )
+    .toBeNull()
+})
+
+test('standby countdown still fires for a signed-in member on the homepage @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: false })
+  registerMemberLogin(api)
+  await loginThroughVisibleUi(page, '/')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/')
+
+  // 登录态本身就是必须清的东西，即使 sessionStorage 里一片干净。
+  await expectWarningWithinThreeSeconds(page)
+  await expect(page.getByText('当前登录：', { exact: false })).toBeVisible()
+})
+
+/**
+ * 打印进行中不得被普通 idle 倒计时清场。
+ *
+ * 用户站在机器前等出纸，整个过程完全不碰屏幕——这正是 idle 计时器最容易误判的场景。
+ * 打印页通过 useBusyLock 持锁，普通 idle 全程暂停；这里用真实轮询把这条锁钉死，
+ * 避免以后有人改动打印页的锁条件时无声退化。
+ *
+ * 注意边界：不受 busy 抑制的**硬隐私截止**仍会在最长安全时限后清场，这是刻意设计
+ * （见 kiosk-privacy-timeout.spec.ts「hard clear stops active print polling without
+ * cancelling the backend task」）：终端页面重置，但后台打印任务继续，纸照出。
+ * 本用例只守「普通 30 秒倒计时不得打断打印」，不碰硬截止。
+ */
+test('an active print job is never interrupted by the ordinary idle countdown @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const printTaskId = 'warning-print-task'
+  let pollRequests = 0
+  await page.route(`**/api/v1/print/jobs/${printTaskId}`, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    pollRequests += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ taskId: printTaskId, status: 'printing' }),
+    })
+  })
+
+  await page.goto('/')
+  await page.evaluate((taskId) => {
+    window.history.pushState(
+      { usr: { taskId, amountCents: 0 }, key: 'warning-print', idx: 1 },
+      '',
+      '/print/progress',
+    )
+  }, printTaskId)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  // 先确认真的在打印中（轮询已经跑起来），否则「没弹倒计时」可能只是页面没加载。
+  await expect(page).toHaveURL(/\/print\/progress$/)
+  await expect.poll(() => pollRequests).toBeGreaterThan(0)
+
+  // 远超一个完整 idle 周期(4s)，全程不触摸：倒计时一次都不许出现。
+  await expectNoWarningWithin(page, IDLE_WINDOW_SETTLE_MS)
+  await expect(page).toHaveURL(/\/print\/progress$/)
 })
