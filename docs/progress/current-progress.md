@@ -1,5 +1,15 @@
 # 当前开发进度
 
+2026-08-18 新增 **上线种子内容录入清单（分支 `claude/seed-content-checklist`，基于 `origin/main@a26eae3ca`，纯文档，未改任何代码）**：[../operations/seed-content-entry-checklist-2026-08.md](../operations/seed-content-entry-checklist-2026-08.md)。承接上一条「链路是通的，空是因为没录数据」的结论，给出 30 条政策 + 20 场招聘会的可执行录入清单：字段字典与合法取值、前置条件、待录表格模板（示范行**只给结构、逐格标注「示例·需替换」**，不含任何编造的政策名称/文号/金额/日期/链接）、录入方式推荐与验收步骤。
+
+**澄清了一处运营最容易搞错的差异**：政策与招聘会的发布闸门**不一样**。招聘会过两道（`assertOrgContentTrustActive` + `assertPublishFieldsComplete`，`jobs-admin.service.ts:192-210`，10 个必填字段、`sourceUrl` 必须 http/https）；**政策只过第一道**（`policies.service.ts:293-311` 无完整性校验调用，`PolicyPost` 也不在 `publish-completeness.ts` 的字段表里），因此政策的 `externalUrl` / `externalId` 可空且不影响发布——这是刻意设计（很多地方政策只有红头文件、没有网页原文，也不是每条都有发文字号，schema 注释明确「不得伪造」）。**录入方式给单一推荐：两类都走 `manual` 手动录入**——政策本就不在数据源体系里（无数据源外键，excel/csv/api/webhook 四种对政策全不适用），20 场招聘会摊不平 Excel 的建源+配映射成本，且手动录入的 `externalId` 由系统生成不会填错；`json` 只有壳、`api` 半通、`webhook` 只收岗位。
+
+**验收口径的关键取证**：公开读取路径**不校验**机构内容可信状态（政策 `policies.service.ts:107-113`、招聘会 `jobs-kiosk.service.ts:139-142` 的 `where` 都只有 `reviewStatus=approved` + `publishStatus=published`），所以「已通过+已发布」就是前台可见的充分必要条件，不存在「发布了但因信任问题看不到」；反过来机构在发布**之后**被降级或归档，已发布内容**不会自动下架**。
+
+**登记 6 处代码问题（只报不修，本轮未动代码）**：**A.** 机构「内容可信」标记**没有任何后台界面**——`apps/admin/src/routes/partners/` 零 trust 控件，全 `apps/` 检索 `contentTrust` 只命中 `BulkPublishButton.tsx:341-343` / `bulkPublish.ts:62` 两处**只读**展示，而前者的提示文案恰恰让运营「到『合作机构』把该机构标记为内容可信」，**指向的控件不存在**；实际只能由工程师调 `PATCH /admin/orgs/:id/content-trust` 或跑 `maintenance:backfill-org-content-trust`。**B.** `PolicyPost.externalId`（发文字号）后端全链路支持，但 `apps/partner/src/routes/policy/index.tsx:56-65` 的 `PolicyFormState` **没有该字段**、Admin 侧也没有，故走控制台录入的政策该字段**永远为 null**；且 schema 要求的 null 兜底文案「来源未提供编号」全仓**只存在于 schema/migration 注释，无任何前端消费方**——CLAUDE.md §10 的「外部ID 展示」对政策目前无法满足。**C.** `/renshi?tab=policy` 把后端数据与内置硬编码指引合并展示（`RenshiPage.tsx:69-70`），**政策库为空时页面看上去也是满的**，既与 §9「不伪造能力」相冲突，也让验收失去判别力（清单里已改用 `?tab=notice` 或接口 `pagination.total` 验证）。**D.** 已结束招聘会前台不隐藏、详情端点**无任何日期条件**（对比岗位两侧都套 `jobValidityWhere()`）。**E.** 公开 `GET /policies` 不校验 `kind`/`audience`/`category` 取值，拼错安静返回 0 条而非 400。**F.** `theme` 白名单在 6 处重复硬编码，无共享常量。
+
+验证：`verify:repository-integrity` 通过；`verify:compliance-copy` 通过（该门禁只扫 `apps/*/src`，故另对新增文档单独核了 SSOT 全部 7 项禁词及 `平台内?投递` 正则变体，**零命中**）。
+
 2026-08-18 完成 **内容信息库端到端链路实测 + 三处修复（分支 `claude/content-pipeline-e2e`，基于 `origin/main@7d6feaf31`，未合入、未部署）**：新增 `pnpm --filter @ai-job-print/api verify:content-pipeline-e2e`（117 断言，真实 HTTP + 真实 Prisma + 真实 Guard）。
 
 **为什么要跑这一趟。** 岗位 / 招聘会 / 政策三个库是一体机的主内容，机器摆出去、求职者点进「岗位信息」看到空列表，就等于这台机器没用。同日合入的两道发布闸门（`content-trust` / `publish-completeness`）各自都有**纯内存假 Prisma** 的单元门禁，但没有任何门禁在真实数据流上证明过两件事：该拦的拦住了、**不该拦的放行了**。只验拒绝等于可能把发布焊死而没人发现 —— 这正是本次补上的判别力。
