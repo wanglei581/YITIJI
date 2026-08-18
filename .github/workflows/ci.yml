@@ -606,6 +606,10 @@ jobs:
           # 文件端点内部账号身份回源:停用/删号/降权后旧 token 不得再取走求职者简历。
           # 纯内存桩(真实 JwtService + 真实 FilesController),不需要 DB/Redis/网络。
           pnpm --filter @ai-job-print/api verify:file-internal-auth
+          # 文件清理 CAS 复核 + 物理删除重试账本:删除依据必须在写入时自证,
+          # 且 deleteObject 失败后 tombstone 已落、cleanupExpired 再也捞不到 —— 须靠账本对账。
+          # 用真 Prisma + 独立临时 SQLite(现有文件门禁的假 Prisma 对未知 where 键恒真放行)。
+          pnpm --filter @ai-job-print/api verify:file-cleanup-cas-ledger
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files

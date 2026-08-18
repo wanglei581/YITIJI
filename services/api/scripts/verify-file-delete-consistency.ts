@@ -259,7 +259,22 @@ async function main(): Promise<void> {
     'owner delete'
   )
   assert.equal(deleted.status, 'deleted')
-  assert.deepEqual(normal.order, ['metadata', 'storage'])
+  // 本条守的是「DB tombstone 必须先于对象删除」，不是「总共只准写两次库」。
+  // 删除成功后新增了一次物理删除账本写入（storageDeletedAt，CLAUDE.md §11 要求
+  // 删除后保留删除日志），所以原来的整串 deepEqual 会误判。下界不降反升：
+  // 前两步仍逐字钉死、storage 仍只准调一次，并且额外正向要求那次删除日志存在。
+  assert.deepEqual(normal.order.slice(0, 2), ['metadata', 'storage'])
+  assert.equal(
+    normal.order.filter((step) => step === 'storage').length,
+    1,
+    'successful delete must touch object storage exactly once'
+  )
+  assert.equal(
+    normal.order[2],
+    'metadata',
+    'successful object deletion must be recorded in the storage-delete ledger (§11 删除日志)'
+  )
+  assert.equal(normal.order.length, 3, 'no unexpected extra writes in the success path')
 
   const unauthorized = makeHarness()
   await assert.rejects(
