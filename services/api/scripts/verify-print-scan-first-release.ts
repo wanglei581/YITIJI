@@ -217,10 +217,24 @@ function main(): void {
       'const claimedTask = await tx.printTask.updateMany',
       'if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()',
       'if (error instanceof PrintTaskClaimRaceError) claimed = null',
-      // CAS 必须复核仍是 paid：findFirst 与 updateMany 之间有退款 / 关单时间窗。
-      "payStatus: 'paid'",
     ],
-    'claim must CAS Order paid+pending→claimed before PrintTask and roll back a PrintTask race',
+    'claim must CAS Order pending→claimed before PrintTask and roll back a PrintTask race',
+  )
+  // CAS 必须**自己**复核仍是 paid：findFirst 与 updateMany 之间有退款 / 关单时间窗。
+  //
+  // 这条断言必须只在 updateMany 这一小段里判定。第一版把 `payStatus: 'paid'` 直接塞进
+  // 上面那个 mustContain(claimBlock, …)，而 claimBlock 里的 claimableWhere 本来就含这个
+  // 字符串 —— 于是即使把 CAS 的付款条件整条删掉，断言照样通过，是一条空转门禁。
+  const claimOrderCas = section(
+    claimBlock,
+    'const claimedOrder = await tx.order.updateMany',
+    'if (claimedOrder.count !== 1)',
+    'claim Order CAS',
+  )
+  mustContain(
+    claimOrderCas,
+    ["payStatus: 'paid'", "taskStatus: 'pending'"],
+    'claim Order CAS must itself re-check paid+pending (refund/close race window)',
   )
   mustContain(terminalsService, ['class PrintTaskClaimRaceError extends Error {}'], 'claim race must use a rollback sentinel')
   mustContain(

@@ -144,7 +144,7 @@
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
 - [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
-- [ ] `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false（生产缺省会拒启动；启用真实支付通道时必须 true）。
+- [ ] ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false~~ **该开关已删除，无需配置**。先付后印现在写死在代码里：Agent 只领取「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere` 与事务内 CAS 两层都要求，任何环境都关不掉。验收口径改为看 CI 静态门禁 `verify:print-rollout-config`（钉死该开关不得存在、不得放行无订单任务）与行为门禁 `verify:kiosk-cashier-ui`。若运行目录 `.env` 里还留着这个变量，删掉即可，它已不生效。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
 - [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
 - [ ] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。

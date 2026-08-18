@@ -404,7 +404,9 @@ export class TerminalAgentService implements OnModuleInit {
     //
     // 无关联订单的任务同样不再放行：真实业务流两条建单路径都在同一事务内把
     // PrintTask 与 Order 绑定，能匹配「无订单」的只剩孤儿数据（手工 SQL / 缺陷 /
-    // 迁移残留），那正是绕过付费的形状。dev 播种任务改为自带 0 元 paid 订单。
+    // 迁移残留），那正是绕过付费的形状。
+    // dev 播种任务（ptask_seed_001）不受影响：它建出来 terminalId 为 null，
+    // 而本查询一直带终端过滤，本改动前后都匹配不上任何终端的领取请求。
     const claimableWhere = {
       status: 'pending' as const,
       terminalId,

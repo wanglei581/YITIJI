@@ -23,9 +23,13 @@
 
 | 模式 | 价格配置 | 支付配置 | 出纸门禁 | 用户路径 | 部署判断 |
 | --- | --- | --- | --- | --- | --- |
-| 免费试运营 | `PriceConfig.unitCents=0` | `PAYMENT_PROVIDER` unset/disabled | `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true` | does not enter cashier | recommended |
-| 有人值守线下收款 | `unitCents>0` | payment disabled | gate true | cashier waits for Admin mark-paid | supervised only |
-| Live 支付后出纸 | `unitCents>0` | live provider | gate true | cashier paid then progress | C5-6 only |
+| 免费试运营 | `PriceConfig.unitCents=0` | `PAYMENT_PROVIDER` unset/disabled | 代码写死（0 元单本身即 `paid`） | does not enter cashier | recommended |
+| 有人值守线下收款 | `unitCents>0` | payment disabled | 代码写死（Admin mark-paid 后才可领） | cashier waits for Admin mark-paid | supervised only |
+| Live 支付后出纸 | `unitCents>0` | live provider | 代码写死 | cashier paid then progress | C5-6 only |
+
+> 出纸门禁不再是部署开关。原 `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 已删除：Agent 只领取
+> 「已关联订单 + `payStatus='paid'` + `taskStatus='pending'`」的任务，`claimableWhere`
+> 与事务内 CAS 两层都要求，任何环境都关不掉，也无法误配。
 
 2026-07-08 更新：`wechat` live provider 已完成一笔生产小额支付、退款回调和一笔业务打印 completed 样本；`alipay` 未验收。试运营采用 live paid mode 前仍需确认 staffed support、退款 SOP、异常打印处理、对账查看和隐私证据保存规则。
 
@@ -52,14 +56,14 @@
 
 - 明确写入并启用 active zero prices，确保相关 `PriceConfig.unitCents=0`。
 - `PAYMENT_PROVIDER` unset/disabled，不进入 live 支付或 sandbox 支付路径。
-- `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`，保持 claim 前门禁开启。
+- 出纸门禁无需配置：代码写死「只领已付款订单」，0 元单建单后即 `paid`，正常可领。
 - 现场只观察上传、建单、终端 claim、状态回传和纸张输出，不在首轮试运营中验证 C5-6 live payment。
 
 如改用 live WeChat paid mode，必须在试运营前复核：
 
 - `PAYMENT_PROVIDER=wechat`，`/api/v1/payment/channels` 返回 `wechat`。
 - 微信支付与退款通知 URL 均为正式 HTTPS 生产域名，退款通知空请求进入验签路径而非 404 / provider unsupported。
-- `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`，未支付任务不得下发。
+- 未支付任务不得下发：由代码保证（无开关），可用 CI 门禁 `verify:kiosk-cashier-ui` 复核。
 - Windows 队列为空，`AIJobPrintAgent` Running / Automatic，`printerStatus=ready`。
 - 现场人员知道如何清理 `Error, Printing, Retained` 队列、重启 Print Spooler、发起 Admin 退款和核查对账。
 
@@ -71,7 +75,7 @@
 | --- | --- | --- |
 | F1 价格 | `print_bw_page` 与 `print_color_page` 均存在 active `PriceConfig`，且 `unitCents=0` | 停止；不得把缺失价格当免费 |
 | F2 支付 | `PAYMENT_PROVIDER` unset/disabled，且 `NODE_ENV=production` 下不使用 sandbox | 停止；不得让用户进入不可完成支付路径 |
-| F3 出纸门禁 | `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true` | 停止；不得延续 unpaid 可 claim 的非商用验收口径 |
+| F3 出纸门禁 | 代码写死「只领已付款订单」，无 env 开关；CI `verify:print-rollout-config` 钉死该开关不得存在 | 停止；不得把开关加回来，也不得延续 unpaid 可 claim 的口径 |
 | F4 端点链路 | Kiosk 仍通过同源 `/api/v1`，`/print/jobs` 仍只接受内部 HMAC content URL | 停止；不得为 split-origin 放宽 SSRF 防线 |
 
 只读复核建议：
@@ -95,7 +99,6 @@ ORDER BY "serviceKey", "updatedAt" DESC;
 ```text
 NODE_ENV=production
 PAYMENT_PROVIDER unset/disabled
-PRINT_REQUIRE_PAID_BEFORE_CLAIM=true
 FILE_SIGNING_SECRET configured
 PAYMENT_SESSION_SECRET configured
 VITE_TERMINAL_ID=<target terminal id>
@@ -149,7 +152,6 @@ ORDER BY "serviceKey";
 ```text
 NODE_ENV
 PAYMENT_PROVIDER
-PRINT_REQUIRE_PAID_BEFORE_CLAIM
 FILE_SIGNING_SECRET
 VITE_TERMINAL_ID
 ```
@@ -158,7 +160,7 @@ VITE_TERMINAL_ID
 
 - 生产环境不得使用 sandbox 支付配置。
 - 免费试运营时 `PAYMENT_PROVIDER` 应 unset/disabled。
-- `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 应为 `true`。
+- 不需要也不应再配置 `PRINT_REQUIRE_PAID_BEFORE_CLAIM`；该开关已删除，出纸门禁写死在代码里。
 - HMAC content URL 所需密钥已由受控密钥系统注入，不在文档、脚本或命令行中明文传递。
 
 ## 证据边界
