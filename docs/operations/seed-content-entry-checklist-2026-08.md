@@ -490,13 +490,25 @@ GET /api/v1/job-fairs/:id/detail
 > 与岗位口径不同是刻意的：过期岗位会让人照着去投递（故 `getPublishedJobById`
 > 套 `jobValidityWhere()`），招聘会资料是档案。
 >
-> ⚠️ **但同一口径下发现一处真实漏网（待产品裁决，未修）**：「AI参会准备单」全链路
-> 对招聘会状态无感——`JobFairDetailPage.tsx` 的 AI准备单按钮**落在 `!isEnded` 守卫之外**
-> （同一 actionBar 里签到/预约都收了，只有它漏了）、`JobFairDetailTabs.tsx` 磁贴只判
-> `hasManagedData`、`FairVisitPlanPage.tsx` 不取 fair 也不读 status、
-> `services/api/src/ai/resume/fair-visit-plan.service.ts` 查询只有 `approved+published`
-> 没有 `endAt`。净效果：可为已结束场次生成并打印「出发前逐项核对」清单，还付一次 LLM 调用。
-> 待定口径：(A) 按钮隐藏，与签到/预约一致；(B) 该页改成「回顾 / 资料整理」语义。
+> ⚠️ **同一口径下曾发现一处真实漏网 —— ✅ 已实现（2026-08-18，PR #715，方案 B）。**
+> 原问题：「AI参会准备单」全链路对招聘会状态无感——`JobFairDetailPage.tsx` 的
+> AI准备单按钮**落在 `!isEnded` 守卫之外**（同一 actionBar 里签到/预约都收了，只有它漏了）、
+> `JobFairDetailTabs.tsx` 磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 不取 fair
+> 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 查询只有
+> `approved+published` 没有 `endAt`。净效果：可为已结束场次生成并打印「出发前逐项核对」
+> 清单，还付一次 LLM 调用。
+>
+> **产品裁定取 (B)：不隐藏按钮，改语义** —— 已结束场次产出「参会回顾与后续跟进」。
+> 保留 LLM 调用（简历 × 参展企业名册的匹配推理在活动结束后**更有用**，企业仍在招人）；
+> 换掉语义已坏的三段（参会前准备清单 / 现场可咨询问题 / 现场提醒）。
+> 新增**非 LLM 事实区**「你在本机留下的记录」，只列本机打开过来源投递入口的参展企业，
+> **刻意不列签到入口**（打开签到入口 ≠ 到场）；并固定展示诚实声明
+> 「本系统不记录你是否到场，也不记录你在现场取得的材料」，屏幕与打印版同文。
+> `mode` 由服务端按 `endAt` 判定并盖章入库，读取/打印双路在**渲染之前** fail-closed，
+> 旧链接与旧二维码一律拒发。
+>
+> **运营影响**：验收已结束场次时，AI 入口会显示「AI参会回顾」而不是「AI准备单」，
+> 这是预期行为，不是数据没录对。
 
 **E. 公开 `GET /policies` 不校验 `kind` / `audience` / `category` 取值。**
 原始字符串直接进 Prisma `where`，拼错安静返回 0 条而非 400。

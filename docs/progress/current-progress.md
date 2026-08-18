@@ -1,5 +1,23 @@
 # 当前开发进度
 
+2026-08-18 **删除 5 个零引用 placeholder 死页**：`apps/kiosk/src/pages/placeholders/` 下的 `OfflineAgenciesPage` / `OfflineJobDetailPage` / `PrintScanConvertPage` / `PrintScanFeaturePage` / `PrintScanSignPage`。删除依据（CLAUDE.md §8 五条）：全路径引用 0（`placeholders/XxxPage` 全仓零命中）、无路由引用（`routes/index.tsx` 指向的是 `offline-agencies/` 下的同名真实页）、无 verify 依赖、无当前文档声明、不被生产或硬件链路使用。**同名撞车提醒**：按组件名搜 `OfflineAgenciesPage` 会命中 7 处，全部指向 `offline-agencies/` 下的真实页——这正是 `docs/README.md` §四警告的 basename 陷阱，判定必须用全路径。证据来源：项目图谱孤儿检测（PR #716）与 `docs/design/kiosk-v6-migration-matrix.md` §(c) 双向独立印证，两套方法收敛到完全相同的这 5 个。产品负责人 2026-08-18 明确授权「只删那 5 个 placeholder」，同批候选中的其余 16 个源文件与 122 份文档本轮不动。
+
+2026-08-18 修复 **已结束招聘会的「AI参会准备单」改为「参会回顾」语义（分支 `claude/fair-visit-review`，基于 `origin/main@c66a970f6`，未合入、未部署）**。产品裁决：不隐藏入口，改语义。
+
+**洞在哪。** AI参会准备单全链路对招聘会状态完全无感，四层都没有 `endAt` 条件：`JobFairDetailPage.tsx` 的按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到 / 预约都收了，只有它漏了）、`JobFairDetailTabs.tsx` 磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 查询只有 `approved+published`。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。该洞由 [PR #708](https://github.com/wanglei581/YITIJI/pull/708) 复核「已结束招聘会」线索时顺带发现（那条线索本身判定不成立）。
+
+**为什么保留 LLM 调用而不是退化成静态页。** 6 段产出里 `priorityCompanies`（简历方向 × 参展企业名册匹配）在活动结束后**不但没失效反而更有用**——企业在招聘会结束后通常仍在招人，招聘会只是发现渠道；活动当天人在现场跑，结束后坐下来跟进才是用得上这份清单的时候。所以这不是浪费的调用，是同一份推理换个交付时机。真正坏掉的是另外三段（参会前准备清单 / 现场可咨询问题 / 现场提醒）——**语义坏了不是文案坏了**，改字解决不了「现场提醒」在活动结束后的存在问题；review 态换成「后续可做的跟进动作 / 下次同类活动可提前准备的问题」，`onsiteTips` 直接不出。
+
+**不许编的边界（本次最要紧的一条）。** 系统只记录「浏览」与「打开来源平台入口」两类本人行为（`activity.types.ts` / compliance-boundary §4.4），**打开签到入口 ≠ 到场**，现场取得了什么材料更是完全不知道。因此新增的「你在本机留下的记录」是**非 LLM 事实区**，只列一项最无歧义也最有跟进价值的信号：在本机打开过来源投递入口的参展企业（`fair_company` + `external_apply`）；**刻意不列「打开过签到入口」**——它既不代表到场，又最容易被读成「你去过」。`REVIEW_DISCLOSURE`（不记录你是否到场、也不记录你在现场取得的材料）屏幕与打印版同文。**任何到场信号都不得进入 LLM 上下文**，由断言 B8.3 反向钉死。
+
+**fail-closed 在服务端，不靠前端守卫。** `mode` 由服务端按 `endAt` 判定并**盖章写入存储**，不采信模型回传值（形态决定纸上印什么、以及存量结果日后还能不能被读出，不能让模型或任何桩左右它）。`getLatest` / `printPlan` 在**渲染之前**按「现在」重新判定：活动结束前生成的准备单，结束后拿旧链接或旧二维码回来一律拒发（`FAIR_VISIT_PLAN_STALE_MODE`）。纸是带走的，所以拒绝必须发生在抵达 PDF 渲染器之前；打印版标题与小节也随形态变（「招聘会参会回顾与后续跟进」/「四、后续可做的跟进动作」）。
+
+**先破后立。** 新增 `services/api/scripts/verify-fair-visit-review.ts`（30 条，内存假 Prisma + 真实 Service / 真实 PDF 渲染，不连库不起 HTTP），**串进已被 CI 执行的 `verify:fair-visit-plan`**，因此**不需要新增任何 `ci.yml` 行、也未在 `ci-gate-exemptions.json` 登记豁免**（`verify:ci-gate-coverage` 按闭包展开，实测 365/371 在闭包内、0 条待接线）。未修复代码上实测 8 条红。kiosk 侧 6 条 UI 断言并入已被 CI 执行的 `verify:jobfair-ui`，在干净 `origin/main@c66a970f6` 上实测 6 条全红。另做三类变异验证证明新断言有判别力：PDF 回顾分支退回 → B5 四条红（报错里直接列出纸面小节）；prompt 删掉「不得暗示到场」→ B6.2 红；诚实声明被「优化」掉 → B7 两条红。
+
+**⚠️ 过程中抓到并修掉自己写的一个空转闸门（记下来避免重复）。** B4「已结束后不得再打印存量准备单」第一版看似绿，实为**假绿**：`printPlan` 抛的是 `FILE_SIGNING_SECRET` 缺失（**环境错误**），而 `pdfCalls` 已经是 1 —— 过期的「出发前带齐简历」其实**已经进了 PDF 渲染器**，只是签名环节才炸。判据从「有没有抛错」改成「过期内容有没有抵达渲染器」，并补 B4b 断言「拒绝必须是服务端的有意判定，不能是缺环境变量之类的意外错误」，才构成真正的保护。教训：**门禁里任何「抛错即通过」的判据都要先问一句「这个错是不是环境噪声」。**
+
+**本机可判别性。** `verify:jobfair-review` / `verify:fair-list-integrity` / `verify:fair-info-fields` 首跑三条全红，实为缺 `DATABASE_URL`；按 `ci.yml` 同款做法 `DATABASE_URL=file:./prisma/dev.db` + `npx prisma db push` 后三条全绿——属环境噪声，已让它从「判别不了」变成「可判别」，未以此为由跳过。
+
 2026-08-18 接线 **合同审查 22 个单测里从未执行过的 17 个（分支 `claude/contract-review-tests-ci`，基于 `origin/main@b7faca037`，未合入、未部署）**。
 
 **洞在哪。** `services/api/src/contract-review/__tests__/` 有 22 个 `.test.ts`，`services/api/package.json:137-141` 只把其中 5 个（file-policy / report / print-lifecycle / schema / consent，54 用例）提升成 npm script 并挂进 `ci.yml`。**其余 17 个文件、252 个用例没有任何 script、不在 ci.yml、不被任何 runner 收集，自写下起从未执行过**，其中含 safety-gate / pii-masker / sensitive-delete / rule-engine / service / orchestrator 等安全要害。`docs/superpowers/plans/2026-08-01-ai-contract-review.md` 把每个测试都写成分步验收项，只有 5 个被接线，**仓库内无任何文档记录这是有意为之**。
