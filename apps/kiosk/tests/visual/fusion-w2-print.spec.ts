@@ -107,7 +107,7 @@ test('pickup scanner auto-submits once and Enter suffix is deduplicated @w2', as
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await expect(page.locator('[data-w2-page="pickup-claim"]')).toBeVisible()
   await expect(page.getByText('等待扫码输入')).toBeVisible()
   await assertNoHorizontalOverflow(page)
@@ -142,9 +142,9 @@ test('pickup controls remain readable in Windows landscape @pickup-landscape', a
 
   await page.goto('/print/pickup-claim')
 
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   const submit = page.getByRole('button', { name: '确认取件' })
-  const help = page.getByText('怎么找取件码？')
+  const help = page.getByText('怎么找到机码？')
   await expect(input).toBeVisible()
   await expect(submit).toBeVisible()
   await expect(help).toBeVisible()
@@ -200,10 +200,60 @@ test('pickup manual fallback normalizes the displayed code before claiming @w2',
   })
 
   await page.goto('/print/pickup-claim')
-  await page.getByLabel('取件码输入框').fill('ab-2c-7m-9p-3k')
+  await page.getByLabel('到机码输入框').fill('ab-2c-7m-9p-3k')
 
   await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
   expect(submittedCode).toBe('AB2C7M9P3K')
+  expect(errors).toEqual([])
+})
+
+// 2026-08-18：取件码改为 8 位纯数字，过渡期同时受理 10 位存量码。
+// 这条守的是「两种长度共用一个输入框」引出的那个真实陷阱：存量码字符集含 2–9，
+// 因此旧码前 8 位可能恰好全是数字（(8/31)^8 ≈ 1/50000）。若读满 8 位就提交，
+// 这类已付费用户会被永久卡在「截断 → 认领失败 → 输入被清空」的循环里。
+// 页面用 250ms 静默窗口区分两者：扫码器按键间隔约 5ms，10 位码 <100ms 读完，
+// 永远不会命中 8 位分支。
+test('pickup accepts 8-digit codes without truncating a legacy 10-char code @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+  const submitted: string[] = []
+  await page.route('**/api/v1/print/jobs/claim-pickup', async (route) => {
+    submitted.push(JSON.parse(route.request().postData() ?? '{}').code)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        released: false,
+        orderId: 'order-w2-digit',
+        orderNo: 'ORD-W2-DIGIT',
+        terminalId: 'KSK-001',
+        taskStatus: 'awaiting_payment',
+        printTaskStatus: 'awaiting_payment',
+        amountCents: 100,
+        priceLines: [],
+        paymentSessionToken: 'w2-digit-payment-session-token',
+      }),
+    })
+  })
+
+  await page.goto('/print/pickup-claim')
+  const input = page.getByLabel('到机码输入框')
+  await expect(input).toBeVisible()
+  // 纯数字码必须唤起数字键盘，而不是全键盘。
+  await expect(input).toHaveAttribute('inputmode', 'numeric')
+
+  // 前 8 位全为数字的存量码：逐字符输入，不得在第 8 位被提交。
+  await input.pressSequentially('23456789', { delay: 5 })
+  expect(submitted).toEqual([])
+  await input.pressSequentially('AB', { delay: 5 })
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  expect(submitted).toEqual(['23456789AB'])
+
+  // 8 位新码：静默 250ms 后自动核销，无需按钮。
+  await page.getByRole('button', { name: '再取一件' }).click()
+  await input.pressSequentially('28491703', { delay: 5 })
+  await expect(page.getByText('订单核验成功', { exact: true })).toBeVisible()
+  expect(submitted).toEqual(['23456789AB', '28491703'])
   expect(errors).toEqual([])
 })
 
@@ -224,7 +274,7 @@ test('pickup invalid code is rejected, cleared, and ready for the next scan @w2'
   })
 
   await page.goto('/print/pickup-claim')
-  const input = page.getByLabel('取件码输入框')
+  const input = page.getByLabel('到机码输入框')
   await input.fill('AB2C7M9P3K')
 
   await expect(page.getByRole('alert')).toHaveText(/到机码无效或已过期/)

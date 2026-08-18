@@ -1,6 +1,8 @@
-import { randomBytes } from 'crypto'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
+// 取件码长度/字符集/签发的唯一定义。曾在本文件和
+// member-print-orders/member-print-order-create.service.ts 各写一份 PICKUP_CODE_LEN=10。
+import { randomPickupCode } from '../common/pickup-code'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
@@ -10,19 +12,13 @@ type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUn
 type RedemptionSettlementOptions = { discountCents: number; benefitRef: string; operatorId?: string }
 type OrderClient = Pick<PrismaTransactionClient, 'order'>
 
-// 取件码字符集：去掉易混字符 0/O/1/I/L；10 位 ≈ 49 bit 熵（非低熵）。
-const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
-const PICKUP_CODE_LEN = 10
+/**
+ * 撞码重试上限。注意它与码长是耦合的：取件码只增不减（`pickupCode` 全表永久
+ * @unique，订单完成/过期都不回收），6 位 = 10^6 空间，累计签发量抬高后
+ * `generateUniquePickupCode` 会更频繁地用掉这 6 次预检。回收机制见
+ * `common/pickup-code.ts` 里的长期问题说明。
+ */
 const PICKUP_MAX_ATTEMPTS = 6
-
-function randomPickupCode(): string {
-  const bytes = randomBytes(PICKUP_CODE_LEN)
-  let out = ''
-  for (let i = 0; i < PICKUP_CODE_LEN; i += 1) {
-    out += PICKUP_ALPHABET[(bytes[i] ?? 0) % PICKUP_ALPHABET.length]
-  }
-  return out
-}
 
 /** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
 function isPickupCodeUniqueConflict(e: unknown): boolean {

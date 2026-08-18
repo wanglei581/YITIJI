@@ -76,7 +76,7 @@ test('tool center exposes the miniapp arrival-code claim entry @w2', async ({ pa
   await entry.click()
 
   await expect(page).toHaveURL(/\/print\/pickup-claim$/)
-  await expect(page.getByLabel('取件码输入框')).toBeVisible()
+  await expect(page.getByLabel('到机码输入框')).toBeVisible()
   expect(errors).toEqual([])
 })
 

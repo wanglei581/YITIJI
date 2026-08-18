@@ -566,7 +566,9 @@ const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
 const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')
 for (const marker of [
   'claimLockRef',
-  'VALID_CODE.test(nextCode)',
+  // 到机码改 8 位后符号更名：扫码路径仍必须先过格式判据，且新旧两种码各有分支
+  'isLegacyPickupCode(nextCode)',
+  'PICKUP_CODE_PATTERN.test(nextCode)',
   'void handleClaim(nextCode)',
   'claimLockRef.current = false',
   "setCode('')",
@@ -579,7 +581,7 @@ for (const marker of [
 }
 assert.match(
   pickupClaim,
-  /if \(!VALID_CODE\.test\(submittedCode\) \|\| claimLockRef\.current\) return/,
+  /if \(!PICKUP_CODE_ACCEPTED_PATTERN\.test\(submittedCode\) \|\| claimLockRef\.current\) return/,
   'pickup scanner submission is format-gated and idempotently locked'
 )
 assert.match(

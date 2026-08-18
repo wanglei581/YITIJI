@@ -9,6 +9,7 @@
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
+import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN } from '../src/common/pickup-code'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import { RefundService } from '../src/payment/refund.service'
@@ -369,6 +370,26 @@ async function main(): Promise<void> {
     // 用收集器逐条 check（不 fail-fast），跑完汇总；有未满足项则抛错（finally 清理后退 1）。
     // ============================================================
     console.log('\n--- P0a payment-domain contract (batch1, expect RED before impl) ---')
+
+    /**
+     * 取件码规格断言。
+     *
+     * 原写法是 `pickupCode.length >= 8`（一条熵下限）。2026-08-18 产品裁决把取件码
+     * 从 10 位字母数字改为 6 位纯数字后，`>= 8` 会把合规的新码判红。
+     *
+     * 处理方式是**收紧而不是删除**：由「至少 8 个任意字符」改为「恰好等于规格长度
+     * 且逐字符符合规格字符集」，判别力比原来更强（原断言放行 'ABCDEFGH'、
+     * 放行任意 9 位、放行含空格的串，新断言都不放行）。
+     *
+     * 需要说清楚的取舍：绝对熵确实下降了（31^10 ≈ 49 bit → 10^8 ≈ 26.6 bit）。
+     * 补偿它的是另外三条控制，而它们各自有自己的断言，不在本文件：
+     *   - claim-pickup 限流 20 次/分钟 → scripts/verify-miniapp-cloud-print-m2.ts
+     *   - 取件码 24h 失效 → 本文件同批 pickupCodeVisibleFor 门 + m2 的过期用例
+     *   - 认领必须命中订单绑定终端 + 按终端失败锁定 → m2 的预言机合并 / 锁定用例
+     * 任何一条被放宽，6 位就不再成立 —— 别只改这里。
+     */
+    const isSpecPickupCode = (value: unknown): boolean =>
+      typeof value === 'string' && value.length === PICKUP_CODE_LENGTH && PICKUP_CODE_PATTERN.test(value)
     // wechat/alipay/benefit 为未来扩展，本批 markPaid 必须拒绝（对齐 packages/shared P0A_ALLOWED_PAYMENT_SOURCES）。
     const P0A_FORBIDDEN_SOURCES = ['wechat', 'alipay', 'benefit'] as const
     const VALID_PAGE_SOURCES = ['pdf_lightweight_scan', 'image_single_page'] as const
@@ -456,8 +477,7 @@ async function main(): Promise<void> {
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
         !!paid.paidAt &&
-        typeof paid.pickupCode === 'string' &&
-        paid.pickupCode.length >= 8 &&
+        isSpecPickupCode(paid.pickupCode) &&
         idem.payStatus === 'paid' &&
         idem.pickupCode === paid.pickupCode &&
         after - before === 1 // 幂等：重复 markPaid 不重复写审计
@@ -554,8 +574,7 @@ async function main(): Promise<void> {
           o.payStatus === 'paid' &&
           o.paymentSource === 'free' &&
           !!o.paidAt &&
-          typeof o.pickupCode === 'string' &&
-          o.pickupCode.length >= 8
+          isSpecPickupCode(o.pickupCode)
         )
       } finally {
         await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: PRINT_UNIT_PRICE_CENTS.black_white } })
@@ -656,8 +675,7 @@ async function main(): Promise<void> {
         rejectsBadSource &&
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
-        typeof paid.pickupCode === 'string' &&
-        (paid.pickupCode?.length ?? 0) >= 8 &&
+        isSpecPickupCode(paid.pickupCode) &&
         idem.payStatus === 'paid' &&
         idem.pickupCode === paid.pickupCode &&
         auditAfterPaid - auditBefore === 1 && // 幂等：mark-paid 只写 1 条审计

@@ -2,6 +2,9 @@ import crypto from 'crypto'
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
+// 取件码长度/字符集/签发/哈希的唯一定义。曾在本文件和 payment/order-status.service.ts
+// 各写一份 PICKUP_CODE_LEN=10，两处不同步即「按一种长度发码、按另一种长度收码」。
+import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
 import { OrderStatusService } from '../payment/order-status.service'
@@ -11,27 +14,40 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 
-const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
-const PICKUP_CODE_LEN = 10
-const PICKUP_TTL_MS = 24 * 60 * 60 * 1000
+/**
+ * 取件码有效期上限：7 天（产品裁决 2026-08-18 方案 A，原 24 小时）。
+ *
+ * ⚠️ **这是上限，不是承诺值。** 真正落库的是
+ * `min(now + PICKUP_TTL_MS, file.expiresAt)` —— 取件码绝不能活得比源文件久，
+ * 否则用户会拿到「码仍有效、文件已被清理」的假承诺。
+ *
+ * 按当前默认留存（`system_short`，见 `files/file.types.ts` 的 FILE_DEFAULT_TTL_HOURS
+ * 与 `file-validation.ts` 的 DEFAULT_SENSITIVE_BY_PURPOSE），本上限对多数订单是空转：
+ *
+ *   | purpose                      | 敏感级           | 文件 TTL | 取件码实际有效期 |
+ *   |------------------------------|------------------|----------|------------------|
+ *   | print_doc                    | normal           | 24h      | 24h              |
+ *   | cover_letter                 | sensitive        | 6h       | 6h               |
+ *   | resume_upload / resume_scan  | highly_sensitive | 1h       | 1h               |
+ *
+ * 只有用户主动把文件留存延长到 months_3 / months_6 / long_term（需同意条款）时，
+ * 7 天才真的生效。
+ *
+ * **因此界面绝不能按本常量显示倒计时**（CLAUDE.md §9「不伪造能力」）：
+ * 所有对外展示都必须用落库的 `Order.pickupCodeExpiresAt`，
+ * 它已经是夹取后的真实值。该约束由 `verify-backend-p0-contracts.mjs` 与
+ * `verify-miniapp-cloud-print-m2.ts` 两侧断言守住 —— 后者会真的建一个
+ * 短留存文件的订单，验证落库过期时间跟的是文件而不是这个常量。
+ *
+ * 同理：**不要为了「让 7 天生效」去掉下面的 Math.min 夹取**，那只会制造
+ * 指向已删除文件的取件码。要延长实际有效期，改的是文件留存策略，不是这里。
+ */
+const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 const ALLOWED_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 const REQUIRED_PII_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan'])
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 type TerminalSummary = { displayName: string | null; locationLabel: string | null }
-
-function randomPickupCode(): string {
-  const bytes = crypto.randomBytes(PICKUP_CODE_LEN)
-  let out = ''
-  for (let i = 0; i < PICKUP_CODE_LEN; i += 1) {
-    out += PICKUP_ALPHABET[(bytes[i] ?? 0) % PICKUP_ALPHABET.length]
-  }
-  return out
-}
-
-export function hashPickupCode(code: string): string {
-  return crypto.createHash('sha256').update(`m2-pickup-v1|${code}`).digest('hex')
-}
 
 function makeOrderNo(): string {
   const now = new Date()
