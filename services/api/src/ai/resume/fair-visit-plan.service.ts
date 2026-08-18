@@ -6,7 +6,7 @@ import { FilesService } from '../../files/files.service'
 import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { FairVisitPlanPdfService } from './fair-visit-plan-pdf.service'
-import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
+import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanMode, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
 import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 
 const RESULT_TTL_HOURS = (() => {
@@ -24,6 +24,16 @@ interface StoredFairVisitPlan {
   payload: FairVisitPlanPayload
   providerName: string
   basedOn: { resume: true; fairId: string; fairName: string; companyCount: number; positionCount: number }
+}
+
+/**
+ * 招聘会结束与否决定这条链产出什么。判定只看 endAt，与 deriveFairStatus 同构。
+ * 单独抽出来是因为**读取路径也要用**：活动结束前生成的准备单，
+ * 一周后拿旧链接 / 旧二维码回来读或打印时必须按「现在」重新判定。
+ */
+export function resolveFairVisitMode(endAt: Date | string, now = new Date()): FairVisitPlanMode {
+  const end = endAt instanceof Date ? endAt : new Date(endAt)
+  return Number.isFinite(end.getTime()) && end.getTime() < now.getTime() ? 'review' : 'preparation'
 }
 
 function hashToken(token: string): string {
@@ -114,7 +124,11 @@ export class FairVisitPlanService {
       userAgent: null,
       requestId: null,
     })
-    return this.toResponse(taskId, stored)
+    return this.toResponse(
+      taskId,
+      stored,
+      stored.payload.mode === 'review' ? await this.loadLocalRecords(fairId, parse.endUserId) : undefined,
+    )
   }
 
   async getLatest(fairId: string, taskId: string, requester: FairVisitPlanRequester) {
@@ -127,7 +141,12 @@ export class FairVisitPlanService {
     if (stored.basedOn.fairId !== fairId) {
       throw new NotFoundException({ error: { code: 'FAIR_VISIT_PLAN_NOT_FOUND', message: '暂无该招聘会的参会准备单' } })
     }
-    return this.toResponse(taskId, stored)
+    this.assertModeStillValid(stored)
+    return this.toResponse(
+      taskId,
+      stored,
+      stored.payload.mode === 'review' ? await this.loadLocalRecords(fairId, requester.endUserId) : undefined,
+    )
   }
 
   async printPlan(fairId: string, taskId: string, requester: FairVisitPlanRequester) {
@@ -140,6 +159,8 @@ export class FairVisitPlanService {
     if (stored.basedOn.fairId !== fairId) {
       throw new NotFoundException({ error: { code: 'FAIR_VISIT_PLAN_NOT_FOUND', message: '暂无该招聘会的参会准备单' } })
     }
+    // 纸是带走的：过期形态必须在**抵达渲染器之前**就被拒，不能靠后面的环节意外报错。
+    this.assertModeStillValid(stored)
     const { buffer, pageCount } = await this.pdf.render(
       {
         date: new Date(row.updatedAt).toISOString().slice(0, 10),
@@ -182,6 +203,29 @@ export class FairVisitPlanService {
   }
 
   /**
+   * 存量结果的形态必须与「现在」的活动状态一致。
+   *
+   * 覆盖两条真实路径：直接敲 URL / 收藏里的旧链接（getLatest），
+   * 以及活动结束前生成、结束后才去打印的旧二维码（printPlan）。
+   * 只改前端守卫挡不住这两条，所以判定放在服务端且**先于**任何渲染。
+   */
+  private assertModeStillValid(stored: StoredFairVisitPlan): void {
+    const currentMode = resolveFairVisitMode(stored.fair.endAt)
+    // 旧结果没有 mode 字段的，按其形态推断（历史数据一律是 preparation）。
+    const storedMode = stored.payload.mode ?? 'preparation'
+    if (storedMode === currentMode) return
+    throw new NotFoundException({
+      error: {
+        code: 'FAIR_VISIT_PLAN_STALE_MODE',
+        message:
+          currentMode === 'review'
+            ? '该招聘会已结束，此前生成的参会准备单不再适用，请重新生成参会回顾'
+            : '该招聘会状态已变化，请重新生成',
+      },
+    })
+  }
+
+  /**
    * A-6：落 AiServiceLog（仅元数据）。
    * 一次都没打到模型（如 AI_NOT_CONFIGURED 直接抛错）时不落，避免污染失败率告警。
    */
@@ -214,7 +258,10 @@ export class FairVisitPlanService {
     const positionCount = ctx.fairCompanies.reduce((sum, company) => sum + company.positions.length, 0)
     return {
       fair: ctx.fair,
-      payload,
+      // mode 是服务端按 endAt 判定的事实，不采信模型回传值：
+      // 形态决定了纸上印什么、以及存量结果日后还能不能被读出，
+      // 不能让模型（或任何桩）有机会左右它。
+      payload: { ...payload, mode: ctx.mode } as FairVisitPlanPayload,
       providerName: 'llm',
       basedOn: {
         resume: true,
@@ -226,15 +273,47 @@ export class FairVisitPlanService {
     }
   }
 
-  private toResponse(taskId: string, stored: StoredFairVisitPlan) {
+  private toResponse(
+    taskId: string,
+    stored: StoredFairVisitPlan,
+    localRecords?: { openedCompanySourceEntries: string[]; requiresLogin: boolean },
+  ) {
     return {
       taskId,
       status: 'completed' as const,
       basedOn: stored.basedOn,
       fair: stored.fair,
       ...stored.payload,
+      ...(localRecords ? { localRecords } : {}),
       providerName: stored.providerName,
     }
+  }
+
+  /**
+   * 回顾态的「本机记录」事实区。**不经过 LLM**，也**绝不并进 LLM 上下文**。
+   *
+   * 只取一类信号：本人在本机打开过来源投递入口的参展企业（fair_company +
+   * external_apply，其 externalId 存的就是所属招聘会 id）。
+   * 刻意不取「打开过签到入口」——那既不代表到场（compliance-boundary §4.4
+   * 明确不记录签到入场状态），又最容易被读成「你去过」。
+   */
+  private async loadLocalRecords(
+    fairId: string,
+    endUserId: string | null,
+  ): Promise<{ openedCompanySourceEntries: string[]; requiresLogin: boolean }> {
+    if (!endUserId) return { openedCompanySourceEntries: [], requiresLogin: true }
+    const rows = await this.prisma.externalJumpLog.findMany({
+      where: { endUserId, targetType: 'fair_company', action: 'external_apply', externalId: fairId },
+      orderBy: { createdAt: 'desc' },
+      select: { targetTitle: true },
+      take: 50,
+    })
+    const names: string[] = []
+    for (const row of rows) {
+      const name = row.targetTitle?.trim()
+      if (name && !names.includes(name)) names.push(name)
+    }
+    return { openedCompanySourceEntries: names.slice(0, 12), requiresLogin: false }
   }
 
   private async loadFairContext(fairId: string): Promise<Omit<FairVisitPlanContext, 'resumeText'>> {
@@ -251,6 +330,8 @@ export class FairVisitPlanService {
       throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: '招聘会不存在或未发布' } })
     }
     return {
+      // ⚠️ 只由 endAt 判定，调用方无从指定；且**不含任何到场信号**（见 FairVisitPlanContext 注释）。
+      mode: resolveFairVisitMode(fair.endAt),
       fair: {
         id: fair.id,
         title: fair.title,
