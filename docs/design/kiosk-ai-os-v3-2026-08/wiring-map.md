@@ -11,6 +11,15 @@
 > 凡涉及打印 / 权益 / 计价的 ❌，本表只指路，不另出方案 —— 一律引用规格对应小节。
 >
 > **计价与权益口径**已拍板，见 `backend-contract-pricing-benefits.md` 与上面那份规格，本文不重复论证。
+>
+> **［2026-08-18 部分订正］** 本表成稿于 2026-08-11，所据分支早于 PR #570（08-10 合入 main）。
+> 此后多条「缺 / 不存在」的判定已被主干实现推翻 —— 若照原文开工，会去重造已经存在的端点。
+> 本轮对 `origin/main@85eb7a3b4` 重验，**只订正「某端点 / 某能力存不存在」判定已经反转的条目**，
+> 原结论保留在括注里以便追溯；未标注订正的条目本轮复核仍然成立（含四个 `kiosk/*` 空壳桩、
+> `redactedFileId` 恒 null、会话钟零实现、`FileProvenance` / `OrderQuote` / `BenefitReservation` 全无）。
+> 已订正：§1.1 `39` / `41` claim / `41` wrongdoc、§4 `36`、§5 `21` 分页 / `21` 条件对照、
+> §8 `22` ai-down、§9 `04` s5 / `40` leftover、§11 A6 / A7 / A8 / A11 / B5 / B6 / B7 / B22 / B25、
+> §12 第 1 / 21 / 22 / 26 / 34 条。**行号会漂，订正条目一律以符号名与提交号为准。**
 
 ---
 
@@ -144,7 +153,7 @@ FileProvenance
 | `08` t3 证件照 | — | **缺** | ⏸ | 见 §1.5 |
 | `39` 能力探测（八张能力卡的可用态） | 逐能力开关 | `GET /terminals/:terminalId/capabilities` | ⚠️ | 匿名可读，返回 10 个键。**该端点只认 `Terminal.id`**，而 `/config` 与 `/printer-status` 两者都认 `id` 或 `terminalCode` —— 前端要统一持有 `Terminal.id`。fail-closed 口径与设计 §0.2「读不到不得默认设备正常」一致 ✅ |
 | `39` 设备在线 / 打印机状态 | device-off 态判定 | `GET /terminals/:terminalId/printer-status` | ✅ | 匿名。`isOnline` = 最近心跳 < 5 分钟。终端存在但没心跳返回 `isOnline:false` 而不是 404 |
-| `39`「异常反馈」六选项 | 提工单 | `POST /me/feedback` | ⚠️ | **需会员登录**。`category` 只有四类 `device \| print \| file_process \| general`，设计的六个选项（没出纸/不清楚/扫描失败/文件没收到/收费退款/其他）要前端归并。`content` 必填 10–500 字。未登录点这个按钮必须先过身份门 |
+| `39`「异常反馈」六选项 | 提工单 | `POST /kiosk/feedback`（匿名）/ `POST /me/feedback`（会员） | ✅ | **［2026-08-18 订正］原记「只有需登录的 `POST /me/feedback`，六选项要前端归并」，现已有匿名提交面**：`member-feedback/kiosk-feedback.controller.ts:24-33`，免登录、6 次/60 秒/IP + 落库的 5 条/10 分钟与 20 条/60 分钟按终端限流。客户端只传 `issueCode`（9 值封闭词表，`dto/kiosk-feedback.dto.ts`），`category` 由服务端映射 —— 词表**就是照 P39 六选项与 P06 s7 定的**（`device_out_of_paper / print_quality_defect / scan_issue / upload_issue / billing_issue / other` …），前端不必再自己归并。2026-08-16 `6caedd6dc`(#612) 落地。注意**只开「提交」一个动作**：没有列表 / 详情 / 追加 / 关单，匿名侧拿不到任何工单读能力，那些仍走会员端 `/me/feedback` |
 | `39` AI 三条捷径（不知道用哪个 / 帮我检查文件 / 打印前隐私检查） | 意图分流 | `POST /assistant/chat` + `POST /materials/tasks` | ✅ | 前两条走 chat，第三条直接开 `pii_scan` 任务 |
 
 ### 1.4 P41 履约与异常八处境
@@ -158,8 +167,8 @@ FileProvenance
 | `41` 三处「打印退款凭条 / 回执 / 失败凭条」 | 把单号金额渲染成一张 A4 | **缺** | ❌ | 没有凭条渲染端点。要做成：`POST /orders/:id/receipt {kind:'refund'\|'paid'\|'refund_failed'}` → 与其他 `/print` 端点同形（`{fileId, filename, pageCount, printFileUrl}`），再由 `POST /print/jobs` 出纸。**必须免费**（设计已写「本机不收费」）—— 免费单走 `amountCents:0` 自动 paid 分支即可 |
 | `41` supply「我关好了，继续打」 | 卡纸后续打剩余份数 | **缺** | ❌ | 见 buildout-spec「⑥」：同一 Order 下由工作人员授权 attempt 2，`complimentaryRetry=true`，**不重新付款、不重新报价、不再次核销权益**。接口 `POST /admin/orders/:orderId/print-resolution {printTaskId, expectedVersion, resolution:'authorize_reprint', operatorNote}` |
 | `41` supply「改到另一台机器」 | 跨机续打 | **缺** | ❌ | 需要「凭取件码在另一台机重排」的能力：`POST /print/pickup/redeem {pickupCode, terminalId}` 校验后在新终端下建 attempt。约束：一次只能一台机认领（CAS）、原单不重复收费、取件码单次有效期内可重试 |
-| `41` claim「确认认领」自助取件核销 | 输取件码 → 核销 → 出纸 | **缺**（`POST /print/jobs/claim-pickup` 不存在） | ❌ | ⚠️ **这条已经是线上的假接真**：生产 `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:44` 正在调这个不存在的路径。要做成：`POST /print/jobs/claim-pickup {pickupCode, terminalId}` → 校验码有效 + 订单 `paid` + 未退款 + 任务未终态 → CAS 置 `claimed` → 返回 `{taskId, orderId, status}`。**幂等**（同码重复提交返回同一结果）、**限流**（防爆破 10 位码）、**一次性**（认领后码作废） |
-| `41` wrongdoc「立即上报 / 原样交回」 | 错件事故登记 | ⚠️ 只能落 `POST /me/feedback` | ⚠️ | 需登录，且没有「机位 + 时间 + 订单号」的结构化字段（只有 `terminalId` / `relatedPrintTaskId` 两个可选串）。要做成结构化上报见 §11 |
+| `41` claim「确认认领」自助取件核销 | 输取件码 → 核销 → 出纸 | `POST /print/jobs/claim-pickup` | ⚠️ | **［2026-08-18 订正］原记「不存在 / 线上假接真」，该判定已不成立**：端点在 `print-jobs.controller.ts:33-38`，转 `PickupOrderService.claim(dto.code, terminalId)`，限流 20/min。**入参形态与本表原方案不同**：body 只有 `{code}`（`dto/claim-pickup.dto.ts` 用 `/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/` 校验，去掉了易混字符），终端从 `x-terminal-id` 头取、不在 body 里。2026-08-12 `c61b7e06f`(feat(print): wire miniapp order-only pickup flow) 落地，本表成稿时确实不存在。⚠️ **本轮只验了路由存在性**：幂等、单次有效、以及「订单已付 + 未退款 + 任务未终态」三项前置是否都在 `PickupOrderService` 内，接线前请自行核对，不要因为路由在就当语义齐全 |
+| `41` wrongdoc「立即上报 / 原样交回」 | 错件事故登记 | ⚠️ `POST /kiosk/feedback`（匿名）/ `POST /me/feedback` | ⚠️ | **［2026-08-18 订正］「只能落需登录的 `/me/feedback`」已不成立** —— 匿名侧有 `POST /kiosk/feedback`（见 §1.1 的 `39` 行）。**但本行的实质问题没变**：两个端点都只有 `terminalId` / `relatedPrintTaskId` 这类可选串，**仍没有「机位 + 时间 + 订单号」的结构化事故字段**，错件登记拿不到可追责的结构。结构化上报见 §11 |
 
 ### 1.5 P29 证件照工作台
 
@@ -253,7 +262,7 @@ FileProvenance
 
 | 页面·动作 | 需要的能力 | 对应端点 | 状态 | 备注 |
 |---|---|---|---|---|
-| `36` 第一屏「城市 + 日期 + 方向」筛选 | 按城市/日期/方向筛场次 | `GET /job-fairs` | ⚠️ | **后端只有 `status / page / pageSize / terminalId` 四个参数** —— 城市、日期范围、方向、主题**一个都没有**。（`fair.types.ts:114-120` 里有一个声明了 `theme/city/startAfter` 的 `FairListQuery`，但**没有任何路由用它**。）36 的第一屏目前接不上 |
+| `36` 第一屏「城市 + 日期 + 方向」筛选 | 按城市/日期/方向筛场次 | `GET /job-fairs` | ⚠️ | **［2026-08-18 订正］原记「只有 `status / page / pageSize / terminalId` 四个参数」，现为五个** —— 2026-08-17 `6210efa07`(#652) 加了 `keyword`（服务端 OR contains 全表检索，与 `/jobs` 同做法，`jobs.controller.ts:146-152`）。**城市、日期范围、方向、主题仍然一个都没有**，36 第一屏的三个筛选依旧接不上。（`fair.types.ts` 那个声明了 `theme/city/startAfter` 的 `FairListQuery` 仍无路由使用。）**同一次提交还把 `status` 与 `keyword` 下推到了 Prisma where**，原来「分页后内存过滤」的计数 bug 已消，见 §12 第 22 条 |
 | `36` / `17` s1 场次列表 | 列场次 | `GET /job-fairs` | ⚠️ | **`status` 是分页之后在内存里过滤的**（`jobs-kiosk.service.ts:176-181`）→ `pagination.total` 是未过滤的总数、每页条数会短。后端 bug，前端不能拿 `total` 当真 |
 | `17` s1 场次详情 | 一次拿场次+企业+分区 | `GET /job-fairs/:id/detail` | ✅ | **后端有、设计没用上**：一次返回 `{fair, companies[], zones[]}`，17 现在要发三次请求。见 §10 |
 | `17` s2 参会企业 | 列企业 | `GET /job-fairs/:id/companies` + `/:companyId` | ✅ | `page/pageSize`，按 `jobsCount desc`。**没有关键词/行业/展区筛选** |
@@ -282,10 +291,10 @@ FileProvenance
 | 页面·动作 | 需要的能力 | 对应端点 | 状态 | 备注 |
 |---|---|---|---|---|
 | `38` 四个分类入口（就业/社保/档案/补贴） | 按分类筛政策 | `GET /policies?category=` | ⚠️ | query 只有 `kind / audience / category` 三个，**且公开 GET 不校验取值** —— 打错一个字静默返回空列表（`policies.service.ts:100-102`）。合法值：`kind ∈ policy_guide\|notice`、`audience ∈ graduate\|flexible\|migrant\|hardship\|startup\|general`、`category ∈ policy\|announcement\|notice\|recruitment`。**注意后端的 `category` 四值与设计的四个分类（就业/社保/档案/补贴）不是同一套分类轴** —— 设计的分类在后端没有对应字段 |
-| `21` 政策列表 / 翻页 | 分页 | `GET /policies` | ⚠️ | **完全没有分页**，硬 `take: 200`（`policies.service.ts:96-106`）。也**没有关键词搜索**。21 页脚「看全部 N 条」只能在这 200 条里做 |
+| `21` 政策列表 / 翻页 | 分页 | `GET /policies` | ⚠️ | **［2026-08-18 订正］「完全没有分页，硬 `take: 200`」已不成立**：现有 `page` / `pageSize` 两个 query（`policies.controller.ts:56-65`），service 真分页并回 `pagination{page,pageSize,total,totalPages}`（`policies.service.ts:103-125`，`pageSize` 默认与上限均为 200、`page` 上限 10000）。于是 21 页脚「看全部 N 条」拿得到真 `total` 了。**仍然没有关键词搜索** —— `policies` 目录下零 `keyword` 命中 |
 | `21` s2 政策原文 | 详情 | `GET /policies` 的列表项自带 `content`（≤10000 字） | ⚠️ | **没有 `GET /policies/:id`**。43 与 38 的深链 `?policyId=p1` 只能拉全量再前端找 —— 一旦超过 200 条就找不到了。要做成 `GET /policies/:id`，见 §11 |
 | `21` 政策来源三件套 | 来源机构/同步时间/外部 ID | `GET /policies` 的 `sourceOrgId`/`sourceName`/`syncTime` | ⚠️ | `PolicyPostDto` 有 `sourceOrgId / sourceName / syncTime`，**缺 `externalId` 和 `sourceUrl`**（外部入口字段叫 `externalUrl`）。合规要求详情页展示外部 ID —— 政策详情这一项目前给不出 |
-| `21` s1→s2「看我卡在哪」条件对照 | 按用户情况核对政策条件、列缺口 | **缺** | ❌ | 后端零实现。要做成 `POST /policies/:id/eligibility-check {city, identity, insuredStatus, unemploymentRegistered, insuredMonths, graduationYear, ...}` → `{items:[{condition, status:'met'\|'unmet'\|'unknown', basis}], gaps[], nextSteps[]}`。**硬约束**：允许「不确定」，结论标「待确认」；**绝不能表述成资格认定或代办**（本公司无人力资源服务许可证）；不与人社系统打通 |
+| `21` s1→s2「看我卡在哪」条件对照 | 按用户情况核对政策条件、列缺口 | `GET /policies/eligibility-questions` + `POST /policies/eligibility-check` | ⚠️ | **［2026-08-18 订正］原记「后端零实现」，已落地**：2026-08-16 `743942db2`(#631，三态判定) + 2026-08-17 `ce7b608fb`(#645，Partner 侧条件录入与判定预览)。**路径形态与本表原方案不同**：不是 `POST /policies/:id/eligibility-check`，而是**不带 `:id`** 的 `POST /policies/eligibility-check`，body `{answers, policyIds}` 可一次核对多条（`policies.controller.ts:74-90`）。免登录、20 次/60 秒；用 POST 而非 GET 是因为作答含户籍 / 参保 / 失业登记，**不得进 URL query**；作答**不落库、不进审计、不进日志**。问项取值必须从 `GET /policies/eligibility-questions` 字典拉，**前端不得自己硬编码** —— 取值漂移会让已录入条件静默失配、结果全变「无法判定」。原「允许不确定 / 不表述成资格认定或代办」的硬约束不变 |
 | `21` s3「生成办事清单」 | 按事项列材料清单 | **缺** | ❌ | `job-materials` 只有招聘会清单模板。要做成 `POST /policies/:id/checklist` → `{items[{name, required, note, source}]}` + 一个 print 端点 |
 | `21` s3「去打印 · 清单 1 份 + 原文 2 份」 | 把政策原文渲染成 PDF | **缺** | ❌ | 政策 `content` 是纯文本字段，**没有把它渲成 A4 的端点** —— 没有文件就调不了 `/print/jobs`。要做成 `POST /policies/print {policyIds[], includeChecklist:boolean}` → `{fileId, printFileUrl, pageCount}` |
 | `21` 官方热线 / 官网二维码 | 站点级官方渠道配置 | **缺** | ❌ | 见 §11 的「站点配置下发面」（`hotline` / `officialSiteUrl` 按城市下发） |
@@ -366,7 +375,7 @@ FileProvenance
 | `20` / `37` 历史报告 | 只列本人 | `GET /me/mock-interviews` | ⚠️ | **快照把它误写成 `GET /mock-interviews`**，见 §13。会员限定 |
 | `22` s1 现状 → s2 方向与缺口 | 职业规划 | `POST /resume/career-plan/:taskId` | ⚠️ | **`:taskId` 必须是已有的简历 parse taskId** —— 22 s1「你现在会什么」若没有简历就跑不起来。会自动叠加同 task 的 job-fit、最近一次面试报告、最近一次自我评估作为上下文 ✅ |
 | `22` s3「带走行动清单」 | 出规划单 | `POST /resume/career-plan/:taskId/print` | ✅ | 出文件（源码注释说「进打印订单」是**过时注释**，代码并不建订单） |
-| `22` ai-down 降级「只看岗位计数表」 | 数岗位要求条数 | **缺** | ❌ | 没有「本机读过的岗位正文里某类要求出现多少条」的统计端点。要做成 `GET /jobs/requirement-counts?category=&city=` → `{items:[{requirement, count, sampleJobIds[]}], scannedJobCount, syncedAt}`。**必须是原文计数，不是模型判断**（这正是该降级态的价值：E1/E2 不依赖 AI） |
+| `22` ai-down 降级「只看岗位计数表」 | 数岗位要求条数 | `GET /jobs/requirement-stats` | ⚠️ | **［2026-08-18 订正］原记「缺，后端没有这个统计端点」，已落地**：2026-08-17 `ffe8b3259`(#636)。**端点名与本表原方案不同** —— 是 `requirement-stats` 不是 `requirement-counts`（`jobs.controller.ts:126-141`），query 为 `keyword / city / industry / category / workType / sourceOrgId`（与 `GET /jobs` 同一套）。无鉴权，与 `GET /jobs` 同为已审核已发布岗位的公开只读聚合，**且不返回任何岗位标识**（所以本表原方案里的 `sampleJobIds[]` 拿不到，别照着接）。仍是原文计数、非模型判断，证据分级 E2 |
 | `37` 面试域首屏三条分诊 | 纯前端分流，不调接口 | 无需端点 | ✅ | |
 | `37`「行业薪资参考」 | 同方向岗位薪资区间 | `GET /jobs` 的 `salaryMin/Max` 字段 | ⚠️ | 字段返回了但**不能按薪资筛选、也没有聚合端点**。设计写的是「来源方原文转录，不预测你个人能拿多少」✅ 合规，但要做出「区间分布」得前端自己聚合本页数据 |
 | `37`「面试技巧 · 建设中」 | 技巧内容 | **缺** | ⏸ | 设计已标「建设中」并禁用 ✅。要做需要一个内容模型（可复用 toolbox item 或新建 `GET /kiosk/interview-tips`） |
@@ -386,10 +395,10 @@ FileProvenance
 | `04` s2 法务文本 | 隐私政策 / 服务条款 / AI 声明 | `GET /kiosk/legal/:type` | ⚠️ | 四个合法值：`privacy_policy / terms_of_service / ai_disclaimer / contract_review_disclaimer`。**非法 type 不报错，静默回 `terms_of_service`**（`legal.controller.ts:11-13`）—— 前端拿到的可能是错的文档而不是错误。返回含 `version`，**登录流程要用这个版本号**（见 §7 的 03） |
 | `04` s2「扫码存全文」 | 把法务全文带走 | **缺** | ❌ | 同「本机 → 手机下行通道」 |
 | `04` s3 会话超时 / `40` 六个会话处境 | 服务端会话钟 | `POST /kiosk/session/heartbeat` / `POST /kiosk/session/extend` | ❌ | **两个都是空壳**：整个 controller 14 行，恒返回 `{ok:true}`，`KioskSessionService` 是空类且没被注入（`kiosk-session/kiosk-session.controller.ts:1-14`）。**服务端零会话状态、零超时**。40 的六个处境（无操作预警 / 超时锁屏 / 会话接管 / 结束并清空 / 断电恢复 / 遗留物）后端一个都不支撑。要做成：`POST /kiosk/sessions` 建会话 → `POST /kiosk/sessions/:id/heartbeat` → `POST /kiosk/sessions/:id/extend` → `POST /kiosk/sessions/:id/end {reason}`；服务端持有 `hintSec/graceSec` 并在超时时**吊销该会话签发的所有一次性 token**（这才是公共终端隐私清场的真正落点，光靠前端计时不成立） |
-| `04` s5「接着上次做」会话恢复 | 恢复未完成办理单 | **缺**（`GET /me/pending-tasks` 不存在） | ❌ | ⚠️ **这条也是线上的假接真**：生产 `/session-resume` 页在调这个不存在的端点。要做成 `GET /me/pending-tasks` → `{items:[{kind:'print_order'\|'ai_task'\|'upload_session', refId, title, terminalCode, updatedAt, resumable:boolean}]}`，**只回本人、只回未完成、不自动铺开内容**（设计 P04 明写「要不要恢复由你决定，本机不直接把它铺开」） |
+| `04` s5「接着上次做」会话恢复 | 恢复未完成办理单 | `GET /me/pending-tasks` | ⚠️ | **［2026-08-18 订正］原记「不存在 / 线上假接真」，该判定已不成立**：`member-print-orders.controller.ts:69-80` 的 `MemberPendingTasksController`，类级 `EndUserAuthGuard`、`Cache-Control: no-store`，转 `MemberPrintOrdersService.listPending(endUserId)`，无任务回 `[]`。2026-08-09 `83588b8f1` 提交、随 PR #570 于 08-10 进 main，本表成稿所据分支早于它。**但口径只有一半**：它只覆盖会员本人可续办的**打印**任务，本表原方案里的 `ai_task` / `upload_session` 两类仍无来源，且**需登录**（匿名会话恢复不成立）。通用办理单恢复依赖 Errand 模型，见 §11 A11 |
 | `40` handover 会话接管（换人） | 通知另一台机结束会话 | **缺** | ❌ | 依赖上面的会话模型：`POST /kiosk/sessions/:id/takeover {newTerminalId}` → 旧会话立即 end + 清 token |
 | `40` recover 断电恢复 | 恢复到第 3 步 | **缺** | ❌ | 同上，需要服务端记住「进行到哪一步」。可与 `OrderQuote`（buildout-spec）合并考虑：报价快照本身就是「进行到哪一步」的可信载体 |
-| `40` leftover 遗留物「呼叫服务台」 | 现场求助 | **缺** | ❌ | 要做成 `POST /kiosk/service-calls {terminalId, reason, relatedOrderId?}` → 落告警中心（`GET /admin/alerts` 已有读侧）。当前只能落 `POST /me/feedback`（需登录，不合适） |
+| `40` leftover 遗留物「呼叫服务台」 | 现场求助 | ⚠️ `POST /kiosk/feedback` 可兜底 | ⚠️ | **［2026-08-18 订正］「当前只能落需登录的 `POST /me/feedback`」已不成立**：2026-08-16 `6caedd6dc`(#612) 落了免登录的 `POST /kiosk/feedback`，公共位无人值守场景可以先用它兜底。**但它不是服务呼叫**：词表是打印 / 扫描 / 上传 / 费用九类 issueCode，没有「遗留物」，也不进告警中心的实时通路。原方案 `POST /kiosk/service-calls {terminalId, reason, relatedOrderId?}` → 落告警中心（`GET /admin/alerts` 已有读侧）仍待做，见 §11 B22 |
 | `01`/`04` 站点信息（机号 / 场馆 / 服务台 / 客服电话 / 城市） | 站点配置下发 | **缺** | ❌ | `GET /terminals/:id/config` 只回 `smartCampus` + `toolbox` + `configVersion` + `refreshIntervalMs` + `serverTime`（`terminals-admin.service.ts:622-641`），**没有任何站点文案字段**。设计 §4C 列的 `serviceDeskLocation / serviceHours / supportPhone / venueName / terminalNo / cityCode / officialSiteUrl / hotline` 一个都没有。要做成 `config` 增一个 `site:{...}` 段；**缺配置时返回空串而不是示例值**，前端照兜底文案渲染（设计稿的 `FALLBACK` 已经写好了） |
 
 ---
@@ -436,12 +445,12 @@ FileProvenance
 | A3 | **报价锁价（`quoteId` / `expiresAt` / `priceVersionId`）** | `06` s3→s4「后台刚调价」那一屏 | buildout-spec **「价格版本」+「报价快照」+「报价接口」**：新建 `PriceVersion` 与 `OrderQuote`，移除 `PriceConfig.serviceKey @unique`；报价改成 `POST /orders/quotes`（带 `Idempotency-Key`），建单改成 `POST /print-jobs {quoteId}`。**在这之前，屏上不能承诺「你看到的就是你要付的」**（设计稿已按此写好那一屏 ✅） |
 | A4 | **权益预占** | `06` s4→s5 之间 | buildout-spec **「权益预占」**：`BenefitReservation`（`quoteId @unique`、`held/committed/released`、`version` CAS）。预占只加 `quantityReserved`，提交时才 `quantityRemaining -= 1` 并建 `RedemptionRecord`。**两台终端争最后一次额度，最多一台成功** |
 | A5 | **月度周期余额 + 有效状态** | `24` s1、`06` s4 | buildout-spec **「③ 月度周期余额」**：`BenefitPeriodBalance`（`@@unique([benefitGrantId, periodKey])`，`Asia/Shanghai` 自然月，`[startsAt, endsAt)`，不结转，月中首领发整月 N 次）。`GET /me/benefits` 增 `balance{total, remaining, reserved, available, nextResetAt}` 与 `effectiveStatus`（**读时同步计算，不靠午夜 cron**） |
-| A6 | **止血：现有 `/orders/:id/redeem` 不得再按任意 Grant 整单免** | `06` s4 | buildout-spec **「迁移与灰度 · 第一阶段」第 1 条**：对打印订单默认拒绝，最终只接受**已提交的 Reservation**。历史 Grant 无法证明规则的返回 `BENEFIT_RULE_MISSING`，暂不可核销 |
-| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**队列未出现 / 普通超时不得写 complete**（规格「需要纠正的几点」第 1 条，`apps/terminal-agent/src/agent/task-runner.ts:495`）—— 这是无人值守机器的上线阻塞 |
-| A8 | **自助取件核销端点** | `41` claim「确认认领」 | `POST /print/jobs/claim-pickup {pickupCode, terminalId}` → 校验码有效 + 订单 `paid` + 未退款 + 任务未终态 → CAS 置 `claimed` → `{taskId, orderId, status}`。**幂等**（同码重提返回同一结果）、**强限流**（10 位码要防爆破）、**单次有效**（认领后作废）。⚠️ 生产 `apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx:44` **已经在调这个不存在的路径** |
+| A6 | ~~止血：现有 `/orders/:id/redeem` 不得再按任意 Grant 整单免~~ **［2026-08-18 订正：已完成，勿重做］** | `06` s4 | **止血闸已在 main 上**：2026-08-17 `385a20632`(#683) 起，`benefit-redemption.service.ts:173-181` 在**任何写入之前**对 `order.type === 'print'` 直接抛 `REDEEM_PRINT_ORDER_UNSUPPORTED`（同一事务内拒绝，不会留半个核销；`resume_optimize` 等非订单核销 `orderId` 恒 null，不走这条路径、不受影响）。源码注释直接引本表 §12 第 1 条作为口径来源。**A6 到此为止，不要再写第二道止血**；A1–A5 的正式规则链（面值 / 抵扣上限 / 适用范围 / 预占 / 周期余额）仍全部未建，止血解除必须等它们，届时改成只接受**已提交的 Reservation**，历史 Grant 返回 `BENEFIT_RULE_MISSING` |
+| A7 | **履约判定与失败补偿** | `06` s6 六处境、`41` 全八屏 | buildout-spec **「⑥ 履约判定与失败补偿」**：`PrintTask` 增 `orderId / attemptNo / retryOfTaskId / complimentaryRetry / dispatchStage / outputOutcome / outputOutcomeSource / outcomeEvidenceJson`；新建 `PrintExceptionCase` 与 `RedemptionAdjustment`；`Order` 增 `fulfillmentStatus`。工作人员接口 `POST /admin/orders/:orderId/print-resolution`。**［2026-08-18 订正］原文这一句 ——「队列未出现 / 普通超时不得写 complete，见 `task-runner.ts:495`」—— 已不成立**：Agent 侧对四类不确定结果统一 fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是唯一出口 —— 非 Windows（`task-runner.ts:582-585`）、队列连续 5 次 not_found 且从未见过活动作业（`:662-668`）、监控硬超时含 Pantum `Printing, Retained` 态（`:679-704`）、崩溃后 `spooled`/`dispatching` 恢复（`:289-299`）；`apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 有覆盖。2026-08-09 `fbc762dd0`(fix: fail closed on unverified print outcomes) 落地、随 PR #570 于 08-10 进 main，本表成稿所据分支早于它。**A7 剩下的仍然要做**：`PrintTask` 的 attempt / 履约证据字段、`PrintExceptionCase` / `RedemptionAdjustment`、`Order.fulfillmentStatus`、上面那个工作人员接口，以及 Windows 真机对这条 fail-closed 行为的验收 —— **但不要再按「Agent 误报 completed」去修，那个洞已经堵上了** |
+| A8 | ~~自助取件核销端点~~ **［2026-08-18 订正：端点已存在，勿重造］** | `41` claim「确认认领」 | `POST /print/jobs/claim-pickup` 已于 2026-08-12 `c61b7e06f` 落地（`print-jobs.controller.ts:33-38` → `PickupOrderService.claim()`，限流 20/min）。**入参与原方案不同**：body 只有 `{code}`（10 位大写码，正则去掉了易混字符），终端走 `x-terminal-id` 头。原文「生产 `PrintPickupClaimPage.tsx:44` 已经在调这个不存在的路径」**不再成立** —— 页面与端点现在对得上。⚠️ **本轮只验了路由存在性**：幂等、单次有效、以及「订单 `paid` + 未退款 + 任务未终态 → CAS 置 `claimed`」是否都在 `PickupOrderService` 内，接线前请自行核对；若确有缺口，那是**补语义**不是**建端点** |
 | A9 | **PII 遮盖产物** | `06` s2「遮住这一处再继续」 | `POST /materials/tasks {kind:'pii_redact'}` 目前 `redactedFileId` 恒 `null`（`materials.service.ts:617-634`）。要真的产出一份打了码的新 FileObject 并回 `redactedFileId + printFileUrl`，否则 s2→s3 断链 |
 | A10 | **服务端会话钟** | `04` s3、`40` 六处境 | `POST /kiosk/sessions` / `:id/heartbeat` / `:id/extend` / `:id/end`。服务端持 `hintSec/graceSec`，**超时时吊销该会话签发的全部一次性 token**（`x-resume-access-token`、`X-Upload-Session-Control`、`X-Scan-Session-Control`、`x-payment-session-token`）。公共终端的隐私清场只靠前端计时不成立 |
-| A11 | **`GET /me/pending-tasks`** | `04` s5 会话恢复 | `{items:[{kind, refId, title, terminalCode, updatedAt, resumable}]}`，只回本人未完成的。⚠️ 生产 `/session-resume` 已经在调它 |
+| A11 | ~~`GET /me/pending-tasks`~~ → **通用办理单恢复** **［2026-08-18 订正：同名端点已存在，勿重造］** | `04` s5 会话恢复 | `GET /me/pending-tasks` 已于 2026-08-09 `83588b8f1` 提交、随 PR #570 于 08-10 进 main（`member-print-orders.controller.ts:69-80`，`EndUserAuthGuard` + `no-store`，无任务回 `[]`）。原文「生产 `/session-resume` 已经在调它」现在是**正常接线**，不是假接真。**剩下的缺口是覆盖面不是端点**：当前只回会员本人可续办的打印任务，`ai_task` / `upload_session` 两类无来源，且匿名用户完全不适用。要做通用办理单恢复，应在 Errand 模型成立后**扩展这个端点**，不要另建同名的第二个 |
 | A12 | **站点配置下发面** | `01` / `02` / `04` / `21` / `39` / `41` 全站 | `GET /terminals/:id/config` 增 `site:{terminalNo, venueName, cityCode, serviceDeskLocation, serviceHours, supportPhone, peerTerminal, hotline, officialSiteUrl}`。**缺配置返回空串，不返回示例值** —— 前端已有兜底文案（`scripts/site-config.js` 的 `FALLBACK`） |
 
 ### B. 可后做（不阻塞出纸与收钱，但页面要靠它才完整）
@@ -452,9 +461,9 @@ FileProvenance
 | B2 | **清单类 PDF 渲染（8 处共用）** | `13` 岗位清单、`14` 岗位信息、`15` 企业与岗位信息、`16`/`44` 机构与路线 / 到店问题清单、`21` 政策要点与办事清单、`45` 展位图与顺序、`46` 报到 / 办卡清单 | **建议做成一个统一端点**而不是八个：`POST /print-renders {kind, refIds[], options}` → `{fileId, filename, pageCount, printFileUrl}`。`kind` 枚举与设计稿的 `kind=` 参数对齐（`job-list / policy-checklist / fair-plan / material / assessment-sheet / interview-sheet / resume-report / jobfit-report / contract-report / id-photo-sheet / template`）。**内容一律服务端渲染**，客户端只给 ID 与选项，不能塞任意文本；**第三方条目必须逐条带来源机构 / 同步时间 / 外部 ID**；**AI 生成内容每页恰好一次 AIGC 标识** |
 | B3 | **扫描参数** | `07` s1/s2 | `POST /scan/sessions` DTO 增 `{outputFormat:'pdf'\|'jpeg'\|'pdf_ocr', dpi:200\|300\|600, colorMode:'bw'\|'gray'\|'color', source:'adf'\|'flatbed', duplex:'both'\|'one'}`，随 claim 下发给 Agent。`pdf_ocr` 在 OCR 不可用时必须能被探测为不可选 |
 | B4 | **岗位筛选补齐** | `13` 25 项筛选 | `GET /jobs` 增 `salaryMin / salaryMax / experience / education / sourceKind / sort`；`city` 支持省市区三级；`industry` 从 `tagsJson` 字符串匹配改成正式字段 |
-| B5 | **招聘会筛选** | `36` 第一屏、`17` s1、`18` | `GET /job-fairs` 增 `city / theme / startAfter / startBefore / keyword`；**并修掉 `status` 分页后内存过滤的 bug**（`jobs-kiosk.service.ts:176-181`） |
-| B6 | **`GET /policies/:id` + 分页 + 关键词** | `21` / `38` / `43` 深链 | 现在硬 `take:200` 且无详情端点，`?policyId=` 深链超过 200 条就找不到 |
-| B7 | **政策条件对照 + 办事清单** | `21` s2 / s3 | `POST /policies/:id/eligibility-check` → 逐条 `met/unmet/unknown` + 依据；`POST /policies/:id/checklist` → 材料清单。**允许「不确定」，结论标「待确认」；绝不表述成资格认定或代办**（本公司无人力资源服务许可证） |
+| B5 | **招聘会筛选**（**［2026-08-18 订正］范围已缩小） | `36` 第一屏、`17` s1、`18` | **`keyword` 与那个分页 bug 都已经做完了**：2026-08-17 `6210efa07`(#652) 加了服务端 `keyword` 全表检索，并把 `status` / `keyword` 下推到 Prisma where、`total` 改为分组计数之和，同时新增 `verify:fair-list-integrity`（11 项）挂进双 CI。**本条剩下的只有 `city / theme / startAfter / startBefore` 四个筛选** —— 不要再去改 `jobs-kiosk.service.ts` 的分页逻辑，那里已经是下推版 |
+| B6 | **`GET /policies/:id` + 关键词**（**［2026-08-18 订正］分页已完成，从本条移除） | `21` / `38` / `43` 深链 | **分页已经有了**：`GET /policies` 现有 `page` / `pageSize` 并回 `pagination{total,totalPages}`（`policies.service.ts:103-125`），原文「硬 `take:200`」不再成立。**仍缺的是详情端点与关键词** —— `policies.controller.ts:70-73` 的注释明写「本控制器没有 `GET /policies/:id`」，`policies` 目录零 `keyword` 命中，所以 `?policyId=` 深链仍要拉列表再前端找 |
+| B7 | **办事清单**（**［2026-08-18 订正］条件对照已完成，从本条移除） | `21` s2 / s3 | **条件对照已经做完了**：`POST /policies/eligibility-check`（**不带 `:id`**，body `{answers, policyIds}`，可一次核对多条）+ 问项字典 `GET /policies/eligibility-questions`，2026-08-16 `743942db2`(#631) 落地、2026-08-17 `ce7b608fb`(#645) 补 Partner 侧条件录入与判定预览。作答不落库不进日志。**本条剩下的只有 `POST /policies/:id/checklist` 材料清单**。合规硬约束不变：允许「不确定」，结论标「待确认」；绝不表述成资格认定或代办（本公司无人力资源服务许可证） |
 | B8 | **简历版本模型** | `09` s5、`42` 我的简历 | `ResumeVersion{resumeId, versionNo, fromTaskId, fileObjectId, adoptedModulesJson}` + `GET /me/resumes/:id/versions`。**只新增版本、永不覆盖原件** |
 | B9 | **`optimize` 产物的导出** | `09` s5「导出 PDF」 | 让 `POST /resume/generate/export` 接受 optimize 产物，或新增 `POST /resume/records/:taskId/export` |
 | B10 | **逐条「换一版」** | `09` s4 | `POST /resume/records/:taskId/optimize/:moduleIndex/regenerate` → 只回该条新 `after`，带 `attemptNo` 与每条上限 |
@@ -469,10 +478,10 @@ FileProvenance
 | B19 | **U 盘文件面** | `06` s1 | 由 Agent 推成 FileObject，Kiosk 凭 control token 取。**绝不让浏览器直接读本地盘** |
 | B20 | **凭条 / 回执渲染** | `41` 三处 | `POST /orders/:id/receipt {kind}` → 同其它 print 端点形态。**必须免费**（走 0 元单自动 paid 分支） |
 | B21 | **跨机续打** | `41` supply | `POST /print/pickup/redeem {pickupCode, terminalId}` → 新终端下建 attempt。一次只能一台机认领（CAS），原单不重复收费 |
-| B22 | **现场服务呼叫** | `40` leftover、`41` refund-fail / wrongdoc | `POST /kiosk/service-calls {terminalId, reason, relatedOrderId?}` → 落告警中心（读侧 `GET /admin/alerts` 已有）。当前只能落需登录的 `POST /me/feedback`，不合适 |
+| B22 | **现场服务呼叫** | `40` leftover、`41` refund-fail / wrongdoc | `POST /kiosk/service-calls {terminalId, reason, relatedOrderId?}` → 落告警中心（读侧 `GET /admin/alerts` 已有）。**［2026-08-18 订正］原文「当前只能落需登录的 `POST /me/feedback`」已不成立** —— 免登录的 `POST /kiosk/feedback` 已于 2026-08-16 `6caedd6dc`(#612) 落地，可作兜底。**但本条不能因此关掉**：那是工单提交面（九类打印 / 扫描 / 上传 / 费用 issueCode，无「遗留物」，不进告警中心实时通路），不是现场服务呼叫 |
 | B23 | **办理单（Errand）模型** | `01` 意图台、`04` s5、`40` recover | `{errandId, intent(封闭集 7), goalText, steps[], assets[], context, advice, status}`。在它落地前，屏上的「#E-7742」应降级成本地会话号并注明。可与 A3 的 `OrderQuote` 合并考虑 —— 报价快照本身就是「进行到哪一步」的可信载体 |
 | B24 | **校招计划表** | `18` s3 | `POST /campus/plan {fairIds[], resumeTaskId?}` → `{timeline[], checklist[]}` + print |
-| B25 | **岗位要求原文计数** | `22` ai-down 降级 | `GET /jobs/requirement-counts` → `{items:[{requirement, count, sampleJobIds[]}], scannedJobCount, syncedAt}`。**必须是原文计数不是模型判断** —— 这正是该降级态的价值 |
+| B25 | ~~岗位要求原文计数~~ **［2026-08-18 订正：已完成，勿重造］** | `22` ai-down 降级 | 已于 2026-08-17 `ffe8b3259`(#636) 落地，**但端点名是 `GET /jobs/requirement-stats` 不是 `requirement-counts`**（`jobs.controller.ts:126-141`），query 与 `GET /jobs` 同一套，无鉴权。**且它刻意不返回任何岗位标识** —— 本条原方案里的 `sampleJobIds[]` 拿不到，接线时别照着旧字段写。仍是原文计数、非模型判断（证据分级 E2）|
 | B26 | **到店问题清单生成** | `16` detail | `POST /kiosk/offline-agencies/:id/visit-questions` → `{questions[], checklist[]}`。**只能是「到店要问什么」，不得表述成代办 / 代排队 / 资格认定** |
 | B27 | **助手输出打印** | `25` / `26` | `POST /assistant/sessions/:sessionId/print {messageIds[]}`。**必须带 AIGC 标识**（每页恰好一次 + 文件元数据） |
 | B28 | **落款位建议** | `08` t2 | `POST /print/sign/suggest-placement` → `{page, position, confidence, reason}` |
@@ -506,7 +515,7 @@ FileProvenance
 
 | # | 项 | 设计怎么写 | 后端实际 | 建议改哪边 |
 |---|---|---|---|---|
-| 1 | **免单券语义** | 四道闸全满足 → 整单免 + 扣 1 | `discountCents = order.amountCents`，**不分品类、无上限、不看色彩、不看场景**（`benefit-redemption.service.ts:152-160`） | **改后端**（A1–A6）。在补齐前**立即止血**：`/orders/:id/redeem` 对打印订单默认拒绝 |
+| 1 | **免单券语义** | 四道闸全满足 → 整单免 + 扣 1 | `discountCents = order.amountCents`，**不分品类、无上限、不看色彩、不看场景**（`benefit-redemption.service.ts:152-160`） | **改后端**（A1–A5）。**［2026-08-18 订正］止血闸已经装上了** —— `benefit-redemption.service.ts:173-181` 自 2026-08-17 `385a20632`(#683) 起对 `order.type === 'print'` 在任何写入前抛 `REDEEM_PRINT_ORDER_UNSUPPORTED`（源码注释直接引本条为口径来源）。所以「整单免单」当前**打不出来**；下面「后端实际」一列描述的仍是止血闸之后那段代码的形态，解除止血必须先有 A1–A5 |
 | 2 | **核销需要登录** | `06` s4 只在「未认领身份」处境提登录，其余处境看起来匿名可用 | `POST /orders/:id/redeem` 是类级 `EndUserAuthGuard`，匿名 401 | **改前端**：任何要用券的分支都先过身份门；`NEEDS_IDENTITY` 原因码要覆盖全部匿名场景 |
 | 3 | **报价不锁价** | 设计已诚实标注「本机不锁价、确认下单时服务端重算」✅ | 确实不锁：`quotePrint` 无 quoteId/expiresAt，`effectiveFrom` 不被读（`pricing.service.ts:24`），`serviceKey @unique` 存不下两份价 | 口径一致 ✅。**改后端**补 A3 后可以把这段话换成「已锁价至 XX:XX」 |
 | 4 | **手机接力二维码有效期** | `site-config.js` `handoffQrSec: 300`（5 分钟） | `SESSION_TTL_SECONDS = 600` 硬编码（`upload-sessions.service.ts:87`） | **改前端**：读服务端返回的 `expiresAt`，不要用本地常量 |
@@ -526,12 +535,12 @@ FileProvenance
 | 18 | **求职材料需登录** | `12` 看起来匿名可用 | `POST /job-materials/generate` 是 `EndUserAuthGuard`（而 `GET /templates` 匿名） | **改前端**：生成前过身份门 |
 | 19 | **岗位 AI（收敛 / 解读 / 匹配）需登录** | `13`/`14` 是匿名浏览页 | `POST /jobs/ai/recommendations` 与 `/ai/explain` `/ai/match` 实际**会员限定 + `job_ai` 同意**；另有日限流 20/100/60 | **改前端**：先过身份门与同意，或把这块降级成非 AI 排序 |
 | 20 | **岗位筛选 25 项** | `13` 筛选面板 | 后端 7 个；无薪资/经验/学历/排序；`city` 精确等值；`industry` 是 tag 串匹配 | **改前端**先只放能生效的 + **改后端**（B4） |
-| 21 | **招聘会筛选（城市/日期/方向）** | `36` 第一屏 | `GET /job-fairs` 只有 4 个参数 | **改后端**（B5） |
-| 22 | **`GET /job-fairs?status=` 破坏分页** | — | 分页后内存过滤，`total` 是未过滤总数、页条数会短 | **改后端**（bug）。前端不能拿 `total` 当真 |
+| 21 | **招聘会筛选（城市/日期/方向）** | `36` 第一屏 | **［2026-08-18 订正］** 原记「只有 4 个参数」；`6210efa07`(#652) 加了 `keyword`，现为 5 个。城市 / 日期 / 方向仍然没有 | **改后端**（B5，范围已缩小） |
+| 22 | ~~**`GET /job-fairs?status=` 破坏分页**~~ **［2026-08-18 订正：已修复］** | — | 原记「分页后内存过滤，`total` 是未过滤总数、页条数会短」。2026-08-17 `6210efa07`(#652) 把 `status` / `keyword` 下推到 Prisma where，`total` 改为分组计数之和（三态互斥且穷尽，各态 total 之和 = 不筛选 total） | **无需再改**。`total` 现在可以当真；回归门禁 `verify:fair-list-integrity` 已挂双 CI |
 | 23 | **`GET /kiosk/offline-agencies?service=` 破坏分页与 total** | — | 分页后内存过滤且把 `total` 改成当前页长度 | **改后端**（bug） |
 | 24 | **招聘会现场数据** | `45` stats 显示签到进度 / 浏览数 | 五个计数**恒 null**，`zoneBreakdown` 恒 `[]` | **改前端**：按 null 走「主办方未提供」，**不能显示 0**；后端 B17 |
 | 25 | **展位图** | `17` s3 / `45` 画展位方块 | `/map` 的 `booths` **恒空** | **改前端**改接 `/venue-guide`（§10 第 1 条），那里才有展厅与展位号 |
-| 26 | **政策深链 `?policyId=`** | `21`/`38`/`43` 都在传 | 无 `GET /policies/:id`，列表硬 `take:200` | **改后端**（B6） |
+| 26 | **政策深链 `?policyId=`** | `21`/`38`/`43` 都在传 | **［2026-08-18 订正］** 列表「硬 `take:200`」已不成立，现有真分页与 `total`；**但 `GET /policies/:id` 仍然没有**（`policies.controller.ts:70-73` 注释明写），深链仍要拉列表再前端找 | **改后端**（B6，范围已缩小到详情端点 + 关键词） |
 | 27 | **政策分类轴** | `38` 四类：就业 / 社保 / 档案 / 补贴 | 后端 `category ∈ policy\|announcement\|notice\|recruitment` —— **不是同一套轴** | **改后端**（加 `topic` 字段）或**改前端**（用 `audience` 近似并说明） |
 | 28 | **政策来源三件套** | 合规要求详情页展示外部 ID | `PolicyPostDto` **缺 `externalId` 与 `sourceUrl`** | **改后端**（补字段） |
 | 29 | **企业列表来源字段** | 合规要求列表卡至少来源机构 + 同步时间 | `GET /companies` 列表项**只有 `sourceName`**，缺 `syncTime`/`externalId`/`sourceUrl`；`/companies/:id/jobs` 缺 `syncTime` | **改后端**（补字段） |
@@ -539,7 +548,7 @@ FileProvenance
 | 31 | **收藏企业 / 机构** | `15`/`16` 有收藏按钮，`43` 有「企业 0」chip | `FAVORITE_TARGET_TYPES` 只有 job / job_fair / policy，非法值 400 | **改后端**（B16）。在此之前这两个按钮**不能显示成已收藏** |
 | 32 | **权益「可用」不等于能用** | `24`/`06` 已明写这一点 ✅ | `status` 原样返回，读时不算过期；但 redeem 时**会**按 `validUntil` 判 `BENEFIT_EXPIRED` | 口径一致 ✅，但**前端仍要自己比 `validUntil`** 才能显示诚实的「已过期」；后端 A5 |
 | 33 | **活动限领次数** | `claimLimitPerUser` 在响应里 | 创建时恒写 1 且 claim 时**根本不读**，实际靠唯一索引每人一次 | **改前端**：不要做「限领 3 次」的 UI |
-| 34 | **异常反馈六选项** | `39` 六个 | `POST /me/feedback` 只有四类 category，**且需登录** | **改前端**：归并到四类 + 未登录先过身份门 |
+| 34 | ~~**异常反馈六选项**~~ **［2026-08-18 订正：后端已补匿名面］** | `39` 六个 | 原记「`POST /me/feedback` 只有四类 category 且需登录」。2026-08-16 `6caedd6dc`(#612) 落了免登录的 `POST /kiosk/feedback`，客户端传 `issueCode`（9 值封闭词表，**照 P39 六选项与 P06 s7 定的**），`category` 由服务端映射 | **改前端接 `/kiosk/feedback`**：不必再归并到四类、匿名不必先过身份门。注意匿名面**只开提交**，列表 / 详情 / 追加 / 关单仍走会员端 |
 | 35 | **通知计数** | `23` 写「7 条通知 · 2 条未读」 | `total` 是当前页长度、`nextCursor` 恒 null | **改前端**：只显示 `unreadCount`；后端 B15 |
 | 36 | **文件保留期限设置** | `23` 画的是账号级总设置 | 只有逐文件 `PATCH /files/:id/retention` | **改前端**（挪到文档列表逐份设）或**改后端**（补账号级默认） |
 | 37 | **`/me/*` 的 chip 计数** | `42` 订单 4 chip、`43` AI 5 chip、`42` 文档 3 chip | 无过滤参数 + cursor 分页 → **计数必然不准** | **改后端**（B14）。在此之前 chip 上不要显示数字 |
@@ -655,10 +664,19 @@ PY
 
 诚实列出，不猜：
 
-1. **Terminal Agent 侧的出纸判定细节。** 我只读了服务端（`services/api/src`），
-   buildout-spec 引用的 `apps/terminal-agent/src/agent/task-runner.ts:495`「队列多次未出现后按完成处理」
-   我**没有亲自打开复核**。A7 那条依据的是 buildout-spec 的结论（它注明已由 Claude 读过该 doc comment），
-   不是我自己的一手证据。Codex 动手前建议自己再看一眼那一段。
+1. ~~**Terminal Agent 侧的出纸判定细节。**~~ **［2026-08-18 已核实，结论反转］**
+   原文写的是：我只读了服务端（`services/api/src`），buildout-spec 引用的
+   `apps/terminal-agent/src/agent/task-runner.ts:495`「队列多次未出现后按完成处理」没有亲自复核，
+   A7 那条依据的是 buildout-spec 的转述而非一手证据。
+   **现已对 `origin/main@85eb7a3b4` 一手复核，且那个转述是错的**：`monitorPrintJob()` 的四类不确定
+   结果全部 fail-closed 成 `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是唯一出口 ——
+   非 Windows（`:582-585`）、连续 5 次 not_found 且从未见过活动作业（`:662-668`）、
+   硬超时含 Pantum `Printing, Retained` 态（`:679-704`）、崩溃后 `spooled`/`dispatching` 恢复（`:289-299`）。
+   只有「显式 Complete/Printed」与「先见到活动作业、随后离开队列」两条才回 `failed:false`，
+   且两处注释都写明这**只确认 Windows 打印后台生命周期，不证明纸真的到了用户手上**。
+   `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 有覆盖（含非 Windows 路径）。
+   变化时点：2026-08-09 `fbc762dd0`，随 PR #570 于 08-10 进 main，**本表成稿所据分支早于它**。
+   → 仍待做的是 Windows 真机验收，不是修「误报 completed」，见 A7。
 
 2. **`materials` 的 `pii_redact` 是否在别处真的产出了文件。**
    我确认了 `materials.service.ts:617-634` 只回计数、`redactedFileId` 恒 null（这一点来自子代理读取的行号），

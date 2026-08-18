@@ -49,7 +49,7 @@ FileProvenance → OrderQuote → BenefitReservation
 |---|---|---|---|
 | **① 计价权益主链** | 后端建模型与接口 + **同窗口顺手接 `apps/kiosk` 的核价 / 结算 / 权益** | 无 | **先开**，其余等它 |
 | **② 两个后台配置面** | Admin 配四道闸规则、Partner 数据面 | 需要 ① 的 schema | ① 的 schema 落地后 |
-| **③ 履约与硬件** | Agent 未确认出纸却报完成、取件页调不存在的端点 | 无 | **现在就能开**（已开两张任务卡） |
+| **③ 履约与硬件** | ~~Agent 未确认出纸却报完成、取件页调不存在的端点~~ → **［2026-08-18 订正］** 履约证据与 attempt 建模、异常补偿、取件核销语义核对、Windows 真机验收 | 无 | **现在就能开**（已开两张任务卡） |
 
 **① 之所以跨前后端放一个窗口**，正是因为它是一条链：契约在同一个上下文里定，不会漂。
 **② ③ 与它没有数据依赖**，可以并行。
@@ -93,7 +93,7 @@ docs/design/kiosk-ai-os-v3-2026-08/api-inventory-snapshot.md   后端 415 个端
 | 优先级 | 内容 |
 |---|---|
 | **P0 上线阻塞** | 价格版本与报价锁价、可信场景溯源、四道闸判定、月度余额、权益预占、有效状态、履约结果与补偿 |
-| **P0 立即止血** | 禁止现有 `/orders/:id/redeem` 按任意 Grant 整单免 |
+| ~~**P0 立即止血**~~ **［2026-08-18 订正：已完成］** | ~~禁止现有 `/orders/:id/redeem` 按任意 Grant 整单免~~ —— 已于 2026-08-17 `385a20632`(#683) 落地：`benefit-redemption.service.ts:173-181` 对 `order.type === 'print'` 在任何写入前抛 `REDEEM_PRINT_ORDER_UNSUPPORTED`。**不要再写第二道止血**；解除它要等上一行那七项建完 |
 | **条件性 P0** | 有政府资金才做独立资金预占/结算/冲正账本。**没有该账本，就不得把免单称为政府补贴** |
 | **P1** | `AiUsageLedger` 先 shadow 计量，没闭环前 AI 继续免费 |
 | **P2 建议不做** | 打印会员 / 订阅。「每月 N 次」不需要 Membership |
@@ -106,7 +106,11 @@ docs/design/kiosk-ai-os-v3-2026-08/api-inventory-snapshot.md   后端 415 个端
   报价锁价在改价场景下不串价；权益预占在并发下只有一台成功；
   券已核销而打印失败时走冲正而**不是删核销记录**。
 - **②**：Admin 保存一条规则后，Kiosk 报价返回的可用权益随之改变（端到端可见）。
-- **③**：未确认出纸不再上报 completed，且有 verify 脚本覆盖那三条路径。
+- **③**：~~未确认出纸不再上报 completed，且有 verify 脚本覆盖那三条路径~~ ——
+  **［2026-08-18 订正：这条验收在 main 上已经满足］** Agent 侧四类不确定结果统一 fail-closed 成
+  `PRINT_JOB_UNCONFIRMED`，`apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 已覆盖（含非 Windows 路径）。
+  ③ 的验收改为：`PrintTask` 履约证据 / attempt 建模、异常补偿链、取件核销语义（端点已存在，核对幂等与单次有效）、
+  以及 **Windows 真机对这条 fail-closed 行为的验收** —— 真机那项仍未做。
 
 ---
 
@@ -201,7 +205,27 @@ docs/design/console-ai-os-2026-08/                   双后台原型 24 页
 「**做不到的能力**」与「**恒为 0 的数字**」不在此列 ——
 前者要在用户动手前就挡住，后者只会制造噪音。
 
-#### 认领 ③ 号窗口的发现
+#### 认领 ③ 号窗口的发现 **［2026-08-18 订正：本节结论已被主干推翻，保留原文备查］**
+
+> **订正结论（对 `origin/main@85eb7a3b4` 一手复核）**：下面这三条 conservative completed 路径
+> **在 main 上都已经不存在了**。`monitorPrintJob()` 的四类不确定结果统一 fail-closed 成
+> `failed + PRINT_JOB_UNCONFIRMED`，`unconfirmedOutcome()` 是函数里唯一的不确定出口 ——
+> 非 Windows（`task-runner.ts:582-585`）、队列连续 5 次 not_found 且从未见过活动作业（`:662-668`）、
+> 监控硬超时含 Pantum `Printing, Retained` 态（`:679-704`），另加崩溃后 `spooled`/`dispatching`
+> 恢复（`:289-299`）。只有「显式 Complete/Printed」与「先见到活动作业、随后离开队列」两条才回
+> `failed:false`，且注释写明这**只确认 Windows 打印后台生命周期，不证明纸真的到了用户手上**。
+> 回归脚本 `apps/terminal-agent/scripts/verify-print-monitor-truth.ts` 覆盖了这些路径（含非 Windows）。
+>
+> **何时因何变化**：2026-08-09 提交 `fbc762dd0`（fix: fail closed on unverified print outcomes），
+> 随 PR #570（`codex/commercial-readiness-wave1-20260809`）于 2026-08-10 合入 main。
+> **本文件成稿于 08-11，但所据分支早于 #570**，因此当时读到的确实还是旧代码 —— 原结论不是编的，是过期的。
+>
+> **对 ③ 号窗口的影响**：不要再按「Agent 误报 completed」立任务卡。仍然要做的是履约证据与 attempt
+> 建模、异常补偿链，以及 **Windows 真机对这条 fail-closed 行为的验收**（那一项确实还没做）。
+> 同理，本节上文 §三 里「取件页调不存在的端点」也已不成立：`POST /print/jobs/claim-pickup`
+> 于 2026-08-12 `c61b7e06f` 落地，页面与端点现在对得上。
+
+**以下为 2026-08-11 原文，保留备查：**
 
 `monitorPrintJob()` 三条 conservative completed 路径已独立复核确认
 （`apps/terminal-agent/src/agent/task-runner.ts` doc comment 原文即写 conservative completed）：
