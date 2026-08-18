@@ -19,6 +19,13 @@
  *   「下架」渲染 ⟺ publishStatus === 'published'
  *
  * Run: pnpm --filter @ai-job-print/admin verify:source-publish-actions
+ *
+ * ⚠ 该 npm script 现在跑两个脚本：本文件（发布/下架按钮渲染条件），以及
+ *   scripts/verify-admin-content-trust-ui.mjs（发布的**前置**：来源机构内容可信控件）。
+ *   两者同属「运营到底能不能把内容发出去」这一面，且都是纯静态、无 DB 依赖。
+ *   之所以共用一个 script 名而不是各起一个：新增 verify:* 名字必须同时改
+ *   .github/workflows/ci.yml，否则 verify:ci-gate-coverage 会判它「未被任何 CI job
+ *   执行」而转红。拆名字时请连同 ci.yml 一起改。
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

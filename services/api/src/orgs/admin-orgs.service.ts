@@ -148,6 +148,14 @@ export interface AdminOrgListItem {
   sceneTemplate: string | null
   enabledModules: string[]
   enabled: boolean
+  /**
+   * 发布闸门读的那一列(src/common/content-trust.ts)。null = 从未标记,闸门拒绝。
+   * 只读回显;写入走 PATCH /admin/orgs/:id/content-trust(AdminOrgContentTrustService),
+   * 那是一次有人负责的核验决策,不允许当档案字段顺手改。
+   */
+  contentTrustStatus: string | null
+  /** archivedAt != null。已归档机构即使 contentTrustStatus='active' 也一样不得发布。 */
+  archived: boolean
   createdAt: string
   updatedAt: string
   counts: { accounts: number; sources: number; jobs: number; fairs: number }
@@ -166,6 +174,8 @@ interface PrismaOrgRow {
   sceneTemplate: string | null
   enabledModulesJson: string
   enabled: boolean
+  contentTrustStatus: string | null
+  archivedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -206,6 +216,8 @@ function mapOrg(
     sceneTemplate: o.sceneTemplate,
     enabledModules: parseModules(o.enabledModulesJson),
     enabled: o.enabled,
+    contentTrustStatus: o.contentTrustStatus,
+    archived: o.archivedAt != null,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
     counts,
