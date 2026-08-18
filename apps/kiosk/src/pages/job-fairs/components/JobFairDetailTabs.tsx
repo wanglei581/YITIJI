@@ -221,8 +221,11 @@ export function DetailsTab({
             </button>
             <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/visit-plan`)}>
               <span className="t-text">
-                <b>AI参会准备单</b>
-                <span className="cnt">基于本人简历生成</span>
+                {/* 已结束场次换语义：回顾 / 跟进，不再是「参会准备」。 */}
+                <b>{fair.status === 'ended' ? 'AI参会回顾' : 'AI参会准备单'}</b>
+                <span className="cnt">
+                  {fair.status === 'ended' ? '基于本人简历梳理后续跟进' : '基于本人简历生成'}
+                </span>
               </span>
             </button>
           </div>

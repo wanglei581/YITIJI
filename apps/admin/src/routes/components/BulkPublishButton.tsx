@@ -18,6 +18,11 @@ import {
   type BulkPublishPreviewResult,
   type OrgOption,
 } from '../../services/api/bulkPublish'
+// 指路文案里的位置**必须**来自这个常量,不许手写:
+// 2026-08-17 到 2026-08-18 之间,这里手写着「到『合作机构』把该机构标记为内容可信」,
+// 而 apps/admin/src/routes/partners/ 下当时根本没有任何 trust 控件 ——
+// 运营照着这句话找不到东西,只能去连数据库或跑维护脚本,绕过审计留痕。
+import { CONTENT_TRUST_UI_PATH_TEXT } from '../partners/contentTrustRules'
 
 // OrgOption / toOrgOptions 放在 services/api/bulkPublish.ts:
 // 组件文件只导出组件,避免 react-refresh 失效。
@@ -340,7 +345,8 @@ function PreviewStep({ preview, label }: { preview: BulkPublishPreviewResult; la
           <p className="mt-1 text-xs text-warning-fg">
             另有 {excluded.orgTrustInactive} 条已过审但<strong>来源机构未通过内容信任核验</strong>
             (未标记 / 已暂停 / 已撤销 / 已归档),按 fail-closed 不进本次发布范围。
-            需先完成来源授权核验,再到「合作机构」把该机构标记为内容可信。
+            需先完成来源授权核验,再由管理员到「{CONTENT_TRUST_UI_PATH_TEXT}」把该机构标记为内容可信
+            (标记时必须填核验依据,依据会进审计日志)。
           </p>
         )}
       </div>

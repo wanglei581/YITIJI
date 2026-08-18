@@ -576,6 +576,26 @@ export interface FairVisitPlanFairSnapshot {
   city: string
 }
 
+/**
+ * 参会准备（未结束） / 参会回顾（已结束）。服务端按 endAt 判定，前端只读不猜。
+ */
+export type FairVisitPlanMode = 'preparation' | 'review'
+
+/**
+ * 回顾态的「本机记录」事实区：**非 LLM 产物**，只来自本机真实记录的行为。
+ *
+ * 合规红线（compliance-boundary §4.4 / activity.types.ts）：系统只记录「浏览」
+ * 与「打开来源平台入口」两类行为。**打开签到入口 ≠ 到场**，系统不知道用户
+ * 是否到过现场、也不知道他在现场取得了什么材料，这些一律不得展示或推断。
+ * 因此这里只放最无歧义、也最有跟进价值的一项：在本机打开过来源投递入口的参展企业。
+ */
+export interface FairVisitPlanLocalRecords {
+  /** 本人在本机打开过来源投递入口的参展企业名（去重，按最近打开排序）。 */
+  openedCompanySourceEntries: string[]
+  /** 未登录会员时无法关联本人记录，此时为 true，页面须如实说明而不是显示「无记录」。 */
+  requiresLogin: boolean
+}
+
 export interface FairVisitPlanResponse {
   taskId: string
   status: 'completed' | 'failed'
@@ -588,12 +608,19 @@ export interface FairVisitPlanResponse {
     positionCount: number
   }
   fair?: FairVisitPlanFairSnapshot
+  /** 服务端判定的形态；缺省视为 preparation（历史结果）。 */
+  mode?: FairVisitPlanMode
   summary?: string
   fairHighlights?: string[]
   priorityCompanies?: Array<{ companyName: string; reason: string; sourceUrl: string | null }>
+  /** preparation 态字段 */
   preparationChecklist?: string[]
   questionsToAsk?: string[]
   onsiteTips?: string[]
+  /** review 态字段 */
+  followUpActions?: string[]
+  nextTimeQuestions?: string[]
+  localRecords?: FairVisitPlanLocalRecords
   providerName?: string
 }
 

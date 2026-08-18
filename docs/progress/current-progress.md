@@ -1,5 +1,37 @@
 # 当前开发进度
 
+2026-08-18 **删除 5 个零引用 placeholder 死页**：`apps/kiosk/src/pages/placeholders/` 下的 `OfflineAgenciesPage` / `OfflineJobDetailPage` / `PrintScanConvertPage` / `PrintScanFeaturePage` / `PrintScanSignPage`。删除依据（CLAUDE.md §8 五条）：全路径引用 0（`placeholders/XxxPage` 全仓零命中）、无路由引用（`routes/index.tsx` 指向的是 `offline-agencies/` 下的同名真实页）、无 verify 依赖、无当前文档声明、不被生产或硬件链路使用。**同名撞车提醒**：按组件名搜 `OfflineAgenciesPage` 会命中 7 处，全部指向 `offline-agencies/` 下的真实页——这正是 `docs/README.md` §四警告的 basename 陷阱，判定必须用全路径。证据来源：项目图谱孤儿检测（PR #716）与 `docs/design/kiosk-v6-migration-matrix.md` §(c) 双向独立印证，两套方法收敛到完全相同的这 5 个。产品负责人 2026-08-18 明确授权「只删那 5 个 placeholder」，同批候选中的其余 16 个源文件与 122 份文档本轮不动。
+
+2026-08-18 修复 **已结束招聘会的「AI参会准备单」改为「参会回顾」语义（分支 `claude/fair-visit-review`，基于 `origin/main@c66a970f6`，未合入、未部署）**。产品裁决：不隐藏入口，改语义。
+
+**洞在哪。** AI参会准备单全链路对招聘会状态完全无感，四层都没有 `endAt` 条件：`JobFairDetailPage.tsx` 的按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到 / 预约都收了，只有它漏了）、`JobFairDetailTabs.tsx` 磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 查询只有 `approved+published`。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。该洞由 [PR #708](https://github.com/wanglei581/YITIJI/pull/708) 复核「已结束招聘会」线索时顺带发现（那条线索本身判定不成立）。
+
+**为什么保留 LLM 调用而不是退化成静态页。** 6 段产出里 `priorityCompanies`（简历方向 × 参展企业名册匹配）在活动结束后**不但没失效反而更有用**——企业在招聘会结束后通常仍在招人，招聘会只是发现渠道；活动当天人在现场跑，结束后坐下来跟进才是用得上这份清单的时候。所以这不是浪费的调用，是同一份推理换个交付时机。真正坏掉的是另外三段（参会前准备清单 / 现场可咨询问题 / 现场提醒）——**语义坏了不是文案坏了**，改字解决不了「现场提醒」在活动结束后的存在问题；review 态换成「后续可做的跟进动作 / 下次同类活动可提前准备的问题」，`onsiteTips` 直接不出。
+
+**不许编的边界（本次最要紧的一条）。** 系统只记录「浏览」与「打开来源平台入口」两类本人行为（`activity.types.ts` / compliance-boundary §4.4），**打开签到入口 ≠ 到场**，现场取得了什么材料更是完全不知道。因此新增的「你在本机留下的记录」是**非 LLM 事实区**，只列一项最无歧义也最有跟进价值的信号：在本机打开过来源投递入口的参展企业（`fair_company` + `external_apply`）；**刻意不列「打开过签到入口」**——它既不代表到场，又最容易被读成「你去过」。`REVIEW_DISCLOSURE`（不记录你是否到场、也不记录你在现场取得的材料）屏幕与打印版同文。**任何到场信号都不得进入 LLM 上下文**，由断言 B8.3 反向钉死。
+
+**fail-closed 在服务端，不靠前端守卫。** `mode` 由服务端按 `endAt` 判定并**盖章写入存储**，不采信模型回传值（形态决定纸上印什么、以及存量结果日后还能不能被读出，不能让模型或任何桩左右它）。`getLatest` / `printPlan` 在**渲染之前**按「现在」重新判定：活动结束前生成的准备单，结束后拿旧链接或旧二维码回来一律拒发（`FAIR_VISIT_PLAN_STALE_MODE`）。纸是带走的，所以拒绝必须发生在抵达 PDF 渲染器之前；打印版标题与小节也随形态变（「招聘会参会回顾与后续跟进」/「四、后续可做的跟进动作」）。
+
+**先破后立。** 新增 `services/api/scripts/verify-fair-visit-review.ts`（30 条，内存假 Prisma + 真实 Service / 真实 PDF 渲染，不连库不起 HTTP），**串进已被 CI 执行的 `verify:fair-visit-plan`**，因此**不需要新增任何 `ci.yml` 行、也未在 `ci-gate-exemptions.json` 登记豁免**（`verify:ci-gate-coverage` 按闭包展开，实测 365/371 在闭包内、0 条待接线）。未修复代码上实测 8 条红。kiosk 侧 6 条 UI 断言并入已被 CI 执行的 `verify:jobfair-ui`，在干净 `origin/main@c66a970f6` 上实测 6 条全红。另做三类变异验证证明新断言有判别力：PDF 回顾分支退回 → B5 四条红（报错里直接列出纸面小节）；prompt 删掉「不得暗示到场」→ B6.2 红；诚实声明被「优化」掉 → B7 两条红。
+
+**⚠️ 过程中抓到并修掉自己写的一个空转闸门（记下来避免重复）。** B4「已结束后不得再打印存量准备单」第一版看似绿，实为**假绿**：`printPlan` 抛的是 `FILE_SIGNING_SECRET` 缺失（**环境错误**），而 `pdfCalls` 已经是 1 —— 过期的「出发前带齐简历」其实**已经进了 PDF 渲染器**，只是签名环节才炸。判据从「有没有抛错」改成「过期内容有没有抵达渲染器」，并补 B4b 断言「拒绝必须是服务端的有意判定，不能是缺环境变量之类的意外错误」，才构成真正的保护。教训：**门禁里任何「抛错即通过」的判据都要先问一句「这个错是不是环境噪声」。**
+
+**本机可判别性。** `verify:jobfair-review` / `verify:fair-list-integrity` / `verify:fair-info-fields` 首跑三条全红，实为缺 `DATABASE_URL`；按 `ci.yml` 同款做法 `DATABASE_URL=file:./prisma/dev.db` + `npx prisma db push` 后三条全绿——属环境噪声，已让它从「判别不了」变成「可判别」，未以此为由跳过。
+
+2026-08-18 修复 **政策页把内置办事指引与政策库混在一起展示（分支 `claude/content-visibility-fixes`，基于 `origin/main@a26eae3ca`，未合入、未部署）**。本条**对应下一条（#707 种子内容录入清单）登记的代码问题 C**；同批登记的 **D（已结束招聘会不隐藏、详情端点无日期条件）经复核判定不成立**，理由见下文，未改代码。
+
+**洞在哪。** `apps/kiosk/src/pages/renshi/RenshiPage.tsx` 把后端政策库条目和 5 条内置办事指引合并成一个数组 `[...policies.filter(kind==='policy_guide').map(fromPublished), ...BUILTIN_GUIDES]`，交给 `PolicyPanel` 平铺渲染。**并且这个「空」在旧代码里根本无法表达**：`PolicyPanel` 的空态挂在 `visible.length === 0` 上，而内置指引里 `builtin-skill-training` 的 `audiences` 含 `'general'`，`matchAudience` 对任何身份都返回 true —— 那条分支永远走不到，政策页从来就没有可达空态。
+
+**后果。** 一是 CLAUDE.md §9「不伪造能力」：政策库一条数据都没有时页面依旧满屏（已留实测截图，`/policies` 返回空数组时页面渲染 5 张完整卡片 + 完整详情面板，唯一线索是一行 16px 灰字）。二是更实际的——**挡在录种子数据前面**：运营录完 30 条政策打开页面看到满屏内容，无法判断自己录的到底进没进去，验收失去判别力。
+
+**怎么修。** `RenshiPage` 不再合并，`libraryItems` / `guideItems` 两个 prop 分开传；`PolicyPanel` 分区渲染 `data-policy-section=library|builtin`，政策库有自己的空态，且**区分两种空**：库为空 →「政策库还没有内容」，身份筛没了 →「当前身份下暂无匹配的政策」。详情面板补来源归属 chip。顺带修掉来源行的错误归因：此前政策 Tab 的来源行用**全部** `/policies` 结果计算，库里只有公告没有政策时会报出公告的来源机构与同步时间，把「没有政策」说成「有政策」；改为按 `kind` 各算各的。**内置指引保留**——本机通用办事参考本来就不来自政策库，有真实价值，问题只在于两者混在一起假装都是政策数据。
+
+**先破后立。** 两道闸门都先在未修复代码上证明会红，且在另开的干净 `origin/main` worktree 复跑确认。`verify:renshi-policy-ui` 新增 J1/J2/K：**J1 是 AST 断言而非字面量匹配**（遍历 `RenshiPage` 的数组字面量与 `.concat` 调用，任何把 policies 派生表达式与 `BUILTIN_GUIDES` 放进同一集合的写法都打红，改变量名躲不掉），J2 用正反例自检守卫本身没空转；`tests/visual/fusion-w4.spec.ts` 新增两条浏览器行为断言（跑在既有 `kiosk-browser-smoke`，**无需新增 CI 行**）：`/policies` 返回空时 library 分区 0 张卡且出现「政策库还没有内容」、builtin 分区仍 5 张；有 1 条真实政策时两分区各 1 / 5 张且不串。基线 worktree 上 J1+K 红、两条浏览器断言红（`data-policy-section` 元素不存在 / library 卡片数 0≠1），本分支全绿。
+
+**同批复核但判定不成立、因此未改的一条：「已结束的招聘会在前台不隐藏、详情端点无日期条件」。** 复核结论是**当前实现是对的**，不是缺陷。`buildPublishedFairGroups` 把已结束场次分到独立时间桶并拼在活跃场次之后（未结束 `startAt` 升序 → 已结束 `startAt` 倒序），前台 `JobFairsPage` 打 `.past` 类（`opacity:.65` + 去掉强调色左边框）、显示「已结束」状态 chip、**整块操作区连同收藏与扫码预约一起隐藏**，`JobFairDetailPage` 同样以 `!isEnded` 收掉扫码签到与扫码预约，首页高亮位与签到页各自只取 ongoing/upcoming。产品判断也是「显示但标注」而非完全隐藏：站在大厅机器前，上周结束的场次是噪音，所以必须沉底 + 明确标注；但求职者常来找「上次那场招聘会的资料」，完全隐藏会让详情页、收藏、浏览记录里的旧链接集体 404，详情端点因此**不应该**加日期条件（岗位不同——过期岗位会让人照着去投递，所以 `getPublishedJobById` 有 `jobValidityWhere()`；招聘会资料是档案，性质不一样）。**未为了有产出去改一段本来正确的代码。**
+
+**⚠️ 但复核顺带发现一处真实的、与上述判断同源的漏网（本次未修，需要单独裁决）**：「AI参会准备单」全链路对招聘会状态完全无感——`JobFairDetailPage.tsx` 的 AI准备单按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到/预约都收了，只有它没收）、`JobFairDetailTabs.tsx` 的「AI参会准备单」磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 的查询只有 `approved+published` 没有 `endAt` 条件，且 LLM system prompt 无当前日期锚点。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。仓库里已有现成的正确写法可复用（`bulk-publish-expiry.ts` 就在用 `buildFairStatusWhere('ended')` 并给出「该招聘会已于 X 结束」）。需要先定产品口径（按钮直接隐藏，还是把该页改成「回顾 / 资料整理」语义）再动手，故未并入本 PR。
+
 2026-08-18 完成 **V6 壳批 0：六个服务域 hub +「我的」并入 V6 暖纸壳（分支 `claude/v6-shell-batch0`，基于 `origin/main@15d9333d9`，未合入、未部署）**。
 
 **问题形态。** 首页 `/` 与 `/print-scan` 已是 V6 暖纸壳，但 `isV6Route` 是 `KioskRoot.tsx:112` 两个硬编码字面量比较，于是**从首页点进任何一个服务域，第一跳立刻掉回旧的深藏青壳** —— 首页承诺的观感当场被推翻。1080×1920 实测像素取证（顶栏中点 / 底栏中点）：改前 `/jobs-service` 为 `rgb(49,66,83)` / `rgb(14,34,56)`，`/`与`/print-scan` 为 `(254,252,246)` / `(255,253,247)`；改后八条路由全部为后者。**页面主体本来就是暖纸（`bg-canvas`），深色的只有顶栏与底栏** —— 所以这是一次纯壳修复，不是改版。

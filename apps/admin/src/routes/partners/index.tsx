@@ -31,6 +31,14 @@ import {
   type UpdateOrgInput,
 } from '../../services/api/orgsAdmin'
 import { PartnerAccountManager } from './PartnerAccountManager'
+import { OrgContentTrustPanel } from './OrgContentTrustPanel'
+import {
+  ORG_CONTENT_TRUST_STATUSES,
+  ORG_CONTENT_TRUST_STATUS_LABELS,
+  ORG_CONTENT_TRUST_UNSET_LABEL,
+  contentTrustPublishable,
+  type OrgContentTrustStatus,
+} from './contentTrustRules'
 
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +57,32 @@ const SCENE_TEMPLATE_STYLES: Record<string, string> = {
 }
 
 const STATUS_FILTERS = ['全部', '合作中', '已停用'] as const
+
+/**
+ * 列表里的「内容可信」单元格。
+ *
+ * 为什么列表也要显示：录种子数据时运营要一眼看出**哪几家还没盖章**，
+ * 否则只能逐个打开抽屉。判据是 active + 未归档两条，所以已归档必须单独标出来 ——
+ * 只显示 active 会让人以为已经能发了。
+ */
+function ContentTrustCell({ status, archived }: { status: string | null; archived: boolean }) {
+  const label =
+    status === null
+      ? ORG_CONTENT_TRUST_UNSET_LABEL
+      : (ORG_CONTENT_TRUST_STATUSES as readonly string[]).includes(status)
+        ? ORG_CONTENT_TRUST_STATUS_LABELS[status as OrgContentTrustStatus]
+        : status
+  const tone = status === 'active' ? 'success' : status === 'pending' ? 'warning' : status === null ? 'default' : 'error'
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <StatusBadge dot status={tone} label={label} />
+      {archived && <StatusBadge status="error" label="已归档" />}
+      {!contentTrustPublishable(status, archived) && (
+        <span className="whitespace-nowrap text-[11px] text-neutral-400">内容发不出去</span>
+      )}
+    </div>
+  )
+}
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -421,6 +455,16 @@ function OrgDetailDrawer({
             </div>
           </div>
 
+          {/* 内容可信:发布闸门的人工入口。放在档案之后、账号之前 ——
+              它决定这家机构的内容能不能对公众可见,比账号管理更靠前。 */}
+          <OrgContentTrustPanel
+            orgId={orgId ?? detail.id}
+            onChanged={() => {
+              onChanged()
+              void load(false)
+            }}
+          />
+
           <PartnerAccountManager
             orgId={orgId ?? detail.id}
             accounts={detail.accounts}
@@ -499,7 +543,7 @@ export default function PartnersPage() {
   return (
     <Page
       title="合作机构管理"
-      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 后台账号`}
+      subtitle={`共 ${orgs.length} 家合作机构 — 机构档案 · 授权启停 · 内容可信 · 后台账号`}
       actions={
         <button
           onClick={() => setCreateOpen(true)}
@@ -568,7 +612,7 @@ export default function PartnersPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr>
-                    {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
+                    {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '内容可信', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
                       <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                     ))}
                   </tr>
@@ -576,7 +620,7 @@ export default function PartnersPage() {
                 <tbody className="divide-y divide-neutral-900/[0.06]">
                   {paginated.length === 0 ? (
                     <tr>
-                      <td colSpan={12}>
+                      <td colSpan={13}>
                         <EmptyState
                           title={search ? '未找到匹配的机构' : '暂无合作机构'}
                           description={search ? '请尝试其他关键词' : '点击右上角"新增机构"录入第一家合作机构'}
@@ -617,6 +661,9 @@ export default function PartnersPage() {
                         <td className="px-4 py-3">
                           <StatusBadge dot status={o.enabled ? 'success' : 'error'} label={o.enabled ? '合作中' : '已停用'} />
                         </td>
+                        <td className="px-4 py-3">
+                          <ContentTrustCell status={o.contentTrustStatus} archived={o.archived} />
+                        </td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.accounts}</td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.sources}</td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.jobs}</td>
@@ -650,7 +697,9 @@ export default function PartnersPage() {
           </Card>
 
           <p className="mt-3 text-xs text-neutral-400">
-            合作机构是外部岗位/招聘会/政策数据的来源方。停用机构 = 该机构账号禁止登录 + 数据导入接口拒绝(已发布数据需到信息源逐条下架)。所有操作记录审计日志;不存在企业招聘端,不接收求职者简历。
+            合作机构是外部岗位/招聘会/政策数据的来源方。停用机构 = 该机构账号禁止登录 + 数据导入接口拒绝(已发布数据需到信息源逐条下架)。
+            「内容可信」是另一件事:它决定该机构的岗位/招聘会/政策**能不能被发布**,判据为状态 active 且机构未归档,在机构详情里核验与变更。
+            所有操作记录审计日志;不存在企业招聘端,不接收求职者简历。
           </p>
         </>
       )}

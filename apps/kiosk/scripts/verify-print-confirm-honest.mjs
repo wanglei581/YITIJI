@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 // ============================================================
 // verify:print-confirm-honest — Kiosk 打印确认页诚实性守卫
@@ -650,6 +651,196 @@ if (simEndActionsIncludeFailure) {
   pass('SIM 成功或失败结束态均提供返回首页 / 重新上传操作')
 } else {
   fail('SIM 结束操作区不得排除 failed；失败演示也必须有返回首页 / 重新上传出口')
+}
+
+// ============================================================
+// 16) 参数摘要：展示的值必须与真实参数同源（AST 断言）
+//
+// 2026-08-18 事故面：#692 放开彩色/双面后，确认页摘要卡的「色彩模式」和预览页
+// 「用量预估」的「颜色模式」两行仍写死 '黑白'，而报价
+// （unitCentsFor(config, params.colorMode)）与建单读的是真实值。
+// TerminalCapability 表里 color_print 零记录时彩色被禁用，撞不到；管理员一标
+// available，用户就会看到「黑白」、按彩色单价（print_color_page 50 分/页 vs
+// print_bw_page 20 分/页）扣款、拿到彩色纸 —— 多付钱 + CLAUDE.md §9 不伪造能力。
+//
+// 断言形态刻意不是「源码里必须出现 params.colorMode」这类字面量匹配 ——
+// 那种门禁被重构时会被顺手改掉字符串，洞原样打回。这里走 AST：
+//   16a) summaryRows 每一行的 value 表达式必须取自某个对象属性（即真实数据），
+//        纯字面量只允许出现在**白名单**里，且白名单每条都要有硬件事实作依据。
+//   16b) 展示色彩模式的表达式，必须与喂给 unitCentsFor(...) 的那个表达式**同源**
+//        （逐字比较两处的属性访问文本，而不是比对某个写死的名字：
+//         把 params 整体改名，两边一起变，仍然通过）。
+//   16c) 预览页 InfoRow 同理：value 不得是纯字符串字面量，白名单同上。
+//
+// 白名单只有硬件事实可以进：奔图 CM2800/CM2820 只有 A4，PrintJobParams.paperSize
+// 的类型就是字面量 'A4'（packages/shared/src/types/print.ts）。放宽白名单 = 放宽门禁。
+// ============================================================
+const LITERAL_ROW_ALLOWLIST = new Map([
+  ['纸张规格', 'CM2800/CM2820 仅 A4，PrintJobParams.paperSize 类型即字面量 A4（CLAUDE.md §3）'],
+])
+
+const parseTsx = (relativePath) =>
+  ts.createSourceFile(relativePath, read(relativePath), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+
+function findVariableInitializer(sourceFile, name) {
+  let found = null
+  const visit = (node) => {
+    if (
+      !found &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer
+    ) {
+      found = node.initializer
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return found
+}
+
+function objectProperty(objectLiteral, name) {
+  for (const property of objectLiteral.properties) {
+    if (!ts.isPropertyAssignment(property)) continue
+    const key = property.name
+    if ((ts.isIdentifier(key) || ts.isStringLiteralLike(key)) && key.text === name) return property.initializer
+  }
+  return null
+}
+
+/** 表达式里出现的所有属性访问（a.b / a[b]）文本；空数组 = 该表达式没读任何数据。 */
+function propertyAccessTexts(node) {
+  const texts = []
+  const visit = (child) => {
+    if (ts.isPropertyAccessExpression(child) || ts.isElementAccessExpression(child)) texts.push(child.getText())
+    ts.forEachChild(child, visit)
+  }
+  visit(node)
+  return texts
+}
+
+/** 第 index 个实参；找不到调用返回 null。 */
+function findCallArgument(sourceFile, calleeName, index) {
+  let found = null
+  const visit = (node) => {
+    if (
+      !found &&
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === calleeName &&
+      node.arguments.length > index
+    ) {
+      found = node.arguments[index]
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return found
+}
+
+const confirmAst = parseTsx(CONFIRM)
+const summaryRowsInit = findVariableInitializer(confirmAst, 'summaryRows')
+
+if (!summaryRowsInit || !ts.isArrayLiteralExpression(summaryRowsInit)) {
+  fail('确认页找不到 summaryRows 数组字面量 —— 摘要卡真实性无法审计，不得静默通过')
+} else {
+  const rows = []
+  for (const element of summaryRowsInit.elements) {
+    if (!ts.isObjectLiteralExpression(element)) continue
+    const labelNode = objectProperty(element, 'label')
+    const valueNode = objectProperty(element, 'value')
+    if (!labelNode || !valueNode || !ts.isStringLiteralLike(labelNode)) continue
+    rows.push({ label: labelNode.text, valueNode })
+  }
+
+  if (rows.length !== summaryRowsInit.elements.length || rows.length === 0) {
+    fail('summaryRows 每一项都必须是 { label: 字面量, value: ... }，否则本守卫审计不到')
+  } else {
+    // 16a) 每行 value 必须读真实数据；纯字面量只允许在白名单里。
+    let allSourced = true
+    for (const { label, valueNode } of rows) {
+      const reads = propertyAccessTexts(valueNode)
+      if (reads.length > 0) continue
+      const reason = LITERAL_ROW_ALLOWLIST.get(label)
+      if (reason) {
+        pass(`摘要行「${label}」写死值已登记豁免：${reason}`)
+      } else {
+        allSourced = false
+        fail(
+          `摘要行「${label}」的展示值没有读取任何真实字段（value = ${valueNode.getText().trim()}）——` +
+            ' 展示写死而计价用真实值，就是「看到的和付的钱不一致」',
+        )
+      }
+    }
+    if (allSourced) pass('确认页参数摘要每一行的展示值都取自真实参数（白名单外无写死值）')
+
+    // 16b) 展示的色彩模式必须与计价用的色彩模式同源。
+    const colorRow = rows.find((row) => row.label === '色彩模式')
+    const pricedColorArg = findCallArgument(confirmAst, 'unitCentsFor', 1)
+    if (!colorRow) {
+      fail('确认页摘要卡必须保留「色彩模式」行 —— 删掉它不算修好，用户仍然核对不到彩色/黑白')
+    } else if (!pricedColorArg) {
+      fail('确认页找不到 unitCentsFor(config, <色彩模式>) 调用 —— 无法证明展示与计价同源')
+    } else {
+      const pricedText = pricedColorArg.getText().trim()
+      const displayedReads = propertyAccessTexts(colorRow.valueNode).map((text) => text.trim())
+      if (displayedReads.includes(pricedText)) {
+        pass(`确认页展示的色彩模式与计价用的是同一个表达式（${pricedText}）`)
+      } else {
+        fail(
+          `确认页「色彩模式」展示值读的是 [${displayedReads.join(', ') || '无'}]，` +
+            `计价读的是 ${pricedText} —— 两者不同源，用户看到的会和扣款口径对不上`,
+        )
+      }
+    }
+  }
+}
+
+// 16c) 预览页「用量预估」的 InfoRow 同类守卫（确认页的上一步，同一批写死值来源）。
+const previewAst = parseTsx(PREVIEW)
+const infoRows = []
+const collectInfoRows = (node) => {
+  const isSelfClosing = ts.isJsxSelfClosingElement(node)
+  if (isSelfClosing || ts.isJsxElement(node)) {
+    const opening = isSelfClosing ? node : node.openingElement
+    if (opening.tagName.getText() === 'InfoRow') {
+      const attributes = opening.attributes.properties.filter(ts.isJsxAttribute)
+      const labelAttr = attributes.find((attr) => attr.name.getText() === 'label')
+      const valueAttr = attributes.find((attr) => attr.name.getText() === 'value')
+      if (labelAttr?.initializer && ts.isStringLiteralLike(labelAttr.initializer) && valueAttr) {
+        infoRows.push({ label: labelAttr.initializer.text, initializer: valueAttr.initializer })
+      }
+    }
+  }
+  ts.forEachChild(node, collectInfoRows)
+}
+collectInfoRows(previewAst)
+
+if (infoRows.length === 0) {
+  fail('预览页找不到任何带字面量 label 的 InfoRow —— 用量预估真实性无法审计')
+} else {
+  let previewSourced = true
+  for (const { label, initializer } of infoRows) {
+    // value="写死" 或 value={'写死'} / value={`写死`}（无插值）都算写死。
+    const isLiteral =
+      ts.isStringLiteralLike(initializer) ||
+      (ts.isJsxExpression(initializer) &&
+        initializer.expression !== undefined &&
+        ts.isStringLiteralLike(initializer.expression))
+    if (!isLiteral) continue
+    const reason = LITERAL_ROW_ALLOWLIST.get(label)
+    if (reason) {
+      pass(`预览页 InfoRow「${label}」写死值已登记豁免：${reason}`)
+    } else {
+      previewSourced = false
+      fail(
+        `预览页 InfoRow「${label}」写死成 ${initializer.getText().trim()} ——` +
+          ' 用户在同一页选了彩色/双面，摘要却说另一回事',
+      )
+    }
+  }
+  if (previewSourced) pass('预览页用量预估的每一行都取自真实状态（白名单外无写死值）')
 }
 
 if (failures > 0) {

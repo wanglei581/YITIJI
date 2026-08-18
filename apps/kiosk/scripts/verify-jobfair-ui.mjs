@@ -252,6 +252,52 @@ mustContain(
   } else pass('I-4. httpAdapter 未伪造非零展位签到数')
 }
 
+// ── J. 已结束招聘会 = 参会回顾，不是参会准备 ──────────────────────────────────
+//
+// 产品裁决（2026-08-18）：不隐藏 AI 入口，改语义。三层文案必须跟着状态走，
+// 且回顾态的诚实声明**不是提示文案、是对用户的声明**，不得以「优化」为由删除。
+// 服务端行为由 api 侧 verify:fair-visit-review 的 30 条断言守；这里只守 UI 三层。
+{
+  const planRel = 'src/pages/job-fairs/FairVisitPlanPage.tsx'
+  const detailRel = 'src/pages/job-fairs/JobFairDetailPage.tsx'
+  const tabsRel = 'src/pages/job-fairs/components/JobFairDetailTabs.tsx'
+  const planSrc = read(planRel)
+  const detailSrc = read(detailRel)
+  const tabsSrc = read(tabsRel)
+
+  if (planSrc === null || detailSrc === null || tabsSrc === null) {
+    fail('J. 招聘会 AI 参会页三件套缺失')
+  } else {
+    // J-1 诚实声明必须在页面里逐字存在（钉死；删掉即红）
+    const disclosure = '本系统不记录你是否到场，也不记录你在现场取得的材料'
+    if (planSrc.includes(disclosure)) pass('J-1. 回顾态诚实声明存在（不记录是否到场 / 现场取得的材料）')
+    else fail(`J-1. ${planRel} 必须逐字保留诚实声明：「${disclosure}…」——这是对用户的声明，不是可选文案`)
+
+    // J-2 声明必须真的渲染出来，而不是只留在注释里
+    const visible = /\{REVIEW_DISCLOSURE\}/.test(planSrc) && /export const REVIEW_DISCLOSURE/.test(planSrc)
+    if (visible) pass('J-2. 诚实声明以常量形式被真实渲染（非注释残留）')
+    else fail(`J-2. ${planRel} 的诚实声明必须作为 REVIEW_DISCLOSURE 常量渲染进页面`)
+
+    // J-3 回顾态不得出现「出发前 / 现场提醒」这类已失效语义
+    const reviewCopyOk = planSrc.includes("'后续可做的跟进动作'") && planSrc.includes('!isReview &&')
+    if (reviewCopyOk) pass('J-3. 回顾态改用「后续跟进」，现场提醒仅在未结束场次渲染')
+    else fail(`J-3. ${planRel} 回顾态必须换成后续跟进语义，且「现场提醒」需被 !isReview 守卫`)
+
+    // J-4 页面必须真的读取招聘会状态（此前从头到尾不取 fair、不读 status）
+    if (/getJobFairById/.test(planSrc) && /plan\?\.mode/.test(planSrc)) {
+      pass('J-4. 参会页读取招聘会状态，并以服务端判定的 mode 为准')
+    } else {
+      fail(`J-4. ${planRel} 必须取招聘会状态且优先采用服务端 plan.mode`)
+    }
+
+    // J-5 详情页按钮与磁贴文案随状态变化
+    if (/isEnded \? 'AI参会回顾'/.test(detailSrc)) pass('J-5. 详情页 AI 入口文案随已结束状态切换')
+    else fail(`J-5. ${detailRel} 的 AI 入口在已结束场次必须显示「AI参会回顾」`)
+    if (/fair\.status === 'ended' \? 'AI参会回顾'/.test(tabsSrc)) pass('J-6. 详情页磁贴文案随已结束状态切换')
+    else fail(`J-6. ${tabsRel} 的 AI 磁贴在已结束场次必须显示「AI参会回顾」`)
+  }
+}
+
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) — 招聘会/校园招聘 UI 疑似回退,合入前必须修复 ===`)
   process.exit(1)
