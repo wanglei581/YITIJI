@@ -610,6 +610,10 @@ jobs:
           # 且 deleteObject 失败后 tombstone 已落、cleanupExpired 再也捞不到 —— 须靠账本对账。
           # 用真 Prisma + 独立临时 SQLite(现有文件门禁的假 Prisma 对未知 where 键恒真放行)。
           pnpm --filter @ai-job-print/api verify:file-cleanup-cas-ledger
+          # 内容入库全链路 E2E:建机构→标可信→配数据源→导入→审核→发布→Kiosk 可见→浏览跳转落库，
+          # 六种 accessMode × 三类内容。真 HTTP + 真 Prisma + 真 Guard,须隔离库。
+          # 含反向断言:把闸门判据收紧以模拟「误拦正常数据」必须变红 —— 该拦的拦住、不该拦的放行两个方向都锁。
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:content-pipeline-e2e
           pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files
