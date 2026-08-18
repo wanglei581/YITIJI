@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-18 **移除融合版原型 `docs/design/kiosk-ai-os-fusion-2026-08/`**：产品负责人裁定该目录不再作为任何判断输入，删除 `index.html` / `scripts/` / `styles/` / 旧 `README.md`，避免与当前口径混淆。**`assets/` 保留**——`kiosk-visual-directions-2026-08/direction-{a,b,c,d}-home.html` 四页通过相对路径引用其中的 `kiosk-home-hero-job-fair.png`，一并删除会让那四页的图挂掉。删除前按 CLAUDE.md §8 核验：无 verify/CI 依赖、无 `apps/` 代码引用；其余 4 处引用均为 README 文字提及且已标注「历史候选」。同时确认三代原型口径：**目标 = `kiosk-ai-os-v3-2026-08/`（首页真值 `01-home-v6.html`，产品负责人称 V6，实际版本号 V3）；待替换的现状 = `kiosk-proto-2026-07/`（Gen 1，线上实现照它做）**。实测：51 个产品页中仅 2 页真正落地 V6（`/` 与 `/print-scan`），判据为代码标记（`V6HomeView`/`V6PrintHubView` + `home-v6.css`/`print-hub-v6.css` + `v6-runtime-shell`）而非注释。
+
 2026-08-18 完成 **内容信息库端到端链路实测 + 三处修复（分支 `claude/content-pipeline-e2e`，基于 `origin/main@7d6feaf31`，未合入、未部署）**：新增 `pnpm --filter @ai-job-print/api verify:content-pipeline-e2e`（117 断言，真实 HTTP + 真实 Prisma + 真实 Guard）。
 
 **为什么要跑这一趟。** 岗位 / 招聘会 / 政策三个库是一体机的主内容，机器摆出去、求职者点进「岗位信息」看到空列表，就等于这台机器没用。同日合入的两道发布闸门（`content-trust` / `publish-completeness`）各自都有**纯内存假 Prisma** 的单元门禁，但没有任何门禁在真实数据流上证明过两件事：该拦的拦住了、**不该拦的放行了**。只验拒绝等于可能把发布焊死而没人发现 —— 这正是本次补上的判别力。
