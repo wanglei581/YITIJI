@@ -2,6 +2,9 @@ import crypto from 'crypto'
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { decryptSecret, encryptSecret } from '../common/crypto/secret-cipher'
+// 取件码长度/字符集/签发/哈希的唯一定义。曾在本文件和 payment/order-status.service.ts
+// 各写一份 PICKUP_CODE_LEN=10，两处不同步即「按一种长度发码、按另一种长度收码」。
+import { hashPickupCode, randomPickupCode } from '../common/pickup-code'
 import { signFileUrl } from '../files/signing'
 import { OrderQuoteService } from '../payment/order-quote.service'
 import { OrderStatusService } from '../payment/order-status.service'
@@ -11,27 +14,12 @@ import type { PrintJobParamsDto } from '../print-jobs/dto/create-print-job.dto'
 import type { CancelMemberPrintOrderDto } from './dto/cancel-member-print-order.dto'
 import type { CreateMemberPrintOrderDto } from './dto/create-member-print-order.dto'
 
-const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
-const PICKUP_CODE_LEN = 10
 const PICKUP_TTL_MS = 24 * 60 * 60 * 1000
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 const ALLOWED_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 const REQUIRED_PII_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan'])
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 type TerminalSummary = { displayName: string | null; locationLabel: string | null }
-
-function randomPickupCode(): string {
-  const bytes = crypto.randomBytes(PICKUP_CODE_LEN)
-  let out = ''
-  for (let i = 0; i < PICKUP_CODE_LEN; i += 1) {
-    out += PICKUP_ALPHABET[(bytes[i] ?? 0) % PICKUP_ALPHABET.length]
-  }
-  return out
-}
-
-export function hashPickupCode(code: string): string {
-  return crypto.createHash('sha256').update(`m2-pickup-v1|${code}`).digest('hex')
-}
 
 function makeOrderNo(): string {
   const now = new Date()

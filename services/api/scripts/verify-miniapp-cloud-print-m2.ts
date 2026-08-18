@@ -7,7 +7,10 @@ import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { validateSync } from 'class-validator'
 import { AuditService } from '../src/audit/audit.service'
+import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN, randomPickupCode } from '../src/common/pickup-code'
+import { ClaimPickupDto } from '../src/print-jobs/dto/claim-pickup.dto'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
@@ -94,8 +97,88 @@ function assertCrossSurfaceWiring(): void {
   }
 }
 
+/**
+ * 取件码不变量：**签发出来的码，必须恒被受理端接受**。
+ *
+ * 这是本仓「PICKUP_CODE_LEN 重复定义两份」那个 bug 唯一能被自动发现的形态。
+ * 两份长度不同步时，typecheck 全绿、lint 全绿、页面全绿 —— 只有真的发一枚码、
+ * 再喂给真正的 DTO 校验器，才会看见「按 6 位发、按 10 位收」。
+ *
+ * 刻意不连库：这条不变量与数据无关，应该在最前面最快失败。
+ */
+function assertPickupCodeSpecInvariant(): void {
+  const SAMPLES = 500
+  const seen = new Set<string>()
+  const digitsSeen = new Set<string>()
+
+  for (let i = 0; i < SAMPLES; i += 1) {
+    const code = randomPickupCode()
+
+    if (code.length !== PICKUP_CODE_LENGTH) {
+      fail(`签发码长度应为 ${PICKUP_CODE_LENGTH}，实际 ${code.length}（${JSON.stringify(code)}）`)
+    }
+    if (!PICKUP_CODE_PATTERN.test(code)) {
+      fail(`签发码不符合当前格式 ${PICKUP_CODE_PATTERN}：${JSON.stringify(code)}`)
+    }
+
+    // ★ 核心不变量：把真码喂给真正的受理校验器（不是复刻一遍正则）。
+    const errors = validateSync(Object.assign(new ClaimPickupDto(), { code }))
+    if (errors.length > 0) {
+      fail(
+        `签发端与受理端长度/字符集不一致：randomPickupCode() 产出 ${JSON.stringify(code)}` +
+          `（${code.length} 位），但 ClaimPickupDto 拒绝了它 —— ` +
+          `${JSON.stringify(errors.map((e) => e.constraints))}。` +
+          '这正是 PICKUP_CODE_LEN 被复制成两份时的事故形态：在途取件码全部作废。',
+      )
+    }
+
+    seen.add(code)
+    for (const ch of code) digitsSeen.add(ch)
+  }
+  pass(`签发 ${SAMPLES} 枚码，全部为 ${PICKUP_CODE_LENGTH} 位纯数字且全部被 ClaimPickupDto 受理`)
+
+  // 随机性起码要是随机的：500 枚 6 位码全命中 10 个数字的概率 ≈ 1；
+  // 若字符集被写错成子集（或退化成常量），这里立刻红。
+  if (digitsSeen.size !== 10) {
+    fail(`签发码只用到 ${digitsSeen.size} 个不同数字，字符集疑似写错：${[...digitsSeen].sort().join('')}`)
+  }
+  if (seen.size < SAMPLES * 0.9) {
+    fail(`${SAMPLES} 次签发只得到 ${seen.size} 个不同码，随机源疑似退化`)
+  }
+  pass('签发码覆盖全部 10 个数字且无明显重复退化（随机源为 crypto.randomBytes + 拒绝采样）')
+
+  // 存量防线：10 位旧码必须仍被受理，否则已付费用户在过渡期取不到自己的文件。
+  const legacySample = 'AB2C7M9P3K'
+  if (validateSync(Object.assign(new ClaimPickupDto(), { code: legacySample })).length > 0) {
+    fail(`存量 10 位取件码 ${legacySample} 被拒 —— 已付费用户的在途订单将无法认领`)
+  }
+  pass('存量 10 位取件码仍被受理（过渡期不得让已付费用户取不到件）')
+
+  // 受理面不许被顺手放宽成「什么都收」。
+  for (const bad of ['12345', '1234567', '', 'ABCDEF', '12345A', 'AB2C7M9P3', 'AB2C7M9P3KL', 'AB2C7M9P30']) {
+    if (validateSync(Object.assign(new ClaimPickupDto(), { code: bad })).length === 0) {
+      fail(`受理面过宽：${JSON.stringify(bad)} 不应通过 ClaimPickupDto 校验`)
+    }
+  }
+  pass('错长度/错字符集的码一律被 ClaimPickupDto 拒绝（受理面未被放宽）')
+
+  // 限流是 6 位码安全论证的一部分，不是性能参数。被调宽就必须在这里红。
+  const pickupController = readFileSync(path.join(apiRoot, 'src/print-jobs/print-jobs.controller.ts'), 'utf8')
+  const claimThrottle = /@Post\('claim-pickup'\)[\s\S]{0,200}?@Throttle\(\{ default: \{ ttl: 60_000, limit: (\d+) \} \}\)/.exec(
+    pickupController,
+  )
+  if (!claimThrottle || Number(claimThrottle[1]) > 20) {
+    fail(
+      `claim-pickup 限流必须 ≤ 20 次/分钟（实测: ${claimThrottle?.[1] ?? '未找到 @Throttle'}）。` +
+        '6 位码 = 10^6 空间，其抗枚举性依赖「限流 + 24h 有效期 + 终端绑定」三者合力，放宽限流等于削弱码长。',
+    )
+  }
+  pass(`claim-pickup 限流仍为 ${claimThrottle[1]} 次/分钟（6 位码安全论证的前提，未被放宽）`)
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 小程序云打印 M2 第一片专项验证 ===')
+  assertPickupCodeSpecInvariant()
   assertCrossSurfaceWiring()
   cleanupDb()
   prepareDb()
@@ -168,8 +251,16 @@ async function main(): Promise<void> {
     if (!stored || tasksBeforeClaim !== 0 || stored.printTaskId || stored.pickupStatus !== 'pending' || stored.payStatus !== 'unpaid') {
       fail('建单阶段必须只有 Order，不能提前创建 PrintTask')
     }
-    if (!created.pickupCode || created.pickupCode.length !== 10 || stored.pickupCodeEnc === created.pickupCode || stored.pickupCodeHash === created.pickupCode) {
-      fail('到机码必须为 10 位且数据库不得保存可查询明文')
+    // 长度断言按新规格更新为 6，**不是删除**：它守的是「实际建单发出来的码就是规格里那个长度」，
+    // 与 assertPickupCodeSpecInvariant 里的纯函数断言互补（那条守生成↔受理，这条守落库路径）。
+    if (
+      !created.pickupCode ||
+      created.pickupCode.length !== PICKUP_CODE_LENGTH ||
+      !PICKUP_CODE_PATTERN.test(created.pickupCode) ||
+      stored.pickupCodeEnc === created.pickupCode ||
+      stored.pickupCodeHash === created.pickupCode
+    ) {
+      fail(`到机码必须为 ${PICKUP_CODE_LENGTH} 位纯数字且数据库不得保存可查询明文（实际: ${JSON.stringify(created.pickupCode)}）`)
     }
     if (created.billablePages !== 2 || created.copies !== 2 || created.amountCents <= 0) fail('服务端页数/参数/报价快照不正确')
 
