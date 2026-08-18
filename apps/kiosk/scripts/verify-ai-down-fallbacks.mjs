@@ -48,6 +48,13 @@ const files = {
   apiInterviewModule: repo('services/api/src/mock-interview/mock-interview.module.ts'),
   apiResumePdf: repo('services/api/src/ai/resume/resume-pdf.service.ts'),
   apiCareerPlan: repo('services/api/src/ai/resume/career-plan.service.ts'),
+  // ⑤ 简历链演示态：mock 适配器与对照页
+  aiMock: kiosk('src/services/api/aiMockAdapter.ts'),
+  optimizeCompare: kiosk('src/pages/resume/ResumeOptimizeComparePage.tsx'),
+  parse: kiosk('src/pages/resume/ResumeParsePage.tsx'),
+  jobFitApi: kiosk('src/services/api/jobFit.ts'),
+  careerPlanApi: kiosk('src/services/api/careerPlan.ts'),
+  selfAssessmentApi: kiosk('src/services/api/selfAssessment.ts'),
 }
 
 const failures = []
@@ -266,6 +273,119 @@ must('sharedAi', /variant\?: PrintArtifactVariant/, '共享类型必须声明 va
 must('apiCareerPlan', /variant: rendered\.variant/, '后端必须继续回传 variant')
 must('careerPlan', /file\.variant === 'degraded'/, '前端必须真的消费 variant')
 mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当成 AI 版")
+
+// ── ⑤ 简历链演示态：mock 不许假装解析成功 ──────────────────────────────────
+//
+// 事故原样（2026-08-18 走查，8 份不同文件 + 1 份打印机说明书 + 1 份加密 PDF）：
+// 简历链的 mock 适配器**直接 return 成功**，于是 8 份文件全部拿到同一份 37/60、
+// 同样六个分项 8,6,6,5,5,7、同样四条建议 —— 报告里没有任何一份文件里的姓名 /
+// 电话 / 学校。最伤的一处在对照页：一句固定演示文案「热爱工作，积极向上……」
+// 被挂上 `E1 你的材料` 证据标、写成「你写的（原件不会被改）」。用户没写过那句话。
+//
+// 同项目的自我探索 / 岗位匹配 / 职业规划在非 http 模式都**主动抛 MOCK_MODE**
+// 触发既有降级 UI，唯独简历链没有。本节把那条口径钉死。
+//
+// 判据刻意**不写「有没有抛错」** —— 那种断言 `throw new Error('x')` 也能变绿。
+// 这里断言的是：① 拒绝的**身份**（code 必须正好是 MOCK_MODE，isAiOutage 才认）；
+// ② 可观测副作用（那份捏造的报告 / 改写候选**在产物里不复存在**）。
+
+{
+  // ⑤-A 运行时判据：真的把 mock 适配器编译出来调一遍，读拒绝错误的 code。
+  //     纯本地：只编译仓库内一个文件并在内存里 import，不连数据库 / 网络 / 硬件。
+  //     该文件的 import 全是 `import type`（编译后无任何运行时依赖），因此可独立加载。
+  const ts = await import('typescript').catch(() => null)
+  if (!ts) {
+    // 不允许静默跳过 —— 跳过就等于本节从未运行过（空转）。
+    failures.push('aiMock: 无法解析 typescript，⑤-A 运行时判据没能执行（不接受跳过）')
+  } else {
+    const js = ts.default.transpileModule(files.aiMock, {
+      compilerOptions: { module: ts.default.ModuleKind.ESNext, target: ts.default.ScriptTarget.ES2022 },
+    }).outputText
+    if (/^\s*import\s+[^t]/m.test(js)) {
+      failures.push('aiMock: 编译产物出现值导入，本判据依赖它无运行时依赖 —— 请改回 import type')
+    }
+    const encoded = Buffer.from(js, 'utf8').toString('base64')
+    const mod = await import(`data:text/javascript;base64,${encoded}`)
+      .catch((err) => ({ __loadError: err }))
+    if (mod.__loadError) {
+      failures.push(`aiMock: 编译后无法加载（${mod.__loadError.message}）`)
+    } else {
+      const adapter = mod.aiMockAdapter
+      // 这三个方法就是「上传 → 解析 → 报告 → 优化 → 对照」整条链的全部数据来源。
+      const calls = [
+        ['submitResumeParse', () => adapter.submitResumeParse({ fileId: 'x', fileName: 'a.pdf', fileFormat: 'pdf', source: 'upload' }, null)],
+        ['getResumeRecord', () => adapter.getResumeRecord('任意-task-id')],
+        ['getResumeOptimize', () => adapter.getResumeOptimize('任意-task-id')],
+      ]
+      for (const [name, invoke] of calls) {
+        let outcome
+        try {
+          const value = await invoke()
+          outcome = { resolved: true, value }
+        } catch (err) {
+          outcome = { resolved: false, err }
+        }
+        if (outcome.resolved) {
+          // 这是事故本体：mock 返回了一份「成功」的结构化结果，页面据此渲染成真报告。
+          failures.push(
+            `aiMock.${name}: 演示模式下仍 resolve 成功结果（status=${outcome.value?.status}）—— `
+            + '整条简历链会把捏造内容当成对用户简历的真实分析',
+          )
+          continue
+        }
+        const code = outcome.err?.code
+        assert(
+          code === 'MOCK_MODE',
+          `aiMock.${name}: 拒绝错误的 code 是 ${JSON.stringify(code)}，必须正好是 'MOCK_MODE' —— `
+          + 'aiOutage.AI_OUTAGE_CODES 只认这个值，别的码点不亮既有降级 UI',
+        )
+      }
+    }
+  }
+
+  // ⑤-B 可观测副作用：那份被 8 份文件共用的假报告必须从产物里消失，
+  //      而不是「留在文件里但不再返回」—— 留着就随时会被下一个人接回去。
+  //
+  //      扫描前先剥掉注释：和本文件 apiPracticePdf 那条同一个道理 ——
+  //      解释「为什么不能再有这份演示数据」的注释里必然要引用它，
+  //      连注释一起禁会逼着后来的人把事故说明删掉，那是反效果。
+  //      剥掉注释后仍然覆盖任何真实的字符串字面量 / 对象字面量。
+  const aiMockCode = files.aiMock
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '')
+  for (const [pattern, what] of [
+    [/maxScore:/, '六个分项评分'],
+    [/suggestions:\s*\[/, '四条固定建议'],
+    [/optimizedResume:/, '演示用优化版简历'],
+    [/热爱工作/, '被标成「你写的」的那句演示文案'],
+    [/演示用户|演示大学|演示科技公司/, '演示身份字段'],
+  ]) {
+    assert(
+      !pattern.test(aiMockCode),
+      `aiMock: mock 适配器里不得再留${what}——演示数据只要还在，就还会被接回链路`,
+    )
+  }
+
+  // ⑤-C 口径一致：简历链必须和已经做对的三条服务用同一种拒绝方式。
+  //      这条正是走查结论「唯独简历链的 mock 适配器直接返回成功」的门禁化。
+  for (const key of ['jobFitApi', 'careerPlanApi', 'selfAssessmentApi', 'aiMock']) {
+    must(key, /'MOCK_MODE'/, '非 http 模式必须以 MOCK_MODE 拒绝，交给既有降级 UI')
+  }
+
+  // ⑤-D 解析页要把真实原因带进失败态，而不是一律改写成一句通用文案：
+  //      演示模式该说「演示模式不提供…」，用户才知道不是自己的文件有问题。
+  must('parse', /aiErrorMessageOf\(/, '解析失败必须透出真实错误原因，不得把 MOCK_MODE 抹成通用文案')
+
+  // ⑤-E 对照页：全链唯一一个没有演示提示的页面，偏偏是把话塞进用户嘴里的那页。
+  must('optimizeCompare', /providerName/, '对照页必须读取 providerName，否则无从判断这次是不是演示结果')
+  must('optimizeCompare', /KIOSK_RESUME_DEMO_NOTICE/, '对照页必须能挂演示提示横幅（报告页 / 优化页都有，只有它没有）')
+  // 归属标签不得写死：演示态下那句话不是用户写的，不能挂「你写的」。
+  mustNot(
+    'optimizeCompare',
+    /<EvidenceBadge level="E1" \/>\s*\n\s*你写的（原件不会被改）/,
+    '「你写的」不得写死在 JSX 里 —— 演示态下左栏内容并非用户原文，必须按 providerName 切换归属说法',
+  )
+}
 
 // ── 合规文案 ────────────────────────────────────────────────────────────────
 // 刻意**不**在本门禁里再抄一份禁词表。仓库根已有 `pnpm verify:compliance-copy`

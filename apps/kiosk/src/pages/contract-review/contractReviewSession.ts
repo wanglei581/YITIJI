@@ -73,3 +73,8 @@ export function updateContractReviewSession(
 export function clearContractReviewSession(): void {
   activeSession = null
 }
+
+/** 是否存在进行中的合同审查会话（内存态，供「清场是否为空操作」判定使用）。 */
+export function hasContractReviewSession(): boolean {
+  return activeSession !== null
+}

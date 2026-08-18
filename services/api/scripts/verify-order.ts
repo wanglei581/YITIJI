@@ -481,22 +481,60 @@ async function main(): Promise<void> {
         idem.payStatus === 'paid' &&
         idem.pickupCode === paid.pickupCode &&
         after - before === 1 // 幂等：重复 markPaid 不重复写审计
-      let rejectsNoSource = false
-      try {
-        await svc.markPaid(target.id, { paymentSource: '' })
-      } catch {
-        rejectsNoSource = true
+      // ── 支付来源白名单：必须在**仍是 unpaid** 的新订单上验 ──────────────────
+      //
+      // 曾经这里拿 `target` 验，而 target 在上面几行刚被置成 paid。markPaid 的判定顺序是
+      //   ① 白名单 → ② 已 paid 且来源不同 → ORDER_ALREADY_PAID
+      // 于是把 ① 整段删掉，三次调用照样抛错（抛的是 ②），断言恒真 —— 门禁守着资损红线
+      // 却对红线本身零敏感度。判据也从「有没有抛错」改成「抛的是不是 PAYMENT_SOURCE_INVALID」，
+      // 因为「有没有抛错」正是被另一条 guard 冒充的那个判据。
+      //
+      // 防住什么：白名单放开 = 一分钱没收的打印单可被写成 paid + wechat，
+      // 而状态机会给这种单子签发取件码，用户凭码就能取走纸。
+      const whitelistPrint = await printJobs.create(
+        {
+          fileUrl: await seedPdfFixture('srcwhitelist', 1),
+          fileMd5: 'sha256-order-srcwhitelist',
+          fileName: '支付来源白名单.pdf',
+          params: { ...PRINT_PARAMS, copies: 1 },
+        },
+        { endUserId: null, terminalId },
+      )
+      taskIds.push(whitelistPrint.taskId)
+      const whitelistOrder = await prisma.order.findUnique({ where: { printTaskId: whitelistPrint.taskId } })
+      if (!whitelistOrder || whitelistOrder.payStatus !== 'unpaid' || whitelistOrder.amountCents <= 0) {
+        console.error(
+          `  FAIL [P0a] 白名单用例前置不成立（需要一张 unpaid 且金额>0 的新订单）: ${JSON.stringify(whitelistOrder)}`,
+        )
+        return false
       }
-      let rejectsForbidden = true
-      for (const bad of P0A_FORBIDDEN_SOURCES) {
+      // 空串与 wechat/alipay/benefit 都必须**按名字**被拒，不接受任何其它错误码顶替。
+      let rejectsByName = true
+      for (const bad of ['', ...P0A_FORBIDDEN_SOURCES]) {
+        let code = '(未抛错)'
         try {
-          await svc.markPaid(target.id, { paymentSource: bad })
-          rejectsForbidden = false
-        } catch {
-          /* expected reject */
+          await svc.markPaid(whitelistOrder.id, { paymentSource: bad })
+        } catch (e) {
+          code = (e as Error)?.message ?? String(e)
+        }
+        if (!code.includes('PAYMENT_SOURCE_INVALID')) {
+          console.error(
+            `  FAIL [P0a] markPaid(paymentSource=${JSON.stringify(bad)}) 期望 PAYMENT_SOURCE_INVALID，实际: ${code}`,
+          )
+          rejectsByName = false
         }
       }
-      return okHappy && rejectsNoSource && rejectsForbidden
+      // 事后回读：被拒之后订单必须原样 unpaid —— 不得留下半落的 paymentSource / paidAt / 取件码。
+      const afterReject = await readOrder(whitelistPrint.taskId)
+      const untouched =
+        afterReject?.payStatus === 'unpaid' &&
+        afterReject.paymentSource === null &&
+        afterReject.paidAt === null &&
+        afterReject.pickupCode === null
+      if (!untouched) {
+        console.error(`  FAIL [P0a] 支付来源被拒后订单未保持原样 unpaid: ${JSON.stringify(afterReject)}`)
+      }
+      return okHappy && rejectsByName && untouched
     })
 
     // (4) pickupCode 唯一 + 状态门：仅 paid 且未完成/取消/失败/退款时会员视图才返回取件码。

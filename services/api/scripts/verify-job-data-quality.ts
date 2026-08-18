@@ -158,9 +158,6 @@ async function main(): Promise<void> {
   console.log('\n=== 岗位数据质量与来源可用性门禁 ===')
 
   const jobQuality = mustExist('src/job-ai/job-quality.service.ts', 'JobQualityService 已创建')
-  const jobsService = read('src/jobs/jobs.service.ts')
-  // N1拆分后，质量刷新和字段映射在 jobs-partner.service.ts
-  const jobsPartnerService = (() => { try { return read('src/jobs/jobs-partner.service.ts') } catch { return '' } })()
   const jobsModule = read('src/jobs/jobs.module.ts')
   const jobSyncService = read('src/job-sync/job-sync.service.ts')
   const jobSyncModule = read('src/job-sync/job-sync.module.ts')
@@ -213,11 +210,36 @@ async function main(): Promise<void> {
     '质量规则覆盖 required 与 AI-ready 字段',
   )
 
-  // N1拆分后读所有 jobs 子服务合并扫描
+  // N1 拆分后 jobs.service.ts 只剩转发 facade，实现分散在下列子服务里，必须整组一起扫。
+  //
+  // 这份清单曾经漏掉 admin / excel / kiosk 三个实现文件，而 §合规禁词扫描又只喂了
+  // jobs.service.ts（223 行 facade）——等于红线扫描扫的是一个空壳。清单必须是唯一真值：
+  // 上面的能力断言和下面的禁词断言都从这里取输入，不再各写一份。
+  //
+  // 缺文件一律显式报错而不是 `catch { return '' }`：静默变空串会让「扫描输入没了」
+  // 伪装成「扫描通过了」——这正是本次要修的空转形态。文件重命名/拆分后必须来这里改清单。
+  const JOBS_IMPLEMENTATION_FILES = [
+    'src/jobs/jobs.service.ts',
+    'src/jobs/jobs-partner.service.ts',
+    'src/jobs/jobs-admin.service.ts',
+    'src/jobs/jobs-excel.service.ts',
+    'src/jobs/jobs-kiosk.service.ts',
+    'src/jobs/jobs-shared.ts',
+  ]
   const jobsSources = (() => {
-    const files = ['src/jobs/jobs.service.ts','src/jobs/jobs-partner.service.ts','src/jobs/jobs-shared.ts','src/jobs/jobs-public.service.ts']
-    return files.map(f => { try { return read(f) } catch { return '' } }).join('\n')
+    const parts: string[] = []
+    for (const rel of JOBS_IMPLEMENTATION_FILES) {
+      if (!existsSync(join(process.cwd(), rel))) {
+        fail(`jobs 实现文件清单失效 — 找不到 ${rel}（文件被拆分/改名时必须同步本清单，否则禁词扫描会扫空）`)
+        continue
+      }
+      parts.push(read(rel))
+    }
+    return parts.join('\n')
   })()
+  if (jobsSources.trim().length === 0) {
+    fail('jobs 实现文件清单扫描到空内容 — 禁词扫描失去输入，等于没扫')
+  }
   mustContain(
     jobsSources,
     [
@@ -282,8 +304,11 @@ async function main(): Promise<void> {
   mustContain(packageJson, ['"verify:job-data-quality"'], 'package.json 注册 verify:job-data-quality')
   mustContain(ci, ['verify:job-data-quality'], 'CI 串行 verify 接入岗位数据质量门禁')
 
+  // 合规禁词扫描的输入必须覆盖**全部** jobs 实现文件（jobsSources），不能只喂 facade。
+  // CLAUDE.md §2 红线：岗位链路不得引入平台内投递 / 候选人闭环字段。
+  // 全仓只有本门禁和 verify-job-ai.ts 扫 applyStatus —— 漏一个文件就等于红线没人守。
   mustNotContain(
-    [jobQuality, jobsService, jobSyncService, importDto, excelDto].join('\n'),
+    [jobQuality, jobsSources, jobSyncService, importDto, excelDto].join('\n'),
     [
       '一键投递',
       '立即投递',

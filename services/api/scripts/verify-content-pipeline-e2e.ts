@@ -78,6 +78,9 @@ function uploadForm(file: Buffer, fileName: string, fields: Record<string, strin
 
 interface AdminRow { id: string; externalId?: string; title?: string; reviewStatus?: string; publishStatus?: string }
 
+/** §4 闸门断言在夹具定位失败时的失败理由 —— 用「前置失败」而不是静默跳过。 */
+const NT_PRECOND_FAILED = '前置失败:未核验机构的岗位没能在管理员列表定位,本条闸门未能实测'
+
 /** 从 admin 列表里按 externalId 找一条。 */
 async function findAdminRow(http: Client, path: string, externalId: string, token: string): Promise<AdminRow | null> {
   const res = await http.get<AdminRow[]>(path, { token })
@@ -531,22 +534,33 @@ async function main(): Promise<void> {
     assert('闸门｜未核验机构仍可**录入**(闸门只拦发布,不拦录入)',
       ntImport.status === 200 || ntImport.status === 201, `实际 ${ntImport.status} ${errCode(ntImport)}`)
     const ntRow = await findAdminRow(h.http, '/admin/job-sources', ntExternalId, adminToken)
+    // 这条前置断言不能省。没有它时,夹具一旦查不到,下面整段 `if` 就不执行,
+    // 而汇总只数「已执行的失败」—— 于是 8/17 事故(5 条未授权岗位进生产公网)的
+    // **唯一端到端回归**会静默消失,退出码仍是 0,报告上还写着「失败 0」。
+    // 同文件 runReviewPublishVisible() 对同一个 helper 写的正是这条断言(见 §上方)。
+    assert('闸门｜未核验机构的岗位可在管理员列表定位(以下闸门断言的前置)',
+      ntRow !== null, `externalId=${ntExternalId} 未出现在 /admin/job-sources`)
     if (ntRow) {
       await h.http.patch(`/admin/job-sources/${ntRow.id}/review`, { token: adminToken, json: { action: 'approve' } })
-      const ntPublish = await h.http.patch(`/admin/job-sources/${ntRow.id}/publish`, { token: adminToken, json: { action: 'publish' } })
-      show('未核验机构发布', ntPublish)
-      assert('闸门｜未核验机构的内容发布被拒',
-        ntPublish.status === 400 && errCode(ntPublish) === 'ORG_CONTENT_TRUST_REQUIRED',
-        `实际 ${ntPublish.status} ${errCode(ntPublish)}`)
-      assert('闸门｜拒绝信息指名道姓(含机构名 + 怎么办)',
-        errMsg(ntPublish).includes('内容可信') || errMsg(ntPublish).includes('content-trust'),
-        `实际文案: ${errMsg(ntPublish).slice(0, 160)}`)
-
-      // 前台绝不可见
-      const pubList = await h.http.get<{ externalId?: string }[]>('/jobs?pageSize=100')
-      const leaked = (unwrap(pubList) ?? []).some((x) => x.externalId === ntExternalId)
-      assert('闸门｜未核验机构的内容不出现在一体机前台', !leaked, '发生泄漏')
     }
+    // 前置不成立时不跳过断言,而是让它带着「前置失败」的理由变红:
+    // 断言条数恒定,门禁不会因为夹具坏掉而悄悄缩水。
+    const ntPublish = ntRow
+      ? await h.http.patch(`/admin/job-sources/${ntRow.id}/publish`, { token: adminToken, json: { action: 'publish' } })
+      : null
+    if (ntPublish) show('未核验机构发布', ntPublish)
+    assert('闸门｜未核验机构的内容发布被拒',
+      ntPublish !== null && ntPublish.status === 400 && errCode(ntPublish) === 'ORG_CONTENT_TRUST_REQUIRED',
+      ntPublish ? `实际 ${ntPublish.status} ${errCode(ntPublish)}` : NT_PRECOND_FAILED)
+    assert('闸门｜拒绝信息指名道姓(含机构名 + 怎么办)',
+      ntPublish !== null && (errMsg(ntPublish).includes('内容可信') || errMsg(ntPublish).includes('content-trust')),
+      ntPublish ? `实际文案: ${errMsg(ntPublish).slice(0, 160)}` : NT_PRECOND_FAILED)
+
+    // 前台泄漏检查**不依赖**能否在后台定位到这条内容 —— 恰恰相反,后台查不到、
+    // 前台却查得到,才是最坏的情况。所以它无条件执行。
+    const pubList = await h.http.get<{ externalId?: string }[]>('/jobs?pageSize=100')
+    const leaked = (unwrap(pubList) ?? []).some((x) => x.externalId === ntExternalId)
+    assert('闸门｜未核验机构的内容不出现在一体机前台', !leaked, '发生泄漏')
 
     step('4.2 缺来源可追溯字段 → 发布被拒(PUBLISH_INCOMPLETE_FIELDS)')
     // 直接构造一条 sourceUrl='' 的岗位:这正是 Excel 导入 `?? ''` 会产生的形态。
@@ -572,11 +586,16 @@ async function main(): Promise<void> {
 
     step('4.3 下架(unpublish)不受闸门限制 —— 否则不合规内容撤不下来')
     const ntRow2 = await findAdminRow(h.http, '/admin/job-sources', ntExternalId, adminToken)
-    if (ntRow2) {
-      const un = await h.http.patch(`/admin/job-sources/${ntRow2.id}/publish`, { token: adminToken, json: { action: 'unpublish' } })
-      show('未核验机构内容下架', un)
-      assert('闸门｜未核验机构的内容仍可下架', un.status === 200, `实际 ${un.status} ${errCode(un)}`)
-    }
+    assert('闸门｜未核验机构的岗位仍可在管理员列表定位(下架/重试发布的前置)',
+      ntRow2 !== null, `externalId=${ntExternalId} 未出现在 /admin/job-sources`)
+    // 守的是反方向:不可信内容**必须撤得下来**。夹具查不到就跳过的话,
+    // 「撤不下来」这种事故会以「门禁全绿」的形式过关。
+    const un = ntRow2
+      ? await h.http.patch(`/admin/job-sources/${ntRow2.id}/publish`, { token: adminToken, json: { action: 'unpublish' } })
+      : null
+    if (un) show('未核验机构内容下架', un)
+    assert('闸门｜未核验机构的内容仍可下架',
+      un !== null && un.status === 200, un ? `实际 ${un.status} ${errCode(un)}` : NT_PRECOND_FAILED)
     const blankUn = await h.http.patch(`/admin/job-sources/${blankJob.id}/publish`, { token: adminToken, json: { action: 'unpublish' } })
     assert('闸门｜缺字段的内容仍可下架', blankUn.status === 200, `实际 ${blankUn.status} ${errCode(blankUn)}`)
 
@@ -586,12 +605,15 @@ async function main(): Promise<void> {
     })
     show('标记内容可信', trustRes)
     assert('闸门｜PATCH /admin/orgs/:id/content-trust 可用', trustRes.status === 200, `实际 ${trustRes.status} ${errCode(trustRes)}`)
-    if (ntRow2) {
-      const retry = await h.http.patch(`/admin/job-sources/${ntRow2.id}/publish`, { token: adminToken, json: { action: 'publish' } })
-      show('标记可信后重试发布', retry)
-      assert('闸门｜标记可信后同一条内容可以发布(闸门没有把发布焊死)',
-        retry.status === 200, `实际 ${retry.status} ${errCode(retry)}: ${errMsg(retry)}`)
-    }
+    // 守的是另一个反方向:补完核验后**必须发得出去**。只验拒绝的话,
+    // 「闸门把发布焊死」会没人发现 —— 本文件开头就是这么写的。
+    const retry = ntRow2
+      ? await h.http.patch(`/admin/job-sources/${ntRow2.id}/publish`, { token: adminToken, json: { action: 'publish' } })
+      : null
+    if (retry) show('标记可信后重试发布', retry)
+    assert('闸门｜标记可信后同一条内容可以发布(闸门没有把发布焊死)',
+      retry !== null && retry.status === 200,
+      retry ? `实际 ${retry.status} ${errCode(retry)}: ${errMsg(retry)}` : NT_PRECOND_FAILED)
 
     // ── §5 失败路径 ────────────────────────────────────────────────────────
     section('§5 失败路径 —— 运营看得懂吗、幂等吗、静默吞掉吗')
@@ -797,14 +819,28 @@ async function main(): Promise<void> {
       typeof prevData?.excluded?.['orgTrustInactive'] === 'number', JSON.stringify(prevData?.excluded))
   } finally {
     if (f) {
+      // 这里曾经是 `try { cleanup; assert(已删净) } catch { console.error }`:
+      // cleanupFixtures 抛错(典型:新增了引用 Job/JobFair 的子表而 cleanup 没跟上,外键删除失败)
+      // 会让 assert 在它之前被跳过,退出码仍是 0 —— 「清理炸了」和「清理干净了」在退出码上
+      // 完全不可区分。而前者恰恰**就是**残留留在公开列表里的情况:这些夹具在链路里
+      // 已经被走到 approved + published,是公开可见状态。
+      let cleanupError: Error | null = null
       try {
         await cleanupFixtures(prisma, h.run)
+      } catch (e) {
+        cleanupError = e as Error
+      }
+      assert('清理｜cleanupFixtures 未抛错(抛错时夹具已是 approved+published,会泄漏到公开前台)',
+        cleanupError === null, cleanupError?.message)
+
+      // 无论清理是否抛错都要回读残留 —— 清理抛错时正是最需要知道剩了什么的时候。
+      try {
         const leftJobs = await prisma.job.count({ where: { externalId: { contains: h.run } } })
         const leftFairs = await prisma.jobFair.count({ where: { externalId: { contains: h.run } } })
         assert('清理｜测试数据已删净(残留会泄漏到公开前台)', leftJobs === 0 && leftFairs === 0,
           `残留 jobs=${leftJobs} fairs=${leftFairs}`)
       } catch (e) {
-        console.error('  清理失败:', (e as Error).message)
+        assert('清理｜残留回读可执行(回读失败=无法证明已删净)', false, (e as Error).message)
       }
     }
     await prisma.onModuleDestroy()

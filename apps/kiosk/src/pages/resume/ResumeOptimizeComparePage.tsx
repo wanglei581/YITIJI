@@ -27,8 +27,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
 import { Button, Card, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, Loader2Icon } from 'lucide-react'
-import type { ResumeOptimizeModule } from '@ai-job-print/shared'
+import { AlertCircleIcon, FlaskConicalIcon, InfoIcon, Loader2Icon } from 'lucide-react'
+import { COMPLIANCE_COPY, type ResumeOptimizeModule } from '@ai-job-print/shared'
 import {
   AiDisclaimerLine,
   AigcMark,
@@ -87,6 +87,16 @@ export function ResumeOptimizeComparePage() {
   const [probed, setProbed] = useState(false)
   const [failReason, setFailReason] = useState<string | null>(null)
   const [decisions, setDecisions] = useState<Record<number, ModuleDecision>>({})
+  /**
+   * 本次结果是不是演示 provider 出的。
+   *
+   * 走查结论：本页是整条链上**唯一没有演示提示的页面** —— 报告页有横幅、
+   * 优化页有横幅，偏偏这个把话塞进用户嘴里的页面没有。演示模式下 mock 适配器
+   * 现在已改为抛 MOCK_MODE（本页会走降级态，根本走不到这里），但服务端仍可能
+   * 以 `AI_PROVIDER=mock` 返回 `providerName:'mock'`。那条路径必须同样兜住。
+   */
+  const [providerName, setProviderName] = useState<string | null>(null)
+  const isDemoResult = providerName === 'mock'
 
   useEffect(() => {
     if (!taskId) {
@@ -100,6 +110,7 @@ export function ResumeOptimizeComparePage() {
         if (cancelled) return
         // 拿到结构化响应即证明这条能力是通的，无论本次有没有内容。
         setProbed(true)
+        setProviderName(res.providerName ?? null)
         if (res.status === 'completed') {
           setModules(res.modules ?? [])
           if ((res.modules ?? []).length === 0) {
@@ -167,6 +178,22 @@ export function ResumeOptimizeComparePage() {
         action: { label: '返回优化页', onClick: backToOptimize },
       }
 
+  /**
+   * 左栏的归属说法与证据级别（R2 的正题）。
+   *
+   * `E1 你的材料` + 「你写的（原件不会被改）」是一句**关于用户的事实断言**：
+   * 它宣称左栏那段文字出自用户上传的原件。演示 provider 给的是写死的样例句
+   * （走查里那句「热爱工作，积极向上……」用户根本没写过），此时这个断言是假的，
+   * 而且是全链最伤的一处 —— 前面所有诚实的免责声明，在这一句面前一起失效。
+   *
+   * 所以演示态下把证据级别降到 E3（AI 判断 / 仅供参考），归属改成不作归属的说法。
+   * 真实结果照旧 E1「你写的」，不削弱正常路径的证据表达。
+   */
+  const leftEvidenceLevel = isDemoResult ? 'E3' : 'E1'
+  const leftColumnLabel = isDemoResult
+    ? '示例原句（演示内容，不是你的简历原文）'
+    : '你写的（原件不会被改）'
+
   const setDecision = (idx: number, decision: ModuleDecision) =>
     setDecisions((prev) => ({
       ...prev,
@@ -213,7 +240,12 @@ export function ResumeOptimizeComparePage() {
         <div className="resume-lightflow__header">
           <KioskPageHeader
             title="逐条改写对照"
-            description="左边是你自己写的那句，右边是 AI 给的候选表达。一条一条看，决定这条改不改。"
+            /* 标题描述同样是一句归属断言：演示态下左栏不是用户写的，不能这么说。 */
+            description={
+              isDemoResult
+                ? '左边是演示用的示例原句（不是你的简历原文），右边是 AI 给的候选表达。'
+                : '左边是你自己写的那句，右边是 AI 给的候选表达。一条一条看，决定这条改不改。'
+            }
             onBack={backToOptimize}
             backLabel="返回优化页"
           />
@@ -224,6 +256,18 @@ export function ResumeOptimizeComparePage() {
           <InfoIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <p>{UNSAVED_NOTICE}</p>
         </div>
+
+        {/*
+          演示提示横幅（R2）。本页此前是全链唯一没有它的页面 ——
+          而它恰恰是唯一一个把左栏内容标成「你写的」的页面。
+          报告页 / 优化页都有同一句 COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE。
+        */}
+        {isDemoResult && (
+          <div className="resume-compare__demo-notice" role="note">
+            <FlaskConicalIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <p>{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>
+          </div>
+        )}
 
         <AiTaskRegion
           task={task}
@@ -297,8 +341,8 @@ export function ResumeOptimizeComparePage() {
                     <div className="resume-compare__cols">
                       <div className="resume-compare__col">
                         <p className="resume-compare__col-head">
-                          <EvidenceBadge level="E1" />
-                          你写的（原件不会被改）
+                          <EvidenceBadge level={leftEvidenceLevel} />
+                          {leftColumnLabel}
                         </p>
                         <p className="resume-compare__col-body">{mod.before}</p>
                       </div>
