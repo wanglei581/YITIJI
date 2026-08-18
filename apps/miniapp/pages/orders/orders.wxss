@@ -1,13 +1,38 @@
 /* pages/orders/orders.wxss */
-.ord-content { padding-top: 16rpx; }
+.orders-intro {
+  margin: 20rpx 32rpx 0;
+  padding: 22rpx 24rpx;
+  border-radius: 24rpx;
+  border: 1rpx solid #dce9ff;
+  background: #f3f8ff;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+.oi-icon {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 21rpx;
+  background: var(--teal);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.oi-icon .ficon { width: 34rpx; height: 34rpx; }
+.oi-copy { flex: 1; min-width: 0; }
+.oi-title { font-size: 27rpx; font-weight: 700; color: #17233e; }
+.oi-sub { margin-top: 5rpx; font-size: 21rpx; color: #66758d; }
+.ord-content { padding-top: 20rpx; }
 
 .ord-card {
   background: var(--surface);
   border: 1rpx solid var(--line-soft);
   border-radius: var(--r-lg);
-  box-shadow: var(--sh-sm);
+  box-shadow: none;
   padding: 24rpx;
-  margin-bottom: 20rpx;
+  margin: 0 32rpx 20rpx;
 }
 
 .oc-top {
@@ -24,7 +49,7 @@
   color: var(--muted);
   min-width: 0;
 }
-.oc-store-ic { font-size: 26rpx; color: var(--clay-deep); flex-shrink: 0; }
+.oc-store-ic { font-size: 26rpx; color: var(--teal); flex-shrink: 0; }
 
 .oc-body {
   display: flex;
@@ -65,16 +90,17 @@
   gap: 14rpx;
   padding: 18rpx 20rpx;
   border-radius: var(--r);
-  background: var(--wheat-wash);
+  background: var(--teal-wash);
+  border: 1rpx solid #dce9ff;
   margin-bottom: 18rpx;
 }
-.pk-label { font-size: 23rpx; color: var(--wheat-deep); font-weight: 600; }
+.pk-label { font-size: 23rpx; color: var(--teal-deep); font-weight: 600; }
 .pk-code {
   font-size: 34rpx;
   font-weight: 700;
   letter-spacing: 6rpx;
-  color: var(--wheat-deep);
-  font-family: var(--font-serif);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .pk-hint { font-size: 21rpx; color: var(--muted); margin-left: auto; }
 
@@ -90,7 +116,7 @@
   font-size: 32rpx;
   font-weight: 700;
   color: var(--ink);
-  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
 }
 .oc-btns { display: flex; gap: 14rpx; }
 .oc-btn {
@@ -122,3 +148,4 @@
 .es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
 .es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
 .es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); }
+.empty-slot .btn { margin-top: 28rpx; }

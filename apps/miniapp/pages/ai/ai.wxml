@@ -3,10 +3,11 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-title left serif">AI百宝箱</view>
+    <view class="nav-title left serif">职业生活圈</view>
   </view>
 
   <view class="content has-tabbar">
+
 
     <!-- 小青入口 -->
     <view class="xq-card sheen tap rise" hover-class="tap-press" bindtap="tapChat">
@@ -20,48 +21,70 @@
 
     <!-- AI 免责声明（强制） -->
     <view class="as-disc">
-      <view class="ficon i-info"></view>
+      <text class="ficon i-info"></text>
       <text>小青与各项 AI 结果均由 AI 生成，可能存在错误。政策、补贴等信息请以官方渠道为准。</text>
     </view>
 
-    <!-- 工具网格 -->
-    <view class="section-t">AI 求职工具</view>
+
+    <!-- 按处境分组：每组一个标题 + 一句说明，组内是同一处境下的动作。
+         原本是「AI 求职工具」5 个 +「材料与打印」5 个，按技术属性分类；
+         但用户不按技术找东西——他按自己此刻卡在哪里找。 -->
+    <block wx:for="{{groups}}" wx:key="key" wx:for-item="g">
+      <view class="grp-head">
+        <view class="section-t">{{g.title}}</view>
+        <view class="grp-sub">{{g.sub}}</view>
+      </view>
+      <view class="tiles">
+        <view
+          class="tile sheen tap"
+          wx:for="{{g.items}}"
+          wx:key="id"
+          wx:for-item="item"
+          hover-class="tap-press"
+          bindtap="tapEntry"
+          data-id="{{item.id}}"
+          role="button"
+          aria-label="{{item.title}}，{{item.desc}}"
+        >
+          <view class="t-ic a-{{item.accent}}"><text class="ficon i-{{item.icon}}"></text></view>
+          <view class="t-title">{{item.title}}</view>
+          <view class="t-desc">{{item.desc}}</view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 未开放能力：不伪装成可用，也不藏起来假装没规划过。
+         按 CLAUDE.md §9「不伪造能力」：入口处就写明未开放**并说明原因**（item.why
+         直接渲染在卡片上），用户在点之前就知道这条路走不通，而不是走进去撞墙。
+         aria-disabled 让读屏软件也播报「不可用」；但卡片仍可点、可聚焦，
+         点开是完整解释——点了没反应的死按钮会让用户以为是自己点错了。 -->
+    <view class="grp-head">
+      <view class="section-t">尚未开放</view>
+      <view class="grp-sub">页面已完成，等服务端接口上线后开放</view>
+    </view>
     <view class="tiles">
       <view
-        class="tile sheen tap rise-d{{index+1}}"
-        wx:for="{{tools}}"
+        class="tile pending sheen tap"
+        wx:for="{{pending}}"
         wx:key="id"
+        wx:for-item="item"
         hover-class="tap-press"
-        bindtap="tapTool"
-      >
-        <view class="t-ic a-{{item.accent}}"><view class="ficon i-{{item.icon}}"></view></view>
-        <view class="t-title">{{item.title}}</view>
-        <view class="t-desc">{{item.desc}}</view>
-      </view>
-    </view>
-
-    <view class="section-t utility-title">材料与打印</view>
-    <view class="service-list">
-      <view
-        class="service-row tap"
-        wx:for="{{services}}"
-        wx:key="id"
-        hover-class="tap-press"
-        bindtap="tapService"
+        bindtap="tapPending"
         data-id="{{item.id}}"
+        role="button"
+        aria-disabled="true"
+        aria-label="{{item.title}}，当前未开放，{{item.why}}。{{item.desc}}。点击查看完整说明"
       >
-        <view class="service-icon"><view class="ficon i-{{item.icon}}"></view></view>
-        <view class="service-copy">
-          <view class="service-name">{{item.title}}</view>
-          <view class="service-desc">{{item.desc}}</view>
-        </view>
-        <view class="service-arrow">›</view>
+        <view class="t-ic a-slate"><text class="ficon i-{{item.icon}}"></text></view>
+        <view class="t-title">{{item.title}}<text class="t-badge">未开放</text></view>
+        <view class="t-desc">{{item.desc}}</view>
+        <view class="t-why"><text class="ficon i-info t-why-ic"></text>{{item.why}}</view>
       </view>
     </view>
 
     <view class="section-t">AI 服务记录</view>
     <view class="ai-empty tap" hover-class="tap-press" bindtap="toRecords">
-      <view class="ficon i-history ae-ic"></view>
+      <text class="ficon i-history ae-ic"></text>
       <view class="ae-text">查看本人 AI 服务记录</view>
       <view class="ae-sub">从服务端读取诊断、优化和规划记录</view>
     </view>

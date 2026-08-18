@@ -1,111 +1,47 @@
-/* pages/jobs/jobs.wxss — Direction B: 奶油质感 */
-
-.page-wrap { min-height: 100vh; background: #FAF7F2; }
-
-.page-hd { padding: 14rpx 32rpx 10rpx; }
-.page-title { font-size: 48rpx; font-weight: 900; color: #2C1A0E; letter-spacing: -1rpx; }
-
-/* 搜索栏 */
-.search-bar {
-  margin: 8rpx 32rpx 16rpx;
-  background: #F2EAE0; border-radius: 200rpx;
-  padding: 20rpx 28rpx;
-  display: flex; align-items: center; gap: 14rpx;
-}
-.sb-ic { font-size: 30rpx; color: #A89080; }
-.sb-ph { font-size: 28rpx; color: #C8B4A0; }
-.sb-input { flex: 1; min-width: 0; font-size: 28rpx; color: #2C1A0E; }
-
-/* 筛选条 */
-.filter-scroll { width: 100%; }
-.filter-row {
-  display: flex; flex-direction: row;
-  padding: 4rpx 24rpx 20rpx; gap: 12rpx; white-space: nowrap;
-}
-.f-chip {
-  display: inline-block; flex-shrink: 0;
-  background: #F2EAE0; color: #7A5C48;
-  font-size: 26rpx; font-weight: 500;
-  padding: 12rpx 28rpx; border-radius: 200rpx;
-}
-.f-on {
-  background: #2C1A0E; color: #FFFDF9;
-  font-weight: 700;
-}
-
-/* 加载状态 */
-.list-state {
-  display: flex; justify-content: center; gap: 12rpx;
-  padding: 60rpx 0;
-}
-.ls-dot {
-  width: 14rpx; height: 14rpx; border-radius: 50%;
-  background: #C8B4A0;
-}
-
-/* 岗位卡 */
-.job-list { padding: 0 32rpx; display: flex; flex-direction: column; gap: 20rpx; }
-.job-card {
-  background: #FFFDF9;
-  border-radius: 28rpx;
-  padding: 28rpx 24rpx;
-  box-shadow: 0 4rpx 20rpx rgba(44,26,14,.07);
-}
-.jc-top {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 8rpx;
-}
-.jc-title { font-size: 32rpx; font-weight: 800; color: #2C1A0E; flex: 1; line-height: 1.3; }
-.jc-salary { font-size: 30rpx; font-weight: 900; color: #C84B2F; flex-shrink: 0; margin-left: 12rpx; }
-.jc-company { font-size: 24rpx; color: #7A5C48; display: block; margin-bottom: 14rpx; }
-.jc-tags { display: flex; flex-wrap: wrap; gap: 8rpx; margin-bottom: 16rpx; }
-.j-tag {
-  background: #F2EAE0; color: #4A3020;
-  font-size: 22rpx; font-weight: 500;
-  padding: 6rpx 16rpx; border-radius: 200rpx;
-}
-.jc-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  padding-top: 16rpx; border-top: 1rpx solid #F0E8DC;
-}
-.jc-source { font-size: 22rpx; color: #A89080; flex: 1; }
-.jc-cta {
-  background: #F2EAE0; color: #2C1A0E;
-  font-size: 22rpx; font-weight: 700;
-  padding: 10rpx 22rpx; border-radius: 200rpx;
-  flex-shrink: 0;
-}
-.act-press { opacity: .7; }
-
-/* 空态/错误态 */
-.empty-wrap {
-  margin: 40rpx 32rpx;
-  background: #FFFDF9;
-  border-radius: 28rpx;
-  padding: 60rpx 40rpx;
-  text-align: center;
-  border: 1rpx solid #E5D8C8;
-}
-.ev-icon { font-size: 72rpx; display: block; margin-bottom: 20rpx; }
-.ev-title { font-size: 32rpx; font-weight: 800; color: #2C1A0E; margin-bottom: 12rpx; }
-.ev-desc { font-size: 26rpx; color: #A89080; line-height: 1.6; margin-bottom: 32rpx; display: block; }
-.btn-retry {
-  display: inline-block; background: #2C1A0E; color: #fff;
-  font-size: 28rpx; font-weight: 600; padding: 18rpx 48rpx; border-radius: 200rpx;
-}
-
-/* 触底加载状态 */
-.list-more {
-  padding: 28rpx 0 8rpx;
-  text-align: center;
-  font-size: 24rpx; color: #C8B4A0;
-}
-
-/* 合规声明 */
-.compliance-note {
-  margin: 24rpx 32rpx 0;
-  font-size: 22rpx; color: #C8B4A0; line-height: 1.7;
-}
-
-.tap { transition: opacity 80ms; }
-.tap-press { opacity: .7; }
+page { height: 100%; overflow: hidden; background: var(--paper); }
+.jobs-page { height: 100vh; display: flex; flex-direction: column; background: var(--paper); }
+.jobs-head { min-height: 108rpx; padding: 14rpx 32rpx 14rpx; display: flex; align-items: center; flex-shrink: 0; }
+.jobs-title { font-size: 42rpx; line-height: 1.2; font-weight: 800; letter-spacing: -1rpx; }
+.jobs-sub { margin-top: 7rpx; font-size: 22rpx; color: var(--muted); }
+.search-bar { height: 86rpx; margin: 0 28rpx 16rpx; padding: 0 22rpx; border-radius: 25rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; align-items: center; gap: 14rpx; flex-shrink: 0; box-shadow: var(--sh-xs); }
+.sb-ic { width: 29rpx; height: 29rpx; color: var(--faint); flex-shrink: 0; }
+.sb-input { flex: 1; min-width: 0; font-size: 26rpx; color: var(--ink); }
+.sb-ph { color: var(--faint); }
+.filter-scroll { width: 100%; flex-shrink: 0; }
+.filter-row { padding: 0 28rpx 18rpx; display: flex; gap: 12rpx; white-space: nowrap; }
+.filter-chip { height: 58rpx; padding: 0 25rpx; border-radius: 17rpx; border: 1rpx solid var(--line-soft); background: #fff; color: var(--muted); font-size: 23rpx; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.filter-chip.on { color: #fff; background: var(--teal); border-color: var(--teal); font-weight: 650; box-shadow: 0 8rpx 18rpx rgba(22,119,255,.15); }
+.jobs-scroll { flex: 1; min-height: 0; }
+.jobs-body { padding: 0 28rpx; }
+.source-banner { min-height: 104rpx; padding: 18rpx 20rpx; margin-bottom: 18rpx; border-radius: 24rpx; border: 1rpx solid #dce9ff; background: #f3f8ff; display: flex; align-items: center; gap: 16rpx; }
+.source-icon { width: 58rpx; height: 58rpx; border-radius: 18rpx; background: #fff; color: var(--teal); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.source-icon .ficon { width: 27rpx; height: 27rpx; }
+.source-copy { flex: 1; }
+.source-title { font-size: 25rpx; font-weight: 650; color: #17233e; }
+.source-desc { margin-top: 4rpx; font-size: 22rpx; color: #5f708d; line-height: 1.5; }
+.job-list { display: flex; flex-direction: column; gap: 16rpx; }
+.job-card { padding: 25rpx 24rpx 22rpx; border-radius: 27rpx; border: 1rpx solid var(--line-soft); background: #fff; }
+.job-top { display: flex; align-items: flex-start; gap: 16rpx; }
+.job-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.job-title { font-size: 30rpx; line-height: 1.35; font-weight: 750; color: var(--ink); }
+.job-company { margin-top: 8rpx; font-size: 23rpx; color: var(--muted); }
+.job-salary { flex-shrink: 0; margin-top: 1rpx; color: var(--teal); font-size: 28rpx; font-weight: 750; }
+.job-tags { margin-top: 18rpx; display: flex; flex-wrap: wrap; gap: 9rpx; }
+.job-tag { min-height: 46rpx; padding: 0 14rpx; border-radius: 12rpx; background: var(--surface-2); color: var(--ink-soft); font-size: 22rpx; display: inline-flex; align-items: center; }
+.job-source { margin-top: 20rpx; padding-top: 18rpx; border-top: 1rpx solid var(--line-faint); display: flex; align-items: center; justify-content: space-between; gap: 14rpx; }
+.source-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8rpx; color: var(--muted); font-size: 22rpx; }
+.source-meta .ficon { width: 22rpx; height: 22rpx; flex-shrink: 0; }
+.source-action { min-height: 76rpx; padding: 0 20rpx; border-radius: 19rpx; background: var(--teal-soft); color: var(--teal-deep); display: flex; align-items: center; font-size: 23rpx; font-weight: 650; flex-shrink: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.list-state, .empty-wrap { padding: 68rpx 30rpx; border-radius: 27rpx; border: 1rpx solid var(--line-soft); background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.loading-line { width: 72%; height: 24rpx; border-radius: 999rpx; background: var(--surface-3); }
+.loading-line.short { width: 48%; margin-top: 18rpx; }
+.state-icon { width: 92rpx; height: 92rpx; border-radius: 28rpx; background: var(--surface-2); color: var(--faint); display: flex; align-items: center; justify-content: center; }
+.state-icon.error { background: var(--error-soft); color: var(--error); }
+.state-icon .ficon { width: 44rpx; height: 44rpx; }
+.state-title { margin-top: 22rpx; font-size: 29rpx; font-weight: 700; }
+.state-desc { margin-top: 9rpx; font-size: 23rpx; color: var(--muted); line-height: 1.5; }
+.retry-btn { margin-top: 25rpx; height: 64rpx; padding: 0 28rpx; border-radius: 18rpx; background: var(--teal); color: #fff; display: flex; align-items: center; font-size: 23rpx; font-weight: 650; }
+.list-more { padding: 26rpx 0 6rpx; text-align: center; font-size: 23rpx; color: var(--faint); }
+.jobs-note { padding: 24rpx 10rpx 8rpx; color: var(--muted); font-size: 22rpx; line-height: 1.6; text-align: center; }
+.tab-spacer { height: calc(130rpx + env(safe-area-inset-bottom)); }

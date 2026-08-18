@@ -10,25 +10,25 @@
     <view class="section-t">上传简历</view>
     <view class="src-list">
       <view class="src-item tap" bindtap="tapUploadFile">
-        <view class="src-ic a-teal"><view class="ficon i-upload"></view></view>
+        <view class="src-ic a-teal"><text class="ficon i-upload"></text></view>
         <view class="src-body">
           <view class="src-title">从手机选择文件</view>
           <view class="src-desc">支持 PDF、Word、图片格式</view>
         </view>
-        <view class="src-arr">›</view>
+        <text class="ficon i-right src-arr"></text>
       </view>
       <view class="src-item tap" bindtap="tapCamera">
-        <view class="src-ic a-clay"><view class="ficon i-scan"></view></view>
+        <view class="src-ic a-clay"><text class="ficon i-scan"></text></view>
         <view class="src-body">
           <view class="src-title">拍照上传</view>
           <view class="src-desc">用手机相机拍摄简历页面</view>
         </view>
-        <view class="src-arr">›</view>
+        <text class="ficon i-right src-arr"></text>
       </view>
     </view>
 
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>上传的简历仅用于本次 AI 服务，不会共享给第三方。敏感文件会在服务完成后按设置自动清理。</text>
     </view>
 

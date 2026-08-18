@@ -1,92 +1,146 @@
 <view class="page-wrap">
 <view style="height:{{statusBarHeight}}px"></view>
 <view class="navbar">
-  <view class="nav-back tap" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+  <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
   <view class="nav-title">打印参数</view>
   <view class="nav-right"></view>
 </view>
 
 <view class="content has-bar">
+  <!-- 步骤条文案与 print-store / print-pay 保持同一套，避免同一笔订单在相邻两页读到不同流程 -->
   <view class="steps rise-d1">
-    <view class="st on"><text class="n">1</text><text class="nl">上传文件</text></view>
+    <view class="st on"><text class="n">1</text><text class="nl">选择文件</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">2</text><text class="nl">选门店</text></view>
     <view class="line"></view>
     <view class="st"><text class="n">3</text><text class="nl">到机核验</text></view>
     <view class="line"></view>
-    <view class="st"><text class="n">4</text><text class="nl">现场打印</text></view>
+    <view class="st"><text class="n">4</text><text class="nl">{{priceStatus === 'ready' ? (amountCents === 0 ? '现场打印' : '机端支付') : '到机完成'}}</text></view>
   </view>
 
+  <!-- 文件 -->
   <view class="card file-card rise-d2 tap" hover-class="tap-press" bindtap="tapFile">
     <view class="fc-ic a-teal"><text class="ficon i-file-text"></text></view>
     <view class="fc-main">
       <view class="fc-name">{{file.name}}</view>
-      <view class="fc-meta">{{hasFile ? (hasPageCount ? '服务端核定 ' + file.pages + ' 页' : (priceStatus === 'loading' ? '正在由服务端识别页数…' : '页数和金额待服务端核定')) : '从本人文档或真实 AI 成果选择'}}</view>
+      <view class="fc-meta">
+        <text wx:if="{{hasFile}}" class="fc-tag">{{fileExt}}</text>
+        <text class="fc-sub">{{hasFile ? (hasPageCount ? '服务端核定 ' + file.pages + ' 页' : (priceStatus === 'loading' ? '正在由服务端识别页数…' : '页数待服务端核定')) : '从本人文档或真实 AI 成果选择'}}</text>
+      </view>
     </view>
-    <view class="fc-preview">{{hasFile ? '预览排版' : '选择文件'}} ›</view>
+    <view class="fc-go"><text>{{hasFile ? '查看原文' : '选择文件'}}</text><text class="ficon i-right"></text></view>
   </view>
 
-  <view class="section-t rise-d3">打印颜色</view>
-  <view class="opt-list rise-d3">
-    <view class="opt {{color==='bw'?'on':''}} tap" data-v="bw" bindtap="pickColor">
-      <view class="o-radio">{{color==='bw'?'✓':''}}</view>
-      <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济，适合文字文档</view></view>
-      <view class="o-price">{{priceLabels.bw}}</view>
+  <!-- 打印设置 -->
+  <view class="section-t rise-d3">打印设置</view>
+  <view class="card flat setting rise-d3">
+
+    <view class="set-k">打印颜色</view>
+    <view class="opt-list">
+      <view class="opt {{color==='bw'?'on':''}} tap" hover-class="tap-press" data-v="bw" bindtap="pickColor">
+        <view class="o-radio"><text wx:if="{{color==='bw'}}" class="ficon i-check"></text></view>
+        <view class="o-main"><view class="o-title">黑白打印</view><view class="o-sub">清晰经济，适合文字文档</view></view>
+        <view class="o-price">{{priceLabels.bw}}</view>
+      </view>
+      <view class="opt off tap" hover-class="tap-press" data-v="color" bindtap="pickColor">
+        <view class="o-radio"></view>
+        <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">驱动侧彩色参数未完成真机验收</view></view>
+        <view class="o-locked">暂不可选</view>
+      </view>
     </view>
-    <view class="opt off tap" data-v="color" bindtap="pickColor">
-      <view class="o-radio">{{color==='color'?'✓':''}}</view>
-      <view class="o-main"><view class="o-title">彩色打印</view><view class="o-sub">暂未完成 Windows 真机验收</view></view>
-      <view class="o-price">暂未开放</view>
+
+    <view class="set-sep"></view>
+
+    <view class="set-row">
+      <view class="set-k tight">纸张规格</view>
+      <view class="set-v">A4 · 210 × 297mm</view>
+      <view class="set-badge">仅支持 A4</view>
+    </view>
+
+    <view class="set-sep"></view>
+
+    <view class="set-k">打印方式</view>
+    <view class="duplex-row">
+      <view class="duplex-opt {{duplex==='single'?'on':''}} tap" hover-class="tap-press" data-v="single" bindtap="pickDuplex">
+        <view class="d-t">单面</view>
+        <view class="d-s">每页一张纸</view>
+      </view>
+      <view class="duplex-opt off tap" hover-class="tap-press" data-v="double" bindtap="pickDuplex">
+        <view class="d-t">双面</view>
+        <view class="d-s">暂不可选</view>
+      </view>
+    </view>
+    <view class="set-why">彩色与双面本期不可选，点一下会说明原因；开放前不会按这两项计价。</view>
+
+    <view class="set-sep"></view>
+
+    <view class="set-row">
+      <view class="set-k tight">打印份数</view>
+      <view class="stepper">
+        <view class="s-btn tap {{copies<=1?'off':''}}" hover-class="tap-press" bindtap="minus">−</view>
+        <view class="s-val">{{copies}}</view>
+        <view class="s-btn tap {{copies>=99?'off':''}}" hover-class="tap-press" bindtap="plus">+</view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 页数与金额：明确写出这笔钱是怎么来的，页数、份数、单价、合计逐项对得上 -->
+  <view class="section-t rise-d4">页数与金额</view>
+  <view class="card flat bill rise-d4">
+    <block wx:if="{{priceStatus === 'ready'}}">
+      <view class="bl-row">
+        <text class="bl-k">计费页数</text>
+        <text class="bl-v">{{file.pages}} 页 / 份</text>
+      </view>
+      <view class="bl-note">{{billingPageSource === 'image_single_page' ? '图片文件按 1 页核定' : (billingPageSource === 'pdf_lightweight_scan' ? '由服务端读取 PDF 实际页数核定' : '由服务端核定，不由手机端推算')}}</view>
+      <view class="bl-row">
+        <text class="bl-k">打印份数</text>
+        <text class="bl-v">× {{copies}} 份</text>
+      </view>
+      <view class="bl-row">
+        <text class="bl-k">合计纸张</text>
+        <text class="bl-v">{{file.pages * copies}} 页</text>
+      </view>
+      <view class="bl-row">
+        <text class="bl-k">黑白单价</text>
+        <text class="bl-v">{{priceLabels.bw}}</text>
+      </view>
+      <view class="bl-row total">
+        <text class="bl-k strong">{{amountCents === 0 ? '试运营费用' : '服务端报价'}}</text>
+        <text class="bl-amt">{{amountCents === 0 ? '免费' : '¥' + total}}</text>
+      </view>
+    </block>
+
+    <view wx:elif="{{!hasFile}}" class="bl-idle">选择文件后，由服务端核定真实页数并给出精确报价。</view>
+
+    <view wx:elif="{{priceStatus === 'loading'}}" class="bl-idle">服务端正在读取文件真实页数并核定金额…</view>
+
+    <view wx:else class="bl-fail">
+      <view class="bl-fail-t"><text class="ficon i-warning"></text><text>暂时无法取得精确报价</text></view>
+      <view class="bl-fail-s">{{priceError || '服务端暂时无法核定页数和金额'}}</view>
+      <view class="btn ghost bl-retry" bindtap="retryQuote">重新报价</view>
     </view>
   </view>
 
-  <view class="section-t rise-d4">纸张规格</view>
-  <view class="card flat paper-row rise-d4">
-    <view class="pr-main"><view class="o-title">A4 (210 × 297mm)</view><view class="o-sub">标准幅面</view></view>
-    <view class="paper-badge">仅支持 A4</view>
-  </view>
-
-  <view wx:if="{{hasFile && priceStatus === 'unavailable'}}" class="quote-error rise-d4">
-    <view class="qe-main">
-      <view class="qe-title">暂时无法取得精确报价</view>
-      <view class="qe-text">{{priceError}}</view>
-    </view>
-    <view class="btn ghost sm" bindtap="retryQuote">重新报价</view>
-  </view>
-
-  <view class="section-t rise-d4">打印方式</view>
-  <view class="duplex-row rise-d4">
-    <view class="duplex-opt {{duplex==='single'?'on':''}} tap" data-v="single" bindtap="pickDuplex">单面</view>
-    <view class="duplex-opt off tap" data-v="double" bindtap="pickDuplex">双面 · 暂未开放</view>
-  </view>
-
-  <view class="section-t rise-d5">打印份数</view>
-  <view class="card flat stepper-row rise-d5">
-    <view class="o-title">份数</view>
-    <view class="stepper">
-      <view class="s-btn tap {{copies<=1?'off':''}}" bindtap="minus">−</view>
-      <view class="s-val">{{copies}}</view>
-      <view class="s-btn tap" bindtap="plus">+</view>
-    </view>
-  </view>
-
+  <!-- 隐私检查 -->
   <view class="section-t rise-d5">打印隐私检查</view>
   <view class="card flat privacy-check rise-d5">
     <view wx:if="{{privacyStatus === 'scanning'}}" class="pc-state">正在检查文件中的手机号、证件号等敏感片段…</view>
-    <view wx:elif="{{privacyStatus === 'error'}}">
+    <view wx:elif="{{privacyStatus === 'error'}}" class="pc-block">
       <view class="pc-error">{{privacyError}}</view>
-      <view class="btn ghost sm" bindtap="retryPrivacy">重新检查</view>
+      <view class="btn ghost pc-btn" bindtap="retryPrivacy">重新检查</view>
     </view>
-    <view wx:elif="{{privacyStatus === 'review'}}">
+    <view wx:elif="{{privacyStatus === 'review'}}" class="pc-block">
       <view class="pc-title">发现 {{privacyFindings.length}} 处可能的敏感信息</view>
       <view wx:for="{{privacyFindings}}" wx:key="id" class="pc-finding">
         <text>{{item.label}}{{item.pageNumber ? ' · 第' + item.pageNumber + '页' : ''}}</text>
         <text class="pc-snippet">{{item.snippet || '未返回原文片段'}}</text>
       </view>
       <view class="pc-note">继续表示你确认这些内容属于本次打印文件，并选择原样保留。</view>
-      <view class="btn primary sm" bindtap="confirmPrivacy">{{privacySubmitting ? '确认中…' : '确认保留并继续'}}</view>
+      <view class="btn primary pc-btn" bindtap="confirmPrivacy">{{privacySubmitting ? '确认中…' : '确认保留并继续'}}</view>
     </view>
-    <view wx:elif="{{privacyStatus === 'ready'}}" class="pc-ready">✓ 隐私检查已完成，可以提交打印订单</view>
+    <view wx:elif="{{privacyStatus === 'ready'}}" class="pc-ready"><text class="ficon i-check"></text><text>隐私检查已完成，可以提交打印订单</text></view>
     <view wx:else class="pc-state">选择文件后开始检查</view>
   </view>
 
@@ -97,7 +151,8 @@
   <view class="ab-price">
     <text class="ab-label">{{priceStatus === 'loading' ? '服务端正在报价' : (priceStatus === 'ready' ? (amountCents === 0 ? '免费试运营' : '精确报价') : '报价暂不可用')}}</text>
     <text wx:if="{{priceStatus === 'ready'}}" class="ab-amt">{{amountCents === 0 ? '免费' : '¥' + total}}</text>
+    <text wx:else class="ab-amt pending">—</text>
   </view>
-  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端 →')}}</view>
+  <view class="btn primary lg {{priceStatus !== 'ready' || !hasFile || privacyStatus !== 'ready' ? 'disabled' : ''}}" bindtap="toStore">{{!hasFile ? '请先选择文件' : (privacyStatus !== 'ready' ? '请完成隐私检查' : '选择终端')}}</view>
 </view>
 </view>

@@ -18,7 +18,7 @@
 
     <!-- 不可恢复错误 -->
     <view wx:if="{{phase === 'failed'}}" class="qa-state">
-      <view class="ficon i-info qa-fail-ic"></view>
+      <text class="ficon i-info qa-fail-ic"></text>
       <text class="state-tip">{{failMsg}}</text>
       <view class="btn ghost tap qa-back-btn" bindtap="tapQuit">返回</view>
     </view>

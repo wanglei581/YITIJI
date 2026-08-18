@@ -9,8 +9,9 @@ Page({
     loadError: '',
     pageId: '',
     policy: {
-      category: '', title: '', org: '', date: '', syncTime: '', aiSummary: '',
-      targetGroup: '', subsidies: [], steps: [], officialUrl: '',
+      icon: 'file-text', label: '', accent: 'slate', title: '', summary: '', paragraphs: [],
+      tag: '', tagTone: '', audience: '', publishedDate: '', sourceOrg: '', syncTime: '',
+      externalUrl: '',
     },
   },
 
@@ -25,7 +26,7 @@ Page({
     this.setData({ loading: true, loadError: '' });
     api.getPolicyDetail(id).then((policy) => {
       this.setData({ policy, loading: false });
-      history.recordView('policy', { id, title: policy.title, source: policy.org });
+      history.recordView('policy', { id, title: policy.title, source: policy.sourceOrg });
     }).catch((err) => {
       const msg = err && err.statusCode === 404 ? '未找到该内容，可能已下线' : (err && err.message) || '加载失败';
       this.setData({ loading: false, loadError: msg });
@@ -42,13 +43,13 @@ Page({
 
   tapOfficial() {
     const p = this.data.policy || {};
-    if (this.data.loading || this.data.loadError || !p.officialUrl) {
+    if (this.data.loading || this.data.loadError || !p.externalUrl) {
       wx.showToast({ title: '官方原文链接暂不可用', icon: 'none' });
       return;
     }
     wx.setClipboardData({
-      data: p.officialUrl,
-      success: () => history.recordJump('policy', { id: this.data.pageId, title: p.title, source: p.org }),
+      data: p.externalUrl,
+      success: () => history.recordJump('policy', { id: this.data.pageId, title: p.title, source: p.sourceOrg }),
     });
   },
 

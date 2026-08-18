@@ -4,13 +4,15 @@
   <view class="navbar">
     <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">岗位详情</view>
-    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
   </view>
 
-  <view class="content has-bar">
+  <view class="content has-bar detail-content">
 
     <!-- 加载中 -->
-    <view wx:if="{{loading}}" class="detail-state">加载中…</view>
+    <view wx:if="{{loading}}" class="detail-state">
+      <view class="state-icon"><text class="ficon i-solution"></text></view>
+      <view class="ds-msg">正在加载岗位详情</view>
+    </view>
 
     <!-- 加载失败 -->
     <view wx:elif="{{loadError}}" class="detail-state">
@@ -23,6 +25,7 @@
     <block wx:else>
     <!-- 岗位头部 -->
     <view class="job-header rise-d1">
+      <view class="source-pill">第三方来源信息</view>
       <view class="jh-title">{{job.title}}</view>
       <view class="jh-salary">{{job.salary}}</view>
       <view class="jh-company">{{job.company}}</view>
@@ -33,7 +36,13 @@
 
     <!-- 来源信息 -->
     <view class="info-card rise-d2">
-      <view class="ic-title">来源信息</view>
+      <view class="ic-head">
+        <view class="ic-head-icon"><text class="ficon i-link"></text></view>
+        <view>
+          <view class="ic-title">来源信息</view>
+          <view class="ic-subtitle">请在来源平台确认职位有效性</view>
+        </view>
+      </view>
       <view class="ic-row"><text class="ic-k">来源机构</text><text class="ic-v">{{job.sourceOrg}}</text></view>
       <view class="ic-row"><text class="ic-k">外部 ID</text><text class="ic-v mono">{{job.externalId}}</text></view>
       <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{job.syncTime}}</text></view>
@@ -54,7 +63,7 @@
 
     <!-- 工作职责 -->
     <view class="section-t rise-d3">工作职责</view>
-    <view class="duty-list rise-d3">
+    <view class="duty-list section-card rise-d3">
       <view class="duty-item" wx:for="{{job.duties}}" wx:key="*this">
         <view class="duty-dot"></view>
         <text class="duty-text">{{item}}</text>
@@ -63,7 +72,7 @@
 
     <!-- 任职要求 -->
     <view class="section-t rise-d4">任职要求</view>
-    <view class="duty-list rise-d4">
+    <view class="duty-list section-card rise-d4">
       <view class="duty-item" wx:for="{{job.requirements}}" wx:key="*this">
         <view class="duty-dot"></view>
         <text class="duty-text">{{item}}</text>
@@ -80,7 +89,15 @@
 
   </view>
 
+  <!-- 收藏原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——
+       胶囊是系统浮层，自定义导航栏右侧永远不可用。移到底部操作条：
+       拇指可达，且与主操作并列时用户一眼能看到。 -->
   <view class="actionbar">
+    <view class="fav-btn tap {{faved ? 'on' : ''}}" hover-class="tap-press" bindtap="tapFav"
+          role="button" aria-label="{{faved ? '取消收藏' : '收藏这个岗位'}}">
+      <text class="ficon i-inbox"></text>
+      <text class="fav-btn-t">{{faved ? '已收藏' : '收藏'}}</text>
+    </view>
     <view class="btn primary block tap" bindtap="tapExternalApply">复制来源链接</view>
   </view>
 

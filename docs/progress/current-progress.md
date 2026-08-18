@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-08-18 修复 **政策页把内置办事指引与政策库混在一起展示（分支 `claude/content-visibility-fixes`，基于 `origin/main@a26eae3ca`，未合入、未部署）**。
+2026-08-18 修复 **政策页把内置办事指引与政策库混在一起展示（分支 `claude/content-visibility-fixes`，基于 `origin/main@a26eae3ca`，未合入、未部署）**。本条**对应下一条（#707 种子内容录入清单）登记的代码问题 C**；同批登记的 **D（已结束招聘会不隐藏、详情端点无日期条件）经复核判定不成立**，理由见下文，未改代码。
 
 **洞在哪。** `apps/kiosk/src/pages/renshi/RenshiPage.tsx` 把后端政策库条目和 5 条内置办事指引合并成一个数组 `[...policies.filter(kind==='policy_guide').map(fromPublished), ...BUILTIN_GUIDES]`，交给 `PolicyPanel` 平铺渲染。**并且这个「空」在旧代码里根本无法表达**：`PolicyPanel` 的空态挂在 `visible.length === 0` 上，而内置指引里 `builtin-skill-training` 的 `audiences` 含 `'general'`，`matchAudience` 对任何身份都返回 true —— 那条分支永远走不到，政策页从来就没有可达空态。
 
@@ -13,6 +13,15 @@
 **同批复核但判定不成立、因此未改的一条：「已结束的招聘会在前台不隐藏、详情端点无日期条件」。** 复核结论是**当前实现是对的**，不是缺陷。`buildPublishedFairGroups` 把已结束场次分到独立时间桶并拼在活跃场次之后（未结束 `startAt` 升序 → 已结束 `startAt` 倒序），前台 `JobFairsPage` 打 `.past` 类（`opacity:.65` + 去掉强调色左边框）、显示「已结束」状态 chip、**整块操作区连同收藏与扫码预约一起隐藏**，`JobFairDetailPage` 同样以 `!isEnded` 收掉扫码签到与扫码预约，首页高亮位与签到页各自只取 ongoing/upcoming。产品判断也是「显示但标注」而非完全隐藏：站在大厅机器前，上周结束的场次是噪音，所以必须沉底 + 明确标注；但求职者常来找「上次那场招聘会的资料」，完全隐藏会让详情页、收藏、浏览记录里的旧链接集体 404，详情端点因此**不应该**加日期条件（岗位不同——过期岗位会让人照着去投递，所以 `getPublishedJobById` 有 `jobValidityWhere()`；招聘会资料是档案，性质不一样）。**未为了有产出去改一段本来正确的代码。**
 
 **⚠️ 但复核顺带发现一处真实的、与上述判断同源的漏网（本次未修，需要单独裁决）**：「AI参会准备单」全链路对招聘会状态完全无感——`JobFairDetailPage.tsx` 的 AI准备单按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到/预约都收了，只有它没收）、`JobFairDetailTabs.tsx` 的「AI参会准备单」磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 的查询只有 `approved+published` 没有 `endAt` 条件，且 LLM system prompt 无当前日期锚点。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。仓库里已有现成的正确写法可复用（`bulk-publish-expiry.ts` 就在用 `buildFairStatusWhere('ended')` 并给出「该招聘会已于 X 结束」）。需要先定产品口径（按钮直接隐藏，还是把该页改成「回顾 / 资料整理」语义）再动手，故未并入本 PR。
+2026-08-18 新增 **上线种子内容录入清单（分支 `claude/seed-content-checklist`，基于 `origin/main@a26eae3ca`，纯文档，未改任何代码）**：[../operations/seed-content-entry-checklist-2026-08.md](../operations/seed-content-entry-checklist-2026-08.md)。承接上一条「链路是通的，空是因为没录数据」的结论，给出 30 条政策 + 20 场招聘会的可执行录入清单：字段字典与合法取值、前置条件、待录表格模板（示范行**只给结构、逐格标注「示例·需替换」**，不含任何编造的政策名称/文号/金额/日期/链接）、录入方式推荐与验收步骤。
+
+**澄清了一处运营最容易搞错的差异**：政策与招聘会的发布闸门**不一样**。招聘会过两道（`assertOrgContentTrustActive` + `assertPublishFieldsComplete`，`jobs-admin.service.ts:192-210`，10 个必填字段、`sourceUrl` 必须 http/https）；**政策只过第一道**（`policies.service.ts:293-311` 无完整性校验调用，`PolicyPost` 也不在 `publish-completeness.ts` 的字段表里），因此政策的 `externalUrl` / `externalId` 可空且不影响发布——这是刻意设计（很多地方政策只有红头文件、没有网页原文，也不是每条都有发文字号，schema 注释明确「不得伪造」）。**录入方式给单一推荐：两类都走 `manual` 手动录入**——政策本就不在数据源体系里（无数据源外键，excel/csv/api/webhook 四种对政策全不适用），20 场招聘会摊不平 Excel 的建源+配映射成本，且手动录入的 `externalId` 由系统生成不会填错；`json` 只有壳、`api` 半通、`webhook` 只收岗位。
+
+**验收口径的关键取证**：公开读取路径**不校验**机构内容可信状态（政策 `policies.service.ts:107-113`、招聘会 `jobs-kiosk.service.ts:139-142` 的 `where` 都只有 `reviewStatus=approved` + `publishStatus=published`），所以「已通过+已发布」就是前台可见的充分必要条件，不存在「发布了但因信任问题看不到」；反过来机构在发布**之后**被降级或归档，已发布内容**不会自动下架**。
+
+**登记 6 处代码问题（只报不修，本轮未动代码）**：**A.** 机构「内容可信」标记**没有任何后台界面**——`apps/admin/src/routes/partners/` 零 trust 控件，全 `apps/` 检索 `contentTrust` 只命中 `BulkPublishButton.tsx:341-343` / `bulkPublish.ts:62` 两处**只读**展示，而前者的提示文案恰恰让运营「到『合作机构』把该机构标记为内容可信」，**指向的控件不存在**；实际只能由工程师调 `PATCH /admin/orgs/:id/content-trust` 或跑 `maintenance:backfill-org-content-trust`。**B.** `PolicyPost.externalId`（发文字号）后端全链路支持，但 `apps/partner/src/routes/policy/index.tsx:56-65` 的 `PolicyFormState` **没有该字段**、Admin 侧也没有，故走控制台录入的政策该字段**永远为 null**；且 schema 要求的 null 兜底文案「来源未提供编号」全仓**只存在于 schema/migration 注释，无任何前端消费方**——CLAUDE.md §10 的「外部ID 展示」对政策目前无法满足。**C.** `/renshi?tab=policy` 把后端数据与内置硬编码指引合并展示（`RenshiPage.tsx:69-70`），**政策库为空时页面看上去也是满的**，既与 §9「不伪造能力」相冲突，也让验收失去判别力（清单里已改用 `?tab=notice` 或接口 `pagination.total` 验证）。**D.** 已结束招聘会前台不隐藏、详情端点**无任何日期条件**（对比岗位两侧都套 `jobValidityWhere()`）。**E.** 公开 `GET /policies` 不校验 `kind`/`audience`/`category` 取值，拼错安静返回 0 条而非 400。**F.** `theme` 白名单在 6 处重复硬编码，无共享常量。
+
+验证：`verify:repository-integrity` 通过；`verify:compliance-copy` 通过（该门禁只扫 `apps/*/src`，故另对新增文档单独核了 SSOT 全部 7 项禁词及 `平台内?投递` 正则变体，**零命中**）。
 
 2026-08-18 完成 **内容信息库端到端链路实测 + 三处修复（分支 `claude/content-pipeline-e2e`，基于 `origin/main@7d6feaf31`，未合入、未部署）**：新增 `pnpm --filter @ai-job-print/api verify:content-pipeline-e2e`（117 断言，真实 HTTP + 真实 Prisma + 真实 Guard）。
 

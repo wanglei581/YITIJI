@@ -5,7 +5,10 @@
 .legal-heading { margin: 34rpx 0 16rpx; color: var(--ink); font-size: 32rpx; font-weight: 800; line-height: 1.45; }
 .legal-heading:first-of-type { margin-top: 0; }
 .legal-paragraph { margin-bottom: 20rpx; color: var(--ink-soft); font-size: 28rpx; line-height: 1.9; word-break: break-all; }
-.legal-bullet { padding-left: 12rpx; }
+.legal-bullet { display: flex; align-items: flex-start; gap: 14rpx; padding-left: 4rpx; }
+.legal-bullet-dot { width: 9rpx; height: 9rpx; margin-top: 19rpx; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0; }
+.legal-bullet-text { flex: 1; }
 .legal-numbered { padding-left: 8rpx; }
 .legal-end { margin-top: 40rpx; color: var(--faint); font-size: 24rpx; text-align: center; }
 .legal-state { padding: 80rpx 32rpx; color: var(--muted); font-size: 28rpx; text-align: center; line-height: 1.7; }

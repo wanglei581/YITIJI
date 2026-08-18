@@ -1,0 +1,115 @@
+/* pages/fair-reminders/fair-reminders.wxss */
+.rm-list { padding: 0 24rpx; }
+
+/* 列表工具栏：承接原导航栏右上角的「管理」。导航栏右侧被微信胶囊常驻遮挡，不可放操作。
+   触控区 96rpx = 48px，满足 CLAUDE.md §9 最小可点击尺寸。 */
+.list-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16rpx; padding: 8rpx 32rpx 4rpx;
+}
+.lt-label { font-size: 24rpx; color: var(--muted); flex: 1; }
+.lt-action {
+  flex-shrink: 0;
+  min-width: 132rpx; height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 22rpx; border: 1rpx solid var(--line);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: 27rpx; font-weight: 600;
+}
+.lt-action.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+
+.rm-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid var(--line-faint);
+}
+.rm-item:last-child { border-bottom: none; }
+
+.rm-ic {
+  flex-shrink: 0;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: var(--r);
+  background: var(--teal-wash);
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rm-ic.expired { background: var(--surface-2); color: var(--ghost); }
+.rm-ic .ficon { width: 36rpx; height: 36rpx; }
+
+.rm-body { flex: 1; min-width: 0; }
+.rm-title {
+  font-size: 28rpx;
+  font-weight: 650;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rm-meta {
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rm-sep { color: var(--line); }
+.rm-expired-tag {
+  display: inline-block;
+  margin-top: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  background: var(--surface-2);
+  color: var(--ghost);
+  font-size: 20rpx;
+}
+
+.rm-del {
+  flex-shrink: 0;
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--error-soft);
+  color: var(--error);
+}
+.rm-del .ficon { width: 26rpx; height: 26rpx; }
+
+.rm-arrow { color: var(--ghost); }
+.rm-arrow .ficon { width: 19rpx; height: 19rpx; }
+
+.clear-btn {
+  margin: 20rpx 0 4rpx;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--error);
+  background: var(--error-soft);
+  border-radius: var(--r-md);
+}
+
+.remind-note {
+  padding: 24rpx 10rpx 8rpx;
+  color: var(--muted);
+  font-size: 22rpx;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.empty-slot {
+  padding: 60rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.es-ic { font-size: 88rpx; color: var(--faint); margin-bottom: 20rpx; }
+.es-t { font-size: 30rpx; font-weight: 600; color: var(--ink-soft); }
+.es-d { margin-top: 8rpx; font-size: 24rpx; color: var(--muted); line-height: 1.6; }

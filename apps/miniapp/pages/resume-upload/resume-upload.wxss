@@ -1,23 +1,24 @@
 .page-wrap { min-height: 100vh; background: var(--paper); }
 
 /* 来源选择列表 */
-.src-list { background: var(--surface); border-radius: 14rpx; overflow: hidden; }
-.src-item { display: flex; align-items: center; gap: 20rpx; padding: 28rpx 24rpx;
-  border-bottom: 1rpx solid var(--line); }
+.src-list { margin: 0 32rpx; background: var(--surface); border: 1rpx solid var(--line-soft);
+  border-radius: 28rpx; overflow: hidden; box-shadow: var(--sh-xs); }
+.src-item { display: flex; align-items: center; gap: 20rpx; min-height: 124rpx;
+  padding: 24rpx 26rpx; border-bottom: 1rpx solid var(--line-faint); }
 .src-item:last-child { border-bottom: none; }
 .src-ic { width: 72rpx; height: 72rpx; border-radius: 18rpx; display: flex;
   align-items: center; justify-content: center; font-size: 36rpx; flex-shrink: 0; }
 .src-body { flex: 1; }
 .src-title { font-size: 30rpx; font-weight: 600; color: var(--ink); }
 .src-desc { font-size: 24rpx; color: var(--muted); margin-top: 4rpx; }
-.src-arr { font-size: 30rpx; color: var(--ghost); }
+.src-arr { width: 22rpx; height: 22rpx; color: var(--ghost); }
 
 /* 简历库列表 */
 .resume-list { background: var(--surface); border-radius: 14rpx; overflow: hidden; }
 .resume-item { display: flex; align-items: center; gap: 16rpx; padding: 24rpx;
   border-bottom: 1rpx solid var(--line); }
 .resume-item:last-child { border-bottom: none; }
-.ri-ic { width: 56rpx; height: 56rpx; border-radius: 12rpx; background: rgba(31,158,134,.12);
+.ri-ic { width: 56rpx; height: 56rpx; border-radius: 12rpx; background: var(--teal-soft);
   display: flex; align-items: center; justify-content: center; font-size: 28rpx; color: var(--teal); }
 .ri-body { flex: 1; }
 .ri-name { font-size: 28rpx; font-weight: 600; color: var(--ink); }

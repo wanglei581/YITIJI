@@ -1,85 +1,116 @@
-<!--pages/jobs/jobs.wxml-->
-<view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+<view class="jobs-page">
+  <view style="height:{{statusBarHeight}}px"></view>
 
-  <!-- 页头 -->
-  <view class="page-hd">
-    <text class="page-title">发现岗位</text>
+  <view class="jobs-head">
+    <view>
+      <view class="jobs-title">求职</view>
+      <view class="jobs-sub">看清来源，再去来源平台完成后续操作</view>
+    </view>
   </view>
 
-  <!-- 搜索栏 -->
   <view class="search-bar">
-    <view class="ficon i-search sb-ic"></view>
-    <input class="sb-input" type="text" value="{{query}}" placeholder="搜索职位、公司、行业…"
+    <text class="ficon i-search sb-ic"></text>
+    <input class="sb-input" type="text" value="{{query}}" placeholder="搜索职位、公司或行业"
       placeholder-class="sb-ph" confirm-type="search" bindinput="onSearchInput" />
   </view>
 
-  <!-- 分类筛选条 -->
-  <scroll-view class="filter-scroll" scroll-x enhanced="{{true}}" show-scrollbar="{{false}}">
+  <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
     <view class="filter-row">
       <view
-        class="f-chip {{activeFilter === index ? 'f-on' : ''}} tap"
+        class="filter-chip {{activeFilter === index ? 'on' : ''}} tap"
         wx:for="{{filters}}"
         wx:key="*this"
         hover-class="tap-press"
         data-index="{{index}}"
         bindtap="tapFilter"
+        role="button"
+        aria-label="按{{item}}筛选"
       >{{item}}</view>
     </view>
   </scroll-view>
 
-  <!-- 加载中 -->
-  <view class="list-state" wx:if="{{loading}}">
-    <view class="ls-dot"></view><view class="ls-dot"></view><view class="ls-dot"></view>
-  </view>
-
-  <!-- 加载失败 -->
-  <view class="empty-wrap" wx:elif="{{loadError}}">
-    <view class="ev-icon">⚠️</view>
-    <view class="ev-title">加载失败</view>
-    <view class="ev-desc">{{loadError}}</view>
-    <view class="btn-retry tap" hover-class="tap-press" bindtap="reload">重新加载</view>
-  </view>
-
-  <!-- 空态 -->
-  <view class="empty-wrap" wx:elif="{{jobs.length === 0}}">
-    <view class="ev-icon">📋</view>
-    <view class="ev-title">{{query ? '没有匹配的岗位' : '暂无岗位'}}</view>
-    <view class="ev-desc">{{query ? '换个关键词试试' : '换个筛选条件，或稍后再来看看'}}</view>
-  </view>
-
-  <!-- 岗位卡列表 -->
-  <view class="job-list" wx:else>
-    <view
-      class="job-card tap"
-      wx:for="{{jobs}}"
-      wx:key="id"
-      hover-class="tap-press"
-      data-id="{{item.id}}"
-      bindtap="tapJob"
-    >
-      <view class="jc-top">
-        <text class="jc-title">{{item.title}}</text>
-        <text class="jc-salary">{{item.salary}}</text>
+  <!--
+    列表移进 scroll-view 后，页面本身不再滚动，Page 的 onReachBottom /
+    onPullDownRefresh 都不会再触发。岗位是服务端分页检索（见 jobs.js），
+    没有触底追加就永远只看得到第 1 页，所以这两件事必须改由 scroll-view
+    自己的 scrolltolower / refresher 事件驱动。
+  -->
+  <scroll-view
+    class="jobs-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    lower-threshold="120"
+    bindscrolltolower="onReachBottom"
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresherRefresh"
+  >
+    <view class="jobs-body">
+      <view class="source-banner">
+        <view class="source-icon"><text class="ficon i-info"></text></view>
+        <view class="source-copy">
+          <view class="source-title">可信来源信息</view>
+          <view class="source-desc">岗位均标注第三方或官方来源，本平台不接收简历。</view>
+        </view>
       </view>
-      <text class="jc-company">{{item.company}}</text>
-      <view class="jc-tags" wx:if="{{item.tags && item.tags.length}}">
-        <text class="j-tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+
+      <view class="list-state" wx:if="{{loading}}" aria-label="正在加载岗位信息">
+        <text class="sr-only">正在加载岗位信息</text>
+        <view class="loading-line"></view>
+        <view class="loading-line short"></view>
       </view>
-      <view class="jc-footer">
-        <text class="jc-source">来源：{{item.source}}<block wx:if="{{item.time}}"> · {{item.time}}</block></text>
-        <view class="jc-cta tap" hover-class="act-press" catchtap="tapSource" data-url="{{item.sourceUrl || item.externalUrl}}">复制来源链接</view>
+
+      <view class="empty-wrap" wx:elif="{{loadError}}">
+        <view class="state-icon error"><text class="ficon i-warning"></text></view>
+        <view class="state-title">加载失败</view>
+        <view class="state-desc">{{loadError}}</view>
+        <view class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载岗位信息">重新加载</view>
       </view>
+
+      <view class="empty-wrap" wx:elif="{{jobs.length === 0}}">
+        <view class="state-icon"><text class="ficon i-solution"></text></view>
+        <view class="state-title">{{query ? '没有匹配的岗位' : '暂无岗位'}}</view>
+        <view class="state-desc">{{query ? '换个关键词试试' : '换个筛选条件，或稍后再来看看'}}</view>
+      </view>
+
+      <view class="job-list" wx:else>
+        <view
+          class="job-card tap"
+          wx:for="{{jobs}}"
+          wx:key="id"
+          hover-class="tap-press"
+          data-id="{{item.id}}"
+          bindtap="tapJob"
+          role="button"
+          aria-label="查看岗位：{{item.title}}，{{item.company}}，{{item.salary}}"
+        >
+          <view class="job-top">
+            <view class="job-main">
+              <text class="job-title">{{item.title}}</text>
+              <text class="job-company">{{item.company}}</text>
+            </view>
+            <text class="job-salary">{{item.salary}}</text>
+          </view>
+          <view class="job-tags" wx:if="{{item.tags && item.tags.length}}">
+            <text class="job-tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+          </view>
+          <view class="job-source">
+            <view class="source-meta">
+              <text class="ficon i-link"></text>
+              <text>{{item.source}}<block wx:if="{{item.time}}"> · {{item.time}}</block></text>
+            </view>
+            <view class="source-action tap" hover-class="tap-press" catchtap="tapSource" data-url="{{item.sourceUrl || item.externalUrl}}" role="button" aria-label="复制{{item.source}}来源链接">复制来源链接</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 触底追加：只反映真实请求状态，不伪造「已加载全部」（沿用 #610 口径） -->
+      <view class="list-more" wx:if="{{loadingMore}}">正在加载更多岗位…</view>
+      <view class="list-more" wx:elif="{{!loading && !loadError && jobs.length && !hasMore}}">已显示全部岗位</view>
+
+      <view class="jobs-note">岗位信息仅作展示与来源跳转，不提供平台内投递、企业筛选或录用承诺。</view>
+      <view class="tab-spacer"></view>
     </view>
-
-    <!-- 触底追加：只反映真实请求状态，不伪造「已加载全部」 -->
-    <view class="list-more" wx:if="{{loadingMore}}">正在加载更多岗位…</view>
-    <view class="list-more" wx:elif="{{!hasMore}}">已显示全部岗位</view>
-  </view>
-
-  <!-- 合规声明 -->
-  <view class="compliance-note">岗位信息均来自第三方或官方来源，本平台仅作展示与跳转，不收简历，不做平台内投递。</view>
-
-  <!-- tabBar 安全区 -->
-  <view style="height:calc(100rpx + env(safe-area-inset-bottom))"></view>
+  </scroll-view>
 </view>

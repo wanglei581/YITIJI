@@ -19,6 +19,8 @@ Page({
     hasMore: false,
     page: 1,
     loadError: '',
+    // scroll-view 自带下拉刷新的受控开关（页面本身不滚动，见 jobs.wxml 注释）
+    refreshing: false,
   },
 
   onLoad() {
@@ -82,6 +84,15 @@ Page({
     this.loadJobs().then(stop, stop)
   },
 
+  // 列表在 scroll-view 里，页面级下拉不会触发，改由 refresher 事件驱动。
+  // 与 onPullDownRefresh 同样「等请求真正结束再收指示器」，成功失败都收。
+  onRefresherRefresh() {
+    if (this.data.refreshing) return
+    this.setData({ refreshing: true })
+    const stop = () => this.setData({ refreshing: false })
+    this.loadJobs().then(stop, stop)
+  },
+
   onReachBottom() {
     if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) {
       this.loadJobs({ append: true })
@@ -125,6 +136,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '智引答 · 发现求职机会', path: '/pages/jobs/jobs' }
+    return { title: '职易达 · 发现求职机会', path: '/pages/jobs/jobs' }
   },
 })

@@ -9,7 +9,7 @@
 
   <view class="content">
     <view class="usb-hero rise-d1">
-      <view class="usb-ic">🔌</view>
+      <view class="usb-ic"><text class="ficon i-usb"></text></view>
       <view class="usb-title">U盘打印在一体机上操作</view>
       <view class="usb-sub">手机无法直接读取 U盘，请携带 U盘到附近终端，按以下步骤在一体机上完成打印。</view>
     </view>

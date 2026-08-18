@@ -2,11 +2,16 @@
 // 本地存储封装(wx.getStorageSync / setStorageSync),集中 key 管理,便于清理与调试。
 
 const KEYS = {
+  // 曾成功登录过、且未主动登出：401 静默补签的准入依据。
+  // 不能用「有没有 token」推断——getToken() 在过期时会先清会话，
+  // 使「自然过期」与「主动登出」两种状态看起来完全一样。
+  RESIGNIN_ELIGIBLE: 'resignin_eligible',
   TOKEN: 'zyd_token',
   USER: 'zyd_user',
   MAPPING_RULE: 'zyd_last_mapping', // 预留
   FAVORITES: 'zyd_favorites',       // 本机收藏(岗位/招聘会/企业),接后端后由服务端同步
   HISTORY: 'zyd_history',           // 本机浏览/外部跳转记录,接后端后由服务端埋点为准
+  REMINDERS: 'zyd_fair_reminders',  // 招聘会本地提醒 { [fairId]: item }
   // 最近一次 AI 简历解析任务 { taskId, accessToken, fileName, ts }。
   // accessToken 是匿名读取诊断报告的唯一凭证,后端只在提交解析时下发一次,
   // 丢失就必须重新上传重新解析(重复消耗一次模型调用),所以必须落地而非只放内存。

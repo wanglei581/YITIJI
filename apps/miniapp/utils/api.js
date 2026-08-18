@@ -7,6 +7,7 @@ const config = require('./config');
 const { request, uploadFile } = require('./request');
 const mock = require('./mock-data');
 const N = require('./normalize');
+const uploadNames = require('./upload-name');
 
 /**
  * 对列表逐项做字段适配,并保留挂在数组上的分页元数据。
@@ -135,7 +136,17 @@ const api = {
   },
   getCompanyDetail(id) {
     if (config.USE_MOCK) return mockResolve(mock.companyById(id));
-    return request(`/companies/${id}`, { method: 'GET', needAuth: false });
+    return request(`/companies/${id}`, { method: 'GET', needAuth: false }).then(N.companyDetail);
+  },
+  getCompanyJobs(id, params = {}) {
+    if (config.USE_MOCK) {
+      const detail = mock.companyById(id);
+      return mockResolve(detail && Array.isArray(detail.jobs) ? detail.jobs : []);
+    }
+    return adaptList(
+      unwrapList(request(`/companies/${id}/jobs`, { method: 'GET', data: params, needAuth: false })),
+      N.companyJob,
+    );
   },
 
   // ---------- 政策 ----------
@@ -325,21 +336,58 @@ const api = {
    * @param {string} purpose resume_upload | resume_scan(其余场景见后端白名单)
    * @returns {Promise<{fileId,filename,sizeBytes,mimeType,sha256,signedUrl,signedUrlExpiresAt,fileExpiresAt}>}
    */
-  uploadResumeFile(filePath, purpose = 'resume_upload') {
+  /**
+   * 上传本人简历文件。
+   *
+   * displayName 与 uploadPrintFile 同理：wx.uploadFile 固定取 filePath 的
+   * basename 作为 multipart 文件名，直传临时路径会让服务端存下 tmp_xxx，
+   * 简历记录里显示的就是那串英文数字。走同一套改名副本方案。
+   */
+  uploadResumeFile(filePath, purpose = 'resume_upload', displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('简历上传'));
-    return uploadFile('/files/kiosk-upload', filePath, {
-      name: 'file',
-      formData: { purpose },
-      needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
-    });
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose },
+        needAuth: true, // 已登录则带 token 归属到本人,未登录走匿名
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
   },
 
-  /** 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。 */
-  uploadPrintFile(filePath) {
+  /**
+   * 上传本人通用打印文件；后端 print_doc 仅接受 PDF/JPG/PNG 并按真实 MIME/魔数校验。
+   *
+   * 文件名只能走 multipart 文件段本身（wx.uploadFile 取 filePath 的 basename），
+   * 绝不能塞进 formData：后端 KioskUploadOptionsDto 只白名单了 purpose 一个字段，
+   * 配合 main.ts 全局 whitelist + forbidNonWhitelisted，多传字段会整体
+   * 400 VALIDATION_FAILED。旧实现的 originalFilename 形参正是这个陷阱
+   * （所幸从未被调用方传值，否则上传必失败）。
+   *
+   * @param {string} filePath 本地临时路径
+   * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
+   */
+  uploadPrintFile(filePath, displayName) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印文件上传'));
-    return uploadFile('/files/kiosk-upload', filePath, {
-      name: 'file',
-      formData: { purpose: 'print_doc' },
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose: 'print_doc' },
+        needAuth: true,
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
+  },
+
+  /** 获取本人文件的预览 URL（短时签名，仅用于预览/打印报价）。 */
+  getFilePreviewUrl(fileId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('文件预览'));
+    return request(`/files/${encodeURIComponent(fileId)}/preview-url`, {
+      method: 'GET',
       needAuth: true,
     });
   },
@@ -676,6 +724,74 @@ const api = {
     return request(`/me/browse-logs/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
   },
 
+  /** 本人外部跳转记录；只表示打开过来源平台/官方入口，不表示投递或预约结果。 */
+  getMyJumpLogs(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('跳转记录'));
+    return unwrapList(request('/me/external-jump-logs', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  deleteMyJumpLog(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除跳转记录'));
+    return request(`/me/external-jump-logs/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
+
+  /**
+   * 上报一次浏览。后端 ActivityController 为可选登录：匿名会诚实返回
+   * { recorded:false, reason:'LOGIN_REQUIRED' } 且不落库，故调用方只在登录态发。
+   * body 只收 targetType/targetId/terminalId，来源名称与外链一律由服务端从
+   * 「已审核+已发布」目标补齐，前端伪造不了；目标未发布 → 404。
+   * @param {{targetType:string,targetId:string}} payload targetType ∈
+   *        job | job_fair | policy | company_profile | fair_company
+   */
+  recordBrowseActivity(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('浏览记录上报'));
+    return request('/activity/browse', { method: 'POST', data: payload, needAuth: true });
+  },
+
+  /**
+   * 上报一次「打开来源平台 / 官方入口」。action 必须与 targetType 匹配，否则 400：
+   *   job / fair_company        → external_apply
+   *   job_fair                  → external_appointment | external_checkin_open
+   *   policy / company_profile  → external_open
+   */
+  recordJumpActivity(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('跳转记录上报'));
+    return request('/activity/external-jump', { method: 'POST', data: payload, needAuth: true });
+  },
+
+  /**
+   * 本人收藏列表。type ∈ job | job_fair | policy（后端 FAVORITE_TARGET_TYPES，
+   * 没有企业）；缺省返回全部。返回数组附 .nextCursor / .total。
+   * 条目字段只有 { id, targetType, targetId, title|null, createdAt }。
+   */
+  getMyFavorites(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return unwrapList(request('/me/favorites', { method: 'GET', data: params, needAuth: true }));
+  },
+
+  /**
+   * 新增收藏（服务端 upsert 幂等）。AddFavoriteDto 走 whitelist +
+   * forbidNonWhitelisted，多传任何字段都会 400；title 服务端一律忽略并从
+   * 「已审核+已发布」目标重新派生，所以这里不传。目标未发布 → 404。
+   */
+  addMyFavorite(targetType, targetId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return request('/me/favorites', {
+      method: 'POST',
+      data: { targetType, targetId },
+      needAuth: true,
+    });
+  },
+
+  /** 取消收藏（幂等，未收藏也返回 { removed:false } 而不是报错）。 */
+  removeMyFavorite(targetType, targetId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('我的收藏'));
+    return request(
+      `/me/favorites/${encodeURIComponent(targetType)}/${encodeURIComponent(targetId)}`,
+      { method: 'DELETE', needAuth: true },
+    );
+  },
+
   /**
    * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
    * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan
@@ -783,6 +899,374 @@ const api = {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('终端列表'));
     return request('/terminals/public', { method: 'GET', needAuth: false });
   },
+
+  // ---------- 材料包打印订单（小程序专用）----------
+
+  /**
+   * 创建材料包打印订单（一体机现场取件）
+   * @param {object} data { terminalId, files: [{ fileId, filename, pageCount }], params: { colorMode, duplex, copies }, totalAmount }
+   * @returns {Promise<{ orderId, pickupCode, qrCodeUrl, expiresAt }>}
+   */
+  createPackageOrder(data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('材料包订单'));
+    return request('/orders/package', { method: 'POST', data, needAuth: true });
+  },
+
+  /**
+   * 获取材料包订单详情
+   * @param {string} orderId
+   */
+  getPackageOrder(orderId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('订单详情'));
+    return request(`/orders/package/${encodeURIComponent(orderId)}`, { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 取消材料包订单
+   * @param {string} orderId
+   * @param {string} reason
+   */
+  cancelPackageOrder(orderId, reason) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消订单'));
+    return request(`/orders/package/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      data: { reason },
+      needAuth: true
+    });
+  },
+
+  // ---------- 职业圈动态 ----------
+
+
+  /**
+   * 获取动态详情
+   * @param {string} id
+   */
+  getFeedDetail(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('动态详情'));
+    return request(`/community/feeds/${encodeURIComponent(id)}`, { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 点赞动态
+   * @param {string} id
+   */
+  likeFeed(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞'));
+    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'POST', needAuth: true });
+  },
+
+  /**
+   * 取消点赞
+   * @param {string} id
+   */
+  unlikeFeed(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞'));
+    return request(`/community/feeds/${encodeURIComponent(id)}/like`, { method: 'DELETE', needAuth: true });
+  },
+
+  /**
+   * 获取动态评论列表
+   * @param {string} feedId
+   * @param {object} params { cursor, pageSize }
+   */
+  getFeedComments(feedId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('评论列表'));
+    return unwrapList(request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
+      method: 'GET',
+      data: params,
+      needAuth: false
+    }));
+  },
+
+  /**
+   * 发表评论
+   * @param {string} feedId
+   * @param {object} data { content, replyToCommentId? }
+   */
+  commentFeed(feedId, data) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('发表评论'));
+    return request(`/community/feeds/${encodeURIComponent(feedId)}/comments`, {
+      method: 'POST',
+      data,
+      needAuth: true
+    });
+  },
+
+  /**
+   * 点赞评论
+   * @param {string} commentId
+   */
+  likeComment(commentId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('点赞评论'));
+    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
+      method: 'POST',
+      needAuth: true
+    });
+  },
+
+  /**
+   * 取消点赞评论
+   * @param {string} commentId
+   */
+  unlikeComment(commentId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('取消点赞评论'));
+    return request(`/community/comments/${encodeURIComponent(commentId)}/like`, {
+      method: 'DELETE',
+      needAuth: true
+    });
+  },
+
+  // ---------- 今日早报 ----------
+
+  /**
+   * 职业圈动态 / 今日早报。
+   *
+   * ⚠️ 服务端 /community/feeds 与 /assistant/daily-report 目前均不存在。
+   * 保留这两个方法不是因为它们能用，而是 pages/community/ 与
+   * pages/daily-report/ 这两个在制页面仍在调用，删掉会直接打断
+   * 主仓正在进行的工作。等那两页连同后端一起落地或一起废弃时再处理。
+   * AI 百宝箱首页已不再引用（见 e2d8dcfb1）。
+   */
+  getCommunityFeeds(params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('职业圈动态'));
+    return unwrapList(request('/community/feeds', { method: 'GET', data: params, needAuth: false }));
+  },
+
+  getDailyReport() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('今日早报'));
+    return request('/assistant/daily-report', { method: 'POST', needAuth: false, timeout: config.aiTimeout });
+  },
+
+  // ---------- 合同审查（后端 contract-review.controller.ts 已实现） ----------
+  /**
+   * 合同类型白名单，与服务端 dto/contract-review.dto.ts 的 CONTRACT_TYPES 一一对应。
+   * 服务端用 @IsIn 强校验，前端传错值会 400，因此不要在页面里另写字面量。
+   */
+  CONTRACT_TYPES: ['labor_contract', 'internship_agreement', 'non_compete', 'offer'],
+
+  /**
+   * 上传待审查合同原件。purpose 必须是 contract_upload，不能借用 print_doc：
+   *   1. contract-review.service.ts:178 只认 contract_upload，别的 purpose 一律
+   *      404 CONTRACT_REVIEW_SOURCE_NOT_FOUND（extraction 侧还有第二道拦截）；
+   *   2. 该 purpose 在服务端被判为 highly_sensitive，并由 retention-policy 锁定
+   *      两小时寿命（retentionLockedReason=contract_review_session_only），
+   *      换成别的 purpose 等于把合同按普通打印件留存。
+   * formData 只能带 purpose：KioskUploadOptionsDto 只白名单了 purpose 一个字段，
+   * 全局 forbidNonWhitelisted:true 会把 originalFilename 之类的多余字段直接 400。
+   *
+   * displayName 与 uploadPrintFile / uploadResumeFile 同理：wx.uploadFile 固定取
+   * filePath 的 basename 作为 multipart 文件名，直传临时路径会让服务端存下 tmp_xxx。
+   * 对合同尤其要紧——提取阶段的 resolveSupportedKind()
+   * （contract-review-extraction.service.ts:167）是拿 mimeType **和文件扩展名**
+   * 配对判定的，文件名丢了扩展名会直接 CONTRACT_UNSUPPORTED_FILE_TYPE。
+   *
+   * 注意 prepareNamedFile 会在 USER_DATA_PATH 留一份改名副本，合同属敏感个人信息，
+   * 因此 cleanup() 在成功与失败两条路径上都必须调用，不能只写 then。
+   *
+   * @param {string} filePath 本地临时路径
+   * @param {string} [displayName] 期望服务端落库的文件名；见 utils/upload-name.js
+   */
+  uploadContractFile(filePath, displayName) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return uploadNames.prepareNamedFile(filePath, displayName).then((prepared) =>
+      uploadFile('/files/kiosk-upload', prepared.filePath, {
+        name: 'file',
+        formData: { purpose: 'contract_upload' },
+        needAuth: true,
+      }).then(
+        (res) => { prepared.cleanup(); return res; },
+        (err) => { prepared.cleanup(); throw err; }
+      )
+    );
+  },
+
+  /**
+   * 取同意范围。必须先调这个：create 需要回传 consentVersion / consentScopeHash /
+   * disclaimerVersion，服务端据此校验用户确实看过当前版本的告知内容。
+   * 这是一道刻意设置的合规闸门，不能在前端伪造这几个值绕过去。
+   *
+   * 返回形状（contract-review-consent.service.ts:79-89 的 ContractReviewPublicConsentScope）：
+   *   { consentVersion, consentScopeHash,
+   *     disclaimer: { id, version, content, publishedAt },
+   *     disclosures: {...} }
+   * ⚠️ 顶层没有 disclaimerVersion，版本号在 disclaimer.version。
+   */
+  getContractConsentScope() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/contract-reviews/consent-scope', { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 会员合同审查 AI 授权状态。/me/ai-consents/status 返回全部 scope 的数组。
+   * 注意 granted=true 还不够：create 会额外要求授权事件的 grantedAt 不早于
+   * 当前生效免责声明的 publishedAt（contract-review.service.ts:232-239），
+   * 所以调用方必须再拿 grantedAt 与 consent-scope 的 disclaimer.publishedAt 比对。
+   */
+  getMemberContractConsent() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/me/ai-consents/status', { method: 'GET', needAuth: true }).then((list) => {
+      const item = Array.isArray(list) ? list.find((v) => v && v.scope === 'contract_review') : null;
+      return item || { scope: 'contract_review', granted: false, grantedAt: null };
+    });
+  },
+
+  /**
+   * 授予合同审查 AI 授权。会员路径的 create 走 requireActiveConsentInTransaction，
+   * 服务端没有授权记录就 403 USER_AI_CONSENT_REQUIRED —— 只在前端弹窗点"同意"没用。
+   * 服务端是 append-only 事件表，每次调用写一条新授权时间，不覆盖历史。
+   */
+  grantMemberContractConsent() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request('/me/ai-consents', {
+      method: 'POST', data: { scope: 'contract_review' }, needAuth: true,
+    });
+  },
+
+  /**
+   * 建审查任务。sourceFileId 来自 uploadContractFile() 的上传结果；
+   * consent* 四个字段原样透传 getContractConsentScope() 的返回，不要自行构造，
+   * 其中 disclaimerVersion 取 scope.disclaimer.version。
+   * @param {{sourceFileId:string, contractType:string, consentVersion:string,
+   *          consentedAt:string, consentScopeHash:string, disclaimerVersion:string}} payload
+   */
+  createContractReview(payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    // 建任务要落库并校验同意快照，15 秒默认值偏紧。
+    return request('/contract-reviews', { method: 'POST', data: payload, needAuth: true, timeout: config.aiTimeout });
+  },
+
+  /**
+   * 轮询任务状态。这也是**唯一**能拿到审查结论的地方：
+   * status='completed' 时 result 里带 findings 与各优先级计数
+   * （contract-review.types.ts:153-168 的 ContractReviewTaskView）。
+   */
+  getContractReview(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 确认解析范围。totalPages / analyzedPages / truncated 必须与轮询响应逐字段相等
+   * （lifecycle 的 assertConfirmation 做 matchesExtraction 比对，不等就 400）。
+   * ocrCoverageConfirmed / personalUseConfirmed 是两个 @Equals(true) 必填项，
+   * 代表用户确认了识别范围与个人用途——页面必须真的让用户勾选，不能默认写死。
+   * @param {{contractType:string,totalPages:number,analyzedPages:number,
+   *          truncated:boolean,ocrCoverageConfirmed:true,personalUseConfirmed:true}} payload
+   */
+  confirmContractReview(id, payload) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}/confirm`, {
+      method: 'POST', data: payload, needAuth: true,
+      // 确认后服务端要做状态机切换与入队，实测会超过 15 秒默认值。
+      timeout: config.aiTimeout,
+    });
+  },
+
+  // ⚠️ 故意不提供 POST /contract-reviews/:id/report 的封装。
+  // 该端点返回的是**报告 PDF 的文件元数据**（ContractReviewReportView），里面没有
+  // findings；结论一直在 getContractReview() 的 result 里。而调用它会有两个副作用：
+  // 服务端 deleteSource 删掉合同原文，且生成一份带 abandonToken 的高敏 PDF——
+  // 不消费 abandonToken 就没人回收。将来要做"打印审查报告"再单独设计整条回收链路。
+
+  /** 删除审查记录。合同属敏感文件，用户放弃时应即时清除而非留存。 */
+  deleteContractReview(id) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('合同审查'));
+    return request(`/contract-reviews/${encodeURIComponent(id)}`, { method: 'DELETE', needAuth: true });
+  },
+
+  // ---------- 会员二次验证（step-up） ----------
+  // 契约来源（逐字段核对，勿凭字段名猜）：
+  //   services/api/src/member-auth/member-auth.controller.ts  POST member/auth/step-up/sms-code | verify
+  //   services/api/src/member-auth/dto/member-step-up.dto.ts  请求体白名单
+  //   services/api/src/member-auth/member-step-up.types.ts    action 白名单
+  //   services/api/src/member-auth/member-step-up.service.ts  返回结构与错误码
+  // 全局 ValidationPipe 开了 forbidNonWhitelisted，请求体多一个字段就 400 VALIDATION_FAILED，
+  // 因此下面两个方法只允许送 DTO 里存在的键。
+  //
+  // deviceId 一律不送：它在服务端只做两件事 —— 设备维度小时频控，以及审计里的
+  // deviceMatched 布尔。小程序没有终端号，编一个塞进去会污染审计；两侧都不送时
+  // deviceDigest 恒为 null，consumeGrant 比对 null === null 仍判定 matched。
+  // 同理不送 x-terminal-id（该头在服务端就是被当作 deviceId 用的）。
+
+  /**
+   * 为敏感动作发送二次验证短信，发到账号已绑定的手机号（前端无从选择号码）。
+   * @param {'export_data_request'|'export_data_download'|'close_account'|'phone_rebind'} action
+   * @returns {Promise<{challengeId:string, phoneMasked:string, expiresInSeconds:number, cooldownSeconds:number}>}
+   *   已知错误码：STEP_UP_SEND_TOO_FREQUENT / STEP_UP_RATE_LIMITED(429)、
+   *   ACCOUNT_UNAVAILABLE(403)、SMS_SEND_FAILED(502)。
+   */
+  sendMemberStepUpCode(action) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('二次验证'));
+    return request('/member/auth/step-up/sms-code', {
+      method: 'POST', data: { action }, needAuth: true,
+    });
+  },
+
+  /**
+   * 校验二次验证码，换一次性 stepUpToken。
+   * token 与 action 绑定、单次消费、有效期即 expiresInSeconds（服务端默认 300s）。
+   * @returns {Promise<{stepUpToken:string, action:string, expiresInSeconds:number}>}
+   *   已知错误码：STEP_UP_CHALLENGE_INVALID / STEP_UP_CODE_INVALID(401)、ACCOUNT_UNAVAILABLE(403)。
+   */
+  verifyMemberStepUp(challengeId, code) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('二次验证'));
+    return request('/member/auth/step-up/verify', {
+      method: 'POST', data: { challengeId, code }, needAuth: true,
+    });
+  },
+
+  // ---------- 会员数据权利请求 ----------
+  // 契约来源：services/api/src/member-privacy/member-privacy.controller.ts
+  //           services/api/src/member-privacy/member-data-request.service.ts
+  //           services/api/src/member-privacy/member-privacy.types.ts
+
+  /**
+   * 我的数据权利请求列表（倒序）。
+   * @returns {Promise<{items:Array, nextCursor:string|null, capabilities:{accountClosureAvailable:boolean}}>}
+   *   item: { id, requestType, status, requestedAt, handledAt, executionStep,
+   *           exportExpiresAt, failureCode, canRetry, canDownload }
+   *   status ∈ pending|handling|ready|completed|expired|failed|rejected|cancelled
+   *   ⚠️ capabilities.accountClosureAvailable 是服务端对「账号注销是否开放」的唯一真话，
+   *      当前实现恒为 false（create 对 requestType='delete' 固定抛 ACCOUNT_CLOSURE_NOT_AVAILABLE）。
+   */
+  listMemberDataRequests() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
+    return request('/me/data-requests', { method: 'GET', needAuth: true });
+  },
+
+  /**
+   * 创建数据权利请求。
+   * @param {'export'|'delete'|'revoke_consent'} requestType
+   * @param {{idempotencyKey:string, stepUpToken?:string}} opts
+   *   idempotencyKey 必填且必须是 UUID 形态，服务端正则 [1-8] 版本位 + [89ab] variant 位，
+   *   全局唯一：重试必须复用同一个 key，换 key 会被当成新请求。
+   *   stepUpToken 仅 export 需要（action=export_data_request），走 header 而非 body。
+   */
+  createMemberDataRequest(requestType, opts = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据权利请求'));
+    const header = { 'idempotency-key': opts.idempotencyKey };
+    if (opts.stepUpToken) header['x-member-step-up-token'] = opts.stepUpToken;
+    return request('/me/data-requests', {
+      method: 'POST', data: { requestType }, header, needAuth: true,
+    });
+  },
+
+  /**
+   * 为已 ready 的导出请求换一次性下载授权。
+   * 需要 action=export_data_download 的 stepUpToken（与创建时那张不是同一张）。
+   * @returns {Promise<{requestId:string, downloadUrl:string, expiresAt:string}>}
+   *   downloadUrl 是一个网页地址，ticket 放在 URL fragment 里，见 pages/privacy/export-file.js。
+   *   已知错误码：DATA_EXPORT_DOWNLOAD_UNAVAILABLE(404)、
+   *   DATA_EXPORT_DOWNLOAD_CONFIG_UNAVAILABLE / DATA_EXPORT_DOWNLOAD_SERVICE_UNAVAILABLE(503)。
+   */
+  authorizeMemberDataExportDownload(requestId, stepUpToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('数据导出下载'));
+    return request(`/me/data-requests/${encodeURIComponent(requestId)}/download-authorizations`, {
+      method: 'POST', data: {}, header: { 'x-member-step-up-token': stepUpToken }, needAuth: true,
+    });
+  },
 };
+
 
 module.exports = api;

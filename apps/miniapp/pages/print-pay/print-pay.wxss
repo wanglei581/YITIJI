@@ -19,7 +19,7 @@
 .fee-row text:last-child { color: var(--ink); }
 .fee-row .minus { color: var(--teal-deep); }
 .fee-row.total { padding-top: 16rpx; border-top: 1rpx solid var(--line); }
-.fee-row.total .amt { color: var(--clay-deep); font-weight: 700; font-size: 32rpx; }
+.fee-row.total .amt { color: var(--teal); font-weight: 700; font-size: 32rpx; }
 
 .pay-list { display: flex; flex-direction: column; gap: 16rpx; }
 .pay-opt { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: var(--surface); border-radius: var(--r-lg); border: 2rpx solid transparent; box-shadow: var(--sh-sm); }
@@ -35,7 +35,7 @@
 .pay-opt.on .po-radio { background: var(--teal); border-color: var(--teal); }
 
 .ab-label { font-size: 22rpx; color: var(--ink-soft); display: block; }
-.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--clay-deep); font-family: var(--font-serif); }
+.ab-amt { font-size: 40rpx; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; }
 
 /* 门店迷你卡主内容区 */
 .sm-main { flex: 1; }

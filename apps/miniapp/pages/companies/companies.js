@@ -19,13 +19,7 @@ Page({
     this.setData({ loading: true, loadError: '' })
     return api.getCompanies()
       .then((list) => {
-        // 列表卡片绑定字段为 meta / jobs,与数据层的 listMeta / jobCount 映射
-        const mapped = (list || []).map((c) => ({
-          id: c.id, emoji: c.emoji, name: c.name, tags: c.tags,
-          meta: c.listMeta !== undefined ? c.listMeta : c.meta,
-          jobs: c.jobCount !== undefined ? c.jobCount : c.jobs,
-        }))
-        this.setData({ companies: mapped, loading: false })
+        this.setData({ companies: list || [], loading: false })
       })
       .catch((err) => this.setData({ loading: false, loadError: (err && err.message) || '加载失败' }))
   },
@@ -45,6 +39,6 @@ Page({
   },
 
   onShareAppMessage() {
-    return { title: '智引答 · 找企业', path: '/pages/companies/companies' }
+    return { title: '职易达 · 找企业', path: '/pages/companies/companies' }
   },
 })

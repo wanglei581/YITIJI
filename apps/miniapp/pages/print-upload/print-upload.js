@@ -1,6 +1,14 @@
 const api = require('../../utils/api')
 const pricing = require('../../utils/print-pricing')
 
+// 后端 print_doc 只收 PDF/JPG/PNG，扩展名足以判型，不必为一个徽章多打一次网络请求。
+function extLabelOf(name) {
+  const clean = String(name || '').split('?')[0].trim()
+  const dot = clean.lastIndexOf('.')
+  if (dot < 0 || dot === clean.length - 1) return 'FILE'
+  return clean.slice(dot + 1).toUpperCase().slice(0, 5)
+}
+
 function verifiedPrintParams(copies) {
   return {
     copies,
@@ -22,6 +30,7 @@ Page({
     statusBarHeight: 20,
     // 文件内容始终留在服务端；页面只持有本人文件 id 和安全元数据。
     file: { name: '未选择文件', pages: 0, size: '—' },
+    fileExt: 'FILE',
     fileId: '',
     hasFile: false,
     hasPageCount: false,
@@ -45,7 +54,10 @@ Page({
   onLoad(opts) {
     this.setData({ statusBarHeight: getApp().globalData.statusBarHeight || 20 })
     const o = opts || {}
-    if (o.name) this.setData({ 'file.name': decodeURIComponent(o.name) })
+    if (o.name) {
+      const name = decodeURIComponent(o.name)
+      this.setData({ 'file.name': name, fileExt: extLabelOf(name) })
+    }
 
     // 上游页数只作瞬时参考，不作为计价依据；服务端报价会覆盖为真实计费页数。
     const upstreamPages = parseInt(o.pages, 10)
@@ -135,8 +147,16 @@ Page({
   },
 
   pickColor(e) {
+    // 不可选项要说清楚「为什么」。一个没有解释的 toast 会让用户以为是自己点错了、
+    // 反复去点；讲明原因之后，暂不开放才是一条能被接受的产品结论。
+    // 注意：本函数必须紧跟 _refreshQuote 之后（verify-miniapp-static 的报价竞态门禁按此定位）。
     if (e.currentTarget.dataset.v !== 'bw') {
-      wx.showToast({ title: '彩色打印尚未完成真机验收', icon: 'none' })
+      wx.showModal({
+        title: '彩色打印暂不可选',
+        content: '门店一体机硬件支持彩色，但驱动侧的彩色参数尚未完成 Windows 真机出纸验收。在验收通过前放开，可能出现按彩色计价、实际却出黑白的情况，所以本期只开放黑白。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
       return
     }
     this.setData({ color: 'bw' })
@@ -144,7 +164,12 @@ Page({
 
   pickDuplex(e) {
     if (e.currentTarget.dataset.v !== 'single') {
-      wx.showToast({ title: '双面打印尚未完成真机验收', icon: 'none' })
+      wx.showModal({
+        title: '双面打印暂不可选',
+        content: '一体机支持自动双面，但双面参数要经打印驱动 DEVMODE 下发，尚未完成真机验收。在验收通过前放开，可能出现按双面计费却打成单面的情况，所以本期只开放单面。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
       return
     }
     this.setData({ duplex: 'single' })
@@ -194,11 +219,21 @@ Page({
     return true
   },
 
+  // 预览页已不再是流程节点：它只让用户看「自己这份文件是什么」，本身没有任何
+  // 通往选门店的出口（print-preview.js 里不存在 confirm/print-store 跳转），
+  // 所以 #610 要堵的「预览 → 建单绕过隐私确认」那条旁路是结构性关掉的，
+  // 预览不必再被报价卡住。下单闸门仍然只有 _passPrintGate() 这一处实现，
+  // 且只有 toStore() 这一个入口会用到它——任何入口都不得再内联重复校验。
+  // 报价未就绪时不本地补 0、不伪造免费结论，金额与页数一律传空由预览页显示「待核定」。
   preview() {
-    if (!this._passPrintGate()) return
-    const { color, duplex, copies, total, amountCents, file, fileId } = this.data
+    const { color, duplex, copies, total, amountCents, file, fileId, hasPageCount } = this.data
+    if (!fileId) {
+      wx.showToast({ title: '请先从“我的文档”选择真实文件', icon: 'none' })
+      return
+    }
+    const quoted = this.data.priceStatus === 'ready' && hasPageCount
     wx.navigateTo({
-      url: `/pages/print-preview/print-preview?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${total}&amountCents=${encodeURIComponent(amountCents)}&pages=${file.pages}&name=${encodeURIComponent(file.name)}`,
+      url: `/pages/print-preview/print-preview?fileId=${encodeURIComponent(fileId)}&color=${color}&duplex=${duplex}&copies=${copies}&total=${encodeURIComponent(quoted ? total : '')}&amountCents=${encodeURIComponent(quoted ? amountCents : '')}&pages=${quoted ? file.pages : 0}&name=${encodeURIComponent(file.name)}`,
     })
   },
 
