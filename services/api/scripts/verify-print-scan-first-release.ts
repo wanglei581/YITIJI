@@ -202,22 +202,25 @@ function main(): void {
       'where: claimableWhere',
       "status: 'pending' as const",
       'terminalId,',
+      // 出纸付费门控已从可关闭的 env 开关改为写死：claim 只领已付款订单。
+      // 原先这里还钉着 `payStatus: { notIn: REFUND_PAY_STATUSES }`（门控关闭时的
+      // 放行分支），那条分支正是 P0-1 的资损路径，已随开关一并删除。
       "payStatus: 'paid', taskStatus: 'pending'",
-      "payStatus: { notIn: REFUND_PAY_STATUSES }, taskStatus: 'pending'",
     ],
-    'claim must keep terminalId + pending filters and distinguish paid gate from refund-state guard',
+    'claim must keep terminalId + pending filters and require a paid order',
   )
   mustContain(
     claimBlock,
     [
-      'requirePaidBeforeClaim()',
       'const claimedOrder = await tx.order.updateMany',
       "data: { taskStatus: 'claimed', terminalId }",
       'const claimedTask = await tx.printTask.updateMany',
       'if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()',
       'if (error instanceof PrintTaskClaimRaceError) claimed = null',
+      // CAS 必须复核仍是 paid：findFirst 与 updateMany 之间有退款 / 关单时间窗。
+      "payStatus: 'paid'",
     ],
-    'claim must CAS Order pending→claimed before PrintTask and roll back a PrintTask race',
+    'claim must CAS Order paid+pending→claimed before PrintTask and roll back a PrintTask race',
   )
   mustContain(terminalsService, ['class PrintTaskClaimRaceError extends Error {}'], 'claim race must use a rollback sentinel')
   mustContain(
