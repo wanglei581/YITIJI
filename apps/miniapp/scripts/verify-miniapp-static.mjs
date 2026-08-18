@@ -463,15 +463,17 @@ if (
   // 术语随终端对齐为「到机码」（kiosk 入口名为「到机码核销 · 不是取件码」）。
   // 这里只是定位锚点；真正守能力的是下面的 createPickupQrMatrix / PICKUP_CODE_RE /
   // 不得出现 scanTerminal / 不得调 `/pickup` 四条，未做任何放宽。
-  pickupWxml.includes('二维码只包含本订单的 10 位到机码') &&
+  pickupWxml.includes('二维码只包含本订单的到机码') &&
   pickupJs.includes("require('../../utils/pickup-qrcode')") &&
   pickupJs.includes('createPickupQrMatrix(this.data.codeRaw)') &&
-  pickupQr.includes("PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/") &&
+  pickupQr.includes('LEGACY_PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/') &&
+  pickupQr.includes('CURRENT_PICKUP_CODE_RE = /^[0-9]{8}$/') &&
+  pickupQr.includes('PICKUP_CODE_RE = /^(?:[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}|[0-9]{8})$/') &&
   pickupQr.includes('const HIGH_ECC_FORMAT_BITS = 2') &&
   !pickupWxml.includes('bindtap="scanTerminal"') &&
   !apiJs.includes('/pickup`')
 ) ok('取件页本地生成核销二维码并保留真实码兜底')
-else bad('取件页扫码核销能力', '必须离线编码真实 10 位码，不得恢复手机反扫终端或不存在的详情接口')
+else bad('取件页扫码核销能力', '必须离线编码真实到机码（同时认 10 位旧码与 8 位新码），不得恢复手机反扫终端或不存在的详情接口')
 
 if (
   pickupJs.includes('api.getCloudPrintOrder(this.data.orderId)') &&

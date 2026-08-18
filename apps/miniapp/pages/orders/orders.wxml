@@ -26,7 +26,7 @@
     <view class="oi-icon"><text class="ficon i-printer"></text></view>
     <view class="oi-copy">
       <view class="oi-title">真实订单与终端状态</view>
-      <view class="oi-sub">待核销订单可查看二维码与 10 位到机码</view>
+      <view class="oi-sub">待核销订单可查看二维码与到机码</view>
     </view>
   </view>
 
