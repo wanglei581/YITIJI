@@ -65,32 +65,46 @@ export function RenshiPage() {
   }, [searchParams])
 
   const notices = policies.filter((p) => p.kind === 'notice')
+  const policyGuides = policies.filter((p) => p.kind === 'policy_guide')
 
-  const policyItems = useMemo<PolicyItem[]>(
-    () => [...policies.filter((p) => p.kind === 'policy_guide').map(fromPublished), ...BUILTIN_GUIDES],
+  // 政策库条目与内置办事指引分开传给 PolicyPanel，绝不合并成一个数组。
+  // 合并后政策库为空时页面照样满屏（内置指引常驻 5 条，其中一条对任何身份都命中），
+  // 运营录完种子政策无法判断到底进没进去，验收因此失去判别力（CLAUDE.md §9）。
+  // useMemo 的引用稳定性要保住：fromPublished 每次都造新对象，
+  // 掉了 memo 会让详情面板的选中项每帧换新身份，白跑 onOpened 副作用。
+  const libraryItems = useMemo<PolicyItem[]>(
+    () => policies.filter((p) => p.kind === 'policy_guide').map(fromPublished),
     [policies],
   )
+  const guideItems = BUILTIN_GUIDES
 
-  const sourceLine = (() => {
-    if (policies.length === 0) return '当前展示内置办事指引（整理参考，以官方发布为准）；标注「政策发布」的为合作机构发布、管理员审核内容'
-    const names = [...new Set(policies.map((p) => p.sourceName))].slice(0, 2).join('、')
-    const latest = policies.map((p) => p.syncTime).sort().at(-1)?.slice(0, 10) ?? ''
-    // 单页有上限，取回条数少于服务端总数时如实说明，不让多出来的条目无声消失。
-    const truncated = policyTotal > policies.length
-      ? `；共 ${policyTotal} 条已发布政策，当前展示 ${policies.length} 条，可用上方身份筛选缩小范围`
-      : ''
-    return `「政策发布」来源：${names} · 同步于 ${latest}；其余为内置办事指引（整理参考，以官方发布为准）${truncated}`
-  })()
+  // 单页有上限，取回条数少于服务端总数时如实说明，不让多出来的条目无声消失。
+  const truncated = policyTotal > policies.length
+    ? `；服务端共 ${policyTotal} 条已发布内容，本页取回 ${policies.length} 条，可用上方身份筛选缩小范围`
+    : ''
+  /** 来源行必须按 kind 各算各的：政策 Tab 引用公告的来源机构会把「库里其实没有政策」说成有。 */
+  const describeSources = (rows: PolicyPostView[]) => {
+    const names = [...new Set(rows.map((p) => p.sourceName))].slice(0, 2).join('、')
+    const latest = rows.map((p) => p.syncTime).sort().at(-1)?.slice(0, 10) ?? ''
+    return `来源：${names} · 同步于 ${latest}`
+  }
+  const policySourceLine = libraryItems.length === 0
+    ? `政策库暂无已发布政策；下方「通用办事指引」为本机整理参考，以官方发布为准${truncated}`
+    : `政策库${describeSources(policyGuides)}；「通用办事指引」为本机整理参考${truncated}`
+  const noticeSourceLine = notices.length === 0
+    ? null
+    : `政策公告${describeSources(notices)}${truncated}`
 
   const renderPolicyTab = () => {
     if (policyState === 'loading') return <LoadingState className="py-16" />
     if (policyState === 'error') return <ErrorState className="py-16" onRetry={loadPolicies} />
     return (
       <PolicyPanel
-        items={policyItems}
+        libraryItems={libraryItems}
+        guideItems={guideItems}
         audience={audience}
         onAudienceChange={setAudience}
-        sourceLine={sourceLine}
+        sourceLine={policySourceLine}
         onOpened={handlePolicyItemOpened}
         onOfficialEntry={handlePolicyItemEntry}
       />
@@ -100,7 +114,7 @@ export function RenshiPage() {
   const renderNoticeTab = () => {
     if (policyState === 'loading') return <LoadingState className="py-16" />
     if (policyState === 'error') return <ErrorState className="py-16" onRetry={loadPolicies} />
-    return <NoticePanel notices={notices} sourceLine={sourceLine} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} />
+    return <NoticePanel notices={notices} sourceLine={noticeSourceLine} onOpened={handleNoticeOpened} onOfficialEntry={handleNoticeEntry} />
   }
 
   return (
