@@ -1,5 +1,15 @@
 # 当前开发进度
 
+2026-08-18 修复 **收银台把真实应付金额标成「示例金额」（分支 `claude/print-cashier-sample-amount-truth`，基于 `origin/main@c66a970f6`，未合入、未部署）**：`apps/kiosk/src/pages/print/PrintCashierPage.tsx` 的应付金额卡下常驻一句小字「示例金额 · 以现场公示价为准」，而它正上方那个数是 `formatCents(amountCents)`。
+
+**为什么这句话是假的。** 本页三个入口带进来的 `amountCents` 全部来自**服务端已建订单**：确认页 `createPrintJob` 的响应（`PrintConfirmPage.tsx:382`，且只有 `API_MODE === 'http'` 分支才跳收银台，mock 分支直接进 `/print/progress`）、`SessionResumePage` 的 `task.resume.amountCents`、`PrintPickupClaimPage` 的到机码核验结果；本页自身在 `API_MODE !== 'http'` 时直接进 GuardScreen。**因此没有任何演示 / mock 路径能走到这张卡**——所谓「示例」在生产里一次都不成立。金额侧同样已锁定：`online-payment.service.ts:236` 出码时把 `order.amountCents` 快照进支付尝试（注释原文「金额快照自服务端订单，绝不信任前端」），`:357` 回调金额与订单不符即判失败，`amountCents` 由 `pricing.service.ts` 按 DB `PriceConfig` 算出。所以「以现场公示价为准」在这一步也是错的——后台此后调价只影响新订单，不会改写本单；确认页那侧本来就已明说「实付以收银台为准」，两页口径互相打架。**净效果：用户正要扫码付的那笔钱，被页面告知只是个示例、且应以别的价为准**，违反 CLAUDE.md §9「不伪造能力 / 页面不得陈述与实际不符的结论」。与 [PR #711](https://github.com/wanglei581/YITIJI/pull/711) 同类（写死文案与旁边的真实数据互相打架），方向相反：那次显示错，这次免责声明错。
+
+**改法。** 常驻文案改为 `本单实付金额 · 已按下单时公示价锁定`。**「非真实收款」这句话没有被删掉，而是改成了条件性的**——唯一「钱不会真的动」的路径是 sandbox 测试支付通道，只有 `snapshot.attempt.channel === 'sandbox'` 时才显示「测试支付通道 · 不会真实扣款」。（sandbox 此前只在二维码面板有提示，金额卡这侧反而什么都没说，被那句常驻「示例」盖住了。）
+
+**先破后立。** 新增 `apps/kiosk/tests/visual/print-cashier-amount-truth.spec.ts`（3 例），已接进 `test:browser:truth`（CI `ci.yml:970` 已在跑该脚本，**未改 `.github/workflows/`**）。门禁**刻意不锁「源码里必须出现某句话」**：在真实浏览器里渲染收银台，支付尝试金额从 `POST /orders/:id/pay` **观测**得到，断言「页面展示的金额 === 该通道将要收取的金额」，且这个数在页面任何位置都不得被称作示例 / 样例 / 仅供参考；反向锁条件性——真实通道（wechat）下不得出现「不会真实扣款」类措辞，sandbox 下必须出现。核心那条断言**刻意不依赖新增的 `data-cashier-amount*` 钩子**（读整页可见文本），钩子被重构掉时它仍然成立。在**未改动的 `origin/main` 源码**上 3/3 全红，且三条都红在这条实质断言而非「找不到元素」；另做一次只回退文案、保留钩子的变异，同样 3/3 红，证明红的原因就是那句文案。修复后 3/3 绿。
+
+验证（全部本地实跑）：kiosk `lint`（0 error / 9 条既有 warning）、`typecheck`、`verify:print-confirm-honest`（ALL PASS）、`verify:fusion-w2`（ALL PASS）、`test:browser:w2`（44 passed）、`test:browser:truth`（29 passed，含新增 3 例）。
+
 2026-08-18 修复 **AI 简历链「演示态假装读过你的简历」+ 换文件不清 session + 两处触控/布局缺陷（分支 `claude/resume-chain-truth-fix`，基于 `origin/main@22127deaf` rebase，未合入、未部署）**。起因是一次 1080×1920 真实走查：用 8 份不同文件（含中文简历 PDF、拍照式 JPG、纯图片 PDF、加密 PDF、DOCX、一份打印机说明书）把「选择来源 → 上传 → 解析 → 报告 → 优化 → 逐条对照 → 导出」整条链当普通用户走了一遍。
 
 **洞在哪（R1/R2，最严重）。** `apps/kiosk/src/services/api/aiMockAdapter.ts` 的 `submitResumeParse` / `getResumeRecord` / `getResumeOptimize` 在演示模式下**直接 return 一份写死的成功结果**。于是 8 份完全不同的文件全部拿到同一份 `37/60`、同样六个分项 `8,6,6,5,5,7`、同样四条建议；两张报告截图像素比对只差页眉时钟与雷达图动画一帧，**文字一字不差**。说明书那次给出的建议是「项目描述建议使用『负责、主导、实现』等动词开头」。**最伤的一处在 `/resume/optimize/compare`**：一句固定演示文案「热爱工作，积极向上……」被挂上 `E1 你的材料` 证据标、写成「你写的（原件不会被改）」，而**这一页是全链唯一没有演示提示横幅的**（报告页、优化页都有）。用户从没写过那句话——前面所有诚实的免责声明，在这一句面前一起失效。
