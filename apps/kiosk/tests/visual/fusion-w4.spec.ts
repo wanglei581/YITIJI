@@ -369,3 +369,39 @@ test('/renshi 官方信息不承诺代办 @w4', async ({ page, api }) => {
   await expect(page.getByText(/保证到账|免申即享/)).toHaveCount(0)
   await verifyPage(page, errors)
 })
+
+// 政策库空 ≠ 页面空。内置办事指引常驻 5 条（其中一条 audiences 含 'general'，
+// 任何身份筛选都命中），一旦和库内政策并进同一个列表，政策库为空时页面照样满屏：
+// 运营录完 30 条种子政策，打开页面无法判断自己录的到底进没进去。
+// 这两条断言钉死「两个分区各自成列、政策库有自己的空态」。
+test('/renshi 政策库为空时给出明确空态，内置指引不冒充库内政策 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  api.respond('GET', '/api/v1/policies', {
+    status: 200,
+    json: { success: true, data: [], pagination: { page: 1, pageSize: 200, total: 0, totalPages: 1 } },
+  })
+  await page.goto('/renshi')
+
+  const library = page.locator('[data-policy-section="library"]')
+  const builtin = page.locator('[data-policy-section="builtin"]')
+  await expect(library).toBeVisible()
+  await expect(library.getByText('政策库还没有内容')).toBeVisible()
+  await expect(library.locator('.k8-policy-list-item')).toHaveCount(0)
+  // 指引本身有真实价值（本机通用办事参考），保留但必须落在自己的分区里。
+  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
+  await verifyPage(page, errors)
+})
+
+test('/renshi 库内政策与内置指引分区渲染 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api) // fixture: 1 条 kind=policy_guide
+  await page.goto('/renshi')
+
+  const library = page.locator('[data-policy-section="library"]')
+  const builtin = page.locator('[data-policy-section="builtin"]')
+  await expect(library.locator('.k8-policy-list-item')).toHaveCount(1)
+  await expect(library.getByText('高校毕业生就业服务指引')).toBeVisible()
+  await expect(library.getByText('政策库还没有内容')).toHaveCount(0)
+  await expect(builtin.locator('.k8-policy-list-item')).toHaveCount(5)
+  await expect(builtin.getByText('高校毕业生就业服务指引')).toHaveCount(0)
+  await verifyPage(page, errors)
+})

@@ -25,6 +25,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
+import { clearAiResumeSession } from './aiResumeSession'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
@@ -151,6 +152,27 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/**
+ * 把上传失败翻译成用户看得懂的话。
+ *
+ * 事故原样：`fetch` 断网时 `err.message` 就是浏览器的英文原文 `Failed to fetch`，
+ * 直接甩给站在一体机前的求职者。而本页自己写着「上传失败会如实提示原因」——
+ * 那就别把浏览器的英文当原因。真实后端返回的中文业务错误照常透出，不做覆盖。
+ */
+function uploadErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message.trim() : ''
+  if (!raw) return '上传失败,请重试'
+  // 浏览器 / 运行时层面的网络错误：英文原文对用户没有任何意义。
+  if (/^(Failed to fetch|NetworkError|Load failed|The user aborted a request)/i.test(raw)) {
+    return '文件没能传到服务器，请检查网络后重试；也可以改用 U盘 或 手机扫码上传。'
+  }
+  // 纯 ASCII 的技术错误（英文异常 / 堆栈）同样不适合直接展示。
+  if (!/[一-龥]/.test(raw)) {
+    return `上传失败，请重试或更换上传方式。（技术原因：${raw}）`
+  }
+  return raw
+}
+
 export function ResumeSourcePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -212,6 +234,28 @@ export function ResumeSourcePage() {
     fileInputRef.current?.click()
   }
 
+  /*
+   * 下面三个「选中了一份新文件」的处理器都会先调 clearAiResumeSession()，
+   * 作废上一份简历的匿名结果会话（taskId + accessToken）。
+   *
+   * 事故原样（2026-08-18 走查）：优化过简历 A 之后回到本页选了 B，最小会话里
+   * 仍然是 A 的 taskId；此时直接进 /resume/optimize/compare，渲染出来的是
+   * **A 的四条改写建议**，不是空态。报告页 / 优化页 / 对照页读 taskId 的顺序都是
+   * state → query → session，所以只要 session 不清，直接进页面就一定读到上一份。
+   * 与后端模式无关，真实后端下同样成立。
+   *
+   * 注意本页刻意**不**直接碰任何浏览器持久化 API —— 简历预览 URL 绝不落盘是
+   * `verify:resume-phone-upload-ui` 守着的隐私红线。读写那份最小会话一律经由
+   * `aiResumeSession.ts`，那里才是被允许、且只存 taskId + accessToken 的地方。
+   *
+   * 边界（同样重要，别清过头）：
+   * - 只在**选中了一份新文件**时清。重新选同一个文件也算新的一次上传，照清即可 ——
+   *   后端会重新分配 fileId，旧 taskId 本来就对不上了。
+   * - **不**挂在页面 mount / unmount 上。从报告页点「返回上一步」回到本页、
+   *   或中途来回切换上传方式，都不该清 —— 那会把用户刚跑完的诊断结果清掉，
+   *   逼他把整条链重跑一遍。这正是「回退再继续」必须保住的路径。
+   * - 只清 taskId + accessToken 这类读回凭证；简历原文本来就不落 session。
+   */
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = '' // 允许选同名再次触发
@@ -222,6 +266,7 @@ export function ResumeSourcePage() {
     }
     setError(null)
     setUploading(true)
+    clearAiResumeSession()
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
       setUploadedFile({
@@ -234,19 +279,20 @@ export function ResumeSourcePage() {
         channel: selected,
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '上传失败,请重试'
-      setError(msg)
+      setError(uploadErrorMessage(err))
     } finally {
       setUploading(false)
     }
   }
 
   const handlePhoneUploaded = (file: PhoneUploadedFile) => {
+    clearAiResumeSession()
     setUploadedFile({ ...file, fileUrl: file.fileUrl })
     setError(null)
   }
 
   const handleUsbUploaded = (file: ResumeUsbImportedFile) => {
+    clearAiResumeSession()
     setUploadedFile(file)
     setError(null)
   }
@@ -287,13 +333,13 @@ export function ResumeSourcePage() {
 
       <AiDriverBanner feature="AI简历诊断" description="上传后自动解析结构、识别问题" />
 
-      <div className="resume-source-privacy mt-4">
+      <div className="resume-source-privacy mt-3">
         <ComplianceBanner tone="success" title="隐私保护">
           {copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
         </ComplianceBanner>
       </div>
 
-      <div className="resume-lightflow__stepper mt-4">
+      <div className="resume-lightflow__stepper mt-3">
         <Stepper steps={RESUME_FLOW_STEPS} currentIndex={0} />
       </div>
 
@@ -306,7 +352,7 @@ export function ResumeSourcePage() {
         onChange={handleFileChosen}
       />
 
-      <div className="resume-source-content mt-6 flex flex-1 flex-col gap-5 overflow-y-auto pb-1">
+      <div className="resume-source-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-1">
         <Card className="resume-source-intro border-primary-100 bg-primary-50/50 p-5">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
@@ -333,7 +379,7 @@ export function ResumeSourcePage() {
         <button
           type="button"
           onClick={() => navigate('/resume/generate')}
-          className="resume-source-alternative flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
+          className="resume-source-alternative flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-3 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
             <SparklesIcon className="h-6 w-6" aria-hidden="true" />
@@ -412,7 +458,9 @@ export function ResumeSourcePage() {
                     ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
                       uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
                     } · 已就绪`
-                    : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
+                    /* 与 SUPPORTED_FORMATS / ACCEPT 保持同一份口径：旧版 .doc 后端固定
+                       返回 UNSUPPORTED_FILE_TYPE，文件选择器也选不中，不能在这里承诺。 */
+                    : '支持 PDF / DOCX / 图片格式，单个文件最大 10MB'}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   {SUPPORTED_FORMATS.map((format) => (
@@ -423,7 +471,7 @@ export function ResumeSourcePage() {
                 </div>
               </button>
             )}
-            <p className="resume-source-upload-hint mt-3 text-sm leading-relaxed text-neutral-500">
+            <p className="resume-source-upload-hint mt-2 text-sm leading-relaxed text-neutral-500">
               再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
             </p>
             {uploadedFile && (
@@ -462,33 +510,47 @@ export function ResumeSourcePage() {
           </aside>
         </div>
 
-        <Card className="resume-source-evidence p-5">
-          <div className="flex items-center gap-2">
-            <ShieldCheckIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-            <p className="text-base font-bold text-neutral-900">
-              {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
-            </p>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {DIAGNOSIS_DIMENSIONS.map((item, idx) => {
-              // 最后两项（风险表述提醒、修改优先级建议）为扩展维度，用 wheat 色区分
-              const isExtra = idx >= DIAGNOSIS_DIMENSIONS.length - 2
-              return (
-                <div
-                  key={item}
-                  className={[
-                    'flex min-h-[64px] items-center justify-center rounded-2xl border px-3 text-center text-sm font-semibold',
-                    isExtra
-                      ? 'fy-inc-extra border-amber-200 bg-amber-50 text-amber-800'
-                      : 'border-neutral-200 bg-neutral-50 text-neutral-700',
-                  ].join(' ')}
-                >
-                  {item}
-                </div>
-              )
-            })}
-          </div>
-          <div className="mt-4 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
+        {/*
+          维度清单默认收起（R5）。
+          事故原样：56px 的主 CTA「开始 AI 诊断」在 1080×1920 首屏只露 21px ——
+          内容 1903px 挤进 1844px 可视区。一体机没有滚动条，用户看到的就是一条
+          被切坏的按钮，以为传失败了。复验还发现两处更糟的：`?intent=optimize`
+          与「上传失败横幅在屏」时该按钮 0px 可见，完全看不到。
+          这张卡是页面上最高的一块非必需内容（291px），收起后四种情形全部归零溢出。
+          注意只收清单本身；下面那句「不会编造无法验证的结论」是合规声明，常驻可见。
+        */}
+        <Card className="resume-source-evidence p-4">
+          <details className="resume-source-dimensions">
+            <summary className="flex min-h-[56px] cursor-pointer list-none items-center gap-2 text-base font-bold text-neutral-900">
+              <ShieldCheckIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
+              <span className="flex-1">
+                {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
+              </span>
+              <span className="text-sm font-medium text-neutral-500">
+                {DIAGNOSIS_DIMENSIONS.length} 项 · 点击展开
+              </span>
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {DIAGNOSIS_DIMENSIONS.map((item, idx) => {
+                // 最后两项（风险表述提醒、修改优先级建议）为扩展维度，用 wheat 色区分
+                const isExtra = idx >= DIAGNOSIS_DIMENSIONS.length - 2
+                return (
+                  <div
+                    key={item}
+                    className={[
+                      'flex min-h-[64px] items-center justify-center rounded-2xl border px-3 text-center text-sm font-semibold',
+                      isExtra
+                        ? 'fy-inc-extra border-amber-200 bg-amber-50 text-amber-800'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-700',
+                    ].join(' ')}
+                  >
+                    {item}
+                  </div>
+                )
+              })}
+            </div>
+          </details>
+          <div className="mt-3 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
             <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
           </div>
@@ -505,7 +567,7 @@ export function ResumeSourcePage() {
         <div className="resume-source-status mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
       )}
 
-      <KioskActionBar className="resume-source-actions mt-6">
+      <KioskActionBar className="resume-source-actions mt-4">
         {uploadedFile ? (
           <Button
             size="lg"

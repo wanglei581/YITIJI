@@ -42,7 +42,7 @@
       <block wx:if="{{showQr}}">
         <text class="ph-divider">扫码不便时，手动输入</text>
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
-        <text class="ph-hint">二维码与下方 10 位到机码对应同一笔订单</text>
+        <text class="ph-hint">二维码与下方到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
       </block>
 
@@ -94,7 +94,7 @@
     <view class="sync-warning" wx:if="{{errorMsg}}">状态同步暂时失败，当前展示最近一次可用状态：{{errorMsg}}</view>
 
     <view class="notice-card">
-      <text class="nc-text">二维码只包含本订单的 10 位到机码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
+      <text class="nc-text">二维码只包含本订单的到机码，不含文件、姓名或手机号。{{isFreeOrder ? '扫码和打印状态' : '扫码、付款和打印状态'}}以服务端与终端实时结果为准。</text>
     </view>
 
     <view class="pk-actions">

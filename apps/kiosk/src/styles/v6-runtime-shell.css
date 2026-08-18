@@ -1,4 +1,6 @@
-/* V6 首批运行时壳：只作用于已迁移的 / 与 /print-scan，不污染未迁页面。 */
+/* V6 运行时壳：只作用于 KioskRoot 的 V6_SHELL_ROUTES 白名单路由，不污染未迁页面。
+   本文件按 .v6-runtime-shell 类生效，与具体路由无关；白名单本身在
+   apps/kiosk/src/layouts/KioskRoot.tsx，那里是「哪些路由是 V6」的唯一真值。 */
 [data-kiosk-presentation='fusion-youth'].v6-runtime-shell .ui-kiosk-topbar {
   height: 100px;
   padding: 0 56px;

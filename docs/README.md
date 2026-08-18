@@ -29,6 +29,13 @@
 首页真值是 **`01-home-v6.html`** —— 它是全仓唯一被代码/CI 引用的首页原型（5 处）。
 同目录下的 `01-home.html` / `-v4` / `-v5` 已于 2026-08-17 删除（零引用的中间稿）。
 
+V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ 拆页判断 ↔ 批次 ↔ 门禁成本）：
+[design/kiosk-v6-migration-matrix.md](design/kiosk-v6-migration-matrix.md)。
+它是 `reviews/2026-08-12-v6-commercial-product-audit.md` §4/§7 与 `progress/next-tasks.md` 施工队列的可执行化，
+不是第三套口径；冲突时以那两处为准。
+⚠️ 不要与 `design/kiosk-proto-2026-07-migration-matrix.md` 混淆 —— 后者是 **Gen 1** 的 75 屏矩阵，
+仍被 `verify-fusion-baseline.mjs` 当作路由清单门禁的检查对象，**不能删、也不是 V6 口径**。
+
 **双后台**：`design/console-ai-os-2026-08/`。
 
 **小程序**：`design/miniapp-os-prototype-2026-08/`。

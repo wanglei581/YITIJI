@@ -9,6 +9,7 @@
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
+import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN } from '../src/common/pickup-code'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import { RefundService } from '../src/payment/refund.service'
@@ -369,6 +370,26 @@ async function main(): Promise<void> {
     // 用收集器逐条 check（不 fail-fast），跑完汇总；有未满足项则抛错（finally 清理后退 1）。
     // ============================================================
     console.log('\n--- P0a payment-domain contract (batch1, expect RED before impl) ---')
+
+    /**
+     * 取件码规格断言。
+     *
+     * 原写法是 `pickupCode.length >= 8`（一条熵下限）。2026-08-18 产品裁决把取件码
+     * 从 10 位字母数字改为 6 位纯数字后，`>= 8` 会把合规的新码判红。
+     *
+     * 处理方式是**收紧而不是删除**：由「至少 8 个任意字符」改为「恰好等于规格长度
+     * 且逐字符符合规格字符集」，判别力比原来更强（原断言放行 'ABCDEFGH'、
+     * 放行任意 9 位、放行含空格的串，新断言都不放行）。
+     *
+     * 需要说清楚的取舍：绝对熵确实下降了（31^10 ≈ 49 bit → 10^8 ≈ 26.6 bit）。
+     * 补偿它的是另外三条控制，而它们各自有自己的断言，不在本文件：
+     *   - claim-pickup 限流 20 次/分钟 → scripts/verify-miniapp-cloud-print-m2.ts
+     *   - 取件码 24h 失效 → 本文件同批 pickupCodeVisibleFor 门 + m2 的过期用例
+     *   - 认领必须命中订单绑定终端 + 按终端失败锁定 → m2 的预言机合并 / 锁定用例
+     * 任何一条被放宽，6 位就不再成立 —— 别只改这里。
+     */
+    const isSpecPickupCode = (value: unknown): boolean =>
+      typeof value === 'string' && value.length === PICKUP_CODE_LENGTH && PICKUP_CODE_PATTERN.test(value)
     // wechat/alipay/benefit 为未来扩展，本批 markPaid 必须拒绝（对齐 packages/shared P0A_ALLOWED_PAYMENT_SOURCES）。
     const P0A_FORBIDDEN_SOURCES = ['wechat', 'alipay', 'benefit'] as const
     const VALID_PAGE_SOURCES = ['pdf_lightweight_scan', 'image_single_page'] as const
@@ -456,27 +477,64 @@ async function main(): Promise<void> {
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
         !!paid.paidAt &&
-        typeof paid.pickupCode === 'string' &&
-        paid.pickupCode.length >= 8 &&
+        isSpecPickupCode(paid.pickupCode) &&
         idem.payStatus === 'paid' &&
         idem.pickupCode === paid.pickupCode &&
         after - before === 1 // 幂等：重复 markPaid 不重复写审计
-      let rejectsNoSource = false
-      try {
-        await svc.markPaid(target.id, { paymentSource: '' })
-      } catch {
-        rejectsNoSource = true
+      // ── 支付来源白名单：必须在**仍是 unpaid** 的新订单上验 ──────────────────
+      //
+      // 曾经这里拿 `target` 验，而 target 在上面几行刚被置成 paid。markPaid 的判定顺序是
+      //   ① 白名单 → ② 已 paid 且来源不同 → ORDER_ALREADY_PAID
+      // 于是把 ① 整段删掉，三次调用照样抛错（抛的是 ②），断言恒真 —— 门禁守着资损红线
+      // 却对红线本身零敏感度。判据也从「有没有抛错」改成「抛的是不是 PAYMENT_SOURCE_INVALID」，
+      // 因为「有没有抛错」正是被另一条 guard 冒充的那个判据。
+      //
+      // 防住什么：白名单放开 = 一分钱没收的打印单可被写成 paid + wechat，
+      // 而状态机会给这种单子签发取件码，用户凭码就能取走纸。
+      const whitelistPrint = await printJobs.create(
+        {
+          fileUrl: await seedPdfFixture('srcwhitelist', 1),
+          fileMd5: 'sha256-order-srcwhitelist',
+          fileName: '支付来源白名单.pdf',
+          params: { ...PRINT_PARAMS, copies: 1 },
+        },
+        { endUserId: null, terminalId },
+      )
+      taskIds.push(whitelistPrint.taskId)
+      const whitelistOrder = await prisma.order.findUnique({ where: { printTaskId: whitelistPrint.taskId } })
+      if (!whitelistOrder || whitelistOrder.payStatus !== 'unpaid' || whitelistOrder.amountCents <= 0) {
+        console.error(
+          `  FAIL [P0a] 白名单用例前置不成立（需要一张 unpaid 且金额>0 的新订单）: ${JSON.stringify(whitelistOrder)}`,
+        )
+        return false
       }
-      let rejectsForbidden = true
-      for (const bad of P0A_FORBIDDEN_SOURCES) {
+      // 空串与 wechat/alipay/benefit 都必须**按名字**被拒，不接受任何其它错误码顶替。
+      let rejectsByName = true
+      for (const bad of ['', ...P0A_FORBIDDEN_SOURCES]) {
+        let code = '(未抛错)'
         try {
-          await svc.markPaid(target.id, { paymentSource: bad })
-          rejectsForbidden = false
-        } catch {
-          /* expected reject */
+          await svc.markPaid(whitelistOrder.id, { paymentSource: bad })
+        } catch (e) {
+          code = (e as Error)?.message ?? String(e)
+        }
+        if (!code.includes('PAYMENT_SOURCE_INVALID')) {
+          console.error(
+            `  FAIL [P0a] markPaid(paymentSource=${JSON.stringify(bad)}) 期望 PAYMENT_SOURCE_INVALID，实际: ${code}`,
+          )
+          rejectsByName = false
         }
       }
-      return okHappy && rejectsNoSource && rejectsForbidden
+      // 事后回读：被拒之后订单必须原样 unpaid —— 不得留下半落的 paymentSource / paidAt / 取件码。
+      const afterReject = await readOrder(whitelistPrint.taskId)
+      const untouched =
+        afterReject?.payStatus === 'unpaid' &&
+        afterReject.paymentSource === null &&
+        afterReject.paidAt === null &&
+        afterReject.pickupCode === null
+      if (!untouched) {
+        console.error(`  FAIL [P0a] 支付来源被拒后订单未保持原样 unpaid: ${JSON.stringify(afterReject)}`)
+      }
+      return okHappy && rejectsByName && untouched
     })
 
     // (4) pickupCode 唯一 + 状态门：仅 paid 且未完成/取消/失败/退款时会员视图才返回取件码。
@@ -516,8 +574,7 @@ async function main(): Promise<void> {
           o.payStatus === 'paid' &&
           o.paymentSource === 'free' &&
           !!o.paidAt &&
-          typeof o.pickupCode === 'string' &&
-          o.pickupCode.length >= 8
+          isSpecPickupCode(o.pickupCode)
         )
       } finally {
         await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: PRINT_UNIT_PRICE_CENTS.black_white } })
@@ -618,8 +675,7 @@ async function main(): Promise<void> {
         rejectsBadSource &&
         paid.payStatus === 'paid' &&
         paid.paymentSource === 'offline' &&
-        typeof paid.pickupCode === 'string' &&
-        (paid.pickupCode?.length ?? 0) >= 8 &&
+        isSpecPickupCode(paid.pickupCode) &&
         idem.payStatus === 'paid' &&
         idem.pickupCode === paid.pickupCode &&
         auditAfterPaid - auditBefore === 1 && // 幂等：mark-paid 只写 1 条审计

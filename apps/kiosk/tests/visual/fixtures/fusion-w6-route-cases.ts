@@ -120,7 +120,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
-  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("打开小程序「我的 → 打印订单 → 查看取件码」，将二维码对准本机扫码器；无法扫码时可手动输入。")', featureText: '扫码取件' },
+  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("打开小程序「我的 → 打印订单 → 查看到机码」，将二维码对准本机扫码器；无法扫码时可手动输入。")', featureText: '扫码取件' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("AI方案确认")', featureText: 'AI方案确认' },
   { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },
@@ -178,6 +178,25 @@ export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(creat
 
 export const w6KioskCases = w6RouteCases.filter(({ viewport }) => viewport === 'kiosk')
 export const w6MobileCases = w6RouteCases.filter(({ viewport }) => viewport === 'mobile')
+
+/**
+ * 已迁到 V6 暖纸壳的路由，必须与 apps/kiosk/src/layouts/KioskRoot.tsx 的
+ * V6_SHELL_ROUTES 逐条一致。
+ *
+ * 这条契约存在的原因（2026-08-18 批 0）：首页是 V6 暖纸壳，但此前从首页点进任何一个
+ * 服务域，第一跳就掉回旧的深藏青壳 —— 首页承诺的观感当场被推翻。断言分两个方向：
+ * 表内路由必须真的挂上 V6 壳且顶栏是浅色纸面，表外路由不得被误伤染成 V6。
+ */
+export const V6_SHELL_ROUTE_PATTERNS = new Set<ProductionRoutePattern>([
+  '/',
+  '/print-scan',
+  '/resume-service',
+  '/jobs-service',
+  '/fairs-service',
+  '/interview-service',
+  '/policy-service',
+  '/profile',
+])
 
 const actualPatterns = w6RouteCases.map(({ pattern }) => pattern)
 const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.indexOf(pattern) !== index)

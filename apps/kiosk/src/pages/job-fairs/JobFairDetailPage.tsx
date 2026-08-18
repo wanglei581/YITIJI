@@ -217,9 +217,14 @@ export function JobFairDetailPage() {
       }
       actionBar={
         <>
+          {/*
+            已结束场次不隐藏这个入口，而是换语义：产出「回顾 / 跟进」而不是
+            「出发前逐项核对」。服务端按 endAt 判定形态并 fail-closed，
+            这里只负责让按钮文案与将要看到的东西一致。
+          */}
           <button type="button" className="jf-btn ghost" onClick={handleVisitPlan}>
             <SparklesIcon aria-hidden="true" />
-            AI准备单
+            {isEnded ? 'AI参会回顾' : 'AI准备单'}
           </button>
           <div className="jf-spacer" />
           {!isEnded && fair.checkinUrl && (

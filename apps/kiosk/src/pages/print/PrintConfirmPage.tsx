@@ -86,6 +86,18 @@ type QuoteView =
   | { status: 'ready'; amountCents: number; billablePages: number; unitCents: number; quantity: number }
   | { status: 'unavailable'; reason: string }
 
+/**
+ * 色彩模式展示名。必须与计价用的 params.colorMode 同源 —— 报价
+ * （unitCentsFor(config, params.colorMode)）和建单都读真实值，摘要卡此前却写死「黑白」。
+ * 一旦 Admin 把某台终端的 color_print 能力标成 available，用户选彩色后
+ * 会看到「黑白」却按彩色单价扣款（print_color_page 50 分/页 vs print_bw_page 20 分/页），
+ * 属 CLAUDE.md §9「不伪造能力」红线 + 资损。
+ */
+const COLOR_MODE_LABEL: Record<string, string> = {
+  black_white: '黑白',
+  color: '彩色',
+}
+
 const DUPLEX_LABEL: Record<string, string> = {
   simplex: '单面',
   duplex_long_edge: '双面（长边翻转）',
@@ -306,7 +318,7 @@ export function PrintConfirmPage() {
     { label: '文件页数', value: file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页` },
     { label: '纸张规格', value: 'A4（210 × 297 mm）' },
     { label: '打印份数', value: `${params.copies} 份` },
-    { label: '色彩模式', value: '黑白' },
+    { label: '色彩模式', value: COLOR_MODE_LABEL[params.colorMode] ?? params.colorMode },
     { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
@@ -490,7 +502,7 @@ export function PrintConfirmPage() {
             <b className="print-sum-title">参数确认清单</b>
             <div className="print-sum-table">
               {summaryRows.map(({ label, value }) => (
-                <div key={label} className="print-sum-row">
+                <div key={label} className="print-sum-row" data-sum-row={label}>
                   <span className="k">{label}</span>
                   <span className="v">{value}</span>
                 </div>
@@ -534,7 +546,7 @@ export function PrintConfirmPage() {
             </div>
             <div className="print-est-row">
               <span className="k">计费方式</span>
-              <span className="v" style={{ fontSize: 16 }}>{costCalcLabel}</span>
+              <span className="v" data-cost-calc style={{ fontSize: 16 }}>{costCalcLabel}</span>
             </div>
             <div className="print-cost-total">
               <span className="print-cost-label">

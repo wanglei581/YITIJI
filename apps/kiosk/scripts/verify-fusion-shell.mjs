@@ -342,4 +342,71 @@ assert.match(
   'index.css must document attribute-scoped Kiosk presentation CSS',
 )
 
+// ── V6 壳白名单：单一真值 + 跨文件同步 ──────────────────────────────
+// 批 0（2026-08-18）之前 isV6Route 是两个字面量硬编码，加一条 V6 路由要改多处，
+// 而 Playwright 侧没有任何东西能发现两边不同步。这里锁三件事：
+//   1) 白名单是一张具名表，不是散落的 pathname 比较；
+//   2) KioskShell 不再绕过这张表单独判断某条 V6 路由；
+//   3) 运行时表与 fusion-w6 契约表逐条一致。
+function collectStringLiteralRouteKeys(source, declarationName, fileLabel) {
+  const file = ts.createSourceFile(fileLabel, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  let initializer = null
+  const findDeclaration = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === declarationName) {
+      initializer = node.initializer ?? null
+    }
+    ts.forEachChild(node, findDeclaration)
+  }
+  findDeclaration(file)
+  assert.ok(initializer, `${fileLabel} must declare ${declarationName}`)
+
+  const keys = []
+  const collect = (node) => {
+    // Map: [['/route', {...}], ...]  Set: ['/route', ...]
+    if (ts.isArrayLiteralExpression(node)) {
+      const [first] = node.elements
+      if (first && ts.isStringLiteral(first)) keys.push(first.text)
+    }
+    if (ts.isStringLiteral(node) && node.parent && ts.isArrayLiteralExpression(node.parent)) {
+      const siblings = node.parent.elements
+      if (siblings.length && siblings[0] === node && siblings.every((element) => ts.isStringLiteral(element))) {
+        for (const element of siblings) keys.push(element.text)
+      }
+    }
+    ts.forEachChild(node, collect)
+  }
+  collect(initializer)
+  return [...new Set(keys)].sort()
+}
+
+const w6RouteCasesSource = await read('tests/visual/fixtures/fusion-w6-route-cases.ts')
+const runtimeV6Routes = collectStringLiteralRouteKeys(root, 'V6_SHELL_ROUTES', 'KioskRoot.tsx')
+const contractV6Routes = collectStringLiteralRouteKeys(
+  w6RouteCasesSource,
+  'V6_SHELL_ROUTE_PATTERNS',
+  'fusion-w6-route-cases.ts',
+)
+
+assert.ok(runtimeV6Routes.length >= 8, `V6_SHELL_ROUTES must stay a declared table, received ${runtimeV6Routes.length}`)
+assert.deepEqual(
+  runtimeV6Routes,
+  contractV6Routes,
+  'KioskRoot V6_SHELL_ROUTES and fusion-w6 V6_SHELL_ROUTE_PATTERNS must list the same routes',
+)
+for (const requiredRoute of ['/', '/print-scan', '/resume-service', '/jobs-service', '/fairs-service', '/interview-service', '/policy-service', '/profile']) {
+  assert.ok(runtimeV6Routes.includes(requiredRoute), `V6_SHELL_ROUTES must keep ${requiredRoute} on the V6 shell`)
+}
+assert.match(
+  shellBody,
+  /const\s+isV6Route\s*=\s*v6Shell\s*!==\s*null/,
+  'isV6Route must be derived from the V6_SHELL_ROUTES table, not from ad-hoc pathname comparisons',
+)
+for (const v6Route of runtimeV6Routes.filter((route) => route !== '/')) {
+  assert.doesNotMatch(
+    shellBody,
+    new RegExp(`pathname\\s*===\\s*['"]${v6Route}['"]`),
+    `KioskShell must resolve ${v6Route} through V6_SHELL_ROUTES instead of a separate pathname check`,
+  )
+}
+
 console.log('PASS Kiosk fusion presentation shell contract')

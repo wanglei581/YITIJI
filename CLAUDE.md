@@ -625,6 +625,25 @@ Claude Code 每次开发前必须：
 3. 确认当前模块是否涉及合规边界
 4. 不擅自新增企业招聘闭环功能
 5. 不擅自改产品定位
+6. **对每个准备改的文件，先查项目图谱**：
+
+   ```bash
+   node scripts/project-graph-query.mjs file <你要改的文件路径>
+   node scripts/project-graph-query.mjs route <你要改的路由>     # 改页面时
+   node scripts/project-graph-query.mjs endpoint <端点路径>      # 改接口时
+   ```
+
+   它直接回答「这个文件被哪些 verify 门禁断言」「这个路由背后调哪些端点、落哪些
+   Prisma 模型」。防的是今天反复付出代价的三件事：**改了文件不知道会红哪条门禁**、
+   **引用一个不存在的路径**、**按注释判断实现风格**（注释会过期，图谱是从代码算的）。
+
+   图谱是自动产物，由 `node scripts/generate-project-graph.mjs` 从源码生成，
+   产出在 `docs/graph/`（人读的分册 + 可 diff 的 `graph.json`）。改动了路由、端点、
+   Prisma 模型或门禁之后，顺手 `pnpm graph` 重跑一次。
+
+   **图谱和代码对不上时，以代码为准，并且那是脚本的 bug —— 请修 `scripts/project-graph/`，
+   不要手改 `docs/graph/` 里的产物**（手改会在下次生成时被直接覆盖）。
+   图谱明确不保证什么，见 [docs/graph/README.md](docs/graph/README.md) 末节的七条边界。
 
 每次开发后必须：
 
