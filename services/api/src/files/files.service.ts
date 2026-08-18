@@ -793,11 +793,16 @@ export class FilesService {
       await this.storage.deleteObject(tombstone.storageKey, tombstone.bucket)
     } catch (error) {
       const errorType = error instanceof Error ? error.constructor.name : typeof error
+      // 只 warn 会让这条记录变成孤儿：DB 说已删（deletedAt 有值），对象仍在，
+      // 而 cleanupExpired 只捞 deletedAt=null，永远不会再碰它。必须落账本，
+      // 让 reconcileStorageDeletions 重试到收敛（CLAUDE.md §11）。
+      await this.markStorageDeletePending(fileId, errorType)
       this.logger.warn(
         `code=FILE_OBJECT_DELETE_RETRY_REQUIRED file=${digestFileId(fileId)} errorType=${errorType}`
       )
       throw error
     }
+    await this.markStorageDeleted(fileId)
     if (sensitiveLog) {
       this.logger.log(`Sensitive file deleted by ${deletedBy}: ${digestFileId(fileId)}`)
     } else {
@@ -810,25 +815,42 @@ export class FilesService {
 
   async cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
     const now = new Date()
-    const expired = await this.prisma.fileObject.findMany({
+    // 「当初做删除决定所依据的条件」必须是同一个对象，既用于选出候选，也在真正
+    // 落删除时原样带回 where 做 compare-and-swap。
+    //
+    // 候选快照与逐条删除之间隔着 fairMaterialPrintBridge.findFirst 与
+    // hasActivePrintTaskForFile（后者把**所有** pending/claimed/printing 的 PrintTask
+    // 拉进内存再在 JS 里过滤），窗口不是微秒级。期间任何把 expiresAt 推到未来的
+    // 并发写入，都必须让这一条被跳过，而不是照旧快照删掉用户的简历。
+    //
+    // 口径说明（不要退回原写法）：POST /files/:id/retention 对已过期文件会
+    // 404（requireAlive），所以「用户点延长保存期限」这一条今天进不到这个窗口；
+    // 但 upload-sessions.service.ts 的 bindMemberFile() 会把匿名文件的 expiresAt
+    // 直接改成会员默认 90 天，它只挡 deletedAt、完全不看 expiresAt。删除动作
+    // 不该依赖「碰巧没人能写」这种别处模块的常量来保证安全 —— 条件必须自证。
+    //
+    // 写成共享常量而不是两处各写一份，是为了让选行与落删不可能漂移。
+    const stillEligibleWhere = {
       // 导出文件必须由 member-privacy reconciler 同步收口请求账本，
       // 通用 cron 不得越过账本直接删除。
-      where: {
-        deletedAt: null,
-        purpose: { not: 'member_data_export' },
-        OR: [
-          { expiresAt: { lt: now } },
-          // contract_upload 必须始终有系统锁定的短期寿命；null 是异常高敏行，
-          // 按已过期处理，避免因无法命中 expiresAt < now 而无限留存。
-          { purpose: 'contract_upload', expiresAt: null },
-        ],
-      },
+      deletedAt: null,
+      purpose: { not: 'member_data_export' },
+      OR: [
+        { expiresAt: { lt: now } },
+        // contract_upload 必须始终有系统锁定的短期寿命；null 是异常高敏行，
+        // 按已过期处理，避免因无法命中 expiresAt < now 而无限留存。
+        { purpose: 'contract_upload', expiresAt: null },
+      ],
+    }
+    const expired = await this.prisma.fileObject.findMany({
+      where: stillEligibleWhere,
       select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
     })
 
     const deletedIds: string[] = []
     const bySensitiveLevel: Record<string, number> = {}
     const byPurpose: Record<string, number> = {}
+    let stateChangedCount = 0
     for (const f of expired) {
       try {
         const bridge = await this.prisma.fairMaterialPrintBridge.findFirst({
@@ -841,13 +863,29 @@ export class FilesService {
           continue
         }
         // 先隔离，确保后续对象删除或最终 tombstone 写入任一失败时都不会继续签发 URL/读取内容。
+        // CAS：把选行条件原样带回来，条件不再成立（最典型的是用户刚延长了保存
+        // 期限）就跳过这一条并如实记账，绝不照旧快照删。
         const quarantined = await this.prisma.fileObject.updateMany({
-          where: { id: f.id, deletedAt: null },
+          where: { ...stillEligibleWhere, id: f.id },
           data: { status: 'quarantined' },
         })
-        if (quarantined.count === 0) continue
+        if (quarantined.count === 0) {
+          stateChangedCount += 1
+          this.logger.log(
+            `code=FILE_RETENTION_STATE_CHANGED file=${digestFileId(f.id)} action=cleanup_skipped`
+          )
+          continue
+        }
 
-        await this.storage.deleteObject(f.storageKey, f.bucket)
+        try {
+          await this.storage.deleteObject(f.storageKey, f.bucket)
+        } catch (error) {
+          // 隔离已生效（对外一律 404），但对象仍在：落账本让对账轮次重试。
+          // 该行 deletedAt 仍为 null，下一轮 cleanupExpired 也会重新捞到它。
+          const errorType = error instanceof Error ? error.constructor.name : typeof error
+          await this.markStorageDeletePending(f.id, errorType)
+          throw error
+        }
         const finalized = await this.prisma.fileObject.updateMany({
           where: { id: f.id, deletedAt: null, status: 'quarantined' },
           data: {
@@ -856,6 +894,10 @@ export class FilesService {
             deleteReason:
               triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
             status: 'deleted',
+            // 物理对象已确认删除，与 tombstone 同一次写入落删除日志（§11）。
+            storageDeletedAt: now,
+            storageDeletePendingAt: null,
+            storageDeleteError: null,
           },
         })
         if (finalized.count === 0) {
@@ -889,7 +931,13 @@ export class FilesService {
       this.logger.log(`Cleanup (${triggeredBy}): deleted ${deletedIds.length} expired files`)
     }
 
-    if (triggeredBy === 'cron' && deletedIds.length > 0) {
+    if (stateChangedCount > 0) {
+      this.logger.log(
+        `code=FILE_RETENTION_STATE_CHANGED triggeredBy=${triggeredBy} retainedCount=${stateChangedCount}`
+      )
+    }
+
+    if (triggeredBy === 'cron' && (deletedIds.length > 0 || stateChangedCount > 0)) {
       await this.audit.write({
         actorId: null,
         actorRole: 'system',
@@ -899,6 +947,8 @@ export class FilesService {
         payload: {
           triggeredBy,
           deletedCount: deletedIds.length,
+          // CAS 复核不通过而被保留的候选数（最典型的是用户刚延长了保存期限）。
+          stateChangedCount,
           bySensitiveLevel,
           byPurpose,
           fileIdDigest: deletedIds.slice(0, 50).map(digestFileId),
@@ -914,7 +964,123 @@ export class FilesService {
     }
   }
 
+  // ── cron / 手动:物理对象删除账本对账 ───────────────────────────────────
+
+  /**
+   * 重试所有「DB 已 tombstone / 已隔离，但对象存储删除失败」的行。
+   *
+   * 为什么必须单独有这一轮：cleanupExpired 只捞 deletedAt=null 的行，而 _delete
+   * 走的是「先写 tombstone 再删对象」，一旦对象删除失败，这条记录 deletedAt 已
+   * 有值，cleanupExpired 永远不会再碰它 —— 简历 / 身份证扫描件就此在对象存储
+   * 里变成孤儿，而且因为库里说"已删"，审计也查不出来（CLAUDE.md §11）。
+   *
+   * 只处理 storageDeletePendingAt IS NOT NULL 的行：null 表示"未记账"（存量行
+   * 或从未失败过），不能被当成待重试而去删一个可能仍在使用的对象。
+   */
+  async reconcileStorageDeletions(
+    triggeredBy: 'manual' | 'cron',
+    limit = 200
+  ): Promise<{ reconciledCount: number; stillPendingCount: number; triggeredBy: string }> {
+    const pending = await this.prisma.fileObject.findMany({
+      where: { storageDeletePendingAt: { not: null }, storageDeletedAt: null },
+      select: { id: true, storageKey: true, bucket: true, status: true, deletedAt: true },
+      orderBy: { storageDeletePendingAt: 'asc' },
+      take: limit,
+    })
+
+    const reconciledIds: string[] = []
+    let stillPendingCount = 0
+    for (const f of pending) {
+      try {
+        await this.storage.deleteObject(f.storageKey, f.bucket)
+      } catch (error) {
+        const errorType = error instanceof Error ? error.constructor.name : typeof error
+        await this.markStorageDeletePending(f.id, errorType)
+        stillPendingCount += 1
+        this.logger.warn(
+          `code=FILE_OBJECT_DELETE_RETRY_REQUIRED file=${digestFileId(f.id)} errorType=${errorType}`
+        )
+        continue
+      }
+      // cleanupExpired 侧的失败停在 quarantined(deletedAt 仍为 null)。物理对象既然
+      // 已经确认删除，这一行的真相就是"已删除"，必须补完 tombstone：否则它会一直
+      // 卡在 quarantined —— 尤其是当 CAS 复核此后不再通过（有人延长了保存期限）时，
+      // cleanupExpired 再也不会收口它。绝不因此恢复可访问性。
+      await this.markStorageDeleted(f.id, {
+        finalizeTombstone: f.deletedAt === null && f.status === 'quarantined',
+      })
+      reconciledIds.push(f.id)
+    }
+
+    if (reconciledIds.length > 0) {
+      this.logger.log(
+        `code=FILE_OBJECT_DELETE_RECONCILED triggeredBy=${triggeredBy} count=${reconciledIds.length}`
+      )
+    }
+
+    if (triggeredBy === 'cron' && (reconciledIds.length > 0 || stillPendingCount > 0)) {
+      // §11:文件删除后必须保留删除日志。物理对象是在这一轮才真正消失的，
+      // 所以这一轮同样要留审计，不能只留最初那次失败的 tombstone。
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'file.storage_delete_reconciled',
+        targetType: 'file',
+        targetId: null,
+        payload: {
+          triggeredBy,
+          reconciledCount: reconciledIds.length,
+          stillPendingCount,
+          fileIdDigest: reconciledIds.slice(0, 50).map(digestFileId),
+        },
+      })
+    }
+
+    return { reconciledCount: reconciledIds.length, stillPendingCount, triggeredBy }
+  }
+
   // ── 内部 ────────────────────────────────────────────────────────────────────
+
+  /** 物理对象删除失败:落可重试账本。绝不改 deletedAt / status,不恢复可访问性。 */
+  private async markStorageDeletePending(fileId: string, errorType: string): Promise<void> {
+    const current = await this.prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: { storageDeleteAttempts: true },
+    })
+    await this.prisma.fileObject.update({
+      where: { id: fileId },
+      data: {
+        storageDeletePendingAt: new Date(),
+        storageDeleteAttempts: (current?.storageDeleteAttempts ?? 0) + 1,
+        // 只记错误类型名,不记 message —— message 可能带对象键 / 文件名。
+        storageDeleteError: errorType,
+      },
+    })
+  }
+
+  /** 物理对象确认删除:写删除日志并清掉待重试标记(§11)。 */
+  private async markStorageDeleted(
+    fileId: string,
+    options: { finalizeTombstone?: boolean } = {}
+  ): Promise<void> {
+    const now = new Date()
+    await this.prisma.fileObject.update({
+      where: { id: fileId },
+      data: {
+        storageDeletedAt: now,
+        storageDeletePendingAt: null,
+        storageDeleteError: null,
+        ...(options.finalizeTombstone
+          ? {
+              deletedAt: now,
+              deletedBy: 'auto',
+              deleteReason: 'storage delete reconciled after quarantine',
+              status: 'deleted',
+            }
+          : {}),
+      },
+    })
+  }
 
   private resolveSensitiveLevel(
     purpose: FilePurpose,
@@ -1013,6 +1179,8 @@ export class FilesService {
       await this.storage.deleteObject(record.storageKey, record.bucket)
     } catch (error) {
       const errorType = error instanceof Error ? error.constructor.name : typeof error
+      // 与另外两个物理删除失败点同一口径：落可重试账本，交给对账轮次收敛。
+      await this.markStorageDeletePending(record.id, errorType)
       this.logger.warn(
         `code=FILE_QUARANTINE_DELETE_RETRY_REQUIRED file=${digestFileId(record.id)} errorType=${errorType}`
       )

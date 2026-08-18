@@ -29,5 +29,19 @@ export class FilesCleanupTask {
     } catch {
       this.logger.error('code=FILE_CLEANUP_BATCH_FAILED')
     }
+
+    // 独立 try:清理批次失败不能连带跳过对账。这一轮收口的是「DB 说已删、
+    // 对象存储里还在」的孤儿 —— cleanupExpired 只捞 deletedAt=null，永远
+    // 够不到它们（CLAUDE.md §11:不长期保存身份证等敏感文件）。
+    try {
+      const reconciled = await this.files.reconcileStorageDeletions('cron')
+      if (reconciled.reconciledCount > 0 || reconciled.stillPendingCount > 0) {
+        this.logger.log(
+          `Hourly cron: storage delete reconcile ok=${reconciled.reconciledCount} pending=${reconciled.stillPendingCount}`
+        )
+      }
+    } catch {
+      this.logger.error('code=FILE_STORAGE_DELETE_RECONCILE_BATCH_FAILED')
+    }
   }
 }

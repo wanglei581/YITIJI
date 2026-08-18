@@ -955,6 +955,21 @@ model FileObject {
   deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
   deleteReason String?
 
+  // ── 物理对象删除账本(CLAUDE.md §11)────────────────────────────────
+  // DB tombstone 必须先于对象删除写入,所以两者之间天然存在一个中间态:
+  // deletedAt 已有值(库里说"已删")而对象存储里的实体文件仍在。此前这个
+  // 中间态只有一行 logger.warn,简历 / 身份证扫描件会在对象存储里变成
+  // 无人知晓、无人清理的孤儿,且因为 DB 说已删,任何审计都查不出来。
+  // 下面四列把这个中间态显式落库,由 FilesCleanupTask 的对账轮次重试到收敛。
+  //
+  // 存量行没有这本账的真实值 → 全部可空且不设默认值。
+  // null 语义明确为"未知/该行删除时还没有这本账",不是"已删除"也不是"待重试",
+  // 因此重试对账只捞 storageDeletePendingAt IS NOT NULL 的行,绝不追溯存量。
+  storageDeletedAt       DateTime? // 物理对象确认删除成功的时间(§11 删除日志)
+  storageDeletePendingAt DateTime? // 物理删除失败、等待重试;成功后置回 null
+  storageDeleteAttempts  Int?      // 已尝试的物理删除次数(null = 未记账)
+  storageDeleteError     String?   // 最近一次失败的错误类型名;不含文件名/路径/租户信息
+
   // 文件资产分类 / 派生关系 / 保存策略。
   // 取值由应用层校验,保持 SQLite / PostgreSQL schema parity。
   assetCategory String @default("original") // 'original' | 'optimized' | 'derived'
@@ -987,6 +1002,8 @@ model FileObject {
   @@index([expiresAt])
   @@index([deletedAt])
   @@index([sourceFileId])
+  // 物理删除重试对账的选行索引:待重试行相对全表极少,不能全表扫。
+  @@index([storageDeletePendingAt])
 }
 
 // ── Materials / Document Processing ─────────────────────────────────────────
