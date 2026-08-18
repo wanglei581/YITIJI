@@ -414,6 +414,22 @@ export function PrintCashierPage() {
   }
 
   const total = formatCents(amountCents)
+  /**
+   * 金额文案只能说本单的真话。
+   *
+   * 本页三个入口（确认页建单 / 继续上次 / 到机码核验）带进来的 amountCents 一律来自
+   * 服务端已建订单，且本页在 API_MODE !== 'http' 时直接走 GuardScreen —— 没有任何
+   * 演示 / mock 路径能走到这张卡。出码时服务端把 Order.amountCents 快照进支付尝试
+   * （online-payment.service「金额快照自服务端订单，绝不信任前端」），回调金额与订单
+   * 不符即判失败；确认页那侧也已明说「实付以收银台为准」。所以这个数就是本单实付，
+   * 既不是「示例金额」，也不会再被现场公示价改写 —— 后台此后调价只影响新订单。
+   *
+   * 唯一「钱不会真的动」的路径是 sandbox 测试支付通道；只有它才允许说不真实扣款。
+   */
+  const isSandboxAttempt = snapshot?.attempt?.channel === 'sandbox'
+  const amountNote = isSandboxAttempt
+    ? '测试支付通道 · 不会真实扣款'
+    : '本单实付金额 · 已按下单时公示价锁定'
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
   const isPaymentFailed = view != null && ['failed', 'closed', 'refunded'].includes(view.phase)
@@ -473,9 +489,9 @@ export function PrintCashierPage() {
               <span className="cashier-amount-label">
                 应付金额
                 <br />
-                示例金额 · 以现场公示价为准
+                <span data-cashier-amount-note={isSandboxAttempt ? 'sandbox' : 'real'}>{amountNote}</span>
               </span>
-              <span className="cashier-amount-num">
+              <span className="cashier-amount-num" data-cashier-amount="">
                 <small>¥</small>
                 {total.replace('¥', '')}
               </span>
