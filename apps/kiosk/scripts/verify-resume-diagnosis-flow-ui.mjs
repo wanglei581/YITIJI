@@ -108,11 +108,104 @@ assertIncludes(optimize, "navigate('/resume/optimize/compare'", 'optimize page l
 assertIncludes(optimizeCompare, '未保存', 'compare page states the adoption selection is not persisted')
 assertNotIncludes(optimizeCompare, '已采纳', 'compare page avoids copy implying the selection was saved')
 
-assertIncludes(mockAdapter, "key: 'objective'", 'mock adapter uses objective dimension')
-assertIncludes(mockAdapter, "key: 'quantification'", 'mock adapter uses quantification dimension')
-assertIncludes(mockAdapter, "key: 'readability'", 'mock adapter uses readability dimension')
-assertNotIncludes(mockAdapter, "key: 'education'", 'mock adapter no longer returns old education dimension')
-assertNotIncludes(mockAdapter, "key: 'layout'", 'mock adapter no longer returns old layout dimension')
+// 2026-08-18：这三条原本断言「mock 报告的分项 key 与 SSOT 对齐」（objective /
+// quantification / readability），前提是 mock **会返回一份报告**。走查证明那份报告
+// 本身就是事故源头：8 份不同文件（含打印机说明书、加密 PDF）全部拿到同一份 37/60。
+// 修复后 mock 改为抛 MOCK_MODE、不再返回任何报告，于是「分项对不对」这个问题消失，
+// 取而代之的是更强的一条：**产物里一个分项 key 都不许再有**。
+// 下面 8 条覆盖 SSOT 六个 key + 已退役的 education/layout，严格蕴含原来的 114/115 两条。
+for (const key of ['basic', 'objective', 'experience', 'quantification', 'keyword', 'readability', 'education', 'layout']) {
+  assertNotIncludes(mockAdapter, `key: '${key}'`, `mock adapter no longer fabricates the ${key} report dimension`)
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// 2026-08-18 走查修复：换文件不清 session / 排版按钮 18px / 主 CTA 被切一半
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * 取某个箭头函数处理器的函数体（大括号配对）。
+ *
+ * R3 必须落在处理器体内断言：整文件搜 `clearAiResumeSession` 会被一个没用到的
+ * import 骗绿，而事故恰恰是「函数存在、就是没人在选文件时调它」。
+ */
+function handlerBody(src, name) {
+  const start = src.indexOf(`const ${name} =`)
+  if (start === -1) return null
+  const open = src.indexOf('{', src.indexOf('=>', start))
+  if (open === -1) return null
+  let depth = 0
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1
+    else if (src[i] === '}') {
+      depth -= 1
+      if (depth === 0) return src.slice(open, i + 1)
+    }
+  }
+  return null
+}
+
+function assertHandlerIncludes(src, handler, marker, label) {
+  const body = handlerBody(src, handler)
+  if (!body) throw new Error(`${label}: 找不到处理器 ${handler}`)
+  if (!body.includes(marker)) throw new Error(`${label}: ${handler} 体内缺少 ${marker}`)
+  console.log(`PASS ${label}`)
+}
+
+// ── R3 换新简历必须清掉上一份的 taskId ────────────────────────────────────
+// 事故原样：优化过 A 之后回上传页选 B，sessionStorage 里仍是 A 的 taskId；
+// 此时直接进对照页，渲染的是 **A 的四条改写建议**，不是空态。已实测复现。
+// 三页读 taskId 的顺序都是 state → query → session，所以只要 session 不清，
+// 直接进页面就一定会读到上一份。与后端模式无关，真实后端下同样成立。
+//
+// 边界（同样重要）：只有「选中了一份新文件」才清。中途返回上一步、原地重进
+// 都不许清 —— 那会把用户刚做完的诊断白白清掉，等于逼他重跑一遍。
+// 因此断言落在三个**文件选中**处理器上，不落在页面 mount / unmount 上。
+for (const handler of ['handleFileChosen', 'handlePhoneUploaded', 'handleUsbUploaded']) {
+  assertHandlerIncludes(source, handler, 'clearAiResumeSession()', `source page clears the previous AI resume session in ${handler}`)
+}
+// 反向：不许挂在 mount/卸载上 —— 那正是「回退再继续」被清掉的写法。
+assertNotIncludes(source, 'useEffect(() => {\n    clearAiResumeSession()', 'source page does not clear the session merely on mount')
+
+// ── R4 排版分段控件的可点区必须 ≥48px ─────────────────────────────────────
+// 事故原样：14 个分段按钮在 1080×1920 实测各宽 **18px**（硬约束要求 ≥48px），
+// 文字被压成一字一行竖排。根因是 5 组控件在 348px 宽的侧栏里并排（md:grid-cols-5），
+// 每组再自己切 3 列 → 每个按钮只剩 18px。修法：每组一行。
+assertNotIncludes(layoutControls, 'md:grid-cols-5', 'layout controls no longer squeeze five groups into one row')
+assertIncludes(layoutControls, 'min-h-[48px]', 'layout control choices meet the 48px touch floor')
+assertIncludes(layoutControls, 'min-w-[48px]', 'layout control choices meet the 48px touch floor on the horizontal axis too')
+
+// ── R5 上传页主 CTA 必须完整落在首屏 ──────────────────────────────────────
+// 事故原样：56px 的「开始 AI 诊断」首屏只露 21px（内容 1903px 挤进 1844px 可视区）。
+// 一体机没有滚动条，用户看到的就是一个被切坏的条。复验还发现两处更糟的：
+// `?intent=optimize` 与「上传失败横幅在屏」时 CTA 完全 0px 可见。
+// 修法：诊断维度清单收进可折叠区（默认收起）+ 削掉纵向留白。
+assertIncludes(source, '<details', 'source page collapses the diagnosis dimension list so the primary CTA stays on the first screen')
+// 折叠掉的只能是清单本身；「不编造结论」这句合规声明必须常驻可见。
+assertIncludes(source, '系统不会编造', 'source page keeps the no-fabrication statement outside the collapsed area')
+
+// ── R5b 上传成功与预览失败不得同屏互相打脸 ────────────────────────────────
+// 事故原样：文件卡写「已就绪」，正下方预览卡写「预览链接不可用或已过期，请重新上传文件」。
+// 用户以为传失败了，于是重传一次，还是这样。预览失败 ≠ 上传失败，不许指挥用户重传。
+const filePreview = read('src/components/FileContentPreview.tsx')
+assertNotIncludes(filePreview, '请重新上传文件', 'preview failure no longer instructs a re-upload that would not help')
+
+// ── R7 报告页同屏出现两个「目标岗位匹配参考」入口 ─────────────────────────
+// 事故原样：底部动作条里一个、正下方独立整行又一个，两个 onClick 完全一样
+// （都是 navigate('/resume/job-fit', { state: { taskId, accessToken } })）。
+// 副作用不只是重复：动作条被挤成三等分后，「重新诊断」「查看优化建议」
+// 在按钮内被拆成两行。去掉动作条里那个，剩下两个按钮就够宽了。
+{
+  const jobFitEntries = (report.match(/navigate\('\/resume\/job-fit'/g) ?? []).length
+  if (jobFitEntries !== 1) {
+    throw new Error(`report page must expose exactly one 岗位匹配 entry, found ${jobFitEntries}`)
+  }
+  console.log('PASS report page exposes a single job-fit entry (no same-screen duplicate)')
+}
+
+// ── R9 文案写支持 DOC，accept 里没有 DOC ──────────────────────────────────
+// 后端对旧版 .doc 固定返回 UNSUPPORTED_FILE_TYPE，前端 accept 已按此移除 .doc，
+// 只剩这句文案还在承诺 DOC —— 用户照它准备文件，到了机器前才发现选不中。
+assertNotIncludes(source, '支持 PDF / DOC / DOCX', 'upload copy no longer promises DOC support the picker cannot accept')
 
 // ── Wave1 Task 8:目标维度(专业/学历)输入 + 优化版多格式导出入口 ──────────
 const httpAdapter = read('src/services/api/aiHttpAdapter.ts')

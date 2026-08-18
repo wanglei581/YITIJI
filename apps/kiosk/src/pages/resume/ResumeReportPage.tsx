@@ -81,7 +81,12 @@ function ReportNoticePanel({
 }) {
   const notices = [
     isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
-    '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
+    // R11：这两条曾经相邻且互相打脸 —— 上一条说「由演示用 AI 生成」，
+    // 下一条却说「仅基于上传文件中可解析出的内容生成」。演示态下后半句是假的：
+    // 演示报告和用户上传的文件毫无关系。所以这句话必须随 isDemoReport 换口径。
+    isDemoReport
+      ? '演示报告不基于你上传的文件内容生成，仅用于展示报告结构；它不会发送给企业，也不代表录用、面试或投递结果。'
+      : '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
     // extractionNotice 现在对所有提取来源都可能下发（超长截断等提示不限于 OCR），
     // 因此「经 OCR 识别」这句只能在真的走了 OCR 时说，否则就是对用户谎报处理方式。
     buildExtractionNotice(extractionNotice),
@@ -420,15 +425,13 @@ export function ResumeReportPage() {
         >
           {intent === 'optimize' ? '重新上传' : '重新诊断'}
         </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          className="resume-secondary-action flex flex-1 items-center justify-center gap-2"
-          onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
-        >
-          <TargetIcon className="h-4 w-4" />
-          目标岗位匹配参考
-        </Button>
+        {/*
+          R7：这里原本还有一个「目标岗位匹配参考」按钮，onClick 与下方那个整行入口
+          完全相同（同一路由、同一 state）—— 同屏两个一模一样的入口。
+          副作用不只是重复：动作条被挤成三等分后，「重新诊断」「查看优化建议」
+          在按钮内被拆成两行。去掉这一个，剩下两个按钮就够宽了；
+          岗位匹配保留下方那个整行入口，位置更显眼。
+        */}
         <Button
           size="lg"
           className="resume-primary-action flex flex-[1.4] items-center gap-2"

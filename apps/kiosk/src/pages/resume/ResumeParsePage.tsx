@@ -10,6 +10,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskPageFrame, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import { submitResumeParse } from '../../services/api'
+import { aiErrorMessageOf } from '../../ai'
 import { saveAiResumeSession } from './aiResumeSession'
 import {
   RESUME_SCORING_DIMENSIONS,
@@ -100,9 +101,11 @@ export function ResumeParsePage() {
       navigate('/resume/report', {
         state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, providerName: result.providerName, report: result.report, extractionNotice: result.extractionNotice },
       })
-    } catch {
+    } catch (err) {
       if (cancelRef.current) return
-      navigateFail('AI 服务暂时不可用，请稍后重试')
+      // 把真实原因带进失败态：演示模式要说「演示模式不提供简历解析与诊断」，
+      // 一律改写成「服务暂时不可用」会让用户以为是网络问题、反复重试同一份文件。
+      navigateFail(aiErrorMessageOf(err, 'AI 服务暂时不可用，请稍后重试'))
     }
   }, [file, fileId, getToken, navigate, navigateFail, state])
 
