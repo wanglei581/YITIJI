@@ -41,15 +41,15 @@ function normalizeInput(raw: string): string {
 }
 
 /**
- * 6 位码读满后不立即提交，而是等输入静默 250ms —— 这不是防抖美化，是防误提交。
+ * 8 位码读满后不立即提交，而是等输入静默 250ms —— 这不是防抖美化，是防误提交。
  *
- * 存量 10 位码的字符集含 2–9，因此**旧码的前 6 位有可能全是数字**
- * （概率 (8/31)^6 ≈ 1/3400）。若读满 6 位就提交，这类用户会：
- * 提交 → 后端 PICKUP_CODE_INVALID → 本页 setCode('') 清空 → 重输 → 再次在第 6 位被截断，
+ * 存量 10 位码的字符集含 2–9，因此**旧码的前 8 位有可能全是数字**
+ * （概率 (8/31)^8 ≈ 1/50000）。若读满 8 位就提交，这类用户会：
+ * 提交 → 后端 PICKUP_CODE_INVALID → 本页 setCode('') 清空 → 重输 → 再次在第 8 位被截断，
  * 永远取不到自己已付费的文件。
  *
  * 250ms 的取值依据：USB/HID 扫码器按键间隔约 5ms，10 位存量码全部键入耗时 <100ms，
- * 远小于静默窗口，因此扫码永远不会命中 6 位分支；扫码器随后附带的 Enter 会立即提交。
+ * 远小于静默窗口，因此扫码永远不会命中 8 位分支；扫码器随后附带的 Enter 会立即提交。
  * 存量码删除后（上线满 24h），本函数与该定时器可一并移除。
  */
 const SETTLE_MS = 250
@@ -156,7 +156,7 @@ export function PrintPickupClaimPage() {
       void handleClaim(nextCode)
       return
     }
-    // 6 位新码则等静默 250ms 再提交：旧码前 6 位可能恰好全为数字，
+    // 8 位新码则等静默 250ms 再提交：旧码前 8 位可能恰好全为数字，
     // 立即提交会把这类用户永久卡死在「输入被截断 → 认领失败 → 清空」的循环里。
     if (PICKUP_CODE_PATTERN.test(nextCode)) {
       settleTimerRef.current = setTimeout(() => {
@@ -274,7 +274,7 @@ export function PrintPickupClaimPage() {
               // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
               // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
               inputMode="numeric"
-              placeholder="例：284917"
+              placeholder="例：28491703"
               // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
               // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
               maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}

@@ -381,11 +381,11 @@ async function main(): Promise<void> {
      * 且逐字符符合规格字符集」，判别力比原来更强（原断言放行 'ABCDEFGH'、
      * 放行任意 9 位、放行含空格的串，新断言都不放行）。
      *
-     * 需要说清楚的取舍：绝对熵确实下降了（31^10 ≈ 49 bit → 10^6 ≈ 20 bit）。
+     * 需要说清楚的取舍：绝对熵确实下降了（31^10 ≈ 49 bit → 10^8 ≈ 26.6 bit）。
      * 补偿它的是另外三条控制，而它们各自有自己的断言，不在本文件：
      *   - claim-pickup 限流 20 次/分钟 → scripts/verify-miniapp-cloud-print-m2.ts
      *   - 取件码 24h 失效 → 本文件同批 pickupCodeVisibleFor 门 + m2 的过期用例
-     *   - 认领必须命中订单绑定终端 → m2 的 PICKUP_TERMINAL_MISMATCH 用例
+     *   - 认领必须命中订单绑定终端 + 按终端失败锁定 → m2 的预言机合并 / 锁定用例
      * 任何一条被放宽，6 位就不再成立 —— 别只改这里。
      */
     const isSpecPickupCode = (value: unknown): boolean =>

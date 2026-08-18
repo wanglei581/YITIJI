@@ -10,7 +10,9 @@ import path from 'node:path'
 import { validateSync } from 'class-validator'
 import { AuditService } from '../src/audit/audit.service'
 import { PICKUP_CODE_LENGTH, PICKUP_CODE_PATTERN, randomPickupCode } from '../src/common/pickup-code'
+import type { RedisService } from '../src/common/redis/redis.service'
 import { ClaimPickupDto } from '../src/print-jobs/dto/claim-pickup.dto'
+import { PICKUP_LOCKOUT_FAILURE_THRESHOLD } from '../src/print-jobs/pickup-claim-lockout'
 import { MemberPrintOrderCreateService } from '../src/member-print-orders/member-print-order-create.service'
 import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
@@ -46,6 +48,30 @@ function codeOf(error: unknown): string {
     | { error?: { code?: string }; message?: string } | undefined
   return response?.error?.code ?? response?.message ?? ex.message ?? 'UNKNOWN'
 }
+/**
+ * 抓取一次调用的**完整对外响应形状**（HTTP 状态 + 错误码 + 文案）。
+ *
+ * 预言机断言必须比对这个结构，而不是「有没有抛错」—— 合并前后两条路径都抛，
+ * 用「抛没抛」当判据的话，合并与否都会绿。
+ */
+async function captureHttpError(
+  action: () => Promise<unknown>,
+): Promise<{ thrown: boolean; status: number | null; code: string | null; message: string | null }> {
+  try {
+    await action()
+    return { thrown: false, status: null, code: null, message: null }
+  } catch (error) {
+    const ex = error as {
+      getStatus?: () => number
+      getResponse?: () => unknown
+    }
+    const status = typeof ex.getStatus === 'function' ? ex.getStatus() : null
+    const body = typeof ex.getResponse === 'function' ? ex.getResponse() : null
+    const err = (body as { error?: { code?: string; message?: string } } | null)?.error
+    return { thrown: true, status, code: err?.code ?? null, message: err?.message ?? null }
+  }
+}
+
 async function expectCode(action: () => Promise<unknown>, expected: string, label: string): Promise<void> {
   try { await action(); fail(`${label}: expected ${expected}`) }
   catch (error) {
@@ -54,6 +80,48 @@ async function expectCode(action: () => Promise<unknown>, expected: string, labe
     pass(label)
   }
 }
+/**
+ * 最小 Redis 替身：只实现锁定模块用到的 4 个命令（get / setEx / incrWithTtl / del）。
+ *
+ * 为什么用替身而不是连真 Redis：本脚本此前**整条链路不经过 Redis**
+ * （见 `common/redis/redis-degradation.ts` 的 `'terminal-agent-print': 'unaffected'` 声明），
+ * 为了测锁定而给它引入一个外部服务依赖，会让这条声明变得难以维持，
+ * 也让脚本在没有 Redis 的开发机上跑不了。
+ * 替身覆盖的是锁定的**状态机语义**（阈值 / 计数清零 / 锁存在性），
+ * 而「生产上注入的是真 RedisService」由 verify-backend-p0-contracts.mjs 静态断言。
+ * `failing` 模式用于验证 Redis 故障时**放行**（fail-open）。
+ */
+class FakeRedis {
+  private store = new Map<string, string>()
+  failing = false
+
+  private guard(): void {
+    if (this.failing) throw new Error('FakeRedis: simulated outage')
+  }
+  async get(key: string): Promise<string | null> {
+    this.guard()
+    return this.store.get(key) ?? null
+  }
+  async setEx(key: string, _ttlSeconds: number, value: string): Promise<void> {
+    this.guard()
+    this.store.set(key, value)
+  }
+  async del(key: string): Promise<number> {
+    this.guard()
+    return this.store.delete(key) ? 1 : 0
+  }
+  async incrWithTtl(key: string, _ttlSeconds: number): Promise<number> {
+    this.guard()
+    const next = Number(this.store.get(key) ?? '0') + 1
+    this.store.set(key, String(next))
+    return next
+  }
+  /** 测试辅助：直接清掉全部状态，等价于窗口/锁自然过期。 */
+  reset(): void {
+    this.store.clear()
+  }
+}
+
 function cleanupDb(): void {
   for (const suffix of ['', '-wal', '-shm']) rmSync(`${dbPath}${suffix}`, { force: true })
 }
@@ -155,12 +223,17 @@ function assertPickupCodeSpecInvariant(): void {
   pass('存量 10 位取件码仍被受理（过渡期不得让已付费用户取不到件）')
 
   // 受理面不许被顺手放宽成「什么都收」。
-  for (const bad of ['12345', '1234567', '', 'ABCDEF', '12345A', 'AB2C7M9P3', 'AB2C7M9P3KL', 'AB2C7M9P30']) {
+  // 6/7/9 位在列表里是刻意的：方案 A 把长度从 6 提到 8，若有人改回 6 位或写错成 7/9，
+  // 这里必须红 —— 不能只靠「8 位能过」证明长度对。
+  for (const bad of [
+    '123456', '1234567', '123456789', '', 'ABCDEFGH', '1234567A',
+    'AB2C7M9P3', 'AB2C7M9P3KL', 'AB2C7M9P30', '12345678 ', ' 12345678',
+  ]) {
     if (validateSync(Object.assign(new ClaimPickupDto(), { code: bad })).length === 0) {
       fail(`受理面过宽：${JSON.stringify(bad)} 不应通过 ClaimPickupDto 校验`)
     }
   }
-  pass('错长度/错字符集的码一律被 ClaimPickupDto 拒绝（受理面未被放宽）')
+  pass('错长度（含 6/7/9 位）/错字符集的码一律被 ClaimPickupDto 拒绝（受理面未被放宽）')
 
   // 限流是 6 位码安全论证的一部分，不是性能参数。被调宽就必须在这里红。
   const pickupController = readFileSync(path.join(apiRoot, 'src/print-jobs/print-jobs.controller.ts'), 'utf8')
@@ -170,10 +243,10 @@ function assertPickupCodeSpecInvariant(): void {
   if (!claimThrottle || Number(claimThrottle[1]) > 20) {
     fail(
       `claim-pickup 限流必须 ≤ 20 次/分钟（实测: ${claimThrottle?.[1] ?? '未找到 @Throttle'}）。` +
-        '6 位码 = 10^6 空间，其抗枚举性依赖「限流 + 24h 有效期 + 终端绑定」三者合力，放宽限流等于削弱码长。',
+        '限流是 8 位码安全论证的组成部分（8 位 + 7 天单靠限流命中率已约 50.6%，靠按终端锁定压到约 1.4%）。放宽它等于削弱码长。',
     )
   }
-  pass(`claim-pickup 限流仍为 ${claimThrottle[1]} 次/分钟（6 位码安全论证的前提，未被放宽）`)
+  pass(`claim-pickup 限流仍为 ${claimThrottle[1]} 次/分钟（8 位码安全论证的组成部分，未被放宽）`)
 }
 
 async function main(): Promise<void> {
@@ -190,7 +263,8 @@ async function main(): Promise<void> {
   const orderStatus = new OrderStatusService(prisma, audit)
   const quote = new OrderQuoteService(new PrintPageCountService(prisma, storage), new PricingService(prisma))
   const memberOrders = new MemberPrintOrderCreateService(prisma, quote, capabilities, orderStatus, audit)
-  const pickup = new PickupOrderService(prisma, capabilities, audit)
+  const redis = new FakeRedis()
+  const pickup = new PickupOrderService(prisma, capabilities, audit, redis as unknown as RedisService)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const userId = `eu_m2_${suffix}`
@@ -281,11 +355,41 @@ async function main(): Promise<void> {
     }
     pass('未付款 Order-only 可取消且不会创建 PrintTask')
 
-    await expectCode(
-      () => pickup.claim(created.pickupCode, otherTerminalId),
-      'PICKUP_TERMINAL_MISMATCH',
-      '错终端不能认领',
-    )
+    // ── 预言机合并 ────────────────────────────────────────────────────────
+    // 「码有效但不在这台机器」与「码根本不存在」必须**完全无法区分**。
+    // 判据刻意不是「有没有抛错」（两者本来就都抛），而是逐字段比对真实响应：
+    // HTTP 状态码、错误码、错误文案三者全等，才算不泄露「这枚码是否存在」。
+    const mismatchShape = await captureHttpError(() => pickup.claim(created.pickupCode, otherTerminalId))
+    const unknownShape = await captureHttpError(() => pickup.claim('00000000', otherTerminalId))
+    if (mismatchShape.thrown === false || unknownShape.thrown === false) {
+      fail('错终端 / 不存在的码都必须被拒绝')
+    }
+    if (JSON.stringify(mismatchShape) !== JSON.stringify(unknownShape)) {
+      fail(
+        '预言机未合并：「真码 + 错终端」与「不存在的码」响应不一致，攻击者据此可筛出真码。\n' +
+          `  真码错终端: ${JSON.stringify(mismatchShape)}\n` +
+          `  不存在的码: ${JSON.stringify(unknownShape)}`,
+      )
+    }
+    if (mismatchShape.status !== 404 || mismatchShape.code !== 'PICKUP_CODE_INVALID') {
+      fail(`合并后的拒绝响应应为 404/PICKUP_CODE_INVALID，实际 ${JSON.stringify(mismatchShape)}`)
+    }
+    pass(`错终端与不存在的码返回完全相同的响应 ${JSON.stringify(mismatchShape)}（预言机已合并）`)
+
+    // 运营侧不能因为合并而变瞎：真码走错机器仍必须在服务端留痕，且带得出 orderId；
+    // 而「码不存在」不留痕（否则枚举流量会被放大成审计写入）。
+    const mismatchAudits = await prisma.auditLog.findMany({
+      where: { action: 'print_order.pickup_claim_rejected', targetId: created.id },
+    })
+    if (mismatchAudits.length !== 1) {
+      fail(`真码走错终端必须留下 1 条审计（现场排障靠它区分「走错机器」与「码输错」），实际 ${mismatchAudits.length} 条`)
+    }
+    const allRejectAudits = await prisma.auditLog.count({ where: { action: 'print_order.pickup_claim_rejected' } })
+    if (allRejectAudits !== 1) {
+      fail(`「码不存在」不得写审计（可被无限触发 → 审计表写放大），当前共 ${allRejectAudits} 条`)
+    }
+    pass('走错终端在服务端留痕且可定位到 orderId；不存在的码不写审计（运营不瞎、审计不被灌）')
+    redis.reset() // 上面几次失败已计入锁定计数，清掉以免干扰后续用例
     const claimed = await pickup.claim(created.pickupCode, terminalId)
     if (claimed.released !== false || await prisma.printTask.count({ where: { endUserId: userId } }) !== 0) {
       fail('未付款认领不得创建 PrintTask')
@@ -341,6 +445,80 @@ async function main(): Promise<void> {
     await expectCode(() => pickup.claim(expiring.pickupCode, terminalId), 'PICKUP_CODE_EXPIRED', '过期到机码拒绝认领')
     if (await prisma.printTask.count({ where: { endUserId: userId } }) !== 2) fail('过期订单不得产生额外打印任务')
     pass('文件 TTL 收紧到机码 TTL，过期订单不会释放任务')
+    redis.reset()
+
+    // ── §9 不伪造能力：对外的有效期必须是**真实生效值**，不是 PICKUP_TTL_MS ──
+    // 有效期上限已改为 7 天，但落库值是 min(7 天, 文件过期时间)。上面那个 1 小时
+    // 文件的订单，真实有效期就是 1 小时。若哪天有人「为了让 7 天生效」去掉夹取，
+    // 或前端改成按常量算倒计时，用户就会拿到「码还在、文件已被清理」的假承诺。
+    const expiringView = (await memberOrders.listCloud(userId))
+      .find((row) => row.id === expiring.id) as { pickupCodeExpiresAt: string | null } | undefined
+    const freshExpiring = await prisma.order.findUnique({ where: { id: expiring.id } })
+    if (!expiringView) fail('会员订单列表里应能查到该订单')
+    if (expiringView.pickupCodeExpiresAt !== (freshExpiring?.pickupCodeExpiresAt?.toISOString() ?? null)) {
+      fail(
+        '对外返回的取件码有效期与落库值不一致 —— 界面会显示一个并不成立的时间。\n' +
+          `  视图: ${expiringView.pickupCodeExpiresAt}\n  落库: ${freshExpiring?.pickupCodeExpiresAt?.toISOString() ?? null}`,
+      )
+    }
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000
+    const mainOrder = await prisma.order.findUnique({ where: { id: created.id } })
+    const mainTtlMs = (mainOrder?.pickupCodeExpiresAt?.getTime() ?? 0) - mainOrder!.createdAt.getTime()
+    if (mainTtlMs >= sevenDaysMs) {
+      fail(
+        `源文件 30 小时后过期，取件码有效期却达到了 ${Math.round(mainTtlMs / 3600000)} 小时 —— ` +
+          'min(TTL, file.expiresAt) 夹取失效，会产生指向已清理文件的取件码',
+      )
+    }
+    pass(`对外有效期 == 落库有效期，且被源文件夹取（本单实际 ${Math.round(mainTtlMs / 3600000)}h，远小于 7 天上限）`)
+
+    // ── 按终端失败锁定 ────────────────────────────────────────────────────
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await captureHttpError(() => pickup.claim('00000000', terminalId))
+    }
+    // 阈值前一次：仍然按正常拒绝处理，不能提前锁。
+    const beforeLock = await captureHttpError(() => pickup.claim('00000001', terminalId))
+    if (beforeLock.code !== 'PICKUP_CODE_INVALID') {
+      fail(`第 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次失败前不应锁定，实际 ${JSON.stringify(beforeLock)}`)
+    }
+    const afterLock = await captureHttpError(() => pickup.claim('00000002', terminalId))
+    if (afterLock.code !== 'PICKUP_CLAIM_LOCKED') {
+      fail(`达到 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次失败后必须锁定该终端，实际 ${JSON.stringify(afterLock)}`)
+    }
+    // 锁定必须**按终端**：另一台机器不受牵连（按 IP 就做不到这一点）。
+    const otherStillOpen = await captureHttpError(() => pickup.claim('00000003', otherTerminalId))
+    if (otherStillOpen.code !== 'PICKUP_CODE_INVALID') {
+      fail(`锁定不得外溢到其它终端，otherTerminal 实际 ${JSON.stringify(otherStillOpen)}`)
+    }
+    pass(`失败 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次后锁定本终端认领，且不影响其它终端`)
+
+    // 成功认领清零计数：这是「正常用户手误不受影响」的实现手段，必须真的生效。
+    redis.reset()
+    for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
+      await captureHttpError(() => pickup.claim('00000000', terminalId))
+    }
+    await pickup.claim(created.pickupCode, terminalId) // 真实用户成功一次
+    const afterSuccess = await captureHttpError(() => pickup.claim('00000004', terminalId))
+    if (afterSuccess.code !== 'PICKUP_CODE_INVALID') {
+      fail(`成功认领应清零失败计数，否则繁忙机器会被零散手误累积锁死；实际 ${JSON.stringify(afterSuccess)}`)
+    }
+    pass('成功认领清零失败计数（繁忙终端不会被零散手误累积锁死）')
+
+    // Redis 故障时放行：`REDIS_DEGRADED_IMPACT` 里 'terminal-agent-print': 'unaffected'
+    // 是一条被门禁实际发请求核对的声明；锁定若在 Redis 挂掉时改为拒绝，那句话就成了假话，
+    // 且所有人都取不到已付费的文件。
+    redis.reset()
+    redis.failing = true
+    const degraded = await captureHttpError(() => pickup.claim('00000005', terminalId))
+    if (degraded.code !== 'PICKUP_CODE_INVALID') {
+      fail(`Redis 不可用时锁定必须放行（fail-open），实际 ${JSON.stringify(degraded)}`)
+    }
+    const degradedReal = await pickup.claim(created.pickupCode, terminalId)
+    if (degradedReal.orderId !== created.id) fail('Redis 不可用时真实取件码仍必须能认领')
+    redis.failing = false
+    redis.reset()
+    pass('Redis 不可用时锁定 fail-open，真实取件码仍可认领（不把纵深防线变成单点故障）')
 
   } finally {
     setPrintScanCapabilityModeForTest(null)

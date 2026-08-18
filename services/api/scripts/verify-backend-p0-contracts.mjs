@@ -153,17 +153,17 @@ const miniappPickupQr = read('apps/miniapp/utils/pickup-qrcode.js')
 /** 规格字面量：改任何一行都必须四处同改，否则本段全红。 */
 const PICKUP_SPEC_LITERALS = [
   "export const PICKUP_CODE_ALPHABET = '0123456789'",
-  'export const PICKUP_CODE_LENGTH = 6',
-  'export const PICKUP_CODE_PATTERN = /^[0-9]{6}$/',
+  'export const PICKUP_CODE_LENGTH = 8',
+  'export const PICKUP_CODE_PATTERN = /^[0-9]{8}$/',
   "export const LEGACY_PICKUP_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'",
   'export const LEGACY_PICKUP_CODE_LENGTH = 10',
   'export const LEGACY_PICKUP_CODE_PATTERN = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/',
-  'export const PICKUP_CODE_ACCEPTED_PATTERN = /^(?:[0-9]{6}|[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10})$/',
+  'export const PICKUP_CODE_ACCEPTED_PATTERN = /^(?:[0-9]{8}|[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10})$/',
 ]
 
 check(
   containsAll(pickupCodeSrc, PICKUP_SPEC_LITERALS),
-  '后端 common/pickup-code.ts 是取件码规格的唯一定义（6 位纯数字 + 10 位存量）',
+  '后端 common/pickup-code.ts 是取件码规格的唯一定义（8 位纯数字 + 10 位存量）',
 )
 check(
   containsAll(pickupCodeShared, PICKUP_SPEC_LITERALS),
@@ -237,7 +237,7 @@ check(
 check(
   pickupCodeSrc.includes('LEGACY_PICKUP_CODE_PATTERN') &&
     pickupCodeSrc.includes('[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}') &&
-    /PICKUP_CODE_ACCEPTED_PATTERN = .*\[0-9\]\{6\}\|\[23456789ABCDEFGHJKMNPQRSTUVWXYZ\]\{10\}/.test(pickupCodeSrc),
+    /PICKUP_CODE_ACCEPTED_PATTERN = .*\[0-9\]\{8\}\|\[23456789ABCDEFGHJKMNPQRSTUVWXYZ\]\{10\}/.test(pickupCodeSrc),
   '受理正则同时收 6 位新码与 10 位存量码（已付费用户的在途取件码不得被拒）',
 )
 check(
@@ -259,9 +259,80 @@ check(
 
 // 小程序：本次不改（归用户所有），但它那份 10 位正则**已与后端不一致**。
 // 这条断言不是为了拦住谁，是为了让「小程序仍在发 10 位码」这件事在 CI 上可见。
+// ⚠️ 后端已改为签发 8 位码，而小程序用这条正则**闸住取件码与二维码的显示**
+// （print-pickup.js 的 hasCode / showQr / codeRaw）——
+// 小程序未同步发版前，新订单在小程序里看不到码，也扫不出二维码。
+// 部署顺序因此是硬约束，见 PR 正文第九节。
 check(
   miniappPickupQr.includes('PICKUP_CODE_RE = /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/'),
-  '小程序仍是 10 位口径（本 PR 未授权修改；后端存量兼容分支删除前必须先改它）',
+  '小程序仍是 10 位口径（本 PR 未授权修改；**必须先于后端发版**，否则新订单在小程序里无码可看）',
+)
+
+// ── 预言机合并（方案 A）──────────────────────────────────────────────────
+// claim 路径上「码不存在」与「码存在但不属于本终端」必须走同一个拒绝对象。
+check(
+  pickupOrderSrc.includes('private static readonly CLAIM_REJECTION') &&
+    (pickupOrderSrc.match(/throw new NotFoundException\(PickupOrderService\.CLAIM_REJECTION\)/g) || []).length === 2,
+  'claim 的两条失败路径共用同一个 CLAIM_REJECTION 响应（不泄露「这枚码是否存在」）',
+)
+check(
+  !/if \(order\.terminalId !== terminal\.id\) \{[\s\S]{0,200}?PICKUP_TERMINAL_MISMATCH/.test(pickupOrderSrc),
+  'claim 不再向客户端返回 PICKUP_TERMINAL_MISMATCH（该错误码曾是筛真码的预言机）',
+)
+// 运营侧不能变瞎：真码走错终端仍要留痕；码不存在则不留痕（否则枚举会灌爆审计表）。
+check(
+  pickupOrderSrc.includes("action: 'print_order.pickup_claim_rejected'") &&
+    pickupOrderSrc.includes("reason === 'terminal_mismatch' && orderId"),
+  '走错终端在服务端写审计并带 orderId（现场排障靠它区分「走错机器」与「码输错」）',
+)
+
+// ── 按终端失败锁定（方案 A）──────────────────────────────────────────────
+const lockoutSrc = read('services/api/src/print-jobs/pickup-claim-lockout.ts')
+check(
+  lockoutSrc.includes('`pickup:claim:fail:${terminalId}`') && lockoutSrc.includes('`pickup:claim:lock:${terminalId}`'),
+  '失败计数与锁定都按**终端**维度（按 IP 无效：IP 可换，见 terminal-throttle.ts）',
+)
+check(
+  lockoutSrc.includes('export const PICKUP_LOCKOUT_FAILURE_THRESHOLD = 10') &&
+    lockoutSrc.includes('export const PICKUP_LOCKOUT_WINDOW_SECONDS = 10 * 60') &&
+    lockoutSrc.includes('export const PICKUP_LOCKOUT_SECONDS = 15 * 60'),
+  '锁定参数为 10 次/10 分钟 → 锁 15 分钟（改这三个数就是改 8 位码的安全结论，先重算）',
+)
+check(
+  lockoutSrc.includes('export async function clearPickupClaimFailures') &&
+    pickupOrderSrc.includes('await clearPickupClaimFailures(this.redis, terminal.id)'),
+  '成功认领清零失败计数（否则繁忙终端会被零散手误累积锁死）',
+)
+check(
+  lockoutSrc.includes('tryRedis(') && lockoutSrc.includes("if (!attempt.ok) return false"),
+  'Redis 不可用时锁定 fail-open —— 否则 REDIS_DEGRADED_IMPACT 的 terminal-agent-print:unaffected 会变成假话',
+)
+check(
+  /isPickupClaimLocked\(this\.redis, terminal\.id\)[\s\S]{0,400}?findUnique\(\{ where: \{ pickupCodeHash/.test(pickupOrderSrc),
+  '锁定检查发生在查库之前（锁定的意义就是不再为这台终端检查任何码）',
+)
+
+// ── §9 不伪造能力：有效期上限 ≠ 对外承诺值 ───────────────────────────────
+// TTL 提到 7 天后，绝大多数订单的真实有效期仍由源文件留存决定
+// （print_doc 24h / cover_letter 6h / resume_* 1h）。
+check(
+  orderCreateSrc.includes('const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000'),
+  '取件码有效期上限为 7 天（方案 A）',
+)
+check(
+  orderCreateSrc.includes('Math.min(pickupDeadline, file.expiresAt?.getTime() ?? pickupDeadline)'),
+  '有效期仍被源文件夹取 —— 去掉夹取就会产生指向已清理文件的取件码',
+)
+check(
+  orderCreateSrc.includes('pickupCodeExpiresAt: expiresAt') &&
+    orderCreateSrc.includes('pickupCodeExpiresAt: order.pickupCodeExpiresAt?.toISOString() ?? null'),
+  '对外返回的是落库的真实有效期，不是 PICKUP_TTL_MS 常量（CLAUDE.md §9）',
+)
+// 客户端不得自己按「时长」推算倒计时：所有展示都必须来自服务端的 pickupCodeExpiresAt。
+check(
+  !/PICKUP_TTL|PICKUP_CODE_TTL|7 \* 24 \* 60 \* 60/.test(pickupCodeShared) &&
+    !/PICKUP_TTL|7 \* 24 \* 60 \* 60/.test(kioskClaimPage),
+  '跨端契约与 kiosk 页面都不带有效期时长常量（带了就会有人拿它算倒计时）',
 )
 
 if (failed > 0) {

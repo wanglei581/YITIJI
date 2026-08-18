@@ -5,7 +5,13 @@ import { signFileUrl } from '../files/signing'
 import { hashPickupCode } from '../common/pickup-code'
 import { createPaymentSessionToken, verifyPaymentSessionToken } from '../payment/payment-session-token'
 import { PrismaService } from '../prisma/prisma.service'
+import { RedisService } from '../common/redis/redis.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import {
+  clearPickupClaimFailures,
+  isPickupClaimLocked,
+  recordPickupClaimFailure,
+} from './pickup-claim-lockout'
 
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -16,15 +22,49 @@ export class PickupOrderService {
     private readonly prisma: PrismaService,
     private readonly capabilities: TerminalCapabilitiesService,
     private readonly audit: AuditService,
+    private readonly redis: RedisService,
   ) {}
+
+  /**
+   * 「码无效」与「码有效但不属于本终端」返回**完全相同**的响应。
+   *
+   * 合并前这是一个预言机：404 `PICKUP_CODE_INVALID` 与 403 `PICKUP_TERMINAL_MISMATCH`
+   * 让攻击者不必待在正确终端就能筛出「哪些码是真的」，把枚举成本按终端数除了一遍。
+   * 合并后，攻击者从响应里得不到任何关于码是否存在的信息。
+   *
+   * 运营侧不会因此变瞎：真实的区分仍然写进服务端（审计 + 日志），只是不回给客户端。
+   * 见 `rejectClaimAsInvalid` 里的审计写入。
+   */
+  private static readonly CLAIM_REJECTION = {
+    error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' },
+  } as const
 
   async claim(codeInput: string, terminalRef: string | undefined) {
     const code = codeInput.trim().toUpperCase()
     const terminal = await this.requireTerminal(terminalRef)
+
+    // 锁定检查必须在查库之前：锁定的意义就是「不再为这台终端检查任何码」。
+    if (await isPickupClaimLocked(this.redis, terminal.id)) {
+      throw new ForbiddenException({
+        error: {
+          code: 'PICKUP_CLAIM_LOCKED',
+          message: '本机取件暂时停用，请找现场工作人员协助',
+        },
+      })
+    }
+
     const order = await this.prisma.order.findUnique({ where: { pickupCodeHash: hashPickupCode(code) } })
-    if (!order) throw new NotFoundException({ error: { code: 'PICKUP_CODE_INVALID', message: '到机码无效或已过期' } })
+    if (!order) {
+      // 码不存在：**不写审计**。这条路径是攻击者可无限触发的，逐次落库等于把
+      // 枚举流量放大成审计表写入。计数走 Redis（有界、自动过期）。
+      await this.noteClaimFailure(terminal.id, 'code_not_found', null)
+      throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
+    }
     if (order.terminalId !== terminal.id) {
-      throw new ForbiddenException({ error: { code: 'PICKUP_TERMINAL_MISMATCH', message: '该订单已绑定其他服务终端' } })
+      // 码真实存在但绑在别的终端：这是运营真正需要区分的场景（用户走错机器），
+      // 也是攻击者「猜中了一枚真码」的场景 —— 两者都值得留痕，且发生率天然很低。
+      await this.noteClaimFailure(terminal.id, 'terminal_mismatch', order.id)
+      throw new NotFoundException(PickupOrderService.CLAIM_REJECTION)
     }
     if (!order.pickupCodeExpiresAt || order.pickupCodeExpiresAt <= new Date()) {
       await this.prisma.order.updateMany({
@@ -33,6 +73,11 @@ export class PickupOrderService {
       })
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_EXPIRED', message: '到机码已过期，请在小程序重新下单' } })
     }
+    // 走到这里说明用户手里拿的是一枚**属于本终端的真码**，即他是真实用户而非枚举者。
+    // 清零该终端的失败计数：这是「正常用户手误不受影响」那条约束的主要实现手段 ——
+    // 繁忙机器上成功远多于失败，计数攒不起来；纯枚举场景没有成功，计数会一路涨到阈值。
+    await clearPickupClaimFailures(this.redis, terminal.id)
+
     if (order.pickupStatus === 'used' && order.printTaskId) return this.releasedView(order)
     if (!['pending', 'claimed'].includes(order.pickupStatus)) {
       throw new BadRequestException({ error: { code: 'PICKUP_CODE_UNAVAILABLE', message: '到机码当前不可使用' } })
@@ -128,6 +173,33 @@ export class PickupOrderService {
     const fresh = await this.prisma.order.findUnique({ where: { id: order.id } })
     if (!fresh) throw new NotFoundException('ORDER_NOT_FOUND')
     return this.releasedView(fresh)
+  }
+
+  /**
+   * 认领失败的统一处置：计数 + （必要时）留痕。
+   *
+   * 客户端拿到的响应对两种 reason 完全一致；区分只存在于服务端。
+   * 现场排障口径：工作人员遇到「码打不进去」时，让运维按 terminalId 查
+   * 审计动作 `print_order.pickup_claim_rejected` ——
+   * 有 `terminal_mismatch` 记录 = 用户走错机器（payload 里有 orderId，
+   * 能直接查到该单绑的是哪台）；没有记录 = 码本身不存在（输错或已换单）。
+   */
+  private async noteClaimFailure(
+    terminalId: string,
+    reason: 'code_not_found' | 'terminal_mismatch',
+    orderId: string | null,
+  ): Promise<void> {
+    if (reason === 'terminal_mismatch' && orderId) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'kiosk',
+        action: 'print_order.pickup_claim_rejected',
+        targetType: 'order',
+        targetId: orderId,
+        payload: { terminalId, reason },
+      })
+    }
+    await recordPickupClaimFailure(this.redis, terminalId)
   }
 
   private async requireTerminal(terminalRef: string | undefined) {
