@@ -11,6 +11,10 @@
 import type { SceneTemplate } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
+import {
+  contentTrustSubmitBlock,
+  type OrgContentTrustStatus,
+} from '../../routes/partners/contentTrustRules'
 
 // ─── 类型(契约 = services/api AdminOrgsService 返回形状)───────────────────
 
@@ -74,6 +78,13 @@ export interface AdminOrgListItem {
   sceneTemplate: SceneTemplate | null
   enabledModules: string[]
   enabled: boolean
+  /**
+   * 内容信任状态(发布闸门读的那一列)。null = 从未标记,闸门同样拒绝。
+   * 取值见 routes/partners/contentTrustRules.ts 的 ORG_CONTENT_TRUST_STATUSES。
+   */
+  contentTrustStatus: string | null
+  /** 机构是否已归档。已归档机构即使 contentTrustStatus='active' 也发不出内容。 */
+  archived: boolean
   createdAt: string
   updatedAt: string
   counts: { accounts: number; sources: number; jobs: number; fairs: number }
@@ -81,6 +92,27 @@ export interface AdminOrgListItem {
 
 export interface AdminOrgDetail extends AdminOrgListItem {
   accounts: AdminOrgAccount[]
+}
+
+/**
+ * GET / PATCH /admin/orgs/:id/content-trust 的返回形状。
+ * 契约源:services/api/src/orgs/admin-org-content-trust.service.ts 的 OrgContentTrustView。
+ * contentTrustReviewedBy 是**操作人账号 ID**(User.id),服务端不做姓名回显,这里原样展示。
+ */
+export interface OrgContentTrustView {
+  id: string
+  name: string
+  contentTrustStatus: string | null
+  contentTrustReviewedBy: string | null
+  contentTrustReviewedAt: string | null
+  contentTrustReason: string | null
+  archived: boolean
+}
+
+export interface SetOrgContentTrustInput {
+  status: OrgContentTrustStatus
+  /** status='active' 时必填(服务端 CONTENT_TRUST_REASON_REQUIRED)。会写进审计日志。 */
+  reason?: string
 }
 
 export interface OrgAccountInput {
@@ -117,6 +149,8 @@ export interface OrgsAdminServiceInterface {
   createOrg(input: CreateOrgInput): Promise<AdminOrgDetail>
   updateOrg(orgId: string, input: UpdateOrgInput): Promise<AdminOrgDetail>
   setOrgStatus(orgId: string, action: 'enable' | 'disable'): Promise<AdminOrgDetail>
+  getContentTrust(orgId: string): Promise<OrgContentTrustView>
+  setContentTrust(orgId: string, input: SetOrgContentTrustInput): Promise<OrgContentTrustView>
   createAccount(orgId: string, input: OrgAccountInput): Promise<AdminOrgAccount>
   setAccountStatus(orgId: string, accountId: string, action: 'enable' | 'disable'): Promise<AdminOrgAccount>
   resetAccountPassword(orgId: string, accountId: string, password: string): Promise<void>
@@ -212,6 +246,9 @@ const httpAdapter: OrgsAdminServiceInterface = {
   createOrg: (input) => req<AdminOrgDetail>('POST', '/admin/orgs', input),
   updateOrg: (orgId, input) => req<AdminOrgDetail>('PATCH', `/admin/orgs/${orgId}`, input),
   setOrgStatus: (orgId, action) => req<AdminOrgDetail>('PATCH', `/admin/orgs/${orgId}/status`, { action }),
+  getContentTrust: (orgId) => req<OrgContentTrustView>('GET', `/admin/orgs/${orgId}/content-trust`),
+  setContentTrust: (orgId, input) =>
+    req<OrgContentTrustView>('PATCH', `/admin/orgs/${orgId}/content-trust`, input),
   createAccount: (orgId, input) => req<AdminOrgAccount>('POST', `/admin/orgs/${orgId}/accounts`, input),
   setAccountStatus: (orgId, accountId, action) =>
     req<AdminOrgAccount>('PATCH', `/admin/orgs/${orgId}/accounts/${accountId}/status`, { action }),
@@ -307,18 +344,23 @@ const mockChallenges = new Map<string, MockActionBinding & { verifyMethod: Partn
 const mockActionTickets = new Map<string, MockActionBinding>()
 const mockRebindTickets = new Map<string, MockActionBinding & { newPhone: string }>()
 
+/** mock 侧的信任留痕(演示数据);http 模式下这些字段全部来自服务端。 */
+const mockTrust = new Map<string, { reviewedBy: string | null; reviewedAt: string | null; reason: string | null }>([
+  ['org-mock-1', { reviewedBy: 'mock-admin-001', reviewedAt: now(), reason: '演示数据:合作协议 DEMO-2026-001' }],
+])
+
 const mockOrgs: Omit<AdminOrgListItem, 'counts'>[] = [
   {
     id: 'org-mock-1', name: '市人才交流中心(演示)', type: 'public_employment_service',
     contact: '李老师', contactPhone: '0532-00000000', sceneTemplate: 'public_employment',
     enabledModules: ['print_scan', 'policy_service', 'job_info', 'job_fair', 'external_apply_redirect'],
-    enabled: true, createdAt: now(), updatedAt: now(),
+    enabled: true, contentTrustStatus: 'active', archived: false, createdAt: now(), updatedAt: now(),
   },
   {
     id: 'org-mock-2', name: '某大学就业指导中心(演示)', type: 'school_employment_center',
     contact: '王老师', contactPhone: null, sceneTemplate: 'school',
     enabledModules: ['resume_service', 'print_scan', 'job_info', 'job_fair', 'smart_campus'],
-    enabled: false, createdAt: now(), updatedAt: now(),
+    enabled: false, contentTrustStatus: null, archived: false, createdAt: now(), updatedAt: now(),
   },
 ]
 
@@ -340,7 +382,9 @@ const mockAdapter: OrgsAdminServiceInterface = {
       id: nextId('org'), name: input.name, type: input.type,
       contact: input.contact ?? null, contactPhone: input.contactPhone ?? null,
       sceneTemplate: input.sceneTemplate ?? null, enabledModules: input.enabledModules ?? [],
-      enabled: true, createdAt: now(), updatedAt: now(),
+      // 新建机构一律「未标记」——与服务端一致(Organization.contentTrustStatus 默认 null),
+      // 不给演示数据发假的信任章。
+      enabled: true, contentTrustStatus: null, archived: false, createdAt: now(), updatedAt: now(),
     }
     mockOrgs.unshift(org)
     if (input.account) {
@@ -373,6 +417,46 @@ const mockAdapter: OrgsAdminServiceInterface = {
     org.enabled = action === 'enable'
     org.updatedAt = now()
     return this.getOrgDetail(orgId)
+  },
+  async getContentTrust(orgId) {
+    const org = mockOrgs.find((o) => o.id === orgId)
+    if (!org) throw new ApiHttpError('ORG_NOT_FOUND', `机构 ${orgId} 不存在`, 404)
+    const t = mockTrust.get(orgId)
+    return {
+      id: org.id,
+      name: org.name,
+      contentTrustStatus: org.contentTrustStatus,
+      contentTrustReviewedBy: t?.reviewedBy ?? null,
+      contentTrustReviewedAt: t?.reviewedAt ?? null,
+      contentTrustReason: t?.reason ?? null,
+      archived: org.archived,
+    }
+  },
+  // 刻意复刻服务端 setContentTrust 的两道 400,否则 mock 模式会演示出一个
+  // 「空理由也能标可信」的假能力,而真实后端 100% 拒绝。
+  async setContentTrust(orgId, input) {
+    const org = mockOrgs.find((o) => o.id === orgId)
+    if (!org) throw new ApiHttpError('ORG_NOT_FOUND', `机构 ${orgId} 不存在`, 404)
+    const reason = (input.reason ?? '').trim()
+    const block = contentTrustSubmitBlock({ status: input.status, reason, archived: org.archived })
+    if (block === 'reason_required') {
+      throw new ApiHttpError(
+        'CONTENT_TRUST_REASON_REQUIRED',
+        '标记为 active 必须填写核验依据(授权书 / 合同 / 公开声明编号等),这条依据会进审计。',
+        400,
+      )
+    }
+    if (block === 'archived') {
+      throw new ApiHttpError('ORG_ARCHIVED', `机构 ${orgId} 已归档,不能标记为内容可信;如需恢复供稿请先取消归档。`, 400)
+    }
+    org.contentTrustStatus = input.status
+    org.updatedAt = now()
+    mockTrust.set(orgId, {
+      reviewedBy: 'mock-admin-001',
+      reviewedAt: now(),
+      reason: reason.length > 0 ? reason : null,
+    })
+    return this.getContentTrust(orgId)
   },
   async createAccount(orgId, input) {
     if (mockAccounts.some((a) => a.username === input.username)) {
