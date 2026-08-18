@@ -78,6 +78,7 @@ interface BootedApp {
   child: ChildProcess
   port: number
   output: () => string
+  waitForLine: (needle: string, timeoutMs?: number) => Promise<boolean>
   stop: () => Promise<void>
 }
 
@@ -114,7 +115,25 @@ async function bootApp(env: Record<string, string>, waitMs: number): Promise<Boo
     if (child.exitCode !== null) break
     await sleep(250)
   }
-  return { child, port, listening, output: () => buffer, stop }
+  return {
+    child,
+    port,
+    listening,
+    output: () => buffer,
+    stop,
+    // 启动摘要（console.warn → stderr）在 app.listen 与 'API running'（console.log →
+    // stdout）之后才打，两条走不同管道，合并缓冲区里的先后顺序没有保证。一见
+    // 'API running' 就抓快照断言摘要，在 CI 负载下会偶发读空 —— 必须有界等待。
+    waitForLine: async (needle: string, timeoutMs = 10_000): Promise<boolean> => {
+      const until = Date.now() + timeoutMs
+      while (Date.now() < until) {
+        if (buffer.includes(needle)) return true
+        if (child.exitCode !== null) return buffer.includes(needle)
+        await sleep(100)
+      }
+      return buffer.includes(needle)
+    },
+  }
 }
 
 interface HealthProbe { status: number; body: unknown }
@@ -234,7 +253,11 @@ async function verifyUnreachableRedis(): Promise<void> {
     check('日志含可搜索错误行 BOOT_DEPENDENCY_DEGRADED subsystem=member-privacy-scheduler',
       log.includes('BOOT_DEPENDENCY_DEGRADED subsystem=member-privacy-scheduler'))
     check('日志给出排查方向（REDIS_URL / 进程 / 防火墙）', log.includes('REDIS_URL') && log.includes('防火墙'))
-    check('降级结论同时写到启动摘要', log.includes('API 以降级状态启动'))
+    check(
+      '降级结论同时写到启动摘要',
+      await app.waitForLine('API 以降级状态启动'),
+      '10s 内 stderr 未出现启动摘要行',
+    )
     check('日志不回显 REDIS_URL 凭证', !/redis:\/\/[^\s]*:[^\s]*@/.test(log))
 
     const health = await probe(app.port, '/health')
