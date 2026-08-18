@@ -1016,3 +1016,54 @@ test('standby countdown still fires for a signed-in member on the homepage @warn
   await expectWarningWithinThreeSeconds(page)
   await expect(page.getByText('当前登录：', { exact: false })).toBeVisible()
 })
+
+/**
+ * 打印进行中不得被普通 idle 倒计时清场。
+ *
+ * 用户站在机器前等出纸，整个过程完全不碰屏幕——这正是 idle 计时器最容易误判的场景。
+ * 打印页通过 useBusyLock 持锁，普通 idle 全程暂停；这里用真实轮询把这条锁钉死，
+ * 避免以后有人改动打印页的锁条件时无声退化。
+ *
+ * 注意边界：不受 busy 抑制的**硬隐私截止**仍会在最长安全时限后清场，这是刻意设计
+ * （见 kiosk-privacy-timeout.spec.ts「hard clear stops active print polling without
+ * cancelling the backend task」）：终端页面重置，但后台打印任务继续，纸照出。
+ * 本用例只守「普通 30 秒倒计时不得打断打印」，不碰硬截止。
+ */
+test('an active print job is never interrupted by the ordinary idle countdown @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const printTaskId = 'warning-print-task'
+  let pollRequests = 0
+  await page.route(`**/api/v1/print/jobs/${printTaskId}`, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    pollRequests += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ taskId: printTaskId, status: 'printing' }),
+    })
+  })
+
+  await page.goto('/')
+  await page.evaluate((taskId) => {
+    window.history.pushState(
+      { usr: { taskId, amountCents: 0 }, key: 'warning-print', idx: 1 },
+      '',
+      '/print/progress',
+    )
+  }, printTaskId)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  // 先确认真的在打印中（轮询已经跑起来），否则「没弹倒计时」可能只是页面没加载。
+  await expect(page).toHaveURL(/\/print\/progress$/)
+  await expect.poll(() => pollRequests).toBeGreaterThan(0)
+
+  // 远超一个完整 idle 周期(4s)，全程不触摸：倒计时一次都不许出现。
+  await expectNoWarningWithin(page, IDLE_WINDOW_SETTLE_MS)
+  await expect(page).toHaveURL(/\/print\/progress$/)
+})
