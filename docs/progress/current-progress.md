@@ -18,6 +18,24 @@
 
 **本机可判别性。** `verify:jobfair-review` / `verify:fair-list-integrity` / `verify:fair-info-fields` 首跑三条全红，实为缺 `DATABASE_URL`；按 `ci.yml` 同款做法 `DATABASE_URL=file:./prisma/dev.db` + `npx prisma db push` 后三条全绿——属环境噪声，已让它从「判别不了」变成「可判别」，未以此为由跳过。
 
+2026-08-18 接线 **合同审查 22 个单测里从未执行过的 17 个（分支 `claude/contract-review-tests-ci`，基于 `origin/main@b7faca037`，未合入、未部署）**。
+
+**洞在哪。** `services/api/src/contract-review/__tests__/` 有 22 个 `.test.ts`，`services/api/package.json:137-141` 只把其中 5 个（file-policy / report / print-lifecycle / schema / consent，54 用例）提升成 npm script 并挂进 `ci.yml`。**其余 17 个文件、252 个用例没有任何 script、不在 ci.yml、不被任何 runner 收集，自写下起从未执行过**，其中含 safety-gate / pii-masker / sensitive-delete / rule-engine / service / orchestrator 等安全要害。`docs/superpowers/plans/2026-08-01-ai-contract-review.md` 把每个测试都写成分步验收项，只有 5 个被接线，**仓库内无任何文档记录这是有意为之**。
+
+**为什么比「没有测试」更糟。** `services/api/tsconfig.json` 的 `include: ["src/**/*"]` 覆盖 `__tests__`，这 17 个文件一直在被 typecheck —— 永远编译通过、永远看起来是绿的。真实断言是否还成立，没有任何信号。
+
+**实跑结果：22 个文件逐个跑，21 绿 1 红。** 红的是 `contract-review-sensitive-delete.test.ts`（4 用例红 3）。归因清楚：三条红全部由**当天**合入的 #704（`7d6feaf31`「文件清理删前 CAS 复核 + 物理删除可重试账本」）造成，测试上次改动是 08-10。#704 给 `FilesService._delete` 加了删对象成功后的 `storageDeletedAt` 账本写入（`prisma.fileObject.update`），给 `FilesCleanupTask.handleHourly` 加了独立第二轮 `reconcileStorageDeletions`。**这是有意的行为新增，不是生产缺陷**，但测试夹具停在旧契约上 —— 而因为它不在 CI，这个漂移无人可见。**没有改任何生产代码。**
+
+**修法是加断言不是放宽断言。** 夹具补齐 `update` / `findUnique` 后，顺手把 #704 的新不变量锁进去：删除顺序断言从 `[tombstone, object-delete]` 收严成 `[tombstone, object-delete, storage-delete-ledger]`（账本必须晚于对象真正消失，反了就产生「DB 说已删、对象还在」且 `cleanupExpired` 永远捞不到的孤儿）；cron 断言从「只有一条 `FILE_CLEANUP_BATCH_FAILED`」改成「两轮各自记账且都脱敏」。另修掉一处**假绿**：第三个用例原先因夹具缺 `findUnique`，`markStorageDeletePending` 以 TypeError 提前中断，日志断言是碰巧通过的；补齐后该路径真的走到，并新增断言「可重试账本只记错误类型名、不记 message」（message 带对象键与文件名）。
+
+**接线方式刻意用 glob 而不是 17 个脚本名。** 新增单条 `verify:contract-review:units` = `node -r @swc-node/register --test "src/contract-review/__tests__/*.test.ts"`（306 用例，305 通过 / 1 skip，skip 是既有的 `POSTGRES_URL` 未配置分支）。按文件名逐个登记只是把同一个洞再挖一遍 —— 下一个新增测试文件照样漏；glob 让新文件自动进闸。连跑 3 次结果稳定。
+
+**⚠️ 本分支合入前 `verify:ci-gate-coverage` 必红，且这是正确行为**：元门禁要求每个 `verify:*` 脚本都出现在 ci.yml 执行闭包里，新脚本尚未挂进去（本分支不改 workflow、不登记豁免）。需在 `ci.yml` 的 build-and-verify job、`verify:contract-review:consent` 那一行之后加：`pnpm --filter @ai-job-print/api verify:contract-review:units`。基线 worktree 上该门禁绿（364/370），差分归因干净。
+
+**顺带登记元门禁自身的盲区（只报不改，`scripts/verify-ci-gate-coverage.mjs` 另有同事在碰）**：它的 B 类断言用 `Object.keys(pkg.scripts)` 枚举门禁，**只看已声明的脚本名，从不走目录找文件**。所以「脚本声明了但没进 CI」它抓得住（本次就抓住了新脚本），「测试文件存在但从没被任何脚本引用」它一条都抓不到 —— 这 17 个在它眼里根本不存在。补法见报告：遍历 `**/__tests__/*.test.ts` 与 `scripts/verify-*`，对每个文件反查是否被任一 script 命令字面量或**其 glob 展开**覆盖（glob 展开这一步不能省，否则本次的 glob 接线方式会被误判成未覆盖）。
+
+**验证：** `verify:contract-review:units` 306 用例 305 绿；原有 8 条 contract-review CI 门禁全绿；`api typecheck`、`api lint`、`prettier --check`、`verify:repository-integrity` 全绿；`verify:ci-gate-coverage` 如上，红在待加的那一行。
+
 2026-08-18 修复 **政策页把内置办事指引与政策库混在一起展示（分支 `claude/content-visibility-fixes`，基于 `origin/main@a26eae3ca`，未合入、未部署）**。本条**对应下一条（#707 种子内容录入清单）登记的代码问题 C**；同批登记的 **D（已结束招聘会不隐藏、详情端点无日期条件）经复核判定不成立**，理由见下文，未改代码。
 
 **洞在哪。** `apps/kiosk/src/pages/renshi/RenshiPage.tsx` 把后端政策库条目和 5 条内置办事指引合并成一个数组 `[...policies.filter(kind==='policy_guide').map(fromPublished), ...BUILTIN_GUIDES]`，交给 `PolicyPanel` 平铺渲染。**并且这个「空」在旧代码里根本无法表达**：`PolicyPanel` 的空态挂在 `visible.length === 0` 上，而内置指引里 `builtin-skill-training` 的 `audiences` 含 `'general'`，`matchAudience` 对任何身份都返回 true —— 那条分支永远走不到，政策页从来就没有可达空态。

@@ -441,6 +441,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
+          # 合同审查单元测试全量:此前 22 个测试文件只有 5 个被注册,
+          # 其余 17 个(运行时 252 用例)从写完那天起从未执行,而 tsconfig 覆盖 __tests__
+          # 导致它们一直被 typecheck、永远看起来是绿的。用 glob 收全,避免逐文件登记再挖同一个洞。
+          pnpm --filter @ai-job-print/api verify:contract-review:units
           # 合同审查超时口径：模型超时必须随合同页数伸缩（不得回到 30 秒硬上限），
           # 服务端三层时限的包含链要恒成立、且与小程序预估口径同源；
           # 失败原因必须对用户可读，日志必须有底层错误类型但没有合同正文。
