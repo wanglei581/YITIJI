@@ -11,6 +11,8 @@ const samples = [
   ['ABCDEFGHJK', '020c59ea87bafc7941c75b099fdc1abeee82008cf2d30fc1f5d2aa09b673dd27'],
   ['MNPQRSTUVW', 'e8f79a88b0eac6487e5d77a16aac5802d9ffee9f91a56299beb1df0bf0151245'],
   ['ZY9X8W7V6U', 'c8437537013b7826e22359264fcacbb827ca3d77acfe7a625fc4b458ac9c277c'],
+  ['01234567', 'f27aa3c2231b5f905e2041a9097c9949417c3f79bbeefd5b13499049e5f75832'],
+  ['87654321', '9912a695191f80d4d2efba8f838fe7d089d744cb1eb6c2756f97ec283ec05abf'],
 ]
 
 function matrixFingerprint(matrix) {
@@ -19,7 +21,11 @@ function matrixFingerprint(matrix) {
 
 assert.equal(normalizePickupCode('ab-cd ef-ghjk'), 'ABCDEFGHJK')
 assert.equal(normalizePickupCode('  zy9x-8w7v6u '), 'ZY9X8W7V6U')
+assert.equal(normalizePickupCode('01-23-45-67'), '01234567')
 assert.throws(() => createPickupQrMatrix('0123456789'), /PICKUP_CODE_INVALID/)
+assert.throws(() => createPickupQrMatrix('123456'), /PICKUP_CODE_INVALID/)
+assert.throws(() => createPickupQrMatrix('1234567'), /PICKUP_CODE_INVALID/)
+assert.throws(() => createPickupQrMatrix('123456789'), /PICKUP_CODE_INVALID/)
 assert.throws(() => createPickupQrMatrix('TOO-SHORT'), /PICKUP_CODE_INVALID/)
 
 const fingerprints = new Set()
