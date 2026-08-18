@@ -494,12 +494,20 @@ async function main(): Promise<void> {
     pass(`失败 ${PICKUP_LOCKOUT_FAILURE_THRESHOLD} 次后锁定本终端认领，且不影响其它终端`)
 
     // 成功认领清零计数：这是「正常用户手误不受影响」的实现手段，必须真的生效。
+    //
+    // ⚠️ 计数位置必须算准，否则这条断言是空的（第一版就踩了）：
+    // 第 THRESHOLD 次失败会**置锁但仍返回 INVALID**（锁在下一次请求入口才生效）。
+    // 所以「9 次失败 + 成功 + 再 1 次失败」两种实现都返回 INVALID，判别不出来。
+    // 这里刻意在成功之后再失败**两次**：
+    //   - 清零生效 → 计数 1、2，两次都是 INVALID；
+    //   - 清零失效 → 计数 10（置锁）、11（被锁拦下）→ 第二次是 PICKUP_CLAIM_LOCKED。
     redis.reset()
     for (let i = 0; i < PICKUP_LOCKOUT_FAILURE_THRESHOLD - 1; i += 1) {
       await captureHttpError(() => pickup.claim('00000000', terminalId))
     }
     await pickup.claim(created.pickupCode, terminalId) // 真实用户成功一次
-    const afterSuccess = await captureHttpError(() => pickup.claim('00000004', terminalId))
+    await captureHttpError(() => pickup.claim('00000004', terminalId))
+    const afterSuccess = await captureHttpError(() => pickup.claim('00000005', terminalId))
     if (afterSuccess.code !== 'PICKUP_CODE_INVALID') {
       fail(`成功认领应清零失败计数，否则繁忙机器会被零散手误累积锁死；实际 ${JSON.stringify(afterSuccess)}`)
     }
