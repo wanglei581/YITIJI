@@ -65,10 +65,13 @@ export function RenshiPage() {
   }, [searchParams])
 
   const notices = policies.filter((p) => p.kind === 'notice')
+  const policyGuides = policies.filter((p) => p.kind === 'policy_guide')
 
   // 政策库条目与内置办事指引分开传给 PolicyPanel，绝不合并成一个数组。
   // 合并后政策库为空时页面照样满屏（内置指引常驻 5 条，其中一条对任何身份都命中），
   // 运营录完种子政策无法判断到底进没进去，验收因此失去判别力（CLAUDE.md §9）。
+  // useMemo 的引用稳定性要保住：fromPublished 每次都造新对象，
+  // 掉了 memo 会让详情面板的选中项每帧换新身份，白跑 onOpened 副作用。
   const libraryItems = useMemo<PolicyItem[]>(
     () => policies.filter((p) => p.kind === 'policy_guide').map(fromPublished),
     [policies],
@@ -87,7 +90,7 @@ export function RenshiPage() {
   }
   const policySourceLine = libraryItems.length === 0
     ? `政策库暂无已发布政策；下方「通用办事指引」为本机整理参考，以官方发布为准${truncated}`
-    : `政策库${describeSources(policies.filter((p) => p.kind === 'policy_guide'))}；「通用办事指引」为本机整理参考${truncated}`
+    : `政策库${describeSources(policyGuides)}；「通用办事指引」为本机整理参考${truncated}`
   const noticeSourceLine = notices.length === 0
     ? null
     : `政策公告${describeSources(notices)}${truncated}`
