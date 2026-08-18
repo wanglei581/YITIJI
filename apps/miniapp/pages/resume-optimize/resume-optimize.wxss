@@ -53,7 +53,7 @@
 /* 失败 */
 .failed-state { display: flex; flex-direction: column; align-items: center;
   padding: 100rpx 48rpx 0; gap: 16rpx; }
-.fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.fail-ic { font-size: 72rpx; color: var(--error); }
 .fail-msg { font-size: 30rpx; font-weight: 700; color: var(--ink); text-align: center;
   line-height: 1.5; }
 .fail-hint { font-size: 24rpx; color: var(--muted); text-align: center; line-height: 1.7;
@@ -62,9 +62,11 @@
 .fail-btn-sm { padding: 0 40rpx; min-height: 72rpx; color: var(--muted); }
 
 /* Mock 模型横幅 */
-.mock-banner { margin: 16rpx 32rpx 0; padding: 16rpx 20rpx; background: rgba(255,170,0,.1);
-  border-left: 4rpx solid #fa0; border-radius: 8rpx;
-  font-size: 22rpx; color: var(--ink); line-height: 1.6; }
+.mock-banner { margin: 16rpx 32rpx 0; padding: 18rpx 22rpx; background: var(--warn-soft);
+  border: 1rpx solid #f5d99b; border-radius: 20rpx;
+  font-size: 22rpx; color: var(--wheat-deep); line-height: 1.6;
+  display: flex; align-items: flex-start; gap: 12rpx; }
+.mock-icon { width: 27rpx; height: 27rpx; margin-top: 3rpx; flex-shrink: 0; }
 
 /* content 包裹层 */
 .content { padding: 24rpx 24rpx 0; }

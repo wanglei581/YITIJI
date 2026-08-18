@@ -5,8 +5,10 @@
     class="tab {{selected === index ? 'on' : ''}}"
     data-index="{{index}}"
     bindtap="switchTab"
+    role="button"
+    aria-label="{{item.text}}"
   >
-    <view class="tb"><view class="ti ficon i-{{item.icon}}"></view></view>
+    <view class="tb" aria-hidden="true"><text class="ti ficon i-{{item.icon}}"></text></view>
     <view class="tl">{{item.text}}</view>
   </view>
 </view>

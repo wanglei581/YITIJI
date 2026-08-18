@@ -24,7 +24,7 @@
 .qa-state { display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
 .state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.6; }
-.qa-fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.qa-fail-ic { font-size: 72rpx; color: var(--error); }
 .qa-back-btn { margin-top: 8rpx; }
 
 /* spinner（inline SVG rotate） */

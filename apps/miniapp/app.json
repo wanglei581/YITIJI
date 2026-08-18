@@ -7,6 +7,10 @@
     "pages/jobs/jobs",
     "pages/ai/ai",
     "pages/me/me",
+    "pages/package-create/package-create",
+    "pages/store-select/store-select",
+    "pages/package-confirm/package-confirm",
+    "pages/package-code/package-code",
     "pages/print-upload/print-upload",
     "pages/print-store/print-store",
     "pages/print-pay/print-pay",
@@ -31,7 +35,9 @@
     "pages/resume-parse/resume-parse",
     "pages/resumes/resumes",
     "pages/documents/documents",
+    "pages/contract-review/contract-review",
     "pages/orders/orders",
+    "pages/order-detail/order-detail",
     "pages/ai-records/ai-records",
     "pages/browse-history/browse-history",
     "pages/favorites/favorites",
@@ -42,7 +48,11 @@
     "pages/about/about",
     "pages/legal/legal",
     "pages/notifications/notifications",
-    "pages/kiosk-login/kiosk-login"
+    "pages/fair-reminders/fair-reminders",
+    "pages/kiosk-login/kiosk-login",
+    "pages/daily-report/daily-report",
+    "pages/community/community",
+    "pages/job-tracker/job-tracker"
   ],
   "window": {
     "navigationBarTextStyle": "black",
@@ -57,10 +67,22 @@
     "selectedColor": "#1f9e86",
     "backgroundColor": "#fffdf8",
     "list": [
-      { "pagePath": "pages/home/home", "text": "首页" },
-      { "pagePath": "pages/ai/ai", "text": "AI百宝箱" },
-      { "pagePath": "pages/jobs/jobs", "text": "求职" },
-      { "pagePath": "pages/me/me", "text": "我的" }
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/ai/ai",
+        "text": "职业生活圈"
+      },
+      {
+        "pagePath": "pages/jobs/jobs",
+        "text": "求职"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
+      }
     ]
   },
   "style": "v2",

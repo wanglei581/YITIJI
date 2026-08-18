@@ -1,7 +1,7 @@
 // utils/normalize.js
 // 真实后端字段 → 页面绑定字段的适配层。
 //
-// 背景:mock 数据里内置了一批纯展示字段(emoji / bannerStyle / accent / tagTone /
+// 背景:mock 数据里内置了一批纯展示字段(icon / bannerStyle / accent / tagTone /
 // metaLines 等),后端没有这些概念;同时后端字段名与页面绑定名不一致
 // (sourceName vs source、syncTime vs time、name vs title、description vs duties)。
 // 直接把后端对象丢给页面会出现大面积空白绑定。
@@ -46,25 +46,68 @@ function shortDateTime(iso) {
   return `${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// ---------- emoji 派生 ----------
-// 按行业/类别查固定表。这是确定性映射,不是编造数据;查不到给中性默认值。
-const INDUSTRY_EMOJI = {
-  internet_software: '💻',
-  it: '💻',
-  manufacturing: '🏭',
-  education: '📚',
-  healthcare: '🏥',
-  finance: '💰',
-  retail: '🛍️',
-  logistics: '🚚',
-  construction: '🏗️',
-  culture_media: '🎬',
-  government: '🏛️',
+// ---------- 展示图标与中文标签派生 ----------
+// 映射到 app.wxss 已收录的 Ant Design Outlined 图标类，不用 emoji 充当正式素材。
+const INDUSTRY_ICON = {
+  internet_software: 'solution',
+  it: 'solution',
+  ai_big_data: 'robot',
+  smart_manufacturing: 'setting',
+  manufacturing: 'setting',
+  education: 'file-text',
+  healthcare: 'form',
+  biomedicine: 'form',
+  finance: 'bank',
+  retail: 'home',
+  retail_trade: 'home',
+  logistics: 'compass',
+  transport_logistics: 'compass',
+  construction: 'home',
+  construction_realestate: 'home',
+  culture_media: 'comment',
+  government: 'bank',
+  public_services: 'bank',
 };
 
-function industryEmoji(industry, fallback = '🏢') {
+const COMPANY_TYPE_LABEL = {
+  central_soe: '央企',
+  soe: '国企',
+  public_institution: '事业单位',
+  private: '民营企业',
+  foreign: '外资企业',
+  joint_venture: '合资企业',
+  listed: '上市公司',
+  specialized_new: '专精特新',
+  high_tech: '高新技术企业',
+  school_enterprise: '校企合作单位',
+  public_org: '公共机构',
+  other: '其他',
+};
+
+const COMPANY_INDUSTRY_LABEL = {
+  smart_manufacturing: '智能制造',
+  internet_software: '互联网/软件',
+  ai_big_data: 'AI/大数据',
+  electronics: '电子信息',
+  new_energy: '新能源',
+  new_materials: '新材料',
+  biomedicine: '生物医药',
+  finance: '金融',
+  education: '教育培训',
+  healthcare: '医疗健康',
+  construction_realestate: '建筑地产',
+  transport_logistics: '交通物流',
+  retail_trade: '商贸零售',
+  culture_media: '文旅传媒',
+  agriculture_food: '农业食品',
+  professional_services: '专业服务',
+  public_services: '公共服务',
+  other: '其他',
+};
+
+function industryIcon(industry, fallback = 'bank') {
   if (!industry) return fallback;
-  return INDUSTRY_EMOJI[industry] || fallback;
+  return INDUSTRY_ICON[industry] || fallback;
 }
 
 // ---------- 岗位 ----------
@@ -139,7 +182,7 @@ const FAIR_STATUS_TAG = {
 };
 
 /**
- * 招聘会列表项。页面绑定:id / title / emoji / tag / tagTone / live /
+ * 招聘会列表项。页面绑定:id / title / icon / tag / tagTone / live /
  * metaLines / source / sync / bannerStyle
  *
  * tag / tagTone / live 由后端真实 status 派生;metaLines 由真实
@@ -163,7 +206,7 @@ function fair(raw) {
   return {
     id: raw.id,
     title: pick(raw.name),
-    emoji: raw.theme ? '🎯' : '📅',
+    icon: 'calendar',
     tag: st.tag,
     tagTone: st.tagTone,
     live: st.live === true,
@@ -209,7 +252,7 @@ function fairDetail(raw) {
 // ---------- 企业 ----------
 
 /**
- * 企业列表项。页面绑定:id / emoji / name / tags / meta / jobs
+ * 企业列表项。页面绑定:id / icon / name / tags / meta / jobs
  * 后端给 openJobCount / repJobTitles / province / city / district。
  */
 function company(raw) {
@@ -220,15 +263,68 @@ function company(raw) {
 
   return {
     id: raw.id,
-    emoji: industryEmoji(raw.industry),
+    icon: industryIcon(raw.industry),
     name: raw.name,
     tags: Array.isArray(raw.tags) && raw.tags.length ? raw.tags : undefined,
     meta,
     jobs: typeof raw.openJobCount === 'number' ? raw.openJobCount : undefined,
     logoUrl: raw.logoUrl,
     sourceName: raw.sourceName,
+    companyTypeLabel: COMPANY_TYPE_LABEL[raw.companyType],
+    industryLabel: COMPANY_INDUSTRY_LABEL[raw.industry],
     repJobTitles: Array.isArray(raw.repJobTitles) ? raw.repJobTitles : undefined,
+    repJobsText: Array.isArray(raw.repJobTitles) && raw.repJobTitles.length
+      ? raw.repJobTitles.join(' · ')
+      : undefined,
     fairParticipant: raw.fairParticipant === true,
+  };
+}
+
+/** 企业详情与在招岗位均沿用公开只读接口；只做字段展示适配。 */
+function companyDetail(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const region = [raw.province, raw.city, raw.district].filter(Boolean).join(' · ');
+  const tags = [];
+  if (COMPANY_TYPE_LABEL[raw.companyType]) tags.push(COMPANY_TYPE_LABEL[raw.companyType]);
+  if (COMPANY_INDUSTRY_LABEL[raw.industry]) tags.push(COMPANY_INDUSTRY_LABEL[raw.industry]);
+  if (Array.isArray(raw.honorTags)) tags.push(...raw.honorTags.filter(Boolean));
+  if (Array.isArray(raw.tags)) tags.push(...raw.tags.filter(Boolean));
+  return {
+    id: raw.id,
+    name: raw.name,
+    legalName: raw.legalName,
+    logoUrl: raw.logoUrl,
+    coverImageUrl: raw.coverImageUrl,
+    descriptionLines: toLines(pick(raw.description, raw.desc)),
+    icon: industryIcon(raw.industry),
+    meta: pick(
+      region,
+      raw.listMeta,
+      Array.isArray(raw.metaParts) ? raw.metaParts.filter((s) => s && s !== '·').join(' · ') : undefined,
+      COMPANY_INDUSTRY_LABEL[raw.industry],
+      COMPANY_TYPE_LABEL[raw.companyType],
+    ),
+    tags: [...new Set(tags)],
+    metrics: raw.metrics && typeof raw.metrics === 'object' ? raw.metrics : {},
+    address: raw.address,
+    sourceOrg: pick(raw.sourceName),
+    externalId: raw.externalId,
+    syncTime: dateTime(raw.syncTime),
+    externalUrl: pick(raw.sourceUrl),
+    dataSourceNote: raw.dataSourceNote,
+  };
+}
+
+function companyJob(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return {
+    id: raw.id,
+    title: raw.title,
+    meta: pick(raw.meta, [raw.city, raw.category].filter(Boolean).join(' · ')),
+    salary: pick(raw.salaryDisplay, '面议'),
+    tags: Array.isArray(raw.tags) ? raw.tags : undefined,
+    source: raw.sourceName,
+    externalUrl: raw.sourceUrl,
   };
 }
 
@@ -236,8 +332,8 @@ function company(raw) {
 
 // kind: 'policy_guide' | 'notice'
 const POLICY_KIND_STYLE = {
-  policy_guide: { emoji: '📋', label: '政策指南', accent: 'primary' },
-  notice: { emoji: '📢', label: '通知公告', accent: 'warn' },
+  policy_guide: { icon: 'file-text', label: '政策指南', accent: 'teal' },
+  notice: { icon: 'bell', label: '通知公告', accent: 'wheat' },
 };
 
 // category: 'policy' | 'announcement' | 'notice' | 'recruitment'
@@ -259,16 +355,16 @@ const POLICY_AUDIENCE_LABEL = {
 };
 
 /**
- * 政策列表项。页面绑定:id / emoji / title / summary / label / accent /
+ * 政策列表项。页面绑定:id / icon / title / summary / label / accent /
  * tag / tagTone / source / foot
  *
- * emoji / label / accent 由真实 kind 派生;tag / tagTone 由真实 category 派生;
+ * icon / label / accent 由真实 kind 派生;tag / tagTone 由真实 category 派生;
  * foot 用真实 publishedDate。查不到枚举时给中性值,不编造分类。
  */
 function policy(raw) {
   if (!raw || typeof raw !== 'object') return raw;
 
-  const ks = POLICY_KIND_STYLE[raw.kind] || { emoji: '📄', label: undefined, accent: 'muted' };
+  const ks = POLICY_KIND_STYLE[raw.kind] || { icon: 'file-text', label: undefined, accent: 'slate' };
   const cs = POLICY_CATEGORY_TAG[raw.category] || {};
   const audience = POLICY_AUDIENCE_LABEL[raw.audience];
 
@@ -278,9 +374,10 @@ function policy(raw) {
 
   return {
     id: raw.id,
-    emoji: ks.emoji,
+    icon: ks.icon,
     label: ks.label,
     accent: ks.accent,
+    category: raw.category,
     title: raw.title,
     summary: raw.summary,
     tag: cs.tag,
@@ -293,11 +390,11 @@ function policy(raw) {
 /** 政策详情。content 为整段正文,按换行拆成段落数组。 */
 function policyDetail(raw) {
   if (!raw || typeof raw !== 'object') return raw;
-  const ks = POLICY_KIND_STYLE[raw.kind] || { emoji: '📄', label: undefined, accent: 'muted' };
+  const ks = POLICY_KIND_STYLE[raw.kind] || { icon: 'file-text', label: undefined, accent: 'slate' };
   const cs = POLICY_CATEGORY_TAG[raw.category] || {};
   return {
     id: raw.id,
-    emoji: ks.emoji,
+    icon: ks.icon,
     label: ks.label,
     accent: ks.accent,
     title: raw.title,
@@ -594,7 +691,7 @@ module.exports = {
   syncLabel,
   dateTime,
   shortDateTime,
-  industryEmoji,
+  industryIcon,
   toLines,
   mapList,
   job,
@@ -602,6 +699,8 @@ module.exports = {
   fair,
   fairDetail,
   company,
+  companyDetail,
+  companyJob,
   policy,
   policyDetail,
 };

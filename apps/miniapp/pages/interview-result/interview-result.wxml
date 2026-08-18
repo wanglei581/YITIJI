@@ -15,7 +15,7 @@
 
     <!-- 失败 -->
     <view wx:if="{{phase === 'failed'}}" class="ri-state">
-      <view class="ficon i-info ri-fail-ic"></view>
+      <text class="ficon i-info ri-fail-ic"></text>
       <text class="state-tip">{{failMsg}}</text>
       <view class="btn ghost tap ri-retry-btn" bindtap="tapRetry">重新开始</view>
     </view>
@@ -43,7 +43,7 @@
           wx:for-index="pi"
           class="rs-point"
         >
-          <text class="rs-dot">·</text>
+          <text class="rs-dot"></text>
           <text class="rs-text">{{point}}</text>
         </view>
       </view>
@@ -66,7 +66,10 @@
           <view class="star-row"><text class="star-k">T</text><text class="star-v">{{starAdvice.t}}</text></view>
           <view class="star-row"><text class="star-k">A</text><text class="star-v">{{starAdvice.a}}</text></view>
           <view class="star-row"><text class="star-k">R</text><text class="star-v">{{starAdvice.r}}</text></view>
-          <view wx:if="{{starAdvice.reminder}}" class="star-reminder">💡 {{starAdvice.reminder}}</view>
+          <view wx:if="{{starAdvice.reminder}}" class="star-reminder">
+            <text class="ficon i-thunder star-reminder-icon"></text>
+            <text>{{starAdvice.reminder}}</text>
+          </view>
         </view>
       </view>
 
@@ -74,13 +77,13 @@
       <view wx:if="{{checklist.length > 0}}" class="ri-section">
         <view class="rs-title">面试前行动清单</view>
         <view wx:for="{{checklist}}" wx:key="*this" wx:for-item="item" class="ri-check-item">
-          <text class="chk-box">☐</text>
+          <text class="ficon i-check chk-box"></text>
           <text class="chk-text">{{item}}</text>
         </view>
       </view>
 
       <view class="notice info ri-disc">
-        <view class="ficon i-info n-ic"></view>
+        <text class="ficon i-info n-ic"></text>
         <text>以上复盘由 AI 生成，仅供个人练习参考，不代表任何招聘机构的评价标准。</text>
       </view>
 

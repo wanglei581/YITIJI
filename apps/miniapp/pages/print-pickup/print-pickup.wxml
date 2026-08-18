@@ -1,11 +1,11 @@
 <!--pages/print-pickup/print-pickup.wxml-->
 <view class="page-wrap">
-  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+  <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nb-back tap" hover-class="tap-press" bindtap="back">‹ 返回</view>
-    <view class="nb-title">打印取件</view>
-    <view class="nb-right"></view>
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">打印取件</view>
+    <view class="nav-right"></view>
   </view>
 
   <view class="state-center" wx:if="{{state === 'loading'}}">
@@ -14,7 +14,7 @@
   </view>
 
   <view class="state-center" wx:elif="{{state === 'error'}}">
-    <view class="state-icon">⚠️</view>
+    <view class="state-icon"><text class="ficon i-warning"></text></view>
     <text class="state-label">{{errorMsg}}</text>
     <view class="btn-retry tap" hover-class="tap-press" bindtap="retry">重新加载</view>
   </view>
@@ -42,12 +42,14 @@
       <block wx:if="{{showQr}}">
         <text class="ph-divider">扫码不便时，手动输入</text>
         <view class="ph-code-wrap"><text class="ph-code">{{code}}</text></view>
-        <text class="ph-hint">二维码与下方 10 位码对应同一笔订单</text>
+        <text class="ph-hint">二维码与下方 10 位到机码对应同一笔订单</text>
         <text class="ph-countdown" wx:if="{{countdown}}">{{countdown}}</text>
       </block>
 
       <view class="status-visual" wx:else>
-        <view class="sv-icon">{{statusKey === 'completed' ? '✓' : (statusKey === 'failed' || statusKey === 'expired' || statusKey === 'cancelled' ? '!' : '…')}}</view>
+        <view class="sv-icon">
+          <text class="ficon {{statusKey === 'completed' ? 'i-check' : (statusKey === 'failed' || statusKey === 'expired' || statusKey === 'cancelled' ? 'i-warning' : 'i-history')}}"></text>
+        </view>
         <view class="sv-text">{{statusKey === 'awaiting_payment' ? '请继续在终端操作' : (statusKey === 'awaiting_release' || statusKey === 'queued' || statusKey === 'printing' ? '请在终端旁等待' : '本次到机码已停止展示')}}</view>
       </view>
     </view>
@@ -59,7 +61,7 @@
       </view>
       <view class="step-item">
         <view class="step-num">2</view>
-        <text class="step-text">在终端选择「到机码核销」</text>
+        <text class="step-text">在终端首页选择「到机码核销」，扫码或输入本页的码</text>
       </view>
       <view class="step-item">
         <view class="step-num">3</view>

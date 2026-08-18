@@ -1,6 +1,6 @@
 /* ============================================================
-   AI求职打印服务终端 · 微信小程序 v2 设计系统
-   fusion-youth 青序 · 移植自 shared.css
+   职易达微信小程序 · Commercial UI v3
+   视觉基准：UINotes 成熟效率类 App 的冷白、轻量、强层级体系
    ============================================================ */
 
 /* ── Design Tokens ──────────────────────────────────────────── */
@@ -8,97 +8,123 @@ page {
   /* iOS 异形屏底部安全区(Android/传统屏优雅降级为 0) */
   --sab:          env(safe-area-inset-bottom);
   /* 基础色板 */
-  --paper:        #f4f1e8;
-  --paper-deep:   #ede9da;
-  --surface:      #fffdf8;
-  --surface-2:    #faf7ee;
-  --surface-3:    #f7f3e8;
+  --paper:        #f5f7fa;
+  --paper-deep:   #eef2f7;
+  --surface:      #ffffff;
+  --surface-2:    #f7f9fc;
+  --surface-3:    #edf2f8;
 
   /* 文字色阶 */
-  --ink:          #10302b;
-  --ink-soft:     #274b43;
-  --muted:        #5d6b63;
-  --faint:        #8a978f;
-  --ghost:        #b8c2bc;
+  --ink:          #131a2a;
+  --ink-soft:     #344054;
+  --muted:        #5A6478;  /* 4.5:1 达标，正文次要信息 */
+  /* --faint 原 #98a2b3 在 --paper 上仅约 2.4:1，低于 WCAG 4.5:1；
+     GB/T 47797-2026《政务服务平台适老化服务建设指南》2026-11-01 实施后，
+     文本对比度是投标评分项。加深到达标值，仍保留层级差。 */
+  --faint:        #6E7A90;
+  --ghost:        #AEB8C8;  /* 仅用于禁用态与装饰，不承载正文 */
+  /* 蓝色作为正文/链接文字时对比不足（#1677ff 约 3.8:1），
+     文字场景一律用 --link，图标与填充仍可用 --teal。 */
+  --link:         #0B5ED7;
 
   /* 分割线 */
-  --line:         #e2dccb;
-  --line-soft:    #eee9db;
-  --line-faint:   #f5f1e5;
+  --line:         #dfe6ef;
+  --line-soft:    #e9eef5;
+  --line-faint:   #f1f4f8;
 
-  /* 主品牌 · 青绿 */
-  --teal:         #1f9e86;
-  --teal-deep:    #157a67;
-  --teal-mid:     #29b097;
-  --teal-soft:    #e2f2ec;
-  --teal-wash:    #f0f7f3;
+  /* 主品牌 · 靛蓝。
+     原 #1677ff 是 Ant Design 默认蓝，满街都是，是「模板感」的直接来源之一。
+     加深并偏靛后：① 一眼脱离默认感；② 更贴政务/院校采购场景的稳重语义；
+     ③ 在 --paper 上对比度达标，正文与链接可直接使用，不必再走兜底色。
+     不改用青绿：BOSS 直聘即青绿，换过去是撞车不是差异化。
+     真正的识别特征交给功能色系统（金刚区四色），主色只负责稳。 */
+  --teal:         #2354E6;
+  --teal-deep:    #1A3FB8;
+  --teal-mid:     #4B79F0;
+  --teal-soft:    #E7EDFD;
+  --teal-wash:    #F3F6FE;
 
   /* 价格橙褐 · clay */
-  --clay:         #b8683c;
-  --clay-deep:    #9a5530;
-  --clay-soft:    #f6e7dd;
-  --clay-wash:    #fdf3ed;
+  --clay:         #f06a3c;
+  --clay-deep:    #d34d24;
+  --clay-soft:    #ffebe3;
+  --clay-wash:    #fff7f3;
 
   /* 招聘暖金 · wheat */
-  --wheat:        #a9781f;
-  --wheat-deep:   #8a6018;
-  --wheat-soft:   #f5edd9;
-  --wheat-wash:   #fdf7ec;
+  --wheat:        #e99b18;
+  --wheat-deep:   #b96d08;
+  --wheat-soft:   #fff1d6;
+  --wheat-wash:   #fff9ed;
 
   /* AI 紫调 · plum */
-  --plum:         #7a5a86;
-  --plum-deep:    #614870;
-  --plum-mid:     #9070a0;
-  --plum-soft:    #efe6f2;
-  --plum-wash:    #f8f4fa;
+  --plum:         #6c5ce7;
+  --plum-deep:    #5142c7;
+  --plum-mid:     #8475f5;
+  --plum-soft:    #ece9ff;
+  --plum-wash:    #f7f5ff;
 
   /* 信息蓝 · slate */
-  --slate:        #3f68b0;
-  --slate-deep:   #2f5090;
-  --slate-soft:   #e5ecf6;
-  --slate-wash:   #f2f5fb;
+  --slate:        #3e6fe5;
+  --slate-deep:   #2857c6;
+  --slate-soft:   #e8efff;
+  --slate-wash:   #f4f7ff;
 
   /* 功能色 */
-  --ok:           #1f9e86;
-  --ok-soft:      #e2f2ec;
-  --warn:         #c88a2e;
-  --warn-soft:    #f6ebd5;
-  --error:        #c14a34;
-  --error-soft:   #faebe8;
+  --ok:           #12a879;
+  --ok-soft:      #e4f7f0;
+  --warn:         #d88b0d;
+  --warn-soft:    #fff2d9;
+  --error:        #e5484d;
+  --error-soft:   #ffeaeb;
 
   /* 圆角 */
   --r-xs:   6px;
-  --r-sm:   10px;
-  --r:      14px;
-  --r-md:   18px;
-  --r-lg:   22px;
-  --r-xl:   28px;
+  --r-sm:   9px;
+  --r:      12px;
+  --r-md:   16px;
+  --r-lg:   20px;
+  --r-xl:   24px;
   --r-full: 999px;
 
   /* 阴影 */
-  --sh-xs:  0 1px 4px rgba(16,48,43,.06);
-  --sh-sm:  0 2px 8px rgba(16,48,43,.08), 0 1px 2px rgba(16,48,43,.04);
-  --sh:     0 4px 16px rgba(16,48,43,.10), 0 1px 4px rgba(16,48,43,.06);
-  --sh-md:  0 8px 28px rgba(16,48,43,.12), 0 2px 8px rgba(16,48,43,.06);
-  --sh-lg:  0 16px 48px rgba(16,48,43,.14), 0 4px 12px rgba(16,48,43,.08);
+  --sh-xs:  0 1px 3px rgba(28, 45, 72, .035);
+  --sh-sm:  0 4px 14px rgba(28, 45, 72, .055);
+  --sh:     0 8px 24px rgba(28, 45, 72, .07);
+  --sh-md:  0 12px 34px rgba(28, 45, 72, .09);
+  --sh-lg:  0 18px 52px rgba(28, 45, 72, .11);
 
   /* 字体（小程序无法加载 web 字体，回退系统字体） */
-  --font-serif: 'Songti SC', STSong, serif;
-  --font-sans:  -apple-system, 'PingFang SC', sans-serif;
+  --font-serif: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-sans:  -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
   --font-mono:  'SF Mono', Consolas, monospace;
 
   background: var(--paper);
   font-family: var(--font-sans);
   color: var(--ink);
-  line-height: 1.6;   /* CJK 正文默认行高；单行标题/按钮各自 override */
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
 view, text, scroll-view, image, button { box-sizing: border-box; }
 
+/* ── 一级交互可访问性基线 ─────────────────────────────────────── */
+.icon-action {
+  min-width: 88rpx;
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.text-action {
+  min-height: 72rpx;
+  padding: 0 8rpx;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* ── 自定义导航栏 ───────────────────────────────────────────── */
 .navbar {
-  height: 46px;
+  height: 48px;
   padding: 0 16px;
   display: flex;
   align-items: center;
@@ -116,12 +142,12 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .navbar .nav-back .nav-back-ic { transform: rotate(180deg); }
 .navbar .nav-title {
   position: absolute; left: 50%; transform: translateX(-50%);
-  font-size: 15px; font-weight: 600; color: var(--ink);
-  font-family: var(--font-serif);
-  letter-spacing: .3px;
+  font-size: 16px; font-weight: 650; color: var(--ink);
+  font-family: var(--font-sans);
+  letter-spacing: 0;
   white-space: nowrap;
 }
-.navbar .nav-title.left { position: static; transform: none; font-size: 17px; }
+.navbar .nav-title.left { position: static; transform: none; font-size: 20px; font-weight: 750; }
 .navbar .nav-caps {
   font-size: 11px; color: var(--muted);
   background: var(--surface-2);
@@ -157,16 +183,16 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* ── 底部 TabBar（页面内展示态；实际导航用 custom-tab-bar 组件） ── */
 .tabbar {
   /* min-height + border-box:安全区靠 padding 叠加撑高,不压扁图标文字 */
-  min-height: 72px;
-  padding: 10px 6px calc(14px + var(--sab));
+  min-height: 66px;
+  padding: 8px 6px calc(10px + var(--sab));
   display: flex;
   align-items: flex-start;
   justify-content: space-around;
   /* 浮起纸片:顶圆角 + 向上柔光,取代生硬的一条上边线 */
   background: var(--surface);
   border-top: 1px solid var(--line-faint);
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -6px 20px rgba(16,48,43,.06), 0 -1px 3px rgba(16,48,43,.04);
+  border-radius: 0;
+  box-shadow: 0 -4px 18px rgba(28, 45, 72, .04);
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: 100;
@@ -174,18 +200,19 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .tabbar .tab {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; gap: 4px;
+  min-height: 48px;
   padding-top: 2px;
 }
 /* 图标药丸:选中态用青底托住图标,非选中透明,布局不抖 */
 .tabbar .tab .tb {
   display: flex; align-items: center; justify-content: center;
-  width: 46px; height: 30px; border-radius: var(--r-full);
+  width: 42px; height: 28px; border-radius: 10px;
   background: transparent;
   transition: background-color .22s ease, transform .22s ease;
 }
 .tabbar .tab .ti { font-size: 23px; line-height: 1; color: var(--faint); transition: color .22s ease; }
-.tabbar .tab .tl { font-size: 10px; color: var(--faint); letter-spacing: .2px; transition: color .22s ease; }
-.tabbar .tab.on .tb { background: var(--teal-soft); transform: translateY(-1px); }
+.tabbar .tab .tl { font-size: 11px; color: var(--muted); letter-spacing: .2px; transition: color .22s ease; }
+.tabbar .tab.on .tb { background: var(--teal-soft); transform: none; }
 .tabbar .tab.on .ti { color: var(--teal-deep); }
 .tabbar .tab.on .tl { color: var(--teal-deep); font-weight: 600; }
 .tabbar .tab:active .tb { transform: scale(.92); }
@@ -193,7 +220,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* ── 底部操作条 ──────────────────────────────────────────────── */
 .actionbar {
   position: fixed; bottom: 0; left: 0; right: 0;
-  padding: 12px 20px calc(28px + var(--sab));
+  padding: 10px 16px calc(14px + var(--sab));
   background: var(--surface);
   border-top: 1px solid var(--line-soft);
   display: flex; align-items: center; gap: 12px;
@@ -208,7 +235,8 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .card {
   background: var(--surface);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-sm);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--sh-xs);
   margin: 0 16px 12px;
   overflow: hidden;
 }
@@ -223,11 +251,11 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .card-sep { height: 1px; background: var(--line-faint); margin: 0 16px; }
 
 .section-t {
-  padding: 20px 16px 8px;
-  font-size: 13px; font-weight: 600;
-  color: var(--muted);
-  letter-spacing: .5px;
-  text-transform: uppercase;
+  padding: 22px 16px 10px;
+  font-size: 16px; font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0;
+  text-transform: none;
 }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -241,7 +269,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 52px; padding: 0 24px;
-  border-radius: var(--r-full);
+  border-radius: 14px;
   font-size: 15px; font-weight: 600;
   font-family: var(--font-sans);
   border: none;
@@ -250,7 +278,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   line-height: 1;
 }
 .btn::after { border: none; }
-.btn.primary  { background: var(--teal); color: #fff; }
+.btn.primary  { background: var(--teal); color: #fff; box-shadow: 0 8px 18px rgba(35, 84, 230, .22); }
 .btn.dark     { background: var(--ink); color: #fff; }
 .btn.clay     { background: var(--clay); color: #fff; }
 .btn.plum     { background: var(--plum); color: #fff; }
@@ -273,14 +301,15 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 
 .tile {
   background: var(--surface);
-  border-radius: var(--r);
+  border-radius: var(--r-md);
   padding: 16px 14px 14px;
-  box-shadow: var(--sh-xs);
+  border: 1px solid var(--line-soft);
+  box-shadow: none;
   display: flex; flex-direction: column; gap: 8px;
 }
 .tile .t-ic {
   width: 44px; height: 44px;
-  border-radius: 12px;
+  border-radius: 13px;
   display: flex; align-items: center; justify-content: center;
   font-size: 22px;
 }
@@ -291,11 +320,13 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .tiles.c3 .tile .t-title { font-size: 12px; }
 
 /* 磁贴颜色：浅色 wash 底 + 同色描边 + 深色图标（去饱和"糖果块"感） */
-.a-teal   { background: var(--teal-wash);  color: var(--teal-deep);  border: 1px solid rgba(31,158,134,.18); }
-.a-clay   { background: var(--clay-wash);  color: var(--clay-deep);  border: 1px solid rgba(184,104,60,.18); }
-.a-wheat  { background: var(--wheat-wash); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.18); }
-.a-plum   { background: var(--plum-wash);  color: var(--plum-deep);  border: 1px solid rgba(122,90,134,.18); }
-.a-slate  { background: var(--slate-wash); color: var(--slate-deep); border: 1px solid rgba(63,104,176,.16); }
+.a-teal   { background: var(--teal-wash);  color: var(--teal-deep);  border: 1px solid rgba(35,84,230,.16); }
+/* ai 页「发起打印」用到 a-cyan；此前只有 me.wxss 的页面级 .tone-cyan，管不到这里 */
+.a-cyan   { background: #E0F7F3;            color: #0F766E;           border: 1px solid rgba(15,118,110,.16); }
+.a-clay   { background: var(--clay-wash);  color: var(--clay-deep);  border: 1px solid rgba(211,77,36,.18); }
+.a-wheat  { background: var(--wheat-wash); color: var(--wheat-deep); border: 1px solid rgba(226,150,12,.20); }
+.a-plum   { background: var(--plum-wash);  color: var(--plum-deep);  border: 1px solid rgba(124,58,237,.16); }
+.a-slate  { background: var(--slate-wash); color: var(--slate-deep); border: 1px solid rgba(74,91,120,.16); }
 .a-ink    { background: var(--surface-3);  color: var(--ink-soft);   border: 1px solid var(--line); }
 
 /* ── 列表行 ─────────────────────────────────────────────────── */
@@ -366,14 +397,14 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* ── 分段控件 ────────────────────────────────────────────────── */
 .seg {
   display: flex; background: var(--surface-2);
-  border-radius: var(--r-full);
+  border-radius: 12px;
   padding: 3px; margin: 0 16px;
   border: 1px solid var(--line-soft);
 }
 .seg .s {
   flex: 1; height: 34px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--r-full);
+  border-radius: 9px;
   font-size: 13px; font-weight: 500; color: var(--muted);
 }
 .seg .s.on {
@@ -497,7 +528,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* 印章式字号头像（编辑感，替代 emoji 人像） */
 .avatar.mono-plum {
   background: var(--plum-wash);
-  border: 1px solid rgba(122,90,134,.28);
+  border: 1px solid rgba(124,58,237,.24);
   color: var(--plum-deep);
   font-weight: 700; letter-spacing: 1px;
 }
@@ -537,8 +568,8 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 /* ── 页头 pagehead ───────────────────────────────────────────── */
 .pagehead { padding: 12px 16px 16px; }
 .pagehead .ph-title {
-  font-family: var(--font-serif); font-size: 22px; font-weight: 700;
-  color: var(--ink); line-height: 1.3; letter-spacing: .5px;
+  font-family: var(--font-sans); font-size: 24px; font-weight: 750;
+  color: var(--ink); line-height: 1.25; letter-spacing: 0;
 }
 .pagehead .ph-sub { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
 
@@ -630,11 +661,12 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
   border-radius: var(--r-md);
   padding: 16px;
   margin: 0 16px 10px;
-  box-shadow: var(--sh-xs);
+  border: 1px solid var(--line-soft);
+  box-shadow: none;
 }
 .job-card .jc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.job-card .jc-title { font-size: 16px; font-weight: 600; color: var(--ink); font-family: var(--font-serif); letter-spacing: .3px; }
-.job-card .jc-salary { font-family: var(--font-serif); font-size: 16px; font-weight: 700; color: var(--clay); white-space: nowrap; }
+.job-card .jc-title { font-size: 16px; font-weight: 650; color: var(--ink); font-family: var(--font-sans); letter-spacing: 0; }
+.job-card .jc-salary { font-family: var(--font-sans); font-size: 16px; font-weight: 700; color: var(--teal); white-space: nowrap; }
 .job-card .jc-company { font-size: 13px; color: var(--muted); margin-top: 4px; }
 .job-card .jc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .job-card .jc-bottom {
@@ -666,7 +698,8 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 }
 .fair-card .fc-banner {
   height: 80px; border-radius: var(--r);
-  background: linear-gradient(135deg, var(--wheat-soft) 0%, var(--wheat-wash) 100%);
+  background: var(--wheat-wash);
+  border: 1px solid var(--wheat-soft);
   margin-bottom: 12px;
   display: flex; align-items: center; justify-content: center;
   font-size: 32px;
@@ -701,7 +734,7 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .spacer-lg { height: 24px; }
 .section-gap { height: 8px; background: var(--paper-deep); }
 
-.serif { font-family: var(--font-serif); }
+.serif { font-family: var(--font-sans); }
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
 .teal  { color: var(--teal); }
@@ -829,8 +862,34 @@ view, text, scroll-view, image, button { box-sizing: border-box; }
 .i-user { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M858.5 763.6a374 374 0 00-80.6-119.5 375.63 375.63 0 00-119.5-80.6c-.4-.2-.8-.3-1.2-.5C719.5 518 760 444.7 760 362c0-137-111-248-248-248S264 225 264 362c0 82.7 40.5 156 102.8 201.1-.4.2-.8.3-1.2.5-44.8 18.9-85 46-119.5 80.6a375.63 375.63 0 00-80.6 119.5A371.7 371.7 0 00136 901.8a8 8 0 008 8.2h60c4.4 0 7.9-3.5 8-7.8 2-77.2 33-149.5 87.8-204.3 56.7-56.7 132-87.9 212.2-87.9s155.5 31.2 212.2 87.9C779 752.7 810 825 812 902.2c.1 4.4 3.6 7.8 8 7.8h60a8 8 0 008-8.2c-1-47.8-10.9-94.3-29.5-138.2zM512 534c-45.9 0-89.1-17.9-121.6-50.4S340 407.9 340 362c0-45.9 17.9-89.1 50.4-121.6S466.1 190 512 190s89.1 17.9 121.6 50.4S684 316.1 684 362c0 45.9-17.9 89.1-50.4 121.6S557.9 534 512 534z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M858.5 763.6a374 374 0 00-80.6-119.5 375.63 375.63 0 00-119.5-80.6c-.4-.2-.8-.3-1.2-.5C719.5 518 760 444.7 760 362c0-137-111-248-248-248S264 225 264 362c0 82.7 40.5 156 102.8 201.1-.4.2-.8.3-1.2.5-44.8 18.9-85 46-119.5 80.6a375.63 375.63 0 00-80.6 119.5A371.7 371.7 0 00136 901.8a8 8 0 008 8.2h60c4.4 0 7.9-3.5 8-7.8 2-77.2 33-149.5 87.8-204.3 56.7-56.7 132-87.9 212.2-87.9s155.5 31.2 212.2 87.9C779 752.7 810 825 812 902.2c.1 4.4 3.6 7.8 8 7.8h60a8 8 0 008-8.2c-1-47.8-10.9-94.3-29.5-138.2zM512 534c-45.9 0-89.1-17.9-121.6-50.4S340 407.9 340 362c0-45.9 17.9-89.1 50.4-121.6S466.1 190 512 190s89.1 17.9 121.6 50.4S684 316.1 684 362c0 45.9-17.9 89.1-50.4 121.6S557.9 534 512 534z'/%3E%3C/svg%3E"); }
 .i-right { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M765.7 486.8L314.9 134.7A7.97 7.97 0 00302 141v77.3c0 4.9 2.3 9.6 6.1 12.6l360 281.1-360 281.1c-3.9 3-6.1 7.7-6.1 12.6V883c0 6.7 7.7 10.4 12.9 6.3l450.8-352.1a31.96 31.96 0 000-50.4z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M765.7 486.8L314.9 134.7A7.97 7.97 0 00302 141v77.3c0 4.9 2.3 9.6 6.1 12.6l360 281.1-360 281.1c-3.9 3-6.1 7.7-6.1 12.6V883c0 6.7 7.7 10.4 12.9 6.3l450.8-352.1a31.96 31.96 0 000-50.4z'/%3E%3C/svg%3E"); }
 .i-thunder { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M848 359.3H627.7L825.8 109c4.1-5.3.4-13-6.3-13H436c-2.8 0-5.5 1.5-6.9 4L170 547.5c-3.1 5.3.7 12 6.9 12h174.4l-89.4 357.6c-1.9 7.8 7.5 13.3 13.3 7.7L853.5 373c5.2-4.9 1.7-13.7-5.5-13.7zM378.2 732.5l60.3-241H281.1l189.6-327.4h224.6L487 427.4h211L378.2 732.5z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M848 359.3H627.7L825.8 109c4.1-5.3.4-13-6.3-13H436c-2.8 0-5.5 1.5-6.9 4L170 547.5c-3.1 5.3.7 12 6.9 12h174.4l-89.4 357.6c-1.9 7.8 7.5 13.3 13.3 7.7L853.5 373c5.2-4.9 1.7-13.7-5.5-13.7zM378.2 732.5l60.3-241H281.1l189.6-327.4h224.6L487 427.4h211L378.2 732.5z'/%3E%3C/svg%3E"); }
+.i-plus { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M482 152h60c4.4 0 8 3.6 8 8v320h320c4.4 0 8 3.6 8 8v60c0 4.4-3.6 8-8 8H550v320c0 4.4-3.6 8-8 8h-60c-4.4 0-8-3.6-8-8V556H154c-4.4 0-8-3.6-8-8v-60c0-4.4 3.6-8 8-8h320V160c0-4.4 3.6-8 8-8z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M482 152h60c4.4 0 8 3.6 8 8v320h320c4.4 0 8 3.6 8 8v60c0 4.4-3.6 8-8 8H550v320c0 4.4-3.6 8-8 8h-60c-4.4 0-8-3.6-8-8V556H154c-4.4 0-8-3.6-8-8v-60c0-4.4 3.6-8 8-8h320V160c0-4.4 3.6-8 8-8z'/%3E%3C/svg%3E"); }
+.i-check { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 00-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z'/%3E%3C/svg%3E"); }
+.i-close { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M800 166l58 58-288 288 288 288-58 58-288-288-288 288-58-58 288-288-288-288 58-58 288 288z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M800 166l58 58-288 288 288 288-58 58-288-288-288 288-58-58 288-288-288-288 58-58 288 288z'/%3E%3C/svg%3E"); }
+.i-warning { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M464 720a48 48 0 1096 0 48 48 0 10-96 0zm16-304v184c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8V416c0-4.4-3.6-8-8-8h-48c-4.4 0-8 3.6-8 8zm475.7 440l-416-720c-6.2-10.7-16.9-16-27.7-16s-21.6 5.3-27.7 16l-416 720C56 877.4 71.4 904 96 904h832c24.6 0 40-26.6 27.7-48zm-783.5-27.9L512 239.9l339.8 588.2H172.2z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M464 720a48 48 0 1096 0 48 48 0 10-96 0zm16-304v184c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8V416c0-4.4-3.6-8-8-8h-48c-4.4 0-8 3.6-8 8zm475.7 440l-416-720c-6.2-10.7-16.9-16-27.7-16s-21.6 5.3-27.7 16l-416 720C56 877.4 71.4 904 96 904h832c24.6 0 40-26.6 27.7-48zm-783.5-27.9L512 239.9l339.8 588.2H172.2z'/%3E%3C/svg%3E"); }
+.i-more { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M456 231a56 56 0 10112 0 56 56 0 10-112 0zm0 280a56 56 0 10112 0 56 56 0 10-112 0zm0 280a56 56 0 10112 0 56 56 0 10-112 0z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M456 231a56 56 0 10112 0 56 56 0 10-112 0zm0 280a56 56 0 10112 0 56 56 0 10-112 0zm0 280a56 56 0 10112 0 56 56 0 10-112 0z'/%3E%3C/svg%3E"); }
+.i-usb { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M760 432V144c0-17.7-14.3-32-32-32H296c-17.7 0-32 14.3-32 32v288c-66.2 0-120 52.1-120 116v356c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V548c0-24.3 21.6-44 48.1-44h495.8c26.5 0 48.1 19.7 48.1 44v356c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V548c0-63.9-53.8-116-120-116zm-424 0V184h352v248H336zm120-184h-48c-4.4 0-8 3.6-8 8v48c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8v-48c0-4.4-3.6-8-8-8zm160 0h-48c-4.4 0-8 3.6-8 8v48c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8v-48c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M760 432V144c0-17.7-14.3-32-32-32H296c-17.7 0-32 14.3-32 32v288c-66.2 0-120 52.1-120 116v356c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V548c0-24.3 21.6-44 48.1-44h495.8c26.5 0 48.1 19.7 48.1 44v356c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V548c0-63.9-53.8-116-120-116zm-424 0V184h352v248H336zm120-184h-48c-4.4 0-8 3.6-8 8v48c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8v-48c0-4.4-3.6-8-8-8zm160 0h-48c-4.4 0-8 3.6-8 8v48c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8v-48c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); }
 
 .i-info { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z'/%3E%3Cpath d='M464 336a48 48 0 1096 0 48 48 0 10-96 0zm72 112h-48c-4.4 0-8 3.6-8 8v272c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8V456c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372s166.6-372 372-372 372 166.6 372 372-166.6 372-372 372z'/%3E%3Cpath d='M464 336a48 48 0 1096 0 48 48 0 10-96 0zm72 112h-48c-4.4 0-8 3.6-8 8v272c0 4.4 3.6 8 8 8h48c4.4 0 8-3.6 8-8V456c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); }
 .i-scan { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M136 384h56c4.4 0 8-3.6 8-8V200h176c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H196c-37.6 0-68 30.4-68 68v180c0 4.4 3.6 8 8 8zm512-184h176v176c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V196c0-37.6-30.4-68-68-68H648c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zM376 824H200V648c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v180c0 37.6 30.4 68 68 68h180c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm512-184h-56c-4.4 0-8 3.6-8 8v176H648c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h180c37.6 0 68-30.4 68-68V648c0-4.4-3.6-8-8-8zm16-164H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M136 384h56c4.4 0 8-3.6 8-8V200h176c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H196c-37.6 0-68 30.4-68 68v180c0 4.4 3.6 8 8 8zm512-184h176v176c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V196c0-37.6-30.4-68-68-68H648c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zM376 824H200V648c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v180c0 37.6 30.4 68 68 68h180c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm512-184h-56c-4.4 0-8 3.6-8 8v176H648c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h180c37.6 0 68-30.4 68-68V648c0-4.4-3.6-8-8-8zm16-164H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8z'/%3E%3C/svg%3E"); }
 .i-calendar { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32zm-40 656H184V460h656v380zM184 392V256h128v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h256v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h128v136H184z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32zm-40 656H184V460h656v380zM184 392V256h128v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h256v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h128v136H184z'/%3E%3C/svg%3E"); }
 .i-bank { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M894 462c30.9 0 43.8-39.7 18.7-58L530.8 126.2a31.81 31.81 0 00-37.6 0L111.3 404c-25.1 18.2-12.2 58 18.8 58H192v374h-72c-4.4 0-8 3.6-8 8v52c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-52c0-4.4-3.6-8-8-8h-72V462h62zM512 196.7l271.1 197.2H240.9L512 196.7zM264 462h117v374H264V462zm189 0h117v374H453V462zm307 374H642V462h118v374z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='64 64 896 896' fill='%23000'%3E%3Cpath d='M894 462c30.9 0 43.8-39.7 18.7-58L530.8 126.2a31.81 31.81 0 00-37.6 0L111.3 404c-25.1 18.2-12.2 58 18.8 58H192v374h-72c-4.4 0-8 3.6-8 8v52c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-52c0-4.4-3.6-8-8-8h-72V462h62zM512 196.7l271.1 197.2H240.9L512 196.7zM264 462h117v374H264V462zm189 0h117v374H453V462zm307 374H642V462h118v374z'/%3E%3C/svg%3E"); }
+
+/* === 缺失图标补齐（统一用 Unicode 占位，保证点击区不失效） === */
+.ficon.i-heart::before { content: "\2764"; font-size: 18px; }
+.ficon.i-message-circle::before { content: "\1F4AC"; font-size: 18px; }
+.ficon.i-clock::before { content: "\23F0"; font-size: 18px; }
+.ficon.i-map-pin::before { content: "\1F4CD"; font-size: 18px; }
+.ficon.i-lightbulb::before { content: "\1F4A1"; font-size: 18px; }
+.ficon.i-briefcase::before { content: "\1F4BC"; font-size: 18px; }
+.ficon.i-share::before { content: "\1F517"; font-size: 18px; }
+.ficon.i-corner-up-left::before { content: "\21B0"; font-size: 18px; }
+.ficon.i-credit-card::before { content: "\1F4B3"; font-size: 18px; }
+.ficon.i-tag::before { content: "\1F3F7"; font-size: 18px; }
+.ficon.i-dollar-sign::before { content: "\0024"; font-size: 18px; }
+.ficon.i-navigation::before { content: "\1F9ED"; font-size: 18px; }
+.ficon.i-phone::before { content: "\260E"; font-size: 18px; }
+.ficon.i-map::before { content: "\1F5FA"; font-size: 18px; }
+.ficon.i-check-circle::before { content: "\2705"; font-size: 18px; }
+.ficon.i-wallet::before { content: "\1F4B0"; font-size: 18px; }
+.ficon.i-info::before { content: "\2139"; font-size: 18px; }
+.ficon.i-comment::before { content: "\1F4AC"; font-size: 18px; }

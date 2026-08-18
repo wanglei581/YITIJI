@@ -11,7 +11,79 @@ const auth = require('./auth');
  * @param {object} options { method, data, header, needAuth, timeout }
  * @returns {Promise<any>} resolve 业务 data;reject Error(带 statusCode/code)
  */
+/**
+ * 401 静默补签。
+ *
+ * 背景:enduser JWT 只有 30 分钟(member-print-orders.module.ts 签发 expiresIn:'30m'),
+ * 且服务端全仓没有 refresh 机制。用户中午下单、下午走到一体机前打开取件页,
+ * 必然已经掉线 → 取件页 401 进错误态。取件是这条业务链最关键的一刻。
+ *
+ * 为什么不能用 wx-login 补签:该端点要求 phoneCode,而 phoneCode 只能由用户
+ * 亲手点 open-type="getPhoneNumber" 按钮产生,拦到 401 时无法静默取得。
+ * 因此走 /member/auth/wx-resignin —— 只凭 wx.login 的 code 换 openid,
+ * 为已绑定手机号的存量账号重签,全程无感、不建号、不削弱鉴权。
+ */
+let resigninInflight = null;
+
+function silentResignin() {
+  // single-flight:并发 401 只触发一次 wx.login。
+  // 微信的 code 是一次性的,并发换取会互相作废。
+  if (resigninInflight) return resigninInflight;
+
+  const done = () => { resigninInflight = null; };
+  resigninInflight = new Promise((resolve, reject) => {
+    wx.login({
+      success: (r) => (r && r.code ? resolve(r.code) : reject(makeError('wx.login 未返回 code', -1))),
+      fail: () => reject(makeError('wx.login 调用失败', -1)),
+    });
+  })
+    .then((code) => rawRequest('/member/auth/wx-resignin', {
+      method: 'POST',
+      data: { code },
+      needAuth: false,
+    }))
+    .then((res) => {
+      const token = res && res.token;
+      if (!token) throw makeError('续签未返回 token', -1);
+      auth.saveSession({ token, user: res.user });
+      done();
+      return token;
+    })
+    .catch((e) => { done(); throw e; });
+
+  return resigninInflight;
+}
+
+/**
+ * 对外请求入口:在 rawRequest 之上加一层 401 静默补签重试。
+ * 只重试一次;补签失败则清理本地会话并抛出原始 401,让页面走登录引导。
+ */
 function request(path, options = {}) {
+  return rawRequest(path, options).catch((err) => {
+    // 准入依据是「曾登录过且未主动登出」，不是「当前有没有 token」。
+    // 后者会二选一地出错：getToken() 在 JWT 过期时先 clearSession
+    // 再返回 null，使「自然过期」与「主动登出」完全同形——
+    // 用 token 判断要么让过期补不了签（原始 401 问题原样存在），
+    // 要么让登出的用户被自动登回（共用设备隐私问题）。
+    const retriable = err && err.statusCode === 401
+      && options.needAuth !== false
+      && !options._retried
+      && auth.canSilentResignin();
+    if (!retriable) throw err;
+
+    return silentResignin().then(
+      () => rawRequest(path, Object.assign({}, options, { _retried: true })),
+      (resignErr) => {
+        auth.logout();
+        // 补签自身若带业务码(如 MEMBER_LEGAL_VERSION_STALE),优先抛它:
+        // 原始 401 只表示「这次请求没通过」,补签错误才说明「为什么补不上」。
+        throw (resignErr && resignErr.code) ? resignErr : err;
+      },
+    );
+  });
+}
+
+function rawRequest(path, options = {}) {
   const { method = 'GET', data = {}, header = {}, needAuth = true, timeout } = options;
 
   const finalHeader = { 'content-type': 'application/json', ...header };
@@ -47,9 +119,16 @@ function request(path, options = {}) {
           }
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
-          // 登录失效:清理本地会话
-          auth.clearSession();
-          reject(makeError('登录已失效,请重新登录', 401));
+          // 不在此处清会话:外层 request() 会先尝试静默补签,
+          // 补签失败才清。否则一次可恢复的过期会把用户直接踢下线。
+          //
+          // 保留服务端的 code 与文案,不再固定造一句「登录已失效」。
+          // 401 不都是同一回事:MEMBER_LEGAL_VERSION_STALE 要告诉用户
+          // 「服务条款已更新,请重新登录并确认」——丢掉响应体,这道
+          // 合规闸门的告知意图就永远到不了用户面前。
+          const e401 = extractError(body, statusCode);
+          if (!e401.code) e401.message = '登录已失效,请重新登录';
+          reject(e401);
         } else {
           reject(extractError(body, statusCode));
         }
@@ -140,7 +219,8 @@ function uploadFile(path, filePath, options = {}) {
           }
           resolve(unwrapEnvelope(body));
         } else if (statusCode === 401) {
-          auth.clearSession();
+          // 与 rawRequest 一致：不在此清会话。上传是合同审查等流程的
+          // 第一个鉴权调用，过期即清会话会让用户「上传失败还被登出」。
           reject(makeError('登录已失效,请重新登录', 401));
         } else {
           reject(extractError(body, statusCode));

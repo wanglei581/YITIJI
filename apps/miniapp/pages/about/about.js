@@ -25,7 +25,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '关于智引答',
+      title: '关于职易达',
       path: '/pages/about/about',
     }
   },

@@ -21,52 +21,60 @@
 
     <!-- 详情内容 -->
     <block wx:else>
-    <!-- 政策头部 -->
     <view class="policy-hero rise-d1">
-      <view class="ph-cat">{{policy.category}}</view>
+      <view class="ph-top">
+        <view class="ph-labels">
+          <view wx:if="{{policy.tag}}" class="chip {{policy.tagTone}}">{{policy.tag}}</view>
+          <view wx:if="{{policy.label}}" class="ph-kind">{{policy.label}}</view>
+        </view>
+        <view class="ph-icon tone-{{policy.accent}}"><text class="ficon i-{{policy.icon}}"></text></view>
+      </view>
       <view class="ph-title">{{policy.title}}</view>
       <view class="ph-meta">
-        <text>{{policy.org}}</text>
-        <text class="ph-dot">·</text>
-        <text>{{policy.date}}</text>
+        <text>{{policy.sourceOrg || '来源机构未标注'}}</text>
+        <text wx:if="{{policy.publishedDate}}">{{policy.publishedDate}}</text>
       </view>
     </view>
 
-    <!-- AI 速读 -->
-    <view class="ai-card rise-d2">
-      <view class="ai-head">
-        <text class="ficon i-thunder"></text>
-        <text>AI 政策速读 · 参考</text>
-      </view>
-      <view class="ai-body">{{policy.aiSummary}}</view>
-      <view class="ai-disclaimer">AI 摘要仅供参考，以官方原文及经办窗口解释为准。</view>
-    </view>
-
-    <!-- 政策正文 -->
-    <view class="section-t rise-d3">补贴对象</view>
-    <view class="body-text rise-d3">{{policy.targetGroup}}</view>
-
-    <view class="section-t rise-d3">补贴标准</view>
-    <view class="policy-table rise-d3">
-      <view class="pt-row" wx:for="{{policy.subsidies}}" wx:key="type">
-        <view class="pt-type">{{item.type}}</view>
-        <view class="pt-amt">{{item.amount}}</view>
+    <view wx:if="{{policy.summary}}" class="summary-card rise-d2">
+      <view class="summary-icon"><text class="ficon i-file-search"></text></view>
+      <view class="summary-body">
+        <view class="summary-title">政策摘要</view>
+        <view class="summary-text">{{policy.summary}}</view>
       </view>
     </view>
 
-    <view class="section-t rise-d4">申领流程</view>
-    <view class="step-flow rise-d4">
-      <view class="sf-item" wx:for="{{policy.steps}}" wx:key="*this">
-        <view class="sf-n">{{index + 1}}</view>
-        <text class="sf-text">{{item}}</text>
+    <view wx:if="{{policy.audience}}" class="audience-card rise-d3">
+      <view class="audience-icon"><text class="ficon i-user"></text></view>
+      <view>
+        <view class="audience-label">适用人群</view>
+        <view class="audience-value">{{policy.audience}}</view>
       </view>
     </view>
 
-    <!-- 来源机构 -->
-    <view class="info-card rise-d5">
-      <view class="ic-title">来源信息</view>
-      <view class="ic-row"><text class="ic-k">发布机构</text><text class="ic-v">{{policy.org}}</text></view>
-      <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{policy.syncTime}}</text></view>
+    <view class="policy-section-head rise-d3">
+      <view class="section-title">政策正文</view>
+      <view class="section-sub">以下内容来自公开原文</view>
+    </view>
+    <view wx:if="{{policy.paragraphs && policy.paragraphs.length}}" class="article-card rise-d3">
+      <view class="article-paragraph" wx:for="{{policy.paragraphs}}" wx:key="*this">{{item}}</view>
+    </view>
+    <view wx:else class="article-card article-empty rise-d3">
+      <view class="article-empty-icon"><text class="ficon i-file-text"></text></view>
+      <view>当前来源未提供正文，请通过官方原文链接核验完整内容。</view>
+    </view>
+
+    <view class="source-card rise-d4">
+      <view class="source-head">
+        <view class="source-icon"><text class="ficon i-link"></text></view>
+        <view>
+          <view class="source-title">来源信息</view>
+          <view class="source-sub">保留发布与同步记录，方便核验</view>
+        </view>
+      </view>
+      <view class="ic-row"><text class="ic-k">发布机构</text><text class="ic-v">{{policy.sourceOrg || '未标注'}}</text></view>
+      <view wx:if="{{policy.publishedDate}}" class="ic-row"><text class="ic-k">发布日期</text><text class="ic-v">{{policy.publishedDate}}</text></view>
+      <view wx:if="{{policy.syncTime}}" class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{policy.syncTime}}</text></view>
     </view>
 
     <!-- 合规提示 -->
@@ -80,7 +88,9 @@
   </view>
 
   <view class="actionbar">
-    <view class="btn primary block tap" bindtap="tapOfficial">复制官方原文链接</view>
+    <view class="btn primary block tap {{policy.externalUrl ? '' : 'disabled'}}" bindtap="tapOfficial">
+      {{policy.externalUrl ? '复制官方原文链接' : '官方原文链接暂不可用'}}
+    </view>
   </view>
 
 </view>

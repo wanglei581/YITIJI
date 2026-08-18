@@ -20,7 +20,7 @@
       <view class="set-item">
         <view class="set-ic a-clay"><text class="ficon i-form"></text></view>
         <view class="set-t">登录手机号</view>
-        <view class="set-v">{{phoneMasked}}</view>
+        <view class="set-v">{{isLoggedIn ? phoneMasked : '未登录'}}</view>
       </view>
     </view>
 
@@ -30,12 +30,12 @@
       <view class="set-item tap" hover-class="tap-press" bindtap="toNotifications">
         <view class="set-ic a-teal"><text class="ficon i-bell"></text></view>
         <view class="set-t">消息通知</view>
-        <view class="set-go">›</view>
+        <text class="ficon i-right set-go"></text>
       </view>
       <view class="set-item tap" hover-class="tap-press" bindtap="toDocuments">
         <view class="set-ic a-clay"><text class="ficon i-folder"></text></view>
         <view class="set-t">我的文档与清理期限</view>
-        <view class="set-go">›</view>
+        <text class="ficon i-right set-go"></text>
       </view>
     </view>
 
@@ -45,7 +45,7 @@
       <view class="set-item tap" hover-class="tap-press" bindtap="toPrivacy">
         <view class="set-ic a-teal"><text class="ficon i-solution"></text></view>
         <view class="set-t">隐私设置</view>
-        <view class="set-go">›</view>
+        <text class="ficon i-right set-go"></text>
       </view>
     </view>
 
@@ -55,17 +55,18 @@
       <view class="set-item tap" hover-class="tap-press" bindtap="toHelp">
         <view class="set-ic a-teal"><text class="ficon i-comment"></text></view>
         <view class="set-t">使用帮助</view>
-        <view class="set-go">›</view>
+        <text class="ficon i-right set-go"></text>
       </view>
       <view class="set-item tap" hover-class="tap-press" bindtap="toAbout">
         <view class="set-ic a-plum"><text class="ficon i-info"></text></view>
         <view class="set-t">关于我们</view>
         <view class="set-v">v1.0.2</view>
-        <view class="set-go">›</view>
+        <text class="ficon i-right set-go"></text>
       </view>
     </view>
 
-    <view class="logout tap" hover-class="tap-press" bindtap="logout">{{loggingOut ? '正在退出…' : '退出登录'}}</view>
+    <view wx:if="{{isLoggedIn}}" class="logout tap" hover-class="tap-press" bindtap="logout">{{loggingOut ? '正在退出…' : '退出登录'}}</view>
+    <view wx:else class="logout login-cta tap" hover-class="tap-press" bindtap="toLogin">登录职易达</view>
 
   </view>
 </view>

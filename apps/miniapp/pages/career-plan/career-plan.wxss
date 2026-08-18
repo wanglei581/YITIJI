@@ -31,9 +31,10 @@
 
 /* 空态/失败态的行动按钮。48px 是最小可点尺寸下限 */
 .cp-cta { margin-top: 12rpx; min-height: 96rpx; display: flex; align-items: center;
-  justify-content: center; padding: 0 40rpx; border-radius: 48rpx;
+  justify-content: center; gap: 10rpx; padding: 0 40rpx; border-radius: 24rpx;
   background: var(--teal-wash); color: var(--teal-deep);
   font-size: 28rpx; font-weight: 600; }
+.cp-cta-arrow { width: 19rpx; height: 19rpx; }
 
 /* ready 态说明文字 */
 .cp-p { font-size: 27rpx; color: var(--muted); line-height: 1.75; margin-bottom: 14rpx; }
@@ -51,7 +52,7 @@
 
 /* 生成依据(如实展示参考了什么) */
 .cp-based { margin: 0 16px 12px; padding: 22rpx 24rpx;
-  background: var(--surface); border-radius: 14rpx; }
+  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 28rpx; }
 .cb-cap { font-size: 24rpx; color: var(--muted); margin-bottom: 14rpx; }
 .cb-hint { font-size: 22rpx; color: var(--ghost); line-height: 1.6; margin-top: 12rpx; }
 
@@ -64,9 +65,11 @@
 
 /* 现状画像 */
 .cs-item { display: flex; gap: 14rpx; padding: 22rpx 24rpx;
-  background: var(--surface); border-radius: 14rpx; }
-.cs-mark { flex-shrink: 0; width: 32rpx; text-align: center; font-size: 32rpx;
-  font-weight: 700; color: var(--teal); line-height: 1.4; }
+  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 24rpx; }
+.cs-mark { flex-shrink: 0; width: 40rpx; height: 40rpx; border-radius: 50%;
+  background: var(--teal-soft); color: var(--teal); display: flex; align-items: center;
+  justify-content: center; margin-top: 2rpx; }
+.cs-mark .ficon { width: 21rpx; height: 21rpx; }
 .cs-body { flex: 1; min-width: 0; }
 .cs-point { font-size: 27rpx; color: var(--ink); font-weight: 600; line-height: 1.6; }
 .cs-ev { font-size: 23rpx; color: var(--muted); line-height: 1.6; margin-top: 8rpx;
@@ -74,7 +77,7 @@
 
 /* 方向卡(无匹配度徽章) */
 .dir-list { margin: 0 16px; display: flex; flex-direction: column; gap: 16rpx; }
-.dir-item { background: var(--surface); border-radius: 14rpx; padding: 24rpx; }
+.dir-item { background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 26rpx; padding: 24rpx; }
 .di-head { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
 .di-rank { width: 36rpx; height: 36rpx; border-radius: 50%; background: var(--teal-wash);
   color: var(--teal-deep); font-size: 22rpx; font-weight: 700;
@@ -87,7 +90,7 @@
 .ds-text { font-size: 26rpx; color: var(--ink); line-height: 1.7; }
 
 /* 技能提升 */
-.sk-item { padding: 22rpx 24rpx; background: var(--surface); border-radius: 14rpx; }
+.sk-item { padding: 22rpx 24rpx; background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 24rpx; }
 .sk-head { display: flex; align-items: center; gap: 12rpx; }
 .sk-name { flex: 1; font-size: 28rpx; font-weight: 600; color: var(--ink); }
 .sk-time { flex-shrink: 0; font-size: 22rpx; padding: 4rpx 14rpx; border-radius: 20rpx;
@@ -96,7 +99,7 @@
 
 /* 行动清单 */
 .action-list { margin: 0 16px; display: flex; flex-direction: column;
-  background: var(--surface); border-radius: 14rpx; overflow: hidden; }
+  background: var(--surface); border: 1rpx solid var(--line-soft); border-radius: 26rpx; overflow: hidden; }
 .al-item { display: flex; align-items: flex-start; gap: 16rpx; padding: 20rpx 24rpx;
   border-bottom: 1rpx solid var(--line); }
 .al-item:last-child { border-bottom: none; }

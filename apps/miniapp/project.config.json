@@ -30,6 +30,14 @@
       {
         "value": "scripts",
         "type": "folder"
+      },
+      {
+        "value": ".claude",
+        "type": "folder"
+      },
+      {
+        "value": "README.md",
+        "type": "file"
       }
     ],
     "include": []

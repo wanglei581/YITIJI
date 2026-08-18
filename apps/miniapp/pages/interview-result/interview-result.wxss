@@ -4,7 +4,7 @@
 .ri-state { display: flex; flex-direction: column; align-items: center;
   justify-content: center; padding: 80rpx 40rpx; gap: 24rpx; }
 .state-tip { font-size: 28rpx; color: var(--muted); text-align: center; line-height: 1.7; }
-.ri-fail-ic { font-size: 72rpx; color: var(--danger, #e55); }
+.ri-fail-ic { font-size: 72rpx; color: var(--error); }
 .ri-retry-btn { margin-top: 8rpx; }
 
 .spinner { width: 56rpx; height: 56rpx; border: 4rpx solid var(--line);
@@ -13,19 +13,20 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── 总评卡 ── */
-.ri-hero { background: var(--surface); border-radius: 16rpx; padding: 36rpx 32rpx;
-  margin-top: 16rpx; }
+.ri-hero { background: var(--surface); border: 1rpx solid #dce9ff; border-radius: 30rpx;
+  padding: 36rpx 32rpx; margin: 16rpx 32rpx 0; box-shadow: var(--sh-xs); }
 .rh-level { font-size: 44rpx; font-weight: 800; line-height: 1; }
 .rh-pos { font-size: 28rpx; color: var(--ink); font-weight: 600; margin-top: 12rpx; }
 .rh-iv { font-size: 26rpx; color: var(--muted); font-weight: 400; }
 .rh-summary { font-size: 28rpx; color: var(--muted); line-height: 1.7; margin-top: 16rpx; }
 
 /* ── 维度点评 & 通用 section ── */
-.ri-section { background: var(--surface); border-radius: 14rpx; padding: 24rpx 28rpx;
-  margin-top: 16rpx; }
+.ri-section { background: var(--surface); border: 1rpx solid var(--line-soft);
+  border-radius: 28rpx; padding: 24rpx 28rpx; margin: 16rpx 32rpx 0; }
 .rs-title { font-size: 28rpx; font-weight: 700; color: var(--ink); margin-bottom: 16rpx; }
 .rs-point { display: flex; align-items: flex-start; gap: 10rpx; margin-bottom: 10rpx; }
-.rs-dot { color: var(--teal); font-size: 28rpx; flex-shrink: 0; line-height: 1.6; }
+.rs-dot { width: 10rpx; height: 10rpx; margin-top: 18rpx; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0; }
 .rs-text { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
 
 /* ── 高概率追问 ── */
@@ -43,12 +44,16 @@
   flex-shrink: 0; line-height: 1.6; }
 .star-v { font-size: 28rpx; color: var(--ink); line-height: 1.6; flex: 1; }
 .star-reminder { font-size: 26rpx; color: var(--muted); line-height: 1.6;
-  padding-top: 10rpx; border-top: 1rpx solid var(--line); }
+  padding: 18rpx 20rpx; border-radius: 20rpx; background: var(--wheat-wash);
+  display: flex; align-items: flex-start; gap: 12rpx; }
+.star-reminder-icon { width: 27rpx; height: 27rpx; color: var(--wheat-deep);
+  margin-top: 5rpx; flex-shrink: 0; }
 
 /* ── 行动清单 ── */
 .ri-check-item { display: flex; align-items: flex-start; gap: 14rpx; margin-bottom: 12rpx; }
 .ri-check-item:last-child { margin-bottom: 0; }
-.chk-box { font-size: 28rpx; color: var(--muted); flex-shrink: 0; line-height: 1.5; }
+.chk-box { width: 27rpx; height: 27rpx; padding: 5rpx; border-radius: 8rpx;
+  color: var(--teal); background: var(--teal-soft); flex-shrink: 0; margin-top: 4rpx; }
 .chk-text { font-size: 28rpx; color: var(--ink); line-height: 1.5; }
 
 /* ── 免责声明间距 ── */

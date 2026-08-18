@@ -1,0 +1,120 @@
+<view class="store-select-page">
+  <view style="height:{{statusBarHeight}}px"></view>
+  
+  <view class="navbar">
+    <view class="nav-back icon-action tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <text class="nav-title">选择服务点</text>
+  </view>
+
+  <scroll-view class="store-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="store-body">
+      <!-- 提示信息 -->
+      <view class="tip-card">
+        <text class="ficon i-info"></text>
+        <text>请选择最近的服务点，打印完成后凭到机码取件</text>
+      </view>
+
+      <!-- 服务点列表 -->
+      <view class="store-list">
+        <view 
+          class="store-item tap {{selectedStore === item.id ? 'selected' : ''}}" 
+          wx:for="{{stores}}" 
+          wx:key="id"
+          hover-class="tap-press"
+          bindtap="selectStore"
+          data-id="{{item.id}}"
+          role="button"
+          aria-label="服务点：{{item.name}}"
+        >
+          <!-- 选中标记 -->
+          <view class="store-check" wx:if="{{selectedStore === item.id}}">
+            <text class="ficon i-check"></text>
+          </view>
+
+          <!-- 服务点信息 -->
+          <view class="store-info">
+            <view class="store-header">
+              <text class="store-name">{{item.name}}</text>
+              <view class="store-status {{item.status}}">
+                <text wx:if="{{item.status === 'open'}}">营业中</text>
+                <text wx:if="{{item.status === 'busy'}}">繁忙</text>
+                <text wx:if="{{item.status === 'closed'}}">已打烊</text>
+              </view>
+            </view>
+
+            <view class="store-address">
+              <text class="ficon i-map-pin"></text>
+              <text>{{item.address}}</text>
+            </view>
+
+            <view class="store-meta">
+              <view class="store-distance">
+                <text class="ficon i-navigation"></text>
+                <text>{{item.distance}}</text>
+              </view>
+              <view class="store-hours">
+                <text class="ficon i-clock"></text>
+                <text>{{item.hours}}</text>
+              </view>
+            </view>
+
+            <!-- 服务设施 -->
+            <view class="store-facilities">
+              <view class="facility-tag" wx:for="{{item.facilities}}" wx:key="*this" wx:for-item="facility">
+                {{facility}}
+              </view>
+            </view>
+          </view>
+
+          <!-- 操作按钮 -->
+          <view class="store-actions">
+            <view 
+              class="action-btn icon-action tap" 
+              hover-class="tap-press" 
+              catchtap="callStore" 
+              data-phone="{{item.phone}}"
+              role="button"
+              aria-label="拨打电话"
+            >
+              <text class="ficon i-phone"></text>
+            </view>
+            <view 
+              class="action-btn icon-action tap" 
+              hover-class="tap-press" 
+              catchtap="viewInMap" 
+              data-id="{{item.id}}"
+              role="button"
+              aria-label="地图查看"
+            >
+              <text class="ficon i-map"></text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 底部占位 -->
+      <view style="height: 120rpx;"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 底部确认栏 -->
+  <view class="bottom-bar">
+    <view class="selected-info" wx:if="{{selectedStore}}">
+      <text class="ficon i-check-circle"></text>
+      <text>已选择服务点</text>
+    </view>
+    <view class="selected-info empty" wx:else>
+      <text class="ficon i-info"></text>
+      <text>请选择服务点</text>
+    </view>
+    <button 
+      class="confirm-btn {{selectedStore ? '' : 'disabled'}}" 
+      bindtap="confirmAndContinue"
+      disabled="{{!selectedStore}}"
+    >
+      确认并继续
+    </button>
+  </view>
+</view>

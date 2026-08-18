@@ -53,9 +53,13 @@
               <view class="rec-t">{{rec.title}}</view>
               <view class="rec-sub">{{rec.time}} · {{rec.statusLabel}}</view>
             </view>
-            <view class="rec-action {{rec.canOpen ? 'ready' : ''}}">{{rec.actionLabel}} ›</view>
+            <view class="rec-action {{rec.canOpen ? 'ready' : ''}}">
+              <text>{{rec.actionLabel}}</text><text class="ficon i-right rec-arrow"></text>
+            </view>
           </view>
-          <view class="rec-more tap" hover-class="tap-press" data-id="{{rec.id}}" catchtap="moreRecord">•••</view>
+          <view class="rec-more tap" hover-class="tap-press" data-id="{{rec.id}}" catchtap="moreRecord">
+            <text class="ficon i-more"></text>
+          </view>
         </view>
       </view>
     </block>

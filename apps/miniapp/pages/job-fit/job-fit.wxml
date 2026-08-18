@@ -12,13 +12,15 @@
     <view class="st-ic"><text class="ficon i-file-text"></text></view>
     <view class="rs-title">还没有可用的简历</view>
     <view class="rs-sub">岗位匹配需要先上传并解析一份简历,才能与岗位要求做对比</view>
-    <view class="jf-cta tap" bindtap="toUpload">去上传简历 ›</view>
+    <view class="jf-cta tap" bindtap="toUpload">
+      <text>去上传简历</text><text class="ficon i-right jf-cta-arrow"></text>
+    </view>
   </view>
 
   <view wx:elif="{{phase === 'history-loading'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
-      <view class="ficon i-history rs-ic"></view>
+      <text class="ficon i-history rs-ic"></text>
     </view>
     <view class="rs-title">正在读取历史岗位匹配结果…</view>
     <view class="rs-sub">只读取账户中已保存的结果，不会重新调用 AI</view>
@@ -39,7 +41,7 @@
       </view>
     </view>
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>本功能只输出三档参考等级与文字建议，不提供数字比例，也不预测招聘结果。</text>
     </view>
     <view class="jf-act"><view class="btn primary block tap" bindtap="tapGrant">我已阅读并授权</view></view>
@@ -65,7 +67,7 @@
       </view>
     </view>
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>分析由 AI 完成,实测 6~40 秒不等,请勿离开页面。</text>
     </view>
     <view class="jf-act"><view class="btn primary block tap" bindtap="tapAnalyze">开始分析</view></view>
@@ -75,7 +77,7 @@
   <view wx:elif="{{phase === 'running'}}" class="running-state">
     <view class="rs-anim">
       <view class="rs-ring"></view>
-      <view class="ficon i-link rs-ic"></view>
+      <text class="ficon i-link rs-ic"></text>
     </view>
     <view class="rs-title">AI 正在对比简历与岗位要求…</view>
     <view class="rs-sub">已用 {{elapsed}} 秒,实测 6~40 秒不等</view>
@@ -87,23 +89,25 @@
     <view class="st-ic warn"><text class="ficon i-info"></text></view>
     <view class="rs-title">分析没有完成</view>
     <view class="rs-sub">{{failMsg}}</view>
-    <view class="jf-cta tap" bindtap="retry">{{historyMode ? '重新加载 ›' : '重新分析 ›'}}</view>
+    <view class="jf-cta tap" bindtap="retry">
+      <text>{{historyMode ? '重新加载' : '重新分析'}}</text><text class="ficon i-right jf-cta-arrow"></text>
+    </view>
   </view>
 
   <!-- 结果 -->
   <view wx:elif="{{phase === 'done'}}" class="content has-bar">
     <view class="notice plum">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>以下结论由 AI 基于简历文本与岗位要求生成,仅供你本人参考,不代表用人单位的实际招聘判断。</text>
     </view>
 
     <view wx:if="{{historyMode}}" class="notice info">
-      <view class="ficon i-history n-ic"></view>
+      <text class="ficon i-history n-ic"></text>
       <text>这是账户中的历史结果，只读展示；不会重新调用 AI，也不会覆盖当前简历任务。</text>
     </view>
 
     <view wx:if="{{fit.isMockProvider}}" class="notice warn">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>当前服务端使用占位分析模型,以下内容仅用于流程演示,不能作为求职依据。</text>
     </view>
 
@@ -161,7 +165,7 @@
       <view class="fit-list">
         <view class="fit-item plus tap" wx:for="{{fit.matchPoints}}" wx:key="point"
               data-title="{{item.point}}" data-text="{{item.evidence}}" bindtap="tapText">
-          <view class="fi-mark">✓</view>
+          <view class="fi-mark"><text class="ficon i-check"></text></view>
           <view class="fi-body">
             <view wx:if="{{item.requirement}}" class="fi-requirement">岗位要求 · {{item.requirement}}</view>
             <view class="fi-text">{{item.point}}</view>
@@ -176,7 +180,7 @@
       <view class="fit-list">
         <view class="fit-item minus tap" wx:for="{{fit.gapPoints}}" wx:key="gap"
               data-title="{{item.gap}}" data-text="{{item.suggestion}}" bindtap="tapText">
-          <view class="fi-mark">△</view>
+          <view class="fi-mark"><text class="ficon i-warning"></text></view>
           <view class="fi-body">
             <view wx:if="{{item.requirement}}" class="fi-requirement">岗位要求 · {{item.requirement}}</view>
             <view class="fi-text">{{item.gap}}</view>
@@ -225,7 +229,7 @@
           <view class="jf-next-title">继续优化这份简历</view>
           <view class="jf-next-sub">生成优化稿后，对照上面的差距与建议逐项核实</view>
         </view>
-        <view class="jf-next-go">›</view>
+        <text class="ficon i-right jf-next-go"></text>
       </view>
       <view class="jf-next tap" bindtap="tapPracticeInterview">
         <view class="jf-next-icon"><text class="ficon i-comment"></text></view>
@@ -233,12 +237,12 @@
           <view class="jf-next-title">针对该岗位练习面试</view>
           <view class="jf-next-sub">自动带入岗位名称，题目仍仅用于个人练习</view>
         </view>
-        <view class="jf-next-go">›</view>
+        <text class="ficon i-right jf-next-go"></text>
       </view>
     </view>
 
     <view class="notice info">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>以上分析不代表招聘方意见。投递须前往来源平台操作。</text>
     </view>
     <view wx:if="{{!historyMode}}" class="jf-revoke tap" bindtap="tapRevokeConsent">撤销岗位分析授权</view>

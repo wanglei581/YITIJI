@@ -8,9 +8,6 @@
         <text class="ficon i-right nav-back-ic"></text>
       </view>
       <view class="nav-title">我的文档</view>
-      <view class="nav-right tap" hover-class="tap-press" bindtap="loadDocuments">
-        <text class="nav-caps">刷新</text>
-      </view>
     </view>
   </view>
 
@@ -26,7 +23,14 @@
       >{{item.label}}</view>
     </view>
 
-    <view class="section-t" wx:if="{{!loading && !loadError}}">最近 · {{filtered.length}} 个文件</view>
+    <!-- 「刷新」原本在导航栏右上角，被微信胶囊（···⊙）完全遮挡——胶囊是系统浮层，
+         自定义导航栏右侧永远不可用。本页只在 onLoad 拉一次列表，刷新入口必须保留，
+         但属低频次级操作，并入列表标题行。 -->
+    <view class="list-toolbar" wx:if="{{!loading && !loadError}}">
+      <text class="section-t lt-title">最近 · {{filtered.length}} 个文件</text>
+      <view class="lt-action tap" hover-class="tap-press" bindtap="loadDocuments"
+            role="button" aria-label="重新加载文档列表">刷新</view>
+    </view>
 
     <view class="card" wx:if="{{loading}}">
       <view class="empty-slot"><view class="es-t">正在加载本人文档…</view></view>
@@ -67,7 +71,7 @@
       <view class="empty-slot">
         <text class="ficon i-folder es-ic"></text>
         <view class="es-t">暂无文件</view>
-        <view class="es-d">上传文件后可再次发起打印</view>
+        <view class="es-d">拍下纸质材料，或上传已有文件，之后可再次发起打印</view>
       </view>
     </view>
 
@@ -79,7 +83,7 @@
   </view>
 
   <view class="actionbar">
-    <view class="btn primary block {{uploading ? 'disabled' : ''}}" hover-class="tap-press" bindtap="upload">{{uploading ? '上传中…' : '上传新文件'}}</view>
+    <view class="btn primary block {{uploading ? 'disabled' : ''}}" hover-class="tap-press" bindtap="upload">{{uploading ? '上传中…' : '拍照或上传文件'}}</view>
   </view>
 
 </view>

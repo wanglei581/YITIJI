@@ -35,7 +35,7 @@ Page({
       {
         id: 1,
         role: 'ai',
-        text: '你好，我是小青 👋 简历优化、打印帮助、求职政策都可以问我。想从哪里开始？',
+        text: '你好，我是小青。简历优化、打印帮助、求职政策都可以问我。想从哪里开始？',
         cards: [
           { id: 'resume', icon: 'file-text', tone: 'plum', title: '诊断我的简历', sub: 'AI 分析并给出优化建议', url: '/pages/resume-upload/resume-upload' },
           { id: 'print',  icon: 'printer',   tone: 'teal', title: '怎么打印文件', sub: '上传、扫码或到店打印',  url: '/pages/print/print' },

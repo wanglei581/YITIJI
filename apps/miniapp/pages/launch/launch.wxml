@@ -4,20 +4,23 @@
 
   <view class="launch-mid">
     <view class="launch-icon-wrap">
-      <text class="ficon i-printer launch-icon-ic"></text>
+      <text class="ficon i-aim launch-icon-ic"></text>
     </view>
-    <view class="launch-brand">AI求职打印服务终端</view>
-    <view class="launch-sub">Smart Job Hunt · Print Terminal</view>
-    <view class="launch-divider"></view>
+    <view class="launch-brand">职易达</view>
+    <view class="launch-sub">求职 · AI · 打印 · 生活服务</view>
+    <view class="launch-slogan">让每一步求职准备，都更清晰一点</view>
   </view>
 
   <view class="launch-btns">
+    <view class="sheet-handle"></view>
+    <view class="sheet-title">登录后继续</view>
+    <view class="sheet-sub">同步本人简历、文档、打印订单和 AI 服务记录</view>
 
     <!-- ① 微信一键登录（默认） -->
     <block wx:if="{{!showSms}}">
       <button class="btn wx block launch-btn-wx tap" hover-class="tap-press"
         open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" disabled="{{!agreed}}">
-        <text class="ficon i-comment" style="margin-right:8rpx;font-size:36rpx"></text>微信一键登录
+        <text class="ficon i-comment launch-wx-icon"></text>微信一键登录
       </button>
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapSmsLogin">
         使用短信验证码登录
@@ -34,7 +37,7 @@
         <view class="sms-phone-wrap">
           <view class="sms-prefix">+86</view>
           <input class="sms-phone-input" type="number" maxlength="11"
-            placeholder="手机号码" placeholder-style="color:rgba(255,255,255,.3)"
+            placeholder="手机号码" placeholder-style="color:#98a2b3"
             value="{{phone}}" bindinput="onPhoneInput" focus="{{showSms}}" />
           <view class="sms-send-btn {{counting || sending ? 'counting' : ''}} tap"
             hover-class="tap-press" bindtap="sendCode">
@@ -63,14 +66,16 @@
 
       <!-- 返回微信登录 -->
       <view class="launch-alt tap" hover-class="tap-press" bindtap="tapBackToWx">
-        ← 返回微信一键登录
+        <text class="ficon i-right launch-back-icon"></text>返回微信一键登录
       </view>
     </block>
 
     <!-- 法律条款（两种模式共用） -->
     <view class="launch-legal">
       <view class="launch-agree tap" hover-class="tap-press" bindtap="toggleAgree">
-        <view class="launch-check {{agreed ? 'checked' : ''}}">{{agreed ? '✓' : ''}}</view>
+        <view class="launch-check {{agreed ? 'checked' : ''}}">
+          <view wx:if="{{agreed}}" class="check-dot"></view>
+        </view>
         <text>我已阅读并同意</text>
       </view>
       <view>

@@ -8,7 +8,7 @@
   <view class="content has-bar">
 
     <view class="notice plum">
-      <view class="ficon i-info n-ic"></view>
+      <text class="ficon i-info n-ic"></text>
       <text>模拟面试由 AI 出题并点评，仅供练习参考，不代表真实招聘标准。</text>
     </view>
 

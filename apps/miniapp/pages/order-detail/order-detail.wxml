@@ -1,0 +1,70 @@
+<!--pages/order-detail/order-detail.wxml-->
+<view class="page-wrap">
+
+  <view class="navbar col">
+    <view style="height:{{statusBarHeight}}px"></view>
+    <view class="nav-inner">
+      <view class="nav-back tap" hover-class="tap-press" bindtap="back">
+        <text class="ficon i-right nav-back-ic"></text>
+      </view>
+      <view class="nav-title">订单详情</view>
+      <view class="nav-right"></view>
+    </view>
+  </view>
+
+  <view class="content">
+
+    <view class="card" wx:if="{{loading}}">
+      <view class="empty-slot">
+        <view class="es-t">正在加载订单详情…</view>
+      </view>
+    </view>
+
+    <view class="card" wx:elif="{{error}}" bindtap="retry">
+      <view class="empty-slot">
+        <view class="es-t">加载失败，点此重试</view>
+        <view class="es-d">{{error}}</view>
+      </view>
+    </view>
+
+    <block wx:else>
+      <view class="card od-card">
+        <view class="od-filename">{{detail.fileName}}</view>
+        <view class="od-status-row">
+          <view class="chip {{detail.statusTone}}">{{detail.statusLabel}}</view>
+        </view>
+        <view class="od-rows">
+          <view class="od-row">
+            <text class="od-label">终端</text>
+            <text class="od-val">{{detail.store}}</text>
+          </view>
+          <view class="od-row">
+            <text class="od-label">规格</text>
+            <text class="od-val">{{detail.spec}}</text>
+          </view>
+          <view class="od-row">
+            <text class="od-label">金额</text>
+            <text class="od-val">{{detail.price}}</text>
+          </view>
+          <view class="od-row">
+            <text class="od-label">下单时间</text>
+            <text class="od-val">{{detail.createdAt}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="card od-pickup-card" wx:if="{{detail.pickup}}">
+        <view class="od-pickup">
+          <view class="od-pickup-label">到机码</view>
+          <view class="od-pickup-code">{{detail.pickup}}</view>
+          <view class="od-pickup-hint">到店后在一体机扫码或手动输入到机码</view>
+        </view>
+      </view>
+
+      <view class="od-actions">
+        <button class="btn primary block tap" hover-class="tap-press" bindtap="toPrint">再打印一份</button>
+      </view>
+    </block>
+
+  </view>
+</view>

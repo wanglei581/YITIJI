@@ -1,0 +1,50 @@
+<!--pages/community/community.wxml-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack"><text class="nav-back-ic ficon i-right"></text></view>
+    <view class="nav-title serif">职业圈</view>
+  </view>
+
+  <scroll-view class="content" scroll-y enable-back-to-top
+    bindscrolltolower="loadMore" refresher-enabled refresher-triggered="{{refreshing}}" bindrefresherrefresh="onPullDownRefresh">
+
+    <view wx:if="{{error}}" class="comm-error">
+      <text class="ficon i-info ce-icon"></text>
+      <view class="ce-msg">{{error}}</view>
+    </view>
+
+    <view wx:elif="{{feeds.length === 0 && !loading}}" class="comm-empty">
+      <text class="ficon i-user ce-icon"></text>
+      <view class="ce-msg">暂无动态</view>
+    </view>
+
+    <view class="feed-list">
+      <view class="feed-card" wx:for="{{feeds}}" wx:key="id">
+        <view class="fc-head">
+          <view class="fc-av" style="background:{{item._color}}">{{item._initials}}</view>
+          <view class="fc-meta">
+            <view class="fc-name">{{item._authorName}}</view>
+            <view class="fc-time">{{item._timeAgo}}</view>
+          </view>
+        </view>
+        <view class="fc-content">{{item.content}}</view>
+        <view class="fc-foot">
+          <view class="fc-like tap" hover-class="tap-press"
+            bindtap="tapLike" data-id="{{item.id}}" data-liked="{{item.likedByMe}}">
+            <text class="ficon i-heart lk-ic {{item.likedByMe ? 'liked' : ''}}"></text>
+            <text>{{item.likeCount || 0}}</text>
+          </view>
+          <view class="fc-comments">
+            <text class="ficon i-comment cm-ic"></text>
+            <text>{{item.commentCount || 0}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{loading}}" class="load-more-tip">加载中…</view>
+    <view wx:elif="{{noMore && feeds.length > 0}}" class="load-more-tip">已经到底了</view>
+    <view class="page-pad"></view>
+  </scroll-view>
+</view>
