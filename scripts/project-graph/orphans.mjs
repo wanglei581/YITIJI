@@ -19,6 +19,32 @@ import { readText, sorted, trackedFiles } from './repo.mjs'
 /** 图谱产物目录。它自己不参与孤儿判定，也不计入提及索引。 */
 export const GRAPH_OUTPUT_DIR = 'docs/graph'
 
+/**
+ * 图谱工具自身的源码，同样不计入提及索引。
+ *
+ * 这是自指 bug 的**第二次**出现，值得单独记一笔：产物目录排掉之后，我在
+ * orphans.mjs 的注释里举了 `placeholders/OfflineAgenciesPage.tsx` 当例子说明
+ * basename 误判 —— 下一次生成，这个文件就因为「被 scripts/project-graph/ 引用」
+ * 从 low 升成了 high，也就是「动不得」。工具描述一个文件，被自己算成了这个文件
+ * 还有人用。
+ *
+ * 教训不是「别在注释里写路径」，而是：**任何分析工具都必须把自己排除在分析域外**，
+ * 否则它的输出会反过来喂进自己的输入。
+ */
+const GRAPH_TOOL_PATHS = [
+  'scripts/project-graph/',
+  'scripts/generate-project-graph.mjs',
+  'scripts/project-graph-query.mjs',
+]
+
+/** 该文件是否属于图谱自身（产物或工具源码）。 */
+export function isGraphSelf(file) {
+  return (
+    file.startsWith(`${GRAPH_OUTPUT_DIR}/`) ||
+    GRAPH_TOOL_PATHS.some((prefix) => file === prefix || file.startsWith(prefix))
+  )
+}
+
 export const PROTECTED = [
   {
     prefix: 'apps/miniapp/',
@@ -58,16 +84,34 @@ const TEXT_EXT =
 
 const PATH_TOKEN_PATTERN = /[\w@][\w@.-]*(?:\/[\w@.-]+)+/g
 
-/** 返回 { paths:Set<string>, basenames:Map<string, Set<file>> } */
+/**
+ * 返回 { paths, basenames, ambiguousBasenames }
+ *
+ * ambiguousBasenames：仓库里存在同名不同路径的文件名集合。
+ * 这类文件名**不能**用来判定「谁提到了我」—— 见 mentionsOf 的说明。
+ */
 export function buildMentionIndex(maxBytes = 2 * 1024 * 1024) {
   const paths = new Map()
   const basenames = new Map()
+
+  // 先算出哪些 basename 在仓库里不唯一。
+  // 本仓库真实存在 placeholders/OfflineAgenciesPage.tsx 与
+  // offline-agencies/OfflineAgenciesPage.tsx 这种同名对，按文件名比对必然张冠李戴。
+  const basenameCount = new Map()
+  for (const file of trackedFiles()) {
+    if (isGraphSelf(file)) continue
+    const base = file.slice(file.lastIndexOf('/') + 1)
+    basenameCount.set(base, (basenameCount.get(base) ?? 0) + 1)
+  }
+  const ambiguousBasenames = new Set(
+    [...basenameCount.entries()].filter(([, count]) => count > 1).map(([base]) => base),
+  )
 
   for (const file of trackedFiles()) {
     // 排除图谱自己的产物。它列举了仓库里几乎每一个路径，一旦计入提及索引，
     // 「全仓没有任何其它文件提到它」这条判据对所有文件都恒假 —— 实测会把孤儿
     // 候选从 161 条压到 45 条，protected 一条不剩。图谱不能把自己算作引用。
-    if (file.startsWith(`${GRAPH_OUTPUT_DIR}/`)) continue
+    if (isGraphSelf(file)) continue
     if (!TEXT_EXT.test(file) && !file.endsWith('package.json')) continue
     const text = readText(file)
     if (!text || text.length > maxBytes) continue
@@ -83,7 +127,7 @@ export function buildMentionIndex(maxBytes = 2 * 1024 * 1024) {
     }
   }
 
-  return { paths, basenames }
+  return { paths, basenames, ambiguousBasenames }
 }
 
 /** 除自身之外，还有哪些文件提到了 target。 */
@@ -98,8 +142,17 @@ export function mentionsOf(target, index) {
     for (const file of index.paths.get(suffix) ?? []) if (file !== target) hits.add(file)
   }
 
+  // 文件名兜底匹配：只在该文件名全仓唯一时才算数。
+  //
+  // 不加这个前提就会张冠李戴 —— 实测踩过：placeholders/OfflineAgenciesPage.tsx 被
+  // 判成 high（「仍被门禁引用」），而门禁真正 read 的是 offline-agencies/ 目录下的
+  // 同名文件。两个路径都真实存在，按 basename 比对分不开，结果把一个零引用死文件
+  // 误报成「动不得」。docs/README.md 专门警告过这类比对，图谱既然按路径建索引，
+  // 兜底也必须让位给路径。
   const base = segments[segments.length - 1]
-  for (const file of index.basenames.get(base) ?? []) if (file !== target) hits.add(file)
+  if (!index.ambiguousBasenames?.has(base)) {
+    for (const file of index.basenames.get(base) ?? []) if (file !== target) hits.add(file)
+  }
 
   return sorted([...hits])
 }

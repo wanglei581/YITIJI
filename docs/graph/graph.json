@@ -16801,8 +16801,14 @@
     "scripts/ci-gate-exemptions.json": [
       "scripts/verify-ci-gate-coverage.mjs"
     ],
+    "scripts/generate-project-graph.mjs": [
+      "scripts/project-graph/orphans.mjs"
+    ],
     "scripts/mock-server-contract-bindings.json": [
       "scripts/verify-mock-server-contract.mjs"
+    ],
+    "scripts/project-graph-query.mjs": [
+      "scripts/project-graph/orphans.mjs"
     ],
     "services/api/package.json": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -20737,7 +20743,7 @@
         "missing": []
       },
       "file": "scripts/generate-project-graph.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": false,
       "package": "ai-job-print-terminal",
       "scriptNames": [
@@ -20754,7 +20760,7 @@
         "missing": []
       },
       "file": "scripts/project-graph-query.mjs",
-      "helper": false,
+      "helper": true,
       "inCi": false,
       "package": "ai-job-print-terminal",
       "scriptNames": [
@@ -20830,7 +20836,10 @@
         "dirs": [
           "docs/graph"
         ],
-        "files": [],
+        "files": [
+          "scripts/generate-project-graph.mjs",
+          "scripts/project-graph-query.mjs"
+        ],
         "missing": []
       },
       "file": "scripts/project-graph/orphans.mjs",
@@ -21497,17 +21506,12 @@
         "file": "apps/kiosk/src/App.tsx",
         "kind": "component",
         "mentions": [
-          "apps/admin/src/main.tsx",
-          "apps/partner/src/main.tsx",
-          "docs/progress/archive/2026-06-20-current-progress-pre-normalization.md",
-          "docs/reviews/agency-phase2-closeout-review.md",
           "docs/reviews/agency-project-structure-review.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
-          "docs/superpowers/plans/2026-06-29-global-seamless-data-refresh.md"
+          "docs/reviews/legacy-capability-inventory-2026-08-16.md"
         ],
         "risk": "medium",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md、docs/reviews/agency-phase2-closeout-review.md、docs/reviews/agency-project-structure-review.md"
+        "why": "仅被文档提及：docs/reviews/agency-project-structure-review.md、docs/reviews/legacy-capability-inventory-2026-08-16.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -21671,36 +21675,23 @@
         "file": "apps/kiosk/src/pages/placeholders/OfflineAgenciesPage.tsx",
         "kind": "component",
         "mentions": [
-          ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
-          "apps/kiosk/scripts/verify-fusion-w4.mjs",
-          "apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs",
-          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
           "docs/design/kiosk-v6-migration-matrix.md",
-          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md",
-          "docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md",
-          "services/api/scripts/verify-backend-p0-contracts.mjs"
+          "docs/reviews/legacy-capability-inventory-2026-08-16.md"
         ],
-        "risk": "high",
+        "risk": "medium",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs、services/api/scripts/verify-backend-p0-contracts.mjs"
+        "why": "仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/reviews/legacy-capability-inventory-2026-08-16.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/placeholders/OfflineJobDetailPage.tsx",
         "kind": "component",
         "mentions": [
-          ".ccg/tasks/archive/2026-07/kiosk87-runtime-visual-defect-audit/plan.md",
-          "apps/kiosk/scripts/verify-fusion-w4.mjs",
-          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
-          "docs/design/kiosk-v6-migration-matrix.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md",
-          "docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md"
+          "docs/design/kiosk-v6-migration-matrix.md"
         ],
-        "risk": "high",
+        "risk": "medium",
         "scope": "kiosk",
-        "why": "仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs"
+        "why": "仅被文档提及：docs/design/kiosk-v6-migration-matrix.md"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -21773,13 +21764,10 @@
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/services/api/smartCampus.ts",
         "kind": "component",
-        "mentions": [
-          "docs/reviews/kiosk-control-integrity-audit-2026-08-16.md",
-          "services/api/src/smart-campus/smart-campus.types.ts"
-        ],
-        "risk": "medium",
+        "mentions": [],
+        "risk": "low",
         "scope": "kiosk",
-        "why": "仅被文档提及：docs/reviews/kiosk-control-integrity-audit-2026-08-16.md"
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
@@ -21867,7 +21855,34 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/design/kiosk-ai-orchestration-2026-08/README.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/design/kiosk-ai-os-fusion-2026-08/README.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/design/kiosk-ai-os-prototype-2026-08/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -21931,6 +21946,15 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/device/release-batching-2026-08-17.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/patent/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -22156,6 +22180,15 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/reviews/project-normalization-task-evidence-triage.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/reviews/real-file-print-2026-08-17/README.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",

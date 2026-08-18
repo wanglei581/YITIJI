@@ -22,9 +22,9 @@
 | 风险 | 含义 | 数量 |
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
-| **high** | 仍被 CI / 门禁 / 包脚本引用 | 14 |
-| **medium** | 只被文档或其它文件提及 | 12 |
-| **low** | 全仓零提及 | 120 |
+| **high** | 仍被 CI / 门禁 / 包脚本引用 | 12 |
+| **medium** | 只被文档或其它文件提及 | 13 |
+| **low** | 全仓零提及 | 126 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -49,20 +49,21 @@
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（120）
+## low — 全仓零提及（126）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
 
-### 页面/组件（3）
+### 页面/组件（4）
 
 | 路径 | 判定依据 |
 | --- | --- |
 | `apps/kiosk/src/pages/print/pageRange.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `apps/kiosk/src/services/api/smartCampus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（117）
+### 文档（122）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -72,10 +73,14 @@
 | `docs/business/职易达AI求职服务终端-参赛项目简介.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/职易达AI求职服务终端-青岛OPC创业大赛商业计划书.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/job-link-risk-analysis.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/design/kiosk-ai-orchestration-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/design/kiosk-ai-os-fusion-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/design/kiosk-ai-os-prototype-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/mini-proto-v2-2026-07/CRAFT-NOTES.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/device/deploy-unfreeze-runbook-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/device/release-batching-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/patent/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/对接清单.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/product/miniapp-life-circle-plan-v0.1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/product/miniprogram-phase-a-prototype-changelist-2026-07.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -101,6 +106,7 @@
 | `docs/reviews/project-normalization-ignore-proposal.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-local-tools-landing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-task-evidence-triage.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/real-file-print-2026-08-17/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/task-card-x1-n2-n4-admin-fe-split.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-06-18-benefit-activities-real-validation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-06-18-profile-notifications-feedback-p1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -187,23 +193,24 @@
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（12）
+## medium — 只被文档或其它文件提及（13）
 
-### 页面/组件（11）
+### 页面/组件（12）
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md、docs/reviews/agency-phase2-closeout-review.md、docs/reviews/agency-project-structure-review.md |
+| `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/agency-project-structure-review.md、docs/reviews/legacy-capability-inventory-2026-08-16.md |
 | `apps/kiosk/src/components/KioskNumPad.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md |
 | `apps/kiosk/src/pages/interview/InterviewTopbar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
 | `apps/kiosk/src/pages/jobs-fairs-prototype.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md |
 | `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
 | `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
+| `apps/kiosk/src/pages/placeholders/OfflineAgenciesPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/reviews/legacy-capability-inventory-2026-08-16.md |
+| `apps/kiosk/src/pages/placeholders/OfflineJobDetailPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md |
 | `apps/kiosk/src/pages/placeholders/PrintScanConvertPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
 | `apps/kiosk/src/pages/placeholders/PrintScanFeaturePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
 | `apps/kiosk/src/pages/placeholders/PrintScanSignPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
-| `apps/kiosk/src/services/api/smartCampus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/kiosk-control-integrity-audit-2026-08-16.md |
 
 ### 样式（1）
 
@@ -214,9 +221,9 @@
 
 ──────────────────────────────────────────────────────────────────────
 
-## high — 仍被 CI / 门禁 / 包脚本引用（14）
+## high — 仍被 CI / 门禁 / 包脚本引用（12）
 
-### 页面/组件（8）
+### 页面/组件（6）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -226,8 +233,6 @@
 | `apps/kiosk/src/pages/auth/components/MemberLoginDialog.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-member-login-dialog.mjs |
 | `apps/kiosk/src/pages/home/hooks/useHomeDeviceStatus.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-prod-build-config.mjs、apps/kiosk/scripts/verify-runtime-terminal-identity.mjs |
 | `apps/kiosk/src/pages/home/serviceGroups.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-job-material-library-ui.mjs、apps/kiosk/scripts/verify-jobfair-checkin.mjs、apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs |
-| `apps/kiosk/src/pages/placeholders/OfflineAgenciesPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs、apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs、services/api/scripts/verify-backend-p0-contracts.mjs |
-| `apps/kiosk/src/pages/placeholders/OfflineJobDetailPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仍被 CI / 门禁 / 包脚本引用：apps/kiosk/scripts/verify-fusion-w4.mjs |
 
 ### 门禁脚本（3）
 
