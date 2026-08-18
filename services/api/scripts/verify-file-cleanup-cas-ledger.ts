@@ -257,6 +257,27 @@ async function main(): Promise<void> {
     }
     check(stillHidden, '待重试的删除记录对外仍必须一律 404')
 
+    // ── 不变量 2a′：会员本人正常删除（不失败）必须留删除日志 ─────────────
+    // 这条正是 verify:member-assets-c2d 端到端走的那个路径（真 app + 真库 +
+    // FilesService.ownerDelete → 查 fileObject.deletedAt）。那条门禁依赖 Redis，
+    // 本机跑不了；把同一路径在真 Prisma 上单独钉住，避免这块只能靠 CI 兜底。
+    const plainDeleted = await seedFile({
+      name: 'plain',
+      expiresAt: new Date(Date.now() + DAY),
+    })
+    const plainMeta = await files.ownerDelete(
+      plainDeleted,
+      { kind: 'member', endUserId: memberId },
+      'verify plain delete'
+    )
+    eq(plainMeta.status, 'deleted', '正常删除必须返回 deleted 状态')
+    const plainRow = await row(plainDeleted)
+    check(Boolean(plainRow.deletedAt), '正常删除必须写 deletedAt（member-assets-c2d 同款断言）')
+    eq(plainRow.status, 'deleted', '正常删除必须落 tombstone')
+    check(storage.deletedKeys.includes(key('plain')), '正常删除必须真删对象存储实体')
+    check(Boolean(plainRow.storageDeletedAt), '正常删除必须写物理删除日志（§11）')
+    eq(plainRow.storageDeletePendingAt, null, '正常删除不得留下待重试标记')
+
     // ── 不变量 2b：清理路径的物理删除失败也要落账本 ──────────────────────
     const quarantined = await seedFile({
       name: 'quarantined',
