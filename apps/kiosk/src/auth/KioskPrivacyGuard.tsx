@@ -278,30 +278,33 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     clearSessionTo({ path: '/' })
   }, [clearSessionTo])
 
-  const enterScreensaver = useCallback(
-    (playlist: KioskScreensaverPlaylist | null): void => {
-      if (!playlist?.enabled || playlist.items.length === 0) {
-        hardClear()
-        return
-      }
-      if (!claimClearing('screensaver')) return
-      returningWarningRef.current = false
+  const clearToScreensaver = useCallback((): void => {
+    if (returningWarningRef.current) {
+      hardClear()
+      return
+    }
+    const pendingWarning = pendingWarningRef.current
+    const playlist = pendingWarning?.exitTo === 'screensaver' ? pendingWarning.playlist : null
+    if (!playlist?.enabled || playlist.items.length === 0) {
+      hardClear()
+      return
+    }
+    if (!claimClearing('screensaver')) return
+    returningWarningRef.current = false
 
-      setClearing(true)
-      clearKioskSensitiveSession()
-      logout()
-      const nextBoundary = establishPrivacyBoundary()
-      pendingWarningRef.current = null
-      setWarning(null)
-      navigate('/screensaver', {
-        state: {
-          playlist,
-          privacyBoundary: nextBoundary,
-        },
-      })
-    },
-    [claimClearing, establishPrivacyBoundary, hardClear, logout, navigate]
-  )
+    setClearing(true)
+    clearKioskSensitiveSession()
+    logout()
+    const nextBoundary = establishPrivacyBoundary()
+    pendingWarningRef.current = null
+    setWarning(null)
+    navigate('/screensaver', {
+      state: {
+        playlist,
+        privacyBoundary: nextBoundary,
+      },
+    })
+  }, [claimClearing, establishPrivacyBoundary, hardClear, logout, navigate])
 
   const startWarning = useCallback(
     (
@@ -319,7 +322,20 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       // 干净待机态：清场什么都清不掉。不要把空操作包装成「还在使用吗？」问用户。
       // 屏保已配置时仍要进待机宣传屏——那是产品行为，不是隐私清场，直接进即可。
       if (isKioskClearNoOp({ pathname, isLoggedIn, guestMode })) {
-        if (exitTo === 'screensaver') enterScreensaver(playlist)
+        if (exitTo === 'screensaver') {
+          // 复用既有清场收尾，不另起一条进屏保的路径：clearToScreensaver 从
+          // pendingWarningRef 取 playlist，所以这里先按「已确认要进屏保」登记，
+          // 再交给它统一执行 clearKioskSensitiveSession / logout /
+          // establishPrivacyBoundary / navigate('/screensaver')。
+          pendingWarningRef.current = {
+            sourceHistoryIndex: null,
+            sourcePath: pathname,
+            exitTo,
+            deadlineAt: request.deadlineAt,
+            playlist,
+          }
+          clearToScreensaver()
+        }
         return
       }
       if (Date.now() >= request.deadlineAt) {
@@ -349,7 +365,7 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       })
       navigate('/session-timeout')
     },
-    [enterScreensaver, guestMode, hardClear, isLoggedIn, navigate, pathname]
+    [clearToScreensaver, guestMode, hardClear, isLoggedIn, navigate, pathname]
   )
 
   const handleOrdinaryWarning = useCallback(
@@ -388,15 +404,6 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       hardClear()
     })
   }, [hardClear, navigate])
-
-  const clearToScreensaver = useCallback((): void => {
-    if (returningWarningRef.current) {
-      hardClear()
-      return
-    }
-    const pendingWarning = pendingWarningRef.current
-    enterScreensaver(pendingWarning?.exitTo === 'screensaver' ? pendingWarning.playlist : null)
-  }, [enterScreensaver, hardClear])
 
   const { active: screensaverActive } = useScreensaverController(handleScreensaverWarning)
   useIdleLogout(screensaverActive, handleOrdinaryWarning)
