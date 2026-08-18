@@ -142,6 +142,22 @@ function ToggleGroup({
   )
 }
 
+/**
+ * 色彩模式选项 —— 控件与「用量预估」摘要行的**唯一**来源。
+ * 摘要行此前写死 '黑白'，而 handlePrint 送出的是真实 colorMode：
+ * 终端登记 color_print=available 后，用户选彩色会看到「颜色模式 黑白」，
+ * 却按彩色单价报价出纸（CLAUDE.md §9「不伪造能力」+ 资损）。两处共用一份定义，
+ * 以后再改选项也不会只改一半。
+ */
+const COLOR_MODE_OPTIONS: { label: string; value: ColorMode }[] = [
+  { label: '黑白', value: 'black_white' },
+  { label: '彩色', value: 'color' },
+]
+
+function colorModeLabel(mode: ColorMode): string {
+  return COLOR_MODE_OPTIONS.find((opt) => opt.value === mode)?.label ?? mode
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
@@ -481,10 +497,7 @@ export function PrintPreviewPage() {
           {/* Color mode */}
           <ParamCard label="色彩模式">
             <ToggleGroup
-              options={[
-                { label: '黑白', value: 'black_white' },
-                { label: '彩色', value: 'color' },
-              ]}
+              options={COLOR_MODE_OPTIONS}
               value={colorMode}
               onChange={(v) => setColorMode(v as ColorMode)}
               disabled={!capability.color.allowed}
@@ -598,7 +611,7 @@ export function PrintPreviewPage() {
               value={file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`}
             />
             <InfoRow label="打印份数" value={`${copies} 份`} />
-            <InfoRow label="颜色模式" value="黑白" />
+            <InfoRow label="颜色模式" value={colorModeLabel(colorMode)} />
             <InfoRow label="纸张规格" value="A4" />
             <InfoRow
               label="总打印面"
