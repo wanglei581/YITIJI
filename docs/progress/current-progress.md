@@ -1,5 +1,18 @@
 # 当前开发进度
 
+2026-08-18 修复 **政策页把内置办事指引与政策库混在一起展示（分支 `claude/content-visibility-fixes`，基于 `origin/main@a26eae3ca`，未合入、未部署）**。本条**对应下一条（#707 种子内容录入清单）登记的代码问题 C**；同批登记的 **D（已结束招聘会不隐藏、详情端点无日期条件）经复核判定不成立**，理由见下文，未改代码。
+
+**洞在哪。** `apps/kiosk/src/pages/renshi/RenshiPage.tsx` 把后端政策库条目和 5 条内置办事指引合并成一个数组 `[...policies.filter(kind==='policy_guide').map(fromPublished), ...BUILTIN_GUIDES]`，交给 `PolicyPanel` 平铺渲染。**并且这个「空」在旧代码里根本无法表达**：`PolicyPanel` 的空态挂在 `visible.length === 0` 上，而内置指引里 `builtin-skill-training` 的 `audiences` 含 `'general'`，`matchAudience` 对任何身份都返回 true —— 那条分支永远走不到，政策页从来就没有可达空态。
+
+**后果。** 一是 CLAUDE.md §9「不伪造能力」：政策库一条数据都没有时页面依旧满屏（已留实测截图，`/policies` 返回空数组时页面渲染 5 张完整卡片 + 完整详情面板，唯一线索是一行 16px 灰字）。二是更实际的——**挡在录种子数据前面**：运营录完 30 条政策打开页面看到满屏内容，无法判断自己录的到底进没进去，验收失去判别力。
+
+**怎么修。** `RenshiPage` 不再合并，`libraryItems` / `guideItems` 两个 prop 分开传；`PolicyPanel` 分区渲染 `data-policy-section=library|builtin`，政策库有自己的空态，且**区分两种空**：库为空 →「政策库还没有内容」，身份筛没了 →「当前身份下暂无匹配的政策」。详情面板补来源归属 chip。顺带修掉来源行的错误归因：此前政策 Tab 的来源行用**全部** `/policies` 结果计算，库里只有公告没有政策时会报出公告的来源机构与同步时间，把「没有政策」说成「有政策」；改为按 `kind` 各算各的。**内置指引保留**——本机通用办事参考本来就不来自政策库，有真实价值，问题只在于两者混在一起假装都是政策数据。
+
+**先破后立。** 两道闸门都先在未修复代码上证明会红，且在另开的干净 `origin/main` worktree 复跑确认。`verify:renshi-policy-ui` 新增 J1/J2/K：**J1 是 AST 断言而非字面量匹配**（遍历 `RenshiPage` 的数组字面量与 `.concat` 调用，任何把 policies 派生表达式与 `BUILTIN_GUIDES` 放进同一集合的写法都打红，改变量名躲不掉），J2 用正反例自检守卫本身没空转；`tests/visual/fusion-w4.spec.ts` 新增两条浏览器行为断言（跑在既有 `kiosk-browser-smoke`，**无需新增 CI 行**）：`/policies` 返回空时 library 分区 0 张卡且出现「政策库还没有内容」、builtin 分区仍 5 张；有 1 条真实政策时两分区各 1 / 5 张且不串。基线 worktree 上 J1+K 红、两条浏览器断言红（`data-policy-section` 元素不存在 / library 卡片数 0≠1），本分支全绿。
+
+**同批复核但判定不成立、因此未改的一条：「已结束的招聘会在前台不隐藏、详情端点无日期条件」。** 复核结论是**当前实现是对的**，不是缺陷。`buildPublishedFairGroups` 把已结束场次分到独立时间桶并拼在活跃场次之后（未结束 `startAt` 升序 → 已结束 `startAt` 倒序），前台 `JobFairsPage` 打 `.past` 类（`opacity:.65` + 去掉强调色左边框）、显示「已结束」状态 chip、**整块操作区连同收藏与扫码预约一起隐藏**，`JobFairDetailPage` 同样以 `!isEnded` 收掉扫码签到与扫码预约，首页高亮位与签到页各自只取 ongoing/upcoming。产品判断也是「显示但标注」而非完全隐藏：站在大厅机器前，上周结束的场次是噪音，所以必须沉底 + 明确标注；但求职者常来找「上次那场招聘会的资料」，完全隐藏会让详情页、收藏、浏览记录里的旧链接集体 404，详情端点因此**不应该**加日期条件（岗位不同——过期岗位会让人照着去投递，所以 `getPublishedJobById` 有 `jobValidityWhere()`；招聘会资料是档案，性质不一样）。**未为了有产出去改一段本来正确的代码。**
+
+**⚠️ 但复核顺带发现一处真实的、与上述判断同源的漏网（本次未修，需要单独裁决）**：「AI参会准备单」全链路对招聘会状态完全无感——`JobFairDetailPage.tsx` 的 AI准备单按钮**落在 `!isEnded` 守卫之外**（同一个 actionBar 里签到/预约都收了，只有它没收）、`JobFairDetailTabs.tsx` 的「AI参会准备单」磁贴只判 `hasManagedData`、`FairVisitPlanPage.tsx` 从头到尾不取 fair 也不读 status、`services/api/src/ai/resume/fair-visit-plan.service.ts` 的查询只有 `approved+published` 没有 `endAt` 条件，且 LLM system prompt 无当前日期锚点。净效果：**可以为上周就结束的招聘会生成并打印一份「出发前逐项核对」清单**，还要付一次 LLM 调用。仓库里已有现成的正确写法可复用（`bulk-publish-expiry.ts` 就在用 `buildFairStatusWhere('ended')` 并给出「该招聘会已于 X 结束」）。需要先定产品口径（按钮直接隐藏，还是把该页改成「回顾 / 资料整理」语义）再动手，故未并入本 PR。
 2026-08-18 新增 **上线种子内容录入清单（分支 `claude/seed-content-checklist`，基于 `origin/main@a26eae3ca`，纯文档，未改任何代码）**：[../operations/seed-content-entry-checklist-2026-08.md](../operations/seed-content-entry-checklist-2026-08.md)。承接上一条「链路是通的，空是因为没录数据」的结论，给出 30 条政策 + 20 场招聘会的可执行录入清单：字段字典与合法取值、前置条件、待录表格模板（示范行**只给结构、逐格标注「示例·需替换」**，不含任何编造的政策名称/文号/金额/日期/链接）、录入方式推荐与验收步骤。
 
 **澄清了一处运营最容易搞错的差异**：政策与招聘会的发布闸门**不一样**。招聘会过两道（`assertOrgContentTrustActive` + `assertPublishFieldsComplete`，`jobs-admin.service.ts:192-210`，10 个必填字段、`sourceUrl` 必须 http/https）；**政策只过第一道**（`policies.service.ts:293-311` 无完整性校验调用，`PolicyPost` 也不在 `publish-completeness.ts` 的字段表里），因此政策的 `externalUrl` / `externalId` 可空且不影响发布——这是刻意设计（很多地方政策只有红头文件、没有网页原文，也不是每条都有发文字号，schema 注释明确「不得伪造」）。**录入方式给单一推荐：两类都走 `manual` 手动录入**——政策本就不在数据源体系里（无数据源外键，excel/csv/api/webhook 四种对政策全不适用），20 场招聘会摊不平 Excel 的建源+配映射成本，且手动录入的 `externalId` 由系统生成不会填错；`json` 只有壳、`api` 半通、`webhook` 只收岗位。

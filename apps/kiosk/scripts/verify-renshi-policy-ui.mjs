@@ -9,12 +9,14 @@
  *   E. 人群筛选与后端 POLICY_AUDIENCES 对齐（含 flexible 与 migrant）。
  *   F. 首页政策服务子入口与 Tab 一一对应（社保指南→tab=social），不得回退「补贴指引→tab=social」错位。
  *   G. 无越界承诺文案（代办 / 保证到账 / 免申即享 / 一键投递等）。
+ *   J. 内置办事指引不得与政策库条目合并成同一个列表（AST 断言，见下方说明）。
  *
  * 运行：pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
@@ -126,6 +128,63 @@ if (allowedServiceClaims.every((text) => !hasUnsafeServiceClaim(text)) && forbid
   pass('G2. 代办文案守卫正反例契约通过')
 } else {
   fail('G2. 代办文案守卫必须放过否定声明并拦截所有正向承诺')
+}
+
+// J. 内置办事指引 ≠ 政策库内容，两者不得合并成同一个数组再一起渲染。
+//
+//   合并之后政策库为空时页面依旧满屏，运营录完种子数据打不开判别力：
+//   看到一堆卡片却无法确认自己录的 30 条到底进没进去（CLAUDE.md §9「不伪造能力」）。
+//   用 AST 判定而不是字面量匹配：任何把「policies 派生表达式」和「BUILTIN_GUIDES」
+//   放进同一个数组字面量 / concat 调用的写法都会被打红，换个变量名也躲不掉。
+function mergesBuiltinWithLibrary(sourceText) {
+  const source = ts.createSourceFile('RenshiPage.tsx', sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const offenders = []
+  const mentionsBuiltin = (node) => /\bBUILTIN_GUIDES\b/.test(node.getText(source))
+  const mentionsLibrary = (node) => /\bpolicies\b|\bfromPublished\b/.test(node.getText(source))
+
+  function inspect(parts, node) {
+    const hasBuiltin = parts.some(mentionsBuiltin)
+    const hasLibrary = parts.some(mentionsLibrary)
+    if (hasBuiltin && hasLibrary) offenders.push(node.getText(source).replace(/\s+/g, ' ').slice(0, 160))
+  }
+
+  function visit(node) {
+    if (ts.isArrayLiteralExpression(node)) inspect([...node.elements], node)
+    if (
+      ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === 'concat'
+    ) inspect([node.expression.expression, ...node.arguments], node)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return offenders
+}
+const mergeOffenders = mergesBuiltinWithLibrary(page)
+if (mergeOffenders.length === 0) {
+  pass('J1. 内置办事指引未与政策库条目合并成同一个列表')
+} else {
+  fail(`J1. 内置指引不得与政策库条目合并渲染（政策库为空时页面会假装有内容）：${mergeOffenders.join(' ｜ ')}`)
+}
+// 正反例自检：守卫必须真的能抓到合并写法，也不能把「分开传两个 prop」误判成合并。
+const mergeFixture = 'const items = [...policies.map(fromPublished), ...BUILTIN_GUIDES]'
+const splitFixture = 'const lib = policies.map(fromPublished)\nconst guides = [...BUILTIN_GUIDES]'
+if (mergesBuiltinWithLibrary(mergeFixture).length > 0 && mergesBuiltinWithLibrary(splitFixture).length === 0) {
+  pass('J2. 合并守卫正反例契约通过')
+} else {
+  fail('J2. 合并守卫必须拦截合并数组并放过分区写法')
+}
+
+// K. 政策库必须有可达空态：内置指引里存在 audiences 含 'general' 的条目，
+//    任何身份筛选下它都命中，所以「整个列表为空」这条分支永远走不到。
+//    空态必须挂在政策库分区自己身上，且分区标记可被浏览器断言定位。
+const librarySection = /data-policy-section="library"/.test(policyPanel)
+const builtinSection = /data-policy-section="builtin"/.test(policyPanel)
+const libraryEmptyCopy = /政策库还没有内容/.test(policyPanel)
+if (librarySection && builtinSection && libraryEmptyCopy) {
+  pass('K. 政策库/内置指引分区标记与政策库空态文案齐备')
+} else {
+  fail('K. PolicyPanel 必须分区渲染（data-policy-section=library/builtin）并为空政策库提供「政策库还没有内容」空态')
 }
 
 if (packageJson.includes('"verify:renshi-policy-ui"')) {
