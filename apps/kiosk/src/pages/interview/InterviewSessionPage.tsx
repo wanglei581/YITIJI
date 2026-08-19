@@ -28,6 +28,7 @@ import { InterviewSessionPanels } from './session/InterviewSessionPanels'
 import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
 import './interview-service-desk.css'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const advisorPortrait = '/assets/ai-advisor.png'
 
@@ -291,7 +292,7 @@ export function InterviewSessionPage() {
       const { text } = await transcribeAnswer(state.sessionId, wav, access)
       setVoice({ kind: 'review', transcript: text, edited: text, durationSec })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '语音转写失败'
+      const msg = userMessageOf(err, '语音转写失败')
       if (msg.includes('未启用') || msg.includes('未配置')) {
         fallbackToText(`${msg}，请使用文字输入完成练习`)
       } else {
@@ -337,7 +338,7 @@ export function InterviewSessionPage() {
       setQuestionIndex(res.questionIndex)
       setPhase('answering')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '提交失败，请重试')
+      setError(userMessageOf(err, '提交失败，请重试'))
       setPhase('answering')
     }
   }
@@ -352,7 +353,7 @@ export function InterviewSessionPage() {
       const report = await endInterview(state.sessionId, access)
       navigate('/interview/report', { state: { sessionId: state.sessionId, accessToken: state.accessToken, report } })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '报告生成失败，请重试')
+      setError(userMessageOf(err, '报告生成失败，请重试'))
       setPhase(messages.some((m) => m.role === 'candidate' && !m.skipped) ? 'done_suggest' : 'answering')
     }
   }

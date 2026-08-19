@@ -34,6 +34,7 @@ import { ResumeLayoutControls } from './components/ResumeLayoutControls'
 import { useResumeLayout } from './hooks/useResumeLayout'
 import './resume-authoring-lightflow.css'
 import './resume-fusion-youth.css'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 /** 导出格式可选项 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
@@ -209,7 +210,7 @@ export function ResumeOptimizePage() {
       const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)
       setExported(result); setIsDirty(false)
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : '导出失败，请稍后重试')
+      setExportError(userMessageOf(err, '导出失败，请稍后重试'))
     } finally { setExporting(false) }
   }
 
@@ -220,7 +221,7 @@ export function ResumeOptimizePage() {
       const result = await adjustResumeLayoutDraft(taskId, optimizedResume, action, layout, { token: getToken(), accessToken })
       setLastResumeBeforeAiAdjust(before); setOptimizedResume(result.resume); setAdjustWarnings(result.warnings ?? []); setExported(null); setIsDirty(true)
     } catch (err) {
-      setAdjustError(err instanceof Error ? err.message : 'AI 调整失败，请稍后重试或继续手动编辑')
+      setAdjustError(userMessageOf(err, 'AI 调整失败，请稍后重试或继续手动编辑'))
     } finally { setAdjusting(null) }
   }
 

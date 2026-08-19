@@ -46,7 +46,7 @@ async function get<T>(path: string): Promise<T> {
     throw new Error('COMPANIES_REQUIRES_BACKEND')
   }
   const res = await fetch(`${API_BASE_URL}${path}`, { headers: { Accept: 'application/json' } })
-  if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  if (!res.ok) throw new Error(`请求失败（${res.status}）`)
   const body = (await res.json()) as { data: T }
   return body.data
 }

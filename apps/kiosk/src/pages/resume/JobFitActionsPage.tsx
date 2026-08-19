@@ -41,6 +41,7 @@ import './jobFit-inkpaper.css'
 import './jobFit-inkpaper-ext.css'
 import './resume-fusion-youth.css'
 import './job-fit-actions.css'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const JOB_FIT_ROUTE = '/resume/job-fit'
 
@@ -159,7 +160,7 @@ export function JobFitActionsPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }

@@ -43,7 +43,7 @@ async function readError(res: Response): Promise<string> {
   } catch {
     /* 非 JSON，回退 */
   }
-  return text || `HTTP ${res.status}`
+  return text || `请求失败（${res.status}）`
 }
 
 function paymentSessionHeaders(input: PaymentSessionInput): Record<string, string> {

@@ -20,6 +20,7 @@ import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobResultsSection } from './components/JobResultsSection'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
 import { FusionBadge, FusionNotice, KioskPageFrame } from './components/W4Presentation'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
@@ -471,7 +472,7 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
     return err.message
   }
-  return err instanceof Error ? err.message : 'AI 辅助暂时不可用，请稍后重试。'
+  return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')
 }
 // Component markers for verify:job-info-ui contract
 // JobOverviewPanel — 岗位总览面板 (显示来源统计、岗位数量、最近同步时间)

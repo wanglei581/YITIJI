@@ -33,6 +33,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import './resume-authoring-lightflow.css'
 import './resume-fusion-youth.css'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface LocationState {
   result?: ResumeGenerateResponse
@@ -147,7 +148,7 @@ export function ResumeGeneratePreviewPage() {
       const file = await exportGeneratedResume(resume, result.taskId, getToken())
       setExported(file)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '导出失败，请稍后重试')
+      setError(userMessageOf(err, '导出失败，请稍后重试'))
     } finally {
       setExporting(false)
     }

@@ -72,7 +72,7 @@ async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
   clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
-    let message = `HTTP ${res.status}`
+    let message = `请求失败（${res.status}）`
     try {
       const body = (await res.json()) as { error?: { code?: string; message?: string } }
       code    = body.error?.code    ?? code
@@ -120,7 +120,7 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
   clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
-    let message = `HTTP ${res.status}`
+    let message = `请求失败（${res.status}）`
     try {
       const body2 = (await res.json()) as { error?: { code?: string; message?: string } }
       code    = body2.error?.code    ?? code
@@ -158,7 +158,7 @@ async function postWithAccess<T>(path: string, body: unknown, access?: ResumeRea
   clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
-    let message = `HTTP ${res.status}`
+    let message = `请求失败（${res.status}）`
     try {
       const body2 = (await res.json()) as { error?: { code?: string; message?: string } }
       code    = body2.error?.code    ?? code
@@ -192,7 +192,7 @@ async function postForm<T>(path: string, body: FormData): Promise<T> {
   clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
-    let message = `HTTP ${res.status}`
+    let message = `请求失败（${res.status}）`
     try {
       const body2 = (await res.json()) as { error?: { code?: string; message?: string } }
       code    = body2.error?.code    ?? code

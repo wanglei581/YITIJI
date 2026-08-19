@@ -123,7 +123,7 @@ export async function getEligibilityQuestions(): Promise<EligibilityQuestionSet>
   const res = await fetch(`${API_BASE_URL}/policies/eligibility-questions`, {
     headers: { Accept: 'application/json' },
   })
-  if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  if (!res.ok) throw new Error(`请求失败（${res.status}）`)
   return (await res.json()) as EligibilityQuestionSet
 }
 
@@ -144,6 +144,6 @@ export async function checkEligibility(
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ answers }),
   })
-  if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  if (!res.ok) throw new Error(`请求失败（${res.status}）`)
   return (await res.json()) as EligibilityCheckResult
 }
