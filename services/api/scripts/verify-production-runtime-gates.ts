@@ -21,8 +21,6 @@ const PROD_OK: Env = {
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
-  // C5-6：生产必须显式声明 paid-before-claim（缺省即拒启动）
-  PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
   // 商用隐私底线：用户原始材料必须完成 PII 检查后才能建打印任务。
   PRINT_REQUIRE_PII_SCAN: 'true',
   // Task 11：生产必须显式声明 print-scan 能力开关未配置行语义
@@ -244,34 +242,24 @@ function main(): void {
     '生产环境拒绝逗号列表中混入 sandbox',
   )
   expectAllowed(
-    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat,alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true' },
+    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat,alipay' },
     '生产环境允许 wechat,alipay 真实通道（凭证齐全性由 Provider 工厂另行 fail-closed 校验）',
   )
 
-  // 生产环境：paid-before-claim 必须显式声明（C5-6）
-  expectRejected(
-    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: undefined },
-    'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED',
-    '生产环境拒绝未显式声明 PRINT_REQUIRE_PAID_BEFORE_CLAIM',
-  )
-  expectRejected(
-    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'yes' },
-    'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED',
-    '生产环境拒绝非 true|false 取值',
+  // 先付后印不再是部署开关：claim 无条件只领 payStatus='paid'，写死在
+  // terminals-agent.service.ts 的 claimableWhere 里。这里只需证明启动门禁
+  // 不再因为该变量的取值而放行或拒绝 —— 它已经不参与任何决策。
+  //
+  // 被删掉的用例里最危险的一条是「生产 + PAYMENT_PROVIDER=disabled +
+  // PRINT_REQUIRE_PAID_BEFORE_CLAIM=false 允许启动」：它把「未支付可出纸」
+  // 写成了合法部署形态。删除它不是放宽防线，因为对应的代码路径已经不存在。
+  expectAllowed(
+    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
+    '旧的 paid-before-claim 变量已不参与启动决策（取 false 也不影响启动，且不再有可关闭的出纸门控）',
   )
   expectAllowed(
-    { ...PROD_OK, PAYMENT_PROVIDER: 'disabled', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
-    '生产环境线上支付关闭时允许显式声明 false（线下收款模式）',
-  )
-  expectRejected(
-    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
-    'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
-    '启用真实支付通道时强制 paid-before-claim=true（先付后印）',
-  )
-  expectRejected(
-    { ...PROD_OK, PAYMENT_PROVIDER: 'alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
-    'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
-    'alipay 通道同样强制先付后印',
+    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: undefined },
+    '不再要求声明 paid-before-claim（开关已删除）',
   )
 
   // 生产环境：打印前 PII 检查必须显式开启，不能保留观察期 bypass。

@@ -26,7 +26,7 @@
 | `PAYMENT_PROVIDER` | 启用哪些线上支付通道；逗号分隔可多通道 | 部署决策：`wechat` / `alipay` / `wechat,alipay`；未上线支付时留空或 `disabled` | 启动日志无 `PAYMENT_PROVIDER_INVALID` / `*_SANDBOX_*` 报错；`GET` 收银页可见对应通道 | 王 |
 | `PAYMENT_NOTIFY_BASE_URL` | 渠道回调可达的公网 base；回调 URL = `{base}/api/v1/payment/callback/{wechat\|alipay}` | https 域名（见 nginx 草案）；生产**必须** `https://` 开头，不带尾斜线 | 启动无 `PAYMENT_NOTIFY_BASE_URL_*` 报错；`curl -i https://<域名>/api/v1/payment/callback/wechat`（POST 空体应返回 4xx 业务拒绝而非 502/超时） | 王 |
 | `PAYMENT_SESSION_SECRET` | 打印建单后签发短期支付会话 token 的签名密钥 | 服务器上 `openssl rand -base64 48` 生成（T2 类，≥ 32 字符） | 启动无 `PRODUCTION_PAYMENT_SESSION_SECRET_INVALID`；收银页可正常出码 | 王 |
-| `PRINT_REQUIRE_PAID_BEFORE_CLAIM` | 未支付订单能否被 Agent claim 出纸（先付后印门禁） | 部署决策，生产**必须显式写** `true` 或 `false`；启用 wechat/alipay 时**必须 `true`** | 启动无 `PRODUCTION_PAID_BEFORE_CLAIM_*` 报错；真机验证未支付单不出纸 | 王 |
+| ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM`~~ | **已删除，无需配置**。先付后印写死在代码里（`claimableWhere` + 事务内 CAS 两层要求 `payStatus='paid'`），任何环境关不掉 | 不要再写进 `.env`；已存在的可删除 | 看 CI 门禁 `verify:print-rollout-config`（钉死该开关不得存在）与 `verify:kiosk-cashier-ui`；真机仍需验证未支付单不出纸 | 王 |
 | `PAYMENT_QR_TTL_SECONDS`（可选） | 动态码有效期，默认 300，范围 30–86400 | 留空用默认；调整须与收银页倒计时体验联动 | 收银页二维码过期倒计时符合预期 | 王 |
 | `PAYMENT_ORDER_TTL_SECONDS`（可选） | 订单超时关单时限，默认 900，范围 30–86400 | 留空用默认 | 超时单自动 closed；可重新发起 | 王 |
 | `SANDBOX_PAYMENT_SECRET` | 沙箱通道验签密钥 | **生产不需要、不应配置**（生产禁 sandbox） | 生产 `.env` 中确认此行不存在或留空 | 王 |
@@ -63,8 +63,7 @@
 
 | 错误配置 | 门禁错误码 | 正确做法 |
 |---|---|---|
-| `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 缺省/留空/写成 `1`、`yes` | `PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED` | 显式写 `true` 或 `false`（小写） |
-| 启用 wechat/alipay 但 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=false` | `PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED` | 收真钱必须 `true`（先付后印，无豁免） |
+| ~~`PRINT_REQUIRE_PAID_BEFORE_CLAIM` 相关的两条启动报错~~ | ~~`PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED` / `_REQUIRED`~~ | 该开关与两条校验已删除。先付后印不再可配置，写死在代码里；`.env` 里留着这个变量既不生效也不再报错，建议删掉以免误导 |
 | `PAYMENT_PROVIDER` 含 `sandbox`（生产） | `PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN`（gates 层）/ `PAYMENT_PROVIDER_SANDBOX_FORBIDDEN_IN_PRODUCTION`（工厂层） | 生产只允许 空/`disabled`/`wechat`/`alipay` |
 | `PAYMENT_PROVIDER=sandbox,wechat` 之类混配（任何环境） | `PAYMENT_PROVIDER_SANDBOX_EXCLUSIVE` | 测试通道与真实资金通道绝不混跑 |
 | `PAYMENT_PROVIDER` 写了未知值（如 `weixin`、`wxpay`） | `PAYMENT_PROVIDER_INVALID` | 仅 `sandbox`/`wechat`/`alipay` 三个合法通道名 |

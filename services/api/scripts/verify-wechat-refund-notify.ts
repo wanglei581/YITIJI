@@ -19,7 +19,6 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-wxrn-terminal-admin-secret-0123
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-wxrn-terminal-action-secret-01234'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-wxrn-file-signing-secret-01234567890abc'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-wxrn-payment-session-secret-01234567'
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
 
 import 'dotenv/config'
 import { createDecipheriv, createSign, generateKeyPairSync, randomBytes, randomUUID } from 'crypto'

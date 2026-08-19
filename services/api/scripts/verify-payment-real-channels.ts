@@ -24,8 +24,6 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-realpay-terminal-admin-secret-0
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-realpay-terminal-action-secret-0123456789'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-realpay-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-realpay-payment-session-secret-0123456789'
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
-
 import 'dotenv/config'
 import express from 'express'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
@@ -1075,15 +1073,15 @@ async function main(): Promise<void> {
       fail(`reconciled-paid claims mismatch: ${[...reconClaims].join(',')}`)
     }
 
-    // ── (7) 门禁开关对照（隔离订单 H，验证 legacy off 行为仍可用）─────────
+    // ── (7) 旧开关已删除：未支付任务在任何环境变量下都不可领取 ─────────────
+    // 这里原本验证的是「关掉门禁后 unpaid 可 claim」这条 legacy 行为，
+    // 而那正是 P0-1 的资损路径本身。开关删除后改为反向证明它已彻底失效。
     const H = await makePrintOrder('orderH')
-    // 门禁开启时 H（及此前未支付的 C/E/F）都不可领取。
-    if ((await claimOnce()) === null) pass('门禁开启时全部未支付任务不可 claim')
-    else fail('gate-on claim leaked an unpaid task')
-    // 关闭门禁：未支付任务（含 H）可被领取 —— claim 按创建序逐个取，循环至取到 H。
+    if ((await claimOnce()) === null) pass('全部未支付任务不可 claim')
+    else fail('claim leaked an unpaid task')
+    // 把旧变量塞回 false，再扫一轮：不应领到任何任务，更不应领到 H。
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
     let sawH = false
-    // 前文还会创建两笔已由渠道关单释放的二维码订单；按上限扫描到 H，避免测试夹具数量变化掩盖门禁断言。
     for (let i = 0; i < 12; i += 1) {
       const claimed = await claimOnce()
       if (!claimed) break
@@ -1092,11 +1090,11 @@ async function main(): Promise<void> {
         break
       }
     }
-    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
-    if (sawH) {
-      pass('门禁关闭时 unpaid 任务可 claim（legacy 行为，生产由 runtime gates 强制显式声明）')
+    delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+    if (!sawH) {
+      pass('旧开关设为 false 也无效：未支付任务 H 仍不可 claim')
     } else {
-      fail('gate-off did not allow claiming unpaid task H')
+      fail('legacy env var still allowed claiming unpaid task H —— 出纸付费门控被绕过')
     }
 
     console.log(`\n  ✅ verify:payment-real-channels 全部通过（${passCount} checks）\n`)

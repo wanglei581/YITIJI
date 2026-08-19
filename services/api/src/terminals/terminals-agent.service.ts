@@ -33,7 +33,6 @@ import {
   tryNormalizeMacAddress,
   isMacUniqueConstraintError,
   exceptionErrorCode,
-  requirePaidBeforeClaim,
   shouldSeedTestPrintTask,
   normalizeHeartbeatStatus,
   inferMimeFromFileName,
@@ -57,7 +56,6 @@ import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit
 type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 'cancelled'
 
 const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
-const REFUND_PAY_STATUSES = ['refunding', 'partial_refunded', 'refunded']
 
 class PrintTaskClaimRaceError extends Error {}
 
@@ -397,21 +395,23 @@ export class TerminalAgentService implements OnModuleInit {
 
     const results: ClaimTaskResponse[] = []
 
-    const paidGate = requirePaidBeforeClaim()
-    const claimableWhere = paidGate
-      ? {
-          status: 'pending' as const,
-          terminalId,
-          OR: [{ order: { is: null } }, { order: { is: { payStatus: 'paid', taskStatus: 'pending' } } }],
-        }
-      : {
-          status: 'pending' as const,
-          terminalId,
-          OR: [
-            { order: { is: null } },
-            { order: { is: { payStatus: { notIn: REFUND_PAY_STATUSES }, taskStatus: 'pending' } } },
-          ],
-        }
+    // 出纸的唯一前置条件：这一单已经付过钱。
+    //
+    // 这里曾经是一个 env 开关（PRINT_REQUIRE_PAID_BEFORE_CLAIM），默认关闭，
+    // 关闭时 unpaid / paying / closed / expired 全都能被领走真实出纸。免费单
+    // （amountCents=0）与线下收款（Admin mark-paid）本来就落成 payStatus='paid'，
+    // 所以那个开关没有任何合法用途，只是一条可以被配置打开的资损旁路，已删除。
+    //
+    // 无关联订单的任务同样不再放行：真实业务流两条建单路径都在同一事务内把
+    // PrintTask 与 Order 绑定，能匹配「无订单」的只剩孤儿数据（手工 SQL / 缺陷 /
+    // 迁移残留），那正是绕过付费的形状。
+    // dev 播种任务（ptask_seed_001）不受影响：它建出来 terminalId 为 null，
+    // 而本查询一直带终端过滤，本改动前后都匹配不上任何终端的领取请求。
+    const claimableWhere = {
+      status: 'pending' as const,
+      terminalId,
+      order: { is: { payStatus: 'paid', taskStatus: 'pending' } },
+    }
 
     for (let i = 0; i < limit; i++) {
       let claimed
@@ -429,16 +429,15 @@ export class TerminalAgentService implements OnModuleInit {
           })
           if (!task) return null
 
+          // 订单必须存在（claimableWhere 已要求），并以 CAS 再确认一次仍是 paid+pending：
+          // findFirst 与 updateMany 之间存在退款/关单的时间窗，只靠前置查询会漏。
           const order = await tx.order.findFirst({ where: { printTaskId: task.id }, select: { id: true } })
-          if (order) {
-            const claimedOrder = await tx.order.updateMany({
-              where: paidGate
-                ? { id: order.id, taskStatus: 'pending', payStatus: 'paid' }
-                : { id: order.id, taskStatus: 'pending', payStatus: { notIn: REFUND_PAY_STATUSES } },
-              data: { taskStatus: 'claimed', terminalId },
-            })
-            if (claimedOrder.count !== 1) return null
-          }
+          if (!order) return null
+          const claimedOrder = await tx.order.updateMany({
+            where: { id: order.id, taskStatus: 'pending', payStatus: 'paid' },
+            data: { taskStatus: 'claimed', terminalId },
+          })
+          if (claimedOrder.count !== 1) return null
 
           const claimedAt = new Date()
           const claimedTask = await tx.printTask.updateMany({

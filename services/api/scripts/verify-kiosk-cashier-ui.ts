@@ -5,11 +5,11 @@
  *  1. 建单响应契约（收银衔接）：付费单返回 orderId / orderNo / amountCents>0 / payStatus=unpaid /
  *     priceLines 计费明细 / billablePages / billingPageSource / paymentSessionToken；
  *     免费单 amountCents=0 且 payStatus=paid。
- *  2. **出纸门控（PRINT_REQUIRE_PAID_BEFORE_CLAIM=true）**：付费单未支付时 claim **不下发**、任务保持 pending。
+ *  2. **出纸付费门控（无条件）**：付费单未支付时 claim **不下发**、任务保持 pending。
  *  3. 沙箱模拟支付成功 → 订单 paid + pickupCode → 同一任务变为可 claim（出纸放行）。
- *  4. 无关联 Order 的任务（seed/历史/直连）在门控开启下仍可 claim（order:null 放行）。
- *  5. 免费单（amountCents=0，已 paid+free）在门控开启下即可 claim；免费单出码被拒（PAY_NOT_REQUIRED）。
- *  6. 门控**默认关闭**回归：flag 关时未支付单可 claim（与 C5-3 前一致，证明零静默回归）。
+ *  4. 无关联 Order 的孤儿任务**不可** claim（没有支付依据不得出纸）。
+ *  5. 免费单（amountCents=0，已 paid+free）可 claim；免费单出码被拒（PAY_NOT_REQUIRED）。
+ *  6. 旧开关 PRINT_REQUIRE_PAID_BEFORE_CLAIM 已删除：即使塞回 false 也不再有任何效果。
  *  7. pay-status 取件码可见性：paid 才回 pickupCode；未支付一律 null。
  *  8. P0-1 报价：POST /orders/quote 同口径 service 不落库；报价金额 == 建单金额；
  *     pageRange 计费与超收修复一致；外部 fileUrl fail-closed。
@@ -24,8 +24,8 @@ import { randomBytes, randomUUID } from 'crypto'
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-cashier-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-cashier-terminal-action-secret-0123456789'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-cashier-file-signing-secret-0123456789abcd'
-// 出纸门控本波显式开启（决策 1：默认关闭，verify/CI/验收显式设 true）。
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
+// 出纸付费门控已不再是开关：claim 无条件只领 payStatus='paid' 的任务。
+// 这里刻意不设置任何相关环境变量，用例 6 会反向证明旧变量已完全失效。
 // 沙箱模拟支付要求非生产环境。
 if (process.env['NODE_ENV'] === 'production') {
   console.error('  FAIL verify:kiosk-cashier-ui 不得在 NODE_ENV=production 下运行（沙箱模拟支付被禁用）')
@@ -213,14 +213,19 @@ async function main(): Promise<void> {
     const paidTaskClaimed = await prisma.printTask.findUnique({ where: { id: paid.taskId } })
     assert(paidTaskClaimed?.status === 'claimed', '3i. claim 后 PrintTask 变 claimed')
 
-    // ── (4) 无关联 Order 的任务在门控开启下仍可 claim（seed/历史放行）────────
+    // ── (4) 无关联 Order 的任务**不可** claim（孤儿任务没有支付依据）─────────
+    // 曾经这里断言的是「仍可 claim」。真实业务流的两条建单路径都在同一事务内把
+    // PrintTask 与 Order 绑定，所以能匹配「无订单」的只剩手工 SQL / 缺陷 / 迁移
+    // 残留造成的孤儿任务 —— 放行它等于留一条无支付依据的出纸路径。
     const legacyTaskId = `ptask_cashier_legacy_${suffix}`
     await prisma.printTask.create({
       data: { id: legacyTaskId, terminalId, fileUrl: 'file://legacy', fileMd5: '', paramsJson: '{}', status: 'pending', createdAt: OLD_DATE },
     })
     taskIds.push(legacyTaskId)
     const claimLegacy = await claimOne()
-    assert(claimLegacy.length === 1 && claimLegacy[0].taskId === legacyTaskId, '4. 无 Order 任务（seed/历史）门控开启下仍可 claim')
+    assert(claimLegacy.length === 0, '4. 无 Order 的孤儿任务不可 claim（无支付依据不得出纸）')
+    const legacyStill = await prisma.printTask.findUnique({ where: { id: legacyTaskId } })
+    assert(legacyStill?.status === 'pending', '4b. 被拒的孤儿任务保持 pending，不被静默改状态')
 
     // ── (5) 免费单：amountCents=0 + payStatus=paid，门控下可 claim；出码被拒 ──
     await prisma.priceConfig.upsert({
@@ -243,18 +248,20 @@ async function main(): Promise<void> {
       data: { unitCents: 20, active: true, description: '黑白打印' },
     })
 
-    // ── (6) 门控默认关闭回归：flag 关时未支付单可 claim（零静默回归）──────────
+    // ── (6) 未支付单在任何环境变量下都不可 claim（开关已删除）───────────────
+    // 这里原本断言「flag 关时未支付单可 claim」，即把资损路径写成期望行为。
+    // 开关已删除，改为反向证明：即使有人把旧变量塞回环境，也不再有任何效果。
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
     const gateOff = await printJobs.create(
-      { fileUrl: await seedPdf('gateoff', 1), fileMd5: 'sha256-cash-off', fileName: '门控关闭.pdf', params: { copies: 1, colorMode: 'black_white' } },
+      { fileUrl: await seedPdf('gateoff', 1), fileMd5: 'sha256-cash-off', fileName: '旧开关无效.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
     )
     taskIds.push(gateOff.taskId)
-    assert(gateOff.payStatus === 'unpaid', '6a. 门控关闭用例：建单仍为未支付单')
+    assert(gateOff.payStatus === 'unpaid', '6a. 用例前置：建单为未支付单')
     await backdate(gateOff.taskId)
     const claimGateOff = await claimOne()
-    assert(claimGateOff.length === 1 && claimGateOff[0].taskId === gateOff.taskId, '6b. 门控关闭时未支付单可 claim（与 C5-3 前一致，证明零静默回归）')
-    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true' // 复位
+    assert(claimGateOff.length === 0, '6b. 旧开关设为 false 也无效：未支付单仍不可 claim（开关已删除）')
+    delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
 
     // ── (7) pay-status 取件码可见性 ────────────────────────────────────────
     await expectCode('7a. 缺失 paymentSessionToken 时拒绝查支付状态', 'PAYMENT_SESSION_REQUIRED', () => payment.getPayStatus(paid.orderId, ''))

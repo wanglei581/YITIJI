@@ -202,15 +202,16 @@ function main(): void {
       'where: claimableWhere',
       "status: 'pending' as const",
       'terminalId,',
+      // 出纸付费门控已从可关闭的 env 开关改为写死：claim 只领已付款订单。
+      // 原先这里还钉着 `payStatus: { notIn: REFUND_PAY_STATUSES }`（门控关闭时的
+      // 放行分支），那条分支正是 P0-1 的资损路径，已随开关一并删除。
       "payStatus: 'paid', taskStatus: 'pending'",
-      "payStatus: { notIn: REFUND_PAY_STATUSES }, taskStatus: 'pending'",
     ],
-    'claim must keep terminalId + pending filters and distinguish paid gate from refund-state guard',
+    'claim must keep terminalId + pending filters and require a paid order',
   )
   mustContain(
     claimBlock,
     [
-      'requirePaidBeforeClaim()',
       'const claimedOrder = await tx.order.updateMany',
       "data: { taskStatus: 'claimed', terminalId }",
       'const claimedTask = await tx.printTask.updateMany',
@@ -218,6 +219,22 @@ function main(): void {
       'if (error instanceof PrintTaskClaimRaceError) claimed = null',
     ],
     'claim must CAS Order pending→claimed before PrintTask and roll back a PrintTask race',
+  )
+  // CAS 必须**自己**复核仍是 paid：findFirst 与 updateMany 之间有退款 / 关单时间窗。
+  //
+  // 这条断言必须只在 updateMany 这一小段里判定。第一版把 `payStatus: 'paid'` 直接塞进
+  // 上面那个 mustContain(claimBlock, …)，而 claimBlock 里的 claimableWhere 本来就含这个
+  // 字符串 —— 于是即使把 CAS 的付款条件整条删掉，断言照样通过，是一条空转门禁。
+  const claimOrderCas = section(
+    claimBlock,
+    'const claimedOrder = await tx.order.updateMany',
+    'if (claimedOrder.count !== 1)',
+    'claim Order CAS',
+  )
+  mustContain(
+    claimOrderCas,
+    ["payStatus: 'paid'", "taskStatus: 'pending'"],
+    'claim Order CAS must itself re-check paid+pending (refund/close race window)',
   )
   mustContain(terminalsService, ['class PrintTaskClaimRaceError extends Error {}'], 'claim race must use a rollback sentinel')
   mustContain(

@@ -11,7 +11,6 @@
  * - cron 任务 env 门控（源码断言 REFUND_AUTO_CONVERGE_ENABLED）。
  */
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-refundconv-payment-session-secret-0123456789'
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
 if (process.env['NODE_ENV'] === 'production') {
   console.error('  FAIL verify:refund-convergence 不得在 NODE_ENV=production 运行')
   process.exit(1)

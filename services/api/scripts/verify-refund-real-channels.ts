@@ -26,7 +26,6 @@ process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-refundreal-terminal-admin-secre
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-refundreal-terminal-action-secret-0123456789'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-refundreal-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-refundreal-payment-session-secret-0123456789'
-process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
 
 import 'dotenv/config'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'

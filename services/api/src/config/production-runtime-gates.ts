@@ -14,8 +14,6 @@
  *     生产不得回退 JWT_SECRET / FILE_SIGNING_SECRET）
  *   - PAYMENT_PROVIDER 不得含 sandbox（生产禁止沙箱支付通道；wechat/alipay 真实渠道
  *     由 Provider 工厂启动期校验凭证齐全，缺一拒启动）
- *   - PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须显式声明 true|false（C5-6：未支付订单能否被
- *     claim 出纸是显式部署决策）；启用 wechat/alipay 时必须为 true（先付后印）
  *   - PRINT_REQUIRE_PII_SCAN 必须为 true（用户原始材料未完成隐私检查与逐项裁决时，
  *     生产环境不得创建打印任务）
  *   - PRINT_SCAN_CAPABILITY_MODE 必须显式声明 managed|strict（Task 11：打印扫描能力开关
@@ -52,7 +50,6 @@ export interface ProductionRuntimeEnv {
   TRTC_LLM_API_KEY?: string
   PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
-  PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
   PRINT_REQUIRE_PII_SCAN?: string
   PRINT_SCAN_CAPABILITY_MODE?: string
   TRUST_PROXY_HOPS?: string
@@ -163,23 +160,9 @@ export function assertProductionRuntimeGates(
       'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN: NODE_ENV=production 时 PAYMENT_PROVIDER 不得含 sandbox（生产只允许 disabled / wechat / alipay）',
     )
   }
-  const realChannelEnabled = paymentChannels.some((c) => c === 'wechat' || c === 'alipay')
-
-  // C5-6 paid-before-claim 门禁「按部署环境显式开启」：
-  // - 生产必须**显式**声明 PRINT_REQUIRE_PAID_BEFORE_CLAIM=true|false，不允许沉默缺省 ——
-  //   缺省 false 会让付费单未支付即被 Agent claim 出纸，这类资金风险必须是显式决策。
-  // - 启用真实支付通道（wechat/alipay）时必须为 true：收真钱就必须先付后印，无豁免。
-  const paidBeforeClaim = env.PRINT_REQUIRE_PAID_BEFORE_CLAIM?.trim()
-  if (paidBeforeClaim !== 'true' && paidBeforeClaim !== 'false') {
-    throw new Error(
-      'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED: NODE_ENV=production 时必须显式设置 PRINT_REQUIRE_PAID_BEFORE_CLAIM=true|false（未支付订单是否禁止 claim 出纸必须是显式部署决策）',
-    )
-  }
-  if (realChannelEnabled && paidBeforeClaim !== 'true') {
-    throw new Error(
-      'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED: 启用真实支付通道（wechat/alipay）时 PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须为 true（先付后印，服务端门禁）',
-    )
-  }
+  // 先付后印不再是部署开关：claim 只领 payStatus='paid' 的任务，写死在
+  // terminals-agent.service.ts 的 claimableWhere 里，任何环境都无法关闭。
+  // 原 PRINT_REQUIRE_PAID_BEFORE_CLAIM 及其两条启动校验已随开关一并删除。
 
   // 商用隐私底线：生产环境不保留“只审计、不拦截”的观察模式。
   // 必须与 print-jobs.service.ts 的精确 `=== 'true'` 判定一致，避免带空格或大小写

@@ -93,15 +93,22 @@ function main(): void {
     join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'),
   )
 
+  // 先付后印曾经是一个可关闭的 env 开关，关闭时未支付订单可被领走真实出纸。
+  // 开关已删除：这里钉死「可执行代码里不得再出现该开关」，防止有人把它加回来。
+  //
+  // 必须对**剥掉注释后**的代码判定：本仓库有过先例 —— 断言「代码里没有
+  // Math.random」被同一文件里写着「绝不能换成 Math.random()」的注释判红。
+  // 解释为什么删除这个开关的注释同样会命中裸字符串匹配。
+  const terminalsExecutable = terminals.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check(
-    /(?:process\.env\[['"]PRINT_REQUIRE_PAID_BEFORE_CLAIM['"]\]|process\.env\.PRINT_REQUIRE_PAID_BEFORE_CLAIM)\s*===\s*['"]true['"]/.test(terminals),
-    'PRINT_REQUIRE_PAID_BEFORE_CLAIM uses strict explicit true opt-in',
-    'PRINT_REQUIRE_PAID_BEFORE_CLAIM must be checked with === "true"',
+    !/PRINT_REQUIRE_PAID_BEFORE_CLAIM/.test(terminalsExecutable),
+    'paid-before-claim is unconditional (no env kill switch in terminals sources)',
+    'PRINT_REQUIRE_PAID_BEFORE_CLAIM must not exist: 出纸付费门控不得退回可关闭的部署开关',
   )
 
   const claimGate = section(
     terminals,
-    'const paidGate = requirePaidBeforeClaim()',
+    'const claimableWhere = {',
     'return results',
     'TerminalsService claim gate query',
   )
@@ -110,10 +117,12 @@ function main(): void {
     'claim gate keeps payStatus=paid requirement',
     'claim gate must include payStatus: "paid"',
   )
+  // 无关联订单的任务不得可领：真实业务流两条建单路径都在同一事务内绑定 Order，
+  // 能匹配「无订单」的只剩孤儿数据，那是一条没有支付依据的出纸路径。
   check(
-    /order\s*:\s*(?:null|\{\s*is\s*:\s*null\s*\})/.test(claimGate),
-    'claim gate keeps null-order legacy/seed allowance',
-    'claim gate must include order:null or Prisma order:{is:null} allowance',
+    !/order\s*:\s*(?:null|\{\s*is\s*:\s*null\s*\})/.test(claimGate),
+    'claim gate refuses tasks without an order',
+    'claim gate must not allow order:null —— 无订单任务不得出纸',
   )
   check(
     /findFirst\s*\(\s*\{[\s\S]{0,800}where\s*:\s*claimableWhere/.test(claimGate),

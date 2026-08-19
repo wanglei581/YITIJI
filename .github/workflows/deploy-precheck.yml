@@ -139,11 +139,15 @@ jobs:
               echo "REDIS_REACHABLE=unknown  （本机无 redis-cli，需另行确认）"
             fi
 
-            echo "=== 8. 发布后验证：#555 资金门禁启动告警是否出现在应用日志 ==="
-            if pm2 logs "$EXPECT_PM2" --lines 200 --nostream 2>/dev/null | grep -q "PRINT_REQUIRE_PAID_BEFORE_CLAIM"; then
-              echo "PAID_GATE_WARNING_PRESENT=yes"
+            echo "=== 8. 发布后验证：资金门禁不得退回可关闭的部署开关 ==="
+            # 原先这里 grep 启动日志里的 PRINT_REQUIRE_PAID_BEFORE_CLAIM 告警。该开关
+            # 及其告警已删除：claim 无条件只领已付款订单，写死在 claimableWhere 与事务
+            # 内 CAS 两层。继续 grep 会恒打 "no" 并被误读成「日志轮转了」。
+            # 现在改为反向检查：运行目录的 .env 里不该再出现这个已废弃的变量。
+            if [ -f "$EXPECT_DIR/.env" ] && grep -q "^[[:space:]]*PRINT_REQUIRE_PAID_BEFORE_CLAIM=" "$EXPECT_DIR/.env"; then
+              echo "PAID_GATE_DEAD_ENV_PRESENT=yes  （该变量已废弃且不再生效，建议从 .env 移除以免误导运维）"
             else
-              echo "PAID_GATE_WARNING_PRESENT=no  （可能日志已轮转，或该版本未上线）"
+              echo "PAID_GATE_DEAD_ENV_PRESENT=no  （符合预期：门控已写死在代码里）"
             fi
 
             echo "=== 9. 发布后验证：#553 隐私门控审计动作是否已注册 ==="
