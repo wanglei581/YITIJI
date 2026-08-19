@@ -286,7 +286,7 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
-      if (granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+      if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
         setShowAnonymousConsent(false)
         setRejectedTask(true)
         return
@@ -327,7 +327,7 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
-      if (granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+      if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
         setShowMemberConsent(false)
         setRejectedTask(true)
         return
@@ -367,6 +367,10 @@ export function JobFitPage() {
       setAnonymousConsentActive(false)
       setNotice('已撤回，重新分析需再次授权')
     } catch (err) {
+      if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+        setRejectedTask(true)
+        return
+      }
       setError(userMessageOf(err, '撤回失败，请稍后重试'))
     } finally {
       setRevokingConsent(false)

@@ -173,11 +173,12 @@ expectIncludes(jobFitPage, "type PreconditionGate = 'missing' | 'rejected'", '�
 expectIncludes(jobFitPage, "err.code === 'AI_TASK_NOT_FOUND'", '岗位匹配把后端不认的 taskId 挡在选岗表单前')
 expectIncludes(jobFitPage, '重新上传简历', '后端不认的 taskId 引导重新上传而不是空表单')
 expectIncludes(jobFitPage, 'setRejectedTask(true)', '岗位匹配把 AI_TASK_NOT_FOUND 落成 rejected 门禁')
+expectAbsent(jobFitPage, /granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND'/, '授权请求本身的 AI_TASK_NOT_FOUND 也要出门禁，不能等 granted')
 {
   const rejectedHits = jobFitPage.split('setRejectedTask(true)').length - 1
-  rejectedHits >= 3
-    ? pass(`getLatest / 分析 / 授权后重跑 三处都把 AI_TASK_NOT_FOUND 落成门禁（${rejectedHits}）`)
-    : fail(`授权后重跑仍可能把 AI_TASK_NOT_FOUND 当成普通红条 — setRejectedTask(true) 只有 ${rejectedHits} 处，至少要 3`)
+  rejectedHits >= 5
+    ? pass(`getLatest / 分析 / 授权 / 授权后重跑 / 撤回 都把 AI_TASK_NOT_FOUND 落成门禁（${rejectedHits}）`)
+    : fail(`仍有路径把 AI_TASK_NOT_FOUND 当成普通红条 — setRejectedTask(true) 只有 ${rejectedHits} 处，至少要 5`)
 }
 expectAbsent(jobFitPage, /err\.code === 'JOB_FIT_NOT_FOUND'/, '没有历史匹配结果不得当成简历被拒')
 expectIncludes(jobFitPage, "err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED'", '分析请求显式分流匿名授权 403')
