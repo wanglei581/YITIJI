@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import {
   AiConclusion,
+  AI_OUTAGE_CODES,
   AiDisclaimerLine,
   AigcMark,
   AiTaskRegion,
@@ -56,12 +57,11 @@ interface PageState {
  */
 type PreconditionGate = 'missing' | 'rejected'
 
-/**
- * 会把整条 AI 能力判成不可用的错误码。
- * 其余错误（限流 429、参数错误等）是**本次调用**失败，不是能力不可用 ——
- * 那些保留重试入口，不许拿去把按钮永久置灰。
- */
-const AI_OUTAGE_CODES = new Set(['AI_NOT_CONFIGURED', 'AI_UNAVAILABLE', 'MOCK_MODE', 'NETWORK_ERROR'])
+// 能力级错误码只有一份真值：`../../ai` 的 AI_OUTAGE_CODES。
+//
+// 这里曾经自己 new Set([...]) 抄了一份。抄本的危害不是重复，而是**假绿**：
+// 共享表加一个码，本页不会跟着变，而门禁只检查「本页出现过 AI_OUTAGE_CODES
+// 这个标识符」，照样通过 —— 于是「已修好」和「本页仍不认」可以同时成立。
 
 const SELF_ASSESSMENT_ROUTE = '/resume/self-assessment/intro'
 
@@ -219,8 +219,19 @@ export function CareerPlanPage() {
   )
 
   const handleGenerate = async () => {
-    if (!taskId || !aiTask.canStart) return
+    // 这里刻意**不看** aiTask.canStart。
+    //
+    // 原写法是 `if (!taskId || !aiTask.canStart) return`，配合下面按钮被
+    // `canStart` 包起来，构成一个死锁：首屏读取只要撞上一次能力级错误，
+    // `aiOutage` 就被写死，`canStart` 恒 false，生成钮直接不渲染，而本页
+    // 没有任何地方清除 `aiOutage` —— AI 恢复了用户也只能退出重进。
+    //
+    // 现在对齐 ResumeGeneratePage:243 / InterviewSetupPage:182 的写法：
+    // 用户主动点一次就清掉上次的能力判定，再发一次真实请求，由结果重新决定。
+    // 不加轮询、不自动重探：只有用户按下去才会再打一次。
+    if (!taskId || generating) return
     setGenerating(true)
+    setAiOutage(null)
     setError(null)
     setTaskFailReason(null)
     try {
@@ -541,11 +552,22 @@ export function CareerPlanPage() {
           {/* 这条路径上后端必定发降级版式（本页没有已生成的 plan），文案就得先说清楚。 */}
           {printing ? '正在生成参考单…' : '打印求职参考单（未含 AI 规划）'}
         </Button>
-        {(aiTask.canStart || aiTask.isRunning) && (
-          <Button size="lg" variant="secondary" className="career-plan-lightflow__primary-action" aria-disabled={generating} onClick={() => void handleGenerate()} aria-live="polite">
-            {generating ? <><Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />正在生成（约 15–30 秒）…</> : <>生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>}
-          </Button>
-        )}
+        {/*
+          生成钮**无条件**渲染，不再被 aiTask.canStart 包起来。
+          被 canStart 包着时，AI 一挂按钮就消失，用户连重试的入口都没有；
+          而 canStart 只在 availability==='available' 时为真，
+          availability 又由上一次失败决定 —— 一次失败就再也回不去。
+          现在按钮常在，点下去先清 outage 再真发一次请求（见 handleGenerate）。
+        */}
+        <Button size="lg" variant="secondary" className="career-plan-lightflow__primary-action" aria-disabled={generating} onClick={() => void handleGenerate()} aria-live="polite">
+          {generating ? (
+            <><Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />正在生成（约 15–30 秒）…</>
+          ) : aiOutage ? (
+            <>重试生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>
+          ) : (
+            <>生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>
+          )}
+        </Button>
       </KioskActionBar>
     </main>
     </CareerPlanFullscreenFrame>
