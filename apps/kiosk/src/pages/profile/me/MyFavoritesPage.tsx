@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, EmptyState } from '@ai-job-print/ui'
 import type { FavoriteTargetType, MemberFavoriteItem } from '@ai-job-print/shared'
 import { ChevronRightIcon, HeartIcon } from 'lucide-react'
@@ -22,26 +22,39 @@ const TYPE_META: Record<FavoriteTargetType, { label: string; icon: KioskIconName
   policy: { label: '政策', icon: 'policy', tone: 'slate' },
 }
 
-const TABS: { key: FavoriteTargetType | 'all'; label: string }[] = [
+type FavoriteTab = FavoriteTargetType | 'all'
+
+const TABS: { key: FavoriteTab; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'job', label: '岗位' },
   { key: 'job_fair', label: '招聘会' },
   { key: 'policy', label: '政策' },
 ]
 
+const VALID_FAVORITE_TABS = new Set<FavoriteTab>(TABS.map((tab) => tab.key))
+
+function getFavoriteTab(searchParams: URLSearchParams): FavoriteTab {
+  const tab = searchParams.get('tab')
+  return tab && VALID_FAVORITE_TABS.has(tab as FavoriteTab) ? (tab as FavoriteTab) : 'all'
+}
+
 function detailRoute(item: MemberFavoriteItem): string {
   if (item.targetType === 'job') return `/jobs/${item.targetId}`
   if (item.targetType === 'job_fair') return `/job-fairs/${item.targetId}`
-  return '/renshi'
+  return '/renshi?tab=policy'
 }
 
 export function MyFavoritesPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberFavoriteItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
-  const [tab, setTab] = useState<FavoriteTargetType | 'all'>('all')
+  const tab = getFavoriteTab(searchParams)
+  const setTab = (next: FavoriteTab) => {
+    setSearchParams(next === 'all' ? {} : { tab: next }, { replace: true })
+  }
   useInkRipple('.me-inkdetail .me-ripple')
 
   const load = useCallback(() => {
@@ -73,8 +86,8 @@ export function MyFavoritesPage() {
   return (
     <div className="me-inkdetail me-inkdetail-favorites h-full">
       <MeListShell
-        title="我的收藏"
-        subtitle="本人收藏的岗位 / 招聘会 / 政策（仅本人可见）"
+        title={tab === 'policy' ? '政策收藏' : '我的收藏'}
+        subtitle={tab === 'policy' ? '本人收藏的政策（仅本人可见）' : '本人收藏的岗位 / 招聘会 / 政策（仅本人可见）'}
         loginFrom="/me/favorites"
         isLoggedIn={isLoggedIn}
         state={state}

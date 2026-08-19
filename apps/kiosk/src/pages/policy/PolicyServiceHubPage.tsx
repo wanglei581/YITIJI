@@ -113,10 +113,8 @@ const CAPABILITIES: PolicyCapability[] = [
     iconColor: 'text-plum',
     goColor: 'text-plum',
     title: '政策收藏',
-    description: '查看已收藏的政策文章与AI问答记录，方便随时回顾',
-    // 不传 `state.type`：`/me/ai-records` 没有按类型筛选的能力（该页连
-    // react-router 都没 import）。留着它会让人以为这个入口已经带了筛选。
-    to: '/me/ai-records',
+    description: '查看已收藏的政策，方便随时回顾',
+    to: '/me/favorites?tab=policy',
   },
 ]
 

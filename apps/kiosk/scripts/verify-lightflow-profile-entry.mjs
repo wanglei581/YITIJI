@@ -371,6 +371,7 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',

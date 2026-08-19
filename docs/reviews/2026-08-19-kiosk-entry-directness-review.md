@@ -183,4 +183,5 @@ Cursor 第二轮未返回结论。我的判断：**能钉一部分，钉不住�
 
 - **批次 1 已完成**，见 `fix/kiosk-entry-directness-print`。实现要点与一处只有真实浏览器
   才能发现的缺陷记录在 `docs/progress/current-progress.md` 当日条目。
-- 批次 2 / 4 / 5 待排。
+- **批次 2 进行中**，见 `fix/kiosk-policy-favorites`：复用 `/me/favorites?tab=policy`，不新建页面。
+- 批次 4 / 5 待排。
