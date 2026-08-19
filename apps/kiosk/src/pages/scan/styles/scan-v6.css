@@ -1,0 +1,60 @@
+/* /scan/start 页体。不改编排步骤、不装扫描仪已就绪。 */
+
+.v6-scan .v6-page-lead {
+  margin: 0 48px 16px;
+  max-width: 32em;
+  padding: 18px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(31, 158, 134, 0.28);
+  border-left: 6px solid var(--k-teal, #1f9e86);
+  background: rgba(226, 242, 236, 0.55);
+  font-size: 22px;
+  line-height: 1.5;
+}
+
+.v6-scan .v6-page-lead strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.v6-scan .ui-kiosk-page-header h1,
+.v6-scan .ui-kiosk-page-header .ui-kiosk-page-header__title {
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.v6-scan .w2-scan-steps > div.is-active > span,
+.v6-scan .w2-scan-steps .is-active > span {
+  background: var(--k-teal, #1f9e86);
+  border-color: var(--k-teal, #1f9e86);
+  color: #fff;
+}
+
+.v6-scan .w2-scan-start-grid {
+  grid-template-columns: 1fr;
+}
+
+.v6-scan .w2-scan-start-grid > .w2-scan-side-card {
+  display: none;
+}
+
+.v6-scan .w2-scan-choice {
+  min-height: 132px;
+  border-radius: 22px;
+  box-shadow: 0 12px 30px rgba(51, 68, 59, 0.06);
+}
+
+.v6-scan .w2-scan-choice.is-selected {
+  border-color: var(--k-teal, #1f9e86);
+  background: rgba(226, 242, 236, 0.7);
+  box-shadow: 0 0 0 3px rgba(31, 158, 134, 0.18);
+}
+
+.v6-scan .w2-scan-notice {
+  max-width: 36em;
+  line-height: 1.6;
+}
