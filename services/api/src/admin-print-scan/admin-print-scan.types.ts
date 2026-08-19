@@ -32,6 +32,7 @@ export type AdminPrintScanTaskItem =
       copies: number | null
       colorMode: 'black_white' | 'color' | null
       paperSize: string | null
+      printOutcome: 'printed' | 'not_printed' | null
     })
   | (AdminPrintScanTaskBase & {
       type: 'scan'

@@ -352,6 +352,25 @@ async function main() {
       fail('PRINT_JOB_UNCONFIRMED retry 拒绝后 PrintTask、Order、状态日志和任务总数必须完全不变')
     }
     pass('PRINT_JOB_UNCONFIRMED retry 拒绝路径零副作用（任务/订单/日志/任务总数不变）')
+    const unconfirmedDetail = await printScan.getTaskDetail('print', unconfirmedTaskId)
+    if (unconfirmedDetail.type !== 'print' || unconfirmedDetail.printOutcome !== null) {
+      fail('未核查 UNCONFIRMED 详情必须暴露 printOutcome=null')
+    }
+    await prisma.printTask.update({
+      where: { id: unconfirmedTaskId },
+      data: { printOutcome: 'printed' },
+    })
+    const verifiedDetail = await printScan.getTaskDetail('print', unconfirmedTaskId)
+    if (verifiedDetail.type !== 'print' || verifiedDetail.printOutcome !== 'printed' || verifiedDetail.errorCode !== 'PRINT_JOB_UNCONFIRMED') {
+      fail('核查后详情必须同时保留 UNCONFIRMED 与 printOutcome=printed')
+    }
+    await expectHttpErrorCode(
+      () => printScan.applyAction('print', unconfirmedTaskId, 'retry'),
+      409,
+      'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
+      '核查后仍禁止 retry',
+    )
+    pass('print-scan 展示 printOutcome，核查后仍禁止重试且不改 errorCode')
 
     // 退役与 retry 必须争用同一 Terminal 行：已退役终端的 failed 任务不能重新进入 pending，
     // 否则凭证已吊销且 claim 门禁为 active 的终端会留下永久无法领取的任务。

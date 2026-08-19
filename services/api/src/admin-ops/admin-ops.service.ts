@@ -192,7 +192,15 @@ export class AdminOpsService {
 
     // 2) 近 24h 打印失败任务
     const failedTasks = await this.prisma.printTask.findMany({
-      where: { status: 'failed', updatedAt: { gte: new Date(now - FAILED_LOOKBACK_MS) } },
+      where: {
+        status: 'failed',
+        updatedAt: { gte: new Date(now - FAILED_LOOKBACK_MS) },
+        // SQL 的 NOT IN 不匹配 NULL，必须显式收未核查任务，否则普通失败告警会全灭。
+        OR: [
+          { printOutcome: null },
+          { printOutcome: { notIn: ['printed', 'not_printed'] } },
+        ],
+      },
       select: {
         id: true,
         errorCode: true,

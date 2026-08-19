@@ -33,24 +33,24 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 应用 | 目录 | 路由数 | 源文件 | 入口可达 |
 | --- | --- | --- | --- | --- |
-| kiosk | `apps/kiosk` | 86 | 430 | 405 |
+| kiosk | `apps/kiosk` | 86 | 428 | 408 |
 | admin | `apps/admin` | 37 | 137 | 134 |
 | partner | `apps/partner` | 13 | 39 | 38 |
 
 | 维度 | 数量 |
 | --- | --- |
-| HTTP 端点（services/api） | 465 |
+| HTTP 端点（services/api） | 466 |
 | Prisma 模型 | 91 |
 | 门禁脚本文件 | 165 |
 | ├ 其中辅助库（被别的门禁 import） | 71 |
 | ├ 已在 package.json 里有脚本名 | 131 |
 | ├ 在 CI 执行闭包里 | 128 |
 | └ **无脚本名，从未被执行** | 3 |
-| 被至少一条门禁断言的文件 | 735 |
+| 被至少一条门禁断言的文件 | 746 |
 | 孤儿候选 · protected（不得删） | 4 |
 | 孤儿候选 · high（仍被 CI/门禁引用） | 12 |
-| 孤儿候选 · medium（仅文档提及） | 13 |
-| 孤儿候选 · low（全仓零提及） | 126 |
+| 孤儿候选 · medium（仅文档提及） | 8 |
+| 孤儿候选 · low（全仓零提及） | 125 |
 
 ## 分册
 
@@ -70,7 +70,7 @@ flowchart LR
   kiosk["apps/kiosk<br/>一体机前台<br/>86 路由"]
   admin["apps/admin<br/>管理员后台<br/>37 路由"]
   partner["apps/partner<br/>合作机构后台<br/>13 路由"]
-  api["services/api<br/>NestJS<br/>465 端点"]
+  api["services/api<br/>NestJS<br/>466 端点"]
   db[("Prisma<br/>91 模型")]
   gates{{"verify 门禁<br/>165 个脚本"}}
 
@@ -78,7 +78,7 @@ flowchart LR
   admin -->|"/api/v1"| api
   partner -->|"/api/v1"| api
   api --> db
-  gates -.->|"断言 735 个文件"| kiosk
+  gates -.->|"断言 746 个文件"| kiosk
   gates -.-> admin
   gates -.-> partner
   gates -.-> api

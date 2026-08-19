@@ -8,10 +8,10 @@
 
 ### A. 代码侧（我方可修，共 4 条）
 
-- [ ] **A1 岗位匹配无简历前置门禁** —— 从首页直点进 `/resume/job-fit`，没简历也渲染表单，点分析必 400 红条。职业规划页有门禁卡，这页漏了。`JobFitPage.tsx:72-74,195-208`
-- [ ] **A2 模拟面试 / 合同审查触屏传不了文件** —— 只有桌面隐藏 `<input type="file">`，全屏 Kiosk 下弹 Windows 资源管理器。`InterviewSetupPage.tsx:449-466`、`ContractReviewHomePage.tsx:95-100`
-- [ ] **A3 `.env.example` 弱默认可启动生产** —— `JWT_SECRET="dev-only-…"`、`TERMINAL_LEGACY_REGISTER_ENABLED=true`、真实生产桶名；仅 `NODE_ENV=production` 时才拦
-- [ ] **A4 告警无推送、无工单** —— `admin-ops.service.ts` 自陈实时派生、无 Alert 模型、「不支持确认/处理流转」，全仓无 webhook/短信/邮件。无人值守场地机器停了没人知道。Cursor 裁定：只做一件就做**核查状态机**（已核查·已出纸 / 已核查·未出纸）
+- [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
+- [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
+- [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；`NODE_ENV` 是否真跑门禁仍待 Windows `pm2 describe` 回报
+- [~] **A4 断电卡单核查状态机** —— 本刀 `fix/admin-print-outcome-verify`（未合入）。推送/工单仍不做；告警仍是实时派生
 
 ### B. 需你方动手（共 3 条，非代码）
 

@@ -47,6 +47,8 @@ if (
   page.includes("detail.errorCode === 'PRINT_JOB_UNCONFIRMED'") &&
   page.includes("detail.status === 'failed' && !isUnconfirmed") &&
   page.includes('打印结果未确认，禁止重试，避免重复出纸') &&
+  page.includes('已核查·已出纸') &&
+  page.includes('已完成现场核查，仍禁止重新排队') &&
   page.includes('<Link to="/orders"') &&
   service.includes("item.errorCode === 'PRINT_JOB_UNCONFIRMED'") &&
   service.includes("'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN'")

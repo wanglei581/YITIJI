@@ -24,6 +24,7 @@ export interface AdminOrderReadonlyItem {
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
   errorCode: string | null
+  printOutcome: 'printed' | 'not_printed' | null
   aftercareStatus: AdminOrderAftercareStatus
   refundEligible: boolean
   retryForbidden: boolean
@@ -179,6 +180,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   colorMode: 'black_white',
   paperSize: 'A4',
   errorCode: null,
+  printOutcome: null,
   aftercareStatus: null,
   refundEligible: false,
   retryForbidden: false,

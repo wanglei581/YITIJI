@@ -61,6 +61,7 @@ export type AuditAction =
   | 'system.login'
   | 'system.config_change'
   | 'print_job.admin_abandon'
+  | 'print_job.admin_verify_outcome'
 
 export type AuditTargetType =
   | 'auth'

@@ -32,6 +32,7 @@ interface OrderRow {
     paramsJson: string
     status: string
     errorCode: string | null
+    printOutcome: string | null
     createdAt: Date
     completedAt: Date | null
   } | null
@@ -44,19 +45,31 @@ interface LabelMaps {
 
 const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 
-function deriveAftercare(row: OrderRow): Pick<AdminOrderReadonlyItem, 'aftercareStatus' | 'refundEligible' | 'retryForbidden'> {
-  const manualCheckRequired =
+function parsePrintOutcome(value: string | null | undefined): AdminOrderReadonlyItem['printOutcome'] {
+  if (value === 'printed' || value === 'not_printed') return value
+  return null
+}
+
+function deriveAftercare(row: OrderRow): Pick<
+  AdminOrderReadonlyItem,
+  'aftercareStatus' | 'refundEligible' | 'retryForbidden' | 'printOutcome'
+> {
+  const printOutcome = parsePrintOutcome(row.printTask?.printOutcome)
+  const unconfirmedFailure =
     row.type === 'print' &&
-    row.payStatus === 'paid' &&
     row.taskStatus === 'failed' &&
     row.printTask?.status === 'failed' &&
     row.printTask.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE
+  const manualCheckRequired =
+    unconfirmedFailure && row.payStatus === 'paid' && printOutcome === null
 
   return {
+    printOutcome,
     aftercareStatus: manualCheckRequired ? 'manual_check_required' : null,
-    // 保留既有 canonical 全额退款能力；RefundService 仍是最终写入门禁。
-    refundEligible: row.payStatus === 'paid',
-    retryForbidden: manualCheckRequired,
+    // 已确认出纸禁止退款；RefundService 仍是最终写入门禁。
+    refundEligible: row.payStatus === 'paid' && printOutcome !== 'printed',
+    // 未确认历史原因仍在时禁止重打，核查后同样禁止。
+    retryForbidden: unconfirmedFailure,
   }
 }
 
@@ -271,6 +284,7 @@ function orderSelect() {
         paramsJson: true,
         status: true,
         errorCode: true,
+        printOutcome: true,
         createdAt: true,
         completedAt: true,
       },

@@ -75,6 +75,7 @@ async function main() {
   // 打印任务:完成 1 条(合法 params)、失败 1 条(损坏 params)
   const taskOk = `pt_vop_ok_${suffix}`
   const taskFailed = `pt_vop_fail_${suffix}`
+  const taskVerified = `pt_vop_verified_${suffix}`
   await prisma.printTask.createMany({
     data: [
       {
@@ -86,11 +87,15 @@ async function main() {
         id: taskFailed, terminalId: tOnline, fileUrl: 'https://internal/secret-url-2', fileMd5: 'cafebabe',
         paramsJson: '{broken json', status: 'failed', errorCode: 'PRINTER_OFFLINE', errorMessage: '内部细节不外露',
       },
+      {
+        id: taskVerified, terminalId: tOnline, fileUrl: 'https://internal/secret-url-3', fileMd5: 'verified',
+        paramsJson: '{}', status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', printOutcome: 'printed',
+      },
     ],
   })
 
   const cleanup = async () => {
-    await prisma.printTask.deleteMany({ where: { id: { in: [taskOk, taskFailed] } } })
+    await prisma.printTask.deleteMany({ where: { id: { in: [taskOk, taskFailed, taskVerified] } } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tOffline, tOnline, tPrinterIssue] } } })
     await prisma.terminal.deleteMany({ where: { id: { in: [tOffline, tOnline, tPrinterIssue] } } })
   }
@@ -132,6 +137,7 @@ async function main() {
       if (!printerIssue || printerIssue.severity !== 'warning') fail('3. 缺少打印机缺纸告警(warning)')
       const printFailed = data.find((a) => a.id === `print_failed:${taskFailed}`)
       if (!printFailed) fail('3. 缺少打印失败告警')
+      if (data.some((a) => a.id === `print_failed:${taskVerified}`)) fail('3. 已核查任务不得再进失败告警')
       if (data.some((a) => a.terminalCode === `VOP-ON-${suffix}` && a.type !== 'print_failed')) {
         fail('3. 在线正常终端不应产生终端/打印机告警')
       }

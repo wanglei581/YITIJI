@@ -31,6 +31,8 @@ export interface AdminOrderReadonlyItem {
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
   errorCode: string | null
+  /** 管理员现场核查：null = 未核查；printed / not_printed 与 errorCode 正交。 */
+  printOutcome: 'printed' | 'not_printed' | null
   aftercareStatus: AdminOrderAftercareStatus
   refundEligible: boolean
   retryForbidden: boolean

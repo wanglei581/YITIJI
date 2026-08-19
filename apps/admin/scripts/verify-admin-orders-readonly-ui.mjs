@@ -71,4 +71,19 @@ if (
   fail('Gate 0.3B orders aftercare UI/service contract is incomplete')
 }
 
+const jobsClient = readFileSync(join(root, 'src/services/api/adminPrintJobs.ts'), 'utf8')
+if (
+  page.includes('已核查·已出纸') &&
+  page.includes('已核查·未出纸') &&
+  page.includes('VERIFY_PRINTED') &&
+  page.includes('VERIFY_NOT_PRINTED') &&
+  page.includes('adminPrintJobsService.verifyOutcome') &&
+  jobsClient.includes('/admin/print-jobs/${encodeURIComponent(printTaskId)}/verify-outcome') &&
+  service.includes("printOutcome: 'printed' | 'not_printed' | null")
+) {
+  pass('orders aftercare can persist printed/not_printed via confirm phrases, without adding print-scan write actions')
+} else {
+  fail('UNCONFIRMED verification buttons, confirm phrases and print-jobs client must stay aligned')
+}
+
 console.log('\nALL PASS')
