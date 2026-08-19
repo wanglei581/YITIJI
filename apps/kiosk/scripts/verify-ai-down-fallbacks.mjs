@@ -468,11 +468,20 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
   must('careerPlan', /AI_OUTAGE_CODES,/, '必须从 ../../ai 引入共享 AI_OUTAGE_CODES')
 
   // 粘滞死锁防线：生成入口不得被 canStart 藏起来，且用户主动重试时必须先清 outage。
-  mustNot(
-    'careerPlan',
-    /\{\(aiTask\.canStart \|\| aiTask\.isRunning\) && \(/,
-    '生成钮不得被 aiTask.canStart 包住 —— 一次能力级失败后按钮消失，用户再也无法重试',
-  )
+  // 判据不能只认 `&&` 一种写法：本页有两颗生成钮（首次生成 / 已有规划后重新生成），
+  // 第一版断言只钉了 `{(...) && (`，而「重新生成」那颗写的是三元 `? ( ... ) : null`，
+  // 于是它带着同一个粘滞 bug 溜过了门禁。这里对**两种条件渲染写法**一起判。
+  for (const form of [
+    /\{\s*\(?\s*aiTask\.canStart\s*\|\|\s*aiTask\.isRunning\s*\)?\s*&&/,
+    /\{\s*\(?\s*aiTask\.canStart\s*\|\|\s*aiTask\.isRunning\s*\)?\s*\?/,
+  ]) {
+    mustNot(
+      'careerPlan',
+      form,
+      '生成钮不得被 aiTask.canStart 条件渲染（&& 或三元都不行）—— '
+      + '一次能力级失败后按钮消失，用户再也无法重试',
+    )
+  }
   must(
     'careerPlan',
     /setGenerating\(true\)\s*\n\s*setAiOutage\(null\)/,
