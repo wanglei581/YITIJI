@@ -22,6 +22,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import type { SelfAssessmentDimensionResult } from './self-assessment.types'
 
@@ -272,16 +273,16 @@ export class LlmSelfAssessmentService {
       }
       // 已经发出请求（可能已计费），必须记一次调用，否则失败调用整条不落账
       onLlmCall?.({ provider: providerLabel })
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败' } })
+      throw llmUnreachableError('AI 自我探索解读服务')
     }
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
+      throw llmUpstreamStatusError('AI 自我探索解读服务', res.status)
     }
     const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const reply = data?.choices?.[0]?.message?.content?.trim()
-    if (!reply) throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
+    if (!reply) throw llmEmptyResponseError('AI 自我探索解读服务')
     return reply
   }
 }

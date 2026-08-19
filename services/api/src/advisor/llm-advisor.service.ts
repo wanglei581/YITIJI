@@ -8,6 +8,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../ai/llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import {
@@ -477,17 +478,13 @@ export class LlmAdvisorService {
         })
       }
       this.logger.error('advisor.llm network_error')
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' },
-      })
+      throw llmUnreachableError('AI 顾问服务')
     }
     const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     if (!res.ok) {
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`advisor.llm upstream_non_2xx status=${res.status}`)
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` },
-      })
+      throw llmUpstreamStatusError('AI 顾问服务', res.status)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
@@ -496,9 +493,7 @@ export class LlmAdvisorService {
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' },
-      })
+      throw llmEmptyResponseError('AI 顾问服务')
     }
     return reply
   }
