@@ -92,6 +92,12 @@
     font-size: 22px;
   }
 }
+.v6-runtime-shell .ui-kiosk-page-header p,
+.v6-runtime-shell .ui-kiosk-page-header .ui-kiosk-page-header__desc {
+  max-width: 36em;
+  line-height: 1.65;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v6-runtime-shell .ui-kiosk-topbar__brand-mark {
     animation: none;

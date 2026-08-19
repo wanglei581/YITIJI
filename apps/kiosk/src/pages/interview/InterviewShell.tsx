@@ -18,7 +18,7 @@ export function InterviewShell({
 }) {
   return (
     <KioskFullscreenShell hideTopbar={hideTopbar} className={className}>
-      <KioskPageFrame className="fusion-w3 fusion-w3--interview h-full min-h-0 flex-1">
+      <KioskPageFrame className="fusion-w3 fusion-w3--interview v6-interview h-full min-h-0 flex-1">
         {children}
       </KioskPageFrame>
     </KioskFullscreenShell>

@@ -345,6 +345,10 @@ export function InterviewSetupPage() {
         }
       />
 
+      <p className="v6-page-lead" data-v6-lead="interview">
+        <strong>先定岗位和面试官，再进练习间。</strong>
+        只供本人练习，不代表任何招聘结果。
+      </p>
       <AiDriverBanner feature="AI模拟面试反馈" description="面试后即时给出评分与改进建议" />
 
       <div className="interview-flow__scroll min-h-0 flex-1 overflow-y-auto pb-28">

@@ -1,5 +1,5 @@
 // ============================================================
-// PrintPickupClaimPage — 步骤4：扫码取件认领
+// PrintPickupClaimPage — 步骤4：到机码核销认领
 //
 // 用户用一体机扫码器扫描二维码，或手动输入小程序中的到机码，
 // 调用 POST /api/v1/print/jobs/claim-pickup → 任务状态从 pending → claimed，
@@ -11,12 +11,13 @@
 // 认领接口无需登录态（Kiosk = 可控设备层），后端 Throttle 20次/min/IP 防滥用。
 //
 // 过渡期：同时受理 10 位存量码。删除条件与后端一致（上线满 24h，到机码 TTL 到期）。
+// 视觉对照 P47，但不照抄 31 键键盘、10 位混排字位、假金额或假页数。
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { ScanIcon, ArrowRightIcon, RotateCcwIcon, PrinterIcon } from 'lucide-react'
-import { KioskPageHeader } from '@ai-job-print/ui'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
   PICKUP_CODE_ACCEPTED_PATTERN,
   PICKUP_CODE_INPUT_ALPHABET,
@@ -25,9 +26,18 @@ import {
   PICKUP_CODE_PATTERN,
   isLegacyPickupCode,
 } from '@ai-job-print/shared'
-import { PrintPageFrame } from './PrintPrototypeLayout'
+import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
+import { formatCents } from './cashierStatus'
+import {
+  V6ArrivalCodeErrorBody,
+  V6ArrivalCodeNextNotes,
+  V6ArrivalCodePrinterWarn,
+  V6ArrivalCodeSide,
+  classifyArrivalClaimError,
+  type ArrivalClaimErrorKind,
+} from './V6ArrivalCodeGuide'
 import './styles/print-pickup-claim.css'
 
 // ── 到机码工具 ────────────────────────────────────────────────
@@ -71,6 +81,15 @@ interface ClaimPickupResult {
 
 type ClaimState = 'idle' | 'loading' | 'success' | 'error'
 
+class ClaimPickupError extends Error {
+  readonly code: string
+  constructor(code: string, message: string) {
+    super(message)
+    this.name = 'ClaimPickupError'
+    this.code = code
+  }
+}
+
 // ── API 调用（无登录态，Kiosk 匿名层） ────────────────────────
 async function claimPickup(code: string): Promise<ClaimPickupResult> {
   const terminalId = getTerminalId()
@@ -96,7 +115,7 @@ async function claimPickup(code: string): Promise<ClaimPickupResult> {
       body.error?.message ??
       (Array.isArray(body.message) ? body.message.join('; ') : (body.message as string | undefined)) ??
       `到机码无效或已过期（${errCode}）`
-    throw new Error(errMsg)
+    throw new ClaimPickupError(errCode, errMsg)
   }
   return body as ClaimPickupResult
 }
@@ -104,6 +123,7 @@ async function claimPickup(code: string): Promise<ClaimPickupResult> {
 // ── 组件 ──────────────────────────────────────────────────────
 export function PrintPickupClaimPage() {
   const navigate = useNavigate()
+  const device = useOutletContext<TerminalDeviceStatusView | undefined>()
   const inputRef = useRef<HTMLInputElement>(null)
   const claimLockRef = useRef(false)
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -112,6 +132,8 @@ export function PrintPickupClaimPage() {
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [errorKind, setErrorKind] = useState<ArrivalClaimErrorKind>('invalid')
+  const [lastAttemptCode, setLastAttemptCode] = useState('')
 
   const isValid = PICKUP_CODE_ACCEPTED_PATTERN.test(code)
 
@@ -129,6 +151,7 @@ export function PrintPickupClaimPage() {
     if (!PICKUP_CODE_ACCEPTED_PATTERN.test(submittedCode) || claimLockRef.current) return
     claimLockRef.current = true
     setCode(submittedCode)
+    setLastAttemptCode(submittedCode)
     setState('loading')
     setErrorMsg('')
     try {
@@ -138,6 +161,8 @@ export function PrintPickupClaimPage() {
     } catch (err) {
       claimLockRef.current = false
       setCode('')
+      const kind = err instanceof ClaimPickupError ? classifyArrivalClaimError(err.code) : 'invalid'
+      setErrorKind(kind)
       setErrorMsg(err instanceof Error ? err.message : '请求失败，请重试')
       setState('error')
       setTimeout(() => inputRef.current?.focus(), 80)
@@ -172,6 +197,7 @@ export function PrintPickupClaimPage() {
     setState('idle')
     setResult(null)
     setErrorMsg('')
+    setLastAttemptCode('')
     claimLockRef.current = false
     setTimeout(() => inputRef.current?.focus(), 80)
   }
@@ -179,7 +205,7 @@ export function PrintPickupClaimPage() {
   // ── 成功：提示排队，跳进度页 ─────────────────────────────────
   if (state === 'success' && result) {
     return (
-      <PrintPageFrame>
+      <KioskPageFrame className="v6-pickup-claim-page">
         <KioskPageHeader
           title="认领成功"
           description={result.released ? '打印任务已进入队列，请稍候出纸' : '订单核验成功，请先完成现场支付'}
@@ -198,6 +224,18 @@ export function PrintPickupClaimPage() {
               <dt>订单号</dt>
               <dd>{result.orderNo}</dd>
             </div>
+            {result.fileName ? (
+              <div className="pcs-row">
+                <dt>文件</dt>
+                <dd>{result.fileName}</dd>
+              </div>
+            ) : null}
+            {typeof result.amountCents === 'number' ? (
+              <div className="pcs-row">
+                <dt>应付</dt>
+                <dd>{formatCents(result.amountCents)}</dd>
+              </div>
+            ) : null}
             {result.terminalId && (
               <div className="pcs-row">
                 <dt>终端</dt>
@@ -205,6 +243,7 @@ export function PrintPickupClaimPage() {
               </div>
             )}
           </dl>
+          <V6ArrivalCodeNextNotes released={result.released} />
 
           <div className="pcs-actions">
             <button
@@ -233,22 +272,26 @@ export function PrintPickupClaimPage() {
             </button>
           </div>
         </div>
-      </PrintPageFrame>
+      </KioskPageFrame>
     )
   }
 
   // ── 输入界面 ──────────────────────────────────────────────────
   return (
-    <PrintPageFrame>
+    <KioskPageFrame className="v6-pickup-claim-page">
       <KioskPageHeader
-        title="扫码取件"
+        title="到机码核销"
         description={`扫描小程序二维码，或输入 ${CODE_LEN} 位到机码`}
         onBack={() => navigate('/print-scan')}
         backLabel="返回"
       />
 
       <div className="pickup-claim-page" data-w2-page="pickup-claim" data-claim-state={state}>
-        {/* 说明区 */}
+        <V6ArrivalCodePrinterWarn
+          kind={device?.kind ?? 'unknown'}
+          loading={device?.loading ?? true}
+          printerLabel={device?.printerLabel ?? '已配置打印机'}
+        />
         <div className="pcp-lead">
           <span className="pcp-lead-icon" aria-hidden="true"><ScanIcon size={32} /></span>
           <div className="pcp-lead-copy">
@@ -259,7 +302,6 @@ export function PrintPickupClaimPage() {
           </div>
         </div>
 
-        {/* 输入框 */}
         <div className="pcp-input-section">
           <label className="pcp-label" htmlFor="pickup-code-input">
             扫码结果 / 到机码（{CODE_LEN} 位）
@@ -296,20 +338,16 @@ export function PrintPickupClaimPage() {
           </div>
         </div>
 
-        {/* 格式说明 */}
         <p className="pcp-format-hint">
-          到机码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
-          {' '}早前下单拿到的 {PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍然有效，可直接输入。
+          {CODE_LEN} 位数字，扫码后自动核销。{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍可用。
         </p>
 
-        {/* 错误信息 */}
         {state === 'error' && (
           <div id="pcp-error-msg" className="pcp-error" role="alert">
-            ⚠ {errorMsg}
+            <V6ArrivalCodeErrorBody kind={errorKind} message={errorMsg} lastCode={lastAttemptCode} />
           </div>
         )}
 
-        {/* 确认按钮 */}
         <button
           type="button"
           className="k-btn pcp-submit"
@@ -331,7 +369,6 @@ export function PrintPickupClaimPage() {
           )}
         </button>
 
-        {/* 操作指引 */}
         <div className="pcp-help">
           <p className="pch-title">怎么找到机码？</p>
           <ol className="pch-steps">
@@ -339,8 +376,9 @@ export function PrintPickupClaimPage() {
             <li>选择「打印订单」，找到待取件订单</li>
             <li>点击「查看到机码」，对准扫码器；也可手动输入 {CODE_LEN} 位数字</li>
           </ol>
+          <V6ArrivalCodeSide />
         </div>
       </div>
-    </PrintPageFrame>
+    </KioskPageFrame>
   )
 }

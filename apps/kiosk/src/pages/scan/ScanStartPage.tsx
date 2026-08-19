@@ -19,6 +19,7 @@ import {
 } from '../../services/api/printScanCapabilities'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
+import './styles/scan-v6.css'
 
 type ScanType = 'resume' | 'id' | 'document'
 /** 能力门禁态：禁止伪装硬件已就绪。 */
@@ -118,7 +119,7 @@ export function ScanStartPage() {
     'is-offline'
 
   return (
-    <KioskPageFrame className="w2-scan-page">
+    <KioskPageFrame className="w2-scan-page v6-scan">
       <div data-w2-page="scan-start" className="w2-scan-shell">
         <KioskPageHeader
           title="材料扫描"
@@ -131,6 +132,11 @@ export function ScanStartPage() {
           backLabel="返回打印扫描服务"
           aside={<span className={`w2-scan-status-chip ${statusChipClass}`}><span />{statusLabel}</span>}
         />
+
+        <p className="v6-page-lead" data-v6-lead="scan-start">
+          <strong>这一屏只选扫什么。</strong>
+          下一步才建真实会话，要在打印机面板上操作。
+        </p>
 
         <ScanFlowSteps activeIndex={0} />
 

@@ -275,3 +275,89 @@
     font-size: 28px;
   }
 }
+
+.v6-page-lead {
+  margin: 0 0 16px;
+  max-width: 28em;
+  padding: 18px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(31, 158, 134, 0.28);
+  border-left: 6px solid var(--k-teal, #1f9e86);
+  background: rgba(226, 242, 236, 0.55);
+  color: var(--k-ink, #24312c);
+  font-size: 22px;
+  line-height: 1.5;
+}
+
+.v6-page-lead strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* P13 岗位列表页体。数据与筛选项不动，只把首屏从「两排芯片 + 统计长句」收成主列表。 */
+.v6-jobs .ui-kiosk-page-header h1,
+.v6-jobs .ui-kiosk-page-header .ui-kiosk-page-header__title {
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.v6-jobs .ui-kiosk-page-header p,
+.v6-jobs .ui-kiosk-page-header .ui-kiosk-page-header__desc {
+  max-width: 28em;
+  line-height: 1.55;
+}
+
+.v6-jobs .jf-filter-bar {
+  min-height: 76px;
+  padding: 10px 18px;
+  border: 1px solid rgba(75, 67, 50, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.88);
+  box-shadow: 0 10px 24px rgba(51, 68, 59, 0.05);
+}
+
+.v6-jobs .jf-f-chip {
+  min-height: 56px;
+  padding: 0 22px;
+  font-size: 20px;
+}
+
+.v6-jobs .jf-searchbox {
+  min-height: 56px;
+}
+
+.v6-jobs .jf-list-meta {
+  font-size: 18px;
+}
+
+.v6-jobs .jf-list {
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.v6-jobs .jf-row {
+  min-height: 200px;
+  padding: 24px 28px;
+  border-radius: 22px;
+  border-left-width: 6px;
+  box-shadow: 0 12px 30px rgba(51, 68, 59, 0.06);
+}
+
+.v6-jobs .jf-row-title b {
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.v6-jobs .jf-salary {
+  font-size: 26px;
+}
+
+.v6-jobs .jf-quick-row {
+  margin-top: 8px;
+}

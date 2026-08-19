@@ -1,0 +1,83 @@
+/* 打印履约链页体（上传 / 检查 / 预览 / 确认 / 收银 / 进度）。
+   只换皮，不改步骤名、不删六步条、不动 W2 钉死的 class。 */
+
+.v6-print-flow .v6-page-lead {
+  margin: 0 0 16px;
+  max-width: 28em;
+  padding: 18px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(31, 158, 134, 0.28);
+  border-left: 6px solid var(--print-teal, #1f9e86);
+  background: rgba(226, 242, 236, 0.55);
+  font-size: 22px;
+  line-height: 1.5;
+}
+
+.v6-print-flow .v6-page-lead strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--print-serif, 'Songti SC', serif);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.v6-print-flow .ui-kiosk-page-header h1,
+.v6-print-flow .ui-kiosk-page-header .ui-kiosk-page-header__title {
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.v6-print-flow .ui-kiosk-page-header p,
+.v6-print-flow .ui-kiosk-page-header .ui-kiosk-page-header__desc {
+  max-width: 28em;
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+.v6-print-flow .ui-kiosk-steps {
+  min-height: 72px;
+  margin: 8px 0 28px;
+  padding: 10px 8px 4px;
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.72);
+  border: 1px solid rgba(75, 67, 50, 0.1);
+}
+
+.v6-print-flow .ui-kiosk-step[data-state='active'] .ui-kiosk-step__dot {
+  background: var(--print-teal, #1f9e86);
+  color: #fff;
+}
+
+.v6-print-flow .w2-print-upload-source-grid {
+  gap: 18px;
+}
+
+.v6-print-flow .w2-print-upload-source-grid > button {
+  min-height: 124px !important;
+  flex-direction: column;
+  gap: 10px !important;
+  border-radius: 22px !important;
+  font-size: 22px !important;
+  box-shadow: 0 10px 28px rgba(51, 68, 59, 0.06);
+}
+
+.v6-print-flow .w2-print-upload-source-grid > button svg {
+  width: 32px;
+  height: 32px;
+}
+
+.v6-print-flow [data-w2-page='print-upload'] button.border-dashed {
+  min-height: 280px;
+  border-radius: 28px;
+  border-color: rgba(31, 158, 134, 0.28);
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: 0 16px 36px rgba(51, 68, 59, 0.06);
+}
+
+.v6-print-flow [data-w2-page='print-upload'] button.border-dashed p.text-lg {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--print-ink);
+}

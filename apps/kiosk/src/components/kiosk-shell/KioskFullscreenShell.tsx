@@ -45,7 +45,7 @@ export function KioskFullscreenShell({
   const shell = (
     <div
       {...getKioskPresentationAttributes('fusion-youth', viewport)}
-      className={['ui-kiosk-shell flex h-screen flex-col overflow-hidden', className].filter(Boolean).join(' ')}
+      className={['ui-kiosk-shell v6-runtime-shell flex h-screen flex-col overflow-hidden', className].filter(Boolean).join(' ')}
     >
       {!hideTopbar && <KioskAppTopbar />}
       {children}

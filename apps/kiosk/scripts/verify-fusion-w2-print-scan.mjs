@@ -573,6 +573,18 @@ assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricat
 
 const pickupClaim = read('src/pages/print/PrintPickupClaimPage.tsx')
 const pickupClaimCss = read('src/pages/print/styles/print-pickup-claim.css')
+const arrivalTitle = /ARRIVAL_CODE_ENTRY\s*=\s*\{[\s\S]{0,600}?title:\s*'([^']+)'/.exec(printScanHome)?.[1]
+assert.equal(arrivalTitle, '到机码核销', 'print-scan hub card still names the arrival-code entry 到机码核销')
+assert.match(
+  pickupClaim,
+  /<KioskPageHeader[\s\S]{0,240}?title="到机码核销"/,
+  'pickup-claim landing title follows the hub card (到机码核销), not a second name'
+)
+assert.doesNotMatch(
+  pickupClaim,
+  /title="扫码取件"/,
+  'pickup-claim must not keep the old 扫码取件 title after the hub renamed the entry'
+)
 for (const marker of [
   'claimLockRef',
   // 到机码改 8 位后符号更名：扫码路径仍必须先过格式判据，且新旧两种码各有分支
