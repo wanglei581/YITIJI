@@ -124,14 +124,23 @@ for (const route of [
 ]) {
   check(manifest.includes(`'${route}'`), `真实域入口保留 ${route}`)
 }
+// 2026-08-19 入口直达：三条 URL 尾部各加了 &mode=transfer。原断言用整串精确匹配，
+// 与它要守的东西（必须落到 Kiosk 自己的上传会话页、且带正确的 tab）无关，故改为
+// 前缀匹配并**新增**一条「三个通道型入口必须带 mode=transfer」。
 check(
-  manifest.includes("'print-phone': '/print/upload?source=document&tab=qr'"),
+  manifest.includes("'print-phone': '/print/upload?source=document&tab=qr"),
   '手机扫码传先进入 Kiosk 真上传会话页'
 )
 check(
-  manifest.includes("'print-local': '/print/upload?source=document&tab=file'") &&
-    manifest.includes("'print-usb': '/print/upload?source=document&tab=usb'"),
+  manifest.includes("'print-local': '/print/upload?source=document&tab=file") &&
+    manifest.includes("'print-usb': '/print/upload?source=document&tab=usb"),
   '本机与 U 盘入口由既有 PrintUploadPage 消费'
+)
+check(
+  ['print-local', 'print-phone', 'print-usb'].every((id) =>
+    new RegExp(`'${id}': '/print/upload\\?[^']*&mode=transfer'`).test(manifest)
+  ),
+  '三个通道型快捷入口带 mode=transfer，落地页不再重复问一遍通道'
 )
 check(!manifest.includes('/upload/phone'), 'Kiosk 首页不会直接打开手机辅助页')
 

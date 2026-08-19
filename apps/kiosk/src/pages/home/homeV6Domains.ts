@@ -46,9 +46,13 @@ export const HOME_V6_ROUTES: Readonly<Record<HomeV6ActionId, string>> = {
   login: '/login',
   profile: '/profile',
   'print-hub': '/print-scan',
-  'print-local': '/print/upload?source=document&tab=file',
-  'print-phone': '/print/upload?source=document&tab=qr',
-  'print-usb': '/print/upload?source=document&tab=usb',
+  // 这三个是**通道型**快捷入口（只声明「文件从哪来」，没声明要做什么），
+  // 因此带 mode=transfer 让落地页直达对应面板、标题用入口名，
+  // 不再让用户把刚点过的通道在 2×2 网格里重选一遍。
+  // 判据见 docs/reviews/2026-08-19-kiosk-entry-directness-review.md。
+  'print-local': '/print/upload?source=document&tab=file&mode=transfer',
+  'print-phone': '/print/upload?source=document&tab=qr&mode=transfer',
+  'print-usb': '/print/upload?source=document&tab=usb&mode=transfer',
   'scan-paper': '/scan/start',
   'file-tools': '/print-scan/convert',
   'resume-hub': '/resume-service',

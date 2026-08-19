@@ -136,6 +136,8 @@ export function PrintUploadPage() {
   // 默认视图（不带 mode）必须保持原样：fusion-w2-print.spec.ts:403-411 访问不带 tab 的
   // 本页并要求四个通道按钮同时可见、还会点「扫描原件」；fusion-w6 钉死不带 query 时
   // 页面上要能看到「文档打印」。所以本次是纯增量，只有深链走新行为。
+  // 三个通道型入口（首页快捷区的「本机上传 / 手机扫码传 / U 盘」与打印扫描 Hub 的
+  // 「手机扫码上传」）都只声明了通道，因此一律直达；标题按通道切，不再统称「文档打印」。
   const isTransferMode = isDocumentPrint && searchParams.get('mode') === 'transfer'
   // 「照片打印」原本只用 router state 传 category，刷新或收藏就丢；改为同时接受 query。
   const isPhotoEntry =
@@ -145,28 +147,33 @@ export function PrintUploadPage() {
   // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
   const contentCategory = isPhotoEntry ? 'photo' : undefined
 
+  // 简历打印与文档打印共用三种上传通道；?tab= 决定初始通道。
+  const requestedTab = searchParams.get('tab')
+  const entryTab: UploadTab =
+    requestedTab === 'qr' || requestedTab === 'usb' ? requestedTab : 'file'
+
+  const TRANSFER_COPY: Record<UploadTab, { title: string; subtitle: string }> = {
+    file: { title: '本机上传', subtitle: '在这台机器上选择文件，传完可以直接接着打印' },
+    qr: { title: '手机扫码上传', subtitle: '把手机里的文件传到这台机器，传完可以直接接着打印' },
+    usb: { title: 'U盘导入', subtitle: '从 U 盘里选文件传到这台机器，传完可以直接接着打印' },
+  }
+
   const pageTitle = !isDocumentPrint
     ? '简历打印'
     : isTransferMode
-      ? '手机扫码上传'
+      ? TRANSFER_COPY[entryTab].title
       : isPhotoEntry
         ? '照片打印'
         : '文档打印'
   const pageSubtitle = !isDocumentPrint
     ? '从我的简历或上传一份简历进入打印'
     : isTransferMode
-      ? '把手机里的文件传到这台机器，传完可以直接接着打印'
+      ? TRANSFER_COPY[entryTab].subtitle
       : isPhotoEntry
         ? '照片上传后设参数打印，与文档打印同一条流程'
         : '通用文档、求职材料或图片上传后打印'
 
-  // 简历打印与文档打印共用三种上传通道；?tab=qr 可从「手机扫码上传」入口直达扫码面板。
-  const requestedTab = searchParams.get('tab')
-  const initialTab: UploadTab = isTransferMode
-    ? 'qr'
-    : requestedTab === 'qr' || requestedTab === 'usb'
-      ? requestedTab
-      : 'file'
+  const initialTab: UploadTab = entryTab
   const [tab, setTab] = useState<UploadTab>(initialTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -412,7 +419,12 @@ export function PrintUploadPage() {
 
         {/* 直达模式：入口已经把通道定死了，不再摆等权网格。
             其余通道降级为一行次要链接 —— 用户仍然换得了，只是不必先答一遍已经答过的问题。 */}
-        {isTransferMode && (
+        {/* 有文件后这一行就撤掉：换通道的时机在传文件之前。
+            传完再让人点「改用 U 盘」只会静默丢掉已传的文件，用户到下一步才发现是空的；
+            要重来有文件卡自带的 × 按钮，那条路径会一并清掉服务端会话。
+            刻意不用 window.confirm 兜底 —— CLAUDE.md §17 禁止一体机出现系统级弹窗，
+            全 kiosk 也无此先例。 */}
+        {isTransferMode && !file && (
           <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
             <span>也可以改用：</span>
             {tabs
@@ -425,7 +437,6 @@ export function PrintUploadPage() {
                   onClick={() => {
                     if (disabled) return
                     setTab(key)
-                    setFile(null)
                     setUploadError(null)
                   }}
                   className={[
