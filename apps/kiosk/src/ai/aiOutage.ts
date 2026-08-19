@@ -23,12 +23,36 @@ import type { AiAvailability } from './useAiTask'
  * 其余错误（限流 429、参数错误 400、鉴权 401 等）只是**本次调用**失败，
  * 不是能力不可用 —— 那些必须保留重试入口，
  * 不许拿去把按钮永久置灰（置灰了用户就再也点不动，而服务其实是好的）。
+ *
+ * 准入标准只有一条：**这个码只可能由「能力没配好 / 根本没接真模型」产生**。
+ * 只要后端同一个码还会用于「这次没成」（超时、限流、空回复、上游 4xx/5xx），
+ * 就不能进这张表 —— 把限流显示成「这个功能不可用」本身就是伪造能力。
+ *
+ * 移出记录（2026-08-19，四家只读审查 3:1）：
+ * - `AI_UNAVAILABLE`：后端把「连不上」「上游任意非 2xx（含 429 限流）」「模型没返回内容」
+ *   三种情况抛成同一个码（`llm-fair-visit-plan.service.ts:318/323/329`，同型复用见
+ *   `llm-career-plan` / `llm-job-fit` / `mock-interview-llm` / `job-ai-llm`）。留在表里
+ *   等于把被限流的用户告知「功能死了」。
+ * - `NETWORK_ERROR`：连服务端都没够着，天然瞬态，与「AI 能力」无关；它还是
+ *   `CareerPlanPage` 粘滞死锁的直接来源（首屏抖一下就永久置灰）。
+ *
+ * 已知代价：模型真正连不上时，上述四条链不再进诚实降级态，只会给一个可重试的错误。
+ * 根治要在**后端**把 `*_UNAVAILABLE` 拆成「未配置 / 连不上 / 限流 / 空回复」四个码，
+ * 那是独立一刀（涉及 5+ 处 service），不在本次范围。
+ *
+ * 同类 `AI_DIAGNOSIS_UNAVAILABLE` / `AI_GENERATE_UNAVAILABLE` / `AI_OPTIMIZE_UNAVAILABLE`
+ * 是真实的 503 错误码（不是 `status:'failed'`），但复用形态与 `AI_UNAVAILABLE` 完全一致，
+ * 因此同样不进表，等后端拆码。
  */
 export const AI_OUTAGE_CODES: ReadonlySet<string> = new Set([
+  // 功能位未启用 / 无密钥：只可能是没配好，不可能是「这次没成」。
   'AI_NOT_CONFIGURED',
-  'AI_UNAVAILABLE',
+  // 简历诊断 / 生成 / 优化的模型未配置（ai.service.ts、llm-resume-optimize.service.ts）。
+  // 与 AI_NOT_CONFIGURED 同义，只是简历链用了另一个名字。
+  'AI_PROVIDER_NOT_CONFIGURED',
+  // 演示模式：前端 mock 适配器主动拒绝，代表「这里根本没接真模型」。
+  // 由 verify-ai-down-fallbacks.mjs 运行时钉死必须正好是这个值。
   'MOCK_MODE',
-  'NETWORK_ERROR',
 ])
 
 /** 从任意 API error 上取错误码；取不到时归为 `UNKNOWN_ERROR`（= 不判定能力不可用）。 */
