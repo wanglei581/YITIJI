@@ -8,6 +8,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
 // ============================================================
@@ -417,11 +418,11 @@ export class LlmJobFitService {
         })
       }
       this.logger.error('jobfit.llm network_error')
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
+      throw llmUnreachableError('AI 岗位匹配服务')
     }
     if (!res.ok) {
       this.logger.error(`jobfit.llm upstream_non_2xx status=${res.status}`)
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
+      throw llmUpstreamStatusError('AI 岗位匹配服务', res.status)
     }
     const data = res.data as {
       choices?: Array<{ message?: { content?: string } }>
@@ -436,7 +437,7 @@ export class LlmJobFitService {
     } | null
     const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
+      throw llmEmptyResponseError('AI 岗位匹配服务')
     }
     return {
       text: reply,

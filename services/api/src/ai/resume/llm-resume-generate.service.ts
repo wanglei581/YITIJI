@@ -9,6 +9,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { containsForbiddenWord } from '../llm/llm-guard'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
@@ -175,18 +176,14 @@ export class LlmResumeGenerateService {
           error: { code: 'AI_GENERATE_TIMEOUT', message: llmTimeoutMessage('AI 简历生成', error.timeoutMs) },
         })
       }
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_GENERATE_UNAVAILABLE', message: 'AI 简历生成服务连接失败，请稍后重试' },
-      })
+      throw llmUnreachableError('AI 简历生成服务')
     }
 
     if (!res.ok) {
       // 打到模型了但没拿到 usage：如实回报「调用发生过、token 未知」，不塞 tokenUsage。
       onLlmCall?.({ provider: providerLabel })
       this.logger.error(`resume generate http ${res.status}`)
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_GENERATE_UNAVAILABLE', message: `AI 简历生成服务返回错误 (${res.status})` },
-      })
+      throw llmUpstreamStatusError('AI 简历生成服务', res.status)
     }
 
     const data = res.data as {
@@ -197,9 +194,7 @@ export class LlmResumeGenerateService {
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const content = data?.choices?.[0]?.message?.content?.trim()
     if (!content) {
-      throw new ServiceUnavailableException({
-        error: { code: 'AI_GENERATE_UNAVAILABLE', message: 'AI 简历生成服务未返回内容' },
-      })
+      throw llmEmptyResponseError('AI 简历生成服务')
     }
     return content
   }

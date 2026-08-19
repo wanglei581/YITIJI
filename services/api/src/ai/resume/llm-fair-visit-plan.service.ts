@@ -8,6 +8,7 @@ import {
   llmFetchJson,
   llmTimeoutMessage,
 } from '../llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../llm/llm-failure'
 import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 import { maskUserTextForLlmText } from '../../common/pii/llm-input-mask'
 
@@ -315,18 +316,18 @@ export class LlmFairVisitPlanService {
       }
       this.logger.error('fairvisit.llm network_error')
       onLlmCall?.({ provider: providerLabel })
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
+      throw llmUnreachableError('AI 参会准备单服务')
     }
     if (!res.ok) {
       this.logger.error(`fairvisit.llm upstream_non_2xx status=${res.status}`)
       onLlmCall?.({ provider: providerLabel })
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
+      throw llmUpstreamStatusError('AI 参会准备单服务', res.status)
     }
     const data = res.data as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage } | null
     onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data?.usage) })
     const reply = data?.choices?.[0]?.message?.content?.trim()
     if (!reply) {
-      throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
+      throw llmEmptyResponseError('AI 参会准备单服务')
     }
     return reply
   }

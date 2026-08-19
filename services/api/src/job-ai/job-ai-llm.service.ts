@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import { LLM_BUSY_MESSAGE, LlmBusyError, LlmTimeoutError, llmFetchJson } from '../ai/llm/llm-http'
+import { llmEmptyResponseError, llmUnreachableError, llmUpstreamStatusError } from '../ai/llm/llm-failure'
 import { maskUserTextForLlmText } from '../common/pii/llm-input-mask'
 import type {
   JobAiExplanationPayload,
@@ -177,7 +178,7 @@ export class JobAiLlmService {
       )
       if (!res.ok) {
         this.logger.warn(`${operation}.upstream_non_2xx status=${res.status}`)
-        throw unavailable('AI_UNAVAILABLE', `AI 模型返回错误 (${res.status})`)
+        throw llmUpstreamStatusError('AI 岗位服务', res.status)
       }
       const data = res.data as {
         choices?: Array<{ message?: { content?: string } }>
@@ -191,7 +192,7 @@ export class JobAiLlmService {
         }
       } | null
       const reply = data?.choices?.[0]?.message?.content?.trim()
-      if (!reply) throw unavailable('AI_UNAVAILABLE', 'AI 模型未返回内容')
+      if (!reply) throw llmEmptyResponseError('AI 岗位服务')
       return {
         text: reply,
         provider: `llm:${cfg.vendor}:${cfg.model}`,
@@ -214,7 +215,7 @@ export class JobAiLlmService {
         throw unavailable('AI_TIMEOUT', 'AI 模型响应超时，请稍后重试')
       }
       this.logger.warn(`${operation}.network_error ms=${Date.now() - startedAt}`)
-      throw unavailable('AI_UNAVAILABLE', 'AI 模型连接失败，请稍后重试')
+      throw llmUnreachableError('AI 岗位服务')
     }
   }
 }

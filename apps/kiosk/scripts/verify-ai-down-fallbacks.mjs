@@ -405,11 +405,15 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     const members = [...setLiteral.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1])
     assert(members.length > 0, 'aiOutage: 码表为空 —— AI 真的没配好时将没有任何页面进入降级态')
 
-    // 能力级：只可能由「没配好 / 根本没接真模型」产生，不可能是「这次没成」。
+    // 能力级：只可能由「没配好 / 根本没接真模型 / 根本没连上」产生，
+    // 不可能是「这次没成」。
     const CAPABILITY_LEVEL = new Set([
       'AI_NOT_CONFIGURED',
       'AI_PROVIDER_NOT_CONFIGURED',
       'MOCK_MODE',
+      // 后端拆码后新增（services/api/src/ai/llm/llm-failure.ts）：
+      // 只代表 fetch 层根本没连上，不再混着 429 / 5xx / 空回复。
+      'AI_PROVIDER_UNREACHABLE',
     ])
     // 单次失败：后端同一个码还会用于超时 / 限流 / 空回复 / 上游非 2xx。
     // 这些进表就会把可重试的入口置灰。`*_UNAVAILABLE` 系列目前全部属于此类：
@@ -418,6 +422,9 @@ mustNot('careerPlan', /variant \?\? 'ai'/, "禁止把缺失的 variant 默认当
     // 后端拆码之后可以把拆出来的「连不上」码移进白名单，那是另一刀。
     const SINGLE_CALL_FAILURE = [
       'AI_UNAVAILABLE', 'AI_DIAGNOSIS_UNAVAILABLE', 'AI_GENERATE_UNAVAILABLE', 'AI_OPTIMIZE_UNAVAILABLE',
+      // 后端拆码产出的四个「这次没成」码：限流 / 上游 5xx / 其它 4xx / 空回复。
+      // 它们进表就会把可重试的入口置灰 —— 429 尤其不能进，那等于告诉排队中的用户功能坏了。
+      'AI_RATE_LIMITED', 'AI_PROVIDER_ERROR', 'AI_PROVIDER_REQUEST_ERROR', 'AI_EMPTY_RESPONSE',
       'AI_BUSY', 'AI_TIMEOUT', 'AI_CHAT_TIMEOUT', 'AI_CAREER_PLAN_TIMEOUT', 'AI_JOB_FIT_TIMEOUT',
       'AI_FAIR_VISIT_PLAN_TIMEOUT', 'AI_MOCK_INTERVIEW_TIMEOUT', 'AI_OPTIMIZE_TIMEOUT',
       'AI_DIAGNOSIS_TIMEOUT', 'AI_GENERATE_TIMEOUT', 'REQUEST_TIMEOUT',
