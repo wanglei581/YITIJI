@@ -124,14 +124,30 @@ for (const route of [
 ]) {
   check(manifest.includes(`'${route}'`), `真实域入口保留 ${route}`)
 }
+// 2026-08-19 入口直达：三条 URL 尾部各加了 &mode=transfer。原断言用整串精确匹配，
+// 与它要守的东西（必须落到 Kiosk 自己的上传会话页、且带正确的 tab）无关，故改为
+// 前缀匹配并**新增**一条「三个通道型入口必须带 mode=transfer」。
 check(
-  manifest.includes("'print-phone': '/print/upload?source=document&tab=qr'"),
+  manifest.includes("'print-phone': '/print/upload?source=document&tab=qr"),
   '手机扫码传先进入 Kiosk 真上传会话页'
 )
 check(
-  manifest.includes("'print-local': '/print/upload?source=document&tab=file'") &&
-    manifest.includes("'print-usb': '/print/upload?source=document&tab=usb'"),
+  manifest.includes("'print-local': '/print/upload?source=document&tab=file") &&
+    manifest.includes("'print-usb': '/print/upload?source=document&tab=usb"),
   '本机与 U 盘入口由既有 PrintUploadPage 消费'
+)
+check(
+  ['print-phone', 'print-usb'].every((id) =>
+    new RegExp(`'${id}': '/print/upload\\?[^']*&mode=transfer'`).test(manifest)
+  ),
+  '手机扫码传与 U 盘两个通道型入口带 mode=transfer，落地页不再重复问一遍通道'
+)
+// print-local 走 <input type="file">，只是桌面 E2E 验证路径，生产一体机不许弹系统
+// 文件对话框（CLAUDE.md §17）。钉死它不得被提升为直达入口 —— 直达会给它一个
+// 专属标题「本机上传」，把非生产路径包装成一等公民。
+check(
+  !/'print-local': '\/print\/upload\?[^']*&mode=transfer'/.test(manifest),
+  '本机上传不得配直达入口（桌面验证路径，非一体机生产路径）'
 )
 check(!manifest.includes('/upload/phone'), 'Kiosk 首页不会直接打开手机辅助页')
 

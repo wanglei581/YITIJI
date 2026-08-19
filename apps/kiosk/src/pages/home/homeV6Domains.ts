@@ -46,9 +46,18 @@ export const HOME_V6_ROUTES: Readonly<Record<HomeV6ActionId, string>> = {
   login: '/login',
   profile: '/profile',
   'print-hub': '/print-scan',
+  // 通道型快捷入口（只声明「文件从哪来」，没声明要做什么）带 mode=transfer，
+  // 让落地页直达对应面板、标题用入口名，不再让用户把刚点过的通道重选一遍。
+  // 判据见 docs/reviews/2026-08-19-kiosk-entry-directness-review.md。
+  //
+  // **print-local 刻意不加 mode=transfer**：`PrintUploadPage` 文件头注明「选择文件」
+  // 用的是 `<input type="file">`，只是桌面 Chrome/Edge 下的 E2E 链路验证，
+  // 生产一体机按 CLAUDE.md §17 不许弹系统文件对话框（真正的本机路径是 U 盘导入，
+  // 走 Terminal Agent 的 /local/usb/* 网桥）。给它配直达入口 + 专属标题，
+  // 等于把一条非生产路径提升成一等公民，所以保持原样不做直达。
   'print-local': '/print/upload?source=document&tab=file',
-  'print-phone': '/print/upload?source=document&tab=qr',
-  'print-usb': '/print/upload?source=document&tab=usb',
+  'print-phone': '/print/upload?source=document&tab=qr&mode=transfer',
+  'print-usb': '/print/upload?source=document&tab=usb&mode=transfer',
   'scan-paper': '/scan/start',
   'file-tools': '/print-scan/convert',
   'resume-hub': '/resume-service',
