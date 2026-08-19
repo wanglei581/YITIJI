@@ -8,6 +8,7 @@ import { KioskIconSprite } from '../components/kiosk-icon'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useKioskStageFit } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
+import { resolveV6Shell, type V6ShellRoute } from './v6ShellRoutes'
 import '../styles/v6-runtime-shell.css'
 
 function getActiveTab(pathname: string): KioskTab {
@@ -52,40 +53,6 @@ const ACTIONBAR_ROUTES = new Set([
 function routeUsesPageActionbar(pathname: string): boolean {
   return ACTIONBAR_ROUTES.has(pathname) || pathname.startsWith('/print-scan/feature/')
 }
-
-interface V6ShellRoute {
-  /**
-   * 顶栏主标题。
-   * null   → 该页自带页内 KioskPageHeader（返回键 + 域名 h1），顶栏只显示「职易达」全局品牌，
-   *          避免同一屏 76px 内出现两个同名标题。
-   * string → 该页没有页内页头（/print-scan、/profile），域名必须由顶栏承载，
-   *          否则用户不知道自己在哪一屏。
-   */
-  domainTitle: string | null
-  /** 副标题是否附终端编号。首页是品牌页不挂设备号；其余页保留，运维要能一眼读出机器。 */
-  withTerminalCode: boolean
-  /** 顶栏品牌是否兼作「返回首页」。只给没有页内返回键的页，避免和页内返回重复。 */
-  brandReturnsHome: boolean
-}
-
-/**
- * V6 暖纸壳白名单 —— 「哪些路由已经迁到 V6 壳」的唯一真值。
- *
- * 要把一条路由改成 V6，只改这张表；不要在别处另写 pathname === '/xxx' 的判断。
- * 表外路由继续用旧的深藏青顶栏，互不污染。
- */
-const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
-  ['/', { domainTitle: null, withTerminalCode: false, brandReturnsHome: false }],
-  ['/print-scan', { domainTitle: '打印扫描服务', withTerminalCode: true, brandReturnsHome: true }],
-  ['/resume-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/jobs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/fairs-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-  ['/profile', { domainTitle: '我的', withTerminalCode: true, brandReturnsHome: false }],
-  // 页内自带 KioskPageHeader「到机码核销」，顶栏不再重复域名。
-  ['/print/pickup-claim', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
-])
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
   // 域名已经在顶栏主标题上时，副标题回落到品牌名，避免「职易达 / 职易达 · 机号」自我重复。
@@ -149,7 +116,7 @@ function KioskShell() {
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI顾问/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
-  const v6Shell = V6_SHELL_ROUTES.get(pathname) ?? null
+  const v6Shell = resolveV6Shell(pathname)
   const isV6Route = v6Shell !== null
   const v6DomainTitle = v6Shell?.domainTitle ?? null
   const usesPageActionbar = routeUsesPageActionbar(pathname)

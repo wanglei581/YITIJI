@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { registerW6Api, W6_MEMBER_TOKEN } from './fixtures/fusion-w6-api'
+import { matchV6RoutePattern } from '../../src/layouts/v6ShellRoutes'
 import { V6_SHELL_ROUTE_PATTERNS, w6KioskCases, w6MobileCases, type W6RouteCase } from './fixtures/fusion-w6-route-cases'
 
 /** 相对亮度，用来分辨「V6 暖纸顶栏」和「旧深藏青顶栏」，不锁具体色值。 */
@@ -29,7 +30,7 @@ async function expectV6ShellConsistency(page: Page, route: W6RouteCase): Promise
       topbarBg: topbar ? getComputedStyle(topbar).backgroundColor : null,
     }
   })
-  const expected = V6_SHELL_ROUTE_PATTERNS.has(state.landedPath)
+  const expected = [...V6_SHELL_ROUTE_PATTERNS].some((pattern) => matchV6RoutePattern(pattern, state.landedPath))
   expect(
     state.hasV6Class,
     `${route.pattern}（落地于 ${state.landedPath}）的 V6 壳归属必须与 KioskRoot 的 V6_SHELL_ROUTES 一致（期望 ${expected}）`,

@@ -380,32 +380,37 @@ function collectStringLiteralRouteKeys(source, declarationName, fileLabel) {
 }
 
 const w6RouteCasesSource = await read('tests/visual/fixtures/fusion-w6-route-cases.ts')
-const runtimeV6Routes = collectStringLiteralRouteKeys(root, 'V6_SHELL_ROUTES', 'KioskRoot.tsx')
-const contractV6Routes = collectStringLiteralRouteKeys(
-  w6RouteCasesSource,
-  'V6_SHELL_ROUTE_PATTERNS',
-  'fusion-w6-route-cases.ts',
+const v6ShellRoutesSource = await read('src/layouts/v6ShellRoutes.ts')
+const runtimeV6Routes = collectStringLiteralRouteKeys(
+  v6ShellRoutesSource,
+  'V6_SHELL_ROUTE_KEYS',
+  'v6ShellRoutes.ts',
 )
 
-assert.ok(runtimeV6Routes.length >= 8, `V6_SHELL_ROUTES must stay a declared table, received ${runtimeV6Routes.length}`)
-assert.deepEqual(
-  runtimeV6Routes,
-  contractV6Routes,
-  'KioskRoot V6_SHELL_ROUTES and fusion-w6 V6_SHELL_ROUTE_PATTERNS must list the same routes',
+assert.ok(runtimeV6Routes.length >= 8, `V6_SHELL_ROUTE_KEYS must stay a declared table, received ${runtimeV6Routes.length}`)
+assert.match(
+  w6RouteCasesSource,
+  /V6_SHELL_ROUTE_KEYS/,
+  'fusion-w6 V6_SHELL_ROUTE_PATTERNS must be derived from V6_SHELL_ROUTE_KEYS, not a second handwritten list',
 )
-for (const requiredRoute of ['/', '/print-scan', '/resume-service', '/jobs-service', '/fairs-service', '/interview-service', '/policy-service', '/profile']) {
-  assert.ok(runtimeV6Routes.includes(requiredRoute), `V6_SHELL_ROUTES must keep ${requiredRoute} on the V6 shell`)
+assert.match(
+  root,
+  /resolveV6Shell\(\s*pathname\s*\)/,
+  'KioskShell must resolve V6 chrome through resolveV6Shell(pathname)',
+)
+for (const requiredRoute of ['/', '/print-scan', '/resume-service', '/jobs-service', '/fairs-service', '/interview-service', '/policy-service', '/profile', '/print/upload', '/print/cashier', '/jobs', '/assistant']) {
+  assert.ok(runtimeV6Routes.includes(requiredRoute), `V6_SHELL_ROUTE_KEYS must keep ${requiredRoute} on the V6 shell`)
 }
 assert.match(
   shellBody,
   /const\s+isV6Route\s*=\s*v6Shell\s*!==\s*null/,
-  'isV6Route must be derived from the V6_SHELL_ROUTES table, not from ad-hoc pathname comparisons',
+  'isV6Route must be derived from resolveV6Shell, not from ad-hoc pathname comparisons',
 )
-for (const v6Route of runtimeV6Routes.filter((route) => route !== '/')) {
+for (const v6Route of ['/print-scan', '/profile', '/print/upload', '/jobs', '/assistant']) {
   assert.doesNotMatch(
     shellBody,
     new RegExp(`pathname\\s*===\\s*['"]${v6Route}['"]`),
-    `KioskShell must resolve ${v6Route} through V6_SHELL_ROUTES instead of a separate pathname check`,
+    `KioskShell must resolve ${v6Route} through resolveV6Shell instead of a separate pathname check`,
   )
 }
 

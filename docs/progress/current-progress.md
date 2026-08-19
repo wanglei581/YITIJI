@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-19 扩面 **一体机用户页全部挂 V6 暖纸壳（同一分支 `fix/kiosk-pickup-claim-title` / #741，未合入、未部署）**。负责人明确：不是只换首页。`V6_SHELL_ROUTE_KEYS` 覆盖打印/扫描/简历/岗位/招聘会/我的/顾问及面试、岗位匹配、合同审查等全屏页；`resolveV6Shell` 按模式匹配动态路由。`KioskFullscreenShell` 同步挂 `v6-runtime-shell`，顶栏改「职 / 职易达」。手机辅助页 `/member/qr-login`、`/upload/phone` 与待机屏不进表。各页内部换皮与拆页仍按一页一刀继续，本刀先让从首页点进去不再掉回深藏青顶栏。不部署。
+
 2026-08-19 落地 **V6 第一刀：到机码核销页对照 P47（同一分支 `fix/kiosk-pickup-claim-title` / #741，未合入、未部署）**。负责人改口后续页一律按 V6，先本地 5183 预览再进仓。五家同审（DeepSeek / Antigravity / Grok / Claude Opus max / 本会话）Q0–Q4 全 GO/A：保留 HID + `<input>` 与 8 位静默 250ms，不画 31 键；打印机异常只警告不硬拦；失败态只分 `EXPIRED` / `UNAVAILABLE` / `CLAIM_LOCKED` / 其余「无效或已过期」，不拆 notfound 与错终端；成功只展示 API 真有的 `orderNo` / `fileName?` / `amountCents?`。`/print/pickup-claim` 进入 `V6_SHELL_ROUTES`（与 W6 `V6_SHELL_ROUTE_PATTERNS` 同步）。负责人续裁：V6 文字不得过密、缺页/挤页可新增同风格页拆开。首屏已去掉「这一步做什么」四段和对照长表，只留扫码主句、输入、三步找码、一句到机码≠取件码。不改 `pickupCode.ts`、支付、小程序、Prisma。CEO 记分卡写入 `next-tasks.md`。不部署。
 
 2026-08-19 修复 **到机码核销点进去标题变成「扫码取件」（分支 `fix/kiosk-pickup-claim-title`，基于 `origin/main@e267dbc29`，已并入 `main@2e7b4fc52`，未合入、未部署）**。入口直达批次 4，只改一页：Hub 卡 `ARRIVAL_CODE_ENTRY.title` 已是「到机码核销」，落地页 `PrintPickupClaimPage` 输入态 `KioskPageHeader` 仍写死「扫码取件」。五家同审（DeepSeek / Antigravity / Grok / Claude Opus max / 本会话）裁定本刀只跟随这一处，其余 14 个写死标题不动。`/error-offline` 不接线、`window.open(_blank)` 已核为桌面-only、部署脚本不擅自加 `NODE_ENV`。W6 `featureText` 与 `verify:fusion-w2` / `verify:fusion-w6` 改钉新标题。不改流程、不改小程序「请到服务点扫码取件」、不部署。

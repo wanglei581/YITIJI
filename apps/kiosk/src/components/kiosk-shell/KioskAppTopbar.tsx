@@ -51,8 +51,9 @@ export function KioskAppTopbar() {
 
   return (
     <KioskTopbar
-      brandTitle={`就业服务大厅 · ${terminalCode}`}
-      brandSubtitle="AI求职打印服务终端"
+      brandMark="职"
+      brandTitle="职易达"
+      brandSubtitle={`AI 求职操作系统 · ${terminalCode}`}
       right={<KioskTopbarStatus tone={tone} label={loading ? '设备检查中' : printerLabel} />}
     />
   )
