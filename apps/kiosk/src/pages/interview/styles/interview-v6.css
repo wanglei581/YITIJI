@@ -1,5 +1,25 @@
 /* 面试落地页页体。不改出题 / 上传 / 降级逻辑，只把设置页从旧卡片收成 V6 暖纸。 */
 
+.v6-interview .v6-page-lead {
+  margin: 0 16px 16px;
+  max-width: 28em;
+  padding: 18px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(31, 158, 134, 0.28);
+  border-left: 6px solid var(--k-teal, #1f9e86);
+  background: rgba(226, 242, 236, 0.55);
+  font-size: 22px;
+  line-height: 1.5;
+}
+
+.v6-interview .v6-page-lead strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 28px;
+  font-weight: 600;
+}
+
 .v6-interview .ui-kiosk-page-header h1,
 .v6-interview .interview-pagehead h1,
 .v6-interview .ui-kiosk-page-header .ui-kiosk-page-header__title {

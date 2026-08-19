@@ -385,6 +385,12 @@ export function PrintUploadPage() {
           step={1}
           backLabel={isTransferMode ? '返回打印扫描' : '返回首页'}
           onBack={() => navigate(isTransferMode ? '/print-scan' : '/')}
+          lead={
+            <p className="v6-page-lead" data-v6-lead="print-upload">
+              <strong>先把文件放到这一台机器上。</strong>
+              选一种方式即可，下一步再检查能不能打。
+            </p>
+          }
         />
 
         {source === 'resume' && (

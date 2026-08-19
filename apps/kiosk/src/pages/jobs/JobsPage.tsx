@@ -336,6 +336,10 @@ export function JobsPage() {
         }}
         onClose={() => setShowFilterPicker(false)}
       />
+      <p className="v6-page-lead" data-v6-lead="jobs">
+        <strong>这一屏只展示已审核的来源岗位。</strong>
+        投递去来源平台，这里不收简历。
+      </p>
       <AiDriverBanner feature="AI岗位研判" description="结合你的简历分析匹配度" />
       {facetLoading ? (
         <LoadingState className="flex-1" />

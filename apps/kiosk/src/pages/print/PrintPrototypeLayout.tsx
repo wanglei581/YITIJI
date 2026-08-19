@@ -18,6 +18,7 @@ interface PrintPrototypeHeaderProps {
   onBack?: () => void
   /** 替代返回按钮，显示在标题右侧（如"任务进行中"徽章） */
   aside?: ReactNode
+  lead?: ReactNode
 }
 
 /**
@@ -26,10 +27,11 @@ interface PrintPrototypeHeaderProps {
  * 顶栏（品牌 / 时钟 / 设备状态）由 KioskLayout 全局提供，本组件不得自建，
  * 否则会出现双顶栏。步骤条复用 kiosk-shell.css 的 .ui-kiosk-steps 规范。
  */
-export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack, aside }: PrintPrototypeHeaderProps) {
+export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack, aside, lead }: PrintPrototypeHeaderProps) {
   return (
     <>
       <KioskPageHeader title={title} description={subtitle} onBack={onBack} backLabel={backLabel} aside={aside} />
+      {lead}
       <nav className="ui-kiosk-steps v6-print-steps" aria-label="打印流程">
         {PRINT_STEPS.map((label, index) => {
           const indexStep = (index + 1) as PrintFlowStep
