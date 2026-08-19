@@ -390,6 +390,7 @@ function TaskDetailBody({
 }) {
   const statusMeta = TASK_STATUS_MAP[detail.status] ?? { badge: 'default' as const, label: detail.status }
   const isUnconfirmed = detail.type === 'print' && detail.errorCode === 'PRINT_JOB_UNCONFIRMED'
+  const needsManualCheck = isUnconfirmed && detail.type === 'print' && !detail.printOutcome
   const canRetry = detail.type === 'print' && detail.status === 'failed' && !isUnconfirmed
   const canCancel = detail.type === 'scan' && detail.status === 'waiting'
   const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
@@ -410,6 +411,7 @@ function TaskDetailBody({
       ['份数 / 色彩 / 纸型', `${detail.copies ?? '—'} 份 · ${detail.colorMode === 'color' ? '彩色' : detail.colorMode === 'black_white' ? '黑白' : '—'} · ${detail.paperSize ?? '—'}`],
       ['关联订单', detail.orderNo ?? '—'],
       ['完成时间', fmt(detail.completedAt)],
+      ['核查结果', detail.printOutcome === 'printed' ? '已核查·已出纸' : detail.printOutcome === 'not_printed' ? '已核查·未出纸' : '未核查'],
     )
   }
   if (detail.type === 'scan') {
@@ -444,7 +446,7 @@ function TaskDetailBody({
         </div>
       )}
 
-      {isUnconfirmed && (
+      {needsManualCheck && (
         <div className="rounded-lg border border-error-text/25 bg-error-bg px-3 py-2.5 text-[12.5px] leading-relaxed text-error-text">
           <p className="font-bold">打印结果未确认，禁止重试，避免重复出纸。</p>
           <p className="mt-1">
@@ -455,6 +457,11 @@ function TaskDetailBody({
             ，并按实际情况决定是否全额退款。
           </p>
         </div>
+      )}
+      {isUnconfirmed && !needsManualCheck && (
+        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-[12.5px] leading-relaxed text-neutral-600">
+          已完成现场核查，仍禁止重新排队。
+        </p>
       )}
 
       {(canRetry || canCancel) && (

@@ -11,6 +11,7 @@ import { AdminPrintJobsController } from './admin-print-jobs.controller'
 import { PrintJobsService } from './print-jobs.service'
 import { PrintPageCountService } from './print-page-count.service'
 import { AdminPrintJobsAbandonService } from './admin-print-jobs-abandon.service'
+import { AdminPrintJobsVerifyOutcomeService } from './admin-print-jobs-verify-outcome.service'
 import { PickupOrderService } from './pickup-order.service'
 
 /**
@@ -27,7 +28,7 @@ import { PickupOrderService } from './pickup-order.service'
     AuditModule,
   ],
   controllers: [PrintJobsController, AdminPrintJobsController, OrderQuoteController],
-  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, OrderQuoteService, PickupOrderService],
+  providers:   [PrintJobsService, PrintPageCountService, AdminPrintJobsAbandonService, AdminPrintJobsVerifyOutcomeService, OrderQuoteService, PickupOrderService],
   exports:     [PrintPageCountService, OrderQuoteService],
 })
 export class PrintJobsModule {}

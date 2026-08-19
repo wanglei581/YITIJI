@@ -17,7 +17,7 @@ flowchart TD
   JobFair["JobFair<br/><small>39 字段</small>"]
   JobSource["JobSource<br/><small>30 字段</small>"]
   User["User<br/><small>26 字段</small>"]
-  PrintTask["PrintTask<br/><small>20 字段</small>"]
+  PrintTask["PrintTask<br/><small>21 字段</small>"]
   BenefitClaim["BenefitClaim<br/><small>8 字段</small>"]
   DocumentProcessTask["DocumentProcessTask<br/><small>19 字段</small>"]
   FairCompany["FairCompany<br/><small>22 字段</small>"]
@@ -74,7 +74,7 @@ flowchart TD
 | **ContractReviewTask** | 30 | EndUser | 7 个文件<br/>`contract-review/__tests__/contract-review-orchestrator.test.ts`<br/>`contract-review/contract-review-lifecycle.service.ts`<br/>`contract-review/contract-review-orchestrator.service.ts`<br/>… |
 | **DocumentProcessTask** | 19 | EndUser、FileObject、PiiFinding | 5 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`materials/materials.service.ts`<br/>`member-print-orders/member-print-order-create.service.ts`<br/>… |
 | **EndUser** | 32 | AiResumeResult、AiServiceLog、BenefitClaim、BenefitGrant、BroadcastReadState、BrowseLog、ContractReviewTask、DocumentProcessTask、ExternalJumpLog、Favorite、FeedbackTicket、FileObject、JobAiSession、MemberLegalConsent、MemberNotification、PrintTask、ScanTask、UserAiConsent、UserDataRequest | 12 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`benefit-activities/benefit-activities.service.ts`<br/>… |
-| **ExternalJumpLog** | 13 | EndUser | 3 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`member-privacy/member-data-export.mapper.ts` |
+| **ExternalJumpLog** | 13 | EndUser | 4 个文件<br/>`activity/activity.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>`ai/resume/fair-visit-plan.service.ts`<br/>… |
 | **FairCompany** | 22 | FairCompanyPosition、FairVenueHallCompany、JobFair | 6 个文件<br/>`activity/activity.service.ts`<br/>`jobs/admin-fairs.service.ts`<br/>`jobs/fair-company-print.service.ts`<br/>… |
 | **FairCompanyBooth** | 9 | — | **无代码读写** |
 | **FairCompanyPosition** | 16 | FairCompany | **无代码读写** |
@@ -120,7 +120,7 @@ flowchart TD
 | **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 7 个文件<br/>`activity/activity.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 3 个文件<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>`payment/pricing.service.ts` |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 20 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 19 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>… |
+| **PrintTask** | 21 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 20 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>… |
 | **PrintTaskStatusLog** | 7 | PrintTask | 6 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`print-jobs/admin-closed-pending-print-task-disposition.service.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RedemptionRecord** | 11 | — | 2 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`member-benefits/member-benefits.service.ts` |

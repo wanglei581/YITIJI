@@ -50,13 +50,17 @@ async function main(): Promise<void> {
   const ordPaid = `ord_aref_paid_${suffix}`
   const ordUnpaid = `ord_aref_unpaid_${suffix}`
   const ordRefunded = `ord_aref_done_${suffix}`
+  const ordPrinted = `ord_aref_printed_${suffix}`
+  const taskPrinted = `pt_aref_printed_${suffix}`
   const orderNoPaid = `ORD-AREF-PAID-${suffix.toUpperCase()}`
   const orderNoUnpaid = `ORD-AREF-UNPA-${suffix.toUpperCase()}`
   const orderNoDone = `ORD-AREF-DONE-${suffix.toUpperCase()}`
+  const orderNoPrinted = `ORD-AREF-PRNT-${suffix.toUpperCase()}`
 
   async function cleanup(): Promise<void> {
-    await prisma.refund.deleteMany({ where: { orderId: { in: [ordPaid, ordUnpaid, ordRefunded] } } })
-    await prisma.order.deleteMany({ where: { id: { in: [ordPaid, ordUnpaid, ordRefunded] } } })
+    await prisma.refund.deleteMany({ where: { orderId: { in: [ordPaid, ordUnpaid, ordRefunded, ordPrinted] } } })
+    await prisma.order.deleteMany({ where: { id: { in: [ordPaid, ordUnpaid, ordRefunded, ordPrinted] } } })
+    await prisma.printTask.deleteMany({ where: { id: taskPrinted } })
     await prisma.terminal.deleteMany({ where: { id: { startsWith: 't_aref_' } } })
   }
 
@@ -78,6 +82,32 @@ async function main(): Promise<void> {
     // 已退款订单
     await prisma.order.create({
       data: { id: ordRefunded, orderNo: orderNoDone, type: 'print', terminalId, amountCents: 100, currency: 'CNY', payStatus: 'refunded', taskStatus: 'completed', paymentSource: 'sandbox', discountCents: 0 },
+    })
+    await prisma.printTask.create({
+      data: {
+        id: taskPrinted,
+        terminalId,
+        fileUrl: 'https://internal/aref-printed',
+        fileMd5: 'aref-printed',
+        status: 'failed',
+        errorCode: 'PRINT_JOB_UNCONFIRMED',
+        printOutcome: 'printed',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: ordPrinted,
+        orderNo: orderNoPrinted,
+        type: 'print',
+        printTaskId: taskPrinted,
+        terminalId,
+        amountCents: 200,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'failed',
+        paymentSource: 'sandbox',
+        discountCents: 0,
+      },
     })
     pass('测试夹具创建完成')
 
@@ -131,7 +161,19 @@ async function main(): Promise<void> {
       }
     }
 
-    // 5. 审计日志：退款成功时写入 refund.created
+    // 5. 已核查出纸禁止退款（写门，不只是 UI 藏按钮）
+    try {
+      await refundService.refund(ordPrinted, { reason: '已出纸不应退款', operatorId })
+      fail('已核查出纸订单退款应被拒绝')
+    } catch (e) {
+      if (e instanceof BadRequestException && e.message === 'PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN') {
+        pass('已核查出纸退款被 PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN 拒绝')
+      } else {
+        throw e
+      }
+    }
+
+    // 6. 审计日志：退款成功时写入 refund.created
     const auditLogs = await prisma.auditLog.findMany({
       where: { action: 'refund.created', targetId: ordPaid },
       orderBy: { createdAt: 'desc' },

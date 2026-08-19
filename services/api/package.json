@@ -75,6 +75,7 @@
     "verify:print-param-suggestion": "node -r @swc-node/register scripts/verify-print-param-suggestion.ts",
     "verify:file-display-truth": "node -r @swc-node/register scripts/verify-file-display-truth.ts",
     "verify:admin-pending-dispose": "node -r @swc-node/register scripts/verify-admin-pending-dispose.ts",
+    "verify:admin-print-outcome": "node -r @swc-node/register scripts/verify-admin-print-outcome.ts",
     "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
     "verify:closed-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-closed-pending-print-task-disposition.ts",

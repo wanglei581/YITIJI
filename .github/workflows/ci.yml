@@ -632,6 +632,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-param-suggestion
           pnpm --filter @ai-job-print/api verify:resume-diagnosis-context
           pnpm --filter @ai-job-print/api verify:admin-pending-dispose
+          pnpm --filter @ai-job-print/api verify:admin-print-outcome
           pnpm --filter @ai-job-print/api verify:benefit-activities
           pnpm --filter @ai-job-print/api verify:change-password
           pnpm --filter @ai-job-print/api verify:change-password:target-guard
@@ -890,6 +891,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:reconciliation
           pnpm --filter @ai-job-print/api verify:refund-convergence
           pnpm --filter @ai-job-print/api verify:admin-orders-refund
+          pnpm --filter @ai-job-print/api verify:admin-print-outcome
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config

@@ -36,21 +36,27 @@ async function main(): Promise<void> {
   const taskId = `ptask_aor_${suffix}`
   const brokenTaskId = `ptask_aor_broken_${suffix}`
   const unconfirmedTaskId = `ptask_aor_unconfirmed_${suffix}`
+  const printedTaskId = `ptask_aor_printed_${suffix}`
+  const notPrintedTaskId = `ptask_aor_notp_${suffix}`
   const orderId = `ord_aor_${suffix}`
   const brokenOrderId = `ord_aor_broken_${suffix}`
   const unconfirmedOrderId = `ord_aor_unconfirmed_${suffix}`
+  const printedOrderId = `ord_aor_printed_${suffix}`
+  const notPrintedOrderId = `ord_aor_notp_${suffix}`
   const orderNo = `ORD-READ-${suffix.toUpperCase()}`
   const brokenOrderNo = `ORD-READ-B-${suffix.toUpperCase()}`
   const unconfirmedOrderNo = `ORD-READ-U-${suffix.toUpperCase()}`
+  const printedOrderNo = `ORD-READ-P-${suffix.toUpperCase()}`
+  const notPrintedOrderNo = `ORD-READ-N-${suffix.toUpperCase()}`
 
   async function cleanup(): Promise<void> {
     const leftoverTasks = await prisma.printTask.findMany({
       where: { id: { startsWith: 'ptask_aor_' } },
       select: { id: true },
     })
-    const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, ...leftoverTasks.map((task) => task.id)])]
+    const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, printedTaskId, notPrintedTaskId, ...leftoverTasks.map((task) => task.id)])]
     await prisma.order.deleteMany({
-      where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
+      where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId, printedOrderId, notPrintedOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
     })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
@@ -142,6 +148,52 @@ async function main(): Promise<void> {
         taskStatus: 'failed',
       },
     })
+    await prisma.printTask.create({
+      data: {
+        id: printedTaskId,
+        fileUrl: 'https://internal.example/printed',
+        fileMd5: 'sha256-printed',
+        paramsJson: JSON.stringify({ fileName: '已核查已出纸.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+        status: 'failed',
+        errorCode: 'PRINT_JOB_UNCONFIRMED',
+        printOutcome: 'printed',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: printedOrderId,
+        orderNo: printedOrderNo,
+        type: 'print',
+        printTaskId: printedTaskId,
+        amountCents: 300,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'failed',
+      },
+    })
+    await prisma.printTask.create({
+      data: {
+        id: notPrintedTaskId,
+        fileUrl: 'https://internal.example/not-printed',
+        fileMd5: 'sha256-not-printed',
+        paramsJson: JSON.stringify({ fileName: '已核查未出纸.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+        status: 'failed',
+        errorCode: 'PRINT_JOB_UNCONFIRMED',
+        printOutcome: 'not_printed',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: notPrintedOrderId,
+        orderNo: notPrintedOrderNo,
+        type: 'print',
+        printTaskId: notPrintedTaskId,
+        amountCents: 300,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'failed',
+      },
+    })
 
     await prisma.printTask.create({
       data: {
@@ -200,9 +252,28 @@ async function main(): Promise<void> {
       unconfirmedItem?.id !== unconfirmedOrderId ||
       unconfirmedItem.aftercareStatus !== 'manual_check_required' ||
       unconfirmedItem.refundEligible !== true ||
-      unconfirmedItem.retryForbidden !== true
+      unconfirmedItem.retryForbidden !== true ||
+      unconfirmedItem.printOutcome !== null
     ) {
       fail(`paid+failed+PRINT_JOB_UNCONFIRMED 必须派生人工核查/可退款/禁重试：${JSON.stringify(unconfirmedItem)}`)
+    }
+    const printedItem = (await service.list({ payStatus: 'paid', taskStatus: 'failed', search: printedOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      printedItem?.printOutcome !== 'printed' ||
+      printedItem.aftercareStatus !== null ||
+      printedItem.refundEligible !== false ||
+      printedItem.retryForbidden !== true
+    ) {
+      fail(`已核查已出纸必须清红条、禁退款、仍禁重试：${JSON.stringify(printedItem)}`)
+    }
+    const notPrintedItem = (await service.list({ payStatus: 'paid', taskStatus: 'failed', search: notPrintedOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      notPrintedItem?.printOutcome !== 'not_printed' ||
+      notPrintedItem.aftercareStatus !== null ||
+      notPrintedItem.refundEligible !== true ||
+      notPrintedItem.retryForbidden !== true
+    ) {
+      fail(`已核查未出纸必须清红条、可退款、仍禁重试：${JSON.stringify(notPrintedItem)}`)
     }
     const unconfirmedDetail = await service.getById(unconfirmedOrderId)
     if (

@@ -189,6 +189,7 @@ export class AdminPrintScanService {
           status: true,
           paramsJson: true,
           errorCode: true,
+          printOutcome: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -213,6 +214,7 @@ export class AdminPrintScanService {
         updatedAt: row.updatedAt.toISOString(),
         expiresAt: null,
         ...safe,
+        printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
       }
     })
 
@@ -235,6 +237,7 @@ export class AdminPrintScanService {
         status: true,
         paramsJson: true,
         errorCode: true,
+        printOutcome: true,
         completedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -273,6 +276,7 @@ export class AdminPrintScanService {
       closeUnpaidEligible: eligibility.eligible,
       closeUnpaidBlockReason: eligibility.reason,
       ...safe,
+      printOutcome: row.printOutcome === 'printed' || row.printOutcome === 'not_printed' ? row.printOutcome : null,
     }
   }
 

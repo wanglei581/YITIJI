@@ -10,6 +10,24 @@ export interface AdminPrintJobAbandonResult {
   abandonedAt: string
 }
 
+export interface AdminPrintJobVerifyOutcomeResult {
+  taskId: string
+  orderId: string | null
+  printOutcome: 'printed' | 'not_printed'
+  idempotent: boolean
+  verifiedAt: string
+}
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  return readOk(res)
+}
+
 async function postEmpty<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -17,6 +35,10 @@ async function postEmpty<T>(path: string): Promise<T> {
     credentials: 'include',
     body: '{}',
   })
+  return readOk(res)
+}
+
+async function readOk<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let code = `HTTP_${res.status}`
     let message = res.statusText
@@ -36,12 +58,21 @@ async function postEmpty<T>(path: string): Promise<T> {
 
 interface AdminPrintJobsService {
   abandonPending(printTaskId: string): Promise<AdminPrintJobAbandonResult>
+  verifyOutcome(
+    printTaskId: string,
+    input: { outcome: 'printed' | 'not_printed'; confirm: string },
+  ): Promise<AdminPrintJobVerifyOutcomeResult>
 }
 
 const httpAdapter: AdminPrintJobsService = {
   abandonPending: (printTaskId) =>
     postEmpty<AdminPrintJobAbandonResult>(
       `/admin/print-jobs/${encodeURIComponent(printTaskId)}/abandon`
+    ),
+  verifyOutcome: (printTaskId, input) =>
+    postJson<AdminPrintJobVerifyOutcomeResult>(
+      `/admin/print-jobs/${encodeURIComponent(printTaskId)}/verify-outcome`,
+      input,
     ),
 }
 
@@ -53,6 +84,15 @@ const mockAdapter: AdminPrintJobsService = {
       newStatus: 'abandoned',
       orderId: null,
       abandonedAt: new Date().toISOString(),
+    }
+  },
+  async verifyOutcome(printTaskId, input) {
+    return {
+      taskId: printTaskId,
+      orderId: null,
+      printOutcome: input.outcome,
+      idempotent: false,
+      verifiedAt: new Date().toISOString(),
     }
   },
 }
