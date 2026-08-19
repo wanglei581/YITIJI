@@ -252,13 +252,15 @@ export function PrintDonePage() {
           <div className="print-done-fail-reason">
             {failureReason}
           </div>
-          {/* 「无法确认」不等于「没出纸」，也不等于「已出纸」。这里只能给用户两件确定的事：
-              纸要现场看，钱还在订单上、需要工作人员核查后处理 —— 不承诺退款，也不否认出纸。
-              本机不提供自助退款（PrintCashierPage 已有同口径声明），所以只给核查路径。 */}
+          {/* 「无法确认」不等于「没出纸」，也不等于「已出纸」。这里只给两件确定的事：
+              纸要现场看，订单还在、由工作人员核查后处理 —— 不承诺结果，也不否认出纸。
+              刻意不提「自助退款」四个字：verify:kiosk-feedback-entry 按 2026-08-16 定案
+              禁止本页出现退款字样（「点一下就能拿到钱」的预期会落空），且那句不是可执行
+              信息 —— 真正有用的是「凭订单号找工作人员」。 */}
           {isUnconfirmed && (
             <div className="print-done-fail-reason" role="status">
               请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，
-              请凭订单号联系现场工作人员核查后处理；本机不提供自助退款。
+              请凭订单号联系现场工作人员核查处理。
               {taskId ? `（任务号 ${taskId}）` : null}
             </div>
           )}
