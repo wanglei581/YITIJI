@@ -137,10 +137,17 @@ check(
   '本机与 U 盘入口由既有 PrintUploadPage 消费'
 )
 check(
-  ['print-local', 'print-phone', 'print-usb'].every((id) =>
+  ['print-phone', 'print-usb'].every((id) =>
     new RegExp(`'${id}': '/print/upload\\?[^']*&mode=transfer'`).test(manifest)
   ),
-  '三个通道型快捷入口带 mode=transfer，落地页不再重复问一遍通道'
+  '手机扫码传与 U 盘两个通道型入口带 mode=transfer，落地页不再重复问一遍通道'
+)
+// print-local 走 <input type="file">，只是桌面 E2E 验证路径，生产一体机不许弹系统
+// 文件对话框（CLAUDE.md §17）。钉死它不得被提升为直达入口 —— 直达会给它一个
+// 专属标题「本机上传」，把非生产路径包装成一等公民。
+check(
+  !/'print-local': '\/print\/upload\?[^']*&mode=transfer'/.test(manifest),
+  '本机上传不得配直达入口（桌面验证路径，非一体机生产路径）'
 )
 check(!manifest.includes('/upload/phone'), 'Kiosk 首页不会直接打开手机辅助页')
 
