@@ -33,6 +33,8 @@ import { assertProductionTrustProxyHops } from './trust-proxy'
 export interface ProductionRuntimeEnv {
   NODE_ENV?: string
   JWT_SECRET?: string
+  FILE_SIGNING_SECRET?: string
+  SECRET_ENCRYPTION_KEY?: string
   FILE_STORAGE_DRIVER?: string
   DATABASE_URL?: string
   REDIS_URL?: string
@@ -59,6 +61,25 @@ export interface ProductionRuntimeEnv {
 
 const MIN_JWT_SECRET_LENGTH = 16
 const MIN_PAYMENT_SESSION_SECRET_LENGTH = 32
+/** 文件签名与 pepper 类密钥的最低长度，与各调用点（signing.ts / phone-identity.ts）保持一致。 */
+const MIN_LONG_SECRET_LENGTH = 32
+
+/**
+ * `.env.example` 的样值刻意做得「能本地跑」，于是长度校验一律放行 ——
+ * 这正是照抄示例就能起一个用公开密钥签 JWT / 做 pepper 的生产实例的原因。
+ * 因此除长度外还要拒绝样值本身的标记；示例文件里所有可跑密钥必须带这些前缀之一。
+ */
+const SAMPLE_SECRET_MARKERS = ['dev-only-', 'dev-', 'test-', 'replace-with-', 'change-me'] as const
+
+function assertNotSampleSecret(name: string, value: string): void {
+  const lowered = value.toLowerCase()
+  const hit = SAMPLE_SECRET_MARKERS.find((marker) => lowered.startsWith(marker))
+  if (hit) {
+    throw new Error(
+      `PRODUCTION_SAMPLE_SECRET_FORBIDDEN: NODE_ENV=production 时 ${name} 不得使用 .env.example 的样值（以 "${hit}" 开头）`,
+    )
+  }
+}
 const REQUIRED_TENCENT_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
   'TENCENT_SMS_SECRET_KEY',
@@ -83,6 +104,27 @@ export function assertProductionRuntimeGates(
       `PRODUCTION_JWT_SECRET_INVALID: NODE_ENV=production 时 JWT_SECRET 必须存在且长度 >= ${MIN_JWT_SECRET_LENGTH} 字符`,
     )
   }
+  assertNotSampleSecret('JWT_SECRET', jwtSecret)
+
+  // FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY 此前只在各自调用点查长度，没进集中门禁。
+  // 而 .env.example 给的样值**刚好超过阈值**，长度校验一律放行 —— 照抄进生产，
+  // 文件签名和手机号/邮箱 hash 的 pepper 就是一个公开在仓库里的字符串。
+  // （SECRET_ENCRYPTION_KEY 同时是 phone-identity.ts:26 的 pepper 与 LLM apiKey 的加密密钥。）
+  const fileSigningSecret = env.FILE_SIGNING_SECRET
+  if (!fileSigningSecret || fileSigningSecret.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_FILE_SIGNING_SECRET_INVALID: NODE_ENV=production 时 FILE_SIGNING_SECRET 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('FILE_SIGNING_SECRET', fileSigningSecret)
+
+  const secretEncryptionKey = env.SECRET_ENCRYPTION_KEY
+  if (!secretEncryptionKey || secretEncryptionKey.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_SECRET_ENCRYPTION_KEY_INVALID: NODE_ENV=production 时 SECRET_ENCRYPTION_KEY 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('SECRET_ENCRYPTION_KEY', secretEncryptionKey)
 
   const driver = env.FILE_STORAGE_DRIVER?.trim()
   if (driver !== 'cos') {

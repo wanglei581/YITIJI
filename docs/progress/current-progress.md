@@ -1,5 +1,6 @@
 # 当前开发进度
 
+<<<<<<< HEAD
 2026-08-19 修复 **首页服务域卡片不按真实能力说话（分支 `fix/kiosk-home-domain-capability-truth`，基于 `origin/main@daa4c2eef`，未合入、未部署）**。Cursor Sol 在商用交付评审里把「首页和所有入口按真实能力置灰」列为上线阻塞项；我核查后认为**这条过头了**，复裁后它自己也认了「整张聚合大卡置灰是错的」。本条记录的是修正后的做法。
 
 **问题。** `V6HomeView.tsx:194` 两张大卡（打印扫描、AI简历服务）写死 `disabled={false}`，六个小卡里也只有 toolbox / campus 有真实判定；而该区块标题写着「**绿色入口可办理**；锁定项保留位置并说明原因」——八个域有六个没兑现这句话。打印机离线时打印域照样是绿的，用户点进去才撞死路。
@@ -15,6 +16,23 @@
 **新增 4 项门禁，先破后立三处，其中一处暴露了我自己门禁的漏洞。** 破「标题改回承诺可办理」→ 红；破「两张大卡去掉 statusNote」→ 红；破「删掉 loading 分支」→ **第一版没红**，因为我只检查了文件里出现过「正在确认」这个字符串，而注释里也有——收紧为按**代码分支**正则判定（并剥注释）后再破，抓住。另有一处同样的坑：门禁一开始把我解释「为什么删掉这句承诺」的注释判成违规，与今天早些时候在 `verify-compliance-copy` 踩到的是同一个，已按同法剥注释。
 
 本轮只改 `apps/kiosk`（1 个新模块 + 1 个视图 + 1 个门禁脚本）与本文件，**未触碰 `services/api`、`apps/miniapp`、Prisma、支付或打印状态机**。
+=======
+2026-08-19 修复 **A3 `.env.example` 弱默认可照抄进生产（分支 `fix/api-env-example-weak-defaults`，基于 `origin/main@f4c9256a8`，未合入、未部署）**。Grok 在部署审查中报出 7 个「能直接跑起来」的默认值；四家同审 + 我逐条实测后，**真实缺口比报告窄，但顺带挖出一个比它严重得多的问题**。
+
+**先纠正范围（今天第六次）。** 对生产门禁逐条核实：`JWT_SECRET` / `TERMINAL_LEGACY_REGISTER_ENABLED` / `FILE_STORAGE_DRIVER` / `REDIS_URL` **本来就拦住了**（5 of 7 中的 4 个）。真正的洞只有三个，且性质不同：`FILE_SIGNING_SECRET` 只在 `signing.ts:25` 有运行时兜底、未进集中门禁；`SECRET_ENCRYPTION_KEY` **完全没进门禁**，而它同时是 `phone-identity.ts:26` 手机号 hash 的 pepper 与 LLM apiKey 的加密密钥；`TENCENT_COS_BUCKET` 写着真实生产桶名（信息泄露，不影响启动）。
+
+**弱默认真正危险的地方不是「值不好」，是它们能跑。** 示例里的密钥刻意做得够长（`dev-secret-encryption-key-replace-in-prod-min-32-chars` 正好超过 32 字符），所有长度校验一律放行——运维照抄就能起一个用公开在仓库里的字符串做 pepper 的生产实例。
+
+**⚠️ DeepSeek 挖出的更严重问题（本刀未修，已列为新阻塞项）：整套生产门禁可能根本不执行。** `production-runtime-gates.ts:77-78` 的前提是 `NODE_ENV === 'production'`，否则整段直接 return。而 `deploy.yml:28,147-156` 传给服务器的 env 列表里**没有 `NODE_ENV`**，`deploy-api-release.sh:230-233` 只导出 `COMMIT` 与 `PRINT_REQUIRE_PII_SCAN` 就 `pm2 restart`，**不设也不校验**；它完全依赖服务器那份 `.env`/PM2 环境。部署健康检查只 `grep '"status":"ok"'`，不证明门禁跑过。CI 里的 `verify:production-runtime-gates` 是脚本自造 `NODE_ENV:'production'` 后调用，属内存态验证。文档自己也承认（`production-deployment-and-windows-host-checklist.md:19,138`）。**后果**：若服务器漏设或 PM2 dump 残留旧环境，JWT 弱密钥、本地磁盘存简历、legacy 终端注册全部放行且无任何信号。**本刀刻意不动部署脚本**——用户正准备按 `deploy-unfreeze-runbook` 解冻发布，同时改脚本会撞车；已请 Windows 侧发布后执行 `pm2 describe <api> | grep -i NODE_ENV` 回报实际取值，那一行决定今天所有「门禁拦住了什么」的结论是否成立。
+
+**改法（三处，均不碰部署脚本）。** ① `FILE_SIGNING_SECRET` 与 `SECRET_ENCRYPTION_KEY` 进集中门禁（≥32 字符，与 `signing.ts` / `phone-identity.ts` 各调用点阈值一致）；② 新增 `assertNotSampleSecret()`——除长度外**拒绝以 `dev-only-` / `dev-` / `test-` / `replace-with-` / `change-me` 开头的值**，错误码 `PRODUCTION_SAMPLE_SECRET_FORBIDDEN`，示例里三个可跑密钥全部命中；③ `.env.example` 的 `TENCENT_COS_BUCKET` 留空并注明原因。
+
+**门禁按 Cursor 的建议做成行为断言，不做手写清单。** Cursor 原方案是拆两份 env 文件 + manifest，我**未采纳全套**（维护面翻倍）；采纳的是它自己判为最有价值的那条：「把每个开发样值逐一放入其余均合法的 production env，必须被对应错误码拒绝」。实现上**真读 `.env.example`** 解析出键值，对受门禁覆盖的敏感键逐一注入 `PROD_OK` 基线并断言被拒——好处是将来新增敏感键而有人忘了同步进门禁时会自动变红，手写清单做不到。并入已在 CI 的 `verify:production-runtime-gates`，未新增脚本与 CI 行。
+
+**先破后立三处全部验红**：真实桶名塞回 `.env.example` → 红；撤掉 `SECRET_ENCRYPTION_KEY` 的样值拒绝 → 红；删掉 `FILE_SIGNING_SECRET` 整条校验 → 红。复原后 ALL PASS。同时把两个新键补进 `PROD_OK` 基线（否则既有全部用例会因缺键而红——这本身也证明门禁真的生效了）。
+
+**验证**：`verify:production-runtime-gates` ALL PASS（含新增 5 条断言）。**未验证**：未连生产、未部署；`NODE_ENV` 在服务器上的实际取值待 Windows 侧回报。本轮只改 `services/api`（1 个门禁源文件 + 1 个 verify 脚本 + `.env.example`）与本文件，**未触碰部署脚本、`apps/*`、Prisma、支付或打印状态机**。
+>>>>>>> 6a7894817 (fix(api): 生产拒绝 .env.example 的样值密钥 —— 它们够长，所以长度校验一直放行)
 
 2026-08-19 修复 **打印结果未确认时，页面告诉用户「已由服务端确认失败」（分支 `fix/kiosk-unconfirmed-print-truth`，基于 `origin/main@daa4c2eef`，已合入 `main@1fd8da34c`，未部署）**。四家 CLI 只读同审「断电卡单」这条链路时发现，是当轮唯一成立的新缺陷 —— **同一轮里另有四条被核回去**，过程一并记下。
 
