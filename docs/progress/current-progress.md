@@ -1,6 +1,8 @@
 # 当前开发进度
 
-2026-08-19 修复 **A3 `.env.example` 弱默认可照抄进生产（分支 `fix/api-env-example-weak-defaults`，基于 `origin/main@f4c9256a8`，未合入、未部署）**。Grok 在部署审查中报出 7 个「能直接跑起来」的默认值；四家同审 + 我逐条实测后，**真实缺口比报告窄，但顺带挖出一个比它严重得多的问题**。
+2026-08-19 修复 **岗位匹配页：session 里过期的 taskId 仍放出选岗表单（分支 `fix/kiosk-job-fit-rejected-resume-gate`，基于 `origin/main@c5cbdf519`，未合入、未部署）**。商业交付评审把「首页进岗位匹配、没简历还出表单」写成 A1；在 `origin/main` 上复验后，**缺 taskId 的门禁已经在**（`JobFitPage` 无 session 会挡、引导「去上传简历」）。真正剩下的洞与职业规划页已经修过的一样：`sessionStorage` 里的 taskId 比后端那行解析结果活得久，`getLatest` 把 `AI_TASK_NOT_FOUND`（不存在 / 过期 / 非本人）和 `JOB_FIT_NOT_FOUND`（解析还在、只是没做过匹配）一起吞掉，表单照出，用户选完岗位再分析才失败。本刀按 `CareerPlanPage` 同一套 `missing | rejected`：只把 `AI_TASK_NOT_FOUND` 落成「重新上传简历」，`JOB_FIT_NOT_FOUND` 继续放行选岗。分析失败同一码也切门禁，不让红条留在假表单上。断言写入已有 `verify:job-fit-m1-5-ui`。不改后端、不改入口、不做 A2 触控上传。
+
+2026-08-19 修复 **A3 `.env.example` 弱默认可照抄进生产（分支 `fix/api-env-example-weak-defaults`，基于 `origin/main@f4c9256a8`，已合入 `main@c5cbdf519`，未部署）**。Grok 在部署审查中报出 7 个「能直接跑起来」的默认值；四家同审 + 我逐条实测后，**真实缺口比报告窄，但顺带挖出一个比它严重得多的问题**。
 
 **先纠正范围（今天第六次）。** 对生产门禁逐条核实：`JWT_SECRET` / `TERMINAL_LEGACY_REGISTER_ENABLED` / `FILE_STORAGE_DRIVER` / `REDIS_URL` **本来就拦住了**（5 of 7 中的 4 个）。真正的洞只有三个，且性质不同：`FILE_SIGNING_SECRET` 只在 `signing.ts:25` 有运行时兜底、未进集中门禁；`SECRET_ENCRYPTION_KEY` **完全没进门禁**，而它同时是 `phone-identity.ts:26` 手机号 hash 的 pepper 与 LLM apiKey 的加密密钥；`TENCENT_COS_BUCKET` 写着真实生产桶名（信息泄露，不影响启动）。
 

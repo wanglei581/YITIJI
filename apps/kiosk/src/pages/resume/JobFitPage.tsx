@@ -54,6 +54,14 @@ interface PageState {
   accessToken?: string
 }
 
+/**
+ * 只判「有没有 taskId」不够：sessionStorage 里的 taskId 会比后端那行解析结果活得久。
+ * 后端 AI_TASK_NOT_FOUND（不存在 / 已过期 / 不属于当前身份）必须挡在选岗表单之前，
+ * 否则用户选完岗位再点分析，吃到的是同一条失败。JOB_FIT_NOT_FOUND 是另一回事：
+ * 解析还在，只是还没做过匹配 —— 那种情况该放行选岗。
+ */
+type PreconditionGate = 'missing' | 'rejected'
+
 function JobFitFullscreenFrame({ children }: { children: ReactNode }) {
   return (
     <KioskFullscreenShell>
@@ -102,6 +110,7 @@ export function JobFitPage() {
   const [pendingMemberInput, setPendingMemberInput] = useState<JobFitRequest | null>(null)
   const [anonymousConsentActive, setAnonymousConsentActive] = useState(false)
   const [revokingConsent, setRevokingConsent] = useState(false)
+  const [rejectedTask, setRejectedTask] = useState(false)
   const anonymousConsentRevisionRef = useRef(0)
 
   useBusyLock(analyzing || printing || revokingConsent)
@@ -136,6 +145,7 @@ export function JobFitPage() {
     setConsentError(null)
     setMemberConsentRequired(false)
     setAnonymousConsentActive(false)
+    setRejectedTask(false)
     const consentStatusRevision = ++anonymousConsentRevisionRef.current
     if (!taskId) {
       setLoadingLatest(false)
@@ -160,9 +170,14 @@ export function JobFitPage() {
       .then((res) => {
         if (!cancelled) setResult(res.status === 'completed' ? res : null)
       })
-      .catch(() => {
-        // 没有历史匹配、已过期或非本人时，保持现有选岗/手填入口。
-        if (!cancelled) setResult(null)
+      .catch((err: unknown) => {
+        if (cancelled) return
+        // AI_TASK_NOT_FOUND = 解析行本身不认；JOB_FIT_NOT_FOUND = 解析还在、只是没做过匹配。
+        if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+          setRejectedTask(true)
+          return
+        }
+        setResult(null)
       })
       .finally(() => {
         if (!cancelled) setLoadingLatest(false)
@@ -170,13 +185,21 @@ export function JobFitPage() {
     return () => { cancelled = true }
   }, [taskId, accessToken, currentToken, isAnonymous])
 
-  if (!taskId) {
+  const gate: PreconditionGate | null = !taskId ? 'missing' : rejectedTask ? 'rejected' : null
+
+  if (gate) {
     return (
       <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="alert">
           <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
-          <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
-          <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+          <p className="text-base text-neutral-500">
+            {gate === 'missing'
+              ? '请先完成简历上传与诊断，再做岗位匹配参考'
+              : '这台机器上读不到你那份简历解析结果了。解析有保存期限，也只对本人开放 —— 重新上传并跑完诊断后再来。'}
+          </p>
+          <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>
+            {gate === 'missing' ? '去上传简历' : '重新上传简历'}
+          </Button>
         </div>
       </main></JobFitFullscreenFrame>
     )
@@ -217,6 +240,10 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
+      if (err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+        setRejectedTask(true)
+        return
+      }
       if (err instanceof JobFitApiError && err.status === 403) {
         if (err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED' && !token && accessToken) {
           setPendingConsentInput(input)
