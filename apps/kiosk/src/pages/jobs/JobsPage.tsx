@@ -274,6 +274,7 @@ export function JobsPage() {
   return (
     <KioskPageFrame
       tone="clay"
+      className="v6-jobs"
       title="岗位信息"
       subtitle="第三方 / 官方来源岗位入口，去来源平台投递"
       backLabel="返回"
@@ -402,7 +403,7 @@ export function JobsPage() {
 
           <div className="jf-list-meta">
             <span>
-              共 <b>{listTotal}</b> 个岗位 · 当前展示 <b>{displayedJobs.length}</b> 个 · 来源机构 <b>{sourceCards.length}</b> 个 · 最新同步 <b>{latestSync}</b>
+              共 <b>{listTotal}</b> 个岗位 · 最新同步 <b>{latestSync}</b>
             </span>
             <span className="jf-sort-group">
               <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} onClick={() => setFavoritesOnly((value) => !value)}>

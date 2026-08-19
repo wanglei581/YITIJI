@@ -1,0 +1,36 @@
+/* 面试落地页页体。不改出题 / 上传 / 降级逻辑，只把设置页从旧卡片收成 V6 暖纸。 */
+
+.v6-interview .ui-kiosk-page-header h1,
+.v6-interview .interview-pagehead h1,
+.v6-interview .ui-kiosk-page-header .ui-kiosk-page-header__title {
+  font-family: var(--k-serif, 'Songti SC', serif);
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.v6-interview .ui-kiosk-page-header p,
+.v6-interview .interview-pagehead p,
+.v6-interview .ui-kiosk-page-header .ui-kiosk-page-header__desc {
+  max-width: 28em;
+  line-height: 1.55;
+}
+
+.v6-interview .interview-card,
+.v6-interview .interview-setup__job {
+  border-radius: 22px;
+  border: 1px solid rgba(75, 67, 50, 0.14);
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: 0 12px 30px rgba(51, 68, 59, 0.06);
+}
+
+.v6-interview .interview-setup__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.v6-interview .interview-option,
+.v6-interview button.interview-option {
+  min-height: 56px;
+  border-radius: 16px;
+}

@@ -3,6 +3,7 @@
 @import "./styles/print-preview-params.css";
 @import "./styles/print-cashier.css";
 @import "./styles/print-progress-result.css";
+@import "./styles/print-flow-v6.css";
 
 :root {
   --print-paper: var(--k-paper, var(--color-canvas));

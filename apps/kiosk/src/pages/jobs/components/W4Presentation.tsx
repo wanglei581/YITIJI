@@ -18,6 +18,7 @@ export function KioskPageFrame({
   children,
   actionBar,
   tight,
+  className,
 }: {
   tone: W4PageTone
   title: string
@@ -28,10 +29,11 @@ export function KioskPageFrame({
   children: React.ReactNode
   actionBar?: React.ReactNode
   tight?: boolean
+  className?: string
 }) {
   return (
     <UiKioskPageFrame
-      className={`jf-proto tone-${tone} w4-page-frame`}
+      className={`jf-proto tone-${tone} w4-page-frame${className ? ` ${className}` : ''}`}
       header={(
         <KioskPageHeader
           title={title}

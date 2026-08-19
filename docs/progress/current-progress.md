@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-19 纠偏 **首页点进去的页体开始换 V6（同一分支 `fix/kiosk-pickup-claim-title` / #741，未合入、未部署）**。上一刀只换顶栏，岗位列表 / 文档打印 / 面试设置看起来和旧页一样。本刀对着 5183 真截图改页体：`/jobs` 对照 P13 加大卡片、收短统计句；打印履约链共用 `v6-print-flow`；面试落地页挂 `v6-interview`。不改岗位/打印/面试业务逻辑，不部署。
+
 2026-08-19 扩面 **一体机用户页全部挂 V6 暖纸壳（同一分支 `fix/kiosk-pickup-claim-title` / #741，未合入、未部署）**。负责人明确：不是只换首页。`V6_SHELL_ROUTE_KEYS` 覆盖打印/扫描/简历/岗位/招聘会/我的/顾问及面试、岗位匹配、合同审查等全屏页；`resolveV6Shell` 按模式匹配动态路由。`KioskFullscreenShell` 同步挂 `v6-runtime-shell`，顶栏改「职 / 职易达」。手机辅助页 `/member/qr-login`、`/upload/phone` 与待机屏不进表。各页内部换皮与拆页仍按一页一刀继续，本刀先让从首页点进去不再掉回深藏青顶栏。不部署。
 
 2026-08-19 落地 **V6 第一刀：到机码核销页对照 P47（同一分支 `fix/kiosk-pickup-claim-title` / #741，未合入、未部署）**。负责人改口后续页一律按 V6，先本地 5183 预览再进仓。五家同审（DeepSeek / Antigravity / Grok / Claude Opus max / 本会话）Q0–Q4 全 GO/A：保留 HID + `<input>` 与 8 位静默 250ms，不画 31 键；打印机异常只警告不硬拦；失败态只分 `EXPIRED` / `UNAVAILABLE` / `CLAIM_LOCKED` / 其余「无效或已过期」，不拆 notfound 与错终端；成功只展示 API 真有的 `orderNo` / `fileName?` / `amountCents?`。`/print/pickup-claim` 进入 `V6_SHELL_ROUTES`（与 W6 `V6_SHELL_ROUTE_PATTERNS` 同步）。负责人续裁：V6 文字不得过密、缺页/挤页可新增同风格页拆开。首屏已去掉「这一步做什么」四段和对照长表，只留扫码主句、输入、三步找码、一句到机码≠取件码。不改 `pickupCode.ts`、支付、小程序、Prisma。CEO 记分卡写入 `next-tasks.md`。不部署。

@@ -150,7 +150,7 @@ export function InterviewServiceHubPage() {
 
   return (
     <KioskPageFrame>
-      <div className="service-hub service-hub--interview flex h-full flex-col overflow-y-auto bg-canvas">
+      <div className="service-hub service-hub--interview v6-interview flex h-full flex-col overflow-y-auto bg-canvas">
         <KioskPageHeader
           title="AI面试训练"
           description="模拟问答 · 自我评估 · 面试技巧 · 训练报告，仅供练习参考"

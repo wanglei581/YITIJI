@@ -30,7 +30,7 @@ export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack,
   return (
     <>
       <KioskPageHeader title={title} description={subtitle} onBack={onBack} backLabel={backLabel} aside={aside} />
-      <nav className="ui-kiosk-steps" aria-label="打印流程">
+      <nav className="ui-kiosk-steps v6-print-steps" aria-label="打印流程">
         {PRINT_STEPS.map((label, index) => {
           const indexStep = (index + 1) as PrintFlowStep
           const state = indexStep < step ? 'done' : indexStep === step ? 'active' : 'todo'
@@ -66,7 +66,7 @@ export function PrintPageFrame(props: { children: ReactNode; className?: string 
 
   return (
     <KioskPageFrame
-      className={['print-proto', ...retainedClassNames].join(' ')}
+      className={['print-proto', 'v6-print-flow', ...retainedClassNames].join(' ')}
       contentClassName={usesUnifiedGutter ? 'print-proto-content--guttered' : undefined}
     >
       {props.children}

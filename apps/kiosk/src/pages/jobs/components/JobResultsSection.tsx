@@ -28,7 +28,7 @@ export function JobResultsSection({
 }) {
   void sortMode
   void onSortChange
-  const pageSize = 6
+  const pageSize = 5
   const [page, setPage] = useState(0)
   const pageCount = Math.max(1, Math.ceil(jobs.length / pageSize))
   const visibleJobs = useMemo(() => jobs.slice(page * pageSize, page * pageSize + pageSize), [jobs, page])
