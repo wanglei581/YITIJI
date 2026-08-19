@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { HOME_V6_DOMAINS, type HomeV6ActionId, type HomeV6Domain } from '../homeV6Domains'
+import { printDomainStatus } from '../homeDomainStatus'
 
 const ICONS: Record<HomeV6Domain['icon'], LucideIcon> = {
   printer: PrinterIcon,
@@ -44,11 +45,16 @@ function DomainCard({
   domain,
   disabled,
   disabledReason,
+  statusNote,
+  unavailableQuickActions,
   onAction,
 }: {
   domain: HomeV6Domain
   disabled: boolean
   disabledReason?: string
+  /** 卡面如实说明（与 disabledReason 互斥）与确实做不了的叶子动作，见 ../homeDomainStatus。 */
+  statusNote?: string
+  unavailableQuickActions?: ReadonlySet<HomeV6ActionId>
   onAction: (actionId: HomeV6ActionId) => void
 }) {
   const Icon = ICONS[domain.icon]
@@ -76,17 +82,23 @@ function DomainCard({
 
       {domain.quickActions && !disabled ? (
         <div className="v6-home-domain__quick" aria-label={`${domain.title}快捷入口`}>
+          {/* 叶子级门控理由见 ../homeDomainStatus。 */}
           {domain.quickActions.map((action) => (
-            <button key={action.id} type="button" onClick={() => onAction(action.id)}>
+            <button
+              key={action.id}
+              type="button"
+              disabled={unavailableQuickActions?.has(action.id) ?? false}
+              onClick={() => onAction(action.id)}
+            >
               {action.label}
             </button>
           ))}
         </div>
       ) : null}
 
-      {disabledReason ? (
+      {disabledReason || statusNote ? (
         <p id={`v6-domain-reason-${domain.id}`} className="v6-home-domain__reason" role="status">
-          {disabledReason}
+          {disabledReason ?? statusNote}
         </p>
       ) : null}
       <span className="v6-home-domain__sheen" aria-hidden="true" />
@@ -106,6 +118,8 @@ export function V6HomeView({
   footerSlot,
   onAction,
 }: V6HomeViewProps) {
+  const printStatus = printDomainStatus({ deviceLoading, deviceReady, deviceLabel })
+
   return (
     <div className="v6-home" data-v6-page="home">
       <section className="v6-home-hero" aria-labelledby="v6-home-title">
@@ -187,11 +201,19 @@ export function V6HomeView({
             <span>八个正式服务域</span>
             <h2 id="v6-home-services-title">选一件事，直接开始</h2>
           </div>
-          <p>绿色入口可办理；锁定项保留位置并说明原因。</p>
+          {/* 原文「绿色入口可办理」办不到：打印机离线时打印域照样是绿的。 */}
+          <p>可进入查看；受限或锁定的会在卡片上说明原因。</p>
         </div>
         <div className="v6-home-services__primary">
           {HOME_V6_DOMAINS.filter((domain) => domain.size === 'large').map((domain) => (
-            <DomainCard key={domain.id} domain={domain} disabled={false} onAction={onAction} />
+            <DomainCard
+              key={domain.id}
+              domain={domain}
+              disabled={false}
+              statusNote={domain.id === 'print' ? printStatus.note : undefined}
+              unavailableQuickActions={domain.id === 'print' ? printStatus.unavailableActions : undefined}
+              onAction={onAction}
+            />
           ))}
         </div>
         <div className="v6-home-services__secondary">

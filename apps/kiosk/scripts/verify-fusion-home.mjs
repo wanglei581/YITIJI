@@ -151,6 +151,31 @@ check(
 )
 check(!manifest.includes('/upload/phone'), 'Kiosk 首页不会直接打开手机辅助页')
 
+// ---- 首页服务域按真实能力说话（2026-08-19）----
+// 此前两张大卡写死 disabled={false}，而区块标题承诺「绿色入口可办理」——
+// 打印机离线时打印域照样是绿的。但整域置灰同样错：域内有三项不经过打印机。
+// 故钉三件事：不许再写死 false、区块标题不再承诺办理结果、状态判据是纯函数且分支正确。
+const domainStatus = read('src/pages/home/homeDomainStatus.ts')
+check(
+  !/disabled=\{false\}/.test(view) || /statusNote=/.test(view),
+  '大卡若仍写死 disabled={false}，必须同时提供 statusNote 如实说明真实能力',
+)
+// 剥注释后再判：解释「为什么删掉这句承诺」的注释里必然引用原文，
+// 不剥就会把说明文字判成违规（同一个坑今天已在 verify-compliance-copy 踩过一次）。
+const viewCode = view.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')
+check(!viewCode.includes('绿色入口可办理'), '区块标题不得承诺「可办理」——能不能办由真实设备状态决定')
+// 按**代码分支**判，不按字符串出现过 —— 注释里也写着「正在确认」，
+// 只查字符串的话把 loading 分支整条删掉照样能过（本轮先破后立实测漏放）。
+const statusCode = domainStatus.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')
+check(
+  /if\s*\(\s*input\.deviceLoading\s*\)\s*return\s*\{\s*note:\s*'正在确认/.test(statusCode),
+  'loading 态必须先返回「正在确认」，不得提前判离线',
+)
+check(
+  domainStatus.includes("'scan-paper'") && domainStatus.includes('仍可用'),
+  '离线态只禁纸质扫描并说明哪些仍可用，不整域封死',
+)
+
 check(
   view.includes("HOME_V6_DOMAINS.filter((domain) => domain.size === 'large')"),
   '大卡从唯一 typed manifest 渲染'

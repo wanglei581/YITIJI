@@ -1,6 +1,22 @@
 # 当前开发进度
 
-2026-08-19 修复 **打印结果未确认时，页面告诉用户「已由服务端确认失败」（分支 `fix/kiosk-unconfirmed-print-truth`，基于 `origin/main@daa4c2eef`，未合入、未部署）**。四家 CLI 只读同审「断电卡单」这条链路时发现，是当轮唯一成立的新缺陷 —— **同一轮里另有四条被核回去**，过程一并记下。
+2026-08-19 修复 **首页服务域卡片不按真实能力说话（分支 `fix/kiosk-home-domain-capability-truth`，基于 `origin/main@daa4c2eef`，未合入、未部署）**。Cursor Sol 在商用交付评审里把「首页和所有入口按真实能力置灰」列为上线阻塞项；我核查后认为**这条过头了**，复裁后它自己也认了「整张聚合大卡置灰是错的」。本条记录的是修正后的做法。
+
+**问题。** `V6HomeView.tsx:194` 两张大卡（打印扫描、AI简历服务）写死 `disabled={false}`，六个小卡里也只有 toolbox / campus 有真实判定；而该区块标题写着「**绿色入口可办理**；锁定项保留位置并说明原因」——八个域有六个没兑现这句话。打印机离线时打印域照样是绿的，用户点进去才撞死路。
+
+**为什么不能照原方案整卡置灰。** `PrintScanHomePage` 七项能力里，手机扫码上传 / 文件加工 / 签名盖章**不经过打印机**，该 Hub 已按 `needsMfp` 逐卡诚实降级（`mfpOffStateNote: '照常可用 · 这一步不经过打印机'`）。首页整卡封死会把这三项还能用的功能一起堵掉——那不是更诚实，是更难用。Cursor 复裁结论：选「不置灰 + 卡面显真实状态 + 叶子级精细门控」，并**纠正了我一处事实**：`HomePage` 的设备状态来自 `useOutletContext<TerminalDeviceStatusView>()`（`HomePage.tsx:27`），不是我以为的 `useHomeDeviceStatus`。该类型已有 `loading` / `printerReady` / `tonerKnown`（注释原文「Agent 未上报耗材时恒为 false」），信号本就齐备且 fail-closed。
+
+**改法。** 新增纯函数模块 `homeDomainStatus.ts`：loading → 只说「正在确认打印机状态」；就绪 → 无提示；非就绪 → 「{设备标签} · 上传与文件加工仍可用，出纸与扫描暂停」并**只禁 `scan-paper` 一项**（纸质扫描用的是同一台一体机，出不了纸就扫不了；上传与加工不受影响）。`DomainCard` 增加 `statusNote` 与 `unavailableQuickActions` 两个可选入参。区块标题由「绿色入口可办理」改为「可进入查看；受限或锁定的会在卡片上说明原因」——原文是一句办不到的承诺。**内容为空的四个小卡（jobs/fairs/interview/policy）本轮不动**：Cursor 判「成功返回 0 条 ≠ 服务不可用」，置灰反而不诚实，页内诚实空态已经存在。
+
+**撞上文件体积门禁，按其本意处理而非绕过。** `verify-fusion-home.mjs:220` 要求 `V6HomeView.tsx` 少于 260 行（`split('\n').length`，比 `wc -l` 多 1）。第一版加到 275。**没有靠删注释过关**——那正是这条门禁想防的反面；而是把状态判据连同全部理由抽成同级模块 `homeDomainStatus.ts`，视图侧只留一行调用，最终 256。
+
+**验证。** kiosk `tsc --noEmit` exit 0；`verify-fusion-home` / `verify-home-prototype-v1` / `verify-home-narrow-visual-balance` / `verify-kiosk-visible-actions-truth` / `verify-home-toolbox-ui` / `verify-service-entry-readiness` / `verify-fusion-w6` 全 PASS。**纯函数四态实跑**（内存编译后真调）：loading 只说「正在确认」且不禁任何叶子、就绪无提示、离线与未知均点名受影响范围且只禁 `scan-paper`。**1080×1920 真实浏览器**验到未绑定终端态渲染为「状态未知 · 上传与文件加工仍可用，出纸与扫描暂停」且纸质扫描按钮已禁用。
+
+**新增 4 项门禁，先破后立三处，其中一处暴露了我自己门禁的漏洞。** 破「标题改回承诺可办理」→ 红；破「两张大卡去掉 statusNote」→ 红；破「删掉 loading 分支」→ **第一版没红**，因为我只检查了文件里出现过「正在确认」这个字符串，而注释里也有——收紧为按**代码分支**正则判定（并剥注释）后再破，抓住。另有一处同样的坑：门禁一开始把我解释「为什么删掉这句承诺」的注释判成违规，与今天早些时候在 `verify-compliance-copy` 踩到的是同一个，已按同法剥注释。
+
+本轮只改 `apps/kiosk`（1 个新模块 + 1 个视图 + 1 个门禁脚本）与本文件，**未触碰 `services/api`、`apps/miniapp`、Prisma、支付或打印状态机**。
+
+2026-08-19 修复 **打印结果未确认时，页面告诉用户「已由服务端确认失败」（分支 `fix/kiosk-unconfirmed-print-truth`，基于 `origin/main@daa4c2eef`，已合入 `main@1fd8da34c`，未部署）**。四家 CLI 只读同审「断电卡单」这条链路时发现，是当轮唯一成立的新缺陷 —— **同一轮里另有四条被核回去**，过程一并记下。
 
 **先说被核回去的四条**（都曾被列为高危，实测均不成立）：① DeepSeek 第一轮审的是落后 19 提交的旧 checkout，报出的 `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 门禁在 main 上早随 #726 删除；② Antigravity 把 `ResumeExportPage` 判为「不可操作的空壳死页」，实测该页写着「此页面不会虚构文件、保存结果或打印任务」，按钮用 `aria-disabled` + 常显原因，是刻意的诚实守卫页；③ Grok 把 Agent「三次失败不再自动重启」当 bug，实测 `docs/superpowers/specs/2026-07-14-windows-agent-reliability-p0-design.md` 有明确设计理由（「配置错误或损坏依赖不能靠重启解决」）且失败计数每日重置；④ Grok 把 Admin 禁止重试 UNCONFIRMED 当漏洞，实测**服务端也拦**（`admin-print-scan.service.ts:450` 抛 `PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN`，位置在文件重签与任何事务写入之前，注释明写「拒绝路径保持任务、订单和状态日志完全不变」），直接调 API 也绕不过。**结论：静态审查会系统性地把「刻意的保守设计」误读成「缺失」，每条都必须实跑核过再落笔。**
 
@@ -40,7 +56,7 @@
 
 **⚠️ 真实浏览器抓到一个静态门禁完全看不见的缺陷。** 第一版用 Tailwind `hidden` 类隐藏通道网格，`tsc` 0 错误、四条门禁全 PASS，**但真机上网格照样可见** —— `.w2-print-upload-source-grid` 自带的 `display:grid` 把 `hidden` 盖掉了，而静态门禁只看类名在不在源码里，看不出这个差别。改为条件不渲染后复测通过。**这条记下来：涉及「某元素在某状态下不能出现」的改动，静态断言不足以采信，必须起浏览器看。**
 
-**验证**：kiosk `tsc --noEmit` exit 0；`verify-fusion-w2-print-scan` / `verify-print-entry-source-split` / `verify-service-entry-readiness` / `verify-kiosk-runtime-error-boundary` / `verify-fusion-w6` 全 PASS。**1080×1920 真实浏览器实测**（Chrome，`deviceScaleFactor=1`，mock 后端）五个入口：`tab=file&mode=transfer` → 标题「本机上传」；`tab=qr&mode=transfer` → 「手机扫码上传」；`tab=usb&mode=transfer` → 「U盘导入」——三者通道网格与「扫描原件」均不可见，主按钮「继续文档打印」；`category=photo` → 标题「照片打印」、网格可见；无参数默认 → 标题「文档打印」、网格可见、扫描原件可见（既有用例依赖这一态，一个字未动）。触控实测：直达页 7 个可点区域**0 个低于 48px**，两个主按钮各 56px。**未验证**：未连真实后端跑完整上传（截图里二维码显示生成失败是 mock 环境预期）、未在真机一体机点击。本轮只改 `apps/kiosk`（3 个源文件 + 2 个门禁脚本）与文档，**未触碰 `apps/miniapp`、`services/api`、Prisma、支付或打印状态机**。
+**验证**：kiosk `tsc --noEmit` exit 0；`verify-fusion-w2-print-scan` / `verify-print-entry-source-split` / `verify-service-entry-readiness` / `verify-kiosk-runtime-error-boundary` / `verify-fusion-w6` 全 PASS。**1080×1920 真实浏览器实测**（Chrome，`deviceScaleFactor=1`，mock 后端）五个入口：`tab=file&mode=transfer` → 标题「本机上传」；`tab=qr&mode=transfer` → 「手机扫码上传」；`tab=usb&mode=transfer` → 「U盘导入」——三者通道网格与「扫描原件」均不可见，主按钮「继续文档打印」；`category=photo` → 标题「照片打印」、网格可见；无参数默认 → 标题「文档打印」、网格可见、扫描原件可见（既有用例依赖这一态，一个字未动）。触控实测：直达页 7 个可点区域**0 个低于 48px**，两个主按钮各 56px。**未验证**：未连真实后端跑完整上传（截图里二维码显示生成失败是 mock 环境预期）、未在真机一体机点击。本轮只改 `apps/kiosk`（3 个源文件 + 2 个门禁脚本）与文档，**未触碰 `apps/miniapp`、`services/api`、Prisma、支付或打印状态机**。>>>>>>> a1895370e (fix(kiosk): 首页服务域按真实能力说话 —— 但不整卡置灰)
 2026-08-19 修复 **P0-3 小程序材料包侧链：深链/分享可绕过入口挡板走进假下单皮（分支 `fix/miniapp-package-chain-guard`，基于 `origin/main@c28916377`，未合入、未部署）**。四家 CLI 只读同审后动手，改的是 `apps/miniapp`（唯一发布源），因此逐条留证。
 
 **先纠正评审措辞里的两点。** ① 「无订单也显示成功码」在**正常点击流里走不到**：`package-confirm.js:106` 调 `api.createPackageOrder` → `POST /orders/package`，该端点在 `services/api` 全仓零命中（`@Controller('orders')` 只有 `order-quote.controller.ts` 的 `POST /orders/quote`），404 被 `request.js:132` 转成 reject，最后弹「提交失败」Modal。成功页只能靠**构造 URL 或转发分享卡片**进入。② 这个假到机码拿到一体机上**不会真的取到东西**：Kiosk 先按 `PICKUP_CODE_ACCEPTED_PATTERN` 校验格式，后端再按 `Order.pickupCodeHash` 精确查库（`pickup-order.service.ts:56`），只会返回 `PICKUP_CODE_INVALID`。**所以没有资损，但有完整的欺骗面**：用户（或收到转发卡片的人）看到一张写着「材料包创建成功 · 请到服务点扫码取件」并带着到机码的页面，跑到机器前才发现是空的。
