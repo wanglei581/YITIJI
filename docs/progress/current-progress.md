@@ -1,5 +1,23 @@
 # 当前开发进度
 
+2026-08-19 修复 **打印结果未确认时，页面告诉用户「已由服务端确认失败」（分支 `fix/kiosk-unconfirmed-print-truth`，基于 `origin/main@daa4c2eef`，未合入、未部署）**。四家 CLI 只读同审「断电卡单」这条链路时发现，是当轮唯一成立的新缺陷 —— **同一轮里另有四条被核回去**，过程一并记下。
+
+**先说被核回去的四条**（都曾被列为高危，实测均不成立）：① DeepSeek 第一轮审的是落后 19 提交的旧 checkout，报出的 `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 门禁在 main 上早随 #726 删除；② Antigravity 把 `ResumeExportPage` 判为「不可操作的空壳死页」，实测该页写着「此页面不会虚构文件、保存结果或打印任务」，按钮用 `aria-disabled` + 常显原因，是刻意的诚实守卫页；③ Grok 把 Agent「三次失败不再自动重启」当 bug，实测 `docs/superpowers/specs/2026-07-14-windows-agent-reliability-p0-design.md` 有明确设计理由（「配置错误或损坏依赖不能靠重启解决」）且失败计数每日重置；④ Grok 把 Admin 禁止重试 UNCONFIRMED 当漏洞，实测**服务端也拦**（`admin-print-scan.service.ts:450` 抛 `PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN`，位置在文件重签与任何事务写入之前，注释明写「拒绝路径保持任务、订单和状态日志完全不变」），直接调 API 也绕不过。**结论：静态审查会系统性地把「刻意的保守设计」误读成「缺失」，每条都必须实跑核过再落笔。**
+
+**真正的缺陷。** `PRINT_JOB_UNCONFIRMED` 的全部含义是「派发已开始，但重启后无法确认纸出没出」（`terminal-agent/src/agent/task-runner.ts:284-299`，注释原文「we cannot confirm whether it printed … do NOT assert completed」）。整条链路都按「无法确认」处理，**唯独用户看到的终态页把它和普通失败混成一屏**：`PrintDonePage.tsx:222-234` 标题「打印失败」、副标题「打印任务已由服务端确认失败」。服务端恰恰没有确认任何事。**两个方向都会害人**：纸真出来了，用户以为失败去要退款；纸没出来，他也拿不到「系统承认不确定、请找人核查」这个说法。属 CLAUDE.md §9「不得展示未经证实的结论」。同屏自相矛盾在未修版实测可见：标题「已由服务端确认失败」，正文却是「但未确认完成」。
+
+**改法。** `PrintVerification` 增加 `errorCode`（后端 `print-jobs.service.ts:554` 本就下发，此前前端丢弃）；仅当 `errorCode === 'PRINT_JOB_UNCONFIRMED'` 时标题/副标题改为「打印结果未确认 / 服务端无法确认本次是否已出纸」，并补一段可执行指引：先查看出纸口，无论有没有纸，订单都已保留，凭订单号联系现场工作人员核查（附任务号）。**刻意不承诺退款、也不替现场断言「未出纸」**——两个方向都不能替人下结论；本机不提供自助退款是既有口径（`PrintCashierPage.tsx:517` 同款声明）。其余失败码一字未动。
+
+**门禁。** 不新增文件、不改 CI 接线：两条用例并入已在 `test:browser:truth` 与 CI 的 `tests/visual/print-done-truth.spec.ts`。一条锁 UNCONFIRMED 必须如实并给出指引，一条**反向锁**普通失败仍显示「打印失败」（防止有人把真失败也改成「不确定」）。断言放在可见文本上，不依赖 `data-*` 钩子。改前已核该 spec 既有的 `打印失败` 断言（:63）用的是**无 errorCode 的普通失败**，不受影响。
+
+**先破后立（真实浏览器，非静态断言）。** 因本机无 pnpm、且 `vite preview` 自带的 `/api/v1` 代理在无后端时会崩，改用独立 playwright-core 探针 + 最简静态服务器分别伺服**未修 `origin/main` 构建**与修复版构建，浏览器侧拦 `/api/v1` 喂 UNCONFIRMED 终态。未修版 **4/4 断言全红**并打印出自相矛盾的原文；修复版 **4/4 全绿**。**未改仓库 Playwright 配置、未装全局包。**
+
+**验证**：kiosk `tsc --noEmit` exit 0；1080×1920 真实浏览器双版本对比如上。**未验证**：未在 CI 环境跑该 spec（本机缺 pnpm，webServer 起不来）、未在真机一体机复现断电场景。
+
+**同轮查实、本刀未做的三条**（留档，按危害排）：① **告警无推送、无工单**——`admin-ops.service.ts` 自陈告警为实时派生、无独立 Alert 模型、「不支持确认/处理流转」，全仓无 webhook/短信/邮件，无人值守场地里机器停了要等人主动打开后台才知道；② **处理完的单子仍在报警**——`RefundService` 明确不触碰 `PrintTask`（`refund.service.ts:4`），退款后任务仍是 `failed + PRINT_JOB_UNCONFIRMED`，`abandonPending` 又只收 `pending`（`admin-print-jobs-abandon.service.ts:82`），于是告警永远派生下去，最终把这套设计赖以成立的机制淹掉；③ **订单侧零自动处理**——`payStatus` 保持 `paid`，`resetExpiredClaims` 不扫已 failed 的任务，支付收敛对 paid 直接跳过，退款必须管理员手动且只能全额（系统没有实际出纸页数证据）。Cursor Sol 对补法的裁定是「只做一件就做核查状态机（已核查·已出纸 / 已核查·未出纸），推送是无人值守运营必需，用户工单是兜底」——列为独立下一刀。
+
+本轮只改 `apps/kiosk`（1 个页面 + 1 个既有 spec）与本文件，**未触碰 `services/api`、`apps/miniapp`、Prisma、支付或打印状态机**。
+
 2026-08-19 修复 **V6 功能入口不直达：点「手机扫码上传」落到标题写着「文档打印」的页面、还要把通道再选一遍（分支 `fix/kiosk-entry-directness-print`，基于 `origin/main@5650c5d4e`，未合入、未部署）**。产品负责人真机截图发现，四家 CLI 只读同审后全站盘点，完整评审见 [docs/reviews/2026-08-19-kiosk-entry-directness-review.md](../reviews/2026-08-19-kiosk-entry-directness-review.md)。本条只记批次 1 的实现。
 
 **问题定性。** Hub 层按「你要做什么事」组织，落地页按「文件从哪来」组织，两套分类交叉——「手机扫码上传」既是一件事也是一个通道。于是 `/print-scan` 点「手机扫码上传」→ `/print/upload?source=document&tab=qr`，落地页标题恒为「文档打印」（`PrintUploadPage:129` 写死），顶部 2×2 网格（`:382` **无条件渲染**）又摆出「选择文件 / 扫码上传 / U盘导入 / 扫描原件」让用户重选一遍。**全站盘点另发现**：`PrintScanHomePage` 的「照片打印」与「文档打印」指向**完全同一 URL**（只靠 router state `category:'photo'` 区分，刷新即丢），标题两种情况都显示「文档打印」；`PolicyServiceHubPage` 的「政策收藏」与「AI政策问答记录」都跳 `/me/ai-records`，前者是**去错地方**（负责人已定：做真的收藏页，另刀）；另有 15 个落地页标题写死不跟随入口，其中「到机码核销」点进去变成「扫码取件」。
