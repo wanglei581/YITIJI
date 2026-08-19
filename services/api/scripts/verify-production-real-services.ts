@@ -19,6 +19,8 @@ const PROD_OK: Env = {
   BAIDU_OCR_SECRET_KEY: 'baidu-secret-key',
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
+  FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
+  SECRET_ENCRYPTION_KEY: 'a-strong-secret-encryption-key-01234567',
   PAYMENT_SESSION_SECRET: 'ci-production-payment-session-secret-0123456789',
   // C5-6：生产必须显式声明 paid-before-claim（缺省启动即拒）
   PRINT_REQUIRE_PII_SCAN: 'true',

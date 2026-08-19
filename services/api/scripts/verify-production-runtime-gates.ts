@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 
@@ -6,6 +8,9 @@ type Env = Parameters<typeof assertProductionRuntimeGates>[0]
 const PROD_OK: Env = {
   NODE_ENV: 'production',
   JWT_SECRET: 'a-strong-production-secret-0123456789',
+  // 2026-08-19 进入集中门禁：此前只在各调用点查长度，而 .env.example 的样值刚好够长。
+  FILE_SIGNING_SECRET: 'a-strong-file-signing-secret-0123456789',
+  SECRET_ENCRYPTION_KEY: 'a-strong-encryption-key-0123456789ab',
   FILE_STORAGE_DRIVER: 'cos',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/ai_job_print',
   REDIS_URL: 'redis://127.0.0.1:6379/0',
@@ -349,6 +354,53 @@ function main(): void {
     { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true' },
     '生产全实例升级后允许显式开启 planned writer',
   )
+
+  // ── 照抄 .env.example 必须起不了生产（2026-08-19）────────────────────────
+  //
+  // 弱默认的危险不在「值不好」，在于**它们能跑**：示例里的密钥刻意做得够长，
+  // 于是所有长度校验一律放行，运维照抄就能起一个用公开在仓库里的密钥签 JWT、
+  // 做手机号 pepper 的生产实例。
+  //
+  // 覆盖名单仍是手写的（漏列就不会查），但样值本身从 .env.example 现场解析，
+  // 不把「dev-xxx」字符串再抄一份到本文件。漏列的键合入前必须补进名单。
+  const exampleText = readFileSync(join(__dirname, '..', '.env.example'), 'utf8')
+  const exampleValues = new Map<string, string>()
+  for (const line of exampleText.split('\n')) {
+    const m = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line.trim())
+    if (!m) continue
+    const value = (m[2] ?? '').trim().replace(/^["']|["']$/g, '')
+    if (value) exampleValues.set(m[1] as string, value)
+  }
+  if (exampleValues.size === 0) throw new Error('解析 .env.example 得到 0 个键，格式可能已变')
+
+  // 只针对门禁真正覆盖的敏感键做断言；其余键（端口、区域、开关）不在此列。
+  const GUARDED_SECRET_KEYS = [
+    'JWT_SECRET',
+    'FILE_SIGNING_SECRET',
+    'SECRET_ENCRYPTION_KEY',
+    'PAYMENT_SESSION_SECRET',
+  ] as const
+  let checked = 0
+  for (const key of GUARDED_SECRET_KEYS) {
+    const sample = exampleValues.get(key)
+    if (!sample) {
+      throw new Error(`.env.example 缺少 ${key} 的可跑样值 —— 本节靠它证明样值会被拒`)
+    }
+    expectRejected(
+      { ...PROD_OK, [key]: sample } as Env,
+      'PRODUCTION_SAMPLE_SECRET_FORBIDDEN',
+      `生产拒绝 .env.example 的 ${key} 样值`,
+    )
+    checked += 1
+  }
+  console.log(`  PASS 已对 ${checked} 个敏感键逐一证明「照抄示例起不了生产」`)
+
+  // 示例文件不得再出现真实生产资源标识（原先写着真实 COS 桶名）。
+  const bucket = exampleValues.get('TENCENT_COS_BUCKET')
+  if (bucket) {
+    throw new Error(`.env.example 的 TENCENT_COS_BUCKET 必须留空，当前为「${bucket}」——不得泄露生产资源标识`)
+  }
+  console.log('  PASS .env.example 未写入真实 COS 桶名')
 
   console.log('\n=== ALL PASS ===')
 }

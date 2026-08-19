@@ -10,8 +10,9 @@
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
  *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
- *   - PAYMENT_SESSION_SECRET 必须存在且长度 >= 32（打印建单后签发短期支付会话 token，
- *     生产不得回退 JWT_SECRET / FILE_SIGNING_SECRET）
+ *   - FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY / PAYMENT_SESSION_SECRET 必须存在、
+ *     长度 >= 32，且不得使用 .env.example 的样值前缀（dev- / test- / replace-with- 等）
+ *   - JWT_SECRET 同样拒绝样值前缀（长度门槛仍是 16）
  *   - PAYMENT_PROVIDER 不得含 sandbox（生产禁止沙箱支付通道；wechat/alipay 真实渠道
  *     由 Provider 工厂启动期校验凭证齐全，缺一拒启动）
  *   - PRINT_REQUIRE_PII_SCAN 必须为 true（用户原始材料未完成隐私检查与逐项裁决时，
@@ -33,6 +34,8 @@ import { assertProductionTrustProxyHops } from './trust-proxy'
 export interface ProductionRuntimeEnv {
   NODE_ENV?: string
   JWT_SECRET?: string
+  FILE_SIGNING_SECRET?: string
+  SECRET_ENCRYPTION_KEY?: string
   FILE_STORAGE_DRIVER?: string
   DATABASE_URL?: string
   REDIS_URL?: string
@@ -59,6 +62,25 @@ export interface ProductionRuntimeEnv {
 
 const MIN_JWT_SECRET_LENGTH = 16
 const MIN_PAYMENT_SESSION_SECRET_LENGTH = 32
+/** 文件签名与 pepper 类密钥的最低长度，与各调用点（signing.ts / phone-identity.ts）保持一致。 */
+const MIN_LONG_SECRET_LENGTH = 32
+
+/**
+ * `.env.example` 的样值刻意做得「能本地跑」，于是长度校验一律放行 ——
+ * 这正是照抄示例就能起一个用公开密钥签 JWT / 做 pepper 的生产实例的原因。
+ * 因此除长度外还要拒绝样值本身的标记；示例文件里所有可跑密钥必须带这些前缀之一。
+ */
+const SAMPLE_SECRET_MARKERS = ['dev-only-', 'dev-', 'test-', 'replace-with-', 'change-me'] as const
+
+function assertNotSampleSecret(name: string, value: string): void {
+  const lowered = value.toLowerCase()
+  const hit = SAMPLE_SECRET_MARKERS.find((marker) => lowered.startsWith(marker))
+  if (hit) {
+    throw new Error(
+      `PRODUCTION_SAMPLE_SECRET_FORBIDDEN: NODE_ENV=production 时 ${name} 不得使用 .env.example 的样值（以 "${hit}" 开头）`,
+    )
+  }
+}
 const REQUIRED_TENCENT_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
   'TENCENT_SMS_SECRET_KEY',
@@ -83,6 +105,27 @@ export function assertProductionRuntimeGates(
       `PRODUCTION_JWT_SECRET_INVALID: NODE_ENV=production 时 JWT_SECRET 必须存在且长度 >= ${MIN_JWT_SECRET_LENGTH} 字符`,
     )
   }
+  assertNotSampleSecret('JWT_SECRET', jwtSecret)
+
+  // FILE_SIGNING_SECRET / SECRET_ENCRYPTION_KEY 此前只在各自调用点查长度，没进集中门禁。
+  // 而 .env.example 给的样值**刚好超过阈值**，长度校验一律放行 —— 照抄进生产，
+  // 文件签名和手机号/邮箱 hash 的 pepper 就是一个公开在仓库里的字符串。
+  // （SECRET_ENCRYPTION_KEY 同时是 phone-identity.ts:26 的 pepper 与 LLM apiKey 的加密密钥。）
+  const fileSigningSecret = env.FILE_SIGNING_SECRET
+  if (!fileSigningSecret || fileSigningSecret.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_FILE_SIGNING_SECRET_INVALID: NODE_ENV=production 时 FILE_SIGNING_SECRET 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('FILE_SIGNING_SECRET', fileSigningSecret)
+
+  const secretEncryptionKey = env.SECRET_ENCRYPTION_KEY
+  if (!secretEncryptionKey || secretEncryptionKey.length < MIN_LONG_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_SECRET_ENCRYPTION_KEY_INVALID: NODE_ENV=production 时 SECRET_ENCRYPTION_KEY 必须存在且长度 >= ${MIN_LONG_SECRET_LENGTH} 字符`,
+    )
+  }
+  assertNotSampleSecret('SECRET_ENCRYPTION_KEY', secretEncryptionKey)
 
   const driver = env.FILE_STORAGE_DRIVER?.trim()
   if (driver !== 'cos') {
@@ -148,6 +191,10 @@ export function assertProductionRuntimeGates(
       `PRODUCTION_PAYMENT_SESSION_SECRET_INVALID: NODE_ENV=production 时 PAYMENT_SESSION_SECRET 必须存在且长度 >= ${MIN_PAYMENT_SESSION_SECRET_LENGTH} 字符`,
     )
   }
+  // 与 JWT / 文件签名 / pepper 同类：.env.example 的
+  // `dev-payment-session-secret-replace-in-prod-min-32-chars` 正好 55 字符，
+  // 只查长度会放行。漏掉这一行，照抄示例就能用仓库里的公开串签支付会话。
+  assertNotSampleSecret('PAYMENT_SESSION_SECRET', paymentSessionSecret)
 
   // C5-2/C5-6：生产禁止沙箱支付通道（测试通道绝不能在生产入账）。未设置/disabled = 线上支付关闭，放行；
   // wechat / alipay（可逗号并列）为 C5-6 真实渠道，凭证齐全性由 Provider 工厂启动期校验（fail-closed）。
