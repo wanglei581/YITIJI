@@ -8,7 +8,14 @@
     <text class="nav-title">到机码</text>
   </view>
 
-  <scroll-view class="code-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <!-- ready 由 onLoad 守卫放行后才置 true。「材料包创建成功」是写死在模板里的，
+       不加这层 wx:if 的话，深链/分享打开时首屏会先闪出一句没有订单支撑的成功宣告。 -->
+  <view wx:if="{{!ready}}" class="code-body">
+    <view class="section-t">材料包尚未开放</view>
+    <view class="qr-hint">服务端下单接口尚未上线，本页不展示任何到机码。</view>
+  </view>
+
+  <scroll-view wx:if="{{ready}}" class="code-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="code-body">
       <!-- 成功提示 -->
       <view class="success-banner">

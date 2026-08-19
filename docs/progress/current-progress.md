@@ -1,5 +1,23 @@
 # 当前开发进度
 
+2026-08-19 修复 **P0-3 小程序材料包侧链：深链/分享可绕过入口挡板走进假下单皮（分支 `fix/miniapp-package-chain-guard`，基于 `origin/main@c28916377`，未合入、未部署）**。四家 CLI 只读同审后动手，改的是 `apps/miniapp`（唯一发布源），因此逐条留证。
+
+**先纠正评审措辞里的两点。** ① 「无订单也显示成功码」在**正常点击流里走不到**：`package-confirm.js:106` 调 `api.createPackageOrder` → `POST /orders/package`，该端点在 `services/api` 全仓零命中（`@Controller('orders')` 只有 `order-quote.controller.ts` 的 `POST /orders/quote`），404 被 `request.js:132` 转成 reject，最后弹「提交失败」Modal。成功页只能靠**构造 URL 或转发分享卡片**进入。② 这个假到机码拿到一体机上**不会真的取到东西**：Kiosk 先按 `PICKUP_CODE_ACCEPTED_PATTERN` 校验格式，后端再按 `Order.pickupCodeHash` 精确查库（`pickup-order.service.ts:56`），只会返回 `PICKUP_CODE_INVALID`。**所以没有资损，但有完整的欺骗面**：用户（或收到转发卡片的人）看到一张写着「材料包创建成功 · 请到服务点扫码取件」并带着到机码的页面，跑到机器前才发现是空的。
+
+**真正的洞在页面这一侧。** `package-code.js:15-24` 把 `pickupCode` / `orderId` / `storeName` / `expireTime` / `price` **全部从 URL query 读出来直接渲染**，服务端零校验；同页 `:55` 还挂着 `onShareAppMessage`，标题就是「材料包创建成功 · 职易达」。入口侧其实早就诚实了——`pages/ai/ai.js:90-133` 的 pending 列表里材料包那条写着「服务端 POST /orders/package 尚未实现，现在下单必然失败，所以入口不放开」，`home.js:34` 也已把首页那格换成职业规划。缺的只是页面自身的 fail-closed。
+
+**选守卫不选下线（Cursor Sol 判、Grok 复核门禁面）。** 从 `app.json` 摘路由会撞两条既有门禁：`verify-miniapp-static.mjs:151-163` 要求 `pages/*` 物理目录与注册路由**严格一一对应**（只摘路由留目录直接爆红），而 `:510-517` 的 `ARRIVAL_CODE_FILES` 数组**硬编码**了 `package-code.{wxml,js}` 与 `store-select.wxml`（删文件会让 `read()` 抛 ENOENT 把脚本打崩）。加上「已发布版本里可能已有这些页面、旧分享卡片点开会 404」的不确定性，保留注册 + 每页守卫是两种情况下都安全的那一个。四页均在 2026-08-18 随 `a1a771252`（PR #694 职业生活圈改版）进入 main，仓库范围内从未形成过真实成功闭环，**挡死是零能力损失**。
+
+**改法。** 新增 `apps/miniapp/utils/package-feature.js`，`guardPackageChain()` 弹出与 ai.js 同口径的「材料包 · 尚未开放」说明后 `wx.reLaunch` 回首页（深链进来没有上一页可退，`navigateBack` 不可靠）；四页 `onLoad` **首行** `if (guardPackageChain()) return`，后续 setData 一律不执行。删掉 `package-code` 与 `package-create` 的 `onShareAppMessage`。**假数据即使被挡住也一并清掉**（Cursor C4：守卫可能被回退或漏页，不能把假能力留在唯一发布源里）：`store-select.js:49` 的 `'010-00000000'` 改为空并由 `callStore` 明确提示「该服务点暂未提供联系电话」（原实现走 `makePhoneCall` 失败弹「拨打失败」，会被理解成网络问题）；`:86-92` 写死的北大坐标 `39.9925/116.3067` 删除，不再假装拿到了用户位置；`distance` 从「计算中…」改为「距离待接入」（没有任何东西在算）；`package-create.js:35-37` 的本地计价 `bw ? 0.5 : 2.0` 删除——那两个单价既不读 `GET /print/price-config`，也对不上仓库价目（黑白 20 分 / 彩色 50 分），函数一并从 `_calculatePrice` 改名 `_recalculateSummary`（只算真实页数），金额位显示 `--`。**顺带修掉两处同源的空壳交互**：`viewInMap` 读的 `store.lat/lng` 从来没被赋值过（map 里没有这两个字段，`getPublicTerminals` 也不下发坐标），原实现等于用 `undefined` 调 `wx.openLocation`；现改为明确提示暂无坐标。
+
+**Grok 指出并已处理的一点：`onLoad` 挡不住首屏那一帧。** `package-code.wxml:17` 的「材料包创建成功 / 请到服务点扫码取件」是**写死在模板里**的，不受 data 控制——只加 JS 守卫的话，深链打开时仍会在弹窗背后闪出一句无订单支撑的成功宣告。因此加 `ready`（默认 `false`）开关把整个成功区关在 `wx:if` 之内，守卫放行后才置 `true`；未放行时显示「材料包尚未开放 / 服务端下单接口尚未上线，本页不展示任何到机码」。
+
+**新增 4 项门禁（`verify-miniapp-static.mjs`）。** ① 四页必须引入 `package-feature` 且 `guardPackageChain()` 在 `onLoad` **首行**（正则允许中间夹注释，但不允许夹语句）；② `package-code` 的成功横幅必须在 `wx:if="{{ready}}"` 内且 `ready` 默认 false；③ 四页不得有 `onShareAppMessage/onShareTimeline`；④ 四页不得出现假电话 / 北大坐标 / 本地硬编码单价。第 ④ 项**剥掉注释后再判**（照抄 `verify-job-requirement-stats.ts:41` 的 `stripComments`），否则解释「为什么删掉这个假值」的注释会把自己判红——这是 2026-08-18 记录里踩过的同一个坑。
+
+**先破后立六处全部验红**：拿掉 package-code 守卫 → 红；**把守卫挪到 `setData` 之后（典型伪修复）→ 红**；加回 `onShareAppMessage` → 红；塞回 `010-00000000` → 红；`ready` 默认改回 `true` → 红；把成功横幅挪出 `wx:if` → 红。复原后 98 PASS / 0 FAIL。
+
+**验证**：`verify-miniapp-static`（98 PASS / 0 FAIL，注册页面 53）、`verify-pickup-qrcode` PASS。**未验证（须你在微信开发者工具与真机做）**：未在开发者工具里点过、未真机构造深链验证守卫、未验证 `wx.reLaunch` 到 tabBar 页 `pages/home/home` 的实际跳转表现。**开放条件**：服务端 `POST /orders/package`（及配套报价）上线后，删掉 `utils/package-feature.js` 与四处调用、恢复 `ready` 逻辑即可，页面业务代码未被破坏。本轮只改 `apps/miniapp`（1 个新文件 + 4 个页面 js + 1 个 wxml + 1 个门禁脚本）与本文件，**未触碰 `services/api`、Kiosk、Prisma、支付或打印状态机**。
+
 2026-08-19 修复 **P0-2 上半刀：线上平台目录用了岗位级 CTA，越 §4.6 分级白名单（分支 `fix/kiosk-directory-level-cta`，基于 `origin/main@7c9273820`，未合入、未部署）**。8-18 专家评审把 P0-2 记成一条，实际是两个可分离的问题：(A) 四家平台硬编码、`OnlinePlatformDirectory` 未被前台读；(B) 目录 CTA 越合规白名单。**四家 CLI 只读同审后拆两刀，本轮只做 B**——Cursor Sol 的裁定理由是「不能让一个跨端治理工程阻塞立即可消除的合规风险」；A 要建整条写入/审核链，且做完后生产空库会让页面从「有四个平台」变成空列表，须先有运营录入才能切读，属独立排期。
 
 **违规在哪。** `compliance-boundary.md:209`（§4.6）原文：「目录 CTA 只允许"前往官方平台查看 / 扫码打开来源平台"；进入具体岗位后才可使用"去来源平台投递 / 扫码投递"。」而 `OnlinePlatformsPage.tsx` 的列表按钮写的是「去来源平台投递」、副标题写「用手机扫码前往来源平台投递」；入口侧 `JobsServiceHubPage.tsx:128` 的卡片描述同样是「…去来源平台投递」。目录只把用户送到第三方**官网首页**，那里没有岗位、更没有投递对象，写「投递」等于替第三方承诺了本终端做不到的事。**V6 原型本身是对的**——`docs/design/kiosk-ai-os-v3-2026-08/35-online-platforms.html:142` 用的就是「扫码打开来源平台」，还专门注释「不写『扫码投递』——码指向平台首页，不是某个岗位的投递页」；是实现跑偏了。
