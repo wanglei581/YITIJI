@@ -1,5 +1,6 @@
 // pages/store-select/store-select.js
 const api = require('../../utils/api')
+const { guardPackageChain } = require('../../utils/package-feature')
 
 Page({
   data: {
@@ -12,6 +13,7 @@ Page({
   },
 
   onLoad(options) {
+    if (guardPackageChain()) return
     const app = getApp()
     this.setData({
       statusBarHeight: app.globalData.statusBarHeight || 44
@@ -42,11 +44,14 @@ Page({
           id: terminal.id,
           name: terminal.displayName || '服务点',
           address: terminal.locationLabel || '地址待补充',
-          distance: '计算中...',
+          // 「计算中…」会一直停在那里：没有定位、也没有接地图距离服务，没有任何东西在算。
+          distance: '距离待接入',
           distanceValue: 999999, // 默认排最后
           hours: '营业时间待补充',
           status: terminal.isOnline ? 'open' : 'closed',
-          phone: '010-00000000', // 待后端补充
+          // 服务点电话后端尚未下发。原先写死 '010-00000000' 让页面看起来有联系方式，
+          // 用户真拨过去只会打空号；接口补齐前留空，由 wxml 显示「电话待补充」。
+          phone: '',
           facilities: ['打印', '扫描', '复印'] // 默认设施
         }))
         
@@ -69,27 +74,10 @@ Page({
 
   // 获取用户位置
   _getUserLocation() {
-    // 实际使用时调用微信定位API
-    // wx.getLocation({
-    //   type: 'gcj02',
-    //   success: (res) => {
-    //     this.setData({
-    //       userLocation: {
-    //         latitude: res.latitude,
-    //         longitude: res.longitude
-    //       }
-    //     })
-    //     this._calculateDistances()
-    //   }
-    // })
-    
-    // Mock：使用默认位置（北京大学附近）
-    this.setData({
-      userLocation: {
-        latitude: 39.9925,
-        longitude: 116.3067
-      }
-    })
+    // 原先在这里塞了一个北京大学附近的固定坐标当作「用户位置」，任何人打开都被当成在北大。
+    // 真实定位要走 wx.getLocation（需要 app.json 的 permission.scope.userLocation 与用户授权），
+    // 距离计算还要接地图服务；这些都没有做，所以不假装有位置：不设 userLocation，
+    // 列表上的距离保持 wxml 的「距离待计算」，不排序成看起来是按远近排的。
   },
 
   // 计算距离（实际使用时调用地图API）
@@ -130,6 +118,12 @@ Page({
   // 拨打电话
   callStore(e) {
     const { phone } = e.currentTarget.dataset
+    // 电话为空时不要走 makePhoneCall —— 它失败后弹的是「拨打失败」，
+    // 会被理解成网络或权限问题，而真实原因是后端根本没下发这个号码。
+    if (!phone) {
+      wx.showToast({ title: '该服务点暂未提供联系电话', icon: 'none' })
+      return
+    }
     wx.makePhoneCall({
       phoneNumber: phone,
       fail: () => {
@@ -146,15 +140,19 @@ Page({
     const { id } = e.currentTarget.dataset
     const store = this.data.stores.find(s => s.id === id)
     
-    if (store) {
-      wx.openLocation({
-        latitude: store.lat,
-        longitude: store.lng,
-        name: store.name,
-        address: store.address,
-        scale: 15
-      })
+    // store.lat / store.lng 从来没有被赋值过（上面的 map 里没有这两个字段，
+    // 后端 getPublicTerminals 也不下发坐标），原实现等于用 undefined 调 openLocation。
+    if (!store || typeof store.lat !== 'number' || typeof store.lng !== 'number') {
+      wx.showToast({ title: '该服务点暂未提供地图坐标', icon: 'none' })
+      return
     }
+    wx.openLocation({
+      latitude: store.lat,
+      longitude: store.lng,
+      name: store.name,
+      address: store.address,
+      scale: 15
+    })
   },
 
   // 确认并继续

@@ -2,6 +2,7 @@
 const app = getApp()
 const api = require('../../utils/api')
 const auth = require('../../utils/auth')
+const { guardPackageChain } = require('../../utils/package-feature')
 
 Page({
   data: {
@@ -26,6 +27,7 @@ Page({
   },
 
   onLoad() {
+    if (guardPackageChain()) return
     const { statusBarHeight } = app.globalData
     this.setData({ statusBarHeight: statusBarHeight || 44 })
     this._loadOrderData()
