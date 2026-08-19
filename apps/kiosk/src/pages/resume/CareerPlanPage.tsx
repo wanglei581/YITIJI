@@ -464,12 +464,16 @@ export function CareerPlanPage() {
             {printing ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : <PrinterIcon aria-hidden="true" />}
             {printing ? '正在生成建议单…' : '打印建议单'}
           </Button>
-          {aiTask.canStart || aiTask.isRunning ? (
-            <Button size="lg" variant="secondary" className="career-plan-lightflow__secondary-action" aria-disabled={generating} onClick={() => void handleGenerate()}>
-              {generating ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : null}
-              {generating ? '正在重新生成…' : '重新生成'}
-            </Button>
-          ) : null}
+          {/*
+            与下方「首次生成」同一条口径：**不得**被 aiTask.canStart 包住。
+            已经生成过规划的用户撞上一次能力级错误后，canStart 恒 false，
+            这颗「重新生成」会整个消失，而本页没有清除 aiOutage 的其它入口 ——
+            用户只能退出页面重进。handleGenerate 开头已会清 aiOutage 再发真实请求。
+          */}
+          <Button size="lg" variant="secondary" className="career-plan-lightflow__secondary-action" aria-disabled={generating} onClick={() => void handleGenerate()}>
+            {generating ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : null}
+            {generating ? '正在重新生成…' : aiOutage ? '重试生成' : '重新生成'}
+          </Button>
         </KioskActionBar>
       </main></CareerPlanFullscreenFrame>
     )
