@@ -132,7 +132,7 @@ export function InterviewSetupPage() {
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>('standard')
   const [duration, setDuration] = useState<InterviewDuration>(5)
   const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(null)
-  const [resumeChannel, setResumeChannel] = useState<ResumeChannel>('phone')
+  const [resumeChannel, setResumeChannel] = useState<ResumeChannel | null>(null)
   const [uploading, setUploading] = useState(false)
   const [qrBusy, setQrBusy] = useState(false)
   const [usbBusy, setUsbBusy] = useState(false)
@@ -495,12 +495,12 @@ export function InterviewSetupPage() {
                         onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
                         onBusyChange={setUsbBusy}
                       />
-                    ) : (
+                    ) : resumeChannel === 'desktop' ? (
                       <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
                         {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
                         本机文件（桌面验证）
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                   <p className="mt-3 text-sm text-neutral-500">不上传也可以开始练习</p>
                 </>
