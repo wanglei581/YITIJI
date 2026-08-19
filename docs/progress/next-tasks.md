@@ -1,5 +1,31 @@
 # 下一步任务
 
+## 交付阻塞清单（2026-08-19 建立，只放**卡上线**的，勾完即可放机器收真钱）
+
+> 建立原因：产品负责人问「到底还剩多少问题、是不是处理不完了」。本节只列**阻塞交付**的，
+> 体验问题与 V6 逐页迁移**不进本节**（它们不卡上线，可边运营边推）。
+> 每清一条就勾一条；本节保持 30 行以内，长说明写进 `current-progress.md`。
+
+### A. 代码侧（我方可修，共 4 条）
+
+- [ ] **A1 岗位匹配无简历前置门禁** —— 从首页直点进 `/resume/job-fit`，没简历也渲染表单，点分析必 400 红条。职业规划页有门禁卡，这页漏了。`JobFitPage.tsx:72-74,195-208`
+- [ ] **A2 模拟面试 / 合同审查触屏传不了文件** —— 只有桌面隐藏 `<input type="file">`，全屏 Kiosk 下弹 Windows 资源管理器。`InterviewSetupPage.tsx:449-466`、`ContractReviewHomePage.tsx:95-100`
+- [ ] **A3 `.env.example` 弱默认可启动生产** —— `JWT_SECRET="dev-only-…"`、`TERMINAL_LEGACY_REGISTER_ENABLED=true`、真实生产桶名；仅 `NODE_ENV=production` 时才拦
+- [ ] **A4 告警无推送、无工单** —— `admin-ops.service.ts` 自陈实时派生、无 Alert 模型、「不支持确认/处理流转」，全仓无 webhook/短信/邮件。无人值守场地机器停了没人知道。Cursor 裁定：只做一件就做**核查状态机**（已核查·已出纸 / 已核查·未出纸）
+
+### B. 需你方动手（共 3 条，非代码）
+
+- [ ] **B1 部署闸门解冻** —— `DEPLOY_API_ENABLED` 自 8/14 关闭后 97 次 skipped / 0 成功；**今天合入的全部改动尚未上服务器**。按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md`
+- [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
+- [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
+
+### 已清（2026-08-19 当日）
+
+未付订单可被领走出纸（#726）· AI 能力级错误码分类（#727）· LLM 失败码拆分（#729）·
+职业规划粘滞（#728）· 平台目录合规 CTA（#730）· 材料包侧链 fail-closed（#731）·
+10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
+首页域按真实能力说话（#735，CI 中）
+
 > 最后更新：2026-08-18
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
