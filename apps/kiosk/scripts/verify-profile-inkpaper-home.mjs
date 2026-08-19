@@ -317,7 +317,7 @@ expectAbsent(detailCss, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '明细页 
 expectIncludes(favoritesPage, 'loginFrom="/me/favorites"', '我的收藏保留登录回跳来源')
 expectIncludes(favoritesPage, 'return `/jobs/${item.targetId}`', '我的收藏保留岗位详情跳转')
 expectIncludes(favoritesPage, 'return `/job-fairs/${item.targetId}`', '我的收藏保留招聘会详情跳转')
-expectIncludes(favoritesPage, "return '/renshi'", '我的收藏保留政策入口跳转')
+expectIncludes(favoritesPage, "return '/renshi?tab=policy'", '我的收藏保留政策入口跳转')
 expectIncludes(favoritesPage, '还没有收藏', '我的收藏保留空态标题')
 expectIncludes(favoritesPage, '在岗位 / 招聘会 / 政策详情页点收藏', '我的收藏保留空态说明')
 

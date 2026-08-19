@@ -81,6 +81,10 @@ const assert = (condition, message) => { if (!condition) failures.push(message) 
     !/\/renshi\?tab=subsidy/.test(read('src/pages/policy/PolicyServiceHubPage.tsx')),
     'PolicyServiceHubPage.tsx: 不得链接 /renshi?tab=subsidy（不在 tab 白名单，会被静默回落到 policy）',
   )
+  assert(
+    /key: 'policy-fav'[\s\S]*?to: '\/me\/favorites\?tab=policy'/.test(read('src/pages/policy/PolicyServiceHubPage.tsx')),
+    'PolicyServiceHubPage.tsx: 政策收藏必须落到 /me/favorites?tab=policy，不得再进 AI 记录',
+  )
 
   // `/print/upload` 的 source 取自 query 且只认 resume|document；jobId/jobTitle 无消费点。
   assert(
