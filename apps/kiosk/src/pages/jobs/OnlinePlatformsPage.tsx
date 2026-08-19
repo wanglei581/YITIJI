@@ -8,37 +8,34 @@ import '../../styles/prototype-v1.css'
 interface Platform {
   id: string
   name: string
-  tagline: string
   category: string
   url: string
 }
 
+// 卡片副行展示官方域名而非平台标语：标语是本终端替第三方写的推销语,
+// 既未经对方授权也无从核验;域名是可核对的事实,还能让用户在扫码前确认目标站点。
 const PLATFORMS: readonly Platform[] = [
   {
     id: 'boss',
     name: 'Boss直聘',
-    tagline: '直连招聘，直接与招聘负责人沟通',
     category: '直聘平台',
     url: 'https://www.zhipin.com',
   },
   {
     id: '51job',
     name: '前程无忧',
-    tagline: '综合招聘求职一站式服务平台',
     category: '综合平台',
     url: 'https://www.51job.com',
   },
   {
     id: 'zhilian',
     name: '智联招聘',
-    tagline: '职业发展综合服务，岗位丰富',
     category: '综合平台',
     url: 'https://www.zhaopin.com',
   },
   {
     id: 'liepin',
     name: '猎聘',
-    tagline: '中高端人才招聘，精准匹配职位',
     category: '中高端平台',
     url: 'https://www.liepin.com',
   },
@@ -60,7 +57,7 @@ export function OnlinePlatformsPage() {
     <KioskPageFrame
       className="kpv1 kpv1--content-only a-clay"
       title="线上招聘平台"
-      subtitle="用手机扫码前往来源平台投递"
+      subtitle="扫码打开第三方招聘平台官网，岗位与投递均在该平台自行完成"
       onBack={() => navigate(-1)}
       backLabel="返回"
     >
@@ -118,7 +115,7 @@ export function OnlinePlatformsPage() {
                 </span>
               </div>
               <div style={{ fontSize: 16, color: 'var(--pv-muted)', marginTop: 5 }}>
-                {platform.tagline}
+                {new URL(platform.url).host}
               </div>
             </div>
 
@@ -143,7 +140,7 @@ export function OnlinePlatformsPage() {
               }}
             >
               <ExternalLinkIcon aria-hidden="true" style={{ width: 18, height: 18 }} />
-              去来源平台投递
+              扫码打开来源平台
             </button>
           </div>
         ))}
@@ -152,7 +149,7 @@ export function OnlinePlatformsPage() {
       {/* 合规提示 */}
       <div className="notice" style={{ marginTop: 8 }}>
         <InfoIcon aria-hidden="true" />
-        投递请前往来源平台，本终端不参与投递流程，不收取求职者简历，不参与企业筛选。
+        本终端只提供第三方平台官网入口，不参与投递流程，不收取求职者简历，不参与企业筛选。
       </div>
 
       {/* 二维码面板（全屏遮罩） */}
@@ -272,7 +269,7 @@ export function OnlinePlatformsPage() {
                 width: '100%',
               }}
             >
-              投递请前往来源平台，本终端不参与投递流程
+              本终端不参与投递流程，岗位与投递结果均以来源平台为准
             </div>
           </div>
         </div>

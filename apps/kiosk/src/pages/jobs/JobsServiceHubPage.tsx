@@ -125,7 +125,7 @@ const CAPABILITIES: Capability[] = [
     iconColor: 'text-info-fg',
     goColor: 'text-info-fg',
     title: '线上招聘平台',
-    description: '扫码访问 Boss直聘、前程无忧等主流平台，去来源平台投递',
+    description: '扫码打开第三方招聘平台官网，岗位与投递均在该平台自行完成',
     to: '/jobs/online-platforms',
     available: true,
     requiresApi: false,
