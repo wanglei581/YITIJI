@@ -4,10 +4,12 @@
 // Admin 专属打印任务操作端点（受 JwtAuthGuard + RolesGuard('admin') 保护）。
 //
 // 路由（均含 /api/v1 前缀）：
-//   POST /admin/print-jobs/:id/abandon  — 废弃单条历史 pending 孤单
+//   POST /admin/print-jobs/:id/abandon         — 废弃单条历史 pending 孤单
+//   POST /admin/print-jobs/:id/verify-outcome  — 核查出纸结果（printed / not_printed）
 // ============================================================
 
 import {
+  Body,
   Controller,
   HttpCode,
   HttpStatus,
@@ -21,12 +23,16 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { AdminPrintJobsAbandonService } from './admin-print-jobs-abandon.service'
+import { AdminPrintJobsVerifyOutcomeService } from './admin-print-jobs-verify-outcome.service'
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminPrintJobsController {
-  constructor(private readonly abandonSvc: AdminPrintJobsAbandonService) {}
+  constructor(
+    private readonly abandonSvc: AdminPrintJobsAbandonService,
+    private readonly verifyOutcomeSvc: AdminPrintJobsVerifyOutcomeService,
+  ) {}
 
   /**
    * 废弃单条历史 pending 孤单（claimedAt===null，未被 Terminal Agent 领取）。
@@ -44,5 +50,20 @@ export class AdminPrintJobsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.abandonSvc.abandonPending(id, user.userId)
+  }
+
+  /**
+   * 核查出纸结果。不改 errorCode / status，只写 printOutcome。
+   *
+   * body: { outcome: 'printed' | 'not_printed', confirm: 'VERIFY_PRINTED' | 'VERIFY_NOT_PRINTED' }
+   */
+  @Post('admin/print-jobs/:id/verify-outcome')
+  @HttpCode(HttpStatus.OK)
+  async verifyOutcome(
+    @Param('id') id: string,
+    @Body() body: { outcome?: unknown; confirm?: unknown },
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.verifyOutcomeSvc.verifyOutcome(id, body ?? {}, user.userId)
   }
 }

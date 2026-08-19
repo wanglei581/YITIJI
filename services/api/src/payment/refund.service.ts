@@ -266,6 +266,17 @@ export class RefundService {
       throw new BadRequestException('ORDER_NOT_REFUNDABLE') // unpaid / paying / closed / failed
     }
 
+    // ②′ 现场已确认出纸：禁止退款。只读 PrintTask.printOutcome，不改任务状态。
+    if (order.printTaskId) {
+      const printTask = await this.prisma.printTask.findUnique({
+        where: { id: order.printTaskId },
+        select: { printOutcome: true },
+      })
+      if (printTask?.printOutcome === 'printed') {
+        throw new BadRequestException('PRINT_REFUND_VERIFIED_PRINTED_FORBIDDEN')
+      }
+    }
+
     const paymentSource = order.paymentSource ?? ''
     if (!REFUNDABLE_SOURCES.has(paymentSource)) throw new BadRequestException('REFUND_CHANNEL_UNSUPPORTED')
     const channel = paymentSource

@@ -84,6 +84,7 @@ export type AdminPrintScanTaskItem =
       copies: number | null
       colorMode: 'black_white' | 'color' | null
       paperSize: string | null
+      printOutcome: 'printed' | 'not_printed' | null
     })
   | (AdminPrintScanTaskBase & { type: 'scan'; scanType: string; hasResultFile: boolean })
   | (AdminPrintScanTaskBase & { type: 'document_process'; kind: string; hasResultFile: boolean })
@@ -235,12 +236,14 @@ const MOCK_PRINT_TASKS: AdminPrintScanTaskItem[] = [
     status: 'failed', ownerType: 'member', errorCode: 'printer_offline',
     createdAt: new Date(Date.now() - 3600_000).toISOString(), updatedAt: new Date().toISOString(), expiresAt: null,
     fileName: '演示简历.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4',
+    printOutcome: null,
   },
   {
     type: 'print', taskId: 'pt_demo_2', terminalId: 'term_demo', terminalCode: 'KSK-001',
     status: 'completed', ownerType: 'anonymous', errorCode: null,
     createdAt: new Date(Date.now() - 7200_000).toISOString(), updatedAt: new Date().toISOString(), expiresAt: null,
     fileName: '求职材料.pdf', copies: 2, colorMode: 'color', paperSize: 'A4',
+    printOutcome: null,
   },
 ]
 

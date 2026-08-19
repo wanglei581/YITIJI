@@ -42,8 +42,8 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | --- | --- | --- |
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 12 |
-| **medium** | 只被文档或其它文件提及 | 13 |
-| **low** | 全仓零提及 | 126 |
+| **medium** | 只被文档或其它文件提及 | 8 |
+| **low** | 全仓零提及 | 125 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（126）
+## low — 全仓零提及（125）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -82,7 +82,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（122）
+### 文档（121）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -97,7 +97,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/design/kiosk-ai-os-fusion-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-os-prototype-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/mini-proto-v2-2026-07/CRAFT-NOTES.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/device/deploy-unfreeze-runbook-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/device/release-batching-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/对接清单.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -107,6 +106,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/product/pii-redaction-decision-2026-08.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/audit/2026-06-09-doc-consistency.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/owners.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/2026-08-18-expert-panel-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/agency-phase2-closeout-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/agency-project-structure-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/ai-resume-phase0-contract-lock-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -201,7 +201,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/superpowers/specs/2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-14-assistant-voice-consultation-restore-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-14-windows-agent-reliability-p0-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-15-admin-billing-description-editor-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-15-production-deployment-integrated-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -212,9 +211,9 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## medium — 只被文档或其它文件提及（13）
+## medium — 只被文档或其它文件提及（8）
 
-### 页面/组件（12）
+### 页面/组件（7）
 
 | 路径 | 判定依据 |
 | --- | --- |
@@ -225,11 +224,6 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/pages/jobs/components/JobAiEntryPanel.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
 | `apps/kiosk/src/pages/jobs/components/JobFilterAssistant.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md |
 | `apps/kiosk/src/pages/jobs/components/JobListInsights.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/ai-capability-wiring-matrix-2026-08-16.md、docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md |
-| `apps/kiosk/src/pages/placeholders/OfflineAgenciesPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/reviews/legacy-capability-inventory-2026-08-16.md |
-| `apps/kiosk/src/pages/placeholders/OfflineJobDetailPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-v6-migration-matrix.md |
-| `apps/kiosk/src/pages/placeholders/PrintScanConvertPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
-| `apps/kiosk/src/pages/placeholders/PrintScanFeaturePage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
-| `apps/kiosk/src/pages/placeholders/PrintScanSignPage.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md |
 
 ### 样式（1）
 

@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`465` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`466` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -107,9 +107,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.latest | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
-| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.generate | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
-| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId/print` | FairVisitPlanController.print | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| GET | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.latest | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId` | FairVisitPlanController.generate | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
+| POST | `/api/v1/job-fairs/:fairId/visit-plan/:taskId/print` | FairVisitPlanController.print | — | FairVisitPlanService | AiResumeResult<br/>AiServiceLog<br/>AuditLog<br/>ExternalJumpLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>JobFair<br/>PrintTask |
 
 ## `services/api/src/ai/job-fit.controller.ts`
 
@@ -689,7 +689,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/orders/:id/mark-paid` | AdminOrderActionsController.markPaid | admin | OrderStatusService | AuditLog<br/>Order |
-| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund |
+| POST | `/api/v1/admin/orders/:id/refund` | AdminOrderActionsController.refund | admin | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
 
 ## `services/api/src/payment/order-quote.controller.ts`
 
@@ -708,7 +708,7 @@
 | POST | `/api/v1/payment/callback/:channel` | PaymentController.callback | — | — | — |
 | GET | `/api/v1/payment/channels` | PaymentController.getChannels | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
 | POST | `/api/v1/payment/sandbox/simulate` | PaymentController.simulate | — | OnlinePaymentService | AuditLog<br/>Order<br/>PaymentAttempt |
-| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>Refund |
+| POST | `/api/v1/payment/wechat/refund-notify` | PaymentController.wechatRefundNotify | — | RefundService | AuditLog<br/>Order<br/>PaymentAttempt<br/>PrintTask<br/>Refund |
 | GET | `/api/v1/print/price-config` | PaymentController.getPrintPriceConfig | — | PricingService | PriceConfig |
 
 ## `services/api/src/policies/policies.controller.ts`
@@ -742,6 +742,7 @@
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/admin/print-jobs/:id/abandon` | AdminPrintJobsController.abandonPending | admin | AdminPrintJobsAbandonService | AuditLog<br/>Order<br/>PrintTask<br/>PrintTaskStatusLog<br/>User |
+| POST | `/api/v1/admin/print-jobs/:id/verify-outcome` | AdminPrintJobsController.verifyOutcome | admin | — | — |
 
 ## `services/api/src/print-jobs/print-jobs.controller.ts`
 

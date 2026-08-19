@@ -140,6 +140,10 @@ model PrintTask {
   completedAt  DateTime?
   errorCode    String?
   errorMessage String?
+  // 管理员现场核查结果。与 errorCode=PRINT_JOB_UNCONFIRMED 正交：
+  // errorCode 保留 Agent「无法确认是否出纸」的历史原因，不得被核查覆盖。
+  // null = 未核查；只允许 printed | not_printed。
+  printOutcome String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

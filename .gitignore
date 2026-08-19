@@ -91,6 +91,7 @@ dump.rdb
 # docs 下的二进制文档（如机器生成 / 外部 .docx）不入库，结论沉淀为同名 .md
 docs/**/*.docx
 services/api/prisma/ci-test.db
+services/api/prisma/verify-print-outcome.db
 services/api/src/generated/prisma-pg/
 
 # deliverables 下的二进制成品（演示 PPT / PDF / DOCX）不入库，防止误提交撑大历史；文本类（.md / .html）仍可入库

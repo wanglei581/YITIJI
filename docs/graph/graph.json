@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 465,
+    "endpointCount": 466,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -2470,6 +2470,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
           "Refund"
         ],
         "path": "/api/v1/admin/orders/:id/refund",
@@ -2982,6 +2983,18 @@
         "services": [
           "AdminPrintJobsAbandonService"
         ]
+      },
+      {
+        "controller": "services/api/src/print-jobs/admin-print-jobs.controller.ts",
+        "handler": "AdminPrintJobsController.verifyOutcome",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/print-jobs/:id/verify-outcome",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/admin-print-scan/admin-print-scan.controller.ts",
@@ -5126,6 +5139,7 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
@@ -5148,6 +5162,7 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
@@ -5170,6 +5185,7 @@
           "AiResumeResult",
           "AiServiceLog",
           "AuditLog",
+          "ExternalJumpLog",
           "FairMaterialPrintBridge",
           "FileObject",
           "JobFair",
@@ -8305,6 +8321,7 @@
           "AuditLog",
           "Order",
           "PaymentAttempt",
+          "PrintTask",
           "Refund"
         ],
         "path": "/api/v1/payment/wechat/refund-notify",
@@ -10182,7 +10199,7 @@
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
-      "reachableFileCount": 405,
+      "reachableFileCount": 408,
       "root": "apps/kiosk",
       "router": "apps/kiosk/src/routes/index.tsx",
       "routes": [
@@ -10903,6 +10920,17 @@
         {
           "component": "FairVisitPlanPage",
           "endpoints": [
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url",
             "POST /print"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
@@ -12088,6 +12116,17 @@
           "component": "JobFitActionsPage",
           "endpoints": [
             "DELETE /resume/job-fit/consent/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/job-fit",
             "POST /resume/job-fit/:param/print",
             "POST /resume/job-fit/consent"
@@ -12294,7 +12333,8 @@
             "apps/kiosk/src/pages/resume/styles/resume-fusion-authoring.css",
             "apps/kiosk/src/pages/resume/styles/resume-fusion-common.css",
             "apps/kiosk/src/pages/resume/styles/resume-fusion-diagnosis.css",
-            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css"
+            "apps/kiosk/src/pages/resume/styles/resume-fusion-library.css",
+            "apps/kiosk/src/styles/ai-primitives.css"
           ],
           "wrappers": []
         },
@@ -12822,7 +12862,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 430
+      "sourceFileCount": 428
     },
     "partner": {
       "entry": "apps/partner/src/main.tsx",
@@ -13385,6 +13425,7 @@
         "usedBy": [
           "services/api/src/activity/activity.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
+          "services/api/src/ai/resume/fair-visit-plan.service.ts",
           "services/api/src/member-privacy/member-data-export.mapper.ts"
         ]
       },
@@ -13988,7 +14029,7 @@
         "usedBy": []
       },
       {
-        "fieldCount": 20,
+        "fieldCount": 21,
         "name": "PrintTask",
         "relations": [
           "EndUser",
@@ -14009,6 +14050,7 @@
           "services/api/src/member-feedback/kiosk-feedback.service.ts",
           "services/api/src/member-feedback/member-feedback.service.ts",
           "services/api/src/member-print-orders/member-print-orders.service.ts",
+          "services/api/src/payment/refund.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
@@ -14569,6 +14611,9 @@
     "apps/admin/src/services/api/adminOrdersReadonly.ts": [
       "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
     ],
+    "apps/admin/src/services/api/adminPrintJobs.ts": [
+      "apps/admin/scripts/verify-admin-orders-readonly-ui.mjs"
+    ],
     "apps/admin/src/services/api/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
     ],
@@ -14762,6 +14807,9 @@
     "apps/kiosk/src/ai/AiTaskRegion.tsx": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
+    "apps/kiosk/src/ai/aiOutage.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs"
+    ],
     "apps/kiosk/src/ai/index.ts": [
       "apps/kiosk/scripts/verify-kiosk-ai-primitives.mjs"
     ],
@@ -14797,6 +14845,7 @@
     ],
     "apps/kiosk/src/components/FileContentPreview.tsx": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/components/FilePreviewDialog.tsx": [
@@ -15113,6 +15162,9 @@
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs",
       "apps/kiosk/scripts/verify-smart-campus-ui.mjs"
     ],
+    "apps/kiosk/src/pages/home/homeDomainStatus.ts": [
+      "apps/kiosk/scripts/verify-fusion-home.mjs"
+    ],
     "apps/kiosk/src/pages/home/homeV6Domains.ts": [
       "apps/kiosk/scripts/verify-fusion-home.mjs",
       "apps/kiosk/scripts/verify-home-toolbox-ui.mjs"
@@ -15160,6 +15212,7 @@
     ],
     "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2c-interview.mjs",
       "apps/kiosk/scripts/verify-mic-capability-truth.mjs"
     ],
@@ -15233,6 +15286,8 @@
     "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
@@ -15269,7 +15324,8 @@
       "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx": [
-      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs"
+      "apps/kiosk/scripts/verify-jobfair-commercial-closure.mjs",
+      "apps/kiosk/scripts/verify-jobfair-ui.mjs"
     ],
     "apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx": [
       "apps/kiosk/scripts/verify-jobfair-ui.mjs"
@@ -15285,12 +15341,14 @@
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
       "apps/kiosk/scripts/verify-job-info-ui.mjs",
-      "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
+      "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/pages/jobs/JobsPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-job-ai-ui.mjs",
-      "apps/kiosk/scripts/verify-job-info-ui.mjs"
+      "apps/kiosk/scripts/verify-job-info-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx": [
       "apps/kiosk/scripts/verify-service-entry-readiness.mjs"
@@ -15435,7 +15493,8 @@
     ],
     "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs",
-      "apps/kiosk/scripts/verify-scan-input-safety.mjs"
+      "apps/kiosk/scripts/verify-scan-input-safety.mjs",
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/kiosk/src/pages/print/PrintPreviewPage.tsx": [
       "apps/kiosk/scripts/verify-device-status-honest.mjs",
@@ -15563,6 +15622,7 @@
     ],
     "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w5.mjs",
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs"
     ],
@@ -15778,12 +15838,14 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx": [
-      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs"
+      "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/pages/resume/JobFitPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
     "apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx": [
@@ -15809,22 +15871,27 @@
     "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx": [
       "apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx": [
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs",
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/ResumeParsePage.tsx": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-fusion-w3.mjs",
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -15877,6 +15944,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx": [
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx": [
@@ -16077,6 +16145,7 @@
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
     "apps/kiosk/src/services/api/aiMockAdapter.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs",
       "apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs"
     ],
@@ -16084,6 +16153,7 @@
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/careerPlan.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs"
     ],
     "apps/kiosk/src/services/api/client.ts": [
@@ -16132,6 +16202,7 @@
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
     "apps/kiosk/src/services/api/jobFit.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs",
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
@@ -16199,6 +16270,7 @@
       "apps/kiosk/scripts/verify-runtime-terminal-identity.mjs"
     ],
     "apps/kiosk/src/services/api/selfAssessment.ts": [
+      "apps/kiosk/scripts/verify-ai-down-fallbacks.mjs",
       "apps/kiosk/scripts/verify-kiosk-frontend-debt.mjs"
     ],
     "apps/kiosk/src/services/api/terminalConfig.ts": [
@@ -16209,6 +16281,9 @@
     ],
     "apps/kiosk/src/services/api/uploadSessions.ts": [
       "apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs"
+    ],
+    "apps/kiosk/src/services/api/userErrorMessage.ts": [
+      "apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs"
     ],
     "apps/kiosk/src/services/auth/memberAuthApi.ts": [
       "apps/kiosk/scripts/verify-member-session-closure.mjs",
@@ -16433,7 +16508,8 @@
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
     ],
     "apps/miniapp/utils/pickup-qrcode.js": [
-      "apps/miniapp/scripts/verify-miniapp-static.mjs"
+      "apps/miniapp/scripts/verify-miniapp-static.mjs",
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "apps/miniapp/utils/request.js": [
       "apps/miniapp/scripts/verify-miniapp-static.mjs"
@@ -16699,6 +16775,9 @@
     "packages/shared/src/index.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+    ],
+    "packages/shared/src/pickupCode.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "packages/shared/src/types/adminUsers.ts": [
       "apps/admin/scripts/verify-admin-users-ui.mjs"
@@ -17016,6 +17095,9 @@
     "services/api/src/common/filters/http-exception.filter.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
     ],
+    "services/api/src/common/pickup-code.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
     "services/api/src/config/production-runtime-gates.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -17148,6 +17230,9 @@
     "services/api/src/member-feedback/dto/kiosk-feedback.dto.ts": [
       "apps/kiosk/scripts/verify-kiosk-feedback-entry.mjs"
     ],
+    "services/api/src/member-print-orders/member-print-order-create.service.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
     "services/api/src/member-privacy/member-data-export.mapper.ts": [
       "apps/kiosk/scripts/verify-data-request-ui.mjs"
     ],
@@ -17193,6 +17278,9 @@
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs"
     ],
+    "services/api/src/payment/order-status.service.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
     "services/api/src/payment/payment-session-token.ts": [
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
       "apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs",
@@ -17206,6 +17294,15 @@
     ],
     "services/api/src/payment/pricing.service.ts": [
       "apps/kiosk/scripts/verify-price-single-source.mjs"
+    ],
+    "services/api/src/print-jobs/dto/claim-pickup.dto.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "services/api/src/print-jobs/pickup-claim-lockout.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "services/api/src/print-jobs/pickup-order.service.ts": [
+      "services/api/scripts/verify-backend-p0-contracts.mjs"
     ],
     "services/api/src/print-jobs/print-jobs.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -17409,7 +17506,8 @@
         "dirs": [],
         "files": [
           "apps/admin/src/routes/orders/index.tsx",
-          "apps/admin/src/services/api/adminOrdersReadonly.ts"
+          "apps/admin/src/services/api/adminOrdersReadonly.ts",
+          "apps/admin/src/services/api/adminPrintJobs.ts"
         ],
         "missing": []
       },
@@ -17774,14 +17872,21 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/ai/aiOutage.ts",
           "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "apps/kiosk/src/pages/resume/CareerPlanPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
           "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "apps/kiosk/src/pages/resume/components/ResumeDiagnosisFailExits.tsx",
           "apps/kiosk/src/services/api/ai.ts",
+          "apps/kiosk/src/services/api/aiMockAdapter.ts",
+          "apps/kiosk/src/services/api/careerPlan.ts",
           "apps/kiosk/src/services/api/interview.ts",
+          "apps/kiosk/src/services/api/jobFit.ts",
+          "apps/kiosk/src/services/api/selfAssessment.ts",
           "packages/shared/src/types/ai.ts",
           "packages/shared/src/types/mockInterview.ts",
           "services/api/src/ai/resume/career-plan.service.ts",
@@ -18023,6 +18128,7 @@
           "apps/kiosk/src/pages/home/HomePage.tsx",
           "apps/kiosk/src/pages/home/components/V6HomeFooterPanels.tsx",
           "apps/kiosk/src/pages/home/components/V6HomeView.tsx",
+          "apps/kiosk/src/pages/home/homeDomainStatus.ts",
           "apps/kiosk/src/pages/home/homeV6Domains.ts",
           "apps/kiosk/src/pages/home/hooks/useHomeJobFairHighlight.ts",
           "apps/kiosk/src/pages/home/styles/home-v6-footer.css",
@@ -18654,10 +18760,12 @@
           "apps/kiosk/src/pages/home/serviceGroups.ts",
           "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairCalendarPopover.tsx",
           "apps/kiosk/src/pages/job-fairs/components/FairDataScreen.tsx",
+          "apps/kiosk/src/pages/job-fairs/components/JobFairDetailTabs.tsx",
           "apps/kiosk/src/pages/job-fairs/components/MapBlock.tsx",
           "apps/kiosk/src/pages/job-fairs/components/RegionPicker.tsx",
           "apps/kiosk/src/pages/jobs-fairs-prototype.css",
@@ -18778,12 +18886,25 @@
     {
       "asserts": {
         "absent": [],
-        "dirs": [],
+        "dirs": [
+          "apps/kiosk/src/services"
+        ],
         "files": [
           "apps/kiosk/src/layouts/KioskRoot.tsx",
           "apps/kiosk/src/main.tsx",
           "apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx",
-          "apps/kiosk/src/routes/index.tsx"
+          "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
+          "apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx",
+          "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
+          "apps/kiosk/src/pages/jobs/JobsPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitActionsPage.tsx",
+          "apps/kiosk/src/pages/resume/JobFitPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
+          "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
+          "apps/kiosk/src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx",
+          "apps/kiosk/src/routes/index.tsx",
+          "apps/kiosk/src/services/api/userErrorMessage.ts"
         ],
         "missing": []
       },
@@ -19064,6 +19185,7 @@
           "apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
+          "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
@@ -20087,6 +20209,7 @@
         "absent": [],
         "dirs": [],
         "files": [
+          "apps/kiosk/src/components/FileContentPreview.tsx",
           "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
           "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
@@ -21407,14 +21530,23 @@
           "apps/admin/src/services/api/offlineAgenciesAdmin.ts",
           "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx",
           "apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx",
+          "apps/kiosk/src/pages/print/PrintPickupClaimPage.tsx",
+          "apps/miniapp/utils/pickup-qrcode.js",
           "apps/partner/src/routes/sources/ExcelImportModal.tsx",
           "apps/partner/src/routes/sources/index.tsx",
+          "packages/shared/src/pickupCode.ts",
+          "services/api/src/common/pickup-code.ts",
           "services/api/src/job-sync/job-sync.controller.ts",
           "services/api/src/job-sync/job-sync.service.ts",
           "services/api/src/jobs/jobs-partner.service.ts",
           "services/api/src/jobs/partner-capabilities.ts",
+          "services/api/src/member-print-orders/member-print-order-create.service.ts",
           "services/api/src/offline-agencies/admin-offline-agencies.controller.ts",
           "services/api/src/offline-agencies/offline-agencies.service.ts",
+          "services/api/src/payment/order-status.service.ts",
+          "services/api/src/print-jobs/dto/claim-pickup.dto.ts",
+          "services/api/src/print-jobs/pickup-claim-lockout.ts",
+          "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/sync/sync.controller.ts",
           "services/api/src/sync/sync.service.ts"
         ],
@@ -21672,65 +21804,6 @@
       },
       {
         "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/placeholders/OfflineAgenciesPage.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/design/kiosk-v6-migration-matrix.md",
-          "docs/reviews/legacy-capability-inventory-2026-08-16.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/design/kiosk-v6-migration-matrix.md、docs/reviews/legacy-capability-inventory-2026-08-16.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/placeholders/OfflineJobDetailPage.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/design/kiosk-v6-migration-matrix.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/design/kiosk-v6-migration-matrix.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/placeholders/PrintScanConvertPage.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
-          "docs/design/kiosk-v6-migration-matrix.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/placeholders/PrintScanFeaturePage.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
-          "docs/design/kiosk-v6-migration-matrix.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
-        "file": "apps/kiosk/src/pages/placeholders/PrintScanSignPage.tsx",
-        "kind": "component",
-        "mentions": [
-          "docs/design/kiosk-proto-2026-07-migration-matrix.md",
-          "docs/design/kiosk-v6-migration-matrix.md"
-        ],
-        "risk": "medium",
-        "scope": "kiosk",
-        "why": "仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/design/kiosk-v6-migration-matrix.md"
-      },
-      {
-        "detail": "不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中",
         "file": "apps/kiosk/src/pages/print-scan/styles/print-scan-home.css",
         "kind": "style",
         "mentions": [
@@ -21936,15 +22009,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/device/deploy-unfreeze-runbook-2026-08-17.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/device/release-batching-2026-08-17.md",
         "kind": "doc",
         "mentions": [],
@@ -22018,6 +22082,15 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/progress/owners.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/reviews/2026-08-18-expert-panel-review.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
@@ -22864,15 +22937,6 @@
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/superpowers/specs/2026-07-14-windows-agent-reliability-p0-design.md",
         "kind": "doc",
         "mentions": [],
         "risk": "low",
