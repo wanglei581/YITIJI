@@ -40,7 +40,7 @@ async function request<T>(
   }
   if (!res.ok) {
     let code = `HTTP_${res.status}`
-    let message = res.statusText || '请求失败'
+    let message = `请求失败（${res.status}）`
     try {
       const body = (await res.json()) as { error?: { code?: string; message?: string } }
       code = body.error?.code ?? code

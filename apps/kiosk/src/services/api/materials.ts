@@ -113,7 +113,7 @@ function extractError(body: ResponseEnvelope<unknown>, fallback: string): { code
 async function parseEnvelope<T>(res: Response, failedToken?: string): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as ResponseEnvelope<T>
   if (!res.ok) {
-    const error = extractError(body, `HTTP ${res.status}`)
+    const error = extractError(body, `请求失败（${res.status}）`)
     if (isMemberSessionInvalidError(res.status, error.code, Boolean(failedToken))) notifyMemberSessionExpired(failedToken)
     throw new ApiHttpError(error.code, error.message, res.status)
   }

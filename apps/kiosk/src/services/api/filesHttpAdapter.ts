@@ -23,7 +23,7 @@ export const filesHttpAdapter = {
     })
     if (!res.ok) {
       let code = 'UNKNOWN_ERROR'
-      let message = `HTTP ${res.status}`
+      let message = `请求失败（${res.status}）`
       try {
         const body = (await res.json()) as ResponseEnvelope<unknown>
         code = body.error?.code ?? code

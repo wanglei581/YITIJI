@@ -38,7 +38,7 @@ async function fetchPolicies(): Promise<PublishedPoliciesResult> {
   const res = await fetch(`${API_BASE_URL}/policies`, {
     headers: { Accept: 'application/json' },
   })
-  if (!res.ok) throw new Error(`HTTP_${res.status}`)
+  if (!res.ok) throw new Error(`请求失败（${res.status}）`)
   const body = (await res.json()) as {
     data: PolicyPostView[]
     pagination?: { total?: number }

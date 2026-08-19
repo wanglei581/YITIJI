@@ -121,7 +121,7 @@ async function call<T>(
   const json = await res.json().catch(() => ({}))
   if (!res.ok) {
     const code: string = json?.error?.code ?? json?.code ?? 'UNKNOWN'
-    const msg: string = json?.error?.message ?? json?.message ?? `HTTP ${res.status}`
+    const msg: string = json?.error?.message ?? json?.message ?? `请求失败（${res.status}）`
     if (isMemberSessionInvalidError(res.status, code, !!access.token)) {
       notifyMemberSessionExpired()
     }
