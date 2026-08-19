@@ -223,3 +223,40 @@ export const COMPLIANCE_PREFERRED_TERMS = [
   '去来源平台预约',
   '扫码预约',
 ] as const
+
+/**
+ * 目录级 CTA 分级约束(compliance-boundary.md §4.6)。
+ *
+ * 上面的禁词模型是**全局**的:一个词要么处处能用,要么处处不能用。它表达不了分级 ——
+ * 「去来源平台投递」在 COMPLIANCE_PREFERRED_TERMS 里是白名单文案,但 §4.6 规定它只能用在
+ * **已落到某个具体岗位**的场景。平台目录页只是把用户送到第三方官网首页,那里没有岗位、
+ * 更没有投递对象,再写「投递」就是替第三方承诺了本终端做不到的事。
+ *
+ * 2026-08-19 实测:目录页与其入口卡片都在用岗位级 CTA,而全局禁词门禁扫不出来
+ * —— 该词本身就在白名单里,只能按作用域单独判定。
+ *
+ * 消费方与 COMPLIANCE_FORBIDDEN_TERMS 相同(文本解析,格式变动 fail-closed)。
+ */
+export const COMPLIANCE_DIRECTORY_LEVEL_FILES = [
+  'apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx',
+] as const
+
+/**
+ * 目录级路由。门禁除了扫上面整份文件,还会扫**其他文件里**提到这些路由的邻近若干行 ——
+ * 入口卡片的标题和描述与 `to:` 写在同一个对象字面量里,不扫邻域就漏掉入口那一侧。
+ * 2026-08-19 的实际违规正是一处在目录页、一处在岗位服务中心的入口卡片描述。
+ */
+export const COMPLIANCE_DIRECTORY_LEVEL_ROUTES = ['/jobs/online-platforms'] as const
+
+/** 目录级作用域内禁止的岗位级 CTA。 */
+export const COMPLIANCE_DIRECTORY_FORBIDDEN_TERMS = [
+  '去来源平台投递',
+  '扫码投递',
+  '前往来源平台投递',
+] as const
+
+/** §4.6 原文允许的目录级 CTA。目录页至少要出现其中之一,否则说明 CTA 缺失或改写跑偏。 */
+export const COMPLIANCE_DIRECTORY_PREFERRED_TERMS = [
+  '前往官方平台查看',
+  '扫码打开来源平台',
+] as const

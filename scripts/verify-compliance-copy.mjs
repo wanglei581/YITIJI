@@ -232,6 +232,87 @@ if (probeFailures === 0) {
   fail(`3. 判定逻辑自检失败 ${probeFailures}/${probe.length} 条`)
 }
 
+// ---------- 5. 目录级 CTA 分级(§4.6) ----------
+//
+// 上面三项是全局判定,管不了分级:「去来源平台投递」本身就在白名单里,用在平台目录页上
+// 一个字都不会被标红。§4.6 规定该文案只能用在已落到具体岗位的场景,目录页只送用户到
+// 第三方官网首页,那里没有投递对象。故按作用域再判一次。
+
+const dirFiles = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_DIRECTORY_LEVEL_FILES', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (dirFiles.length === 0) hardFail('COMPLIANCE_DIRECTORY_LEVEL_FILES 解析出 0 项')
+
+const dirRoutes = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_DIRECTORY_LEVEL_ROUTES', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (dirRoutes.length === 0) hardFail('COMPLIANCE_DIRECTORY_LEVEL_ROUTES 解析出 0 项')
+
+const dirForbidden = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_DIRECTORY_FORBIDDEN_TERMS', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (dirForbidden.length === 0) hardFail('COMPLIANCE_DIRECTORY_FORBIDDEN_TERMS 解析出 0 项')
+
+const dirPreferred = [
+  ...sliceBlock(ssotSource, 'COMPLIANCE_DIRECTORY_PREFERRED_TERMS', '[', ']').matchAll(/'([^']+)'/g),
+].map((m) => m[1])
+if (dirPreferred.length === 0) hardFail('COMPLIANCE_DIRECTORY_PREFERRED_TERMS 解析出 0 项')
+
+/** 入口卡片的 title / description 与 `to:` 同在一个对象字面量内,实测跨度 ≤ 12 行。 */
+const ROUTE_NEIGHBORHOOD = 12
+
+const dirViolations = []
+
+for (const rel of dirFiles) {
+  const abs = path.join(root, rel)
+  if (!fs.existsSync(abs)) {
+    hardFail(`目录级文件不存在: ${rel} —— 页面被改名或删除后必须同步 SSOT,不能让门禁空跑`)
+  }
+  const lines = fs.readFileSync(abs, 'utf8').split('\n')
+  lines.forEach((line, i) => {
+    for (const term of dirForbidden) {
+      if (line.includes(term)) {
+        dirViolations.push({ file: rel, line: i + 1, term, text: line.trim().slice(0, 100) })
+      }
+    }
+  })
+  const body = lines.join('\n')
+  if (!dirPreferred.some((term) => body.includes(term))) {
+    fail(`4. ${rel} 未出现任何目录级 CTA(${dirPreferred.join(' / ')}）`)
+  }
+}
+
+// 入口侧:别的文件里指向目录路由的对象字面量邻域。
+for (const file of files) {
+  const rel = path.relative(root, file)
+  if (dirFiles.includes(rel)) continue
+  const lines = fs.readFileSync(file, 'utf8').split('\n')
+  lines.forEach((line, i) => {
+    if (!dirRoutes.some((route) => line.includes(route))) return
+    const from = Math.max(0, i - ROUTE_NEIGHBORHOOD)
+    const to = Math.min(lines.length, i + ROUTE_NEIGHBORHOOD + 1)
+    for (let j = from; j < to; j += 1) {
+      for (const term of dirForbidden) {
+        if (!lines[j].includes(term)) continue
+        if (dirViolations.some((v) => v.file === rel && v.line === j + 1 && v.term === term)) continue
+        dirViolations.push({ file: rel, line: j + 1, term, text: lines[j].trim().slice(0, 100) })
+      }
+    }
+  })
+}
+
+if (dirViolations.length === 0) {
+  pass(`4. 目录级作用域无岗位级 CTA(${dirFiles.length} 份文件 + ${dirRoutes.length} 条路由入口邻域)`)
+} else {
+  fail(`4. 目录级作用域发现 ${dirViolations.length} 处岗位级 CTA:`)
+  for (const v of dirViolations) {
+    console.error(`       ${v.file}:${v.line}  「${v.term}」`)
+    console.error(`         ${v.text}`)
+  }
+  console.error(`\n     §4.6:目录只送用户到第三方官网首页,没有具体岗位可投递。`)
+  console.error(`     改用:${dirPreferred.join(' / ')}`)
+}
+
 // ---------- 结果 ----------
 
 if (failures > 0) {
