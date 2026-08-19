@@ -18,6 +18,29 @@
 
 本轮只改 `apps/kiosk`（1 个页面 + 1 个既有 spec）与本文件，**未触碰 `services/api`、`apps/miniapp`、Prisma、支付或打印状态机**。
 
+2026-08-19 修复 **V6 功能入口不直达：点「手机扫码上传」落到标题写着「文档打印」的页面、还要把通道再选一遍（分支 `fix/kiosk-entry-directness-print`，基于 `origin/main@5650c5d4e`，未合入、未部署）**。产品负责人真机截图发现，四家 CLI 只读同审后全站盘点，完整评审见 [docs/reviews/2026-08-19-kiosk-entry-directness-review.md](../reviews/2026-08-19-kiosk-entry-directness-review.md)。本条只记批次 1 的实现。
+
+**问题定性。** Hub 层按「你要做什么事」组织，落地页按「文件从哪来」组织，两套分类交叉——「手机扫码上传」既是一件事也是一个通道。于是 `/print-scan` 点「手机扫码上传」→ `/print/upload?source=document&tab=qr`，落地页标题恒为「文档打印」（`PrintUploadPage:129` 写死），顶部 2×2 网格（`:382` **无条件渲染**）又摆出「选择文件 / 扫码上传 / U盘导入 / 扫描原件」让用户重选一遍。**全站盘点另发现**：`PrintScanHomePage` 的「照片打印」与「文档打印」指向**完全同一 URL**（只靠 router state `category:'photo'` 区分，刷新即丢），标题两种情况都显示「文档打印」；`PolicyServiceHubPage` 的「政策收藏」与「AI政策问答记录」都跳 `/me/ai-records`，前者是**去错地方**（负责人已定：做真的收藏页，另刀）；另有 15 个落地页标题写死不跟随入口，其中「到机码核销」点进去变成「扫码取件」。
+
+**判据（已写入评审文档，建议后续升为 CLAUDE.md 长期口径）**：入口带「任务」与「通道」两维。只声明任务 → 落地页**保留**通道选择器（用户确实还没决定）；只声明通道 → **直达**该面板、标题用入口名、其余通道降为次要链接；两者都声明 → 直达且按组合定制。
+
+**关键设计约束（Cursor Sol 指出）：不能用 `tab` 参数判断是否收起选择器** —— 文档打印与照片打印也带 `tab=file`，按 tab 收会把它们正常的通道选择一起干掉。故另立 `mode=transfer`，语义是「入口已经把通道定死了」。实现照抄仓库既有的 `ResumeSourcePage:78-107` 的 `INTENT_COPY` 字典写法，未另发明。
+
+**门禁面决定了本刀只能是纯增量（Grok 实测）**：`fusion-w2-print.spec.ts:403-411` 访问**不带 tab 的** `/print/upload?source=document`，要求四个通道按钮同时可见并会点「扫描原件」；`fusion-w6-route-cases.ts:115` 钉死不带 query 时页面上要能看到「文档打印」；`verify-fusion-w2-print-scan.mjs:354-363` 与 `verify-print-entry-source-split.mjs:48-60` 钉死源码里的通道文案、`navigate('/scan/start')`、`w2-print-upload-source-grid` 类名与「文档打印」字面量。**因此默认视图一个字没动**，只有携带意图参数的深链走新行为，回归面接近零。
+
+**范围在实现中扩了一次（有据）**：`verify-fusion-home.mjs:128` 暴露出**首页 V6 也有一组同样的通道型快捷入口**（`homeV6Domains.ts:49-51` 的 `print-local` / `print-phone` / `print-usb`，即「本机上传 / 手机扫码传 / U 盘」），指向的还是旧 URL、犯同一个毛病。三者都只声明通道、不声明任务，按判据一律直达，故 `mode=transfer` 泛化为**按通道切标题**（本机上传 / 手机扫码上传 / U盘导入），一次覆盖首页与 Hub 两侧共四个通道型入口。
+
+**⚠️ 本刀差点把一条非生产路径提成一等公民（Cursor Sol 二轮审查抓到，已回退）**：首页快捷入口 `print-local`「本机上传」第一版也加了 `mode=transfer`，于是它有了专属标题「本机上传」和直达面板。但 `PrintUploadPage` 文件头第 8 行白纸黑字写着——「选择文件」用的是 `<input type="file">`，**只是桌面 Chrome/Edge 下的 E2E 链路验证**，CLAUDE.md §17 要求生产一体机不弹系统文件对话框，真正的本机路径是 U 盘导入（走 Terminal Agent 的 `/local/usb/*` 网桥）。给它配直达等于把非生产路径包装成正式能力。已回退为原样，并**新增门禁钉死它不得被提升为直达入口**（先破后立已验红）。手机扫码传与 U 盘两条保留直达。
+
+**Cursor Sol 预警的另一个坑，我第一版确实踩了**：次要链接里直接 `setFile(null)`，用户已经传完文件后点「改用 U 盘」会被静默丢掉，到下一步才发现是空的。第二版改的是 `window.confirm` 兜底——**这更糟**，CLAUDE.md §17 禁止一体机出现系统级弹窗，且全 kiosk 零先例（实测唯一命中就是我自己那行）。最终解法不需要任何弹窗：**有文件时整行「也可以改用」不渲染**——换通道的时机本来就在传文件之前，传完之后该做的是继续打印，要重来有文件卡自带的 × 按钮（它会一并 `clearPrintMaterialSession()` 清服务端会话）。
+
+**改动**：`PrintUploadPage` 增加 `mode=transfer` 与 `category=photo`（后者同时接受 query，原先只走 router state，刷新或直接输 URL 就丢）；标题/副标题按入口切换；直达模式下整块通道网格**不渲染**、其余通道降为一行次要链接（`min-h-[48px]`）、返回键指向 `/print-scan`、主按钮文案改为「继续文档打印」（搬运不产出打印件，「下一步」没有指向；**刻意不做「传完自动跳走」**——重进本页会 `file=null`，用户会被迫再传一次）。`PrintScanHomePage` 两张卡的 `to` 相应更新，同 Hub 同址重复消除。
+
+**改了一条既有门禁的正则，但没有削弱它**：`verify-fusion-w2-print-scan.mjs:316` 原本要求 `to` **恰好**等于 `...&tab=qr`，尾部不能再挂参数。该断言要守的是「必须落到一体机自己的扫码会话、不得指向手机 H5」，与尾部锚点无关；故放开尾部并**新增**一条「该卡必须带 `mode=transfer`」。先破后立两条都验：退回不带 mode → 新断言红；把卡改指 `/upload/phone` → 原安全断言照样红。
+
+**⚠️ 真实浏览器抓到一个静态门禁完全看不见的缺陷。** 第一版用 Tailwind `hidden` 类隐藏通道网格，`tsc` 0 错误、四条门禁全 PASS，**但真机上网格照样可见** —— `.w2-print-upload-source-grid` 自带的 `display:grid` 把 `hidden` 盖掉了，而静态门禁只看类名在不在源码里，看不出这个差别。改为条件不渲染后复测通过。**这条记下来：涉及「某元素在某状态下不能出现」的改动，静态断言不足以采信，必须起浏览器看。**
+
+**验证**：kiosk `tsc --noEmit` exit 0；`verify-fusion-w2-print-scan` / `verify-print-entry-source-split` / `verify-service-entry-readiness` / `verify-kiosk-runtime-error-boundary` / `verify-fusion-w6` 全 PASS。**1080×1920 真实浏览器实测**（Chrome，`deviceScaleFactor=1`，mock 后端）五个入口：`tab=file&mode=transfer` → 标题「本机上传」；`tab=qr&mode=transfer` → 「手机扫码上传」；`tab=usb&mode=transfer` → 「U盘导入」——三者通道网格与「扫描原件」均不可见，主按钮「继续文档打印」；`category=photo` → 标题「照片打印」、网格可见；无参数默认 → 标题「文档打印」、网格可见、扫描原件可见（既有用例依赖这一态，一个字未动）。触控实测：直达页 7 个可点区域**0 个低于 48px**，两个主按钮各 56px。**未验证**：未连真实后端跑完整上传（截图里二维码显示生成失败是 mock 环境预期）、未在真机一体机点击。本轮只改 `apps/kiosk`（3 个源文件 + 2 个门禁脚本）与文档，**未触碰 `apps/miniapp`、`services/api`、Prisma、支付或打印状态机**。
 2026-08-19 修复 **P0-3 小程序材料包侧链：深链/分享可绕过入口挡板走进假下单皮（分支 `fix/miniapp-package-chain-guard`，基于 `origin/main@c28916377`，未合入、未部署）**。四家 CLI 只读同审后动手，改的是 `apps/miniapp`（唯一发布源），因此逐条留证。
 
 **先纠正评审措辞里的两点。** ① 「无订单也显示成功码」在**正常点击流里走不到**：`package-confirm.js:106` 调 `api.createPackageOrder` → `POST /orders/package`，该端点在 `services/api` 全仓零命中（`@Controller('orders')` 只有 `order-quote.controller.ts` 的 `POST /orders/quote`），404 被 `request.js:132` 转成 reject，最后弹「提交失败」Modal。成功页只能靠**构造 URL 或转发分享卡片**进入。② 这个假到机码拿到一体机上**不会真的取到东西**：Kiosk 先按 `PICKUP_CODE_ACCEPTED_PATTERN` 校验格式，后端再按 `Order.pickupCodeHash` 精确查库（`pickup-order.service.ts:56`），只会返回 `PICKUP_CODE_INVALID`。**所以没有资损，但有完整的欺骗面**：用户（或收到转发卡片的人）看到一张写着「材料包创建成功 · 请到服务点扫码取件」并带着到机码的页面，跑到机器前才发现是空的。

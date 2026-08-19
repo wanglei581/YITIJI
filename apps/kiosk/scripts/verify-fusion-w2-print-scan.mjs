@@ -313,10 +313,19 @@ assert.match(
   /\.v6-print-hub\s*\{[^}]*padding:\s*0\s+48px\s+40px\s*;/,
   'V6 print hub uses the 48px content gutter without adding top padding to the pagehead'
 )
+// 尾部允许再挂参数（2026-08-19 入口直达加了 &mode=transfer）。本断言要守的是两件事：
+// 必须落到一体机自己的扫码会话 tab、不得指向手机 H5 路由 —— 这两条一个字没放松，
+// 放开的只是「URL 到 tab=qr 就必须结束」这个与安全无关的字面量锚点。
 assert.match(
   printScanHome,
-  /to:\s*['"]\/print\/upload\?source=document&tab=qr['"]/,
+  /to:\s*['"]\/print\/upload\?source=document&tab=qr(?:&[^'"]*)?['"]/,
   'phone upload opens the kiosk QR-session tab instead of the phone H5 page'
+)
+// 入口直达：该卡只声明了「通道」，落地页必须据此跳过通道选择，不能再问一遍。
+assert.match(
+  printScanHome,
+  /to:\s*['"]\/print\/upload\?source=document&tab=qr&mode=transfer['"]/,
+  'phone upload entry must carry mode=transfer so the landing page skips the channel grid'
 )
 assert.doesNotMatch(
   printScanHome,

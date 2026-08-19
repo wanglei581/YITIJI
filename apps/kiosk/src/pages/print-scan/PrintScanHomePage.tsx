@@ -133,7 +133,10 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: SmartphoneIcon,
     title: '手机扫码上传',
     description: '手机或其他联网设备扫码，把文件传到这台机器',
-    to: '/print/upload?source=document&tab=qr',
+    // mode=transfer 让落地页直达扫码面板并把标题改成本卡的名字，不再让用户
+    // 在通道网格里把「扫码上传」重选一遍。不能用 tab 表达 —— 文档打印和照片打印
+    // 也带 tab，见 PrintUploadPage 里的说明。
+    to: '/print/upload?source=document&tab=qr&mode=transfer',
     aiRole: 'none',
     needsMfp: false,
     available: true,
@@ -163,7 +166,9 @@ const CAPABILITIES: readonly CapabilityDefinition[] = [
     icon: ImageIcon,
     title: '照片打印',
     description: '和文档打印同一条流程：进去第 1 步选图片（本机上传 / 手机扫码传），再设参数',
-    to: '/print/upload?source=document&tab=file',
+    // category 同时走 query：原先只用 router state 传，刷新或直接输 URL 就丢，
+    // 落地页会退回「文档打印」标题，用户以为自己点错了卡。
+    to: '/print/upload?source=document&tab=file&category=photo',
     state: { category: 'photo' },
     aiRole: 'ai',
     needsMfp: true,
