@@ -138,25 +138,28 @@ export async function getConsentScope(): Promise<ConsentScope> {
   return call<ConsentScope>('/contract-reviews/consent-scope', {}, undefined)
 }
 
-/** 上传合同文件并创建审查任务 */
-export async function createContractReview(
-  file: File,
+export interface ContractReviewSourceFile {
+  fileId: string
+  signedUrl?: string | null
+}
+
+/** 已上传的合同文件直接建审查任务，不再二次上传。 */
+export async function createContractReviewFromSource(
+  source: ContractReviewSourceFile,
   contractType: ContractType,
   consent: { consentVersion: string; consentScopeHash: string; disclaimerVersion: string },
   access: ContractReviewAccess,
 ): Promise<ContractReviewCreatedTaskView> {
   if (API_MODE !== 'http') return mockCreateTask()
-  // 1. 上传文件
-  const upload = await kioskUploadFile(file, 'contract_upload', access.token)
-  // 2. 创建审查任务。匿名用户需附带 source-file-proof（上传返回的签名 URL），
-  //    后端用于验证 sourceFileId 归属；已登录用户凭 JWT 校验，无需 proof。
-  const extraHeaders: Record<string, string> = !access.token && upload.signedUrl
-    ? { 'x-contract-review-source-file-proof': upload.signedUrl }
+  // 匿名用户需附带 source-file-proof（短时 HMAC 内容 URL），
+  // 后端用于验证 sourceFileId 归属；已登录用户凭 JWT 校验，无需 proof。
+  const extraHeaders: Record<string, string> = !access.token && source.signedUrl
+    ? { 'x-contract-review-source-file-proof': source.signedUrl }
     : {}
   return call<ContractReviewCreatedTaskView>('/contract-reviews', access, {
     method: 'POST',
     body: {
-      sourceFileId: upload.fileId,
+      sourceFileId: source.fileId,
       contractType,
       consentVersion: consent.consentVersion,
       consentedAt: new Date().toISOString(),
@@ -165,6 +168,23 @@ export async function createContractReview(
     },
     extraHeaders,
   })
+}
+
+/** 本机选择合同文件：先 kiosk-upload，再走同一条建任务合同。 */
+export async function createContractReview(
+  file: File,
+  contractType: ContractType,
+  consent: { consentVersion: string; consentScopeHash: string; disclaimerVersion: string },
+  access: ContractReviewAccess,
+): Promise<ContractReviewCreatedTaskView> {
+  if (API_MODE !== 'http') return mockCreateTask()
+  const upload = await kioskUploadFile(file, 'contract_upload', access.token)
+  return createContractReviewFromSource(
+    { fileId: upload.fileId, signedUrl: upload.signedUrl },
+    contractType,
+    consent,
+    access,
+  )
 }
 
 /** 轮询审查任务状态 */

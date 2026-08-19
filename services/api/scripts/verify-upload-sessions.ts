@@ -288,10 +288,10 @@ async function main(): Promise<void> {
       'temporary contract upload must expire exactly two hours after upload'
     )
     const confirmed = await service.confirm(session.sessionId, session.controlToken)
-    assert.equal(
-      confirmed.file.fileUrl,
-      undefined,
-      'contract upload confirmation must not mint a print URL'
+    assert.match(
+      confirmed.file.fileUrl ?? '',
+      /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/,
+      'contract upload confirmation must mint a signed content URL for anonymous proof'
     )
   }
 

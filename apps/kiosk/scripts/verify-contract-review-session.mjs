@@ -60,5 +60,11 @@ const mockScope = contractApi.match(/function mockConsentScope\(\)[\s\S]*?\n\}\n
 assert.ok(mockScope, 'mockConsentScope 必须存在')
 assert.doesNotMatch(mockScope, /disclaimerVersion/)
 assert.match(home, /disclaimerVersion:\s*consentScope\.disclaimer\.version/)
+assert.match(home, /UploadSessionQrPanel/)
+assert.match(home, /purpose="contract_upload"/)
+assert.match(home, /createContractReviewFromSource/)
+assert.match(home, /本机文件（桌面验证）/)
+assert.match(contractApi, /export async function createContractReviewFromSource/)
+assert.doesNotMatch(home, /不超过 20MB/)
 
 console.log('PASS contract review volatile session contract')
