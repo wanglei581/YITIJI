@@ -286,6 +286,11 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
+      if (granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+        setShowAnonymousConsent(false)
+        setRejectedTask(true)
+        return
+      }
       const message = userMessageOf(err, '授权失败，请稍后重试')
       if (granted) setError(message)
       else setConsentError(message)
@@ -322,6 +327,11 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
+      if (granted && err instanceof JobFitApiError && err.code === 'AI_TASK_NOT_FOUND') {
+        setShowMemberConsent(false)
+        setRejectedTask(true)
+        return
+      }
       const message = userMessageOf(err, '授权失败，请稍后重试')
       // 已授权后失败的是分析本身，属页面级错误；授权本身失败才留在弹窗里。
       if (granted) setError(message)
