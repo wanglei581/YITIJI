@@ -86,8 +86,14 @@ export class LlmResumeProvider implements AiProvider {
     switch (errorCodeOf(err)) {
       case 'AI_PROVIDER_NOT_CONFIGURED':
         return 'AI 诊断模型尚未配置，请联系管理员后重试'
+      case 'AI_RATE_LIMITED':
+        // 限流不是「服务不可用」：说清是排队，用户才知道该等一下而不是放弃。
+        return 'AI 诊断当前排队较多，请稍后重试'
+      case 'AI_PROVIDER_UNREACHABLE':
+        return 'AI 诊断服务连接失败，请稍后重试'
+      case 'AI_EMPTY_RESPONSE':
+        return 'AI 诊断这次没有返回内容，请稍后重试'
       case 'AI_DIAGNOSIS_INVALID_OUTPUT':
-      case 'AI_DIAGNOSIS_UNAVAILABLE':
       default:
         return 'AI 诊断服务暂时不可用，请稍后重试'
     }
