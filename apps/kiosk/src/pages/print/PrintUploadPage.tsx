@@ -119,22 +119,54 @@ export function PrintUploadPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const source: PrintMaterialSource =
     searchParams.get('source') === 'resume' ? 'resume' : 'document'
-  // PrintScanHomePage 的"照片打印"卡片通过 router state 传 category: 'photo'；
-  // 仅作为 pii_scan 任务的审计字段随请求持久化，不再驱动是否跳过真实扫描
-  // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
-  const contentCategory =
-    (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
   const isResumePrint = source === 'resume'
   const isDocumentPrint = source === 'document'
-  const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
-  const pageSubtitle = isDocumentPrint
-    ? '通用文档、求职材料或图片上传后打印'
-    : '从我的简历或上传一份简历进入打印'
+
+  // 入口直达（2026-08-19）。此前本页标题恒为「文档打印」：用户在 /print-scan 点的是
+  // 「手机扫码上传」或「照片打印」，落地却看到别人的名字，还要在 2×2 网格里把刚才
+  // 已经选过的通道再选一遍。
+  //
+  // 判据是入口声明了哪一维（详见 docs/reviews/2026-08-19-kiosk-entry-directness-review.md）：
+  //   只声明任务（文档打印）→ 保留通道选择器，用户确实还没决定文件从哪来；
+  //   只声明通道（手机扫码上传）→ 直达该面板，不再问第二遍。
+  //
+  // **不能用 `tab` 参数判断**：文档打印与照片打印也带 `tab=file`，按 tab 收会把它们
+  // 正常的通道选择一起干掉。因此另立 `mode`，语义是「入口已经把通道定死了」。
+  //
+  // 默认视图（不带 mode）必须保持原样：fusion-w2-print.spec.ts:403-411 访问不带 tab 的
+  // 本页并要求四个通道按钮同时可见、还会点「扫描原件」；fusion-w6 钉死不带 query 时
+  // 页面上要能看到「文档打印」。所以本次是纯增量，只有深链走新行为。
+  const isTransferMode = isDocumentPrint && searchParams.get('mode') === 'transfer'
+  // 「照片打印」原本只用 router state 传 category，刷新或收藏就丢；改为同时接受 query。
+  const isPhotoEntry =
+    (location.state as { category?: 'photo' } | null)?.category === 'photo' ||
+    searchParams.get('category') === 'photo'
+  // 仅作为 pii_scan 任务的审计字段随请求持久化，不再驱动是否跳过真实扫描
+  // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
+  const contentCategory = isPhotoEntry ? 'photo' : undefined
+
+  const pageTitle = !isDocumentPrint
+    ? '简历打印'
+    : isTransferMode
+      ? '手机扫码上传'
+      : isPhotoEntry
+        ? '照片打印'
+        : '文档打印'
+  const pageSubtitle = !isDocumentPrint
+    ? '从我的简历或上传一份简历进入打印'
+    : isTransferMode
+      ? '把手机里的文件传到这台机器，传完可以直接接着打印'
+      : isPhotoEntry
+        ? '照片上传后设参数打印，与文档打印同一条流程'
+        : '通用文档、求职材料或图片上传后打印'
 
   // 简历打印与文档打印共用三种上传通道；?tab=qr 可从「手机扫码上传」入口直达扫码面板。
   const requestedTab = searchParams.get('tab')
-  const initialTab: UploadTab =
-    requestedTab === 'qr' || requestedTab === 'usb' ? requestedTab : 'file'
+  const initialTab: UploadTab = isTransferMode
+    ? 'qr'
+    : requestedTab === 'qr' || requestedTab === 'usb'
+      ? requestedTab
+      : 'file'
   const [tab, setTab] = useState<UploadTab>(initialTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -344,8 +376,8 @@ export function PrintUploadPage() {
           title={pageTitle}
           subtitle={pageSubtitle}
           step={1}
-          backLabel="返回首页"
-          onBack={() => navigate('/')}
+          backLabel={isTransferMode ? '返回打印扫描' : '返回首页'}
+          onBack={() => navigate(isTransferMode ? '/print-scan' : '/')}
         />
 
         {source === 'resume' && (
@@ -378,7 +410,44 @@ export function PrintUploadPage() {
           </Card>
         )}
 
-        {/* Tab bar */}
+        {/* 直达模式：入口已经把通道定死了，不再摆等权网格。
+            其余通道降级为一行次要链接 —— 用户仍然换得了，只是不必先答一遍已经答过的问题。 */}
+        {isTransferMode && (
+          <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
+            <span>也可以改用：</span>
+            {tabs
+              .filter(({ key }) => key !== tab)
+              .map(({ key, label, disabled, note }) => (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (disabled) return
+                    setTab(key)
+                    setFile(null)
+                    setUploadError(null)
+                  }}
+                  className={[
+                    // 次要链接也要够得着：一体机上任何可点区域不小于 48px。
+                    'min-h-[48px] rounded px-2 font-medium underline underline-offset-4',
+                    disabled
+                      ? 'cursor-not-allowed text-neutral-300 no-underline'
+                      : 'text-primary-600 hover:text-primary-700',
+                  ].join(' ')}
+                >
+                  {label}
+                  {disabled && note ? `（${note}）` : ''}
+                </button>
+              ))}
+          </div>
+        )}
+
+        {/* Tab bar。
+            直达模式下**整块不渲染**，而不是加 `hidden` 类 —— 后者被
+            .w2-print-upload-source-grid 自己的 display:grid 盖掉，实测真机上网格照样可见，
+            而静态门禁看不出这个差别（类名在源码里就算数）。 */}
+        {!isTransferMode && (
         <div className="w2-print-upload-source-grid mt-6 grid grid-cols-2 gap-3">
           {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
             <button
@@ -420,6 +489,7 @@ export function PrintUploadPage() {
             </button>
           )}
         </div>
+        )}
 
         {recentFiles.length > 0 && (
           <section
@@ -665,11 +735,18 @@ export function PrintUploadPage() {
 
         {/* Bottom action */}
         <div className="print-upload-footer mt-6 flex gap-3">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
-            取消
+          <Button
+            variant="secondary"
+            size="lg"
+            className="flex-1"
+            onClick={() => navigate(isTransferMode ? '/print-scan' : '/')}
+          >
+            {isTransferMode ? '返回打印扫描' : '取消'}
           </Button>
           <Button size="lg" className="flex-1" disabled={!file || uploading} onClick={handleNext}>
-            下一步
+            {/* 搬运本身不产出打印件，主按钮要说清下一步到底是什么，而不是一个没有指向的「下一步」。
+                刻意不做「传完自动跳走」：重新进本页会 file=null，用户会被迫再传一次。 */}
+            {isTransferMode ? '继续文档打印' : '下一步'}
           </Button>
         </div>
       </div>
