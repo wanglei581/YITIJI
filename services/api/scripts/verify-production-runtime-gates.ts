@@ -361,9 +361,8 @@ function main(): void {
   // 于是所有长度校验一律放行，运维照抄就能起一个用公开在仓库里的密钥签 JWT、
   // 做手机号 pepper 的生产实例。
   //
-  // 这一节不逐个手写变量名，而是**真读 .env.example**，把里面每个非空的敏感值
-  // 逐一注入一份其余均合法的生产 env，断言全部被拒。好处是将来新增敏感键、
-  // 而有人忘了同步进门禁时，这里会自动变红 —— 手写清单做不到这一点。
+  // 覆盖名单仍是手写的（漏列就不会查），但样值本身从 .env.example 现场解析，
+  // 不把「dev-xxx」字符串再抄一份到本文件。漏列的键合入前必须补进名单。
   const exampleText = readFileSync(join(__dirname, '..', '.env.example'), 'utf8')
   const exampleValues = new Map<string, string>()
   for (const line of exampleText.split('\n')) {
@@ -375,7 +374,12 @@ function main(): void {
   if (exampleValues.size === 0) throw new Error('解析 .env.example 得到 0 个键，格式可能已变')
 
   // 只针对门禁真正覆盖的敏感键做断言；其余键（端口、区域、开关）不在此列。
-  const GUARDED_SECRET_KEYS = ['JWT_SECRET', 'FILE_SIGNING_SECRET', 'SECRET_ENCRYPTION_KEY'] as const
+  const GUARDED_SECRET_KEYS = [
+    'JWT_SECRET',
+    'FILE_SIGNING_SECRET',
+    'SECRET_ENCRYPTION_KEY',
+    'PAYMENT_SESSION_SECRET',
+  ] as const
   let checked = 0
   for (const key of GUARDED_SECRET_KEYS) {
     const sample = exampleValues.get(key)

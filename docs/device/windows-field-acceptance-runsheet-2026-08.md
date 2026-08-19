@@ -19,6 +19,7 @@
 - [ ] `localApiBridgeToken` 与 Kiosk `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 一致；未配置时 `/local/usb/*` 与 `/local/print/wake` fail-closed。
 - [ ] `printerName` 配置为 Windows 实际识别名（现场 `Pantum CM2800ADN Series`），代码/配置无硬编码其他型号。
 - [ ] `https://zyidai.cn/api/v1/health` 返回 `status=ok` / `db=postgres`。
+- [ ] 服务器侧确认 API 进程真实 `NODE_ENV=production`（整套 `production-runtime-gates` 只在这个取值下执行；health=`ok` 不能证明门禁跑过）。命令：`pm2 describe <api进程名> | grep -i NODE_ENV`，或 `pm2 env <api进程id> | grep NODE_ENV`。取值不是 `production` 则本单后续「生产门禁已生效」全部不得打勾。
 - [ ] 首页 bundle 与 `DEPLOY_SOURCE` / PM2 `COMMIT` 一致（当前 `e78f3668`，如已前进以现场为准）。
 
 ## 2. 上传链路
