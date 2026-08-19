@@ -35,7 +35,6 @@ import {
   V6ArrivalCodeNextNotes,
   V6ArrivalCodePrinterWarn,
   V6ArrivalCodeSide,
-  V6ArrivalCodeWhy,
   classifyArrivalClaimError,
   type ArrivalClaimErrorKind,
 } from './V6ArrivalCodeGuide'
@@ -340,11 +339,8 @@ export function PrintPickupClaimPage() {
         </div>
 
         <p className="pcp-format-hint">
-          到机码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
-          {' '}早前下单拿到的 {PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍然有效，可直接输入。
+          {CODE_LEN} 位数字，扫码后自动核销。{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍可用。
         </p>
-
-        <V6ArrivalCodeWhy />
 
         {state === 'error' && (
           <div id="pcp-error-msg" className="pcp-error" role="alert">

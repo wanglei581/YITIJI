@@ -24,11 +24,10 @@
     'lead help'
     'input help'
     'hint help'
-    'why help'
     'submit help';
   align-content: start;
-  gap: 16px 28px;
-  padding: 0 48px 36px;
+  gap: 22px 36px;
+  padding: 8px 56px 48px;
   color: var(--ac-ink);
 }
 
@@ -38,7 +37,6 @@
     'lead help'
     'input help'
     'error help'
-    'why help'
     'submit help';
 }
 
@@ -48,23 +46,12 @@
 
 [data-kiosk-presentation='fusion-youth'] .pcp-printer-warn {
   grid-area: warn;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border: 1px solid color-mix(in srgb, var(--ac-amber) 42%, var(--ac-line));
   border-radius: 16px;
   background: color-mix(in srgb, var(--fy-clay-soft, rgba(188, 116, 78, 0.08)) 60%, var(--ac-card));
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-printer-warn strong {
-  display: block;
-  margin-bottom: 4px;
   font-size: 18px;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-printer-warn p {
-  margin: 0;
-  color: var(--ac-muted);
-  font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-lead {
@@ -121,8 +108,9 @@
 [data-kiosk-presentation='fusion-youth'] .pcp-lead-text {
   margin: 0;
   color: var(--ac-ink);
-  font-size: 21px;
-  line-height: 1.65;
+  font-size: 22px;
+  line-height: 1.7;
+  max-width: 28em;
 }
 
 [data-kiosk-presentation='fusion-youth'] .pcp-input-section {
@@ -213,24 +201,6 @@
   font-weight: 700;
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-why {
-  grid-area: why;
-  padding: 18px 20px;
-  border: 1px solid var(--ac-line);
-  border-radius: 18px;
-  background: var(--ac-card);
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-why-list {
-  margin: 0;
-  padding-left: 1.1em;
-  color: var(--ac-muted);
-  font-size: 16px;
-  line-height: 1.55;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-why-list b { color: var(--ac-ink); }
-
 [data-kiosk-presentation='fusion-youth'] .pcp-error {
   grid-area: error;
   padding: 14px 18px;
@@ -276,14 +246,18 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .pch-title {
-  margin: 0 0 14px;
+  margin: 0 0 18px;
   color: var(--ac-ink);
   font-family: var(--k-serif, 'Songti SC', serif);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 900;
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-side-extra .pch-title { margin-top: 22px; }
+[data-kiosk-presentation='fusion-youth'] .pcp-side-extra {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ac-line);
+}
 
 [data-kiosk-presentation='fusion-youth'] .pch-steps {
   margin: 0;
@@ -294,11 +268,11 @@
 
 [data-kiosk-presentation='fusion-youth'] .pch-steps li {
   position: relative;
-  min-height: 56px;
-  padding: 5px 0 16px 50px;
+  min-height: 64px;
+  padding: 6px 0 20px 50px;
   color: var(--ac-muted);
-  font-size: 17px;
-  line-height: 1.5;
+  font-size: 18px;
+  line-height: 1.55;
   counter-increment: pickup-step;
 }
 
@@ -328,63 +302,21 @@
   background: var(--ac-line);
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-facts {
+[data-kiosk-presentation='fusion-youth'] .pcp-cmp-one {
   margin: 0;
-  display: grid;
-  gap: 10px;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-facts > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--ac-line);
-  font-size: 15px;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-facts dt { color: var(--ac-muted); }
-[data-kiosk-presentation='fusion-youth'] .pcp-facts dd { margin: 0; text-align: right; }
-[data-kiosk-presentation='fusion-youth'] .pcp-facts em { font-style: normal; font-weight: 800; }
-
-[data-kiosk-presentation='fusion-youth'] .pcp-cmp {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-cmp th,
-[data-kiosk-presentation='fusion-youth'] .pcp-cmp td {
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--ac-line);
-  text-align: left;
-  vertical-align: top;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-cmp thead th:nth-child(2),
-[data-kiosk-presentation='fusion-youth'] .pcp-cmp td:first-of-type {
-  color: var(--ac-ink);
-  font-weight: 700;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-note,
-[data-kiosk-presentation='fusion-youth'] .pcs-next {
-  margin: 10px 0 0;
   color: var(--ac-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-[data-kiosk-presentation='fusion-youth'] .pcp-flow {
-  margin: 0;
-  padding-left: 1.2em;
-  color: var(--ac-muted);
-  font-size: 15px;
+  font-size: 18px;
   line-height: 1.7;
 }
 
-[data-kiosk-presentation='fusion-youth'] .pcp-flow .is-now { color: var(--ac-ink); font-weight: 700; }
-[data-kiosk-presentation='fusion-youth'] .pcp-flow .is-done { color: var(--ac-muted); }
+[data-kiosk-presentation='fusion-youth'] .pcp-cmp-one strong { color: var(--ac-ink); }
+
+[data-kiosk-presentation='fusion-youth'] .pcs-next {
+  margin: 16px 0 0;
+  color: var(--ac-muted);
+  font-size: 18px;
+  line-height: 1.6;
+}
 
 [data-kiosk-presentation='fusion-youth'] .pickup-claim-success {
   flex: 1;
@@ -455,12 +387,10 @@
       'submit help';
   }
 
-  [data-kiosk-presentation='fusion-youth'] .pcp-why,
   [data-kiosk-presentation='fusion-youth'] .pcp-side-extra,
   [data-kiosk-presentation='fusion-youth'] .pcp-echo { display: none; }
 
-  [data-kiosk-presentation='fusion-youth'] .pcp-printer-warn { padding: 8px 12px; border-radius: 12px; }
-  [data-kiosk-presentation='fusion-youth'] .pcp-printer-warn strong { font-size: 14px; }
+  [data-kiosk-presentation='fusion-youth'] .pcp-printer-warn { padding: 8px 12px; border-radius: 12px; font-size: 14px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-printer-warn p { font-size: 13px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-lead { gap: 14px; padding: 13px 16px; border-radius: 14px; }
   [data-kiosk-presentation='fusion-youth'] .pcp-lead-icon { width: 50px; height: 50px; border-radius: 13px; }
@@ -511,14 +441,14 @@
 @media (max-width: 760px) {
   [data-kiosk-presentation='fusion-youth'] .pickup-claim-page {
     grid-template-columns: 1fr;
-    grid-template-areas: 'warn' 'lead' 'input' 'hint' 'why' 'submit' 'help';
+    grid-template-areas: 'warn' 'lead' 'input' 'hint' 'submit' 'help';
     gap: 14px;
     padding: 0 20px 24px;
     overflow: visible;
   }
 
   [data-kiosk-presentation='fusion-youth'] .pickup-claim-page[data-claim-state='error'] {
-    grid-template-areas: 'warn' 'lead' 'input' 'error' 'why' 'submit' 'help';
+    grid-template-areas: 'warn' 'lead' 'input' 'error' 'submit' 'help';
   }
 
   [data-kiosk-presentation='fusion-youth'] .pcp-lead { padding: 16px; }
