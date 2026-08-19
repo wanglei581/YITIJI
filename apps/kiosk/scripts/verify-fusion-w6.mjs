@@ -536,6 +536,11 @@ check('W6 legal and long-text fixture', () => {
   const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')
   assert.match(routes, /pattern: '\/legal\/:doc'[\s\S]*longText: W6_LONG_LEGAL_TEXT/, 'legal route must own the long-text scenario')
   assert.match(spec, /route\.longText[\s\S]*getByText\(route\.longText, \{ exact: true \}\)/, 'W6 spec must visibly assert the long-text fixture')
+  assert.match(
+    routes,
+    /pattern:\s*'\/print\/pickup-claim'[\s\S]*?featureText:\s*'到机码核销'/,
+    'W6 pickup-claim featureText follows the hub/landing title 到机码核销'
+  )
 })
 
 if (failures > 0) process.exitCode = 1

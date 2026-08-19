@@ -120,7 +120,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
-  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("打开小程序「我的 → 打印订单 → 查看到机码」，将二维码对准本机扫码器；无法扫码时可手动输入。")', featureText: '扫码取件' },
+  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("打开小程序「我的 → 打印订单 → 查看到机码」，将二维码对准本机扫码器；无法扫码时可手动输入。")', featureText: '到机码核销' },
   // PR #496 新路由
   { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("AI方案确认")', featureText: 'AI方案确认' },
   { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: 'W6 待续打材料.pdf', requiresMemberSession: true },

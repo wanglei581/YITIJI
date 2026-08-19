@@ -1,5 +1,5 @@
 // ============================================================
-// PrintPickupClaimPage — 步骤4：扫码取件认领
+// PrintPickupClaimPage — 步骤4：到机码核销认领
 //
 // 用户用一体机扫码器扫描二维码，或手动输入小程序中的到机码，
 // 调用 POST /api/v1/print/jobs/claim-pickup → 任务状态从 pending → claimed，
@@ -241,7 +241,7 @@ export function PrintPickupClaimPage() {
   return (
     <PrintPageFrame>
       <KioskPageHeader
-        title="扫码取件"
+        title="到机码核销"
         description={`扫描小程序二维码，或输入 ${CODE_LEN} 位到机码`}
         onBack={() => navigate('/print-scan')}
         backLabel="返回"
