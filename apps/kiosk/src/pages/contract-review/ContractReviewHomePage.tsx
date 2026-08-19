@@ -21,6 +21,8 @@ import {
   FileTextIcon,
   InfoIcon,
   Loader2Icon,
+  MonitorSmartphoneIcon,
+  QrCodeIcon,
   ShieldAlertIcon,
   UploadIcon,
   XIcon,
@@ -30,10 +32,15 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
   createContractReview,
+  createContractReviewFromSource,
   describeDataCategories,
   getConsentScope,
   type ConsentScope,
 } from '../../services/api/contractReview'
+import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
+
+type ContractChannel = 'phone' | 'desktop'
+type PhoneSource = { fileId: string; name: string; sizeLabel: string; signedUrl?: string }
 import {
   clearContractReviewSession,
   startContractReviewSession,
@@ -48,23 +55,27 @@ const CONTRACT_TYPES: Array<{ key: ContractType; name: string; hint: string }> =
 ]
 
 const ACCEPTED = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp'
-const MAX_SIZE_MB = 20
+/** 本机 kiosk-upload 走代理上限 15MB；扫码会话硬上限 10MB。 */
+const DESKTOP_MAX_SIZE_MB = 15
 
 export function ContractReviewHomePage() {
   const navigate = useNavigate()
   const { getToken, user } = useAuth()
 
   const [file, setFile] = useState<File | null>(null)
+  const [phoneSource, setPhoneSource] = useState<PhoneSource | null>(null)
+  const [channel, setChannel] = useState<ContractChannel>('phone')
   const [contractType, setContractType] = useState<ContractType>('labor_contract')
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentScope, setConsentScope] = useState<ConsentScope | null>(null)
   const [loadingConsent, setLoadingConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [qrBusy, setQrBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useBusyLock(submitting)
+  useBusyLock(submitting || qrBusy)
 
   useEffect(() => {
     // 上传页不恢复上一份合同；浏览器返回到这里也立即丢弃易失凭证与结果。
@@ -77,11 +88,12 @@ export function ContractReviewHomePage() {
 
   function handleFileChange(f: File | null) {
     if (!f) return
-    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
-      setError(`文件不能超过 ${MAX_SIZE_MB}MB`)
+    if (f.size > DESKTOP_MAX_SIZE_MB * 1024 * 1024) {
+      setError(`本机验证文件不能超过 ${DESKTOP_MAX_SIZE_MB}MB`)
       return
     }
     setError(null)
+    setPhoneSource(null)
     setFile(f)
   }
 
@@ -93,20 +105,28 @@ export function ContractReviewHomePage() {
   }
 
   async function handleSubmit() {
-    if (!file || !consentScope || !consentChecked) return
+    if ((!file && !phoneSource) || !consentScope || !consentChecked) return
+    if (phoneSource && !getToken() && !phoneSource.signedUrl) {
+      setError('这份合同还缺少确认凭证，请重新扫码上传')
+      return
+    }
     setError(null)
     setSubmitting(true)
     try {
-      const task = await createContractReview(
-        file,
-        contractType,
-        {
-          consentVersion: consentScope.consentVersion,
-          consentScopeHash: consentScope.consentScopeHash,
-          disclaimerVersion: consentScope.disclaimer.version,
-        },
-        { token: getToken() },
-      )
+      const consent = {
+        consentVersion: consentScope.consentVersion,
+        consentScopeHash: consentScope.consentScopeHash,
+        disclaimerVersion: consentScope.disclaimer.version,
+      }
+      const access = { token: getToken() }
+      const task = phoneSource
+        ? await createContractReviewFromSource(
+          { fileId: phoneSource.fileId, signedUrl: phoneSource.signedUrl },
+          contractType,
+          consent,
+          access,
+        )
+        : await createContractReview(file!, contractType, consent, access)
       startContractReviewSession({
         taskId: task.id,
         accessToken: task.accessToken ?? null,
@@ -122,7 +142,8 @@ export function ContractReviewHomePage() {
     }
   }
 
-  const canSubmit = !!file && consentChecked && !loadingConsent && !submitting
+  const selectedName = file?.name ?? phoneSource?.name ?? null
+  const canSubmit = Boolean(selectedName) && consentChecked && !loadingConsent && !submitting
 
   return (
     <KioskFullscreenShell>
@@ -183,6 +204,26 @@ export function ContractReviewHomePage() {
           <p className="text-sm font-semibold text-muted mb-4" style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
             上传合同文件
           </p>
+          <div className="mb-4 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              aria-pressed={channel === 'phone'}
+              className={`cr-type-btn${channel === 'phone' ? ' cr-type-btn--active' : ''}`}
+              onClick={() => setChannel('phone')}
+            >
+              <span className="cr-type-btn__name"><QrCodeIcon className="mr-2 inline h-5 w-5" aria-hidden="true" />手机扫码上传</span>
+              <span className="cr-type-btn__hint">一体机主通道 · 单个不超过 10MB</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={channel === 'desktop'}
+              className={`cr-type-btn${channel === 'desktop' ? ' cr-type-btn--active' : ''}`}
+              onClick={() => setChannel('desktop')}
+            >
+              <span className="cr-type-btn__name"><MonitorSmartphoneIcon className="mr-2 inline h-5 w-5" aria-hidden="true" />本机文件（桌面验证）</span>
+              <span className="cr-type-btn__hint">E2E / 桌面浏览器 · 不超过 {DESKTOP_MAX_SIZE_MB}MB</span>
+            </button>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -190,6 +231,33 @@ export function ContractReviewHomePage() {
             className="sr-only"
             onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
           />
+          {channel === 'phone' ? (
+            selectedName && phoneSource ? (
+              <div className="cr-upload-zone cr-upload-zone--filled">
+                <div className="cr-upload-icon"><FileTextIcon /></div>
+                <p className="cr-upload-filename">{phoneSource.name}</p>
+                <p className="cr-upload-hint">{phoneSource.sizeLabel} · 手机扫码已确认</p>
+              </div>
+            ) : (
+              <UploadSessionQrPanel
+                purpose="contract_upload"
+                title="手机扫码上传合同"
+                description="手机只负责上传合同文件；一体机确认后才开始风险分析。单个不超过 10MB。"
+                confirmLabel="确认使用这份合同"
+                onUploaded={(uploaded) => {
+                  setFile(null)
+                  setPhoneSource({
+                    fileId: uploaded.fileId,
+                    name: uploaded.name,
+                    sizeLabel: uploaded.size,
+                    signedUrl: uploaded.fileUrl,
+                  })
+                  setError(null)
+                }}
+                onBusyChange={setQrBusy}
+              />
+            )
+          ) : (
           <div
             role="button"
             tabIndex={0}
@@ -223,18 +291,19 @@ export function ContractReviewHomePage() {
               <>
                 <p className="cr-upload-title">点击上传或拖拽文件</p>
                 <p className="cr-upload-hint">
-                  支持 PDF · Word · 图片（JPG / PNG）<br />
-                  单份合同，不超过 {MAX_SIZE_MB}MB
+                  支持 PDF · Word · 图片（JPG / PNG / WEBP）<br />
+                  本机验证通道不超过 {DESKTOP_MAX_SIZE_MB}MB；手机扫码不超过 10MB
                 </p>
               </>
             )}
           </div>
-          {file && (
+          )}
+          {selectedName && (
             <button
               type="button"
               className="mt-3 flex items-center gap-2 text-sm"
               style={{ fontSize: 18, color: 'var(--muted)', marginTop: 12 }}
-              onClick={(e) => { e.stopPropagation(); setFile(null) }}
+              onClick={(e) => { e.stopPropagation(); setFile(null); setPhoneSource(null) }}
             >
               <XIcon size={18} />
               移除文件

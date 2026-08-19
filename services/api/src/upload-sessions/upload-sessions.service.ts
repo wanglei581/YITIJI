@@ -42,7 +42,7 @@ export interface UploadSessionFileView {
   mimeType: string
   sha256: string
   fileExpiresAt: string | null
-  /** resume_upload / print_doc / signature_image 在 confirm 时签发的短时 HMAC 内容 URL。 */
+  /** resume_upload / print_doc / signature_image / contract_upload 在 confirm 时签发的短时 HMAC 内容 URL。 */
   fileUrl?: string | null
 }
 
@@ -102,6 +102,9 @@ const SIGNED_URL_PURPOSES: ReadonlySet<FilePurpose> = new Set([
   'resume_upload',
   'print_doc',
   'signature_image',
+  // 匿名合同审查创建需要 x-contract-review-source-file-proof = 短时 HMAC 内容 URL。
+  // 这不是打印链接；TTL 与 kiosk-upload 同为 30 分钟。
+  'contract_upload',
 ])
 
 @Injectable()

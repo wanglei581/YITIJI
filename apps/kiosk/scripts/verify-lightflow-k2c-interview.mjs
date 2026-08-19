@@ -82,7 +82,10 @@ const setup = read(pages[0])
 check(setup.indexOf('createInterview(') < setup.indexOf('startInterview('), '创建与启动面试顺序被改变')
 for (const token of [
   'kioskUploadFile',
-  'useBusyLock(creating || uploading || printingSheet)',
+  'useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)',
+  'UploadSessionQrPanel',
+  'ResumeUsbImportPanel',
+  "purpose=\"resume_upload\"",
   'durationMin: duration',
   'interviewerType,',
   'position: pos',

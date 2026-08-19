@@ -43,8 +43,8 @@ const PHONE_UPLOAD_PURPOSES: Readonly<Record<string, PhoneUploadPurposeConfig>> 
   },
   contract_upload: {
     noun: '合同文件',
-    accept: '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png',
-    helper: '支持 PDF / JPG / PNG；单个最大 10MB，选择后自动上传',
+    accept: RESUME_ACCEPT,
+    helper: '合同支持 PDF / Word / JPG / PNG / WEBP；单个最大 10MB，选择后自动上传',
   },
 }
 

@@ -26,7 +26,10 @@ import {
   GraduationCapIcon,
   ListFilterIcon,
   Loader2Icon,
+  MonitorSmartphoneIcon,
   NotebookPenIcon,
+  QrCodeIcon,
+  UsbIcon,
   UserRoundCheckIcon,
   XIcon,
 } from 'lucide-react'
@@ -43,7 +46,11 @@ import { createInterview, printInterviewPracticeSheet, startInterview } from '..
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { UploadSessionQrPanel } from '../upload/components/UploadSessionQrPanel'
+import { ResumeUsbImportPanel } from '../resume/components/ResumeUsbImportPanel'
 import { InterviewShell } from './InterviewShell'
+
+type ResumeChannel = 'phone' | 'usb' | 'desktop'
 import './interview-service-desk.css'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
@@ -125,7 +132,10 @@ export function InterviewSetupPage() {
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>('standard')
   const [duration, setDuration] = useState<InterviewDuration>(5)
   const [resumeFile, setResumeFile] = useState<{ fileId: string; name: string } | null>(null)
+  const [resumeChannel, setResumeChannel] = useState<ResumeChannel>('phone')
   const [uploading, setUploading] = useState(false)
+  const [qrBusy, setQrBusy] = useState(false)
+  const [usbBusy, setUsbBusy] = useState(false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /**
@@ -148,7 +158,7 @@ export function InterviewSetupPage() {
    */
   const [startFailed, setStartFailed] = useState(false)
 
-  useBusyLock(creating || uploading || printingSheet)
+  useBusyLock(creating || uploading || printingSheet || qrBusy || usbBusy)
 
   const positionReady = position.trim().length > 0
   const visibleIndustries = POPULAR_INDUSTRIES.includes(industry)
@@ -432,7 +442,7 @@ export function InterviewSetupPage() {
             </div>
 
             <Card className="interview-card p-5">
-              <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="上传后面试官会结合经历提问；不上传则按通用问题练习。" />
+              <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="一体机请用手机扫码或 U 盘；不上传则按通用问题练习。" />
               {resumeFile ? (
                 <div className="interview-resume-chip flex items-center justify-between rounded-xl border px-4 py-3">
                   <span className="truncate text-sm font-medium">{resumeFile.name}</span>
@@ -446,15 +456,54 @@ export function InterviewSetupPage() {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
-                  <Button variant="secondary" className="min-h-[56px] text-base" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-                    {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
-                    上传简历
-                  </Button>
-                  <div className="flex min-h-[56px] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 text-sm text-neutral-500">
-                    不上传也可以开始练习
+                <>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {([
+                      { key: 'phone' as const, label: '手机扫码上传', icon: QrCodeIcon },
+                      { key: 'usb' as const, label: 'U盘导入', icon: UsbIcon },
+                      { key: 'desktop' as const, label: '本机文件（桌面验证）', icon: MonitorSmartphoneIcon },
+                    ]).map((channel) => (
+                      <button
+                        key={channel.key}
+                        type="button"
+                        aria-pressed={resumeChannel === channel.key}
+                        onClick={() => setResumeChannel(channel.key)}
+                        className={[
+                          'flex min-h-[56px] items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium',
+                          resumeChannel === channel.key
+                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-neutral-200 bg-white text-neutral-700',
+                        ].join(' ')}
+                      >
+                        <channel.icon className="h-4 w-4" aria-hidden="true" />
+                        {channel.label}
+                      </button>
+                    ))}
                   </div>
-                </div>
+                  <div className="mt-3">
+                    {resumeChannel === 'phone' ? (
+                      <UploadSessionQrPanel
+                        purpose="resume_upload"
+                        title="手机扫码上传简历"
+                        description="手机只负责上传；一体机确认后才会带进本次练习。不上传也可以开始。"
+                        confirmLabel="确认使用这份简历"
+                        onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                        onBusyChange={setQrBusy}
+                      />
+                    ) : resumeChannel === 'usb' ? (
+                      <ResumeUsbImportPanel
+                        onUploaded={(file) => setResumeFile({ fileId: file.fileId, name: file.name })}
+                        onBusyChange={setUsbBusy}
+                      />
+                    ) : (
+                      <Button variant="secondary" className="min-h-[56px] w-full text-base" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                        {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
+                        本机文件（桌面验证）
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-3 text-sm text-neutral-500">不上传也可以开始练习</p>
+                </>
               )}
               <input
                 ref={fileInputRef}
