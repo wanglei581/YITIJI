@@ -205,6 +205,10 @@ export function JobFitPage() {
     )
   }
 
+  // `gate` 是中间变量，TS 不会从 `!taskId ? 'missing'` 反推 taskId。
+  // 上面已经挡过缺简历；这里只是把类型收成 string，后面分析/授权/撤回才能过 typecheck。
+  if (!taskId) return null
+
   if (loadingLatest) {
     return (
       <JobFitFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">

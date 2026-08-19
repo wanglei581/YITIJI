@@ -170,6 +170,7 @@ expectIncludes(jobFitApi, 'grantJobFitConsent', '岗位匹配 API 暴露匿名�
 expectIncludes(jobFitApi, 'getJobFitConsentStatus', '岗位匹配 API 暴露匿名授权状态读取')
 expectIncludes(jobFitApi, 'revokeJobFitConsent', '岗位匹配 API 暴露匿名授权撤回方法')
 expectIncludes(jobFitPage, "type PreconditionGate = 'missing' | 'rejected'", '岗位匹配区分缺简历与后端不认的 taskId')
+expectIncludes(jobFitPage, 'if (!taskId) return null', '门禁用中间变量后仍把 taskId 收成 string，否则 CI typecheck 红')
 expectIncludes(jobFitPage, "err.code === 'AI_TASK_NOT_FOUND'", '岗位匹配把后端不认的 taskId 挡在选岗表单前')
 expectIncludes(jobFitPage, '重新上传简历', '后端不认的 taskId 引导重新上传而不是空表单')
 expectIncludes(jobFitPage, 'setRejectedTask(true)', '岗位匹配把 AI_TASK_NOT_FOUND 落成 rejected 门禁')
