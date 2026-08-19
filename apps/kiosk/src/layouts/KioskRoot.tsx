@@ -83,6 +83,8 @@ const V6_SHELL_ROUTES = new Map<string, V6ShellRoute>([
   ['/interview-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/policy-service', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
   ['/profile', { domainTitle: '我的', withTerminalCode: true, brandReturnsHome: false }],
+  // 页内自带 KioskPageHeader「到机码核销」，顶栏不再重复域名。
+  ['/print/pickup-claim', { domainTitle: null, withTerminalCode: true, brandReturnsHome: false }],
 ])
 
 function v6ShellSubtitle(entry: V6ShellRoute, terminalCode: string): string {
