@@ -144,7 +144,7 @@ async function getJson<T>(path: string): Promise<T> {
     headers: { Accept: 'application/json' },
     credentials: 'include',
   })
-  if (!response.ok) throw new Error(`HTTP_${response.status}`)
+  if (!response.ok) throw new Error(`请求失败（${response.status}）`)
   return response.json() as Promise<T>
 }
 

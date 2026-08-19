@@ -643,6 +643,80 @@ for (const f of textFiles) {
 }
 if (!secretHit) ok('无密钥残留')
 
+/**
+ * 去掉块注释与整行注释再做「不得出现 X」的静态断言。
+ * 不剥注释的话，说明为什么删掉某个假值的注释本身会被判成违规 ——
+ * 抓的是解释文字，不是真实代码。写法与 services/api/scripts/verify-job-requirement-stats.ts 一致。
+ */
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join('\n')
+}
+
+// ---- 材料包侧链 fail-closed（P0-3）----
+//
+// 这四页可以被深链和分享卡片直接打开，而服务端 POST /orders/package 不存在。
+// package-code 更是把到机码、订单号、金额全部从 URL query 读出来就渲染，
+// 一条构造出来的链接就能显示一张带到机码的「创建成功」页。守卫必须在 onLoad 首行，
+// 且不许有任何一页漏掉 —— 漏一页，那一页就是完整的绕过入口。
+const PACKAGE_CHAIN_PAGES = [
+  'pages/package-create/package-create',
+  'pages/store-select/store-select',
+  'pages/package-confirm/package-confirm',
+  'pages/package-code/package-code',
+]
+
+const packageGuardMisses = []
+for (const page of PACKAGE_CHAIN_PAGES) {
+  const src = read(`${page}.js`)
+  if (!src.includes("require('../../utils/package-feature')")) {
+    packageGuardMisses.push(`${page}.js 未引入 package-feature 守卫`)
+    continue
+  }
+  // 钉在 onLoad 之后的第一条语句：放到 setData 之后就等于先把 URL 参数渲染出去了。
+  if (!/onLoad\s*\([^)]*\)\s*\{\s*(\/\/[^\n]*\n\s*)*if\s*\(guardPackageChain\(\)\)\s*return/.test(src)) {
+    packageGuardMisses.push(`${page}.js 的 guardPackageChain() 不在 onLoad 首行`)
+  }
+}
+if (!packageGuardMisses.length) ok(`材料包四页均在 onLoad 首行 fail-closed（${PACKAGE_CHAIN_PAGES.length} 页）`)
+else bad('材料包侧链守卫', packageGuardMisses.join('；'))
+
+// onLoad 守卫挡不住首屏那一帧：「材料包创建成功」写死在 wxml 里，不受 data 控制。
+// 必须由一个默认 false 的开关把它关在门外，否则深链打开时会先闪出一句无订单支撑的成功宣告。
+const codeWxml = read('pages/package-code/package-code.wxml')
+const codeJs = read('pages/package-code/package-code.js')
+if (
+  /wx:if="\{\{ready\}\}"/.test(codeWxml) &&
+  /材料包创建成功/.test(codeWxml.split('wx:if="{{ready}}"')[1] || '') &&
+  /\bready:\s*false\b/.test(codeJs)
+) ok('到机码页成功横幅由默认关闭的开关控制，首屏不闪假成功')
+else bad('到机码页首屏', 'package-code 的「材料包创建成功」必须在 wx:if="{{ready}}" 之内，且 ready 默认 false')
+
+// 分享会把这条未开放的链继续散出去，package-code 的分享标题原本就是「材料包创建成功」。
+const packageShare = PACKAGE_CHAIN_PAGES
+  .filter((page) => /onShare(AppMessage|Timeline)\s*\(/.test(read(`${page}.js`)))
+if (!packageShare.length) ok('材料包四页均未开放分享')
+else bad('材料包侧链分享', `${packageShare.join(',')} 在功能开放前不得提供 onShareAppMessage/onShareTimeline`)
+
+// 假数据即使被守卫挡住也不能留在唯一发布源里：守卫可能被回退或漏页。
+const PACKAGE_FAKE_DATA = [
+  { pattern: /['"]010-00000000['"]/, label: '假服务点电话 010-00000000' },
+  { pattern: /39\.9925|116\.3067/, label: '写死的北大坐标' },
+  { pattern: /pricePerPage|colorMode === 'bw' \? 0\.5/, label: '本地硬编码单价（价格必须由服务端报价）' },
+]
+const packageFakeHits = []
+for (const page of PACKAGE_CHAIN_PAGES) {
+  const src = stripComments(read(`${page}.js`))
+  for (const { pattern, label } of PACKAGE_FAKE_DATA) {
+    if (pattern.test(src)) packageFakeHits.push(`${page}.js: ${label}`)
+  }
+}
+if (!packageFakeHits.length) ok('材料包四页无假电话 / 假坐标 / 本地硬编码计价')
+else bad('材料包侧链假数据', packageFakeHits.join('；'))
+
 const pageCount = (appJson?.pages || []).length
 console.log(`\n${pass} PASS / ${fails.length} FAIL（注册页面 ${pageCount}）`)
 if (fails.length) {

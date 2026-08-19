@@ -27,7 +27,7 @@ function authHeaders(token: string, withJsonBody = false, extra?: Record<string,
 async function unwrap<T>(res: Response, token: string): Promise<T> {
   if (!res.ok) {
     let code = 'UNKNOWN_ERROR'
-    let message = `HTTP ${res.status}`
+    let message = `请求失败（${res.status}）`
     try {
       const body = (await res.json()) as { error?: { code?: string; message?: string } }
       code = body.error?.code ?? code

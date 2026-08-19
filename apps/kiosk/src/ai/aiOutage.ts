@@ -15,6 +15,7 @@
  * 提取的直接原因：S2-1 / S2-2 再各抄一份的话，同一个常量会出现四处，
  * 而「哪些错误码算能力不可用」一旦各页漂移，降级行为就会各不相同。
  */
+import { userMessageOf } from '../services/api/userErrorMessage'
 import type { AiAvailability } from './useAiTask'
 
 /**
@@ -76,10 +77,18 @@ export function isAiOutage(error: unknown): boolean {
   return AI_OUTAGE_CODES.has(aiErrorCodeOf(error))
 }
 
-/** 取用户可读的错误文案；没有可读信息时用调用方给的兜底句。 */
+/**
+ * 取用户可读的错误文案。
+ *
+ * 2026-08-19 修正：此前这里是 `error.message ? error.message : fallback` ——
+ * 兜底挂在了「没有 message」那一支，而适配器造的技术串（`HTTP 500`、浏览器的
+ * `Failed to fetch`）恰恰**都是有 message 的 Error**，于是那句中文兜底一次都执行不到，
+ * 用户看到的是英文。现改为委托给 `userMessageOf`：按错误码白名单给文案，
+ * 未知码一律落到调用方兜底句，绝不透传任意服务端 message（服务端确实存在含
+ * 环境变量名和字体路径的中文报错，见该模块头部注释）。
+ */
 export function aiErrorMessageOf(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message) return error.message
-  return fallback
+  return userMessageOf(error, fallback)
 }
 
 /**

@@ -3,6 +3,7 @@ import { Button, Card } from '@ai-job-print/ui'
 import { CheckIcon, MicIcon, RotateCcwIcon, SquareIcon, XIcon } from 'lucide-react'
 import { transcribeResumeVoice } from '../../../services/api'
 import { startWavRecorder, type WavRecorder } from '../../../utils/wavRecorder'
+import { userMessageOf } from '../../../services/api/userErrorMessage'
 
 const MAX_RECORD_SECONDS = 58
 
@@ -64,7 +65,7 @@ export function ResumeTranscriptConfirmDialog({
       setStatus('ready')
     } catch (err) {
       setStatus('error')
-      setError(err instanceof Error ? err.message : '语音转写失败，请改用文字输入')
+      setError(userMessageOf(err, '语音转写失败，请改用文字输入'))
     }
   }
 
@@ -88,7 +89,7 @@ export function ResumeTranscriptConfirmDialog({
       }, 250)
     } catch (err) {
       setStatus('error')
-      setError(err instanceof Error ? err.message : '麦克风不可用，请改用文字输入')
+      setError(userMessageOf(err, '麦克风不可用，请改用文字输入'))
       cancelRecorder()
     }
   }

@@ -29,6 +29,7 @@ import {
   QrOverlay,
 } from './components/JobDetailSections'
 import { FusionBadge, KioskPageFrame } from './components/W4Presentation'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 export function JobDetailPage() {
   const navigate = useNavigate()
@@ -352,5 +353,5 @@ function formatJobAiError(err: unknown): string {
     if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
     return err.message
   }
-  return err instanceof Error ? err.message : 'AI 辅助暂时不可用，请稍后重试。'
+  return userMessageOf(err, 'AI 辅助暂时不可用，请稍后重试。')
 }

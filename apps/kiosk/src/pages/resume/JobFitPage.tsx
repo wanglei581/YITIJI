@@ -47,6 +47,7 @@ import { grantJobAiConsent } from '../../services/api/jobAi'
 import './jobFit-inkpaper.css'
 import './jobFit-inkpaper-ext.css'
 import './resume-fusion-youth.css'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface PageState {
   taskId?: string
@@ -232,7 +233,7 @@ export function JobFitPage() {
           return
         }
       }
-      setError(err instanceof Error ? err.message : '分析失败，请稍后重试')
+      setError(userMessageOf(err, '分析失败，请稍后重试'))
     } finally {
       setAnalyzing(false)
     }
@@ -258,7 +259,7 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : '授权失败，请稍后重试'
+      const message = userMessageOf(err, '授权失败，请稍后重试')
       if (granted) setError(message)
       else setConsentError(message)
     } finally {
@@ -294,7 +295,7 @@ export function JobFitPage() {
         setResult(res)
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : '授权失败，请稍后重试'
+      const message = userMessageOf(err, '授权失败，请稍后重试')
       // 已授权后失败的是分析本身，属页面级错误；授权本身失败才留在弹窗里。
       if (granted) setError(message)
       else setConsentError(message)
@@ -329,7 +330,7 @@ export function JobFitPage() {
       setAnonymousConsentActive(false)
       setNotice('已撤回，重新分析需再次授权')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '撤回失败，请稍后重试')
+      setError(userMessageOf(err, '撤回失败，请稍后重试'))
     } finally {
       setRevokingConsent(false)
     }
@@ -356,7 +357,7 @@ export function JobFitPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }

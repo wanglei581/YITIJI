@@ -32,6 +32,7 @@ import { generateFairVisitPlan, getLatestFairVisitPlan, printFairVisitPlan } fro
 import { getJobFairById } from '../../services/api/jobFairs'
 import { readAiResumeSession } from '../resume/aiResumeSession'
 import { FusionBadge, FusionNotice, FusionSectionHead, KioskPageFrame } from '../jobs/components/W4Presentation'
+import { userMessageOf } from '../../services/api/userErrorMessage'
 
 interface PageState {
   taskId?: string
@@ -129,7 +130,7 @@ export function FairVisitPlanPage() {
       if (result.status === 'failed') setError(result.failReason ?? '生成未完成，请稍后重试')
       else setPlan(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '参会准备单生成失败，请稍后重试')
+      setError(userMessageOf(err, '参会准备单生成失败，请稍后重试'))
     } finally {
       setGenerating(false)
     }
@@ -156,7 +157,7 @@ export function FairVisitPlanPage() {
         },
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+      setError(userMessageOf(err, '打印版生成失败，请稍后重试'))
     } finally {
       setPrinting(false)
     }
