@@ -34,7 +34,21 @@ interface PrintVerification {
   taskId: string
   result: Exclude<PrintResultState, 'loading'>
   failureReason?: string
+  errorCode?: string
 }
+
+/**
+ * Agent 在派发已开始、但重启后无法确认纸到底出没出时上报的码
+ * （`terminal-agent/src/agent/task-runner.ts`）。整条链路对它的口径都是「**无法确认**」：
+ * 服务端在任何写入之前拒绝重排以防重复出纸（`PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN`），
+ * Admin 也只引导人工核查后决定退款。
+ *
+ * 唯独本页此前把它和普通失败混在一起，标题写「打印失败」、副标题写
+ * 「打印任务已由服务端确认失败」—— 服务端恰恰没有确认任何事。这句话两个方向都会害人：
+ * 纸真出来了，用户以为失败去要退款；纸没出来，他也拿不到「系统承认不确定、请找人核查」
+ * 这个说法。属 CLAUDE.md §9「不得展示未经证实的结论」。
+ */
+const PRINT_JOB_UNCONFIRMED = 'PRINT_JOB_UNCONFIRMED'
 
 interface PickupLookup {
   orderId: string
@@ -74,6 +88,8 @@ export function PrintDonePage() {
   const failureReason = verification?.taskId === taskId
     ? verification.failureReason ?? '打印任务未能完成，请联系现场工作人员'
     : '打印任务未能完成，请联系现场工作人员'
+  const isUnconfirmed =
+    verification?.taskId === taskId && verification.errorCode === PRINT_JOB_UNCONFIRMED
 
   // C5-3：paid 后展示取件凭证码。取件码可见性完全由后端 pickupCodeVisibleFor 决定
   // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
@@ -105,6 +121,7 @@ export function PrintDonePage() {
             taskId,
             result: 'failed',
             failureReason: result.failureReasonForUser ?? '打印任务未能完成，请联系现场工作人员',
+            errorCode: result.errorCode,
           })
           return
         }
@@ -221,8 +238,8 @@ export function PrintDonePage() {
     return (
       <PrintPageFrame><div data-w2-page="print-done" className="flex min-h-full flex-col">
         <PrintPrototypeHeader
-          title="打印失败"
-          subtitle="打印任务已由服务端确认失败"
+          title={isUnconfirmed ? '打印结果未确认' : '打印失败'}
+          subtitle={isUnconfirmed ? '服务端无法确认本次是否已出纸' : '打印任务已由服务端确认失败'}
           step={6}
           backLabel="返回首页"
           onBack={() => navigate('/')}
@@ -231,10 +248,20 @@ export function PrintDonePage() {
           <div className="print-done-fail-icon">
             <AlertCircleIcon aria-hidden="true" />
           </div>
-          <div className="print-done-fail-title">打印失败</div>
+          <div className="print-done-fail-title">{isUnconfirmed ? '打印结果未确认' : '打印失败'}</div>
           <div className="print-done-fail-reason">
             {failureReason}
           </div>
+          {/* 「无法确认」不等于「没出纸」，也不等于「已出纸」。这里只能给用户两件确定的事：
+              纸要现场看，钱还在订单上、需要工作人员核查后处理 —— 不承诺退款，也不否认出纸。
+              本机不提供自助退款（PrintCashierPage 已有同口径声明），所以只给核查路径。 */}
+          {isUnconfirmed && (
+            <div className="print-done-fail-reason" role="status">
+              请先查看出纸口是否已有纸张。无论有没有，这笔订单都已保留，
+              请凭订单号联系现场工作人员核查后处理；本机不提供自助退款。
+              {taskId ? `（任务号 ${taskId}）` : null}
+            </div>
+          )}
           <div className="print-done-fail-actions">
             <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/')}>
               返回首页

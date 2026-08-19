@@ -65,6 +65,57 @@ test('forged success cannot override pending or failed backend status @kiosk', a
   await expect(page.getByText('private agent stack must remain hidden')).toHaveCount(0)
 })
 
+// `PRINT_JOB_UNCONFIRMED` 的全部含义是「派发已开始，但重启后无法确认纸出没出」。
+// 整条链路都按「无法确认」处理：Agent 拒绝断言 completed，服务端在任何写入之前拒绝重排
+// 以防重复出纸（PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN），Admin 只引导人工核查。
+// 唯独用户终态页此前把它和普通失败混成一屏，副标题写「打印任务已由服务端确认失败」——
+// 服务端恰恰没有确认任何事。两个方向都会害人：纸真出来了，用户以为失败去要退款；
+// 纸没出来，他也拿不到「系统承认不确定、请找人核查」这个说法。
+// 断言刻意放在可见文本上，不依赖 data 钩子，钩子被重构掉时仍然成立。
+test('an unconfirmed print is never presented as a confirmed failure @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: {
+      taskId: TASK_ID,
+      status: 'failed',
+      errorCode: 'PRINT_JOB_UNCONFIRMED',
+      failureReasonForUser: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
+    },
+  })
+
+  await openDoneWithState(page, taskState)
+
+  // 事故本体：系统不知道结果，却告诉用户「已确认失败」。
+  await expect(page.getByText('打印任务已由服务端确认失败')).toHaveCount(0)
+  await expect(page.getByText('打印失败', { exact: true })).toHaveCount(0)
+
+  await expect(page.getByText('打印结果未确认', { exact: true }).first()).toBeVisible()
+  const body = await page.locator('body').innerText()
+  expect(body).toContain('出纸口')
+  expect(body).toContain('联系现场工作人员')
+  // 不承诺退款、也不替现场断言纸没出来。
+  expect(body).not.toContain('已为你退款')
+})
+
+// 反向锁：没有该错误码时不得被误改成「未确认」，否则真失败也被说成不确定。
+test('a plain failure is still shown as a confirmed failure @kiosk', async ({ page, api }) => {
+  registerShell(api)
+  api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
+    status: 200,
+    json: {
+      taskId: TASK_ID,
+      status: 'failed',
+      failureReasonForUser: '打印机暂时离线，请联系现场工作人员',
+    },
+  })
+
+  await openDoneWithState(page, taskState)
+
+  await expect(page.getByText('打印失败', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('打印结果未确认', { exact: true })).toHaveCount(0)
+})
+
 test('completed backend status overrides a forged failure state @kiosk', async ({ page, api }) => {
   registerShell(api)
   api.respond('GET', `/api/v1/print/jobs/${TASK_ID}`, {
