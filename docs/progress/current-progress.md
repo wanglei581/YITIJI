@@ -2,6 +2,18 @@
 
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
+2026-08-22 **本机多模型调用（负责人指定，后续共识必须带齐）**。DeepSeek 不再走 Codex。调用方式：
+
+| 角色 | 本地命令 | 模型 |
+|------|---------|------|
+| Grok | 当前会话 | Grok 4.6 |
+| Claude | `claude --model opus --effort xhigh` | Claude Opus 5 xhigh |
+| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"` | GPT-5.6 Sol High |
+| Antigravity | 参数必须写在 `-p` **前面**：`agy --dangerously-skip-permissions --model gemini-3.7-flash-high -p "..."` | Gemini 3.7 Flash High |
+| Hermes | 终端直接 `Hermes`；非交互：`Hermes chat --cli -Q --yolo --provider deepseek -m deepseek-v4-flash --reasoning max --in "<仓库根>" -q "..."` | DeepSeek-v4-flash Max |
+
+2026-08-22 本机连通：Codex 回 `PONG-CODEX-SOL`（`gpt-5.6-sol` / high）；`Hermes` 回 `PONG-HERMES-DS`（`deepseek-v4-flash` / max）。以后整理线、审查、开工共识把这五家一起算，缺 Hermes 或把 DeepSeek 再塞回 Codex 都不算齐。
+
 2026-08-22 **正式开工（整理线，三家 START_OK：Claude Opus 5 xhigh / Codex DeepSeek-v4-flash / Antigravity Gemini 3.7 Flash High）**。范围只做口径/分类/空间，不重做 `apps/kiosk` 运行时（负责人另做新原型，现网前端问题不挡本线）、不改 `apps/miniapp` 运行时、不碰 `kiosk-redesign-2026-08`、不解冻部署。已 push `c3522398a` + `af1fb6360`。GitHub CI run [32511406355](https://github.com/wanglei581/YITIJI/actions/runs/32511406355) 三 job 全绿（`build-and-verify` / `postgres-readiness` / `kiosk-browser-smoke`）；Deploy 为 skipped（`DEPLOY_API_ENABLED=false`，正确）。本机工作树 62 棵全部保留：空登记 105 条已 prune；脏树 18 棵（含 s3-consent、pickup-title、v6-online-platforms、v6-partner-stats、v3-round2）当候选功能资产，不 `worktree remove`；独有提交较多的锚点同样保留（professional-circle 64、agent-image-jobname 35、windows-agent-online-update 31）。`kiosk-redesign-2026-08/` 与 `apps/kiosk/scripts/design-shot.mjs` 保持 untracked，禁止 `git add -A`。
 
 2026-08-22 补 **双后台进现行口径**：`feature-scope.md` §1.2 增加 Admin / Partner 两行（真实路由、禁止招聘闭环、C0 `/online-platforms` 原型有运行时无、C1 统计待收口）。`docs/README.md` 写明双后台运行时真源是 `apps/admin` 与 `apps/partner`。原型目录补 `docs/design/console-ai-os-2026-08/README.md`。A4 核查状态机按 `main@2e7b4fc52`（#740）改为已合入未部署。不改后台运行时代码，不部署。

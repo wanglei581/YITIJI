@@ -1,7 +1,8 @@
 # AI 协作规则
 
 > 创建时间：2026-05-23  
-> 适用对象：Claude Code、Codex
+> 适用对象：Claude Code、Codex、Antigravity、Hermes、Grok  
+> 本机调用名单以 [`../progress/current-progress.md`](../progress/current-progress.md) 最上条为准（2026-08-22 起 Codex = GPT-5.6 Sol High，DeepSeek 改走 Hermes）。
 
 ---
 
@@ -95,3 +96,21 @@ docs/reviews/codex-[模块]-review.md
 1. 以用户（王磊）的判断为最终依据
 2. 两方写出各自方案，放在 `docs/decisions/` 供用户决策
 3. 决定后记录在决策文件中，后续不再重复讨论
+
+---
+
+## 七、本机多模型调用（2026-08-22）
+
+实时名单只认 `docs/progress/current-progress.md` 最上条。当前固定：
+
+| 角色 | 本地命令要点 | 模型 |
+|------|-------------|------|
+| Claude | `claude --model opus --effort xhigh` | Claude Opus 5 xhigh |
+| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"` | GPT-5.6 Sol High |
+| Antigravity | 参数必须在 `-p` 前面；`--dangerously-skip-permissions --model gemini-3.7-flash-high` | Gemini 3.7 Flash High |
+| Hermes | 终端直接输入 `Hermes`；非交互加 `chat --cli -Q --yolo --provider deepseek -m deepseek-v4-flash --reasoning max` | DeepSeek-v4-flash Max |
+| Grok | 当前 Grok 会话 | Grok 4.6 |
+
+- DeepSeek **只走 Hermes**，不要再用 `codex exec -m deepseek-v4-flash`。
+- 共识审查默认五家一起；缺 Hermes 不算齐。
+- 不因此改产品定位、合规红线、部署闸门或运行时代码。
