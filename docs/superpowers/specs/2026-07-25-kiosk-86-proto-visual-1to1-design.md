@@ -1,5 +1,7 @@
 # Kiosk 86 屏原型视觉 1:1 对齐设计（方案 B）
 
+> ⚠️ **2026-08-22 口径**：本文是 2026-07-25 的历史实施规格，**不是**现行视觉指令。不要把 `apps/kiosk` 再 1:1 对齐 75 屏 / fusion。一体机首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。现行导航见 `docs/README.md` 第二节。
+>
 > 日期：2026-07-25  
 > 分支：`codex/kiosk-visual-unification-20260725`  
 > 状态：用户已确认方案 B，进入实施

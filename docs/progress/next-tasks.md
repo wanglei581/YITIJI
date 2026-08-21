@@ -26,7 +26,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-22（交付阻塞清单仍以 8-19 节为准；本节日期只表示文档维护日。本地已做口径盖章与可重建依赖清理，**未合入、未部署**。）
+> 最后更新：2026-08-22（交付阻塞清单仍以 8-19 节为准；本节日期只表示文档维护日。口径文档 `c3522398a` / `af1fb6360` 已在 origin/main；开工记录与多模型名单在本地待推。**生产仍未部署。**）
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 

@@ -1,5 +1,7 @@
 # Kiosk 8177 / 5299 融合视觉验收 Runbook
 
+> ⚠️ **2026-08-22 口径**：本文是 fusion 回归验收手册，**不是**现行视觉改版指令。视觉基准目录只作 CI / 路由回归；一体机首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。不要按本文把生产 UI 退回 7 月。
+>
 > 适用范围：W1–W6 的 Kiosk 呈现层迁移与状态验收。
 >
 > 视觉基准：`docs/design/kiosk-proto-2026-07-fusion/`。
