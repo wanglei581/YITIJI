@@ -14054,6 +14054,7 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/print-jobs/pickup-order.service.ts",
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
@@ -14073,6 +14074,7 @@
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -14340,7 +14342,8 @@
           "services/api/src/orgs/admin-orgs.service.ts",
           "services/api/src/print-jobs/admin-closed-pending-print-task-disposition.service.ts",
           "services/api/src/print-jobs/admin-legacy-pending-print-task-disposition.service.ts",
-          "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts"
+          "services/api/src/print-jobs/admin-print-jobs-abandon.service.ts",
+          "services/api/src/print-jobs/admin-print-jobs-verify-outcome.service.ts"
         ]
       },
       {
@@ -21955,15 +21958,6 @@
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/kiosk-ai-os-prototype-2026-08/README.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
         "file": "docs/design/kiosk-ai-os-v3-2026-08/IMPLEMENTATION-NOTES.md",
         "kind": "doc",
         "mentions": [],
@@ -21997,15 +21991,6 @@
         "risk": "protected",
         "scope": "docs",
         "why": "当前 V6 目标设计，是「将要实现」而不是「已被引用」"
-      },
-      {
-        "detail": "全仓没有任何其它文件提到这个路径或文件名",
-        "file": "docs/design/mini-proto-v2-2026-07/CRAFT-NOTES.md",
-        "kind": "doc",
-        "mentions": [],
-        "risk": "low",
-        "scope": "docs",
-        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",

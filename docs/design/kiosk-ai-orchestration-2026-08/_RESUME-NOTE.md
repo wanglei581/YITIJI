@@ -19,7 +19,7 @@
 - `06-jobfit-compare.html` — 岗位匹配对比页（最后在做的）
 - `README.md` / `shared.css` / `assets/`
 
-相关：`docs/design/kiosk-visual-directions-2026-08/`（首页 4 个视觉方向 A/B/C/D）、`docs/design/kiosk-ai-os-fusion-2026-08/`（AI OS 融合方案）
+相关：`docs/design/kiosk-visual-directions-2026-08/` 已于 2026-08-22 删除；`docs/design/kiosk-ai-os-fusion-2026-08/` 仅保留 README。
 
 ## 中断点（撞用量上限，非主动结束）
 - 刚完成 `06-jobfit-compare.html` 的浏览器两态验证 → **C 型两态验证通过**

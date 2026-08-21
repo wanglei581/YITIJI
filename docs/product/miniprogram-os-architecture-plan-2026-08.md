@@ -4,7 +4,7 @@
 > 最后更新：2026-08-06（补充找回源码事实）
 > 适用范围：微信小程序、一体机协同、AI 能力编排、远程下单与到机打印、会员与商业化
 > 上游约束：[功能范围](./feature-scope.md)｜[双渠道差异化策略](./miniprogram-vs-kiosk-differentiation-strategy-2026-07.md)｜[打印扫描商用方案](./print-scan-commercial-plan.md)｜[百宝箱微应用平台](./toolbox-micro-app-platform.md)｜[合规边界](../compliance/compliance-boundary.md)
-> 高保真原型：[41 页 AI 求职操作系统联合原型](../design/miniapp-os-prototype-2026-08/README.md)
+> 页面级体验以 `apps/miniapp/` 正式源码为准。`docs/design/miniapp-os-prototype-2026-08/` 已于 2026-08-22 按产品负责人确认删除。
 
 ---
 
@@ -41,7 +41,7 @@
 - 已找回原生微信小程序候选源码 `/Users/wanglei/zhiyida-miniapp`：独立 Git 仓库，审查基线为 `feature/test-mode-pricing-2026-08-04@4d17e5b`，`app.json` 注册 57 个页面，采用原生 JavaScript/WXML/WXSS。它可作为选择性迁移资产，但尚未进入主仓唯一 `apps/miniapp/`，不是正式发布 SSOT。
 - `apps/miniprogram/` 当前只有 ignored 的 `node_modules`，不是可运行源码。
 - 分支 `codex/miniapp-wechat-wave0` 仍保存一套旧 Taro Wave 0 源码，但未合入 `main`，范围也只覆盖公开内容浏览。
-- `docs/design/mini-proto-v2-2026-07/` 保留了高保真原型，可作为视觉与流程参考，不能当作运行时代码事实。
+- `docs/design/mini-proto-v2-2026-07/` 已于 2026-08-22 按产品负责人确认删除；小程序页面以 `apps/miniapp/` 为准，不再另留独立原型目录。
 - 主仓库已经具备大量可复用后端底座，包括微信登录、会员资产、文件安全、AI 服务、支付退款、订单、取件码、Terminal Agent 和内容来源治理。
 - `PrintMaterialPack` 当前只有基础表，未发现真实业务服务；材料包仍需正式建模和接线。
 - 进度文档曾记录 `claim-pickup` 已完成，但当前工作区的 `services/api/src/` 在排除生成目录后没有对应 controller、service 或路由。Gate 0 必须以干净 `main`、CI 和真实端点再次核验；若仍缺失，`POST /print/jobs/claim-pickup` 及其 CAS、限流、审计和负向测试就是 M2 明确新增项，不得继续标成“待复核”或假定可用。

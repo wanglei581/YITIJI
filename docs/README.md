@@ -2,7 +2,7 @@
 
 > **这份文件只做导航，不产出任何结论。** 需要结论时按下面的指向去读正式文档。
 >
-> 存在的理由：`docs/` 有 879 个文件、四代原型并存、130 份未被任何代码引用的历史任务单。
+> 存在的理由：`docs/` 仍有多代原型和大量历史任务单并存。2026-08-22 已按产品负责人确认删除 7 套废弃原型（见本节「已删除」）。
 > 2026-08-17 一天之内发生过 **6 次**「读了过期材料 → 得出错误结论 → 动手改了不该改的东西」，
 > 其中两次差点删掉已经合入 main 的能力。这份索引是为了让下一个人不用猜哪份是活的。
 
@@ -38,7 +38,9 @@ V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ �
 
 **双后台**：`design/console-ai-os-2026-08/`。
 
-**小程序**：`design/miniapp-os-prototype-2026-08/`。
+**小程序**：没有独立原型目录。页面级体验以 `apps/miniapp/` 正式源码为准。
+
+**禁止清理**：`design/kiosk-redesign-2026-08/` 是产品负责人指定保留的一体机新原型整目录，不得删除、归档或当作垃圾。
 
 ### 只读历史目录 —— 不得从中提取业务口径
 
@@ -48,8 +50,18 @@ V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ �
 |---|---|---|
 | `design/kiosk-proto-2026-07/` | 7 月单体原型（Gen 1） | 回归测试基线 |
 | `design/kiosk-proto-2026-07-fusion/sources/` | 合流前两份完整快照 | 融合验证证据链 |
-| `design/kiosk-visual-directions-2026-08/` | 8 月视觉方案比选（a/b/c/d） | `apps/kiosk/capture-dir.mjs` |
-| `design/mini-proto-2026-07/`、`mini-proto-v2-2026-07/` | 小程序 Gen 1 / Gen 2 | `.claude/launch.json` |
+
+### 已删除（2026-08-22，产品负责人确认）
+
+以下目录已从仓库移除，**不得再当设计输入，也不得从 Git 历史里捡回来当现行口径**：
+
+- `design/mini-proto-2026-07/`
+- `design/mini-proto-v2-2026-07/`
+- `design/miniapp-os-prototype-2026-08/`
+- `design/kiosk-ai-os-prototype-2026-08/`
+- `design/kiosk-visual-directions-2026-08/`
+- `design/zhiyida-front-2026-08/`
+- `design/paper-desk-proto-2026-08/`
 
 ⚠️ **`kiosk-proto-2026-07/01-home.html` 与 V6 首页是两份互相冲突的设计。**
 前者仍在被引用，读它会导致 UI 布局倒退。它只是测试基线，不是设计口径。

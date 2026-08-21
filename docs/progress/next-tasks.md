@@ -26,7 +26,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-18
+> 最后更新：2026-08-22（交付阻塞清单仍以 8-19 节为准；本节日期只表示文档维护日。本地已做口径盖章与可重建依赖清理，**未合入、未部署**。）
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
@@ -160,7 +160,9 @@
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
-开发视觉基线已按用户最终确认切回：[7 月 75 屏原型](../design/kiosk-proto-2026-07/README.md)。`docs/design/kiosk-ai-os-prototype-2026-08/` 只保留为独立设计资产，不再作为本轮真实 `apps/kiosk` 页面替换依据。所有改造继续复用现有路由、API、设备门禁、支付打印扫描链路和公共终端隐私安全，不按静态原型补造能力。
+> ⚠️ **2026-08-22 口径**：本节是 **2026-08-05 前后的历史实施记录**，不是下一刀任务书。现行施工看本文上面的「交付阻塞清单」和「2026-08-12 V6 + 双后台统一施工队列」。7 月 75 屏只作 CI 回归基线；首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。
+
+开发视觉基线已按用户最终确认切回：[7 月 75 屏原型](../design/kiosk-proto-2026-07/README.md)。`docs/design/kiosk-ai-os-prototype-2026-08/` 已于 2026-08-22 按产品负责人确认删除，不再作为任何设计输入。所有改造继续复用现有路由、API、设备门禁、支付打印扫描链路和公共终端隐私安全，不按静态原型补造能力。
 
 - [x] **共享视觉基线与关键服务页**：共享壳/首页恢复 7 月原型色彩、字体、导航和纸感；`/print-scan` 与简历、岗位、招聘会、面试、政策五个一级服务中心已完成层级收口，路由回顶已修复。Kiosk typecheck/lint/build、专项静态守卫、`git diff --check` 和 1080x1920 首页/打印扫描/服务中心浏览器抽检通过；本地候选未部署。
 - [x] **入口真实性与不可用门禁**：首页打印/扫描/双面静态就绪声明已移除；打印扫描以本机 capability 成功响应为放行条件；五个一级服务中心以 `/health` 做入口级 fail-closed，只有线上招聘平台二维码、面试技巧、社保指南、档案/登记保留离线阅读。新增真实性静态守卫，受控失败/重试恢复浏览器验证及 W6 `104/104` 通过；只证明入口行为与失败状态，不证明具体 AI 模型、业务数据、支付或硬件可用。
@@ -180,7 +182,7 @@
 
 ## P1：微信小程序找回、收敛与跨端商业闭环（候选源码已找回，Gate 0 事实审查完成）
 
-权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；开发视觉基线候选：[41 页现代公共就业服务 V8.0 pilot 原型](../design/miniapp-os-prototype-2026-08/README.md)；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。独立仓 `/Users/wanglei/zhiyida-miniapp` 最终形成 59 页 `1.0.2@0d3d86a` 候选；2026-08-11 已在 `codex/miniapp-1-0-2-sync-p0` 选择性迁入 43 个有真实入口或真实后端依据的页面，其余伪能力/占位页面不进入主仓唯一真源。用户已确认四 Tab 为“首页 / AI百宝箱 / 求职 / 我的”，后续正式功能只在 `apps/miniapp/` 推进。
+权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；页面级体验以 `apps/miniapp/` 为准（`docs/design/miniapp-os-prototype-2026-08/` 已于 2026-08-22 删除）；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。独立仓 `/Users/wanglei/zhiyida-miniapp` 最终形成 59 页 `1.0.2@0d3d86a` 候选；2026-08-11 已在 `codex/miniapp-1-0-2-sync-p0` 选择性迁入 43 个有真实入口或真实后端依据的页面，其余伪能力/占位页面不进入主仓唯一真源。用户已确认四 Tab 为“首页 / AI百宝箱 / 求职 / 我的”，后续正式功能只在 `apps/miniapp/` 推进。
 
 - [~] **M0/M1 开发计划执行中（2026-08-07）**：按 `docs/product/miniprogram-m0m1-development-plan-2026-08-07.md` 分四批推进——M0 工程壳/登录/公开浏览/我的只读；M1 今天引擎、简历链路、岗位匹配真实结果页、模拟面试、自我探索、资产材料；视觉沿用找回工程既有风格，每批独立 PR + 门禁。M0.1 `main@305c7296`、M0.2 `main@57527e87`、M0.3（公开浏览：岗位/招聘会/政策/企业列表与详情，线上真实空态）`main@c0c73f04` 已合入；下一步 M0.4 本人数据只读（订单/权益/消息/反馈）。岗位匹配真实结果页 API 级验收已通过（用户真实简历），模拟器 UI 实点待开发者工具服务端口开启后执行。
 

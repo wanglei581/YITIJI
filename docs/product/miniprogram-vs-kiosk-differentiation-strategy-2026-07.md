@@ -4,7 +4,7 @@
 > 结论由 Claude 独立分析 + Codex（analyzer 角色，商业战略视角）独立分析交叉得出，两方在核心判断上收敛一致。
 > 合规口径以 [docs/compliance/compliance-boundary.md](../compliance/compliance-boundary.md) 与 [CLAUDE.md](../../CLAUDE.md) 为准，本方案不突破任何红线。
 >
-> 现状基线：Kiosk 原型 86 页全路由基准（docs/design/kiosk-proto-2026-07/），小程序原型 56 页（docs/design/mini-proto-v2-2026-07/）。
+> 现状基线：Kiosk 原型 86 页全路由基准（docs/design/kiosk-proto-2026-07/）。当时对照的小程序 56 页原型 `docs/design/mini-proto-v2-2026-07/` 已于 2026-08-22 按产品负责人确认删除。
 
 ---
 

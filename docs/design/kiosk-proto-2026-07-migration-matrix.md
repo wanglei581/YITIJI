@@ -1,5 +1,7 @@
 # Kiosk 75 屏原型 ↔ 生产实现迁移映射矩阵
 
+> ⚠️ **2026-08-22 口径**：本文是 **Gen1 路由清单合同**，供 `verify-fusion-baseline` 校验反引号路由，**不是 V6 设计口径**。V6 逐页迁移看 [`kiosk-v6-migration-matrix.md`](kiosk-v6-migration-matrix.md)。不要按本文去重做首页视觉。
+>
 > 基准原型目录:`docs/design/kiosk-proto-2026-07/`（75 屏 · 2026-07 定稿，源自 worktree `resume-optimize-wave2-plan`）
 > 生产分支/worktree:`kiosk-proto-v1-home-20260720`(`apps/kiosk/src/`)
 > 生成日期:2026-07-20 · 本文档为只读调研产物,不改任何源码

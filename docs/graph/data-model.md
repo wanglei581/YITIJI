@@ -120,8 +120,8 @@ flowchart TD
 | **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 7 个文件<br/>`activity/activity.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 3 个文件<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>`payment/pricing.service.ts` |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 21 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 20 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>… |
-| **PrintTaskStatusLog** | 7 | PrintTask | 6 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`print-jobs/admin-closed-pending-print-task-disposition.service.ts`<br/>… |
+| **PrintTask** | 21 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 21 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>… |
+| **PrintTaskStatusLog** | 7 | PrintTask | 7 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`print-jobs/admin-closed-pending-print-task-disposition.service.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RedemptionRecord** | 11 | — | 2 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`member-benefits/member-benefits.service.ts` |
 | **Refund** | 12 | Order | 2 个文件<br/>`payment/reconciliation.service.ts`<br/>`payment/refund.service.ts` |
@@ -143,7 +143,7 @@ flowchart TD
 | **ToolboxApp** | 12 | ToolboxAppVersion | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAppVersion** | 14 | ToolboxApp | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxLaunchEvent** | 10 | — | 1 个文件<br/>`terminals/terminal-toolbox.service.ts` |
-| **User** | 26 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 14 个文件<br/>`auth/admin-initial-phone-bind.service.ts`<br/>`auth/admin-phone-transfer.service.ts`<br/>`auth/auth.service.ts`<br/>… |
+| **User** | 26 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 15 个文件<br/>`auth/admin-initial-phone-bind.service.ts`<br/>`auth/admin-phone-transfer.service.ts`<br/>`auth/auth.service.ts`<br/>… |
 | **UserAiConsent** | 8 | EndUser | 3 个文件<br/>`member-privacy/member-data-export.mapper.ts`<br/>`member-privacy/member-data-request.service.ts`<br/>`member-privacy/member-privacy.service.ts` |
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |

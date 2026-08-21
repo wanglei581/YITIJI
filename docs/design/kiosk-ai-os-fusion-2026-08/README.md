@@ -8,9 +8,7 @@
 - **目标设计**：`kiosk-ai-os-v3-2026-08/`（首页真值 `01-home-v6.html`）
 - **待替换的现状**：`kiosk-proto-2026-07/`（Gen 1，线上实现照它做）
 
-`assets/` **保留**：`kiosk-visual-directions-2026-08/direction-{a,b,c,d}-home.html`
-四个页面通过 `../kiosk-ai-os-fusion-2026-08/assets/kiosk-home-hero-job-fair.png`
-引用其中的图片，一并删除会让那四页的图挂掉。
+`assets/` 已于 2026-08-22 删除：两张 PNG 与 `apps/kiosk/public/assets/` 下同名文件 SHA256 完全相同，引用它们的 `kiosk-visual-directions-2026-08/` 也已删除。生产页面继续用 `apps/kiosk/public/assets/`。本目录只留本说明，不再作为设计输入。
 
 删除前已核验：无 verify / CI 依赖，无 `apps/` 代码引用；其余 4 处引用均为
 README 中的文字提及，且都已标注「历史候选，不再作为输入」。

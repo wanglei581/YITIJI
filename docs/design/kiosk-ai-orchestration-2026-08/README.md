@@ -24,8 +24,8 @@
 | 目录 | 角色（本轮起） |
 | --- | --- |
 | `kiosk-proto-2026-07/`（75 屏定稿） | **降级为功能完整性 checklist**：只用来保证融合过程一个功能都不丢，不再作为视觉基准 |
-| `kiosk-ai-os-prototype-2026-08/`（AI OS V2） | **闭环骨架来源**：「本次办理单」任务编排机制取自此版 |
-| `kiosk-visual-directions-2026-08/direction-d-refined-home.html` | **视觉基底来源**：墨青纸感 token 取自此版 |
+| `kiosk-ai-os-prototype-2026-08/`（AI OS V2） | 当时的闭环骨架来源；目录已于 2026-08-22 删除 |
+| `kiosk-visual-directions-2026-08/direction-d-refined-home.html` | 当时的视觉基底来源；目录已于 2026-08-22 删除 |
 | `kiosk-ai-os-fusion-2026-08/` | 并行候选，本轮不作为输入 |
 | **本目录** | 机制说明书 + 3 张标志性样张。样张通过评审后才铺开其余屏 |
 

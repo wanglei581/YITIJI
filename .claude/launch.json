@@ -130,32 +130,6 @@
       "autoPort": false
     },
     {
-      "name": "miniproto",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "5290",
-        "--directory",
-        "docs/design/mini-proto-2026-07"
-      ],
-      "port": 5290,
-      "autoPort": false
-    },
-    {
-      "name": "miniproto-v2",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "5291",
-        "--directory",
-        "docs/design/mini-proto-v2-2026-07"
-      ],
-      "port": 5291,
-      "autoPort": false
-    },
-    {
       "name": "ai-os-v3",
       "runtimeExecutable": "python3",
       "runtimeArgs": [

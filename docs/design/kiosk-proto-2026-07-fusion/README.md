@@ -1,5 +1,7 @@
 # Kiosk 8177 / 5299 Fusion Baseline
 
+> ⚠️ **2026-08-22 口径**：本目录是 CI 融合证据链（`verify-fusion-baseline.mjs` 硬锁 `sources/` 哈希），**不是**现行设计口径。不要从这里提取首页布局或视觉 token。现行首页真值是 `docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。`sources/**` 仍不可改、不可删。
+
 本目录冻结 2026-07 的 5299-led / 8177-state-complete Kiosk 视觉基线。它只用于设计审查、路由映射和后续迁移验收，不进入生产 Kiosk bundle，也不定义新的生产路由。
 
 ## 三层契约

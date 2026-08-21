@@ -15,7 +15,8 @@
 | --- | --- |
 | `kiosk-proto-2026-07/`（78 个 html，即「75 屏」定稿） | **功能完整性真值**：只用来保证融合过程一个功能都不丢 |
 | `kiosk-ai-orchestration-2026-08/` | **机制来源**：办理单 / 建议四要素 / 证据分级 / 权限红线 / 四态同版面 |
-| `kiosk-visual-directions-2026-08/` `kiosk-ai-os-prototype-2026-08/` `kiosk-ai-os-style-study-2026-08/` `kiosk-ai-os-fusion-2026-08/` | 历史候选，不再作为输入 |
+| `kiosk-ai-os-fusion-2026-08/` | 历史候选残留（仅 README），不再作为输入 |
+| `kiosk-visual-directions-2026-08/`、`kiosk-ai-os-prototype-2026-08/` | 已于 2026-08-22 按产品负责人确认删除 |
 | **本目录** | 设计基线 + 26 页样张 + 覆盖矩阵 |
 
 被本轮**推翻**的一条历史结论：`kiosk-ai-os-prototype-2026-08` 写的「没有渐变、毛玻璃、光晕」。本轮视觉禁令作废，机制与红线全部保留。

@@ -16,7 +16,8 @@
 | `01-home-v6.html`(theme=warm) | **P01 正典首页** | 首页以它为准(README 顶部与 index P01 卡均已指向它);`01-home.html`、`01-home-v4.html`、`01-home-v5.html` 是构图历史,留档不删、不再维护,三页均带页面水印 |
 | `kiosk-proto-2026-07/`(78 个 html,即「75 屏」定稿) | 功能完整性真值 | 26 页承接了它全部 78 个编号(见 README §七),能力已零丢失并入;只用于回查,不再演进 |
 | `kiosk-ai-orchestration-2026-08/` | 机制来源 | 办理单/四要素/证据分级/权限红线的出处(README §零) |
-| `kiosk-ai-os-fusion-2026-08/`、`kiosk-ai-os-prototype-2026-08/`、`kiosk-ai-os-style-study-2026-08/`、`kiosk-visual-directions-2026-08/` | 历史候选 | 仅存档,不再作为输入(README §零 原判) |
+| `kiosk-ai-os-fusion-2026-08/` | 历史候选残留 | 仅 README,不再作为输入 |
+| `kiosk-ai-os-prototype-2026-08/`、`kiosk-visual-directions-2026-08/` | 已删除 | 2026-08-22 按产品负责人确认移除 |
 
 规则:发现两套页面不一致时,**以本目录 26 页为准**;若 26 页缺了原型里的能力,按 README §七 覆盖矩阵回查 `kiosk-proto-2026-07/` 补齐,而不是回去改历史目录。
 
