@@ -11,7 +11,7 @@
 - [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
 - [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
 - [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；`NODE_ENV` 是否真跑门禁仍待 Windows `pm2 describe` 回报
-- [~] **A4 断电卡单核查状态机** —— 本刀 `fix/admin-print-outcome-verify`（未合入）。推送/工单仍不做；告警仍是实时派生
+- [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做；告警仍是实时派生
 
 ### B. 需你方动手（共 3 条，非代码）
 

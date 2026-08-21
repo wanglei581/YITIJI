@@ -1,6 +1,8 @@
 # 当前开发进度
 
-> **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。
+> **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
+
+2026-08-22 补 **双后台进现行口径**：`feature-scope.md` §1.2 增加 Admin / Partner 两行（真实路由、禁止招聘闭环、C0 `/online-platforms` 原型有运行时无、C1 统计待收口）。`docs/README.md` 写明双后台运行时真源是 `apps/admin` 与 `apps/partner`。原型目录补 `docs/design/console-ai-os-2026-08/README.md`。A4 核查状态机按 `main@2e7b4fc52`（#740）改为已合入未部署。不改后台运行时代码，不部署。
 
 2026-08-22 **整理第二批（CEO 口径，三家 GO_BATCH2：Claude Opus 5 xhigh / Codex DeepSeek-v4-flash / Antigravity）**。不图省事全删。做了：① 过期声明盖章（上一刀）；② 工作树只抽可重建 `node_modules`、`git worktree prune` 清空登记、删 installer artifacts；有未提交改动或独有提交的工作树**源码全留**；未 `git worktree remove` 整棵树。③ `feature-scope.md` 补 1.2 实现/上线状态表。不动：`apps/miniapp` 运行时、`kiosk-redesign-2026-08`、V6/Gen1 CI 原型、主仓 `node_modules`。不 push、不部署、不 SSH。工作树分类：约 105 个 prunable 空登记；活树约 62，脏树（如 s3-consent、pickup-title、v6-online-platforms）当候选资产保留。
 

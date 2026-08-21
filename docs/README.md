@@ -36,7 +36,11 @@ V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ �
 ⚠️ 不要与 `design/kiosk-proto-2026-07-migration-matrix.md` 混淆 —— 后者是 **Gen 1** 的 75 屏矩阵，
 仍被 `verify-fusion-baseline.mjs` 当作路由清单门禁的检查对象，**不能删、也不是 V6 口径**。
 
-**双后台**：`design/console-ai-os-2026-08/`。
+**双后台（不要漏）**：
+- 运行时真源：管理员 `apps/admin/`，合作机构 `apps/partner/`。
+- 设计原型：`design/console-ai-os-2026-08/`（`admin/` + `partner/`）。
+- 不是招聘企业端。Partner 只做数据与运营，不做候选人筛选 / 收简历 / 面试邀约。
+- C0 事实冻结未完成：原型有 Admin `/online-platforms`，`apps/admin/src/routes/index.tsx` 里还没有这条运行时路由。后续施工仍以 `progress/next-tasks.md` 的 C0–C6 为准，不要把原型页当成已经上线的后台。
 
 **小程序**：没有独立原型目录。页面级体验以 `apps/miniapp/` 正式源码为准。
 
