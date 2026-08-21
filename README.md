@@ -42,7 +42,7 @@ apps/
   kiosk/               # 一体机前台（主终端，1080×1920 竖屏触控）
   admin/               # 管理员后台（终端、订单、文件、AI、告警、审计）
   partner/             # 合作机构后台（数据源、岗位/招聘会信息管理）
-  miniprogram/         # 微信小程序（M0 阶段）
+  miniapp/             # 微信小程序唯一发布源（原生）
   terminal-agent/      # Windows 本地 Agent（硬件交互，独立运行于 Win10/11 x64）
 
 services/

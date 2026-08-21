@@ -2,6 +2,8 @@
 
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
+2026-08-22 **清理多余文件（五家 GO_CLEAN：Claude / Codex GPT-5.6 Sol High / Antigravity / Hermes / Grok）**。负责人授权只清混乱无用文件，不解冻、不重做前端。删了：未跟踪空壳 `apps/miniprogram/`（仅残留 Taro `node_modules`，正式源仍是 `apps/miniapp/`）；无 CI/无引用的 `apps/kiosk/fusion-capture.mjs`、`fusion-audit.mjs`、`fusion-layout.mjs`；本地 `.DS_Store` / 空 `outputs/` / `.superpowers/brainstorm` 缓存。根 README 小程序路径改为 `apps/miniapp/`。保留：`其他文档/`、`kiosk-redesign-2026-08`、`design-shot.mjs`、`apps/miniapp` 运行时、`apps/kiosk` 运行时页、fusion `sources/**`、独有工作树源码、主仓 `node_modules`。未 `git add -A`。
+
 2026-08-22 **整理线收口（本线做完）**。范围内已完成：7 套废弃原型删除、误导口径/规格盖章、双后台写入 `feature-scope` §1.2、工作树 prune + 只抽可重建依赖（源码全留）、五家调用名单与连通复测。本线**停止加新刀**。不做：130 份 `superpowers` 历史任务单逐份改写、独有工作树合并（要你醒着点头）、`apps/kiosk`/`apps/miniapp` 运行时、解冻部署、把 `kiosk-redesign-2026-08` 入库。本地仍有纯文档提交待推；生产仍冻在 8/14 SHA。产品上线剩余是 B1 解冻 / B2 内容 / B3 真机，不在本线。
 
 2026-08-22 **本机多模型调用（负责人指定，后续共识必须带齐）**。DeepSeek 不再走 Codex。调用方式：
