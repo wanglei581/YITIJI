@@ -8,9 +8,11 @@
 |------|---------|------|
 | Grok | 当前会话 | Grok 4.6 |
 | Claude | `claude --model opus --effort xhigh` | Claude Opus 5 xhigh |
-| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"` | GPT-5.6 Sol High |
+| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"`（需 `~/.local/bin/codex-code-mode-host`） | GPT-5.6 Sol High |
 | Antigravity | 参数必须写在 `-p` **前面**：`agy --dangerously-skip-permissions --model gemini-3.7-flash-high -p "..."` | Gemini 3.7 Flash High |
 | Hermes | 终端直接 `Hermes`；非交互：`Hermes chat --cli -Q --yolo --provider deepseek -m deepseek-v4-flash --reasoning max --in "<仓库根>" -q "..."` | DeepSeek-v4-flash Max |
+
+2026-08-22 **五家连通复测通过后继续 BATCH5**。实测：Grok 本会话；Claude `OK Claude Code claude-opus-5`；Codex `OK Codex GPT-5.6 Sol High`（已把 ChatGPT.app 里的 `codex-code-mode-host` 链到 `~/.local/bin`，缺它时只读工具全红）；Antigravity `OK agy Gemini 3.7 Flash High`；Hermes `OK hermes deepseek-v4-flash`。五家都能读到 `current-progress` 顶部 BATCH4 / `kiosk-redesign`。BATCH5 只给 `docs/superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md` 加过期横幅（正文仍写「现行视觉 / 已生效」，那是当时快照）。未 push。不动运行时、不解冻、不碰 `kiosk-redesign`。
 
 2026-08-22 **整理 BATCH4（五家：Claude Opus 5 xhigh / Codex GPT-5.6 Sol High / Antigravity / Hermes DeepSeek-v4-flash Max / Grok）**。有效票 GO_BATCH4（Codex 因本机 `codex-code-mode-host` 缺失弃权，未当反对）。做了：① 抽 `fix-pii-billing` 工作树可重建 `node_modules`（约 990MB→源码仍在）；② 删除 gitignore 内 `.pdfvenv`（约 74MB）；③ 给仍会误导的 7 月规格/runbook/视觉参考加过期声明；④ 改正 `next-tasks.md` 页脚（口径已在 origin/main，生产未部署）。未 push（需负责人回「推」）。不动：`kiosk-redesign-2026-08`、`apps/miniapp` 运行时、`apps/kiosk` 运行时、fusion `sources/**`、不解冻部署、不 `worktree remove`。
 

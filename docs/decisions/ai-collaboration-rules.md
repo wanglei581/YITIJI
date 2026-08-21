@@ -106,7 +106,7 @@ docs/reviews/codex-[模块]-review.md
 | 角色 | 本地命令要点 | 模型 |
 |------|-------------|------|
 | Claude | `claude --model opus --effort xhigh` | Claude Opus 5 xhigh |
-| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"` | GPT-5.6 Sol High |
+| Codex | `codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"`（PATH 上要有 `codex-code-mode-host`） | GPT-5.6 Sol High |
 | Antigravity | 参数必须在 `-p` 前面；`--dangerously-skip-permissions --model gemini-3.7-flash-high` | Gemini 3.7 Flash High |
 | Hermes | 终端直接输入 `Hermes`；非交互加 `chat --cli -Q --yolo --provider deepseek -m deepseek-v4-flash --reasoning max` | DeepSeek-v4-flash Max |
 | Grok | 当前 Grok 会话 | Grok 4.6 |
