@@ -15,7 +15,7 @@
 
 ### B. 需你方动手（共 3 条，非代码）
 
-- [ ] **B1 评审并落地 Batch 2 后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。治理分支 `codex/governance-safety-20260822` 已推送首个 Batch 2 提交 `5121a1408`；精确 SHA CI run `32565825843` 发现 `actions/upload-artifact` pin 归属错误后已取消，生产 Deploy 未触发。当前下一步是提交并推送 Action 精确允许表修复，重新运行该新 SHA 的完整 CI，要求三 job 全绿且 Linux `setsid` 用例真实执行；只有这些证据成立，才进入 PR/合并决策。随后仍需做 Git/PR/worktree/stash 只读治理和容量/可观测性/Worker 并发方案。真实生产部署、备份清理、空间回收、重启或迁移必须另开具名维护窗口，重新核对磁盘、备份、Node 22、Redis、PM2、nginx、`DEPLOY_SOURCE.txt`/`API_DEPLOY_SOURCE.txt`、release-state 和人工恢复命令；不得直接把 `DEPLOY_API_ENABLED` 打开
+- [ ] **B1 评审并落地 Batch 2 后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。治理分支 `codex/governance-safety-20260822` 已推送 `5121a1408` 与 Action 所属修复 `614e2e5ec`；run `32565825843` 发现 upload-artifact pin 归属错误，run `32567507641` 已证明新 Action allowlist 在 Ubuntu 通过，但继续暴露部署安全 fixture 的跨平台权限读取误判，两个 run 均未触发生产 Deploy。当前下一步是提交 Node `fs.statSync().mode` 权限断言修复并对新精确 SHA 重跑完整 CI，要求三 job 全绿、Linux `setsid` 用例真实执行且 PM2 dump `0600` 断言通过；只有这些证据成立，才进入 PR/合并决策。随后仍需做 Git/PR/worktree/stash 只读治理和容量/可观测性/Worker 并发方案。真实生产部署、备份清理、空间回收、重启或迁移必须另开具名维护窗口，重新核对磁盘、备份、Node 22、Redis、PM2、nginx、`DEPLOY_SOURCE.txt`/`API_DEPLOY_SOURCE.txt`、release-state 和人工恢复命令；不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
 - [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
 

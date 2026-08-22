@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-22 **Batch 2 Linux CI 反证与权限断言修复（当前候选，尚待新 SHA CI）**。治理提交 `614e2e5ec8ab4bc8e74ba745833e32f96d9da72a` 已推送；精确 SHA 的 CI run `32567507641` 中，Action 所属 allowlist 与完整 YAML `uses` 扫描在 Ubuntu 上已输出 `ALL PASS`，但同一 gate 后续的部署安全 fixture 报 `FAIL: API restore did not protect the PM2 dump`。核对真实恢复脚本确认 `pm2 save` 后仍执行 `chmod 0600`；失败源是测试用 `stat -f ... || stat -c ...` 在 GNU stat 下首个命令可能以成功状态返回非权限内容，导致 Linux 误判。当前候选改用已锁定 Node 的 `fs.statSync(...).mode & 0o777` 跨平台读取权限，不放宽 `0600` 要求；仍须以新提交精确 SHA 的 GitHub CI 证明 Linux `setsid`、PM2 dump 权限及三 job 全绿。生产继续 NO-GO。
+
 2026-08-22 **Batch 2 Action 引用门禁补充（修复候选，尚待新 SHA CI）**。Action 允许表不仅逐项绑定 `owner/repository@40hex`，还通过 Ruby/Psych 安全解析完整 YAML 结构并递归收集所有 `uses` 键；规范块、合法行内映射、引号键以及 anchor/alias 展开都进入同一 allowlist，不能再绕过扫描。行内映射与引号键反方用例已加入 verifier 自测；仍须以修复提交精确 SHA 的 GitHub CI 证明，生产继续 NO-GO。
 
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。

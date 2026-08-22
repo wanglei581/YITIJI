@@ -490,7 +490,7 @@ grep -Fxq 'PRINT_REQUIRE_PII_SCAN=true' "$RESTORE/home/.pm2/start-env" || fail '
 if grep -Eq '^(DEPLOY_|TARGET_SHA=|CI_RUN=|KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN=)' "$RESTORE/home/.pm2/start-env"; then
   fail 'API restore leaked deployment controls into PM2'
 fi
-test "$(stat -f '%Lp' "$RESTORE/home/.pm2/dump.pm2" 2>/dev/null || stat -c '%a' "$RESTORE/home/.pm2/dump.pm2")" = 600 \
+test "$("$RESTORE/bin/node" -e 'const fs = require("node:fs"); process.stdout.write((fs.statSync(process.argv[1]).mode & 0o777).toString(8))' "$RESTORE/home/.pm2/dump.pm2")" = 600 \
   || fail 'API restore did not protect the PM2 dump'
 
 RESTORE_TARGET_SHA="7777777777777777777777777777777777777777"
