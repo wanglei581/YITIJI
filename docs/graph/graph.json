@@ -14427,10 +14427,20 @@
       "apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs",
       "packages/ui/scripts/verify-service-desk-foundation.mjs",
       "scripts/project-graph/gates.mjs",
-      "scripts/verify-ci-gate-coverage.mjs"
+      "scripts/verify-ci-gate-coverage.mjs",
+      "scripts/verify-deploy-authorization-gate.mjs"
+    ],
+    ".github/workflows/cleanup-stale-releases.yml": [
+      "scripts/verify-deploy-authorization-gate.mjs"
+    ],
+    ".github/workflows/deploy-precheck.yml": [
+      "scripts/verify-deploy-authorization-gate.mjs"
     ],
     ".github/workflows/deploy.yml": [
       "apps/kiosk/scripts/verify-deploy-vite-env-coverage.mjs",
+      "scripts/verify-deploy-authorization-gate.mjs"
+    ],
+    ".github/workflows/server-cleanup.yml": [
       "scripts/verify-deploy-authorization-gate.mjs"
     ],
     "apps/admin/package.json": [
@@ -21063,7 +21073,11 @@
         "absent": [],
         "dirs": [],
         "files": [
-          ".github/workflows/deploy.yml"
+          ".github/workflows/ci.yml",
+          ".github/workflows/cleanup-stale-releases.yml",
+          ".github/workflows/deploy-precheck.yml",
+          ".github/workflows/deploy.yml",
+          ".github/workflows/server-cleanup.yml"
         ],
         "missing": []
       },
@@ -21991,6 +22005,15 @@
         "risk": "protected",
         "scope": "docs",
         "why": "当前 V6 目标设计，是「将要实现」而不是「已被引用」"
+      },
+      {
+        "detail": "全仓没有任何其它文件提到这个路径或文件名",
+        "file": "docs/device/deploy-unfreeze-runbook-2026-08-17.md",
+        "kind": "doc",
+        "mentions": [],
+        "risk": "low",
+        "scope": "docs",
+        "why": "全仓零提及：无路由、无 import、无门禁、无文档、无 CI"
       },
       {
         "detail": "全仓没有任何其它文件提到这个路径或文件名",

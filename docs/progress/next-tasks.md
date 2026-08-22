@@ -15,7 +15,7 @@
 
 ### B. 需你方动手（共 3 条，非代码）
 
-- [ ] **B1 固化生产启动环境后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。API `.env` 已提供 `NODE_ENV=production`，但 PM2 初始环境没有显式固化；集中安全门禁、生产 CORS/CSP 与 trust proxy 不应依赖隐含启动路径。**先在 PM2/部署配置中显式固定 production，经备份与回滚准备后受控重启，确认进程 online、ready=200、门禁与三端正常，再按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布**。不得直接把 `DEPLOY_API_ENABLED` 打开
+- [ ] **B1 评审并落地 Batch 2 后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。本地治理分支已形成 Batch 2 候选：固定 production runtime、PM2 最小环境、受信任 `workflow_run`/main SHA 绑定、API/full 双来源、attempt 状态机、三端原子切换与真实 HTTP/磁盘对盘、混合版本 fail-closed、备份精确保留、deploy/cleanup 双层互斥及故障注入门禁；**尚未 push、尚无 GitHub CI、尚未部署**。下一步先完成剩余独立终审和完整本地门禁，再显式提交/推送治理分支并观察 CI 与 Deploy skipped；随后先做 Git/PR/worktree/stash 只读治理和容量/可观测性/Worker 并发方案。真实生产部署、备份清理、空间回收、重启或迁移必须另开具名维护窗口，重新核对磁盘、备份、Node 22、Redis、PM2、nginx、`DEPLOY_SOURCE.txt`/`API_DEPLOY_SOURCE.txt`、release-state 和人工恢复命令；不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
 - [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
 

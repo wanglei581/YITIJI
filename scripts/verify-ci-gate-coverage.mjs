@@ -52,6 +52,7 @@ const exemptionsPath = join(repoRoot, 'scripts/ci-gate-exemptions.json')
 // 只增不减：删除任何一条都等于降低标准。
 const REQUIRED_COMMANDS = [
   'node scripts/verify-deploy-authorization-gate.mjs',
+  'bash scripts/verify-deploy-safety.sh',
   'pnpm --filter @ai-job-print/miniapp verify:static',
   'pnpm run verify:task-runner-wake',
   'pnpm --filter @ai-job-print/kiosk verify:service-entry-readiness',

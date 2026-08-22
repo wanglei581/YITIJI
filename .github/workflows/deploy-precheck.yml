@@ -1,5 +1,7 @@
 name: Deploy Precheck (read-only)
 
+permissions: {}
+
 # 发布前置核对：只回答「部署脚本的默认值与服务器实际是否一致」，不做任何写操作。
 #
 # 背景：deploy-api-release.sh 的顺序是
@@ -23,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read-only probe via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}

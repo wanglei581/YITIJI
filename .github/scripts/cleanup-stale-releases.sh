@@ -9,7 +9,7 @@
 #   4. execute 用两阶段：先 mv 到隔离区 /srv/.cleanup-trash/<时间戳>，
 #      **不直接 rm** —— 误判也能立刻恢复。真删由人在观察窗口后手动执行。
 #   5. usb-bridge-live / -final- / releases 三类**不在**本白名单，进第二批人工确认。
-set -uo pipefail
+set -euo pipefail
 
 MODE="${CLEANUP_MODE:-dry-run}"          # dry-run | execute
 CONFIRM="${CLEANUP_CONFIRM:-}"           # execute 模式必须等于 EXPECT_CONFIRM
@@ -46,12 +46,8 @@ refuse() { echo "❌ REFUSE: $*" >&2; exit 1; }
 if [ "$MODE" = purge-trash ]; then
   TARGET="${CLEANUP_PURGE_PATH:-}"
   [[ -n "$TARGET" ]] || refuse "purge-trash 需要 CLEANUP_PURGE_PATH"
-  case "$TARGET" in
-    /srv/.cleanup-trash/*) : ;;
-    *) refuse "只允许删 /srv/.cleanup-trash/<时间戳>：$TARGET" ;;
-  esac
-  [[ "$TARGET" != *"*"* && "$TARGET" != *".."* ]] || refuse "含通配符或相对路径：$TARGET"
-  [[ "$TARGET" != "/srv/.cleanup-trash" && "$TARGET" != "/srv/.cleanup-trash/" ]]     || refuse "拒绝删整个隔离区根目录，必须指定具体时间戳子目录"
+  [[ "$TARGET" =~ ^/srv/\.cleanup-trash/[0-9]{8}T[0-9]{6}$ ]] \
+    || refuse "只允许删 /srv/.cleanup-trash/YYYYMMDDTHHMMSS"
   [[ -d "$TARGET" ]] || refuse "目录不存在：$TARGET"
 
   [[ -n "$EXPECT_CONFIRM" && "$CONFIRM" == "$EXPECT_CONFIRM" ]]     || refuse "confirm 不匹配，purge 中止（未删除任何文件）"
@@ -202,6 +198,6 @@ done
 echo
 echo "=== 已隔离到 $TRASH（未真删）==="
 echo "请依次验证，全部正常后再手动 rm -rf $TRASH ："
-echo "  nginx -t && curl -fsS http://127.0.0.1:3010/health"
+echo "  nginx -t && curl -fsS http://127.0.0.1:3010/api/v1/health"
 echo "  pm2 jlist >/dev/null && df -h /"
 echo "建议观察 24-72 小时无异常后再删除隔离区。"

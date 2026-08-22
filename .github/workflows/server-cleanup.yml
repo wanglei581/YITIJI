@@ -1,5 +1,12 @@
 name: Server Cleanup (backups / pnpm store / journal)
 
+permissions:
+  contents: read
+
+concurrency:
+  group: production-maintenance
+  cancel-in-progress: false
+
 # 服务器磁盘清理。默认 dry-run，只列清单不删任何东西。
 #
 # 背景：根分区 40GB 已用 100%，可用仅 1GiB。占用分布（只读探测所得）：
@@ -43,8 +50,27 @@ jobs:
     name: Reclaim disk space
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout reviewed cleanup script
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Copy reviewed retention script
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          source: .github/scripts/deploy-backup-retention.sh
+          target: /tmp/ai-job-print-cleanup-${{ github.sha }}
+          strip_components: 2
+
       - name: Run cleanup via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          KEEP: ${{ inputs.keep }}
+          PRUNE_PNPM: ${{ inputs.prune_pnpm }}
+          VACUUM_JOURNAL: ${{ inputs.vacuum_journal }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -53,8 +79,22 @@ jobs:
           command_timeout: 15m
           envs: DRY_RUN,KEEP,PRUNE_PNPM,VACUUM_JOURNAL
           script: |
-            set -uo pipefail
+            set -euo pipefail
+            command -v flock >/dev/null 2>&1 || { echo "::error::flock is required"; exit 1; }
+            exec 9>/var/lock/ai-job-print-production-maintenance.lock
+            flock -n 9 || { echo "::error::another production maintenance operation is active"; exit 1; }
             BK=/srv/ai-job-print-backups
+            RUNTIME_ROOT=/srv/ai-job-print
+            RETENTION_SCRIPT=/tmp/ai-job-print-cleanup-${{ github.sha }}/deploy-backup-retention.sh
+
+            case "$DRY_RUN" in true | false) ;; *) echo "::error::dry_run must be true or false"; exit 1;; esac
+            case "$KEEP" in '' | *[!0-9]*) echo "::error::keep must be a positive integer"; exit 1;; esac
+            if [ "$KEEP" -lt 1 ]; then echo "::error::keep must be at least 1"; exit 1; fi
+            case "$PRUNE_PNPM" in true | false) ;; *) echo "::error::prune_pnpm must be true or false"; exit 1;; esac
+            case "$VACUUM_JOURNAL" in true | false) ;; *) echo "::error::vacuum_journal must be true or false"; exit 1;; esac
+            if [ ! -f "$RETENTION_SCRIPT" ] || [ -L "$RETENTION_SCRIPT" ]; then
+              echo "::error::reviewed retention script is missing"; exit 1
+            fi
 
             echo "=== 清理前 ==="
             echo "ROOT_USED_PCT=$(df --output=pcent / | tail -1 | tr -dc '0-9')"
@@ -64,52 +104,13 @@ jobs:
               echo "::error::备份目录不存在，中止（不在未知路径上执行删除）"; exit 1
             fi
 
-            echo "=== 备份清单（按发布分组，新→旧）==="
-            # 每次发布产生 <prefix>.dump 与 <prefix>.runtime，按 prefix 归组
-            STEMS="$(find "$BK" -maxdepth 1 -mindepth 1 -printf '%T@\t%p\n' \
-                     | sort -rn \
-                     | sed 's#.*/##' \
-                     | sed 's/\.\(dump\|runtime\)$//' \
-                     | awk '!seen[$0]++')"
-            TOTAL="$(echo "$STEMS" | grep -c . || true)"
-            echo "RELEASE_GROUP_COUNT=$TOTAL"
-
-            IDX=0
-            KEEP_LIST=""
-            DEL_LIST=""
-            while IFS= read -r stem; do
-              [ -z "$stem" ] && continue
-              IDX=$((IDX+1))
-              SZ="$(du -sm "$BK"/"$stem"* 2>/dev/null | awk '{s+=$1} END{print s+0}')"
-              AGE="$(find "$BK" -maxdepth 1 -name "$stem*" -printf '%T@\n' 2>/dev/null | sort -rn | head -1 \
-                     | awk '{print int((systime()-$1)/86400)}')"
-              if [ "$IDX" -le "$KEEP" ]; then
-                echo "  [保留] #$IDX  ${SZ}MB  ${AGE}天前"
-                KEEP_LIST="$KEEP_LIST $stem"
-              else
-                echo "  [待删] #$IDX  ${SZ}MB  ${AGE}天前"
-                DEL_LIST="$DEL_LIST $stem"
-              fi
-            done <<< "$STEMS"
-
-            DEL_COUNT="$(echo $DEL_LIST | wc -w | tr -d ' ')"
-            echo "PLAN_KEEP=$KEEP  PLAN_DELETE_GROUPS=$DEL_COUNT"
-
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "=== DRY-RUN：以上仅为计划，未删除任何文件 ==="
-            else
-              if [ "$IDX" -le "$KEEP" ]; then
-                echo "备份份数未超过保留数，无需删除"
-              else
-                echo "=== 执行删除（永不删最新一份）==="
-                for stem in $DEL_LIST; do
-                  # 双重保险：跳过保留名单中的任何 stem
-                  case " $KEEP_LIST " in *" $stem "*) echo "  跳过（在保留名单）"; continue;; esac
-                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime 2>/dev/null
-                  echo "  已删除一组"
-                done
-              fi
-            fi
+            echo "=== 精确备份保留计划 ==="
+            BACKUP_ROOT="$BK" \
+              BACKUP_ROOT_EXPECTED="$BK" \
+              DEPLOY_SOURCE_FILE="$RUNTIME_ROOT/DEPLOY_SOURCE.txt" \
+              DEPLOY_BACKUP_KEEP="$KEEP" \
+              DEPLOY_BACKUP_DRY_RUN="$DRY_RUN" \
+              bash "$RETENTION_SCRIPT"
 
             if [ "$PRUNE_PNPM" = "true" ] && [ "$DRY_RUN" != "true" ]; then
               echo "=== pnpm store prune（只删无引用包）==="
@@ -125,8 +126,15 @@ jobs:
             echo "ROOT_USED_PCT=$(df --output=pcent / | tail -1 | tr -dc '0-9')"
             echo "ROOT_AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
             echo "BACKUP_ROOT_SIZE_MB=$(du -sm "$BK" 2>/dev/null | cut -f1)"
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-          KEEP: ${{ inputs.keep }}
-          PRUNE_PNPM: ${{ inputs.prune_pnpm }}
-          VACUUM_JOURNAL: ${{ inputs.vacuum_journal }}
+
+      - name: Remove transferred script
+        if: always()
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          script: |
+            rm -f -- /tmp/ai-job-print-cleanup-${{ github.sha }}/deploy-backup-retention.sh
+            rmdir -- /tmp/ai-job-print-cleanup-${{ github.sha }} 2>/dev/null || true

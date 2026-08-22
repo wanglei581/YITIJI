@@ -6,6 +6,9 @@
 # FILE_STORAGE_DRIVER 强制 local,绝不触达生产 COS。
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -49,7 +52,7 @@ jobs:
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -66,11 +69,11 @@ jobs:
           fi
           echo "OK: 无被跟踪的 AI 工具活动状态文件"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.2.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -83,7 +86,9 @@ jobs:
 
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
-        run: node scripts/verify-deploy-authorization-gate.mjs
+        run: |
+          node scripts/verify-deploy-authorization-gate.mjs
+          bash scripts/verify-deploy-safety.sh
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
@@ -717,11 +722,11 @@ jobs:
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
       TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.2.2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -908,13 +913,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.2.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -977,7 +982,7 @@ jobs:
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           name: kiosk-browser-smoke-failure
           path: |
