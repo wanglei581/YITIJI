@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -24,6 +25,96 @@ const staticReleaseScriptPath = path.join(root, '.github/scripts/deploy-static-r
 const staticReleaseScript = fs.readFileSync(staticReleaseScriptPath, 'utf8')
 const wholeReleaseClassifierPath = path.join(root, '.github/scripts/classify-whole-release-state.sh')
 const wholeReleaseClassifier = fs.readFileSync(wholeReleaseClassifierPath, 'utf8')
+const workflowDirectory = path.join(root, '.github/workflows')
+
+const approvedActionRefs = new Set([
+  'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
+  'actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9',
+  'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
+  'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  'appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634',
+  'appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262',
+  'pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa',
+])
+
+function assertApprovedActionRef(actionRef, sourceName) {
+  assert.match(
+    actionRef,
+    /^[^/@\s]+\/[^@\s]+@[0-9a-f]{40}$/,
+    `${sourceName} must pin every external Action to a full commit or annotated-tag object SHA: ${actionRef}`
+  )
+  assert.ok(
+    approvedActionRefs.has(actionRef),
+    `${sourceName} uses an unapproved or mismatched Action ref: ${actionRef}`
+  )
+}
+
+function extractYamlActionRefs(contents, sourceName) {
+  const ruby = String.raw`
+require 'json'
+require 'yaml'
+
+source = STDIN.read
+document = begin
+  YAML.safe_load(source, permitted_classes: [], permitted_symbols: [], aliases: true)
+rescue ArgumentError
+  YAML.safe_load(source, [], [], true)
+end
+
+refs = []
+walk = nil
+walk = lambda do |value|
+  case value
+  when Hash
+    value.each do |key, child|
+      refs << child if key.to_s == 'uses'
+      walk.call(child)
+    end
+  when Array
+    value.each { |child| walk.call(child) }
+  end
+end
+walk.call(document)
+STDOUT.write(JSON.generate(refs))
+`
+  const result = spawnSync('ruby', ['-e', ruby], {
+    cwd: root,
+    encoding: 'utf8',
+    input: contents,
+  })
+  if (result.error) {
+    if (result.error.code === 'ENOENT') {
+      throw new Error('Ruby is required for structured workflow Action validation but was not found')
+    }
+    throw result.error
+  }
+  assert.equal(result.status, 0, `${sourceName} could not be parsed as safe YAML: ${result.stderr.trim()}`)
+  const actionRefs = JSON.parse(result.stdout)
+  for (const actionRef of actionRefs) {
+    assert.equal(typeof actionRef, 'string', `${sourceName} contains a non-string uses value`)
+  }
+  return actionRefs
+}
+
+assert.throws(
+  () => assertApprovedActionRef('actions/upload-artifact@v4', 'self-test'),
+  /must pin every external Action/,
+  'immutable Action gate must reject mutable tags'
+)
+assert.throws(
+  () => assertApprovedActionRef('actions/upload-artifact@b906affcce14559ad1aafd4ab0e942779e9f58b1', 'self-test'),
+  /unapproved or mismatched Action ref/,
+  'immutable Action gate must reject a valid SHA that belongs to another Action repository'
+)
+assert.throws(
+  () => {
+    for (const actionRef of extractYamlActionRefs('- { "uses": attacker/example@v1 }\n', 'self-test.yml')) {
+      assertApprovedActionRef(actionRef, 'self-test.yml')
+    }
+  },
+  /must pin every external Action/,
+  'immutable Action gate must parse and reject YAML flow mappings with quoted uses keys'
+)
 
 const deployJob = workflow.match(/^  deploy:\n[\s\S]*$/m)?.[0]
 assert.ok(deployJob, 'deploy.yml must contain the deploy job')
@@ -50,22 +141,19 @@ for (const [name, contents] of [
   assert.match(contents, /flock -n 9/, `${name} must also acquire the host-level production maintenance lock`)
 }
 
-const productionWorkflows = [
-  ['deploy workflow', workflow],
-  ['deploy precheck workflow', deployPrecheckWorkflow],
-  ['server cleanup workflow', cleanupWorkflow],
-  ['stale release cleanup workflow', staleCleanupWorkflow],
-]
-for (const [name, contents] of [['CI workflow', fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')], ...productionWorkflows]) {
-  const actionRefs = [...contents.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)(?:\s+#.*)?$/gm)]
-  if (name === 'CI workflow') {
-    assert.equal(actionRefs.length, 10, 'CI action inventory changed; review and update the immutable-action gate')
-  }
-  for (const match of actionRefs) {
-    const actionRef = match[1]
-    assert.match(actionRef, /@[0-9a-f]{40}$/, `${name} must pin every third-party Action to a full commit SHA: ${actionRef}`)
+const workflowFiles = fs.readdirSync(workflowDirectory)
+  .filter((file) => /\.ya?ml$/.test(file))
+  .sort()
+let actionInventoryCount = 0
+for (const file of workflowFiles) {
+  const contents = fs.readFileSync(path.join(workflowDirectory, file), 'utf8')
+  const actionRefs = extractYamlActionRefs(contents, file)
+  actionInventoryCount += actionRefs.length
+  for (const actionRef of actionRefs) {
+    assertApprovedActionRef(actionRef, file)
   }
 }
+assert.equal(actionInventoryCount, 21, 'workflow Action inventory changed; review every new or removed Action ref')
 const ciWorkflow = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')
 assert.match(ciWorkflow, /^permissions:\s*\n\s+contents:\s*read\s*$/m, 'CI workflow must grant only repository contents read permission')
 assert.match(workflow, /^permissions:\s*\{\}\s*$/m, 'deploy workflow must declare no GitHub token permissions')
