@@ -38,6 +38,68 @@ function expectClassTokens(source, tokens, message) {
   if (classLists.some((classList) => tokens.every((token) => classList.includes(token)))) pass(message)
   else fail(`${message} — class tokens ${tokens.join(' + ')} not found`)
 }
+function hasImmutableCheckoutWithFullHistory(source) {
+  const ruby = String.raw`
+require 'json'
+require 'yaml'
+
+source = STDIN.read
+document = begin
+  YAML.safe_load(source, permitted_classes: [], permitted_symbols: [], aliases: true)
+rescue ArgumentError
+  YAML.safe_load(source, [], [], true)
+end
+
+jobs = document.is_a?(Hash) ? document.fetch('jobs', {}) : {}
+job = jobs.is_a?(Hash) ? jobs.fetch('build-and-verify', {}) : {}
+steps = job.is_a?(Hash) ? job.fetch('steps', []) : []
+rows = steps.is_a?(Array) ? steps.each_with_object([]) do |step, result|
+  next unless step.is_a?(Hash)
+  inputs = step['with']
+  fetch_depth = inputs.is_a?(Hash) ? inputs['fetch-depth'] : nil
+  fetch_depth_valid =
+    (fetch_depth.is_a?(Integer) && fetch_depth == 0) ||
+    (fetch_depth.is_a?(String) && fetch_depth == '0')
+  result << { 'uses' => step['uses'], 'fetch_depth_valid' => fetch_depth_valid }
+end : []
+
+STDOUT.write(JSON.generate(rows))
+`
+  const rows = JSON.parse(
+    execFileSync('ruby', ['-e', ruby], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      input: source,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }),
+  )
+
+  const checkoutSteps = rows.filter(
+    (step) => typeof step.uses === 'string' && /^actions\/checkout(?:@|$)/i.test(step.uses),
+  )
+  return checkoutSteps.length > 0 && checkoutSteps.every((step) => {
+    const immutableCheckout =
+      typeof step.uses === 'string' && /^actions\/checkout@[0-9a-f]{40}$/.test(step.uses)
+    return immutableCheckout && step.fetch_depth_valid === true
+  })
+}
+function expectImmutableCheckoutWithFullHistory(source, message) {
+  if (hasImmutableCheckoutWithFullHistory(source)) pass(message)
+  else fail(`${message} — build-and-verify 的所有 checkout 必须固定 40 位小写提交 SHA，且各自 with.fetch-depth 必须为 0`)
+}
+function expectCheckoutFixture(source, expected, message) {
+  const actual = hasImmutableCheckoutWithFullHistory(source)
+  if (actual === expected) pass(message)
+  else fail(`${message} — expected ${expected}, received ${actual}`)
+}
+function buildWorkflowFixture(steps) {
+  const indentedSteps = steps
+    .trim()
+    .split('\n')
+    .map((line) => `      ${line}`)
+    .join('\n')
+  return `jobs:\n  build-and-verify:\n    steps:\n${indentedSteps}`
+}
 function readImportedCss(entryPath, expectedImports, message) {
   const entry = read(entryPath)
   const imports = [...entry.matchAll(/^@import\s+['"]([^'"]+)['"];\s*$/gm)].map((match) => match[1])
@@ -122,9 +184,90 @@ function checkScopedCss(relativePath, source) {
 
 console.log('\n=== Profile 主入口 LightFlow 与 /me 明细边界守卫 ===')
 
-expectMatches(
+const checkoutSha = '11d5960a326750d5838078e36cf38b85af677262'
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha} # v4\n  with:\n    fetch-depth: 0`),
+  true,
+  'checkout 契约自检接受 immutable SHA 与同一步完整历史配置',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture('- uses: actions/checkout@v4\n  with:\n    fetch-depth: 0'),
+  false,
+  'checkout 契约自检拒绝可变 tag',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n- name: unrelated\n  with:\n    fetch-depth: 0`),
+  false,
+  'checkout 契约自检拒绝借用其他 step 的 fetch-depth',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    fetch-depth: 0\n- uses: actions/checkout@v4\n  with:\n    fetch-depth: 0`),
+  false,
+  'checkout 契约自检拒绝混入第二个可变 checkout',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    fetch-depth: 0\n- uses: actions/checkout@${'2'.repeat(40)}\n  with:\n    fetch-depth: "0"`),
+  true,
+  'checkout 契约自检接受多个各自合规的 checkout',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    fetch-depth: 0\n- uses: actions/checkout`),
+  false,
+  'checkout 契约自检拒绝混入裸 checkout 引用',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    nested:\n      fetch-depth: 0`),
+  false,
+  'checkout 契约自检拒绝嵌套伪造的 fetch-depth',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    nested:\n      with:\n        fetch-depth: 0`),
+  false,
+  'checkout 契约自检拒绝嵌套 with 伪造的 fetch-depth',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- name: forged script\n  run: |\n    - uses: actions/checkout@${checkoutSha}\n      with:\n        fetch-depth: 0`),
+  false,
+  'checkout 契约自检不把 run 脚本文本当作真实 checkout',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}`),
+  false,
+  'checkout 契约自检拒绝缺失完整历史配置',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha.toUpperCase()}\n  with:\n    fetch-depth: 0`),
+  false,
+  'checkout 契约自检拒绝非小写 SHA',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- uses: actions/checkout@${checkoutSha}\n  with:\n    fetch-depth: 0.0`),
+  false,
+  'checkout 契约自检拒绝浮点 fetch-depth',
+)
+expectCheckoutFixture(
+  buildWorkflowFixture(`- { uses: "actions/checkout@${checkoutSha}", with: { fetch-depth: "0" } }`),
+  true,
+  'checkout 契约自检按 YAML 语义接受引号与行内 mapping',
+)
+expectCheckoutFixture(
+  `checkout-inputs: &checkout-inputs\n  fetch-depth: 0\njobs:\n  build-and-verify:\n    steps:\n      - uses: actions/checkout@${checkoutSha}\n        with: *checkout-inputs`,
+  true,
+  'checkout 契约自检按 YAML 语义接受安全 anchor/alias',
+)
+expectCheckoutFixture(
+  `jobs:\n  unrelated:\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 1\n  build-and-verify:\n    steps:\n      - uses: actions/checkout@${checkoutSha}\n        with:\n          fetch-depth: 0`,
+  true,
+  'checkout 契约自检仅约束实际运行 verifier 的 build-and-verify job',
+)
+expectCheckoutFixture(
+  `jobs:\n  unrelated:\n    steps:\n      - uses: actions/checkout@${checkoutSha}\n        with:\n          fetch-depth: 0\n  build-and-verify:\n    steps:\n      - run: echo no-checkout`,
+  false,
+  'checkout 契约自检拒绝借用其他 job 的合法 checkout',
+)
+
+expectImmutableCheckoutWithFullHistory(
   ciWorkflow,
-  /uses:\s*actions\/checkout@v4\s*\n\s*with:\s*\n\s*fetch-depth:\s*0/,
   'CI checkout 获取完整 Git 历史，范围守卫可计算 merge-base',
 )
 
