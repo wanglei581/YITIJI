@@ -1,7 +1,7 @@
 # AI 协作规则
 
 > 创建时间：2026-05-23  
-> 适用对象：Claude Code、Codex、Antigravity、Hermes、Grok  
+> 适用对象：Claude Code、Codex、Antigravity、Hermes、Grok
 > 本机调用名单以 [`../progress/current-progress.md`](../progress/current-progress.md) 最上条为准（2026-08-22 起 Codex = GPT-5.6 Sol High，DeepSeek 改走 Hermes）。
 
 ---

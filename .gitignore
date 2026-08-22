@@ -60,6 +60,9 @@ pnpm-debug.log*
 test-results/
 playwright-report/
 blob-report/
+# Firefox profiles created by the protected Kiosk redesign screenshot scripts.
+/docs/design/kiosk-redesign-2026-08/.ffprof-*/
+/docs/design/kiosk-redesign-2026-08/assets/.ff*/
 
 # Temp
 .tmp

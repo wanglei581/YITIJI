@@ -6,7 +6,53 @@ import { fileURLToPath } from 'node:url'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(scriptDir, '..')
 
-const conflictMarkerPattern = /^(?:<{7}(?: .*)?|\|{7}(?: .*)?|={7}|>{7}(?: .*)?)\r?$/gm
+// Git's split marker must occupy the whole line. Start/base/end markers are also
+// rejected when appended to prose because that exact corruption has reached main.
+const conflictMarkerPattern = /(?<![<|>`])(?<marker><{7}(?: [^`\r\n]*)?|\|{7}(?: [^`\r\n]*)?|>{7}(?: [^`\r\n]*)?)(?=\r?$)|^(?<split>={7})\r?$/gm
+
+function scanConflictMarkers(content) {
+  conflictMarkerPattern.lastIndex = 0
+  return [...content.matchAll(conflictMarkerPattern)].map((match) => ({
+    index: match.index,
+    marker: match.groups.marker ?? match.groups.split,
+  }))
+}
+
+function verifyConflictMarkerDetector() {
+  const left = '<'.repeat(7)
+  const base = '|'.repeat(7)
+  const split = '='.repeat(7)
+  const right = '>'.repeat(7)
+  const cases = [
+    { name: 'clean text', content: 'ordinary text\n', expected: [] },
+    {
+      name: 'standard conflict',
+      content: `${left} HEAD\nleft\n${base} base\n${split}\nright\n${right} branch\n`,
+      expected: [`${left} HEAD`, `${base} base`, split, `${right} branch`],
+    },
+    {
+      name: 'marker appended to prose',
+      content: `ordinary text ${right} branch\n`,
+      expected: [`${right} branch`],
+    },
+    {
+      name: 'markdown code example',
+      content: `Example: \`${right} branch\`\n`,
+      expected: [],
+    },
+    { name: 'equals appended to prose', content: `ordinary text ${split}\n`, expected: [] },
+    { name: 'long decorative rule', content: `${'='.repeat(8)}\n`, expected: [] },
+  ]
+
+  for (const testCase of cases) {
+    const actual = scanConflictMarkers(testCase.content).map(({ marker }) => marker)
+    if (JSON.stringify(actual) !== JSON.stringify(testCase.expected)) {
+      throw new Error(
+        `conflict marker detector self-test failed (${testCase.name}): expected ${JSON.stringify(testCase.expected)}, got ${JSON.stringify(actual)}`
+      )
+    }
+  }
+}
 
 function gitTrackedFiles(patterns = []) {
   const args = ['ls-files', '-z']
@@ -47,10 +93,9 @@ export function findConflictMarkers(filePaths) {
       throw error
     }
 
-    conflictMarkerPattern.lastIndex = 0
-    for (const match of content.matchAll(conflictMarkerPattern)) {
+    for (const match of scanConflictMarkers(content)) {
       const line = content.slice(0, match.index).split('\n').length
-      findings.push(`${displayPath(absolutePath)}:${line}: ${match[0].trimEnd()}`)
+      findings.push(`${displayPath(absolutePath)}:${line}: ${match.marker}`)
     }
   }
 
@@ -103,6 +148,8 @@ function reportFailures(label, findings) {
 }
 
 function main() {
+  verifyConflictMarkerDetector()
+
   const explicitConflictPaths = parseExplicitPaths('--check-conflicts')
   const explicitYamlPaths = parseExplicitPaths('--check-yaml')
 

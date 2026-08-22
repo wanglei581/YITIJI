@@ -27,7 +27,7 @@
 
 AI 在小程序中作为全局交互层，通过“今天页 + 全局小青 + 页内建议”理解用户意图、编排已有能力并交付成品，不单独堆成功能入口墙。岗位、招聘会、企业信息继续只做第三方或官方来源入口，不提供平台内投递、预约结果回流或企业候选人能力。
 
-小程序完整功能、商业模式、信息架构、跨端状态机、技术边界和分阶段路线以 [微信小程序商业产品与 AI 求职操作系统方案](./miniprogram-os-architecture-plan-2026-08.md) 为唯一正式总方案；页面级体验以 `apps/miniapp/` 正式源码为准。2026-08-22 已按产品负责人确认删除 `docs/design/miniapp-os-prototype-2026-08/`、`mini-proto-v2-2026-07/`、`mini-proto-2026-07/`，不再把独立小程序原型目录当视觉基线。目标源码目录为 `apps/miniapp/`；2026-08-06 已找回 `/Users/wanglei/zhiyida-miniapp` 原生微信小程序候选（57 个注册页面，审查基线 `feature/test-mode-pricing-2026-08-04@4d17e5b`），但它仍是独立仓库，只能在 Gate 0 审查后选择性迁入唯一真源，不代表已完成正式工程归位或可以发布。功能差距见 [找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)。
+小程序完整功能、商业模式、信息架构、跨端状态机、技术边界和分阶段路线以 [微信小程序商业产品与 AI 求职操作系统方案](./miniprogram-os-architecture-plan-2026-08.md) 为正式方案；页面级体验、路由和发布内容以 `apps/miniapp/` 源码及静态门禁为准。2026-08-22 已按产品负责人确认删除 `docs/design/miniapp-os-prototype-2026-08/`、`mini-proto-v2-2026-07/`、`mini-proto-2026-07/`，不再把独立小程序原型目录当视觉基线。外部 `/Users/wanglei/zhiyida-miniapp` 只保留为找回过程和候选资产的历史证据；经 Gate 0 复核后，2026-08-11 已选择性迁入 43 个有真实入口或后端依据的页面，正式功能后续只在主仓 `apps/miniapp/` 推进。该事实不代表已上传、已发布或已完成生产验收。功能差距见 [找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)。
 
 ### 1.2 2026-08-22 实现与上线状态（代码事实，不是宣传）
 
@@ -36,7 +36,7 @@ AI 在小程序中作为全局交互层，通过“今天页 + 全局小青 + �
 | 端 | 代码事实 | 对用户 | 线上 |
 |---|---|---|---|
 | 微信小程序 `apps/miniapp/` | 唯一发布源；`verify:miniapp-static` 53 个注册页、98 PASS。四 Tab：首页 / 职业生活圈 / 求职 / 我的 | 材料包四页 `guardPackageChain()` fail-closed（后端 `POST /orders/package` 不存在）。职业圈、今日早报入口标明「未开放」。求职进度看板仅为本人本地记录，不是平台投递 | 未授权上传正式版；须与后端同一 SHA 再发 |
-| 一体机 `apps/kiosk/` | 首页与打印扫描域已接 V6 运行时；7 月 75 屏仍是 CI 回归基线，不是视觉目标。首页真值原型：`docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。`kiosk-redesign-2026-08/` 为负责人指定保留的新原型整目录 | 未付不能出纸；断电卡单用户页说「结果未确认」 | 生产冻在 2026-08-14 的旧 SHA；`DEPLOY_API_ENABLED=false`。公开 `/api/v1/health` 为 ok + postgres，不等于新代码已发布 |
+| 一体机 `apps/kiosk/` | 首页与打印扫描域已接 V6 运行时；7 月 75 屏仍是 CI 回归基线，不是视觉目标。首页真值原型：`docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html`。`kiosk-redesign-2026-08/` 为负责人指定保留的新原型整目录 | 未付不能出纸；断电卡单用户页说「结果未确认」 | 2026-08-22 只读核验：生产运行 `771d53e2`（部署于 2026-08-18），落后于当前 `origin/main`；PM2 环境缺 `NODE_ENV=production`，修复并验证前禁止解冻。公开 `/api/v1/health` 为 ok + postgres，不等于新代码已发布 |
 | 管理员后台 `apps/admin/` | 运行时路由在 `apps/admin/src/routes/index.tsx`：工作台、设备（终端/打印机/外设合并）、订单、打印扫描运维、计费、文件、求职材料、AI 服务/配置、岗位/招聘会/政策来源审核、招聘会、企业、合作机构、用户、会员权益/活动/反馈/通知/隐私、告警、权限、审计、导入批次、同步源、宣传屏、百宝箱、智慧校园、线下机构、法务文档、隐私请求、账号设置。**没有**候选人筛选 / 面试邀约 / Offer。断电卡单核查 `POST /admin/print-jobs/:id/verify-outcome` 已合入 `main`（#740），未部署。原型：`docs/design/console-ai-os-2026-08/admin/` | 运营可审内容、管设备与订单；C0 仍待冻结（原型有 `/online-platforms`，运行时路由尚未建）。Redis 故障时部分后台动作会 500，见 next-tasks 平台可靠性遗留 | 与四端同闸门，未解冻则后台也是旧构建 |
 | 合作机构后台 `apps/partner/` | 运行时路由在 `apps/partner/src/routes/index.tsx`：工作台、机构资料、岗位、企业、招聘会、智慧校园、政策、终端、统计、数据源、同步日志、账号。**禁止**候选人管理 / 收简历 / 面试邀约。原型：`docs/design/console-ai-os-2026-08/partner/` | 只做外部岗位/招聘会/政策数据管理。C1 统计时区与响应解包仍待收口，不得伪造曝光漏斗 | 同上，未解冻不发新包 |
 | API | 打印先付后印、到机码、报价、AI 多条链在 main 上有代码 | 岗位/招聘会/政策生产库曾清成空列表，需授权来源再录入，代码不能编造 | 与 Kiosk/Admin/Partner 同闸门，未解冻则四端都不发 |

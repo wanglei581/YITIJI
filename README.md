@@ -11,17 +11,14 @@
 
 ## 当前状态
 
-| 项 | 状态 |
-|---|---|
-| Phase 1–8 | 已封板（设计系统、一体机前台、管理员后台、合作机构后台、后端 API、AI 能力、岗位/招聘会真实接口、Windows Terminal Agent） |
-| 生产环境 | 已部署至 `zyidai.cn`（nginx + HTTPS，API 在线，数据库为 PostgreSQL） |
-| 持续部署 | main 分支 CI 全绿后自动部署（`.github/workflows/deploy.yml`，仅发布 Kiosk 前端） |
-| 微信小程序 | M0 阶段进行中（四 Tab 骨架、登录、公开浏览页已合入） |
-| 上线验收 | **进行中，尚未对外服务**。逐项进度见 [上线验收清单](docs/device/production-deployment-and-windows-host-checklist.md) |
+项目仍处于上线前收口，商业上线结论以正式状态表和交付阻塞清单为准，不在 README 复制容易过期的阶段数字。
 
-> 实时进度以 [docs/progress/current-progress.md](docs/progress/current-progress.md) 为唯一信源；本表只作概览。
->
-> 已知上线前阻塞：生产库岗位 / 招聘会 / 政策内容为空；API 发布路径尚未纳入自动化；法务文本与部分生产密钥待确认。
+- 当前阶段与已完成事项：[docs/progress/current-progress.md](docs/progress/current-progress.md) 顶部活动快照。
+- 唯一交付阻塞与下一步：[docs/progress/next-tasks.md](docs/progress/next-tasks.md) 顶部清单。
+- Miniapp / Kiosk / Admin / Partner / API / Agent 的实现、开放和线上状态：[docs/product/feature-scope.md](docs/product/feature-scope.md) §1.2。
+- 生产事实只认服务器 `DEPLOY_SOURCE.txt`、PM2、nginx Web Root 与健康检查；CI 通过不等于已部署。
+
+部署工作流会构建 API、Kiosk、Admin、Partner，但只有 CI 全绿且 `DEPLOY_API_ENABLED=true` 才进入部署；Admin / Partner 未配置各自 Web Root 时保持线上现状。微信小程序唯一发布源是 `apps/miniapp/`，是否上传或发布须单独验收。
 
 ---
 
@@ -80,7 +77,7 @@ Windows 驱动识别名（真机确认）：`Pantum CM2800ADN Series`
 
 ## 本地开发
 
-**环境要求**：Node.js ≥ 20 · pnpm 11（见 `packageManager`）· Git
+**环境要求**：Node.js `>=22.13 <23` · pnpm `>=11.2.2 <12`（锁定 `pnpm@11.2.2`）· Git
 
 ```bash
 pnpm install          # 安装依赖
@@ -143,6 +140,7 @@ pnpm verify:dependency-security   # 依赖安全检查
 |------|------|
 | [CLAUDE.md](CLAUDE.md) | 完整开发说明（Claude Code 必读） |
 | [AGENTS.md](AGENTS.md) | 项目说明（Codex 必读） |
+| [docs/README.md](docs/README.md) | 正式文档、原型和取证导航 |
 | [docs/compliance/compliance-boundary.md](docs/compliance/compliance-boundary.md) | 合规边界（开发前必读） |
 | [docs/product/feature-scope.md](docs/product/feature-scope.md) | 功能范围与优先级 |
 | [docs/progress/current-progress.md](docs/progress/current-progress.md) | 当前进度（唯一信源） |

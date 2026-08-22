@@ -91,6 +91,7 @@ docs/                # 所有文档
 4. `docs/product/feature-scope.md`
 5. `docs/compliance/compliance-boundary.md`
 6. `.ccg/spec/guides/index.md`（若存在）
+7. `docs/README.md`
 
 记录保存规则：
 
@@ -147,28 +148,14 @@ docs/                # 所有文档
 
 ## 当前进度
 
-详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
-下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
+本文件不再复制阶段流水，避免与实际代码、远程 `main` 和生产部署状态漂移。接手任务时按以下顺序判断：
 
-当前阶段：上线前收口（2026-06-12）：只做验收、阻塞项修复建议、文档收口、部署准备、真机验证规划；不再新增非必要功能。
+- 当前阶段与已完成事项：[docs/progress/current-progress.md](docs/progress/current-progress.md) 顶部活动快照。
+- 唯一交付阻塞与下一步：[docs/progress/next-tasks.md](docs/progress/next-tasks.md) 顶部清单。
+- 小程序、一体机、管理员后台、合作机构后台的实现 / 开放 / 线上状态：[docs/product/feature-scope.md](docs/product/feature-scope.md) §1.2。
+- 代码事实：精确的 `origin/main@SHA`；生产事实：服务器 `DEPLOY_SOURCE.txt`、PM2、nginx Web Root 与健康检查。
 
-- Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
-- Phase 8 全部封板（2026-05-29，Mac 真实后端跨机 E2E 验证通过）：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固
-- 图片打印路径：pdfkit 临时 PDF → Method B（pdf-to-printer/SumatraPDF）
-- Agent 命令：`node dist/index.js agent` / `install-service` / `uninstall-service`
-- W1/W2/W3 stacked 分支已 FF 合入 main（2026-06-01，`3f35caa`）：
-  - W1：BE-1 文件签名 + Kiosk 上传 + K2 简历四步流 + Diff View
-  - W2：BE-7 JobFair 8 端点切真 Prisma + audit + 校企合作详情端点
-  - W3：JobSource 凭证加密落库 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）
-- Phase 7.11 R4 完成（2026-06-01）：`packages/shared` 新增 `PartnerDataSourceView`/`ConnStatus`，`SyncFrequency` 加 `weekly`；前后端 Partner 数据源 DTO 收紧为字面量；UI 零变化；E2E demo 复跑通过
-- 阶段1 三端数据打通 1A–1F 已完成（2026-06-10）：Admin 招聘会 / 合作机构 / 订单告警、Partner 编辑与政策公告、Kiosk 招聘会与校园招聘 UI 均已接真。
-- 阶段2 已完成：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调与安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理。
-- 2C 模拟面试 + 2C+ 语音增强已完成；2D 目标岗位定向优化 + 岗位匹配参考、2E 职业规划、P1 浏览/外部跳转记录接真已完成；第四阶段 PostgreSQL 生产数据底座已完成（Windows 生产实例待部署复验）。
-- AI 数字人主体已完成：Kiosk `/assistant` 使用 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人方案已被替代，不再作为下一步重做。
-- Stage 3 真实 OCR 已完成（2026-06-11，百度智能云）：图片/扫描件简历真实进诊断闭环；上线前须轮换百度密钥。
-- **入口稳定规则（2026-06-12 用户确认）**：当前首页与各业务板块里的功能入口已经定版；后续只做已有入口真实化、页面接真、按钮接线、状态补齐和「我的」数据闭环，不新增重复入口 / 同义卡片。详见 `docs/product/user-data-flow-matrix.md`。
-- **上线前 P0**：按 `docs/device/production-deployment-and-windows-host-checklist.md` 完成生产服务器、PostgreSQL 生产实例、Windows 本地主机、Terminal Agent、打印扫描、密钥轮换、法务合规、线上浏览器闭环验收；最新部署提交必须保持 SQLite 主 CI 与 `postgres-readiness` 双 job 通过。
-- **下一步**：① 上线前 P0 验收；② 打印任务状态实时追踪 UI；③ 择期补场馆导览扩展（Partner 配置入口 / 平面图图片）。
+禁止把本地候选、CI 通过、历史真机证据或原型页面写成“已部署 / 已上线 / 当前真机已通过”。
 
 ---
 

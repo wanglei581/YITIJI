@@ -10,12 +10,12 @@
 
 - [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
 - [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
-- [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；`NODE_ENV` 是否真跑门禁仍待 Windows `pm2 describe` 回报
+- [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；但 2026-08-22 生产只读核验确认 PM2 实际进程环境没有 `NODE_ENV`，集中生产门禁未获启用证据，转为 B1 前置阻塞
 - [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做；告警仍是实时派生
 
 ### B. 需你方动手（共 3 条，非代码）
 
-- [ ] **B1 部署闸门解冻** —— `DEPLOY_API_ENABLED` 自 8/14 关闭后 97 次 skipped / 0 成功；**今天合入的全部改动尚未上服务器**。按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md`
+- [ ] **B1 生产启动环境修复后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。PM2 实际进程环境未设置 `NODE_ENV=production`，而集中安全门禁、生产 CORS/CSP 与 trust proxy 都依赖该值；**先修 PM2 启动环境并受控重启，确认进程仍 online、ready=200 且门禁真实执行，再按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布**。不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
 - [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
 
@@ -26,7 +26,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-22（交付阻塞清单仍以 8-19 节为准；本节日期只表示文档维护日。口径文档 `c3522398a` / `af1fb6360` 已在 origin/main；开工记录与多模型名单在本地待推。**生产仍未部署。**）
+> 最后更新：2026-08-22。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 
@@ -182,7 +182,7 @@
 
 ## P1：微信小程序找回、收敛与跨端商业闭环（候选源码已找回，Gate 0 事实审查完成）
 
-权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；页面级体验以 `apps/miniapp/` 为准（`docs/design/miniapp-os-prototype-2026-08/` 已于 2026-08-22 删除）；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。独立仓 `/Users/wanglei/zhiyida-miniapp` 最终形成 59 页 `1.0.2@0d3d86a` 候选；2026-08-11 已在 `codex/miniapp-1-0-2-sync-p0` 选择性迁入 43 个有真实入口或真实后端依据的页面，其余伪能力/占位页面不进入主仓唯一真源。用户已确认四 Tab 为“首页 / AI百宝箱 / 求职 / 我的”，后续正式功能只在 `apps/miniapp/` 推进。
+权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；页面级体验以 `apps/miniapp/` 为准（`docs/design/miniapp-os-prototype-2026-08/` 已于 2026-08-22 删除）；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。独立仓 `/Users/wanglei/zhiyida-miniapp` 最终形成 59 页 `1.0.2@0d3d86a` 候选；2026-08-11 已在 `codex/miniapp-1-0-2-sync-p0` 选择性迁入 43 个有真实入口或真实后端依据的页面，其余伪能力/占位页面不进入主仓唯一真源。四 Tab 当前代码事实为“首页 / 职业生活圈 / 求职 / 我的”；这是 `apps/miniapp/app.json` 和 `verify-miniapp-static.mjs` 的现行契约，后续正式功能只在 `apps/miniapp/` 推进。
 
 - [~] **M0/M1 开发计划执行中（2026-08-07）**：按 `docs/product/miniprogram-m0m1-development-plan-2026-08-07.md` 分四批推进——M0 工程壳/登录/公开浏览/我的只读；M1 今天引擎、简历链路、岗位匹配真实结果页、模拟面试、自我探索、资产材料；视觉沿用找回工程既有风格，每批独立 PR + 门禁。M0.1 `main@305c7296`、M0.2 `main@57527e87`、M0.3（公开浏览：岗位/招聘会/政策/企业列表与详情，线上真实空态）`main@c0c73f04` 已合入；下一步 M0.4 本人数据只读（订单/权益/消息/反馈）。岗位匹配真实结果页 API 级验收已通过（用户真实简历），模拟器 UI 实点待开发者工具服务端口开启后执行。
 
@@ -191,7 +191,7 @@
 - [ ] **岗位匹配真实结果页验收**：2026-08-06 已用仓库内无个人信息的虚构简历和测试 JD 对正式 API 做受控验证，上传、解析、匿名未授权 `403`、任务级授权、真实模型三档结果、读回、内部签名 PDF 和测试授权撤回均通过；微信开发者工具已渲染真实结果页。正式 API 仍返回 `productionBreakdown=false`，缺少候选代码新增的 `decisionSupport.requirementBreakdown` 和逐项 `requirement`，证明 `zyidai.cn` 尚未部署最新 JD 拆解后端，因此本项保持未完成。下一步先按部署门禁发布同一冻结候选，再用经本人授权的真实可解析简历复验原文证据、PDF、撤回后拒绝和两个连续动作；不得为验收伪造生产结果或引入站内投递。
 - [x] **岗位匹配连续动作与诚实文案代码收口**：已删除“成功率约 17%”及相关内部断言，失败态改为非概率、非录用暗示的诚实说明，并新增数字概率承诺防回退门禁；岗位匹配跳转优化前强制校验当前 `RESUME_TASK.taskId`，上下文缺失时 fail-closed 提示重新上传，匿名 token 不进入 URL，优化页只读取同 taskId token。运行时连续动作 6/6、Node 22 岗位匹配 29/29、简历优化 35/35、模拟面试 58/58、shared typecheck、PDF 9/9 和微信重新编译通过。该项只关闭代码级断点；最新后端部署后仍须用正常上传产生的完整任务上下文，在真实结果页 UI 实点优化和模拟面试，结论并入上一项真实验收。
 - [x] **岗位匹配真实结果页 API 级验收（2026-08-07，用户真实简历）**：真实简历 `我的简历测试文件.pdf` + 多段真实 JD 已在生产验证：解析、任务级授权、匹配分析三档结论（`reference_low`，无百分比）、`requirementBreakdown` 四组原文拆解（3/4/2/1）、读回一致、PDF 生成、撤回后重新分析 403 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED`、撤回后读回仍可用；“继续优化”与“按岗位模拟面试”两个连续动作 API 均 200/201。剩余：微信开发者工具真实结果页 UI 实点（结果展示、继续优化/模拟面试跳转、PDF 预览，按 `docs/acceptance/miniprogram-jobfit-ui-real-click-runsheet-2026-08-07.md` 执行）与真实岗位/政策数据接入；不得为验收伪造生产结果或引入站内投递。
-- [x] **Gate 0 产品与工程决策（2026-08-07 已确认）**：四 Tab 冻结为“首页 / AI百宝箱 / 求职 / 我的”；产品定位“职易达 · AI 求职与职业生活服务”（以微信后台实际注册名为准）、原生小程序渐进演进（不迁 Taro 4）、首发 M0+M1、v1 不做下单/到机履约/支付（M2 延后）。正式结论见 `docs/product/miniprogram-gate0-decision-confirmation-2026-08-07.md`；微信 AppID/主体/类目/隐私、真实岗位与政策来源、真实简历列为待办清单，不阻塞 M0/M1 开发启动。
+- [x] **Gate 0 产品与工程决策（2026-08-07 已确认，Tab 文案后续已演进）**：当时冻结为“首页 / AI百宝箱 / 求职 / 我的”；2026-08-18 职业生活圈改版后，当前代码与静态门禁的第二 Tab 已更新为“职业生活圈”。产品定位“职易达 · AI 求职与职业生活服务”（以微信后台实际注册名为准）、原生小程序渐进演进（不迁 Taro 4）、首发 M0+M1、v1 不做下单/到机履约/支付（M2 延后）。原始 Gate 0 结论见 `docs/product/miniprogram-gate0-decision-confirmation-2026-08-07.md`；微信 AppID/主体/类目/隐私、真实岗位与政策来源、真实简历列为待办清单，不阻塞 M0/M1 开发启动。
 - [~] **唯一工程底座（候选已完成，待 CI/合并/真机验收）**：`codex/miniapp-1-0-2-sync-p0` 已从干净 `main@6ad3be9f` 选择性迁入 43 页原生 1.0.2 候选，接入既有 workspace/CI `verify:static`，离线 66/66；已移除无后端支撑页面和伪商业能力。微信开发者工具游客工程普通编译项目代码 0 error / 0 warning；游客模式不能替代真实 AppID 的登录与 API 验收。剩余 DoD：最终 diff/CI、真实 AppID 关键路径实点与真机、合并后停止独立仓继续产生正式功能提交；不使用微信云开发，不接生产密钥。
 - [~] **M0 可登录 Shell**：微信一键/短信降级、协议隐私、公开岗位/招聘会/政策、本人简历/文档/订单/权益/消息的真实读取已进入唯一底座候选；仍缺反馈后端与入口、登录会员收藏/浏览记录服务端 SSOT、真实 AppID 开发者工具和真机点击验收。未完成前保持进行中。
 - [ ] **M1 AI 操作系统 MVP**：完成规则优先的“今天”下一步引擎、全局小青按端意图路由、简历上传/OCR/诊断/优化、成果资产与材料页；AI 不自由生成路由、按钮、外链、支付或打印动作，所有成果必须进入本人简历、文档、报告或后续材料包。同阶段提前在微信公众平台提交订阅消息模板与隐私声明材料，代码接线仍留 M3，避免后期才等待人工审核。
