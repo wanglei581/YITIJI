@@ -1,7 +1,9 @@
 # 功能范围文档
 
-> 最后更新：2026-08-22（补 1.2 实现与上线状态：代码事实，不是宣传）
+> 最后更新：2026-08-24（补 1.2 实现与上线状态：代码事实，不是宣传）
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [compliance-boundary.md](../compliance/compliance-boundary.md) | [current-progress.md](../progress/current-progress.md) | [next-tasks.md](../progress/next-tasks.md)
+
+> **2026-08-24 事实边界**：治理、会员 Redis、Admin 可靠性候选均仍只存在本地 worktree，未 push、未建 PR、未进入匹配 CI、未合并、未部署。服务器只读刷新在 SSH banner/kex 阶段失败，以下线上字段中的历史 SHA、健康检查和容量记录不能替代当前生产盘点；当前整体商用结论继续为 **NO-GO**。
 
 ---
 
