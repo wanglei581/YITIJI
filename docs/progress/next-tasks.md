@@ -10,12 +10,12 @@
 
 - [x] **A1 岗位匹配无简历前置门禁** —— 已合入 #737
 - [x] **A2 模拟面试 / 合同审查触屏传不了文件** —— 已合入 #738
-- [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；2026-08-22 生产只读核验确认 API `.env` 已含 `NODE_ENV=production`，入口会通过 dotenv 加载且历史启动失败证明门禁曾执行，但 PM2 初始环境没有固化该值，转为 B1 的环境单一真源阻塞
+- [x] **A3 `.env.example` 弱默认可启动生产** —— 已合入 #736；2026-08-22 只读核验未确认 PM2 启动环境显式固化 `NODE_ENV=production`。API 入口会加载 production `.env`，但启动方式变化仍可能造成漂移，故转为 B1 前置阻塞
 - [x] **A4 断电卡单核查状态机** —— 已合入 #740（`main@2e7b4fc52`）。Admin `POST /admin/print-jobs/:id/verify-outcome` 已在代码里；**未部署**。推送/工单仍不做；告警仍是实时派生
 
 ### B. 需你方动手（共 3 条，非代码）
 
-- [ ] **B1 合并 Batch 2 后再评估解冻部署** —— 治理分支已推送 `869821eaff838c2c026797b664d0d07cd764a709`，CI run `32571109909` 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 三 job 全绿；Ubuntu 部署安全日志未出现 `setsid` 跳过并输出 `ALL PASS`，同一 SHA 没有 Deploy、Cleanup 或 Deploy Precheck 运行。代码与 CI 层面已 `GO`，下一步是 PR/合并决策；生产仍精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`，不得把 CI 通过写成已部署。合并后继续 Git/PR/worktree/stash 资产账本、Node 20 Action 运行时升级、容量/可观测性与 Worker 并发方案。真实生产部署、备份清理、空间回收、重启、Redis/PM2 调整或迁移必须另开具名维护窗口，重新核对磁盘、备份、Node 22、Redis、PM2、nginx、`DEPLOY_SOURCE.txt`/`API_DEPLOY_SOURCE.txt`、release-state 和人工恢复命令；不得直接打开 `DEPLOY_API_ENABLED`
+- [ ] **B1 生产启动环境修复后再解冻部署** —— 最近一次成功服务器只读快照（2026-08-22）记录生产运行 `771d53e2ceb257a684cf0d8657c4844045de509e`，但 2026-08-24 只读刷新在 SSH banner/kex 阶段失败，不能证明该 SHA、PM2 环境或磁盘状态仍是当前事实。先恢复只读连接并重新盘点，再修复并受控重启，确认进程仍 online、ready=200 且门禁真实执行，最后按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布。不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
 - [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
 
@@ -34,13 +34,13 @@
 
 - [ ] **扫码上传后端生命周期独立收口**：当前公共 UI 已保证刷新先撤销旧码、手机成功态不可伪造重传，但 Redis 会话自然过期后未确认 `FileObject` 的删除仍不能只靠 UI 证明。需独立设计并验证：自然超时、上传/确认/取消竞态、匿名与会员归属、确认后进入打印履约的短留存；不得将旧会话 token、终端展示名或原始错误带入手机页。
 
-## 平台可靠性遗留（FIX-CONSOLE-P0 拆出，2026-08-17）
+## 平台可靠性遗留（FIX-CONSOLE-P0 拆出，2026-08-17；候选状态按 2026-08-24 索引读取）
 
-两条都在修「Redis 故障时后台全 500 + 异常零日志」时查实，但不在该批范围内，需另立任务：
+以下条目来自「Redis 故障时后台全 500 + 异常零日志」排查；本地候选未 push、未建 PR、未进 CI、未部署，不能写成线上能力：
 
-- [ ] **`EndUserAuthGuard` 的 Redis 等待未加界**：C 端会员端点在 Redis 不可达时单请求实测 **23.6 秒**后返回 500。它的 fail-closed 判定本身是**正确**的（Redis 就是会员会话真源，读不到就该拒绝，绝不能改成放行），问题只在耗时与错误码不诚实：应收敛为有界等待 + 明确的 503/`MEMBER_SESSION_STORE_UNAVAILABLE`，而不是让每个请求把连接占满 23 秒再塌成通用 500。修的时候**不得改变「拒绝」这个判定**。
-- [ ] **`admin-orgs.service.ts` 的 `invalidateAccountSession` 在 Redis 故障时造成「看起来失败其实成功了」**：账号启停 / 改密 / 换邮箱的数据库更新已提交后，缓存失效调用抛错 → 端点返回 500，管理员以为没生效；重试时因为状态已经是目标值会跳过整个分支，反而**连缓存失效也不做了**。当前只在 `/health` 里如实声明为 `internal-console-redis-actions=unavailable`，代码未改。修的时候要一并想清楚「部分 Redis 故障（写失败读成功）」下最长 60s 的陈旧缓存窗口如何处置。
-- [ ] **`admin-ops.service.ts:203` 告警 `take: 50` 硬截断**：响应体无 `total`、无 `truncated` 标记，被截掉的条数在接口层无法察觉（来源批次实测 73 条只回 50 条）。批量故障恰恰是最需要看全的场景。本批未碰。
+- [~] **`EndUserAuthGuard` 的 Redis 等待**：本地提交 `18a9dd5f1` 已覆盖 required guard 有界 503、Optional guard/helper hanging-Promise 匿名降级和失效清理 best-effort；真实 Nest HTTP、Redis/PostgreSQL、登录/注册/wx-resignin/QR/Step-up 链路仍待补齐，`tryRedis` 进程级共享 cooldown 仍是边界。
+- [~] **`admin-orgs.service.ts` 的 `invalidateAccountSession`**：本地提交 `35ecda396` 已覆盖 Redis DEL 失败时数据库停用仍完成并返回成功；完整 verifier、真实 HTTP/PG/Redis、Partner 回归仍待补齐，机构停用后重新启用时旧 Partner JWT 是否永久失效仍需产品决策。
+- [~] **`admin-ops.ts` 告警截断**：本地提交 `35ecda396` 改为 `take=51`、最多返回 50 条并增加 `truncated/limits`，已覆盖 49/50/51/73 边界；真实 HTTP、Admin 浏览器和 CI 仍待补齐。
 
 ## 历史施工队列：小程序到 Windows 真实出纸（以顶部交付阻塞清单为准）
 

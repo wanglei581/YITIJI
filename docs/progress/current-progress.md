@@ -1,5 +1,16 @@
 # 当前开发进度
 
+## 当前治理状态索引（2026-08-24，只读入口）
+
+- **根工作区不是干净发布树**：当前根分支为 `codex/governance-safety-20260822`，存在用户/Claude 的 Kiosk、设计原型和 Windows watchdog 未提交/未跟踪资产。禁止 `git clean`、`git reset`、`git add -A`、删除 worktree/branch/stash 或覆盖这些资产。
+- **当前主线基线**：根工作区 `HEAD=d0d198b758243b7417b2fe4f6c0cd3fc1945ff06`，`origin/main=284d34b08361bd0751cee0dac08f32c491419dd8`；外部动作前必须重新读取，不得把此处 SHA 当发布指针。
+- **独立候选**：治理候选当前精确 HEAD 为 `f7623f891e79a6cb432b29dab2a264523cbf9a30`；会员 Redis 为 `18a9dd5f1`；Admin 可靠性为 `35ecda396`。三者均仅存在本地，无远程分支、PR 或匹配 CI，不得写成已合入或可部署。
+- **保护边界**：`apps/miniapp/` 及其 Claude worktree、Claude Kiosk 原型、`docs/design/kiosk-redesign-2026-08/`、打印/扫描、Windows Agent、生产密钥、备份和回滚资产均不属于治理候选，继续 PRESERVE。
+- **服务器/生产**：2026-08-24 SSH 只读刷新未完成，未取得新的 `DEPLOY_SOURCE.txt`、PM2、磁盘、备份或 health/ready 证据；生产继续 `NO-GO / PENDING`。当前不授权 push、PR、merge、deploy、SSH 写操作、服务器清理/重启、Redis/PostgreSQL/PM2/Worker 写操作或小程序发布。
+- **治理候选本地结果**：`f7623f891` 的范围与门禁需在治理 worktree 内实时重跑；本地静态通过不代表 GitHub CI、服务器或生产通过。
+
+2026-08-22 修复 **一体机长时间挂页显示失败（未提交、未部署）**。用户看到的是浏览器挂过夜后白屏/「页面无法显示」，不是缺原生客户端。本刀不改业务页、不做成 Electron/WebView2。Kiosk 增加三层页内恢复：① 路由错误页 4 秒自动 `reload`（404 不自动刷）；② `KioskDisplayErrorBoundary` 包住 `KioskApp`，渲染崩溃自动刷新，15 分钟内最多 3 次，超限只留中文恢复页；③ 待机宣传屏默认每 45 分钟整页 `reload`（屏保会停掉 idle 清场，这是最长驻 GPU 路径）。`window.onerror` 同样走有界刷新，忽略 ResizeObserver。Windows 用户会话看门狗脚本 `apps/terminal-agent/scripts/install-kiosk-browser-watchdog.ps1`：Edge 进程没了才以 `--kiosk` 拉起生产 URL，**不进 Agent 服务 / Session 0**。未在真机过夜验收，未部署。Chromium GPU 已死时页内 JS 救不了，须在一体机上安装该计划任务或配 Assigned Access 才算现场修好。
+
 2026-08-22 **Batch 2 精确 SHA CI 反证已闭环（代码 GO，生产仍 NO-GO）**。结构化 checkout 守卫已提交并推送为 `869821eaff838c2c026797b664d0d07cd764a709`；Antigravity（Gemini 3.7 Flash High）、Claude Fable 5 xhigh、Hermes（DeepSeek V4 Flash Max）均对冻结差异给出 `GO`，Grok 4.6 的条件项已由源码逐项核对和本地实跑满足。精确 SHA 的 CI run `32571109909` 三个 job 全绿：`build-and-verify` 15m48s、`postgres-readiness` 7m34s、`kiosk-browser-smoke` 13m13s；旧失败点 `Verify suites` 已在 Ubuntu 上通过全部 16 个 checkout 正反契约。部署安全日志未出现 macOS 专用 `SKIP: real setsid...`，并输出部署授权与原子发布安全 `ALL PASS`，因此 Linux process-group 与 PM2 dump `0600` fixture 均已真实执行通过。同一 SHA 的 Actions 记录只有 CI，没有 Deploy、Cleanup 或 Deploy Precheck 运行。GitHub 仅提示所固定的三个 Action 仍以 Node 20 为目标、当前被 runner 强制到 Node 24，登记为后续供应链升级项，不阻塞本闭环。生产继续运行 `771d53e2ceb257a684cf0d8657c4844045de509e`；本轮未部署、未重启、未清理、未迁移，也未触碰微信小程序。
 
 2026-08-22 **Batch 2 Linux CI 反证与权限断言修复（当前候选，尚待新 SHA CI）**。治理提交 `614e2e5ec8ab4bc8e74ba745833e32f96d9da72a` 已推送；精确 SHA 的 CI run `32567507641` 中，Action 所属 allowlist 与完整 YAML `uses` 扫描在 Ubuntu 上已输出 `ALL PASS`，但同一 gate 后续的部署安全 fixture 报 `FAIL: API restore did not protect the PM2 dump`。核对真实恢复脚本确认 `pm2 save` 后仍执行 `chmod 0600`；失败源是测试用 `stat -f ... || stat -c ...` 在 GNU stat 下首个命令可能以成功状态返回非权限内容，导致 Linux 误判。当前候选改用已锁定 Node 的 `fs.statSync(...).mode & 0o777` 跨平台读取权限，不放宽 `0600` 要求；仍须以新提交精确 SHA 的 GitHub CI 证明 Linux `setsid`、PM2 dump 权限及三 job 全绿。生产继续 NO-GO。
