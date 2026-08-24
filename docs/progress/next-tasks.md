@@ -42,6 +42,8 @@
 - [~] **`admin-orgs.service.ts` 的 `invalidateAccountSession`**：本地提交 `35ecda396` 已覆盖 Redis DEL 失败时数据库停用仍完成并返回成功；完整 verifier、真实 HTTP/PG/Redis、Partner 回归仍待补齐，机构停用后重新启用时旧 Partner JWT 是否永久失效仍需产品决策。
 - [~] **`admin-ops.ts` 告警截断**：本地提交 `35ecda396` 改为 `take=51`、最多返回 50 条并增加 `truncated/limits`，已覆盖 49/50/51/73 边界；真实 HTTP、Admin 浏览器和 CI 仍待补齐。
 
+> **候选兼容性演练（2026-08-24）**：在仓库外从 `origin/main` 临时 cherry-pick `18a9dd5f1` + `35ecda396` 无冲突；Node `22.23.2` 下目标 TypeScript、ESLint、会员 Redis 降级、Admin 告警边界和机构 Redis DEL 失败专项均通过。该结果仅证明两条候选可在本地共存，不代表真实 PG/Redis/Nest HTTP、GitHub CI、PR、合并或生产可用。
+
 ## 历史施工队列：小程序到 Windows 真实出纸（以顶部交付阻塞清单为准）
 
 - [x] **M2 第一片本地代码闭环**：小程序本人文件隐私检查、在线终端选择、服务端页数/报价、Order-only、10 位到机码、Kiosk 核验、机端支付后唯一 PrintTask 已接通；隔离 DB 并发/过期/重试回归和 API/Kiosk/小程序本地门禁通过。候选未部署。
