@@ -4,10 +4,10 @@
 
 - **根工作区不是干净发布树**：当前根分支为 `codex/governance-safety-20260822`，存在用户/Claude 的 Kiosk、设计原型和 Windows watchdog 未提交/未跟踪资产。禁止 `git clean`、`git reset`、`git add -A`、删除 worktree/branch/stash 或覆盖这些资产。
 - **当前主线基线**：根工作区与 `origin/main` 都必须在读取时运行 `git rev-parse HEAD` / `git rev-parse origin/main`；本索引不嵌入会随文档提交立即过期的根 HEAD，也不得把读取到的 SHA 当发布指针。
-- **独立候选**：治理候选当前精确 HEAD 为 `f7623f891e79a6cb432b29dab2a264523cbf9a30`；会员 Redis 为 `18a9dd5f1`；Admin 可靠性为 `35ecda396`。三者均仅存在本地，无远程分支、PR 或匹配 CI，不得写成已合入或可部署。
+- **独立候选**：治理候选必须在读取时进入 `.worktrees/governance-only-20260824` 运行 `git rev-parse HEAD`（当前审查快照为 `1f3d5105a3b5048646a977b0ebed748444ade6c1`）；会员 Redis 为 `18a9dd5f1`；Admin 可靠性为 `35ecda396`。三者均仅存在本地，无远程分支、PR 或匹配 CI，不得写成已合入或可部署；后续治理文档提交会使治理 SHA 继续变化，不能复用本行历史值。
 - **保护边界**：`apps/miniapp/` 及其 Claude worktree、Claude Kiosk 原型、`docs/design/kiosk-redesign-2026-08/`、打印/扫描、Windows Agent、生产密钥、备份和回滚资产均不属于治理候选，继续 PRESERVE。
 - **服务器/生产**：2026-08-24 SSH 只读刷新未完成，未取得新的 `DEPLOY_SOURCE.txt`、PM2、磁盘、备份或 health/ready 证据；生产继续 `NO-GO / PENDING`。当前不授权 push、PR、merge、deploy、SSH 写操作、服务器清理/重启、Redis/PostgreSQL/PM2/Worker 写操作或小程序发布。
-- **治理候选本地结果**：`f7623f891` 的范围与门禁需在治理 worktree 内实时重跑；本地静态通过不代表 GitHub CI、服务器或生产通过。
+- **治理候选本地结果**：治理 worktree 的范围与门禁必须按读取时精确 HEAD 实时重跑；本地静态通过不代表 GitHub CI、服务器或生产通过。
 - **API/Admin 临时集成演练（只读）**：在仓库外临时 worktree 从 `origin/main` 依次 cherry-pick 会员候选 `18a9dd5f1` 与 Admin 候选 `35ecda396`，无冲突；Node `22.23.2` 下目标 TypeScript、ESLint、会员 Redis 降级 verifier、Admin 告警边界和机构 Redis DEL 失败专项均通过。该演练未接真实 PG/Redis/Nest HTTP，未进入 CI/PR，不构成合并或生产 GO；临时目录不属于项目资产。
 
 2026-08-22 修复 **一体机长时间挂页显示失败（未提交、未部署）**。用户看到的是浏览器挂过夜后白屏/「页面无法显示」，不是缺原生客户端。本刀不改业务页、不做成 Electron/WebView2。Kiosk 增加三层页内恢复：① 路由错误页 4 秒自动 `reload`（404 不自动刷）；② `KioskDisplayErrorBoundary` 包住 `KioskApp`，渲染崩溃自动刷新，15 分钟内最多 3 次，超限只留中文恢复页；③ 待机宣传屏默认每 45 分钟整页 `reload`（屏保会停掉 idle 清场，这是最长驻 GPU 路径）。`window.onerror` 同样走有界刷新，忽略 ResizeObserver。Windows 用户会话看门狗脚本 `apps/terminal-agent/scripts/install-kiosk-browser-watchdog.ps1`：Edge 进程没了才以 `--kiosk` 拉起生产 URL，**不进 Agent 服务 / Session 0**。未在真机过夜验收，未部署。Chromium GPU 已死时页内 JS 救不了，须在一体机上安装该计划任务或配 Assigned Access 才算现场修好。
