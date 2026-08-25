@@ -50,6 +50,25 @@ ENV_TMP=""
 PROVENANCE_TMP=""
 rollback_armed=false
 
+protect_pm2_dumps() {
+  local pm2_home="${PM2_HOME:-$HOME/.pm2}"
+  local dump_path="$pm2_home/dump.pm2"
+  local backup_path="$pm2_home/dump.pm2.bak"
+  if [ -L "$dump_path" ] || [ ! -f "$dump_path" ]; then
+    echo "::error::PM2 dump is missing or unsafe" >&2
+    return 1
+  fi
+  chmod 0600 "$dump_path"
+  if [ -L "$backup_path" ]; then
+    echo "::error::PM2 backup dump is a symlink" >&2
+    return 1
+  fi
+  if [ -e "$backup_path" ]; then
+    [ -f "$backup_path" ] || { echo "::error::PM2 backup dump is not a regular file" >&2; return 1; }
+    chmod 0600 "$backup_path"
+  fi
+}
+
 OLD_SHA="$(sed -n 's/^source=origin\/main@\([0-9a-f]\{40\}\)$/\1/p' "$ACTIVE_SOURCE" | head -n1)"
 if ! printf '%s\n' "$OLD_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
   echo "::error::current DEPLOY_SOURCE.txt does not contain a valid active SHA" >&2
@@ -336,7 +355,7 @@ for _ in $(seq 1 30); do
     rm -f -- "$API_PROVENANCE_PENDING.bak"
     mv -f -- "$API_PROVENANCE_PENDING" "$RUNTIME_ROOT/API_DEPLOY_SOURCE.txt"
     pm2 save
-    chmod 0600 "${PM2_HOME:-$HOME/.pm2}/dump.pm2"
+    protect_pm2_dumps
     rollback_armed=false
     echo "API release ready; full provenance remains pending until all static sites pass"
     exit 0

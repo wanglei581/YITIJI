@@ -461,7 +461,26 @@ case "${1:-}" in
     PII="$(sed -n 's/^PRINT_REQUIRE_PII_SCAN=//p' "${PM2_HOME:?}/process-env")"
     printf '[{"name":"ai-job-print-api","pm2_env":{"status":"online","COMMIT":"%s","NODE_ENV":"%s","PRINT_REQUIRE_PII_SCAN":"%s"}}]\n' "$COMMIT" "$NODE_ENV" "$PII"
     ;;
-  save) : > "${PM2_HOME:?}/dump.pm2" ;;
+  save)
+    : > "${PM2_HOME:?}/dump.pm2"
+    rm -rf -- "${PM2_HOME:?}/dump.pm2.bak"
+    case "${PM2_SAVE_SHAPE:-regular}" in
+      regular)
+        : > "${PM2_HOME:?}/dump.pm2.bak"
+        chmod 0644 "${PM2_HOME:?}/dump.pm2.bak"
+        ;;
+      symlink)
+        ln -s dump.pm2 "${PM2_HOME:?}/dump.pm2.bak"
+        ;;
+      directory)
+        mkdir "${PM2_HOME:?}/dump.pm2.bak"
+        ;;
+      *)
+        echo "unsupported PM2_SAVE_SHAPE" >&2
+        exit 1
+        ;;
+    esac
+    ;;
 esac
 exit 0
 EOF
@@ -492,6 +511,8 @@ if grep -Eq '^(DEPLOY_|TARGET_SHA=|CI_RUN=|KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN=)' 
 fi
 test "$("$RESTORE/bin/node" -e 'const fs = require("node:fs"); process.stdout.write((fs.statSync(process.argv[1]).mode & 0o777).toString(8))' "$RESTORE/home/.pm2/dump.pm2")" = 600 \
   || fail 'API restore did not protect the PM2 dump'
+test "$("$RESTORE/bin/node" -e 'const fs = require("node:fs"); process.stdout.write((fs.statSync(process.argv[1]).mode & 0o777).toString(8))' "$RESTORE/home/.pm2/dump.pm2.bak")" = 600 \
+  || fail 'API restore did not protect the PM2 backup dump'
 
 RESTORE_TARGET_SHA="7777777777777777777777777777777777777777"
 RESTORE_ATTEMPT=888888-1
@@ -513,6 +534,22 @@ grep -Fxq "source=origin/main@$RESTORE_TARGET_SHA" "$RESTORE/runtime/API_DEPLOY_
 grep -Fxq 'status=api-rolled-back' "$RESTORE/runtime/API_DEPLOY_SOURCE.txt" || fail 'API restore did not persist its completed state'
 grep -Fxq "release_attempt=$RESTORE_ATTEMPT" "$RESTORE/runtime/API_DEPLOY_SOURCE.txt" || fail 'API restore marker is not attempt-scoped'
 grep -Fxq "restored_source=origin/main@$RESTORE_SHA" "$RESTORE/runtime/API_DEPLOY_SOURCE.txt" || fail 'API restore marker lost the restored source'
+
+for PM2_SAVE_SHAPE in symlink directory; do
+  if PATH="$RESTORE/bin:$PATH" \
+    HOME="$RESTORE/home" \
+    PM2_HOME="$RESTORE/home/.pm2" \
+    DEPLOY_RESTORE_TEST_MODE=true \
+    DEPLOY_RESTORE_NODE_BIN="$RESTORE/bin/node" \
+    RUNTIME_ROOT="$RESTORE/runtime" \
+    BACKUP_ROOT="$RESTORE/backups" \
+    RUNTIME_BACKUP="$RESTORE_BACKUP" \
+    OLD_SHA="$RESTORE_SHA" \
+    PM2_SAVE_SHAPE="$PM2_SAVE_SHAPE" \
+    bash "$API_RESTORE" >/dev/null 2>&1; then
+    fail "API restore accepted PM2 backup dump shape: $PM2_SAVE_SHAPE"
+  fi
+done
 
 CLEANUP_REMOTE_SCRIPT="$(sed -n '/^[[:space:]]*script: |/,$p' "$CLEANUP_WORKFLOW")"
 if printf '%s\n' "$CLEANUP_REMOTE_SCRIPT" | grep -Fq '${{ inputs.'; then

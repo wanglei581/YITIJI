@@ -13,6 +13,25 @@ HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3010/api/v1/health}"
 READY_URL="${DEPLOY_READY_URL:-${HEALTH_URL%/}/ready}"
 RESTORE_MARKER_FILE="${DEPLOY_RESTORE_MARKER_FILE:-}"
 
+protect_pm2_dumps() {
+  local pm2_home="${PM2_HOME:-$HOME/.pm2}"
+  local dump_path="$pm2_home/dump.pm2"
+  local backup_path="$pm2_home/dump.pm2.bak"
+  if [ -L "$dump_path" ] || [ ! -f "$dump_path" ]; then
+    echo "::error::PM2 dump is missing or unsafe" >&2
+    return 1
+  fi
+  chmod 0600 "$dump_path"
+  if [ -L "$backup_path" ]; then
+    echo "::error::PM2 backup dump is a symlink" >&2
+    return 1
+  fi
+  if [ -e "$backup_path" ]; then
+    [ -f "$backup_path" ] || { echo "::error::PM2 backup dump is not a regular file" >&2; return 1; }
+    chmod 0600 "$backup_path"
+  fi
+}
+
 if [ "${DEPLOY_RESTORE_TEST_MODE:-false}" != true ] && [ -z "$RESTORE_MARKER_FILE" ]; then
   echo "::error::production API restore requires an attempt-scoped marker" >&2
   exit 1
@@ -123,7 +142,7 @@ if [ "$restored" != true ]; then
 fi
 
 pm2 save >/dev/null
-chmod 0600 "${PM2_HOME:-$HOME/.pm2}/dump.pm2"
+protect_pm2_dumps
 if [ -n "$RESTORE_MARKER_FILE" ]; then
   marker_tmp="$(mktemp "$RUNTIME_ROOT/.API_DEPLOY_SOURCE.restored.XXXXXX")"
   cat > "$marker_tmp" <<EOF

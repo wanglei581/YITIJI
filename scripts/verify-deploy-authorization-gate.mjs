@@ -268,6 +268,15 @@ assert.match(restoreScript, /production API restore requires an attempt-scoped m
 assert.match(restoreScript, /env -i[\s\S]*COMMIT="\$OLD_SHA"[\s\S]*pm2 start/, 'API failure recovery must restart the previous commit from a narrow environment')
 assert.match(restoreScript, /restored PM2 commit does not match the old SHA/, 'API failure recovery must verify restored PM2 provenance')
 assert.match(restoreScript, /restored PM2 contains forbidden deployment environment keys/, 'API failure recovery must verify that deployment controls were not persisted')
+assert.match(releaseScript, /dump\.pm2\.bak/, 'API release must account for the PM2 backup dump')
+assert.match(restoreScript, /dump\.pm2\.bak/, 'API restore must account for the PM2 backup dump')
+for (const [name, script] of [['API release', releaseScript], ['API restore', restoreScript]]) {
+  assert.match(script, /chmod 0600/, `${name} must restrict PM2 dump files to mode 0600`)
+  assert.match(script, /not a regular file/, `${name} must reject non-regular PM2 backup dumps`)
+  assert.match(script, /set -euo pipefail/, `${name} must propagate chmod failures instead of continuing`)
+}
+assert.match(releaseScript, /PM2 backup dump is a symlink/, 'API release must reject a symlinked PM2 backup dump')
+assert.match(restoreScript, /PM2 backup dump is a symlink/, 'API restore must reject a symlinked PM2 backup dump')
 assert.match(restoreScript, /"status":"ok"[\s\S]*"status":"ready"/, 'API recovery must verify liveness and readiness')
 assert.match(restoreScript, /status=api-rolled-back[\s\S]*restored_source=origin\/main@\$OLD_SHA/, 'API recovery must persist an attempt-scoped completed rollback marker')
 assert.match(releaseScript, /database migrations were not reversed/, 'API recovery must not pretend to reverse additive database migrations')
