@@ -14,12 +14,12 @@
 |---|---|
 | 现在做到哪一步、已完成什么 | [progress/current-progress.md](progress/current-progress.md) |
 | 下一步做什么 | [progress/next-tasks.md](progress/next-tasks.md) |
-| 当日开发摘要与协作收尾 | [progress/today-claude.md](progress/today-claude.md) |
+| 历史协作摘要（不能替代当前进度） | [progress/today-claude.md](progress/today-claude.md) |
 | 功能边界（能做 / 不能做） | [product/feature-scope.md](product/feature-scope.md) |
 | 合规红线 | [compliance/](compliance/) 全部 |
 | 目录职责 | [project-structure.md](project-structure.md) |
 
-**这六处之外的任何文档，都不是当前口径。**
+**当前事实只由 `current-progress.md`、`next-tasks.md`、`feature-scope.md`、合规边界和实际代码/生产证据共同裁决。`today-claude.md` 只是历史协作日志。**
 
 ---
 
@@ -77,7 +77,7 @@ V6 的**逐页迁移矩阵**（原型页 ↔ 实现文件 ↔ 当前风格 ↔ �
 | 目录 | 数量 | 说明 |
 |---|---|---|
 | `superpowers/plans/`、`superpowers/specs/` | 146 | 6–8 月的一次性任务单与设计草案。**其中 130 份未被任何代码或 CI 引用**，结论已合入主干 |
-| `reviews/` | 69 | 一次性评审。约 50 份的结论已被后续基线覆盖 |
+| `reviews/` | 动态增长 | 一次性评审；数量会变化，结论可能已被后续基线覆盖 |
 | `patent/`、`business/` | 11 | 专利交底与大赛申报材料，**不是产品功能范围**，易被误读 |
 
 **引用它们之前先确认日期**，并和第一节的正式入口交叉验证。

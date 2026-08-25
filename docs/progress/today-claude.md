@@ -1,5 +1,7 @@
 # 2026-07-11 AI / 求职产物 printFileUrl 契约修复（Hermes）
 
+> **历史协作日志，非当前任务入口。** 本文件记录多日 Claude/Hermes 开发摘要和接力背景，最近正文并不等于 2026-08-22 的当前阶段。接手项目必须先读 `current-progress.md` 顶部、`next-tasks.md` 顶部、`feature-scope.md` §1.2，并以实际代码、`origin/main` 与生产证据为准。
+
 - 独立分支：`codex/ai-artifact-print-url-contract-20260711`，基线 `origin/main=69fed4fc`。
 - TDD RED：新守卫 28 项失败，覆盖 shared、API 签名生成、Kiosk 消费和缺 URL 阻断。
 - GREEN：AI 产物、我的文档和招聘会资料入口统一只向打印链路传内部 HMAC `printFileUrl`；COS `signedUrl` 仅预览/下载；求职材料 mock 打印按钮诚实禁用。

@@ -26,6 +26,7 @@
     "verify:ci-gate-coverage": "node scripts/verify-ci-gate-coverage.mjs",
     "verify:repository-integrity": "node scripts/verify-repository-integrity.mjs",
     "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
+    "verify:deploy-safety": "bash scripts/verify-deploy-safety.sh",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:compliance-copy": "node scripts/verify-compliance-copy.mjs",
     "verify:mock-server-contract": "node scripts/verify-mock-server-contract.mjs"

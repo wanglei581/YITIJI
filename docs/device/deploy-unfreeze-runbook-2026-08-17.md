@@ -1,5 +1,7 @@
 # 解冻发布执行手册（2026-08-17）
 
+> **历史快照警告（2026-08-22）**：本手册正文记录 2026-08-17 当时的 SHA、线上能力和旧部署顺序，不是当前可直接执行的任务书。当前生产事实以 `docs/progress/current-progress.md` 顶部和服务器 provenance 为准；当前候选已经引入 `API_DEPLOY_SOURCE.txt` / `DEPLOY_SOURCE.txt` 分层、PM2 最小环境、三端原子切换回退、backup cleanup 精确保留以及 deploy/cleanup 双层互斥。Batch 2 未 push/未部署前，仍禁止打开 `DEPLOY_API_ENABLED`。本手册后续必须在具名维护窗口按目标 SHA 重新生成，而不是照抄 `db643ab34`。
+
 > **一句话**：生产四端已冻结在同一个 SHA 三天，原因是一个发布授权开关在上次发布后 26 秒被关上。
 > 管线没坏、迁移不危险。本手册给出把 `db643ab34`（含全部四个安全/隐私修复）发上去的可执行步骤。
 >
