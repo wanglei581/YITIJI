@@ -221,6 +221,18 @@ export class ReleaseObservationService {
           throw new BadRequestException({ error: { code: 'RELEASE_OBSERVATION_WINDOW_EXPIRED', message: '观察窗口已结束，不能激活计划' } })
         }
         const terminalIds = plan.targets.map((target) => target.terminalId)
+        const terminals = await tx.terminal.findMany({
+          where: { id: { in: terminalIds } },
+          select: { id: true, terminalCode: true, enabled: true, lifecycleStatus: true },
+        })
+        if (terminals.length !== terminalIds.length) {
+          throw new NotFoundException({ error: { code: 'RELEASE_TARGET_NOT_FOUND', message: '至少一个目标终端不存在' } })
+        }
+        for (const terminal of terminals) {
+          if (!terminal.enabled || terminal.lifecycleStatus !== 'active') {
+            throw new BadRequestException({ error: { code: 'RELEASE_TARGET_INELIGIBLE', message: `终端 ${terminal.terminalCode} 未处于运行中，不能激活观察计划` } })
+          }
+        }
         // Expired or otherwise inactive assignments are no longer effective;
         // remove them before acquiring the terminal-keyed active assignments.
         await tx.activeReleaseObservationAssignment.deleteMany({
