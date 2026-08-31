@@ -17,7 +17,7 @@
 
 - [ ] **B1 生产启动环境修复后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。PM2 实际进程环境未设置 `NODE_ENV=production`，而集中安全门禁、生产 CORS/CSP 与 trust proxy 都依赖该值；**先修 PM2 启动环境并受控重启，确认进程仍 online、ready=200 且门禁真实执行，再按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布**。不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
-- [ ] **B3 Windows + 奔图真机验收** —— 「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」，留订单号/任务号/出纸照片。按 `docs/device/windows-host-acceptance-runbook.md`
+- [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。USB001 被误报“打印机不可达”的 Agent 根因已在干净 main 候选修复，仍须 Windows 包与现场复验。下一步从最新 main 选择性重建不低于 `0.4.11` 的候选，保留现场 `0.4.10` 打印完成判定与 main 图片实际尺寸能力；不得整支合并落后 main 210 个提交的旧 Agent 分支。按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
 
 ### 已清（2026-08-19 当日）
 
