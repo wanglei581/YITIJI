@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { verifyCandidateProvenance } from './verify-candidate-provenance.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8')
@@ -279,7 +280,7 @@ assert.match(lifecycle, /desktop link is an MSI advertised shortcut/)
 assert.match(lifecycle, /Terminal control center desktop shortcut remains after uninstall/)
 assert.ok(lifecycle.includes('URL=http://127\\.0\\.0\\.1:9527/local/panel'))
 assert.match(lifecycle, /Start Menu shortcut remains after uninstall/)
-assert.match(workflow, /artifacts\/msi\/lifecycle-logs\//)
+assert.match(workflow, /artifacts\/evidence\/fresh-msi-lifecycle-logs\//)
 assert.doesNotMatch(workflow, /lifecycle-logs\/\*\.log/)
 assert.match(exeLifecycle, /Invoke-Bundle -Action "\/install"/)
 assert.match(exeLifecycle, /Invoke-Bundle -Action "\/repair"/)
@@ -315,7 +316,6 @@ assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnap
 assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "repair"/)
 assert.match(upgradeLifecycle, /Assert-StateFixture -Expected \$stateFixtureSnapshot -Phase "uninstall"/)
 assert.match(upgradeLifecycle, /EXE_UPGRADE_LIFECYCLE_PASS/)
-assert.match(workflow, /Build unsigned WiX Burn EXE/)
 assert.match(workflow, /Verify staged secure scan reader boundary/)
 assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
 assert.match(secureScanReaderVerify, /SECURE_SCAN_READER_PASS/)
@@ -360,22 +360,14 @@ assert.match(workflow, /verify-staged-powershell\.ps1/)
 assert.match(workflow, /path: predecessor-0\.4\.10/)
 assert.match(workflow, /predecessor-0\.4\.10\/apps\/terminal-agent\/installer\/build-staging\.ps1/)
 assert.match(workflow, /predecessor-0\.4\.10\/apps\/terminal-agent\/installer\/artifacts\/exe/)
-const freshJobStart = workflow.indexOf('  unsigned-msi-candidate:')
-const upgradeJobStart = workflow.indexOf('  unsigned-exe-upgrade:')
-const freshJob = workflow.slice(freshJobStart, upgradeJobStart)
-const upgradeJob = workflow.slice(upgradeJobStart)
-assert.doesNotMatch(freshJob, /test-exe-upgrade-lifecycle\.ps1/)
-assert.doesNotMatch(freshJob, /predecessor-0\.4\.10/)
-assert.match(upgradeJob, /test-exe-upgrade-lifecycle\.ps1/)
-assert.match(upgradeJob, /ref: 75e0711561f74eed0e76ed956e4b1b5fcd2c54d4/)
-assert.doesNotMatch(upgradeJob, /test-exe-lifecycle\.ps1/)
-assert.doesNotMatch(upgradeJob, /test-msi-lifecycle\.ps1/)
-assert.ok(
-  freshJob.indexOf('test-exe-lifecycle.ps1') < freshJob.indexOf('test-msi-lifecycle.ps1'),
-  'fresh EXE lifecycle must run before fresh MSI lifecycle',
-)
 assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
-assert.match(workflow, /artifacts\/exe\/lifecycle-logs\//)
+assert.match(workflow, /artifacts\/evidence\/fresh-exe-lifecycle-logs\//)
+assert.match(workflow, /artifacts\/evidence\/upgrade-lifecycle-logs\//)
+verifyCandidateProvenance({
+  workflow,
+  candidateIdentity: read('candidate-identity.ps1'),
+  productVersion: inputs.productVersion,
+})
 
 assert.match(windowsScanAdapter, /AJPSR002/, 'Node must require secure-reader protocol v2')
 assert.match(windowsScanAdapter, /rootIdentity/, 'READ must return the pinned root identity token')

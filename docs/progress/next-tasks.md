@@ -17,7 +17,7 @@
 
 - [ ] **B1 生产启动环境修复后再解冻部署** —— 生产当前精确运行 `771d53e2ceb257a684cf0d8657c4844045de509e`（`DEPLOY_SOURCE` / PM2 `COMMIT` / `/root/YITIJI` HEAD 一致，部署于 2026-08-18 19:09:21+08:00），落后于当前 `origin/main`。PM2 实际进程环境未设置 `NODE_ENV=production`，而集中安全门禁、生产 CORS/CSP 与 trust proxy 都依赖该值；**先修 PM2 启动环境并受控重启，确认进程仍 online、ready=200 且门禁真实执行，再按 `docs/device/deploy-unfreeze-runbook-2026-08-17.md` 申请精确 SHA 发布**。不得直接把 `DEPLOY_API_ENABLED` 打开
 - [ ] **B2 生产内容录入** —— 岗位/招聘会/政策 `total:0`；需授权来源，代码不能编造
-- [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。干净 `0.4.11` 本地候选已冻结为 `63e081158 + 9d01db974 + 54fdb9fde + 5b3e1b42f`：保留现场 `0.4.10` 打印完成判定、主干图片实际尺寸/安全扫描能力并修复 USB001 假告警；打印两项 P1 已 fail-closed 修复，安装器升级与 fresh 生命周期已拆到两台隔离 Windows runner，既有 required job 会显式汇总升级结果，未整支合并旧 Agent 分支或带回在线更新。下一步先推送该精确候选并让 GitHub Windows CI 实际跑 PowerShell 5.1、Node `22.23.1`、WiX MSI/Burn、fresh/repair/uninstall、精确 `0.4.10@75e0711 -> 0.4.11` 状态保留；**不要在现场机运行会创建测试 ProgramData 的 CI 生命周期脚本**。CI 通过后再对现场安装做独立备份/哈希、受控升级、USB001=`not_network_printer`/Admin“非网络端口”和维护态无打印心跳；通过后另行申请真实出纸授权。按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
+- [ ] **B3 Windows + 奔图真机验收** —— 2026-08-31 已完成 KSK-001 空队列、本地 SQLite、维护态启动、9527、云端心跳 `0.4.10` 与无出纸收尾，服务已恢复 `Stopped / Manual`；仍未执行「建单 → 到机码 → 支付 → claim → 真实出纸 → 回流」。`0.4.11@94353ab29` 的五项 CI 已全绿，但升级 job 验证的 EXE 与最终下载 artifact 是同源码的两次非确定性构建，SHA-256 不同，且均未 Authenticode 签名，因此当前不得升级在役终端。现正以最小 workflow 修复改为候选只构建一次、冻结 source SHA/版本/三文件 SHA-256、upgrade 与 fresh lifecycle 消费同一字节、全部成功后才发布；新 SHA 仍须推送并重新取得 Windows CI。之后还必须落实企业 Authenticode 签名/时间戳/签名者指纹验证和可审计 Windows 执行入口，再申请维护态无打印升级；**不要在现场机运行会创建测试 ProgramData 的 CI 生命周期脚本**。无打印升级通过后才另行申请真实出纸授权，并按 `docs/device/windows-host-acceptance-runbook.md` 留订单号/任务号/出纸照片
 
 ### 已清（2026-08-19 当日）
 
@@ -26,7 +26,7 @@
 10 页裸英文报错（#732）· 入口直达（#733）· 打印未确认假陈述（#734，CI 中）·
 首页域按真实能力说话（#735，CI 中）
 
-> 最后更新：2026-08-31。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。Windows Agent `0.4.11` 仅为本地源码候选，未推送、未构建 Windows 安装包、未安装或真机出纸。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
+> 最后更新：2026-08-31。生产只读核验：`771d53e2` 部署于 2026-08-18，PM2 自该次部署持续 online、ready=200、PostgreSQL health 正常，Kiosk/Admin/Partner 为独立构建；这不等于当前 `origin/main` 已部署。Windows Agent `0.4.11@94353ab29` 已推送且五项 CI 全绿，但可下载二进制与升级测试二进制不同且未 Authenticode 签名；同字节 provenance workflow 修复候选已形成，仍须以其最终分支 HEAD 的新 Windows CI 裁决，未安装或真机出纸。生产岗位 / 招聘会 / 政策公开列表仍为 0，Windows + 奔图现场闭环仍未验收。
 
 > **P1 证据候选状态（2026-08-14）**：target 31 已按既有 W2 三任务合同补齐 synthetic success evidence preparation；target 60 仍走普通 idle → `/session-timeout`，仅把等待上限由 200 秒增至 220 秒；warning 专项仅为 V6 首页补 `/job-fairs` 200 空列表 fixture。Node `v22.23.2` + pnpm `11.2.2` 下 session-warning 19/19、target 31/60 各 1/1、W2 30/30、完整 P1 83/83 capture OK、W6 104/104 已通过，但 judgment 仍为 72 `PENDING` + 11 `PROFILE_DEFER`。target 64 已使用官方 Chrome `151.0.7922.138` 完成 synthetic PDF HTTP 200、outer / viewer / inner / plugin 共 18 项 readiness 全 true、`captureOk=true`、`pageErrors=[]`，人工确认缩略图和正文页均显示 synthetic PDF 黑色矩形，不是空白或错误页；这只证明 synthetic PDF viewer evidence contract，不等于真实材料服务、真实打印预览、像素封板、V6 完成、全产品验收、生产部署或硬件验收。整体继续 **NO-GO**，须待实际完整 diff 的 Claude FINAL 后再决定是否本地冻结。
 

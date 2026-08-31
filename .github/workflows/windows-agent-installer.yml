@@ -35,68 +35,91 @@ jobs:
         with:
           node-version: 22.23.1
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Enable locked pnpm
-        shell: pwsh
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.2.2 --activate
-
       - name: Verify installer source contract
         shell: pwsh
         run: node apps/terminal-agent/installer/verify-installer-inputs.mjs
 
-      - name: Build reproducible staging
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-staging.ps1
+      - name: Download exact upgrade-tested candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: terminal-agent-unsigned-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: apps/terminal-agent/installer/artifacts/candidate
 
-      - name: Verify Windows PrintService completion correlation
+      - name: Verify downloaded candidate identity before install
         shell: powershell
-        working-directory: apps/terminal-agent
-        run: node installer/verify-printservice-completion.mjs
-
-      - name: Parse staged provisioning scripts with Windows PowerShell 5.1
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-staged-powershell.ps1 -StagingRoot apps/terminal-agent/installer/artifacts/staging
-
-      - name: Verify staged secure scan reader boundary
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
-
-      - name: Build unsigned WiX MSI
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1
-
-      - name: Build unsigned WiX Burn EXE
-        shell: powershell
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11"
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
         run: |
-          $exe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
-          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-lifecycle.ps1 -ExePath $exe.FullName
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-lifecycle.ps1 `
+            -ExePath apps/terminal-agent/installer/artifacts/candidate/AIJobPrintTerminalSetup.exe
+
+      - name: Collect fresh EXE lifecycle evidence
+        if: always()
+        shell: powershell
+        run: |
+          $source = "apps/terminal-agent/installer/artifacts/candidate/lifecycle-logs"
+          $destination = "apps/terminal-agent/installer/artifacts/evidence/fresh-exe-lifecycle-logs"
+          if (Test-Path -LiteralPath $source -PathType Container) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Move-Item -LiteralPath $source -Destination $destination
+          }
 
       - name: Exercise MSI install, repair, and uninstall
         shell: powershell
         run: |
-          $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
-          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-msi-lifecycle.ps1 -MsiPath $msi.FullName
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-msi-lifecycle.ps1 `
+            -MsiPath apps/terminal-agent/installer/artifacts/candidate/AIJobPrintAgent.msi
 
-      - name: Upload unsigned test evidence
+      - name: Collect fresh MSI lifecycle evidence
         if: always()
+        shell: powershell
+        run: |
+          $source = "apps/terminal-agent/installer/artifacts/candidate/lifecycle-logs"
+          $destination = "apps/terminal-agent/installer/artifacts/evidence/fresh-msi-lifecycle-logs"
+          if (Test-Path -LiteralPath $source -PathType Container) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Move-Item -LiteralPath $source -Destination $destination
+          }
+
+      - name: Verify candidate identity after fresh lifecycles
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11"
+
+      - name: Upload exact tested unsigned candidate
         uses: actions/upload-artifact@v4
         with:
           name: terminal-agent-unsigned-installer-candidates
           path: |
-            apps/terminal-agent/installer/artifacts/msi/*.msi
-            apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/
-            apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe
-            apps/terminal-agent/installer/artifacts/exe/lifecycle-logs/
-            apps/terminal-agent/installer/artifacts/staging/manifest.json
+            apps/terminal-agent/installer/artifacts/candidate/AIJobPrintAgent.msi
+            apps/terminal-agent/installer/artifacts/candidate/AIJobPrintTerminalSetup.exe
+            apps/terminal-agent/installer/artifacts/candidate/staging-manifest.json
+            apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
+            apps/terminal-agent/installer/artifacts/evidence/fresh-exe-lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/evidence/fresh-msi-lifecycle-logs/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload fresh lifecycle evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-unsigned-installer-failure-evidence
+          path: |
+            apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
+            apps/terminal-agent/installer/artifacts/evidence/fresh-exe-lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/evidence/fresh-msi-lifecycle-logs/
           if-no-files-found: warn
           retention-days: 7
 
@@ -139,6 +162,35 @@ jobs:
           & apps/terminal-agent/installer/build-msi.ps1
           & apps/terminal-agent/installer/build-exe.ps1
 
+      - name: Verify Windows PrintService completion correlation
+        shell: powershell
+        working-directory: apps/terminal-agent
+        run: node installer/verify-printservice-completion.mjs
+
+      - name: Parse staged provisioning scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-staged-powershell.ps1 -StagingRoot apps/terminal-agent/installer/artifacts/staging
+
+      - name: Verify staged secure scan reader boundary
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
+
+      - name: Freeze candidate identity
+        shell: powershell
+        run: |
+          $candidateRoot = "apps/terminal-agent/installer/artifacts/candidate"
+          New-Item -ItemType Directory -Path $candidateRoot -Force | Out-Null
+          $msi = @(Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi -File)
+          if ($msi.Count -ne 1) { throw "Expected exactly one candidate MSI, found $($msi.Count)" }
+          Copy-Item -LiteralPath $msi[0].FullName -Destination "$candidateRoot/AIJobPrintAgent.msi"
+          Copy-Item -LiteralPath apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe -Destination "$candidateRoot/AIJobPrintTerminalSetup.exe"
+          Copy-Item -LiteralPath apps/terminal-agent/installer/artifacts/staging/manifest.json -Destination "$candidateRoot/staging-manifest.json"
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Create `
+            -CandidateRoot $candidateRoot `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11"
+
       - name: Build exact field predecessor 0.4.10 upgrade fixture
         shell: powershell
         run: |
@@ -150,10 +202,41 @@ jobs:
         shell: powershell
         run: |
           $predecessor = Get-ChildItem predecessor-0.4.10/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
-          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
             -PredecessorExePath $predecessor.FullName `
-            -CandidateExePath $candidate.FullName
+            -CandidateExePath apps/terminal-agent/installer/artifacts/candidate/AIJobPrintTerminalSetup.exe
+
+      - name: Collect upgrade lifecycle evidence
+        if: always()
+        shell: powershell
+        run: |
+          $source = "apps/terminal-agent/installer/artifacts/candidate/lifecycle-logs"
+          $destination = "apps/terminal-agent/installer/artifacts/evidence/upgrade-lifecycle-logs"
+          if (Test-Path -LiteralPath $source -PathType Container) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Move-Item -LiteralPath $source -Destination $destination
+          }
+
+      - name: Verify candidate identity after upgrade lifecycle
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/candidate-identity.ps1 `
+            -Mode Verify `
+            -CandidateRoot apps/terminal-agent/installer/artifacts/candidate `
+            -SourceCommit "${{ github.event.pull_request.head.sha || github.sha }}" `
+            -ProductVersion "0.4.11"
+
+      - name: Transfer exact upgrade-tested candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-unsigned-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            apps/terminal-agent/installer/artifacts/candidate/AIJobPrintAgent.msi
+            apps/terminal-agent/installer/artifacts/candidate/AIJobPrintTerminalSetup.exe
+            apps/terminal-agent/installer/artifacts/candidate/staging-manifest.json
+            apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Upload unsigned upgrade evidence
         if: always()
@@ -161,8 +244,8 @@ jobs:
         with:
           name: terminal-agent-unsigned-upgrade-evidence
           path: |
-            apps/terminal-agent/installer/artifacts/exe/lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/evidence/upgrade-lifecycle-logs/
             predecessor-0.4.10/apps/terminal-agent/installer/artifacts/staging/manifest.json
-            apps/terminal-agent/installer/artifacts/staging/manifest.json
+            apps/terminal-agent/installer/artifacts/candidate/candidate-identity.json
           if-no-files-found: warn
           retention-days: 7
