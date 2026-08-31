@@ -2,7 +2,7 @@
 
 ## 当前候选：F0.5 发布可观测性（2026-09-01）
 
-- [~] **F0.5 管理端计划与 Agent 运行版本观察（本地候选，未推送/未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。下一步须先完成最终独立审查和 CI，再另行授权 push/PR；生产迁移、KSK-001 操作和任何 updater 功能均需新的具名授权。
+- [~] **F0.5 管理端计划与 Agent 运行版本观察（Draft PR #744，未合并/未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。首轮 CI 只暴露既有模型计数治理断言未随本轮 +5 additive schema 模型更新；修复后需完成复跑 CI 与最终独立审查。生产迁移、KSK-001 操作和任何 updater 功能均需新的具名授权。
 
 ## 交付阻塞清单（2026-08-19 建立，只放**卡上线**的，勾完即可放机器收真钱）
 
