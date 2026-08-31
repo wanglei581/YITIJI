@@ -37,6 +37,8 @@ import { ClaimTasksDto } from './dto/claim-tasks.dto'
 import { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import { RecordToolboxLaunchEventDto } from './dto/record-toolbox-launch-event.dto'
 import { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
+import { ReportReleaseObservationDto } from './dto/report-release-observation.dto'
+import { ReleaseObservationService } from './release-observation.service'
 
 @Controller()
 export class TerminalsController {
@@ -44,6 +46,7 @@ export class TerminalsController {
     private readonly terminalsService: TerminalsService,
     private readonly toolbox: TerminalToolboxService,
     private readonly capabilities: TerminalCapabilitiesService,
+    private readonly releases: ReleaseObservationService,
   ) {}
 
   // ── 1. Register ──────────────────────────────────────────────────────────
@@ -72,6 +75,27 @@ export class TerminalsController {
     @Headers('authorization') auth: string | undefined,
   ) {
     return this.terminalsService.heartbeat(terminalId, dto, auth)
+  }
+
+  // F0.5 only: the Agent receives release identity for observation. It never
+  // receives an artifact URL, command, schedule, service instruction or install action.
+  @Get('terminals/:terminalId/release-observation-plan')
+  @HttpCode(HttpStatus.OK)
+  getReleaseObservationPlan(
+    @Param('terminalId') terminalId: string,
+    @Headers('authorization') auth: string | undefined,
+  ) {
+    return this.releases.getPlanForTerminal(terminalId, auth)
+  }
+
+  @Put('terminals/:terminalId/release-observation')
+  @HttpCode(HttpStatus.OK)
+  reportReleaseObservation(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: ReportReleaseObservationDto,
+    @Headers('authorization') auth: string | undefined,
+  ) {
+    return this.releases.reportObservation(terminalId, dto, auth)
   }
 
   // ── 3. Claim tasks ───────────────────────────────────────────────────────

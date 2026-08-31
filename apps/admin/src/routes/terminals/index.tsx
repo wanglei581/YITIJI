@@ -19,8 +19,9 @@ import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
+import { ReleaseObservationPanel } from './ReleaseObservationPanel'
 
-const TABLE_COLS = 14
+const TABLE_COLS = 15
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
@@ -68,6 +69,27 @@ function runtimeStatusView(t: AdminTerminalRecord) {
     return { ...DEGRADED_VIEW, detail: '本地任务库不可用，已暂停领取打印任务' }
   }
   return { ...ONLINE_VIEW, detail: null }
+}
+
+function releaseObservationView(t: AdminTerminalRecord) {
+  const observation = t.releaseObservation
+  if (!observation) return { badge: 'default' as const, label: '无计划', detail: null }
+  const labels = {
+    draft: '草稿',
+    paused: '已暂停',
+    expired: '观察结束',
+    not_seen: '尚未看到',
+    unverified: '版本未验证',
+    current: '版本匹配（未验包）',
+    mismatch: '版本不匹配',
+    stale: '心跳陈旧',
+  } as const
+  const badge = observation.state === 'current'
+    ? 'success' as const
+    : observation.state === 'mismatch' || observation.state === 'stale'
+      ? 'warning' as const
+      : 'default' as const
+  return { badge, label: labels[observation.state], detail: observation.targetVersion }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -399,7 +421,7 @@ export default function TerminalsPage() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
+                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '最近心跳', 'Agent 版本', '更新观察', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -432,6 +454,7 @@ export default function TerminalsPage() {
                 paginated.map((t) => {
                   const runtimeView = runtimeStatusView(t)
                   const printerView = printerStatusView(t.printerStatus ?? null)
+                  const releaseView = releaseObservationView(t)
                   const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
                   const bindCodeTitle = !t.enabled
                     ? '停用终端不可生成绑定码'
@@ -678,6 +701,12 @@ export default function TerminalsPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={printerView.badge} label={printerView.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge dot status={releaseView.badge} label={releaseView.label} />
+                          {releaseView.detail && <span className="font-mono text-[11px] text-neutral-500">目标 {releaseView.detail}</span>}
+                        </div>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.ipAddress ?? '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{fmtDisk(t.diskFreeGb)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{t.registeredAt ? new Date(t.registeredAt).toLocaleDateString('zh-CN') : '—'}</td>
@@ -700,6 +729,10 @@ export default function TerminalsPage() {
       </p>
       <p className="mt-1 text-xs text-neutral-500">
         「设备档案」用于商用部署的机器识别和权限绑定；MAC 地址建议由 Terminal Agent 上报，也可由管理员人工校正。停用终端后，Kiosk 统一配置会关闭敏感模块。
+      </p>
+      <ReleaseObservationPanel terminals={terminals} onNotice={setNotice} />
+      <p className="mt-1 text-xs text-neutral-500">
+        「更新观察」只显示终端是否看到已指定的版本计划。本阶段不会下载、安装或控制 Windows 服务；未签名和内部自签名制品均不能作为正式发布结论。
       </p>
 
       {bindCodeTerminal ? (
