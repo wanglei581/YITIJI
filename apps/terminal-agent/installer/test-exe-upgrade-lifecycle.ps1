@@ -148,6 +148,7 @@ function Assert-StateFixture([System.Collections.IDictionary]$Expected, [string]
 $predecessorInstalled = $false
 $candidateInstalled = $false
 $upgradeCompleted = $false
+$ownsFixtureState = $false
 $stateFixtureSnapshot = $null
 
 try {
@@ -166,6 +167,7 @@ try {
   if (Test-Path -LiteralPath $stateRoot) {
     throw "EXE upgrade lifecycle requires an unused ProgramData root: $stateRoot"
   }
+  $ownsFixtureState = $true
 
   Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install" -LogName "upgrade-predecessor-install.log"
   $predecessorInstalled = $true
@@ -236,12 +238,14 @@ try {
       Write-Warning "Predecessor cleanup failed: $($_.Exception.Message)"
     }
   }
-  foreach ($fixturePath in @($configPath, $tokenPath, $databasePath, $scanFixturePath)) {
-    if (Test-Path -LiteralPath $fixturePath -PathType Leaf) {
-      Remove-Item -LiteralPath $fixturePath -Force
+  if ($ownsFixtureState) {
+    foreach ($fixturePath in @($configPath, $tokenPath, $databasePath, $scanFixturePath)) {
+      if (Test-Path -LiteralPath $fixturePath -PathType Leaf) {
+        Remove-Item -LiteralPath $fixturePath -Force
+      }
     }
-  }
-  if ((Test-Path -LiteralPath $scanRoot -PathType Container) -and @(Get-ChildItem -LiteralPath $scanRoot -Force).Count -eq 0) {
-    Remove-Item -LiteralPath $scanRoot -Force
+    if ((Test-Path -LiteralPath $scanRoot -PathType Container) -and @(Get-ChildItem -LiteralPath $scanRoot -Force).Count -eq 0) {
+      Remove-Item -LiteralPath $scanRoot -Force
+    }
   }
 }

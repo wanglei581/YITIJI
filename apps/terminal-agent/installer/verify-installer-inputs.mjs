@@ -292,6 +292,16 @@ assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.4\.10"/)
 assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.4\.11"/)
 assert.match(upgradeLifecycle, /EXE upgrade lifecycle requires an unused ProgramData root/)
+assert.doesNotMatch(upgradeLifecycle, /Remove-Item -LiteralPath \$stateRoot/)
+const unusedStateGuard = upgradeLifecycle.indexOf('EXE upgrade lifecycle requires an unused ProgramData root')
+const fixtureOwnership = upgradeLifecycle.indexOf('$ownsFixtureState = $true')
+const predecessorInstall = upgradeLifecycle.indexOf('Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install"')
+assert.ok(unusedStateGuard < fixtureOwnership && fixtureOwnership < predecessorInstall)
+assert.match(
+  upgradeLifecycle,
+  /if \(\$ownsFixtureState\) \{\s*foreach \(\$fixturePath in @\(\$configPath, \$tokenPath, \$databasePath, \$scanFixturePath\)\)/,
+  'fixture cleanup must be disabled when the initial ProgramData guard rejects the runner',
+)
 assert.match(upgradeLifecycle, /Assert-PanelShortcut/)
 assert.match(upgradeLifecycle, /Assert-DesktopShortcut/)
 assert.match(upgradeLifecycle, /Assert-ControlCenterSmoke -ExpectedVersion \$PREDECESSOR_VERSION/)
@@ -320,6 +330,17 @@ assert.match(secureScanReaderVerify, /replace\(\/\^\\uFEFF\//, 'Windows PowerShe
 assert.match(secureScanReaderVerify, /FileAttributes\]::ReparsePoint/, 'cleanup must never treat an ordinary non-empty scan directory as a link')
 assert.match(lifecycle, /Installed secure scan reader boundary verification failed/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
+assert.match(workflow, /unsigned-exe-upgrade:/, 'run upgrade lifecycle on an isolated Windows runner')
+assert.match(
+  workflow,
+  /unsigned-msi-candidate:\s*needs: unsigned-exe-upgrade\s*if: \$\{\{ always\(\) \}\}/,
+  'the existing required Windows job must depend on the isolated upgrade lifecycle',
+)
+assert.match(
+  workflow,
+  /if \("\$\{\{ needs\.unsigned-exe-upgrade\.result \}\}" -ne "success"\) \{\s*throw "Isolated EXE upgrade lifecycle did not pass"/,
+  'the existing required Windows job must fail rather than skip when the isolated upgrade job fails',
+)
 assert.match(
   workflow,
   /actions\/checkout@v4[\s\S]*?ref:\s*\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/,
@@ -339,9 +360,19 @@ assert.match(workflow, /verify-staged-powershell\.ps1/)
 assert.match(workflow, /path: predecessor-0\.4\.10/)
 assert.match(workflow, /predecessor-0\.4\.10\/apps\/terminal-agent\/installer\/build-staging\.ps1/)
 assert.match(workflow, /predecessor-0\.4\.10\/apps\/terminal-agent\/installer\/artifacts\/exe/)
+const freshJobStart = workflow.indexOf('  unsigned-msi-candidate:')
+const upgradeJobStart = workflow.indexOf('  unsigned-exe-upgrade:')
+const freshJob = workflow.slice(freshJobStart, upgradeJobStart)
+const upgradeJob = workflow.slice(upgradeJobStart)
+assert.doesNotMatch(freshJob, /test-exe-upgrade-lifecycle\.ps1/)
+assert.doesNotMatch(freshJob, /predecessor-0\.4\.10/)
+assert.match(upgradeJob, /test-exe-upgrade-lifecycle\.ps1/)
+assert.match(upgradeJob, /ref: 75e0711561f74eed0e76ed956e4b1b5fcd2c54d4/)
+assert.doesNotMatch(upgradeJob, /test-exe-lifecycle\.ps1/)
+assert.doesNotMatch(upgradeJob, /test-msi-lifecycle\.ps1/)
 assert.ok(
-  workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
-  'EXE lifecycle must run first on a clean ProgramData root',
+  freshJob.indexOf('test-exe-lifecycle.ps1') < freshJob.indexOf('test-msi-lifecycle.ps1'),
+  'fresh EXE lifecycle must run before fresh MSI lifecycle',
 )
 assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
 assert.match(workflow, /artifacts\/exe\/lifecycle-logs\//)
