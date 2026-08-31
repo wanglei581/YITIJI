@@ -609,6 +609,7 @@ export async function monitorPrintJob(
   // the first queue poll.
   const deadline = now() + timeoutMs
   let paperEmptyCount = 0
+  let paperEmptySeen = false
   let notFoundCount = 0
   let activeJobSeenOnce = false
   let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
@@ -620,6 +621,7 @@ export async function monitorPrintJob(
 
     switch (status) {
       case 'paper_empty':
+        paperEmptySeen = true
         paperEmptyCount++
         notFoundCount = 0
         // Require 2 consecutive PaperOut confirmations before declaring failure.
@@ -654,7 +656,7 @@ export async function monitorPrintJob(
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
-        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
         break
@@ -675,6 +677,11 @@ export async function monitorPrintJob(
         // A small job can finish and leave a non-retained queue before the
         // first Get-PrintJob sample. Event 307 is stronger evidence than queue
         // visibility when it carries this exact taskId after dispatch.
+        if (paperEmptySeen) {
+          return unconfirmedOutcome(
+            'the job disappeared after a paper-empty signal; completion cannot be confirmed',
+          )
+        }
         if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
@@ -697,7 +704,7 @@ export async function monitorPrintJob(
       case 'unknown':
         // Get-PrintJob can fail independently of the Operational event log.
         // Preserve fail-closed behaviour but accept an exact post-dispatch 307.
-        if (await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
+        if (!paperEmptySeen && await queryCompletionEvent(printerName, taskId, dispatchedAtMs)) {
           return { failed: false, errorCode: '' }
         }
         paperEmptyCount = 0

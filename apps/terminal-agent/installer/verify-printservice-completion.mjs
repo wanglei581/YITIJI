@@ -21,6 +21,8 @@ assert.match(
   'completion correlation must inspect locale-independent Event XML for the taskId',
 )
 assert.match(script, /Param5/, 'generic-document fallback must read the target queue')
+assert.match(script, /Param2/, 'generic-document fallback must read the document name')
+assert.match(script, /打印文档/, 'generic-document fallback must allow only the field-verified Pantum name')
 assert.match(script, /S-1-5-18/, 'generic-document fallback must require LocalSystem')
 assert.doesNotMatch(script, /\.Message/, 'localized formatted messages must not gate completion')
 
@@ -89,6 +91,11 @@ assert.equal(
   runFixture(genericPantumEvent.replace('S-1-5-18', 'S-1-5-21-1234')),
   'false',
   'generic document events from another user must not confirm',
+)
+assert.equal(
+  runFixture(genericPantumEvent.replace('打印文档', 'unrelated-system-job.pdf')),
+  'false',
+  'unrelated LocalSystem documents on the same queue must not confirm',
 )
 
 console.log('PRINTSERVICE_COMPLETION_PASS taskId=true genericPantum=true unrelated=false')

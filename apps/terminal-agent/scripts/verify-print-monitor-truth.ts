@@ -32,6 +32,8 @@ function verifyPrintServiceCompletionScriptContract(): void {
     'completion correlation must inspect locale-independent Event XML for the taskId',
   )
   assert.match(script, /Param5/, 'generic-document fallback must read the target queue')
+  assert.match(script, /Param2/, 'generic-document fallback must read the document name')
+  assert.match(script, /打印文档/, 'generic-document fallback must allow only the field-verified Pantum name')
   assert.match(
     script,
     /S-1-5-18/,
@@ -109,6 +111,11 @@ function verifyPrintServiceCompletionScriptContract(): void {
     runFixture(genericPantumEvent.replace('S-1-5-18', 'S-1-5-21-1234')),
     'false',
     'a generic document event from a non-Agent user must not confirm the task',
+  )
+  assert.equal(
+    runFixture(genericPantumEvent.replace('打印文档', 'unrelated-system-job.pdf')),
+    'false',
+    'an unrelated LocalSystem document on the same queue must not confirm the task',
   )
 }
 
@@ -269,6 +276,19 @@ async function main(): Promise<void> {
       statuses: ['paper_empty', 'not_found'],
       expectedFailed: true,
       expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'observed active job then paper-out then disappearance is not completion evidence',
+      statuses: ['printing', 'paper_empty', 'not_found'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+    },
+    {
+      name: 'paper-out signal is not overridden by a later completion event on unknown status',
+      statuses: ['paper_empty', 'unknown'],
+      expectedFailed: true,
+      expectedErrorCode: 'PRINT_JOB_UNCONFIRMED',
+      completionEvent: true,
     },
     {
       name: 'explicit spooler error confirms failure',

@@ -270,10 +270,11 @@ export async function getPrintJobStatus(
  * submitted document name in raw XML, so the taskId remains the preferred
  * correlation key. Some Pantum drivers replace it with a generic localized
  * value such as "打印文档". For that verified field behaviour, the fallback is
- * deliberately narrow: the event must be for the exact configured queue, be
- * owned by LocalSystem (the Agent service identity), and occur after this
- * dispatch began. Claim cycles are serialized, so the Agent cannot dispatch a
- * second task to the same queue while the current task is being monitored.
+ * deliberately narrow: Param2 must equal the field-verified generic value
+ * "打印文档", the event must be for the exact configured queue, be owned by
+ * LocalSystem (the Agent service identity), and occur after this dispatch began.
+ * Claim cycles are serialized, so the Agent cannot dispatch a second task to
+ * the same queue while the current task is being monitored.
  */
 export function buildPrintServiceCompletionEventScript(): string {
   return (
@@ -287,11 +288,13 @@ export function buildPrintServiceCompletionEventScript(): string {
     `$raw = $_.ToXml(); ` +
     `if ($raw -like "*$tId*") { $true } else { ` +
     `[xml]$xml = $raw; ` +
+    `$documentNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param2']"); ` +
     `$printerNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param5']"); ` +
     `$securityNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='System']/*[local-name()='Security']/@UserID"); ` +
+    `$isKnownGenericName = $null -ne $documentNode -and [string]::Equals($documentNode.InnerText, '打印文档', [StringComparison]::Ordinal); ` +
     `$printerMatches = $null -ne $printerNode -and [string]::Equals($printerNode.InnerText, $pName, [StringComparison]::OrdinalIgnoreCase); ` +
     `$isLocalSystem = $null -ne $securityNode -and [string]::Equals($securityNode.Value, 'S-1-5-18', [StringComparison]::OrdinalIgnoreCase); ` +
-    `$printerMatches -and $isLocalSystem ` +
+    `$isKnownGenericName -and $printerMatches -and $isLocalSystem ` +
     `} } catch { $false } } | ` +
     `Select-Object -First 1; ` +
     `if ($event) { 'true' } else { 'false' }`
@@ -305,8 +308,8 @@ export function buildPrintServiceCompletionEventScript(): string {
  * `Printing, Retained` even after the spooler emitted its completion event. We
  * accept a successful 307 after this dispatch began when either:
  *   1. raw XML contains the exact sanitized task correlation id; or
- *   2. a driver discarded the document name, but the exact queue and the
- *      LocalSystem service identity both match.
+ *   2. a driver replaced the document name with the field-verified generic
+ *      value "打印文档", and the exact queue and LocalSystem identity match.
  * This remains Windows spooler completion evidence; it does not prove that
  * paper physically exited.
  */

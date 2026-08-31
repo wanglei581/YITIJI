@@ -163,6 +163,9 @@ try {
   if (@(Get-AgentProductEntries).Count -ne 0) {
     throw "EXE upgrade lifecycle requires the Agent MSI product to be absent"
   }
+  if (Test-Path -LiteralPath $stateRoot) {
+    throw "EXE upgrade lifecycle requires an unused ProgramData root: $stateRoot"
+  }
 
   Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install" -LogName "upgrade-predecessor-install.log"
   $predecessorInstalled = $true
