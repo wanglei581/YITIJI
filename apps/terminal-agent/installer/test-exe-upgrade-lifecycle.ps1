@@ -140,7 +140,7 @@ function Assert-StateFixture([System.Collections.IDictionary]$Expected, [string]
   $actual = Get-StateFixtureSnapshot
   foreach ($relativePath in $Expected.Keys) {
     if ($actual[$relativePath] -ne $Expected[$relativePath]) {
-      throw "ProgramData state changed during $Phase: $relativePath"
+      throw "ProgramData state changed during ${Phase}: $relativePath"
     }
   }
 }
