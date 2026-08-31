@@ -31,6 +31,31 @@
               Wait="yes" />
           </Component>
         </Directory>
+        <Directory Id="PROVISIONDIR" Name="provision">
+          <Component Id="ProvisioningWizardComponent" Guid="EAE4A871-94BE-4A31-BEA4-7ACFB4FA77E8" Bitness="always64">
+            <File Id="ProvisionLauncher" Source="$(var.StagingRoot)\provision\provision-terminal.cmd" Checksum="yes" />
+            <File Id="ProvisionWizard" Source="$(var.StagingRoot)\provision\provision-installed-agent.ps1" Checksum="yes" />
+            <File Id="ProvisionProductionScript" Source="$(var.StagingRoot)\provision\install-production-agent.ps1" Checksum="yes" />
+            <File Id="ProvisionServiceIdentity" Source="$(var.StagingRoot)\provision\service-identity.ps1" Checksum="yes" />
+            <File Id="ControlCenterScript" Source="$(var.StagingRoot)\provision\terminal-control-center.ps1" Checksum="yes" />
+            <File Id="ControlCenterLauncher" Source="$(var.StagingRoot)\provision\launch-control-center.vbs" KeyPath="yes" Checksum="yes" />
+            <Shortcut
+              Id="ControlCenterStartMenuShortcut"
+              Directory="AgentProgramMenuFolder"
+              Name="终端控制中心"
+              Description="绑定、配置并维护 AI 求职打印服务终端"
+              Target="[#ControlCenterLauncher]"
+              WorkingDirectory="PROVISIONDIR" />
+            <Shortcut
+              Id="ControlCenterDesktopShortcut"
+              Directory="DesktopFolder"
+              Name="AI 求职打印服务终端"
+              Description="打开 AI 求职打印服务终端控制中心"
+              Advertise="yes"
+              WorkingDirectory="PROVISIONDIR" />
+            <RemoveFolder Id="RemoveProvisioningProgramMenuFolder" Directory="AgentProgramMenuFolder" On="uninstall" />
+          </Component>
+        </Directory>
       </Directory>
     </StandardDirectory>
 
@@ -41,11 +66,27 @@
           <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="StateDirectoryCreated" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>
+      <Directory Id="CommonMicrosoftFolder" Name="Microsoft">
+        <Directory Id="CommonWindowsFolder" Name="Windows">
+          <Directory Id="CommonStartMenuFolder" Name="Start Menu">
+            <Directory Id="CommonStartMenuProgramsFolder" Name="Programs">
+              <Directory Id="AgentProgramMenuFolder" Name="AI Job Print Terminal">
+                <Component Id="AgentPanelShortcutComponent" Guid="E565227D-70C5-4C17-A63E-2322DA18C0E4" Bitness="always64">
+                  <File Id="AgentPanelInternetShortcut" Source="$(var.InstallerSourceRoot)\assets\AI Job Print Terminal.url" KeyPath="yes" />
+                  <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
+                </Component>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
     </StandardDirectory>
 
     <Feature Id="MainFeature" Title="AI Job Print Agent" Level="1">
       <ComponentRef Id="AgentServiceComponent" />
       <ComponentRef Id="AgentStateDirectoryComponent" />
+      <ComponentRef Id="AgentPanelShortcutComponent" />
+      <ComponentRef Id="ProvisioningWizardComponent" />
       <ComponentGroupRef Id="AgentPayload" />
     </Feature>
   </Package>

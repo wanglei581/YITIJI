@@ -31,17 +31,24 @@ const IMAGE_EXTENSIONS_SUPPORTED = new Set(['.jpg', '.jpeg', '.png'])
 /** BMP/TIFF：扩展名已在 SUPPORTED_EXTENSIONS 中，但 Phase 8.1A 暂不支持 image-to-pdf 转换 */
 const IMAGE_EXTENSIONS_PHASE_NEXT = new Set(['.bmp', '.tiff', '.tif'])
 
+export interface PrintExecutionOptions {
+  /** Stable task id retained in converted image filenames for spooler correlation. */
+  correlationId?: string
+}
+
 /**
  * 统一打印函数（Phase 8.1A）。
  *
  * @param filePath     待打印文件的绝对路径
  * @param printerName  打印机名称（必须由 CLI 参数或 Agent 配置传入）
  * @param params       打印参数（W7 起真实传给 SumatraPDF -print-settings）
+ * @param options      Agent execution context used for spooler correlation
  */
 export async function print(
   filePath: string,
   printerName: string,
   params?: Partial<PrintJobParams>,
+  options: PrintExecutionOptions = {},
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
@@ -109,7 +116,10 @@ export async function print(
     try {
       // scale 必须在生成 PDF 时就生效：图片一旦铺满 A4 烘进 PDF，
       // SumatraPDF 的 noscale 只会 100% 打印那张已被放大的页。
-      tempPdfPath = await imageToPdf(filePath, params?.scale === 'actual' ? 'actual' : 'fit')
+      tempPdfPath = await imageToPdf(filePath, {
+        scale: params?.scale === 'actual' ? 'actual' : 'fit',
+        correlationId: options.correlationId,
+      })
       return await printWithPdfToPrinter(tempPdfPath, printerName, params)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
