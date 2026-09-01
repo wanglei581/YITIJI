@@ -27,6 +27,7 @@ import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { getPrinterStatus, getDiskFreeGB } from './wmi'
 import { collectNetworkDiagnostics } from './network-diagnostics'
+import { observeReleasePlan } from './release-observation'
 import { log, warn, err } from '../logger'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,6 +130,10 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     if (resp.data.config && onConfigUpdate) {
       onConfigUpdate(resp.data.config as Partial<AgentConfig>)
     }
+
+    // Separate from the mutable `config` response: this only observes a plan
+    // and reports the already-running version. It cannot change runtime state.
+    void observeReleasePlan(config)
 
     return true
   } catch (e) {

@@ -311,6 +311,9 @@ jobs:
           pnpm run verify:installer-inputs
           pnpm run verify:printer-config
           pnpm run verify:local-print-wake
+          # F0.5 仅观察边界：静态确认 Agent 没有下载、安装、服务控制或任何
+          # 制品身份回传能力；不触发 Windows API、打印机或本地 Agent。
+          pnpm run verify:release-observation-boundary
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -664,6 +667,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:toolbox-micro-app-platform
           pnpm --filter @ai-job-print/api verify:toolbox-preprod-acceptance
           pnpm --filter @ai-job-print/api verify:toolbox-review-workflow
+          # F0.5 仅观察契约：需要已生成的 Prisma client，故必须位于
+          # 「Prepare fresh SQLite db」之后；不下载、安装或控制终端服务。
+          pnpm --filter @ai-job-print/api verify:release-observation-contract
           # ── GATE-WIRE 接线（#647 修好的漂移门禁，第二批）──────────────
           # 这 5 条都 import services/api/src（src 引用数 1 / 3 / 1 / 11 / 4），
           # 会传递依赖到 Prisma 客户端，因此必须留在本步（「Prepare fresh

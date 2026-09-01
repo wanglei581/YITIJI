@@ -126,6 +126,16 @@ export interface AdminTerminalRecord {
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
+  releaseObservation: {
+    planId: string
+    planStatus: 'draft' | 'active' | 'paused' | 'cancelled'
+    planVersion: number
+    targetVersion: string
+    signerTrustLevel: string
+    observedVersion: string | null
+    observedAt: string | null
+    state: 'draft' | 'paused' | 'expired' | 'not_seen' | 'unverified' | 'current' | 'mismatch' | 'stale'
+  } | null
 }
 
 export interface CreatePlannedTerminalInput {
@@ -148,6 +158,44 @@ export interface PlannedTerminalCreated {
 
 export interface AdminTerminalsResponse {
   terminals: AdminTerminalRecord[]
+}
+
+export interface CreateReleaseObservationPlanInput {
+  artifactVersion: string
+  packageSha256: string
+  runtimeManifestSha256: string
+  signerTrustLevel: 'unsigned_internal' | 'internal_self_signed' | 'enterprise_signed'
+  signerCertificateThumbprint?: string
+  targetPlatform?: string
+  reason: string
+  observationEndsAt: string
+  targets: Array<{ terminalId: string }>
+}
+
+export interface ReleaseObservationPlanRecord {
+  planId: string
+  status: 'draft' | 'active' | 'paused' | 'cancelled'
+  version: number
+  targetVersion: string
+  signerTrustLevel: string
+  observationEndsAt: string
+  targets: Array<{
+    terminalCode: string
+    state: 'draft' | 'paused' | 'expired' | 'not_seen' | 'unverified' | 'current' | 'mismatch' | 'stale'
+    observedVersion: string | null
+    observedAt: string | null
+  }>
+  execution: 'not_supported'
+}
+
+export interface ReleaseObservationPlansResponse {
+  plans: ReleaseObservationPlanRecord[]
+}
+
+export interface UpdateReleaseObservationPlanInput {
+  action: 'activate' | 'pause' | 'cancel'
+  expectedVersion: number
+  reason: string
 }
 
 // ─── 终端机构归属（绑定/解绑）─────────────────────────────────────────────────

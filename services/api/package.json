@@ -15,6 +15,7 @@
     "drill:d2-docker": "bash scripts/d2-docker/run.sh",
     "verify:d2-same-host-contract": "node scripts/d2-same-host/verify-contract.mjs",
     "verify:d2-same-host-governance": "node --test --experimental-test-coverage --test-coverage-include=\"scripts/d2-same-host/governance*.mjs\" --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 scripts/d2-same-host/verify-governance.mjs",
+    "verify:release-observation-contract": "node scripts/verify-release-observation-contract.mjs",
     "drill:d2-same-host": "bash scripts/d2-same-host/run.sh",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",

@@ -26,6 +26,7 @@
     "verify:agent-config-resilience": "node scripts/verify-agent-config-resilience.mjs",
     "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs",
     "verify:agent-unauthorized": "node scripts/verify-agent-unauthorized.mjs",
+    "verify:release-observation-boundary": "node scripts/verify-release-observation-boundary.mjs",
     "verify:production-provisioning": "node scripts/verify-production-provisioning.mjs",
     "verify:installer-inputs": "node installer/verify-installer-inputs.mjs",
     "installer:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-staging.ps1",

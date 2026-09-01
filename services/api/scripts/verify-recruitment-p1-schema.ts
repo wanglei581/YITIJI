@@ -107,8 +107,15 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     富文本 content + 一个 audience 单标签，两者都不可机读；前台展示的
  *     「申领条件」是硬编码模板，与该条政策无关。判定为确定性比对（证据 E2），
  *     支持 unknown 三态，不接模型 —— 政策口径不得由 AI 编造。
+ * - 96（本次，F0.5 Windows Agent 发布可观测性，+5）：
+ *     AgentReleaseArtifact                —— 不可变的观察目标身份与兼容性边界。
+ *     AgentReleasePlan                    —— 管理员创建、启停或取消的只读观察计划。
+ *     AgentReleaseTarget                  —— 计划中显式冻结的终端目标。
+ *     ActiveReleaseObservationAssignment  —— 每终端至多一个有效观察计划的索引。
+ *     TerminalReleaseObservation          —— Agent 上报的最新本机运行时事实。
+ *   该阶段不下发制品、不下载、不安装、不控制 Windows 服务；版本匹配不代表制品或签名验真。
  */
-const EXPECTED_MODEL_COUNT = 91
+const EXPECTED_MODEL_COUNT = 96
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)

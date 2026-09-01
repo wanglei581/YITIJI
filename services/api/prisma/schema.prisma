@@ -44,6 +44,8 @@ model Terminal {
   scanTasks    ScanTask[]
   scanDeletionAudits TerminalScanDeletionAudit[]
   capabilities TerminalCapability[]
+  releaseTargets AgentReleaseTarget[]
+  activeReleaseObservationAssignment ActiveReleaseObservationAssignment?
 
   @@index([orgId])
   @@index([enabled])
@@ -229,6 +231,101 @@ model TerminalHeartbeat {
   createdAt                  DateTime @default(now())
 
   @@index([terminalId, createdAt])
+}
+
+// ── F0.5 Agent release observation ─────────────────────────────────────────
+//
+// This is deliberately a control-plane observation model, not an updater.
+// Artifacts contain identity only. They never contain a URL, command, token or
+// any install instruction. A terminal can only read its own active target and
+// report the version fact it is currently running.
+model AgentReleaseArtifact {
+  id                         String   @id @default(cuid())
+  version                    String
+  targetPlatform             String   @default("windows-x64")
+  packageSha256              String
+  runtimeManifestSha256      String
+  signerTrustLevel           String
+  signerCertificateThumbprint String?
+  observationProtocolVersion String   @default("release-observation-v1")
+  createdBy                  String?
+  createdAt                  DateTime @default(now())
+
+  plans AgentReleasePlan[]
+
+  @@unique([version, packageSha256])
+  @@index([createdAt])
+}
+
+model AgentReleasePlan {
+  id                   String   @id @default(cuid())
+  artifactId           String
+  artifact             AgentReleaseArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  status               String   @default("draft")
+  version              Int      @default(1)
+  reason               String
+  observationEndsAt    DateTime
+  createdBy            String?
+  activatedBy          String?
+  activatedAt          DateTime?
+  pausedBy             String?
+  pausedAt             DateTime?
+  cancelledBy          String?
+  cancelledAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  targets AgentReleaseTarget[]
+  activeAssignments ActiveReleaseObservationAssignment[]
+
+  @@index([status, observationEndsAt])
+  @@index([createdAt])
+}
+
+model AgentReleaseTarget {
+  id                   String   @id @default(cuid())
+  planId               String
+  plan                 AgentReleasePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  terminalId           String
+  terminal             Terminal @relation(fields: [terminalId], references: [id], onDelete: Restrict)
+  orgIdSnapshot        String?
+  batchNumber          Int      @default(1)
+  createdAt            DateTime @default(now())
+
+  observation TerminalReleaseObservation?
+  activeAssignment ActiveReleaseObservationAssignment?
+
+  @@unique([planId, terminalId])
+  @@index([terminalId, createdAt])
+}
+
+// Enforces the F0.5 invariant that a terminal can observe at most one active
+// plan. The terminal primary key is the database-level concurrency guard.
+model ActiveReleaseObservationAssignment {
+  terminalId String @id
+  terminal   Terminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  planId     String
+  plan       AgentReleasePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  targetId   String @unique
+  target     AgentReleaseTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([planId])
+}
+
+model TerminalReleaseObservation {
+  id                         String   @id @default(cuid())
+  targetId                   String   @unique
+  target                     AgentReleaseTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  seenPlanId                 String
+  seenPlanVersion            Int
+  runtimeVersion             String?
+  observationProtocolVersion String
+  observedAt                 DateTime
+  receivedAt                 DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([observedAt])
 }
 
 // ── PrintTaskStatusLog ────────────────────────────────────────────────────────

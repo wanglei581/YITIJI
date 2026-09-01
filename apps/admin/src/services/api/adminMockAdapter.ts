@@ -23,6 +23,10 @@ import type {
   AuditLogListQuery,
   AuditLogRecord,
   DeviceFleetOverview,
+  CreateReleaseObservationPlanInput,
+  ReleaseObservationPlanRecord,
+  ReleaseObservationPlansResponse,
+  UpdateReleaseObservationPlanInput,
 } from './types'
 import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
@@ -135,6 +139,19 @@ const MOCK_DEVICE_FLEET_OVERVIEW: DeviceFleetOverview = {
     { area: 'screensaver', kind: 'orphan_config', affectedTerminalCodes: [] },
   ],
 }
+
+let MOCK_RELEASE_OBSERVATION_PLANS: ReleaseObservationPlanRecord[] = [
+  {
+    planId: 'rop_demo_001',
+    status: 'active',
+    version: 2,
+    targetVersion: '0.4.11',
+    signerTrustLevel: 'unsigned_internal',
+    observationEndsAt: '2026-09-02T12:00:00.000Z',
+    targets: [{ terminalCode: 'KSK-001', state: 'current', observedVersion: '0.4.11', observedAt: '2026-09-01T00:10:00.000Z' }],
+    execution: 'not_supported',
+  },
+]
 
 // ─── 终端机构归属 mock 状态（页面刷新重置；不写数据库）─────────────────────────
 
@@ -305,7 +322,7 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion' | 'credentialGeneration' | 'hasActiveCredential'>> = [
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion' | 'credentialGeneration' | 'hasActiveCredential' | 'releaseObservation'>> = [
       { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          wiredNetworkStatus: 'connected',    printerNetworkStatus: 'reachable',           agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
       { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', wiredNetworkStatus: 'connected',    printerNetworkStatus: 'reachable',           agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
       { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          wiredNetworkStatus: 'disconnected', printerNetworkStatus: 'unreachable',         agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
@@ -341,6 +358,7 @@ export const adminMockAdapter = {
         agentVersion: null,
         ipAddress: null,
         diskFreeGb: null,
+        releaseObservation: null,
       })), ...base.map((t) => ({
         ...t,
         lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
@@ -351,6 +369,18 @@ export const adminMockAdapter = {
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
         ...mockOrgFields(t.terminalCode),
+        releaseObservation: t.terminalCode === 'KSK-001'
+          ? {
+              planId: 'rop_demo_001',
+              planStatus: 'active' as const,
+              planVersion: 2,
+              targetVersion: '0.4.11',
+              signerTrustLevel: 'unsigned_internal',
+              observedVersion: '0.4.11',
+              observedAt: min(1),
+              state: 'current' as const,
+            }
+          : null,
       }))],
     }
   },
@@ -373,6 +403,48 @@ export const adminMockAdapter = {
     }
     MOCK_PLANNED_TERMINALS.unshift(created)
     return created
+  },
+
+  async getReleaseObservationPlans(): Promise<ReleaseObservationPlansResponse> {
+    await delay()
+    return { plans: MOCK_RELEASE_OBSERVATION_PLANS.map((plan) => ({ ...plan, targets: [...plan.targets] })) }
+  },
+
+  async createReleaseObservationPlan(input: CreateReleaseObservationPlanInput): Promise<ReleaseObservationPlanRecord> {
+    await delay()
+    const terminalResponse = await this.getTerminals()
+    const terminalCodes = input.targets.map((target) => {
+      const terminal = terminalResponse.terminals.find((item) => item.id === target.terminalId)
+      if (!terminal) throw new ApiHttpError('RELEASE_TARGET_NOT_FOUND', '目标终端不存在', 404)
+      return terminal.terminalCode
+    })
+    const created: ReleaseObservationPlanRecord = {
+      planId: `rop_mock_${Date.now()}`,
+      status: 'draft',
+      version: 1,
+      targetVersion: input.artifactVersion,
+      signerTrustLevel: input.signerTrustLevel,
+      observationEndsAt: input.observationEndsAt,
+      targets: terminalCodes.map((terminalCode) => ({ terminalCode, state: 'draft', observedVersion: null, observedAt: null })),
+      execution: 'not_supported',
+    }
+    MOCK_RELEASE_OBSERVATION_PLANS = [created, ...MOCK_RELEASE_OBSERVATION_PLANS]
+    return created
+  },
+
+  async updateReleaseObservationPlan(
+    planId: string,
+    input: UpdateReleaseObservationPlanInput,
+  ): Promise<{ planId: string; status: 'active' | 'paused' | 'cancelled'; version: number; artifactVersion: string }> {
+    await delay()
+    const plan = MOCK_RELEASE_OBSERVATION_PLANS.find((item) => item.planId === planId)
+    if (!plan) throw new ApiHttpError('RELEASE_PLAN_NOT_FOUND', '观察计划不存在', 404)
+    if (plan.version !== input.expectedVersion) throw new ApiHttpError('RELEASE_PLAN_VERSION_CONFLICT', '计划版本已变化，请刷新后重试', 409)
+    const status = input.action === 'activate' ? 'active' : input.action === 'pause' ? 'paused' : 'cancelled'
+    plan.status = status
+    plan.version += 1
+    plan.targets = plan.targets.map((target) => ({ ...target, state: status === 'active' ? 'not_seen' : 'paused' }))
+    return { planId, status, version: plan.version, artifactVersion: plan.targetVersion }
   },
 
   // ── 终端机构归属（绑定/解绑）mock ─────────────────────────────────────────
