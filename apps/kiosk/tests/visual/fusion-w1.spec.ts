@@ -1,9 +1,12 @@
 import type { Locator, Page } from '@playwright/test'
+import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
 
 const FIXTURE_KIOSK_URL = 'http://127.0.0.1:4178/?viewport=kiosk'
 const FIXTURE_MOBILE_URL = 'http://127.0.0.1:4178/?viewport=mobile'
+const FILING_TEXT =
+  '鲁ICP备2026023517号-2 · 鲁公网安备37021402007308号 · 职易达AI。© 2026 青岛智磊信创软件智能科技有限公司。'
 
 function collectRuntimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -58,8 +61,7 @@ async function expectWithinViewport(page: Page, locator: Locator): Promise<void>
   }
 }
 
-test('production home exposes the fusion frame and touch-safe real controls @w1-kiosk', async ({ page, api }) => {
-  const runtimeErrors = collectRuntimeErrors(page)
+function installHomeApi(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
@@ -87,6 +89,45 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
     status: 200,
     json: { data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 } },
   })
+}
+
+/**
+ * 备案 / 版权块合同：常驻首页末尾、文案逐字一致、两个外链指向官方查询入口，
+ * 触控高度不低于 CLAUDE.md §9 的 48px，且不与共享底部导航重叠。
+ */
+async function expectFilingFooter(page: Page): Promise<void> {
+  const legal = page.locator('.v6-home-legal')
+  await expect(legal).toBeVisible()
+  await expect(legal).toHaveText(FILING_TEXT)
+
+  const icp = legal.getByRole('link', { name: '鲁ICP备2026023517号-2' })
+  const police = legal.getByRole('link', { name: '鲁公网安备37021402007308号' })
+  await expect(icp).toHaveAttribute('href', 'https://beian.miit.gov.cn/')
+  await expect(police).toHaveAttribute(
+    'href',
+    'https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308',
+  )
+  for (const link of [icp, police]) {
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', 'noreferrer noopener')
+  }
+
+  await legal.scrollIntoViewIfNeeded()
+  await expectMinimumTargets(legal.locator('a'), 48)
+
+  const navBox = await page.locator('.ui-kiosk-nav').boundingBox()
+  const legalBox = await legal.boundingBox()
+  expect(navBox, '共享底部导航必须仍然存在').not.toBeNull()
+  expect(legalBox, '备案块必须可测量').not.toBeNull()
+  expect(
+    legalBox!.y + legalBox!.height,
+    '备案块滚到底后仍不得压到共享底部导航',
+  ).toBeLessThanOrEqual(navBox!.y + 0.5)
+}
+
+test('production home exposes the fusion frame and touch-safe real controls @w1-kiosk', async ({ page, api }) => {
+  const runtimeErrors = collectRuntimeErrors(page)
+  installHomeApi(api)
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
@@ -102,6 +143,22 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
   await expect(frame.getByText('本终端仅展示与跳转，不代收简历', { exact: false })).toBeVisible()
   await expectMinimumTargets(frame.locator('button:not(:disabled)'), 48)
   await expectMinimumTargets(frame.locator('.v6-home-domain__main, .v6-home-command__cta'), 56)
+  await expectFilingFooter(page)
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('production home keeps the filing footer readable and touch-safe on 390px @w1-mobile', async ({ page, api }) => {
+  const runtimeErrors = collectRuntimeErrors(page)
+  installHomeApi(api)
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+
+  const frame = page.locator('.v6-home-page[data-kiosk-component="page-frame"]')
+  await expect(frame).toBeVisible()
+  await expect(frame.locator('.v6-home[data-v6-page="home"]')).toBeVisible()
+  await expectFilingFooter(page)
+  await expectWithinViewport(page, page.locator('.v6-home-legal'))
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
 })

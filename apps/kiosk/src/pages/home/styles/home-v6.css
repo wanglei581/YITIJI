@@ -498,3 +498,22 @@
   font-size: 15px;
   line-height: 1.55;
 }
+/* 备案与版权：最低层级常驻小字，无卡片、无描边，不参与首屏业务视觉 */
+.v6-home-legal {
+  margin: 10px 0 0;
+  color: var(--k-muted);
+  font-size: 14px;
+  line-height: 24px;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+/* 行内块 + 上下 13px 内边距把两个备案外链撑到 50px 触控高度（≥ CLAUDE.md §9 的 48px） */
+.v6-home-legal a {
+  display: inline-block;
+  min-height: 48px;
+  padding: 13px 2px;
+  color: inherit;
+  line-height: 24px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

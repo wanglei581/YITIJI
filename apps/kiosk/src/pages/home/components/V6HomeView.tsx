@@ -228,6 +228,22 @@ export function V6HomeView({
           岗位与招聘会信息来自第三方或官方来源。本终端仅展示与跳转，不代收简历；投递、预约请到来源平台办理。
         </p>
       </footer>
+
+      {/* 备案与版权：常驻小字，层级低于合规边界，不做卡片也不改首屏业务视觉。 */}
+      <p className="v6-home-legal">
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer noopener">
+          鲁ICP备2026023517号-2
+        </a>
+        {' · '}
+        <a
+          href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          鲁公网安备37021402007308号
+        </a>
+        {' · 职易达AI。© 2026 青岛智磊信创软件智能科技有限公司。'}
+      </p>
     </div>
   )
 }

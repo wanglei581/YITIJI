@@ -166,6 +166,35 @@ check(
   view.includes('第三方或官方来源') && view.includes('不代收简历') && view.includes('来源平台办理'),
   '首页常驻合规边界'
 )
+check(
+  view.includes('鲁ICP备2026023517号-2') &&
+    view.includes('鲁公网安备37021402007308号') &&
+    view.includes('职易达AI。© 2026 青岛智磊信创软件智能科技有限公司。'),
+  '首页常驻 ICP / 公安备案号与公司版权'
+)
+check(
+  view.includes('href="https://beian.miit.gov.cn/"') &&
+    view.includes('href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308"'),
+  '备案号分别指向工信部与公安部官方查询入口'
+)
+check(
+  (view.match(/target="_blank"/g) ?? []).length === 2 &&
+    (view.match(/rel="noreferrer noopener"/g) ?? []).length === 2,
+  '两个备案外链均带 target=_blank 与 noreferrer noopener'
+)
+check(
+  view.indexOf('v6-home-legal') > view.indexOf('v6-home-boundary'),
+  '备案块排在合规边界之后，层级低于业务内容'
+)
+check(
+  /\.v6-home-legal a\s*\{[^}]*min-height:\s*48px/.test(css) &&
+    /\.v6-home-legal\s*\{[^}]*overflow-wrap:\s*break-word/.test(css),
+  '备案外链触控高度不小于 48px 且长文案自然换行'
+)
+check(
+  !/\.v6-home-legal\s*\{[^}]*(border|box-shadow|background)/.test(css),
+  '备案块不做描边卡片，不抢首屏视觉'
+)
 check(!/一键投递|立即投递/.test(`${home}\n${view}\n${manifest}`), '首页拒绝违规投递文案')
 check(
   !/12 家来源|本周 3 场|已有 1 份|示例办理单/.test(view),
