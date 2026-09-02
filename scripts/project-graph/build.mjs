@@ -82,12 +82,24 @@ function buildFrontend(fileSet) {
     }
 
     const routes = parseRouterFile(app.router).map((route) => {
-      const pageName =
+      let pageName =
         route.elements.find((name) => {
           const file = componentFiles.get(name)
           return file && /\/(pages|routes)\//.test(file)
         }) ?? route.elements[0] ?? null
-      const pageFile = pageName ? componentFiles.get(pageName) ?? null : null
+      let pageFile = pageName ? componentFiles.get(pageName) ?? null : null
+
+      // `lazy:` 路由没有顶层 import，componentFiles 里查不到；直接解析它的
+      // 动态 import 说明符。`default` 导出用文件名兜底当组件名。
+      if (!pageFile && route.lazyModule) {
+        pageFile = resolveModule(app.router, route.lazyModule, fileSet, app.root)
+        if (pageFile) {
+          pageName =
+            route.lazyName && route.lazyName !== 'default'
+              ? route.lazyName
+              : pageFile.split('/').pop().replace(/\.[jt]sx?$/, '')
+        }
+      }
 
       let endpoints = []
       const styles = []

@@ -127,12 +127,31 @@ export function parseController(file, fileSet) {
   const text = stripComments(readText(file))
   if (!text) return null
 
-  const controllerMatch = /@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/.exec(text)
-  if (!controllerMatch) return null
-  const prefix = controllerMatch[1] ?? ''
+  // 一个文件里可以有多个 @Controller（本仓 6 个文件是这样，例如
+  // member-print-orders.controller.ts 同时声明 `me/print-orders` 与 `me/pending-tasks`）。
+  // 只 exec 一次会把后面所有端点错挂到第一个前缀上 —— 2026-09-02 实测
+  // `/me/pending-tasks` 因此整条从图谱消失。这里改成按位置切段。
+  const controllerHits = [
+    ...text.matchAll(/@Controller\s*\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)/g),
+  ].map((m) => ({ index: m.index, prefix: m[1] ?? '' }))
+  if (controllerHits.length === 0) return null
+  const controllerMatch = { index: controllerHits[0].index }
+  const prefix = controllerHits[0].prefix
 
-  const classMatch = /export\s+class\s+([\w$]+)/.exec(text)
-  const className = classMatch ? classMatch[1] : path.posix.basename(file)
+  const classHits = [...text.matchAll(/export\s+class\s+([\w$]+)/g)].map((m) => ({
+    index: m.index,
+    name: m[1],
+  }))
+  const className = classHits[0]?.name ?? path.posix.basename(file)
+
+  // 某个位置归哪个 @Controller / 哪个 class：取它之前最近的一个。
+  const ownerAt = (pos) => {
+    let ctrl = controllerHits[0]
+    for (const hit of controllerHits) if (hit.index <= pos) ctrl = hit
+    let cls = classHits[0]?.name ?? className
+    for (const hit of classHits) if (hit.index <= pos) cls = hit.name
+    return { prefix: ctrl.prefix, className: cls }
+  }
 
   // 构造器注入：属性名 → 类名
   const injections = new Map()
@@ -181,10 +200,11 @@ export function parseController(file, fileSet) {
         .filter(Boolean),
     )
 
+    const owner = ownerAt(match.index)
     endpoints.push({
       method,
-      path: joinApiPath(API_GLOBAL_PREFIX.slice(1), prefix, subPath),
-      handler: `${className}.${handler}`,
+      path: joinApiPath(API_GLOBAL_PREFIX.slice(1), owner.prefix, subPath),
+      handler: `${owner.className}.${handler}`,
       roles: methodRoles.length > 0 ? methodRoles : classRoles,
       services: calledServices,
     })

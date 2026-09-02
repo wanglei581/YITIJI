@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`466` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`471` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -68,16 +68,16 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/advisor/availability` | CreateAdvisorSessionDto.availability | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions` | CreateAdvisorSessionDto.create | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| GET | `/api/v1/advisor/sessions/:sessionId` | CreateAdvisorSessionDto.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | CreateAdvisorSessionDto.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/ask` | CreateAdvisorSessionDto.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/pins` | CreateAdvisorSessionDto.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | CreateAdvisorSessionDto.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/run` | CreateAdvisorSessionDto.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| PATCH | `/api/v1/advisor/sessions/:sessionId/skill` | CreateAdvisorSessionDto.switchSkill | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
-| POST | `/api/v1/advisor/sessions/:sessionId/slots` | CreateAdvisorSessionDto.fillSlot | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| GET | `/api/v1/advisor/availability` | AdvisorController.availability | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions` | AdvisorController.create | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| GET | `/api/v1/advisor/sessions/:sessionId` | AdvisorController.get | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions/:sessionId/artifacts/:artifactId/print` | AdvisorController.print | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions/:sessionId/ask` | AdvisorController.ask | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions/:sessionId/pins` | AdvisorController.pin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| DELETE | `/api/v1/advisor/sessions/:sessionId/pins/:pinId` | AdvisorController.unpin | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions/:sessionId/run` | AdvisorController.run | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| PATCH | `/api/v1/advisor/sessions/:sessionId/skill` | AdvisorController.switchSkill | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
+| POST | `/api/v1/advisor/sessions/:sessionId/slots` | AdvisorController.fillSlot | — | AdvisorService | AdvisorArtifact<br/>AdvisorPin<br/>AdvisorSession<br/>AiServiceLog<br/>AuditLog |
 
 ## `services/api/src/ai/ai.controller.ts`
 
@@ -115,24 +115,24 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/resume/job-fit` | JobFitRequestDto.analyze | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
-| GET | `/api/v1/resume/job-fit/:taskId` | JobFitRequestDto.latest | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
-| POST | `/api/v1/resume/job-fit/:taskId/print` | JobFitRequestDto.print | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
-| POST | `/api/v1/resume/job-fit/consent` | JobFitRequestDto.grantConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
-| DELETE | `/api/v1/resume/job-fit/consent/:taskId` | JobFitRequestDto.revokeConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
-| GET | `/api/v1/resume/job-fit/consent/:taskId` | JobFitRequestDto.consentStatus | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+| POST | `/api/v1/resume/job-fit` | JobFitController.analyze | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| GET | `/api/v1/resume/job-fit/:taskId` | JobFitController.latest | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+| POST | `/api/v1/resume/job-fit/:taskId/print` | JobFitController.print | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+| POST | `/api/v1/resume/job-fit/consent` | JobFitController.grantConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+| DELETE | `/api/v1/resume/job-fit/consent/:taskId` | JobFitController.revokeConsent | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
+| GET | `/api/v1/resume/job-fit/consent/:taskId` | JobFitController.consentStatus | — | JobFitService | AiResumeResult<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>Job<br/>PrintTask |
 
 ## `services/api/src/ai/llm/ai-config.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/ai-config` | AiConfigController.get | admin | LlmConfigService | — |
-| GET | `/api/v1/admin/ai-config` | AiConfigController.getAll | admin | LlmConfigService | — |
 | PUT | `/api/v1/admin/ai-config` | AiConfigController.update | admin | LlmConfigService | — |
-| GET | `/api/v1/admin/ai-config/:featureKey` | AiConfigController.getOne | admin | LlmConfigService | — |
-| PUT | `/api/v1/admin/ai-config/:featureKey` | AiConfigController.updateOne | admin | LlmConfigService | — |
-| POST | `/api/v1/admin/ai-config/:featureKey/test` | AiConfigController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 | POST | `/api/v1/admin/ai-config/test` | AiConfigController.test | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
+| GET | `/api/v1/admin/ai-configs` | AiConfigsController.getAll | admin | LlmConfigService | — |
+| GET | `/api/v1/admin/ai-configs/:featureKey` | AiConfigsController.getOne | admin | LlmConfigService | — |
+| PUT | `/api/v1/admin/ai-configs/:featureKey` | AiConfigsController.updateOne | admin | LlmConfigService | — |
+| POST | `/api/v1/admin/ai-configs/:featureKey/test` | AiConfigsController.testOne | admin | LlmChatService<br/>LlmConfigService | AiServiceLog |
 
 ## `services/api/src/ai/self-assessment.controller.ts`
 
@@ -312,18 +312,18 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/jobs` | JobAiController.list | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
-| DELETE | `/api/v1/jobs/:id` | JobAiController.remove | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/:id/ai/explain` | JobAiController.explain | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/:id/ai/match` | JobAiController.match | — | GovernedJobFitService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 | POST | `/api/v1/jobs/ai/recommendations` | JobAiController.recommendations | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| GET | `/api/v1/me/job-ai-sessions` | MemberJobAiSessionsController.list | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
+| DELETE | `/api/v1/me/job-ai-sessions/:id` | MemberJobAiSessionsController.remove | — | JobAiService | AiResumeResult<br/>AiServiceLog<br/>ContractReviewTask<br/>Job<br/>JobAiRecommendation<br/>JobAiSession<br/>UserAiConsent |
 
 ## `services/api/src/job-materials/job-materials.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/job-materials/summary` | AdminJobMaterialsController.summary | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | POST | `/api/v1/job-materials/generate` | JobMaterialsController.generate | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
-| GET | `/api/v1/job-materials/summary` | JobMaterialsController.summary | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 | GET | `/api/v1/job-materials/templates` | JobMaterialsController.templates | — | JobMaterialsService | AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>PrintTask |
 
 ## `services/api/src/job-sync/job-sync.controller.ts`
@@ -546,8 +546,8 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/me/pending-tasks` | MemberPendingTasksController.list | — | MemberPrintOrdersService | Order<br/>PrintTask |
 | GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | — | — |
-| GET | `/api/v1/me/print-orders` | MemberPrintOrdersController.list | — | MemberPrintOrdersService | Order<br/>PrintTask |
 | POST | `/api/v1/me/print-orders` | MemberPrintOrdersController.create | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
 | GET | `/api/v1/me/print-orders/:orderId` | MemberPrintOrdersController.detail | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
 | POST | `/api/v1/me/print-orders/:orderId/cancel` | MemberPrintOrdersController.cancel | — | MemberPrintOrderCreateService | AuditLog<br/>DocumentProcessTask<br/>FileObject<br/>Order<br/>PiiFinding<br/>Terminal<br/>TerminalCapability |
@@ -571,30 +571,30 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/me/ai-consents` | MemberPrivacyController.list | — | — | — |
 | POST | `/api/v1/me/ai-consents` | MemberPrivacyController.grantConsent | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
-| POST | `/api/v1/me/ai-consents` | MemberPrivacyController.create | — | — | — |
-| POST | `/api/v1/me/ai-consents/:id/download-authorizations` | MemberPrivacyController.authorizeDownload | — | — | — |
 | POST | `/api/v1/me/ai-consents/:scope/revoke` | MemberPrivacyController.revokeConsent | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
 | GET | `/api/v1/me/ai-consents/status` | MemberPrivacyController.getConsentStatus | — | MemberPrivacyService | ContractReviewTask<br/>UserAiConsent |
+| GET | `/api/v1/me/data-requests` | MemberDataRequestController.list | — | — | — |
+| POST | `/api/v1/me/data-requests` | MemberDataRequestController.create | — | — | — |
+| POST | `/api/v1/me/data-requests/:id/download-authorizations` | MemberDataRequestController.authorizeDownload | — | — | — |
 
 ## `services/api/src/mock-interview/mock-interview.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/mock-interviews` | CreateInterviewDto.list | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews` | CreateInterviewDto.create | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| DELETE | `/api/v1/mock-interviews/:id` | CreateInterviewDto.remove | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| GET | `/api/v1/mock-interviews/:id` | CreateInterviewDto.get | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/answer` | CreateInterviewDto.answer | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/end` | CreateInterviewDto.end | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/practice-sheet` | CreateInterviewDto.practiceSheet | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| GET | `/api/v1/mock-interviews/:id/report` | CreateInterviewDto.report | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/report/print` | CreateInterviewDto.print | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/start` | CreateInterviewDto.start | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/transcribe` | CreateInterviewDto.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | CreateInterviewDto.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
-| GET | `/api/v1/mock-interviews/capabilities/voice` | CreateInterviewDto.voiceCapability | — | — | — |
+| GET | `/api/v1/me/mock-interviews` | MemberMockInterviewController.list | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| DELETE | `/api/v1/me/mock-interviews/:id` | MemberMockInterviewController.remove | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews` | MockInterviewController.create | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| GET | `/api/v1/mock-interviews/:id` | MockInterviewController.get | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/answer` | MockInterviewController.answer | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/end` | MockInterviewController.end | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/practice-sheet` | MockInterviewController.practiceSheet | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| GET | `/api/v1/mock-interviews/:id/report` | MockInterviewController.report | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/report/print` | MockInterviewController.print | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/start` | MockInterviewController.start | — | MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/transcribe` | MockInterviewController.transcribe | — | AiLogService<br/>AsrService<br/>MockInterviewService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| POST | `/api/v1/mock-interviews/:id/turns/:idx/audio` | MockInterviewController.questionAudio | — | AiLogService<br/>MockInterviewService<br/>TtsService | AiServiceLog<br/>AuditLog<br/>FairMaterialPrintBridge<br/>FileObject<br/>MockInterviewReport<br/>MockInterviewSession<br/>MockInterviewTurn<br/>PrintTask |
+| GET | `/api/v1/mock-interviews/capabilities/voice` | MockInterviewController.voiceCapability | — | — | — |
 
 ## `services/api/src/notifications/notifications.controller.ts`
 
@@ -667,14 +667,14 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/profile` | UpdateOwnOrgProfileDto.getProfile | partner | AdminOrgsService | AuditLog<br/>Organization<br/>User |
-| PUT | `/api/v1/partner/profile` | UpdateOwnOrgProfileDto.updateProfile | partner | AdminOrgsService | AuditLog<br/>Organization<br/>User |
+| GET | `/api/v1/partner/profile` | PartnerOrgController.getProfile | partner | AdminOrgsService | AuditLog<br/>Organization<br/>User |
+| PUT | `/api/v1/partner/profile` | PartnerOrgController.updateProfile | partner | AdminOrgsService | AuditLog<br/>Organization<br/>User |
 
 ## `services/api/src/orgs/partner-stats.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/partner/stats` | PartnerStatsQueryDto.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>SyncLog |
+| GET | `/api/v1/partner/stats` | PartnerStatsController.getStats | partner | PartnerStatsService | CompanyProfile<br/>Job<br/>JobFair<br/>JobSource<br/>PolicyPost<br/>SyncLog |
 
 ## `services/api/src/payment/admin-billing.controller.ts`
 
@@ -811,6 +811,14 @@
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/admin/printers` | AdminPrintersController.list | admin | — | — |
 
+## `services/api/src/terminals/admin-release-observation.controller.ts`
+
+| 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.list | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| POST | `/api/v1/admin/release-observation-plans` | AdminReleaseObservationController.create | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| PATCH | `/api/v1/admin/release-observation-plans/:planId` | AdminReleaseObservationController.update | admin | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+
 ## `services/api/src/terminals/admin-terminals.controller.ts`
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
@@ -858,6 +866,8 @@
 | GET | `/api/v1/terminals/:terminalId/config` | TerminalsController.getTerminalConfig | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | PUT | `/api/v1/terminals/:terminalId/heartbeat` | TerminalsController.heartbeat | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | GET | `/api/v1/terminals/:terminalId/printer-status` | TerminalsController.getTerminalPrinterStatus | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
+| PUT | `/api/v1/terminals/:terminalId/release-observation` | TerminalsController.reportReleaseObservation | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
+| GET | `/api/v1/terminals/:terminalId/release-observation-plan` | TerminalsController.getReleaseObservationPlan | — | ReleaseObservationService | ActiveReleaseObservationAssignment<br/>AgentReleaseArtifact<br/>AgentReleasePlan<br/>AgentReleaseTarget<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalReleaseObservation |
 | POST | `/api/v1/terminals/:terminalId/scan-deletion-audits` | TerminalsController.reportScanDeletionAudit | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/tasks/claim` | TerminalsController.claimTasks | — | TerminalsService | AuditLog<br/>Order<br/>Organization<br/>PrintTask<br/>PrintTaskStatusLog<br/>ScanTask<br/>Terminal<br/>TerminalBindCode<br/>TerminalCredential<br/>TerminalHeartbeat<br/>TerminalSmartCampusConfig |
 | POST | `/api/v1/terminals/:terminalId/toolbox-events` | TerminalsController.recordToolboxLaunchEvent | — | TerminalToolboxService | Terminal<br/>TerminalToolboxConfig<br/>ToolboxLaunchEvent |

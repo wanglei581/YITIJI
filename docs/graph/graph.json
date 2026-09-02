@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 466,
+    "endpointCount": 471,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -344,22 +344,6 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.getAll",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/admin/ai-config",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
         "handler": "AiConfigController.update",
         "method": "PUT",
         "models": [],
@@ -376,44 +360,12 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.getOne",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/admin/ai-config/:featureKey",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.updateOne",
-        "method": "PUT",
-        "models": [],
-        "path": "/api/v1/admin/ai-config/:featureKey",
-        "roles": [
-          "admin"
-        ],
-        "serviceFiles": [
-          "services/api/src/ai/llm/llm-config.service.ts"
-        ],
-        "services": [
-          "LlmConfigService"
-        ]
-      },
-      {
-        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.testOne",
+        "handler": "AiConfigController.test",
         "method": "POST",
         "models": [
           "AiServiceLog"
         ],
-        "path": "/api/v1/admin/ai-config/:featureKey/test",
+        "path": "/api/v1/admin/ai-config/test",
         "roles": [
           "admin"
         ],
@@ -428,12 +380,60 @@
       },
       {
         "controller": "services/api/src/ai/llm/ai-config.controller.ts",
-        "handler": "AiConfigController.test",
+        "handler": "AiConfigsController.getAll",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.getOne",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs/:featureKey",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.updateOne",
+        "method": "PUT",
+        "models": [],
+        "path": "/api/v1/admin/ai-configs/:featureKey",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/ai/llm/llm-config.service.ts"
+        ],
+        "services": [
+          "LlmConfigService"
+        ]
+      },
+      {
+        "controller": "services/api/src/ai/llm/ai-config.controller.ts",
+        "handler": "AiConfigsController.testOne",
         "method": "POST",
         "models": [
           "AiServiceLog"
         ],
-        "path": "/api/v1/admin/ai-config/test",
+        "path": "/api/v1/admin/ai-configs/:featureKey/test",
         "roles": [
           "admin"
         ],
@@ -1707,6 +1707,25 @@
         ],
         "services": [
           "JobsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-materials/job-materials.controller.ts",
+        "handler": "AdminJobMaterialsController.summary",
+        "method": "GET",
+        "models": [
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "PrintTask"
+        ],
+        "path": "/api/v1/admin/job-materials/summary",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-materials/job-materials.service.ts"
+        ],
+        "services": [
+          "JobMaterialsService"
         ]
       },
       {
@@ -3338,6 +3357,87 @@
         ]
       },
       {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.list",
+        "method": "GET",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.create",
+        "method": "POST",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/admin-release-observation.controller.ts",
+        "handler": "AdminReleaseObservationController.update",
+        "method": "PATCH",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/admin/release-observation-plans/:planId",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
         "controller": "services/api/src/content/content.controller.ts",
         "handler": "ContentController.listScreensaverTerminals",
         "method": "GET",
@@ -4103,7 +4203,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.availability",
+        "handler": "AdvisorController.availability",
         "method": "GET",
         "models": [
           "AdvisorArtifact",
@@ -4123,7 +4223,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.create",
+        "handler": "AdvisorController.create",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -4143,7 +4243,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.get",
+        "handler": "AdvisorController.get",
         "method": "GET",
         "models": [
           "AdvisorArtifact",
@@ -4163,7 +4263,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.print",
+        "handler": "AdvisorController.print",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -4183,7 +4283,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.ask",
+        "handler": "AdvisorController.ask",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -4203,7 +4303,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.pin",
+        "handler": "AdvisorController.pin",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -4223,7 +4323,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.unpin",
+        "handler": "AdvisorController.unpin",
         "method": "DELETE",
         "models": [
           "AdvisorArtifact",
@@ -4243,7 +4343,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.run",
+        "handler": "AdvisorController.run",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -4263,7 +4363,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.switchSkill",
+        "handler": "AdvisorController.switchSkill",
         "method": "PATCH",
         "models": [
           "AdvisorArtifact",
@@ -4283,7 +4383,7 @@
       },
       {
         "controller": "services/api/src/advisor/advisor.controller.ts",
-        "handler": "CreateAdvisorSessionDto.fillSlot",
+        "handler": "AdvisorController.fillSlot",
         "method": "POST",
         "models": [
           "AdvisorArtifact",
@@ -5536,25 +5636,6 @@
       },
       {
         "controller": "services/api/src/job-materials/job-materials.controller.ts",
-        "handler": "JobMaterialsController.summary",
-        "method": "GET",
-        "models": [
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "PrintTask"
-        ],
-        "path": "/api/v1/job-materials/summary",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-materials/job-materials.service.ts"
-        ],
-        "services": [
-          "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-materials/job-materials.controller.ts",
         "handler": "JobMaterialsController.templates",
         "method": "GET",
         "models": [
@@ -5570,28 +5651,6 @@
         ],
         "services": [
           "JobMaterialsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-ai/job-ai.controller.ts",
-        "handler": "JobAiController.list",
-        "method": "GET",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "ContractReviewTask",
-          "Job",
-          "JobAiRecommendation",
-          "JobAiSession",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/jobs",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-ai.service.ts"
-        ],
-        "services": [
-          "JobAiService"
         ]
       },
       {
@@ -5619,28 +5678,6 @@
         ],
         "services": [
           "JobsService"
-        ]
-      },
-      {
-        "controller": "services/api/src/job-ai/job-ai.controller.ts",
-        "handler": "JobAiController.remove",
-        "method": "DELETE",
-        "models": [
-          "AiResumeResult",
-          "AiServiceLog",
-          "ContractReviewTask",
-          "Job",
-          "JobAiRecommendation",
-          "JobAiSession",
-          "UserAiConsent"
-        ],
-        "path": "/api/v1/jobs/:id",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/job-ai/job-ai.service.ts"
-        ],
-        "services": [
-          "JobAiService"
         ]
       },
       {
@@ -6009,16 +6046,6 @@
       },
       {
         "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.list",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/me/ai-consents",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
         "handler": "MemberPrivacyController.grantConsent",
         "method": "POST",
         "models": [
@@ -6033,26 +6060,6 @@
         "services": [
           "MemberPrivacyService"
         ]
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.create",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/me/ai-consents",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
-        "handler": "MemberPrivacyController.authorizeDownload",
-        "method": "POST",
-        "models": [],
-        "path": "/api/v1/me/ai-consents/:id/download-authorizations",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
       },
       {
         "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
@@ -6182,6 +6189,36 @@
           "ActivityService",
           "AuditService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.list",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/data-requests",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.create",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/me/data-requests",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
+      },
+      {
+        "controller": "services/api/src/member-privacy/member-privacy.controller.ts",
+        "handler": "MemberDataRequestController.authorizeDownload",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/me/data-requests/:id/download-authorizations",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-assets/member-assets.controller.ts",
@@ -6398,6 +6435,96 @@
         ]
       },
       {
+        "controller": "services/api/src/job-ai/job-ai.controller.ts",
+        "handler": "MemberJobAiSessionsController.list",
+        "method": "GET",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "ContractReviewTask",
+          "Job",
+          "JobAiRecommendation",
+          "JobAiSession",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/me/job-ai-sessions",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-ai/job-ai.service.ts"
+        ],
+        "services": [
+          "JobAiService"
+        ]
+      },
+      {
+        "controller": "services/api/src/job-ai/job-ai.controller.ts",
+        "handler": "MemberJobAiSessionsController.remove",
+        "method": "DELETE",
+        "models": [
+          "AiResumeResult",
+          "AiServiceLog",
+          "ContractReviewTask",
+          "Job",
+          "JobAiRecommendation",
+          "JobAiSession",
+          "UserAiConsent"
+        ],
+        "path": "/api/v1/me/job-ai-sessions/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/job-ai/job-ai.service.ts"
+        ],
+        "services": [
+          "JobAiService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "MemberMockInterviewController.list",
+        "method": "GET",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask"
+        ],
+        "path": "/api/v1/me/mock-interviews",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "services": [
+          "MockInterviewService"
+        ]
+      },
+      {
+        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
+        "handler": "MemberMockInterviewController.remove",
+        "method": "DELETE",
+        "models": [
+          "AiServiceLog",
+          "AuditLog",
+          "FairMaterialPrintBridge",
+          "FileObject",
+          "MockInterviewReport",
+          "MockInterviewSession",
+          "MockInterviewTurn",
+          "PrintTask"
+        ],
+        "path": "/api/v1/me/mock-interviews/:id",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/mock-interview/mock-interview.service.ts"
+        ],
+        "services": [
+          "MockInterviewService"
+        ]
+      },
+      {
         "controller": "services/api/src/member-notifications/member-notifications.controller.ts",
         "handler": "MemberNotificationsController.list",
         "method": "GET",
@@ -6457,23 +6584,13 @@
       },
       {
         "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
-        "handler": "MemberPrintOrdersController.list",
-        "method": "GET",
-        "models": [],
-        "path": "/api/v1/me/print-orders",
-        "roles": [],
-        "serviceFiles": [],
-        "services": []
-      },
-      {
-        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
-        "handler": "MemberPrintOrdersController.list",
+        "handler": "MemberPendingTasksController.list",
         "method": "GET",
         "models": [
           "Order",
           "PrintTask"
         ],
-        "path": "/api/v1/me/print-orders",
+        "path": "/api/v1/me/pending-tasks",
         "roles": [],
         "serviceFiles": [
           "services/api/src/member-print-orders/member-print-orders.service.ts"
@@ -6481,6 +6598,16 @@
         "services": [
           "MemberPrintOrdersService"
         ]
+      },
+      {
+        "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
+        "handler": "MemberPrintOrdersController.list",
+        "method": "GET",
+        "models": [],
+        "path": "/api/v1/me/print-orders",
+        "roles": [],
+        "serviceFiles": [],
+        "services": []
       },
       {
         "controller": "services/api/src/member-print-orders/member-print-orders.controller.ts",
@@ -6842,30 +6969,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.list",
-        "method": "GET",
-        "models": [
-          "AiServiceLog",
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewReport",
-          "MockInterviewSession",
-          "MockInterviewTurn",
-          "PrintTask"
-        ],
-        "path": "/api/v1/mock-interviews",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/mock-interview/mock-interview.service.ts"
-        ],
-        "services": [
-          "MockInterviewService"
-        ]
-      },
-      {
-        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.create",
+        "handler": "MockInterviewController.create",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -6888,30 +6992,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.remove",
-        "method": "DELETE",
-        "models": [
-          "AiServiceLog",
-          "AuditLog",
-          "FairMaterialPrintBridge",
-          "FileObject",
-          "MockInterviewReport",
-          "MockInterviewSession",
-          "MockInterviewTurn",
-          "PrintTask"
-        ],
-        "path": "/api/v1/mock-interviews/:id",
-        "roles": [],
-        "serviceFiles": [
-          "services/api/src/mock-interview/mock-interview.service.ts"
-        ],
-        "services": [
-          "MockInterviewService"
-        ]
-      },
-      {
-        "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.get",
+        "handler": "MockInterviewController.get",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -6934,7 +7015,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.answer",
+        "handler": "MockInterviewController.answer",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -6957,7 +7038,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.end",
+        "handler": "MockInterviewController.end",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -6980,7 +7061,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.practiceSheet",
+        "handler": "MockInterviewController.practiceSheet",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -7003,7 +7084,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.report",
+        "handler": "MockInterviewController.report",
         "method": "GET",
         "models": [
           "AiServiceLog",
@@ -7026,7 +7107,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.print",
+        "handler": "MockInterviewController.print",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -7049,7 +7130,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.start",
+        "handler": "MockInterviewController.start",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -7072,7 +7153,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.transcribe",
+        "handler": "MockInterviewController.transcribe",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -7099,7 +7180,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.questionAudio",
+        "handler": "MockInterviewController.questionAudio",
         "method": "POST",
         "models": [
           "AiServiceLog",
@@ -7126,7 +7207,7 @@
       },
       {
         "controller": "services/api/src/mock-interview/mock-interview.controller.ts",
-        "handler": "CreateInterviewDto.voiceCapability",
+        "handler": "MockInterviewController.voiceCapability",
         "method": "GET",
         "models": [],
         "path": "/api/v1/mock-interviews/capabilities/voice",
@@ -8130,7 +8211,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
-        "handler": "UpdateOwnOrgProfileDto.getProfile",
+        "handler": "PartnerOrgController.getProfile",
         "method": "GET",
         "models": [
           "AuditLog",
@@ -8150,7 +8231,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-org.controller.ts",
-        "handler": "UpdateOwnOrgProfileDto.updateProfile",
+        "handler": "PartnerOrgController.updateProfile",
         "method": "PUT",
         "models": [
           "AuditLog",
@@ -8217,7 +8298,7 @@
       },
       {
         "controller": "services/api/src/orgs/partner-stats.controller.ts",
-        "handler": "PartnerStatsQueryDto.getStats",
+        "handler": "PartnerStatsController.getStats",
         "method": "GET",
         "models": [
           "CompanyProfile",
@@ -8721,7 +8802,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.analyze",
+        "handler": "JobFitController.analyze",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -8743,7 +8824,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.latest",
+        "handler": "JobFitController.latest",
         "method": "GET",
         "models": [
           "AiResumeResult",
@@ -8764,7 +8845,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.print",
+        "handler": "JobFitController.print",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -8785,7 +8866,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.grantConsent",
+        "handler": "JobFitController.grantConsent",
         "method": "POST",
         "models": [
           "AiResumeResult",
@@ -8806,7 +8887,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.revokeConsent",
+        "handler": "JobFitController.revokeConsent",
         "method": "DELETE",
         "models": [
           "AiResumeResult",
@@ -8827,7 +8908,7 @@
       },
       {
         "controller": "services/api/src/ai/job-fit.controller.ts",
-        "handler": "JobFitRequestDto.consentStatus",
+        "handler": "JobFitController.consentStatus",
         "method": "GET",
         "models": [
           "AiResumeResult",
@@ -9212,6 +9293,56 @@
       },
       {
         "controller": "services/api/src/terminals/terminals.controller.ts",
+        "handler": "TerminalsController.reportReleaseObservation",
+        "method": "PUT",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/terminals/:terminalId/release-observation",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/terminals.controller.ts",
+        "handler": "TerminalsController.getReleaseObservationPlan",
+        "method": "GET",
+        "models": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalBindCode",
+          "TerminalCredential",
+          "TerminalReleaseObservation"
+        ],
+        "path": "/api/v1/terminals/:terminalId/release-observation-plan",
+        "roles": [],
+        "serviceFiles": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ],
+        "services": [
+          "ReleaseObservationService"
+        ]
+      },
+      {
+        "controller": "services/api/src/terminals/terminals.controller.ts",
         "handler": "TerminalsController.reportScanDeletionAudit",
         "method": "POST",
         "models": [
@@ -9518,7 +9649,7 @@
   "apps": {
     "admin": {
       "entry": "apps/admin/src/main.tsx",
-      "reachableFileCount": 134,
+      "reachableFileCount": 135,
       "root": "apps/admin",
       "router": "apps/admin/src/routes/index.tsx",
       "routes": [
@@ -9534,13 +9665,43 @@
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
             "GET /admin/print-tasks",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/dashboard/index.tsx",
@@ -9557,10 +9718,40 @@
             "GET /admin/fair-sources",
             "GET /admin/import-batches",
             "GET /admin/job-sources",
+            "GET /auth/me",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/account-settings/index.tsx",
           "layout": [
@@ -9572,7 +9763,28 @@
         },
         {
           "component": "AiConfigPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/ai-config/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -9591,13 +9803,43 @@
             "GET /admin/import-batches",
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/ai-services/index.tsx",
@@ -9612,7 +9854,27 @@
           "component": "AlertsPage",
           "endpoints": [
             "GET /admin/alerts",
-            "GET /admin/print-tasks"
+            "GET /admin/print-tasks",
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/alerts/index.tsx",
           "layout": [
@@ -9628,10 +9890,40 @@
             "GET /admin/fair-sources",
             "GET /admin/import-batches",
             "GET /admin/job-sources",
+            "GET /auth/me",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/audit/index.tsx",
           "layout": [
@@ -9644,10 +9936,30 @@
         {
           "component": "BenefitActivitiesPage",
           "endpoints": [
+            "GET /auth/me",
             "PATCH /admin/benefit-activities/:param",
             "PATCH /admin/benefit-activities/:param/end",
             "PATCH /admin/benefit-activities/:param/publish",
-            "POST /admin/benefit-activities"
+            "POST /admin/benefit-activities",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/benefit-activities/index.tsx",
           "layout": [
@@ -9660,7 +9972,27 @@
         {
           "component": "BillingPage",
           "endpoints": [
-            "PUT /admin/billing/price-config/:param"
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
+            "PUT /admin/billing/price-config"
           ],
           "file": "apps/admin/src/routes/billing/index.tsx",
           "layout": [
@@ -9684,6 +10016,7 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /auth/me",
             "PATCH /admin/companies/:param",
             "PATCH /admin/companies/:param/publish",
             "PATCH /admin/companies/:param/review",
@@ -9701,6 +10034,25 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/orgs/:param/accounts/:param/email"
           ],
           "file": "apps/admin/src/routes/companies/index.tsx",
@@ -9717,10 +10069,40 @@
             "GET /admin/fair-sources",
             "GET /admin/import-batches",
             "GET /admin/job-sources",
+            "GET /auth/me",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/devices/index.tsx",
           "layout": [
@@ -9740,15 +10122,45 @@
             "GET /admin/import-batches",
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
             "POST /admin/bulk-publish/execute",
             "POST /admin/bulk-publish/preview",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/fair-sources/index.tsx",
@@ -9770,13 +10182,34 @@
             "GET /admin/fairs/:param",
             "GET /admin/fairs/:param/stats",
             "GET /admin/fairs/:param/venue-guide",
+            "GET /auth/me",
             "PATCH /admin/fairs/:param",
             "PATCH /admin/fairs/:param/companies/:param",
             "PATCH /admin/fairs/:param/materials/:param",
             "PATCH /admin/fairs/:param/materials/:param/publish",
             "PATCH /admin/fairs/:param/zones/:param",
             "POST /admin/fairs/:param/companies",
+            "POST /admin/fairs/:param/materials",
             "POST /admin/fairs/:param/zones",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/fairs/:param/venue-guide"
           ],
           "file": "apps/admin/src/routes/fairs/index.tsx",
@@ -9797,13 +10230,43 @@
             "GET /admin/import-batches",
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/files/index.tsx",
@@ -9824,13 +10287,43 @@
             "GET /admin/import-batches",
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/import-batches/index.tsx",
@@ -9843,7 +10336,30 @@
         },
         {
           "component": "JobMaterialsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /admin/job-materials/summary",
+            "GET /auth/me",
+            "GET /job-materials/templates",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/job-materials/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -9862,15 +10378,45 @@
             "GET /admin/import-batches",
             "GET /admin/job-sources",
             "GET /admin/jobs/quality-summary",
+            "GET /auth/me",
             "GET /files",
             "GET /files/:param/url",
             "GET /files/lifecycle-summary",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
             "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
             "POST /admin/bulk-publish/execute",
             "POST /admin/bulk-publish/preview",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /files/cleanup-expired"
           ],
           "file": "apps/admin/src/routes/job-sources/index.tsx",
@@ -9883,7 +10429,30 @@
         },
         {
           "component": "LegalDocsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "PATCH /admin/legal-doc-versions/:param/activate",
+            "POST /admin/legal-doc-versions",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/legal-docs/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -9894,7 +10463,28 @@
         },
         {
           "component": "LoginPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/login/index.tsx",
           "layout": [],
           "path": "/login",
@@ -9906,8 +10496,28 @@
         {
           "component": "MemberBenefitsPage",
           "endpoints": [
+            "GET /auth/me",
             "PATCH /admin/member-benefits/:param/revoke",
-            "POST /admin/member-benefits"
+            "POST /admin/member-benefits",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/member-benefits/index.tsx",
           "layout": [
@@ -9920,8 +10530,28 @@
         {
           "component": "MemberFeedbackPage",
           "endpoints": [
+            "GET /auth/me",
             "PATCH /admin/feedback/:param/status",
-            "POST /admin/feedback/:param/replies"
+            "POST /admin/feedback/:param/replies",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/member-feedback/index.tsx",
           "layout": [
@@ -9935,7 +10565,27 @@
           "component": "MemberNotificationsPage",
           "endpoints": [
             "DELETE /admin/notifications/broadcasts/:param",
-            "POST /admin/notifications/broadcasts"
+            "GET /auth/me",
+            "POST /admin/notifications/broadcasts",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/member-notifications/index.tsx",
           "layout": [
@@ -9947,7 +10597,30 @@
         },
         {
           "component": "MemberPrivacyPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /admin/member-privacy/data-requests/:param/reject",
+            "POST /admin/member-privacy/data-requests/:param/retry",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/member-privacy/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -9958,7 +10631,28 @@
         },
         {
           "component": "OfflineAgenciesPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/offline-agencies/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -9972,7 +10666,29 @@
           "endpoints": [
             "GET /admin/orders",
             "GET /admin/orders/:param",
-            "POST /admin/orders/:param/refund"
+            "GET /auth/me",
+            "POST /admin/orders/:param/refund",
+            "POST /admin/print-jobs/:param/abandon",
+            "POST /admin/print-jobs/:param/verify-outcome",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/orders/index.tsx",
           "layout": [
@@ -9992,6 +10708,7 @@
             "GET /admin/orgs",
             "GET /admin/orgs/:param",
             "GET /admin/orgs/:param/content-trust",
+            "GET /auth/me",
             "PATCH /admin/orgs/:param",
             "PATCH /admin/orgs/:param/accounts/:param/password",
             "PATCH /admin/orgs/:param/accounts/:param/status",
@@ -10004,6 +10721,25 @@
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/start",
             "POST /admin/orgs/:param/accounts/:param/phone-rebind/verify",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/orgs/:param/accounts/:param/email"
           ],
           "file": "apps/admin/src/routes/partners/index.tsx",
@@ -10040,10 +10776,30 @@
           "component": "PolicySourcesPage",
           "endpoints": [
             "GET /admin/policy-sources",
+            "GET /auth/me",
             "PATCH /admin/policy-sources/:param/publish",
             "PATCH /admin/policy-sources/:param/review",
             "POST /admin/bulk-publish/execute",
-            "POST /admin/bulk-publish/preview"
+            "POST /admin/bulk-publish/preview",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/policy-sources/index.tsx",
           "layout": [
@@ -10059,10 +10815,49 @@
             "GET /admin/fair-sources",
             "GET /admin/import-batches",
             "GET /admin/job-sources",
+            "GET /admin/print-scan/tasks",
+            "GET /admin/print-scan/tasks/:param/:param",
+            "GET /admin/print-scan/tasks/:param/:param/actions",
+            "GET /admin/print-scan/tasks/print/:param/close-unpaid",
+            "GET /admin/terminals/:param/capabilities",
+            "GET /admin/terminals/:param/capabilities/:param",
+            "GET /auth/me",
+            "PATCH /admin/audit-logs",
+            "PATCH /admin/device-fleet/overview",
             "PATCH /admin/fair-sources/:param/publish",
             "PATCH /admin/fair-sources/:param/review",
             "PATCH /admin/job-sources/:param/publish",
-            "PATCH /admin/job-sources/:param/review"
+            "PATCH /admin/job-sources/:param/review",
+            "PATCH /admin/printers",
+            "PATCH /admin/release-observation-plans",
+            "PATCH /admin/terminals",
+            "PATCH /admin/terminals/org-options",
+            "POST /admin/print-scan/tasks/:param/:param/actions",
+            "POST /admin/print-scan/tasks/print/:param/close-unpaid",
+            "POST /admin/release-observation-plans/:param",
+            "POST /admin/terminals/:param/lifecycle",
+            "POST /admin/terminals/:param/org",
+            "POST /admin/terminals/:param/profile",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
+            "PUT /admin/terminals/:param/capabilities/:param"
           ],
           "file": "apps/admin/src/routes/print-scan/index.tsx",
           "layout": [
@@ -10085,7 +10880,31 @@
         },
         {
           "component": "PrivacyRequestsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /admin/member-privacy/data-requests",
+            "POST /admin/member-privacy/data-requests/:param/reject",
+            "POST /admin/member-privacy/data-requests/:param/retry",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/privacy-requests/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -10103,9 +10922,30 @@
             "GET /admin/ad-playlists",
             "GET /admin/ai-posters/status",
             "GET /admin/screensaver/terminals",
+            "GET /auth/me",
             "PATCH /admin/ad-assets/:param",
+            "POST /admin/ad-assets",
             "POST /admin/ad-assets/external-video",
             "POST /admin/ad-playlists",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/ad-playlists/:param",
             "PUT /admin/terminals/:param/screensaver-config"
           ],
@@ -10121,6 +10961,26 @@
           "component": "SmartCampusPage",
           "endpoints": [
             "GET /admin/smart-campus/terminals",
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/terminals/:param/smart-campus-config"
           ],
           "file": "apps/admin/src/routes/smart-campus/index.tsx",
@@ -10133,7 +10993,28 @@
         },
         {
           "component": "SyncSourcesPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/admin/src/routes/sync-sources/index.tsx",
           "layout": [
             "AdminLayoutWrapper"
@@ -10161,6 +11042,7 @@
             "GET /admin/toolbox/apps/:param/versions",
             "GET /admin/toolbox/launch-summary",
             "GET /admin/toolbox/terminals",
+            "GET /auth/me",
             "POST /admin/toolbox/allowed-hosts",
             "POST /admin/toolbox/allowed-hosts/:param/review",
             "POST /admin/toolbox/apps",
@@ -10170,6 +11052,25 @@
             "POST /admin/toolbox/apps/:param/versions/:param/publish",
             "POST /admin/toolbox/apps/:param/versions/:param/reject",
             "POST /admin/toolbox/apps/:param/versions/:param/submit",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /admin/terminals/:param/toolbox-config"
           ],
           "file": "apps/admin/src/routes/toolbox/index.tsx",
@@ -10184,7 +11085,27 @@
           "component": "UsersPage",
           "endpoints": [
             "GET /admin/users",
-            "GET /admin/users/:param"
+            "GET /admin/users/:param",
+            "GET /auth/me",
+            "POST /auth/admin/phone/initial-bind/cancel",
+            "POST /auth/admin/phone/initial-bind/start",
+            "POST /auth/admin/phone/initial-bind/verify",
+            "POST /auth/admin/phone/transfer/cancel",
+            "POST /auth/admin/phone/transfer/start",
+            "POST /auth/admin/phone/transfer/verify",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/logout",
+            "POST /auth/password/change",
+            "POST /auth/password/first-admin-change",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/initial-bind/start",
+            "POST /auth/phone/initial-bind/verify",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
           ],
           "file": "apps/admin/src/routes/users/index.tsx",
           "layout": [
@@ -10195,7 +11116,7 @@
           "wrappers": []
         }
       ],
-      "sourceFileCount": 137
+      "sourceFileCount": 138
     },
     "kiosk": {
       "entry": "apps/kiosk/src/main.tsx",
@@ -10206,6 +11127,8 @@
         {
           "component": "HomePage",
           "endpoints": [
+            "GET /files/:param",
+            "GET /files/:param/retention",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10215,6 +11138,11 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /me/ai-records/:param",
+            "GET /me/print-orders",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -10279,9 +11207,25 @@
           "wrappers": []
         },
         {
+          "component": "AiPlanPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/ai-plan/AiPlanPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/ai/plan",
+          "styles": [
+            "apps/kiosk/src/styles/prototype-v1.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "AssistantPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10291,25 +11235,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/assistant/AssistantPage.tsx",
           "layout": [
@@ -10339,6 +11297,7 @@
           "component": "CampusPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10348,25 +11307,43 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/campus/CampusPage.tsx",
           "layout": [
@@ -10375,6 +11352,32 @@
             "Outlet"
           ],
           "path": "/campus",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "FreshmanInsightsPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/placeholders/FreshmanInsightsPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/campus/freshman-insights",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "CampusWelcomePage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/placeholders/CampusWelcomePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/campus/welcome",
           "styles": [],
           "wrappers": []
         },
@@ -10404,7 +11407,11 @@
             "GET /companies/:param",
             "GET /companies/:param/jobs",
             "GET /companies/filters",
-            "GET /companies/stats"
+            "GET /companies/stats",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
+            "POST /activity/browse",
+            "POST /activity/external-jump"
           ],
           "file": "apps/kiosk/src/pages/companies/CompanyDetailPage.tsx",
           "layout": [
@@ -10414,6 +11421,147 @@
           ],
           "path": "/companies/:id",
           "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "ContractReviewHomePage",
+          "endpoints": [
+            "DELETE /contract-reviews/:param",
+            "DELETE /contract-reviews/reports/:param",
+            "DELETE /upload-sessions/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
+            "POST /contract-reviews",
+            "POST /contract-reviews/:param/confirm",
+            "POST /contract-reviews/:param/report",
+            "POST /files/kiosk-upload",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
+          ],
+          "file": "apps/kiosk/src/pages/contract-review/ContractReviewHomePage.tsx",
+          "layout": [
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/contract-review",
+          "styles": [
+            "apps/kiosk/src/pages/contract-review/contract-review.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "ContractReviewProcessingPage",
+          "endpoints": [
+            "DELETE /contract-reviews/:param",
+            "DELETE /contract-reviews/reports/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
+            "POST /contract-reviews",
+            "POST /contract-reviews/:param/confirm",
+            "POST /contract-reviews/:param/report",
+            "POST /files/kiosk-upload",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/contract-review/ContractReviewProcessingPage.tsx",
+          "layout": [
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/contract-review/processing",
+          "styles": [
+            "apps/kiosk/src/pages/contract-review/contract-review.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "ContractReviewResultPage",
+          "endpoints": [
+            "DELETE /contract-reviews/:param",
+            "DELETE /contract-reviews/reports/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
+            "POST /contract-reviews",
+            "POST /contract-reviews/:param/confirm",
+            "POST /contract-reviews/:param/report",
+            "POST /files/kiosk-upload",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions"
+          ],
+          "file": "apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx",
+          "layout": [
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/contract-review/result",
+          "styles": [
+            "apps/kiosk/src/pages/contract-review/contract-review.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "ErrorOfflinePage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/placeholders/ErrorOfflinePage.tsx",
+          "layout": [
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/error-offline",
+          "styles": [
+            "apps/kiosk/src/pages/placeholders/system-pages-batch8.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "FairsServiceHubPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/job-fairs/FairsServiceHubPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/fairs-service",
+          "styles": [
+            "apps/kiosk/src/pages/styles/service-hub-editorial.css"
+          ],
           "wrappers": []
         },
         {
@@ -10432,6 +11580,21 @@
           "wrappers": []
         },
         {
+          "component": "InterviewServiceHubPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/interview/InterviewServiceHubPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/interview-service",
+          "styles": [
+            "apps/kiosk/src/pages/styles/service-hub-editorial.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "InterviewReportPage",
           "endpoints": [
             "DELETE /me/mock-interviews/:param",
@@ -10444,13 +11607,19 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/end",
+            "POST /mock-interviews/:param/practice-sheet",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcribe",
+            "POST /mock-interviews/:param/turns/:param/audio"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewReportPage.tsx",
           "layout": [
@@ -10482,13 +11651,19 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/end",
+            "POST /mock-interviews/:param/practice-sheet",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcribe",
+            "POST /mock-interviews/:param/turns/:param/audio"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewReportsPage.tsx",
           "layout": [
@@ -10520,13 +11695,19 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/end",
+            "POST /mock-interviews/:param/practice-sheet",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcribe",
+            "POST /mock-interviews/:param/turns/:param/audio"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewSessionPage.tsx",
           "layout": [
@@ -10549,6 +11730,7 @@
           "component": "InterviewSetupPage",
           "endpoints": [
             "DELETE /me/mock-interviews/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10558,13 +11740,23 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /mock-interviews",
             "POST /mock-interviews/:param/answer",
             "POST /mock-interviews/:param/end",
+            "POST /mock-interviews/:param/practice-sheet",
             "POST /mock-interviews/:param/report/print",
-            "POST /mock-interviews/:param/start"
+            "POST /mock-interviews/:param/start",
+            "POST /mock-interviews/:param/transcribe",
+            "POST /mock-interviews/:param/turns/:param/audio",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/interview/InterviewSetupPage.tsx",
           "layout": [
@@ -10596,6 +11788,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -10620,6 +11815,7 @@
           "component": "JobFairsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10629,25 +11825,43 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx",
           "layout": [
@@ -10663,6 +11877,7 @@
           "component": "JobFairDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10672,25 +11887,43 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx",
           "layout": [
@@ -10706,6 +11939,7 @@
           "component": "FairCompaniesPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10715,25 +11949,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx",
           "layout": [
@@ -10749,6 +11997,7 @@
           "component": "FairCompanyDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10758,25 +12007,43 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx",
           "layout": [
@@ -10792,6 +12059,7 @@
           "component": "FairMapPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10801,25 +12069,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairMapPage.tsx",
           "layout": [
@@ -10835,6 +12117,7 @@
           "component": "FairMaterialsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10844,25 +12127,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx",
           "layout": [
@@ -10878,6 +12175,7 @@
           "component": "FairStatsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10887,25 +12185,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/FairStatsPage.tsx",
           "layout": [
@@ -10947,6 +12259,7 @@
           "component": "JobFairCheckinPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10956,25 +12269,43 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/job-fairs/JobFairCheckinPage.tsx",
           "layout": [
@@ -10990,6 +12321,9 @@
           "component": "JobsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
+            "GET /files/:param",
+            "GET /files/:param/retention",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -10999,25 +12333,40 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/ai-records/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/jobs/JobsPage.tsx",
           "layout": [
@@ -11030,9 +12379,27 @@
           "wrappers": []
         },
         {
+          "component": "JobsServiceHubPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/jobs/JobsServiceHubPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/jobs-service",
+          "styles": [
+            "apps/kiosk/src/pages/styles/service-hub-editorial.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "JobDetailPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
+            "GET /files/:param",
+            "GET /files/:param/retention",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11042,25 +12409,44 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
+            "GET /me/ai-records/:param",
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/jobs/JobDetailPage.tsx",
           "layout": [
@@ -11073,9 +12459,42 @@
           "wrappers": []
         },
         {
+          "component": "OfflineJobDetailPage",
+          "endpoints": [
+            "GET /kiosk/offline-agencies",
+            "GET /kiosk/offline-agencies/:param",
+            "GET /kiosk/offline-jobs/:param"
+          ],
+          "file": "apps/kiosk/src/pages/offline-agencies/OfflineJobDetailPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/jobs/:id/offline",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "OnlinePlatformsPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/jobs/OnlinePlatformsPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/jobs/online-platforms",
+          "styles": [
+            "apps/kiosk/src/styles/prototype-v1.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "LegalDocPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11085,25 +12504,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/legal/LegalDocPage.tsx",
           "layout": [
@@ -11128,6 +12561,16 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /kiosk/legal/:param",
+            "GET /local/terminal-identity",
+            "GET /member/auth/login",
+            "GET /member/auth/logout",
+            "GET /member/auth/sms-code",
+            "GET /member/auth/step-up/sms-code",
+            "GET /member/auth/step-up/verify",
+            "GET /member/me",
+            "GET /member/phone/rebind",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -11150,7 +12593,12 @@
         },
         {
           "component": "MyActivityPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
+            "POST /activity/browse",
+            "POST /activity/external-jump"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyActivityPage.tsx",
           "layout": [
             "KioskRoot",
@@ -11169,9 +12617,36 @@
           "wrappers": []
         },
         {
+          "component": "MeActivityDetailPage",
+          "endpoints": [
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
+            "POST /activity/browse",
+            "POST /activity/external-jump"
+          ],
+          "file": "apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/me/activity/:id",
+          "styles": [
+            "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-records.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "MyAiRecordsPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "GET /files/:param",
+            "GET /files/:param/retention",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11181,8 +12656,11 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
             "GET /me/ai-consents/status",
+            "GET /me/ai-records/:param",
             "GET /me/job-ai-sessions",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11211,6 +12689,7 @@
         {
           "component": "MyBenefitsPage",
           "endpoints": [
+            "DELETE /me/favorites/:param/:param",
             "POST /me/favorites"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx",
@@ -11232,7 +12711,11 @@
         },
         {
           "component": "MyDocumentsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /files/:param",
+            "GET /files/:param/retention",
+            "GET /me/ai-records/:param"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx",
           "layout": [
             "KioskRoot",
@@ -11253,6 +12736,7 @@
         {
           "component": "MyFavoritesPage",
           "endpoints": [
+            "DELETE /me/favorites/:param/:param",
             "POST /me/favorites"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx",
@@ -11275,7 +12759,9 @@
         {
           "component": "MyFeedbackPage",
           "endpoints": [
-            "POST /me/feedback"
+            "PATCH /me/feedback/:param/close",
+            "POST /me/feedback",
+            "POST /me/feedback/:param/replies"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx",
           "layout": [
@@ -11297,6 +12783,8 @@
         {
           "component": "MyNotificationsPage",
           "endpoints": [
+            "DELETE /me/notifications/:param/:param",
+            "PATCH /me/notifications/:param/:param/read",
             "PATCH /me/notifications/read-all"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx",
@@ -11318,7 +12806,9 @@
         },
         {
           "component": "MyPrintOrdersPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /me/print-orders"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx",
           "layout": [
             "KioskRoot",
@@ -11348,8 +12838,12 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /me/data-requests",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /me/data-requests"
           ],
           "file": "apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx",
           "layout": [
@@ -11370,7 +12864,11 @@
         },
         {
           "component": "MyResumesPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /files/:param",
+            "GET /files/:param/retention",
+            "GET /me/ai-records/:param"
+          ],
           "file": "apps/kiosk/src/pages/profile/me/MyResumesPage.tsx",
           "layout": [
             "KioskRoot",
@@ -11401,8 +12899,17 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
+            "GET /member/auth/login",
+            "GET /member/auth/logout",
+            "GET /member/auth/sms-code",
+            "GET /member/auth/step-up/sms-code",
+            "GET /member/auth/step-up/verify",
+            "GET /member/me",
+            "GET /member/phone/rebind",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
@@ -11430,12 +12937,93 @@
         },
         {
           "component": "MobileQrLoginPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /member/auth/login",
+            "GET /member/auth/logout",
+            "GET /member/auth/sms-code",
+            "GET /member/auth/step-up/sms-code",
+            "GET /member/auth/step-up/verify",
+            "GET /member/me",
+            "GET /member/phone/rebind"
+          ],
           "file": "apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx",
           "layout": [],
           "path": "/member/qr-login",
           "styles": [
             "apps/kiosk/src/pages/auth/mobile-qr-service-desk.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "NotificationsPage",
+          "endpoints": [
+            "DELETE /me/notifications/:param/:param",
+            "PATCH /me/notifications/:param/:param/read",
+            "PATCH /me/notifications/read-all"
+          ],
+          "file": "apps/kiosk/src/pages/placeholders/NotificationsPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/notifications",
+          "styles": [
+            "apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-assets.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-detail-base.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-orders.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-records.css",
+            "apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "OfflineAgenciesPage",
+          "endpoints": [
+            "GET /kiosk/offline-agencies",
+            "GET /kiosk/offline-agencies/:param",
+            "GET /kiosk/offline-jobs/:param"
+          ],
+          "file": "apps/kiosk/src/pages/offline-agencies/OfflineAgenciesPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/offline-agencies",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "OfflineAgencyDetailPage",
+          "endpoints": [
+            "GET /kiosk/offline-agencies",
+            "GET /kiosk/offline-agencies/:param",
+            "GET /kiosk/offline-jobs/:param"
+          ],
+          "file": "apps/kiosk/src/pages/offline-agencies/OfflineAgencyDetailPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/offline-agencies/:id",
+          "styles": [],
+          "wrappers": []
+        },
+        {
+          "component": "PolicyServiceHubPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/policy/PolicyServiceHubPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/policy-service",
+          "styles": [
+            "apps/kiosk/src/pages/styles/service-hub-editorial.css"
           ],
           "wrappers": []
         },
@@ -11451,8 +13039,11 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /kiosk/feedback"
           ],
           "file": "apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx",
           "layout": [
@@ -11470,6 +13061,7 @@
         {
           "component": "ConvertImagesPage",
           "endpoints": [
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11479,8 +13071,15 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /print/convert/images-to-pdf",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx",
           "layout": [
@@ -11512,6 +13111,7 @@
         {
           "component": "SignStampPage",
           "endpoints": [
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11521,10 +13121,16 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /print/sign/compose",
-            "POST /print/sign/inspect"
+            "POST /print/sign/inspect",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/print-scan/SignStampPage.tsx",
           "layout": [
@@ -11550,8 +13156,20 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /orders/:param/pay-status",
+            "GET /payment/channels",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
+            "POST /orders/:param/code-pay",
+            "POST /orders/:param/pay",
+            "POST /orders/:param/pay/reconcile",
+            "POST /payment/sandbox/simulate",
+            "POST /print/jobs/:param/release"
           ],
           "file": "apps/kiosk/src/pages/print/PrintCashierPage.tsx",
           "layout": [
@@ -11574,6 +13192,8 @@
           "component": "PrintConfirmPage",
           "endpoints": [
             "DELETE /contract-reviews/:param",
+            "DELETE /contract-reviews/reports/:param",
+            "DELETE /me/favorites/:param/:param",
             "DELETE /resume/self-assessment/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -11584,10 +13204,23 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /print/price-config",
+            "GET /terminals/:param/screensaver",
+            "POST /contract-reviews",
+            "POST /contract-reviews/:param/confirm",
+            "POST /contract-reviews/:param/report",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/favorites",
+            "POST /orders/quote",
+            "POST /print/jobs",
             "POST /resume/self-assessment",
+            "POST /resume/self-assessment/:param/append",
             "POST /resume/self-assessment/:param/print"
           ],
           "file": "apps/kiosk/src/pages/print/PrintConfirmPage.tsx",
@@ -11619,8 +13252,23 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /orders/:param/pay-status",
+            "GET /payment/channels",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /kiosk/feedback",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
+            "POST /orders/:param/code-pay",
+            "POST /orders/:param/pay",
+            "POST /orders/:param/pay/reconcile",
+            "POST /orders/quote",
+            "POST /payment/sandbox/simulate",
+            "POST /print/jobs",
+            "POST /print/jobs/:param/release"
           ],
           "file": "apps/kiosk/src/pages/print/PrintDonePage.tsx",
           "layout": [
@@ -11652,8 +13300,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions"
           ],
           "file": "apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx",
           "layout": [
@@ -11697,6 +13350,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -11730,8 +13385,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions"
           ],
           "file": "apps/kiosk/src/pages/print/PrintPreviewPage.tsx",
           "layout": [
@@ -11762,8 +13422,16 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /local/print/wake",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
+            "POST /orders/quote",
+            "POST /print/jobs"
           ],
           "file": "apps/kiosk/src/pages/print/PrintProgressPage.tsx",
           "layout": [
@@ -11824,6 +13492,7 @@
         {
           "component": "PrintUploadPage",
           "endpoints": [
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11833,8 +13502,18 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /me/print-orders",
+            "GET /terminals/:param/screensaver",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/print/PrintUploadPage.tsx",
           "layout": [
@@ -11856,6 +13535,10 @@
         {
           "component": "ProfilePage",
           "endpoints": [
+            "DELETE /me/favorites/:param/:param",
+            "GET /files/:param",
+            "GET /files/:param/retention",
+            "GET /me/ai-records/:param",
             "POST /me/favorites"
           ],
           "file": "apps/kiosk/src/pages/profile/ProfilePage.tsx",
@@ -11875,7 +13558,13 @@
         },
         {
           "component": "RenshiPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /me/browse-logs/:param",
+            "GET /me/external-jump-logs/:param",
+            "POST /activity/browse",
+            "POST /activity/external-jump",
+            "POST /policies/eligibility-check"
+          ],
           "file": "apps/kiosk/src/pages/renshi/RenshiPage.tsx",
           "layout": [
             "KioskRoot",
@@ -11902,6 +13591,21 @@
           "wrappers": []
         },
         {
+          "component": "ResumeServiceHubPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/resume/ResumeServiceHubPage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/resume-service",
+          "styles": [
+            "apps/kiosk/src/pages/styles/service-hub-editorial.css"
+          ],
+          "wrappers": []
+        },
+        {
           "component": "CareerPlanPage",
           "endpoints": [
             "GET /job-fairs",
@@ -11913,6 +13617,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/career-plan/:param",
@@ -11960,6 +13667,7 @@
           "component": "ResumeGeneratePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -11969,25 +13677,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx",
           "layout": [
@@ -12011,6 +13733,7 @@
           "component": "ResumeGeneratePreviewPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12020,25 +13743,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx",
           "layout": [
@@ -12062,6 +13799,7 @@
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
             "DELETE /resume/job-fit/consent/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12071,19 +13809,29 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
@@ -12092,7 +13840,12 @@
             "POST /resume/job-fit",
             "POST /resume/job-fit/:param/print",
             "POST /resume/job-fit/consent",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/JobFitPage.tsx",
           "layout": [
@@ -12163,6 +13916,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
+            "POST /files/:param/preview-url",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12188,6 +13944,7 @@
           "component": "ResumeOptimizePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12197,25 +13954,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx",
           "layout": [
@@ -12238,6 +14009,7 @@
           "component": "ResumeOptimizeComparePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12247,25 +14019,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeOptimizeComparePage.tsx",
           "layout": [
@@ -12290,6 +14076,7 @@
           "component": "ResumeParsePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12299,25 +14086,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeParsePage.tsx",
           "layout": [
@@ -12342,6 +14143,7 @@
           "component": "ResumeReportPage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12351,25 +14153,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeReportPage.tsx",
           "layout": [
@@ -12402,9 +14218,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/self-assessment",
+            "POST /resume/self-assessment/:param/append",
             "POST /resume/self-assessment/:param/print"
           ],
           "file": "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
@@ -12432,9 +14252,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/self-assessment",
+            "POST /resume/self-assessment/:param/append",
             "POST /resume/self-assessment/:param/print"
           ],
           "file": "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
@@ -12462,9 +14286,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/self-assessment",
+            "POST /resume/self-assessment/:param/append",
             "POST /resume/self-assessment/:param/print"
           ],
           "file": "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
@@ -12492,9 +14320,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /resume/self-assessment",
+            "POST /resume/self-assessment/:param/append",
             "POST /resume/self-assessment/:param/print"
           ],
           "file": "apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx",
@@ -12513,6 +14345,7 @@
           "component": "ResumeSourcePage",
           "endpoints": [
             "DELETE /me/job-ai-sessions/:param",
+            "DELETE /upload-sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12522,25 +14355,39 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
             "GET /jobs",
             "GET /jobs/:param",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
             "GET /me/ai-consents/status",
             "GET /me/job-ai-sessions",
             "GET /resume/generate/:param",
             "GET /resume/records/:param",
             "GET /resume/records/:param/optimize",
+            "GET /terminals/:param/screensaver",
             "POST /assistant/chat",
+            "POST /files/:param/preview-url",
+            "POST /files/kiosk-upload",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url",
             "POST /jobs/:param/ai/explain",
             "POST /jobs/:param/ai/match",
             "POST /jobs/ai/recommendations",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions",
             "POST /me/ai-consents",
             "POST /me/ai-consents/:param/revoke",
             "POST /print",
             "POST /resume/generate",
             "POST /resume/generate/export",
-            "POST /resume/parse"
+            "POST /resume/parse",
+            "POST /resume/records/:param/layout-adjust",
+            "POST /resume/voice/transcribe",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/resume/ResumeSourcePage.tsx",
           "layout": [
@@ -12572,6 +14419,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /job-materials/generate",
+            "GET /job-materials/templates",
+            "POST /files/:param/preview-url",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12609,6 +14459,7 @@
         {
           "component": "ScanProgressPage",
           "endpoints": [
+            "DELETE /scan/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12618,8 +14469,11 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /scan/sessions"
           ],
           "file": "apps/kiosk/src/pages/scan/ScanProgressPage.tsx",
           "layout": [
@@ -12651,6 +14505,7 @@
         {
           "component": "ScanSettingsPage",
           "endpoints": [
+            "DELETE /scan/sessions/:param",
             "GET /job-fairs",
             "GET /job-fairs/:param",
             "GET /job-fairs/:param/companies",
@@ -12660,8 +14515,11 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /scan/sessions"
           ],
           "file": "apps/kiosk/src/pages/scan/ScanSettingsPage.tsx",
           "layout": [
@@ -12687,6 +14545,8 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12714,8 +14574,13 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /materials/tasks/:param",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
-            "POST /job-fairs/:param/materials/:param/print-url"
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /materials/tasks",
+            "POST /materials/tasks/:param/pii-findings/decisions"
           ],
           "file": "apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx",
           "layout": [
@@ -12725,6 +14590,37 @@
           "path": "/screensaver",
           "styles": [
             "apps/kiosk/src/pages/screensaver/screensaver-service-desk.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "SessionResumePage",
+          "endpoints": [
+            "GET /me/pending-tasks"
+          ],
+          "file": "apps/kiosk/src/pages/session-resume/SessionResumePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/session-resume",
+          "styles": [
+            "apps/kiosk/src/styles/prototype-v1.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "SessionTimeoutPage",
+          "endpoints": [],
+          "file": "apps/kiosk/src/pages/placeholders/SessionTimeoutPage.tsx",
+          "layout": [
+            "KioskRuntimeRoot",
+            "Outlet"
+          ],
+          "path": "/session-timeout",
+          "styles": [
+            "apps/kiosk/src/pages/placeholders/system-pages-batch8.css"
           ],
           "wrappers": []
         },
@@ -12740,6 +14636,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12766,6 +14665,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12794,6 +14696,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12822,6 +14727,9 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
           ],
@@ -12839,7 +14747,7 @@
           ]
         },
         {
-          "component": "PhoneUploadPage",
+          "component": "ToolboxZonePage",
           "endpoints": [
             "GET /job-fairs",
             "GET /job-fairs/:param",
@@ -12850,8 +14758,44 @@
             "GET /job-fairs/:param/stats",
             "GET /job-fairs/:param/venue-guide",
             "GET /job-fairs/:param/zones",
+            "GET /local/terminal-identity",
+            "GET /terminals/:param/config",
+            "GET /terminals/:param/screensaver",
             "POST /job-fairs/:param/companies/:param/print-url",
             "POST /job-fairs/:param/materials/:param/print-url"
+          ],
+          "file": "apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx",
+          "layout": [
+            "KioskRoot",
+            "KioskRuntimeRoot",
+            "Outlet",
+            "ToolboxCapabilityBoundary"
+          ],
+          "path": "/toolbox",
+          "styles": [
+            "apps/kiosk/src/pages/toolbox/toolbox-zone.css",
+            "apps/kiosk/src/styles/prototype-v1.css"
+          ],
+          "wrappers": []
+        },
+        {
+          "component": "PhoneUploadPage",
+          "endpoints": [
+            "DELETE /upload-sessions/:param",
+            "GET /job-fairs",
+            "GET /job-fairs/:param",
+            "GET /job-fairs/:param/companies",
+            "GET /job-fairs/:param/companies/:param",
+            "GET /job-fairs/:param/map",
+            "GET /job-fairs/:param/materials",
+            "GET /job-fairs/:param/stats",
+            "GET /job-fairs/:param/venue-guide",
+            "GET /job-fairs/:param/zones",
+            "POST /job-fairs/:param/companies/:param/print-url",
+            "POST /job-fairs/:param/materials/:param/print-url",
+            "POST /upload-sessions",
+            "POST /upload-sessions/:param/confirm",
+            "POST /upload-sessions/:param/files"
           ],
           "file": "apps/kiosk/src/pages/upload/PhoneUploadPage.tsx",
           "layout": [],
@@ -12873,6 +14817,15 @@
         {
           "component": "DashboardPage",
           "endpoints": [
+            "GET /auth/me",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /partner/profile"
           ],
           "file": "apps/partner/src/routes/dashboard/index.tsx",
@@ -12897,10 +14850,13 @@
         {
           "component": "CompaniesPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/companies",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -12913,9 +14869,19 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/companies/import",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -12931,9 +14897,12 @@
         {
           "component": "FairsPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -12944,8 +14913,18 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -12961,9 +14940,12 @@
         {
           "component": "JobsPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -12974,8 +14956,18 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -12990,7 +14982,17 @@
         },
         {
           "component": "LoginPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/partner/src/routes/login/index.tsx",
           "layout": [],
           "path": "/login",
@@ -13003,11 +15005,20 @@
           "component": "PolicyPage",
           "endpoints": [
             "DELETE /partner/policies/:param",
+            "GET /auth/me",
             "GET /partner/policies",
             "GET /partner/policies/:param/eligibility-rules",
             "GET /policies/eligibility-questions",
             "PATCH /partner/policies/:param",
             "PATCH /partner/policies/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/policies",
             "POST /partner/policies/:param/eligibility-preview",
             "PUT /partner/policies/:param/eligibility-rules"
@@ -13023,6 +15034,15 @@
         {
           "component": "ProfilePage",
           "endpoints": [
+            "GET /auth/me",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "PUT /partner/profile"
           ],
           "file": "apps/partner/src/routes/profile/index.tsx",
@@ -13036,9 +15056,12 @@
         {
           "component": "SmartCampusPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -13049,8 +15072,18 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -13066,9 +15099,12 @@
         {
           "component": "SourcesPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -13079,8 +15115,18 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -13095,7 +15141,17 @@
         },
         {
           "component": "StatsPage",
-          "endpoints": [],
+          "endpoints": [
+            "GET /auth/me",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code"
+          ],
           "file": "apps/partner/src/routes/stats/index.tsx",
           "layout": [
             "PartnerLayoutWrapper"
@@ -13107,9 +15163,12 @@
         {
           "component": "SyncLogsPage",
           "endpoints": [
+            "DELETE /partner/excel/:param/confirm",
+            "GET /auth/me",
             "GET /partner/data-sources",
             "GET /partner/data-sources/capabilities",
             "GET /partner/excel/mapping-rule",
+            "GET /partner/excel/template",
             "GET /partner/fairs",
             "GET /partner/jobs",
             "GET /partner/jobs/quality-summary",
@@ -13120,8 +15179,18 @@
             "PATCH /partner/fairs/:param/publish",
             "PATCH /partner/jobs/:param",
             "PATCH /partner/jobs/:param/publish",
+            "POST /auth/login",
+            "POST /auth/login/sms",
+            "POST /auth/password/reset/complete",
+            "POST /auth/password/reset/start",
+            "POST /auth/password/reset/verify",
+            "POST /auth/phone/code",
+            "POST /auth/phone/verify",
+            "POST /auth/sms-code",
             "POST /partner/data-sources",
             "POST /partner/excel/:param/confirm",
+            "POST /partner/excel/parse",
+            "POST /partner/excel/preview",
             "POST /partner/fairs/import",
             "POST /partner/jobs/import",
             "PUT /partner/smart-campus/terminals/:param/config"
@@ -13150,8 +15219,20 @@
     }
   },
   "dataModel": {
-    "modelCount": 91,
+    "modelCount": 96,
     "models": [
+      {
+        "fieldCount": 7,
+        "name": "ActiveReleaseObservationAssignment",
+        "relations": [
+          "AgentReleasePlan",
+          "AgentReleaseTarget",
+          "Terminal"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
       {
         "fieldCount": 19,
         "name": "AdAsset",
@@ -13216,6 +15297,41 @@
         "usedBy": [
           "services/api/src/advisor/advisor-retention.task.ts",
           "services/api/src/advisor/advisor.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 11,
+        "name": "AgentReleaseArtifact",
+        "relations": [
+          "AgentReleasePlan"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 18,
+        "name": "AgentReleasePlan",
+        "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseArtifact",
+          "AgentReleaseTarget"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 10,
+        "name": "AgentReleaseTarget",
+        "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleasePlan",
+          "Terminal",
+          "TerminalReleaseObservation"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
         ]
       },
       {
@@ -14164,9 +16280,11 @@
         ]
       },
       {
-        "fieldCount": 22,
+        "fieldCount": 24,
         "name": "Terminal",
         "relations": [
+          "ActiveReleaseObservationAssignment",
+          "AgentReleaseTarget",
           "Organization",
           "PrintTask",
           "ScanTask",
@@ -14190,6 +16308,7 @@
           "services/api/src/print-jobs/print-jobs.service.ts",
           "services/api/src/scan-tasks/scan-tasks.service.ts",
           "services/api/src/smart-campus/smart-campus.service.ts",
+          "services/api/src/terminals/release-observation.service.ts",
           "services/api/src/terminals/terminal-capabilities.service.ts",
           "services/api/src/terminals/terminal-credential-security.service.ts",
           "services/api/src/terminals/terminal-toolbox.service.ts",
@@ -14238,6 +16357,16 @@
         ],
         "usedBy": [
           "services/api/src/terminals/terminals-agent.service.ts"
+        ]
+      },
+      {
+        "fieldCount": 10,
+        "name": "TerminalReleaseObservation",
+        "relations": [
+          "AgentReleaseTarget"
+        ],
+        "usedBy": [
+          "services/api/src/terminals/release-observation.service.ts"
         ]
       },
       {
@@ -16906,6 +19035,9 @@
     "services/api/prisma/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs"
     ],
+    "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
     "services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
       "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
@@ -16916,14 +19048,19 @@
     "services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs"
     ],
+    "services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
     "services/api/prisma/postgres/schema.prisma": [
       "apps/kiosk/scripts/verify-fusion-w4.mjs",
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/prisma/schema.prisma": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
-      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs"
+      "apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs",
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/scripts/d2-same-host/governance.mjs": [
       "services/api/scripts/d2-same-host/verify-governance-invocation.mjs"
@@ -17350,6 +19487,12 @@
     ],
     "services/api/src/sync/sync.service.ts": [
       "services/api/scripts/verify-backend-p0-contracts.mjs"
+    ],
+    "services/api/src/terminals/release-observation.service.ts": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
+    ],
+    "services/api/src/terminals/terminals.controller.ts": [
+      "services/api/scripts/verify-release-observation-contract.mjs"
     ],
     "services/api/src/upload-sessions/upload-sessions.service.ts": [
       "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
@@ -20789,6 +22932,22 @@
         "files": [],
         "missing": []
       },
+      "file": "apps/terminal-agent/scripts/verify-release-observation-boundary.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "terminal-agent",
+      "scriptNames": [
+        "terminal-agent::verify:release-observation-boundary"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [],
+        "missing": []
+      },
       "file": "apps/terminal-agent/scripts/verify-windows-service-recovery.mjs",
       "helper": true,
       "inCi": true,
@@ -21577,6 +23736,29 @@
       "package": "@ai-job-print/api",
       "scriptNames": [
         "@ai-job-print/api::verify:import-review-reset"
+      ],
+      "wired": true
+    },
+    {
+      "asserts": {
+        "absent": [],
+        "dirs": [],
+        "files": [
+          "services/api/prisma/migrations/20260901090000_add_agent_release_observation/migration.sql",
+          "services/api/prisma/postgres/migrations/20260901090000_add_agent_release_observation/migration.sql",
+          "services/api/prisma/postgres/schema.prisma",
+          "services/api/prisma/schema.prisma",
+          "services/api/src/terminals/release-observation.service.ts",
+          "services/api/src/terminals/terminals.controller.ts"
+        ],
+        "missing": []
+      },
+      "file": "services/api/scripts/verify-release-observation-contract.mjs",
+      "helper": false,
+      "inCi": true,
+      "package": "@ai-job-print/api",
+      "scriptNames": [
+        "@ai-job-print/api::verify:release-observation-contract"
       ],
       "wired": true
     }

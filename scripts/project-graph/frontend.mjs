@@ -98,7 +98,7 @@ function parseRouteArray(text, start) {
 }
 
 function parseRouteObject(text, start) {
-  const route = { path: null, index: false, elements: [], children: [] }
+  const route = { path: null, index: false, elements: [], children: [], lazyModule: null, lazyName: null }
   let i = start + 1
 
   while (i < text.length) {
@@ -112,6 +112,16 @@ function parseRouteObject(text, start) {
     const keyMatch = /^([A-Za-z_$][\w$]*)\s*:/.exec(text.slice(i, i + 64))
     if (!keyMatch) {
       const skipped = skipValue(text, i)
+      // 条件展开：`...(flag ? { lazy: ... } : { element: <Navigate/> })`。
+      // 没有可匹配的键名，但里面确实声明了这条路由的页面；不捞出来整条会丢。
+      if (!route.lazyModule && /\.\.\./.test(text.slice(i, i + 4))) {
+        const spec = /import\(\s*['"`]([^'"`]+)['"`]\s*\)/.exec(skipped.raw ?? '')
+        if (spec) {
+          route.lazyModule = spec[1]
+          const named = /import\(\s*['"`][^'"`]+['"`]\s*\)\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/.exec(skipped.raw)
+          route.lazyName = named ? named[1] : 'default'
+        }
+      }
       i = skipped.next === i ? i + 1 : skipped.next
       continue
     }
@@ -140,6 +150,18 @@ function parseRouteObject(text, start) {
     if (key === 'element' || key === 'Component') {
       route.elements = [...value.raw.matchAll(/<([A-Z][\w.]*)/g)].map((m) => m[1])
     }
+    // React Router 的 `lazy: async () => ({ Component: (await import('...')).X })`
+    // 里没有 JSX，也没有顶层 import —— 只按 element/Component 取名字会把整条路由
+    // 静默丢掉（2026-09-02 实测漏掉 kiosk 21/107 条，且全是最新加的页面）。
+    // 这里直接记住模块说明符，交给 build.mjs 用 resolveModule 落到文件。
+    if (key === 'lazy') {
+      const spec = /import\(\s*['"`]([^'"`]+)['"`]\s*\)/.exec(value.raw)
+      if (spec) {
+        route.lazyModule = spec[1]
+        const named = /import\(\s*['"`][^'"`]+['"`]\s*\)\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/.exec(value.raw)
+        route.lazyName = named ? named[1] : 'default'
+      }
+    }
     i = value.next === i ? i + 1 : value.next
   }
 
@@ -158,11 +180,13 @@ function flattenRoutes(routes, parentPath, layerElements, out) {
     const fullPath = route.index ? parentPath : joinRoutePath(parentPath, route.path)
     const isLeaf = route.children.length === 0
 
-    if (isLeaf && route.elements.length > 0) {
+    if (isLeaf && (route.elements.length > 0 || route.lazyModule)) {
       out.push({
         path: fullPath || '/',
         index: route.index,
         elements: route.elements,
+        lazyModule: route.lazyModule,
+        lazyName: route.lazyName,
         layout: sorted(layerElements),
       })
     }
@@ -366,7 +390,12 @@ const METHOD_CALL_PATTERN =
   /\breq(?:uest)?\s*(?:<[^()]*?>)?\s*\(\s*['"`](GET|POST|PATCH|PUT|DELETE)['"`]\s*,\s*['"`](\/[^'"`]*)/gi
 const VERB_CALL_PATTERN =
   /\b(get|post|patch|put|del|delete)\s*(?:<[^()]*?>)?\s*\(\s*['"`](\/[^'"`]*)/g
-const INLINE_METHOD_PATTERN = /['"`](\/[^'"`\s]*)['"`][^;\n]{0,120}?method:\s*['"`](GET|POST|PATCH|PUT|DELETE)['"`]/gi
+// 路径与 method 之间允许换行：`fetch(\`${API_BASE_URL}/me/pending-tasks\`, {\n  method: 'GET',`
+// 这种直接调用 fetch、不经 helper 的写法，原来因为 [^;\n] 禁换行而扫不到。
+const INLINE_METHOD_PATTERN =
+  /['"`](?:\$\{[\w$.]*\})?(\/[^'"`\s]*)['"`][^;]{0,160}?method:\s*['"`](GET|POST|PATCH|PUT|DELETE)['"`]/gi
+// 裸 fetch 且整个 options 里没有 method —— 按 Fetch 规范即 GET。
+const BARE_FETCH_PATTERN = /\bfetch\s*\(\s*[`'"](?:\$\{[\w$.]*\})?(\/[^`'"\s]*)[`'"]\s*(?:,\s*\{(?![^}]*\bmethod\b)[^}]{0,200}\})?\s*\)/g
 
 const VERB_TO_METHOD = {
   get: 'GET',
@@ -396,6 +425,52 @@ export function extractEndpoints(strippedText) {
   }
   for (const [, rawPath, method] of strippedText.matchAll(INLINE_METHOD_PATTERN)) {
     record(method.toUpperCase(), rawPath)
+  }
+  for (const [, rawPath] of strippedText.matchAll(BARE_FETCH_PATTERN)) {
+    record('GET', rawPath)
+  }
+
+  // 本仓前端 service 的主流写法不是 `request('GET', '/path')`，而是先声明一个
+  // 「第一个参数是 path」的 helper，把 method 固定或默认在 helper 内部：
+  //
+  //   async function call<T>(path: string, token: string, method: 'GET'|'DELETE' = 'GET') {
+  //     res = await fetch(`${API_BASE_URL}${path}`, { method, ... })
+  //   }
+  //   ... call<Page>(`/me/resumes`, token)
+  //
+  // 上面三条模式一条都扫不到，导致「端点数」系统性少报（2026-09-02 实测
+  // /me/print-orders、/me/resumes、/me/documents 等页面全被记成 0 端点）。
+  // 这里先认出 helper 与它的 method，再回扫调用点；method 取不到字面量就跳过，
+  // 不猜、不默认，宁可继续少报也不要写进图谱一个错的动词。
+  const helperMethods = new Map()
+  const HELPER_DECL =
+    /(?:async\s+)?function\s+([\w$]+)\s*(?:<[^>()]*>)?\s*\(([\s\S]{0,600}?)\)\s*(?::[^{]{0,120})?\{/g
+  for (const decl of strippedText.matchAll(HELPER_DECL)) {
+    const [, name, params] = decl
+    if (!/\bpath\s*:\s*string/.test(params)) continue
+    const body = strippedText.slice(decl.index, decl.index + 1200)
+    if (!/API_BASE_URL\s*\}\s*\$\{\s*path|API_BASE_URL\s*\+\s*path/.test(body)) continue
+    const literal = /method\s*:\s*['"`](GET|POST|PATCH|PUT|DELETE)['"`]/i.exec(body)
+    if (literal) {
+      helperMethods.set(name, literal[1].toUpperCase())
+      continue
+    }
+    // `method,` 简写 → 取参数表里的默认值
+    const fallback = /\bmethod\s*:[^=)]*?=\s*['"`](GET|POST|PATCH|PUT|DELETE)['"`]/i.exec(params)
+    if (fallback) {
+      helperMethods.set(name, fallback[1].toUpperCase())
+      continue
+    }
+    // 整个 helper 里根本没出现 method —— `fetch()` 不带 method 时按 Fetch 规范就是 GET。
+    // 这是规范定死的，不是默认值猜测。（例：offlineAgencies.ts 的 getJson）
+    if (!/\bmethod\b/.test(body) && !/\bmethod\b/.test(params)) helperMethods.set(name, 'GET')
+  }
+  for (const [name, method] of helperMethods) {
+    const CALL = new RegExp(
+      `\\b${name}\\s*(?:<[^()<>]*>)?\\s*\\(\\s*['"\`](/[^'"\`\\n]*)`,
+      'g',
+    )
+    for (const [, rawPath] of strippedText.matchAll(CALL)) record(method, rawPath)
   }
 
   return [...found.values()].sort((a, b) =>
