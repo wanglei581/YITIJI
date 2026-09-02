@@ -78,7 +78,7 @@ export class JobApplicationsService {
     status: string
     statusSource: string
     note: string | null
-    appliedAt: Date | null
+    selfReportedAt: Date | null
     createdAt: Date
     updatedAt: Date
   }): JobApplicationItem {
@@ -92,7 +92,7 @@ export class JobApplicationsService {
       status: row.status as JobApplicationStatus,
       statusSource: row.statusSource as JobApplicationItem['statusSource'],
       note: row.note,
-      appliedAt: row.appliedAt?.toISOString() ?? null,
+      selfReportedAt: row.selfReportedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }
@@ -108,7 +108,7 @@ export class JobApplicationsService {
     status: true,
     statusSource: true,
     note: true,
-    appliedAt: true,
+    selfReportedAt: true,
     createdAt: true,
     updatedAt: true,
   } as const
@@ -177,7 +177,7 @@ export class JobApplicationsService {
         sourceName,
         status: input.status ?? 'intention',
         note: input.note?.trim() || null,
-        appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
+        selfReportedAt: input.selfReportedAt ? new Date(input.selfReportedAt) : null,
         // resumeFileId / consentId 刻意不写：无证期恒为 null，无任何写入路径。
       },
       select: JobApplicationsService.SELECT,
@@ -226,8 +226,8 @@ export class JobApplicationsService {
     const data: Record<string, unknown> = {}
     if (input.status !== undefined) data['status'] = input.status
     if (input.note !== undefined) data['note'] = input.note?.trim() || null
-    if (input.appliedAt !== undefined) {
-      data['appliedAt'] = input.appliedAt === null ? null : new Date(input.appliedAt)
+    if (input.selfReportedAt !== undefined) {
+      data['selfReportedAt'] = input.selfReportedAt === null ? null : new Date(input.selfReportedAt)
     }
     if (input.companyName !== undefined) data['companyName'] = input.companyName.trim()
     if (input.positionTitle !== undefined) data['positionTitle'] = input.positionTitle.trim()

@@ -1930,7 +1930,7 @@ model JobApplication {
 
   note          String?
   /// 用户自述的投递时间，可为空；不是系统观测到的事实。
-  appliedAt     DateTime?
+  selfReportedAt     DateTime?
 
   /// 前向兼容空槽位：无证期**恒为 null 且无任何写入路径**，由门禁断言。
   /// 刻意不建到 FileObject 的外键 —— 建了就意味着「简历与投递已可关联」，

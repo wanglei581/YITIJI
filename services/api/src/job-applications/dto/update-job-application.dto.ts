@@ -25,8 +25,8 @@ export class UpdateJobApplicationDto {
   /** 显式传 null 表示清空；不传表示不改。 */
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
-  @IsISO8601({}, { message: 'appliedAt 必须是 ISO8601 时间字符串或 null' })
-  appliedAt?: string | null
+  @IsISO8601({}, { message: 'selfReportedAt 必须是 ISO8601 时间字符串或 null' })
+  selfReportedAt?: string | null
 
   /** 仅对用户手填条目生效；已关联本站岗位的条目由服务端派生，改不动（service 层拒绝）。 */
   @IsOptional()

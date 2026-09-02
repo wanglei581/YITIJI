@@ -51,7 +51,7 @@ export interface JobApplicationItem {
   status: JobApplicationStatus
   statusSource: JobApplicationStatusSource
   note: string | null
-  appliedAt: string | null
+  selfReportedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -62,13 +62,13 @@ export interface CreateJobApplicationInput {
   positionTitle?: string
   status?: JobApplicationStatus
   note?: string
-  appliedAt?: string
+  selfReportedAt?: string
 }
 
 export interface UpdateJobApplicationInput {
   status?: JobApplicationStatus
   note?: string
-  appliedAt?: string | null
+  selfReportedAt?: string | null
   companyName?: string
   positionTitle?: string
 }

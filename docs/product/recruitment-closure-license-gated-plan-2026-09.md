@@ -76,7 +76,7 @@ JobApplication
   note?            用户自填备注
   resumeFileId?    无证期恒 null，由门禁断言
   consentId?       无证期恒 null，拿证后指向 PIPL §23 单独同意记录
-  appliedAt?       用户自填
+  selfReportedAt?       用户自填
   createdAt / updatedAt / expiresAt
 ```
 

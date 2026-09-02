@@ -15,7 +15,7 @@ CREATE TABLE "JobApplication" (
     "status" TEXT NOT NULL DEFAULT 'intention',
     "statusSource" TEXT NOT NULL DEFAULT 'self_reported',
     "note" TEXT,
-    "appliedAt" DATETIME,
+    "selfReportedAt" DATETIME,
     "resumeFileId" TEXT,
     "consentId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

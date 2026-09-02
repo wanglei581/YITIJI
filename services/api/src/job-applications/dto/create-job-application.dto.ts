@@ -45,6 +45,6 @@ export class CreateJobApplicationDto {
 
   /** 用户自述的投递时间，不是系统观测到的事实。 */
   @IsOptional()
-  @IsISO8601({}, { message: 'appliedAt 必须是 ISO8601 时间字符串' })
-  appliedAt?: string
+  @IsISO8601({}, { message: 'selfReportedAt 必须是 ISO8601 时间字符串' })
+  selfReportedAt?: string
 }

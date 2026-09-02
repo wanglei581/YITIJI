@@ -27,7 +27,7 @@
 //
 // Run: node -r @swc-node/register scripts/verify-job-application-track.ts
 
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 import { JobApplicationsService } from '../src/job-applications/job-applications.service'
@@ -521,7 +521,7 @@ function checkNoStatusLeakIntoOtherTables(): void {
     assert(`${model} 模型存在`, m !== null)
     if (!m) continue
     const block = m[0]
-    for (const field of ['applicationStatus', 'statusSource', 'appliedAt', 'jobApplicationId']) {
+    for (const field of ['applicationStatus', 'statusSource', 'selfReportedAt', 'jobApplicationId']) {
       assert(`${model} 未新增 ${field}`, !new RegExp(`\\b${field}\\b`).test(block))
     }
   }
@@ -530,59 +530,40 @@ function checkNoStatusLeakIntoOtherTables(): void {
 // ── ⑩ 用户可见文案 ──────────────────────────────────────────────────────────
 
 function checkUserFacingCopy(): void {
-  console.log('\n[6] 用户可见文案：无禁词，且带诚实声明')
-  // 求职进度不是独立页，是 /me/activity 的第三个 Tab（与「外部跳转记录」同页）。
-  // 断言钉在这个文件上，顺带保证将来没人把它拆成新页而绕开本门禁。
-  const page = read('apps/kiosk/src/pages/profile/me/MyActivityPage.tsx')
-  const detail = read('apps/kiosk/src/pages/jobs/JobDetailPage.tsx')
+  console.log('\n[6] 前端面：本波刻意不接 Kiosk 运行时')
 
-  // 刻意**不**在这里自己实现禁词检查。
+  // 本波**只交付后端与判据**，Kiosk 运行时不接入。原因不是做不动，是那片是冻结区：
+  //   - verify-fusion-w5 对 profileEntries.ts 逐字节冻结
+  //   - verify-user-center-wave0 硬断言 Profile 恰好 22 个已接真目的地（Wave 0 产品决策）
+  //   - verify-profile-inkpaper-home 断言 me-detail-inkpaper.css 的 import 集合封闭
+  // 加第 23 个入口是改产品范围，需要产品负责人授权，不是工程侧能自行决定的。
+  // 且负责人已定性当前运行时 UI 后续替换为新 UI（docs/design/kiosk-redesign-2026-08）。
   //
-  // 实测教训：本门禁最初照抄了一份禁词清单，结果把「在岗位详情页去来源平台投递后」
-  // 判成违规 —— 它命中「平台投递」，但那是合规白名单文案「去来源平台投递」的一部分。
-  // 唯一正确的判定在 scripts/verify-compliance-copy.mjs：它按 SSOT 的豁免标记
-  // （前向回看窗口内出现「来源 / 外部 / 第三方 / 官方 / 站外」即为指向站外的合规用法）
-  // 判定，并且已经全量扫 apps/kiosk/src。再抄一份只会得到第 47 份互相矛盾的清单
-  // —— 那正是 verify-compliance-copy 文件头记录的、它自己被建立起来要解决的问题。
-  //
-  // 所以这里只断言**本能力特有**的诚实声明，禁词覆盖交给那一条。
-  assert('求职进度 Tab 带「本终端不参与投递」诚实声明', page.includes('本终端不参与投递'))
-  assert('求职进度 Tab 声明不掌握来源平台结果', page.includes('不掌握来源平台的处理结果'))
-  assert('求职进度 Tab 声明不提供给企业或来源机构',
-    page.includes('不会把这些记录提供给企业或来源机构'))
-  // 前两个 Tab 原有的边界声明不得被这次合并冲掉。
-  assert('浏览 / 跳转 Tab 保留原边界声明',
-    page.includes('投递 / 预约结果以来源平台为准，本系统不记录'))
-  assert('求职进度并入 /me/activity，未另建独立页',
-    !/MyJobApplicationsPage/.test(read('apps/kiosk/src/routes/index.tsx')))
-  assert('入口文案主语是用户（记录一次投递）', detail.includes('记录一次投递'))
-
-  // 状态可达性：UI 只给一个「改为下一档」按钮，那张 NEXT_STATUS 表必须是覆盖全部
-  // 五个状态的**单一循环**，否则有状态永远点不到。
-  // 实测教训：初版写成 offered → intention 且 rejected 只出不进，「已拒绝」永远
-  // 到不了 —— 用户被拒了记不进去，而五个 Tab 里那一个恒为空。类型系统抓不到这个。
-  const cycleBody = page.match(/const NEXT_STATUS[^=]*=\s*\{([\s\S]*?)\}/)
-  assert('UI 存在 NEXT_STATUS 状态推进表', cycleBody !== null)
-  if (cycleBody) {
-    const edges = new Map<string, string>()
-    for (const m of cycleBody[1].matchAll(/(\w+)\s*:\s*'(\w+)'/g)) edges.set(m[1], m[2])
-    const all = ['intention', 'applied', 'interviewing', 'offered', 'rejected']
-    assert('推进表覆盖全部五个状态', all.every((k) => edges.has(k)),
-      all.filter((k) => !edges.has(k)).join(', '))
-    // 从任一状态出发走满 5 步，必须访问到全部五个状态（即单一循环，无不可达点）。
-    const visited = new Set<string>()
-    let cur = 'intention'
-    for (let i = 0; i < all.length; i += 1) {
-      visited.add(cur)
-      cur = edges.get(cur) ?? cur
-    }
-    const unreachable = all.filter((k) => !visited.has(k))
-    assert('每个状态都能通过点击到达（无不可达状态）',
-      unreachable.length === 0, `不可达: ${unreachable.join(', ')}`)
-    assert('推进表回到起点（单一循环）', cur === 'intention', `走满 5 步落在 ${cur}`)
+  // 因此这里断言的是「前端面确实是空的」—— 防的是有人以为已经接好了，
+  // 或者在冻结区偷偷加入口而不走授权。前端接入时把本函数改成真实的文案断言。
+  const kioskTouched = [
+    'apps/kiosk/src/pages/profile/profileEntries.ts',
+    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+    'apps/kiosk/src/pages/jobs/JobDetailPage.tsx',
+  ]
+  for (const rel of kioskTouched) {
+    const src = read(rel)
+    assert(`${rel.split('/').pop()} 未接入求职进度（冻结区保持原状）`,
+      !/job-applications|JobApplication|求职进度/.test(src))
   }
-  assert('岗位详情页保留原边界声明', detail.includes('本终端不接收简历、不参与招聘流程'))
+  assert('Kiosk 尚无求职进度 API 客户端',
+    !existsSync(join(REPO_ROOT, 'apps/kiosk/src/services/api/jobApplications.ts')))
+
+  // 后端错误文案同样受合规约束：不得出现暗示平台参与投递的措辞。
+  const svcSrc = read('services/api/src/job-applications/job-applications.service.ts')
+  const messages = [...svcSrc.matchAll(/message:\s*'([^']*)'/g)].map((m) => m[1])
+  assert('服务端错误文案已扫到（断言不是空跑）', messages.length >= 3, String(messages.length))
+  for (const msg of messages) {
+    assert(`错误文案「${msg.slice(0, 16)}…」不含平台投递措辞`,
+      !/一键投递|立即投递|平台投递|投递简历|企业收简历|候选人管理/.test(msg))
+  }
 }
+
 
 // ── ⑪⑫ schema 与导出 ───────────────────────────────────────────────────────
 

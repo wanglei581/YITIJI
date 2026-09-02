@@ -181,7 +181,7 @@ export class MemberDataExportMapper {
           status: true,
           statusSource: true,
           note: true,
-          appliedAt: true,
+          selfReportedAt: true,
           createdAt: true,
           updatedAt: true,
         },

@@ -27,14 +27,9 @@ const SERVICES: Entry[] = [
 // 3. 来源与活动（外部来源信息入口 / 记录）
 // 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
 // 来源平台后续动作与结果以来源平台为准，本系统不记录。
-//
-// 「求职进度」与上面两条性质不同，别混为一谈：浏览与跳转是**系统观测到的行为**，
-// 求职进度是**用户自己写下来的**。本系统依然不记录来源平台的处理结果 ——
-// 它记的是用户本人说的话（compliance-boundary.md §4.4A）。
 const FAIRS: Entry[] = [
   { icon: 'eye', tone: 'slate', label: '浏览记录', desc: '岗位、招聘会、政策、企业', route: '/me/activity' },
   { icon: 'external', tone: 'teal', label: '外部跳转记录', desc: '本人离场跳转记录', route: '/me/activity?tab=jump' },
-  { icon: 'route', tone: 'clay', label: '求职进度', desc: '本人自填的投递进展', route: '/me/activity?tab=applications' },
 ]
 
 // 4. 权益与政策（均为既有真实入口）

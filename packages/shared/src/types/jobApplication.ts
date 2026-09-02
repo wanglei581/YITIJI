@@ -70,7 +70,7 @@ export interface JobApplicationItem {
   statusSource: JobApplicationStatusSource
   note: string | null
   /** 用户自述的投递时间（ISO 字符串），不是系统观测到的事实。 */
-  appliedAt: string | null
+  selfReportedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -90,14 +90,14 @@ export interface CreateJobApplicationInput {
   positionTitle?: string
   status?: JobApplicationStatus
   note?: string
-  appliedAt?: string
+  selfReportedAt?: string
 }
 
 /** 更新入参。只允许改用户自己写的东西，不允许改 jobId 与派生快照。 */
 export interface UpdateJobApplicationInput {
   status?: JobApplicationStatus
   note?: string
-  appliedAt?: string | null
+  selfReportedAt?: string | null
   companyName?: string
   positionTitle?: string
 }

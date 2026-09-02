@@ -114,8 +114,18 @@ function assertNoSqliteDrift(db: string, label: string): void {
  *     ActiveReleaseObservationAssignment  —— 每终端至多一个有效观察计划的索引。
  *     TerminalReleaseObservation          —— Agent 上报的最新本机运行时事实。
  *   该阶段不下发制品、不下载、不安装、不控制 Windows 服务；版本匹配不代表制品或签名验真。
+ * - 98（本次，招聘闭环分期第 1、2 刀，+2）：
+ *     PlatformQualification —— **平台自身**的行政许可事实（当前只关心人力资源服务
+ *     许可证）。刻意不复用 QualificationRecord：后者 organizationId 必填且指向
+ *     Organization（语义为来源 / 合作机构），插一条代表平台自身的机构行会污染所有
+ *     以机构为维度的列表、统计、审核与发布路径。建表本身不解锁任何能力 —— 判据在
+ *     src/common/recruitment-capability.ts，且当前零调用点。
+ *     JobApplication —— 用户**本人自填**的求职进度（compliance-boundary.md §4.4A）。
+ *     不是平台内投递：没有任何第三方写入路径，没有对外读取接口，不按岗位 / 企业聚合。
+ *     channel / statusSource 由服务端恒定写入；resumeFileId / consentId 为前向兼容
+ *     空槽位，无证期恒空且无写入路径。门禁 verify:job-application-track。
  */
-const EXPECTED_MODEL_COUNT = 96
+const EXPECTED_MODEL_COUNT = 98
 
 function verifyStaticContract(): void {
   const sqliteSchema = read(SQLITE_SCHEMA)
