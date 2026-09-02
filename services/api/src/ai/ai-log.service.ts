@@ -139,9 +139,35 @@ export interface AdminAiUsage {
   costCollectionSince: string
 }
 
+export type AiLogStatus = AiLogEntry['status']
+
+/** 分页上限。一次最多 500 行，禁止「拉全表」。 */
+export const MAX_LOG_LIMIT = 500
+export const DEFAULT_LOG_LIMIT = 100
+
+/**
+ * Admin 日志列表筛选条件。
+ *
+ * 时间用 Date 而不是 ISO 字符串：字符串解析与非法值 400 由 controller 边界负责，
+ * service 只吃已经合法的值（与 assertValidFeatureKey 的「不静默回落」同一口径）。
+ */
+export interface AdminAiLogsQuery {
+  operation?: AiOperation
+  status?: AiLogStatus
+  /** 含（createdAt >= startAt） */
+  startAt?: Date
+  /** 不含（createdAt < endAt） */
+  endAt?: Date
+  limit?: number
+  offset?: number
+}
+
 export interface AdminAiLogsResult {
+  /** 匹配筛选条件的**总行数**，不是本页条数。 */
   total: number
   entries: AiLogEntry[]         // safe — no content fields in AiLogEntry
+  limit: number
+  offset: number
 }
 
 /**
@@ -176,6 +202,35 @@ const OPERATIONS: AiOperation[] = [
   'selfAssessment',
   'contractReview',
 ]
+
+/** 合法 operation 取值（只读快照，供 controller 校验筛选参数）。 */
+export const AI_OPERATIONS: readonly AiOperation[] = OPERATIONS
+export const AI_LOG_STATUSES: readonly AiLogStatus[] = ['success', 'failed']
+
+export function isAiOperation(value: unknown): value is AiOperation {
+  return typeof value === 'string' && OPERATIONS.includes(value as AiOperation)
+}
+
+export function isAiLogStatus(value: unknown): value is AiLogStatus {
+  return value === 'success' || value === 'failed'
+}
+
+/**
+ * AiServiceLog 行里**本服务真正读到的**字段（结构化声明，不 import Prisma 命名空间）。
+ * 故意不含 endUserId —— 读取侧压根不该碰它。
+ */
+interface AiServiceLogRow {
+  id: string
+  provider: string | null
+  operation: string
+  latencyMs: number | null
+  status: string
+  tokenUsageJson: string | null
+  estimatedCostCny: number | null
+  errorCode: string | null
+  createdAt: Date
+  terminalId: string | null
+}
 
 // ─── 跨重试用量累计（A-6）────────────────────────────────────────
 //
@@ -461,25 +516,44 @@ export class AiLogService {
     }
   }
 
-  async getLogs(limit = 100): Promise<AdminAiLogsResult> {
-    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(Math.round(limit), 500) : 100
-    const rows = await this.prisma.aiServiceLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: safeLimit,
-    })
-    const entries = rows.map((row): AiLogEntry => ({
-      taskId: row.id,
-      provider: row.provider ?? 'unknown',
-      operation: normalizeOperation(row.operation),
-      latencyMs: row.latencyMs ?? 0,
-      status: row.status === 'failed' ? 'failed' : 'success',
-      tokenUsage: parseTokenUsage(row.tokenUsageJson),
-      estimatedCostCny: row.estimatedCostCny ?? undefined,
-      errorCode: row.errorCode ?? undefined,
-      createdAt: row.createdAt.toISOString(),
-      terminalId: row.terminalId ?? null,
-    }))
-    return { total: entries.length, entries }
+  /**
+   * Admin 日志列表：**服务端**按能力 / 状态 / 时间筛选并分页。
+   *
+   * 为什么必须在服务端筛：此前端点只认 limit，Admin 页固定拉最近 100 条再在浏览器里
+   * 按能力过滤。contractReview 这类低频能力只要没挤进最近 100 条就显示为空 ——
+   * 页面在对运营说「没有调用」，而库里其实有。这是「不伪造能力」的直接违反。
+   *
+   * 索引：where 用的是 Prisma schema 里已建好的 `@@index([operation, createdAt])`
+   * 与 `@@index([status, createdAt])`，不新建索引。
+   *
+   * total 语义：**匹配筛选条件的总行数**，不是本页条数（旧实现返回的是本页条数，
+   * 页面拿它当总数就会少报）。
+   */
+  async getLogs(query: AdminAiLogsQuery = {}): Promise<AdminAiLogsResult> {
+    const limit = normalizeLogLimit(query.limit)
+    const offset = normalizeLogOffset(query.offset)
+
+    // 与 audit.service.ts list() 同款动态 where 构造。
+    const where: Record<string, unknown> = {}
+    if (query.operation) where['operation'] = query.operation
+    if (query.status) where['status'] = query.status
+    if (query.startAt || query.endAt) {
+      const range: Record<string, Date> = {}
+      if (query.startAt) range['gte'] = query.startAt
+      if (query.endAt) range['lt'] = query.endAt
+      where['createdAt'] = range
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.aiServiceLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.aiServiceLog.count({ where }),
+    ])
+    return { total, entries: rows.map((row) => toLogEntry(row, 'unknown')), limit, offset }
   }
 
   private async loadRecentEntries(providerName: string): Promise<AiLogEntry[]> {
@@ -489,19 +563,36 @@ export class AiLogService {
       orderBy: { createdAt: 'desc' },
       take: 10_000,
     })
-    return rows.map((row): AiLogEntry => ({
-      taskId: row.id,
-      provider: row.provider ?? providerName,
-      operation: normalizeOperation(row.operation),
-      latencyMs: row.latencyMs ?? 0,
-      status: row.status === 'failed' ? 'failed' : 'success',
-      tokenUsage: parseTokenUsage(row.tokenUsageJson),
-      estimatedCostCny: row.estimatedCostCny ?? undefined,
-      errorCode: row.errorCode ?? undefined,
-      createdAt: row.createdAt.toISOString(),
-      terminalId: row.terminalId ?? null,
-    }))
+    return rows.map((row) => toLogEntry(row, providerName))
   }
+}
+
+/** AiServiceLog 行 → 对外条目。getLogs 与 loadRecentEntries 共用，避免两份漂移的映射。 */
+function toLogEntry(row: AiServiceLogRow, providerFallback: string): AiLogEntry {
+  return {
+    taskId: row.id,
+    provider: row.provider ?? providerFallback,
+    operation: normalizeOperation(row.operation),
+    latencyMs: row.latencyMs ?? 0,
+    status: row.status === 'failed' ? 'failed' : 'success',
+    tokenUsage: parseTokenUsage(row.tokenUsageJson),
+    estimatedCostCny: row.estimatedCostCny ?? undefined,
+    errorCode: row.errorCode ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    terminalId: row.terminalId ?? null,
+    // ⚠️ endUserId 故意不映射：AI 日志对 Admin **不暴露调用者是谁**（合规设计）。
+    // 想加之前先走合规决策，不要因为「运营想定位滥用账号」就顺手补上。
+  }
+}
+
+function normalizeLogLimit(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return DEFAULT_LOG_LIMIT
+  return Math.min(Math.round(value), MAX_LOG_LIMIT)
+}
+
+function normalizeLogOffset(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return 0
+  return Math.round(value)
 }
 
 function operationRecord(value: number): Record<AiOperation, number> {
