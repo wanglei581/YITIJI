@@ -48,6 +48,20 @@ Page({
         title: '准备材料',
         sub: '改简历、管文档、发起打印',
         items: [
+          // 排在诊断/优化**之前**：那两条都以「你已经有一份简历」为前提，
+          // 一份都没有的应届生在这一组里原本无路可走。
+          //
+          // 删掉这条会怎样：pages/resume-build 立刻变成不可达页面。全仓对它的
+          // 唯一其它引用是 ai-records 的记录回看路由，而那个列表在用户成功生成过
+          // 一次之前是空的——「要先有记录才能进页面，要进页面才能产生记录」。
+          // 页面本身是完整的（6 段表单 + 服务端 POST /resume/generate，已在
+          // scripts/api-contract.json 的 endpoints 里，不是 knownMissing），
+          // 所以这不是「功能没做完」，是入口漏接。没有门禁能发现这种漏接。
+          //
+          // desc 写「AI 只润色不编造」而不是「AI 帮你写简历」：后端 DTO 的契约
+          // 原文就是「AI 只润色，不编造」，在 service 层强制。入口处先把预期封住，
+          // 用户才不会带着「AI 会替我写经历」的期待进去。
+          { id: 'build',     icon: 'plus',        title: '生成简历', desc: '从零填写，AI 只润色不编造', accent: 'cyan'  },
           { id: 'diagnose',  icon: 'file-search', title: '简历诊断', desc: '逐条给出问题与依据', accent: 'plum'  },
           { id: 'optimize',  icon: 'edit',        title: '简历优化', desc: '改写前后对照可选用', accent: 'teal'  },
           // 放「准备材料」而不是 AI 组：这条链全程无模型，服务端按模板 + 你填的字段
@@ -162,6 +176,10 @@ Page({
   tapEntry(e) {
     const { id } = e.currentTarget.dataset
     const routes = {
+      // 删掉这条会怎样：上面 groups.prepare 的「生成简历」磁贴点下去 url 取到
+      // undefined，wx.navigateTo 不会被调用，卡片变成静默死按钮（用户会以为是
+      // 自己没点准，反复去戳）。id 与 groups 里的 id 必须逐字对应。
+      build:     '/pages/resume-build/resume-build',
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',

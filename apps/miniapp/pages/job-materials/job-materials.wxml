@@ -81,11 +81,15 @@
       <view class="compliance-note">材料按模板排版，内容以你填写的为准。</view>
     </block>
     <block wx:else>
-      <view class="jm-bar">
-        <view class="btn lg ghost tap" hover-class="tap-press" bindtap="backToList" role="button" aria-label="换一个模板">换模板</view>
-        <view class="btn lg primary tap {{!canSubmit || generating ? 'disabled' : ''}}" hover-class="tap-press"
-              bindtap="submit" role="button" aria-label="生成并去打印">{{generating ? '正在生成…' : '生成并去打印'}}</view>
-      </view>
+      <!-- 两个按钮直接做 .actionbar 的 flex 子项——全仓 20+ 个底栏都是这个写法，
+           本页原先是唯一的例外（外面套了一层 .jm-bar）。
+           删掉这层包裹是修 bug 不是洁癖：.actionbar 是 display:flex，而 .jm-bar
+           自己没有 flex:1，于是它按 max-content 收缩（1×93 + 2×93 + 8 = 287px），
+           在 343px 的可用宽里靠左贴着，右边空 56px。子元素的 flex:1 / flex:2 只能
+           在这个已经缩过的父容器里分配，救不回来。 -->
+      <view class="btn lg ghost tap jm-side" hover-class="tap-press" bindtap="backToList" role="button" aria-label="换一个模板">换模板</view>
+      <view class="btn lg primary tap jm-main {{!canSubmit || generating ? 'disabled' : ''}}" hover-class="tap-press"
+            bindtap="submit" role="button" aria-label="生成并去打印">{{generating ? '正在生成…' : '生成并去打印'}}</view>
     </block>
   </view>
 </view>

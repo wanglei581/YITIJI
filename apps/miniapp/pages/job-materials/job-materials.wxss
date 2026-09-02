@@ -30,6 +30,10 @@
 .jm-area { min-height: 180rpx; }
 .jm-ph { color: var(--ghost); }
 
-.jm-bar { display: flex; gap: 16rpx; }
-.jm-bar .btn { flex: 1; }
-.jm-bar .btn.primary { flex: 2; }
+/* 底栏两个按钮的分配比例。对应 self-explore 的 .ab-side / .ab-main 写法：
+   flex 直接挂在按钮上，因为它们本身就是 .actionbar 的 flex 子项，中间不再隔
+   一层 .jm-bar（那一层没有 flex:1，会先把自己缩到 max-content，见 wxml 注释）。
+   删掉这两条会怎样：两个按钮各自退回 flex:0 1 auto，宽度只够包住「换模板」和
+   「生成并去打印」这几个字，底栏右侧空出一大块，主次比例也没了。 */
+.jm-side { flex: 1; }
+.jm-main { flex: 2; }

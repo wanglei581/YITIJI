@@ -126,7 +126,24 @@ Page({
     this._token = saved.accessToken || ''
 
     const windowInfo = typeof wx.getWindowInfo === 'function' ? wx.getWindowInfo() : { windowWidth: 375 }
-    const radarPx = Math.round(Math.max(260, Math.min(340, (windowInfo.windowWidth || 375) - 48)))
+    // 画布宽度必须减掉**整条容器链**的横向占用，不是拍一个 48。
+    // 链路（canvas 在 .radar-wrap > .card.card-inner 里，三层都是 border-box）：
+    //   .card       margin: 0 16px      → 32
+    //   .card       border: 1px         →  2
+    //   .card-inner padding: 16px       → 32
+    // 合计 66；卡片内容盒 = windowWidth - 66。
+    //
+    // 删掉这个减数（回到 -48）会怎样：375/390/393pt——也就是主流 iPhone 全部——
+    // 画布比内容盒宽 13~18px。.radar-wrap 是 align-items:center，超出的部分从两侧
+    // 各吃掉一半内边距，16px 余量掉到 7px，雷达图几乎贴住卡片描边。
+    // 它**不会**被裁掉（.card overflow:hidden 的裁切线在 windowWidth-34），
+    // 所以既不报错也不留痕，纯靠肉眼才看得出来——没有门禁盯这个。
+    const RADAR_CARD_CHROME_PX = 16 * 2 + 1 * 2 + 16 * 2
+    const radarAvailPx = (windowInfo.windowWidth || 375) - RADAR_CARD_CHROME_PX
+    // 上限 340 不变。下限不再写死 260：固定下限一旦大于内容盒（windowWidth < 326pt
+    // 的窄机）就是把同一个 bug 原样搬回来。窄屏按内容盒缩即可——五个数值在下面的
+    // 等价文字列表里始终可读，图形本来就是冗余表达。
+    const radarPx = Math.round(Math.max(0, Math.min(340, radarAvailPx)))
 
     this.setData({
       statusBarHeight: (app.globalData && app.globalData.statusBarHeight) || 20,
