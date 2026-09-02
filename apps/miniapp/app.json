@@ -42,6 +42,7 @@
     "pages/resume-parse/resume-parse",
     "pages/resumes/resumes",
     "pages/documents/documents",
+    "pages/job-materials/job-materials",
     "pages/contract-review/contract-review",
     "pages/orders/orders",
     "pages/order-detail/order-detail",

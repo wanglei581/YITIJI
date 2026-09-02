@@ -1029,6 +1029,35 @@ const api = {
     return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
   },
 
+  // ---------- 求职材料模板 ----------
+  // **这条链全程无 LLM**：服务端按模板 + 用户填写的字段直接渲染 PDF
+  // （job-materials.service.ts 里没有任何模型调用）。所以页面不得挂 AI 标识、
+  // 不得写「AI 生成」——那是伪造。
+
+  /** 模板清单。免登录。返回 [{ id, type, title, description, tags, recommendedFor, fields[] }]。 */
+  getJobMaterialTemplates() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('求职材料模板'));
+    return request('/job-materials/templates', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 按模板生成 PDF。需登录（EndUserAuthGuard），限流 10 次/分钟。
+   *
+   * type 为 'resume_template' 的模板服务端会拒（JOB_MATERIAL_TEMPLATE_UNSUPPORTED，
+   * 提示走简历诊断/优化链路），页面应当直接不给它「去填写」入口，
+   * 而不是让用户填完才被打回。
+   *
+   * 产出文件带 endUserId（归属本人）且 sensitiveLevel='sensitive'，
+   * 所以打印走普通 fileId 路径即可，**不需要 printFileUrl 旁路**
+   * ——那条旁路是给招聘会共享派生文件用的。
+   */
+  generateJobMaterial(templateId, values) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('求职材料模板'));
+    return request('/job-materials/generate', {
+      method: 'POST', data: Object.assign({ templateId }, values || {}), needAuth: true, timeout: 60000,
+    });
+  },
+
   // ---------- 自我探索 · 倾向参考 ----------
   // 注意命名：后端本身就叫「自我探索 · 倾向参考」。**不要叫「职业测评」**——
   // 「测评 / 性格 / 适合岗位」是资格判定口吻，这里只是本人倾向的参考描述。

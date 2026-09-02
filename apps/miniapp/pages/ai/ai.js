@@ -50,6 +50,9 @@ Page({
         items: [
           { id: 'diagnose',  icon: 'file-search', title: '简历诊断', desc: '逐条给出问题与依据', accent: 'plum'  },
           { id: 'optimize',  icon: 'edit',        title: '简历优化', desc: '改写前后对照可选用', accent: 'teal'  },
+          // 放「准备材料」而不是 AI 组：这条链全程无模型，服务端按模板 + 你填的字段
+          // 直接渲染 PDF。desc 也不写「智能/AI」——写了就是伪造。
+          { id: 'materials', icon: 'form',        title: '材料模板', desc: '自荐信、感谢信、材料清单', accent: 'wheat' },
           { id: 'documents', icon: 'folder',      title: '我的文档', desc: '管理材料并再次打印', accent: 'clay'  },
           { id: 'print',     icon: 'printer',     title: '发起打印', desc: '选文档、终端与参数', accent: 'cyan'  },
         ],
@@ -162,6 +165,7 @@ Page({
       diagnose:  '/pages/resume-diagnose/resume-diagnose',
       optimize:  '/pages/resume-optimize/resume-optimize',
       documents: '/pages/documents/documents',
+      materials: '/pages/job-materials/job-materials',
       print:     '/pages/print/print',
       contract:  '/pages/contract-review/contract-review',
       match:     '/pages/job-fit/job-fit',
