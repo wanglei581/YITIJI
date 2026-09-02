@@ -1,6 +1,6 @@
 {
   "api": {
-    "endpointCount": 471,
+    "endpointCount": 472,
     "endpoints": [
       {
         "controller": "services/api/src/benefit-activities/benefit-activities.controller.ts",
@@ -558,8 +558,8 @@
         "handler": "AdminOpsController.listAlerts",
         "method": "GET",
         "models": [
-          "PrintTask",
-          "Terminal"
+          "AlertDisposition",
+          "PrintTask"
         ],
         "path": "/api/v1/admin/alerts",
         "roles": [
@@ -570,6 +570,20 @@
         ],
         "services": [
           "AdminOpsService"
+        ]
+      },
+      {
+        "controller": "services/api/src/admin-ops/admin-ops.controller.ts",
+        "handler": "AdminOpsController.disposeAlert",
+        "method": "POST",
+        "models": [],
+        "path": "/api/v1/admin/alerts/disposition",
+        "roles": [
+          "admin"
+        ],
+        "serviceFiles": [],
+        "services": [
+          "AdminAlertActionsService"
         ]
       },
       {
@@ -3103,8 +3117,8 @@
         "handler": "AdminOpsController.listPrintTasks",
         "method": "GET",
         "models": [
-          "PrintTask",
-          "Terminal"
+          "AlertDisposition",
+          "PrintTask"
         ],
         "path": "/api/v1/admin/print-tasks",
         "roles": [
@@ -13281,7 +13295,7 @@
     }
   },
   "dataModel": {
-    "modelCount": 96,
+    "modelCount": 97,
     "models": [
       {
         "fieldCount": 7,
@@ -13424,6 +13438,14 @@
         "usedBy": [
           "services/api/src/ai/ai-log.service.ts",
           "services/api/src/ai/ai-result.cleanup.task.ts"
+        ]
+      },
+      {
+        "fieldCount": 12,
+        "name": "AlertDisposition",
+        "relations": [],
+        "usedBy": [
+          "services/api/src/admin-ops/admin-ops.service.ts"
         ]
       },
       {
@@ -14357,7 +14379,6 @@
           "TerminalScanDeletionAudit"
         ],
         "usedBy": [
-          "services/api/src/admin-ops/admin-ops.service.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/content/content.service.ts",

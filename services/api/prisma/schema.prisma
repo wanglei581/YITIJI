@@ -342,6 +342,38 @@ model PrintTaskStatusLog {
   @@index([taskId, createdAt])
 }
 
+// ── AlertDisposition ──────────────────────────────────────────────────────────
+// 派生告警没有自己的行（见 admin-ops listDerivedAlerts）：每次列表都是现算的。
+// 不能在 Terminal / PrintTask 上加「已确认」字段：
+//   - 一台终端同时可能离线或打印机异常，两种告警主体不同；
+//   - 静默 TTL、episode、操作者是运营态，不是设备/任务域；
+//   - 退款排除失败告警必须读 Order.payStatus，禁止为了消警去写 printOutcome。
+// 本表只存处理态。告警是否仍在发生，永远以实时派生结果为准。
+model AlertDisposition {
+  id           String    @id @default(cuid())
+  // 稳定键：`${alertType}:${subjectId}`。不含时间、心跳 id、严重级别——
+  // 那些会在同一条故障持续期间变化，不能当确认挂载点。
+  subjectKey   String    @unique
+  alertType    String    // terminal_offline | printer_issue | print_failed
+  subjectId    String    // Terminal.id 或 PrintTask.id
+  // 区分「同一主体上一次故障」和「恢复后又发生」。
+  // terminal_offline = lastSeen ISO（持续离线期间不变）
+  // printer_issue = `${printerStatus}:${lastHealthyAt ISO}`（不能用最新心跳时间）
+  // print_failed = PrintTask.id（一次性事件）
+  episodeToken String
+  action       String    // acknowledged | silenced | closed
+  actorId      String?
+  note         String?
+  silencedUntil DateTime?
+  // 派生结果里已经没有这条时写入。匹配时必须 episode 一致且本字段为空。
+  recoveredAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([alertType, subjectId])
+  @@index([recoveredAt])
+}
+
 // ── Order ───────────────────────────────────────────────────────────────────
 // 打印运营订单。承载 PrintTask 无法承载的金额、支付状态和运营订单号,
 // 与设备任务层(PrintTask)解耦。

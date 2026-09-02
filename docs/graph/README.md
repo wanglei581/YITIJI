@@ -39,8 +39,8 @@ node scripts/project-graph-query.mjs model PrintTask
 
 | 维度 | 数量 |
 | --- | --- |
-| HTTP 端点（services/api） | 471 |
-| Prisma 模型 | 96 |
+| HTTP 端点（services/api） | 472 |
+| Prisma 模型 | 97 |
 | 门禁脚本文件 | 167 |
 | ├ 其中辅助库（被别的门禁 import） | 71 |
 | ├ 已在 package.json 里有脚本名 | 133 |
@@ -70,8 +70,8 @@ flowchart LR
   kiosk["apps/kiosk<br/>一体机前台<br/>86 路由"]
   admin["apps/admin<br/>管理员后台<br/>37 路由"]
   partner["apps/partner<br/>合作机构后台<br/>13 路由"]
-  api["services/api<br/>NestJS<br/>471 端点"]
-  db[("Prisma<br/>96 模型")]
+  api["services/api<br/>NestJS<br/>472 端点"]
+  db[("Prisma<br/>97 模型")]
   gates{{"verify 门禁<br/>167 个脚本"}}
 
   kiosk -->|"/api/v1"| api
@@ -97,7 +97,7 @@ flowchart LR
    宁可多一条边，也不要漏 —— 但读的时候要知道这是上界不是精确值。
 3. **后端 service → 模型走的是受限闭包**（只沿 `.service.ts` 和同目录文件，深度 2）。
    跨目录的间接数据访问会漏。放开成全量闭包的结果是几乎每个端点都连上全部
-   96 个模型，那样的图没有分辨力。
+   97 个模型，那样的图没有分辨力。
 4. **孤儿清单是候选，不是删除许可。** 判定用的是 CLAUDE.md §8 的五条证据；
    `protected` 名单里的目录即使五条全中也不得删除（原因见 orphans.md）。
 5. **`apps/miniapp` 不在解析范围内**，只在门禁清单里只读引用它的 package.json 脚本名。

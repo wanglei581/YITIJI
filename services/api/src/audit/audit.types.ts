@@ -59,6 +59,9 @@ export type AuditAction =
   | 'system.config_change'
   | 'print_job.admin_abandon'
   | 'print_job.admin_verify_outcome'
+  | 'alert.acknowledge'
+  | 'alert.silence'
+  | 'alert.close'
 
 export type AuditTargetType =
   | 'auth'
@@ -75,6 +78,7 @@ export type AuditTargetType =
   | 'toolbox_config'
   | 'terminal'
   | 'print_task'
+  | 'derived_alert'
 
 export interface AuditLogRecord {
   id: string
