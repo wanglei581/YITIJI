@@ -30,7 +30,7 @@
             <text wx:if="{{halls.length}}" class="fv-sum-i">{{halls.length}} 个展厅</text>
             <text wx:if="{{zones.length}}" class="fv-sum-i">{{zones.length}} 个展区</text>
             <text wx:if="{{boothTotal}}" class="fv-sum-i">{{boothTotal}} 个展位</text>
-            <text wx:if="{{!halls.length && !zones.length && !boothTotal}}" class="fv-sum-i">主办方暂未发布分区数据</text>
+            <text wx:if="{{!halls.length && !zones.length && !boothTotal}}" class="fv-sum-i">没有可展示的分区数据</text>
           </view>
         </view>
       </view>
@@ -39,7 +39,7 @@
            否则用户会以为是自己网络的问题反复重试。 -->
       <view wx:if="{{guideMissing}}" class="notice warn rise-d1">
         <text class="ficon i-info n-ic"></text>
-        <text>本场暂未提供会场导览（展厅划分与设施点位），以下为主办方已发布的展区与展位信息。</text>
+        <text>没有可展示的会场导览（展厅划分与设施点位）。以下为该场已发布的展区与展位信息。</text>
       </view>
       <view wx:elif="{{guideError}}" class="notice err rise-d1">
         <text class="ficon i-warning n-ic"></text>
@@ -118,7 +118,7 @@
             </view>
           </block>
           <view wx:elif="{{guideError}}" class="fv-inline err">设施点位加载失败，可到现场服务台咨询</view>
-          <view wx:else class="fv-inline">主办方暂未标注入口、服务台、打印点等设施点位</view>
+          <view wx:else class="fv-inline">没有可展示的入口、服务台、打印点等设施点位</view>
         </view>
 
         <view class="fv-sec rise-d3">展厅分区</view>
@@ -158,7 +158,7 @@
           </view>
         </block>
         <view wx:elif="{{guideError}}" class="card rise-d3"><view class="fv-inline err">展厅划分加载失败</view></view>
-        <view wx:else class="card rise-d3"><view class="fv-inline">主办方暂未发布展厅划分</view></view>
+        <view wx:else class="card rise-d3"><view class="fv-inline">没有可展示的展厅划分</view></view>
 
         </block>
 
@@ -179,7 +179,7 @@
             </view>
           </block>
           <view wx:elif="{{zonesError}}" class="fv-inline err">展区信息加载失败：{{zonesError}}</view>
-          <view wx:else class="fv-inline">主办方暂未发布展区划分</view>
+          <view wx:else class="fv-inline">没有可展示的展区划分</view>
         </view>
 
         <view class="fv-sec rise-d5">展位分布</view>
@@ -201,7 +201,7 @@
           </view>
         </block>
         <view wx:elif="{{boothsError}}" class="card rise-d5"><view class="fv-inline err">展位明细加载失败：{{boothsError}}</view></view>
-        <view wx:else class="card rise-d5"><view class="fv-inline">主办方暂未发布可查询的展位明细</view></view>
+        <view wx:else class="card rise-d5"><view class="fv-inline">没有可展示的展位明细</view></view>
 
       </block>
 

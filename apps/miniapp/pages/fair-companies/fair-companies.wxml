@@ -54,7 +54,9 @@
     <view wx:elif="{{!all.length}}" class="empty-wrap">
       <view class="state-icon"><text class="ficon i-bank"></text></view>
       <view class="state-title">暂无参会企业</view>
-      <view class="state-desc">主办方尚未录入参会企业名单，可稍后再来查看。</view>
+      <!-- 后端对「招聘会不存在 / 未发布」也返回 200 空集(jobs.controller.ts:175)，
+           空集有两种成因、前端分不出来，就不能只挑一种说成事实。 -->
+      <view class="state-desc">可能是主办方尚未录入名单，也可能这场招聘会已下线。</view>
     </view>
 
     <block wx:else>

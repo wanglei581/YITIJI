@@ -274,6 +274,9 @@ Page({
     this.setData({ printingId: id });
     wx.showLoading({ title: '正在生成打印文件…', mask: true });
     api.prepareFairMaterialPrint(fairId, id).then((res) => {
+      // _finishPrint 只是跳过 setData，调用方仍会 navigateTo——
+      // 用户等不及返回后，照样会被拖进打印下单流程。
+      if (this._gone) { wx.hideLoading(); return; }
       this._finishPrint();
       const fid = encodeURIComponent((res && res.fileId) || '');
       // 没拿到 fileId 还往下跳，用户会停在一张没有文件的参数页上只能返回重来，
@@ -286,6 +289,7 @@ Page({
       const pages = (res && res.pageCount) || '';
       wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` });
     }).catch((err) => {
+      if (this._gone) { wx.hideLoading(); return; }
       this._finishPrint();
       if (err && err.statusCode === 401) {
         this._printNeedLogin();

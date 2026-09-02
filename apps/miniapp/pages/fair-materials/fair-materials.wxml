@@ -22,7 +22,8 @@
 
     <view wx:elif="{{phase === 'empty'}}" class="empty">
       <view class="e-ic"><text class="ficon i-folder"></text></view>
-      <view class="e-title">本场暂未提供活动资料</view>
+      <!-- 空集也可能是招聘会已下线：后端两种情况都返回 200 空集。 -->
+      <view class="e-title">没有可展示的活动资料</view>
       <view class="e-desc">主办方发布日程、展馆图或企业名册后会显示在这里。</view>
     </view>
 

@@ -273,7 +273,13 @@ Page({
   },
 
   tapGenerate() {
-    if (this.data.phase === 'running') return
+    // 不能只看 this.data.phase:微信的 setData 是异步的,连点两次时第二次
+    // 读到的 phase 还是旧值,两次都能过关、各自 POST 一遍。_seq 只丢掉第二个
+    // **响应**,两个请求都已经打到 PaidAiThrottle 那条真花钱的模型调用上。
+    // 所以锁必须是同步的实例字段。
+    if (this._generating) return
+    this._generating = true
+    if (this.data.phase === 'running') { this._generating = false; return }
     const fairId = this.data.fairId
     const taskId = this.data.taskId
     if (!fairId || !taskId) return
@@ -281,6 +287,7 @@ Page({
     this.setData({ phase: 'running', elapsed: 0, failMsg: '', staleNote: '' })
     this._startElapsed()
     api.generateFairVisitPlan(fairId, taskId, this._token).then((res) => {
+      this._generating = false
       this._stopElapsed()
       if (this._stopped || seq !== this._seq) return
       // 200 + status:'failed'：简历原文已按隐私策略清理，重试多少次都是同一个结果
@@ -295,6 +302,7 @@ Page({
       }
       this._showPlan(plan)
     }).catch((err) => {
+      this._generating = false
       this._stopElapsed()
       if (this._stopped || seq !== this._seq) return
       const code = err && err.code
@@ -382,6 +390,17 @@ Page({
       wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` })
     }).catch((err) => {
       wx.hideLoading()
+      // 会员 JWT 30 分钟过期后点打印会走到这里。另两页都弹「去登录」，
+      // 只有这页收成一句无信息量的「请稍后重试」。
+      if (err && err.statusCode === 401) {
+        wx.showModal({
+          title: '需要登录',
+          content: '生成打印文件会存进你本人的「我的文档」，需要先登录。',
+          confirmText: '去登录',
+          success: (r) => { if (r.confirm) wx.navigateTo({ url: '/pages/launch/launch' }) },
+        })
+        return
+      }
       this.setData({ printing: false })
       wx.showModal({
         title: '生成打印版失败',
