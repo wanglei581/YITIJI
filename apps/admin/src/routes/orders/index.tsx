@@ -6,6 +6,8 @@ import { FilterChip } from '../components/FilterChip'
 import { FileTextIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import {
   adminOrdersReadonlyService,
+  type AdminOrderMarkPaidResult,
+  type AdminOrderMarkPaidSource,
   type AdminOrderReadonlyDetail,
   type AdminOrderReadonlyItem,
 } from '../../services/api/adminOrdersReadonly'
@@ -52,6 +54,30 @@ const PAY_FILTERS = [
 
 const COLOR_LABELS: Record<string, string> = { black_white: '黑白', color: '彩色' }
 const OWNER_LABELS: Record<string, string> = { member: '会员', anonymous: '游客' }
+
+// 收款入账来源：后端 AdminMarkPaidDto 只放行这两个（free 由 0 元建单自动产生，
+// 线上通道各走各的回调路径），文案与「我的」订单侧的来源展示保持一致。
+const MARK_PAID_SOURCES: ReadonlyArray<{ value: AdminOrderMarkPaidSource; label: string; hint: string }> = [
+  { value: 'offline', label: '线下收款', hint: '现场向用户实际收到现金' },
+  { value: 'manual_confirmed', label: '人工确认', hint: '非现场现金，已另行核实到账后由管理员确认' },
+]
+
+function markPaidSourceLabel(source: string | null): string {
+  return MARK_PAID_SOURCES.find((s) => s.value === source)?.label ?? source ?? '未标注'
+}
+
+// 后端错误码 → 可读解释；原始码始终一并展示，便于现场上报排查。
+const MARK_PAID_ERROR_TEXT: Record<string, string> = {
+  ORDER_ALREADY_PAID: '该订单已由其它来源入账，本次未重复记账',
+  ORDER_INVALID_TRANSITION: '该订单当前支付状态不允许入账（已退款 / 已关闭 / 支付失败等）',
+  ORDER_NOT_FOUND: '订单不存在',
+  // 后端两道防线：ValidationPipe 先拒非法取值（VALIDATION_FAILED），
+  // controller / service 再各有一层白名单（*_NOT_ADMIN_ALLOWED / *_INVALID）。
+  VALIDATION_FAILED: '请求被后端校验拒绝（收款来源仅支持线下收款 / 人工确认）',
+  PAYMENT_SOURCE_NOT_ADMIN_ALLOWED: '收款来源不被后端允许',
+  PAYMENT_SOURCE_INVALID: '收款来源不被后端允许',
+  PICKUP_CODE_UNAVAILABLE: '取件码生成失败，订单未入账，可稍后重试',
+}
 
 // M1：渠道展示。null = 存量单**无法可靠判定**（一体机与小程序建单写的字段相同），
 // 必须显示「未标注」——不得按 terminalId 猜成一体机，那会污染统计。
@@ -112,6 +138,13 @@ export default function OrdersPage() {
   const [refundSubmitting, setRefundSubmitting] = useState(false)
   const [refundError, setRefundError] = useState<string | null>(null)
 
+  // 线下 / 人工确认收款对话框状态（入口仅 payStatus==='unpaid' 可见；结论只认服务端返回）
+  const [markPaidOpen, setMarkPaidOpen] = useState(false)
+  const [markPaidSource, setMarkPaidSource] = useState<AdminOrderMarkPaidSource>('offline')
+  const [markPaidSubmitting, setMarkPaidSubmitting] = useState(false)
+  const [markPaidError, setMarkPaidError] = useState<string | null>(null)
+  const [markPaidResult, setMarkPaidResult] = useState<AdminOrderMarkPaidResult | null>(null)
+
   // 废弃孤单对话框状态（仅 pending + claimedAt=null 任务可见）
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false)
   const [abandonSubmitting, setAbandonSubmitting] = useState(false)
@@ -171,6 +204,11 @@ export default function OrdersPage() {
   const openDetail = async (id: string) => {
     setDetailState('loading')
     setDetail(null)
+    // 收款结论只属于刚操作过的那一单，换单必须清掉，避免把上一单的入账结果显示在这一单上。
+    setMarkPaidOpen(false)
+    setMarkPaidSource('offline')
+    setMarkPaidError(null)
+    setMarkPaidResult(null)
     try {
       const data = await adminOrdersReadonlyService.getById(id)
       setDetail(data)
@@ -186,6 +224,10 @@ export default function OrdersPage() {
     setRefundOpen(false)
     setRefundReason('')
     setRefundError(null)
+    setMarkPaidOpen(false)
+    setMarkPaidSource('offline')
+    setMarkPaidError(null)
+    setMarkPaidResult(null)
     setAbandonConfirmOpen(false)
     setAbandonError(null)
     setVerifyOpen(null)
@@ -212,6 +254,33 @@ export default function OrdersPage() {
       setRefundSubmitting(false)
     }
   }, [detail, refundReason, refresh])
+
+  const handleMarkPaid = useCallback(async () => {
+    if (!detail) return
+    setMarkPaidSubmitting(true)
+    setMarkPaidError(null)
+    setMarkPaidResult(null)
+    try {
+      // 入账结论完全取自服务端返回（payStatus / paymentSource / paidAt），前端不拼状态、不推断金额。
+      const result = await adminOrdersReadonlyService.markPaidOrder(detail.id, markPaidSource)
+      setMarkPaidResult(result)
+      void refresh()
+      const updated = await adminOrdersReadonlyService.getById(detail.id)
+      setDetail(updated)
+      setMarkPaidOpen(false)
+    } catch (err) {
+      const code = err instanceof ApiHttpError ? err.code : ''
+      const hint = MARK_PAID_ERROR_TEXT[code]
+      setMarkPaidError(hint ? `${hint}（${code}）` : code || '操作失败，请重试')
+      // 失败常见于本地状态已过期（并发入账 / 退款），重拉一次服务端真值；
+      // 重拉本身失败不覆盖上面的错误提示——收款失败必须留在页面上。
+      try {
+        setDetail(await adminOrdersReadonlyService.getById(detail.id))
+      } catch { /* 保留原错误 */ }
+    } finally {
+      setMarkPaidSubmitting(false)
+    }
+  }, [detail, markPaidSource, refresh])
 
   const handleAbandon = useCallback(async () => {
     if (!detail?.printTaskId) return
@@ -269,7 +338,7 @@ export default function OrdersPage() {
     >
       {/* 说明横幅 */}
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        展示真实订单与打印任务安全元数据。已支付订单可由管理员发起全额退款；退款渠道由订单支付来源决定。
+        展示真实订单与打印任务安全元数据。未支付订单可由管理员在线下实际收款后确认入账；已支付订单可由管理员发起全额退款，退款渠道由订单支付来源决定。
       </div>
 
       <section className="overflow-hidden rounded-lg border border-neutral-900/[0.06] bg-surface shadow-sm">
@@ -572,6 +641,108 @@ export default function OrdersPage() {
                         type="button"
                         disabled={abandonSubmitting}
                         onClick={() => { setAbandonConfirmOpen(false); setAbandonError(null) }}
+                        className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/*
+              收款入账结果：与下方入口**分开渲染**。入账成功后 payStatus 变为 paid、入口随即消失，
+              若把结论放在入口内部，成功/失败提示会一起消失变成静默。
+            */}
+            {markPaidResult && (
+              <div className="mt-6 rounded-[9px] border border-success/30 bg-success-bg px-4 py-3 text-[12.5px] leading-relaxed text-success-fg">
+                <p className="font-extrabold">收款已入账（服务端确认）</p>
+                <p className="mt-1">
+                  支付状态 {PAY_STATUS_MAP[markPaidResult.payStatus]?.label ?? markPaidResult.payStatus}
+                  {' · '}来源 {markPaidSourceLabel(markPaidResult.paymentSource)}
+                  {' · '}入账时间 {fmt(markPaidResult.paidAt)}
+                </p>
+              </div>
+            )}
+            {markPaidError && (
+              <div className="mt-6 rounded-[9px] border border-error/30 bg-error-bg px-4 py-3 text-[12.5px] leading-relaxed text-error-fg">
+                <p className="font-extrabold">收款未入账</p>
+                <p className="mt-1">{markPaidError}</p>
+                <p className="mt-1">订单支付状态以上方「支付状态」为准；如现场已收钱，请核对后重试或人工处理。</p>
+              </div>
+            )}
+
+            {/*
+              线下 / 人工确认收款入口：对应 POST /admin/orders/:id/mark-paid（admin 角色）。
+              后端只允许 unpaid → paid，因此入口只在服务端返回的 payStatus 为 unpaid 时出现；
+              已支付 / 已退款 / 支付失败等状态下不渲染，避免给出后端必然拒绝的按钮。
+            */}
+            {detail.payStatus === 'unpaid' && (
+              <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
+                {!markPaidOpen ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-bold text-neutral-800">确认线下收款</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        订单尚未入账。仅当线下已实际收到该笔款项时才可确认；确认后订单转为已支付并写入审计日志，不可撤销
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setMarkPaidOpen(true); setMarkPaidError(null); setMarkPaidResult(null) }}
+                      className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90"
+                    >
+                      确认收款
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-[13px] font-bold text-neutral-800">确认已在线下收到现金？</p>
+                    <p className="text-xs leading-relaxed text-neutral-600">
+                      本单应收 <span className="font-bold text-neutral-900">{amountText(detail.amountCents, detail.currency)}</span>。
+                      点击确认即表示<span className="font-bold text-neutral-900">现场已实际收到该笔现金</span>，
+                      系统随即把订单支付状态置为已支付并写入审计日志。操作不可撤销，如需退回只能另行发起全额退款。
+                    </p>
+                    <fieldset className="space-y-1.5">
+                      <legend className="text-xs font-bold text-neutral-700">收款方式</legend>
+                      {MARK_PAID_SOURCES.map((source) => (
+                        <label
+                          key={source.value}
+                          className="flex cursor-pointer items-start gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3 py-2"
+                        >
+                          <input
+                            type="radio"
+                            name="mark-paid-source"
+                            value={source.value}
+                            checked={markPaidSource === source.value}
+                            disabled={markPaidSubmitting}
+                            onChange={() => setMarkPaidSource(source.value)}
+                            className="mt-0.5"
+                          />
+                          <span>
+                            <span className="block text-[13px] font-bold text-neutral-800">{source.label}</span>
+                            <span className="block text-xs text-neutral-500">{source.hint}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    {markPaidError && (
+                      <p className="text-xs font-semibold text-error-fg">{markPaidError}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={markPaidSubmitting}
+                        onClick={() => void handleMarkPaid()}
+                        className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90 disabled:opacity-40"
+                      >
+                        {markPaidSubmitting ? '处理中…' : '确认已收到现金'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={markPaidSubmitting}
+                        onClick={() => { setMarkPaidOpen(false); setMarkPaidError(null) }}
                         className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-40"
                       >
                         取消

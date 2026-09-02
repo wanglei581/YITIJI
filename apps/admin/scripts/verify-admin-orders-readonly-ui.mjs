@@ -37,12 +37,33 @@ if (
   fail('service must expose GET /admin/orders list/detail')
 }
 
-// refundOrder 已由 G5 合法新增，不再列为禁止操作；
-// 标记支付/强制改状态仍禁止。
-for (const forbidden of ['标记已支付', '标记支付失败', 'updateOrderStatus']) {
+// refundOrder 已由 G5 合法新增；线下收款入账（mark-paid）于 2026-09-03 合法新增。
+//
+// 为什么 `标记已支付` 从禁止清单里移除：
+//   这条禁令写于本页还是纯只读的年代（8a83555b7），当时后端 mark-paid 端点没有前端。
+//   但 docs/operations/print-rollout-deployment-matrix.md:27 把「有人值守线下收款」
+//   列为正式运营模式（「代码写死（Admin mark-paid 后才可领）」），同文件 :40 更写明
+//   「正价 + 无 live 支付 + 无线下 mark-paid SOP → cashier stuck → 禁止用于首台终端试运营」。
+//   current-progress.md 的 2026-07-04 条目把上线路径定为三选一，其中第 ② 条就是
+//   「走 Admin 线下 mark-paid」。即：没有这个入口，三条上线路径只剩两条。
+//   所以这是补齐既定规划，不是放宽收款边界。
+//
+// 仍然禁止的两件事，以及新增的正向钉死：
+//   `标记支付失败` —— 后端无此转换，前端不得自造。
+//   `updateOrderStatus` —— 任意改状态仍禁止。
+//   入口必须只在服务端返回 payStatus === 'unpaid' 时渲染（后端只允许 unpaid → paid）。
+//   加这条正向断言是为了防止后来者把入口放宽到别的状态而门禁察觉不到 ——
+//   只删禁止项不加约束，等于把这块地方变成无人看守。
+for (const forbidden of ['标记支付失败', 'updateOrderStatus']) {
   if (page.includes(forbidden)) fail(`orders page contains forbidden write operation: ${forbidden}`)
 }
 pass('orders page has no unauthorized payment/status mutation actions')
+
+if (/detail\.payStatus\s*===\s*'unpaid'\s*&&/.test(page)) {
+  pass('offline mark-paid entry is pinned to server-returned payStatus === unpaid')
+} else {
+  fail('offline mark-paid entry must render only when server-returned payStatus is unpaid')
+}
 
 if (
   page.includes('orderNo') &&
