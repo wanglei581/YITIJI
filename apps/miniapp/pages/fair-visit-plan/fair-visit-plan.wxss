@@ -1,3 +1,177 @@
-/* 参会准备单：骨架样式。真实实现优先复用 app.wxss 全局类（page-wrap / navbar / content /
-   card / chip / empty / list-state / notice / actionbar），本文件只放本页私有类。
-   页面 wxss 一律用 rpx 与 var(--*) 令牌，不写死色值。 */
+/* 参会准备单 / 参会回顾。布局与卡片壳复用 app.wxss（page-wrap / navbar / content /
+   card / chip / tile / notice / actionbar / compliance-note），这里只放本页私有类。
+   横向内缩一律写 16px 而不是 32rpx：全局 .card 用的是 px，混着写在宽屏机上会错半格。 */
+
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 底部操作条用的是 60px 的 .btn.lg，比全局 .content.has-bar 预留的 80px 高，
+   不加这一条，结果页最后一行会被操作条压住。 */
+.vp-body { padding-bottom: calc(108px + var(--sab)); }
+
+/* ── 空态 / 失败态（与 jobs 页同口径，全局没有这几个类，必须页内定义）── */
+.empty-wrap {
+  margin: 20rpx 16px 0;
+  padding: 68rpx 30rpx;
+  border-radius: 27rpx;
+  border: 1rpx solid var(--line-soft);
+  background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.state-icon {
+  width: 92rpx; height: 92rpx; border-radius: 28rpx;
+  background: var(--surface-2); color: var(--faint);
+  display: flex; align-items: center; justify-content: center;
+}
+.state-icon.error { background: var(--error-soft); color: var(--error); }
+.state-icon .ficon { width: 44rpx; height: 44rpx; }
+.state-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 700; color: var(--ink); }
+.state-desc { margin-top: 10rpx; font-size: 24rpx; color: var(--muted); line-height: 1.6; }
+/* 96rpx = 48px，可点区下限 */
+.retry-btn {
+  margin-top: 28rpx; min-height: 96rpx; padding: 0 40rpx; border-radius: 20rpx;
+  background: var(--teal); color: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26rpx; font-weight: 650;
+}
+
+/* ── 招聘会信息块 ── */
+.vp-fair-title { font-size: 32rpx; font-weight: 700; color: var(--ink); line-height: 1.45; }
+.vp-fair-row {
+  display: flex; align-items: center; gap: 12rpx;
+  margin-top: 12rpx; font-size: 25rpx; color: var(--muted); line-height: 1.5;
+}
+.vp-fr-ic { width: 26rpx; height: 26rpx; color: var(--teal); flex-shrink: 0; }
+
+/* ── ready 态说明 ── */
+.vp-p { font-size: 26rpx; color: var(--muted); line-height: 1.75; }
+.vp-p-last { margin-top: 14rpx; }
+.vp-file {
+  display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx;
+  padding: 18rpx 20rpx; background: var(--paper);
+  border: 1rpx solid var(--line); border-radius: 14rpx;
+}
+.vp-file-ic { width: 28rpx; height: 28rpx; color: var(--teal); flex-shrink: 0; }
+.vp-file-name {
+  flex: 1; font-size: 25rpx; color: var(--ink);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+/* 磁贴图标底色：只换配色，尺寸沿用全局 .tile .t-ic */
+.vp-ic-teal  { background: var(--teal-soft);  color: var(--teal-deep); }
+.vp-ic-clay  { background: var(--clay-soft);  color: var(--clay-deep); }
+.vp-ic-plum  { background: var(--plum-soft);  color: var(--plum-deep); }
+.vp-ic-wheat { background: var(--wheat-soft); color: var(--wheat-deep); }
+
+/* ── 生成中 ── */
+.vp-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 120rpx 32rpx 0; gap: 18rpx;
+}
+.vp-anim { position: relative; width: 120rpx; height: 120rpx; margin-bottom: 16rpx; }
+.vp-ring {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  border-radius: 50%; border: 4rpx solid var(--line);
+  border-top-color: var(--teal);
+  animation: vp-spin 1s linear infinite;
+}
+.vp-anim-ic {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 48rpx; height: 48rpx; margin: auto; color: var(--teal);
+}
+@keyframes vp-spin { to { transform: rotate(360deg); } }
+.vp-state-title { font-size: 32rpx; font-weight: 700; color: var(--ink); }
+.vp-state-desc { font-size: 26rpx; color: var(--muted); text-align: center; line-height: 1.6; }
+.vp-state-hint { font-size: 22rpx; color: var(--faint); text-align: center; line-height: 1.6; }
+
+/* ── 结果页：生成依据 ── */
+.vp-based { display: flex; gap: 12rpx; margin-top: 18rpx; }
+.vp-based-cell {
+  flex: 1; padding: 18rpx 16rpx; border-radius: 16rpx;
+  background: var(--surface-2); text-align: center;
+}
+/* 值可能是「暂无数据」四个字：字号不能按纯数字设计，否则会被挤成两行 */
+.vp-based-val { font-size: 30rpx; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.vp-based-cap { margin-top: 6rpx; font-size: 21rpx; color: var(--muted); }
+
+.vp-summary { font-size: 27rpx; color: var(--ink); line-height: 1.8; }
+
+/* ── 通用列表容器：与 .card 同一内缩 ── */
+.vp-list { margin: 0 16px; display: flex; flex-direction: column; gap: 12rpx; }
+.vp-hint { margin: 12rpx 16px 0; font-size: 22rpx; color: var(--faint); line-height: 1.6; }
+
+.vp-bullet { display: flex; align-items: flex-start; gap: 14rpx; }
+.vp-dot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0; margin-top: 16rpx;
+}
+.vp-bullet-text { flex: 1; font-size: 26rpx; color: var(--ink-soft); line-height: 1.75; }
+
+/* ── 优先企业 ── */
+.vp-co {
+  padding: 24rpx; background: var(--surface);
+  border: 1rpx solid var(--line-soft); border-radius: 24rpx;
+}
+.vp-co-name { font-size: 29rpx; font-weight: 700; color: var(--ink); line-height: 1.5; }
+.vp-co-reason { margin-top: 10rpx; font-size: 25rpx; color: var(--muted); line-height: 1.7; }
+.vp-co-act {
+  margin-top: 16rpx; min-height: 96rpx; padding: 0 28rpx;
+  display: inline-flex; align-items: center; gap: 10rpx;
+  background: var(--teal-wash); color: var(--teal-deep);
+  border-radius: 18rpx; font-size: 25rpx; font-weight: 600;
+}
+.vp-co-ic { width: 26rpx; height: 26rpx; }
+.vp-co-none { margin-top: 14rpx; font-size: 22rpx; color: var(--faint); }
+
+/* ── 清单 ── */
+.vp-checklist {
+  margin: 0 16px; background: var(--surface);
+  border: 1rpx solid var(--line-soft); border-radius: 26rpx; overflow: hidden;
+}
+.vp-check {
+  display: flex; align-items: flex-start; gap: 16rpx;
+  padding: 22rpx 24rpx; border-bottom: 1rpx solid var(--line-faint);
+}
+.vp-check:last-child { border-bottom: none; }
+/* 空方框，且刻意不可勾选：系统无从得知用户做没做，
+   画上勾会被读成「已完成」，可勾选又会让用户以为勾了会存下来。 */
+.vp-check-box {
+  width: 32rpx; height: 32rpx; border-radius: 8rpx; flex-shrink: 0; margin-top: 6rpx;
+  border: 2rpx solid var(--teal-mid); background: var(--surface);
+}
+.vp-check-text { flex: 1; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+
+/* ── 可咨询问题 ── */
+.vp-q {
+  display: flex; align-items: flex-start; gap: 14rpx;
+  padding: 22rpx 24rpx; background: var(--surface);
+  border: 1rpx solid var(--line-soft); border-radius: 22rpx;
+}
+.vp-q-no {
+  width: 38rpx; height: 38rpx; border-radius: 50%; flex-shrink: 0;
+  background: var(--plum-soft); color: var(--plum-deep);
+  font-size: 22rpx; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.vp-q-text { flex: 1; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
+
+/* ── 现场提醒 ── */
+.vp-tip {
+  display: flex; align-items: flex-start; gap: 14rpx;
+  padding: 20rpx 24rpx; background: var(--wheat-wash);
+  border-radius: 22rpx;
+}
+.vp-tip-ic { width: 28rpx; height: 28rpx; color: var(--wheat-deep); flex-shrink: 0; margin-top: 4rpx; }
+.vp-tip-text { flex: 1; font-size: 25rpx; color: var(--ink-soft); line-height: 1.7; }
+
+/* ── 本机记录（非 AI 事实区）── */
+.vp-local-cap { font-size: 22rpx; color: var(--faint); margin-bottom: 14rpx; }
+.vp-local-text { font-size: 26rpx; color: var(--ink-soft); line-height: 1.75; }
+.vp-local-list { margin-top: 12rpx; display: flex; flex-direction: column; gap: 10rpx; }
+.vp-local-note {
+  margin-top: 18rpx; padding-top: 16rpx; border-top: 1rpx solid var(--line-faint);
+  font-size: 22rpx; color: var(--muted); line-height: 1.65;
+}
+
+/* 打印按钮比「重新生成」宽：它才是这一屏的主动作 */
+.vp-print-btn { flex: 1.5; }

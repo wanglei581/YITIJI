@@ -31,9 +31,14 @@ const API_JS = join(REPO, 'apps/miniapp/utils/api.js')
 const API_SRC = join(REPO, 'services/api/src')
 const SNAPSHOT = join(HERE, 'api-contract.json')
 
-/** 路径参数名不参与契约身份：/jobs/${id} 和 /jobs/:jobId 是同一个端点 */
+/**
+ * 路径参数名不参与契约身份：/jobs/${id} 和 /jobs/:jobId 是同一个端点。
+ * query string 同样不参与：端点身份是 method + path，
+ * `/x/print-url?variant=profile` 和 `/x/print-url` 是同一个后端路由。
+ * 早先漏了剥 query，导致给一个既有端点加查询参数会被误报成 UNDECLARED 新端点。
+ */
 const normalize = (p) =>
-  ('/' + p.replace(/^\/+/, ''))
+  ('/' + p.split('?')[0].split('#')[0].replace(/^\/+/, ''))
     .replace(/\$\{[^}]*\}/g, ':p')   // 小程序模板字面量
     .replace(/:[A-Za-z0-9_]+/g, ':p') // Nest 路由参数
     .replace(/\/+$/, '')

@@ -1,14 +1,286 @@
+<!--pages/fair-visit-plan/fair-visit-plan.wxml-->
+<!--
+  内容全部来自服务端 FairVisitPlanResponse，前端不补全、不推断。
+
+  这里刻意没有的东西：
+  - 「你到访过 / 你签到过 / 你投递过」这类结论。系统只记录「本人在本机打开过某家
+    参展企业的来源投递入口」这一个动作；打开入口不等于到过现场，更不等于投出去了。
+  - 生成进度条与「预计还剩 N 秒」。后端不返回进度，能说的只有真实已用秒数。
+  - 企业联系人 / HR 邮箱 / 任何私下投递路径。后端本来就不返回，页面也不留占位。
+-->
 <view class="page-wrap">
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
-    <view class="nav-title">参会准备单</view>
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
+    <view class="nav-title">{{copy.navTitle}}</view>
   </view>
 
-  <view class="content">
-    <view wx:if="{{loading}}" class="list-state">加载中…</view>
-    <view wx:elif="{{loadError}}" class="list-state">{{loadError}}</view>
-    <view wx:else class="list-state">该页面正在接入中，暂未开放。</view>
+  <!-- 先读「是否已经生成过」，读完才决定给不给生成按钮：生成是真花钱的模型调用 -->
+  <view wx:if="{{phase === 'loading'}}" class="content">
+    <view class="list-state">正在读取已生成的内容…</view>
+  </view>
+
+  <view wx:elif="{{phase === 'no-fair'}}" class="content">
+    <view class="empty-wrap rise-d1">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">缺少招聘会参数</view>
+      <view class="state-desc">这一页需要从具体的招聘会进入，才能知道要为哪一场做准备。</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回上一页">返回上一页</view>
+    </view>
+  </view>
+
+  <!-- 没有已解析简历:不伪造内容,给真实入口 -->
+  <view wx:elif="{{phase === 'no-resume'}}" class="content">
+    <view wx:if="{{fair}}" class="card rise-d1">
+      <view class="card-inner">
+        <view class="vp-fair-title">{{fair.title}}</view>
+        <view wx:if="{{fair.when}}" class="vp-fair-row"><text class="ficon i-calendar vp-fr-ic"></text><text>{{fair.when}}</text></view>
+        <view wx:if="{{fair.venue}}" class="vp-fair-row"><text class="ficon i-location vp-fr-ic"></text><text>{{fair.venue}}</text></view>
+      </view>
+    </view>
+    <view class="empty-wrap rise-d2">
+      <view class="state-icon"><text class="ficon i-file-text"></text></view>
+      <view class="state-title">还没有可用的简历</view>
+      <view class="state-desc">内容完全基于你的简历原文生成，需要先上传并解析一份简历。</view>
+      <view class="retry-btn tap" hover-class="tap-press" bindtap="tapUpload" role="button" aria-label="去上传简历">去上传简历</view>
+    </view>
+    <view class="notice info rise-d3">
+      <text class="ficon i-info n-ic"></text>
+      <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+    </view>
+  </view>
+
+  <!-- 可生成:先说清依据和代价,由用户自己按 -->
+  <view wx:elif="{{phase === 'ready'}}" class="content has-bar vp-body">
+    <view wx:if="{{fair}}" class="card rise-d1">
+      <view class="card-inner">
+        <view class="vp-fair-title">{{fair.title}}</view>
+        <view wx:if="{{fair.when}}" class="vp-fair-row"><text class="ficon i-calendar vp-fr-ic"></text><text>{{fair.when}}</text></view>
+        <view wx:if="{{fair.venue}}" class="vp-fair-row"><text class="ficon i-location vp-fr-ic"></text><text>{{fair.venue}}</text></view>
+        <view wx:if="{{fair.source}}" class="vp-fair-row"><text class="ficon i-bank vp-fr-ic"></text><text>来源：{{fair.source}}</text></view>
+        <view wx:if="{{fair.tag}}" class="chips mt8"><view class="chip">{{fair.tag}}</view></view>
+      </view>
+    </view>
+
+    <!-- 招聘会信息取不到不影响生成:能不能生成由服务端判定,这里只是少了一块展示 -->
+    <view wx:if="{{fairError}}" class="notice warn rise-d1">
+      <text class="ficon i-warning n-ic"></text>
+      <text>招聘会信息暂时读取不到（{{fairError}}），下方内容仍以服务端返回为准。</text>
+    </view>
+
+    <!-- 服务端说旧结果形态已失效时的原话,原样转达 -->
+    <view wx:if="{{staleNote}}" class="notice warn rise-d2">
+      <text class="ficon i-history n-ic"></text>
+      <text>{{staleNote}}</text>
+    </view>
+
+    <view class="section-t rise-d2">将为你生成</view>
+    <view class="tiles rise-d3">
+      <view class="tile">
+        <view class="t-ic vp-ic-teal"><text class="ficon i-thunder"></text></view>
+        <view class="t-title">{{copy.highlights}}</view>
+        <view class="t-desc">本场公开信息里值得留意的部分</view>
+      </view>
+      <view class="tile">
+        <view class="t-ic vp-ic-clay"><text class="ficon i-bank"></text></view>
+        <view class="t-title">{{copy.companies}}</view>
+        <view class="t-desc">结合你的简历方向给出的企业清单</view>
+      </view>
+      <view class="tile">
+        <view class="t-ic vp-ic-plum"><text class="ficon i-solution"></text></view>
+        <view class="t-title">{{copy.checklist}}</view>
+        <view class="t-desc">逐项可核对的行动清单</view>
+      </view>
+      <view class="tile">
+        <view class="t-ic vp-ic-wheat"><text class="ficon i-form"></text></view>
+        <view class="t-title">{{copy.questions}}</view>
+        <view class="t-desc">可以当面问出口的问题</view>
+      </view>
+    </view>
+
+    <view class="card rise-d4">
+      <view class="card-head"><view class="ch-title">生成依据</view></view>
+      <view class="card-inner">
+        <view class="vp-p">{{copy.lead}}。系统不会把你的简历发送给任何用人单位。</view>
+        <view wx:if="{{resumeName}}" class="vp-file">
+          <text class="ficon i-file-text vp-file-ic"></text>
+          <text class="vp-file-name">{{resumeName}}</text>
+        </view>
+        <view class="vp-p vp-p-last">生成需要调用 AI，通常要等几十秒。生成后重新进入本页会直接展示已有结果，不会重复生成；超过服务端保留期后需要重新生成。</view>
+      </view>
+    </view>
+
+    <view class="notice info rise-d5">
+      <text class="ficon i-info n-ic"></text>
+      <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+    </view>
+  </view>
+
+  <!-- 生成中:只显示真实已用秒数,不显示任何伪造进度 -->
+  <view wx:elif="{{phase === 'running'}}" class="content">
+    <view class="vp-state">
+      <view class="vp-anim">
+        <view class="vp-ring"></view>
+        <text class="ficon i-robot vp-anim-ic"></text>
+      </view>
+      <view class="vp-state-title">AI 正在依据你的简历生成…</view>
+      <view class="vp-state-desc">已用 {{elapsed}} 秒，请勿离开页面</view>
+      <view class="vp-state-hint">生成结果仅供你本人参考，不代表用人单位意见</view>
+    </view>
+  </view>
+
+  <!-- 失败:三类原因给三种出口,不都当成「网络错误」 -->
+  <view wx:elif="{{phase === 'failed'}}" class="content">
+    <view class="empty-wrap rise-d1">
+      <view class="state-icon error"><text class="ficon i-warning"></text></view>
+      <view class="state-title">没有生成成功</view>
+      <view class="state-desc">{{failMsg}}</view>
+      <view wx:if="{{failKind === 'reupload'}}" class="retry-btn tap" hover-class="tap-press" bindtap="tapUpload" role="button" aria-label="重新上传简历">重新上传简历</view>
+      <view wx:elif="{{failKind === 'login'}}" class="retry-btn tap" hover-class="tap-press" bindtap="tapLogin" role="button" aria-label="去登录">去登录</view>
+      <view wx:elif="{{failKind === 'reload'}}" class="retry-btn tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载">重新加载</view>
+      <view wx:else class="retry-btn tap" hover-class="tap-press" bindtap="tapGenerate" role="button" aria-label="重新生成">重新生成</view>
+    </view>
+  </view>
+
+  <!-- 结果 -->
+  <view wx:elif="{{phase === 'done'}}" class="content has-bar vp-body">
+    <!-- 免责声明原文照抄,不得改写或省略 -->
+    <view class="notice plum rise-d1">
+      <text class="ficon i-info n-ic"></text>
+      <text>以下建议由 AI 基于你的简历文本生成，仅供你本人参考，不构成职业指导意见，也不代表用人单位意见。</text>
+    </view>
+
+    <view class="card rise-d1">
+      <view class="card-inner">
+        <view class="vp-fair-title">{{plan.fairName || '本场招聘会'}}</view>
+        <view class="vp-based">
+          <view class="vp-based-cell">
+            <view class="vp-based-val">{{plan.companyCountText}}</view>
+            <view class="vp-based-cap">参展企业（家）</view>
+          </view>
+          <view class="vp-based-cell">
+            <view class="vp-based-val">{{plan.positionCountText}}</view>
+            <view class="vp-based-cap">在册岗位（个）</view>
+          </view>
+        </view>
+        <view wx:if="{{plan.sourceName}}" class="vp-fair-row"><text class="ficon i-bank vp-fr-ic"></text><text>来源：{{plan.sourceName}}</text></view>
+        <view class="chips mt8">
+          <view class="chip teal">简历原文</view>
+          <view class="chip">{{plan.isReview ? '场次已结束' : '场次未结束'}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{plan.summary}}" class="card rise-d2">
+      <view class="card-head"><view class="ch-title">总览</view></view>
+      <view class="card-inner"><view class="vp-summary">{{plan.summary}}</view></view>
+    </view>
+
+    <block wx:if="{{plan.highlights.length}}">
+      <view class="section-t">{{copy.highlights}}</view>
+      <view class="vp-list">
+        <view class="vp-bullet" wx:for="{{plan.highlights}}" wx:key="*this">
+          <view class="vp-dot"></view>
+          <view class="vp-bullet-text">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{plan.companies.length}}">
+      <view class="section-t">{{copy.companies}}</view>
+      <view class="vp-list">
+        <view class="vp-co" wx:for="{{plan.companies}}" wx:key="key">
+          <view class="vp-co-name">{{item.companyName}}</view>
+          <view wx:if="{{item.reason}}" class="vp-co-reason">{{item.reason}}</view>
+          <!-- sourceUrl 为空就是这家企业没有可公开的来源入口,不给按钮也不编一个 -->
+          <view wx:if="{{item.sourceUrl}}" class="vp-co-act tap" hover-class="tap-press"
+                bindtap="tapCopySource" data-url="{{item.sourceUrl}}"
+                role="button" aria-label="复制{{item.companyName}}的来源链接">
+            <text class="ficon i-link vp-co-ic"></text><text>复制来源链接</text>
+          </view>
+          <view wx:else class="vp-co-none">来源平台链接暂不可用</view>
+        </view>
+      </view>
+      <view class="vp-hint">顺序由 AI 按你的简历方向给出，仅供本人参考，不代表用人单位的意见或排名。投递须前往来源平台办理。</view>
+    </block>
+
+    <!-- 方框是空的,而且不可点:系统不知道用户做没做,画上勾就成了「已完成」的假结论 -->
+    <block wx:if="{{plan.checklist.length}}">
+      <view class="section-t">{{copy.checklist}}</view>
+      <view class="vp-checklist">
+        <view class="vp-check" wx:for="{{plan.checklist}}" wx:key="*this">
+          <view class="vp-check-box"></view>
+          <view class="vp-check-text">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{plan.questions.length}}">
+      <view class="section-t">{{copy.questions}}</view>
+      <view class="vp-list">
+        <view class="vp-q" wx:for="{{plan.questions}}" wx:key="*this">
+          <view class="vp-q-no">{{index + 1}}</view>
+          <view class="vp-q-text">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 现场提醒只在未结束场次出现:活动结束后再说「现场注意什么」是语义错误 -->
+    <block wx:if="{{plan.onsiteTips.length}}">
+      <view class="section-t">现场提醒</view>
+      <view class="vp-list">
+        <view class="vp-tip" wx:for="{{plan.onsiteTips}}" wx:key="*this">
+          <text class="ficon i-bell vp-tip-ic"></text>
+          <view class="vp-tip-text">{{item}}</view>
+        </view>
+      </view>
+    </block>
+
+    <!--
+      本机记录:非 AI 生成的事实区。只列系统真实记录下来的动作 ——
+      「在本机打开过这家企业的来源投递入口」。打开入口不等于到过现场,
+      更不等于投出去了,所以这里一个字都不能往「到访 / 签到 / 已投递」上靠。
+      未登录时必须说清是「关联不到」,不能说成「没有记录」。
+    -->
+    <block wx:if="{{plan.hasLocalRecords}}">
+      <view class="section-t">你在本机留下的记录</view>
+      <view class="card">
+        <view class="card-inner">
+          <view class="vp-local-cap">非 AI 生成，来自本机真实记录</view>
+          <view wx:if="{{plan.localRequiresLogin}}" class="vp-local-text">未登录会员，无法关联你在本机的浏览与跳转记录。</view>
+          <block wx:elif="{{plan.localCompanies.length}}">
+            <view class="vp-local-text">你在本机打开过这些参展企业的来源投递入口：</view>
+            <view class="vp-local-list">
+              <view class="vp-bullet" wx:for="{{plan.localCompanies}}" wx:key="*this">
+                <view class="vp-dot"></view>
+                <view class="vp-bullet-text">{{item}}</view>
+              </view>
+            </view>
+          </block>
+          <view wx:else class="vp-local-text">本机没有你在这场招聘会打开来源投递入口的记录。</view>
+          <view class="vp-local-note">本系统不记录你是否到场，也不记录你在现场取得的材料；以上内容仅基于本机记录的浏览与跳转行为，以及该场招聘会的公开信息。</view>
+        </view>
+      </view>
+    </block>
+
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+    </view>
+    <view class="compliance-note">内容为 AI 参考建议，不预测薪资与求职结果；岗位与活动信息以来源平台公布为准。</view>
+  </view>
+
+  <view wx:if="{{phase === 'ready'}}" class="actionbar">
+    <view class="btn primary block lg tap" hover-class="tap-press" bindtap="tapGenerate"
+          role="button" aria-label="{{copy.generate}}">{{copy.generate}}</view>
+  </view>
+
+  <view wx:if="{{phase === 'done'}}" class="actionbar">
+    <view class="btn ghost lg tap" hover-class="tap-press" bindtap="tapRegenerate" role="button" aria-label="重新生成">重新生成</view>
+    <view class="btn primary lg tap vp-print-btn {{printing ? 'disabled' : ''}}" hover-class="tap-press"
+          bindtap="tapPrint" role="button" aria-label="{{copy.print}}">{{printing ? '生成中…' : copy.print}}</view>
   </view>
 </view>
