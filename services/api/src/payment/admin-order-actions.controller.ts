@@ -37,7 +37,26 @@ export class AdminOrderActionsController {
     if (!(ADMIN_ALLOWED_PAYMENT_SOURCES as readonly string[]).includes(body.paymentSource)) {
       throw new BadRequestException('PAYMENT_SOURCE_NOT_ADMIN_ALLOWED')
     }
-    return this.orderStatus.markPaid(id, { paymentSource: body.paymentSource, operatorId: user.userId })
+    const order = await this.orderStatus.markPaid(id, { paymentSource: body.paymentSource, operatorId: user.userId })
+    // 只回入账结论，不把整行 Order 交给浏览器。
+    //
+    // markPaid 的返回值是完整 Prisma Order 行，其中含 pickupCodeEnc（到机码密文）。
+    // schema.prisma 的 Order 段落写着「日志、审计、Admin 视图均不得返回 codeEnc」，
+    // 只读订单视图也早已裁掉它。此前本端点把整行原样 res.json()，等于让密文进入
+    // 管理员浏览器、DevTools 与任何记录响应体的反代日志。
+    //
+    // pickupCode 保留：一体机现场单的取件凭证码由 markPaid 现铸，运营就是要把它
+    // 念给用户，这是线下收款模式的必要产出。而小程序云打印单的真码存在
+    // pickupCodeHash/Enc 里、只在用户手机上解密显示，本服务已不再为这类单另铸码
+    // （见 order-status.service.ts 的 mintPickupCode），此处恒为 null —— 正好避免
+    // 运营念出一枚无法认领的幽灵码。
+    return {
+      id: order.id,
+      payStatus: order.payStatus,
+      paymentSource: order.paymentSource,
+      paidAt: order.paidAt,
+      pickupCode: order.pickupCode,
+    }
   }
 
   // C5-4：Admin 退款走 canonical RefundService（Refund 账本 + sandbox provider 退款 + 幂等 + 审计）。
