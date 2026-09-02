@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import { BriefcaseIcon, BuildingIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, QrCodeIcon, StarIcon } from 'lucide-react'
-import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, CATEGORY_STYLE, formatSync } from '../utils/jobDisplay'
+import { evaluateJobSourceTrust } from '../utils/sourceTrust'
 
 export type JobSortMode = 'latest' | 'salary_first'
 
@@ -92,7 +92,10 @@ function JobResultCard({
   onToggleFavorite: () => void
   onOpen: () => void
 }) {
-  const validSource = isValidSourceUrl(job.sourceUrl)
+  // 判据必须与详情页的放行门禁同源：这张卡上写「可扫码投递」，而详情页只在
+  // 来源四要素齐全时才真的放行外跳与扫码。只看 sourceUrl 会让列表先许下一个
+  // 详情页兑现不了的承诺（用户点进去发现按钮是灰的）。
+  const validSource = evaluateJobSourceTrust(job).ok
   return (
     <div className="jf-row" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter') onOpen() }}>
       <div className="jf-row-main">
@@ -117,7 +120,7 @@ function JobResultCard({
                 <QrCodeIcon className="h-3 w-3" aria-hidden="true" />
                 线上平台 · 可扫码投递
               </>
-            ) : '来源链接待补齐'}
+            ) : '来源要素待补齐'}
           </span>
         </div>
       </div>

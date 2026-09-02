@@ -15,7 +15,7 @@ import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
-import { isValidSourceUrl } from '../../lib/url'
+import { evaluateJobSourceTrust, sourceTrustReason } from './utils/sourceTrust'
 import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
 import { JobAiConsentModal } from './components/JobAiConsentModal'
@@ -102,7 +102,12 @@ export function JobDetailPage() {
 
   const currentJob = job
   const favorite = isFavorite('job', currentJob.id)
-  const sourceCanApply = isValidSourceUrl(currentJob.sourceUrl)
+  // 来源四要素（来源机构 / 同步时间 / 外部ID / 外部投递链接）缺一即不放行外跳与扫码。
+  // 判据与不放行文案的完整理由见 ./utils/sourceTrust.ts —— 那里也写清了
+  // 为什么 validThrough 不参与门禁（过期与否由来源平台决定，本机无权替它下结论）。
+  const sourceTrust = evaluateJobSourceTrust(currentJob)
+  const sourceCanApply = sourceTrust.ok
+  const sourceBlockedReason = sourceTrustReason(sourceTrust, SOURCE_APPLY_UNAVAILABLE_REASON)
   const isTerminalKiosk = Boolean(getTerminalId())
 
   function openSourceQr() {
@@ -252,7 +257,7 @@ export function JobDetailPage() {
             投递在来源平台完成，本终端不接收简历、不参与招聘流程
             {sourceCanApply ? null : (
               <b id="job-detail-apply-blocked" className="jf-blocked-reason">
-                {SOURCE_APPLY_UNAVAILABLE_REASON}
+                {sourceBlockedReason}
               </b>
             )}
           </span>
@@ -308,10 +313,10 @@ export function JobDetailPage() {
         onToggleFavorite={() => toggleFavorite({ type: 'job', id: currentJob.id, title: currentJob.title })}
       />
       <JobDescriptionSection job={currentJob} />
-      <JobTrustSection job={currentJob} sourceCanApply={sourceCanApply} />
+      <JobTrustSection job={currentJob} trust={sourceTrust} />
       <JobNextActionsSection
         job={currentJob}
-        sourceCanApply={sourceCanApply}
+        trust={sourceTrust}
         onOpenQr={openSourceQr}
         onViewCompany={viewCompany}
         onExplainAi={() => void startExplain()}
