@@ -60,6 +60,18 @@ Page({
     this.loadDetail(this.data.pageId);
   },
 
+  // 现场助手四个入口。fairId 是这四页的必需参数,取不到就不跳——
+  // 与其跳进去让下游页面报「缺少招聘会参数」,不如在这里就不给点。
+  _openFairPage(page) {
+    const id = this.data.pageId
+    if (!id) return
+    wx.navigateTo({ url: `/pages/${page}/${page}?fairId=${encodeURIComponent(id)}` })
+  },
+  tapVenue()     { this._openFairPage('fair-venue') },
+  tapCompanies() { this._openFairPage('fair-companies') },
+  tapMaterials() { this._openFairPage('fair-materials') },
+  tapVisitPlan() { this._openFairPage('fair-visit-plan') },
+
   goBack() {
     wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } });
   },
