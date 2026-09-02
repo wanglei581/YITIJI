@@ -125,6 +125,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-checkin
           pnpm --filter @ai-job-print/kiosk verify:jobfair-size
+          pnpm --filter @ai-job-print/kiosk verify:jobfairs-terminal-priority
           pnpm --filter @ai-job-print/kiosk verify:kiosk-runtime-error-boundary
           pnpm --filter @ai-job-print/kiosk verify:kiosk-visual-unity
           pnpm --filter @ai-job-print/kiosk verify:print-cta-contrast
