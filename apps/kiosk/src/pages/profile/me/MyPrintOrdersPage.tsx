@@ -245,6 +245,7 @@ export function MyPrintOrdersPage() {
   return (
     <div className="me-inkdetail me-inkdetail-print-orders h-full">
       <MeListShell
+      signedOutDescription="这里存的是你的打印订单、取件码与出纸状态。到机取件用小程序里的到机码，不需要在这台机器登录。"
         title="打印订单"
         subtitle="本人打印任务与订单记录（仅本人可见）"
         loginFrom="/me/print-orders"

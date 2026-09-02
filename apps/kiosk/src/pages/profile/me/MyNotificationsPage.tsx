@@ -123,6 +123,7 @@ export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { login
   return (
     <div className="me-inkdetail me-inkdetail-notifications h-full">
       <MeListShell
+      signedOutDescription="这里存的是服务端下发给你的会员通知，未读状态需要绑定身份才能保存。"
         title="消息通知"
         subtitle="本人设备、打印、文件与服务消息"
         loginFrom={loginFrom}

@@ -312,6 +312,7 @@ export function MyDocumentsPage() {
   return (
     <div className="me-inkdetail me-inkdetail-documents h-full">
       <MeListShell
+      signedOutDescription="这里存的是你上传和生成的文件。公共终端不跨会话保留匿名文件，登录后才能之后回来找。"
         title="我的文档"
         subtitle="本人保存的文档（仅本人可见，到期自动清理）"
         loginFrom="/me/documents"

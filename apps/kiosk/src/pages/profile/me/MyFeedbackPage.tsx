@@ -178,6 +178,7 @@ export function MyFeedbackPage() {
   return (
     <div className="me-inkdetail me-inkdetail-feedback h-full">
       <MeListShell
+      signedOutDescription="这里存的是你提交过的反馈与处理状态。打印完成页有免登录反馈入口，不登录也能提交。"
         title="意见反馈"
         subtitle="提交设备、打印、文件处理与一般建议"
         loginFrom="/me/feedback"
