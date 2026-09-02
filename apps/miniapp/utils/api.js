@@ -283,6 +283,36 @@ const api = {
     if (config.USE_MOCK) return mockResolve(mock.policyList());
     return adaptList(unwrapList(request('/policies', { method: 'GET', data: params, needAuth: false })), N.policy);
   },
+  /**
+   * 政策条件自测问项。免登录（与 GET /policies 同口径）。
+   * 返回 { questionSetVersion, questions, privacyNotice, disclaimer }。
+   * questions[].sensitive 为真表示敏感个人信息——页面必须就地提示「这项可以不填」，
+   * 而不是默默收集。
+   */
+  getPolicyEligibilityQuestions() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('政策条件自测'));
+    return request('/policies/eligibility-questions', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 政策条件核对。免登录、纯计算、**服务端零落库**——作答不进库、不进审计、不进日志
+   * （policy-eligibility.service.ts 的隐私口径）。
+   *
+   * 用 POST 而不是 GET 是刻意的：作答含户籍/参保/失业登记等个人信息，
+   * 放进 URL query 会进网关与访问日志。同理前端也不得把作答写进
+   * Storage 或页面路由参数。
+   *
+   * 结果里的 overallLabel 是服务端给定的合规措辞（「已录入条件的比对结果」），
+   * **必须原样展示**：写成「你符合申领资格」就把机械比对说成了资格认定。
+   * evidenceLevel 恒为 E2（来源方事实），不得出现「AI 判断」字样。
+   */
+  checkPolicyEligibility(answers, policyIds) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('政策条件自测'));
+    const data = { answers: answers || {} };
+    if (Array.isArray(policyIds) && policyIds.length) data.policyIds = policyIds;
+    return request('/policies/eligibility-check', { method: 'POST', data, needAuth: false });
+  },
+
   getPolicyDetail(id) {
     if (config.USE_MOCK) return mockResolve(mock.policyById(id));
     return request(`/policies/${id}`, { method: 'GET', needAuth: false }).then(N.policyDetail);

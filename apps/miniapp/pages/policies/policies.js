@@ -47,6 +47,10 @@ Page({
 
   back() { wx.navigateBack({ fail() { wx.switchTab({ url: '/pages/home/home' }) } }) },
 
+  tapSelfCheck() {
+    wx.navigateTo({ url: '/pages/policy-check/policy-check' })
+  },
+
   tapPolicy(e) {
     wx.navigateTo({ url: `/pages/policy-detail/policy-detail?id=${e.currentTarget.dataset.id}` })
   },

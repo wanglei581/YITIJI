@@ -1,0 +1,31 @@
+/* 政策条件自测。只放本页私有类，其余复用 app.wxss 全局类。
+   尺寸一律走 --fs-* / --r-* 令牌，不再挑新数。 */
+
+.q-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 16rpx; }
+.q-label { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+/* 「可以不填」要看得见但不抢戏——它是知情提示，不是操作 */
+.q-optional { font-size: var(--fs-xs); color: var(--faint); flex-shrink: 0; }
+
+.q-opts { display: flex; flex-wrap: wrap; gap: 14rpx; }
+/* 96rpx = 48px 触控下限 */
+.q-opt {
+  min-height: 96rpx; padding: 0 26rpx;
+  display: flex; align-items: center;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.q-opt.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); font-weight: 600; }
+
+.r-title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); line-height: 1.45; }
+.r-overall { margin-top: 10rpx; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
+.r-sum { margin-top: 16rpx; display: flex; flex-wrap: wrap; gap: 12rpx; }
+.r-foot {
+  margin-top: 16rpx; padding-top: 16rpx; border-top: 1px solid var(--line-faint);
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+  font-size: var(--fs-xs); color: var(--faint);
+}
+.r-manual { color: var(--warn); }

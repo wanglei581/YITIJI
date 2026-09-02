@@ -35,6 +35,7 @@
     "pages/company-detail/company-detail",
     "pages/fairs/fairs",
     "pages/policies/policies",
+    "pages/policy-check/policy-check",
     "pages/print-preview/print-preview",
     "pages/usb-import/usb-import",
     "pages/resume-parse/resume-parse",
