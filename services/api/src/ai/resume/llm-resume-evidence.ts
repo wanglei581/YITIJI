@@ -63,7 +63,7 @@ const DIMENSION_KEYS = new Set<string>(RESUME_SCORING_DIMENSIONS.map((d) => d.ke
  * 防编造校验）；此处**复用同一口径**，不另立一套宽严标准。
  */
 function normalizeForMatch(text: string): string {
-  return text.replace(/[\s　,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
+  return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
 }
 
 /** 去控制字符、压空白、trim、截断。空串返回 null。 */

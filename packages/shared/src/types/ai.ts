@@ -88,6 +88,12 @@ export type ResumeContentBlockKey = typeof RESUME_CONTENT_BLOCKS[number]['key']
  *   每块最多 6 行、每行最多 80 字。
  * - 一行都没留下的块不会出现在数组里：服务端无法区分「简历里没有这块」「模型没摘出来」
  *   「被输入截断切掉了」三种情况，摆一个空块等于替用户下结论。
+ *
+ * 留存后果（新增面，改动前请先读）：报告要在刷新后仍能渲染，所以这些片段会随
+ * AiResumeResult.payloadJson 落库到结果 TTL 到期为止 —— 这是本字段之前不存在的
+ * 「简历文本入库」面。片段摘自**遮盖后**的文本，手机 / 邮箱 / 身份证等高置信 PII
+ * 已被替换成 [手机号_1] 这类占位符，服务端不做还原（在公共终端上把真手机号显示
+ * 回来并写进库，比留占位符更糟）。上限 7 块 × 6 行 × 80 字，不是整份简历。
  */
 export interface ResumeContentBlock {
   key: ResumeContentBlockKey
