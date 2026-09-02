@@ -118,7 +118,7 @@ page {
   --fs-md:    30rpx;   /* 15px  强调正文、列表主标题 */
   --fs-lg:    34rpx;   /* 17px  卡片与分区标题 */
   --fs-xl:    40rpx;   /* 20px  页面标题 */
-  --fs-2xl:   52rpx;   /* 26px  数字、大标 */;
+  --fs-2xl:   52rpx;   /* 26px  数字、大标 */
 
   background: var(--paper);
   font-family: var(--font-sans);

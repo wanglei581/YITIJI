@@ -826,6 +826,36 @@ for (const page of PACKAGE_CHAIN_PAGES) {
 if (!packageFakeHits.length) ok('材料包四页无假电话 / 假坐标 / 本地硬编码计价')
 else bad('材料包侧链假数据', packageFakeHits.join('；'))
 
+// WXSS 编译器比标准 CSS 严：注释后面跟一个多余的分号（`*/;`）、或连续分号
+// （`;;`），在浏览器和 postcss 里都是无害的空声明，会被静默忽略；WXSS 直接判编译
+// 失败，**整个视图层不渲染**——App 照常启动、getApp() 有值、页面栈恒为 0、模拟器
+// 纯白，日志里只有一句「编译 .wxss 文件错误」不指文件。
+//
+// 2026-09-02 就是这么炸的：app.wxss 的字阶块末尾写成 `52rpx;  /* 26px ... */;`。
+// 当时 110 条静态门禁全绿、API 契约一致、视觉刻度零偏离、postcss 解析 63 个 wxss
+// 全过、花括号与注释配平也全过——没有任何一道拦得住，最后是靠在开发者工具里看到
+// 白屏、二分 app.wxss 才找出来。
+//
+// 删掉这条检查会怎样：同一类改动可以再次把整个小程序变成白屏而全部门禁保持绿色。
+const wxssFiles = [
+  path.join(ROOT, 'app.wxss'),
+  ...PAGE_PATHS.map((pg) => path.join(ROOT, `${pg}.wxss`)),
+  path.join(ROOT, 'custom-tab-bar/index.wxss'),
+].filter((f) => fs.existsSync(f))
+const wxssStrayHits = []
+for (const f of wxssFiles) {
+  const src = fs.readFileSync(f, 'utf8')
+  const rel = path.relative(ROOT, f)
+  for (const [re, what] of [[/\*\/\s*;/g, '注释后多余分号 `*/;`'], [/;\s*;/g, '连续分号 `;;`']]) {
+    let m
+    while ((m = re.exec(src))) {
+      wxssStrayHits.push(`${rel}:${src.slice(0, m.index).split('\n').length} ${what}`)
+    }
+  }
+}
+if (!wxssStrayHits.length) ok(`wxss 无 WXSS 编译器拒绝的空声明（${wxssFiles.length} 个文件）`)
+else bad('wxss 含 WXSS 会拒绝的空声明', `${wxssStrayHits.slice(0, 5).join('；')}——会导致整个小程序白屏`)
+
 const pageCount = (appJson?.pages || []).length
 console.log(`\n${pass} PASS / ${fails.length} FAIL（注册页面 ${pageCount}）`)
 if (fails.length) {
