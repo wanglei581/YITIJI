@@ -89,6 +89,21 @@ export class PoliciesController {
     return this.eligibility.checkEligibility({ answers: dto.answers, policyIds: dto.policyIds })
   }
 
+  /**
+   * 政策详情。此前只有列表端点，详情页一直是 404。
+   *
+   * **这个装饰器的位置是有意义的**：必须排在 policies/eligibility-questions 与
+   * policies/eligibility-check 之后。Nest 按声明顺序匹配，放前面会把
+   * `policies/eligibility-questions` 当成 `:id` 吃掉。
+   *
+   * 与 job-fairs/:id 同口径：查不到返回 data:null 而不是抛 404，
+   * 前端据此落空态。不区分「不存在」与「未发布」——区分了就泄露未发布政策的存在性。
+   */
+  @Get('policies/:id')
+  getPolicyById(@Param('id') id: string) {
+    return this.policies.getPublishedPolicyById(id)
+  }
+
   // ── Partner ─────────────────────────────────────────────────────────────────
 
   @Get('partner/policies')

@@ -114,7 +114,6 @@
     "GET /community/feeds/:p": "同上，社区详情。",
     "GET /community/feeds/:p/comments": "同上，社区评论列表。",
     "GET /orders/package/:p": "同上，材料包详情。",
-    "GET /policies/:p": "政策详情：后端 policies.controller.ts 只提供 GET /policies 列表与 eligibility-* 端点，没有按 id 取详情的路由。这是 2026-09-02 契约审计新发现的断层，不是已知延后项——政策详情页会 404，须补后端端点或改为从列表带入。",
     "POST /assistant/daily-report": "今日早报：后端无该端点。CLAUDE.md §15 已声明未开放。",
     "POST /community/comments/:p/like": "同上，评论点赞。",
     "POST /community/feeds/:p/comments": "同上，发评论。社区功能上线前须先过 UGC 内容审核与合规评估。",
