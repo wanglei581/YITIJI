@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>能力受控专区 · 职易达</title>
+<!--
+  宿主：能力受控共享工作台（一个宿主承接四条真实 route，不拆多份 HTML）
+  route: /toolbox                     screen=toolbox         —— 台账 038
+         /smart-campus                screen=campus          —— 台账 039
+         /smart-campus/welcome        screen=campus-welcome  —— 台账 040
+         /smart-campus/service/:key   screen=campus-service  —— 台账 042
+  为什么四条共用一个宿主：这四条全部经同一个能力边界（能力开关 + 本机编号一致才放行），
+         扩展项的启动语义（站内 / 外部 / 扫码）在生产里也是同一份共享代码，只有投放位置
+         不同。拆成两个宿主等于把同一个门禁卡、同一张磁贴、同一个启动层各画两遍。
+  screen/state: ?screen= 与 ?state= 都是**原型演示控制，不属于产品逻辑**。生产里这四条是
+         四条独立 route，服务页用路径参数带 key；这里把 key 编进 state 名，不新增第四个参数。
+         ?flat=1 关闭非必要动效，?debug=1 显示演示面板，?capture=1 固定时钟与循环动画相位。
+         静态页只切视图，不发任何请求、不推进业务、不生成 AI 结果。
+  文件： policy-campus-workspaces.js / .css = 与 48 / 49 共用的壳层（S9 已冻结，本批一个字节都不改）；
+         capability-zone-workspace.js / .css = 本宿主独有的视图、状态注册表与版式。
+
+  ── 真实 React 合同（本页按它落笔，不美化）────────────────────────────
+  能力边界（KioskCapabilityGuard）
+      读取本机配置后，只有「配置已就绪 + 能力已开启 + 本机编号存在且与本次一致」四条同时成立
+      才放行；否则整屏替换成一张能力卡：
+        · 读取中 → 「⋯⋯服务配置检查中」，**不渲染任何按钮**（本页照此画成无出口）；
+        · 其余   → 「本机暂未开启⋯⋯」+ 返回首页。
+      「没有开启」「本机编号缺失」「本机编号漂移」「读取失败」「配置畸形」五种真实原因
+      被同一个分支折叠成同一句话 —— 这是产品所有者选定的 fail-closed 口径，本页照做，
+      不另画一屏 error（代价见下方「真话边界」④）。
+  百宝箱（ToolboxZonePage）
+      放行时必然至少有一个可启动项（边界的判据里就含这一条），因此**不存在**「已开启但一项都没有」
+      的空屏；本页不画那一屏。磁贴按运营方设定的顺序排列；静态页将名称与说明明确标为
+      「字段演示」，不使用灰色槽位冒充真实已上架服务。
+  智慧校园首页（SmartCampusHomePage）
+      校园卡 / 一卡通 / 校园网三张自助服务卡不受任何子模块开关约束，校园总开关一开就出现；
+      迎新指引 / 行李帮运 / VR校园 三张按各自子模块开关显隐。
+      徽标只有两种句式：「可查看指引 N 项」与「可查看指引 N 项 · 已配置入口 M 项」，
+      N ≡ 卡片数、M ≡ 可启动的扩展项数，不得写成「本校已开通 X 项服务」。
+      校园大数据不出任何入口，只在页脚说明未开放。
+  迎新指引（SmartCampusWelcomePage）／服务指引（SmartCampusServicePage）
+      只做信息展示与指引，不在本机采集任何个人信息；子模块关闭时由子页门禁替换成
+      「本机暂未开启这项智慧校园服务」+ 返回智慧校园（注意出口是校园首页，不是首页）。
+      未知服务 key 由页面内兜底成「未找到该服务」—— 它不是门禁态，两者文案与图标必须能分开。
+      五种服务详情按各自任务组织：办卡材料打印、权限核对、网络排查、行李现场顺序、全景替代方式；
+      不再套同一份「通用类别 + 空地点 + 去迎新」模板。
+
+  ── 设计修正（与当前 React 的刻意差异，迁移时按本设计改）─────────────
+  ① 磁贴的可用性只由「原因常显」表达，不由徽标表达。现 React 用两套判据：可点与否看安全校验，
+     徽标看字段是否为空，于是会出现「灰掉、写着外部应用、却没有任何原因」的磁贴。
+     本页统一：不可用磁贴一律标注不可用并在磁贴内常显一句原因。
+  ② 服务指引页不写死办理地点与所需材料。现 React 把「校园卡服务中心 / 一卡通中心」
+     「初始密码（随录取材料发放）」等写进代码，本机对这所学校一无所知，这属于编造。
+     本页只列**通用类别**，并把办理地点与时间做成诚实空态，一律以学校官方通知为准。
+  ③ 迎新指引不深链到任何求职材料清单技能。那条技能的开场白与免责声明写死的是面试、
+     招聘会与入职场景，用在报到材料上会给出错框；本页只保留「第一份简历 · AI 诊断」这条
+     真实可交接的路径，且本页不预填、不预告结果。
+  ④ 读取中一屏没有超时也没有出口，是当前真实行为，本页照实画（任务区零可点元素）。
+     这条产品风险只记录在取证报告的边界说明里，不写成用户看得懂却帮不上忙的界面文字。
+
+  ── 真话边界（本页逐条自检）───────────────────────────────────────────
+  ① 扩展服务的名称、说明与目标以「配置字段演示」呈现，本机不预置任何示例第三方服务，也不替它们背书。
+  ② 校园内容一律是通用参考：不写具体学校名、院系名、楼栋位置、校历日期、初始密码，
+     不声称校方授权、校方审核或校方已开启，实际安排一律以学校官方通知为准。
+  ③ 计数只数页面上真实存在的东西：能查看的指引卡数、能启动的扩展项数，不写「已开通」。
+  ④ 「本机暂未开启」同时覆盖没开和没读到两种情况；运营到现场看到这一句时无法区分，
+     这是当前 fail-closed 口径的已知代价，已写进取证报告，不在界面上给「其实可用」的暗示。
+  ⑤ 无真实图源不留灰块：全景导览没有内容时整块换成诚实说明，不放占位图。
+  ⑥ 本页不判断能力是否开启、模块是否开启、扩展项是否可启动、目标是否可信、
+     学校是否真的提供该服务，也不判断打印是否完成 —— 这些只认本机配置与设备回流。
+
+  ai-mode: 矩阵目标态 AI-CONTEXT；**当前现状**：/toolbox、/smart-campus、
+           /smart-campus/service/:key 三条一律 AI-NONE —— 小青现有技能里没有任何一条
+           可用于百宝箱或校园办理，扩展项又是本系统未核验的第三方服务，
+           因此这三屏**不放任何 AI 控件**（连置灰的也不放），也不摆 AI 说明板。
+           /smart-campus/welcome 是本批唯一有真实 AI 能力可交接的一屏：确认 → 交接，
+           生成发生在简历来源选择页，本页零输入、零预填、零输出。
+           后续逐页迁移必须为适合 AI 的正常办理页补齐任务相关能力；加载、未开放、未知服务、
+           二维码、外部跳转与配置确认不放 AI，也不把全局「AI 顾问」计作页内增强。
+  ai-input: 三条 AI-NONE 屏不向模型发送任何内容（不发扩展项标题、说明、目标或本机清单）；
+           迎新页也不持有输入，用户到目标页自行提供本人简历。
+  ai-consent: 本批不索取任何 AI 授权；迎新页的真实授权在目标页按其既有契约取得。
+  ai-output: 本批零 AI 输出。不生成推荐、排序、优劣比较、材料清单、校历或办理建议。
+  ai-failure: 模型不可用或缺上下文时，本批四屏的主任务（选服务 / 看指引 / 打印）完全不受影响，
+           因为它们本来就不经过模型。
+  ai-fallback: 看磁贴与卡片、扫码、离场确认后前往、打印、去现场窗口或学校官方自助平台。
+  ai-persistence: 本批不产生 AI 记录。扩展项的启动动作按现有匿名口径上报，
+           不记录第三方页面的办理结果，也不上报目标地址。
+  验收范围：静态原型表现；不证明 React 接线、本机配置可读、扩展项真实上架、模块开关真实下发、
+           小青可用、二维码生成、打印、部署、Windows Agent 或奔图真机完成。
+-->
+<link rel="stylesheet" href="policy-campus-workspaces.css">
+<link rel="stylesheet" href="capability-zone-workspace.css">
+</head>
+<body data-host="capability">
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back-link" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">—</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">百宝箱</h1>
+    <p class="th-s" id="task-sub">—</p>
+  </section>
+
+  <div id="tabbar-host"></div>
+
+  <main class="body" id="body-root" data-screen="toolbox-zone" data-state="ready" data-testid="toolbox-zone-state-ready"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="capability-truth">
+    <div><b>扩展服务与校园指引按本机配置展示</b>进入第三方服务前会先提示；本机不记录你在第三方页面的办理结果，校园办理一律以学校官方通知为准。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script src="policy-campus-workspaces.js"></script>
+<script src="capability-zone-workspace.js"></script>
+</body>
+</html>

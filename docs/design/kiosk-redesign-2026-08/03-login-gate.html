@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>登录 · 职易达</title>
+<!--
+  route: /login（apps/kiosk/src/pages/auth/LoginPage.tsx）
+  回跳来源（**参数名是 from，不是 returnTo**，LoginPage.tsx:97-109）：
+    ① location.state.from —— 本站自己写进 history state 的字符串，优先；
+    ② ?from= —— query 通道，可被外部构造，所以同样要过安全校验；
+    ③ 两者都不合法 → '/'。
+    安全判定的唯一实现是 src/auth/returnPath.ts 的 isSafeInternalPath()：
+      必须以 '/' 开头、不得以 '//' 开头、不得含反斜线、不得是 /login 自身（isLoginPath）。
+    静态页只有 query 一条通道，所以本页读 ?from=；并在两处比运行时更严（静态页没有
+    React Router 兜底）：'//' 出现在任何位置都判非法；含控制字符（U+0000-U+001F、U+007F）判非法。
+    非法值一律按 '/' 处理，且**不回显原值**（回显等于给了一个能在登录页写字的注入点），
+    只在页头如实说明「来源参数不合法，已按回首页处理」。
+  mode:  phone（运行时默认 tab）| qr（扫码登录 tab，ScanQrLoginPanel）
+  state: phone-idle | phone-sending | phone-code-sent | phone-send-limited | phone-send-failed |
+         phone-verifying | phone-code-invalid | phone-code-expired |
+         qr-loading | qr-ready | qr-expired | qr-confirmed | qr-error
+         mode 与 state 冲突时（例如 ?mode=phone&state=qr-ready）**以状态前缀为准**：
+         状态是页面真正在画的东西，tab 只是它的投影。?mode=qr 不带 state 时落到 qr-loading。
+  api:   POST /member/sms-code → 成功 { sent:true, cooldownSeconds=60, expiresInSeconds=300 }
+                                 SMS_SEND_FAILED(502) → 服务端把刚写入的验证码与冷却一起删掉，可立刻重试
+                                 SMS_TOO_FREQUENT / IP / DEVICE / PROVIDER_RATE_LIMIT(429) → 稍后再试
+                                 SMS_DAILY_LIMIT / PROVIDER_PHONE_DAILY_LIMIT(429)         → 明天再试
+         POST /member/login  → SMS_CODE_INVALID / SMS_CODE_EXPIRED / SMS_CODE_LOCKED 三条不同下一步
+         POST /local/qr-login/create → { ticketId, qrContent, expiresInSeconds }，QR_TICKET_TTL=180 秒
+         GET  /local/qr-login/status → pending | confirmed | expired（expiresInSeconds 是剩余值，不是 180）
+         POST /local/qr-login/claim  → 一体机凭票据换登录态；claim 会失败，失败后要求重扫
+  fallback: 每个失败态都保留「改用另一种登录方式」「不登录继续」「返回首页」三条实体出口（≥56px）
+  真实性:  静态页不生成可扫描二维码、不声称短信已发送、不声称已登录。
+           手机确认只等于 confirmed，一体机还要 claim 成功才登录，因此本页没有「登录成功」屏。
+           协议勾选发生在创建票据/发码**之前**（ScanQrLoginPanel.refresh() 里 !agreed 直接 return；
+           LoginPage.handleQrLoginSuccess 在 !agreed 时也会拦下 claim 成功回调）。所以本页的
+           发码、创建/刷新二维码、claim 与确认登录四个 CTA 在未勾协议时**一律不可用，且原因常显**；
+           未勾协议时扫码区也不会说「正在申请票据」——那一步根本没发生。
+  AI 边界: 本 route 为 AI-NONE。AI 不判定身份、手机号归属、验证码有效性和登录结果。
+  原型演示控制: ?mode= / ?state= 只切换展示状态，不驱动任何业务；?debug=1 显演示面板，?flat=1 关非必要动效。
+                页内所有 tab / mode / state 跳转都会带上 from、debug、flat，不会走一步丢一个参数。
+-->
+<style>
+/* 弹出式数字键盘 —— 公共终端无物理键盘；inputmode 只对移动端有效，
+   Windows Edge/Chrome 全屏 Kiosk 下不弹任何系统键盘，必须页内自带。
+   点输入框弹出、点遮罩收起；不调系统键盘，避免其设置入口造成 Kiosk 逃逸。 */
+#kbmask{position:absolute;inset:0;z-index:40;background:rgba(11,36,30,.18);display:none;}
+#kbmask.on{display:block;}
+#kbpad{position:absolute;left:0;right:0;bottom:0;z-index:41;transform:translateY(102%);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);background:#fffdf8;
+  border-top:1px solid #d4cdb6;border-radius:28px 28px 0 0;padding:22px 26px 26px;
+  box-shadow:0 -14px 40px rgba(11,36,30,.14);}
+#kbpad.on{transform:translateY(0);}
+#kbpad .kbhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+#kbpad .kbfor{font-size:19px;color:#6b857c;}
+#kbpad .kbfor b{color:#10302b;}
+#kbpad .kbdone{height:56px;padding:0 26px;border-radius:16px;border:1px solid #d4cdb6;
+  background:#f5f2e9;font-size:20px;font-weight:700;color:#10302b;cursor:pointer;}
+#kbpad .kbrow{display:flex;gap:12px;margin-top:12px;}
+#kbpad .kbk{flex:1;height:88px;border-radius:18px;border:1px solid #d4cdb6;background:#f5f2e9;
+  font-size:34px;font-weight:800;color:#10302b;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .14s;}
+#kbpad .kbk:active{transform:scale(.97);background:#e0f2ec;border-color:#1f9e86;}
+#kbpad .kbk.fn{font-size:22px;font-weight:700;}
+#kbpad .kbk.del{background:#0b241e;color:#fff;border-color:#0b241e;}
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:32px; --r-md:24px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+a:focus-visible,button:focus-visible,input:focus-visible,[role=button]:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.head{flex:none;padding:24px 44px 0}
+.head .no{font-size:19px;letter-spacing:5px;color:var(--teal-d);font-weight:700;margin-bottom:8px}
+.head h1{font-size:44px;font-weight:700;letter-spacing:1px}
+.head .sub{margin-top:8px;font-size:21px;color:var(--ink-2);line-height:1.5}
+.head .sub b{color:var(--ink);font-weight:600}
+.from-note{margin-top:10px;padding:12px 20px;border-radius:16px;background:var(--wheat-soft);border:1px solid #e6d8b4;color:var(--wheat-d);font-size:18px;line-height:1.5;font-weight:600}
+.from-note[hidden]{display:none}
+
+.tabs{flex:none;display:flex;gap:14px;margin:18px 44px 0}
+.tab{flex:1;min-height:88px;border-radius:var(--r-md);border:1px solid var(--line-2);background:var(--surface);display:flex;align-items:center;gap:16px;padding:0 24px}
+.tab .ti{flex:none;width:56px;height:56px;border-radius:18px;background:var(--paper);color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+.tab .tb{flex:1;min-width:0}
+.tab .tn{display:block;font-size:25px;font-weight:700}
+.tab .td{display:block;margin-top:4px;font-size:17px;color:var(--ink-3);line-height:1.35}
+.tab.on{background:var(--deep);border-color:var(--deep);color:#f2efe4}
+.tab.on .ti{background:rgba(46,230,168,.16);color:var(--emerald)}
+.tab.on .td{color:rgba(242,239,228,.66)}
+
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.scrollarea{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+/* 触屏可供性：公共终端用户不会主动试探能不能滑，滚动条必须常驻可见。 */
+.scrollarea{scrollbar-width:thin;scrollbar-color:var(--line-2,#d4cdb6) transparent}
+.scrollarea::-webkit-scrollbar{width:10px}
+.scrollarea::-webkit-scrollbar-thumb{background:var(--line-2,#d4cdb6);border-radius:6px}
+.scrollarea::-webkit-scrollbar-track{background:transparent}
+.sec{flex:none;padding:0 44px;margin-top:22px}
+.sec.last{margin-bottom:18px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+
+.field{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px 26px}
+.field+.field{margin-top:14px}
+.field label{display:block;font-size:21px;font-weight:700;margin-bottom:10px}
+.field .row{display:flex;align-items:center;gap:14px}
+.field input{flex:1;min-width:0;height:82px;padding:0 22px;border:1px solid #9eb4aa;border-radius:20px;background:#fffefa;font-size:30px;letter-spacing:3px;font-variant-numeric:tabular-nums}
+.field input::placeholder{color:#a3b1ab;letter-spacing:1px;font-size:24px}
+.field input:disabled{background:#eef0ec;border-color:var(--line-2);color:var(--ink-3)}
+.field .side{flex:none;min-height:82px;min-width:212px;padding:0 24px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink);font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3}
+.field .side[aria-disabled=true]{opacity:.55;cursor:default}
+.field .echo{margin-top:12px;font-size:20px;color:var(--ink-2)}
+.field .echo b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.reason{margin-top:10px;font-size:18px;line-height:1.5;color:var(--wheat-d);font-weight:600}
+
+.state{border-radius:var(--r-lg);padding:26px 32px;border:1px solid var(--line);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:28px;font-weight:700}
+.state-p{margin-top:11px;font-size:21px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px 26px}
+.card h3{font-size:24px;font-weight:700;display:flex;align-items:center;gap:12px}
+.card .ci{flex:none;width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.card p{margin-top:10px;font-size:19px;line-height:1.55;color:var(--ink-2)}
+.card p b{color:var(--ink);font-weight:600}
+.entries{display:flex;flex-direction:column;gap:14px}
+.entry{display:flex;align-items:center;gap:20px;min-height:126px;padding:20px 26px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)}
+.entry .ei{flex:none;width:70px;height:70px;border-radius:22px;display:flex;align-items:center;justify-content:center}
+.entry .eb{flex:1;min-width:0}
+.entry .en{display:block;font-size:26px;font-weight:700}
+.entry .ed{display:block;margin-top:6px;font-size:19px;line-height:1.45;color:var(--ink-2)}
+.entry .ego{flex:none;width:60px;height:60px;border-radius:50%;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center}
+
+.qrwrap{display:flex;gap:22px;align-items:stretch}
+.qrslot{flex:none;width:440px;height:440px;border-radius:var(--r-lg);border:2px dashed var(--line-2);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:26px;text-align:center}
+.qrslot .qi{width:96px;height:96px;border-radius:26px;background:var(--paper);color:var(--ink-3);display:flex;align-items:center;justify-content:center}
+.qrslot b{font-size:23px;font-weight:700}
+.qrslot span{font-size:18px;line-height:1.5;color:var(--ink-3);max-width:330px}
+.qrside{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.steps{list-style:none;display:flex;flex-direction:column;gap:12px}
+.steps li{display:flex;gap:14px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.steps .sn{flex:none;width:38px;height:38px;border-radius:12px;background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.steps b{color:var(--ink);font-weight:600}
+
+.agree{flex:none;margin:0 44px 12px;display:flex;align-items:center;gap:16px;padding:18px 22px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line)}
+.agree input[type=checkbox]{flex:none;width:48px;height:48px;accent-color:var(--teal-d)}
+.agree label{flex:1;min-width:0;font-size:20px;line-height:1.5;color:var(--ink-2);display:flex;align-items:center;min-height:48px}
+.agree a{min-height:48px;display:inline-flex;align-items:center;padding:0 10px;color:var(--teal-d);font-weight:700;text-decoration:underline}
+/* 门禁原因常显：不是只写进 aria-label，屏幕上看得见为什么按不动 */
+.gate-note{flex:none;margin:0 44px 14px;padding:14px 22px;border-radius:18px;font-size:19px;line-height:1.5;font-weight:600;background:var(--wheat-soft);border:1px solid #e6d8b4;color:var(--wheat-d)}
+.gate-note.ok{background:var(--teal-soft);border-color:#c6e4da;color:var(--teal-d)}
+
+.ctabar{flex:none;padding:18px 44px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px}
+.btn{min-height:76px;padding:0 30px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:24px;font-weight:700;text-align:center;flex:1}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{cursor:default}
+.btn.primary[aria-disabled=true]{background:#dfe4e0;color:#5f716a}
+.btn.ghost[aria-disabled=true]{opacity:.55}
+.truth{flex:none;padding:14px 44px 16px;border-top:1px solid var(--line);display:flex;gap:26px;background:var(--paper)}
+.truth div{flex:1;font-size:18px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+
+.dot16{width:16px;height:16px;border-radius:50%;background:var(--teal);display:inline-block;flex:none}
+@keyframes k-breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px;max-height:1400px;overflow:auto}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="kbmask" aria-hidden="true"></div>
+  <div id="kbpad" role="group" aria-label="数字键盘" data-testid="login-gate-keypad" aria-hidden="true">
+    <div class="kbhead"><span class="kbfor">正在输入：<b id="kbfor">手机号</b></span>
+      <button type="button" class="kbdone" data-kb="done">收起键盘</button></div>
+    <div class="kbrow"><button type="button" class="kbk" data-kb="1">1</button><button type="button" class="kbk" data-kb="2">2</button><button type="button" class="kbk" data-kb="3">3</button></div>
+    <div class="kbrow"><button type="button" class="kbk" data-kb="4">4</button><button type="button" class="kbk" data-kb="5">5</button><button type="button" class="kbk" data-kb="6">6</button></div>
+    <div class="kbrow"><button type="button" class="kbk" data-kb="7">7</button><button type="button" class="kbk" data-kb="8">8</button><button type="button" class="kbk" data-kb="9">9</button></div>
+    <div class="kbrow"><button type="button" class="kbk fn" data-kb="clear">清空</button><button type="button" class="kbk" data-kb="0">0</button><button type="button" class="kbk fn del" data-kb="del">删除</button></div>
+  </div>
+  <header class="topbar">
+    <a class="back" id="back" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">登录结果以服务端返回为准</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <div class="head">
+    <div class="no">SIGN IN</div>
+    <h1 class="serif" id="head-title">登录后继续办理</h1>
+    <div class="sub" id="head-sub">登录成功后回到 <b id="return-to">首页</b>。不登录也能用公开与无需账户的服务。</div>
+    <div class="from-note" id="from-note" data-testid="login-gate-from-note" hidden></div>
+  </div>
+
+  <nav class="tabs" aria-label="登录方式">
+    <a class="tab" id="tab-phone" href="?mode=phone" data-route="/login" data-testid="login-gate-tab-phone">
+      <span class="ti"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span>
+      <span class="tb"><span class="tn">手机号登录</span><span class="td">输入手机号，用服务端下发的短信验证码登录</span></span>
+    </a>
+    <a class="tab" id="tab-qr" href="?mode=qr" data-route="/login" data-testid="login-gate-tab-qr">
+      <span class="ti"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><path d="M14 14h3v3h-3zM20.5 14v1M14 20.5h1M17.5 17.5h3.5"/></svg></span>
+      <span class="tb"><span class="tn">扫码登录</span><span class="td">用手机扫这台机器上的二维码，在手机上确认</span></span>
+    </a>
+  </nav>
+
+  <main class="body" id="body-root" data-screen="login-gate" data-mode="phone" data-state="phone-idle" data-testid="login-gate-state-phone-idle">
+    <div class="scrollarea" id="scrollarea"></div>
+    <div class="agree">
+      <input type="checkbox" id="agree" data-testid="login-gate-agree" aria-label="我已阅读并同意用户服务协议与隐私政策" aria-describedby="gate-note">
+      <label for="agree">我已阅读并同意</label>
+      <a href="08-legal.html?doc=user" data-route="/legal/terms">用户服务协议</a>
+      <a href="08-legal.html?doc=privacy" data-route="/legal/privacy">隐私政策</a>
+    </div>
+    <div class="gate-note" id="gate-note" role="status" data-testid="login-gate-reason">未勾选协议：不会发码，也不会创建二维码。</div>
+    <div class="ctabar" id="ctabar"></div>
+  </main>
+
+  <div class="truth" data-disclaimer="true" data-testid="login-gate-truth">
+    <div><b>验证码</b>由服务端短信通道下发，本机不生成、不预填，也不判断它是否有效。</div>
+    <div><b>扫码</b>手机确认只代表确认了这次请求，一体机还要换取登录态才算登录。</div>
+    <div><b>公共终端</b>结束会话或闲置超时清除本机登录态与临时会话信息；账号内数据按服务端留存期限管理。</div>
+  </div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true">
+    <div class="dp-t">原型演示控制</div>
+  </div>
+</div>
+<script>
+var SCREEN='login-gate';
+var STATES=['phone-idle','phone-sending','phone-code-sent','phone-send-limited','phone-send-failed','phone-verifying','phone-code-invalid','phone-code-expired','qr-loading','qr-ready','qr-expired','qr-confirmed','qr-error'];
+/* 服务端还在处理、按钮点了也不会提前有结果的状态 */
+var PENDING={'phone-sending':1,'phone-verifying':1,'qr-loading':1,'qr-confirmed':1};
+var ICO={
+ shield:'<path d="M12 3l7.5 3v6c0 4.4-3 8.1-7.5 9-4.5-.9-7.5-4.6-7.5-9V6z"/><path d="M9.2 12.2l2 2 3.6-3.9"/>',
+ files:'<path d="M8 3.5h6l4 4V17a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5.5a2 2 0 0 1 2-2z"/><path d="M14 3.5v4h4"/><path d="M4 7v11.5A2.5 2.5 0 0 0 6.5 21H16"/>',
+ link:'<path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1.4 1.4"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5L12.4 17"/>',
+ qr:'<rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><path d="M14 14h3v3h-3zM20.5 14v1M14 20.5h1M17.5 17.5h3.5"/>',
+ doc:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ code:'<rect x="3" y="4" width="18" height="14" rx="2.5"/><path d="M7 9.5h2M11 9.5h2M15 9.5h2M7 13.5h6"/><path d="M9 21l3-3 3 3"/>',
+ brief:'<rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.8A1.8 1.8 0 0 1 10.8 4h2.4A1.8 1.8 0 0 1 15 5.8v1.7"/>',
+ arrow:'<path d="M9 5l7 7-7 7"/>',
+ warn:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6.5V12l3.5 2"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.3"/>',
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+
+var q=new URLSearchParams(location.search);
+/* ── 回跳来源 ?from= ───────────────────────────────────────────────
+   与 src/auth/returnPath.ts 的 isSafeInternalPath() 对齐，另加两条更严的静态页规则：
+   '//' 出现在任何位置即非法；含控制字符（码位 < 32 或 == 127）即非法。
+   非法值按 '/' 处理且不回显原值。 */
+var RAW_FROM=q.get('from');
+function hasControlChar(p){
+ for(var i=0;i<p.length;i++){var c=p.charCodeAt(i);if(c<32||c===127)return true}
+ return false;
+}
+function isSafeInternalPath(p){
+ if(typeof p!=='string'||p==='')return false;
+ if(p.charAt(0)!=='/')return false;
+ if(p.indexOf('//')>=0)return false;
+ if(p.indexOf('\\')>=0)return false;
+ if(hasControlChar(p))return false;
+ if(p==='/login'||p.indexOf('/login?')===0||p.indexOf('/login#')===0||p.indexOf('/login/')===0)return false;
+ return true;
+}
+var FROM=isSafeInternalPath(RAW_FROM)?RAW_FROM:'';
+var FROM_REJECTED=(RAW_FROM!==null&&RAW_FROM!=='')&&FROM==='';
+/* 页内跳转统一走这里：换 tab、换状态都不会把 from / debug / flat 丢掉 */
+function P(mode,state){
+ var s='?mode='+mode;
+ if(state)s+='&state='+state;
+ if(FROM)s+='&from='+encodeURIComponent(FROM);
+ if(q.get('debug')==='1')s+='&debug=1';
+ if(q.get('flat')==='1')s+='&flat=1';
+ return s;
+}
+
+/* ── 手机号登录：输入区 ───────────────────────────────────────────── */
+/* codeInput: 'off' = 没有可填的码（不给可填输入框）；'on' = 服务端此刻还可能留着一条码 */
+function phoneFields(opt){
+ var codeOn=opt.codeInput==='on';
+ return '<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">用手机号登录</span><span class="hint">'+opt.hint+'</span></div>'+
+  '<div class="field"><label for="phone">手机号</label><div class="row">'+
+  '<input id="phone" type="tel" inputmode="numeric" autocomplete="off" maxlength="11" aria-label="手机号（11 位本人号码）" placeholder="请输入本人手机号"'+(opt.phoneLocked?' readonly':'')+'>'+
+  '<span class="side" id="send-btn" role="button" tabindex="0" aria-disabled="true" data-label="'+opt.sendPlain+'" data-testid="login-gate-send">'+opt.sendLabel+'</span>'+
+  '</div>'+(opt.phoneEcho?'<div class="echo">本次输入：<b id="phone-echo">未获取到本次输入的手机号</b></div>':'')+
+  (opt.phoneNote?'<div class="reason">'+opt.phoneNote+'</div>':'')+'</div>'+
+  '<div class="field"><label for="code">短信验证码</label><div class="row">'+
+  '<input id="code" type="text" inputmode="numeric" autocomplete="off" maxlength="6" aria-label="'+(codeOn?'短信验证码（6 位数字）':'短信验证码（现在没有可填的验证码，输入框已关闭）')+'" placeholder="'+(codeOn?'输入短信里的 6 位验证码':'还没有可填的验证码')+'"'+(codeOn?'':' disabled')+'>'+
+  '</div>'+'<div class="reason">'+opt.codeNote+'</div></div></section>';
+}
+function whyLogin(){
+ return '<section class="sec"><div class="sec-label"><span class="no serif">02</span><span class="t">登录之后多出什么</span><span class="hint">不登录也能办的事见下一栏</span></div>'+
+  '<div class="grid2">'+
+  '<div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('files','currentColor',26)+'</span>本人资产按账号归集</h3>'+
+  '<p>我的文档、打印订单、AI 服务记录归到你名下，<b>只有本人可见</b>。删除与留存按服务端规则执行。</p></div>'+
+  '<div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('link','currentColor',26)+'</span>手机与这台机器接得上</h3>'+
+  '<p>手机上下单拿到的到机码、手机传上来的文件，<b>能和这台机器对上号</b>，不用重新传一遍。</p></div>'+
+  '</div></section>';
+}
+var ANON=[
+ ['打印与扫描','文档、照片、扫描与格式转换，进入后按真实能力状态继续。','10-print-hub.html','/print-scan','var(--teal-soft)','#157a67','doc'],
+ ['到机码核销','手机上下过单，拿到机码直接来这台机器取。','11-arrival-code.html','/print/pickup-claim','var(--clay-soft)','#9e5330','code'],
+ ['岗位与招聘会','来源机构发布的信息，投递与预约都在来源平台自行完成。','16-service-hubs.html?hub=jobs','/jobs-service','var(--slate-soft)','#35608f','brief']
+];
+function anonRow(no){
+ no=no||'03';
+ var h='';
+ for(var i=0;i<ANON.length;i++){var a=ANON[i];
+  h+='<a class="entry" href="'+a[2]+'" data-route="'+a[3]+'" data-testid="login-gate-anon-'+i+'">'+
+   '<span class="ei" style="background:'+a[4]+';color:'+a[5]+'">'+svg(a[6],'currentColor',30)+'</span>'+
+   '<span class="eb"><span class="en">'+a[0]+'</span><span class="ed">'+a[1]+'</span></span>'+
+   '<span class="ego">'+svg('arrow','currentColor',26)+'</span></a>';
+ }
+ return '<section class="sec last"><div class="sec-label"><span class="no serif">'+no+'</span><span class="t">不登录也能办</span><span class="hint">需要本人身份时才会回到这一页</span></div>'+
+  '<div class="entries">'+h+'</div></section>';
+}
+function btnA(cls,href,route,text,testid,flex){
+ return '<a class="btn '+cls+'" href="'+href+'" data-route="'+route+'"'+(testid?' data-testid="'+testid+'"':'')+(flex?' style="flex:'+flex+'"':'')+'>'+text+'</a>';
+}
+function btnDead(text,reason){
+ return '<span class="btn primary" role="button" aria-disabled="true" data-testid="'+SCREEN+'-primary" aria-label="'+text+'（'+reason+'）">'+text+'</span>';
+}
+/* 需要「先勾协议」的动作：发码、创建/刷新二维码、claim 换登录态。
+   未勾协议时 aria-disabled=true 且点了不跳转，原因写在 #gate-note 上，不只藏进 aria-label。 */
+function btnGate(cls,text,url,testid,flex){
+ return '<span class="btn '+cls+'" role="button" tabindex="0" data-gate="agree" data-go="'+url+'" data-label="'+text+'"'+
+  (testid?' data-testid="'+testid+'"':'')+(flex?' style="flex:'+flex+'"':'')+' aria-disabled="true" aria-label="'+text+'（请先勾选协议）">'+text+'</span>';
+}
+
+var V={};
+/* ── phone ─────────────────────────────────────────────────────── */
+V['phone-idle']=function(){
+ return {body:phoneFields({hint:'先填手机号，再获取验证码',sendLabel:'获取验证码',sendPlain:'获取验证码',codeInput:'off',
+   codeNote:'还没有发出过验证码，所以这一格暂时不可填。先获取验证码，收到后这里会打开。'})+
+   whyLogin()+anonRow(),
+  /* 底部原本还有一个「获取验证码」，与手机号输入框右侧那个文案、行为完全相同，
+     用户不知道该点哪个。取码是就地动作，留在字段旁；底部只保留唯一的另一条去向。
+     后续状态（code-*）的底部是「确认登录」，与字段旁的「重新获取」职责不同，不受此改动影响。 */
+  cta:btnA('ghost','01-home.html?state=no-context','/','不登录，继续使用','login-gate-anonymous')};
+};
+V['phone-sending']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h"><span class="dot16 breathe"></span>正在请求发送验证码</div>'+
+   '<div class="state-p">请求已发出，<b>结果由服务端返回</b>。它可能成功，也可能被频控挡下，或者短信通道本身没发出去 —— 三种结果的下一步不一样，本页不提前替它下结论。</div>'+
+   '<div class="state-p">这一步不会自动跳过。没有拿到成功回执之前，验证码输入框保持不可用。</div></div></section>'+
+   phoneFields({hint:'等待服务端返回',sendLabel:'请求中',sendPlain:'请求中',codeInput:'off',phoneLocked:true,phoneEcho:true,
+    codeNote:'只有拿到成功回执才会锁号、起 60 秒冷却、开放验证码输入框。'})+anonRow(),
+  cta:btnA('ghost','01-home.html','/','返回首页')+btnDead('等待服务端返回','请求进行中')};
+};
+V['phone-code-sent']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('check','currentColor',28)+'服务端回执：验证码已发出</div>'+
+   '<div class="state-p">这条状态<b>只在拿到成功回执后</b>出现。回执同时带来两个数：重新获取的冷却（默认 60 秒）和验证码有效期（300 秒）。</div>'+
+   '<div class="state-p">短信到达手机的时间由运营商决定，本机看不到，也不会替它保证。</div></div></section>'+
+   phoneFields({hint:'填短信里的 6 位验证码',sendLabel:'<span id="resend-label">重新获取</span>',sendPlain:'重新获取验证码',codeInput:'on',phoneLocked:true,phoneEcho:true,
+    phoneNote:'已按这个号码发码；要换号请先重新获取。',
+    codeNote:'验证码有效期以服务端为准；填错、过期、试太多次是三种不同结果，服务端会分别告诉你。'})+anonRow(),
+  cta:btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
+   '<span class="btn primary" role="button" tabindex="0" id="primary-confirm" aria-disabled="true" data-testid="login-gate-primary" style="flex:1.6">确认登录</span>'};
+};
+V['phone-send-limited']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('clock','currentColor',28)+'这次发码被频率限制挡下了</div>'+
+   '<div class="state-p">服务端判定发得太频繁（按号码、IP 或本机分别限制）。<b>这一次请求什么都没有改变</b>：之前那条验证码是否还在、还剩多久，本页读不到，也不猜。</div>'+
+   '<div class="state-p">还要等多少秒本页同样读不到 —— 冷却是在上一次请求时开始算的，回执里没有剩余值，写一个数字出来就是编的。</div></div></section>'+
+   phoneFields({hint:'可以换一个本人手机号，或稍后再试',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneEcho:true,
+    codeNote:'如果你手上还有一条没过期的验证码，可以直接回上一步继续填；本页不替服务端保证它此刻一定有效。'})+anonRow(),
+  cta:btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
+   btnGate('primary','再试一次发码',P('phone','phone-sending'),'login-gate-primary','1.6')};
+};
+V['phone-send-failed']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('warn','currentColor',28)+'短信通道没把这条码发出去</div>'+
+   '<div class="state-p">服务端明确回了发送失败。它会把<b>刚写进去的验证码和冷却一起删掉</b>，所以之前收到的码同样作废，必须重新获取；也正因为冷却被删了，可以立刻重试。</div>'+
+   '<div class="state-p">这不是你填错了，也不是账号问题。连着几次都失败，请找现场工作人员。</div></div></section>'+
+   phoneFields({hint:'可以立刻重试，冷却已被清掉',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneEcho:true,
+    codeNote:'旧码已作废，重新获取之前这里没有可填的内容。'})+anonRow(),
+  cta:btnA('ghost','06-help.html','/help','联系工作人员')+
+   btnGate('primary','立刻重新获取',P('phone','phone-sending'),'login-gate-primary','1.6')};
+};
+V['phone-verifying']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h"><span class="dot16 breathe"></span>验证码已提交，等待服务端核验</div>'+
+   '<div class="state-p">核验通过与否<b>只有服务端说了算</b>。本页不显示「登录成功」：真正登录成功时，页面会直接回到你进来之前那一页。</div>'+
+   '<div class="state-p">核验不通过时，服务端会分成「填错了」「过期或不存在」「试太多次被作废」三种结论，各自的下一步不一样。</div></div></section>'+
+   phoneFields({hint:'等待服务端核验',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneLocked:true,phoneEcho:true,
+    codeNote:'核验期间不重复提交；结果回来之前不清空、也不改写你填过的内容。'})+anonRow(),
+  cta:btnA('ghost','01-home.html','/','返回首页')+btnDead('等待核验结果','核验进行中')};
+};
+V['phone-code-invalid']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('warn','currentColor',28)+'验证码不正确</div>'+
+   '<div class="state-p">服务端比对没通过。这一次比对<b>没有消费掉那条验证码</b>，所以可以核对短信里最新的一条再试一次 —— 但它仍然受有效期和尝试次数限制，本页不替服务端保证它此刻一定还有效。</div>'+
+   '<div class="state-p">重新获取照旧受冷却约束，不是多余的一步。</div></div></section>'+
+   phoneFields({hint:'核对短信里最新的一条',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'on',phoneLocked:true,phoneEcho:true,
+    codeNote:'已清空刚才填错的内容；手机号保持不变，不用重填。'})+anonRow(),
+  cta:btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
+   '<span class="btn primary" role="button" tabindex="0" id="primary-confirm" aria-disabled="true" data-testid="login-gate-primary" style="flex:1.6">确认登录</span>'};
+};
+V['phone-code-expired']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('clock','currentColor',28)+'这条验证码已经不能用了</div>'+
+   '<div class="state-p">服务端那边已经没有这条码：可能超过有效期，可能已经用过一次，也可能因为试的次数太多被主动作废。<b>重填同一条只会再失败</b>，所以这里的输入框先关掉。</div>'+
+   '<div class="state-p">这不是封号。重新获取一条就能继续。</div></div></section>'+
+   phoneFields({hint:'必须重新获取一条',sendLabel:'重新获取',sendPlain:'重新获取验证码',codeInput:'off',phoneLocked:true,phoneEcho:true,
+    codeNote:'输入框已清空并关闭，避免你把作废的码再填一遍。'})+anonRow(),
+  cta:btnA('ghost',P('qr','qr-loading'),'/login','改用扫码登录')+
+   btnGate('primary','重新获取验证码',P('phone','phone-sending'),'login-gate-primary','1.6')};
+};
+/* ── qr ────────────────────────────────────────────────────────── */
+function qrSlot(title,desc){
+ return '<div class="qrslot" data-testid="login-gate-qr-slot" role="group" aria-label="'+title+'">'+
+  '<span class="qi">'+svg('qr','currentColor',44)+'</span><b id="qr-slot-title">'+title+'</b><span id="qr-slot-desc">'+desc+'</span></div>';
+}
+function qrSide(items,foot){
+ var h='<ul class="steps">';
+ for(var i=0;i<items.length;i++) h+='<li><span class="sn">'+(i+1)+'</span><span>'+items[i]+'</span></li>';
+ h+='</ul>';
+ return '<div class="qrside">'+h+(foot?'<div class="card"><p>'+foot+'</p></div>':'')+'</div>';
+}
+V['qr-loading']=function(){
+ return {body:'<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">扫码登录</span><span class="hint" id="qr-hint">勾选协议后才会向服务端申请票据</span></div>'+
+   '<div class="qrwrap">'+qrSlot('等待你勾选协议','没有勾选协议之前，这台机器<b>不会</b>向服务端申请票据，这里也不会出现任何可扫的图形。')+
+   qrSide(['勾选下面的协议，这台机器才会去申请登录票据。','服务端返回票据后，二维码显示在左边这块区域。','拿手机相机或微信扫它，在手机上完成手机号验证并确认。'],
+    '票据自一体机生成起共 <b>180 秒</b>。手机上看到的剩余秒数会比 180 少 —— 看屏、举手机、扫码都要花时间。')+'</div></section>'+
+   anonRow('02'),
+  cta:btnA('ghost',P('phone','phone-idle'),'/login','改用手机号登录')+btnDead('等待服务端返回票据','需要先勾协议，结果由服务端返回')};
+};
+V['qr-ready']=function(){
+ return {body:'<section class="sec"><div class="sec-label"><span class="no serif">01</span><span class="t">扫码登录</span><span class="hint">票据有效期内可扫</span></div>'+
+   '<div class="qrwrap">'+qrSlot('二维码显示区','二维码由服务端返回的票据内容渲染。<b>静态设计稿不生成可扫描图形</b>，也不放示意图案冒充。')+
+   qrSide(['用手机相机或微信扫左边的二维码。','在手机上填手机号和短信验证码，确认<b>你面前这台机器</b>的登录请求。','手机提示已确认后回到这台机器 —— 登录还要这台机器再换一次登录态。'],
+    '手机上的确认<b>不等于你已经登录</b>；短信验证码能证明的只是这个号码收得到码，不能证明人站在机器前。')+'</div></section>'+
+   '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--wheat-soft);color:var(--wheat-d)">'+svg('clock','currentColor',26)+'</span>过期了怎么办</h3>'+
+   '<p>票据到点自动失效，<b>刷新动作在这台机器上</b>，手机那一侧刷不了。过期后点下面的「重新生成二维码」再扫一次即可。</p></div></section>'+
+   anonRow('02'),
+  cta:btnA('ghost',P('phone','phone-idle'),'/login','改用手机号登录')+
+   btnGate('primary','重新生成二维码',P('qr','qr-loading'),'login-gate-primary','1.6')};
+};
+V['qr-expired']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="warn" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('clock','currentColor',28)+'这张二维码已经过期</div>'+
+   '<div class="state-p">票据从生成起只活 <b>180 秒</b>，现在服务端已经不认它了。手机上继续操作也不会成功。</div>'+
+   '<div class="state-p">重新生成一张再扫即可，不影响你的账号，也不需要联系工作人员。</div></div></section>'+
+   '<section class="sec last"><div class="qrwrap">'+qrSlot('二维码已失效','重新生成后，新的二维码会显示在这里。')+
+   qrSide(['点下面的「重新生成二维码」。','用手机重新扫新的二维码。','在手机上确认后回到这台机器继续。'],
+    '也可以直接改用手机号登录，两条路走到的是同一个账号。')+'</div></section>'+anonRow('02'),
+  cta:btnA('ghost',P('phone','phone-idle'),'/login','改用手机号登录')+
+   btnGate('primary','重新生成二维码',P('qr','qr-loading'),'login-gate-primary','1.6')};
+};
+V['qr-confirmed']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="info" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('check','currentColor',28)+'手机已确认这次请求</div>'+
+   '<div class="state-p">服务端返回的状态是 <b>confirmed</b> —— 手机那一侧做完了。接下来这台机器要拿票据去换登录态，<b>换成功才算登录</b>。</div>'+
+   '<div class="state-p">这一步会失败（票据被用过、已过期、网络中断都可能）。失败时二维码会作废并要求重扫，本页不会替它写成「已登录」。<b>协议没勾时，这一步同样不会写入登录态。</b></div></div></section>'+
+   '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--teal-soft);color:var(--teal-d)">'+svg('info','currentColor',26)+'</span>请留在这台机器前</h3>'+
+   '<p>换取登录态由这台机器发起，结果只显示在这块屏幕上。手机那一侧看不到这一步，也不会代替你完成。</p></div></section>'+
+   anonRow('02'),
+  cta:btnGate('ghost','重新生成二维码',P('qr','qr-loading'),'login-gate-regen')+
+   btnDead('正在换取登录态','结果由服务端返回')};
+};
+V['qr-error']=function(){
+ return {body:'<section class="sec"><div class="state" data-kind="error" data-testid="'+SCREEN+'-fallback">'+
+   '<div class="state-h">'+svg('warn','currentColor',28)+'扫码登录这条路暂时走不通</div>'+
+   '<div class="state-p">申请票据或查询状态的请求没有成功。<b>本页不推测原因</b>，也不显示一张可能已经失效的二维码让你白扫。</div>'+
+   '<div class="state-p">手机号登录不经过这条链路，通常仍然可用。</div></div></section>'+
+   '<section class="sec last"><div class="card"><h3><span class="ci" style="background:var(--slate-soft);color:var(--slate-d)">'+svg('phone','currentColor',26)+'</span>建议先走手机号登录</h3>'+
+   '<p>两条路进的是同一个账号。如果手机号登录也失败，多半是这台机器和服务器之间断了 —— 那时请找现场工作人员。</p></div></section>'+
+   anonRow('02'),
+  cta:btnA('ghost','06-help.html','/help','联系工作人员')+
+   btnA('primary',P('phone','phone-idle'),'/login','改用手机号登录','login-gate-primary','1.6')};
+};
+
+var PILL={
+ 'phone-idle':['','登录结果以服务端返回为准'],
+ 'phone-sending':['','正在请求发送验证码'],
+ 'phone-code-sent':['ok','服务端回执：验证码已发出'],
+ 'phone-send-limited':['warn','发码被频率限制挡下'],
+ 'phone-send-failed':['bad','短信通道发送失败'],
+ 'phone-verifying':['','验证码已提交，等待核验'],
+ 'phone-code-invalid':['warn','验证码不正确'],
+ 'phone-code-expired':['warn','验证码已失效'],
+ 'qr-loading':['warn','未勾协议 · 尚未申请票据'],
+ 'qr-ready':['ok','二维码有效期 180 秒'],
+ 'qr-expired':['warn','二维码已过期'],
+ 'qr-confirmed':['ok','手机已确认 · 尚未登录'],
+ 'qr-error':['bad','扫码登录暂不可用']
+};
+var TITLE={
+ 'phone-idle':['登录后继续办理','登录成功后回到 <b id="return-to">首页</b>。不登录也能用公开与无需账户的服务。'],
+ 'phone-sending':['正在发送验证码','结果由服务端返回。成功、频控、通道失败三种下一步不一样。'],
+ 'phone-code-sent':['填写短信验证码','验证码有 <b>300 秒</b>有效期；重新获取默认要等 <b>60 秒</b>。'],
+ 'phone-send-limited':['稍后再获取验证码','这一次请求什么都没有改变，本页读不到还要等多久。'],
+ 'phone-send-failed':['短信没发出去','旧码已被一起作废，可以立刻重新获取。'],
+ 'phone-verifying':['正在核验验证码','结果只由服务端决定；登录成功会直接回到你进来之前那一页。'],
+ 'phone-code-invalid':['验证码不正确','可以核对最新一条再试；它仍受有效期和尝试次数限制。'],
+ 'phone-code-expired':['需要重新获取验证码','服务端那边已经没有这条码，重填同一条只会再失败。'],
+ 'qr-loading':['扫码登录','先勾协议，这台机器才会去要票据；拿到之前不显示任何可扫图形。'],
+ 'qr-ready':['扫码登录','用手机扫码并在手机上确认；确认之后要回到这台机器。'],
+ 'qr-expired':['二维码已过期','票据从生成起只活 180 秒，刷新动作在这台机器上。'],
+ 'qr-confirmed':['手机已确认','这台机器正在换取登录态，换成功才算登录。'],
+ 'qr-error':['扫码登录暂不可用','请求没有成功；手机号登录不经过这条链路。']
+};
+
+var root=document.getElementById('body-root');
+var KEY_PHONE='kiosk-login-phone';
+function readPhone(){try{return sessionStorage.getItem(KEY_PHONE)||''}catch(e){return''}}
+function savePhone(v){try{sessionStorage.setItem(KEY_PHONE,v)}catch(e){}}
+function mask(v){return v.length===11?v.slice(0,3)+'****'+v.slice(7):''}
+function render(mode,state){
+ var view=V[state]();
+ root.setAttribute('data-mode',mode);
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ document.getElementById('scrollarea').innerHTML=view.body;
+ document.getElementById('ctabar').innerHTML=view.cta;
+ document.getElementById('tab-phone').className='tab'+(mode==='phone'?' on':'');
+ document.getElementById('tab-qr').className='tab'+(mode==='qr'?' on':'');
+ document.getElementById('tab-phone').setAttribute('aria-current',mode==='phone'?'page':'false');
+ document.getElementById('tab-qr').setAttribute('aria-current',mode==='qr'?'page':'false');
+ /* tab 也是页内跳转：不能一点 tab 就把 from 丢了 */
+ document.getElementById('tab-phone').setAttribute('href',P('phone','phone-idle'));
+ document.getElementById('tab-qr').setAttribute('href',P('qr','qr-loading'));
+ var p=document.getElementById('pill');
+ p.className='pill'+(PILL[state][0]?' '+PILL[state][0]:'');
+ document.getElementById('pill-txt').textContent=PILL[state][1];
+ document.getElementById('pill-dot').className='dot'+(state==='phone-sending'||state==='phone-verifying'?' breathe':'');
+ document.getElementById('head-title').textContent=TITLE[state][0];
+ document.getElementById('head-sub').innerHTML=TITLE[state][1];
+ var rt=document.getElementById('return-to');
+ if(rt)rt.textContent=FROM||'首页';
+ var fn=document.getElementById('from-note');
+ if(FROM_REJECTED){
+  fn.textContent='来源参数不合法，已按回首页处理：只接受本站内部路径（/ 开头，不含 //、反斜线、控制字符，且不是 /login 自身）。这里不回显你传进来的原值。';
+  fn.hidden=false;
+ }else{
+  fn.textContent='';
+  fn.hidden=true;
+ }
+ wire(state);
+}
+/* 本地表单交互：只做真实的必填校验与按钮启停，不发请求、不伪造结果 */
+function wire(state){
+ var phone=document.getElementById('phone'),code=document.getElementById('code'),
+     agree=document.getElementById('agree'),send=document.getElementById('send-btn'),
+     pSend=document.getElementById('primary-send'),pConfirm=document.getElementById('primary-confirm'),
+     echo=document.getElementById('phone-echo'),note=document.getElementById('gate-note');
+ var gates=[].slice.call(document.querySelectorAll('[data-gate=agree]'));
+ var stored=readPhone();
+ if(phone){phone.value=stored;phone.addEventListener('input',function(){phone.value=phone.value.replace(/\D/g,'');savePhone(phone.value);refresh()})}
+ if(echo)echo.textContent=mask(stored)||'未获取到本次输入的手机号';
+ if(code)code.addEventListener('input',function(){code.value=code.value.replace(/\D/g,'');refresh()});
+ if(agree)agree.addEventListener('change',refresh);
+ function ok(el,on,label){
+  if(!el)return;
+  el.setAttribute('aria-disabled',on?'false':'true');
+  if(label)el.setAttribute('aria-label',label);
+ }
+ /* qr-loading 是「有没有发起过申请」的分界：没勾协议就没发起过，屏幕上必须这么写 */
+ function paintQrLoading(agreed){
+  if(state!=='qr-loading')return;
+  var t=document.getElementById('qr-slot-title'),d=document.getElementById('qr-slot-desc'),h=document.getElementById('qr-hint');
+  if(!t||!d)return;
+  if(agreed){
+   t.textContent='正在申请登录二维码';
+   d.innerHTML='请求已发出，<b>票据由服务端返回</b>。没有拿到票据之前，这里不会出现任何可扫的图形。';
+   if(h)h.textContent='已勾协议，正在向服务端申请票据';
+  }else{
+   t.textContent='等待你勾选协议';
+   d.innerHTML='没有勾选协议之前，这台机器<b>不会</b>向服务端申请票据，这里也不会出现任何可扫的图形。';
+   if(h)h.textContent='勾选协议后才会向服务端申请票据';
+  }
+  var pill=document.getElementById('pill');
+  pill.className='pill'+(agreed?'':' warn');
+  document.getElementById('pill-txt').textContent=agreed?'正在申请登录二维码':'未勾协议 · 尚未申请票据';
+  document.getElementById('pill-dot').className='dot'+(agreed?' breathe':'');
+ }
+ function paintNote(agreed,phoneOk,codeOk){
+  var t,cls='';
+  if(PENDING[state]&&!(state==='qr-loading'&&!agreed)){
+   t='请求已经发出，结果由服务端返回；这一步不会因为多点几下而提前结束。';
+  }else if(!agreed){
+   t='未勾选协议：不会发码、不会创建二维码，也不会写入登录态。请先勾选上面的协议。';
+  }else if(send&&!phoneOk){
+   t='已勾选协议。还差一个 11 位本人手机号，填完才能获取验证码。';
+  }else if(pConfirm&&!codeOk){
+   t='已勾选协议。填完 6 位验证码后才能提交核验。';
+  }else{
+   t='已勾选协议。发码、生成二维码与提交核验都由服务端执行，本页不预判结果。';cls=' ok';
+  }
+  note.className='gate-note'+cls;
+  note.textContent=t;
+ }
+ function refresh(){
+  var agreed=!!(agree&&agree.checked);
+  var phoneVal=phone?phone.value:stored;
+  var phoneOk=phoneVal.length===11;
+  var codeOk=!!(code&&!code.disabled&&code.value.length===6);
+  ok(send,phoneOk&&agreed,phoneOk&&agreed?'':'请先填写 11 位手机号并勾选协议');
+  /* phone-idle 已移除底部重复的取码按钮，pSend 在该态不存在；ok() 内有 !el 守卫。
+     其它仍带 primary-send 的状态继续沿用这条启停逻辑。 */
+  ok(pSend,phoneOk&&agreed,phoneOk&&agreed?'获取验证码':'获取验证码（请先填写 11 位手机号并勾选协议）');
+  ok(pConfirm,codeOk&&agreed,codeOk&&agreed?'确认登录':'确认登录（请先填写 6 位验证码并勾选协议）');
+  for(var i=0;i<gates.length;i++){
+   var lb=gates[i].getAttribute('data-label')||'继续';
+   ok(gates[i],agreed,agreed?lb:lb+'（请先勾选协议）');
+  }
+  paintQrLoading(agreed);
+  paintNote(agreed,phoneOk,codeOk);
+ }
+ function go(url){location.href=url}
+ function bind(el,url){
+  if(!el)return;
+  el.addEventListener('click',function(){if(el.getAttribute('aria-disabled')==='false')go(url)});
+  el.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&el.getAttribute('aria-disabled')==='false'){e.preventDefault();go(url)}});
+ }
+ bind(send,P('phone','phone-sending'));
+ bind(pSend,P('phone','phone-sending'));
+ bind(pConfirm,P('phone','phone-verifying'));
+ for(var g=0;g<gates.length;g++) bind(gates[g],gates[g].getAttribute('data-go'));
+ refresh();
+}
+/* mode 与 state 的关系：state 是真值，mode 只是它的投影。
+   ?mode=qr 不带 state → qr-loading；两者冲突 → 状态前缀说了算。 */
+var mode=q.get('mode')==='qr'?'qr':'phone';
+var state=q.get('state');
+if(STATES.indexOf(state)<0) state=mode==='qr'?'qr-loading':'phone-idle';
+mode=state.indexOf('qr-')===0?'qr':'phone';
+render(mode,state);
+
+/* 原型演示控制（非产品功能）：只切 data-state，并保留 from */
+var panel=document.getElementById('demo-panel');
+for(var i=0;i<STATES.length;i++){
+ var a=document.createElement('a');
+ var m=STATES[i].indexOf('qr-')===0?'qr':'phone';
+ var href=P(m,STATES[i]);
+ if(href.indexOf('debug=1')<0)href+='&debug=1';
+ a.href=href;
+ a.textContent=STATES[i];
+ if(STATES[i]===state)a.className='on';
+ panel.appendChild(a);
+}
+if(q.get('debug')==='1')document.documentElement.classList.add('debug');
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+/* 时钟：只刷新顶栏文本，不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+
+/* ---------- 弹出式数字键盘（点输入框弹出 / 点遮罩收起） ----------
+   只做输入，不触发发码或登录；发码与登录仍由既有按钮与服务端决定。 */
+(function(){
+  var pad=document.getElementById('kbpad'), mask=document.getElementById('kbmask'), forEl=document.getElementById('kbfor');
+  if(!pad||!mask) return;
+  var target=null;
+  var LABEL={phone:'手机号', code:'短信验证码'};
+  function open(el){
+    target=el;
+    forEl.textContent=LABEL[el.id]||'数字';
+    pad.classList.add('on'); mask.classList.add('on');
+    pad.setAttribute('aria-hidden','false'); mask.setAttribute('aria-hidden','false');
+  }
+  function close(){
+    target=null;
+    pad.classList.remove('on'); mask.classList.remove('on');
+    pad.setAttribute('aria-hidden','true'); mask.setAttribute('aria-hidden','true');
+  }
+  // 点输入框弹出（只对数字输入框；禁用/只读的不弹）
+  document.addEventListener('focusin',function(e){
+    var el=e.target;
+    if(el&&el.tagName==='INPUT'&&(el.id==='phone'||el.id==='code')&&!el.disabled&&!el.readOnly) open(el);
+  });
+  document.addEventListener('click',function(e){
+    var el=e.target.closest&&e.target.closest('#phone,#code');
+    if(el&&!el.disabled&&!el.readOnly){ open(el); return; }
+  });
+  // 点遮罩（键盘以外任何地方）收起
+  mask.addEventListener('click',close);
+  // 按键：不夺输入框焦点
+  pad.addEventListener('pointerdown',function(e){ if(e.target.closest('[data-kb]')) e.preventDefault(); });
+  pad.addEventListener('click',function(e){
+    var k=e.target.closest('[data-kb]'); if(!k) return;
+    var v=k.getAttribute('data-kb');
+    if(v==='done'){ close(); return; }
+    if(!target) return;
+    if(v==='clear') target.value='';
+    else if(v==='del') target.value=target.value.slice(0,-1);
+    else {
+      var max=parseInt(target.getAttribute('maxlength')||'0',10);
+      if(!max||target.value.length<max) target.value+=v;
+    }
+    target.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+})();
+</script>
+</body>
+</html>

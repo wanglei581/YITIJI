@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>线下招聘机构 · 职易达</title>
+<!--
+  宿主：线下机构工作台（一个宿主承接三条 route，不新增第二套 HTML）
+  route: /offline-agencies          —— 078 机构目录（list-*）
+         /offline-agencies/:id      —— 079 机构详情（agency-*）
+         /jobs/:id/offline          —— 077 线下机构岗位详情（job-*）
+  state: list-ready | list-loading | list-filtered | list-empty | list-error
+         agency-ready | agency-jobs-empty | agency-not-found | agency-error
+         job-ready | job-source-incomplete
+  api:  GET /api/v1/kiosk/offline-agencies?keyword&district&service&orgType&page&pageSize
+        —— 每页 10 条；四个查询维度都可输入、清除和组合
+        GET /api/v1/offline-agencies/:id
+        GET /api/v1/offline-jobs/:id
+        对齐 apps/kiosk/src/pages/offline-agencies/{OfflineAgenciesPage,OfflineAgencyDetailPage,OfflineJobDetailPage}.tsx
+  真话边界：
+    ① 不预置机构名称、门店数量、营业时间、服务项目、来源编号；列表行只画字段位置（.slot）。
+    ② 没有可核对的资质字段就不显示「已核验 / 正常收录」一类徽章（对齐 079 边界）。
+    ③ 来源要素不足 = fail-closed：job-source-incomplete 下外跳与到店指引按钮全部 aria-disabled，
+       并常显原因（27 寸触屏无 hover，原因不能藏在 title 里）。
+    ④ 线下岗位不存在平台内投递：本机不代收简历、不代投递，也不记录到店后的结果。
+  fallback: 任何异常态保留「联系工作人员」实体出口（≥56px）
+  ai-mode: AI-CONTEXT（077 / 078 / 079 共用页内辅助，不自动调用）
+  ai-input: 用户主动选择的本人简历，或用户手动填写的求职方向；机构、岗位与来源字段只读真实返回
+  ai-consent: 用户必须主动选择“用本人简历”或“填写求职方向”，不得静默读取文件或历史画像
+  ai-output: 到店咨询问题与材料清单；不得核验资质、生成机构/岗位事实或匹配百分比
+  ai-failure: 缺输入、本人简历不可用、AI 服务不可用均常显原因，不生成演示结果
+  ai-fallback: 机构检索、详情、岗位浏览、到店指引和材料准备保持可用；提供三项人工咨询要点
+  ai-persistence: 仅当前会话临时使用，默认不生成 AI 记录，离开页面或清场即清除输入
+  原型演示控制：状态只通过 ?state= 切换（?debug=1 显示左侧演示面板），页面无计时器推进业务状态
+  验收范围：静态原型表现；不证明 React 接线、API 可用、生产数据或硬件链路
+-->
+<link rel="stylesheet" href="directory-workspaces.css">
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="16-service-hubs.html?hub=jobs" data-route="/jobs-service" aria-label="返回岗位服务"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">机构名单以服务端返回为准</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">线下招聘机构</h1>
+    <p class="th-s" id="task-sub">先缩小范围，再看已发布的机构名单。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="offline-agency" data-state="list-ready" data-testid="offline-agency-state-list-ready"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="offline-agency-truth">
+    <div><b>隐私提示</b>结束会话或闲置超时清除本机登录态和临时会话信息；文件与订单按服务端留存期限管理。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script>window.DW_SCREEN='offline-agency'</script>
+<script src="directory-workspaces.js"></script>
+</body>
+</html>

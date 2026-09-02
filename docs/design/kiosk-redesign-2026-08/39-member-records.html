@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的简历 · 收藏 · AI记录 · 足迹 ｜ 职易达</title>
+<!--
+  route: /me/resumes | /me/favorites | /me/ai-records | /me/activity | /me/activity/:id
+  state: resumes-{login,loading,error,empty,ready} | favorites-{login,loading,error,empty,ready}
+         | ai-records-{login,loading,error,empty,ready,delete-confirm,delete-expired,deleting,delete-success,delete-failure}
+         | activity-{login,loading,error,browse-empty,jump-empty,browse-ready,jump-ready}
+         | activity-detail-{login,loading,error,not-found,detail}
+  api: GET /api/v1/me/resumes?pageSize=50（仅元数据）；GET /api/v1/me/favorites（type/cursor/pageSize，客户端逐页最多 10 页 500 条）；
+       GET /api/v1/me/ai-records?pageSize=50 与 GET /api/v1/me/job-ai-sessions?pageSize=50 并行读取，
+       DELETE /api/v1/me/ai-records/:id（parse 行服务端级联同任务派生记录与岗位 AI 会话）、DELETE /api/v1/me/job-ai-sessions/:id；
+       GET /api/v1/me/browse-logs?pageSize=50 与 GET /api/v1/me/external-jump-logs?pageSize=50；
+       记录详情没有独立端点：按 id 在上面两个列表里逐页查找，找不到即「未找到这条记录」。
+  fallback: 未登录只引导登录，不展示任何本人内容；加载失败保留重试；空列表不造数据；
+            简历任务未完成只保留禁用出口与原因；AI 记录删除失败保留原记录并提示可能已到期或被清理。
+  note: 「取消」按钮与「确认时限已过」为本设计批次的可用性建议（当前 React 靠 3.5 秒后自动回到未确认状态，没有取消按钮）；
+        其余文案、字段、动作与出口均对齐当前 React 页面与端点。
+        /resume/job-fit（岗位匹配）的静态宿主是 46-resume-decision-workspace.html?screen=job-fit，
+        本页的岗位匹配出口按真实链接渲染：不带 taskId 或任何合成 id，落到宿主的「未选目标岗位」态，
+        由用户在那边自己选目标。这只说明静态宿主存在，不代表 React 页面或接口已经接通。
+        仍待建 route：/renshi（政策列表）在青序流光里还没有宿主页面。
+        这类出口一律渲染成常驻禁用元素：不带 href、aria-disabled=true、显著写明「对应页面待建设，暂不可进入」，
+        并用 data-pending-route-host="true" + data-route 保留真实目标，只作迁移台账用；不落任何暂代页面，
+        用户点它不会跳到 Hub，也不会以为目标页已经做完。
+  原型演示控制：仅用 ?view= 与 ?state= 切换；ready 中的条目是排版示例，不代表真实账号数据。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--tealsoft:#e0f2ec;
+  --slate:#3f68b0;--slate2:#35608f;--slatesoft:#e6ecf7;
+  --clay:#b8683c;--clay2:#9e5330;--claysoft:#f7ebe1;
+  --plum:#7a5a86;--plum2:#6b4a77;--plumsoft:#efe8f2;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+  --ease:cubic-bezier(.22,1,.36,1);
+  /* 与 00–15 定稿页同名令牌（值一致，供后续统一改名） */
+  --ink-2:var(--ink2);--ink-3:var(--ink3);--deep-2:var(--deep2);--emerald:var(--green);
+  --teal-d:var(--teal2);--teal-soft:var(--tealsoft);--slate-d:var(--slate2);--slate-soft:var(--slatesoft);
+  --clay-d:var(--clay2);--clay-soft:var(--claysoft);--plum-d:var(--plum2);--plum-soft:var(--plumsoft);
+  --wheat-d:var(--wheat2);--wheat-soft:var(--wheatsoft);--cinnabar:var(--bad);--cinnabar-soft:var(--badsoft);
+  --line-2:var(--line2);--ease-out:var(--ease);
+  --r-lg:32px;--r-md:24px;--r-sm:18px;--tap-min:48px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);overflow:hidden}
+a{text-decoration:none;color:inherit}button{font:inherit;color:inherit;border:0;background:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;transform-origin:center center;
+  background:radial-gradient(900px 420px at 86% 6%,rgba(31,158,134,.07),transparent 60%),radial-gradient(820px 500px at -6% 58%,rgba(122,90,134,.05),transparent 56%),var(--paper)}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+
+.topbar{height:104px;flex:none;padding:0 36px;display:flex;align-items:center;gap:18px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;display:grid;place-items:center;border-radius:20px;border:1px solid var(--line2);background:var(--paper)}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}
+.logo-name{font-size:26px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.pill{height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:19px;font-weight:700}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--teal)}
+.pill .dot.breathe{animation:breathe 2.2s var(--ease) infinite}
+.clock{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.xq{margin:22px 42px 0;padding:28px 38px;border-radius:34px;flex:none;background:linear-gradient(158deg,var(--deep2),var(--deep));color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-150px;top:-150px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{width:88px;height:88px;flex:none;border-radius:50%;display:grid;place-items:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.1);color:var(--green);font-size:40px}
+.xq-eyebrow{font-size:17px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:7px}
+.xq-ask{font-size:37px;line-height:1.28;font-weight:800}
+.xq-ask em{font-style:normal;color:var(--green)}
+.xq-doing{font-size:20px;line-height:1.5;color:rgba(242,239,228,.74);margin-top:9px}
+.xq-doing b{color:#fff;font-weight:700}
+
+.viewtabs{margin:18px 42px 0;flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.vtab{min-height:76px;padding:0 10px;border:1px solid var(--line2);border-radius:20px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:21px;font-weight:800}
+.vtab span{font-size:15px;font-weight:600;color:var(--ink3)}
+.vtab.on{background:var(--deep);border-color:var(--deep);color:#fff}
+.vtab.on span{color:rgba(242,239,228,.66)}
+
+.body{flex:1;min-height:0;padding:20px 42px 16px;display:grid;gap:14px;overflow:hidden}
+/* 每种布局的 1fr 都落在**主内容**上，不再落到说明栅格上 */
+.body.state-layout{grid-template-rows:auto minmax(0,1fr) auto auto}            /* banner · 主内容 · 说明 · 操作 */
+.body.list-layout{grid-template-rows:auto auto minmax(0,1fr) auto}             /* 示例条 · 概览 · 列表 · 操作 */
+.body.list5-layout{grid-template-rows:auto auto auto minmax(0,1fr) auto}       /* 示例条 · 概览 · 筛选 · 列表 · 操作 */
+.body.empty-layout{grid-template-rows:auto auto minmax(0,1fr) auto auto}       /* 概览 · 筛选 · 主内容 · 说明 · 操作 */
+.body.detail-layout{grid-template-rows:auto auto minmax(0,1fr) auto}          /* 示例条 · 记录抬头 · 字段清单 · 操作 */
+
+.card,.state{background:var(--surface);border:1px solid var(--line);border-radius:26px}
+.card{padding:24px 26px}
+
+/* 状态横幅：取代「小卡片 + 大片空白」的居中焦点卡 */
+.banner{flex:none;display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.banner-ico{width:72px;height:72px;flex:none;border-radius:22px;display:grid;place-items:center;background:var(--slatesoft);color:var(--slate2)}
+.banner-ico svg{width:34px;height:34px}
+.banner-ico[data-tone=lock]{background:var(--plumsoft);color:var(--plum2)}
+.banner-ico[data-tone=warn]{background:var(--badsoft);color:var(--bad)}
+.banner-ico[data-tone=calm]{background:var(--tealsoft);color:var(--teal2)}
+.banner-main{flex:1;min-width:0}
+.banner-t{display:block;font-size:28px;font-weight:800;line-height:1.28}
+.banner-p{display:block;margin-top:7px;font-size:19px;line-height:1.5;color:var(--ink3)}
+.banner-p b{color:var(--ink2)}
+.banner-mini{flex:none;display:flex;flex-direction:column;gap:6px;text-align:right}
+.banner-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+/* 接口回填结构位与骨架条 */
+.slot{display:inline-flex;align-items:center;min-height:32px;padding:0 11px;border-radius:10px;border:1px dashed var(--line2);background:var(--surface);color:var(--ink3);font-size:16px;font-weight:700}
+.slot.lock{border-style:solid;background:#efeade;color:#6d7069}
+.skel{height:22px;border-radius:8px;background:#ece7d9}
+.skel.t{width:54%}
+.skel.s{display:block;width:36%;height:18px;margin-top:12px}
+.row-ico[data-tone=off]{background:#ded9cb;color:#6d7069}
+
+.summary{display:flex;align-items:center;gap:20px;padding:20px 26px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.summary-ico{width:66px;height:66px;flex:none;border-radius:20px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.summary-ico svg{width:32px;height:32px}
+.summary-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.summary-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.summary-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.summary-main{flex:1;min-width:0}
+.summary-main b{display:block;font-size:19px;color:var(--ink3);font-weight:700}
+.summary-main strong{display:block;font-size:34px;font-weight:800;line-height:1.2;margin-top:2px}
+.summary-main span{display:block;margin-top:4px;font-size:17px;color:var(--ink3);line-height:1.45}
+.summary-mini{display:flex;flex-direction:column;gap:6px;flex:none;text-align:right}
+.summary-mini i{font-style:normal;font-size:17px;font-weight:700;color:var(--ink2)}
+
+.tabbar{display:grid;gap:10px;flex:none}
+.tabbar.n4{grid-template-columns:repeat(4,1fr)}
+.tabbar.n2{grid-template-columns:repeat(2,1fr)}
+.tab{min-height:64px;padding:0 12px;border:1px solid var(--line2);border-radius:18px;background:var(--surface);display:flex;align-items:center;justify-content:center;gap:9px;font-size:20px;font-weight:750}
+.tab i{font-style:normal;min-width:34px;height:32px;padding:0 9px;border-radius:11px;background:var(--paper);color:var(--ink3);font-size:16px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.tab.on{background:var(--tealsoft);border-color:#8dc4b5;color:var(--teal2)}
+.tab.on i{background:#fff;color:var(--teal2)}
+
+.list{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:26px;overflow-y:auto;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+/* 任务行按产品尺寸排：可以吃掉一部分剩余高度，但有上限；封顶之后的余量落在列表底部，
+   而不是把每一行撑成「260–330px 里只装 90px 内容」的空壳。
+   flex-basis 保持 auto、不收缩，条目多时照常滚动，不会把行压扁。 */
+/* 行高上限决定列表卡里剩多少余量：卡片被 1fr 拉长后，行吃不下的部分会堆在卡片底部。
+   220px 时 error/empty/not-found 底部空 200~265px；实测 240px 是这一页的最优解
+   （最差从 265 降到 225，且行内不会空得发虚）。 */
+/* flex-shrink 必须是 1，且列表内的行要有一个比 .row 更低的下限：
+   原来是 flex:1 0 auto + min-height:132px，行既不能压缩、又有硬下限，
+   内容一多列表卡就直接把底注裁掉（空列表/失败态实测被切 13~61px）。
+   下限只在卡片装不下时才生效，正常状态下行仍然按 flex-grow 撑到上限，版面不变。 */
+.list>.row{flex:1 1 auto;min-height:104px;max-height:240px}
+.fixture{flex:none;display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:15px;background:var(--wheatsoft);color:var(--wheat2);font-size:17px;font-weight:750;line-height:1.35}
+.fixture svg{width:21px;height:21px;flex:none}
+.fixture>span{min-width:0}
+.row{min-height:132px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper);display:flex;align-items:center;gap:16px}
+.row.tap{cursor:pointer;width:100%;text-align:left}
+.row.flag{border-color:#d9b8b2;background:#fdf4f2}
+.row.dead{background:#eeeade;border-color:#ddd8c8}
+.row.dead .row-title{color:#6d7069}
+.row.dead .row-ico{background:#ded9cb;color:#6d7069}
+.pending-flag{flex:none;height:38px;padding:0 14px;border-radius:12px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:#ded9cb;color:#6d7069}
+.row-ico{width:58px;height:58px;flex:none;border-radius:17px;display:grid;place-items:center;background:var(--tealsoft);color:var(--teal2)}
+.row-ico svg{width:28px;height:28px}
+.row-ico.slate{background:var(--slatesoft);color:var(--slate2)}
+.row-ico.clay{background:var(--claysoft);color:var(--clay2)}
+.row-ico.plum{background:var(--plumsoft);color:var(--plum2)}
+.row-ico.wheat{background:var(--wheatsoft);color:var(--wheat2)}
+.row-main{flex:1;min-width:0}
+.row-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.row-title{display:block;font-size:22px;font-weight:800;line-height:1.3}
+.row-sub{display:block;margin-top:6px;font-size:17px;color:var(--ink3);line-height:1.45}
+.row-arrow{width:40px;height:40px;flex:none;display:grid;place-items:center;color:var(--ink3)}
+.row-arrow svg{width:22px;height:22px}
+.chip{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;background:var(--paper);border:1px solid var(--line2);color:var(--ink2);font-size:16px;font-weight:750}
+.st{height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--tealsoft);color:var(--teal2)}
+.st.wait{background:var(--wheatsoft);color:var(--wheat2)}
+.st.run{background:var(--slatesoft);color:var(--slate2)}
+.st.bad{background:var(--badsoft);color:var(--bad)}
+.acts{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end;flex:none;max-width:392px}
+.small{min-height:56px;padding:0 16px;border-radius:16px;border:1px solid var(--line2);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font-size:17px;font-weight:750}
+.small svg{width:19px;height:19px}
+.small.primary{background:var(--deep);border-color:var(--deep);color:#fff}
+.small.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.small[aria-disabled="true"]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e}
+.reason{display:block;margin-top:8px;font-size:16px;line-height:1.4;color:var(--wheat2);font-weight:700}
+.legal{flex:none;padding:14px 18px;}
+.list-foot{flex:none;padding:14px 18px;border-radius:16px;background:rgba(11,36,30,.045);color:var(--ink2);font-size:17px;line-height:1.5}
+.list-foot b{color:var(--ink)}
+.favorite-next{flex:none;padding:18px 4px 4px;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--line)}
+.favorite-next>div{padding:0 18px;min-width:0}
+.favorite-next>div+div{border-left:1px solid var(--line)}
+.favorite-next b{display:block;font-size:18px;font-weight:800;color:var(--ink2)}
+.favorite-next span{display:block;margin-top:7px;font-size:16px;line-height:1.45;color:var(--ink3)}
+.note{padding:16px 20px;border-radius:18px;background:var(--tealsoft);color:var(--ink2);font-size:18px;line-height:1.55}
+.note.warn{background:var(--wheatsoft);color:var(--wheat2)}
+.note.bad{background:var(--badsoft);color:var(--bad)}
+.dl{display:grid;gap:10px;margin-top:18px}
+.dl>div{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-radius:16px;background:var(--paper);border:1px solid var(--line)}
+.dl dt{font-size:18px;color:var(--ink3);width:150px;flex:none;font-weight:700}
+.dl dd{font-size:20px;font-weight:750;line-height:1.4}
+.detail-head{display:flex;align-items:center;gap:18px}
+.detail-head .row-ico{width:70px;height:70px}
+.guide{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.guide-item{padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);display:flex;flex-direction:column;justify-content:center}
+.guide-k{font-size:16px;font-weight:800;color:var(--teal2);letter-spacing:1px}
+.guide-t{margin-top:8px;font-size:21px;font-weight:800;line-height:1.3}
+.guide-p{margin-top:7px;font-size:17px;line-height:1.5;color:var(--ink3)}
+.detail-head h2{font-size:31px;font-weight:800;line-height:1.28}
+.detail-head p{margin-top:6px;font-size:18px;color:var(--ink3)}
+
+.toast{flex:none;display:flex;align-items:center;gap:12px;padding:18px 26px;border-radius:22px;background:var(--deep);color:#f2efe4;font-size:21px;font-weight:800;line-height:1.4}
+.toast svg{width:24px;height:24px;flex:none;color:var(--green)}
+.toast[data-tone="bad"]{background:var(--badsoft);color:var(--bad);border:1px solid #e2b7b0}
+.toast[data-tone="bad"] svg{color:var(--bad)}
+/* 演示态提示条：明确写清「这是版式演示」，不冒充真实操作结果。
+   底色必须和下面那条 .fixture 示例条拉开——两条都用 --wheatsoft 时，
+   「这一屏没有发出请求」会被读成又一句排版说明，等于没有披露。
+   取值与 35 / 40 / 41 三页的演示态提示条一致。 */
+.toast[data-tone="demo"]{background:var(--deep);color:#f6f2e6;border:1px solid rgba(46,230,168,.34);
+  box-shadow:0 14px 34px rgba(11,36,30,.16);font-size:19px;font-weight:750}
+.toast[data-tone="demo"] svg{color:var(--wheat)}
+.body.state-layout.has-toast{grid-template-rows:auto auto minmax(0,1fr) auto auto}
+.body.empty-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+.body.list-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.body.list5-layout.has-toast{grid-template-rows:auto auto auto auto minmax(0,1fr) auto}
+.body.detail-layout.has-toast{grid-template-rows:auto auto auto minmax(0,1fr) auto}
+.ctabar{display:flex;gap:14px;flex:none}
+.btn{min-height:72px;padding:0 30px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--line2);background:var(--surface);font-size:22px;font-weight:800}
+.btn svg{width:24px;height:24px}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#fff;flex:1.7}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;flex:1.7}
+.btn[aria-disabled="true"]{background:#dcd8cc;border-color:#dcd8cc;color:#77796f}
+.cta-note{flex:1;display:flex;align-items:center;font-size:17px;line-height:1.45;color:var(--ink3)}
+
+.truth{height:58px;flex:none;padding:0 44px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);color:var(--ink3);font-size:17px}
+.truth b{color:var(--ink2)}
+.navbar{height:112px;flex:none;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--ink3);font-size:19px;font-weight:700}
+.nav-item.on{color:var(--teal2)}
+.nav-item svg{width:30px;height:30px}
+
+.demo-tab,.demo-panel{display:none}
+html.debug .demo-tab{display:block;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:54px;min-height:150px;border-radius:0 16px 16px 0;background:rgba(11,36,30,.9);color:var(--green);writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+html.debug .demo-panel.show{display:flex;position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;padding:14px;flex-direction:column;gap:6px;max-height:1600px;overflow:auto;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}
+.demo-panel a{min-height:48px;padding:0 14px;display:flex;align-items:center;border-radius:12px;background:rgba(255,255,255,.07);color:#fff;font-size:16px;white-space:nowrap}
+.demo-panel .dp-t{color:var(--green);font-size:15px;letter-spacing:2px;padding:4px 6px}
+
+@keyframes breathe{50%{opacity:.36;transform:scale(.76)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+</style>
+</head>
+<body><div id="viewport"><div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back" href="30-my-profile.html" data-route="/profile" data-testid="member-records-back" aria-label="返回我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill"><span class="dot" id="pill-dot"></span><span id="pill-text">本人记录</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="xq"><div class="xq-row">
+    <div class="xq-face serif">青</div>
+    <div class="xq-main">
+      <div class="xq-eyebrow" id="eyebrow">MY RECORDS</div>
+      <h1 class="xq-ask serif" id="ask">只看<em>你自己的记录</em>。</h1>
+      <div class="xq-doing" id="doing">未登录不展示任何个人内容。</div>
+    </div>
+  </div></section>
+
+  <nav class="viewtabs" id="viewtabs" aria-label="我的记录分类"></nav>
+
+  <main class="body" id="body-root" data-screen="member-records" data-state="resumes-login" data-testid="member-records-state-resumes-login" aria-live="polite"></main>
+
+  <div class="truth"><b>本人可见</b><span id="truth-copy">这里只显示当前登录账号的记录，不展示其他账号内容。</span></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/" data-testid="member-records-nav-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>首页</a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant" data-testid="member-records-nav-assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a>
+    <a class="nav-item on press" href="30-my-profile.html" data-route="/profile" aria-current="page" data-testid="member-records-nav-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制" hidden>演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" hidden></div>
+</div></div>
+<script>
+/* 原型脚本：只做状态渲染、切态演示与本地交互；不发任何请求，不伪造业务结果。 */
+var SCREEN = 'member-records';
+
+var ICO = {
+  doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  resume:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  heart:'<path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9z"/>',
+  brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V4h8v3M3 12h18"/>',
+  fair:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  policy:'<path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5M9 13h6M9 17h6"/>',
+  route:'<path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15M15 6v15"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  eye:'<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="3"/>',
+  external:'<path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',
+  lock:'<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  warn:'<path d="M12 3 2.8 20h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+  empty:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 11h18M8 6V3h8v3"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
+  print:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z"/>',
+  arrow:'<path d="M9 18l6-6-6-6"/>',
+  robot:'<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M8 16h8"/>',
+  up:'<path d="M12 20V5M6 11l6-6 6 6"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>'
+};
+function svg(n, cls){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'+(cls?' class="'+cls+'"':'')+'>'+(ICO[n]||ICO.info)+'</svg>'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── 视图定义：state 集合、默认态、文案 ─────────────────────── */
+var VIEWS = {
+  'resumes': {
+    tab:'简历', tabHint:'诊断与生成', route:'/me/resumes', pill:'我的简历',
+    states:['login','loading','error','empty','ready'], def:'login',
+    eyebrow:'MY RESUMES', ask:'你的简历，<em>都在这里</em>。',
+    doing:'只显示<b>本人简历服务记录</b>，不展示简历原文或诊断正文。',
+    truth:'只展示本人简历元数据；原始简历短留存，到期后无法恢复，不向企业提供或投递。'
+  },
+  'favorites': {
+    tab:'收藏', tabHint:'岗位·招聘会·政策', route:'/me/favorites', pill:'我的收藏',
+    states:['login','loading','error','empty','ready'], def:'login',
+    eyebrow:'MY FAVORITES', ask:'收藏的岗位与招聘会，<em>随时找回</em>。',
+    doing:'只记录<b>本人收藏行为</b>，不含投递或预约结果。',
+    truth:'投递与预约都在来源平台完成；本机不代收简历，也不记录结果。'
+  },
+  'ai-records': {
+    tab:'AI记录', tabHint:'服务元数据', route:'/me/ai-records', pill:'AI服务记录',
+    states:['login','loading','error','empty','ready','delete-confirm','delete-expired','deleting','delete-success','delete-failure'], def:'login',
+    eyebrow:'AI SERVICE RECORDS', ask:'AI 帮你做过什么，<em>一条不落</em>。',
+    doing:'只展示<b>服务元数据</b>，不展示简历原文、诊断正文或模型原始输出。',
+    truth:'删除后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
+  },
+  'activity': {
+    tab:'足迹', tabHint:'浏览与跳转', route:'/me/activity', pill:'浏览与跳转记录',
+    states:['login','loading','error','browse-empty','jump-empty','browse-ready','jump-ready'], def:'login',
+    eyebrow:'MY ACTIVITY', ask:'看过什么、去过哪个来源，<em>都能回看</em>。',
+    doing:'只记录<b>浏览与打开来源入口</b>这两个动作本身。',
+    truth:'投递 / 预约结果以来源平台为准，本系统不记录也不参与。'
+  },
+  'activity-detail': {
+    tab:null, parentTab:'activity', route:'/me/activity/:id', pill:'记录详情',
+    states:['login','loading','error','not-found','detail'], def:'login',
+    eyebrow:'ACTIVITY DETAIL', ask:'这条记录，<em>只说明它自己</em>。',
+    doing:'记录里只有<b>内容类型与时间</b>，没有来源平台的处理结果。',
+    truth:'投递 / 预约结果以来源平台为准，本系统不记录也不参与。'
+  }
+};
+var VIEW_ORDER = ['resumes','favorites','ai-records','activity','activity-detail'];
+var TAB_VIEWS = ['resumes','favorites','ai-records','activity'];
+
+/* 跨视图切换时保留同族状态：ready↔ready、empty↔empty，其余回该视图默认态。 */
+var FAMILY = {
+  'resumes':{login:'login',loading:'loading',error:'error',empty:'empty',ready:'ready'},
+  'favorites':{login:'login',loading:'loading',error:'error',empty:'empty',ready:'ready'},
+  'ai-records':{login:'login',loading:'loading',error:'error',empty:'empty',ready:'ready'},
+  'activity':{login:'login',loading:'loading',error:'error',empty:'browse-empty',ready:'browse-ready'}
+};
+function familyOf(view, state){
+  var map = FAMILY[view]; if(!map) return null;
+  for(var k in map){ if(map[k]===state) return k; }
+  return null;
+}
+var q = new URLSearchParams(location.search);
+var DEBUG = q.get('debug')==='1';
+/* debug 只在已经是 debug 会话时继续传递，绝不写进普通 URL */
+function keep(url){ return DEBUG ? url + (url.indexOf('?')<0?'?':'&') + 'debug=1' : url; }
+function href(view, state, extra){
+  return keep('39-member-records.html?view='+view+'&state='+state+(extra?'&'+extra:''));
+}
+
+/* ── 通用块 ───────────────────────────────────────────────── */
+function ctaBar(parts){ return '<div class="ctabar">'+parts.join('')+'</div>'; }
+function link(label, target, route, testid, opts){
+  opts = opts || {};
+  return '<a class="btn press'+(opts.primary?' primary':'')+'" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+testid+'">'+(opts.icon?svg(opts.icon):'')+label+'</a>';
+}
+function deadPrimary(label, reason, testid){
+  return '<span class="btn primary" aria-disabled="true" aria-label="'+esc(label+'（'+reason+'）')+'" data-testid="'+testid+'">'+label+'</span>';
+}
+/* 状态横幅：横向排布，不再把一张小卡片摊在整屏中央 */
+function banner(tone, ico, title, desc, minis){
+  return '<section class="banner" data-testid="'+SCREEN+'-fallback" data-kind="'+tone+'"><span class="banner-ico" data-tone="'+tone+'">'+svg(ico)+'</span>'
+    +'<span class="banner-main"><span class="banner-t">'+title+'</span><span class="banner-p">'+desc+'</span></span>'
+    +(minis?'<span class="banner-mini">'+minis.map(function(m){return '<i>'+esc(m)+'</i>';}).join('')+'</span>':'')
+    +'</section>';
+}
+function slot(text, cls){ return '<span class="slot'+(cls?' '+cls:'')+'">'+esc(text)+'</span>'; }
+function previewList(inner, foot, label){
+  return '<section class="list" data-testid="'+SCREEN+'-list" aria-label="'+esc(label)+'">'+inner
+    +'<div class="list-foot legal">'+foot+'</div></section>';
+}
+/* 结构行：登录 / 失败态只画「这里会出现什么」，不写任何条目内容 */
+function lockRow(mode, ico, tone, title, desc, tid){
+  var tail = mode==='lock'
+    ? '<span class="small" aria-disabled="true" data-testid="'+tid+'-locked" aria-label="'+esc(title+'：登录后才会显示')+'">'+svg('lock')+'登录后显示</span>'
+    : '<span class="small" aria-disabled="true" data-testid="'+tid+'-off" aria-label="'+esc(title+'：本次没有取到')+'">'+svg('warn')+'本次未取到</span>';
+  return '<div class="row dead" data-slot-mode="'+mode+'" data-testid="'+tid+'">'
+    +'<span class="row-ico" data-tone="off">'+svg(ico)+'</span>'
+    +'<span class="row-main"><span class="row-title">'+title+'</span><span class="row-sub">'+desc+'</span>'
+    +'<span class="row-foot" style="margin-top:9px;display:flex;gap:9px;flex-wrap:wrap">'
+      /* 失败态原来是两枚光秃秃的「—」，一行里并排两个同样的破折号，看着像没做完的占位。
+         和登录态一样写清这两个字段位分别是什么。 */
+      + slot(mode==='lock'?'标题登录后显示':'标题本次未取到','lock') + slot(mode==='lock'?'时间登录后显示':'时间本次未取到','lock')
+    +'</span></span>'
+    +'<span class="acts">'+tail+'</span></div>';
+}
+function skelRow(i){
+  return '<div class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+    +'<span class="row-ico" data-tone="off"></span>'
+    +'<span class="row-main"><span class="skel t"></span><span class="skel s"></span></span>'
+    +'<span class="acts"><span class="skel" style="width:110px;height:50px;border-radius:16px"></span></span></div>';
+}
+/* 「怎么产生这类记录」的真实入口行 */
+function startRow(ico, tone, title, desc, label, target, route, tid){
+  return '<a class="row tap press" href="'+esc(keep(target))+'" data-route="'+esc(route)+'" data-testid="'+tid+'">'
+    +'<span class="row-ico '+tone+'">'+svg(ico)+'</span>'
+    +'<span class="row-main"><span class="row-title">'+esc(title)+'</span><span class="row-sub">'+esc(desc)+'</span></span>'
+    +'<span class="acts"><span class="small primary">'+esc(label)+'</span></span></a>';
+}
+/* extra：这一屏「哪些字段由接口回填」只在页级说明里讲一次，不再逐行重复同一句披露。 */
+function fixtureNote(extra){
+  return '<div class="fixture" data-testid="'+SCREEN+'-fixture-note">'+svg('info')+'排版示例，不代表真实账号数据'+(extra?'；'+extra:'')+'</div>';
+}
+function summary(tone, ico, label, big, desc, minis){
+  return '<section class="summary" aria-label="'+esc(label)+'概览"><span class="summary-ico '+tone+'">'+svg(ico)+'</span>'
+    +'<span class="summary-main"><b>'+label+'</b><strong>'+big+'</strong><span>'+desc+'</span></span>'
+    +'<span class="summary-mini">'+minis.map(function(m){return '<i>'+m+'</i>';}).join('')+'</span></section>';
+}
+function tabbar(n, items){
+  return '<div class="tabbar n'+n+'" role="group" aria-label="记录筛选">'+items.map(function(t){
+    return '<a class="tab press'+(t.on?' on':'')+'" href="'+esc(t.href)+'" data-route="'+esc(t.route)+'" data-testid="'+t.testid+'"'+(t.on?' aria-current="true"':'')+'>'+t.label+'<i>'+t.count+'</i></a>';
+  }).join('')+'</div>';
+}
+var GUIDE = {
+  login:[['隐私','只对本人可见','退出或超时后，本机不保留任何明细'],['登录方式','手机号 + 验证码','也可以在登录页用手机扫码登录'],['边界','本机不代收简历','岗位与招聘会只做来源信息入口']],
+  loading:[['读取范围','只读当前账号','不会展示其他账号的数据'],['显示规则','不闪回旧记录','上一位用户的内容不会残留在屏幕上'],['失败怎么办','保留重试入口','读取失败不会改动任何已有数据']],
+  error:[['数据','已保存内容不受影响','这次加载失败不会删除任何记录'],['先试这个','检查网络后重试','重试不会重复创建记录'],['仍不行','联系现场工作人员','可在帮助页找到联系方式']],
+  'not-found':[['可能原因','记录已被清理','记录按各自留存期限清理'],['也可能','不属于当前账号','记录只对本人可见'],['下一步','回列表重新选择','列表里只显示本人记录']],
+  'empty-resumes':[['怎么产生','登录后上传或生成','游客上传不会自动绑定到账号'],['这里显示什么','只有元数据','不展示简历原文或诊断正文'],['留存','原始简历短留存','到期后无法恢复']],
+  'empty-favorites':[['怎么产生','在详情页点收藏','岗位 / 招聘会 / 政策都可以收藏'],['这里显示什么','只有收藏行为','不含投递或预约结果'],['去哪儿办','来源平台','投递与预约都在来源平台完成']],
+  'empty-ai-records':[['怎么产生','用过 AI 服务之后','诊断、优化、规划、参会准备都会记'],['这里显示什么','只有服务元数据','不展示提示词或模型原始输出'],['可以删除','两步确认','删除后不可恢复']],
+  'empty-activity':[['怎么产生','浏览或打开来源入口','这两个动作分开记录'],['这里显示什么','动作本身','不记录投递、预约或签到结果'],['谁能看到','只有本人','退出后本机不留明细']]
+};
+function guide(key){
+  var items = GUIDE[key] || GUIDE.login;
+  return '<section class="guide" aria-label="说明">'+items.map(function(it){
+    return '<div class="guide-item"><div class="guide-k">'+it[0]+'</div><div class="guide-t">'+it[1]+'</div><div class="guide-p">'+it[2]+'</div></div>';
+  }).join('')+'</section>';
+}
+/* 每个视图「登录后 / 正常时会出现什么」的结构清单：只画结构，不写任何条目内容 */
+var VIEW_STRUCT = {
+  'resumes':[['doc','','上传诊断简历','诊断报告、优化版与打印出口'],['spark','plum','AI 生成简历','生成的版本与打印出口'],['clock','slate','每条记录的处理状态','待处理 / 处理中 / 已完成 / 失败']],
+  'favorites':[['brief','','岗位收藏','回到岗位详情，按来源平台规则投递'],['fair','wheat','招聘会收藏','回到活动详情，预约以来源平台为准'],['policy','slate','政策收藏','对应政策页待建设，收藏仍会保留']],
+  'ai-records':[['doc','','简历诊断与优化记录','只存服务元数据，不存原文与模型输出'],['route','wheat','职业规划建议记录','阶段性行动建议的服务记录'],['brief','slate','岗位 AI 参考会话','基于公开岗位字段的解读记录']],
+  'activity':[['eye','','浏览记录','看过哪些岗位、招聘会与政策'],['external','slate','外部跳转记录','打开过哪些来源平台或官方入口'],['clock','wheat','记录时间','由服务端返回，本机不本地留存明细']],
+  'activity-detail':[['eye','','这条记录的内容类型','岗位 / 招聘会 / 政策 / 企业'],['clock','slate','记录时间','由服务端返回'],['external','wheat','回到原内容','一步回到来源详情']]
+};
+function structRows(view, mode){
+  return VIEW_STRUCT[view].map(function(s, i){
+    return lockRow(mode, s[0], s[1], s[2], s[3], SCREEN+'-struct-'+view+'-'+i);
+  }).join('');
+}
+/* 未登录这一屏不能只有「去登录」和「返回」两个落点：浏览岗位和打印扫描在这台机器上
+   本来就不需要账号，把这两条按真实入口摆出来，未登录的人也有事可做。
+   这里不放第二个「返回我的」，避免和底部操作条重复。 */
+function guestRows(){
+  return '<div class="legal">不用登录也能办 · 这两项在这台机器上不需要账号</div>'
+    + startRow('brief','','看第三方岗位与招聘会','来源机构、更新时间与外部入口都在详情页里','查看岗位','26-browse-list.html','/jobs',SCREEN+'-guest-jobs')
+    + startRow('print','wheat','打印或扫描材料','当场办完的打印、扫描不需要登录，也不会绑定到账号','去打印扫描','10-print-hub.html','/print-scan',SCREEN+'-guest-print');
+}
+
+/* ── 待建 route 出口 ──────────────────────────────────────────
+   /renshi（政策列表）在青序流光里还没有宿主页面。这里不给任何暂代落点：
+   出口渲染成常驻禁用元素（无 href），data-route 只作迁移台账，data-pending-route-host 标记结构。 */
+var PENDING_REASON = '对应页面待建设，暂不可进入';
+function pendingRow(route, testid, kindAttr, title, sub, ico, tone){
+  return '<div class="row dead" aria-disabled="true" data-pending-route-host="true" data-route="'+esc(route)+'"'
+    + ' data-testid="'+testid+'" '+kindAttr+' aria-label="'+esc(title+'（'+PENDING_REASON+'）')+'">'
+    + '<span class="row-ico '+tone+'">'+svg(ico)+'</span>'
+    + '<span class="row-main"><span class="row-title">'+title+'</span><span class="row-sub">'+sub+'</span>'
+    + '<span class="reason">'+PENDING_REASON+'</span></span>'
+    + '<span class="pending-flag">待建设</span></div>';
+}
+
+/* ── 简历（/me/resumes）────────────────────────────────────── */
+var RESUME_ROWS = [
+  {id:'a', kind:'parse', status:'completed', optimized:true, task:'example-a'},
+  {id:'b', kind:'parse', status:'pending', task:'example-b'},
+  {id:'c', kind:'parse', status:'processing', task:'example-c'},
+  {id:'d', kind:'parse', status:'failed', task:'example-d'},
+  {id:'e', kind:'generate', status:'completed', task:'example-e'}
+];
+var RESUME_STATUS = {pending:['待处理','wait'],processing:['处理中','run'],completed:['已完成',''],failed:['失败','bad']};
+function resumeAct(label, file, route, testid, aria, enabled, reason, ico, secondary){
+  if(enabled) return '<a class="small'+(secondary?'':' primary')+' press" href="'+esc(keep(file))+'" data-route="'+esc(route)+'" data-testid="'+testid+'" aria-label="'+esc(aria)+'">'+svg(ico)+label+'</a>';
+  return '<span class="small" aria-disabled="true" data-testid="'+testid+'" aria-label="'+esc(aria+'（'+reason+'）')+'">'+svg(ico)+label+'</span>';
+}
+function resumeRow(r){
+  var st = RESUME_STATUS[r.status], done = r.status==='completed';
+  var reason = r.status==='failed' ? '任务已失败，不可继续操作' : '任务完成后可用';
+  var isParse = r.kind==='parse';
+  var title = isParse ? '上传诊断简历' : 'AI 生成简历';
+  var hint = isParse ? '上传简历后生成的诊断记录' : 'AI 引导生成的简历版本';
+  var acts;
+  if(isParse){
+    /* 岗位匹配走静态宿主 46-resume-decision-workspace.html?screen=job-fit：不带 taskId 或合成 id，
+       落地是宿主的「未选目标岗位」态，目标岗位在那边选；本页不声称 React 页面或接口已接通。
+       正因为不带 taskId，这个出口和本行任务状态无关，四种状态下都是可点链接；
+       只有报告 / 优化两个出口按本行任务状态禁用，行内说明也只写这两个出口。 */
+    acts = resumeAct('查看报告','22-resume-report.html?taskId='+r.task,'/resume/report?taskId='+r.task,SCREEN+'-resume-report-'+r.id,'查看这条简历诊断报告',done,reason,'doc')
+      + resumeAct(r.optimized?'查看优化版':'继续优化','23-resume-optimize.html?taskId='+r.task,'/resume/optimize?taskId='+r.task,SCREEN+'-resume-optimize-'+r.id,(r.optimized?'查看':'继续生成')+'这条简历的优化版',done,reason,'spark')
+      + resumeAct('岗位匹配','46-resume-decision-workspace.html?screen=job-fit','/resume/job-fit',SCREEN+'-resume-jobfit-'+r.id,'去岗位匹配，在那里选择目标岗位',true,'','brief',true);
+  } else {
+    acts = resumeAct('查看并打印','24-resume-generate.html?taskId='+r.task,'/resume/generate/preview?taskId='+r.task,SCREEN+'-resume-generate-'+r.id,'查看并打印这份 AI 生成简历',done,reason,'print');
+  }
+  return '<div class="row'+(r.status==='failed'?' flag':'')+'" data-record-status="'+r.status+'" data-record-kind="'+r.kind+'">'
+    +'<span class="row-ico'+(isParse?'':' plum')+'">'+svg(isParse?'doc':'spark')+'</span>'
+    +'<span class="row-main"><span class="row-head"><span class="row-title">'+title+'</span><span class="st '+st[1]+'">'+st[0]+'</span>'
+    +(isParse?'<span class="chip">'+(r.optimized?'已生成优化版':'未优化')+'</span>':'')+'</span>'
+    +'<span class="row-sub">'+hint+'</span>'
+    +(done ? '' : '<span class="reason">'+(isParse?'报告与优化：':'')+reason+'</span>')+'</span>'
+    +'<span class="acts">'+acts+'</span></div>';
+}
+function resumesReady(){
+  return fixtureNote('文件名与时间由接口回填')
+    + summary('','resume','简历档案','—','仅展示本人简历服务元数据，不展示原文或诊断正文',['数量由接口返回','当前显示 '+RESUME_ROWS.length+' 行'])
+    + '<section class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="我的简历（排版示例）">'
+    + RESUME_ROWS.map(resumeRow).join('')
+    + '<div class="list-foot legal">仅展示本人简历元数据；原始简历短留存，到期后无法恢复，<b>不向企业提供或投递</b>。<b>「岗位匹配」不依赖这条诊断结果</b>：点进去是重新挑一次目标岗位，任务失败的那行也能用。</div>'
+    + '</section>'
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              link('去上传简历','21-resume-triage.html','/resume/source',SCREEN+'-primary',{primary:true,icon:'up'})]);
+}
+
+/* ── 收藏（/me/favorites）─────────────────────────────────── */
+var FAV_ROWS = [
+  {id:'f1', type:'job', title:'岗位收藏示例 A', file:'27-browse-detail.html', route:'/jobs/example-1', label:'岗位', ico:'brief', tone:''},
+  {id:'f2', type:'job', title:'岗位收藏示例 B', file:'27-browse-detail.html', route:'/jobs/example-2', label:'岗位', ico:'brief', tone:''},
+  {id:'f3', type:'job_fair', title:'招聘会收藏示例', file:'28-jobfair-enhanced.html', route:'/job-fairs/example-3', label:'招聘会', ico:'fair', tone:'wheat'},
+  {id:'f4', type:'policy', title:'政策收藏示例', pending:true, route:'/renshi?tab=policy', label:'政策', ico:'policy', tone:'slate'}
+];
+var FAV_TABS = [['all','全部'],['job','岗位'],['job_fair','招聘会'],['policy','政策']];
+function favCount(k){ return k==='all' ? FAV_ROWS.length : FAV_ROWS.filter(function(r){return r.type===k;}).length; }
+function favRow(r){
+  var sub = r.label;
+  if(r.pending){
+    return pendingRow(r.route, SCREEN+'-fav-'+r.id, 'data-favorite-type="'+r.type+'"', r.title, sub, r.ico, r.tone);
+  }
+  return '<a class="row tap press" href="'+esc(keep(r.file))+'" data-route="'+esc(r.route)+'" data-testid="'+SCREEN+'-fav-'+r.id+'" data-favorite-type="'+r.type+'">'
+    +'<span class="row-ico '+r.tone+'">'+svg(r.ico)+'</span>'
+    +'<span class="row-main"><span class="row-title">'+r.title+'</span><span class="row-sub">'+sub+'</span></span>'
+    +'<span class="row-arrow">'+svg('arrow')+'</span></a>';
+}
+function favoritesReady(tab){
+  var rows = tab==='all' ? FAV_ROWS : FAV_ROWS.filter(function(r){return r.type===tab;});
+  var tabs = FAV_TABS.map(function(t){
+    return {label:t[1], count:favCount(t[0]), on:tab===t[0], testid:SCREEN+'-fav-tab-'+t[0],
+            href:href('favorites','ready', t[0]==='all'?'':'tab='+t[0]), route:'/me/favorites'+(t[0]==='all'?'':'?tab='+t[0])};
+  });
+  return fixtureNote('收藏时间由接口回填')
+    + summary('plum','heart','收藏夹','—','只记录本人浏览兴趣，不含投递或预约结果',['数量由接口返回','当前显示 '+FAV_ROWS.length+' 行'])
+    + tabbar(4, tabs)
+    + '<section class="list favorites-list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="我的收藏（排版示例）">'
+    + (rows.length ? rows.map(favRow).join('') : '<div class="note warn">当前分类下没有收藏。</div>')
+    + '<div class="favorite-next" aria-label="收藏使用说明">'
+      + '<div><b>岗位收藏</b><span>打开岗位详情后，按来源平台的规则完成投递。</span></div>'
+      + '<div><b>招聘会收藏</b><span>查看活动详情；预约和签到以来源平台或现场规则为准。</span></div>'
+      + '<div><b>政策收藏</b><span>对应政策页待建设，当前保留收藏，不提供误导性的替代跳转。</span></div>'
+    + '</div>'
+    + '<div class="list-foot legal">收藏只记录本人收藏行为；<b>投递与预约都在来源平台完成</b>，本机不代收简历，也不记录结果。</div>'
+    + '</section>'
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              link('去看更多岗位','26-browse-list.html','/jobs',SCREEN+'-primary',{primary:true,icon:'brief'})]);
+}
+
+/* ── AI 服务记录（/me/ai-records）─────────────────────────── */
+var AI_SESSIONS = [
+  {id:'s1', op:'岗位 AI 推荐参考', hint:'基于本人简历与已审核发布的来源岗位生成', status:'completed', ico:'spark', tone:''},
+  {id:'s2', op:'AI岗位解读', hint:'基于来源岗位公开字段生成', status:'failed', ico:'brief', tone:'slate'}
+];
+var AI_RECORDS = [
+  {id:'r1', kind:'parse', label:'简历诊断', hint:'上传简历后的诊断记录', status:'completed', ico:'doc', tone:'', cascade:true},
+  {id:'r2', kind:'optimize', label:'简历优化', hint:'基于诊断生成的优化建议', status:'processing', ico:'spark', tone:'plum'},
+  {id:'r3', kind:'career_plan', label:'职业规划建议', hint:'阶段性行动建议记录', status:'completed', ico:'route', tone:'wheat'}
+];
+var AI_STATUS = {pending:['待处理','wait'],processing:['处理中','run'],completed:['已完成',''],failed:['失败','bad']};
+function aiDeleteControls(scope, rowId, mode, target){
+  var isTarget = target && target.scope===scope && target.id===rowId;
+  var confirming = mode==='delete-confirm' && isTarget;
+  var busy = mode==='deleting' && isTarget;
+  var tid = SCREEN+'-ai-'+scope+'-'+rowId;
+  if(confirming){
+    return '<a class="small press" href="'+href('ai-records','ready')+'" data-route="/me/ai-records" data-testid="'+tid+'-cancel" aria-label="取消删除这条记录">'+svg('x')+'取消</a>'
+      +'<a class="small danger press" href="'+href('ai-records','deleting')+'" data-route="/me/ai-records" data-testid="'+tid+'-confirm" aria-label="确认删除这条记录，删除后不可恢复">'+svg('trash')+'确认删除</a>';
+  }
+  if(busy){
+    return '<span class="small" aria-disabled="true" data-testid="'+tid+'-delete" aria-label="正在删除（演示版式：本页没有发出请求，服务端记录不会被删除）">'+svg('trash')+'正在删除…（演示版式）</span>';
+  }
+  return '<a class="small press" href="'+href('ai-records','delete-confirm')+'" data-route="/me/ai-records" data-testid="'+tid+'-delete" aria-label="删除这条记录，需要再次确认">'+svg('trash')+'删除</a>';
+}
+function aiSessionRow(s, mode, target){
+  var st = AI_STATUS[s.status];
+  return '<div class="row'+(mode==='delete-confirm'&&target&&target.scope==='session'&&target.id===s.id?' flag':'')+'" data-record-kind="job-ai-session" data-record-status="'+s.status+'">'
+    +'<span class="row-ico '+s.tone+'">'+svg(s.ico)+'</span>'
+    +'<span class="row-main"><span class="row-head"><span class="chip">'+s.op+'</span><span class="st '+st[1]+'">'+st[0]+'</span></span>'
+    +'<span class="row-title" style="margin-top:8px;display:block">'+s.hint+'</span></span>'
+    +'<span class="acts">'+aiDeleteControls('session', s.id, mode, target)+'</span></div>';
+}
+function aiRecordRow(r, mode, target){
+  var st = AI_STATUS[r.status];
+  var isTarget = target && target.scope==='record' && target.id===r.id;
+  var expired = mode==='delete-expired' && isTarget;
+  return '<div class="row'+(mode==='delete-confirm'&&isTarget?' flag':'')+'" data-record-kind="'+r.kind+'" data-record-status="'+r.status+'"'+(expired?' data-confirm-window="expired"':'')+'>'
+    +'<span class="row-ico '+r.tone+'">'+svg(r.ico)+'</span>'
+    +'<span class="row-main"><span class="row-head"><span class="chip">'+r.label+'</span><span class="st '+st[1]+'">'+st[0]+'</span></span>'
+    +'<span class="row-title" style="margin-top:8px;display:block">'+r.hint+'</span>'
+    +(mode==='delete-confirm'&&isTarget&&r.cascade?'<span class="reason">删除这条诊断记录时，服务端会同时删除同一任务的派生记录与岗位 AI 会话。</span>':'')
+    +(expired?'<span class="reason">上一次确认已超时失效，删除未执行；需要重新点击删除。</span>':'')
+    +'</span>'
+    +'<span class="acts">'+aiDeleteControls('record', r.id, mode, target)+'</span></div>';
+}
+function aiRecordsBody(mode){
+  /* 被删目标固定为简历诊断记录 r1：服务端删 parse 会级联同任务派生记录（r2）与该简历任务的岗位 AI 会话（s1）。 */
+  var target = {scope:'record', id:'r1'};
+  var sessions = AI_SESSIONS, records = AI_RECORDS;
+  if(mode==='delete-success'){
+    records = AI_RECORDS.filter(function(r){ return r.id!=='r1' && r.id!=='r2'; });
+    sessions = AI_SESSIONS.filter(function(s){ return s.id!=='s1'; });
+    target = null;
+  }
+  var total = sessions.length + records.length;
+  var done = sessions.filter(function(s){return s.status==='completed';}).length + records.filter(function(r){return r.status==='completed';}).length;
+  var noteCls = mode==='delete-confirm' ? 'list-foot note warn' : mode==='delete-failure' ? 'list-foot note bad' : 'list-foot note';
+  var noteText = mode==='delete-confirm'
+      ? '再次点击「确认删除」后不可恢复；删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。'
+      : mode==='delete-failure'
+      ? '删除失败，记录可能已到期或被清理。列表保持原样，可稍后重试。'
+      : mode==='deleting'
+      ? '这一屏演示删除请求发出后、结果返回前的版式。<b>静态原型没有发出请求</b>，服务端记录不会被删除。'
+      : '删除需要两步确认；未在确认时限内再次点击，会回到未确认状态。删除简历诊断记录会同时删除同一任务的派生记录与岗位 AI 会话。';
+  return fixtureNote('时间由接口回填')
+    + summary('','robot','AI 服务记录','—','仅展示本人服务元数据，不展示简历原文、诊断正文或模型原始输出',['数量由接口返回','当前显示 '+total+' 行'])
+    + '<section class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="AI 服务记录（排版示例）">'
+    + (sessions.length?'<div class="legal">岗位 AI 参考记录 · 仅展示会话元数据，不展示提示词或模型原始输出</div>'+sessions.map(function(s){return aiSessionRow(s, mode, target);}).join(''):'')
+    + (records.length?'<div class="legal">简历与规划 AI 记录 · 仅展示服务元数据，不展示简历原文或诊断正文</div>'+records.map(function(r){return aiRecordRow(r, mode, target);}).join(''):'')
+    + '<div class="'+noteCls+'">'+noteText+'</div>'
+    + '</section>'
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile'),
+              link('去 AI 简历服务','16-service-hubs.html?hub=resume','/resume-service',SCREEN+'-primary',{primary:true,icon:'spark'})]);
+}
+
+/* ── 浏览与跳转记录（/me/activity）────────────────────────── */
+var BROWSE_ROWS = [
+  {id:'b1', label:'岗位', title:'岗位浏览示例 A', file:'27-browse-detail.html', route:'/jobs/example-1', ico:'brief', tone:'', source:'示例来源机构'},
+  {id:'b2', label:'招聘会', title:'招聘会浏览示例', file:'28-jobfair-enhanced.html', route:'/job-fairs/example-3', ico:'fair', tone:'wheat', source:'示例主办方'},
+  {id:'b3', label:'政策', title:'政策浏览示例', pending:true, route:'/renshi?tab=policy', ico:'policy', tone:'slate', source:'示例官方来源'},
+  {id:'b4', label:'岗位', title:'岗位浏览示例 B', file:'27-browse-detail.html', route:'/jobs/example-2', ico:'brief', tone:'', source:'示例来源机构'}
+];
+var JUMP_ROWS = [
+  {id:'j1', label:'岗位', action:'岗位来源入口', title:'岗位跳转示例', file:'27-browse-detail.html', route:'/jobs/example-1', ico:'brief', tone:''},
+  {id:'j2', label:'招聘会', action:'招聘会来源入口', title:'招聘会跳转示例', file:'28-jobfair-enhanced.html', route:'/job-fairs/example-3', ico:'fair', tone:'wheat'},
+  /* 与浏览记录同构：政策同样会产生外部跳转记录，但政策宿主页待建设，所以这一行常驻不可点。 */
+  {id:'j3', label:'政策', action:'政策官方入口', title:'政策跳转示例', pending:true, route:'/renshi?tab=policy', ico:'policy', tone:'slate'}
+];
+function activityRow(r, kind){
+  var meta = kind==='browse'
+    ? '浏览 · '+r.label+' · '+r.source
+    : '打开'+r.action+' · '+r.label;
+  if(r.pending){
+    return pendingRow(r.route, SCREEN+'-activity-'+r.id, 'data-activity-kind="'+kind+'"', r.title, meta, kind==='browse'?'eye':'external', r.tone);
+  }
+  return '<a class="row tap press" href="'+esc(keep(r.file))+'" data-route="'+esc(r.route)+'" data-testid="'+SCREEN+'-activity-'+r.id+'" data-activity-kind="'+kind+'">'
+    +'<span class="row-ico '+r.tone+'">'+svg(kind==='browse'?'eye':'external')+'</span>'
+    +'<span class="row-main"><span class="row-title">'+r.title+'</span><span class="row-sub">'+meta+'</span></span>'
+    +'<span class="row-arrow">'+svg('arrow')+'</span></a>';
+}
+function activityTabs(tab, empty){
+  return tabbar(2, [
+    {label:'浏览记录', count:empty?0:BROWSE_ROWS.length, on:tab==='browse', testid:SCREEN+'-activity-tab-browse', href:href('activity', empty?'browse-empty':'browse-ready'), route:'/me/activity'},
+    {label:'外部跳转记录', count:empty?0:JUMP_ROWS.length, on:tab==='jump', testid:SCREEN+'-activity-tab-jump', href:href('activity', empty?'jump-empty':'jump-ready'), route:'/me/activity?tab=jump'}
+  ]);
+}
+function activityBody(tab, empty){
+  if(empty){
+    var browse = tab==='browse';
+    var starts = browse
+      ? startRow('brief','','看看第三方岗位','浏览来源平台或机构发布的岗位，浏览动作会记在这里','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
+        + startRow('fair','wheat','看看招聘会','查看官方或主办方发布的招聘会信息','查看招聘会','28-jobfair-enhanced.html','/job-fairs',SCREEN+'-start-fairs')
+        + startRow('doc','plum','先做一份简历','诊断或生成之后再去看岗位会更有针对性','去简历服务','16-service-hubs.html?hub=resume','/resume-service',SCREEN+'-start-resume')
+      : startRow('brief','','打开岗位的来源入口','在岗位详情里点「去来源平台投递」或「扫码投递」','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
+        + startRow('fair','wheat','打开招聘会的官方入口','在招聘会详情里点「去来源平台预约」或「扫码预约」','查看招聘会','28-jobfair-enhanced.html','/job-fairs',SCREEN+'-start-fairs')
+        + startRow('eye','slate','先看看浏览记录','浏览与打开来源入口是两类记录，分开保存','切到浏览记录',href('activity','browse-empty'),'/me/activity',SCREEN+'-start-browse');
+    return {layout:'empty', html:
+      summary('slate','clock','访问足迹','0','只记录浏览与打开来源入口动作，不记录投递或预约结果',['浏览 0','跳转 0'])
+      + activityTabs(tab, true)
+      + previewList(starts,
+          browse ? '浏览岗位 / 招聘会 / 政策 / 企业之后，这里会出现你的浏览记录。<b>空就是空</b>，本页不会造记录让页面好看。'
+                 : '打开来源平台或官方入口之后，这里会出现记录。<b>是否投递、是否预约成功由来源平台决定，本系统不记录也不参与。</b>',
+          browse?'从这里开始浏览':'从这里打开来源入口')
+      + guide('empty-activity')
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                link(browse?'查看岗位':'查看招聘会', browse?'26-browse-list.html':'28-jobfair-enhanced.html', browse?'/jobs':'/job-fairs', SCREEN+'-primary',{primary:true,icon:'arrow'})])};
+  }
+  var rows = tab==='browse' ? BROWSE_ROWS : JUMP_ROWS;
+  return {layout:'list5', html:
+    fixtureNote('时间由接口回填')
+    + summary('slate','clock','访问足迹','—','只记录浏览与打开来源入口动作，不记录投递或预约结果',['数量由接口返回','当前显示 '+rows.length+' 行'])
+    + activityTabs(tab, false)
+    + '<section class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="浏览与跳转记录（排版示例）">'
+    + rows.map(function(r){return activityRow(r, tab);}).join('')
+    + '<div class="list-foot legal">仅记录本人浏览与打开来源入口的行为；<b>投递 / 预约结果以来源平台为准</b>，本系统不记录。</div>'
+    + '</section>'
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              link(tab==='browse'?'继续看岗位':'去看招聘会', tab==='browse'?'26-browse-list.html':'28-jobfair-enhanced.html', tab==='browse'?'/jobs':'/job-fairs', SCREEN+'-primary',{primary:true,icon:'arrow'})])};
+}
+
+/* ── 记录详情（/me/activity/:id）──────────────────────────── */
+/* 一条记录就那么几个字段。原来把它们塞进一张小 dl 卡，卡被 1fr 拉满之后字段浮在顶部、
+   下面整屏空着。改成和本页其它视图同一套行结构：抬头单独一张卡，字段各占一行、平分中段高度。 */
+var DETAIL_FIELDS = [
+  ['eye','','内容类型','岗位','这条记录指向一条来源岗位'],
+  ['route','slate','记录动作','浏览','只记「看过」这个动作，不是投递，也不是预约'],
+  ['clock','wheat','记录时间',null,'由服务端返回，本机不本地留存明细'],
+  ['brief','','来源机构',null,'来源机构与外部投递入口以岗位详情页为准'],
+  ['lock','plum','可见范围','仅本人可见','退出或超时后，本机不保留这条记录的明细']
+];
+function detailFieldRow(f, i){
+  return '<div class="row" data-detail-field="'+i+'" data-testid="'+SCREEN+'-detail-field-'+i+'">'
+    +'<span class="row-ico '+f[1]+'">'+svg(f[0])+'</span>'
+    +'<span class="row-main"><span class="row-title">'+esc(f[2])+'</span><span class="row-sub">'+esc(f[4])+'</span></span>'
+    +'<span class="acts">'+(f[3] ? '<span class="chip">'+esc(f[3])+'</span>' : slot('接口回填'))+'</span></div>';
+}
+function activityDetailBody(){
+  return fixtureNote()
+    + '<section class="card" data-testid="'+SCREEN+'-detail" data-evidence-fixture="synthetic">'
+    + '<div class="detail-head"><span class="row-ico">'+svg('eye')+'</span><div><h2>岗位浏览示例 A</h2><p>浏览记录 · 仅本人可见</p></div></div>'
+    + '</section>'
+    + '<section class="list" data-testid="'+SCREEN+'-detail-fields" aria-label="这条记录包含的字段">'
+    + DETAIL_FIELDS.map(detailFieldRow).join('')
+    + '<div class="list-foot legal">这里只记录<b>浏览</b>与<b>打开来源入口</b>这两个动作本身；投递或预约结果以来源平台为准，本系统不记录也不参与。</div>'
+    + '</section>'
+    + ctaBar([
+      link('返回记录列表', href('activity','browse-ready'), '/me/activity', SCREEN+'-back-activity', {icon:'back'}),
+      link('查看原内容','27-browse-detail.html','/jobs/example-1',SCREEN+'-primary',{primary:true,icon:'arrow'})
+    ]);
+}
+
+/* ── 状态装配：登录 / 加载 / 失败 / 空 一律「横幅 + 结构清单 + 说明 + 操作」 ── */
+function loginState(view, title, desc){
+  var from = view==='activity-detail' ? '/me/activity' : VIEWS[view].route;
+  return {layout:'state', html:
+    banner('lock','lock', title, desc + '<b>下面是登录后会出现的内容结构，以及现在就能办的事。</b>', ['共 —','登录后回填'])
+    + previewList('<div class="legal">登录后会出现的内容结构 · 现在不显示任何明细</div>'
+        + structRows(view,'lock') + guestRows(),
+        '登录只用来确认「是你本人」。<b>结束会话只清除本机登录态与临时会话信息</b>；服务端的记录按各自留存期限管理。',
+        '登录后会出现的内容结构，以及不用登录也能办的事')
+    + guide('login')
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              '<a class="btn primary press" href="'+esc(keep('03-login-gate.html?from='+encodeURIComponent(from)))+'" data-route="/login" data-login-from="'+esc(from)+'" data-testid="'+SCREEN+'-primary">手机号登录</a>'])};
+}
+function loadingState(view, title){
+  return {layout:'state', html:
+    banner('calm','clock', title, '正在读取当前账号的记录。<b>返回前一律显示「—」</b>，不会闪回上一位用户的内容。', ['共 —','正在安全读取'])
+    + previewList([0,1,2,3].map(skelRow).join(''),
+        '这次读取失败不会删除任何记录，也不会改动任何已保存的内容。','正在加载的记录占位')
+    + guide('loading')
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              deadPrimary('记录还未加载完成','数据尚未返回，暂时不可操作',SCREEN+'-primary')])};
+}
+function errorState(view, state, title, desc){
+  return {layout:'state', html:
+    banner('warn','warn', title, desc + '<b>本页不会拿上一次的内容冒充当前账号</b>，所以字段一律显示「—」。', ['共 —','本次未取到'])
+    + previewList(structRows(view,'error'),
+        '重试不会重复创建记录，也不会改动已保存的内容。多次重试仍失败时，可以让现场工作人员协助查询。','本次未取到的内容结构')
+    + guide('error')
+    + ctaBar([link('联系工作人员','06-help.html','/help',SCREEN+'-help'),
+              link('重新加载', href(view, state), VIEWS[view].route, SCREEN+'-primary',{primary:true})])};
+}
+function emptyState(view, ico, title, desc, starts, cta){
+  return {layout:'state', html:
+    banner('','empty', title, desc + '<b>空就是空</b>，本页不会造几条记录让页面好看。', ['共 0'])
+    + previewList(starts, '按上面任一条办完之后，记录会出现在这一页；<b>本机不代收简历，也不记录来源平台的处理结果</b>。','从这里开始')
+    + guide('empty-'+view)
+    + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+              link(cta[0], cta[1], cta[2], SCREEN+'-primary', {primary:true, icon:cta[3]})])};
+}
+
+function renderBody(view, state, tab){
+  if(view==='resumes'){
+    if(state==='login') return loginState('resumes','登录后查看我的简历','公共一体机不会在未登录时展示简历文件名、任务或诊断记录；游客上传不会自动绑定到账号。');
+    if(state==='loading') return loadingState('resumes','正在加载我的简历');
+    if(state==='error') return errorState('resumes','loading','简历记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已保存的简历不会因为这次失败而消失。');
+    if(state==='empty') return emptyState('resumes','resume','还没有登录后保存的简历',
+      '公共一体机上的游客上传不会自动绑定到账号；登录后上传、诊断或生成的简历才会出现在这里。',
+      startRow('up','','上传一份现有简历','上传后可以做诊断、优化，并生成可打印的版本','去上传','21-resume-triage.html','/resume/source',SCREEN+'-start-upload')
+      + startRow('doc','slate','扫描纸质简历','把纸质简历扫成 PDF，再走同一条诊断流程','去扫描','18-scan-workbench.html?state=setup','/scan/start',SCREEN+'-start-scan')
+      + startRow('spark','plum','让 AI 生成一份新简历','按引导逐段生成，可直接打印','去生成','24-resume-generate.html','/resume/generate',SCREEN+'-start-generate'),
+      ['去上传简历','21-resume-triage.html','/resume/source','up']);
+    return {layout:'list', html:resumesReady()};
+  }
+  if(view==='favorites'){
+    if(state==='login') return loginState('favorites','登录后查看我的收藏','收藏只在登录后与账号绑定；公共一体机不保存游客的收藏。');
+    if(state==='loading') return loadingState('favorites','正在加载我的收藏');
+    if(state==='error') return errorState('favorites','loading','收藏这次没有加载出来','当前列表没有更新。请检查网络后重试；已有收藏不会因为这次失败而消失。');
+    if(state==='empty') return emptyState('favorites','heart','还没有收藏',
+      '在岗位 / 招聘会 / 政策详情页点收藏之后，才会出现在这里。',
+      startRow('brief','','看看第三方岗位','来源、更新时间与外部投递入口都在详情页','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
+      + startRow('fair','wheat','看看招聘会','时间、地点与官方预约入口以详情页为准','查看招聘会','28-jobfair-enhanced.html','/job-fairs',SCREEN+'-start-fairs')
+      + startRow('doc','plum','先把简历准备好','诊断或生成之后再去收藏岗位会更有针对性','去简历服务','16-service-hubs.html?hub=resume','/resume-service',SCREEN+'-start-resume'),
+      ['查看岗位','26-browse-list.html','/jobs','brief']);
+    return {layout:'list5', html:favoritesReady(tab||'all')};
+  }
+  if(view==='ai-records'){
+    if(state==='login') return loginState('ai-records','登录后查看 AI 服务记录','AI 服务记录只在登录后与账号绑定；公共一体机不保存游客记录。');
+    if(state==='loading') return loadingState('ai-records','正在加载 AI 服务记录');
+    if(state==='error') return errorState('ai-records','loading','AI 服务记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
+    if(state==='empty') return emptyState('ai-records','robot','还没有 AI 服务记录',
+      '完成简历诊断、优化、岗位 AI 参考或职业规划之后，服务记录才会出现在这里。',
+      startRow('doc','','做一次简历诊断','诊断结果会生成一条可回看的服务记录','去诊断','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose',SCREEN+'-start-diagnose')
+      + startRow('brief','slate','让 AI 解读一个岗位','基于来源岗位的公开字段生成参考解读','查看岗位','26-browse-list.html','/jobs',SCREEN+'-start-jobs')
+      + startRow('route','wheat','做一次职业规划','阶段性行动建议会存成一条服务记录','去规划','16-service-hubs.html?hub=resume','/resume-service',SCREEN+'-start-plan'),
+      ['去做简历诊断','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose','doc']);
+    return {layout:'list', html:aiRecordsBody(state)};
+  }
+  if(view==='activity'){
+    if(state==='login') return loginState('activity','登录后查看本人记录','游客模式不保存跨会话浏览记录；公共一体机也不在本机留存浏览历史。');
+    if(state==='loading') return loadingState('activity','正在加载本人记录');
+    if(state==='error') return errorState('activity','loading','记录这次没有加载出来','当前列表没有更新。请检查网络后重试；已有记录不会因为这次失败而消失。');
+    if(state==='browse-empty') return activityBody('browse', true);
+    if(state==='jump-empty') return activityBody('jump', true);
+    if(state==='jump-ready') return activityBody('jump', false);
+    return activityBody('browse', false);
+  }
+  if(state==='login') return loginState('activity-detail','登录后查看本人记录','游客模式不保存跨会话浏览记录，这条记录只对本人可见。');
+  if(state==='loading') return loadingState('activity-detail','正在读取这条记录');
+  if(state==='error') return errorState('activity-detail','loading','这条记录这次没有读到','当前没有读到这条记录。请检查网络后重试。');
+  if(state==='not-found') return {layout:'state', html:
+      banner('','empty','未找到这条记录','记录可能已按留存期限清理，或不属于当前登录账号。<b>本页不会拿别的记录顶替。</b>', ['—'])
+      + previewList(structRows('activity-detail','error'),
+          '记录详情没有独立接口：按 id 在浏览与跳转两个列表里查找，找不到就是找不到。','这条记录本应包含的字段')
+      + guide('not-found')
+      + ctaBar([link('返回我的','30-my-profile.html','/profile',SCREEN+'-back-profile',{icon:'back'}),
+                link('返回记录列表', href('activity','browse-ready'), '/me/activity', SCREEN+'-primary',{primary:true})])};
+  return {layout:'detail', html:activityDetailBody()};
+}
+
+/* ── 渲染 ─────────────────────────────────────────────────── */
+function renderTabs(view, state){
+  var fam = familyOf(view, state);
+  var active = VIEWS[view].tab ? view : VIEWS[view].parentTab;
+  document.getElementById('viewtabs').innerHTML = TAB_VIEWS.map(function(v){
+    var target = (fam && FAMILY[v][fam]) ? FAMILY[v][fam] : VIEWS[v].def;
+    return '<a class="vtab press'+(v===active?' on':'')+'" href="'+href(v, target)+'" data-route="'+VIEWS[v].route+'" data-testid="'+SCREEN+'-view-'+v+'"'+(v===active?' aria-current="true"':'')+'>'
+      + VIEWS[v].tab + '<span>' + VIEWS[v].tabHint + '</span></a>';
+  }).join('');
+}
+var LAYOUT = {state:'state-layout', empty:'empty-layout', list:'list-layout', list5:'list5-layout', detail:'detail-layout'};
+function render(view, state, tab){
+  var v = VIEWS[view];
+  var out = renderBody(view, state, tab);
+  var root = document.getElementById('body-root');
+  root.className = 'body ' + (LAYOUT[out.layout] || 'state-layout');
+  root.dataset.state = view + '-' + state;
+  root.dataset.view = view;
+  root.dataset.testid = SCREEN + '-state-' + view + '-' + state;
+  if(tab) root.dataset.tab = tab; else delete root.dataset.tab;
+  /* 提交中与结果态都只作为**版式演示**保留：静态原型没有发过请求，不能声称真的提交或删掉了记录。 */
+  var toast = '', tone = '', demo = false;
+  if(state==='deleting'){ toast = '演示态：这是「正在删除」提交中的版式；本页没有发出任何请求，服务端记录不会被删除。'; tone = 'demo'; demo = true; }
+  if(state==='delete-success'){ toast = '演示态：这是删除成功后的版式；本页没有发出任何请求，服务端记录没有被改动。'; tone = 'demo'; demo = true; }
+  if(state==='delete-failure'){ toast = '演示态：这是删除失败后的版式（记录可能已到期或被清理）；本页没有发出任何请求。'; tone = 'demo'; demo = true; }
+  if(toast) root.className += ' has-toast';
+  root.innerHTML = (toast ? '<div class="toast" role="status" data-tone="'+tone+'"'+(demo?' data-demo-state="true"':'')+' data-testid="'+SCREEN+'-toast">'+svg('info')+'<span>'+toast+'</span></div>' : '') + out.html;
+  document.getElementById('eyebrow').textContent = v.eyebrow;
+  document.getElementById('ask').innerHTML = v.ask;
+  document.getElementById('doing').innerHTML = v.doing;
+  document.getElementById('pill-text').textContent = v.pill;
+  document.getElementById('pill-dot').className = 'dot' + (state==='loading' || state==='deleting' ? ' breathe' : '');
+  document.getElementById('truth-copy').textContent = v.truth;
+  document.getElementById('back').href = view==='activity-detail' ? href('activity','browse-ready') : keep('30-my-profile.html');
+  document.getElementById('back').setAttribute('data-route', view==='activity-detail' ? '/me/activity' : '/profile');
+  document.getElementById('back').setAttribute('aria-label', view==='activity-detail' ? '返回浏览与跳转记录' : '返回我的');
+  renderTabs(view, state);
+}
+
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+if(DEBUG) document.documentElement.classList.add('debug');
+var view = q.get('view'); if(VIEW_ORDER.indexOf(view)<0) view = 'resumes';
+var state = q.get('state'); if(VIEWS[view].states.indexOf(state)<0) state = VIEWS[view].def;
+var tab = q.get('tab');
+if(view==='favorites'){ var keys = FAV_TABS.map(function(t){return t[0];}); if(keys.indexOf(tab)<0) tab='all'; } else { tab = null; }
+render(view, state, tab);
+
+function fit(){ var k=Math.min(innerWidth/1080, innerHeight/1920); var s=document.getElementById('stage'); if('zoom' in s.style) s.style.zoom=k; else s.style.transform='scale('+k+')'; }
+addEventListener('resize', fit); fit();
+function tick(){ var d=new Date(); document.getElementById('clock').textContent = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 10000);
+/* 演示面板只在 ?debug=1 时填充并解除 hidden；普通 URL 下既不可见也不可聚焦。 */
+if(DEBUG){
+  var demoTab = document.getElementById('demo-tab'), panel = document.getElementById('demo-panel');
+  panel.innerHTML = '<div class="dp-t">原型演示控制</div>' + VIEW_ORDER.map(function(v){
+    return VIEWS[v].states.map(function(s){ return '<a href="?debug=1&view='+v+'&state='+s+'">'+v+' / '+s+'</a>'; }).join('');
+  }).join('');
+  demoTab.hidden = false; panel.hidden = false;
+  demoTab.onclick = function(){ panel.classList.toggle('show'); };
+}
+</script>
+</body></html>

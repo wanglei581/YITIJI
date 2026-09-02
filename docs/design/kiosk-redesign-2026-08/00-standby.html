@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职易达 · 待机屏</title>
+<style>
+:root{
+  --deep:#09251f;--emerald:#35e6ad;--gold:#e4c982;--paper:#f4f6ef;
+  --muted:rgba(244,246,239,.68);--line:rgba(244,246,239,.18);
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif;
+  --sans:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#151a18;font-family:var(--sans)}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;overflow:hidden;transform-origin:center;background:var(--deep);color:var(--paper)}
+#body-root{position:absolute;inset:0;overflow:hidden;background:linear-gradient(180deg,rgba(5,25,20,.28),rgba(5,25,20,.8)),url('assets/bg-standby.jpg') center/cover no-repeat}
+.grain{position:absolute;inset:0;opacity:.045;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E")}
+.beam{position:absolute;width:1400px;height:360px;left:-160px;top:720px;transform:rotate(-12deg);filter:blur(60px);background:linear-gradient(90deg,transparent,rgba(53,230,173,.12),transparent);animation:drift 12s ease-in-out infinite;pointer-events:none}
+@keyframes drift{0%,100%{transform:translateX(-90px) rotate(-12deg)}50%{transform:translateX(90px) rotate(-12deg)}}
+.topbar{position:absolute;z-index:3;top:0;left:0;right:0;height:132px;padding:0 64px;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:20px}.seal{width:74px;height:74px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(145deg,#48efba,#22bd8d);color:var(--deep);font:900 39px/1 var(--serif)}
+.brand-name{font:900 34px/1.2 var(--serif);letter-spacing:3px}.brand-sub{margin-top:6px;color:var(--muted);font-size:19px;letter-spacing:2px}
+.ready{height:58px;padding:0 24px;border:1px solid rgba(53,230,173,.42);border-radius:999px;display:flex;align-items:center;gap:11px;background:rgba(9,37,31,.44);font-size:21px}.ready i{width:10px;height:10px;border-radius:50%;background:var(--emerald)}
+.clock-zone{position:absolute;z-index:3;top:208px;left:0;right:0;text-align:center}.date{font-size:28px;letter-spacing:5px;color:var(--muted)}
+.time{margin-top:18px;font:900 206px/1 var(--serif);font-variant-numeric:tabular-nums;letter-spacing:5px;text-shadow:0 0 70px rgba(53,230,173,.18)}
+.media-slot{position:absolute;z-index:3;top:560px;left:96px;right:96px;height:500px;border:1px solid rgba(244,246,239,.22);border-radius:28px;overflow:hidden;background:linear-gradient(150deg,rgba(20,69,57,.82),rgba(7,31,25,.88));box-shadow:0 30px 90px rgba(0,0,0,.22)}
+.media-slot::before{content:"";position:absolute;inset:0;background:radial-gradient(620px 320px at 75% 10%,rgba(53,230,173,.17),transparent 66%)}
+.media-label{position:absolute;left:32px;top:28px;display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:2px;color:rgba(244,246,239,.64)}
+.media-label i{width:9px;height:9px;border-radius:50%;background:var(--gold)}
+.media-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:72px}
+.media-icon{width:98px;height:98px;border-radius:28px;display:grid;place-items:center;border:1px solid rgba(53,230,173,.35);background:rgba(53,230,173,.09);color:var(--emerald)}
+.media-title{margin-top:28px;font:900 40px/1.3 var(--serif);letter-spacing:2px}.media-copy{margin-top:14px;font-size:23px;line-height:1.7;color:var(--muted)}
+.service-strip{position:absolute;z-index:3;top:1096px;left:96px;right:96px;display:flex;justify-content:center;gap:18px}
+.service-chip{height:58px;padding:0 22px;border:1px solid var(--line);border-radius:999px;display:flex;align-items:center;font-size:20px;color:rgba(244,246,239,.84)}
+.cta-zone{position:absolute;z-index:3;top:1210px;left:0;right:0;height:330px;display:grid;place-items:center;pointer-events:none}
+.halo{position:absolute;width:480px;height:480px;border:1px solid rgba(53,230,173,.36);border-radius:50%;animation:halo 4s ease-out infinite}.halo.b{animation-delay:2s}
+@keyframes halo{from{transform:scale(.55);opacity:.9}to{transform:scale(1.35);opacity:0}}
+.cta{width:700px;height:166px;border-radius:84px;border:1.5px solid rgba(53,230,173,.64);background:rgba(8,42,34,.68);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;box-shadow:0 0 72px rgba(53,230,173,.17)}
+.cta-main{font:900 47px/1.2 var(--serif);letter-spacing:5px}.cta-sub{font-size:22px;color:var(--muted);letter-spacing:2px}
+.bottom{position:absolute;z-index:3;left:0;right:0;bottom:0;height:310px;padding:44px 72px 46px;display:flex;flex-direction:column;justify-content:flex-end;background:linear-gradient(180deg,transparent,rgba(3,18,14,.86) 32%)}
+.truth-row{display:flex;justify-content:center;gap:18px}.truth{min-height:54px;padding:0 22px;border:1px solid var(--line);border-radius:999px;display:flex;align-items:center;gap:10px;color:rgba(244,246,239,.82);font-size:19px}.truth i{width:8px;height:8px;border-radius:50%;background:rgba(244,246,239,.48)}
+.boundary{margin-top:28px;text-align:center;color:rgba(244,246,239,.66);font-size:19px;line-height:1.8;letter-spacing:.5px}.boundary strong{color:#fff;font-weight:600}
+.wake-target{position:absolute;z-index:9;inset:0;border:0;background:transparent;cursor:pointer;color:transparent}.wake-target:focus-visible{outline:6px solid var(--gold);outline-offset:-12px}
+@media(prefers-reduced-motion:reduce){.beam,.halo{animation:none}.halo{display:none}}
+</style>
+</head>
+<body>
+<div id="viewport"><main id="stage"><div id="body-root" data-screen="standby" data-state="default" data-testid="standby-state-default">
+  <div class="grain"></div><div class="beam"></div>
+  <header class="topbar"><div class="brand"><div class="seal">职</div><div><div class="brand-name">职易达</div><div class="brand-sub">就业服务大厅 · 01 号机</div></div></div><div class="ready"><i></i>轻触即可开始</div></header>
+  <section class="clock-zone" aria-label="当前时间"><div class="date" id="dateLine">--</div><div class="time" id="clock">--:--</div></section>
+  <section class="media-slot" data-material-source="kiosk/screensaver-content" data-testid="standby-material-slot" aria-label="宣传内容区域">
+    <div class="media-label"><i></i>宣传内容</div><div class="media-fallback" data-testid="standby-material-fallback"><div class="media-icon" aria-hidden="true"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15l3-3 3 3 2-2 2 2"/><circle cx="8" cy="9" r="1.2"/></svg></div><div class="media-title">暂无宣传内容</div><div class="media-copy">宣传物料未下发或暂不可用。<br>不影响打印、简历与信息查询入口。</div></div>
+  </section>
+  <div class="service-strip" aria-label="可进入的服务类别"><span class="service-chip">材料打印</span><span class="service-chip">简历服务</span><span class="service-chip">岗位信息</span><span class="service-chip">招聘会信息</span></div>
+  <section class="cta-zone" aria-hidden="true"><div class="halo"></div><div class="halo b"></div><div class="cta"><div class="cta-main">轻触屏幕，开始办事</div><div class="cta-sub">服务状态进入具体页面后核验</div></div></section>
+  <footer class="bottom"><div class="truth-row"><span class="truth"><i></i>不预报设备状态</span><span class="truth"><i></i>不展示虚构数量</span><span class="truth"><i></i>异常会如实提示</span></div><div class="boundary">本机提供求职材料服务与第三方信息入口：<strong>不代收简历 · 不替你投递</strong><br>公共终端，结束办理后请清空本次资料</div></footer>
+  <button class="wake-target" type="button" aria-label="轻触屏幕进入职易达首页" data-testid="standby-primary" onclick="location.href='01-home.html?state=context'"></button>
+</div></main></div>
+<script>
+function fit(){var k=Math.min(innerWidth/1080,innerHeight/1920),s=document.getElementById('stage');if('zoom' in s.style)s.style.zoom=k;else s.style.transform='scale('+k+')'}addEventListener('resize',fit);addEventListener('orientationchange',fit);fit();
+var week=['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];function tick(){var d=new Date(),hh=String(d.getHours()).padStart(2,'0'),mm=String(d.getMinutes()).padStart(2,'0');document.getElementById('clock').textContent=hh+':'+mm;document.getElementById('dateLine').textContent=d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日 · '+week[d.getDay()]}tick();setInterval(tick,10000);
+</script>
+</body>
+</html>

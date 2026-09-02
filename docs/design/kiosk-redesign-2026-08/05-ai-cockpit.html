@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 顾问 · 职易达</title>
+<!--
+  route: /assistant（工作台类型：AI 驾驶舱。单页多状态，不新增路由）
+  页面名：AI 顾问。旧稿的「问小青」称呼已在本页可见文案中全部下线（含底栏导航项）。
+
+  state（12 态，均可用 ?state= 直达；?debug=1 打开原型演示控制）：
+    default | composer | submitting | reply-real | reply-not-ai | reply-error | ai-unavailable
+    voice-gate | voice-connecting | voice-live | mic-denied | voice-error
+  每态在 #body-root 上写 data-screen / data-state / data-testid=ai-cockpit-state-<state>；
+  五个语音态的面板另带 data-screen="ai-cockpit-voice"，便于与文字态分开断言。
+
+  真实性合同（对齐 pages/assistant/advisorProvider.ts）：
+    · 只有 providerLabel 以 `llm:` 开头 **且** aiGenerated===true，才允许把正文当 AI 回答渲染；
+      任一缺失一律 fail-closed 走 reply-not-ai，后端预置话术**不进 UI、不进 state**。
+    · reply-real 是**布局示例 / 合成数据**，正文为排版占位，页面上持续标记，不得读作模型输出。
+    · submitting 只表达「请求在飞」：无百分比、无阶段点、无预计时间（MOTION-SPEC M2）。
+    · 语音默认关闭；本页不加载 TRTC SDK、不进房、不申请麦克风、不显示转写与时长。
+      voice-live 是合成布局示例，展示未来真实控制区（字幕 / 静音 / 切换文字 / 结束通话），不代表已接通。
+
+  四个非 AI 入口（AI 失败或不可用时不得被阻断，对齐 advisorScenes.ts ADVISOR_MANUAL_ENTRIES）：
+    打印扫描  → 10-print-hub.html                  生产路由 /print-scan
+    招聘会    → 16-service-hubs.html?hub=fairs      生产路由 /job-fairs
+    政策服务  → 16-service-hubs.html?hub=policy     生产路由 /policy-service
+    简历服务  → 16-service-hubs.html?hub=resume     生产路由 /resume-service
+    （静态 href 指向本设计集的宿主页，data-route 写运行时真实路由；运行时该项标签为「AI简历服务」，
+      本页在「不经过 AI」的语境下写作「简历服务」，指向同一路由。）
+
+  safe action 白名单（对齐 AssistantPage.tsx ALLOWED_ROUTE_PREFIXES）：
+    /resume /resume-service /print/ /print-scan /scan/ /jobs /job-fairs /fairs-service /jobs-service
+    /interview /interview-service /renshi /policy-service /companies
+    白名单外的 action 直接丢弃，不渲染。
+    每条动作的 testid 为 cockpit-action-<route slug>（route 去掉非字母数字后连字符化，页面内唯一、跨主题稳定）；
+    需要整组断言时用 [data-allowed-route=true]，不要再依赖同名 testid。
+
+  intent（来自 16-service-hubs.html 的入口方向）：resume | jobs | fair | interview | policy
+    只换主题选中项与提示，**不预填、不发起调用、不生成回答**；不认识的值 fail-closed 回通用，不报错不空屏。
+    ⚠ 运行时 AssistantPage.tsx 的 ?intent= 读的是百宝箱 skill 键（normalizeToolboxSkill），与本页 Hub 方向是两套取值，
+      React 迁移时必须分开处理，不能把 Hub 方向塞进 skill 键。
+
+  隐私：草稿只写 sessionStorage（键 kiosk-assistant-draft），离开本页 / 点「清空」即清；
+        URL 里不放任何用户输入；本页零网络请求、零外部依赖。
+        「离场即清」只覆盖本机草稿与临时会话；服务端的对话、文件与订单按各自留存期限管理，
+        本页不得写成「不留存」，也不得替服务端承诺删除。
+  合规：岗位与招聘会仅第三方 / 官方来源入口，本页不做站内投递、不代收简历；
+        AI 不决定身份、支付、设备、打印扫描成败、岗位来源真伪、政策资格或录用结果。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --r-lg:32px; --r-md:24px; --r-sm:18px;
+  --dur-quick:240ms; --ease-out:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+textarea{font:inherit}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── 顶栏 ───────────────────────────────────────── */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.pill.lock{background:var(--slate-soft);color:var(--slate-d);border-color:transparent}.pill.lock .dot{background:var(--slate)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+/* ── AI 驾驶舱条 ────────────────────────────────── */
+.cockpit{flex:none;margin:18px 44px 0;border-radius:var(--r-lg);padding:24px 32px 22px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;display:flex;flex-wrap:wrap;align-items:stretch;gap:26px;position:relative;overflow:hidden}
+.ck-mark,.ck-main,.ck-tel{min-height:148px}
+.rail{flex:0 0 100%;width:100%;}
+.cockpit::before{content:"";position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(46,230,168,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(46,230,168,.07) 1px,transparent 1px);background-size:48px 48px}
+.ck-mark{position:relative;z-index:1;flex:none;width:92px;height:92px;align-self:center;border-radius:26px;border:1.5px solid rgba(46,230,168,.42);background:rgba(46,230,168,.09);color:var(--emerald);display:flex;align-items:center;justify-content:center}
+.ck-main{position:relative;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.ck-eyebrow{font-size:17px;letter-spacing:4px;color:rgba(242,239,228,.5);font-weight:700}
+.ck-title{margin-top:7px;font-size:36px;line-height:1.28;font-weight:700;letter-spacing:1px}
+.ck-title em{font-style:normal;color:var(--emerald)}
+.ck-copy{margin-top:9px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.74)}
+.ck-tel{position:relative;z-index:1;flex:none;width:320px;align-self:center;padding-left:26px;border-left:1px solid rgba(242,239,228,.16);display:flex;flex-direction:column;gap:12px}
+.ck-tel div{display:flex;align-items:baseline;gap:10px}
+.ck-tel span{flex:none;width:92px;font-size:16px;color:rgba(242,239,228,.5);letter-spacing:1px}
+.ck-tel b{font-size:18px;font-weight:600;color:#f2efe4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-tel b.hi{color:var(--emerald)}
+.ck-tel b.amber{color:#f0c463}
+
+/* ── 主体与分区 ─────────────────────────────────── */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.sec{flex:none;padding:0 44px;margin-top:22px;display:flex;flex-direction:column;min-height:0}
+.sec.grow{flex:1;min-height:0}
+.sec.last{margin-bottom:22px}
+.sec-label{flex:none;display:flex;align-items:baseline;gap:16px;margin-bottom:13px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:28px;font-weight:700}
+.sec-label .hint{font-size:18px;color:var(--ink-3);margin-left:auto;text-align:right}
+.press:active{transform:scale(.985)}
+
+/* 任务卡 */
+.tasks{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px}
+.task{min-height:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:20px 24px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);position:relative;overflow:hidden}
+.task-ic{flex:none;width:56px;height:56px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal-d)}
+.task-ic[data-tone=slate]{background:var(--slate-soft);color:var(--slate-d)}
+.task-ic[data-tone=clay]{background:var(--clay-soft);color:var(--clay-d)}
+.task-ic[data-tone=wheat]{background:var(--wheat-soft);color:var(--wheat-d)}
+.task-n{margin-top:12px;font-size:26px;font-weight:700;line-height:1.25}
+.task-d{margin-top:7px;font-size:19px;line-height:1.45;color:var(--ink-3)}
+.task-f{margin-top:auto;padding-top:10px;font-size:17px;font-weight:600;color:var(--teal-d)}
+.task.on{border-color:var(--teal);background:var(--teal-soft)}
+.task.on .task-f{color:var(--teal-d)}
+.task.on::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:6px;border-radius:0 6px 6px 0;background:var(--teal);transform-origin:top;animation:k-bar var(--dur-quick) var(--ease-out)}
+@keyframes k-bar{from{transform:scaleY(.2)}to{transform:scaleY(1)}}
+
+/* 快速问题 */
+.qlist{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+.qrow{flex:1;min-height:76px;display:flex;align-items:center;gap:18px;padding:0 24px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);text-align:left}
+.qrow-ic{flex:none;width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:var(--paper);color:var(--teal-d)}
+.qrow-t{flex:1;min-width:0;font-size:22px;font-weight:600;line-height:1.35}
+.qrow-go{flex:none;display:flex;align-items:center;gap:7px;font-size:18px;font-weight:600;color:var(--teal-d)}
+.qrow:active{border-color:var(--teal)}
+
+/* 四个非 AI 入口 */
+.mrail{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.ment{min-height:112px;display:flex;flex-direction:column;justify-content:center;gap:9px;padding:14px 18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);text-align:left}
+.ment-top{display:flex;align-items:center;gap:12px}
+.ment-ic{flex:none;width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--teal-soft);color:var(--teal-d)}
+.ment-ic[data-tone=slate]{background:var(--slate-soft);color:var(--slate-d)}
+.ment-top b{flex:1;min-width:0;font-size:21px;font-weight:700}
+.ment-d{font-size:16px;line-height:1.4;color:var(--ink-3)}
+.ment .go{flex:none;color:var(--teal-d)}
+/* AI 不可用时：同样四项，改成 2×2 主视野卡片，撑满主区不留大片空白 */
+.mrail.big{flex:1;min-height:0;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:16px}
+.mrail.big .ment{min-height:0;justify-content:space-between;gap:12px;padding:22px 26px}
+.mrail.big .ment-top b{font-size:24px}
+.mrail.big .ment-d{font-size:18px}
+.ment-sub{display:flex;flex-direction:column;gap:10px}
+.ment-sub span{display:flex;gap:11px;font-size:18px;line-height:1.4;color:var(--ink-2)}
+.ment-sub i{flex:none;width:8px;height:8px;margin-top:8px;border-radius:2px;background:var(--teal)}
+.ment-sub[data-tone=slate] i{background:var(--slate)}
+.ment-go{display:flex;align-items:center;gap:10px;padding-top:13px;border-top:1px dashed var(--line-2);font-size:18px;font-weight:700;color:var(--teal-d)}
+.ment-go small{font-size:15px;font-weight:600;color:var(--ink-3)}
+/* 失败 / 等待态复用同一份 2×2，但卡内更紧，留给上方原因说明更多空间 */
+.mrail.big.dense{gap:14px}
+.mrail.big.dense .ment{gap:10px;padding:18px 22px}
+.mrail.big.dense .ment-top b{font-size:23px}
+.mrail.big.dense .ment-ic{width:44px;height:44px}
+.mrail.big.dense .ment-d{font-size:17px}
+.mrail.big.dense .ment-sub{gap:8px}
+.mrail.big.dense .ment-sub span{font-size:17px;line-height:1.35}
+.mrail.big.dense .ment-go{padding-top:11px}
+
+/* 状态块 / 对话 */
+.state{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:26px 30px}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state-h{display:flex;align-items:center;gap:14px;font-size:27px;font-weight:700}
+.state-p{margin-top:11px;font-size:20px;line-height:1.6;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+/* 失败态：说明块随内容收紧，不撑成大片空有色面板 */
+.state.fit{flex:none;padding:22px 26px}
+.state.fit .state-h{font-size:26px}
+.state.fit .acts{margin-top:16px}
+.kvrow{margin-top:14px;display:grid;grid-template-columns:auto auto;justify-content:start;gap:4px 52px}
+.kvrow .kv2{padding:2px 0;gap:12px}
+.kvrow .kv2 span{width:auto}
+.bub{flex:none;border-radius:var(--r-md);padding:18px 24px;background:var(--paper);border:1px solid var(--line-2)}
+.bub-who{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--ink-3)}
+.bub p{margin-top:8px;font-size:22px;line-height:1.5;word-break:break-word}
+.tag{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border-radius:9px;font-size:15px;font-weight:700}
+.tag.syn{background:var(--wheat-soft);color:var(--wheat-d);border:1px dashed var(--wheat)}
+.tag.ok{background:var(--teal-soft);color:var(--teal-d)}
+.tag.slate{background:var(--slate-soft);color:var(--slate-d)}
+
+/* 合成示例（持续标记） */
+.ans{flex:1;min-height:0;margin-top:14px;display:flex;flex-direction:column;border-radius:var(--r-lg);padding:22px 26px 20px}
+.ans.synthetic{border:1.5px dashed var(--wheat);background-color:var(--surface);background-image:repeating-linear-gradient(135deg,rgba(169,120,31,.055) 0 10px,rgba(169,120,31,0) 10px 22px)}
+.ans.waiting{border:1.5px dashed var(--line-2);background:var(--surface)}
+.syn-bar{flex:none;display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px dashed var(--line-2);font-size:18px;line-height:1.45;color:var(--wheat-d);font-weight:600}
+.wait-bar{flex:none;display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px dashed var(--line-2);font-size:19px;line-height:1.4;font-weight:700;color:var(--ink-2)}
+.slot{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 30px;font-size:19px;line-height:1.55;color:var(--ink-3)}
+.ans-list{margin-top:16px;display:flex;flex-direction:column;gap:11px;list-style:none}
+.ans-list li{display:flex;gap:13px;font-size:21px;line-height:1.55;color:var(--ink-2)}
+.ans-list li i{flex:none;width:26px;height:26px;margin-top:3px;border-radius:9px;background:var(--wheat-soft);color:var(--wheat-d);font-style:normal;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ans-foot{margin-top:auto;padding-top:16px;border-top:1px dashed var(--line-2)}
+.kv2{display:flex;gap:14px;font-size:18px;line-height:1.5;padding:3px 0}
+.kv2 span{flex:none;width:150px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.kv2 b{font-weight:600;color:var(--ink)}
+.gate{margin-top:10px;font-size:17px;line-height:1.5;color:var(--ink-2)}
+.gate code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--paper);border:1px solid var(--line-2);border-radius:7px;padding:1px 7px}
+.nodo{margin-top:12px;display:flex;gap:12px;align-items:baseline;font-size:17px;line-height:1.5;color:var(--ink-2)}
+.nodo b{flex:none;color:var(--cinnabar-d);font-weight:700}
+
+/* 动作芯片（白名单） */
+.acts{flex:none;display:flex;flex-wrap:wrap;gap:12px}
+.act{min-height:64px;display:inline-flex;align-items:center;gap:10px;padding:0 22px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface);font-size:20px;font-weight:650;color:var(--ink)}
+.act small{font-size:15px;color:var(--ink-3);font-weight:600}
+.drop{margin-top:11px;font-size:17px;line-height:1.5;color:var(--ink-3)}
+
+/* 等待 / 语音面板 */
+.panel{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);padding:26px 30px}
+.panel.deep{border:0;background:linear-gradient(158deg,var(--deep-2),var(--deep));color:#f2efe4}
+.panel.deep .state-p{color:rgba(242,239,228,.76)}
+.pcenter{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.orb{width:132px;height:132px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(46,230,168,.4);background:rgba(46,230,168,.08);color:var(--emerald)}
+.orb.syn{border-style:dashed;border-color:#f0c463;color:#f0c463;background-image:repeating-linear-gradient(135deg,rgba(240,196,99,.1) 0 8px,rgba(240,196,99,0) 8px 18px)}
+.pcenter b{font-size:27px;line-height:1.3;font-weight:700}
+.pcenter p{max-width:660px;font-size:20px;line-height:1.55;color:var(--ink-2)}
+.panel.deep .pcenter p{color:rgba(242,239,228,.76)}
+/* voice-connecting：把居中大留白换成顶部横向状态条，面板随内容收紧 */
+.panel.flow{flex:none}
+.pband{flex:none;display:flex;align-items:flex-start;gap:22px}
+.pband .dots{flex:none;margin-top:14px}
+.pband div{flex:1;min-width:0}
+.pband b{display:block;font-size:26px;line-height:1.3;font-weight:700}
+.pband p{margin-top:9px;font-size:20px;line-height:1.5;color:rgba(242,239,228,.76)}
+.dots{display:flex;gap:9px}
+.dots i{width:13px;height:13px;border-radius:50%;background:var(--teal)}
+.panel.deep .dots i{background:var(--emerald)}
+.dots i:nth-child(1){animation:k-dot 1200ms ease-in-out infinite}
+.dots i:nth-child(2){animation:k-dot 1200ms ease-in-out 160ms infinite}
+.dots i:nth-child(3){animation:k-dot 1200ms ease-in-out 320ms infinite}
+@keyframes k-dot{0%,100%{opacity:.28}50%{opacity:1}}
+.cc{flex:none;margin-top:16px;border:1.5px dashed #f0c463;border-radius:var(--r-md);padding:18px 22px;background:rgba(240,196,99,.08)}
+.cc-h{display:flex;align-items:center;gap:12px;font-size:17px;font-weight:700;color:#f0c463}
+.cc p{margin-top:9px;font-size:21px;line-height:1.5;color:rgba(242,239,228,.9)}
+.cc[hidden]{display:none}
+.twocol{flex:none;margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mini-list{border:1px solid var(--line);border-radius:var(--r-md);background:var(--paper);padding:16px 20px}
+.panel.deep .mini-list{border-color:rgba(242,239,228,.18);background:rgba(242,239,228,.06)}
+.mini-list b{display:block;font-size:19px;font-weight:700;margin-bottom:9px}
+.mini-list li{list-style:none;display:flex;gap:10px;font-size:18px;line-height:1.45;color:var(--ink-2);padding:3px 0}
+.panel.deep .mini-list li{color:rgba(242,239,228,.74)}
+.mini-list li i{flex:none;width:8px;height:8px;margin-top:8px;border-radius:2px;background:var(--teal)}
+.panel.deep .mini-list li i{background:var(--emerald)}
+.spec{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.spec div{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:14px 16px}
+.spec b{display:block;font-size:19px;font-weight:700}
+.spec span{display:block;margin-top:5px;font-size:16px;line-height:1.4;color:var(--ink-3)}
+
+/* ── 底部输入坞 / 语音控制区 ────────────────────── */
+.dock{flex:none;padding:16px 44px 18px;background:var(--surface);border-top:1px solid var(--line)}
+.dock textarea{width:100%;height:98px;resize:none;padding:16px 20px;border:1px solid #9eb4aa;border-radius:var(--r-md);background:#fffefa;color:var(--ink);font-size:22px;line-height:1.5}
+.dock textarea::placeholder{color:#9baaa4}
+.dock textarea[readonly]{background:#f0efe8;border-color:var(--line-2);color:var(--ink-2)}
+.dock-row{margin-top:12px;display:flex;align-items:center;gap:14px}
+.dock-meta{flex:1;min-width:0;font-size:17px;line-height:1.4;color:var(--ink-3)}
+.dock-meta b{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.mini{flex:none;min-height:48px;padding:0 18px;border:1px solid var(--line-2);border-radius:14px;background:var(--paper);font-size:17px;font-weight:600;color:var(--ink-2)}
+.btn{min-height:64px;padding:0 26px;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;gap:11px;font-size:23px;font-weight:650;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn.danger{background:var(--cinnabar);color:#fff}
+.btn[aria-disabled=true]{opacity:.5}
+.btn[aria-pressed=true]{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d)}
+.dock-note{margin-top:11px;display:flex;gap:11px;align-items:baseline;font-size:17px;line-height:1.5;color:var(--ink-2)}
+.dock-note b{flex:none;color:var(--wheat-d);font-weight:700}
+.vdock{display:flex;gap:14px}
+.vdock .btn{flex:1;padding:0 12px}
+
+/* ── truth / 导航 ───────────────────────────────── */
+.truth{flex:none;padding:15px 44px 16px;border-top:1px solid var(--line);display:flex;gap:24px}
+.truth div{flex:1;font-size:17px;line-height:1.5;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:700}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+.nav-item.on .ni{color:var(--teal-d)}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}
+
+/* 状态进入过渡：承载「内容换了」这一条真实信息 */
+.body.enter .sec{animation:k-enter var(--dur-quick) var(--ease-out) both}
+@keyframes k-enter{from{opacity:.4;transform:translateY(8px)}to{opacity:1;transform:none}}
+.breathe{animation:k-breathe 2600ms ease-in-out infinite}
+@keyframes k-breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* 原型演示控制（非产品功能） */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:140px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 16px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+.flat *{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ══ 能力仪表带 ═══════════════════════════════════════════════
+   驾驶舱的核心不是特效，是「看得见真实状态」。15 个能力各一盏灯：
+   emerald 呼吸 = 在线可用 · clay = 受控（需授权或前置条件）· 灰 = 本机未开放。
+   灯的颜色只由服务端返回决定，不可用就是灰的——不伪造能力。
+   通电序列只在首屏跑一次：prefers-reduced-motion 与 ?flat=1 下全部直接就位。 */
+.rail{margin-top:2px;border-top:1px solid rgba(46,230,168,.16);padding-top:20px;}
+.rail-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+.rail-t{font-size:18px;font-weight:700;color:#dff3ea;letter-spacing:.02em;}
+.rail-n{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:15px;
+  color:rgba(223,243,234,.62);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
+.rail-n b{color:#2ee6a8;font-weight:600;}
+.rgrp{display:flex;align-items:flex-start;gap:16px;padding:9px 0;}
+.rgrp+.rgrp{border-top:1px solid rgba(46,230,168,.08);}
+.rgl{flex:none;width:118px;padding-top:12px;font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  font-size:14px;color:rgba(223,243,234,.5);letter-spacing:.06em;}
+.rcs{display:flex;flex-wrap:wrap;gap:9px;flex:1;}
+.rc{display:flex;align-items:center;gap:9px;min-height:52px;padding:0 17px;border-radius:14px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(46,230,168,.13);
+  font-size:18px;color:#dff3ea;cursor:pointer;transition:background .16s,border-color .16s,transform .16s;
+  opacity:0;transform:translateY(7px);}
+.rc.lit{opacity:1;transform:none;}
+.rc:active{transform:scale(.975);}
+.rc .lamp{width:9px;height:9px;border-radius:50%;flex:none;background:#5b7a70;}
+.rc.on{border-color:rgba(46,230,168,.3);}
+.rc.on .lamp{background:#2ee6a8;box-shadow:0 0 0 0 rgba(46,230,168,.5);}
+.rc.on .lamp.pulse{animation:lampbreathe 3.4s ease-in-out infinite;}
+.rc.ctl{border-color:rgba(184,104,60,.36);}
+.rc.ctl .lamp{background:#d98a52;}
+.rc.off{color:rgba(223,243,234,.42);border-color:rgba(255,255,255,.07);}
+.rc.off .lamp{background:#4a635b;}
+.rc .rt{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;
+  color:rgba(223,243,234,.45);margin-left:2px;}
+@keyframes lampbreathe{0%,100%{box-shadow:0 0 0 0 rgba(46,230,168,.5);}
+  50%{box-shadow:0 0 0 5px rgba(46,230,168,0);}}
+@media (prefers-reduced-motion:reduce){
+  .rc{opacity:1;transform:none;} .rc.on .lamp.pulse{animation:none;}
+}
+#stage.flat .rc{opacity:1;transform:none;}
+#stage.flat .rc.on .lamp.pulse{animation:none;}
+
+/* ══ 本次 AI 活动流 ══════════════════════════════════════════ */
+.act{display:flex;flex-direction:column;gap:12px;}
+.act-lg{display:flex;gap:20px;flex-wrap:wrap;padding:14px 18px;border-radius:16px;
+  background:var(--paper);border:1px solid var(--line);font-size:17px;color:var(--ink-3);}
+.act-lg span{display:flex;align-items:center;gap:8px;}
+.ev{width:14px;height:14px;border-radius:50%;flex:none;}
+.ev.e1{background:var(--teal);}
+.ev.e2{background:transparent;border:3px solid var(--teal);border-bottom-color:transparent;}
+.ev.e3{background:transparent;border:2px dashed var(--clay);}
+
+/* ══ 意图路由 ═══════════════════════════════════════════════
+   用户提问 → 一道光沿仪表带扫过 → 停在将要处理这件事的能力上。
+   这是「驾驶」的语义：把控制权交给某个系统，而且让人看见交给了谁。
+   扫光只在真的识别出目标能力时才跑；识别不出就什么都不做，不乱指。 */
+.rail{position:relative;}
+.sweep{position:absolute;left:0;top:52px;bottom:8px;width:120px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(46,230,168,.16),transparent);
+  opacity:0;transform:translateX(-140px);}
+.sweep.run{animation:railsweep 620ms cubic-bezier(.3,.7,.3,1) forwards;}
+@keyframes railsweep{
+  0%{opacity:0;transform:translateX(-140px);}
+  14%{opacity:1;}
+  86%{opacity:1;}
+  100%{opacity:0;transform:translateX(var(--sweep-to,900px));}}
+.rc.routed{background:rgba(46,230,168,.13);border-color:rgba(46,230,168,.62);
+  box-shadow:0 0 0 1px rgba(46,230,168,.3);}
+.rc.routed .lamp{background:#2ee6a8;}
+.rc .rby{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;
+  color:#2ee6a8;margin-left:6px;letter-spacing:.04em;}
+.rail-route{margin-top:14px;padding:11px 16px;border-radius:13px;
+  background:rgba(46,230,168,.08);border:1px solid rgba(46,230,168,.22);
+  font-size:17px;color:#dff3ea;display:none;align-items:center;gap:10px;}
+.rail-route.on{display:flex;}
+.rail-route b{color:#2ee6a8;font-weight:700;}
+.rail-route .rr-x{margin-left:auto;font-size:15px;color:rgba(223,243,234,.5);}
+@media (prefers-reduced-motion:reduce){.sweep.run{animation:none;opacity:0;}}
+#stage.flat .sweep.run{animation:none;opacity:0;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="01-home.html" data-route="/" aria-label="返回首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">AI 状态以本轮真实返回确认</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="cockpit">
+    <div class="ck-mark" aria-hidden="true"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M12 3v3.2M12 17.8V21M3 12h3.2M17.8 12H21"/><path d="M6.4 6.4a8 8 0 0 0 0 11.2M17.6 17.6a8 8 0 0 0 0-11.2"/></svg></div>
+    <div class="ck-main">
+      <div class="ck-eyebrow">AI COCKPIT · AI 驾驶舱</div>
+      <h1 class="ck-title serif" id="ck-title">你想解决什么？</h1>
+      <p class="ck-copy" id="ck-copy">选一件事，或直接点常见问题；不打字也能用。</p>
+    </div>
+    <div class="ck-tel" id="ck-tel" aria-label="会话状态读数"></div>
+    <div class="rail" id="rail" aria-label="本机 AI 能力状态"><span class="sweep" id="sweep" aria-hidden="true"></span></div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="ai-cockpit" data-state="default" data-testid="ai-cockpit-state-default" aria-live="polite"></main>
+
+  <div class="dock" id="dock"></div>
+
+  <div class="truth" data-disclaimer="true" data-testid="ai-cockpit-truth">
+    <div><b>回答来源</b>只有服务标识以 llm: 开头且标记为模型生成时，正文才会显示；否则如实说明并不展示正文。</div>
+    <div><b>AI 不做的判定</b>身份、支付、设备、打印扫描成败、岗位来源真伪、政策资格、录用结果，一律不由 AI 决定。</div>
+    <div><b>隐私与边界</b>本机草稿离场即清；对话、文件与订单按服务端各自留存期限管理。岗位与招聘会只到来源入口，本机不代收简历。</div>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item on" href="05-ai-cockpit.html" data-route="/assistant" aria-current="page"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#157a67" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3"/><path d="M6.6 6.6a7.6 7.6 0 0 0 0 10.8M17.4 17.4a7.6 7.6 0 0 0 0-10.8"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"><div class="dp-t">原型演示控制</div></div>
+</div>
+<script>(function(){
+'use strict';
+var SCREEN='ai-cockpit';
+var STATES=['default','composer','submitting','reply-real','reply-not-ai','reply-error','ai-unavailable',
+            'voice-gate','voice-connecting','voice-live','mic-denied','voice-error'];
+var VOICE=['voice-gate','voice-connecting','voice-live','mic-denied','voice-error'];
+var DRAFT_KEY='kiosk-assistant-draft';
+
+var ICO={
+ doc:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ chat:'<path d="M20 15.5a2 2 0 0 1-2 2H8.5L4.5 21V5.5a2 2 0 0 1 2-2h11.5a2 2 0 0 1 2 2z"/>',
+ brief:'<rect x="3" y="7.5" width="18" height="12.5" rx="2.4"/><path d="M9 7.5V5.8A1.8 1.8 0 0 1 10.8 4h2.4A1.8 1.8 0 0 1 15 5.8v1.7"/>',
+ policy:'<path d="M5 3h14v18H5z"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>',
+ shield:'<path d="M12 21.5s7.5-3.8 7.5-9.5V5.2L12 2.5 4.5 5.2v6.8c0 5.7 7.5 9.5 7.5 9.5z"/>',
+ printer:'<path d="M6.5 9V3.5h11V9"/><rect x="3" y="9" width="18" height="7.5" rx="2.2"/><path d="M6.5 13.5h11V21h-11z"/>',
+ calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.4"/><path d="M3.5 10h17M8.5 2.8v4M15.5 2.8v4"/>',
+ mic:'<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+ micoff:'<path d="M4 4l16 16"/><path d="M15 9.5V5.5a3 3 0 0 0-5.7-1.3"/><path d="M9 9.6V12a3 3 0 0 0 4.4 2.6"/><path d="M5.6 11.6a6.5 6.5 0 0 0 9.1 5.9M18.4 11.6a6.4 6.4 0 0 1-.6 2.7"/><path d="M12 18.6V21"/>',
+ alert:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.4"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ arrow:'<path d="M9 5l7 7-7 7"/>',
+ send:'<path d="M21.2 2.8L2.8 10.4l8 3.1 3.1 8z"/><path d="M10.8 13.5l10.4-10.7"/>',
+ refresh:'<path d="M20.4 12a8.4 8.4 0 1 1-2.6-6.1"/><path d="M20.4 4.4V10h-5.6"/>',
+ cc:'<rect x="3" y="5" width="18" height="14" rx="2.4"/><path d="M10 10.6a2.6 2.6 0 1 0 0 2.8M17.2 10.6a2.6 2.6 0 1 0 0 2.8"/>',
+ hangup:'<circle cx="12" cy="12" r="9"/><path d="M8.6 8.6l6.8 6.8M15.4 8.6l-6.8 6.8"/>',
+ question:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.8-.9 1.4v.4M12 17h.01"/>',
+ edit:'<path d="M12.5 20h8.5"/><path d="M16.6 3.6a2.1 2.1 0 0 1 3 3L8.2 18l-4 1 1-4z"/>',
+ wave:'<path d="M3 12h2.5M8 7.5v9M12 4.5v15M16 7.5v9M20.5 12H21"/>'
+};
+function svg(n,c,w){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(c||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICO[n]||'')+'</svg>'}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+/* 白名单动作的 testid 后缀：由 route 直接推出，同一条动作在任何主题下都是同一个值 */
+function routeSlug(r){return String(r).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
+
+/* 四个咨询主题：文案与快捷问题对齐 advisorScenes.ts CONSULTATION_TASKS / GENERAL_QUESTIONS。
+   acts 是「回答后可去的地方」，路由全部落在 ALLOWED_ROUTE_PREFIXES 白名单内。 */
+var TASKS=[
+ {id:'resume',n:'简历与求职材料',d:'项目经历、格式与材料准备',ic:'doc',tone:'teal',
+  q:['项目经历应该怎么写？','简历打印用 PDF 还是 Word？','没有实习经历怎么办？'],
+  acts:[['简历诊断','21-resume-triage.html?intent=diagnose','/resume/source'],['打印文件','12-file-source.html?source=document&tab=file','/print/upload'],['简历服务','16-service-hubs.html?hub=resume','/resume-service']]},
+ {id:'interview',n:'面试与沟通',d:'自我介绍、常见问题与谈薪',ic:'chat',tone:'slate',
+  q:['自我介绍应该怎么准备？','面试常见问题怎么回答？','谈薪时应该注意什么？'],
+  acts:[['模拟面试','29-interview-training.html','/interview/setup'],['岗位信息','26-browse-list.html','/jobs']]},
+ {id:'jobs',n:'岗位与选择',d:'读懂 JD、比较 Offer、定方向',ic:'brief',tone:'slate',
+  q:['这个岗位是否适合我？','两个 Offer 应该怎样比较？','阅读 JD 时应该关注哪些重点？'],
+  acts:[['岗位信息','26-browse-list.html','/jobs'],['招聘会','16-service-hubs.html?hub=fairs','/job-fairs'],['找企业','43-company-directory.html','/companies']]},
+ {id:'workplace',n:'入职与职场',d:'入职材料、试用期、社保公积金',ic:'policy',tone:'wheat',
+  q:['入职通常需要准备哪些材料？','试用期有哪些常见注意事项？','社保公积金应该怎样了解？'],
+  acts:[['政策服务','16-service-hubs.html?hub=policy','/policy-service'],['政策与材料','28-jobfair-enhanced.html?view=policy','/renshi?tab=policy']]}
+];
+var GENERAL_Q=['应届生没什么经验，简历怎么写工作经历？','简历打印用什么纸、什么格式比较合适？','灵活就业社保补贴怎么申请？需要什么材料？'];
+
+/* Hub 带来的入口方向：只换选中主题、提示与问题，不预填、不调用、不生成回答 */
+var INTENTS={
+ resume:{task:'resume',chip:'来自简历服务入口'},
+ jobs:{task:'jobs',chip:'来自岗位信息入口'},
+ interview:{task:'interview',chip:'来自面试训练入口'},
+ policy:{task:'workplace',chip:'来自政策服务入口'},
+ fair:{task:'jobs',chip:'来自招聘会入口',q:['参会前要带哪些材料？','现场怎么跟企业开口？','一天能跑几家比较合适？']}
+};
+
+/* AI 挂掉也不受影响的四条真实路径（ADVISOR_MANUAL_ENTRIES） */
+var MANUAL=[
+ {k:'print',n:'打印扫描',d:'上传、扫描、复印',href:'10-print-hub.html',route:'/print-scan',ic:'printer',tone:'teal'},
+ {k:'fairs',n:'招聘会',d:'场次与来源预约入口',href:'16-service-hubs.html?hub=fairs',route:'/job-fairs',ic:'calendar',tone:'slate'},
+ {k:'policy',n:'政策服务',d:'人社政策与材料说明',href:'16-service-hubs.html?hub=policy',route:'/policy-service',ic:'shield',tone:'slate'},
+ {k:'resume',n:'简历服务',d:'上传、版式与打印',href:'16-service-hubs.html?hub=resume',route:'/resume-service',ic:'doc',tone:'teal'}
+];
+/* 每个入口进去之后不依赖 AI 的具体去处，逐条对齐目的页已有的卡片，不编造能力 */
+var MANUAL_SUB={
+ print:['文档打印：PDF / JPG / PNG 上传','材料扫描：在奔图面板扫成 PDF','手机扫码上传：不用登录'],
+ fairs:['招聘会列表：时间、地点与来源','校园招聘场次','到场指引与来源预约入口'],
+ policy:['就业与创业政策条目','社保参保流程与材料','档案托管、登记与证明'],
+ resume:['我的简历：查看已保存版本','纸质简历扫描存成 PDF','简历打印：选文件、核价、出纸']
+};
+
+var HERO={
+ 'default':['你想解决什么？','选一件事，或直接点常见问题；不打字也能用。'],
+ 'composer':['这条问题<em>还没有发出</em>。','可以接着改，也可以换一条再发。'],
+ 'submitting':['已发出，<em>等服务返回</em>。','不显示百分比和阶段，只等真实结果。'],
+ 'reply-real':['这是回答区的<em>排版示例</em>。','正文是合成文本，不是模型输出。'],
+ 'reply-not-ai':['这一轮<em>不是 AI 生成</em>。','服务标识不带 llm: 前缀，正文不展示。'],
+ 'reply-error':['这一轮<em>没连上</em>。','可以重试，也可以直接走下面四个入口。'],
+ 'ai-unavailable':['AI 顾问<em>暂不可用</em>。','四个入口不经过 AI，照常能办。'],
+ 'voice-gate':['语音<em>默认关闭</em>。','按下开启之前，本页不申请麦克风。'],
+ 'voice-connecting':['正在<em>尝试建立</em>语音通道。','能不能用，由真实服务返回确认。'],
+ 'voice-live':['语音控制区<em>布局示例</em>。','未接通 TRTC / ASR / TTS，字幕是合成示例。'],
+ 'mic-denied':['没拿到<em>麦克风权限</em>。','语音开不了，文字咨询照常。'],
+ 'voice-error':['语音通道<em>没建立</em>。','不推测原因，改文字或重试都行。']
+};
+var PILL={
+ 'default':['','AI 状态以本轮真实返回确认',false],
+ 'composer':['','尚未发送',false],
+ 'submitting':['','等待本轮返回',true],
+ 'reply-real':['warn','示例排版 · 非模型输出',false],
+ 'reply-not-ai':['warn','非 AI 回复 · 正文不展示',false],
+ 'reply-error':['bad','本轮失败 · 可重试',false],
+ 'ai-unavailable':['lock','AI 顾问未接真实模型',false],
+ 'voice-gate':['','语音默认关闭',false],
+ 'voice-connecting':['','语音尝试建立中',true],
+ 'voice-live':['warn','语音示例 · 未接通',false],
+ 'mic-denied':['warn','麦克风权限被拒',false],
+ 'voice-error':['bad','语音通道未建立',false]
+};
+var TEL={
+ 'default':['未请求','默认关闭'],'composer':['未请求','默认关闭'],'submitting':['等待返回','默认关闭'],
+ 'reply-real':['示例 · 无标识','默认关闭'],'reply-not-ai':['非 llm: 前缀','默认关闭'],
+ 'reply-error':['本轮失败','默认关闭'],'ai-unavailable':['未接真实模型','默认关闭'],
+ 'voice-gate':['未请求','等待你开启'],'voice-connecting':['未请求','尝试建立中'],
+ 'voice-live':['未请求','示例 · 未接通'],'mic-denied':['未请求','权限被拒'],
+ 'voice-error':['未请求','建立失败']
+};
+
+var q=new URLSearchParams(location.search);
+var rawIntent=q.get('intent');
+var intent=Object.prototype.hasOwnProperty.call(INTENTS,rawIntent||'')?rawIntent:null;
+var state=STATES.indexOf(q.get('state'))>=0?q.get('state'):'default';
+var topic=intent?INTENTS[intent].task:null;
+var muted=false, ccOn=true;
+var root=document.getElementById('body-root'), dock=document.getElementById('dock');
+
+function getDraft(){try{return sessionStorage.getItem(DRAFT_KEY)||''}catch(e){return''}}
+function setDraft(v){try{v?sessionStorage.setItem(DRAFT_KEY,v):sessionStorage.removeItem(DRAFT_KEY)}catch(e){}}
+function task(){for(var i=0;i<TASKS.length;i++)if(TASKS[i].id===topic)return TASKS[i];return null}
+function questions(){if(intent&&INTENTS[intent].q)return INTENTS[intent].q;var t=task();return t?t.q:GENERAL_Q}
+function asked(){var d=getDraft().trim();return d?{t:d,syn:false}:{t:'我想把三段实习压缩到一页简历里，重点写数据分析相关的部分。',syn:true}}
+
+/* ── 片段 ───────────────────────────────────────── */
+function head(no,t,hint){return '<div class="sec-label"><span class="no serif">'+no+'</span><span class="t">'+t+'</span>'+(hint?'<span class="hint">'+hint+'</span>':'')+'</div>'}
+function taskCard(t){
+ var on=t.id===topic;
+ return '<button type="button" class="task press'+(on?' on':'')+'" data-act="pick" data-task="'+t.id+'" aria-pressed="'+(on?'true':'false')+'" data-testid="cockpit-task-'+t.id+'">'
+ +'<span class="task-ic" data-tone="'+t.tone+'">'+svg(t.ic,'currentColor',28)+'</span>'
+ +'<span class="task-n">'+t.n+'</span><span class="task-d">'+t.d+'</span>'
+ +'<span class="task-f">'+(on?'已选 · 下面是这方面的问题':'看 3 个常见问题')+'</span></button>';
+}
+function taskGrid(){return '<div class="tasks">'+TASKS.map(taskCard).join('')+'</div>'}
+function qList(){
+ return '<div class="qlist">'+questions().map(function(x,i){
+  return '<button type="button" class="qrow press" data-act="fill" data-q="'+esc(x)+'" data-testid="cockpit-quick-'+i+'">'
+   +'<span class="qrow-ic">'+svg('question','currentColor',26)+'</span>'
+   +'<span class="qrow-t">'+esc(x)+'</span>'
+   +'<span class="qrow-go">填入输入框'+svg('arrow','currentColor',20)+'</span></button>';
+ }).join('')+'</div>';
+}
+function rail(){
+ return '<div class="mrail">'+MANUAL.map(function(m){
+  return '<a class="ment press" href="'+m.href+'" data-route="'+m.route+'" data-testid="cockpit-manual-'+m.k+'">'
+   +'<span class="ment-top"><span class="ment-ic" data-tone="'+m.tone+'">'+svg(m.ic,'currentColor',24)+'</span>'
+   +'<b>'+m.n+'</b><span class="go">'+svg('arrow','currentColor',22)+'</span></span>'
+   +'<span class="ment-d">'+m.d+'</span></a>';
+ }).join('')+'</div>';
+}
+function railSec(no){
+ return '<section class="sec last">'+head(no,'不经过 AI 也能办','AI 出问题时这四项照常')+rail()+'</section>';
+}
+/* AI 不可用态专用：同一份 MANUAL，展开成占主视野的 2×2，子项都是不调用模型的去处 */
+function railBig(no){
+ return '<section class="sec last grow">'+head(no,'不经过 AI 也能办','这四项不调用模型，现在就能用')
+  +'<div class="mrail big">'+MANUAL.map(function(m){
+   return '<a class="ment press" href="'+m.href+'" data-route="'+m.route+'" data-testid="cockpit-manual-'+m.k+'">'
+    +'<span class="ment-top"><span class="ment-ic" data-tone="'+m.tone+'">'+svg(m.ic,'currentColor',26)+'</span>'
+    +'<b>'+m.n+'</b><span class="go">'+svg('arrow','currentColor',22)+'</span></span>'
+    +'<span class="ment-d">'+m.d+'</span>'
+    +'<span class="ment-sub" data-tone="'+m.tone+'">'+MANUAL_SUB[m.k].map(function(s){return '<span><i></i>'+esc(s)+'</span>'}).join('')+'</span>'
+    +'<span class="ment-go">进入'+m.n+'<small>'+m.route+'</small></span></a>';
+  }).join('')+'</div></section>';
+}
+/* 失败 / 等待态专用：同一份 MANUAL 与子项，卡内更紧的 2×2。
+   承担「哪些能力不受影响」这一段，hint 按本态的原因写，不复述上方说明。 */
+function railFull(no,hint){
+ return '<section class="sec last grow">'+head(no,'不经过 AI 也能办',hint||'这四项不调用模型，现在就能用')
+  +'<div class="mrail big dense">'+MANUAL.map(function(m){
+   return '<a class="ment press" href="'+m.href+'" data-route="'+m.route+'" data-testid="cockpit-manual-'+m.k+'">'
+    +'<span class="ment-top"><span class="ment-ic" data-tone="'+m.tone+'">'+svg(m.ic,'currentColor',24)+'</span>'
+    +'<b>'+m.n+'</b><span class="go">'+svg('arrow','currentColor',22)+'</span></span>'
+    +'<span class="ment-d">'+m.d+'</span>'
+    +'<span class="ment-sub" data-tone="'+m.tone+'">'+MANUAL_SUB[m.k].map(function(s){return '<span><i></i>'+esc(s)+'</span>'}).join('')+'</span>'
+    +'<span class="ment-go">进入'+m.n+'<small>'+m.route+'</small></span></a>';
+  }).join('')+'</div></section>';
+}
+function miniList(title,items){
+ return '<div class="mini-list"><b>'+title+'</b><ul>'+items.map(function(x){return '<li><i></i>'+x+'</li>'}).join('')+'</ul></div>';
+}
+function askBubble(){
+ var a=asked();
+ return '<div class="bub" data-testid="cockpit-ask">'
+  +'<span class="bub-who">你的问题'+(a.syn?'<i class="tag syn">合成示例</i>':'')+'</span>'
+  +'<p>'+esc(a.t)+'</p></div>';
+}
+function chipRow(){
+ var t=task();
+ return '<div class="acts" style="margin-bottom:13px">'
+  +(intent?'<span class="act" style="min-height:56px"><span class="tag slate">'+INTENTS[intent].chip+'</span></span>':'')
+  +'<span class="act" style="min-height:56px">'+(t?'主题 · '+t.n:'未选主题 · 通用咨询')+'</span>'
+  +'<button type="button" class="act press" data-act="go" data-state="default">换一个主题</button></div>';
+}
+
+/* ── 各状态 ─────────────────────────────────────── */
+var V={};
+V['default']=function(){
+ /* 舱面上的能力仪表带已经回答了「这台机器能干什么」，原来的四张主题卡与它重复，
+    在 1080x1920 上又会把首屏撑爆，因此去掉。
+    「本次用过的 AI」不放首屏：第一次进来必然为空，占位没有价值；
+    该内容归「我的 · AI 服务记录」，E1/E2/E3 图例归有真实结论的 reply 态。 */
+ return '<section class="sec grow">'+head('01','点一下就能问',intent?INTENTS[intent].chip+' · 已选好方向':'点完落进输入框，可以改')+qList()+'</section>'
+  +railSec('02',false);
+};
+V['composer']=function(){
+ var d=getDraft().trim();
+ return '<section class="sec">'+head('01','这条还没发出','改完按右下角发送')+chipRow()
+  +'<div class="state"><div class="state-h">'+svg('edit','currentColor',26)+(d?'将要发送的内容':'输入框还是空的')+'</div>'
+  +'<div class="state-p">'+(d?esc(d):'点下面的问题填进去，或者直接在输入框里打字。')+'</div>'
+  +'<div class="state-p" style="font-size:17px;color:var(--ink-3)">草稿只留在本机这次会话，离开本页即清；地址栏不会带上你输入的内容。</div></div></section>'
+  /* 正在写问题时不再铺降级出口：用户此刻的焦点是这一条，
+     「不经过 AI 也能办」在 default 与 ai-unavailable 态给足即可。
+     仪表带撑高舱面后，三个区块会在 1080x1920 上互相压叠。 */
+  +'<section class="sec grow">'+head('02','换一条问题','点了会替换输入框内容')+qList()+'</section>';
+};
+V['submitting']=function(){
+ return '<section class="sec grow">'+head('01','已发出，等真实结果','请求在飞，没有阶段可报')+askBubble()
+  +'<div class="ans waiting" data-testid="cockpit-waiting">'
+  +'<div class="wait-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>正在等待服务返回 · 没有百分比、阶段和预计时间可显示</div>'
+  +'<div class="slot">回答会出现在这一区。返回之前这里保持空白，不预演内容、不逐字打字。</div>'
+  +'<div class="ans-foot">'
+  +'<div class="kv2"><span>providerLabel</span><b>未取得</b></div>'
+  +'<div class="kv2"><span>aiGenerated</span><b>未取得</b></div>'
+  +'<p class="gate">返回后先过双门禁：providerLabel 以 <code>llm:</code> 开头 <b>且</b> aiGenerated=true 才渲染正文，否则如实说明并不展示。</p>'
+  +'</div></div></section>'
+  +railSec('02');
+};
+V['reply-real']=function(){
+ var t=task()||TASKS[0];
+ return '<section class="sec grow">'+head('01','回答区排版示例','正文为合成文本')+askBubble()
+  +'<div class="ans synthetic" data-testid="cockpit-reply-synthetic" data-synthetic="true">'
+  +'<div class="syn-bar"><span class="tag syn">合成示例</span>下面三条是排版占位，不是模型输出，也不会写进任何记录。</div>'
+  +'<ol class="ans-list">'
+  +'<li><i>1</i>按目标岗位排序，把数据分析那段放最前面。</li>'
+  +'<li><i>2</i>每段只留两条，写成「做了什么 + 结果」。</li>'
+  +'<li><i>3</i>一页放不下就先删掉与目标无关的经历。</li>'
+  +'</ol>'
+  +'<div class="ans-foot">'
+  +'<div class="kv2"><span>providerLabel</span><b>—（原型没有真实服务标识）</b></div>'
+  +'<div class="kv2"><span>aiGenerated</span><b>未取得</b></div>'
+  +'<p class="gate">迁移合同：providerLabel 以 <code>llm:</code> 开头 <b>且</b> aiGenerated=true 时正文才允许渲染；缺一即走「非 AI 回复」。按这条合同，真实页面此刻<b>不会</b>显示上面的正文。</p>'
+  +'<p class="nodo"><b>这一轮不决定</b><span>身份 · 支付 · 设备状态 · 打印扫描成败 · 岗位来源真伪 · 政策资格 · 录用结果</span></p>'
+  +'</div></div></section>'
+  +'<section class="sec">'+head('02','可以直接去的地方','只渲染白名单内的路由')
+  +'<div class="acts">'+t.acts.map(function(a,i){
+    return '<a class="act press" href="'+a[1]+'" data-route="'+a[2]+'" data-allowed-route="true" data-action-index="'+i+'" data-testid="cockpit-action-'+routeSlug(a[2])+'">'+a[0]+'<small>'+a[2]+'</small>'+svg('arrow','currentColor',20)+'</a>';
+   }).join('')+'</div>'
+  +'<p class="drop">白名单外的路由直接丢弃、不渲染（本例丢弃 1 条：/admin/orders）。岗位与招聘会只到来源入口为止，本机不做站内投递。</p></section>'
+  +railSec('03',false);
+};
+V['reply-not-ai']=function(){
+ return '<section class="sec">'+head('01','这一轮不是 AI 生成','正文不予展示')+askBubble()
+  +'<div class="state fit" data-kind="warn" style="margin-top:14px" data-testid="cockpit-not-ai">'
+  +'<div class="state-h">'+svg('alert','currentColor',26)+'服务标识不带 llm: 前缀</div>'
+  +'<div class="state-p">后端这次返回的是<b>未接模型时的预置话术</b>。页面不会拿它冒充 AI 回答，所以正文一个字都不显示。</div>'
+  +'<div class="kvrow"><div class="kv2"><span>providerLabel</span><b>mock（示例取值）</b></div>'
+  +'<div class="kv2"><span>aiGenerated</span><b>false</b></div></div>'
+  +'<p class="gate">双门禁任一不满足即走本状态；同一轮返回里的建议动作也一并丢弃，不当作「AI 建议的下一步」。</p>'
+  +'<div class="acts"><button type="button" class="act press" data-act="recheck">'+svg('refresh','currentColor',22)+'重新检查 AI 顾问</button>'
+  +'<button type="button" class="act press" data-act="go" data-state="default">回到提问</button></div>'
+  +'</div></section>'
+  +railFull('02','这一轮没给出正文，下面四项照常能办');
+};
+V['reply-error']=function(){
+ return '<section class="sec">'+head('01','这一轮没连上','不猜原因，也不编回答')+askBubble()
+  +'<div class="state fit" data-kind="error" style="margin-top:14px" data-testid="cockpit-error">'
+  +'<div class="state-h">'+svg('alert','currentColor',26)+'请求失败，没有回答</div>'
+  +'<div class="state-p">页面不推测失败原因，也不会用编出来的内容顶上。你的问题还在输入框里，重试不用重打。</div>'
+  +'<div class="acts">'
+  +'<button type="button" class="act press" data-act="retry" data-testid="cockpit-retry">'+svg('refresh','currentColor',22)+'重试这一轮</button>'
+  +'<button type="button" class="act press" data-act="go" data-state="voice-gate">改用语音</button>'
+  +'<button type="button" class="act press" data-act="go" data-state="default">换个问题</button></div>'
+  +'</div></section>'
+  +railFull('02','这一轮失败不影响下面四项');
+};
+V['ai-unavailable']=function(){
+ return '<section class="sec">'+head('01','AI 顾问暂不可用','下面四项不经过 AI')
+  +'<div class="state" data-kind="lock" data-testid="cockpit-unavailable">'
+  +'<div class="state-h">'+svg('lock','currentColor',26)+'本机 AI 顾问还没有接上真实模型</div>'
+  +'<div class="state-p">输入框已锁住：<b>页面不会用预置话术冒充回答</b>。配置修好后可以在这里再试一次。</div>'
+  +'<div class="acts" style="margin-top:16px"><button type="button" class="act press" data-act="recheck" data-testid="cockpit-recheck">'+svg('refresh','currentColor',22)+'重新检查 AI 顾问</button>'
+  +'<button type="button" class="act press" data-act="go" data-state="voice-gate">看看语音入口</button></div></div></section>'
+  +railBig('02');
+};
+V['voice-gate']=function(){
+ return '<section class="sec grow" data-screen="ai-cockpit-voice">'+head('01','语音咨询默认关闭','按下才可能请求麦克风')
+  +'<div class="panel deep" data-testid="cockpit-voice-gate"><div class="pcenter">'
+  +'<div class="orb">'+svg('mic','currentColor',54)+'</div>'
+  +'<b>先由你决定要不要用麦克风</b>'
+  +'<p>在你按下开启之前，本页不会请求麦克风权限，也不采集任何声音。</p></div>'
+  +'<div class="twocol"><div class="mini-list"><b>按下开启后会发生</b>'
+  +'<li><i></i>浏览器弹出麦克风授权询问</li><li><i></i>向服务端申请一次语音会话</li><li><i></i>结果由真实服务返回确认</li></div>'
+  +'<div class="mini-list"><b>现在不会发生</b>'
+  +'<li><i></i>不采集声音、不加载通话 SDK</li><li><i></i>不显示转写、时长或识别结果</li><li><i></i>不把原型状态当成已接通</li></div></div>'
+  +'</div></section>'
+  +railSec('02',false);
+};
+V['voice-connecting']=function(){
+ return '<section class="sec" data-screen="ai-cockpit-voice">'+head('01','正在尝试建立语音通道','尚未接通')
+  +'<div class="panel deep flow" data-testid="cockpit-voice-connecting">'
+  +'<div class="pband"><div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>'
+  +'<div><b>请求已发出，等真实服务结果</b>'
+  +'<p>能不能用由服务端返回确认。此时不显示转写、计时或任何对话内容。</p></div></div>'
+  +'<div class="twocol">'
+  +miniList('这一步在等什么',['服务端下发进房凭证','通话模块加载完成','本地麦克风开启结果'])
+  +miniList('失败会怎样',['直接说没建立，不猜原因','文字咨询照常可用','四个非 AI 入口不受影响'])
+  +'</div></div></section>'
+  +railFull('02','等结果的这段时间，这四项照常可用');
+};
+V['voice-live']=function(){
+ return '<section class="sec grow" data-screen="ai-cockpit-voice">'+head('01','语音会话控制区','合成布局示例，未接通')
+  +'<div class="panel deep" data-testid="cockpit-voice-live"><div class="pcenter" style="gap:14px">'
+  +'<div class="orb syn">'+svg('wave','currentColor',52)+'</div>'
+  +'<b><span class="tag syn">合成示例</span> 真实会话建立后，这里显示通话状态</b>'
+  +'<p>示例静止不动：没有真实音量信号，就不做声波动画，避免看起来像正在听。</p></div>'
+  +'<div class="cc" id="cc-box"'+(ccOn?'':' hidden')+'><div class="cc-h">'+svg('cc','currentColor',22)+'字幕区 · 合成示例文本，不是识别结果</div>'
+  +'<p>「你可以先说要办的事，比如把简历改到一页。」</p></div>'
+  +'<div class="twocol" style="margin-top:16px"><div class="mini-list"><b>真机由什么承担</b>'
+  +'<li><i></i>TRTC 进房与音频收发</li><li><i></i>云端 ASR / LLM / TTS</li><li><i></i>离开页面即结束会话</li></div>'
+  +'<div class="mini-list"><b>本页不做</b>'
+  +'<li><i></i>不加载 SDK、不进房、不申请麦克风</li><li><i></i>不显示真实字幕、时长与音量</li><li><i></i>不声称已接通</li></div></div>'
+  +'</div></section>'
+  +'<section class="sec">'+head('02','下面四个控制在真机做什么','本页只切原型状态')
+  +'<div class="spec">'
+  +'<div><b>字幕</b><span>开关 AI 回复字幕显示</span></div>'
+  +'<div><b>静音</b><span>关掉本地麦克风上行</span></div>'
+  +'<div><b>切换文字</b><span>结束语音，回到输入框</span></div>'
+  +'<div><b>结束通话</b><span>释放房间并停止计费</span></div></div></section>'
+  +railSec('03',false);
+};
+V['mic-denied']=function(){
+ return '<section class="sec" data-screen="ai-cockpit-voice">'+head('01','没拿到麦克风权限','语音不可用')
+  +'<div class="state fit" data-kind="warn" data-testid="cockpit-mic-denied">'
+  +'<div class="state-h">'+svg('micoff','currentColor',26)+'浏览器没有授予麦克风权限</div>'
+  +'<div class="state-p">语音咨询开不了。可以在系统或浏览器设置里允许后再试，也可以直接用文字。</div>'
+  +'<div class="twocol">'
+  +miniList('现在可做什么',['改用文字咨询，回答能力一样','让现场工作人员开权限后重试','下面四项不用麦克风也能办'])
+  +miniList('页面不会做',['不反复弹授权打断你','不假装语音已经可用','不记录任何声音'])
+  +'</div></div></section>'
+  +railFull('02','这四项不用麦克风，现在就能办');
+};
+V['voice-error']=function(){
+ return '<section class="sec" data-screen="ai-cockpit-voice">'+head('01','语音通道没建立','可改用文字')
+  +'<div class="state fit" data-kind="error" data-testid="cockpit-voice-error">'
+  +'<div class="state-h">'+svg('alert','currentColor',26)+'这次没连上语音服务</div>'
+  +'<div class="state-p">页面不推测失败原因，也不展示任何模拟对话。文字咨询和下面四个入口都不受影响。</div>'
+  +'<div class="twocol">'
+  +miniList('现在可做什么',['底部「重试语音」会重新走一次真实申请','底部「改用文字咨询」回到输入框','连续失败请找现场工作人员'])
+  +miniList('这次没有发生',['没有进入通话房间','没有采集或上传声音','没有生成任何对话记录'])
+  +'</div></div></section>'
+  +railFull('02','语音没建立不影响下面四项');
+};
+
+/* ── 底部输入坞 / 语音控制区 ────────────────────── */
+function composerDock(){
+ var locked=state==='ai-unavailable', busy=state==='submitting';
+ var d=getDraft(), n=d.trim().length;
+ var ph=locked?'AI 顾问未接真实模型，暂时不能发送':(task()?'补充「'+task().n+'」的具体情况':'说说你想解决什么，例如：我想把简历压到一页');
+ var canSend=!locked&&!busy&&n>0;
+ return '<label class="sr-only" for="draft">咨询内容</label>'
+  +'<textarea id="draft" placeholder="'+esc(ph)+'" '+(locked?'readonly aria-disabled="true"':'')+(busy?' disabled':'')+' data-testid="cockpit-composer">'+esc(d)+'</textarea>'
+  +'<div class="dock-row">'
+  +'<span class="dock-meta"><b id="count">'+n+'</b> 字 · 草稿只留在本机这次会话，离开本页即清 · 真机用屏幕拼音键盘输入</span>'
+  +'<button type="button" class="mini press" data-act="clear" data-testid="cockpit-clear">清空草稿</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-gate" data-testid="cockpit-voice-entry">'+svg('mic','currentColor',24)+'语音咨询</button>'
+  +'<button type="button" class="btn primary press" id="send" data-act="send" aria-disabled="'+(canSend?'false':'true')+'" data-testid="cockpit-send">'+svg('send','currentColor',24)+(busy?'等待返回':'发送')+'</button>'
+  +'</div>'
+  +(locked?'<p class="dock-note"><b>已锁</b><span>本机 AI 顾问还没接上真实模型，页面不会用预置话术冒充回答。输入框保留可读，方便读屏用户听到原因。</span></p>'
+        :(busy?'<p class="dock-note"><b>等待中</b><span>这一轮还没返回，发送键先停用；四个非 AI 入口照常可点。</span></p>'
+             :(n?'':'<p class="dock-note"><b>提示</b><span>不想打字就点上面的问题，一下就填进来。</span></p>')));
+}
+function voiceDock(){
+ if(state==='voice-gate') return '<div class="vdock">'
+  +'<button type="button" class="btn primary press" data-act="go" data-state="voice-connecting" data-testid="cockpit-voice-accept">我同意，开启语音</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="default">继续用文字</button></div>'
+  +'<p class="dock-note"><b>说明</b><span>本原型不会真的请求麦克风；按下只切换到「尝试建立」这一态的布局。</span></p>';
+ if(state==='voice-connecting') return '<div class="vdock">'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-gate">取消尝试</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-live">看控制区示例</button>'
+  +'<button type="button" class="btn primary press" data-act="go" data-state="default">回到文字</button></div>'
+  +'<p class="dock-note"><b>说明</b><span>真机在这一步等服务端结果；原型不计时、不自动跳成功。</span></p>';
+ if(state==='voice-live') return '<div class="vdock">'
+  +'<button type="button" class="btn ghost press" data-act="cc" aria-pressed="'+(ccOn?'true':'false')+'" data-testid="cockpit-cc">'+svg('cc','currentColor',24)+(ccOn?'字幕已开':'字幕已关')+'</button>'
+  +'<button type="button" class="btn ghost press" data-act="mute" aria-pressed="'+(muted?'true':'false')+'" data-testid="cockpit-mute">'+svg(muted?'micoff':'mic','currentColor',24)+(muted?'已静音':'静音')+'</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="composer" data-testid="cockpit-to-text">切换文字</button>'
+  +'<button type="button" class="btn danger press" data-act="go" data-state="voice-gate" data-testid="cockpit-hangup">'+svg('hangup','currentColor',24)+'结束通话</button></div>'
+  +'<p class="dock-note"><b>示例</b><span>字幕与静音只改本页显示，没有真实音频通道；切换文字与结束通话是真的会离开这一态。</span></p>';
+ if(state==='mic-denied') return '<div class="vdock">'
+  +'<button type="button" class="btn primary press" data-act="go" data-state="default">改用文字咨询</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-gate">重新尝试授权</button></div>';
+ return '<div class="vdock">'
+  +'<button type="button" class="btn primary press" data-act="go" data-state="default">改用文字咨询</button>'
+  +'<button type="button" class="btn ghost press" data-act="go" data-state="voice-connecting">重试语音</button></div>';
+}
+
+/* ── 渲染 ───────────────────────────────────────── */
+function syncUrl(){
+ try{history.replaceState(null,'','?state='+state+(intent?'&intent='+intent:'')+(document.documentElement.classList.contains('debug')?'&debug=1':''))}catch(e){}
+}
+/* ══ 能力仪表带 ═══════════════════════════════════════════════
+   CAPS 的 key 逐一对应后端 llm-config.service.ts 的 feature key。
+   state 三态只映射服务端返回：online / controlled / off。
+   静态原型里给的是「大多数未开放」的诚实取值——生产库尚未配置 AI 能力时
+   本来就该是这个样子；不摆一屏全绿的假仪表。
+   真接线后改为读 GET /kiosk/ai/capabilities（该端点尚需新增）。 */
+var CAPS=[
+ ['简历与材料',[
+   ['resume_diagnosis','简历诊断','online'],
+   ['resume_optimize','简历优化','online'],
+   ['resume_generate','从零生成','online'],
+   ['print_param_prefill','打印参数预填','online'],
+   ['poster_generation','海报生成','off','二期']]],
+ ['岗位与选择',[
+   ['job_fit','岗位匹配','online'],
+   ['job_recommend','岗位推荐','online'],
+   ['job_explain','岗位解释','online'],
+   ['career_plan','职业规划','online']]],
+ ['练习与评估',[
+   ['mock_interview','模拟面试','online'],
+   ['self_assessment','自我评估','online']]],
+ ['受控能力',[
+   ['contract_review','签约风险提示','controlled','需本机授权'],
+   ['digital_human','数字人顾问','controlled','需终端配置']]],
+ ['现场辅助',[
+   ['fair_visit_plan','招聘会拜访计划','online'],
+   ['advisor_work','顾问工作台','off','未接入']]]
+];
+function paintRail(){
+ var el=document.getElementById('rail'); if(!el) return;
+ var on=0,ctl=0,off=0,idx=0,rows='';
+ CAPS.forEach(function(g){
+   var chips=g[1].map(function(c){
+     var st=c[2];
+     if(st==='online')on++; else if(st==='controlled')ctl++; else off++;
+     var cls=st==='online'?'on':(st==='controlled'?'ctl':'off');
+     CAP_NAME[c[0]]=c[1];
+     var note=c[3]?'<span class="rt">'+c[3]+'</span>':'';
+     return '<button type="button" class="rc '+cls+'" data-cap="'+c[0]+'" data-i="'+(idx++)+'">'
+       +'<i class="lamp'+(st==='online'?' pulse':'')+'" aria-hidden="true"></i>'+c[1]+note+'</button>';
+   }).join('');
+   rows+='<div class="rgrp"><div class="rgl">'+g[0]+'</div><div class="rcs">'+chips+'</div></div>';
+ });
+ var sweepEl=el.querySelector('.sweep');
+ el.innerHTML='<div class="rail-h"><span class="rail-t">本机 AI 能力</span>'
+   +'<span class="rail-n">在线 <b>'+on+'</b> · 受控 '+ctl+' · 未开放 '+off+'</span></div>'+rows
+   +'<div class="rail-route" id="railroute"></div>';
+ if(sweepEl) el.insertBefore(sweepEl, el.firstChild);
+ /* 通电序列：只在首屏跑一次，逐盏点亮。flat / reduced-motion 下直接全亮。 */
+ var chips=el.querySelectorAll('.rc');
+ /* flat 加在 #stage 上（不是 html），且截图工具会在动画跑完前拍——
+    直接读 URL 参数最稳，避免拍到没点亮的灯。 */
+ var instant=new URLSearchParams(location.search).get('flat')==='1'
+   || new URLSearchParams(location.search).get('capture')==='1'
+   || (window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+ chips.forEach(function(c,i){
+   if(instant){c.classList.add('lit');return;}
+   setTimeout(function(){c.classList.add('lit')}, 90+i*38);
+ });
+}
+/* ══ 意图 → 能力 路由 ═══════════════════════════════════════
+   静态稿用关键词匹配演示「识别到谁来处理」。真接线时这一步由服务端意图识别返回，
+   前端只负责把返回的 capability key 高亮——不要把关键词表当成产品逻辑。
+   识别不出就不高亮：宁可不指，不能乱指。 */
+var ROUTE_KW=[
+ ['resume_diagnosis',['诊断','看看我的简历','简历有什么问题']],
+ ['resume_optimize',['优化','改简历','压到一页','工作经历怎么写','项目经历']],
+ ['resume_generate',['生成简历','从零','没有简历','写一份简历']],
+ ['print_param_prefill',['打印','用什么纸','什么格式','双面','彩色']],
+ ['job_fit',['匹配','合不合适','这个岗位我能不能']],
+ ['job_explain',['jd','岗位要求','这个岗位是做什么']],
+ ['job_recommend',['推荐岗位','有什么岗位','找工作方向']],
+ ['career_plan',['职业规划','以后做什么','转行']],
+ ['mock_interview',['面试','自我介绍','谈薪','常见问题']],
+ ['self_assessment',['我适合','性格','职业倾向','自我评估']],
+ ['fair_visit_plan',['招聘会','参会','现场','带哪些材料','跑几家']]
+];
+var CAP_NAME={};
+function routeFor(text){
+ var t=(text||'').toLowerCase();
+ for(var i=0;i<ROUTE_KW.length;i++){
+   var kws=ROUTE_KW[i][1];
+   for(var j=0;j<kws.length;j++){ if(t.indexOf(kws[j])>=0) return ROUTE_KW[i][0]; }
+ }
+ return null;
+}
+function routeTo(text){
+ var key=routeFor(text); if(!key) return;
+ var el=document.getElementById('rail'); if(!el) return;
+ var chip=el.querySelector('[data-cap="'+key+'"]'); if(!chip) return;
+ /* 受控 / 未开放的能力不做「已交给它」的承诺，只提示为什么用不了 */
+ var usable=chip.classList.contains('on');
+ el.querySelectorAll('.rc.routed').forEach(function(x){
+   x.classList.remove('routed'); var b=x.querySelector('.rby'); if(b) b.remove();
+ });
+ var sw=document.getElementById('sweep');
+ var instant=new URLSearchParams(location.search).get('flat')==='1'
+   || (window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+ if(sw&&!instant){
+   sw.style.setProperty('--sweep-to', (chip.offsetLeft+chip.offsetWidth/2-60)+'px');
+   sw.classList.remove('run'); void sw.offsetWidth; sw.classList.add('run');
+ }
+ function land(){
+   chip.classList.add('routed');
+   if(usable&&!chip.querySelector('.rby')){
+     var b=document.createElement('span'); b.className='rby'; b.textContent='接手'; chip.appendChild(b);
+   }
+   var rr=document.getElementById('railroute');
+   if(rr){
+     rr.className='rail-route on';
+     rr.innerHTML= usable
+      ? '这件事会交给 <b>'+CAP_NAME[key]+'</b> 处理<span class="rr-x">结果仍以服务端返回为准</span>'
+      : '这件事对应 <b>'+CAP_NAME[key]+'</b>，但它在本机<b>暂时用不了</b><span class="rr-x">下面四条路照常可用</span>';
+   }
+ }
+ /* 落位永远同步执行：状态是事实，不能等动画。
+    扫光只是叠在上面的装饰——动画在跑，结论已经在那儿了。
+    （早前把落位放进 setTimeout，截图与真实交互都可能读到"还没路由"的中间态。） */
+ land();
+}
+function render(next,keepUrl){
+ if(STATES.indexOf(next)<0) next='default';
+ state=next;
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ root.innerHTML=V[state]();
+ dock.innerHTML=VOICE.indexOf(state)>=0?voiceDock():composerDock();
+ var h=HERO[state];
+ document.getElementById('ck-title').innerHTML=h[0];
+ document.getElementById('ck-copy').textContent=h[1];
+ var p=PILL[state];
+ document.getElementById('pill').className='pill'+(p[0]?' '+p[0]:'');
+ document.getElementById('pill-txt').textContent=p[1];
+ document.getElementById('pill-dot').className='dot'+(p[2]?' breathe':'');
+ var tel=TEL[state];
+ document.getElementById('ck-tel').innerHTML=
+  '<div><span>回答来源</span><b class="'+(state==='reply-real'||state==='reply-not-ai'?'amber':'')+'">'+tel[0]+'</b></div>'
+  +'<div><span>语音通道</span><b class="'+(state==='voice-live'?'amber':'')+'">'+tel[1]+'</b></div>'
+  +'<div><span>本机草稿</span><b class="hi">离场即清</b></div>';
+ bindDraft();
+ root.classList.remove('enter');void root.offsetWidth;root.classList.add('enter');
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-s')===state?'on':'');
+ if(!keepUrl)syncUrl();
+}
+function bindDraft(){
+ var ta=document.getElementById('draft');
+ if(!ta)return;
+ ta.addEventListener('input',function(){
+  setDraft(ta.value);
+  var c=document.getElementById('count');if(c)c.textContent=ta.value.trim().length;
+  var s=document.getElementById('send');
+  if(s)s.setAttribute('aria-disabled',ta.value.trim().length&&state!=='ai-unavailable'&&state!=='submitting'?'false':'true');
+ });
+}
+
+/* 事件委托：所有可点控件都真的会动，不留假占位 */
+document.getElementById('stage').addEventListener('click',function(ev){
+ var el=ev.target.closest('[data-act]');
+ if(!el)return;
+ var act=el.getAttribute('data-act');
+ if(act==='pick'){
+  var id=el.getAttribute('data-task');
+  topic=(topic===id)?null:id;
+  render(getDraft().trim()?'composer':'default');
+ }else if(act==='fill'){
+  var q=el.getAttribute('data-q');
+  setDraft(q);
+  render('composer');
+  routeTo(q);   /* 选完问题就沿仪表带扫到将要接手的能力上 */
+  var ta=document.getElementById('draft');if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
+ }else if(act==='clear'){
+  setDraft('');render(state==='composer'?'default':state);
+ }else if(act==='send'){
+  if(el.getAttribute('aria-disabled')==='true')return;
+  routeTo(getDraft());
+  render('submitting');
+ }else if(act==='retry'){
+  routeTo(getDraft());
+  render('submitting');
+ }else if(act==='recheck'){
+  render('default');
+ }else if(act==='go'){
+  render(el.getAttribute('data-state'));
+ }else if(act==='mute'){
+  muted=!muted;dock.innerHTML=voiceDock();
+ }else if(act==='cc'){
+  ccOn=!ccOn;
+  var box=document.getElementById('cc-box');if(box)box.hidden=!ccOn;
+  dock.innerHTML=voiceDock();
+ }
+});
+/* 离场即清：公共终端不把草稿留给下一位使用者 */
+addEventListener('pagehide',function(){setDraft('')});
+
+/* 原型演示控制（非产品逻辑）：只切 data-state，不驱动任何业务结果 */
+var panel=document.getElementById('demo-panel');
+panel.insertAdjacentHTML('beforeend',STATES.map(function(s){return '<a href="?state='+s+'&debug=1'+(intent?'&intent='+intent:'')+'" data-s="'+s+'">'+s+'</a>'}).join(''));
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+if(q.get('debug')==='1')document.documentElement.classList.add('debug');
+if(q.get('flat')==='1')document.getElementById('stage').classList.add('flat');
+
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();addEventListener('resize',fit);
+render(state,true);
+paintRail();   /* 仪表带只画一次；切状态不重跑通电序列 */
+})();
+</script>
+</body>
+</html>

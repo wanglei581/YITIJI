@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>服务中心 · 职易达</title>
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--muted:#64766f;--line:#ddd7c8;
+  --deep:#0b2b24;--teal:#16866f;--mint:#dff2eb;--blue:#376da7;--blue-soft:#e7eef7;
+  --amber:#b87518;--amber-soft:#f8ecd6;--clay:#a95336;--clay-soft:#f6e7df;
+  --plum:#75558b;--plum-soft:#eee7f3;--neutral:#52645d;--neutral-soft:#e9eee9;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;
+  --sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#e8e3d7;color:var(--ink);font-family:var(--sans)}
+a,button{font:inherit;color:inherit;text-decoration:none}
+button{border:0}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;overflow:hidden;transform-origin:center;background:var(--paper)}
+.screen{height:100%;display:flex;flex-direction:column}
+.topbar{height:104px;flex:none;padding:0 36px;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);background:var(--surface)}
+.back{width:64px;height:64px;display:grid;place-items:center;border:1px solid #d4cdb6;border-radius:20px;background:var(--paper)}
+.brand{display:flex;align-items:center;gap:12px}.mark{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:var(--deep);color:#3ce1ae;font:900 25px/1 var(--serif)}
+.brand-copy b{display:block;font-size:24px}.brand-copy span{display:none}
+.clock{margin-left:0;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}.clock small{display:none}
+.status{height:56px;margin-left:auto;padding:0 22px;border:1px solid #d4cdb6;border-radius:28px;display:flex;align-items:center;gap:10px;background:var(--paper);color:var(--neutral);font-size:19px;font-weight:600;white-space:nowrap}
+.status i{width:11px;height:11px;border-radius:50%;background:#87958f}.status.warn{background:var(--amber-soft);color:#775016}.status.warn i{background:var(--amber)}
+.hero{height:216px;flex:none;margin:20px 44px 0;padding:28px 42px 26px;background:var(--deep);border-radius:36px;color:#f7f3e8;display:flex;gap:24px;align-items:center}
+.hero-avatar{width:100px;height:100px;flex:none;border:1.5px solid rgba(46,230,168,.4);border-radius:50%;display:grid;place-items:center;color:#46e0b5;font:900 46px/1 var(--serif);background:rgba(46,230,168,.1)}
+.hero-main{flex:1;min-width:0}.eyebrow{color:rgba(242,239,228,.5);font-size:18px;font-weight:700;letter-spacing:5px}.hero h1{margin-top:5px;font:900 38px/1.3 var(--serif);letter-spacing:0}.hero p{margin-top:7px;max-width:760px;color:rgba(242,239,228,.72);font-size:21px;line-height:1.55}.hero p b{color:#fff}
+.hero-note{display:flex;align-items:baseline;gap:8px;margin-top:8px;color:#9fc0b5;font-size:14px;line-height:1.35}.hero-note b{flex:none;color:#d8ebe4;font-size:14px}.hero-note span{min-width:0}
+.first-panel{height:0;overflow:hidden;transition:height .25s ease}
+.screen[data-state="first"] .first-panel{height:140px}
+.first-inner{height:122px;margin:18px 44px 0;padding:17px 22px;border:1px solid var(--line);border-radius:24px;background:var(--surface);display:flex;align-items:center;gap:18px}.first-copy{flex:1}.first-copy b{font:800 20px/1.3 var(--serif)}.first-copy p{margin-top:3px;color:var(--muted);font-size:15px}.first-actions{display:flex;gap:8px;max-width:610px}
+.seg{min-width:124px;height:58px;padding:0 13px;border:1px solid var(--line);border-radius:18px;background:var(--paper);font-size:15px;font-weight:650;display:flex;align-items:center;justify-content:center;text-align:center}
+.seg.on{border-color:#83bcae;background:var(--mint);color:var(--teal)}
+.notice{height:70px;flex:none;margin:18px 44px 0;padding:0 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--muted);font-size:16px;display:flex;align-items:center;gap:12px}
+.notice b{color:var(--ink)}.notice svg{flex:none;color:var(--teal)}
+.notice .state-only{display:none}.screen[data-state="ai-down"] .notice .default-only,.screen[data-state="device-off"] .notice .default-only{display:none}
+.screen[data-state="ai-down"] .notice .ai-only,.screen[data-state="device-off"] .notice .device-only{display:inline}
+.hub{flex:1;min-height:0;padding:22px 44px 20px;display:flex;flex-direction:column}
+.section-head{height:43px;display:flex;align-items:baseline;gap:14px}.section-head::before{content:"01";color:var(--teal);font:700 16px/1 var(--serif)}.section-head h2{font:900 27px/1 var(--serif)}.section-head span{color:var(--muted);font-size:16px}.section-head b{margin-left:auto;color:var(--teal);font-size:16px}
+.cap-chips{height:48px;flex:none;display:flex;gap:10px;align-items:center;margin:2px 0 12px}.cap-chip{height:42px;padding:0 14px;display:inline-flex;align-items:center;border:1px solid #e1dac9;border-radius:15px;background:#faf8f1;color:#56746b;font-size:14px;font-weight:650;white-space:nowrap}.cap-chip:first-child{border-color:#c9e6db;background:var(--mint);color:var(--teal)}
+.grid{flex:none;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(var(--grid-rows,3),var(--card-row-height,260px));gap:16px}.grid .card:nth-child(8):last-child{grid-column:span 2}.screen[data-card-count="8"] .grid{--card-row-height:260px}.screen[data-card-count="8"][data-state="first"] .grid{--card-row-height:220px}.screen[data-card-count="6"] .grid{--card-row-height:400px}.screen[data-card-count="6"][data-state="first"] .grid{--card-row-height:350px}
+.card{min-width:0;min-height:0;padding:18px;border:1px solid #e2dbc9;border-radius:30px;background:var(--surface);display:flex;flex-direction:column;gap:9px;box-shadow:0 7px 16px rgba(24,45,38,.035)}
+.card:active{transform:scale(.992)}.card.is-unavailable{cursor:default;touch-action:manipulation}.card.is-unavailable:active{transform:none}.card-head{display:flex;align-items:center;gap:12px}.card-icon{width:50px;height:50px;flex:none;border-radius:16px;display:grid;place-items:center;background:var(--soft,var(--mint));color:var(--accent,var(--teal))}
+.card-icon svg{width:26px;height:26px}.card h3{font:800 21px/1.24 var(--serif);letter-spacing:0}.card p{color:var(--muted);font-size:15px;line-height:1.43;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-foot{margin-top:auto;display:flex;align-items:center;gap:7px}.badge{min-height:31px;padding:0 9px;border-radius:10px;background:var(--soft,var(--mint));color:var(--accent,var(--teal));font-size:13px;font-weight:700}
+.go{margin-left:auto;color:var(--teal);font-size:16px;font-weight:750}.go svg{vertical-align:-3px}
+.card[data-ai="true"]{--accent:#76628d;--soft:#f0ebf4}.card[data-kind="info"]{--accent:#3c79ae;--soft:#e9f0f8}.card[data-kind="support"]{--accent:#76628d;--soft:#f0ebf4}.card[data-device="true"]{--accent:#16866f;--soft:#e0f4ed}
+.card.is-unavailable{background:#faf8f1;border-color:#e2dbc9}.card.is-unavailable .card-head,.card.is-unavailable p,.card.is-unavailable .badge{opacity:.62}.card.is-unavailable .go{color:#775016;font-size:14px}.card.is-unavailable .card-foot{gap:9px}
+.quick-label{height:35px;display:flex;align-items:end;gap:10px;margin-top:12px;color:var(--muted);font-size:15px}.quick-label::before{content:"02";color:var(--teal);font:700 15px/1 var(--serif)}.quick-label b{color:var(--ink);font:800 19px/1 var(--serif)}
+.quick{height:96px;flex:none;margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.quick a{min-width:0;border:1px dashed #d5cdbb;border-radius:22px;background:rgba(255,253,248,.64);padding:0 18px;display:flex;align-items:center;gap:12px}.quick svg{width:27px;height:27px;color:var(--teal);flex:none}.quick b{font-size:17px}.quick span{display:block;margin-top:3px;color:var(--muted);font-size:14px}
+.truth{height:144px;flex:none;padding:20px 44px;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px;border-top:1px solid var(--line);background:#f1ede1;color:var(--muted);font-size:18px;line-height:1.5}.truth div{min-width:0}.truth div+div{border-left:1px solid #dcd5c6;padding-left:20px}.truth b{display:block;margin-bottom:5px;color:var(--ink);font-size:18px}
+.navbar{height:128px;flex:none;display:flex;border-top:1px solid var(--line);background:var(--surface)}.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative}.nav-item span{font-size:21px;color:var(--muted);font-weight:600}.nav-item.on span{color:var(--teal);font-weight:700}.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal)}.nav-item svg{width:34px;height:34px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="viewport"><main id="stage"><div class="screen" data-screen="service-hub" data-state="default" data-testid="service-hub-state-default">
+  <header class="topbar">
+    <a class="back" href="01-home.html?state=context" aria-label="返回首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <div class="brand"><div class="mark">职</div><div class="brand-copy"><b>职易达</b><span>就业服务大厅 · 01号机</span></div></div>
+    <div class="status" id="status"><i></i><span>能力与设备状态以办理时确认为准</span></div>
+    <div class="clock" id="clock">--:--<small id="dateLine">--</small></div>
+  </header>
+  <section class="hero">
+    <div class="hero-avatar" aria-hidden="true">青</div>
+    <div class="hero-main"><div class="eyebrow" id="eyebrow">服务中心</div><h1 id="title">服务中心</h1><p id="subtitle"></p><aside class="hero-note"><b id="heroNoteTitle"></b><span id="heroNote"></span></aside></div>
+  </section>
+  <section class="first-panel"><div class="first-inner"><div class="first-copy"><b>先告诉我你现在最想完成什么</b><p>选择后直接进入对应服务；不会替你提交或生成结果。</p></div><div class="first-actions" id="firstActions"></div></div></section>
+  <div class="notice">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <span class="default-only"><b>进入具体服务后再确认实时能力。</b> 本页只负责分流，不预报在线、名额、价格或办理结果。</span>
+    <span class="state-only ai-only"><b>AI能力当前不可用。</b> 不依赖AI的浏览、材料和本机服务仍可进入。</span>
+    <span class="state-only device-only"><b>本机设备当前不可用。</b> 当前入口中的信息浏览和AI服务仍可进入；涉及出纸或扫描的具体步骤请稍后再试。</span>
+  </div>
+  <section class="hub"><div class="section-head"><h2 id="sectionTitle">可办理事项</h2><span id="sectionHint"></span><b id="count">0项</b></div><div class="cap-chips" id="capChips"></div><div class="grid" id="grid"></div><div class="quick-label"><b>常用入口</b><span>继续查看与管理</span></div><div class="quick" id="quick"></div></section>
+  <div class="truth"><div><b id="truthTitle"></b><span id="truthCopy"></span></div><div><b>能力</b><span>进入具体服务后按实际状态确认，不以本页为准。</span></div><div><b>隐私</b><span>结束会话或闲置超时清除本机登录态与临时会话信息。</span></div></div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html?state=context" data-route="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span>AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c1.4-3.4 4-5 7-5s5.6 1.6 7 5"/></svg><span>我的</span></a>
+  </nav>
+</div></main></div>
+<script>
+const icon=(name)=>({
+ file:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+ edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/>',
+ brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V4h8v3M3 12h18"/>',
+ building:'<path d="M3 21h18M6 21V4h9v17M15 9h3v12M9 8h2M9 12h2M9 16h2"/>',
+ calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+ map:'<path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3zM9 3v15M15 6v15"/>',
+ mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0014 0v-1M12 18v4"/>',
+ chart:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>',
+ shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+ bot:'<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M8 16h8"/>',
+ printer:'<path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v7H6z"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>',
+ external:'<path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/>'
+}[name]||'<circle cx="12" cy="12" r="9"/>');
+const H={
+ resume:{eyebrow:'AI简历服务',title:'把简历这件事，做得更清楚',subtitle:'从来源选择、诊断优化到生成、材料与打印，按你的目标进入对应步骤。',noteTitle:'原件始终由你掌控',note:'AI建议仅供参考，新版本不会覆盖原文件。',section:'八项简历能力',hint:'先选目标，再进入真实流程',truthTitle:'简历是否使用、投给谁，由你本人决定。',truth:'系统不代投、不替企业筛选或邀约。',
+ first:[['我有简历要体检','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose'],['我没简历要新建','24-resume-generate.html','/resume/generate'],['我要对着岗位改','21-resume-triage.html?intent=optimize','/resume/source?intent=optimize']],
+ cards:[
+ ['AI简历诊断','先选简历来源，再查看结构与问题','search','AI · 仅供参考','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose','ai'],
+ ['AI简历优化','选择目标岗位后逐条查看改写建议','edit','AI · 仅供参考','21-resume-triage.html?intent=optimize','/resume/source?intent=optimize','ai'],
+ ['从零生成简历','按引导补充信息，生成可核对草稿','file','AI · 需核对','24-resume-generate.html','/resume/generate','ai'],
+ ['简历素材库','按分类查看真实模板、标签与适用场景','file','模板目录','46-resume-decision-workspace.html?screen=templates&state=list','/resume/templates','info'],
+ ['职业规划','基于真实经历与目标生成行动建议','map','AI · 仅供参考','46-resume-decision-workspace.html?screen=career-plan&state=missing-task','/resume/career-plan','ai'],
+ ['求职材料','准备求职信、自我介绍与材料清单','brief','AI · 需核对','25-material-workshop.html','/resume/materials','ai'],
+ ['简历打印','选择文件、核价后在本机打印','printer','依赖打印机','12-file-source.html?source=resume','/print/upload?source=resume','device'],
+ ['岗位匹配参考','简历与岗位逐项对照，不给录用结论','chart','AI · 不给百分比','46-resume-decision-workspace.html?screen=job-fit&state=missing-task','/resume/job-fit','ai']],
+ quick:[['我的简历','查看本人已保存版本','user','39-member-records.html?view=resumes','/me/resumes'],['AI服务记录','查看诊断与优化记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['自我探索','完成职业倾向参考','chart','34-self-assessment.html?state=intro','/resume/self-assessment/intro']]},
+ jobs:{eyebrow:'岗位信息',title:'看清来源，再决定去哪里投',subtitle:'岗位来自第三方或官方来源。本机帮助筛选和理解，投递仍在来源平台完成。',noteTitle:'本机不代收简历',note:'不做企业筛选、面试邀约或Offer管理。',section:'岗位与来源入口',hint:'岗位以进入后的真实加载为准',truthTitle:'投递在来源平台完成。',truth:'本机只记录浏览和外部跳转，不记录投递结果。',
+ first:[['找全职','26-browse-list.html?category=fulltime','/jobs?category=fulltime'],['找实习','26-browse-list.html?category=intern','/jobs?category=intern'],['找校招','26-browse-list.html?category=campus','/jobs?category=campus'],['找兼职','26-browse-list.html?category=parttime','/jobs?category=parttime']],
+ cards:[
+ ['全职岗位','按行业、地区与薪资范围筛选','brief','第三方来源','26-browse-list.html?category=fulltime','/jobs?category=fulltime','info'],
+ ['实习岗位','查看面向在校生与应届生的机会','brief','第三方来源','26-browse-list.html?category=intern','/jobs?category=intern','info'],
+ ['兼职信息','查看灵活就业与兼职来源信息','brief','第三方来源','26-browse-list.html?category=parttime','/jobs?category=parttime','info'],
+ ['校园招聘岗位','查看经审核发布的校招来源岗位','brief','第三方来源','26-browse-list.html?category=campus','/jobs?category=campus','info'],
+ ['全部岗位','搜索并查看全部已审核来源岗位','search','真实加载','26-browse-list.html','/jobs','info'],
+ ['企业信息','先了解企业，再查看岗位来源','building','来源信息','43-company-directory.html?screen=list','/companies','info'],
+ ['岗位匹配参考','简历与目标岗位逐项对照','chart','AI · 仅供参考','46-resume-decision-workspace.html?screen=job-fit&state=missing-task','/resume/job-fit','ai'],
+ ['线上招聘平台','打开第三方平台，由你自行操作','external','外部来源','45-online-platform-directory.html','/jobs/online-platforms','info'],
+ ['线下招聘机构','查看机构地址与到店咨询指引','map','线下咨询','42-offline-agency-directory.html?screen=list','/offline-agencies','info']],
+ quick:[['浏览记录','查看看过的岗位','user','39-member-records.html?view=activity','/me/activity'],['外部跳转','查看打开过的来源入口','external','39-member-records.html?view=activity&state=jump-ready','/me/activity?tab=jump'],['招聘会','换一种线下找法','calendar','16-service-hubs.html?hub=fairs','/fairs-service']]},
+ fairs:{eyebrow:'招聘会',title:'先看场次，再准备到场',subtitle:'查看招聘会时间、地点和来源，准备简历与路线；预约在来源平台完成。',noteTitle:'不显示虚构签到结果',note:'场次、参会企业和地图均以真实数据为准。',section:'招聘会服务',hint:'六个入口，覆盖会前与现场准备',truthTitle:'预约和投递由来源平台负责。',truth:'本机不代收简历，也不承诺外部活动结果。',
+ first:[['找近期场次','28-jobfair-enhanced.html','/job-fairs'],['准备到场','28-jobfair-enhanced.html?screen=checkin&state=guide','/job-fairs/checkin'],['准备材料','10-print-hub.html','/print-scan']],
+ cards:[
+ ['招聘会列表','查看真实场次、时间、地点与来源','calendar','真实加载','28-jobfair-enhanced.html','/job-fairs','info'],
+ ['校园招聘','查看校园相关场次与企业信息','building','真实加载','49-campus-workspace.html?screen=campus&state=loading','/campus','info'],
+ ['到场指引','核对来源预约与现场流程','map','无签到回执','28-jobfair-enhanced.html?screen=checkin&state=guide','/job-fairs/checkin','info'],
+ ['问AI顾问','了解参会准备与现场沟通建议','bot','AI · 仅供参考','05-ai-cockpit.html?intent=fair','/assistant','ai'],
+ ['简历服务','诊断、优化或准备多份简历','file','进入简历中心','16-service-hubs.html?hub=resume','/resume-service','info'],
+ ['打印扫描','先查看文件、格式与办理入口；出纸或扫描步骤进入后确认','printer','进入后确认','10-print-hub.html','/print-scan','info']],
+ quick:[['浏览记录','查看看过的招聘会','user','39-member-records.html?view=activity','/me/activity'],['外部跳转','查看打开过的来源入口','external','39-member-records.html?view=activity&state=jump-ready','/me/activity?tab=jump'],['岗位信息','同时查看来源岗位','brief','16-service-hubs.html?hub=jobs','/jobs-service']]},
+ interview:{eyebrow:'AI面试训练',title:'把表达练熟，不替你下结论',subtitle:'模拟问答、自我探索、技巧与历史报告，用于练习和复盘，不代表真实面试结果。',noteTitle:'不排名，不预测录用',note:'报告仅供本人练习参考，不对外共享。',section:'面试与成长',hint:'六个入口，按练习目标进入',truthTitle:'AI训练不是企业面试。',truth:'不进行录用判断，不向企业推荐候选人。',
+ first:[['马上练一场','29-interview-training.html','/interview/setup'],['先看技巧','29-interview-training.html?state=tips','/interview/tips'],['回看报告','29-interview-training.html?state=reports-guest','/interview/reports']],
+ cards:[
+ ['开始模拟面试','选择岗位类型与难度后进入训练','mic','AI · 练习','29-interview-training.html','/interview/setup','ai'],
+ ['职业自我探索','了解优势、偏好与可尝试方向','chart','AI · 仅供参考','34-self-assessment.html','/resume/self-assessment/intro','ai'],
+ ['职业规划建议','根据经历与目标形成行动建议','map','AI · 仅供参考','46-resume-decision-workspace.html?screen=career-plan&state=missing-task','/resume/career-plan','ai'],
+ ['面试技巧','查看通用问答与沟通要点','file','静态内容','29-interview-training.html?state=tips','/interview/tips','info'],
+ ['评估历史','回看本人历次自我探索结果','chart','本人记录','34-self-assessment.html?state=history','/resume/self-assessment/history','info'],
+ ['行业薪资参考','向通用AI顾问询问市场信息','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai']],
+ quick:[['AI服务记录','查看本人AI调用记录','bot','39-member-records.html?view=ai-records','/me/ai-records'],['训练报告','查看模拟面试报告','chart','29-interview-training.html?state=reports-guest','/interview/reports'],['简历服务','先完善求职材料','file','16-service-hubs.html?hub=resume','/resume-service']]},
+ policy:{eyebrow:'政策服务',title:'看来源、查条件、备材料',subtitle:'就业政策、社保与档案登记以来源内容为准；AI顾问只做通用说明。',noteTitle:'不承诺办理或资格结果',note:'资格核对使用确定性规则，最终以官方审核为准。',section:'政策与办事指引',hint:'六个入口，来源与条件分开看',truthTitle:'政策内容以来源发布为准。',truth:'AI顾问不替主管部门作资格判断。',
+ first:[['找就业政策','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy'],['核对申领条件','48-policy-workspace.html?tab=eligibility&state=form','/renshi?tab=eligibility'],['查社保材料','48-policy-workspace.html?tab=social&state=social','/renshi?tab=social'],['看登记档案','48-policy-workspace.html?tab=register&state=register','/renshi?tab=register']],
+ cards:[
+ ['就业政策','查看就业、创业与灵活就业政策','file','来源内容','48-policy-workspace.html?tab=policy&state=loading','/renshi?tab=policy','info'],
+ ['社保指南','查看参保流程与材料说明','shield','确定性内容','48-policy-workspace.html?tab=social&state=social','/renshi?tab=social','info'],
+ ['档案与登记','查看托管、登记和证明材料','file','确定性内容','48-policy-workspace.html?tab=register&state=register','/renshi?tab=register','info'],
+ ['条件核对','按 9 项真实问项机械比对，不作资格认定','brief','确定性规则','48-policy-workspace.html?tab=eligibility&state=form','/renshi?tab=eligibility','info'],
+ ['政策公告','查看发布方公告、来源与发布日期','file','来源内容','48-policy-workspace.html?tab=notice&state=loading','/renshi?tab=notice','info'],
+ ['打开AI顾问','咨询通用政策说明并核对来源','bot','AI · 需核实','05-ai-cockpit.html','/assistant','ai'],
+ ['政策收藏','查看本人收藏的政策内容','user','本人记录','39-member-records.html?view=favorites&tab=policy','/me/favorites?tab=policy','info']],
+ quick:[['浏览记录','查看最近浏览的政策','user','39-member-records.html?view=activity','/me/activity'],['AI问答记录','查看本人政策问答','bot','39-member-records.html?view=ai-records','/me/ai-records'],['全部服务','返回服务目录','external','02-services.html','/']]}}
+/* hub key → 生产 route（真源 apps/kiosk/src/routes/index.tsx）。五个 hub 共享本页一个 HTML 宿主，
+   ?hub= 选中哪个 H 条目，就渲染成对应的那一条生产 route，不新增第二个页面文件。 */
+const HUB_ROUTE={resume:'/resume-service',jobs:'/jobs-service',fairs:'/fairs-service',interview:'/interview-service',policy:'/policy-service'};
+const p=new URLSearchParams(location.search),hub=Object.hasOwn(H,p.get('hub'))?p.get('hub'):'resume',state=['default','first','ai-down','device-off'].includes(p.get('state'))?p.get('state'):'default',d=H[hub],screen=document.querySelector('.screen');
+screen.dataset.screen=hub+'-hub';screen.dataset.state=state;screen.dataset.testid=hub+'-hub-state-'+state;screen.dataset.cardCount=d.cards.length;screen.dataset.route=HUB_ROUTE[hub];
+document.title=d.eyebrow+' · 职易达';document.getElementById('eyebrow').textContent=d.eyebrow;document.getElementById('title').textContent=d.title;document.getElementById('subtitle').textContent=d.subtitle;document.getElementById('heroNoteTitle').textContent=d.noteTitle;document.getElementById('heroNote').textContent=d.note;document.getElementById('sectionTitle').textContent=d.section;document.getElementById('sectionHint').textContent=d.hint;document.getElementById('truthTitle').textContent=d.truthTitle;document.getElementById('truthCopy').textContent=d.truth;
+document.getElementById('firstActions').innerHTML=d.first.map((x,i)=>'<a class="seg'+(i===0?' on':'')+'" href="'+x[1]+'" data-route="'+x[2]+'" data-testid="'+hub+'-goal-'+i+'">'+x[0]+'</a>').join('');
+const cardHtml=c=>{const kind=c[6],ai=kind==='ai',device=kind==='device',unavailable=(state==='ai-down'&&ai)||(state==='device-off'&&device),reason=state==='ai-down'?'AI能力当前不可用':'本机设备当前不可用';const head='<div class="card-head"><span class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">'+icon(c[2])+'</svg></span><h3>'+c[0]+'</h3></div><p>'+c[1]+'</p><div class="card-foot"><span class="badge"><span>'+c[3]+'</span></span><span class="go">'+(unavailable?reason:'进入 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>')+'</span></div>';return unavailable?'<div class="card is-unavailable" role="group" aria-disabled="true" aria-label="'+c[0]+'：'+reason+'" data-route="'+c[5]+'" data-unavailable="true" data-kind="'+(ai?'support':kind)+'" data-ai="'+ai+'" data-device="'+device+'">'+head+'</div>':'<a class="card" href="'+c[4]+'" data-route="'+c[5]+'" data-kind="'+(ai?'support':kind)+'" data-ai="'+ai+'" data-device="'+device+'">'+head+'</a>'};
+const chipCopy=state==='ai-down'?['能力配置 · 以办理时确认','AI能力 · 暂不可用','其他入口 · 进入后确认']:state==='device-off'?['能力配置 · 以办理时确认','本机设备 · 暂不可用','信息与AI · 进入后确认']:['能力配置 · 以办理时确认','来源与流程 · 进入后确认','本页只做分流'];document.getElementById('capChips').innerHTML=chipCopy.map(x=>'<span class="cap-chip">'+x+'</span>').join('');
+document.getElementById('grid').innerHTML=d.cards.map(cardHtml).join('');document.getElementById('grid').style.setProperty('--grid-rows',Math.ceil(d.cards.length/3));document.getElementById('count').textContent=d.cards.length+'项';
+document.getElementById('quick').innerHTML=d.quick.map(q=>'<a href="'+q[3]+'" data-route="'+q[4]+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">'+icon(q[2])+'</svg><span><b>'+q[0]+'</b><span>'+q[1]+'</span></span></a>').join('');
+if(state==='ai-down'){document.getElementById('status').classList.add('warn');document.getElementById('status').querySelector('span').textContent='AI能力不可用，其他服务仍按实际状态办理'}if(state==='device-off'){document.getElementById('status').classList.add('warn');document.getElementById('status').querySelector('span').textContent='本机设备不可用，信息与AI服务仍可进入'}
+function fit(){const k=Math.min(innerWidth/1080,innerHeight/1920),s=document.getElementById('stage');if('zoom'in s.style)s.style.zoom=k;else s.style.transform='scale('+k+')'}addEventListener('resize',fit);fit();
+const week=['周日','周一','周二','周三','周四','周五','周六'];function tick(){const x=new Date();document.getElementById('clock').firstChild.nodeValue=String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0');document.getElementById('dateLine').textContent=(x.getMonth()+1)+'月'+x.getDate()+'日 · '+week[x.getDay()]}tick();setInterval(tick,10000);
+</script>
+</body>
+</html>

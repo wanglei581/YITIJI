@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>继续打印任务 · 职易达</title>
+<!--
+  route: /session-resume（apps/kiosk/src/pages/session-resume/SessionResumePage.tsx）
+  screen: session-resume
+  state: loading | payment-unpaid | payment-paying | progress-pending-paid | progress-claimed |
+         progress-printing | multi-list-scroll | empty | unavailable | session-expired | invalid-task
+
+  ── 唯一数据源 ────────────────────────────────────────────────────────────────
+  GET /api/v1/me/pending-tasks（apps/kiosk/src/services/api/pendingTasks.ts → services/api
+  MemberPrintOrdersService.listPending；guard=EndUserAuthGuard；响应头 Cache-Control: no-store）。
+  envelope 为 { success, data: PendingTask[] }，data 非数组按空列表处理。服务端只按已认证的
+  endUserId 过滤，orderBy updatedAt desc / id desc，take 20。
+  ⚠ take:20 在 DB 层、**早于**后续逐条 fail-closed 过滤，所以最终条数可能少于 20，库里也可能还有
+    更多可续办任务没被读到。页面只能说「最多读取最近 20 条候选」，不得说「最多显示 20 条可续办任务」。
+  PendingTask 只含安全元数据：
+    { id, type:'print', status:'pending'|'claimed'|'printing', payStatus, fileName, updatedAt,
+      resume:{ kind:'payment'|'print-progress', orderId?, orderNo?, amountCents?, priceLines?,
+               paymentSessionToken? } }
+  没有 fileUrl、没有文件哈希、没有 terminalId、没有 paramsJson 原文。
+
+  ── 必须登录 ────────────────────────────────────────────────────────────────
+  未登录或会话失效时 React 直接 replace 到 /login 并保留回跳目标，本页不拿空列表冒充「你没有任务」。
+  回跳的**真实通道是 router state.from='/session-resume'**（不出现在地址栏）；LoginPage 读取优先级
+  为 state.from → query ?from= → '/'，两条都过 isSafeInternalPath。**参数名是 from，不是 returnTo**，
+  Kiosk 全仓没有 returnTo 这个 URL query。静态原型只有 query 一条通道，所以去登录的链接写
+  03-login-gate.html?from=%2Fsession-resume，语义等价。
+  ⚠ 已登录用户进入 /login 会被 LoginPage 立刻弹回 returnTo，所以本页**不提供「换个账号」入口**：
+    真实切换账号在 /me/settings（clearSessionTo({path:'/login',state:{from:'/profile'}}））。
+    本页从未引入 useKioskSessionControl，不得在这里伪造该入口。
+
+  ── 受控去向映射（继续按钮唯一允许的两个目的地）────────────────────────────
+  页面 verdict() 是**前端自己的保守保护**，不是服务端判定的复刻。服务端返回什么，本页仍要再核一遍：
+    pending + unpaid|paying + 真实 order + amountCents>0 + terminalId + 服务端签发 paymentSessionToken
+        → resume.kind='payment'         → /print/cashier （静态原型 32-cashier.html）
+    pending + paid / claimed + paid / printing + paid
+        → resume.kind='print-progress'  → /print/progress（静态原型 15-print-fulfill.html）
+    order 为 null 的 legacy active task（服务端 where 的 OR 分支 `order is null` 会放行，且
+        `status==='pending' && order && payStatus!=='paid'` 这条排除需要 order 存在）
+        → resume.kind='print-progress'  → /print/progress，payStatus 为 null
+  ⚠ 真实 React 的 taskDescription 对这类 order=null 的任务会误写「已支付，等待终端领取任务」
+    （SessionResumePage.tsx:31-36）。那是运行时缺陷，不是合同；本原型对无订单任务一律用中性文案，
+    **不得复刻「已支付」**。
+  本页 fail-closed（按钮禁用 + 常驻原因，不猜目的地、不回首页冒充继续）的全部条件：
+    非 active 状态（completed / cancelled / failed …）；
+    refunding / partial_refunded / refunded / failed / closed 五个不可续办付款状态；
+    pending 且 order 存在但 payStatus 既不是 paid 也不是 unpaid/paying；
+    amountCents<=0、缺 orderNo、缺 terminalId、服务端未签发支付凭证；
+    status 与 payStatus 矛盾（如 printing+unpaid、claimed+unpaid）；resume.kind 读不出来。
+
+  ⚠ **runtime gap（必须照实说，不得写成已完成）**：上面这份条件里，只有一部分与服务端当前行为一致。
+    services/api/src/member-print-orders/member-print-orders.service.ts 目前**只在 status==='pending'
+    的分支上判付款状态**；`claimed` / `printing` 且 payStatus 为 `unpaid` / `paying` 的任务会直接落到该
+    方法最后的 return，被当作 `kind:'print-progress'` 返回（且不签发 paymentSessionToken）。
+    也就是说：
+      - 「amountCents<=0」「缺 terminalId」「refunding/…/closed」「非 active 状态」——服务端确实不会返回；
+      - 「claimed/printing + unpaid|paying」——**服务端目前会返回，是本页更保守，主动不放行**；
+      - 「缺 orderNo」「缺 paymentSessionToken」「resume.kind 读不出来」——是对畸形响应的前端防御，
+        正常契约下不会出现。
+    所以本页任何地方都**不得声称「这些组合在服务端就会被挡掉」**。真实收口仍需服务端补齐
+    claimed/printing 的付款状态分支；那属于 services/**，不在本轮写入范围，尚未完成。
+  「继续」＝回到这一单原来的那一步，**不是重新建单**（真实 React 传出的 state 始终带 taskId，
+  收银台的 releasePickupOrder 分支因此永不触发）。目的页仍按服务端最新状态重新核对：
+  收银台每 2.5s 查 pay-status、进度页每轮查 print jobs，本页行状态只是进入时的快照。
+
+  ── 清场与留存（本页不做清场动作）──────────────────────────────────────────
+  本页没有清除按钮。真实清场（KioskPrivacyGuard.clearSessionTo）只清**本机内存登录态**与
+  **本次临时 sessionStorage**（3 个受控键 + 合同检查会话），并调用登出接口作废会话；
+  **全仓没有任何一处会删除服务端订单、PrintTask 或文件**。任何页面不得承诺「删除服务端订单/文件」
+  或「留下删除记录」。取件码能否继续使用由服务端门控决定（paid、未退款、任务未终态才可见；核销还要求
+  同一台终端、未过期、文件仍有效、终端未锁定），所以本页只做条件表达，不写「到机码照常有效」这种绝对句。
+
+  ── 演示数据边界 ────────────────────────────────────────────────────────────
+  静态原型不发请求、不读账号。带任务内容的状态必须显式加 fixture=1 才渲染，否则一律回落 loading 并置
+  data-fallback="1"；只要屏上有任务内容，顶部就常驻「演示数据」标签。单一形态的状态会把同一种行铺满，
+  便于逐行核对样式；真实列表按更新时间混排。
+
+  ── 不泄漏 ─────────────────────────────────────────────────────────────────
+  paymentSessionToken 不上屏、不进 URL、不进 storage（页面只用布尔 sess 表示「服务端已签发」）；
+  不显示 fileUrl、文件哈希、Bearer / Authorization / 任何服务端路由原文。
+
+  ── AI ────────────────────────────────────────────────────────────────────
+  本页不提供任何 AI 入口，也不产生 AI 记录：恢复一笔打印任务不需要模型参与。COVERAGE-MATRIX 101 仍
+  登记为 AI-EXPLAIN，属台账与页面的已知差异，本批不改台账（门禁 verify-ai-route-classification.mjs
+  只读 COVERAGE-MATRIX.md 与 route-manifest.ts，不读本文件）。
+
+  原型演示控制：?state= 切状态；?fixture=1 显式注入演示任务；
+                ?capture=1 把时钟固定为 09:30 并停用循环动效（固定成正常时间，不用 `--:--`，
+                           那会被读成「时钟坏了」这种并不存在的故障态）；
+                ?flat=1 关非必要动效；?debug=1 显演示面板。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --sage:#4d7a6a; --sage-d:#3c6355; --sage-soft:#e4ede8;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  /* 骨架条必须是真正画得出来的墨色：太浅的骨架在像素层就是一整屏空白，
+     那样的 loading 屏对用户等于什么都没有，验收也应当判红。 */
+  --skel:#b3ac99;
+  --r-lg:32px; --r-md:26px; --r-row:22px;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+ul,li{list-style:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;text-align:left}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform 140ms var(--ease),border-color 140ms ease,background-color 140ms ease}
+.press:active{transform:scale(.985)}
+
+/* ───────── 顶栏 104px：不放大标题、不做欢迎语 ───────── */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 42px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;white-space:nowrap}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+/* ───────── 主体：grid，列表吃满 1fr ───────── */
+.body{flex:1;min-height:0;padding:20px 42px 16px;display:grid;gap:14px;overflow:hidden;
+  grid-template-rows:auto minmax(0,1fr) auto}
+
+/* 页头条：标题 + 条数 + 演示标签 + 一句事实（全页唯一的顶部说明） */
+.head{display:flex;align-items:center;gap:16px;padding:14px 22px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.head-ico{flex:none;width:58px;height:58px;border-radius:17px;display:grid;place-items:center;background:var(--teal-soft);color:var(--teal-d)}
+.head-ico svg{width:28px;height:28px}
+.head-ico[data-tone=warn]{background:var(--wheat-soft);color:var(--wheat-d)}
+.head-ico[data-tone=bad]{background:var(--cinnabar-soft);color:var(--cinnabar)}
+.head-m{flex:1;min-width:0}
+.head-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1.head-t{font-size:28px;font-weight:800;line-height:1.28;letter-spacing:1px}
+.count{flex:none;height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--teal-soft);color:var(--teal-d)}
+.fx{flex:none;height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--wheat-soft);color:var(--wheat-d)}
+.head-p{display:block;margin-top:7px;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.head-p b{color:var(--ink-2);font-weight:700}
+
+/* 列表容器：26px surface 卡，行铺在 paper 底上；唯一滚动区。
+   滚动条常驻可见（窄、低对比、留固定沟槽），让「还有更多」这件事不靠一句提示语来承担；
+   固定沟槽保证滚动态与非滚动态的行宽一致。
+   注意只用 ::-webkit-scrollbar，**不要再写 scrollbar-width/-color**：Chromium 一旦看到标准属性
+   就会整体忽略这几条 legacy 规则，而 `thin` 在无头环境下是 0 宽的 overlay 滚动条 —— 结果是滚动条
+   又变回看不见。 */
+.list{min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  overflow-y:auto;scrollbar-gutter:stable}
+.list::-webkit-scrollbar{width:8px}
+.list::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+.list::-webkit-scrollbar-track{background:transparent}
+.list>.row{flex:1 1 auto;min-height:132px;max-height:220px}
+.list>.row.link{max-height:300px}
+.list>.banner,.list>.note{flex:none}
+
+/* 行 */
+.row{min-height:132px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-row);
+  background:var(--paper);display:flex;align-items:center;gap:16px;width:100%;text-align:left}
+.row[data-blocked="1"]{background:#eeeade;border-color:#ddd8c8}
+.row[data-blocked="1"] .fn{color:#6d7069}
+.row-ico{flex:none;width:58px;height:58px;border-radius:17px;display:grid;place-items:center;background:var(--teal-soft);color:var(--teal-d)}
+.row-ico svg{width:28px;height:28px}
+.row-ico[data-tone=slate]{background:var(--slate-soft);color:var(--slate-d)}
+.row-ico[data-tone=clay]{background:var(--clay-soft);color:var(--clay-d)}
+.row-ico[data-tone=wheat]{background:var(--wheat-soft);color:var(--wheat-d)}
+.row-ico[data-tone=sage]{background:var(--sage-soft);color:var(--sage-d)}
+.row-ico[data-tone=off]{background:#ded9cb;color:#6d7069}
+.row-main{flex:1;min-width:0}
+.row-head{display:flex;align-items:center;gap:9px;min-width:0}
+.row-head .fn{flex:1 1 auto;min-width:0;font-size:22px;font-weight:800;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-sub{display:block;margin-top:6px;font-size:17px;line-height:1.45;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-sub b{color:var(--ink-2);font-weight:700}
+/* 出口行不是任务行：说明可以占两行，行也允许长一些 */
+.row.link .row-sub{white-space:normal;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.row-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.st{flex:none;height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;font-size:16px;font-weight:800;background:var(--teal-soft);color:var(--teal-d)}
+.st.wait{background:var(--wheat-soft);color:var(--wheat-d)}
+.st.pay{background:var(--clay-soft);color:var(--clay-d)}
+.st.run{background:var(--slate-soft);color:var(--slate-d)}
+.st.off{background:#ded9cb;color:#6d7069}
+.chip{flex:none;height:32px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;
+  background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:16px;font-weight:700}
+.row.link .chip{background:var(--surface)}
+.acts{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:392px}
+.small{min-height:56px;padding:0 18px;border-radius:16px;border:1px solid var(--line-2);background:var(--surface);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:800;white-space:nowrap}
+.small svg{width:19px;height:19px}
+.small.primary{background:var(--deep);border-color:var(--deep);color:var(--emerald)}
+.small[aria-disabled="true"]{background:#e6e2d7;border-color:#dcd7c9;color:#84867e;cursor:default}
+.reason{display:block;max-width:392px;font-size:16px;line-height:1.4;color:var(--wheat-d);font-weight:700;text-align:right}
+.row-arrow{flex:none;width:40px;height:40px;display:grid;place-items:center;color:var(--ink-3)}
+.row-arrow svg{width:22px;height:22px}
+
+/* 骨架行：保留真实行结构，不是空白长条 */
+.skel{background:var(--skel);border-radius:8px;display:block}
+.skel.t{height:22px;width:54%}
+.skel.s{height:18px;width:36%;margin-top:12px}
+.skel.m{height:32px;width:64%;margin-top:12px;border-radius:11px}
+.skel.a{width:132px;height:56px;border-radius:16px}
+
+/* 横幅（空 / 失败 / 失效态的结论行） */
+.banner{display:flex;align-items:center;gap:20px;padding:20px 24px;border-radius:var(--r-row);
+  background:var(--surface);border:1px solid var(--line)}
+.banner-ico{flex:none;width:72px;height:72px;border-radius:22px;display:grid;place-items:center;background:var(--slate-soft);color:var(--slate-d)}
+.banner-ico svg{width:34px;height:34px}
+.banner-ico[data-tone=calm]{background:var(--teal-soft);color:var(--teal-d)}
+.banner-ico[data-tone=warn]{background:var(--wheat-soft);color:var(--wheat-d)}
+.banner-ico[data-tone=bad]{background:var(--cinnabar-soft);color:var(--cinnabar)}
+.banner-m{flex:1;min-width:0}
+.banner-t{display:block;font-size:28px;font-weight:800;line-height:1.28}
+.banner-p{display:block;margin-top:7px;font-size:19px;line-height:1.5;color:var(--ink-3)}
+.banner-p b{color:var(--ink-2);font-weight:700}
+
+/* 单条提醒（最多两行） */
+.note{padding:20px 24px;border-radius:var(--r-row);border:1px solid var(--line);background:var(--surface)}
+.note[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.note[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.note-h{display:flex;align-items:center;gap:12px;font-size:24px;font-weight:800}
+.note-p{margin-top:10px;font-size:19px;line-height:1.5;color:var(--ink-2)}
+.note-p b{color:var(--ink);font-weight:700}
+
+/* 底部操作条（grid 轨道，不是浮层） */
+.ctabar{display:flex;gap:14px}
+.btn{min-height:104px;padding:0 22px;border-radius:24px;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-size:25px;font-weight:700;text-align:center;flex:1}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+/* quiet：列表态的页级动作。深色底只留给每一行的「继续」，底栏不跟行内按钮抢主层级。 */
+.btn.quiet{background:var(--surface);border:1px solid var(--teal);color:var(--teal-d)}
+
+/* 事实条：原来的三联说明卡 + 单行 truth 合并成这一条，省下的高度全部给任务列表。
+   三件事实一件都不能少：去哪、列谁的、不动什么。 */
+.truth{flex:none;min-height:95px;padding:12px 42px;display:flex;align-items:center;background:var(--paper);border-top:1px solid var(--line)}
+.truth-in{display:flex;gap:24px;width:100%}
+.tf{flex:1;font-size:16px;line-height:1.45;color:var(--ink-3)}
+.tf b{display:block;font-size:15px;font-weight:800;letter-spacing:1px;color:var(--teal-d);margin-bottom:3px}
+.tf i{font-style:normal;color:var(--ink-2);font-weight:700}
+
+/* ───────── 动效：一个循环点 + 一个按压反馈，全部可降级 ───────── */
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.78)}}
+.dot.breathe{animation:breathe 2.4s var(--ease) infinite}
+html.capture .dot.breathe{animation:none!important}
+html.flat *,html.flat *::before,html.flat *::after{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ───────── 原型演示控制（产品 URL 上不可见） ───────── */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:56px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 16px 16px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:17px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 18px 18px 0;padding:14px;flex-direction:column;gap:6px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:15px;font-weight:700;letter-spacing:2px}
+.demo-panel a{display:flex;align-items:center;min-height:48px;color:#f2efe4;font-size:16px;padding:0 14px;border-radius:12px;background:rgba(255,255,255,.07);white-space:nowrap}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+html:not(.debug) .demo-tab,html:not(.debug) .demo-panel{display:none!important}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" id="back" href="01-home.html" data-route="/" aria-label="返回首页">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">继续打印任务</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <main class="body" id="body-root" aria-live="polite"
+        data-screen="session-resume" data-route="/session-resume"
+        data-state="loading" data-testid="session-resume-state-loading">
+    <section class="head" id="head"></section>
+    <div class="list" id="list" data-scroll="list"></div>
+    <div class="ctabar" id="ctabar"></div>
+  </main>
+
+  <div class="truth" data-disclaimer="true" data-testid="session-resume-truth"><div class="truth-in" id="truth-txt"></div></div>
+
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"><div class="dp-t">原型演示控制</div></div>
+</div>
+<script>
+var SCREEN = 'session-resume';
+var ROUTE  = '/session-resume';
+var STATES = ['loading','payment-unpaid','payment-paying','progress-pending-paid','progress-claimed',
+              'progress-printing','multi-list-scroll','empty','unavailable','session-expired','invalid-task'];
+/* 带任务内容的状态：必须显式 fixture=1 才渲染，否则回落 loading 并置 data-fallback */
+var FIXTURE_STATES = ['payment-unpaid','payment-paying','progress-pending-paid','progress-claimed',
+                      'progress-printing','multi-list-scroll','invalid-task'];
+
+var ICO={
+ printer:'<path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>',
+ wallet:'<rect x="3" y="6" width="18" height="13" rx="2.6"/><path d="M3 10h18M16.5 14.5h.01"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6.6V12l3.6 2.1"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ server:'<rect x="3.5" y="4" width="17" height="6.5" rx="2"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2"/><path d="M7 7.2h.01M7 16.8h.01"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.3"/>',
+ warn:'<path d="M12 4.6L21 19.4H3z"/><path d="M12 10v4.6M12 17.2h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ inbox:'<path d="M3.5 13.5h4l1.6 3h5.8l1.6-3h4"/><path d="M5.6 5.2h12.8l3.1 8.3v4a2 2 0 0 1-2 2H4.5a2 2 0 0 1-2-2v-4z"/>',
+ arrow:'<path d="M5 12h13M12.5 6l6 6-6 6"/>',
+ refresh:'<path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.4V10h-5.6"/>',
+ ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+ hand:'<path d="M9 11V5.6a1.6 1.6 0 0 1 3.2 0V11"/><path d="M12.2 11V7.4a1.6 1.6 0 0 1 3.2 0V12"/><path d="M15.4 12V9.4a1.6 1.6 0 0 1 3.2 0V15a5.5 5.5 0 0 1-5.5 5.5h-1.4A5.7 5.7 0 0 1 6 14.8L5 12.4a1.5 1.5 0 0 1 2.6-1.5L9 13"/>',
+ phone:'<rect x="6.5" y="2.6" width="11" height="18.8" rx="2.6"/><path d="M10.6 18.6h2.8"/>',
+ code:'<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M13.5 13.5h3v3h-3zM20.5 13.5v3M17 20.5h3.5"/>',
+ help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.4v.4"/><path d="M12 17h.01"/>'
+};
+function svg(n,w,s){return '<svg width="'+(w||28)+'" height="'+(w||28)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+var q = new URLSearchParams(location.search);
+var CAPTURE = q.get('capture')==='1';
+var FIXTURE = q.get('fixture')==='1';
+var LOGIN   = '03-login-gate.html?from=' + encodeURIComponent(ROUTE);   /* 真实参数名是 from */
+
+/* 受控去向：只有这两个目的地。到了目的页仍按服务端最新状态重新核对。 */
+var DEST = {
+ payment : {href:'32-cashier.html?state=pending', route:'/print/cashier',  label:'去收银台付款'},
+ progress: {href:'15-print-fulfill.html',         route:'/print/progress', label:'去打印进度'}
+};
+var ACTIVE_STATUS = ['pending','claimed','printing'];
+var TERMINAL_PAY  = ['refunding','partial_refunded','refunded','failed','closed'];
+
+/* ── 续办判定：前端自己的保守保护，不是服务端判定的复刻。
+      服务端当前只在 pending 分支判付款状态，claimed/printing + unpaid|paying 仍会作为
+      print-progress 返回；本页主动不放行。详见页头 runtime gap 一节。 ──────────────── */
+function verdict(t){
+ if(t.kind==='unknown')                       return {ok:false,why:'读不出该回到哪一步'};
+ if(ACTIVE_STATUS.indexOf(t.status)<0)        return {ok:false,why:'任务已结束，不能继续'};
+ if(t.pay && TERMINAL_PAY.indexOf(t.pay)>=0)  return {ok:false,why:'付款状态已结束'};
+ if(t.status==='pending' && (t.pay==='unpaid'||t.pay==='paying')){
+   if(!t.orderNo)          return {ok:false,why:'缺这一单的订单号'};
+   if(!(t.amountCents>0))  return {ok:false,why:'缺这一单的应付金额'};
+   if(!t.terminal)         return {ok:false,why:'缺这一单的终端信息'};
+   if(!t.sess)             return {ok:false,why:'缺服务端签发的支付凭证'};
+   return {ok:true,dest:DEST.payment};
+ }
+ if(t.pay===null)          return {ok:true,dest:DEST.progress,legacy:true};   /* 无订单的早期任务 */
+ if(t.pay==='paid')        return {ok:true,dest:DEST.progress};
+ return {ok:false,why:'状态与付款状态对不上'};
+}
+
+/* ── 行外观：全部由 status/payStatus 推导 ────────────────────────────────────── */
+function look(t){
+ if(t.kind==='unknown')                       return {ic:'ban',    tone:'off',  st:['无法识别','off'],  sub:'这一条<b>读不出该回哪一步</b>，按钮保持禁用'};
+ if(ACTIVE_STATUS.indexOf(t.status)<0)        return {ic:'ban',    tone:'off',  st:['已结束','off'],    sub:'这条任务<b>已经是终态</b>，不在可继续范围内'};
+ if(t.pay && TERMINAL_PAY.indexOf(t.pay)>=0)  return {ic:'ban',    tone:'off',  st:['付款已结束','off'],sub:'付款状态<b>不属于可继续的范围</b>'};
+ if(t.status==='pending' && t.pay==='unpaid') return {ic:'wallet', tone:'clay', st:['待付款','pay'],    sub:'订单<b>还没付款</b>，付完才会开始排队打印'};
+ if(t.status==='pending' && t.pay==='paying') return {ic:'wallet', tone:'clay', st:['支付处理中','pay'],sub:'支付<b>正在处理</b>，本页不判定成功或失败'};
+ if(t.status==='pending' && t.pay==='paid')   return {ic:'clock',  tone:'wheat',st:['等待领取','wait'], sub:'已付款，<b>等待终端领取</b>这一单'};
+ if(t.status==='pending' && t.pay===null)     return {ic:'clock',  tone:'sage', st:['早期任务','run'],  sub:'这一单<b>没有关联订单记录</b>，继续会回到打印进度'};
+ if(t.status==='claimed')                     return {ic:'hand',   tone:'slate',st:['终端已领取','run'],sub:'终端<b>已领取任务</b>，正在准备打印'};
+ if(t.status==='printing')                    return {ic:'printer',tone:'teal', st:['正在出纸',''],     sub:'打印机<b>正在出纸</b>，去进度页看还剩多少'};
+ return {ic:'warn',tone:'wheat',st:['状态异常','off'],sub:'状态与付款状态对不上'};
+}
+function money(c){return '￥'+(c/100).toFixed(2)}
+
+function taskRow(t){
+ var v = verdict(t), l = look(t);
+ var chips = [];
+ if(t.orderNo)       chips.push('单号 '+esc(t.orderNo));
+ if(t.amountCents>0) chips.push(money(t.amountCents));
+ if(t.pay===null)    chips.push('无关联订单');
+ if(t.spec)          chips.push(esc(t.spec));
+ chips.push('更新于 '+esc(t.updated));
+ var act = v.ok
+   ? '<a class="small primary press" href="'+v.dest.href+'" data-route="'+v.dest.route+'" data-testid="'+SCREEN+'-continue-'+t.id+'"'
+     + ' aria-label="'+esc(v.dest.label+'：'+(t.name||'未命名打印任务'))+'">'+v.dest.label+svg('arrow',19)+'</a>'
+   : '<button type="button" class="small" aria-disabled="true" aria-describedby="why-'+t.id+'" data-testid="'+SCREEN+'-continue-'+t.id+'"'
+     + ' aria-label="'+esc('继续（暂不可用）：'+(t.name||'未命名打印任务'))+'">继续（暂不可用）</button>'
+     + '<span class="reason" id="why-'+t.id+'" data-testid="'+SCREEN+'-why-'+t.id+'">'+esc(v.why)+'</span>';
+ /* data-* 只暴露判定所需的**布尔与已上屏字段**，供验收独立复算 verdict；不含任何凭证或文件地址。 */
+ return '<li class="row" data-task="'+t.id+'" data-status="'+t.status+'" data-pay="'+(t.pay===null?'none':t.pay)+'"'
+   + ' data-order="'+(t.orderNo?'1':'0')+'" data-amount="'+(t.amountCents||0)+'"'
+   + ' data-terminal="'+(t.terminal?'1':'0')+'" data-sess="'+(t.sess?'1':'0')+'"'
+   + ' data-kind="'+(v.ok?(v.dest===DEST.payment?'payment':'print-progress'):'blocked')+'"'
+   + ' data-blocked="'+(v.ok?'0':'1')+'" data-legacy="'+(v.legacy?'1':'0')+'" data-testid="'+SCREEN+'-task-'+t.id+'">'
+   + '<span class="row-ico" data-tone="'+l.tone+'">'+svg(l.ic,28)+'</span>'
+   + '<span class="row-main"><span class="row-head"><span class="fn">'+esc(t.name||'未命名打印任务')+'</span>'
+   + '<span class="st '+l.st[1]+'">'+l.st[0]+'</span></span>'
+   + '<span class="row-sub">'+l.sub+'</span>'
+   + '<span class="row-meta"><span class="chip">'+chips.join('</span><span class="chip">')+'</span></span></span>'
+   + '<span class="acts">'+act+'</span></li>';
+}
+function taskList(list){
+ return list.map(taskRow).join('');
+}
+/* 出口行：空 / 失败 / 失效态复用同一个行组件，不新建卡片体系 */
+function linkRow(o){
+ return '<a class="row link press" href="'+o.href+'" data-route="'+o.route+'" data-testid="'+SCREEN+'-exit-'+o.id+'">'
+  + '<span class="row-ico" data-tone="'+o.tone+'">'+svg(o.icon,28)+'</span>'
+  + '<span class="row-main"><span class="row-head"><span class="fn">'+o.title+'</span></span>'
+  + '<span class="row-sub">'+o.sub+'</span>'
+  + '<span class="row-meta"><span class="chip">'+o.chips.join('</span><span class="chip">')+'</span></span></span>'
+  + '<span class="row-arrow">'+svg('arrow',22)+'</span></a>';
+}
+function banner(o){
+ return '<div class="banner" data-testid="'+SCREEN+'-'+o.id+'"><span class="banner-ico" data-tone="'+o.tone+'">'+svg(o.icon,34)+'</span>'
+  + '<span class="banner-m"><span class="banner-t">'+o.title+'</span><span class="banner-p">'+o.desc+'</span></span></div>';
+}
+
+/* ── 演示任务（只在 fixture=1 时注入） ────────────────────────────────────────── */
+function T(o){
+ return {id:o.id,name:o.name===undefined?'个人简历-2026春招.pdf':o.name,status:o.status,
+   pay:o.pay===undefined?'paid':o.pay,orderNo:o.orderNo===undefined?'PT26082700931':o.orderNo,
+   amountCents:o.amountCents===undefined?200:o.amountCents,terminal:o.terminal===undefined?true:o.terminal,
+   sess:o.sess===undefined?true:o.sess,updated:o.updated||'6 分钟前',spec:o.spec,kind:o.kind}
+}
+var LONG_NAME = '2026届秋招-字节跳动-产品运营岗-个人简历-第三版-终稿-打印用-A4双面-请勿再改.pdf';
+var NAMES = ['个人简历-陈静-2026春招.pdf','求职材料合集.pdf','三方协议扫描件.pdf',LONG_NAME,
+  '英文简历-Chen-Jing-EN.pdf','成绩单-本科四年完整版.pdf','实习证明-2025暑期.pdf','获奖证书合集-6项.pdf',
+  '教师资格证复印件.pdf','户口本首页与本人页.pdf'];
+var SPEC = ['A4 黑白 · 2 页 · 1 份','A4 彩色 · 4 页 · 1 份','A4 黑白 · 6 页 · 2 份'];
+var AGO  = ['刚刚','2 分钟前','9 分钟前','24 分钟前','48 分钟前','1 小时前','2 小时前'];
+
+/* 同一形态铺满一屏，便于逐行核对样式；真实列表按更新时间混排。 */
+function sameKind(prefix,status,pay,n){
+ var rows=[];
+ for(var i=0;i<n;i++){
+  rows.push(T({id:prefix+(i+1),name:NAMES[i%NAMES.length],status:status,pay:pay,
+   orderNo: pay===null ? null : 'PT260827'+String(1100+i*13),
+   amountCents: pay===null ? 0 : [200,450,1200,300,600,250][i%6],
+   spec:SPEC[i%3],updated:AGO[i%AGO.length]}));
+ }
+ return rows;
+}
+var FIX = {};
+/* 7 条：正好铺满释放出来的列表区，行不会被撑到上限、也不留尾部空档。 */
+FIX['payment-unpaid']        = sameKind('a','pending','unpaid',7);
+FIX['payment-paying']        = sameKind('b','pending','paying',7);
+FIX['progress-pending-paid'] = sameKind('c','pending','paid',7);
+FIX['progress-claimed']      = sameKind('d','claimed','paid',7);
+FIX['progress-printing']     = sameKind('e','printing','paid',7);
+FIX['invalid-task'] = [
+ T({id:'x1',name:'求职材料-缺订单号.pdf',   status:'pending', pay:'unpaid', orderNo:null,   updated:'8 分钟前',spec:SPEC[0]}),
+ T({id:'x2',name:'求职材料-金额为零.pdf',   status:'pending', pay:'unpaid', amountCents:0,  updated:'11 分钟前',spec:SPEC[1]}),
+ T({id:'x3',name:'求职材料-缺终端信息.pdf', status:'pending', pay:'unpaid', terminal:false, updated:'14 分钟前',spec:SPEC[2]}),
+ T({id:'x4',name:'求职材料-缺支付凭证.pdf', status:'pending', pay:'unpaid', sess:false,     updated:'17 分钟前',spec:SPEC[0]}),
+ T({id:'x5',name:'求职材料-状态矛盾.pdf',   status:'printing',pay:'unpaid',                 updated:'21 分钟前',spec:SPEC[1]}),
+ T({id:'x6',name:'求职材料-已退款.pdf',     status:'pending', pay:'refunded',               updated:'26 分钟前',spec:SPEC[2]}),
+ T({id:'x7',name:'求职材料-已完成.pdf',     status:'completed',pay:'paid',                  updated:'32 分钟前',spec:SPEC[0]})
+];
+/* 20 条：服务端 take 上限就是 20。混合全部可继续形态 + 长文件名 + 无文件名 + 无订单早期任务。 */
+(function(){
+ var rows=[], plan=[
+  ['pending','unpaid'],['printing','paid'],['claimed','paid'],['pending','paid'],['pending','paying'],
+  ['claimed','paid'],['printing','paid'],['pending','paid'],['pending',null],['pending','paid'],
+  ['printing','paid'],['claimed','paid'],['pending','unpaid'],['pending','paid'],['printing','paid'],
+  ['claimed','paid'],['pending','paid'],['printing',null],['claimed','paid'],['pending','paid']
+ ];
+ for(var i=0;i<plan.length;i++){
+  var name = i===3 ? LONG_NAME : (i===8 ? null : NAMES[i%NAMES.length]);
+  rows.push(T({id:'m'+(i+1),name:name,status:plan[i][0],pay:plan[i][1],
+   orderNo: plan[i][1]===null ? null : 'PT260827'+String(1200+i*7),
+   amountCents: plan[i][1]===null ? 0 : [200,450,1200,300,600,250][i%6],
+   spec:SPEC[i%3],
+   updated: i<AGO.length ? AGO[i] : (i<14?'2 小时前':'今天上午')}));
+ }
+ FIX['multi-list-scroll']=rows;
+})();
+
+/* ── 事实条：全页唯一的说明位。三件事实各占一格，每格不超过两行。 ─────────────── */
+var TRUTH =
+   '<span class="tf"><b>去向</b>只回这一单原来那一步：待付款去<i>收银台</i>，其余去<i>打印进度</i>。</span>'
+ + '<span class="tf"><b>归属</b>只列<i>你名下</i>没办完的打印任务；未登录会先去登录页。</span>'
+ + '<span class="tf"><b>边界</b><i>不重新建单</i>，也<i>不删除服务端订单或文件</i>。</span>';
+
+function btn(kind,href,route,label,testid){
+ return '<a class="btn '+kind+' press" href="'+href+'" data-route="'+route+'"'+(testid?' data-testid="'+testid+'"':'')+'>'+label+'</a>';
+}
+
+/* ── 各状态视图 ───────────────────────────────────────────────────────────────── */
+var V={};
+function listView(state,pill,desc,rows){
+ return {
+  pill:pill,
+  head:'<span class="head-ico" data-tone="'+pill[0].replace('ok','')+'">'+svg('inbox',28)+'</span>'
+   + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续打印任务</h1>'
+   + '<span class="count" data-testid="'+SCREEN+'-count">共 '+rows.length+' 条</span>'
+   + '<span class="fx" data-testid="'+SCREEN+'-fixture">演示数据 · 非真实任务</span></span>'
+   + '<span class="head-p">'+desc+'</span></span>',
+  list:taskList(rows),
+  cta: btn('ghost','01-home.html','/','返回首页')
+     + btn('ghost','10-print-hub.html','/print-scan','去打印扫描')
+     /* 列表态的页级动作只做次级：深色底留给每一行的「继续」，底栏不跟行内按钮抢主层级。 */
+     + '<a class="btn quiet press" href="?state='+state+'&fixture=1&capture=1" data-route="'+ROUTE+'" data-testid="'+SCREEN+'-primary">'+svg('refresh',26)+'重新读取列表</a>'
+ };
+}
+V['payment-unpaid'] = function(){ return listView('payment-unpaid',['warn','待付款'],
+ '这些单<b>还没付款</b>。继续会回到<b>这一单的收银台</b>接着付，<b>不会重新建单</b>；付款结果以服务端为准。',
+ FIX['payment-unpaid']) };
+V['payment-paying'] = function(){ return listView('payment-paying',['warn','支付处理中'],
+ '这些单<b>支付处理中</b>。继续会回到<b>这一单的收银台</b>看最新结果；本页<b>不判定成功或失败</b>。',
+ FIX['payment-paying']) };
+V['progress-pending-paid'] = function(){ return listView('progress-pending-paid',['ok','等待领取'],
+ '这些单<b>已付款</b>，正在<b>等待终端领取</b>。继续会回到<b>这一单的打印进度</b>，看它排到哪一步。',
+ FIX['progress-pending-paid']) };
+V['progress-claimed'] = function(){ return listView('progress-claimed',['ok','终端已领取'],
+ '终端<b>已领取</b>这些单，正在准备打印。继续会回到<b>这一单的打印进度</b>；进度以终端回流为准。',
+ FIX['progress-claimed']) };
+V['progress-printing'] = function(){ return listView('progress-printing',['ok','正在出纸'],
+ '打印机<b>正在出纸</b>。继续会回到<b>这一单的打印进度</b>，看还剩多少、要不要取件。',
+ FIX['progress-printing']) };
+V['multi-list-scroll'] = function(){ return listView('multi-list-scroll',['warn','20 条待办'],
+ '服务端<b>最多读取最近 20 条候选</b>，按更新时间从新到旧排；过滤后可能更少。列表<b>可以上下滑动</b>，文件名过长会截断。',
+ FIX['multi-list-scroll']) };
+V['invalid-task'] = function(){ return listView('invalid-task',['bad','不可继续'],
+ '这几条<b>不能在这里继续</b>：读不出该回哪一步，或者已经结束。按钮禁用并写明原因，<b>这一页不猜目的地</b>，也不会把你送到别处。',
+ FIX['invalid-task']) };
+
+V['loading']=function(){
+ var sk='';
+ for(var i=0;i<7;i++) sk+='<li class="row" aria-hidden="true" data-testid="'+SCREEN+'-skeleton-'+i+'">'
+   + '<span class="row-ico" data-tone="off"></span>'
+   + '<span class="row-main"><span class="skel t"></span><span class="skel s"></span><span class="skel m"></span></span>'
+   + '<span class="acts"><span class="skel a"></span></span></li>';
+ return {
+  pill:['','正在读取'],
+  head:'<span class="head-ico">'+svg('clock',28)+'</span>'
+   + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续打印任务</h1></span>'
+   + '<span class="head-p">先确认<b>登录还在不在</b>，再取你名下没办完的打印任务。<b>取不到就说取不到</b>，不会先画一份任务出来。</span></span>',
+  list:sk,
+  cta: btn('ghost','01-home.html','/','返回首页')
+     + '<a class="btn primary press" style="flex:1.25" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">去打印扫描</a>'
+ };
+};
+V['empty']=function(){
+ return {
+  pill:['ok','名下没有未完成任务'],
+  head:'<span class="head-ico">'+svg('check',28)+'</span>'
+   + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续打印任务</h1>'
+   + '<span class="count" data-testid="'+SCREEN+'-count">共 0 条</span></span>'
+   + '<span class="head-p">这条结论来自服务端返回的<b>空列表</b>，<b>不是读取失败</b>。历史订单不在这里。</span></span>',
+  list: banner({id:'empty',tone:'calm',icon:'check',title:'名下没有未完成的打印任务',
+        desc:'你名下现在<b>没有待付款、等待领取或正在打印</b>的任务。'})
+   + linkRow({id:'print',tone:'slate',icon:'printer',href:'10-print-hub.html',route:'/print-scan',
+        title:'直接办新的',sub:'上传文件、扫描原件、用手机传过来，几步就能开印。',
+        chips:['上传文件','扫描原件','手机传输','U盘导入']})
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+        title:'手机上已经下过单',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，可以直接继续那一单。',
+        chips:['输入到机码','扫码核销']})
+   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/records',
+        title:'查以前办过的',sub:'打印订单、服务记录、我的文档都在我的记录里，只有本人看得到。',
+        chips:['打印订单','我的文档','服务记录']})
+   + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
+        title:'刚下过单却看不到',sub:'先确认是不是<b>用另一个手机号</b>建的单；这里只列当前登录账号名下的任务。',
+        chips:['换号核对','现场求助']}),
+  cta: btn('ghost','01-home.html','/','返回首页')
+     + btn('ghost','39-member-records.html','/me/records','我的记录')
+     + '<a class="btn primary press" style="flex:1.25" href="10-print-hub.html" data-route="/print-scan" data-testid="'+SCREEN+'-primary">去打印扫描</a>'
+ };
+};
+V['unavailable']=function(){
+ return {
+  pill:['bad','没读到未完成任务'],
+  head:'<span class="head-ico" data-tone="bad">'+svg('warn',28)+'</span>'
+   + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续打印任务</h1></span>'
+   + '<span class="head-p">这次<b>没能把列表读回来</b>。本页不猜原因，也<b>不拿空列表冒充「你没有任务」</b>。</span></span>',
+  list: banner({id:'unavailable',tone:'bad',icon:'warn',title:'没读到未完成任务',
+        desc:'读不出列表<b>不等于任务没了</b>；已经建好的单继续排队或出纸。'})
+   + '<div class="note" data-kind="warn" data-testid="'+SCREEN+'-no-reorder"><div class="note-h">'+svg('info',26)+'先别重新下单</div>'
+   + '<p class="note-p">这一页读不出来<b>不影响已经建好的任务</b>。再下一单会<b>多付一次钱</b>，请先重试或换下面的方式继续。</p></div>'
+   + linkRow({id:'retry-hint',tone:'wheat',icon:'refresh',href:'?state=unavailable',route:ROUTE,
+        title:'先重试一次',sub:'网络抖一下就会这样，多数时候再读一次就好。',
+        chips:['重新读取','不改变任何任务']})
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+        title:'用到机码继续',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，可以绕开这一页。',
+        chips:['输入到机码','扫码核销']})
+   + linkRow({id:'records',tone:'teal',icon:'inbox',href:'39-member-records.html',route:'/me/records',
+        title:'去我的记录看看',sub:'打印订单和状态在我的记录里，同样能确认这一单还在不在。',
+        chips:['打印订单','订单状态']})
+   + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
+        title:'一直读不出来',sub:'按常见问题里的方式找现场工作人员，请他们帮你核对这一单的真实状态。',
+        chips:['常见问题','现场求助']}),
+  cta: btn('ghost','01-home.html','/','返回首页')
+     + btn('ghost','10-print-hub.html','/print-scan','去打印扫描')
+     + '<a class="btn primary press" style="flex:1.25" href="?state=unavailable" data-route="'+ROUTE+'" data-testid="'+SCREEN+'-primary">'+svg('refresh',26)+'重新读取</a>'
+ };
+};
+V['session-expired']=function(){
+ return {
+  pill:['bad','登录已失效'],
+  head:'<span class="head-ico" data-tone="bad">'+svg('lock',28)+'</span>'
+   + '<span class="head-m"><span class="head-r"><h1 class="head-t">继续打印任务</h1></span>'
+   + '<span class="head-p">这一页<b>必须登录</b>才能看。真实运行时会<b>直接送回登录页</b>并记住这一页，不会停在这一屏。</span></span>',
+  list: banner({id:'session-expired',tone:'warn',icon:'lock',title:'登录已失效，请重新登录',
+        desc:'重新登录后会<b>回到这一页</b>，列出的就是你名下的未完成任务。'})
+   + '<div class="note" data-kind="info" data-testid="'+SCREEN+'-tasks-safe"><div class="note-h">'+svg('server',26)+'任务不受影响</div>'
+   + '<p class="note-p">登录失效<b>不影响已经建好的打印任务</b>：它们在服务端继续排队或出纸，重新登录后仍然能继续。</p></div>'
+   + linkRow({id:'login',tone:'teal',icon:'lock',href:LOGIN,route:'/login',
+        title:'用手机号验证码登录',sub:'登录只为把任务和记录<b>归到你名下</b>，登录后自动回到这一页。',
+        chips:['手机号验证码','登录后回到本页']})
+   + linkRow({id:'print',tone:'slate',icon:'printer',href:'10-print-hub.html',route:'/print-scan',
+        title:'不登录也能打印',sub:'直接去打印扫描上传文件即可；登录只是为了留下记录。',
+        chips:['上传文件','扫描原件']})
+   + linkRow({id:'code',tone:'clay',icon:'code',href:'11-arrival-code.html',route:'/print/arrival-code',
+        title:'手机上下过单',sub:'到机码<b>还在有效期内、且就在这台机器上核销</b>时，不用先登录也能继续。',
+        chips:['输入到机码','扫码核销']})
+   + linkRow({id:'help',tone:'sage',icon:'help',href:'06-help.html',route:'/help',
+        title:'登录遇到问题',sub:'收不到验证码、换了手机号，可以先看常见问题，或请现场工作人员协助。',
+        chips:['常见问题','现场求助']}),
+  cta: btn('ghost','01-home.html','/','返回首页')
+     + btn('ghost','10-print-hub.html','/print-scan','去打印扫描')
+     + '<a class="btn primary press" style="flex:1.25" href="'+LOGIN+'" data-route="/login" data-testid="'+SCREEN+'-primary">'+svg('lock',26)+'去登录并回到这一页</a>'
+ };
+};
+
+/* ── 渲染 ─────────────────────────────────────────────────────────────────────── */
+var root = document.getElementById('body-root');
+function render(state,fallback,fixture){
+ var view = V[state]();
+ root.setAttribute('data-state',state);
+ root.setAttribute('data-testid',SCREEN+'-state-'+state);
+ if(fallback) root.setAttribute('data-fallback','1'); else root.removeAttribute('data-fallback');
+ if(fixture)  root.setAttribute('data-fixture','1');  else root.removeAttribute('data-fixture');
+ document.getElementById('head').innerHTML = view.head
+   + (fallback?'<span class="fx" data-testid="'+SCREEN+'-fallback-note">地址里的展示参数未被接受</span>':'');
+ var listEl = document.getElementById('list');
+ listEl.innerHTML = view.list;
+ listEl.setAttribute('data-count', listEl.querySelectorAll('[data-task]').length);
+ document.getElementById('ctabar').innerHTML = view.cta;
+ document.getElementById('truth-txt').innerHTML = TRUTH;
+ var p = document.getElementById('pill');
+ p.className = 'pill' + (view.pill[0] ? ' ' + view.pill[0] : '');
+ document.getElementById('pill-dot').className = 'dot' + (state==='progress-printing' ? ' breathe' : '');
+ document.getElementById('pill-txt').textContent = view.pill[1];
+}
+
+var wanted = q.get('state');
+var state = 'loading', fallback = false;
+if(wanted !== null){
+ if(STATES.indexOf(wanted) < 0){ state = 'loading'; fallback = true; }
+ else if(FIXTURE_STATES.indexOf(wanted) >= 0 && !FIXTURE){ state = 'loading'; fallback = true; }
+ else state = wanted;
+}
+if(CAPTURE) document.documentElement.classList.add('capture');
+if(q.get('flat')==='1') document.documentElement.classList.add('flat');
+render(state, fallback, FIXTURE_STATES.indexOf(state) >= 0);
+
+/* ── 原型演示控制 ─────────────────────────────────────────────────────────────── */
+var panel = document.getElementById('demo-panel');
+for(var i=0;i<STATES.length;i++){
+ var a = document.createElement('a');
+ a.href = '?debug=1&capture=1&state='+STATES[i] + (FIXTURE_STATES.indexOf(STATES[i])>=0 ? '&fixture=1' : '');
+ a.textContent = STATES[i];
+ if(STATES[i]===state) a.className='on';
+ panel.appendChild(a);
+}
+if(q.get('debug')==='1') document.documentElement.classList.add('debug');
+document.getElementById('demo-tab').addEventListener('click',function(){panel.classList.toggle('show')});
+
+function tick(){
+ /* 截图态用一个固定但正常的时间；`--:--` 会被读成「时钟坏了」，那是伪造的故障态。 */
+ if(CAPTURE){document.getElementById('clock').textContent='09:30';return}
+ var d=new Date();
+ document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+tick(); setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit(); addEventListener('resize',fit);
+</script>
+</body>
+</html>

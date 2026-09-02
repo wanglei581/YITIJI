@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模板 T1 · 编排型 ｜ 青序流光 v2</title>
+<link rel="stylesheet" href="../kiosk-tokens.css">
+<link rel="stylesheet" href="../kiosk-components.css">
+<style>html,body{margin:0}</style>
+</head>
+<body>
+<!--
+route: /（示例：首页、域首页）
+state: 本模板只示范 normal 编排结构；loading/empty/offline 由真实宿主按接口结果和 MOTION-SPEC 另行实现
+api: 登录用户快照来自内存会话 `{ id, phoneMasked, nickname }`；GET /api/v1/terminals/:id/printer-status → `{ isOnline, printerStatus, lastSeenAt }`（以实际响应为准）
+fallback: 设备状态接口失败 → 状态胶囊显示「状态未知」，不显示「设备正常」
+-->
+<div id="viewport">
+<main id="stage" data-screen="t1" data-state="normal" data-testid="t1-state-normal">
+  <header class="k-topbar">
+    <span class="title">职易达</span>
+    <span class="spacer"></span>
+    <span class="k-status-pill" data-tone=""><i class="dot"></i>状态未知</span>
+  </header>
+
+  <!-- 小青问句：每屏仅此一句 -->
+  <section class="k-xiaoqing">
+    <span class="core">青</span>
+    <div>
+      <p class="q">今天想办<em>哪件事</em>？</p>
+      <p class="hint">点下方入口，或直接对我说</p>
+    </div>
+  </section>
+
+  <div class="k-scroll">
+    <section class="k-sec">
+      <div class="k-sec-head"><span class="no">01</span><h2>办事入口</h2><span class="hint">按真实能力配置</span></div>
+      <a class="k-card k-entry" data-testid="t1-primary" href="../../../10-print-hub.html">
+        <span class="icon"><!-- lucide svg --></span>
+        <div class="txt"><p class="name">打印 / 扫描</p><p class="desc">查看本终端当前开放的文件来源与服务</p></div>
+      </a>
+      <!-- 更多入口卡：同一 .k-entry 组件，不复制样式 -->
+    </section>
+  </div>
+
+  <nav class="k-navbar" aria-label="主导航">
+    <a href="../../../01-home.html" aria-current="page">首页</a><a href="../../../05-ai-cockpit.html">问小青</a><a href="../../../30-my-profile.html">我的</a>
+  </nav>
+</main>
+</div>
+</body>
+</html>

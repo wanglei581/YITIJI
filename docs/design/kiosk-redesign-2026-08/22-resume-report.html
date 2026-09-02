@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>简历诊断报告 · 职易达</title>
+<!--
+  S25 · AI 简历诊断报告（青序流光，1080x1920 单 HTML 宿主）
+  route: /resume/report —— COVERAGE-MATRIX 064，本文件只承载这一条 route，不新建第二个页面。
+         React 宿主：apps/kiosk/src/pages/resume/ResumeReportPage.tsx
+
+  ── S25 返修的那一件事 ────────────────────────────────────────────────
+  S19 版本的 ready 态主视觉是六条分数条。分数只能回答「AI 给了几分」，回答不了
+  「它到底看见了我简历里的哪句话」。本轮把主内容换成**内容结构 + 问题证据**：
+
+    · 内容结构（seg=structure）—— 简历被切成七个内容块，每块摆出实际片段，
+      并标出这一块命中了几条问题、有几条原文证据。
+    · 问题与证据（seg=issues）—— 每条问题都写清：属于哪个诊断维度、严重度、
+      **它引用的那句原文**、这会让读的人怎么样、可以怎么改。
+    · 六维分数（seg=scores）—— 分数退回成一个分区，不再是整页的主角。
+    · 先改这几处（seg=priorities）/ 建议与风险（seg=advice）—— 服务端报告里
+      本来就有的三个数组，原样列出。
+
+  ── 每个数字的出处必须写在它旁边（provenance）───────────────────────
+  屏幕上每一处数据都带一个出处标记，三选一，不允许含糊：
+
+    合同    值逐字来自服务端 ResumeReport（sections/suggestions/riskNotes/priorities）。
+    本页算  由上面那些值机械推出（分档、比例条长度、计数），规则常驻写在页面上。
+    夹具    **服务端合同当前没有这个字段**，屏幕上的内容是本页合成样本。
+
+  「内容结构」和「问题证据」整片是 `夹具`：ResumeReport 里没有原文片段、没有问题
+  对象、没有证据引用。这一点不藏着 —— 每块都带 `夹具` 标记，分区底部还有一句
+  常驻说明。**不把缺字段说成后端返回**，也不把「字段还没有」写成页面的主视觉：
+  夹具标记是小徽章，内容本身才是主体。
+
+  ── 查询契约 ────────────────────────────────────────────────────────────
+    ?state=<下列 9 态之一>   no-context | loading | report | report-minimal |
+                             report-empty | read-error | diagnose-failed |
+                             unavailable | illegal
+    ?taskId=<x> / ?resumeId=<x>   严格 ^[A-Za-z0-9_-]{1,24}$
+    ?seg=structure|issues|scores|conclusions   报告主内容分区（不是独立 route）
+         rename（S19 → S25）：seg=priorities|suggestions|risks
+                            → seg=structure|issues|scores|conclusions
+                            （报告自带的三个数组合成「报告结论」一段，按报告顺序依次列出；
+                              新增「内容结构」「问题证据」两段，分数退成其中一段）
+    ?blk=basic|objective|education|experience|project|skill|selfintro
+                             内容结构里定位到某一块（仅 seg=structure 有效）
+    ?dim=basic|objective|experience|quantification|keyword|readability
+                             维度详情展开（仅 seg=scores 有效）
+    ?view=overview           报告内容总览浮层（同一份报告的六项分数 + 计数）
+    ?src=<下列 6 态之一>     上传原件预览层（只在报告态内有意义）
+                             pdf | image        —— 可渲染，进近全屏查看器
+                             docx               —— 不能内嵌预览，给可执行替代
+                             no-file | expired | render-failed —— 三种独立的预览失败
+    ?p / ?fit / ?z / ?rot   仅在 src=pdf|image 下有效：页码 1..N、page|width、
+                             1|1.5|2|3 倍、0|90|180|270（旋转只对 image 开放）
+    ?capture=1 / ?debug=1   夹具可达门 + 技术披露门；?flat=1 截图去动效
+    fail-closed（一律不回显 URL 原文）：
+      · 未登记的 state → illegal，并在 main 上标 data-fallback="1"
+      · 非法 taskId → 按「没有编号」处理（等价于没带），标 data-fallback="1"
+      · report / report-minimal / report-empty 是合成夹具，裸地址不可达 → 收敛为 no-context
+      · 未登记的 seg / dim / blk → 回默认值并标 data-fallback="1"
+      · dim 与非 scores 分区同现、blk 与非 structure 分区同现 → 丢弃该参数并标 fallback
+      · 未登记的 src、非报告态带 src、越界的 p / fit / z、对 pdf 用 rot、
+        没有 src 却带 p/fit/z/rot、src 与 view 同时出现 → 一律丢弃该参数并标 fallback；
+        src 与 view 同现时 src 优先（原件优先于总览，两层不叠加）
+
+  ── 真实合同（来源：代码，不是想象）────────────────────────────────────
+    读取     GET /resume/records/:taskId → ResumeParseResponse
+             （services/api/src/ai/ai.controller.ts:177；kiosk 侧 aiHttpAdapter.ts:215）
+             凭证：登录会员带 Authorization，匿名带一次性 accessToken，走
+             x-resume-access-token 请求头（aiHttpAdapter.ts:43，绝不进 URL query）。
+             **query 里的 taskId 不是授权**：越权 / 无 token / 错 token 一律
+             AI_TASK_NOT_FOUND（controller 注释 171-175）。本页只读，不写、不删、不导出。
+    taskId   来自 /resume/parse 成功后的 router state、?taskId 深链，或刷新后的
+             最小会话（aiResumeSession.ts 只存 taskId + accessToken，sessionStorage，
+             标签页关闭即清；待机 / 超时清场调 clearAiResumeSession）。三者都没有 → 没有报告。
+    报告     ResumeReport { sections[]、suggestions[]、riskNotes?[]、priorities?[] }
+             （packages/shared/src/types/ai.ts:72-79）
+             sections 固定 6 维，key 是跨端协议：basic / objective / experience /
+             quantification / keyword / readability（ai.ts:46-53）。
+             riskNotes 与 priorities 是 additive 可选字段：旧报告（无这两项）仍合法 ——
+             本页的 report-minimal 态就是这条分支。
+             **合同里没有的**：原文片段、问题对象、证据引用、内容结构、任何百分比。
+             所以本页的「内容结构」「问题与证据」整片标 `夹具`。
+    分数纪律 每一项直接显示服务端同一份报告里的 score/maxScore。
+             明确不做：**不求 6 项相加的总分**、不换算百分比 / 得分率、不排名、
+             不给匹配率，也不给录用 / 面试 / 通过概率。
+             档位（较强 / 中等 / 偏弱）与问题严重度（高 / 中 / 低）都只是同一个分数的
+             机械读法，分档规则常驻写在页面上，它们不是新结论。
+    建议归属 suggestions 是 string[]、priorities 是 {focus,reason}[]，**都没有维度字段**。
+             所以本页绝不把 `合同` 里的某条建议挂到某个维度名下 —— 那是合同里没有的结构。
+             问题卡片里那句「可以怎么改」属于夹具问题对象自己，标 `夹具`，
+             与 seg=advice 里逐条列出的 `合同` suggestions 分开显示。
+    演示模式 API_MODE !== 'http' 时 aiMockAdapter.getResumeRecord 直接 reject
+             （aiMockAdapter.ts:94「演示模式不提供简历诊断报告」），不会返回任何
+             「读过你简历」的结论。本页 unavailable 态对应这条真实分支。
+    失败分治 React 当前把「没有报告」「读取失败」合并成同一屏（ResumeReportPage.tsx
+             `!report || loadError`）。本设计把它拆成 no-context / read-error 两态，
+             把 success=false 单列 diagnose-failed，把「报告对象回来了但里面是空的」
+             单列 report-empty。这是**设计侧的建议拆分**：React 落地时需按错误码分流
+             才能到达对应态，在那之前不得声称 React 已经有这四屏。
+    打印     当前 React /resume/report **没有报告打印端点**（ai.controller.ts 只有
+             resume/generate/export，那是「生成的简历」不是「诊断报告」）。
+             因此内容总览里的「打印这份报告」是**受限按钮**：真 button + aria-disabled +
+             常驻原因，不做可执行的打印、下载或保存。
+    原件     ?src=* 是**预览这一次上传的原件**，和读报告是两条不同的凭证：
+             报告按 taskId 读，原件要另一份带时效的文件访问凭证（§11 临时签名 URL）。
+             所以「取不到原件」有它自己的三种结局 —— no-file / expired / render-failed，
+             三者都**不是**报告读取失败：报告已经在下面了，预览层关掉就能接着看。
+             这三屏都不判断原件是否还在服务端保留 —— 客户端看不到那件事。
+             docx 不做内嵌渲染：终端里没有 Office 排版引擎，硬渲染会改掉字体、
+             行距和分页，看到的就不是真正会打印出来的那一份，所以如实说不能预览。
+             静态原型里没有真实文件，原件一律是**合成占位页**，预览层内常驻标记。
+
+  ── AI 契约（DESIGN-SYSTEM §7.1 六项）──────────────────────────────────
+    ai-mode:        AI-DIRECT
+    ai-input:       本人已解析简历对应的那一份服务端报告；没有 taskId 就没有输入，
+                    本页不生成任何个性化结论。合成夹具只在 capture/debug 门内可达。
+    ai-consent:     授权发生在 /resume/source 的上传 / 扫描环节；本页不二次扩大授权。
+                    读取按凭证判本人：会员凭 Authorization，匿名凭一次性 accessToken，
+                    地址栏里的 taskId 不构成授权。
+    ai-output:      六维分数、修改优先级、可执行建议、表达风险提醒（`合同`），
+                    加上内容结构与问题证据（`夹具`）。可忽略、可回原文核对，
+                    不是录用结论，也不会发给任何企业。
+    ai-failure:     unavailable（能力未接通）、read-error（本次读取失败）、
+                    diagnose-failed（上一步解析中断）、report-empty（报告回来了但是空的）
+                    四者分开表达，不合并成「再试一次」。
+    ai-fallback:    人工核对清单零模型；AI 不可用不阻断查看原文、打印、扫描、看岗位、
+                    看招聘会和返回来源，diagnose-failed 屏一条 AI 结论都不给。
+    ai-persistence: 报告归属服务端 AI 记录（/me/ai-records）；本静态页不写入、不删除、
+                    不导出，也不写任何本机存储。会话只承载 taskId + 一次性令牌，
+                    待机 / 超时清场后本页回到「没有编号」。
+
+  ── 边界 ────────────────────────────────────────────────────────────────
+    静态设计原型。不接 React / API / 模型 / 打印 / 硬件，页内不发起任何请求、不写本机存储。
+    report / report-minimal / report-empty 全部为**合成排版数据**，不代表任何真实简历或
+    真实 AI 结果，页面上以常驻标记说明。静态原型不证明 React 接线、接口可用、模型可用、
+    生产数据或真机。本页无手机 H5、无二维码、无 phone 入口，S25 不新增。
+-->
+<style>
+:root{
+  --paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;
+  --deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;
+  --teal:#1f9e86;--teal2:#157a67;--soft:#e0f2ec;
+  --blue:#3f68b0;--bluesoft:#e6ecf7;
+  --wheat:#a9781f;--wheat2:#8a6219;--wheatsoft:#f3ecda;
+  --line:#e3ddcb;--line2:#d4cdb6;--bad:#b23a2e;--badsoft:#f6e4e1;
+  --dur-instant:120ms;--dur-quick:240ms;--dur-page:480ms;--ease-out:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);
+  font-family:"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;text-align:left}
+ol,ul{list-style:none}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden}
+#stage{width:1080px;height:1920px;position:relative;display:flex;flex-direction:column;overflow:hidden;
+  transform-origin:center center;
+  background:radial-gradient(880px 400px at 90% 2%,rgba(31,158,134,.075),transparent 62%),var(--paper)}
+
+/* ── 顶栏 104 ─────────────────────────────────────────────────────── */
+.topbar{flex:none;height:104px;padding:0 34px;display:flex;align-items:center;gap:20px;
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.back{width:64px;height:64px;flex:none;display:grid;place-items:center;border-radius:20px;
+  border:1px solid var(--line2);background:var(--paper)}
+.brand{flex:none;display:flex;align-items:center;gap:12px}
+.brand i{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;
+  background:var(--deep);color:var(--green);font-size:24px;font-weight:800;font-style:normal}
+.brand b{font-size:25px;font-weight:800;letter-spacing:1px}
+.sp{flex:1}
+.stepchip{flex:none;height:54px;padding:0 22px;border-radius:27px;display:flex;align-items:center;gap:10px;
+  background:var(--soft);border:1px solid #bfe3d7;color:var(--teal2);font-size:19px;font-weight:700}
+.stepchip .dot{width:11px;height:11px;border-radius:50%;background:var(--teal);flex:none}
+.clock{flex:none;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+/* ── 紧凑任务头（标题 + 状态 + 四步轨；不做巨型导语 banner） ───────── */
+.head{flex:none;margin:16px 36px 0;padding:18px 26px 16px;border-radius:26px;position:relative;overflow:hidden;
+  background:linear-gradient(148deg,var(--deep2),var(--deep) 74%);color:#f2efe4}
+.head::after{content:"";position:absolute;right:-130px;top:-140px;width:340px;height:340px;border-radius:50%;
+  background:radial-gradient(circle,rgba(46,230,168,.15),transparent 66%)}
+.head-row{display:flex;align-items:center;gap:20px;position:relative;z-index:1}
+.head-ic{flex:none;width:58px;height:58px;border-radius:19px;display:grid;place-items:center;
+  background:rgba(46,230,168,.12);border:1px solid rgba(46,230,168,.34);color:var(--green)}
+.head-tx{flex:1;min-width:0}
+.head-tx h1{font-size:29px;font-weight:800;line-height:1.3;letter-spacing:.4px}
+.head-tx p{margin-top:5px;font-size:19px;line-height:1.38;color:rgba(242,239,228,.76)}
+.head-tag{flex:none;height:46px;padding:0 20px;border-radius:23px;display:flex;align-items:center;
+  font-size:19px;font-weight:800;background:rgba(242,239,228,.14);border:1px solid rgba(242,239,228,.24)}
+.rail{margin-top:13px;padding-top:12px;border-top:1px solid rgba(242,239,228,.16);
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:relative;z-index:1}
+.rail>span{display:flex;align-items:center;gap:9px;font-size:17px;color:rgba(242,239,228,.55)}
+.rail>span i{width:27px;height:27px;flex:none;border-radius:50%;display:grid;place-items:center;font-style:normal;
+  font-size:15px;font-weight:800;background:rgba(242,239,228,.13);color:rgba(242,239,228,.6)}
+.rail>span.done{color:rgba(242,239,228,.72)}
+.rail>span.done i{background:rgba(46,230,168,.18);color:var(--green)}
+.rail>span.now{color:#f2efe4;font-weight:800}
+.rail>span.now i{background:var(--green);color:var(--deep)}
+
+/* ── 主体 ─────────────────────────────────────────────────────────── */
+.body{flex:1;min-height:0;margin:13px 36px 0;display:flex;flex-direction:column;gap:11px;position:relative}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:24px}
+.ch{display:flex;align-items:baseline;gap:14px}
+.ch b{font-size:25px;font-weight:800;line-height:1.34;letter-spacing:.3px}
+.ch span{margin-left:auto;font-size:17px;color:var(--ink3)}
+
+/* 合成夹具标记 + 两个同层入口（report 系列常驻，不可折叠） */
+.idbar{flex:none;height:78px;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px;
+  border-radius:22px;background:var(--wheatsoft);border:1px solid #e2d3ae}
+.idbar .fx{flex:none;height:40px;padding:0 14px;border-radius:12px;display:flex;align-items:center;gap:8px;
+  background:var(--wheat);color:#fff;font-size:17px;font-weight:800;letter-spacing:.5px}
+.idbar .fxtx{flex:1;min-width:0;font-size:17px;line-height:1.32;color:var(--wheat2);font-weight:700}
+.idbar .rid{flex:none;font-size:17px;color:var(--wheat2);font-variant-numeric:tabular-nums}
+.idbar .act{flex:none;height:56px;padding:0 16px;border-radius:16px;display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid #ddcaa2;color:var(--wheat2);font-size:18px;font-weight:800}
+.idbar button.act[aria-disabled="true"]{background:#efe7d4;border-style:dashed;color:#9d8c6a;cursor:not-allowed}
+
+/* 确定性计数条：每格一个数，数字旁边就是出处 */
+.cbar{flex:none;padding:11px 16px 10px}
+.cgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+.cc{min-height:74px;padding:7px 8px;border-radius:16px;background:#faf7ef;border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center}
+.cc u{font-size:16px;font-weight:700;color:var(--ink3);text-decoration:none;line-height:1.2}
+.cc b{font-size:27px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.cc[data-zero="1"]{border-style:dashed;color:var(--ink3)}
+.cc[data-zero="1"] b{color:var(--ink3)}
+.provlegend{margin-top:9px;font-size:16px;line-height:1.4;color:var(--ink3)}
+.provlegend b{font-weight:800;color:var(--ink2)}
+
+/* 出处徽章：合同 / 本页算 / 夹具 */
+.prov{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:8px;
+  font-size:14px;font-weight:800;letter-spacing:.4px;vertical-align:middle}
+.prov[data-p="contract"]{background:var(--soft);color:var(--teal2);border:1px solid #bfe3d7}
+.prov[data-p="derived"]{background:var(--bluesoft);color:var(--blue);border:1px solid #c6d3ea}
+.prov[data-p="fixture"]{background:var(--wheatsoft);color:var(--wheat2);border:1px solid #e2d3ae}
+
+/* 分区条（5 段） */
+.segs{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:6px;border-radius:20px;
+  background:#efeade;border:1px solid var(--line)}
+.seg{height:64px;border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:19px;font-weight:800;color:var(--ink2);transition:background var(--dur-instant) var(--ease-out)}
+.seg em{font-style:normal;font-size:15px;font-weight:700;color:var(--ink3)}
+.seg[aria-selected="true"]{background:var(--deep);color:#f2efe4}
+.seg[aria-selected="true"] em{color:var(--green)}
+.seg[aria-disabled="true"]{color:#a9b8b1}
+.seg[aria-disabled="true"] em{color:#a9b8b1}
+button.seg{width:100%;cursor:not-allowed}
+
+/* 主内容分区容器 */
+.zone{flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 22px 18px;
+  animation:segIn var(--dur-quick) var(--ease-out) both}
+@keyframes segIn{from{opacity:0;transform:translateY(8px)}}
+.zone .zh{flex:none;display:flex;align-items:center;gap:12px;margin-bottom:11px}
+.zone .zh b{font-size:24px;font-weight:800}
+.zone .zh .sp{flex:1}
+.zone .zh .mini{font-size:17px;color:var(--ink3);font-weight:700}
+.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  display:flex;flex-direction:column;gap:10px}
+.scroll::-webkit-scrollbar{display:none}
+.zfoot{flex:none;margin-top:10px;padding:11px 15px;border-radius:15px;background:#f3f7f4;border:1px solid #dfe9e3;
+  font-size:17px;line-height:1.44;color:var(--ink2)}
+.zfoot b{font-weight:800;color:var(--ink)}
+
+/* 内容结构：每块一张行卡（块名 + 实际片段 + 该块问题数 / 证据数） */
+.blk{flex:none;padding:12px 16px;border-radius:18px;background:#faf7ef;border:1px solid var(--line);
+  display:flex;gap:14px;align-items:flex-start}
+.blk[data-on="1"]{background:var(--soft);border-color:#bfe3d7}
+.blk .bno{flex:none;width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+  font-size:19px;font-weight:800;background:var(--surface);border:1px solid var(--line2);color:var(--teal2)}
+.blk .btx{flex:1;min-width:0}
+.blk .bhd{display:flex;align-items:center;gap:10px}
+.blk .bhd b{font-size:21px;font-weight:800}
+.blk .bhd .tag{height:26px;padding:0 9px;border-radius:8px;display:inline-flex;align-items:center;
+  font-size:15px;font-weight:800;background:var(--surface);border:1px solid var(--line2);color:var(--ink3)}
+.blk .bhd .tag[data-hit="1"]{background:var(--badsoft);border-color:#ecd5cf;color:var(--bad)}
+.blk .lines{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+.blk .lines span{font-size:18px;line-height:1.42;color:var(--ink2);display:block;
+  padding-left:26px;text-indent:-26px}
+.blk .lines span i{font-style:normal;display:inline-block;width:20px;color:var(--ink3);font-size:15px;font-weight:800}
+.blk .lines span[data-ev="1"]{color:var(--ink);font-weight:600}
+.blk .lines span[data-empty="1"]{color:var(--ink3)}
+
+/* 问题与证据：每条问题一张卡 */
+.iss{flex:none;padding:11px 15px;border-radius:18px;background:#faf7ef;border:1px solid var(--line)}
+.iss .ihd{display:flex;align-items:center;gap:10px}
+.iss .ihd .no{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+  font-size:18px;font-weight:800;background:var(--surface);border:1px solid var(--line2);color:var(--teal2)}
+.iss .ihd b{flex:1;min-width:0;font-size:21px;font-weight:800;line-height:1.3}
+.sev{flex:none;height:32px;padding:0 12px;border-radius:10px;display:inline-flex;align-items:center;gap:6px;
+  font-size:16px;font-weight:800}
+.sev[data-s="high"]{background:var(--badsoft);color:var(--bad);border:1px solid #ecd5cf}
+.sev[data-s="mid"]{background:var(--wheatsoft);color:var(--wheat2);border:1px solid #e2d3ae}
+.sev[data-s="low"]{background:var(--soft);color:var(--teal2);border:1px solid #bfe3d7}
+.iss .dimlink{flex:none;min-height:48px;padding:0 13px;border-radius:13px;display:inline-flex;align-items:center;gap:7px;
+  background:var(--surface);border:1px solid var(--line2);color:var(--ink2);font-size:16px;font-weight:800}
+.iss .evs{margin-top:7px;display:flex;flex-direction:column;gap:5px}
+.ev{display:block;padding:6px 12px 7px 13px;border-radius:12px;background:var(--surface);
+  border:1px solid var(--line);border-left:5px solid var(--line2)}
+.ev .evsrc{display:block;font-size:15px;font-weight:800;color:var(--ink3)}
+.ev .evtx{display:block;margin-top:1px;font-size:17px;line-height:1.38;color:var(--ink)}
+.iss .why2{margin-top:7px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.iss .why2 span{font-size:16px;line-height:1.38;color:var(--ink2);padding-left:44px;text-indent:-44px}
+.iss .why2 span u{text-decoration:none;font-weight:800;color:var(--ink3);margin-right:6px}
+
+/* 六维分项 */
+.dimlist{flex:none;display:grid;grid-auto-rows:62px;gap:8px}
+.dimmap{flex:1;min-height:0;margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-auto-rows:minmax(0,1fr);gap:9px}
+.dmc{padding:9px 12px;border-radius:15px;background:#faf7ef;border:1px solid var(--line);
+  display:flex;flex-direction:column;justify-content:center;gap:3px}
+.dmc b{font-size:18px;font-weight:800;line-height:1.24}
+.dmc span{font-size:16px;color:var(--ink3);font-weight:700}
+.dmc[data-hit="1"] span{color:var(--bad)}
+.dimissues{flex:1;min-height:0;margin-top:10px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
+  display:flex;flex-direction:column;gap:9px}
+.dimissues::-webkit-scrollbar{display:none}
+.dim{display:flex;align-items:center;gap:16px;padding:0 14px;border-radius:16px;width:100%;height:100%;
+  border:1px solid transparent;background:transparent;transition:background var(--dur-instant) var(--ease-out),border-color var(--dur-instant) var(--ease-out)}
+.dim .nm{flex:none;width:196px;font-size:21px;font-weight:700;color:var(--ink)}
+.dim .track{flex:1;min-width:0;height:22px;border-radius:11px;background:#ece7d8;overflow:hidden;position:relative}
+.dim .fill{position:absolute;inset:0;border-radius:11px;transform-origin:left center;
+  animation:barIn var(--dur-page) var(--ease-out) both}
+.dim .ticks{position:absolute;inset:0;display:grid;grid-template-columns:repeat(10,1fr)}
+.dim .ticks i{border-right:1px solid rgba(255,253,248,.85)}
+.dim .ticks i:last-child{border-right:0}
+.dim .tier{flex:none;width:62px;font-size:18px;font-weight:700;color:var(--ink2);text-align:right}
+.dim .sc{flex:none;width:92px;text-align:right;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.dim .sc u{text-decoration:none;font-size:17px;font-weight:700;color:var(--ink3)}
+.dim[data-tone="ok"] .fill{background:linear-gradient(90deg,var(--teal),#37c2a4)}
+.dim[data-tone="mid"] .fill{background:linear-gradient(90deg,var(--wheat),#c79433)}
+.dim[data-tone="low"] .fill{background:linear-gradient(90deg,var(--blue),#5b83c4)}
+.dim[aria-pressed="true"]{background:var(--soft);border-color:#bfe3d7}
+.dim[aria-pressed="true"] .nm{color:var(--teal2)}
+@keyframes barIn{from{transform:scaleX(0)}}
+.dd{flex:none;margin-top:9px;min-height:84px;padding:10px 16px;border-radius:18px;background:#faf7ef;
+  border:1px solid var(--line);display:flex;align-items:center;gap:16px}
+.dd .ddi{flex:none;width:52px;height:52px;border-radius:17px;display:grid;place-items:center;
+  background:var(--soft);color:var(--teal2)}
+.dd .ddt{flex:1;min-width:0}
+.dd .ddt b{display:block;font-size:21px;font-weight:800}
+.dd .ddt p{margin-top:4px;font-size:18px;line-height:1.4;color:var(--ink2)}
+.dd .dds{flex:none;width:118px;text-align:right}
+.dd .dds b{display:block;font-size:29px;font-weight:800;font-variant-numeric:tabular-nums}
+.dd .dds b u{text-decoration:none;font-size:19px;color:var(--ink3)}
+.dd .dds span{display:block;margin-top:3px;font-size:16px;color:var(--ink3)}
+.dd.hint .ddt p{color:var(--ink3)}
+
+/* 结论条目（priorities / suggestions / riskNotes） */
+.it{flex:none;display:flex;gap:14px;align-items:flex-start;padding:11px 16px;border-radius:17px;
+  background:#faf7ef;border:1px solid var(--line)}
+.scroll[data-fill="1"]>.it{flex:1 1 auto;min-height:74px;max-height:152px;align-items:center}
+.scroll[data-fill="1"]>.subh{flex:none}
+.it .no{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  font-size:18px;font-weight:800;background:var(--soft);color:var(--teal2)}
+.it .tx{flex:1;min-width:0}
+.it .tx b{display:block;font-size:21px;font-weight:800;line-height:1.32}
+.it .tx p{margin-top:4px;font-size:18px;line-height:1.44;color:var(--ink2)}
+.it[data-kind="risk"]{background:#fbf4f2;border-color:#ecd5cf}
+.it[data-kind="risk"] .no{background:var(--badsoft);color:var(--bad)}
+.it[data-kind="sug"] .no{background:var(--bluesoft);color:var(--blue)}
+.it[data-kind="sug"] .tx b,.it[data-kind="risk"] .tx b{font-size:20px;font-weight:600;line-height:1.44}
+.subh{flex:none;display:flex;align-items:center;gap:10px;padding:2px 2px 0;font-size:19px;font-weight:800;color:var(--ink2)}
+.subh span{margin-left:auto;font-size:16px;color:var(--ink3);font-weight:700}
+
+/* 非 report 态的说明块 / 出口行 / 清单 */
+.state-b{flex:none;padding:22px 26px}
+.state-b h2{font-size:27px;font-weight:800;line-height:1.34;letter-spacing:.3px}
+.state-b p{margin-top:10px;font-size:20px;line-height:1.52;color:var(--ink2)}
+.state-b p b{font-weight:800;color:var(--ink)}
+.exits{flex:1;min-height:0;display:flex;flex-direction:column;padding:18px 24px 20px}
+.exits .rows{flex:1;min-height:0;margin-top:14px;grid-auto-rows:minmax(0,1fr)}
+.rows{display:grid;gap:10px}
+.row{display:flex;align-items:center;gap:16px;min-height:88px;padding:0 18px;border-radius:18px;
+  background:#faf7ef;border:1px solid var(--line)}
+.row .ic{flex:none;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;
+  background:var(--soft);color:var(--teal2)}
+.row .tx{flex:1;min-width:0}
+.row .tx b{display:block;font-size:22px;font-weight:800}
+.row .tx span{display:block;margin-top:5px;font-size:18px;color:var(--ink2)}
+.row .go{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+  background:var(--paper);border:1px solid var(--line2);color:var(--ink3)}
+.row[aria-disabled="true"]{background:#f1eee5;border-style:dashed}
+.row[aria-disabled="true"] .ic{background:#e8e3d5;color:#a9b8b1}
+.row[aria-disabled="true"] .tx b{color:#8d9d96}
+.dnames{margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dn{display:flex;align-items:center;gap:11px;min-height:64px;padding:0 14px;border-radius:15px;
+  background:#faf7ef;border:1px solid var(--line);font-size:19px;font-weight:700;color:var(--ink2)}
+.dn i{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-style:normal;
+  font-size:16px;font-weight:800;background:var(--soft);color:var(--teal2)}
+.checks{flex:none;padding:18px 24px 20px;display:flex;flex-direction:column}
+.checks .list{margin-top:14px;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.checks .list>div{display:flex;align-items:center;gap:14px;min-height:74px;padding:0 16px;border-radius:16px;
+  background:#faf7ef;border:1px solid var(--line);font-size:19px;line-height:1.36}
+.checks .list>div i{flex:none;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  font-style:normal;font-size:17px;font-weight:800;background:var(--soft);color:var(--teal2)}
+
+/* 原因行 + 主操作条 */
+.why{flex:none;margin:11px 36px 0;font-size:17px;line-height:1.42;color:var(--ink2)}
+.why:empty{display:none}
+.cta{flex:none;margin:12px 36px 0;display:flex;gap:14px}
+.btn{flex:1;height:92px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:11px;
+  font-size:25px;font-weight:800;background:var(--surface);border:1px solid var(--line2);color:var(--ink)}
+.btn.primary{background:var(--deep);border-color:var(--deep);color:#f2efe4;flex:1.35}
+.btn[aria-disabled="true"]{background:#eceadf;border-color:var(--line);color:#96a49d;cursor:not-allowed}
+button.btn{width:100%}
+button.row{width:100%;cursor:not-allowed}
+.press{transition:transform var(--dur-instant) var(--ease-out)}
+.press:active{transform:scale(.98)}
+
+/* 真话条 + 底栏 */
+.truth{flex:none;height:50px;margin-top:10px;padding:0 36px;display:flex;align-items:center;gap:11px;
+  font-size:17px;color:var(--ink3)}
+.truth i{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-style:normal;
+  font-size:15px;font-weight:800;background:#e6e1d2;color:var(--ink3)}
+.navbar{flex:none;height:118px;display:grid;grid-template-columns:repeat(3,1fr);
+  background:var(--surface);border-top:1px solid var(--line)}
+.navbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  font-size:18px;color:var(--ink3)}
+.navbar a svg{width:32px;height:32px}
+.navbar a.on{color:var(--teal2);font-weight:800}
+
+/* 内容总览浮层（只看内容；不生成、不保存、不打印） */
+.ov{position:absolute;inset:0;z-index:30;display:none}
+.ov.on{display:block}
+/* 原件预览是近全屏的阅读层，但不盖住底部导航：一体机上那三个入口是随时可退的出口，
+   被浮层压住等于把人关在预览里。留出导航条高度（118px）后，适应宽度与适应整页
+   才真的算出两个不同的倍率 —— 竖屏里 A4 不再是宽度先到边。 */
+.ov[data-kind="source"]{bottom:118px}
+.pv{position:absolute;inset:0;background:rgba(11,36,30,.55);display:flex;
+  align-items:center;justify-content:center;padding:0 36px;animation:pvIn var(--dur-quick) var(--ease-out) both}
+@keyframes pvIn{from{opacity:0}}
+.pv-box{width:100%;max-height:1300px;display:flex;flex-direction:column;border-radius:26px;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line2)}
+.pv-hd{flex:none;padding:20px 24px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--line)}
+.pv-hd b{font-size:25px;font-weight:800}
+.pv-hd .cl{margin-left:auto;height:56px;padding:0 22px;border-radius:18px;display:flex;align-items:center;gap:9px;
+  background:var(--paper);border:1px solid var(--line2);font-size:20px;font-weight:800}
+.pv-warn{flex:none;margin:16px 24px 0;padding:14px 18px;border-radius:16px;background:var(--wheatsoft);
+  border:1px solid #e2d3ae;color:var(--wheat2);font-size:18px;line-height:1.46;font-weight:700}
+.pv-sheet{flex:1;min-height:0;margin:14px 24px 0;border-radius:18px;border:1px solid var(--line);
+  background:#fff;padding:22px 26px;display:flex;flex-direction:column;gap:13px}
+.pv-sheet .sh-t{font-size:24px;font-weight:800}
+.pv-sheet .sh-m{font-size:17px;color:var(--ink3)}
+.pv-sheet .sh-g{flex:1;min-height:0;display:grid;grid-template-rows:repeat(6,minmax(0,1fr));gap:9px}
+.pv-sheet .sh-r{display:flex;align-items:center;gap:14px;font-size:18px}
+.pv-sheet .sh-r span:first-child{flex:none;width:200px;color:var(--ink2)}
+.pv-sheet .sh-r .b{flex:1;height:14px;border-radius:7px;background:#ece7d8;overflow:hidden;position:relative}
+.pv-sheet .sh-r .b u{position:absolute;inset:0;text-decoration:none;background:var(--teal);
+  transform-origin:left center}
+.pv-sheet .sh-r span:last-child{flex:none;width:76px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.pv-sheet .sh-f{flex:none;font-size:17px;line-height:1.5;color:var(--ink2);border-top:1px dashed var(--line);padding-top:11px}
+.pv-sheet .sh-c{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pv-sheet .sh-c span{min-height:64px;padding:0 14px;border-radius:14px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;background:#faf7ef;border:1px solid var(--line);font-size:18px}
+.pv-sheet .sh-c span b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.pv-sheet .sh-c span[data-has="0"]{color:var(--ink3);border-style:dashed}
+/* 受限的打印入口：真 button + aria-disabled + 常驻原因，不做可执行打印 */
+.pv-act{flex:none;margin:14px 24px 20px;display:flex;align-items:center;gap:16px}
+.pv-act .dead{flex:none;min-width:280px;min-height:76px;padding:0 22px;border-radius:20px;border:1px dashed var(--line2);
+  background:var(--paper);color:#6f7a72;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;font-size:21px;font-weight:800;cursor:not-allowed}
+.pv-act .dead small{font-size:16px;font-weight:700}
+.pv-act .reason{flex:1;min-width:0;font-size:17px;line-height:1.45;color:var(--ink3);font-weight:700}
+
+/* ══ 上传原件预览：近全屏查看器（报告仍在这一层下面，上下文不丢） ══════════ */
+.sv{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper);
+  animation:pvIn var(--dur-quick) var(--ease-out) both}
+.sv-hd{flex:none;height:104px;padding:0 24px;display:flex;align-items:center;gap:16px;
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.sv-hd .ti{flex:none;width:56px;height:56px;border-radius:18px;display:grid;place-items:center;
+  background:var(--soft);color:var(--teal2)}
+.sv-hd .tt{min-width:0}
+.sv-hd .tt b{display:block;font-size:25px;font-weight:800;line-height:1.3}
+.sv-hd .tt span{display:block;margin-top:3px;font-size:17px;color:var(--ink3)}
+.sv-fx{flex:none;height:46px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:8px;
+  background:var(--wheatsoft);border:1px solid #e2d3ae;color:var(--wheat2);font-size:17px;font-weight:800}
+.sv-cl{flex:none;margin-left:auto;height:64px;padding:0 24px;border-radius:20px;display:flex;align-items:center;
+  gap:10px;background:var(--deep);color:#f2efe4;font-size:21px;font-weight:800}
+.sv-tb{flex:none;background:var(--surface);border-bottom:1px solid var(--line)}
+.sv-tr{height:84px;padding:0 24px;display:flex;align-items:center;gap:12px}
+.sv-tr+.sv-tr{border-top:1px solid var(--line)}
+.sv-tr .sp2{flex:1}
+.tbtn{height:60px;min-width:60px;padding:0 20px;border-radius:18px;display:flex;align-items:center;
+  justify-content:center;gap:9px;font-size:20px;font-weight:800;background:var(--paper);
+  border:1px solid var(--line2);color:var(--ink)}
+.tbtn[aria-pressed="true"]{background:var(--deep);border-color:var(--deep);color:#f2efe4}
+.tbtn[aria-disabled="true"]{background:#eceadf;border-color:var(--line);color:#9aa8a1}
+button.tbtn{cursor:not-allowed}
+.tread{flex:none;height:60px;padding:0 18px;border-radius:18px;display:flex;align-items:center;
+  background:var(--soft);border:1px solid #bfe3d7;color:var(--teal2);font-size:20px;font-weight:800;
+  font-variant-numeric:tabular-nums}
+.sv-view{flex:1;min-height:0;position:relative}
+.sv-canvas{position:absolute;inset:0;overflow:auto;background:#16352c;
+  touch-action:pan-x pan-y;overscroll-behavior:contain;scrollbar-width:none}
+.sv-canvas::-webkit-scrollbar{display:none}
+.sv-pad{min-width:100%;min-height:100%;display:flex;padding:26px}
+.sv-doc{margin:auto;flex:none;position:relative}
+.sv-sheet{position:absolute;left:50%;top:50%;background:#fff;overflow:hidden}
+.sv-sheet .photo{position:absolute;inset:0;background:#b8b2a2}
+.sv-sheet .paper{position:absolute;background:#fff;box-shadow:0 6px 26px rgba(0,0,0,.22);overflow:hidden}
+/* 合成示例简历的整页版面。以前这里是一堆灰色条，翻到第几页都只是深浅不同的线，
+   既看不出内容，也没法拿它核对报告里那几条问题。现在按 A4 自然尺寸（1000×1414）
+   排成三页真的能读的示例简历，内容与报告夹具（STRUCT / ISSUES）同源：
+   邮箱确实是空的、求职意向确实只写了一句愿望、职责句确实停在「负责什么」。
+   每页自带水印和页脚，单独截一张图也不会被当成用户的真实文件。 */
+.sv-sheet .pg{position:absolute;inset:0;padding:74px 76px 0;box-sizing:border-box;
+  color:#1d2a26;font-size:25px;line-height:1.72;text-align:left;font-weight:500}
+.sv-sheet .pg .nm{display:flex;align-items:baseline;gap:16px}
+.sv-sheet .pg .nm b{font-size:48px;font-weight:800;letter-spacing:3px;line-height:1.1}
+.sv-sheet .pg .nm i{font-style:normal;font-size:25px;font-weight:700;color:#5c6b65}
+.sv-sheet .pg .ct{margin-top:12px;font-size:23px;color:#4a5a55}
+.sv-sheet .pg .hr{margin:18px 0 0;height:3px;background:#1d2a26}
+.sv-sheet .pg h3{margin:30px 0 4px;font-size:30px;font-weight:800;letter-spacing:1px;
+  padding-left:13px;border-left:8px solid #2b6b5c;line-height:1.3}
+.sv-sheet .pg .ln{display:flex;gap:14px;align-items:baseline;margin-top:16px}
+.sv-sheet .pg .ln b{font-size:26px;font-weight:800}
+.sv-sheet .pg .ln u{margin-left:auto;text-decoration:none;font-size:22px;color:#5c6b65;white-space:nowrap}
+.sv-sheet .pg p{margin:8px 0 0}
+.sv-sheet .pg .li{margin-top:10px;padding-left:26px;position:relative}
+.sv-sheet .pg .li::before{content:"·";position:absolute;left:7px;font-weight:800}
+.sv-sheet .pg .ft{position:absolute;left:76px;right:76px;bottom:40px;display:flex;
+  align-items:center;gap:12px;padding-top:12px;border-top:1px solid #c9d2ce;
+  font-size:19px;color:#7b8a85}
+.sv-sheet .pg .ft b{font-weight:800;color:#2b6b5c}
+.sv-sheet .pg .ft u{margin-left:auto;text-decoration:none;font-variant-numeric:tabular-nums}
+.sv-sheet .wm{position:absolute;left:-10%;right:-10%;top:41%;text-align:center;
+  font-size:86px;font-weight:800;letter-spacing:18px;color:rgba(43,107,92,.13);
+  transform:rotate(-21deg);pointer-events:none;white-space:nowrap}
+.sv-doc .cm{position:absolute;width:36px;height:36px;border:0 solid rgba(46,230,168,.92);display:block}
+.sv-doc .cm[data-corner="tl"]{left:0;top:0;border-left-width:5px;border-top-width:5px}
+.sv-doc .cm[data-corner="tr"]{right:0;top:0;border-right-width:5px;border-top-width:5px}
+.sv-doc .cm[data-corner="bl"]{left:0;bottom:0;border-left-width:5px;border-bottom-width:5px}
+.sv-doc .cm[data-corner="br"]{right:0;bottom:0;border-right-width:5px;border-bottom-width:5px}
+.sv-rail{position:absolute;pointer-events:none}
+.sv-rail.x{left:26px;right:26px;bottom:10px;height:7px}
+.sv-rail.y{top:26px;bottom:26px;right:10px;width:7px}
+.sv-rail u{position:absolute;display:block;border-radius:4px;background:rgba(242,239,228,.6);text-decoration:none}
+.sv-rail.x u{top:0;height:7px}
+.sv-rail.y u{left:0;width:7px}
+.sv-ft{flex:none;height:96px;padding:0 24px;display:flex;align-items:center;gap:16px;
+  background:var(--surface);border-top:1px solid var(--line)}
+.sv-ft .ccip{flex:none;height:44px;padding:0 16px;border-radius:14px;display:flex;align-items:center;
+  background:var(--soft);color:var(--teal2);font-size:18px;font-weight:800}
+.sv-ft .cctx{flex:1;min-width:0;font-size:19px;line-height:1.4;color:var(--ink2)}
+.sv-ft .cctx b{font-weight:800;color:var(--ink)}
+.sv-ft .ccsc{flex:none;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+.sv-ft .ccsc u{text-decoration:none;font-size:18px;color:var(--ink3)}
+
+.sv-notice{max-height:1240px}
+.sv-notice .nh{flex:none;padding:22px 24px 0;display:flex;align-items:center;gap:16px}
+.sv-notice .nh .ni{flex:none;width:64px;height:64px;border-radius:20px;display:grid;place-items:center;
+  background:var(--badsoft);color:var(--bad)}
+.sv-notice .nh b{flex:1;min-width:0;font-size:26px;font-weight:800;line-height:1.32}
+.sv-notice .nwhy{flex:none;margin:14px 24px 0;padding:16px 18px;border-radius:16px;background:#faf7ef;
+  border:1px solid var(--line);font-size:19px;line-height:1.5;color:var(--ink2)}
+.sv-notice .nrows{flex:1;min-height:0;margin:14px 24px 0;display:grid;gap:10px;grid-auto-rows:minmax(0,1fr)}
+.sv-notice .nkeep{flex:none;margin:14px 24px 22px;padding:14px 18px;border-radius:16px;background:#f3f7f4;
+  border:1px solid #dfe9e3;font-size:18px;line-height:1.46;color:var(--ink2)}
+.sv-notice .nkeep b{font-weight:800;color:var(--ink)}
+
+/* 原型演示控制（不属于产品逻辑） */
+.proto-tab{position:absolute;right:0;top:392px;z-index:40;width:56px;height:96px;border-radius:18px 0 0 18px;
+  background:var(--deep);color:var(--green);font-size:17px;font-weight:800;writing-mode:vertical-rl;
+  letter-spacing:3px;display:none;align-items:center;justify-content:center}
+.proto-panel{position:absolute;right:0;top:392px;z-index:41;width:400px;padding:16px;border-radius:18px 0 0 18px;
+  background:var(--deep);color:#f2efe4;display:none;flex-direction:column;gap:6px;max-height:1080px;overflow:auto}
+.proto-panel b{font-size:17px;color:var(--green);letter-spacing:1px}
+.proto-panel a{min-height:48px;display:flex;align-items:center;padding:0 14px;border-radius:12px;
+  background:rgba(242,239,228,.1);font-size:17px}
+html.proto .proto-tab{display:flex}
+html.proto.proto-open .proto-panel{display:flex}
+html.proto.proto-open .proto-tab{display:none}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after{animation:none!important;transition:none!important}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+  <header class="topbar">
+    <a class="back press" id="back" href="21-resume-triage.html" data-route="/resume/source" data-testid="resume-report-back" aria-label="返回简历来源">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </a>
+    <span class="brand"><i class="serif">职</i><b>职易达</b></span>
+    <span class="sp"></span>
+    <span class="stepchip" id="stepchip"><span class="dot" aria-hidden="true"></span><span id="stepchip-tx">第 3 步 / 共 4 步 · 诊断报告</span></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="head">
+    <div class="head-row">
+      <span class="head-ic" aria-hidden="true">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M8.5 13h7M8.5 17h4.5"/></svg>
+      </span>
+      <span class="head-tx"><h1 id="hd-title">简历诊断报告</h1><p id="hd-sub">需要一份已完成解析的本人简历，才会有报告。</p></span>
+      <span class="head-tag" id="hd-tag">无报告</span>
+    </div>
+    <div class="rail" id="rail" aria-label="简历服务四步"></div>
+  </section>
+
+  <main class="body" id="body-root" data-screen="resume-report" data-route="/resume/report" data-state="no-context" data-testid="resume-report-state-no-context"></main>
+
+  <p class="why" id="why"></p>
+  <div class="cta" id="cta" data-testid="resume-report-cta"></div>
+
+  <p class="truth" data-disclaimer="true" data-testid="resume-report-truth"><i aria-hidden="true">i</i><span id="truth-tx"></span></p>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a href="01-home.html" data-route="/" data-testid="resume-report-nav-home" aria-label="回到首页">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>首页</span></a>
+    <a href="05-ai-cockpit.html" data-route="/assistant" data-testid="resume-report-nav-advisor" aria-label="AI 顾问">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span>AI 顾问</span></a>
+    <a href="30-my-profile.html" data-route="/profile" data-testid="resume-report-nav-profile" aria-label="我的">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span>我的</span></a>
+  </nav>
+
+  <div class="ov" id="overlay"></div>
+
+  <button type="button" class="proto-tab" id="proto-tab" data-proto-control="1" aria-label="打开原型演示控制">演示控制</button>
+  <div class="proto-panel" id="proto-panel" data-proto-control="1" aria-label="原型演示控制（不属于产品逻辑）">
+    <b>原型演示控制 · 非产品逻辑</b>
+    <a href="22-resume-report.html?debug=1&amp;state=no-context">no-context 没有编号</a>
+    <a href="22-resume-report.html?debug=1&amp;state=loading&amp;taskId=RPT-2026-0830-A">loading 读取中</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A">report 内容结构</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=issues">report 问题与证据</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=scores">report 六维分数</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;seg=conclusions">report 报告结论</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report">report（无编号 · 优化入口应关闭）</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report-minimal&amp;taskId=RPT-2026-0830-A">report-minimal 旧报告降级</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report-empty&amp;taskId=RPT-2026-0830-A">report-empty 空报告</a>
+    <a href="22-resume-report.html?debug=1&amp;state=read-error&amp;taskId=RPT-2026-0830-A">read-error 读取失败</a>
+    <a href="22-resume-report.html?debug=1&amp;state=diagnose-failed">diagnose-failed 解析中断</a>
+    <a href="22-resume-report.html?debug=1&amp;state=unavailable">unavailable 能力未接通</a>
+    <a href="22-resume-report.html?debug=1&amp;state=illegal">illegal 参数不合法</a>
+    <b>上传原件预览（六种结局）</b>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=pdf">src=pdf 三页 PDF</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=pdf&amp;z=2">src=pdf 放大 2 倍（可拖动）</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=image">src=image 图片（可旋转）</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=image&amp;fit=width">src=image 适应宽度</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=docx">src=docx 不能内嵌预览</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=no-file">src=no-file 没有文件凭证</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=expired">src=expired 链接过期</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;src=render-failed">src=render-failed 渲染失败</a>
+    <a href="22-resume-report.html?debug=1&amp;state=report&amp;taskId=RPT-2026-0830-A&amp;view=overview">view=overview 内容总览</a>
+  </div>
+
+</div>
+</div>
+<script>
+(function () {
+'use strict';
+
+/* ════════ 1. 参数解析：未登记值一律 fail-closed，不猜、不回显 ════════ */
+var q = new URLSearchParams(location.search);
+var CAPTURE = q.get('capture') === '1';
+var DEBUG   = q.get('debug') === '1';
+var TECH    = CAPTURE || DEBUG;                 /* 技术披露门：端点/DTO/文件名只在这里出现 */
+if (q.get('flat') === '1' || CAPTURE) document.documentElement.setAttribute('data-flat', '1');
+if (DEBUG) document.documentElement.classList.add('proto');
+
+var SCREEN = 'resume-report';
+var SELF   = '22-resume-report.html';
+var STATES = ['no-context','loading','report','report-minimal','report-empty','read-error','diagnose-failed','unavailable','illegal'];
+var FIXTURE_STATES = ['report','report-minimal','report-empty'];   /* 合成夹具：裸地址不可达 */
+
+var fallback = false;
+var wanted   = q.get('state');
+var state    = wanted === null ? 'no-context' : (STATES.indexOf(wanted) < 0 ? (fallback = true, 'illegal') : wanted);
+
+/* 编号只接受严格字符集。不合法 == 没带（都读不到报告），并标 fallback；绝不回显 URL 原文。
+   注意：编号本身不是授权 —— 真实链路按会员 token 或匿名一次性令牌判本人，
+   地址栏里带一个编号并不能读到别人的报告。 */
+var rawRid   = q.get('taskId') || q.get('resumeId');
+var RID      = rawRid && /^[A-Za-z0-9_-]{1,24}$/.test(rawRid) ? rawRid : null;
+var ridBad   = !!rawRid && !RID;
+if (ridBad) fallback = true;
+
+if (FIXTURE_STATES.indexOf(state) >= 0 && !TECH) { state = 'no-context'; fallback = true; }
+if (FIXTURE_STATES.indexOf(state) >= 0 && ridBad) { state = 'no-context'; }
+if (state === 'loading' && !RID) { state = 'no-context'; fallback = true; }
+
+/* 主内容分区（S25：五段。S19 的 priorities|suggestions|risks 已合并/改名） */
+var SEGS = ['structure','issues','scores','conclusions'];
+var rawSeg = q.get('seg');
+var seg = rawSeg === null ? 'structure' : (SEGS.indexOf(rawSeg) < 0 ? (fallback = true, 'structure') : rawSeg);
+
+var DIM_KEYS = ['basic','objective','experience','quantification','keyword','readability'];
+var rawDim = q.get('dim');
+var dim = rawDim === null ? null : (DIM_KEYS.indexOf(rawDim) < 0 ? (fallback = true, null) : rawDim);
+/* dim 只在六维分区里有意义；没带 seg 时自然落到 scores，显式指定别的分区就丢弃。 */
+if (dim && rawSeg === null) seg = 'scores';
+else if (dim && seg !== 'scores') { dim = null; fallback = true; }
+
+var BLK_KEYS = ['basic','objective','education','experience','project','skill','selfintro'];
+var rawBlk = q.get('blk');
+var blk = rawBlk === null ? null : (BLK_KEYS.indexOf(rawBlk) < 0 ? (fallback = true, null) : rawBlk);
+if (blk && rawSeg === null) seg = 'structure';
+else if (blk && seg !== 'structure') { blk = null; fallback = true; }
+
+var rawView = q.get('view');
+var view = rawView === null ? null : (rawView === 'overview' ? 'overview' : (fallback = true, null));
+
+/* ── 上传原件预览层的参数 ────────────────────────────────────────── */
+var SRC_MODES  = ['pdf','image','docx','no-file','expired','render-failed'];
+var SRC_FILE = {
+  pdf:   { kind:'PDF',   pages:3, w:1000, h:1414, rotatable:false, meta:'PDF · 共 3 页 · A4 竖版' },
+  image: { kind:'图片',  pages:1, w:1000, h:1778, rotatable:true,  meta:'图片 · 单页 · 手机拍摄比例' }
+};
+var ZOOMS = ['1','1.5','2','3'];
+var ROTS  = ['0','90','180','270'];
+
+var rawSrc = q.get('src');
+var srcMode = rawSrc === null ? null : (SRC_MODES.indexOf(rawSrc) < 0 ? (fallback = true, null) : rawSrc);
+if (srcMode && FIXTURE_STATES.indexOf(state) < 0) { srcMode = null; fallback = true; }
+if (srcMode && state === 'report-empty') { srcMode = null; fallback = true; }
+if (srcMode && !RID) { srcMode = null; fallback = true; }
+if (srcMode && view) { view = null; fallback = true; }
+
+var srcFile = srcMode ? (SRC_FILE[srcMode] || null) : null;
+var pageNo = 1, fitMode = 'page', zoomLv = '1', rotDeg = '0';
+var rawPage = q.get('p'), rawFit = q.get('fit'), rawZoom = q.get('z'), rawRot = q.get('rot');
+if (srcFile) {
+  if (rawPage !== null) {
+    var n = /^[0-9]{1,3}$/.test(rawPage) ? Number(rawPage) : 0;
+    if (n >= 1 && n <= srcFile.pages) pageNo = n; else fallback = true;
+  }
+  if (rawFit !== null) { if (rawFit === 'page' || rawFit === 'width') fitMode = rawFit; else fallback = true; }
+  if (rawZoom !== null) { if (ZOOMS.indexOf(rawZoom) >= 0) zoomLv = rawZoom; else fallback = true; }
+  if (rawRot !== null) {
+    if (srcFile.rotatable && ROTS.indexOf(rawRot) >= 0) rotDeg = rawRot; else fallback = true;
+  }
+} else if (rawPage !== null || rawFit !== null || rawZoom !== null || rawRot !== null) {
+  fallback = true;
+}
+
+var stage = document.getElementById('stage');
+var body  = document.getElementById('body-root');
+var overlay = document.getElementById('overlay');
+var cta   = document.getElementById('cta');
+var why   = document.getElementById('why');
+var hdTitle = document.getElementById('hd-title');
+var hdSub = document.getElementById('hd-sub');
+var hdTag = document.getElementById('hd-tag');
+var stepTx = document.getElementById('stepchip-tx');
+var truthTx = document.getElementById('truth-tx');
+var railEl = document.getElementById('rail');
+
+var RAIL = ['上传与方向','AI 解析','诊断报告','优化打印'];
+function rail(nowIndex){
+  var out = '';
+  for (var i = 0; i < RAIL.length; i++) {
+    var cls = i < nowIndex ? 'done' : (i === nowIndex ? 'now' : '');
+    out += '<span'+(cls?' class="'+cls+'"':'')+'><i>'+(i+1)+'</i>'+RAIL[i]+'</span>';
+  }
+  railEl.innerHTML = out;
+}
+
+function fit(){ var k = Math.min(innerWidth/1080, innerHeight/1920);
+  if ('zoom' in stage.style) stage.style.zoom = k; else stage.style.transform = 'scale(' + k + ')'; }
+addEventListener('resize', fit); fit();
+
+var clock = document.getElementById('clock');
+if (CAPTURE) clock.textContent = '09:30';
+else { var tick = function(){ var d=new Date(), h=d.getHours(), m=d.getMinutes();
+  clock.textContent = (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }; tick(); setInterval(tick, 10000); }
+
+/* ════════ 2. 内联图标（零外部资源） ════════ */
+var P = {
+  upload:'<path d="M12 16.5V4.5"/><path d="M7.5 9L12 4.5 16.5 9"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
+  folder:'<path d="M3.5 6.5h6l2 2.5h9v10a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19z"/>',
+  refresh:'<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4.5h-4.5"/>',
+  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.6c-.6.2-.8.7-.8 1.3v.4M12 16.6v.2"/>',
+  print:'<path d="M7 8.5V3.5h10v5"/><rect x="4" y="8.5" width="16" height="7.5" rx="2"/><path d="M7 13.5h10V21H7z"/>',
+  scan:'<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M4 12h16"/>',
+  brief:'<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5v2"/>',
+  cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/>',
+  doc:'<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M8.5 13h7M8.5 17h4.5"/>',
+  spark:'<path d="M12 3.5l1.9 4.9 4.9 1.9-4.9 1.9L12 17.1l-1.9-4.9L5.2 10.3l4.9-1.9z"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  go:'<path d="M9 6l6 6-6 6"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.2"/>',
+  prev:'<path d="M15 5l-7 7 7 7"/>',
+  next:'<path d="M9 5l7 7-7 7"/>',
+  fitpage:'<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8 7.5h8M8 12h8M8 16.5h5"/>',
+  fitwidth:'<path d="M3 8.5v7M21 8.5v7"/><path d="M3 12h18"/><path d="M7 8.5L3.5 12 7 15.5M17 8.5l3.5 3.5-3.5 3.5"/>',
+  zoomin:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5M11 8.5v5"/>',
+  zoomout:'<circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5M8.5 11h5"/>',
+  rotate:'<path d="M20 11.5a8 8 0 1 1-2.4-5.7"/><path d="M20 3.5V8h-4.5"/>',
+  image:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.7"/><path d="M4.5 17l4.5-4.5 3.5 3.5 3-2.5 4 3.5"/>',
+  broken:'<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5z"/><path d="M14 2.5v5h5"/><path d="M9.5 12l5 5M14.5 12l-5 5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6.8V12l3.4 2.2"/>',
+  slash:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  quote:'<path d="M9.5 6.5C7 8 5.5 10.2 5.5 13v4.5h5V13h-3c0-2 1-3.6 2.8-4.7z"/><path d="M18 6.5c-2.5 1.5-4 3.7-4 6.5v4.5h5V13h-3c0-2 1-3.6 2.8-4.7z"/>',
+  list:'<path d="M8 6.5h12M8 12h12M8 17.5h12"/><path d="M4 6.5h.01M4 12h.01M4 17.5h.01"/>'
+};
+function ic(n, s, w){ return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(P[n]||'')+'</svg>'; }
+var GO = '<span class="go" aria-hidden="true">'+ic('go',22,2.3)+'</span>';
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function withRid(file, extra){
+  var p = [];
+  if (RID) p.push('taskId=' + encodeURIComponent(RID));
+  if (extra) p.push(extra);
+  return p.length ? file + '?' + p.join('&') : file;
+}
+/* 本页内部跳转：所有页内状态都写进地址，刷新后能回到同一屏，每次交互都能被外部逐条验证。 */
+function selfURL(over){
+  over = over || {};
+  var has = function(k){ return Object.prototype.hasOwnProperty.call(over, k); };
+  var pick = function(k, cur){ return has(k) ? over[k] : cur; };
+  var out = ['state=' + state], v;
+  var sg = pick('seg', seg);
+  if (sg) out.push('seg=' + sg);
+  v = pick('dim', dim);      if (v && sg === 'scores') out.push('dim=' + v);
+  v = pick('blk', blk);      if (v && sg === 'structure') out.push('blk=' + v);
+  var s = pick('src', srcMode);
+  if (s) {
+    out.push('src=' + s);
+    var f = SRC_FILE[s];
+    if (f) {
+      var pg = pick('p', pageNo);    if (pg && f.pages > 1 && pg !== 1) out.push('p=' + pg);
+      var ft = pick('fit', fitMode); if (ft && ft !== 'page') out.push('fit=' + ft);
+      var zm = pick('z', zoomLv);    if (zm && zm !== '1') out.push('z=' + zm);
+      var rt = pick('rot', rotDeg);  if (rt && rt !== '0' && f.rotatable) out.push('rot=' + rt);
+    }
+  }
+  v = pick('view', view);    if (v && !s) out.push('view=' + v);
+  if (RID) out.push('taskId=' + encodeURIComponent(RID));
+  if (DEBUG) out.push('debug=1');
+  if (CAPTURE) out.push('capture=1');
+  if (q.get('flat') === '1') out.push('flat=1');
+  return SELF + '?' + out.join('&amp;');
+}
+function closeURL(){ return selfURL({ src:null, view:null, p:null, fit:null, z:null, rot:null }); }
+
+function rowLink(href, icon, title, desc, tid, route){
+  return '<a class="row press" href="'+esc(href)+'"'+(route?' data-route="'+esc(route)+'"':'')+' data-testid="'+tid+'">'
+    + '<span class="ic">'+ic(icon,26)+'</span>'
+    + '<span class="tx"><b>'+title+'</b><span>'+desc+'</span></span>'+GO+'</a>';
+}
+function rowDead(icon, title, desc, tid, reason){
+  return '<button type="button" class="row" aria-disabled="true" data-testid="'+tid+'" aria-label="'+esc(title+'（'+reason+'）')+'">'
+    + '<span class="ic">'+ic(icon,26)+'</span>'
+    + '<span class="tx"><b>'+title+'</b><span>'+desc+'</span></span></button>';
+}
+function btn(href, label, primary, tid, route){
+  return '<a class="btn press'+(primary?' primary':'')+'" href="'+esc(href)+'"'+(route?' data-route="'+esc(route)+'"':'')+' data-testid="'+tid+'">'+label+'</a>';
+}
+function btnDead(label, tid){
+  return '<button type="button" class="btn" aria-disabled="true" data-testid="'+tid+'" aria-describedby="'+SCREEN+'-why">'+label+'</button>';
+}
+/* 出处徽章：合同 / 本页算 / 夹具 —— 每一处数据都必须挂一个 */
+var PROV_LABEL = { contract:'合同', derived:'本页算', fixture:'夹具' };
+function prov(kind, owner){
+  /* owner 是这颗徽章挂在谁身上。同一种出处一屏会出现好几次，testid 必须按挂载点唯一 ——
+     否则测试和读屏都会指到第一颗上去。 */
+  return '<span class="prov" data-p="'+kind+'" data-testid="'+SCREEN+'-prov-'+owner+'">'+PROV_LABEL[kind]+'</span>';
+}
+
+/* ════════ 3. 合成夹具 ════════
+   排版用的合成数据，不代表任何真实简历或真实 AI 结果 —— 页面上以常驻标记说明。
+   六个 key 与 packages/shared RESUME_SCORING_DIMENSIONS 逐字对应，顺序一致。 */
+var FIXTURE = {
+  sections: [
+    { key:'basic',          label:'基础信息完整度', score:8, maxScore:10 },
+    { key:'objective',      label:'求职目标清晰度', score:6, maxScore:10 },
+    { key:'experience',     label:'经历表达清晰度', score:5, maxScore:10 },
+    { key:'quantification', label:'成果量化程度',   score:3, maxScore:10 },
+    { key:'keyword',        label:'岗位关键词覆盖', score:6, maxScore:10 },
+    { key:'readability',    label:'版式与可读性',   score:8, maxScore:10 }
+  ],
+  priorities: [
+    { focus:'职责后面补一句结果',   reason:'现在多数条目停在「负责什么」，看的人要自己猜你做成了什么。' },
+    { focus:'把求职目标写在最前面', reason:'开头没有一句明确的岗位方向，前半屏的指向就散了。' },
+    { focus:'能写数字的地方写数字', reason:'规模、频次、周期这类可核实的信息，比形容词更容易被看懂。' },
+    { focus:'统一技能的写法',       reason:'工具名称和熟练程度分开写，读的人要来回对照两处。' }
+  ],
+  suggestions: [
+    '每段经历用「做了什么 → 怎么做 → 结果如何」三句收住，不要只写岗位职责。',
+    '开头一句写清目标岗位与方向，让第一屏就能看出你想去哪儿。',
+    '技能按「工具名称 + 熟练程度」成对写，不要只写「熟练办公软件」。',
+    '同一段经历里时间、地点、职务的写法保持一致，避免中英文与格式混排。',
+    '通读一遍删掉与目标岗位无关的段落，把版面让给最想被看到的两段。'
+  ],
+  riskNotes: [
+    '「精通」「资深」这类程度词如果没有具体例子支撑，建议换成你实际做过的事。',
+    '简历里出现多套联系方式时，读的人不知道该联系哪一个，建议只留一套。',
+    '与目标岗位无关的个人信息可以不写，公共终端上尤其不建议留身份证号一类信息。',
+    '经历之间存在时间空档时，与其留白，不如用一行如实说明那段时间在做什么。'
+  ]
+};
+
+/* ── 内容结构（夹具）──────────────────────────────────────────────
+   ResumeReport 里没有原文片段字段，所以这一片整块标 `夹具`。
+   片段全部是合成样本：姓名写成「某某」、手机号是不存在的示例号段并默认遮挡、
+   公司与学校写成「示例/XX」，不含任何真实个人信息。 */
+var STRUCT = [
+  { key:'basic', name:'基础信息', lines:[
+      '某某（合成示例姓名） · 求职者',
+      '手机 138****0000（公共终端默认遮挡）',
+      '邮箱：这一行在原文里是空的' ] },
+  { key:'objective', name:'求职目标', lines:[
+      '希望找一份稳定的工作，用户运营或者社群运营都可以。' ] },
+  { key:'education', name:'教育经历', lines:[
+      'XX 大学 市场营销 本科 2019.09-2023.06' ] },
+  { key:'experience', name:'工作经历', lines:[
+      '示例科技（合成公司名） · 运营专员 · 2023.07-2025.08',
+      '负责社群运营，维护用户关系，日常维护 3 个用户社群共 1200 人。',
+      '配合市场部完成活动落地，参与内容排期。' ] },
+  { key:'project', name:'项目经历', lines:[
+      '社群月活跃提升项目 · 主要参与人',
+      '梳理入群路径并调整活动节奏，月活跃用户从 600 增至 780。',
+      '另一个内容排期项目，原文只写了「参与」，没写做了什么。' ] },
+  { key:'skill', name:'技能', lines:[
+      '熟练使用 Office 办公软件',
+      'Excel 会用数据透视表和 VLOOKUP，PPT 做过路演材料' ] },
+  { key:'selfintro', name:'自我评价', lines:[
+      '本人性格开朗，工作认真负责，交接文档一直是我在整理和更新。' ] }
+];
+
+/* ── 问题与证据（夹具）────────────────────────────────────────────
+   dim 是 `合同` 里那六个 key 之一；严重度由该维 score/maxScore 机械分档（`本页算`）；
+   evidence 逐条指向上面某一块的某一行 —— 引用的是那一行的原文，不是另写一句。 */
+var ISSUES = [
+  { id:'I1', dim:'basic', title:'邮箱一栏是空的',
+    ev:[['basic',2]],
+    impact:'只留一个联系方式时，对方换一种方式联系不到你。',
+    fixIt:'把常用邮箱补在手机号后面，两个都留。' },
+  { id:'I2', dim:'objective', title:'求职目标写成了愿望，没有岗位方向',
+    ev:[['objective',0]],
+    impact:'第一屏看不出你想去哪个岗位，后面的经历就没有对照的标准。',
+    fixIt:'开头改成一句「求职方向：用户运营 / 社群运营」。' },
+  { id:'I3', dim:'experience', title:'职责句停在「负责什么」，没有交代结果',
+    ev:[['experience',1],['experience',2]],
+    impact:'读的人只知道你被安排做什么，不知道你做成了什么。',
+    fixIt:'每条后面补一句结果，把「负责」换成你实际做到的动作。' },
+  { id:'I4', dim:'quantification', title:'两段项目里只有一段写了可核实的数字',
+    ev:[['project',1],['project',2]],
+    impact:'没有数字的那一段，读的人无法判断规模，也无从比较。',
+    fixIt:'第二段补上你自己核对过的规模或频次；核不到就如实写做法。' },
+  { id:'I5', dim:'keyword', title:'技能写成了程度词，工具名和熟练度分在两行',
+    ev:[['skill',0],['skill',1]],
+    impact:'「熟练使用」这类词没有信息量，读的人要往下翻才知道你会什么。',
+    fixIt:'合并成「Excel：数据透视表、VLOOKUP；PPT：路演材料」这种写法。' },
+  { id:'I6', dim:'readability', title:'同一段里的分隔符与格式不统一',
+    ev:[['education',0]],
+    impact:'同类信息写法不一致时，视线要在同一行里来回找边界。',
+    fixIt:'统一成「学校 · 专业 · 学历 · 起止时间」的分隔写法。' }
+];
+
+/* 维度的静态定义：描述「这一项在看什么」，不是对任何人简历的判断。 */
+var DIM_ABOUT = {
+  basic:          '看姓名、联系方式、求职意向是否齐全好找。',
+  objective:      '看有没有写明目标岗位，全篇是否围绕它。',
+  experience:     '看每段经历有没有交代做法与结果。',
+  quantification: '看成果有没有用可核实的数字说明。',
+  keyword:        '看用词与目标岗位的常见表述是否对得上。',
+  readability:    '看分区、留白与长度是否便于快速阅读。'
+};
+var DIM_LABEL = {};
+for (var di = 0; di < FIXTURE.sections.length; di++) DIM_LABEL[FIXTURE.sections[di].key] = FIXTURE.sections[di].label;
+
+/* 档位与严重度：同一个分数的两种粗略读法，规则常驻写在页面上；
+   不是新结论、不是排名、不是概率。 */
+function tierOf(score, max){
+  var ratio = max > 0 ? score / max : 0;
+  if (ratio >= 0.8) return { word:'较强', tone:'ok' };
+  if (ratio >= 0.5) return { word:'中等', tone:'mid' };
+  return { word:'偏弱', tone:'low' };
+}
+function sevOf(dimKey){
+  var s = null, i;
+  for (i = 0; i < FIXTURE.sections.length; i++) if (FIXTURE.sections[i].key === dimKey) s = FIXTURE.sections[i];
+  var ratio = s && s.maxScore > 0 ? s.score / s.maxScore : 0;
+  if (ratio < 0.5)  return { key:'high', word:'严重度 高' };
+  if (ratio < 0.8)  return { key:'mid',  word:'严重度 中' };
+  return { key:'low', word:'严重度 低' };
+}
+var TIER_RULE = '档位与严重度都由同一个分数机械分档：八成及以上（较强／低），一半到八成（中等／中），不足一半（偏弱／高）。它们不是新结论，也不是排名或通过率。';
+
+/* 量化表达命中：只数「工作经历」「项目经历」两块正文里的阿拉伯数字串。
+   规则写在屏幕上，任何人都能照着数一遍；它是计数，不是评分。 */
+var QUANT_BLOCKS = ['experience','project'];
+function quantHits(){
+  var out = [], i, j, b, m;
+  for (i = 0; i < STRUCT.length; i++) {
+    b = STRUCT[i];
+    if (QUANT_BLOCKS.indexOf(b.key) < 0) continue;
+    for (j = 1; j < b.lines.length; j++) {          /* 第 1 行是抬头，不计正文 */
+      m = String(b.lines[j]).match(/\d+(?:[.．]\d+)*/g) || [];
+      for (var k = 0; k < m.length; k++) out.push({ block:b.key, line:j, text:m[k] });
+    }
+  }
+  return out;
+}
+function evidenceCount(){ var n = 0, i; for (i = 0; i < ISSUES.length; i++) n += ISSUES[i].ev.length; return n; }
+function issuesOfBlock(key){
+  var out = [], i, j;
+  for (i = 0; i < ISSUES.length; i++) for (j = 0; j < ISSUES[i].ev.length; j++)
+    if (ISSUES[i].ev[j][0] === key && out.indexOf(ISSUES[i]) < 0) out.push(ISSUES[i]);
+  return out;
+}
+function evOfBlock(key){
+  var n = 0, i, j;
+  for (i = 0; i < ISSUES.length; i++) for (j = 0; j < ISSUES[i].ev.length; j++)
+    if (ISSUES[i].ev[j][0] === key) n++;
+  return n;
+}
+function lineOf(bkey, idx){
+  for (var i = 0; i < STRUCT.length; i++) if (STRUCT[i].key === bkey) return STRUCT[i].lines[idx];
+  return '';
+}
+function blockName(bkey){
+  for (var i = 0; i < STRUCT.length; i++) if (STRUCT[i].key === bkey) return STRUCT[i].name;
+  return bkey;
+}
+function evLines(bkey){
+  var set = {}, i, j;
+  for (i = 0; i < ISSUES.length; i++) for (j = 0; j < ISSUES[i].ev.length; j++)
+    if (ISSUES[i].ev[j][0] === bkey) set[ISSUES[i].ev[j][1]] = 1;
+  return set;
+}
+
+/* ════════ 4. 人工核对清单：零模型的产品文案，纸质简历同样适用 ════════ */
+var CHECKS = [
+  '姓名、手机号、邮箱在第一屏就能看到',
+  '每段经历都写了起止时间',
+  '职责后面跟着结果，不只写「负责什么」',
+  '技能写清工具名称和熟练程度',
+  '通读一遍，没有错别字和断行',
+  '控制在一到两页，导出后再看一次排版'
+];
+function dimNames(){
+  var s = '<section class="card state-b" style="padding-bottom:18px"><div class="ch"><b>报告会给你这六项</b>'
+    + '<span>固定角度 · 没有报告时这里不会有分数</span></div><div class="dnames">';
+  for (var i = 0; i < FIXTURE.sections.length; i++) {
+    s += '<span class="dn"><i>'+(i+1)+'</i>'+FIXTURE.sections[i].label+'</span>';
+  }
+  return s + '</div></section>';
+}
+function checklist(title, hint){
+  var s = '<section class="card checks" data-testid="'+SCREEN+'-fallback"><div class="ch"><b>'+title+'</b><span>'+hint+'</span></div>'
+    + '<div class="list" data-testid="'+SCREEN+'-list">';
+  for (var i = 0; i < CHECKS.length; i++) s += '<div><i>'+(i+1)+'</i><span>'+CHECKS[i]+'</span></div>';
+  return s + '</div></section>';
+}
+
+/* ════════ 5. report 系列 ════════ */
+function idbar(hasBody){
+  var rid = RID ? '编号 ' + esc(RID) : '本次进入没有带编号';
+  var acts;
+  if (!hasBody) {
+    acts = '<button type="button" class="act" aria-disabled="true" data-testid="'+SCREEN+'-overview-open"'
+      + ' aria-label="内容总览（这份报告里没有内容）">'+ic('eye',22)+'内容总览</button>'
+      + '<button type="button" class="act" aria-disabled="true" data-testid="'+SCREEN+'-source-open"'
+      + ' aria-label="查看上传原件（这份报告是空的，先重新诊断）">'+ic('doc',22)+'查看上传原件</button>';
+  } else {
+    acts = '<a class="act press" href="'+selfURL({ view:'overview', src:null })+'" data-route="/resume/report"'
+      + ' data-testid="'+SCREEN+'-overview-open">'+ic('eye',22)+'内容总览</a>' + srcEntry();
+  }
+  return '<section class="idbar" data-testid="'+SCREEN+'-fixture">'
+    + '<span class="fx">合成演示</span>'
+    + '<span class="fxtx">合成数据，不是任何人的真实简历，也不是真实 AI 结果。</span>'
+    + '<span class="rid" data-testid="'+SCREEN+'-rid">'+rid+'</span>'
+    + acts + '</section>';
+}
+
+/* 「查看上传原件」：取不取得到原件由服务端说了算，客户端点之前并不知道 —— 有编号时不预先置灰。
+   没有编号是另一回事：那是客户端此刻就能确定的，于是和「继续优化」同样如实关掉。 */
+function srcEntry(){
+  if (!RID) {
+    return '<button type="button" class="act" aria-disabled="true" data-testid="'+SCREEN+'-source-open"'
+      + ' aria-describedby="'+SCREEN+'-why" aria-label="查看上传原件（这份报告没有编号，取不到对应的原件）">'
+      + ic('doc',22)+'查看上传原件</button>';
+  }
+  return '<a class="act press" href="'+selfURL({ src:'pdf', view:null, p:null, fit:null, z:null, rot:null })+'"'
+    + ' data-route="/resume/report" data-testid="'+SCREEN+'-source-open" aria-label="查看上传原件，边看原件边核对诊断">'
+    + ic('doc',22)+'查看上传原件</a>';
+}
+
+/* 确定性计数条：六格，每格一个数 + 出处。数字全部可以照着页面上的规则数一遍。 */
+function countBar(report, hasBody){
+  var q1 = hasBody ? quantHits().length : 0;
+  var cells = [
+    ['内容块',      hasBody ? STRUCT.length : 0,      'fixture'],
+    ['问题',        hasBody ? ISSUES.length : 0,      'fixture'],
+    ['原文证据',    hasBody ? evidenceCount() : 0,    'fixture'],
+    ['量化命中',    q1,                                'derived'],
+    ['评分维度',    report.sections.length,            'contract'],
+    ['结论条目',    (report.priorities ? report.priorities.length : 0)
+                  + report.suggestions.length
+                  + (report.riskNotes ? report.riskNotes.length : 0), 'contract']
+  ];
+  var s = '<section class="card cbar" data-testid="'+SCREEN+'-counts"><div class="cgrid">';
+  for (var i = 0; i < cells.length; i++) {
+    s += '<span class="cc" data-count-key="'+['blocks','issues','evidence','quant','dims','conclusions'][i]+'"'
+      + ' data-count="'+cells[i][1]+'" data-zero="'+(cells[i][1]?0:1)+'" data-prov="'+cells[i][2]+'">'
+      + '<u>'+cells[i][0]+' '+prov(cells[i][2], ['blocks','issues','evidence','quant','dims','conclusions'][i])+'</u><b>'+cells[i][1]+'</b></span>';
+  }
+  return s + '</div><p class="provlegend" data-testid="'+SCREEN+'-prov-legend">'
+    + '<b>合同</b>＝服务端报告里就有；<b>本页算</b>＝由报告或原文机械数出（量化命中＝工作／项目经历里除首行抬头外的正文，其中阿拉伯数字串的条数）；'
+    + '<b>夹具</b>＝服务端合同当前没有这个字段，屏幕上的内容是本页合成样本。</p></section>';
+}
+
+function segTab(key, label, count, enabled){
+  var over = { seg:key, src:null, view:null };
+  if (key !== 'scores') over.dim = null;
+  if (key !== 'structure') over.blk = null;
+  var href = selfURL(over);
+  var sel = seg === key;
+  if (!enabled) {
+    return '<button type="button" class="seg" role="tab" aria-selected="false" aria-disabled="true" data-testid="'+SCREEN+'-seg-'+key+'"'
+      + ' aria-label="'+esc(label+'（这份报告没有这一项）')+'">'+label+'<em>无</em></button>';
+  }
+  return '<a class="seg press" role="tab" href="'+href+'" data-route="/resume/report" aria-selected="'+(sel?'true':'false')+'" data-testid="'+SCREEN+'-seg-'+key+'">'
+    + label+'<em>'+count+'</em></a>';
+}
+
+function segsBar(report, hasBody){
+  var hasP = !!(report.priorities && report.priorities.length);
+  var hasR = !!(report.riskNotes && report.riskNotes.length);
+  var conclN = (hasP ? report.priorities.length : 0) + report.suggestions.length + (hasR ? report.riskNotes.length : 0);
+  return '<div class="segs" role="tablist" aria-label="报告主内容分区" data-testid="'+SCREEN+'-segs">'
+    + segTab('structure',   '内容结构', hasBody ? STRUCT.length : 0, hasBody)
+    + segTab('issues',      '问题证据', hasBody ? ISSUES.length : 0, hasBody)
+    + segTab('scores',      '六维分数', report.sections.length, report.sections.length > 0)
+    + segTab('conclusions', '报告结论', conclN, conclN > 0)
+    + '</div>';
+}
+
+/* ── 分区一：内容结构 ─────────────────────────────────────────── */
+function zoneStructure(){
+  var s = '<section class="card zone" data-testid="'+SCREEN+'-zone" data-zone="structure">'
+    + '<div class="zh"><b>简历被读成了这七块</b><span class="sp"></span>'
+    + '<span class="mini">共 '+STRUCT.length+' 块 · 命中 '+ISSUES.length+' 条问题 '+prov('fixture','structure-head')+'</span></div>'
+    + '<div class="scroll" data-clip="1" data-testid="'+SCREEN+'-list" data-list="structure">';
+  for (var i = 0; i < STRUCT.length; i++) {
+    var b = STRUCT[i], hit = issuesOfBlock(b.key).length, evc = evOfBlock(b.key), marks = evLines(b.key);
+    var on = blk === b.key ? '1' : '0';
+    s += '<div class="blk" data-on="'+on+'" data-block="'+b.key+'" data-issues="'+hit+'" data-evidence="'+evc+'"'
+      + ' data-testid="'+SCREEN+'-block-'+b.key+'">'
+      + '<span class="bno">'+(i+1)+'</span><span class="btx">'
+      + '<span class="bhd"><b>'+b.name+'</b>'
+      + '<span class="tag" data-hit="'+(hit?1:0)+'">'+(hit ? '命中 '+hit+' 条问题 · '+evc+' 条证据' : '本块没有命中问题')+'</span>'
+      + '</span><span class="lines">';
+    for (var j = 0; j < b.lines.length; j++) {
+      var isEv = marks[j] ? '1' : '0';
+      var empty = /原文里是空的|只写了/.test(b.lines[j]) ? '1' : '0';
+      s += '<span data-ev="'+isEv+'" data-empty="'+empty+'"><i>'+(j+1)+'</i>'+esc(b.lines[j])+'</span>';
+    }
+    s += '</span></span></div>';
+  }
+  return s + '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
+    + '这一块的<b>内容结构与原文片段是本页合成样本</b>：服务端报告里目前没有「原文片段」这个字段，'
+    + '接真之前不会有你自己的原文出现在这里。被问题引用过的那几行用深色标出，共 '+evidenceCount()+' 处。</p></section>';
+}
+
+/* 一条问题的完整卡片：类型（维度）· 严重度 · 引用的原文 · 影响 · 改法。
+   两个分区共用同一段渲染，屏幕上不会出现两种长得不一样的「同一条问题」。 */
+function issueCard(it, i){
+  var sv = sevOf(it.dim), ev = '', j;
+  for (j = 0; j < it.ev.length; j++) {
+    var bk = it.ev[j][0], ln = it.ev[j][1];
+    ev += '<span class="ev"><span class="evsrc">'+blockName(bk)+' 第 '+(ln+1)+' 行原文</span>'
+      + '<span class="evtx">'+esc(lineOf(bk, ln))+'</span></span>';
+  }
+  return '<div class="iss" data-issue="'+it.id+'" data-dim="'+it.dim+'" data-sev="'+sv.key+'"'
+    + ' data-evidence="'+it.ev.length+'" data-testid="'+SCREEN+'-issue-'+it.id+'">'
+    + '<div class="ihd"><span class="no">'+(i+1)+'</span><b>'+it.title+'</b>'
+    + '<span class="sev" data-s="'+sv.key+'">'+sv.word+'</span>'
+    + '<a class="dimlink press" href="'+selfURL({ seg:'scores', dim:it.dim, blk:null, src:null, view:null })+'"'
+    + ' data-route="/resume/report" data-testid="'+SCREEN+'-issue-dim-'+it.id+'"'
+    + ' aria-label="'+esc('看 '+DIM_LABEL[it.dim]+' 这一维的分数')+'">'+DIM_LABEL[it.dim]+'</a></div>'
+    + '<div class="evs" data-testid="'+SCREEN+'-evidence-'+it.id+'">'+ev+'</div>'
+    + '<div class="why2"><span><u>影响</u>'+it.impact+'</span><span><u>可以怎么改</u>'+it.fixIt+'</span></div>'
+    + '</div>';
+}
+
+/* ── 分区二：问题与证据 ───────────────────────────────────────── */
+function zoneIssues(){
+  var cnt = { high:0, mid:0, low:0 }, i;
+  for (i = 0; i < ISSUES.length; i++) cnt[sevOf(ISSUES[i].dim).key]++;
+  var s = '<section class="card zone" data-testid="'+SCREEN+'-zone" data-zone="issues"'
+    + ' data-sev-high="'+cnt.high+'" data-sev-mid="'+cnt.mid+'" data-sev-low="'+cnt.low+'">'
+    + '<div class="zh"><b>每条问题都指到原文那一句</b><span class="sp"></span>'
+    + '<span class="mini">高 '+cnt.high+' · 中 '+cnt.mid+' · 低 '+cnt.low+' '+prov('derived','issues-head')+'</span></div>'
+    + '<div class="scroll" data-clip="1" data-testid="'+SCREEN+'-list" data-list="issues">';
+  for (i = 0; i < ISSUES.length; i++) s += issueCard(ISSUES[i], i);
+  return s + '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
+    + '问题所属的<b>维度名来自服务端报告里那六个固定维度</b>；<b>严重度由该维分数机械分档</b>（不足一半＝高）；'
+    + '标题、引用的原文、影响与改法是本页合成样本 —— 服务端报告里没有问题对象，也没有证据引用。'
+    + '「可以怎么改」属于这条合成问题自己，和「建议风险」分区里那几条服务端建议是两回事。</p></section>';
+}
+
+/* ── 分区三：六维分数 ─────────────────────────────────────────── */
+function zoneScores(sections){
+  var s = '<section class="card zone" data-testid="'+SCREEN+'-zone" data-zone="scores">'
+    + '<div class="zh"><b>六个维度各自的分数</b><span class="sp"></span>'
+    + '<span class="mini">点任意一项看它在看什么 '+prov('contract','scores-head')+'</span></div>'
+    + '<div class="dimlist" data-testid="'+SCREEN+'-dimensions" role="group" aria-label="六个诊断维度">';
+  for (var i = 0; i < sections.length; i++) {
+    var d = sections[i], t = tierOf(d.score, d.maxScore);
+    var on = dim === d.key;
+    var href = selfURL({ seg:'scores', dim: d.key, blk:null, src:null, view:null });
+    s += '<a class="dim press" href="'+href+'" data-route="/resume/report" role="button" aria-pressed="'+(on?'true':'false')+'"'
+      + ' data-dim="'+d.key+'" data-score="'+d.score+'" data-max="'+d.maxScore+'" data-tone="'+t.tone+'"'
+      + ' data-testid="'+SCREEN+'-dim-'+d.key+'" aria-label="'+esc(d.label+'：'+d.score+'分，满分'+d.maxScore+'分，'+t.word)+'">'
+      + '<span class="nm">'+d.label+'</span>'
+      + '<span class="track"><span class="fill" style="transform:scaleX('+(d.maxScore>0?(d.score/d.maxScore):0)+');animation-delay:'+(i*60)+'ms"></span>'
+      + '<span class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span>'
+      + '<span class="tier">'+t.word+'</span>'
+      + '<span class="sc">'+d.score+'<u>/'+d.maxScore+'</u></span></a>';
+  }
+  s += '</div>' + dimDetail(sections) + dimBelow(sections);
+  return s + '<p class="zfoot" data-testid="'+SCREEN+'-tier-note">'+TIER_RULE
+    + ' 六项各自成立，本页<b>不求和、不换算比例、不排名</b>。</p></section>';
+}
+
+/* 分数下面接的是「这一维在问题里对应哪几条」——把分数和证据接上，
+   而不是把六条分数条拉高去填满整屏（那种空高度是假的信息密度）。 */
+function dimBelow(sections){
+  var i, j;
+  if (dim) {
+    var mine = [];
+    for (j = 0; j < ISSUES.length; j++) if (ISSUES[j].dim === dim) mine.push(ISSUES[j]);
+    if (!mine.length) {
+      return '<div class="dimmap" data-testid="'+SCREEN+'-dim-issues" data-count="0" style="grid-template-columns:1fr">'
+        + '<span class="dmc"><b>这一维没有对应的问题条目</b>'
+        + '<span>分数偏低不等于一定有问题条目；问题清单是本页合成样本，不是服务端字段。</span></span></div>';
+    }
+    var h = '<div class="dimissues" data-clip="1" data-testid="'+SCREEN+'-dim-issues" data-count="'+mine.length+'">';
+    for (j = 0; j < mine.length; j++) h += issueCard(mine[j], j);
+    return h + '</div>';
+  }
+  var out = '<div class="dimmap" data-testid="'+SCREEN+'-dim-map">';
+  for (i = 0; i < sections.length; i++) {
+    var k = sections[i].key, n = 0, e = 0;
+    for (j = 0; j < ISSUES.length; j++) if (ISSUES[j].dim === k) { n++; e += ISSUES[j].ev.length; }
+    out += '<span class="dmc" data-dim="'+k+'" data-issues="'+n+'" data-hit="'+(n?1:0)+'">'
+      + '<b>'+sections[i].label+'</b><span>'+(n ? '命中 '+n+' 条问题 · '+e+' 条证据' : '没有对应问题')+'</span></span>';
+  }
+  return out + '</div>';
+}
+
+function dimDetail(sections){
+  if (!dim) {
+    return '<div class="dd hint" data-testid="'+SCREEN+'-dim-detail" data-dim-selected="none">'
+      + '<span class="ddi" aria-hidden="true">'+ic('info',24)+'</span>'
+      + '<span class="ddt"><b>点上面任意一项，看它在看什么</b>'
+      + '<p>六项各自打分、互不换算，只描述这份简历的表达。</p></span></div>';
+  }
+  var d = null;
+  for (var i = 0; i < sections.length; i++) if (sections[i].key === dim) d = sections[i];
+  var t = tierOf(d.score, d.maxScore), sv = sevOf(d.key);
+  var mine = [], j;
+  for (j = 0; j < ISSUES.length; j++) if (ISSUES[j].dim === d.key) mine.push(ISSUES[j]);
+  return '<div class="dd" data-testid="'+SCREEN+'-dim-detail" data-dim-selected="'+d.key+'" data-dim-issues="'+mine.length+'">'
+    + '<span class="ddi" aria-hidden="true">'+ic('doc',24)+'</span>'
+    + '<span class="ddt"><b>'+d.label+'</b><p>'+DIM_ABOUT[d.key]
+    + (mine.length ? ' 本维在「问题证据」里对应 '+mine.length+' 条（'+sv.word+'）。' : ' 本维在「问题证据」里没有对应条目。')
+    + '</p></span>'
+    + '<span class="dds"><b>'+d.score+'<u> / '+d.maxScore+'</u></b><span>本项 '+t.word+'</span></span></div>';
+}
+
+/* ── 分区四：报告自带的三个数组（先改这几处 / 可执行建议 / 表达风险）───────
+   它们是同一份报告的三个字段，按报告给的顺序依次列出。分成两段展示只会各自留半屏空白，
+   也让人以为它们是两类不同的结论 —— 其实是同一份报告的三栏。 */
+function zoneConclusions(report){
+  var hasP = !!(report.priorities && report.priorities.length);
+  var hasR = !!(report.riskNotes && report.riskNotes.length);
+  var i, n = (hasP ? report.priorities.length : 0) + report.suggestions.length + (hasR ? report.riskNotes.length : 0);
+  var s = '<section class="card zone" data-testid="'+SCREEN+'-zone" data-zone="conclusions">'
+    + '<div class="zh"><b>报告自己给的三栏结论</b><span class="sp"></span>'
+    + '<span class="mini">先改 '+(hasP?report.priorities.length:0)+' · 建议 '+report.suggestions.length
+    + ' · 风险 '+(hasR?report.riskNotes.length:0)+' '+prov('contract','conclusions-head')+'</span></div>'
+    + '<div class="scroll" data-clip="1" data-fill="1" data-testid="'+SCREEN+'-list" data-list="conclusions" data-count="'+n+'">';
+  if (hasP) {
+    s += '<div class="subh">先改这几处<span>'+report.priorities.length+' 条 · 报告自带'+(TECH?' · priorities':'')+'</span></div>';
+    for (i = 0; i < report.priorities.length; i++) {
+      s += '<div class="it" data-kind="pri"><span class="no">'+(i+1)+'</span><span class="tx"><b>'
+        + esc(report.priorities[i].focus)+'</b><p>'+esc(report.priorities[i].reason)+'</p></span></div>';
+    }
+  }
+  s += '<div class="subh">可执行建议<span>'+report.suggestions.length+' 条 · 报告自带'+(TECH?' · suggestions':'')+'</span></div>';
+  for (i = 0; i < report.suggestions.length; i++) {
+    s += '<div class="it" data-kind="sug"><span class="no">'+(i+1)+'</span><span class="tx"><b>'+esc(report.suggestions[i])+'</b></span></div>';
+  }
+  if (hasR) {
+    s += '<div class="subh">表达风险提醒<span>'+report.riskNotes.length+' 条 · 报告自带'+(TECH?' · riskNotes':'')+'</span></div>';
+    for (i = 0; i < report.riskNotes.length; i++) {
+      s += '<div class="it" data-kind="risk"><span class="no">'+(i+1)+'</span><span class="tx"><b>'+esc(report.riskNotes[i])+'</b></span></div>';
+    }
+  }
+  s += '</div><p class="zfoot" data-testid="'+SCREEN+'-zone-note">'
+    + (hasP && hasR
+       ? '三栏都<b>按报告给出的顺序原样排列</b>，本页不重新排序、也不按分数替它排。建议只针对<b>简历表达</b>，不涉及录用、面试或投递结果，也不会发给任何企业；风险提醒只看文本表达方式，不对身份信息或真实性作判断。'
+       : '这是一份<b>早期报告</b>：只有分数和建议，没有「先改这几处」「表达风险」两项字段 —— 这不是读取失败；重新诊断会带上。建议只针对简历表达，<b>不涉及录用、面试或投递结果</b>，也不会发给任何企业。')
+    + '</p></section>';
+  return s;
+}
+
+/* ── 内容总览浮层 ──────────────────────────────────────────────
+   同一份报告的六项分数 + 计数摆在一起看。它不叫「排版预览」 ——
+   这里没有分页、没有纸张边距，也不产生任何文件。打印入口如实置灰。 */
+function overviewOverlay(report){
+  var sections = report.sections;
+  var counts = [
+    ['先改这几处', report.priorities ? report.priorities.length : 0],
+    ['可执行建议', report.suggestions ? report.suggestions.length : 0],
+    ['表达风险',   report.riskNotes  ? report.riskNotes.length  : 0]
+  ];
+  var s = '<div class="pv" data-testid="'+SCREEN+'-overview" role="dialog" aria-modal="true" aria-label="报告内容总览">'
+    + '<div class="pv-box"><div class="pv-hd"><b>报告内容总览</b>'
+    + '<a class="cl press" href="'+closeURL()+'" data-route="/resume/report" data-testid="'+SCREEN+'-overview-close">'
+    + ic('close',22,2.3)+'关闭</a></div>'
+    + '<p class="pv-warn">只看内容。当前<b>没有报告打印端点</b>，这一屏不生成文件、不保存、不打印，也没有可下载的东西。</p>'
+    + '<div class="pv-sheet"><div class="sh-t">简历诊断报告 · 内容总览</div>'
+    + '<div class="sh-m">合成演示数据 · 不代表真实简历或真实 AI 结果</div><div class="sh-g">';
+  for (var i = 0; i < sections.length; i++) {
+    var d = sections[i];
+    s += '<div class="sh-r"><span>'+d.label+'</span><span class="b"><u style="transform:scaleX('+(d.score/d.maxScore)+')"></u></span>'
+      + '<span>'+d.score+' / '+d.maxScore+'</span></div>';
+  }
+  s += '</div><div class="sh-c" data-testid="'+SCREEN+'-overview-counts">';
+  for (var j = 0; j < counts.length; j++) {
+    s += '<span data-count-key="'+['priorities','suggestions','risks'][j]+'" data-count="'+counts[j][1]+'" data-has="'+(counts[j][1]?1:0)+'">'
+      + counts[j][0] + (counts[j][1] ? '<b>' + counts[j][1] + ' 条</b>' : '<b>无</b>') + '</span>';
+  }
+  s += '</div><div class="sh-f">六项各自列出分数，不做合计、不换算比例；三栏的条数直接数报告里那三个数组，没有另算任何指标。</div></div>'
+    + '<div class="pv-act"><button type="button" class="dead" aria-disabled="true" data-testid="'+SCREEN+'-print-report"'
+    + ' aria-describedby="'+SCREEN+'-print-reason" aria-label="打印这份报告（当前没有报告打印端点，按钮受限）">'
+    + '<span>打印这份报告</span><small>当前受限</small></button>'
+    + '<span class="reason" id="'+SCREEN+'-print-reason" data-testid="'+SCREEN+'-print-reason">'
+    + '诊断报告没有打印端点：现有的导出只针对「生成的简历」，不是这份报告。要能打印，需要服务端先出一个报告文件并下发可打印的文件凭证。'
+    + '在那之前这个按钮保持受限，不做假的打印或下载。</span></div>'
+    + '</div></div>';
+  return s;
+}
+
+/* ════════ 5B. 上传原件预览 ════════ */
+/* 合成示例简历的正文。三页内容与报告夹具（STRUCT / ISSUES）同源：
+   邮箱确实空着（I1）、求职意向确实只写了一句愿望（I2）、职责句确实停在
+   「负责什么」（I3）、可量化的只有 3 / 1200 / 600 / 780 那几个数字。
+   所以对着这三页真能逐条核报告，而不是只看一堆灏线。
+   姓名写成「张示例」、单位写成「示例/XX」、手机用不存在的示例号段并默认遮挡，
+   不含任何真实个人信息；每页自带水印与页脚。 */
+var SHEET_DOC = {
+  1: '<div class="nm"><b>张示例</b><i>求职者 · 合成示例姓名</i></div>'
+   + '<div class="ct">手机 138****0000（示例号段 · 公共终端默认遮挡）　·　现居地 上海</div>'
+   + '<div class="hr"></div>'
+   + '<h3>求职意向</h3>'
+   + '<p>希望找一份稳定的工作，用户运营或者社群运营都可以。</p>'
+   + '<h3>教育经历</h3>'
+   + '<div class="ln"><b>XX 大学 · 市场营销 · 本科</b><u>2019.09 - 2023.06</u></div>'
+   + '<div class="li">主修市场调研、消费者行为与统计学基础；毕业论文方向为社群用户留存。</div>'
+   + '<div class="li">在校期间担任院学生会宣传部干事，负责活动通知与素材整理。</div>'
+   + '<h3>工作经历</h3>'
+   + '<div class="ln"><b>示例科技（合成公司名） · 运营专员</b><u>2023.07 - 2025.08</u></div>'
+   + '<div class="li">负责社群运营，维护用户关系，日常维护 3 个用户社群共 1200 人。</div>'
+   + '<div class="li">配合市场部完成活动落地，参与内容排期。</div>'
+   + '<div class="li">每周整理一次社群反馈，汇总成表格发给产品与市场同事。</div>'
+   + '<div class="li">负责新人入群的欢迎流程，包括自动回复话术与常见问题文档。</div>'
+   + '<div class="li">参与制定社群管理规范，包括发言尺度与违规处理流程。</div>'
+   + '<div class="li">对接第三方活动工具的日常配置，活动开始前做一次流程自测。</div>'
+   + '<div class="li">整理常见问题文档并按月更新，交接给轮值同事时一并说明。</div>'
+   + '<div class="li">跟进社群违规举报，按规范处理并记录处理结果。</div>'
+   + '<div class="li">配合运营主管准备月度汇报材料，提供社群侧的数据与截图。</div>'
+   + '<div class="li">参与新同事的入职带教，讲解社群日常操作与话术规范。</div>',
+  2: '<h3>工作经历（续）</h3>'
+   + '<div class="ln"><b>示例科技（合成公司名） · 运营专员</b><u>2023.07 - 2025.08</u></div>'
+   + '<div class="li">参与两次线下用户见面会的现场执行，负责签到、物料与合影环节。</div>'
+   + '<div class="li">维护社群公告模板，保证三个群的公告口径一致。</div>'
+   + '<div class="li">协助客服同事处理群内咨询转接，日常答疑响应控制在半小时内。</div>'
+   + '<div class="ln"><b>XX 文化传播（合成公司名） · 运营实习生</b><u>2022.07 - 2022.09</u></div>'
+   + '<div class="li">协助整理公众号选题库，参与每周一次的内容排期会。</div>'
+   + '<div class="li">负责活动海报的素材收集与初稿排版，交由设计同事定稿。</div>'
+   + '<h3>项目经历</h3>'
+   + '<div class="ln"><b>社群月活跃提升项目 · 主要参与人</b><u>2024.03 - 2024.09</u></div>'
+   + '<div class="li">梳理入群路径并调整活动节奏，月活跃用户从 600 增至 780。</div>'
+   + '<div class="li">把入群欢迎语拆成三条分时发送，减少新人一次性接收过多信息。</div>'
+   + '<div class="li">每月复盘一次活动数据，形成一页纸结论发给项目组。</div>'
+   + '<div class="ln"><b>内容排期项目 · 参与</b><u>2023.10 - 2024.01</u></div>'
+   + '<div class="li">参与。</div>'
+   + '<div class="ln"><b>老用户回访项目 · 参与</b><u>2024.10 - 2024.12</u></div>'
+   + '<div class="li">按沉默时长把老用户分成三档，配合客服同事逐档回访。</div>'
+   + '<div class="li">整理回访话术并按反馈修订两版，供客服同事直接取用。</div>'
+   + '<div class="li">把回访结果按档位汇总成表，交给项目负责人做后续判断。</div>'
+   + '<div class="li">项目结束后写了一页操作说明，方便下一轮直接复用。</div>',
+  3: '<h3>技能</h3>'
+   + '<div class="li">熟练使用 Office 办公软件</div>'
+   + '<div class="li">Excel 会用数据透视表和 VLOOKUP，PPT 做过路演材料</div>'
+   + '<div class="li">了解基础的数据看板搭建，能看懂日活、留存和转化这几项指标</div>'
+   + '<div class="li">中文普通话；英语 CET-4</div>'
+   + '<h3>证书与奖项</h3>'
+   + '<div class="ln"><b>大学英语四级（CET-4）</b><u>2020.12</u></div>'
+   + '<div class="ln"><b>校级社会实践优秀个人</b><u>2021.06</u></div>'
+   + '<h3>自我评价</h3>'
+   + '<p>本人性格开朗，工作认真负责，交接文档一直是我在整理和更新。</p>'
+   + '<h3>求职说明</h3>'
+   + '<div class="li">可接受需要偶尔周末值班的社群岗位。</div>'
+   + '<div class="li">到岗时间：面谈后两周内。</div>'
+   + '<div class="li">期望城市：上海；也可考虑长三角内需要每周到岗的岗位。</div>'
+   + '<h3>其他</h3>'
+   + '<div class="li">长期在两个行业社群里当值班管理员，习惯处理群内突发争议。</div>'
+   + '<div class="li">业余整理过一份社群冷启动的操作笔记，可在面谈时提供。</div>'
+   + '<div class="li">平时会看行业公众号与运营社区，习惯把看到的做法记下来再试。</div>'
+   + '<div class="li">对线下活动执行不排斥，参与过校内两场百人规模的活动现场。</div>'
+   + '<div class="li">能接受出差；日常沟通以微信与企业微信为主。</div>'
+};
+var SHEET_PAGES = 3;
+function sheetPage(n, photo){
+  return '<div class="wm" aria-hidden="true">合成示例</div>'
+    + '<div class="pg">' + (SHEET_DOC[n] || SHEET_DOC[1])
+    + '<div class="ft"><b>合成预览内容</b><span>本页由原型自带的示例简历排出，不是你上传的真实文件</span>'
+    + '<u>' + (photo ? '手机拍摄 · 单页' : '第 ' + n + ' 页 / 共 ' + SHEET_PAGES + ' 页') + '</u></div></div>';
+}
+function sheetInner(mode, pageNo){
+  if (mode === 'image') {
+    /* 手机拍的那一张：相纸背景上摆一张略微歪的 A4，纸上排的就是同一份示例简历第 1 页。
+       纸面宽 860（A4 比例 860×1216），内容按 0.86 缩放套进去，不另排一套。 */
+    return '<span class="photo" aria-hidden="true"></span>'
+      + '<span class="paper" style="left:70px;top:200px;width:860px;height:1216px;transform:rotate(-1.4deg)">'
+      + '<span style="position:absolute;left:0;top:0;width:1000px;height:1414px;transform:scale(.86);transform-origin:0 0;display:block">'
+      + sheetPage(1, true) + '</span></span>';
+  }
+  return sheetPage(pageNo);
+}
+
+function svToolbar(f){
+  var last = f.pages, prevOn = pageNo > 1, nextOn = pageNo < last;
+  var zi = ZOOMS.indexOf(zoomLv), ri = ROTS.indexOf(rotDeg);
+  var nav = function(on, dir, label, icon, whyTx){
+    if (!on) {
+      return '<button type="button" class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-source-page-'+dir+'"'
+        + ' aria-label="'+esc(label+'（'+whyTx+'）')+'">'+ic(icon,24,2.3)+label+'</button>';
+    }
+    return '<a class="tbtn press" href="'+selfURL({ p: pageNo + (dir==='next'?1:-1) })+'" data-route="/resume/report"'
+      + ' data-testid="'+SCREEN+'-source-page-'+dir+'" aria-label="'+esc(label)+'">'+ic(icon,24,2.3)+label+'</a>';
+  };
+  var fitBtn = function(key, label, icon){
+    return '<a class="tbtn press" href="'+selfURL({ fit:key })+'" data-route="/resume/report" role="button"'
+      + ' aria-pressed="'+(fitMode===key?'true':'false')+'" data-testid="'+SCREEN+'-source-fit-'+key+'"'
+      + ' aria-label="'+esc(label)+'">'+ic(icon,24)+label+'</a>';
+  };
+  var zoomBtn = function(delta, dir, label, icon, whyTx){
+    var idx = zi + delta;
+    if (idx < 0 || idx >= ZOOMS.length) {
+      return '<button type="button" class="tbtn" aria-disabled="true" data-testid="'+SCREEN+'-source-zoom-'+dir+'"'
+        + ' aria-label="'+esc(label+'（'+whyTx+'）')+'">'+ic(icon,24)+label+'</button>';
+    }
+    return '<a class="tbtn press" href="'+selfURL({ z: ZOOMS[idx] })+'" data-route="/resume/report"'
+      + ' data-testid="'+SCREEN+'-source-zoom-'+dir+'" aria-label="'+esc(label)+'">'+ic(icon,24)+label+'</a>';
+  };
+  var bound = zi === 0 ? ' · 最小' : (zi === ZOOMS.length - 1 ? ' · 最大' : '');
+  var rowA = '<div class="sv-tr">'
+    + nav(prevOn, 'prev', '上一页', 'prev', last === 1 ? '这份原件只有一页' : '已经是第一页')
+    + '<span class="tread" data-testid="'+SCREEN+'-source-page-indicator" data-page="'+pageNo+'" data-pages="'+last+'"'
+    + ' aria-live="polite">第 '+pageNo+' 页 / 共 '+last+' 页</span>'
+    + nav(nextOn, 'next', '下一页', 'next', last === 1 ? '这份原件只有一页' : '已经是最后一页')
+    + '<span class="sp2"></span>';
+  if (f.rotatable) {
+    rowA += '<a class="tbtn press" href="'+selfURL({ rot: ROTS[(ri + 1) % ROTS.length] })+'" data-route="/resume/report"'
+      + ' data-testid="'+SCREEN+'-source-rotate" aria-label="'+esc('顺时针旋转 90 度，当前 '+rotDeg+' 度')+'">'
+      + ic('rotate',24)+'旋转</a>'
+      + '<span class="tread" data-testid="'+SCREEN+'-source-rot-readout" data-rot="'+rotDeg+'">当前 '+rotDeg+'°</span>';
+  }
+  return '<div class="sv-tb" data-testid="'+SCREEN+'-source-toolbar">' + rowA + '</div>'
+    + '<div class="sv-tr">' + fitBtn('page','适应整页','fitpage') + fitBtn('width','适应宽度','fitwidth')
+    + '<span class="sp2"></span>'
+    + zoomBtn(-1,'out','缩小','zoomout','已经是最小倍数')
+    + '<span class="tread" data-testid="'+SCREEN+'-source-zoom-readout" data-zoom="'+zoomLv+'">'
+    + Number(zoomLv).toFixed(1) + ' 倍' + bound + '</span>'
+    + zoomBtn(1,'in','放大','zoomin','已经是最大倍数')
+    + '</div></div>';
+}
+
+/* 对照条：报告里选中的那一维（或最重的那条问题），跟着原件一起显示。 */
+function svFoot(sections){
+  var d = null, i;
+  for (i = 0; i < sections.length; i++) if (sections[i].key === dim) d = sections[i];
+  if (!d) {
+    return '<div class="sv-ft" data-testid="'+SCREEN+'-source-crosscheck" data-cc-dim="none">'
+      + '<span class="ccip">对照</span>'
+      + '<span class="cctx">在「六维分数」里点一个维度，这一栏会显示那一项的分数，方便对着原件逐条核对。</span></div>';
+  }
+  return '<div class="sv-ft" data-testid="'+SCREEN+'-source-crosscheck" data-cc-dim="'+d.key+'"'
+    + ' data-cc-score="'+d.score+'" data-cc-max="'+d.maxScore+'">'
+    + '<span class="ccip">对照</span>'
+    + '<span class="cctx"><b>'+d.label+'</b>：'+DIM_ABOUT[d.key]+'</span>'
+    + '<span class="ccsc">'+d.score+'<u> / '+d.maxScore+'</u></span></div>';
+}
+
+function sourceViewer(sections, f){
+  var marks = '';
+  for (var i = 0; i < 4; i++) marks += '<i class="cm" data-corner="'+['tl','tr','bl','br'][i]+'" aria-hidden="true"></i>';
+  return '<div class="sv" data-testid="'+SCREEN+'-source-preview" data-src-mode="viewer" role="dialog"'
+    + ' aria-label="上传原件预览">'
+    + '<div class="sv-hd"><span class="ti" aria-hidden="true">'+ic(srcMode==='image'?'image':'doc',26)+'</span>'
+    + '<span class="tt"><b>上传原件预览</b><span>'+f.meta+'</span></span>'
+    + '<span class="sv-fx" data-testid="'+SCREEN+'-source-fixture">合成预览内容 · 不是你上传的文件</span>'
+    + '<a class="sv-cl press" href="'+closeURL()+'" data-route="/resume/report" data-testid="'+SCREEN+'-source-close">'
+    + ic('close',22,2.3)+'关闭</a></div>'
+    + svToolbar(f)
+    + '<div class="sv-view"><div class="sv-canvas" data-scroll="preview" data-clip="1"'
+    + ' data-testid="'+SCREEN+'-source-canvas"><div class="sv-pad">'
+    + '<div class="sv-doc" data-testid="'+SCREEN+'-source-doc" data-page="'+pageNo+'" data-pages="'+f.pages+'"'
+    + ' data-rot="'+rotDeg+'"><div class="sv-sheet" data-testid="'+SCREEN+'-source-sheet">'
+    + sheetInner(srcMode, pageNo) + '</div>' + marks + '</div></div></div>'
+    + '<span class="sv-rail x" data-testid="'+SCREEN+'-source-rail-x" aria-hidden="true"><u></u></span>'
+    + '<span class="sv-rail y" data-testid="'+SCREEN+'-source-rail-y" aria-hidden="true"><u></u></span>'
+    + '</div>' + svFoot(sections) + '</div>';
+}
+
+var NOTICE = {
+  'docx': { icon:'doc', title:'这份原件是 DOCX，屏幕上不做翻页预览',
+    why:'终端里没有 Office 排版引擎。硬渲染会改掉字体、行距和分页，你在这儿看到的就不是真正会打印出来的那一份，所以这里不做假预览。',
+    keep:'<b>报告本身不受影响</b>：诊断结论已经读出来了，就在这一层下面。',
+    rows:[
+      ['dead','print','打印这份原件','静态原型没有真实文件凭证','-source-alt-print'],
+      ['link','21-resume-triage.html','upload','返回简历来源，转成 PDF 再上传一次','PDF 能直接翻页预览','/resume/source','-source-alt-source'],
+      ['link','10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖预览，照常可用','/print-scan','-source-alt-print-hub'],
+      ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
+    ] },
+  'no-file': { icon:'slash', title:'这次没有可预览的原件',
+    why:'报告按编号读取，原件预览要另外一份带时效的文件访问凭证，这次进入没有拿到。原件是否还在服务端保留，这一屏看不出来，也不做判断。',
+    keep:'这<b>不是报告读取失败</b>：下面那份诊断报告已经读到了。',
+    rows:[
+      ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
+      ['link','39-member-records.html','folder','打开我的诊断记录','从记录里挑一份带原件的','/me/ai-records','-source-alt-records'],
+      ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
+    ] },
+  'expired': { icon:'clock', title:'原件的临时访问链接已过期',
+    why:'原件用有时效的临时链接访问，超过时效就要重新取一次。链接还能不能续、原件是否还在服务端保留，这一屏都看不出来，也不做判断。',
+    keep:'这<b>不是报告读取失败</b>：下面那份诊断报告已经读到了。',
+    rows:[
+      ['dead','refresh','再取一次原件','静态原型不会真的重新取件','-source-alt-retry'],
+      ['link','21-resume-triage.html','upload','返回简历来源重新上传','重新上传会带上新的文件凭证','/resume/source','-source-alt-source'],
+      ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
+    ] },
+  'render-failed': { icon:'broken', title:'原件取到了，但这一层没能把它显示出来',
+    why:'常见原因是文件损坏、格式不受支持或渲染超时。这一屏只说明这次没显示出来，不判断文件本身是好是坏，也不判断原件是否还在服务端保留。',
+    keep:'<b>报告不受影响</b>：诊断结论就在这一层下面。',
+    rows:[
+      ['dead','refresh','再显示一次','静态原型不会真的重新渲染','-source-alt-retry'],
+      ['link','10-print-hub.html','print','去打印 / 扫描','不经过预览也能把材料出纸','/print-scan','-source-alt-print-hub'],
+      ['link','21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析','/resume/source','-source-alt-source'],
+      ['close','','doc','关闭这一层，继续看诊断报告','报告和你选中的分区都还在','-source-alt-close']
+    ] }
+};
+
+function sourceNotice(mode){
+  var N = NOTICE[mode], rows = '';
+  for (var i = 0; i < N.rows.length; i++) {
+    var r = N.rows[i];
+    if (r[0] === 'dead')       rows += rowDead(r[1], r[2], r[3], SCREEN + r[4], '静态原型没有真实文件');
+    else if (r[0] === 'close') rows += rowLink(closeURL(), r[2], r[3], r[4], SCREEN + r[5], '/resume/report');
+    else                       rows += rowLink(r[1], r[2], r[3], r[4], SCREEN + r[6], r[5]);
+  }
+  return '<div class="pv" data-testid="'+SCREEN+'-source-preview" data-src-mode="notice" role="dialog"'
+    + ' aria-label="'+esc(N.title)+'"><div class="pv-box sv-notice">'
+    + '<div class="pv-hd"><b>上传原件预览</b>'
+    + '<a class="cl press" href="'+closeURL()+'" data-route="/resume/report" data-testid="'+SCREEN+'-source-close">'
+    + ic('close',22,2.3)+'关闭</a></div>'
+    + '<div class="nh"><span class="ni" aria-hidden="true">'+ic(N.icon,30)+'</span><b>'+N.title+'</b></div>'
+    + '<p class="nwhy" data-testid="'+SCREEN+'-source-reason">'+N.why+'</p>'
+    + '<div class="nrows">'+rows+'</div>'
+    + '<div class="nkeep" data-testid="'+SCREEN+'-source-report-intact">'+N.keep+'</div>'
+    + '</div></div>';
+}
+function sourceOverlay(sections){
+  return srcFile ? sourceViewer(sections, srcFile) : sourceNotice(srcMode);
+}
+
+/* 画布几何：把自然单位的页面缩放到画布里。fit 决定基准倍率，z 在它之上再乘。
+   预览层给底部导航让出 118px 之后，画布不再比 A4 更「高」，所以适应宽度会比适应整页
+   大一点，代价是要上下滚才能看到页脚 —— 两个按钮各有各的用处，倍率差是算出来的，
+   不是为了让按钮显得有用造出来的。真的算出同一个倍率时，两个按钮也照样都留着。 */
+function layoutSource(){
+  var canvas = document.querySelector('[data-testid="'+SCREEN+'-source-canvas"]');
+  if (!canvas || !srcFile) return;
+  var doc = canvas.querySelector('.sv-doc'), sheet = canvas.querySelector('.sv-sheet');
+  var pad = 26 * 2;
+  var boxW = canvas.clientWidth - pad, boxH = canvas.clientHeight - pad;
+  var turned = rotDeg === '90' || rotDeg === '270';
+  var natW = turned ? srcFile.h : srcFile.w, natH = turned ? srcFile.w : srcFile.h;
+  var k = fitMode === 'width' ? (boxW / natW) : Math.min(boxW / natW, boxH / natH);
+  k *= Number(zoomLv);
+  doc.style.width  = Math.round(natW * k) + 'px';
+  doc.style.height = Math.round(natH * k) + 'px';
+  sheet.style.width  = srcFile.w + 'px';
+  sheet.style.height = srcFile.h + 'px';
+  sheet.style.transform = 'translate(-50%,-50%) rotate(' + rotDeg + 'deg) scale(' + k + ')';
+  doc.setAttribute('data-scale', k.toFixed(4));
+  canvas.scrollLeft = 0;
+  canvas.scrollTop = 0;
+  var railX = document.querySelector('[data-testid="'+SCREEN+'-source-rail-x"]');
+  var railY = document.querySelector('[data-testid="'+SCREEN+'-source-rail-y"]');
+  var paint = function(){
+    var sx = canvas.scrollWidth - canvas.clientWidth, sy = canvas.scrollHeight - canvas.clientHeight;
+    var one = function(rail, over, size, pos, prop){
+      if (!rail) return;
+      rail.style.display = over > 1 ? 'block' : 'none';
+      if (over <= 1) return;
+      var frac = size / (size + over), len = Math.max(48, Math.round(rail[prop === 'left' ? 'clientWidth' : 'clientHeight'] * frac));
+      var room = (prop === 'left' ? rail.clientWidth : rail.clientHeight) - len;
+      rail.firstChild.style[prop === 'left' ? 'width' : 'height'] = len + 'px';
+      rail.firstChild.style[prop] = Math.round(room * (pos / over)) + 'px';
+    };
+    one(railX, sx, canvas.clientWidth, canvas.scrollLeft, 'left');
+    one(railY, sy, canvas.clientHeight, canvas.scrollTop, 'top');
+  };
+  canvas.addEventListener('scroll', paint, { passive: true });
+  paint();
+}
+
+/* ════════ 6. 九个状态 ════════ */
+var R = {};
+var SESSION_LINE = '本次会话只记住编号和一次性令牌（不存报告正文）；待机或超时清场后一并清掉，本页回到「没有编号」。';
+
+R['no-context'] = function(){
+  hdSub.textContent = ridBad
+    ? '地址里的编号不合法，已按没有编号处理，所以没有可展示的报告。'
+    : '这次进入没有带简历编号，所以没有可展示的报告。';
+  hdTag.textContent = '无报告';
+  stepTx.textContent = '诊断报告 · 无报告';
+  rail(0);
+  body.innerHTML =
+    '<section class="card state-b"><h2>当前没有可展示的报告</h2>'
+    + '<p>诊断结果按<b>简历任务编号</b>读取，并且要凭本人凭证才读得到 —— 地址栏里带一个编号不等于有权限。'
+    + '没有编号就读不到，本页也不会拿通用结论顶替。'
+    + (TECH ? '（读取端点 GET /resume/records/:taskId，匿名走 x-resume-access-token 请求头）' : '') + '</p></section>'
+    + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>四条都不会动你已上传的文件</span></div>'
+    + '<div class="rows">'
+    + rowLink('21-resume-triage.html','upload','返回简历来源','重新上传或扫描一份简历，交给解析',SCREEN+'-exit-source','/resume/source')
+    + rowLink('39-member-records.html','folder','打开我的诊断记录','从已保存的记录里挑一份继续',SCREEN+'-exit-records','/me/ai-records')
+    + rowLink(withRid(SELF,'state=loading'),'refresh','再读一次','重新确认这台机器上有没有结果',SCREEN+'-exit-retry','/resume/report')
+    + rowLink('10-print-hub.html','print','去打印 / 扫描','不需要报告也能出纸',SCREEN+'-exit-print','/print-scan')
+    + '</div></section>'
+    + dimNames()
+    + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
+  cta.innerHTML = btn('39-member-records.html','我的诊断记录',false,SCREEN+'-secondary','/me/ai-records')
+    + btn('21-resume-triage.html','去上传简历',true,SCREEN+'-primary','/resume/source');
+  why.textContent = ridBad ? '地址里的编号不在允许的字符范围内，本页按「没有编号」处理，也不会把它显示出来。' : '';
+  truthTx.textContent = '静态设计原型：本页不连接真实简历、模型或打印，也不会自动出现结果。';
+};
+
+R['loading'] = function(){
+  hdSub.textContent = '正在按编号读取这份报告，读取本身不会改动任何文件。';
+  hdTag.textContent = '读取中';
+  stepTx.textContent = '诊断报告 · 读取中';
+  rail(2);
+  body.innerHTML =
+    '<section class="card state-b"><h2>正在读取诊断报告</h2>'
+    + '<p>这是一次<b>整体等待</b>：结果要么回来，要么失败，中间没有可显示的阶段或百分比，所以这里不画进度条。'
+    + (TECH ? '（GET /resume/records/:taskId 单次请求）' : '') + '</p></section>'
+    + '<section class="card exits"><div class="ch"><b>等待期间</b><span>三条随时可以走</span></div>'
+    + '<div class="rows">'
+    + rowLink('21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析',SCREEN+'-exit-source','/resume/source')
+    + rowLink('10-print-hub.html','print','去打印 / 扫描','不用等报告，打印扫描照常可用',SCREEN+'-exit-print','/print-scan')
+    + rowLink('39-member-records.html','folder','打开我的诊断记录','看已经读回过的那几份',SCREEN+'-exit-records','/me/ai-records')
+    + '</div></section>'
+    + dimNames()
+    + checklist('等的时候先自己核一遍', '6 项 · 不依赖模型');
+  cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
+    + btnDead('正在读取结果', SCREEN+'-primary');
+  why.innerHTML = '<span id="'+SCREEN+'-why">读取还没有结束，现在还不知道有没有报告，所以下一步先不给出口。结果回来后这里会换成「继续优化」或失败说明。</span>';
+  truthTx.textContent = '静态设计原型：这一屏只表达等待状态，不会因为时间过去就自动出现结果。';
+};
+
+function reportState(kind){
+  var report = kind === 'full' ? FIXTURE
+    : kind === 'minimal' ? { sections: FIXTURE.sections, suggestions: FIXTURE.suggestions }
+    : { sections: [], suggestions: [] };
+  var hasBody = kind !== 'empty';
+
+  hdSub.textContent = kind === 'full'
+    ? '简历被读成七块，六条问题各自指到原文那一句。'
+    : kind === 'minimal'
+      ? '这是一份早期报告：有分数和建议，但没有优先级和风险提醒。'
+      : '报告读回来了，但里面一条内容都没有。';
+  hdTag.textContent = kind === 'full' ? '报告已读取' : (kind === 'minimal' ? '早期报告' : '空报告');
+  stepTx.textContent = kind === 'full' ? '诊断报告 · 已读取' : (kind === 'minimal' ? '诊断报告 · 早期报告' : '诊断报告 · 空报告');
+  rail(2);
+
+  if (kind === 'empty') {
+    /* 空报告不是读取失败，也不是没接通：报告对象确实回来了，只是里面没有内容。
+       这一屏不画任何空的分区骨架 —— 撑满高度的空占位比不画更误导。 */
+    body.innerHTML = idbar(false) + countBar(report, false)
+      + '<section class="card state-b"><h2>报告回来了，但里面是空的</h2>'
+      + '<p>服务端<b>确实返回了这份报告</b>，只是六个维度、建议、优先级和风险提醒都是空的。'
+      + '常见原因是这次提取到的简历文字太少，不足以给出有依据的结论。'
+      + '这<b>不是读取失败，也不是能力未接通</b> —— 那两种情况长得不一样，各有各的一屏。'
+      + '本页不会为了把版面填满而生成任何结论。</p></section>'
+      + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>三条都不会动你已上传的文件</span></div>'
+      + '<div class="rows">'
+      + rowLink('21-resume-triage.html','upload','换一份更完整的简历','内容多一些，解析才有东西可看',SCREEN+'-exit-source','/resume/source')
+      + rowLink('24-resume-generate.html','spark','手动逐项填写','不经过模型，自己写一份再来诊断',SCREEN+'-exit-manual','/resume/generate')
+      + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖报告的现成链路',SCREEN+'-exit-print','/print-scan')
+      + '</div></section>'
+      + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
+    cta.innerHTML = btn('39-member-records.html','我的诊断记录',false,SCREEN+'-secondary','/me/ai-records')
+      + btn('21-resume-triage.html','重新诊断',true,SCREEN+'-primary','/resume/source');
+    why.innerHTML = '<span id="'+SCREEN+'-why">报告里没有内容，优化那一步就没有可对照的原文片段，所以下一步先不给入口。'
+      + SESSION_LINE + '</span>';
+    truthTx.textContent = '静态设计原型：这一屏表达「报告为空」，本页不连接真实简历、模型或打印，也不生成任何结论。';
+    return;
+  }
+
+  var zone = seg === 'structure' ? zoneStructure()
+    : seg === 'issues' ? zoneIssues()
+    : seg === 'scores' ? zoneScores(report.sections)
+    : zoneConclusions(report);
+
+  body.innerHTML = idbar(true) + countBar(report, true) + segsBar(report, true) + zone;
+
+  if (srcMode) {
+    overlay.innerHTML = sourceOverlay(report.sections);
+    overlay.setAttribute('data-kind', 'source');
+    overlay.setAttribute('data-src', srcMode);
+    overlay.classList.add('on');
+  } else if (view === 'overview') {
+    overlay.innerHTML = overviewOverlay(report);
+    overlay.setAttribute('data-kind', 'overview');
+    overlay.classList.add('on');
+  }
+
+  if (RID) {
+    cta.innerHTML = btn('21-resume-triage.html', '重新诊断', false, SCREEN+'-secondary', '/resume/source')
+      /* 只带 taskId 会落在 23 的「没有上下文」那一屏：那等于把用户送进一个空页面。
+         这里显式请求 23 的**读取入口**（state=loading），由那一页凭编号去读优化结果。
+         编号只是「读哪一条」的键，**不是授权** —— 真实链路仍按登录态或一次性令牌判本人，
+         令牌走请求头，不进地址栏。 */
+      + btn(withRid('23-resume-optimize.html', 'state=loading'), '继续优化这份简历', true, SCREEN+'-primary', '/resume/optimize');
+    why.innerHTML = '<span id="'+SCREEN+'-handoff" data-testid="'+SCREEN+'-handoff">本页只给这一次的诊断；'
+      + '想看改完之后的版本对照，去下一步的简历优化，本页不会替你生成一个还不存在的新版本。</span>'
+      + ' <span data-testid="'+SCREEN+'-session">'+SESSION_LINE+'</span>';
+  } else {
+    cta.innerHTML = btn('21-resume-triage.html','重新诊断',false,SCREEN+'-secondary','/resume/source')
+      + btnDead('继续优化这份简历', SCREEN+'-primary');
+    why.innerHTML = '<span id="'+SCREEN+'-why">这份报告没有对应的简历编号：优化那一步取不到原文，原件也没有可用的文件凭证，所以两个入口都先关着。重新走一次上传与解析就会带上编号。</span>'
+      + ' <span data-testid="'+SCREEN+'-session">'+SESSION_LINE+'</span>';
+  }
+  truthTx.textContent = srcMode
+    ? '静态设计原型：报告与原件都是合成演示数据，本页不连接真实简历、真实文件、模型或打印，也不生成、保存或导出任何文件。'
+    : '静态设计原型：报告为合成演示数据，本页不连接真实简历、模型或打印，也不生成、保存或导出任何文件。';
+}
+R['report'] = function(){ reportState('full'); };
+R['report-minimal'] = function(){ reportState('minimal'); };
+R['report-empty'] = function(){ reportState('empty'); };
+
+R['read-error'] = function(){
+  hdSub.textContent = '这次没能取到报告，你上传的原件不受影响。';
+  hdTag.textContent = '读取失败';
+  stepTx.textContent = '诊断报告 · 读取失败';
+  rail(2);
+  body.innerHTML =
+    '<section class="card state-b"><h2>这次没能取到报告</h2>'
+    + '<p>常见原因：本次办理会话已经结束、结果已按留存期清理，或者读取中途断开。'
+    + '<b>读取失败不会动到你上传的原件，也不会删掉任何已保存的简历。</b>'
+    + (TECH ? '（GET /resume/records/:taskId 未返回报告或请求失败）' : '') + '</p></section>'
+    + '<section class="card exits"><div class="ch"><b>接下来可以做的</b><span>先试一次，再换路径</span></div>'
+    + '<div class="rows">'
+    + rowLink(withRid(SELF,'state=loading'),'refresh','再读一次','重新向这台机器要一次结果',SCREEN+'-exit-retry','/resume/report')
+    + rowLink('21-resume-triage.html','upload','返回简历来源','换一份文件重新提交解析',SCREEN+'-exit-source','/resume/source')
+    + rowLink('39-member-records.html','folder','打开我的诊断记录','看看有没有别的可用记录',SCREEN+'-exit-records','/me/ai-records')
+    + rowLink('06-help.html','help','找工作人员','连着几次都失败时的人工出口',SCREEN+'-exit-help','/help')
+    + '</div></section>'
+    + dimNames()
+    + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
+  cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
+    + btn(withRid(SELF,'state=loading'),'再读一次',true,SCREEN+'-primary','/resume/report');
+  why.textContent = '优化那一步要用同一份报告作输入，报告没取到就先不给入口，避免点进去再失败一次。';
+  truthTx.textContent = '静态设计原型：这一屏只表达读取失败，本页不会重试真实接口，也不会自动出现结果。';
+};
+
+R['diagnose-failed'] = function(){
+  hdSub.textContent = '解析中断，你上传的文件没有丢。';
+  hdTag.textContent = '解析失败';
+  stepTx.textContent = 'AI 解析 · 中断';
+  rail(1);
+  body.innerHTML =
+    '<section class="card state-b"><h2>解析中断，中断的只是「读懂它」这一步</h2>'
+    + '<p>失败原因由上一步原样带过来（示例：<b>文字识别失败，请确保文件清晰</b>）。'
+    + '这一屏<b>一条 AI 结论都不给</b> —— 没跑出来就是没有，不拿通用建议顶替。</p></section>'
+    + '<section class="card exits"><div class="ch"><b>这些都不需要 AI</b><span>现在就能做</span></div>'
+    + '<div class="rows">'
+    + rowDead('print','打印我上传的原件','本次不可用',SCREEN+'-exit-print-original',
+        '静态原型没有真实文件凭证')
+    + rowLink('10-print-hub.html','print','去打印 / 扫描其他材料','打印扫描不依赖 AI，照常可用',SCREEN+'-exit-print','/print-scan')
+    + rowLink('26-browse-list.html','brief','查看岗位','来源平台的岗位信息照常可看',SCREEN+'-exit-jobs','/jobs')
+    + rowLink('28-jobfair-enhanced.html','cal','查看招聘会','现场活动信息照常可看',SCREEN+'-exit-fairs','/job-fairs')
+    + '</div></section>'
+    + checklist('不等 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
+  cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
+    + btn('21-resume-triage.html','重新解析',true,SCREEN+'-primary','/resume/source');
+  why.textContent = '打印原件要用这次上传下发的文件访问凭证。静态原型里没有真实文件，所以这条如实置灰，不给一个点了没反应的按钮。';
+  truthTx.textContent = '静态设计原型：本页不给任何诊断结论，也不连接真实文件、模型或打印。';
+};
+
+R['unavailable'] = function(){
+  hdSub.textContent = '这台机器还没有接通报告读取能力，不是你的简历有问题。';
+  hdTag.textContent = '未接通';
+  stepTx.textContent = '诊断报告 · 能力未接通';
+  rail(0);
+  body.innerHTML =
+    '<section class="card state-b"><h2>诊断报告能力当前不可用</h2>'
+    + '<p>没有接通真实 AI 服务时，读取报告会被<b>直接拒绝</b>，不会返回任何「读过你简历」的结论 —— '
+    + '这是有意为之，避免把演示分数当成真实评价。'
+    + (TECH ? '（apps/kiosk/src/services/api/aiMockAdapter.ts：演示模式下 getResumeRecord 直接拒绝）' : '') + '</p></section>'
+    + '<section class="card exits"><div class="ch"><b>不靠 AI，这些照常能用</b><span>四条都是现成链路</span></div>'
+    + '<div class="rows">'
+    + rowLink('10-print-hub.html','print','打印简历或材料','选好份数和单双面就能出纸',SCREEN+'-exit-print','/print-scan')
+    + rowLink('18-scan-workbench.html','scan','扫描纸质简历','在奔图面板扫描，回传成 PDF',SCREEN+'-exit-scan','/scan/start')
+    + rowLink('39-member-records.html','folder','打开我的简历','查看和整理已保存的版本',SCREEN+'-exit-records','/me/ai-records')
+    + rowLink('06-help.html','help','找工作人员','需要有人帮忙时的人工出口',SCREEN+'-exit-help','/help')
+    + '</div></section>'
+    + dimNames()
+    + checklist('不靠 AI，先自己核一遍', '6 项 · 纸质简历同样适用');
+  cta.innerHTML = btn('21-resume-triage.html','返回简历来源',false,SCREEN+'-secondary','/resume/source')
+    + btn('10-print-hub.html','去打印 / 扫描',true,SCREEN+'-primary','/print-scan');
+  why.textContent = '能力没接通时不提供优化入口：优化和诊断走同一条 AI 链路，这时候点进去只会再失败一次。';
+  truthTx.textContent = '静态设计原型：这一屏表达能力未接通，本页不会探测真实服务，也不代表线上状态。';
+};
+
+R['illegal'] = function(){
+  hdSub.textContent = '地址里的参数不在登记范围内，已按不可用处理。';
+  hdTag.textContent = '参数不合法';
+  stepTx.textContent = '诊断报告 · 参数不合法';
+  rail(0);
+  body.innerHTML =
+    '<section class="card state-b"><h2>这个地址不能用来打开报告</h2>'
+    + '<p>本页只认登记过的状态与编号格式。收到没登记的值时一律按不可用处理，'
+    + '<b>也不会把地址里的原文显示出来</b>，避免把外部输入原样搬到屏幕上。</p></section>'
+    + '<section class="card exits"><div class="ch"><b>回到正常入口</b><span>四条都能继续</span></div>'
+    + '<div class="rows">'
+    + rowLink('21-resume-triage.html','upload','返回简历来源','从上传或扫描重新开始',SCREEN+'-exit-source','/resume/source')
+    + rowLink('39-member-records.html','folder','打开我的诊断记录','从记录里选一条正常打开',SCREEN+'-exit-records','/me/ai-records')
+    + rowLink('10-print-hub.html','print','去打印 / 扫描','不依赖 AI 的现成链路',SCREEN+'-exit-print','/print-scan')
+    + rowLink('01-home.html','help','返回首页','换一个服务入口',SCREEN+'-exit-home','/')
+    + '</div></section>'
+    + dimNames()
+    + checklist('顺手核一遍简历', '6 项 · 不依赖模型');
+  cta.innerHTML = btn('01-home.html','返回首页',false,SCREEN+'-secondary','/')
+    + btn('21-resume-triage.html','返回简历来源',true,SCREEN+'-primary','/resume/source');
+  why.textContent = '';
+  truthTx.textContent = '静态设计原型：这一屏是参数兜底，本页不连接真实简历、模型或打印。';
+};
+
+/* ════════ 7. 渲染 ════════ */
+body.setAttribute('data-state', state);
+body.setAttribute('data-testid', SCREEN + '-state-' + state);
+R[state]();
+if (fallback) body.setAttribute('data-fallback', '1'); else body.removeAttribute('data-fallback');
+if (FIXTURE_STATES.indexOf(state) >= 0) {
+  body.setAttribute('data-seg', state === 'report-empty' ? 'none' : seg);
+  body.setAttribute('data-dim', dim || 'none');
+  body.setAttribute('data-blk', blk || 'none');
+  body.setAttribute('data-context', RID ? 'task' : 'none');
+  body.setAttribute('data-src', srcMode || 'none');
+  body.setAttribute('data-view', view || 'none');
+}
+
+/* 滚动区如实标注：能滚就说还有几条在下面，不让人误以为屏幕上这几条就是全部。
+   data-overflow / data-hidden-items 同时给门禁用：断言「最后一条真的够得着」。 */
+(function(){
+  var sc = body.querySelector('.scroll');
+  if (!sc) return;
+  var over = sc.scrollHeight - sc.clientHeight;
+  sc.setAttribute('data-overflow', over > 1 ? String(over) : '0');
+  var kids = sc.children, hidden = 0, top = sc.getBoundingClientRect().top, bot = sc.getBoundingClientRect().bottom;
+  for (var i = 0; i < kids.length; i++) {
+    var r = kids[i].getBoundingClientRect();
+    if (r.bottom > bot + 1 || r.top < top - 1) hidden++;
+  }
+  sc.setAttribute('data-hidden-items', String(hidden));
+  var head = body.querySelector('.zone .zh .mini');
+  if (head && over > 1) {
+    var tip = document.createElement('span');
+    tip.className = 'mini';
+    tip.setAttribute('data-testid', SCREEN + '-scroll-hint');
+    tip.style.marginLeft = '12px';
+    tip.textContent = '· 下滑还有 ' + hidden + ' 条';
+    head.parentNode.appendChild(tip);
+  }
+})();
+
+/* 浮层打开时，**被它盖住的那些**退出交互：inert 一次性拿掉点击、触摸和 Tab 焦点，
+   所以「点主按钮的位置会穿透到下面」这件事在结构上就不可能发生。
+   原件预览层给底部导航让出了 118px，导航条并没有被盖住 —— 那就不能连它一起 inert：
+   看得见、点不动比直接盖住更糟。所以这一层只 inert 它真正盖住的部分，导航条保持可用，
+   也因此它不是 aria-modal（见 sourceViewer / sourceNotice）。
+   内容总览浮层仍然铺满整屏，底下全部 inert，包括导航条。 */
+if (overlay.classList.contains('on')) {
+  var srcLayer = overlay.getAttribute('data-kind') === 'source';
+  var under = [document.querySelector('.topbar'), document.querySelector('.head'), body,
+    why, cta, document.querySelector('.truth')];
+  if (!srcLayer) under.push(document.querySelector('.navbar'));
+  for (var u = 0; u < under.length; u++) {
+    if (!under[u]) continue;
+    under[u].setAttribute('inert', '');
+    under[u].setAttribute('aria-hidden', 'true');
+  }
+  if (srcMode && srcFile) layoutSource();
+}
+
+/* 原型演示控制开合（不属于产品逻辑；产品地址下整块不渲染可见） */
+var tab = document.getElementById('proto-tab');
+var panel = document.getElementById('proto-panel');
+tab.addEventListener('click', function(){ document.documentElement.classList.add('proto-open'); });
+panel.addEventListener('click', function(e){ if (e.target === panel) document.documentElement.classList.remove('proto-open'); });
+})();
+</script>
+</body>
+</html>

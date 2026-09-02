@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>岗位信息 · 职易达</title>
+<!--
+  宿主：岗位目录（075 唯一青序流光宿主）
+  route: /jobs
+  state: default | filtered | loading | empty | error | offline | source-blocked |
+         ai-consent | ai-resume-select | ai-input-missing | ai-no-resume |
+         ai-processing | ai-result | ai-empty | ai-error
+         —— 未知 ?state= 进入显式 unknown 提示（data-state="unknown"），不静默回落 default 掩盖坏链接
+  api:  GET /api/v1/jobs?keyword&category&city&industry&sourceOrgId&tag&page&pageSize
+        —— 只返回 reviewStatus=approved & publishStatus=published & validThrough 未过期的岗位
+        —— 每条必须带 sourceName / sourceUrl / externalId / syncTime（合规四要素）
+        对齐 apps/kiosk/src/pages/jobs/*
+  ai-api: GET  /me/resumes（只取 kind=parse & status=completed 的本人简历，对齐 ResumeSelectModal.tsx）
+          POST /api/v1/jobs/ai/recommendations
+               { resumeTaskId, intent{targetTitle,city,industry,keywords}, filters{city,category,sourceOrgId}, limit }
+               → recommendations[] { job, rank, fitLevel: reference_high|medium|low, summary, matchPoints, gapPoints, actionChecklist }
+        对齐 apps/kiosk/src/services/api/jobAi.ts 与 JobsPage.tsx（startAiRecommend → confirmConsent → ResumeSelectModal → runAiRecommend）
+  ai 链路（与 React 同序，不跳步）：
+        ai-consent →（同意）ai-resume-select →（选中一份 parse+completed 简历）ai-processing → ai-result / ai-empty / ai-error
+        ai-resume-select 无可用简历 → ai-no-resume（上传并诊断 / 继续普通浏览）
+  输入守卫（直接改地址栏也不放行）：
+        ai-processing / ai-result 缺少有效 ?resume= → 一律渲染 ai-input-missing（内含可直接点选的简历列表），
+        绝不渲染看起来像「你的」推荐结果的画面；data-state 写成 ai-input-missing，data-guard-from 记下被拦下的目标态。
+        ?resume=r1|r2|r3 是本原型的简历示例夹具键，只用于在 processing / result / empty / error 里保持
+        「你上一步选了哪一份」的语义；不是用户输入，不含真实简历信息，不写 sessionStorage，也不发任何请求。
+  ?err= 只接受服务端错误类目白名单（timeout / unavailable / quota / invalid-input）。
+        没有这个参数时，失败文案不猜网络、模型或额度，只说明服务端未返回具体原因。
+  fallback: 列表取不到 → error/offline，保留手动搜索、筛选与官方平台目录；不拿示例岗位顶替真实结果
+  真话边界：
+    ① 不预置真实岗位名称、公司、薪资、距离、发布时间、来源编号。合成排版数据只出现在持续标注
+       「布局示例 · 合成数据」的位置（default 列表、AI 推荐结果、AI 简历选择行），字段位置（.slot）用于等服务端返回。
+    ② 不显示岗位总数、招聘会数量、匹配条数；计数一律由服务端返回，静态原型写「—」。
+    ③ 不显示打印机/扫描仪/网络/AI 在线状态：设备与服务状态由各自功能页的真实轮询决定。
+    ④ 来源四要素缺一或已过期 = fail-closed（source-blocked）：外跳与扫码全部 aria-disabled 并常显原因。
+    ⑤ 本机不代收简历、不代替投递；行内 CTA 只用「查看岗位」，外跳与扫码在详情页按真实来源链接开放。
+    ⑥ 合成岗位行只进 27-browse-detail.html?state=detail-example（详情页显式的合成数据态），不进未支持状态。
+    ⑦ 页面上没有任何可见控件能把「处理中」变成「成功」。演示切态只走 ?state=（?debug=1 面板），不是产品控件。
+    ⑧ offline 只给本机可执行的恢复步骤与站内出口：不展示岗位、来源目录，不判断设备故障，不自动重连也不代为上报。
+  ai-mode: AI-CONTEXT（覆盖矩阵 075）
+  ai-input: 用户主动选定的本人 parse+completed 诊断简历 + 当前搜索意图/筛选条件 + 已发布真实岗位候选
+  ai-consent: 登录会员必须确认 job_ai 授权，并在下一步明确选择一份简历；不静默读取历史文件
+  ai-output: 最多返回真实岗位候选的较高/中等/偏低参考等级、匹配理由、差距与准备动作；不生成岗位、不给百分比或录用结论
+  ai-failure: 未登录、无可用简历、缺输入、零推荐、服务端失败分别进入独立状态；不拿普通列表冒充 AI 结果
+  ai-fallback: 搜索、分类/来源筛选、普通岗位列表和来源目录在 AI 不可用时全部照常；失败态常驻三条可用出路
+  ai-persistence: 服务端保存受 TTL 管理的本人 JobAiSession/Recommendation；本页不声称永久保存，可退出 AI 推荐回到普通列表
+  动效：处理中只用三点脉冲（MOTION-SPEC M2），无循环 spinner、无百分比、无阶段、无预计时间、无自动跳转计时器；
+        prefers-reduced-motion 与 ?flat=1 静态降级
+  验收范围：静态原型表现；不证明 React 接线、API 可用、真实岗位数据或硬件链路
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --r-lg:32px; --r-md:24px; --r-sm:18px; --r-xs:14px;
+  --dur:200ms; --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#e8e3d3;color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","Noto Serif SC","SimSun",serif}
+a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+ul{list-style:none}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.press{transition:transform var(--dur) var(--ease),border-color var(--dur) ease,background-color var(--dur) ease}
+.press:active{transform:scale(.985)}
+
+/* 顶栏 */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center}
+.logo{flex:none;display:flex;align-items:center;gap:12px}
+.logo-mark{width:44px;height:44px;border-radius:var(--r-xs);background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px}
+.sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:28px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:520px;white-space:nowrap;overflow:hidden}
+.pill .dot{width:12px;height:12px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+/* 紧凑任务头：目录页把第一屏留给名单 */
+.taskhead{flex:none;margin:20px 44px 0;display:flex;align-items:baseline;gap:20px;flex-wrap:wrap}
+.th-t{font-size:40px;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:14px}
+.th-t::before{content:"";flex:none;width:8px;height:36px;border-radius:4px;background:linear-gradient(180deg,var(--emerald),var(--teal))}
+.th-s{flex:1;min-width:280px;font-size:20px;line-height:1.45;color:var(--ink-2)}
+
+/* 主体 */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 44px}
+.sec{flex:none;margin-top:18px}
+.grow{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:16px}
+.grow.stack{gap:16px}
+
+/* 检索 */
+.qbar{display:flex;align-items:center;gap:14px;height:82px;padding:0 12px 0 22px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-md)}
+.qbar .qi{flex:none;display:flex;color:var(--ink-3)}
+.qinput{flex:1;min-width:0;height:60px;border:0;background:transparent;font-size:23px;color:var(--ink);font-family:inherit;outline:none}
+.qinput::placeholder{color:var(--ink-3)}
+.qbtn{flex:none;min-height:58px;padding:0 26px;border-radius:var(--r-sm);background:var(--deep);color:var(--emerald);font-size:22px;font-weight:600;display:inline-flex;align-items:center;gap:9px}
+.chips{display:flex;gap:12px;flex-wrap:wrap}
+.chip{min-height:56px;padding:0 22px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:8px;font-size:19px;font-weight:600;color:var(--ink-2)}
+.chip.on{background:var(--deep);border-color:transparent;color:#f2efe4}
+.filter-panel{flex:none;margin-top:12px;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.filter-field{display:flex;align-items:center;gap:10px;min-height:58px}
+.filter-field label{flex:none;width:92px;font-size:18px;font-weight:700;color:var(--ink-2)}
+.filter-field input{flex:1;min-width:0;height:54px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-xs);background:var(--paper);color:var(--ink);font:600 18px/1 inherit;outline:none}
+.filter-field input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(31,158,134,.12)}
+.filter-actions{display:flex;align-items:center;gap:10px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+.filter-actions p{flex:1;font-size:16px;line-height:1.4;color:var(--ink-3)}
+.filter-actions button,.filter-actions a{min-height:52px;padding:0 18px;border-radius:var(--r-xs);display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
+.filter-actions button{background:var(--deep);color:var(--emerald)}
+.filter-actions a{border:1px solid var(--line-2);background:var(--paper)}
+
+/* 就地 AI 辅助（不常驻大横幅） */
+.aibar{display:flex;align-items:center;gap:18px;padding:16px 22px;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:var(--r-md);background:var(--surface)}
+.ai-ic{flex:none;width:56px;height:56px;border-radius:var(--r-sm);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.ai-tx{flex:1;min-width:0}
+.ai-t{display:block;font-size:22px;font-weight:700}
+.ai-d{display:block;margin-top:5px;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.ai-d b{color:var(--ink)}
+.ai-btn{flex:none;min-height:60px;padding:0 24px;border-radius:var(--r-sm);border:1px solid var(--teal);background:var(--teal-soft);color:var(--teal-d);font-size:22px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+
+/* AI 任务工作台 */
+.ai-workspace{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.ai-panel{flex:none;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--teal);border-radius:var(--r-md);padding:22px 26px}
+.ai-panel.warn{border-left-color:var(--wheat);background:var(--wheat-soft);border-color:#e6d8b4}
+.ai-panel h2{font-size:29px;line-height:1.3;display:flex;align-items:center;gap:12px}
+.ai-panel h2 .step{margin-left:auto;font-size:19px;font-weight:600;color:var(--ink-3);letter-spacing:1px}
+.ai-panel p{margin-top:10px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.ai-panel p b{color:var(--ink)}
+.consent-lines{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.consent-line{min-height:96px;padding:15px 17px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);font-size:18px;line-height:1.45;color:var(--ink-2);display:flex;align-items:flex-start;gap:10px}
+.consent-line svg{flex:none;color:var(--teal-d);margin-top:2px}
+
+/* 合成数据横幅：所有示例内容常显 */
+.fixnote{flex:none;display:flex;align-items:center;gap:12px;padding:14px 20px;border:1px solid #e6d8b4;border-left:6px solid var(--wheat);border-radius:var(--r-sm);background:var(--wheat-soft);color:var(--wheat-d);font-size:18px;line-height:1.45;font-weight:600}
+.fixnote svg{flex:none}
+
+/* 当前筛选摘要 */
+.fsum{flex:none;display:flex;align-items:center;gap:18px;padding:14px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.fsum-h{flex:none;width:150px;font-size:18px;font-weight:700;color:var(--ink-2);line-height:1.35}
+.fsum-list{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:9px 10px}
+.fsum-list li{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 14px;border-radius:var(--r-xs);background:var(--paper);border:1px solid var(--line);font-size:18px;color:var(--ink-2)}
+.fsum-list b{font-weight:600;color:var(--ink-3);font-size:17px}
+.fsum-go{flex:none;min-height:56px;padding:0 20px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px}
+
+/* 说明卡：会输出什么 / 不会输出什么 */
+.duo{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.info{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 22px}
+.info.warn{background:var(--wheat-soft);border-color:#e6d8b4}
+.info.slate{background:var(--slate-soft);border-color:#cfdcee}
+.info h3{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:700}
+.info ul{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.info li{position:relative;padding-left:20px;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.info li::before{content:"";position:absolute;left:3px;top:10px;width:7px;height:7px;border-radius:50%;background:var(--teal)}
+.info.warn li{color:var(--wheat-d)}.info.warn li::before{background:var(--wheat)}
+.info.slate li{color:var(--slate-d)}.info.slate li::before{background:var(--slate)}
+
+/* 简历选择 */
+.picks{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.picks::-webkit-scrollbar{display:none}
+.pick{flex:none;width:100%;display:flex;align-items:center;gap:20px;padding:20px 24px;min-height:172px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);text-align:left}
+.pick[aria-checked=true]{border-color:var(--teal);background:var(--teal-soft)}
+.pick-box{flex:none;width:44px;height:44px;border-radius:50%;border:2px solid var(--line-2);background:var(--paper);display:flex;align-items:center;justify-content:center;color:transparent}
+.pick[aria-checked=true] .pick-box{border-color:var(--teal-d);background:var(--surface);color:var(--teal-d)}
+.pick-tx{flex:1;min-width:0}
+.pick-t{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:700;flex-wrap:wrap}
+.pick-d{display:block;margin-top:7px;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.pick-meta{display:flex;gap:8px 10px;flex-wrap:wrap;margin-top:10px}
+.pick-meta span{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 13px;border-radius:var(--r-xs);background:var(--paper);border:1px solid var(--line);font-size:17px;color:var(--ink-2)}
+.pick[aria-checked=true] .pick-meta span{background:var(--surface);border-color:#c6e4da}
+.pick-go{flex:none;color:var(--ink-3);display:flex}
+.pick.escape{border-style:dashed;border-color:var(--line-2);background:var(--paper)}
+.pick.escape .pick-box{border-radius:var(--r-sm);border-color:var(--wheat);color:var(--wheat-d);background:var(--wheat-soft)}
+.pickhint{flex:none;min-height:56px;display:flex;align-items:center;gap:10px;padding:0 6px;font-size:19px;font-weight:600;color:var(--ink-2)}
+
+/* 已选简历说明 */
+.rcard{flex:none;display:flex;align-items:center;gap:18px;padding:16px 22px;border:1px solid var(--line);border-left:6px solid var(--slate);border-radius:var(--r-md);background:var(--surface)}
+.rcard.warn{border-left-color:var(--wheat);background:var(--wheat-soft);border-color:#e6d8b4}
+.rcard-ic{flex:none;width:56px;height:56px;border-radius:var(--r-sm);background:var(--slate-soft);color:var(--slate-d);display:flex;align-items:center;justify-content:center}
+.rcard.warn .rcard-ic{background:var(--surface);color:var(--wheat-d)}
+.rcard-tx{flex:1;min-width:0}
+.rcard-t{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:700;flex-wrap:wrap}
+.rcard-d{display:block;margin-top:5px;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.rcard.warn .rcard-d{color:var(--wheat-d)}
+.rcard-go{flex:none;min-height:56px;padding:0 20px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+
+/* AI 推荐结果 */
+.ai-results{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.ai-results::-webkit-scrollbar{display:none}
+.ai-result{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 24px;display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px 20px}
+.air-title{font-size:25px;font-weight:700;line-height:1.35;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.air-source{margin-top:6px;font-size:17px;color:var(--slate-d)}
+.air-grade{justify-self:end;min-height:52px;padding:0 18px;border-radius:var(--r-sm);background:var(--teal-soft);color:var(--teal-d);font-size:20px;font-weight:700;display:flex;align-items:center}
+.air-grade.mid{background:var(--slate-soft);color:var(--slate-d)}.air-grade.low{background:var(--wheat-soft);color:var(--wheat-d)}
+.air-body{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.air-block{padding:13px 16px;border-radius:var(--r-sm);background:var(--paper);font-size:17px;line-height:1.45;color:var(--ink-2)}
+.air-block b{display:block;margin-bottom:5px;color:var(--ink);font-size:17px}
+.air-go{grid-column:1/-1;justify-self:end;min-height:58px;padding:0 22px;border-radius:var(--r-sm);background:var(--deep);color:var(--emerald);font-size:22px;font-weight:700;display:inline-flex;align-items:center;gap:8px}
+
+/* 处理中：三点脉冲，不用循环 spinner */
+.dots{display:inline-flex;align-items:center;gap:9px}
+.dots i{width:13px;height:13px;border-radius:50%;background:var(--teal)}
+.dots i:nth-child(1){animation:k-dot 1200ms ease-in-out infinite}
+.dots i:nth-child(2){animation:k-dot 1200ms ease-in-out 160ms infinite}
+.dots i:nth-child(3){animation:k-dot 1200ms ease-in-out 320ms infinite}
+@keyframes k-dot{0%,100%{opacity:.28}50%{opacity:1}}
+
+/* 列表 */
+.lhead{flex:none;display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.lh-t{font-size:25px;font-weight:700}
+.lh-m{font-size:19px;color:var(--ink-3)}
+.sortbtn{margin-left:auto;min-height:52px;padding:0 20px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--surface);font-size:19px;font-weight:600;color:var(--ink-2);display:inline-flex;align-items:center;gap:8px}
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.list::-webkit-scrollbar{display:none}
+.row{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.row-link{display:flex;align-items:center;gap:22px;padding:22px 24px;min-height:180px}
+.row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.row-t{font-size:27px;font-weight:700;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.row-sub{display:flex;gap:8px 24px;flex-wrap:wrap;font-size:19px;color:var(--ink-2)}
+.row-sub span{display:inline-flex;align-items:center;gap:7px}
+.row-src{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:17px;color:var(--slate-d);background:var(--slate-soft);border-radius:var(--r-xs);padding:9px 14px;align-self:flex-start}
+.row-go{flex:none;min-height:64px;padding:0 26px;border-radius:var(--r-sm);background:var(--deep);color:var(--emerald);font-size:22px;font-weight:700;display:inline-flex;align-items:center;gap:9px}
+.row.blocked .row-go{background:var(--paper);border:1px solid var(--line-2);color:var(--ink-3)}
+.slot{display:inline-block;min-width:88px;border-bottom:2px dotted var(--line-2);color:var(--ink-3);font-weight:400}
+.slot.big{min-width:280px;font-weight:700;color:var(--ink-3)}
+.lh-m .slot,.pnum .slot{min-width:52px}
+.tag{min-height:40px;padding:0 13px;border-radius:var(--r-xs);font-size:17px;font-weight:600;display:inline-flex;align-items:center;background:var(--slate-soft);color:var(--slate-d)}
+.tag.warn{background:var(--wheat-soft);color:var(--wheat-d)}
+.tag.teal{background:var(--teal-soft);color:var(--teal-d)}
+.rownote{font-size:17px;line-height:1.45;color:var(--wheat-d);font-weight:600;padding:0 2px}
+
+/* 分页 */
+.pager{flex:none;display:flex;align-items:center;gap:12px;margin-top:12px}
+.pbtn{min-height:56px;padding:0 24px;border-radius:var(--r-sm);border:1px solid var(--line-2);background:var(--surface);font-size:19px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.pbtn[aria-disabled=true]{opacity:.45}
+.pnum{margin-left:auto;font-size:19px;color:var(--ink-3)}
+
+/* 状态块 */
+.grow.center{justify-content:center;gap:18px}
+.state{flex:none;display:flex;flex-direction:column;gap:16px;padding:32px 34px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:14px;font-size:30px;font-weight:700}
+.state-p{font-size:21px;line-height:1.55;color:var(--ink-2);max-width:900px}
+.state-p b{color:var(--ink)}
+.alt{flex:none;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);overflow:hidden}
+.alt.fill{flex:1;min-height:0;display:flex;flex-direction:column}
+.alt.fill .alt-row{flex:1}
+.alt-h{padding:15px 22px;font-size:20px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line);background:var(--paper)}
+.alt-row{display:flex;align-items:center;gap:18px;padding:16px 22px;min-height:116px;border-bottom:1px solid var(--line)}
+.alt-row:last-child{border-bottom:0}
+.alt-ic{flex:none;width:58px;height:58px;border-radius:var(--r-sm);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center}
+.alt-tx{flex:1;min-width:0}
+.alt-t{display:block;font-size:23px;font-weight:700}
+.alt-d{display:block;margin-top:5px;font-size:18px;line-height:1.4;color:var(--ink-2)}
+.alt-go{flex:none;color:var(--teal-d);display:flex;align-items:center}
+.skel{display:flex;flex-direction:column;gap:12px}
+.skel.fill{flex:1;min-height:0;overflow:hidden}
+.skel.fill .skel-row{flex:1 1 150px}
+.skel-row{flex:none;height:150px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;gap:20px;padding:20px 24px}
+.skel-line{height:20px;border-radius:var(--r-xs);background:#eee9db}
+.load-row{flex:1 1 150px;min-height:150px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);display:flex;align-items:center;gap:20px;padding:20px 24px}.load-index{flex:none;width:54px;height:54px;border-radius:var(--r-sm);background:var(--teal-soft);color:var(--teal-d);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700}.load-copy{flex:1}.load-title{display:block;font-size:22px;font-weight:700}.load-desc{display:block;margin-top:8px;font-size:18px;line-height:1.45;color:var(--ink-2)}
+
+/* 主操作条：常驻底部整幅色带，位置在所有状态里一致 */
+.ctabar{flex:none;margin:16px -44px 0;padding:18px 44px 20px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:16px;align-items:center}
+.btn{min-height:72px;padding:0 28px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:11px;font-size:23px;font-weight:700;text-align:center}
+.btn.primary{background:var(--deep);color:var(--emerald)}
+.btn.ghost{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.btn[aria-disabled=true]{opacity:.5}
+.ctabar .btn{flex:1}
+.ctabar .why{flex:1.1;font-size:17px;line-height:1.4;color:var(--wheat-d);font-weight:600}
+
+/* 页脚与底栏 */
+.truth{flex:none;min-height:58px;padding:12px 44px;border-top:1px solid var(--line);display:flex;align-items:center;gap:18px;background:var(--paper)}
+.truth p{flex:1;font-size:17px;line-height:1.45;color:var(--ink-3)}
+.truth b{color:var(--ink-2);font-weight:600}
+.truth a{flex:none;min-height:48px;padding:0 16px;border-radius:var(--r-xs);display:inline-flex;align-items:center;font-size:17px;font-weight:600;color:var(--teal-d)}
+.navbar{flex:none;height:128px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.nav-item .ni{font-size:21px;color:var(--ink-3);font-weight:600}
+
+/* 演示面板（?debug=1 才显示，不参与业务表达，也不是产品控件） */
+.demo-tab,.demo-panel{display:none}
+.demo-tab.on{display:inline-flex;position:absolute;left:0;top:300px;min-height:56px;padding:0 16px;align-items:center;background:var(--deep);color:var(--emerald);font-size:18px;border-radius:0 var(--r-sm) var(--r-sm) 0;z-index:9}
+.demo-panel.on{display:block;position:absolute;left:0;top:0;width:300px;height:100%;background:rgba(11,36,30,.96);color:#e7efe9;padding:16px;overflow-y:auto;z-index:10}
+.demo-panel a{min-height:48px;padding:8px 10px;font-size:17px;border-bottom:1px solid rgba(231,239,233,.14);display:flex;align-items:center}
+html.flat *{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="16-service-hubs.html?hub=jobs" data-route="/jobs-service" aria-label="返回岗位服务"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <span class="logo"><span class="logo-mark serif">职</span><span class="logo-name">职易达</span></span>
+    <span class="sp"></span>
+    <span class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">岗位与来源信息以服务端返回为准</span></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <section class="taskhead">
+    <h1 class="th-t" id="task-title">岗位信息</h1>
+    <p class="th-s" id="task-sub">只展示已审核发布、来源完整且在有效期内的第三方与官方岗位。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="jobs" data-state="default" data-testid="jobs-state-default"></main>
+
+  <div class="truth">
+    <p><b>本机不代收简历、不代替投递。</b>岗位由来源平台发布，投递在来源平台完成；结束会话只清除本机登录态与临时会话信息。</p>
+    <a href="06-help.html" data-route="/help">遇到问题</a>
+  </div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item press" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item press" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item press" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+
+  <button type="button" class="demo-tab" id="demo-tab" data-proto-control="true" aria-label="打开原型演示控制面板">演示</button>
+  <div class="demo-panel" id="demo-panel" data-proto-control="true" aria-label="原型演示控制"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var SCREEN='jobs';
+var SELF='26-browse-list.html';
+var DETAIL='27-browse-detail.html';
+var DETAIL_FIXTURE=DETAIL+'?state=detail-example';
+
+var ICON={
+  search:'<circle cx="11" cy="11" r="7"/><path d="M20.5 20.5L16.5 16.5"/>',
+  pin:'<path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+  yuan:'<path d="M7 5l5 7 5-7"/><path d="M7.5 13h9M7.5 16.5h9M12 12v7"/>',
+  users:'<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20a6.2 6.2 0 0 1 12.4 0"/><path d="M16.5 5.2a3.4 3.4 0 0 1 0 6.6M18 20a6 6 0 0 0-2.2-4.6"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 3 2.6 15 0 18M12 3c-2.6 3-2.6 15 0 18"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.4l3.4 2"/>',
+  hash:'<path d="M5 9h14M5 15h14M10 4l-2 16M16 4l-2 16"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  right:'<path d="M9 5l7 7-7 7"/>',
+  left:'<path d="M15 5l-7 7 7 7"/>',
+  sort:'<path d="M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3"/>',
+  alert:'<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.6M12 17.4h.01"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/>',
+  lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+  wifi:'<path d="M2.5 8.5a16 16 0 0 1 19 0M5.8 12.3a11 11 0 0 1 12.4 0M9.2 16a6 6 0 0 1 5.6 0"/><path d="M12 19.6h.01"/>',
+  empty:'<rect x="3.5" y="6" width="17" height="13" rx="2"/><path d="M3.5 11h17M9 15h6"/>',
+  book:'<path d="M5 4.5h9a3 3 0 0 1 3 3V20H8a3 3 0 0 1-3-3z"/><path d="M17 7.5h2V20"/>',
+  doc:'<path d="M6.5 3.5h7l4.5 4.5v12h-11.5z"/><path d="M13.5 3.5V8H18M9 12.5h6M9 16h4"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+  refresh:'<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/>',
+  upload:'<path d="M12 16.5V4.5"/><path d="M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/>',
+  building:'<rect x="4" y="3.5" width="12" height="17" rx="1.6"/><path d="M16 9h4v11.5M7.5 7.5h5M7.5 11.5h5M7.5 15.5h5"/>'
+};
+function svg(n,s,w){return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[n]+'</svg>';}
+function slot(t,big){return '<span class="slot'+(big?' big':'')+'">'+t+'</span>';}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function dots(){return '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>';}
+
+/* ---------- 输入夹具：只是排版占位，不含任何真实简历信息 ---------- */
+var FIXTURE_RESUMES={
+  r1:{key:'r1',short:'示例简历 A',meta:'诊断任务示例编号 A',fmt:'PDF · 1 页',aim:'方向字段示例'},
+  r2:{key:'r2',short:'示例简历 B',meta:'诊断任务示例编号 B',fmt:'PDF · 2 页',aim:'方向字段示例'},
+  r3:{key:'r3',short:'示例简历 C',meta:'诊断任务示例编号 C',fmt:'DOCX · 1 页',aim:'方向字段示例'}
+};
+
+/* ---------- 服务端错误类目白名单：没有它就不猜原因 ---------- */
+var ERR_CLASS={
+  'timeout':'服务端返回的错误类目是<b>请求超时（timeout）</b>。',
+  'unavailable':'服务端返回的错误类目是<b>AI 服务不可用（service_unavailable）</b>。',
+  'quota':'服务端返回的错误类目是<b>今日 AI 辅助额度已用完（quota_exceeded）</b>。',
+  'invalid-input':'服务端返回的错误类目是<b>所选简历不能用于这次推荐（invalid_input）</b>。'
+};
+
+var params=new URLSearchParams(location.search);
+var CATEGORY_KEYS=['all','fulltime','intern','campus','parttime'];
+function cleanParam(name,max){
+  var raw=params.get(name);
+  if(raw===null)return '';
+  var value=raw.trim();
+  if(!value||value.length>(max||80)||/[\u0000-\u001f\u007f]/.test(value))return '';
+  return value;
+}
+var FILTER={
+  keyword:cleanParam('keyword',80),city:cleanParam('city',40),industry:cleanParam('industry',80),
+  sourceOrgId:cleanParam('sourceOrgId',80),tag:cleanParam('tag',80),
+  category:CATEGORY_KEYS.indexOf(params.get('category'))>=0?params.get('category'):'all',
+  sort:params.get('sort')==='salary_first'?'salary_first':'latest',
+  page:/^[1-9][0-9]{0,3}$/.test(params.get('page')||'')?Number(params.get('page')):1
+};
+function listUrl(over){
+  var next={state:'filtered',keyword:FILTER.keyword,city:FILTER.city,industry:FILTER.industry,sourceOrgId:FILTER.sourceOrgId,
+    tag:FILTER.tag,category:FILTER.category,sort:FILTER.sort,page:String(FILTER.page)};
+  Object.keys(over||{}).forEach(function(k){next[k]=over[k];});
+  var sp=new URLSearchParams();
+  Object.keys(next).forEach(function(k){var v=next[k];if(v!==''&&v!==null&&v!==undefined&&!(k==='category'&&v==='all')&&!(k==='sort'&&v==='latest')&&!(k==='page'&&String(v)==='1'))sp.set(k,String(v));});
+  var query=sp.toString();return SELF+(query?'?'+query:'');
+}
+function pickedResume(){var k=params.get('resume');return (k&&Object.prototype.hasOwnProperty.call(FIXTURE_RESUMES,k))?FIXTURE_RESUMES[k]:null;}
+function resumeQS(r){return r?'&resume='+r.key:'';}
+function errLine(){
+  var k=params.get('err');
+  if(k&&Object.prototype.hasOwnProperty.call(ERR_CLASS,k))return ERR_CLASS[k];
+  return '服务端这次<b>没有返回具体错误类目</b>，本机就不替它猜是网络、模型还是额度问题。';
+}
+
+/* ---------- 通用片段 ---------- */
+function searchSec(kw){
+  return '<section class="sec"><form class="qbar" method="get" action="'+SELF+'"><span class="qi">'+svg('search',28)+'</span>'
+    +'<input type="hidden" name="state" value="filtered"><input type="hidden" name="category" value="'+esc(FILTER.category==='all'?'':FILTER.category)+'">'
+    +'<input class="qinput" id="q" name="keyword" maxlength="80" type="search" aria-label="搜索岗位、公司或技能关键词" placeholder="搜岗位、公司、技能关键词"'+(kw?' value="'+esc(kw)+'"':'')+'>'
+    +'<button type="submit" class="qbtn press" data-testid="'+SCREEN+'-search">'+svg('search',22)+'搜索</button></form></section>';
+}
+function chipsSec(active){
+  var items=[['全部','all'],['全职','fulltime'],['实习','intern'],['校招','campus'],['兼职','parttime']];
+  var h='<section class="sec"><div class="chips" role="group" aria-label="岗位类型筛选">';
+  for(var i=0;i<items.length;i++){
+    var on=items[i][1]===active;
+    h+='<a class="chip press'+(on?' on':'')+'" href="'+listUrl({category:items[i][1],page:'1'})+'" data-route="/jobs" data-testid="'+SCREEN+'-filter-'+items[i][1]+'" aria-pressed="'+(on?'true':'false')+'">'+items[i][0]+'</a>';
+  }
+  h+='<a class="chip press" href="'+listUrl({state:'filters'})+'" data-route="/jobs" data-testid="'+SCREEN+'-filter-more">完整筛选</a></div></section>';
+  return h;
+}
+function head(kw,active){return searchSec(kw||FILTER.keyword)+chipsSec(active||FILTER.category||'all');}
+function advancedFilters(){
+  function field(name,label,placeholder,value){return '<div class="filter-field"><label for="filter-'+name+'">'+label+'</label><input id="filter-'+name+'" name="'+name+'" maxlength="80" value="'+esc(value)+'" placeholder="'+placeholder+'"></div>';}
+  return '<form class="filter-panel" method="get" action="'+SELF+'" data-testid="'+SCREEN+'-complete-filters">'
+    +'<input type="hidden" name="state" value="filtered"><input type="hidden" name="category" value="'+esc(FILTER.category==='all'?'':FILTER.category)+'">'
+    +'<div class="filter-grid">'+field('city','工作城市','输入或从实时城市项点选',FILTER.city)+field('industry','所属行业','输入或从实时行业项点选',FILTER.industry)
+    +field('sourceOrgId','来源机构','输入或从已发布来源项点选',FILTER.sourceOrgId)+field('tag','技能标签','输入岗位标签精确筛选',FILTER.tag)+'</div>'
+    +'<div class="filter-actions"><p>城市、行业和来源选项必须由当前已同步岗位动态生成；静态设计不写死几个城市冒充完整字典。</p>'
+    +'<a href="'+SELF+'" data-route="/jobs" data-testid="'+SCREEN+'-filter-clear">清除全部</a><button type="submit" data-testid="'+SCREEN+'-filter-apply">应用筛选</button></div></form>';
+}
+function aiSec(){
+  return '<section class="sec"><div class="aibar"><span class="ai-ic">'+svg('spark',26)+'</span>'
+    +'<span class="ai-tx"><span class="ai-t">用我的简历智能推荐</span>'
+    +'<span class="ai-d">选择一份<b>本人已完成诊断的简历</b>，从当前真实岗位里给出参考等级和理由；不向企业共享简历。</span></span>'
+    +'<a class="ai-btn press" href="'+SELF+'?state=ai-consent" data-route="/jobs" data-testid="'+SCREEN+'-ai-start">开始推荐</a></div></section>';
+}
+function fixBanner(tid,text){
+  return '<div class="fixnote" data-evidence-fixture="synthetic" data-testid="'+SCREEN+'-'+tid+'">'+svg('alert',22)
+    +'<span><b>布局示例 · 合成数据。</b>'+text+'</span></div>';
+}
+function filterSummary(){
+  return '<section class="fsum" data-testid="'+SCREEN+'-ai-filter-summary" aria-label="本次会带上的筛选与意图">'
+    +'<span class="fsum-h">本次带上的<br>筛选与意图</span>'
+    +'<ul class="fsum-list"><li><b>关键词</b>'+(FILTER.keyword?esc(FILTER.keyword):slot('—'))+'</li><li><b>岗位类型</b>'+(FILTER.category==='all'?'全部':esc(FILTER.category))+'</li>'
+    +'<li><b>工作城市</b>'+(FILTER.city?esc(FILTER.city):slot('—'))+'</li><li><b>所属行业</b>'+(FILTER.industry?esc(FILTER.industry):slot('—'))+'</li>'
+    +'<li><b>来源机构</b>'+(FILTER.sourceOrgId?esc(FILTER.sourceOrgId):slot('—'))+'</li><li><b>技能标签</b>'+(FILTER.tag?esc(FILTER.tag):slot('—'))+'</li></ul>'
+    +'<a class="fsum-go press" href="'+SELF+'" data-route="/jobs" data-testid="'+SCREEN+'-ai-edit-filter">改条件'+svg('right',20)+'</a></section>';
+}
+function outputCards(){
+  return '<div class="duo"><div class="info" data-testid="'+SCREEN+'-ai-will-output"><h3>'+svg('spark',22)+'会返回什么</h3>'
+    +'<ul><li>最多 6 条来自<b>已审核发布</b>岗位的候选</li><li>每条一个参考等级：较高 / 中等 / 偏低</li>'
+    +'<li>匹配理由、差距和可执行的准备清单</li></ul></div>'
+    +'<div class="info warn" data-testid="'+SCREEN+'-ai-wont-output"><h3>'+svg('ban',22)+'不会返回什么</h3>'
+    +'<ul><li>不给百分比、评分或排名</li><li>不预测面试机会与录用结果</li>'
+    +'<li>不生成岗位，也不代你投递</li></ul></div></div>';
+}
+function altRow(ic,href,route,t,d,tid){
+  return '<a class="alt-row press" href="'+href+'" data-route="'+route+'" data-testid="'+SCREEN+'-alt-'+tid+'">'
+    +'<span class="alt-ic">'+svg(ic,26)+'</span><span class="alt-tx"><span class="alt-t">'+t+'</span><span class="alt-d">'+d+'</span></span>'
+    +'<span class="alt-go">'+svg('right',24)+'</span></a>';
+}
+function altList(headTxt,rows,cls){return '<div class="alt'+(cls?' '+cls:'')+'"><div class="alt-h">'+headTxt+'</div>'+rows+'</div>';}
+/* 编号步骤行：沿用 .alt-row 排版，图标位换成步数；步骤本身不是链接，恢复动作仍只在底部主操作条 */
+function stepRow(n,t,d,tid){
+  return '<div class="alt-row" data-testid="'+SCREEN+'-'+tid+'">'
+    +'<span class="alt-ic" style="font-size:24px;font-weight:700">'+n+'</span>'
+    +'<span class="alt-tx"><span class="alt-t">'+t+'</span><span class="alt-d">'+d+'</span></span></div>';
+}
+function manualPaths(cls){
+  return altList('不使用 AI 也能继续',
+    altRow('search',SELF,'/jobs','搜索与筛选岗位','按职位、公司、城市、行业和来源自己找，排序不受 AI 影响。','manual')
+    +altRow('globe','45-online-platform-directory.html','/jobs/online-platforms','官方与合作平台目录','按来源平台查看，扫码在手机上继续。','platforms')
+    +altRow('users','28-jobfair-enhanced.html','/job-fairs','招聘会信息','招聘会由主办方发布，和岗位名单不是同一个接口。','fairs')
+    +altRow('building','43-company-directory.html','/companies','企业目录','先看用人单位，再看它的在招岗位与来源。','companies'),cls);
+}
+function resumeCard(picked,tid){
+  if(picked){
+    return '<div class="rcard" data-evidence-fixture="synthetic" data-testid="'+SCREEN+'-'+(tid||'picked-resume')+'">'
+      +'<span class="rcard-ic">'+svg('doc',26)+'</span><span class="rcard-tx">'
+      +'<span class="rcard-t">本次使用的简历：'+picked.short+'<span class="tag warn">布局示例</span></span>'
+      +'<span class="rcard-d">'+picked.meta+' —— 真实页面这里是你上一步点选的那一份，只读元数据，不展示简历正文。</span></span>'
+      +'<a class="rcard-go press" href="'+SELF+'?state=ai-resume-select" data-route="/jobs" data-testid="'+SCREEN+'-change-resume">换一份'+svg('right',20)+'</a></div>';
+  }
+  return '<div class="rcard warn" data-testid="'+SCREEN+'-picked-resume-missing">'
+    +'<span class="rcard-ic">'+svg('alert',26)+'</span><span class="rcard-tx">'
+    +'<span class="rcard-t">这次没有带上简历选择</span>'
+    +'<span class="rcard-d">推荐必须由你先选定一份本人诊断简历才会发起；本机不替你挑，也不默认用最近一次。</span></span>'
+    +'<a class="rcard-go press" href="'+SELF+'?state=ai-resume-select" data-route="/jobs" data-testid="'+SCREEN+'-pick-resume-again">去选择简历'+svg('right',20)+'</a></div>';
+}
+/* 状态块只描述发生了什么；恢复动作一律放到底部常驻主操作条 */
+function stateBlock(kind,icon,title,desc,tid){
+  return '<div class="state" data-kind="'+kind+'" data-testid="'+SCREEN+'-'+(tid||'fallback')+'"><div class="state-h">'+svg(icon,32)+title+'</div>'
+    +'<p class="state-p">'+desc+'</p></div>';
+}
+/* 主操作条：每个状态都以它收尾，位置和高度在所有状态里一致 */
+function ctaBar(btns,why){
+  return '<div class="ctabar">'+(why?'<p class="why">'+why+'</p>':'')+btns+'</div>';
+}
+function btn(kind,href,route,label,tid){
+  return '<a class="btn '+kind+' press" href="'+href+'" data-route="'+route+'"'+(tid?' data-testid="'+SCREEN+'-'+tid+'"':'')+'>'+label+'</a>';
+}
+function ctaDirectory(why){
+  return ctaBar(btn('ghost','42-offline-agency-directory.html','/offline-agencies','线下招聘机构')
+    +btn('primary','45-online-platform-directory.html','/jobs/online-platforms','官方与合作平台目录','primary'),why);
+}
+
+/* ---------- 列表行 ---------- */
+function listHead(t,m,right){
+  return '<div class="lhead"><span class="lh-t">'+t+'</span><span class="lh-m">'+m+'</span>'+(right||'')+'</div>';
+}
+function sortBtn(){
+  var next=FILTER.sort==='latest'?'salary_first':'latest';
+  return '<a class="sortbtn press" href="'+listUrl({sort:next,page:'1'})+'" data-route="/jobs" data-testid="'+SCREEN+'-sort">'+svg('sort',20)+(FILTER.sort==='latest'?'按更新时间':'当前结果薪资优先')+'</a>';
+}
+function fieldRow(i,blocked){
+  var go=blocked
+    ? '<span class="row-go" aria-hidden="true">'+svg('lock',20)+'来源待补全</span>'
+    : '<span class="row-go">查看岗位'+svg('right',20)+'</span>';
+  var inner='<span class="row-main"><span class="row-t">'+slot('岗位名称',true)+(blocked?'<span class="tag warn">来源要素不全</span>':'')+'</span>'
+    +'<span class="row-sub"><span>'+svg('yuan',20)+slot('基本劳动报酬')+'</span><span>'+svg('pin',20)+slot('工作地点')+'</span><span>'+svg('users',20)+slot('招聘人数')+'</span></span>'
+    +'<span class="row-src">'+svg('globe',18)+slot('来源平台')+svg('clock',18)+slot('同步时间')+svg('hash',18)+slot('外部编号')+'</span></span>'+go;
+  if(blocked){
+    return '<li class="row blocked"><span class="row-link">'+inner+'</span>'
+      +'<p class="rownote" style="padding:0 24px 16px">来源平台、外部编号、同步时间或有效期缺一项，本机就不放行外跳，也不展示这条岗位的投递入口。</p></li>';
+  }
+  return '<li class="row"><a class="row-link press" href="'+DETAIL+'" data-route="/jobs/:id" data-testid="'+SCREEN+'-row-'+i+'">'+inner+'</a></li>';
+}
+function exampleRow(i,title){
+  return '<li class="row" data-evidence-fixture="synthetic"><a class="row-link press" href="'+DETAIL_FIXTURE+'" data-route="/jobs/:id" data-testid="'+SCREEN+'-example-row-'+i+'">'
+    +'<span class="row-main"><span class="row-t">'+title+'<span class="tag warn">布局示例</span></span>'
+    +'<span class="row-sub"><span>'+svg('yuan',20)+'报酬字段示例</span><span>'+svg('pin',20)+'地点字段示例</span><span>'+svg('users',20)+'人数字段示例</span></span>'
+    +'<span class="row-src">'+svg('globe',18)+'来源平台示例'+svg('clock',18)+'同步时间示例'+svg('hash',18)+'编号示例</span></span>'
+    +'<span class="row-go">查看岗位'+svg('right',20)+'</span></a></li>';
+}
+function recommendation(i,title,grade,tone){
+  var cls=tone==='mid'?' mid':tone==='low'?' low':'';
+  return '<article class="ai-result" data-evidence-fixture="synthetic" data-testid="'+SCREEN+'-recommendation-'+i+'">'
+    +'<div><div class="air-title">'+title+'<span class="tag warn">布局示例</span></div><div class="air-source">来源平台示例 · 外部编号示例 · 同步时间示例</div></div>'
+    +'<span class="air-grade'+cls+'">'+grade+'</span>'
+    +'<div class="air-body"><div class="air-block"><b>匹配理由</b>接入后展示服务端 matchPoints：来自你本人简历里的技能与经历字段。</div>'
+    +'<div class="air-block"><b>差距</b>接入后展示 gapPoints：岗位要求里你简历还没写到的部分，不补造岗位要求。</div>'
+    +'<div class="air-block"><b>准备清单</b>接入后展示 actionChecklist：投递前可以先做完的几件事。</div></div>'
+    +'<a class="air-go press" href="'+DETAIL_FIXTURE+'" data-route="/jobs/:id" data-testid="'+SCREEN+'-open-recommendation-'+i+'">查看岗位'+svg('right',18)+'</a></article>';
+}
+function pager(){
+  var prev=FILTER.page>1?'<a class="pbtn press" href="'+listUrl({page:String(FILTER.page-1)})+'" data-route="/jobs" data-testid="'+SCREEN+'-prev">'+svg('left',20)+'上一页</a>':'<span class="pbtn" aria-disabled="true">'+svg('left',20)+'上一页</span>';
+  return '<div class="pager">'+prev
+    +'<a class="pbtn press" href="'+listUrl({page:String(FILTER.page+1)})+'" data-route="/jobs" data-testid="'+SCREEN+'-next">下一页'+svg('right',20)+'</a>'
+    +'<span class="pnum">第 '+FILTER.page+' 页 · 共 '+slot('—')+' 页 · 每页 10 条</span></div>';
+}
+
+/* ---------- 简历选择器（consent 之后唯一的输入入口，guard 态复用同一组件） ---------- */
+function pickRow(r,i){
+  return '<button type="button" class="pick press" role="radio" aria-checked="false" data-resume-pick="'+r.key+'" data-resume-short="'+r.short+'" data-testid="'+SCREEN+'-resume-option-'+i+'">'
+    +'<span class="pick-box">'+svg('check',22,2.8)+'</span>'
+    +'<span class="pick-tx"><span class="pick-t">'+r.short+'<span class="tag warn">布局示例</span><span class="tag teal">已完成诊断</span></span>'
+    +'<span class="pick-d">'+r.meta+' —— 只读元数据，不展示简历正文，也不发送给企业。</span>'
+    +'<span class="pick-meta"><span>'+svg('doc',18)+r.fmt+'</span><span>'+svg('clock',18)+'诊断完成时间示例</span><span>'+svg('spark',18)+r.aim+'</span></span>'
+    +'</span><span class="pick-go">'+svg('right',24)+'</span></button>';
+}
+function pickEscapeRow(){
+  return '<a class="pick escape press" href="'+SELF+'?state=ai-no-resume" data-route="/jobs" data-testid="'+SCREEN+'-resume-none">'
+    +'<span class="pick-box">'+svg('upload',22)+'</span>'
+    +'<span class="pick-tx"><span class="pick-t">上面没有你的简历？</span>'
+    +'<span class="pick-d">诊断未完成、只上传过文件或还没上传时，这里都不会出现；先去上传并诊断，再回来选。</span></span>'
+    +'<span class="pick-go">'+svg('right',24)+'</span></a>';
+}
+function pickerList(){
+  return '<div class="picks" role="radiogroup" aria-label="可用于岗位推荐的本人简历（布局示例）" data-testid="'+SCREEN+'-resume-list">'
+    +pickRow(FIXTURE_RESUMES.r1,1)+pickRow(FIXTURE_RESUMES.r2,2)+pickRow(FIXTURE_RESUMES.r3,3)+pickEscapeRow()+'</div>';
+}
+function pickerHint(){
+  return '<p class="pickhint" id="resume-hint" data-testid="'+SCREEN+'-resume-hint">'+svg('info',22)+'还没有选择简历，下一步按钮保持不可用。</p>';
+}
+function pickerCta(backHref,backLabel){
+  return '<div class="ctabar"><p class="why">推荐只作求职准备参考：不给百分比，不预测录用，也不代替你投递。</p>'
+    +'<a class="btn ghost press" href="'+backHref+'" data-route="/jobs" data-testid="'+SCREEN+'-resume-back">'+backLabel+'</a>'
+    +'<a class="btn primary" id="resume-cta" aria-disabled="true" data-route="/jobs" data-testid="'+SCREEN+'-resume-confirm">用这份简历生成推荐</a></div>';
+}
+
+/* ---------- 状态视图 ---------- */
+var VIEWS={
+  'default':function(){
+    return head('',FILTER.category)+aiSec()
+      +'<section class="grow">'+fixBanner('list-fixture-note','下面 5 条不是真实岗位，只用于确认行高、来源条与按钮排版；点进去也只到详情页的合成数据态。')
+      +'<div style="height:12px"></div>'
+      +listHead('岗位列表','共 '+slot('—')+' 条 · 数量以服务端返回为准',sortBtn())
+      +'<ul class="list" data-testid="'+SCREEN+'-list" data-evidence-fixture="synthetic" aria-label="岗位列表布局示例">'
+      +exampleRow(1,'岗位示例 A')+exampleRow(2,'岗位示例 B')+exampleRow(3,'岗位示例 C')+exampleRow(4,'岗位示例 D')+exampleRow(5,'岗位示例 E')+'</ul>'
+      +pager()+'</section>'
+      +ctaDirectory('真实页面只展示已审核发布、来源完整且未过期的岗位。');
+  },
+  'filters':function(){
+    return head('',FILTER.category)+advancedFilters()+aiSec()
+      +'<section class="grow stack">'+stateBlock('info','search','完整筛选条件',
+        '岗位类型是固定合同；城市、行业、来源机构和标签来自当前已同步岗位或由你手动填写。应用后请求会带上 <b>keyword / category / city / industry / sourceOrgId / tag / page / pageSize</b>，不会把未选条件补成默认值。','filters')
+      +manualPaths('fill')+'</section>'
+      +ctaDirectory('筛选只改变岗位查询参数，不改变来源审核、有效期和合规门禁。');
+  },
+  'filtered':function(){
+    var summary=[];
+    if(FILTER.category!=='all')summary.push('类型 '+FILTER.category);
+    if(FILTER.keyword)summary.push('关键词 '+esc(FILTER.keyword));
+    if(FILTER.city)summary.push('城市 '+esc(FILTER.city));
+    if(FILTER.industry)summary.push('行业 '+esc(FILTER.industry));
+    if(FILTER.sourceOrgId)summary.push('来源 '+esc(FILTER.sourceOrgId));
+    if(FILTER.tag)summary.push('标签 '+esc(FILTER.tag));
+    return head('',FILTER.category)+advancedFilters()+aiSec()
+      +'<section class="grow">'
+      +listHead('已按条件筛选',(summary.length?summary.join(' · '):'全部岗位')+' · 共 '+slot('—')+' 条',sortBtn())
+      +'<ul class="list" data-testid="'+SCREEN+'-list">'+fieldRow(1)+fieldRow(2)+fieldRow(3)+fieldRow(4)+fieldRow(5)+'</ul>'
+      +pager()+'</section>'
+      +ctaDirectory('筛选条件由你选择；AI 只提供关键词，不改变排序，也不隐藏符合条件的岗位。');
+  },
+  'loading':function(){
+    var row=function(i,t,d){return '<div class="load-row"><span class="load-index">'+i+'</span><span class="load-copy"><span class="load-title">'+t+'</span><span class="load-desc">'+d+'</span></span></div>';};
+    return head('','all')
+      +'<section class="grow">'+listHead('正在取岗位名单','未返回前不显示条数',dots())
+      +'<div class="list skel fill" data-testid="'+SCREEN+'-list" aria-label="岗位名单等待中，尚无内容">'
+      +row(1,'等待岗位标题与用人单位','真实字段返回前不显示示例岗位，也不沿用上一次列表。')
+      +row(2,'等待工作地点与基本劳动报酬','来源没有提供的字段保持未提供，不由本机估算。')
+      +row(3,'等待来源四要素','来源平台、外部编号、同步时间和有效期限缺一即不放行。')
+      +row(4,'等待审核与有效期结果','只展示审核通过、已发布且仍在有效期内的岗位。')
+      +row(5,'准备本页排序与翻页','条数和页码只认服务端返回，不提前显示。')+'</div>'
+      +'<p class="rownote" style="margin-top:12px">只显示整体等待，不画阶段进度条，也不预估剩余秒数。</p></section>'
+      +ctaDirectory('');
+  },
+  'empty':function(){
+    /* 空态必须保留用户真实选中的分类：原来写死 'parttime'，
+       筛「全职」无结果时高亮却跳回「兼职」，条件与结果对不上。 */
+    return head('')
+      +'<section class="grow stack">'+stateBlock('info','empty','这组条件下没有已发布的岗位',
+        '本机<b>不会拿示例岗位把列表填满</b>。可以放宽条件重新筛选，也可以换一条路径找岗位。','empty')
+      +manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost',SELF,'/jobs','清除筛选条件','empty-clear')+btn('primary',SELF+'?state=loading','/jobs','重新查询','primary'));
+  },
+  'error':function(){
+    return head('','all')
+      +'<section class="grow stack">'+stateBlock('error','alert','岗位名单这次没取到',
+        '服务端没有返回这一页岗位。本机<b>不显示上一次的缓存结果冒充最新岗位</b>，也不猜是网络还是接口的问题。','error')
+      +manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost','06-help.html','/help','找工作人员','error-help')+btn('primary',SELF+'?state=loading','/jobs','重新加载','primary'));
+  },
+  'offline':function(){
+    return '<section class="grow stack" style="margin-top:18px">'+stateBlock('warn','wifi','网络断开，岗位信息暂时看不了',
+        '岗位来自第三方与官方来源。断网时无法核对来源、有效期和外部链接，本机<b>就不展示任何岗位内容</b>，也不给外跳入口。','offline')
+      +altList('断网时可以按顺序试的三步',
+        stepRow(1,'先点下方「重试连接」试一次','本页不自动重连，也不会自己变成已恢复；每次重试都由你发起。','offline-step-1')
+        +stepRow(2,'重试后仍不通，请工作人员检查一体机网线与网络设备','本页不读取设备状态，也不代替你向后台上报故障。','offline-step-2')
+        +stepRow(3,'网络恢复后，重新取一次岗位名单','来源四要素与有效期会重新核对后才显示，不沿用上一次的结果。','offline-step-3'))
+      +'<div class="duo"><div class="info" data-testid="'+SCREEN+'-offline-retry-does"><h3>'+svg('refresh',22)+'点「重试连接」会做什么</h3>'
+      +'<ul><li>重新向服务端取这一页岗位名单</li><li>逐条核对来源四要素与有效期</li><li>取到之前不显示任何岗位内容</li></ul></div>'
+      +'<div class="info warn" data-testid="'+SCREEN+'-offline-wont-do"><h3>'+svg('ban',22)+'断网期间不会发生什么</h3>'
+      +'<ul><li>不拿上一次缓存冒充最新岗位</li><li>不放行外跳与扫码入口</li><li>不判断设备故障，也不代为上报</li></ul></div></div>'
+      +altList('现在还能去哪儿',
+        altRow('empty','01-home.html','/','回首页看看别的服务','每项服务进入后各自核验能力，本页不替它们预报状态。','home')
+        +altRow('info','09-system-state.html','/error-offline','查看本机状态说明','受影响范围与恢复安排以系统状态页为准。','system')
+        +altRow('alert','06-help.html','/help','帮助与求助','服务台位置、常见问题与人工处理方式都在这里。','help'))
+      +'<p class="pickhint" data-testid="'+SCREEN+'-offline-retry-note">'+svg('info',22)+'「重试连接」只重新取这一页岗位名单，不会改动你的账号、订单或已保存的材料。</p>'
+      +'</section>'
+      +ctaBar(btn('ghost','06-help.html','/help','找工作人员','offline-help')+btn('primary',SELF+'?state=loading','/jobs','重试连接','primary'));
+  },
+  'source-blocked':function(){
+    return head('','all')
+      +'<section class="grow">'+listHead('已发布岗位','共 '+slot('—')+' 条 · 每页 10 条',sortBtn())
+      +'<ul class="list" data-testid="'+SCREEN+'-list">'+fieldRow(1,true)+fieldRow(2)+fieldRow(3)+fieldRow(4)+'</ul>'
+      +'<p class="rownote" style="margin-top:10px">来源要素不全或已过有效期的岗位保持只读：不给外跳、不给扫码，也不进入详情页。</p>'
+      +pager()+'</section>'
+      +ctaDirectory('来源平台、外部编号、同步时间、有效期四项缺一，本机就按 fail-closed 处理。');
+  },
+
+  /* --- AI 第 1 步：授权 --- */
+  'ai-consent':function(){
+    return head('','all')
+      +'<section class="ai-workspace"><div class="ai-panel"><h2>'+svg('spark',28)+'开启岗位 AI 推荐<span class="step">第 1 步 / 共 2 步</span></h2>'
+      +'<p>确认后进入<b>选择简历</b>这一步；只有你点选了一份本人已完成诊断的简历，本机才会把它和当前筛选条件一起发给服务端。</p>'
+      +'<div class="consent-lines"><div class="consent-line">'+svg('lock',20)+'分析结果只展示给当前登录的求职者本人。</div>'
+      +'<div class="consent-line">'+svg('ban',20)+'绝不向企业共享或推荐你的简历，也不代替你投递。</div>'
+      +'<div class="consent-line">'+svg('book',20)+'结果按服务端留存期限管理，可在 AI 记录中查看或删除。</div></div></div>'
+      +outputCards()+manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost',SELF,'/jobs','取消，继续普通浏览','ai-cancel')
+        +btn('primary',SELF+'?state=ai-resume-select','/jobs','同意，去选择简历','ai-consent-confirm'));
+  },
+
+  /* --- AI 第 2 步：选简历。未选中前主操作常驻不可用 --- */
+  'ai-resume-select':function(){
+    return head('','all')
+      +'<section class="ai-workspace"><div class="ai-panel"><h2>'+svg('doc',28)+'选择这次要用的简历<span class="step">第 2 步 / 共 2 步</span></h2>'
+      +'<p>只列出本人<b>已上传并完成诊断</b>的简历（parse + completed）。未完成诊断的记录、普通上传文件和他人简历都不会出现，也不会被读取。</p></div>'
+      +fixBanner('resume-fixture-note','下面 3 行是简历行的排版占位，不是你的账号数据；真实页面按你本人的诊断记录列出。')
+      +filterSummary()+pickerList()+pickerHint()+'</section>'
+      +pickerCta(SELF+'?state=ai-consent','上一步');
+  },
+
+  /* --- 输入守卫：直接开 ai-processing / ai-result 但没带简历时落到这里 --- */
+  'ai-input-missing':function(){
+    var target=GUARD_FROM==='ai-result'?'推荐结果':'推荐处理中';
+    return head('','all')
+      +'<section class="ai-workspace">'
+      +stateBlock('warn','lock','这一步缺少你选定的简历',
+        '你打开的是<b>'+target+'</b>，但这次没有带上任何一份由你点选的诊断简历。本机<b>不会凭空生成一份看起来像「你的」结果</b>，也不会默认用最近一次的简历。先在下面选一份，再继续。',
+        'ai-input-missing')
+      +pickerList()+pickerHint()+'</section>'
+      +pickerCta(SELF,'退出 AI，回岗位列表');
+  },
+
+  'ai-no-resume':function(){
+    return head('','all')
+      +'<section class="ai-workspace"><div class="ai-panel warn"><h2>'+svg('book',28)+'还没有可用于推荐的简历</h2>'
+      +'<p>岗位 AI 只使用本人<b>已上传并完成诊断</b>的简历。普通上传文件、诊断失败或还在处理中的记录都不会被读取，本机也不会拿空简历跑一次假推荐。</p>'
+      +'<div class="consent-lines"><div class="consent-line">'+svg('check',20)+'已上传原件并完成 AI 诊断 —— 会出现在选择列表里。</div>'
+      +'<div class="consent-line">'+svg('ban',20)+'只上传未诊断、诊断失败或处理中 —— 不出现，也不会被读取。</div>'
+      +'<div class="consent-line">'+svg('lock',20)+'他人简历、别的账号的文件 —— 任何情况下都不出现。</div></div></div>'
+      +manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost',SELF,'/jobs','继续普通浏览','no-resume-manual')
+        +btn('primary','21-resume-triage.html?intent=diagnose','/resume/source?intent=diagnose','上传并诊断简历','no-resume-import'));
+  },
+
+  'ai-processing':function(){
+    var picked=pickedResume();
+    return head('','all')
+      +'<section class="ai-workspace"><div class="ai-panel" role="status" aria-live="polite" data-processing-live="true"><h2>'+dots()+'正在生成岗位推荐</h2>'
+      +'<p>服务端正在读取你确认的简历与当前真实岗位候选。页面<b>不会按计时器自动显示成功</b>，也不会在返回前补造推荐；这期间上面的搜索、筛选和普通列表照常可用。</p></div>'
+      +resumeCard(picked)+filterSummary()
+      +'<div class="skel fill" aria-label="推荐结果等待中，尚无内容">'
+      +'<div class="load-row"><span class="load-index">1</span><span class="load-copy"><span class="load-title">核对岗位候选是否仍然有效</span><span class="load-desc">过期、未审核或来源不完整的岗位不会进入推荐。</span></span></div>'
+      +'<div class="load-row"><span class="load-index">2</span><span class="load-copy"><span class="load-title">查找简历原文依据</span><span class="load-desc">只引用已选简历中可以追溯的技能和经历字段。</span></span></div>'
+      +'<div class="load-row"><span class="load-index">3</span><span class="load-copy"><span class="load-title">整理差距与准备动作</span><span class="load-desc">不补造岗位要求，不生成匹配百分比或录用结论。</span></span></div>'
+      +'<div class="load-row"><span class="load-index">4</span><span class="load-copy"><span class="load-title">等待服务端返回明确结果</span><span class="load-desc">返回前不自动跳转；失败时保留普通岗位浏览。</span></span></div></div></section>'
+      +ctaBar(btn('ghost',SELF+'?state=ai-resume-select','/jobs','换一份简历','processing-change-resume')
+        +btn('primary',SELF,'/jobs','返回手动浏览','primary'),
+        '等待中不显示百分比、阶段和预计时间；只有服务端返回后才会进入结果或失败状态。');
+  },
+
+  'ai-result':function(){
+    var picked=pickedResume();
+    return head('','all')
+      +'<section class="ai-workspace">'
+      +fixBanner('result-fixture-note','下面 3 条推荐是排版占位，不是真实岗位、不是你的账号结果，也不是模型输出。')
+      +resumeCard(picked)
+      +listHead('AI 岗位推荐','共 '+slot('—')+' 条 · 仅供求职准备参考',
+        '<a class="sortbtn press" href="'+SELF+'" data-route="/jobs" data-testid="'+SCREEN+'-ai-clear">退出 AI 推荐</a>')
+      +'<div class="ai-results" data-testid="'+SCREEN+'-ai-results">'
+      +recommendation(1,'岗位示例 A','参考较高','high')+recommendation(2,'岗位示例 B','参考中等','mid')+recommendation(3,'岗位示例 C','参考偏低','low')+'</div></section>'
+      +ctaBar(btn('ghost',SELF+'?state=ai-resume-select','/jobs','换一份简历再试','result-change-resume')
+        +btn('primary',SELF,'/jobs','返回普通列表','primary'),
+        '参考等级不是匹配度百分比，也不代表能否录用；投递仍需进入岗位详情后前往来源平台。');
+  },
+
+  'ai-empty':function(){
+    var picked=pickedResume();
+    return head('','all')
+      +'<section class="ai-workspace">'+stateBlock('info','empty','这次没有返回合适的推荐',
+        '服务端没有为当前简历和筛选条件返回推荐。本机<b>不会为了填满页面编造岗位或参考等级</b>，也不会把普通列表当成 AI 结果。','ai-empty')
+      +resumeCard(picked)+filterSummary()+manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost',SELF,'/jobs','退出 AI，继续普通浏览','empty-manual')
+        +btn('ghost',SELF+'?state=ai-resume-select','/jobs','换一份简历再试','empty-change-resume')
+        +btn('primary',SELF+'?state=ai-processing'+resumeQS(picked),'/jobs','放宽条件重新推荐','primary'));
+  },
+
+  'ai-error':function(){
+    var picked=pickedResume();
+    /* 三条出路：① 按当前输入重试 ② 换一种分析方式 ③ 退出 AI 回到确定性浏览 */
+    var retry=picked
+      ? btn('primary',SELF+'?state=ai-processing'+resumeQS(picked),'/jobs','用同一份简历重试','error-retry')
+      : btn('primary',SELF+'?state=ai-resume-select','/jobs','重新选择简历再试','error-retry');
+    var swap=picked
+      ? btn('ghost',SELF+'?state=ai-resume-select','/jobs','重新选择简历再试','error-change-resume')
+      : btn('ghost',DETAIL+'?state=ai-choice&amp;mode=explain','/jobs/:id','改用逐条岗位解读','error-change-resume');
+    return head('','all')
+      +'<section class="ai-workspace">'+stateBlock('error','alert','这次岗位推荐没有生成',
+        errLine()+'<b>普通岗位搜索、筛选、收藏和来源查看都不受影响</b>；本机不会用旧结果或普通列表冒充这次的推荐。','ai-error')
+      +resumeCard(picked)
+      +'<div class="duo"><div class="info"><h3>'+svg('check',22)+'现在仍然可用</h3>'
+      +'<ul><li>关键词搜索、类型 / 城市 / 行业筛选</li><li>普通岗位列表、详情与来源四要素</li><li>在来源平台自行完成后续操作</li></ul></div>'
+      +'<div class="info warn"><h3>'+svg('ban',22)+'AI 不可用时不会发生</h3>'
+      +'<ul><li>不拿上一次的推荐冒充这次结果</li><li>不因为 AI 挂了就隐藏岗位或改排序</li><li>不把失败写成「没有合适岗位」</li></ul></div></div>'
+      +manualPaths('fill')+'</section>'
+      +ctaBar(btn('ghost',SELF,'/jobs','退出 AI，继续普通浏览','error-manual')+swap+retry);
+  }
+};
+
+function unknownView(raw){
+  var shown=raw.length>40?raw.slice(0,40)+'…':raw;
+  return head('','all')
+    +'<section class="grow stack">'+stateBlock('warn','alert','这个页面状态不存在',
+      '链接里带的 <b>?state='+esc(shown)+'</b> 不是本页支持的状态。本机<b>不会拿默认列表把坏链接盖过去</b>，因为那样你会以为看到的是真实结果。',
+      'unknown-state')
+    +manualPaths('fill')+'</section>'
+    +ctaBar(btn('ghost','06-help.html','/help','找工作人员','unknown-help')
+      +btn('primary',SELF,'/jobs','回岗位列表','primary'));
+}
+
+var PILL={
+  'filters':['','完整筛选 · 动态选项与手动输入'],
+  'loading':['','正在向服务端取岗位名单'],
+  'error':['bad','岗位接口这次没有返回'],
+  'offline':['bad','网络断开，来源无法核对'],
+  'source-blocked':['warn','部分岗位来源要素不全，已按 fail-closed 处理'],
+  'ai-consent':['','第 1 步：确认岗位 AI 用途'],
+  'ai-resume-select':['warn','第 2 步：选择简历后才能继续'],
+  'ai-input-missing':['bad','缺少你选定的简历，已拦下这一步'],
+  'ai-no-resume':['warn','没有可用于岗位推荐的诊断简历'],
+  'ai-processing':['','岗位 AI 正在处理，手动浏览仍可用'],
+  'ai-result':['warn','布局示例推荐，不代表真实岗位或账号结果'],
+  'ai-empty':['warn','这次没有返回推荐'],
+  'ai-error':['bad','这次推荐没有生成，浏览不受影响'],
+  'default':['warn','布局示例列表，不代表真实岗位'],
+  'unknown':['bad','链接里的状态不存在']
+};
+var TITLE={
+  'ai-consent':'岗位 AI 推荐',
+  'ai-resume-select':'选择本人简历',
+  'ai-input-missing':'缺少简历输入',
+  'ai-no-resume':'没有可用简历',
+  'ai-processing':'正在生成推荐',
+  'ai-result':'AI 岗位推荐',
+  'ai-empty':'没有返回推荐',
+  'ai-error':'推荐没有生成',
+  'unknown':'状态不存在'
+};
+var SUB={
+  'default':'列表内容为布局示例；真实页面只展示已审核发布、来源完整且未过期的岗位。',
+  'filters':'城市、行业、来源机构和标签不写死，按当前同步数据生成选项并允许手动填写。',
+  'filtered':'筛选后仍只展示已审核发布、来源完整且未过期的岗位。',
+  'loading':'名单返回前不显示条数，也不画阶段进度。',
+  'empty':'没有符合条件的岗位时保持空态，不拿示例数据填充。',
+  'error':'接口失败时不展示岗位，只给重试与人工帮助。',
+  'offline':'断网时无法核对来源与有效期，因此不展示岗位。',
+  'source-blocked':'来源四要素不全或已过期的岗位按 fail-closed 只读处理。',
+  'ai-consent':'确认用途后进入选择简历，两步都完成才会发起推荐。',
+  'ai-resume-select':'只列出本人已完成诊断的简历；不选就不能继续。',
+  'ai-input-missing':'没有选定简历就不生成任何看起来像你的结果。',
+  'ai-no-resume':'没有可用诊断简历时，先上传诊断或继续普通浏览。',
+  'ai-processing':'服务端返回前不展示任何推荐结果。',
+  'ai-result':'参考等级与建议来自服务端，投递仍在来源平台完成。',
+  'ai-empty':'零推荐就是零推荐，不用示例数据补位。',
+  'ai-error':'失败原因只认服务端返回的错误类目，本机不猜。',
+  'unknown':'坏链接按坏链接处理，不静默回落到默认列表。'
+};
+
+/* ---------- 状态解析 + 输入守卫 ---------- */
+var NEEDS_RESUME={'ai-processing':1,'ai-result':1};
+var rawState=params.get('state')||'default';
+var state=Object.prototype.hasOwnProperty.call(VIEWS,rawState)?rawState:'unknown';
+var GUARD_FROM='';
+if(NEEDS_RESUME[state]&&!pickedResume()){GUARD_FROM=state;state='ai-input-missing';}
+
+var root=document.getElementById('body-root');
+root.setAttribute('data-state',state);
+root.setAttribute('data-testid',SCREEN+'-state-'+state);
+if(GUARD_FROM)root.setAttribute('data-guard-from',GUARD_FROM);
+root.innerHTML=state==='unknown'?unknownView(rawState):VIEWS[state]();
+
+if(PILL[state]){
+  var p=document.getElementById('pill');
+  p.className='pill'+(PILL[state][0]?' '+PILL[state][0]:'');
+  document.getElementById('pill-txt').textContent=PILL[state][1];
+}
+if(TITLE[state])document.getElementById('task-title').textContent=TITLE[state];
+if(SUB[state])document.getElementById('task-sub').textContent=SUB[state];
+
+/* 简历选择：选中后才放行下一步。纯本地状态切换，不发请求、不写存储、不带用户输入 */
+(function bindPicker(){
+  var cta=document.getElementById('resume-cta');
+  var hint=document.getElementById('resume-hint');
+  if(!cta||!hint)return;
+  var opts=Array.prototype.slice.call(document.querySelectorAll('[data-resume-pick]'));
+  opts.forEach(function(opt){
+    opt.addEventListener('click',function(){
+      opts.forEach(function(o){o.setAttribute('aria-checked',o===opt?'true':'false');});
+      cta.setAttribute('href',SELF+'?state=ai-processing&resume='+opt.getAttribute('data-resume-pick'));
+      cta.setAttribute('aria-disabled','false');
+      cta.classList.add('press');
+      hint.innerHTML=svg('check',22,2.4)+'已选择：'+opt.getAttribute('data-resume-short')+'（布局示例，不是真实简历）；下一步会把它和上面的筛选条件一起发给服务端。';
+    });
+  });
+})();
+
+function tick(){var d=new Date();document.getElementById('clock').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+tick();setInterval(tick,20000);
+
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')';}
+fit();addEventListener('resize',fit);
+if(params.get('flat')==='1')document.documentElement.classList.add('flat');
+
+/* 原型演示控制：?debug=1 才出现，用于人工与截图取证直接跳状态；不是产品控件 */
+if(params.get('debug')==='1'){
+  var tab=document.getElementById('demo-tab'),panel=document.getElementById('demo-panel'),html='';
+  var extra=['ai-processing&resume=r2','ai-result&resume=r2','ai-empty&resume=r2','ai-error&resume=r2','ai-error&err=timeout','ai-error&err=quota'];
+  for(var k in VIEWS){if(k!=='ai-input-missing')html+='<a href="'+SELF+'?debug=1&state='+k+'">'+k+'</a>';}
+  html+='<a href="'+SELF+'?debug=1&state=ai-processing">ai-processing（无简历→守卫）</a>';
+  html+='<a href="'+SELF+'?debug=1&state=ai-result">ai-result（无简历→守卫）</a>';
+  for(var i=0;i<extra.length;i++)html+='<a href="'+SELF+'?debug=1&state='+extra[i]+'">'+extra[i]+'</a>';
+  html+='<a href="'+SELF+'?debug=1&state=no-such-state">unknown（坏链接）</a>';
+  panel.innerHTML=html;tab.classList.add('on');
+  tab.addEventListener('click',function(){panel.classList.toggle('on');});
+}
+})();
+</script>
+</body>
+</html>

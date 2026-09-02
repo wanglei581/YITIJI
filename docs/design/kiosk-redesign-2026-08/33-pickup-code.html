@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>取件码核销 · 职易达</title>
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e;
+  --r-lg:32px; --r-md:24px;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);}
+#viewport{position:fixed;inset:0;display:grid;place-items:center;overflow:hidden;}
+#stage{width:1080px;height:1920px;flex:none;transform-origin:center center;position:relative;
+  background:
+    radial-gradient(900px 400px at 85% 8%, rgba(31,158,134,.06), transparent 60%),
+    radial-gradient(800px 500px at -5% 55%, rgba(184,104,60,.04), transparent 55%),
+    var(--paper);
+  overflow:hidden;display:flex;flex-direction:column;}
+.serif{font-family:"Songti SC","STSong","SimSun",serif;}
+
+/* 顶栏 */
+.topbar{flex:none;height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;
+  background:var(--surface);border-bottom:1px solid var(--line);}
+.back{flex:none;width:64px;height:64px;border-radius:20px;border:1px solid var(--line-2);
+  display:flex;align-items:center;justify-content:center;background:var(--paper);cursor:pointer;}
+.back svg{width:28px;height:28px;stroke:var(--ink);}
+.logo{flex:none;display:flex;align-items:center;gap:12px;}
+.logo-mark{width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--emerald);
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;}
+.logo-name{font-size:26px;font-weight:700;letter-spacing:2px;}
+.topbar .sp{flex:1;}
+.pill-status{flex:none;display:flex;align-items:center;gap:10px;height:52px;padding:0 22px;
+  border-radius:26px;background:var(--teal-soft);color:var(--teal-d);font-size:19px;font-weight:600;}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--teal);}
+.dot.breathe{animation:breathe 2.4s var(--ease) infinite;}
+@keyframes breathe{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.78);}}
+.clock{flex:none;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+
+/* 小青区 */
+.xq{flex:none;margin:24px 44px 0;border-radius:36px;padding:36px 44px 32px;
+  background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden;}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;
+  background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%);}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1;}
+.xq-face{flex:none;width:96px;height:96px;border-radius:50%;background:rgba(46,230,168,.1);
+  border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;
+  font-size:44px;color:var(--emerald);position:relative;}
+.xq-face::before{content:"";position:absolute;inset:-10px;border-radius:50%;
+  border:1.5px solid rgba(46,230,168,.22);animation:ring 3s var(--ease) infinite;}
+@keyframes ring{0%{transform:scale(.92);opacity:.9;}70%{transform:scale(1.12);opacity:0;}100%{opacity:0;}}
+.xq-main{flex:1;min-width:0;}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px;}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:700;letter-spacing:1px;}
+.xq-ask em{font-style:normal;color:var(--emerald);}
+.xq-doing{margin-top:10px;font-size:21px;line-height:1.5;color:rgba(242,239,228,.72);}
+.xq-doing b{color:#fff;font-weight:600;}
+
+/* 主体 */
+.body{flex:1;display:flex;flex-direction:column;padding:24px 44px 0;gap:24px;}
+
+/* 取件码输入区 */
+.code-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:40px 34px;display:flex;flex-direction:column;align-items:center;gap:28px;}
+.code-title{font-size:26px;font-weight:700;}
+.code-inputs{display:flex;gap:14px;}
+.code-cell{width:80px;height:100px;border-radius:18px;border:2px solid var(--line-2);
+  background:var(--paper);display:flex;align-items:center;justify-content:center;
+  font-size:44px;font-weight:900;color:var(--ink);font-variant-numeric:tabular-nums;
+  transition:all .2s;}
+.code-cell.filled{border-color:var(--teal);background:var(--teal-soft);}
+.code-cell.active{border-color:var(--emerald);box-shadow:0 0 0 4px rgba(46,230,168,.2);}
+
+/* 数字键盘 —— 公共终端无物理键盘，纯数字码必须页内自带输入方式。
+   不依赖 inputMode/系统软键盘：Windows Edge/Chrome 全屏 Kiosk 下不会弹任何键盘。 */
+.kb{display:flex;flex-direction:column;gap:14px;padding:26px 28px;border-radius:var(--r-md);
+  background:var(--surface);border:1px solid var(--line);}
+.kb-note{font-size:19px;line-height:1.6;color:var(--ink-3);}
+.kb-note b{color:var(--ink);}
+.kb-row{display:flex;gap:14px;}
+.key{flex:1;height:96px;border-radius:20px;border:1px solid var(--line-2);background:var(--paper);
+  font-size:38px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .16s;}
+.key:active{transform:scale(.97);background:var(--teal-soft);border-color:var(--teal);}
+.key.wide{flex:1.1;font-size:24px;font-weight:700;}
+.key.del{background:var(--deep);color:#fff;border-color:var(--deep);}
+.key.ok{background:var(--teal);color:#fff;border-color:var(--teal);font-size:24px;}
+
+/* 扫码区域 */
+.scan-area{display:flex;flex-direction:column;align-items:center;gap:20px;padding:32px;
+  border-radius:var(--r-md);background:var(--paper);border:1px dashed var(--line-2);}
+.scan-icon{width:80px;height:80px;border-radius:20px;background:var(--teal-soft);
+  display:flex;align-items:center;justify-content:center;color:var(--teal-d);}
+.scan-icon svg{width:36px;height:36px;}
+.scan-text{font-size:20px;color:var(--ink-2);text-align:center;line-height:1.6;}
+
+/* 订单信息 */
+.order-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:28px 30px;display:none;}
+.order-card.show{display:block;}
+.order-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.order-icon{width:56px;height:56px;border-radius:16px;background:var(--teal-soft);
+  display:flex;align-items:center;justify-content:center;color:var(--teal-d);}
+.order-icon svg{width:26px;height:26px;}
+.order-title{font-size:24px;font-weight:700;}
+.order-list{display:flex;flex-direction:column;gap:14px;}
+.order-item{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:var(--r-md);
+  background:var(--paper);border:1px solid var(--line);}
+.order-item-icon{flex:none;width:44px;height:44px;border-radius:12px;background:var(--teal-soft);
+  display:flex;align-items:center;justify-content:center;color:var(--teal-d);}
+.order-item-icon svg{width:20px;height:20px;}
+.order-item-info{flex:1;}
+.order-item-name{font-size:19px;font-weight:600;}
+.order-item-meta{font-size:16px;color:var(--ink-3);}
+.order-item-status{flex:none;font-size:16px;font-weight:600;color:var(--teal-d);}
+
+/* 规矩条 */
+.rail{flex:none;margin:auto 44px 0;padding:18px 24px;border-radius:18px;
+  background:rgba(11,36,30,.04);border:1px dashed var(--line-2);
+  display:flex;align-items:center;justify-content:center;gap:20px;}
+.rail-item{display:flex;align-items:center;gap:8px;font-size:18px;color:var(--ink-3);}
+.rail-item svg{width:18px;height:18px;opacity:.5;}
+
+/* CTA 底栏 */
+.cta-bar{flex:none;display:flex;gap:16px;padding:20px 44px;background:var(--surface);
+  border-top:1px solid var(--line);}
+.cta-btn{flex:1;height:88px;border-radius:24px;display:flex;align-items:center;justify-content:center;
+  gap:12px;font-size:26px;font-weight:700;cursor:pointer;transition:transform .15s var(--ease);}
+.cta-btn:active{transform:scale(.97);}
+.cta-btn.primary{background:var(--deep);color:#fff;}
+.cta-btn.primary em{font-style:normal;color:var(--emerald);}
+.cta-btn.secondary{border:1.5px solid var(--line-2);background:var(--surface);color:var(--ink-2);}
+
+/* 底部导航 */
+.navbar{flex:none;height:112px;display:flex;background:var(--surface);border-top:1px solid var(--line);}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  position:relative;cursor:pointer;}
+.nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600;}
+.nav-item.on .ni{color:var(--teal-d);}
+.nav-item.on::before{content:"";position:absolute;top:0;width:56px;height:6px;border-radius:0 0 6px 6px;background:var(--teal);}
+.nav-item svg{width:30px;height:30px;margin-bottom:2px;}
+
+@media(prefers-reduced-motion:reduce){
+  .dot.breathe{animation:none;}
+  .xq-face::before{animation:none;opacity:.3;}
+}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <div class="back" onclick="location.href='01-home.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="logo"><div class="logo-mark">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill-status"><span class="dot breathe"></span>取件核销</div>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+
+  <!-- 小青意图区 -->
+  <div class="xq">
+    <div class="xq-row">
+      <div class="xq-face serif">青</div>
+      <div class="xq-main">
+        <div class="xq-eyebrow">PICKUP CODE</div>
+        <div class="xq-ask">输入取件码，<em>拿你的文件</em>。</div>
+        <div class="xq-doing">8 位取件码，手机上能找到。<b>输满稍停会自动核销</b>，也可以直接按下方「确认核销」。核销后纸从出纸口出来。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="body">
+
+    <!-- 取件码输入 -->
+    <div class="code-card">
+      <div class="code-title">输入 8 位取件码</div>
+      <div class="code-inputs" id="code-inputs">
+        <div class="code-cell active" data-idx="0"></div>
+        <div class="code-cell" data-idx="1"></div>
+        <div class="code-cell" data-idx="2"></div>
+        <div class="code-cell" data-idx="3"></div>
+        <div class="code-cell" data-idx="4"></div>
+        <div class="code-cell" data-idx="5"></div>
+        <div class="code-cell" data-idx="6"></div>
+        <div class="code-cell" data-idx="7"></div>
+      </div>
+      <div style="font-size:18px;color:var(--ink-3);text-align:center;">
+        取件码在手机短信或小程序里<br>也可以用扫码枪扫手机上的码
+      </div>
+    </div>
+
+    <!-- 扫码区域 -->
+    <div class="scan-area">
+      <div class="scan-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      </div>
+      <div class="scan-text">
+        <b>扫码枪取件 · 无需点击</b><br>把手机上的取件码对准扫码枪，自动识别
+      </div>
+    </div>
+      <div class="kb" data-testid="pickup-keyboard">
+        <div class="kb-note">取件码是 <b>8 位纯数字</b>。也可以把手机上的码对准扫码枪，自动识别。</div>
+        <div class="kb-row"><button type="button" class="key" data-key="1">1</button><button type="button" class="key" data-key="2">2</button><button type="button" class="key" data-key="3">3</button></div>
+        <div class="kb-row"><button type="button" class="key" data-key="4">4</button><button type="button" class="key" data-key="5">5</button><button type="button" class="key" data-key="6">6</button></div>
+        <div class="kb-row"><button type="button" class="key" data-key="7">7</button><button type="button" class="key" data-key="8">8</button><button type="button" class="key" data-key="9">9</button></div>
+        <div class="kb-row"><button type="button" class="key wide" data-act="clear">清空</button><button type="button" class="key" data-key="0">0</button><button type="button" class="key wide del" data-act="del">删除</button></div>
+      </div>
+
+    <!-- 订单信息（核销后显示） -->
+    <div class="order-card" id="order-card">
+      <div class="order-header">
+        <div class="order-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="order-title">核销成功，正在出纸</div>
+      </div>
+      <div class="order-list">
+        <div class="order-item">
+          <div class="order-item-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div class="order-item-info">
+            <div class="order-item-name">简历_2026.pdf</div>
+            <div class="order-item-meta">5 页 · A4 黑白 · 单面</div>
+          </div>
+          <div class="order-item-status">打印中</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 规矩条 -->
+  <div class="rail">
+    <div class="rail-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      取件码一次性使用
+    </div>
+    <div class="rail-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      24 小时内有效
+    </div>
+    <div class="rail-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
+      出纸口在屏幕下方
+    </div>
+  </div>
+
+  <!-- CTA 底栏 -->
+  <div class="cta-bar">
+    <div class="cta-btn secondary" onclick="clearCode()">清空重输</div>
+    <div class="cta-btn primary" onclick="verifyCode()">确认核销<em>→</em></div>
+  </div>
+
+  <!-- 底部导航 -->
+  <div class="navbar">
+    <div class="nav-item" onclick="location.href='01-home.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <div class="ni">首页</div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <div class="ni">AI 顾问</div>
+    </div>
+    <div class="nav-item" onclick="location.href='30-my-profile.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <div class="ni">我的</div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var k=Math.min(window.innerWidth/1080,window.innerHeight/1920);
+  var s=document.getElementById('stage');
+  if('zoom' in s.style){ s.style.zoom=k; }
+  else{ s.style.transform='scale('+k+')'; }
+}
+window.addEventListener('resize',fit);
+window.addEventListener('orientationchange',fit);
+fit();
+function tick(){
+  var d=new Date();
+  document.getElementById('clock').textContent=
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+tick();setInterval(tick,10000);
+
+// 取件码输入模拟
+var cells=document.querySelectorAll('.code-cell');
+var currentIdx=0;
+var demoCode='48291637';   // 8 位纯数字，与 2026-08-18 方案 A 及后端一致
+
+// 自动填充演示
+setTimeout(function autoFill(){
+  if(currentIdx<cells.length){
+    cells[currentIdx].textContent=demoCode[currentIdx];
+    cells[currentIdx].classList.add('filled');
+    cells[currentIdx].classList.remove('active');
+    currentIdx++;
+    if(currentIdx<cells.length)cells[currentIdx].classList.add('active');
+    setTimeout(autoFill,300);
+  }else{
+    document.getElementById('order-card').classList.add('show');
+  }
+},1000);
+
+// 键盘输入 —— 只负责把数字填进格子；是否核销由服务端返回决定，本页不伪造结果。
+function pressDigit(d){
+  if(currentIdx>=cells.length) return;
+  cells[currentIdx].textContent=d;
+  cells[currentIdx].classList.add('filled');
+  cells[currentIdx].classList.remove('active');
+  currentIdx++;
+  if(currentIdx<cells.length) cells[currentIdx].classList.add('active');
+}
+function pressDel(){
+  if(currentIdx<=0) return;
+  if(currentIdx<cells.length) cells[currentIdx].classList.remove('active');
+  currentIdx--;
+  cells[currentIdx].textContent='';
+  cells[currentIdx].classList.remove('filled');
+  cells[currentIdx].classList.add('active');
+}
+document.addEventListener('click',function(e){
+  var k=e.target.closest('.key'); if(!k) return;
+  var d=k.getAttribute('data-key'), a=k.getAttribute('data-act');
+  if(d!==null) pressDigit(d);
+  else if(a==='del') pressDel();
+  else if(a==='clear') clearCode();
+});
+
+function clearCode(){
+  currentIdx=0;
+  cells.forEach(function(c){c.textContent='';c.classList.remove('filled','active');});
+  cells[0].classList.add('active');
+  document.getElementById('order-card').classList.remove('show');
+}
+
+function verifyCode(){
+  document.getElementById('order-card').classList.add('show');
+}
+</script>
+</body>
+</html>
