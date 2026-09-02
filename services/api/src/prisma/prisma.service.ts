@@ -345,6 +345,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.favorite
   }
 
+  // ── 我的求职进度（compliance-boundary.md §4.4A）───────────────────────────
+  // 只被 JobApplicationsService 使用，且只在 me/ 命名空间下。没有 admin / partner
+  // 读写路径，没有第三方回流入口 —— 由 verify:job-application-track 断言。
+
+  get jobApplication() {
+    return this.client.jobApplication
+  }
+
   get benefitGrant() {
     return this.client.benefitGrant
   }

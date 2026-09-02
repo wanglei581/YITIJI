@@ -28,6 +28,16 @@ AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 
 
 岗位和招聘会只能作为第三方/官方来源信息入口。
 
+> **长期处置（2026-09-02）**：产品负责人已定性「招聘闭环是必要能力，取得人力资源服务许可证后启用」。
+> 这**不改变上面八条在当前的效力** —— 未取得许可证前一律不得开发，判据已落为
+> `services/api/src/common/recruitment-capability.ts` 的 fail-closed 闸门（门禁 `verify:recruitment-capability-gate`，
+> 当前零调用点）。八条中哪几条属「许可证解锁类」、哪几条属「即使拿证也不做的永久边界类」，
+> 分类方案见 [recruitment-closure-license-gated-plan-2026-09.md](docs/product/recruitment-closure-license-gated-plan-2026-09.md) §7，
+> **尚待产品负责人签字**；未签字前按本节全量禁止执行，不得自行按分类放宽任何一条。
+>
+> 另注意：用户**本人自填**的求职进度不在本节禁止范围内（它不构成「平台内投递」，
+> 平台既不收简历也不转交），已经产品负责人具名授权，边界见 [compliance-boundary.md §4.4A](docs/compliance/compliance-boundary.md)。
+
 按钮文案必须使用：
 
 - 查看岗位
@@ -387,8 +397,11 @@ ai-job-print-terminal/
 - 外部跳转
 - 打印
 - AI服务调用
+- 用户本人自填的求职进度（2026-09-02 起，经产品负责人具名授权）
 
 系统不记录企业筛选结果，不保存企业端招聘闭环数据。
+
+求职进度这一条容易被误读，先说清楚：**合法性由「谁写的」决定，不由字段名决定。** 用户自己敲进本系统的「已投递 / 面试中」是个人求职记事本；由企业、来源平台或本平台写入的同名状态是招聘闭环数据，需人力资源服务许可证。因此这条**只允许本人手动增删改**，服务端不得从任何第三方来源写入或更新，不得回传或展示给企业与来源机构，不得按企业聚合后对外呈现（那等于重建候选人漏斗），也不得给 `BrowseLog` / `ExternalJumpLog` / `Favorite` 扩展状态字段。完整边界见 [compliance-boundary.md §4.4A](docs/compliance/compliance-boundary.md)，不要只按本节这几行判断。
 
 ## 11. 文件安全要求
 

@@ -244,6 +244,7 @@ const expectedEntries = [
   ['AI顾问', '/assistant'],
   ['浏览记录', '/me/activity'],
   ['外部跳转记录', '/me/activity?tab=jump'],
+  ['求职进度', '/me/activity?tab=applications'],
   ['权益活动', '/activities'],
   ['政策补贴指引', '/renshi?tab=policy'],
   ['消息通知', '/me/notifications'],
@@ -252,7 +253,7 @@ const expectedEntries = [
   ['意见反馈', '/me/feedback'],
 ]
 
-expect(countMatches(entries, /\blabel:\s*'/g) === 22, 'Profile entries retain exactly 22 real destinations')
+expect(countMatches(entries, /\blabel:\s*'/g) === 23, 'Profile entries retain exactly 23 real destinations')
 for (const [label, route] of expectedEntries) {
   expectMatches(
     entries,
@@ -379,6 +380,9 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
   'apps/kiosk/src/pages/profile/me/styles/me-records.css',
   'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+  // §4.4A：求职进度并入 /me/activity 第三个 Tab，其动作按钮样式页面作用域化，
+  // 不改共享层（me-detail-base.css）避免正面外溢。
+  'apps/kiosk/src/pages/profile/me/styles/me-activity-applications.css',
 ])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),

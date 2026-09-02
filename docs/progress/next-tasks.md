@@ -4,6 +4,16 @@
 
 - [x] **F0.5 管理端计划与 Agent 运行版本观察（PR #744 已合并至 `main`，未部署）**：仅对明确 `active` 的 Windows 终端创建、启用、暂停或取消观察计划；激活事务会再次确认全部静态目标仍为 `enabled + active`。Agent 通过独立端点读取本终端计划，并只读安装目录 `manifest.json` 的 `productVersion` 回报运行版本。该阶段不下载、不验包、不安装、不控制 Windows 服务、不创建计划任务、不执行远程 PowerShell，也不自动更新。`版本匹配` 仅表示 manifest 版本字符串与计划目标相同，**不代表** MSI/EXE 字节、哈希、Authenticode 签名或证书链已经由 Agent 验证。+5 additive schema 模型已登记，两条新增 `verify:*` 已接入 CI，合并前四项 CI 全绿。后续生产迁移、F0.5 部署、KSK-001 操作和任何 updater 功能均需新的具名授权。
 
+## 招聘闭环分期（2026-09-02 定性，不卡上线）
+
+产品负责人已定性「招聘闭环是必要能力，取得人力资源服务许可证后启用」。**本条不进交付阻塞清单** —— 它不卡当前上线，且第 4 刀的前置是许可证到手。分期方案与组件复用矩阵见 [recruitment-closure-license-gated-plan-2026-09.md](../product/recruitment-closure-license-gated-plan-2026-09.md)。
+
+- [x] **第 1 刀：资质闸门（2026-09-02 完成，未部署）**：`PlatformQualification` 模型 + `src/common/recruitment-capability.ts` fail-closed 判据 + `verify:recruitment-capability-gate`（63 PASS，双 CI job 已接线）。刻意不是环境变量也不是管理员可点的 boolean；门禁断言模块零 `process.env`、不导出 set/enable/toggle 类函数、**闸门零调用点**。两套迁移对空库 deploy 成功且 `migrate diff` 无差异。
+- [ ] **第 2 刀：投递记录与求职进度（`JobApplication`）**：§4.4 口径修订已于 2026-09-02 获产品负责人具名授权（落为 [compliance-boundary.md §4.4A](../compliance/compliance-boundary.md)），**阻塞已解除**。范围：后端本人维度模型与读写 + Kiosk「我的求职进度」页 + 岗位详情页「记录一次投递」入口 + `verify:job-application-track`。建模必须按方案 §3 的**建法二**（带 `channel` / `statusSource`，`resumeFileId`/`consentId` 恒空且门禁断言），否则拿证时要新建表并迁移数据。**排期未定**：属新增功能，建议排在首次上线之后，插不插队由产品负责人定。
+- [ ] **第 3 刀：小程序求职进度对齐后端**：现为 `wx.getStorageSync` 本地存储，换设备即丢。走小程序专用 worktree + 契约门禁。第 2 刀之后。
+- [ ] **第 4 刀：形态 A（平台内投递）** —— **取得许可证之后才启动**。前置还包括方案 §5 的义务清单逐项交付、法务复核、以及至少一个真实企业客户愿意作为收件方（当前系统内不存在企业账号与收件箱）。
+- [ ] **待签字**：方案 §7「即使拿证也不做」的永久边界清单（代投 / 候选人筛选 / 面试邀约 / Offer 管理 / 主动推荐）。未签字前 `CLAUDE.md` §2 八条按全量禁止执行，不得自行按分类放宽。
+
 ## 交付阻塞清单（2026-08-19 建立，只放**卡上线**的，勾完即可放机器收真钱）
 
 > 建立原因：产品负责人问「到底还剩多少问题、是不是处理不完了」。本节只列**阻塞交付**的，

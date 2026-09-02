@@ -177,6 +177,8 @@
     "verify:bulk-publish": "node -r @swc-node/register scripts/verify-bulk-publish.ts",
     "verify:publish-expiry-completeness": "node -r @swc-node/register scripts/verify-publish-expiry-completeness.ts",
     "verify:content-trust-publish-gate": "node -r @swc-node/register scripts/verify-content-trust-publish-gate.ts",
+    "verify:recruitment-capability-gate": "node -r @swc-node/register scripts/verify-recruitment-capability-gate.ts",
+    "verify:job-application-track": "node -r @swc-node/register scripts/verify-job-application-track.ts",
     "verify:content-pipeline-e2e": "node -r @swc-node/register scripts/verify-content-pipeline-e2e.ts",
     "maintenance:backfill-org-content-trust": "node -r @swc-node/register scripts/backfill-org-content-trust.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",

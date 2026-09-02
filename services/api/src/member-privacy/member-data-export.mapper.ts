@@ -21,6 +21,8 @@ export interface MemberDataExportEnvelope {
     }
     printOrders: JsonRecord[]
     favorites: JsonRecord[]
+    /** 本人自填的求职进度（§4.4A）。可导出、可删除，随账号注销一并清理。 */
+    jobApplications: JsonRecord[]
     benefits: JsonRecord[]
     activity: {
       browsing: JsonRecord[]
@@ -59,6 +61,7 @@ export class MemberDataExportMapper {
       mockInterviews,
       printOrders,
       favorites,
+      jobApplications,
       benefits,
       browsing,
       externalOpens,
@@ -161,6 +164,27 @@ export class MemberDataExportMapper {
       this.prisma.favorite.findMany({
         where: { endUserId: input.endUserId },
         select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take,
+      }),
+      // 本人自填的求职进度（§4.4A）。resumeFileId / consentId 无证期恒为 null 且
+      // 不属于用户可读内容，刻意不进导出 select。
+      this.prisma.jobApplication.findMany({
+        where: { endUserId: input.endUserId },
+        select: {
+          id: true,
+          channel: true,
+          jobId: true,
+          companyName: true,
+          positionTitle: true,
+          sourceName: true,
+          status: true,
+          statusSource: true,
+          note: true,
+          appliedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take,
       }),
@@ -274,6 +298,7 @@ export class MemberDataExportMapper {
       mockInterviews,
       printOrders,
       favorites,
+      jobApplications,
       benefits,
       browsing,
       externalOpens,
@@ -299,6 +324,7 @@ export class MemberDataExportMapper {
         },
         printOrders: this.toJsonRecords(printOrders),
         favorites: this.toJsonRecords(favorites),
+        jobApplications: this.toJsonRecords(jobApplications),
         benefits: this.toJsonRecords(benefits),
         activity: {
           browsing: this.toJsonRecords(browsing),

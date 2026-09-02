@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobExplainResponse, MemberResumeItem } from '@ai-job-print/shared'
-import { ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
+import { ClipboardListIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getJobById } from '../../services/api'
 import {
   explainJobWithAi,
@@ -12,6 +12,7 @@ import {
   type JobAiMatchResponse,
 } from '../../services/api/jobAi'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { createJobApplication } from '../../services/api/jobApplications'
 import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../lib/capabilityReasons'
@@ -45,6 +46,8 @@ export function JobDetailPage() {
   const [loading, setLoading] = useState(!hasStateMatch)
   const [error, setError] = useState(false)
   const [showQr, setShowQr] = useState(false)
+  // idle | saving | saved | error —— 只驱动按钮文案，不代表来源平台上的任何结果。
+  const [trackState, setTrackState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [pendingAiAction, setPendingAiAction] = useState<'explain' | 'match' | null>(null)
   const [showConsent, setShowConsent] = useState(false)
   const [showResumeSelect, setShowResumeSelect] = useState(false)
@@ -104,6 +107,30 @@ export function JobDetailPage() {
   const favorite = isFavorite('job', currentJob.id)
   const sourceCanApply = isValidSourceUrl(currentJob.sourceUrl)
   const isTerminalKiosk = Boolean(getTerminalId())
+
+  /**
+   * 记录一次投递（compliance-boundary.md §4.4A）。
+   *
+   * 这不是投递动作 —— 投递发生在来源平台，本终端只把用户**自己**说的这件事记下来。
+   * 因此：状态来源恒为「用户自填」（服务端写死），不向企业或来源机构回传，
+   * 也不因此改变本页任何投递入口的行为。
+   */
+  async function recordApplication() {
+    const token = requireToken()
+    if (!token) return
+    if (trackState === 'saving') return
+    setTrackState('saving')
+    try {
+      await createJobApplication(token, {
+        jobId: currentJob.id,
+        status: 'applied',
+        appliedAt: new Date().toISOString(),
+      })
+      setTrackState('saved')
+    } catch {
+      setTrackState('error')
+    }
+  }
 
   function openSourceQr() {
     if (!sourceCanApply) return
@@ -261,6 +288,23 @@ export function JobDetailPage() {
               踢出 Tab 序列、读屏直接跳过，旁边那句原因就永远不会被念出来。
               放行由 openSourceQr / openSourcePlatform 自身的 `if (!sourceCanApply) return`
               兜底，置灰不是靠属性拦的，点了也不会真的跳出去。 */}
+          {/* 「记录一次投递」主语是用户，不是平台：它只写入本人的求职进度，
+              不触发任何投递行为，也不改变上面那句边界声明。 */}
+          <button
+            type="button"
+            className="jf-btn ghost"
+            onClick={() => void recordApplication()}
+            aria-disabled={trackState === 'saving' || undefined}
+          >
+            <ClipboardListIcon aria-hidden="true" />
+            {trackState === 'saving'
+              ? '保存中'
+              : trackState === 'saved'
+                ? '已记录到我的求职进度'
+                : trackState === 'error'
+                  ? '保存失败，重试'
+                  : '记录一次投递'}
+          </button>
           <button
             type="button"
             className="jf-btn dark"
