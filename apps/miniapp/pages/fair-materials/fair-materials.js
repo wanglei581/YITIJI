@@ -285,9 +285,12 @@ Page({
         this._printFailed('服务端未返回可打印文件，请稍后重试。');
         return;
       }
+      // 活动资料是共享派生文件(endUserId 为 null)，print-upload 用 fileId 去换
+      // preview-url 会吃 403。服务端在这个响应里已经给了 printFileUrl，透传过去。
+      const purl = encodeURIComponent((res && res.printFileUrl) || '');
       const name = encodeURIComponent((res && res.filename) || '活动资料.pdf');
       const pages = (res && res.pageCount) || '';
-      wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` });
+      wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}&printFileUrl=${purl}` });
     }).catch((err) => {
       if (this._gone) { wx.hideLoading(); return; }
       this._finishPrint();

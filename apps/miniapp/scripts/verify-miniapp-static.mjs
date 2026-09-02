@@ -548,7 +548,7 @@ if (
 else bad('文档上传与服务端计价闭环', '缺少真实上传、PII 确认、Order-only 建单，或仍由小程序提交金额/页数')
 
 if (
-  apiJs.includes('quoteMyPrintOrder(fileId, params)') &&
+  apiJs.includes('quoteMyPrintOrder(fileId, params, presetFileUrl)') &&
   apiJs.includes("/preview-url`") &&
   apiJs.includes("request('/orders/quote'") &&
   printUploadJs.includes('api.quoteMyPrintOrder') &&
@@ -558,6 +558,25 @@ if (
   !/quoteMyPrintOrder\([\s\S]{0,500}\b(?:pages|billablePages|amountCents)\s*:/.test(printUploadJs)
 ) ok('打印参数页使用服务端真实页数与精确报价')
 else bad('打印参数页服务端精确报价', '必须先取本人 printFileUrl 再调 /orders/quote，且不得提交或本地计算页数/金额')
+
+// presetFileUrl 旁路：招聘会活动资料 / 参会企业资料是共享派生文件(endUserId 为 null)，
+// 会员拿 fileId 去 preview-url 必吃 403，只能透传服务端已下发的 printFileUrl。
+// 这条旁路把「本人」的证明点从 preview-url 的归属校验挪到了上游端点自己的资格校验 +
+// HMAC 签名上，所以必须钉死两件事：URL 只能来自服务端响应，且只有这两页可以用。
+{
+  const PRESET_ALLOWED = ['fair-materials', 'fair-company-detail']
+  const offenders = []
+  for (const full of physicalPageDirs) {
+    const dir = full.replace(/^pages\//, '')   // physicalPageDirs 已带 pages/ 前缀
+    const js = read(`${full}/${dir}.js`)
+    if (!js.includes('printFileUrl=')) continue
+    if (!PRESET_ALLOWED.includes(dir)) { offenders.push(`${dir}：不在旁路白名单内`); continue }
+    // 必须是从服务端响应里取的，不许自己拼
+    if (!/res\s*&&\s*res\.printFileUrl/.test(js)) offenders.push(`${dir}：printFileUrl 不是取自服务端响应`)
+  }
+  if (offenders.length === 0) ok('打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应')
+  else bad('打印 printFileUrl 旁路受控', offenders.join('；'))
+}
 
 const quoteRefreshMatch = printUploadJs.match(/_refreshQuote\(delay = 0\) \{([\s\S]*?)\n  \},\n\n  pickColor/)
 const quoteRefreshBody = quoteRefreshMatch ? quoteRefreshMatch[1] : ''

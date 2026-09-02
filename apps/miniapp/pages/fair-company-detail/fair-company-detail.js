@@ -5,6 +5,7 @@ const api = require('../../utils/api')
 // 规模标签口径收在 utils/normalize.js。这里原本自己写了一份,注释还写着
 // 「与列表页同一份口径」,值却是带「企业」的长形 —— 正是这种复制导致的漂移。
 const N = require('../../utils/normalize')
+const history = require('../../utils/history')
 const POSITION_TYPE_LABEL = {
   full_time: '全职',
   part_time: '兼职',
@@ -216,7 +217,10 @@ Page({
         }
         const name = encodeURIComponent((res && res.filename) || fallbackName)
         const pages = (res && res.pageCount) || ''
-        wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` })
+        // 企业资料是服务端实时渲染的共享派生文件(endUserId 为 null)，print-upload
+        // 用 fileId 去换 preview-url 会吃 403。响应里已经带了 printFileUrl，透传过去。
+        const purl = encodeURIComponent((res && res.printFileUrl) || '')
+        wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}&printFileUrl=${purl}` })
       })
       .catch((err) => {
         wx.hideLoading()
@@ -255,7 +259,17 @@ Page({
       wx.showToast({ title: '该企业未提供来源平台链接', icon: 'none', duration: 2000 })
       return
     }
-    wx.setClipboardData({ data: url })
+    // 上报「打开过来源投递入口」。服务端自己按 companyId 补 targetTitle 和
+    // externalId(父级 JobFair.id),这里只送三个字段。
+    // 只在真正复制成功后记——复制失败却记了一笔,就是记了一件没发生的事。
+    // 合规:只记录「打开过入口」,不记录也无法知道用户是否真的投了。
+    wx.setClipboardData({
+      data: url,
+      success: () => history.recordJump('fair_company', {
+        id: this.data.companyId,
+        title: this.data.company.name,
+      }),
+    })
   },
 
   onShareAppMessage() {

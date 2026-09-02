@@ -790,8 +790,32 @@ const api = {
    *
    * 页面不得传 pages / billablePages / amountCents，也不得把公开单价乘法当成最终报价。
    */
-  quoteMyPrintOrder(fileId, params) {
+  /**
+   * 打印报价。
+   *
+   * 常规路径：拿 fileId 去换 printFileUrl 再报价。这条路要求文件属于本人
+   * （canAccessFile 对会员只认 `record.endUserId === requester.endUserId`）。
+   *
+   * presetFileUrl 是给「服务端已经把 printFileUrl 交到手上」的场景用的：
+   * 招聘会活动资料和参会企业资料是共享派生文件，创建时 uploaderId / endUserId
+   * 都是 null（ownerType 落成 'system'），会员拿 fileId 去 preview-url 必吃
+   * 403 FILE_ACCESS_DENIED。而 prepareFair*Print 的响应里本来就带 printFileUrl，
+   * 后端注释也写明「前端据此进入正常打印流程」——透传即可，不必再换一次。
+   *
+   * 注意这里不放宽任何访问策略：presetFileUrl 只能来自服务端刚刚下发的响应，
+   * 前端不构造、不缓存、不复用。
+   */
+  quoteMyPrintOrder(fileId, params, presetFileUrl) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('打印报价'));
+    const quoteWith = (fileUrl) => request('/orders/quote', {
+      method: 'POST',
+      data: { fileUrl, params },
+      needAuth: false,
+    });
+
+    const preset = String(presetFileUrl || '').trim();
+    if (preset) return quoteWith(preset);
+
     const id = String(fileId || '').trim();
     if (!id) return Promise.reject(new Error('缺少打印文件'));
     return request(`/files/${encodeURIComponent(id)}/preview-url`, {
@@ -800,11 +824,7 @@ const api = {
     }).then((access) => {
       const fileUrl = access && access.printFileUrl;
       if (!fileUrl) throw new Error('服务端未返回可打印文件凭证');
-      return request('/orders/quote', {
-        method: 'POST',
-        data: { fileUrl, params },
-        needAuth: false,
-      });
+      return quoteWith(fileUrl);
     });
   },
 
