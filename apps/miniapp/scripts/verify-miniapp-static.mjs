@@ -9,6 +9,7 @@
  * - 登录/合规/诚实能力与密钥残留扫描
  */
 import fs from 'node:fs'
+import { execSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -577,6 +578,45 @@ if (
   !/quoteMyPrintOrder\([\s\S]{0,500}\b(?:pages|billablePages|amountCents)\s*:/.test(printUploadJs)
 ) ok('打印参数页使用服务端真实页数与精确报价')
 else bad('打印参数页服务端精确报价', '必须先取本人 printFileUrl 再调 /orders/quote，且不得提交或本地计算页数/金额')
+
+// 注册的页面必须**在 git 里**有四件套，不只是在磁盘上有。
+//
+// 上面所有目录/四件套检查都按磁盘判定。这在本地永远是对的，但挡不住一类事故：
+// 用限定范围的 `git add` 提交了 app.json 的页面注册，而实现文件还是未跟踪状态。
+// 本地跑门禁全绿（文件就在磁盘上），干净检出却直接红——2026-09-02 的
+// ec552bb8 就是这样：app.json 注册了 pages/resume-build、ai-records 也指向它，
+// 而 git ls-files 该目录 0 个文件。
+//
+// 用 git ls-files 复核一遍。拿不到 git（打包产物、非仓库环境）就跳过并说明，
+// 不把「查不了」当成「查过了」。
+{
+  let tracked = null
+  try {
+    tracked = new Set(
+      execSync('git ls-files apps/miniapp/pages', { cwd: path.join(ROOT, '..', '..'), encoding: 'utf8' })
+        .split('\n').filter(Boolean)
+        .map((f) => f.replace(/^apps\/miniapp\//, '')),
+    )
+  } catch (_) {
+    tracked = null
+  }
+  if (tracked === null) {
+    ok('注册页面四件套已入库（跳过：当前环境取不到 git）')
+  } else {
+    const missing = []
+    for (const page of PAGE_PATHS) {
+      for (const ext of ['js', 'wxml', 'wxss', 'json']) {
+        if (!tracked.has(`${page}.${ext}`)) missing.push(`${page}.${ext}`)
+      }
+    }
+    if (missing.length) {
+      bad('注册页面四件套已入库', `已在 app.json 注册但 git 里没有：${[...new Set(missing)].slice(0, 8).join(', ')}` +
+        `${missing.length > 8 ? ` 等 ${missing.length} 项` : ''}——干净检出会红`)
+    } else {
+      ok(`注册页面四件套已入库（${PAGE_PATHS.length} 页 × 4 文件）`)
+    }
+  }
+}
 
 // 报价参数与下单参数必须锁在一起。
 //

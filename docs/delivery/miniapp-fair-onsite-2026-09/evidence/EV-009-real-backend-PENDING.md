@@ -1,10 +1,12 @@
-# 真后端闭环验证（EV-009）—— 尚未执行
+# 本文件已被取代 —— 内容见 `EV-025-critical-journey-unverified.md`
 
-**状态：PENDING。本文件的存在不代表任何验证已完成。**
+建包时本文件挂在编号 EV-009 上。之后对 `https://zyidai.cn` 做了只读探测，
+那条结论是 PASS，占用了 EV-009（`EV-009-real-backend-readonly-probe.md`）。
 
-本批 12 个招聘会端点 + 政策详情 + 保留期限，**全部只对代码验证过，从未对
-https://zyidai.cn 发过一次真实请求**。响应字段是从 `services/api` 源码与
-`packages/shared` 读出来的，不是见过的真实响应。
+一个编号不能同时挂「已验」和「未验」两种结论，所以「仍然没验」的部分
+迁到 **EV-025**：`evidence/EV-025-critical-journey-unverified.md`，
+并按当前修订更新（建包后新增的四页同样一步没验）。
 
-待验证的关键旅程：行前计划 → 展位导览 → 参展企业 → 生成打印文件 → print-upload 报价。
-其中打印交接刚从 403 修通（透传 printFileUrl），**这条路径连一次真实调用都没有**。
+本文件保留只为不制造悬空引用，**不承载任何结论**；
+证据台账（`evidence-ledger.csv`）不登记本文件。
+提交时可以直接删除。

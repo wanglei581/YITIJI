@@ -1,11 +1,20 @@
 schema_version: 1
-project: "小程序 · 招聘会现场助手与批 2 收口"
+project: "小程序 · 招聘会现场助手与批 2/批 3 收口"
 release_id: "miniapp-fair-onsite-2026-09"
 boundary: "local"
 # 边界声明：本包只对 local 构建成立。真机（wechat-devtools）与真后端
 # （production-api）两个环境从未验证过本批改动，因此 G3 之后一律不得宣称 GO。
-release_revision: "8176c1ee200494b4f59e59b9ffdbbe4696d8b4d1"
-generated_at: "2026-09-02T18:23:41+08:00"
+#
+# 2026-09-02 20:55 更新：建包后又落了 11 个提交（批 2 第 4 项 + 批 3 三页
+# + 两处诚实性缺陷修复 + CI 门禁接线修复）。新增 4 个页面和 1 个后端端点，
+# 但真机与真后端的验证缺口一点没变 —— 功能变多不等于验证变强，
+# 因此 G3 七条 MUST 全部维持 PENDING。
+#
+# 警告：分支 claude/miniapp-lane 正被另一位作者并发提交，采证期间 HEAD
+# 前进了 3 次。引用包内结论前先 git rev-parse HEAD 与下面的 release_revision
+# 比对；不一致就重跑 EV-017~EV-021。时间线见 evidence/EV-022。
+release_revision: "eff92ac9c06392091f5b0fb18b14bf5bbeb4433d"
+generated_at: "2026-09-02T20:55:00+08:00"
 overall_verdict: "PARTIAL"
 owners:
   accountable: "TBD"
@@ -21,18 +30,18 @@ acceptance_authorities:
 environments:
   - name: "local"
     purpose: "development"
-    url: "worktree /Users/wanglei/AI求职打印服务终端-miniapp（分支 claude/miniapp-lane）"
+    url: "worktree /Users/wanglei/AI求职打印服务终端-miniapp（分支 claude/miniapp-lane · 修订 eff92ac9c063）"
   - name: "wechat-devtools"
     purpose: "visual + real-click acceptance"
     url: "TBD（尚未执行：清单见 docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md）"
   - name: "production-api"
     purpose: "real backend"
-    url: "https://zyidai.cn/api/v1（小程序侧从未对它验证过本批改动）"
+    url: "https://zyidai.cn/api/v1（公开只读端点已探测 EV-009；认证后的业务闭环从未验证；库里岗位/招聘会/政策/终端全为 0 条）"
 gates:
-  G0: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "既有：CLAUDE.md §1/§9A/§15/§16 已确立定位、用户、价值、合规边界与止损条件"}
-  G1: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "本批：批 1/批 2 范围、按批文件预算、合规口径与验收标准逐批写明并经三模型评审"}
-  G2: {status: "PARTIAL", approved_by: "Claude（实现方）", approved_at: "2026-09-02T18:25:00+08:00", note: "修订 8176c1ee2004；四条自动门禁 + API typecheck 全绿"}
-  G3: {status: "PARTIAL", approved_by: "TBD", approved_at: "TBD", note: "静态/契约/视觉刻度/离线状态机探针通过；真机、真后端、可访问性与性能未验"}
-  G4: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：小程序未上传、未配置发布、未做微信平台材料"}
+  G0: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "既有：CLAUDE.md §1/§9A/§15/§16 已确立定位、用户、价值、合规边界与止损条件；G0-02 指标基线与 G0-05 预算里程碑仍 PENDING"}
+  G1: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "批 1/2/3 范围、按批文件预算、合规口径与验收标准逐批写明；G1-03 UI 状态从未在开发者工具中看过、G1-06 遥测与回滚未涉及 仍 PENDING"}
+  G2: {status: "PARTIAL", approved_by: "Claude（实现方 · 非验收权威）", approved_at: "2026-09-02T20:55:00+08:00", note: "修订 eff92ac9c063：四条小程序门禁 + API typecheck + CI 门禁覆盖率全绿（EV-017~EV-024）；已知缺陷 DEF-001~005 全部关闭。G2-05 向后兼容未对既有调用方回归 仍 PENDING。门禁全部在开发工作区跑 —— 本分支从未推送、CI 从未跑过"}
+  G3: {status: "PARTIAL", approved_by: "TBD", approved_at: "TBD", note: "七条 MUST **一条都没达成**（全部 PENDING）。PARTIAL 指的是有部分证据（离线状态机探针 EV-006 / 三模型评审 EV-007 / 生产只读探测 EV-009）而不是有部分达成。真机、真后端业务闭环、可访问性、性能一律未验；且生产库无内容 —— 解阻塞的前置不是有设备而是有内容"}
+  G4: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：小程序未上传、未配置发布、未做微信平台材料；合法域名是否配置未查证（RISK-002）"}
   G5: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：无授权用户走过真实关键旅程"}
   G6: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始"}

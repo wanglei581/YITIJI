@@ -4,24 +4,24 @@ G0-02,G0,PROJECT,Measurable outcome has baseline and target,MUST,metric review,p
 G0-03,G0,PROJECT,"Scope, non-goals, assumptions, and constraints are approved",MUST,scope review,planning,EV-011,产品负责人,PASS,不做招聘闭环、只做第三方来源入口的非目标已明确
 G0-04,G0,PROJECT,"Product, technology, data, provider, compliance, cost, and schedule feasibility are assessed",MUST,feasibility review,planning,EV-010,产品负责人,PASS,可行性与合规约束既有
 G0-05,G0,PROJECT,"Funding, staffing, decision rights, milestones, and stop conditions are named",MUST,governance review,planning,,TBD,PENDING,止损条件已在生态规划中给出（单机毛利/付费转化/次月留存），但未定预算与里程碑日期
-G1-01,G1,J-01,Critical journey and actor are defined,MUST,scope review,planning,EV-012,Claude,PASS,关键旅程：行前计划→展位导览→参展企业→现场打材料→出纸
-G1-02,G1,J-01,"Business rules, permissions, data lifecycle, and failure behavior are unambiguous",MUST,rule and state review,planning,EV-013,Claude,PASS,合规口径逐条写进代码注释：applyNote 必展示、null 不显示为 0、生成≠已打印
-G1-03,G1,J-01,UI states and content are reviewable at appropriate fidelity,MUST,experience review,planning,docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md,TBD,PENDING,UI 状态只在代码里成立，从未在开发者工具中看过——与 G3-01 同一缺口
-G1-04,G1,J-01,"APIs, events, schemas, migrations, and external contracts are versioned",MUST,contract review,planning,EV-014,Claude,PASS,105 个端点契约快照，含 12 条带原因的已知缺口豁免
+G1-01,G1,J-01,Critical journey and actor are defined,MUST,scope review,planning,EV-012,Claude,PASS,关键旅程：行前计划→展位导览→参展企业→现场打材料→出纸；建包后新增的批 3 三页已并入 scope.md「Committed Scope」
+G1-02,G1,J-01,"Business rules, permissions, data lifecycle, and failure behavior are unambiguous",MUST,rule and state review,planning,EV-013,Claude,PASS,合规口径逐条写进代码注释：applyNote 必展示、null 不显示为 0、生成≠已打印；新增 R-08（ai-records 的招聘会规划有意不给跳转）
+G1-03,G1,J-01,UI states and content are reviewable at appropriate fidelity,MUST,experience review,planning,,TBD,PENDING,UI 状态只在代码里成立，从未在开发者工具中看过——与 G3-01 同一缺口。抽查清单在 docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md（清单不是证据，故 evidence_ref 留空）｜新增 4 页后待查面更大
+G1-04,G1,J-01,"APIs, events, schemas, migrations, and external contracts are versioned",MUST,contract review,planning,EV-018,Claude,PASS,117 个端点契约快照，含 12 条带原因的已知缺口豁免（建包时为 105）
 G1-05,G1,J-01,Acceptance criteria are observable,MUST,acceptance review,planning,EV-015,Claude,PASS,逐批写明门禁与未验证项
 G1-06,G1,PROJECT,"Rollout, migration, compatibility, telemetry, and rollback needs influence design",MUST,technical decision review,planning,,TBD,PENDING,兼容性由静态门禁覆盖；遥测与回滚未涉及（小程序尚未发布）｜条目级无 PARTIAL：未全部满足即记 PENDING
-G2-01,G2,PROJECT,Release candidate has immutable revision or artifact digest,MUST,revision inspection,build,EV-016,Claude,PASS,分支 claude/miniapp-lane，工作区干净
-G2-02,G2,PROJECT,Required build and automated checks pass,MUST,automated checks,build,EV-001,Claude,PASS,四条小程序门禁 + services/api typecheck 0 error
-G2-03,G2,PROJECT,"Configuration, migrations, feature flags, fixtures, and documentation are current",MUST,change review,build,EV-002,Claude,PASS,契约快照随改动同步；本批无迁移与开关；无 fixture
-G2-04,G2,PROJECT,No implementation-critical defect or abandoned placeholder remains,MUST,defect and placeholder scan,build,EV-007,Claude,PASS,评审 13 条已修；全仓无 TODO 占位（静态门禁含诚实性禁词检查）
-G2-05,G2,PROJECT,Scope compliance and backward-compatibility effects are reviewed,MUST,diff review,build,,Claude,PENDING,范围合规：只动 apps/miniapp 与 services/api 政策端点（additive）。向后兼容未对既有调用方回归｜条目级无 PARTIAL：未全部满足即记 PENDING
-G3-01,G3,J-01,Critical journey passes end to end,MUST,runtime E2E,staging,,TBD,PENDING,
-G3-02,G3,J-01,Applicable failure and recovery paths pass,MUST,runtime scenarios,staging,,TBD,PENDING,
-G3-03,G3,PROJECT,"Security, privacy, auditability, and abuse controls meet the declared risk profile",MUST,security verification,staging,,TBD,PENDING,
-G3-04,G3,PROJECT,"Performance, capacity, reliability, and compatibility thresholds pass",MUST,non-functional verification,staging,,TBD,PENDING,
-G3-05,G3,J-01,Accessibility and representative device or browser UX pass,MUST,rendered UX verification,staging,,TBD,PENDING,
-G3-06,G3,PROJECT,"Mocks, simulations, test data, and untested boundaries are explicitly labeled",MUST,evidence inventory review,staging,,TBD,PENDING,
-G3-07,G3,PROJECT,No unresolved P0 or P1 defects,MUST,defect review,staging,,TBD,PENDING,
+G2-01,G2,PROJECT,Release candidate has immutable revision or artifact digest,MUST,revision inspection,build,EV-022,Claude,PASS,修订 eff92ac9c063（分支 claude/miniapp-lane）；apps/miniapp 与 services/api 工作区干净。**这条分支正在被另一位作者并发提交**：采证期间 HEAD 前进 3 次，引用前先比对 HEAD
+G2-02,G2,PROJECT,Required build and automated checks pass,MUST,automated checks,build,EV-017,Claude,PASS,四条小程序门禁（EV-017/019/020）+ services/api typecheck 0 error（EV-021）+ CI 门禁覆盖率 371/377（EV-024）。全部在开发工作区跑，**不是在 CI 上跑的**——本分支从未推送
+G2-03,G2,PROJECT,"Configuration, migrations, feature flags, fixtures, and documentation are current",MUST,change review,build,EV-018,Claude,PASS,契约快照随改动同步至 117 端点；本批无迁移与开关；无 fixture。ec552bb8111a 补上过一次漏跑 --write 的快照（DEF-005）
+G2-04,G2,PROJECT,No implementation-critical defect or abandoned placeholder remains,MUST,defect and placeholder scan,build,EV-023,Claude,PASS,已知缺陷全部关闭（DEF-001~005）；全仓无 TODO 占位。**但不构成穷尽性保证**：建包后又查出 2 处静默失效的诚实性防线（EV-023），两处都不是门禁报出来的，是另一路审计顺带发现的
+G2-05,G2,PROJECT,Scope compliance and backward-compatibility effects are reviewed,MUST,diff review,build,,Claude,PENDING,范围合规：只动 apps/miniapp 与两个 additive 后端端点（GET /policies/:id、GET /resume/self-assessment/questions）+ 一处 CI 脚本串联方式。向后兼容仍未对既有调用方（Kiosk/Admin/Partner）回归｜条目级无 PARTIAL：未全部满足即记 PENDING
+G3-01,G3,J-01,Critical journey passes end to end,MUST,runtime E2E,staging,EV-025,TBD,PENDING,一次都没跑过。生产只读探测（EV-009）只证明公开端点可达；生产库岗位/招聘会/政策/终端全为 0 条，**即便今天拿到设备也走不到第一步**。建包后新增 4 页 1 端点，这个缺口一点没变
+G3-02,G3,J-01,Applicable failure and recovery paths pass,MUST,runtime scenarios,staging,EV-006,TBD,PENDING,只有批 1 两页的离线状态机探针（fair-venue 69 / fair-visit-plan 33 条断言）且探针未入库；建包后新增的 4 页无任何状态机探针。断网、超时、401 过期、AI 降级的真实恢复行为一律未跑
+G3-03,G3,PROJECT,"Security, privacy, auditability, and abuse controls meet the declared risk profile",MUST,security verification,staging,EV-007,TBD,PENDING,只有三模型只读代码评审（基于 c816e55 之前的代码）；建包后新增的 4 页与自我探索的敏感项同意链路未经评审。限流、越权、审计落库一律未在运行时验证
+G3-04,G3,PROJECT,"Performance, capacity, reliability, and compatibility thresholds pass",MUST,non-functional verification,staging,,TBD,PENDING,未设阈值也未测。仅有生产公开只读端点 2–4s 的观测（EV-009）；AI 长任务（aiTimeout 90s）真实耗时、并发、机型兼容一律未知
+G3-05,G3,J-01,Accessibility and representative device or browser UX pass,MUST,rendered UX verification,staging,EV-008,TBD,PENDING,阻塞项：只有产品负责人能在微信开发者工具/真机执行。雷达图 canvas 与 6 段表单步骤条属于**只有渲染出来才知道对不对**的东西，静态门禁一条都覆盖不到
+G3-06,G3,PROJECT,"Mocks, simulations, test data, and untested boundaries are explicitly labeled",MUST,evidence inventory review,staging,,TBD,PENDING,产品侧已改善：小青降级话术与 OCR 低置信度现在会显式披露（EV-023）；契约门禁登记 12 条带原因的未开放端点。但本条要求的是**证据清单级**的复核，尚未由验收权威做过——且已知两处标注失效是事后发现的
+G3-07,G3,PROJECT,No unresolved P0 or P1 defects,MUST,defect review,staging,,TBD,PENDING,已知 P0/P1 均已关闭（DEF-001/002/004）。但缺陷发现面只有源码走查与静态门禁，真机与真后端一次没跑——不足以支撑「无未解决 P0/P1」的结论
 G4-01,G4,PROJECT,"Production topology, configuration, secrets ownership, domains, certificates, and providers are ready",MUST,production readiness review,production-equivalent,,TBD,PENDING,
 G4-02,G4,PROJECT,Deployment and migrations are rehearsed,MUST,release rehearsal,staging,,TBD,PENDING,
 G4-03,G4,PROJECT,Monitoring and alert ownership are verified,MUST,alert test,production-equivalent,,TBD,PENDING,

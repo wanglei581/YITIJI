@@ -1,10 +1,15 @@
-# 修订 ec552bb81114 · 2026-09-02T20:52+08:00 · local
+# 修订 eff92ac9c063 · 2026-09-02T20:53+0800 · local
 
 $ services/api/node_modules/.bin/tsc --noEmit -p services/api/tsconfig.json
 exit=0 · 输出行数 0 · error TS 计数 0
 
-本次**未重跑** prisma generate，沿用工作区中已生成的 Prisma Client。
-若 prisma/schema.prisma 变更后未重新生成，本条结论不成立。
-
 覆盖本批唯一的后端改动：services/api/src/ai/self-assessment.controller.ts
-新增 @Get('questions')（additive，排在 @Get(':taskId') 之前）。
+新增 @Get('questions')（additive）。装饰器顺序排在 @Get(':taskId') 之前——
+Nest 按声明顺序匹配，放后面 'questions' 会被当成 taskId 吃掉。
+顺序正确性由源码走查确认，**不由本次 typecheck 证明**（类型检查看不出路由顺序）。
+
+本条不能证明什么：
+- 本次**未重跑** prisma generate，沿用工作区中已生成的 Prisma Client；
+  若 prisma/schema.prisma 变更后未重新生成，本条结论不成立。
+- typecheck 只证明类型自洽，不证明运行时行为、不证明端点真的可达。
+  该端点从未被真实请求过（生产探测 EV-009 未覆盖它）。

@@ -1,4 +1,4 @@
-# 修订 ec552bb81114 · 2026-09-02T20:50+08:00 · local（工作区含 1 个未提交页面 pages/resume-build/ —— 见 EV-022）
+# 修订 eff92ac9c063 · 2026-09-02T20:52+0800 · local（apps/miniapp 与 services/api 工作区干净；唯一未提交内容是本交付包自身）
 
 $ cd apps/miniapp && node scripts/verify-miniapp-api-contract.mjs
 小程序调用端点 117 个 · 后端路由 473 条 · 已知缺口 12 个

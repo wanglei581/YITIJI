@@ -454,6 +454,16 @@ function resumeReport(raw) {
   });
 
   const notice = raw.extractionNotice || null;
+  // 低/中置信度时下面会渲染一条完整的「识别置信度…」横幅，而提取层
+  // （services/api resume-extraction.service.ts 的 finalizeText）对**同一条件**还会再推一条
+  // 「文字识别置信度有限…」warning。两条讲的是同一件事，一起渲染就是同一句话叠两个警告框。
+  // 这里只在横幅已经出现时摘掉那一条 warning；截断、只识别前 N 页等其它 warning 全部保留。
+  // 后端不动：那条 warning 由 verify-ocr-baidu 断言，Kiosk 也在消费同一个 extractionNotice。
+  const needsReview = Boolean(notice && (notice.confidence === 'low' || notice.confidence === 'medium'));
+  const rawWarnings = notice && Array.isArray(notice.warnings) ? notice.warnings : [];
+  const dedupedWarnings = needsReview
+    ? rawWarnings.filter((w) => !(typeof w === 'string' && w.indexOf(CONFIDENCE_WARNING_PREFIX) === 0))
+    : rawWarnings;
 
   return {
     taskId: raw.taskId || '',
@@ -486,13 +496,20 @@ function resumeReport(raw) {
     // 只要不是 high 就提醒。宁可多提醒一次，也不要让 medium 悄悄过去——
     // 这条提示的代价是一行字，漏掉的代价是用户按错误识别的文本改简历。
     noticeConfidenceLabel: notice && CONFIDENCE_LABEL[notice.confidence] ? CONFIDENCE_LABEL[notice.confidence] : '',
-    noticeNeedsReview: Boolean(notice && (notice.confidence === 'low' || notice.confidence === 'medium')),
-    noticeWarnings: notice && Array.isArray(notice.warnings) ? notice.warnings : [],
+    noticeNeedsReview: needsReview,
+    noticeWarnings: dedupedWarnings,
   };
 }
 
 /** 文本抽取置信度 → 中文标签。取值来自后端 extractionNotice.confidence 枚举。 */
 const CONFIDENCE_LABEL = { high: '较高', medium: '中等', low: '较低' };
+
+/**
+ * 提取层「置信度有限」warning 的开头（services/api resume-extraction.service.ts）。
+ * 只有在页面已经显示置信度横幅时才拿它去重。故意用开头匹配而不是包含匹配：
+ * 截断 / 只识别前 N 页等其它 warning 不以此开头，不会被误删。
+ */
+const CONFIDENCE_WARNING_PREFIX = '文字识别置信度';
 
 /** 数组映射helper:对 null/非数组安全 */
 function mapList(fn) {
