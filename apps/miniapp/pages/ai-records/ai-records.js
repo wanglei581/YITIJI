@@ -6,11 +6,16 @@ const auth = require('../../utils/auth')
 const KIND_META = {
   parse:           { type: 'resume',  title: '简历诊断',   icon: 'i-file-search', tone: 'plum', route: '/pages/resume-diagnose/resume-diagnose' },
   optimize:        { type: 'resume',  title: '简历优化',   icon: 'i-edit',        tone: 'teal', route: '/pages/resume-optimize/resume-optimize' },
-  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '' },
+  generate:        { type: 'resume',  title: 'AI 生成简历', icon: 'i-file-text',  tone: 'plum', route: '/pages/resume-build/resume-build' },
   job_fit:         { type: 'job',     title: '岗位匹配',   icon: 'i-link',        tone: 'teal', route: '/pages/job-fit/job-fit' },
   career_plan:     { type: 'career',  title: '职业规划',   icon: 'i-compass',     tone: 'plum', route: '/pages/career-plan/career-plan' },
-  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat', route: '' },
-  self_assessment: { type: 'career',  title: '自我评估',   icon: 'i-form',        tone: 'wheat', route: '' },
+  // route 有意留空：fair-visit-plan 页要求 ?fairId= 才能取数（getFairVisitPlan 的
+  // fairId 在路径里），而 /me/ai-records 只 select 了 id/taskId/kind，**不带招聘会标识**。
+  // 硬接上会让「查看结果」点进去撞「缺少招聘会参数」——比诚实的说明更糟。
+  // 等后端记录带上 fairId 再接。
+  fair_visit_plan: { type: 'career',  title: '招聘会规划',  icon: 'i-calendar',    tone: 'wheat', route: '',
+                     noRouteReason: '招聘会规划要从对应的那场招聘会进入才能打开；服务端的记录列表不带招聘会标识，所以这里无法直接跳转。你可以在「求职 → 招聘会」里找到那场招聘会再进。' },
+  self_assessment: { type: 'career',  title: '自我探索',   icon: 'i-form',        tone: 'wheat', route: '/pages/self-explore/self-explore' },
 }
 
 const STATUS_LABEL = {
@@ -57,6 +62,7 @@ function mapRecord(item) {
     tone: meta.tone,
     route: meta.route,
     canOpen,
+    noRouteReason: meta.noRouteReason || '',
     actionLabel: canOpen ? '查看结果' : '查看状态',
   }
 }
@@ -82,7 +88,8 @@ Page({
       { key: 'all', label: '全部' },
       { key: 'resume', label: '简历服务' },
       { key: 'job', label: '岗位匹配' },
-      { key: 'career', label: '规划评估' },
+      // 这一组现在装的是职业规划 / 招聘会规划 / 自我探索，没有一项是「评估」。
+      { key: 'career', label: '规划探索' },
     ],
     groups: [],
     loginRequired: false,
@@ -142,7 +149,9 @@ Page({
     }
     const reason = record.status !== 'completed'
       ? `任务状态：${record.statusLabel}`
-      : '当前版本没有注册这类结果的独立回看页面，记录仍保留在你的账户中。'
+      // 有专属原因就说专属的。笼统说「没有注册页面」对招聘会规划是不准确的——
+      // 那一页注册了，只是没有招聘会标识进不去。
+      : (record.noRouteReason || '当前版本没有注册这类结果的独立回看页面，记录仍保留在你的账户中。')
     wx.showModal({
       title: record.title,
       content: `${reason}\n创建时间：${record.day} ${record.time}`,

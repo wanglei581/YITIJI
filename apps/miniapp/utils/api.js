@@ -995,7 +995,7 @@ const api = {
 
   /**
    * 本人 AI 服务记录（需登录）。返回 MemberAiRecordItem[] 数组，附 .total。
-   * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan
+   * kind 取值: parse | optimize | generate | job_fit | career_plan | fair_visit_plan | self_assessment
    * 后端: GET /api/v1/me/ai-records?cursor=&pageSize=
    */
   getMyAiRecords(params = {}) {
@@ -1027,6 +1027,54 @@ const api = {
     const body = { message };
     if (sessionId) body.sessionId = sessionId;
     return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
+  },
+
+  // ---------- AI 简历从零生成 ----------
+  // 定位：给**没有简历**的人用。现有链路是「上传 → 诊断 → 优化」，
+  // 没有简历的应届生根本进不来。
+  //
+  // 合规（后端 DTO 注释原文）：「输入只是求职者本人提供的简历资料；
+  // AI 只润色，不编造（契约在 service 层强制）」。前端配套的红线是：
+  //   1. 这是**表单**不是聊天。不做「帮你写一段实习经历」这类入口。
+  //   2. 用户没填的段落，结果与导出的 PDF 上必须**可见地留空/留占位**，
+  //      不许出现「已为你补全」。
+  //   3. 后端全局 ValidationPipe 是 whitelist + forbidNonWhitelisted，
+  //      多传任何字段（身份证号、候选人评级、企业侧字段）直接 400。
+  //      前端也不要自作主张加字段。
+
+  /**
+   * 提交生成（付费 AI，PaidAiThrottle 6 次/分钟）。
+   * 必填：basic.name、intention.position、experience[].company/role/description、
+   *       education[].school。其余可选，留空就是留空。
+   * 上限：education≤6 experience≤8 projects≤6 skills≤20 certificates≤15。
+   */
+  submitResumeGenerate(payload, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request('/resume/generate', {
+      method: 'POST', data: payload, header: tokenHeader(accessToken),
+      needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取生成结果（轮询用）。无记录时 404 属正常空态，不是错误。 */
+  getResumeGenerate(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request(`/resume/generate/${encodeURIComponent(taskId)}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /**
+   * 导出为文件。format ∈ pdf | docx | txt | md。
+   * draft=true 表示**导出未经润色的原始填写内容**——AI 不可用时给用户的退路：
+   * 功能退化成「按你填的排版」，而不是转圈假装成功。
+   */
+  exportGeneratedResume(payload, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 简历生成'));
+    return request('/resume/generate/export', {
+      method: 'POST', data: payload, header: tokenHeader(accessToken),
+      needAuth: true, timeout: 60000,
+    });
   },
 
   // ---------- 求职材料模板 ----------

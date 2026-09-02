@@ -277,6 +277,25 @@ for (const f of jsFiles) {
 }
 if (!fails.some((x) => x.startsWith('JS 跳转目标已注册'))) ok('JS 跳转目标全部已注册')
 
+// 上面那条查不到「路由存在表里、跳转时拼出来」的写法——它把含 ${} 的动态目标
+// 整个过滤掉了。ai-records 正是这种：`${record.route}?taskId=...`，
+// 于是 KIND_META 里的 route 字面量从来没被校验过，2026-09-02 就因此漏过一次
+// 「页面已存在但表里是空字符串」。这里把这类路由表单独捞出来查。
+{
+  const aiRecordsJs = read('pages/ai-records/ai-records.js')
+  const routes = [...aiRecordsJs.matchAll(/route:\s*'([^']*)'/g)].map((m) => m[1]).filter(Boolean)
+  const dead = routes
+    .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
+    .filter((t) => !pagePathSet.has(t))
+  if (routes.length === 0) {
+    bad('AI 记录路由表已注册', 'ai-records.js 里取不到任何 route 字面量——抽取失效，不要当作通过')
+  } else if (dead.length) {
+    bad('AI 记录路由表已注册', `指向未注册页面: ${[...new Set(dead)].join(',')}`)
+  } else {
+    ok(`AI 记录路由表全部已注册（${routes.length} 条）`)
+  }
+}
+
 for (const f of wxmlFiles.filter((x) => x.startsWith('./pages/'))) {
   const pageJs = f.replace(/\.wxml$/, '.js')
   if (!jsFiles.includes(pageJs)) continue
@@ -558,6 +577,37 @@ if (
   !/quoteMyPrintOrder\([\s\S]{0,500}\b(?:pages|billablePages|amountCents)\s*:/.test(printUploadJs)
 ) ok('打印参数页使用服务端真实页数与精确报价')
 else bad('打印参数页服务端精确报价', '必须先取本人 printFileUrl 再调 /orders/quote，且不得提交或本地计算页数/金额')
+
+// 报价参数与下单参数必须锁在一起。
+//
+// print-upload 的 verifiedPrintParams()（报价用）和 print-pay 的
+// createCloudPrintOrder()（下单用）各自硬编码了 colorMode / duplex。
+// 今天两边都是 black_white / simplex，与 print-upload 页上「彩色与双面本期不可选」
+// 的锁定一致，所以没有问题。
+//
+// 但这是个潜伏陷阱：哪天驱动侧彩色通过真机验收、有人在 print-upload 解锁了选项，
+// 却忘了改 print-pay 的硬编码，用户就会看到「彩色·双面」而实际下单黑白单面——
+// 展示与实付不一致。那是钱和纸的事，不是文案问题。
+//
+// 所以这里把两处钉在一起：值必须逐字相等，改一边不改另一边即转红。
+{
+  const grab = (src, label) => {
+    const color = /colorMode:\s*'([a-z_]+)'/.exec(src)
+    const duplex = /duplex:\s*'([a-z]+)'/.exec(src)
+    return { label, color: color && color[1], duplex: duplex && duplex[1] }
+  }
+  const quote = grab(printUploadJs, 'print-upload/verifiedPrintParams')
+  const order = grab(printPayJs, 'print-pay/createCloudPrintOrder')
+  if (!quote.color || !quote.duplex || !order.color || !order.duplex) {
+    bad('报价与下单打印参数一致', '取不到 colorMode / duplex 字面量——抽取失效，不要当作通过')
+  } else if (quote.color !== order.color || quote.duplex !== order.duplex) {
+    bad('报价与下单打印参数一致',
+      `报价用 ${quote.color}/${quote.duplex}，下单用 ${order.color}/${order.duplex}——` +
+      '用户看到的和实际下单的不是一回事，必须两处同改')
+  } else {
+    ok(`报价与下单打印参数一致（${quote.color} / ${quote.duplex}）`)
+  }
+}
 
 // presetFileUrl 旁路：招聘会活动资料 / 参会企业资料是共享派生文件(endUserId 为 null)，
 // 会员拿 fileId 去 preview-url 必吃 403，只能透传服务端已下发的 printFileUrl。
