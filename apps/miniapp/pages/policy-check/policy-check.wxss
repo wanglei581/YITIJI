@@ -36,3 +36,25 @@
   font-size: var(--fs-xs); color: var(--faint);
 }
 .r-manual { color: var(--warn); }
+
+/* 加载失败态的这 5 个类此前**哪儿都没有定义**——app.wxss 没有，本页也没有。
+   别的页面（fair-companies / fair-company-detail / fair-visit-plan / jobs / fairs /
+   policies）各自在自己的 wxss 里定义了同名的一套，而页面 wxss 不跨页生效，
+   于是本页的失败态拿不到任何样式。
+   删掉这一段会怎样：接口一失败就是满屏贴边的四行黑字（.content 无横向内距），
+   「重新加载」和正文长得完全一样、可点高度只有 24.8px（低于 §9 的 48px 下限），
+   而它是这一屏**唯一的出口**。取问项失败在首屏就可能命中。
+   数值照抄 fair-companies.wxss 的同名类，保证跨页观感一致。 */
+.empty-wrap { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
+  border: 1rpx solid var(--line-soft); background: var(--surface);
+  display: flex; flex-direction: column; align-items: center; text-align: center; }
+.state-icon { width: 92rpx; height: 92rpx; border-radius: var(--r); background: var(--surface-2);
+  color: var(--faint); display: flex; align-items: center; justify-content: center; }
+.state-icon.error { background: var(--error-soft); color: var(--error); }
+.state-icon .ficon { width: 44rpx; height: 44rpx; }
+.state-title { margin-top: 22rpx; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.state-desc { margin-top: 9rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
+/* 112rpx = 56px：错误态的重试是这一屏的主操作，按主按钮下限给。 */
+.retry-btn { margin-top: 25rpx; height: 112rpx; padding: 0 40rpx; border-radius: 24rpx;
+  background: var(--teal); color: #fff; display: flex; align-items: center;
+  font-size: 26rpx; font-weight: 650; }

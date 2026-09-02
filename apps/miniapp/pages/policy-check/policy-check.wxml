@@ -89,7 +89,11 @@
           <view class="r-sum" wx:else>
             <text class="chip">该政策未录入可比对条件</text>
           </view>
-          <view class="r-foot">
+          <!-- 这层必须带条件:里面两个 text 都是条件渲染,而 sourceName 默认 ''、
+               manualReviewRequired 默认 false,可以同时为假。无条件渲染时 .r-foot 的
+               border-top + padding-top 仍然占位,卡片底部会出现一条断头分隔线,
+               线下面 17px 全空。 -->
+          <view wx:if="{{item.sourceName || item.manualReviewRequired}}" class="r-foot">
             <text wx:if="{{item.sourceName}}">来源：{{item.sourceName}}</text>
             <text wx:if="{{item.manualReviewRequired}}" class="r-manual">需窗口人工核定</text>
           </view>
@@ -107,7 +111,11 @@
   </view>
 
   <view class="actionbar" wx:if="{{!loading && !loadError}}">
-    <view wx:if="{{phase === 'result'}}" class="btn lg block tap" hover-class="tap-press"
+    <!-- ghost 不能省：.btn 基类只给尺寸与字重,background/color 全在配色变体里
+           (.primary/.ghost/.dark/...)。不带变体就是透明底 + 无描边,压在 .actionbar
+           的白底上,「重新填写」会退化成一行居中深色文字,看不出是按钮。
+           用 ghost 而不是 primary:这是结果页的「重来」,不是要引导用户去点的主动作。 -->
+      <view wx:if="{{phase === 'result'}}" class="btn lg block ghost tap" hover-class="tap-press"
           bindtap="restart" role="button" aria-label="重新填写">重新填写</view>
     <view wx:else class="btn lg block primary tap {{submitting ? 'disabled' : ''}}" hover-class="tap-press"
           bindtap="submit" role="button" aria-label="开始比对">{{submitting ? '正在比对…' : '开始比对（已选 ' + answeredCount + ' 项）'}}</view>
