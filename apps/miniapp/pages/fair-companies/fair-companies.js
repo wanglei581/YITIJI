@@ -9,24 +9,16 @@ const MAX_PAGES = 5
 // 关键词输入到重算列表的等待。纯本地过滤不发请求，200ms 只为避免逐字符 setData 抖动。
 const SEARCH_DEBOUNCE = 200
 
-// 后端 FairCompany.scale 是自由文本列（fair.types.ts 里 `scale: string | null`），
-// 库里既可能是枚举值也可能是中文原文。只翻译认得出的枚举，认不出就原样显示——
-// 不学一体机 httpAdapter 那样兜底成 'medium'，那等于给每家没填规模的企业凭空盖章。
-const SCALE_LABEL = {
-  startup: '初创',
-  small: '小型',
-  medium: '中型',
-  large: '大型',
-  enterprise: '超大型',
-}
+// 规模标签口径收在 utils/normalize.js:列表页和详情页曾各写一份且值不一样,
+// 同一家企业在相邻两页显示「中型」和「中型企业」。
+const N = require('../../utils/normalize')
 
 function text(v) {
   return v == null ? '' : String(v).trim()
 }
 
 function scaleLabel(scale) {
-  const s = text(scale)
-  return s ? (SCALE_LABEL[s] || s) : ''
+  return N.scaleLabel(scale)
 }
 
 /**

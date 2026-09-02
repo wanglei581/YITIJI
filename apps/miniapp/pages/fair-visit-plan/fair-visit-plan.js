@@ -179,6 +179,15 @@ Page({
   },
 
   onShow() {
+    // 从 resume-upload 传完简历回来:本地已经有 taskId 了,但页面还停在
+    // 「还没有可用的简历」。不重读一次,用户会以为上传没生效。
+    if (this.data.phase === 'no-resume') {
+      const saved = storage.get(storage.KEYS.RESUME_TASK) || {}
+      if (saved.taskId) {
+        this._init()
+        return
+      }
+    }
     if (!this._waitingForLogin || !auth.isLoggedIn()) return
     this._waitingForLogin = false
     this._init()
@@ -358,6 +367,17 @@ Page({
       if (this._stopped) return
       const name = encodeURIComponent((res && res.filename) || '参会准备单.pdf')
       const fid = encodeURIComponent((res && res.fileId) || '')
+      // 另两页(fair-company-detail / fair-materials)都拦了这一步:没有 fileId
+      // 就跳进 print-upload,用户会停在一个「未选择文件」的死页上。
+      if (!fid) {
+        wx.showModal({
+          title: '生成打印文件失败',
+          content: '服务端未返回可打印文件，请稍后重试。',
+          showCancel: false,
+          confirmText: '知道了',
+        })
+        return
+      }
       const pages = (res && res.pageCount) || ''
       wx.navigateTo({ url: `/pages/print-upload/print-upload?name=${name}&fileId=${fid}&pages=${pages}` })
     }).catch((err) => {

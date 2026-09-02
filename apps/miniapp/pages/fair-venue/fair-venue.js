@@ -69,6 +69,12 @@ function settle(promise) {
 Page({
   // 非响应式实例状态：请求序号用于作废过期响应，索引只在搜索时读，都不进 data
   _seq: 0,
+
+  // 三个并发请求靠 _seq 作废。没有 onUnload 递增它,用户在请求回来之前返回上一页,
+  // 三个 Promise 仍会 setData 到已销毁的实例上。
+  onUnload() {
+    this._seq += 1
+  },
   _index: [],
 
   data: {

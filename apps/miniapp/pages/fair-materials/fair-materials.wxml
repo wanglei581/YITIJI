@@ -27,7 +27,7 @@
     </view>
 
     <block wx:else>
-      <view class="mat-sum rise-d1">共 {{list.length}} 份资料，由招聘会主办方发布</view>
+      <view class="mat-sum rise-d1">{{truncated ? '已显示前 ' + list.length + ' 份资料' : '共 ' + list.length + ' 份资料'}}，由招聘会主办方发布</view>
 
       <view wx:for="{{list}}" wx:key="id" class="card rise-d2">
         <view class="card-inner">

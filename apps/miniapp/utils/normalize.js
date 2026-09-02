@@ -717,7 +717,31 @@ function fairZoneLike(raw) {
   });
 }
 
+/**
+ * 参会企业规模标签。后端 FairCompany.scale 是自由文本列
+ * (fair.types.ts 的 `scale: string | null`),库里既可能是枚举值也可能是中文原文。
+ * 只翻译认得出的枚举,认不出原样显示 —— 不学一体机 httpAdapter 兜底成 'medium',
+ * 那等于给每家没填规模的企业凭空盖章。
+ *
+ * 收在这里是因为列表页和详情页各写过一份,值还不一样(「中型」vs「中型企业」),
+ * 同一家企业在相邻两页显示两种说法。用不带「企业」的短形:
+ * 详情页里它紧挨着行业名,带上「企业」是冗余。
+ */
+const SCALE_LABEL = {
+  startup: '初创',
+  small: '小型',
+  medium: '中型',
+  large: '大型',
+  enterprise: '超大型',
+};
+
+function scaleLabel(scale) {
+  const s = scale == null ? '' : String(scale).trim();
+  return s ? (SCALE_LABEL[s] || s) : '';
+}
+
 module.exports = {
+  scaleLabel,
   fairCompanyLike,
   fairZoneLike,
   resumeReport,

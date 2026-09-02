@@ -3,6 +3,10 @@ const api = require('../../utils/api');
 const N = require('../../utils/normalize');
 const fileUrl = require('../../utils/file-url');
 
+// 后端 /job-fairs/:id/materials 的 pageSize 上限是 100(safeInt(sizeStr, 20, 1, 100))。
+// 取满说明可能还有下一页,此时页面不得把已载入数说成总数。
+const MATERIALS_PAGE_SIZE = 100;
+
 // 类型中文名与 apps/kiosk/src/types/fair.ts 的 FAIR_MATERIAL_TYPE_LABELS 保持同名：
 // 同一份资料用户在手机上看到「展馆地图」，走到一体机前也要能认出是同一份，
 // 两端各起一个名字会让现场对不上。
@@ -62,7 +66,11 @@ Page({
   _previews: {},
   _gone: false,
 
+  // truncated 见 load():取满上限时页面文案必须改口
+
+
   data: {
+    truncated: false,
     statusBarHeight: 20,
     fairId: '',
     // phase: loading=首次/刷新请求中 | error=请求失败 | empty=本场没有已发布资料 | ready=有资料
@@ -96,7 +104,13 @@ Page({
     }
     const seq = ++this._seq;
     this.setData({ phase: 'loading', loadError: '' });
-    return api.getFairMaterials(fairId).then((list) => {
+    // 不传 pageSize 会吃到后端默认 20(jobs.controller.ts 的 safeInt(sizeStr, 20, 1, 100)),
+    // 第 21 份之后既看不到也没有提示。取满上限 100,取到 100 说明可能还有,
+    // 此时不能把已载入数当总数说。
+    return api.getFairMaterials(fairId, { pageSize: MATERIALS_PAGE_SIZE }).then((list) => {
+      // 取满一页就不能宣称这是全部。没有可信 total 时(request.js 解包只留
+      // body.pagination),宁可说「已显示前 N 份」也不谎报「共 N 份」。
+      this.setData({ truncated: Array.isArray(list) && list.length >= MATERIALS_PAGE_SIZE });
       if (seq !== this._seq || this._gone) return;
       const rows = Array.isArray(list) ? list : [];
       this._previews = {};
@@ -176,6 +190,9 @@ Page({
     wx.downloadFile({
       url: info.url,
       success: (dl) => {
+        // 大文件下载耗时长。用户中途退出后仍执行 _openLocal，会在他当前所在的
+        // 任意页面强行弹出文档预览。
+        if (this._gone) { wx.hideLoading(); return; }
         // 签名失效时 serveMaterialContent 一律回 401(不区分原因，防探测)，
         // 所以 401/403 只可能是链接过期或被撤销，给用户可执行的下一步而不是错误码。
         if (dl.statusCode === 401 || dl.statusCode === 403) {
@@ -191,6 +208,7 @@ Page({
         this._openLocal(dl.tempFilePath);
       },
       fail: (err) => {
+        if (this._gone) { wx.hideLoading(); return; }
         this._finishPreview();
         this._previewFailed(fileUrl.readableDownloadError(err && err.errMsg));
       },

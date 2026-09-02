@@ -2,14 +2,9 @@
 const app = getApp()
 const api = require('../../utils/api')
 
-// 与列表页同一份口径：scale 是自由文本列，认得出的枚举才翻译，认不出原样显示。
-const SCALE_LABEL = {
-  startup: '初创企业',
-  small: '小型企业',
-  medium: '中型企业',
-  large: '大型企业',
-  enterprise: '超大型企业',
-}
+// 规模标签口径收在 utils/normalize.js。这里原本自己写了一份,注释还写着
+// 「与列表页同一份口径」,值却是带「企业」的长形 —— 正是这种复制导致的漂移。
+const N = require('../../utils/normalize')
 const POSITION_TYPE_LABEL = {
   full_time: '全职',
   part_time: '兼职',
@@ -21,8 +16,7 @@ function text(v) {
 }
 
 function scaleLabel(scale) {
-  const s = text(scale)
-  return s ? (SCALE_LABEL[s] || s) : ''
+  return N.scaleLabel(scale)
 }
 
 function normalizePosition(p) {
@@ -114,6 +108,7 @@ function normalize(row, zoneName) {
 
 Page({
   _seq: 0,
+  _gone: false,
 
   data: {
     statusBarHeight: 20,
@@ -140,6 +135,7 @@ Page({
 
   onUnload() {
     this._seq += 1
+    this._gone = true
   },
 
   load() {
@@ -209,6 +205,9 @@ Page({
     api.prepareFairCompanyPrint(this.data.fairId, this.data.companyId, variant)
       .then((res) => {
         wx.hideLoading()
+        // 生成要 1~3 秒。用户等不及返回上一页时不能再 navigateTo——
+        // 那会把人从他自己翻到的页面强行拖进打印下单流程。
+        if (this._gone) return
         this.setData({ printing: '' })
         const fid = encodeURIComponent((res && res.fileId) || '')
         if (!fid) {
@@ -221,6 +220,9 @@ Page({
       })
       .catch((err) => {
         wx.hideLoading()
+        // 失败路径同样要判:退出后弹「需要登录」或错误 modal,
+        // 一样是在用户已经离开的页面上打断他。
+        if (this._gone) return
         this.setData({ printing: '' })
         if (err && err.statusCode === 401) {
           wx.showModal({

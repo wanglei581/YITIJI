@@ -65,7 +65,15 @@ Page({
   _openFairPage(page) {
     const id = this.data.pageId
     if (!id) return
-    wx.navigateTo({ url: `/pages/${page}/${page}?fairId=${encodeURIComponent(id)}` })
+    // 真机上快速双击会压两次栈,用户要按两次返回才出得来。
+    // 500ms 内只放行一次;navigateTo 失败也要解锁,否则这个入口会永久卡住。
+    if (this._navBusy) return
+    this._navBusy = true
+    setTimeout(() => { this._navBusy = false }, 500)
+    wx.navigateTo({
+      url: `/pages/${page}/${page}?fairId=${encodeURIComponent(id)}`,
+      fail: () => { this._navBusy = false },
+    })
   },
   tapVenue()     { this._openFairPage('fair-venue') },
   tapCompanies() { this._openFairPage('fair-companies') },
