@@ -1,4 +1,9 @@
 /* 求职材料模板。本页私有类，其余复用 app.wxss 全局类；尺寸走令牌。 */
+/* 同 policy-check：本页模板卡与字段卡都是简单内容卡，全局 .card 不带
+   padding（内距在 .card-inner），此处统一补齐。取 16px 与 .card-inner 一致。
+   删掉这条会让模板标题、描述和输入框直接贴住卡片边框。 */
+.card { padding: 16px; }
+
 
 .jm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
 .jm-title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); line-height: 1.45; }

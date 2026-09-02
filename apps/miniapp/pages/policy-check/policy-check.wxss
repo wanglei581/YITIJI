@@ -1,5 +1,12 @@
 /* 政策条件自测。只放本页私有类，其余复用 app.wxss 全局类。
    尺寸一律走 --fs-* / --r-* 令牌，不再挑新数。 */
+/* 本页所有卡片都是「简单内容卡」，不是 fair-venue 那种整幅行卡，
+   因此统一补内距。全局 .card 有意不带 padding（内距在 .card-inner），
+   本页每张卡都需要，就不再逐张套一层 .card-inner 节点。
+   取 16px 而不是 32rpx：要和别的页面用 .card-inner 的卡片内距逐像素一致。
+   删掉这条会让题目文字和选项直接贴住卡片 1px 边框。 */
+.card { padding: 16px; }
+
 
 .q-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin-bottom: 16rpx; }
 .q-label { font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
