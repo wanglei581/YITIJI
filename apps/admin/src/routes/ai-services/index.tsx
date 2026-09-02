@@ -121,6 +121,9 @@ const OP_FILTER_LABELS: Record<OpFilter, string> = {
   selfAssessment:     '自我探索 · 倾向参考',
   contractReview:     '合同审查',
 }
+/** 单页条数。后端硬上限 500（services/api/src/ai/ai-log.service.ts MAX_LOG_LIMIT）。 */
+const LOGS_PAGE_SIZE = 100
+
 const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
 const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
   all:     '全部状态',
@@ -158,24 +161,27 @@ function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-
 export default function AiServicesPage() {
   const [usage,        setUsage]        = useState<AdminAiUsage | null>(null)
   const [logs,         setLogs]         = useState<AdminAiLogEntry[]>([])
+  const [logsTotal,    setLogsTotal]    = useState(0)
+  const [logsOffset,   setLogsOffset]   = useState(0)
+  const [logsLoading,  setLogsLoading]  = useState(true)
+  const [logsError,    setLogsError]    = useState<string | null>(null)
   const [qualitySummary, setQualitySummary] = useState<JobSourceQualitySummary[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState<string | null>(null)
   const [opFilter,     setOpFilter]     = useState<OpFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
+  // 概览（统计 + 岗位质量）只在挂载时取一次，与日志筛选解耦。
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const [usageData, logsData, qualityData] = await Promise.all([
+        const [usageData, qualityData] = await Promise.all([
           getAiUsage(),
-          getAiLogs(100),
           getAdminJobQualitySummary(),
         ])
         if (cancelled) return
         setUsage(usageData)
-        setLogs(logsData.entries)
         setQualitySummary(qualityData)
       } catch {
         if (!cancelled) setError('AI 服务数据加载失败，请刷新重试')
@@ -185,6 +191,44 @@ export default function AiServicesPage() {
     })()
     return () => { cancelled = true }
   }, [])
+
+  // 日志：**每次筛选 / 翻页都重新请求后端**。
+  //
+  // 此前是「固定拉最近 100 条 → 在浏览器里 filter」，低频能力（合同审查等）
+  // 只要没挤进最近 100 条就显示为空 —— 页面在对运营说「没有调用」，
+  // 而库里其实有。筛选必须由后端带 operation / status 走索引查，
+  // 不要为了少一次请求把它改回客户端过滤。
+  useEffect(() => {
+    let cancelled = false
+    setLogsLoading(true)
+    void (async () => {
+      try {
+        const result = await getAiLogs({
+          operation: opFilter === 'all' ? undefined : opFilter,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          limit: LOGS_PAGE_SIZE,
+          offset: logsOffset,
+        })
+        if (cancelled) return
+        setLogs(result.entries)
+        setLogsTotal(result.total)
+        setLogsError(null)
+      } catch {
+        if (cancelled) return
+        // 失败时清空并明说加载失败，绝不留着上一次筛选的结果冒充本次结果。
+        setLogs([])
+        setLogsTotal(0)
+        setLogsError('调用日志加载失败，请重试')
+      } finally {
+        if (!cancelled) setLogsLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [opFilter, statusFilter, logsOffset])
+
+  // 换筛选条件必须回到第一页，否则会停在旧偏移量上、看起来像「筛不出东西」。
+  const applyOpFilter = (next: OpFilter) => { setOpFilter(next); setLogsOffset(0) }
+  const applyStatusFilter = (next: StatusFilter) => { setStatusFilter(next); setLogsOffset(0) }
 
   if (loading) {
     return (
@@ -268,11 +312,12 @@ export default function AiServicesPage() {
     ? Math.round((qualityTotals.readyJobs / qualityTotals.totalJobs) * 1000) / 10
     : 0
 
-  const visibleLogs = logs.filter((l) => {
-    if (opFilter !== 'all'     && l.operation !== opFilter)  return false
-    if (statusFilter !== 'all' && l.status    !== statusFilter) return false
-    return true
-  })
+  // 日志已由后端按 operation / status 筛好，这里**不再做二次过滤**
+  //（客户端过滤正是「低频能力显示为空」的成因）。
+  const logsRangeFrom = logsTotal === 0 ? 0 : logsOffset + 1
+  const logsRangeTo = logsOffset + logs.length
+  const hasPrevLogsPage = logsOffset > 0
+  const hasNextLogsPage = logsOffset + logs.length < logsTotal
 
   return (
     <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
@@ -585,7 +630,7 @@ export default function AiServicesPage() {
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setOpFilter(f)}
+                  onClick={() => applyOpFilter(f)}
                   className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
                     opFilter === f
                       ? 'bg-primary-600 text-white'
@@ -601,7 +646,7 @@ export default function AiServicesPage() {
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setStatusFilter(f)}
+                  onClick={() => applyStatusFilter(f)}
                   className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
                     statusFilter === f
                       ? 'bg-primary-600 text-white'
@@ -629,14 +674,26 @@ export default function AiServicesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-50">
-                {visibleLogs.length === 0 ? (
+                {logsLoading ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
-                      暂无匹配记录
+                      加载中…
+                    </td>
+                  </tr>
+                ) : logsError ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-error-fg">
+                      {logsError}
+                    </td>
+                  </tr>
+                ) : logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
+                      该筛选条件下没有调用记录（已按条件查全库，不是只翻了最近 100 条）
                     </td>
                   </tr>
                 ) : (
-                  visibleLogs.map((log) => (
+                  logs.map((log) => (
                     <tr key={log.taskId} className="hover:bg-neutral-50/50">
                       <td className="px-4 py-3 font-mono text-xs text-neutral-500">
                         {log.taskId.slice(0, 28)}{log.taskId.length > 28 ? '…' : ''}
@@ -672,6 +729,37 @@ export default function AiServicesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* 分页：总数来自后端 count(匹配筛选条件)，不是本页条数 */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 px-4 py-3 text-xs text-neutral-500">
+            <span className="tabular-nums">
+              {logsLoading
+                ? '统计中…'
+                : logsError
+                  ? '—'
+                  : logsTotal === 0
+                    ? '共 0 条'
+                    : `第 ${logsRangeFrom}–${logsRangeTo} 条 / 共 ${logsTotal} 条`}
+            </span>
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                disabled={!hasPrevLogsPage || logsLoading}
+                onClick={() => setLogsOffset(Math.max(logsOffset - LOGS_PAGE_SIZE, 0))}
+                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                上一页
+              </button>
+              <button
+                type="button"
+                disabled={!hasNextLogsPage || logsLoading}
+                onClick={() => setLogsOffset(logsOffset + LOGS_PAGE_SIZE)}
+                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                下一页
+              </button>
+            </div>
           </div>
         </Card>
       </section>

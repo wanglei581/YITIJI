@@ -1,4 +1,4 @@
-import type { AdminUserActivityType, AdminUserListQuery } from '@ai-job-print/shared'
+import type { AdminUserActivityType, AdminUserListItem, AdminUserListQuery } from '@ai-job-print/shared'
 
 export interface UserFilterState {
   search: string
@@ -30,6 +30,32 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   minute: '2-digit',
   hour12: false,
 })
+
+export function userDisplayName(user: Pick<AdminUserListItem, 'nickname'>): string {
+  return user.nickname?.trim() || '未设置昵称'
+}
+
+/**
+ * 只有 status === 'disabled' 才允许恢复。
+ *
+ * 不能写成 `!user.enabled`：closing（注销中）与 anonymized（已匿名化）同样是
+ * enabled=false，但前者由隐私执行器推进、后者手机号已换成墓碑值无法还原，
+ * 服务端对这两种一律 409。按 enabled 判断会让 UI 摆出一个必然失败的按钮。
+ */
+export function canRestoreUser(user: Pick<AdminUserListItem, 'status'>): boolean {
+  return user.status === 'disabled'
+}
+
+export function canDisableUser(user: Pick<AdminUserListItem, 'status'>): boolean {
+  return user.status === 'active'
+}
+
+export const USER_STATUS_LABELS: Record<AdminUserListItem['status'], string> = {
+  active: '正常',
+  disabled: '已停用',
+  closing: '注销中',
+  anonymized: '已注销',
+}
 
 export function formatUserDateTime(value: string | null): string {
   if (!value) return '—'
