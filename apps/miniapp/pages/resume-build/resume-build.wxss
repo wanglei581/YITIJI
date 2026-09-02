@@ -1,0 +1,161 @@
+/* 从零建简历。骨架与卡片壳复用 app.wxss（page-wrap / navbar / content / card /
+   chip / seg / steps / notice / actionbar / compliance-note），这里只放本页私有类。
+
+   两条纪律：
+   - 字号一律 var(--fs-*)，圆角一律 var(--r-*)。verify-miniapp-visual-scale.mjs 是
+     只降不升的棘轮，随手挑一个 25rpx 就会把全仓偏离数顶上去。
+   - 横向内缩写 16px 而不是 32rpx：全局 .card 用的是 px，混着写在宽屏机上会错半格。 */
+
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+/* 底部是 60px 的 .btn.lg，比全局 .content.has-bar 预留的 80px 高；
+   不抬这一档，表单最后一行会被操作条压住。 */
+.content.has-bar { padding-bottom: calc(108px + var(--sab)); }
+
+/* ── 步骤条 ────────────────────────────────────────────────────
+   6 段挤在 375px 上，全局 .steps 的 20px 内缩要收窄；
+   .st 是可点的（允许跳段），必须撑到 96rpx = 48px 的可点下限。 */
+.rb-steps { padding: 12px 12px 4px; }
+.rb-steps .st { min-height: 96rpx; justify-content: center; padding: 0 4rpx; }
+
+/* ── 表单字段 ──────────────────────────────────────────────── */
+.rb-field { margin-bottom: 24rpx; }
+.rb-field:last-child { margin-bottom: 0; }
+.rb-label {
+  display: flex; align-items: center; gap: 12rpx;
+  font-size: var(--fs-base); font-weight: 600; color: var(--ink); margin-bottom: 12rpx;
+}
+/* 必填标在标签上，而不是靠一个红星——红星在小屏上经常被当成装饰忽略 */
+.rb-req {
+  font-size: var(--fs-xs); font-weight: 500; color: var(--clay);
+  background: var(--clay-soft); border-radius: var(--r-full);
+  padding: 2rpx 12rpx;
+}
+.rb-input {
+  width: 100%; box-sizing: border-box;
+  min-height: 96rpx; padding: 22rpx 24rpx;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-md); color: var(--ink); line-height: 1.6;
+}
+.rb-area { min-height: 168rpx; }
+.rb-area-lg { min-height: 260rpx; }
+.rb-ph { color: var(--ghost); }
+
+/* 说明性小字：合规口径、限额、字数统计都走这一档，不另起字号 */
+.rb-fine {
+  margin-top: 16rpx;
+  font-size: var(--fs-sm); color: var(--faint); line-height: 1.6;
+}
+
+/* ── 可重复条目 ────────────────────────────────────────────── */
+.rb-row-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20rpx; padding-bottom: 16rpx;
+  border-bottom: 1px solid var(--line-faint);
+}
+.rb-row-title { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+/* 96rpx = 48px 可点下限；删除是破坏性操作，触区不能小 */
+.rb-row-del {
+  width: 96rpx; height: 96rpx; margin: -24rpx -20rpx -24rpx 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--faint); font-size: var(--fs-md);
+}
+.rb-add {
+  margin: 0 16px 12px;
+  min-height: 104rpx;
+  display: flex; align-items: center; justify-content: center; gap: 12rpx;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--fs-base); font-weight: 600; color: var(--teal-deep);
+}
+.rb-add-ic { font-size: var(--fs-md); }
+
+/* 技能 / 证书：解析出来的 chip 就是将要提交的那一份，放在输入框正下方当场可核对 */
+.rb-parsed { margin-top: 16rpx; }
+.rb-parsed-cap { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 12rpx; }
+
+/* ── 空段落的可见占位 ──────────────────────────────────────────
+   这是这一页的合规落点之一：用户没填的段落必须看得见地空着，
+   既不隐藏、也不由 AI 补写。样式刻意做成虚线框而不是灰字一行——
+   灰字一行容易被读成"加载中"。 */
+.rb-slot {
+  padding: 20rpx 24rpx;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  font-size: var(--fs-base); color: var(--faint); line-height: 1.6;
+}
+
+/* ── 运行中 / 失败态 ───────────────────────────────────────── */
+.rb-state {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 72rpx 32rpx 24rpx; gap: 16rpx; text-align: center;
+}
+.rb-state-run { padding-top: 160rpx; }
+.rb-ic {
+  width: 128rpx; height: 128rpx; border-radius: var(--r-full);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--faint); font-size: var(--fs-xl);
+}
+.rb-ic.warn { background: var(--warn-soft); color: var(--warn); }
+.rb-anim { position: relative; width: 128rpx; height: 128rpx; margin-bottom: 8rpx; }
+.rb-ring {
+  position: absolute; inset: 0; border-radius: var(--r-full);
+  border: 4rpx solid transparent; border-top-color: var(--teal);
+  animation: rb-spin 1s linear infinite;
+}
+.rb-anim-ic {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xl); color: var(--teal);
+}
+@keyframes rb-spin { to { transform: rotate(360deg); } }
+.rb-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+.rb-sub { font-size: var(--fs-base); color: var(--muted); line-height: 1.6; }
+
+/* 失败态的出口按钮竖排：三个出口语义不同，横排会被读成主次关系 */
+.rb-acts { margin: 8rpx 16px 12px; display: flex; flex-direction: column; gap: 16rpx; }
+
+/* ── 结果 ──────────────────────────────────────────────────── */
+.rb-res-name { font-size: var(--fs-xl); font-weight: 750; color: var(--ink); line-height: 1.3; }
+.rb-res-pos { margin-top: 8rpx; font-size: var(--fs-md); color: var(--teal-deep); font-weight: 600; }
+.rb-res-meta { margin-top: 8rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.6; }
+.rb-para { font-size: var(--fs-base); color: var(--ink); line-height: 1.8; }
+
+.rb-entry { padding-bottom: 20rpx; margin-bottom: 20rpx; border-bottom: 1px solid var(--line-faint); }
+.rb-entry:last-child { padding-bottom: 0; margin-bottom: 0; border-bottom: none; }
+.rb-entry-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
+.rb-entry-title { flex: 1; font-size: var(--fs-md); font-weight: 600; color: var(--ink); line-height: 1.45; }
+.rb-entry-period { flex-shrink: 0; font-size: var(--fs-sm); color: var(--faint); }
+.rb-entry-desc { margin-top: 10rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.75; }
+
+.rb-sub-cap { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); margin-bottom: 12rpx; }
+.rb-sep { margin: 24rpx 0; }
+
+/* 服务端确定性算出的缺口提示 */
+.rb-hint-item { display: flex; align-items: flex-start; gap: 12rpx; margin-bottom: 12rpx; }
+.rb-hint-ic { flex-shrink: 0; margin-top: 4rpx; font-size: var(--fs-base); color: var(--wheat-deep); }
+.rb-hint-text { flex: 1; font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.7; }
+
+/* ── 导出设置 ──────────────────────────────────────────────── */
+.rb-opt { margin-bottom: 20rpx; }
+.rb-opt:last-of-type { margin-bottom: 0; }
+.rb-opt-l { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); margin-bottom: 12rpx; }
+/* 全局 .seg 自带 0 16px 外边距，这里已经在 card-inner 里，收掉；
+   .s 抬到 96rpx = 48px 可点下限（全局是 34px，够点但不达标） */
+.rb-seg { margin: 0; }
+.rb-seg .s { min-height: 96rpx; font-size: var(--fs-base); }
+
+/* 次级文字操作：重新生成会再花一次模型调用，做成弱按钮而不是主按钮 */
+.rb-textline {
+  margin: 4rpx 16px 12px;
+  min-height: 96rpx;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-base); color: var(--teal-deep);
+}
+
+/* actionbar 里主按钮占更大权重 */
+.rb-grow { flex: 1.6; }

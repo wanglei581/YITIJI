@@ -477,10 +477,22 @@ function resumeReport(raw) {
 
     // OCR / 文本抽取质量提示:低置信度时页面必须提醒人工复核
     noticeSource: notice ? notice.textSource || '' : '',
-    noticeConfidence: notice && typeof notice.confidence === 'number' ? notice.confidence : null,
+    // 后端声明的是字符串枚举 'high' | 'medium' | 'low'（packages/shared ai.ts
+    // extractionNotice），不是数字。原来写 typeof === 'number'，于是这个字段
+    // **永远是 null**，页面上「低置信度请人工复核」那条提示从来没出现过——
+    // 扫描件/OCR 简历拿到一份看起来很确定的评分，却没有任何可靠性提示。
+    // 上一行的注释写着「低置信度时页面必须提醒人工复核」，意图是对的，实现失效了。
+    noticeConfidence: notice && typeof notice.confidence === 'string' ? notice.confidence : null,
+    // 只要不是 high 就提醒。宁可多提醒一次，也不要让 medium 悄悄过去——
+    // 这条提示的代价是一行字，漏掉的代价是用户按错误识别的文本改简历。
+    noticeConfidenceLabel: notice && CONFIDENCE_LABEL[notice.confidence] ? CONFIDENCE_LABEL[notice.confidence] : '',
+    noticeNeedsReview: Boolean(notice && (notice.confidence === 'low' || notice.confidence === 'medium')),
     noticeWarnings: notice && Array.isArray(notice.warnings) ? notice.warnings : [],
   };
 }
+
+/** 文本抽取置信度 → 中文标签。取值来自后端 extractionNotice.confidence 枚举。 */
+const CONFIDENCE_LABEL = { high: '较高', medium: '中等', low: '较低' };
 
 /** 数组映射helper:对 null/非数组安全 */
 function mapList(fn) {
