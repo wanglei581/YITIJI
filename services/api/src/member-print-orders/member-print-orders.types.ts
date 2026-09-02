@@ -13,6 +13,11 @@ export interface MemberPrintOrderItem {
   completedAt: string | null
   copies: number | null
   colorMode: 'black_white' | 'color' | null
+  /**
+   * 单双面（2026-09-02 补）。取值与 shared 的 `DuplexMode` 一致；
+   * 历史 paramsJson 无该键时为 null（= 未记录，前端不得默认成「单面」）。
+   */
+  duplex: 'simplex' | 'duplex_long_edge' | 'duplex_short_edge' | null
   paperSize: string | null
   // ── 支付字段（P0a，无 live 网关；可选以保持向后兼容）──
   amountCents?: number | null

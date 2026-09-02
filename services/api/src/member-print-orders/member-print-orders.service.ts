@@ -26,14 +26,20 @@ import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 // - 空列表返回 []，不伪造订单数量。
 // ============================================================
 
+type DuplexMode = 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
+
 type ParsedParams = {
   fileName: string | null
   copies: number | null
   colorMode: 'black_white' | 'color' | null
+  duplex: DuplexMode | null
   paperSize: string | null
 }
 
-const EMPTY_PARAMS: ParsedParams = { fileName: null, copies: null, colorMode: null, paperSize: null }
+/** 与 shared 的 `DuplexMode` 逐字一致；改这里必须同改 packages/shared/src/types/print.ts。 */
+const DUPLEX_MODES: readonly DuplexMode[] = ['simplex', 'duplex_long_edge', 'duplex_short_edge']
+
+const EMPTY_PARAMS: ParsedParams = { fileName: null, copies: null, colorMode: null, duplex: null, paperSize: null }
 const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
 const RESUMABLE_PAYMENT_STATUSES = new Set<OrderPayStatus>(['unpaid', 'paying'])
 const NON_RESUMABLE_PAYMENT_STATUSES: OrderPayStatus[] = [
@@ -61,9 +67,13 @@ function parseSafeParams(paramsJson: string): ParsedParams {
       : null
   const colorMode =
     p['colorMode'] === 'black_white' || p['colorMode'] === 'color' ? p['colorMode'] : null
+  // duplex 是 2026-09-02 才补进对外契约的：下单侧一直写，读取侧一直没往外带。
+  // 本字段补充之前建的 PrintTask，paramsJson 里根本没有 duplex 键 —— 缺失/非法一律 null
+  // （= 未记录），绝不回落成 'simplex'：那会把「不知道」讲成「就是单面」。
+  const duplex = DUPLEX_MODES.includes(p['duplex'] as DuplexMode) ? (p['duplex'] as DuplexMode) : null
   const paperSize = typeof p['paperSize'] === 'string' && p['paperSize'].length > 0 ? p['paperSize'] : null
 
-  return { fileName, copies, colorMode, paperSize }
+  return { fileName, copies, colorMode, duplex, paperSize }
 }
 
 function parseSafePriceLines(itemsJson: string): PrintPriceLine[] {
@@ -151,6 +161,7 @@ export class MemberPrintOrdersService {
         completedAt: r.completedAt ? r.completedAt.toISOString() : null,
         copies: params.copies,
         colorMode: params.colorMode,
+        duplex: params.duplex,
         paperSize: params.paperSize,
         // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
         amountCents: order ? order.amountCents : null,

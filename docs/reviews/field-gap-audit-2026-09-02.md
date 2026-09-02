@@ -1,5 +1,7 @@
 # 四层字段核对：四条主链路完整缺口清单（2026-09-02）
 
+> **⚠️ 本文初版四条结论里有两条是错的，已在文末「更正」一节推翻。先读那一节再读正文。**
+
 > 方法：每条链路按 **输入 DTO → 服务端计算/落库 → Prisma 模型 → 对外共享契约** 四层逐层比对。
 > 全部人工追查，每条结论都能指到文件。自动化尝试的失败记录见文末，避免下一个人重走。
 
@@ -89,3 +91,55 @@
 
 **建议**：优先把 `Order.printParamsJson`、`Order.itemsJson`、AI 评分三处拆成真实字段。
 不是上线必需，但「每个功能每个按钮都对应上」这个目标在 36 个 JSON blob 面前无法机械验证。
+
+---
+
+## 更正（2026-09-02 晚，并行核对推翻本文两条结论）
+
+四条结论经复核，**第三、第四条是我判断错了**。
+
+### 第三条「onsiteServices / admissionMethod 是死字段」——错，它们有活消费者
+
+`apps/kiosk/src/pages/campus/components/CampusTabs.tsx:157-161` **真的在渲染**
+「现场服务」「入场方式」两行；`apps/kiosk/src/data/externalSources.ts:236-237` 的
+`MOCK_FAIRS` 在赋值。删掉会当场打断渲染分支、kiosk typecheck 变红。
+
+**而真实情况比「死字段」更糟**：服务端从来不赋值——Prisma `JobFair` 没有对应列，
+`fair.mapper.ts` 不产出，真实接口永远 `undefined`；唯一赋值点是 kiosk 本地 mock。
+也就是**只有跑 mock 时校园页才显示这三行，接真数据后整段静默消失**。
+
+这不是新发现：`docs/product/partner-console-integration-plan-2026-08.md` 的 FA4/P0-12
+与 `docs/reviews/four-chain-data-integrity-ledger-2026-08.md` 的 A4 已同时点名，
+都给了同一个二选一——**补数据源，或移除展示**。`tagline` 是同一批同一病灶。
+本次按后者的 escape clause 保留字段并在类型上加注释说明现状与两条路，未做取舍。
+
+### 第四条「publishedAt 落库但不外露」——错，它根本没落库
+
+Prisma `Job` 模型**没有** `publishedAt` 列。全 schema 只有两处 `publishedAt`，
+分别属于 `ToolboxAppVersion`（2284 行）与 `LegalDocVersion`（2454 行），与岗位无关。
+`Job` 的时间列只有 `validThrough / sourceLastSeenAt / archivedAt / reviewedAt /
+syncTime / createdAt / updatedAt`。
+
+我误判的原因：只数了 `publishedAt` 在 schema 里的**出现次数**（得到 2），
+没有确认它属于哪个模型——和更正一里「正则先命中 /admin/ 就收手」是同一类毛病。
+
+入站也没有来源（webhook / Excel / 同步 DTO 均不接收发布时间）。原型
+`27-browse-detail.html` 也**没有**把它列为要展示的字段：来源行实际只有四条
+（来源平台 / 同步时间 / 外部编号 / 有效期限，第 353–356、385 行）；全文唯一一次
+出现「发布时间」是第 41 行的**否定句**「不预置招聘人数、发布时间…」，即禁止合成填充。
+
+所以加这个字段等于造一个**永远填不上值的新死字段**，正是更正一刚判红的病。
+要真做发布时间，是 Prisma 加列 + 入站映射 + mapper 输出一整条链，需先裁决是否开这条链。
+
+### 第一条「duplex」——成立，但我指错了文件
+
+我在任务里指的读取侧 `member-print-order-create.service.ts` **早就返回 duplex**
+（第 308 行），它产出的是小程序云打印订单视图。真正漏的是
+`member-print-orders.service.ts` 的 `list()`（`GET /api/v1/me/print-orders`，
+读 `PrintTask.paramsJson`）——那才是「我的 → 打印订单」列表页的数据源。已修该处。
+
+### 结论修订
+
+四条确证缺口 → **实际两条**：`duplex`（已修）与 `ResumeReport` 缺三类结构（待施工）。
+另两条一条是更严重的「mock-only 字段」问题（已登记，待产品裁决），
+一条是我的误判（不存在）。

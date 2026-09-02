@@ -81,12 +81,32 @@ export interface ExternalJobFair extends ExternalJobSource {
   expectedAttendance?: number
   /** 预计求职意向分布（机构录入，数据大屏饼图） */
   seekerIntent?: FairIntentSlice[]
-  // ── 企业速览展示字段（机构/管理员录入，纯展示，后台可更新）──
-  /** 副标题（Hero 标语，如「智能招聘·职面未来」） */
+  // ── 企业速览展示字段（原设计：机构/管理员录入，纯展示，后台可更新）──
+  //
+  // ⚠️ 现状核实（2026-09-02，全路径 grep 复核，非 basename 匹配）：以下三个字段
+  // **服务端从来不赋值** —— Prisma 的 `JobFair` 模型没有对应列，
+  // `services/api/src/jobs/fair.mapper.ts` 也不产出它们；真实接口返回的招聘会
+  // 永远 undefined。当前唯一的赋值点是 kiosk 本地 mock
+  // `apps/kiosk/src/data/externalSources.ts`（MOCK_FAIRS，仅 mockAdapter 走），
+  // 而 `apps/kiosk/src/pages/campus/{CampusPage,components/CampusTabs}.tsx` 会照常渲染。
+  // 结果就是：**只有跑 mock 时校园页才显示这三行，接真后整段静默消失。**
+  //
+  // 曾被 2026-08 两份评审同时点名，条目号 FA4 / A4「无数据库来源却在校园页展示」：
+  //   - docs/product/partner-console-integration-plan-2026-08.md（P0-12）
+  //   - docs/reviews/four-chain-data-integrity-ledger-2026-08.md
+  // 两份都给了同一个二选一：**要么补数据源，要么移除展示**。
+  //
+  // 因此本次未删除（删了会直接打断 kiosk 那两个渲染分支，且 P0-12 的裁决尚未落地）。
+  // 谁来补：Partner/Admin 招聘会域负责人按 P0-12 二选一收口 ——
+  // 走「补数据源」就要 JobFair 加列 + Partner 录入表单 + fair.mapper 输出；
+  // 走「移除展示」就同时删本段字段与 kiosk 两处渲染，并清掉 MOCK_FAIRS 里的赋值。
+  // 在此之前，任何新页面都不要再依赖这三个字段（接真即空）。
+
+  /** 副标题（Hero 标语，如「智能招聘·职面未来」）。⚠️ 见上：服务端无来源，仅 kiosk mock 有值。 */
   tagline?: string
-  /** 现场服务清单（如 自助打印 / AI求职助手 / 导览地图） */
+  /** 现场服务清单（如 自助打印 / AI求职助手 / 导览地图）。⚠️ 见上：服务端无来源，仅 kiosk mock 有值。 */
   onsiteServices?: string[]
-  /** 入场方式说明（如「凭学生证或身份证免费入场」） */
+  /** 入场方式说明（如「凭学生证或身份证免费入场」）。⚠️ 见上：服务端无来源，仅 kiosk mock 有值。 */
   admissionMethod?: string
 }
 
