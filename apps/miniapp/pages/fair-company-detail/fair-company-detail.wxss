@@ -8,31 +8,31 @@
   background: var(--teal-wash); border: 1rpx solid var(--teal-soft);
   display: flex; align-items: center; gap: 22rpx; }
 /* 首字标识，不用 logoUrl：那是任意远程地址，挂了只剩一块空白。 */
-.cd-logo { width: 104rpx; height: 104rpx; border-radius: 30rpx; background: var(--teal);
-  color: #fff; font-size: 44rpx; font-weight: 700; flex-shrink: 0;
+.cd-logo { width: 104rpx; height: 104rpx; border-radius: var(--r-md); background: var(--teal);
+  color: #fff; font-size: var(--fs-xl); font-weight: 700; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; }
 .cd-hero-copy { flex: 1; min-width: 0; }
-.cd-name { font-size: 38rpx; font-weight: 780; color: var(--ink); line-height: 1.35; }
-.cd-sub { margin-top: 9rpx; font-size: 23rpx; color: var(--muted); line-height: 1.5; }
+.cd-name { font-size: var(--fs-xl); font-weight: 780; color: var(--ink); line-height: 1.35; }
+.cd-sub { margin-top: 9rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
 
 .cd-honors { margin: 16rpx 32rpx 0; }
 
-.cd-booth { margin: 16rpx 32rpx 0; padding: 24rpx; border-radius: 28rpx;
+.cd-booth { margin: 16rpx 32rpx 0; padding: 24rpx; border-radius: var(--r);
   background: var(--surface); border: 1rpx solid var(--line-soft);
   display: flex; align-items: flex-start; gap: 20rpx; }
-.cd-booth-ic { width: 72rpx; height: 72rpx; border-radius: 22rpx; background: var(--wheat-soft);
+.cd-booth-ic { width: 72rpx; height: 72rpx; border-radius: var(--r); background: var(--wheat-soft);
   color: var(--wheat-deep); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; }
 .cd-booth-ic .ficon { width: 34rpx; height: 34rpx; }
 .cd-booth-copy { flex: 1; min-width: 0; }
-.cd-booth-label { font-size: 21rpx; color: var(--muted); }
+.cd-booth-label { font-size: var(--fs-sm); color: var(--muted); }
 .cd-booth-val { margin-top: 6rpx; font-size: 30rpx; font-weight: 720; color: var(--ink); }
 .cd-booth-zone { margin-top: 6rpx; font-size: 22rpx; color: var(--teal-deep); }
 
-.cd-card { margin: 16rpx 32rpx 0; padding: 24rpx; border-radius: 28rpx;
+.cd-card { margin: 16rpx 32rpx 0; padding: 24rpx; border-radius: var(--r);
   background: var(--surface); border: 1rpx solid var(--line-soft); }
-.cd-card-title { font-size: 28rpx; font-weight: 720; color: var(--ink); }
-.cd-text { margin-top: 12rpx; font-size: 25rpx; color: var(--ink-soft); line-height: 1.75;
+.cd-card-title { font-size: var(--fs-md); font-weight: 720; color: var(--ink); }
+.cd-text { margin-top: 12rpx; font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.75;
   white-space: pre-wrap; }
 
 .cd-row { display: flex; align-items: flex-start; padding: 18rpx 0;
@@ -40,57 +40,57 @@
 /* 用相邻兄弟而不是 :first-of-type —— 后者比的是同类型元素，卡片里第一个 view
    是标题，规则会永远命中不到第一行。 */
 .cd-card-title + .cd-row { margin-top: 8rpx; }
-.cd-row-k { font-size: 25rpx; color: var(--muted); width: 150rpx; flex-shrink: 0; }
-.cd-row-v { font-size: 25rpx; color: var(--ink); flex: 1; text-align: right;
+.cd-row-k { font-size: var(--fs-base); color: var(--muted); width: 150rpx; flex-shrink: 0; }
+.cd-row-v { font-size: var(--fs-base); color: var(--ink); flex: 1; text-align: right;
   overflow-wrap: anywhere; }
 
-.cd-score { margin-top: 16rpx; padding: 18rpx 20rpx; border-radius: 20rpx;
+.cd-score { margin-top: 16rpx; padding: 18rpx 20rpx; border-radius: var(--r-sm);
   background: var(--surface-2); }
 .cd-score-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
-.cd-score-label { font-size: 23rpx; color: var(--muted); }
+.cd-score-label { font-size: var(--fs-sm); color: var(--muted); }
 .cd-score-num { font-size: 34rpx; font-weight: 780; color: var(--ink); }
-.cd-score-note { margin-top: 8rpx; font-size: 21rpx; color: var(--faint); line-height: 1.6; }
+.cd-score-note { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--faint); line-height: 1.6; }
 
 .cd-sec-head { margin: 30rpx 32rpx 0; display: flex; align-items: baseline;
   justify-content: space-between; gap: 16rpx; }
-.cd-sec-title { font-size: 32rpx; font-weight: 760; color: var(--ink); }
+.cd-sec-title { font-size: var(--fs-lg); font-weight: 760; color: var(--ink); }
 .cd-sec-count { font-size: 22rpx; font-weight: 650; color: var(--teal-deep);
-  background: var(--teal-soft); padding: 6rpx 16rpx; border-radius: 999rpx; }
+  background: var(--teal-soft); padding: 6rpx 16rpx; border-radius: var(--r-full); }
 
-.cd-empty-pos { font-size: 27rpx; font-weight: 650; color: var(--ink-soft); text-align: center; }
+.cd-empty-pos { font-size: var(--fs-base); font-weight: 650; color: var(--ink-soft); text-align: center; }
 .cd-empty-note { margin-top: 10rpx; font-size: 22rpx; color: var(--muted);
   line-height: 1.6; text-align: center; }
 
 .cd-pos-list { margin-top: 16rpx; display: flex; flex-direction: column; gap: 14rpx; }
-.cd-pos { margin: 0 32rpx; padding: 24rpx; border-radius: 26rpx;
+.cd-pos { margin: 0 32rpx; padding: 24rpx; border-radius: var(--r);
   background: var(--surface); border: 1rpx solid var(--line-soft); }
 .cd-pos-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
-.cd-pos-title { flex: 1; min-width: 0; font-size: 28rpx; font-weight: 700; color: var(--ink);
+.cd-pos-title { flex: 1; min-width: 0; font-size: var(--fs-md); font-weight: 700; color: var(--ink);
   line-height: 1.45; }
 .cd-pos-salary { font-size: 26rpx; font-weight: 700; color: var(--clay); flex-shrink: 0;
   white-space: nowrap; }
 .cd-pos-head { margin-top: 9rpx; font-size: 22rpx; color: var(--wheat-deep); }
 .cd-pos-meta { margin-top: 8rpx; font-size: 22rpx; color: var(--muted); line-height: 1.55; }
 .cd-pos-req { margin-top: 12rpx; padding-top: 12rpx; border-top: 1rpx solid var(--line-faint);
-  font-size: 23rpx; color: var(--ink-soft); line-height: 1.7; white-space: pre-wrap; }
+  font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.7; white-space: pre-wrap; }
 
 .cd-print-hint { margin: 16rpx 32rpx 0; display: flex; align-items: flex-start; gap: 10rpx;
-  font-size: 21rpx; color: var(--faint); line-height: 1.6; }
+  font-size: var(--fs-sm); color: var(--faint); line-height: 1.6; }
 .cd-print-ic { width: 26rpx; height: 26rpx; flex-shrink: 0; margin-top: 2rpx; }
 
 /* 加载 / 错误 / 空态卡片 */
-.list-state { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: 27rpx;
+.list-state { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
   border: 1rpx solid var(--line-soft); background: var(--surface); text-align: center;
   font-size: 26rpx; color: var(--muted); }
-.empty-wrap { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: 27rpx;
+.empty-wrap { margin: 20rpx 32rpx 0; padding: 68rpx 30rpx; border-radius: var(--r);
   border: 1rpx solid var(--line-soft); background: var(--surface);
   display: flex; flex-direction: column; align-items: center; text-align: center; }
-.state-icon { width: 92rpx; height: 92rpx; border-radius: 28rpx; background: var(--surface-2);
+.state-icon { width: 92rpx; height: 92rpx; border-radius: var(--r); background: var(--surface-2);
   color: var(--faint); display: flex; align-items: center; justify-content: center; }
 .state-icon.error { background: var(--error-soft); color: var(--error); }
 .state-icon .ficon { width: 44rpx; height: 44rpx; }
-.state-title { margin-top: 22rpx; font-size: 29rpx; font-weight: 700; color: var(--ink); }
-.state-desc { margin-top: 9rpx; font-size: 23rpx; color: var(--muted); line-height: 1.55; }
+.state-title { margin-top: 22rpx; font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.state-desc { margin-top: 9rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; }
 /* 112rpx = 56px：错误态的重试是这一屏的主操作，按主按钮下限给。 */
 .retry-btn { margin-top: 25rpx; height: 112rpx; padding: 0 40rpx; border-radius: 24rpx;
   background: var(--teal); color: #fff; display: flex; align-items: center;
@@ -100,13 +100,13 @@
    + 一个自适应的主按钮。三者都是 112rpx = 56px 主按钮高度。 */
 .actionbar { display: flex; align-items: center; gap: 14rpx; }
 .ab-btn { flex-shrink: 0; min-width: 140rpx; height: 112rpx; padding: 0 16rpx;
-  border-radius: 26rpx; border: 1rpx solid var(--line-soft); background: var(--surface);
+  border-radius: var(--r); border: 1rpx solid var(--line-soft); background: var(--surface);
   color: var(--ink-soft); display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 4rpx; }
 .ab-btn-ic { width: 34rpx; height: 34rpx; }
-.ab-btn-t { font-size: 21rpx; font-weight: 650; }
+.ab-btn-t { font-size: var(--fs-sm); font-weight: 650; }
 .ab-btn.busy { border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep); }
 /* 岗位明细为空时按钮变浅，但仍可点：点了会明确说明「暂无岗位明细」，
    比一个点不动、也不解释为什么的灰按钮好。 */
 .ab-btn.off { opacity: .55; }
-.ab-main { flex: 1; min-width: 0; height: 112rpx; border-radius: 26rpx; font-size: 27rpx; }
+.ab-main { flex: 1; min-width: 0; height: 112rpx; border-radius: var(--r); font-size: var(--fs-base); }

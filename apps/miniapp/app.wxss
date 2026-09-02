@@ -98,6 +98,28 @@ page {
   --font-sans:  -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
   --font-mono:  'SF Mono', Consolas, monospace;
 
+  /* ── 字阶 ───────────────────────────────────────────────────────
+     页面层用 rpx（页面 wxss 里 rpx:px ≈ 3821:300），app.wxss 自己用 px，
+     这个分工是有意的：共享组件保持固定物理尺寸，页面内容随屏宽缩放。
+     所以字阶定在 rpx，供页面 wxss 使用。
+
+     定这套阶之前实测过：全部页面 wxss 里 20–34rpx 之间用了 14 个不同值，
+     21 / 23 / 25 / 27 都在大量出现。那不是字阶，是噪音——每页各自挑了个
+     差不多的数。单看没人察觉，累积起来就是"哪儿都对不齐"。
+
+     取值从实际高频值收敛而来，比例约 1.15–1.2：
+       22(96次) 24(80) 26(79) 28(74) 23(71) 21(60) 27(55) 25(42) 30(41) 32(32)
+
+     存量页面不做盲目迁移——我无法视觉验证，批量改字号是拿观感赌。
+     新增与改动的页面用令牌，另有棘轮门禁盯着偏离值不再增长。 */
+  --fs-xs:    20rpx;   /* 10px  角标、时间戳 */
+  --fs-sm:    22rpx;   /* 11px  次要说明、meta 行 */
+  --fs-base:  26rpx;   /* 13px  正文 */
+  --fs-md:    30rpx;   /* 15px  强调正文、列表主标题 */
+  --fs-lg:    34rpx;   /* 17px  卡片与分区标题 */
+  --fs-xl:    40rpx;   /* 20px  页面标题 */
+  --fs-2xl:   52rpx;   /* 26px  数字、大标 */;
+
   background: var(--paper);
   font-family: var(--font-sans);
   color: var(--ink);

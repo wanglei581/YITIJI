@@ -62,14 +62,14 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "AI 求职打印服务",
     "navigationStyle": "custom",
-    "backgroundColor": "#f4f1e8",
+    "backgroundColor": "#f5f7fa",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
-    "color": "#8a978f",
-    "selectedColor": "#1f9e86",
-    "backgroundColor": "#fffdf8",
+    "color": "#8d98a9",
+    "selectedColor": "#2354E6",
+    "backgroundColor": "#ffffff",
     "list": [
       {
         "pagePath": "pages/home/home",

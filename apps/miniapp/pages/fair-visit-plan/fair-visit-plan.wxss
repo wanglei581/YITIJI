@@ -12,33 +12,33 @@
 .empty-wrap {
   margin: 20rpx 16px 0;
   padding: 68rpx 30rpx;
-  border-radius: 27rpx;
+  border-radius: var(--r);
   border: 1rpx solid var(--line-soft);
   background: var(--surface);
   display: flex; flex-direction: column; align-items: center; text-align: center;
 }
 .state-icon {
-  width: 92rpx; height: 92rpx; border-radius: 28rpx;
+  width: 92rpx; height: 92rpx; border-radius: var(--r);
   background: var(--surface-2); color: var(--faint);
   display: flex; align-items: center; justify-content: center;
 }
 .state-icon.error { background: var(--error-soft); color: var(--error); }
 .state-icon .ficon { width: 44rpx; height: 44rpx; }
 .state-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 700; color: var(--ink); }
-.state-desc { margin-top: 10rpx; font-size: 24rpx; color: var(--muted); line-height: 1.6; }
+.state-desc { margin-top: 10rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.6; }
 /* 96rpx = 48px，可点区下限 */
 .retry-btn {
-  margin-top: 28rpx; min-height: 96rpx; padding: 0 40rpx; border-radius: 20rpx;
+  margin-top: 28rpx; min-height: 96rpx; padding: 0 40rpx; border-radius: var(--r-sm);
   background: var(--teal); color: var(--surface);
   display: flex; align-items: center; justify-content: center;
   font-size: 26rpx; font-weight: 650;
 }
 
 /* ── 招聘会信息块 ── */
-.vp-fair-title { font-size: 32rpx; font-weight: 700; color: var(--ink); line-height: 1.45; }
+.vp-fair-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); line-height: 1.45; }
 .vp-fair-row {
   display: flex; align-items: center; gap: 12rpx;
-  margin-top: 12rpx; font-size: 25rpx; color: var(--muted); line-height: 1.5;
+  margin-top: 12rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.5;
 }
 .vp-fr-ic { width: 26rpx; height: 26rpx; color: var(--teal); flex-shrink: 0; }
 
@@ -48,11 +48,11 @@
 .vp-file {
   display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx;
   padding: 18rpx 20rpx; background: var(--paper);
-  border: 1rpx solid var(--line); border-radius: 14rpx;
+  border: 1rpx solid var(--line); border-radius: var(--r-xs);
 }
 .vp-file-ic { width: 28rpx; height: 28rpx; color: var(--teal); flex-shrink: 0; }
 .vp-file-name {
-  flex: 1; font-size: 25rpx; color: var(--ink);
+  flex: 1; font-size: var(--fs-base); color: var(--ink);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 
@@ -80,21 +80,21 @@
   width: 48rpx; height: 48rpx; margin: auto; color: var(--teal);
 }
 @keyframes vp-spin { to { transform: rotate(360deg); } }
-.vp-state-title { font-size: 32rpx; font-weight: 700; color: var(--ink); }
+.vp-state-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
 .vp-state-desc { font-size: 26rpx; color: var(--muted); text-align: center; line-height: 1.6; }
 .vp-state-hint { font-size: 22rpx; color: var(--faint); text-align: center; line-height: 1.6; }
 
 /* ── 结果页：生成依据 ── */
 .vp-based { display: flex; gap: 12rpx; margin-top: 18rpx; }
 .vp-based-cell {
-  flex: 1; padding: 18rpx 16rpx; border-radius: 16rpx;
+  flex: 1; padding: 18rpx 16rpx; border-radius: var(--r-sm);
   background: var(--surface-2); text-align: center;
 }
 /* 值可能是「暂无数据」四个字：字号不能按纯数字设计，否则会被挤成两行 */
 .vp-based-val { font-size: 30rpx; font-weight: 700; color: var(--ink); line-height: 1.3; }
-.vp-based-cap { margin-top: 6rpx; font-size: 21rpx; color: var(--muted); }
+.vp-based-cap { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); }
 
-.vp-summary { font-size: 27rpx; color: var(--ink); line-height: 1.8; }
+.vp-summary { font-size: var(--fs-base); color: var(--ink); line-height: 1.8; }
 
 /* ── 通用列表容器：与 .card 同一内缩 ── */
 .vp-list { margin: 0 16px; display: flex; flex-direction: column; gap: 12rpx; }
@@ -112,13 +112,13 @@
   padding: 24rpx; background: var(--surface);
   border: 1rpx solid var(--line-soft); border-radius: 24rpx;
 }
-.vp-co-name { font-size: 29rpx; font-weight: 700; color: var(--ink); line-height: 1.5; }
-.vp-co-reason { margin-top: 10rpx; font-size: 25rpx; color: var(--muted); line-height: 1.7; }
+.vp-co-name { font-size: var(--fs-md); font-weight: 700; color: var(--ink); line-height: 1.5; }
+.vp-co-reason { margin-top: 10rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.7; }
 .vp-co-act {
   margin-top: 16rpx; min-height: 96rpx; padding: 0 28rpx;
   display: inline-flex; align-items: center; gap: 10rpx;
   background: var(--teal-wash); color: var(--teal-deep);
-  border-radius: 18rpx; font-size: 25rpx; font-weight: 600;
+  border-radius: 18rpx; font-size: var(--fs-base); font-weight: 600;
 }
 .vp-co-ic { width: 26rpx; height: 26rpx; }
 .vp-co-none { margin-top: 14rpx; font-size: 22rpx; color: var(--faint); }
@@ -126,7 +126,7 @@
 /* ── 清单 ── */
 .vp-checklist {
   margin: 0 16px; background: var(--surface);
-  border: 1rpx solid var(--line-soft); border-radius: 26rpx; overflow: hidden;
+  border: 1rpx solid var(--line-soft); border-radius: var(--r); overflow: hidden;
 }
 .vp-check {
   display: flex; align-items: flex-start; gap: 16rpx;
@@ -136,7 +136,7 @@
 /* 空方框，且刻意不可勾选：系统无从得知用户做没做，
    画上勾会被读成「已完成」，可勾选又会让用户以为勾了会存下来。 */
 .vp-check-box {
-  width: 32rpx; height: 32rpx; border-radius: 8rpx; flex-shrink: 0; margin-top: 6rpx;
+  width: 32rpx; height: 32rpx; border-radius: var(--r-xs); flex-shrink: 0; margin-top: 6rpx;
   border: 2rpx solid var(--teal-mid); background: var(--surface);
 }
 .vp-check-text { flex: 1; font-size: 26rpx; color: var(--ink); line-height: 1.7; }
@@ -145,7 +145,7 @@
 .vp-q {
   display: flex; align-items: flex-start; gap: 14rpx;
   padding: 22rpx 24rpx; background: var(--surface);
-  border: 1rpx solid var(--line-soft); border-radius: 22rpx;
+  border: 1rpx solid var(--line-soft); border-radius: var(--r);
 }
 .vp-q-no {
   width: 38rpx; height: 38rpx; border-radius: 50%; flex-shrink: 0;
@@ -159,10 +159,10 @@
 .vp-tip {
   display: flex; align-items: flex-start; gap: 14rpx;
   padding: 20rpx 24rpx; background: var(--wheat-wash);
-  border-radius: 22rpx;
+  border-radius: var(--r);
 }
 .vp-tip-ic { width: 28rpx; height: 28rpx; color: var(--wheat-deep); flex-shrink: 0; margin-top: 4rpx; }
-.vp-tip-text { flex: 1; font-size: 25rpx; color: var(--ink-soft); line-height: 1.7; }
+.vp-tip-text { flex: 1; font-size: var(--fs-base); color: var(--ink-soft); line-height: 1.7; }
 
 /* ── 本机记录（非 AI 事实区）── */
 .vp-local-cap { font-size: 22rpx; color: var(--faint); margin-bottom: 14rpx; }

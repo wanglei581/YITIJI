@@ -11,19 +11,19 @@
   padding: 120rpx 48rpx;
 }
 .fv-state-ic {
-  width: 112rpx; height: 112rpx; border-radius: 34rpx;
+  width: 112rpx; height: 112rpx; border-radius: var(--r-md);
   display: flex; align-items: center; justify-content: center;
-  background: var(--surface-2); color: var(--faint); font-size: 48rpx;
+  background: var(--surface-2); color: var(--faint); font-size: var(--fs-2xl);
 }
 .fv-state-ic.err { background: var(--error-soft); color: var(--error); }
-.fv-state-t { margin-top: 26rpx; font-size: 32rpx; font-weight: 700; color: var(--ink); }
+.fv-state-t { margin-top: 26rpx; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
 .fv-state-d { margin-top: 12rpx; font-size: 26rpx; color: var(--muted); line-height: 1.6; }
 /* 主按钮下限 56px */
 .fv-retry {
   margin-top: 32rpx; min-height: 112rpx; padding: 0 56rpx;
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--r-full); background: var(--teal); color: #fff;
-  font-size: 28rpx; font-weight: 600;
+  font-size: var(--fs-md); font-weight: 600;
 }
 
 /* ── 我在哪：场馆头 ─────────────────────────────────────────── */
@@ -34,14 +34,14 @@
   border-radius: var(--r-md); box-shadow: var(--sh-xs);
 }
 .fv-head-ic {
-  width: 88rpx; height: 88rpx; flex-shrink: 0; border-radius: 26rpx;
+  width: 88rpx; height: 88rpx; flex-shrink: 0; border-radius: var(--r);
   display: flex; align-items: center; justify-content: center;
   background: var(--teal-soft); color: var(--teal-deep); font-size: 40rpx;
 }
 .fv-head-c { flex: 1; min-width: 0; }
-.fv-venue { font-size: 32rpx; font-weight: 700; color: var(--ink); line-height: 1.4; }
+.fv-venue { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); line-height: 1.4; }
 .fv-sum { margin-top: 8rpx; display: flex; flex-wrap: wrap; gap: 8rpx 18rpx; }
-.fv-sum-i { font-size: 24rpx; color: var(--muted); }
+.fv-sum-i { font-size: var(--fs-base); color: var(--muted); }
 
 /* ── 搜索：现场找路的主入口 ─────────────────────────────────── */
 .fv-search {
@@ -51,14 +51,14 @@
   background: var(--surface); border: 1rpx solid var(--line-soft);
   border-radius: var(--r-full); box-shadow: var(--sh-xs);
 }
-.fv-search-ic { font-size: 32rpx; color: var(--faint); flex-shrink: 0; }
-.fv-search-in { flex: 1; min-width: 0; height: 96rpx; font-size: 28rpx; color: var(--ink); }
+.fv-search-ic { font-size: var(--fs-lg); color: var(--faint); flex-shrink: 0; }
+.fv-search-in { flex: 1; min-width: 0; height: 96rpx; font-size: var(--fs-md); color: var(--ink); }
 .fv-ph { color: var(--ghost); }
 /* 48px 可点下限 */
 .fv-search-x {
   width: 96rpx; height: 96rpx; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  color: var(--faint); font-size: 28rpx;
+  color: var(--faint); font-size: var(--fs-md);
 }
 
 /* ── 搜索结果 ───────────────────────────────────────────────── */
@@ -69,15 +69,15 @@
 .fv-hit + .fv-hit { border-top: 1rpx solid var(--line-faint); }
 .fv-hit-b {
   min-width: 108rpx; padding: 10rpx 12rpx; flex-shrink: 0;
-  border-radius: 14rpx; background: var(--teal-wash); color: var(--teal-deep);
+  border-radius: var(--r-xs); background: var(--teal-wash); color: var(--teal-deep);
   font-size: 26rpx; font-weight: 700; text-align: center;
 }
 .fv-hit-c { flex: 1; min-width: 0; }
 .fv-hit-n {
-  font-size: 28rpx; font-weight: 600; color: var(--ink);
+  font-size: var(--fs-md); font-weight: 600; color: var(--ink);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-.fv-hit-s { margin-top: 6rpx; font-size: 23rpx; color: var(--muted); line-height: 1.5; }
+.fv-hit-s { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
 .fv-more { padding: 16rpx 24rpx 22rpx; font-size: 22rpx; color: var(--ghost); line-height: 1.5; }
 .fv-arrow { flex-shrink: 0; font-size: 26rpx; color: var(--ghost); }
 
@@ -90,7 +90,7 @@
 /* ── 卡内空态 / 分区级失败态 ────────────────────────────────── */
 .fv-inline {
   padding: 40rpx 30rpx; text-align: center;
-  font-size: 24rpx; color: var(--muted); line-height: 1.6;
+  font-size: var(--fs-base); color: var(--muted); line-height: 1.6;
 }
 .fv-inline.err { color: var(--error); }
 
@@ -106,7 +106,7 @@
 .fv-map-err {
   display: flex; align-items: center; gap: 14rpx;
   min-height: 112rpx; padding: 28rpx 24rpx;
-  font-size: 24rpx; color: var(--error); line-height: 1.55;
+  font-size: var(--fs-base); color: var(--error); line-height: 1.55;
 }
 .fv-map-err-ic { font-size: 30rpx; flex-shrink: 0; }
 
@@ -114,7 +114,7 @@
 .fv-fac { display: flex; align-items: center; gap: 20rpx; padding: 22rpx 24rpx; }
 .fv-fac + .fv-fac { border-top: 1rpx solid var(--line-faint); }
 .fv-fac-ic {
-  width: 76rpx; height: 76rpx; flex-shrink: 0; border-radius: 22rpx;
+  width: 76rpx; height: 76rpx; flex-shrink: 0; border-radius: var(--r);
   display: flex; align-items: center; justify-content: center;
   background: var(--surface-2); color: var(--ink-soft); font-size: 34rpx;
 }
@@ -123,8 +123,8 @@
 .fv-fac.print .fv-fac-ic { background: var(--clay-soft); color: var(--clay-deep); }
 .fv-fac.print .fv-fac-n { color: var(--clay-deep); }
 .fv-fac-c { flex: 1; min-width: 0; }
-.fv-fac-n { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.fv-fac-s { margin-top: 6rpx; font-size: 23rpx; color: var(--muted); line-height: 1.5; }
+.fv-fac-n { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.fv-fac-s { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
 
 /* ── 展厅 ───────────────────────────────────────────────────── */
 .fv-hall-h {
@@ -134,20 +134,20 @@
 .fv-hall-code {
   min-width: 76rpx; height: 76rpx; padding: 0 12rpx; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 22rpx; background: var(--teal); color: #fff;
+  border-radius: var(--r); background: var(--teal); color: #fff;
   font-size: 30rpx; font-weight: 700;
 }
 .fv-hall-c { flex: 1; min-width: 0; }
-.fv-hall-n { font-size: 29rpx; font-weight: 700; color: var(--ink); }
+.fv-hall-n { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
 .fv-hall-s { margin-top: 6rpx; display: flex; flex-wrap: wrap; gap: 4rpx 16rpx; }
-.fv-hall-si { font-size: 23rpx; color: var(--muted); }
+.fv-hall-si { font-size: var(--fs-sm); color: var(--muted); }
 .fv-hall-x {
   flex-shrink: 0; padding: 12rpx 20rpx; border-radius: var(--r-full);
   background: var(--surface-2); color: var(--ink-soft);
-  font-size: 23rpx; font-weight: 600;
+  font-size: var(--fs-sm); font-weight: 600;
 }
 .fv-hall-d {
-  padding: 0 24rpx 20rpx; font-size: 24rpx; color: var(--muted); line-height: 1.7;
+  padding: 0 24rpx 20rpx; font-size: var(--fs-base); color: var(--muted); line-height: 1.7;
 }
 .fv-co {
   display: flex; align-items: flex-start; gap: 20rpx;
@@ -156,13 +156,13 @@
 }
 .fv-co-b {
   min-width: 108rpx; padding: 10rpx 12rpx; flex-shrink: 0;
-  border-radius: 14rpx; background: var(--wheat-soft); color: var(--wheat-deep);
+  border-radius: var(--r-xs); background: var(--wheat-soft); color: var(--wheat-deep);
   font-size: 26rpx; font-weight: 700; text-align: center;
 }
 .fv-co-c { flex: 1; min-width: 0; }
-.fv-co-n { font-size: 28rpx; font-weight: 600; color: var(--ink); }
-.fv-co-s { margin-top: 6rpx; font-size: 23rpx; color: var(--muted); }
-.fv-co-t { margin-top: 8rpx; font-size: 23rpx; color: var(--teal-deep); line-height: 1.5; }
+.fv-co-n { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.fv-co-s { margin-top: 6rpx; font-size: var(--fs-sm); color: var(--muted); }
+.fv-co-t { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--teal-deep); line-height: 1.5; }
 
 /* ── 展区 ───────────────────────────────────────────────────── */
 .fv-zone { display: flex; gap: 20rpx; padding: 24rpx; }
@@ -171,9 +171,9 @@
 /* 主办方没配 color 时用默认令牌色，不自造一套配色冒充分区标识 */
 .fv-zone-bar.def { background: var(--line); }
 .fv-zone-c { flex: 1; min-width: 0; }
-.fv-zone-n { font-size: 28rpx; font-weight: 700; color: var(--ink); }
-.fv-zone-s { margin-top: 4rpx; font-size: 23rpx; color: var(--muted); }
-.fv-zone-d { margin-top: 8rpx; font-size: 23rpx; color: var(--ink-soft); line-height: 1.6; }
+.fv-zone-n { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
+.fv-zone-s { margin-top: 4rpx; font-size: var(--fs-sm); color: var(--muted); }
+.fv-zone-d { margin-top: 8rpx; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
 .fv-zone-m { margin-top: 10rpx; display: flex; flex-wrap: wrap; gap: 6rpx 20rpx; }
 .fv-zone-mi { font-size: 22rpx; color: var(--faint); }
 
@@ -182,7 +182,7 @@
   display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx;
   padding: 22rpx 24rpx 14rpx;
 }
-.fv-bg-n { font-size: 28rpx; font-weight: 700; color: var(--ink); }
+.fv-bg-n { font-size: var(--fs-md); font-weight: 700; color: var(--ink); }
 .fv-bg-c { font-size: 22rpx; color: var(--faint); flex-shrink: 0; }
 .fv-bg-list { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 0 24rpx 24rpx; }
 .fv-booth {
