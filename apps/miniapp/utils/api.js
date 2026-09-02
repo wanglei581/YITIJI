@@ -129,6 +129,123 @@ const api = {
     return request(`/job-fairs/${id}`, { method: 'GET', needAuth: false }).then(N.fairDetail);
   },
 
+  // ---------- 招聘会现场助手 ----------
+  // 这一组端点后端早就为一体机建好了（apps/kiosk 已在消费），小程序此前一条都没接。
+  // 响应结构以 packages/shared 的 FairCompanyDTO / FairZoneDTO / FairVenueGuideDTO /
+  // FairMaterialDTO / FairVisitPlanResponse 为准，前端不得自行猜测字段。
+
+  /**
+   * 参会企业列表。分页响应，走 unwrapList。
+   * 合规：DTO 不含企业联系人和 HR 邮箱——后端就没返回，前端也不要显示任何"联系方式"占位。
+   */
+  getFairCompanies(fairId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
+    return unwrapList(request(`/job-fairs/${fairId}/companies`, {
+      method: 'GET', data: params, needAuth: false,
+    }));
+  },
+
+  /**
+   * 参会企业详情。
+   * 合规：响应里的 applyNote 是**必须展示**的合规提示文字，页面不得省略或改写。
+   */
+  getFairCompanyDetail(fairId, companyId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
+    return request(`/job-fairs/${fairId}/companies/${companyId}`, { method: 'GET', needAuth: false });
+  },
+
+  /** 展区列表（FairZoneDTO[]）。未发布或无数据时后端可能给 null，调用方要兜空数组。 */
+  getFairZones(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('展区导览'));
+    return request(`/job-fairs/${fairId}/zones`, { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 展位平面数据 { zones, booths }。
+   * 后端在未发布/无数据时会返回 data:null，这里统一兜成空集合，
+   * 让页面落到空态而不是在 .map 上崩掉。
+   */
+  getFairMap(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('展位导览'));
+    return request(`/job-fairs/${fairId}/map`, { method: 'GET', needAuth: false })
+      .then((d) => ({ zones: (d && d.zones) || [], booths: (d && d.booths) || [] }));
+  },
+
+  /** 会场导览（展厅 + 设施点位）。无配置时后端返回 null，属正常空态不是错误。 */
+  getFairVenueGuide(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('会场导览'));
+    return request(`/job-fairs/${fairId}/venue-guide`, { method: 'GET', needAuth: false });
+  },
+
+  /** 活动资料列表。previewUrl 是 2 小时签名 URL，不要缓存也不要拼接原始存储路径。 */
+  getFairMaterials(fairId, params = {}) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('活动资料'));
+    return unwrapList(request(`/job-fairs/${fairId}/materials`, {
+      method: 'GET', data: params, needAuth: false,
+    }));
+  },
+
+  /**
+   * 活动资料按需打印：生成短期派生文件，返回 { fileId, filename, pageCount, printFileUrl, ... }。
+   * **生成文件不等于已打印**——拿到响应只能进入打印下单流程，页面不得声称已打印。
+   */
+  prepareFairMaterialPrint(fairId, materialId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('活动资料打印'));
+    return request(`/job-fairs/${fairId}/materials/${materialId}/print-url`, {
+      method: 'POST', needAuth: true, timeout: 60000,
+    });
+  },
+
+  /**
+   * 参会企业资料按需打印。variant: 'profile' 企业资料 / 'positions' 岗位清单。
+   * 与活动资料不同，这里没有预置文件，服务端按库内展示字段实时渲染 PDF，
+   * 所以 pageCount / sizeBytes 来自真实渲染结果，前端不要估算。
+   */
+  prepareFairCompanyPrint(fairId, companyId, variant) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('企业资料打印'));
+    return request(`/job-fairs/${fairId}/companies/${companyId}/print-url`, {
+      method: 'POST', data: { variant }, needAuth: true, timeout: 60000,
+    });
+  },
+
+  /**
+   * 招聘会统计。
+   * 合规：DTO 里 checkedInCompanies / browseCount / scanCount / printCount / checkinCount
+   * 为 null 时表示**无可证明的统计源**，页面必须渲染「暂无数据」，**不得显示 0**。
+   */
+  getFairStats(fairId) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('招聘会数据'));
+    return request(`/job-fairs/${fairId}/stats`, { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 生成 AI 参会准备单（付费 AI 服务，限流 6 次/分钟，与职业规划同一条权益扣次通道）。
+   * 依赖本人已有简历任务 taskId——没有简历就没有这个能力，页面要先引导去上传简历。
+   * 服务端按招聘会 endAt 判定 mode：未结束 preparation / 已结束 review，前端只读不猜。
+   */
+  generateFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取已生成的参会准备单（不触发新生成）。无记录时后端 404，属正常空态。 */
+  getFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /** 把准备单渲染成 PDF 入库。同 printCareerPlan：进了「我的文档」，但不等于已打印。 */
+  printFairVisitPlan(fairId, taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('AI 参会准备单'));
+    return request(`/job-fairs/${fairId}/visit-plan/${taskId}/print`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+    });
+  },
+
   // ---------- 企业 ----------
   getCompanies(params = {}) {
     if (config.USE_MOCK) return mockResolve(mock.companyList());

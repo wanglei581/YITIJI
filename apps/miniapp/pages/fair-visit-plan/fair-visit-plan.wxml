@@ -1,0 +1,10 @@
+<view class="page">
+  <view class="nav" style="padding-top:{{statusBarHeight}}px">
+    <view class="nav-back" bindtap="goBack" aria-label="返回">返回</view>
+    <view class="nav-title">参会准备单</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state">正在加载…</view>
+  <view wx:elif="{{loadError}}" class="state">{{loadError}}</view>
+  <view wx:else class="state">该页面正在接入中，暂未开放。</view>
+</view>
