@@ -46,6 +46,10 @@ const PICKUP_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SIGNED_URL_TTL_MS = 30 * 60 * 1000
 const ALLOWED_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
 const REQUIRED_PII_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan'])
+
+type DuplexMode = 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
+/** 与 shared 的 `DuplexMode` 逐字一致；改这里必须同改 packages/shared/src/types/print.ts。 */
+const DUPLEX_MODES: readonly DuplexMode[] = ['simplex', 'duplex_long_edge', 'duplex_short_edge']
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 type TerminalSummary = { displayName: string | null; locationLabel: string | null }
 
@@ -305,7 +309,10 @@ export class MemberPrintOrderCreateService {
       billablePages: order.billablePages,
       copies: typeof params.copies === 'number' ? params.copies : null,
       colorMode: typeof params.colorMode === 'string' ? params.colorMode : null,
-      duplex: typeof params.duplex === 'string' ? params.duplex : null,
+      // 与 member-print-orders.service.ts 的 parseSafeParams 同一口径：三值白名单。
+      // printParamsJson 由校验过的 DTO（@IsIn 三值）写入，读时仍按不可信 JSON 处理；
+      // 缺失 / 非白名单一律 null（= 未记录），绝不回落成 'simplex'。
+      duplex: DUPLEX_MODES.includes(params.duplex as DuplexMode) ? (params.duplex as DuplexMode) : null,
       paperSize: typeof params.paperSize === 'string' ? params.paperSize : null,
       priceLines: lines,
       payStatus: order.payStatus,

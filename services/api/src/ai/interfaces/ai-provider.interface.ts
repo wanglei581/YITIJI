@@ -105,6 +105,80 @@ export interface ResumeTargetContext {
 }
 
 /**
+ * 简历内容块固定七块（key 为跨端协议，不随 UI 文案漂移）。
+ *
+ * 为什么不让模型自由切分：Kiosk 报告页 `/resume/report?blk=` 深链契约与相关门禁都
+ * 建在这个枚举上（原型 docs/design/kiosk-redesign-2026-08/22-resume-report.html 的
+ * BLK_KEYS 与此逐字一致）。模型每次自拟块名，深链与断言会同时失效。
+ */
+export const RESUME_CONTENT_BLOCKS = [
+  { key: 'basic',      label: '基础信息' },
+  { key: 'objective',  label: '求职目标' },
+  { key: 'education',  label: '教育经历' },
+  { key: 'experience', label: '工作经历' },
+  { key: 'project',    label: '项目经历' },
+  { key: 'skill',      label: '技能' },
+  { key: 'selfintro',  label: '自我评价' },
+] as const
+
+export type ResumeContentBlockKey = typeof RESUME_CONTENT_BLOCKS[number]['key']
+
+/**
+ * 简历内容块：简历被切成固定七块，每块摆出实际片段。
+ *
+ * - `label` 由服务端按 RESUME_CONTENT_BLOCKS 的 canonical 值覆盖模型输出
+ *   （与 ResumeSection.label 同一纪律：展示文案不随模型漂移）。
+ * - `lines` 每行**逐字**摘自送模型的那份简历文本；服务端逐行回配校验，配不上即丢弃。
+ *   每块最多 6 行、每行最多 80 字。
+ * - 一行都没留下的块不会出现在数组里：服务端无法区分「简历里没有这块」「模型没摘出来」
+ *   「被输入截断切掉了」三种情况，摆一个空块等于替用户下结论。
+ */
+export interface ResumeContentBlock {
+  key: ResumeContentBlockKey
+  label: string
+  lines: string[]
+}
+
+/**
+ * 问题证据：一条问题引用的那一行原文。
+ *
+ * 为什么是「引文拷贝」而不是字符 offset：
+ * 1. 模型数不准字符数，offset 几乎必然错位；
+ * 2. offset 只在「遮盖后 + 截断后」那份文本里成立，客户端永远拿不到那份文本；
+ * 3. 简历原文从不落库，结果过期前服务端自己也复原不出那份文本。
+ * 所以模型只发 {blockKey, quote}，`lineIndex` 由服务端把 quote 回配到已校验的
+ * lines 算出，回配不上就丢弃该证据 —— 悬空下标这一整类错误在设计上不存在。
+ */
+export interface ResumeIssueEvidence {
+  blockKey: ResumeContentBlockKey
+  /** 指向 contentBlocks 中同 key 块的 lines 下标；服务端计算，保证不悬空。 */
+  lineIndex: number
+  /** 逐字引文，恒等于对应块的 lines[lineIndex]（服务端覆盖模型输出）。 */
+  quote: string
+}
+
+/**
+ * 一条带原文证据的简历问题。
+ *
+ * 严重度**不进契约**：它由 sections[].score/maxScore 机械分档得出，分档规则常驻印在
+ * 报告页上（原型 sevOf()）。能由已有字段算出来的，不问模型。
+ *
+ * 合规：`impact` 只描述读简历的人会看不到 / 看不懂什么，不得推断招聘方的决定。
+ * 本终端是求职打印服务终端，不做企业匹配、录用预测或投递结论。
+ */
+export interface ResumeIssue {
+  /** 服务端分配的稳定短 id（形如 I1）；供前端做 key / data-testid，不含用户文本。 */
+  id: string
+  /** 所属诊断维度，必须是 RESUME_SCORING_DIMENSIONS 六个 key 之一（不新增维度枚举）。 */
+  dim: ResumeScoringDimensionKey
+  title: string
+  /** 1~3 处原文证据；一处都回配不上的问题整条丢弃。 */
+  evidence: ResumeIssueEvidence[]
+  impact: string
+  fixIt: string
+}
+
+/**
  * 诊断报告：评分仅供参考，不代表真实招聘结果。
  *
  * Phase 1.1「8 项诊断结果」内部结构 = 6 评分维度（sections）+ 风险表述提醒（riskNotes）
@@ -118,6 +192,26 @@ export interface ResumeReport {
   riskNotes?: string[]
   /** 修改优先级建议（2~4 条）。旧报告缺失时前端回退按低分 section 派生。 */
   priorities?: ResumePriority[]
+  /**
+   * 内容结构：简历被切成固定七块的实际片段（S25 报告页主视觉之一）。
+   *
+   * additive 可选。校验失败**不拖垮整份报告**：清洗后为空就不附带该字段，
+   * sections / suggestions / priorities 的严格度一字不改，最坏退回旧报告形态。
+   */
+  contentBlocks?: ResumeContentBlock[]
+  /**
+   * 问题与证据：每条问题带维度归属与逐字原文证据（S25 报告页主视觉之一）。
+   * additive 可选，失败纪律同 contentBlocks。
+   */
+  issues?: ResumeIssue[]
+  /**
+   * 本次诊断只看了简历前若干字符（服务端有输入上限，超出部分从未送进模型）。
+   *
+   * true = 确实发生过截断，后面的内容块可能整块缺失；页面必须如实说明「没看完」，
+   * 否则用户会把「没送进模型」误读成「简历里没有这几块」——CLAUDE.md §9 不伪造能力。
+   * 缺省 = 未截断，或旧报告。
+   */
+  truncatedInput?: boolean
 }
 
 export interface ParseResumeInput {

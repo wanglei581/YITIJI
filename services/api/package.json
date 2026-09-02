@@ -102,6 +102,7 @@
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",
     "verify:audit-logs": "node -r @swc-node/register scripts/verify-audit-logs.ts",
     "verify:ai-config": "node -r @swc-node/register scripts/verify-ai-config.ts",
+    "verify:ai-contract-mirror": "node scripts/verify-ai-contract-mirror.mjs",
     "verify:job-review": "node -r @swc-node/register scripts/verify-job-review.ts",
     "verify:jobfair-review": "node -r @swc-node/register scripts/verify-jobfair-review.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",

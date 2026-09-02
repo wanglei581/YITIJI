@@ -39,3 +39,18 @@
   .knp-key { min-height: 64px; font-size: 26px; }
   .knp-fn { font-size: 18px; }
 }
+
+/* 左下角替换键（如取件码页的「输入历史码」）：它是一次模式选择，
+   不是数字输入，所以视觉上要能和数字键区分，但不能抢主按钮的重量。 */
+.knp-key.knp-alt {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--print-teal-deep, #14705e);
+  background: color-mix(in srgb, var(--print-teal, #1f9e86) 8%, transparent);
+  border-color: color-mix(in srgb, var(--print-teal, #1f9e86) 30%, transparent);
+}
+.knp-key.knp-alt.is-on {
+  color: #fff;
+  background: var(--print-teal-deep, #14705e);
+  border-color: var(--print-teal-deep, #14705e);
+}

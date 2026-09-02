@@ -54,10 +54,22 @@ const STATUS_FILTERS = [
 
 type FilterKey = (typeof STATUS_FILTERS)[number]['key']
 
+/** 单双面文案；键取自契约类型，新增取值会在此处编译期报错，不会静默漏显示。 */
+const DUPLEX_LABEL: Record<NonNullable<MemberPrintOrderItem['duplex']>, string> = {
+  simplex: '单面',
+  duplex_long_edge: '双面（长边）',
+  duplex_short_edge: '双面（短边）',
+}
+
 function metaLine(item: MemberPrintOrderItem): string {
   const parts: string[] = []
   if (item.copies) parts.push(`${item.copies} 份`)
   if (item.colorMode) parts.push(item.colorMode === 'color' ? '彩色' : '黑白')
+  // duplex 为 null = 后端「未记录」（该字段 2026-09-02 才进对外契约，更早的订单
+  // paramsJson 里没有这个键），此时整项不展示，也不补占位符号。
+  // 绝不回落成「单面」：那是把「不知道」讲成「就是单面」（CLAUDE.md §9 不伪造能力），
+  // 用户据此申诉补打会拿到错误依据。
+  if (item.duplex) parts.push(DUPLEX_LABEL[item.duplex])
   if (item.paperSize) parts.push(item.paperSize)
   parts.push(formatTime(item.completedAt ?? item.createdAt))
   return parts.join(' · ')

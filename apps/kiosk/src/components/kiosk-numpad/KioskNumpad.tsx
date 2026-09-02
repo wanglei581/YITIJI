@@ -21,12 +21,16 @@ export function KioskNumpad({
   maxLength,
   disabled = false,
   label = '数字键盘',
+  leadKey,
 }: {
   value: string
   onChange: (next: string) => void
   maxLength?: number
   disabled?: boolean
   label?: string
+  /** 左下角功能键槽。不传时是「清空」；页面另有更该占这个位置的动作时替换它
+   *  （取件码页放「输入历史码」——用户拿的是哪种码，比清空更早需要决定）。 */
+  leadKey?: { text: string; onPress: () => void; ariaLabel?: string; active?: boolean }
 }) {
   const press = (next: string) => {
     if (disabled) return
@@ -60,11 +64,16 @@ export function KioskNumpad({
           press(value + d)
         }),
       )}
-      {key('清空', () => press(''), {
-        className: 'knp-fn',
-        ariaLabel: '清空',
-        disabled: value.length === 0,
-      })}
+      {leadKey
+        ? key(leadKey.text, leadKey.onPress, {
+            className: `knp-fn knp-alt${leadKey.active ? ' is-on' : ''}`,
+            ariaLabel: leadKey.ariaLabel ?? leadKey.text,
+          })
+        : key('清空', () => press(''), {
+            className: 'knp-fn',
+            ariaLabel: '清空',
+            disabled: value.length === 0,
+          })}
       {key('0', () => {
         if (maxLength && value.length >= maxLength) return
         press(value + '0')

@@ -15,8 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ScanIcon, ArrowRightIcon, RotateCcwIcon, PrinterIcon } from 'lucide-react'
-import { KioskPageHeader } from '@ai-job-print/ui'
+import { ArrowRightIcon, RotateCcwIcon, PrinterIcon } from 'lucide-react'
 import {
   PICKUP_CODE_ACCEPTED_PATTERN,
   PICKUP_CODE_INPUT_ALPHABET,
@@ -25,10 +24,10 @@ import {
   PICKUP_CODE_PATTERN,
   isLegacyPickupCode,
 } from '@ai-job-print/shared'
-import { PrintPageFrame } from './PrintPrototypeLayout'
+import { QxPageFrame } from '../../components/qingxu/QxPageFrame'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
-import './styles/print-pickup-claim.css'
+import './styles/pickup-claim-qx.css'
 import { KioskNumpad } from '../../components/kiosk-numpad/KioskNumpad'
 
 // ── 到机码工具 ────────────────────────────────────────────────
@@ -113,8 +112,14 @@ export function PrintPickupClaimPage() {
   const [state, setState] = useState<ClaimState>('idle')
   const [result, setResult] = useState<ClaimPickupResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  // 只影响显示几个码位格与提示文案；受理正则同时接受 8 位新码与 10 位历史码，
+  // 这个开关不参与任何格式判定，也不影响提交。
+  const [legacyMode, setLegacyMode] = useState(false)
 
   const isValid = PICKUP_CODE_ACCEPTED_PATTERN.test(code)
+  // 已输入超过 8 位时按历史码展示，不必等用户去点开关。
+  const cellCount = legacyMode || code.length > CODE_LEN ? PICKUP_CODE_MAX_INPUT_LENGTH : CODE_LEN
+  const codeCells = Array.from({ length: cellCount }, (_, i) => code[i] ?? '')
 
   const cancelSettle = () => {
     if (settleTimerRef.current) {
@@ -184,37 +189,19 @@ export function PrintPickupClaimPage() {
   // ── 成功：提示排队，跳进度页 ─────────────────────────────────
   if (state === 'success' && result) {
     return (
-      <PrintPageFrame>
-        <KioskPageHeader
-          title="认领成功"
-          description={result.released ? '打印任务已进入队列，请稍候出纸' : '订单核验成功，请先完成现场支付'}
-          onBack={() => navigate('/print-scan')}
-          backLabel="返回"
-        />
-        <div className="pickup-claim-success" data-w2-page="pickup-claim-success" aria-live="polite">
-          <div className="pcs-icon-wrap">
-            <PrinterIcon size={48} className="pcs-icon" />
-          </div>
-          <h2 className="pcs-title">{result.released ? '打印任务已释放' : '订单核验成功'}</h2>
-          <p className="pcs-sub">{result.released ? '等待打印机排队出纸' : '付款成功后系统才会创建打印任务，不会提前出纸'}</p>
-
-          <dl className="pcs-meta">
-            <div className="pcs-row">
-              <dt>订单号</dt>
-              <dd>{result.orderNo}</dd>
-            </div>
-            {result.terminalId && (
-              <div className="pcs-row">
-                <dt>终端</dt>
-                <dd>{result.terminalId}</dd>
-              </div>
-            )}
-          </dl>
-
-          <div className="pcs-actions">
+      <QxPageFrame
+        title="认领成功"
+        subtitle={result.released ? '打印任务已进入队列，请稍候出纸' : '订单核验成功，请先完成现场支付'}
+        terminalLabel="就业服务大厅"
+        ctabar={
+          <>
+            <p className="why">{result.released ? '出纸完成前请留在取件口旁边。' : '付款成功后系统才会创建打印任务，不会提前出纸。'}</p>
+            <button type="button" className="qx-btn" data-variant="ghost" onClick={handleReset}>
+              <RotateCcwIcon size={18} />再取一件
+            </button>
             <button
               type="button"
-              className="k-btn pcs-primary"
+              className="qx-btn"
               data-variant="primary"
               onClick={() => navigate(result.released ? '/print/progress' : '/print/cashier', {
                 state: result.released
@@ -232,45 +219,88 @@ export function PrintPickupClaimPage() {
               <ArrowRightIcon size={20} />
               {result.released ? '查看打印进度' : '进入现场支付'}
             </button>
-            <button type="button" className="k-btn pcs-secondary" data-variant="ghost" data-size="sm" onClick={handleReset}>
-              <RotateCcwIcon size={18} />
-              再取一件
-            </button>
+          </>
+        }
+      >
+        <div className="qx-scroll pickup-claim-success" data-w2-page="pickup-claim-success" aria-live="polite">
+          <div className="qx-state" data-tone="empty">
+            <span className="qx-state-ic"><PrinterIcon size={30} /></span>
+            <div>
+              <div className="qx-state-t">{result.released ? '打印任务已释放' : '订单核验成功'}</div>
+              <div className="qx-state-d">{result.released ? '等待打印机排队出纸。' : '付款成功后系统才会创建打印任务，不会提前出纸。'}</div>
+            </div>
           </div>
+
+          <div className="qx-rows">
+            <div className="qx-row" style={{ cursor: 'default' }}>
+              <span className="qx-row-tx"><span className="qx-row-t">订单号</span></span>
+              <span className="qx-num" style={{ fontSize: 24 }}>{result.orderNo}</span>
+            </div>
+            {result.terminalId && (
+              <div className="qx-row" style={{ cursor: 'default' }}>
+                <span className="qx-row-tx"><span className="qx-row-t">终端</span></span>
+                <span className="qx-num" style={{ fontSize: 24 }}>{result.terminalId}</span>
+              </div>
+            )}
+          </div>
+
         </div>
-      </PrintPageFrame>
+      </QxPageFrame>
     )
   }
 
   // ── 输入界面 ──────────────────────────────────────────────────
   return (
-    <PrintPageFrame>
-      <KioskPageHeader
-        title="扫码取件"
-        description={`扫描小程序二维码，或输入 ${CODE_LEN} 位到机码`}
-        onBack={() => navigate('/print-scan')}
-        backLabel="返回"
-      />
-
-      <div className="pickup-claim-page" data-w2-page="pickup-claim" data-claim-state={state}>
-        {/* 说明区 */}
-        <div className="pcp-lead">
-          <span className="pcp-lead-icon" aria-hidden="true"><ScanIcon size={32} /></span>
-          <div className="pcp-lead-copy">
-            <span className="pcp-status">等待扫码输入</span>
-            <p className="pcp-lead-text">
-              打开小程序「我的 → 打印订单 → 查看到机码」，将二维码对准本机扫码器；无法扫码时可手动输入。
-            </p>
-          </div>
-        </div>
-
-        {/* 输入框 */}
-        <div className="pcp-input-section">
+    <QxPageFrame
+      title="输入你的到机码"
+      subtitle={`在手机小程序「我的 → 打印订单」里拿到的那串码，新码是 ${CODE_LEN} 位纯数字。`}
+      terminalLabel="就业服务大厅"
+      ctabar={
+        <>
+          <p className="why">输错可以改，不作废；这一步不收钱。</p>
+          <button type="button" className="qx-btn" data-variant="ghost" onClick={() => navigate('/print-scan')}>返回</button>
+          <button
+            type="button"
+            className="qx-btn pcp-submit"
+            data-variant="primary"
+            disabled={!isValid || state === 'loading'}
+            onClick={() => void handleClaim()}
+            aria-busy={state === 'loading'}
+          >
+            {state === 'loading'
+              ? (<><span className="pcp-spinner" aria-hidden />认领中…</>)
+              : (<><ArrowRightIcon size={20} />确认校验</>)}
+          </button>
+        </>
+      }
+    >
+      <div className="qx-scroll pickup-claim-page" data-w2-page="pickup-claim" data-claim-state={state}>
+        {/* 码位格：真实 input 透明覆盖在格子上——HID 扫码器与物理键盘仍然直接打进 input，
+            格子只做显示。既保住扫码通路，又让站着的人一眼看出还差几位。 */}
+        <div className="qx-card pcp-input-section">
           <label className="pcp-label" htmlFor="pickup-code-input">
-            扫码结果 / 到机码（{CODE_LEN} 位）
+            扫码结果 / 到机码
           </label>
           {/* 小程序会把码显示为 12-34-56；分隔符不进入状态或接口。 */}
           <div className="pcp-input-wrap">
+            <div
+              className={`pcp-codebox${codeCells.length > CODE_LEN ? ' pcp-codebox--legacy' : ''}`}
+              aria-hidden="true"
+            >
+              {codeCells.map((ch, i) => (
+                <span
+                  key={i}
+                  className={[
+                    'pcp-cb',
+                    ch ? 'is-filled' : '',
+                    !ch && i === code.length ? 'is-cur' : '',
+                    state === 'error' ? 'is-err' : '',
+                  ].filter(Boolean).join(' ')}
+                >
+                  {ch}
+                </span>
+              ))}
+            </div>
             <input
               id="pickup-code-input"
               ref={inputRef}
@@ -279,7 +309,6 @@ export function PrintPickupClaimPage() {
               // 纯数字码必须唤起数字键盘。用 inputMode 而非 type="number"：
               // 后者会吞掉前导 0、渲染上下箭头，且过渡期还要能键入 10 位存量码的字母。
               inputMode="numeric"
-              placeholder="例：28491703"
               // 上限取两套长度的较大者（存量 10 位）×3，容纳粘贴进来的分隔符；
               // 真正的长度判定在 normalizeInput + 受理正则，不靠 maxLength。
               maxLength={PICKUP_CODE_MAX_INPUT_LENGTH * 3}
@@ -296,26 +325,40 @@ export function PrintPickupClaimPage() {
             />
             {/* 计数器按当前输入形态显示目标长度：正在输入存量码时不该催用户「只要 8 位」。 */}
             <div id="pcp-hint" className={`pcp-counter ${isValid ? 'pcp-counter--full' : ''}`}>
-              {code.length} / {code.length > CODE_LEN ? PICKUP_CODE_MAX_INPUT_LENGTH : CODE_LEN}
+              {code.length} / {codeCells.length}
             </div>
           </div>
         </div>
 
-        {/* 格式说明 */}
-        <p className="pcp-format-hint">
-          到机码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
-          {' '}早前下单拿到的 {PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍然有效，可直接输入。
-        </p>
+        {/* 三条安心提示。说的是本页行为，不是任何服务端数据，所以可以直接写死。
+            站在机器前的人最担心的就是「输错了这码是不是就废了」。 */}
+        <ul className="pcp-easy">
+          <li>输错可以改，不作废</li>
+          <li>这一步不收钱</li>
+          <li>输满稍停自动校验，也可按「确认校验」</li>
+        </ul>
 
         {/* 页内数字键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
             没有物理键盘的用户在扫码失败时原本无法输入到机码。 */}
-        <KioskNumpad
-          value={code}
-          onChange={applyCode}
-          maxLength={PICKUP_CODE_MAX_INPUT_LENGTH}
-          disabled={state === 'loading'}
-          label="到机码数字键盘"
-        />
+        <div className="qx-card pcp-keypad-card">
+          <p className="pcp-keypad-note">
+            新码是 <b>{CODE_LEN} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。
+            早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。
+          </p>
+          <KioskNumpad
+            value={code}
+            onChange={applyCode}
+            maxLength={PICKUP_CODE_MAX_INPUT_LENGTH}
+            disabled={state === 'loading'}
+            label="到机码数字键盘"
+            leadKey={{
+              text: legacyMode ? '回到新码' : '输入历史码',
+              ariaLabel: legacyMode ? '回到 8 位新码' : '输入 10 位历史码',
+              active: legacyMode,
+              // 只切显示格数与提示；受理正则同时接受两种码，不改判据也不清空已输内容。
+              onPress: () => setLegacyMode(v => !v),
+            }}
+          />
 
         {/* 错误信息 */}
         {state === 'error' && (
@@ -324,38 +367,39 @@ export function PrintPickupClaimPage() {
           </div>
         )}
 
-        {/* 确认按钮 */}
-        <button
-          type="button"
-          className="k-btn pcp-submit"
-          data-variant="primary"
-          disabled={!isValid || state === 'loading'}
-          onClick={() => void handleClaim()}
-          aria-busy={state === 'loading'}
-        >
-          {state === 'loading' ? (
-            <>
-              <span className="pcp-spinner" aria-hidden />
-              认领中…
-            </>
-          ) : (
-            <>
-              <ArrowRightIcon size={20} />
-              确认取件
-            </>
-          )}
-        </button>
+        </div>
 
-        {/* 操作指引 */}
-        <div className="pcp-help">
-          <p className="pch-title">怎么找到机码？</p>
-          <ol className="pch-steps">
-            <li>打开小程序，点击底部「我的」</li>
-            <li>选择「打印订单」，找到待取件订单</li>
-            <li>点击「查看到机码」，对准扫码器；也可手动输入 {CODE_LEN} 位数字</li>
-          </ol>
+        {/* 三种码对照：现场最高频的求助是「我手上这串码是哪种」——
+            到机码、上传码、取件凭证码长得像，用途完全不同。 */}
+        <section className="qx-card pcp-ab" aria-label="三种码的区别">
+          <h2 className="pcp-ab-t">三种码，别搞混</h2>
+          <div className="pcp-ab-cols">
+            <div className="pcp-ab-col is-current">
+              <b>到机码 · 本页用</b>
+              <span>{CODE_LEN} 位纯数字（旧码 {PICKUP_CODE_MAX_INPUT_LENGTH} 位），对应一笔打印订单。</span>
+            </div>
+            <div className="pcp-ab-col">
+              <b>上传码 · 手机传文件用</b>
+              <span>在手机上传页出示，有效期以服务端返回为准。</span>
+            </div>
+            <div className="pcp-ab-col">
+              <b>取件凭证码 · 取纸/补打用</b>
+              <span>打印完成后才有，给工作人员核验或代取——本页不输它。</span>
+            </div>
+          </div>
+        </section>
+
+        {/* 兜底出口。原本这里是「怎么找到机码」的三步说明，但真正卡住的人
+            需要的是另一条路，不是把同一条路再讲一遍。 */}
+        <div className="qx-card pcp-help">
+          <p className="pch-title">码找不到了？</p>
+          <ul className="pch-steps pch-outs">
+            <li><b>回手机小程序看</b><span>「我的 → 打印订单」</span></li>
+            <li><b>用机身扫码区</b><span>免输码</span></li>
+            <li><b>问工作人员</b><span>帮你查订单</span></li>
+          </ul>
         </div>
       </div>
-    </PrintPageFrame>
+    </QxPageFrame>
   )
 }
