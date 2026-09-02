@@ -1,0 +1,5 @@
+# 修订 ec552bb81114 · 2026-09-02T20:50+08:00 · local（工作区含 1 个未提交页面 pages/resume-build/ —— 见 EV-022）
+
+$ cd apps/miniapp && node scripts/verify-pickup-qrcode.mjs
+PICKUP_QR_MATRIX_PASS samples=6 version=1 ecc=H
+exit=0

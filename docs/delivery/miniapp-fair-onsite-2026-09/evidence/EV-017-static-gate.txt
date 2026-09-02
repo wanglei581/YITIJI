@@ -1,0 +1,115 @@
+# 修订 ec552bb81114 · 2026-09-02T20:50+08:00 · local（工作区含 1 个未提交页面 pages/resume-build/ —— 见 EV-022）
+
+$ cd apps/miniapp && node scripts/verify-miniapp-static.mjs
+  ✓ JSON 全部可解析
+  ✓ 页面四件套完整
+  ✓ tabBar 四 Tab 配置正确
+  ✓ custom-tab-bar 与 app.json 一致
+  ✓ 小程序唯一目录分类受门禁
+  ✓ 本地图片体积预算（2 张 / 38KB）
+  ✓ 页面目录与注册路由一一对应
+  ✓ 发布包排除验证脚本且无运行时 npm 依赖
+  ✓ 路由检查 ./custom-tab-bar/index.wxml
+  ✓ 路由检查 ./pages/about/about.wxml
+  ✓ 路由检查 ./pages/ai/ai.wxml
+  ✓ 路由检查 ./pages/ai-records/ai-records.wxml
+  ✓ 路由检查 ./pages/assistant/assistant.wxml
+  ✓ 路由检查 ./pages/browse-history/browse-history.wxml
+  ✓ 路由检查 ./pages/career-plan/career-plan.wxml
+  ✓ 路由检查 ./pages/community/community.wxml
+  ✓ 路由检查 ./pages/companies/companies.wxml
+  ✓ 路由检查 ./pages/company-detail/company-detail.wxml
+  ✓ 路由检查 ./pages/contract-review/contract-review.wxml
+  ✓ 路由检查 ./pages/daily-report/daily-report.wxml
+  ✓ 路由检查 ./pages/documents/documents.wxml
+  ✓ 路由检查 ./pages/fair-companies/fair-companies.wxml
+  ✓ 路由检查 ./pages/fair-company-detail/fair-company-detail.wxml
+  ✓ 路由检查 ./pages/fair-detail/fair-detail.wxml
+  ✓ 路由检查 ./pages/fair-materials/fair-materials.wxml
+  ✓ 路由检查 ./pages/fair-reminders/fair-reminders.wxml
+  ✓ 路由检查 ./pages/fair-venue/fair-venue.wxml
+  ✓ 路由检查 ./pages/fair-visit-plan/fair-visit-plan.wxml
+  ✓ 路由检查 ./pages/fairs/fairs.wxml
+  ✓ 路由检查 ./pages/favorites/favorites.wxml
+  ✓ 路由检查 ./pages/help/help.wxml
+  ✓ 路由检查 ./pages/home/home.wxml
+  ✓ 路由检查 ./pages/interview-entry/interview-entry.wxml
+  ✓ 路由检查 ./pages/interview-qa/interview-qa.wxml
+  ✓ 路由检查 ./pages/interview-result/interview-result.wxml
+  ✓ 路由检查 ./pages/job-detail/job-detail.wxml
+  ✓ 路由检查 ./pages/job-fit/job-fit.wxml
+  ✓ 路由检查 ./pages/job-materials/job-materials.wxml
+  ✓ 路由检查 ./pages/jobs/jobs.wxml
+  ✓ 路由检查 ./pages/kiosk-login/kiosk-login.wxml
+  ✓ 路由检查 ./pages/launch/launch.wxml
+  ✓ 路由检查 ./pages/legal/legal.wxml
+  ✓ 路由检查 ./pages/me/me.wxml
+  ✓ 路由检查 ./pages/membership/membership.wxml
+  ✓ 路由检查 ./pages/notifications/notifications.wxml
+  ✓ 路由检查 ./pages/order-detail/order-detail.wxml
+  ✓ 路由检查 ./pages/orders/orders.wxml
+  ✓ 路由检查 ./pages/package-code/package-code.wxml
+  ✓ 路由检查 ./pages/package-confirm/package-confirm.wxml
+  ✓ 路由检查 ./pages/package-create/package-create.wxml
+  ✓ 路由检查 ./pages/policies/policies.wxml
+  ✓ 路由检查 ./pages/policy-check/policy-check.wxml
+  ✓ 路由检查 ./pages/policy-detail/policy-detail.wxml
+  ✓ 路由检查 ./pages/print/print.wxml
+  ✓ 路由检查 ./pages/print-pay/print-pay.wxml
+  ✓ 路由检查 ./pages/print-pickup/print-pickup.wxml
+  ✓ 路由检查 ./pages/print-preview/print-preview.wxml
+  ✓ 路由检查 ./pages/print-store/print-store.wxml
+  ✓ 路由检查 ./pages/print-upload/print-upload.wxml
+  ✓ 路由检查 ./pages/privacy/privacy.wxml
+  ✓ 路由检查 ./pages/resume-build/resume-build.wxml
+  ✓ 路由检查 ./pages/resume-diagnose/resume-diagnose.wxml
+  ✓ 路由检查 ./pages/resume-optimize/resume-optimize.wxml
+  ✓ 路由检查 ./pages/resume-parse/resume-parse.wxml
+  ✓ 路由检查 ./pages/resume-upload/resume-upload.wxml
+  ✓ 路由检查 ./pages/resumes/resumes.wxml
+  ✓ 路由检查 ./pages/self-explore/self-explore.wxml
+  ✓ 路由检查 ./pages/settings/settings.wxml
+  ✓ 路由检查 ./pages/store-select/store-select.wxml
+  ✓ 路由检查 ./pages/usb-import/usb-import.wxml
+  ✓ 运行时依赖方向清晰且无循环
+  ✓ JavaScript 语法全部有效
+  ✓ CommonJS 模块导入形态正确
+  ✓ JS 跳转目标全部已注册
+  ✓ AI 记录路由表全部已注册（6 条）
+  ✓ 事件绑定全部有实现
+  ✓ dataset 绑定完整
+  ✓ 图标定义已从 app.wxss 推导（50 个）
+  ✓ 图标类有效
+  ✓ 合规文案无违规词
+  ✓ 登录/协议/隐私页已注册
+  ✓ 登录页含微信一键登录与短信降级
+  ✓ 登录页含协议勾选
+  ✓ 登录实现无密钥残留
+  ✓ 登录与真实退出入口完整
+  ✓ 401 补签准入与 token 存在性解耦
+  ✓ 登录后受控回到原会员页面
+  ✓ 过期会员令牌会在展示与请求前主动清理
+  ✓ 未注册无后端支撑页面
+  ✓ 无伪造个人数据或商业能力
+  ✓ 取件页本地生成核销二维码并保留真实码兜底
+  ✓ 取件页轮询真实订单状态并在扫码/终态撤码
+  ✓ 取件页首次状态请求失败仍能绘制真实到机码二维码
+  ✓ 到机码与取件凭证码不混名，且跨端指引对得上终端标签
+  ✓ 文档真实上传、隐私确认且由服务端建单计价
+  ✓ 打印参数页使用服务端真实页数与精确报价
+  ✓ 报价与下单打印参数一致（black_white / simplex）
+  ✓ 打印 printFileUrl 旁路仅限共享派生文件且只取自服务端响应
+  ✓ 打印份数变化立即作废旧报价并锁定继续操作
+  ✓ 免费试运营订单全流程不再误导用户现场支付
+  ✓ 扫码后撤下订单列表到机码且登录失效停止状态轮询
+  ✓ AI 服务记录支持真实结果回看与删除
+  ✓ AI 历史模式登录失效时保留任务并在登录后自动恢复
+  ✓ 正式源码默认关闭 mock
+  ✓ 无密钥残留
+  ✓ 材料包四页均在 onLoad 首行 fail-closed（4 页）
+  ✓ 到机码页成功横幅由默认关闭的开关控制，首屏不闪假成功
+  ✓ 材料包四页均未开放分享
+  ✓ 材料包四页无假电话 / 假坐标 / 本地硬编码计价
+
+109 PASS / 0 FAIL（注册页面 61）
+exit=0

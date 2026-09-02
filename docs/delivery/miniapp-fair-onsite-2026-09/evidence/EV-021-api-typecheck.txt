@@ -1,0 +1,10 @@
+# 修订 ec552bb81114 · 2026-09-02T20:52+08:00 · local
+
+$ services/api/node_modules/.bin/tsc --noEmit -p services/api/tsconfig.json
+exit=0 · 输出行数 0 · error TS 计数 0
+
+本次**未重跑** prisma generate，沿用工作区中已生成的 Prisma Client。
+若 prisma/schema.prisma 变更后未重新生成，本条结论不成立。
+
+覆盖本批唯一的后端改动：services/api/src/ai/self-assessment.controller.ts
+新增 @Get('questions')（additive，排在 @Get(':taskId') 之前）。
