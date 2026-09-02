@@ -28,6 +28,24 @@ overrides:
   # 传递自 @prisma/config@7.8.0，它精确锁 7.1.5，所以只能靠 override 抬版本。
   # 这是跨大版本覆盖：升级 prisma 到自带 8.x 的版本后应删掉本条。
   deepmerge-ts@7.1.5: 8.0.0
+  # browserslist: GHSA-c83g-rgw3-j3cx（缓存无淘汰致内存无界增长）
+  #             + GHSA-73wf-gq98-2v4g（不可信 browserslist-stats.json 触发崩溃/原型写入）
+  # 两条都影响 <=4.28.6，首个修复版 4.28.7；这里钉 4.28 线最新的 4.28.8。
+  # 传递自 @vitejs/plugin-react → @babel/core → @babel/helper-compilation-targets，
+  # 三端都放在 devDependencies，生产 SPA 包不含这段，但门禁扫 full tree，high 就是红。
+  # patch 级升级，babel 只调 browserslist(query) / loadConfig，4.28.7 改的是缓存淘汰
+  # 与 normalizeStats 的键守卫，不动查询 DSL。
+  browserslist: 4.28.8
+  # mysql2: GHSA-3f6p-5ww8-9rcr（认证插件被降级到 mysql_clear_password，明文凭据泄露）
+  # 影响 <3.22.0，首个修复版 3.22.0；这里钉 3.22 线最新稳定的 3.22.6
+  #（3.22.7 只有 canary，不钉预发布版）。
+  # 传递自 prisma@7.8.0 CLI（services/api 的 devDependency），生产依赖是
+  # @prisma/adapter-pg + @prisma/adapter-libsql，API 进程连 PG/SQLite 时不 require 它。
+  # 不走「已接受-不可达」而是照修：门禁只写死过一条例外（GHSA-qwww-vcr4-c8h2，
+  # 修它等于把三端迁到 React Router 8），本条有同 major 补丁，扩例外是改门禁政策而非修复。
+  # 同 major 升级，且比已有的 deepmerge-ts 7.1.5 → 8.0.0（同样来自 prisma@7.8.0，跨 major）更保守。
+  # 3.22 的行为变化就是漏洞修复本身：默认关掉 mysql_clear_password。
+  mysql2: 3.22.6
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true
