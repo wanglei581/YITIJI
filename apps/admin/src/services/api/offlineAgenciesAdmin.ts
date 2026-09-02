@@ -9,6 +9,7 @@
 // ============================================================
 
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
+import { MOCK_SOURCE_ORG_ROTATION } from './offlineAgencyGovernance'
 import { authHeader, redirectToLogin } from '../auth'
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
@@ -35,6 +36,14 @@ export interface AdminOfflineAgencyListItem {
   reviewStatus: string   // pending | reviewing | approved | rejected
   publishStatus: string  // draft | published | unpublished | expired
   jobCount: number
+  /**
+   * 来源机构 Organization.id。可空、**无外键**（schema.prisma model OfflineAgency）。
+   * 后端 adminFindAll / adminFindOne 用 include 返回全部标量，本字段一直在返回体里，
+   * 只是前端此前没有声明。offline-agencies.service.ts 的发布闸门把它当 Organization.id
+   * 交给 assertOrgContentTrustActive，因此它是 legacy 机构通向治理档案 / 资质的唯一桥。
+   * 为空 = 后台自录的线下机构目录，本就不存在「来源机构资质」这个对象。
+   */
+  sourceOrgId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -167,7 +176,9 @@ function listQuery(filters: OfflineAgencyListFilters): string {
 
 const BASE = '/admin/offline-agencies'
 
-interface RawOfflineAgency extends Omit<AdminOfflineAgencyDetail, 'jobCount'> {
+interface RawOfflineAgency extends Omit<AdminOfflineAgencyDetail, 'jobCount' | 'sourceOrgId'> {
+  /** 后端一直返回；声明为可选是为了老部署缺字段时不把 undefined 当成合法 orgId 用。 */
+  sourceOrgId?: string | null
   _count?: { jobs: number }
   jobs?: RawOfflineJob[]
 }
@@ -182,7 +193,11 @@ interface RawPage<T> {
 }
 
 function mapAgency(raw: RawOfflineAgency): AdminOfflineAgencyDetail {
-  return { ...raw, jobCount: raw._count?.jobs ?? raw.jobs?.length ?? 0 }
+  return {
+    ...raw,
+    sourceOrgId: raw.sourceOrgId ?? null,
+    jobCount: raw._count?.jobs ?? raw.jobs?.length ?? 0,
+  }
 }
 
 function mapJob(raw: RawOfflineJob): OfflineAgencyJob {
@@ -234,6 +249,7 @@ function toListItem(a: AdminOfflineAgencyDetail): AdminOfflineAgencyListItem {
     phone: a.phone,
     reviewStatus: a.reviewStatus, publishStatus: a.publishStatus,
     jobCount: mockJobs.get(a.id)?.length ?? 0,
+    sourceOrgId: a.sourceOrgId,
     createdAt: a.createdAt, updatedAt: a.updatedAt,
   }
 }
@@ -273,6 +289,10 @@ const mockAdapter: OfflineAgenciesAdminServiceInterface = {
       reviewStatus: 'pending',
       publishStatus: 'draft',
       jobCount: 0,
+      // mock-only：真后端的 sourceOrgId 由外部供稿链路写入，本地表单没有这个字段。
+      // 这里按固定顺序轮流分配，只为让治理档案抽屉的「有资质 / 无资质 /
+      // 机构不存在 / 接口失败 / 无来源机构」几种表现都能被人工点到。
+      sourceOrgId: MOCK_SOURCE_ORG_ROTATION[mockAgencies.length % MOCK_SOURCE_ORG_ROTATION.length] ?? null,
       createdAt: now(),
       updatedAt: now(),
     }
