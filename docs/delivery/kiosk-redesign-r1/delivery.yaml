@@ -1,0 +1,71 @@
+schema_version: 1
+project: "职易达 AI求职打印服务终端"
+release_id: "kiosk-redesign-r1"
+boundary: "local"
+release_revision: "23464350fd0ff48191381b6412815e7cb8061d42"  # 本 worktree 分支 claude/project-readiness-review-959ffe
+generated_at: "2026-09-02T18:25:09+08:00"
+overall_verdict: "NO_GO"
+owners:
+  accountable: "产品负责人（本仓 CLAUDE.md 指定的决策人）"
+  product: "产品负责人"
+  engineering: "TBD"
+  qa: "TBD"
+  operations: "TBD"
+acceptance_authorities:
+  business: "TBD"
+  technical: "TBD"
+  security: "TBD"
+  release: "TBD"
+environments:
+  - name: "local"
+    purpose: "development"
+    url: "macOS 开发机；kiosk vite dev"
+  - name: "production"
+    purpose: "线上部署（百度云）"
+    url: "120.48.13.190 —— 当前生产提交落后 origin/main 107 个提交，未复验"
+  - name: "windows-kiosk"
+    purpose: "一体机真机（打印/扫描/Terminal Agent）"
+    url: "PENDING —— 新 Windows 主机未验收"
+gates:
+  G0: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-05 及以前（定位、硬件、合规边界已封板，见 CLAUDE.md §1/§3/§15）"}
+  G1: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02（51 页原型 = 可执行的功能定义；107 路由与 471 端点契约齐备，逐页台账见 docs/reviews/wiring-ledger-2026-09-02.md）"}
+  G2: {status: "NO_GO", approved_by: "-", approved_at: "-"}
+  G3: {status: "PENDING", approved_by: "TBD", approved_at: "TBD"}
+  G4: {status: "PENDING", approved_by: "TBD", approved_at: "TBD"}
+  G5: {status: "PENDING", approved_by: "TBD", approved_at: "TBD"}
+  G6: {status: "PENDING", approved_by: "TBD", approved_at: "TBD"}
+
+# ── 判定边界（不得合并成更强的整体结论）──────────────────────
+verdict_by_boundary:
+  local_build: "PARTIAL —— 代码可构建、门禁通过；但新稿 0/51 落地，功能定义未实现"
+  production:  "NO-GO —— 生产提交落后 origin/main 107 个提交，未复验；新稿未落地"
+  device:      "NO-GO —— Windows 一体机与打印扫描真机未验收（domain-overlays: 物理设备不接受截图或绿色状态徽章作为 GO 证据）"
+
+# ── 硬阻塞（任一未清即不得宣称商用交付）──────────────────────
+hard_blockers:
+  - id: BL-01
+    desc: "运行时 0/51 页按新稿实现；用户看到的仍是 V6/Gen1 旧版式"
+    owner: "工程"
+    status: OPEN
+  - id: BL-02
+    desc: "生产实例落后 origin/main 107 个提交，未做部署复验"
+    owner: "运维"
+    status: OPEN
+  - id: BL-03
+    desc: "Windows 一体机真机打印/扫描/Terminal Agent 未验收"
+    owner: "现场"
+    status: OPEN
+  - id: BL-04
+    desc: "51 页原型目录 git 完全未跟踪（git ls-files = 0），无版本历史可回滚"
+    owner: "工程"
+    status: OPEN
+    note: "2026-09-02 已做 3.3MB 只含 HTML 的本地备份 docs/design/_backup-kiosk-redesign-20260902-1815，非 git 保护"
+  - id: BL-05
+    desc: "百度 OCR 密钥曾在聊天暴露，上线前须在控制台重建应用轮换"
+    owner: "产品负责人"
+    status: OPEN
+
+# ── 进度口径 ────────────────────────────────────────────────
+# 本包只承载闸门、证据与验收签署。项目进度的唯一信源仍是
+# docs/progress/current-progress.md 与 docs/progress/next-tasks.md（CLAUDE.md §7）。
+# 不在本包内维护第二份进度声明。
