@@ -41,7 +41,7 @@ export interface PrinterInfo {
  * colorMode 分层说明（CLAUDE.md §3：硬件能力与开放 API 能力必须分开描述）：
  *   LocalWindowsPrintExecutor（Phase 8.1 主方案）：
  *     black_white → 通过 SumatraPDF -print-settings grayscale 或 DEVMODE 控制（需真机验证）
- *     color       → 通过 SumatraPDF -print-settings color 或驱动默认彩色（需真机验证）
+ *     color       → 通过 SumatraPDF -print-settings color 或驱动默认彩色（2026-09-02 产品负责人真机验证通过）
  *   PantumCloudDispatchProvider（未来预留，当前无实现）：
  *     black_white → mode:"bw" ✅（《开放打印能力》V1.0 第 5 页明确）
  *     color       → ❌ 开放 API 文档**只定义了 "bw"**，彩色取值未公开 ——
@@ -52,8 +52,8 @@ export interface PrinterInfo {
  * | 字段           | Method A (PowerShell) | Method B (pdf-to-printer/SumatraPDF) | 说明 |
  * |----------------|----------------------|--------------------------------------|------|
  * | copies         | ✅ -ArgumentList     | ✅ pdf-to-printer option              | |
- * | colorMode      | ⚠️ 驱动待验证         | ⚠️ SumatraPDF -print-settings grayscale（黑白）；彩色待验 | Start-Process -Verb PrintTo 无法直接控制色彩 |
- * | duplex         | ⚠️ 驱动待验证         | ⚠️ SumatraPDF -print-settings duplex-long/short | 需 DEVMODE 或 SumatraPDF -print-settings |
+ * | colorMode      | ✅ 真机已验证         | ✅ SumatraPDF -print-settings grayscale / color 均可控 | Start-Process -Verb PrintTo 无法直接控制色彩 |
+ * | duplex         | ✅ 自动双面已验证     | ⚠️ duplex-long/short 的实际翻页方向仍未核对 | 需 DEVMODE 或 SumatraPDF -print-settings |
  * | paperSize      | ✅ A4（驱动默认）     | ✅ 同左                               | CM2800ADN/CM2820ADN 仅支持 A4 |
  * | pageRange      | ⚠️ 驱动待验证         | ✅ SumatraPDF -print-pages（undefined = all） | |
  * | orientation    | ⚠️ 驱动待验证         | ⚠️ SumatraPDF -print-settings portrait/landscape | auto 通常够用 |
@@ -73,7 +73,7 @@ export interface PrinterInfo {
 export interface PrintJobParams {
   copies: number
   /**
-   * 本地驱动：black_white/color 均通过 SumatraPDF 或 DEVMODE 控制，需真机验证。
+   * 本地驱动：black_white/color 均通过 SumatraPDF 或 DEVMODE 控制，（2026-09-02 产品负责人真机验证通过）。
    *
    * Pantum 开放 API —— 事实与未知要分开读，别当成"填个值就行"：
    *   事实：《开放打印能力》V1.0 协议里**不存在彩色取值**。mode 只定义 "bw"，

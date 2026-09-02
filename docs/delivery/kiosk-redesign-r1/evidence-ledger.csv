@@ -11,3 +11,4 @@ EV-009,G1-01,2026-09-02,23464350f,local,Claude,路由与原型清点,关键旅�
 EV-010,G1-02,2026-09-02,-,planning,产品负责人,文档评审,规则、权限、数据生命周期与失败行为无歧义,每页原型头部「真话边界」逐条写明规则与失败态；合规红线见 docs/compliance/compliance-boundary.md,evidence/EV-010-rules-citation.txt,PASS,合规文档变更后复核
 EV-011,G1-03,2026-09-02,23464350f,local,Claude,原型清点,UI 状态可评审,51 个宿主页承载 126 个 ?state= 状态，含 loading/empty/error/权限/失败/恢复态,evidence/EV-011-ui-state-coverage.txt,PASS,原型变更后复核
 EV-012,G1-05,2026-09-02,-,planning,产品负责人,标准评审,验收标准可观测且映射到旅程,单页验收六条：按稿实现 / 状态真实不伪造 / 无死链 / 门禁与 typecheck / 1080×1920 实测截图 / 合规复核,evidence/EV-012-acceptance-criteria.txt,PASS,标准变更后复核
+EV-013,G3-05,2026-09-02,fbc5bd1a2,windows-kiosk,产品负责人,真机实操：本地驱动控制彩色打印、自动双面出纸,确认本地驱动能否控制彩色与自动双面,两项均通过。长边/短边翻页方向未核对；故障恢复未验证；奔图开放 API 彩色仍未知（协议无该取值，与本条无关）,evidence/EV-013-device-color-duplex.txt,PASS,设备、驱动或 Agent 版本变更后需重验；本条不覆盖故障恢复路径

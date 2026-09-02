@@ -100,7 +100,7 @@ export const PANTUM_API_RANGE_FORMAT_HINT = '如 "1,3,5" 或 "1-3,5,7-9"；省�
 /**
  * 本地驱动路径的内部色彩取值。**不要**改成 Pantum wire 取值。
  *
- * - 本地 Windows 驱动（Phase 8.1 主方案）：black_white / color 都由驱动控制，需真机验证。
+ * - 本地 Windows 驱动（Phase 8.1 主方案）：black_white / color 都由驱动控制，（2026-09-02 产品负责人真机验证通过）。
  * - 奔图开放打印 API：`black_white` → `mode:"bw"`（官方文档第 5 页）；
  *   `color` **无对应 wire 取值** —— 文档只定义了 "bw"，彩色取值未公开，
  *   走开放 API 时彩色不可用，禁止假设为 "color"。见 PANTUM_API_MODES。
@@ -134,7 +134,7 @@ export type PagesPerSheet = 1 | 2 | 4
  * （官方文档 V1.0 第 5–6 页，见 PANTUM_API_PAPER_SIZES），本项目按产品决策收口到 A4。
  *
  * colorMode 说明（CLAUDE.md §3：硬件能力与开放 API 能力必须分开描述）：
- *   - 本地 Windows 驱动路径（Phase 8.1 主方案）：black_white / color 均通过驱动控制，需真机验证
+ *   - 本地 Windows 驱动路径（Phase 8.1 主方案）：black_white / color 均通过驱动控制，（2026-09-02 产品负责人真机验证通过）
  *   - Pantum 开放打印 API 路径（PantumCloudDispatchProvider，未来预留，**当前无实现**）：
  *     "black_white" → mode:"bw" ✅（官方文档 V1.0 第 5 页明确）
  *     "color" → ❌ **开放 API 文档只定义了 "bw"，彩色取值未公开** ——
