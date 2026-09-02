@@ -5,6 +5,7 @@
     "DELETE /community/comments/:p/like",
     "DELETE /community/feeds/:p/like",
     "DELETE /contract-reviews/:p",
+    "DELETE /files/:p",
     "DELETE /me/ai-records/:p",
     "DELETE /me/browse-logs/:p",
     "DELETE /me/external-jump-logs/:p",

@@ -72,11 +72,17 @@ function collectMiniappCalls() {
   const found = new Map() // key -> Set(行号)
 
   // request('/x', {...})  /  request(`/x/${id}`, {...})  /  uploadFile('/x', file, {...})
-  const re = /\b(request|uploadFile)\(\s*(['"`])([^'"`]*?)\2/g
+  //
+  // 三种定界符分开处理：反引号内部允许出现引号。
+  // 早先用统一的 [^'"`]*? 字符类，`/files/${encodeURIComponent(fileId)}?reason=${encodeURIComponent('...')}`
+  // 这类调用里 ${} 内的单引号会让整条匹配失败——端点被**静默漏掉**，
+  // 门禁于是也不会为它报 BROKEN。假阴性比误报更危险。
+  const re = /\b(request|uploadFile)\(\s*(?:'([^']*)'|"([^"]*)"|`([^`]*)`)/g
   let m
   while ((m = re.exec(src)) !== null) {
     const fn = m[1]
-    const path = m[3]
+    const path = m[2] ?? m[3] ?? m[4]
+    if (path == null) continue
     if (!path.startsWith('/')) continue // 变量拼接的路径抓不到，交给下面的兜底告警
 
     const line = src.slice(0, m.index).split('\n').length
