@@ -178,6 +178,37 @@ async function checkServerControlledFields(): Promise<void> {
   assert('关联岗位时前端传的公司名被忽略', forged.companyName === '示例科技有限公司', forged.companyName)
   assert('关联岗位时前端传的岗位名被忽略', forged.positionTitle === '前端开发工程师', forged.positionTitle)
 
+  // 最关键的一条注入测试：直接给 service 喂 channel / statusSource。
+  // DTO 白名单只挡得住 HTTP 入参，挡不住 service 被内部调用方喂值；而
+  // 「恒为常量」如果只在不传的快乐路径上验，改成
+  // `channel: input.channel ?? SELF_REPORTED_CHANNEL` 之后断言照样绿。
+  // 无证期这两个值必须无视任何输入。
+  const injected = await svc.create(ME, {
+    jobId: 'job-live',
+    channel: 'platform',
+    statusSource: 'employer_feedback',
+    resumeFileId: 'file-should-be-ignored',
+    consentId: 'consent-should-be-ignored',
+  } as never)
+  assert('注入 channel=platform 被无视，仍为站外自报',
+    injected.channel === SELF_REPORTED_CHANNEL, String(injected.channel))
+  assert('注入 statusSource=employer_feedback 被无视，仍为用户自填',
+    injected.statusSource === SELF_REPORTED_STATUS_SOURCE, String(injected.statusSource))
+  const injectedRow = rows.find((r) => r.id === injected.id)
+  assert('注入的 resumeFileId 未落库', injectedRow?.['resumeFileId'] === undefined)
+  assert('注入的 consentId 未落库', injectedRow?.['consentId'] === undefined)
+
+  // 同样喂给 update：改状态的路径也不能被顺带改掉来源。
+  const afterUpdate = await svc.update(ME, injected.id, {
+    status: 'applied',
+    statusSource: 'employer_feedback',
+    channel: 'platform',
+  } as never)
+  assert('update 注入 statusSource 被无视',
+    afterUpdate.statusSource === SELF_REPORTED_STATUS_SOURCE, String(afterUpdate.statusSource))
+  assert('update 注入 channel 被无视',
+    afterUpdate.channel === SELF_REPORTED_CHANNEL, String(afterUpdate.channel))
+
   // 未发布岗位必须拒绝
   let thrown: unknown = null
   try {
@@ -285,12 +316,17 @@ async function checkOwnership(): Promise<void> {
   assert('删他人记录不生效（removed=false）', del.removed === false)
   assert('他人记录仍在', rows.some((r) => r.id === mine.id))
 
+  // 顺序很重要：必须在**两条都还在**的时候查他人列表。
+  // 若先删掉本人那条再查，库里只剩一条，list 就算完全不按 endUserId 过滤也会绿。
+  const otherList = await svc.list(OTHER, PAGE)
+  assert('他人列表只看得到他人自己的记录（此时本人记录仍在库）',
+    otherList.items.length === 1 && otherList.items[0].companyName === '别人的公司',
+    JSON.stringify(otherList.items.map((i) => i.companyName)))
+  assert('查他人列表时本人记录确实还在库（证明上一条不是空跑）',
+    rows.some((r) => r.id === mine.id))
+
   const mineDel = await svc.remove(ME, mine.id)
   assert('删本人记录生效', mineDel.removed === true)
-
-  const otherList = await svc.list(OTHER, PAGE)
-  assert('他人列表只看得到他人自己的记录',
-    otherList.items.length === 1 && otherList.items[0].companyName === '别人的公司')
 }
 
 // ── ③④⑧ 仓库层结构约束 ─────────────────────────────────────────────────────
@@ -315,38 +351,165 @@ function checkRepoStructure(): void {
   }
   assert('本表只被自身模块、导出链路与 Prisma 委托触及', touchers.length === 0, touchers.join(', '))
 
-  // 控制器必须只在 me/ 命名空间，且受 EndUserAuthGuard 保护
+  // ── 自身目录：只许有这几个文件，且只许有一个控制器 ──────────────────────
+  //
+  // 早期版本对整个 src/job-applications/ 免检、只钉死 job-applications.controller.ts
+  // 一份文件。于是在同目录新增 job-applications.admin.controller.ts 并挂进模块，
+  // 就能对外读写甚至接第三方回流，而三条断言全绿 —— 那正是把记事本做成招聘闭环
+  // 最自然的写法。改为枚举整个目录。
+  const ownFiles = files
+    .map((f) => relative(API_ROOT, f).split('\\').join('/'))
+    .filter((r) => r.startsWith(OWN_DIR))
+    .sort()
+  const EXPECTED_OWN = [
+    'src/job-applications/dto/create-job-application.dto.ts',
+    'src/job-applications/dto/update-job-application.dto.ts',
+    'src/job-applications/job-application.types.ts',
+    'src/job-applications/job-applications.controller.ts',
+    'src/job-applications/job-applications.module.ts',
+    'src/job-applications/job-applications.service.ts',
+  ]
+  const unexpected = ownFiles.filter((r) => !EXPECTED_OWN.includes(r))
+  assert('模块目录内没有计划外文件（新增控制器 / 服务必须先改本门禁）',
+    unexpected.length === 0, unexpected.join(', '))
+  const missing = EXPECTED_OWN.filter((r) => !ownFiles.includes(r))
+  assert('模块目录内预期文件齐全（断言不是因为路径写错而空跑）',
+    missing.length === 0, missing.join(', '))
+
+  const mod = read('services/api/src/job-applications/job-applications.module.ts')
+  const ctrlList = mod.match(/controllers:\s*\[([^\]]*)\]/)
+  assert('模块只注册一个控制器',
+    ctrlList !== null && ctrlList[1].split(',').filter((x) => x.trim()).length === 1,
+    ctrlList?.[1] ?? '未找到 controllers 数组')
+
+  // ── 控制器：命名空间、守卫、路由词表 ────────────────────────────────────
   const ctrl = read('services/api/src/job-applications/job-applications.controller.ts')
   assert('控制器路由前缀为 me/job-applications', /@Controller\('me\/job-applications'\)/.test(ctrl))
   assert('控制器受 EndUserAuthGuard 保护', /@UseGuards\(EndUserAuthGuard\)/.test(ctrl))
   assert('控制器不含 @Roles（没有 admin / partner 入口）', !/@Roles\(/.test(ctrl))
 
-  // 不得出现任何回流 / 同步 / 企业侧命名的端点。
-  // 只扫**路由路径字面量**，不整文件正则 —— 'sync' 会命中 'async'，那种写法既误报
-  // 又会逼后来的人把断言删掉，比没有断言更糟。
-  const routePaths = [...ctrl.matchAll(/@(?:Get|Post|Patch|Put|Delete)\(\s*'([^']*)'/g)].map((m) => m[1])
-  const banned = ['webhook', 'callback', 'sync', 'employer', 'recruiter', 'candidate', 'admin', 'partner']
+  // 路由词表：单双引号与反引号都认，@All 也认 —— 只认单引号 @Get 的话，
+  // @Post("webhook") / @All('callback') 都能溜过去。
+  const routeDecorators = [...ctrl.matchAll(/@(All|Get|Post|Patch|Put|Delete)\(\s*(['"`])([^'"`]*)\2/g)]
+  const routePaths = routeDecorators.map((m) => m[3])
+  const argless = [...ctrl.matchAll(/@(All|Get|Post|Patch|Put|Delete)\(\s*\)/g)].length
+  // 每个路由方法都必须被上面两种形态之一覆盖，否则说明有写法没被扫到。
+  const totalRouteDecorators = [...ctrl.matchAll(/@(All|Get|Post|Patch|Put|Delete)\(/g)].length
+  assert('路由装饰器全部被扫描覆盖（无遗漏写法）',
+    routePaths.length + argless === totalRouteDecorators,
+    `扫到 ${routePaths.length} 带路径 + ${argless} 无参，总共 ${totalRouteDecorators}`)
+  assert('控制器确实存在路由（断言不是空跑）', totalRouteDecorators > 0)
+
+  const banned = ['webhook', 'callback', 'sync', 'employer', 'recruiter', 'candidate',
+    'admin', 'partner', 'summary', 'stats', 'count', 'funnel', 'export', 'by-job', 'by-company']
   for (const word of banned) {
     const hit = routePaths.filter((r) => r.toLowerCase().includes(word))
     assert(`路由中无 ${word} 相关入口`, hit.length === 0, hit.join(', '))
   }
-  assert('已扫到路由路径（断言不是空跑）', routePaths.length > 0 || /@Get\(\)/.test(ctrl))
 
-  // service 不得有按岗位 / 企业聚合的分组（重建候选人漏斗）
-  const svcSrc = read('services/api/src/job-applications/job-applications.service.ts')
-  // 本波 service 里**一个聚合都没有**：看板数量由前端从本人完整列表算，服务端不做
-  // 分组统计。这条断言因此是负向的 —— 将来谁加了 groupBy，必须证明它不是按岗位 /
-  // 企业 / 来源分组（那是候选人漏斗），且必须带 endUserId 约束。
-  const groupBys = [...svcSrc.matchAll(/by:\s*\[([^\]]*)\]/g)].map((m) => m[1])
-  const badGroup = groupBys.filter((g) => /jobId|companyName|sourceName/.test(g))
-  assert('没有按岗位 / 企业 / 来源聚合的 groupBy', badGroup.length === 0, badGroup.join(' | '))
-  for (const g of groupBys) {
-    assert(`groupBy(${g.trim()}) 必须带 endUserId 约束`, /where:\s*\{\s*endUserId/.test(svcSrc))
+  // ── 核心不变量：对 JobApplication 的每一次查询都必须按人收窄 ─────────────
+  //
+  // 这条取代了原先「找 groupBy、看它是不是按企业分组」的写法。原写法有两个洞：
+  // service 里一个 groupBy 都没有时它恒真；而 count({ where: { jobId } })、
+  // findMany({ where: { companyName } }) 同样是候选人漏斗，却根本不叫 groupBy。
+  // 与其枚举坏写法（永远列不全），不如断言好性质：**没有任何一次查询是跨用户的**。
+  const QUERY_SCOPED = ['findMany', 'findFirst', 'findUnique', 'count', 'groupBy', 'aggregate',
+    'updateMany', 'deleteMany', 'createMany', 'upsert']
+  const ROW_SCOPED = ['update', 'delete']   // 单行、按唯一 id，靠前置归属校验
+  const CREATE = ['create']
+
+  const scanned: string[] = []
+  for (const rel of [...EXPECTED_OWN, 'src/member-privacy/member-data-export.mapper.ts']) {
+    const src = readFileSync(join(API_ROOT, rel), 'utf-8')
+    for (const m of src.matchAll(/prisma\.jobApplication\.(\w+)\(/g)) {
+      const method = m[1]
+      const arg = balanced(src, m.index! + m[0].length - 1)
+      const where = resolveClause(src, m.index!, arg, 'where')
+      const data = resolveClause(src, m.index!, arg, 'data')
+      const label = `${rel.split('/').pop()}:${method}`
+      scanned.push(label)
+
+      if (QUERY_SCOPED.includes(method)) {
+        assert(`${label} 的 where 按 endUserId 收窄`, /\bendUserId\b/.test(where), where.slice(0, 90))
+      } else if (CREATE.includes(method)) {
+        assert(`${label} 的 data 写入 endUserId`, /\bendUserId\b/.test(data), data.slice(0, 90))
+      } else if (ROW_SCOPED.includes(method)) {
+        // 单行写：where 用唯一 id，归属靠同一函数体里的前置校验。
+        const before = src.slice(Math.max(0, m.index! - 1600), m.index!)
+        assert(`${label} 之前有按 endUserId 的归属校验`,
+          /findFirst\(\{[\s\S]{0,120}?endUserId/.test(before))
+      } else {
+        assert(`${label} 是未登记的 Prisma 方法（必须先在门禁里裁定）`, false, method)
+      }
+    }
   }
-  // 服务端不提供任何对外统计端点（含只读计数）——统计面是漏斗的入口。
-  assert('控制器不暴露统计 / 聚合端点',
-    !/@Get\(\s*'(summary|stats|count|funnel)'/.test(ctrl))
+  assert('确实扫到了查询调用（断言不是空跑）', scanned.length >= 6, scanned.join(', '))
+
+  // ── 两个白名单文件：只许各自的用途，不许夹带 ────────────────────────────
+  const prismaSvc = read('services/api/src/prisma/prisma.service.ts')
+  const delegateOnly = prismaSvc.match(/get jobApplication\(\)\s*\{\s*return this\.client\.jobApplication\s*\}/)
+  assert('prisma.service 只暴露 jobApplication 委托，不在其上做查询', delegateOnly !== null)
+  assert('prisma.service 未对 jobApplication 直接发起调用',
+    !/this\.client\.jobApplication\.\w+\(/.test(prismaSvc))
+
+  const mapper = read('services/api/src/member-privacy/member-data-export.mapper.ts')
+  const mapperCalls = [...mapper.matchAll(/prisma\.jobApplication\.(\w+)\(/g)].map((m) => m[1])
+  assert('导出链路只读不写', mapperCalls.every((m) => m === 'findMany'), mapperCalls.join(', '))
 }
+
+/** 从 openIdx 处的 '(' 起取平衡括号内的文本。 */
+function balanced(src: string, openIdx: number): string {
+  let depth = 0
+  for (let i = openIdx; i < src.length; i += 1) {
+    const c = src[i]
+    if (c === '(' || c === '{' || c === '[') depth += 1
+    else if (c === ')' || c === '}' || c === ']') {
+      depth -= 1
+      if (depth === 0) return src.slice(openIdx + 1, i)
+    }
+  }
+  return src.slice(openIdx + 1, Math.min(src.length, openIdx + 600))
+}
+
+/** 取对象字面量里某个键的值（平衡括号）。找不到返回空串。 */
+function sliceKey(objText: string, key: string): string {
+  const i = objText.search(new RegExp(`\\b${key}\\s*:`))
+  if (i === -1) return ''
+  const brace = objText.indexOf('{', i)
+  if (brace === -1) return objText.slice(i, i + 160)
+  return balanced(objText, brace)
+}
+
+/**
+ * 取调用参数里某个子句的文本，**跟一层局部变量**。
+ *
+ * 三种写法都要认，否则会把合规代码判成违规：
+ *   findMany({ where: { endUserId } })   直接字面量
+ *   findMany({ where })                  简写，指向局部 const where = { endUserId }
+ *   findMany({ where: scoped })          具名变量
+ *
+ * 只跟一层、且只在调用点之前的同文件范围内找 —— 再深就不是静态断言能保证的了，
+ * 那时应该让写代码的人把 where 内联回调用点，而不是让门禁去猜。
+ */
+function resolveClause(src: string, callIdx: number, arg: string, key: string): string {
+  const direct = sliceKey(arg, key)
+  if (direct.trim()) return direct
+
+  // 具名变量：`key: ident`
+  const named = arg.match(new RegExp(`\\b${key}\\s*:\\s*([A-Za-z_$][\\w$]*)`))
+  // 简写：`{ ..., key, ... }` —— key 后面直接跟逗号或右括号
+  const shorthand = new RegExp(`(^|[,{\\s])${key}\\s*(,|$|\\})`).test(arg)
+  const ident = named?.[1] ?? (shorthand ? key : null)
+  if (!ident) return ''
+
+  const before = src.slice(0, callIdx)
+  const decl = before.lastIndexOf(`const ${ident} =`)
+  if (decl === -1) return ''
+  const brace = before.indexOf('{', decl)
+  if (brace === -1) return ''
+  return balanced(before, brace)
+}
+
 
 // ── ⑨ 三张表未被扩状态字段 ──────────────────────────────────────────────────
 
@@ -440,6 +603,10 @@ function checkSchemasAndExport(): void {
 
   const mapper = read('services/api/src/member-privacy/member-data-export.mapper.ts')
   assert('个人信息导出包含 jobApplications 段', /jobApplications/.test(mapper))
+  // 只查「有没有这个字符串」锁不住任何东西：导出必须是按本人过滤的。
+  // 具体的 where 收窄由 [4] 的查询不变量逐调用点断言，这里再钉一次形状。
+  assert('导出对 jobApplication 的查询按 endUserId 过滤',
+    /jobApplication\.findMany\(\{[\s\S]{0,120}?where:\s*\{\s*endUserId/.test(mapper))
   // 去注释再扫：注释里正是在解释「这两个字段刻意不进导出」，连注释一起扫会把说明判成违规。
   const mapperCode = mapper.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   assert('导出 select 不含 resumeFileId', !/resumeFileId/.test(mapperCode))
