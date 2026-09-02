@@ -58,8 +58,12 @@ hard_blockers:
   - id: BL-04
     desc: "51 页原型目录 git 完全未跟踪（git ls-files = 0），无版本历史可回滚"
     owner: "工程"
-    status: OPEN
-    note: "2026-09-02 已做 3.3MB 只含 HTML 的本地备份 docs/design/_backup-kiosk-redesign-20260902-1815，非 git 保护"
+    status: CLOSED
+    closed_at: "2026-09-02"
+    closed_by: "2d9f73c1b"
+    note: "9.9MB 入库（53 HTML + 被引用资源），682MB 截图证据以目录级 .gitignore 排除；
+      入库后从 worktree 位置重渲三页验证相对资源路径正常。本地备份
+      docs/design/_backup-kiosk-redesign-20260902-1815 可删，不再是唯一保护。"
   - id: BL-05
     desc: "百度 OCR 密钥曾在聊天暴露，上线前须在控制台重建应用轮换"
     owner: "产品负责人"
