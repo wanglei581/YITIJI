@@ -148,7 +148,7 @@ X-App-Key: <appKey>        ← appKey 放 Header，不参与签名
 
 | # | 问题 | 影响范围 |
 |---|------|---------|
-| Q1 | 彩色打印的 Pantum API `mode` 取值是什么？ | `PantumCloudDispatchProvider` colorMode 映射 |
+| Q1 | **协议里到底有没有彩色？**（不是问「取值是多少」——V1.0 全文 color / 彩色 / cmyk 各 0 次，`mode` 只定义 `bw`，而且它是五个可选参数里唯一没写「不同机型可选值集合不一样」的。所以要问厂家的是：有无未公开取值、后续版本会不会补。**问错问题会得到错答案。**） | `PantumCloudDispatchProvider` colorMode 映射；拿到答复前走开放 API 一律不能彩色 |
 | Q2 | `duplex` 参数的可用值集合（simplex / long / short 对应什么字符串）？ | 双面打印参数映射 |
 | Q3 | A4 纸张的 `paperSize` 参数取值？ | 纸张参数映射 |
 | Q4 | `copies` 是否支持 1–99 范围？ | 份数上限 |
