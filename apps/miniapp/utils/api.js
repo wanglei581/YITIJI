@@ -140,9 +140,9 @@ const api = {
    */
   getFairCompanies(fairId, params = {}) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
-    return unwrapList(request(`/job-fairs/${fairId}/companies`, {
+    return adaptList(unwrapList(request(`/job-fairs/${fairId}/companies`, {
       method: 'GET', data: params, needAuth: false,
-    }));
+    })), N.fairCompanyLike);
   },
 
   /**
@@ -151,13 +151,15 @@ const api = {
    */
   getFairCompanyDetail(fairId, companyId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('参会企业'));
-    return request(`/job-fairs/${fairId}/companies/${companyId}`, { method: 'GET', needAuth: false });
+    return request(`/job-fairs/${fairId}/companies/${companyId}`, { method: 'GET', needAuth: false })
+      .then(N.fairCompanyLike);
   },
 
   /** 展区列表（FairZoneDTO[]）。未发布或无数据时后端可能给 null，调用方要兜空数组。 */
   getFairZones(fairId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('展区导览'));
-    return request(`/job-fairs/${fairId}/zones`, { method: 'GET', needAuth: false });
+    return request(`/job-fairs/${fairId}/zones`, { method: 'GET', needAuth: false })
+      .then((list) => (Array.isArray(list) ? list.map(N.fairZoneLike) : []));
   },
 
   /**
@@ -168,7 +170,14 @@ const api = {
   getFairMap(fairId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('展位导览'));
     return request(`/job-fairs/${fairId}/map`, { method: 'GET', needAuth: false })
-      .then((d) => ({ zones: (d && d.zones) || [], booths: (d && d.booths) || [] }));
+      .then((d) => ({
+        // mapImageUrl 是主办方上传的真实平面图,早先这里把它丢了,页面就算有图也看不到。
+        mapImageUrl: (d && d.mapImageUrl) || null,
+        zones: ((d && d.zones) || []).map(N.fairZoneLike),
+        // 服务端当前恒返回空数组(jobs-kiosk.service.ts 的返回类型写死 booths: [])。
+        // 保留这条链路,等真有展位数据时页面不用改。
+        booths: (d && d.booths) || [],
+      }));
   },
 
   /** 会场导览（展厅 + 设施点位）。无配置时后端返回 null，属正常空态不是错误。 */
@@ -203,8 +212,11 @@ const api = {
    */
   prepareFairCompanyPrint(fairId, companyId, variant) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('企业资料打印'));
-    return request(`/job-fairs/${fairId}/companies/${companyId}/print-url`, {
-      method: 'POST', data: { variant }, needAuth: true, timeout: 60000,
+    // variant 必须拼进 query string:后端是 @Query('variant')(jobs.controller.ts),
+    // 放进 POST body 会拿到 undefined 并抛 400「variant 只能是 profile 或 positions」。
+    const q = encodeURIComponent(variant || '');
+    return request(`/job-fairs/${fairId}/companies/${companyId}/print-url?variant=${q}`, {
+      method: 'POST', needAuth: true, timeout: 60000,
     });
   },
 

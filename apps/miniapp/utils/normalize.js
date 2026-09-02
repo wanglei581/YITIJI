@@ -681,7 +681,45 @@ function interviewReport(raw) {
   };
 }
 
+/**
+ * 参会企业:后端实际返回的是 services/api/src/jobs/fair.types.ts 的 FairCompany
+ * (name / jobFairId / jobsCount),不是 packages/shared 的 FairCompanyDTO
+ * (companyName / fairId / applyNote / checkinStatus / aiMatchScore)。
+ *
+ * 这里只做键名对齐,**不造后端没有的值**。
+ * 一体机端 httpAdapter.ts 是硬编了 checkinStatus:'pending' 和一句
+ * applyNote:'如需了解更多,请扫码前往来源平台' —— 那是前端自己编的字符串,
+ * 冒充成了来源方给的提示。小程序不跟这个做法:拿不到就保持缺失,
+ * 页面按「暂无」渲染,而不是显示一句谁都没说过的话。
+ */
+function fairCompanyLike(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return Object.assign({}, raw, {
+    companyName: pick(raw.companyName, raw.name),
+    fairId:      pick(raw.fairId, raw.jobFairId),
+    jobCount:    typeof raw.jobsCount === 'number' ? raw.jobsCount
+               : (typeof raw.jobCount === 'number' ? raw.jobCount : undefined),
+    coverImageUrl: pick(raw.coverImageUrl, raw.logoUrl),
+  });
+}
+
+/**
+ * 展区:后端 mapFairZone 返回 name,且**没有** industry / boothCount /
+ * checkedInCount / color 这四个字段。同样只对齐键名,不补 0。
+ * 一体机端在适配层填了 boothCount:0 / checkedInCount:0 —— 那会让页面
+ * 显示「0 个展位」,而真相是「不知道有几个展位」。这两件事不一样。
+ */
+function fairZoneLike(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  return Object.assign({}, raw, {
+    zoneName: pick(raw.zoneName, raw.name),
+    fairId:   pick(raw.fairId, raw.jobFairId),
+  });
+}
+
 module.exports = {
+  fairCompanyLike,
+  fairZoneLike,
   resumeReport,
   resumeOptimize,
   jobFit,
