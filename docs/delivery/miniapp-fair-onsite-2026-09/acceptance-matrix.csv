@@ -1,0 +1,41 @@
+criterion_id,gate,journey,requirement,priority,verification_method,environment,evidence_ref,owner,status,notes
+G0-01,G0,PROJECT,"Problem, target users, and accountable owner are approved",MUST,document review,planning,EV-010,产品负责人,PASS,定位、用户、四 Tab 与页面范围已定版
+G0-02,G0,PROJECT,Measurable outcome has baseline and target,MUST,metric review,planning,,TBD,PENDING,北极星指标写在 miniprogram-os-architecture-plan §3.3，但本批未设基线与目标值
+G0-03,G0,PROJECT,"Scope, non-goals, assumptions, and constraints are approved",MUST,scope review,planning,EV-011,产品负责人,PASS,不做招聘闭环、只做第三方来源入口的非目标已明确
+G0-04,G0,PROJECT,"Product, technology, data, provider, compliance, cost, and schedule feasibility are assessed",MUST,feasibility review,planning,EV-010,产品负责人,PASS,可行性与合规约束既有
+G0-05,G0,PROJECT,"Funding, staffing, decision rights, milestones, and stop conditions are named",MUST,governance review,planning,,TBD,PENDING,止损条件已在生态规划中给出（单机毛利/付费转化/次月留存），但未定预算与里程碑日期
+G1-01,G1,J-01,Critical journey and actor are defined,MUST,scope review,planning,EV-012,Claude,PASS,关键旅程：行前计划→展位导览→参展企业→现场打材料→出纸
+G1-02,G1,J-01,"Business rules, permissions, data lifecycle, and failure behavior are unambiguous",MUST,rule and state review,planning,EV-013,Claude,PASS,合规口径逐条写进代码注释：applyNote 必展示、null 不显示为 0、生成≠已打印
+G1-03,G1,J-01,UI states and content are reviewable at appropriate fidelity,MUST,experience review,planning,docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md,TBD,PENDING,UI 状态只在代码里成立，从未在开发者工具中看过——与 G3-01 同一缺口
+G1-04,G1,J-01,"APIs, events, schemas, migrations, and external contracts are versioned",MUST,contract review,planning,EV-014,Claude,PASS,105 个端点契约快照，含 12 条带原因的已知缺口豁免
+G1-05,G1,J-01,Acceptance criteria are observable,MUST,acceptance review,planning,EV-015,Claude,PASS,逐批写明门禁与未验证项
+G1-06,G1,PROJECT,"Rollout, migration, compatibility, telemetry, and rollback needs influence design",MUST,technical decision review,planning,,TBD,PENDING,兼容性由静态门禁覆盖；遥测与回滚未涉及（小程序尚未发布）｜条目级无 PARTIAL：未全部满足即记 PENDING
+G2-01,G2,PROJECT,Release candidate has immutable revision or artifact digest,MUST,revision inspection,build,EV-016,Claude,PASS,分支 claude/miniapp-lane，工作区干净
+G2-02,G2,PROJECT,Required build and automated checks pass,MUST,automated checks,build,EV-001,Claude,PASS,四条小程序门禁 + services/api typecheck 0 error
+G2-03,G2,PROJECT,"Configuration, migrations, feature flags, fixtures, and documentation are current",MUST,change review,build,EV-002,Claude,PASS,契约快照随改动同步；本批无迁移与开关；无 fixture
+G2-04,G2,PROJECT,No implementation-critical defect or abandoned placeholder remains,MUST,defect and placeholder scan,build,EV-007,Claude,PASS,评审 13 条已修；全仓无 TODO 占位（静态门禁含诚实性禁词检查）
+G2-05,G2,PROJECT,Scope compliance and backward-compatibility effects are reviewed,MUST,diff review,build,,Claude,PENDING,范围合规：只动 apps/miniapp 与 services/api 政策端点（additive）。向后兼容未对既有调用方回归｜条目级无 PARTIAL：未全部满足即记 PENDING
+G3-01,G3,J-01,Critical journey passes end to end,MUST,runtime E2E,staging,,TBD,PENDING,
+G3-02,G3,J-01,Applicable failure and recovery paths pass,MUST,runtime scenarios,staging,,TBD,PENDING,
+G3-03,G3,PROJECT,"Security, privacy, auditability, and abuse controls meet the declared risk profile",MUST,security verification,staging,,TBD,PENDING,
+G3-04,G3,PROJECT,"Performance, capacity, reliability, and compatibility thresholds pass",MUST,non-functional verification,staging,,TBD,PENDING,
+G3-05,G3,J-01,Accessibility and representative device or browser UX pass,MUST,rendered UX verification,staging,,TBD,PENDING,
+G3-06,G3,PROJECT,"Mocks, simulations, test data, and untested boundaries are explicitly labeled",MUST,evidence inventory review,staging,,TBD,PENDING,
+G3-07,G3,PROJECT,No unresolved P0 or P1 defects,MUST,defect review,staging,,TBD,PENDING,
+G4-01,G4,PROJECT,"Production topology, configuration, secrets ownership, domains, certificates, and providers are ready",MUST,production readiness review,production-equivalent,,TBD,PENDING,
+G4-02,G4,PROJECT,Deployment and migrations are rehearsed,MUST,release rehearsal,staging,,TBD,PENDING,
+G4-03,G4,PROJECT,Monitoring and alert ownership are verified,MUST,alert test,production-equivalent,,TBD,PENDING,
+G4-04,G4,PROJECT,Rollback or recovery is exercised,MUST,recovery rehearsal,production-equivalent,,TBD,PENDING,
+G4-05,G4,PROJECT,"Legal, privacy, security, licensing, payment, retention, and customer obligations are satisfied",MUST,external approval review,production-equivalent,,TBD,PENDING,
+G4-06,G4,PROJECT,"Release window, rollout, controls, communication, support, and abort rules are approved",MUST,release plan review,production-equivalent,,TBD,PENDING,
+G5-01,G5,J-01,Authorized user completes real critical journey,MUST,witnessed UAT,production-equivalent,,TBD,PENDING,
+G5-02,G5,J-01,"Production-equivalent identities, permissions, data, providers, AI services, payments, and devices are used",MUST,environment and dependency review,production-equivalent,,TBD,PENDING,
+G5-03,G5,J-01,Business outputs reconcile with authoritative systems or records,MUST,reconciliation,production-equivalent,,TBD,PENDING,
+G5-04,G5,PROJECT,Known limitations and residual risks are explicitly accepted,MUST,risk acceptance review,acceptance,,TBD,PENDING,
+G5-05,G5,PROJECT,Named authority signs the declared boundary,MUST,sign-off review,acceptance,,TBD,PENDING,
+G6-01,G6,PROJECT,Release manifest is complete,MUST,manifest review,handover,,TBD,PENDING,
+G6-02,G6,PROJECT,"Operational ownership, access, support, escalation, SLA or SLO, and warranty are transferred",MUST,ownership review,handover,,TBD,PENDING,
+G6-03,G6,PROJECT,Receiving operator can use critical runbooks,MUST,operator rehearsal,handover,,TBD,PENDING,
+G6-04,G6,PROJECT,"Training, user and admin documentation, account transfer, and asset inventory are complete",MUST,handover review,handover,,TBD,PENDING,
+G6-05,G6,PROJECT,"Residual backlog, debt, licenses, recurring costs, renewals, and end-of-life obligations are owned",MUST,closure register review,handover,,TBD,PENDING,
+G6-06,G6,PROJECT,Post-release observation and closure decision are recorded,MUST,stability and closure review,handover,,TBD,PENDING,

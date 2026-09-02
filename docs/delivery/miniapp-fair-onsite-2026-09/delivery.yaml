@@ -1,0 +1,38 @@
+schema_version: 1
+project: "小程序 · 招聘会现场助手与批 2 收口"
+release_id: "miniapp-fair-onsite-2026-09"
+boundary: "local"
+# 边界声明：本包只对 local 构建成立。真机（wechat-devtools）与真后端
+# （production-api）两个环境从未验证过本批改动，因此 G3 之后一律不得宣称 GO。
+release_revision: "8176c1ee200494b4f59e59b9ffdbbe4696d8b4d1"
+generated_at: "2026-09-02T18:23:41+08:00"
+overall_verdict: "PARTIAL"
+owners:
+  accountable: "TBD"
+  product: "TBD"
+  engineering: "TBD"
+  qa: "TBD"
+  operations: "TBD"
+acceptance_authorities:
+  business: "TBD"
+  technical: "TBD"
+  security: "TBD"
+  release: "TBD"
+environments:
+  - name: "local"
+    purpose: "development"
+    url: "worktree /Users/wanglei/AI求职打印服务终端-miniapp（分支 claude/miniapp-lane）"
+  - name: "wechat-devtools"
+    purpose: "visual + real-click acceptance"
+    url: "TBD（尚未执行：清单见 docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md）"
+  - name: "production-api"
+    purpose: "real backend"
+    url: "https://zyidai.cn/api/v1（小程序侧从未对它验证过本批改动）"
+gates:
+  G0: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "既有：CLAUDE.md §1/§9A/§15/§16 已确立定位、用户、价值、合规边界与止损条件"}
+  G1: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "本批：批 1/批 2 范围、按批文件预算、合规口径与验收标准逐批写明并经三模型评审"}
+  G2: {status: "PARTIAL", approved_by: "Claude（实现方）", approved_at: "2026-09-02T18:25:00+08:00", note: "修订 8176c1ee2004；四条自动门禁 + API typecheck 全绿"}
+  G3: {status: "PARTIAL", approved_by: "TBD", approved_at: "TBD", note: "静态/契约/视觉刻度/离线状态机探针通过；真机、真后端、可访问性与性能未验"}
+  G4: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：小程序未上传、未配置发布、未做微信平台材料"}
+  G5: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：无授权用户走过真实关键旅程"}
+  G6: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始"}
