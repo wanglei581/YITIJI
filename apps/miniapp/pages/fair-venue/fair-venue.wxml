@@ -2,13 +2,216 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回招聘会详情">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
     <view class="nav-title">会场导览</view>
   </view>
 
   <view class="content">
-    <view wx:if="{{loading}}" class="list-state">加载中…</view>
-    <view wx:elif="{{loadError}}" class="list-state">{{loadError}}</view>
-    <view wx:else class="list-state">该页面正在接入中，暂未开放。</view>
+
+    <view wx:if="{{phase === 'loading'}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{phase === 'error'}}" class="fv-state">
+      <view class="fv-state-ic err"><text class="ficon i-warning"></text></view>
+      <view class="fv-state-t">加载失败</view>
+      <view class="fv-state-d">{{loadError}}</view>
+      <view class="fv-retry tap" hover-class="tap-press" bindtap="reload" role="button" aria-label="重新加载会场导览">重新加载</view>
+    </view>
+
+    <block wx:else>
+
+      <!-- 我在哪：场馆名 + 已发布规模。三个数字都是接口真实条数，不是估算。 -->
+      <view class="fv-head rise-d1">
+        <view class="fv-head-ic"><text class="ficon i-map-pin"></text></view>
+        <view class="fv-head-c">
+          <view class="fv-venue">{{venueName || '本场未标注场馆名称'}}</view>
+          <view class="fv-sum">
+            <text wx:if="{{halls.length}}" class="fv-sum-i">{{halls.length}} 个展厅</text>
+            <text wx:if="{{zones.length}}" class="fv-sum-i">{{zones.length}} 个展区</text>
+            <text wx:if="{{boothTotal}}" class="fv-sum-i">{{boothTotal}} 个展位</text>
+            <text wx:if="{{!halls.length && !zones.length && !boothTotal}}" class="fv-sum-i">主办方暂未发布分区数据</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- venue-guide 返回 null 是「主办方没配」，不是故障；两种情况文案必须分开，
+           否则用户会以为是自己网络的问题反复重试。 -->
+      <view wx:if="{{guideMissing}}" class="notice warn rise-d1">
+        <text class="ficon i-info n-ic"></text>
+        <text>本场暂未提供会场导览（展厅划分与设施点位），以下为主办方已发布的展区与展位信息。</text>
+      </view>
+      <view wx:elif="{{guideError}}" class="notice err rise-d1">
+        <text class="ficon i-warning n-ic"></text>
+        <text>展厅与设施信息加载失败：{{guideError}}</text>
+      </view>
+
+      <view wx:if="{{canSearch}}" class="fv-search rise-d2">
+        <text class="ficon i-search fv-search-ic"></text>
+        <input class="fv-search-in" value="{{keyword}}" placeholder="搜企业名或展位号" placeholder-class="fv-ph"
+               confirm-type="search" bindinput="onSearch" />
+        <view wx:if="{{keyword}}" class="fv-search-x tap" hover-class="tap-press" bindtap="clearSearch"
+              role="button" aria-label="清空搜索">
+          <text class="ficon i-close"></text>
+        </view>
+      </view>
+
+      <!-- 搜索期间收起浏览分区：现场用户输了名字就是要立刻看到落点，不该再往下翻 -->
+      <block wx:if="{{keyword}}">
+        <view wx:if="{{!matches.length}}" class="empty">
+          <view class="e-ic"><text class="ficon i-search"></text></view>
+          <view class="e-title">没有匹配的企业或展位</view>
+          <view class="e-desc">只能搜到主办方已录入导览的企业；换个关键词，或到服务台咨询</view>
+        </view>
+        <view wx:else class="card">
+          <view class="card-head"><view class="ch-title">命中 {{matchTotal}} 条</view></view>
+          <view wx:for="{{matches}}" wx:key="key" class="fv-hit tap" hover-class="tap-press"
+                bindtap="tapCompany" data-cid="{{item.companyId}}"
+                role="button" aria-label="查看 {{item.name}}">
+            <view class="fv-hit-b">{{item.boothNo || '—'}}</view>
+            <view class="fv-hit-c">
+              <view class="fv-hit-n">{{item.name}}</view>
+              <view class="fv-hit-s">{{item.where || '位置未标注'}}{{item.extra ? ' · ' + item.extra : ''}}</view>
+            </view>
+            <text class="ficon i-right fv-arrow"></text>
+          </view>
+          <view wx:if="{{matchTotal > matches.length}}" class="fv-more">仅列出前 {{matches.length}} 条，输入更完整的名称可缩小范围</view>
+        </view>
+      </block>
+
+      <block wx:else>
+
+        <!-- 平面图来自 /map，与 venue-guide 无关，所以放在 guideMissing 收起块之外：
+             主办方没配展厅导览、却传了平面图时，这张图仍然要出得来。
+             没传图就整块不渲染——不占位、不写「暂无平面图」，那是噪音。 -->
+        <block wx:if="{{mapImageUrl}}">
+          <view class="fv-sec rise-d2">场馆平面图</view>
+          <view class="card rise-d2">
+            <view wx:if="{{!mapImageFailed}}" class="fv-map-wrap tap" hover-class="tap-press"
+                  bindtap="previewMap" role="button" aria-label="放大查看场馆平面图">
+              <image class="fv-map" src="{{mapImageUrl}}" mode="widthFix" binderror="onMapError" />
+            </view>
+            <view wx:else class="fv-map-err tap" hover-class="tap-press" bindtap="retryMap"
+                  role="button" aria-label="重新加载场馆平面图">
+              <text class="ficon i-warning fv-map-err-ic"></text>
+              <text>平面图加载失败，点此重试。展厅、展区与展位信息不受影响，仍可正常查看。</text>
+            </view>
+            <view wx:if="{{!mapImageFailed}}" class="fv-map-tip">图片由主办方提供，点击可放大查看展位号</view>
+          </view>
+        </block>
+
+        <!-- 主办方压根没配导览时，这两块的空态和上面那条提示是同一句话。
+             手机上连着三段「暂无」只会把展区/展位挤到屏外，所以整块收起，
+             由上面的提示条充当 venue-guide 自己的空态。
+             guide 存在但 halls/facilities 为空是另一回事，仍要各自出空态。 -->
+        <block wx:if="{{!guideMissing}}">
+
+        <view class="fv-sec rise-d2">现场设施</view>
+        <view class="card rise-d2">
+          <block wx:if="{{facilities.length}}">
+            <view wx:for="{{facilities}}" wx:key="id" class="fv-fac {{item.tone}}">
+              <view class="fv-fac-ic"><text class="ficon {{item.icon}}"></text></view>
+              <view class="fv-fac-c">
+                <view class="fv-fac-n">{{item.name}}</view>
+                <view class="fv-fac-s">{{item.typeLabel}}{{item.locationLabel ? ' · ' + item.locationLabel : ' · 位置未标注'}}{{item.relatedHallCode ? ' · 邻近展厅 ' + item.relatedHallCode : ''}}</view>
+              </view>
+            </view>
+          </block>
+          <view wx:elif="{{guideError}}" class="fv-inline err">设施点位加载失败，可到现场服务台咨询</view>
+          <view wx:else class="fv-inline">主办方暂未标注入口、服务台、打印点等设施点位</view>
+        </view>
+
+        <view class="fv-sec rise-d3">展厅分区</view>
+        <block wx:if="{{halls.length}}">
+          <view wx:for="{{halls}}" wx:key="hallId" class="card rise-d3">
+            <view class="fv-hall-h tap" hover-class="tap-press" bindtap="toggleHall" data-id="{{item.hallId}}"
+                  role="button" aria-label="{{expandedHallId === item.hallId ? '收起' : '展开'}} {{item.hallName}} 企业清单">
+              <view class="fv-hall-code">{{item.hallCode || '厅'}}</view>
+              <view class="fv-hall-c">
+                <view class="fv-hall-n">{{item.hallName}}</view>
+                <view class="fv-hall-s">
+                  <text wx:if="{{item.industryCategory}}" class="fv-hall-si">{{item.industryCategory}}</text>
+                  <text wx:if="{{item.boothRange}}" class="fv-hall-si">展位 {{item.boothRange}}</text>
+                  <text class="fv-hall-si">{{item.companyText}}</text>
+                </view>
+              </view>
+              <view class="fv-hall-x">{{expandedHallId === item.hallId ? '收起' : '展开'}}</view>
+            </view>
+
+            <block wx:if="{{expandedHallId === item.hallId}}">
+              <view wx:if="{{item.description}}" class="fv-hall-d">{{item.description}}</view>
+              <block wx:if="{{item.companies.length}}">
+                <view wx:for="{{item.companies}}" wx:for-item="co" wx:key="companyId"
+                      class="fv-co tap" hover-class="tap-press" bindtap="tapCompany" data-cid="{{co.companyId}}"
+                      role="button" aria-label="查看 {{co.companyName}}">
+                  <view class="fv-co-b">{{co.boothNo || '—'}}</view>
+                  <view class="fv-co-c">
+                    <view class="fv-co-n">{{co.companyName}}</view>
+                    <view class="fv-co-s">{{co.industry ? co.industry + ' · ' : ''}}{{co.jobText}}</view>
+                    <view wx:if="{{co.titlesText}}" class="fv-co-t">{{co.titlesText}}</view>
+                  </view>
+                  <text class="ficon i-right fv-arrow"></text>
+                </view>
+              </block>
+              <view wx:else class="fv-inline">该展厅暂未录入企业清单</view>
+            </block>
+          </view>
+        </block>
+        <view wx:elif="{{guideError}}" class="card rise-d3"><view class="fv-inline err">展厅划分加载失败</view></view>
+        <view wx:else class="card rise-d3"><view class="fv-inline">主办方暂未发布展厅划分</view></view>
+
+        </block>
+
+        <view class="fv-sec rise-d4">展区</view>
+        <view class="card rise-d4">
+          <block wx:if="{{zones.length}}">
+            <view wx:for="{{zones}}" wx:key="id" class="fv-zone">
+              <!-- color 有值才用主办方配色；没有就退回默认令牌色，不自己编一套配色冒充分区标识 -->
+              <view class="fv-zone-bar {{item.colorStyle ? '' : 'def'}}" style="{{item.colorStyle}}"></view>
+              <view class="fv-zone-c">
+                <view class="fv-zone-n">{{item.zoneName}}</view>
+                <view class="fv-zone-s">{{item.subText || '分类未标注'}}</view>
+                <view wx:if="{{item.description}}" class="fv-zone-d">{{item.description}}</view>
+                <view class="fv-zone-m">
+                  <text wx:for="{{item.metrics}}" wx:for-item="mt" wx:key="*this" class="fv-zone-mi">{{mt}}</text>
+                </view>
+              </view>
+            </view>
+          </block>
+          <view wx:elif="{{zonesError}}" class="fv-inline err">展区信息加载失败：{{zonesError}}</view>
+          <view wx:else class="fv-inline">主办方暂未发布展区划分</view>
+        </view>
+
+        <view class="fv-sec rise-d5">展位分布</view>
+        <block wx:if="{{boothGroups.length}}">
+          <view wx:for="{{boothGroups}}" wx:key="zoneName" class="card rise-d5">
+            <view class="fv-bg-h">
+              <view class="fv-bg-n">{{item.zoneName}}</view>
+              <view class="fv-bg-c">{{item.countText}}</view>
+            </view>
+            <view class="fv-bg-list">
+              <view wx:for="{{item.list}}" wx:for-item="bo" wx:key="id"
+                    class="fv-booth tap {{bo.statusTone}}" hover-class="tap-press"
+                    bindtap="tapCompany" data-cid="{{bo.companyId}}"
+                    role="button" aria-label="展位 {{bo.boothNumber}} {{bo.companyName || bo.statusLabel}}">
+                <view class="fv-booth-n">{{bo.boothNumber}}</view>
+                <view class="fv-booth-c">{{bo.companyName || bo.statusLabel}}</view>
+              </view>
+            </view>
+          </view>
+        </block>
+        <view wx:elif="{{boothsError}}" class="card rise-d5"><view class="fv-inline err">展位明细加载失败：{{boothsError}}</view></view>
+        <view wx:else class="card rise-d5"><view class="fv-inline">主办方暂未发布可查询的展位明细</view></view>
+
+      </block>
+
+      <view class="notice info rise-d6">
+        <text class="ficon i-info n-ic"></text>
+        <text>本终端仅展示招聘会信息，预约/报名请前往来源平台或现场办理，本平台不代收报名信息。</text>
+      </view>
+      <view class="compliance-note">会场导览由主办方配置，现场以指示牌与工作人员引导为准。</view>
+
+    </block>
+
   </view>
 </view>
