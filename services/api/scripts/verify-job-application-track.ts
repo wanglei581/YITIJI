@@ -19,8 +19,9 @@
 //   ⑦ 越权不可能：读、改、删都只命中本人的行
 //   ⑧ 不存在按岗位 / 企业 / 来源机构聚合投递的方法（重建候选人漏斗）
 //   ⑨ 没有给 Favorite / BrowseLog / ExternalJumpLog 扩状态字段
-//   ⑩ 用户可见文案带「本终端不参与投递」的诚实声明（禁词覆盖交给 verify:compliance-copy，
-//     本门禁刻意不自造第二份禁词清单，理由见 checkUserFacingCopy）
+//   ⑩ 前端面确实是空的：整棵 apps/kiosk/src 无任何求职进度引用（本波不接运行时，
+//     那片是冻结区）。禁词覆盖交给 verify:compliance-copy，本门禁不自造第二份清单。
+//     前端接入时把 checkUserFacingCopy 改成真实的文案断言，并同步本行。
 //   ⑪ 两份 schema 都有模型；⑫ 已纳入个人信息导出
 //
 // 纯内存假 Prisma + 真实 service，不连数据库、不起 HTTP。
@@ -530,36 +531,56 @@ function checkNoStatusLeakIntoOtherTables(): void {
 // ── ⑩ 用户可见文案 ──────────────────────────────────────────────────────────
 
 function checkUserFacingCopy(): void {
-  console.log('\n[6] 前端面：本波刻意不接 Kiosk 运行时')
+  console.log('\n[6] 前端面：整棵 kiosk 源码树无求职进度引用')
 
   // 本波**只交付后端与判据**，Kiosk 运行时不接入。原因不是做不动，是那片是冻结区：
   //   - verify-fusion-w5 对 profileEntries.ts 逐字节冻结
-  //   - verify-user-center-wave0 硬断言 Profile 恰好 22 个已接真目的地（Wave 0 产品决策）
+  //   - verify-user-check-wave0 硬断言 Profile 恰好 22 个已接真目的地（Wave 0 产品决策）
   //   - verify-profile-inkpaper-home 断言 me-detail-inkpaper.css 的 import 集合封闭
-  // 加第 23 个入口是改产品范围，需要产品负责人授权，不是工程侧能自行决定的。
-  // 且负责人已定性当前运行时 UI 后续替换为新 UI（docs/design/kiosk-redesign-2026-08）。
+  // 加第 23 个入口是改产品范围，需产品负责人授权，不是工程侧能自行决定的。
   //
-  // 因此这里断言的是「前端面确实是空的」—— 防的是有人以为已经接好了，
-  // 或者在冻结区偷偷加入口而不走授权。前端接入时把本函数改成真实的文案断言。
-  const kioskTouched = [
-    'apps/kiosk/src/pages/profile/profileEntries.ts',
-    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
-    'apps/kiosk/src/pages/jobs/JobDetailPage.tsx',
-  ]
-  for (const rel of kioskTouched) {
-    const src = read(rel)
-    assert(`${rel.split('/').pop()} 未接入求职进度（冻结区保持原状）`,
-      !/job-applications|JobApplication|求职进度/.test(src))
-  }
-  assert('Kiosk 尚无求职进度 API 客户端',
-    !existsSync(join(REPO_ROOT, 'apps/kiosk/src/services/api/jobApplications.ts')))
+  // 初版只钉死三个文件名 + 一个客户端路径，被指出那不是「前端面为空」的全称证明：
+  // 换个文件名、换句文案、把调用塞进别的 service 就能绕过。改为**整棵源码树扫描** ——
+  // 要绕过就得完全不引用这个能力，那正是本断言想要的性质。
+  // 前端接入时把本函数改成真实的文案断言（并同步文件头 ⑩）。
+  const kioskFiles = walk(join(REPO_ROOT, 'apps/kiosk/src'))
+  assert('已扫到 kiosk 源码（断言不是空跑）', kioskFiles.length > 100, String(kioskFiles.length))
 
-  // 后端错误文案同样受合规约束：不得出现暗示平台参与投递的措辞。
-  const svcSrc = read('services/api/src/job-applications/job-applications.service.ts')
-  const messages = [...svcSrc.matchAll(/message:\s*'([^']*)'/g)].map((m) => m[1])
-  assert('服务端错误文案已扫到（断言不是空跑）', messages.length >= 3, String(messages.length))
+  const MARKERS = [
+    'job-applications',      // API 路径与客户端文件名
+    'jobApplication',        // 模型 / Prisma 委托 / 客户端函数名
+    'JobApplication',        // 类型名
+    '求职进度',
+    '记录一次投递',
+    'tab=applications',
+  ]
+  const leaked: string[] = []
+  for (const full of kioskFiles) {
+    const src = readFileSync(full, 'utf-8')
+    const hit = MARKERS.filter((m) => src.includes(m))
+    if (hit.length) leaked.push(`${relative(REPO_ROOT, full)} (${hit.join('/')})`)
+  }
+  assert('apps/kiosk/src 无任何求职进度引用', leaked.length === 0, leaked.join(', '))
+
+  // 服务端错误文案同样受合规约束：不得出现暗示平台参与投递的措辞。
+  //
+  // 扫**整个模块目录**、且单双引号与反引号都认 —— 初版只扫 service 的单引号
+  // `message: '...'`，controller 与两个 DTO 的 message 全在射程外。
+  // 这是上一轮刚修过的同类问题（只认一种引号即可绕过）在本函数里的复发。
+  const MODULE_FILES = [
+    'src/job-applications/job-applications.service.ts',
+    'src/job-applications/job-applications.controller.ts',
+    'src/job-applications/dto/create-job-application.dto.ts',
+    'src/job-applications/dto/update-job-application.dto.ts',
+  ]
+  const messages: string[] = []
+  for (const rel of MODULE_FILES) {
+    const src = readFileSync(join(API_ROOT, rel), 'utf-8')
+    for (const m of src.matchAll(/message:\s*(['"`])((?:[^'"`\\]|\\.)*)\1/g)) messages.push(m[2])
+  }
+  assert('模块内错误 / 校验文案已扫到（断言不是空跑）', messages.length >= 6, String(messages.length))
   for (const msg of messages) {
-    assert(`错误文案「${msg.slice(0, 16)}…」不含平台投递措辞`,
+    assert(`文案「${msg.slice(0, 14)}…」不含平台投递措辞`,
       !/一键投递|立即投递|平台投递|投递简历|企业收简历|候选人管理/.test(msg))
   }
 }
