@@ -1,0 +1,112 @@
+/* 青序流光 · 壳层：舞台、顶栏、底部导航
+ *
+ * 舞台口径：一体机全屏路由永远是 1080×1920 的固定舞台，按可视区等比缩放。
+ * 41 张原型里 width/height/overflow 三项 41/41 完全一致；居中策略有两派
+ * （27 页 absolute+translate、14 页 relative），这里取多数派。
+ *
+ * ⚠️ 缩放会影响像素断言：舞台被 scale(s) 之后，屏幕上量到的 px 是 CSS px × s。
+ *    写门禁断言"按钮 ≥56px"时必须除以 stage scale，否则永远误判。
+ */
+
+.qx-stage {
+  width: 1080px;
+  height: 1920px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+  /* transform 由运行时按 min(innerWidth/1080, innerHeight/1920) 算出并写入 */
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--qx-paper);
+  color: var(--qx-ink);
+  font-family: var(--qx-sans);
+}
+
+/* ── 顶栏：机构名 · 终端号 · 时间 · 状态 ───────────────────────────
+   状态胶囊是这一条里唯一会说谎的地方——它必须只反映服务端真实上报，
+   拿不到就显示"状态未知"，绝不默认"正常"。 */
+.qx-topbar {
+  flex: none;
+  height: 104px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 var(--qx-gutter);
+  background: var(--qx-deep);
+  color: var(--qx-paper);
+}
+.qx-topbar-brand { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 700; }
+.qx-topbar-mark {
+  width: 46px; height: 46px; border-radius: var(--qx-r);
+  background: var(--qx-emerald); color: var(--qx-deep);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--qx-serif); font-size: 24px; font-weight: 700;
+}
+.qx-topbar-sub { font-size: 18px; opacity: .72; }
+.qx-topbar-spacer { flex: 1; }
+.qx-topbar-clock { font-family: var(--qx-mono); font-size: 22px; font-variant-numeric: tabular-nums; }
+
+.qx-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: var(--qx-tap-min);
+  padding: 0 18px; border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  font-size: 19px; font-weight: 650;
+}
+.qx-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.qx-pill[data-tone='ok']      { color: var(--qx-emerald); }
+.qx-pill[data-tone='warn']    { color: #e8b45c; }
+.qx-pill[data-tone='bad']     { color: #e88b7d; }
+.qx-pill[data-tone='unknown'] { color: var(--qx-paper); opacity: .7; }
+
+/* ── 页头：分区名 + 一句话说明 ───────────────────────────────── */
+.qx-pagehead {
+  flex: none;
+  margin: 18px var(--qx-gutter) 0;
+  display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap;
+}
+.qx-pagehead h1 {
+  margin: 0; font-family: var(--qx-serif); font-size: 38px; font-weight: 700;
+  letter-spacing: 1px; display: flex; align-items: center; gap: 14px;
+}
+.qx-pagehead h1::before {
+  content: ''; width: 6px; height: 34px; border-radius: 3px; background: var(--qx-emerald);
+}
+.qx-pagehead p { flex: 1; min-width: 260px; margin: 0; font-size: 20px; line-height: 1.4; color: var(--qx-ink-2); }
+
+/* ── 正文与滚动区 ───────────────────────────────────────────── */
+.qx-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 var(--qx-gutter); }
+.qx-scroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 18px;
+  padding-top: 16px;
+  scrollbar-width: none;
+}
+.qx-scroll::-webkit-scrollbar { display: none; }
+
+/* ── 底部导航：三个固定入口 ─────────────────────────────────── */
+.qx-navbar {
+  flex: none; height: 132px;
+  display: flex; align-items: stretch;
+  border-top: 1px solid var(--qx-line);
+  background: var(--qx-surface);
+}
+.qx-nav-item {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  font-size: 20px; color: var(--qx-ink-3);
+  border: 0; background: transparent; cursor: pointer;
+}
+.qx-nav-item[aria-current='page'] { color: var(--qx-teal-d); font-weight: 700; }
+.qx-nav-item[aria-current='page']::after {
+  content: ''; position: absolute; bottom: 18px; width: 28px; height: 3px;
+  border-radius: 2px; background: var(--qx-emerald);
+}
+.qx-nav-item { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qx-stage, .qx-stage * { animation: none !important; transition: none !important; }
+}

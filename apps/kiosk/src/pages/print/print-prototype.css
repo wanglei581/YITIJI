@@ -7,9 +7,15 @@
 :root {
   --print-paper: var(--k-paper, var(--color-canvas));
   --print-surface: var(--k-surface, var(--color-surface));
-  --print-ink: var(--k-ink);
-  --print-muted: var(--k-muted);
-  --print-line: var(--k-line);
+  /* 同上：--k-ink / --k-muted / --k-line 也定义在
+     [data-kiosk-presentation='fusion-youth'] [data-visual-theme='service-desk'] 这个**后代**元素上，
+     不在 :root。裸 var() 在 :root 解析不到 → 整条声明作废 → --print-line 全局不存在，
+     于是 `border: …solid var(--print-line)`（全仓 92 处）静默变成无边框，
+     `color: var(--print-ink)` 退回继承色。看起来「还行」，所以一直没被发现。
+     2026-09-02 迁移取件码页时才由「码位格没有边框」暴露出来。 */
+  --print-ink: var(--k-ink, #10302b);
+  --print-muted: var(--k-muted, #5d6b63);
+  --print-line: var(--k-line, #e2dccb);
   /* Fallbacks required: --k-teal lives on fusion-youth, not :root. Bare var(--k-teal) freezes as empty. */
   --print-teal: var(--k-teal, #1f9e86);
   --print-teal-deep: var(--k-teal-deep, #157a67);
@@ -104,4 +110,18 @@
   .print-proto {
     --print-page-gutter: 24px;
   }
+}
+
+/* 主题层重新起别名：--print-* 在 :root 上求值，拿不到后代作用域里的 --k-*。
+   在主题所在的同一选择器上重算一次，主题换色才会跟随；
+   :root 的兜底则保证主题未挂载时仍有可见边框与文字色。 */
+[data-kiosk-presentation='fusion-youth'] [data-visual-theme='service-desk'] {
+  --print-ink: var(--k-ink, #10302b);
+  --print-muted: var(--k-muted, #5d6b63);
+  --print-line: var(--k-line, #e2dccb);
+  --print-paper: var(--k-paper, var(--color-canvas));
+  --print-surface: var(--k-surface, var(--color-surface));
+  --print-teal: var(--k-teal, #1f9e86);
+  --print-teal-deep: var(--k-teal-deep, #157a67);
+  --print-teal-soft: var(--k-teal-soft, #e2f2ec);
 }

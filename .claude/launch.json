@@ -2,6 +2,26 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "kiosk-worktree",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/.claude/worktrees/dazzling-hodgkin-24cdea/apps/kiosk && /Users/wanglei/AI求职打印服务终端/.claude/worktrees/dazzling-hodgkin-24cdea/apps/kiosk/node_modules/.bin/vite --port 5279"
+      ],
+      "port": 5279,
+      "autoPort": false
+    },
+    {
+      "name": "api-worktree",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/.claude/worktrees/dazzling-hodgkin-24cdea && npx --yes pnpm@11.2.2 --filter @ai-job-print/api dev"
+      ],
+      "port": 3010,
+      "autoPort": false
+    },
+    {
       "name": "kiosk",
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": [
