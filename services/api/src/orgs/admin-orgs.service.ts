@@ -317,6 +317,18 @@ export class AdminOrgsService {
         contactPhone: dto.contactPhone ?? null,
         sceneTemplate,
         enabledModulesJson: JSON.stringify(enabledModules),
+        // 显式写 'pending'，而不是留 null。
+        //
+        // 内容发布是 fail-closed 的：content-trust.ts 要求 contentTrustStatus === 'active'，
+        // null 与 'pending' 一样被拒——所以这行**不放宽任何闸门**。
+        // 它修的是另一件事：null 表达的是"这个字段没人填过"，'pending' 表达的是
+        // "已登记、待审核"。此前新建机构一律留 null，结果是机构录完岗位提交审核后
+        // 永远发不出去，而 partner 端对 contentTrustStatus 零引用（admin 端有 54 处），
+        // 机构侧完全看不到原因。写成 'pending' 后这个状态才有得查、有得显示。
+        //
+        // 'pending' 是 ORG_CONTENT_TRUST_STATUSES 的合法取值之一
+        // （admin-org-content-trust.service.ts:27），不是新造的值。
+        contentTrustStatus: 'pending',
       },
     })
     await this.writeAudit(admin, 'org.create', orgId, { name: dto.name, type: dto.type })

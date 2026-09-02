@@ -35,6 +35,41 @@
 
 **没有任何一条结论是"我没搜到所以不存在"。**
 
+
+### 0.3 四类管理动作的定义
+
+| 类别 | 含义 | 判定依据 |
+| --- | --- | --- |
+| 看得见 | 列表 / 详情 / 统计 / 日志读取 | `GET` 且非取证类 |
+| 改得了 | 新增 / 编辑 / 配置 / 审核通过 / 发布 | `POST`/`PUT`/`PATCH` 写入 |
+| 停得掉 | 禁用 / 下架 / 撤销 / 关闭 / 删除 / 驳回 | 语义为停止对外生效或收回 |
+| 查得到 | 审计 / 追溯 / 取证 / 对账 | 写审计或专门用于事后追溯 |
+
+**一个端点可以同时属于两类。** 例如 `PATCH /admin/job-sources/:id/publish` 的 body 是
+`{action: 'publish' | 'unpublish'}`，同一个端点既能上架也能下架，本文记为「改得了 + 停得掉」。
+若把它只算作「改得了」，下面的「停得掉缺口」统计会假性变大。
+
+反过来也校准过：`POST /admin/bulk-publish/execute` 虽然复用了双向的 `publishJobSource`，
+但 `services/api/src/bulk-publish/bulk-publish.service.ts:173/182/190` 三处都硬编码 `'publish'`，
+**批量下架实际做不到**，所以只记「改得了」。
+
+### 0.4 一个必须先说明的前提：Admin 默认跑在 mock 模式
+
+`apps/admin/src/services/api/client.ts:8` ——
+`API_MODE = (import.meta.env.VITE_API_MODE) === 'http' ? 'http' : 'mock'`。
+**默认值是 `mock`**，只有显式设置 `VITE_API_MODE=http` 才走真实后端。
+本文第 1 章的「对应页面」列回答的是「哪个页面接了这个端点」，
+不等于「该页面在当前部署里正在读真实数据」。后者取决于部署时的 `VITE_API_MODE`。
+
+---
+
+## 1. 总表：187 条 admin 端点逐条归类
+
+编号即穷举序号，按路径字典序 + method 排序，与 `graph.json` 一致。
+「对应页面」列的判定方式见 §0.1；`/devices（xx tab）` 表示该端点由 `/devices` 页的对应 tab 消费。
+
+| # | Method | 路径（省略 `/api/v1`） | 业务对象 | 动作类型 | 对应 admin 页面 |
+| --- | --- | --- | --- | --- | --- |
 | 1 | `GET` | `/admin/ad-assets` | 宣传屏素材 AdAsset | 看得见 | /screensaver |
 | 2 | `POST` | `/admin/ad-assets` | 宣传屏素材 AdAsset | 改得了 | /screensaver |
 | 3 | `DELETE` | `/admin/ad-assets/:id` | 宣传屏素材 AdAsset | 停得掉 | /screensaver |
@@ -68,7 +103,7 @@
 | 31 | `GET` | `/admin/billing/price-config` | 计费价目与对账 ServicePriceConfig | 看得见 | /billing |
 | 32 | `PUT` | `/admin/billing/price-config/:serviceKey` | 计费价目与对账 ServicePriceConfig | 改得了 + 停得掉 | /billing |
 | 33 | `GET` | `/admin/billing/reconciliation` | 计费价目与对账 ServicePriceConfig | 查得到 | /billing |
-| 34 | `POST` | `/admin/bulk-publish/execute` | 批量发布（岗位/招聘会/政策） | 改得了 + 停得掉 | /job-sources + /fair-sources + /policy-sources（BulkPublishButton） |
+| 34 | `POST` | `/admin/bulk-publish/execute` | 批量发布（岗位/招聘会/政策） | 改得了 | /job-sources + /fair-sources + /policy-sources（BulkPublishButton） |
 | 35 | `POST` | `/admin/bulk-publish/preview` | 批量发布（岗位/招聘会/政策） | 改得了 | /job-sources + /fair-sources + /policy-sources（BulkPublishButton） |
 | 36 | `GET` | `/admin/companies` | 企业展示 CompanyProfile | 看得见 | /companies |
 | 37 | `POST` | `/admin/companies` | 企业展示 CompanyProfile | 改得了 | /companies |
@@ -229,7 +264,7 @@
 | --- | --- |
 | 看得见（read） | 72 |
 | 改得了（write） | 88 |
-| 停得掉（disable/revoke） | 53 |
+| 停得掉（disable/revoke） | 52 |
 | 查得到（audit/trace） | 4 |
 
 ---
@@ -269,7 +304,7 @@
 | 宣传屏终端配置 | 3 | 2 | 1 | 1 | 0 | 0 | /screensaver |
 | 智慧校园配置 | 3 | 2 | 1 | 1 | 0 | 0 | /smart-campus |
 | AI 调用日志与用量 AiServiceLog | 2 | 2 | 0 | 0 | 0 | 0 | /ai-services |
-| 批量发布（岗位/招聘会/政策） | 2 | 0 | 2 | 1 | 0 | 0 | /job-sources + /fair-sources + /policy-sources（BulkPublishButton） |
+| 批量发布（岗位/招聘会/政策） | 2 | 0 | 2 | 0 | 0 | 0 | /job-sources + /fair-sources + /policy-sources（BulkPublishButton） |
 | 打印任务 PrintTask（订单侧动作） | 2 | 0 | 1 | 1 | 0 | 0 | /orders |
 | 终端能力开关 TerminalCapability | 2 | 1 | 1 | 1 | 0 | 0 | /print-scan |
 | 百宝箱终端配置 | 2 | 1 | 1 | 1 | 0 | 0 | /toolbox |
@@ -294,7 +329,7 @@
 
 - `services/api/src/jobs/jobs-admin.service.ts:87` —— 岗位/招聘会信息源 review 落审计
   （注意：`graph.json` 的 `serviceFiles` 闭包只走深度 2，**漏标**了这条，按图谱会误判成"无审计"）
-- `services/api/src/admin-print-scan/admin-print-scan.controller.ts:104` —— 打印扫描动作落审计
+- `services/api/src/admin-print-scan/admin-print-scan.controller.ts:107` —— 打印扫描动作落审计
 - `services/api/src/recruitment-content/admin-recruitment-content.controller.ts:72-89` —— 资质取证访问落审计
 - 批量发布 `services/api/src/bulk-publish/bulk-publish.service.ts:173/182/190` 复用单条
   `publishJobSource / publishFairSource / publishPolicy`，审计由单条路径写入
@@ -327,7 +362,7 @@
 
 | # | 端点 | 全仓复核 | 性质 |
 | --- | --- | --- | --- |
-| 1 | `GET /admin/ai-config` | 仅 `services/api/src/ai/llm/ai-config.controller.ts:37` 定义 + `services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts:105` 引用 | **重复端点，非缺口**。前端走复数版 `/admin/ai-configs`（`apps/admin/src/services/api/aiConfig.ts:92`）。两个 Controller 在同一文件里（`AiConfigController` 37 行 / `AiConfigsController` 81 行），共用同一个 `LlmConfigService`，能力等价 |
+| 1 | `GET /admin/ai-config` | 仅 `services/api/src/ai/llm/ai-config.controller.ts:37` 定义 + `services/api/scripts/verify-toolbox-ai-skill-real-acceptance.ts:105` 引用 | **重复端点，非缺口**。前端走复数版 `/admin/ai-configs`（`apps/admin/src/services/api/aiConfig.ts:92`）。两个 Controller 在同一文件里（`AiConfigController` 37 行 / `AiConfigsController` 81 行，同一文件 128 行），共用同一个 `LlmConfigService`，能力等价 |
 | 2 | `PUT /admin/ai-config` | 同上 | 同上（旧单例写路径，未带 `:featureKey`，默认落 `assistant_chat`） |
 | 3 | `POST /admin/ai-config/test` | 同上 | 同上 |
 | 4 | `POST /admin/ai-posters/generations` | 全仓 `ai-posters` 只有 3 处命中：controller 自身、其注释、`apps/admin/src/services/api/screensaver.ts:115`（只调 `/status`） | **按设计的二期占位**。`AI_IMAGE_PROVIDER=disabled` 时这三条一律返回 400 `AI_POSTER_NOT_ENABLED`（`services/api/src/content/ai-poster.controller.ts:9-13`），不算能力缺口 |
@@ -453,7 +488,7 @@
 
 | 需求 | 服务端 | 前端 |
 | --- | --- | --- |
-| 分服务**统计调用量** | ✅ `usage.byOperation` | ✅ `/ai-services` 有全量 17 行表格（`index.tsx:421-490`），只显示 `calls>0` 的行 |
+| 分服务**统计调用量** | ✅ `usage.byOperation` | ✅ `/ai-services` 有全量 17 行表格（`index.tsx:432-513`），只显示 `calls>0` 的行 |
 | 分服务**统计成本** | ✅ `usage.costByOperation` 三态 | ✅ 同表格「估算成本」列，未采集显示「未估算」而非 ¥0 |
 | 分服务**查询日志** | ❌ 端点无 operation 参数 | ⚠️ **只有客户端筛选**：页面取回最近 100 条后用 `logs.filter()` 在浏览器里过滤（`index.tsx:271-275`） |
 | 分服务看**成功率 / 延迟 / 错误码** | ❌ 只有总量 | ❌ 页面也只能显示总量 |
@@ -469,17 +504,17 @@
 
 | 字段 | 在页面上？ | 位置与形态 |
 | --- | --- | --- |
-| 成本（总额） | ✅ | 322-347 行「预估成本」卡片，`unmeasuredCalls>0` 时标注「下限 · 另有 N 次未采集」 |
-| 成本（分能力） | ✅ | 421-490 行表格「估算成本」列，三态：`measured` 显金额 / `partial` 显金额+缺口 / `uncollected` 显「未估算」 |
-| 延迟 | ⚠️ 两处，都不分能力 | 335 行「平均响应时间」（全局总量）；624-628 行日志表每行的单次 `latencyMs` |
-| provider | ✅ | 351-357 行「当前 Provider」卡片（全局）；609-613 行日志表每行 provider 标签 |
-| token | ⚠️ 仅总量 | 375-382 行「真实 token 用量」卡片（总/输入/输出）。**分能力 token 页面上没有，后端也没提供** |
-| 失败率 | ⚠️ 仅总量 | 327-334 行「成功率」卡片（`successCount / failCount`）。**分能力失败率没有** |
-| 错误码 | ✅ 两处 | 550-571 行「失败原因分布」（全局 code + count）；616-618 行日志表每行 `errorCode` |
-| 按服务筛选 | ✅ 但是客户端筛选 | 583-600 行 18 个按钮（全部 + 17 个 operation），配合 602-618 行状态筛选（全部/成功/失败），生效范围见 §5.3 |
-| 岗位 AI 专区 | ✅ | 385-417 行：`jobRecommend / jobExplain / jobMatch` 三项调用量 + 成本 |
-| 岗位来源质量 | ✅ | 519-548 行，数据来自 `GET /admin/jobs/quality-summary`（同页第三个请求） |
-| 成本采集起始日 | ✅ | 508-511 行，如实声明该日期前的历史成本不完整且不回填 |
+| 成本（总额） | ✅ | 343-349 行「预估成本」卡片，`unmeasuredCalls>0` 时标注「下限 · 另有 N 次未采集」 |
+| 成本（分能力） | ✅ | 432-513 行「分能力调用量与成本」表的「估算成本」列，三态：`measured` 显金额 / `partial` 显金额+缺口 / `uncollected` 显「未估算」 |
+| 延迟 | ⚠️ 两处，都不分能力 | 336-341 行「平均响应时间」卡片（全局总量）；662-666 行日志表每行的单次 `latencyMs` |
+| provider | ✅ | 353-358 行「当前 Provider」卡片（全局）；647-650 行日志表每行 provider 标签 |
+| token | ⚠️ 仅总量 | 380-385 行「真实 token 用量」卡片（总/输入/输出）。**分能力 token 页面上没有，后端也没提供** |
+| 失败率 | ⚠️ 仅总量 | 329-334 行「成功率」卡片（`successCount / failCount`）。**分能力失败率没有** |
+| 错误码 | ✅ 两处 | 553-573 行「失败原因分布」section（全局 code + count）；658-660 行日志表每行 `errorCode` |
+| 按服务筛选 | ✅ 但是客户端筛选 | 584-598 行 18 个按钮（全部 + 17 个 operation，常量表在 83-102 行），配合 600-614 行状态筛选（全部/成功/失败），生效范围见 §5.3 |
+| 岗位 AI 专区 | ✅ | 390-430 行「岗位 AI 运营」section：`jobRecommend / jobExplain / jobMatch` 三项调用量 + 成本 |
+| 岗位来源质量 | ✅ | 515-551 行「岗位来源质量」section，数据来自 `GET /admin/jobs/quality-summary`（同页第三个请求） |
+| 成本采集起始日 | ✅ | 509-512 行，如实声明该日期前的历史成本不完整且不回填 |
 
 **页面上没有的**：分能力延迟、分能力成功率、分能力 token、按用户/终端维度的用量、
 导出 CSV（全 `apps/admin/src` 无任何导出实现）、任何写操作按钮。
@@ -491,8 +526,133 @@
 
 | 诉求 | 有没有 | 证据 |
 | --- | --- | --- |
-| **停用某个 AI 能力** | ✅ **有** | `PUT /admin/ai-configs/:featureKey` 的 body 含 `enabled?: boolean`（`services/api/src/ai/llm/ai-config.controller.ts:29`、`:117`），`/ai-config` 页有开关（`apps/admin/src/routes/ai-config/index.tsx:370`）。关掉后页面明写「未启用，相关功能会明确失败或走既有默认应答」（`:227`） |
-| **切换 / 禁用某个 provider** | ✅ **有，但是按能力切，不是全局禁用** | 同一端点可改 `vendor / model / baseURL / apiKey`（`ai-config.controller.ts:110-119`）。**没有"禁用某 provider"这个动作**；等价做法是把用到它的 feature 逐个改 vendor 或 `enabled:false`。注意 `/ai-services` 页的「当前 Provider」卡片提示「切换需修改服务端 AI_PROVIDER」（`ai-services/index.tsx:354`），与 `/ai-config` 的按能力切换是两套口径 |
-| **限流 / 配额** | ❌ **不能在后台配** | 限流是代码级装饰器 `@PaidAiThrottle(4)`（`ai-config.controller.ts:71`、`:120`，实现在 `services/api/src/common/throttler/terminal-throttle.ts:266`）。187 条 admin 端点里**没有任何一条**路径或 body 涉及 quota / throttle / rate-limit（已对全部 187 条逐条核对） |
+| **停用某个 AI 能力** | ✅ **有** | `PUT /admin/ai-configs/:featureKey` 的 body 含 `enabled?: boolean`（`services/api/src/ai/llm/ai-config.controller.ts:29`、`:118`），`/ai-config` 页有开关（`apps/admin/src/routes/ai-config/index.tsx:370`）。关掉后页面明写「未启用，相关功能会明确失败或走既有默认应答」（`:227`） |
+| **切换 / 禁用某个 provider** | ✅ **有，但是按能力切，不是全局禁用** | 同一端点可改 `vendor / model / baseURL / apiKey`（`ai-config.controller.ts:111-119`）。**没有"禁用某 provider"这个动作**；等价做法是把用到它的 feature 逐个改 vendor 或 `enabled:false`。注意 `/ai-services` 页的「当前 Provider」卡片提示「切换需修改服务端 AI_PROVIDER」（`ai-services/index.tsx:355`），与 `/ai-config` 的按能力切换是两套口径 |
+| **限流 / 配额** | ❌ **不能在后台配** | 两套限流都在代码里，不在后台：①`@PaidAiThrottle(4)` 装饰器（`ai-config.controller.ts:72`、`:122`，实现 `services/api/src/common/throttler/terminal-throttle.ts:266`）；②`AiPublicQuotaService`（`services/api/src/ai/ai.controller.ts:5`、`:132`、`:404`），只服务 Kiosk 匿名调用，**没有任何 admin 端点读或写它的配额值**。穷举复核：187 条端点的路径无一含 quota/limit/throttle；35 个 admin controller 文件里只有 `ai.controller.ts` 出现 `Quota` 标识，且全在非 admin 的 Kiosk handler 里 |
 | **封禁滥用账号** | ❌ **后端根本没有写入路径**，详见 §6.1 | |
 | **AI 配置变更留痕** | ❌ **不写审计** | `services/api/src/ai/llm/llm-config.service.ts` 共 506 行，`grep -n audit` **零命中**；`services/api/src/ai/llm/` 整个目录零命中；`main.ts` / `app.module.ts` 无全局审计 interceptor。也就是说**改 AI 模型 / 改 apiKey / 关停某能力，`/audit` 页查不到** |
+
+---
+
+## 6. 「我以为有其实没有」与「我以为没有其实有」
+
+按价值排序。每条都注明是**读代码确认**还是**穷举后未命中**。
+
+### 6.1 以为有、其实没有：封禁 / 停用终端用户
+
+`EndUser` 模型有完整的封禁字段（`services/api/prisma/schema.prisma:738-740`）：
+
+```
+enabled     Boolean   @default(true)
+status      String    @default("active")
+statusChangedAt DateTime?
+```
+
+这三个字段**是被真正执行的**：
+- `services/api/src/member-auth/member-phone-rebind.service.ts:101` 换绑前校验
+  `!currentUser.enabled || currentUser.status !== 'active'` → 抛 `ACCOUNT_UNAVAILABLE`
+- `services/api/src/member-auth/member-step-up.service.ts:173/210/216` 把
+  `statusChangedAt` 编进 step-up 授权票据，用户状态一变，已签发的票据立即失效
+- Admin 侧可以按 `enabled` 筛选（`admin-users.controller.ts:58`），
+  `/users` 页会渲染「正常 / 已停用」状态柱（`routes/users/index.tsx:38-41`）
+
+**但是全仓没有任何端点能把 `enabled` 置为 `false` 或把 `status` 改成非 `active`。**
+
+穷举范围与结果：
+- 471 条端点中触及 `EndUser` 且非 GET 的共 **19 条**，逐条看过：
+  4 条权益活动、2 条会员权益、2 条隐私工单、1 条活动核销、10 条 `member/auth/*` 登录类，
+  **没有一条改状态**
+- `grep -rn "endUser.update" services/api/src`（排除 `src/generated/`）只有 3 处命中：
+  `member-auth.service.ts:273`（只写 `lastLoginAt`）、`:431`（只写 `wxOpenId` + `lastLoginAt`）、
+  `member-phone-rebind.service.ts:101`（只写手机号）。**唯一写 `enabled` 的地方是首次登录建号时写死 `true`**
+  （`member-auth.service.ts:267-268`、`:431-433`）
+
+**结论：封禁机制的"执行端"完整、"开关端"不存在。** 一体机上出现滥用账号时，
+运营在后台只能看到这个人，没有任何按钮能停掉他。这是本次盘点里最高价值的发现。
+
+### 6.2 以为有、其实没有：AI 配置变更不写审计
+
+见 §5.5 最后一行。改 AI vendor / model / baseURL / apiKey / systemPrompt / forbiddenWords /
+temperature / enabled 全部经由 `LlmConfigService.update`，
+而 `services/api/src/ai/llm/llm-config.service.ts`（506 行）与整个
+`services/api/src/ai/llm/` 目录 **`grep -n audit` 零命中**，`main.ts` / `app.module.ts`
+也没有全局审计 interceptor。
+
+对照：`services/api/src/orgs/`、`services/api/src/jobs/jobs-admin.service.ts:87`、
+`services/api/src/admin-print-scan/admin-print-scan.controller.ts:107` 等都写审计。
+**AI 密钥与开关是少数写操作里的审计空白。**
+
+### 6.3 以为没有、其实有：分能力 AI 成本统计确实存在
+
+我最初按「`/admin/ai/usage` 名字太通用」的直觉预期只有总量。
+读代码后确认 `byOperation` 与 `costByOperation` 两张分能力表都真实存在
+（`ai-log.service.ts:417-418`、`:444-455`），且 `/ai-services` 页有覆盖全部
+17 个 operation 的表格。**「AI 花在哪个能力上」这件事后台是看得到的。**
+看不到的是分能力的延迟 / 成功率 / token（§5.1）。
+
+### 6.4 以为没有、其实有：法务文档版本管理有完整页面
+
+按业务词搜 `legal` 时容易漏 —— 前端模块名是 `legalDocs.ts`，页面在
+`apps/admin/src/routes/legal-docs/`，导航项叫「法务文档版本」
+（`AdminLayoutWrapper.tsx:123`）。三条端点全部接通。
+本文第一版的自动匹配脚本曾把这 3 条误报成「无页面」，
+原因是脚本按"字面量所在行往上找函数名"的启发式取名失败 —— 已改为按 import 图匹配后修正。
+**这正是"没搜到 ≠ 不存在"的又一个实例。**
+
+### 6.5 以为没有、其实有：终端 / 计费 / 宣传屏的「停得掉」藏在通用写端点里
+
+这几条按路径名完全看不出有停用能力，是读 DTO 才确认的：
+
+| 端点 | 停用开关 | 证据 |
+| --- | --- | --- |
+| `PATCH /admin/terminals/:terminalId/profile` | `enabled?: boolean` | `services/api/src/terminals/dto/update-terminal-profile.dto.ts:16-18` |
+| `PUT /admin/billing/price-config/:serviceKey` | `active?: boolean` | `services/api/src/payment/dto/admin-billing.dto.ts:27-29` |
+| `PATCH /admin/ad-assets/:id` | `status: 'active' \| 'disabled'` | `services/api/src/content/dto/update-ad-asset.dto.ts:15-17` |
+| `PUT /admin/ad-playlists/:id` | `enabled?: boolean` | `services/api/src/content/dto/save-playlist.dto.ts:25` |
+| `PUT /admin/terminals/:terminalId/screensaver-config` | `enabled!: boolean` | `services/api/src/content/dto/save-config.dto.ts:5` |
+| `PUT /admin/terminals/:terminalId/smart-campus-config` | `enabled` | `services/api/src/smart-campus/smart-campus.controller.ts:69` |
+| `PUT /admin/terminals/:terminalId/toolbox-config` | `enabled` | `services/api/src/terminals/admin-toolbox.controller.ts:82` |
+| `PATCH /admin/release-observation-plans/:planId` | `action: 'activate' \| 'pause' \| 'cancel'` | `services/api/src/terminals/dto/update-release-observation-plan.dto.ts:4-5` |
+
+**如果只按路径名统计，「停得掉」会被少算 8 条**（52 → 44），
+从而得出「设备和计费停不掉」的错误结论。
+
+### 6.6 图谱与代码不一致（按 CLAUDE.md 口径以代码为准，属脚本 bug）
+
+| 现象 | 代码事实 |
+| --- | --- |
+| `graph.json` 里 `GET /admin/job-materials/summary` 的 `roles` 为空数组（187 条里唯一一条） | 代码有 `@Roles('admin')`：`services/api/src/job-materials/job-materials.controller.ts:56-58`。同文件里 `JobMaterialsController` 在前、`AdminJobMaterialsController` 在后，解析器疑似只取了文件里第一个 `@Controller` 的类级装饰器 |
+| `graph.json` 的 `serviceFiles` 闭包（深度 2、同目录）漏掉 `jobs-admin.service.ts`，导致按图谱推断「岗位信息源审核不写审计」 | 实际 `services/api/src/jobs/jobs-admin.service.ts:87` 写审计 |
+
+两条都建议后续修 `scripts/project-graph/`，**不要手改 `docs/graph/` 产物**。本文不改。
+
+---
+
+## 7. 我未判定的
+
+严格意义上「完全看不懂用途」的端点：**0 条**。187 条都读到了 controller（多数还读了 service 或 DTO），
+业务对象与动作类型都能给出有依据的归类。
+
+但以下 **5 处是判断，不是事实**，如果换一种口径，统计会变，列出来供复核：
+
+| # | 端点 | 我的归类 | 争议点 |
+| --- | --- | --- | --- |
+| 1 | `POST /admin/print-jobs/:id/verify-outcome` | 改得了 | 它是「人工核查是否真出纸」并写入 `printOutcome`，既是状态写入也是取证记录。归到「查得到」也说得通。我按"它改变了任务状态"归为改得了 |
+| 2 | `GET /admin/job-sync/sources/:sourceId/impact` | 查得到 | 它算的是"停用这个数据源会影响多少条内容"，属于**动作前的影响面评估**，不是事后审计。放在「查得到」是因为它服务于追溯而非展示 |
+| 3 | `GET /admin/billing/reconciliation` | 查得到 | 也可以算成普通「看得见」的报表。归到查得到是因为它是对账（事后核账）用途 |
+| 4 | `POST /admin/bulk-publish/execute` | 改得了（**已修正**） | 曾按"复用了双向的 `publishJobSource`"标成「改得了 + 停得掉」。读 `bulk-publish.service.ts:173/182/190` 后确认三处都硬编码 `'publish'`，**批量下架做不到**，已改回「改得了」。上面第 1 章表格与统计已按修正值 |
+| 5 | `PATCH /admin/feedback/:id/status` | 改得了 + 停得掉 | 工单状态流转（处理中/已解决/已关闭），「关闭工单」算不算"停得掉"取决于口径。我按"关闭 = 终止对外流转"归入 |
+
+另有 **1 处事实未查全**（不影响本文任何结论，但如实说明）：
+`GET /admin/orders`、`GET /admin/print-scan/tasks` 等列表端点的**全部查询参数**我只核对了
+与页面对接相关的部分，没有逐个字段比对 DTO。若后续要做"页面暴露度"专项，需要补这一步。
+
+---
+
+## 8. 一句话结论
+
+- 187 条端点**全部归类完毕**，覆盖 42 类业务对象；看得见 72 / 改得了 88 / 停得掉 52 / 查得到 4。
+- **16 条端点无页面**，其中 3 条是重复端点、3 条是设计内的二期 stub，**真正够不着的是 10 条**
+  （`recruitment-content` 8 条 + `orders/mark-paid` + `policy-sources 资格规则`）。
+- **2 个页面无端点**（`/permissions`、`/peripherals`），但都如实标注"本阶段不开放"，不算伪造。
+- 最该处理的两个洞：**终端用户封不掉**（§6.1）、**AI 配置改动无审计**（§6.2）。
