@@ -38,6 +38,15 @@ export type JobApplicationStatus =
   | 'offered'
   | 'rejected'
 
+/**
+ * 这里**刻意不提供状态展示名映射**。
+ *
+ * 本波只交付后端与判据，Kiosk 运行时未接入（冻结区，见 verify:job-application-track
+ * 的 checkUserFacingCopy）。展示名一旦提前放进契约就是没有消费者的死代码，
+ * 与本轮删掉零消费者的 /summary 端点是同一标准。
+ *
+ * 接前端时再加，并同时受合规约束：主语必须是用户，不得暗示平台参与投递。
+ */
 export const JOB_APPLICATION_STATUSES: readonly JobApplicationStatus[] = [
   'intention',
   'applied',
@@ -46,17 +55,6 @@ export const JOB_APPLICATION_STATUSES: readonly JobApplicationStatus[] = [
   'rejected',
 ] as const
 
-/**
- * 状态展示名。**主语必须是用户**，不得出现暗示平台参与投递的措辞
- * （§4.4A 禁止项第 5 条），并继续遵守合规禁词清单。
- */
-export const JOB_APPLICATION_STATUS_LABELS: Record<JobApplicationStatus, string> = {
-  intention: '意向',
-  applied: '已投递',
-  interviewing: '面试中',
-  offered: '已拿Offer',
-  rejected: '已拒绝',
-}
 
 export interface JobApplicationItem {
   id: string
