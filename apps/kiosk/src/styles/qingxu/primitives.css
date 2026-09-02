@@ -26,7 +26,7 @@
 .qx-btn[data-variant='primary'] { min-height: var(--qx-btn-h-lg); background: var(--qx-deep); border-color: var(--qx-deep); color: var(--qx-paper); }
 .qx-btn[data-variant='teal']    { background: var(--qx-teal-soft); border-color: var(--qx-teal); color: var(--qx-teal-d); }
 .qx-btn[data-variant='ghost']   { background: var(--qx-paper); }
-.qx-btn[data-variant='danger']  { background: var(--qx-cinnabar); border-color: var(--qx-cinnabar); color: #fff; }
+.qx-btn[data-variant='danger']  { background: var(--qx-cinnabar); border-color: var(--qx-cinnabar); color: var(--qx-on-solid); }
 
 /* ── 卡片 ───────────────────────────────────────────────────── */
 .qx-card {

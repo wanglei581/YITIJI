@@ -40,6 +40,13 @@
   --qx-cinnabar-d: #963227;
   --qx-cinnabar-soft: #f6e4e1;
 
+  /* 深底之上的状态色。语义色（--qx-wheat / --qx-cinnabar）是为浅底设计的，
+     压在 --qx-deep 顶栏上对比度不够，故单列一组提亮版本。 */
+  --qx-on-deep-warn: #e8b45c;
+  --qx-on-deep-bad:  #e88b7d;
+  /* 反白文字：用于 deep / cinnabar 等深色实底之上 */
+  --qx-on-solid:     #ffffff;
+
   /* 描边与圆角 */
   --qx-line:   #e3ddcb;
   --qx-line-2: #d4cdb6;

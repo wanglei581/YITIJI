@@ -55,8 +55,8 @@
 }
 .qx-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .qx-pill[data-tone='ok']      { color: var(--qx-emerald); }
-.qx-pill[data-tone='warn']    { color: #e8b45c; }
-.qx-pill[data-tone='bad']     { color: #e88b7d; }
+.qx-pill[data-tone='warn']    { color: var(--qx-on-deep-warn); }
+.qx-pill[data-tone='bad']     { color: var(--qx-on-deep-bad); }
 .qx-pill[data-tone='unknown'] { color: var(--qx-paper); opacity: .7; }
 
 /* ── 页头：分区名 + 一句话说明 ───────────────────────────────── */
