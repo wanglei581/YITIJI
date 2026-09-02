@@ -1029,6 +1029,70 @@ const api = {
     return request('/assistant/chat', { method: 'POST', data: body, needAuth: false, timeout: config.aiTimeout });
   },
 
+  // ---------- 自我探索 · 倾向参考 ----------
+  // 注意命名：后端本身就叫「自我探索 · 倾向参考」。**不要叫「职业测评」**——
+  // 「测评 / 性格 / 适合岗位」是资格判定口吻，这里只是本人倾向的参考描述。
+
+  /**
+   * 题目下发（5 维 × 5 题）。免登录。
+   * 小程序原生 JS 无构建，导不进 packages/shared 的题库模块，所以由服务端下发；
+   * 下发的正是服务端用来计分的那一份，不存在「题目与计分口径不一致」。
+   */
+  getSelfAssessmentQuestions() {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request('/resume/self-assessment/questions', { method: 'GET', needAuth: false });
+  },
+
+  /**
+   * 提交作答。付费 AI 服务（PaidAiThrottle 6 次/分钟）。
+   *
+   * consent.nonSensitive 为必填：为 false 服务端直接拒绝
+   * （SELF_ASSESSMENT_CONSENT_REQUIRED）。consentVersion 必须用服务端
+   * questions 接口下发的那个值，不在前端写死——写死会在版本换代时静默失配。
+   *
+   * 隐私：答案原文**不入库也不送 LLM**，服务端只持久化
+   * answersHash + dimensions + summary + note，送模型的只有维度
+   * key/label/strength 与证据题号。
+   *
+   * 结果里的 strength 是**纯函数评分**（5 题 weight 累加归一化），
+   * LLM 只写 note；LLM 不可用或命中合规词时 note 为 null 而 strength 不变。
+   * 所以图表只能画 strength，绝不能拿 note 反推分数。
+   */
+  submitSelfAssessment(answers, consent, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request('/resume/self-assessment', {
+      method: 'POST',
+      data: { answers, consent },
+      header: tokenHeader(accessToken),
+      needAuth: true,
+      timeout: config.aiTimeout,
+    });
+  },
+
+  /** 读取已生成的结果（不触发新生成）。无记录时 404 属正常空态。 */
+  getSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}`, {
+      method: 'GET', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
+  /** 渲染报告 PDF 入库。同 printCareerPlan：进了「我的文档」，但不等于已打印。 */
+  printSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}/print`, {
+      method: 'POST', header: tokenHeader(accessToken), needAuth: true, timeout: 60000,
+    });
+  },
+
+  /** 本人撤回该次结果（服务端删除并留审计）。 */
+  withdrawSelfAssessment(taskId, accessToken) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('自我探索'));
+    return request(`/resume/self-assessment/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE', header: tokenHeader(accessToken), needAuth: true,
+    });
+  },
+
   // ---------- 打印订单 ----------
 
   /**

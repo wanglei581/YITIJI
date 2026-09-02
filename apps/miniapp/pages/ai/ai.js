@@ -63,6 +63,10 @@ Page({
           { id: 'match',     icon: 'link',    title: '岗位匹配', desc: '三档参考，不代表录用结果', accent: 'teal'  },
           { id: 'interview', icon: 'comment', title: '模拟面试', desc: '按岗位出题并复盘',       accent: 'plum'  },
           { id: 'plan',      icon: 'compass', title: '职业规划', desc: '方向建议仅供参考',       accent: 'wheat' },
+          // 放「想清楚再决定」而不是另起一组：它和岗位匹配/职业规划一样，
+          // 产出的是帮你做判断的参考，不是可交付的材料。
+          // 标题按后端口径写「自我探索」——不叫「测评」：测评是资格判定口吻。
+          { id: 'explore',   icon: 'aim',     title: '自我探索', desc: '五维倾向参考，非资格评定', accent: 'slate' },
         ],
       },
       {
@@ -162,6 +166,7 @@ Page({
       contract:  '/pages/contract-review/contract-review',
       match:     '/pages/job-fit/job-fit',
       interview: '/pages/interview-entry/interview-entry',
+      explore:   '/pages/self-explore/self-explore',
       plan:      '/pages/career-plan/career-plan',
       orders:    '/pages/orders/orders',
       kiosk:     '/pages/kiosk-login/kiosk-login',

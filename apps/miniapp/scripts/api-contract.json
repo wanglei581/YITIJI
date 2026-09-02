@@ -11,6 +11,7 @@
     "DELETE /me/external-jump-logs/:p",
     "DELETE /me/favorites/:p/:p",
     "DELETE /resume/job-fit/consent/:p",
+    "DELETE /resume/self-assessment/:p",
     "GET /community/feeds",
     "GET /community/feeds/:p",
     "GET /community/feeds/:p/comments",
@@ -60,6 +61,8 @@
     "GET /resume/job-fit/consent/:p",
     "GET /resume/records/:p",
     "GET /resume/records/:p/optimize",
+    "GET /resume/self-assessment/:p",
+    "GET /resume/self-assessment/questions",
     "GET /terminals/public",
     "PATCH /files/:p/retention",
     "PATCH /me/notifications/:p/:p/read",
@@ -108,7 +111,9 @@
     "POST /resume/job-fit",
     "POST /resume/job-fit/:p/print",
     "POST /resume/job-fit/consent",
-    "POST /resume/parse"
+    "POST /resume/parse",
+    "POST /resume/self-assessment",
+    "POST /resume/self-assessment/:p/print"
   ],
   "knownMissing": {
     "DELETE /community/comments/:p/like": "同上，取消评论点赞。",
