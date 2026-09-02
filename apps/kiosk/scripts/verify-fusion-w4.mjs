@@ -71,18 +71,11 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
   'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
   'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
-  // 体检报告本身（纯文档，不改行为）。本门禁对文档一贯逐条列举，不开 docs/** 通配。
-  'docs/reviews/page-audit-no-design-2026-09-02.md',
-  // 2026-09-02 招聘会企业数据诚实性修复。W4 本就负责签到数据不伪造
-  // （见下方 fair check-in 三条断言），但守卫按文件路径拦，拦到了 W4 自己的数据路径：
-  //   · httpAdapter 硬造 checkinStatus:'pending'，页面把占位渲染成「未签到」chip
-  //   · coerceScale 把来源的 '>2000' 兜底成 'medium'，全部企业错标「中型（100-999人）」
-  // 两处都在 W4 拥有的招聘会页面上显形，故按现行惯例列入本波集成文件。
-  'apps/kiosk/src/services/api/httpAdapter.ts',
-  'packages/shared/src/types/fairDto.ts',
-  'apps/kiosk/src/types/fair.ts',
-  'apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx',
-  'apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx',
+  // 2026-09-03 撤销：此处一度列入 6 个招聘会诚实性修复文件。撤销原因是当时
+  // 误以为本门禁按 origin/main...HEAD 判定；实际 changedFiles() 读的是
+  // `git diff --name-only HEAD`（工作区，见下方函数注释），改动一提交它就不再
+  // 触发。所以那些条目对 CI 是空操作，却会压掉别人在工作区编辑这些文件时
+  // 本该收到的越界提醒 —— 净效果是削弱门禁。跨 W4 改动的正确处理是提交，不是列举。
   'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
   'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
 ])
