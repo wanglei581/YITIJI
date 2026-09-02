@@ -1,5 +1,7 @@
-// HomePage — V6 首页运行时纵切。
-// 视觉真值：docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html。
+// HomePage — 首页运行时纵切。
+// 视觉真值：docs/design/kiosk-redesign-2026-08/01-home.html（青序流光，2026-09-02 定为上线口径）。
+// 旧引用 docs/design/kiosk-ai-os-v3-2026-08/01-home-v6.html 已降级为只读历史参考；
+// 本页当前实现仍停在 V6 版式，属待迁移项，勿据旧稿继续施工。
 // 本页只负责读取真实状态与执行封闭 action；视图不复制原型脚本或伪造任务进度。
 
 import { KioskPageFrame } from '@ai-job-print/ui'

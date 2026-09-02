@@ -1,0 +1,41 @@
+/* KioskNumpad —— 复用打印域既有令牌，不引入新调色板 */
+.knp {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 20px;
+}
+.knp-key {
+  min-height: 96px;
+  border-radius: 18px;
+  border: 1px solid var(--print-line);
+  background: var(--print-paper);
+  color: var(--print-ink);
+  font-size: 34px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, transform 0.14s;
+}
+.knp-key:active:not(:disabled) {
+  transform: scale(0.975);
+  background: var(--print-teal-soft);
+  border-color: var(--print-teal);
+}
+.knp-key:focus-visible {
+  outline: 3px solid var(--print-teal);
+  outline-offset: 2px;
+}
+.knp-key:disabled { opacity: 0.42; cursor: default; }
+.knp-fn { font-size: 22px; font-weight: 700; }
+.knp-del { background: var(--print-teal-deep); color: #fff; border-color: var(--print-teal-deep); }
+@media (prefers-reduced-motion: reduce) {
+  .knp-key { transition: none; }
+  .knp-key:active:not(:disabled) { transform: none; }
+}
+/* Windows 横屏调试形态下压缩，与页面既有 landscape 收窄口径一致 */
+@media (max-height: 900px) and (orientation: landscape) {
+  .knp { gap: 10px; margin-top: 14px; }
+  .knp-key { min-height: 64px; font-size: 26px; }
+  .knp-fn { font-size: 18px; }
+}

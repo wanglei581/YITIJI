@@ -29,6 +29,7 @@ import { PrintPageFrame } from './PrintPrototypeLayout'
 import { API_BASE_URL } from '../../services/api/client'
 import { getTerminalId } from '../../services/api/screensaver'
 import './styles/print-pickup-claim.css'
+import { KioskNumpad } from '../../components/kiosk-numpad/KioskNumpad'
 
 // ── 到机码工具 ────────────────────────────────────────────────
 const CODE_LEN = PICKUP_CODE_LENGTH
@@ -144,8 +145,10 @@ export function PrintPickupClaimPage() {
     }
   }
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextCode = normalizeInput(e.target.value)
+  // 输入的唯一入口：手输、HID 扫码器、页内数字键盘三条来源共用这一条路径，
+  // 保证格式判据、静默窗口与提交锁对三者完全一致。
+  const applyCode = (raw: string) => {
+    const nextCode = normalizeInput(raw)
     setCode(nextCode)
     cancelSettle()
     if (state === 'error') { setState('idle'); setErrorMsg('') }
@@ -165,6 +168,8 @@ export function PrintPickupClaimPage() {
       }, SETTLE_MS)
     }
   }
+
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => applyCode(e.target.value)
 
   const handleReset = () => {
     cancelSettle()
@@ -301,6 +306,16 @@ export function PrintPickupClaimPage() {
           到机码为 {CODE_LEN} 位数字；扫码器读满后自动核销。
           {' '}早前下单拿到的 {PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码仍然有效，可直接输入。
         </p>
+
+        {/* 页内数字键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
+            没有物理键盘的用户在扫码失败时原本无法输入到机码。 */}
+        <KioskNumpad
+          value={code}
+          onChange={applyCode}
+          maxLength={PICKUP_CODE_MAX_INPUT_LENGTH}
+          disabled={state === 'loading'}
+          label="到机码数字键盘"
+        />
 
         {/* 错误信息 */}
         {state === 'error' && (
