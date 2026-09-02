@@ -7,7 +7,9 @@
     "node": ">=22.13 <23"
   },
   "scripts": {
-    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs"
+    "verify:static": "node scripts/verify-miniapp-static.mjs && node scripts/verify-pickup-qrcode.mjs && node scripts/verify-miniapp-api-contract.mjs",
+    "verify:api-contract": "node scripts/verify-miniapp-api-contract.mjs",
+    "contract:update": "node scripts/verify-miniapp-api-contract.mjs --write"
   },
   "main": "app.js",
   "keywords": [],
