@@ -114,7 +114,7 @@ export class JobsKioskService {
         orderBy: groups[i].orderBy,
         skip: remainingSkip,
         take,
-        include: { _count: { select: { companies: true } } },
+        include: { _count: { select: { companies: true, materials: true } } },
       })
       rows.push(...pageRows)
       remainingTake -= take
@@ -160,7 +160,7 @@ export class JobsKioskService {
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
       where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
-      include: { _count: { select: { companies: true } } },
+      include: { _count: { select: { companies: true, materials: true } } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
   }

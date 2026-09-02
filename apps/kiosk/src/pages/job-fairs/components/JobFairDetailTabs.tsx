@@ -210,7 +210,11 @@ export function DetailsTab({
               <span className="t-text">
                 <b>活动资料</b>
                 {/* 2026-08-11：后端未对活动资料免费，去掉「免费」字样（见 FairMaterialsPage 文件头注释） */}
-                <span className="cnt">{fair.managedMaterialCount} 份 · 可打印</span>
+                <span className="cnt">
+                  {fair.managedMaterialCount === null
+                    ? '可打印'
+                    : `${fair.managedMaterialCount} 份 · 可打印`}
+                </span>
               </span>
             </button>
             <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/stats`)}>

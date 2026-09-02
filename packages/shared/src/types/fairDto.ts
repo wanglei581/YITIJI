@@ -39,7 +39,14 @@ export interface ExternalJobFairDTO extends ExternalJobFair {
   /** 已录入参会企业数量 */
   managedCompanyCount: number
   /** 已发布活动资料数量 */
-  managedMaterialCount: number
+  /**
+   * 本场招聘会已上传的活动资料份数。
+   *
+   * 必须可空：查询未 select 该关联时为 null，含义是「本次没查」而不是「一份都没有」。
+   * 曾经是必填 number 且服务端一律回 0，页面照印「0 份 · 可打印」——资料接口是真的，
+   * 但用户看到的是没资料。类型必填是根：它断言「份数总是已知的」，而这句话不成立。
+   */
+  managedMaterialCount: number | null
   /** 合规来源说明（必须展示） */
   dataSourceNote: string
   /** 参展企业行业分布（按已录企业聚合，数据大屏柱状图） */

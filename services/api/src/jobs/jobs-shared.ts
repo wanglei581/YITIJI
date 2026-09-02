@@ -156,7 +156,10 @@ export interface FairListItemDto {
   startTime: string; endTime: string; venue: string; status: FairStatus
   description?: string; boothCount?: number
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; checkinUrl?: string; syncTime: string
-  hasManagedData: boolean; managedCompanyCount: number; managedMaterialCount: number
+  // managedMaterialCount 可空：null = 本次查询未 select 该关联（不是「没有资料」）。
+  // 注意本接口是 API 侧的第二份 FairListItemDto，与 packages/shared/src/types/fairDto.ts
+  // 各写各的；两边字段可选性必须同步改，否则前端按可空处理、后端仍必填就会漂。
+  hasManagedData: boolean; managedCompanyCount: number; managedMaterialCount: number | null
   dataSourceNote: string
   jobCount?: number; theme?: string
   city?: string; address?: string; mapImageUrl?: string
@@ -653,7 +656,12 @@ export function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     syncTime: fmtSyncTime(f.syncTime),
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
-    managedMaterialCount: 0,
+    // 曾经硬编码 0。资料接口本身是真的（FairMaterial 表 + /job-fairs/:id/materials），
+    // 但列表 mapper 一律回 0，Kiosk 的「活动资料」磁贴照印「0 份 · 可打印」，
+    // 于是"功能做了却显示成没做"，现场会当成坏了。改为读真实关联计数。
+    // 查询未 select materials 时为 undefined —— 那是"没查"，不是"没有"，
+    // 所以走 null 让页面显示未知，而不是继续兜成 0。
+    managedMaterialCount: f._count?.materials ?? null,
     dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
     jobCount: f.jobCount,
     theme: f.theme,
@@ -828,5 +836,5 @@ export interface PrismaJobFairRow {
   trafficInfo: string | null
   expectedAttendance: number | null
   seekerIntentJson: string | null
-  _count?: { companies: number }
+  _count?: { companies: number; materials?: number }
 }
