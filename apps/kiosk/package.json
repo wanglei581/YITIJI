@@ -79,6 +79,7 @@
     "verify:data-request-ui": "node scripts/verify-data-request-ui.mjs",
     "verify:jobfair-commercial-closure": "node scripts/verify-jobfair-commercial-closure.mjs",
     "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs",
+    "verify:jobfairs-terminal-priority": "node scripts/verify-jobfairs-terminal-priority.mjs",
     "verify:price-single-source": "node scripts/verify-price-single-source.mjs",
     "verify:renshi-policy-ui": "node scripts/verify-renshi-policy-ui.mjs",
     "verify:policy-eligibility-ui": "node scripts/verify-policy-eligibility-ui.mjs",
