@@ -4,8 +4,9 @@
 
 - Release: miniapp-fair-onsite-2026-09
 - Environment: **local** —— 只对本 worktree 的构建成立
-- Revision: `eff92ac9c06392091f5b0fb18b14bf5bbeb4433d`（分支 `claude/miniapp-lane`）
-  —— 建包时为 `8176c1ee2004`，之后落了 11 个提交
+- Revision: `0c04cec15ee92debc5d47f178b5bac52a4478bd0`（分支 `claude/miniapp-lane`）
+  —— 建包时为 `8176c1ee2004`，之后累计落了 **20** 个提交；
+  上一次刷新钉的是 `eff92ac9c063`，其后又落了 **9** 个（本轮刷新的就是这 9 个）
 - Intended users/sites/devices: 微信小程序端求职者；线下场景为校园就业服务点、
   人社大厅、招聘会现场（与一体机同账号）
 
@@ -14,14 +15,26 @@
 >
 > 建包后新增了 4 个页面和 1 个后端端点，**这两个环境的验证缺口一点没变**。
 > 功能变多不等于验证变强 —— 所以 G3 各条一律维持 PENDING。
+>
+> **本轮（第二次刷新）之后这句话反而更强了。** 这 9 个提交里没有一行新功能，
+> 全部是「修没验证过的东西」和「加本地门禁」：修完之后新增的 CSS 规则、
+> 新增的入口磁贴、改过的画布尺寸算式，一处都没在渲染环境里看过 ——
+> **未验证的面积变大了，不是变小了。**
 
 > **本包只是时间点快照。** 这是一个共享 worktree：分支正被另一位作者并发提交，
-> 采证期间 HEAD 前进了 3 次（`ec552bb8` → `75752bdb` → `eff92ac9c`），
-> 门禁跑完 2 分钟后 `utils/normalize.js` 又出现未提交在制品。
+> 上一轮采证期间 HEAD 前进了 3 次（`ec552bb8` → `75752bdb` → `eff92ac9c`）；
+> 本轮开始时 HEAD 已在 `0c04cec15`，且工作区**不干净** ——
+> `docs/progress/current-progress.md` 与 `scripts/verify-ci-gate-coverage.mjs`
+> 两处 lane 外未提交改动（另一位作者正在做的 CI 治理 B-1）。
 > 引用包内任何「通过」结论前，先 `git rev-parse HEAD` 与上面的 Revision 比对、
-> 并 `git status --porcelain` 确认工作区干净；任一不符就在干净检出上重跑
-> EV-017~EV-021、EV-024。时间线与 mtime 证据见
-> `evidence/EV-022-revision-and-worktree-state.md`。
+> 并 `git status --porcelain` 看脏文件是否落在被测面上；任一不符就在干净检出上重跑
+> EV-026~EV-030。时间线与取证见
+> `evidence/EV-031-revision-and-worktree-state.md`。
+
+> **这条分支从未推送，CI 一次都没跑过。** `git branch -r --contains HEAD` 为空；
+> `.github/workflows/ci.yml` 的触发是 `push: [main]` + `pull_request` +
+> `workflow_dispatch`，本分支未进 `main`、无 PR、无手动派发，三条都不满足。
+> 包内每一条「门禁通过」都只是**开发工作区**的结论（RISK-009）。
 
 ## Critical Journeys
 
@@ -80,6 +93,52 @@ J-01 的打印交接刚从 `403 FILE_ACCESS_DENIED` 修通（透传 `printFileUr
 **`ai-records` 路由表补全**（`7796e5424`）：`generate` / `self_assessment` 补上结果页跳转；
 `fair_visit_plan` **有意不接**（见 R-08）。
 
+### 第二次刷新纳入的 9 个提交（`eff92ac9c063..0c04cec15`）
+
+**这 9 个提交里没有一行新功能。** 逐类如下，能力面为零增长：
+
+**A. 8 处渲染与可达性缺陷修复（DEF-006~013，证据 `evidence/EV-032-static-render-defect-fixes.md`）**
+
+| 提交 | 修了什么 |
+|---|---|
+| `453f92799` | 全局 `.card` 无 padding 导致 `policy-check` / `job-materials` 卡片内容贴住 1px 边框 |
+| `f14cd5093` | `pages/resume-build` 全站无 UI 入口（1467 行完整页面不可达）· `self-explore` 雷达画布超出内容盒 13~18px · `job-materials` 底栏按钮按 max-content 缩到左侧 |
+| `0c04cec15` | `policy-check` 失败态 5 个 CSS 类哪儿都没定义（唯一出口可点高度 24.8px，低于 §9 的 48px 下限）· 结果页主按钮无配色变体 · `.r-foot` 条件空壳渲染出断头分隔线 |
+| `9193a6efd` | 简历诊断低置信度时横幅与提取层 warning 叠两个警告框（**派工书未列，本轮核对 diff 时补记**） |
+
+**这 8 处一条都不是门禁报出来的。** 同一修订上静态门禁 110 条断言全 PASS，
+而 8 处缺陷全部存在。它管的是「文件在不在、路由注册没注册、有没有假数据、
+有没有密钥残留」这类字符串可判定的事实；「这个类有没有被定义过」
+「这个 flex 子项会不会缩到 max-content」不在其中。视觉刻度门禁也不管 ——
+它只管字号与圆角落不落在令牌刻度上。**110 条门禁对渲染类缺陷是零覆盖。**
+
+**B. 新增 1 条门禁规则**（`9193a6efd`）：注册页面的四件套必须**在 git 里**存在，
+不只是磁盘上有（`git ls-files` 复核，取不到 git 时跳过并说明）。静态门禁 109 → 110。
+这条堵的是 DEF-003 那类事故：限定范围 `git add` 把页面注册提交了、实现留在未跟踪状态，
+本地全绿而干净检出直接红。
+（派工书另称本轮还新增了「报价与下单参数一致」——**核实为不实**：该规则加于
+`7796e5424`，是 `eff92ac9c063` 的祖先，属于上一轮已计入的内容，本轮只新增了 1 条。）
+
+**C. lane 外的 CI 治理 3 项**（经产品负责人授权，不碰 `apps/miniapp`）：
+`f6ca12ba4` 修 `verify-jobfairs-terminal-priority` 的过期正则并接线（原豁免理由把因果写反，
+照着做会毁掉 #652 的筛选下推）；`82dfd80c2` 删除结构上不可能接线的
+`verify-self-assessment-r3-pick`、把 `packages/refresh` 接进 CI typecheck、
+`MAX_UNWIRED` 3 → 1。
+
+**D. 3 份文档，都不是证据**：`242b060c8` 简历投递闭环的条件性开放设计口径
+（`docs/compliance/`，只写决策不落实现）；`2f5f35b4f` 真机抽查清单扩到 9 页 / 7 项
+＋ 生产库最小可验证内容清单（743 行）；`fccc3b61b` CI 门禁豁免清理待办。
+按本包既有口径（G1-03 注），**清单不是证据**，因此这三份都没有进 evidence-ledger。
+
+**E. `services/api` / `packages/shared` / `schema.prisma` 在这 9 个提交里零改动**
+（`git diff --stat eff92ac9c063..HEAD` 无对应条目）。这是 EV-021 本轮未重跑
+却仍列为有效的唯一依据 —— 被测对象没变，不等于跑过了。
+
+**F. 有意不修、已登记的两条**：`.ficon` 的 16 个图标无 mask（修法有岔路，
+emoji 渲不渲染决定方向相反，改错会让 61 页图标一起消失 —— RISK-007）；
+`fair-visit-plan` 在 320pt 下按钮切字（320pt 不只是老 SE，iPhone 开「更大文字」
+后逻辑宽度也是 320pt —— RISK-008）。两条都挂在抽查清单 §4A，只需产品负责人看一眼。
+
 ## Non-Goals
 
 - 不做平台内投递、不收简历给企业、不做候选人筛选/邀约/Offer（`CLAUDE.md §2`）
@@ -118,11 +177,11 @@ J-01 的打印交接刚从 `403 FILE_ACCESS_DENIED` 修通（透传 `printFileUr
 
 | Dependency | Demo/test state | Live state | Owner | Failure behavior | Evidence |
 |---|---|---|---|---|---|
-| `services/api`（同仓） | typecheck 0 error（含本批第二个 additive 端点 `GET /resume/self-assessment/questions`） | 未部署本批改动 | TBD | 端点缺失时契约门禁报 BROKEN | EV-021 |
+| `services/api`（同仓） | typecheck 0 error（含本批第二个 additive 端点 `GET /resume/self-assessment/questions`）—— 测于 `eff92ac9c063`，**本轮未重跑**；依据是 diff 实证这 9 个提交对 `services/api` 零改动 | 未部署本批改动 | TBD | 端点缺失时契约门禁报 BROKEN | EV-021 / EV-031 |
 | 生产 API `https://zyidai.cn` | 公开只读端点已探测 | **业务闭环未验证**：库里岗位/招聘会/政策/终端全为 0 条 | TBD | 无内容 ⇒ 现场助手一步都走不到 | EV-009 / RISK-001 |
-| 微信开发者工具 / 真机 | 无环境 | **未验证** | 产品负责人 | 未知 | EV-008（PENDING）/ EV-025 |
+| 微信开发者工具 / 真机 | 无环境 | **未验证**；本轮新增两条只有真机能定的问题（RISK-007 图标 / RISK-008 320pt 切字） | 产品负责人 | 未知 | EV-008（PENDING）/ EV-025 |
 | 微信平台（合法域名） | 未涉及 | 未知 | TBD | `downloadFile` 域名若未配置，资料预览必失败 | 未查证 · RISK-002 |
-| CI（GitHub Actions） | 门禁已进执行闭包 371/377 | **本分支从未推送、从未在 CI 上跑过** | TBD | 曾会在 Repository integrity gate 直接转红（DEF-004） | EV-024 |
+| CI（GitHub Actions） | 覆盖率检查 exit=0（实测值 375/381 出自**带未提交改动的脚本**，非 HEAD 版本，HEAD 版本本轮未实测） | **本分支从未推送、从未在 CI 上跑过任何一个提交**：`git branch -r --contains HEAD` 为空，`on: push` 只认 `main`，无 PR，无手动派发 | TBD | 曾会在 Repository integrity gate 直接转红（DEF-004） | EV-030 / RISK-009 |
 
 ## Change Control
 

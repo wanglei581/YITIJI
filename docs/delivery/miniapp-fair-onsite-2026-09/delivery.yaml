@@ -5,16 +5,33 @@ boundary: "local"
 # 边界声明：本包只对 local 构建成立。真机（wechat-devtools）与真后端
 # （production-api）两个环境从未验证过本批改动，因此 G3 之后一律不得宣称 GO。
 #
-# 2026-09-02 20:55 更新：建包后又落了 11 个提交（批 2 第 4 项 + 批 3 三页
+# 2026-09-02 20:55 第一次刷新：建包后又落了 11 个提交（批 2 第 4 项 + 批 3 三页
 # + 两处诚实性缺陷修复 + CI 门禁接线修复）。新增 4 个页面和 1 个后端端点，
-# 但真机与真后端的验证缺口一点没变 —— 功能变多不等于验证变强，
-# 因此 G3 七条 MUST 全部维持 PENDING。
+# 但真机与真后端的验证缺口一点没变 —— 功能变多不等于验证变强。
 #
-# 警告：分支 claude/miniapp-lane 正被另一位作者并发提交，采证期间 HEAD
-# 前进了 3 次。引用包内结论前先 git rev-parse HEAD 与下面的 release_revision
-# 比对；不一致就重跑 EV-017~EV-021。时间线见 evidence/EV-022。
-release_revision: "eff92ac9c06392091f5b0fb18b14bf5bbeb4433d"
-generated_at: "2026-09-02T20:55:00+08:00"
+# 2026-09-02 22:25 第二次刷新（本次）：eff92ac9c063 之后又落了 9 个提交，
+# 建包至今累计 20 个。这 9 个提交里 **没有一行是新功能**：
+#   · 修 8 处渲染/可达性缺陷（DEF-006~013，全部读代码静态推导，一条都不是门禁报的）
+#   · 新增 1 条门禁规则（注册页面四件套必须入库，静态门禁 109 → 110）
+#   · lane 外 CI 治理 3 项（接线 1 条、删 1 条恒红门禁、packages/refresh 进 typecheck）
+#   · 1 份合规设计口径 + 2 份验收清单（都是文档，不是证据）
+# services/api / packages/shared / schema.prisma 在这 9 个提交里零改动。
+#
+# **G3 七条 MUST 全部维持 PENDING，且本轮没有任何事实让它更接近达成。**
+# G3 要的是真机、真后端业务闭环、可访问性与性能；本轮全部是静态推导 + 本地门禁。
+# 修掉 8 处缺陷反而让未验证的面积**变大**：新增的 CSS、新增的入口磁贴、
+# 改过的画布算式，一处都没在渲染环境里看过。
+#
+# 警告一：分支 claude/miniapp-lane 正被另一位作者并发提交。引用包内结论前先
+# git rev-parse HEAD 与下面的 release_revision 比对；不一致就重跑 EV-026~EV-030。
+# 时间线与工作区状态见 evidence/EV-031。
+#
+# 警告二：**本分支从未推送，CI 一次都没跑过。** git branch -r --contains HEAD
+# 为空；ci.yml 触发是 push:[main] + pull_request + workflow_dispatch，三条都不满足。
+# 包内所有「门禁通过」都是开发工作区的结论。且采证时工作区**不干净**
+# （两处 lane 外未提交改动），EV-030 跑的就不是 HEAD 的脚本。见 RISK-009。
+release_revision: "0c04cec15ee92debc5d47f178b5bac52a4478bd0"
+generated_at: "2026-09-02T22:25:00+08:00"
 overall_verdict: "PARTIAL"
 owners:
   accountable: "TBD"
@@ -30,7 +47,7 @@ acceptance_authorities:
 environments:
   - name: "local"
     purpose: "development"
-    url: "worktree /Users/wanglei/AI求职打印服务终端-miniapp（分支 claude/miniapp-lane · 修订 eff92ac9c063）"
+    url: "worktree /Users/wanglei/AI求职打印服务终端-miniapp（分支 claude/miniapp-lane · 修订 0c04cec15 · 采证时工作区有 2 处 lane 外未提交改动，见 EV-031）"
   - name: "wechat-devtools"
     purpose: "visual + real-click acceptance"
     url: "TBD（尚未执行：清单见 docs/acceptance/miniapp-fair-onsite-visual-spotcheck-2026-09-02.md）"
@@ -40,7 +57,7 @@ environments:
 gates:
   G0: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "既有：CLAUDE.md §1/§9A/§15/§16 已确立定位、用户、价值、合规边界与止损条件；G0-02 指标基线与 G0-05 预算里程碑仍 PENDING"}
   G1: {status: "PARTIAL", approved_by: "产品负责人", approved_at: "2026-09-02T18:25:00+08:00", note: "批 1/2/3 范围、按批文件预算、合规口径与验收标准逐批写明；G1-03 UI 状态从未在开发者工具中看过、G1-06 遥测与回滚未涉及 仍 PENDING"}
-  G2: {status: "PARTIAL", approved_by: "Claude（实现方 · 非验收权威）", approved_at: "2026-09-02T20:55:00+08:00", note: "修订 eff92ac9c063：四条小程序门禁 + API typecheck + CI 门禁覆盖率全绿（EV-017~EV-024）；已知缺陷 DEF-001~005 全部关闭。G2-05 向后兼容未对既有调用方回归 仍 PENDING。门禁全部在开发工作区跑 —— 本分支从未推送、CI 从未跑过"}
+  G2: {status: "PARTIAL", approved_by: "Claude（实现方 · 非验收权威）", approved_at: "2026-09-02T22:25:00+08:00", note: "修订 0c04cec15：四条小程序门禁在 HEAD 重跑全绿（EV-026 静态 110 PASS/0 FAIL · EV-027 契约 117 端点 · EV-028 视觉刻度零新增偏离 · EV-029 到机码）；已知缺陷 DEF-001~013 全部关闭（本轮新增 8 条，全部是读代码静态推导出来的渲染/可达性缺陷，一条都不是门禁报的 —— 见 EV-032）。三项打折：① EV-030 CI 门禁覆盖率跑的是**带未提交改动的脚本**，375/381 不是 HEAD 的数；② EV-021 services/api typecheck 本轮未重跑，只凭 diff 实证被测对象零改动；③ G2-05 向后兼容未对既有调用方回归 仍 PENDING。**门禁全部在开发工作区跑，本分支从未推送、CI 从未跑过任何一个提交**"}
   G3: {status: "PARTIAL", approved_by: "TBD", approved_at: "TBD", note: "七条 MUST **一条都没达成**（全部 PENDING）。PARTIAL 指的是有部分证据（离线状态机探针 EV-006 / 三模型评审 EV-007 / 生产只读探测 EV-009）而不是有部分达成。真机、真后端业务闭环、可访问性、性能一律未验；且生产库无内容 —— 解阻塞的前置不是有设备而是有内容"}
   G4: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：小程序未上传、未配置发布、未做微信平台材料；合法域名是否配置未查证（RISK-002）"}
   G5: {status: "PENDING", approved_by: "TBD", approved_at: "TBD", note: "未开始：无授权用户走过真实关键旅程"}

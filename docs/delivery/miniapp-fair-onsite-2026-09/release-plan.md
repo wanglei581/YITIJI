@@ -6,8 +6,10 @@
 
 ## Release Identity
 
-- Revision/artifact: `eff92ac9c06392091f5b0fb18b14bf5bbeb4433d`（分支 `claude/miniapp-lane`）
-  —— 注意该分支正被并发提交，引用前先 `git rev-parse HEAD` 比对（EV-022）
+- Revision/artifact: `0c04cec15ee92debc5d47f178b5bac52a4478bd0`（分支 `claude/miniapp-lane`）
+  —— 注意该分支正被并发提交，引用前先 `git rev-parse HEAD` 比对（EV-031）。
+  该分支**不在任何远端**（`git branch -r --contains HEAD` 为空），
+  这个修订目前只存在于本地 worktree，不构成任何可分发的发布物
 - Build provenance/checksum: TBD —— 小程序无构建产物；发布物是微信开发者工具上传的代码包，从未上传过
 - Configuration schema: `apps/miniapp/utils/config.js`（`USE_MOCK` 正式源码默认关闭，由静态门禁断言）
 - Migration set: 无 —— 本批两个后端端点均为 additive，未涉及 Prisma 迁移
