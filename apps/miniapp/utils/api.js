@@ -828,6 +828,28 @@ const api = {
     });
   },
 
+  /**
+   * 修改本人文件的保存期限。
+   *
+   * 可选项**只能用服务端在 /me/documents 里给出的 allowedRetentionPolicies**，
+   * 前端不自行推算：证件照 / 签名 / 合同上传与审查报告被锁死在 system_short，
+   * 原始文件不允许 long_term——这些规则在 retention-policy.ts 里，
+   * 前端复制一份必然漂移，漂移的结果是用户点了却被后端打回。
+   *
+   * months_6 与 long_term 属于延长保存，服务端要求 consentVersion；
+   * 缺了回 RETENTION_CONSENT_REQUIRED，版本不对回 RETENTION_CONSENT_INVALID。
+   * 所以调用方必须**先向用户出示保存条款并取得确认**，再带上版本号——
+   * 在这里默认补一个版本号等于替用户签字。
+   */
+  updateFileRetention(fileId, retentionPolicy, consentVersion) {
+    if (config.USE_MOCK) return Promise.reject(mockUnavailable('修改保存期限'));
+    const data = { retentionPolicy };
+    if (consentVersion) data.consentVersion = consentVersion;
+    return request(`/files/${encodeURIComponent(fileId)}/retention`, {
+      method: 'PATCH', data, needAuth: true,
+    });
+  },
+
   /** 删除本人文档：服务端校验归属，物理删除对象并保留删除审计。 */
   deleteMyDocument(fileId) {
     if (config.USE_MOCK) return Promise.reject(mockUnavailable('删除文档'));

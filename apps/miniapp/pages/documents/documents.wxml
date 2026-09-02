@@ -62,6 +62,12 @@
             <text>{{item.time}}</text>
             <text class="doc-exp" wx:if="{{item.expire}}">{{item.expire}}</text>
           </view>
+          <!-- 保存期限：此前只显示到期日期，用户看不出自己处在哪一档、也不知道能不能改。
+               档位与是否可改都由服务端给（allowedRetentionPolicies），前端不推算。 -->
+          <view class="doc-retention" wx:if="{{item.retentionPolicy}}">
+            <text class="chip">{{item.retentionLabel}}</text>
+            <text class="doc-retention-hint" wx:if="{{item.retentionLocked}}">此类文件按系统策略保存，不可延长</text>
+          </view>
         </view>
         <view class="doc-more tap" hover-class="tap-press" catchtap="more" data-id="{{item.id}}">⋯</view>
       </view>

@@ -60,6 +60,7 @@
     "GET /resume/records/:p",
     "GET /resume/records/:p/optimize",
     "GET /terminals/public",
+    "PATCH /files/:p/retention",
     "PATCH /me/notifications/:p/:p/read",
     "PATCH /me/notifications/read-all",
     "POST /activity/browse",
