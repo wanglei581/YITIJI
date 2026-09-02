@@ -2,13 +2,89 @@
   <view style="height:{{statusBarHeight}}px"></view>
 
   <view class="navbar">
-    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-back tap" hover-class="tap-press" bindtap="goBack" role="button" aria-label="返回上一页">
+      <text class="ficon i-right nav-back-ic"></text>
+    </view>
     <view class="nav-title">活动资料</view>
   </view>
 
   <view class="content">
-    <view wx:if="{{loading}}" class="list-state">加载中…</view>
-    <view wx:elif="{{loadError}}" class="list-state">{{loadError}}</view>
-    <view wx:else class="list-state">该页面正在接入中，暂未开放。</view>
+
+    <view wx:if="{{phase === 'loading'}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{phase === 'error'}}" class="empty">
+      <view class="e-ic"><text class="ficon i-warning"></text></view>
+      <view class="e-title">加载失败</view>
+      <view class="e-desc">{{loadError}}</view>
+      <view class="btn primary tap mt16" hover-class="tap-press" bindtap="reload"
+            role="button" aria-label="重新加载活动资料">重新加载</view>
+    </view>
+
+    <view wx:elif="{{phase === 'empty'}}" class="empty">
+      <view class="e-ic"><text class="ficon i-folder"></text></view>
+      <view class="e-title">本场暂未提供活动资料</view>
+      <view class="e-desc">主办方发布日程、展馆图或企业名册后会显示在这里。</view>
+    </view>
+
+    <block wx:else>
+      <view class="mat-sum rise-d1">共 {{list.length}} 份资料，由招聘会主办方发布</view>
+
+      <view wx:for="{{list}}" wx:key="id" class="card rise-d2">
+        <view class="card-inner">
+
+          <view class="mat-top">
+            <view class="mat-ic {{item.ic}}"><text class="ficon {{item.icon}}"></text></view>
+            <view class="mat-head">
+              <view class="mat-name">{{item.name}}</view>
+              <view class="chips mt8"><view class="chip {{item.chip}}">{{item.typeLabel}}</view></view>
+            </view>
+          </view>
+
+          <view wx:if="{{item.description}}" class="mat-desc">{{item.description}}</view>
+
+          <view class="mat-meta">
+            <text>{{item.pagesText}}</text>
+            <text class="mat-dot">·</text>
+            <text>{{item.sizeText}}</text>
+            <block wx:if="{{item.updatedText}}">
+              <text class="mat-dot">·</text>
+              <text>更新于 {{item.updatedText}}</text>
+            </block>
+          </view>
+          <!-- 「累计被打印」说的是这份资料被所有人打印过的总次数，不是本人的打印记录；
+               本人的打印去向在「我的 · 打印订单」，两者不是一回事，文案不能混。 -->
+          <view wx:if="{{item.printedText}}" class="mat-meta">{{item.printedText}}</view>
+
+          <view class="mat-acts">
+            <view wx:if="{{item.canPreview}}"
+                  class="btn ghost-ink lg mat-btn tap {{openingId && openingId !== item.id ? 'disabled' : ''}}"
+                  hover-class="tap-press" catchtap="tapPreview" data-id="{{item.id}}"
+                  role="button" aria-label="预览{{item.name}}">
+              {{openingId === item.id ? '正在打开…' : '预览资料'}}
+            </view>
+            <view wx:else class="mat-off">该资料未提供在线预览</view>
+
+            <view wx:if="{{item.canPrint}}"
+                  class="btn primary lg mat-btn tap {{printingId && printingId !== item.id ? 'disabled' : ''}}"
+                  hover-class="tap-press" catchtap="tapPrint" data-id="{{item.id}}"
+                  role="button" aria-label="生成{{item.name}}的打印文件并进入打印流程">
+              {{printingId === item.id ? '正在生成…' : '生成并去打印'}}
+            </view>
+            <view wx:else class="mat-off">本资料不提供打印</view>
+          </view>
+
+        </view>
+      </view>
+
+      <!-- 「生成并去打印」只把文件交给打印流程，出纸要到门店终端核销后才发生，
+           所以按钮和这条提示都不能宣称出纸已完成。 -->
+      <view class="notice info rise-d3">
+        <text class="ficon i-info n-ic"></text>
+        <text>资料由招聘会主办方发布。点击「生成并去打印」只生成待打印文件并进入打印流程，费用以下单时报价为准，出纸需到门店终端核销后完成。</text>
+      </view>
+
+      <view class="compliance-note">本页仅提供招聘会公开资料的查看与打印，不代收报名信息，也不提供平台内投递。</view>
+    </block>
+
   </view>
 </view>
