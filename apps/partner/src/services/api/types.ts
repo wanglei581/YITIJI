@@ -98,6 +98,14 @@ export interface PartnerJobRecord {
   tags?: string[]
   description?: string
   requirements?: string
+  /**
+   * 管理员驳回原因（契约 = 后端 PartnerJobDto.rejectReason）。
+   *
+   * **null = 本条没有被驳回**，不是「驳回了但没写原因」：审核通过会清成 null，
+   * 机构编辑/重新录入也会清成 null。因此只有 `reviewStatus === 'rejected'` 时才读它，
+   * 不得把 null 渲染成空串或「无原因」。
+   */
+  rejectReason: string | null
 }
 
 // ─── Fairs ────────────────────────────────────────────────────────────────────
@@ -123,6 +131,8 @@ export interface PartnerFairRecord {
   city?: string
   address?: string
   description?: string
+  /** 同 {@link PartnerJobRecord.rejectReason}：null = 未被驳回，不是「驳回但无原因」。 */
+  rejectReason: string | null
 }
 
 // ─── Import payloads ──────────────────────────────────────────────────────────

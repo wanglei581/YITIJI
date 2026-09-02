@@ -12,6 +12,8 @@ import type {
 } from '../../services/api'
 import { getPartnerJobQualitySummary, getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
 import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
+import { RejectReason } from '../../components/RejectReason'
+import { useCapability } from '../../services/capabilities'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -97,7 +99,16 @@ function errMsg(e: unknown): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * 服务端按机构类型拒绝新增岗位（partner-capabilities.ts 的 canImportJobs → 403
+ * PARTNER_CAPABILITY_DENIED）。此前前端不投影这条规则，机构要把整张表填完、
+ * 点保存才撞到 403。列表/编辑/下架不受此限（存量数据仍要能自己下架），
+ * 所以这里禁用的是「新增」按钮本身，而不是隐藏整页。
+ */
+const CANNOT_CREATE_HINT = '本机构类型不支持录入岗位数据，如需开通请联系平台运营。已有岗位仍可编辑与下架。'
+
 export default function JobsPage() {
+  const canCreate = useCapability('canImportJobs')
   const [categoryFilter, setCategoryFilter] = useState('全部')
   const [reviewFilter,   setReviewFilter]   = useState('全部')
   // 编辑/新增抽屉
@@ -254,10 +265,22 @@ export default function JobsPage() {
       title="岗位信息管理"
       subtitle={`共 ${jobs.length} 条岗位`}
       actions={
-        <Button size="sm" variant="primary" className="flex items-center gap-1.5" onClick={openNew}>
-          <PlusIcon className="h-4 w-4" />
-          新增岗位
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button
+            size="sm"
+            variant="primary"
+            className="flex items-center gap-1.5"
+            onClick={openNew}
+            disabled={!canCreate}
+            title={canCreate ? undefined : CANNOT_CREATE_HINT}
+          >
+            <PlusIcon className="h-4 w-4" />
+            新增岗位
+          </Button>
+          {!canCreate && (
+            <p className="max-w-[280px] text-right text-xs leading-relaxed text-neutral-500">{CANNOT_CREATE_HINT}</p>
+          )}
+        </div>
       }
     >
       {notice && (
@@ -350,7 +373,10 @@ export default function JobsPage() {
                         </a>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{j.syncTime}</td>
-                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
+                      <td className="px-4 py-3">
+                        <StatusBadge dot status={review.badge}  label={review.label}  />
+                        <RejectReason reviewStatus={j.reviewStatus} reason={j.rejectReason} />
+                      </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
                           <span className={`h-1.5 w-1.5 rounded-full ${publish.dot}`} aria-hidden="true" />

@@ -243,6 +243,14 @@ export interface PartnerDataSourceView {
   activationManagedBy?: 'admin' | 'partner'
 }
 
+/**
+ * `GET /partner/data-sources/capabilities` 的响应契约。
+ *
+ * 权威实现是服务端 `services/api/src/jobs/partner-capabilities.ts` 的
+ * PARTNER_CAPABILITY_MATRIX——**本接口只是它的形状声明，不是第二份规则**。
+ * Partner 控制台按这里的布尔值决定入口是否可点/侧栏是否展示；服务端按同一份矩阵
+ * 拒写。前端不得另写一份机构类型判断。
+ */
 export interface PartnerDataSourceCapabilities {
   orgType: string
   allowedAccessModes: AccessMode[]
@@ -251,6 +259,10 @@ export interface PartnerDataSourceCapabilities {
   adminManagedAccessModes: AccessMode[]
   canImportJobs: boolean
   canImportFairs: boolean
+  /** 能否创建政策内容（policies.service.ts 的 ORG_TYPE_NOT_ALLOWED_FOR_POLICY 同源）。 */
+  canManagePolicies: boolean
+  /** 能否读写智慧校园配置（smart-campus.service.ts 的 PARTNER_NOT_SCHOOL 同源，读写都拒）。 */
+  canManageSmartCampus: boolean
 }
 
 // ============================================================

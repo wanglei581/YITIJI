@@ -98,24 +98,24 @@ let DATA_SOURCES: PartnerDataSource[] = [
 // ─── Jobs (R2: added sourceName) ──────────────────────────────────────────────
 
 let PARTNER_JOBS: PartnerJobRecord[] = [
-  { id: 'pj1', externalId: 'UNI-2026-JOB-0041', title: '软件开发实习生',   company: '某科技有限公司', city: '上海', category: 'intern',   sourceUrl: 'https://job.uni.edu.cn/j/41', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj2', externalId: 'UNI-2026-JOB-0042', title: '产品运营校招生',   company: '某电商平台',     city: '杭州', category: 'campus',   sourceUrl: 'https://job.uni.edu.cn/j/42', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj3', externalId: 'UNI-2026-JOB-0043', title: '前端开发工程师',   company: '某互联网公司',   city: '北京', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/43', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj4', externalId: 'UNI-2026-JOB-0044', title: '数据分析实习',     company: '某金融科技公司', city: '深圳', category: 'intern',   sourceUrl: 'https://job.uni.edu.cn/j/44', syncTime: '2026-05-25 09:00', reviewStatus: 'pending',   publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj5', externalId: 'UNI-2026-JOB-0045', title: 'Java 后端开发',    company: '某软件公司',     city: '苏州', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/45', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj6', externalId: 'UNI-2026-JOB-0038', title: '运营管理培训生',   company: '某零售集团',     city: '广州', category: 'campus',   sourceUrl: 'https://job.uni.edu.cn/j/38', syncTime: '2026-05-24 18:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj7', externalId: 'UNI-2026-JOB-0037', title: '人力资源专员',     company: '某国有企业',     city: '本市', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/37', syncTime: '2026-05-24 18:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pj8', externalId: 'UNI-2026-JOB-0036', title: '市场推广兼职',     company: '某营销公司',     city: '本市', category: 'parttime', sourceUrl: 'https://job.uni.edu.cn/j/36', syncTime: '2026-05-24 18:00', reviewStatus: 'rejected',  publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
+  { id: 'pj1', externalId: 'UNI-2026-JOB-0041', title: '软件开发实习生',   company: '某科技有限公司', city: '上海', category: 'intern',   sourceUrl: 'https://job.uni.edu.cn/j/41', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj2', externalId: 'UNI-2026-JOB-0042', title: '产品运营校招生',   company: '某电商平台',     city: '杭州', category: 'campus',   sourceUrl: 'https://job.uni.edu.cn/j/42', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj3', externalId: 'UNI-2026-JOB-0043', title: '前端开发工程师',   company: '某互联网公司',   city: '北京', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/43', syncTime: '2026-05-25 08:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj4', externalId: 'UNI-2026-JOB-0044', title: '数据分析实习',     company: '某金融科技公司', city: '深圳', category: 'intern',   sourceUrl: 'https://job.uni.edu.cn/j/44', syncTime: '2026-05-25 09:00', reviewStatus: 'pending',   publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj5', externalId: 'UNI-2026-JOB-0045', title: 'Java 后端开发',    company: '某软件公司',     city: '苏州', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/45', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj6', externalId: 'UNI-2026-JOB-0038', title: '运营管理培训生',   company: '某零售集团',     city: '广州', category: 'campus',   sourceUrl: 'https://job.uni.edu.cn/j/38', syncTime: '2026-05-24 18:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj7', externalId: 'UNI-2026-JOB-0037', title: '人力资源专员',     company: '某国有企业',     city: '本市', category: 'fulltime', sourceUrl: 'https://job.uni.edu.cn/j/37', syncTime: '2026-05-24 18:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pj8', externalId: 'UNI-2026-JOB-0036', title: '市场推广兼职',     company: '某营销公司',     city: '本市', category: 'parttime', sourceUrl: 'https://job.uni.edu.cn/j/36', syncTime: '2026-05-24 18:00', reviewStatus: 'rejected',  publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: '来源链接无法打开，且岗位描述缺少工作地点与任职要求，请补全后重新提交' },
 ]
 
 // ─── Fairs (R2: added sourceName) ─────────────────────────────────────────────
 
 let PARTNER_FAIRS: PartnerFairRecord[] = [
-  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pf2', externalId: 'UNI-2026-FAIR-024', name: '互联网行业专场招聘',       organizer: '某大学就业指导中心', startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/24', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pf3', externalId: 'UNI-2026-FAIR-020', name: '制造业专场招聘会',         organizer: '市人才交流中心',     startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B区大厅',            status: 'ongoing',  sourceUrl: 'https://job.uni.edu.cn/fair/20', syncTime: '2026-05-22 14:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pf4', externalId: 'UNI-2026-FAIR-018', name: '护理医疗专场招聘',         organizer: '某大学就业指导中心', startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',        status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/18', syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
-  { id: 'pf5', externalId: 'UNI-2026-FAIR-015', name: '2026 春季大型综合招聘会', organizer: '某大学就业指导中心', startTime: '2026-04-15 09:00', endTime: '2026-04-15 17:00', venue: '某大学操场',         status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/15', syncTime: '2026-04-10 10:00', reviewStatus: 'approved',  publishStatus: 'expired',     sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
+  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf2', externalId: 'UNI-2026-FAIR-024', name: '互联网行业专场招聘',       organizer: '某大学就业指导中心', startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/24', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf3', externalId: 'UNI-2026-FAIR-020', name: '制造业专场招聘会',         organizer: '市人才交流中心',     startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B区大厅',            status: 'ongoing',  sourceUrl: 'https://job.uni.edu.cn/fair/20', syncTime: '2026-05-22 14:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf4', externalId: 'UNI-2026-FAIR-018', name: '护理医疗专场招聘',         organizer: '某大学就业指导中心', startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',        status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/18', syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
+  { id: 'pf5', externalId: 'UNI-2026-FAIR-015', name: '2026 春季大型综合招聘会', organizer: '某大学就业指导中心', startTime: '2026-04-15 09:00', endTime: '2026-04-15 17:00', venue: '某大学操场',         status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/15', syncTime: '2026-04-10 10:00', reviewStatus: 'approved',  publishStatus: 'expired',     sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', rejectReason: null },
 ]
 
 // ─── Sync Logs (R3: field names aligned with backend) ─────────────────────────
@@ -185,6 +185,8 @@ export const partnerMockAdapter = {
       adminManagedAccessModes: ['api', 'webhook'],
       canImportJobs: true,
       canImportFairs: false,
+      canManagePolicies: false,
+      canManageSmartCampus: false,
     }
   },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {
@@ -259,6 +261,7 @@ export const partnerMockAdapter = {
       description: item.description, requirements: item.requirements,
       reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
       sourceOrgId: 'mock-org', sourceName: '测试机构',
+      rejectReason: null,
     }))
     PARTNER_JOBS = [...PARTNER_JOBS, ...added]
     return { imported: added.length, items: added }
@@ -274,6 +277,7 @@ export const partnerMockAdapter = {
             ...Object.fromEntries(Object.entries(input).filter(([k, v]) => v !== undefined && k !== 'workType')),
             reviewStatus: 'pending' as const,
             publishStatus: 'draft' as const,
+            rejectReason: null,
             syncTime: sync,
           }
         : j,
@@ -310,6 +314,7 @@ export const partnerMockAdapter = {
         theme: item.theme, city: item.city, address: item.address, description: item.description,
         reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
         sourceOrgId: 'mock-org', sourceName: '测试机构',
+        rejectReason: null,
       }
     })
     PARTNER_FAIRS = [...PARTNER_FAIRS, ...added]
@@ -333,6 +338,7 @@ export const partnerMockAdapter = {
       if (input.sourceUrl !== undefined) next.sourceUrl = input.sourceUrl
       next.reviewStatus = 'pending'
       next.publishStatus = 'draft'
+      next.rejectReason = null
       next.syncTime = sync
       return next
     })
