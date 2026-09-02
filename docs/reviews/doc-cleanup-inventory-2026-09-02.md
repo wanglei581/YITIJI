@@ -172,6 +172,35 @@
 > ⚠️ 后续动作提醒：`docs/graph/graph.json` 与 `docs/graph/orphans.md` 现在含 65 条已不存在的路径。
 > 这不是错误，是自动产物滞后。本任务禁止改 `docs/graph/`，**请在下次改动路由/端点/模型时顺手跑 `pnpm graph` 重生成**。
 
+### 4.1 全量 markdown 链接复查（删除后跑，覆盖 `docs/` 全部 701 条相对链接）
+
+除 basename 复查外，另跑了一次真正的链接解析（排除 `docs/graph/` 与代码块内示例）。结果：
+
+- **指向本轮已删 65 份的链接：只有 1 条**，且在 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`
+  （指向 `../superpowers/plans/2026-06-18-profile-commercial-closure-p0.md`）。
+  **有意不修**：`progress/archive/` 是规范化之前的冻结快照，它记录的是「当时的进度文件长什么样」；
+  去改正文等于篡改历史记录。该链接在写下时是有效的，失效本身就是历史的一部分。
+- **其余 12 个文件的断链全部是本轮之前既存的**，与删除无关（逐条核对：无一指向已删文件）。
+
+### 4.2 顺手修掉的 3 条既存断链（都在允许改的目录内，目标文件确认存在）
+
+| 文件 | 原链接 | 改为 |
+|---|---|---|
+| `product/ai-provider-integration.md:54` | `../compliance/file-security.md` | `../compliance/file-retention-and-cos-lifecycle.md`（`compliance/` 下无 `file-security.md`，该内容在 retention 文档里） |
+| `progress/mock-to-api-replacement-plan.md:310` | `./data-model-phase7.md` | `../product/data-model-phase7.md`（文件在 `product/`，不在 `progress/`） |
+| `progress/mock-to-api-replacement-plan.md:311` | `./partner-permission-matrix.md` | `../product/partner-permission-matrix.md`（同上） |
+
+### 4.3 未修的既存断链（记录在案，本轮无权限或不该动）
+
+| 文件 | 问题 | 为什么没修 |
+|---|---|---|
+| `design/kiosk-ai-os-v3-2026-08/hardware-camera-scanner-plan.md`、`reviews-codex-2026-08-11.md` | 正文引用**另一台机器的绝对路径** `/Users/wanglei/YITIJI-v3-round2/...`，共 10+ 条 | 在 `docs/design/`，本任务禁止触碰。但值得单独排期：这说明该批文档是对着另一个 checkout 写的，路径无法在本仓复算 |
+| `reviews/2026-08-11-backend-buildout-spec.md` | 同类问题，引用 `/Users/wanglei/AI求职打印服务终端/...` 绝对路径 | 该文件被 `next-tasks.md` 等四处引用，属保留侧；改正文超出本轮范围 |
+| `design/kiosk-ai-os-v3-2026-08/REVIEW-FINDINGS-2026-08-15.md` | `../../CLAUDE.md` 少一级，应为 `../../../CLAUDE.md`；另有 3 条同类 | 在 `docs/design/` |
+| `design/job-link-risk-analysis.md` | 指向不存在的 `./kiosk-login-center.md`、`../deployment/kiosk-cloud-agent-launch-checklist.md`（`docs/deployment/` 目录本身不存在） | 在 `docs/design/` |
+| `design/kiosk-proto-2026-07-fusion/sources/8177/WAVE-P-CLOSURE.md` | 相对层级错 | 在 `docs/design/`，且是冻结的合流前快照 |
+| `product/miaoda-reference-catalog.md`、`reviews/2026-07-12-cloud-print-decision.md`、两份 `progress/archive/*` | 指向已改名或已删的源码文件（如 `home-inkpaper.css`） | 属历史记录；`progress/archive/` 同 §4.1 理由不动 |
+
 过程中命中并因此**从删除清单撤回**的两份（保留文档正文有指向它们的正文链接）：
 
 | 撤回文件 | 谁在引用 |
@@ -251,6 +280,8 @@
 | 4 | `docs/README.md:31-32` | 「运行时目前只有 `/` 与 `/print-scan` 是新版」 | 该句描述的是 V6 落地状态。按 `next-tasks.md` 今日基线，**运行时页面 ↔ 新稿 51 页 = 0/51**；同时 `e8a468fca` 已把取件码页迁到青序流光。两处口径不是同一把尺子（V6 vs 青序流光新稿），并排读会误判进度 | ✅ 本轮已改（§七），指向 `next-tasks.md` 为准 |
 | 5 | `docs/reviews/a3-print-fulfillment-gap-spec-2026-08-16.md:验证基线表` | 「`docs/reviews/2026-08-12-v6-commercial-product-audit.md` **不在 `origin/main`**，仅存在于 `claude/four-tasks-project-coordination-d39229`」 | 该文件现在既在工作区，也被 `docs/README.md`、`docs/progress/next-tasks.md`、`current-progress.md` 三处正式引用 | 只记录。该行是 2026-08-16 的时点事实，改它等于篡改当时的取证记录；正确读法是「基线已推进」 |
 | 6 | `docs/product/role-boundary.md`（`current-progress.md:1004` 已记） | 早前写「DB 层按角色收敛 DELETE 权限」 | 实测 `services/api/src` 有 29 处 Prisma `delete/deleteMany`、28 个 `@Delete()` 端点，单一应用账号 | 已于 2026-08-01 修正为可验证表述，此处仅确认结论仍成立，未再改动 |
+| 7 | 奔图开放 API 彩色 `mode` 取值，**三处措辞两种语义** | `packages/shared/src/types/print.ts:100-107` 写「协议侧没有该取值，**不是待实现**，彩色不可用」；`apps/terminal-agent/src/printer/types.ts:76-77` 与 `docs/device/pantum-api-design.md:87` 都写「**TODO，待厂家确认**」 | 两种读法的结论相反：一个是「永久不做」，一个是「排期待做」。更麻烦的是 `terminal-agent/types.ts` **自身前后矛盾** —— 同文件 47–48 行块注释写「彩色不可用」，76–77 行字段注释写「TODO 待确认」 | 已写入 `next-tasks.md` 待办并给出统一措辞；**本轮未改代码**（只允许改 `docs/`）。这条影响对外能力承诺，不是文字洁癖 |
+| 8 | `docs/reviews/wiring-ledger-2026-09-02.md:32` 已核实 | 原型 `30-my-profile.html` 头部把数量来源写成 `GET /me/summary` | 后端**无此端点**；运行时 `useMemberProfileOverview` 实际是 `Promise.allSettled` 并发调 `/me/ai-records`、`/me/favorites`、`/me/documents` 读分页 `total` | 已在 `next-tasks.md`「待产品负责人裁决」第 6 条（新建端点 vs 改说明书），本轮未动 |
 
 ---
 
@@ -259,5 +290,8 @@
 | 文件 | 改了什么 |
 |---|---|
 | `docs/progress/current-progress.md` | 追加 2026-09-02 条目：图谱解析器修复（86→107）、取件码虚拟键盘、kiosk-redesign-r1 交付治理包（七闸门 / G2 NO_GO / 总判定 NO_GO）、51 页原型入库、BL-04 关闭、接口声明对齐 90/90、duplex 契约外露、青序流光地基 + `--print-*` 令牌链断裂修复、取件码页迁移，以及本次文档清理 |
-| `docs/progress/next-tasks.md` | 「当前主线」勾掉已完成项；新增四条待办：奔图开放 API 三处取值不一致、彩色 mode 取值待厂家确认、mock-only 字段待产品裁决、`/me/summary` 端点缺失 |
-| `docs/README.md` | §二修正 51 页原型入库状态与 107 路由口径；§三重算统计并标注复核日期；§五补一条删除记录指向本文件 |
+| `docs/progress/next-tasks.md` | 「当前主线」补 2026-09-02 已完成清单（7 项）；把「运行时页面 ↔ 新稿 51 页」由 `0/51` 更正为 `1/51` 并换掉会虚涨的取证命令；新增「奔图开放 API 彩色 mode 三处措辞不一致」一节。**另三条待办（彩色 mode 待厂家确认、mock-only 字段待裁决、`/me/summary` 端点缺失）本轮核查时发现已由并行的另一条线写入该文件，未重复添加** |
+| `docs/README.md` | §二修正 51 页原型入库状态（BL-04 已关闭）与 106→107 路由口径，并点破「V6 与青序流光是两把尺子」；§三按实测重算统计表；§五补「已执行的删除」表与本轮新学到的取证方法（为什么判零引用要用 basename 而不是全路径） |
+| `docs/product/ai-provider-integration.md`、`docs/progress/mock-to-api-replacement-plan.md` | 修 3 条既存断链（见 §4.2），与删除无关，顺手修 |
+
+**未新建任何交接 / handoff 文档**（`CLAUDE.md §7` 明令禁止）。本台账是执行记录，不是第二套口径。

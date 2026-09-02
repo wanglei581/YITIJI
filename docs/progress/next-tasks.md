@@ -9,9 +9,26 @@
 | kiosk 路由注册 | 107 / 107 | `docs/graph/graph.json`（含 lazy 路由修复） |
 | 原型 `data-route` → 运行时路由 | 95 / 95 | 51 页属性提取 + 参数化匹配 |
 | 前端端点引用 → 后端存在 | 1820 / 1820 | 剥 `/api/v1` 前缀后比对 471 个端点 |
-| **运行时页面 ↔ 新稿 51 页** | **0 / 51** | `grep -rl kiosk-redesign-2026-08 apps/kiosk/src` = 0 |
+| **运行时页面 ↔ 新稿 51 页** | **1 / 51** | `KioskRoot.tsx` 的 `QX_MIGRATED_ROUTES` 集合（当前只有 `/print/pickup-claim`） |
 
-**结论：不需要新建后端端点。** 全部剩余工作是逐页把新稿实现进运行时。当前边界判定：`LOCAL BUILD GO` / `PRODUCTION NO-GO`（新稿一页未落地，不具备商用交付条件）。
+> **取证方式已更正（2026-09-02）**：本行原写 `0 / 51`，取证用 `grep -rl kiosk-redesign-2026-08 apps/kiosk/src`。
+> 该命令现在命中 5 个文件，但其中 4 处是**注释里的视觉真值指针**（`HomePage.tsx:2`、`tokens.css:3`、
+> `pickup-claim-qx.css:6`、`KioskRoot.tsx:150`），只有 1 页真正换了实现。**注释不是实现** ——
+> 用它当分母会随注释增加而虚涨。唯一权威登记是 `KioskRoot.tsx` 里的 `QX_MIGRATED_ROUTES`：
+> 该集合决定哪些路由退出旧 `KioskLayout` 外壳，改错了页面会当场两套色系打架，因此它不可能悄悄漂移。
+
+**结论：不需要新建后端端点。** 全部剩余工作是逐页把新稿实现进运行时。当前边界判定：`LOCAL BUILD GO` / `PRODUCTION NO-GO`（51 页只落地 1 页，不具备商用交付条件）。
+
+**已完成（2026-09-02，均为本地候选，未部署、未真机）：**
+
+- [x] **图谱解析器修复（`6d74c2f17`）** —— 补 `React.lazy()` 路由与单文件多 controller 解析，kiosk 路由由误报的 86 更正为真实 **107**。按 CLAUDE.md §14「图谱和代码对不上以代码为准、那是脚本 bug」，改的是 `scripts/project-graph/` 而非 `docs/graph/` 产物。**基于旧图谱算过的任何覆盖率结论都要按 107 重算。**
+- [x] **51 页原型入库（`2d9f73c1b`）** —— 关闭硬阻塞 **BL-04**（此前 `git ls-files` = 0，无版本历史可回滚）。9.9MB / 53 个 HTML 加被引用资源；682MB 截图证据以目录级 `.gitignore` 排除；入库后从 worktree 位置重渲三页验证相对资源路径正常。
+- [x] **接口声明对齐（`859163498`）** —— 51 页原型标注的端点 **90/90 命中真实后端端点**，同批更正此前两处误判。
+- [x] **duplex 契约外露（`f9d1890ea`）** —— `MemberPrintOrderItem` 补 `duplex`（此前采集/计价/落库都有、唯独对外契约没有，用户付了双面的钱看不到），同批更正字段审计两条误判。
+- [x] **青序流光设计地基（`1135e251d`）** —— `styles/qingxu/` 四个 token/原语文件 + `components/qingxu/QxPageFrame.tsx` + `scripts/dev/shot-route.sh` 截图链路。顺带修掉 `--print-*` 令牌链断裂：**92 处 `var(--print-line)` 一直解析不到值、边框实际没渲染**，而 typecheck 与 lint 全绿——这正是验收标准第 5 条「不靠『编辑成功』判断」要防的。
+- [x] **取件码页迁移（`e8a468fca` + `23464350f`）** —— 51 页替换的第一块样板，含 duplex 前端显示与虚拟数字键盘（一体机无物理键盘，Kiosk 模式不得依赖系统输入法）。
+- [x] **交付治理包（`2f92deb44`）** —— `docs/delivery/kiosk-redesign-r1/` 七闸门；当前 G0/G1 PARTIAL、**G2 NO_GO**、G3–G6 PENDING，`overall_verdict: NO_GO`。硬阻塞 BL-01/02/03/05 仍 OPEN。
+- [x] **文档清理（2026-09-02）** —— 候选池 252 份核出零阻塞引用 135 份，实删 **65 份**（`superpowers/plans` 35 / `specs` 17 / `reviews` 13），保留 187 份；删除前后各跑一次互链复查均为空，无死链、未改任何链接。台账见 [`../reviews/doc-cleanup-inventory-2026-09-02.md`](../reviews/doc-cleanup-inventory-2026-09-02.md)。**副作用**：`docs/graph/graph.json` 与 `orphans.md` 现含 65 条已不存在的路径，属自动产物滞后，下次改路由/端点/模型时跑 `pnpm graph` 即刷新。
 
 **单页验收标准（六条全过才算这一页完成，缺一条记 PARTIAL 不记完成）：**
 
@@ -70,6 +87,25 @@
 - 卡纸 / 缺纸 / 缺粉的恢复路径
 - 断网重连后打印队列是否保留
 - 向奔图厂家确认：开放 API 的彩色 mode 取值是否存在（V1.0 文档全文无彩色取值）
+
+### 奔图开放 API 彩色 mode：三处措辞仍不一致（2026-09-02 盘点发现，属 PR 4 范围）
+
+同一件事在三处写了两种**语义不同**的结论，会让下一个人得出相反判断：
+
+| 位置 | 现在怎么写 | 隐含结论 |
+|---|---|---|
+| `packages/shared/src/types/print.ts:100-107` | 「`color` **无对应 wire 取值** …… 走开放 API 时彩色**不可用**（不是"待实现"，是协议侧没有该取值）」 | 协议**不存在**该能力 |
+| `apps/terminal-agent/src/printer/types.ts:76-77`（字段级注释） | 「Pantum 开放 API：`black_white` → `"bw"`；`color` → **TODO（待厂家确认）**」 | 确认后**就能做** |
+| `docs/device/pantum-api-design.md:87` | 「⚠️ **TODO** \| 待奔图厂家确认，**禁止假设为 `"color"`**」 | 确认后**就能做** |
+
+注意 `terminal-agent/types.ts` **自己内部就冲突**：同文件 47–48 行的块注释写「彩色不可用」，
+76–77 行的字段注释写「TODO 待厂家确认」。
+
+**这不是文字洁癖**：两种读法决定「云打印彩色」是**永久不做**还是**排期待做**，直接影响 Phase 8.1 之后的
+路线与对外能力承诺（CLAUDE.md §3 要求硬件能力与开放 API 能力分开描述，正是为了防这类混读）。
+**收口方式**：厂家回复前，三处统一改成同一句可证伪表述 ——「V1.0 文档只定义 `"bw"`；彩色取值未公开，
+未取得厂家书面确认前开放 API 路径不提供彩色，禁止假设为 `"color"`」；拿到回复后再一次性改三处。
+本轮只记录，**未改任何代码**（本任务只允许改 `docs/`）。
 
 **批次队列（按业务闭环切，每批完成即形成一条端到端可走通路径）：**
 

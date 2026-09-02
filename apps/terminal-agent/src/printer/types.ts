@@ -74,7 +74,15 @@ export interface PrintJobParams {
   copies: number
   /**
    * 本地驱动：black_white/color 均通过 SumatraPDF 或 DEVMODE 控制，需真机验证。
-   * Pantum 开放 API：black_white → "bw"；color → TODO（待厂家确认）。
+   *
+   * Pantum 开放 API —— 事实与未知要分开读，别当成"填个值就行"：
+   *   事实：《开放打印能力》V1.0 协议里**不存在彩色取值**。mode 只定义 "bw"，
+   *         全文 color / 彩色 / cmyk 各 0 次；且文档在 duplex/collate/paperSize/
+   *         paperType/feeder 五项下都写了"不同机型可选值集合不一样"，唯独 mode 没有——
+   *         所以这不是"本机型子集"，是协议侧压根没给。
+   *   未知：厂家是否另有未公开取值、后续版本会不会补。这是要去问的那件事。
+   *   结论：拿到厂家答复之前，走开放 API 一律不能彩色。禁止自行写 "color" 试探。
+   *   注意：硬件是彩色激光机、本地驱动可能能控彩色——那是另一条路，与本条无关。
    */
   colorMode: 'black_white' | 'color'
   /**
