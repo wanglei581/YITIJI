@@ -7,7 +7,7 @@ EV-005,G2-02,2026-09-02T18:25:00+08:00,8176c1ee2004,local,Claude（实现方，�
 EV-006,G3-02,2026-09-02T18:25:00+08:00,8176c1ee2004,local(node stub),Claude（实现方，非验收权威）,离线状态机探针（各页 33~69 条断言）,全通过,fair-venue 69 / fair-visit-plan 33 全通过,evidence/EV-006-offline-probes.md,PARTIAL,仅逻辑分支，非真实渲染；探针在 scratchpad 未入库
 EV-007,G3-03,2026-09-02T18:25:00+08:00,8176c1ee2004,local,Claude（实现方，非验收权威）,三模型只读代码评审（grok / antigravity / hermes）,无高危,采纳 13 条修复；含一处付费模型连点缺陷,evidence/EV-007-model-review.md,PARTIAL,评审基于修订 c816e55 之前的代码
 EV-008,G3-01,2026-09-02T18:25:00+08:00,,wechat-devtools,TBD,视觉抽查清单 5 项,无系统性版式问题,尚未执行,evidence/EV-008-device-spotcheck-PENDING.md,PENDING,阻塞 G3；只有产品负责人能执行
-EV-009,G3-01,2026-09-02T18:25:00+08:00,,production-api,TBD,对 https://zyidai.cn 走通现场闭环五段,五段全通,尚未执行,evidence/EV-009-real-backend-PENDING.md,PENDING,阻塞 G3；本批全部端点从未对真后端验证过
+EV-009,G3-01,2026-09-02T19:30:00+08:00,8176c1ee2004,production-api,Claude（只读探测）,curl 只读 GET + 零落库 POST,公开端点可达且契约一致,7 端点全 200；政策自测契约与实现假设完全一致；但岗位/招聘会/政策/终端全为 0 项，批 1 现场助手在生产上无内容可验,evidence/EV-009-real-backend-readonly-probe.md,PASS,只覆盖公开只读；认证、AI 生成、打印下单、真机渲染一律未测。生产内容变化即失效
 EV-010,G0-01,2026-09-02T18:25:00+08:00,8176c1ee2004,repo,Claude（实现方，非验收权威）,文档核对,定位/用户/负责人已定版,CLAUDE.md §1 定位、§9A 页面范围、§15 四 Tab 与硬件基线,evidence/EV-010-claude-md-snapshot.md,PASS,CLAUDE.md 变更即需复核
 EV-011,G0-03,2026-09-02T18:25:00+08:00,8176c1ee2004,repo,Claude（实现方，非验收权威）,文档核对,非目标明确,CLAUDE.md §2 禁做清单、§10 数据边界；compliance-boundary.md §4.4/§4.5,evidence/EV-011-compliance-snapshot.md,PASS,合规文档变更即需复核
 EV-012,G1-01,2026-09-02T18:25:00+08:00,8176c1ee2004,repo,Claude（实现方，非验收权威）,文档核对,关键旅程与角色已定义,现场闭环五段：行前计划→展位导览→参展企业→现场打材料→出纸,scope.md,PASS,批次范围变更即失效
