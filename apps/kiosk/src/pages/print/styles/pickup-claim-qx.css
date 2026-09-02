@@ -69,7 +69,16 @@
 .pcp-easy li::before { content: '✓ '; }
 
 /* ── 键盘卡 ─────────────────────────────────────────────────── */
-.pcp-keypad-card { padding: 22px 24px 24px; }
+.pcp-keypad-card {
+  padding: 22px 24px 24px;
+  display: flex; flex-direction: column;
+}
+/* 本页由键盘卡吸收余量：站着输码时，键越大越好按。
+   四行等分拉伸，但每键不低于 96px（触控下限）。 */
+.pcp-keypad-card .knp {
+  flex: 1 1 auto; min-height: 0;
+  grid-template-rows: repeat(4, minmax(96px, 1fr));
+}
 .pcp-keypad-note {
   margin: 0 0 16px; text-align: center;
   font-size: 19px; line-height: 1.5; color: var(--qx-ink-3);

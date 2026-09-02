@@ -340,7 +340,7 @@ export function PrintPickupClaimPage() {
 
         {/* 页内数字键盘：Windows 全屏 Kiosk 下 inputMode 不会唤起任何系统键盘，
             没有物理键盘的用户在扫码失败时原本无法输入到机码。 */}
-        <div className="qx-card pcp-keypad-card">
+        <div className="qx-card qx-grow pcp-keypad-card">
           <p className="pcp-keypad-note">
             新码是 <b>{CODE_LEN} 位纯数字</b>：输满稍停片刻自动校验，或按「确认校验」。
             早前下单拿到的 <b>{PICKUP_CODE_MAX_INPUT_LENGTH} 位旧码</b>点左下角「输入历史码」。

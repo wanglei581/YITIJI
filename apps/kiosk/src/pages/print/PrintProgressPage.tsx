@@ -47,20 +47,41 @@ const DUPLEX_LABELS: Record<string, string> = {
   duplex_short_edge: '双面(短边)',
 }
 
-function formatParams(params: Partial<PrintJobParams> | null | undefined): string {
-  if (!params) return '—'
-  const color = params.colorMode === 'color' ? '彩色' : '黑白'
-  const duplex = DUPLEX_LABELS[params.duplex ?? ''] ?? '单面'
-  const copies = params.copies ? `${params.copies} 份` : ''
-  return [color, duplex, copies].filter(Boolean).join(' · ')
+const COLOR_LABELS: Record<string, string> = {
+  black_white: '黑白',
+  color: '彩色',
 }
 
+/**
+ * 打印参数 → 展示串。**缺失 / 未知的项直接不出现，绝不补默认值**。
+ *
+ * 修于 2026-09-02：原实现写的是 `DUPLEX_LABELS[params.duplex ?? ''] ?? '单面'` 与
+ * `params.colorMode === 'color' ? '彩色' : '黑白'`，把「未记录」讲成了「就是单面 / 就是黑白」，
+ * 属 CLAUDE.md §9 禁止的伪造能力：null 是没记录，不是取到了默认值。
+ * params 来自路由 state 的裸 cast（见下方 `state?.params as PrintJobParams | undefined`），
+ * 类型上是必填不代表运行时一定有，所以这里必须按缺值处理而不是按默认值补齐。
+ * 全部缺失时整行退回「—」，与同页文件名 / 任务号 / 订单号的缺值表现一致。
+ */
+function formatParams(params: Partial<PrintJobParams> | null | undefined): string {
+  if (!params) return '—'
+  const color = params.colorMode ? COLOR_LABELS[params.colorMode] : undefined
+  const duplex = params.duplex ? DUPLEX_LABELS[params.duplex] : undefined
+  const copies = params.copies ? `${params.copies} 份` : undefined
+  const parts = [color, duplex, copies].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : '—'
+}
+
+/**
+ * 预计出纸张数 / 面数。这是一句对物理出纸结果的断言，任何一个输入缺失都会让数字变成编的，
+ * 因此 duplex / copies / pagesPerSheet 三个参与运算的字段有任一缺失就退回「待识别」，
+ * 不再像原实现那样用 `params.duplex !== 'simplex'` 把缺失当成双面（会把张数直接算少一半）。
+ */
 function expectedSheets(file: Pick<PrintFileState, 'pages'> | null, params: Partial<PrintJobParams> | null | undefined): string {
   if (!file || file.pages == null || !params) return '待识别'
-  const pps = params.pagesPerSheet ?? 1
-  const copies = params.copies ?? 1
+  const { duplex, copies, pagesPerSheet: pps } = params
+  if (!duplex || !copies || !pps) return '待识别'
   const facesPerCopy = Math.ceil(file.pages / pps)
-  const isDouble = params.duplex !== 'simplex'
+  const isDouble = duplex !== 'simplex'
   const sheetsPerCopy = isDouble ? Math.ceil(facesPerCopy / 2) : facesPerCopy
   const totalFaces = facesPerCopy * copies
   const totalSheets = sheetsPerCopy * copies

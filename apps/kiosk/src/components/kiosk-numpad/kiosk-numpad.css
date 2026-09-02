@@ -8,9 +8,9 @@
 .knp-key {
   min-height: 96px;
   border-radius: 18px;
-  border: 1px solid var(--print-line);
-  background: var(--print-paper);
-  color: var(--print-ink);
+  border: 1px solid var(--qx-line, var(--print-line));
+  background: var(--qx-paper, var(--print-paper));
+  color: var(--qx-ink, var(--print-ink));
   font-size: 34px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -20,15 +20,15 @@
 .knp-key:active:not(:disabled) {
   transform: scale(0.975);
   background: var(--print-teal-soft);
-  border-color: var(--print-teal);
+  border-color: var(--qx-teal, var(--print-teal));
 }
 .knp-key:focus-visible {
-  outline: 3px solid var(--print-teal);
+  outline: 3px solid var(--qx-teal, var(--print-teal));
   outline-offset: 2px;
 }
 .knp-key:disabled { opacity: 0.42; cursor: default; }
 .knp-fn { font-size: 22px; font-weight: 700; }
-.knp-del { background: var(--print-teal-deep); color: #fff; border-color: var(--print-teal-deep); }
+.knp-del { background: var(--qx-teal-deep, var(--print-teal-deep)); color: #fff; border-color: var(--qx-teal-deep, var(--print-teal-deep)); }
 @media (prefers-reduced-motion: reduce) {
   .knp-key { transition: none; }
   .knp-key:active:not(:disabled) { transform: none; }
