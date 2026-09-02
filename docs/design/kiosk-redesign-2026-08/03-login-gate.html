@@ -22,14 +22,28 @@
          qr-loading | qr-ready | qr-expired | qr-confirmed | qr-error
          mode 与 state 冲突时（例如 ?mode=phone&state=qr-ready）**以状态前缀为准**：
          状态是页面真正在画的东西，tab 只是它的投影。?mode=qr 不带 state 时落到 qr-loading。
-  api:   POST /member/sms-code → 成功 { sent:true, cooldownSeconds=60, expiresInSeconds=300 }
+  api:   POST /api/v1/member/auth/sms-code → 成功 { sent:true, cooldownSeconds=60, expiresInSeconds=300 }
                                  SMS_SEND_FAILED(502) → 服务端把刚写入的验证码与冷却一起删掉，可立刻重试
                                  SMS_TOO_FREQUENT / IP / DEVICE / PROVIDER_RATE_LIMIT(429) → 稍后再试
                                  SMS_DAILY_LIMIT / PROVIDER_PHONE_DAILY_LIMIT(429)         → 明天再试
-         POST /member/login  → SMS_CODE_INVALID / SMS_CODE_EXPIRED / SMS_CODE_LOCKED 三条不同下一步
-         POST /local/qr-login/create → { ticketId, qrContent, expiresInSeconds }，QR_TICKET_TTL=180 秒
-         GET  /local/qr-login/status → pending | confirmed | expired（expiresInSeconds 是剩余值，不是 180）
-         POST /local/qr-login/claim  → 一体机凭票据换登录态；claim 会失败，失败后要求重扫
+         POST /api/v1/member/auth/login → SMS_CODE_INVALID / SMS_CODE_EXPIRED / SMS_CODE_LOCKED 三条不同下一步
+         扫码登录横跨两个服务，**不要写成同一个 base**（2026-09-02 对 memberQrLoginApi.ts +
+         terminal-agent/src/local-api/qr-login-server.ts + member-auth.controller.ts 核实）：
+         POST /local/qr-login/create → **Terminal Agent 本地网桥**（VITE_TERMINAL_AGENT_LOCAL_URL，
+                                       默认 http://127.0.0.1:9527，需 X-Local-Bridge-Token 头）
+                                       返回 { ticketId, qrUrl, expiresInSeconds, returnTo }，QR_TICKET_TTL=180 秒
+                                       （字段名是 qrUrl，不是 qrContent；Agent 内部代调后端
+                                        POST /api/v1/member/auth/qr/create，claimToken 只留在 Agent，不下发前端）
+         GET  /api/v1/member/auth/qr/:ticketId/status → **后端 API，不是本地网桥**（Agent 没有这条路由）
+                                       返回 { status, deviceLabel?, returnTo, expiresInSeconds }
+                                       status 只有 pending | confirmed 两个取值，**没有 expired**：
+                                       票据过期即 404 QR_LOGIN_NOT_FOUND，已被领取则 410 QR_LOGIN_ALREADY_CLAIMED，
+                                       所以本页的 qr-expired 态由错误码驱动，不是由 status 值驱动。
+                                       expiresInSeconds 是剩余值，不是 180。
+         POST /local/qr-login/claim  → **Terminal Agent 本地网桥**；一体机凭票据换登录态；
+                                       claim 会失败，失败后要求重扫
+                                       （后端另有 POST /api/v1/member/auth/qr/:ticketId/claim，
+                                        由 Agent 持 claimToken 代调，Kiosk 前端不直接打这条）
   fallback: 每个失败态都保留「改用另一种登录方式」「不登录继续」「返回首页」三条实体出口（≥56px）
   真实性:  静态页不生成可扫描二维码、不声称短信已发送、不声称已登录。
            手机确认只等于 confirmed，一体机还要 claim 成功才登录，因此本页没有「登录成功」屏。

@@ -19,13 +19,21 @@
   api:  各项数量由对应列表端点的分页 total 得到，**没有 /me/summary 这个聚合端点**
         （2026-09-02 核实：后端无此路由，运行时 useMemberProfileOverview 是 Promise.allSettled
           并发调列表读 total；此前本文件写「GET /me/summary 一律由此返回」是错的）
+        顶部概览只并发这三条，各带 pageSize=1、只取响应里的 total，不拉明细
+        （useMemberProfileOverview.ts:52-56）：
+          GET /api/v1/me/ai-records?pageSize=1
+          GET /api/v1/me/favorites?pageSize=1
+          GET /api/v1/me/documents?pageSize=1
+        allSettled 意味着**三条互不阻塞**：只挂其中一条时，另两个数量照常显示，挂掉那条显示「—」。
+        其余卡片进入各自页面后才按需调用：
         GET /api/v1/me/resumes | /documents | /print-orders | /favorites | /benefits | /ai-records
         GET /api/v1/me/pending-tasks  —— 真实待办；无待办即空态，不造「继续办理」
                                         契约见 apps/kiosk/src/services/api/pendingTasks.ts：
                                         status(pending|claimed|printing) / payStatus / fileName /
                                         updatedAt / resume(payment|print-progress)
         对齐 apps/kiosk/src/pages/profile/*、ContinuePanel 与 /session-resume
-  fallback: summary 失败 → error：卡片保留入口但数量显示「—」，不拿上次数字冒充当前账号
+  fallback: 概览数量读取失败 → error：卡片保留入口但数量显示「—」，不拿上次数字冒充当前账号
+            （是「那三条列表端点读 total 失败」，不是「summary 端点失败」——没有那个端点）
   真话边界：
     ① 区分两件事，别混：
        · **运行时**没有「默认状态」——页面渲染的就是接口返回值，返回空就显示空，

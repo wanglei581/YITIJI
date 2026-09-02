@@ -14,8 +14,14 @@
          job-ready | job-source-incomplete
   api:  GET /api/v1/kiosk/offline-agencies?keyword&district&service&orgType&page&pageSize
         —— 每页 10 条；四个查询维度都可输入、清除和组合
-        GET /api/v1/offline-agencies/:id
-        GET /api/v1/offline-jobs/:id
+        GET /api/v1/kiosk/offline-agencies/:id
+        —— 详情响应里**内联返回 jobs[]**，机构下属岗位不用再发第二个请求；
+           agency-jobs-empty 就是这个数组为空。后端另有 GET /api/v1/kiosk/offline-agencies/:id/jobs，
+           但本页当前不调它（offlineAgencies.ts 只有 227 一处详情调用）。
+        GET /api/v1/kiosk/offline-jobs/:id  —— 返回 raw Prisma 镜像，前端 mapWireOfflineJob 再映射
+        —— 三条端点**都带 kiosk/ 段**（2026-09-02 对 offlineAgencies.ts:227/258/272 核实）。
+           不带 kiosk/ 的 /api/v1/admin/offline-agencies/* 是管理员后台的另一组端点，
+           走 admin 鉴权、能读到未审核/未发布数据，一体机前台不得调用。
         对齐 apps/kiosk/src/pages/offline-agencies/{OfflineAgenciesPage,OfflineAgencyDetailPage,OfflineJobDetailPage}.tsx
   真话边界：
     ① 不预置机构名称、门店数量、营业时间、服务项目、来源编号；列表行只画字段位置（.slot）。

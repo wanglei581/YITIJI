@@ -26,9 +26,19 @@
                                                            status ∈ upcoming | ongoing | ended（与服务端 FairStatus 同名）
         GET /api/v1/job-fairs/:id                       —— 详情 + sourceName/sourceUrl/externalId/syncTime
         GET /api/v1/job-fairs/:id/companies             —— 主办方提供的参展名单
-        GET /api/v1/job-fairs/:id/booth-map             —— 有真实图或展位索引才返回
+        GET /api/v1/job-fairs/:id/map                   —— 有真实图或展位索引才返回；返回 { zones, booths }
+                                                           （端点名是 /map，不是 /booth-map；未发布 / 无数据时
+                                                            后端可能返回 data:null，前端兜成空集合落空态）
         GET /api/v1/job-fairs/:id/materials             —— 临时签名 URL，过期需重新获取
-        POST /api/v1/job-fairs/:id/visit-plan           —— { resumeId } → { taskId }；结果由任务状态返回
+        参会准备单是 fairId + taskId 两级路径，**没有 POST /job-fairs/:id/visit-plan 这种一级写法**
+        （2026-09-02 对 services/api/src/ai/fair-visit-plan.controller.ts +
+          apps/kiosk/src/services/api/fairVisitPlan.ts 核实）：
+        POST /api/v1/job-fairs/:fairId/visit-plan/:taskId        —— 生成；PaidAiThrottle 6/min
+        GET  /api/v1/job-fairs/:fairId/visit-plan/:taskId        —— 读最近一次结果
+        POST /api/v1/job-fairs/:fairId/visit-plan/:taskId/print  —— 生成可打印文件
+        taskId **是调用方传进去的路径参数，不是接口返回值**：来自 location.state.taskId 或当前
+        简历会话的 session.taskId（FairVisitPlanPage.tsx:83）；拿不到 taskId 就落 missing-context，
+        不存在「先 POST 一次换 taskId」这一步。凭证：会员 Bearer，匿名 x-resume-access-token。
         GET /api/v1/job-fairs/:id/stats                 —— 真实统计；无数据即空
         对齐 apps/kiosk/src/pages/job-fairs/*
   fallback: 任一子任务失败只影响该 screen；招聘会浏览与来源预约入口保持可用

@@ -44,3 +44,22 @@
 
 单页验收标准六条见 [next-tasks.md](../progress/next-tasks.md) 顶部「当前主线」。
 交付闸门与证据见 [docs/delivery/kiosk-redesign-r1/](../delivery/kiosk-redesign-r1/)。
+
+## 六、2026-09-02 晚更正（并行核对推翻本文两处结论）
+
+本文第二节此前把三条列为「真实缺口」，经复核**两条是我判断错了**：
+
+| 我原先的结论 | 实际 | 我错在哪 |
+|---|---|---|
+| `GET /offline-agencies/:id` —— kiosk 侧不存在 | **存在**：`GET /api/v1/kiosk/offline-agencies/:id`，且 `apps/kiosk/src/services/api/offlineAgencies.ts:227` 正在调 | 正则先命中 `/admin/` 就下了结论，没看全端点表 |
+| `GET /local/qr-login/status` —— Agent 与 kiosk 均无 | 能力**在后端 API 上**：`GET /api/v1/member/auth/qr/:ticketId/status`。扫码登录横跨本地网桥（create/claim）与后端 API（status/confirm）两个服务 | 只在 Agent 和 kiosk 里找，没在 services/api 里找 |
+
+**真实缺口因此从 2 条降为 1 条：只有 `GET /me/summary` 后端确实不存在。**
+
+另外复核发现原型 `03-login-gate.html` 声明的 `status → pending | confirmed | expired` 也是错的：
+后端 `QrTicketStatus`（`member-qr-login.service.ts:17`）只有 `'pending' | 'confirmed'`，
+过期是 404 `QR_LOGIN_NOT_FOUND`、已领取是 410 `QR_LOGIN_ALREADY_CLAIMED`。
+原型的 qr-expired 态是**错误码驱动**的，照 status 值写会永远等不到。以上均已在原型头部改正。
+
+**教训**：判断「某端点不存在」必须遍历完整端点表，不能靠一次正则命中就收手——
+这和本文第三节记的两次错误比较是同一类毛病。
