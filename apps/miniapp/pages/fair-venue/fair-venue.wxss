@@ -1,6 +1,3 @@
-/* 会场导览：骨架样式。真实实现应优先复用 app.wxss 的全局类，这里只保留导航与占位态。 */
-.page { min-height: 100vh; background: #f4f1e8; }
-.nav { display: flex; align-items: center; gap: 16rpx; padding: 0 32rpx 20rpx; }
-.nav-back { font-size: 28rpx; color: #6b7a72; padding: 16rpx 8rpx; }
-.nav-title { font-size: 34rpx; font-weight: 600; color: #23302a; }
-.state { padding: 96rpx 48rpx; text-align: center; color: #8a978f; font-size: 28rpx; }
+/* 会场导览：骨架样式。真实实现优先复用 app.wxss 全局类（page-wrap / navbar / content /
+   card / chip / empty / list-state / notice / actionbar），本文件只放本页私有类。
+   页面 wxss 一律用 rpx 与 var(--*) 令牌，不写死色值。 */

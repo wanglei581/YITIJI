@@ -1,10 +1,14 @@
-<view class="page">
-  <view class="nav" style="padding-top:{{statusBarHeight}}px">
-    <view class="nav-back" bindtap="goBack" aria-label="返回">返回</view>
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
     <view class="nav-title">会场导览</view>
   </view>
 
-  <view wx:if="{{loading}}" class="state">正在加载…</view>
-  <view wx:elif="{{loadError}}" class="state">{{loadError}}</view>
-  <view wx:else class="state">该页面正在接入中，暂未开放。</view>
+  <view class="content">
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+    <view wx:elif="{{loadError}}" class="list-state">{{loadError}}</view>
+    <view wx:else class="list-state">该页面正在接入中，暂未开放。</view>
+  </view>
 </view>
