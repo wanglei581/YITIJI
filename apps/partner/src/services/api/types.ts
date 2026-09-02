@@ -10,6 +10,7 @@ import type {
   SyncFrequency,
   PartnerDataSourceView,
   PartnerDataSourceCapabilities,
+  PartnerDataSourceCredentialRotationResult,
   DataSourceConfig,
   FieldMappingRule,
   MappingValidationError,
@@ -38,6 +39,7 @@ export type {
   SmartCampusTerminalView,
   TerminalSmartCampusConfigView,
   PartnerDataSourceCapabilities,
+  PartnerDataSourceCredentialRotationResult,
 }
 
 export type PartnerSmartCampusTerminal = SmartCampusTerminalView
@@ -73,6 +75,18 @@ export interface CreateDataSourcePayload {
   description?: string
   endpoint?: string
   authType?: AuthType
+  credential?: string
+}
+
+/**
+ * `POST /partner/data-sources/:id/rotate-credential` 请求体。
+ *
+ *   - webhook 源：`credential` 留空 = 服务端生成新密钥；传值 = 使用自带密钥。
+ *   - api 源：`credential` 必填（上游 token 只能由机构从来源平台取得）。
+ *
+ * 只上行、不回显；前端不得把该值写入 localStorage 或日志。
+ */
+export interface RotateDataSourceCredentialPayload {
   credential?: string
 }
 

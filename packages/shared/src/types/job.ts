@@ -237,10 +237,47 @@ export interface PartnerDataSourceView {
   endpoint?: string
   /** Webhook 接收地址（相对路径 `/api/v1/sync/webhook?source=…`，前端按 origin 拼接） */
   webhookUrl?: string
-  /** Webhook 共享密钥 — **只在创建那一刻返回一次**，永不出现在 GET 响应里 */
+  /**
+   * Webhook 共享密钥 — **只在创建那一刻、或一次轮换响应里返回一次**，
+   * 永不出现在 GET 响应里。见 {@link PartnerDataSourceCredentialRotationResult}。
+   */
   webhookSecretOnce?: string
   /** API/Webhook 由管理员启停；文件/手工来源可由机构自助启停。 */
   activationManagedBy?: 'admin' | 'partner'
+  /**
+   * 已归档：来源停止接收 Webhook 推送与 API 拉取，且不再参与内容发布治理。
+   * 归档是数据源的退役路径（**不做物理删除**，理由见
+   * services/api/src/jobs/jobs-partner.service.ts 的 archivePartnerDataSource 注释）。
+   */
+  archived?: boolean
+  /** 归档时间（ISO 8601）；未归档为 null。 */
+  archivedAt?: string | null
+  /**
+   * 凭证最近一次轮换时间（ISO 8601）；从未轮换为 null。
+   * 只是时间戳，不含任何密钥内容，可安全回显——供机构确认轮换是否已生效。
+   */
+  credentialRotatedAt?: string | null
+}
+
+/**
+ * `POST /partner/data-sources/:id/rotate-credential` 的响应契约。
+ *
+ * 安全口径（CLAUDE.md §12 / §18）：
+ *   - `webhookSecretOnce` **只在本次轮换响应里出现一次**，此后任何 GET 都不回显；
+ *     前端必须提示用户当场保存，不得写入 localStorage 或日志。
+ *   - `api` 接入模式不返回任何密钥：上游 token 由机构自己从来源平台取得，
+ *     平台无法代为签发，只负责加密保存。
+ *   - 轮换后旧密钥**立即失效**（库里单值覆盖，无双密钥灰度窗口）。
+ */
+export interface PartnerDataSourceCredentialRotationResult {
+  id: string
+  accessMode: AccessMode
+  /** 轮换后服务端是否持有凭证（正常轮换必为 true） */
+  credentialConfigured: boolean
+  /** 本次轮换时间（ISO 8601） */
+  rotatedAt: string
+  /** 仅 webhook 模式返回，且仅此一次 */
+  webhookSecretOnce?: string
 }
 
 /**
