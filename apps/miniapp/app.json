@@ -56,8 +56,7 @@
     "pages/fair-reminders/fair-reminders",
     "pages/kiosk-login/kiosk-login",
     "pages/daily-report/daily-report",
-    "pages/community/community",
-    "pages/job-tracker/job-tracker"
+    "pages/community/community"
   ],
   "window": {
     "navigationBarTextStyle": "black",
