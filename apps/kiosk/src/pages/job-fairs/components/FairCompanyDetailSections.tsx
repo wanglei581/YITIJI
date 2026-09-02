@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { FairCompanyDTO, FairCompanyPositionDTO } from '@ai-job-print/shared'
 import { SOURCE_APPLY_UNAVAILABLE_REASON } from '../../../lib/capabilityReasons'
-import { COMPANY_SCALE_LABELS } from '../../../types/fair'
 import {
   AwardIcon,
   BriefcaseIcon,
@@ -93,7 +92,7 @@ export function CoverArea({ company }: { company: FairCompanyDTO }) {
         <span className="jf-company-logo">{company.companyName.slice(0, 1)}</span>
         <div className="min-w-0 flex-1">
           <h2 className="font-serif text-[38px] font-black leading-tight text-[var(--ink)]">{company.companyName}</h2>
-          <p className="mt-2 text-[21px] text-[var(--muted)]">{company.industry} · {COMPANY_SCALE_LABELS[company.scale]}</p>
+          <p className="mt-2 text-[21px] text-[var(--muted)]">{[company.industry, company.scale].filter(Boolean).join(' · ') || '来源未提供行业与规模'}</p>
           {company.honorTags && company.honorTags.length > 0 && (
             <div className="jf-meta-chips mt-4">
               {company.honorTags.map((tag) => (

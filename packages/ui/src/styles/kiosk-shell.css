@@ -113,6 +113,18 @@
   min-width: 0;
 }
 
+/* __brand-copy 是后来为 V6 顶栏插进 __brand 与 <b>/<span> 之间的一层包裹。
+   插进来时只在 .v6-runtime-shell 下给了样式，基础层漏了 —— 于是非 V6 的 7 个
+   页面上，__brand 的 gap:18px 只隔开了 mark 与 copy，标题和副标题落回 inline
+   相邻，渲染成「就业服务大厅 · KSK-001AI求职打印服务终端」。
+   这里补回 __brand 原本的排布，不是新设计。 */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__brand-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-width: 0;
+}
+
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__brand b {
   font-family: var(--k-serif);
   font-size: 26px;

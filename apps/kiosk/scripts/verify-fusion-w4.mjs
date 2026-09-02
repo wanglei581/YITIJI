@@ -71,6 +71,18 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
   'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
   'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
+  // 体检报告本身（纯文档，不改行为）。本门禁对文档一贯逐条列举，不开 docs/** 通配。
+  'docs/reviews/page-audit-no-design-2026-09-02.md',
+  // 2026-09-02 招聘会企业数据诚实性修复。W4 本就负责签到数据不伪造
+  // （见下方 fair check-in 三条断言），但守卫按文件路径拦，拦到了 W4 自己的数据路径：
+  //   · httpAdapter 硬造 checkinStatus:'pending'，页面把占位渲染成「未签到」chip
+  //   · coerceScale 把来源的 '>2000' 兜底成 'medium'，全部企业错标「中型（100-999人）」
+  // 两处都在 W4 拥有的招聘会页面上显形，故按现行惯例列入本波集成文件。
+  'apps/kiosk/src/services/api/httpAdapter.ts',
+  'packages/shared/src/types/fairDto.ts',
+  'apps/kiosk/src/types/fair.ts',
+  'apps/kiosk/src/pages/job-fairs/FairCompaniesPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/components/FairCompanyDetailSections.tsx',
   'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
   'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
 ])
@@ -418,6 +430,31 @@ check('fair check-in progress UI requires checkedInCompanies != null and totalCo
     'must not interpolate 已签到 N 家 from nullable checkedInCompanies unconditionally',
   )
 })
+check('per-company fair data is not fabricated by the adapter', () => {
+  // 上一条断言的是招聘会**聚合**签到指标不伪造。它管不到**单个企业**那一层：
+  // 适配层曾硬造 checkinStatus:'pending'（接口 payload 里根本没这个字段），
+  // 页面把占位当事实渲染成「未签到」chip —— 对每家企业断言了系统不掌握的状态。
+  // 同一处还有 coerceScale，把来源的 '>2000' 兜底成 'medium'，于是 8 家真实规模
+  // 超两千人的企业全被标成「中型企业（100-999人）」，是对来源信息的改写。
+  const adapter = read('src/services/api/httpAdapter.ts')
+  assert.doesNotMatch(
+    adapter,
+    /checkinStatus:\s*['"](?:pending|checked_in|absent)['"]/,
+    'adapter must not fabricate a per-company checkinStatus; the wire payload has no such field',
+  )
+  assert.doesNotMatch(
+    adapter,
+    /function coerceScale|:\s*coerceScale\(/,
+    'company scale is the source platform\u2019s own display text (e.g. ">2000"); do not re-bucket it into an enum',
+  )
+  const list = read('src/pages/job-fairs/FairCompaniesPage.tsx')
+  assert.doesNotMatch(
+    list,
+    /CHECKIN_LABELS\[/,
+    'company list must not render a check-in chip while the system does not track check-in',
+  )
+})
+
 check('campus and smart-campus stay honest and distinct', () => {
   assert.match(campusPage, /getJobFairs\(terminalId \? \{ terminalId \} : undefined\)/)
   assert.doesNotMatch(campusWelcome, /待开发/)

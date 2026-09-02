@@ -182,27 +182,13 @@ function mapWirePosition(p: WireFairPosition): FairCompanyPositionDTO {
   }
 }
 
-const VALID_SCALES: ReadonlyArray<FairCompanyDTO['scale']> = [
-  'startup',
-  'small',
-  'medium',
-  'large',
-  'enterprise',
-]
-
-function coerceScale(scale?: string | null): FairCompanyDTO['scale'] {
-  return scale && (VALID_SCALES as readonly string[]).includes(scale)
-    ? (scale as FairCompanyDTO['scale'])
-    : 'medium'
-}
-
 function mapWireCompany(c: WireFairCompany): FairCompanyDTO {
   return {
     id:                c.id,
     fairId:            c.jobFairId,
     companyName:       c.name,
     industry:          c.industry ?? '',
-    scale:             coerceScale(c.scale),
+    scale:             c.scale ?? null,
     description:       c.description ?? undefined,
     sourceUrl:         c.sourceUrl ?? undefined,
     boothNumber:       c.boothNumber ?? undefined,
@@ -214,7 +200,10 @@ function mapWireCompany(c: WireFairCompany): FairCompanyDTO {
     headquarters:      c.headquarters ?? undefined,
     registeredCapital: c.registeredCapital ?? undefined,
     // 模型无现场签到 → 合规占位（不做签到）
-    checkinStatus:     'pending',
+    // 系统不追踪招聘会签到，接口 payload 里也没有这个字段。此前这里硬造
+    // 'pending'，页面把占位当事实渲染成「未签到」chip——对每家企业断言了一个
+    // 系统根本不掌握的状态。留 undefined，页面不渲染该 chip。
+    checkinStatus:     undefined,
     applyNote:         '如需了解更多，请扫码前往来源平台',
   }
 }
