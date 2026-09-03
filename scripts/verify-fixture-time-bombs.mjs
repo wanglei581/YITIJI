@@ -31,7 +31,7 @@
 // 大多数是 mock 时钟或惰性过去数据，一刀切会误伤一片，那种门禁会被直接删掉。
 // ============================================================
 
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -42,7 +42,11 @@ const SCAN_DIRS = ['services/api/scripts', 'apps/kiosk/scripts', 'scripts']
 const ENDPOINT_NAMES = /\b(PAST|FUTURE|FAR_PAST|FAR_FUTURE)\b/
 
 /** 受真实时钟影响的时效字段。 */
-const VALIDITY_FIELDS = ['startAt', 'endAt', 'validFrom', 'validUntil', 'expiresAt']
+const VALIDITY_FIELDS = [
+  'startAt', 'endAt', 'validFrom', 'validUntil', 'expiresAt',
+  // validThrough 是原事故的岗位侧字段，初版漏了 —— 岗位过期判定用的就是它。
+  'validThrough',
+]
 
 /**
  * 安全带边界。≤2001 永远是过去，≥2098 在本项目生命周期内永远是未来。
@@ -77,7 +81,28 @@ const DATE_YEAR_PATTERNS = [
   /new Date\(\s*['"`](\d{4})-/g,
   /Date\.parse\(\s*['"`](\d{4})-/g,
   /new Date\(\s*(\d{4})\s*,/g,
+  // 裸 ISO 字符串。仓库里已有这种写法（verify-recruitment-integration-readiness.ts
+  // 的 startAt/endAt 就是 '2026-09-01T…'，和炸过的两颗同一个日期），初版两层都漏。
+  /['"`](\d{4})-\d{2}-\d{2}T/g,
 ]
+
+/** 从 objText[start] 起取到同层的下一个逗号（不被括号 / 引号内的逗号截断）。 */
+function fieldValue(text, start) {
+  let depth = 0
+  let quote = null
+  for (let i = start; i < text.length; i += 1) {
+    const c = text[i]
+    if (quote) {
+      if (c === quote && text[i - 1] !== '\\') quote = null
+      continue
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; continue }
+    if (c === '(' || c === '[' || c === '{') depth += 1
+    else if (c === ')' || c === ']' || c === '}') depth -= 1
+    else if (c === ',' && depth <= 0) return text.slice(start, i)
+  }
+  return text.slice(start)
+}
 
 function dateYears(text) {
   const years = []
@@ -92,6 +117,21 @@ function inDangerZone(year) {
   return year > SAFE_PAST_MAX && year < SAFE_FUTURE_MIN
 }
 
+/**
+ * 存量欠账基线。**这个数只允许调低。**
+ *
+ * 放开扫描范围后，仓库里有 27 处危险带日期字面量。它们大多数是 mock 时钟或惰性
+ * 过去数据，但要逐个读懂 10 个文件的时钟语义才能确认 —— 那是另一个任务，不是
+ * 本门禁的前置条件。给它们批量盖 `time-bomb-ok` 章是更糟的选择：**盖不实的章
+ * 制造虚假信心**，比没有门禁更危险。
+ *
+ * 所以按本仓库既有做法（见 verify-ci-gate-coverage.mjs 的 MAX_UNWIRED）记账：
+ * 存量计数封顶，**新增一处就红**。想加新的，先还掉一条旧的。
+ * 还账方式：改用端点常量，或加 `time-bomb-ok:` 并写明时间从哪来。
+ */
+const BASELINE_FILE = 'scripts/fixture-time-bomb-baseline.json'
+
+let existingSites = 0
 let failed = 0
 let checkedFiles = 0
 let checkedSites = 0
@@ -100,6 +140,13 @@ const exemptedFiles = []
 function fail(msg, detail) {
   failed += 1
   console.log(`  ✗ ${msg}${detail ? ` — ${detail}` : ''}`)
+}
+
+/** 危险带站点按文件归集：baseline 记账按文件比，不看总数。 */
+const sitesByFile = new Map()
+function record(rel, msg) {
+  if (!sitesByFile.has(rel)) sitesByFile.set(rel, [])
+  sitesByFile.get(rel).push(msg)
 }
 function pass(msg) {
   console.log(`  ✓ ${msg}`)
@@ -130,7 +177,9 @@ if (files.length < 50) {
 
 for (const full of files) {
   const src = readFileSync(full, 'utf-8')
-  if (!ENDPOINT_NAMES.test(src)) continue
+  // 范围**不再**限制为「定义了端点常量的文件」。初版那样限制，等于只给已经意识到
+  // 问题的作者加锁 —— 而下一颗雷大概率在一份新写的、压根没有端点常量的脚本里。
+  // 存量欠账走下面的 baseline 记账（只允许调低），增量一律拦死。
   const rel = relative(REPO_ROOT, full).split('\\').join('/')
   // 本门禁自己的源码里写着这些指令字符串（在说明文档里），不能因此把自己豁免掉 ——
   // 「意外自我豁免」是门禁被悄悄掏空的典型方式。
@@ -144,7 +193,7 @@ for (const full of files) {
 
   // ── 规则 1：端点常量本身必须够远 ────────────────────────────────
   for (const m of src.matchAll(
-    /const\s+(PAST|FAR_PAST|FUTURE|FAR_FUTURE)\s*=\s*([^\n]+)/g,
+    /const\s+(PAST|FAR_PAST|FUTURE|FAR_FUTURE)\s*(?::[^=\n]+)?=\s*([^\n]+)/g,
   )) {
     const [, name, expr] = m
     const years = dateYears(expr)
@@ -160,10 +209,7 @@ for (const full of files) {
     const around = lines.slice(Math.max(0, declLine - 5), declLine).join('\n')
     if (!ok && EXEMPT.test(around)) continue
     if (!ok) {
-      fail(
-        `${rel} 的 ${name} 端点不够远`,
-        `${year}；${isPast ? `应 ≤${SAFE_PAST_MAX}` : `应 ≥${SAFE_FUTURE_MIN}`}（它自己就是定时炸弹）`,
-      )
+      record(rel, `${name} 端点=${year}，${isPast ? `应 ≤${SAFE_PAST_MAX}` : `应 ≥${SAFE_FUTURE_MIN}`}（它自己就是定时炸弹）`)
     }
   }
 
@@ -172,16 +218,16 @@ for (const full of files) {
     for (const field of VALIDITY_FIELDS) {
       const at = line.search(new RegExp(`\\b${field}:`))
       if (at === -1) continue
-      const years = dateYears(line.slice(at))
+      // 只取**这个字段自己的值**，切到同层的下一个逗号为止。
+      // 初版切到行尾：`startAt: <安全>, endAt: <危险>` 里查 startAt 会借到 endAt 的
+      // 日期 —— 归属判错，而且反过来会让一个真雷被旁边的安全值掩盖。
+      const years = dateYears(fieldValue(line, at + field.length + 1))
       if (years.length === 0) continue
       checkedSites += 1
       const year = years.find(inDangerZone)
       if (year === undefined) continue
       if (EXEMPT.test(line) || EXEMPT.test(lines[i - 1] ?? '')) continue
-      fail(
-        `${rel}:${i + 1} 的 ${field} 写死危险带日期`,
-        `${year} 年；改用端点常量，或加 \`time-bomb-ok: <理由>\` 注释说明为何不会随运行日期失效`,
-      )
+      record(rel, `:${i + 1} ${field}=${year}`)
     }
   })
 }
@@ -189,9 +235,56 @@ for (const full of files) {
 if (checkedFiles === 0) fail('没有文件被检查（断言空跑）')
 if (checkedSites === 0) fail('没有站点被检查（断言空跑）')
 
+// ── baseline 记账：按文件比，只允许调低 ──────────────────────────────────
+//
+// 不比总数：只看总数的门禁必被「平摊」绕过 —— 删一处旧的、在别处加一处新的，
+// 总数不变而门禁沉默。按文件比对可以同时挡住跨文件搬运。
+// 生成 / 更新基线：FIXTURE_TIME_BOMB_WRITE_BASELINE=1 node scripts/verify-fixture-time-bombs.mjs
+// 还账后用它把基线降下来。**不要**用它来给新增站点开口子 —— 那正是这套记账要挡的。
+if (process.env['FIXTURE_TIME_BOMB_WRITE_BASELINE'] === '1') {
+  const sites = {}
+  for (const [rel, msgs] of [...sitesByFile.entries()].sort()) sites[rel] = msgs.length
+  const body = {
+    $readme: [
+      '危险带（2002–2097）日期字面量的存量欠账，按文件计数。',
+      '这些数**只允许调低**：新增一处就红，跨文件搬运也挡得住（按文件比，不比总数）。',
+      '还账方式：改用远端点常量（≤2001 / ≥2098），或加 `time-bomb-ok:` 注释写明时间从哪来。',
+      '还完账后跑 FIXTURE_TIME_BOMB_WRITE_BASELINE=1 重新生成，把数字落进本文件。',
+    ],
+    sites,
+  }
+  writeFileSync(join(REPO_ROOT, BASELINE_FILE), `${JSON.stringify(body, null, 2)}\n`)
+  console.log(`已写入基线 ${BASELINE_FILE}：${Object.keys(sites).length} 个文件`)
+  process.exit(0)
+}
+
+const baseline = JSON.parse(readFileSync(join(REPO_ROOT, BASELINE_FILE), 'utf-8')).sites
+const seen = new Set()
+for (const [rel, msgs] of [...sitesByFile.entries()].sort()) {
+  seen.add(rel)
+  const allowed = baseline[rel] ?? 0
+  if (msgs.length > allowed) {
+    fail(
+      `${rel} 危险带站点 ${msgs.length} 处，超过基线 ${allowed}`,
+      `新增的必须改用端点常量，或加 \`time-bomb-ok:\` 写明时间从哪来。\n     ${msgs.join('\n     ')}`,
+    )
+  } else if (msgs.length < allowed) {
+    fail(
+      `${rel} 已还账到 ${msgs.length} 处（基线仍写着 ${allowed}）`,
+      '请把基线调低到实际值 —— 这个数只允许调低，还完账要落进文件，否则等于给自己留额度',
+    )
+  }
+}
+for (const [rel, allowed] of Object.entries(baseline)) {
+  if (!seen.has(rel) && allowed > 0) {
+    fail(`基线里的 ${rel} 已无危险带站点`, `请从 ${BASELINE_FILE} 删掉这一条`)
+  }
+}
+
 console.log('')
 if (failed === 0) {
-  pass(`${checkedFiles} 个文件 / ${checkedSites} 处站点，无定时炸弹`)
+  const total = [...sitesByFile.values()].reduce((n, m) => n + m.length, 0)
+  pass(`${checkedFiles} 个文件 / ${checkedSites} 处站点；存量欠账 ${total} 处，与基线一致，无新增`)
   if (exemptedFiles.length) {
     console.log(`  · 整份豁免（mock 时钟）：${exemptedFiles.join(', ')}`)
   }
