@@ -263,6 +263,21 @@ export class JobSyncService {
       throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
     }
     if (enabled) {
+      // 归档源不得被 Admin 重新启用。
+      //
+      // 这条守卫此前只装在 partner 单侧（jobs-partner.service.ts 的 toggle），
+      // 而 Admin 的「审批并启用」走的是本方法，不查 archivedAt —— 于是机构归档后，
+      // Admin 在接入通道页看到它排在停用列表里（页面当时也不显示归档标记），点启用即
+      // 产生 archivedAt != null && enabled = true 的矛盾状态：webhook 接收与 API 拉取
+      // 只看 enabled，会恢复进数据；机构控制台那行仍显示「已归档」，而 admin 托管源
+      // 本就不给 partner toggle，机构自己停不掉。归档时旧密钥也未轮换，对接方还在推
+      // 就会静默恢复流入 pending 队列。
+      // partner 侧注释早已写明这个矛盾状态的危害，本次把同一条判据补到 Admin 这一侧。
+      if (source.archivedAt != null) {
+        throw new BadRequestException({
+          error: { code: 'SOURCE_ARCHIVED', message: '数据源已归档，无法启用；请先由所属机构取消归档' },
+        })
+      }
       if (!source.org.enabled) {
         throw new BadRequestException({ error: { code: 'SOURCE_ORG_DISABLED', message: '机构已停用，不能启用数据源' } })
       }

@@ -12,8 +12,20 @@ import {
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, PartnerDataSourceCapabilities, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
-import { API_ORIGIN, getDataSources, getDataSourceCapabilities, toggleDataSource, createDataSource } from '../../services/api'
+import {
+  API_ORIGIN,
+  getDataSources,
+  getDataSourceCapabilities,
+  toggleDataSource,
+  createDataSource,
+  archiveDataSource,
+  unarchiveDataSource,
+} from '../../services/api'
 import { ExcelImportModal } from './ExcelImportModal'
+import { RotateCredentialDrawer } from './RotateCredentialDrawer'
+
+/** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
+const CREDENTIAL_ACCESS_MODES: readonly string[] = ['api', 'webhook']
 
 function resolveWebhookUrl(webhookUrl?: string): string {
   if (!webhookUrl) return ''
@@ -335,6 +347,11 @@ export default function SourcesPage() {
   const [togglingId,   setTogglingId]   = useState<string | null>(null)
   const [toggleError,  setToggleError]  = useState<string | null>(null)
   const [importNotice, setImportNotice] = useState<string | null>(null)
+  // 凭证轮换(修复"密钥丢了只能删源重建"——而平台从不做物理删除)
+  const [rotateTarget, setRotateTarget] = useState<PartnerDataSource | null>(null)
+  const [archivingId,  setArchivingId]  = useState<string | null>(null)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState<PartnerDataSource | null>(null)
 
   const fetchSources = () =>
     getDataSources()
@@ -372,6 +389,30 @@ export default function SourcesPage() {
       .finally(() => {
         setTogglingId(null)
       })
+  }
+
+  /**
+   * 归档 / 取消归档。
+   *
+   * 归档是本平台数据源的退役路径——**没有物理删除**：数据源上挂着同步日志、导入批次和
+   * 字段映射规则（非空外键），还挂着已导入岗位/招聘会的来源链，硬删会毁掉合规要求留存的记录。
+   * 详见服务端 JobsPartnerService.archivePartnerDataSource 的注释。
+   */
+  const handleArchive = (source: PartnerDataSource, archived: boolean) => {
+    if (archivingId) return
+    setArchivingId(source.id)
+    setArchiveError(null)
+    setConfirmArchive(null)
+    const run = archived ? archiveDataSource(source.id) : unarchiveDataSource(source.id)
+    run
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === source.id ? updated : s))
+      })
+      .catch(() => {
+        setArchiveError(source.id)
+        setTimeout(() => setArchiveError((prev) => (prev === source.id ? null : prev)), 3000)
+      })
+      .finally(() => setArchivingId(null))
   }
 
   const handleSourceCreated = async (payload: CreateDataSourcePayload) => {
@@ -450,6 +491,11 @@ export default function SourcesPage() {
                       <div className="flex items-center gap-2">
                         <DatabaseIcon className="h-4 w-4 text-neutral-400" />
                         {s.name}
+                        {s.archived && (
+                          <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[11px] font-medium text-neutral-600">
+                            已归档
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -485,25 +531,60 @@ export default function SourcesPage() {
                               查看接入
                             </button>
                           )}
-                          {s.activationManagedBy === 'admin' ? (
-                            <span className="rounded bg-warning-bg px-2 py-1 text-xs font-medium text-warning-fg">
-                              {s.connStatus === 'disabled' ? '等待管理员启用' : '管理员管理启停'}
-                            </span>
-                          ) : <button
-                            className={`rounded px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
-                              s.connStatus === 'disabled'
-                                ? 'text-success-fg hover:bg-success-bg'
-                                : 'text-warning-fg hover:bg-warning-bg'
-                            }`}
-                            type="button"
-                            disabled={togglingId === s.id}
-                            onClick={() => handleToggle(s.id)}
-                          >
-                            {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
-                          </button>}
+                          {/* 轮换密钥：凭证丢失/泄露的唯一补救路径。
+                              归档源不给轮换入口——已经不进数据了，轮换没有意义。 */}
+                          {CREDENTIAL_ACCESS_MODES.includes(s.accessMode) && !s.archived && (
+                            <button
+                              className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                              type="button"
+                              onClick={() => setRotateTarget(s)}
+                            >
+                              轮换密钥
+                            </button>
+                          )}
+                          {s.archived ? (
+                            <button
+                              className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg disabled:cursor-not-allowed disabled:opacity-50"
+                              type="button"
+                              disabled={archivingId === s.id}
+                              onClick={() => handleArchive(s, false)}
+                            >
+                              {archivingId === s.id ? '处理中…' : '取消归档'}
+                            </button>
+                          ) : (
+                            <>
+                              {s.activationManagedBy === 'admin' ? (
+                                <span className="rounded bg-warning-bg px-2 py-1 text-xs font-medium text-warning-fg">
+                                  {s.connStatus === 'disabled' ? '等待管理员启用' : '管理员管理启停'}
+                                </span>
+                              ) : <button
+                                className={`rounded px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                                  s.connStatus === 'disabled'
+                                    ? 'text-success-fg hover:bg-success-bg'
+                                    : 'text-warning-fg hover:bg-warning-bg'
+                                }`}
+                                type="button"
+                                disabled={togglingId === s.id}
+                                onClick={() => handleToggle(s.id)}
+                              >
+                                {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
+                              </button>}
+                              <button
+                                className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                type="button"
+                                disabled={archivingId === s.id}
+                                onClick={() => setConfirmArchive(s)}
+                              >
+                                {archivingId === s.id ? '处理中…' : '归档'}
+                              </button>
+                            </>
+                          )}
                         </div>
                         {toggleError === s.id && (
                           <span className="text-xs text-error-fg">操作失败，请重试</span>
+                        )}
+                        {archiveError === s.id && (
+                          <span className="text-xs text-error-fg">归档操作失败，请重试</span>
                         )}
                       </div>
                     </td>
@@ -534,7 +615,7 @@ export default function SourcesPage() {
         />
       )}
 
-      {/* Webhook 接入说明(只读指引;webhookSecret 创建时一次性下发,不再回显) */}
+      {/* Webhook 接入说明(只读指引;密钥不回显,遗失走轮换而不是删除——平台不做物理删除) */}
       <Drawer
         open={Boolean(webhookGuide)}
         onClose={() => setWebhookGuide(null)}
@@ -551,11 +632,66 @@ export default function SourcesPage() {
             </div>
             <div className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">
               <p className="mb-1 font-medium text-neutral-700">签名要求(请求方实现)</p>
-              <p>Header 携带 <code className="font-mono">x-webhook-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
+              <p>Header 携带 <code className="font-mono">x-webhook-signature</code>(HMAC-SHA256,密钥为本数据源的 webhookSecret)、
               <code className="font-mono">x-webhook-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-webhook-nonce</code>(防重放)。</p>
-              <p className="mt-1.5">webhookSecret 仅在创建时下发一次,平台不再回显;如遗失请删除数据源后重建。</p>
+              <p className="mt-1.5">
+                密钥只在下发那一次显示,平台不保存明文也不再回显。
+                <strong className="font-medium text-neutral-700">如遗失,请用列表里的「轮换密钥」重新生成</strong>,不需要也无法删除数据源重建。
+              </p>
+              <p className="mt-1.5 text-warning-fg">
+                注意:轮换会让旧密钥<strong className="font-medium">立即失效</strong>,请先和对接方约好切换时间。
+              </p>
+              {webhookGuide.credentialRotatedAt && (
+                <p className="mt-1.5 text-neutral-400">
+                  最近一次密钥下发/轮换:{new Date(webhookGuide.credentialRotatedAt).toLocaleString('zh-CN')}
+                </p>
+              )}
             </div>
             <p className="text-xs text-neutral-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
+          </div>
+        )}
+      </Drawer>
+
+      {/* 轮换密钥确认 + 新密钥一次性展示 */}
+      <RotateCredentialDrawer
+        source={rotateTarget}
+        onClose={() => setRotateTarget(null)}
+        onRotated={() => { void fetchSources() }}
+      />
+
+      {/* 归档确认。文案只写系统真正会做的事:停止进数据、保留记录、可撤销;
+          不写"删除",因为平台不做物理删除(见 handleArchive 注释)。 */}
+      <Drawer
+        open={Boolean(confirmArchive)}
+        onClose={() => setConfirmArchive(null)}
+        title={confirmArchive ? `归档数据源 · ${confirmArchive.name}` : '归档数据源'}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" size="md" onClick={() => setConfirmArchive(null)}>取消</Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => confirmArchive && handleArchive(confirmArchive, true)}
+            >
+              确认归档
+            </Button>
+          </div>
+        }
+      >
+        {confirmArchive && (
+          <div className="space-y-3 text-sm text-neutral-700">
+            <p>归档后，这个数据源会：</p>
+            <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-neutral-600">
+              <li>停止接收 Webhook 推送、停止 API 拉取（同时置为停用）</li>
+              <li>保留同步日志、导入批次和字段映射规则，历史可追溯</li>
+              <li>保留已导入内容的来源信息，岗位/招聘会详情仍能显示来源机构</li>
+            </ul>
+            <p className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">
+              <strong className="font-medium text-neutral-700">已发布的岗位/招聘会不会被自动下架。</strong>
+              需要下架已发布内容，请另行联系管理员执行批量下架。
+            </p>
+            <p className="text-xs text-neutral-400">归档可以撤销：在列表里点「取消归档」即可，但不会自动恢复启用。</p>
           </div>
         )}
       </Drawer>
