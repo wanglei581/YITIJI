@@ -1,0 +1,251 @@
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory = $true)][string]$PredecessorExePath,
+  [Parameter(Mandatory = $true)][string]$CandidateExePath
+)
+
+$ErrorActionPreference = "Stop"
+$PREDECESSOR_VERSION = "0.4.10"
+$CANDIDATE_VERSION = "0.4.11"
+$resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
+$resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
+$installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
+$stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
+$nodePath = Join-Path $installRoot "node\node.exe"
+$serviceName = "aijobprintagent.exe"
+$programMenuRoot = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal"
+$panelShortcutPath = Join-Path $programMenuRoot "AI Job Print Terminal.url"
+$desktopShortcutName = -join ([char[]](0x0041, 0x0049, 0x0020, 0x6C42, 0x804C, 0x6253, 0x5370, 0x670D, 0x52A1, 0x7EC8, 0x7AEF))
+$desktopShortcutPath = Join-Path ([Environment]::GetFolderPath("CommonDesktopDirectory")) ($desktopShortcutName + ".lnk")
+$controlCenterShortcutName = -join ([char[]](0x7EC8, 0x7AEF, 0x63A7, 0x5236, 0x4E2D, 0x5FC3))
+$controlCenterShortcutPath = Join-Path $programMenuRoot ($controlCenterShortcutName + ".lnk")
+$controlCenterScriptPath = Join-Path $installRoot "provision\terminal-control-center.ps1"
+$controlCenterLauncherPath = Join-Path $installRoot "provision\launch-control-center.vbs"
+$configPath = Join-Path $stateRoot "agent-config.json"
+$tokenPath = Join-Path $stateRoot "agent.token"
+$databasePath = Join-Path $stateRoot "agent.db"
+$scanRoot = Join-Path $stateRoot "scan-inbox"
+$scanFixturePath = Join-Path $scanRoot "upgrade-preservation-fixture.pdf"
+$logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
+New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+
+function Invoke-Bundle([string]$ExePath, [string]$Action, [string]$LogName) {
+  $logPath = Join-Path $logRoot $LogName
+  $arguments = @($Action, "/quiet", "/norestart", "/log", ('"' + $logPath + '"'))
+  $process = Start-Process -FilePath $ExePath -ArgumentList $arguments -Wait -PassThru
+  if ($process.ExitCode -notin @(0, 3010)) {
+    throw "Burn bundle $Action failed with exit code $($process.ExitCode); see $logPath"
+  }
+}
+
+function Get-AgentProductEntries {
+  $uninstallRoots = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+  )
+  return @(
+    Get-ItemProperty -Path $uninstallRoots -ErrorAction SilentlyContinue |
+      Where-Object { $_.DisplayName -eq "AI Job Print Agent" }
+  )
+}
+
+function Assert-AgentProductVersion([string]$ExpectedVersion) {
+  $entries = @(Get-AgentProductEntries)
+  if ($entries.Count -ne 1) {
+    throw "Expected exactly one installed AI Job Print Agent product, found $($entries.Count)"
+  }
+  if ([string]$entries[0].DisplayVersion -ne $ExpectedVersion) {
+    throw "Installed Agent version mismatch: expected=$ExpectedVersion actual=$($entries[0].DisplayVersion)"
+  }
+}
+
+function Assert-StoppedManualService {
+  $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
+  if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
+    throw "Upgrade must preserve the unprovisioned Stopped/Manual service contract"
+  }
+}
+
+function Assert-PanelShortcut {
+  if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not preserve the local status panel Start Menu shortcut"
+  }
+  $shortcut = Get-Content -Raw -Encoding ASCII -LiteralPath $panelShortcutPath
+  if ($shortcut -notmatch "(?m)^URL=http://127\.0\.0\.1:9527/local/panel\r?$") {
+    throw "Upgraded local status panel shortcut does not use the fixed loopback URL"
+  }
+}
+
+function Assert-DesktopShortcut {
+  if (-not (Test-Path -LiteralPath $desktopShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center desktop shortcut"
+  }
+  if (-not (Test-Path -LiteralPath $controlCenterScriptPath -PathType Leaf) -or -not (Test-Path -LiteralPath $controlCenterLauncherPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center payload"
+  }
+  if (-not (Test-Path -LiteralPath $controlCenterShortcutPath -PathType Leaf)) {
+    throw "$CANDIDATE_VERSION upgrade did not install the terminal control center Start Menu shortcut"
+  }
+}
+
+function Assert-ControlCenterSmoke([string]$ExpectedVersion) {
+  $outputPath = Join-Path $logRoot "upgrade-control-center-smoke.json"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $controlCenterScriptPath -SmokeTest -SmokeTestOutput $outputPath
+  if ($LASTEXITCODE -ne 0) { throw "Upgraded terminal control center smoke test failed" }
+  $snapshot = Get-Content -Raw -Encoding UTF8 -LiteralPath $outputPath | ConvertFrom-Json
+  if (-not [bool]$snapshot.installed -or [string]$snapshot.version -ne $ExpectedVersion) {
+    throw "Upgraded terminal control center smoke snapshot is invalid"
+  }
+}
+
+function Write-StateFixture {
+  New-Item -ItemType Directory -Path $stateRoot, $scanRoot -Force | Out-Null
+  $fixtureConfig = [ordered]@{
+    apiBaseUrl = "https://fixture.invalid/api/v1"
+    terminalCode = "UPGRADE-FIXTURE"
+    terminalId = "t_upgrade_fixture"
+    printerName = "Fixture Printer"
+    scanWatchFolder = $scanRoot
+    agentVersion = "$PREDECESSOR_VERSION-production"
+    heartbeatIntervalMs = 30000
+    claimIntervalMs = 5000
+    localApiPort = 9527
+    localApiAllowedOrigins = @("https://fixture.invalid")
+    localApiBridgeToken = "fixture-bridge-token-not-a-real-secret"
+  }
+  [System.IO.File]::WriteAllText(
+    $configPath,
+    (($fixtureConfig | ConvertTo-Json -Depth 4) + "`n"),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  [System.IO.File]::WriteAllBytes($tokenPath, [byte[]](1, 2, 3, 4, 250, 251, 252))
+  [System.IO.File]::WriteAllBytes($databasePath, [System.Text.Encoding]::ASCII.GetBytes("SQLite format 3``0upgrade-fixture"))
+  [System.IO.File]::WriteAllBytes($scanFixturePath, [System.Text.Encoding]::ASCII.GetBytes("%PDF-upgrade-fixture"))
+}
+
+function Get-StateFixtureSnapshot {
+  $paths = @($configPath, $tokenPath, $databasePath, $scanFixturePath)
+  $snapshot = [ordered]@{}
+  foreach ($path in $paths) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+      throw "Upgrade state fixture is missing: $path"
+    }
+    $relativePath = $path.Substring($stateRoot.Length).TrimStart("\")
+    $snapshot[$relativePath] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+  }
+  return $snapshot
+}
+
+function Assert-StateFixture([System.Collections.IDictionary]$Expected, [string]$Phase) {
+  $actual = Get-StateFixtureSnapshot
+  foreach ($relativePath in $Expected.Keys) {
+    if ($actual[$relativePath] -ne $Expected[$relativePath]) {
+      throw "ProgramData state changed during ${Phase}: $relativePath"
+    }
+  }
+}
+
+$predecessorInstalled = $false
+$candidateInstalled = $false
+$upgradeCompleted = $false
+$ownsFixtureState = $false
+$stateFixtureSnapshot = $null
+
+try {
+  if ($resolvedPredecessor -eq $resolvedCandidate) {
+    throw "Predecessor and candidate bundles must be distinct files"
+  }
+  if (Test-Path -LiteralPath $installRoot) {
+    throw "EXE upgrade lifecycle requires an unused Program Files root: $installRoot"
+  }
+  if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
+    throw "EXE upgrade lifecycle requires the Agent service to be absent"
+  }
+  if (@(Get-AgentProductEntries).Count -ne 0) {
+    throw "EXE upgrade lifecycle requires the Agent MSI product to be absent"
+  }
+  if (Test-Path -LiteralPath $stateRoot) {
+    throw "EXE upgrade lifecycle requires an unused ProgramData root: $stateRoot"
+  }
+  $ownsFixtureState = $true
+
+  Invoke-Bundle -ExePath $resolvedPredecessor -Action "/install" -LogName "upgrade-predecessor-install.log"
+  $predecessorInstalled = $true
+  Assert-AgentProductVersion -ExpectedVersion $PREDECESSOR_VERSION
+  Assert-StoppedManualService
+  Assert-PanelShortcut
+  Assert-DesktopShortcut
+  Assert-ControlCenterSmoke -ExpectedVersion $PREDECESSOR_VERSION
+
+  Write-StateFixture
+  $stateFixtureSnapshot = Get-StateFixtureSnapshot
+
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/install" -LogName "upgrade-candidate-install.log"
+  $candidateInstalled = $true
+  Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
+  Assert-StoppedManualService
+  Assert-PanelShortcut
+  Assert-DesktopShortcut
+  Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
+  if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
+    throw "Bundled Node runtime is missing after upgrade"
+  }
+  Assert-StateFixture -Expected $stateFixtureSnapshot -Phase "upgrade"
+  $upgradeCompleted = $true
+
+  Remove-Item -LiteralPath $nodePath -Force
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/repair" -LogName "upgrade-candidate-repair.log"
+  if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
+    throw "Candidate repair did not restore the managed Node runtime after upgrade"
+  }
+  Assert-DesktopShortcut
+  Assert-ControlCenterSmoke -ExpectedVersion $CANDIDATE_VERSION
+  Assert-StateFixture -Expected $stateFixtureSnapshot -Phase "repair"
+
+  Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName "upgrade-candidate-uninstall.log"
+  $candidateInstalled = $false
+  $predecessorInstalled = $false
+  if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
+    throw "Service still exists after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $installRoot) {
+    throw "Program Files payload still exists after upgraded candidate uninstall"
+  }
+  Assert-StateFixture -Expected $stateFixtureSnapshot -Phase "uninstall"
+  if (Test-Path -LiteralPath $panelShortcutPath) {
+    throw "Local status panel Start Menu shortcut remains after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $desktopShortcutPath) {
+    throw "Terminal control center desktop shortcut remains after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $controlCenterShortcutPath) {
+    throw "Terminal control center Start Menu shortcut remains after upgraded candidate uninstall"
+  }
+
+  Write-Host "EXE_UPGRADE_LIFECYCLE_PASS from=$PREDECESSOR_VERSION to=$CANDIDATE_VERSION configTokenDbScanRetained=true"
+} finally {
+  if ($candidateInstalled) {
+    try {
+      Invoke-Bundle -ExePath $resolvedCandidate -Action "/uninstall" -LogName "upgrade-cleanup-candidate.log"
+    } catch {
+      Write-Warning "Candidate cleanup failed: $($_.Exception.Message)"
+    }
+  }
+  if ($predecessorInstalled -and -not $upgradeCompleted) {
+    try {
+      Invoke-Bundle -ExePath $resolvedPredecessor -Action "/uninstall" -LogName "upgrade-cleanup-predecessor.log"
+    } catch {
+      Write-Warning "Predecessor cleanup failed: $($_.Exception.Message)"
+    }
+  }
+  if ($ownsFixtureState) {
+    foreach ($fixturePath in @($configPath, $tokenPath, $databasePath, $scanFixturePath)) {
+      if (Test-Path -LiteralPath $fixturePath -PathType Leaf) {
+        Remove-Item -LiteralPath $fixturePath -Force
+      }
+    }
+    if ((Test-Path -LiteralPath $scanRoot -PathType Container) -and @(Get-ChildItem -LiteralPath $scanRoot -Force).Count -eq 0) {
+      Remove-Item -LiteralPath $scanRoot -Force
+    }
+  }
+}

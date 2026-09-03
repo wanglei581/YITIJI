@@ -226,7 +226,9 @@ export type PrintJobMonitorStatus =
  * so neither value can inject into the PowerShell parser.
  *
  * Matching: DocumentName -like "*<taskId>*"
- * The temp file is named "task_<taskId>.pdf" so DocumentName will contain the taskId.
+ * The submitted PDF filename always contains taskId: downloaded PDFs use
+ * "task_<taskId>.pdf", while converted images use
+ * "print_<taskId>_<uuid>.pdf".
  *
  * PaperOut confirmation: callers must require 2 consecutive 'paper_empty' results
  * before acting, to guard against transient driver state flicker.
@@ -258,6 +260,82 @@ export async function getPrintJobStatus(
 
   const output = await runPowerShell(script, `${printerName}|${safeTaskId}`)
   return parsePrintJobStatus(output)
+}
+
+/**
+ * Build the Windows PrintService completion query used by the runtime and by
+ * the Windows fixture verifier.
+ *
+ * Event 307's formatted Message is localized. Most drivers preserve the
+ * submitted document name in raw XML, so the taskId remains the preferred
+ * correlation key. Some Pantum drivers replace it with a generic localized
+ * value such as "打印文档". For that verified field behaviour, the fallback is
+ * deliberately narrow: Param2 must equal the field-verified generic value
+ * "打印文档", the event must be for the exact configured queue, be owned by
+ * LocalSystem (the Agent service identity), and occur after this dispatch began.
+ * Claim cycles are serialized, so the Agent cannot dispatch a second task to
+ * the same queue while the current task is being monitored.
+ */
+export function buildPrintServiceCompletionEventScript(): string {
+  return (
+    `$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json; ` +
+    `$tId = [string]$payload.taskId; ` +
+    `$pName = [string]$payload.printerName; ` +
+    `if ([string]::IsNullOrWhiteSpace($tId) -or [string]::IsNullOrWhiteSpace($pName)) { 'false'; exit }; ` +
+    `$since = [DateTimeOffset]::FromUnixTimeMilliseconds([Int64]$payload.dispatchedAtMs).LocalDateTime; ` +
+    `$event = Get-WinEvent -FilterHashtable @{ LogName='Microsoft-Windows-PrintService/Operational'; Id=307; StartTime=$since } -ErrorAction SilentlyContinue | ` +
+    `Where-Object { try { ` +
+    `$raw = $_.ToXml(); ` +
+    `if ($raw -like "*$tId*") { $true } else { ` +
+    `[xml]$xml = $raw; ` +
+    `$documentNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param2']"); ` +
+    `$printerNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='UserData']/*[local-name()='DocumentPrinted']/*[local-name()='Param5']"); ` +
+    `$securityNode = $xml.SelectSingleNode("/*[local-name()='Event']/*[local-name()='System']/*[local-name()='Security']/@UserID"); ` +
+    `$isKnownGenericName = $null -ne $documentNode -and [string]::Equals($documentNode.InnerText, '打印文档', [StringComparison]::Ordinal); ` +
+    `$printerMatches = $null -ne $printerNode -and [string]::Equals($printerNode.InnerText, $pName, [StringComparison]::OrdinalIgnoreCase); ` +
+    `$isLocalSystem = $null -ne $securityNode -and [string]::Equals($securityNode.Value, 'S-1-5-18', [StringComparison]::OrdinalIgnoreCase); ` +
+    `$isKnownGenericName -and $printerMatches -and $isLocalSystem ` +
+    `} } catch { $false } } | ` +
+    `Select-Object -First 1; ` +
+    `if ($event) { 'true' } else { 'false' }`
+  )
+}
+
+/**
+ * Confirm that Windows PrintService recorded Event ID 307 for this exact task.
+ *
+ * Pantum's "keep printed documents" mode can leave Get-PrintJob reporting
+ * `Printing, Retained` even after the spooler emitted its completion event. We
+ * accept a successful 307 after this dispatch began when either:
+ *   1. raw XML contains the exact sanitized task correlation id; or
+ *   2. a driver replaced the document name with the field-verified generic
+ *      value "打印文档", and the exact queue and LocalSystem identity match.
+ * This remains Windows spooler completion evidence; it does not prove that
+ * paper physically exited.
+ */
+export async function hasPrintServiceCompletionEvent(
+  printerName: string,
+  taskId: string,
+  dispatchedAtMs: number,
+): Promise<boolean> {
+  if (process.platform !== 'win32') return false
+
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
+  if (
+    safeTaskId.length === 0 ||
+    safeTaskId !== taskId ||
+    printerName.trim().length === 0 ||
+    !Number.isFinite(dispatchedAtMs)
+  ) {
+    return false
+  }
+  const safeSince = Math.max(0, Math.floor(dispatchedAtMs))
+
+  const output = await runPowerShell(
+    buildPrintServiceCompletionEventScript(),
+    JSON.stringify({ taskId: safeTaskId, printerName, dispatchedAtMs: safeSince }),
+  )
+  return output?.trim().toLowerCase() === 'true'
 }
 
 /** Pure JobStatus parser, exported for deterministic fault-injection verification. */

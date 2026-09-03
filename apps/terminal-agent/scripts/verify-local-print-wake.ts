@@ -61,6 +61,7 @@ async function main(): Promise<void> {
   assert.ok(typeof address === 'object' && address)
   assert.equal(address.address, '127.0.0.1')
   const wakeUrl = `http://127.0.0.1:${address.port}/local/print/wake`
+  const sessionUrl = `http://127.0.0.1:${address.port}/local/bridge/session`
 
   try {
     const deniedOrigin = await requestJson<{ error: { code: string } }>(wakeUrl, {
@@ -123,11 +124,24 @@ async function main(): Promise<void> {
     assert.equal(second.status, 202)
     assert.deepEqual(second.json.data, { accepted: true, coalesced: true })
 
+    const session = await requestJson<{
+      success: true
+      data: { token: string; expiresInSeconds: number }
+    }>(sessionUrl, { bridgeToken: null })
+    assert.equal(session.status, 200)
+    assert.equal(session.json.data.expiresInSeconds, 300)
+    const dynamic = await requestJson<{
+      success: true
+      data: { accepted: true; coalesced: boolean }
+    }>(wakeUrl, { bridgeToken: session.json.data.token })
+    assert.equal(dynamic.status, 202)
+    assert.deepEqual(dynamic.json.data, { accepted: true, coalesced: true })
+
     wakeAccepted = false
     const unavailable = await requestJson<{ error: { code: string } }>(wakeUrl)
     assert.equal(unavailable.status, 503)
     assert.equal(unavailable.json.error.code, 'LOCAL_PRINT_WAKE_UNAVAILABLE')
-    assert.equal(wakeCalls, 3)
+    assert.equal(wakeCalls, 4)
   } finally {
     await handle.close()
   }
