@@ -292,16 +292,37 @@ export class JobsPartnerService {
     const rotatedAt = new Date()
     let webhookSecretOnce: string | undefined
 
+    // 并发轮换必须打成冲突，不能各写各的（丢失更新）。
+    //
+    // 场景（2026-09-03 对抗性审查实证）：同一 webhook 源，两个已登录会话同时
+    // POST rotate-credential，此前两次都返回 200、各带一枚不同的新密钥，库里只留
+    // 最后写入的那一枚。先拿到响应的人把密钥交给对接方 → 推送全部 401，而两条审计
+    // 都显示轮换成功，事后无从判断哪一枚才是有效的。前端的 submitting 挡不住两个标签页。
+    //
+    // 判据用读到的 webhookSecretRotatedAt 做 compare-and-set：只有仍是我读到的那个值
+    // 才允许写。CAS 未命中即说明有人在我之前刚轮换过，直接拒绝，让调用方重取当前状态。
+    const casWhere = { id, webhookSecretRotatedAt: source.webhookSecretRotatedAt }
+    const assertRotationWon = (res: { count: number }) => {
+      if (res.count === 0) {
+        throw new BadRequestException({
+          error: {
+            code: 'CREDENTIAL_ROTATION_CONFLICT',
+            message: '该数据源刚刚已被轮换，本次未生效；请刷新后确认当前密钥再决定是否再次轮换',
+          },
+        })
+      }
+    }
+
     if (source.accessMode === 'webhook') {
       // 留空则服务端用 CSPRNG 生成；传值则用机构自带密钥（对方系统密钥不可改时）。
       webhookSecretOnce = dto.credential ?? generateWebhookSecret()
-      await this.prisma.jobSource.update({
-        where: { id },
+      assertRotationWon(await this.prisma.jobSource.updateMany({
+        where: casWhere,
         data: {
           webhookSecret: encryptSecret(webhookSecretOnce),
           webhookSecretRotatedAt: rotatedAt,
         },
-      })
+      }))
     } else if (source.accessMode === 'api') {
       // 上游 token 只能由机构从来源平台取得，平台无法代为签发，所以必填。
       if (!dto.credential) {
@@ -312,13 +333,13 @@ export class JobsPartnerService {
           },
         })
       }
-      await this.prisma.jobSource.update({
-        where: { id },
+      assertRotationWon(await this.prisma.jobSource.updateMany({
+        where: casWhere,
         data: {
           encryptedCredential: encryptSecret(dto.credential),
           webhookSecretRotatedAt: rotatedAt,
         },
-      })
+      }))
     } else {
       // excel / csv / json / manual 没有任何凭证概念，轮换无意义。
       throw new BadRequestException({

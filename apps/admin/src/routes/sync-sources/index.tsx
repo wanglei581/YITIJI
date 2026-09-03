@@ -39,6 +39,8 @@ interface ApiSyncSourceItem {
   hasEndpoint: boolean
   hasCredential: boolean
   hasResponseConfig: boolean
+  /** 已被所属机构归档。归档源不可启用，服务端会拒 SOURCE_ARCHIVED。 */
+  archived: boolean
 }
 
 interface SourceImpact {
@@ -91,6 +93,7 @@ const MOCK_SOURCES: ApiSyncSourceItem[] = [
     hasEndpoint: true,
     hasCredential: true,
     hasResponseConfig: false,
+    archived: false,
   },
 ]
 
@@ -358,7 +361,11 @@ export default function SyncSourcesPage() {
                         {s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '从未'}
                       </td>
                       <td className="px-4 py-3">
-                        {!s.enabled ? (
+                        {s.archived ? (
+                          // 归档必须与「待启用」分开显示：两者都是 enabled=false，
+                          // 但前者是机构主动退役、不可由 Admin 启用，后者才是等审批。
+                          <StatusBadge dot status="default" label="已归档（机构停用供稿）" />
+                        ) : !s.enabled ? (
                           <StatusBadge dot status="warning" label="待启用 / 已停用" />
                         ) : s.lastSyncStatus ? (
                           <StatusBadge
@@ -408,13 +415,21 @@ export default function SyncSourcesPage() {
                              trigState === 'error'   ? '触发失败' :
                              '立即同步'}
                           </button>}
-                          <button
-                            disabled={sourceActionId === s.id}
-                            onClick={() => void handleEnabled(s)}
-                            className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
-                          >
-                            {s.enabled ? '停用通道' : '审批并启用'}
-                          </button>
+                          {s.archived ? (
+                            // 归档源不给启用入口。服务端已拒（SOURCE_ARCHIVED），
+                            // 但界面不该先摆一个必被拒的按钮 —— 那会让运营以为是自己权限不够。
+                            <span className="rounded border border-neutral-200 px-2.5 py-1 text-xs text-neutral-500">
+                              已归档 · 需机构取消归档
+                            </span>
+                          ) : (
+                            <button
+                              disabled={sourceActionId === s.id}
+                              onClick={() => void handleEnabled(s)}
+                              className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                            >
+                              {s.enabled ? '停用通道' : '审批并启用'}
+                            </button>
+                          )}
                           <button
                             disabled={sourceActionId === s.id}
                             onClick={() => void handleBulkUnpublish(s)}

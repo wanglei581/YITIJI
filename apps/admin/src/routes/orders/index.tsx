@@ -698,11 +698,21 @@ export default function OrdersPage() {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    <p className="text-[13px] font-bold text-neutral-800">确认已在线下收到现金？</p>
+                    {/* 文案随所选来源变化：选了「人工确认（非现场现金）」却让管理员签署
+                        「已收到现金」，是逼他为一件没发生的事背书。两种来源的事实不同，
+                        确认语就必须不同。 */}
+                    <p className="text-[13px] font-bold text-neutral-800">
+                      {markPaidSource === 'manual_confirmed' ? '确认该笔款项已另行核实到账？' : '确认已在线下收到现金？'}
+                    </p>
                     <p className="text-xs leading-relaxed text-neutral-600">
                       本单应收 <span className="font-bold text-neutral-900">{amountText(detail.amountCents, detail.currency)}</span>。
-                      点击确认即表示<span className="font-bold text-neutral-900">现场已实际收到该笔现金</span>，
-                      系统随即把订单支付状态置为已支付并写入审计日志。操作不可撤销，如需退回只能另行发起全额退款。
+                      点击确认即表示
+                      <span className="font-bold text-neutral-900">
+                        {markPaidSource === 'manual_confirmed'
+                          ? '你已通过其它渠道核实该笔款项确已到账'
+                          : '现场已实际收到该笔现金'}
+                      </span>
+                      ，系统随即把订单支付状态置为已支付并写入审计日志。操作不可撤销，如需退回只能另行发起全额退款。
                     </p>
                     <fieldset className="space-y-1.5">
                       <legend className="text-xs font-bold text-neutral-700">收款方式</legend>
@@ -737,7 +747,9 @@ export default function OrdersPage() {
                         onClick={() => void handleMarkPaid()}
                         className="inline-flex h-9 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90 disabled:opacity-40"
                       >
-                        {markPaidSubmitting ? '处理中…' : '确认已收到现金'}
+                        {markPaidSubmitting
+                          ? '处理中…'
+                          : markPaidSource === 'manual_confirmed' ? '确认已核实到账' : '确认已收到现金'}
                       </button>
                       <button
                         type="button"
