@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>签名盖章 · 职易达</title>
+<!--
+  S23 · 签名 / 印章图片叠加 PDF 工作台（青序流光，1080x1920 单 HTML 宿主，零外部资源）
+
+  route: /print-scan/sign（旧深链 /print/scan-sign 重定向到此，不新增页面）
+
+  这一页只做一件事：把**本次会话里新传的**签名 / 印章图片，按「页码 + 九宫格 + 大小档」
+  叠到一份**原 PDF** 上，生成一份**独立的派生 PDF**，然后交给 13-print-desk.html
+  `/print/material-check` 做材料检查。**本页不显示金额、权益、支付、打印成功、保存成功或设备成功。**
+
+  三份文件必须始终分开说：
+    原 PDF   —— 本人「我的文档」/ 本机上传 / 既有手机入口；**永不被改写**
+    签名图   —— purpose=signature_image，highly_sensitive，system_short（约 1 小时）；
+                **不进「我的文档」，不能从历史复用，只能是本次会话新传的**
+    派生 PDF —— 每次合成都是**新文件**；再叠一处时它成为下一轮的「原文档」
+
+  查询契约（仅本原型使用）：
+    ?state=<下方 62 态之一>      —— 夹具态一律要求 capture=1 或 debug=1
+    ?capture=1 / ?debug=1        —— 夹具可达门；常显「固定原型数据，不是真实用户文件」
+    ?flat=1                      —— 截图去动效
+    ?from=hub|home|docs          —— 真实来源决定返回落点；**未知 / 外部值一律安全回落
+                                    /print-scan，且原值绝不进入 DOM**
+  普通产品地址（裸 URL）一律落 auth-unknown：看不到文件名、页数、签名图、请求标识或任何结果。
+
+  真实合同（来源：代码，不是想象）：
+    端点   POST /print/sign/inspect（@Throttle 60s/10 次）→ { pages }
+           POST /print/sign/compose（@Throttle 60s/3 次；会员维度 print-sign:rate 60s/3 次）
+           两者都先 assertUserTaskAllowed(terminalId,'signature_stamp')
+    原 PDF  mimeType=application/pdf 且 purpose ∈ {print_doc,resume_upload,resume_scan,cover_letter}
+           （匿名路径只允许 print_doc）；≤ 15MB；PDFDocument.load 不传 ignoreEncryption →
+           加密 / 损坏均 SIGN_DOC_UNSUPPORTED；AcroForm 含 PDFSignature → SIGN_DOC_HAS_DIGITAL_SIGNATURE；
+           页数 1–30，越界 SIGN_DOC_TOO_MANY_PAGES；归属 / 过期不符 → SIGN_SOURCE_NOT_FOUND
+    签名图  purpose=signature_image 且 mimeType ∈ {image/jpeg,image/png}；≤ 10MB；
+           内容嗅探不符 SIGN_STAMP_UNSUPPORTED；width*height ≤ 25,000,000 否则 SIGN_STAMP_TOO_LARGE；
+           embedPng/embedJpg 抛错（CMYK JPEG 等）→ SIGN_STAMP_UNSUPPORTED
+    位置    placement={page(1-based) , position(九宫格) , size(small|medium|large)}
+           print-sign-geometry.ts：SIZE_FACTOR small .15 / medium .25 / large .35（占视觉页宽），
+           MARGIN_RATIO .04；/Rotate 90/180/270 先在视觉空间定位再逆映射。
+           page < 1 或 > pageCount → SIGN_PLACEMENT_INVALID
+    输出    { fileId, printFileUrl(30 分钟), fileMd5, sizeBytes, pages }；**没有百分比、没有阶段、
+           没有任务编号、没有查询接口**；≤ 15MB 否则 SIGN_OUTPUT_TOO_LARGE；
+           assetCategory=derived，sourceFileId=原 PDF，原 PDF 不被改写
+    幂等    Idempotency-Key 必须匹配 /^[A-Za-z0-9_-]{16,80}$/；锁 120s、完成结果 600s；
+           fingerprint = sha256(docFileId|stampFileId|page|position|size)。
+           同 key + 同 fingerprint → 复用已完成结果（并重验归属 + 输出存活）；
+           同 key + 不同 fingerprint → IDEMPOTENCY_KEY_REUSED；
+           in_progress → SIGN_IN_PROGRESS；输出已失效 → 服务端用同 key 重新生成
+
+  runtime gap（本页按**产品裁决**呈现，与当前 React/API 不一致，必须照实说，不得冒充已修）：
+    RG-1 会员门禁：产品裁决要求登录后才允许上传签名图与合成；当前 controller 用
+         resolveOptionalEndUser，endUserId 可为 null，**匿名仍可 inspect / compose**。
+         本页做前端 fail-closed，不代表服务端已收口。
+    RG-2 幂等键时机：SignStampPage.tsx 在 handleCompose 内 sign-<Date.now()>-<random> 每次点击新建，
+         结果未知时无法用同 key 恢复。本页按合同表现「首次提交前生成并绑定」，属静态合同不属现状。
+    RG-3 授权复位：React 只在换签名图 / 换文档时 setAuthorized(false)；addAnother() 不清 error。
+         本页统一复位并写明。
+    RG-4 出口：React goPrint() 直接 navigate('/print/confirm')，跳过材料检查。本页主出口改为
+         /print/material-check，属静态合同差异。
+    RG-5 审计写失败：doCompose 先 files.upload 再 audit.write；审计抛错会让请求失败，
+         但派生文件**已经存在**。因此重试不能保证零重复产物。
+    RG-6 13-print-desk.html 的 ?from= 白名单只有 upload|hub|home|docs（没有签章来源），
+         其 DOCS 夹具表也没有派生 PDF 条目。本页**不修改那个文件**，因此出口按 12-file-source.html
+         的既有口径走裸 href；接收页按它自己的 fail-closed 规则落 missing-context。
+
+  手机入口冻结面（本页对基线唯一不能动的地方，改一个字都算漂移）：
+    基线文件（20-sign-stamp.html，SHA-256 970bcbca0f2d61ce6c077bb5079d885f4157cb0d44d34081a3a5da9b14243e82）
+    里的两张「手机扫码上传」卡片按下列**逐字面**冻结，shoot.mjs 从基线源码解析后逐项比对，任一项
+    不等即 failed：
+      PDF   n='手机扫码上传 PDF'；ic='phone'；bg='var(--slate-soft)'；fg='#35608f'；
+            d='手机扫屏幕上的码，把 PDF 传进这台机器。'；f='PDF · ≤ 15MB'；
+            href='20-sign-stamp.html?state=pick-stamp'；tid='sign-stamp-pick-doc-phone'
+      签章图 n='手机扫码上传图片'；ic='phone'；bg='var(--slate-soft)'；fg='#35608f'；
+            d='手机拍签名或选印章图片，确认后自动进入下一步。'；f='JPG / PNG · ≤ 10MB'；
+            href='20-sign-stamp.html?state=placing'；tid='sign-stamp-pick-stamp-phone'
+    可访问名与基线同源：基线的可点 pick 卡片不写 aria-label，可访问名由卡面文字算出，本页照办。
+    分区与顺序也冻结：每张手机卡仍紧跟同一组里的「本机上传」卡，仍与同组卡片同宽同高，不缩小、
+    不置灰、不移到别处、不改成次级样式。
+    **不新增、不删除、不改名、不扩展任何手机入口**，也不把 href 改成等待态。之前一版曾把两个 href
+    改成 document-phone-entry / stamp-phone-entry，那是错的，已按基线改回。
+    document-phone-entry / stamp-phone-entry 只作为 capture-only 的等待态留着（只能由显式
+    ?state= + capture/debug 到达）；页面上没有任何正常入口指向它们，shoot.mjs 有专门断言。
+    基线的 ?state=placing 在本页对应 placement-default，启动时做同义解析，所以冻结的 href 目标
+    语义（跳到「选位置」这一步）没有变；裸地址下它和其它夹具态一样落 auth-unknown。
+    像素级几何没有冻结，也不谎称冻结：基线把 pick 卡片放在两列 .pickrow 网格里（488×224.6），
+    本页是预览 + 参数双栏工作台，卡片是参数列里的整列卡（356×133.6）。两套版式不可能给出同一个
+    矩形。冻结的是语义、可访问名、分区归属、同组同尺寸与不被降级；实测两组矩形都写进 check-report。
+
+  fallback: 任一门禁未过 → 不显示夹具、不给合成入口、常驻可读原因；
+            结果未知 → 保留全部输入与同一请求标识，只允许同 key 同参数重试，绝不写「没有生成」。
+  原型演示控制：仅 ?debug=1 注入 DOM；只切 data-state，不驱动任何业务结果。页面无计时器推进业务状态。
+-->
+<style>
+:root{
+  --paper:#f5f2e9; --surface:#fffdf8; --ink:#10302b; --ink-2:#3d5a52; --ink-3:#6b857c;
+  --deep:#0b241e; --deep-2:#123a30; --emerald:#2ee6a8;
+  --teal:#1f9e86; --teal-d:#157a67; --teal-soft:#e0f2ec;
+  --slate:#3f68b0; --slate-d:#35608f; --slate-soft:#e6ecf7;
+  --clay:#b8683c; --clay-d:#9e5330; --clay-soft:#f7ebe1;
+  --wheat:#a9781f; --wheat-d:#8a6219; --wheat-soft:#f3ecda;
+  --line:#e3ddcb; --line-2:#d4cdb6;
+  --cinnabar:#b23a2e; --cinnabar-d:#963227; --cinnabar-soft:#f6e4e1;
+  --r-lg:26px; --r-md:18px; --r-sm:13px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);overflow:hidden}
+#stage{width:1080px;height:1920px;position:absolute;left:50%;top:50%;transform-origin:center center;background:var(--paper);overflow:hidden;display:flex;flex-direction:column}
+.serif{font-family:"Songti SC","STSong","SimSun",serif}
+a{color:inherit;text-decoration:none}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+
+/* ── 顶栏 88 + 上下文 88 = 176（预算 ≤180） ───────────────── */
+.topbar{flex:none;height:88px;display:flex;align-items:center;gap:16px;padding:0 32px;background:var(--surface);border-bottom:1px solid var(--line)}
+.back{flex:none;width:60px;height:60px;border-radius:18px;border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;background:var(--paper)}
+.logo-mark{flex:none;width:40px;height:40px;border-radius:12px;background:var(--deep);color:var(--emerald);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+.h1{font-size:26px;font-weight:700;letter-spacing:1px}
+.topbar .sp{flex:1}
+.pill{flex:none;display:flex;align-items:center;gap:9px;height:52px;padding:0 20px;border-radius:26px;background:var(--paper);border:1px solid var(--line-2);color:var(--ink-2);font-size:19px;font-weight:600;max-width:430px;overflow:hidden;white-space:nowrap}
+.pill .dot{width:11px;height:11px;border-radius:50%;background:var(--ink-3);flex:none}
+.pill.ok{background:var(--teal-soft);color:var(--teal-d);border-color:transparent}.pill.ok .dot{background:var(--teal)}
+.pill.warn{background:var(--wheat-soft);color:var(--wheat-d);border-color:transparent}.pill.warn .dot{background:var(--wheat)}
+.pill.bad{background:var(--cinnabar-soft);color:var(--cinnabar-d);border-color:transparent}.pill.bad .dot{background:var(--cinnabar)}
+.clock{flex:none;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px}
+
+.ctxbar{flex:none;height:88px;display:flex;align-items:center;gap:10px;padding:0 32px;background:var(--paper);border-bottom:1px solid var(--line);overflow:hidden}
+.tag{flex:none;display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 18px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--line-2);font-size:18px;font-weight:600;color:var(--ink-2);white-space:nowrap;max-width:390px;overflow:hidden}
+.tag>svg{flex:none}
+.tag b{font-weight:700;color:var(--ink)}
+.tag.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.tag.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.tag.bad{background:var(--cinnabar-soft);border-color:transparent;color:var(--cinnabar-d)}
+.tag.demo{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.tag .fx-b{flex:none;background:var(--wheat-d);color:#fff;border-radius:8px;padding:3px 9px;font-size:15px;letter-spacing:1px}
+.ctxbar .sp{flex:1}
+
+/* ── 主体 ─────────────────────────────────────────────── */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 32px 0}
+.statusrow{flex:none;min-height:210px;display:flex;flex-direction:column}
+.state{flex:1;border-radius:var(--r-lg);padding:20px 24px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;gap:9px}
+.state[data-kind=error]{background:var(--cinnabar-soft);border-color:#e8c9c3}
+.state[data-kind=warn]{background:var(--wheat-soft);border-color:#e6d8b4}
+.state[data-kind=lock]{background:var(--slate-soft);border-color:#cfdcee}
+.state[data-kind=info]{background:var(--teal-soft);border-color:#c6e4da}
+.state-h{display:flex;align-items:center;gap:12px;font-size:27px;font-weight:700;line-height:1.25}
+.state-p{font-size:20px;line-height:1.5;color:var(--ink-2)}
+.state-p b{color:var(--ink);font-weight:600}
+.metarow{margin-top:auto;display:flex;gap:9px;flex-wrap:wrap}
+.chip{min-height:48px;padding:0 16px;border-radius:var(--r-sm);background:var(--paper);border:1px solid var(--line-2);display:inline-flex;align-items:center;gap:8px;font-size:18px;color:var(--ink-2);font-weight:600}
+.chip.ok{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.chip.warn{background:var(--wheat-soft);border-color:transparent;color:var(--wheat-d)}
+.plan{display:flex;flex-direction:column;gap:9px}
+.plan li{list-style:none;display:flex;gap:10px;align-items:flex-start;font-size:19px;line-height:1.45;color:var(--ink-2)}
+.plan .sq{flex:none;width:9px;height:9px;border-radius:3px;background:var(--teal);margin-top:8px}
+/* 阻断态：状态卡按内容自然高度，剩下的高度交给「现在还能去哪」，不留大空洞 */
+.body[data-shape=block] .statusrow{flex:none}
+.body[data-shape=block] .state{flex:none}
+.gatecol{flex:1;min-width:0;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.gatecol h3{flex:none;font-size:21px;font-weight:700;display:flex;align-items:center;gap:10px;line-height:1.25}
+.gatecol h3 span.r{margin-left:auto;font-size:17px;font-weight:600;color:var(--ink-3)}
+.gaterow{flex:1;min-height:0;display:grid;gap:10px;grid-auto-rows:1fr}
+.gaterow .pickcard{align-items:center;border-style:solid}
+.gaterow .pickcard .pi{width:76px;height:76px}
+.gatecol .note{flex:none;font-size:17px;line-height:1.45;color:var(--ink-3)}
+
+/* ── 工作区：左完整页预览 + 右参数（唯一滚动） ────────────── */
+.work{flex:1;min-height:0;margin-top:14px;display:flex;gap:18px}
+.pvcol{flex:none;width:600px;min-height:0;display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:10px}
+.pvbar{flex:none;display:flex;flex-direction:column;gap:8px}
+.pvrow{display:flex;gap:8px;align-items:center}
+.pvbtn{flex:none;min-width:56px;height:52px;padding:0 13px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;color:var(--ink-2);display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.pvbtn[aria-pressed=true]{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.pvbtn[aria-disabled=true]{opacity:.42}
+.pvlabel{flex:1;min-width:0;height:52px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:600;color:var(--ink-2);background:var(--paper);border-radius:var(--r-sm);border:1px solid var(--line-2);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.pv-view{flex:1;min-height:0;overflow:auto;background:#cdc6b2;border-radius:var(--r-md);position:relative;touch-action:none;cursor:grab;outline:none}
+.pv-view.grabbing{cursor:grabbing}
+.pv-scene{position:relative}
+.pv-page{position:absolute;background:#fff;border:2px solid #9a917c;box-shadow:0 4px 18px rgba(16,48,43,.22);overflow:hidden}
+.pv-empty{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:var(--paper);border:1px dashed var(--line-2);border-radius:var(--r-md);padding:24px;font-size:20px;line-height:1.5;color:var(--ink-2)}
+.pv-ghost{flex:none;width:100%;max-width:330px;aspect-ratio:840/1188;background:var(--surface);border:2px dashed var(--line-2);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px}
+.pv-empty b{font-size:23px}
+.pv-cap{flex:none;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--ink-3);text-align:center;padding:0 6px}
+/* 纸面内容 */
+.pp{position:absolute;background:#b6ae98;border-radius:2px}
+.pp.t{background:#7d7561}
+.pmark{position:absolute;border-style:solid;border-color:#9a917c;background:rgba(255,255,255,.88);color:#4a4536;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.pfoot{position:absolute;left:0;right:0;text-align:center;color:#6b6553;font-weight:600;font-variant-numeric:tabular-nums}
+.protchip{position:absolute;border-radius:5px;background:rgba(178,58,46,.1);border:1px solid rgba(178,58,46,.55);color:#8c2c22;font-weight:700;display:flex;align-items:center;justify-content:center}
+.stampmark{position:absolute;border-style:dashed;border-color:var(--cinnabar);background:rgba(178,58,46,.09);color:var(--cinnabar-d);display:flex;align-items:center;justify-content:center;font-weight:700;border-radius:4px}
+.stampmark[data-burned=true]{border-style:solid;background:rgba(178,58,46,.15)}
+
+.ctrlcol{flex:1;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;padding-right:4px}
+.grp{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:15px 18px}
+.grp h3{font-size:21px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:10px;line-height:1.25}
+.grp h3 span.r{margin-left:auto;font-size:17px;font-weight:600;color:var(--ink-3)}
+.grp .note{font-size:17px;line-height:1.45;color:var(--ink-3);margin-top:9px}
+.grp .note b{color:var(--ink-2)}
+.pages{display:flex;gap:6px;flex-wrap:wrap}
+.pgbtn{width:56px;height:56px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:var(--paper);font-size:20px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center}
+.pgbtn[aria-pressed=true]{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.pgbtn[aria-disabled=true]{opacity:.42}
+.nine{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nine button{height:62px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;color:var(--ink-2)}
+.nine button[aria-pressed=true]{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.nine button[aria-disabled=true]{opacity:.42}
+.sizes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sizes button{height:58px;border-radius:var(--r-sm);border:1.5px solid var(--line-2);background:var(--paper);font-size:19px;font-weight:600;color:var(--ink-2)}
+.sizes button[aria-pressed=true]{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.sizes button[aria-disabled=true]{opacity:.42}
+.sum{margin-top:10px;background:var(--paper);border:1px solid var(--line-2);border-radius:var(--r-md);padding:11px 14px;font-size:19px;font-weight:600;color:var(--ink);line-height:1.4}
+.pickcard{display:flex;gap:14px;align-items:flex-start;width:100%;text-align:left;background:var(--paper);border:1.5px dashed var(--line-2);border-radius:var(--r-md);padding:18px 18px;min-height:126px}
+
+.pickcard .pi{flex:none;width:52px;height:52px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center}
+.pickcard .pt{flex:1;min-width:0}
+.pickcard b{display:block;font-size:22px;font-weight:700;line-height:1.25}
+.pickcard .d{display:block;font-size:18px;line-height:1.45;color:var(--ink-3);margin-top:6px}
+.pickcard .f{display:block;font-size:18px;font-weight:600;color:var(--teal-d);margin-top:7px}
+.pickcard .pi{width:58px;height:58px}
+.pickcard[aria-disabled=true]{opacity:.6}
+
+/* ── 选择这一步：与基线 20-sign-stamp.html 同一套版式 ────────────────
+   两张「手机扫码上传」卡片是冻结面：父布局（两列 .pickrow 网格）、视觉分区
+   （整宽 section）、位置、尺寸与卡内竖排结构都必须和基线逐像素相同，所以下面
+   这一段直接照抄基线的数值，不走本页的 --r-lg / --r-md 变量，也不做任何"等价"改写。
+   顶部堆叠同样是算出来的：顶栏 88 + 上下文条 88 + .xq 上外边距 24 + .xq 178.9375
+   + .sec 上外边距 24 + .sec-label 41 + 其下外边距 14 = 457.9375 = 基线的 pickrow 位置。 */
+.xq{flex:none;margin:24px 44px 0;border-radius:36px;padding:28px 42px 26px;background:linear-gradient(158deg,var(--deep-2) 0%,var(--deep) 68%);color:#f2efe4;position:relative;overflow:hidden}
+.xq::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}
+.xq-row{display:flex;align-items:center;gap:24px;position:relative;z-index:1}
+.xq-face{flex:none;width:100px;height:100px;border-radius:50%;background:rgba(46,230,168,.1);border:1.5px solid rgba(46,230,168,.4);display:flex;align-items:center;justify-content:center;font-size:46px;color:var(--emerald)}
+.xq-main{flex:1;min-width:0}
+.xq-eyebrow{font-size:18px;letter-spacing:5px;color:rgba(242,239,228,.5);margin-bottom:8px}
+.xq-ask{font-size:38px;line-height:1.3;font-weight:700;letter-spacing:1px}
+.xq-ask em{font-style:normal;color:var(--emerald)}
+.xq-doing{margin-top:10px;font-size:21px;line-height:1.55;color:rgba(242,239,228,.72)}
+.xq-doing b{color:#fff;font-weight:600}
+.sec{flex:none;padding:0 44px;margin-top:24px}
+.sec-label{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-label .no{font-size:20px;color:var(--teal-d);font-weight:700;letter-spacing:2px}
+.sec-label .t{font-size:29px;font-weight:700}
+.sec-label .hint{font-size:19px;color:var(--ink-3);margin-left:auto}
+.pickrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.pick{background:var(--surface);border:2px dashed var(--line-2);border-radius:32px;padding:24px;display:flex;flex-direction:column;gap:10px;text-align:left;min-height:196px}
+.pick .pi{width:62px;height:62px;border-radius:20px;display:flex;align-items:center;justify-content:center}
+.pick b{font-size:23px;font-weight:700}
+.pick span.d{font-size:17px;line-height:1.45;color:var(--ink-3);flex:1}
+.pick span.f{font-size:17px;font-weight:600;color:var(--teal-d)}
+.pick[aria-disabled=true]{opacity:.55}
+.picknote{background:var(--surface);border:1px solid var(--line);border-radius:32px;padding:22px 26px;display:flex;flex-direction:column}
+.picknote h3{font-size:20px;font-weight:700;margin-bottom:10px}
+.picknote .plan{gap:8px}
+.picknote .plan li{font-size:17px;line-height:1.45}
+.picknote .plan .sq{margin-top:7px}
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{min-height:58px;border-radius:var(--r-sm);background:var(--paper);border:1px solid var(--line-2);display:flex;align-items:center;gap:12px;padding:0 16px;font-size:19px;font-weight:600;color:var(--ink-3)}
+.step.on{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.step.done{background:var(--teal-soft);border-color:transparent;color:var(--teal-d)}
+.step i{flex:none;width:22px;height:22px;border-radius:50%;background:currentColor;opacity:.3}
+.body[data-shape=pick]{padding:0}
+.body[data-shape=pick] .work{margin:14px 44px 0}
+.body[data-shape=pick] .pvcol{width:400px}
+.kv{display:flex;flex-direction:column;gap:8px}
+.kv>div{display:flex;gap:10px;font-size:19px;color:var(--ink-2);line-height:1.35}
+.kv>div>span:first-child{flex:none;width:104px;color:var(--ink-3)}
+.kv b{font-weight:600;color:var(--ink)}
+.consent{display:flex;gap:14px;align-items:flex-start;width:100%;text-align:left;background:var(--paper);border:1.5px solid var(--line-2);border-radius:var(--r-md);padding:14px 16px;min-height:88px}
+.consent .box{flex:none;width:52px;height:52px;border-radius:var(--r-sm);border:2px solid var(--line-2);background:var(--surface);display:flex;align-items:center;justify-content:center;color:transparent}
+.consent[aria-checked=true] .box{background:var(--deep);border-color:transparent;color:var(--emerald)}
+.consent .ct{flex:1;font-size:18px;line-height:1.45;color:var(--ink-2)}
+.consent .ct b{color:var(--ink);font-weight:700}
+.consent[aria-disabled=true]{opacity:.6}
+.reason{font-size:18px;line-height:1.4;font-weight:600;color:var(--wheat-d)}
+.lockline{margin-bottom:10px}
+
+.aside{flex:none;height:240px;margin-top:14px;display:flex;gap:18px}
+.acol{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:15px 18px}
+.acol h4{font-size:20px;font-weight:700;margin-bottom:9px}
+
+/* ── 底部 ─────────────────────────────────────────────── */
+.truth{flex:none;min-height:76px;display:flex;align-items:center;gap:14px;padding:9px 32px;background:var(--slate-soft);border-top:1px solid #cfdcee;font-size:18px;line-height:1.42;color:#2f4f79}
+.truth b{color:#1f3a5c;font-weight:700}
+.truth .fx{flex:none;display:inline-flex;align-items:center;gap:9px;min-height:52px;padding:0 15px;border-radius:var(--r-sm);background:var(--wheat-soft);color:var(--wheat-d);font-size:17px;font-weight:700;line-height:1.25}
+.truth .fx b{flex:none;background:var(--wheat-d);color:#fff;border-radius:8px;padding:3px 9px;font-size:15px;letter-spacing:1px}
+.cta-reason{flex:none;padding:10px 32px 0;font-size:19px;font-weight:600;color:var(--wheat-d);background:var(--surface);line-height:1.3}
+.ctabar{flex:none;padding:14px 32px;background:var(--surface);border-top:1px solid var(--line);display:flex;gap:14px;align-items:center}
+.cta-reason+.ctabar{border-top:0;padding-top:10px}
+.btn{min-height:64px;padding:0 22px;border-radius:var(--r-md);display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:22px;font-weight:600;text-align:center;line-height:1.2}
+.btn.primary{min-height:72px;font-size:24px;background:var(--deep);color:var(--emerald);flex:1.7}
+.btn.ghost{background:var(--paper);border:1px solid var(--line-2);color:var(--ink);flex:1}
+.btn[aria-disabled=true]{opacity:.55;cursor:default}
+.navbar{flex:none;height:104px;display:flex;background:var(--surface);border-top:1px solid var(--line)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.nav-item .ni{font-size:20px;color:var(--ink-3);font-weight:600}
+
+/* ── 动效：唯一循环动效是「等服务端回话」的呼吸点 ───────── */
+a:focus-visible,button:focus-visible,[role=checkbox]:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+.pgbtn:focus,.nine button:focus,.sizes button:focus,.consent:focus,.pvbtn:focus,.pickcard:focus{outline:3px solid var(--teal);outline-offset:3px}
+@keyframes k-breathe{0%,100%{opacity:.45}50%{opacity:1}}
+.breathe{animation:k-breathe 1600ms ease-in-out infinite}
+.press:active{transform:scale(.985)}
+.flat *{backdrop-filter:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important;caret-color:transparent!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ── 原型演示控制（非产品功能，仅 debug=1 注入 DOM） ─────── */
+.demo-tab{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:90;width:52px;min-height:150px;background:rgba(11,36,30,.9);color:var(--emerald);border-radius:0 14px 14px 0;writing-mode:vertical-lr;letter-spacing:4px;font-size:16px;font-weight:700}
+.demo-panel{position:absolute;left:0;top:0;bottom:0;z-index:91;display:none;background:rgba(11,36,30,.96);border-radius:0 16px 16px 0;padding:12px;flex-direction:column;gap:4px;overflow:auto;width:300px}
+.demo-panel.show{display:flex}
+.demo-panel .dp-t{color:var(--emerald);font-size:14px;font-weight:700;letter-spacing:2px;flex:none;padding:4px 0 2px}
+.demo-panel a{display:flex;align-items:center;min-height:28px;color:#f2efe4;font-size:14px;padding:0 10px;border-radius:8px;background:rgba(255,255,255,.07);white-space:nowrap;flex:none}
+.demo-panel a.on{background:rgba(46,230,168,.22);color:var(--emerald);font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage" data-screen="sign-stamp" data-state="auth-unknown">
+  <header class="topbar">
+    <a class="back press" id="back" href="10-print-hub.html" data-route="/print-scan" data-testid="sign-stamp-back" aria-label="返回打印扫描"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <span class="logo-mark serif" aria-hidden="true">职</span>
+    <h1 class="h1">签名盖章</h1>
+    <span class="sp"></span>
+    <span class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">身份未确认</span></span>
+    <span class="clock" id="clock">--:--</span>
+  </header>
+
+  <div class="ctxbar" id="ctxbar"></div>
+
+  <main class="body" id="root" data-shape="block" data-state="auth-unknown" data-testid="sign-stamp-state-auth-unknown"></main>
+
+  <div class="truth" data-testid="sign-stamp-truth">
+    <span class="fx" id="fxbar" data-testid="sign-stamp-fixture-bar" hidden></span>
+    <span data-disclaimer="true"><b>这不是电子签名服务：</b>只是把图片排到 PDF 上，没有 CA 电子签或电子认证，不产生法律效力。正式文件请找有资质机构。</span>
+  </div>
+
+  <div class="cta-reason" id="cta-reason" data-testid="sign-stamp-disabled-reason" hidden></div>
+  <div class="ctabar" id="ctabar"></div>
+
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/" aria-label="回到首页"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant" aria-label="AI 顾问"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile" aria-label="我的"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+</div>
+<script>
+/* ============================================================
+   S23 签名盖章工作台 —— 原型状态机
+   只做界面与产品合同表达：不发请求、不驱动业务完成、不伪造硬件或服务端结果。
+   ============================================================ */
+var SCREEN='sign-stamp';
+
+/* ── 只存在于闭包、绝不进入 DOM / URL / storage 的敏感值 ─────────
+   证据脚本会在 DOM、地址栏、localStorage、sessionStorage、cookie 里搜这些串，命中即判红。 */
+var PRIVATE={
+  docFileId:'flo_9c41a7d2e8b3f60517d4',
+  stampFileId:'flo_2b7e04c9a1d6538fe902',
+  outFileId:'flo_5f83be21c7409ad6e1b8',
+  docAccessUrl:'/files/content/flo_9c41a7d2e8b3f60517d4?exp=1756518000',
+  printFileUrl:'/print/content/flo_5f83be21c7409ad6e1b8?exp=1756518000',
+  idempotencyKey:'sign-7f2ac41b93e6d05a8c1f',
+  fileMd5:'0d7c1e5a9b23f846ce70d5182af49b36',
+  terminalId:'KIOSK-HFHR-0087'
+};
+
+var STATES=[
+ /* 门禁 9 */
+ 'auth-unknown','login-required','login-expired','context-missing','terminal-missing',
+ 'capability-loading','capability-disabled','capability-maintenance','capability-error',
+ /* 原文档 13 */
+ 'pick-document','document-local-uploading','document-phone-entry','document-inspecting','document-ready',
+ 'document-format-rejected','document-too-large','document-encrypted','document-corrupt',
+ 'document-digital-signature','document-too-many-pages','document-source-expired','document-source-forbidden',
+ /* 签名 / 印章图 10 */
+ 'pick-stamp','stamp-local-uploading','stamp-phone-entry','stamp-ready','stamp-format-rejected',
+ 'stamp-too-large','stamp-pixels-too-large','stamp-corrupt','stamp-encoding-unsupported','stamp-source-expired',
+ /* 位置 7 */
+ 'placement-default','placement-page2','placement-last-page','placement-top-left-small',
+ 'placement-center-medium','placement-bottom-right-large','placement-invalid-page',
+ /* 预览与授权 7 */
+ 'preview-fit-page','preview-fit-width','preview-zoomed','preview-panned-corner','preview-rotated-source-page',
+ 'authorization-required','ready-to-compose',
+ /* 合成 8 */
+ 'composing','rate-limited','conversion-in-progress','known-failed','result-unknown',
+ 'retrying-same-request','recovered-completed','idempotency-conflict',
+ /* 输出 8 */
+ 'completed','output-preview-page2','output-preview-last','output-preview-zoomed',
+ 'output-preview-failed','output-expired','output-too-large','add-another-ready',
+ /* 返回守卫 1 */
+ 'return-source-unknown'
+];
+/* 非夹具态：屏幕上不会出现任何服务端才拥有的事实。普通产品地址只能到这一个。 */
+var NON_FIXTURE={'auth-unknown':1};
+
+var ICO={
+ pdf:'<path d="M14 2H6.5A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 2v6h6"/>',
+ phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10 5h4"/><path d="M9 14.5l3 3 3-3"/><path d="M12 17.5v-6"/>',
+ pen:'<path d="M4 20h16"/><path d="M6.5 16.5l8.8-8.8a2.1 2.1 0 0 1 3 3l-8.8 8.8-3.7.7.7-3.7z"/>',
+ stamp:'<rect x="4" y="16" width="16" height="4" rx="1.5"/><path d="M8 16v-2a4 4 0 0 1 1.2-2.8A2.6 2.6 0 0 0 10 9.4V8a2 2 0 0 1 4 0v1.4c0 .7.3 1.4.8 1.8A4 4 0 0 1 16 14v2"/>',
+ img:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M21 15.5l-4.5-4.5L8 19.5"/>',
+ folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.2l2 2.6h7.8A2.5 2.5 0 0 1 21 10.1v7.4A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z"/>',
+ check:'<circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.2"/>',
+ tick:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+ warn:'<path d="M12 3.6 2.8 19.4h18.4z"/><path d="M12 10v4M12 17h.01"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+ lock:'<rect x="4.5" y="10" width="15" height="10.5" rx="2.5"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.2 2"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>',
+ shield:'<path d="M12 3l7.5 3v6c0 4.4-3.1 8.2-7.5 9.4C7.6 20.2 4.5 16.4 4.5 12V6z"/><path d="M9.2 12.2l2 2 3.6-3.8"/>'
+ ,usb:'<path d="M12 3v12M8 7l4-4 4 4M12 15l-3 3M12 15l3 3"/><circle cx="9" cy="19" r="1"/><rect x="14" y="18" width="2" height="2"/>'
+};
+function svg(n,s,w){return '<svg width="'+(w||26)+'" height="'+(w||26)+'" viewBox="0 0 24 24" fill="none" stroke="'+(s||'currentColor')+'" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICO[n]+'</svg>'}
+
+/* ── 真实几何常量：与 services/api/src/print-sign/print-sign-geometry.ts 一致 ── */
+var SIZE_FACTOR={small:0.15,medium:0.25,large:0.35};
+var MARGIN_RATIO=0.04;
+var POSGRID={
+ 'top-left':{col:'left',row:'top'},'top-center':{col:'center',row:'top'},'top-right':{col:'right',row:'top'},
+ 'middle-left':{col:'left',row:'middle'},'center':{col:'center',row:'middle'},'middle-right':{col:'right',row:'middle'},
+ 'bottom-left':{col:'left',row:'bottom'},'bottom-center':{col:'center',row:'bottom'},'bottom-right':{col:'right',row:'bottom'}
+};
+var POSKEYS=['top-left','top-center','top-right','middle-left','center','middle-right','bottom-left','bottom-center','bottom-right'];
+var POSLABEL={'top-left':'左上','top-center':'上','top-right':'右上','middle-left':'左','center':'中','middle-right':'右','bottom-left':'左下','bottom-center':'下','bottom-right':'右下'};
+var SIZEKEYS=['small','medium','large'];
+var SIZELABEL={small:'小',medium:'中',large:'大'};
+var PAGE_W=840,PAGE_H=1188; /* 纸面自然单位，A4 比例 */
+
+/* ── 夹具（固定原型数据，不是真实用户文件） ────────────────── */
+var FX={
+ doc:{name:'就业协议书-示例.pdf',bytes:'1.8 MB',pages:6,rotate:{4:90}},
+ stamp:{name:'签名-示例.png',bytes:'240 KB',w:900,h:360},
+ out:{name:'就业协议书-示例-签章合成.pdf',bytes:'2.1 MB',pages:6}
+};
+
+/* ── 模型 ─────────────────────────────────────────────── */
+var M={};
+function resetModel(){
+ M={
+  auth:'member', ctx:'ok', terminal:'ok', cap:'ready',
+  doc:null, docStage:'idle', docErr:null, derived:false, docJustRead:false,
+  stamp:null, stampStage:'idle', stampErr:null, stampJustAdded:false,
+  place:{page:1,position:'bottom-right',size:'medium'}, placeErr:null,
+  authorized:false, bound:false, oversize:false, authReset:false,
+  phase:'idle', result:null, outErr:null,
+  view:{target:'source',mode:'page',zoom:0,page:1,pan:null},
+  fromUnknown:false
+ };
+}
+resetModel();
+function docFx(){return {name:FX.doc.name,bytes:FX.doc.bytes,pages:FX.doc.pages,rotate:FX.doc.rotate,source:'我的文档'}}
+function stampFx(){return {name:FX.stamp.name,bytes:FX.stamp.bytes,w:FX.stamp.w,h:FX.stamp.h}}
+function withDoc(){M.doc=docFx();M.docStage='ready'}
+function withStamp(){withDoc();M.stamp=stampFx();M.stampStage='ready'}
+function withAuth(){withStamp();M.authorized=true;M.bound=true}
+function at(page,position,size){M.place.page=page;M.place.position=position;M.place.size=size;M.view.page=page}
+function withResult(){withAuth();M.phase='completed';M.result={name:FX.out.name,bytes:FX.out.bytes,pages:FX.out.pages};M.view={target:'output',mode:'page',zoom:0,page:M.place.page,pan:null}}
+
+var SETUP={
+ 'auth-unknown':function(){M.auth='unknown'},
+ 'login-required':function(){M.auth='anonymous'},
+ 'login-expired':function(){M.auth='expired'},
+ 'context-missing':function(){M.ctx='missing'},
+ 'terminal-missing':function(){M.terminal='missing'},
+ 'capability-loading':function(){M.cap='loading'},
+ 'capability-disabled':function(){M.cap='disabled'},
+ 'capability-maintenance':function(){M.cap='maintenance'},
+ 'capability-error':function(){M.cap='error'},
+
+ 'pick-document':function(){},
+ 'document-local-uploading':function(){M.docStage='uploading'},
+ 'document-phone-entry':function(){M.docStage='phone'},
+ 'document-inspecting':function(){M.docStage='inspecting'},
+ 'document-ready':function(){withDoc();M.docJustRead=true},
+ 'document-format-rejected':function(){M.docErr={t:'这份不是 PDF',p:'签名盖章只收 PDF。刚才那份是图片，<b>没有进入流程</b>；图片要盖章，先用「格式转换」拼成 PDF。',f:'讲义扫描.jpg · image/jpeg'}},
+ 'document-too-large':function(){M.docErr={t:'这份 PDF 太大',p:'原文档上限 <b>15 MB</b>，这份 18.4 MB，服务端不接收，<b>没有进入流程</b>。',f:'就业协议书-高清扫描.pdf · 18.4 MB'}},
+ 'document-encrypted':function(){M.docErr={t:'这份 PDF 加了密',p:'服务端<b>不解密</b>任何文档，加密文档一律拒绝。请换一份未加密的 PDF 再来。',f:'劳动合同-加密.pdf · 已设置打开口令'}},
+ 'document-corrupt':function(){M.docErr={t:'这份 PDF 读不开',p:'文件结构损坏或不是有效 PDF，服务端<b>解析不了</b>，<b>没有进入流程</b>。',f:'就业协议书-截断.pdf · 结构损坏'}},
+ 'document-digital-signature':function(){M.docErr={t:'这份 PDF 已含数字签名域',p:'在上面叠图片会让原有数字签名失效，本功能<b>不处理这类文件</b>。请找原签发方处理。',f:'电子劳动合同.pdf · 含数字签名域'}},
+ 'document-too-many-pages':function(){M.docErr={t:'这份 PDF 页数超出',p:'只支持 <b>1–30 页</b>，这份 41 页，<b>没有进入流程</b>。请先拆分再来。',f:'员工手册.pdf · 41 页'}},
+ 'document-source-expired':function(){M.docErr={t:'这份文件的访问凭证过期了',p:'文件访问凭证有时效，过期后服务端不再受理。<b>重新选一次就行</b>，不用重新做材料。',f:'来源：我的文档 · 凭证已过期'}},
+ 'document-source-forbidden':function(){M.docErr={t:'这份文件不在你名下',p:'服务端只接受<b>本人名下且未过期</b>的文件。别人的文件、或已清理的文件，一律按不存在处理。',f:'归属校验未通过'}},
+
+ 'pick-stamp':function(){withDoc()},
+ 'stamp-local-uploading':function(){withDoc();M.stampStage='uploading'},
+ 'stamp-phone-entry':function(){withDoc();M.stampStage='phone'},
+ 'stamp-ready':function(){withStamp();M.stampJustAdded=true},
+ 'stamp-format-rejected':function(){withDoc();M.stampErr={t:'这张图不能用',p:'签名 / 印章图片<b>只支持 JPG / PNG</b>。刚才那份是 PDF，<b>没有进入流程</b>，已选的文档不受影响。',f:'签名扫描件.pdf · application/pdf'}},
+ 'stamp-too-large':function(){withDoc();M.stampErr={t:'这张图太大',p:'签名 / 印章图片上限 <b>10 MB</b>，这张 12.6 MB。请压缩后重传。',f:'印章-原图.png · 12.6 MB'}},
+ 'stamp-pixels-too-large':function(){withDoc();M.stampErr={t:'这张图像素太多',p:'像素总量上限 <b>2500 万</b>，这张 6000×4500 = 2700 万。请缩小分辨率后重传。',f:'印章-单反直出.jpg · 6000×4500'}},
+ 'stamp-corrupt':function(){withDoc();M.stampErr={t:'这张图读不出来',p:'文件内容与声明的格式不符，或图片已损坏，服务端<b>解析不了</b>。',f:'签名.png · 内容不是 PNG'}},
+ 'stamp-encoding-unsupported':function(){withDoc();M.stampErr={t:'这张图的编码暂不支持',p:'服务端嵌入这张图时失败（常见于 CMYK JPEG）。请另存为普通 PNG / JPG 后重试。',f:'印章.jpg · CMYK 编码'}},
+ 'stamp-source-expired':function(){withDoc();M.stampErr={t:'签名图的访问凭证过期了',p:'签名 / 印章图片<b>只在本次会话短期保留</b>（约 1 小时），过期后必须重新上传，<b>不能从历史复用</b>。',f:'来源：本次会话上传 · 凭证已过期'}},
+
+ /* 位置三件套各自可辨：页码 / 九宫格 / 大小各改一维，屏幕上都不一样 */
+ 'placement-default':function(){withStamp();at(1,'bottom-right','medium')},
+ 'placement-page2':function(){withStamp();at(2,'bottom-right','medium')},
+ 'placement-last-page':function(){withStamp();at(6,'bottom-right','medium')},
+ 'placement-top-left-small':function(){withStamp();at(1,'top-left','small')},
+ 'placement-center-medium':function(){withStamp();at(1,'center','medium')},
+ 'placement-bottom-right-large':function(){withStamp();at(1,'bottom-right','large')},
+ 'placement-invalid-page':function(){withStamp();at(1,'bottom-right','medium');M.placeErr='这份文档共 6 页，第 7 页不存在。页码必须在 1–6 之间，超出的请求服务端会直接拒绝。'},
+
+ /* 预览四态统一落在第 3 页 · 中 · 中档，只有取景方式不同，与位置三件套不撞图 */
+ 'preview-fit-page':function(){withStamp();at(3,'center','medium');M.view.mode='page'},
+ 'preview-fit-width':function(){withStamp();at(3,'center','medium');M.view.mode='width'},
+ 'preview-zoomed':function(){withStamp();at(3,'center','medium');M.view.mode='zoom';M.view.zoom=2},
+ 'preview-panned-corner':function(){withStamp();at(3,'center','medium');M.view.mode='zoom';M.view.zoom=2;M.view.pan='br'},
+ 'preview-rotated-source-page':function(){withStamp();at(4,'bottom-right','medium')},
+ /* 授权态 = 刚换过签名图、授权被复位的那一刻，和「还没勾」的默认态不是同一张脸 */
+ 'authorization-required':function(){withStamp();at(1,'bottom-right','medium');M.authReset=true},
+ 'ready-to-compose':function(){withAuth();at(1,'bottom-right','medium')},
+
+ 'composing':function(){withAuth();M.phase='composing'},
+ 'rate-limited':function(){withAuth();M.phase='rate-limited'},
+ 'conversion-in-progress':function(){withAuth();M.phase='in-progress'},
+ 'known-failed':function(){withAuth();M.phase='known-failed'},
+ 'result-unknown':function(){withAuth();M.phase='result-unknown'},
+ 'retrying-same-request':function(){withAuth();M.phase='retrying'},
+ 'recovered-completed':function(){withResult();M.phase='recovered'},
+ 'idempotency-conflict':function(){withAuth();M.phase='conflict'},
+
+ 'completed':function(){withResult()},
+ 'output-preview-page2':function(){withResult();M.view.page=2},
+ 'output-preview-last':function(){withResult();M.view.page=6},
+ 'output-preview-zoomed':function(){withResult();M.view.mode='zoom';M.view.zoom=2},
+ 'output-preview-failed':function(){withResult();M.outErr='render'},
+ 'output-expired':function(){withResult();M.outErr='expired'},
+ 'output-too-large':function(){withAuth();at(1,'bottom-right','large');M.phase='known-failed';M.oversize=true},
+ 'add-another-ready':function(){
+   /* 派生 PDF 成为新的「原文档」；旧签名图与授权全部清空，页数保留 */
+   M.doc={name:FX.out.name,bytes:FX.out.bytes,pages:FX.out.pages,rotate:FX.doc.rotate,source:'上一次合成产物（派生）'};
+   M.docStage='ready';M.derived=true;M.stamp=null;M.stampStage='idle';M.authorized=false;M.bound=false;
+   M.place={page:1,position:'bottom-right',size:'medium'};M.view={target:'source',mode:'page',zoom:0,page:1,pan:null};
+ },
+ 'return-source-unknown':function(){M.fromUnknown=true}
+};
+
+/* ── 阻断判定：任一门禁未过就不显示夹具、不给合成入口 ────────── */
+function blockReason(){
+ var B=function(kind,t,p,li,sec,pri){return {kind:kind,t:t,p:p,li:li,sec:sec,pri:pri}};
+ if(M.auth==='unknown')return B('lock','还没确认你是谁',
+   '签名和印章是<b>高敏材料</b>，在确认身份之前，这一页不提供上传、不显示任何文件，也不合成。',
+   ['没有拿到登录状态，也没有拿到「未登录」的确定答复。','这种情况一律当作不允许，而不是先放行再补检查。'],
+   null,['去登录','03-login-gate.html','/login']);
+ if(M.auth==='anonymous')return B('lock','先登录才能做签名盖章',
+   '签名 / 印章图片属于<b>高敏个人材料</b>，只允许本人在登录后上传与合成。未登录不提供这项能力。',
+   ['登录后才能确认这份文档和这张签名图都属于你本人。','普通打印、扫描、格式转换不受影响，可以直接去用。'],
+   null,['去登录','03-login-gate.html','/login']);
+ if(M.auth==='expired')return B('warn','登录已过期',
+   '为保护高敏材料，登录过期时<b>已上传的签名 / 印章图片会被丢弃</b>，需要重新登录后重新上传。原文档还在你的账号里。',
+   ['签名图不做跨会话保留，过期即不可复用。','这一步不会替你自动重传，也不会替你自动合成。'],
+   null,['重新登录','03-login-gate.html','/login']);
+ if(M.ctx==='missing')return B('warn','没有可用的办理上下文',
+   '没有拿到这次办理的来路，无法判断该回到哪里，也无法确认要处理哪一份材料。<b>请从打印扫描重新进入</b>。',
+   ['不猜上一步是什么，也不放示例文件。','这一步不会替你上传或保存任何文件。'],
+   ['我的文档','38-member-assets.html?state=documents-ready','/me/documents','sign-stamp-docs'],null);
+ if(M.terminal==='missing')return B('error','这台机器还没登记终端编号',
+   '签名盖章要按终端校验能力开关。读不到终端编号就<b>无法确认这台机器是否被允许使用</b>，因此不放行。',
+   ['不假设「读不到就是可用」。','请联系现场工作人员登记这台机器。'],
+   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+ if(M.cap==='loading')return B('info','正在读取这台机器的能力开关',
+   '还没拿到「签名盖章」在这台机器上是否开放的答复。<b>拿到之前不提供上传，也不显示任何文件</b>。',
+   ['读取中不等于可用，也不等于不可用。','这里不画进度条：服务端不回传进度。'],
+   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null,true);
+ if(M.cap==='disabled')return B('lock','这台机器没有开放签名盖章',
+   '管理员没有为这台机器开放「签名盖章」。<b>未登记一律按不允许处理</b>，不做静默降级。',
+   ['文档打印、材料扫描、格式转换不受影响。','需要开放请联系现场工作人员。'],
+   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+ if(M.cap==='maintenance')return B('warn','签名盖章正在维护',
+   '这台机器的签名盖章被管理员置为维护状态，<b>暂时不受理新的合成</b>。已生成的文件不受影响。',
+   ['维护是管理员登记的真实状态，不是这一页猜的。','恢复时间请问现场工作人员。'],
+   ['联系工作人员','06-help.html','/help','sign-stamp-help'],null);
+ if(M.cap==='error')return B('error','能力开关读取失败',
+   '没能读到这台机器的能力开关。<b>读不到就不放行</b>——不说可用，也不说不可用。',
+   ['不把一次读取失败当成能力已关闭。','重试仍失败请联系现场工作人员。'],
+   ['联系工作人员','06-help.html','/help','sign-stamp-help'],['重试读取',null,null]);
+ if(M.fromUnknown)return B('warn','认不出你是从哪里进来的',
+   '来路参数不在允许的内部白名单里，<b>返回已安全回落到「打印扫描」</b>。原始来路值既不接受，也不回显。',
+   ['外部地址一律不作为返回落点。','不会照着来路参数渲染任何内容。'],
+   ['我的文档','38-member-assets.html?state=documents-ready','/me/documents','sign-stamp-docs'],null);
+ return null;
+}
+if(blockReason.length){/* no-op：保持函数被引用 */}
+
+/* ── 返回落点白名单 ───────────────────────────────────── */
+var BACK={hub:['10-print-hub.html','/print-scan','返回打印扫描'],
+          home:['01-home.html','/','返回首页'],
+          docs:['38-member-assets.html?state=documents-ready','/me/documents','返回我的文档']};
+var FROM='hub';
+function backTarget(){return BACK[FROM]}
+
+/* ── 上下文条 ─────────────────────────────────────────── */
+function tag(cls,html,tid){return '<span class="tag'+(cls?' '+cls:'')+'" data-testid="'+tid+'">'+html+'</span>'}
+function renderCtx(){
+ var h='';
+ if(M.auth==='member')h+=tag('ok',svg('user','currentColor',22)+'已登录会员','sign-stamp-auth');
+ else if(M.auth==='expired')h+=tag('bad',svg('user','currentColor',22)+'登录已过期','sign-stamp-auth');
+ else if(M.auth==='anonymous')h+=tag('warn',svg('user','currentColor',22)+'未登录','sign-stamp-auth');
+ else h+=tag('warn',svg('user','currentColor',22)+'身份未确认','sign-stamp-auth');
+ if(M.terminal==='missing')h+=tag('bad','终端未登记','sign-stamp-cap');
+ else if(M.cap==='ready')h+=tag('ok','能力已开放','sign-stamp-cap');
+ else if(M.cap==='loading')h+=tag('','能力读取中','sign-stamp-cap');
+ else if(M.cap==='disabled')h+=tag('bad','能力未开放','sign-stamp-cap');
+ else if(M.cap==='maintenance')h+=tag('warn','能力维护中','sign-stamp-cap');
+ else h+=tag('bad','能力读取失败','sign-stamp-cap');
+ if(M.doc)h+=tag('',svg('pdf','currentColor',22)+'<b>'+M.doc.name+'</b> · '+M.doc.pages+' 页','sign-stamp-doc-tag');
+ if(M.stamp)h+=tag('',svg('stamp','currentColor',22)+'<b>'+M.stamp.name+'</b>','sign-stamp-stamp-tag');
+ h+='<span class="sp"></span>';
+ document.getElementById('ctxbar').innerHTML=h;
+ var fx=document.getElementById('fxbar');
+ if(FIXTURE){fx.innerHTML='<b>演示</b>固定原型数据，不是真实用户文件';fx.hidden=false}else{fx.innerHTML='';fx.hidden=true}
+}
+
+/* ── 完整页预览 ───────────────────────────────────────── */
+function pageIsRotated(n){return Boolean(M.doc&&M.doc.rotate&&M.doc.rotate[n])}
+function visualSize(n){return pageIsRotated(n)?{w:PAGE_H,h:PAGE_W}:{w:PAGE_W,h:PAGE_H}}
+/* 与 computeStampDrawParams 同一套算法：先在视觉空间定位，再换算成 CSS 左上角坐标 */
+function stampBox(n){
+ var v=visualSize(n),f=SIZE_FACTOR[M.place.size];
+ var w=v.w*f,h=w*(FX.stamp.h/FX.stamp.w);
+ if(h>v.h*f){h=v.h*f;w=h*(FX.stamp.w/FX.stamp.h)}
+ var mX=v.w*MARGIN_RATIO,mY=v.h*MARGIN_RATIO,g=POSGRID[M.place.position];
+ var vx=g.col==='left'?mX:(g.col==='right'?v.w-mX-w:(v.w-w)/2);
+ var vy=g.row==='bottom'?mY:(g.row==='top'?v.h-mY-h:(v.h-h)/2);
+ return {x:vx,y:v.h-vy-h,w:w,h:h};
+}
+function pageInner(n,scale,burned){
+ var v=visualSize(n),u=function(x){return (x*scale).toFixed(1)+'px'},html='',i;
+ var pad=v.w*0.085,cw=v.w-pad*2;
+ html+='<span class="pp t" style="left:'+u(pad)+';top:'+u(v.h*0.078)+';width:'+u(cw*0.56)+';height:'+u(v.h*0.026)+'"></span>';
+ var y=v.h*0.14,rowH=v.h*0.0155,gap=v.h*0.0248;
+ var pat=[1,.82,.94,.6,0,.9,.75,.97,.55,0,.88,.7,.93,.62,0,.86,.72,.95,.58,0,.9,.66,.84];
+ for(i=0;i<pat.length;i++){
+  if(pat[i]===0){y+=gap*1.05;continue}
+  html+='<span class="pp" style="left:'+u(pad)+';top:'+u(y)+';width:'+u(cw*pat[i])+';height:'+u(rowH)+'"></span>';
+  y+=gap;
+ }
+ /* 落款区：一份协议纸的下半页本来就是签字栏，也解释了为什么默认盖在右下 */
+ var sy=v.h*0.775,rule=Math.max(1,v.h*0.0032);
+ html+='<span class="pp t" style="left:'+u(pad)+';top:'+u(sy)+';width:'+u(cw*0.15)+';height:'+u(rowH)+'"></span>';
+ html+='<span class="pp" style="left:'+u(pad+cw*0.19)+';top:'+u(sy+rowH*0.85)+';width:'+u(cw*0.27)+';height:'+u(rule)+'"></span>';
+ html+='<span class="pp t" style="left:'+u(pad+cw*0.53)+';top:'+u(sy)+';width:'+u(cw*0.15)+';height:'+u(rowH)+'"></span>';
+ html+='<span class="pp" style="left:'+u(pad+cw*0.72)+';top:'+u(sy+rowH*0.85)+';width:'+u(cw*0.27)+';height:'+u(rule)+'"></span>';
+ html+='<span class="pp" style="left:'+u(pad)+';top:'+u(v.h*0.845)+';width:'+u(cw*0.3)+';height:'+u(rowH*0.8)+'"></span>';
+ /* 四角角标 / 页脚 / 旋转提示：直接按 CSS 像素排，字号有 15px 下限，
+    所以横向页、缩得很小的时候也不会把字挤出框、也不会被纸边裁掉。 */
+ var pw=v.w*scale,ph=v.h*scale,px=function(x){return x.toFixed(1)+'px'};
+ var fs=Math.max(15,ph*0.021);
+ var bh=Math.max(fs*1.75,ph*0.035),bwid=Math.max(fs*3,pw*0.13),bm=Math.max(7,pw*0.02),bw=Math.max(1,scale*2);
+ var C=[['tl','左上',bm,bm],['tr','右上',pw-bm-bwid,bm],['bl','左下',bm,ph-bm-bh],['br','右下',pw-bm-bwid,ph-bm-bh]];
+ for(i=0;i<C.length;i++){
+  html+='<span class="pmark" data-corner="'+C[i][0]+'" style="left:'+px(C[i][2])+';top:'+px(C[i][3])+';width:'+px(bwid)+';height:'+px(bh)+';font-size:'+fs.toFixed(1)+'px;border-width:'+bw.toFixed(1)+'px">'+C[i][1]+'</span>';
+ }
+ var ffs=Math.max(15,ph*0.019);
+ html+='<span class="pfoot" style="top:'+px(ph-ffs*1.5)+';font-size:'+ffs.toFixed(1)+'px">第 '+n+' 页 / 共 '+(M.doc?M.doc.pages:1)+' 页</span>';
+ if(pageIsRotated(n)){
+  var rw=Math.max(fs*9.5,pw*0.28),rh=Math.max(fs*1.75,ph*0.042);
+  html+='<span class="protchip" style="left:'+px((pw-rw)/2)+';top:'+px(bm+bh+Math.max(5,ph*0.012))+';width:'+px(rw)+';height:'+px(rh)+';font-size:'+fs.toFixed(1)+'px">本页 /Rotate 90</span>';
+ }
+ /* 签章标记：位置与大小由真实几何驱动；只出现在被选中的那一页 */
+ if(M.stamp&&n===M.place.page){
+  var b=stampBox(n);
+  html+='<span class="stampmark" data-testid="sign-stamp-overlay-marker" data-position="'+M.place.position+'" data-size="'+M.place.size+'" data-page="'+n+'" data-burned="'+(burned?'true':'false')+'" style="left:'+u(b.x)+';top:'+u(b.y)+';width:'+u(b.w)+';height:'+u(b.h)+';font-size:'+Math.max(15,b.h*0.26*scale).toFixed(1)+'px;border-width:'+Math.max(2,scale*3).toFixed(1)+'px">'+(burned?'已合成':'签名图')+'</span>';
+ }
+ return html;
+}
+function viewEl(){return document.getElementById('pv-view')}
+function fitScales(n){
+ var view=viewEl();if(!view)return {page:0.6,width:0.6};
+ var v=visualSize(n);
+ return {page:Math.min(view.clientWidth/v.w,view.clientHeight/v.h),width:view.clientWidth/v.w};
+}
+var ZOOMS=[1,1.35,1.75,2.25,2.9];
+function currentScale(n){
+ var f=fitScales(n);
+ if(M.view.mode==='width')return f.width;
+ if(M.view.mode==='zoom')return f.page*ZOOMS[M.view.zoom];
+ return f.page;
+}
+function pvDraw(){
+ var view=viewEl();if(!view)return;
+ var n=M.view.page,burned=(M.view.target==='output');
+ var s=currentScale(n),v=visualSize(n);
+ var pw=v.w*s,ph=v.h*s;
+ var sceneW=Math.max(pw,view.clientWidth),sceneH=Math.max(ph,view.clientHeight);
+ var offX=Math.max(0,(sceneW-pw)/2),offY=Math.max(0,(sceneH-ph)/2);
+ view.innerHTML='<div class="pv-scene" style="width:'+sceneW.toFixed(1)+'px;height:'+sceneH.toFixed(1)+'px">'+
+   '<div class="pv-page" data-testid="sign-stamp-pv-page" role="img" aria-label="'+(burned?'派生 PDF':'原 PDF')+' 第 '+n+' 页完整页面预览" style="left:'+offX.toFixed(1)+'px;top:'+offY.toFixed(1)+'px;width:'+pw.toFixed(1)+'px;height:'+ph.toFixed(1)+'px">'+pageInner(n,s,burned)+'</div></div>';
+ var lab=document.getElementById('pv-zoomlabel');
+ if(lab)lab.textContent=(M.view.mode==='width'?'适宽':(M.view.mode==='zoom'?'放大':'适整页'))+' · '+Math.round(s/fitScales(n).page*100)+'%';
+ var pl=document.getElementById('pv-pagelabel');
+ if(pl)pl.textContent='第 '+n+' 页 / 共 '+(M.doc?M.doc.pages:1)+' 页';
+ syncPvButtons();
+}
+function setDis(id,off,reasonId){
+ var e=document.getElementById(id);if(!e)return;
+ if(off){e.setAttribute('aria-disabled','true');e.setAttribute('aria-describedby',reasonId)}
+ else{e.setAttribute('aria-disabled','false');e.removeAttribute('aria-describedby')}
+}
+function syncPvButtons(){
+ var map=[['pv-fit-page','page'],['pv-fit-width','width'],['pv-zoom','zoom']],i,e;
+ for(i=0;i<map.length;i++){e=document.getElementById(map[i][0]);if(e)e.setAttribute('aria-pressed',M.view.mode===map[i][1]?'true':'false')}
+ var n=M.view.page,pages=M.doc?M.doc.pages:1;
+ setDis('pv-prev',n<=1,'pv-pagelabel');
+ setDis('pv-next',n>=pages,'pv-pagelabel');
+ setDis('pv-zoom-out',M.view.mode!=='zoom'||M.view.zoom<=0,'pv-zoomlabel');
+ setDis('pv-zoom-in',M.view.mode==='zoom'&&M.view.zoom>=ZOOMS.length-1,'pv-zoomlabel');
+}
+function pvToolbar(){
+ var b=function(id,tid,label,txt,extra){
+  return '<button type="button" class="pvbtn press" id="'+id+'" data-testid="'+tid+'" aria-label="'+label+'"'+(extra||'')+'>'+txt+'</button>';
+ };
+ return '<div class="pvbar" data-testid="sign-stamp-pv-toolbar">'+
+  '<div class="pvrow">'+
+   b('pv-prev','sign-stamp-pv-prev','上一页','上一页')+
+   '<span class="pvlabel" id="pv-pagelabel" data-testid="sign-stamp-pv-pagelabel">第 1 页 / 共 1 页</span>'+
+   b('pv-next','sign-stamp-pv-next','下一页','下一页')+
+   b('pv-jump2','sign-stamp-pv-jump2','跳到第 2 页','第2页')+
+   b('pv-jump-last','sign-stamp-pv-last','跳到末页','末页')+
+  '</div>'+
+  '<div class="pvrow">'+
+   b('pv-fit-page','sign-stamp-pv-fit-page','适整页显示','适整页',' aria-pressed="true"')+
+   b('pv-fit-width','sign-stamp-pv-fit-width','适宽显示','适宽',' aria-pressed="false"')+
+   b('pv-zoom-out','sign-stamp-pv-zoom-out','缩小','−')+
+   b('pv-zoom-in','sign-stamp-pv-zoom-in','放大','＋')+
+   '<span class="pvlabel" id="pv-zoomlabel" data-testid="sign-stamp-pv-zoomlabel">适整页 · 100%</span>'+
+   b('pv-zoom','sign-stamp-pv-zoom','切到放大模式','放大',' aria-pressed="false"')+
+  '</div></div>';
+}
+function renderPreview(){
+ var col=document.getElementById('pvcol');
+ var burned=(M.view.target==='output');
+ if(burned&&M.outErr){
+  col.innerHTML='<div class="pv-empty" data-testid="sign-stamp-pv-unavailable">'+svg('warn','var(--wheat-d)',44)+
+   '<b>'+(M.outErr==='expired'?'预览链接已过期':'这份预览暂时打不开')+'</b><span>'+
+   (M.outErr==='expired'
+     ? '访问链接<b>有效期 30 分钟</b>，已经到期。<b>文件本身没有丢</b>，重新取一次即可。'
+     : '浏览器没能渲染这份 PDF。<b>不代表文件损坏或丢失</b>，可以重新取一次预览链接。')+'</span></div>'+
+   '<div class="pv-cap">不放上一次的画面，免得你当成这次的结果。</div>';
+  return;
+ }
+ if(!M.doc){
+  /* 空态画的是一张「纸的位置」，不是一张假的纸：虚线框里只写接下来会出现什么。 */
+  col.innerHTML='<div class="pv-empty" data-testid="sign-stamp-pv-empty"><div class="pv-ghost">'+svg('pdf','var(--ink-3)',44)+
+   '<b>还没有文档</b><span>选好 PDF 之后，这里显示<b>完整的一页纸</b>。</span></div></div>'+
+   '<div class="pv-cap">这里只显示你选的文件，不放示例文件。</div>';
+  return;
+ }
+ /* 选择这一步只确认「选中的就是这一份」：整页显示、不给翻页缩放控件。
+    真正的完整预览（翻页 / 适宽 / 缩放 / 拖动四角）在选好位置那一步照旧。 */
+ if(pickPhase()){
+  col.innerHTML='<div class="pv-view" id="pv-view" data-testid="sign-stamp-pv-view" tabindex="0" aria-label="原 PDF 第 '+M.view.page+' 页整页预览"></div>'+
+   '<div class="pv-cap" data-testid="sign-stamp-pv-caption">原 PDF 第 '+M.view.page+' 页 · 下一步可翻页放大</div>';
+  pvDraw();
+  return;
+ }
+ col.innerHTML=pvToolbar()+
+  '<div class="pv-view" id="pv-view" data-testid="sign-stamp-pv-view" tabindex="0" aria-label="'+(burned?'派生 PDF':'原 PDF')+'完整页预览，可拖动平移"></div>'+
+  '<div class="pv-cap" data-testid="sign-stamp-pv-caption">'+(burned?'派生 PDF · 签章已印在纸上':'原 PDF · 框是标记，原件不改写')+'</div>';
+ bindPreview();
+ pvDraw();
+ if(M.view.pan==='br'){var v=viewEl();v.scrollLeft=v.scrollWidth;v.scrollTop=v.scrollHeight}
+}
+var DRAG=null;
+function bindPreview(){
+ var view=viewEl();if(!view)return;
+ view.addEventListener('pointerdown',function(e){
+  if(e.target.closest&&e.target.closest('button'))return;
+  if(view.scrollWidth<=view.clientWidth&&view.scrollHeight<=view.clientHeight)return;
+  DRAG={id:e.pointerId,x:e.clientX,y:e.clientY,sl:view.scrollLeft,st:view.scrollTop};
+  view.classList.add('grabbing');
+  try{view.setPointerCapture(e.pointerId)}catch(err){}
+  e.preventDefault();
+ });
+ view.addEventListener('pointermove',function(e){
+  if(!DRAG||e.pointerId!==DRAG.id)return;
+  view.scrollLeft=DRAG.sl-(e.clientX-DRAG.x);
+  view.scrollTop=DRAG.st-(e.clientY-DRAG.y);
+  e.preventDefault();
+ });
+ var end=function(e){if(!DRAG||e.pointerId!==DRAG.id)return;DRAG=null;view.classList.remove('grabbing')};
+ view.addEventListener('pointerup',end);
+ view.addEventListener('pointercancel',end);
+ var wire=function(id,fn){
+  var el=document.getElementById(id);if(!el)return;
+  el.addEventListener('click',function(){if(el.getAttribute('aria-disabled')==='true')return;fn();pvDraw()});
+ };
+ wire('pv-prev',function(){if(M.view.page>1)M.view.page--});
+ wire('pv-next',function(){if(M.view.page<M.doc.pages)M.view.page++});
+ wire('pv-jump2',function(){M.view.page=Math.min(2,M.doc.pages)});
+ wire('pv-jump-last',function(){M.view.page=M.doc.pages});
+ wire('pv-fit-page',function(){M.view.mode='page';M.view.zoom=0});
+ wire('pv-fit-width',function(){M.view.mode='width'});
+ wire('pv-zoom',function(){M.view.mode='zoom';if(M.view.zoom<1)M.view.zoom=2});
+ wire('pv-zoom-in',function(){M.view.mode='zoom';M.view.zoom=Math.min(ZOOMS.length-1,M.view.zoom+1)});
+ wire('pv-zoom-out',function(){if(M.view.mode!=='zoom')return;M.view.zoom=Math.max(0,M.view.zoom-1);if(M.view.zoom===0)M.view.mode='page'});
+}
+
+/* ── 参数列（唯一滚动区） ─────────────────────────────── */
+/* 参数锁定：正在提交、正在同请求重试、以及结果未确认。最后一种最重要 —— 结果没确认时
+   改一个字节就变成另一次请求，可能真的生成两份，所以这里不许改。 */
+function isLocked(){return M.phase==='composing'||M.phase==='retrying'||M.phase==='result-unknown'}
+function lockAttr(){return isLocked()?' aria-disabled="true" aria-describedby="sign-stamp-lock-reason"':''}
+function pickBody(o){
+ return '<span class="pi" style="background:'+o.bg+';color:'+o.fg+'">'+svg(o.ic,'currentColor',30)+'</span>'+
+  '<b>'+o.n+'</b><span class="d">'+o.d+'</span><span class="f">'+o.f+'</span>';
+}
+/* 卡内竖排结构与基线相同：图标 → 标题 → 说明 → 脚注，四个直接子节点。
+   基线的可点 pick 卡片不写 aria-label（可访问名由卡面文字算出），本页照办，
+   这样两张冻结手机卡的可访问名与基线逐字相同。禁用卡沿用基线的 aria-label="n（f）"。 */
+function pick(o){
+ if(o.disabled)return '<div class="pick" role="group" aria-disabled="true"'+(o.rid?' aria-describedby="'+o.rid+'"':'')+' data-testid="'+o.tid+'" aria-label="'+o.n+'（'+o.f+'）">'+pickBody(o)+'</div>';
+ if(o.href)return '<a class="pick press" href="'+o.href+'" data-route="'+(o.route||'/print-scan/sign')+'" data-testid="'+o.tid+'">'+pickBody(o)+'</a>';
+ return '<button type="button" class="pick press" data-testid="'+o.tid+'">'+pickBody(o)+'</button>';
+}
+/* ── 手机入口冻结面 ───────────────────────────────────────────────
+   下面两个字面量按基线逐字冻结（见文件头「手机入口冻结面」）。href 也是基线原值：
+   ?state=pick-stamp / ?state=placing —— 不带任何本轮查询参数，也不指向等待态。
+   裸地址下这两个目标和其它夹具态一样落 auth-unknown，所以点它不会伪造一次手机上传成功。 */
+function phoneDocPick(){
+ return pick({n:'手机扫码上传 PDF',ic:'phone',bg:'var(--slate-soft)',fg:'#35608f',
+  d:'手机扫屏幕上的码，把 PDF 传进这台机器。',f:'PDF · ≤ 15MB',
+  href:'20-sign-stamp.html?state=pick-stamp',tid:'sign-stamp-pick-doc-phone'});
+}
+function phoneStampPick(){
+ return pick({n:'手机扫码上传图片',ic:'phone',bg:'var(--slate-soft)',fg:'#35608f',
+  d:'手机拍签名或选印章图片，确认后自动进入下一步。',f:'JPG / PNG · ≤ 10MB',
+  href:'20-sign-stamp.html?state=placing',tid:'sign-stamp-pick-stamp-phone'});
+}
+function checkCard(title,items,id){
+ var li='';for(var i=0;i<items.length;i++)li+='<li><span class="sq"></span><span>'+items[i]+'</span></li>';
+ return '<div class="picknote"'+(id?' id="'+id+'" data-testid="'+id+'"':'')+'><h3>'+title+'</h3><ul class="plan">'+li+'</ul></div>';
+}
+/* 两个选择组都按基线的两列 .pickrow 排：第一行永远是「本机上传」+ 冻结的手机卡，
+   顺序、分区、尺寸与基线相同；第二行放本页多出来的来源与当场检查说明，
+   高度不超过第一行，所以手机卡不会被同组任何一张可用卡片比下去。 */
+function docPickers(){
+ return '<div class="sec-label"><span class="no serif">01</span><span class="t">选要盖章的 PDF</span><span class="hint">≤ 15MB · 1–30 页</span></div>'+
+  '<div class="pickrow">'+
+  pick({n:'本机上传 PDF',ic:'pdf',bg:'var(--clay-soft)',fg:'#9e5330',d:'这趟刚传进本机的文件。',f:'PDF · ≤ 15MB',tid:'sign-stamp-pick-doc-local'})+
+  phoneDocPick()+
+  pick({n:'从我的文档选',ic:'folder',bg:'var(--teal-soft)',fg:'#157a67',d:'你账号里已有的 PDF。',f:'仅本人名下文件',tid:'sign-stamp-pick-doc-docs'})+
+  pick({n:'从 U 盘选 PDF',ic:'usb',bg:'var(--paper)',fg:'#6b857c',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-doc-usb',disabled:true,rid:'sign-stamp-doc-note'})+
+  checkCard('选好之后当场检查',['是不是真的 PDF。','有没有加密、损坏或数字签名域。','页数在不在 1–30 之间。','<b>原文件全程不改写。</b>'])+
+  /* 禁用卡的常驻原因：占的是这一行本来空着的第二格，高度低于同组的手机卡，不会把它比下去 */
+  checkCard('U 盘为什么用不了',['U 盘导入能用来打印，但还没通到签名盖章这一步。','先用上面三种方式选这份 PDF。'],'sign-stamp-doc-note')+
+  '</div>';
+}
+function stampPickers(){
+ return '<div class="sec-label"><span class="no serif">02</span><span class="t">传这次的签名 / 印章图</span><span class="hint">≤ 10MB · ≤ 2500 万像素</span></div>'+
+  '<div class="pickrow">'+
+  pick({n:'本机上传图片',ic:'img',bg:'var(--clay-soft)',fg:'#9e5330',d:'白纸上签好名拍一张，或用已有的印章图片。背景干净、边缘清楚更好。',f:'JPG / PNG · ≤ 10MB',tid:'sign-stamp-pick-stamp-local'})+
+  phoneStampPick()+
+  pick({n:'从 U 盘选图片',ic:'usb',bg:'var(--paper)',fg:'#6b857c',d:'U 盘那条路还没通到这一步。',f:'暂时用不了 · 原因见下方',tid:'sign-stamp-pick-stamp-usb',disabled:true,rid:'sign-stamp-stamp-note'})+
+  pick({n:'在屏幕上手写签名',ic:'pen',bg:'var(--paper)',fg:'#6b857c',d:'触屏手写要先做压感校准。',f:'未开放 · 需校准后开放',tid:'sign-stamp-pick-stamp-handwrite',disabled:true,rid:'sign-stamp-stamp-note'})+
+  checkCard('这张图会被怎么对待',['只能这次新传，U 盘和手写暂时用不了。','按高敏材料短期保留，约 1 小时。','<b>不进「我的文档」，也不能复用历史。</b>'],'sign-stamp-stamp-note')+
+  '</div>';
+}
+function placementControls(){
+ var pages=M.doc?M.doc.pages:1,h='',g='',z='',i;
+ for(i=1;i<=pages;i++)h+='<button type="button" class="pgbtn press" data-testid="sign-stamp-page-'+i+'" aria-pressed="'+(i===M.place.page?'true':'false')+'" aria-label="放在第 '+i+' 页"'+lockAttr()+'>'+i+'</button>';
+ for(i=0;i<POSKEYS.length;i++)g+='<button type="button" class="press" data-testid="sign-stamp-pos-'+POSKEYS[i]+'" aria-pressed="'+(POSKEYS[i]===M.place.position?'true':'false')+'" aria-label="放到'+POSLABEL[POSKEYS[i]]+'"'+lockAttr()+'>'+POSLABEL[POSKEYS[i]]+'</button>';
+ for(i=0;i<SIZEKEYS.length;i++)z+='<button type="button" class="press" data-testid="sign-stamp-size-'+SIZEKEYS[i]+'" aria-pressed="'+(SIZEKEYS[i]===M.place.size?'true':'false')+'" aria-label="大小'+SIZELABEL[SIZEKEYS[i]]+'"'+lockAttr()+'>'+SIZELABEL[SIZEKEYS[i]]+'</button>';
+ return '<div class="grp"><h3>放第几页<span class="r">共 '+pages+' 页</span></h3><div class="pages">'+h+'</div>'+
+   (M.placeErr?'<div class="note reason" data-testid="sign-stamp-page-reason">'+M.placeErr+'</div>':'')+'</div>'+
+  '<div class="grp"><h3>放哪个位置</h3><div class="nine">'+g+'</div></div>'+
+  '<div class="grp"><h3>多大<span class="r">占页宽 15% / 25% / 35%</span></h3><div class="sizes">'+z+'</div>'+
+   '<div class="sum" data-testid="sign-stamp-summary">第 '+M.place.page+' 页 · '+POSLABEL[M.place.position]+' · '+SIZELABEL[M.place.size]+'</div></div>';
+}
+function consentBlock(){
+ var lock=isLocked()||M.phase==='completed'||M.phase==='recovered';
+ return '<div class="grp"><h3>'+svg('shield','var(--teal-d)',24)+'确认授权</h3>'+
+  '<button type="button" class="consent press" role="checkbox" data-testid="sign-stamp-authorize" aria-checked="'+(M.authorized?'true':'false')+'"'+
+   (lock?' aria-disabled="true" aria-describedby="sign-stamp-lock-reason"':'')+
+   ' aria-label="我确认本人拥有该签名/印章图片的使用授权，仅用于本人材料的版式整理">'+
+   '<span class="box" aria-hidden="true">'+svg('tick','currentColor',26)+'</span>'+
+   '<span class="ct">'+(M.authorized?'<b>已确认：</b>':'<b>请先确认：</b>')+'我确认本人拥有该签名/印章图片的使用授权，仅用于本人材料的版式整理。</span></button>'+
+  '<div class="note" data-disclaimer="true">勾选只表示你有这张图的使用权，<b>不是签署协议</b>，不产生法律凭证。<b>伪造印章或冒用他人签名违法</b>，责任自负。换图后要重新确认。</div></div>';
+}
+function retainedBlock(){
+ var lock=lockReason();
+ return '<div class="grp">'+(lock?'<div class="reason lockline" id="sign-stamp-lock-reason" data-testid="sign-stamp-lock-reason">'+lock+'</div>':'')+
+  '<h3>本次提交保留了什么<span class="r">不用重传</span></h3><div class="kv" data-testid="sign-stamp-retained">'+
+  '<div><span>原文档</span><b>'+(M.doc?M.doc.name+' · '+M.doc.pages+' 页':'—')+'</b></div>'+
+  '<div><span>签名图</span><b>'+(M.stamp?M.stamp.name+' · 本次会话':'—')+'</b></div>'+
+  '<div><span>授权</span><b>'+(M.authorized?'已确认':'未确认')+'</b></div>'+
+  '<div><span>请求标识</span><b>'+(M.bound?'已绑定 · 不上屏':'尚未生成')+'</b></div>'+
+  '</div></div>';
+}
+function outputBlock(){
+ return '<div class="grp"><h3>'+svg('check','var(--teal-d)',24)+'这份派生 PDF</h3><div class="kv" data-testid="sign-stamp-output">'+
+  '<div><span>文件名</span><b>'+M.result.name+'</b></div>'+
+  '<div><span>页数</span><b>'+M.result.pages+' 页 · 同原文档</b></div>'+
+  '<div><span>大小</span><b>'+M.result.bytes+'</b></div>'+
+  '<div><span>身份</span><b>新文件 · 原件未改写</b></div>'+
+  '<div><span>预览链接</span><b>'+(M.outErr==='expired'?'已过期 · 30 分钟有效':'有效期 30 分钟')+'</b></div>'+
+  '</div><div class="note">交接的就是<b>这份派生 PDF</b>，标识<b>不进地址栏</b>。<span data-disclaimer="true">图片排版，不是电子签名。</span></div></div>';
+}
+function lockReason(){
+ if(!isLocked())return '';
+ return M.phase==='result-unknown'
+  ? '结果还没确认，参数已锁定：改一个字节就是另一次请求，可能真的生成两份。'
+  : '正在提交这一次合成，参数与再次提交都已锁定，避免生成两份。';
+}
+function usedInputsBlock(){
+ return '<div class="grp"><h3>这一次用的输入</h3><div class="kv" data-testid="sign-stamp-used-inputs">'+
+  '<div><span>原文档</span><b>'+M.doc.name+'</b></div>'+
+  '<div><span>签名图</span><b>'+M.stamp.name+'</b></div>'+
+  '<div><span>位置</span><b>第 '+M.place.page+' 页 · '+POSLABEL[M.place.position]+' · '+SIZELABEL[M.place.size]+'</b></div>'+
+  '<div><span>授权</span><b>已确认</b></div>'+
+  '</div></div>';
+}
+function nextRoundBlock(){
+ return '<div class="grp"><h3>'+svg('stamp','var(--clay-d)',24)+'想再叠一处</h3><div class="kv" data-testid="sign-stamp-next-round">'+
+  '<div><span>原文档</span><b>换成这份派生 PDF</b></div>'+
+  '<div><span>签名图</span><b>清空 · 要重新传</b></div>'+
+  '<div><span>授权</span><b>复位 · 要重新确认</b></div>'+
+  '<div><span>页数</span><b>保留 '+M.result.pages+' 页</b></div>'+
+  '</div><div class="note">签名图不留存，沿用不了上一张。</div></div>';
+}
+/* 选择这一步的顶部说明带：与基线同一块面，高度由三行文字算出（18 / 38 / 21 px 各一行），
+   所以下面的 pickrow 落在基线那一行的同一个 y 上。每行都必须是一行，写长了会换行 →
+   手机卡的 y 就变了 → 冻结门禁当场变红。 */
+function askFor(phase){
+ if(phase==='doc'){
+  if(M.docErr)return ['这一份<em>没收下</em>。','原因在右边。<b>它没有进入流程</b>，换一份就行。'];
+  if(M.docStage==='uploading')return ['正在<em>传这份 PDF</em>。','单次上传，<b>没有进度回传</b>，传完立刻读页数。'];
+  if(M.docStage==='phone')return ['用<em>手机</em>把 PDF 传进来。','扫屏幕上的码；<b>手机上确认之后</b>才进下一步。'];
+  if(M.docStage==='inspecting')return ['正在<em>读这份 PDF 的页数</em>。','加密、损坏、含数字签名域的，<b>这一步就会被拒</b>。'];
+  return ['先选一份<em>要盖章的 PDF</em>。','把签名图叠上去，生成<b>一份新的 PDF</b>，原件不动。'];
+ }
+ if(M.stampErr)return ['这张图<em>没收下</em>。','原因在右边，<b>换一张就行</b>。'];
+ if(M.stampStage==='uploading')return ['正在<em>传这张签名图</em>。','按高敏材料短期保留，<b>不进「我的文档」</b>。'];
+ if(M.stampStage==='phone')return ['用<em>手机</em>传签名 / 印章图。','手机上确认之后才进下一步，<b>这一页不替你确认</b>。'];
+ if(M.derived)return ['接着叠<em>第二处</em>。','刚才那份派生 PDF 成了新原文档，<b>签名图要重传</b>。'];
+ if(M.docJustRead)return ['这份 PDF <em>读好了</em>。','接下来传<b>这次要用的</b>签名或印章图片。'];
+ return ['传一张<em>这次要用的</em>签名图。','只能这次新传，<b>不进「我的文档」，也不能复用历史</b>。'];
+}
+function xqBand(){
+ var a=askFor(pickPhase());
+ return '<section class="xq"><div class="xq-row">'+
+  '<div class="xq-face serif" aria-hidden="true">青</div>'+
+  '<div class="xq-main">'+
+   '<div class="xq-eyebrow">SIGN &amp; STAMP</div>'+
+   '<div class="xq-ask serif">'+a[0]+'</div>'+
+   '<div class="xq-doing">'+a[1]+'</div>'+
+  '</div></div></section>';
+}
+/* 选择阶段 = 还没有原 PDF，或者原 PDF 有了但这次的签名图还没有。
+   这两个阶段用基线版式（整宽两列 pickrow）；其余阶段用「完整页预览 + 参数」工作台。 */
+function pickPhase(){
+ if(M.phase==='completed'||M.phase==='recovered')return null;
+ if(M.docErr||!M.doc)return 'doc';
+ if(M.stampErr||!M.stamp)return 'stamp';
+ return null;
+}
+/* 四步进度轨：选择这一步的右列靠它把「现在在哪一步、后面还有什么」说清楚，
+   同时把这一列填满 —— 不靠堆解释文字来占位。 */
+function stepRail(active){
+ var S=['选文档','传签名 / 印章图','选位置','合成结果'],h='',i;
+ for(i=0;i<S.length;i++)h+='<div class="step'+(i<active?' done':(i===active?' on':''))+'"><i aria-hidden="true"></i><span>'+S[i]+'</span></div>';
+ return '<div class="grp"><h3>这一趟四步</h3><div class="steps" data-testid="sign-stamp-steps">'+h+'</div></div>';
+}
+function renderControls(){
+ var c=document.getElementById('ctrlcol'),ph=pickPhase(),h='';
+ if(ph)h='<div class="statusrow" id="statusrow">'+statusFor()+'</div>'+stepRail(ph==='doc'?0:1);
+ else if(M.phase==='completed'||M.phase==='recovered')h=outputBlock()+usedInputsBlock()+nextRoundBlock();
+ else if(isLocked())h=retainedBlock()+placementControls();
+ else if(M.phase!=='idle')h=retainedBlock()+placementControls();
+ else h=placementControls()+consentBlock();
+ c.innerHTML=h;
+ bindControls();
+}
+/* 参数一动，状态块 / 摘要 / 完整预览 / 主操作 / 顶栏胶囊同时重画；
+   「刚读到页数 / 刚收到签名图 / 授权刚被复位」这类一次性说明也随之退场。 */
+function refreshWorkspace(keepFocus){
+ M.docJustRead=false;M.stampJustAdded=false;M.authReset=false;
+ document.getElementById('statusrow').innerHTML=statusFor();
+ renderControls();renderCta();renderPill();pvDraw();
+ if(keepFocus){var el=document.querySelector('[data-testid="'+keepFocus+'"]');if(el&&el.focus)el.focus()}
+}
+function bindControls(){
+ var i,list;
+ list=document.querySelectorAll('.pgbtn');
+ for(i=0;i<list.length;i++)(function(b){
+  var tid=b.getAttribute('data-testid'),n=parseInt(tid.replace('sign-stamp-page-',''),10);
+  b.addEventListener('click',function(){if(b.getAttribute('aria-disabled')==='true')return;M.place.page=n;M.view.page=n;M.placeErr=null;refreshWorkspace(tid)});
+ })(list[i]);
+ list=document.querySelectorAll('.nine button');
+ for(i=0;i<list.length;i++)(function(b){
+  var tid=b.getAttribute('data-testid'),k=tid.replace('sign-stamp-pos-','');
+  b.addEventListener('click',function(){if(b.getAttribute('aria-disabled')==='true')return;M.place.position=k;refreshWorkspace(tid)});
+ })(list[i]);
+ list=document.querySelectorAll('.sizes button');
+ for(i=0;i<list.length;i++)(function(b){
+  var tid=b.getAttribute('data-testid'),k=tid.replace('sign-stamp-size-','');
+  b.addEventListener('click',function(){if(b.getAttribute('aria-disabled')==='true')return;M.place.size=k;refreshWorkspace(tid)});
+ })(list[i]);
+ var au=document.querySelector('[data-testid="sign-stamp-authorize"]');
+ if(au)au.addEventListener('click',function(){
+  if(au.getAttribute('aria-disabled')==='true')return;
+  M.authorized=!M.authorized;if(M.authorized)M.bound=true;
+  refreshWorkspace('sign-stamp-authorize');
+ });
+ var wire=function(tid,fn){var el=document.querySelector('[data-testid="'+tid+'"]');if(el&&el.tagName==='BUTTON')el.addEventListener('click',function(){if(el.getAttribute('aria-disabled')==='true')return;fn()})};
+ wire('sign-stamp-pick-doc-local',function(){go('document-local-uploading')});
+ wire('sign-stamp-pick-doc-docs',function(){go('document-inspecting')});
+ wire('sign-stamp-pick-stamp-local',function(){go('stamp-local-uploading')});
+}
+
+/* ── 阻断态：状态卡 + 「这些还能用」+ 侧栏 ─────────────── */
+var ALT=[
+ ['文档打印','pdf','var(--teal-soft)','#157a67','传文件、选参数、去打印。','10-print-hub.html','/print-scan','hub','要打印机就绪'],
+ ['材料扫描','img','var(--clay-soft)','#9e5330','把纸质材料扫成电子件。','18-scan-workbench.html','/scan/start','scan','要扫描仪就绪'],
+ ['图片转 PDF','folder','var(--wheat-soft)','#8a6219','几张照片拼成一份 PDF。','19-img2pdf.html','/print-scan/convert','convert','不经过打印机'],
+ ['AI 顾问','info','var(--slate-soft)','#35608f','说不清就直接问她。','05-ai-cockpit.html','/assistant','ask','随时可以问']
+];
+function gateOptions(){
+ var h='',i,a;
+ for(i=0;i<ALT.length;i++){a=ALT[i];
+  h+='<a class="pickcard press" href="'+a[5]+'" data-route="'+a[6]+'" data-testid="sign-stamp-alt-'+a[7]+'">'+
+   '<span class="pi" style="background:'+a[2]+';color:'+a[3]+'">'+svg(a[1],'currentColor',26)+'</span>'+
+   '<span class="pt"><b>'+a[0]+'</b><span class="d">'+a[4]+'</span><span class="f">'+a[8]+'</span></span></a>';
+ }
+ return '<div class="gatecol"><h3>'+svg('check','var(--teal-d)',24)+'这一步过不去，这些还能用<span class="r">每个入口自己再检查一次</span></h3>'+
+  '<div class="gaterow">'+h+'</div>'+
+  '<div class="note">这里只是导航；能不能用由那一页自己判断。</div></div>';
+}
+function gateAside(b){
+ var li=function(a){return '<ul class="plan">'+a.map(function(x){return '<li><span class="sq"></span><span>'+x+'</span></li>'}).join('')+'</ul>'};
+ return '<div class="acol"><h4>为什么这么处理</h4>'+li(b.li)+'</div>'+
+        '<div class="acol" data-disclaimer="true"><h4>这一页现在不做什么</h4>'+li(['不显示任何文件名或页数。','不上传、不合成、不保存。'])+'</div>';
+}
+
+/* ── 状态条 / 侧栏 ────────────────────────────────────── */
+function stateBlock(kind,icon,title,desc,more,chips){
+ return '<div class="state" data-kind="'+kind+'" data-testid="sign-stamp-fallback">'+
+  '<div class="state-h">'+svg(icon,'currentColor',28)+title+'</div>'+
+  '<div class="state-p">'+desc+'</div>'+(more?'<div class="state-p">'+more+'</div>':'')+
+  '<div class="metarow">'+chips.map(function(c){return '<span class="chip'+(c[1]?' '+c[1]:'')+'">'+c[0]+'</span>'}).join('')+'</div></div>';
+}
+function statusFor(){
+ var P='第 '+M.place.page+' 页 · '+POSLABEL[M.place.position]+' · '+SIZELABEL[M.place.size];
+ if(M.docErr)return stateBlock('warn','warn',M.docErr.t,M.docErr.p,'',[[M.docErr.f],['原文档未被改写','ok'],['没有生成任何文件','ok']]);
+ if(M.stampErr)return stateBlock('warn','warn',M.stampErr.t,M.stampErr.p,'',[[M.stampErr.f],['已选文档不受影响','ok'],['没有生成任何文件','ok']]);
+ if(M.phase==='composing')return stateBlock('info','clock','正在提交这一次合成',
+  '按<b>'+P+'</b>把图片叠上去，生成一份新 PDF。一次性请求，<b>服务端不回传进度</b>，所以没有百分比也没有阶段。','',
+  [['参数已锁定'],['不会自动重复提交','ok'],['原 PDF 不被改写','ok']]);
+ if(M.phase==='rate-limited')return stateBlock('warn','clock','提交太频繁了',
+  '合成一分钟内最多三次。<b>你的文档、签名图和位置都还在</b>，等一会儿用<b>同一次请求标识</b>重试即可。','',
+  [['一分钟内 3 次上限'],['输入已全部保留','ok'],['没有重复生成','ok']]);
+ if(M.phase==='in-progress')return stateBlock('warn','clock','上一次合成还没结束',
+  '同一个请求标识上还有一次<b>正在进行</b>的合成。为避免生成两份，这次不受理，<b>稍候用同一次请求重试</b>。','',
+  [['服务端登记为进行中'],['输入已全部保留','ok'],['不会另开一份','ok']]);
+ if(M.phase==='known-failed')return stateBlock('error','warn',M.oversize?'合成结果超出大小限制':'这一次明确失败了',
+  M.oversize
+   ? '叠加后的 PDF 超过 <b>15 MB</b>，服务端拒绝落库，<b>没有生成可用文件</b>。换小一点的签名图，或先压缩原 PDF。'
+   : '服务端给了<b>明确的失败答复</b>：这一次<b>没有生成文件</b>。文档、签名图、页码、位置、大小和授权全部保留，重试不用重传。','',
+  [['服务端明确拒绝'],['输入已全部保留','ok'],['原 PDF 不被改写','ok']]);
+ if(M.phase==='result-unknown')return stateBlock('warn','warn','这一次的结果<b>没有确认</b>',
+  '请求中断了，<b>不知道服务端有没有执行</b>。所以这里<b>不说已生成，也不说没生成</b>。',
+  '只能用<b>同一请求标识 + 同一份输入</b>重试。参数一改就是另一次请求，可能真生成两份。',
+  [['结果未确认'],['输入与请求标识已保留','ok'],['只允许同一请求重试','ok']]);
+ if(M.phase==='retrying')return stateBlock('info','clock','正在用<b>同一次请求</b>重试',
+  '复用<b>同一次请求标识</b>，并且文档、签名图、页码、位置、大小<b>一个字节都没有改</b>。如果服务端上一次已经做完，会把那一份直接还回来，不会再生成一份。','',
+  [['同一请求标识'],['同一份输入','ok'],['参数已锁定','ok']]);
+ if(M.phase==='conflict')return stateBlock('error','warn','这个请求标识已经用过了',
+  '同一个请求标识上一次绑定的是<b>另一组参数</b>。服务端拒绝覆盖，<b>上一次的结果原样保留</b>。要换参数，就得是一次新的请求。','',
+  [['请求标识已被占用'],['上一次结果未被覆盖','ok'],['未生成新文件','ok']]);
+ if(M.phase==='recovered')return stateBlock('info','check','这一份是<b>恢复出来的已完成结果</b>',
+  '服务端确认<b>同一次请求标识、同一份输入</b>上已经有完成的结果，于是把那一份还回来了。<b>没有重复生成</b>。','',
+  [['同一请求已完成'],['没有重复生成','ok'],['原 PDF 不被改写','ok']]);
+ if(M.phase==='completed'){
+  if(M.outErr==='expired')return stateBlock('warn','clock','派生 PDF 已生成，但预览链接过期了',
+   '访问链接<b>有效期 30 分钟</b>，已到期。<b>文件没丢，但现在打不了</b>——要重新取一次。','',
+   [['链接已过期','warn'],['文件仍在','ok'],['需重新取链接','warn']]);
+  if(M.outErr==='render')return stateBlock('warn','warn','派生 PDF 已生成，但这里渲染不出来',
+   '浏览器没能把这份 PDF 画出来。<b>这不代表文件损坏或丢失</b>，可以重新取一次预览链接，或直接去材料检查。','',
+   [['预览渲染失败','warn'],['文件仍在','ok'],['可继续下一步','ok']]);
+  return stateBlock('info','check','新的派生 PDF 已生成',
+   '服务端返回了<b>一份新文件</b>。<b>原 PDF 一个字节没改</b>。下一步去<b>材料检查</b>，那一步才决定能不能打印。','',
+   [[M.result.pages+' 页 · '+M.result.bytes],['原 PDF 未被改写','ok'],['下一步：材料检查','ok']]);
+ }
+ if(M.derived)return stateBlock('info','stamp','以刚才的合成结果继续叠加',
+  '旧签名图和授权<b>已清空</b>，<b>得重新传一张</b>才能接着叠。','',
+  [[M.doc.name+' · '+M.doc.pages+' 页'],['旧签名图已清空','warn'],['授权已复位','warn']]);
+ if(M.docStage==='uploading')return stateBlock('info','pdf','正在把这份 PDF 传进本机',
+  '单次上传，<b>没有可用的进度百分比</b>，所以这里只说在传。传完会立刻读一次页数。','',
+  [['单次上传'],['没有进度回传'],['失败会原样说明','ok']]);
+ if(M.docStage==='phone')return stateBlock('info','phone','用手机把 PDF 传进来',
+  '手机扫屏幕上的码，选一份 PDF 上传。<b>确认之后才会进入下一步</b>，这一页不会替你确认。','',
+  [['手机扫屏幕码'],['需你在手机上确认','warn'],['不使用扫码枪']]);
+ if(M.docStage==='inspecting')return stateBlock('info','pdf','正在读这份 PDF 的页数',
+  '服务端打开文档，读出<b>一共几页</b>，好让你选放在第几页。<b>加密、损坏、含数字签名域的会在这一步被拒绝</b>。','',
+  [['读取页数'],['没有进度回传'],['原文件不被改写','ok']]);
+ if(M.stampStage==='uploading')return stateBlock('info','img','正在传这张签名 / 印章图',
+  '这张图按<b>高敏材料</b>处理：短期保留（约 1 小时），<b>不进「我的文档」</b>，会话结束即不可再用。','',
+  [['单次上传'],['高敏 · 约 1 小时','warn'],['不进我的文档','warn']]);
+ if(M.stampStage==='phone')return stateBlock('info','phone','用手机传签名 / 印章图',
+  '手机拍一张签名，或选一张印章图片。<b>确认之后才会进入下一步</b>。这张图同样只在本次会话短期保留。','',
+  [['手机扫屏幕码'],['需你在手机上确认','warn'],['高敏 · 约 1 小时','warn']]);
+ if(!M.doc)return stateBlock('info','pdf','先选一份要盖章的 PDF',
+  '把签名或印章<b>图片</b>叠到 PDF 的指定位置，生成<b>一份新的 PDF</b>。原文件不会被改写。','',
+  [['原 PDF ≤ 15MB · 1–30 页'],['产物是新文件','ok'],['原文件不被改写','ok']]);
+ if(M.docJustRead)return stateBlock('info','check','这份 PDF 读好了：共 '+M.doc.pages+' 页',
+  '读到 <b>'+M.doc.pages+' 页</b>；没加密、没损坏、没有数字签名域。接下来传<b>这次要用的</b>签名图。','',
+  [[M.doc.name+' · '+M.doc.bytes],[M.doc.pages+' 页 · 在 1–30 内','ok'],['原文件不被改写','ok']]);
+ if(!M.stamp)return stateBlock('info','stamp','传一张这次要用的签名 / 印章图',
+  '只能用<b>这次新传的图</b>：按高敏材料保留约 1 小时，<b>不进我的文档</b>。','',
+  [['JPG / PNG ≤ 10MB'],['≤ 2500 万像素'],['高敏 · 约 1 小时','warn']]);
+ if(M.stampJustAdded)return stateBlock('info','check','签名图收到了',
+  '<b>'+M.stamp.name+'</b> 已经在本次会话里。接下来选<b>第几页、哪个位置、多大</b>，左边同步画出来。','',
+  [[M.stamp.bytes+' · '+M.stamp.w+'×'+M.stamp.h],['高敏 · 约 1 小时','warn'],['不进我的文档','warn']]);
+ if(M.placeErr)return stateBlock('warn','warn','页码超出这份文档',
+  M.placeErr,'',[['共 '+M.doc.pages+' 页'],['服务端会直接拒绝','warn'],['改回 1–6 页即可','ok']]);
+ if(M.authReset)return stateBlock('warn','shield','换了签名图，授权要重新确认',
+  '上一次的授权只对上一张图有效。换图之后<b>授权已经复位</b>，得对这张新图再确认一次才能生成。','',
+  [['授权已复位','warn'],['上一张图不留存','warn'],['原 PDF 不被改写','ok']]);
+ if(!M.authorized)return stateBlock('warn','shield','生成之前先确认授权',
+  '勾选「我拥有这张图的使用授权」之后才能生成。<b>没勾就不给生成</b>，原因常驻在按钮上方。','',
+  [['需勾选授权','warn'],['换图后需重新确认','warn'],['原 PDF 不被改写','ok']]);
+ return stateBlock('info','check','参数已就绪，可以生成',
+  '将按<b>'+P+'</b>合成一份新的 PDF。<b>原 PDF 不会被改写</b>，成功后进入材料检查。','',
+  [[P,'ok'],['产物是新文件','ok'],['下一步是材料检查','ok']]);
+}
+function asideFor(){
+ var left,right,li=function(a){return '<ul class="plan">'+a.map(function(x){return '<li><span class="sq"></span><span>'+x+'</span></li>'}).join('')+'</ul>'};
+ if(M.phase==='completed'||M.phase==='recovered'){
+  left=['接下来',['去<b>材料检查</b>核对隐私与可打印性，那之后才谈报价。','也可以拿它<b>再叠一处</b>。','再叠要<b>重新传签名图</b>。']];
+  right=['不会做什么',['不代表材料已生效。','不下单、不出纸、不显示金额。']];
+ }else if(M.phase!=='idle'){
+  left=['这一次的边界',['一次性请求，<b>没有进度也没有阶段</b>。','结果未确认只许<b>同请求同参数</b>重试。','审计失败会报错，但派生文件<b>可能已存在</b>。']];
+  right=['不会做什么',['不画进度条，也不自动重试。','不覆盖原 PDF。']];
+ }else{
+  left=['三份文件分开',['<b>原 PDF</b>：永不改写。','<b>签名图</b>：只能这次新传，约 1 小时，不进我的文档。','<b>派生 PDF</b>：每次都是新文件。']];
+  right=['不会做什么',['不判断该签在哪。','不做防篡改，不发证书。']];
+ }
+ return '<div class="acol"><h4>'+left[0]+'</h4>'+li(left[1])+'</div>'+
+        '<div class="acol" data-disclaimer="true"><h4>'+right[0]+'</h4>'+li(right[1])+'</div>';
+}
+
+/* ── 底部主操作 ───────────────────────────────────────── */
+function ghost(label,href,route,tid){return '<a class="btn ghost press" href="'+href+'" data-route="'+route+'" data-testid="'+tid+'" aria-label="'+label+'">'+label+'</a>'}
+function ghostBtn(label,tid){return '<button type="button" class="btn ghost press" data-testid="'+tid+'">'+label+'</button>'}
+function priLink(label,href,route){return '<a class="btn primary press" href="'+href+'" data-route="'+route+'" data-testid="sign-stamp-primary" aria-label="'+label+'">'+label+'</a>'}
+function priBtn(label){setReason(null);return '<button type="button" class="btn primary press" data-testid="sign-stamp-primary">'+label+'</button>'}
+function priOff(label,reason){
+ setReason(reason);
+ return '<span class="btn primary" role="button" aria-disabled="true" data-testid="sign-stamp-primary" aria-describedby="sign-stamp-disabled-reason" aria-label="'+label+'（'+reason+'）">'+label+'</span>';
+}
+function setReason(r){
+ var el=document.getElementById('cta-reason');
+ if(r){el.textContent=r;el.hidden=false}else{el.textContent='';el.hidden=true}
+}
+function renderCta(){
+ setReason(null); /* 先清空：禁用原因只由本次重画里的 priOff 写，不留上一屏的残句 */
+ var bar=document.getElementById('ctabar'),bt=backTarget(),b=blockReason(),h='';
+ h+=ghost(bt[2],bt[0],bt[1],'sign-stamp-exit');
+ if(b){
+  if(b.sec)h+=ghost(b.sec[0],b.sec[1],b.sec[2],b.sec[3]);
+  setReason(null);
+  h+=b.pri?(b.pri[1]?priLink(b.pri[0],b.pri[1],b.pri[2]):priBtn(b.pri[0])):priLink(bt[2]+'（唯一出口）',bt[0],bt[1]);
+  bar.innerHTML=h;return;
+ }
+ if(M.phase==='completed'||M.phase==='recovered'){
+  h+=ghostBtn('再加一处签名 / 印章','sign-stamp-add-another');
+  h+=(M.outErr==='expired')
+    ? priOff('去材料检查（先重新取链接）','链接已过期，重新取一次才能交给材料检查')
+    : priLink('去材料检查','13-print-desk.html','/print/material-check');
+ }
+ else if(M.docErr)h+=priOff('换一份 PDF 再继续','刚才那份没有进入流程，先换一份符合要求的 PDF');
+ else if(M.stampErr)h+=priOff('换一张图片再继续','刚才那张没有进入流程，先换一张 JPG / PNG');
+ else if(M.phase==='composing'||M.phase==='retrying')h+=priOff('正在生成…','这一次合成还没有回来，重复提交可能生成两份');
+ else if(M.phase==='result-unknown')h+=priBtn('用同一次请求重试');
+ else if(M.phase==='known-failed'||M.phase==='rate-limited'||M.phase==='in-progress')h+=priBtn('重试生成');
+ else if(M.phase==='conflict')h+=priOff('换一次新请求再生成','这个请求标识已绑定另一组参数，必须换一次新的请求，不能覆盖上一次');
+ else if(!M.doc)h+=priOff('选好 PDF 再继续','还没有选文档，没有文档就没法选页码和位置');
+ else if(!M.stamp)h+=priOff('传好签名 / 印章图再继续','还没有这次的签名 / 印章图片，没有图就没有可叠加的内容');
+ else if(M.placeErr)h+=priOff('先改成 1–6 页之间','页码超出这份文档的范围，服务端会直接拒绝');
+ else if(!M.authorized)h+=priOff('生成合成 PDF（请先确认授权）','还没有勾选授权确认，勾选后才能生成');
+ else h+=priBtn('生成合成 PDF');
+ bar.innerHTML=h;
+ var ex=document.querySelector('[data-testid="sign-stamp-add-another"]');
+ if(ex)ex.addEventListener('click',function(){go('add-another-ready')});
+}
+
+/* ── 顶栏胶囊 ─────────────────────────────────────────── */
+function renderPill(){
+ var cls='',txt='',b=blockReason();
+ if(b){cls=(b.kind==='error'?'bad':(b.kind==='info'?'':'warn'));txt=b.t}
+ else if(M.docErr||M.stampErr){cls='warn';txt='这一份没被接收'}
+ else if(M.phase==='composing'||M.phase==='retrying'){cls='';txt='正在生成 · 无进度回传'}
+ else if(M.phase==='result-unknown'){cls='warn';txt='结果未确认'}
+ else if(M.phase==='known-failed'||M.phase==='conflict'){cls='bad';txt='这一次未生成'}
+ else if(M.phase==='rate-limited'||M.phase==='in-progress'){cls='warn';txt='暂不受理 · 可稍后重试'}
+ else if(M.phase==='completed'||M.phase==='recovered'){cls='ok';txt=M.outErr?'已生成 · 预览受限':'派生 PDF 已生成'}
+ else if(!M.doc){cls='';txt='第 1 步 · 选 PDF'}
+ else if(!M.stamp){cls='';txt='第 2 步 · 传签名图'}
+ else if(!M.authorized){cls='warn';txt='第 3 步 · 需确认授权'}
+ else{cls='ok';txt='第 4 步 · 可以生成'}
+ document.getElementById('pill').className='pill'+(cls?' '+cls:'');
+ document.getElementById('pill-txt').textContent=txt;
+ var live=(M.phase==='composing'||M.phase==='retrying'||M.cap==='loading'||M.docStage==='inspecting'||M.docStage==='uploading'||M.stampStage==='uploading');
+ document.getElementById('pill-dot').className='dot'+(live?' breathe':'');
+}
+
+/* ── 主渲染 ───────────────────────────────────────────── */
+function render(st){
+ var stage=document.getElementById('stage'),root=document.getElementById('root'),bt=backTarget();
+ stage.setAttribute('data-state',st);
+ root.setAttribute('data-state',st);
+ root.setAttribute('data-testid',SCREEN+'-state-'+st);
+ var back=document.getElementById('back');
+ back.setAttribute('href',bt[0]);back.setAttribute('data-route',bt[1]);back.setAttribute('aria-label',bt[2]);
+ renderCtx();
+ var b=blockReason();
+ if(b){
+  root.setAttribute('data-shape','block');
+  root.innerHTML='<div class="statusrow" id="statusrow"></div><div class="work" id="work"></div><div class="aside" id="aside"></div>';
+  document.getElementById('statusrow').innerHTML=
+   '<div class="state" data-kind="'+b.kind+'" data-testid="sign-stamp-fallback">'+
+    '<div class="state-h">'+svg(b.kind==='lock'?'lock':(b.kind==='info'?'info':'warn'),'currentColor',28)+b.t+'</div>'+
+    '<div class="state-p">'+b.p+'</div>'+
+    '<div class="metarow"><span class="chip">这一页不显示任何文件</span><span class="chip">不生成、不保存、不上传</span><span class="chip">签名图不跨会话保留</span></div>'+
+   '</div>';
+  document.getElementById('work').innerHTML=gateOptions();
+  document.getElementById('aside').innerHTML=gateAside(b);
+ }else{
+  var ph=pickPhase();
+  if(ph){
+   root.setAttribute('data-shape','pick');
+   root.innerHTML=xqBand()+
+    '<section class="sec" id="picksec" aria-label="'+(ph==='doc'?'选要盖章的 PDF':'传这次的签名 / 印章图')+'">'+(ph==='doc'?docPickers():stampPickers())+'</section>'+
+    '<div class="work" id="work"><section class="pvcol" id="pvcol" aria-label="文档完整页预览"></section>'+
+    '<section class="ctrlcol" id="ctrlcol" aria-label="这一步的状态与说明"></section></div>';
+  }else{
+   root.setAttribute('data-shape','work');
+   root.innerHTML='<div class="statusrow" id="statusrow"></div>'+
+    '<div class="work" id="work"><section class="pvcol" id="pvcol" aria-label="文档完整页预览"></section><section class="ctrlcol" id="ctrlcol" aria-label="叠加参数"></section></div>'+
+    '<div class="aside" id="aside"></div>';
+   document.getElementById('statusrow').innerHTML=statusFor();
+   document.getElementById('aside').innerHTML=asideFor();
+  }
+  renderControls();
+ }
+ renderPill();
+ renderCta();
+ if(!b)renderPreview();
+ var links=document.querySelectorAll('#demo-panel a');
+ for(var i=0;i<links.length;i++)links[i].className=(links[i].getAttribute('data-s')===st?'on':'');
+}
+var CURRENT='auth-unknown';
+function go(st){resetModel();if(SETUP[st])SETUP[st]();if(FROM_UNKNOWN)M.fromUnknown=true;CURRENT=st;render(st)}
+
+/* ── 启动 ─────────────────────────────────────────────── */
+var Q=new URLSearchParams(location.search);
+var DEBUG=Q.get('debug')==='1';
+var CAPTURE=Q.get('capture')==='1';
+var FIXTURE=DEBUG||CAPTURE;
+var FLAT=Q.get('flat')==='1';
+/* 未知 / 外部来路一律回落 hub；原始值绝不进入 DOM，也不做返回落点。
+   真的传了一个不认识的来路时，页面照实说一句，而不是悄悄换个落点。 */
+var RAW_FROM=Q.get('from');
+var FROM_KNOWN=RAW_FROM!==null&&Object.prototype.hasOwnProperty.call(BACK,String(RAW_FROM));
+var FROM_UNKNOWN=RAW_FROM!==null&&!FROM_KNOWN;
+FROM=FROM_KNOWN?String(RAW_FROM):'hub';
+
+/* 基线冻结的手机卡 href 用基线状态名 ?state=placing；本页对应 placement-default。
+   只做同义解析，不新增状态、不放宽夹具门。 */
+var STATE_ALIAS={placing:'placement-default'};
+
+/* 夹具门：所有带文件名 / 页数 / 结果的状态都要 capture=1 或 debug=1；
+   普通产品地址一律落 auth-unknown，看不到任何夹具事实。 */
+var wanted=Q.get('state');
+if(wanted!==null&&Object.prototype.hasOwnProperty.call(STATE_ALIAS,wanted))wanted=STATE_ALIAS[wanted];
+var start='auth-unknown';
+if(STATES.indexOf(wanted)>=0){ if(FIXTURE||NON_FIXTURE[wanted])start=wanted }
+go(start);
+
+/* 原型演示控制（非产品功能）：仅 debug=1 注入 DOM */
+if(DEBUG){
+ var tab=document.createElement('button');
+ tab.type='button';tab.className='demo-tab';tab.id='demo-tab';
+ tab.setAttribute('aria-label','打开原型演示控制面板');
+ tab.setAttribute('data-proto-control','true');
+ tab.textContent='演示';
+ var panel=document.createElement('div');
+ panel.className='demo-panel';panel.id='demo-panel';
+ panel.setAttribute('aria-label','原型演示控制');
+ panel.setAttribute('data-proto-control','true');
+ var dh='<div class="dp-t">原型演示控制（非产品功能）</div>',si;
+ for(si=0;si<STATES.length;si++)dh+='<a href="?debug=1&capture=1'+(FLAT?'&flat=1':'')+'&state='+STATES[si]+'" data-s="'+STATES[si]+'"'+(STATES[si]===CURRENT?' class="on"':'')+'>'+STATES[si]+'</a>';
+ panel.innerHTML=dh;
+ var stg=document.getElementById('stage');
+ stg.appendChild(tab);stg.appendChild(panel);
+ tab.addEventListener('click',function(){panel.classList.toggle('show')});
+}
+/* 时钟：只刷新顶栏时间文本，不改 data-state，也不推进任何业务状态 */
+function tick(){var d=new Date();document.getElementById('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+tick();setInterval(tick,20000);
+function fit(){var s=Math.min(innerWidth/1080,innerHeight/1920);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+s+')'}
+fit();
+addEventListener('resize',function(){fit();if(viewEl())pvDraw()});
+if(FLAT)document.getElementById('stage').classList.add('flat');
+</script>
+</body>
+</html>

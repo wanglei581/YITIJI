@@ -1,0 +1,80 @@
+/* ============================================================
+   青序流光 · Kiosk 共享动效层（第 1 批基准）
+   真源：kimi-full-coverage-v2/design-system/MOTION-SPEC.md
+   规则：
+   - 只用 transform/opacity（GPU 友好）
+   - 禁止循环 spinner（旋转加载圈）、假百分比、假阶段、假页码递增
+   - 处理中指示一律用「整体脉冲」，不用进度条模拟未知进度
+   - prefers-reduced-motion 与 ?flat=1 下一律静态降级
+   ============================================================ */
+
+:root{
+  --m-dur-instant:120ms;
+  --m-dur-quick:240ms;
+  --m-dur-page:480ms;
+  --m-ease:cubic-bezier(.22,1,.36,1);
+}
+
+/* ---------- M1 状态呼吸 ---------- */
+
+/* 设备/状态在线点（2600ms 光晕呼吸，信号=状态轮询成功） */
+.m-dot{width:12px;height:12px;border-radius:50%;background:var(--teal,#1f9e86);position:relative;flex:none;}
+.m-dot.breathe::after{content:"";position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid currentColor;opacity:.7;color:var(--teal,#1f9e86);
+  animation:m-breathe 2600ms ease-in-out infinite;}
+@keyframes m-breathe{0%,100%{transform:scale(.82);opacity:.7;}50%{transform:scale(1.3);opacity:0;}}
+
+/* 小青脸光环（3000ms 扩散环，纯氛围） */
+.m-face-ring{position:relative;}
+.m-face-ring::before{content:"";position:absolute;inset:-10px;border-radius:50%;
+  border:1.5px solid rgba(46,230,168,.22);animation:m-ring 3000ms var(--m-ease) infinite;}
+@keyframes m-ring{0%{transform:scale(.92);opacity:.9;}70%{transform:scale(1.12);opacity:0;}100%{opacity:0;}}
+
+/* 等待用户操作·卡缘呼吸（2400ms） */
+.m-await{animation:m-await 2400ms ease-in-out infinite;}
+@keyframes m-await{0%,100%{box-shadow:0 0 0 1.5px rgba(31,158,134,.35);}50%{box-shadow:0 0 0 3px rgba(31,158,134,.85);}}
+
+/* ---------- M2 处理中·整体脉冲（唯一允许的"进行中"表达） ---------- */
+/* 用法：上传中 / 等待解析结果 / 正在打印 / 等待回传 / 校验中。
+   绝对禁止改造成进度条或百分比。 */
+.m-pulse{display:inline-flex;align-items:center;gap:10px;}
+.m-pulse .mp-dots{display:inline-flex;gap:7px;}
+.m-pulse .mp-dots i{width:10px;height:10px;border-radius:50%;background:currentColor;
+  animation:m-pulse 1600ms ease-in-out infinite;}
+.m-pulse .mp-dots i:nth-child(2){animation-delay:200ms;}
+.m-pulse .mp-dots i:nth-child(3){animation-delay:400ms;}
+@keyframes m-pulse{0%,100%{opacity:.25;transform:scale(.85);}50%{opacity:1;transform:scale(1);}}
+
+/* ---------- M3 状态过渡（240ms ease-out 淡入，无布局跳动） ---------- */
+.m-fade-in{animation:m-fade-in 240ms var(--m-ease) both;}
+@keyframes m-fade-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.m-state-swap{animation:m-fade-in 240ms var(--m-ease) both;}
+
+/* ---------- M4 触控反馈 ---------- */
+.m-press{transition:transform 120ms var(--m-ease);}
+.m-press:active{transform:scale(.98);}
+
+/* ---------- M5 硬件引导 ---------- */
+/* 出纸引导（2800ms 纸张下落循环；纯位置引导，不代表打印进度） */
+.m-paper-guide{animation:m-paperdrop 2800ms var(--m-ease) infinite;}
+@keyframes m-paperdrop{0%{transform:translateY(-30px);opacity:0;}18%{opacity:1;}
+  70%{transform:translateY(46px);}100%{transform:translateY(58px);opacity:1;}}
+
+/* 扫码取景角标脉冲（1600ms；A/B 两方向共用样式，语义由宿主文案区分） */
+.m-scan-corner{animation:m-scan 1600ms ease-in-out infinite;}
+@keyframes m-scan{0%,100%{opacity:.5;}50%{opacity:1;}}
+
+/* 输入光标闪烁（1000ms steps） */
+.m-caret::after{content:"";display:inline-block;width:4px;height:.9em;background:currentColor;
+  vertical-align:middle;animation:m-blink 1000ms steps(1) infinite;}
+@keyframes m-blink{50%{opacity:0;}}
+
+/* ---------- 全局降级 ---------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;}
+  /* 降级后处理中指示保留三点静态点 + 文字，不靠运动表意 */
+  .m-pulse .mp-dots i{opacity:1!important;transform:none!important;}
+}
+html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after{
+  animation:none!important;transition:none!important;
+}

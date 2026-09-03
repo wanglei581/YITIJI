@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模板 T3 · 加工型 ｜ 青序流光 v2</title>
+<link rel="stylesheet" href="../kiosk-tokens.css">
+<link rel="stylesheet" href="../kiosk-components.css">
+<style>html,body{margin:0}</style>
+</head>
+<body>
+<!--
+route: /resume/parse（示例；同源适用 /resume/generate/preview、/print-scan/convert、/print-scan/sign）
+state: 本模板只示范 processing；结果 / 失败由真实宿主根据单次请求的最终响应切换
+api: 当前 Kiosk 对 POST /api/v1/resume/parse 等待完整结果 `{ status, taskId, accessToken?, providerName?, report?, extractionNotice?, failReason? }`；本页不使用 GET 轮询制造解析进度
+fallback: 处理超时/失败 → 显示失败原因 + 「重新处理」+ 保留原文件入口，不丢失采集成果
+-->
+<div id="viewport">
+<main id="stage" data-screen="t3" data-state="processing" data-testid="t3-state-processing">
+  <header class="k-topbar">
+    <a class="back" href="../../../21-resume-triage.html" aria-label="返回简历来源选择">←</a>
+    <span class="title">正在处理</span><span class="spacer"></span>
+  </header>
+
+  <div class="k-scroll">
+    <!-- 处理中：接口没有真实 progress/stage 字段，只显示整体等待，不画百分比或步骤点 -->
+    <section class="k-sec">
+      <div class="k-card">
+        <p class="k-card-title">正在解析你的简历</p>
+        <p class="k-card-meta">正在等待解析结果；请不要关闭当前页面。</p>
+        <p class="k-card-meta" style="margin-top:12px" role="status" aria-live="polite">整体处理中，不显示未经接口返回的百分比或阶段。</p>
+      </div>
+    </section>
+
+    <!-- 结果态骨架：产物卡 + 去向动作 -->
+    <section class="k-sec" hidden>
+      <div class="k-sec-head"><span class="no">01</span><h2>处理结果</h2></div>
+      <div class="k-card">
+        <p class="k-card-title">解析完成</p>
+        <p class="k-card-meta">仅在接口返回 completed 后渲染真实报告字段；本模板不提供示例数量。</p>
+      </div>
+    </section>
+
+    <!-- 失败态：不丢成果 -->
+    <section class="k-sec" data-testid="t3-fallback" hidden>
+      <div class="k-state" data-kind="error">
+        <span class="ic">!</span>
+        <p class="t">没有解析成功</p>
+        <p class="d">可能是文件图片不清晰。可以换一份文件重试，或改用手机拍照上传。</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="k-cta-bar">
+    <span class="grow"></span>
+    <button class="k-btn" type="button" data-kind="primary" data-testid="t3-primary" aria-disabled="true" disabled>等待处理结果</button>
+  </div>
+  <p class="k-disabled-reason" data-testid="t3-disabled-reason" style="text-align:center">解析请求尚未返回最终结果，当前不能进入报告页。</p>
+  <nav class="k-navbar" aria-label="主导航"><a href="../../../01-home.html">首页</a><a href="../../../05-ai-cockpit.html">问小青</a><a href="../../../30-my-profile.html">我的</a></nav>
+</main>
+</div>
+</body>
+</html>

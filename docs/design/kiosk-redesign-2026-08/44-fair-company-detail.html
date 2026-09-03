@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>招聘会参展企业 · 职易达</title>
+<!--
+  宿主：招聘会参展企业详情
+  route: /job-fairs/:id/companies/:companyId  —— 089（入口来自 087 参展企业列表）
+  state: ready | loading | qr | positions-empty | source-incomplete | not-found | error
+  api:  GET /api/v1/job-fairs/:id/companies/:companyId
+        （命中 router state 传入的企业对象时直接渲染，否则回源请求；对齐
+          apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx）
+  合规闸门（逐项对齐运行时）：
+    ① 「扫码投递 / 去来源平台投递」只在 isValidSourceUrl(sourceUrl) 为真时放行；
+       为假时两个按钮一起 aria-disabled，并常显 SOURCE_APPLY_UNAVAILABLE_REASON
+       「该来源未提供可用的投递链接，请到来源平台查询该职位」。
+    ② 置灰用 aria-disabled 而非原生 disabled：触屏无 hover，读屏也不能跳过按钮。
+    ③ 本机不接收简历、不参与招聘闭环；投递在来源平台或现场展位完成。
+  真话边界：不预置企业名称、展位号、岗位数量、行业与来源域名；二维码在运行时按服务端
+            返回的来源链接生成，静态原型不生成可扫描图形。
+            打印企业资料 / 岗位清单受 printBackendReady 门禁，原型内一律置灰并写明原因。
+  ai-mode: AI-CONTEXT（089 页内辅助，不自动调用）
+  ai-input: 当前真实返回的展位/岗位字段 + 用户主动选择的本人简历或手动填写的求职方向
+  ai-consent: 用户必须主动选择输入，不得静默读取简历、录音、历史报告或到场记录
+  ai-output: 到展位可核对的提问清单；不得生成企业/岗位事实，不得投递、预约、签到或外跳
+  ai-failure: 缺输入、本人简历不可用、AI 服务不可用均常显原因，不生成演示提问
+  ai-fallback: 展位、岗位、来源投递与现场咨询主流程保持可用，并提供三项人工提问模板
+  ai-persistence: 提问清单默认只在当前会话临时使用，不生成投递/预约记录，清场时删除输入
+  原型演示控制：状态只通过 ?state= 切换（?debug=1 显示演示面板），页面无计时器推进业务状态
+  验收范围：静态原型表现；不证明 React 接线、API 可用、生产数据或打印真机链路
+-->
+<link rel="stylesheet" href="directory-workspaces.css">
+</head>
+<body>
+<div id="stage">
+  <header class="topbar">
+    <a class="back press" href="28-jobfair-enhanced.html" data-route="/job-fairs/:id/companies" aria-label="返回参展企业列表"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="logo"><div class="logo-mark serif">职</div><div class="logo-name">职易达</div></div>
+    <div class="sp"></div>
+    <div class="pill" id="pill"><span class="dot" id="pill-dot" aria-hidden="true"></span><span id="pill-txt">展位与岗位以主办方名单为准</span></div>
+    <div class="clock" id="clock">--:--</div>
+  </header>
+
+  <section class="taskhead" aria-labelledby="task-title">
+    <h1 class="th-t" id="task-title">招聘会参展企业</h1>
+    <p class="th-s" id="task-sub">先看展位和现场岗位，再安排逛展路线。</p>
+  </section>
+
+  <main class="body" id="body-root" data-screen="fair-company" data-state="ready" data-testid="fair-company-state-ready"></main>
+
+  <div class="truth" data-disclaimer="true" data-testid="fair-company-truth">
+    <div><b>隐私提示</b>结束会话或闲置超时清除本机登录态和临时会话信息；文件与订单按服务端留存期限管理。</div>
+  </div>
+  <nav class="navbar" aria-label="全局导航">
+    <a class="nav-item" href="01-home.html" data-route="/"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span class="ni">首页</span></a>
+    <a class="nav-item" href="05-ai-cockpit.html" data-route="/assistant"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg><span class="ni">AI 顾问</span></a>
+    <a class="nav-item" href="30-my-profile.html" data-route="/profile"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6b857c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg><span class="ni">我的</span></a>
+  </nav>
+  <button type="button" class="demo-tab" id="demo-tab" aria-label="打开原型演示控制面板" data-proto-control="true">演示</button>
+  <div class="demo-panel" id="demo-panel" aria-label="原型演示控制" data-proto-control="true"></div>
+</div>
+<script>window.DW_SCREEN='fair-company'</script>
+<script src="directory-workspaces.js"></script>
+</body>
+</html>

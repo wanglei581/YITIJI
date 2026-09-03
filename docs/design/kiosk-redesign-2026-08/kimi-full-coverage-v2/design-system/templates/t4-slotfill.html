@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>模板 T4 · 填槽型 ｜ 青序流光 v2</title>
+<link rel="stylesheet" href="../kiosk-tokens.css">
+<link rel="stylesheet" href="../kiosk-components.css">
+<style>
+  html,body{margin:0}
+  .k-slot-field{display:grid;gap:10px;margin-top:18px}
+  .k-slot-label{font-size:var(--fs-primary);font-weight:var(--fw-bold)}
+  .k-slot-input{min-height:64px;width:100%;border:2px solid var(--line);border-radius:var(--r-card);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--fs-body);padding:0 20px}
+  .k-slot-input:focus{border-color:var(--sage-deep);outline:3px solid var(--sage-soft);outline-offset:2px}
+  .k-submit-note{margin:12px 24px 0;text-align:center;font-size:var(--fs-meta);color:var(--sage-deep)}
+</style>
+</head>
+<body>
+<!--
+route: /resume/generate（示例；可复用其交互结构到 /resume/materials、/assistant?intent=self_intro_gen、/interview/setup，但各宿主必须按自己的真实字段和提交条件校正）
+state: 本模板文件只示范 filling；generating/failed 由真实宿主按 MOTION-SPEC 与真实请求结果另行实现，不得从本静态 DOM 推断已覆盖
+api: 当前页面单次 POST /api/v1/resume/generate，等待完整 completed/failed 结果；不按 GET 轮询或字段流式到达制作进度
+fallback: 生成失败 → 已填槽位保留并明示，重试不丢输入
+-->
+<div id="viewport">
+<main id="stage" data-screen="t4" data-state="filling" data-testid="t4-state-filling">
+  <header class="k-topbar">
+    <a class="back" href="../../../21-resume-triage.html" aria-label="返回简历来源选择">←</a>
+    <span class="title">告诉我你的情况</span><span class="spacer"></span>
+    <span class="k-tag">正在填写</span>
+  </header>
+
+  <section class="k-xiaoqing">
+    <span class="core">青</span>
+    <div><p class="q">你想找<em>什么方向</em>的工作？</p><p class="hint">说一句也行，例如「电商运营，在广州」</p></div>
+  </section>
+
+  <div class="k-scroll">
+    <section class="k-sec">
+      <div class="k-sec-head"><span class="no">01</span><h2>当前必填</h2><span class="hint">姓名和目标岗位用于继续流程</span></div>
+      <div class="k-card k-slot-field">
+        <label class="k-slot-label" for="candidate-name">姓名 <span aria-hidden="true">*</span></label>
+        <input class="k-slot-input" id="candidate-name" data-testid="t4-name" name="candidateName" autocomplete="name" placeholder="请输入本人姓名" required>
+      </div>
+      <div class="k-card k-slot-field">
+        <label class="k-slot-label" for="target-role">目标岗位 <span aria-hidden="true">*</span></label>
+        <input class="k-slot-input" id="target-role" data-testid="t4-target-role" name="targetRole" autocomplete="organization-title" placeholder="例如：电商运营" required>
+      </div>
+    </section>
+
+    <section class="k-sec">
+      <div class="k-sec-head"><span class="no">02</span><h2>可选信息</h2></div>
+      <div class="k-card">
+        <p class="k-card-title">教育与工作经历</p>
+        <p class="k-card-meta">按本人真实情况填写，没有的部分可以跳过</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="k-cta-bar">
+    <span class="grow"></span>
+    <button class="k-btn" type="button" data-kind="primary" data-testid="t4-primary" aria-disabled="true" disabled>生成简历</button>
+  </div>
+  <p class="k-disabled-reason" data-testid="t4-disabled-reason" style="text-align:center">请先填写姓名和目标岗位；其他经历可按实际情况补充或跳过。</p>
+  <p class="k-submit-note" data-testid="t4-submit-note" role="status" aria-live="polite" hidden></p>
+  <nav class="k-navbar" aria-label="主导航"><a href="../../../01-home.html?state=context">首页</a><a href="../../../05-ai-cockpit.html">问小青</a><a href="../../../30-my-profile.html">我的</a></nav>
+</main>
+</div>
+<script>
+  const nameInput = document.querySelector('#candidate-name');
+  const roleInput = document.querySelector('#target-role');
+  const primaryButton = document.querySelector('[data-testid="t4-primary"]');
+  const disabledReason = document.querySelector('[data-testid="t4-disabled-reason"]');
+  const submitNote = document.querySelector('[data-testid="t4-submit-note"]');
+
+  function syncSubmitState() {
+    const ready = Boolean(nameInput.value.trim() && roleInput.value.trim());
+    primaryButton.disabled = !ready;
+    primaryButton.setAttribute('aria-disabled', String(!ready));
+    disabledReason.hidden = ready;
+    submitNote.hidden = true;
+    submitNote.textContent = '';
+  }
+
+  nameInput.addEventListener('input', syncSubmitState);
+  roleInput.addEventListener('input', syncSubmitState);
+  primaryButton.addEventListener('click', () => {
+    if (primaryButton.disabled) return;
+    submitNote.textContent = '已满足提交条件；真实宿主此时调用简历生成接口。';
+    submitNote.hidden = false;
+  });
+  syncSubmitState();
+</script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>职业自我评估 · 职易达</title>
+<!--
+  routes: /resume/self-assessment/intro | questions | result | history
+  静态设计宿主：?state=intro|questions|review|result|history|ai-down（+ ?q=1..25）
+
+  ============================ 事实边界（先读这一段） ============================
+  1) 题库 = 正式共享合同 v1，**5 维度 × 5 题 = 25 题，一题不少、一题不改**。
+     真源：packages/shared/src/data/selfAssessment/v1.questions.json
+     源文件 SHA-256：07870c7da30ee6fc7e53499a8464833dc2132f5b6e716a047aca2bb8f73ddc72
+     源文件字节数：10210
+     类型合同：packages/shared/src/types/selfAssessment.ts
+     运行时真源：apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx
+                 + apps/kiosk/src/pages/resume/selfAssessmentSession.ts
+     下面 `var SA_V1=` 后面那一段，是该 JSON 的**逐字段等价内嵌副本**（只去掉了缩进空白，
+     连 weight 都原样保留）。单文件静态设计不能 import，所以只能内嵌；为了内嵌不变成
+     「另造题库」，门禁 shoot.mjs 会做两件事：
+       a. 从本文件正文里抠出这段 JSON，与源文件做**深比较**（version / 5 个维度 key 与
+          label / 每维 5 题 / 共 25 题 / 每题 idx 与 prompt / 每个 choice 的 key、label、
+          weight 全相等），任一不等即 failed；
+       b. 真实点着走完 25 题，把**页面渲染出来的**题干与选项文字再逐题与源 JSON 比一次。
+     本页不新增、不删减、不改写任何题意或选项，也不另造题库。
+  2) 页面**不读 weight、不计分**。weight 保留在数据里只为与源文件逐字段相等；
+     静态页给不出分数，也就不许显示分数、百分比、人格类型或岗位适配结论。
+  3) 本页不调用任何 API / AI / 模型，不写账号数据，不生成 PDF、打印文件或报告。
+     一次作答只存在于当前浏览器标签的 sessionStorage（键 sa_static_proto_v1），关标签即消失。
+  4) 本页**不显示任何完成时间 / 日期**。静态原型没有服务端，也就没有可信的完成时刻；
+     顶栏那个 HH:MM 是一体机的墙上时钟（全套 45 页统一元素），不是业务时间，
+     门禁断言全舞台唯一的 `时:分` 只能出现在 #clock 里，正文出现任何年月日即 failed。
+  5) 合规边界与 CLAUDE.md §2 / §9 一致：本页不出现平台内投递、收简历、企业筛选、
+     面试邀约或 Offer 能力，也不把作答结果交给企业或合作机构。
+  ============================================================================
+
+  fail-closed 口径（普通产品 URL 一律按下面判定，不看 debug）：
+    ?state=questions  缺同意 → recover-consent；本次已提交 → recover-submitted
+    ?state=review     缺同意 → recover-consent；未答满 25 题 → recover-progress
+    ?state=result     缺「25 题答满 + 已明确提交」标记 → recover-result
+    未知 state / q 不是 1..25 的整数 / 出现允许清单以外的参数 → invalid
+    invalid 与 recover 界面**只说类别，不回显参数原值**。
+
+  原型演示控制：默认完全不渲染；仅 ?debug=1 注入演示按钮与面板
+  （data-proto-control="true"，常显「演示模式」标识），面板链接保留 debug=1
+  及现有 flat/capture。仅 ?debug=1 且 result 无真实完成标记时，允许渲染一份
+  **显著标注 synthetic fixture** 的布局示例，用于看版式，不代表任何真实结果，
+  且同样不带任何日期时刻。
+-->
+<link rel="stylesheet" href="kimi-full-coverage-v2/design-system/kiosk-motion.css">
+<style>
+:root{--paper:#f5f2e9;--surface:#fffdf8;--ink:#10302b;--ink2:#3d5a52;--ink3:#6b857c;--deep:#0b241e;--deep2:#123a30;--green:#2ee6a8;--teal:#1f9e86;--teal2:#157a67;--soft:#e0f2ec;--line:#e3ddcb;--line2:#d4cdb6;--red:#963227;--redsoft:#f6e4e1;--amber:#8a5a12;--ambersoft:#fbf0dc;--amberline:#c99a4e}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{height:100%;background:#e8e3d3;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink)}a{color:inherit;text-decoration:none}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}li{list-style:none}
+#stage{position:absolute;left:50%;top:50%;width:1080px;height:1920px;display:flex;flex-direction:column;overflow:hidden;transform-origin:center;background:var(--paper)}.top{height:104px;display:flex;align-items:center;gap:18px;padding:0 36px;background:var(--surface);border-bottom:1px solid var(--line)}.back{display:grid;place-items:center;width:64px;height:64px;border:1px solid var(--line2);border-radius:20px;background:var(--paper)}.logo{display:flex;gap:12px;align-items:center}.mark{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--deep);color:var(--green);font-size:24px;font-weight:800}.brand{font-size:26px;font-weight:800;letter-spacing:2px}.space{flex:1}.pill{display:flex;align-items:center;gap:10px;height:52px;padding:0 22px;border-radius:26px;background:var(--soft);color:var(--teal2);font-size:19px;font-weight:800}.pill i{width:12px;height:12px;border-radius:50%;background:var(--teal)}.clock{font-size:24px;font-weight:800}
+.hero{position:relative;overflow:hidden;margin:24px 44px 0;padding:28px 44px;border-radius:36px;background:linear-gradient(158deg,var(--deep2),var(--deep) 68%);color:#f2efe4}.hero:after{content:"";position:absolute;right:-140px;top:-140px;width:410px;height:410px;border-radius:50%;background:radial-gradient(circle,rgba(46,230,168,.16),transparent 65%)}.hero-row{position:relative;z-index:1;display:flex;align-items:center;gap:24px}.face{display:grid;place-items:center;flex:none;width:92px;height:92px;border:1.5px solid rgba(46,230,168,.42);border-radius:50%;background:rgba(46,230,168,.1);color:var(--green);font-family:"Songti SC",serif;font-size:42px}.eyebrow{margin-bottom:7px;color:rgba(242,239,228,.55);font-size:17px;letter-spacing:5px}.ask{font-size:35px;line-height:1.28;font-weight:800}.ask em{color:var(--green);font-style:normal}.doing{margin-top:9px;color:rgba(242,239,228,.74);font-size:19px;line-height:1.46}.doing b{color:#fff}
+#body{display:flex;flex:1;flex-direction:column;justify-content:space-between;min-height:0;padding:20px 44px 0;gap:14px}.card{padding:22px 30px;border:1px solid var(--line);border-radius:30px;background:var(--surface)}.hd{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:25px;font-weight:800}.hd span{font-size:17px;color:var(--ink3);font-weight:700}.sub{margin-top:8px;color:var(--ink3);font-size:18px;line-height:1.5}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.intro{display:flex;gap:16px;min-height:118px;padding:18px 20px;border:1px solid var(--line);border-radius:22px;background:var(--paper)}.no{display:grid;place-items:center;flex:none;width:42px;height:42px;border-radius:14px;background:var(--soft);color:var(--teal2);font-size:19px;font-weight:800}.intro b{display:block;font-size:21px}.intro p,.help p{margin-top:6px;color:var(--ink2);font-size:18px;line-height:1.46}.notice{display:flex;gap:14px;padding:17px 22px;border:1px solid var(--line);border-radius:20px;background:var(--paper);color:var(--ink2);font-size:18px;line-height:1.5}.notice i{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--teal2);font-style:normal;font-weight:800}.notice b{color:var(--ink)}
+.task{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.task span{display:flex;align-items:center;gap:9px;padding:10px 16px;border:1px solid var(--line);border-radius:16px;background:var(--paper);color:var(--ink2);font-size:18px;font-weight:700}.task span:before{content:"";width:10px;height:10px;flex:none;border-radius:50%;background:var(--teal)}.task span b{color:var(--ink);font-weight:800}.task span.warn:before{background:var(--red)}
+.picks{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}.picks.three{grid-template-columns:repeat(3,1fr)}.pick{display:flex;gap:15px;align-items:flex-start;min-height:112px;padding:17px 20px;border:1.5px solid var(--line);border-radius:22px;background:var(--paper);text-align:left}.pick i{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:15px;background:var(--soft);color:var(--teal2);font-style:normal;font-size:20px;font-weight:800}.pick b{display:block;font-size:20px}.pick p{margin-top:6px;color:var(--ink2);font-size:17px;line-height:1.42}.pick.lead{border-color:var(--teal);background:var(--soft)}.pick.off{border-style:dashed;background:rgba(11,36,30,.03)}.pick.off i{background:var(--line);color:var(--ink3)}.pick.off b{color:var(--ink2)}
+.progress{padding:18px 28px}.prow{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-size:24px;font-weight:800}.prow span{color:var(--teal2);font-size:19px}.bar{height:12px;overflow:hidden;margin-top:12px;border-radius:6px;background:var(--line)}.bar i{display:block;height:100%;border-radius:6px;background:var(--teal)}.qnum{display:flex;align-items:center;gap:12px;color:var(--ink3);font-size:19px;font-weight:800}.qnum em{padding:5px 12px;border-radius:12px;background:var(--soft);color:var(--teal2);font-style:normal;font-size:17px}.question{margin-top:11px;font-size:30px;line-height:1.34;font-weight:800}.qhint{margin-top:8px;color:var(--ink3);font-size:17px;line-height:1.42}.answers{display:flex;flex-direction:column;gap:11px;margin-top:15px}.answer{display:flex;align-items:center;gap:16px;min-height:90px;padding:14px 24px;border:1.5px solid var(--line);border-radius:22px;background:var(--paper);font-size:22px;text-align:left;line-height:1.42}.answer.on{border-color:var(--teal);background:var(--soft)}.radio{width:30px;height:30px;flex:none;border:2px solid var(--line2);border-radius:50%}.answer.on .radio{border:9px solid var(--teal)}.help{padding:20px 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}.help b{font-size:21px}.checks{display:flex;flex-direction:column;gap:7px;margin-top:9px;color:var(--ink2);font-size:18px}.checks span:before{content:"✓";margin-right:9px;color:var(--teal2);font-weight:800}
+.consent-list{display:flex;flex-direction:column;gap:9px;margin-top:13px}.consent-list li{display:flex;gap:14px;align-items:flex-start;padding:12px 18px;border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--ink2);font-size:18px;line-height:1.44}.consent-list em{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:10px;background:var(--soft);color:var(--teal2);font-style:normal;font-size:16px;font-weight:800}.cbox{display:flex;align-items:center;gap:18px;width:100%;min-height:84px;margin-top:14px;padding:0 24px;border:1.5px solid var(--line2);border-radius:22px;background:var(--paper);font-size:22px;font-weight:800;text-align:left}.cbox .box{display:grid;place-items:center;flex:none;width:38px;height:38px;border:2px solid var(--line2);border-radius:11px;color:transparent;font-size:22px;font-weight:800}.cbox.on{border-color:var(--teal);background:var(--soft)}.cbox.on .box{border-color:var(--teal);background:var(--teal);color:#fff}
+.gate{display:flex;gap:14px;align-items:center;min-height:76px;padding:13px 24px;border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink2);font-size:18px;line-height:1.44}.gate i{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--soft);color:var(--teal2);font-style:normal;font-weight:800}.gate b{color:var(--ink);font-weight:800}.gate.warn{border-color:#d9b4aa;background:var(--redsoft);color:var(--red)}.gate.warn i{background:#efd0ca;color:var(--red)}.gate.warn b{color:var(--red)}
+.dimgrid{display:grid;grid-template-columns:148px repeat(5,1fr);gap:10px;margin-top:14px}.dl{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 2px}.dl b{font-size:18px;font-weight:800;white-space:nowrap}.dl em{color:var(--ink3);font-style:normal;font-size:16px;font-weight:800}.dl.on b{color:var(--teal2)}.dl.full em{color:var(--teal2)}
+.qcell{display:grid;place-items:center;height:52px;border:1.5px solid var(--line);border-radius:16px;background:var(--paper);color:var(--ink3);font-size:21px;font-weight:800}.qcell.done{border-color:var(--teal);background:var(--soft);color:var(--teal2)}.qcell.cur{border-color:var(--deep);background:var(--deep);color:var(--green)}.qcell.lock{border-style:dashed;color:var(--line2)}
+.quickrow{display:flex;gap:14px;margin-top:13px}.quick{display:flex;align-items:center;justify-content:center;gap:10px;flex:1;height:56px;border:1.5px solid var(--line2);border-radius:18px;background:var(--paper);color:var(--ink2);font-size:19px;font-weight:800}.quick i{font-style:normal;color:var(--teal2)}
+.rv{display:flex;flex-direction:column;justify-content:center;min-height:100px;padding:13px 14px;border:1.5px solid var(--line);border-radius:18px;background:var(--paper);text-align:left}.rv small{display:block;color:var(--teal2);font-size:15px;font-weight:800}.rv b{display:block;margin-top:7px;font-size:16px;line-height:1.4;font-weight:700}.rv.on{border-color:var(--teal)}
+.cov{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:15px}.cov div{min-height:126px;padding:18px}.cov div{border:1px solid var(--line);border-radius:20px;background:var(--paper)}.cov small{display:block;color:var(--ink3);font-size:16px;font-weight:800}.cov b{display:block;margin-top:10px;font-size:21px}.cov p{margin-top:9px;color:var(--teal2);font-size:18px;font-weight:800}
+.result-lead{border-color:var(--teal);background:var(--soft)}.result-lead .hd{color:var(--teal2)}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:15px}.result{min-height:158px;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--paper)}.result i{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--surface);color:var(--teal2);font-style:normal;font-weight:800}.result b{display:block;margin-top:12px;font-size:21px}.result p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.45}
+.blank{display:flex;align-items:center;gap:22px;min-height:176px;margin-top:15px;padding:24px 26px;border:1px dashed var(--line2);border-radius:24px;background:var(--paper)}.blank .empty-i{display:grid;place-items:center;flex:none;width:74px;height:74px;border-radius:24px;background:var(--soft);color:var(--teal2);font-size:32px}.blank h2{font-size:26px}.blank p{margin-top:9px;color:var(--ink2);font-size:19px;line-height:1.52}
+.down{border-color:#d9b4aa;background:var(--redsoft)}.down .hd{color:var(--red)}.flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:15px}.flow{min-height:138px;padding:19px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}.flow.current{border-color:var(--teal);background:var(--soft)}.flow small{display:block;color:var(--ink3);font-size:17px;font-weight:800}.flow b{display:block;margin-top:8px;font-size:21px}.flow p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.44}.flow.current small{color:var(--teal2)}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:15px}.mini div{padding:16px 18px;border:1px solid var(--line);border-radius:20px;background:var(--paper)}.mini small{display:block;color:var(--teal2);font-size:16px;font-weight:800}.mini p{margin-top:7px;color:var(--ink2);font-size:17px;line-height:1.44}
+.synthetic{display:flex;gap:18px;align-items:center;padding:20px 26px;border:2px solid var(--amberline);border-radius:24px;background:var(--ambersoft);color:var(--amber);font-size:21px;font-weight:800;line-height:1.44}.synthetic i{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:16px;background:var(--amberline);color:#fff;font-style:normal;font-size:24px}.synthetic p{margin-top:7px;font-size:18px;font-weight:700}
+.rail{display:flex;justify-content:center;gap:28px;padding:14px 24px;border:1px dashed var(--line2);border-radius:18px;background:rgba(11,36,30,.035);color:var(--ink3);font-size:17px}.rail span:before{content:"·";margin-right:8px;color:var(--teal2);font-weight:800}.actions{display:flex;gap:16px;padding:18px 44px;background:var(--surface);border-top:1px solid var(--line)}.btn{display:flex;align-items:center;justify-content:center;flex:1;height:86px;border:1.5px solid var(--line2);border-radius:24px;background:var(--surface);font-size:25px;font-weight:800}.btn.primary{border-color:var(--deep);background:var(--deep);color:#fff}.btn.primary em{margin-left:10px;color:var(--green);font-style:normal}.btn[aria-disabled="true"]{border-color:var(--line2);background:#e6e2d6;color:#8b9a94}.btn.primary[aria-disabled="true"]{border-color:var(--line2);background:#c3ccc8;color:#5d6f69}.btn.primary[aria-disabled="true"] em{color:#5d6f69}.nav{display:flex;height:108px;background:var(--surface);border-top:1px solid var(--line)}.nav a{display:flex;flex:1;flex-direction:column;gap:5px;align-items:center;justify-content:center;color:var(--ink3);font-size:20px;font-weight:700}.nav svg{width:30px;height:30px}
+.demo-tab{position:absolute;z-index:4;left:0;top:50%;transform:translateY(-50%);min-height:200px;padding:18px 9px;border-radius:0 14px 14px 0;background:rgba(11,36,30,.9);color:var(--green);font-size:15px;font-weight:800;letter-spacing:4px;writing-mode:vertical-lr}.demo-panel{position:absolute;z-index:5;left:0;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:7px;padding:16px 14px;border-radius:0 18px 18px 0;background:rgba(11,36,30,.96)}.demo-panel.show{display:flex}.demo-panel .dp-t{color:var(--green);font-size:14px;font-weight:800;letter-spacing:2px}.demo-panel a{display:flex;align-items:center;min-height:48px;padding:0 14px;border-radius:10px;background:rgba(255,255,255,.08);color:#f2efe4;font-size:15px;white-space:nowrap}.demo-panel a.on{background:rgba(46,230,168,.2);color:var(--green);font-weight:800}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}.flat *{box-shadow:none!important;filter:none!important}
+</style></head><body>
+<div id="stage"><header class="top"><a class="back m-press" href="16-service-hubs.html?hub=resume" aria-label="返回简历服务"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10302b" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a><div class="logo"><div class="mark">职</div><div class="brand">职易达</div></div><div class="space"></div><div class="pill"><i class="m-dot breathe"></i>自我评估</div><time class="clock" id="clock" aria-label="终端墙上时钟">--:--</time></header><section class="hero"><div class="hero-row"><div class="face m-face-ring">青</div><div><div class="eyebrow">SELF ASSESSMENT</div><div class="ask" id="ask"></div><div class="doing" id="doing"></div></div></div></section><main id="body" data-screen="self-assessment" data-state="intro" data-testid="self-assessment-state-intro"></main><div class="actions" id="actions"></div><nav class="nav" aria-label="全局导航"><a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m3 10 9-7 9 7v11H3z"/><path d="M9 21v-8h6v8"/></svg>首页</a><a href="05-ai-cockpit.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a8 8 0 1 1-3.5-6.6"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>AI 顾问</a><a href="30-my-profile.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/></svg>我的</a></nav></div>
+<script>
+/* ---------------------------------------------------------------- 舞台与时钟 */
+var stageEl=document.getElementById('stage'),bodyEl=document.getElementById('body'),actionsEl=document.getElementById('actions'),askEl=document.getElementById('ask'),doingEl=document.getElementById('doing'),clockEl=document.getElementById('clock');
+function fit(){stageEl.style.transform='translate(-50%,-50%) scale('+Math.min(innerWidth/1080,innerHeight/1920)+')'}fit();addEventListener('resize',fit);
+/* 顶栏是终端墙上时钟（全套 45 页统一元素），只有时:分，不是业务时间；本页正文不出现任何日期或时刻。 */
+function tick(){var d=new Date();clockEl.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}tick();setInterval(tick,10000);
+
+/* ============================ v1 题库（25 题）内嵌副本 ============================
+   源：packages/shared/src/data/selfAssessment/v1.questions.json
+   源文件 SHA-256：07870c7da30ee6fc7e53499a8464833dc2132f5b6e716a047aca2bb8f73ddc72
+   下面这一行是该 JSON 的逐字段等价副本（仅去缩进空白，含 weight）。
+   单文件静态设计无法 import，只能内嵌；门禁 shoot.mjs 会把它与源文件深比较，不等即 failed。
+   页面从不读取 weight，也从不计分 —— 见文件头第 2 条。
+   ============================================================================== */
+var SA_V1={"version":"v1","dimensions":[{"key":"interest","label":"兴趣偏好","questions":[{"idx":0,"prompt":"在日常学习中，你更愿意花时间深入了解哪类内容？","choices":[{"key":"a","label":"解决具体的工程问题","weight":1},{"key":"b","label":"与不同岗位背景的人沟通协作","weight":0},{"key":"c","label":"梳理数据并得出结论","weight":0}]},{"idx":1,"prompt":"你更愿意花精力打磨哪种类型的产出？","choices":[{"key":"a","label":"可运行的产品或代码","weight":1},{"key":"b","label":"清晰可读的文档或方案","weight":0},{"key":"c","label":"对外发布的稿件或讲解","weight":0}]},{"idx":2,"prompt":"在团队合作中，你更喜欢扮演哪种角色？","choices":[{"key":"a","label":"推动事情落实落地的执行者","weight":1},{"key":"b","label":"提出思路与可能性的探索者","weight":0},{"key":"c","label":"把控节奏与方向的协调者","weight":0}]},{"idx":3,"prompt":"面对新工具、新框架，你的反应更接近？","choices":[{"key":"a","label":"先跑通一个最小版本","weight":1},{"key":"b","label":"先读官方文档或权威说明","weight":0},{"key":"c","label":"观察他人使用后的反馈再决定","weight":0}]},{"idx":4,"prompt":"什么样的工作内容会让你更愿意主动加班？","choices":[{"key":"a","label":"用户反馈推动的迭代与上线","weight":1},{"key":"b","label":"某个长期项目的关键节点","weight":0},{"key":"c","label":"研究和学习新的技术方向","weight":0}]}]},{"key":"style","label":"工作风格","questions":[{"idx":0,"prompt":"面对一项陌生任务，你更习惯的处理方式是？","choices":[{"key":"a","label":"先列出清单，再按顺序推进","weight":1},{"key":"b","label":"先尝试一种思路，不行再调整","weight":0},{"key":"c","label":"先了解背景与约束再动手","weight":0}]},{"idx":1,"prompt":"你更喜欢的反馈方式是？","choices":[{"key":"a","label":"书面、明确、可回看","weight":1},{"key":"b","label":"面对面、当场讨论","weight":0},{"key":"c","label":"每周一次的复盘节奏","weight":0}]},{"idx":2,"prompt":"面对多个并行任务，你更倾向？","choices":[{"key":"a","label":"先排好优先级，再依次推进","weight":1},{"key":"b","label":"把可合并的并行处理","weight":0},{"key":"c","label":"按截止日期自然推进","weight":0}]},{"idx":3,"prompt":"你更喜欢的工作节奏是？","choices":[{"key":"a","label":"有规律、有计划","weight":1},{"key":"b","label":"弹性、按状态切换","weight":0},{"key":"c","label":"短冲刺、目标驱动","weight":0}]},{"idx":4,"prompt":"独立完成一件事和与他人合作，你更喜欢？","choices":[{"key":"a","label":"可独立完成一段再到协作","weight":1},{"key":"b","label":"一直与他人并行协作","weight":0},{"key":"c","label":"视任务性质切换","weight":0}]}]},{"key":"team","label":"团队偏好","questions":[{"idx":0,"prompt":"在团队会议里你更常扮演哪种角色？","choices":[{"key":"a","label":"记录与跟进结论的执行者","weight":1},{"key":"b","label":"提出不同视角的提问者","weight":0},{"key":"c","label":"促成共识的协调者","weight":0}]},{"idx":1,"prompt":"与不同背景的同事协作时，你更看重？","choices":[{"key":"a","label":"清晰的责任边界","weight":1},{"key":"b","label":"充分的背景信息共享","weight":0},{"key":"c","label":"互相补位的灵活度","weight":0}]},{"idx":2,"prompt":"出现分歧时你更愿意？","choices":[{"key":"a","label":"用数据或事实讨论","weight":1},{"key":"b","label":"先认同动机再讨论方案","weight":0},{"key":"c","label":"由决策者拍板","weight":0}]},{"idx":3,"prompt":"你更欣赏的团队文化是？","choices":[{"key":"a","label":"目标清晰、节奏稳定","weight":1},{"key":"b","label":"鼓励尝试、容错度高","weight":0},{"key":"c","label":"信息透明、人人发言","weight":0}]},{"idx":4,"prompt":"团队规模变大时你的适应方式？","choices":[{"key":"a","label":"用流程保证一致性","weight":1},{"key":"b","label":"用文档沉淀信息","weight":0},{"key":"c","label":"和小范围伙伴保持紧密沟通","weight":0}]}]},{"key":"value","label":"价值取向","questions":[{"idx":0,"prompt":"工作中你更看重？","choices":[{"key":"a","label":"把事做成的能力","weight":1},{"key":"b","label":"持续学习的空间","weight":0},{"key":"c","label":"被信任的归属感","weight":0}]},{"idx":1,"prompt":"在选择工作机会时，你更看重？","choices":[{"key":"a","label":"与日常生活的平衡","weight":1},{"key":"b","label":"成长速度与挑战","weight":0},{"key":"c","label":"稳定的长期发展","weight":0}]},{"idx":2,"prompt":"你更认可的工作成果是？","choices":[{"key":"a","label":"可量化、可衡量的产出","weight":1},{"key":"b","label":"对用户体验明显的改进","weight":0},{"key":"c","label":"为团队建立长期能力","weight":0}]},{"idx":3,"prompt":"面对工作与生活冲突时你倾向？","choices":[{"key":"a","label":"先稳住生活质量","weight":1},{"key":"b","label":"按阶段冲刺","weight":0},{"key":"c","label":"视重要性灵活切换","weight":0}]},{"idx":4,"prompt":"你更看重什么样的认可？","choices":[{"key":"a","label":"具体任务上的反馈","weight":1},{"key":"b","label":"长期能力的提升","weight":0},{"key":"c","label":"稳定的合作机会","weight":0}]}]},{"key":"motivation","label":"求职动机","questions":[{"idx":0,"prompt":"对这一轮求职，你当前最想推进的是？","choices":[{"key":"a","label":"明确下一份工作的方向","weight":1},{"key":"b","label":"找到能长期投入的事业","weight":0},{"key":"c","label":"获得一次稳定的过渡机会","weight":0}]},{"idx":1,"prompt":"下一份工作最希望给你带来？","choices":[{"key":"a","label":"解决日常生计的稳定保障","weight":1},{"key":"b","label":"明确可感知的成长","weight":0},{"key":"c","label":"与背景相称的合适岗位","weight":0}]},{"idx":2,"prompt":"回顾当前情况，你想改进的更多是？","choices":[{"key":"a","label":"求职节奏与渠道","weight":1},{"key":"b","label":"简历表达与亮点提炼","weight":0},{"key":"c","label":"方向选择与判断","weight":0}]},{"idx":3,"prompt":"你在意下一份工作的工作环境吗？","choices":[{"key":"a","label":"在意具体的环境与作息","weight":1},{"key":"b","label":"在意合作氛围","weight":0},{"key":"c","label":"在意发展与晋升空间","weight":0}]},{"idx":4,"prompt":"对未来的工作，你最希望？","choices":[{"key":"a","label":"在熟悉领域继续深耕","weight":1},{"key":"b","label":"尝试一个相邻的新方向","weight":0},{"key":"c","label":"先积累一段时间再调整","weight":0}]}]}]};
+
+/* 把 5 维度 × 5 题摊平成 1..25：顺序与 SelfAssessmentFlow.tsx 的推进顺序一致
+   （同一维度内按 idx 递增，走完一个维度再进下一个维度）。 */
+var DIMS=SA_V1.dimensions.map(function(d){return{key:d.key,label:d.label,count:d.questions.length}});
+var Q=[];SA_V1.dimensions.forEach(function(d,di){d.questions.forEach(function(q){
+  Q.push({n:Q.length+1,dimKey:d.key,dim:d.label,dimIndex:di,idx:q.idx,p:q.prompt,c:q.choices.map(function(c){return[c.key,c.label]})});
+})});
+var TOTAL=Q.length;                              /* = 25，由题库真值算出，不写死 */
+
+/* ------------------------------------------------------------------ 本次会话
+   只用 sessionStorage，只属于当前浏览器标签；不是账号数据，也不上传。
+   **不存任何时间戳** —— 静态原型没有服务端，存下来也只会诱使页面显示一个假的完成时刻。 */
+var KEY='sa_static_proto_v1';
+function blank(){return{v:2,consented:false,answers:{},cursor:1,submitted:false}}
+function load(){
+  var s=blank();
+  try{
+    var raw=sessionStorage.getItem(KEY);if(!raw)return s;
+    var o=JSON.parse(raw);if(!o||o.v!==2)return s;
+    s.consented=o.consented===true;
+    /* 答案必须是从第 1 题开始的连续前缀：本页不允许跳题，被改坏的会话按前缀截断。 */
+    var a={},src=o.answers||{};
+    for(var i=1;i<=TOTAL;i++){var v=src[i];if(typeof v!=='string'||!Q[i-1].c.some(function(x){return x[0]===v}))break;a[i]=v}
+    s.answers=a;
+    var done=answered(s);
+    s.cursor=Math.min(Math.max(1,parseInt(o.cursor,10)||1),Math.min(TOTAL,done+1));
+    s.submitted=o.submitted===true&&done===TOTAL;
+  }catch(e){return blank()}
+  return s;
+}
+function save(s){try{sessionStorage.setItem(KEY,JSON.stringify(s))}catch(e){}}
+function wipe(){try{sessionStorage.removeItem(KEY)}catch(e){}}
+function answered(s){var n=0;for(var i=1;i<=TOTAL;i++){if(s.answers[i])n++;else break}return n}
+function dimDone(s,key){var n=0;Q.forEach(function(q){if(q.dimKey===key&&s.answers[q.n])n++});return n}
+function dimOf(n){return Q[n-1]}
+
+/* -------------------------------------------------------------------- 路由 */
+var ALLOWED=['state','q','debug','flat','capture'],STATES=['intro','questions','review','result','history','ai-down'];
+/* 渲染态 → 生产 route（真源 apps/kiosk/src/routes/index.tsx:111-114）。
+   questions / result 在本页是同一页内的真实状态迁移，不另起 HTML；review 仍在答题流程内（提交前复核，
+   React 侧同样没有独立 review 路由）；ai-down 是 intro 的降级态。
+   recover-* / invalid 是 fail-closed 拦截面，不属于任何生产 route，故不进本表，也不写 data-route。 */
+var ROUTE={intro:'/resume/self-assessment/intro',questions:'/resume/self-assessment/questions',review:'/resume/self-assessment/questions',result:'/resume/self-assessment/result',history:'/resume/self-assessment/history','ai-down':'/resume/self-assessment/intro'};
+function routeOf(state){return ROUTE[state]||null}
+var qs=new URLSearchParams(location.search);
+var DEBUG=qs.get('debug')==='1',FLAT=qs.get('flat')==='1',CAPTURE=qs.get('capture');
+if(FLAT){document.documentElement.classList.add('flat');document.documentElement.setAttribute('data-flat','1')}
+function href(state,extra){
+  var p=new URLSearchParams();p.set('state',state);
+  if(extra&&extra.q)p.set('q',String(extra.q));
+  if(DEBUG)p.set('debug','1');if(FLAT)p.set('flat','1');if(CAPTURE!==null)p.set('capture',CAPTURE);
+  return '?'+p.toString();
+}
+function go(state,extra){location.href=href(state,extra)}
+
+var session=load();
+var bad=null;                                   /* invalid 的类别，只说类别不回显原值 */
+for(var k of qs.keys()){if(ALLOWED.indexOf(k)<0){bad='param';break}}
+var want=qs.get('state')||'intro';
+if(!bad&&STATES.indexOf(want)<0)bad='state';
+var wantQ=null,clamped=false;
+if(!bad&&qs.has('q')){
+  var raw=qs.get('q');
+  if(!/^\d{1,2}$/.test(raw)||Number(raw)<1||Number(raw)>TOTAL)bad='question';else wantQ=Number(raw);
+}
+
+/* ------------------------------------------------------------ fail-closed 门禁 */
+var view=bad?'invalid':want,reason=bad;
+if(!bad){
+  var done=answered(session);
+  if(want==='questions'){
+    if(!session.consented){view='recover';reason='consent'}
+    else if(session.submitted){view='recover';reason='submitted'}
+  }else if(want==='review'){
+    if(!session.consented){view='recover';reason='consent'}
+    else if(done<TOTAL){view='recover';reason='progress'}
+  }else if(want==='result'){
+    if(!(session.submitted&&done===TOTAL)){view=DEBUG?'result-synthetic':'recover';if(view==='recover')reason='result'}
+  }
+}
+if(view==='recover')view='recover-'+reason;
+
+/* 当前题号：URL 的 q 只能落在「已答数 + 1」以内，超出就夹回可作答的那一题。 */
+var cursor=session.cursor||1;
+if(view==='questions'){
+  var reach=Math.min(TOTAL,answered(session)+1);
+  cursor=Math.min(Math.max(1,wantQ||session.cursor||1),reach);
+  if(wantQ&&wantQ>reach)clamped=true;
+  if(session.cursor!==cursor){session.cursor=cursor;save(session)}
+}
+
+/* -------------------------------------------------------------------- 片段 */
+function mark(state,extra){
+  bodyEl.dataset.state=state;bodyEl.dataset.testid='self-assessment-state-'+state;
+  var route=routeOf(state);if(route)bodyEl.dataset.route=route;else bodyEl.removeAttribute('data-route');
+  bodyEl.dataset.answered=String(answered(session));bodyEl.dataset.total=String(TOTAL);
+  bodyEl.dataset.dims=String(DIMS.length);
+  bodyEl.dataset.consented=session.consented?'true':'false';
+  bodyEl.dataset.submitted=session.submitted?'true':'false';
+  if(extra&&extra.q)bodyEl.dataset.q=String(extra.q);else bodyEl.removeAttribute('data-q');
+  if(extra&&extra.dim)bodyEl.dataset.dim=extra.dim;else bodyEl.removeAttribute('data-dim');
+  if(extra&&extra.reason)bodyEl.dataset.reason=extra.reason;else bodyEl.removeAttribute('data-reason');
+  if(extra&&extra.fixture)bodyEl.dataset.fixture=extra.fixture;else bodyEl.removeAttribute('data-fixture');
+}
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function rail(){return '<div class="rail"><span>结果仅供自我参考</span><span>不评分不排名</span><span>不替代能力证明</span></div>'}
+function gate(warn,text){return '<div class="gate'+(warn?' warn':'')+'" data-testid="sa-gate"'+(warn?' role="status"':'')+'><i>'+(warn?'!':'✓')+'</i><div>'+text+'</div></div>'}
+function pick(o){
+  var inner='<i>'+o.icon+'</i><div><b>'+o.title+'</b><p>'+o.desc+'</p></div>';
+  var cls='pick m-press'+(o.cls?' '+o.cls:'');
+  if(o.act)return '<button type="button" class="'+cls+'" data-act="'+o.act+'"'+(o.arg?' data-arg="'+o.arg+'"':'')+' data-testid="sa-pick">'+inner+'</button>';
+  if(o.link)return '<a class="'+cls+'" href="'+o.link+'" data-testid="sa-pick">'+inner+'</a>';
+  return '<div class="pick off" data-testid="sa-pick-off">'+inner+'</div>';
+}
+function actionBtn(o){
+  var cls='btn m-press'+(o.primary?' primary':'');
+  var tid=o.testid||(o.primary?'self-assessment-primary':'self-assessment-fallback');
+  var tail=o.primary?'<em>→</em>':'';
+  if(o.blocked)return '<button type="button" class="'+cls+'" aria-disabled="true" data-testid="'+tid+'" data-blocked="true">'+o.label+tail+'</button>';
+  if(o.act)return '<button type="button" class="'+cls+'" data-act="'+o.act+'"'+(o.arg?' data-arg="'+o.arg+'"':'')+' data-testid="'+tid+'">'+o.label+tail+'</button>';
+  return '<a class="'+cls+'" href="'+o.link+'" data-testid="'+tid+'">'+o.label+tail+'</a>';
+}
+function dimNames(sep){return DIMS.map(function(d){return d.label}).join(sep||'、')}
+function statusMini(){
+  var done=answered(session);
+  return '<section class="card"><div class="hd">本次会话现在的状态<span>页面按真实会话如实显示</span></div><div class="mini">'
+  +'<div><small>是否已确认说明</small><p>'+(session.consented?'已确认，可以作答。':'尚未确认，不能开始作答。')+'</p></div>'
+  +'<div><small>已作答题数</small><p>'+done+' / '+TOTAL+' 题'+(done===TOTAL?'，已答满。':'，未答满不进入确认。')+'</p></div>'
+  +'<div><small>是否已提交</small><p>'+(session.submitted?'已提交，可查看完成情况。':'未提交，不生成任何结果。')+'</p></div>'
+  +'</div></section>';
+}
+
+/* -------------------------------------------------------------------- intro */
+function viewIntro(){
+  mark('intro');
+  askEl.innerHTML='把职业倾向，<em>说得更明白</em>。';
+  doingEl.innerHTML=TOTAL+' 道选择题，覆盖 '+DIMS.length+' 个方向；<b>不评分、不排名，结果只给你自己看。</b>';
+  var ok=session.consented;
+  bodyEl.innerHTML='<section class="card"><div class="hd">这次要做的事<span>约 6 分钟 · 不需登录</span></div>'
+  +'<div class="task"><span><b>'+TOTAL+'</b> 道选择题</span><span>覆盖 <b>'+DIMS.length+'</b> 个方向</span><span>随时可返回修改</span><span>不评分、不排名</span></div>'
+  +'<div class="sub">题目问的是你更愿意怎么工作，不是考你会不会。'+TOTAL+' 道题按'+dimNames()+'五个方向排列，题干与选项与现有共享题库逐字一致，本页不改写题意、不另造题目。</div></section>'
+  +'<section class="card"><div class="hd">你会经历哪三步<span>每一步都要你自己确认</span></div><div class="flow-grid">'
+  +'<div class="flow current"><small>第 1 步</small><b>逐题作答</b><p>'+TOTAL+' 道选择题分属'+dimNames(' / ')+'，一次一题，可随时回上一题改。</p></div>'
+  +'<div class="flow"><small>第 2 步</small><b>提交前确认</b><p>答满 '+TOTAL+' 题后，先按方向看一遍你的选择，再决定是否提交。</p></div>'
+  +'<div class="flow"><small>第 3 步</small><b>查看完成情况</b><p>只显示你完成了什么，不生成评分、人格类型或岗位结论。</p></div></div></section>'
+  +'<section class="card"><div class="hd">开始前请先确认<span>勾选后才能作答</span></div><ul class="consent-list">'
+  +'<li><em>1</em><div>本工具基于本人作答提供倾向参考，<b>不是临床、心理或人格诊断</b>。</div></li>'
+  +'<li><em>2</em><div>结果只对本人可见，不向企业、合作机构或第三方推送。</div></li>'
+  +'<li><em>3</em><div>不评分、不排名，不生成人格类型或百分比标签。</div></li>'
+  +'<li><em>4</em><div>不判定你是否适合某个岗位，也不构成能力证明。</div></li>'
+  +'<li><em>5</em><div>本页为静态设计原型：答案只留在当前浏览器会话，<b>不上传服务端、不写入账号</b>。</div></li>'
+  +'</ul><button type="button" class="cbox m-press'+(ok?' on':'')+'" role="checkbox" aria-checked="'+(ok?'true':'false')+'" data-act="consent" data-testid="sa-consent"><span class="box" aria-hidden="true">✓</span>我已读完上面 5 条，了解这不是诊断也不会给我贴标签</button></section>'
+  +gate(!ok,ok?'<b>已确认说明。</b>现在可以开始作答，答题过程中随时可以返回修改或退出。':'<b>还没有勾选上面的确认，暂时不能开始作答。</b>先读完 5 条说明并勾选，按钮才会变为可用。')
+  +'<section class="notice"><i>i</i><div><b>本页是自我探索，不是心理、临床或能力测评。</b>它不会参与岗位排序，也不会把你的答案提供给企业或合作机构。</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn({link:'16-service-hubs.html?hub=resume',label:'返回简历服务'})
+  +actionBtn({primary:true,act:ok?'start':null,blocked:!ok,label:'开始作答'});
+}
+
+/* ---------------------------------------------------------------- questions */
+function viewQuestions(){
+  var done=answered(session),q=Q[cursor-1],chosen=session.answers[cursor]||null,last=cursor===TOTAL,full=done===TOTAL;
+  mark('questions',{q:cursor,dim:q.dimKey});
+  askEl.innerHTML='第 '+cursor+' 题，<em>按真实想法选</em>。';
+  doingEl.innerHTML='当前方向：<b>'+esc(q.dim)+'</b>（第 '+(q.dimIndex+1)+' / '+DIMS.length+' 个）。已答 '+done+' 题，还剩 '+(TOTAL-done)+' 题。';
+  var answers=q.c.map(function(c){
+    var on=chosen===c[0];
+    return '<button type="button" class="answer m-press'+(on?' on':'')+'" role="radio" aria-checked="'+(on?'true':'false')+'" data-act="answer" data-arg="'+c[0]+'" data-choice="'+c[0]+'" data-testid="sa-answer"><i class="radio" aria-hidden="true"></i>'+esc(c[1])+'</button>';
+  }).join('');
+  /* 题号导航按维度分行：一行就是一个真实维度的 5 道题，既能回改，也能看出五个方向的进度。 */
+  var reach=Math.min(TOTAL,done+1),grid='';
+  DIMS.forEach(function(d,di){
+    var n=dimDone(session,d.key),here=q.dimIndex===di;
+    grid+='<div class="dl'+(here?' on':'')+(n===d.count?' full':'')+'" data-testid="sa-dim-row"><b>'+esc(d.label)+'</b><em>'+n+' / '+d.count+' 题</em></div>';
+    for(var j=0;j<d.count;j++){
+      var i=di*d.count+j+1,lock=i>reach;
+      var cls=i===cursor?'cur':session.answers[i]?'done':lock?'lock':'';
+      grid+='<button type="button" class="qcell'+(cls?' '+cls:'')+'" data-act="'+(lock?'locked':'goto')+'" data-arg="'+i+'"'+(lock?' aria-disabled="true"':'')+(i===cursor?' aria-current="true"':'')
+        +' aria-label="第 '+i+' 题（'+esc(d.label)+'）'+(lock?'，答完前面的题才能进入':session.answers[i]?'，已作答，可修改':'，当前可作答')+'" data-testid="sa-map">'+i+'</button>';
+    }
+  });
+  bodyEl.innerHTML='<section class="card progress" data-testid="sa-progress"><div class="prow"><b>第 '+cursor+' 题 / 共 '+TOTAL+' 题</b><span>本次作答不计时</span></div>'
+  +'<div class="bar"><i style="width:'+(done/TOTAL*100).toFixed(2)+'%"></i></div>'
+  +'<div class="task"><span>已答 <b>'+done+'</b> 题</span><span>还剩 <b>'+(TOTAL-done)+'</b> 题</span><span>方向 <b>'+esc(q.dim)+'</b></span><span>没有倒计时</span><span>可返回修改</span></div></section>'
+  +'<section class="card"><div class="qnum">第 '+cursor+' 题<em>'+esc(q.dim)+'</em></div>'
+  +'<h2 class="question" id="sa-q" data-testid="sa-prompt">'+esc(q.p)+'</h2>'
+  +'<p class="qhint">选你平时更舒服的那一项，不用揣摩哪个答案更好；选完还可以改。</p>'
+  +'<div class="answers" role="radiogroup" aria-labelledby="sa-q" data-testid="self-assessment-list">'+answers+'</div></section>'
+  +'<section class="card"><div class="hd">'+TOTAL+' 题按 '+DIMS.length+' 个方向分行<span>深色＝当前题 · 浅绿＝已答可改 · 虚线＝答完前面才开放</span></div>'
+  +'<div class="dimgrid" data-testid="sa-question-map">'+grid+'</div>'
+  +'<div class="quickrow"><button type="button" class="quick m-press" data-act="restart" data-testid="sa-quick"><i>↻</i>重新开始（清空本次 '+done+' 个答案）</button>'
+  +'<button type="button" class="quick m-press" data-act="exit" data-testid="sa-quick"><i>✕</i>退出并清空，回简历服务</button></div></section>'
+  +gate(!chosen,chosen
+    ?(last?(full?'<b>'+TOTAL+' 题都已作答。</b>可以进入提交前确认，确认页还能逐题回来改。':'<b>本题已选择。</b>前面还有没答的题，先把题号里空着的补上。')
+          :'<b>本题已选择。</b>可以进入下一题，之后也能从题号回来改。')
+    :(clamped?'<b>还没有选择本题的答案，暂时不能前进。</b>你打开的题号超过了本次可作答的位置，已经回到第 '+cursor+' 题。'
+             :'<b>还没有选择本题的答案，暂时不能前进。</b>选中一项后，「'+(last?'去提交前确认':'下一题')+'」才会变为可用。'))
+  +rail();
+  actionsEl.innerHTML=(cursor===1
+    ?actionBtn({link:href('intro'),label:'返回说明'})
+    :actionBtn({act:'prev',label:'上一题'}))
+  +actionBtn({primary:true,act:chosen?(last?'review':'next'):null,blocked:!chosen,label:last?'去提交前确认':'下一题'});
+}
+
+/* ------------------------------------------------------------------- review */
+function viewReview(){
+  var submitted=session.submitted;
+  mark('review',{reason:submitted?'after-submit':'before-submit'});
+  askEl.innerHTML=submitted?'这是你<em>已提交的 '+TOTAL+' 个选择</em>。':'提交前，<em>先检查这 '+TOTAL+' 个选择</em>。';
+  doingEl.innerHTML=submitted
+    ?'本次已提交，页面不再改动这些答案；<b>要换答案只能重新开始一次新的作答。</b>'
+    :TOTAL+' 题已全部作答。<b>确认提交后只记录本次已完成，不生成评分、人格类型或岗位结论。</b>';
+  /* 与答题页同一套「一行一个维度」布局：既是五维度完成情况，也是逐题回改入口。 */
+  var grid='';
+  DIMS.forEach(function(d,di){
+    var n=dimDone(session,d.key);
+    grid+='<div class="dl'+(n===d.count?' full':'')+'" data-testid="sa-dim-row"><b>'+esc(d.label)+'</b><em>'+n+' / '+d.count+' 题</em></div>';
+    for(var j=0;j<d.count;j++){
+      var i=di*d.count+j+1,item=Q[i-1];
+      var label=(item.c.find(function(c){return c[0]===session.answers[i]})||['','—'])[1];
+      var inner='<small>第 '+i+' 题</small><b>'+esc(label)+'</b>';
+      grid+=submitted
+        ?'<div class="rv" data-testid="sa-review-item">'+inner+'</div>'
+        :'<button type="button" class="rv m-press" data-act="goto" data-arg="'+i+'" aria-label="回到第 '+i+' 题修改（'+esc(d.label)+'），当前选择：'+esc(label)+'" data-testid="sa-review-item">'+inner+'</button>';
+    }
+  });
+  bodyEl.innerHTML='<section class="card result-lead"><div class="hd">'+(submitted?'本次作答已提交':'本次 '+TOTAL+' 题已全部作答')+'<span>'+(submitted?'本次会话已提交':'提交前可以逐题回去改')+'</span></div>'
+  +'<div class="task"><span>已答 <b>'+TOTAL+'</b> 题</span><span>'+DIMS.length+' 个方向各 <b>5</b> 题</span><span>'+(submitted?'已提交':'尚未提交')+'</span><span>只存在于本次会话</span></div></section>'
+  +'<section class="card"><div class="hd">你这次选了什么<span>'+(submitted?'只读回看，按方向分行':'点任意一项即可回去修改')+'</span></div><div class="dimgrid" data-testid="sa-review-grid">'+grid+'</div></section>'
+  /* 两个分支用同一张「三件事」卡，只换时态：避免提交后出现两条长得几乎一样的 ✓ 提示条。 */
+  +'<section class="card"><div class="hd">'+(submitted?'这次提交做了什么':'确认提交会发生什么')+'<span>只有这三件事</span></div><div class="flow-grid">'
+  +'<div class="flow current"><small>'+(submitted?'已发生':'会发生')+'</small><b>标记本次已完成</b><p>'+(submitted?'这次作答已记为已提交，完成页按此显示。':'把这次作答记为已提交，然后进入完成页。')+'</p></div>'
+  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不生成任何结论</b><p>不打分、不给人格类型、不判断适不适合某个岗位。</p></div>'
+  +'<div class="flow"><small>'+(submitted?'未发生':'不会发生')+'</small><b>不上传、不入账号</b><p>答案不发给服务端，也不写进你的账号记录。</p></div></div></section>'
+  +(submitted?'':gate(false,'<b>'+TOTAL+' 题都已作答。</b>确认无误后再提交；现在取消也不会丢掉这些选择。'))
+  +rail();
+  actionsEl.innerHTML=(submitted
+    ?actionBtn({act:'restart-all',label:'重新开始一次'})+actionBtn({primary:true,link:href('result'),label:'回到完成页'})
+    :actionBtn({act:'goto',arg:TOTAL,label:'取消，返回修改'})+actionBtn({primary:true,act:'submit',label:'确认提交',testid:'sa-submit'}));
+}
+
+/* ------------------------------------------------------------------- result */
+function viewResult(synthetic){
+  var s=synthetic?syntheticSession():session;
+  mark('result',synthetic?{fixture:'synthetic'}:null);
+  askEl.innerHTML=synthetic?'这是<em>版式示例</em>，不是结果。':'本次 '+TOTAL+' 题<em>已完成并提交</em>。';
+  doingEl.innerHTML=synthetic
+    ?'仅在 debug 模式下渲染的 synthetic fixture；<b>页面上的数字是合成占位样例，不是任何人的作答。</b>'
+    :'本次会话已提交。<b>本页只记录你完成了什么，不生成评分、人格类型或岗位结论，也不显示服务端完成时间。</b>';
+  var cov=DIMS.map(function(d){
+    return '<div><small>'+esc(d.label)+'</small><b>'+dimDone(s,d.key)+' / '+d.count+' 题</b><p>已作答</p></div>';
+  }).join('');
+  bodyEl.innerHTML=(synthetic?'<section class="synthetic" data-testid="synthetic-fixture-banner"><i>!</i><div>SYNTHETIC FIXTURE · 演示版式，合成数据，不是真实结果<p>仅在 ?debug=1 下渲染：本页没有真实完成记录，题数为占位值，页面也不展示任何完成时间，不得截图当作真实完成证据。</p></div></section>':'')
+  +'<section class="card result-lead"><div class="hd">本次自我探索已完成<span>'+(synthetic?'合成数据 · 仅版式':'本次会话已提交')+'</span></div>'
+  +'<div class="task"><span>已作答 <b>'+TOTAL+'</b> 题</span><span>'+DIMS.length+' 个方向已覆盖</span><span>已提交</span><span>不评分、不排名</span></div>'
+  /* synthetic 下这段由顶部横幅承担，重复一遍只会把版式挤到行动条底下。 */
+  +(synthetic?'':'<div class="sub">这一屏只陈述本次作答的完成情况与覆盖范围。静态原型没有服务端，因此不展示完成时间；倾向描述、维度解读与建议由服务端与模型产出，接入前本页不显示，也不用占位文字冒充。</div>')+'</section>'
+  +'<section class="card"><div class="hd">本次作答覆盖<span>按你实际答完的题统计</span></div><div class="cov" data-testid="sa-coverage">'+cov+'</div></section>'
+  +'<section class="card"><div class="hd">本页现在不做什么<span>没接通就不假装</span></div><div class="flow-grid">'
+  +'<div class="flow"><small>不生成</small><b>评分与人格类型</b><p>不给分数、不贴类型标签、不显示固定百分比。</p></div>'
+  +'<div class="flow"><small>不保存</small><b>账号记录与完成时间</b><p>答案不上传服务端，关掉标签页即消失。</p></div>'
+  +'<div class="flow"><small>不产出</small><b>报告与打印文件</b><p>报告 PDF 由服务端生成后才开放打印，现在不提供。</p></div></div></section>'
+  +'<section class="card"><div class="hd">接下来可以做什么<span>都是现在就能打开的功能</span></div><div class="picks three">'
+  +pick({link:'26-browse-list.html',icon:'岗',title:'去看岗位信息',desc:'带着这次的偏好，看第三方来源的岗位列表和详情。',cls:'lead'})
+  +pick({link:'29-interview-training.html',icon:'练',title:'做一次模拟面试',desc:'把偏好换成能说出口的表达，练完可以复盘。'})
+  +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'改简历、生成材料或安排打印，按各自页面的实际状态确认。'})
+  +pick({link:href('review'),icon:'查',title:'查看本次 '+TOTAL+' 个选择',desc:'按方向逐题回看这次选了什么；已提交后只读，不再改动。'})
+  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'账号记录需要登录后按服务端返回展示，本次会话不算记录。'})
+  +pick({icon:'印',title:'打印本次结果',desc:'结果文件由服务端生成后才开放打印，现在不提供。'})
+  +'</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn({act:'restart-all',label:'重新开始一次'})
+  +actionBtn({primary:true,link:'26-browse-list.html',label:'去看岗位信息'});
+}
+function syntheticSession(){var s=blank();s.consented=true;s.submitted=true;Q.forEach(function(q){s.answers[q.n]=q.c[0][0]});return s}
+
+/* ------------------------------------------------------------------ history */
+function viewHistory(){
+  mark('history');
+  askEl.innerHTML='需要登录后，<em>才可查看记录</em>。';
+  doingEl.innerHTML='当前静态原型不伪造任何历史作答；<b>没有记录时会如实显示为空。</b>';
+  bodyEl.innerHTML='<section class="card"><div class="hd">本人评估记录<span>需登录后按账号读取</span></div>'
+  +'<div class="blank" data-testid="self-assessment-list"><div class="empty-i">⌁</div><div><h2>这里还没有可查看的记录</h2>'
+  +'<p>本页不生成示例历史，也不把本次未提交的答案写成记录。真实记录、保存期限和撤回能力，由账号与服务端契约确认后展示。</p></div></div></section>'
+  +'<section class="card"><div class="hd">登录后这里会显示什么<span>字段结构，不是已有数据</span></div><div class="mini">'
+  +'<div><small>作答批次</small><p>每次完成对应的题目版本与题量。</p></div>'
+  +'<div><small>结果描述</small><p>当次生成的偏好描述文本。</p></div>'
+  +'<div><small>可否重做</small><p>是否可重新作答、删除或打印。</p></div></div></section>'
+  +statusMini()
+  +'<section class="card"><div class="hd">现在可以做什么<span>不必等记录恢复</span></div><div class="picks">'
+  +pick({link:href(session.consented?'questions':'intro'),icon:'答',title:session.consented?'继续本次作答':'开始一次作答',desc:'不登录也能做完 '+TOTAL+' 道题，完成情况当场就能看。',cls:'lead'})
+  +pick({link:'03-login-gate.html',icon:'登',title:'先登录账号',desc:'登录后才请求本人记录；能否查看以服务端返回为准。'})
+  +pick({link:'30-my-profile.html',icon:'我',title:'去我的记录',desc:'在“我的”里查看已经产生的服务与文档记录。'})
+  +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'继续改简历、生成材料或安排打印。'})
+  +'</div></section>'
+  +'<section class="notice"><i>i</i><div>本次作答只存在于这台机器的当前浏览器会话，<b>不是账号记录</b>，也不会出现在上面的列表里。</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn({link:href('intro'),label:'返回介绍'})
+  +actionBtn({primary:true,link:'03-login-gate.html',label:'去登录查看记录'});
+}
+
+/* ------------------------------------------------------------------ ai-down */
+function viewDown(){
+  mark('ai-down');
+  askEl.innerHTML='现在可以答题，<em>暂不生成解读</em>。';
+  doingEl.innerHTML='AI 服务不可用时不假装已生成结果；<b>本页仅保留不依赖 AI 的介绍和作答说明。</b>';
+  bodyEl.innerHTML='<section class="card down"><div class="hd">AI 解读暂时不可用<span>不伪造恢复状态</span></div>'
+  +'<div class="task"><span class="warn">解读与建议<b>本次不能生成</b></span><span>'+TOTAL+' 道题与作答不依赖 AI，可照常进行</span><span>不预报恢复时间</span></div>'
+  +'<div class="sub">本次不能承诺生成职业倾向描述或建议。恢复时间以现场公告或实际服务状态为准。</div></section>'
+  +'<section class="card"><div class="hd">不依赖 AI 也能做的事<span>现在就能打开</span></div><div class="picks">'
+  +pick({link:href(session.consented?'questions':'intro'),icon:'答',title:'照常做完 '+TOTAL+' 道题',desc:'题目本身不依赖 AI；答完后先不生成解读。',cls:'lead'})
+  +pick({link:'29-interview-training.html?state=tips',icon:'备',title:'看面试准备清单',desc:'公开的准备方法和 STAR 结构，不需要模型参与。'})
+  +pick({link:'26-browse-list.html',icon:'岗',title:'看岗位信息',desc:'第三方来源岗位列表与详情，按来源平台投递。'})
+  +pick({link:'10-print-hub.html',icon:'印',title:'打印与扫描',desc:'打印、扫描等硬件服务按设备实际状态执行。'})
+  +'</div></section>'
+  +'<section class="card"><div class="hd">恢复之后会怎样<span>按实际状态放开</span></div><div class="flow-grid">'
+  +'<div class="flow"><small>恢复判断</small><b>以服务状态为准</b><p>不按倒计时提示，恢复由实际检测结果决定。</p></div>'
+  +'<div class="flow"><small>恢复之后</small><b>才出现生成入口</b><p>确认可用前，页面不展示“查看解读”按钮。</p></div>'
+  +'<div class="flow"><small>本次答案</small><b>不当作已出结果</b><p>未生成描述前，不写成已完成的评估记录。</p></div></div></section>'
+  +statusMini()
+  +'<section class="notice"><i>i</i><div><b>不把“能答题”说成“能出报告”。</b>待真实 AI 服务恢复并由流程确认后，才展示可生成解读的入口。</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn({link:'16-service-hubs.html?hub=resume',label:'返回简历服务'})
+  +actionBtn({primary:true,link:href(session.consented?'questions':'intro'),label:'先照常作答'});
+}
+
+/* ---------------------------------------------------------- fail-closed 恢复 */
+var RECOVER={
+  consent:{title:'还不能进入答题',why:'这一步需要先在说明页确认',
+    facts:['本次会话里没有「已确认说明」的记录。','说明包含 5 条前提，读完并勾选后才开始作答。','不会因为你直接打开答题链接就当作已同意。'],
+    primary:{link:href('intro'),label:'去看说明并确认'},secondary:{link:'16-service-hubs.html?hub=resume',label:'返回简历服务'}},
+  progress:{title:'还不能进入提交前确认',why:'本次还没有答满 '+TOTAL+' 题',
+    facts:['提交前确认只在 '+TOTAL+' 题全部作答后才开放。','已作答的题都还在，回去接着答即可。','没答满不会生成任何完成记录。'],
+    primary:{link:href('questions'),label:'回去接着作答'},secondary:{link:href('intro'),label:'返回说明'}},
+  result:{title:'还没有可查看的完成结果',why:'本次会话没有「答满并提交」的标记',
+    facts:['完成页只在本次 '+TOTAL+' 题答满并明确提交后才显示。','直接打开完成页的链接不会放行，也不会补一个结果给你看。','之前的作答如果还在，可以接着答完再提交。'],
+    primary:{link:href('intro'),label:'从说明开始'},secondary:{link:'16-service-hubs.html?hub=resume',label:'返回简历服务'}},
+  submitted:{title:'本次作答已经提交',why:'已提交的答案不再改动',
+    facts:['本次 '+TOTAL+' 题已提交，答题页不再打开以免答案与提交不一致。','可以回完成页查看这次完成了什么。','想换答案就重新开始一次新的作答。'],
+    primary:{link:href('result'),label:'查看本次完成情况'},secondary:{act:'restart-all',label:'重新开始一次'}}
+};
+function viewRecover(kind){
+  var r=RECOVER[kind];
+  mark('recover-'+kind,{reason:kind});
+  askEl.innerHTML='这一步<em>还打不开</em>。';
+  doingEl.innerHTML=r.why+'。<b>页面不会跳过这一步，也不会补一个假结果给你看。</b>';
+  bodyEl.innerHTML='<section class="card down" data-testid="sa-recover"><div class="hd">'+r.title+'<span>'+r.why+'</span></div>'
+  +'<div class="task"><span class="warn">当前入口<b>不放行</b></span><span>已有作答不会被清空</span><span>不生成任何结果</span></div>'
+  +'<div class="sub">这不是错误提示，而是这一步本来就有前置条件。按下面任意一个出口继续即可。</div></section>'
+  +'<section class="card"><div class="hd">为什么会这样<span>三条都可核对</span></div><div class="flow-grid">'
+  +r.facts.map(function(f,i){return '<div class="flow'+(i===0?' current':'')+'"><small>事实 '+(i+1)+'</small><p style="margin-top:9px;font-size:18px">'+f+'</p></div>'}).join('')
+  +'</div></section>'
+  +statusMini()
+  +'<section class="card"><div class="hd">现在可以做什么<span>都是现在就能打开的入口</span></div><div class="picks">'
+  +pick({link:href('intro'),icon:'说',title:'看说明并确认',desc:'读完 5 条前提并勾选后，就可以开始作答。',cls:'lead'})
+  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'账号记录需登录后按服务端返回展示，不会伪造历史。'})
+  +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'改简历、生成材料或安排打印，按各自页面状态确认。'})
+  +pick({link:'30-my-profile.html',icon:'我',title:'去我的记录',desc:'在“我的”里查看已经产生的服务与文档记录。'})
+  +'</div></section>'
+  +'<section class="notice"><i>i</i><div><b>不显示你打开的链接参数内容。</b>这里只说明是哪一类前置条件没满足，不回显参数原值。</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn(Object.assign({},r.secondary))+actionBtn(Object.assign({primary:true},r.primary));
+}
+
+/* ------------------------------------------------------------------ invalid */
+var INVALID={
+  state:{label:'页面状态取值不在支持范围内',hint:'链接里的状态名不是本页支持的几种之一。'},
+  question:{label:'题号超出 1 – '+TOTAL+' 的范围',hint:'本页共 '+TOTAL+' 道题，题号必须是 1 到 '+TOTAL+' 的整数。'},
+  param:{label:'链接里有无法识别的参数',hint:'本页只接受固定的几个参数，多余参数一律不解析。'}
+};
+function viewInvalid(kind){
+  var v=INVALID[kind]||INVALID.state;
+  mark('invalid',{reason:kind});
+  askEl.innerHTML='这个入口<em>打不开</em>。';
+  doingEl.innerHTML=v.hint+'<b>页面不猜你想去哪一步，也不显示参数原值。</b>';
+  bodyEl.innerHTML='<section class="card down" data-testid="sa-invalid"><div class="hd">无法打开这个入口<span>'+v.label+'</span></div>'
+  +'<div class="task"><span class="warn">入口<b>不放行</b></span><span>不猜测目标步骤</span><span>不回显参数原值</span></div>'
+  +'<div class="sub">为避免泄露你在地址里输入的内容，这里只说明属于哪一类，不把原值显示出来。换成下面任意一个正常入口就能继续。</div></section>'
+  +'<section class="card"><div class="hd">本页支持哪些入口<span>其余一律不放行</span></div><div class="flow-grid">'
+  +'<div class="flow current"><small>说明页</small><b>先确认再作答</b><p>普通入口都从这里开始，读完 5 条前提并勾选。</p></div>'
+  +'<div class="flow"><small>答题页</small><b>确认后才开放</b><p>逐题作答，题号 1 到 '+TOTAL+'，可回去修改。</p></div>'
+  +'<div class="flow"><small>完成页</small><b>提交后才开放</b><p>答满 '+TOTAL+' 题并明确提交后，才显示完成情况。</p></div></div></section>'
+  +statusMini()
+  +'<section class="card"><div class="hd">现在可以做什么<span>都是现在就能打开的入口</span></div><div class="picks">'
+  +pick({link:href('intro'),icon:'说',title:'返回自我探索说明',desc:'从正常入口重新开始，前面已作答的内容不会丢。',cls:'lead'})
+  +pick({link:href('history'),icon:'录',title:'查看评估记录',desc:'账号记录需登录后按服务端返回展示，不会伪造历史。'})
+  +pick({link:'16-service-hubs.html?hub=resume',icon:'简',title:'回简历服务',desc:'改简历、生成材料或安排打印，按各自页面状态确认。'})
+  +pick({link:'01-home.html',icon:'首',title:'回首页',desc:'从首页重新选择要办的事。'})
+  +'</div></section>'
+  +'<section class="notice"><i>i</i><div><b>为保护隐私，这里不显示你输入的参数内容。</b>如果是从别处跳转过来的，请回到上一步重新进入。</div></section>'
+  +rail();
+  actionsEl.innerHTML=actionBtn({link:'16-service-hubs.html?hub=resume',label:'回简历服务'})
+  +actionBtn({primary:true,link:href('intro'),label:'返回自我探索说明'});
+}
+
+/* -------------------------------------------------------------------- 分发 */
+if(view==='intro')viewIntro();
+else if(view==='questions')viewQuestions();
+else if(view==='review')viewReview();
+else if(view==='result')viewResult(false);
+else if(view==='result-synthetic')viewResult(true);
+else if(view==='history')viewHistory();
+else if(view==='ai-down')viewDown();
+else if(view.indexOf('recover-')===0)viewRecover(view.slice(8));
+else viewInvalid(reason);
+
+/* ------------------------------------------------------------------ 交互 */
+function handle(act,arg){
+  if(act==='consent'){session.consented=!session.consented;save(session);viewIntro();return}
+  if(act==='start'){if(!session.consented)return;go('questions',{q:Math.min(TOTAL,answered(session)+1)});return}
+  if(act==='answer'){
+    if(view!=='questions'||session.submitted)return;
+    session.answers[cursor]=arg;session.cursor=cursor;save(session);clamped=false;viewQuestions();return;
+  }
+  if(act==='next'){if(!session.answers[cursor])return;go('questions',{q:Math.min(TOTAL,cursor+1)});return}
+  if(act==='prev'){go('questions',{q:Math.max(1,cursor-1)});return}
+  if(act==='goto'){go('questions',{q:Number(arg)});return}
+  if(act==='locked')return;
+  if(act==='review'){if(answered(session)<TOTAL)return;go('review');return}
+  if(act==='submit'){
+    if(answered(session)<TOTAL||session.submitted)return;
+    session.submitted=true;save(session);go('result');return;
+  }
+  if(act==='restart'){var c=session.consented;session=blank();session.consented=c;save(session);go('questions',{q:1});return}
+  if(act==='restart-all'){wipe();session=blank();go('intro');return}
+  if(act==='exit'){wipe();location.href='16-service-hubs.html?hub=resume';return}
+}
+function onTap(e){
+  var el=e.target.closest?e.target.closest('[data-act]'):null;
+  if(!el||!stageEl.contains(el))return;
+  e.preventDefault();handle(el.dataset.act,el.dataset.arg);
+}
+bodyEl.addEventListener('click',onTap);actionsEl.addEventListener('click',onTap);
+
+/* ---------- 原型演示控制：仅 debug=1 注入 DOM，普通/state/capture/flat 及组合 URL 一律不渲染 ---------- */
+if(DEBUG){
+  var demoHref=function(s){var p=new URLSearchParams();p.set('state',s);p.set('debug','1');if(FLAT)p.set('flat','1');if(CAPTURE!==null)p.set('capture',CAPTURE);return '?'+p.toString()};
+  var tab=document.createElement('button');
+  tab.type='button';tab.className='demo-tab';tab.setAttribute('data-proto-control','true');
+  tab.setAttribute('aria-label','打开原型演示控制面板');tab.setAttribute('aria-expanded','false');tab.textContent='演示模式 DEBUG';
+  var panel=document.createElement('div');
+  panel.className='demo-panel';panel.setAttribute('data-proto-control','true');panel.setAttribute('aria-label','原型演示控制');
+  panel.innerHTML='<div class="dp-t">状态（仍走 fail-closed 门禁）</div>'+STATES.map(function(s){return '<a href="'+demoHref(s)+'" data-proto-control="true" data-s="'+s+'"'+(s===want?' class="on"':'')+'>'+s+'</a>'}).join('');
+  tab.addEventListener('click',function(){var open=panel.classList.toggle('show');tab.setAttribute('aria-expanded',open?'true':'false')});
+  stageEl.appendChild(tab);stageEl.appendChild(panel);
+}
+</script></body></html>

@@ -1,0 +1,74 @@
+/* ============================================================
+   青序流光 · Kiosk 设计令牌（第 0 批冻结候选）
+   用法：所有 v2 页面 <link> 引入本文件，禁止硬编码 px 字号/颜色。
+   命名分两层：
+   1) 生产语义令牌（--fs-* / --r-* / --dur-* / --tap-*）——对接时直接继承
+   2) 青序流光调色板（--paper/--ink/--teal...）——取值沿用现有 35 屏原型
+   ============================================================ */
+:root{
+  /* ── 调色板（青序流光，取值与 kiosk-redesign-2026-08 现有原型一致） ── */
+  --paper:#f5f2e9;        /* 米纸底 */
+  --surface:#fffdf8;      /* 卡面 */
+  --ink:#10302b;          /* 主文字·深墨绿 */
+  --muted:#5d6b63;        /* 辅助文字 */
+  --line:#e3ddcb;         /* 分隔线 */
+  --deep:#0b241e;         /* 深色区底 */
+  --emerald:#2ee6a8;      /* 深色区高光（仅深色区使用） */
+  --ink-soft:#eae7dc;
+
+  /* 语义色（角色固定，不得互换） */
+  --teal:#1f9e86;   --teal-deep:#157a67;   --teal-soft:#e0f1ea;   /* 本机服务/已验证 */
+  --slate:#3f68b0;  --slate-deep:#35608f;  --slate-soft:#e6edf5;  /* 第三方与官方来源 */
+  --clay:#b8683c;   --clay-deep:#9e5330;   --clay-soft:#f5e9de;   /* 待核实/付费相关 */
+  --plum:#7a5a86;   --plum-deep:#6b4a77;   --plum-soft:#efe8f2;   /* 会员/权益 */
+  --wheat:#a9781f;  --wheat-deep:#8a6219;  --wheat-soft:#f3ecda;  /* 提醒/注意 */
+  --sage:#4d7a6a;   --sage-deep:#3c6355;   --sage-soft:#e4ede8;   /* 次要辅助 */
+  --cinnabar:#b23a2e; --cinnabar-deep:#963227; --cinnabar-soft:#f6e4e1; /* 不可逆确认，仅此语义可用 */
+
+  /* ── 字阶（生产令牌；硬约束：正文≥19 任意文字≥15 主按钮≥22） ── */
+  --fs-display:42px;   /* 小青问句（40–44） */
+  --fs-title:29px;     /* 区块标题 */
+  --fs-key:26px;       /* 关键数字/价格/结果 */
+  --fs-primary:22px;   /* 主按钮/强调正文 */
+  --fs-body:19px;      /* 正文 */
+  --fs-meta:17px;      /* 辅助说明 */
+  --fs-micro:15px;     /* 最小合法文字（来源信息等） */
+
+  /* ── 字重 ── */
+  --fw-regular:400; --fw-medium:500; --fw-bold:700; --fw-black:900;
+
+  /* ── 字体族 ── */
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif;
+  --sans:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+
+  /* ── 圆角 ── */
+  --r-paper:30px;   /* 大卡片/页面块 */
+  --r-card:22px;    /* 标准卡片 */
+  --r-pill:999px;   /* 胶囊/主按钮 */
+
+  /* ── 动效 ── */
+  --dur-instant:120ms;
+  --dur-quick:240ms;
+  --dur-page:480ms;
+  --ease-out:cubic-bezier(.22,1,.36,1);
+
+  /* ── 触控 ── */
+  --tap-min:48px;      /* 任意可点元素最小高/宽 */
+  --tap-primary:56px;  /* 主按钮最小高度 */
+
+  /* ── 布局 ── */
+  --stage-w:1080px; --stage-h:1920px;
+  --pad-x:48px;          /* 页面左右安全边距 */
+  --topbar-h:92px;       /* 顶栏高 */
+  --navbar-h:132px;      /* 底部三 Tab 高（常驻） */
+  --cta-h:96px;          /* 主操作条高（常驻） */
+  --gap-card:24px;
+}
+
+/*  reduced-motion 与 ?flat=1 一键降级：所有 v2 页必须遵守  */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+html[data-flat="1"] *,html[data-flat="1"] *::before,html[data-flat="1"] *::after{
+  animation:none!important;transition:none!important
+}
