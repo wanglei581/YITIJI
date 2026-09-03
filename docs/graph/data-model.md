@@ -69,7 +69,7 @@ flowchart TD
 | **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AiResumeResult** | 15 | EndUser | 10 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume/appended-self-assessment.service.ts`<br/>… |
 | **AiServiceLog** | 12 | EndUser | 2 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts` |
-| **AlertDisposition** | 12 | — | 1 个文件<br/>`admin-ops/admin-ops.service.ts` |
+| **AlertDisposition** | 12 | — | 2 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`admin-ops/admin-ops.service.ts` |
 | **AuditLog** | 12 | User | 14 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
 | **BenefitActivity** | 19 | BenefitClaim、User | 1 个文件<br/>`benefit-activities/benefit-activities.service.ts` |
 | **BenefitClaim** | 8 | BenefitActivity、BenefitGrant、EndUser | 1 个文件<br/>`benefit-activities/benefit-activities.service.ts` |
@@ -126,7 +126,7 @@ flowchart TD
 | **PolicyPost** | 22 | Organization、PolicyEligibilityRule | 7 个文件<br/>`activity/activity.service.ts`<br/>`bulk-publish/bulk-publish.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **PriceConfig** | 9 | — | 3 个文件<br/>`payment/admin-billing.service.ts`<br/>`payment/price-config.seed.ts`<br/>`payment/pricing.service.ts` |
 | **PrintMaterialPack** | 9 | — | **无代码读写** |
-| **PrintTask** | 21 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 21 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`admin-users/admin-users.service.ts`<br/>… |
+| **PrintTask** | 21 | EndUser、FileObject、Order、PrintTaskStatusLog、Terminal | 22 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-ops/derived-alerts.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **PrintTaskStatusLog** | 7 | PrintTask | 7 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`print-jobs/admin-closed-pending-print-task-disposition.service.ts`<br/>… |
 | **QualificationRecord** | 26 | FileObject、OfflineAgencyBranch、Organization | 1 个文件<br/>`recruitment-content/recruitment-content-read.service.ts` |
 | **RedemptionRecord** | 11 | — | 2 个文件<br/>`benefit-redemption/benefit-redemption.service.ts`<br/>`member-benefits/member-benefits.service.ts` |
@@ -136,11 +136,11 @@ flowchart TD
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **SyncLog** | 15 | JobSource | 5 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 1 个文件<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 24 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 19 个文件<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`content/content.service.ts`<br/>… |
+| **Terminal** | 24 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 20 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 1 个文件<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
-| **TerminalHeartbeat** | 12 | Terminal | 1 个文件<br/>`terminals/terminals-agent.service.ts` |
+| **TerminalHeartbeat** | 12 | Terminal | 2 个文件<br/>`admin-ops/derived-alerts.ts`<br/>`terminals/terminals-agent.service.ts` |
 | **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
@@ -150,7 +150,7 @@ flowchart TD
 | **ToolboxApp** | 12 | ToolboxAppVersion | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxAppVersion** | 14 | ToolboxApp | 1 个文件<br/>`terminals/toolbox-governance.service.ts` |
 | **ToolboxLaunchEvent** | 10 | — | 1 个文件<br/>`terminals/terminal-toolbox.service.ts` |
-| **User** | 26 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 15 个文件<br/>`auth/admin-initial-phone-bind.service.ts`<br/>`auth/admin-phone-transfer.service.ts`<br/>`auth/auth.service.ts`<br/>… |
+| **User** | 26 | AuditLog、BenefitActivity、FeedbackReply、FileObject、Organization、ReviewDecision | 16 个文件<br/>`admin-ops/admin-alert-actions.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>`auth/admin-phone-transfer.service.ts`<br/>… |
 | **UserAiConsent** | 8 | EndUser | 3 个文件<br/>`member-privacy/member-data-export.mapper.ts`<br/>`member-privacy/member-data-request.service.ts`<br/>`member-privacy/member-privacy.service.ts` |
 | **UserDataRequest** | 22 | EndUser | 6 个文件<br/>`member-privacy/member-data-export-download.service.ts`<br/>`member-privacy/member-data-export-reconciler.service.ts`<br/>`member-privacy/member-data-export.mapper.ts`<br/>… |
 | **UserNotification** | 10 | — | **无代码读写** |

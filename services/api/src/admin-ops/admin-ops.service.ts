@@ -16,6 +16,8 @@ import { collectDerivedAlerts } from './derived-alerts'
 //     errorMessage(可能含内部细节);归属只回 member/anonymous,不回 endUserId。
 //   - 告警仍是实时派生(终端离线 / 打印机异常 / 近 24h 打印失败)。
 //     处理态落 AlertDisposition，确认不等于故障消失。
+//   - GET 只读：告警列表端点不写数据库。恢复与否只能正向查证，
+//     不能用「本次查询没看见」推断（见 listDerivedAlerts 注释）。
 // ============================================================
 
 export interface AdminPrintTaskItem {
@@ -55,11 +57,23 @@ export interface AdminAlertItem {
 export interface AdminAlertsResult {
   data: AdminAlertItem[]
   derivedAt: string
+  /** 当前仍在发生的告警总数(精确计数,不受列表上限影响)。 */
   firingCount: number
+  /** 本次实际派生出的条数;小于 firingCount 即说明被截断。 */
+  listedCount: number
+  /**
+   * 截断说明。非 null 时界面必须如实提示「列表不是全部」,
+   * 并且必须说明下面三个处理态计数只覆盖已列出的部分(CLAUDE.md §9)。
+   */
+  truncation: { type: 'print_failed'; omitted: number; cap: number } | null
+  /** 以下计数只统计本次已列出的告警。 */
   openCount: number
   acknowledgedCount: number
   suppressedCount: number
 }
+
+/** SQLite 的绑定变量上限保守取值;subjectKey in (...) 按此分批,避免长列表炸参数。 */
+const DISPOSITION_LOOKUP_CHUNK = 300
 
 type ParsedParams = {
   fileName: string | null
@@ -153,23 +167,28 @@ export class AdminOpsService {
 
   // ── 派生告警(告警中心页数据源)───────────────────────────────────────────
 
+  /**
+   * 派生告警列表。这是 GET 端点,只读——不写 AlertDisposition。
+   *
+   * 为什么删掉原来的「不在本次派生结果里就写 recoveredAt」:
+   *   缺席不是恢复的证据。一条告警没出现在本次结果里,可能是真恢复,也可能是被
+   *   列表上限截断,还可能是这一跳查询本身没覆盖到。用缺席反推恢复,会把仍在
+   *   firing 的告警标成已恢复,并且在它重新进入列表时把操作员的确认 / 关闭
+   *   无声撤销(resolveHandlingState 看到 recoveredAt != null 就回 open)。
+   *
+   *   删掉之后「恢复后再发作」仍然是对的:那由 episodeToken 负责——离线用 lastSeen、
+   *   打印机异常用 printerStatus+lastHealthyAt、打印失败用 PrintTask.id,
+   *   任何一次真实恢复都会让下一轮故障拿到新 token,旧处置自然失效。
+   *   也就是说恢复判定是从正面数据算出来的,不是从「没看见」推断出来的。
+   */
   async listDerivedAlerts(view: AlertListView = 'open'): Promise<AdminAlertsResult> {
     const now = new Date()
-    const derived = await collectDerivedAlerts(this.prisma, now)
-    const firingKeys = new Set(derived.map((alert) => alert.subjectKey))
+    const collected = await collectDerivedAlerts(this.prisma, now)
+    const derived = collected.alerts
 
-    const openRows = await this.prisma.alertDisposition.findMany({
-      where: { recoveredAt: null },
-    })
-    const staleIds = openRows.filter((row) => !firingKeys.has(row.subjectKey)).map((row) => row.id)
-    if (staleIds.length > 0) {
-      await this.prisma.alertDisposition.updateMany({
-        where: { id: { in: staleIds }, recoveredAt: null },
-        data: { recoveredAt: now },
-      })
-    }
-
-    const byKey = new Map(openRows.filter((row) => firingKeys.has(row.subjectKey)).map((row) => [row.subjectKey, row]))
+    // 只按本次确实派生出来的 subjectKey 取处置行,读取范围随列表有界。
+    const rows = await this.findDispositions(derived.map((alert) => alert.subjectKey))
+    const byKey = new Map(rows.map((row) => [row.subjectKey, row]))
     const items: AdminAlertItem[] = derived.map((alert) => {
       const row = byKey.get(alert.subjectKey) ?? null
       const handlingState = resolveHandlingState(row, alert.episodeToken, now)
@@ -206,10 +225,45 @@ export class AdminOpsService {
     return {
       data: items.filter((item) => matchesView(item.handlingState, view)),
       derivedAt: now.toISOString(),
-      firingCount: items.length,
+      // 精确总数,不是「本次列出了几条」。截断时二者不等,由 truncation 如实说明。
+      firingCount: collected.firingTotal,
+      listedCount: items.length,
+      truncation: collected.omitted > 0
+        ? { type: 'print_failed' as const, omitted: collected.omitted, cap: collected.cap }
+        : null,
       openCount,
       acknowledgedCount,
       suppressedCount,
     }
+  }
+
+  /** 分批按 subjectKey 取处置行,避免超长 in (...) 触碰 SQLite 绑定变量上限。 */
+  private async findDispositions(subjectKeys: string[]) {
+    const out: Array<{
+      subjectKey: string
+      action: string
+      episodeToken: string
+      recoveredAt: Date | null
+      silencedUntil: Date | null
+      note: string | null
+      updatedAt: Date
+    }> = []
+    for (let i = 0; i < subjectKeys.length; i += DISPOSITION_LOOKUP_CHUNK) {
+      const chunk = subjectKeys.slice(i, i + DISPOSITION_LOOKUP_CHUNK)
+      const rows = await this.prisma.alertDisposition.findMany({
+        where: { subjectKey: { in: chunk } },
+        select: {
+          subjectKey: true,
+          action: true,
+          episodeToken: true,
+          recoveredAt: true,
+          silencedUntil: true,
+          note: true,
+          updatedAt: true,
+        },
+      })
+      out.push(...rows)
+    }
+    return out
   }
 }

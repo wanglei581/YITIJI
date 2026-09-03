@@ -6,6 +6,8 @@ import { AlertTriangleIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'l
 import {
   adminOpsService,
   type AdminAlertItem,
+  type AdminAlertsResult,
+  type AlertAction,
   type AlertListView,
 } from '../../services/api/adminOps'
 import { ApiHttpError } from '../../services/api/client'
@@ -54,6 +56,8 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AdminAlertItem[]>([])
   const [derivedAt, setDerivedAt] = useState<string | null>(null)
   const [firingCount, setFiringCount] = useState(0)
+  const [listedCount, setListedCount] = useState(0)
+  const [truncation, setTruncation] = useState<AdminAlertsResult['truncation']>(null)
   const [openCount, setOpenCount] = useState(0)
   const [acknowledgedCount, setAcknowledgedCount] = useState(0)
   const [suppressedCount, setSuppressedCount] = useState(0)
@@ -61,16 +65,20 @@ export default function AlertsPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [view, setView] = useState<AlertListView>('open')
   const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [confirmCloseKey, setConfirmCloseKey] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const load = useCallback(async (nextView: AlertListView = view) => {
     setState('loading')
     setActionError(null)
+    setConfirmCloseKey(null)
     try {
       const res = await adminOpsService.listAlerts(nextView)
       setAlerts(res.data)
       setDerivedAt(res.derivedAt)
       setFiringCount(res.firingCount)
+      setListedCount(res.listedCount)
+      setTruncation(res.truncation)
       setOpenCount(res.openCount)
       setAcknowledgedCount(res.acknowledgedCount)
       setSuppressedCount(res.suppressedCount)
@@ -87,11 +95,12 @@ export default function AlertsPage() {
 
   async function dispose(
     alert: AdminAlertItem,
-    action: 'acknowledge' | 'silence' | 'close',
+    action: AlertAction,
     duration?: '1h' | '4h' | '24h',
   ) {
     setBusyKey(`${alert.subjectKey}:${action}${duration ?? ''}`)
     setActionError(null)
+    setConfirmCloseKey(null)
     try {
       await adminOpsService.disposeAlert({
         subjectKey: alert.subjectKey,
@@ -121,7 +130,7 @@ export default function AlertsPage() {
   return (
     <Page
       title="告警中心"
-      subtitle={`实时派生 · 待处理 ${openCount} / 仍在发生 ${firingCount}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${errorCount}` : ''}`}
+      subtitle={`实时派生 · 待处理 ${openCount} / 仍在发生 ${firingCount}${truncation ? `（本页只列出 ${listedCount} 条）` : ''}${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}${errorCount ? ` · 本栏严重 ${errorCount}` : ''}`}
       actions={
         <button
           type="button"
@@ -134,8 +143,17 @@ export default function AlertsPage() {
       }
     >
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        告警由实时状态派生：终端离线（心跳超 3 分钟）、打印机异常、近 24 小时打印失败。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复。已退款失败单按订单退款状态退出告警，不伪造出纸结果。
+        告警由实时状态派生：终端离线（心跳超 3 分钟）、打印机异常、近 24 小时打印失败。确认 / 静默 / 关闭只记录处理，设备仍异常时不会显示成已恢复；关闭后可以「重新打开」退回待处理。已退款失败单按订单退款状态退出告警，不伪造出纸结果。
       </div>
+
+      {truncation && (
+        <div className="mb-4 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-2.5 text-[13px] text-warning-fg">
+          当前仍在发生 <span className="font-bold tabular-nums">{firingCount}</span> 条，本页最多列出最近{' '}
+          <span className="tabular-nums">{truncation.cap}</span> 条，另有{' '}
+          <span className="font-bold tabular-nums">{truncation.omitted}</span> 条打印失败告警未在本页列出。
+          下方各栏计数只统计已列出的部分，未列出的告警同样仍在发生。
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap gap-2.5">
         {VIEW_TABS.map((tab) => (
@@ -208,21 +226,38 @@ export default function AlertsPage() {
                   </div>
                   <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                     <p className="text-xs tabular-nums text-neutral-500">{fmt(alert.occurredAt)}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {alert.handlingState === 'open' && (
-                        <ActionButton disabled={busy} onClick={() => void dispose(alert, 'acknowledge')}>确认</ActionButton>
-                      )}
-                      {alert.handlingState !== 'closed' && (
-                        <>
-                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '1h')}>静默 1 小时</ActionButton>
-                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '4h')}>静默 4 小时</ActionButton>
-                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '24h')}>静默 24 小时</ActionButton>
-                        </>
-                      )}
-                      {alert.handlingState !== 'closed' && (
-                        <ActionButton disabled={busy} onClick={() => void dispose(alert, 'close')}>关闭</ActionButton>
-                      )}
-                    </div>
+                    {confirmCloseKey === alert.subjectKey ? (
+                      // 关闭会把仍在发生的告警移出默认视图，所以要二次确认；
+                      // 即使误点，也还有下面的「重新打开」可以退回待处理。
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[12px] text-neutral-600">关闭后不再出现在待处理，问题仍在发生：</span>
+                        <ActionButton
+                          disabled={busy}
+                          tone="danger"
+                          onClick={() => void dispose(alert, 'close')}
+                        >
+                          确认关闭
+                        </ActionButton>
+                        <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(null)}>取消</ActionButton>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {alert.handlingState === 'open' && (
+                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'acknowledge')}>确认</ActionButton>
+                        )}
+                        {alert.handlingState !== 'closed' && (
+                          <>
+                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '1h')}>静默 1 小时</ActionButton>
+                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '4h')}>静默 4 小时</ActionButton>
+                            <ActionButton disabled={busy} onClick={() => void dispose(alert, 'silence', '24h')}>静默 24 小时</ActionButton>
+                            <ActionButton disabled={busy} onClick={() => setConfirmCloseKey(alert.subjectKey)}>关闭</ActionButton>
+                          </>
+                        )}
+                        {alert.handlingState !== 'open' && (
+                          <ActionButton disabled={busy} onClick={() => void dispose(alert, 'reopen')}>重新打开</ActionButton>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -238,17 +273,22 @@ function ActionButton({
   children,
   disabled,
   onClick,
+  tone = 'default',
 }: {
   children: string
   disabled: boolean
   onClick: () => void
+  tone?: 'default' | 'danger'
 }) {
+  const toneClass = tone === 'danger'
+    ? 'border-error/40 bg-error-bg text-error-fg hover:bg-error-bg/80'
+    : 'border-neutral-200 bg-surface text-neutral-700 hover:bg-neutral-50'
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-9 min-w-[48px] items-center justify-center rounded-[9px] border border-neutral-200 bg-surface px-3 text-[12px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+      className={`inline-flex h-9 min-w-[48px] items-center justify-center rounded-[9px] border px-3 text-[12px] font-bold transition-colors disabled:opacity-50 ${toneClass}`}
     >
       {children}
     </button>

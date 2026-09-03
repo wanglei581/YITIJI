@@ -11,22 +11,25 @@ import {
   auditActionFor,
   parseAlertAction,
   parseSilenceDuration,
-  buildSubjectKey,
   parseSubjectKey,
+  resolveHandlingState,
   SILENCE_DURATIONS,
   storedAction,
+  type AlertDispositionAction,
+  type AlertHandlingState,
   type SilenceDuration,
 } from './derived-alert-identity'
-import { collectDerivedAlerts } from './derived-alerts'
+import { resolveDerivedAlert } from './derived-alerts'
 
 const NOTE_MAX = 200
 
 export interface AlertDispositionResult {
   subjectKey: string
   episodeToken: string
-  action: 'acknowledged' | 'silenced' | 'closed'
+  action: AlertDispositionAction
   conditionState: 'firing'
-  handlingState: 'acknowledged' | 'silenced' | 'closed'
+  /** 由 resolveHandlingState 算出,保证与随后 GET 看到的状态一致。 */
+  handlingState: AlertHandlingState
   silencedUntil: string | null
   note: string | null
   idempotent: boolean
@@ -47,7 +50,7 @@ export class AdminAlertActionsService {
     const action = parseAlertAction(body.action)
     if (!action) {
       throw new BadRequestException({
-        error: { code: 'ALERT_ACTION_INVALID', message: 'action 必须是 acknowledge / silence / close' },
+        error: { code: 'ALERT_ACTION_INVALID', message: 'action 必须是 acknowledge / silence / close / reopen' },
       })
     }
     const parsedKey = typeof body.subjectKey === 'string' ? parseSubjectKey(body.subjectKey) : null
@@ -84,8 +87,9 @@ export class AdminAlertActionsService {
     }
 
     const now = new Date()
-    const firing = await collectDerivedAlerts(this.prisma, now)
-    const current = firing.find((alert) => alert.subjectKey === buildSubjectKey(parsedKey.type, parsedKey.subjectId))
+    // 单条正向查证,不扫列表:列表有物化上限,用列表判定会让被截断的告警
+    // 变成「查无此条」,操作员既看不到也处置不了(M1)。
+    const current = await resolveDerivedAlert(this.prisma, parsedKey.type, parsedKey.subjectId, now)
     if (!current) {
       throw new NotFoundException({
         error: { code: 'ALERT_NOT_FIRING', message: '该告警当前未在发生，不能对其写入处理态' },
@@ -104,22 +108,29 @@ export class AdminAlertActionsService {
     const existing = await this.prisma.alertDisposition.findUnique({
       where: { subjectKey: current.subjectKey },
     })
-    const sameAction = existing
-      && existing.recoveredAt === null
-      && existing.episodeToken === current.episodeToken
-      && existing.action === stored
-      && (stored !== 'silenced' || (existing.silencedUntil !== null && existing.silencedUntil.getTime() > now.getTime()))
-    if (sameAction) {
+    // 重复点同一个动作不再写库、不再多写一条审计。
+    // reopen 的幂等条件是「现在已经是待处理」——包括从来没被处置过的情况,
+    // 那种情况下不该为了一次无操作凭空造一行处置记录。
+    const alreadyApplied = action === 'reopen'
+      ? resolveHandlingState(existing, current.episodeToken, now) === 'open'
+      : Boolean(
+        existing
+        && existing.recoveredAt === null
+        && existing.episodeToken === current.episodeToken
+        && existing.action === stored
+        && (stored !== 'silenced' || (existing.silencedUntil !== null && existing.silencedUntil.getTime() > now.getTime())),
+      )
+    if (alreadyApplied) {
       return {
         subjectKey: current.subjectKey,
         episodeToken: current.episodeToken,
         action: stored,
         conditionState: 'firing',
-        handlingState: stored,
-        silencedUntil: existing.silencedUntil ? existing.silencedUntil.toISOString() : null,
-        note: existing.note,
+        handlingState: resolveHandlingState(existing, current.episodeToken, now),
+        silencedUntil: existing?.silencedUntil ? existing.silencedUntil.toISOString() : null,
+        note: existing?.note ?? null,
         idempotent: true,
-        at: existing.updatedAt.toISOString(),
+        at: (existing?.updatedAt ?? now).toISOString(),
       }
     }
 
@@ -172,7 +183,8 @@ export class AdminAlertActionsService {
       episodeToken: current.episodeToken,
       action: stored,
       conditionState: 'firing',
-      handlingState: stored,
+      // 用同一个解析函数,保证 POST 报出来的状态就是随后 GET 会看到的状态。
+      handlingState: resolveHandlingState(row, current.episodeToken, now),
       silencedUntil: row.silencedUntil ? row.silencedUntil.toISOString() : null,
       note: row.note,
       idempotent: false,

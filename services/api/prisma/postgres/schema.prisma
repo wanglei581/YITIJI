@@ -366,11 +366,14 @@ model AlertDisposition {
   // printer_issue = `${printerStatus}:${lastHealthyAt ISO}`（不能用最新心跳时间）
   // print_failed = PrintTask.id（一次性事件）
   episodeToken String
-  action       String    // acknowledged | silenced | closed
+  action       String    // acknowledged | silenced | closed | reopened
   actorId      String?
   note         String?
   silencedUntil DateTime?
-  // 派生结果里已经没有这条时写入。匹配时必须 episode 一致且本字段为空。
+  // 历史字段：旧版本在「本次派生结果里没看见」时写它，那是用缺席反推恢复，
+  // 会把仍在 firing 的告警标成已恢复。现在没有任何读路径再写它；
+  // 残留旧值按「处置已失效」处理（回到待处理），方向仍在安全一侧。
+  // 恢复后再发作由 episodeToken 变化负责，不依赖本字段。
   recoveredAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

@@ -50,10 +50,18 @@ export interface AdminAlertItem {
   note: string | null
 }
 
+export type AlertAction = 'acknowledge' | 'silence' | 'close' | 'reopen'
+
 export interface AdminAlertsResult {
   data: AdminAlertItem[]
   derivedAt: string
+  /** 当前仍在发生的告警总数(精确计数,不受列表上限影响)。 */
   firingCount: number
+  /** 本次实际列出的条数;小于 firingCount 即说明被截断。 */
+  listedCount: number
+  /** 非 null 表示列表不是全部,界面必须如实提示(CLAUDE.md §9)。 */
+  truncation: { type: 'print_failed'; omitted: number; cap: number } | null
+  /** 以下三个计数只覆盖已列出的部分。 */
   openCount: number
   acknowledgedCount: number
   suppressedCount: number
@@ -62,9 +70,9 @@ export interface AdminAlertsResult {
 export interface AlertDispositionResult {
   subjectKey: string
   episodeToken: string
-  action: 'acknowledged' | 'silenced' | 'closed'
+  action: 'acknowledged' | 'silenced' | 'closed' | 'reopened'
   conditionState: 'firing'
-  handlingState: 'acknowledged' | 'silenced' | 'closed'
+  handlingState: AlertHandlingState
   silencedUntil: string | null
   note: string | null
   idempotent: boolean
@@ -77,7 +85,7 @@ export interface AdminOpsServiceInterface {
   disposeAlert(input: {
     subjectKey: string
     episodeToken: string
-    action: 'acknowledge' | 'silence' | 'close'
+    action: AlertAction
     duration?: '1h' | '4h' | '24h'
     note?: string
   }): Promise<AlertDispositionResult>
@@ -200,6 +208,8 @@ const mockAdapter: AdminOpsServiceInterface = {
       data,
       derivedAt: now(),
       firingCount: MOCK_ALERTS.length,
+      listedCount: MOCK_ALERTS.length,
+      truncation: null,
       openCount: MOCK_ALERTS.filter((a) => a.handlingState === 'open').length,
       acknowledgedCount: MOCK_ALERTS.filter((a) => a.handlingState === 'acknowledged').length,
       suppressedCount: MOCK_ALERTS.filter((a) => a.handlingState === 'silenced' || a.handlingState === 'closed').length,
@@ -207,16 +217,24 @@ const mockAdapter: AdminOpsServiceInterface = {
   },
   async disposeAlert(input) {
     const alert = MOCK_ALERTS.find((item) => item.subjectKey === input.subjectKey)
-    const handlingState = input.action === 'acknowledge' ? 'acknowledged' : input.action === 'silence' ? 'silenced' : 'closed'
+    const handlingState: AlertHandlingState =
+      input.action === 'acknowledge' ? 'acknowledged'
+        : input.action === 'silence' ? 'silenced'
+          : input.action === 'reopen' ? 'open'
+            : 'closed'
     if (alert) {
       alert.handlingState = handlingState
-      alert.acknowledgedAt = now()
+      alert.acknowledgedAt = handlingState === 'open' ? null : now()
       alert.silencedUntil = input.action === 'silence' ? now() : null
     }
     return {
       subjectKey: input.subjectKey,
       episodeToken: input.episodeToken,
-      action: handlingState,
+      action:
+        input.action === 'acknowledge' ? 'acknowledged'
+          : input.action === 'silence' ? 'silenced'
+            : input.action === 'reopen' ? 'reopened'
+              : 'closed',
       conditionState: 'firing',
       handlingState,
       silencedUntil: input.action === 'silence' ? now() : null,

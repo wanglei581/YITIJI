@@ -11,6 +11,10 @@
  *   4. 确认/静默/关闭持久化；确认后默认 open 视图消失，all 视图仍标「问题仍在发生」。
  *   5. 已退款失败单（Order.payStatus=refunded，printOutcome 仍为空）不再报警。
  *   6. episode 不一致拒绝；处理动作写审计。
+ *   7. GET 只读：列表端点不写 AlertDisposition（缺席不等于恢复）。
+ *   8. 列表上限：firingCount 是精确总数、截断如实告知、被截断的告警仍可处置，
+ *      且不会因为「这次没列出来」把操作员的处置抹掉。
+ *   9. reopen：已关闭/已静默的告警可以被重新打开，回到待处理。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-ops
  */
@@ -26,6 +30,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminAlertActionsService } from '../src/admin-ops/admin-alert-actions.service'
 import { AdminOpsController } from '../src/admin-ops/admin-ops.controller'
 import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
+import { PRINT_FAILED_LIST_CAP } from '../src/admin-ops/derived-alerts'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { RolesGuard } from '../src/common/guards/roles.guard'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
@@ -46,13 +51,35 @@ function errorCode(err: unknown): string | undefined {
 function mockOpsPrisma(terminalRows: unknown[], printRows: unknown[] = []): PrismaService {
   return {
     terminal: { findMany: async () => terminalRows },
-    printTask: { findMany: async () => printRows },
-    terminalHeartbeat: { groupBy: async () => [] },
+    printTask: { findMany: async () => printRows, count: async () => printRows.length },
+    terminalHeartbeat: { groupBy: async () => [], findFirst: async () => null },
     alertDisposition: {
       findMany: async () => [],
-      updateMany: async () => ({ count: 0 }),
+      updateMany: async () => {
+        throw new Error('listDerivedAlerts 是只读端点，不得写 AlertDisposition')
+      },
     },
   } as unknown as PrismaService
+}
+
+/** disposition 行的可比较快照,用来断言「GET 没有写库」。 */
+function dispositionFingerprint(row: {
+  action: string
+  episodeToken: string
+  recoveredAt: Date | null
+  silencedUntil: Date | null
+  note: string | null
+  updatedAt: Date
+} | null): string {
+  if (!row) return 'ABSENT'
+  return [
+    row.action,
+    row.episodeToken,
+    row.recoveredAt?.toISOString() ?? 'null',
+    row.silencedUntil?.toISOString() ?? 'null',
+    row.note ?? 'null',
+    row.updatedAt.toISOString(),
+  ].join('|')
 }
 
 async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
@@ -93,11 +120,19 @@ async function main() {
   const taskVerified = `pt_vop_verified_${suffix}`
   const taskRefunded = `pt_vop_refunded_${suffix}`
   const ordRefunded = `ord_vop_refunded_${suffix}`
+  /** 第 7 节:被列表上限挤出去的观察目标。 */
+  const taskTruncated = `pt_vop_trunc_${suffix}`
+  /** 第 7 节:把观察目标挤出上限用的压量任务前缀。 */
+  const fillerPrefix = `pt_vop_fill_${suffix}_`
+  /** 第 8 节:从未被处置过的告警,用来验证 reopen 不凭空造记录。 */
+  const taskFresh = `pt_vop_fresh_${suffix}`
   const subjectKeys = [
     `terminal_offline:${tOffline}`,
     `printer_issue:${tPrinterIssue}`,
     `print_failed:${taskFailed}`,
     `print_failed:${taskRefunded}`,
+    `print_failed:${taskTruncated}`,
+    `print_failed:${taskFresh}`,
   ]
 
   await prisma.user.create({
@@ -170,7 +205,10 @@ async function main() {
     await prisma.alertDisposition.deleteMany({ where: { subjectKey: { in: subjectKeys } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: subjectKeys } } })
     await prisma.order.deleteMany({ where: { id: ordRefunded } })
-    await prisma.printTask.deleteMany({ where: { id: { in: [taskOk, taskFailed, taskVerified, taskRefunded] } } })
+    await prisma.printTask.deleteMany({ where: { id: { startsWith: fillerPrefix } } })
+    await prisma.printTask.deleteMany({
+      where: { id: { in: [taskOk, taskFailed, taskVerified, taskRefunded, taskTruncated, taskFresh] } },
+    })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tOffline, tOnline, tPrinterIssue] } } })
     await prisma.terminal.deleteMany({ where: { id: { in: [tOffline, tOnline, tPrinterIssue] } } })
     await prisma.user.deleteMany({ where: { id: adminId } })
@@ -297,14 +335,23 @@ async function main() {
       const silenced = (await svc.listDerivedAlerts('suppressed')).data.find((a) => a.id === issue.id)
       if (!silenced || silenced.handlingState !== 'silenced' || !silenced.silencedUntil) fail('5. 静默态未持久化')
 
+      const beforeRecoveryRow = await prisma.alertDisposition.findUnique({ where: { subjectKey: issue.subjectKey } })
       const recoveredAt = new Date()
       await prisma.terminalHeartbeat.create({
         data: { terminalId: tPrinterIssue, printerStatus: 'ok', createdAt: recoveredAt },
       })
       const recovered = await svc.listDerivedAlerts('all')
       if (recovered.data.some((a) => a.id === issue.id)) fail('5. 打印机恢复后不应再派生 printer_issue')
+      // 旧行为是「派生列表里没有这条 → 写 recoveredAt」。那是用缺席反推恢复：
+      // 缺席也可能只是被列表上限截断，会把仍在 firing 的告警标成已恢复，
+      // 并在它重新进入列表时把操作员的处置无声撤销。现在 GET 一律不写库，
+      // 「恢复后再发作」由 episodeToken 变化负责（下面几行断言）。
       const stale = await prisma.alertDisposition.findUnique({ where: { subjectKey: issue.subjectKey } })
-      if (!stale?.recoveredAt) fail('5. 恢复后应把 disposition.recoveredAt 写上')
+      if (!stale) fail('5. GET 不得删除处置记录')
+      if (stale.recoveredAt !== null) fail('5. GET 不得因「本次列表没看见」就写 recoveredAt')
+      if (dispositionFingerprint(stale) !== dispositionFingerprint(beforeRecoveryRow)) {
+        fail('5. GET 是只读端点，不得改动 AlertDisposition 任何字段')
+      }
       await prisma.terminalHeartbeat.create({
         data: { terminalId: tPrinterIssue, printerStatus: 'paper_empty', createdAt: new Date(recoveredAt.getTime() + 1000) },
       })
@@ -312,7 +359,25 @@ async function main() {
       if (!recurred) fail('5. 恢复后再缺纸应作为新一轮待处理告警')
       if (recurred.handlingState !== 'open') fail('5. 新一轮故障不得继承旧静默')
       if (recurred.episodeToken === issue.episodeToken) fail('5. 新一轮 episodeToken 应变化')
-      pass('5. 关闭/静默持久化、恢复后消失、再发作为新一轮待处理')
+      pass('5. 关闭/静默持久化、恢复后消失(GET 不写库)、再发作为新一轮待处理')
+    }
+
+    // ── 5b. GET 只读：连查多次不得改动任何 disposition ────────────────────
+    {
+      const keys = [`terminal_offline:${tOffline}`, `print_failed:${taskFailed}`, `printer_issue:${tPrinterIssue}`]
+      const snapshot = async () => {
+        const rows = await prisma.alertDisposition.findMany({ where: { subjectKey: { in: keys } } })
+        return keys
+          .map((k) => `${k}=${dispositionFingerprint(rows.find((r) => r.subjectKey === k) ?? null)}`)
+          .join('\n')
+      }
+      const before = await snapshot()
+      for (const v of ['open', 'acknowledged', 'suppressed', 'all'] as const) {
+        await svc.listDerivedAlerts(v)
+      }
+      const after = await snapshot()
+      if (before !== after) fail(`5b. GET /admin/alerts 写了库：\n before=${before}\n after=${after}`)
+      pass('5b. 连续 4 次列表查询不改动任何 AlertDisposition(读端点无副作用)')
     }
 
     // ── 6. HTTP：造告警 → 确认 → 再查列表 ────────────────────────────────
@@ -391,6 +456,154 @@ async function main() {
         await app.close()
         await httpPrisma.onModuleDestroy?.()
       }
+    }
+
+    // ── 7. 列表上限：精确计数 + 如实截断 + 被截断的告警仍可处置 ──────────
+    //
+    // 复现的是 M1：take:50 的截断 × 「不在列表即判恢复」。
+    // 第 51 条以后的失败任务永远进不了列表，操作员既看不到也处置不了；
+    // 更糟的是它早先被关闭过的话，下一次 GET 会把它标成已恢复，
+    // 等它重新落回列表，处置就被无声撤销了。
+    {
+      const victimKey = `print_failed:${taskTruncated}`
+      await prisma.printTask.create({
+        data: {
+          id: taskTruncated, terminalId: tOnline, fileUrl: 'https://internal/secret-url-5', fileMd5: 'trunc',
+          paramsJson: '{}', status: 'failed', errorCode: 'PRINTER_OFFLINE',
+          updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        },
+      })
+      const seen = (await svc.listDerivedAlerts('open')).data.find((a) => a.id === victimKey)
+      if (!seen) fail('7. 前置：目标失败告警应先可见')
+      await actions.dispose({ subjectKey: victimKey, episodeToken: seen.episodeToken, action: 'close' }, adminId)
+
+      // 压入 cap+3 条更新的失败任务，把观察目标挤出物化上限
+      const fillerIds = Array.from({ length: PRINT_FAILED_LIST_CAP + 3 }, (_, i) => `${fillerPrefix}${i}`)
+      const baseMs = Date.now()
+      await prisma.printTask.createMany({
+        data: fillerIds.map((id, i) => ({
+          id, terminalId: tOnline, fileUrl: 'https://internal/secret-url-6', fileMd5: 'fill',
+          paramsJson: '{}', status: 'failed', errorCode: 'PRINTER_OFFLINE',
+          updatedAt: new Date(baseMs - i * 1000),
+        })),
+      })
+
+      const listed = await svc.listDerivedAlerts('all')
+      if (listed.data.some((a) => a.id === victimKey)) fail('7. 前置：目标应已被列表上限挤出')
+      if (!listed.truncation) fail('7. 被截断时必须如实告知界面(truncation 不得为 null)')
+      if (listed.truncation.cap !== PRINT_FAILED_LIST_CAP) fail('7. truncation.cap 应回真实上限')
+      if (listed.truncation.type !== 'print_failed') fail('7. truncation 必须说明被截断的是哪一类')
+      if (listed.listedCount !== listed.data.length) fail('7. listedCount 应等于本次实际列出的条数')
+      if (listed.firingCount <= listed.listedCount) {
+        fail(`7. 截断时 firingCount 必须大于已列出条数，不得把上限当成全部(${listed.firingCount}/${listed.listedCount})`)
+      }
+      if (listed.firingCount - listed.listedCount !== listed.truncation.omitted) {
+        fail('7. omitted 必须等于 firingCount - listedCount')
+      }
+      if (listed.firingCount < PRINT_FAILED_LIST_CAP + 3) fail('7. firingCount 应是精确总数，不受列表上限影响')
+
+      // 真值：这条任务此刻确实仍然满足告警条件
+      const truth = await prisma.printTask.findUnique({
+        where: { id: taskTruncated },
+        select: { status: true, printOutcome: true },
+      })
+      if (truth?.status !== 'failed' || truth.printOutcome !== null) fail('7. 前置：目标任务应仍是失败未核查')
+
+      // 缺席不得被当成恢复
+      const row = await prisma.alertDisposition.findUnique({ where: { subjectKey: victimKey } })
+      if (!row) fail('7. 被截断的告警不得丢失处置记录')
+      if (row.recoveredAt !== null) fail('7. 仍在 firing 的告警被截断后不得标成已恢复')
+      if (row.action !== 'closed') fail('7. 被截断期间处置动作不得被改写')
+
+      // 被截断的告警仍可处置：处置走单条正向查证，不扫列表
+      const onTruncated = await actions.dispose(
+        { subjectKey: victimKey, episodeToken: taskTruncated, action: 'acknowledge' },
+        adminId,
+      )
+      if (onTruncated.handlingState !== 'acknowledged') fail('7. 被列表上限截断的告警仍应可处置')
+      if (onTruncated.conditionState !== 'firing') fail('7. 被截断的告警仍在发生，不得报成已恢复')
+
+      // 回到列表后处置态不得被撤销
+      await prisma.printTask.deleteMany({ where: { id: { in: fillerIds } } })
+      const backList = await svc.listDerivedAlerts('all')
+      const back = backList.data.find((a) => a.id === victimKey)
+      if (!back) fail('7. 压量任务删除后目标应重新出现在列表')
+      if (back.handlingState !== 'acknowledged') fail(`7. 重新进入列表后处置被撤销：${back.handlingState}`)
+      if (back.conditionState !== 'firing') fail('7. 目标仍在发生')
+      if (backList.listedCount < PRINT_FAILED_LIST_CAP && backList.truncation !== null) {
+        fail('7. 未触及上限时 truncation 应为 null')
+      }
+      if (backList.listedCount < PRINT_FAILED_LIST_CAP && backList.firingCount !== backList.listedCount) {
+        fail('7. 未截断时 firingCount 应等于 listedCount')
+      }
+      pass('7. 列表上限如实告知(firingCount 精确/omitted 一致)，被截断的告警不被判恢复、仍可处置、回列表后处置不丢')
+    }
+
+    // ── 8. reopen：关闭可撤销，不再是同一 episode 内的单向门 ──────────────
+    {
+      const offlineKey = `terminal_offline:${tOffline}`
+      const target = (await svc.listDerivedAlerts('all')).data.find((a) => a.id === offlineKey)
+      if (!target) fail('8. 前置：离线告警应仍在发生')
+      await actions.dispose({ subjectKey: offlineKey, episodeToken: target.episodeToken, action: 'close' }, adminId)
+      if ((await svc.listDerivedAlerts('open')).data.some((a) => a.id === offlineKey)) fail('8. 关闭后不应在待处理')
+
+      const reopened = await actions.dispose(
+        { subjectKey: offlineKey, episodeToken: target.episodeToken, action: 'reopen' },
+        adminId,
+      )
+      if (reopened.handlingState !== 'open') fail(`8. reopen 后应回到待处理，得到 ${reopened.handlingState}`)
+      if (reopened.action !== 'reopened') fail('8. reopen 应落 action=reopened')
+      if (reopened.idempotent) fail('8. 首次 reopen 不应报幂等')
+      if (reopened.conditionState !== 'firing') fail('8. reopen 不改变故障仍在发生这一事实')
+
+      const backOpen = (await svc.listDerivedAlerts('open')).data.find((a) => a.id === offlineKey)
+      if (!backOpen) fail('8. reopen 后应重新出现在待处理视图')
+      if (backOpen.handlingState !== 'open') fail('8. reopen 后列表处置态应为 open')
+      // POST 报出来的状态必须等于随后 GET 看到的状态
+      if (backOpen.handlingState !== reopened.handlingState) fail('8. POST 与 GET 的 handlingState 不一致')
+      const storedRow = await prisma.alertDisposition.findUnique({ where: { subjectKey: offlineKey } })
+      if (storedRow?.action !== 'reopened') fail('8. reopen 应持久化，不只是内存态')
+      if (storedRow.recoveredAt !== null) fail('8. reopen 不得把仍在发生的告警写成已恢复')
+
+      const reopenAudits = await prisma.auditLog.findMany({ where: { action: 'alert.reopen', targetId: offlineKey } })
+      if (reopenAudits.length !== 1) fail(`8. reopen 审计应写 1 条，实际 ${reopenAudits.length}`)
+
+      const again = await actions.dispose(
+        { subjectKey: offlineKey, episodeToken: target.episodeToken, action: 'reopen' },
+        adminId,
+      )
+      if (!again.idempotent) fail('8. 重复 reopen 应幂等')
+      const auditsAfter = await prisma.auditLog.findMany({ where: { action: 'alert.reopen', targetId: offlineKey } })
+      if (auditsAfter.length !== 1) fail('8. 幂等 reopen 不得重复写审计')
+
+      // 从未被处置过的告警上 reopen：是无操作，不该凭空造一行处置记录
+      await prisma.printTask.create({
+        data: {
+          id: taskFresh, terminalId: tOnline, fileUrl: 'https://internal/secret-url-7', fileMd5: 'fresh',
+          paramsJson: '{}', status: 'failed', errorCode: 'PRINTER_OFFLINE',
+        },
+      })
+      const freshKey = `print_failed:${taskFresh}`
+      const freshReopen = await actions.dispose(
+        { subjectKey: freshKey, episodeToken: taskFresh, action: 'reopen' },
+        adminId,
+      )
+      if (!freshReopen.idempotent) fail('8. 对本来就待处理的告警 reopen 应是幂等无操作')
+      if (freshReopen.handlingState !== 'open') fail('8. 未处置过的告警 reopen 后仍应是 open')
+      if (await prisma.alertDisposition.findUnique({ where: { subjectKey: freshKey } })) {
+        fail('8. 无操作的 reopen 不得凭空写处置记录')
+      }
+      if ((await prisma.auditLog.findMany({ where: { action: 'alert.reopen', targetId: freshKey } })).length !== 0) {
+        fail('8. 无操作的 reopen 不得写审计')
+      }
+
+      try {
+        await actions.dispose({ subjectKey: offlineKey, episodeToken: target.episodeToken, action: 'resolve' }, adminId)
+        fail('8. 未知动作应被拒绝')
+      } catch (err) {
+        if (errorCode(err) !== 'ALERT_ACTION_INVALID') fail(`8. 期望 ALERT_ACTION_INVALID，得到 ${errorCode(err)}`)
+      }
+      pass('8. reopen 可撤销关闭并回到待处理、持久化 + 审计 1 条、重复与无操作均幂等、未知动作仍拒绝')
     }
 
     console.log('\n=== ALL PASS ===')

@@ -17,9 +17,9 @@
 export const ALERT_TYPES = ['terminal_offline', 'printer_issue', 'print_failed'] as const
 export type DerivedAlertType = (typeof ALERT_TYPES)[number]
 
-export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close'] as const
+export const ALERT_ACTIONS = ['acknowledge', 'silence', 'close', 'reopen'] as const
 export type AlertActionInput = (typeof ALERT_ACTIONS)[number]
-export type AlertDispositionAction = 'acknowledged' | 'silenced' | 'closed'
+export type AlertDispositionAction = 'acknowledged' | 'silenced' | 'closed' | 'reopened'
 
 export const ALERT_LIST_VIEWS = ['open', 'acknowledged', 'suppressed', 'all'] as const
 export type AlertListView = (typeof ALERT_LIST_VIEWS)[number]
@@ -69,12 +69,16 @@ export function parseSilenceDuration(raw: unknown): SilenceDuration | null {
 export function storedAction(action: AlertActionInput): AlertDispositionAction {
   if (action === 'acknowledge') return 'acknowledged'
   if (action === 'silence') return 'silenced'
+  if (action === 'reopen') return 'reopened'
   return 'closed'
 }
 
-export function auditActionFor(action: AlertActionInput): 'alert.acknowledge' | 'alert.silence' | 'alert.close' {
+export function auditActionFor(
+  action: AlertActionInput,
+): 'alert.acknowledge' | 'alert.silence' | 'alert.close' | 'alert.reopen' {
   if (action === 'acknowledge') return 'alert.acknowledge'
   if (action === 'silence') return 'alert.silence'
+  if (action === 'reopen') return 'alert.reopen'
   return 'alert.close'
 }
 
@@ -96,6 +100,14 @@ export function printFailedEpisodeToken(taskId: string): string {
   return taskId
 }
 
+/**
+ * 处置态解析。默认值是 open——凡是拿不准的一律回到待处理,宁可让操作员多看一眼,
+ * 不能让一条仍在发生的告警悄悄从默认视图消失。
+ *
+ * recoveredAt 只作为历史兼容读:旧版本会在「本次查询没看见」时给它写值,
+ * 那是错误推断。现在没有任何读路径再写它;残留的旧值被当成「处置已失效」处理,
+ * 也就是回到 open,方向仍然是安全的那一侧。
+ */
 export function resolveHandlingState(
   row: {
     action: string
@@ -113,6 +125,8 @@ export function resolveHandlingState(
   }
   if (row.action === 'acknowledged') return 'acknowledged'
   if (row.action === 'closed') return 'closed'
+  // reopened:操作员显式撤回了处置,本轮故障重新回到待处理。
+  if (row.action === 'reopened') return 'open'
   return 'open'
 }
 

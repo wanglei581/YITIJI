@@ -38,9 +38,9 @@
 
 | 方法 | 路径 | handler | 角色 | Service | Prisma 模型 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/admin/alerts` | AdminOpsController.listAlerts | admin | AdminOpsService | AlertDisposition<br/>PrintTask |
-| POST | `/api/v1/admin/alerts/disposition` | AdminOpsController.disposeAlert | admin | AdminAlertActionsService | — |
-| GET | `/api/v1/admin/print-tasks` | AdminOpsController.listPrintTasks | admin | AdminOpsService | AlertDisposition<br/>PrintTask |
+| GET | `/api/v1/admin/alerts` | AdminOpsController.listAlerts | admin | AdminOpsService | AlertDisposition<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
+| POST | `/api/v1/admin/alerts/disposition` | AdminOpsController.disposeAlert | admin | AdminAlertActionsService | AlertDisposition<br/>AuditLog<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat<br/>User |
+| GET | `/api/v1/admin/print-tasks` | AdminOpsController.listPrintTasks | admin | AdminOpsService | AlertDisposition<br/>PrintTask<br/>Terminal<br/>TerminalHeartbeat |
 
 ## `services/api/src/admin-orders-readonly/admin-orders-readonly.controller.ts`
 

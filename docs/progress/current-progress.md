@@ -2,7 +2,10 @@
 
 > **读法（2026-08-22）**：当前阶段与阻塞项只看本文件**最上面几条**，以及 [`next-tasks.md`](next-tasks.md) 的「交付阻塞清单」。其下按日流水是历史记录，不是下一刀任务书。不要把 8 月中旬以前的「切回 75 屏」当成今天的视觉目标。功能是否上线以 [`feature-scope.md` §1.2](../product/feature-scope.md) 为准，不要把本地候选写成生产已可用。**四端都要看**：小程序、一体机、管理员后台、合作机构后台，漏掉任一端都算口径不完整。
 
+2026-09-03 **Admin 告警三处缺陷已修（同分支 `fix/grok-admin-alert-20260903`，未合入、未部署）**。独立审查在上一条的实现上查出三条，已修并补门禁：（1）`print_failed` 取 `take:50` 截断 × 「不在派生列表即写 `recoveredAt`」，会把仍在 firing 的告警标成已恢复，并在它重新进入列表时把操作员的关闭无声撤销——已删除这条反向推断（恢复只由 `episodeToken` 变化判定，是正向数据），列表上限提到 500 且 `firingCount` 改走同 where 的 `count()` 精确计数，截断通过 `truncation{omitted,cap}` 在界面如实提示（§9）；处置改走单条正向查证 `resolveDerivedAlert()`，被截断的告警照样可确认/静默/关闭。（2）`GET /admin/alerts` 每次轮询都 `updateMany` 写库，已改为纯只读，`verify-admin-ops` 里把「GET 后 recoveredAt 被写上」的旧断言改成断言 GET 不改动任何 disposition 字段。（3）「关闭」在同一 episode 内不可逆且无确认，已加 `reopen` 动作（服务端 + 界面 + `alert.reopen` 审计）与关闭前二次确认。门禁 `verify:admin-ops` 由 7 段扩到 10 段（`fail()` 断言 48→91），故障注入复核：退回旧实现可复现「仍在 firing 却被标 recovered / firingCount 说谎 / 被截断的告警无法处置 / 关闭被静默撤销」四条，还原后全部消失。真实后端 + 503 条压量任务实测通过；数据库无 schema 变更（只改注释）。
+
 2026-09-03 **CI Verify suites 改为跑完再汇总（分支 `fix/ci-hardening-2026-09-03`，未合入、未部署）**。`.github/workflows/ci.yml` 的 `Verify suites`（269 条）与 `Core verify suites on PG`（97 条）原先靠 bash `set -e` 首败即停，后面的门禁根本看不到。本刀只改这两个 step 内部：新建 `scripts/lib/run-serial-commands.mjs`（必须放 `scripts/lib/`，否则会被 `verify:ci-gate-coverage` 当成未接线门禁），从 stdin 读命令清单逐条 `spawnSync`，收集失败后尾部汇总、非零退出；ci.yml 用 heredoc 包住原命令，业务命令（含 `VERIFICATION_DATABASE_TARGET=isolated` 前缀、注释、空行）与 `HEAD` 字节级一致。仍串行，不用 `continue-on-error`、不用并行。跨 step 依赖链与 `kiosk-browser-smoke` 未动。本地已跑 `verify:repository-integrity`（6 个 workflow YAML 语法通过）与 `verify:ci-gate-coverage`（16 条确定性门禁仍逐字可见，369/375 在闭包内）。先破后立：中段插入 `exit 42` 后后续命令仍执行且汇总列出该失败；移除后全绿。未部署，未改 `apps/` / `services/`，未跑完整 269 条真实 verify。
+
 
 2026-09-03 **Admin 告警可确认/静默/关闭（分支 `fix/grok-admin-alert-20260903`，未合入、未部署）**。告警仍是实时派生，没有独立 Alert 事件表。新增 additive `AlertDisposition`：确认挂在稳定键 `${type}:${Terminal.id|PrintTask.id}`，用 `episodeToken` 区分恢复后再发；确认只压制提醒，界面区分「已确认但仍在发生」和「已恢复」。退款完成写的是 `Order.payStatus=refunded`，不写 `printOutcome`，失败告警按订单退款态排除。管理动作写 `alert.acknowledge|silence|close` 审计。未做推送/工单。
 

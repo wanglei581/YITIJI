@@ -559,7 +559,9 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
-          "PrintTask"
+          "PrintTask",
+          "Terminal",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/alerts",
         "roles": [
@@ -576,12 +578,21 @@
         "controller": "services/api/src/admin-ops/admin-ops.controller.ts",
         "handler": "AdminOpsController.disposeAlert",
         "method": "POST",
-        "models": [],
+        "models": [
+          "AlertDisposition",
+          "AuditLog",
+          "PrintTask",
+          "Terminal",
+          "TerminalHeartbeat",
+          "User"
+        ],
         "path": "/api/v1/admin/alerts/disposition",
         "roles": [
           "admin"
         ],
-        "serviceFiles": [],
+        "serviceFiles": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts"
+        ],
         "services": [
           "AdminAlertActionsService"
         ]
@@ -3118,7 +3129,9 @@
         "method": "GET",
         "models": [
           "AlertDisposition",
-          "PrintTask"
+          "PrintTask",
+          "Terminal",
+          "TerminalHeartbeat"
         ],
         "path": "/api/v1/admin/print-tasks",
         "roles": [
@@ -13445,6 +13458,7 @@
         "name": "AlertDisposition",
         "relations": [],
         "usedBy": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/admin-ops/admin-ops.service.ts"
         ]
       },
@@ -14240,6 +14254,7 @@
         ],
         "usedBy": [
           "services/api/src/admin-ops/admin-ops.service.ts",
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/admin-users/admin-users.service.ts",
           "services/api/src/contract-review/contract-review-report.service.ts",
@@ -14379,6 +14394,7 @@
           "TerminalScanDeletionAudit"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/admin-orders-readonly/admin-orders-readonly.service.ts",
           "services/api/src/admin-print-scan/admin-print-scan.service.ts",
           "services/api/src/content/content.service.ts",
@@ -14439,6 +14455,7 @@
           "Terminal"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/derived-alerts.ts",
           "services/api/src/terminals/terminals-agent.service.ts"
         ]
       },
@@ -14541,6 +14558,7 @@
           "ReviewDecision"
         ],
         "usedBy": [
+          "services/api/src/admin-ops/admin-alert-actions.service.ts",
           "services/api/src/auth/admin-initial-phone-bind.service.ts",
           "services/api/src/auth/admin-phone-transfer.service.ts",
           "services/api/src/auth/auth.service.ts",
