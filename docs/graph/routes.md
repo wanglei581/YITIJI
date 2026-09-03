@@ -306,7 +306,7 @@ flowchart LR
   app --> member_notifications["/member-notifications<br/>1 页 · 2 端点"]
   app --> member_privacy["/member-privacy<br/>1 页 · 0 端点"]
   app --> offline_agencies["/offline-agencies<br/>1 页 · 0 端点"]
-  app --> orders["/orders<br/>1 页 · 3 端点"]
+  app --> orders["/orders<br/>1 页 · 4 端点"]
   app --> partners["/partners<br/>1 页 · 20 端点"]
   app --> peripherals["/peripherals<br/>1 页 · 0 端点"]
   app --> permissions["/permissions<br/>1 页 · 0 端点"]
@@ -347,7 +347,7 @@ flowchart LR
 | `/member-notifications` | MemberNotificationsPage | `apps/admin/src/routes/member-notifications/index.tsx` | 2 | — |
 | `/member-privacy` | MemberPrivacyPage | `apps/admin/src/routes/member-privacy/index.tsx` | 0 | — |
 | `/offline-agencies` | OfflineAgenciesPage | `apps/admin/src/routes/offline-agencies/index.tsx` | 0 | — |
-| `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 3 | — |
+| `/orders` | OrdersPage | `apps/admin/src/routes/orders/index.tsx` | 4 | — |
 | `/partners` | PartnersPage | `apps/admin/src/routes/partners/index.tsx` | 20 | — |
 | `/peripherals` | Navigate | — _(重定向)_ | 0 | — |
 | `/permissions` | PermissionsPage | `apps/admin/src/routes/permissions/index.tsx` | 0 | — |
@@ -399,7 +399,7 @@ flowchart LR
 
 **`/member-notifications`** → `DELETE /admin/notifications/broadcasts/:param`、`POST /admin/notifications/broadcasts`
 
-**`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/refund`
+**`/orders`** → `GET /admin/orders`、`GET /admin/orders/:param`、`POST /admin/orders/:param/mark-paid`、`POST /admin/orders/:param/refund`
 
 **`/partners`** → `DELETE /admin/orgs/:param/accounts/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-challenges/:param`、`DELETE /admin/orgs/:param/accounts/:param/action-tickets/current`、`DELETE /admin/orgs/:param/accounts/:param/phone-rebind/current`、`GET /admin/orgs`、`GET /admin/orgs/:param`、`GET /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param`、`PATCH /admin/orgs/:param/accounts/:param/password`、`PATCH /admin/orgs/:param/accounts/:param/status`、`PATCH /admin/orgs/:param/content-trust`、`PATCH /admin/orgs/:param/status`、`POST /admin/orgs`、`POST /admin/orgs/:param/accounts`、`POST /admin/orgs/:param/accounts/:param/action-challenges`、`POST /admin/orgs/:param/accounts/:param/action-challenges/:param/verify`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/resend-new`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/start`、`POST /admin/orgs/:param/accounts/:param/phone-rebind/verify`、`PUT /admin/orgs/:param/accounts/:param/email`
 

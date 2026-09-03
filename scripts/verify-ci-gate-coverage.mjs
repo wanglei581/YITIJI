@@ -468,7 +468,16 @@ const VALID_UNWIRED_CATEGORIES = new Set([
 //   clear-import-rawdata.ts、release-provenance-fixture.ts），其余是写完没接线的真门禁。
 //   逐条接线或登记是独立任务（接上去很可能直接红），不在本刀范围。
 //   从这个新基线起，「只允许调低」照旧生效。
-const MAX_UNWIRED = 13
+// 13 → 10（2026-09-03）：terminal-agent 三条从未跑过的门禁实跑全绿后接线，
+//   按「还几条降几格」降三格。断言对象都在，注入桩/临时 SQLite/loopback HTTP，
+//   不依赖 Windows 真机；已起 verify:* 脚本名并改 ci.yml 为 pnpm run。
+// 10 → 1（2026-09-03，triage 收口）：api 侧两条（wave2 账号重绑 23 断言、wave3 打印善后
+//   7 断言）实跑全绿后接线；verify-change-password.ts 是**误判出账** —— 它早经
+//   run-verify-change-password.mjs launcher 在 CI 一直跑着，图谱看不见是 gates.mjs 的
+//   字面量正则不认 .ts（本批已修），修好后回归 helper 分类。至此 newly-visible 六条
+//   全部还清。剩下的 1 = verify-partner-account-delete-ui.mjs（断言互相矛盾的存量，
+//   登记为 broken-pending-deletion）。
+const MAX_UNWIRED = 1
 
 const unwiredRegistry = exemptionsFile.unwiredScripts || []
 /** @type {Map<string, object>} */
