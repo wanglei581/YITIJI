@@ -391,7 +391,10 @@ export function gateHelperModules(fileSet) {
     }
 
     // b) + c) 字符串里提到的同族脚本文件名（spawn 路径 / 源码比对素材）
-    for (const [, literal] of text.matchAll(/['"`]([\w./-]*[\w-]+\.(?:mjs|cjs|js))['"`]/g)) {
+    // .ts 也要认：launcher 用字符串 spawn 同族 .ts 门禁（如 run-verify-change-password.mjs
+    // 第 38 行 spawn 'scripts/verify-change-password.ts'）。这个正则原来只认 mjs/cjs/js，
+    // 于是该 .ts 被误判成「写完没接线」并被登记 —— 实际它一直在 CI 里跑。
+    for (const [, literal] of text.matchAll(/['"`]([\w./-]*[\w-]+\.(?:mjs|cjs|js|ts))['"`]/g)) {
       const base = path.posix.basename(literal)
       for (const owner of basenameOwners.get(base) ?? []) {
         if (owner !== gate) helpers.add(owner)
