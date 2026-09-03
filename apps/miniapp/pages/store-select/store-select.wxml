@@ -80,7 +80,13 @@
             >
               <text class="ficon i-phone"></text>
             </view>
-            <view 
+            <!-- 坐标未建模：Terminal 没有 lat/lng 字段，getPublicTerminals 也不下发，
+                 所以这个按钮以前 100% 走 viewInMap 的「暂未提供地图坐标」toast——
+                 一个必然失败的可点区域。藏掉，不是删能力：坐标将来建模并下发后
+                 它自动回来。JS :145 的守卫保留作双保险。
+                 注意别顺手在 store-select.js 的 map 里补 lat/lng 透传——后端不发，
+                 那是死代码；补坐标是 backlog 里的独立任务。 -->
+            <view wx:if="{{item.lat && item.lng}}"
               class="action-btn icon-action tap" 
               hover-class="tap-press" 
               catchtap="viewInMap" 
