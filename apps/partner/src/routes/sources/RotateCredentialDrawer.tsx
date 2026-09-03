@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Drawer } from '@ai-job-print/ui'
 import { AlertTriangleIcon, CopyIcon } from 'lucide-react'
+import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import type { PartnerDataSource, PartnerDataSourceCredentialRotationResult } from '../../services/api'
 import { rotateDataSourceCredential } from '../../services/api'
 
@@ -57,7 +58,11 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
       setError('API 数据源必须填写新的凭证：上游 token 只能由贵机构从来源平台取得，平台无法代为签发')
       return
     }
-    if (credential.trim() && credential.trim().length < 8) {
+    if (isWebhook && credential.trim() && credential.trim().length < WEBHOOK_SECRET_MIN_LENGTH) {
+      setError(`自定义 Webhook 密钥至少 ${WEBHOOK_SECRET_MIN_LENGTH} 位；更短的密钥可被离线撞库，推荐留空由系统生成`)
+      return
+    }
+    if (isApi && credential.trim() && credential.trim().length < 8) {
       setError('自定义密钥至少 8 位')
       return
     }
@@ -66,7 +71,9 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
     try {
       const rotated = await rotateDataSourceCredential(
         source.id,
-        credential.trim() ? { credential: credential.trim() } : {},
+        credential.trim()
+          ? { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION, credential: credential.trim() }
+          : { confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION },
       )
       setResult(rotated)
       setPhase('done')
@@ -79,7 +86,19 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
           ? 'API 数据源必须提供新的凭证'
           : code === 'DATA_SOURCE_HAS_NO_CREDENTIAL'
             ? '该接入方式不使用凭证，无需轮换'
-            : '轮换失败，请检查登录状态或稍后重试',
+            : code === 'DATA_SOURCE_ARCHIVED'
+              ? '数据源已归档，无法轮换。请先取消归档'
+              : code === 'CREDENTIAL_ROTATION_COOLDOWN'
+                ? (err as Error).message || '该数据源刚刚完成轮换，请稍后再试'
+                : code === 'CREDENTIAL_ROTATION_RATE_LIMITED'
+                  ? (err as Error).message || '轮换次数过多。紧急停止接收请归档该数据源'
+                  : code === 'CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED' || code === 'VALIDATION_FAILED'
+                    ? '轮换未确认，已取消'
+                    : code === 'WEBHOOK_SECRET_TOO_SHORT' || code === 'WEBHOOK_SECRET_LOW_ENTROPY'
+                      ? (err as Error).message || '自定义密钥强度不足'
+                      : code === 'CREDENTIAL_ROTATION_CONFLICT'
+                        ? '该数据源刚刚已被轮换，请刷新后再试'
+                        : '轮换失败，请检查登录状态或稍后重试',
       )
     } finally {
       setSubmitting(false)
@@ -208,7 +227,7 @@ export function RotateCredentialDrawer({ source, onClose, onRotated }: RotateCre
               className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-500 focus:outline-none"
             />
             <p className="text-xs text-neutral-400">
-              仅当对方系统的密钥不可改时才需要自填；否则留空，由平台生成高强度随机密钥。
+              仅当对方系统的密钥不可改时才需要自填（至少 {WEBHOOK_SECRET_MIN_LENGTH} 位且不能是简单重复模式）；否则留空，由平台生成高强度随机密钥。
             </p>
           </div>
         )}

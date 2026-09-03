@@ -1,4 +1,5 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { Equals, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { ROTATE_CREDENTIAL_CONFIRMATION } from '../data-source-credential-policy'
 
 export const SOURCE_KINDS = [
   'job_platform',
@@ -38,6 +39,10 @@ export class CreateDataSourceDto {
   /**
    * API 凭证或 Webhook 共享密钥。只允许进入服务端，写库前必须加密；
    * 任何响应都不得回显该字段。
+   *
+   * DTO 下限 8 是 API token 的地板。Webhook 自填密钥另有 32 位 + 熵检查，
+   * 在 service 写路径执行（见 assertWebhookSecretStrength），不在这里一刀切——
+   * 上游 API token 可能短于 32。
    */
   @IsOptional() @IsString() @MinLength(8) @MaxLength(5000)
   credential?: string
@@ -53,8 +58,15 @@ export class CreateDataSourceDto {
  *     平台不可能代为签发；这里只负责加密保存。
  *
  * 与 CreateDataSourceDto.credential 一样：只进不出，任何响应都不回显本字段原值。
+ *
+ * `confirmPhrase` 必填且必须等于 {@link ROTATE_CREDENTIAL_CONFIRMATION}。
+ * 空 body 在 ValidationPipe 就会 400，不能再靠一次 POST 立刻作废线上密钥。
  */
 export class RotateDataSourceCredentialDto {
   @IsOptional() @IsString() @MinLength(8) @MaxLength(5000)
   credential?: string
+
+  @IsString()
+  @Equals(ROTATE_CREDENTIAL_CONFIRMATION)
+  confirmPhrase!: typeof ROTATE_CREDENTIAL_CONFIRMATION
 }

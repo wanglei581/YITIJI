@@ -59,7 +59,7 @@ export const getDataSources    = ()           => adapter.getDataSources()
 export const getDataSourceCapabilities = () => adapter.getDataSourceCapabilities()
 export const toggleDataSource  = (id: string) => adapter.toggleDataSource(id)
 export const createDataSource  = (payload: CreateDataSourcePayload) => adapter.createDataSource(payload)
-export const rotateDataSourceCredential = (id: string, payload: RotateDataSourceCredentialPayload = {}) =>
+export const rotateDataSourceCredential = (id: string, payload: RotateDataSourceCredentialPayload) =>
   adapter.rotateDataSourceCredential(id, payload)
 export const archiveDataSource   = (id: string) => adapter.archiveDataSource(id)
 export const unarchiveDataSource = (id: string) => adapter.unarchiveDataSource(id)

@@ -301,6 +301,27 @@ async function main(): Promise<void> {
     assert.equal(partnerToggle.status, 403)
     assert.equal(errorCode(partnerToggle.json), 'DATA_SOURCE_ADMIN_MANAGED')
 
+    const emptyRotate = await request('POST', `/partner/data-sources/${webhookSourceId}/rotate-credential`, hrToken, {})
+    assert.equal(emptyRotate.status, 400)
+    assert.equal(errorCode(emptyRotate.json), 'VALIDATION_FAILED')
+    const shortWebhook = await request('POST', '/partner/data-sources', hrToken, {
+      name: 'HTTP Short Webhook', accessMode: 'webhook', sourceKind: 'hr_company', credential: '12345678',
+    })
+    assert.equal(shortWebhook.status, 400)
+    assert.equal(errorCode(shortWebhook.json), 'WEBHOOK_SECRET_TOO_SHORT')
+    const rotated = await request('POST', `/partner/data-sources/${webhookSourceId}/rotate-credential`, hrToken, {
+      confirmPhrase: 'ROTATE_CREDENTIAL',
+    })
+    assert.equal(rotated.status, 201)
+    assert.equal(typeof rotated.json['webhookSecretOnce'], 'string')
+    assert.ok(String(rotated.json['webhookSecretOnce']).length >= 32)
+    const listed = await request('GET', '/partner/data-sources', hrToken)
+    assert.equal(listed.status, 200)
+    const listedRows = (Array.isArray(listed.json) ? listed.json : []) as Array<Record<string, unknown>>
+    assert.ok(listedRows.some((row) => row.id === webhookSourceId), 'GET list must include the webhook source just rotated')
+    assert.ok(listedRows.every((row) => !Object.prototype.hasOwnProperty.call(row, 'webhookSecretOnce')))
+    pass('Empty rotate body is rejected; short webhook secrets fail on write; GET never echoes the once-secret')
+
     const adminEnable = await request('PATCH', `/admin/job-sync/sources/${webhookSourceId}/enabled`, adminToken, { enabled: true })
     assert.equal(envelopeData<{ updated: { enabled: boolean } }>(adminEnable).updated.enabled, true)
     const sourceList = await request('GET', '/admin/job-sync/sources', adminToken)

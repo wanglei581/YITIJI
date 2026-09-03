@@ -103,8 +103,43 @@ check(
     "code: 'DATA_SOURCE_ADMIN_MANAGED'",
     "assertPartnerDataTypeCapability(org.type, 'job')",
     "assertPartnerDataTypeCapability(org.type, 'fair')",
+    'assertCredentialRotationConfirmed',
+    'assertCredentialRotationNotArchived',
+    'assertCredentialRotationOrgRateLimit',
+    'assertWebhookSecretStrength',
   ]),
   'API/Webhook start disabled and Partner write paths enforce capability rules',
+)
+
+const dataSourceDto = read('services/api/src/jobs/dto/data-source.dto.ts')
+const credentialPolicy = read('services/api/src/jobs/data-source-credential-policy.ts')
+const webhookStrength = read('services/api/src/common/crypto/webhook-secret-strength.ts')
+const jobsController = read('services/api/src/jobs/jobs.controller.ts')
+const sharedJobTypes = read('packages/shared/src/types/job.ts')
+const rotateDrawer = read('apps/partner/src/routes/sources/RotateCredentialDrawer.tsx')
+check(
+  containsAll(dataSourceDto, ["@Equals(ROTATE_CREDENTIAL_CONFIRMATION)", 'confirmPhrase']) &&
+    containsAll(credentialPolicy, ["export const ROTATE_CREDENTIAL_CONFIRMATION = 'ROTATE_CREDENTIAL' as const"]) &&
+    containsAll(sharedJobTypes, ["export const ROTATE_CREDENTIAL_CONFIRMATION = 'ROTATE_CREDENTIAL' as const"]) &&
+    containsAll(rotateDrawer, ['confirmPhrase: ROTATE_CREDENTIAL_CONFIRMATION']),
+  'Rotate-credential confirmation phrase is required and kept in sync across DTO / policy / shared / Partner UI',
+)
+check(
+  containsAll(jobsController, ['AuthScopedThrottle(3', 'rotate-credential']) &&
+    containsAll(read('services/api/src/common/throttler/terminal-throttle.ts'), ['resolveAuthScopedTracker', 's:${digest(authorization)}']),
+  'Rotate-credential throttle is per Authorization digest, not per IP',
+)
+check(
+  containsAll(webhookStrength, ['export const WEBHOOK_SECRET_MIN_LENGTH = 32', 'low_entropy']) &&
+    containsAll(sharedJobTypes, ['export const WEBHOOK_SECRET_MIN_LENGTH = 32']) &&
+    !webhookService.includes('assertWebhookSecretStrength') &&
+    !webhookService.includes('WEBHOOK_SECRET_MIN_LENGTH'),
+  'Webhook secret strength is write-path only; HMAC verify does not reject existing short secrets',
+)
+check(
+  containsAll(partnerSources, ['omitWebhookSecretOnce(newSource)', 'listSafe']) &&
+    containsAll(read('apps/partner/src/routes/sources/omitWebhookSecretOnce.ts'), ['webhookSecretOnce: _once']),
+  'Partner list state strips webhookSecretOnce after create',
 )
 check(
   containsAll(syncAdminController, [

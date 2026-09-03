@@ -1,3 +1,4 @@
+import { ROTATE_CREDENTIAL_CONFIRMATION, WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import type {
   ConnStatus,
   PartnerDataSource,
@@ -176,7 +177,7 @@ export const partnerMockAdapter = {
   // Data Sources
   async getDataSources(): Promise<PartnerDataSource[]> {
     await delay()
-    return [...DATA_SOURCES]
+    return DATA_SOURCES.map(({ webhookSecretOnce: _once, ...row }) => row)
   },
   async getDataSourceCapabilities(): Promise<PartnerDataSourceCapabilities> {
     await delay()
@@ -214,8 +215,17 @@ export const partnerMockAdapter = {
     if (source.accessMode !== 'webhook' && source.accessMode !== 'api') {
       throw new Error('DATA_SOURCE_HAS_NO_CREDENTIAL')
     }
+    if (payload.confirmPhrase !== ROTATE_CREDENTIAL_CONFIRMATION) {
+      throw new Error('CREDENTIAL_ROTATION_CONFIRMATION_REQUIRED')
+    }
+    if (source.archived) {
+      throw new Error('DATA_SOURCE_ARCHIVED')
+    }
     if (source.accessMode === 'api' && !payload.credential) {
       throw new Error('CREDENTIAL_REQUIRED')
+    }
+    if (source.accessMode === 'webhook' && payload.credential && payload.credential.length < WEBHOOK_SECRET_MIN_LENGTH) {
+      throw new Error('WEBHOOK_SECRET_TOO_SHORT')
     }
     const rotatedAt = new Date().toISOString()
     DATA_SOURCES = DATA_SOURCES.map((s) =>
@@ -252,8 +262,12 @@ export const partnerMockAdapter = {
   async createDataSource(payload: CreateDataSourcePayload): Promise<PartnerDataSource> {
     await delay()
     const accessMode = payload.accessMode ?? 'excel'
+    if (accessMode === 'webhook' && payload.credential && payload.credential.length < WEBHOOK_SECRET_MIN_LENGTH) {
+      throw new Error('WEBHOOK_SECRET_TOO_SHORT')
+    }
     const id = `ds${Date.now()}`
-    const newSource: PartnerDataSource = {
+    const webhookSecretOnce = accessMode === 'webhook' ? 'mock_webhook_secret_only_once' : undefined
+    const listRow: PartnerDataSource = {
       id,
       name: payload.name,
       sourceKind: payload.sourceKind ?? 'manual',
@@ -264,11 +278,10 @@ export const partnerMockAdapter = {
       credentialConfigured: Boolean(payload.credential) || accessMode === 'webhook',
       endpoint: payload.endpoint,
       webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${id}` : undefined,
-      webhookSecretOnce: accessMode === 'webhook' ? 'mock_webhook_secret_only_once' : undefined,
       activationManagedBy: accessMode === 'api' || accessMode === 'webhook' ? 'admin' : 'partner',
     }
-    DATA_SOURCES = [...DATA_SOURCES, newSource]
-    return newSource
+    DATA_SOURCES = [...DATA_SOURCES, listRow]
+    return webhookSecretOnce ? { ...listRow, webhookSecretOnce } : listRow
   },
 
   // Jobs

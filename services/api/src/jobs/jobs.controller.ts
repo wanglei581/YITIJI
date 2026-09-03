@@ -70,7 +70,7 @@ import { JobRequirementStatsService } from './job-requirement-stats.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
-import { PaidAiThrottle } from '../common/throttler/terminal-throttle'
+import { AuthScopedThrottle, PaidAiThrottle } from '../common/throttler/terminal-throttle'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -384,11 +384,12 @@ export class JobsController {
    *
    * 响应里的 `webhookSecretOnce` 是**唯一一次**能看到新密钥的机会，
    * 此后所有 GET /partner/data-sources 都只回 credentialConfigured / credentialRotatedAt。
+   *
+   * 限流按 Authorization 摘要、不含 IP：被盗 JWT 换出口地址不得重置配额。
+   * 空 body 过不了 ValidationPipe（confirmPhrase 必填）。归档源服务端拒轮换。
    */
   @Post('partner/data-sources/:id/rotate-credential')
-  // 签发密钥的端点，限速兜底：正常人工轮换一分钟内不会超过几次，
-  // 而被盗用的 partner token 靠反复轮换就能把对方的线上对接打断，限速能压住爆炸半径。
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @AuthScopedThrottle(3, '被盗 partner JWT 换出口 IP 不应重置轮换配额；按 IP 计等于给攻击者无限次废钥')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
   rotatePartnerDataSourceCredential(
