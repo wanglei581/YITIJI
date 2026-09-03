@@ -1,0 +1,20 @@
+{
+  "$readme": [
+    "危险带（2002–2097）日期字面量的存量欠账，按文件计数。",
+    "这些数**只允许调低**：新增一处就红，跨文件搬运也挡得住（按文件比，不比总数）。",
+    "还账方式：改用远端点常量（≤2001 / ≥2098），或加 `time-bomb-ok:` 注释写明时间从哪来。",
+    "还完账后跑 FIXTURE_TIME_BOMB_WRITE_BASELINE=1 重新生成，把数字落进本文件。"
+  ],
+  "sites": {
+    "services/api/scripts/support/recruitment-wave2-governance-readonly.ts": 1,
+    "services/api/scripts/verify-contract-review-contract.ts": 1,
+    "services/api/scripts/verify-contract-review-timeout.ts": 1,
+    "services/api/scripts/verify-file-lifecycle-summary.ts": 3,
+    "services/api/scripts/verify-member-data-request-contract.ts": 1,
+    "services/api/scripts/verify-partner-org-self.ts": 6,
+    "services/api/scripts/verify-partner-stats-contract.ts": 4,
+    "services/api/scripts/verify-recruitment-integration-readiness.ts": 2,
+    "services/api/scripts/verify-recruitment-wave2-proposed-governance.ts": 5,
+    "services/api/scripts/verify-toolbox-micro-app-platform.ts": 3
+  }
+}
