@@ -6,12 +6,116 @@ export type PrintTaskStatus =
   | 'failed'     // 打印失败
   | 'cancelled'  // 已取消（管理员操作或超时）
 
-// ── Print job parameter types ─────────────────────────────────────────────────
+// ── 奔图开放打印 API v1.0 wire 取值（权威抄录，勿凭记忆改）────────────────────
+//
+// 出处：奔图《开放打印能力》V1.0，`POST {serverUrl}/print/createTask` 的 printSetting
+// 参数表，**官方文档第 5–6 页**（该 PDF 的页脚页码与 PDF 页序一一对应）。
+//
+// ⚠️ CLAUDE.md §3「硬件能力 vs 开放打印 API 能力（必须分开描述）」：
+//    **硬件支持彩色 ≠ 开放 API 支持彩色。** 本节只记录开放 API 的协议取值，
+//    既不代表本地 Windows 驱动路径（Phase 8.1 主方案）做得到，也不代表反过来。
+//
+// ⚠️ 文档在 duplex / collate / paperSize / paperType / feeder 五项上都原文注明
+//    「不同机型，可选值集合不一样」。下列是**协议全集**；CM2800ADN/CM2820ADN 实际
+//    接受哪个子集仍待奔图厂家确认或真机验证，不得据此宣称本机已具备该能力。
+//
+// 目前仓库内**没有** internal → Pantum wire 的映射层（PantumCloudDispatchProvider
+// 只存在于 docs 与注释，无实现）。真正对接开放 API 时，映射层必须以本节为唯一取值来源。
 
+/**
+ * 色彩模式（官方文档 V1.0 第 5 页）。
+ *
+ * 文档**只定义了 "bw"**（黑白，默认值；服务端兼容旧写法 "bg"），**全文没有给出任何彩色取值**。
+ * 结论：走奔图开放打印 API 时**彩色不可用** —— 不是"尚未实现"，是协议侧根本没有公开取值。
+ * 禁止自行假设 "color" / "colour" / "cmyk"。彩色只能走本地 Windows 驱动路径。
+ * 待厂家确认后才可扩展本常量（同步 docs/device/pantum-api-design.md Q1）。
+ */
+export const PANTUM_API_MODES = ['bw'] as const
+
+/**
+ * 单双面（官方文档 V1.0 第 5 页）。协议全集 5 项，含两项**手动**双面。
+ * 手动双面要求人工翻面重新进纸，无人值守一体机不适用，故本项目内部
+ * DuplexMode 只收口到前 3 项；此处保留全集仅作协议记录。
+ */
+export const PANTUM_API_DUPLEX = [
+  'simplex',
+  'duplex_short_edge',
+  'duplex_long_edge',
+  'manual_duplex_short_edge',
+  'manual_duplex_long_edge',
+] as const
+
+/** 逐份打印（官方文档 V1.0 第 5 页）。注意是**连字符** "non-collate"，服务端兼容旧写法 "nocollate"。 */
+export const PANTUM_API_COLLATE = ['collate', 'non-collate'] as const
+
+/**
+ * 纸张尺寸（官方文档 V1.0 第 5–6 页）。协议支持 A4 / A5 / Letter。
+ * 本项目 PrintJobParams.paperSize 仍收口为 'A4'（产品决策 + DTO @IsIn(['A4']) + 计价口径），
+ * 放开 A5/Letter 需同时改 DTO、计价、Kiosk 控件与真机验证，不属于类型对齐范围。
+ */
+export const PANTUM_API_PAPER_SIZES = ['A4', 'A5', 'Letter'] as const
+
+/** 纸张类型（官方文档 V1.0 第 6 页）。薄纸是 "tissue"（**不是** "thin"）。 */
+export const PANTUM_API_PAPER_TYPES = [
+  'plain',
+  'thick',
+  'tissue',
+  'envelope',
+  'transparency',
+  'cardstock',
+  'label',
+] as const
+
+/** 纸张来源（官方文档 V1.0 第 6 页）。默认是 "auto_tray"（自动进纸盒），**不是** "auto"。 */
+export const PANTUM_API_FEEDERS = ['auto', 'manual_tray', 'auto_tray', 'tray1', 'tray2'] as const
+
+export type PantumApiMode = (typeof PANTUM_API_MODES)[number]
+export type PantumApiDuplex = (typeof PANTUM_API_DUPLEX)[number]
+export type PantumApiCollate = (typeof PANTUM_API_COLLATE)[number]
+export type PantumApiPaperSize = (typeof PANTUM_API_PAPER_SIZES)[number]
+export type PantumApiPaperType = (typeof PANTUM_API_PAPER_TYPES)[number]
+export type PantumApiFeeder = (typeof PANTUM_API_FEEDERS)[number]
+
+/** printSetting 各项在文档中标注的默认值（官方文档 V1.0 第 5–6 页）。省略该项即取此值。 */
+export const PANTUM_API_PRINT_SETTING_DEFAULTS = {
+  numOfCopies: 1,
+  mode: 'bw',
+  duplex: 'simplex',
+  collate: 'collate',
+  paperSize: 'A4',
+  paperType: 'plain',
+  feeder: 'auto_tray',
+} as const
+
+/**
+ * 打印范围 `printSetting.range` 的格式（官方文档 V1.0 第 6 页原文）：
+ * 「打印范围，范围以"-"间隔，多个范围之间以","隔开」，文档示例 `1,3,5`，请求体示例 `"range": "1,2,3"`。
+ * 即：单页写页号，连续页写 `起-止`，多段用 `,` 拼接 —— 如 `1,3,5` / `1-3,5` / `1-3,7-9`。
+ * 省略该字段 = 全部页面（与本项目 pageRange 语义一致）。
+ */
+export const PANTUM_API_RANGE_FORMAT_HINT = '如 "1,3,5" 或 "1-3,5,7-9"；省略 = 全部页面'
+
+// ── Print job parameter types（本项目内部取值，非 Pantum wire 取值）──────────────
+
+/**
+ * 本地驱动路径的内部色彩取值。**不要**改成 Pantum wire 取值。
+ *
+ * - 本地 Windows 驱动（Phase 8.1 主方案）：black_white / color 都由驱动控制，（2026-09-02 产品负责人真机验证通过）。
+ * - 奔图开放打印 API：`black_white` → `mode:"bw"`（官方文档第 5 页）；
+ *   `color` **无对应 wire 取值** —— 文档只定义了 "bw"，彩色取值未公开，
+ *   走开放 API 时彩色不可用，禁止假设为 "color"。见 PANTUM_API_MODES。
+ */
 export type ColorMode = 'black_white' | 'color'
 
-/** simplex = one-sided; duplex_long_edge = flip on long side (portrait docs);
- *  duplex_short_edge = flip on short side (landscape docs) */
+/**
+ * 本项目内部单双面取值 —— 是 PANTUM_API_DUPLEX（官方文档第 5 页，5 项）的**前 3 项子集**。
+ *
+ * simplex = 单面；duplex_long_edge = 长边翻页（竖排文档）；duplex_short_edge = 短边翻页（横排文档）。
+ * 官方另有 manual_duplex_short_edge / manual_duplex_long_edge 两项**手动双面**，本项目
+ * **不启用**：手动双面需人工翻面重新进纸，与无人值守一体机场景冲突；且能力门禁
+ * （printScanCapability.ts / terminal-capabilities.types.ts）按自动双面两值判定 duplex_print，
+ * 静默放宽本 union 会让手动双面绕过 fail-closed 门禁。要启用必须同步门禁 + DTO + 真机验证。
+ */
 export type DuplexMode = 'simplex' | 'duplex_long_edge' | 'duplex_short_edge'
 
 export type PrintOrientation = 'auto' | 'portrait' | 'landscape'
@@ -26,15 +130,20 @@ export type PagesPerSheet = 1 | 2 | 4
  * Parameters for a single print job.
  *
  * 机型适用范围：奔图 CM2800ADN / CM2820ADN 系列（Windows 识别名称：Pantum CM2800ADN Series）
- * paperSize 固定为 'A4' — CM2800ADN 系列不支持 A3。
+ * paperSize 固定为 'A4' — CM2800ADN 系列不支持 A3；开放 API 协议本身另支持 A5/Letter
+ * （官方文档 V1.0 第 5–6 页，见 PANTUM_API_PAPER_SIZES），本项目按产品决策收口到 A4。
  *
- * colorMode 说明：
- *   - 本地 Windows 驱动路径（Phase 8.1 主方案）：black_white / color 均通过驱动控制，需真机验证
- *   - Pantum 开放打印 API 路径（PantumCloudDispatchProvider，未来预留）：
- *     "black_white" → mode:"bw" ✅（API 文档明确）
- *     "color" → TODO: 待奔图厂家确认开放 API 的彩色 mode 取值，禁止直接假设为 "color"
+ * colorMode 说明（CLAUDE.md §3：硬件能力与开放 API 能力必须分开描述）：
+ *   - 本地 Windows 驱动路径（Phase 8.1 主方案）：black_white / color 均通过驱动控制，（2026-09-02 产品负责人真机验证通过）
+ *   - Pantum 开放打印 API 路径（PantumCloudDispatchProvider，未来预留，**当前无实现**）：
+ *     "black_white" → mode:"bw" ✅（官方文档 V1.0 第 5 页明确）
+ *     "color" → ❌ **开放 API 文档只定义了 "bw"，彩色取值未公开** ——
+ *       走开放 API 时彩色**不可用**（不是"待实现"，是协议侧没有该取值）。
+ *       禁止假设为 "color"。待厂家确认后再扩展 PANTUM_API_MODES。
  *
- * 带 ? 的可选字段为开放 API 预留扩展字段，当前 CM2800ADN/CM2820ADN 可用值需厂家或真机确认。
+ * 带 ? 的可选字段为开放 API 预留扩展字段，取值集合直接引用上方 Pantum 协议常量。
+ * 文档在这几项上均注明「不同机型，可选值集合不一样」：CM2800ADN/CM2820ADN 实际可用值
+ * 需厂家或真机确认，本地驱动是否能控制同样待验证。
  * 驱动支持状态见 apps/terminal-agent/src/printer/types.ts 注释表格。
  */
 export interface PrintJobParams {
@@ -42,9 +151,18 @@ export interface PrintJobParams {
   copies: number
   colorMode: ColorMode
   duplex: DuplexMode
-  /** 固定 'A4'。CM2800ADN/CM2820ADN 系列不支持 A3 或更大幅面。 */
+  /**
+   * 固定 'A4'。CM2800ADN/CM2820ADN 系列不支持 A3 或更大幅面。
+   * 开放 API 协议另支持 'A5' / 'Letter'（官方文档 V1.0 第 5–6 页，见 PANTUM_API_PAPER_SIZES），
+   * 本项目未放开：放开需同步 DTO @IsIn、计价口径、Kiosk 控件与真机验证。
+   */
   paperSize: 'A4'
-  /** omit = all pages; custom range e.g. '1-3,5,7-9' */
+  /**
+   * 省略(undefined) = 全部页面；自定义范围如 '1-3,5,7-9'。
+   * 映射到开放 API 的 `printSetting.range`（官方文档 V1.0 第 6 页）：
+   * 范围以 '-' 间隔，多个范围之间以 ',' 隔开（文档示例 `1,3,5`；请求体示例 `"range": "1,2,3"`）。
+   * 与本字段格式一致，无需转换；见 PANTUM_API_RANGE_FORMAT_HINT。
+   */
   pageRange?: string
   orientation: PrintOrientation
   quality: PrintQuality
@@ -52,22 +170,30 @@ export interface PrintJobParams {
   pagesPerSheet: PagesPerSheet
 
   // ── 开放 API 预留可选字段（当前 CM2800ADN/CM2820ADN 可用值需厂家/真机确认）────────
+  // 取值集合直接复用上方 Pantum 协议常量，避免第二份手抄件走样。
   /**
-   * 逐份打印 vs 逐页打印（copies > 1 时生效）。
-   * 'collate' = 完整份后再打下一份；'non_collate' = 每页打完 copies 份再翻页。
-   * 驱动支持：⚠️ 待验证。
+   * 逐份打印 vs 逐页打印（copies > 1 时生效）。官方文档 V1.0 第 5 页。
+   * 'collate' = 完整份后再打下一份（默认）；'non-collate' = 每页打完 copies 份再翻页。
+   * ⚠️ 注意是**连字符** 'non-collate'（服务端兼容旧写法 "nocollate"）；
+   *    历史上曾误写为下划线 'non_collate'，该值会被开放 API 拒绝。
+   * 文档注明「不同机型，可选值集合不一样」；驱动支持：⚠️ 待验证。
    */
-  collate?: 'collate' | 'non_collate'
+  collate?: PantumApiCollate
   /**
-   * 纸张类型。普通纸 / 厚纸 / 薄纸 / 信封 / 卡纸 / 标签纸。
-   * 驱动支持：⚠️ 待验证（不同机型可选值集合不同）。
+   * 纸张类型。官方文档 V1.0 第 6 页，默认 'plain'。
+   * 普通纸 / 厚纸 / **薄纸 'tissue'** / 信封 / **胶片 'transparency'** / 卡片纸 / 标签纸。
+   * ⚠️ 薄纸的官方取值是 'tissue'；历史上曾误写为 'thin'，该值会被开放 API 拒绝。
+   * 文档注明「不同机型，可选值集合不一样」；驱动支持：⚠️ 待验证。
    */
-  paperType?: 'plain' | 'thick' | 'thin' | 'envelope' | 'cardstock' | 'label'
+  paperType?: PantumApiPaperType
   /**
-   * 进纸来源。auto = 打印机自动选择；manual_tray = 手送；tray1 / tray2 = 指定纸盒。
-   * 驱动支持：⚠️ 待验证（CM2800ADN 是否有多纸盒需确认）。
+   * 进纸来源。官方文档 V1.0 第 6 页，**默认 'auto_tray'（自动进纸盒）**。
+   * auto = 打印机自动选择；manual_tray = 手动进纸盒；tray1 / tray2 = 选配纸盒。
+   * ⚠️ 历史上缺失默认值 'auto_tray'。
+   * 文档注明「不同机型，可选值集合不一样」；驱动支持：⚠️ 待验证
+   * （CM2800ADN/CM2820ADN 是否有选配纸盒需确认）。
    */
-  feeder?: 'auto' | 'manual_tray' | 'tray1' | 'tray2'
+  feeder?: PantumApiFeeder
 }
 
 // ── Print param normalization helper ──────────────────────────────────────────

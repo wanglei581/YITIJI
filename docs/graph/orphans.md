@@ -43,7 +43,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | **protected** | 硬名单，即使零引用也不得删除 | 4 |
 | **high** | 仍被 CI / 门禁 / 包脚本引用 | 11 |
 | **medium** | 只被文档或其它文件提及 | 8 |
-| **low** | 全仓零提及 | 126 |
+| **low** | 全仓零提及 | 69 |
 
 
 ──────────────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 ──────────────────────────────────────────────────────────────────────
 
-## low — 全仓零提及（126）
+## low — 全仓零提及（69）
 
 五条证据全部满足。**仍需人确认**：脚本看不见运行时动态引用，也不知道
 某个文件是不是刻意保留的下一步入口。
@@ -82,16 +82,19 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `apps/kiosk/src/services/api/smartCampusHttpAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `apps/kiosk/src/services/api/smartCampusMockAdapter.ts` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
-### 文档（122）
+### 文档（65）
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `docs/acceptance/wave1-resume-optimize-preprod-acceptance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/AI求职打印服务终端-B2G-B2B2C方案-专家评审报告.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/百宝箱商业价值与实用性说明.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/职易达AI求职服务终端-参赛项目简介.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/business/职易达AI求职服务终端-青岛OPC创业大赛商业计划书.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/design/job-link-risk-analysis.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/delivery/kiosk-redesign-r1/handover.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/delivery/kiosk-redesign-r1/initiative.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/delivery/kiosk-redesign-r1/release-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/delivery/kiosk-redesign-r1/scope.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/delivery/kiosk-redesign-r1/uat-signoff.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-orchestration-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-orchestration-2026-08/_RESUME-NOTE.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/design/kiosk-ai-os-fusion-2026-08/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -99,61 +102,25 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/device/release-batching-2026-08-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/patent/对接清单.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/product/miniapp-life-circle-plan-v0.1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/product/miniprogram-phase-a-prototype-changelist-2026-07.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/product/operation-manual-benchmark-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/product/pii-redaction-decision-2026-08.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/audit/2026-06-09-doc-consistency.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/progress/owners.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/2026-08-18-expert-panel-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/agency-phase2-closeout-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/agency-project-structure-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/ai-resume-phase0-contract-lock-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/branch-split-plan-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/ci-gate-exemption-cleanup-backlog-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/codex-phase0-followup.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/dev-status-consolidation-2026-07-17.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/empty-catalogs-root-cause-2026-08-16.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/f1-d2-prime-cgroup-consistency-root-cause-2026-08-01.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/global-seamless-data-refresh-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/kiosk-page-split-backlog.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/me-resumes-actions-hardening.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/me-resumes-page.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/my-documents-delete-action.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/operating-charter-2026-08-16.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/phase6.5-data-chain-review.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/profile-print-feedback-link.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/kiosk-management-requirements-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/page-audit-print-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/page-audit-resume-profile-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
+| `docs/reviews/partner-capability-inventory-2026-09-02.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-ignore-proposal.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-local-tools-landing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/project-normalization-task-evidence-triage.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/reviews/real-file-print-2026-08-17/README.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/self-assessment-v1-review-scope.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/reviews/task-card-x1-n2-n4-admin-fe-split.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-18-benefit-activities-real-validation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-18-profile-notifications-feedback-p1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-20-project-normalization-p0.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-22-admin-file-lifecycle-view.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-22-cos-lifecycle-privacy-acceptance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-22-file-assets-gate2-readiness-recheck.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-22-file-assets-trial-acceptance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-26-user-file-upload-flow.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-ai-resume-commercial-closure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-ai-resume-diagnosis-config-ui.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-ai-resume-diagnosis-context-phase1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-ai-resume-overall-assessment-implementation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-global-seamless-data-refresh.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-job-materials-commercial-closure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-06-29-resume-phone-qr-upload-closure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-03-deploy-data-safety-gate.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-03-resume-optimize-wave2-layout.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-03-resume-template-fill-wave3.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-03-resume-voice-wave4.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-10-real-scan-implementation-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-10-remaining-work-report-and-roadmap.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-11-material-check-real-implementation-plan.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-12-c5-4-redemption-settlement-consistency.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-12-isolated-production-p0-launch.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-12-node20-pdf-renderer-compatibility.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-12-ocr-live-renderer-verify.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-12-preprod-test-print-seed-guard-implementation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-13-payment-qr-auto-reconcile.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-13-preprod-payment-timeout-acceptance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
@@ -162,51 +129,27 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 | `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2a-ai-career.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2b-ai-resume.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-14-alipay-f2f-codepay.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-14-assistant-voice-consultation-restore.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-14-qingxu-lightflow-4188-layout-parity.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-14-windows-agent-reliability-p0.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-15-admin-billing-description-editor.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-15-admin-credential-recovery-and-auth-verify-safety.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-15-admin-partner-warm-theme-governance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-15-production-deployment-integrated.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-15-terminal-fleet-f0-overview.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-16-admin-partner-phone-transfer.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-16-partner-account-member-safe-removal.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-17-dependency-security-remediation-main.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-18-partner-account-dual-auth-removal-implementation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w1.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w2.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w5.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w6.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-25-partner-email-login-alias.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-26-home-job-fairs-print-scan-visual-balance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-26-partner-account-phone-transfer-ux.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-26-qingxu-lightflow-kiosk87-shell-closure.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-29-p0-1b-kiosk-session-warning.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/plans/2026-07-30-agent-loop-ci-gates-implementation.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-07-30-f1-d3-single-owner-governance.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-08-01-f1-d2-integration-reconcile.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-08-01-f1-d2-invocation-uniqueness.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/plans/2026-08-09-contract-review-report-printing.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-06-22-cos-lifecycle-privacy-acceptance-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-06-29-ai-resume-overall-assessment-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-06-29-job-materials-commercial-closure-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-06-29-smart-campus-toolbox-home-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-03-resume-optimize-wave2-layout-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-03-resume-template-fill-wave3-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-03-resume-voice-wave4-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-12-ocr-live-renderer-verify-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-12-preprod-test-print-seed-guard-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-13-payment-qr-auto-reconcile-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-13-qingxu-lightflow-core-tabs-4188-layout-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-14-assistant-voice-consultation-restore-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-14-qingxu-lightflow-4188-layout-parity-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-15-admin-billing-description-editor-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-15-production-deployment-integrated-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-16-f1-release-provenance-manifest-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-16-partner-account-member-safe-removal-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
-| `docs/superpowers/specs/2026-07-26-partner-account-phone-transfer-ux-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 | `docs/superpowers/specs/2026-07-29-p0-1b-kiosk-session-warning-design.md` | 全仓没有任何其它文件提到这个路径或文件名<br/>→ 全仓零提及：无路由、无 import、无门禁、无文档、无 CI |
 
 
@@ -218,7 +161,7 @@ git log --since="14 days ago" --name-only --pretty=format: -- docs/ | sort -u
 
 | 路径 | 判定依据 |
 | --- | --- |
-| `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/agency-project-structure-review.md、docs/reviews/legacy-capability-inventory-2026-08-16.md |
+| `apps/kiosk/src/App.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/reviews/legacy-capability-inventory-2026-08-16.md |
 | `apps/kiosk/src/components/KioskNumPad.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/progress/archive/2026-06-20-current-progress-pre-normalization.md |
 | `apps/kiosk/src/pages/interview/InterviewTopbar.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w3.md |
 | `apps/kiosk/src/pages/jobs-fairs-prototype.tsx` | 不在 apps/kiosk/src/main.tsx 的 import 闭包内，也不在路由表中<br/>→ 仅被文档提及：docs/design/kiosk-proto-2026-07-migration-matrix.md、docs/superpowers/plans/2026-07-24-kiosk-8177-5299-fusion-w4.md |

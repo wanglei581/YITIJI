@@ -2,7 +2,7 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # API 端点图谱
 
-`476` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
+`479` 个端点，全局前缀 `/api/v1`（`services/api/src/main.ts` 的 `setGlobalPrefix`）。
 
 端点来自 `@Controller` / `@Get` / `@Post` 等装饰器的**剥注释后**解析。
 本仓库多数 controller 顶部有一整块历史路由清单注释；那些注释不参与本表，
@@ -401,7 +401,10 @@
 | GET | `/api/v1/partner/dashboard` | JobsController.getPartnerDashboard | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | GET | `/api/v1/partner/data-sources` | JobsController.getPartnerDataSources | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | POST | `/api/v1/partner/data-sources` | JobsController.createPartnerDataSource | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
+| PATCH | `/api/v1/partner/data-sources/:id/archive` | JobsController.archivePartnerDataSource | partner | JobsPartnerService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog |
+| POST | `/api/v1/partner/data-sources/:id/rotate-credential` | JobsController.rotatePartnerDataSourceCredential | partner | JobsPartnerService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog |
 | PATCH | `/api/v1/partner/data-sources/:id/toggle` | JobsController.togglePartnerDataSource | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
+| PATCH | `/api/v1/partner/data-sources/:id/unarchive` | JobsController.unarchivePartnerDataSource | partner | JobsPartnerService | AuditLog<br/>Job<br/>JobDataQualitySnapshot<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog |
 | GET | `/api/v1/partner/data-sources/capabilities` | JobsController.getPartnerDataSourceCapabilities | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | DELETE | `/api/v1/partner/excel/:batchId` | JobsController.cancelExcelImport | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
 | POST | `/api/v1/partner/excel/:batchId/confirm` | JobsController.confirmExcelImport | partner | JobsService | FairCompany<br/>FairZone<br/>FieldMappingRule<br/>ImportBatch<br/>ImportRecord<br/>Job<br/>JobFair<br/>JobSource<br/>Organization<br/>PolicyPost<br/>SyncLog<br/>Terminal |
