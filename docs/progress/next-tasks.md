@@ -37,7 +37,12 @@
       一概测不出来——这类后台配置只能靠人核对。按代码实际调用的接口，同一份指引里
       还应勾：选中的照片或视频（`wx.chooseMedia`）、选中的文件（`wx.chooseMessageFile`）、
       手机号（`open-type="getPhoneNumber"`）、设备信息（`wx.getSystemInfoSync` 兜底路径）、
-      剪切板（`wx.setClipboardData`）、邮箱与订单信息与操作日志（表单/业务采集）。
+      **摄像头**（`wx.scanCode({onlyFromCamera:true})`，`kiosk-login.js:46` 扫码登录一体机——
+      漏勾会让真机上扫码直接失败）、邮箱与订单信息与操作日志（表单/业务采集）。
+      **剪切板不必勾**：全仓 `wx.setClipboardData` 10 处（写）、`wx.getClipboardData` **0 处**（读），
+      隐私清单的「剪切板」对应的是读取用户剪切板，写入不是采集。
+      （2026-09-03 更正：初版把摄像头列为「留给产品负责人判断」、把剪切板列为该勾，
+      两条都是按功能猜而不是按接口查的结果；改法是把全仓 `wx.*` 调用逐个枚举后重判。）
       **不该勾**：位置信息（`store-select.js` 只有注释，没真调）、地址、发票、微信运动、
       通讯录、相册写入、日历、蓝牙、车牌、身份证号码、发布内容、所关注账号、四个传感器。
       「用户信息（微信昵称、头像）」也不该勾——全仓无 `getUserProfile` / `chooseAvatar`。
