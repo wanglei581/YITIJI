@@ -170,7 +170,7 @@ mkdir -p /tmp/mp && cd /tmp/mp && npm i miniprogram-automator
 
 cd apps/miniapp
 MP_AUTOMATOR=/tmp/mp/node_modules/miniprogram-automator \
-  node scripts/devtools-probe.mjs \
+  node tools/devtools-probe.mjs \
     --route /pages/store-select/store-select \
     --data '{"loading":false,"stores":[...]}' \
     --measure '.actionbar .btn' \
