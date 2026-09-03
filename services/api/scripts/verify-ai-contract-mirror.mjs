@@ -191,3 +191,30 @@ if (failed > 0) {
   process.exit(1)
 }
 console.log('\n=== ALL PASS ===\n')
+
+// ── apiKey 审计铁律：ApiKeyChange 必须保持封闭 ───────────────────────────────
+//
+// 铁律见 src/ai/llm/ai-config-audit.ts 文件头：apiKey 的明文、密文、长度、前缀、
+// 哈希一律不得进入审计 payload —— 审计日志本身可被读取，而密钥哈希是一个
+// 「猜了就能验证」的预言机。
+//
+// 2026-09-03 故障注入实测：往 payload 塞 `apiKeyHash` 时，**唯一**挡住它的是
+// TypeScript（TS2353，因为 ApiKeyChange 是封闭对象类型）；本文件与
+// verify:job-ai-privacy 当时都放行。也就是说这条铁律的全部防线是一个类型定义 ——
+// 而类型定义可以被人改，改完 tsc 就不再报错。
+//
+// 故本断言直接钉住该类型的字段集：只允许 action / configuredFrom / configuredTo。
+// 想加第四个字段的人必须先删掉这条断言，那是一个显式动作，会出现在 diff 里。
+{
+  const auditSrc = readFileSync(resolve(repo, 'services/api/src/ai/llm/ai-config-audit.ts'), 'utf8')
+  const m = auditSrc.match(/interface ApiKeyChange \{([^}]*)\}/)
+  const fields = m
+    ? m[1].split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('//'))
+        .map((l) => l.split(':')[0].trim()).sort()
+    : null
+  const expected = ['action', 'configuredFrom', 'configuredTo']
+  check(
+    fields !== null && JSON.stringify(fields) === JSON.stringify(expected),
+    `ApiKeyChange 保持封闭（只允许 ${expected.join(' / ')}），实际：${fields ? fields.join(' / ') : '未找到该类型'}`,
+  )
+}
