@@ -80,7 +80,14 @@ function formatFailure(failure) {
 
 function runCommand(command) {
   const started = Date.now()
-  const result = spawnSync(BASH, ['-c', command], {
+  // -e：还原原来的语义。GitHub Actions 对 `run: |` 的默认 shell 是
+  //   `/usr/bin/bash -e {0}`（已从实际 CI 日志取证），而裸 `bash -c` 没有 -e：
+  //   将来清单里出现 `a; b`，a 失败后 b 照跑、整行退出码取 b —— 失败被吞掉。
+  // -o pipefail：**这一条比原来更严**，不是还原。原来的 bash -e 不含 pipefail，
+  //   于是 `a | b` 里 a 失败会被 b 的成功掩盖。对一份 verify 清单来说那是纯粹的
+  //   风险，没有保留的理由。当前 366 条全是无管道的单命令（实测），加它不改变
+  //   任何现有行为，只堵住将来的写法。
+  const result = spawnSync(BASH, ['-eo', 'pipefail', '-c', command], {
     stdio: ['ignore', 'inherit', 'inherit'],
     env: process.env,
     cwd: process.cwd(),

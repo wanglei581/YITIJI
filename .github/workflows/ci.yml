@@ -358,6 +358,8 @@ jobs:
           VITE_TERMINAL_ID: KSK-001
           VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
           node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # ── S0 后端 AI 底座门禁（#617）─────────────────────────────
           # 这四条 import services/api/src，会传递依赖到 Prisma 客户端，
@@ -791,6 +793,8 @@ jobs:
         # 与 SQLite Verify suites 相同：本步内部跑完再汇总，但仍必须串行。
         # 禁止并行 / continue-on-error；跨 step（install → generate → migrate → verify）仍 fail-fast。
         run: |
+          # ⚠ 下面的 CI_SERIAL_COMMANDS 终止行必须顶格（YAML 剥掉公共缩进后）且无尾随空白。
+          # 改缩进、留尾随空格或让 YAML 重排都会让 heredoc 一路吞到文件末尾并**静默丢内容**。
           node scripts/lib/run-serial-commands.mjs <<'CI_SERIAL_COMMANDS'
           # 与 SQLite job 同源的静态门禁：P39 迁移保真不依赖数据库形态，
           # 但它守的是「生产页不得从 V6 原型漂走」，两个 job 都必须挡住。
