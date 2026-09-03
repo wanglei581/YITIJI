@@ -308,3 +308,38 @@ export function IpScopedThrottle(limit: number, reason: string): MethodDecorator
     },
   })
 }
+
+/**
+ * 已认证写操作：按 Authorization 摘要计数，**不含 IP**。
+ *
+ * 与 {@link IpScopedThrottle} 相反的场景：被计数的主体是「这个登录会话」，
+ * 攻击者换出口 IP 不该换到一份新配额。典型是被盗 partner JWT 对轮换密钥
+ * 发空 body——按 IP 计时换一个 NAT 就重置 10 次/分钟。
+ *
+ * 无 Authorization 时退化成纯 IP，避免这条路由在登录前被匿名打穿。
+ * ThrottlerGuard 是 APP_GUARD、跑在 JwtAuthGuard 之前，但请求头里的
+ * Bearer 此时已经在，不需要等 req.user。
+ *
+ * 这挡不住「攻击者还能登录、每次换新 JWT」——那是密码失窃，不是会话失窃。
+ *
+ * @param limit  每会话每分钟允许的次数
+ * @param reason 为什么这条路由不能按 IP 计数（写给下一个读代码的人）
+ */
+export function resolveAuthScopedTracker(req: unknown): string {
+  const authorization = headerOf(req, 'authorization')
+  if (authorization) return `s:${digest(authorization)}`
+  return `ip:${resolveClientIpOrUnknown(req)}`
+}
+
+export function AuthScopedThrottle(limit: number, reason: string): MethodDecorator & ClassDecorator {
+  if (!reason.trim()) {
+    throw new Error('AuthScopedThrottle 必须写明为什么这条路由按会话而不是按 IP 计数')
+  }
+  return Throttle({
+    default: {
+      ttl: THROTTLE_WINDOW_MS,
+      limit,
+      getTracker: resolveAuthScopedTracker,
+    },
+  })
+}

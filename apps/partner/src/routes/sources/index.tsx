@@ -21,7 +21,9 @@ import {
   archiveDataSource,
   unarchiveDataSource,
 } from '../../services/api'
+import { WEBHOOK_SECRET_MIN_LENGTH } from '@ai-job-print/shared'
 import { ExcelImportModal } from './ExcelImportModal'
+import { omitWebhookSecretOnce } from './omitWebhookSecretOnce'
 import { RotateCredentialDrawer } from './RotateCredentialDrawer'
 
 /** 使用凭证、因而可以轮换的接入方式。excel/csv/json/manual 没有凭证概念。 */
@@ -117,6 +119,10 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
   const submit = async () => {
     if (!name.trim()) { setError('请填写数据源名称'); return }
     if (mode === 'api' && !endpoint.trim()) { setError('API 直连必须填写 Endpoint'); return }
+    if (mode === 'webhook' && credential.trim() && credential.trim().length < WEBHOOK_SECRET_MIN_LENGTH) {
+      setError(`自定义 Webhook 密钥至少 ${WEBHOOK_SECRET_MIN_LENGTH} 位；更短的密钥可被离线撞库，推荐留空由系统生成`)
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
@@ -256,7 +262,7 @@ function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnect
               <p className="text-sm text-neutral-700">系统将生成接收地址和签名密钥。把它交给对方 ATS / 招聘系统，数据更新时由对方主动推送到本平台。</p>
               <div>
                 <label className="mb-1 block text-sm font-medium text-neutral-700">自定义密钥（可选）</label>
-                <input value={credential} onChange={(e) => setCredential(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-500 focus:outline-none" placeholder="留空则由系统自动生成" type="password" />
+                <input value={credential} onChange={(e) => setCredential(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-500 focus:outline-none" placeholder={`留空则由系统自动生成（自填至少 ${WEBHOOK_SECRET_MIN_LENGTH} 位）`} type="password" />
               </div>
               <div className="rounded-lg bg-surface px-4 py-3 text-xs text-neutral-500">
                 签名规则：<span className="font-mono">HMAC-SHA256(secret, timestamp + '.' + rawBody)</span>，请求必须携带 timestamp / nonce / signature。
@@ -417,9 +423,11 @@ export default function SourcesPage() {
 
   const handleSourceCreated = async (payload: CreateDataSourcePayload) => {
     const newSource = await createDataSource(payload)
+    // 一次性明文密钥只留在 SourceConnectPanel 自己的 `created` state 里。
+    const listSafe = omitWebhookSecretOnce(newSource)
     setSources((prev) => {
-      const exists = prev.some((s) => s.id === newSource.id)
-      return exists ? prev.map((s) => s.id === newSource.id ? newSource : s) : [newSource, ...prev]
+      const exists = prev.some((s) => s.id === listSafe.id)
+      return exists ? prev.map((s) => s.id === listSafe.id ? listSafe : s) : [listSafe, ...prev]
     })
     return newSource
   }
@@ -554,7 +562,10 @@ export default function SourcesPage() {
                           ) : (
                             <>
                               {s.activationManagedBy === 'admin' ? (
-                                <span className="rounded bg-warning-bg px-2 py-1 text-xs font-medium text-warning-fg">
+                                <span
+                                  className="rounded bg-warning-bg px-2 py-1 text-xs font-medium text-warning-fg"
+                                  title="紧急停止接收请归档，不会下架已发布内容。启停由管理员管理。"
+                                >
                                   {s.connStatus === 'disabled' ? '等待管理员启用' : '管理员管理启停'}
                                 </span>
                               ) : <button
@@ -640,6 +651,7 @@ export default function SourcesPage() {
               </p>
               <p className="mt-1.5 text-warning-fg">
                 注意:轮换会让旧密钥<strong className="font-medium">立即失效</strong>,请先和对接方约好切换时间。
+                API/Webhook 由管理员启停；若密钥被盗、需要立刻停止接收推送，请用列表里的「归档」（不会下架已发布内容）。
               </p>
               {webhookGuide.credentialRotatedAt && (
                 <p className="mt-1.5 text-neutral-400">
