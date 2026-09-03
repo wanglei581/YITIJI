@@ -2,31 +2,31 @@
 <!-- 手改会在下次 `node scripts/generate-project-graph.mjs` 时被覆盖。 -->
 # 数据模型图谱
 
-`91` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
+`96` 个 Prisma 模型，来源 `services/api/prisma/schema.prisma`。
 
-下图只画**关系度数最高的 18 个模型**：全量 91 个节点的
+下图只画**关系度数最高的 18 个模型**：全量 96 个节点的
 ER 图人是读不了的。全量关系见下方表格和 `graph.json`。
 
 ```mermaid
 flowchart TD
   EndUser["EndUser<br/><small>32 字段</small>"]
   Organization["Organization<br/><small>26 字段</small>"]
-  Terminal["Terminal<br/><small>22 字段</small>"]
+  Terminal["Terminal<br/><small>24 字段</small>"]
   FileObject["FileObject<br/><small>45 字段</small>"]
   Job["Job<br/><small>46 字段</small>"]
   JobFair["JobFair<br/><small>39 字段</small>"]
   JobSource["JobSource<br/><small>30 字段</small>"]
   User["User<br/><small>26 字段</small>"]
   PrintTask["PrintTask<br/><small>21 字段</small>"]
+  AgentReleaseTarget["AgentReleaseTarget<br/><small>10 字段</small>"]
+  ActiveReleaseObservationAssignment["ActiveReleaseObservationAssignment<br/><small>7 字段</small>"]
+  AgentReleasePlan["AgentReleasePlan<br/><small>18 字段</small>"]
   BenefitClaim["BenefitClaim<br/><small>8 字段</small>"]
   DocumentProcessTask["DocumentProcessTask<br/><small>19 字段</small>"]
   FairCompany["FairCompany<br/><small>22 字段</small>"]
   FairVenueGuide["FairVenueGuide<br/><small>8 字段</small>"]
   OfflineAgencyBranch["OfflineAgencyBranch<br/><small>31 字段</small>"]
   Order["Order<br/><small>39 字段</small>"]
-  QualificationRecord["QualificationRecord<br/><small>26 字段</small>"]
-  AdPlaylist["AdPlaylist<br/><small>9 字段</small>"]
-  AdPlaylistItem["AdPlaylistItem<br/><small>8 字段</small>"]
   EndUser --- BenefitClaim
   EndUser --- DocumentProcessTask
   EndUser --- FileObject
@@ -34,13 +34,13 @@ flowchart TD
   Organization --- Job
   Organization --- JobFair
   Organization --- JobSource
-  Organization --- QualificationRecord
   Organization --- Terminal
   Organization --- User
+  Terminal --- ActiveReleaseObservationAssignment
+  Terminal --- AgentReleaseTarget
   Terminal --- PrintTask
   FileObject --- DocumentProcessTask
   FileObject --- PrintTask
-  FileObject --- QualificationRecord
   FileObject --- User
   Job --- JobSource
   Job --- OfflineAgencyBranch
@@ -48,20 +48,25 @@ flowchart TD
   JobFair --- FairVenueGuide
   JobFair --- JobSource
   PrintTask --- Order
-  OfflineAgencyBranch --- QualificationRecord
-  AdPlaylist --- AdPlaylistItem
+  AgentReleaseTarget --- ActiveReleaseObservationAssignment
+  AgentReleaseTarget --- AgentReleasePlan
+  ActiveReleaseObservationAssignment --- AgentReleasePlan
 ```
 
 ## 全部模型
 
 | 模型 | 字段数 | 关联模型 | 被哪些文件读写 |
 | --- | --- | --- | --- |
+| **ActiveReleaseObservationAssignment** | 7 | AgentReleasePlan、AgentReleaseTarget、Terminal | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AdAsset** | 19 | AdPlaylistItem | 1 个文件<br/>`content/content.service.ts` |
 | **AdPlaylist** | 9 | AdPlaylistItem、TerminalScreensaverConfig | 1 个文件<br/>`content/content.service.ts` |
 | **AdPlaylistItem** | 8 | AdAsset、AdPlaylist | 1 个文件<br/>`content/content.service.ts` |
 | **AdvisorArtifact** | 11 | AdvisorSession | 3 个文件<br/>`advisor/advisor-artifact.service.ts`<br/>`advisor/advisor-retention.task.ts`<br/>`advisor/advisor.service.ts` |
 | **AdvisorPin** | 8 | AdvisorSession | 1 个文件<br/>`advisor/advisor.service.ts` |
 | **AdvisorSession** | 14 | AdvisorArtifact、AdvisorPin | 2 个文件<br/>`advisor/advisor-retention.task.ts`<br/>`advisor/advisor.service.ts` |
+| **AgentReleaseArtifact** | 11 | AgentReleasePlan | 1 个文件<br/>`terminals/release-observation.service.ts` |
+| **AgentReleasePlan** | 18 | ActiveReleaseObservationAssignment、AgentReleaseArtifact、AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
+| **AgentReleaseTarget** | 10 | ActiveReleaseObservationAssignment、AgentReleasePlan、Terminal、TerminalReleaseObservation | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **AiResumeResult** | 15 | EndUser | 10 个文件<br/>`admin-users/admin-users.service.ts`<br/>`ai/ai.service.ts`<br/>`ai/resume/appended-self-assessment.service.ts`<br/>… |
 | **AiServiceLog** | 12 | EndUser | 2 个文件<br/>`ai/ai-log.service.ts`<br/>`ai/ai-result.cleanup.task.ts` |
 | **AuditLog** | 12 | User | 14 个文件<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>`audit/audit.service.ts`<br/>`auth/admin-initial-phone-bind.service.ts`<br/>… |
@@ -130,11 +135,12 @@ flowchart TD
 | **ScreensaverContent** | 9 | — | **无代码读写** |
 | **SyncLog** | 15 | JobSource | 5 个文件<br/>`job-sync/job-sync.service.ts`<br/>`jobs/jobs-excel.service.ts`<br/>`jobs/jobs-partner.service.ts`<br/>… |
 | **SystemBroadcast** | 9 | BroadcastReadState | 1 个文件<br/>`member-notifications/member-notifications.service.ts` |
-| **Terminal** | 22 | Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 19 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
+| **Terminal** | 24 | ActiveReleaseObservationAssignment、AgentReleaseTarget、Organization、PrintTask、ScanTask、TerminalBindCode、TerminalCapability、TerminalCredential、TerminalHeartbeat、TerminalScanDeletionAudit | 20 个文件<br/>`admin-ops/admin-ops.service.ts`<br/>`admin-orders-readonly/admin-orders-readonly.service.ts`<br/>`admin-print-scan/admin-print-scan.service.ts`<br/>… |
 | **TerminalBindCode** | 10 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalCapability** | 9 | Terminal | 1 个文件<br/>`terminals/terminal-capabilities.service.ts` |
 | **TerminalCredential** | 9 | Terminal | 2 个文件<br/>`terminals/terminal-credential-security.service.ts`<br/>`terminals/terminals-admin.service.ts` |
 | **TerminalHeartbeat** | 12 | Terminal | 1 个文件<br/>`terminals/terminals-agent.service.ts` |
+| **TerminalReleaseObservation** | 10 | AgentReleaseTarget | 1 个文件<br/>`terminals/release-observation.service.ts` |
 | **TerminalScanDeletionAudit** | 13 | Terminal | 1 个文件<br/>`terminals/terminal-scan-deletion-audit.service.ts` |
 | **TerminalScreensaverConfig** | 9 | AdPlaylist | 2 个文件<br/>`content/content.service.ts`<br/>`device-fleet/device-fleet.service.ts` |
 | **TerminalSmartCampusConfig** | 7 | — | 3 个文件<br/>`device-fleet/device-fleet.service.ts`<br/>`smart-campus/smart-campus.service.ts`<br/>`terminals/terminals-agent.service.ts` |
