@@ -1,0 +1,12 @@
+/* 青序流光设计系统 —— 新版 kiosk 前端的唯一视觉真值。
+ *
+ * 视觉来源：docs/design/kiosk-redesign-2026-08/ 的 51 张原型（2026-09-02 产品负责人
+ * 定为上线口径，整体替换旧前端，不在旧页上打补丁）。
+ *
+ * 用法：新页面只 import 这一个文件，不要再引 print-prototype.css 或
+ * warm-professional-override.css —— 那两套是旧配色（暖褐系），混用必然打架，
+ * V6 那次"只迁移了一半所以效果不好"就是这么来的。
+ */
+@import './tokens.css';
+@import './shell.css';
+@import './primitives.css';
