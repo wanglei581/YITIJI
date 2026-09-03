@@ -30,7 +30,10 @@
 .jf-file { display: flex; align-items: center; gap: 12rpx; margin-top: 18rpx;
   padding: 18rpx 20rpx; background: var(--surface-2); border-radius: 12rpx; }
 .jf-file-ic { font-size: 30rpx; color: var(--teal); flex-shrink: 0; }
-.jf-file-name { font-size: 26rpx; color: var(--ink); flex: 1;
+  /* min-width:0 不能省：flex 子项的 min-width 默认是 auto(=min-content)，
+     文件名一长就把整行撑出容器，ellipsis 永远不触发。旁边的图标是 flex-shrink:0，
+     压不动，于是溢出全部由这一项承担。删掉这行：长文件名把行顶出屏幕。 */
+.jf-file-name { font-size: 26rpx; color: var(--ink); flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .jf-label { font-size: 25rpx; font-weight: 600; color: var(--ink-soft);
   margin: 20rpx 0 10rpx; }

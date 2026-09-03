@@ -52,7 +52,10 @@
 }
 .vp-file-ic { width: 28rpx; height: 28rpx; color: var(--teal); flex-shrink: 0; }
 .vp-file-name {
-  flex: 1; font-size: var(--fs-base); color: var(--ink);
+  /* min-width:0 不能省：flex 子项的 min-width 默认是 auto(=min-content)，
+     文件名一长就把整行撑出容器，ellipsis 永远不触发。旁边的图标是 flex-shrink:0，
+     压不动，于是溢出全部由这一项承担。删掉这行：长文件名把行顶出屏幕。 */
+  flex: 1; min-width: 0; font-size: var(--fs-base); color: var(--ink);
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 
