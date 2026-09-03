@@ -108,6 +108,7 @@
     "verify:jobfair-review": "node -r @swc-node/register scripts/verify-jobfair-review.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
+    "verify:pii-redaction": "node -r @swc-node/register scripts/verify-pii-redaction.ts",
     "verify:material-task-token-transport": "node -r @swc-node/register scripts/verify-material-task-token-transport.ts",
     "verify:job-materials": "node -r @swc-node/register scripts/verify-job-materials.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
