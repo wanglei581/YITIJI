@@ -475,6 +475,21 @@ function OrgDetailDrawer({
           <p className="text-xs text-neutral-400">
             机构信息编辑、账号操作均记录审计日志。停用机构后:机构账号无法登录、数据导入接口拒绝;已发布数据不自动下架,如需下架请到岗位/招聘会信息源逐条操作。
           </p>
+          {/* 2026-09-03：停用与内容信任是两根独立杠杆，这一点此前只有代码知道。
+              发布闸门 contentTrustDenial 的入参 OrgTrustFacts 只有
+              contentTrustStatus 与 archivedAt，结构上取不到 enabled —— 也就是说
+              停用只切断机构自己供稿，不影响管理员继续把它的存量内容发布上屏。
+              闸门刻意不改：把 enabled 塞进去，等于让「停一个账号」顺手清空用户
+              正在浏览的岗位列表，那是另一种事故。缺的只是让管理员知道这件事。 */}
+          {/* 判据复用 contentTrustRules.contentTrustPublishable，不手写 ——
+              该文件刻意不 import 任何模块，正是为了让门禁能真求值而非字符串匹配。 */}
+          {!detail.enabled && contentTrustPublishable(detail.contentTrustStatus, detail.archived) && (
+            <p className="rounded-[9px] border border-warning/30 bg-warning-bg px-3 py-2 text-xs leading-relaxed text-warning-fg">
+              该机构已停用，但内容信任仍为「内容可信」——
+              <span className="font-bold">管理员仍可把它的内容发布上屏，批量发布也会把它扫进去。</span>
+              停用只切断机构自己供稿。若要连同内容一起停，请在上方把内容信任改为「已暂停」或「已撤销」。
+            </p>
+          )}
         </div>
       )}
     </Drawer>
