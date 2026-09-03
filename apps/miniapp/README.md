@@ -155,3 +155,45 @@ pnpm --dir apps/miniapp contract:update       # 小程序新增调用后重新�
 门禁会主动要求把豁免删掉，防止豁免长草。
 
 微信开发者工具 Stable 2.01.2510290 已用正式 AppID 完成普通编译；本次取件页二维码和 10 位码已在模拟器正常渲染，控制台 0 error，仅有基础库 HarmonyOS 兼容提示。这不等于已上传、真机手机号能力通过或 M2 跨端打印闭环完成。
+
+## 开发者工具自动化探针（`scripts/devtools-probe.mjs`）
+
+**不是门禁**——需要开发者工具在本机运行，所以不进 CI、不挂 `verify:static` 链。
+它是「人要看一眼」时的替代手段。
+
+2026-09-03 这一轮用它抓出 **15 处版式缺陷，没有一处是 111 条静态门禁报的，
+也没有一处目测能发现**。静态门禁覆盖逻辑、合规文案、数据契约；**能不能显示出来它一概不知道**。
+
+```bash
+# automator 是开发期工具，**不要装进 apps/miniapp**（dependencies 必须为空，有门禁盯着）
+mkdir -p /tmp/mp && cd /tmp/mp && npm i miniprogram-automator
+
+cd apps/miniapp
+MP_AUTOMATOR=/tmp/mp/node_modules/miniprogram-automator \
+  node scripts/devtools-probe.mjs \
+    --route /pages/store-select/store-select \
+    --data '{"loading":false,"stores":[...]}' \
+    --measure '.actionbar .btn' \
+    --canvas radar \
+    --shot /tmp/a.png
+```
+
+`--measure` 会对每个盒子断言「右缘不超出视口」，超出即 **exit 1**；
+`--canvas` 用 `getImageData` 数非空像素占比，几乎全空即 **exit 1**。
+
+### 六个坑（都踩过，别再踩）
+
+1. **`cli auto` 执行完就退出**，端口随之关闭 —— 必须和探针在同一进程里活着，分两次调用会连不上。
+2. **`page.setData()` 挂死超时** —— 改用 `evaluate` 里 `getCurrentPages()` 拿实例再 setData。
+3. **`screenshot()` 抓不到 canvas 原生层** —— WXML 能截、画布内容截不到。
+   验画布用 `getImageData()`（机器可断言）或 `toDataURL()` 导出。
+4. **`cli auto` 会附到已开着的窗口** —— IDE 里开着别的项目时，自动化连的是那个，
+   路由全报 `getPageMetaByWebviewId is null`。看日志里的 `✔ Using AppID:` 确认。
+5. **模拟器改不了宽度** —— 验窄屏规则的办法是临时把 `@media` 断点改宽、量完复原。
+6. **注入要按页面真实的 data 形状** —— `self-explore` 的雷达读 `result.dims` 不是顶层 `dims`，
+   灌错位置会静默不画，还以为是产品 bug。
+
+### automator 的解析方式
+
+它是 CommonJS（`main: ./out/index`，无扩展名），**ESM 裸 import 和 `NODE_PATH` 都解析不到**。
+脚本内用 `createRequire` 走 CJS 解析，`MP_AUTOMATOR` 给安装目录即可。
