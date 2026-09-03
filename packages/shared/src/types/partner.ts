@@ -55,6 +55,33 @@ export type ProhibitedModule = typeof PROHIBITED_MODULES[number]
 
 export type PartnerCoopStatus = 'active' | 'suspended' | 'pending'
 
+// ============================================================
+// 机构内容信任（发布闸门依据）
+// ============================================================
+
+export const ORG_CONTENT_TRUST_STATUSES = ['pending', 'active', 'suspended', 'revoked'] as const
+export type OrgContentTrustStatus = (typeof ORG_CONTENT_TRUST_STATUSES)[number]
+
+export const ORG_CONTENT_TRUST_STATUS_LABELS: Record<OrgContentTrustStatus, string> = {
+  pending: '待核验',
+  active: '内容可信',
+  suspended: '已暂停',
+  revoked: '已撤销',
+}
+
+export const ORG_CONTENT_TRUST_UNSET_LABEL = '未标记'
+
+/**
+ * 机构内容是否具备发布资格（用于合作机构后台 / 管理员后台一致的判据）
+ * 判据：contentTrustStatus === 'active' && !archived
+ */
+export function isOrgContentPublishable(
+  contentTrustStatus: string | null | undefined,
+  archived: boolean | undefined,
+): boolean {
+  return contentTrustStatus === 'active' && !archived
+}
+
 /** 公共就业服务机构行政层级（public_employment_service 专用） */
 export type PublicServiceLevel = 'municipal' | 'district' | 'street' | 'village'
 
@@ -92,6 +119,10 @@ export interface PartnerProfile {
   contactEmail?: string
   qualification?: string
   coopStatus: PartnerCoopStatus
+  contentTrustStatus?: OrgContentTrustStatus | null
+  contentTrustReason?: string | null
+  contentTrustReviewedAt?: string | null
+  archived?: boolean
   coopSince: string
   boundTerminalIds: string[]
 }

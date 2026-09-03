@@ -5,6 +5,7 @@
 // mock 模式返回带标记的演示数据（仅本地无后端调试用，绝不混入 http 链路）。
 // ============================================================
 
+import type { OrgContentTrustStatus } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
@@ -35,6 +36,10 @@ export interface PartnerOrgProfile {
   sceneTemplate: string | null
   enabledModules: string[]
   enabled: boolean
+  contentTrustStatus?: OrgContentTrustStatus | null
+  contentTrustReason?: string | null
+  contentTrustReviewedAt?: string | null
+  archived?: boolean
   createdAt: string
   sourceCount: number
   accountCount: number
@@ -88,6 +93,10 @@ const MOCK_PROFILE: PartnerOrgProfile = {
   sceneTemplate: 'campus',
   enabledModules: ['jobs', 'fairs', 'policies'],
   enabled: true,
+  contentTrustStatus: 'pending',
+  contentTrustReason: null,
+  contentTrustReviewedAt: null,
+  archived: false,
   createdAt: new Date('2026-01-01').toISOString(),
   sourceCount: 3,
   accountCount: 1,
